@@ -22,6 +22,30 @@ function cssRuleBody(source, selector) {
   return stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
 }
 
+function braceBody(source, marker) {
+  const at = source.indexOf(marker)
+  if (at < 0) return ''
+  const open = source.indexOf('{', at + marker.length)
+  if (open < 0) return ''
+  let depth = 0
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open, index + 1)
+    }
+  }
+  return ''
+}
+
+function betweenMarkers(source, start, end) {
+  const at = source.indexOf(start)
+  if (at < 0) return ''
+  const stop = source.indexOf(end, at + start.length)
+  return source.slice(at, stop < 0 ? source.length : stop)
+}
+
 function splitSelectorList(source) {
   const selectors = []
   let current = ''
@@ -279,8 +303,9 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
-// 2026-09-28 稿 21 v2 summary 明确为文件 → 办理摘要 → 可展开的方向设置。
-// 旧双栏 / 0.9 比例是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 2026-09-28 稿 21 v2 曾把方向设置收成可展开的 details。T21a-fix1 按新稿改成独立画面。
+// 旧双栏 / 0.9 比例仍是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 「设置随时能打开」改成：按钮切到 target，工作台每一屏都有回到来源的出路。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
 const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
 check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses the design-21 vertical summary stage')
@@ -288,7 +313,17 @@ check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersi
 check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
 check(/flex-direction:\s*column/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source keeps file and summary in one vertical column')
 check(resumeSource.indexOf('<ResumeSourceSummary') < resumeSource.indexOf('<DiagnosisDirectionForm'), 'read-only summary precedes editable direction settings')
-check(resumeSource.includes('<details className="qx-rt-settings">'), 'direction settings remain accessible through the design disclosure')
+{
+  const openBody = braceBody(resumeSource, 'const openDirectionSettings =')
+  const actions = read('src/pages/resume/components/ResumeSourceActions.tsx')
+  check(actions.includes('设置诊断方向与目标背景') && resumeSource.includes('onOpenWorkbench={openDirectionSettings}') && openBody.includes("rememberScreen('target')"), 'direction settings button switches the screen to target')
+  const targetBlock = betweenMarkers(resumeSource, "{screen === 'target' ? (", "{(screen === 'target-context'")
+  const contextBlock = betweenMarkers(resumeSource, "{(screen === 'target-context' || screen === 'target-profile') ? (", "{screen === 'target-industry'")
+  const industryBlock = betweenMarkers(resumeSource, "{screen === 'target-industry' ? (", "{screen === 'summary'")
+  check(targetBlock.includes("rememberScreen('source')"), 'target screen can return to the source screen')
+  check(contextBlock.includes("rememberScreen('source')"), 'target context can return to the source screen')
+  check(industryBlock.includes("rememberScreen('target-context')") && contextBlock.includes("rememberScreen('source')"), 'industry screen can return to source through target context')
+}
 check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
@@ -362,6 +397,12 @@ includes('src/pages/ai-plan/AiPlanPage.tsx', '打开我的 AI 记录', 'empty st
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'data-testid="advisor-artifact-cta-redo"', 'expired state has a redo button')
 includes('src/pages/ai-plan/AiPlanPage.tsx', '回去重做一次', 'expired redo uses the design label')
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'justify-content: space-evenly', 'body spreads leftover space as gaps')
+const artifactBodyRule = cssRuleBody(read('src/pages/ai-plan/styles/advisor-artifact-qx.css'), '.aa-body')
+check(artifactBodyRule.includes('justify-content: flex-start'), 'artifact body stacks from the top: justify-content: flex-start')
+check(!artifactBodyRule.includes('space-evenly'), 'artifact body does not spread leftover height between sections')
+check(artifactBodyRule.includes('gap: 20px'), 'artifact body keeps the 20px section gap')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'flex: 1 0 auto', 'the 01 card grows to absorb leftover height and does not shrink below its items')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', "[data-testid='advisor-artifact-qa']", 'the pinned-item card is the section that grows')
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'font-size: 42px', 'hero sentence uses the 2.0 size')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('qx-grow'), 'artifact page no longer stretches cards with qx-grow')
 for (const file of [
@@ -418,7 +459,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact sparse pins stack from the top without open bands']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }

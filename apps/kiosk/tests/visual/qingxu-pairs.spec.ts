@@ -96,7 +96,9 @@ test('capture qingxu prototype/runtime pairs', async ({ browser }) => {
 
   const proto = await listenProto()
   const id = sha()
-  const outRoot = path.join(repoRoot, 'test-results/qingxu-pairs', id)
+  // QX_PAIRS_OUT 是输出根目录本身；未设置时仍落到仓库 test-results/qingxu-pairs/<sha>。
+  const outEnv = process.env.QX_PAIRS_OUT?.trim()
+  const outRoot = outEnv ? path.resolve(outEnv) : path.join(repoRoot, 'test-results/qingxu-pairs', id)
   fs.mkdirSync(outRoot, { recursive: true })
   const only = process.env.QX_PAIRS_ONLY
   const filter = only ? new RegExp(only) : null
