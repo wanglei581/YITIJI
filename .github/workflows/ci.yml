@@ -870,6 +870,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-outcome
           pnpm --filter @ai-job-print/api verify:benefit-activities
           pnpm --filter @ai-job-print/api verify:change-password
+          # 管理员 / 合作机构登录凭证即时失效：退出撤销当前 jti；改密、停用、删除、角色版本变化后旧凭证 401。真 HTTP + 临时 Redis + 隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-session-revocation
           pnpm --filter @ai-job-print/api verify:change-password:target-guard
           pnpm --filter @ai-job-print/api verify:internal-auth-phone:target-guard
           pnpm --filter @ai-job-print/api verify:contract-review:http

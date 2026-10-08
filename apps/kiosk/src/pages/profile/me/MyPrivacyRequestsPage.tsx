@@ -14,6 +14,8 @@ import {
   type MemberDataRequestItem,
 } from '@ai-job-print/shared'
 import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { useAuth } from '../../../auth/useAuth'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { createMyDataRequest, listMyDataRequests } from '../../../services/api/memberPrivacy'
@@ -155,15 +157,7 @@ export function MyPrivacyRequestsPage() {
             </div>
           ) : null}
 
-          {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">请求记录这次没有加载出来</div>
-                <p className="qx-state-d">{message ?? '请稍后重试'}。本次加载失败不会撤回或恢复任何授权。</p>
-              </span>
-            </div>
-          ) : null}
+          {uiState === 'error' ? <PrivacyLoadError message={message} /> : null}
 
           {isLoggedIn && uiState !== 'loading' ? (
             <section data-testid="member-privacy-capabilities" aria-label="可提交与暂未开放的请求">
@@ -284,6 +278,19 @@ export function MyPrivacyRequestsPage() {
   )
 }
 
+function PrivacyLoadError({ message }: { message: string | null }) {
+  const contact = useSupportContact()
+  return (
+    <div className="qx-state" data-tone="error">
+      <span className="qx-state-ic" />
+      <span>
+        <div className="qx-state-t">请求记录这次没有加载出来</div>
+        <p className="qx-state-d">{message ?? '请稍后重试'}。本次加载失败不会撤回或恢复任何授权。{helpNeededLine(contact)}</p>
+      </span>
+    </div>
+  )
+}
+
 function PrivacyCta({
   uiState,
   busy,
@@ -314,7 +321,7 @@ function PrivacyCta({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>帮助中心</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
           重新加载
         </button>

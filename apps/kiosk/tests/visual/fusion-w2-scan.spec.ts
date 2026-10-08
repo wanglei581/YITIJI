@@ -647,7 +647,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   await expect(scanBlock).toBeVisible()
   await expect(scanBlock.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   await expect(scanBlock.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
-  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+  await expect(page.locator('.qx-pill')).toHaveText('第 2 步 · 确认这次办理')
 
   // 晚到的第一次结果放行后，页面仍停在来源页 —— 不被带去报告页。
   const late = page.waitForResponse('**/api/v1/resume/parse')
@@ -659,7 +659,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
 
   // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
   await chooseGenericResumeDirection(page)
-  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.getByRole('button', { name: 'AI 诊断，看改进建议' }).click()
   await page.waitForURL('**/resume/parse')
   await expect(page.getByRole('button', { name: '原样再试一次' })).toBeVisible()
   expect(parseBodies).toHaveLength(1)
@@ -766,7 +766,7 @@ test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ p
   expect(swapBox!.height).toBeGreaterThanOrEqual(48)
   expect(swapBox!.width).toBeGreaterThanOrEqual(48)
   // 顶栏胶囊在 390 下折两行：原先逐字断行，第二行只剩一个「认」。现在只在「 · 」处断，不裁字、不藏字。
-  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+  await expect(page.locator('.qx-pill')).toHaveText('第 2 步 · 确认这次办理')
   await assertQxPillReadable(page, '/resume/source scan-ready 390')
   await page.screenshot({ path: testInfo.outputPath('qx-resume-scan-ready-390.png'), fullPage: false })
   await expectHealthy(page, errors)

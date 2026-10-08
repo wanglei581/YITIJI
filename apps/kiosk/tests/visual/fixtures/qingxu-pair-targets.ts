@@ -32,6 +32,8 @@ import { w6RouteCases, type W6RouteCase } from './fusion-w6-route-cases'
 import { preparePrioritySeed, priorityPlan } from './qingxu-pair-seeds'
 import { policyPagesExtraPairs, policyPagesPlan, preparePolicyPages } from './qingxu-pair-policy-pages'
 import { prepareResumePages, resumePagesExtraPairs, resumePagesPlan } from './qingxu-pair-resume-pages'
+import { mePagesPlan, prepareMePages } from './qingxu-pair-me-pages'
+import { mePages2Plan, prepareMePages2 } from './qingxu-pair-me-pages-2'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -97,6 +99,11 @@ const STATE_QUERY: Record<string, Record<string, Record<string, string>>> = {
   '32-cashier.html': Object.fromEntries(PAY_CHANNEL_STATES.map((state) => [state, { channel: 'wechat' }])),
   // 14 的「已报价 / 权益未抵扣 / 零元单」摆的是示例金额，只在演示模式（debug=1）里画；不带就停在一屏说明。
   '14-print-confirm.html': Object.fromEntries(['quoted', 'benefit-unverified', 'zero-amount'].map((state) => [state, { debug: '1' }])),
+  // 稿 21：手里要有一份文件的态，不带 source 会落成 missing-file。
+  '21-resume-triage.html': Object.fromEntries(
+    ['summary', 'uploading', 'upload-failed', 'parsing', 'parse-failed', 'upload-unknown', 'upload-rechecking', 'parse-unknown', 'parse-rechecking']
+      .map((state) => [state, { source: 'usb' }]),
+  ),
 }
 
 const CANONICAL_ROUTE: Record<string, string> = {
@@ -162,6 +169,10 @@ export type RuntimePlan =
   | { kind: 'policy-pages' }
   /** B 路 16/18–25/29/34/46/52（qingxu-pair-resume-pages.ts）。 */
   | { kind: 'resume-pages' }
+  /** 35 消息、38 文档与订单、39 简历/收藏/AI 记录/足迹（qingxu-pair-me-pages.ts）。 */
+  | { kind: 'me-pages' }
+  /** 31 权益与活动、40 意见反馈、41 隐私与数据请求（qingxu-pair-me-pages-2.ts）。 */
+  | { kind: 'me-pages-2' }
 
 interface RawPair {
   screen: string
@@ -772,7 +783,11 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
     for (const pair of raw) {
       const siblings = byScreen.get(pair.screen) ?? [pair.state]
       const route = routeOf(file, pair)
-      const priority = resumePagesPlan(file, pair.screen, pair.state) ?? priorityPlan(file, pair.screen, pair.state) ?? policyPagesPlan(file, pair.screen, pair.state)
+      const priority = resumePagesPlan(file, pair.screen, pair.state)
+        ?? priorityPlan(file, pair.screen, pair.state)
+        ?? policyPagesPlan(file, pair.screen, pair.state)
+        ?? mePagesPlan(file, pair.screen, pair.state)
+        ?? mePages2Plan(file, pair.screen, pair.state)
       const decided = priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
@@ -810,7 +825,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         runtimeUrl: decided.plan.kind === 'none' ? null : (priority?.runtimePath ?? runtimeUrlFor(runtimeRoute)),
         readyMarker: decided.plan.kind === 'none' ? null : marker,
         capture: !REGISTER_ONLY.has(file),
-        missingReason: decided.plan.kind === 'none' ? (decided.reason ?? (runtimeRoute ? '没有现成注册器覆盖这一态' : '稿没有对应运行时路由')) : null,
+        missingReason: decided.reason ?? (decided.plan.kind === 'none' ? (runtimeRoute ? '没有现成注册器覆盖这一态' : '稿没有对应运行时路由') : null),
         plan: decided.plan.kind === 'w6' && !runtimeUrlFor(runtimeRoute)
           ? { kind: 'none' }
           : decided.plan,
@@ -890,6 +905,16 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   if (target.plan.kind === 'resume-pages') {
     registerEvidenceShell(api)
     await prepareResumePages(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'me-pages') {
+    registerEvidenceShell(api)
+    await prepareMePages(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'me-pages-2') {
+    registerEvidenceShell(api)
+    await prepareMePages2(page, api, target)
     return
   }
   if (target.plan.kind === 'fair') {

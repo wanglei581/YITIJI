@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 674,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15397,6 +15397,7 @@
           "path": "/resume/optimize/compare",
           "styles": [
             "apps/kiosk/src/pages/resume/resume-optimize-compare.css",
+            "apps/kiosk/src/pages/resume/resume-optimize-overview-qx.css",
             "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15965,7 +15966,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 770
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19825,7 +19826,21 @@
     "apps/kiosk/src/pages/print-scan/printHubContent.ts": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts": [
@@ -19844,6 +19859,9 @@
     ],
     "apps/kiosk/src/pages/print-scan/styles/print-scan-uplift.css": [
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+    ],
+    "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/CashierPaymentPanel.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -20111,6 +20129,10 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
@@ -20283,6 +20305,14 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -20362,6 +20392,10 @@
     "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css": [
@@ -20631,6 +20665,13 @@
     "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/ResumeSourceCards.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx": [
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -20828,7 +20869,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-r1-qx2.css": [
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-fixture.ts": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
@@ -22422,6 +22464,7 @@
       "services/api/scripts/verify-ai-quota.ts"
     ],
     "packages/shared/src/types/memberPrintOrders.ts": [
+      "apps/kiosk/scripts/verify-member-print-orders-ui.mjs",
       "services/api/scripts/verify-member-order-timeline.ts"
     ],
     "packages/shared/src/types/memberPrivacy.ts": [
@@ -22994,6 +23037,7 @@
       "services/api/scripts/verify-print-jobs.ts"
     ],
     "services/api/scripts/support/boot-api-child.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
@@ -23005,6 +23049,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts"
     ],
     "services/api/scripts/support/dead-redis-gate-env.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-error-observability.ts",
       "services/api/scripts/verify-redis-degradation-truth.ts"
     ],
@@ -23012,6 +23057,7 @@
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/ephemeral-redis-server.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
@@ -23031,6 +23077,7 @@
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -24370,6 +24417,7 @@
     ],
     "services/api/src/auth/password-proof-state.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
@@ -24406,6 +24454,9 @@
     ],
     "services/api/src/common/auth/admin-ip-allowlist.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts"
+    ],
+    "services/api/src/common/auth/internal-session-revocation.ts": [
+      "services/api/scripts/verify-admin-session-revocation.ts"
     ],
     "services/api/src/common/auth/optional-end-user.ts": [
       "services/api/scripts/verify-member-account-status.ts",
@@ -26011,6 +26062,7 @@
       "services/api/scripts/verify-admin-orgs-delete-concurrency.ts",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-admin-orgs.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
@@ -26545,6 +26597,7 @@
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -28877,10 +28930,16 @@
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print-scan/components/QxPrintHubView.tsx",
           "apps/kiosk/src/pages/print-scan/convert-images-model.ts",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampGateView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPreview.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampWorkbench.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css",
           "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
           "apps/kiosk/src/pages/print-scan/styles/print-scan-fusion.css",
+          "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
           "apps/kiosk/src/pages/print/CashierPaymentPanel.tsx",
           "apps/kiosk/src/pages/print/DevSandboxControls.tsx",
           "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
@@ -28975,6 +29034,7 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
@@ -29090,6 +29150,7 @@
           "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
           "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "apps/kiosk/src/pages/print-scan/sign-stamp/SignStampPickView.tsx",
+          "apps/kiosk/src/pages/print-scan/sign-stamp/constants.ts",
           "apps/kiosk/src/pages/print-scan/sign-stamp/useSignStampFlow.ts",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/assets/format.ts",
@@ -30132,6 +30193,7 @@
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileHeader.tsx",
+          "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/me/MeListShell.tsx",
@@ -30156,6 +30218,8 @@
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
+          "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
+          "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
@@ -30168,6 +30232,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
+          "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
@@ -30234,7 +30299,8 @@
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx",
           "apps/kiosk/src/pages/profile/me/printOrders/paymentCopy.ts",
-          "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts"
+          "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
+          "packages/shared/src/types/memberPrintOrders.ts"
         ],
         "missing": []
       },
@@ -30958,6 +31024,7 @@
           "apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileHeader.tsx",
+          "apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx",
           "apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx",
           "apps/kiosk/src/pages/profile/components/QxMemberNavbar.tsx",
           "apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx",
@@ -30983,6 +31050,8 @@
           "apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx",
           "apps/kiosk/src/pages/profile/me/components/SettingsConfirm.tsx",
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
+          "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
+          "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
@@ -30996,6 +31065,7 @@
           "apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts",
           "apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx",
           "apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx",
+          "apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts",
           "apps/kiosk/src/pages/profile/me/styles/benefits-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
           "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
@@ -31312,6 +31382,8 @@
           "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx",
           "apps/kiosk/src/pages/resume/components/OptimizedResumeEditor.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeLayoutControls.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeSourceCards.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareBatchBar.tsx",
@@ -31423,6 +31495,7 @@
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx",
+          "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
           "apps/kiosk/src/pages/resume/resume-report-fixture.ts",
           "apps/kiosk/src/pages/resume/resume-report-model.ts",
           "apps/kiosk/src/pages/resume/resume-report-qx.css"
@@ -34409,6 +34482,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-print-scan"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/boot-api-child.ts",
+          "services/api/scripts/support/dead-redis-gate-env.ts",
+          "services/api/scripts/support/ephemeral-redis-server.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/password-proof-state.ts",
+          "services/api/src/common/auth/internal-session-revocation.ts",
+          "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-admin-session-revocation.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:admin-session-revocation"
       ],
       "wired": true
     },
@@ -43073,29 +43171,6 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/hooks/useSupportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/current-progress.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
         "kind": "style",
         "mentions": [
@@ -44047,6 +44122,24 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/components/ResumeContextStrip.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/resume/components/ResumeUploadNotices.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/resume/job-fit-actions.css",
         "kind": "style",
         "mentions": [],
@@ -44323,18 +44416,6 @@
         "risk": "low",
         "scope": "kiosk",
         "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/services/api/supportContact.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
