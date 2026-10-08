@@ -306,12 +306,22 @@ try {
   for (const unavailable of [false, true]) {
     const html = renderToStaticMarkup(react.createElement(PolicyAiFallback, { unavailable, aiLabel: '问小青别的问题，不判断能不能办', aiDraft: '', policyId: 'policy-001', onManual: () => {} }))
     const title = unavailable ? '小青暂时不可用' : '本条政策暂未接入小青'
-    for (const text of [title, '自己看原文与来源', '不经过模型的人工核对', '问小青别的问题，不判断能不能办', 'aria-disabled="true"', 'aria-disabled="false"']) {
+    for (const text of [title, '自己看原文与来源', '不经过 AI，自己对照', '问小青别的问题，不判断能不能办', 'aria-disabled="true"', 'aria-disabled="false"']) {
       if (!html.includes(text)) throw new Error(`缺少「${text}」，实际：${html}`)
     }
   }
-  if (!page.includes('manual-view-source') || !policyPanel.includes('manual ? null : (') || !policyPanel.includes('返回政策库')) throw new Error('人工核对状态、隐藏小青或返回出口缺失')
-  pass('L2. 两种小青控件均有置灰原因、人工核对与问别的问题；人工视图可返回')
+  if (!page.includes('manual-view-source') || !policyPanel.includes('manual ? null : (') || !policyPanel.includes('返回政策库')) throw new Error('自己核对状态、隐藏小青或返回出口缺失')
+  const pageCode = ts.createSourceFile('RenshiPage.tsx', page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const literals = []
+  function collectStrings(node) {
+    if (ts.isStringLiteral(node)) literals.push(node.text)
+    ts.forEachChild(node, collectStrings)
+  }
+  collectStrings(pageCode)
+  for (const text of ['自己核对', '自己核对，不经过 AI：直接看这条政策的原文与来源。', '自己核对：不经过 AI，直接看这条政策的原文与来源']) {
+    if (!literals.includes(text)) throw new Error(`自己核对视图缺少「${text}」`)
+  }
+  pass('L2. 两种小青控件均有置灰原因、自己核对与问别的问题；自己核对视图三处文字齐全且可返回')
 } catch (err) {
   fail(`L. 小青控件渲染错误：${err.message}`)
 }

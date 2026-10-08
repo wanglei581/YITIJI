@@ -225,7 +225,8 @@ export function RenshiPage() {
     if (policyState === 'error') return { tone: 'bad', label: '政策读取失败' }
     if (libraryEmpty) return { tone: 'warn', label: '政策库暂无内容' }
     if (visibleLibraryCount === 0) return { tone: 'warn', label: '筛选后无匹配' }
-    if (manual) return { tone: 'ok', label: '人工核对路径' }
+    // 10/8 产品负责人批准的文字偏离：稿上是『人工核对路径』，不要照稿改回去。
+    if (manual) return { tone: 'ok', label: '自己核对' }
     if (aiUnavailable) return { tone: 'bad', label: '小青不可用' }
     return { tone: 'unknown', label: '政策库与办事指引' }
   }
@@ -286,13 +287,15 @@ export function RenshiPage() {
             : visibleLibraryCount === 0
               ? '按身份筛选后政策库没有命中；这是筛选结果，不是库里没有政策。'
               : manual
-                ? '不经过模型的人工核对：直接看这条政策的原文与来源。'
+                // 10/8 产品负责人批准的文字偏离：稿上是『不经过模型的人工核对：直接看这条政策的原文与来源。』，不要照稿改回去。
+                ? '自己核对，不经过 AI：直接看这条政策的原文与来源。'
                 : aiUnavailable
                   ? '小青暂时不可用；这一屏其余功能照常，条件核对本来也不用小青。'
                   : '政策库条目与本机整理的指引分区展示，展开即看原文、条件与办理路径。',
       status: pill,
       source: policyState !== 'ready' ? null : manual
-        ? '人工核对：不经过模型，直接看这条政策的原文与来源'
+        // 10/8 产品负责人批准的文字偏离：稿上是『人工核对：不经过模型，直接看这条政策的原文与来源』，不要照稿改回去。
+        ? '自己核对：不经过 AI，直接看这条政策的原文与来源'
         : aiUnavailable ? '小青暂时不可用；看原文、筛选、扫码与条件核对都照常可用' : policySourceLine,
     }
   })()

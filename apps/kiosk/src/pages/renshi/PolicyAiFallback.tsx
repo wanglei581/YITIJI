@@ -1,7 +1,7 @@
 import { EyeIcon, MessageCircleIcon } from 'lucide-react'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 
-/** 稿 48：一行原因、置灰的小青控件与人工核对入口；通用办事指引不使用它。 */
+/** 稿 48：一行原因、置灰的小青控件与自己核对入口（稿上叫人工核对）；通用办事指引不使用它。 */
 export function PolicyAiFallback({ unavailable, aiLabel, aiDraft, policyId, onManual }: {
   unavailable: boolean
   aiLabel: string
@@ -31,7 +31,10 @@ export function PolicyAiFallback({ unavailable, aiLabel, aiDraft, policyId, onMa
         </div>
         <button type="button" className="rq-exit" data-testid="renshi-policy-manual-source" onClick={onManual}>
           <EyeIcon aria-hidden="true" />
-          <span><b>自己看原文与来源</b><small>不经过模型的人工核对</small></span>
+          {/* 10/8 产品负责人批准的文字偏离：稿上是『不经过模型的人工核对』，不要照稿改回去。
+              合规提醒：「不经过 AI」必须一直属实。这个入口点开的视图以后哪一项接了小青或模型，这句和 RenshiPage 里另外两句「不经过 AI」要同步改；
+              fusion-w4「政策库条目有自己核对入口，点开后不出现小青块」守着这一视图期间 0 条 AI 请求。 */}
+          <span><b>自己看原文与来源</b><small>不经过 AI，自己对照</small></span>
         </button>
       </div>
     </div>

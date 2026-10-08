@@ -822,7 +822,7 @@ function capturePolicyAiRequests(page: Page): string[] {
   return requests
 }
 
-test('政策库条目有人工核对入口，点开后不出现小青块 @w4', async ({ page, api }) => {
+test('政策库条目有自己核对入口，点开后不出现小青块 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   const aiRequests = capturePolicyAiRequests(page)
   await registerPolicyGapApi(page, api)
@@ -831,20 +831,21 @@ test('政策库条目有人工核对入口，点开后不出现小青块 @w4', a
   const manual = card.getByTestId('renshi-policy-manual-source')
   await expect(manual).toBeVisible()
   await expectPolicyText(manual, '自己看原文与来源')
-  await expectPolicyText(manual, '不经过模型的人工核对')
+  await expectPolicyText(manual, '不经过 AI，自己对照')
   await expect(page.locator('[data-policy-section="builtin"]').getByTestId('renshi-policy-manual-source')).toHaveCount(0)
   await manual.click()
   const state = page.getByTestId('renshi-policy-state-manual-view-source')
   await expect(state, `读到状态：${await page.locator('.w4-policy-page').getAttribute('data-state')}`).toHaveAttribute('data-state', 'manual-view-source')
-  await expectPolicyText(page.locator('.qx-pagehead p'), '不经过模型的人工核对：直接看这条政策的原文与来源。')
-  await expectPolicyText(state.locator('.rq-srcline'), '人工核对：不经过模型，直接看这条政策的原文与来源')
+  await expectPolicyText(page.locator('.qx-pagehead p'), '自己核对，不经过 AI：直接看这条政策的原文与来源。')
+  await expectPolicyText(state.locator('.rq-srcline'), '自己核对：不经过 AI，直接看这条政策的原文与来源')
+  await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('自己核对')
   await expect(card.locator('.rq-item-main')).toHaveAttribute('aria-expanded', 'true')
   await expect(card.locator('.rq-quote p')).toHaveText(POLICY_GAP_ROWS[1]!.content)
   await expectPolicyText(card.locator('.rq-facts'), POLICY_GAP_ROWS[1]!.sourceName)
   await expect(page.locator('.rq-ai-off')).toHaveCount(0)
   await expect(page.getByTestId('renshi-ask-ai')).toHaveCount(0)
   await expectPolicyText(page.getByTestId('renshi-ctabar'), '原文只做展示；需要纸质件请上传你自己的材料。')
-  expect(aiRequests, `人工核对期间的 AI 请求：${aiRequests.join('、') || '0 条'}`).toEqual([])
+  expect(aiRequests, `自己核对期间的 AI 请求：${aiRequests.join('、') || '0 条'}`).toEqual([])
   const exits = card.locator('.rq-acc > .rq-strip')
   const back = exits.getByTestId('renshi-policy-manual-back')
   await expect(back, `返回入口应在展开条目的出口区，读到：${await card.innerText()}`).toHaveCount(1)

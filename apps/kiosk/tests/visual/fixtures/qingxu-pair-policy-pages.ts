@@ -8,7 +8,7 @@
 //     另外登记成 runtime:* 对，左边一律配稿的 ready 并排看。
 // 48：五个分区按 ?tab= 进。政策与公告同走 GET /policies，按 kind 分开答（ApiRouter 只认路径，这里用
 //     page.route 按查询串分）；条件核对先用空作答探一次，再按作答比对：POST 第 1 次是探针、第 2 次是提交。
-import type { Page, Route } from '@playwright/test'
+import { expect, type Page, type Route } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../../fixtures/recruitment-hosting'
 import type { QingxuPairTarget, RuntimePlan } from './qingxu-pair-targets'
@@ -391,7 +391,11 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
       await page.locator('[data-policy-section="builtin"]').getByRole('button', { name: /职业技能培训/ }).click()
     } else if (state === 'manual-view-source') {
       await see(page, '[data-policy-section="library"] .k8-policy-list-item.is-open')
+      await expect(page.getByTestId('renshi-policy-manual-source')).toContainText('不经过 AI，自己对照')
       await page.getByTestId('renshi-policy-manual-source').click()
+      await expect(page.locator('.qx-pagehead p')).toHaveText('自己核对，不经过 AI：直接看这条政策的原文与来源。')
+      await expect(page.locator('.rq-srcline')).toHaveText('自己核对：不经过 AI，直接看这条政策的原文与来源')
+      await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('自己核对')
     }
     return
   }
@@ -403,6 +407,13 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
       if (state !== 'eligibility-ask-partial') {
         await page.locator('.rq-cta-host .k8-elig-submit').click()
         await see(page, state === 'eligibility-result' ? '.k8-elig-headline' : 'text=正在比对…')
+        if (state === 'eligibility-result') {
+          const cards = page.locator('.k8-elig-card')
+          await expect(cards).toHaveCount(2)
+          await expect(cards.nth(0).locator('.k8-elig-card-src .k8-elig-chip').filter({ hasText: '外部编号' })).toHaveText('外部编号 HRSS-2026-0918')
+          await expect(cards.nth(1).locator('.k8-elig-card-src .k8-elig-chip')).toHaveCount(2)
+          await expect(cards.nth(1).locator('.k8-elig-card-src .k8-elig-chip').filter({ hasText: '外部编号' })).toHaveCount(0)
+        }
       }
     }
     return
