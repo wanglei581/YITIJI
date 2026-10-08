@@ -11,7 +11,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
 import { RESUME_DOC_LIMITS as L } from '../resume/resume-doc-limits'
 
 /**
@@ -89,8 +89,13 @@ export class ResumeGenExperienceDto {
   @IsString() @IsNotEmpty() @MaxLength(100)
   company!: string
 
-  @IsString() @IsNotEmpty() @MaxLength(60)
-  role!: string
+  /**
+   * 职务可以不填（10/6 总指挥定）：用户只写了公司、没写职务的经历也是真实经历，照样参与生成，职务保持为空。
+   * null / 缺省一律规整成 ''，下游组装原样复制，润色里不许补出职务（见 llm-resume-generate.service.ts）。
+   */
+  @Transform(({ value }) => (typeof value === 'string' ? value : ''))
+  @IsOptional() @IsString() @MaxLength(60)
+  role: string = ''
 
   @IsOptional() @IsString() @MaxLength(40)
   period?: string
