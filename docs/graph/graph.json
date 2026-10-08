@@ -13051,7 +13051,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 676,
+      "reachableFileCount": 677,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16028,7 +16028,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 772
+      "sourceFileCount": 773
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
