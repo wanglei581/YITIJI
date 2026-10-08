@@ -442,7 +442,7 @@
 }
 [data-kiosk-presentation='fusion-youth'] .pcp-keypad-note b { color: var(--print-ink); font-weight: 750; }
 
-/* ── 三种码对照：现场最高频的求助是「我手上这串是哪种码」───── */
+/* ── 两种码对照：现场最高频的求助是「我手上这串是哪种码」───── */
 [data-kiosk-presentation='fusion-youth'] .pcp-ab {
   padding: 20px 22px 22px;
   border: 1px solid var(--print-line);
@@ -450,7 +450,7 @@
   background: var(--print-surface);
 }
 [data-kiosk-presentation='fusion-youth'] .pcp-ab-t { margin: 0 0 14px; font-family: var(--print-serif); font-size: 25px; font-weight: 700; }
-[data-kiosk-presentation='fusion-youth'] .pcp-ab-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+[data-kiosk-presentation='fusion-youth'] .pcp-ab-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 [data-kiosk-presentation='fusion-youth'] .pcp-ab-col {
   display: flex;
   flex-direction: column;

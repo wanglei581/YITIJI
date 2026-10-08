@@ -17,6 +17,7 @@ import {
   EyeIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  QrCodeIcon,
 } from 'lucide-react'
 import { getMyBrowseLogs, getMyJumpLogs } from '../../../services/api/activity'
 import { listMyJobApplications } from '../../../services/api/jobApplications'
@@ -32,6 +33,13 @@ type ActivityTab = 'browse' | 'jump' | 'applications'
 
 /** 托管关闭时只保留政策类记录：其余类型的详情页都在招聘内容闸门后面。 */
 const keepWhenClosed = (item: { targetType: string }) => item.targetType === 'policy'
+
+/** 托管关闭时行上不写岗位、招聘会、企业。没有「机构官方渠道」这一类足迹，不能把别的类型改叫那个名字。 */
+function activityTypeLabel(targetType: keyof typeof TYPE_LABEL, hostingOpen: boolean): string {
+  const label = TYPE_LABEL[targetType]
+  if (hostingOpen || targetType === 'policy') return label
+  return '原内容'
+}
 
 function getTab(searchParams: URLSearchParams): ActivityTab {
   if (searchParams.get('tab') === 'applications') return 'applications'
@@ -55,9 +63,9 @@ export function MyActivityPage() {
   const fetchBrowse = useCallback((cursor?: string) => getMyBrowseLogs(token, { pageSize: 50, cursor }), [token])
   const fetchJumps = useCallback((cursor?: string) => getMyJumpLogs(token, { pageSize: 50, cursor }), [token])
   const fetchApplications = useCallback((cursor?: string) => listMyJobApplications(token, { pageSize: 50, cursor }), [token])
-  const browsePage = useMemberCursorPage<MemberBrowseLogItem>({ enabled: isLoggedIn && tab === 'browse', identityKey: token, reloadKey, fetchPage: fetchBrowse })
-  const jumpsPage = useMemberCursorPage<MemberJumpLogItem>({ enabled: isLoggedIn && tab === 'jump', identityKey: token, reloadKey, fetchPage: fetchJumps })
-  const applicationsPage = useMemberCursorPage<JobApplicationItem>({ enabled: isLoggedIn && tab === 'applications', identityKey: token, reloadKey, fetchPage: fetchApplications })
+  const browsePage = useMemberCursorPage<MemberBrowseLogItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage: fetchBrowse })
+  const jumpsPage = useMemberCursorPage<MemberJumpLogItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage: fetchJumps })
+  const applicationsPage = useMemberCursorPage<JobApplicationItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage: fetchApplications })
   const { items: loadedBrowse } = browsePage
   const { items: loadedJumps } = jumpsPage
   const { items: applications } = applicationsPage
@@ -89,13 +97,13 @@ export function MyActivityPage() {
   const tabs = (
     <div className="qx-me-tabbar" data-n="3" role="group" aria-label="记录筛选">
       <button type="button" className="qx-me-tab" aria-current={tab === 'browse' ? 'true' : undefined} data-testid="member-records-activity-tab-browse" onClick={() => setTab('browse')}>
-        浏览记录{tab === 'browse' ? <i>{browse.length}</i> : null}
+        浏览记录<i>{browse.length}</i>
       </button>
       <button type="button" className="qx-me-tab" aria-current={tab === 'jump' ? 'true' : undefined} data-testid="member-records-activity-tab-jump" onClick={() => setTab('jump')}>
-        外部跳转记录{tab === 'jump' ? <i>{jumps.length}</i> : null}
+        外部跳转记录<i>{jumps.length}</i>
       </button>
       <button type="button" className="qx-me-tab" aria-current={tab === 'applications' ? 'true' : undefined} data-testid="member-records-activity-tab-applications" onClick={() => setTab('applications')}>
-        求职进度{tab === 'applications' ? <i>{applications.length}</i> : null}
+        求职进度<span className="qx-me-chip qx-me-self">本人自填</span><i>{applications.length}</i>
       </button>
     </div>
   )
@@ -155,6 +163,7 @@ export function MyActivityPage() {
           {!hostingOpen ? (
             <>
               <QxMeStartRow icon={FileTextIcon} tone="slate" title={browseTab ? '看看就业政策' : '打开政策的官方入口'} desc={browseTab ? '政策、社保与登记指引，浏览动作会记在这里' : '在政策详情里打开发布方的官方入口'} label="查看政策" route="/policy-service" testid="member-records-start-policy" onClick={() => navigate('/policy-service')} />
+              <QxMeStartRow icon={QrCodeIcon} title={browseTab ? '看看机构官方渠道' : '打开机构官方渠道'} desc="本机构的二维码和官方入口在『本机构官方渠道』页查看" label="去看看" route="/official-channels" testid="member-records-start-channel" onClick={() => navigate('/official-channels')} />
               {browseTab
                 ? <QxMeStartRow icon={FileTextIcon} tone="plum" title="先做一份简历" desc="诊断或生成一份简历，当场打印带走" label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
                 : <QxMeStartRow icon={EyeIcon} tone="slate" title="先看看浏览记录" desc="浏览与打开官方入口是两类记录，分开保存" label="切到浏览记录" route="/me/activity" testid="member-records-start-browse" onClick={() => setTab('browse')} />}
@@ -206,8 +215,8 @@ export function MyActivityPage() {
               >
                 <span className="qx-me-row-ico" data-tone="slate" aria-hidden="true"><EyeIcon size={28} /></span>
                 <span className="qx-me-row-main">
-                  <span className="qx-me-row-title">{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</span>
-                  <span className="qx-me-row-sub">浏览 · {TYPE_LABEL[it.targetType]}{it.sourceName ? ` · ${it.sourceName}` : ''} · {formatTime(it.createdAt)}</span>
+                  <span className="qx-me-row-title">{it.targetTitle ?? `${activityTypeLabel(it.targetType, hostingOpen)}详情`}</span>
+                  <span className="qx-me-row-sub">浏览 · {activityTypeLabel(it.targetType, hostingOpen)}{it.sourceName ? ` · ${it.sourceName}` : ''} · {formatTime(it.createdAt)}</span>
                 </span>
                 <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
               </button>
@@ -223,8 +232,8 @@ export function MyActivityPage() {
               >
                 <span className="qx-me-row-ico" aria-hidden="true"><ExternalLinkIcon size={28} /></span>
                 <span className="qx-me-row-main">
-                  <span className="qx-me-row-title">{it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}</span>
-                  <span className="qx-me-row-sub">打开{actionLabel(it.action, it.targetType)} · {TYPE_LABEL[it.targetType]} · {formatTime(it.createdAt)}</span>
+                  <span className="qx-me-row-title">{it.targetTitle ?? `${activityTypeLabel(it.targetType, hostingOpen)}详情`}</span>
+                  <span className="qx-me-row-sub">打开{hostingOpen || !/岗位|招聘会|企业/.test(actionLabel(it.action, it.targetType)) ? actionLabel(it.action, it.targetType) : '官方入口'} · {activityTypeLabel(it.targetType, hostingOpen)} · {formatTime(it.createdAt)}</span>
                 </span>
                 <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
               </button>
@@ -235,8 +244,8 @@ export function MyActivityPage() {
     )
   }
 
-  const primaryLabel = !hostingOpen ? '查看政策' : tab === 'jump' ? '查看招聘会' : '查看岗位'
-  const primaryGo = () => navigate(!hostingOpen ? '/policy-service' : tab === 'jump' ? '/job-fairs' : '/jobs')
+  const primaryLabel = !hostingOpen ? (tab === 'jump' ? '去看机构官方渠道' : '查看政策') : tab === 'jump' ? '查看招聘会' : '查看岗位'
+  const primaryGo = () => navigate(!hostingOpen ? (tab === 'jump' ? '/official-channels' : '/policy-service') : tab === 'jump' ? '/job-fairs' : '/jobs')
 
   return (
     <QxMePage
