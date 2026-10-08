@@ -16703,6 +16703,7 @@
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-ai-alerts.ts",
           "services/api/src/ai/usage/ai-budget.service.ts",
           "services/api/src/ai/usage/ai-usage-retention.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
@@ -24314,6 +24315,7 @@
     ],
     "services/api/src/ai/usage/ai-budget.service.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -24332,6 +24334,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -34442,6 +34445,8 @@
           "services/api/src/admin-ops/admin-ops.service.ts",
           "services/api/src/admin-ops/derived-alert-identity.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
