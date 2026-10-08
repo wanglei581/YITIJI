@@ -10,6 +10,7 @@
 - 返工：独立有效性行合并到码格下原有三条提示中，保留领取打印件的结果说明（规则 3、4）。
 - 历史码输入态保留三个已输入字符和完整键盘，不选伪造成功态（规则 5）。
 - AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- 2026-10-06 方案②：消歧卡去掉取件凭证码一栏，标题改为「两种码，别搞混」；输码说明加上同一到机码续打、每单最多 2 次。
 -->
 <html lang="zh-CN">
 <head>
@@ -208,7 +209,7 @@ button:disabled,button[aria-disabled="true"]{cursor:default;}
 .safe-strip{flex:none;margin:18px 44px 0;display:flex;align-items:center;gap:14px;
   padding:18px 26px;border-radius:18px;background:var(--teal-soft);font-size:20px;color:var(--teal-d);font-weight:600;line-height:1.5;}
 
-/* 三码消歧 */
+/* 两种码消歧 */
 .vs{flex:none;margin:18px 44px 0;background:var(--surface);border:1px solid var(--line);
   border-radius:var(--r-md);padding:22px 28px;}
 .vs-t{font-size:21px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
@@ -597,10 +598,9 @@ document.addEventListener('keydown',function(e){
 function vsCard(cur){
   return '<div class="vs" data-testid="'+SCREEN+'-list"><div class="vs-t">'+
     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>'+
-    '三种码，别搞混</div><div class="vs-cols">'+
-    '<div class="vs-col'+(cur==='arrival'?' cur':'')+'"><b>到机码 · 本页用</b>8 位纯数字（旧码 10 位），对应一笔打印订单。</div>'+
-    '<div class="vs-col"><b>上传码 · 手机传文件用</b>用于把手机文件传到本机。</div>'+
-    '<div class="vs-col"><b>取件凭证码 · 取纸/补打用</b>取纸时出示给工作人员，不在本页输入。</div></div></div>';
+    '两种码，别搞混</div><div class="vs-cols">'+
+    '<div class="vs-col'+(cur==='arrival'?' cur':'')+'"><b>到机码 · 本页用</b>8 位纯数字（旧码 10 位），对应一笔打印订单。取件和接着打都用它。<br>没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。</div>'+
+    '<div class="vs-col"><b>上传码 · 手机传文件用</b>用于把手机文件传到本机。</div></div></div>';
 }
 function outs(){
   return '<div class="outs"><div class="q">码找不到了？</div><div class="items">'+
