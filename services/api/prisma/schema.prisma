@@ -62,10 +62,13 @@ model Terminal {
   @@index([lifecycleStatus])
 }
 
-// 远程重启终端程序。同一终端同时只能有一条未结束命令（pending / accepted）。
+// 远程终端命令：restart_agent（重启终端程序）、clear_print_queue（清空打印队列）。
+// 同一终端同时只能有一条未结束命令（pending / accepted）。
+// clear_print_queue 不进入 accepted，回执即结束。
 // 条件唯一索引 TerminalCommand_terminalId_open_unique 只写在两份迁移里：
 // Prisma @@unique 表达不了 WHERE status IN ('pending','accepted')
 // （先例：ScanTask_terminalId_active_unique、User_single_backup_admin）。
+// remainingJobs 只给清空打印队列：失败是还剩的作业数，完成是 0。
 // 本表没有会员、订单、文件字段，不进注销清单。
 model TerminalCommand {
   id                String    @id
@@ -81,6 +84,7 @@ model TerminalCommand {
   finishedAt        DateTime?
   completedVerified Boolean?
   resultCode        String?
+  remainingJobs     Int?
 
   @@index([terminalId, requestedAt])
   @@index([status, expiresAt])
