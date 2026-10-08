@@ -359,7 +359,7 @@ export function CareerPlanPage() {
           />
         )}
       >
-        <DecisionHero eyebrow="职业规划" title={emphasizeTitle(view.title)} copy={view.subtitle} />
+        <DecisionHero eyebrow="职业规划" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
         <main
           className="qx-scroll"
           data-kiosk-domain="resume"

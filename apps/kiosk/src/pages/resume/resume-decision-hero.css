@@ -3,7 +3,20 @@
  * 颜色只用 --qx-* 或 color-mix，不写死色值。
  */
 
-.jfq-root .qx-pagehead { display: none; }
+/* 稿 46 没有第二套页头：深色英雄区就是标题。框架页头只做视觉隐藏、留给读屏（它的 h1 是全页唯一的 h1）。
+   不用 display:none：路由巡检取页面上第一个内容标记，取到被藏掉的 h1 会判成空壳，读屏也读不到。
+   不用 margin:-1px：元素会落到 left=-1，撞越界门禁。 */
+.jfq-root .qx-stage > .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* 手机关掉舞台缩放后，壳仍要占满这一屏：正文在 .qx-scroll 里滚，底栏留在视口内。 */
 @media (max-width: 760px) {

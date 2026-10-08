@@ -256,7 +256,7 @@ export function JobFitActionsPage() {
           />
         )}
       >
-        <DecisionHero eyebrow="行动清单" title={emphasizeTitle(view.title)} copy={view.subtitle} />
+        <DecisionHero eyebrow="行动清单" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
         <main
           className="qx-scroll"
           data-kiosk-domain="resume"

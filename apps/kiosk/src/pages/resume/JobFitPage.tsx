@@ -235,7 +235,7 @@ export function JobFitPage() {
           ctabar={<DecisionCta>{view.cta}</DecisionCta>}
           navbar={navbar}
         >
-          <DecisionHero eyebrow="简历对照" title={emphasizeTitle(view.title)} copy={view.subtitle} />
+          <DecisionHero eyebrow="简历对照" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
           <main
             className="qx-scroll"
             data-kiosk-domain="resume"

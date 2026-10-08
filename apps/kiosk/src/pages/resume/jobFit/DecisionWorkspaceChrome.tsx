@@ -1,5 +1,5 @@
-// 稿 46 英雄区与单行真话栏。四条 route 共用，页头仍交给 QxPageFrame（读屏与门禁），
-// 可见标题改由英雄区承担，避免再叠一层普通页标题。
+// 稿 46 英雄区与单行真话栏。四条路由共用，QxPageFrame 页头只做视觉隐藏，保留全页唯一的 h1 给读屏与门禁。
+// 英雄区用 p 承担可见标题；与页头同句时对读屏隐藏，不同句的引导语仍留给读屏。
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../resume-decision-hero.css'
@@ -16,16 +16,19 @@ export function DecisionHero({
   eyebrow,
   title,
   copy,
+  echoesPageHead,
 }: {
   eyebrow: DecisionEyebrow
   title: ReactNode
   copy?: ReactNode
+  /** 可见标题和框架页头的 h1 是同一句，读屏已经读过页头那一遍，这里不再重复。 */
+  echoesPageHead?: boolean
 }) {
   return (
     <section className="jfq-hero" data-testid="resume-decision-hero" aria-label={eyebrow}>
       <div className="jfq-hero-mark" aria-hidden="true">青</div>
       <p className="jfq-hero-eyebrow">{eyebrow}</p>
-      <h1 className="jfq-hero-title">{title}</h1>
+      <p className="jfq-hero-title" aria-hidden={echoesPageHead ? true : undefined}>{title}</p>
       {copy ? <p className="jfq-hero-copy">{copy}</p> : null}
       <ol className="jfq-hero-steps">
         {STEPS.map(([no, text]) => (

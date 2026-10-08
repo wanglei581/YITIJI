@@ -376,7 +376,7 @@ export function ResumeTemplateLibraryPage() {
           />
         )}
       >
-        <DecisionHero eyebrow="简历模板" title={emphasizeTitle(view.title)} copy={view.subtitle} />
+        <DecisionHero eyebrow="简历模板" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
         <section
           className="qx-scroll"
           data-kiosk-domain="resume"
