@@ -290,6 +290,8 @@ export class ContractReviewProviderService {
       response_format: { type: 'json_object' },
       temperature: 0,
     }
+    const userContent = JSON.stringify({ pages: input.pages, partyFacts: input.partyFacts })
+    assertContentAllowed(userContent, 'input', undefined, { feature: 'contract_review' })
     let response: unknown
     try {
       response = await this.transport.send({

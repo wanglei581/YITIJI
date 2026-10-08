@@ -2047,6 +2047,20 @@ model AiUsageMonthlySummary {
   @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
+/// 违法和不良信息词库。只存类别、词条和开关，不含用户提问。种子在代码里，这张表只记增删。
+model AiSafetyTerm {
+  id        String   @id @default(cuid())
+  category  String
+  term      String
+  kind      String
+  enabled   Boolean  @default(true)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, kind, term])
+  @@index([enabled])
+}
+
 model UserAiConsent {
   id             String    @id @default(cuid())
   endUserId      String

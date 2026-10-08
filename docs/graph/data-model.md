@@ -2,9 +2,9 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`112` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`113` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 112 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 113 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
@@ -70,6 +70,7 @@ flowchart TD
 | **AiQuotaDaily** | 4 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiQuotaReservation** | 12 | — | 2 个文件<br/>`ai/quota/ai-quota.service.ts`<br/>`member-privacy/member-closure.service.ts` |
 | **AiResumeResult** | 16 | EndUser | 15 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume-parse-submission.service.ts`<br/>… |
+| **AiSafetyTerm** | 7 | — | 1 个文件<br/>`ai/safety/ai-safety-lexicon.service.ts` |
 | **AiServiceLog** | 13 | EndUser | 5 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **AiUsageMonthlySummary** | 10 | — | 1 个文件<br/>`ai/usage/ai-usage-retention.ts` |
 | **AiUsageRecord** | 18 | EndUser | 5 个文件<br/>`admin-ops/derived-ai-alerts.ts`<br/>`ai/usage/ai-budget.service.ts`<br/>`ai/usage/ai-usage-retention.ts`<br/>… |

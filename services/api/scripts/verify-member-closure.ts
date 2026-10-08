@@ -412,6 +412,11 @@ async function main() {
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
     const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
+    const safetySchema = readFileSync(join(apiRoot, 'prisma/schema.prisma'), 'utf8')
+    const safetyAt = safetySchema.indexOf('model AiSafetyTerm {')
+    const safetyBlock = safetySchema.slice(safetyAt, safetySchema.indexOf('\nmodel ', safetyAt + 1))
+    assert.ok(safetyAt >= 0 && !/\bendUserId\b|\bmemberId\b/.test(safetyBlock), 'AiSafetyTerm 不含会员字段')
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('aiSafetyTerm'), false, 'AiSafetyTerm 不进注销清单')
     const platformSetting = metadata.PlatformSetting
     assert.ok(platformSetting, 'PlatformSetting 必须存在')
     assert.equal(

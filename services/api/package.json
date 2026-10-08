@@ -5,7 +5,7 @@
   "description": "AI求职打印服务终端 — 后端 API 服务（NestJS）",
   "main": "dist/main.js",
   "scripts": {
-    "build": "prisma generate && pnpm db:pg:generate && tsc",
+    "build": "prisma generate && pnpm db:pg:generate && tsc && node -e \"const fs=require('fs');fs.mkdirSync('dist/ai/safety',{recursive:true});fs.copyFileSync('src/ai/safety/lexicon.seed.json','dist/ai/safety/lexicon.seed.json')\"",
     "start": "node dist/main.js",
     "start:guarded": "node dist/release-provenance/release-guard.js",
     "release:manifest": "node dist/release-provenance/release-manifest-cli.js",
@@ -314,6 +314,7 @@
     "verify:ai-feature-keys": "node -r @swc-node/register scripts/verify-ai-feature-keys.ts",
     "verify:aigc-pdf-metadata": "node -r @swc-node/register scripts/verify-aigc-pdf-metadata.ts && pnpm run verify:ai-safety-aigc && pnpm run verify:resume-export-label",
     "verify:ai-safety-aigc": "node -r @swc-node/register scripts/verify-ai-safety-aigc.ts",
+    "verify:ai-safety-lexicon": "node -r @swc-node/register scripts/verify-ai-safety-lexicon.ts",
     "verify:resume-export-label": "node -r @swc-node/register scripts/verify-resume-export-label.ts",
     "verify:resume-export-draft-source": "node -r @swc-node/register scripts/verify-resume-export-draft-source.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",

@@ -50,6 +50,15 @@
 - **门禁（退出码都是 0）：** `verify:admin-ops` 最后一行 `=== ALL PASS ===`（含第 12 节）；`verify:alert-push` 最后一行 `alert push gates passed`；API `typecheck` 最后一行是 Prisma Client 7.8.0 生成成功，`tsc --noEmit` 无输出；API `lint` 无输出；`verify:ai-usage-budget` 最后一行 `✅ verify:ai-usage-budget（覆盖面）21/21 通过`；`verify:ai-usage-retention` 最后一行 `66 PASS / 0 FAIL / 66 checks`；`verify:beijing-display-time` 最后一行 `ALL PASS verify-beijing-display-time (29 checks)`；`verify:console-plain-copy` 最后一行 `verify:console-plain-copy passed`；`verify:service-desk-dashboard-ui` 最后一行 `ALL PASS`；`verify:feedback-sla` 最后一行 `verify-feedback-sla: 33 项全部通过`；`verify:datetime-honesty` 最后一行 `ALL PASS`；`verify:print-monitor-truth` 最后一行 `verify-print-monitor-truth: all assertions passed`；`verify:queue-dispatch-printer-status` 最后一行 `PASS queue dispatch printer status`；`verify:admin-print-outcome` 最后一行 `ALL PASS`；`node scripts/verify-ci-gate-coverage.mjs` 最后一行 `OK: 21 deterministic CI gates are directly executed; 524/534 verify/ui 门禁在 CI 执行闭包内，10 条已登记豁免（其中 0 条待接线，上限 1）；581 个门禁脚本文件中 0 个无脚本名（全部已登记，上限 0）`。`pnpm graph` 写入 `docs/graph/` 2 个文件有变化；`pnpm graph:check` 最后一行 `PASS docs/graph/ 与当前代码一致`。没改 `.github/`，两条门禁本来就在 CI 里。
 - **反向变异（已改回，不留在代码里）：** 账户失败后有成功仍报 → 退出码 1，`FAIL 账户失败之后有成功，告警应消失`；连续失败阈值改成 1 → 退出码 1，`FAIL 连续 4 次超时不得告警`；`aborted` 计入且不再忽略 → 退出码 1，`FAIL aborted 不计，4 次超时加 1 次中止不得告警`；预算比较改成单终端上限 → 退出码 1，`FAIL 单终端达上限不得出 ai_budget_exhausted`。源文件哈希与变异前一致。
 - **没验的：** 本会话没有浏览器工具，后台告警中心和工作台没有在浏览器里点过。金额封顶、计费、一体机、小程序、机构后台页面都没改。
+## 2026-10-06：AI 内容安全最小可行版（违法和不良信息词库 + 两道检查 + 拒答指令 + 拒答题门禁；Grok 初稿、Claude 收尾，未部署）
+
+- **为什么：** 线上《AI 服务说明》pilot-2 第五节写了「检查提问和生成内容、违法的拒绝回答」，代码原先只有十个招聘流程禁词，做不到。输入来自合规窗口 `legal-set-0930/drafts/ai-safety-lexicon-and-refusal-tests.md`（15 类、60 道拒答题、25 道反向题）。
+- **词库：** 新目录 `services/api/src/ai/safety/`。种子在 `lexicon.seed.json`（只放描述行为的通用词组；A1、A2 不放人名、地名、事件名；不放单字与常用词）；新表 `AiSafetyTerm`（迁移 `20261006170000_ai_safety_term`，两份 schema）存后台增删，管理员接口 `GET/PUT /api/v1/admin/ai-safety/lexicon`，改动写审计 `ai_safety.lexicon.update`（不记词本身）。主管部门 / 第三方补充词库只走后台导入或生产配置，不进仓库。匹配前做繁简、全半角、大小写、插空格与符号归一，白名单短语先剔除（防反向题误拦）。
+- **两道检查：** 接在公共出口 `llmFetchJson` 与现有 `ContentModerationProvider` 上，提问进模型前、回复给用户前各查一次；违法词库与原来的招聘禁词分开，**不进系统提示词**。命中给统一拒答语（A3、A7 追加 110；C2 追加「我只能帮你把真实经历写清楚」；不写未核实的 12356），拒答不扣 AI 次数，页面照常可用。
+- **拒答指令：** 合规第 6 条原文追加到所有入口的系统提示词（加在公共安全句这一层），门禁逐个入口抓实际发出的系统提示词断言。
+- **拦截日志：** 写审计表 `AuditLog`，动作 `ai_safety.content_blocked`；字段只有时间（行的 createdAt）、终端编号、入口、类别代码、位置（提问 / 输出），不存原文也不存命中词。
+- **小青语音：** 腾讯云 `StartAIConversation` 直连模型，识别文字与回复不经过我们服务器，只能靠系统提示词里的拒答指令；若生产配置了 `TRTC_LLM_CONFIG_JSON`，整段配置原样下发，连拒答指令也没有——要请总指挥只读核生产该项为空。逐句检查需要把 `APIUrl` 指向我们自己的代理，本次不做。
+- **验证：** `verify:ai-safety-lexicon`（进 CI）：60 题全拦、25 题全过、两个真实 HTTP 入口、输出检查、变体、系统提示词、审计表记录、种子形状。图谱点名的 228 条门禁与 `verify:member-closure`（closure 环境）本机全绿；临时 PostgreSQL `migrate deploy` + `migrate diff --exit-code` 无差异。反向变异四处全红：去归一化、白名单失效、不落审计表、种子塞常用词。
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。

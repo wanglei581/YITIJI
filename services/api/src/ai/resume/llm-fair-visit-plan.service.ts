@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../safety/content-blocked'
 import { LlmConfigService } from '../llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -305,7 +306,7 @@ export class LlmFairVisitPlanService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'fair_visit_plan', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
