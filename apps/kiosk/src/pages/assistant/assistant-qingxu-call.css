@@ -48,6 +48,12 @@
 .kassist .assistant-voice-card p { margin-top: 14px; overflow-wrap: anywhere; }
 .kassist .assistant-voice-card[data-kind='warn'] { background: var(--qx-wheat-soft); border-color: var(--qx-line-2); }
 .kassist .assistant-voice-resume { margin: 16px auto; }
+.kassist .assistant-voice-silent { margin-top: 20px; padding: 22px 24px; border: 1px solid var(--qx-line-2); border-radius: 24px; background: var(--qx-wheat-soft); }
+.kassist .assistant-voice-silent h3 { font-size: var(--qx-fs-sec); }
+.kassist .assistant-voice-silent p { margin-top: 12px; color: var(--qx-ink-2); }
+.kassist .assistant-voice-silent-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
+.kassist .assistant-voice-silent-action { flex: 1 1 180px; min-height: 64px; padding: 16px 22px; border: 1px solid var(--qx-line-2); border-radius: 22px; background: var(--qx-surface); color: var(--qx-ink); font-size: var(--qx-fs-btn); }
+.kassist .assistant-voice-silent-action--primary { background: var(--qx-teal-d); color: var(--qx-on-solid); border-color: var(--qx-teal-d); }
 @keyframes kassist-qingxu-wave { to { transform: scaleY(.25); } }
 @media (max-width: 600px) {
   .kassist .assistant-voice-backdrop { position: fixed; inset: 0; border-radius: 0; }

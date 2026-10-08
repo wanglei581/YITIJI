@@ -40,7 +40,11 @@ const FROZEN = new Map([
   // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
   // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与公共设备使用说明」。
   // 入口条数、路由、图标都没变。旧哈希 3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0。
-  ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
+  // 2026-10-06 C2-3：产品负责人 10/4 方案②，取件凭证码取消，到机码是唯一的码。
+  // 「打印订单」说明从「取件码、打印状态」改为「打印进度与出纸状态」。
+  // 入口条数、路由、图标都没变。冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 旧哈希 c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3。
+  ['src/pages/profile/profileEntries.ts', 'c75cce264658aa3bc10451fc38195a8b45ec7ef6e4edfdc278510134c06e860d'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   // 2026-09-29 走查 W-01：反馈分类补「AI 内容投诉」（ai_content，C3）。纯追加：
@@ -427,6 +431,17 @@ for (const [path, expected] of A_BATCH_EYEBROWS) {
 }
 assert.doesNotMatch(read('src/pages/print-scan/SignStampPage.tsx'), /固定原型数据|<b>演示<\/b>/, 'sign page sample bar says 示例, never 原型/演示')
 assert.doesNotMatch(read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'), /合成演示/, 'sign page CTA reasons do not say 合成演示')
+assert.match(
+  read('src/pages/print-scan/sign-stamp/constants.ts'),
+  /我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理/,
+  'sign authorization sentence follows the v2 draft',
+)
+assert.match(read('src/pages/print-scan/SignStampPage.tsx'), /问小青：签名放在哪一页/, 'sign page asks 小青 where to place the signature')
+assert.doesNotMatch(
+  read('src/pages/print-scan/SignStampPage.tsx'),
+  /purpose="signature_image"/,
+  'sign page does not create a signature_image upload session',
+)
 assert.doesNotMatch(qxMeChrome, /服务元数据/, 'member record tab hint does not say 元数据')
 assert.doesNotMatch(read('src/pages/profile/me/MockInterviewRecords.tsx'), /元数据/, 'mock interview legal line does not say 元数据')
 for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile/me/MyAiRecordsPage.tsx', 'src/pages/profile/me/JobAiSessionRecords.tsx']) {

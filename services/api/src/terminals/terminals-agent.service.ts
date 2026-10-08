@@ -6,6 +6,7 @@
 // Admin 管理端逻辑见 TerminalAdminService。
 // ============================================================
 
+import { describeBackgroundError, scheduleBackground } from '../common/process/background-task'
 import crypto from 'crypto'
 import {
   Injectable,
@@ -234,8 +235,11 @@ export class TerminalAgentService implements OnModuleInit {
     if (shouldSeedTestPrintTask()) {
       await this.seedPrintTask()
     }
-    const timer = setInterval(() => void this.resetExpiredClaims(), 30_000)
-    timer.unref()
+    // 30 秒回收一次过期领取。失败（例如 Prisma P2028 事务起不来）只记日志、下一轮再试——
+    // 直接 `void this.resetExpiredClaims()` 会把一次 reject 变成未处理的拒绝，整个 API 进程退出。
+    scheduleBackground(() => this.resetExpiredClaims(), 30_000, (error) => {
+      this.logger.warn(`RESET_EXPIRED_CLAIMS_FAILED ${describeBackgroundError(error)}`)
+    })
   }
 
   // ── 1. Register ──────────────────────────────────────────────────────────────

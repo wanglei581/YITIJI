@@ -113,8 +113,8 @@ expectIncludes(page, "new URLSearchParams({ category: 'print', relatedPrintTaskI
 expectIncludes(page, 'OrderPaymentSummary', '打印订单保留支付详单组件')
 expectIncludes(page, 'paymentLine(item)', '打印订单保留支付概要行')
 expectIncludes(page, '{item.pickupCode &&', '打印订单列表取件码提示仍由后端 pickupCode 门控')
-// 2026-10-06：续打说明走可选 hint。取件码仍只来自 code，仍由 item.pickupCode 门控，面板不自己生成码。
-expectIncludes(summary, '{item.pickupCode && <PickupCodePanel code={item.pickupCode} hint={reprint} />}', '支付详单取件码面板仍由后端 pickupCode 门控')
+// 2026-10-06 方案②：同一行加上续打字段。门控仍是 item.pickupCode，码仍来自 item.pickupCode，不在详单里生成。
+expectIncludes(summary, '{item.pickupCode && <PickupCodePanel code={item.pickupCode} reprintAllowed={item.reprintAllowed} reprintRemaining={item.reprintRemaining} />}', '支付详单到机码面板仍由后端 pickupCode 门控')
 expectIncludes(summary, "navigate('/me/documents')", '再打印仍跳转 /me/documents')
 expectIncludes(summary, '去我的文档再打印', '再打印保留诚实路径文案')
 expectIncludes(summary, 'label="单双面"', '详单展示单双面（非计价项）')
@@ -128,7 +128,8 @@ expectAbsent(summary, /amountCents[\s\S]{0,40}-[\s\S]{0,40}discountCents/, '详�
 expectIncludes(copy, "NET_PAID_UNRECORDED = '未记录'", 'paymentCopy 标明非 0 元实付仍未记录')
 expectIncludes(copy, '0 元（免费试运营）', '0 元实付写免费试运营')
 expectIncludes(copy, "return '全部页'", '页范围没传或 all 显示全部页')
-expectIncludes(pickup, 'export function PickupCodePanel({ code, hint }: { code: string; hint?: string | null })', 'PickupCodePanel 取件码仍只来自 code prop')
+// 2026-10-06 方案②：签名增加续打字段。code: string 仍是唯一的码来源，组件不生成码。
+expectIncludes(pickup, "}: { code: string } & Pick<MemberPrintOrderItem, 'reprintAllowed' | 'reprintRemaining'>) {", 'PickupCodePanel 到机码仍只来自 code prop')
 expectIncludes(copy, 'paymentSourceLabel', '支付来源文案仍由 paymentCopy helper 提供')
 expectIncludes(refresh, 'mergePrintOrderRefresh', '自动刷新 helper 保留')
 

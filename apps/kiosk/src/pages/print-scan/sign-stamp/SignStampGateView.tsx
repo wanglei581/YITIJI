@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
 import { machineUnusableLine } from '../../../copy/unattendedCopy'
@@ -45,12 +47,13 @@ const ALTS = [
 
 export function SignStampGateView({
   copy,
-  why,
+  state,
 }: {
   copy: StatusCopy
-  why: string[]
+  state: string
 }) {
   const navigate = useNavigate()
+  const why = gateWhy(state, helpNeededLine(useSupportContact()))
   return (
     <>
       <div className="ss-status">
@@ -82,7 +85,7 @@ export function SignStampGateView({
               </button>
             ))}
           </div>
-          <p className="note" style={{ margin: 0, fontSize: 17, color: 'var(--qx-ink-3)' }}>
+          <p className="note">
             这里只是导航；能不能用由那一页自己判断。
           </p>
         </div>
@@ -117,18 +120,36 @@ export function SignStampGateView({
   )
 }
 
-export function gateWhy(state: string): string[] {
-  if (state === 'login-required' || state === 'auth-unknown') {
-    return ['没有拿到登录状态就不放行，而不是先放行再补检查。', '普通打印、扫描、格式转换不受影响。']
+export function gateWhy(state: string, helpLine: string): string[] {
+  if (state === 'login-required') {
+    return ['登录后才能确认这份文档和这张签名图都属于你本人。', '普通打印、扫描、格式转换不受影响，可以直接去用。']
+  }
+  if (state === 'auth-unknown') {
+    return ['没有拿到登录状态，也没有拿到「未登录」的确定答复。', '这种情况一律当作不允许，而不是先放行再补检查。']
   }
   if (state === 'login-expired') {
-    return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
+    return ['签名图不做跨这次办理保留，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
     return ['不假设「读不到就是可用」。', machineUnusableLine()]
   }
-  if (state.startsWith('capability-')) {
-    return ['读取中不等于可用，也不等于不可用。', '读不到就不放行，不把失败当成已关闭。']
+  if (state === 'capability-loading') {
+    return ['读取中不等于可用，也不等于不可用。', '这里不画进度条：系统不回传进度。']
+  }
+  if (state === 'capability-disabled') {
+    return ['文档打印、材料扫描、格式转换不受影响。', helpLine]
+  }
+  if (state === 'capability-maintenance') {
+    return ['维护是管理员登记的真实状态，不是这一页猜的。', helpLine]
+  }
+  if (state === 'capability-error') {
+    return ['这一次没确认，先不当成不能用。', helpLine]
+  }
+  if (state === 'context-missing') {
+    return ['不猜上一步是什么，也不放示例文件。', '这一步不会替你上传或保存任何文件。']
+  }
+  if (state === 'return-source-unknown') {
+    return ['外部地址一律不作为返回落点。', '不会照着来路参数渲染任何内容。']
   }
   return ['不猜上一步是什么，也不放示例文件。', '外部地址一律不作为返回落点。']
 }

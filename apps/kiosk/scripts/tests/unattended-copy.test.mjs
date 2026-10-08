@@ -128,6 +128,18 @@ const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supp
   './screensaver': screenStub,
 }))
 
+test('文案层 resolveSupportContact：缺字段或非布尔一律按保守值，不把缺省当成已发布 / 附近有终端', () => {
+  const partial = copy.resolveSupportContact({ servicePhone: ' 18369161921 ', serviceHours: '', otherOnlineTerminalNearby: true })
+  assert.equal(partial.servicePhone, '18369161921')
+  assert.equal(partial.serviceHours, null)
+  assert.equal(partial.otherOnlineTerminalNearby, true)
+  assert.equal(partial.miniappPublished, false, '小程序发布字段缺失不能当成已发布')
+  const truthy = copy.resolveSupportContact({ servicePhone: null, serviceHours: null, otherOnlineTerminalNearby: 'yes', miniappPublished: 1 })
+  assert.equal(truthy.otherOnlineTerminalNearby, false)
+  assert.equal(truthy.miniappPublished, false)
+  assert.deepEqual(copy.resolveSupportContact(null), copy.CONSERVATIVE_SUPPORT_CONTACT)
+})
+
 test('联系方式缺字段按保守值，布尔只有 true 才当真', () => {
   assert.deepEqual(contactMod.supportContactFromPayload({ success: true, data: { servicePhone: '18369161921' } }), {
     servicePhone: '18369161921',

@@ -451,7 +451,7 @@ test('activity detail renders an honest missing-record empty state after visible
   await loginThroughVisibleUi(page, '/me/activity/missing-w5-record')
   await expect(page.getByRole('heading', { name: '未找到这条记录' })).toBeVisible()
   await expect(
-    page.getByText('记录可能已清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
+    page.getByText('记录可能已按留存期限清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
   ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()
@@ -1358,14 +1358,14 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   // 置灰原因常显在行内（触屏没有 hover，title 读不到）。
   await expect(page.getByText('该文件格式暂不支持打印', { exact: true })).toBeVisible()
   await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期' })).toBeDisabled()
-  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '打印' })).toBeDisabled()
+  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '用于打印' })).toBeDisabled()
   await assetShot(page, 'documents-ready')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
 
   // 查看：凭本人 token 现换短期链接，在当前页内预览。
   const previewRequest = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/v1/files/doc-photo/preview-url')
-  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' }).click()
+  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' }).click()
   expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
   await expect(dialog).toBeVisible()
@@ -1382,7 +1382,8 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   await page.getByRole('button', { name: '同意并保存' }).click()
   await expect(page.getByTestId('member-assets-toast')).toHaveText('保存期限已更新')
   expect(api.requestCount('PATCH', '/api/v1/files/doc-long/retention')).toBe(1)
-  await expect(longRow.locator('.qx-me-chip')).toContainText('保存 6 个月')
+  // 2026-10-06 C1-3：一行里分类标签和三个小标签都用 .qx-me-chip。按「保存 6 个月」这一枚定位，期限回填这件事不放宽。
+  await expect(longRow.locator('.qx-me-chip', { hasText: '保存 6 个月' })).toBeVisible()
 
   // 删除：两步确认，服务端成功后才从列表移除。
   const zipRow = rows.filter({ hasText: '作品集源文件.zip' })
@@ -1397,7 +1398,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
   )
-  await longRow.getByRole('button', { name: '打印', exact: true }).click()
+  await longRow.getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
   expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: 'doc-long' })
@@ -1442,7 +1443,7 @@ test('documents: derived AI output skips the material check and goes straight to
   const quoteRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote',
   )
-  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '打印', exact: true }).click()
+  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL('**/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
@@ -1463,7 +1464,7 @@ test('documents and orders: error then empty come from the server, never a cache
   await assetShot(page, 'documents-error')
   api.respond('GET', '/api/v1/me/documents', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '还没有文档' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还没有保存的文档' })).toBeVisible()
   await expect(page.getByRole('region', { name: '文档资产概览' })).toContainText('0')
   await expectFusionAcceptance(page, errors)
 
@@ -1515,6 +1516,10 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  await expect(paidRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  await expect(paidRow.getByText('还能续打')).toHaveCount(0)
+  await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
   // 付过钱但没有待退款标记：有「已退款」金额行，不出现「如需退款」申请句。
@@ -1540,6 +1545,49 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded
+})
+
+test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const canResume = memberOrder({
+    id: 'order-resume',
+    fileName: '还能续打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '28491703',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: true,
+    reprintRemaining: 1,
+  })
+  const usedUp = memberOrder({
+    id: 'order-used-up',
+    fileName: '不能再打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '39502814',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: false,
+    reprintRemaining: 0,
+  })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([canResume, usedUp]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
+  await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
+  await expect(resumeRow.getByText('到机码', { exact: true })).toBeVisible()
+  await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
+  await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('还能续打')).toHaveCount(0)
 })
 
 // 走查 N3（10/4）：0 元单的列表与详单不出现支付、金额机制的说法；收费单的金额明细原样保留。
@@ -1582,7 +1630,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
     await docRows.nth(index).scrollIntoViewIfNeeded()
     await expectNameClearOfActions(docRows.nth(index))
   }
-  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' })
+  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' })
   await view.scrollIntoViewIfNeeded()
   await assertTapTargetPointerHit(view)
   await view.click()
@@ -1668,7 +1716,11 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await page.goto('/me/settings')
   await expectQxSettingsShell(page, 'anonymous')
   await expect(page.getByRole('region', { name: '登录引导' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(2)
+  // 协议与帮助是三行（两份协议 + 帮助中心），不再是协议两行。
+  // 入口叫「帮助中心」，不叫「帮助与求助」：现场无人值守，不能让人以为能叫到人。
+  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(3)
+  await expect(page.getByTestId('member-settings-help')).toContainText('帮助中心')
+  await expect(page.getByTestId('member-settings-help')).toContainText('常见问题与操作说明。')
   await expect(page.getByRole('region', { name: '隐私与 AI 授权管理' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /换绑手机号|切换账号|隐私与数据请求/ })).toHaveCount(0)
   // 游客只看到登录后会出现哪几项：不可点、明确「登录后可用」。

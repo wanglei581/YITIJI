@@ -57,15 +57,10 @@ const { outputText: copyJs } = ts.transpileModule(copySrc, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 })
 const fallback = '原有非校验错误文案'
-new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, (specifier) => {
-  if (String(specifier).includes('unattendedCopy')) {
-    return { helpNeededLine: () => '需要帮助？查看《隐私政策》里的联系方式' }
-  }
-  return {
-    errorCodeOf: (error) => error.code,
-    userMessageOf: () => fallback,
-  }
-})
+new Function('exports', 'module', 'require', copyJs)(copyModule.exports, copyModule, () => ({
+  errorCodeOf: (error) => error.code,
+  userMessageOf: () => fallback,
+}))
 const validation = (message) => Object.assign(new Error(message), { code: 'VALIDATION_FAILED' })
 const { optimizeExportErrorMessage } = copyModule.exports
 assert.match(optimizeExportErrorMessage(validation('basic.name should not be empty')), /姓名还没填写.*不能在本页修改.*重新上传并诊断/)
@@ -80,13 +75,15 @@ assert.match(optimizeExportErrorMessage(validation('education.0.school should no
 assert.match(optimizeExportErrorMessage(validation('projects.0.role should not be empty')), /项目经历第 1 条的职务.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('education.0.degree should not be empty')), /教育经历第 1 条的学历.*不能在本页修改.*重新上传并诊断/)
 assert.match(optimizeExportErrorMessage(validation('experience[0].description: description must be shorter than or equal to 1000 characters')), /工作经历第 1 条的描述.*编辑区.*1000 字以内/)
-assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*需要帮助？查看《隐私政策》里的联系方式.*修改清单/)
+// 旧句含「现场工作人员」。优化页不许出现这个词；求职意向仍可以留空，出路仍是先导出修改清单。
+assert.match(optimizeExportErrorMessage(validation('intention.position should not be empty')), /求职意向可以留空.*修改清单/)
+assert.doesNotMatch(optimizeExportErrorMessage(validation('intention.position should not be empty')), /工作人员/)
 assert.doesNotMatch(optimizeExportErrorMessage(validation('unknown.field secret technical payload')), /unknown|secret|technical/)
 assert.equal(optimizeExportErrorMessage({ code: 'NETWORK_ERROR' }), fallback)
 assert.match(page, /setExportError\(optimizeExportErrorMessage\(err\)\)/, '优化稿导出接入专用错误文案')
 assert.match(page, /setExportError\(userMessageOf\(err, '修改清单导出失败，请稍后重试'\)\)/, '修改清单沿用原来的错误文案')
 
-// 就地校验与导出拒绝文案同一套边界：公司、学校、职务不能空，专业可以空；超长按字数拦住。
+// 就地校验与导出拒绝文案同一套边界：公司、学校、职务、专业都可以空（与服务端 DTO 一致，10/6 走查：原件没写职务的简历导不出是回归），超长按字数拦住。
 const titlesSrc = readFileSync(new URL('../src/pages/resume/components/resume-deliver/resumeEntryTitles.ts', import.meta.url), 'utf8')
 const titlesModule = { exports: {} }
 const { outputText: titlesJs } = ts.transpileModule(titlesSrc, {
@@ -105,10 +102,11 @@ const titled = (experience, education) => ({
   certificates: [],
 })
 const messages = (resume) => resumeTitleIssues(resume).map((issue) => issue.message)
-assert.deepEqual(messages(titled([{ company: '  ', role: '店员' }], [{ school: '青岛大学', major: '' }])), ['公司名不能空'])
-assert.deepEqual(messages(titled([{ company: '青序', role: '  ' }], [{ school: '青岛大学' }])), ['职务不能空'])
+assert.deepEqual(messages(titled([{ company: '  ', role: '店员' }], [{ school: '青岛大学', major: '' }])), [], '公司空着不拦')
+assert.deepEqual(messages(titled([{ company: '青序', role: '' }], [{ school: '青岛大学' }])), [], '职务空着不拦（原件只写公司）')
+assert.deepEqual(messages(titled([{ company: '', role: '' }], [{ school: '', major: '' }])), [], '四项全空也不拦，不逼人编')
 assert.deepEqual(messages(titled([{ company: '司'.repeat(101), role: '店员' }], [{ school: '青岛大学', major: '管' }])), ['公司名最多 100 字'])
-assert.deepEqual(messages(titled([{ company: '青序', role: '店员' }], [{ school: '  ', major: '专'.repeat(61) }])), ['学校名不能空', '专业最多 60 字'])
+assert.deepEqual(messages(titled([{ company: '青序', role: '店员' }], [{ school: '  ', major: '专'.repeat(61) }])), ['专业最多 60 字'])
 assert.deepEqual(messages(titled([{ company: '司'.repeat(100), role: '职'.repeat(60) }], [{ school: '校'.repeat(100), major: '' }])), [])
 assert.deepEqual(messages(titled([{ company: '青序', role: '职'.repeat(61) }], [{ school: '校'.repeat(101), major: '专'.repeat(60) }])), ['职务最多 60 字', '学校名最多 100 字'])
 

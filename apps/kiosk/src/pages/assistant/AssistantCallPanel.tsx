@@ -17,9 +17,40 @@ const ADVISOR_IMG = '/assets/ai-advisor.png'
 
 interface AssistantCallPanelProps {
   onClose: () => void
-  onSwitchToText: (expiredSubtitle?: string) => void
+  onSwitchToText: (expiredSubtitle?: string, reason?: 'limit' | 'silent') => void
   /** 把 TRTC 的真实相位上报给舱面（标题 · 胶囊 · 语音通道读数）。 */
   onStateChange?: (state: CockpitVoiceState) => void
+}
+
+function AdvisorSilentNotice({
+  busy,
+  onUseText,
+  onRetry,
+}: {
+  busy: boolean
+  onUseText: () => void
+  onRetry: () => void
+}) {
+  return (
+    <div className="assistant-voice-silent" data-testid="assistant-voice-silent" role="status">
+      <h3>小青这边没有声音，也没有字幕</h3>
+      <p>可能是网络或语音服务没接通。可以改用文字继续问。</p>
+      <div className="assistant-voice-silent-actions">
+        <button
+          type="button"
+          className="assistant-voice-silent-action assistant-voice-silent-action--primary"
+          data-testid="assistant-voice-silent-to-text"
+          disabled={busy}
+          onClick={onUseText}
+        >
+          改用文字继续问
+        </button>
+        <button type="button" className="assistant-voice-silent-action" disabled={busy} onClick={onRetry}>
+          重新连接
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function MiniList({ title, items }: { title: string; items: readonly string[] }) {
@@ -74,6 +105,9 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     }
   }, [call.phase, call.subtitle, onSwitchToText])
 
+  // 没声音的自动转文字也只做一次。重新连接会清掉，下一通可以再判。
+  const silentHandledRef = useRef(false)
+
   const runExit = useCallback(async (afterEnd: () => void) => {
     if (endingRef.current) return
     endingRef.current = true
@@ -86,6 +120,15 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     }
     afterEnd()
   }, [call])
+
+  const switchSilentToText = useCallback(() => {
+    if (silentHandledRef.current || endingRef.current) return
+    silentHandledRef.current = true
+    void runExit(() => onSwitchToText(undefined, 'silent'))
+  }, [onSwitchToText, runExit])
+  useEffect(() => {
+    if (call.phase === 'live' && call.silentStage === 'fallback') switchSilentToText()
+  }, [call.phase, call.silentStage, switchSilentToText])
 
   const closeDialog = useCallback(() => {
     if (call.phase === 'gate') {
@@ -107,6 +150,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
 
   const retryCall = useCallback(async () => {
     if (endingRef.current) return
+    silentHandledRef.current = false
     endingRef.current = true
     setEnding(true)
     try {
@@ -312,6 +356,13 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                       : '通话字幕将在这里显示')}
                 </p>
               </div>
+            )}
+            {call.phase === 'live' && call.silentStage === 'prompt' && (
+              <AdvisorSilentNotice
+                busy={ending}
+                onUseText={switchSilentToText}
+                onRetry={() => void retryCall()}
+              />
             )}
             </div>
 

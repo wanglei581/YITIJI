@@ -634,17 +634,28 @@ if (!simDoneCheckCutsLast && simDoneChecksAllItems && simDoneClassifiesAllItems)
   )
 }
 
-// 10) 仅执行中的真实任务或 SIM 演示保持 busy lock；失败、超时和结束态须释放
-const activeTaskBusyLock =
-  /useBusyLock\s*\(\s*\(\s*useRealApi\s*&&\s*!failed\s*&&\s*!timedOut\s*\)\s*\|\|\s*\(\s*isSim\s*&&\s*!failed\s*&&\s*!simDone\s*\)\s*,?\s*\)/.test(
+// 10) 忙碌锁
+// N-2（2026-10-06）：断网不再跳失败页，连续读不到不能放锁，否则屏保和自动登出
+// 会把人从出纸口赶走。结果未确认（超过 10 分钟仍读不到）也持锁：放锁会让早已过期的隐私硬截止
+// 立刻清场，这一屏看不到（浏览器用例实测）；隐私守卫的顺延上限保证机器不会锁死。
+// 失败、查询超时、模拟结束照旧放锁。公式在 holdsPrintBusyLock，页面不再内联。
+// resultUnconfirmed 只能是 linkPhase === 'unconfirmed'（页面文案与相位判定用它）。
+const pollingCode = stripComments(read('src/pages/print/printProgressPolling.ts'))
+const pageHoldsLock =
+  /useBusyLock\(\s*holdsPrintBusyLock\(\{[\s\S]*?\buseRealApi\b[\s\S]*?\bfailed\b[\s\S]*?\btimedOut\b[\s\S]*?\bresultUnconfirmed\b[\s\S]*?\bisSim\b[\s\S]*?\bsimDone\b[\s\S]*?\}\s*,?\s*\)\s*\)/.test(
     progressCode,
   )
-if (activeTaskBusyLock) {
-  pass('真实任务执行中与 SIM 演示进行中保持 busy lock，失败、超时和结束态释放')
+const unconfirmedIsStrict =
+  /const resultUnconfirmed = linkPhase === 'unconfirmed'/.test(progressCode) &&
+  !/const resultUnconfirmed = linkPhase !== 'live'/.test(progressCode)
+const helperHoldsOffline =
+  /const realActive = input\.useRealApi && !input\.failed && !input\.timedOut\s*$/m.test(pollingCode) &&
+  /const simActive = input\.isSim && !input\.failed && !input\.simDone/.test(pollingCode) &&
+  /return realActive \|\| simActive/.test(pollingCode)
+if (pageHoldsLock && unconfirmedIsStrict && helperHoldsOffline) {
+  pass('真实任务执行中、断网与结果未确认持锁；失败、超时和模拟结束放锁')
 } else {
-  fail(
-    'useBusyLock 须仅覆盖执行中的真实任务或 SIM 演示，并在失败、超时和结束态释放',
-  )
+  fail('useBusyLock 须走 holdsPrintBusyLock：断网与结果未确认都持锁，失败与超时放锁，模拟公式不变')
 }
 
 // 11) SIM / 失败跳转定时器须可清理，避免离页后回调继续执行
@@ -737,16 +748,37 @@ expectMatches(
   /result\.status\s*===\s*'cancelled'[\s\S]{0,200}abandoned/,
   '进度页 cancelled/abandoned 走终态分支',
 )
-expectMatches(
-  progressCode,
-  /POLL_FAIL_LIMIT\s*=\s*5/,
-  '进度页轮询连续失败 ≥5 次才判失败',
-)
-expectMatches(
-  progressCode,
-  /暂时无法读取状态/,
-  '进度页轮询失败文案为「暂时无法读取状态」',
-)
+// N-2（2026-10-06）：旧断言要求 POLL_FAIL_LIMIT = 5「才判失败」。
+// 那正是把大约 15 秒断网写成打印失败、再给「重新打印」的入口。查询抛错不再累计判失败。
+if (/POLL_FAIL_LIMIT/.test(progressCode)) {
+  fail('进度页不得再按 POLL_FAIL_LIMIT 把查询失败判成打印失败')
+} else {
+  pass('进度页已去掉 POLL_FAIL_LIMIT，查询失败不再累计判失败')
+}
+const pollCatchAt = progressCode.indexOf('catch (error) {')
+const pollCatchBody = pollCatchAt >= 0 ? progressCode.slice(pollCatchAt, pollCatchAt + 450) : ''
+if (
+  /isUnreadablePollError/.test(pollCatchBody) &&
+  /kind: 'unreadable'/.test(pollCatchBody) &&
+  !/navigateFail/.test(pollCatchBody)
+) {
+  pass('进度页查询 catch 只记读不到，不调用 navigateFail')
+} else {
+  fail('进度页 catch 必须走 isUnreadablePollError / unreadable，且不得 navigateFail')
+}
+// 文案常量挪到 printProgressPolling.ts，由 PrintProgressLinkNotice 在断网 / 未确认时渲染。
+// 不再写进 navigateFail，所以页面源码里可以没有这句字面量。
+const progressSectionsCode = stripComments(read('src/pages/print/components/PrintProgressSections.tsx'))
+if (
+  /export const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'/.test(pollingCode) &&
+  /STATUS_READ_ERROR_TEXT/.test(progressSectionsCode) &&
+  /PrintProgressLinkNotice/.test(progressCode) &&
+  /linkPhase !== 'live'/.test(progressCode)
+) {
+  pass('「暂时无法读取状态」留在断网提示里，不再拿去跳失败页')
+} else {
+  fail('「暂时无法读取状态」须由 printProgressPolling 提供，并经 PrintProgressLinkNotice 在 linkPhase !== live 时展示')
+}
 expectMatches(
   printJobsApiSrc,
   /'cancelled'[\s\S]{0,40}'abandoned'/,

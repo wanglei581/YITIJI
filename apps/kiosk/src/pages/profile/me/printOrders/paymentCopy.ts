@@ -146,13 +146,14 @@ export function recordedAmountDisplay(amountCents: number | null | undefined): s
 export const NET_PAID_UNRECORDED = '未记录'
 export const NET_PAID_UNRECORDED_HINT = '没有单独记下实付，不按应付减优惠来推算'
 
-/** API-20：已付款未出纸的待退款标签。说明句用标准句 5，且只在金额 > 0、又不是免费单时由详单渲染。 */
+/** API-20：已付款未出纸的待退款展示。到账时间不以天数承诺，渠道不在我们控制范围内。 */
 export const PENDING_REFUND_LABEL = '待退款'
+export const PENDING_REFUND_EXPLANATION =
+  '本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'
 
 /**
  * 0 元单：已经有订单，且金额为 0 或来源是免费。
  * 没有支付状态的历史订单不算免费，仍走「暂无支付信息」。
- * 免费单不展示退款，也不展示实付。
  */
 export function isFreeMemberOrder(item: {
   payStatus?: string | null
@@ -162,21 +163,15 @@ export function isFreeMemberOrder(item: {
   return item.payStatus != null && (item.amountCents === 0 || item.paymentSource === 'free')
 }
 
-/**
- * 列表/详单支付状态。免费单只写「免费」，不出现「退款」。
- * 付过钱时，待退款信号优先于「已支付」。金额仍只格式化服务端字段。
- */
+/** 列表/详单支付状态：待退款信号优先于「已支付」，金额仍只格式化服务端字段。 */
 export function memberPayStatusLabel(
-  item: Pick<MemberPrintOrderItem, 'payStatus' | 'refundRequired' | 'amountCents' | 'paymentSource'>,
+  item: Pick<MemberPrintOrderItem, 'payStatus' | 'refundRequired'>,
 ): { label: string; cls: string } {
-  if (item.payStatus == null) {
-    return { label: '暂无支付信息', cls: 'bg-neutral-100 text-neutral-500' }
-  }
-  if (isFreeMemberOrder(item)) {
-    return { label: '免费', cls: 'bg-neutral-100 text-neutral-500' }
-  }
   if (item.refundRequired === true) {
     return { label: PENDING_REFUND_LABEL, cls: 'bg-warning-bg text-warning-fg' }
+  }
+  if (item.payStatus == null) {
+    return { label: '暂无支付信息', cls: 'bg-neutral-100 text-neutral-500' }
   }
   return payStatusMeta(item.payStatus)
 }

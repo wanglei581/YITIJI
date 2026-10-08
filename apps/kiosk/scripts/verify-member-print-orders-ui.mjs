@@ -109,8 +109,24 @@ expectMatches(summarySrc, /\{item\.pickupCode\s*&&\s*<PickupCodePanel/, '详单�
     fail(`PickupCodePanel 存在未门控渲染：总 ${panelUses} 处，门控 ${gatedUses} 处`)
   }
 }
-// PickupCodePanel 组件本身：取件码只来自 prop code，不含任何生成/推断逻辑。
-expectMatches(panelSrc, /\{\s*code\s*,\s*hint\s*\}\s*:\s*\{\s*code:\s*string\s*;\s*hint\?:\s*string\s*\|\s*null\s*\}/, 'PickupCodePanel 到机码只来自 prop code（hint 只是续打说明，码仍非内部生成）')
+// PickupCodePanel 组件本身：到机码只来自 prop code，不含任何生成/推断逻辑。
+// 2026-10-06 方案②：签名从 `{ code }: { code: string }` 扩成 code 与续打字段的交叉类型。
+// 码仍只来自 code: string；续打句只读传入的 reprintAllowed / reprintRemaining，不在组件内生成码。
+expectMatches(panelSrc, /code:\s*string/, 'PickupCodePanel 到机码仍只来自 code: string prop（非内部生成）')
+expectMatches(panelSrc, /Pick<MemberPrintOrderItem, 'reprintAllowed' \| 'reprintRemaining'>/, '续打条件只读共享会员订单类型上的 reprint 字段')
+expectMatches(panelSrc, /到机码/, '面板标题是到机码')
+expectAbsent(panelSrc, /取件凭证码|出示给工作人员|出示给现场工作人员|请向现场工作人员出示/, '面板不再把到机码说成取件凭证或让人出示给工作人员')
+expectMatches(panelSrc, /reprintAllowed === true && typeof reprintRemaining === 'number'/, '还能续打只在 reprintAllowed 为真且剩余次数是数字时出现')
+expectMatches(panelSrc, /还能续打 \$\{reprintRemaining\} 次/, '续打句带上剩余次数，不写死次数以外的承诺')
+expectMatches(panelSrc, /reprintAllowed === false && reprintRemaining === 0/, '次数用尽只在 reprintAllowed 为假且剩余为 0 时出现')
+expectMatches(panelSrc, /这单已经接着打过 2 次，不能再打了。/, '次数用尽的句子与后端一致')
+expectMatches(summarySrc, /reprintAllowed=\{item\.reprintAllowed\}/, '详单把 reprintAllowed 原样传给面板')
+expectMatches(summarySrc, /reprintRemaining=\{item\.reprintRemaining\}/, '详单把 reprintRemaining 原样传给面板')
+{
+  // 续打字段由后端 #1261 加在共享类型 MemberPrintOrderItem 上，一体机不再另起一份声明。
+  const shared = fs.readFileSync(path.join(root, '..', '..', 'packages/shared/src/types/memberPrintOrders.ts'), 'utf8')
+  expectMatches(shared, /reprintAllowed\?: boolean[\s\S]*reprintRemaining\?: number \| null/, '共享会员打印订单类型带 reprintAllowed / reprintRemaining')
+}
 for (const [name, src] of all) {
   expectAbsent(src, /^.*pickupCode.*payStatus.*$|^.*payStatus.*pickupCode.*$/m, `${name} 不依据 payStatus 推断取件码可见性（门控在服务端）`)
   expectAbsent(src, /pickupCode\s*=[^=]/, `${name} 不本地赋值 / 生成取件码`)
@@ -232,14 +248,17 @@ expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/
 
 // API-20：顾客侧待退款状态。不承诺到账天数，已退款只展示服务端 refundedAmountCents。
 expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
-expectAbsent(copySrc, /退款由工作人员/, '待退款说明不再交给现场工作人员')
+expectMatches(
+  copySrc,
+  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
+  '待退款说明不写到账天数',
+)
 expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
 expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')
 expectMatches(pageSrc, /item\.refundRequired === true/, '列表待退款 chip 由服务端 refundRequired 门控')
 expectMatches(pageSrc, /PENDING_REFUND_LABEL/, '列表使用待退款标签常量')
-expectMatches(summarySrc, /refundApplyLine\(contact\)/, '详单待退款说明用标准句 5（核实后原路退回，不写到账天数）')
-expectMatches(summarySrc, /item\.amountCents > 0/, '退款说明只在金额大于 0 时出现')
-expectMatches(summarySrc, /item\.refundRequired === true && typeof item\.amountCents === 'number' && item\.amountCents > 0/, '详单待退款说明由服务端 refundRequired 且金额大于 0 门控')
+expectMatches(summarySrc, /PENDING_REFUND_EXPLANATION/, '详单展示待退款诚实说明')
+expectMatches(summarySrc, /item\.refundRequired === true/, '详单待退款说明由服务端 refundRequired 门控')
 expectMatches(summarySrc, /recordedAmountDisplay\(item\.refundedAmountCents\)/, '已退款只格式化服务端 refundedAmountCents')
 expectAbsent(copySrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '待退款文案不承诺到账天数')
 expectAbsent(pageSrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '列表不承诺到账天数')

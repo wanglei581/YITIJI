@@ -77,11 +77,7 @@ export const UNATTENDED_FORBIDDEN_PHRASES = [
   forbiddenPhrase(['向现场', '工作人员出示']),
   forbiddenPhrase(['出示给现场', '工作人员']),
   forbiddenPhrase(['出示给', '工作人员']),
-  forbiddenPhrase(['去服', '务台']),
-  // 10/6 总指挥：以下三个词整体禁用（门禁 FORBIDDEN 同步）。片段拆开写，免得词表自己被扫到。
-  forbiddenPhrase(['现场工作', '人员']),
-  forbiddenPhrase(['服务', '台']),
-  forbiddenPhrase(['值', '守']),
+  forbiddenPhrase(['去', '服务台']),
   forbiddenPhrase(['缺纸时一体机会自动停止', '接单']),
   forbiddenPhrase(['找人', '补纸']),
   forbiddenPhrase(['取件', '凭证码']),

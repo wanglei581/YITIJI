@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
-import { BookOpenIcon, FileTextIcon, HelpCircleIcon, HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { BookOpenIcon, FileTextIcon, HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
+import { ResumeGenerateHelpLine } from './components/ResumeGenerateShell'
 
 type Go = (to: string) => void
 
@@ -36,7 +38,6 @@ function ExitRow(props: { icon: ReactNode; title: string; desc: string; to: stri
 const I = {
   book: <BookOpenIcon size={26} />,
   file: <FileTextIcon size={26} />,
-  help: <HelpCircleIcon size={26} />,
 }
 
 /** 空态正文出口。与底部 CTA 不同目的地，避免同义双按钮。 */
@@ -65,8 +66,18 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
   }
   if (props.view === 'preview-loading' || props.view === 'illegal') {
     rows.push(
-      <ExitRow key="help" icon={I.help} title="问小青" desc="常见问题和求助都在帮助中心" to="/help" testid="resume-generate-preview-exit-help" onNavigate={go} />,
+      <QxAiHelp
+        key="help"
+        label="问小青"
+        draft={props.view === 'illegal'
+          ? '这一页认不出地址里的状态，帮我回到从零填写简历。'
+          : '生成结果一直读不回来，帮我看看下一步怎么做。'}
+        testId="resume-generate-preview-exit-help"
+      />,
     )
+  }
+  if (props.view === 'preview-loading') {
+    rows.push(<ResumeGenerateHelpLine key="help-line" />)
   }
   if (rows.length === 0) return null
   return <div className="qx-rows qx-rd-exits">{rows}</div>

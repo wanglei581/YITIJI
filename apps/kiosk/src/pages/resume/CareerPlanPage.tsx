@@ -97,9 +97,7 @@ function errorCodeOf(error: unknown): string {
   return error instanceof CareerPlanApiError ? error.code : 'UNKNOWN_ERROR'
 }
 
-function errorMessageOf(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
+const CAREER_PLAN_OUTAGE_COPY = 'AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）'
 
 /** 置灰一律 aria-disabled + onClick 自己短路；原生 disabled 会让读屏跳过、触屏读不到原因。 */
 function Action({ label, variant, onClick, busy, icon }: {
@@ -150,7 +148,7 @@ export function CareerPlanPage() {
   const [printError, setPrintError] = useState<string | null>(null)
   /** 后端明确不认这份简历解析结果（AI_TASK_NOT_FOUND：不存在 / 已过期 / 不属于当前身份）。 */
   const [rejectedTask, setRejectedTask] = useState(false)
-  /** AI 能力级不可用的**真实原因**（原样透出后端 message），null 表示未观测到不可用。 */
+  /** AI 能力级不可用时的人话（固定句，不透出服务端原文），null 表示未观测到不可用。 */
   const [aiOutage, setAiOutage] = useState<string | null>(null)
   /** 是否已经完成过一次真实往返 —— 没探到之前一律 fail-closed，不假设服务正常。 */
   const [probed, setProbed] = useState(false)
@@ -196,7 +194,7 @@ export function CareerPlanPage() {
         // 前置校验的落点：后端不认这个 taskId，继续留在本页只会让用户白点一次生成。
         if (code === 'AI_TASK_NOT_FOUND') { setRejectedTask(true); return }
         if (AI_OUTAGE_CODES.has(code)) {
-          setAiOutage(errorMessageOf(err, '系统当前暂时连不上'))
+          setAiOutage(CAREER_PLAN_OUTAGE_COPY)
           return
         }
         // 其余错误不足以判定能力不可用，标记已探测，让用户能真的点一次生成看结果。
@@ -277,8 +275,8 @@ export function CareerPlanPage() {
       if (!isLive(run)) return
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
-      else if (AI_OUTAGE_CODES.has(code)) setAiOutage(errorMessageOf(err, 'AI 服务当前不可用'))
-      else setError(errorMessageOf(err, '生成失败，请稍后重试'))
+      else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
+      else setError(userMessageOf(err, '生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
       settle(run)

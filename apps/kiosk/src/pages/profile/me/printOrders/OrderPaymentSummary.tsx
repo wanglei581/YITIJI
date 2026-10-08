@@ -9,7 +9,7 @@
 // - 有 Order 且不是 0 元单 → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
 //   0 元单（金额为 0 或来源为免费）整块不展示，避免把免费说成支付、实付或抵扣。
 //   实付：金额为 0 时写「0 元（免费试运营）」；其余没有单独的实付字段，标「未记录」，不按应付减优惠推算。
-// - 取件码仅在后端返回时渲染（门控在服务端）。
+// - 到机码（pickupCode）仅在后端返回时渲染（门控在服务端）。续打句只转发订单上的 reprint 字段。
 // - 「再打一份」本批不做订单侧直连（PrintTask 无可重签文件源），
 //   只提供「去我的文档再打印」诚实引导：走我的文档重签 URL → 打印确认，
 //   天然创建新 PrintTask + 新 Order，绝不复用旧任务或旧签名链接。
@@ -17,8 +17,6 @@
 
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
-import { helpNeededLine, readReprintFields, refundApplyLine, reprintHintLine } from '../../../../copy/unattendedCopy'
-import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { KIcon } from '../../../../components/kiosk-icon'
 import {
   BILLING_PAGE_SOURCE_LABEL,
@@ -32,6 +30,7 @@ import {
   pageRangeDisplay,
   publicOrderNo,
   paymentSourceLabel,
+  PENDING_REFUND_EXPLANATION,
   PENDING_REFUND_LABEL,
   recordedAmountDisplay,
 } from './paymentCopy'
@@ -51,10 +50,7 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
   const navigate = useNavigate()
-  const contact = useSupportContact()
   const payStatus = item.payStatus ?? null
-  const reprintFields = readReprintFields(item)
-  const reprint = reprintHintLine(reprintFields.reprintAllowed, reprintFields.reprintRemaining, contact)
   const orderNo = publicOrderNo(item.orderNo)
   const paid = netPaidDisplay(item)
 
@@ -71,7 +67,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录。{helpNeededLine(contact)}）</span>
+          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
         </p>
       ) : isFreeMemberOrder(item) ? null : (
         <div className="me-payment-grid">
@@ -80,7 +76,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
             value={typeof item.amountCents === 'number' ? formatAmountCents(item.amountCents) : '未记录'}
           />
           <DetailRow label="优惠/权益抵扣" value={recordedAmountDisplay(item.discountCents)} />
-          {typeof item.amountCents === 'number' && item.amountCents > 0 ? <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} /> : null}
+          <DetailRow label="已退款" value={recordedAmountDisplay(item.refundedAmountCents)} />
           <DetailRow label="实付" value={paid.value} hint={paid.hint} />
           <DetailRow
             label="支付状态"
@@ -97,15 +93,15 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </div>
       )}
 
-      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 && !isFreeMemberOrder(item) ? (
+      {item.refundRequired === true && (
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {refundApplyLine(contact)}
+          {isFreeMemberOrder(item) ? '本单已确认未出纸，退款由工作人员处理。' : PENDING_REFUND_EXPLANATION}
         </p>
-      ) : null}
+      )}
 
-      {item.pickupCode && <PickupCodePanel code={item.pickupCode} hint={reprint} />}
+      {item.pickupCode && <PickupCodePanel code={item.pickupCode} reprintAllowed={item.reprintAllowed} reprintRemaining={item.reprintRemaining} />}
 
       <button
         type="button"

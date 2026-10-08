@@ -60,6 +60,7 @@ export const AI_USE_ROUTES: readonly AiUseRoute[] = [
   { method: 'POST', path: '/mock-interviews/:id/report/print', kind: 'export' },
   { method: 'POST', path: '/mock-interviews/:id/start', kind: 'generate' },
   { method: 'POST', path: '/mock-interviews/:id/transcribe', kind: 'voice' },
+  { method: 'POST', path: '/mock-interviews/:id/transcript/print', kind: 'export' },
   { method: 'POST', path: '/mock-interviews/:id/turns/:idx/audio', kind: 'voice' },
   { method: 'GET', path: '/mock-interviews/capabilities/voice', kind: 'read' },
   { method: 'GET', path: '/resume/career-plan/:taskId', kind: 'read' },
