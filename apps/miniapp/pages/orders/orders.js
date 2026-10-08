@@ -17,6 +17,7 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
+const { reprintNoteText } = require('../../utils/support-contact')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
@@ -115,8 +116,9 @@ function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
   const amountCents = parseAmountCents(item.amountCents)
   const effectiveStatus = item.status || item.taskStatus || ''
-  // 到机码只在尚未核销的 Order-only 阶段展示；扫码 claimed 或创建 PrintTask 后立即撤下。
-  const pickupRaw = !item.status && item.pickupStatus === 'pending' ? (item.pickupCode || '') : ''
+  // 到机码：尚未核销的 Order-only 阶段展示；失败后服务端仍允许同码续打时也展示。
+  const pendingCode = !item.status && item.pickupStatus === 'pending'
+  const pickupRaw = (pendingCode || item.reprintAllowed === true) ? (item.pickupCode || '') : ''
   const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
                : (pickupRaw && ds.key === 'waiting')              ? 'pickup'
                : null
@@ -141,6 +143,7 @@ function toUiItem(item) {
     reasonNote:  reasonNoteOf(item, effectiveStatus),
     pickup:      fmtCode(pickupRaw),
     pickupRaw,
+    reprintNote: pickupRaw ? reprintNoteText(item) : '',
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
     payStatus:   item.payStatus || '',

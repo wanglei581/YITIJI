@@ -2049,3 +2049,17 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     ai: 'generate',
   });
 };
+
+/**
+ * 公开服务电话。不登录。terminalId 为空就不带查询参数。
+ * 后端: GET /api/v1/public/support-contact
+ */
+api.getSupportContact = function getSupportContact(terminalId) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('服务电话'));
+  const ref = typeof terminalId === 'string' ? terminalId.trim() : '';
+  // 路径必须是字面量：契约门禁只抽 request('…') / request(`…`)，变量拼出来的路径会被漏掉。
+  if (!ref) return request('/public/support-contact', { method: 'GET', needAuth: false });
+  return request(`/public/support-contact?terminalId=${encodeURIComponent(ref)}`, {
+    method: 'GET', needAuth: false,
+  });
+};

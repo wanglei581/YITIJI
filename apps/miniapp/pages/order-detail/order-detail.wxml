@@ -59,6 +59,7 @@
         <view class="od-pickup">
           <view class="od-pickup-label">到机码</view>
           <view class="od-pickup-code">{{detail.pickup}}</view>
+          <view class="od-pickup-hint" wx:if="{{detail.reprintNote}}">{{detail.reprintNote}}</view>
           <view class="od-pickup-hint">到一体机前扫码或手动输入到机码</view>
         </view>
       </view>
