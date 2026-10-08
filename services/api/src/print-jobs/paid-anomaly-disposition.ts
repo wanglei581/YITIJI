@@ -3,6 +3,8 @@
  *
  * 不新建订单状态。待退款复用 Order.refundReason=PAID_UNFULFILLED_PENDING_REFUND
  * （payStatus 保持 paid）。打印结果未确认复用 errorCode=PRINT_JOB_UNCONFIRMED。
+ * 付费单的未确认 / 部分出纸不在认领时自动标待退款。本人自助续打被拒时才标。
+ * 没来续打的，付款满 7 天由同一到期清扫补标并走同一 RefundService。免费单不标。
  */
 
 export const PARTIAL_OUTPUT_ERROR_CODE = 'PARTIAL_OUTPUT'

@@ -15,6 +15,14 @@
 - **同步的文档：** 合规总表（生成式 AI 登记与标识一行、导出标识一条）、next-tasks（三处开关口径）、feature-scope 第 7 行、同意与撤回说明第 10 节。
 - **工作分工：** 后端约 1.5 人日，10/30 前进候选。一体机由前端 B 做，小程序由小程序窗口做：两端第七次先加一句提示，勾选框等后端字段。
 
+## 2026-10-06：取件「出纸未确认 / 只出一部分」的自助出路（叠在 #1261 上，Grok 实现、Claude 审，未部署）
+
+- **为什么：** 现场无人值守（10/4 定）。#1261 只让「整单失败」能用同一到机码续打；出纸未确认（`PRINT_JOB_UNCONFIRMED`）与只出一部分（`PARTIAL_OUTPUT`）仍被拒，文案让人「联系工作人员」「另下新单」，现场没人。
+- **免费单（实付 0）：** 未确认满 5 分钟（`UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS`，从任务 `completedAt` 算，Agent 超时判未确认时写入）可在同一终端续打或走 `/retry`，计入每单 2 次；5 分钟内 409 `PICKUP_RESUME_UNCONFIRMED`。只出一部分可立刻整单重打，同样计数。续打响应带 `mayHavePrinted` / `partialOutput`。
+- **付费单（实付 > 0）：** 两种状态都不自助重打，409 `PICKUP_RESUME_REFUND_PENDING`「这单没有打完，费用会按原路退回，需要帮助请拨打服务电话」，并把订单标成已付未履约待退款（复用 `PAID_UNFULFILLED_PENDING_REFUND`）；没来续打的，付款满 7 天由现有到期清扫补标并走同一 `RefundService`（新原因 `paid_output_anomaly`，审计 `order.paid_output_anomaly_auto_refund`）。不新建退款流程。管理员后台对这两种状态的处置不变。
+- **订单视图：** `reprintAllowed` / `reprintRemaining` 按上面规则算，新增 `reprintNotice: 'may_have_printed' | 'partial_output' | null`（会员订单列表、套餐单、时间线、取件视图同一口径）。
+- **文案：** `paid-reprint-eligibility.ts` 里未确认、部分出纸两条去掉「工作人员」。打印状态页其余失败文案（`print-jobs.service.ts` 的 `PRINTER_OFFLINE`、`PRINT_JOB_UNCONFIRMED` 等）仍含「工作人员」，归「230 处标准句」那批，本次不动。
+- **验证：** `verify:pickup-code-resume` 扩展；本机 API / 一体机 / 后台 typecheck、lint 4 项与图谱点名的 42 条门禁全部退出码 0（含 `verify:member-closure` closure 环境、一体机 `verify:pickup-claim-error-coverage`、小程序 `verify:package-chain`、Agent `verify:print-truth-hardening`）。反向变异四处全红：去冷却期、付费单也自助重打、未确认续打不计数、视图不带 `reprintNotice`。两条 `:postgres` 门禁未在本机 PostgreSQL 上跑，交 CI。
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。
