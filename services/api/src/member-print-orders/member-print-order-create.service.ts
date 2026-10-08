@@ -1,10 +1,11 @@
 import crypto from 'crypto'
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
-import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
+import { encryptSecret } from '../common/crypto/secret-cipher'
 // 取件码长度/字符集/签发/哈希的唯一定义。曾在本文件和 payment/order-status.service.ts
 // 各写一份 PICKUP_CODE_LEN=10，两处不同步即「按一种长度发码、按另一种长度收码」。
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
+import { arrivalViewForOrder, arrivalViewsForOrders, type ArrivalReprintFields } from '../print-jobs/self-service-reprint'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService, priceChanged } from '../payment/order-quote.service'
 import {
@@ -331,7 +332,8 @@ export class MemberPrintOrderCreateService {
       targetId: order.id,
       payload: { terminalId: terminal.id, fileId: file.id, amountCents: quote.amountCents, billablePages: quote.billablePages },
     })
-    return this.toView(settled, this.visibleCode(settled) ?? code, terminal)
+    const arrival = await arrivalViewForOrder(this.prisma, settled)
+    return this.toView(settled, arrival.pickupCode ?? code, terminal, arrival)
     } finally {
       if (!completed) {
         await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
@@ -355,7 +357,11 @@ export class MemberPrintOrderCreateService {
         })
       : []
     const terminalById = new Map(terminals.map((terminal) => [terminal.id, terminal]))
-    return rows.map((row) => this.toView(row, this.visibleCode(row), row.terminalId ? terminalById.get(row.terminalId) : undefined))
+    const views = await arrivalViewsForOrders(this.prisma, rows)
+    return rows.map((row) => {
+      const arrival = views.get(row.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null }
+      return this.toView(row, arrival.pickupCode, row.terminalId ? terminalById.get(row.terminalId) : undefined, arrival)
+    })
   }
 
   async detail(endUserId: string, orderId: string) {
@@ -368,7 +374,8 @@ export class MemberPrintOrderCreateService {
           select: { displayName: true, locationLabel: true },
         })
       : null
-    return this.toView(fresh, this.visibleCode(fresh), terminal ?? undefined)
+    const arrival = await arrivalViewForOrder(this.prisma, fresh)
+    return this.toView(fresh, arrival.pickupCode, terminal ?? undefined, arrival)
   }
 
   async cancel(endUserId: string, orderId: string, dto: CancelMemberPrintOrderDto) {
@@ -452,7 +459,8 @@ export class MemberPrintOrderCreateService {
           select: { displayName: true, locationLabel: true },
         })
       : null
-    return this.toView(order, this.visibleCode(order), terminal ?? undefined)
+    const arrival = await arrivalViewForOrder(this.prisma, order)
+    return this.toView(order, arrival.pickupCode, terminal ?? undefined, arrival)
   }
 
   private async expireIfNeeded(order: Awaited<ReturnType<MemberPrintOrderCreateService['requireOwned']>>) {
@@ -495,19 +503,12 @@ export class MemberPrintOrderCreateService {
     })
   }
 
-  private visibleCode(order: {
-    pickupStatus: string
-    payStatus: string
-    pickupCodeExpiresAt: Date | null
-    pickupCodeEnc: string | null
-  }): string | null {
-    if (order.pickupStatus !== 'pending') return null
-    if (!['unpaid', 'paying', 'paid'].includes(order.payStatus)) return null
-    if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date() || !order.pickupCodeEnc) return null
-    try { return decryptSecret(order.pickupCodeEnc) } catch { return null }
-  }
-
-  private toView(order: OrderRecord, code: string | null, terminal?: TerminalSummary) {
+  private toView(
+    order: OrderRecord,
+    code: string | null,
+    terminal?: TerminalSummary,
+    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining'> = { reprintAllowed: false, reprintRemaining: null },
+  ) {
     let lines: unknown[] = []
     try { lines = Array.isArray(JSON.parse(order.itemsJson)) ? JSON.parse(order.itemsJson) : [] } catch { lines = [] }
     let params: Record<string, unknown> = {}
@@ -546,6 +547,8 @@ export class MemberPrintOrderCreateService {
       pickupCodeExpiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
       printTaskId: order.printTaskId,
       createdAt: order.createdAt.toISOString(),
+      reprintAllowed: reprint.reprintAllowed,
+      reprintRemaining: reprint.reprintRemaining,
     }
   }
 }

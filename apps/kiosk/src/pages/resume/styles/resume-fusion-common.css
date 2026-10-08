@@ -24,8 +24,8 @@
   --fy-dark: var(--k-ink);
   --fy-r-sm: 14px;
   --fy-r-md: 18px;
-  --fy-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
-  --fy-sans: var(--font-sans, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif);
+  --fy-serif: var(--font-heading, 'Qingxu Serif', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
+  --fy-sans: var(--font-sans, 'PingFang SC', 'Qingxu Sans', 'Microsoft YaHei', system-ui, sans-serif);
   min-height: 100%;
   color: var(--fy-ink);
   font-family: var(--fy-sans);

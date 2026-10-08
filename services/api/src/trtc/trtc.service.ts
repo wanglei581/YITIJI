@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException, type OnModuleInit, type OnModuleDestroy } from '@nestjs/common'
+import { describeBackgroundError, runBackground, scheduleBackground } from '../common/process/background-task'
 import { randomUUID } from 'node:crypto'
 import { TrtcSessionRegistry, readTrtcMaxSessionSeconds } from './trtc-session-registry.service'
 import { genUserSig } from './usersig.util'
@@ -103,9 +104,9 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     // 重启立即扫描 Redis；不等待腾讯云，避免依赖故障卡住 API 启动。
-    void this.expireSessions()
-    this.deadlineTimer = setInterval(() => { void this.expireSessions() }, 1_000)
-    this.deadlineTimer.unref()
+    const onError = (error: unknown) => this.logger.error(`TRTC_DEADLINE_SCAN_FAILED ${describeBackgroundError(error)}`)
+    runBackground(() => this.expireSessions(), onError)
+    this.deadlineTimer = scheduleBackground(() => this.expireSessions(), 1_000, onError)
   }
 
   onModuleDestroy(): void { if (this.deadlineTimer) clearInterval(this.deadlineTimer) }

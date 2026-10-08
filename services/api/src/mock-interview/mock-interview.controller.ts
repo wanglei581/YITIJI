@@ -12,6 +12,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
+import { InterviewTranscriptPrintService } from './interview-transcript-print.service'
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 import { AiLogService } from '../ai/ai-log.service'
@@ -81,6 +82,13 @@ export class EndInterviewDto {
   includeAnswersInPrint?: boolean
 }
 
+export class PrintTranscriptDto {
+  /** 默认 false。为 true 时，跳过的题也印出来并标「本题跳过」。 */
+  @IsOptional()
+  @IsBoolean()
+  includeSkipped?: boolean
+}
+
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
 }
@@ -109,6 +117,7 @@ export class MockInterviewController {
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
     private readonly aiLog: AiLogService,
+    private readonly transcriptPrint: InterviewTranscriptPrintService,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
@@ -279,6 +288,20 @@ export class MockInterviewController {
 
   async practiceSheet(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.printPracticeSheet(id, await this.requesterOf(req)))
+  }
+
+  /**
+   * 本场题目和候选人自己的回答。不调模型，进行中、尚未生成报告时也能出。
+   * 通用题目单没有这一场的回答；练习报告打印又要求已经落库的 AI 报告。
+   */
+  @Post(':id/transcript/print')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
+  async printTranscript(@Param('id') id: string, @Body() dto: PrintTranscriptDto, @Req() req: ReqLike) {
+    return ApiResponse.ok(await this.transcriptPrint.print(id, await this.requesterOf(req), {
+      includeSkipped: dto?.includeSkipped === true,
+    }))
   }
 }
 
