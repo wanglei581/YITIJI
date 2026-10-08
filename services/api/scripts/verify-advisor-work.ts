@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import 'reflect-metadata'
 import { randomUUID } from 'crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createClient } from '@libsql/client'
@@ -133,6 +133,24 @@ const downConfig = {
 
 async function main() {
   console.log('\n=== S3-3 · P26 顾问作业面后端验证 ===')
+  // 10/8 产品负责人批准：一体机保存的是 AI 整理的本次要点；打印说明须与页面同批改。
+  const pdfSource = readFileSync(join(__dirname, '../src/advisor/advisor-pdf.service.ts'), 'utf8')
+  const takeawayCopy = [
+    '这次对话的要点',
+    '（本次没有留下要点）',
+    '对话本身不保存；这些要点由 AI 根据本次对话整理，请自行核对后使用。',
+    'AI 顾问 · 本次要点单',
+  ]
+  assert(takeawayCopy.every((text) => pdfSource.includes(text)),
+    'G0a 本次要点打印稿四处新文案完整，末尾说明保留 AI 提示')
+  assert([
+    '你钉住的条目',
+    '（本次没有钉住任何条目）',
+    '对话本身不保存；只有你主动钉住的条目会留下并带进后续步骤。',
+    'AI 顾问 · 钉住条目单',
+  ].every((text) => !pdfSource.includes(text)), 'G0b 打印稿不得回退为用户主动钉住的旧说法')
+  assert(takeawayCopy.every((text) => !text.includes('工作人员')) && takeawayCopy[2]!.includes('AI'),
+    'G0c 新文案不含工作人员，末尾说明标明 AI 整理')
   if (fallbackDbDir) await initFallbackDb()
 
   const prisma = new PrismaService()
@@ -436,6 +454,9 @@ async function main() {
         assert(out.buffer.subarray(0, 4).toString() === '%PDF' && out.pageCount >= 1,
           `G3 ${payload.kind} 渲染出真实 PDF`)
       }
+      const qaPrinted = await svc.printArtifact(qa.sessionId, qaRan.artifacts[0]!.artifactId, owner)
+      assert(qaPrinted.filename === 'AI顾问-本次要点单.pdf' && uploaded[1]!.filename === qaPrinted.filename,
+        'G4 无标题的问答产物以本次要点单文件名上传并返回，打印仍不调模型')
       restoreFetch()
     }
 
