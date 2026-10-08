@@ -115,6 +115,11 @@ export interface DerivedAlertCollection {
   omitted: number
   /** 触发截断的上限值,便于界面如实说明。 */
   cap: number
+  /**
+   * 本次纳入终端类告警考察的主题键(只含正常运营的终端,每台两种类型)。推送据此区分
+   * 「真恢复」与「因转为计划中 / 退役 / 停用 / 删除而不再考察」:后者不推「已恢复」。
+   */
+  terminalSubjectKeysInScope: string[]
 }
 
 type TerminalRow = {
@@ -426,7 +431,11 @@ export async function collectDerivedAlerts(
   const nowMs = now.getTime()
   const alerts: DerivedAlert[] = []
 
+  // 终端类告警只看正常运营的终端(与 pickup-order.service.ts 的放行口径一致):
+  // 计划中、调试中、维护中、已暂停、已退役、停用的机器没人用,不算「离线」或「打印机异常」。
+  // 10/4 线上第一轮推送就把一台从没开过机的计划中终端 new01 报成了离线。
   const terminals = (await prisma.terminal.findMany({
+    where: { enabled: true, lifecycleStatus: 'active' },
     select: TERMINAL_SELECT,
   })) as unknown as TerminalRow[]
 
@@ -502,6 +511,10 @@ export async function collectDerivedAlerts(
     ), 0) + (feedbackAlert ? 1 : 0),
     omitted,
     cap: PRINT_FAILED_LIST_CAP,
+    terminalSubjectKeysInScope: terminals.flatMap((t) => [
+      buildSubjectKey('terminal_offline', t.id),
+      buildSubjectKey('printer_issue', t.id),
+    ]),
   }
 }
 
