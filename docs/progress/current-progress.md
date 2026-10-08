@@ -36,6 +36,11 @@
 - **用户看到什么：** 简历、面试、政策三台服务中心在后端就绪后读 `GET /kiosk/ai/capabilities`：只有 AI 不可用时，依赖 AI 的卡片和目标置灰并写原因、提示条可「重新检测」，不依赖 AI 的卡片照常可点（原来只在整个后端 `/health` 不通时才出 ai-down，那时不依赖 AI 的卡也一起变灰）；后端整体不通时保持原处理。「先选目标」按产品负责人 10/6 批准保留在常用入口下面。岗位、招聘会两台在托管闸门后面，不动。
 - **没做：** 页面自己往共享顶栏塞时钟的做法撤掉了（时钟属共享壳层，A 路统一加，避免出现两个时钟）。
 - **验证：** 一体机 `tsc`、eslint 0；`verify-service-entry-readiness`（新增：目标块在常用入口之后、能力请求路径、后端未就绪不读能力、AI 原因先于在线服务原因、能力条文字）、`verify-browser-spec-coverage`、`verify-kiosk-visible-actions-truth`、`verify-kiosk-frontend-debt` 0；`service-hub-qx.spec.ts` 12 过、`test:browser:truth` 150 过；共享测试路由加了「AI 能力默认全部可用」的桩，审核窗口在候选上跑 w2 171 过、w3 96 过、default 418 过、w5 90 过，红的都是已知项（w3 一条由 #1327 修，default、w5 各一条写死端口）。并排 20 对配上 14 对（缺的 6 对是岗位、招聘会两台，托管闸门后）。
+## 2026-10-06：一体机 34 号自我探索按青序 2.0 补齐拦截说明与真实并排（分支 `claude/kiosk-b-34-self-assessment-1006`）
+
+- **用户看到什么：** 三种拦截态（还不能进入作答 / 本次作答已经提交 / 还没有可查看的完成结果）照稿补「为什么会这样」三条事实、「这次作答现在的状态」三格、「不显示你打开的链接参数内容」说明；底栏改成整行两个等宽按钮；结果空态排满，不再空约 700px。说明页、答题、复核、结果、AI 不可用、记录页原有内容（同意清单、敏感题勾选、题号地图、会发生/不会发生、年龄声明、真实解读与依据题号、撤回、PDF 预览、记录说明）全部保留。
+- **拆分：** `SelfAssessmentFlow.tsx` 改前 1185 行，这次新加的块拆到 `components/self-assessment/SelfAssessmentInterceptFacts.tsx`、`SelfAssessmentResultEmpty.tsx`，主文件 1177 行（仍在 1000 行以上的重构清单里）。后端合规扫描 `services/api/scripts/verify-compliance.ts` 的自我探索名单原来只列主文件，补上整个 `components/self-assessment/` 目录（阳性对照：新组件加临床禁词 → 红）。
+- **验证：** 一体机 `tsc`、eslint 0；`verify-self-assessment-consent-source`、`verify-browser-spec-coverage`、`verify-compliance-copy`、API `verify:compliance` 0；w3 整组 91 过 1 条偶发（职业规划 1440×900 触控高度，重试过）。反向检查：拦截态去掉「为什么会这样」→ 红；结果空态改回不排满 → 红；还原 → 绿。并排 6 对全配上（答题、结果两对现在配的是真实页，不再两边都是拦截态）。
 - **停放、隐藏、改名、降级：** 无。Grok 实现，一体机前端 B 窗口审。
 
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）

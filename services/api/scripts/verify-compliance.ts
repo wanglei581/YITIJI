@@ -90,6 +90,8 @@ const SELF_ASSESSMENT_FILES = [
   'packages/shared/src/data/selfAssessment',
   'apps/kiosk/src/services/api/selfAssessment.ts',
   'apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx',
+  // 2026-10-06 34 号把拦截态说明、结果空态拆到这个目录；目录下的组件同样是自我探索用户可见文字。
+  'apps/kiosk/src/pages/resume/components/self-assessment',
   'apps/kiosk/src/pages/resume/self-assessment-lightflow.css',
 ]
 
