@@ -91,9 +91,15 @@ export function SignStampPreview({
           <FileTextIcon size={44} />
           <b>{outErr === 'expired' ? '预览链接已过期' : '这份预览暂时打不开'}</b>
           <span>
-            {outErr === 'expired'
-              ? '访问链接有效期 30 分钟，已经到期。文件本身没有丢，重新取一次即可。'
-              : '浏览器没能渲染这份 PDF。不代表文件损坏或丢失，可以重新取一次预览链接。'}
+            {outErr === 'expired' ? (
+              <>
+                访问链接<b>有效期 30 分钟</b>，已经到期。<b>文件本身没有丢</b>，重新取一次即可。
+              </>
+            ) : (
+              <>
+                浏览器没能渲染这份 PDF。<b>不代表文件损坏或丢失</b>，可以重新取一次预览链接。
+              </>
+            )}
           </span>
         </div>
         <div className="ss-pv-cap">不放上一次的画面，免得你当成这次的结果。</div>
@@ -108,7 +114,7 @@ export function SignStampPreview({
           <div className="ss-pv-ghost">
             <FileTextIcon size={44} />
             <b>还没有文档</b>
-            <span>选好 PDF 之后，这里显示完整的一页纸。</span>
+            <span>选好 PDF 之后，这里显示<b>完整的一页纸</b>。</span>
           </div>
         </div>
         <div className="ss-pv-cap">这里只显示你选的文件，不放示例文件。</div>
@@ -160,23 +166,21 @@ export function SignStampPreview({
             top: `${(box.y / PAGE_H) * 100}%`,
             width: `${(box.w / PAGE_W) * 100}%`,
             height: `${(box.h / PAGE_H) * 100}%`,
-            fontSize: 15,
+            fontSize: 20,
           }
         : {
             left: box.x * scale,
             top: box.y * scale,
             width: box.w * scale,
             height: box.h * scale,
-            fontSize: Math.max(15, box.h * 0.26 * scale),
+            fontSize: Math.max(20, box.h * 0.26 * scale),
           }}
     >
       签名图
     </span>
   ) : null
 
-  return (
-    <section className="ss-pvcol" aria-label="文档完整页预览">
-      {!compact && (
+  const toolbar = !compact ? (
         <div className="ss-pvbar" data-testid="sign-stamp-pv-toolbar">
           <div className="ss-pvrow">
             <button type="button" className="ss-pvbtn" data-testid="sign-stamp-pv-prev" aria-label="上一页" disabled={viewPage <= 1} onClick={() => onViewPage(viewPage - 1)}>
@@ -247,14 +251,16 @@ export function SignStampPreview({
             </button>
           </div>
         </div>
-      )}
+  ) : null
 
+  return (
+    <section className="ss-pvcol" aria-label="文档完整页预览">
       <div
         className="ss-pv-view"
         ref={viewRef}
         data-testid="sign-stamp-pv-view"
         tabIndex={0}
-        aria-label={`${burned ? '生成的新 PDF' : '原 PDF'}完整页预览，可拖动平移`}
+        aria-label={`${burned ? '签好的 PDF' : '原 PDF'}完整页预览，可拖动平移`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -278,18 +284,23 @@ export function SignStampPreview({
             className="ss-pv-page"
             data-testid="sign-stamp-pv-page"
             data-preview-kind="no-file"
-            style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
+            style={
+              compact
+                ? { position: 'absolute', inset: 16, width: 'auto', height: 'auto' }
+                : { position: 'relative', left: 20, top: 20, width: pw, height: ph }
+            }
           >
-            <p style={{ margin: 24, fontSize: 18, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
+            <p style={{ margin: 24, fontSize: 22, lineHeight: 1.45 }}>没有可打开的文件内容，这里不画示意纸面。</p>
             {marker}
           </div>
         )}
       </div>
+      {toolbar}
       <div className="ss-pv-cap" data-testid="sign-stamp-pv-caption">
         {!previewUrl
           ? '没有可打开的文件内容，不画示意纸面。'
           : burned
-            ? '生成的新 PDF · 签名已印在纸上'
+            ? '签好的 PDF · 签名已印在纸上'
             : compact
               ? `原 PDF 第 ${viewPage} 页 · 下一步可翻页放大`
               : '原 PDF · 框是标记，原件不改写'}
