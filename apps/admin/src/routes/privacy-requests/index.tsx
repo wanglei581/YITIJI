@@ -19,6 +19,10 @@ import {
 
 // ─── Display maps ──────────────────────────────────────────────────────────────
 
+// 与 shared 的 ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM 第一句同文，门禁钉着。
+const ADMIN_DELETE_REQUEST_HINT =
+  '账号注销由管理员在用户管理页执行，需要核对会员身份并再次确认；本页只记录请求与处理结论。'
+
 const STATUS_MAP: Record<DataRequestStatus, { badge: 'success' | 'error' | 'warning' | 'info' | 'default'; label: string }> = {
   pending:   { badge: 'warning', label: '待处理' },
   handling:  { badge: 'info',    label: '处理中' },
@@ -416,8 +420,8 @@ export default function PrivacyRequestsPage() {
             )}
 
             {detail.requestType === 'delete' && (
-              <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[12.5px] text-warning-fg">
-                账号注销请求暂不开放在线处理（法务矩阵尚未签字），本后台目前没有处理这类请求的入口。请联系法务团队确认处理方式。
+              <div className="mt-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[12.5px] text-info-fg">
+                {ADMIN_DELETE_REQUEST_HINT}
               </div>
             )}
           </>
