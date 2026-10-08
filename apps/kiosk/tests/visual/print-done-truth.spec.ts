@@ -13,7 +13,6 @@ const taskState = {
 }
 const PHONE = '拨打服务电话 18369161921（工作日 9:00–18:00）'
 const SENTENCE_2 = `这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请${PHONE}。`
-const SENTENCE_3 = `这台机器暂时不能用，请稍后再来，或${PHONE}。`
 const SENTENCE_5 = `如需退款，请${PHONE}，我们核实后原路退回。`
 
 function supportContact(api: ApiRouter, patch: { miniapp?: boolean }): void {
@@ -122,8 +121,9 @@ test('an unconfirmed print is never presented as a confirmed failure @kiosk', as
   await expect(page.getByText('打印结果未确认', { exact: true }).first()).toBeVisible()
   const state = page.locator('[data-testid="print-fulfill-state-result-unconfirmed"]')
   await expect(state).toContainText('出纸口')
-  // 主按钮在底栏，换成标准句 4。这一单没带金额，不写退款。服务端「请工作人员检查」也不上屏。
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText(`打印有问题？${PHONE}，或问小青`)
+  // 底栏按钮统一叫「求助」，标准句 4 留在正文；这一单没带金额，不写退款。
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('求助')
+  await expect(page.getByTestId('print-fulfill-state-result-unconfirmed')).toContainText(`打印有问题？${PHONE}，或问小青`)
   await expect(state).toContainText(SENTENCE_2)
   await expect(state).not.toContainText('联系现场工作人员')
   await expect(state).not.toContainText('联系工作人员')
@@ -131,6 +131,8 @@ test('an unconfirmed print is never presented as a confirmed failure @kiosk', as
   await expect(state).not.toContainText('已为你退款')
   await expect(state).not.toContainText('如需退款')
   await expect(state).not.toContainText('换一台机器')
+  await page.getByTestId('print-fulfill-primary').click()
+  await expect(page).toHaveURL(/\/help$/)
 })
 
 // 反向锁：没有该错误码时不得被误改成「未确认」，否则真失败也被说成不确定。
@@ -147,7 +149,9 @@ test('a paid unconfirmed print offers the check line and a refund line @kiosk', 
   })
   await openDoneWithState(page, { ...taskState, amountCents: 200 })
   const state = page.locator('[data-testid="print-fulfill-state-result-unconfirmed"]')
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText(`打印有问题？${PHONE}，或问小青`)
+  // 标准句 4 是正文提示；底栏入口显示「求助」，点击仍去 /help。
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('求助')
+  await expect(page.getByTestId('print-fulfill-state-result-unconfirmed')).toContainText(`打印有问题？${PHONE}，或问小青`)
   await expect(state).toContainText(SENTENCE_5)
   await expect(state).not.toContainText('在手机上申请')
   await expect(state).not.toContainText('联系工作人员')
@@ -161,7 +165,9 @@ test('a zero-yuan unconfirmed print does not mention a refund @kiosk', async ({ 
   })
   await openDoneWithState(page, { ...taskState, amountCents: 0 })
   await expect(page.getByText('免费试运营，本单 0 元')).toBeVisible()
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText(`打印有问题？${PHONE}，或问小青`)
+  // 标准句 4 是正文提示；底栏入口显示「求助」，点击仍去 /help。
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('求助')
+  await expect(page.getByTestId('print-fulfill-state-result-unconfirmed')).toContainText(`打印有问题？${PHONE}，或问小青`)
   await expect(page.getByText('退款')).toHaveCount(0)
   await expect(page.getByText('换一台机器')).toHaveCount(0)
 })
@@ -364,7 +370,8 @@ for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
     await retryButton.click()
 
     const alert = page.locator('.qx-ctabar').getByRole('alert')
-    await expect(alert).toHaveText(`这台机器的打印程序需要升级后才能重新提交。${SENTENCE_3}`)
+    // 旧 Agent 拒绝重试后改为升级原因加标准句 1，首屏与禁止重放断言保留。
+    await expect(alert).toHaveText(`这台机器的打印程序需要升级后才能重新提交。需要帮助？${PHONE}`)
     // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。
     await expect(alert).toBeInViewport({ ratio: 1 })
     const box = await alert.boundingBox()
@@ -490,9 +497,9 @@ test('pickup completed receipt shows real summary and directs reorders to phone 
   await expect(page.getByText('3 页 × 2 份', { exact: true })).toBeVisible()
   await expect(page.getByText('双面（长边）', { exact: true })).toBeVisible()
   await expect(page.getByText('彩色', { exact: true })).toBeVisible()
-  // 默认夹具小程序未发布：不写「在手机上重新下单」，留本机「再印一份」。
-  await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('print-fulfill-reprint')).toBeVisible()
+  // 到机码的单本来就是手机上下的，再打一份回手机下单；本机不给「再印一份」（取件码方案②）。
+  await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
+  await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
 })
 
 test('pickup completed receipt directs a reorder to the phone only after the miniapp is published @kiosk', async ({ page, api }) => {

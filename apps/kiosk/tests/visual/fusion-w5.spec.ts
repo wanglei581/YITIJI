@@ -1500,8 +1500,8 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   await expect(rows.filter({ hasText: '历史打印.pdf' })).toContainText('暂无支付信息')
   await expect(rows.filter({ hasText: '成绩单.pdf' })).toContainText('待退款')
-  // 取件码提示只跟着服务端 pickupCode 走：四单里只有一单带码。
-  await expect(page.locator('.qx-me-chip', { hasText: '取件码' })).toHaveCount(1)
+  // 方案②把订单徽标改称「到机码」；仍只跟着服务端 pickupCode 走，四单仅一单带码。
+  await expect(page.locator('.qx-me-chip', { hasText: '到机码' })).toHaveCount(1)
   await expect(page.getByText('进行中任务每 5 秒自动更新')).toBeVisible()
   await assetShot(page, 'orders-ready')
   await assertNoElementCrossesViewport(page)
@@ -1516,7 +1516,8 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
-  await expect(paidRow.getByText('到机码', { exact: true })).toBeVisible()
+  // 列表徽标和详单都写「到机码」；这里精确核查展开的码面板，避免两个同名元素。
+  await expect(paidRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expect(paidRow.getByText('还能续打')).toHaveCount(0)
   await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
@@ -1581,7 +1582,8 @@ test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kio
   await loginThroughVisibleUi(page, '/me/print-orders')
   const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
   await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
-  await expect(resumeRow.getByText('到机码', { exact: true })).toBeVisible()
+  // 徽标与详单标题同名，定位真实码面板；不改变码的可见性条件。
+  await expect(resumeRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
   await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })

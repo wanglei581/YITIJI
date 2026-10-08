@@ -571,7 +571,7 @@ export function PrintDonePage() {
             </div>
             <p className="pff-issue-body">
               {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{printProblemLine(contact)}。</>
+                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。{machineCannotPrintLine(contact, { orderKept: true })}已出的纸你先收好。</>
                   : failureReason}
@@ -583,6 +583,7 @@ export function PrintDonePage() {
             <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
           ) : null}
           <p className="pff-out-sub">{printProblemLine(contact)}</p>
+          {amountCents != null && amountCents > 0 ? <p className="pff-out-sub">{refundApplyLine(contact)}</p> : null}
           {takeawayNotices}
           {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
         </div>

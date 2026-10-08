@@ -15,6 +15,7 @@ import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
 import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
 import { getTerminalId, subscribeTerminalIdentity } from '../services/api/screensaver'
 import { machineUnusableLine } from '../copy/unattendedCopy'
+import { useSupportContact } from './useSupportContact'
 
 const ZERO_TONER = { black: 0, cyan: 0, magenta: 0, yellow: 0 } as const
 
@@ -204,6 +205,7 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
 }
 
 export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusView {
+  const contact = useSupportContact()
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [view, setView] = useState<TerminalDeviceStatusView>(() =>
     terminalId
@@ -325,7 +327,7 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
   }, [enabled, terminalId])
 
   if (view.printer.errorCode === 'queueGate') {
-    return { ...view, printerNotice: machineUnusableLine() }
+    return { ...view, printerNotice: machineUnusableLine(contact) }
   }
   return view
 }

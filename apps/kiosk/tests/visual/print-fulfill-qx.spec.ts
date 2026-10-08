@@ -184,7 +184,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
     await expect(outOfPaper, `缺纸页不得出现「${banned}」`).not.toContainText(banned)
   }
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('问小青')
+  // 打印异常页的求助入口已统一命名为「求助」，仍去 /help。
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('求助')
   await expect(outOfPaper.getByRole('status').filter({ hasText: '暂时无法签发带走链接' })).toContainText(`暂时无法签发带走链接。需要帮助？${PHONE}`)
 
   await expectTouchAndBounds(page)
@@ -375,6 +376,8 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
   await expect(jam).not.toContainText('已付金额')
   await expect(jam).not.toContainText('已支付')
+  // 付费卡纸态补回退款说明时，免费单仍不能出现退款句。
+  await expect(jam).not.toContainText('退款')
   // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
@@ -411,7 +414,8 @@ test('completed done says the paper is already out and never renders a pickup co
   await expect(page.getByText('从出纸口取走', { exact: false })).toBeVisible()
   await expect(page.getByText('请取走纸张', { exact: true })).toHaveCount(0)
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
+  // 完成页核查提示换成标准句 4，仍必须在首屏。
+  await expect(page.getByText(`打印有问题？${PHONE}，或问小青`, { exact: true })).toBeInViewport()
   await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
   await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
   await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
