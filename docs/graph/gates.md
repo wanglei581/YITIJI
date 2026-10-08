@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1882 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1887 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -185,7 +185,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 171 个文件</summary>
+<summary><code>apps/admin/src/</code> — 176 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -198,7 +198,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/account-settings/AdminPhoneTransferCard.tsx` | `verify-admin-phone-transfer-ui.mjs` |
 | `apps/admin/src/routes/account-settings/PhoneBindingCard.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/admin/src/routes/account-settings/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
-| `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs` |
+| `apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx` | `verify-admin-ai-access-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/ai-services/AiLogsTable.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/ai-services/AiOperationCostTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx` | `verify-admin-ai-usage-ui.mjs` |
@@ -243,6 +243,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/login/LegalDocsModal.tsx` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/admin/src/routes/login/SecondFactorPanel.tsx` | `verify-admin-login-second-factor.mjs` |
 | `apps/admin/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/member-benefits/grantFormModel.ts` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx` | `verify-feedback-sla.mjs` |
 | `apps/admin/src/routes/member-feedback/feedbackSla.ts` | `verify-feedback-sla.mjs` |
 | `apps/admin/src/routes/member-feedback/index.tsx` | `verify-feedback-sla.mjs` |
@@ -281,8 +282,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/permissions/presentation.ts` | `verify-admin-internal-accounts-ui.mjs` |
 | `apps/admin/src/routes/policy-sources/index.tsx` | `verify-source-publish-actions.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/print-scan/CapabilityCenter.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-print-color-duplex-capability.ts` |
+| `apps/admin/src/routes/print-scan/ClearCapabilityButton.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/PrintRetryButton.tsx` | `verify-admin-print-scan-ui.mjs` |
+| `apps/admin/src/routes/print-scan/SignatureCapabilityRow.tsx` | `verify-admin-print-scan-ui.mjs` |
 | `apps/admin/src/routes/print-scan/index.tsx` | `verify-admin-print-scan-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/printers/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/privacy-requests/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs` |
@@ -307,6 +310,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/sync-sources/SyncSourceWriteActions.tsx` | `verify-backend-p0-contracts.mjs` |
 | `apps/admin/src/routes/sync-sources/index.tsx` | `verify-no-raw-error-render.mjs`<br/>`verify-backend-p0-contracts.mjs` |
+| `apps/admin/src/routes/sync-sources/syncSourcesApi.ts` | `verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
 | `apps/admin/src/routes/terminals/ReleaseObservationPanel.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/terminals/TerminalBindCodeDialog.tsx` | `verify-admin-terminal-bind-code-ui.mjs` |
@@ -322,7 +326,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/toolbox/components/ToolboxLaunchSummaryCard.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/routes/toolbox/constants.ts` | `verify-console-batch5-copy.mjs`<br/>`verify-toolbox-review-ui.mjs`<br/>`verify-terminal-device-config.ts` |
 | `apps/admin/src/routes/toolbox/index.tsx` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
-| `apps/admin/src/routes/users/UserClosureDialog.tsx` | `verify-user-closure-ui.mjs` |
+| `apps/admin/src/routes/toolbox/toolboxActionState.ts` | `verify-no-raw-error-render.mjs` |
+| `apps/admin/src/routes/users/UserClosureDialog.tsx` | `verify-user-closure-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/admin/src/routes/users/UserDetailDrawer.tsx` | `verify-admin-users-ui.mjs`<br/>`verify-user-closure-ui.mjs` |
 | `apps/admin/src/routes/users/UserStatusDialog.tsx` | `verify-admin-users-ui.mjs` |
 | `apps/admin/src/routes/users/index.tsx` | `verify-admin-users-ui.mjs`<br/>`verify-user-closure-ui.mjs` |
@@ -1164,7 +1169,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/screen/metricLabels.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenMeta.ts` | `verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/screenTabs.ts` | `verify-console-screen-details.mjs` |
-| `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs` |
+| `apps/partner/src/routes/screen/screenView.tsx` | `verify-console-screen-ui.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/partner/src/routes/smart-campus/index.tsx` | `verify-console-plain-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/sources/ExcelImportModal.tsx` | `verify-excel-template-download-ui.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-job-headcount.ts`<br/>`verify-partner-excel-import.ts` |
 | `apps/partner/src/routes/sources/RotateCredentialDrawer.tsx` | `verify-backend-p0-contracts.mjs` |
