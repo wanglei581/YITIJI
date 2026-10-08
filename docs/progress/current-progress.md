@@ -1,6 +1,7 @@
 # 当前开发进度
 
 ## 2026-10-06：AI 生成简历——只写公司没写职务的经历照样生成（后端半；分支 `claude/backend-hardening-20261006-resume-empty-role`，与一体机半同批合）
+## 2026-10-06 夜：终端程序批量部署与激活方案定稿（分支 `claude/batch-activation-plan-1006`，只改文档）
 
 - **起因：** 一体机「AI 帮你生成简历」把只写了公司、没写职务的经历在提交前丢掉（`apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx:191`），用户的真实经历被丢，违背「不编造」。总指挥 10/6 定：照样进生成，职务保持为空。一体机去过滤由主执行做，服务端职务原是必填，两半必须同批合。
 - **改了什么：** `ResumeGenExperienceDto.role` 改为可空（`@IsOptional() @IsString() @MaxLength(60)`，缺省 / null 规整为 `''`）；系统提示词加第 9 条「职务为空的那条，润色描述里不得出现任何职务、岗位或头衔名称」；组装时职务照旧从输入原样复制。**新增职务防编造**（`introducesUnstatedTitle`）：润色后的经历描述出现输入（公司 / 职务 / 原描述）里没有的头衔词，或出现「担任 / 任职 / 职位为」而输入没有，就丢弃这条润色、回落用户原文——此前生成链路只校验条数与违禁词，没有专门的职务校验。输入里写了的职务照常可以出现。导出（PDF / Word / 文本）用 `resumeEntryHead` 拼标题，空职务自动只显示公司。
@@ -108,6 +109,7 @@
 - **审查补丁（Claude）：** 心跳里推进 / 取命令这层出错时只记日志、这一轮不带 `commands`，心跳照常 200（心跳失败会让终端被判离线）；门禁加了对应断言。命令层两处错误日志只记错误类型和错误码，不记 message（告警 webhook 地址、库连接串可能在里面）。
 - **口径差：** 终端令牌打管理员下发接口得到 401 `AUTH_TOKEN_INVALID`。定稿第 1 节要求沿用现有管理员守卫；第 7 节括号写了「终端令牌 403」。实现跟第 1 节和现有 `JwtAuthGuard`。
 - **未做：** 没有部署，没有改生产配置或生产库。后台按钮和 Windows Agent 不在本包。图谱因 `prisma.service.ts`、两份 schema、`ci.yml` 被大量既有门禁点名，对改动文件共列出 219 条既有门禁，本机都跑过。`verify:resume-export-formats` 在共用 SQLite 上因前面门禁留下的删除账本多清了文件而红，换一份干净库重跑为 `ALL PASS`。带 `:postgres` 的 8 条在车道默认的 SQLite 地址上会先红；另起临时 PostgreSQL（端口 55475，库 `terminal_command_drill_ci` 与空库 `p1_upgrade_ci`，用户 `drill`）并生成 PostgreSQL 客户端后，这 8 条都通过。该集群已停，数据目录已删。
+
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。
