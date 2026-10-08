@@ -4,7 +4,8 @@ import { expect, test } from '../fixtures/kiosk-test'
 import { prepareRelayPages, QR_STATES, UPLOAD_STATES, relayPagesPlan, type RelayPagesPlan } from './fixtures/qingxu-pair-relay-pages'
 import type { QingxuPairTarget } from './fixtures/qingxu-pair-targets'
 
-const XIAOQING = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+// 10/8 产品负责人批准的文字偏离：稿上是『回到这台机器后』，手机上改说『一体机』，不要照稿改回去。
+const XIAOQING = '回到一体机后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
 const PHONE = '13812346627'
 const TICKET = 'relay51staff0123456789abcd'
 const STATUS = `/api/v1/member/auth/qr/${TICKET}/status`

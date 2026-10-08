@@ -30,7 +30,8 @@ import { DeviceCard, Facts, QrForm, QrIcon, StateCard, Steps } from './component
 import { useSupportContact } from '../../hooks/useSupportContact'
 import './mobile-qr-service-desk.css'
 
-const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+// 10/8 产品负责人批准的文字偏离：稿上是『回到这台机器后』，手机上改说『一体机』，不要照稿改回去。
+const XIAOQING_FOOT = '回到一体机后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
 
 /* 手机确认登录（/member/qr-login）。视觉与口径真值：稿 51-phone-relay.html screen=qr-login。
  * 手机端从头到尾拿不到登录态：服务端只回 confirmed，一体机还要自己 claim。

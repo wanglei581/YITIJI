@@ -52,7 +52,8 @@ import {
   uploadView,
 } from './phoneUploadModel'
 
-const XIAOQING_FOOT = '回到这台机器后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+// 10/8 产品负责人批准的文字偏离：稿上是『回到这台机器后』，手机上改说『一体机』，不要照稿改回去。
+const XIAOQING_FOOT = '回到一体机后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
 /** 空文件、超限、格式、类型。红色预检说明放到文件信息上面，390×844 首屏看全。 */
 const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 
