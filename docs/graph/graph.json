@@ -23679,6 +23679,7 @@
       "apps/kiosk/scripts/verify-resume-export-facts-contract.mjs",
       "services/api/scripts/verify-resume-draft-versions.ts",
       "services/api/scripts/verify-resume-export-formats.ts",
+      "services/api/scripts/verify-resume-generate.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts"
@@ -41390,6 +41391,7 @@
         "dirs": [],
         "files": [
           "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/dto/resume-generate.dto.ts",
           "services/api/src/ai/interfaces/ai-provider.interface.ts",
           "services/api/src/ai/providers/mock.provider.ts",
           "services/api/src/ai/resume/llm-resume-generate.service.ts",
