@@ -14,6 +14,18 @@
   - 过渡期先默认印：`RESUME_EXPORT_VISIBLE_LABEL` 随第六次发布（10/9）由总指挥请示打开。
 - **同步的文档：** 合规总表（生成式 AI 登记与标识一行、导出标识一条）、next-tasks（三处开关口径）、feature-scope 第 7 行、同意与撤回说明第 10 节。
 - **工作分工：** 后端约 1.5 人日，10/30 前进候选。一体机由前端 B 做，小程序由小程序窗口做：两端第七次先加一句提示，勾选框等后端字段。
+## 2026-10-06：免费打印防刷（Grok 实现、Claude 审，未部署）
+
+- **默认值 10/6 产品负责人已定（「打印上限按推荐」），全部可配。** 没配、空值或越界时回落：每台每天 300 面、每个登录会员每天 50 面、免登录每单 20 面、告警阈值 80%。平台设置键 `print.freeQuota.terminalDailySides` / `memberDailySides` / `guestPerOrderSides` / `alertPercent`。单台覆盖是 `Terminal.dailyFreePrintSides`（null = 用全局）。只约束实付 0 的免费单；实付大于 0 不受这三条限制。
+- **收紧一（在途）：** 拒绝条件是「今天已出纸 + 仍在途（同一终端或同一会员、今天建的、pending / claimed / printing）+ 本单面数 > 上限」。余量接口的 `used` 只算已出纸，`remaining = max(0, 上限 − 已出纸 − 在途)`。失败、未确认、取消不计。成功出纸的 `errorCode` 是空的，计数时必须把空错误码算进去，不能用 SQL `NOT errorCode = 未确认`（那会把空值行丢掉）。
+- **收紧二（文案）：** `PRINT_TERMINAL_DAILY_QUOTA_REACHED` 只说「今天这台机器的免费打印量已用完，明天 0 点恢复。」不写「文件已存在你的『我的文档』里」（不是每单都进了「我的文档」）。三条文案都不出现「工作人员」。
+- **收紧三（告警）：** `print_terminal_quota_high` 写在新文件 `services/api/src/admin-ops/derived-print-quota-alerts.ts`。`collectDerivedAlerts` 只加一行调用。只算 `enabled && lifecycleStatus === 'active'` 的终端；达到阈值 warning，用满 error；回合 = 终端 + 北京日期。`firingTotal` 必须把这一类的条数加进去，否则运营列表的总数会少算。企业微信推送仍用既有包装（标题前加「【职易达告警】」、后面加「正在发生」），告警标题本身是「终端 … 今日免费打印量已达 used / limit 面」。
+- **日界：** 北京自然日 0 点恢复，复用 AI 额度的 `quotaDay` / `quotaResetsAt`。`resetAt` 是次日 0 点的 UTC ISO。
+- **触发器：** `Terminal_planned_update_guard` 只拦 `agentToken`、`lifecycleStatus`、`credentialGeneration`。`Terminal_retired_update_guard` 只在身份列变化时拦截。改 `dailyFreePrintSides` 会刷新 `lastSeenAt`（`@updatedAt`），这一列不在退役身份比较里，不会被拦。已退役行不能直接插入，门禁用静态断言加计划中终端的列更新来证明。
+- **拦截点：** 一体机现场建单、手机单到机放行、自助续打与 `/retry`。管理员后台重试不拦。已经放行、正在出纸的单不打断。
+- **内存桩：** 既有告警和终端列表门禁把 Prisma 收成残缺对象。没有 `platformSetting` 时额度配置用上面的默认值；没有 `printTask` 或订单表时今日免费面数记 0。真实库始终有这些委托。
+- **本机验证（未部署）：** `verify:free-print-quota` 最后一行 `PASS verify:free-print-quota`。API typecheck、lint 退出 0。临时 PostgreSQL（`127.0.0.1:55481`，库 `verify_free_print_quota`）96 条迁移 deploy 成功，`migrate diff --exit-code` 为 No difference detected；随后停库、删除数据目录，并 `prisma generate` 恢复 SQLite 客户端。`pnpm graph:check` PASS，模型数仍是 112。反向变异五处已还原。
+- **留给告警页窗口：** `apps/admin` 的 `AdminAlertType` / `TYPE_META` / `TYPE_FILTERS` 还没有 `print_terminal_quota_high`。本窗口不改页面，`verify:service-desk-dashboard-ui` 会继续红，直到那一页补上这个类型。
 
 ## 2026-10-06：取件「出纸未确认 / 只出一部分」的自助出路（叠在 #1261 上，Grok 实现、Claude 审，未部署）
 
@@ -304,6 +316,22 @@
 ## 2026-10-04：小程序按「现场无人值守」改文字（分支 `claude/miniapp-unattended-copy`，叠在 #1219 上）
 
 产品负责人 10/4 主原则：设备现场没有工作人员，全程自助、自动。小程序里让用户「联系现场工作人员 / 找工作人员核对 / 工作人员处理后 / 到店核对」的地方（注册页面里 6 处，加 3 处「到店」）改成自助出路：手机上重试或重新下单、拨打服务电话。「换一台机器」要等后端接口说附近有别的在线终端才说，接口接上前一律不说（取件页两处；材料包那句「换一个服务点」是原有的、指选服务点，保留）。服务电话号码等后端公开接口（GET /api/v1/public/support-contact?terminalId=，返回 servicePhone / serviceHours / otherOnlineTerminalNearby / miniappPublished，开发中）再接，在那之前只说「号码在首页底部『经营者信息』里」，不写死（`utils/user-error.js` 的 `SUPPORT_HINT`）。停放的招聘会页面不打包，那里说的是主办方的现场人员，没动。新门禁（`free-pilot-copy.test.mjs`）：全部注册页面的 WXML、页面目录 JS 与 utils JS 的文字里不许出现找工作人员、店员、服务台、到店；`supportHint` 在页面 data 里实跑有值。只改文字与接线，不改样式。11 处改动逐处反向变异全部转红。
+## 2026-10-04：取件码方案②（候选分支，未合入、未上线）
+
+产品负责人 10/4 拍板「取件码按推荐」。本段是后端契约，一体机与小程序按同一批字段改前端。字段名不要改。
+
+- 明文列写入路径（本分支核实）：全仓生产代码里，新铸一枚明文 `Order.pickupCode` 的路径原来只有 `order-status.service.ts` 的 `settleRedemptionInTransaction`（`generateUniquePickupCode` 重试循环）。该循环与辅助函数已删。`markPaid` / `markPaidOnline` 本来就不写这一列。建单与作废重发只写 `pickupCodeHash` + `pickupCodeEnc`。退款（`refund.service.ts` 两处）和账号注销保留（`member-closure-retention.ts`）只把这一列置 null。退款来源含糊判断仍会读这一列，不下发。列保留，不迁移存量。
+- 响应里的 `pickupCode` 只可能是解密后的到机码或 null。有哈希、且（仍可取，或此刻可续打）才解密 `pickupCodeEnc`。没有哈希的现场单保持 null。可取口径：`pickupStatus=pending`，付款态为 unpaid / paying / paid，且 `pickupCodeExpiresAt` 仍在未来。
+- 上限：每单自助续打 2 次（`SELF_SERVICE_REPRINT_LIMIT`，加上首次出纸最多 3 次）。计数：该任务状态日志里 `fromStatus=failed`、`toStatus=pending`、`errorCode` 属于 `kiosk_retry` 或 `pickup_code_resume` 的条数。管理员重试（`admin_retry`）不计入、也不受限。`POST /api/v1/print-jobs/:taskId/retry` 与到机码续打共用这个数。旧的 `reprintAttemptsByTaskId` 仍统计全部 failed→pending，不含这次过滤。
+- 两个字段，挂在下发 `pickupCode` 的订单视图上（云打印与材料包的列表和详情、我的打印订单列表与详情、跨端时间线）。在线支付状态和管理员订单动作不带这两个字段。
+  - `reprintAllowed`：此刻绑定终端用同一个到机码能否续打。任务失败、`paidReprintBlockReason` 为空（含 Agent 版本）、任务终端与订单终端相同、取件窗口未关、自助次数未到上限，才为 true。没任务、没失败、现场单、退款中为 false。
+  - `reprintRemaining`：剩余自助次数 0–2。没有任务或现场单（没有哈希）为 null。有任务且有哈希时给数字，哪怕此刻 `reprintAllowed` 为 false。
+  - `reprintAllowed` 为 true 时继续下发到机码。已用且不可续打的单不下发。
+- 续打：认领入口在已放行（used / 有 printTaskId）之后、10 分钟回放之前。满足上面条件则把同一个任务和订单的 `taskStatus` 从 failed 改回 pending，状态日志 `errorCode=pickup_code_resume`，刷新 30 分钟签名文件地址。返回与正常放行同一形状，并多一个 `resumed: true`。不建任务、不改金额、不新建订单。正常放行和 10 分钟回放不带 `resumed`。回放窗口仍从任务最初的 `createdAt` 算，续打不重置。
+- 拒绝：次数用完 409 `PICKUP_RESUME_LIMIT_REACHED`「这单已经接着打过 2 次，不能再打了」。结果未确认 409 `PICKUP_RESUME_UNCONFIRMED`「这单的出纸结果还没确认，暂时不能接着打，请稍后再试」。已出部分纸 409 `PICKUP_RESUME_PARTIAL_OUTPUT`「这单已经出了一部分纸，不能整单重打」。其它不可续打原因沿用既有 `REPRINT_BLOCKED_CODE` 与对应文案；既有「未确认」那句本包不改。会员 `/retry` 超限 409 `PRINT_RETRY_LIMIT_REACHED`，文案与次数用完那句相同。取件窗口已关沿用 400 `PICKUP_CODE_EXPIRED`。退款中 / 已退沿用认领入口既有 400 `ORDER_REFUNDED`，走不到续打。别的终端输这个码仍是认领入口既有 404 `PICKUP_CODE_INVALID`。任务还在排队、打印中或已完成，仍走 10 分钟回放。
+- 管理员可见性：只读订单视图与 `POST /admin/orders/:id/mark-paid` 都不把到机码交给管理员浏览器。`mark-paid` 的 `pickupCode` 恒为 null（字段还在，避免旧客户端缺键）。密文列也不回。
+- 新门禁 `verify:pickup-code-resume` 挂在 `verify:print-jobs` 后面，CI 已有的 `verify:print-jobs` 行会带上它，未改 `.github/`。
+- 停放、隐藏、改名、降级：无。存量明文列留在库里，任何接口不再把它读出来。
 ## 2026-10-04：公开只读接口 support-contact（服务电话与提示条件）
 
 一体机出错时按条件显示「拨打服务电话」「换一台机器」「用手机继续」。本段是后端判断。一体机和小程序的句子由主执行窗口接，本分支不改那三端。

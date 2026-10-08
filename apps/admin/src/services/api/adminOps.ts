@@ -36,7 +36,7 @@ export type AlertHandlingState = 'open' | 'acknowledged' | 'silenced' | 'closed'
 export type AlertListView = 'open' | 'acknowledged' | 'suppressed' | 'all'
 
 /** 与后端 services/api/src/admin-ops/derived-alert-identity.ts 的 ALERT_TYPES 一一对应。 */
-export type AdminAlertType = 'terminal_offline' | 'printer_issue' | 'print_failed' | 'paid_pending_file_unavailable' | 'feedback_pending'
+export type AdminAlertType = 'terminal_offline' | 'printer_issue' | 'print_failed' | 'paid_pending_file_unavailable' | 'feedback_pending' | 'print_terminal_quota_high'
 
 export interface AdminAlertItem {
   id: string

@@ -84,6 +84,9 @@ function mockOpsPrisma(
 ): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
+    platformSetting: { findMany: async () => [] },
+    order: { findMany: async () => [] },
+    orderItem: { findMany: async () => [] },
     printTask: {
       findMany: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows : printRows,
       count: async (args?: { where?: { status?: string } }) => args?.where?.status === 'pending' ? unavailableRows.length : printRows.length,

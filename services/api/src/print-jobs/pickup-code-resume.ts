@@ -11,7 +11,9 @@ import {
 } from './paid-reprint-eligibility'
 import { isPrintableFileRecord } from './print-page-count.service'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
-import { markPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
+import { markPaidUnfulfilledRefundRequired, payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { reprintRequestedSides } from './free-print-quota.usage'
 import {
   PICKUP_CODE_RESUME,
   PICKUP_RESUME_LIMIT_REACHED,
@@ -110,7 +112,7 @@ export async function resumeReleasedFailure(
     await lockPrintTaskRow(tx, task.id)
     const liveTask = await tx.printTask.findUnique({
       where: { id: task.id },
-      select: { status: true, errorCode: true, terminalId: true, fileId: true, completedAt: true },
+      select: { status: true, errorCode: true, terminalId: true, fileId: true, completedAt: true, paramsJson: true, endUserId: true },
     })
     const liveOrder = await tx.order.findUnique({ where: { id: order.id } })
     if (!liveTask || !liveOrder || liveTask.terminalId !== terminalId || liveOrder.printTaskId !== task.id) {
@@ -154,6 +156,16 @@ export async function resumeReleasedFailure(
       conflict(PICKUP_RESUME_LIMIT_REACHED, SELF_SERVICE_REPRINT_LIMIT_MESSAGE)
     }
     if (!freshFileUrl) throwResumeBlock('file_unavailable')
+    const quotaItem = await tx.orderItem.findFirst({
+      where: { printTaskId: task.id },
+      select: { billablePages: true, copies: true },
+    })
+    await assertFreePrintQuota(tx, {
+      terminalId: liveTask.terminalId ?? terminalId,
+      endUserId: liveTask.endUserId,
+      requestedSides: reprintRequestedSides(quotaItem, liveOrder, liveTask.paramsJson),
+      payableCents: payableCents(liveOrder),
+    })
     const notice: ReprintNotice = liveDecision.action === 'reprint' ? liveDecision.notice : null
     const updatedOrder = await tx.order.updateMany({
       where: {

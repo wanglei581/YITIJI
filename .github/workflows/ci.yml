@@ -619,6 +619,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-stats-contract
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:free-print-quota
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
           # 彩色/双面按终端能力开放（fail-closed）：未登记的终端必须拒绝，
           # 且彩色订单必须按彩色价目计价 —— 误放的代价是用户按彩色付费拿到黑白纸。

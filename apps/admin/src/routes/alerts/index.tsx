@@ -36,6 +36,12 @@ const TYPE_META: Record<
     guidance: `有 AI 内容投诉等待处理（条数与最早提交时间见上一行），须在 ${AI_CONTENT_COMPLAINT_SLA_WORKDAYS} 个工作日内答复。点「去处理」直接打开已按「AI 内容投诉」筛好的意见反馈，答复后这条告警自动消失；有新投诉进来会再次提醒。确认 / 静默只记录处理。`,
     link: { label: '去处理', to: '/member-feedback?category=ai_content' },
   },
+  // 免费打印防刷：某台终端当天免费出纸面数达到上限的告警阈值（默认 80%），用满升为严重。
+  print_terminal_quota_high: {
+    label: '免费打印量接近上限',
+    icon: PrinterIcon,
+    guidance: '这台终端今天的免费打印面数已接近或达到每日上限（数字见上一行），达到上限后本机当天不再接受免费单，明天 0 点恢复。每日上限的全站默认值和单台设置由管理员配置。确认 / 静默只记录处理。',
+  },
 }
 
 const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
@@ -55,6 +61,7 @@ const TYPE_FILTERS = [
   { label: '打印失败', value: 'print_failed' },
   { label: '已支付文件不可用', value: 'paid_pending_file_unavailable' },
   { label: 'AI 内容投诉', value: 'feedback_pending' },
+  { label: '免费打印量', value: 'print_terminal_quota_high' },
 ] as const
 
 const VIEW_TABS: Array<{ label: string; value: AlertListView }> = [
