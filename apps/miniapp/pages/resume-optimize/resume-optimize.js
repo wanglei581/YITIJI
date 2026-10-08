@@ -19,6 +19,7 @@ const FORMATS = [
 Page({
   data: {
     statusBarHeight: 20,
+    aiLabelNote: buildModel.RESUME_AI_LABEL_NOTE,
     phase: 'no-task',
     taskId: '',
     needReupload: false,

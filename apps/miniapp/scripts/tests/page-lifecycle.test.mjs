@@ -7403,3 +7403,39 @@ test('续打次数只在服务端允许续打时写，待到机的码旁不写',
   assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 0 }), '')
   assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 1.5 }), '')
 })
+
+// AI 简历导出默认印「含人工智能辅助生成内容」（产品负责人 2026-10-06 晚拍板，服务端开关 10/9 打开）。
+// 导出之前就要让用户知道：生成页「导出设置」卡、优化页「导出优化稿」格式格下方各一句。
+test('AI 简历导出：生成页与优化页在导出处说明每页底部会印 AI 标注', () => {
+  const m = requireMiniapp('../utils/resume-build-model.js')
+  assert.match(m.RESUME_AI_LABEL_NOTE, /每页底部有一行小字：含人工智能辅助生成内容/)
+  for (const rel of ['pages/resume-build/resume-build.js', 'pages/resume-optimize/resume-optimize.js']) {
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx: createWx() })
+    assert.equal(page.data.aiLabelNote, m.RESUME_AI_LABEL_NOTE, `${rel} data.aiLabelNote`)
+  }
+  const build = fs.readFileSync(path.join(MINIAPP, 'pages/resume-build/resume-build.wxml'), 'utf8')
+  const card = build.slice(build.indexOf('<view class="section-t">导出设置</view>'))
+  assert.ok(card.indexOf('{{aiLabelNote}}') > 0 && card.indexOf('{{aiLabelNote}}') < card.indexOf('</view></view>'), '在「导出设置」卡内')
+  const opt = fs.readFileSync(path.join(MINIAPP, 'pages/resume-optimize/resume-optimize.wxml'), 'utf8')
+  const grid = opt.indexOf('<view class="format-grid">')
+  const note = opt.indexOf('{{aiLabelNote}}')
+  assert.ok(grid > 0 && note > grid && note < opt.indexOf('pricing-line', grid), '在「导出优化稿」格式格下方、价格说明之前')
+})
+
+// 还没有真实的大模型备案号时，不对用户（含读屏标签）说「备案号」，只说「备案情况」——
+// 读屏用户听到「备案号」会以为点进去能查到号码（合规窗口反方审查 10/6）。
+// 拿到深度求索备案号、写进后台「AI 服务说明」以后，这条断言连同文案一起改回带号码的写法。
+test('AI 服务说明入口：没有真号码之前只说「备案情况」，不说「备案号」', () => {
+  const stripComments = (src, ext) => ext === 'wxml'
+    ? src.replace(/<!--[\s\S]*?-->/g, '')
+    : src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const files = [
+    'pages/home/home.wxml', 'pages/assistant/assistant.wxml', 'pages/ai/ai.wxml',
+    'pages/about/about.js', 'pages/legal/legal.js', 'pages/help/help.js',
+  ]
+  for (const rel of files) {
+    const src = stripComments(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), rel.split('.').pop())
+    assert.doesNotMatch(src, /备案号/, `${rel} 用户看得到的文字里不该有「备案号」`)
+    assert.match(src, /备案情况/, `${rel} 应改成「备案情况」`)
+  }
+})

@@ -228,7 +228,12 @@ function formAsResume(form) {
   }
 }
 
+// AI 简历导出默认在每页底部印「含人工智能辅助生成内容」（Word 在页脚，TXT / MD 在末尾），
+// 产品负责人 2026-10-06 晚拍板；方案见法务包 c6-owner-kit/04b 第 2 节。生成页与优化页共用这一句。
+const RESUME_AI_LABEL_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容（纯文本、Markdown 格式写在文末）。'
+
 module.exports = {
+  RESUME_AI_LABEL_NOTE,
   MAX_EDUCATION, MAX_EXPERIENCE, MAX_PROJECTS, MAX_SKILLS, MAX_CERTIFICATES,
   LEN, optionGroups, syncOptionGroups,
   emptyEducation, emptyExperience, emptyProject,
