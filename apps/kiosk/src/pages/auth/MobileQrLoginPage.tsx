@@ -235,7 +235,7 @@ export function MobileQrLoginPage() {
           <span className="k1-mobile-qr-seal" aria-hidden="true">职</span>
           <div className="k1-mobile-qr-brand">
             <strong>职易达</strong>
-            <small><span>手机确认登录 ·</span>{' '}<span>{chrome.suffix}</span></small>
+            <small><span>手机确认登录</span><span>{'\u00a0'}·</span>{' '}<span>{chrome.suffix}</span></small>
           </div>
           <span className="k1-mobile-qr-tag">{chrome.tag}</span>
         </header>

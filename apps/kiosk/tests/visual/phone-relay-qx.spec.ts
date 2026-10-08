@@ -449,18 +449,30 @@ test('29 态顶栏副标题不被截断 @mobile', async ({ page, api }) => {
       expect(metrics.scroll, name).toBeLessThanOrEqual(metrics.client)
       expect(metrics.overflow === 'ellipsis' && metrics.whitespace === 'nowrap', name).toBe(false)
       expect(metrics.lines, name).toBeLessThanOrEqual(2.01)
-      if (metrics.lines > 1.01) {
-        expect(metrics.segments, `${name} 折行副标题应分成两段`).toHaveLength(2)
-        expect(metrics.segments[0].text, `${name} 第一段应以「·」结尾`).toMatch(/·$/)
+      if (item.screen === 'qr-login' || metrics.lines > 1.01) {
+        const isQr = item.screen === 'qr-login'
+        expect(metrics.segments, `${name} 副标题应分成${isQr ? '三' : '两'}段`).toHaveLength(isQr ? 3 : 2)
+        if (isQr) {
+          expect(metrics.segments[0].text, `${name} 第一段应保留精确匹配文字`).toBe('手机确认登录')
+          expect(metrics.segments[1].text, `${name} 分隔符前应为不换行空格`).toBe('\u00a0·')
+        } else {
+          expect(metrics.segments[0].text, `${name} 第一段应以「·」结尾`).toMatch(/·$/)
+        }
         for (const [index, segment] of metrics.segments.entries()) {
-          const label = index === 0 ? '第一段应整段同行' : '第二段应整段同行，不能从词中间断开'
+          const label = index === metrics.segments.length - 1 ? '尾巴应整段同行，不能从词中间断开' : '第一段和「·」应整段同行'
           expect(segment.rects.length, `${name} ${label}，应有可见矩形`).toBeGreaterThan(0)
           const tops = segment.rects.map((rect) => rect.top)
           expect(Math.max(...tops) - Math.min(...tops), `${name} ${label}`).toBeLessThanOrEqual(1)
         }
-        const firstBottom = Math.max(...metrics.segments[0].rects.map((rect) => rect.bottom))
-        const secondTop = Math.min(...metrics.segments[1].rects.map((rect) => rect.top))
-        expect(secondTop, `${name} 第二段应从第二行开始`).toBeGreaterThan(firstBottom - 1)
+        const firstLineRects = metrics.segments.slice(0, -1).flatMap((segment) => segment.rects)
+        const firstLineTops = firstLineRects.map((rect) => rect.top)
+        expect(Math.max(...firstLineTops) - Math.min(...firstLineTops), `${name} 第一段和「·」应在同一行`).toBeLessThanOrEqual(1)
+        if (metrics.lines > 1.01) {
+          const firstBottom = Math.max(...firstLineRects.map((rect) => rect.bottom))
+          const tail = metrics.segments[metrics.segments.length - 1]
+          const secondTop = Math.min(...tail.rects.map((rect) => rect.top))
+          expect(secondTop, `${name} 第二行应从尾巴开始`).toBeGreaterThan(firstBottom - 1)
+        }
       }
       await expectInViewport(page, item.selector, name)
       if (width === 390 && item.screen === 'qr-login' && !['ticket-expired', 'confirm-unknown'].includes(item.state)) {
