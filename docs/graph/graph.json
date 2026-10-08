@@ -20231,7 +20231,8 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -20349,7 +20350,8 @@
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
@@ -31849,8 +31851,10 @@
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/QaRecords.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx"
         ],
