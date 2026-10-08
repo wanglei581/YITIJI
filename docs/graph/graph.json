@@ -12989,7 +12989,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 674,
+      "reachableFileCount": 677,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -12997,6 +12997,7 @@
           "component": "HomePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13108,6 +13109,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /me/mock-interviews/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13170,6 +13172,7 @@
           "component": "CampusPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13425,6 +13428,7 @@
           "component": "JobFairsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13480,6 +13484,7 @@
           "component": "JobFairDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13535,6 +13540,7 @@
           "component": "FairCompaniesPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13590,6 +13596,7 @@
           "component": "FairCompanyDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13644,6 +13651,7 @@
           "component": "FairMapPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13699,6 +13707,7 @@
           "component": "FairMaterialsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13754,6 +13763,7 @@
           "component": "FairStatsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13842,6 +13852,7 @@
           "component": "JobFairCheckinPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13897,6 +13908,7 @@
           "component": "JobsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13951,6 +13963,7 @@
           "component": "JobDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14018,6 +14031,7 @@
           "component": "LegalDocPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14932,7 +14946,20 @@
         },
         {
           "component": "RenshiPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /advisor/availability",
+            "GET /advisor/sessions/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "layout": [
             "KioskRoot",
@@ -14944,6 +14971,7 @@
             "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+            "apps/kiosk/src/pages/renshi/renshi-policy-states.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -14969,6 +14997,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15041,6 +15070,7 @@
           "component": "ResumeGeneratePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15097,6 +15127,7 @@
           "component": "ResumeGeneratePreviewPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15154,6 +15185,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15211,6 +15243,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15298,6 +15331,7 @@
           "component": "ResumeOptimizePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15355,6 +15389,7 @@
           "component": "ResumeOptimizeComparePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15411,6 +15446,7 @@
           "component": "ResumeParsePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15467,6 +15503,7 @@
           "component": "ResumeReportPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15655,6 +15692,7 @@
           "component": "ResumeSourcePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15966,7 +16004,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 770
+      "sourceFileCount": 773
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20501,6 +20539,9 @@
     "apps/kiosk/src/pages/renshi/NoticePanel.tsx": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/PolicyAiFallback.tsx": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/PolicyPanel.tsx": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
@@ -20529,8 +20570,14 @@
     "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/renshi-policy-states.css": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/usePolicyAdvisorAvailability.ts": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/usePolicyFocus.ts": [
@@ -21153,7 +21200,8 @@
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/services/api/advisor.ts": [
-      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs"
+      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/services/api/ai.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -31305,14 +31353,18 @@
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyAiFallback.tsx",
           "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
           "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
           "apps/kiosk/src/pages/renshi/builtinData.ts",
           "apps/kiosk/src/pages/renshi/components.tsx",
+          "apps/kiosk/src/pages/renshi/renshi-policy-states.css",
           "apps/kiosk/src/pages/renshi/shared.ts",
-          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts"
+          "apps/kiosk/src/pages/renshi/usePolicyAdvisorAvailability.ts",
+          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
+          "apps/kiosk/src/services/api/advisor.ts"
         ],
         "missing": []
       },
