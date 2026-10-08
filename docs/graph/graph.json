@@ -13051,7 +13051,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 675,
+      "reachableFileCount": 676,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16028,7 +16028,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 771
+      "sourceFileCount": 772
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20085,6 +20085,7 @@
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
@@ -20146,6 +20147,10 @@
     ],
     "apps/kiosk/src/pages/print/printProgressModel.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/printProgressPolling.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs"
@@ -29037,6 +29042,7 @@
           "apps/kiosk/src/pages/print/printDeskModel.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
+          "apps/kiosk/src/pages/print/printProgressPolling.ts",
           "apps/kiosk/src/pages/print/styles/file-source-qx.css",
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
@@ -30603,8 +30609,10 @@
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
+          "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
           "apps/kiosk/src/pages/print/printConfirmModel.ts",
+          "apps/kiosk/src/pages/print/printProgressPolling.ts",
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
