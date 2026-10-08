@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { AdvisorKinds, AdvisorTake } from './AdvisorTakeaway'
 import {
   LEGEND,
@@ -94,7 +94,7 @@ export function QaPinsPanel({
   reread?: ReactNode
 }) {
   return (
-    <section className="aa-sec" data-testid="advisor-artifact-qa">
+    <section className="aa-sec aa-qa" data-testid="advisor-artifact-qa" style={{ '--aa-pin-gaps': Math.max(0, payload.pins.length - 1) } as CSSProperties}>
       <SectionHead n="01" title="你钉住的条目" hint={`共 ${payload.pins.length} 条 · 对话未保存`} stale={stale} reread={reread} />
       <div className="aa-scroll">
         {payload.pins.map((pin, index) => (
@@ -293,12 +293,15 @@ export function ArtifactBody({
   const headerReread = stale ? reread : null
   return (
     <>
+      {panel === 'qa' ? <i className="aa-gap" data-p="top" aria-hidden="true" /> : null}
       {panel === 'qa' && payload?.kind === 'qa_pins' ? <QaPinsPanel payload={payload} stale={stale} reread={headerReread} /> : null}
       {panel === 'slot' && payload?.kind === 'slot_draft' ? <SlotDraftPanel payload={payload} stale={stale} reread={headerReread} /> : null}
       {panel === 'compare' && payload?.kind === 'compare_report' ? <ComparePanel payload={payload} stale={stale} reread={headerReread} /> : null}
       {panel === null ? <ArtifactStatePanel state={state} reread={state === 'error' ? reread : null} /> : null}
       {showsGuide(state) ? <AdvisorKinds /> : null}
+      {panel === 'qa' ? <i className="aa-gap" data-p="mid" aria-hidden="true" /> : null}
       <AdvisorTake state={state} payload={payload} />
+      {panel === 'qa' ? <i className="aa-gap" data-p="bot" aria-hidden="true" /> : null}
     </>
   )
 }
