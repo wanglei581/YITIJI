@@ -134,7 +134,7 @@
      - `systemctl list-timers | grep -i certbot` → 有一行 `certbot.timer`，`NEXT` 列是未来的时间，算有自动续期；没有输出就是没有定时器，在 11/20 冻结前手动续一次（会改生产证书，产品负责人本人做）；
    - 密钥轮换与关闭口令登录，按产品负责人自己的清单做。
 3. **服务器 `.env` 第一批**（只影响服务端，随时可以配）：
-   - `RESUME_EXPORT_VISIBLE_LABEL` **不设（保持关）**：9/29 产品负责人拍板导出的简历不印可见 AI 字样，取代 9/28 的 D2；隐式标识照常保留。`RESUME_EXPORT_UNLABELED_OPTION` 也不设，等律师答复第 21 问；`AIGC_CONTENT_PRODUCER` 按 9/29 拍板写「职易达（统一社会信用代码）」；
+   - `RESUME_EXPORT_VISIBLE_LABEL` **打开（=true）**：2026-10-06 产品负责人定方案 b（默认印，用户申请才不印），取代 9/29「不印」；第六次发布（10/9）由总指挥请示打开；隐式标识照常保留。`RESUME_EXPORT_UNLABELED_OPTION` 不设，等律师答复第 21 问和新版用户协议上线；`AIGC_CONTENT_PRODUCER` 按 9/29 拍板写「职易达（统一社会信用代码）」；
    - `AI_FORBIDDEN_WORDS_FILE` 指向禁词表文件（C10）；
    - `ALERT_WEBHOOK_URL` 填企业微信群机器人地址（派生告警、每日备份失败都会推到群里）；
    - **这一批不要开**：`AI_DECLARATION_ENFORCEMENT`、`AI_LOGIN_GATE`、`POLICY_SCOPE`，第二次发布再开。
@@ -422,7 +422,7 @@
 | C6 年满 14 周岁与录音声明 | #1048 | `AI_DECLARATION_ENFORCEMENT=off` | `on`（**等一体机页面带上声明请求头再开**，见下方 4） |
 | C7 AI 登录档位 | #1048 | `AI_LOGIN_GATE=off` | `before_generate`（D1；等一体机有登录引导再开） |
 | C14 AI 一键暂停 / 全机维护 | #1048 | `AI_PAUSED`、`MAINTENANCE_MODE` = off，后台可一键切换（必须填事由、先写留痕；开关面板见 #1055） | 按需 |
-| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=false`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 两个都保持关（9/29 拍板导出不印 AI 字样，取代 D2）；律师认为必须带时两个一起开 |
+| C8 简历导出显式标识 | #1044 | `RESUME_EXPORT_VISIBLE_LABEL=true`、`RESUME_EXPORT_UNLABELED_OPTION=false` | 2026-10-06 定方案 b：默认印（10/9 第六次发布打开）；「不印」选项只限 PDF、Word，等律师第 21 问和新协议上线后再开 |
 | C9 面试报告改字 | #1044 | 无（直接生效，方案已定） | — |
 | C10 内容双向检查 | #1049 | 词表为空即不检查 | 配置 `AI_FORBIDDEN_WORDS_FILE`（云审核兜底本轮未接） |
 | C11 政策只显示本机构 | #1049 | `POLICY_SCOPE=all` | `org`（D4；等一体机政策请求带上终端会话再开；本人收藏与浏览记录不受影响） |
@@ -435,7 +435,7 @@
 2. 发布前看一次 `/api/v1/health` 的 `data.degraded` 为空——发布的就绪检查改用 `/api/v1/health/ready`，Redis、数据库、会员隐私调度任一降级都会判失败并自动回退。
 3. 后台「法务文档」发布试运行版《用户服务协议》《隐私政策》、AI 服务说明——**先发布，再部署**；「经营者信息」旧后台建不了，第一次发布成功后当天在新后台激活（9/29 统一口径，见 9/29 节「第一次发布」第 1 条）（C4 生产默认拒绝未发布协议的登录；9/29 起正式版前端不再回落，`LEGAL_DOCS_REQUIRE_PUBLISHED=false` 对正式版不起作用，发布前硬检查见 9/29 节）。
 4. 服务器 `.env` 分两批，**顺序不能反**：
-   - 随时可配（只动服务端）：`RESUME_EXPORT_VISIBLE_LABEL` 保持关（9/29 拍板，取代 D2），`RESUME_EXPORT_UNLABELED_OPTION` 保持 false，等律师确认；`AI_FORBIDDEN_WORDS_FILE` 指向词表文件；`ALERT_WEBHOOK_URL` 填企业微信群机器人地址（新增的待处理 AI 内容投诉、终端离线等派生告警和每日备份失败都会推到群里）。
+   - 随时可配（只动服务端）：`RESUME_EXPORT_VISIBLE_LABEL` 打开（10/6 方案 b，取代 9/29「不印」），`RESUME_EXPORT_UNLABELED_OPTION` 保持 false，等律师第 21 问和新协议；`AI_FORBIDDEN_WORDS_FILE` 指向词表文件；`ALERT_WEBHOOK_URL` 填企业微信群机器人地址（新增的待处理 AI 内容投诉、终端离线等派生告警和每日备份失败都会推到群里）。
    - **等一体机对应页面改完、随同一次发布再打开**：`AI_DECLARATION_ENFORCEMENT=on`（一体机现在不带声明请求头，提前打开会让一体机所有 AI 生成与语音请求被拒）；`AI_LOGIN_GATE=before_generate`（提前打开，未登录用户的 AI 请求会被拒，页面上没有去登录的引导）；`POLICY_SCOPE=org`（一体机的政策请求现在不带终端会话，提前打开政策列表会是空的）。前两项也可以用后台的 AI 访问接口即时切换（后台页面见下方「需要页面配合」），`POLICY_SCOPE` 只能改 `.env`。
 5. 服务器安装（步骤见 `docs/device/postgres-operations.md` 第 8 节）：每日备份的 systemd timer 或 cron；用 `services/api/scripts/logrotate/nginx` 替换 `/etc/logrotate.d/nginx`；执行 `services/api/scripts/pm2-logrotate-setup.sh`；做一次恢复演练（临时库名必须含 `drill`）。
 6. （可选）后台「打印扫描运维 → 设备能力」把试点终端的「签名盖章（默认关闭）」设为「不支持」并写备注。#1052 的一体机部分已让未登记的终端显示「暂未开通」，这一步只为在后台一眼看清。
