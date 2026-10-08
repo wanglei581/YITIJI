@@ -54,6 +54,8 @@ export function JobAiSessionRecords({
               </span>
               <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.job ? `${item.job.title} · ${item.job.company}` : meta.hint}</span>
               <span className="qx-me-row-sub">{metaLine(item)}</span>
+              {item.session.status === 'failed' ? <span className="qx-me-reason">这次没有生成成功，可以重新办理</span> : null}
+              {item.session.status === 'pending' || item.session.status === 'processing' ? <span className="qx-me-reason">还在处理，完成后可以打开</span> : null}
             </span>
             <span className="qx-me-acts">
               <button

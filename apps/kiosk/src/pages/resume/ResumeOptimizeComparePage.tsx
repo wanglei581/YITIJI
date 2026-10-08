@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { ResumeOptimizeModule } from '@ai-job-print/shared'
+import type { GeneratedResume, ResumeOptimizeModule } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
+import { carryOptimizeSource } from './components/resume-deliver/optimizeSourceFile'
 import { resumeUserReason } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
@@ -50,6 +51,7 @@ export function ResumeOptimizeComparePage() {
     ?? (usingSessionTask ? session?.accessToken : undefined)
 
   const [modules, setModules] = useState<ResumeOptimizeModule[]>([])
+  const [optimizedResume, setOptimizedResume] = useState<GeneratedResume | null>(null)
   const [loadedTaskId, setLoadedTaskId] = useState<string | null>(null)
   const [providerName, setProviderName] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(taskId))
@@ -74,6 +76,7 @@ export function ResumeOptimizeComparePage() {
     let cancelled = false
     setLoading(true)
     setModules([])
+    setOptimizedResume(null)
     setLoadedTaskId(null)
     setProviderName(null)
     setOutage(null)
@@ -93,6 +96,7 @@ export function ResumeOptimizeComparePage() {
         }
         const nextModules = response.modules ?? []
         setModules(nextModules)
+        setOptimizedResume(response.optimizedResume ?? null)
         setLoadedTaskId(taskId)
         setCurrentIndex((index) => Math.min(index, Math.max(0, nextModules.length - 1)))
         if (nextModules.length === 0) setFailure('这次没有生成逐条改写候选。')
@@ -124,7 +128,7 @@ export function ResumeOptimizeComparePage() {
   const isDemoResult = providerName === 'mock'
 
   const backToOptimize = () => navigate(OPTIMIZE_ROUTE, {
-    state: taskId ? { taskId, accessToken, decisions, ...(existingOnly ? { existingOnly: true } : {}) } : undefined,
+    state: taskId ? { taskId, accessToken, decisions, ...carryOptimizeSource(state), ...(existingOnly ? { existingOnly: true } : {}) } : undefined,
   })
   const retry = () => {
     setLoadedTaskId(null)
@@ -246,8 +250,8 @@ export function ResumeOptimizeComparePage() {
             <ResumeCompareDraft
               items={items}
               decisions={decisions}
-              confirmedByModule={confirmedByModule}
-              customByModule={customByModule}
+              resume={loadedTaskId === taskId ? optimizedResume : null}
+              onEdit={backToOptimize}
             />
           </>
         )}
