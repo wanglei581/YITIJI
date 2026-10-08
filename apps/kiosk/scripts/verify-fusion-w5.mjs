@@ -204,7 +204,11 @@ assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still 
 assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
+/* 2026-10-06 稿 31 活动详情迁入青序流光，同强度替换页壳断言：
+ * KioskPageFrame / KioskPageHeader → QxPageFrame，并断言已退出 V6 壳。
+ * 下面的屏标、滚动容器 class、领取分支字符串保持原断言，不删。 */
+assert.match(benefitActivityDetail, /<QxPageFrame\b/, 'BenefitActivityDetailPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivityDetail, /KioskPageFrame|KioskPageHeader/, 'BenefitActivityDetailPage has left the V6 frame')
 assert.match(
   benefitActivityDetail,
   /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
@@ -359,6 +363,12 @@ assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is register
 assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+assert.match(kioskRootSrc, /['"]\/activities['"]/, '/activities is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)')
+assert.match(kioskRootSrc, /\/\^\\\/activities\\\/\[\^\/\]\+\$\//, '/activities/:id uses an exact pattern, not a wide prefix')
+const benefitActivitiesPage = read('src/pages/activities/BenefitActivitiesPage.tsx')
+assert.match(benefitActivitiesPage, /<QxPageFrame\b/, 'BenefitActivitiesPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivitiesPage, /KioskPageFrame|KioskPageHeader/, 'BenefitActivitiesPage has left the V6 frame')
+assert.match(benefitActivitiesPage, /data-kiosk-screen="activities"/, 'activities list keeps its stable screen marker')
 /* 文档与打印订单同属稿 38，是「文件资产 → 打印订单」这条跨端主链的两屏：
  * 页面换成青序壳却漏登记，KioskLayout 会在青序页上再叠一层旧顶栏和底栏（两套 chrome 同屏）。
  * 所以这里同时钉三件事：进了精确集合、页面不再挂旧壳、页面声明的分域视图就是这两张 Tab。 */

@@ -4,10 +4,20 @@ import { resolve } from 'node:path'
 import assert from 'node:assert/strict'
 const root = resolve(import.meta.dirname, '..')
 const read = (file) => readFileSync(resolve(root, file), 'utf8')
-for (const page of ['Documents', 'Resumes', 'AiRecords', 'Benefits', 'Feedback', 'Activity', 'Notifications']) {
+for (const page of ['Documents', 'Resumes', 'AiRecords', 'Benefits', 'Activity', 'Notifications']) {
   const source = read(`src/pages/profile/me/My${page}Page.tsx`)
   assert.ok(source.includes('useMemberCursorPage') && source.includes('MemberLoadMore'), `${page}: real cursor hook and touch action`)
 }
+const feedbackSource = read('src/pages/profile/me/MyFeedbackPage.tsx')
+assert.ok(feedbackSource.includes('useMemberCursorPage'), 'Feedback: real cursor hook')
+const feedbackListPanel = feedbackSource.match(/<FeedbackListPanel\b[\s\S]*?\/>/)?.[0] ?? ''
+assert.ok([
+  'nextCursor={pagination.nextCursor}',
+  'loadingMore={pagination.loadingMore}',
+  'loadMoreError={pagination.loadMoreError}',
+  'loadMore={() => void pagination.loadMore()}',
+].every((prop) => feedbackListPanel.includes(prop)), 'Feedback: rendered list panel receives real cursor pagination')
+assert.match(read('src/pages/profile/me/feedback/FeedbackListPanel.tsx'), /<MemberLoadMore\b/, 'Feedback: list panel renders touch action')
 assert.match(read('src/pages/profile/me/MemberLoadMore.tsx'), /minHeight: 56/)
 assert.match(read('src/pages/profile/me/MyDocumentsPage.tsx'), /items.length === 0 && !pagination.nextCursor/)
 assert.match(read('src/pages/profile/me/MyResumesPage.tsx'), /confirmDelete.ownerToken === token/)
