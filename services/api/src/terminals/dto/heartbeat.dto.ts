@@ -113,4 +113,11 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   scanInputObservedAt?: string
+
+  /** Agent 进程启动时刻。老版本不带这个字段时，心跳照常接受。 */
+  @IsDateString({ strict: true })
+  @IsString()
+  @MaxLength(64)
+  @ValidateIf((_object, value) => value !== undefined)
+  agentStartedAt?: string
 }

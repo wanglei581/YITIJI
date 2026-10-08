@@ -111,6 +111,19 @@
   - 真服务：待走查窗口在正式构建上复走。
   - 真机、真人试用：未过（试点设备未到货；两轮试用定在 11/2 和 11/23）。
 - **停放、隐藏、改名、降级：** 无。保留的旧功能都放进了 2.0 版式，包括结束使用、撤回 AI 授权、简历对照、求职进度（本人自填）、投诉 AI 内容、AI 内容投诉分类。
+## 2026-10-06：后台远程「重启终端程序」后端（Grok 实现、Claude 审后导入，分支 `claude/backend-hardening-20261006-terminal-remote-command-v2`，基线候选 `cf2e4e1ab`，未部署）
+
+- **范围：** 管理员下发 `restart_agent`，终端用心跳取走、用回执推进状态；每分钟清扫过期，以及接受后 15 分钟仍没有完成的命令。契约是 `~/.cache/claude-lanes/bh-1006/remote-restart-interface-final.md`。不改一体机、小程序、Agent、合作机构后台，也不改两个后台的页面。管理员后台只加了三条审计中文名。用户可见文案没有「工作人员」。
+- **数据：** 新表 `TerminalCommand`（SQLite 与 PostgreSQL 两份 schema，模型数 113，排在 #1260 的 PlatformSetting 之后）。迁移 `20261006150000_add_terminal_command`，晚于 `20261003120000_ai_quota_per_user`。同一终端未结束命令（`pending` / `accepted`）的唯一性在事务里先查，再用迁移里的部分唯一索引 `TerminalCommand_terminalId_open_unique` 兜底。Prisma schema 写不出带 WHERE 的唯一索引，CI 的 `db push` 也不会建它；新门禁开测前执行 `CREATE UNIQUE INDEX IF NOT EXISTS`。表上没有会员、订单、文件字段，不进注销清单。
+- **接口：** `POST /api/v1/admin/terminals/:terminalId/commands`、`GET /api/v1/admin/terminals/:terminalId/commands`，守卫与现有管理员终端接口相同（`JwtAuthGuard` + `RolesGuard` + `@Roles('admin')`）。回执 `POST /api/v1/terminals/:terminalId/commands/:commandId/ack`，终端令牌校验与心跳相同。心跳响应只在有本终端、未过期、`pending` 的命令时带 `commands`，没有就不带这个字段。心跳请求增加可选 `agentStartedAt`。限频按滚动一小时内该终端 `requestedAt` 条数（含已结束），上限 3 次。有效期 10 分钟。
+- **状态：** `pending` → `accepted` → `completed`，或 `pending` → `rejected_busy` / `expired`。`agentStartedAt` 晚于 `acceptedAt` 才把 `completedVerified` 记为真；老 Agent 不带这个字段时，接受之后的第一次心跳记完成但未核实。接受后超过 15 分钟仍未完成则 `failed`，`resultCode` 为 `no_heartbeat_after_restart`，并走 `deliverOpsAlert`（主题键与回合都是命令 id）。结束都写 `terminal.command.finished`。没有撤销接口。
+- **审计中文名：** `terminal.command.requested`「下发远程重启终端程序」、`terminal.command.acked`「终端回执远程重启」、`terminal.command.finished`「远程重启结束」。
+- **门禁：** `services/api/scripts/verify-terminal-remote-command.ts` 起真实 Nest HTTP，走真实守卫，覆盖定稿第 7 节。已登记 `services/api/package.json`，并加在 `.github/workflows/ci.yml` SQLite 主作业「Prepare fresh SQLite db」之后。网点名用「市南区就业服务中心 1 号机」这一类。
+- **本机已通过：** 新门禁、API typecheck、lint、`verify:recruitment-p1-schema`、`verify:member-closure`（closure 环境）、`verify:alert-push`、`verify:admin-ops`、`verify:terminal-provisioning`、`verify:terminal-bind-code`、`verify:admin-print-scan`、后台 `verify:console-plain-copy`、`verify:recruitment-hosting-gate-declares`、`verify:ci-gate-coverage`、`verify:repository-integrity`。临时 PostgreSQL（用户 `drill`，端口 55471，库 `terminal_command_drill`）`migrate deploy` 含本迁移，`migrate diff --exit-code` 无漂移；演练结束后集群已停，数据目录已删。图谱已按当前代码重生成，`graph --check` 通过。
+- **反向变异（只验证，已改回）：** 去掉管理员角色、去掉限频、去掉过期清扫、心跳不再按终端过滤、没带 `agentStartedAt` 也标已核实。五处对应断言都红，退出码都是 1。
+- **审查补丁（Claude）：** 心跳里推进 / 取命令这层出错时只记日志、这一轮不带 `commands`，心跳照常 200（心跳失败会让终端被判离线）；门禁加了对应断言。命令层两处错误日志只记错误类型和错误码，不记 message（告警 webhook 地址、库连接串可能在里面）。
+- **口径差：** 终端令牌打管理员下发接口得到 401 `AUTH_TOKEN_INVALID`。定稿第 1 节要求沿用现有管理员守卫；第 7 节括号写了「终端令牌 403」。实现跟第 1 节和现有 `JwtAuthGuard`。
+- **未做：** 没有部署，没有改生产配置或生产库。后台按钮和 Windows Agent 不在本包。图谱因 `prisma.service.ts`、两份 schema、`ci.yml` 被大量既有门禁点名，对改动文件共列出 219 条既有门禁，本机都跑过。`verify:resume-export-formats` 在共用 SQLite 上因前面门禁留下的删除账本多清了文件而红，换一份干净库重跑为 `ALL PASS`。带 `:postgres` 的 8 条在车道默认的 SQLite 地址上会先红；另起临时 PostgreSQL（端口 55475，库 `terminal_command_drill_ci` 与空库 `p1_upgrade_ci`，用户 `drill`）并生成 PostgreSQL 客户端后，这 8 条都通过。该集群已停，数据目录已删。
 ## 2026-10-06：小青语音通话没声音也没字幕时，带用户回到文字对话（分支 `claude/kiosk-b-advisor-call-silent-fallback-1006`）
 
 - 问题：小青语音进房后，如果机器人没进房、语音合成出错或网络只通了一半，屏幕一直显示「通话中」，用户听不到声音也看不到字幕，只能干等。现场没有工作人员，必须自己把人带回文字对话。

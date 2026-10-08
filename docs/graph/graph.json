@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 580,
+    "endpointCount": 583,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -4165,6 +4165,54 @@
         ],
         "serviceFiles": [],
         "services": []
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-commands.controller.ts",
+        "handler": "AdminTerminalCommandsController.list",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCommand",
+          "TerminalCredential",
+          "User"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/commands",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-commands.service.ts"
+        ],
+        "services": [
+          "TerminalCommandService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-terminal-commands.controller.ts",
+        "handler": "AdminTerminalCommandsController.issue",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCommand",
+          "TerminalCredential",
+          "User"
+        ],
+        "path": "/api/v1/admin/terminals/:terminalId/commands",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/terminal-commands.service.ts"
+        ],
+        "services": [
+          "TerminalCommandService"
+        ]
       },
       {
         "controller": "services/api/src/terminals/admin-terminals.controller.ts",
@@ -11640,6 +11688,16 @@
         ]
       },
       {
+        "controller": "services/api/src/terminals/terminal-commands.controller.ts",
+        "handler": "TerminalCommandsController.ack",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/terminals/:terminalId/commands/:commandId/ack",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/terminals/terminals.controller.ts",
         "handler": "TerminalsController.getTerminalConfig",
         "method": "GET",
@@ -11682,16 +11740,20 @@
           "ScanTask",
           "Terminal",
           "TerminalBindCode",
+          "TerminalCommand",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/heartbeat",
         "roles": [],
         "serviceFiles": [
+          "services/api/src/terminals/terminal-commands.service.ts",
           "services/api/src/terminals/terminals.service.ts"
         ],
         "services": [
+          "TerminalCommandService",
           "TerminalsService"
         ]
       },
@@ -16392,7 +16454,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 112,
+    "modelCount": 113,
     "models": [
       {
         "fieldCount": 7,
@@ -17777,7 +17839,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 30,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -17787,6 +17849,7 @@
           "ScanTask",
           "TerminalBindCode",
           "TerminalCapability",
+          "TerminalCommand",
           "TerminalCredential",
           "TerminalHeartbeat",
           "TerminalScanDeletionAudit"
@@ -17824,6 +17887,7 @@
           "services/api/src/terminals/kiosk-job-board.service.ts",
           "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-commands.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminal-session.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
@@ -17852,6 +17916,17 @@
         "usedBy": [
           "services/api/src/console-screen/console-screen.twin.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 13,
+        "name": "TerminalCommand",
+        "relations": [
+          "Terminal",
+          "User"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/terminal-commands.service.ts"
         ]
       },
       {
@@ -17969,7 +18044,7 @@
         ]
       },
       {
-        "fieldCount": 28,
+        "fieldCount": 29,
         "name": "User",
         "relations": [
           "AuditLog",
@@ -17977,7 +18052,8 @@
           "FeedbackReply",
           "FileObject",
           "Organization",
-          "ReviewDecision"
+          "ReviewDecision",
+          "TerminalCommand"
         ],
         "usedBy": [
           "services/api/src/admin-internal-accounts/admin-internal-accounts.service.ts",
@@ -18002,7 +18078,8 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
-          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts"
+          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/terminals/terminal-commands.service.ts"
         ]
       },
       {
@@ -18192,7 +18269,8 @@
     ],
     "apps/admin/src/lib/auditActionLabels.ts": [
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-terminal-remote-command.ts"
     ],
     "apps/admin/src/lib/printErrorText.ts": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -24191,6 +24269,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
+      "services/api/scripts/verify-terminal-remote-command.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
       "services/api/scripts/verify-upload-sessions-http.ts"
     ],
@@ -24590,6 +24669,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-support-contact.ts",
+      "services/api/scripts/verify-terminal-remote-command.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-sessions-http.ts",
       "services/api/scripts/verify-upload-sessions.ts"
@@ -26741,6 +26821,7 @@
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
+      "services/api/scripts/verify-terminal-remote-command.ts",
       "services/api/scripts/verify-terminal-test-print-seed-guard.ts",
       "services/api/scripts/verify-toolbox-review-workflow.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts",
@@ -27058,6 +27139,9 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
+    "services/api/src/terminals/terminal-commands.service.ts": [
+      "services/api/scripts/verify-terminal-remote-command.ts"
+    ],
     "services/api/src/terminals/terminal-config.types.ts": [
       "services/api/scripts/verify-terminal-device-config.ts"
     ],
@@ -27168,7 +27252,8 @@
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
     "services/api/src/terminals/terminals.module.ts": [
-      "services/api/scripts/verify-terminal-network-diagnostics.ts"
+      "services/api/scripts/verify-terminal-network-diagnostics.ts",
+      "services/api/scripts/verify-terminal-remote-command.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -42161,6 +42246,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:terminal-provisioning"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "services/api/src/app.module.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-commands.service.ts",
+          "services/api/src/terminals/terminals.module.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-terminal-remote-command.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:terminal-remote-command"
       ],
       "wired": true
     },
