@@ -1,5 +1,18 @@
 # 当前开发进度
 
+## 2026-10-08：共同目标继续执行；模型只经 MCP 调用 CLI
+
+- **负责人已授权继续：** 按 next-tasks 顶部完整清单逐包执行；已建立商业收口任务目标，取代下面清单编制时的暂停。Claude、Codex、agy 协作改用 MCP → CLI，不再调用客户端窗口；模型协作的输出只作为审查材料，仍须核对代码和验证证据。
+- **调用事实：** MCP Node REPL 已启动本机 Claude Code CLI；`claude auth status` 为 `loggedIn=false / authMethod=none`，模型返回 `Not logged in`，故本轮不能记作 Claude 已审查 / 开发。已通知负责人在终端恢复 CLI 登录；Codex 与已可调用的 agy 继续独立可执行工作，不提取客户端登录状态或密钥。
+- **执行分工按负责人最新指令：** 页面设计、前端与 UI 统一由 **Claude CLI** 完成；Codex 负责后端 / 契约、审查和验收，agy 独立反方。刚写的 B4 前端草稿与验证夹具全部保留在本隔离工作树，未提交 / 上传 / 合并 / 部署；由 Claude 恢复 CLI 登录后接管评审、修改并完成。Codex 不再继续写该前端包，不将自己的草稿登记为 Claude 已完成。
+- **上传 / 发布授权：** 负责人明确授权每包修复完成后依次按 Claude 既定 Git 上传和服务器标准推进。沿用当前仓库 CI / deploy 工作流与生产清单，不另建发布标准：本地相关门禁 → 审阅 PR → 唯一主执行候选整合 → 精确 main SHA 的 CI 全绿 → 发布预检 / 备份与回滚 → 对应 api-only 或 full 发布 → 部署来源 / PM2 / nginx / ready 与实际链路复核。当前草稿、排队、历史 CI 或仅本地通过不能越过这些门槛。
+- **当前包 B4：** 接通已有订单时间线 / 本机领取，不增加入口、数据模型、外部依赖或后端服务。仅在本隔离工作树保留草稿；主执行候选仍是 `bdeb26f4ae23c3d99f2e0e16076068477b1f4458`，只读核对干净，不修改任何其他作者工作树。
+- **功能归位 / 预算：** 前端在 `apps/kiosk/src/services/api/memberPrintOrders.ts`、`src/pages/profile/me/MyPrintOrdersPage.tsx`，及 `printOrders/` 内的 `useMemberOrderTimeline.ts`、`TimelineOrderCard.tsx`、`orderTimelineModel.ts`；后端 / worker、Agent、共享类型、共享 UI、生产配置与硬件均不涉及。复用共享 `MemberOrderTimeline* / MemberOrderClaimHereResult`、现有终端鉴权、支付详单、订单 CSS 与单任务打印路由。原页面约 460 行，数据副作用与订单卡拆出，业务文件目标均小于 300 行。
+- **验证白名单：** 既有 `verify-member-print-orders-ui.mjs`、`verify-profile-print-orders-inkpaper.mjs`、`verify-profile-print-orders-login-smoke.mjs`；新增 `tests/visual/member-order-timeline.spec.ts`，接入既有 `playwright.w5.config.ts`；既有 `profile-qx.spec.ts`、`fusion-w5.spec.ts`、`fixtures/privacy-clear-shell.ts` 仅更新时间线夹具与相关断言。加本文件 / next-tasks 及必须生成的 3 图谱文件，上限 **18 个路径**；不改 AuthProvider、不新增登录后门，不改其他页面 / 工作流。
+- **方案审查先于功能代码：** agy 第一轮要求把双身份、订单主键、材料包无 taskId、状态桶游标、公共屏迟到响应五条防线写实，修订后已给 **方案 GO**。其对白屏 / 死锁的断言是潜在风险，未当作实际复现。材料包释放后只转述“已领取”并刷新真实状态，不能写成已出纸；网络 / 坏回执须先查询再恢复操作。代码草稿开始于方案 GO 之后；负责人随后指定前端归 Claude，按此新指令停笔并保留草稿。
+- **本包验收计划：** Kiosk typecheck / lint / build，3 既有静态守卫、正式构建 headless 1080×1920 与 390px 浏览器（真实登录 UI、API 桩：三来源、本机 / 异机、材料包、401、重复、未知响应、分页切桶、隐私迟到响应），以及相关既有订单 / 清场回归。桩与本地正式构建不代替真 PG、真实模型、Windows 真出纸或生产验收；五关未全过仍为商业 NO-GO。
+- **补核已完成事实：** Claude 10/8 13:55 原始待办 HTML 明确记录官网两期于 10/6 16:23、17:03 发布，公开旧地址 / 三份法务页已由其核验；服务电话于 10/7 16:26 配置、16:31 对外接口生效。先前 S10 的“尚未证实已改”应改为“Claude 报告已发布，Codex 当前生产复核待做”，不重新安排已完成改稿或要求重复填电话。
+
 ## 2026-10-08：先交完整收口清单，再按共同方案推进（Codex；agy 执行方案 GO）
 
 - **产品负责人本次指令：** 先由 Codex 与 agy 汇总 Claude 的完整收口问题清单，再据共同清单执行；因此暂停新功能扩展，先整理 / 核对 / 评审，不改主执行候选。
