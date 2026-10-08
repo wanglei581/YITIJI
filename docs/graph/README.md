@@ -33,20 +33,20 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 89 | 777 | 679 |
+| kiosk | `apps/kiosk` | 89 | 779 | 681 |
 | admin | `apps/admin` | 38 | 264 | 238 |
 | partner | `apps/partner` | 15 | 84 | 83 |
 
 | 维度 | 数量 |
 | --- | --- |
-| HTTP 端点（services/api） | 580 |
-| Prisma 模型 | 112 |
-| 门禁脚本文件 | 588 |
+| HTTP 端点（services/api） | 583 |
+| Prisma 模型 | 113 |
+| 门禁脚本文件 | 589 |
 | ├ 其中辅助库（被别的门禁 import） | 139 |
-| ├ 已在 package.json 里有脚本名 | 533 |
-| ├ 在 CI 执行闭包里 | 519 |
+| ├ 已在 package.json 里有脚本名 | 534 |
+| ├ 在 CI 执行闭包里 | 520 |
 | └ **无脚本名，从未被执行** | 0 |
-| 被至少一条门禁断言的文件 | 1886 |
+| 被至少一条门禁断言的文件 | 1888 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 80 |
 | 孤儿候选 · medium（仅文档提及） | 29 |
@@ -70,15 +70,15 @@ flowchart LR
   kiosk["apps/kiosk<br/>一体机前台<br/>89 路由"]
   admin["apps/admin<br/>管理员后台<br/>38 路由"]
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
-  api["services/api<br/>NestJS<br/>580 端点"]
-  db[("Prisma<br/>112 模型")]
-  gates{{"verify 门禁<br/>588 个脚本"}}
+  api["services/api<br/>NestJS<br/>583 端点"]
+  db[("Prisma<br/>113 模型")]
+  gates{{"verify 门禁<br/>589 个脚本"}}
 
   kiosk -->|"/api/v1"| api
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1886 个文件"| kiosk
+  gates -.->|"断言 1888 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api
@@ -97,7 +97,7 @@ flowchart LR
    宁可多一条边，也不要漏 —— 但读的时候要知道这是上界不是精确值。
 3. **后端 service → 模型走的是受限闭包**（只沿 `.service.ts` 和同目录文件，深度 2）。
    跨目录的间接数据访问会漏。放开成全量闭包的结果是几乎每个端点都连上全部
-   112 个模型，那样的图没有分辨力。
+   113 个模型，那样的图没有分辨力。
 4. **孤儿清单是候选，不是删除许可。** 判定用的是 CLAUDE.md §8 的五条证据；
    `protected` 名单里的目录即使五条全中也不得删除（原因见 orphans.md）。
 5. **`apps/miniapp` 不在解析范围内**，只在门禁清单里只读引用它的 package.json 脚本名。
