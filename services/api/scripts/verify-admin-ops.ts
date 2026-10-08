@@ -38,7 +38,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, collectDerivedAlerts, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
 import { offlineEpisodeToken } from '../src/admin-ops/derived-alert-identity'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -342,6 +342,11 @@ async function main() {
   const tOffline = `term_vop_off_${suffix}`
   const tOnline = `term_vop_on_${suffix}`
   const tPrinterIssue = `term_vop_pi_${suffix}`
+  // 不在运营的终端：计划中（从没开过机，10/4 线上把这类 new01 报成了离线）、已退役、停用。
+  const tPlanned = `term_vop_plan_${suffix}`
+  const tRetired = `term_vop_ret_${suffix}`
+  const tDisabled = `term_vop_dis_${suffix}`
+  const inactiveTerminalIds = [tPlanned, tRetired, tDisabled]
   const adminId = `user_vop_adm_${suffix}`
   const taskOk = `pt_vop_ok_${suffix}`
   const taskFailed = `pt_vop_fail_${suffix}`
@@ -392,6 +397,9 @@ async function main() {
       { id: tOffline, terminalCode: `VOP-OFF-${suffix}`, agentToken: `tok_off_${suffix}`, deviceFingerprint: 'fp' },
       { id: tOnline, terminalCode: `VOP-ON-${suffix}`, agentToken: `tok_on_${suffix}`, deviceFingerprint: 'fp' },
       { id: tPrinterIssue, terminalCode: `VOP-PI-${suffix}`, agentToken: `tok_pi_${suffix}`, deviceFingerprint: 'fp' },
+      { id: tPlanned, terminalCode: `VOP-PLAN-${suffix}`, agentToken: `planned$vop_${suffix}`, deviceFingerprint: 'fp', lifecycleStatus: 'planned', registeredAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) },
+      { id: tRetired, terminalCode: `VOP-RET-${suffix}`, agentToken: `tok_ret_${suffix}`, deviceFingerprint: 'fp' },
+      { id: tDisabled, terminalCode: `VOP-DIS-${suffix}`, agentToken: `tok_dis_${suffix}`, deviceFingerprint: 'fp', enabled: false },
     ],
   })
   await prisma.terminalHeartbeat.createMany({
@@ -400,7 +408,21 @@ async function main() {
       { terminalId: tOnline, printerStatus: 'ok', createdAt: new Date() },
       { terminalId: tPrinterIssue, printerStatus: 'ok', createdAt: new Date(Date.now() - 20 * 60 * 1000) },
       { terminalId: tPrinterIssue, printerStatus: 'paper_empty', createdAt: new Date() },
+      // 退役与停用的机器：一台心跳很久以前（会被当成离线），一台在线但打印机缺纸（会被当成打印机异常）。
+      { terminalId: tRetired, printerStatus: 'ok', createdAt: new Date(Date.now() - 40 * 60 * 1000) },
+      { terminalId: tDisabled, printerStatus: 'paper_empty', createdAt: new Date() },
     ],
+  })
+  // 退役要按数据库守卫的完整不变式一次转入（与 verify-admin-print-scan 同写法），不能直接插入。
+  await prisma.terminal.update({
+    where: { id: tRetired },
+    data: {
+      enabled: false,
+      lifecycleStatus: 'retired',
+      lifecycleVersion: { increment: 1 },
+      credentialGeneration: { increment: 1 },
+      agentToken: `cred$retired$vop_${suffix}`,
+    },
   })
 
   await prisma.printTask.createMany({
@@ -448,8 +470,9 @@ async function main() {
     await prisma.printTask.deleteMany({
       where: { id: { in: [taskOk, taskFailed, taskVerified, taskRefunded, taskTruncated, taskFresh] } },
     })
-    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tOffline, tOnline, tPrinterIssue] } } })
-    await prisma.terminal.deleteMany({ where: { id: { in: [tOffline, tOnline, tPrinterIssue] } } })
+    // 退役终端受数据库守卫保护，身份行不可删（与 verify-admin-print-scan 一样留着，后缀唯一不互相干扰）。
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tOffline, tOnline, tPrinterIssue, tPlanned, tDisabled] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [tOffline, tOnline, tPrinterIssue, tPlanned, tDisabled] } } })
     await prisma.user.deleteMany({ where: { id: adminId } })
     if (paidSubjectKeys.length > 0) {
       await prisma.alertDisposition.deleteMany({ where: { subjectKey: { in: paidSubjectKeys } } })
@@ -503,6 +526,14 @@ async function main() {
       if (!printerIssue || printerIssue.severity !== 'warning') fail('3. 缺少打印机缺纸告警(warning)')
       const printFailed = data.find((a) => a.id === `print_failed:${taskFailed}`)
       if (!printFailed) fail('3. 缺少打印失败告警')
+      // 只看正常运营（enabled 且 active）的终端：计划中、退役、停用都不出离线或打印机异常告警。
+      for (const id of inactiveTerminalIds) {
+        const leaked = data.filter((a) => a.id === `terminal_offline:${id}` || a.id === `printer_issue:${id}`)
+        if (leaked.length > 0) fail(`3. 不在运营的终端不应出告警：${leaked.map((a) => a.id).join(',')}`)
+      }
+      const scope = new Set((await collectDerivedAlerts(prisma, new Date())).terminalSubjectKeysInScope)
+      if (!scope.has(`terminal_offline:${tOffline}`)) fail('3. 正常运营的离线终端应在告警考察范围内')
+      if (inactiveTerminalIds.some((id) => scope.has(`terminal_offline:${id}`))) fail('3. 不在运营的终端不应在告警考察范围内')
       // W-101：标题只放中文原因，错误码进明细。
       if (printFailed.title !== '打印任务失败：打印机离线') fail(`3. 打印失败告警标题应为中文原因，实际「${printFailed.title}」`)
       if (!printFailed.detail.includes('错误码 PRINTER_OFFLINE')) fail(`3. 错误码应保留在明细里，实际「${printFailed.detail}」`)

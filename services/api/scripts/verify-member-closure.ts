@@ -434,6 +434,17 @@ async function main() {
     assert.ok(!/phoneHash\s*:|phoneEnc\s*:|hashPhone|initial\./.test(finalBlock), '墓碑不得使用原身份派生值覆盖')
     assert.deepEqual(readClosureRetentionYears(), { orders: null, consents: null })
   })
+  await check('TerminalCommand 无会员字段且不进注销清单', async () => {
+    const models = (scanClient as { _runtimeDataModel: { models: Record<string, { fields: Array<{ name: string }> }> } })._runtimeDataModel.models
+    const command = models['TerminalCommand']
+    assert.ok(command, 'TerminalCommand 必须存在')
+    const names = command.fields.map((field) => field.name)
+    for (const forbidden of ['endUserId', 'memberId', 'phone', 'phoneHash', 'phoneEnc', 'nickname', 'orderId', 'fileId']) {
+      assert.equal(names.includes(forbidden), false, forbidden)
+    }
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('terminalCommand'), false)
+    assert.equal(names.includes('endUserId'), false)
+  })
   let newId = ''
   await check('4 原手机号重新登录产生新 id，本人文件/订单/AI列表全部为空', async () => {
     await key(`member:sms:code:${owned.identity.phoneHash}`, '864209')
