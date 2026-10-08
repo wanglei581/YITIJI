@@ -407,7 +407,11 @@ for (const forbidden of ['工作人员', '服务台', '接着聊', '也收进来
 includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-one-pin-hint"', '单条提示保留测试标记')
 check(/payload\.pins\.length === 1\s*&&\s*\(\s*<p className="aa-more" data-testid="advisor-artifact-one-pin-hint">\{ONE_PIN_HINT\}<\/p>\s*\)/.test(read('src/pages/ai-plan/AdvisorArtifactPanels.tsx')), '提示仅由 pins.length === 1 控制，并引用唯一常量')
 check(Boolean(cssRuleBody(artifactCss, '.aa-more')), '单条提示有 aa-more 样式')
-check(Boolean(cssRuleBody(artifactCss, '.aa-qa .aa-pin:only-child')), '单条条目有 only-child 样式')
+// 同一个选择器在样式里有两条规则（上面那条只管不增长），只取第一条会把这条断言变成恒真，所以逐条看。
+const onlyPinRules = [...stripCssComments(artifactCss).matchAll(/\.aa-qa \.aa-pin:only-child\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(onlyPinRules.some((body) => body.includes('padding: 30px 0 36px')), '只有 1 条时条目上下多留一点（padding: 30px 0 36px）')
+check(cssRuleBody(artifactCss, '.aa-body:has(.aa-pin:only-child) > .aa-take').includes('max-height: 736px'), '只有 1 条时纸样上限放到 736px')
+check(cssRuleBody(artifactCss, '.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before').includes('max-height: 165px'), '打印读不到时右栏先长的那处上限 165px')
 check(artifactCss.includes('.aa-take-tx::after') && cssRuleBody(artifactCss, '.aa-body:has(> .aa-qa) .aa-take-tx::after').includes('max-height: 135px'), '带走卡右栏用伪元素先增长稿上已有间距，上限 135px')
 check(!artifactCss.includes('.aa-steps { margin-block: auto'), '带走卡两步不再用自动外边距上下居中')
 check(!cssRuleBody(artifactCss, '.aa-body > .aa-qa').includes('flex: 1 0 auto') && !artifactCss.includes("[data-testid='advisor-artifact-qa']"), '01 卡不再按旧规则拉空')
