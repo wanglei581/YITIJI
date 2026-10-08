@@ -27,15 +27,18 @@ function transpile(absolutePath, replacements = {}) {
 
 const pageRange = transpile(join(kioskRoot, 'src/pages/print/pageRange.ts'))
 const cashier = transpile(join(kioskRoot, 'src/pages/print/cashierStatus.ts'))
+const unattendedUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
 const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressModel.ts'), {
   './cashierStatus': cashier,
   './pageRange': pageRange,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
 const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
 const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
   '../../services/api/httpAdapter': httpStub,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const conversionStub = toDataUrl('export function isWordDocument() { return false }')
 const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/printPreviewKind.ts'), {
