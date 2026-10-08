@@ -18,7 +18,7 @@ overrides:
   proxy-addr: 2.0.8
   '@hono/node-server': 2.0.10
   uuid: 14.0.0
-  shell-quote: 1.9.0
+  shell-quote: 1.11.0
   # hono: seven open advisories. The four below 4.12.34
   # (GHSA-f23p-vx2j-j53r, GHSA-79qm-7rj5-m7r9, GHSA-54fx-42gc-7vw4, GHSA-8j4g-w8fx-2239)
   # and the three below 4.13.5
