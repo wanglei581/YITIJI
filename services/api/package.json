@@ -329,6 +329,7 @@
     "verify:offline-agencies-contract": "node -r @swc-node/register scripts/verify-offline-agencies-contract.ts",
     "verify:partner-source-capabilities": "node -r @swc-node/register scripts/verify-partner-source-capabilities.ts",
     "verify:terminal-device-config": "node -r @swc-node/register scripts/verify-terminal-device-config.ts",
+    "verify:kiosk-terminal-maintenance": "node -r @swc-node/register scripts/verify-kiosk-terminal-maintenance.ts",
     "verify:device-fleet-overview": "node -r @swc-node/register scripts/verify-device-fleet-overview.ts",
     "verify:toolbox-launch-events": "node -r @swc-node/register scripts/verify-toolbox-launch-events.ts",
     "verify:toolbox-preprod-acceptance": "node -r @swc-node/register scripts/verify-toolbox-preprod-acceptance.ts",

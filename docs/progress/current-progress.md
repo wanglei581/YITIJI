@@ -59,6 +59,21 @@
 - **拦截日志：** 写审计表 `AuditLog`，动作 `ai_safety.content_blocked`；字段只有时间（行的 createdAt）、终端编号、入口、类别代码、位置（提问 / 输出），不存原文也不存命中词。
 - **小青语音：** 腾讯云 `StartAIConversation` 直连模型，识别文字与回复不经过我们服务器，只能靠系统提示词里的拒答指令；若生产配置了 `TRTC_LLM_CONFIG_JSON`，整段配置原样下发，连拒答指令也没有——要请总指挥只读核生产该项为空。逐句检查需要把 `APIUrl` 指向我们自己的代理，本次不做。
 - **验证：** `verify:ai-safety-lexicon`（进 CI）：60 题全拦、25 题全过、两个真实 HTTP 入口、输出检查、变体、系统提示词、审计表记录、种子形状。图谱点名的 228 条门禁与 `verify:member-closure`（closure 环境）本机全绿；临时 PostgreSQL `migrate deploy` + `migrate diff --exit-code` 无差异。反向变异四处全红：去归一化、白名单失效、不落审计表、种子塞常用词。
+## 2026-10-06：N-7 一体机提前知道本机不接新单（只加配置字段，未改一体机页面）
+
+给主执行的契约。一体机首页已经在读 `GET /api/v1/terminals/:terminalId/config`（`apps/kiosk/src/pages/home/HomePage.tsx` 经 `useToolboxConfig.ts`、`useSmartCampusConfig.ts`，每 5 分钟一次；请求带终端会话）。本包只在这个响应上给出本机接不接新单。
+
+- `maintenance: boolean`。`true` 表示本机此刻不接新单：`enabled=false`，或 `lifecycleStatus` 为 `maintenance` / `suspended` / `commissioning` / `planned` / `retired`。
+- `maintenanceMessage: string | null`。`maintenance=false` 时为 `null`。为 `true` 时只可能是下面三句：
+  - 生命周期是 `maintenance`：「这台机器正在维护，暂时不能打印和扫描，请稍后再来」
+  - 生命周期是 `suspended`，或生命周期仍是 `active` 但 `enabled=false`：「这台机器暂停服务，请稍后再来」
+  - `commissioning` / `planned` / `retired`：「这台机器还没有开始服务」
+- 心跳超过 5 分钟不算进这两个字段。确认打印原有的 `PRINT_TERMINAL_NOT_READY` 不改。
+- 不读取、不下发管理员备注、操作人、生命周期原值。
+- 顶层 `maintenance` 从本包起表示本机不接新单。原先这个位置是全局 AI 全机维护开关，现改放在 `ai.maintenance`。`ai.paused` 仍是 AI 暂停。
+- 生效：服务端每次请求读库，没有按终端缓存。后台改状态后，下一次这个接口就返回新值。一体机首页自己每 5 分钟重拉，所以屏幕上最迟 5 分钟能看到。`useRecruitmentHosting` 另有 30 秒内存缓存，盖不住这 5 分钟的下一轮。
+- 没有终端会话，或会话对不上这台机器：接口仍是 401 `TERMINAL_SESSION_INVALID`，不返回配置正文，因此也看不到别的终端是否在维护。字段函数在未验明身份时固定 `maintenance=false`、`maintenanceMessage=null`。
+- `enabled=false` 但会话代次仍有效时，只有这个配置接口放行，好把暂停文案读回去。领票、刷新会话和其它接口仍拒绝停用终端。正式退役会把凭证代次加一，旧会话随即 401，一体机下一轮读不到「还没有开始服务」；库里的字段值本身仍是这句文案。
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
 - **依据：** 产品负责人 10/6 晚拍板，AI 简历导出默认在文件里印一行「含人工智能辅助生成内容」（后端开关 10/9 打开，判定见 `services/api/src/common/pdf/aigc-label.ts`）。一体机这一步只加说明文字，不加勾选框、不改颜色；勾选不印那一步等后端字段，排第八或第九次。
