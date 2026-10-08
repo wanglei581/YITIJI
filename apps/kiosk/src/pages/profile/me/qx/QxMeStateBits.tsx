@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
+import { BriefcaseIcon, LandmarkIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
+import { meErrorGuide } from './meErrorGuide'
+import { useOfficialChannels } from '../../../../hooks/useOfficialChannels'
 import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
 
 export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
@@ -30,9 +34,12 @@ export function QxMeStructRow({
   icon: LucideIcon
   title: string
   desc: string
-  mode: 'lock' | 'error'
+  mode: 'lock' | 'error' | 'loading'
   testid: string
 }) {
+  const titleSlot = mode === 'lock' ? '标题登录后显示' : mode === 'loading' ? '标题读取中' : '标题本次未取到'
+  const timeSlot = mode === 'lock' ? '时间登录后显示' : mode === 'loading' ? '时间读取中' : '时间本次未取到'
+  const tail = mode === 'lock' ? '登录后显示' : mode === 'loading' ? '读取中' : '本次未取到'
   return (
     <div className="qx-me-row" data-dead="true" data-slot-mode={mode} data-testid={testid}>
       <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
@@ -40,12 +47,12 @@ export function QxMeStructRow({
         <span className="qx-me-row-title">{title}</span>
         <span className="qx-me-row-sub">{desc}</span>
         <span className="qx-me-row-foot" style={{ marginTop: 9, display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          <span className="qx-me-slot">{mode === 'lock' ? '标题登录后显示' : '标题本次未取到'}</span>
-          <span className="qx-me-slot">{mode === 'lock' ? '时间登录后显示' : '时间本次未取到'}</span>
+          <span className="qx-me-slot">{titleSlot}</span>
+          <span className="qx-me-slot">{timeSlot}</span>
         </span>
       </span>
       <span className="qx-me-acts">
-        <span className="qx-me-small" aria-disabled="true">{mode === 'lock' ? '登录后显示' : '本次未取到'}</span>
+        <span className="qx-me-small" aria-disabled="true">{tail}</span>
       </span>
     </div>
   )
@@ -118,13 +125,19 @@ export function QxMePendingRow({
   )
 }
 
-/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。 */
+/** `hostingOpen`：招聘内容托管（3.13）关闭时没有岗位与招聘会可看，这一行换成同样不用登录的政策服务。
+ *  托管已读到「关闭」且本机构有官方渠道时，第一行改成官方渠道（与首页 HomePage 的 officialChannelCount 同一条件）。 */
 export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => void; onPrint: () => void; hostingOpen: boolean }) {
   const navigate = useNavigate()
+  const recruitment = useRecruitmentHosting()
+  const channels = useOfficialChannels()
+  const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
   return (
     <>
       <div className="qx-me-legal">不用登录也能办 · 这两项在这台机器上不需要账号</div>
-      {hostingOpen ? (
+      {officialChannelCount > 0 ? (
+        <QxMeStartRow icon={QrCodeIcon} tone="slate" title="看本机构官方渠道" desc="二维码和官方入口都在这一页" label="去看看" route="/official-channels" testid="member-records-guest-channels" onClick={() => navigate('/official-channels')} />
+      ) : hostingOpen ? (
         <QxMeStartRow icon={BriefcaseIcon} title="看第三方岗位与招聘会" desc="来源机构、更新时间与外部入口都在详情页里" label="查看岗位" route="/jobs" testid="member-records-guest-jobs" onClick={onJobs} />
       ) : (
         <QxMeStartRow icon={LandmarkIcon} tone="slate" title="查看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-guest-policy" onClick={() => navigate('/policy-service')} />
@@ -170,25 +183,33 @@ export function QxMeLoginBlock({
   )
 }
 
-export function QxMeLoadingBlock({ title }: { title: string }) {
+export function QxMeLoadingBlock({ title, struct }: { title: string; struct?: ReactNode }) {
   return (
     <>
       <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
-      <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
+      {struct ? (
+        <section className="qx-me-list qx-me-grow" aria-label="正在读取的内容结构">
+          {struct}
+          <div className="qx-me-legal">这次读取失败不会删除任何记录，也不会改动任何已保存的内容。</div>
+        </section>
+      ) : (
+        <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
+      )}
       <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
     </>
   )
 }
 
 export function QxMeErrorBlock({ title, desc, struct }: { title: string; desc: string; struct: React.ReactNode }) {
+  const contact = useSupportContact()
   return (
     <>
       <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项都显示「—」。</>} minis={['共 —', '本次未取到']} />
       <section className="qx-me-list qx-me-grow" aria-label="本次未取到的内容结构">
         {struct}
-        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。</div>
+        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍不成功的话，可以稍后再来。{helpNeededLine(contact)}</div>
       </section>
-      <QxMeGuide items={[...QX_ME_GUIDE.error]} />
+      <QxMeGuide items={meErrorGuide('records', contact)} />
     </>
   )
 }

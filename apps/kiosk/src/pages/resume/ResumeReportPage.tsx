@@ -338,6 +338,7 @@ export function ResumeReportPage() {
                 blk={parsed.blk}
                 onSeg={(seg: ReportSeg) => setSearch({ seg, dim: null, blk: null })}
                 onDim={(dim) => setSearch({ seg: 'scores', dim, blk: null })}
+                onJobFit={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
               />
             ) : null}
             <ResumeReportTakeaway
@@ -346,7 +347,6 @@ export function ResumeReportPage() {
               taskId={taskId}
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
-              onJobFit={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
             />
           </>
         ) : viewState === 'report-empty' ? (
