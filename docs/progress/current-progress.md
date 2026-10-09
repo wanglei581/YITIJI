@@ -203,7 +203,6 @@
 - **验证：** 本机跑 `verify:compliance-copy`；图谱重新生成并检查。
 
 ## 2026-10-06：AI 生成简历——只写公司没写职务的经历照样生成（后端半；分支 `claude/backend-hardening-20261006-resume-empty-role`，与一体机半同批合）
-## 2026-10-06 夜：终端程序批量部署与激活方案定稿（分支 `claude/batch-activation-plan-1006`，只改文档）
 
 - **起因：** 一体机「AI 帮你生成简历」把只写了公司、没写职务的经历在提交前丢掉（`apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx:191`），用户的真实经历被丢，违背「不编造」。总指挥 10/6 定：照样进生成，职务保持为空。一体机去过滤由主执行做，服务端职务原是必填，两半必须同批合。
 - **改了什么：** `ResumeGenExperienceDto.role` 改为可空（`@IsOptional() @IsString() @MaxLength(60)`，缺省 / null 规整为 `''`）；系统提示词加第 9 条「职务为空的那条，润色描述里不得出现任何职务、岗位或头衔名称」；组装时职务照旧从输入原样复制。**新增职务防编造**（`introducesUnstatedTitle`）：润色后的经历描述出现输入（公司 / 职务 / 原描述）里没有的头衔词，或出现「担任 / 任职 / 职位为」而输入没有，就丢弃这条润色、回落用户原文——此前生成链路只校验条数与违禁词，没有专门的职务校验。输入里写了的职务照常可以出现。导出（PDF / Word / 文本）用 `resumeEntryHead` 拼标题，空职务自动只显示公司。
