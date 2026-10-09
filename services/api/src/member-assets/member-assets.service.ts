@@ -257,7 +257,6 @@ export class MemberAssetsService {
           fileId: true,
           createdAt: true,
           expiresAt: true,
-          session: { select: { topic: true } },
         },
       }),
       this.prisma.advisorArtifact.count({ where: qaWhere }),
@@ -297,7 +296,7 @@ export class MemberAssetsService {
       sessionId: row.sessionId,
       artifactId: row.id,
       kind: 'qa_pins',
-      title: qaTitleOf(row.payloadJson, row.session.topic),
+      title: qaTitleOf(row.payloadJson),
       createdAt: row.createdAt.toISOString(),
       expiresAt: row.expiresAt.toISOString(),
       fileId: row.fileId,
@@ -537,17 +536,17 @@ function classifyStorageObjectState(
   return 'unknown'
 }
 
-function qaTitleOf(payloadJson: string, topic: string): string {
+function qaTitleOf(payloadJson: string): string {
   try {
     const payload = JSON.parse(payloadJson) as { kind?: unknown; title?: unknown }
     if (payload.kind === 'qa_pins' && typeof payload.title === 'string' && payload.title.trim()) {
       return payload.title.trim().slice(0, 80)
     }
   } catch {
-    // 损坏 payload 不进列表正文，只用会话主题兜底
+    // 损坏 payload 不进列表正文，使用固定标题兜底。
   }
-  const fallback = topic.trim()
-  return fallback ? fallback.slice(0, 80) : '问答要点'
+  // 存量行的 topic 还是用户原话，列表不能再把它显示成标题。
+  return '问答要点'
 }
 
 /** 只抽出 basedOn.fairId / fairName，任何其它 payload 字段都不外露。 */

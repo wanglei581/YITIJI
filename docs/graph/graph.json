@@ -24030,6 +24030,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
@@ -24038,6 +24039,7 @@
     "services/api/src/advisor/advisor-pdf.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/advisor/advisor-retention.task.ts": [
@@ -24045,7 +24047,8 @@
       "services/api/scripts/verify-ai-user-text-retention.ts"
     ],
     "services/api/src/advisor/advisor-skills.ts": [
-      "services/api/scripts/verify-advisor-work.ts"
+      "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/advisor.controller.ts": [
       "services/api/scripts/verify-ai-access.ts"
@@ -24055,12 +24058,14 @@
     ],
     "services/api/src/advisor/advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
-      "services/api/scripts/verify-ai-user-text-retention.ts"
+      "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
@@ -24069,6 +24074,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
@@ -24102,6 +24108,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
@@ -24802,6 +24809,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
@@ -26232,6 +26240,7 @@
     ],
     "services/api/src/member-assets/member-assets.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -35867,7 +35876,9 @@
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.module.ts",
           "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ],
         "missing": []
@@ -36032,9 +36043,16 @@
           "apps/miniapp/pages/assistant/assistant.js",
           "apps/miniapp/pages/assistant/assistant.wxml",
           "apps/miniapp/utils/api.js",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/advisor/advisor-skills.ts",
+          "services/api/src/advisor/advisor.service.ts",
           "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
