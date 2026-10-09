@@ -407,7 +407,7 @@ const artifactPage = read('src/pages/ai-plan/AiPlanPage.tsx')
 check(/canScrollDown\s*&&\s*\(\s*<div className="aa-more-below">\s*<button[^>]*data-testid="advisor-artifact-more-below"[^>]*>\s*\{MORE_BELOW_HINT\}/.test(artifactPage), '下面还有按钮引用唯一常量，并由还能往下滑的状态控制渲染')
 check(/const MORE_BELOW_MIN_BODY = 240\b/.test(artifactPage), '正文可见高度不到 240px 不出提示（常量固定）')
 check(artifactPage.includes('const hasRoom = body.clientHeight >= MORE_BELOW_MIN_BODY'), '正文可见高度够放提示才出，不做点了滚不动的按钮')
-check(artifactPage.includes('const moreBelow = body.scrollTop + body.clientHeight < body.scrollHeight - 8'), '还能往下滑按正文剩余超过 8px 判断')
+check(/const moreBelow = body\.scrollTop \+ body\.clientHeight < body\.scrollHeight - 8(?!\d)/.test(artifactPage), '还能往下滑按正文剩余超过 8px 判断')
 check(artifactPage.includes('setCanScrollDown(hasRoom && moreBelow)'), '两个条件都满足才渲染提示')
 check(artifactPage.includes('document.fonts.ready') && artifactPage.includes('new ResizeObserver(schedule)') && artifactPage.includes("body.addEventListener('scroll', schedule") && artifactPage.includes('window.requestAnimationFrame(measure)'), '挂载、字体就绪、尺寸变化与滚动均重算，使用动画帧节流')
 // 逐条看同名选择器，不能把第一条规则误当成整个层叠结果。

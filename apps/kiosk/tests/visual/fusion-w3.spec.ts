@@ -2676,7 +2676,18 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     expect(hintBox.y).toBeGreaterThanOrEqual(0)
     expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(viewport.width)
     expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(viewport.height)
-    await assertTapTargetPointerHit(hint)
+    // 提示是两头全圆的胶囊，四个角本来就不在形状里；取中心和四条边的中点往里收一点，确认点中的是它自己。
+    const hits = await hint.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const cx = box.left + box.width / 2
+      const cy = box.top + box.height / 2
+      const points: Array<[number, number]> = [[cx, cy], [box.left + 16, cy], [box.right - 16, cy], [cx, box.top + 4], [cx, box.bottom - 4]]
+      return points.map(([x, y]) => {
+        const top = document.elementFromPoint(x, y)
+        return Boolean(top && node.contains(top))
+      })
+    })
+    expect(hits, '提示自己点得中（中心和四边）').toEqual([true, true, true, true, true])
     expect(await page.locator('.aa-more-below').evaluate((node) => getComputedStyle(node).pointerEvents), '渐隐层不接点击，不挡后面的内容').toBe('none')
   }
 
