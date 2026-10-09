@@ -14634,7 +14634,18 @@
         },
         {
           "component": "PrintScanFeatureInfoPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx",
           "layout": [
             "KioskRoot",
@@ -15013,7 +15024,18 @@
         },
         {
           "component": "RenshiPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
           "file": "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "layout": [
             "KioskRoot",
@@ -19196,6 +19218,11 @@
     "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/copy/unattendedCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
+      "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs"
     ],
     "apps/kiosk/src/favorites/localFavorites.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
@@ -29977,6 +30004,7 @@
         ],
         "files": [
           "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/main.tsx",
           "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx",
@@ -30552,6 +30580,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx",
@@ -31989,6 +32018,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/auth/returnPath.ts",
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/pages/auth/accountUserMessage.ts",
           "apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts",
           "apps/kiosk/src/pages/auth/loginGateModel.ts",
@@ -33502,6 +33532,28 @@
       "package": "ai-job-print-terminal",
       "scriptNames": [
         "ai-job-print-terminal::verify:kiosk-font-subset"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [
+          "apps/kiosk/src/probe.tsx"
+        ],
+        "dirs": [],
+        "files": [],
+        "missing": [
+          "apps/kiosk/src/refund-ok-probe.tsx",
+          "apps/kiosk/src/refund-probe.tsx",
+          "apps/kiosk/src/switch-probe.tsx"
+        ]
+      },
+      "file": "scripts/verify-kiosk-unattended-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "ai-job-print-terminal",
+      "scriptNames": [
+        "ai-job-print-terminal::verify:kiosk-unattended-copy"
       ],
       "wired": true
     },

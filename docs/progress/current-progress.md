@@ -28,6 +28,14 @@
 - 剩余时间：扫描、清场遮罩、上传二维码统一走 `formatRemainingDuration`，不足 1 小时显示「N 分钟」，满 1 小时显示「约 N 小时」，不再出现「37996569:36」。
 - 并排截图夹具改成像真的：00 待机屏用真宣传图；12 本机文件和 U 盘 6 份文件；有效期从写死 2099 改为当下起 10 分钟；01 context/member、06 三态补造状态；首页订单按试点免费单。U 盘行不加修改时间（稿里没有，本机程序也不返回）。
 - U 盘口径（产品负责人 10/6「U 盘按推荐」，冻结稿例外）：终端程序本来就多读一级子目录（AGT-09），一体机 12 号页和稿 12 里「不进子文件夹 / 只看最外层」统一改成「最外层和下一层文件夹」，更深的不读；稿里角标用「前两层」。终端程序不改。FROZEN 已按 `verify-qingxu-v2-frozen --update` 重写稿 12 哈希。
+## 2026-10-08：#1340 无人值守线 CI 两处真红的修复
+
+- 红一（build-and-verify）：`verify:queue-dispatch-printer-status` 把 `useTerminalDeviceStatus.ts` 剥掉 import 后放到临时目录跑，本线给该文件新加了 `useSupportContact`、`machineUnusableLine` 两条 import，临时目录解析不到。门禁里给这两条补替身，真实的 `mapTerminalPrinterStatus` 照跑；两条 `printerReady=false` 断言分别输出，并挪到 HTTP 检查之前。反向变异（把 `queue_cleanup_failed` 归到就绪分支）门禁变红，还原后通过。
+- 红二（冒烟 journeys 组）：`account-assets-journey.spec.ts:53` 要求未登录资产页零 `/api/v1/` 请求，本线在运行时根组件预取了 `GET /api/v1/public/support-contact`。保留预取（现场没有工作人员，断网时出错屏也要给得出服务电话，所以要趁联网先取到）；请求显式 `credentials: 'omit'`；用例只放行这一条（方法加路径精确匹配），其余请求仍必须为零，并预置同源 Cookie、要求真发出一次预取，核对不带 Authorization、Cookie、终端号以外的查询参数和请求体。Codex 独立判断与合并窗口一致。缓存只在本次会话内有效，跨刷新或长时间断网后电话是否还在没有验证。
+- 同类断言清点：只有这一条用例收集全部 `/api/v1/` 请求；路由巡检、隐私与会话提醒各组的零请求断言都限定在具体会员、打印、扫描或支付接口，不受预取影响（静态核对，浏览器以 CI 为准）。
+- 顺带：`service-hub-qx.spec.ts:126` 在 CI 首跑读到过 `checking`（重试通过），取快照前改为先等到 `ready` / `degraded` 终态，原有断言全部保留。
+- 验证（Codex 实现，合并窗口逐行审过并复跑）：一体机与后端类型检查、lint、一体机单测 306 条、无人值守门禁（白名单 0）、浏览器用例覆盖门禁、队列门禁完整通过；正式构建下两份用例各跑两遍共 16 条通过（端口平移到 48xx，监听进程确认是本目录的构建）。前任把 `account-assets-journey.spec.ts:53` 记成「换端口假红」是误判，CI 原端口上它是真红。其余浏览器组以本 PR 的 CI 和下一批批次验收为准。
+
 ## 2026-10-06：AI 生成简历——只写公司没写职务的经历照样生成（后端半；分支 `claude/backend-hardening-20261006-resume-empty-role`，与一体机半同批合）
 ## 2026-10-06 夜：终端程序批量部署与激活方案定稿（分支 `claude/batch-activation-plan-1006`，只改文档）
 

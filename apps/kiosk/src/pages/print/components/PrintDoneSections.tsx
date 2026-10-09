@@ -10,7 +10,7 @@
 //   PrintJamGuide          卡纸态下半屏：稿 paper-jam 的三步 + 求助条，用来填掉二维码下面的空白
 //
 // 结果判定（completed / failed / errorCode 分态）、带走链接、重试与清场仍在页面里，门禁按页面文件取证。
-// 本文件渲染在完成页上，守同一套文案红线：不写「已支付」（用「已付」）、不出现退款 / 赔付字样。
+// 本文件渲染在完成页上：不写「已支付」（用「已付」）。退款只在金额大于 0 时用标准句 5，免费单不写。
 // ============================================================
 
 import { useState, type ReactNode } from 'react'
@@ -18,6 +18,7 @@ import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../../lib/fileName'
 import { formatCents } from '../cashierStatus'
+import { helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../../copy/unattendedCopy'
 import { jobSubline, pagesPerCopy, publicOrderNo, type OutOfPaperMoney } from '../printProgressModel'
 import { PrintFileDeletionRecords } from './PrintFileDeletionRecords'
 import { PrintFileRetentionNotice } from './PrintFileRetentionNotice'
@@ -135,8 +136,8 @@ export function PrintJobSummaryCard({ file, params }: {
  *     failed 终态，唯一的重来是 POST /print/jobs/:taskId/retry，要服务端先在 takeaway-url
  *     给出 canRetry，且重打的是整份文件，不是「剩下的部分」；
  *   「已出 1 份」「等待加纸」—— GET /print/jobs/:taskId 不回已出页数，只能请用户看出纸口实物；
- *   「加纸后继续打印不需要重新下单」—— 同上，不存在「继续」，只有工作人员处理或有条件的整份重打。
- * 费用只写订单事实与由谁核查，不写费用处理结果（本页拿不到）。
+ *   「加纸后继续打印不需要重新下单」—— 同上，不存在「继续」，只有整份重打或回到订单。
+ * 缺纸按机器故障标准句说明。付过钱才写退款那一句；免费单不写退款。
  */
 export function PrintOutOfPaperPanel({
   file, params, orderNo, failureReason, money, canRetry, takeaway,
@@ -157,7 +158,8 @@ export function PrintOutOfPaperPanel({
   const fileName = file?.name ? truncateFileNameMiddle(file.name, { maxLength: FILE_NAME_BUDGET_COMPACT }) : '本次打印任务'
   const shownOrderNo = publicOrderNo(orderNo)
   const idLine = shownOrderNo ? `订单号 ${shownOrderNo}` : ''
-  const paid = money.fact === 'paid'
+  const paid = money.fact === 'paid' && typeof money.amountCents === 'number' && money.amountCents > 0
+  const fault = machineCannotPrintLine(undefined, { orderKept: true })
   const orderRef = shownOrderNo ? `订单号 ${shownOrderNo}` : '这一单'
   return (
     <>
@@ -174,15 +176,15 @@ export function PrintOutOfPaperPanel({
               <span>打印机缺纸<small>订单保留，不会自动续打</small></span>
             </div>
             <p className="pff-inbar-b">
-              纸匣已空，这次打印<b>不会在加纸后自动继续</b>。出纸口里如果已经有纸，可以先拿走；没打完的部分请<b>联系现场工作人员</b>处理。
-              {paid ? '订单和已付金额都保留着' : '订单记录保留着'}；只有本页出现「重新提交打印」按钮时，才能自己重打一次{money.fact === 'free' ? '。' : '，且不会重复收费。'}
+              纸匣已空，这次打印<b>不会在加纸后自动继续</b>。出纸口里如果已经有纸，可以先拿走。{fault}
+              {paid ? '订单和支付记录都保留着' : '订单记录保留着'}；只有本页出现「重新提交打印」按钮时，才能自己重打一次{paid ? '，且不会重复收费。' : '。'}
             </p>
             <p className="pff-inbar-b pfd-reason"><span className="pfd-reason-k">设备上报</span><span>{failureReason}</span></p>
           </div>
           <PrintFeeBoundaryBar
             free={money.fact === 'free'}
             sub={paid ? '订单和支付记录都在，不会因为这次缺纸消失' : '订单记录都在，不会因为这次缺纸消失'}
-            body={money.fact === 'free' ? <>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打，以工作人员现场核查结果为准。</> : <>补纸只能由工作人员做，这次打印<b>不会在加纸后自动续打</b>。是否补打、是否处理费用、处理多少，<b>以工作人员核查结果为准</b>，本机不承诺自动处理，也不会替你把费用改成别的数。</>}
+            body={paid ? <>{fault}{refundApplyLine()}</> : <>{fault}</>}
             facts={
               <>
                 {shownOrderNo ? <span>订单 <b>{shownOrderNo}</b></span> : null}
@@ -195,10 +197,10 @@ export function PrintOutOfPaperPanel({
         </div>
       </section>
 
-      <section className="pff-sec" aria-label="找工作人员之前先做这三件">
+      <section className="pff-sec" aria-label="处理之前先做这三件">
         <div className="pff-sec-h">
-          <span className="t">找工作人员之前先做这三件</span>
-          <span className="hint">当场处理最快</span>
+          <span className="t">处理之前先做这三件</span>
+          <span className="hint">先看出纸口</span>
         </div>
         <div className="pfp-card pfp-todo">
           <div className="pff-step">
@@ -207,18 +209,18 @@ export function PrintOutOfPaperPanel({
           </div>
           <div className="pff-step">
             <span className="pff-step-no">2</span>
-            <span className="pff-step-txt">叫现场工作人员<b>加纸</b>，这一步只能由他们做；加完纸这次打印也<b>不会自己接着打</b>。</span>
+            <span className="pff-step-txt">这次打印<b>不会自己接着打</b>。{fault}</span>
           </div>
           <div className="pff-step">
             <span className="pff-step-no">3</span>
             <span className="pff-step-txt">
-              {money.fact === 'free'
-                ? canRetry
-                  ? <>加完纸可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>，请不要重新下单。</>
-                  : <>记下<b>{orderRef}</b>，补打由工作人员凭它处理；请不要重新下单。</>
-                : canRetry
-                ? <>加完纸可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>、不再收费；<b>不要重新下单</b>，那会变成两笔费用。</>
-                : <>记下<b>{orderRef}</b>，补打由工作人员凭它处理；<b>不要重新下单再打一次</b>，那会变成两笔费用。</>}
+              {canRetry
+                ? paid
+                  ? <>可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>、不会重复收费；<b>不要重新下单</b>，那会变成两笔费用。</>
+                  : <>可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>，请不要重新下单。</>
+                : paid
+                  ? <>记下<b>{orderRef}</b>。{refundApplyLine()}不要重新下单再打一次，那会变成两笔费用。</>
+                  : <>记下<b>{orderRef}</b>，回到订单重新打印。</>}
             </span>
           </div>
         </div>
@@ -229,13 +231,14 @@ export function PrintOutOfPaperPanel({
   )
 }
 
-/** 稿 15 paper-jam 的三步和求助条。不写收款；订单号没有时只说「这一单」。 */
+/** 稿 15 paper-jam 的三步和求助条。不写收款；订单号没有时只说「这一单」。不叫人去找工作人员。 */
 export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
   const orderRef = orderNo ? `订单号 ${orderNo}` : '这一单'
+  const help = helpNeededLine()
   return (
-    <section className="pff-jam-fill" aria-label="找工作人员之前先做这三件">
+    <section className="pff-jam-fill" aria-label="处理之前先做这三件">
       <div className="pff-sec-h">
-        <span className="t">找工作人员之前先做这三件</span>
+        <span className="t">处理之前先做这三件</span>
         <span className="hint">当场处理最快</span>
       </div>
       <div className="pff-jam-steps">
@@ -249,11 +252,11 @@ export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
         </div>
         <div className="pff-step">
           <span className="pff-step-no">3</span>
-          <span className="pff-step-txt">记下<b>{orderRef}</b>，补打时工作人员按它找这一单。</span>
+          <span className="pff-step-txt">记下<b>{orderRef}</b>。{help}。</span>
         </div>
       </div>
       <div className="pff-help">
-        <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+        <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{help}。</span>
       </div>
       <PrintAiHelp
         label="问小青：取纸或异常怎么办 →"

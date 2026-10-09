@@ -37,6 +37,7 @@
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:compliance-copy": "node scripts/verify-compliance-copy.mjs && pnpm run verify:datetime-honesty && pnpm run verify:list-truncation-honesty && pnpm run verify:no-raw-error-render",
+    "verify:kiosk-unattended-copy": "node scripts/verify-kiosk-unattended-copy.mjs",
     "verify:datetime-honesty": "node --experimental-strip-types scripts/verify-datetime-honesty.mjs",
     "verify:list-truncation-honesty": "node scripts/verify-list-truncation-honesty.mjs",
     "verify:no-raw-error-render": "node scripts/verify-no-raw-error-render.mjs",

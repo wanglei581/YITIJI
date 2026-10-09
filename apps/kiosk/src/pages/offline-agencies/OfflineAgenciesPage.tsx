@@ -1,4 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate } from 'react-router-dom'
 import { BuildingIcon, ClockIcon, FileTextIcon, MapPinIcon, SearchIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -69,6 +71,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
 }
 
 export function OfflineAgenciesPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const [data, setData] = useState<OfflineAgencyListResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -244,21 +247,21 @@ export function OfflineAgenciesPage() {
             ) : error ? (
               <>
                 <DirState tone="error" testId="offline-agency-result-error" title="机构名单没取到">
-                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试；重试仍失败时，请找现场工作人员。
+                  这次请求失败了。本机不会用示例机构顶替真实结果，所以目录先空着。可以重试。{helpNeededLine(contact)}
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={() => setRetryKey((k) => k + 1)}>重试</button>
-                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>求助</button>
                 </div>
               </>
             ) : !data ? null : data.items.length === 0 ? (
               <>
                 <DirState tone="empty" testId="offline-agency-result-empty" title="当前条件没有匹配的机构">
-                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。也可以找现场工作人员，按纸质名单帮你找。
+                  换个关键词或检索方式再试一次。机构信息需要管理员审核发布后才会出现在目录里。{helpNeededLine(contact)}
                 </DirState>
                 <div className="dw-filter-actions">
                   <button type="button" className="dw-chip" onClick={clearSearch}>清除条件重新查询</button>
-                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+                  <button type="button" className="dw-chip" onClick={() => navigate('/help')}>求助</button>
                 </div>
               </>
             ) : (
