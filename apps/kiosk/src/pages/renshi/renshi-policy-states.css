@@ -1,0 +1,35 @@
+/* 稿 48 的人工核对与小青不可用态，沿用当前字阶和颜色变量。 */
+.rq-ai-fallback { display: flex; flex-direction: column; gap: 12px; }
+.rq-ai-fallback .rq-why { margin: 0; }
+.rq-ai-fallback .rq-ai-off { border-style: dashed; }
+.rq-ai-fallback .rq-ai-off > div { min-width: 0; flex: 1; }
+.rq-ai-fallback .rq-ai-off .qx-ai-help { color: var(--qx-teal-d); }
+/* 人工核对的返回入口独占首行，扫码与打印复用常规出口的两格宽度。 */
+.rq-strip.rq-strip-manual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.rq-strip-manual > [data-testid='renshi-policy-manual-back'] { grid-column: 1 / -1; }
+.rq-strip-manual > [data-testid='renshi-policy-manual-back'] > span {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+.rq-strip-manual > [data-testid='renshi-policy-manual-back'] small { margin-top: 0; }
+.rq-social-steps-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 700;
+  color: var(--qx-teal-d);
+}
+.rq-social-steps-h svg { width: 24px; height: 24px; flex: none; }
+.rq-social .rq-steps-mini li {
+  border: 1px solid var(--qx-line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--qx-paper);
+}

@@ -60,7 +60,7 @@ export function EditFairDrawer({
       onSaved(updated)
       onClose()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '招聘会没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }

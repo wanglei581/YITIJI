@@ -19,6 +19,8 @@
 // 绝不消费 material.fileUrl（那是对象存储的外部签名 URL，打印链路不接）。
 
 import { useEffect, useState } from 'react'
+import { helpNeededLine, machineCannotPrintLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { FairMaterialDTO, ExternalJobFairDTO, FairMaterialType } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
@@ -68,6 +70,7 @@ function MaterialIcon({ type }: { type: FairMaterialType }) {
 }
 
 export function FairMaterialsPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const startPrint = useStartPrintHandoff()
   const { id } = useParams<{ id: string }>()
@@ -142,7 +145,7 @@ export function FairMaterialsPage() {
   const ctabar = uiState === 'print-failed'
     ? (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员处理</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
         <button type="button" className="qx-btn" data-variant="primary" onClick={() => setPrintError(null)}>回到物料列表</button>
       </>
     )
@@ -182,7 +185,7 @@ export function FairMaterialsPage() {
           <DirState tone="error" testId="fair-materials-print-failed" title="这次打印没有成功">
             {printError}
             <br />
-            <b>没出纸就是没出纸</b>，本机不会把它记成已完成。如果已经扣费，请带着订单号找工作人员处理。
+            <b>没出纸就是没出纸</b>，本机不会把它记成已完成。{machineCannotPrintLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={PrinterIcon} title="查看打印订单状态" desc="打印结果以打印机回流状态为准" onClick={() => navigate('/me/print-orders')} />
@@ -198,7 +201,7 @@ export function FairMaterialsPage() {
             清单错了你会按着不存在的手册去找。
           </DirState>
           <DirStrip>
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="一直获取不到？" desc="可以找现场工作人员要一份纸质版" onClick={() => navigate('/help')} />
+            <DirStripItem icon={BuildingIcon} tone="wheat" title="问小青" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
             <DirStripItem icon={PrinterIcon} title="打印你自己的材料" desc="简历、证件材料照常可以打印" onClick={() => navigate('/print-scan')} />
           </DirStrip>
         </>

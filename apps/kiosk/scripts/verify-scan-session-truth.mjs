@@ -1754,7 +1754,9 @@ assert.match(
   assert.doesNotMatch(notDurableText, /\*\*/, '纯字符串直接渲染进 <p>：写 markdown 会把星号打在 27 寸公共屏上')
   assert.match(notDurableText, /先别在面板上按开始/, '必须劝阻面板操作：这一刻没有任何会话会认领那份文件')
   assert.match(notDurableText, /撤掉/, '必须说出「那条任务已经撤掉了」，否则用户会以为纸可能被谁悄悄收走')
-  assert.match(notDurableText, /工作人员/, '出路必须可执行：存储坏了用户自己修不了，只能安全返回 + 叫人')
+  // 2026-10-06：不再叫现场工作人员。出路仍可执行：安全返回 + 标准句 1（helpNeededLine）。
+  assert.match(notDurableText, /请安全返回扫描首页/, '出路必须可执行：存储坏了用户自己修不了，只能安全返回')
+  assert.match(notDurableText, /helpNeededLine\(\)/, '求助走标准句 1，不叫现场工作人员')
 }
 /* 这一屏刻意**不给**「重新开始一次扫描」：写不进去是这台机器的存储坏了 / 被禁用 / 写满，
  * 重建一次只会在同一处再失败，还多留一条要撤的服务端任务。给一颗按不出结果的按钮，

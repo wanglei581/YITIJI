@@ -1,3 +1,5 @@
+import { helpNeededLine } from '../../copy/unattendedCopy'
+
 // ============================================================
 // 打印权益接线（**只读**）— V6 原型 P06 s4「权益与本单价格」卡六态
 //
@@ -144,7 +146,7 @@ export function resolvePrintBenefitState(input: PrintBenefitInput): PrintBenefit
       title: '本机没能取到现行价目',
       detail:
         '价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。'
-        + '请稍后重试，或联系现场工作人员。',
+        + `请稍后重试。${helpNeededLine()}。`,
     }
   }
 

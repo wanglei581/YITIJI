@@ -38,7 +38,7 @@ export function FitSkillMap({ matchPoints, gapPoints, keywordCoverage }: FitSkil
             </div>
           ) : (
             // 结果已完成，空数组代表这次没给出，不是还在等待返回。
-            <div className="jfq-ghost"><b>可以直接讲的优势</b><p>这次返回里没有可直接引用的匹配点。</p><span>本次未提供</span></div>
+            <div className="jfq-ghost"><b>可以直接讲的优势</b><p>这次返回里没有可直接引用的对照要点。</p><span>本次未提供</span></div>
           )}
         </section>
         <section className="jfq-evi-col" data-tone="warn" aria-label="简历里还没体现的要求">

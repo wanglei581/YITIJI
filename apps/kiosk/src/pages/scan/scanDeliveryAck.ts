@@ -2,6 +2,7 @@ import { SCAN_TASK_ACK_NOT_ALLOWED } from '@ai-job-print/shared'
 import { SCAN_ACK_CREDENTIALS_INCOMPLETE, ackScanSession } from '../../services/api/scanTasks'
 import { errorCodeOf } from '../../services/api/userErrorMessage'
 import { scanDeliveryAckBlocked } from './scanCleanupGate'
+import { helpNeededLine, networkDisconnectLine } from '../../copy/unattendedCopy'
 import type { SessionFailure } from './scanRescanRecovery'
 
 /**
@@ -97,10 +98,12 @@ export const SCAN_ACK_REFUSED_FAILURE: SessionFailure = {
  */
 export const SCAN_ACK_PENDING_FAILURE: SessionFailure = {
   title: '还没确认这台机器能收这份文件',
-  description: '这次扫描已经建好，但本机还没能向系统确认投递授权。没确认之前，'
-    + '打印机面板上扫出来的文件不会交到这一场，所以现在按开始只会白扫一张纸，'
-    + '也不会被别人收走。这一步可以重来：点「再确认一次」让本机再问一遍系统。'
-    + '一直不成就安全返回扫描首页，或者叫工作人员看一眼这台机器到系统的网络。',
+  get description() {
+    return '这次扫描已经建好，但本机还没能向系统确认投递授权。没确认之前，'
+      + '打印机面板上扫出来的文件不会交到这一场，所以现在按开始只会白扫一张纸，'
+      + '也不会被别人收走。这一步可以重来：点「再确认一次」让本机再问一遍系统。'
+      + `一直不成就安全返回扫描首页。${networkDisconnectLine()}。${helpNeededLine()}。`
+  },
 }
 
 /**

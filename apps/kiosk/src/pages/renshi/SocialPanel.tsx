@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { ArrowRightIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
 import { isValidSourceUrl } from '../../lib/url'
 import { SOCIAL_GUIDES } from './builtinData'
 import type { SourceQrTarget } from './components'
@@ -22,6 +22,7 @@ export function SocialPanel({ onOfficialEntry }: { onOfficialEntry: (target: Sou
                 <b>{guide.title}</b>
               </header>
               <p className="rq-item-sub">{guide.desc}</p>
+              <p className="rq-social-steps-h"><ArrowRightIcon aria-hidden="true" />办理步骤</p>
               <ol className="rq-steps-mini">
                 {guide.steps.map((step, index) => (
                   <li key={step}><span>{index + 1}</span>{step}</li>

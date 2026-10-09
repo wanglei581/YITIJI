@@ -1,6 +1,6 @@
 import { Drawer, LoadingState, ErrorState } from '@ai-job-print/ui'
 import type { OrderDetailControls } from './useOrderDetail'
-import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, PAY_STATUS_MAP, pickupText, REFUND_REASON_LABELS, STATUS_MAP } from './orderDisplay'
+import { amountText, billablePagesText, channelText, pageRangeText, fmt, orderUserText, payStatusText, pickupText, pickupTitle, REFUND_REASON_LABELS, taskStatusText } from './orderDisplay'
 import { colorModeText, copiesText, duplexText, NET_PAID_UNRECORDED, recordedCentsText } from './orderHonestyCopy'
 import { printErrorText } from '../../lib/printErrorText'
 import { OrderAftercare } from './OrderAftercare'
@@ -16,11 +16,14 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
     <Drawer open={detailState !== 'idle'} onClose={closeDetail} title={detail ? `订单详情 · ${detail.orderNo}` : '订单详情'} size="md">
       {detailState === 'loading' && <LoadingState className="py-16" />}
       {detailState === 'error' && <ErrorState className="py-16" onRetry={closeDetail} />}
-      {detailState === 'ready' && detail && (<>
+      {detailState === 'ready' && detail && (() => {
+            const pay = payStatusText(detail.payStatus)
+            const task = taskStatusText(detail.taskStatus)
+            return <>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" title={detail.type} value={detail.type === 'print' ? '打印' : detail.type === 'scan' ? '扫描' : '未归类'} />
               <Info label="渠道" value={channelText(detail.channel)} />
-              <Info label="取件" value={pickupText(detail)} />
+              <Info label="取件" value={pickupText(detail)} title={pickupTitle(detail)} />
               <Info label="取件码过期时间" value={fmt(detail.pickupCodeExpiresAt)} />
               <Info label="创建时间" value={fmt(detail.createdAt)} />
               <Info label="失败原因" value={printErrorText(detail.errorCode, detail.type)} title={detail.errorCode ?? undefined} />
@@ -28,8 +31,8 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="优惠/权益抵扣" value={recordedCentsText(detail.discountCents, detail.currency)} />
               <Info label="已退款" value={recordedCentsText(detail.refundedAmountCents, detail.currency)} />
               <Info label="实付" value={NET_PAID_UNRECORDED} />
-              <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
-              <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
+              <Info label="支付状态" value={pay.label} title={pay.title} />
+              <Info label="任务状态" value={task.label} title={task.title} />
               <Info label="用户" value={orderUserText(detail)} />
               <Info label="终端" value={detail.terminalCode ?? '—'} />
               <Info label="文件名" value={detail.print?.fileName ?? '未记录'} />
@@ -55,23 +58,28 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <p className="text-xs text-neutral-500">暂无状态流转记录</p>
             ) : (
               <div className="space-y-2">
-                {detail.statusLogs.map((log) => (
+                {detail.statusLogs.map((log) => {
+                  const from = taskStatusText(log.fromStatus)
+                  const to = taskStatusText(log.toStatus)
+                  const rawTitle = [from.title, to.title].filter(Boolean).join(' → ')
+                  return (
                   <div
                     key={`${log.fromStatus}-${log.toStatus}-${log.createdAt}`}
                     className="rounded-[9px] bg-neutral-50 px-3 py-2 text-xs text-neutral-700"
                   >
-                    <span className="font-semibold">
-                      {STATUS_MAP[log.fromStatus]?.label ?? log.fromStatus} → {STATUS_MAP[log.toStatus]?.label ?? log.toStatus}
+                    <span className="font-semibold" title={rawTitle || undefined}>
+                      {from.label} → {to.label}
                     </span>
                     {log.errorCode ? <span title={log.errorCode} className="ml-2 text-error-fg">{printErrorText(log.errorCode, detail.type)}</span> : null}
                     <span className="ml-2 tabular-nums text-neutral-500">{fmt(log.createdAt)}</span>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
       <OrderPaymentActions controls={controls} />
-      </>)}
+      </>})()}
     </Drawer>
   )
 }

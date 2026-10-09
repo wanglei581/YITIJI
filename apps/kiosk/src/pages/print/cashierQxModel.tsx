@@ -13,6 +13,7 @@ import {
   ScanLineIcon,
   Undo2Icon,
 } from 'lucide-react'
+import { helpNeededLine, machineUnusableLine, refundApplyLine } from '../../copy/unattendedCopy'
 import { PAY_CHANNEL_LABEL } from './cashierStatus'
 import type { CashierSnapshot, PaymentMethod } from './CashierPaymentPanel'
 
@@ -173,7 +174,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'channel-empty':
       return {
         kind: 'lock', icon: <LockIcon aria-hidden="true" />, title: '当前设备暂不支持在线付款',
-        paras: ['订单已保留，本次没有发起支付。请联系现场工作人员处理。'],
+        paras: [`订单已保留，本次没有发起支付。${machineUnusableLine()}`],
         chips: [['bad', '暂不支持在线付款'], [undefined, '订单已保留']],
         rows: [['可用通道', '无'], ['本机是否发起支付', '否']],
         ask: [<>这台机器<em>收不了款</em>。</>, '管理员还没开通任何收款方式。订单在，本机没有发起支付。'],
@@ -247,7 +248,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'pending-verification':
       return {
         kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款结果暂未确认',
-        paras: [<>请先查看你的{ch || '支付'}账单，<b>不要重复付款</b>。仍无法确认时请联系工作人员。</>],
+        paras: [<>请先查看你的{ch || '支付'}账单，<b>不要重复付款</b>。仍无法确认时，{helpNeededLine()}。</>],
         chips: [['warn', '结果未确认'], ['bad', '请勿重复扫码']],
         rows: [['本次支付', '结果暂未确认'], ['下一步', `先查${ch || '支付'}账单`]],
         ask: [<>结果<em>还没定</em>。</>, <>渠道可能还在处理。<b>先核实，别重复扫码。</b></>],
@@ -324,7 +325,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'order-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单支付已失败',
-        paras: [<>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</>],
+        paras: [c.free
+          ? <>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>{helpNeededLine()}</>
+          : <>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>{refundApplyLine()}</>],
         chips: [['bad', '订单支付失败'], [undefined, '禁止重新付款']],
         rows: [['订单支付状态', '失败（已经确认）'], ['能否再付', '不能，需重新下单']],
         ask: [<>订单支付<em>已经失败</em>。</>, '这是订单终态，不能再付；要打印请重新下单。'],
@@ -334,7 +337,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单已超时关闭',
         paras: [
           '已经确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。',
-          '要打的话，回去重新发起一次打印，重新报价、重新下单。如果你的支付账单里确实有这一笔，请拿订单号找工作人员核对。',
+          c.free
+            ? `要打的话，回去重新发起一次打印。${helpNeededLine()}`
+            : `要打的话，回去重新发起一次打印，重新报价、重新下单。${refundApplyLine()}`,
         ],
         chips: [['bad', '订单已关闭'], [undefined, '不能再出码']],
         rows: [['订单状态', '已关闭（已经确认）'], ['能否再付', '不能，需重新下单']],
@@ -357,7 +362,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单发生了部分退款',
         paras: [
           <>这笔订单处于<b>部分退款</b>。订单金额只退回了一部分，这类订单仍然一律不放行出纸。</>,
-          '请到「我的打印订单」查看，或找现场工作人员核对。金额只认系统订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。',
+          `请到「我的打印订单」查看。${helpNeededLine()}金额只认系统订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。`,
         ],
         chips: [['warn', '退款待核对'], [undefined, '不放行出纸']],
         rows: [['订单状态', '部分退款（已经确认）'], ['能否出纸', '否']],

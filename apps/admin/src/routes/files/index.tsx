@@ -22,6 +22,7 @@ import {
 import { RETENTION_FILTERS } from './retentionMeta'
 import { RetentionSummary } from './RetentionSummary'
 import { FileTable } from './FileTable'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const TYPE_TO_PURPOSE: Partial<Record<string, AdminFilePurpose>> = {
   简历上传: 'resume_upload',
@@ -139,7 +140,7 @@ export default function FilesPage() {
     setNotice(null)
     deleteFile(id, '管理员手动删除')
       .then(() => { setNotice(`已删除：${name}`); load() })
-      .catch((e: unknown) => setNotice(`删除失败：${e instanceof Error ? e.message : '请稍后重试'}`))
+      .catch((e: unknown) => setNotice(`删除失败：${userMessageOf(e, '请稍后重试')}`))
       .finally(() => setBusyId(null))
   }
 
@@ -156,7 +157,7 @@ export default function FilesPage() {
       .then((res) => { previewWindow.location.replace(resolveSignedUrl(res.signedUrl)) })
       .catch((e: unknown) => {
         previewWindow.close()
-        setNotice(`获取访问链接失败：${e instanceof Error ? e.message : '请稍后重试'}`)
+        setNotice(`获取访问链接失败：${userMessageOf(e, '请稍后重试')}`)
       })
       .finally(() => setBusyId(null))
   }
@@ -168,7 +169,7 @@ export default function FilesPage() {
     setNotice(null)
     cleanupExpiredFiles()
       .then((res) => { setNotice(`已清理 ${res.deletedCount} 个过期文件`); load() })
-      .catch((e: unknown) => setNotice(`清理失败：${e instanceof Error ? e.message : '请稍后重试'}`))
+      .catch((e: unknown) => setNotice(`清理失败：${userMessageOf(e, '请稍后重试')}`))
       .finally(() => setCleaning(false))
   }
 
