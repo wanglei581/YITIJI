@@ -29,6 +29,9 @@ import {
 import './styles/advisor-artifact-qx.css'
 
 const READ_LIMIT = 3
+// 「下面还有」提示自己要盖住正文区底部 120px。正文可见高度不到它的两倍就不出：
+// 手机宽度下这一页的正文区高度是 0，出了也滚不动，不做点了没反应的按钮。
+const MORE_BELOW_MIN_BODY = 240
 
 function isNotFound(err: unknown): boolean {
   return err instanceof ApiHttpError && (
@@ -192,7 +195,9 @@ export function AiPlanPage() {
     let disposed = false
     const measure = () => {
       frame = 0
-      setCanScrollDown(body.scrollTop + body.clientHeight < body.scrollHeight - 8)
+      const hasRoom = body.clientHeight >= MORE_BELOW_MIN_BODY
+      const moreBelow = body.scrollTop + body.clientHeight < body.scrollHeight - 8
+      setCanScrollDown(hasRoom && moreBelow)
     }
     const schedule = () => {
       if (!disposed && !frame) frame = window.requestAnimationFrame(measure)

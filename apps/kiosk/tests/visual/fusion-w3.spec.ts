@@ -2603,18 +2603,33 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
   const moreBelowText = readFileSync('src/pages/ai-plan/advisorArtifactModel.ts', 'utf8')
     .match(/export const MORE_BELOW_HINT = '([^']+)'/)?.[1]
   expect(moreBelowText, '从唯一导出常量读取提示文字').toBeDefined()
-  const longPins: Pin[] = [
+  const minBody = Number(readFileSync('src/pages/ai-plan/AiPlanPage.tsx', 'utf8')
+    .match(/const MORE_BELOW_MIN_BODY = (\d+)/)?.[1])
+  expect(minBody, '从页面常量读取出提示所需的正文最小可见高度').toBeGreaterThan(0)
+  // 两行一条的真实样子：要点在前、待办在后，出处各用各的。
+  const twoLine = (content: string): Pin => ({
+    content,
+    evidenceLevel: 'E3',
+    sourceNote: content.startsWith('待办：') ? '待办（请自行核对后执行）' : '由本次对话浓缩，仅供参考',
+  })
+  const longPoints = [
     '自我介绍先说专业和年级，再讲在学校快递站分拣和盘点的经历，最后说明暑假可以实习两个月并接受轮班安排。',
     '简历里补上快递站的实践经历，写清每天负责分拣和核对的件数，数字只用自己记得的真实记录，不确定的先留空。',
     '面试被问到为什么选择仓储实习，可以结合自己盘点时认真核对的习惯说明优势，再讲希望学习库存管理的想法。',
+    '签实习协议之前核对工作地点和每天的工作时间，问清轮班安排与意外保险由谁办理，把尚未明确的问题记下来。',
+  ].map(twoLine)
+  const longTodos = [
     '待办：面试前核对简历上的实践时间和联系方式，把快递站做过的事情按先后顺序整理好，准备一个真实的小例子。',
     '待办：提前查好去实习地点的公交路线和出发时间，带上学生证和两份核对过的简历，给路上换乘留出足够的时间。',
-    '签实习协议之前核对工作地点和每天的工作时间，问清轮班安排与意外保险由谁办理，把尚未明确的问题记下来。',
-  ].map((content) => ({ content, evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' }))
+  ].map(twoLine)
   const body = page.locator('.aa-body')
   const hint = page.getByTestId('advisor-artifact-more-below')
   const metrics = () => body.evaluate((node) => ({
     scrollTop: node.scrollTop, clientHeight: node.clientHeight, scrollHeight: node.scrollHeight,
+  }))
+  // 提示是量完一帧才出来的。断言「没有」之前先等两帧，免得赶在它出来之前就看过了。
+  const settle = () => page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   }))
   const openSession = async (sessionId: string, pins: Pin[], printUnavailable = false) => {
     api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, pins) })
@@ -2631,8 +2646,14 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     await expect(page.locator('.aa-pin')).toHaveCount(pins.length)
     expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '通过真实会话接口读取正文').toBeGreaterThan(0)
     await page.evaluate(() => document.fonts.ready)
+    await settle()
   }
-  const expectHintBounds = async (checkBodyBounds = true) => {
+  const expectTwoLines = async () => {
+    const lineCounts = await page.locator('.aa-pin-c').evaluateAll((nodes) => nodes.map((node) =>
+      (node as HTMLElement).offsetHeight / parseFloat(getComputedStyle(node).lineHeight)))
+    for (const count of lineCounts) expect(count, '每条正文确实为两行').toBeCloseTo(2, 1)
+  }
+  const expectHintBounds = async () => {
     await expect(hint).toBeVisible()
     expect(await hint.textContent(), '提示文字逐字相等').toBe(moreBelowText)
     const scale = await readEnabledStageScale(page)
@@ -2643,23 +2664,21 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     expect(hintBox.height / scale, '提示点击框高度至少 56px').toBeGreaterThanOrEqual(56)
     expect(hintBox.width / scale, '提示点击框宽度至少 240px').toBeGreaterThanOrEqual(240)
     expect(hintBox.y + hintBox.height, '提示下沿不盖住底部操作条').toBeLessThanOrEqual(barBox.y)
-    if (checkBodyBounds) {
-      expect(hintBox.y, '提示完整位于正文可见区内').toBeGreaterThanOrEqual(bodyBox.y)
-      expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(bodyBox.y + bodyBox.height)
-    }
+    expect(hintBox.y, '提示完整位于正文可见区内').toBeGreaterThanOrEqual(bodyBox.y)
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(bodyBox.y + bodyBox.height)
     expect(hintBox.x).toBeGreaterThanOrEqual(0)
     expect(hintBox.y).toBeGreaterThanOrEqual(0)
     expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(viewport.width)
     expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(viewport.height)
+    await assertTapTargetPointerHit(hint)
+    expect(await page.locator('.aa-more-below').evaluate((node) => getComputedStyle(node).pointerEvents), '渐隐层不接点击，不挡后面的内容').toBe('none')
   }
 
-  await test.step('五条两行正文：有提示，点后向下，滚到底后消失', async () => {
-    await openSession('w3-more-below-five', longPins.slice(0, 5))
+  await test.step('五条两行正文：有提示，点后向下，滚到底消失，滚回顶部再出现', async () => {
+    await openSession('w3-more-below-five', [...longPoints.slice(0, 3), ...longTodos])
     const before = await metrics()
-    expect(before.scrollHeight, '前提：五条两行确实放不下').toBeGreaterThan(before.clientHeight)
-    const lineCounts = await page.locator('.aa-pin-c').evaluateAll((nodes) => nodes.map((node) =>
-      (node as HTMLElement).offsetHeight / parseFloat(getComputedStyle(node).lineHeight)))
-    for (const count of lineCounts) expect(count, '每条正文确实为两行').toBeCloseTo(2, 1)
+    expect(before.scrollHeight, '前提：五条两行确实放不下').toBeGreaterThan(before.clientHeight + 8)
+    await expectTwoLines()
     await expectHintBounds()
     await hint.click()
     await expect.poll(async () => (await metrics()).scrollTop, '点提示后正文向下滚动').toBeGreaterThan(before.scrollTop)
@@ -2669,31 +2688,43 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
       return value.scrollHeight - value.clientHeight - value.scrollTop
     }, '先确认正文已经到底').toBeLessThanOrEqual(1)
     await expect(hint).toHaveCount(0)
+    await body.evaluate((node) => { node.scrollTop = 0 })
+    await expect(hint, '滚回顶部提示再出现').toBeVisible()
+  })
+  await test.step('四条两行正文：放得下，不渲染提示', async () => {
+    await openSession('w3-more-below-four', [...longPoints.slice(0, 3), longTodos[0]!])
+    await expectTwoLines()
+    const value = await metrics()
+    expect(value.scrollHeight - value.clientHeight, '前提：四条两行放得下').toBeLessThanOrEqual(8)
+    await expect(hint).toHaveCount(0)
   })
   await test.step('稿上四条：放得下，不渲染提示', async () => {
     await openSession('w3-more-below-proto', ADVISOR_PROTO)
     const value = await metrics()
-    expect(value.scrollHeight, '前提：稿上四条放得下').toBe(value.clientHeight)
+    expect(value.scrollHeight - value.clientHeight, '前提：稿上四条放得下').toBeLessThanOrEqual(2)
     await expect(hint).toHaveCount(0)
   })
   await test.step('十三条：提示可见', async () => {
     await openSession('w3-more-below-thirteen', [...ADVISOR_REAL, ...ADVISOR_TODO])
     const value = await metrics()
-    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight)
+    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight + 8)
     await expectHintBounds()
   })
   await test.step('打印读不到的六条：同一正文提示可见', async () => {
-    await openSession('w3-more-below-unavailable', longPins, true)
+    await openSession('w3-more-below-unavailable', [...longPoints, ...longTodos], true)
     await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
     const value = await metrics()
-    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight)
+    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight + 8)
     await expectHintBounds()
   })
-  await test.step('手机宽度 390：提示不越过视口和底部操作条', async () => {
+  await test.step('手机宽度 390：正文可见高度不够放提示时不渲染，够放时守同样的边界', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await openSession('w3-more-below-mobile', longPins.slice(0, 5))
-    // 本任务只检查新增提示的边界，不把整页已有的手机版式列入验收。
-    await expectHintBounds(false)
+    await openSession('w3-more-below-mobile', [...longPoints.slice(0, 3), ...longTodos])
+    // 这一页的手机版式不在本条验收里，这里只管提示不乱出：不做点了滚不动的按钮。
+    const value = await metrics()
+    const fits = value.scrollHeight - value.clientHeight <= 8
+    if (value.clientHeight < minBody || fits) await expect(hint).toHaveCount(0)
+    else await expectHintBounds()
   })
   expect(runtimeErrors).toEqual([])
 })
