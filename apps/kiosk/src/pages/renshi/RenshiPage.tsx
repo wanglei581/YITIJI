@@ -18,9 +18,11 @@ import { EligibilityPanel, type EligibilityChrome } from './EligibilityPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
 import { NoticePanel } from './NoticePanel'
+import { usePolicyAdvisorAvailability } from './usePolicyAdvisorAvailability'
 import './renshi-policy-fusion.css'
 import './renshi-eligibility-qx.css'
 import './renshi-narrow-qx.css'
+import './renshi-policy-states.css'
 
 const TAB_TITLE: Record<TabKey, string> = {
   policy: '就业政策',
@@ -45,6 +47,8 @@ export function RenshiPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = getInitialTab(searchParams)
+  const advisorAvailable = usePolicyAdvisorAvailability(activeTab)
+  const [manualPolicyId, setManualPolicyId] = useState<string | null>(null)
   const [audience, setAudience] = useState<AudienceKey>('all')
   const { getToken } = useAuth()
   const [qrEntry, setQrEntry] = useState<SourceQrTarget | null>(null)
@@ -52,6 +56,7 @@ export function RenshiPage() {
   const [eligHost, setEligHost] = useState<HTMLDivElement | null>(null)
 
   const setActiveTab = (tab: TabKey) => {
+    setManualPolicyId(null)
     const next = new URLSearchParams(searchParams)
     if (tab === 'policy') next.delete('tab')
     else next.set('tab', tab)
@@ -185,6 +190,12 @@ export function RenshiPage() {
   // 选了身份时服务端只回这一身份与通用事项：一条都没有是筛选结果，不是政策库空（稿 48 的 filtered-empty）。
   const libraryEmpty = libraryItems.length === 0 && audience === 'all'
   const audienceLabel = AUDIENCE_CHIPS.find((chip) => chip.key === audience)?.label ?? ''
+  const manual = activeTab === 'policy' && policyState === 'ready' && !focusOnList
+    && libraryItems.some((item) => item.id === manualPolicyId && (!focusId || focusId === item.id))
+  const aiUnavailable = advisorAvailable === false
+  const policyViewState = policyState === 'loading' ? 'loading' : policyState === 'error' ? 'request-error'
+    : manual ? 'manual-view-source' : libraryEmpty ? 'policy-library-empty'
+      : visibleLibraryCount === 0 ? 'filtered-empty' : aiUnavailable ? 'ai-unavailable' : 'policy-ready'
 
   const describeSources = (rows: PolicyPostView[]) => {
     const names = [...new Set(rows.map((row) => row.sourceName).filter(Boolean))].slice(0, 2).join('、')
@@ -214,6 +225,9 @@ export function RenshiPage() {
     if (policyState === 'error') return { tone: 'bad', label: '政策读取失败' }
     if (libraryEmpty) return { tone: 'warn', label: '政策库暂无内容' }
     if (visibleLibraryCount === 0) return { tone: 'warn', label: '筛选后无匹配' }
+    // 10/8 产品负责人批准的文字偏离：稿上是『人工核对路径』，不要照稿改回去。
+    if (manual) return { tone: 'ok', label: '自己核对' }
+    if (aiUnavailable) return { tone: 'bad', label: '小青不可用' }
     return { tone: 'unknown', label: '政策库与办事指引' }
   }
   const noticePill = (): Pill => {
@@ -272,9 +286,17 @@ export function RenshiPage() {
             ? '政策库当前为空；下方指引是本机整理的参考，不用来冒充政策库有内容。'
             : visibleLibraryCount === 0
               ? '按身份筛选后政策库没有命中；这是筛选结果，不是库里没有政策。'
-              : '政策库条目与本机整理的指引分区展示，展开即看原文、条件与办理路径。',
+              : manual
+                // 10/8 产品负责人批准的文字偏离：稿上是『不经过模型的人工核对：直接看这条政策的原文与来源。』，不要照稿改回去。
+                ? '自己核对，不经过 AI：直接看这条政策的原文与来源。'
+                : aiUnavailable
+                  ? '小青暂时不可用；这一屏其余功能照常，条件核对本来也不用小青。'
+                  : '政策库条目与本机整理的指引分区展示，展开即看原文、条件与办理路径。',
       status: pill,
-      source: policyState === 'ready' ? policySourceLine : null,
+      source: policyState !== 'ready' ? null : manual
+        // 10/8 产品负责人批准的文字偏离：稿上是『人工核对：不经过模型，直接看这条政策的原文与来源』，不要照稿改回去。
+        ? '自己核对：不经过 AI，直接看这条政策的原文与来源'
+        : aiUnavailable ? '小青暂时不可用；看原文、筛选、扫码与条件核对都照常可用' : policySourceLine,
     }
   })()
 
@@ -339,7 +361,8 @@ export function RenshiPage() {
                 <span className="why">
                   {policyState === 'loading'
                     ? '政策还没读回来，打印你自己带来的材料不受影响。'
-                    : '政策与指引只做说明；需要纸质件请上传你自己的材料。'}
+                    : manual ? '原文只做展示；需要纸质件请上传你自己的材料。'
+                      : '政策与指引只做说明；需要纸质件请上传你自己的材料。'}
                 </span>
               </>
             ) : activeTab === 'social' ? (
@@ -382,7 +405,9 @@ export function RenshiPage() {
       )}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
-      <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
+      <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}
+        data-state={activeTab === 'policy' ? policyViewState : undefined}
+        data-testid={activeTab === 'policy' ? `renshi-policy-state-${policyViewState}` : undefined}>
         {qrEntry && <OfficialEntryQrOverlay target={qrEntry} onClose={() => setQrEntry(null)} />}
         <div className="rq-lead">
           <p className="rq-more">看政策、对条件、备材料。不代办，也不判断你能不能领。</p>
@@ -412,6 +437,7 @@ export function RenshiPage() {
                 suppressAutoOpen={guard.suppressAutoOpen}
                 onAudienceChange={(key) => {
                   guard.release()
+                  setManualPolicyId(null)
                   setAudience(key)
                 }}
                 onOpened={handlePolicyItemOpened}
@@ -420,6 +446,9 @@ export function RenshiPage() {
                 onOfficialEntry={handlePolicyItemEntry}
                 aiLabel={AI_LABEL}
                 aiDraft={AI_DRAFT.policy}
+                aiUnavailable={aiUnavailable}
+                manualPolicyId={manual ? manualPolicyId : null}
+                onManualPolicyChange={setManualPolicyId}
               />
             )
           )}

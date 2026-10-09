@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFavorites } from '../../favorites/useFavorites'
 import { isValidSourceUrl } from '../../lib/url'
-import { FileTextIcon, HeartIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { ArrowLeftIcon, FileTextIcon, HeartIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { matchAudience, type AudienceKey, type PolicyItem } from './shared'
 import { AudienceFilter, CollapsedChevron, DetailList, SourceFacts, type SourceQrTarget } from './components'
+import { PolicyAiFallback } from './PolicyAiFallback'
 
 const SRC_RULE = '来源入口由发布方提供，本系统未核验其官方性；扫码前请核对机构和目标域名。'
 
@@ -33,6 +34,9 @@ export function PolicyPanel({
   onOfficialEntry,
   aiLabel,
   aiDraft,
+  aiUnavailable,
+  manualPolicyId,
+  onManualPolicyChange,
 }: {
   libraryItems: PolicyItem[]
   guideItems: PolicyItem[]
@@ -48,6 +52,9 @@ export function PolicyPanel({
   onOfficialEntry: (item: PolicyItem, target: SourceQrTarget) => void
   aiLabel: string
   aiDraft: string
+  aiUnavailable: boolean
+  manualPolicyId: string | null
+  onManualPolicyChange: (id: string | null) => void
 }) {
   const navigate = useNavigate()
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -81,6 +88,8 @@ export function PolicyPanel({
     : suppressAutoOpen
       ? focusHit
       : (focusHit ?? fallbackId)
+  const manual = manualPolicyId !== null && visibleLibrary.some((item) => item.id === manualPolicyId)
+  const displayedId = manual ? manualPolicyId : openId
 
   useEffect(() => {
     if (touched || !focusHit || openId !== focusHit) return
@@ -88,12 +97,12 @@ export function PolicyPanel({
   }, [focusHit, openId, touched])
 
   useEffect(() => {
-    onActiveId(openId)
+    onActiveId(displayedId)
     return () => onActiveId(null)
-  }, [onActiveId, openId])
+  }, [onActiveId, displayedId])
 
   useEffect(() => {
-    const item = selectable.find((entry) => entry.id === openId)
+    const item = selectable.find((entry) => entry.id === displayedId)
     if (!item) {
       openedIdRef.current = null
       return
@@ -101,15 +110,16 @@ export function PolicyPanel({
     if (openedIdRef.current === item.id) return
     openedIdRef.current = item.id
     onOpened(item)
-  }, [onOpened, openId, selectable])
+  }, [onOpened, displayedId, selectable])
 
   const toggle = (item: PolicyItem) => {
+    onManualPolicyChange(null)
     setTouched(true)
-    setExpandedId(openId === item.id ? null : item.id)
+    setExpandedId(displayedId === item.id ? null : item.id)
   }
 
   const renderItem = (item: PolicyItem, kind: 'library' | 'builtin') => {
-    const open = openId === item.id
+    const open = displayedId === item.id
     const canFavorite = !item.id.startsWith('builtin-')
     const favorite = canFavorite && isFavorite('policy', item.id)
     const urlOk = Boolean(item.officialUrl && isValidSourceUrl(item.officialUrl))
@@ -149,7 +159,7 @@ export function PolicyPanel({
         {open && (
           <div className="rq-acc">
             {kind === 'builtin' ? <p className="rq-kindchip">内置指引 · 非政策库内容</p> : null}
-            {(item.content || item.summary) && !item.conditions && (
+            {(item.content || item.summary) && (manual || !item.conditions) && (
               <div className="rq-quote">
                 <span>政策原文</span>
                 <p>{item.content || item.summary}</p>
@@ -167,16 +177,24 @@ export function PolicyPanel({
             ) : (
               <p className="rq-srcchip">整理来源 <b>{item.sourceName}</b></p>
             )}
-            {kind === 'library' ? (
-              <div className="rq-ai-off">
-                <b>本条政策暂未接入小青</b>
-                <span>小青还不能解释政策原文。看原文、来源二维码和条件核对都不经过它。</span>
-                <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
-              </div>
-            ) : (
+            {kind === 'library' ? (manual ? null : (
+              <PolicyAiFallback
+                unavailable={aiUnavailable}
+                aiLabel={aiLabel}
+                aiDraft={aiDraft}
+                policyId={item.id}
+                onManual={() => onManualPolicyChange(item.id)}
+              />
+            )) : (
               <p className="rq-note">{SRC_RULE}</p>
             )}
-            <div className="rq-strip">
+            <div className={kind === 'library' && manual ? 'rq-strip rq-strip-manual' : 'rq-strip'}>
+              {kind === 'library' && manual ? (
+                <button type="button" className="rq-exit" data-testid="renshi-policy-manual-back" onClick={() => onManualPolicyChange(null)}>
+                  <ArrowLeftIcon aria-hidden="true" />
+                  <span><b>返回政策库</b><small>回到这条的常规说明</small></span>
+                </button>
+              ) : null}
               {urlOk ? (
                 <button
                   type="button"
@@ -268,7 +286,7 @@ export function PolicyPanel({
           <div className="rq-list">{visibleGuides.map((item) => renderItem(item, 'builtin'))}</div>
         )}
       </section>
-      {visibleLibrary.some((item) => item.id === openId) ? null : (
+      {visibleLibrary.some((item) => item.id === displayedId) ? null : (
         <QxStepActions onPrev={goHub}>
           <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
         </QxStepActions>
