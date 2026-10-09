@@ -109,6 +109,30 @@ function Assert-InstalledRuntimeAcl {
   Assert-RestrictedRuntime -Root $installRoot
 }
 
+function Assert-InstalledDiagnosis {
+  # Agent startup failures tell the operator to run this script on the host.
+  # Run the installed copy in its own Windows PowerShell process, as an operator
+  # would, and require it to read this Program Files install as healthy.
+  $diagnosePath = Join-Path $installRoot "provision\diagnose-production-agent.ps1"
+  if (-not (Test-Path -LiteralPath $diagnosePath -PathType Leaf)) {
+    throw "Installed diagnose script is missing"
+  }
+  $windowsPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+  $diagnosisJson = (& $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '$diagnosePath' | Select-Object -Last 1 | ConvertTo-Json -Compress" | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0) {
+    throw "Installed diagnose script exited with code ${LASTEXITCODE}: $diagnosisJson"
+  }
+  $diagnosis = $diagnosisJson | ConvertFrom-Json
+  if (-not [bool]$diagnosis.serviceExists -or [string]$diagnosis.serviceResolution -ne "resolved") {
+    throw "Installed diagnose script did not resolve the installed service: $diagnosisJson"
+  }
+  if ([string]$diagnosis.runtimeRootAclStatus -ne "ok") {
+    $aclText = (& (Join-Path $env:SystemRoot "System32\icacls.exe") $installRoot | Out-String).Trim()
+    throw "Installed diagnose script must report the install root ACL as ok, got '$($diagnosis.runtimeRootAclStatus)': $aclText"
+  }
+  Write-Host "DIAGNOSE_INSTALLED_PASS serviceResolution=resolved runtimeRootAclStatus=ok"
+}
+
 function Add-EvidenceError([string]$Phase, [string]$Message) {
   $line = "[$([DateTime]::UtcNow.ToString('o'))] phase=$Phase $Message`n"
   [System.IO.File]::AppendAllText(
@@ -310,6 +334,7 @@ $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
 }
+Assert-InstalledDiagnosis
 if (-not (Test-Path -LiteralPath (Join-Path $installRoot "node\node.exe"))) {
   throw "Bundled Node runtime is missing after install"
 }
@@ -320,6 +345,7 @@ foreach ($relativeProvisionPath in @(
   "provision\provision-terminal.cmd",
   "provision\provision-installed-agent.ps1",
   "provision\install-production-agent.ps1",
+  "provision\diagnose-production-agent.ps1",
   "provision\service-identity.ps1",
   "provision\terminal-control-center.ps1",
   "provision\launch-control-center.vbs",

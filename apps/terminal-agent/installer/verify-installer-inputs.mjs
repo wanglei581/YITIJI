@@ -317,6 +317,24 @@ assert.match(staging, /Copy-WindowsPowerShellScript/)
 assert.match(staging, /UTF8Encoding\]::new\(\$true\)/)
 assert.match(staging, /provisioning-origin-utils\.ps1/)
 assert.match(staging, /provisioning-runtime-security\.ps1/)
+// Agent startup failures tell the operator to run diagnose-production-agent.ps1, so the
+// script and every helper it dot-sources from its own directory must ship in provision.
+assert.match(agentCli, /Run diagnose-production-agent\.ps1 on this host/)
+const diagnose = fs.readFileSync(path.join(root, '../scripts/diagnose-production-agent.ps1'), 'utf8')
+const stagedProvisionScripts = [
+  ...staging.matchAll(/-Destination \(Join-Path \$provisionRoot "([^"]+\.ps1)"\)/g),
+].map((match) => match[1])
+assert.ok(stagedProvisionScripts.includes('diagnose-production-agent.ps1'), 'diagnose script must be staged into provision')
+const diagnoseHelpers = [...diagnose.matchAll(/^\. \(Join-Path \$scriptRoot "([^"]+\.ps1)"\)/gm)].map((match) => match[1])
+assert.deepEqual([...diagnoseHelpers].sort(), ['provisioning-runtime-security.ps1', 'service-identity.ps1'])
+for (const helper of diagnoseHelpers) {
+  assert.ok(stagedProvisionScripts.includes(helper), `${helper} must be staged next to the diagnose script`)
+}
+assert.match(stagedPowerShellVerify, /"diagnose-production-agent\.ps1"/, 'staged script gate must require the diagnose script')
+const msiLifecycle = read('test-msi-lifecycle.ps1')
+assert.match(msiLifecycle, /"provision\\diagnose-production-agent\.ps1"/, 'MSI lifecycle must require the installed diagnose script')
+assert.match(msiLifecycle, /\nAssert-InstalledDiagnosis\r?\n/, 'MSI lifecycle must run the installed diagnose script')
+assert.match(msiLifecycle, /runtimeRootAclStatus -ne "ok"/, 'MSI lifecycle must require a healthy install root verdict')
 assert.match(stagedPowerShellVerify, /0xEF[\s\S]*0xBB[\s\S]*0xBF/)
 assert.match(stagedPowerShellVerify, /System\.Management\.Automation\.Language\.Parser\]::ParseFile/)
 assert.match(stagedPowerShellVerify, /Merge-LocalApiAllowedOrigins/)
