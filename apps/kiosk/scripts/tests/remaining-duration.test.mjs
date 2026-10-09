@@ -6,13 +6,17 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
-const source = readFileSync(join(root, 'src/pages/scan/scanSettingsModel.ts'), 'utf8')
-const { outputText } = ts.transpileModule(source, {
-  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-  fileName: 'scanSettingsModel.ts',
-})
-const dataUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`
-const model = await import(dataUrl)
+const transpile = (file, fileName) =>
+  ts.transpileModule(readFileSync(join(root, file), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName,
+  }).outputText
+const toDataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
+// scanSettingsModel 依赖无人值守文案模块；data: 地址里解析不了相对路径，这里把它一并转译后换成 data: 地址。
+const unattendedUrl = toDataUrl(transpile('src/copy/unattendedCopy.ts', 'unattendedCopy.ts'))
+const outputText = transpile('src/pages/scan/scanSettingsModel.ts', 'scanSettingsModel.ts')
+  .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`)
+const model = await import(toDataUrl(outputText))
 
 test('remaining time over one hour is about N hours, not an unbounded minute count', () => {
   assert.equal(model.formatRemainingDuration(3600), '约 1 小时')
