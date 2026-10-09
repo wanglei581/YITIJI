@@ -494,14 +494,15 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
 
 // ── 「我的」共用外壳（C1-2）：返回键、页名胶囊、页签下移、问小青、字号下限 ──
 
-const ME_SHELL_PAGES: { path: string; name: string; tabs: boolean; ask: string; draft: string }[] = [
-  { path: '/me/documents', name: '我的文档', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
-  { path: '/me/print-orders', name: '我的打印订单', tabs: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
-  { path: '/me/resumes', name: '我的简历', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
-  { path: '/me/favorites', name: '我的收藏', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
-  { path: '/me/ai-records', name: 'AI服务记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
-  { path: '/me/activity', name: '浏览与跳转记录', tabs: true, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
-  { path: '/me/notifications', name: '消息通知', tabs: false, ask: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
+/** take：头图里有没有六格说明。稿 38（文档、订单）有；稿 39 规则 4 写明四个记录页签「不再加六格说明」。 */
+const ME_SHELL_PAGES: { path: string; name: string; tabs: boolean; take: boolean; ask: string; draft: string }[] = [
+  { path: '/me/documents', name: '我的文档', tabs: true, take: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/print-orders', name: '我的打印订单', tabs: true, take: true, ask: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
+  { path: '/me/resumes', name: '我的简历', tabs: true, take: false, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/favorites', name: '我的收藏', tabs: true, take: false, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/ai-records', name: 'AI服务记录', tabs: true, take: false, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/activity', name: '浏览与跳转记录', tabs: true, take: false, ask: '问小青', draft: '这里的记录能存多久？删掉会怎样？' },
+  { path: '/me/notifications', name: '消息通知', tabs: false, take: false, ask: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
 ]
 
 async function stageScale(page: Page): Promise<number> {
@@ -580,7 +581,18 @@ async function expectMeShell(page: Page, item: (typeof ME_SHELL_PAGES)[number]):
     const tab = page.locator('.qx-me-vtab').first()
     const tabBox = await tab.boundingBox()
     expect(tabBox, '页签有盒子').not.toBeNull()
-    expect((tabBox!.y - origin.y) / scale, `${item.path} 页签上边`).toBeGreaterThanOrEqual(500)
+    const tabTop = (tabBox!.y - origin.y) / scale
+    if (item.take) {
+      // 稿 38：头图带六格，页签排在六格下面。
+      await expect(page.getByTestId('qx-me-take')).toHaveCount(1)
+      expect(tabTop, `${item.path} 页签上边`).toBeGreaterThanOrEqual(500)
+    } else {
+      // 稿 39 规则 4：头图只留副标题这一句、不放六格，页签紧跟头图。
+      // 实测：标语一行的三页约 317（稿上约 322），足迹页标语两行约 364；有六格时会被推到 500 以下。
+      await expect(page.getByTestId('qx-me-take')).toHaveCount(0)
+      expect(tabTop, `${item.path} 页签上边`).toBeGreaterThanOrEqual(280)
+      expect(tabTop, `${item.path} 页签上边`).toBeLessThanOrEqual(420)
+    }
   } else {
     await expect(page.locator('.qx-me-vtab')).toHaveCount(0)
     await expect(page.getByTestId('qx-me-take')).toHaveCount(0)
@@ -1612,6 +1624,8 @@ test('39 删除是次级按钮，确认才用朱砂且整张确认卡自动进�
 for (const [screen, state] of [['resumes', 'ready'], ['favorites', 'ready'], ['ai-records', 'ready'], ['activity', 'browse-ready']]) {
   test(`39 ${screen} 头图按定稿不放六格 @w5-kiosk`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
+    // 足迹页还会读自填的求职进度；并排图夹具不登记它，这里补一条空回包，免得拆卸时报未处理请求。
+    if (screen === 'activity') api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: emptyPage(0) })
     await prepareC41cMeState(page, api, '39', screen, state)
     const count = await page.locator('.qx-me-xq .qx-me-take').count()
     expect(count, `${screen} 头图六格数=${count}；定稿=0`).toBe(0)
