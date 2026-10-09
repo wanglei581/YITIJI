@@ -78,6 +78,11 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
           {file?.name ? `「${file.name}」的解析没有完成。` : '这次没有生成诊断报告。'}
           这一屏不给任何诊断结论 —— 没跑出来就是没有，不拿通用建议顶替。
         </p>
+        {!canPrintOriginal ? (
+          <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginBottom: 12 }}>
+            {NO_PRINT_URL_REASON}
+          </p>
+        ) : null}
         <div className="rows" style={{ display: 'grid', gap: 10 }}>
           {canPrintOriginal ? (
             <button type="button" className="rrp-row" onClick={printOriginal} data-route="/print/material-check">
@@ -86,43 +91,37 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
               <RowGo />
             </button>
           ) : (
-            <div>
-              {/*
-                真 <button> + aria-disabled，不加原生 disabled：
-                置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
-                这里刻意不绑 onClick，按下去不会有任何副作用。
-              */}
-              <button
-                type="button"
-                className="rrp-row"
-                aria-disabled="true"
-                aria-describedby="resume-fail-print-reason"
-              >
-                <RowIcon><PrinterIcon size={26} /></RowIcon>
-                <span className="tx"><b>打印我上传的原件</b><span>本次不可用</span></span>
-              </button>
-              <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginTop: 8 }}>
-                {NO_PRINT_URL_REASON}
-              </p>
-            </div>
+            /*
+              真 <button> + aria-disabled，不加原生 disabled：
+              置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
+              这里刻意不绑 onClick，按下去不会有任何副作用。
+              原因放在网格外面：网格行会分掉余高，包一层 div 的话长高的是外层，按钮仍是矮的。
+            */
+            <button
+              type="button"
+              className="rrp-row"
+              aria-disabled="true"
+              aria-describedby="resume-fail-print-reason"
+            >
+              <RowIcon><PrinterIcon size={26} /></RowIcon>
+              <span className="tx"><b>打印我上传的原件</b><span>本次不可用</span></span>
+            </button>
           )}
           <button type="button" className="rrp-row" onClick={() => navigate('/print-scan')} data-route="/print-scan">
             <RowIcon><PrinterIcon size={26} /></RowIcon>
             <span className="tx"><b>去打印 / 扫描其他材料</b><span>打印扫描不依赖 AI，照常可用</span></span>
             <RowGo />
           </button>
-          <>
-              <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
-                <RowIcon><BookOpenIcon size={26} /></RowIcon>
-                <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
-                <RowGo />
-              </button>
-              <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
-                <RowIcon><QrCodeIcon size={26} /></RowIcon>
-                <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
-                <RowGo />
-              </button>
-</>
+          <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
+            <RowIcon><BookOpenIcon size={26} /></RowIcon>
+            <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
+            <RowGo />
+          </button>
+          <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
+            <RowIcon><QrCodeIcon size={26} /></RowIcon>
+            <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
+            <RowGo />
+          </button>
         </div>
       </section>
       <section className="rrp-checks" data-testid="resume-report-fallback">

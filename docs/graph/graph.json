@@ -13051,7 +13051,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 679,
+      "reachableFileCount": 701,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13124,7 +13124,17 @@
         {
           "component": "BenefitActivitiesPage",
           "endpoints": [
-            "POST /activities/:param/claim"
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /activities/:param/claim",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
           ],
           "file": "apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx",
           "layout": [
@@ -13134,7 +13144,11 @@
           ],
           "path": "/activities",
           "styles": [
-            "apps/kiosk/src/pages/activities/activities-batch8.css"
+            "apps/kiosk/src/pages/activities/activities-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -13161,7 +13175,11 @@
           ],
           "path": "/activities/:id",
           "styles": [
-            "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css"
+            "apps/kiosk/src/pages/activities/activities-qx.css",
+            "apps/kiosk/src/styles/qingxu/index.css",
+            "apps/kiosk/src/styles/qingxu/primitives.css",
+            "apps/kiosk/src/styles/qingxu/shell.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css"
           ],
           "wrappers": []
         },
@@ -14356,6 +14374,7 @@
           "path": "/me/feedback",
           "styles": [
             "apps/kiosk/src/pages/profile/me/styles/feedback-qx.css",
+            "apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -16029,7 +16048,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 775
+      "sourceFileCount": 799
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19578,6 +19597,9 @@
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
     ],
+    "apps/kiosk/src/pages/interview/InterviewModePicker.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
     "apps/kiosk/src/pages/interview/InterviewReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -19588,6 +19610,9 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/InterviewResumePreview.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx": [
@@ -19633,6 +19658,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/InterviewSessionInvalid.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
@@ -20296,7 +20324,8 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
-      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -20397,6 +20426,10 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -20410,11 +20443,24 @@
     "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts": [
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
+    ],
+    "apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts": [
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/feedback/types.ts": [
@@ -21112,6 +21158,9 @@
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/pages/service-hubs/serviceHubChrome.ts": [
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
     "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -21121,6 +21170,9 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css": [
+      "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
+    ],
+    "apps/kiosk/src/pages/service-hubs/useHubAiAvailability.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/session-guard/SessionGuardView.tsx": [
@@ -30244,8 +30296,10 @@
           ".github/workflows/ci.yml",
           "apps/kiosk/scripts/tests/interview-workbench-model.test.mjs",
           "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
+          "apps/kiosk/src/pages/interview/InterviewModePicker.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewResumePreview.tsx",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewShell.tsx",
@@ -30254,6 +30308,7 @@
           "apps/kiosk/src/pages/interview/interview-service-desk.css",
           "apps/kiosk/src/pages/interview/interviewWorkbenchSession.ts",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
+          "apps/kiosk/src/pages/interview/session/InterviewSessionInvalid.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
@@ -30310,10 +30365,14 @@
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
           "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
+          "apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
@@ -31144,10 +31203,14 @@
           "apps/kiosk/src/pages/profile/me/components/documentReprint.ts",
           "apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx",
           "apps/kiosk/src/pages/profile/me/documents/documentClassify.ts",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackDetailPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackFormPanel.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx",
           "apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts",
+          "apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts",
           "apps/kiosk/src/pages/profile/me/feedback/types.ts",
           "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
           "apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx",
@@ -31798,9 +31861,11 @@
           "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx",
+          "apps/kiosk/src/pages/service-hubs/serviceHubChrome.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts",
           "apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts",
           "apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css",
+          "apps/kiosk/src/pages/service-hubs/useHubAiAvailability.ts",
           "apps/kiosk/src/services/api/printScanCapabilities.ts",
           "docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html"
         ],
@@ -31913,8 +31978,10 @@
           "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
           "apps/kiosk/src/pages/profile/me/MemberLoadMore.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "apps/kiosk/src/pages/profile/me/QaRecords.tsx",
+          "apps/kiosk/src/pages/profile/me/feedback/FeedbackListPanel.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx"
         ],
@@ -43258,6 +43325,32 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/activities/activities-batch8.css",
+        "kind": "style",
+        "mentions": [
+          "docs/progress/current-progress.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/progress/current-progress.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/activities/activities-detail-inkpaper.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/scripts/verify-fusion-w5.mjs",
+          "docs/progress/current-progress.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md",
+          "docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w5.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

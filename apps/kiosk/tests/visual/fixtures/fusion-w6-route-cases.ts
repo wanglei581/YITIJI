@@ -106,8 +106,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
-  { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
-  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
+  // 2026-10-06 稿 31：页头改为常驻标题。空列表不再出现旧标题「权益活动」，详情页头是「活动详情」。
+  { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '可参加的活动' },
+  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '活动详情' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
   { pattern: '/campus', url: '/campus', marker: '[data-kiosk-component="page-frame"] .campus-proto', featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘迎新指引' },

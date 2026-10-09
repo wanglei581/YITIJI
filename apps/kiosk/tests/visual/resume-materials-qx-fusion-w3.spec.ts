@@ -126,6 +126,8 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   await expect(page.getByTestId('material-workshop-template-campus-cover-letter')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.qx-pill')).toHaveText('未登录 · 生成前先存草稿')
   await expect(page.getByText('系统不收取求职者简历给企业', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('material-workshop-truth').locator('p')).toHaveText('模板按你填的内容排版，不调用 AI；不代投递，系统不收取求职者简历给企业，费用以确认时显示为准。')
+  await expect(page.getByRole('button', { name: '遇到问题', exact: true })).toBeVisible()
   await captureViewports(page, 'materials-select-signed-out')
 
   // 分类筛掉的模板不凭空消失：给出回跳入口，点一下切回「全部」并选中它。
@@ -170,6 +172,7 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
 
   // 文件卡按真实文件名、页数、大小核对；内部编号与签名凭证不属于用户核对信息，不上屏。
   await expect(screen).toHaveAttribute('data-state', 'generated')
+  await expect(page.getByTestId('material-workshop-why')).toContainText('生成后请先核对文件内容和页数')
   const card = page.getByTestId('material-workshop-file')
   await expect(card).toHaveAttribute('data-print-ready', '1')
   for (const text of ['校招自荐信.pdf', '2 页', '129 KB', '请按文件名、页数和大小核对', '2099-01-01 10:30', '2099-03-01 08:00', '文件已进入我的文档']) {
@@ -298,4 +301,16 @@ test('material workshop: failed generation keeps the form; a file without print 
   await expect(page.getByTestId('material-workshop-file').getByRole('button', { name: '预览文件' })).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
+})
+
+test('material workshop: 遇到问题 opens the in-app help page @w3-kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', TEMPLATES, templatesOf(COVER))
+  await page.goto('/resume/materials')
+  const help = page.getByRole('button', { name: '遇到问题', exact: true })
+  await expect(help).toBeVisible()
+  await assertTapTargetPointerHit(help)
+  await help.click()
+  await expect(page).toHaveURL(/\/help$/)
+  await expect(page.getByText('你想解决')).toBeVisible()
 })

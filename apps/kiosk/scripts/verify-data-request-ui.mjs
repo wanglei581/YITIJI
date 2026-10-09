@@ -111,7 +111,12 @@ expectAbsent(
   '后端数据请求创建路径不删简历/订单/收藏/文档',
 )
 
-expectIncludes(kioskPage, 'MEMBER_DATA_REQUEST_SCOPE', 'Kiosk 页使用 shared 范围横幅')
+// 10/4 现场无人值守、10/3 注销口径：一体机不再整段引用范围横幅。
+// 那段原文有「如由工作人员办理导出」「账号注销暂未开放」，和无人值守、注销口径冲突。
+// 资料清单改由 MEMBER_DATA_EXPORT_INVENTORY 一份真值供给导出行。
+expectIncludes(kioskPage, 'MEMBER_DATA_EXPORT_INVENTORY', 'Kiosk 页使用共享资料清单')
+expectAbsent(kioskPage, /MEMBER_DATA_REQUEST_SCOPE/, 'Kiosk 页不引用范围横幅（10/4 无人值守、10/3 注销口径）')
+expectAbsent(kioskPage, /工作人员/, 'Kiosk 页源码不出现「工作人员」（10/4 现场无人值守）')
 expectIncludes(kioskPage, '隐私与数据请求', 'Kiosk 页标题不再伪称仅岗位 AI')
 expectIncludes(kioskPage, 'MyPrivacyRequestsPage', 'Kiosk 隐私请求页存在')
 expectIncludes(kioskPage, 'revoke_consent', 'Kiosk 仅开放撤回授权操作')

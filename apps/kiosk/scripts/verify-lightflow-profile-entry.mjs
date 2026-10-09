@@ -455,6 +455,11 @@ const allowedMeChanges = new Set([
   // 只加行，不动断言逻辑。
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
   'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
+  // C2-6（2026-10-06）：意见反馈按稿 40 拆成底栏、状态屏、行图标和提交规则。只加行，不动断言逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

@@ -39,7 +39,18 @@ export function ResumeReportCta({ viewState, canOptimize, intent, why, onRetry, 
       </>
     )
   }
-  if (viewState === 'illegal' || viewState === 'no-context' || viewState === 'report-empty') {
+  if (viewState === 'no-context') {
+    return (
+      <>
+        <p className="why" id="resume-report-why">{why}</p>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/ai-records')} data-route="/me/ai-records">我的诊断记录</button>
+        <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/resume/source')} data-route="/resume/source" data-testid="resume-report-primary">
+          去上传简历
+        </button>
+      </>
+    )
+  }
+  if (viewState === 'illegal' || viewState === 'report-empty') {
     return (
       <>
         <p className="why" id="resume-report-why">{why}</p>
