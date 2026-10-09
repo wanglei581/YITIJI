@@ -13064,7 +13064,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 699,
+      "reachableFileCount": 713,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13072,6 +13072,7 @@
           "component": "HomePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13201,6 +13202,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /me/mock-interviews/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13263,6 +13265,7 @@
           "component": "CampusPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13518,6 +13521,7 @@
           "component": "JobFairsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13573,6 +13577,7 @@
           "component": "JobFairDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13628,6 +13633,7 @@
           "component": "FairCompaniesPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13683,6 +13689,7 @@
           "component": "FairCompanyDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13737,6 +13744,7 @@
           "component": "FairMapPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13792,6 +13800,7 @@
           "component": "FairMaterialsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13847,6 +13856,7 @@
           "component": "FairStatsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13935,6 +13945,7 @@
           "component": "JobFairCheckinPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -13990,6 +14001,7 @@
           "component": "JobsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14044,6 +14056,7 @@
           "component": "JobDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -14111,6 +14124,7 @@
           "component": "LegalDocPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15038,6 +15052,8 @@
         {
           "component": "RenshiPage",
           "endpoints": [
+            "GET /advisor/availability",
+            "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies/:param",
@@ -15060,6 +15076,7 @@
             "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+            "apps/kiosk/src/pages/renshi/renshi-policy-states.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -15085,6 +15102,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15131,6 +15149,7 @@
           "path": "/resume/career-plan",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/pages/resume/resume-decision-hero.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15157,6 +15176,7 @@
           "component": "ResumeGeneratePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15213,6 +15233,7 @@
           "component": "ResumeGeneratePreviewPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15270,6 +15291,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15314,6 +15336,7 @@
           "path": "/resume/job-fit",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/pages/resume/resume-decision-hero.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15327,6 +15350,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15371,6 +15395,7 @@
           "path": "/resume/job-fit/actions",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/pages/resume/resume-decision-hero.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15414,6 +15439,7 @@
           "component": "ResumeOptimizePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15471,6 +15497,7 @@
           "component": "ResumeOptimizeComparePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15527,6 +15554,7 @@
           "component": "ResumeParsePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15583,6 +15611,7 @@
           "component": "ResumeReportPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15771,6 +15800,7 @@
           "component": "ResumeSourcePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /advisor/availability",
             "GET /advisor/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -15845,6 +15875,7 @@
           "path": "/resume/templates",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/pages/resume/resume-decision-hero.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
             "apps/kiosk/src/pages/resume/resume-templates-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -16082,7 +16113,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 797
+      "sourceFileCount": 811
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20704,6 +20735,9 @@
     "apps/kiosk/src/pages/renshi/NoticePanel.tsx": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/PolicyAiFallback.tsx": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/PolicyPanel.tsx": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
@@ -20732,8 +20766,14 @@
     "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/renshi-policy-states.css": [
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/renshi/usePolicyAdvisorAvailability.ts": [
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/pages/renshi/usePolicyFocus.ts": [
@@ -20744,7 +20784,6 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
-      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -20855,6 +20894,18 @@
     "apps/kiosk/src/pages/resume/aiResumeSession.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/careerPlanAction.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/careerPlanUnreadyView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/careerPlanView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/DiagnosisDirectionForm.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -21029,7 +21080,17 @@
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "apps/kiosk/src/pages/resume/jobFit/JobFitInteractiveViews.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
+    ],
     "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx": [
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/jobFit/JobFitStage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx": [
@@ -21041,6 +21102,10 @@
     ],
     "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx": [
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/jobFitActionsView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/jobMaterialDraft.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -21362,7 +21427,8 @@
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/services/api/advisor.ts": [
-      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs"
+      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
+      "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
     "apps/kiosk/src/services/api/ai.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -29167,6 +29233,7 @@
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitStage.tsx",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
@@ -29309,10 +29376,15 @@
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
+          "apps/kiosk/src/pages/resume/careerPlanUnreadyView.tsx",
+          "apps/kiosk/src/pages/resume/careerPlanView.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeSourceActions.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
           "apps/kiosk/src/pages/resume/jobFit-inkpaper.css",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitInteractiveViews.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitStage.tsx",
+          "apps/kiosk/src/pages/resume/jobFitActionsView.tsx",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
           "apps/kiosk/src/pages/resume/resume-fusion-youth.css",
           "apps/kiosk/src/pages/resume/resume-triage-qx.css",
@@ -29653,9 +29725,12 @@
           "apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx",
           "apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx",
           "apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitInteractiveViews.tsx",
           "apps/kiosk/src/pages/resume/jobFit/JobFitQxStates.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitStage.tsx",
           "apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx",
           "apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx",
+          "apps/kiosk/src/pages/resume/jobFitActionsView.tsx",
           "apps/kiosk/src/services/api/jobFit.ts",
           "packages/shared/src/types/ai.ts"
         ],
@@ -29897,6 +29972,7 @@
           "apps/kiosk/src/pages/resume/aiResumeSession.ts",
           "apps/kiosk/src/pages/resume/components/ResumeVoiceInputButton.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx",
+          "apps/kiosk/src/pages/resume/jobFit/JobFitInteractiveViews.tsx",
           "apps/kiosk/src/pages/resume/jobMaterialDraft.ts",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
           "apps/kiosk/src/pages/scan/scanWorkbenchModel.ts",
@@ -29942,9 +30018,9 @@
           "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
-          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/careerPlanView.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx",
           "apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareCard.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx",
@@ -30368,6 +30444,9 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
+          "apps/kiosk/src/pages/resume/careerPlanAction.tsx",
+          "apps/kiosk/src/pages/resume/careerPlanUnreadyView.tsx",
+          "apps/kiosk/src/pages/resume/careerPlanView.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx",
           "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx",
@@ -31608,14 +31687,18 @@
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
+          "apps/kiosk/src/pages/renshi/PolicyAiFallback.tsx",
           "apps/kiosk/src/pages/renshi/PolicyPanel.tsx",
           "apps/kiosk/src/pages/renshi/RegisterPanel.tsx",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/renshi/SocialPanel.tsx",
           "apps/kiosk/src/pages/renshi/builtinData.ts",
           "apps/kiosk/src/pages/renshi/components.tsx",
+          "apps/kiosk/src/pages/renshi/renshi-policy-states.css",
           "apps/kiosk/src/pages/renshi/shared.ts",
-          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts"
+          "apps/kiosk/src/pages/renshi/usePolicyAdvisorAvailability.ts",
+          "apps/kiosk/src/pages/renshi/usePolicyFocus.ts",
+          "apps/kiosk/src/services/api/advisor.ts"
         ],
         "missing": []
       },
