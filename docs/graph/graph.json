@@ -12279,7 +12279,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 240,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13047,7 +13047,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 264
+      "sourceFileCount": 267
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16073,7 +16073,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 83,
+      "reachableFileCount": 84,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16491,7 +16491,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 84
+      "sourceFileCount": 85
     }
   },
   "dataModel": {
@@ -18337,7 +18337,8 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
-      "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -18500,6 +18501,9 @@
       "apps/admin/scripts/verify-admin-login-second-factor.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/admin/src/routes/member-benefits/grantFormModel.ts": [
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
     "apps/admin/src/routes/member-feedback/FeedbackSlaBadges.tsx": [
       "apps/admin/scripts/verify-feedback-sla.mjs"
     ],
@@ -18647,10 +18651,16 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
+    "apps/admin/src/routes/print-scan/ClearCapabilityButton.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+    ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/PrintRetryButton.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+    ],
+    "apps/admin/src/routes/print-scan/SignatureCapabilityRow.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/index.tsx": [
@@ -18745,6 +18755,9 @@
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
+    "apps/admin/src/routes/sync-sources/syncSourcesApi.ts": [
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
     "apps/admin/src/routes/terminals/CreatePlannedTerminalDialog.tsx": [
       "apps/admin/scripts/verify-admin-terminal-bind-code-ui.mjs"
     ],
@@ -18807,8 +18820,12 @@
       "apps/admin/scripts/verify-toolbox-review-ui.mjs",
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
+    "apps/admin/src/routes/toolbox/toolboxActionState.ts": [
+      "scripts/verify-no-raw-error-render.mjs"
+    ],
     "apps/admin/src/routes/users/UserClosureDialog.tsx": [
-      "apps/admin/scripts/verify-user-closure-ui.mjs"
+      "apps/admin/scripts/verify-user-closure-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/admin/src/routes/users/UserDetailDrawer.tsx": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -21950,7 +21967,8 @@
       "apps/admin/scripts/verify-console-screen-details.mjs"
     ],
     "apps/partner/src/routes/screen/screenView.tsx": [
-      "apps/admin/scripts/verify-console-screen-ui.mjs"
+      "apps/admin/scripts/verify-console-screen-ui.mjs",
+      "scripts/verify-no-raw-error-render.mjs"
     ],
     "apps/partner/src/routes/smart-campus/index.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
@@ -27909,8 +27927,10 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
+          "apps/admin/src/routes/print-scan/ClearCapabilityButton.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
           "apps/admin/src/routes/print-scan/PrintRetryButton.tsx",
+          "apps/admin/src/routes/print-scan/SignatureCapabilityRow.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
           "apps/admin/src/services/api/printScan.ts"
         ],
@@ -33695,12 +33715,14 @@
         "files": [
           "apps/admin/src/UnhandledRejectionBanner.tsx",
           "apps/admin/src/main.tsx",
+          "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx",
           "apps/admin/src/routes/fair-sources/index.tsx",
           "apps/admin/src/routes/fairs/components/CompaniesTab.tsx",
           "apps/admin/src/routes/fairs/components/MaterialsTab.tsx",
           "apps/admin/src/routes/fairs/components/ZonesTab.tsx",
           "apps/admin/src/routes/job-sources/index.tsx",
           "apps/admin/src/routes/login/index.tsx",
+          "apps/admin/src/routes/member-benefits/grantFormModel.ts",
           "apps/admin/src/routes/offline-agencies/JobsDrawer.tsx",
           "apps/admin/src/routes/orders/OrderAftercare.tsx",
           "apps/admin/src/routes/orders/OrderDetailDrawer.tsx",
@@ -33713,6 +33735,9 @@
           "apps/admin/src/routes/policy-sources/index.tsx",
           "apps/admin/src/routes/screensaver/index.tsx",
           "apps/admin/src/routes/sync-sources/index.tsx",
+          "apps/admin/src/routes/sync-sources/syncSourcesApi.ts",
+          "apps/admin/src/routes/toolbox/toolboxActionState.ts",
+          "apps/admin/src/routes/users/UserClosureDialog.tsx",
           "apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
@@ -33744,6 +33769,7 @@
           "apps/kiosk/src/services/files/usbImportApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
           "apps/kiosk/src/services/print/printJobsApi.ts",
+          "apps/partner/src/routes/screen/screenView.tsx",
           "apps/partner/src/routes/sources/index.tsx"
         ],
         "missing": []
@@ -43384,6 +43410,17 @@
         "risk": "high",
         "scope": "admin",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/services/api/userErrorMessage.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

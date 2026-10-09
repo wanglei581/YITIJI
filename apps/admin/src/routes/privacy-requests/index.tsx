@@ -9,6 +9,7 @@ import {
 import { RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   adminPrivacyRequestsService,
   type AdminDataRequestItem,
@@ -194,7 +195,7 @@ export default function PrivacyRequestsPage() {
       setItems((prev) => prev?.map((i) => (i.id === updated.id ? updated : i)) ?? null)
       if (detail?.id === updated.id) setDetail(updated)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失败，请重试')
+      setActionError(userMessageOf(err, '重试没有提交，请稍后重试'))
     } finally {
       setActionBusy(false)
     }
@@ -210,7 +211,7 @@ export default function PrivacyRequestsPage() {
       if (detail?.id === updated.id) setDetail(updated)
       setRejectTarget(null)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失败，请重试')
+      setActionError(userMessageOf(err, '驳回没有提交，请稍后重试'))
     } finally {
       setActionBusy(false)
     }

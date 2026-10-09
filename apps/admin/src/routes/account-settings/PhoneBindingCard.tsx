@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, Card } from '@ai-job-print/ui'
 import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   completeInitialPhoneBind,
   mergeStoredUser,
@@ -55,7 +56,7 @@ export function PhoneBindingCard({ onBound }: PhoneBindingCardProps) {
     try {
       const result = await startInitialPhoneBind(currentPassword, phone)
       if (!result.ok) {
-        setError(result.message || '验证码发送失败，请稍后重试')
+        setError(userMessageOf(result, '验证码发送失败，请稍后重试'))
         return
       }
       setBindTicket(result.bindTicket)
@@ -91,10 +92,10 @@ export function PhoneBindingCard({ onBound }: PhoneBindingCardProps) {
           setCode('')
           setCooldownSeconds(0)
           setSent(false)
-          setError(`${result.message || '本次绑定验证已失效'}，请重新填写当前密码和手机号获取验证码。`)
+          setError(`${userMessageOf(result, '本次绑定验证已失效')}，请重新填写当前密码和手机号获取验证码。`)
           return
         }
-        setError(result.message || '验证失败，请稍后重试')
+        setError(userMessageOf(result, '验证失败，请稍后重试'))
         return
       }
       const bound = { phoneMasked: result.phoneMasked, phoneVerifiedAt: result.phoneVerifiedAt }

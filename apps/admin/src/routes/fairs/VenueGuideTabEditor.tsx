@@ -8,6 +8,7 @@ import { Card, Drawer, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairVenueFacilityType, SaveFairVenueGuideInput, SaveVenueHallInput, SaveVenueFacilityInput } from '@ai-job-print/shared'
 import { DoorOpenIcon, InfoIcon, MapIcon, MessageCircleQuestionIcon, PlusIcon, PrinterIcon, Trash2Icon } from 'lucide-react'
 import { fairsAdminService, type FairCompanyView } from '../../services/api/fairsAdmin'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ============================================================
 // 场馆导览配置 Tab(Admin):展厅(A/B/C 厅) / 企业展位绑定 / 设施点位。
@@ -147,7 +148,7 @@ export function VenueGuideTabEditor({
       setSavedAt(Date.now())
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败,请重试')
+      setError(userMessageOf(e, '保存失败，请重试'))
     } finally {
       setSaving(false)
     }
@@ -161,7 +162,7 @@ export function VenueGuideTabEditor({
       setDraft(null)
       setSavedAt(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '删除失败,请重试')
+      setError(userMessageOf(e, '删除失败，请重试'))
     } finally {
       setSaving(false)
     }

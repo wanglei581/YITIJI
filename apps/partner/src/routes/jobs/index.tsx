@@ -16,6 +16,7 @@ import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import { useCapability } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -86,9 +87,8 @@ const EMPTY_FORM: JobFormState = {
   salaryMin: '', salaryMax: '', salaryUnit: '', validThrough: '', headcount: '',
 }
 
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') return (e as Error).message
-  return '操作失败,请重试'
+function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ export default function JobsPage() {
       showNotice('岗位已下架，终端将不再展示。')
       void refresh()
     } catch (e) {
-      showNotice(errMsg(e), true)
+      showNotice(errMsg(e, '岗位下架失败，请稍后重试'), true)
     } finally {
       setBusyId(null)
     }
@@ -244,7 +244,7 @@ export default function JobsPage() {
       setEditing(null)
       void refresh()
     } catch (e) {
-      setFormError(errMsg(e))
+      setFormError(errMsg(e, '岗位没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }

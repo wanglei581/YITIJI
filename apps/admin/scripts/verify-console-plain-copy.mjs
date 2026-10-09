@@ -319,6 +319,8 @@ function runFile(rel, imports = {}, append = '', globals = {}) {
   const mod = { exports: {} }
   vm.runInNewContext(output, { ...globals, exports: mod.exports, module: mod, require(id) {
     if (id === 'react/jsx-runtime') return runtime
+    // 页面失败提示统一走 userMessageOf。渲染成功态时用不到它，未单独登记就返回兜底句。
+    if (id.endsWith('/userErrorMessage')) return { userMessageOf: (_error, fallback) => fallback }
     if (!(id in imports)) throw new Error(`${rel}: 未登记依赖 ${id}`)
     return imports[id]
   } })
@@ -397,7 +399,9 @@ if (display.pageRangeText('  ', 4) !== '未单独记录（见计费页数）' ||
 console.log('  PASS W-105 原值页数 / 份数 / null / 未记录 / 未单独记录 / 指定范围真实组件展示')
 if (display.orderUserText({ ownerType: 'member', userLabel: '13812345678' }).includes('13812345678')) fail('用户不得显示完整手机号')
 const common = { '@ai-job-print/ui': ui, '@ai-job-print/shared': shared, '../Page': { Page: (p) => [p.title, p.subtitle, p.children] },
-  '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {} }
+  '../components/FilterChip': { FilterChip: () => null }, 'lucide-react': {},
+  // 计费页和打印扫描页的失败提示走 userMessageOf；本段只渲染成功态，兜底句原样返回即可。
+  '../../services/api/userErrorMessage': { userMessageOf: (_error, fallback) => fallback } }
 let billingStates = []
 const billingHooks = { ...hooks([]), useState: () => [billingStates.shift(), () => {}] }
 const billing = runFile('apps/admin/src/routes/billing/index.tsx', {
