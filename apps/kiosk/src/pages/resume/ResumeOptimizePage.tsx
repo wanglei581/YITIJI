@@ -22,6 +22,8 @@ import {
 } from '../../services/api'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine, type PublicSupportContact } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
 import { readAiResumeSession } from './aiResumeSession'
 import { useResumeAiConsent } from './resumeAiConsent'
@@ -60,8 +62,15 @@ import './resume-optimize-overview-qx.css'
 type LeaveAction = () => void
 const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。'
 
+/** 故障句在请求回来时拼过一次。联系方式随后才到时，按当前号码重拼，避免停在「隐私政策」那句。 */
+function outageDescription(text: string, contact: PublicSupportContact): string {
+  if (!text.startsWith('AI 能力尚未启用')) return text
+  return `AI 能力尚未启用。${helpNeededLine(contact)}`
+}
+
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -334,7 +343,7 @@ export function ResumeOptimizePage() {
     <ResumeStatePanel
       tone={view === 'loading' ? 'info' : view === 'empty' || view === 'no-context' ? 'empty' : 'error'}
       title={optimizeStateTitle(view)}
-      description={optimizeStateDescription(view, failMsg)}
+      description={outageDescription(optimizeStateDescription(view, failMsg), contact)}
       synthetic={resolved.synthetic}
       actions={
         <>

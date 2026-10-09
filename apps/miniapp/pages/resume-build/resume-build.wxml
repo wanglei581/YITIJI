@@ -186,6 +186,7 @@
           </view>
         </view>
         <view class="rb-fine">排版设置只对 PDF 生效。Word / 纯文本 / Markdown 由服务端按各自格式渲染，不套用这里的选择，页面也不假装它生效了。</view>
+        <view class="rb-fine">{{aiLabelNote}}</view>
       </view></view>
 
       <view class="notice info">

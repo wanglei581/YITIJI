@@ -18,6 +18,7 @@ import {
 } from './scanDeliveryAck'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import {
   ScanChain,
@@ -277,7 +278,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             finishWithResult({
               outcome: 'failed',
               success: false,
-              reason: '长时间无法查询扫描状态，请联系工作人员或重新开始',
+              reason: `长时间无法查询扫描状态，请重新开始。${helpNeededLine()}。`,
             }, true)
             return
           }

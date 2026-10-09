@@ -51,7 +51,7 @@ export function ZonesTabEditor({
       setEditing(null)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '展区没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }
@@ -64,7 +64,7 @@ export function ZonesTabEditor({
       await fairsAdminService.deleteZone(fairId, zoneId)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '展区没有删除，请稍后重试'))
     } finally {
       setBusyId(null)
     }

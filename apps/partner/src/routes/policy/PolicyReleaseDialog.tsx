@@ -1,15 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@ai-job-print/ui'
-import { ApiHttpError } from '../../services/api/client'
 import { partnerPoliciesService, type PartnerPolicyRecord } from '../../services/api/policies'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /** 服务端的中文原因（如未通过审核、未确认责任、内容可信未生效、已被紧急下架）原样给出；英文状态串一律换成兜底句。 */
-function errMsg(e: unknown): string {
-  if (e instanceof ApiHttpError) {
-    const message = e.message.trim()
-    if (message && !/^[A-Za-z0-9_\s-]+$/.test(message)) return message
-  }
-  return '发布没有成功，内容状态未改变，请稍后重试'
+function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 /**
@@ -57,7 +53,7 @@ export function PolicyReleaseDialog({
       }
       onReleased(updated)
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '发布没有成功，内容状态未改变，请稍后重试'))
     } finally {
       setBusy(false)
     }

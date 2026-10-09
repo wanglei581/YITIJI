@@ -254,7 +254,7 @@ export function LoginPage() {
               ) : null}
               {state === 'phone-send-failed' || state === 'qr-error' ? (
                 <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-                  联系工作人员
+                  问小青
                 </button>
               ) : null}
             </>

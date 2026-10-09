@@ -31,6 +31,8 @@ import {
   JobTrustSection,
   QrOverlay,
 } from './components/JobDetailSections'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import './styles/job-detail-qx.css'
 
@@ -39,6 +41,7 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const { getToken } = useAuth()
+  const contact = useSupportContact()
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
 
   const stateJob = (location.state as { job?: ExternalJobDTO } | null)?.job
@@ -180,7 +183,7 @@ export function JobDetailPage() {
       return false
     } catch (err) {
       if (!mountedRef.current) return false
-      setAiError(formatJobAiError(err))
+      setAiError(formatJobAiError(err, contact))
       return false
     }
   }
@@ -228,7 +231,7 @@ export function JobDetailPage() {
       else setShowResumeSelect(true)
     } catch (err) {
       if (!mountedRef.current) return
-      setAiError(formatJobAiError(err))
+      setAiError(formatJobAiError(err, contact))
     } finally {
       aiInFlightRef.current = false
       if (mountedRef.current) setAiLoading(false)
@@ -245,7 +248,7 @@ export function JobDetailPage() {
       setExplanation(result)
     } catch (err) {
       if (!mountedRef.current) return
-      setAiError(formatJobAiError(err))
+      setAiError(formatJobAiError(err, contact))
     } finally {
       if (mountedRef.current) setAiLoading(false)
     }
@@ -266,7 +269,7 @@ export function JobDetailPage() {
       setMatchResult(result)
     } catch (err) {
       if (!mountedRef.current) return
-      setAiError(formatJobAiError(err))
+      setAiError(formatJobAiError(err, contact))
     } finally {
       aiInFlightRef.current = false
       if (mountedRef.current) setAiLoading(false)
@@ -393,12 +396,12 @@ export function JobDetailPage() {
   )
 }
 
-function formatJobAiError(err: unknown): string {
+function formatJobAiError(err: unknown, contact: Parameters<typeof helpNeededLine>[0]): string {
   const declined = aiDeclarationDeclineMessage(err)
   if (declined) return declined
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
-    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine(contact)}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message

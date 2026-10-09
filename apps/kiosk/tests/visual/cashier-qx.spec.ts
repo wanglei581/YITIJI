@@ -84,6 +84,8 @@ test('cashier renders real channels and sends the selected channel in the pay pa
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
   await expect(page.locator('[data-qx-state="pending"]')).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-cashier"]')).toContainText('如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。')
+  await expect(page.locator('[data-w2-page="print-cashier"]')).not.toContainText('在手机上申请')
   await expect(page.getByRole('button', { name: '微信支付' })).not.toHaveAttribute('data-active', 'true')
   await expect(page.getByRole('button', { name: '支付宝' })).not.toHaveAttribute('data-active', 'true')
 
@@ -127,7 +129,8 @@ test('channel outcome unconfirmed must say do-not-repay, never claim acceptance 
   const alertText = (await alert.innerText()).replace(/\s+/g, '')
   // ① 说出请勿重复/重新支付并指向核实路径 —— 资金安全的全部要点
   expect(alertText, '结果未确认时必须明说不要再付一次').toMatch(/请勿(重复|重新)支付/)
-  expect(alertText, '必须给出核实路径（现场工作人员 / 自查支付账单）').toMatch(/工作人员|支付账单/)
+  expect(alertText, '必须给出核实路径（自查支付账单，不叫人找现场工作人员）').toMatch(/支付账单/)
+  expect(alertText, '支付结果未确认时不把核实交给现场工作人员').not.toContain('工作人员')
   // ② 不得出现「请稍后重试」类措辞
   expect(alertText, '结果未确认时不得出现通用重试话术').not.toContain('请稍后重试')
   // ③ 不得断言「已受理」：本例 503 body 里正写着这句，页面照抄即红（固定文案不得漂移成透传）
@@ -149,18 +152,29 @@ test('cashier exposes a failed channel request and retries the real endpoint @w2
   await page.goto('/print/cashier')
   await setReactRouterState(page, '/print/cashier', CASHIER_STATE)
   await expect(page.locator('[data-qx-state="channel-failed"]')).toBeVisible()
-  // 原先逐字钉「支付通道服务暂不可用」。文案已改成
-  // 「服务暂时不可用，请稍后重试或联系现场工作人员」—— 更好（多给了下一步动作）。
-  // 改成钉**不变量**而不是句子：必须说了不可用，且必须给出可执行的下一步。
-  // 逐字钉整句会让每次文案打磨都变成一次假红，作者就会去改断言而不是看页面。
+  // 5xx 走「服务暂时不可用，请稍后重试」加标准句 1。不变量仍是：说了不可用，并给出下一步。
   {
     const alertText = (await page.getByRole('alert').innerText()).replace(/\s+/g, '')
     expect(alertText, '通道拉取失败时必须明说不可用').toMatch(/不可用|失败/)
-    expect(alertText, '必须给出可执行的下一步，而不是只报故障').toMatch(/重试|稍后|工作人员/)
+    expect(alertText, '必须给出可执行的下一步，而不是只报故障').toMatch(/重试|稍后/)
+    expect(alertText, '通道失败不叫人找工作人员').not.toContain('工作人员')
   }
   await page.getByRole('button', { name: '重新读取支付通道' }).click()
   await expect(page.locator('[data-qx-state="channel-selected"]')).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/payment/channels')).toBe(2)
+})
+
+test('a zero-yuan cashier does not offer a refund @w2', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', '/api/v1/payment/channels', { status: 200, json: { channels: ['wechat'] } })
+  api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, { status: 200, json: payStatus('unpaid') })
+  await page.goto('/print/cashier')
+  await setReactRouterState(page, '/print/cashier', { ...CASHIER_STATE, amountCents: 0 })
+  const cashier = page.locator('[data-w2-page="print-cashier"]')
+  await expect(cashier).toBeVisible()
+  await expect(cashier).toContainText('如需核对出纸结果')
+  await expect(cashier).not.toContainText('退款')
+  await expect(cashier).not.toContainText('在手机上申请')
 })
 
 test('code-pay success cannot release print before pay-status reaches paid @w2', async ({ page, api }) => {

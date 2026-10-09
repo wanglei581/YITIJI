@@ -14,6 +14,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
 import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
 import { getTerminalId, subscribeTerminalIdentity } from '../services/api/screensaver'
+import { machineUnusableLine } from '../copy/unattendedCopy'
+import { useSupportContact } from './useSupportContact'
 
 const ZERO_TONER = { black: 0, cyan: 0, magenta: 0, yellow: 0 } as const
 
@@ -165,7 +167,7 @@ export function mapTerminalPrinterStatus(input: {
           errorCode: 'queueGate',
         },
         printerLabel: '暂停接单',
-        printerNotice: '打印机暂时不可用，请联系现场工作人员',
+        printerNotice: machineUnusableLine(),
         deviceStatus: 'error',
       }
     default:
@@ -203,6 +205,7 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
 }
 
 export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusView {
+  const contact = useSupportContact()
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [view, setView] = useState<TerminalDeviceStatusView>(() =>
     terminalId
@@ -323,5 +326,8 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
     }
   }, [enabled, terminalId])
 
+  if (view.printer.errorCode === 'queueGate') {
+    return { ...view, printerNotice: machineUnusableLine(contact) }
+  }
   return view
 }

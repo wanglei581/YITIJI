@@ -18,6 +18,8 @@
 // 事后没有任何补救手段，所以拦截必须发生在弹码之前。
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import type { ExternalJobFairDTO, FairZoneDTO } from '@ai-job-print/shared'
 import { CalendarIcon, QrCodeIcon, UsersIcon } from 'lucide-react'
@@ -49,6 +51,7 @@ type QrState =
   | null
 
 export function JobFairDetailPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
@@ -197,14 +200,14 @@ export function JobFairDetailPage() {
     : uiState === 'error'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
         </>
       )
     : uiState === 'unpublished'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>向工作人员反馈</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>回场次列表</button>
         </>
       )
@@ -306,7 +309,7 @@ export function JobFairDetailPage() {
       ) : uiState === 'error' || !fair ? (
         <>
           <DirState tone="error" testId="fair-detail-error" title="这场的详情没取到">
-            请求失败。本机<b>不拿列表里的片段拼一个详情页</b>给你，时间地点错了会让人白跑。
+            请求失败。本机<b>不拿列表里的片段拼一个详情页</b>给你，时间地点错了会让人白跑。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="回场次列表" desc="列表还能打开，可以先看别的场次" onClick={() => navigate('/job-fairs')} />
@@ -316,7 +319,7 @@ export function JobFairDetailPage() {
       ) : uiState === 'unpublished' ? (
         <>
           <DirState tone="error" testId="fair-detail-unpublished" title="这场已经被来源方下架">
-            主办方或管理员把这条信息取消发布了。本机<b>不保留下架内容的副本</b>，也不展示缓存的时间地点。
+            主办方或管理员把这条信息取消发布了。本机<b>不保留下架内容的副本</b>，也不展示缓存的时间地点。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="岗位信息" desc="按岗位继续找，来源与有效期照样标注" onClick={() => navigate('/jobs')} />

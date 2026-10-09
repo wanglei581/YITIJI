@@ -249,15 +249,17 @@ expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/
 // API-20：顾客侧待退款状态。不承诺到账天数，已退款只展示服务端 refundedAmountCents。
 expectMatches(copySrc, /PENDING_REFUND_LABEL = '待退款'/, '待退款标签在 paymentCopy')
 expectMatches(
-  copySrc,
-  /PENDING_REFUND_EXPLANATION =\s*'本单已确认未出纸，退款由工作人员处理，到账时间以支付渠道为准'/,
+  // 详单求助改用标准句 5，号码来自会话联系方式，不再断言现场找人的旧句。
+  summarySrc,
+  /refundApplyLine\(contact\)/,
   '待退款说明不写到账天数',
 )
 expectMatches(copySrc, /item\.refundRequired === true/, 'memberPayStatusLabel 以服务端 refundRequired 为准')
 expectMatches(copySrc, /refunding:\s*\{\s*label:\s*'退款中'/, '退款中单独展示，不伪装已退款')
 expectMatches(pageSrc, /item\.refundRequired === true/, '列表待退款 chip 由服务端 refundRequired 门控')
 expectMatches(pageSrc, /PENDING_REFUND_LABEL/, '列表使用待退款标签常量')
-expectMatches(summarySrc, /PENDING_REFUND_EXPLANATION/, '详单展示待退款诚实说明')
+// 免费或金额未知的单不显示退款说明；收费单才调用标准句 5。
+expectMatches(summarySrc, /item\.amountCents > 0 && !isFreeMemberOrder\(item\)/, '详单退款说明仅用于正金额且非免费单')
 expectMatches(summarySrc, /item\.refundRequired === true/, '详单待退款说明由服务端 refundRequired 门控')
 expectMatches(summarySrc, /recordedAmountDisplay\(item\.refundedAmountCents\)/, '已退款只格式化服务端 refundedAmountCents')
 expectAbsent(copySrc, /[0-9]+\s*个?工作日|[0-9]+\s*天内到账|保证到账/, '待退款文案不承诺到账天数')

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { StatusBadge } from '@ai-job-print/ui'
 import { ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   emergencyRevokeTerminal,
   updateTerminalLifecycle,
@@ -122,7 +123,7 @@ export function TerminalLifecycleActions({
         setAction(null)
         onConflict()
       } else {
-        onNotice({ type: 'error', text: error instanceof Error ? error.message : '设备运维操作失败' })
+        onNotice({ type: 'error', text: userMessageOf(error, '设备运维操作失败，请稍后重试') })
       }
     } finally {
       setSaving(false)

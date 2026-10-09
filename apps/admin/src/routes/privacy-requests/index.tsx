@@ -9,6 +9,7 @@ import {
 import { RefreshCwIcon, RotateCcwIcon, XCircleIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   adminPrivacyRequestsService,
   type AdminDataRequestItem,
@@ -17,6 +18,10 @@ import {
 } from '../../services/api/adminPrivacyRequests'
 
 // ─── Display maps ──────────────────────────────────────────────────────────────
+
+// 与 shared 的 ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM 第一句同文，门禁钉着。
+const ADMIN_DELETE_REQUEST_HINT =
+  '账号注销由管理员在用户管理页执行，需要核对会员身份并再次确认；本页只记录请求与处理结论。'
 
 const STATUS_MAP: Record<DataRequestStatus, { badge: 'success' | 'error' | 'warning' | 'info' | 'default'; label: string }> = {
   pending:   { badge: 'warning', label: '待处理' },
@@ -194,7 +199,7 @@ export default function PrivacyRequestsPage() {
       setItems((prev) => prev?.map((i) => (i.id === updated.id ? updated : i)) ?? null)
       if (detail?.id === updated.id) setDetail(updated)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失败，请重试')
+      setActionError(userMessageOf(err, '重试没有提交，请稍后重试'))
     } finally {
       setActionBusy(false)
     }
@@ -210,7 +215,7 @@ export default function PrivacyRequestsPage() {
       if (detail?.id === updated.id) setDetail(updated)
       setRejectTarget(null)
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '操作失败，请重试')
+      setActionError(userMessageOf(err, '驳回没有提交，请稍后重试'))
     } finally {
       setActionBusy(false)
     }
@@ -415,8 +420,8 @@ export default function PrivacyRequestsPage() {
             )}
 
             {detail.requestType === 'delete' && (
-              <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[12.5px] text-warning-fg">
-                账号注销请求暂不开放在线处理（法务矩阵尚未签字），本后台目前没有处理这类请求的入口。请联系法务团队确认处理方式。
+              <div className="mt-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[12.5px] text-info-fg">
+                {ADMIN_DELETE_REQUEST_HINT}
               </div>
             )}
           </>

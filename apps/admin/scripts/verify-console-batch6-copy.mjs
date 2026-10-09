@@ -59,6 +59,7 @@ export function verifyBatch6Copy({ runFile, textOf, shared, ui, fail }) {
       '@ai-job-print/ui': { ...screen, TwinPulse: () => null },
       '../../services/api/consoleScreen': { normalizeUsageRange: () => '7d' },
       './aiScreenDisplay': {}, './metricLabels': {}, './screenMeta': {}, './UsageHostingOff': {},
+      './measureUnit': runFile('apps/admin/src/routes/screen/measureUnit.ts'),
       './screenView': { TwinShell: ({ children, reportingWindowText }) => [reportingWindowText, children], stampText: () => '', failureOf: () => null },
     })
     const chrome = { params: { get: () => '7d' }, lite: true, setParam() {} }

@@ -25,6 +25,7 @@ import { loadAdminUsage, normalizeUsageRange } from '../../services/api/consoleS
 import { aiOperationRows, usageServiceLabel } from './metricLabels'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
 import { metricReason } from './screenMeta'
+import { measureUnit } from './measureUnit'
 import { UsageAiPanel, UsageAiQualityPanel, UsagePolicyPanel } from './UsageHostingOff'
 
 /**
@@ -142,7 +143,7 @@ export function UsageView({ chrome }: { chrome: ScreenChrome }) {
               <>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                   <span className="twin-big">{twinSmall(value.paidOrders)}</span>
-                  <span className="twin-unit">单</span>
+                  <span className="twin-unit">{measureUnit(twinSmall(value.paidOrders), '单')}</span>
                 </div>
                 {kiosk + miniapp > 0 ? (
                   <div className="twin-split" aria-hidden="true">

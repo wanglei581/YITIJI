@@ -124,7 +124,9 @@ try {
 
   // ── B. AI 类 ───────────────────────────────────────────────────────
   const aiCodes = ['AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_PROVIDER_NOT_CONFIGURED']
-  const GENERIC_5XX = '服务暂时不可用，请稍后重试或联系现场工作人员'
+  // 2026-10-04 无人值守：5xx 固定句改为「服务暂时不可用，请稍后重试」加标准句 1。
+  // 没有服务联系方式缓存时，电话片段是隐私政策里的联系方式。
+  const GENERIC_5XX = '服务暂时不可用，请稍后重试。需要帮助？查看《隐私政策》里的联系方式'
   let checked = 0
   for (const code of aiCodes) {
     if (!serverSourceHasCode(code)) { console.log(`  · ${code} 尚未出现在服务端源码（对应 PR 未合入），跳过`); continue }

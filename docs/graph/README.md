@@ -33,22 +33,22 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 89 | 779 | 681 |
-| admin | `apps/admin` | 38 | 264 | 238 |
-| partner | `apps/partner` | 15 | 84 | 83 |
+| kiosk | `apps/kiosk` | 89 | 811 | 713 |
+| admin | `apps/admin` | 38 | 271 | 242 |
+| partner | `apps/partner` | 15 | 87 | 86 |
 
 | 维度 | 数量 |
 | --- | --- |
 | HTTP 端点（services/api） | 583 |
 | Prisma 模型 | 113 |
-| 门禁脚本文件 | 589 |
-| ├ 其中辅助库（被别的门禁 import） | 139 |
-| ├ 已在 package.json 里有脚本名 | 534 |
-| ├ 在 CI 执行闭包里 | 520 |
+| 门禁脚本文件 | 594 |
+| ├ 其中辅助库（被别的门禁 import） | 140 |
+| ├ 已在 package.json 里有脚本名 | 538 |
+| ├ 在 CI 执行闭包里 | 523 |
 | └ **无脚本名，从未被执行** | 0 |
-| 被至少一条门禁断言的文件 | 1888 |
+| 被至少一条门禁断言的文件 | 1917 |
 | 孤儿候选 · protected（不得删） | 4 |
-| 孤儿候选 · high（仍被 CI/门禁引用） | 80 |
+| 孤儿候选 · high（仍被 CI/门禁引用） | 83 |
 | 孤儿候选 · medium（仅文档提及） | 29 |
 | 孤儿候选 · low（全仓零提及） | 96 |
 
@@ -72,13 +72,13 @@ flowchart LR
   partner["apps/partner<br/>合作机构后台<br/>15 路由"]
   api["services/api<br/>NestJS<br/>583 端点"]
   db[("Prisma<br/>113 模型")]
-  gates{{"verify 门禁<br/>589 个脚本"}}
+  gates{{"verify 门禁<br/>594 个脚本"}}
 
   kiosk -->|"/api/v1"| api
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 1888 个文件"| kiosk
+  gates -.->|"断言 1917 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api

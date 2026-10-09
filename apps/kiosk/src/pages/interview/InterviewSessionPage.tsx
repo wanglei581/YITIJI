@@ -9,14 +9,16 @@ import {
   classifyMicError,
   detectMicCapability,
   subscribeMicDeviceChange,
-  MIC_FAILURE_REASON,
-  MIC_REASON,
   MIC_STATUS_LABEL,
+  micFailureReasonLine,
+  micReasonLine,
   type MicCapabilityState,
 } from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
+import { InterviewNetworkBar } from './session/InterviewNetworkError'
+import { InterviewReportPending } from './session/InterviewReportPending'
 import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { speakInterview } from './session/speakInterview'
@@ -51,6 +53,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const location = useLocation()
   const { getToken } = useAuth()
   const storedLive = readInterviewWorkbenchSession()?.live
+  // 设置屏的选择在进场时定死。纯文字即使语音可用也不自动切过去。
+  const entryInteractionMode = storedLive?.interactionMode === 'voice' ? 'voice' : 'text'
   const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
   const [messages, setMessages] = useState<InterviewMessage[]>(() =>
@@ -62,6 +66,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const [draft, setDraft] = useState('')
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
+  const [networkFailure, setNetworkFailure] = useState(false)
   const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
   // 只认本场亲眼成功过的非跳过回答。乐观写进对话的那条不算，刷新也不能把没成功的说成已保存。
   const [answersRecorded, setAnswersRecorded] = useState(
@@ -102,6 +107,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     remainingSec,
     omitPrintAnswers,
     answersRecorded,
+    interactionMode: entryInteractionMode,
   })
 
   const access = useMemo(
@@ -116,8 +122,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     let asrOn = false
 
     // 探测的是「机器上有没有音频输入设备」，不是「浏览器有没有这个 API」。
-    // 只在服务端 ASR 已启用时才自动切语音模式；能力探测本身始终执行，
-    // 这样状态胶囊与常显原因永远反映真实硬件情况。
+    // 自动切语音只发生在设置屏选了「语音回合」，并且服务端识别开着、麦克风可用。
+    // 选纯文字时探测照旧做，状态胶囊仍说真话，但不改作答方式。
     const runDetect = (autoSwitch: boolean) => {
       void detectMicCapability().then((capability) => {
         if (cancelled) return
@@ -125,7 +131,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         if (asrOn && capability === 'available') {
           if (autoSwitch) setMode('voice')
         } else if (asrOn) {
-          setVoiceHint(MIC_REASON[capability])
+          setVoiceHint(micReasonLine(capability))
         }
       })
     }
@@ -136,14 +142,14 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         asrOn = asr === true
         setAsrEnabled(asrOn)
         setTtsOfficial(ttsEnabled === true)
-        runDetect(true)
+        runDetect(entryInteractionMode === 'voice')
       })
       .catch(() => { if (!cancelled) runDetect(false) })
 
     // 用户可能后插一个 USB 麦克风：热插拔后重新探测，语音入口自动恢复。
     const unsubscribe = subscribeMicDeviceChange(() => runDetect(false))
     return () => { cancelled = true; unsubscribe() }
-  }, [])
+  }, [entryInteractionMode])
 
   /** 手动重探（改权限后 / 插上麦克风后）。 */
   const recheckMic = () => {
@@ -152,7 +158,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     setError(null)
     void detectMicCapability().then((capability) => {
       setMicCapability(capability)
-      setVoiceHint(MIC_REASON[capability])
+      setVoiceHint(micReasonLine(capability))
       if (capability === 'available' && asrEnabled) setVoiceHint(null)
     })
   }
@@ -212,6 +218,15 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     return (
       <InterviewSessionInvalid
         onRestart={() => onGoStage ? onGoStage('setup') : navigate('/interview/setup')}
+        onOpenReports={() => onGoStage ? onGoStage('reports') : navigate('/interview/reports')}
+      />
+    )
+  }
+
+  if (phase === 'finishing') {
+    return (
+      <InterviewReportPending
+        onOpenTips={() => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))}
       />
     )
   }
@@ -235,8 +250,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     // 能力门禁：去掉原生 disabled 后按钮真的可点，守卫必须在 handler 内部。
     if (micCapability !== null && micCapability !== 'available') {
       setMicError(true)
-      setVoiceHint(MIC_REASON[micCapability])
-      setError(MIC_FAILURE_REASON[micCapability])
+      setVoiceHint(micReasonLine(micCapability))
+      setError(micFailureReasonLine(micCapability))
       return
     }
     setError(null)
@@ -264,11 +279,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       const failure = classifyMicError(err)
       resetVoiceState()
       setMicError(true)
-      setError(MIC_FAILURE_REASON[failure])
+      setError(micFailureReasonLine(failure))
       // 归因为设备/权限/不支持时同步收紧能力门禁，语音入口随之置灰。
       if (failure === 'no-device' || failure === 'permission-denied' || failure === 'unsupported') {
         setMicCapability(failure)
-        setVoiceHint(MIC_REASON[failure])
+        setVoiceHint(micReasonLine(failure))
       }
     }
   }
@@ -304,7 +319,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
     void submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
-      setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError,
+      setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError, setNetworkFailure,
       setFinishRecovery, setAnswersRecorded, setQuestionIndex,
     })
   }
@@ -320,7 +335,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const interviewerLabel = INTERVIEWER_LABEL[state.interviewerType] ?? '面试官'
   const statusText =
     phase === 'thinking' ? '面试官正在分析你的回答…'
-    : phase === 'finishing' ? '正在生成练习报告…'
     : phase === 'done_suggest' ? '本场问题已问完，可以结束并生成报告'
     : voice.kind === 'requesting_permission' ? '正在请求麦克风权限…'
     : voice.kind === 'recording' ? '正在听你的回答…'
@@ -330,7 +344,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     : '等待你开始回答'
 
   const timeUp = remainingSec === 0
-  const busyTurn = phase === 'thinking' || phase === 'finishing'
+  const busyTurn = phase === 'thinking'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
   const ttsLabel = ttsOfficial ? '官方语音播报' : '本机语音播报'
   // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
@@ -339,10 +353,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     micCapability === null ? 'blue' : micCapability === 'available' ? 'green' : 'red'
   // 语音入口是否放行 = 服务端 ASR 已启用 且 本机确实有可用麦克风。
   const voiceAvailable = asrEnabled && micCapability === 'available'
+  const voiceEntryBlocked = entryInteractionMode === 'voice' && micCapability !== null && !voiceAvailable
   // 门禁置灰就必须有常显原因，一个都不能漏：硬件原因优先，其次是服务端未启用。
   const micBlockedReason =
     micCapability === null ? null
-    : micCapability !== 'available' ? MIC_REASON[micCapability]
+    : micCapability !== 'available' ? micReasonLine(micCapability)
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
 
@@ -355,7 +370,19 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       subtitle={copy.subtitle}
       status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
       live={voice.kind === 'recording'}
-      ctabar={(
+      ctabar={networkFailure ? (
+        <InterviewNetworkBar
+          voiceAvailable={voiceAvailable}
+          voiceReason={micBlockedReason}
+          onBackToText={() => setNetworkFailure(false)}
+          onRetryVoice={() => {
+            setNetworkFailure(false)
+            setMode('voice')
+            setMicError(false)
+            setError(null)
+          }}
+        />
+      ) : (
         <InterviewSessionBar
           mode={mode}
           phase={phase}
@@ -413,6 +440,9 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         draft={draft}
         voiceAvailable={voiceAvailable}
         micBlockedReason={micBlockedReason}
+        networkFailure={networkFailure}
+        voiceEntryBlocked={voiceEntryBlocked}
+        onBackToText={() => setNetworkFailure(false)}
         onRecheckMic={recheckMic}
         onDraftChange={setDraft}
         onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}
@@ -437,7 +467,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           // 因此按钮仍可点击，短路守卫必须放在 handler 内部。
           if (!voiceAvailable) {
             if (micCapability !== null && micCapability !== 'available') {
-              setVoiceHint(MIC_REASON[micCapability])
+              setVoiceHint(micReasonLine(micCapability))
             }
             return
           }

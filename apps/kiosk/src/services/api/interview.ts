@@ -104,7 +104,10 @@ const MOCK_REPORT: InterviewReportResponse = {
 
 // ── 导出函数 ──────────────────────────────────────────────────────────────────
 
-export function createInterview(input: CreateInterviewInput, access: InterviewAccess): Promise<CreateInterviewResponse> {
+export function createInterview(
+  input: CreateInterviewInput & { interactionMode?: 'text' | 'voice' },
+  access: InterviewAccess,
+): Promise<CreateInterviewResponse> {
   if (API_MODE !== 'http') {
     mockIdx = 0
     return Promise.resolve({ sessionId: 'mock-session', questionTarget: MOCK_QUESTIONS.length, accessToken: 'mock-token' })

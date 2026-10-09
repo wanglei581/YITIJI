@@ -100,11 +100,15 @@ expectMatches(hookSrc, /网络正常/, 'hook 含「网络正常」文案（仅 A
 expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
 
 // 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
-const QUEUE_GATE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+// 2026-10-06：闸门说明改为渲染时的标准句 3（machineUnusableLine），不再把旧的找人句子冻在常量里。
+// 缺纸 / 异常仍靠短标题分开；说明统一为标准句 2。缺纸传感器报不准，屏上不写「找人补纸」。
 const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
-expectMatches(hubPageSrc, /device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸单独识别，不归入离线文案')
-expectMatches(hubPageSrc, /打印机缺纸，请找现场工作人员加纸/, 'W-117 缺纸提示加纸出路')
-expectMatches(hubPageSrc, /打印机异常，请找现场工作人员检查/, 'W-117 真实异常不说成离线')
+expectMatches(hookSrc, /case 'paper_empty':/, 'W-117 缺纸单独一条映射，不掉进离线')
+expectMatches(hookSrc, /printerLabel: '打印机缺纸'/, 'W-117 缺纸短标题不说成离线')
+expectMatches(hookSrc, /errorCode: 'paperEmpty'/, 'W-117 缺纸保留 paperEmpty，供其他页识别')
+expectMatches(hookSrc, /printerLabel: '打印机异常'/, 'W-117 真实异常短标题不说成离线')
+expectNotMatches(hubPageSrc, /找现场工作人员加纸|找人补纸|缺纸时一体机会自动停止接单/, 'W-117 缺纸不再叫人补纸，也不写自动停单')
+expectMatches(hubPageSrc, /notice: machineCannotPrintLine\(contact\)/, 'W-117 出纸暂停说明用标准句 2')
 const hubView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 expectMatches(hubView, /capabilities\.filter\(\(item\) => item\.actionable/, 'W-117 提示条只声明真可用的服务')
 expectMatches(hubView, /usableServices=.*usableServices/, 'W-117 可用服务进入设备异常提示条')
@@ -133,12 +137,12 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   else pass(`${status} deviceStatus=error`)
   if (!block.includes("printerLabel: '暂停接单'")) fail(`${status} 入口短标题必须是「暂停接单」`)
   else pass(`${status} 文案「暂停接单」`)
-  if (!block.includes(`printerNotice: '${QUEUE_GATE_NOTICE}'`)) fail(`${status} 缺少说明「${QUEUE_GATE_NOTICE}」`)
-  else pass(`${status} 文案「${QUEUE_GATE_NOTICE}」`)
+  if (!block.includes('printerNotice: machineUnusableLine()')) fail(`${status} 说明必须在返回时调用 machineUnusableLine()，不能冻住旧的找人句子`)
+  else pass(`${status} 说明调用 machineUnusableLine()`)
 }
 expectMatches(
   hubPageSrc,
-  /orderPaused \? device\.printerNotice/,
+  /orderPaused\s*\?\s*device\.printerNotice/,
   '打印扫描首页在闸门合上时用 printerNotice 作停用说明',
 )
 expectMatches(

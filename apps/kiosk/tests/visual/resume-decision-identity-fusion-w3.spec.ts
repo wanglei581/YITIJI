@@ -267,7 +267,7 @@ async function openActionsWithPendingExpiry(page: Page, api: ApiRouter, third: '
   await loginThenOpen(page, '/resume/job-fit/actions?taskId=t-act')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'ready')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回对照结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   await expiry.arrived
   await page.goBack()
@@ -292,7 +292,7 @@ test('job fit actions: a 401 from the previous page ends the session and the lat
   await expectEnded(page, 'resume-job-fit-actions', ['缺少 Excel 数据整理经历', '把「协助行政」改写成具体做过的三件事'])
   await releaseLate(page, '/api/v1/resume/job-fit/t-act/print', print.release)
   await expectEnded(page, 'resume-job-fit-actions', ['缺少 Excel 数据整理经历'])
-  await expect(page.getByRole('button', { name: '返回比对结果' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '返回对照结果' })).toHaveCount(0)
   expect(creds.staleMemberAfterSwitch()).toEqual([])
   await captureEnded(page, 'actions-session-ended')
 })

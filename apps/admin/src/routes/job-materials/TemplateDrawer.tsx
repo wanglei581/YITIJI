@@ -12,6 +12,7 @@ import {
   type JobMaterialTemplateAdminRow,
 } from '../../services/api/jobMaterials'
 import { JOB_MATERIAL_TYPE_OPTIONS } from './constants'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /** 新建时的默认表单字段骨架：与种子模板同一套 key，方便运营直接改文案。 */
 const DEFAULT_FIELDS_JSON = JSON.stringify(
@@ -215,7 +216,7 @@ export function TemplateDrawer({ open, mode, template, onClose, onSaved }: Props
     try {
       input = buildInput(form)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '表单校验失败')
+      setError(userMessageOf(err, '表单没有通过校验，请按提示修改后再保存'))
       return
     }
     setSubmitting(true)
@@ -227,7 +228,7 @@ export function TemplateDrawer({ open, mode, template, onClose, onSaved }: Props
       }
       onSaved()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败')
+      setError(userMessageOf(err, '模板没有保存，请检查后重试'))
     } finally {
       setSubmitting(false)
     }

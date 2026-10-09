@@ -5,6 +5,8 @@
 // 因此这一页只做浏览与筛选，出口是企业详情（那里才有来源投递入口）。
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { BriefcaseIcon, BuildingIcon, FileTextIcon, SearchIcon, UsersIcon } from 'lucide-react'
@@ -23,6 +25,7 @@ import {
 const BOUNDARY = '名单以主办方回传为准；本机不代收简历，也不在平台内投递。'
 
 export function FairCompaniesPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
@@ -76,7 +79,7 @@ export function FairCompaniesPage() {
   const ctabar = uiState === 'error'
     ? (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
         <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
       </>
     )
@@ -113,7 +116,7 @@ export function FairCompaniesPage() {
       ) : uiState === 'error' ? (
         <>
           <DirState tone="error" testId="fair-companies-error" title="参展名单没取到">
-            请求失败。名单关系到你到现场先去哪几家，<b>取不到就先不显示</b>，不给你一份可能过时的清单。
+            请求失败。名单关系到你到现场先去哪几家，<b>取不到就先不显示</b>，不给你一份可能过时的清单。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={FileTextIcon} title="活动物料" desc="物料里通常也有一份纸质名单可以打印" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />

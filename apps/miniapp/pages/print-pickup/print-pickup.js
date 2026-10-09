@@ -8,14 +8,14 @@
 // 或一张转发出去的卡片，就能在别人手机上渲染出一张带码的取件页 —— 而金额与有效期
 // 同样是本人订单状态，不该由调用方"告诉"本页。现在只收 orderId，其余一律向服务端取。
 // 与材料包的 package-code 同一口径。
-const { SUPPORT_HINT } = require('../../utils/user-error')
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const { isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
 const pickupActions = require('../../utils/pickup-actions')
-const { parseAmountCents, formatCode, formatCountdown, resolveOrderState } = require('./pickup-state')
+const { parseAmountCents, formatCode, formatCountdown, paintOrder } = require('./pickup-state')
+const pickupSupport = require('./pickup-support')
 
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
@@ -60,8 +60,7 @@ Page({
   _inflight: null,
 
   data: {
-    // 现场无人值守：需要帮助只有服务电话（utils/user-error.js SUPPORT_HINT）
-    supportHint: SUPPORT_HINT,
+    ...pickupSupport.supportData,
     statusBarHeight: 20,
     state: 'loading', // loading | ready | error
     errorMsg: '',
@@ -108,6 +107,7 @@ Page({
     this._ownerDeniedFor = ''
     this._requestEpoch = 0
     this._inflight = null
+    pickupSupport.initSupport(this, api)
 
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
@@ -416,6 +416,8 @@ Page({
     })
   },
 
+  callSupport() { pickupSupport.callSupport(this) },
+
   onReady() {
     this._pageReady = true
     this._drawPickupQr()
@@ -538,21 +540,23 @@ Page({
         if (!this._visible || !order) return
         // 码只认服务端这一次给的值。`|| this.data.codeRaw` 会让服务端已经撤码
         // （核销后 pickupCode 不再下发）的订单继续显示上一次那张码。
+        this._lastOrder = order
+        pickupSupport.loadSupportOnce(this, order.terminalId)
         const pickupCode = normalizePickupCode(order.pickupCode)
         const hasCode = PICKUP_CODE_RE.test(pickupCode)
-        const status = resolveOrderState(order)
+        const painted = paintOrder(order, this._supportView, pickupCode, formatCode(pickupCode), hasCode)
         // 有效期同样只认这一次服务端给的值。`|| this.data.expiresAt` 会在核销后
         //（服务端不再下发 pickupCodeExpiresAt）保留上一轮那个时间，于是一张已经被
         // 消费掉的码还挂着"还有 47 分钟过期"的倒计时 —— 与上面那条"码只认服务端"
         // 是同一条理由，漏掉它等于只关了半扇门。
         const expiresAtMs = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : 0
         const expiresAt = Number.isFinite(expiresAtMs) ? expiresAtMs : 0
-        const shouldRedraw = status.showQr && hasCode && pickupCode !== this.data.codeRaw
+        const shouldRedraw = painted.showQr && pickupCode !== this.data.codeRaw
         const amountCents = parseAmountCents(order.amountCents)
         // 这一刻服务端确认过这张码。轮询失败时的信任窗口从这里起算。
         this._codeConfirmedAt = Date.now()
 
-        this.setData({
+        this.setData(Object.assign({
           state: 'ready',
           errorMsg: '',
           refreshing: false,
@@ -561,19 +565,13 @@ Page({
           pickupStatus: order.pickupStatus || '',
           amountCents,
           isFreeOrder: amountCents === 0,
-          statusKey: status.key,
-          statusTitle: status.title,
-          statusDetail: status.detail,
-          showQr: status.showQr && hasCode,
-          codeRaw: status.showQr && hasCode ? pickupCode : '',
-          code: status.showQr && hasCode ? formatCode(pickupCode) : '',
           outlet: (order.share && order.share.outletName) || '',
           expiresAt,
           // 码撤下时倒计时也必须跟着撤：它是这张码的说明文字，留着就是在替一张
           // 已经不显示（或已经被核销）的码继续宣称"还有效"。
-          countdown: status.showQr && hasCode ? this.data.countdown : '',
+          countdown: painted.showQr ? this.data.countdown : '',
           qrStatus: shouldRedraw ? 'loading' : this.data.qrStatus,
-        }, () => {
+        }, painted), () => {
           if (this.data.showQr) this._drawPickupQr()
           this._resumeVisibleWork()
         })
@@ -703,12 +701,7 @@ Page({
       if (ms <= 0) {
         // 过期与核销走同一个出口：凭证连同有效期一起清零，再写状态说明。
         this._clearCredentials()
-        this.setData({
-          countdown: '已过期',
-          statusKey: 'expired',
-          statusTitle: '到机码已过期',
-          statusDetail: '请返回打印订单重新发起打印。',
-        })
+        this.setData(pickupSupport.expiredCodePatch())
         this._stopTimers()
         return
       }
@@ -764,7 +757,8 @@ Page({
   },
 
   reissueCode() {
-    if (!this.data.showQr || this.data.reissuing || !this.data.orderId) return
+    // 打印失败后的续打态，后端拒绝作废重发（PICKUP_CODE_NOT_REISSUABLE）。按钮已藏，这里再挡一次。
+    if (!this.data.showQr || this.data.statusKey === 'failed' || this.data.reissuing || !this.data.orderId) return
     this.setData({ reissuing: true })
     pickupActions.reissue(this.data.orderId)
       .then((order) => {
