@@ -542,7 +542,6 @@ export function PrintScanHomePage() {
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
-        description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
     </QxPageFrame>
   )

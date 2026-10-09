@@ -77,6 +77,10 @@ export const UNATTENDED_FORBIDDEN_PHRASES = [
   forbiddenPhrase(['向现场', '工作人员出示']),
   forbiddenPhrase(['出示给现场', '工作人员']),
   forbiddenPhrase(['出示给', '工作人员']),
+  // 10/9：取件页「码找不到了？」和打印大厅反馈弹窗各漏了一处，上面的组合拦不到。
+  forbiddenPhrase(['问', '工作人员']),
+  forbiddenPhrase(['工作人员会', '核实']),
+  forbiddenPhrase(['现场', '处理']),
   forbiddenPhrase(['去服', '务台']),
   forbiddenPhrase(['现场工作', '人员']),
   forbiddenPhrase(['服务', '台']),
