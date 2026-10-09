@@ -24674,6 +24674,7 @@
       "services/api/scripts/verify-ai-usage-budget.ts"
     ],
     "services/api/src/common/pdf/aigc-label.ts": [
+      "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-production-runtime-gates.ts",
@@ -24687,6 +24688,7 @@
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/common/pdf/pdfjs-document.ts": [
+      "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-mock-interview.ts",
@@ -34540,6 +34542,8 @@
           "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pdf/aigc-label.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
           "services/api/src/prisma/prisma.service.ts"
         ],
         "missing": []

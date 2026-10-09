@@ -1,14 +1,12 @@
 # 当前开发进度
 
-## 2026-10-08：小青作业打印稿改为本次要点（第八次 10/30，须与前端 B 同批合）
+## 2026-10-08：小青作业打印稿改为本次要点（第七次 10/16，须与前端 #1355 同批）
 
-- **范围与方案审查：** 按产品负责人 10/8 批准的任务包，仅调整顾问 PDF 的四处文案、打印 / 下载默认文件名与类型注释，复用 `verify:advisor-work` 补打印文案断言；文件预算为 3 个 API 源文件、1 个门禁、2 个进度文档及至多 7 个图谱生成物。基线 `be7995c6ad589bec64bdd40b0027185af6ecfbcd`，接手工作区干净。仅涉及文件 / 打印展示文案，不新增入口、页面、模型、服务或依赖，不改变钉住接口、schema、打印流程、生产配置、密钥或硬件链路；`apps/` 与小程序由原写入方维护。
-- **改动：** 打印稿采用「这次对话的要点」「（本次没有留下要点）」；末尾明确「这些要点由 AI 根据本次对话整理，请自行核对后使用」。无标题时 PDF 标题为「AI 顾问 · 本次要点单」，文件名为 `AI顾问-本次要点单.pdf`。已核实文件名只用于上传及响应展示，存储键由文件 ID 等字段生成。
-- **本地验证：** API `typecheck`、`lint` 退出码 0。每个修改文件均已执行 `node scripts/project-graph-query.mjs file <路径>`，图谱点名门禁加 `verify:assistant-voice` 共 21 个全部执行：20 个退出码 0（含 `verify:advisor-work` 70 PASS、`verify:assistant-voice`、`verify:ai-safety-aigc`、`verify:cjk-font`、`verify:ai-artifact-print-url-contract`、`verify:beijing-display-time` 及进度文档关联门禁）；`verify:support-contact` 退出码 1，测试 HTTP 服务监听 `127.0.0.1` 被当前沙箱以 `listen EPERM` 拒绝，须 Claude 在允许本地监听的环境补跑，不记通过。图谱生成末行「写入 docs/graph/（0 个文件有变化，共 7 个）」；`--check` 退出码 0，末行「PASS docs/graph/ 与当前代码一致」。
-- **Claude 复核（10/8）：** Codex 沙箱不能监听本地端口而没跑成的 `verify:support-contact`，Claude 本机补跑通过；另复跑 typecheck、lint、`verify:advisor-work`（70 PASS）、`verify:assistant-voice`、`verify:ai-safety-aigc`、`verify:cjk-font`，并亲自重做反向变异（末尾说明改回旧句 → G0a 红）。Codex 多改的 `next-tasks.md` 没有带进本分支。
-- **反向变异：** 只把 PDF 末尾说明改回旧句，`pnpm --filter @ai-job-print/api verify:advisor-work` 退出码 1，命中 `FAIL G0a 本次要点打印稿四处新文案完整，末尾说明保留 AI 提示`；子进程结束即按原字节还原，复跑退出码 0（70 PASS），当前源码为新句。
-- **交付边界：** Codex 实现、Claude 审；须与一体机前端 B 页面改动同批合入第八次（10/30）。本节记录本地候选，不代表 CI、部署或当前真机验收。
-- **前端 B 旧句命中（只读，未修改）：** `apps/kiosk/src/pages/ai-plan/AdvisorArtifactPanels.tsx:98`、`advisorArtifactModel.ts:378`、`styles/advisor-artifact-qx.css:113`；视觉用例 `apps/kiosk/tests/visual/fusion-w3.spec.ts:2240`、夹具 `apps/kiosk/tests/visual/fixtures/qingxu-pair-b/p52.ts:10`。同页关联旧说法另在 `advisorArtifactModel.ts:293,296,430`、`AdvisorTakeaway.tsx:18–20,125`、上述样式 `:100` 与视觉用例 `:2161`。全仓明文及 API scripts/src 的五句完整 / 混合 `\\uXXXX` 搜索已完成，原后端用例没有旧句锚点；新增门禁里的旧句仅作禁止回退断言，钉住接口的报错与标语保持原样。
+- **改了什么：** 52 号「小青的作业」里，问答类产物打印出来的那张纸，四处说法改成和实际一致：小节标题「这次对话的要点」；没有要点时写「（本次没有留下要点）」；没有标题时叫「AI 顾问 · 本次要点单」（文件名 `AI顾问-本次要点单.pdf`）；末尾一节标题改为「使用提示」，正文是「这些要点由 AI 根据本次对话整理，可能有遗漏或错误，请自行核对后使用。涉及政策、补贴、社保的内容，以官方发布的原文和经办窗口的审核为准。」每份打印稿开头的「AI 生成，仅供参考」标识不动。
+- **为什么：** 产品负责人 10/8 批准把「钉住」的说法改成和实际一致（一体机保存的是 AI 整理的本次要点）；末尾一节是合规窗口 10/8 的定稿——纸上不写保存的事。
+- **范围：** 只动问答打印稿上的字和缺省文件名。成稿、比对两种打印稿一个字没动；不新增入口、页面、接口、表或依赖，不动提示词。页面上的字由前端 #1355 改，两边必须同批上线，否则页面说「要点」、纸上还写「钉住的条目」。
+- **验证（Claude 本机，10/10）：** 关联门禁 21 条全过；`verify:advisor-work` 由 70 条增至 87 条通过，新增的 17 条会真把纸渲染出来、读纸上的字（一条要点、零条要点、成稿、比对各一份，每条「不该有」都配同一张纸上的一条「该有」）。反向测试 17 项全部按预期转红、还原后全绿：包括把四句分别改回旧写法、把定稿留在源码里但不印到纸上、让另外两种打印稿也印上这段话。
+- **交付边界：** Codex 实现、Claude 审并做反向测试。以上是本机结果，不代表线上检查、部署或真机验收。
 
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 

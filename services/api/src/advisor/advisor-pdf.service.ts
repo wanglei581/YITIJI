@@ -71,8 +71,8 @@ export class AdvisorPdfService {
         doc.fontSize(10.5).fillColor('#111827').text(`${i + 1}. ${pin.content}`, { lineGap: 2 })
         note(`   出处：${pin.evidenceLevel}${pin.sourceNote ? ` · ${pin.sourceNote}` : ''}`)
       })
-      title('对话保存口径')
-      note('对话本身不保存；这些要点由 AI 根据本次对话整理，请自行核对后使用。')
+      title('使用提示')
+      note('这些要点由 AI 根据本次对话整理，可能有遗漏或错误，请自行核对后使用。涉及政策、补贴、社保的内容，以官方发布的原文和经办窗口的审核为准。')
     } else if (payload.kind === 'slot_draft') {
       title('成稿')
       body(payload.draft)

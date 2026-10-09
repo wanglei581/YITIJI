@@ -2464,10 +2464,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/jwt-verifier.module.ts` | `verify-production-runtime-gates.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/common/middleware/request-id.middleware.ts` | `verify-error-observability.ts`<br/>`verify-internal-accounts.ts` |
 | `services/api/src/common/outbound/ai-endpoint-allowlist.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-usage-budget.ts` |
-| `services/api/src/common/pdf/aigc-label.ts` | `verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-production-runtime-gates.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-self-assessment-ai-gate.ts` |
+| `services/api/src/common/pdf/aigc-label.ts` | `verify-advisor-work.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-production-runtime-gates.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/common/pdf/aigc-pdf-metadata.ts` | `verify-aigc-pdf-metadata.ts` |
 | `services/api/src/common/pdf/cjk-font.ts` | `verify-cjk-font.ts` |
-| `services/api/src/common/pdf/pdfjs-document.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-mock-interview.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-self-assessment-ai-gate.ts` |
+| `services/api/src/common/pdf/pdfjs-document.ts` | `verify-advisor-work.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-mock-interview.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/common/pickup-code.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-idempotency.ts` |
 | `services/api/src/common/pii/llm-input-mask.ts` | `verify-llm-input-pii-mask.ts` |
 | `services/api/src/common/pii/pii-masker.ts` | `verify-llm-input-pii-mask.ts` |

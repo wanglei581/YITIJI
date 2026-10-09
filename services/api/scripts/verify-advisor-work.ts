@@ -13,6 +13,8 @@ import { AdvisorRetentionTask } from '../src/advisor/advisor-retention.task'
 import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
 import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
 import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
+import { AIGC_VISIBLE_HEADER } from '../src/common/pdf/aigc-label'
+import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
 import {
   classifySkillByKeyword,
   deriveStatus,
@@ -68,6 +70,21 @@ function section(title: string) { console.log(`\n-- ${title}`) }
 
 function assert(condition: boolean, message: string) {
   condition ? pass(message) : fail(message)
+}
+
+function squash(text: string): string { return text.replace(/\s+/gu, '') }
+
+async function visibleText(buffer: Buffer): Promise<string> {
+  const unpdf = require('unpdf') as {
+    extractText: (pdf: unknown, options: { mergePages: boolean }) => Promise<{ text: string | string[] }>
+  }
+  const doc = await openUnpdfDocument<{ destroy: () => Promise<void> }>(new Uint8Array(buffer))
+  try {
+    const extracted = await unpdf.extractText(doc, { mergePages: false })
+    return squash(Array.isArray(extracted.text) ? extracted.text.join('') : extracted.text)
+  } finally {
+    await doc.destroy()
+  }
 }
 
 async function expectReject(code: string, label: string, fn: () => Promise<unknown>) {
@@ -133,24 +150,31 @@ const downConfig = {
 
 async function main() {
   console.log('\n=== S3-3 · P26 顾问作业面后端验证 ===')
-  // 10/8 产品负责人批准：一体机保存的是 AI 整理的本次要点；打印说明须与页面同批改。
+  // 合规窗口 10/8 定稿：纸上不写保存的事；须与前端 #1355 同批上线。
   const pdfSource = readFileSync(join(__dirname, '../src/advisor/advisor-pdf.service.ts'), 'utf8')
+  const takeawayNoteFirst = '这些要点由 AI 根据本次对话整理，可能有遗漏或错误，请自行核对后使用。'
+  const takeawayNotePolicy = '涉及政策、补贴、社保的内容，以官方发布的原文和经办窗口的审核为准。'
+  const takeawayNote = takeawayNoteFirst + takeawayNotePolicy
   const takeawayCopy = [
     '这次对话的要点',
     '（本次没有留下要点）',
-    '对话本身不保存；这些要点由 AI 根据本次对话整理，请自行核对后使用。',
+    '使用提示',
+    takeawayNote,
     'AI 顾问 · 本次要点单',
   ]
   assert(takeawayCopy.every((text) => pdfSource.includes(text)),
-    'G0a 本次要点打印稿四处新文案完整，末尾说明保留 AI 提示')
+    'G0a 本次要点打印稿新文案完整，使用提示逐字采用合规定稿')
   assert([
     '你钉住的条目',
     '（本次没有钉住任何条目）',
     '对话本身不保存；只有你主动钉住的条目会留下并带进后续步骤。',
     'AI 顾问 · 钉住条目单',
-  ].every((text) => !pdfSource.includes(text)), 'G0b 打印稿不得回退为用户主动钉住的旧说法')
-  assert(takeawayCopy.every((text) => !text.includes('工作人员')) && takeawayCopy[2]!.includes('AI'),
-    'G0c 新文案不含工作人员，末尾说明标明 AI 整理')
+    '对话本身不保存；这些要点由 AI 根据本次对话整理，请自行核对后使用。',
+    '对话保存口径',
+  ].every((text) => !pdfSource.includes(text)), 'G0b 打印稿不得回退为六条旧说法')
+  assert(takeawayCopy.every((text) => !text.includes('工作人员'))
+    && takeawayNote.includes('AI') && takeawayNote.includes('以官方发布的原文'),
+    'G0c 新文案不含工作人员，末尾说明标明 AI 整理与官方原文口径')
   if (fallbackDbDir) await initFallbackDb()
 
   const prisma = new PrismaService()
@@ -449,14 +473,51 @@ async function main() {
         { kind: 'slot_draft', draft: '我做机械设计六年。', blanks: ['方向'], summary: '还差一句', basedOn: [{ slotKey: 'current_role', prompt: '你现在做什么', value: '机械设计六年' }] },
         { kind: 'compare_report', items: [{ requirement: '熟悉夹具', verdict: 'covered', evidence: '主导工装改造' }], extras: [], summary: '比对结果' },
       ]
+      const printedText = new Map<AdvisorArtifactPayload['kind'], string>()
       for (const payload of payloads) {
         const out = await pdf.render({ date: '2026-08-16', providerLabel: 'llm:fake:v1', contentId: `verify-advisor-${payload.kind}` }, payload)
         assert(out.buffer.subarray(0, 4).toString() === '%PDF' && out.pageCount >= 1,
           `G3 ${payload.kind} 渲染出真实 PDF`)
+        printedText.set(payload.kind, await visibleText(out.buffer))
       }
       const qaPrinted = await svc.printArtifact(qa.sessionId, qaRan.artifacts[0]!.artifactId, owner)
       assert(qaPrinted.filename === 'AI顾问-本次要点单.pdf' && uploaded[1]!.filename === qaPrinted.filename,
         'G4 无标题的问答产物以本次要点单文件名上传并返回，打印仍不调模型')
+
+      // 双方都去掉空白与换行；每个阴性断言都有同一份 PDF 的阳性对照。
+      const qaText = printedText.get('qa_pins')!
+      const hasQa = (text: string) => qaText.includes(squash(text))
+      const pinText = '空窗期不用专门解释'
+      assert(hasQa('AI 顾问 · 本次要点单'), 'G5a 问答纸上有缺省本次要点单标题')
+      assert(hasQa('这次对话的要点'), 'G5b 问答纸上有要点小节标题')
+      assert(hasQa('使用提示'), 'G5c 问答纸上有使用提示小节标题')
+      assert(hasQa(takeawayNoteFirst), 'G5d 问答纸上有完整的 AI 整理与核对说明')
+      assert(hasQa(takeawayNotePolicy), 'G5e 问答纸上有完整的官方原文与窗口审核说明')
+      assert(hasQa(pinText), 'G5f 阳性对照：问答纸上读得出要点原文')
+      assert(hasQa(AIGC_VISIBLE_HEADER), 'G5g 问答纸上保留常量定义的 AI 可见标识')
+      assert(hasQa(pinText) && !hasQa('对话本身不保存'), 'G6a 同纸有要点原文，无对话本身不保存')
+      assert(hasQa(pinText) && !hasQa('对话保存口径'), 'G6b 同纸有要点原文，无对话保存口径')
+      assert(hasQa(pinText) && !hasQa('钉住'), 'G6c 同纸有要点原文，无钉住旧说法')
+
+      const emptyQa = await pdf.render(
+        { date: '2026-08-16', providerLabel: 'server:pins', contentId: 'verify-advisor-empty-qa' },
+        { kind: 'qa_pins', pins: [] },
+      )
+      const emptyText = await visibleText(emptyQa.buffer)
+      assert(emptyText.includes(squash('（本次没有留下要点）')), 'G7a 零条要点纸上有原定空态说明')
+      assert(emptyText.includes(squash(takeawayNoteFirst)), 'G7b 零条要点纸上有完整的 AI 整理与核对说明')
+      assert(emptyText.includes(squash(takeawayNotePolicy)), 'G7c 零条要点纸上有完整的官方原文与窗口审核说明')
+
+      const slotText = printedText.get('slot_draft')!
+      assert(slotText.includes(squash('成稿')) && !slotText.includes(squash('使用提示')),
+        'G8a 同纸有原有成稿标题，无问答使用提示标题')
+      assert(slotText.includes(squash('留空的地方')) && !slotText.includes(squash(takeawayNotePolicy)),
+        'G8b 同纸有原有留空小节标题，无问答官方原文说明')
+      const compareText = printedText.get('compare_report')!
+      assert(compareText.includes(squash('逐条比对结果')) && !compareText.includes(squash('使用提示')),
+        'G9a 同纸有原有逐条比对标题，无问答使用提示标题')
+      assert(compareText.includes(squash('本机比不了的')) && !compareText.includes(squash(takeawayNotePolicy)),
+        'G9b 同纸有原有比对边界标题，无问答官方原文说明')
       restoreFetch()
     }
 
