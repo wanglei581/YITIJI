@@ -14,6 +14,12 @@ import type { ReactNode } from 'react'
 import { AlertCircleIcon, AlertTriangleIcon, FileTextIcon, WalletIcon } from 'lucide-react'
 import { formatCents } from '../cashierStatus'
 import type { PaymentFact } from '../printProgressModel'
+import {
+  OFFLINE_DETAIL,
+  OFFLINE_TITLE,
+  STATUS_READ_ERROR_TEXT,
+  UNCONFIRMED_COPY,
+} from '../printProgressPolling'
 
 export interface PrintJobState {
   tone: 'doing' | 'wait' | 'err'
@@ -172,5 +178,26 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
         </div>
       </section>
     </>
+  )
+}
+
+/** 断网 / 结果未确认。读不到状态，不写成打印失败，也不给重新打印。 */
+export function PrintProgressLinkNotice({ phase }: { phase: 'offline' | 'unconfirmed' }) {
+  const unconfirmed = phase === 'unconfirmed'
+  return (
+    <div
+      className="pff-inbar"
+      data-tone="wheat"
+      role="status"
+      data-testid={unconfirmed ? 'print-progress-unconfirmed' : 'print-progress-offline'}
+    >
+      <div className="pff-inbar-h">
+        <span className="pff-inbar-ic"><AlertTriangleIcon aria-hidden="true" /></span>
+        <span>
+          {unconfirmed ? UNCONFIRMED_COPY : OFFLINE_TITLE}
+          {unconfirmed ? null : <small>{STATUS_READ_ERROR_TEXT}。{OFFLINE_DETAIL}</small>}
+        </span>
+      </div>
+    </div>
   )
 }

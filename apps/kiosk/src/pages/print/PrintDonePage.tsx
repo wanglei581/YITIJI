@@ -489,7 +489,8 @@ export function PrintDonePage() {
               orderNo={faultOrderNo}
               failureReason={failureReason}
               money={money}
-              canRetry={Boolean(takeaway?.canRetry)}
+              // 结果未确认时底部不给「重新提交打印」，说明区也不能写「可点下方重新提交打印」：两处同一条件。
+              canRetry={Boolean(takeaway?.canRetry) && !isUnconfirmed}
               takeaway={takeawayNotices}
             />
             <PrintAiHelp

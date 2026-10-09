@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { kioskAiCapabilityItems } from '../../src/pages/service-hubs/serviceHubModel'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -81,6 +82,12 @@ export class ApiRouter {
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
     // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
     this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
+    // 服务中心在 /health 就绪后读 GET /kiosk/ai/capabilities。默认全部可用，
+    // 避免既有用例把生成式入口误判成置灰；要测关闭或降级的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/kiosk/ai/capabilities', {
+      status: 200,
+      json: { success: true, data: { items: kioskAiCapabilityItems('available') } },
+    })
     // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
     // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
     // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。

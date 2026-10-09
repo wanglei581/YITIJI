@@ -369,6 +369,30 @@ check(
     hubPage.includes('选择后直接进入对应服务；不会替你提交或生成结果。'),
   '目标分段用稿的固定说明，不再拼 sectionHint（那会让同一句话在一屏里出现两次）'
 )
+check(
+  hubPage.indexOf('qx-hub-quick-section') >= 0 &&
+    hubPage.indexOf('qx-hub-quick-section') < hubPage.indexOf('className="qx-hub-goals"'),
+  '先选目标留在常用入口下面（2026-10-06 产品负责人：不挪到页顶）'
+)
+{
+  const hubAi = read('src/pages/service-hubs/useHubAiAvailability.ts')
+  check(hubAi.includes('/kiosk/ai/capabilities'), 'AI 是否可用读现有 GET /kiosk/ai/capabilities，不新造接口')
+  check(
+    /useHubAiAvailability\(apiStatus === 'ready'\)/.test(hubPage),
+    '整站 /health 未就绪时不读 AI 能力清单，保持原来的在线服务不可用'
+  )
+  const reasonFn = hubModel.slice(hubModel.indexOf('export function unavailableReason'))
+  const featureOffAt = reasonFn.indexOf("if (feature === 'off') return 'AI能力当前不可用'")
+  const onlineAt = reasonFn.indexOf("if (state.apiDown) return '在线服务当前不可用'")
+  check(
+    featureOffAt > 0 && onlineAt > featureOffAt,
+    'AI 能力单独不可用时先返回 AI 原因，不会落到「在线服务当前不可用」'
+  )
+  check(
+    read('src/pages/service-hubs/serviceHubChrome.ts').includes('AI能力 · 暂不可用'),
+    '只有 AI 不可用时，能力条写「AI能力 · 暂不可用」'
+  )
+}
 
 // 规格表 ↔ 2.0 稿 16-service-hubs.html（v2 目录）的转录对账。
 // 这份 36 张卡 / 17 个目标 / 15 条常用入口的规格是机械抽取产物；2026-09-10 那版

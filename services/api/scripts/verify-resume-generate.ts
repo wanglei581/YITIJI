@@ -152,6 +152,55 @@ async function main(): Promise<void> {
     pass('3. 润色命中拦截词 → 丢弃润色,回退用户原文')
   }
 
+  // ── 3b. 职务可不填（10/6）：照样生成、职务保持为空、润色不许补出职务 ────────────
+  {
+    const { plainToInstance } = await import('class-transformer')
+    const { validate } = await import('class-validator')
+    const { ResumeGenExperienceDto } = await import('../src/ai/dto/resume-generate.dto')
+    for (const raw of [
+      { company: '青序门店', role: '', description: '负责门店日常运营' },
+      { company: '青序门店', description: '负责门店日常运营' },
+      { company: '青序门店', role: null, description: '负责门店日常运营' },
+    ]) {
+      const dto = plainToInstance(ResumeGenExperienceDto, raw)
+      const errors = await validate(dto)
+      if (errors.length > 0) fail(`3b. 空职务应通过校验：${JSON.stringify(raw)} → ${errors.map((x) => x.property).join(',')}`)
+      if (dto.role !== '') fail(`3b. 空职务应规整为空字符串，实际 ${JSON.stringify(dto.role)}`)
+    }
+    const tooLong = await validate(plainToInstance(ResumeGenExperienceDto, { company: '青序门店', role: 'x'.repeat(61), description: '负责门店日常运营' }))
+    if (tooLong.length === 0) fail('3b. 职务超过 60 字仍应拒绝')
+    pass('3b. DTO 接受空 / 缺省 / null 职务并规整为空字符串，超长仍拒绝')
+
+    const emptyRoleInput: ResumeGenerateInput = {
+      ...INPUT,
+      experience: [{ company: '青序门店', role: '', description: '负责门店日常运营' }],
+    }
+    const mock = await new MockAiProvider().generateResume(emptyRoleInput)
+    if (mock.resume?.experience[0]?.role !== '') fail(`3b. mock 产出职务应为空，实际 ${JSON.stringify(mock.resume?.experience[0]?.role)}`)
+    pass('3b. mock provider：空职务照样生成，experience[0].role === \'\'')
+
+    // 模型在职务为空的那条润色里编出「店长」→ 丢弃润色、回落用户原文；职务仍为空。
+    setResponses([{ status: 200, content: validPolish((o) => { (o['experienceDesc'] as string[])[0] = '担任店长，全面负责门店日常运营与团队管理。' }) }])
+    const fabricatedTitle = await genSvc.generate(emptyRoleInput)
+    if (fabricatedTitle.experience[0].role !== '') fail('3b. 产出职务应保持为空')
+    if (fabricatedTitle.experience[0].description !== '负责门店日常运营') fail(`3b. 编出职务应回落原文，实际 ${fabricatedTitle.experience[0].description}`)
+    if (fabricatedTitle.experience[0].description.includes('店长')) fail('3b. 编造的职务进入了简历')
+    pass('3b. 职务为空时润色编出「店长」→ 丢弃润色、回落用户原文')
+
+    // 不带职务的润色照常保留。
+    setResponses([{ status: 200, content: validPolish((o) => { (o['experienceDesc'] as string[])[0] = '负责门店日常运营，保持货架整洁与收银顺畅。' }) }])
+    const cleanPolish = await genSvc.generate(emptyRoleInput)
+    if (cleanPolish.experience[0].description !== '负责门店日常运营，保持货架整洁与收银顺畅。') fail('3b. 不含职务的润色应保留')
+    pass('3b. 职务为空、润色不含职务 → 润色照常保留')
+
+    // 输入里写了职务，润色里提到同一职务是允许的。
+    const withRole: ResumeGenerateInput = { ...INPUT, experience: [{ company: '青序门店', role: '店长', description: '负责门店日常运营' }] }
+    setResponses([{ status: 200, content: validPolish((o) => { (o['experienceDesc'] as string[])[0] = '作为店长负责门店日常运营与排班。' }) }])
+    const roleKept = await genSvc.generate(withRole)
+    if (!roleKept.experience[0].description.includes('作为店长')) fail('3b. 输入已有的职务不应被当成编造')
+    pass('3b. 输入写了「店长」，润色提到店长照常保留')
+  }
+
   // ── 4. 未配置 → 明确失败 ───────────────────────────────────────────────
   try {
     await genSvcOff.generate(INPUT)

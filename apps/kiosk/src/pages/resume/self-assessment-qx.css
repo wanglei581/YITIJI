@@ -82,6 +82,22 @@
 .sa-xq-ask em { font-style: normal; color: var(--qx-emerald); }
 .sa-xq-doing { margin: 9px 0 0; font-size: 19px; line-height: 1.46; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }
 .sa-xq-doing b { color: var(--qx-paper); font-weight: 700; }
+/* 稿 .qx-steps：英雄区按内容高，三步贴在说明下面，不把深绿区钉死。 */
+.sa-steps {
+  position: relative; z-index: 1;
+  display: flex; gap: 14px;
+  list-style: none; margin: 22px 0 0; padding: 0;
+}
+.sa-steps li {
+  flex: 1; padding-top: 8px;
+  border-top: 2px solid color-mix(in srgb, var(--qx-paper) 35%, transparent);
+  font-size: 21px; line-height: 1.35;
+  color: color-mix(in srgb, var(--qx-paper) 92%, transparent);
+}
+.sa-steps b {
+  display: block; margin-bottom: 4px;
+  font-family: var(--qx-serif); font-size: 26px; color: var(--qx-emerald);
+}
 
 /* ── 卡片内的小标题（稿 .hd / .sub） ───────────────────────────── */
 .sa-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 25px; font-weight: 700; }
@@ -212,13 +228,14 @@
 .sa-qnum em { padding: 5px 12px; border-radius: 12px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-style: normal; font-size: 17px; }
 .sa-question { margin: 11px 0 0; font-size: 30px; line-height: 1.34; font-weight: 800; }
 .sa-qhint { margin: 8px 0 0; font-size: 17px; line-height: 1.42; color: var(--qx-ink-3); }
-.sa-answers { display: flex; flex-direction: column; gap: 11px; margin-top: 15px; }
+/* 9/29：三个选项一行三格，长句折行，不再在右半边留空。 */
+.sa-answers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
 .sa-answer {
-  display: flex; align-items: center; gap: 16px;
-  min-height: 90px; padding: 14px 24px;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 112px; padding: 16px 20px;
   border: 1.5px solid var(--qx-line); border-radius: 22px;
   background: var(--qx-paper); color: var(--qx-ink);
-  font-family: var(--qx-sans); font-size: 22px; line-height: 1.42; text-align: left;
+  font-family: var(--qx-sans); font-size: 24px; line-height: 1.42; text-align: left; text-wrap: balance;
   cursor: pointer;
 }
 .sa-answer[aria-checked='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
@@ -278,9 +295,16 @@
 .sa-dim p { margin: 9px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
 .sa-dim footer { margin-top: 10px; font-size: 15px; line-height: 1.44; color: var(--qx-ink-3); }
 .sa-muted { color: var(--qx-ink-3); }
+/* 稿 .cov：五个方向并排，数字来自真实结果，不在空态里画。 */
+.sa-cov { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
+.sa-cov > div { min-height: 126px; padding: 18px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
+.sa-cov small { display: block; color: var(--qx-ink-3); font-size: 20px; font-weight: 800; }
+.sa-cov b { display: block; margin-top: 10px; font-size: 21px; }
+.sa-cov p { margin: 9px 0 0; color: var(--qx-teal-d); font-size: 20px; font-weight: 800; line-height: 1.4; }
 
 /* ── 记录 / 结果的键值表（稿 .mini） ─────────────────────────── */
 .sa-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 15px 0 0; }
+.sa-meta[data-cols='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .sa-meta > div { padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: 20px; background: var(--qx-paper); }
 .sa-meta dt { font-size: 16px; font-weight: 800; color: var(--qx-teal-d); }
 .sa-meta dd { margin: 7px 0 0; font-size: 17px; line-height: 1.44; color: var(--qx-ink-2); overflow-wrap: anywhere; }
@@ -362,3 +386,29 @@
 .sa-dialog p { margin: 14px 0 0; font-size: 20px; line-height: 1.5; color: var(--qx-ink-2); }
 .sa-dialog-actions { display: flex; gap: 16px; margin-top: 26px; }
 .sa-dialog-actions > * { flex: 1; }
+
+/* 稿 .actions .btn { flex:1; height:86px }。底栏每个直接子项等宽，含置灰槽和声明槽。
+   选择器压过 .qx-btn[data-variant='primary'] 的 96px 高。 */
+.qx-stage:has(.sa-qx) > .qx-ctabar { align-items: stretch; }
+.qx-stage:has(.sa-qx) > .qx-ctabar > .qx-btn,
+.qx-stage:has(.sa-qx) > .qx-ctabar > .sa-guarded,
+.qx-stage:has(.sa-qx) > .qx-ctabar > .qx-ai-declaration-slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.qx-stage:has(.sa-qx) > .qx-ctabar > .qx-btn,
+.qx-stage:has(.sa-qx) > .qx-ctabar .sa-guarded > .qx-btn,
+.qx-stage:has(.sa-qx) > .qx-ctabar .qx-ai-declaration-slot > .qx-btn {
+  width: 100%;
+  min-height: 86px;
+  height: 86px;
+  font-size: 27px;
+}
+.qx-stage:has(.sa-qx) > .qx-ctabar .sa-blocked-reason { max-width: none; }
+
+/* 拦截态与结果空态：内容之间把余量拆开，单段空隙留在 160px 以下，不把出口卡拉成空盒。 */
+.sa-qx[data-state='result-empty'] .qx-scroll,
+.sa-qx[data-state='recover-consent'] .qx-scroll,
+.sa-qx[data-state='recover-submitted'] .qx-scroll {
+  justify-content: space-between;
+}
