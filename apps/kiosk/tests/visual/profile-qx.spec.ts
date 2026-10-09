@@ -1551,3 +1551,159 @@ test('占位行胶囊带图标 @w5-kiosk', async ({ page, api }) => {
   }
   expect(errors).toEqual([])
 })
+
+// ── C4-1c：39 行内次级操作与确认卡、40 留边、41 电话片段、38 读取行 ──
+async function prepareC41cMeState(page: Page, api: ApiRouter, nn: string, screen: string, state: string): Promise<void> {
+  const { buildQingxuPairs } = await import('./fixtures/qingxu-pair-targets')
+  const { prepareMePages } = await import('./fixtures/qingxu-pair-me-pages')
+  const target = buildQingxuPairs().find((item) => item.nn === nn && item.screen === screen && item.state === state)
+  expect(target, `夹具 ${nn}/${screen}/${state}：匹配数=${target ? 1 : 0}`).toBeDefined()
+  registerShell(api)
+  await prepareMePages(page, api, target!)
+}
+
+test('39 删除是次级按钮，确认才用朱砂且整张确认卡自动进入列表可见区 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await prepareC41cMeState(page, api, '39', 'ai-records', 'ready')
+  const list = page.getByTestId('member-records-list')
+  const row = list.locator('[data-record-kind="parse"]').first()
+  const open = row.getByRole('button', { name: '打开', exact: true })
+  const remove = row.getByRole('button', { name: '删除 AI 服务记录', exact: true })
+  const openBackground = await open.evaluate((element) => getComputedStyle(element).backgroundColor)
+  const initial = await remove.evaluate((element) => ({ background: getComputedStyle(element).backgroundColor, width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }))
+  expect(initial.background, `删除背景=${initial.background}；同行打开背景=${openBackground}`).toBe(openBackground)
+  const scale = await stageScale(page)
+  expect(initial.height / scale, `删除高度=${initial.height / scale}px；缩放=${scale}`).toBeGreaterThanOrEqual(56)
+  for (const button of [open, row.getByRole('button', { name: '接着打印', exact: true }), remove]) {
+    const count = await button.locator('svg[aria-hidden="true"]').count()
+    expect(count, `按钮「${await button.textContent()}」装饰图标数=${count}`).toBe(1)
+  }
+  await remove.click()
+  const confirm = row.getByRole('button', { name: '确认删除这条记录，删除后不可恢复', exact: true })
+  await expect(confirm).toBeVisible()
+  const colors = await confirm.evaluate((element) => {
+    const probe = document.createElement('span')
+    probe.style.backgroundColor = 'var(--qx-cinnabar)'
+    element.append(probe)
+    const cinnabar = getComputedStyle(probe).backgroundColor
+    probe.remove()
+    return { background: getComputedStyle(element).backgroundColor, cinnabar }
+  })
+  expect(colors.background, `确认删除背景=${colors.background}；朱砂=${colors.cinnabar}；初次删除=${initial.background}`).toBe(colors.cinnabar)
+  expect(colors.background, `确认背景=${colors.background}；初次背景=${initial.background}`).not.toBe(initial.background)
+  await expect.poll(async () => {
+    const measured = await list.evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      const ratio = box.height / (element as HTMLElement).offsetHeight
+      const top = box.top + element.clientTop * ratio
+      const bottom = top + element.clientHeight * ratio
+      const card = element.querySelector('[data-record-kind="parse"][data-flag="true"]')
+      const button = card?.querySelector('[data-variant="danger"]')
+      const cardBox = card?.getBoundingClientRect()
+      const buttonBox = button?.getBoundingClientRect()
+      const visible = Boolean(cardBox && buttonBox && cardBox.top >= top - 0.5 && cardBox.bottom <= bottom + 0.5 && buttonBox.top >= top - 0.5 && buttonBox.bottom <= bottom + 0.5)
+      return { visible, top, bottom, cardTop: cardBox?.top, cardBottom: cardBox?.bottom, buttonTop: buttonBox?.top, buttonBottom: buttonBox?.bottom, scrollTop: element.scrollTop }
+    })
+    return `${measured.visible ? '完整可见' : '未完整可见'}：${JSON.stringify(measured)}；缩放=${scale}`
+  }, { timeout: 2500, message: '确认卡全文和确认按钮上下沿须在列表可见区内，自动滚动后验收' }).toMatch(/^完整可见：/)
+  expect(errors).toEqual([])
+})
+
+for (const [screen, state] of [['resumes', 'ready'], ['favorites', 'ready'], ['ai-records', 'ready'], ['activity', 'browse-ready']]) {
+  test(`39 ${screen} 头图按定稿不放六格 @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    await prepareC41cMeState(page, api, '39', screen, state)
+    const count = await page.locator('.qx-me-xq .qx-me-take').count()
+    expect(count, `${screen} 头图六格数=${count}；定稿=0`).toBe(0)
+    expect(errors).toEqual([])
+  })
+}
+
+test('40 表单列表和详情底栏及脚注各留至少 40px @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const item = {
+    id: 'fb-c41c-gutter', category: 'print', title: '打印预览页文字被截掉一行',
+    content: '简历预览最下面一行字被裁掉了，按预览打出来也少这一行。',
+    contactPhoneMasked: null, terminalId: null, relatedPrintTaskId: null, status: 'processing',
+    createdAt: '2026-10-02T09:18:00.000+08:00', updatedAt: '2026-10-03T11:05:00.000+08:00',
+  }
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: { success: true, data: { items: [item], nextCursor: null, total: 1 } } })
+  api.respond('GET', `/api/v1/me/feedback/${item.id}`, { status: 200, json: { success: true, data: { ...item, replies: [] } } })
+  await loginThroughVisibleUi(page, '/me/feedback')
+  for (const state of ['form-list', 'detail']) {
+    if (state === 'detail') {
+      await page.getByTestId(`member-feedback-ticket-${item.id}`).click()
+      await expect(page.getByRole('heading', { name: item.title, exact: true })).toBeVisible()
+    } else {
+      await expect(page.getByRole('heading', { name: '提交反馈', exact: true })).toBeVisible()
+      const arrowCount = await page.getByTestId(`member-feedback-ticket-${item.id}`).locator('.fb-row-chevron svg').count()
+      expect(arrowCount, `反馈历史箭头数=${arrowCount}`).toBe(1)
+    }
+    const scale = await stageScale(page)
+    const reading = await page.locator('.qx-stage').evaluate((stage) => {
+      const box = stage.getBoundingClientRect()
+      const buttons = [...stage.querySelectorAll('.fb-cta-row > .qx-btn, .fb-cta-row > .qx-ai-help')]
+      const first = buttons[0]?.getBoundingClientRect()
+      const last = buttons.at(-1)?.getBoundingClientRect()
+      const truth = stage.querySelector('.fb-truth')?.getBoundingClientRect()
+      return { buttonCount: buttons.length, firstLeft: first ? first.left - box.left : -1, lastRight: last ? box.right - last.right : -1, truthLeft: truth ? truth.left - box.left : -1, truthRight: truth ? box.right - truth.right : -1 }
+    })
+    expect(reading.buttonCount, `${state}：${JSON.stringify(reading)}；缩放=${scale}`).toBeGreaterThanOrEqual(2)
+    for (const key of ['firstLeft', 'lastRight', 'truthLeft', 'truthRight'] as const) {
+      expect(reading[key] / scale, `${state} ${key}=${reading[key] / scale}px；读数=${JSON.stringify(reading)}；缩放=${scale}`).toBeGreaterThanOrEqual(40)
+    }
+  }
+  expect(errors).toEqual([])
+})
+
+test('41 号码和服务时间各自一行，整句 textContent 逐字保留 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+  await page.goto('/me/privacy-requests')
+  await contact
+  for (const [id, expected] of [['member-privacy-export-line', EXPORT_WITH_PHONE], ['member-privacy-closure-line', CLOSURE_WITH_PHONE]]) {
+    const line = page.getByTestId(id)
+    await expect(line).toHaveText(expected)
+    const text = await line.textContent()
+    expect(text, `${id} textContent=${JSON.stringify(text)}；长度=${text?.length}；原句长度=${expected.length}`).toBe(expected)
+    const segment = line.getByTestId('member-privacy-phone-hours')
+    await expect(segment).toHaveText(`${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）`)
+    const reading = await segment.evaluate((element) => ({ rectCount: element.getClientRects().length, text: element.textContent, whiteSpace: getComputedStyle(element).whiteSpace }))
+    expect(reading.rectCount, `${id}：${JSON.stringify(reading)}`).toBe(1)
+    expect(reading.whiteSpace, `${id}：${JSON.stringify(reading)}`).toBe('nowrap')
+  }
+  expect(errors).toEqual([])
+})
+
+for (const [state, iconClass] of [['documents-loading', 'lucide-file'], ['orders-loading', 'lucide-receipt-text']]) {
+  test(`38 ${state} 四行均有读取中胶囊 @w5-kiosk`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    await prepareC41cMeState(page, api, '38', 'main', state)
+    const list = page.getByTestId(`member-assets-state-${state}`).locator('.qx-me-list')
+    await expect(list).toHaveAttribute('role', 'status')
+    await expect(list).toHaveAttribute('aria-busy', 'true')
+    await expect(list).toHaveAttribute('aria-label', '正在加载的记录占位')
+    const rows = list.locator(':scope > .qx-me-row[data-slot-mode="loading"]')
+    const count = await rows.count()
+    expect(count, `${state} 读取行数=${count}；目标=4`).toBe(4)
+    for (let i = 0; i < count; i += 1) {
+      const row = rows.nth(i)
+      const text = await row.textContent()
+      expect(text, `${state} 第${i + 1}行文字=${JSON.stringify(text)}；行数=${count}`).toBe('———读取中')
+      await expect(row).toHaveAttribute('aria-hidden', 'true')
+      await expect(row).toHaveAttribute('data-dead', 'true')
+      expect(await row.locator('button, a, [tabindex]').count()).toBe(0)
+      await expect(row.locator('.qx-me-acts .qx-me-small')).toHaveAttribute('aria-disabled', 'true')
+      const iconCount = await row.locator(`.qx-me-row-ico svg.${iconClass}`).count()
+      expect(iconCount, `${state} 第${i + 1}行文件/订单图标数=${iconCount}`).toBe(1)
+      const slots = await row.locator('.qx-me-slot').allTextContents()
+      expect(slots, `${state} 第${i + 1}行占位数=${slots.length}；文字=${JSON.stringify(slots)}`).toEqual(['—', '—', '—'])
+      const clockCount = await row.locator('.qx-me-acts svg.lucide-clock').count()
+      expect(clockCount, `${state} 第${i + 1}行时钟图标数=${clockCount}`).toBe(1)
+    }
+    expect(errors).toEqual([])
+  })
+}

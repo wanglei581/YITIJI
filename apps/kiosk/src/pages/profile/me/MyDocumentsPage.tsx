@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
-import { ClockIcon, EyeIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
+import { ClockIcon, EyeIcon, FileIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 import { DocumentAccessBanner, type DocumentAccessIntent, type DocumentAccessPhase } from './documents/DocumentAccessBanner'
 import { accessLinkExpired, documentFormatTag, documentRoleLabel, isScannedDocument, matchesDocumentFilter, type DocumentListFilter } from './documents/documentClassify'
 import {
@@ -342,7 +342,7 @@ export function MyDocumentsPage() {
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看我的文档" desc="公共一体机不会在未登录时展示文件名、保存期限或访问链接；游客上传不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    body = <QxMeLoadingBlock title="正在加载我的文档" />
+    body = <QxMeLoadingBlock title="正在加载我的文档" placeholderIcon={FileIcon} />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="文档这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的文件不会因为这次失败而消失。" struct={struct} />
   } else if (items.length === 0 && !pagination.nextCursor) {

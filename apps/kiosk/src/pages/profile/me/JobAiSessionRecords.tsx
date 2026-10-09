@@ -61,7 +61,7 @@ export function JobAiSessionRecords({
               <button
                 type="button"
                 className={['qx-me-small me-delete-button', confirming ? 'is-confirm' : ''].join(' ')}
-                data-variant="danger"
+                data-variant={confirming ? 'danger' : undefined}
                 disabled={busyId === item.session.id}
                 onClick={() => onDelete(item.session.id)}
                 title={confirming ? '再次点击确认删除' : '删除'}
