@@ -173,7 +173,7 @@ function verifyConfigDefault(): void {
     apiBaseUrl: 'https://api.example.test/api/v1',
     terminalCode: 'KSK-001',
     printerName: 'Test Printer',
-    agentVersion: '0.4.14',
+    agentVersion: '0.4.15',
   }
   assert.equal(parseConfigText(JSON.stringify(minimal)).holdPrinterQueueWhenIdle, false)
   assert.equal(
@@ -193,7 +193,7 @@ function verifyConfigDefault(): void {
       printerName?: string
     }
     assert.equal(example.holdPrinterQueueWhenIdle, false, `${rel} must keep the code default`)
-    assert.equal(example.agentVersion, '0.4.14')
+    assert.equal(example.agentVersion, '0.4.15')
     assert.equal(example.printerName, '')
   }
 }

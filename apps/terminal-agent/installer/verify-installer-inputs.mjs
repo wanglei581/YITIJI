@@ -57,7 +57,7 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.4.14')
+assert.equal(inputs.productVersion, '0.4.15')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
@@ -483,7 +483,7 @@ assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.10"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.14"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.15"/)
 assert.match(upgradeLifecycle, /EXE upgrade lifecycle requires an unused ProgramData root/)
 assert.doesNotMatch(upgradeLifecycle, /Remove-Item -LiteralPath \$stateRoot/)
 const unusedStateGuard = upgradeLifecycle.indexOf('EXE upgrade lifecycle requires an unused ProgramData root')
