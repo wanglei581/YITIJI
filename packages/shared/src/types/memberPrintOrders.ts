@@ -71,6 +71,11 @@ export interface MemberPrintOrderItem {
   reprintAllowed?: boolean
   /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
   reprintRemaining?: number | null
+  /**
+   * 免费单的出纸提示。may_have_printed = 上次结果未确认（含冷却期内）；
+   * partial_output = 上次只出了一部分。付费单与普通失败为 null。
+   */
+  reprintNotice?: 'may_have_printed' | 'partial_output' | null
   // ── C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）：无 Order 一律 null ──
   /** 已退金额累计（分）；未退款为 0，无 Order 为 null。 */
   refundedAmountCents?: number | null
@@ -102,7 +107,7 @@ export interface MemberPrintOrderItem {
 // 后端副本：services/api/src/member-print-orders/member-print-orders.types.ts（改一处必须同改两处）。
 //
 // 到机码明文只在可取，或失败后仍可续打时，经 pickupCode 下发。
-// 没有哈希的现场单保持 null。reprintAllowed / reprintRemaining 与订单列表同一口径。
+// 没有哈希的现场单保持 null。reprintAllowed / reprintRemaining / reprintNotice 与订单列表同一口径。
 // ============================================================
 
 /** 来源：一体机现场打印任务 / 手机下单单件（未到机）/ 材料包。 */
@@ -175,6 +180,8 @@ export interface MemberOrderTimelineItem {
   reprintAllowed: boolean
   /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
   reprintRemaining: number | null
+  /** 免费单出纸提示。付费单与普通失败为 null。 */
+  reprintNotice: 'may_have_printed' | 'partial_output' | null
   terminal: MemberOrderTimelineTerminal | null
   /** 当前这台一体机（已验明身份）可以直接领取本单。 */
   claimableHere: boolean

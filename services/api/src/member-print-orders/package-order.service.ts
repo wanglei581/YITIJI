@@ -303,7 +303,7 @@ export class PackageOrderService {
     })
     const views = await arrivalViewsForOrders(this.prisma, rows)
     return buildMemberPage(rows, page, total, (order) => {
-      const arrival = views.get(order.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null }
+      const arrival = views.get(order.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null, reprintNotice: null }
       return {
         orderId: order.id,
         orderNo: order.orderNo,
@@ -317,6 +317,7 @@ export class PackageOrderService {
         createdAt: order.createdAt.toISOString(),
         reprintAllowed: arrival.reprintAllowed,
         reprintRemaining: arrival.reprintRemaining,
+        reprintNotice: arrival.reprintNotice,
       }
     })
   }
@@ -439,7 +440,7 @@ export class PackageOrderService {
   private toView(
     order: { id: string; orderNo: string; terminalId: string | null; printTaskId: string | null; pickupCodeExpiresAt: Date | null; pickupStatus: string; payStatus: string; taskStatus: string; amountCents: number; orderItems: Array<{ seq: number; fileId: string; colorMode: string; duplex: string; copies: number; pageRange: string | null; billablePages: number; amountCents: number; status: string; printTaskId: string | null }> },
     pickupCode: string | null,
-    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining'> = { reprintAllowed: false, reprintRemaining: null },
+    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
     return {
       orderId: order.id,
@@ -471,6 +472,7 @@ export class PackageOrderService {
       })),
       reprintAllowed: reprint.reprintAllowed,
       reprintRemaining: reprint.reprintRemaining,
+      reprintNotice: reprint.reprintNotice,
     }
   }
 }

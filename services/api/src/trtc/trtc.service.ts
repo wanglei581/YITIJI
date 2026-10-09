@@ -8,10 +8,10 @@ import { assertTrtcDelegatedEndpoints } from './trtc-delegated-endpoints'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+import { guardTrtcLlmConfigJson } from './trtc-llm-safety'
 import {
   DEFAULT_FORBIDDEN_WORDS,
   DEFAULT_ROLE_SCOPE,
-  buildGuardedSystemPrompt,
   normalizeForbiddenWords,
 } from '../ai/llm/llm-guard'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
@@ -234,15 +234,15 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('LLM API Key 未配置（TRTC_LLM_API_KEY）')
     }
 
-    const systemPrompt = buildGuardedSystemPrompt({
+    const promptConfig = {
       systemPrompt: process.env['TRTC_SYSTEM_PROMPT'] || TRTC_DEFAULT_SYSTEM_PROMPT,
       roleScope: process.env['TRTC_ROLE_SCOPE'] || process.env['AI_ASSISTANT_ROLE_SCOPE'] || DEFAULT_ROLE_SCOPE,
       forbiddenWords: envForbiddenWords('TRTC_FORBIDDEN_WORDS', 'AI_ASSISTANT_FORBIDDEN_WORDS'),
-    })
+    }
 
     // LLMConfig（OpenAI 兼容协议，DeepSeek；DeepSeek 系默认关闭思考，见 buildTrtcLlmConfigJson）
     const llmConfig = buildTrtcLlmConfigJson(
-      { llmType, model: llmModel, apiKey: llmApiKey, apiUrl: llmApiUrl, systemPrompt },
+      { llmType, model: llmModel, apiKey: llmApiKey, apiUrl: llmApiUrl, systemPrompt: promptConfig.systemPrompt },
       process.env['TRTC_LLM_CONFIG_JSON'],
     )
 
@@ -278,6 +278,7 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     try {
       // 交给腾讯云代调的模型 / 语音合成地址先过出站白名单：不在单内就不调腾讯云、不建房。
       assertTrtcDelegatedEndpoints(llmConfig, ttsConfig)
+      payload.LLMConfig = guardTrtcLlmConfigJson(llmConfig, promptConfig)
       await this.sessions.reserve(record) // Redis 不可用时不向腾讯发起计费请求。
       const resp = await callTencentApi<{ TaskId: string }>({
         secretId, secretKey: cloudKey, region,
@@ -297,6 +298,7 @@ export class TrtcService implements OnModuleInit, OnModuleDestroy {
     } catch (err: unknown) {
       // 地址未通过出站白名单（代调地址或腾讯云主机）：一个请求都没发，如实报 503，不报成 500。
       if (err instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
+      if (err instanceof ServiceUnavailableException) throw err
       const msg = err instanceof Error ? err.message : String(err)
       this.logger.error('StartAIConversation 失败', msg)
       throw new InternalServerErrorException(`启动 AI 对话失败: ${msg}`)

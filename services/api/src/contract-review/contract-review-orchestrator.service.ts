@@ -25,6 +25,7 @@ import {
 import type { ContractReviewStatus } from './contract-review.types'
 import { assertContractReviewTaskId } from './contract-review.queue'
 import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
+import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import { backgroundJobAiContext, runWithAiRequestContext } from '../ai/usage/ai-usage-context'
 
 export const CONTRACT_REVIEW_PROVIDER_RUNTIME = Symbol('CONTRACT_REVIEW_PROVIDER_RUNTIME')
@@ -306,15 +307,17 @@ export class ContractReviewOrchestratorService {
       })
       return reviewed
     } catch (error) {
-      this.aiLog.record({
-        taskId: null,
-        provider: contractProviderLabel(this.safeIdentity()),
-        operation: 'contractReview',
-        latencyMs: Date.now() - startedAt,
-        status: 'failed',
-        errorCode: aiErrorCodeOf(error, 'CONTRACT_REVIEW_ANALYSIS_FAILED'),
-        endUserId,
-      })
+      if (!(error instanceof AiContentBlockedError && error.direction === 'input')) {
+        this.aiLog.record({
+          taskId: null,
+          provider: contractProviderLabel(this.safeIdentity()),
+          operation: 'contractReview',
+          latencyMs: Date.now() - startedAt,
+          status: 'failed',
+          errorCode: aiErrorCodeOf(error, 'CONTRACT_REVIEW_ANALYSIS_FAILED'),
+          endUserId,
+        })
+      }
       throw error
     }
   }
@@ -473,6 +476,11 @@ export class ContractReviewOrchestratorService {
     // 否则「合同太长」又会被说成一个更笼统的阶段超时。
     if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_TIMEOUT') {
       return safeError('CONTRACT_PROVIDER_TIMEOUT')
+    }
+    if (error instanceof AiContentBlockedError) {
+      if (error.category === 'A3' || error.category === 'A7') return safeError('CONTRACT_REVIEW_CONTENT_BLOCKED_DANGER')
+      if (error.category === 'C2') return safeError('CONTRACT_REVIEW_CONTENT_BLOCKED_C2')
+      return safeError('CONTRACT_REVIEW_CONTENT_BLOCKED')
     }
     if (this.now().getTime() >= deadline.getTime()) return safeError('CONTRACT_REVIEW_TIMEOUT')
     if (error instanceof ContractReviewSafeError) return error

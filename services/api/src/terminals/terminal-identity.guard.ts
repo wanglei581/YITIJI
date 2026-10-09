@@ -1,10 +1,18 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common'
+import { CanActivate, ExecutionContext, Injectable, Optional, SetMetadata } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
 import { Request } from 'express'
 import { TerminalSessionService } from './terminal-session.service'
 
+/** 只读配置可以认「已停用但仍持有本机有效会话」的终端，以便把暂停文案下发回去。其它接口不挂这个标记。 */
+export const ALLOW_DISABLED_TERMINAL_IDENTITY = 'allowDisabledTerminalIdentity'
+export const AllowDisabledTerminalIdentity = () => SetMetadata(ALLOW_DISABLED_TERMINAL_IDENTITY, true)
+
 @Injectable()
 export class TerminalIdentityGuard implements CanActivate {
-  constructor(private readonly sessions: TerminalSessionService) {}
+  constructor(
+    private readonly sessions: TerminalSessionService,
+    @Optional() private readonly reflector?: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>()
@@ -20,7 +28,11 @@ export class TerminalIdentityGuard implements CanActivate {
     if (typeof bodyTerminalId === 'string' && bodyTerminalId !== terminalId) {
       await this.sessions.validate(undefined, undefined)
     }
-    await this.sessions.validate(terminalId, sessionToken)
+    const allowDisabled = this.reflector?.getAllAndOverride<boolean>(ALLOW_DISABLED_TERMINAL_IDENTITY, [
+      context.getHandler(),
+      context.getClass(),
+    ]) === true
+    await this.sessions.validate(terminalId, sessionToken, { allowDisabled })
     return true
   }
 }
