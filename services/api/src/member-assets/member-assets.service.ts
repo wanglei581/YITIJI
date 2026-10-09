@@ -305,11 +305,14 @@ export class MemberAssetsService {
     return { ...list, items: list.items.filter((row) => visibleIds.has(row.id)), qaRecords: qaList.items, qaNextCursor: qaList.nextCursor, qaTotal }
   }
 
-  /** 只删除本人这份小青作业；已导出的文件仍可在「我的文档」单独管理。 */
+  /** 删除本人问答记录所在会话，级联删钉住条目与全部产物；已导出的文件仍在「我的文档」。 */
   async deleteQaRecord(endUserId: string, artifactId: string): Promise<{ deleted: true }> {
-    const result = await this.prisma.advisorArtifact.deleteMany({
+    const artifact = await this.prisma.advisorArtifact.findFirst({
       where: { id: artifactId, kind: 'qa_pins', session: { endUserId } },
+      select: { sessionId: true },
     })
+    if (!artifact) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
+    const result = await this.prisma.advisorSession.deleteMany({ where: { id: artifact.sessionId, endUserId } })
     if (!result.count) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
     return { deleted: true }
   }

@@ -7636,6 +7636,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -7733,6 +7734,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -7752,6 +7754,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -8297,6 +8300,7 @@
         "method": "GET",
         "models": [
           "AdvisorArtifact",
+          "AdvisorSession",
           "AiResumeResult",
           "FileObject",
           "JobAiSession"
@@ -16923,7 +16927,8 @@
         "usedBy": [
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.service.ts",
-          "services/api/src/advisor/assistant-summary.service.ts"
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/member-assets/member-assets.service.ts"
         ]
       },
       {
@@ -24855,6 +24860,7 @@
       "services/api/scripts/verify-member-print-audit-postgres.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
+      "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-official-channels.ts",
@@ -39581,6 +39587,7 @@
         "files": [
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/job-fit.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/member-assets/member-assets.controller.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/prisma/prisma.service.ts"
