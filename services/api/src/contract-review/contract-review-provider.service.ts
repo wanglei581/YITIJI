@@ -7,7 +7,7 @@ import {
 import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
-import { assertContentAllowed } from '../ai/llm/llm-guard'
+import { assertContentAllowed, assertLexiconAllowed } from '../ai/llm/llm-guard'
 import { isAccountOrModelUpstream } from '../ai/llm/llm-failure'
 import { startLlmUsageMeter } from '../ai/usage/ai-usage-meter'
 import { isAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
@@ -291,7 +291,7 @@ export class ContractReviewProviderService {
       temperature: 0,
     }
     const userContent = JSON.stringify({ pages: input.pages, partyFacts: input.partyFacts })
-    assertContentAllowed(userContent, 'input', undefined, { feature: 'contract_review' })
+    assertLexiconAllowed(userContent, 'input', { feature: 'contract_review' })
     let response: unknown
     try {
       response = await this.transport.send({

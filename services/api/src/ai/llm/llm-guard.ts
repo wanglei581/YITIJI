@@ -127,6 +127,22 @@ export const contentModerationProvider: ContentModerationProvider = new LocalCon
 
 export const AI_CONTENT_BLOCKED_MESSAGE = REFUSAL_BASE
 
+/** 待审材料只查违法和不良信息词库，不查管理员配置禁词。 */
+export function assertLexiconAllowed(
+  text: string,
+  direction: 'input' | 'output',
+  meta: { feature?: string; terminalId?: string | null; memberId?: string | null } = {},
+): void {
+  const match = matchLexicon(text)
+  if (!match) return
+  recordSafetyBlock({
+    feature: meta.feature ?? 'unknown',
+    category: match.category,
+    position: direction,
+  })
+  throw new AiContentBlockedError(direction, meta.feature ?? 'unknown', match.category)
+}
+
 export function assertContentAllowed(
   text: string,
   direction: 'input' | 'output',
