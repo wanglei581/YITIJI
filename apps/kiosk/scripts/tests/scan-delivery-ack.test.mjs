@@ -98,15 +98,18 @@ export function scanDeliveryAckBlocked() {
   return globalThis.__ackCalls.get(${JSON.stringify(key)}).blocked
 }
 `)
+  const unattendedUrl = toDataUrl(transpile(join(root, 'src/copy/unattendedCopy.ts'), 'unattendedCopy.ts'))
   const userErrors = toDataUrl(
     transpile(join(root, 'src/services/api/userErrorMessage.ts'), 'userErrorMessage.ts')
-      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`),
+      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)
+      .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`),
   )
   const code = transpile(join(root, 'src/pages/scan/scanDeliveryAck.ts'), 'scanDeliveryAck.ts')
     .replaceAll("'@ai-job-print/shared'", `'${SHARED_STUB}'`)
     .replaceAll("'../../services/api/scanTasks'", `'${scanTasksStub}'`)
     .replaceAll("'../../services/api/userErrorMessage'", `'${userErrors}'`)
     .replaceAll("'./scanCleanupGate'", `'${cleanupGateStub}'`)
+    .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`)
   const mod = await import(toDataUrl(`${code}\n// instance ${seed}\n`))
   return { mod, calls }
 }

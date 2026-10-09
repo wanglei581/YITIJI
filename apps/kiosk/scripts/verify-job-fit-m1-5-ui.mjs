@@ -59,10 +59,19 @@ console.log('\n=== 岗位匹配 M1.5 前端整合门禁 ===')
 
 const sharedAi = read(repoRoot, 'packages/shared/src/types/ai.ts')
 const jobFitApi = read(kioskRoot, 'src/services/api/jobFit.ts')
-const jobFitPage = read(kioskRoot, 'src/pages/resume/JobFitPage.tsx')
+const jobFitShell = read(kioskRoot, 'src/pages/resume/JobFitPage.tsx')
+// T46：结果屏、选岗屏与舞台拆出，避免单文件超过 500 行。并集只加覆盖，不删断言。
+const jobFitPage = [
+  jobFitShell,
+  read(kioskRoot, 'src/pages/resume/jobFit/JobFitInteractiveViews.tsx'),
+  read(kioskRoot, 'src/pages/resume/jobFit/JobFitStage.tsx'),
+].join('\n')
 // S2-2 拆页：「怎么补」搬到差距行动页，因此这两个组件的断言随之搬过去。
 // 门禁覆盖面不缩水 —— 原来断在结果页上的每一条，现在都在行动页上重新断一次。
-const jobFitActionsPage = read(kioskRoot, 'src/pages/resume/JobFitActionsPage.tsx')
+const jobFitActionsPage = [
+  read(kioskRoot, 'src/pages/resume/JobFitActionsPage.tsx'),
+  read(kioskRoot, 'src/pages/resume/jobFitActionsView.tsx'),
+].join('\n')
 // 2026-09-22 迁入青序流光（稿 46）：六个静态屏（missing-task / rejected-task /
 // loading / analyzing / ai-down / failed）搬进 JobFitQxStates.tsx。
 // 那些屏上的文案与出口仍归本门禁管，因此这里连同读入，断言按「整条路由」判。
@@ -187,7 +196,9 @@ expectAbsent(jobFitQxCss, /(^|\n)\s*(?:body|html)\s*\{/, '岗位匹配青序流�
 expectAbsent(jobFitQxCss, /#[0-9a-f]{3,8}\b/i, '岗位匹配青序流光样式不写死色值，一律取 --qx-* 令牌')
 
 // 六个静态屏的合规边界：等待与失败态都不得放宽（稿 46 的 nots 段）。
-expectIncludes(jobFitStates, '不显示匹配百分比、评分或通过率预测', '等待态不预告分数或通过率')
+// 稿 v2 的 analyzing nots 写成「不显示百分比、评分或通过率预测」，去掉用户可见的「匹配」。
+// 断言仍在：等待态不预告分数或通过率。只换稿上的新文字，不删这条边界。
+expectIncludes(jobFitStates, '不显示百分比、评分或通过率预测', '等待态不预告分数或通过率')
 expectIncludes(jobFitStates, '不把简历内容提供给企业或第三方', '等待态保留不提供给企业的边界')
 expectIncludes(jobFitStates, '不替你在来源渠道完成任何投递或预约动作', '等待态不伪称代办投递或预约')
 expectIncludes(jobFitStates, '不承诺恢复时间', 'AI 不可用时不伪造恢复时间')

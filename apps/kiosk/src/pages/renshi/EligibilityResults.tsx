@@ -139,11 +139,13 @@ function PolicyResultCard({ item }: { item: EligibilityCheckItem }) {
   return (
     <article className="k8-elig-card">
       <h3>{item.title}</h3>
-      {/* 来源标识照最终版稿 48：来源机构 / 同步时间 / 外部编号三枚标签，外部编号缺失如实写「来源未提供」 */}
+      {/* 10/8 产品负责人批准的文字偏离：稿上是『外部编号 来源未提供』，不要照稿改回去。外部编号只在发布方给了的时候显示。 */}
       <p className="k8-elig-card-src">
         <span className="k8-elig-chip k8-elig-chip-slate">来源机构 <b>{item.source.sourceName}</b></span>
         <span className="k8-elig-chip">同步时间 <b>{item.source.syncTime.slice(0, 10)}</b></span>
-        <span className="k8-elig-chip">外部编号 <b>{item.source.externalId ?? '来源未提供'}</b></span>
+        {item.source.externalId && (
+          <span className="k8-elig-chip">外部编号 <b>{item.source.externalId}</b></span>
+        )}
       </p>
       {/* 结论文案由服务端给定，前端不改写 */}
       <p className="k8-elig-card-overall">{item.overallLabel}</p>

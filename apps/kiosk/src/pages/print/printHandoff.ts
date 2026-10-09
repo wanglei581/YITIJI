@@ -5,9 +5,10 @@
 // 现在只有一处：来源整份写入（beginPrintHandoff），跳转只带交接编号；打印链各页只认这里，并校验归属、有效期。
 // 规格：docs/reviews/print-handoff-unification-2026-09-28.md 第 3 节与「协调方裁定」。
 //
-// 本文件只许 import printMaterialSession 与 printHandoffPolicy（单元测试直接转译它）。
+// 本文件只许 import printMaterialSession、printHandoffPolicy 与 unattendedCopy（单元测试直接转译它）。
 
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { helpNeededLine, type PublicSupportContact } from '../../copy/unattendedCopy'
 import type { DocumentProcessTaskView } from '../../services/api/materials'
 import {
   clearPrintMaterialSession,
@@ -303,9 +304,12 @@ export function printHandoffTarget(result: BeginPrintHandoffResult): PrintHandof
   return { ok: false, path: '/print/confirm', state: { printHandoffError: result.reason } }
 }
 
-export function printHandoffFailureText(reason: PrintHandoffFailure): string {
+export function printHandoffFailureText(
+  reason: PrintHandoffFailure,
+  contact?: PublicSupportContact | null,
+): string {
   return reason === 'storage_unavailable'
-    ? '本机暂时无法保存打印信息，请找现场工作人员。'
+    ? `本机暂时无法保存打印信息。${helpNeededLine(contact)}`
     : '这份文件还没准备好打印。请回到上一步重新生成，或重新选择文件。'
 }
 

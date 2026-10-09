@@ -4,6 +4,7 @@ import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
+import { machineUnusableLine } from '../../../copy/unattendedCopy'
 
 const ALTS = [
   {
@@ -130,7 +131,7 @@ export function gateWhy(state: string, helpLine: string): string[] {
     return ['签名图不做跨这次办理保留，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
-    return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']
+    return ['不假设「读不到就是可用」。', machineUnusableLine()]
   }
   if (state === 'capability-loading') {
     return ['读取中不等于可用，也不等于不可用。', '这里不画进度条：系统不回传进度。']

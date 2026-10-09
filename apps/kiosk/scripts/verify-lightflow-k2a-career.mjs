@@ -20,7 +20,15 @@ function readRequired(path) {
   return existsSync(absolutePath) ? read(path) : ''
 }
 
-const page = readRequired('src/pages/resume/CareerPlanPage.tsx')
+const shell = readRequired('src/pages/resume/CareerPlanPage.tsx')
+// T46：各状态正文拆到视图文件，避免单文件超过 500 行。业务文案断言改读并集，不删任何一条。
+// QxPageFrame 计数仍只看壳：一页只许一层壳。
+const page = [
+  shell,
+  readRequired('src/pages/resume/careerPlanView.tsx'),
+  readRequired('src/pages/resume/careerPlanUnreadyView.tsx'),
+  readRequired('src/pages/resume/careerPlanAction.tsx'),
+].join('\n')
 const materials = readRequired('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')
 const section = readRequired('src/pages/resume/components/career-plan/CareerPlanSection.tsx')
 // 2026-09-23 迁入青序流光（稿 46-resume-decision-workspace.html?screen=career-plan）。
@@ -34,7 +42,7 @@ check(page.includes("import './resume-decision-qx.css'"), '职业规划页必须
 check(!/careerPlan-(?:inkpaper|lightflow)\.css/.test(page), '职业规划页不得再导入 InkPaper / LightFlow 样式')
 check(!/KioskFullscreenShell|KioskPageFrame|service-desk/.test(page), '职业规划页不再混入旧壳与旧色系')
 check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞台（1080×1920 定高；手机流式，横屏电脑与一体机同缩放）')
-check((page.match(/<QxPageFrame/g) ?? []).length === 1, '全部状态共用一层 QxPageFrame，不按屏各挂一个壳')
+check((shell.match(/<QxPageFrame/g) ?? []).length === 1, '全部状态共用一层 QxPageFrame，不按屏各挂一个壳')
 check(page.includes('data-kiosk-screen="resume-career-plan"'), '职业规划保留稳定 landmark')
 check(page.includes('data-state={screen}'), '职业规划把当前状态铺到 DOM 上供断言')
 check(page.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'), '职业规划读取与生成中必须提供状态播报（Waiting 自带 status + polite）')

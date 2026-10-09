@@ -64,9 +64,11 @@ async function loadHandoff() {
   globalThis.window = { sessionStorage: storage }
   const session = transpile(join(kioskRoot, 'src/pages/print/printMaterialSession.ts'))
   const policy = transpile(join(kioskRoot, 'src/pages/print/printHandoffPolicy.ts'))
+  const unattended = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
   const handoff = transpile(join(kioskRoot, 'src/pages/print/printHandoff.ts'), {
     './printMaterialSession': session,
     './printHandoffPolicy': policy,
+    '../../copy/unattendedCopy': unattended,
   })
   const mod = await import(`${handoff}#${seq}`)
   const sessionMod = await import(`${session}#${seq}`)
@@ -138,7 +140,8 @@ test('U1c sessionStorage 写不进时报 storage_unavailable，不静默退回',
   assert.equal(target.ok, false)
   assert.equal(target.path, '/print/confirm')
   assert.deepEqual(target.state, { printHandoffError: 'storage_unavailable' })
-  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息，请找现场工作人员/)
+  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息。需要帮助？/)
+  assert.doesNotMatch(h.printHandoffFailureText('storage_unavailable'), /找现场工作人员/)
 })
 
 test('U2 归属：游客→游客、游客→会员（改绑）、同一次登录通过；换人 / 变游客 / 刷新后标记丢了一律不符并清掉', async () => {

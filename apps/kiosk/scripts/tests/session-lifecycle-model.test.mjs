@@ -7,11 +7,17 @@ import ts from 'typescript'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '../..')
 
+const unattendedUrl = `data:text/javascript;base64,${Buffer.from(ts.transpileModule(readFileSync(join(kioskRoot, 'src/copy/unattendedCopy.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText).toString('base64')}`
+
 function loadModule(rel) {
   const source = readFileSync(join(kioskRoot, rel), 'utf8')
   const js = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText
+    .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`)
+    .replaceAll("'../copy/unattendedCopy'", `'${unattendedUrl}'`)
   const dataUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(js)}`
   return import(dataUrl)
 }

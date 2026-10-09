@@ -72,4 +72,25 @@ test.describe('打印扫描运维（mock 口径）', () => {
     await settleAdminPage(page, guards)
   })
 
+  test('已登记能力恢复未配置要先确认，确认后刷新列表', async ({ page }) => {
+    const guards = await openAuthed(page, '/print-scan')
+    await settleAdminPage(page, guards)
+    await page.getByRole('button', { name: '设备能力' }).click()
+
+    const materialRow = page.locator('tr').filter({ hasText: '材料包' })
+    await expect(materialRow.getByRole('button', { name: '恢复未配置' })).toHaveCount(0)
+
+    const printRow = page.locator('tr').filter({ hasText: '文档打印' })
+    await expect(printRow.getByText('已开通')).toBeVisible()
+    await printRow.getByRole('button', { name: '恢复未配置' }).click()
+    await expect(page.getByRole('dialog', { name: '恢复未配置' })).toBeVisible()
+    await expect(page.getByText('跟随服务器的默认设置')).toBeVisible()
+    await expect(printRow.getByText('已开通')).toBeVisible()
+    await page.getByRole('button', { name: '确认恢复' }).click()
+    await expect(page.getByText('已恢复为未配置')).toBeVisible()
+    await expect(printRow.getByText('未登记', { exact: true })).toBeVisible()
+    await expect(printRow.getByRole('button', { name: '恢复未配置' })).toHaveCount(0)
+    await settleAdminPage(page, guards)
+  })
+
 })

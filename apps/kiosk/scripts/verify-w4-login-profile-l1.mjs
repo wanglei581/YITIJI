@@ -16,7 +16,9 @@ function load(name, imports = {}) {
 // 发码经 terminalAttributedFetch（按台计额度）；本门禁不发真实请求，给个会报错的替身即可。
 const api = load('src/services/auth/memberAuthApi.ts', { '../api/client': { API_BASE_URL: '/api/v1' }, './memberSessionEvents': {}, '../terminalAuth': { terminalAttributedFetch: () => { throw new Error('verify-w4: 不应发出真实请求') } } })
 const masking = load('src/utils/maskPii.ts')
-const copy = load('src/pages/auth/accountUserMessage.ts', { '../../services/auth/memberAuthApi': api, '../../utils/maskPii': masking })
+// 2026-10-06：ACCOUNT_UNAVAILABLE 改走 helpNeededLine / preferUnattended，加载时要映上这份文案模块。
+const unattended = load('src/copy/unattendedCopy.ts')
+const copy = load('src/pages/auth/accountUserMessage.ts', { '../../services/auth/memberAuthApi': api, '../../utils/maskPii': masking, '../../copy/unattendedCopy': unattended })
 const model = load('src/pages/auth/loginGateModel.ts')
 const paths = load('src/auth/returnPath.ts')
 let passed = 0

@@ -828,7 +828,7 @@ Session Helper 由 Service 在用户登录事件后（监听 `WTS_SESSION_LOGON`
 
 ### 8.3 崩溃后的服务拉起与锁恢复
 
-生产安装脚本写入的 SCM 失败操作是两次有限重启（约 60 秒、300 秒）后停止，不是“30 秒后必然 Running”。
+生产安装脚本写入的 SCM 失败操作是 60 秒、300 秒，之后每 1800 秒再试一次，不是无限快速重启，也不是“30 秒后必然 Running”。
 WinSW / SCM 只会**尝试**再拉起进程。进程退出后命名管道由系统释放；Unix 套接字由启动器探测残留并清理。残留 `agent.pid` 只作诊断，不阻止新实例，也不需要人工删除。
 `Stop-Service` / `Restart-Service` / `taskkill /F` / reboot / power-cut / SCM 重启阶梯必须在
 Windows 实测；干净停止是否留下锁是条件 P0，不得在 macOS 推断。DEVICE 在该阶梯完成前保持 NO-GO。

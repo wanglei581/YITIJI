@@ -135,7 +135,7 @@ agent-ctl status | start | stop | restart | logs
 | `INSTANCE_LOCK_UNAVAILABLE`；日志 `reason=machine_identity_unavailable…` | 1 | 标识文件读不了或建不出来（权限、磁盘） | 跑 `diagnose-production-agent.ps1`（只读），把输出和诊断文件一起交 Windows 真机路 |
 | `DUPLICATE_INSTANCE`；日志 `reason=duplicate` | 1 | 已有一个 Agent 占着单实例管道，这一个是多余的 | 这是保护在起作用。查是不是有人手工又起了一个；不要去杀服务那一个 |
 
-**服务会自己重启几次：** 第一次失败后 60 秒重启，再失败后 300 秒重启，第三次失败后不再重启；失败计数一天后清零，重启机器也会重新开始（来源：`apps/terminal-agent/installer/bootstrap/aijobprintagent.xml` 的三条 `onfailure` 与 `resetfailure`；MSI 在已绑定终端升级或修复时用 `sc failure … actions= restart/60000/restart/300000` 写回同一策略，来源：`apps/terminal-agent/installer/Agent.wxs`）。所以「装完立刻看到服务停了」不等于坏了，按上表先等够时间再判。
+**服务会自己重启几次：** 第一次失败后 60 秒重启，再失败后 300 秒重启，第三次及以后每 1800 秒再试一次；失败计数一天后清零，重启机器也会重新开始。这不是无限快速重启（来源：`apps/terminal-agent/installer/bootstrap/aijobprintagent.xml` 的三条 `onfailure` 与 `resetfailure`；MSI 在已绑定终端升级或修复时用 `sc failure … actions= restart/60000/restart/300000/restart/1800000` 写回同一策略，来源：`apps/terminal-agent/installer/Agent.wxs`）。所以「装完立刻看到服务停了」不等于坏了，按上表先等够时间再判。
 
 现场核对当前策略（只读）：
 

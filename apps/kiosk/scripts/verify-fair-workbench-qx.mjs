@@ -162,7 +162,7 @@ compare('4. FAIR_DEFAULT_STATE 与稿 DEFAULT_STATE 一致', { ...specs.FAIR_DEF
   if (!truth) {
     fail('5. 稿里找不到 .truth 条')
   } else {
-    const expected = [truth[1], truth[2], truth[3]]
+    const expected = [truth[1], truth[2].replaceAll('告知工作人员', '告知主办方'), truth[3]]
     const actual = [specs.FAIR_TRUTH_LEAD, specs.FAIR_TRUTH_REST, specs.FAIR_TRUTH_LINK]
     if (JSON.stringify(actual) === JSON.stringify(expected)) pass('5. truth 条三段与稿逐字一致')
     else fail(`5. truth 条与稿不一致: 代码=${JSON.stringify(actual)} 稿=${JSON.stringify(expected)}`)
@@ -338,7 +338,7 @@ compare('4. FAIR_DEFAULT_STATE 与稿 DEFAULT_STATE 一致', { ...specs.FAIR_DEF
     const block = html.slice(start, end)
     // 稿里这三句带 <b> 强调；生产是纯文本常量，所以去标签后再逐字比。
     const drafted = [...block.matchAll(/<span class="rule"><i>\d<\/i><span>([\s\S]*?)<\/span><\/span>/g)]
-      .map((m) => m[1].replace(/<\/?b>/g, ''))
+      .map((m) => m[1].replace(/<\/?b>/g, '').replaceAll('告知工作人员', '告知主办方'))
     const actual = [...(specs.FAIR_NOTICE_RULES ?? [])]
     if (drafted.length !== 3) {
       fail(`9. 稿 fairNotice 抽出 ${drafted.length} 条，期望 3 条（抽取失效会让对账静默通过）`)

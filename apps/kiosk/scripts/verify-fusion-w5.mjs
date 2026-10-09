@@ -64,9 +64,10 @@ const FROZEN = new Map([
   // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
   // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
   // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
-  // 2026-10-04 打印主线 0 元口径：新增 isFreeMemberOrder（已有支付状态，且金额为 0 或来源为 free）。
-  // 没有支付状态的历史订单仍不算免费。原有导出、实付不推算、待退款常量都没改。
-  // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 2026-10-06 合并：保留候选侧 isFreeMemberOrder（已有支付状态，且金额为 0 或来源为 free；
+  // 没有支付状态的历史订单仍不算免费）。同时免费单不再展示「待退款 / 已退款 / 退款中」，
+  // 状态改写「免费」；付过钱的单仍按 refundRequired 优先显示待退款。待退款说明不再写工作人员。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随这次合并前移。
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
   ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],

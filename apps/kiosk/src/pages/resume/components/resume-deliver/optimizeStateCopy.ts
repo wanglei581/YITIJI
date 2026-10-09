@@ -1,3 +1,4 @@
+import { containsStaffHandoff } from '../../../../copy/unattendedCopy'
 import type { OptimizeViewState } from './constants'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
 
@@ -59,7 +60,8 @@ export function optimizeStatusCapsule(view: OptimizeViewState): { tone: 'ok' | '
 }
 
 function withoutOnSiteStaff(text: string): string {
-  if (!text.includes('工作人员') && !text.includes('服务台')) return text
+  // AI 没启用时不把公共错误表那句原样摆出来：这一页的出路是手动整理，不是打电话。
+  if (!text.includes('工作人员') && !containsStaffHandoff(text) && !text.startsWith('AI 能力尚未启用')) return text
   return '暂时无法生成优化建议，可以先手动整理或返回上传。'
 }
 

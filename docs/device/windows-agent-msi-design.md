@@ -56,7 +56,7 @@ Program Files\\AIJobPrintAgent\\
 
 ### 4.1 首次安装
 
-MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`，但未 Provisioning 时只注册 Manual/Stopped 服务，不写 token、配置或领取打印任务。独立 Provisioner 成功后才通过既有加固逻辑写入受 ACL 保护的配置与 DPAPI token，并把服务切换为 Automatic/Running；WinSW 继续使用既有 60 秒、300 秒恢复策略。
+MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`，但未 Provisioning 时只注册 Manual/Stopped 服务，不写 token、配置或领取打印任务。独立 Provisioner 成功后才通过既有加固逻辑写入受 ACL 保护的配置与 DPAPI token，并把服务切换为 Automatic/Running；WinSW 使用 60 秒、300 秒、之后每 1800 秒的恢复策略。
 
 已绑定终端（生产安装脚本在绑定成功后写入 `HKLM\SOFTWARE\AIJobPrint\Agent` 的 `Bound=1`）升级或修复时，MSI 用四个固定的系统 `sc.exe` 动作恢复自动启动、失败重启策略与 failureflag，并尽力启动一次；四个动作失败一律忽略，启动失败不会让安装回滚（真机-7，2026-09-29 合入；Windows CI 的 MSI 生命周期测试覆盖已绑定修复）。未绑定时行为不变。这是安装包里唯一允许的自定义动作，门禁 `verify-installer-inputs.mjs` 只放行这四个、只许调用系统 sc.exe。
 
@@ -69,7 +69,7 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 | 操作 | 二进制与服务 | `%ProgramData%` 数据 | 凭据与打印任务 |
 | --- | --- | --- | --- |
 | Repair | 恢复受签名程序、ACL、服务注册和恢复策略 | 默认保留 | 不读取、不重写 token；不创建、领取或重试任务。 |
-| Uninstall | 停止并删除服务，再移除 `Program Files` 内容 | 默认保留，供重装或现场取证 | 不打印；删除状态数据必须使用单独、明确确认的清理工具。 |
+| Uninstall | 停止并删除服务，再移除 `Program Files` 内容。不改 Windows 打印服务的启动类型，也不删开机防护或每日重启任务 | 默认保留，供重装或现场取证 | 不打印；删除状态数据必须使用单独、明确确认的清理工具。卸完若打印服务停在手动且未运行，按母盘清单 G7 的手工命令恢复为自动并启动。 |
 | Major Upgrade | 仅在后台已 drain、活动任务为 0 时停止服务并事务替换二进制 | 原样保留 | 不重新激活，不修改 DPAPI token。 |
 | Rollback | MSI 仅回滚本次二进制与服务改动 | 原样保留 | 不承诺撤销已发生的云端或物理打印副作用。 |
 
