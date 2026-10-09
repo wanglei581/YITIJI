@@ -11,6 +11,7 @@ import { getAdvisorSession, printAdvisorArtifact } from '../../services/api/advi
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ArtifactBody, AdvisorHero, EvidenceLegend } from './AdvisorArtifactPanels'
 import {
+  MORE_BELOW_HINT,
   copyFor,
   deriveContentState,
   fixturePayload,
@@ -81,6 +82,8 @@ export function AiPlanPage() {
   const [readFailed, setReadFailed] = useState(false)
   const printLock = useRef(false)
   const requestSeq = useRef(0)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [canScrollDown, setCanScrollDown] = useState(false)
 
   const loadSession = useCallback(async () => {
     if (fixtureState || !sessionId) return
@@ -181,6 +184,42 @@ export function AiPlanPage() {
     && derivedState !== 'loading'
     && derivedState !== 'expired'
     && derivedState !== 'no-artifact'
+
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    let frame = 0
+    let disposed = false
+    const measure = () => {
+      frame = 0
+      setCanScrollDown(body.scrollTop + body.clientHeight < body.scrollHeight - 8)
+    }
+    const schedule = () => {
+      if (!disposed && !frame) frame = window.requestAnimationFrame(measure)
+    }
+    const observer = new ResizeObserver(schedule)
+    observer.observe(body)
+    // 只看容器会漏掉内容变长；每次正文换态后重新观察现有区块，不加布局包装。
+    for (const child of body.children) observer.observe(child)
+    body.addEventListener('scroll', schedule, { passive: true })
+    schedule()
+    void document.fonts.ready.then(schedule)
+    return () => {
+      disposed = true
+      window.cancelAnimationFrame(frame)
+      body.removeEventListener('scroll', schedule)
+      observer.disconnect()
+    }
+  }, [derivedState, payload, showStale])
+
+  const scrollDown = () => {
+    const body = bodyRef.current
+    if (!body) return
+    body.scrollBy({
+      top: body.clientHeight * 0.6,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }
 
   const onPrint = async () => {
     if (!showPrint || printLock.current || !activeIds) return
@@ -312,9 +351,24 @@ export function AiPlanPage() {
           sub={copy.sub}
         />
         {showLegend ? <EvidenceLegend /> : null}
-        <div className="aa-body">
+        <div className="aa-body" ref={bodyRef}>
           <ArtifactBody state={derivedState} payload={payload} stale={showStale} reread={reread} />
         </div>
+        {canScrollDown && (
+          <div className="aa-more-below">
+            <button
+              type="button"
+              className="aa-more-below-button"
+              data-testid="advisor-artifact-more-below"
+              onClick={scrollDown}
+            >
+              {MORE_BELOW_HINT}
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </QxPageFrame>
   )

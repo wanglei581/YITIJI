@@ -401,6 +401,24 @@ const artifactBodyRule = cssRuleBody(read('src/pages/ai-plan/styles/advisor-arti
 check(artifactBodyRule.includes('justify-content: space-evenly'), '作业正文保留稿的默认区块排法')
 check(artifactBodyRule.includes('gap: 20px'), '作业正文保留稿的默认 20px 间距')
 const artifactCss = read('src/pages/ai-plan/styles/advisor-artifact-qx.css')
+const moreBelowHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const MORE_BELOW_HINT = '([^']+)'/)?.[1]
+check(moreBelowHint === '下面还有，往下滑', 'MORE_BELOW_HINT 导出唯一固定提示文字')
+const artifactPage = read('src/pages/ai-plan/AiPlanPage.tsx')
+check(/canScrollDown\s*&&\s*\(\s*<div className="aa-more-below">\s*<button[^>]*data-testid="advisor-artifact-more-below"[^>]*>\s*\{MORE_BELOW_HINT\}/.test(artifactPage), '下面还有按钮引用唯一常量，并由还能往下滑的状态控制渲染')
+check(artifactPage.includes('setCanScrollDown(body.scrollTop + body.clientHeight < body.scrollHeight - 8)'), '还能往下滑按正文剩余超过 8px 判断')
+check(artifactPage.includes('document.fonts.ready') && artifactPage.includes('new ResizeObserver(schedule)') && artifactPage.includes("body.addEventListener('scroll', schedule") && artifactPage.includes('window.requestAnimationFrame(measure)'), '挂载、字体就绪、尺寸变化与滚动均重算，使用动画帧节流')
+// 逐条看同名选择器，不能把第一条规则误当成整个层叠结果。
+const moreBelowButtonRules = [...stripCssComments(artifactCss).matchAll(/\.aa-more-below-button\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(moreBelowButtonRules.some((body) => /(?:^|;)\s*min-height:\s*56px\s*;?/.test(body)), '下面还有按钮最小高度 56px')
+const artifactBodyRules = [...stripCssComments(artifactCss).matchAll(/\.aa-body\s*\{([^}]*)\}/g)].map((match) => match[1])
+const bodyOverflowValues = artifactBodyRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*overflow-y:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(bodyOverflowValues.length > 0 && bodyOverflowValues.every((value) => value === 'auto'), '正文仍用 overflow-y: auto')
+const bodyScrollbarValues = artifactBodyRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*scrollbar-width:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(bodyScrollbarValues.length > 0 && bodyScrollbarValues.every((value) => value === 'none'), '正文滚动条仍由 scrollbar-width: none 隐藏')
+const artifactScrollbarRules = [...stripCssComments(artifactCss).matchAll(/\.aa-body::-webkit-scrollbar\s*\{([^}]*)\}/g)].map((match) => match[1])
+const webkitScrollbarValues = artifactScrollbarRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*display:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(webkitScrollbarValues.length > 0 && webkitScrollbarValues.every((value) => value === 'none'), 'WebKit 正文滚动条仍然隐藏')
+check(!stripCssComments(artifactCss).includes('scrollbar-gutter'), '正文不增加占宽度的滚动条预留')
 const onePinHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const ONE_PIN_HINT = '([^']+)'/)?.[1]
 check(Boolean(onePinHint?.startsWith('这次只留下了 1 条')), 'ONE_PIN_HINT 导出唯一提示常量并说明只有 1 条')
 for (const forbidden of ['工作人员', '服务台', '接着聊', '也收进来']) check(Boolean(onePinHint) && !onePinHint.includes(forbidden), `单条提示不含误导文案：${forbidden}`)
@@ -476,7 +494,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again', 'advisor artifact shows a more-below hint only while content is cut off']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
