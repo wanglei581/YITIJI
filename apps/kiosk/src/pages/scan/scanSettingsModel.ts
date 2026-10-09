@@ -82,11 +82,29 @@ export function isValidCreatedSession(created: unknown): created is ScanSessionC
     && candidate.instructions.every((instruction) => typeof instruction === 'string' && instruction.trim().length > 0)
 }
 
+/**
+ * 屏上的剩余时间。超过 1 小时不再拼成「37996569:36」这种分钟数。
+ * 扫描设置、上传二维码、清场有效期都走这一处。
+ *
+ * · 非有限或 ≤0 →「0 分钟」
+ * · 不足 1 小时 →「N 分钟」（有剩余但不足 1 分钟时记 1 分钟）
+ * · 满 1 小时 →「约 N 小时」
+ */
+export function formatRemainingDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0 分钟'
+  const seconds = Math.floor(totalSeconds)
+  if (seconds >= 3600) {
+    const hours = Math.max(1, Math.round(seconds / 3600))
+    return `约 ${hours} 小时`
+  }
+  const minutes = Math.max(1, Math.ceil(seconds / 60))
+  return `${minutes} 分钟`
+}
+
 export function formatCountdown(expiresAt: string): string {
-  const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
-  const minutes = Math.floor(seconds / 60)
-  const remain = seconds % 60
-  return `${minutes}:${String(remain).padStart(2, '0')}`
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (!Number.isFinite(ms)) return '0 分钟'
+  return formatRemainingDuration(Math.floor(ms / 1000))
 }
 
 export function liveSessionStillValid(live: ScanLiveState | undefined): live is ScanLiveState {
