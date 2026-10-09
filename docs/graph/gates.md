@@ -171,7 +171,7 @@ node scripts/project-graph-query.mjs file <路径>
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/admin/scripts/support/admin-phone-transfer-ui-contract.mjs` | `verify-admin-phone-transfer-ui.mjs` |
-| `apps/admin/scripts/support/auth-second-factor-module.mjs` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs` |
+| `apps/admin/scripts/support/auth-second-factor-module.mjs` | `logout-keepalive.test.mjs`<br/>`verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs` |
 | `apps/admin/scripts/verify-admin-ai-usage-contract.mjs` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/scripts/verify-admin-ai-usage-render.mjs` | `verify-admin-ai-usage-ui.mjs` |
 | `apps/admin/scripts/verify-console-batch5-copy.mjs` | `verify-console-plain-copy.mjs` |
@@ -358,7 +358,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/services/api/types.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs`<br/>`verify-jobfair-checkin.ts`<br/>`verify-print-scan-first-release.ts` |
 | `apps/admin/src/services/api/userErrorMessage.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs` |
-| `apps/admin/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
+| `apps/admin/src/services/auth/index.ts` | `logout-keepalive.test.mjs`<br/>`verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/auth/secondFactor.ts` | `verify-admin-login-second-factor.mjs` |
 
 </details>

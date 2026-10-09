@@ -179,6 +179,11 @@
 - **审查补丁（Claude）：** 心跳里推进 / 取命令这层出错时只记日志、这一轮不带 `commands`，心跳照常 200（心跳失败会让终端被判离线）；门禁加了对应断言。命令层两处错误日志只记错误类型和错误码，不记 message（告警 webhook 地址、库连接串可能在里面）。
 - **口径差：** 终端令牌打管理员下发接口得到 401 `AUTH_TOKEN_INVALID`。定稿第 1 节要求沿用现有管理员守卫；第 7 节括号写了「终端令牌 403」。实现跟第 1 节和现有 `JwtAuthGuard`。
 - **未做：** 没有部署，没有改生产配置或生产库。后台按钮和 Windows Agent 不在本包。图谱因 `prisma.service.ts`、两份 schema、`ci.yml` 被大量既有门禁点名，对改动文件共列出 219 条既有门禁，本机都跑过。`verify:resume-export-formats` 在共用 SQLite 上因前面门禁留下的删除账本多清了文件而红，换一份干净库重跑为 `ALL PASS`。带 `:postgres` 的 8 条在车道默认的 SQLite 地址上会先红；另起临时 PostgreSQL（端口 55475，库 `terminal_command_drill_ci` 与空库 `p1_upgrade_ci`，用户 `drill`）并生成 PostgreSQL 客户端后，这 8 条都通过。该集群已停，数据目录已删。
+## 2026-10-07：两个后台退出登录先通知服务端再跳转（走查 W-162、W-163）
+
+- 机构后台 `logout()` 原来只清本地登录态就跳登录页，不调服务端，旧 token 之后仍返回 200；管理员后台发了 `POST /auth/logout` 但不等结果、不带 keepalive，可能被页面跳转掐掉。
+- 两端改成同一口径（各自实现）：http 模式且有 token 时先 `POST /auth/logout`（`keepalive: true`），最多等 2 秒，超时只停止等待、不取消请求；成功、失败、超时都清本地并跳 `/login`，网络失败不挡退出；退出进行中再点不重复发请求。mock 模式不发请求。页面与按钮不变。
+- 验证：两端 http 构建浏览器测试各 3 条 × 两档共 12 条（带令牌发出请求并清本地、服务端 500 仍退出、服务端 5 秒才回时先跳走）；管理员端单测执行真实 `logout()` 断言 keepalive、防连点、mock 不发请求，已挂进 `verify:partner-account-action-ui`（CI 在跑）；两端类型检查、eslint、账号相关 4 条门禁全过。反向变异：机构端去掉请求→浏览器测试红；管理员端去掉 keepalive→门禁红。
 
 ## 2026-10-06：一体机简历导出处说明「含人工智能辅助生成内容」印在哪里（分支 `claude/kiosk-b-ai-label-copy-1006`）
 
