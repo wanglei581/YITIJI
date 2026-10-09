@@ -94,15 +94,19 @@ async function expectReject(code: string, label: string, fn: () => Promise<unkno
 
 interface CapturedCall { body: string }
 const captured: CapturedCall[] = []
-let nextReplies: string[] = []
+let nextReplies: Array<string | Error> = []
 
 const realFetch = global.fetch
-function installFakeLlm(replies: string[]) {
+function installFakeLlm(replies: Array<string | Error>) {
   captured.length = 0
   nextReplies = [...replies]
   global.fetch = (async (_url: string, init?: { body?: string }) => {
     captured.push({ body: init?.body ?? '' })
     const content = nextReplies.shift() ?? '{}'
+    // 上游返回失败（正文故意带原话），让真实 callLlm 记调用元数据后抛错。
+    if (content instanceof Error) return {
+      ok: false, status: 503, json: async () => ({ error: { message: content.message } }),
+    }
     return {
       ok: true,
       status: 200,
@@ -163,6 +167,7 @@ async function main() {
   const userA = `eu_adv_a_${s}`
   const userB = `eu_adv_b_${s}`
   const sessionIds: string[] = []
+  const createdSessions: Array<{ id: string; mark: string; label: string }> = []
   const openingMarks = [`开场标记_${s}`, `问答开场_${s}`, `匿名开场_${s}`, `存量问答_${s}`, `存量填槽_${s}`]
 
   async function cleanup() {
@@ -378,6 +383,7 @@ async function main() {
       installFakeLlm([JSON.stringify({ skill: 'slot_fill', reason: `你说了${openingMarks[0]}，手机13800138000` })])
       const created = await svc.createSession(opening, { endUserId: userA, accessToken: null })
       sessionIds.push(created.sessionId)
+      createdSessions.push({ id: created.sessionId, mark: openingMarks[0]!, label: 'C' })
       assert(created.skill === 'slot_fill' && created.skillSource === 'llm', 'C1 建会话并由模型判型')
       assert(created.status === 'collecting' && created.missingSlotKeys.length === 3,
         'C2 新会话状态 collecting，如实回报还缺 3 项')
@@ -451,6 +457,7 @@ async function main() {
         installFakeLlm([JSON.stringify({ skill: 'qa', reason: '拿不准的判断题。' })])
         const row = await svc.createSession(`我拿不准，${openingMarks[1]}，手机13800138000`, { endUserId: userA, accessToken: null })
         sessionIds.push(row.sessionId)
+        createdSessions.push({ id: row.sessionId, mark: openingMarks[1]!, label: 'D' })
         return row
       })()
       assert(qa.status === 'ready' && qa.canRun && qa.missingSlotKeys.length === 0
@@ -545,6 +552,7 @@ async function main() {
       // 判型在模型不可用时退关键词兜底，而不是让用户开不了工
       const created = await svc.createSession(`我够不够格投这个岗，${openingMarks[2]}，手机13800138000`, { endUserId: null, accessToken: null })
       sessionIds.push(created.sessionId)
+      createdSessions.push({ id: created.sessionId, mark: openingMarks[2]!, label: 'H' })
       assert(created.skill === 'compare' && created.skillSource === 'fallback',
         'H3 正向：模型不可用时仍能建会话，判型退关键词并如实标 fallback')
       assert(typeof created.accessToken === 'string' && created.accessToken.length >= 32,
@@ -590,27 +598,33 @@ async function main() {
       } })
       const view = await svc.getSession(oldQa.id, owner)
       assert(view.status === 'completed' && view.canRun, 'J1 旧问答行有产物仍 completed/canRun')
-      assert(view.slots.every((slot) => slot.key !== 'question') && !JSON.stringify(view.slots).includes(openingMarks[3]!),
-        'J2 旧 question 不进槽位视图')
+      assert(view.slots.every((slot) => slot.key !== 'question') && !JSON.stringify(view).includes(openingMarks[3]!),
+        'J2 旧 question 与 topic 原话均不进整份视图')
+      assert(view.topic === ADVISOR_SESSION_TOPIC, 'J2a 存量会话回传固定标签')
       assert(JSON.stringify(view.artifacts).includes('存量钉住要点'), 'J3 阳性对照：存量产物仍可回看')
       const oldFill = await prisma.advisorSession.create({ data: {
-        endUserId: userA, skill: 'slot_fill', topic: '旧填槽',
+        endUserId: userA, skill: 'slot_fill', topic: `${openingMarks[4]} 手机13800138000`,
         slotsJson: JSON.stringify({ question: { value: `${openingMarks[4]} 手机13800138000`, filledAt },
           current_role: { value: '旧材料机械设计六年', filledAt } }),
         expiresAt: new Date(Date.now() + 3600_000),
       } })
       sessionIds.push(oldFill.id)
-      await svc.fillSlot(oldFill.id, 'best_achievement', '旧材料补充产线改造', owner)
+      const filledView = await svc.fillSlot(oldFill.id, 'best_achievement', '旧材料补充产线改造', owner)
+      assert(!JSON.stringify(filledView).includes(openingMarks[4]!), 'J2b 存量 fillSlot 返回整份视图无标记')
+      const switchedView = await svc.switchSkill(oldQa.id, 'slot_fill', owner)
+      assert(!JSON.stringify(switchedView).includes(openingMarks[3]!), 'J2c 存量 switchSkill 返回整份视图无标记')
       const written = await prisma.advisorSession.findUniqueOrThrow({ where: { id: oldFill.id } })
       assert(!written.slotsJson.includes(openingMarks[4]!) && !('question' in JSON.parse(written.slotsJson)),
         'J4 旧填槽行写回时清掉 question 原话')
       assert(JSON.parse(written.slotsJson).current_role.value === '旧材料机械设计六年'
         && JSON.parse(written.slotsJson).best_achievement.value === '旧材料补充产线改造',
         'J5 阳性对照：写回保留旧材料与新填材料')
-      const auditRows = await prisma.auditLog.findMany({ where: { targetId: { in: sessionIds } } })
-      assert(auditRows.some((row) => row.action === 'advisor.session_create'), 'J6 阳性对照：建会话审计确实存在')
-      assert(auditRows.every((row) => openingMarks.every((mark) => !row.payloadJson.includes(mark))),
-        'J7 按 targetId 真读审计，payload 无所有开场标记')
+      for (const { id, mark, label } of createdSessions) {
+        const auditRows = await prisma.auditLog.findMany({ where: { targetId: id, action: 'advisor.session_create' } })
+        assert(auditRows.length === 1, `J6-${label} 阳性对照：该会话恰有一条建会话审计`)
+        assert(auditRows.length === 1 && !auditRows[0]!.payloadJson.includes(mark),
+          `J7-${label} 该会话建会话审计 payload 无自己的开场标记`)
+      }
     }
 
     // ══ I. 留存清理：过期的用户原话必须被物理删除 ════════════════
@@ -682,8 +696,9 @@ async function main() {
       assert(await prisma.advisorSession.findUnique({ where: { id: liveId } }) !== null,
         'I7 反向：未过期会话不受影响（清理不是无差别删表）')
       const stillReadable = await svc.getSession(liveId, { endUserId: userA, accessToken: null })
-      assert(stillReadable.topic === `未过期会话_${s}`,
-        'I8 正向：回读原样返回库里的 topic，清理未改写未过期行')
+      const liveRow = await prisma.advisorSession.findUniqueOrThrow({ where: { id: liveId } })
+      assert(liveRow.topic === `未过期会话_${s}`, 'I8 阳性对照：清理未改写未过期行的库内 topic')
+      assert(stillReadable.topic === ADVISOR_SESSION_TOPIC, 'I8a 接口视图只回固定标签')
 
       // I9：删除必须留痕（CLAUDE.md §11），但痕里不许有原话
       const auditRow = await prisma.auditLog.findFirst({
@@ -694,6 +709,54 @@ async function main() {
       assert(!!auditRow && !auditRow.payloadJson.includes(secretTopic),
         'I10 反向：审计 payload 里不含被删掉的用户原话')
       if (auditRow) await prisma.auditLog.deleteMany({ where: { id: auditRow.id } })
+    }
+
+    section('K. 判型调用失败时不留原话')
+    {
+      const svc = new AdvisorService(prisma, new LlmAdvisorService(readyConfig),
+        new AdvisorArtifactService(prisma, pdf, filesStub, audit), audit, aiLog)
+      for (const mode of ['throw', 'invalid_json'] as const) {
+        const mark = `判型失败_${mode}_${s}`
+        const phone = '13800138000'
+        const opening = `帮我写一段自我介绍，${mark}，手机${phone}`
+        await aiLog.flush()
+        const beforeIds = new Set((await prisma.aiServiceLog.findMany({ where: { endUserId: userA } })).map((row) => row.id))
+        installFakeLlm([mode === 'throw' ? new Error(opening) : `非法JSON ${mark} ${phone}`])
+        const output: string[] = []
+        const stdoutWrite = process.stdout.write
+        const stderrWrite = process.stderr.write
+        process.stdout.write = function (...args: Parameters<typeof stdoutWrite>) {
+          output.push(String(args[0]))
+          return stdoutWrite.apply(process.stdout, args)
+        } as typeof stdoutWrite
+        process.stderr.write = function (...args: Parameters<typeof stderrWrite>) {
+          output.push(String(args[0]))
+          return stderrWrite.apply(process.stderr, args)
+        } as typeof stderrWrite
+        let created: Awaited<ReturnType<AdvisorService['createSession']>>
+        try {
+          created = await svc.createSession(opening, { endUserId: userA, accessToken: null })
+          sessionIds.push(created.sessionId)
+          await aiLog.flush()
+        } finally {
+          process.stdout.write = stdoutWrite
+          process.stderr.write = stderrWrite
+          restoreFetch()
+        }
+        assert(captured.length === 1 && captured[0]!.body.includes(mark), `K1-${mode} 阳性对照：真实判型路径确实调用一次假模型`)
+        assert(created.skillSource === 'fallback' && created.skill === 'slot_fill', `K2-${mode} 调用失败仍建会话并标 fallback`)
+        const text = output.join('')
+        const fixedLog = mode === 'throw' ? 'advisor.classify llm_failed' : 'advisor.classify invalid_output'
+        assert(text.includes(fixedLog), `K3-${mode} 阳性对照：stdout/stderr 捕获到判型失败固定日志`)
+        assert(!text.includes(mark) && !text.includes(phone), `K4-${mode} 普通日志不含开场标记或手机号`)
+        const logs = (await prisma.aiServiceLog.findMany({ where: { endUserId: userA } })).filter((row) => !beforeIds.has(row.id))
+        assert(logs.length === 1, `K5-${mode} 阳性对照：flush 后恰有本次调用对应的一行 AI 日志`)
+        assert(logs.length === 1 && !JSON.stringify(logs).includes(mark) && !JSON.stringify(logs).includes(phone),
+          `K6-${mode} 本次 AI 日志不含开场标记或手机号`)
+        const row = await prisma.advisorSession.findUniqueOrThrow({ where: { id: created.sessionId } })
+        assert(row.topic === ADVISOR_SESSION_TOPIC && !JSON.stringify(row).includes(mark) && !JSON.stringify(row).includes(phone),
+          `K7-${mode} 真读已建会话：固定标签且整行无开场标记或手机号`)
+      }
     }
 
     console.log(`\n=== 顾问作业面验证通过：${passCount} PASS ===\n`)

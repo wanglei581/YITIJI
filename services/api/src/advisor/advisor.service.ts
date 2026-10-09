@@ -9,6 +9,7 @@ import { AdvisorQaMemory } from './advisor-qa-memory'
 import {
   ADVISOR_DISCLAIMER,
   ADVISOR_SESSION_TOPIC,
+  ASSISTANT_SUMMARY_TOPIC,
   COMPARE_LIMITS,
   SKILL_SPECS,
   SLOT_DRAFT_BLANK_POLICY,
@@ -455,7 +456,8 @@ export class AdvisorService {
       /** llm / fallback / user_override —— fallback 时前端应说明「这次按关键词判的型」 */
       skillSource: row.skillSource,
       status: deriveStatus(skill, slots, artifacts.length > 0),
-      topic: row.topic,
+      // 存量 topic 可能含开场原话；只回传固定标签，旧值仍按到期策略清理。
+      topic: row.topic === ASSISTANT_SUMMARY_TOPIC ? ASSISTANT_SUMMARY_TOPIC : ADVISOR_SESSION_TOPIC,
       slots: slotViews(skill, slots),
       missingSlotKeys: missing,
       nextSlotKey: nextSlotKey(skill, slots),

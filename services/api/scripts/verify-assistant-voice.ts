@@ -300,8 +300,9 @@ async function verifySummaryRuntime() {
   await prisma.onModuleInit()
   const s = randomUUID().replace(/-/g, '').slice(0, 10)
   const userId = `vfy-summary-${s}`
-  const marker = `小青开场_${s}`
-  const firstUser = `${marker}，手机13800138000，我拿不准简历怎么写`
+  const markers = [`小青用户一_${s}`, `小青用户二_${s}`, `小青用户三_${s}`]
+  const userTurns = markers.map((marker, index) => ({ role: 'user' as const,
+    content: `${marker}，${index === 1 ? '手机13800138000，' : ''}我拿不准简历怎么写` }))
   const highlights = ['先整理本人做过的工作', '保留可以核实的具体经历']
   const todos = ['补充一项真实成果']
   const realFetch = global.fetch
@@ -319,30 +320,37 @@ async function verifySummaryRuntime() {
   const advisor = new AdvisorService(prisma, new LlmAdvisorService(config), artifacts, audit, aiLog)
   const summary = new AssistantSummaryService(prisma, {
     getOwnedTranscript: () => [
-      { role: 'user', content: firstUser }, { role: 'assistant', content: '可以先整理经历' },
-      { role: 'user', content: '接着做什么' }, { role: 'assistant', content: '补充真实成果' },
+      userTurns[0], { role: 'assistant', content: '可以先整理经历' },
+      userTurns[1], { role: 'assistant', content: '补充真实成果' }, userTurns[2],
     ],
   } as never, config, artifacts, audit, aiLog)
   let sessionId: string | undefined
+  let sentBody = ''
   try {
     await prisma.endUser.create({ data: { id: userId, phoneHash: userId, phoneEnc: 'verify-only', enabled: true, status: 'active' } })
-    global.fetch = (async () => ({ ok: true, status: 200, json: async () => ({
+    global.fetch = (async (_url: string, init?: { body?: string }) => {
+      sentBody = init?.body ?? ''
+      return { ok: true, status: 200, json: async () => ({
       choices: [{ message: { content: JSON.stringify({ highlights, todos }) } }],
       usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-    }) })) as unknown as typeof fetch
+    }) } }) as unknown as typeof fetch
     const saved = await summary.summarize(`assistant-${s}`, userId, null)
     sessionId = saved.advisorSessionId
+    check(markers.every((marker) => sentBody.includes(marker)) && !sentBody.includes('13800138000'),
+      '10i. 阳性对照：每条用户原话标记确实进入浓缩调用，手机号送前已遮盖')
     const row = await prisma.advisorSession.findUniqueOrThrow({ where: { id: sessionId } })
     const slots = JSON.parse(row.slotsJson)
     check(row.topic === ASSISTANT_SUMMARY_TOPIC && Object.keys(slots).join(',') === 'source'
       && slots.source.value === 'assistant' && !('question' in slots), '10a. 真 summarize：固定主题，只存 source，不存 question')
-    check(!JSON.stringify(row).includes(marker) && !JSON.stringify(row).includes('13800138000'),
-      '10b. 真读会话整行：开场标记与手机号均未落库')
+    check(markers.every((marker) => !JSON.stringify(row).includes(marker)) && !JSON.stringify(row).includes('13800138000'),
+      '10b. 真读会话整行：每条用户原话的标记与手机号均未落库')
     const artifactRows = await prisma.advisorArtifact.findMany({ where: { sessionId } })
-    check(artifactRows.length === 1 && artifactRows.every((item) => !JSON.stringify(item).includes(marker)),
-      '10c. 真 AdvisorArtifact.save：产物行不含开场标记')
+    // AI 整理的要点按设计照旧保存，本用例不声称能拦模型复述。
+    check(artifactRows.length === 1 && JSON.stringify(JSON.parse(artifactRows[0]!.payloadJson).pins.map((pin: { content: string }) => pin.content))
+      === JSON.stringify([...highlights, ...todos.map((todo) => `待办：${todo}`)]),
+      '10c. 真 AdvisorArtifact.save：产物内容逐条等于假模型给的要点和待办')
     const view = await advisor.getSession(sessionId, { endUserId: userId, accessToken: null })
-    check(view.status === 'completed' && view.canRun && view.missingSlotKeys.length === 0 && view.nextSlotKey === null,
+    check(view.topic === ASSISTANT_SUMMARY_TOPIC && view.status === 'completed' && view.canRun && view.missingSlotKeys.length === 0 && view.nextSlotKey === null,
       '10d. 真 getSession：摘要回读仍 completed/canRun，不被算回 collecting')
     const page = await new MemberAssetsService(prisma).listAiRecords(userId, { cursor: null, pageSize: 20 })
     check(page.qaRecords.find((item) => item.artifactId === saved.artifactId)?.title === '小青本次要点',
@@ -353,12 +361,13 @@ async function verifySummaryRuntime() {
       && JSON.stringify(payload.pins.map((pin) => pin.content)) === JSON.stringify([...highlights, ...todos.map((todo) => `待办：${todo}`)]),
       '10f. 阳性对照：模型要点/待办逐字留在产物，返回 highlights/todos 与之一致')
     const audits = await prisma.auditLog.findMany({ where: { targetId: sessionId, action: 'assistant.session_summary' } })
-    check(audits.length === 1 && audits.every((item) => !item.payloadJson.includes(marker)),
-      '10g. 真读 assistant.session_summary 审计存在且 payload 无开场标记')
+    check(audits.length === 1 && markers.every((marker) => !JSON.stringify(audits).includes(marker))
+      && !JSON.stringify(audits).includes('13800138000'),
+      '10g. 真读 assistant.session_summary 审计存在且无任何用户原话标记或手机号')
     await aiLog.flush()
     const logs = await prisma.aiServiceLog.findMany({ where: { endUserId: userId } })
-    check(logs.length > 0 && !JSON.stringify(logs).includes(marker) && !JSON.stringify(logs).includes('13800138000'),
-      '10h. 阳性对照：AI 日志真落库，只含元数据，无开场原话/手机号')
+    check(logs.length > 0 && markers.every((marker) => !JSON.stringify(logs).includes(marker)) && !JSON.stringify(logs).includes('13800138000'),
+      '10h. 阳性对照：AI 日志真落库，只含元数据，无任何用户原话标记或手机号')
   } finally {
     global.fetch = realFetch
     await aiLog.flush()
