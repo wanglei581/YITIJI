@@ -22,6 +22,7 @@ import {
   type PrintPriceChangedQuote,
 } from '../../services/print/printJobsApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine, machineCannotPrintLine, machineUnusableLine, printProblemLine } from '../../copy/unattendedCopy'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
@@ -117,23 +118,24 @@ export function PrintConfirmPage() {
   } = usePrintConfirmHandoff(capability)
   const file: PrintFile = handoff?.file ?? { name: '未知文件', size: '-', pages: null }
   const {
+    kind: printerKind,
+    printer,
     printerReady,
     printerLabel,
     printerNotice,
     loading: printerLoading,
-    kind: printerKind,
-    printer,
   } = useTerminalDeviceStatus()
   const printerBlocked = printerLoading || !printerReady
+  // 缺纸、离线、异常仍写明「当前不能下单，不会扣费」（0 元单在传入前剥掉这句）。求助改走标准句 2。
   const printerBlockedReason = printerLoading
     ? '正在确认打印机状态，请稍候'
     : printerNotice
       ? printerNotice
       : printer.errorCode === 'paperEmpty'
-        ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
+        ? `打印机缺纸，当前不能下单，不会扣费。${machineCannotPrintLine()}`
         : printerKind === 'offline'
-          ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
-          : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
+          ? `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
+          : `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
   const adjusted = adjustments.length > 0
   const materialCheck = handoff?.materialCheck
   const source = handoff?.source
@@ -208,7 +210,7 @@ export function PrintConfirmPage() {
         const code = errorCodeOf(err)
         const reason =
           code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE' || code === 'PRINT_TERMINAL_QUEUE_HALTED'
-            ? userMessageOf(err, '请稍后重试或联系现场工作人员')
+            ? userMessageOf(err, `请稍后重试。${helpNeededLine()}。`)
             : '页数以实际结果为准，确认前不显示金额'
         setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason, code } })
       })
@@ -347,7 +349,7 @@ export function PrintConfirmPage() {
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
         { code: 'TERMINAL_SESSION_INVALID' },
-        '这台机器的安全校验没通过，请联系现场工作人员',
+        machineUnusableLine(),
       ))
       return
     }
@@ -459,7 +461,7 @@ export function PrintConfirmPage() {
           setPiiCheckRequired(true)
           setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
         } else {
-          setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
+          setSubmitError(userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`))
         }
       } finally {
         if (!leaving) {
@@ -642,7 +644,7 @@ export function PrintConfirmPage() {
           </>
         )}
         <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
-        <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
+        <li>打印完成请从出纸口取件。{printProblemLine()}。</li>
       </ol>
     </section>
   )
@@ -683,7 +685,7 @@ export function PrintConfirmPage() {
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
-        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
+        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}

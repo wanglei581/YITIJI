@@ -18,6 +18,8 @@ import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
+import { DecisionCta, DecisionHero } from './jobFit/DecisionWorkspaceChrome'
+import { emphasizeTitle } from './jobFit/emphasizeTitle'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 import './resume-templates-qx.css'
@@ -152,7 +154,7 @@ export function ResumeTemplateLibraryPage() {
           <Sec title="正在读取可用的简历模板" hint="无进度条 · 无预计时间">
             <Waiting icon={<LayoutTemplateIcon size={34} />} title="读取请求已提交，等待列表返回" desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。" tag="整体等待中，没有百分比" />
           </Sec>
-          <Sec title="这一步会做什么、不会做什么" hint="读取范围写在前面" grow>
+          <Sec title="这一步会做什么、不会做什么" hint="读取范围写在前面">
             <Checks items={[
               { tone: 'ok', icon: <UserIcon size={24} />, title: '只读列表', desc: '这一步只读取模板列表，不读取你的简历内容。', chip: '已确认' },
               { tone: 'wait', icon: <LayoutTemplateIcon size={24} />, title: '模板数量', desc: '有几个模板由已发布的列表决定，本页不预设。', chip: '等待返回' },
@@ -191,12 +193,13 @@ export function ResumeTemplateLibraryPage() {
             ]} />
             <p className="jfq-alert" role="alert">{error}</p>
           </Sec>
-          <Sec title="这次没有发生的事" hint="失败不影响你已有的内容" grow>
+          <Sec title="这次没有发生的事" hint="失败不影响你已有的内容">
             <Nots items={[
               '没有显示任何模板名称或版式',
               '没有用内置默认模板冒充已发布列表',
               '没有把任何版式套用到你的简历上',
               '没有修改或保存你的简历内容',
+              '没有产生任何费用',
             ]} />
           </Sec>
           <Sec title="接下来" hint="版式不是前提，内容才是">
@@ -230,7 +233,7 @@ export function ResumeTemplateLibraryPage() {
               { tone: 'ok', label: '简历优化', value: '可以直接进行' },
             ]} />
           </Sec>
-          <Sec title="没有模板时，这样准备一样有效" hint="一页 A4 就够" grow>
+          <Sec title="没有模板时，这样准备一样有效" hint="一页 A4 就够">
             <ListRows items={[
               '用一页 A4 说清楚：目标岗位、核心能力、可验证的成果',
               '把与目标岗位最相关的经历放在最前面，其余往后压',
@@ -362,10 +365,9 @@ export function ResumeTemplateLibraryPage() {
     <div className="jfq-root">
       <QxPageFrame
         title={view.title}
-        subtitle={view.subtitle}
         status={view.pill}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
-        ctabar={view.cta}
+        ctabar={<DecisionCta>{view.cta}</DecisionCta>}
         navbar={(
           <QxAppNavbar
             onHome={() => navigate('/')}
@@ -374,6 +376,7 @@ export function ResumeTemplateLibraryPage() {
           />
         )}
       >
+        <DecisionHero eyebrow="简历模板" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
         <section
           className="qx-scroll"
           data-kiosk-domain="resume"

@@ -6,6 +6,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { createScanSession } from '../../services/api/scanTasks'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
 import { acknowledgeScanDelivery, type ScanAckCredentials } from './scanDeliveryAck'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
@@ -299,7 +300,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           title: '这台机器的安全校验没通过',
           description: userMessageOf(
             { code: 'TERMINAL_SESSION_INVALID' },
-            '这台机器的安全校验没通过，请联系现场工作人员',
+            machineUnusableLine(),
           ),
         })
         setPhase('error')

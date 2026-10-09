@@ -3,6 +3,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MegaphoneIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   memberNotificationsAdminApi,
   type AdminBroadcastItem,
@@ -51,7 +52,7 @@ export default function MemberNotificationsPage() {
       setState('ready')
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : '广播列表加载失败')
+      setMessage(userMessageOf(error, '广播列表加载失败，请稍后重试'))
     }
   }, [])
 
@@ -76,7 +77,7 @@ export default function MemberNotificationsPage() {
       setContent('')
       await load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '广播创建失败')
+      setMessage(userMessageOf(error, '广播没有创建，请检查后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -93,7 +94,7 @@ export default function MemberNotificationsPage() {
       setMessage('广播已撤回')
       await load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '广播撤回失败')
+      setMessage(userMessageOf(error, '广播没有撤回，请稍后重试'))
     } finally {
       setSubmitting(false)
     }

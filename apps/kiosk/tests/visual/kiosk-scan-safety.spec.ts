@@ -1046,6 +1046,10 @@ test('with no rescan credentials the page offers a plainly labelled restart, not
   await seedFailedResultWithoutCredentials(page)
   await page.goto('/scan?stage=result')
   await expect(page.getByText('扫描未完成', { exact: true }).first()).toBeVisible()
+  // 种子里的失败原因仍写「联系工作人员」。屏上换成重试句加标准句 1，不把原话留下。
+  await expect(page.getByText('联系工作人员')).toHaveCount(0)
+  // 本文件自建 API 夹具未登记 support-contact，标准句 1 必须用隐私政策联系方式的保守版本。
+  await expect(page.getByText('扫描任务未能完成，请重试。需要帮助？查看《隐私政策》里的联系方式。', { exact: true })).toBeVisible()
 
   // 主行动必须**改口**：这一次不是安全重扫，按钮不许仍然写着「重试扫描」。
   await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeVisible()
@@ -2261,7 +2265,7 @@ test('a network that never comes back ends bounded and says so honestly @scan-sa
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerScanCapabilities(api)
-  const server = installSameSheetScanServer(page)
+  installSameSheetScanServer(page)
 
   await landOnFailedPriorScan(page)
   // 创建端点整条断掉：第一次和后续每一次重放都拿不到 HTTP 应答。

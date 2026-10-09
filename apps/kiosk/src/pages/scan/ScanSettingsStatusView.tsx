@@ -16,6 +16,7 @@ import {
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import type { TerminalSessionState } from '../../services/terminalAuth'
+import { networkDisconnectLine } from '../../copy/unattendedCopy'
 
 /**
  * 设置页「还不能去面板操作」的那几屏。
@@ -378,7 +379,7 @@ export function ScanSettingsStatusView({
                   ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
                   : '返回扫描首页，从选择类型重新走一遍。',
                 '连续失败就别在面板上扫了，扫了也没有这次扫描来接收。',
-                '叫工作人员看一眼这台机器到系统的网络。',
+                `${networkDisconnectLine()}。`,
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">

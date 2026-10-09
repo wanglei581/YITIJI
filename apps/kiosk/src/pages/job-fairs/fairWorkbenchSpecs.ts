@@ -197,13 +197,13 @@ export const FAIR_DEFAULT_STATE: Record<FairScreen, string> = {
 export const FAIR_NOTICE_RULES = [
   '预约与到场登记由主办方和来源平台负责；本机不代预约、不做签到，也查不到登记结果。',
   '用人单位与岗位信息以主办方现场公示为准；本机不代收简历，带足纸质材料当面交给对方。',
-  '现场遇到收费、押金、扣留证件，立即停止并告知工作人员。',
+  '现场遇到收费、押金、扣留证件，立即停止并告知主办方。',
 ] as const
 
 /** 稿底部 .truth 条：八屏共用，是本域的合规底线声明，不得按页删改。 */
 export const FAIR_TRUTH_LEAD = '本机不代收简历、不代预约，也不做签到。'
 export const FAIR_TRUTH_REST =
-  '预约与到场登记由主办方和来源平台负责；现场遇到收费、押金、扣证件请立即告知工作人员。'
+  '预约与到场登记由主办方和来源平台负责；现场遇到收费、押金、扣证件请立即告知主办方。'
 export const FAIR_TRUTH_LINK = '遇到问题'
 
 export function fairPillOf(screen: FairScreen, state: string): FairPill {

@@ -56,6 +56,11 @@ const SCANNER_TEXT = { ready: '就绪', busy: '使用中', error: '暂不可用'
 const WIRED_TEXT: Record<string, string> = { connected: '有线已连接', disconnected: '有线已断开', unknown: '有线状态未知' }
 
 /** 终端级计数也守「少于 5 不显示」：服务端已把 1–4 置 null；这里再兜一层，防旧服务端直接给出小数字。 */
+/** 「少于 5」与量词之间留一个空格（「少于 5 次」）；普通数字仍紧贴量词（「36页」）。 */
+function tileUnit(value: string, unit: string): string {
+  return value === '少于 5' ? ` ${unit}` : unit
+}
+
 function smallCount(value: number | null): string {
   if (value === null || (value > 0 && value < 5)) return '少于 5'
   return screenCount(value)
@@ -196,11 +201,11 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
         <TwinPanel title="今日服务" sub="本机 · 上海自然日" source="今日打印页数只统计这台机器今天已经出纸的页数（打印页数乘以份数，按出纸完成时间，上海自然日）。打印任务、扫描按今天新建的次数计，打印失败按今天发生的失败次数计。打印页数、打印任务、扫描、打印失败大于 0 且少于 5 时只显示「少于 5」。服务人次是今天在这台机器上开始的使用次数。1 到 4 次显示「少于 5」，取不到时显示「暂时取不到」。">
           <TwinTiles
             items={[
-              { value: smallCount(twin.today.printPages), unit: '页', label: '打印页数' },
-              { value: smallCount(twin.today.printTasks), unit: '单', label: '打印任务' },
-              { value: smallCount(twin.today.scans), unit: '次', label: '扫描' },
+              { value: smallCount(twin.today.printPages), unit: tileUnit(smallCount(twin.today.printPages), '页'), label: '打印页数' },
+              { value: smallCount(twin.today.printTasks), unit: tileUnit(smallCount(twin.today.printTasks), '单'), label: '打印任务' },
+              { value: smallCount(twin.today.scans), unit: tileUnit(smallCount(twin.today.scans), '次'), label: '扫描' },
               twin.today.visits.available
-                ? { value: smallCount(twin.today.visits.value), unit: '人次', label: '服务人次' }
+                ? { value: smallCount(twin.today.visits.value), unit: tileUnit(smallCount(twin.today.visits.value), '人次'), label: '服务人次' }
                 : { label: '服务人次', unavailableReason: twin.today.visits.reason },
             ]}
           />

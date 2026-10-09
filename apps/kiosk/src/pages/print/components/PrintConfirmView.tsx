@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { FileTextIcon, LockIcon } from 'lucide-react'
 import type { PrintParamAdjustment } from '@ai-job-print/shared'
 import type { PrintBenefitView } from '../../../services/api/benefits'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { ASK, type PrintConfirmScreen, type QuoteView } from '../printConfirmModel'
 import type { PrintFileState } from '../printMaterialSession'
 import {
@@ -407,7 +408,7 @@ export function PrintConfirmView(props: Props) {
             {selfAssessment}
           </Sec>
           <Sec no="02" title="页数核定" hint={screen === 'quoting' ? '正在核定页数' : screen === 'quote-failed' ? '页数核定未完成' : '免费试运营'}>
-            {quote.status === 'unavailable' ? <div className="pcf-state" data-tone="warn" role="status"><p>{quote.reason.includes('确认前不显示金额') ? '暂时无法核定页数，请重试或找现场工作人员。' : quote.reason}</p></div> : null}
+            {quote.status === 'unavailable' ? <div className="pcf-state" data-tone="warn" role="status"><p>{quote.reason.includes('确认前不显示金额') ? `暂时无法核定页数，请重试。${helpNeededLine()}。` : quote.reason}</p></div> : null}
             {quote.status === 'ready' ? <span data-testid="print-confirm-amount">免费试运营</span> : null}
             <FeeLines rows={[
               { label: '打印页数', value: quote.status === 'ready' ? `${quote.billablePages} 页` : quote.status === 'loading' ? '正在核定' : '未获取', slot: quote.status !== 'ready' },

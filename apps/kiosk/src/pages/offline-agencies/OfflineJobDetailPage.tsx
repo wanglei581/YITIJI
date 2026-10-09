@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { servicePhoneLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -30,6 +32,7 @@ const BOUNDARY = '本机只做机构信息展示、门店指引和材料打印�
 export default function OfflineJobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const [job, setJob] = useState<OfflineJobDetailDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -185,7 +188,7 @@ export default function OfflineJobDetailPage() {
                         ['机构名称', job.agencyName],
                         ['机构类型', job.agencyType],
                         ['营业时间', job.agencyHours || '以机构公示为准'],
-                        ['联系电话', job.agencyPhone || '请向门店工作人员咨询'],
+                        ['联系电话', job.agencyPhone || servicePhoneLine(contact)],
                         ['服务项目', '以机构公示为准'],
                         ['机构地址', job.agencyAddress],
                         ['来源编号', job.externalId || SOURCE_ELEMENT_MISSING_TEXT],

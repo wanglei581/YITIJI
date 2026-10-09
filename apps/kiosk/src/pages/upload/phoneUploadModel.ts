@@ -5,6 +5,7 @@
  * 文案里的 **xx** 由页面渲染成加粗。 */
 import type { UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 
 /** upload-sessions.service.ts SESSION_TTL_SECONDS = 10 * 60，自一体机生成起算。 */
 export const SESSION_TTL_MINUTES = 10
@@ -164,12 +165,12 @@ export function takeoverCopy(issue: Exclude<LinkIssue, null>) {
   if (issue === 'signature-blocked') {
     return {
       kind: 'warn' as const, icon: 'ban' as IconKey, head: '本人手写签名暂不支持手机上传',
-      body: '请回到「签名」的原步骤查看可用方式；没有可用方式时，请联系工作人员。',
+      body: `请回到「签名」的原步骤查看可用方式。没有可用方式时，${helpNeededLine()}。`,
       facts: [
         ['为什么不可用', '手机上传当前只接受 **简历 / 打印文件 / 合同**，签名图片不在其中，系统不会为它开出上传链接。'],
         ['不是你的问题', '不是文件格式不对，也不是网络问题，换张图或换台手机都不会变。'],
-        ['现场怎么办', '回到原步骤查看可用方式；只接受本人手写签名图片，没有可用方式时请联系工作人员。'],
-        ['还是不行', '返回上一步，或请现场工作人员协助；本页没有别的上传方式可试。'],
+        ['现场怎么办', `回到原步骤查看可用方式；只接受本人手写签名图片。没有可用方式时，${helpNeededLine()}。`],
+        ['还是不行', `返回上一步。${helpNeededLine()}。本页没有别的上传方式可试。`],
       ] as FactRow[],
     }
   }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { useAuth } from '../../../auth/useAuth'
+import { formatRemainingDuration } from '../../scan/scanSettingsModel'
 import { getTerminalId } from '../../../services/api/screensaver'
 import {
   buildPhoneUploadUrl,
@@ -192,10 +193,8 @@ export function useUploadSession({
 
   const expiresLabel = useMemo(() => {
     if (!qr) return ''
-    const seconds = Math.max(0, Math.round((new Date(qr.expiresAt).getTime() - now) / 1000))
-    const minutes = Math.floor(seconds / 60)
-    const remain = seconds % 60
-    return `${minutes}:${String(remain).padStart(2, '0')}`
+    const seconds = Math.round((new Date(qr.expiresAt).getTime() - now) / 1000)
+    return formatRemainingDuration(seconds)
   }, [now, qr])
 
   const refresh = useCallback(async () => {

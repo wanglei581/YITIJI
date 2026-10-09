@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { AdvisorKinds, AdvisorTake } from './AdvisorTakeaway'
 import {
   LEGEND,
+  ONE_PIN_HINT,
   VERDICT_LABEL,
   type AdvisorArtifactPayload,
   type ArtifactViewState,
@@ -107,6 +108,9 @@ export function QaPinsPanel({
           </div>
         ))}
       </div>
+      {payload.pins.length === 1 && (
+        <p className="aa-more" data-testid="advisor-artifact-one-pin-hint">{ONE_PIN_HINT}</p>
+      )}
     </section>
   )
 }

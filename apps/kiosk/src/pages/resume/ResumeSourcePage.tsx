@@ -53,7 +53,7 @@ import './resume-triage-qx.css'
 import './resume-triage-panels-qx.css'
 import './resume-r1-qx2.css'
 
-const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+const RESUME_USB_UNCONFIGURED_NOTE = (contact: ReturnType<typeof useSupportContact>) => `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine(contact)}`
 const NO_FABRICATION_NOTE = '报告按六个维度分别给出建议。系统不会编造「超过多少人」「必然提分」等无法验证的结论。'
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -79,7 +79,7 @@ export function ResumeSourcePage() {
   const retryFile = useRef<File | null>(null)
   const contact = useSupportContact()
   const kiosk = useTerminalKiosk()
-  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
+  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE(contact))
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
   const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
   const [channelScreen, setChannelScreen] = useState<null | 'usb' | 'phone' | 'local'>(null)

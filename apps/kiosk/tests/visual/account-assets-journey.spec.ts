@@ -1,10 +1,10 @@
-// 账号资产页未登录走查：直达 /me/resumes、/me/documents、/me/print-orders，必须停在登录门，且不得打 /api/v1/。
+// 账号资产页未登录走查：必须停在登录门，除无凭证的公开服务联系方式外，不得打 /api/v1/。
 //
 // 与既有 spec 的区别：本文件**每个路由独立 browser.newContext()**。共用 page 连跑
 // 多路由时，一体机的清场/待机控制器会吞掉后续导航，产出「页面空白」的假结论
-// （见 human-journey.spec.ts）。未登录断言的是客户端 fail-closed（0 条 /api/v1/），
+// （见 human-journey.spec.ts）。未登录断言的是客户端 fail-closed（0 条非白名单 /api/v1/），
 // 不是服务端 401。
-import type { Page } from '@playwright/test'
+import type { Page, Request } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 
 const SHOTS = process.env.JOURNEY_SHOTS_DIR ?? 'test-results/account-assets-journey'
@@ -50,7 +50,7 @@ async function step(page: Page, s: Step, label: string): Promise<void> {
 }
 
 test.describe('账号资产页（未登录）', () => {
-  test('未登录依次访问 /me/resumes、/me/documents 与 /me/print-orders：登录门且零 /api/v1/ 请求 @kiosk', async ({
+  test('未登录依次访问 /me/resumes、/me/documents 与 /me/print-orders：登录门且仅允许无凭证的公开服务联系方式请求 @kiosk', async ({
     browser,
   }) => {
     test.setTimeout(90_000)
@@ -65,12 +65,20 @@ test.describe('账号资产页（未登录）', () => {
         reducedMotion: 'reduce',
         baseURL: 'http://127.0.0.1:4177',
       })
+      // 不建立会员登录态，但放入同源凭证 Cookie，证明公开预取不会夹带它。
+      await context.addCookies([{ name: 'member_session', value: 'must-not-leak', url: 'http://127.0.0.1:4177' }])
       const page = await context.newPage()
       const apiHits: string[] = []
+      const supportRequests: Request[] = []
       page.on('request', (request) => {
-        const url = request.url()
-        if (url.includes('/api/v1/')) {
-          apiHits.push(`${request.method()} ${new URL(url).pathname}`)
+        const url = new URL(request.url())
+        if (url.pathname.startsWith('/api/v1/')) {
+          // 无人值守终端趁联网预取服务电话，供后续断网屏使用；只放行这一条无身份公开接口。
+          if (request.method() === 'GET' && url.pathname === '/api/v1/public/support-contact') {
+            supportRequests.push(request)
+          } else {
+            apiHits.push(`${request.method()} ${url.pathname}`)
+          }
         }
       })
 
@@ -85,7 +93,19 @@ test.describe('账号资产页（未登录）', () => {
         // 给壳层/页内延迟请求一个窗口，避免「门先出来、请求后发」漏计。
         await page.waitForTimeout(1500)
         expect(apiHits, `${path} 未登录仍发出了 /api/v1/ 请求：${apiHits.join(' ')}`).toEqual([])
-        console.log(`\n  ${path} 登录门可见；/api/v1/ 请求数=${apiHits.length}`)
+        expect(supportRequests, `${path} 必须真发出公开联系方式预取，才能检查凭证`).toHaveLength(1)
+        for (const request of supportRequests) {
+          // allHeaders 包含 Cookie 等安全相关头，不能用省略这些头的 headers() 来证明无凭证。
+          const headers = await request.allHeaders()
+          expect(headers.authorization, `${path} 公开预取不得带 Authorization`).toBeUndefined()
+          expect(headers.cookie, `${path} 公开预取不得带 Cookie`).toBeUndefined()
+          const url = new URL(request.url())
+          expect([...url.searchParams.keys()].filter((key) => key !== 'terminalId'), `${path} 公开预取只允许终端号查询参数`).toEqual([])
+          expect(url.username).toBe('')
+          expect(url.password).toBe('')
+          expect(request.postData(), `${path} 公开预取不得带会员请求体`).toBeNull()
+        }
+        console.log(`\n  ${path} 登录门可见；非白名单 /api/v1/ 请求数=${apiHits.length}；公开预取无凭证`)
       } finally {
         await page.close()
         await context.close()

@@ -1,3 +1,5 @@
+import { machineUnusableLine } from '../copy/unattendedCopy'
+import { useSupportContact } from './useSupportContact'
 // ============================================================
 // useAiAdvisorCallSession — 腾讯 TRTC 对话式 AI 通话会话（headless hook）
 //
@@ -88,6 +90,7 @@ function extractAssistantSubtitleText(raw: string): string {
 }
 
 export function useAiAdvisorCallSession() {
+  const contact = useSupportContact()
   const [phase, setPhase]           = useState<CallPhase>('gate')
   // 通话接通/进行中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(phase === 'connecting' || phase === 'live')
@@ -222,7 +225,7 @@ export function useAiAdvisorCallSession() {
     if (startedRef.current || preparingRef.current) return
     const terminalId = getTerminalId()
     if (!terminalId) {
-      setErrMsg('当前设备身份不可用，请联系现场工作人员')
+      setErrMsg(machineUnusableLine(contact))
       setPhase('error')
       return
     }
@@ -415,7 +418,7 @@ export function useAiAdvisorCallSession() {
       }
       await failCall(err instanceof Error ? err.message : String(err))
     }
-  }, [failCall, restoreRemoteAudio, silentWatch])
+  }, [contact, failCall, restoreRemoteAudio, silentWatch])
 
   // 用户主动挂断、切换咨询方式或重试时，先释放真实会话，再回到未接通状态。
   // cleanup 本身幂等；这里同步重置 startedRef，允许下一次明确点击重新发起通话。

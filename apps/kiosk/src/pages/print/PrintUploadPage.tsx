@@ -25,6 +25,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -233,7 +234,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
+        setUsbError(userMessageOf(err, `暂时无法读取 U 盘，请重试。${helpNeededLine()}。`))
       }
     }
 

@@ -77,14 +77,11 @@ function metaLine(item: MemberPrintOrderItem): string {
 }
 
 /** 卡片上的支付概要一行。历史无 Order 显示「暂无支付信息」。
- *  0 元或免费来源不写「已支付」：待退款仍优先，其余只写免费。收费单保持金额 · 支付状态（来源）。
+ *  免费单不写「已支付」，也不写「退款」或「实付」。收费单保持金额 · 支付状态（来源）。
  */
 function paymentLine(item: MemberPrintOrderItem): string {
   if (item.payStatus == null) return '暂无支付信息'
-  if (item.amountCents === 0 || item.paymentSource === 'free') {
-    if (item.refundRequired === true) return `0 元（免费试运营） · ${PENDING_REFUND_LABEL}`
-    return '0 元（免费试运营） · 免费'
-  }
+  if (isFreeMemberOrder(item)) return '0 元（免费试运营） · 免费'
   const parts: string[] = []
   if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
   const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
@@ -359,11 +356,11 @@ export function MyPrintOrdersPage() {
                     <div className="qx-me-row-foot">
                       <span className="qx-me-chip">{paymentLine(item)}</span>
                       {publicOrderNo(item.orderNo) ? <span className="qx-me-chip">订单 {publicOrderNo(item.orderNo)}</span> : null}
-                      {item.refundRequired === true && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
+                      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 && !isFreeMemberOrder(item) && <span className="qx-me-chip" data-tone="warn">{PENDING_REFUND_LABEL}</span>}
                       {item.pickupCode && (
                         <span className="qx-me-chip" data-tone="ok">
                           <TicketIcon size={16} aria-hidden="true" />
-                          取件码
+                          到机码
                         </span>
                       )}
                     </div>

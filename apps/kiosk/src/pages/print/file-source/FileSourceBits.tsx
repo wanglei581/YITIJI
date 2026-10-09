@@ -271,7 +271,7 @@ const CHANNEL_COPY: Record<UploadTab, { name: string; desc: string; limit: strin
   },
   usb: {
     name: 'U 盘导入',
-    desc: '插右侧 USB 口，本地服务列出根目录里的文件，你在屏幕上选。',
+    desc: '插右侧 USB 口，本地服务列出最外层和下一层文件夹里的文件，你在屏幕上选。',
     limit: 'PDF / JPG / PNG · 单份 ≤ 15MB',
     tone: 'slate',
   },
@@ -372,8 +372,8 @@ export function ExistingSourceLinks({
 
 export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string }) {
   return (
-    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="联系工作人员">
-      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？找人帮忙</span></h4>
+    <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="问小青">
+      <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>问小青</span></h4>
       <p>{text}</p>
     </button>
   )
