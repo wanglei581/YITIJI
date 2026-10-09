@@ -15,8 +15,8 @@ export function AnonymousJobFitConsentDialog({
   return (
     <div className="jfq-modal" role="dialog" aria-modal="true" aria-labelledby="job-fit-anonymous-consent-title">
       <div className="jfq-modal-card">
-        <h2 id="job-fit-anonymous-consent-title">确认岗位匹配授权</h2>
-        <p>本次岗位匹配参考会使用本次简历诊断内容，帮助你准备简历和投递材料。</p>
+        <h2 id="job-fit-anonymous-consent-title">确认简历对照授权</h2>
+        <p>本次简历对照会使用本次简历诊断内容，帮助你准备简历和投递材料。</p>
         <p>分析结果和授权状态按简历诊断到期策略保存；你可随时撤回后续分析授权。</p>
         <p>分析结果仅供本人参考，不代表任何招聘结果，也不会向企业共享简历。</p>
         {error && <p className="jfq-alert" aria-live="polite">{error}</p>}

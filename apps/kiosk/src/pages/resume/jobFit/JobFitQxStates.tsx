@@ -59,6 +59,8 @@ export interface JobFitExits {
   backToPick: () => void
   /** 用当前已确认的输入重新提交分析。 */
   retryAnalyze: () => void
+  /** 缺任务时就地记下要求。不开始分析，也不写成已完成。 */
+  writeRequirements: () => void
 }
 
 export interface JobFitStateView {
@@ -86,15 +88,20 @@ function Primary({ label, onClick }: { label: string; onClick: () => void }) {
   return <button type="button" className="qx-btn" data-variant="primary" onClick={onClick}>{label}</button>
 }
 
-export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExits, failMessage?: string | null): JobFitStateView {
+export function buildJobFitStateView(
+  state: JobFitStaticState,
+  exits: JobFitExits,
+  failMessage?: string | null,
+  writePanel?: ReactNode,
+): JobFitStateView {
   if (state === 'missing-task') {
     return {
-      title: '先补上简历任务，再谈岗位匹配',
-      subtitle: '岗位匹配需要一份仍可读取的本人简历任务。现在没有，所以不显示任何岗位、企业或匹配结论。',
+      title: '先补上简历任务，再做这次对照',
+      subtitle: '这次对照需要一份仍可读取的本人简历任务。现在没有，所以不显示企业名称或对照结果。',
       pill: { tone: 'warn', label: '缺少可读取的本人简历任务' },
       body: (
         <>
-          <Sec no="01" title="这次匹配要用到的输入" hint="四项都要有真实来源">
+          <Sec no="01" title="这次对照要用到的输入" hint="四项都要有真实来源">
             <Slots items={[
               { label: '本人简历任务', value: '尚未选择' },
               { label: '目标岗位', value: '尚未选择' },
@@ -102,25 +109,27 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
               { label: '结果归属', value: '仅本人可见', fixed: true },
             ]} />
           </Sec>
-          <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析" grow>
+          <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析">
             <Checks items={[
               { tone: 'off', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '还没有可读取的简历任务。上传 PDF 或扫描纸质简历，解析成功后才会出现可选任务。', chip: '缺失' },
-              { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: exits.jobs ? '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。' : '填一份岗位要求，至少要有岗位名称。当前尚未填写。', chip: '待选择' },
+              { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: exits.jobs ? '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。' : '由你自己填写目标名称和要求，不从列表里选。当前尚未填写。', chip: '待选择' },
               { tone: 'wait', icon: <ShieldCheckIcon size={24} />, title: '本人授权', desc: '匿名任务和会员账号按各自规则确认。任务补齐后再走这一步。', chip: '待确认' },
-              { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '匹配参考只供本人准备，不提供给企业，也不形成任何投递记录。', chip: '已固定' },
+              { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '对照结果只供本人准备，不提供给企业，也不形成任何投递记录。', chip: '已固定' },
             ]} />
           </Sec>
           <Sec no="03" title="不做 AI 分析，也能先推进这些" hint="都是既有流程">
             <KitRows items={[
               { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程', onClick: exits.printHub },
               { icon: <ScanLineIcon size={22} />, title: '扫描纸质简历', desc: '先扫成 PDF 存下来，再决定要不要分析', onClick: exits.scan },
+              { icon: <PenLineIcon size={22} />, title: '自己写下要求', desc: '把你看到的要求贴进来，自己对照', onClick: exits.writeRequirements },
               ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
             ]} />
+            {writePanel}
           </Sec>
         </>
       ),
       cta: (
-        <Cta note="没有本人简历任务时，本页不显示任何岗位、企业或匹配结论。">
+        <Cta note="没有本人简历任务时，本页不显示企业名称或对照结果。">
           <Ghost label="返回简历服务" onClick={exits.resumeHub} />
           <Primary label="去上传或扫描简历" onClick={exits.triage} />
         </Cta>
@@ -146,7 +155,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
             <Steps items={[
               { title: '重新上传或扫描一份简历', desc: '进入简历材料入口，选择文件上传、纸质扫描或手机传输。' },
               { title: '等待解析完成', desc: '解析成功后才会出现可用任务；失败会直接显示失败原因，不会静默通过。' },
-              { title: '回到岗位匹配重新选目标', desc: '任务可用后，再选择目标岗位并确认本人授权。' },
+              { title: '回到简历对照，重新写要求', desc: '任务可用后，再写下目标要求并确认本人授权。' },
             ]} />
           </Sec>
           <Sec title="这次没有发生的事" hint="明确否定，避免误解">
@@ -174,7 +183,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       pill: { tone: 'unknown', label: '正在等待返回' },
       body: (
         <>
-          <Sec title="正在读取历史岗位匹配报告" hint="无进度条 · 无预计时间">
+          <Sec title="正在读取历史简历对照报告" hint="无进度条 · 无预计时间">
             <Waiting
               icon={<ClockIcon size={34} />}
               title="请求已提交，等待返回"
@@ -194,7 +203,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="还没有返回的内容" hint="返回前一律留空">
             <Ghosts items={[
               { title: '对照要点', desc: '已写到与还没体现的要求，只在结果返回后显示。', tag: '等待返回' },
-              { title: '匹配依据', desc: '岗位要求与简历依据由系统逐条给出。', tag: '等待返回' },
+              { title: '对照依据', desc: '岗位要求与简历依据由系统逐条给出。', tag: '等待返回' },
               { title: '行动建议', desc: '差距与准备建议只出现在真实结果里。', tag: '等待返回' },
             ]} />
           </Sec>
@@ -203,6 +212,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       cta: (
         <Cta note="读取失败或没有历史报告时会直接说明，不会显示一份空白结果。">
           <Ghost label="返回简历服务" onClick={exits.resumeHub} />
+          <Primary label="取消读取，重新写下要对照的要求" onClick={exits.backToPick} />
         </Cta>
       ),
     }
@@ -215,7 +225,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       pill: { tone: 'unknown', label: '分析进行中，等待返回' },
       body: (
         <>
-          <Sec title="正在等待岗位匹配结果" hint="无阶段名 · 无百分比">
+          <Sec title="正在等待简历对照结果" hint="无阶段名 · 无百分比">
             <Waiting
               icon={<BotIcon size={34} />}
               title="分析请求已提交"
@@ -232,7 +242,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           </Sec>
           <Sec title="等待期间不会发生的事" hint="合规边界不随状态放宽" grow>
             <Nots items={[
-              '不显示匹配百分比、评分或通过率预测',
+              '不显示百分比、评分或通过率预测',
               '不给出录用、面试或 Offer 相关结论',
               '不把简历内容提供给企业或第三方',
               '不在本页生成文件、发起支付或打印',
@@ -252,14 +262,14 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
 
   if (state === 'ai-down') {
     return {
-      title: 'AI 匹配当前不可用',
+      title: 'AI 对照当前不可用',
       subtitle: failMessage ?? '这项分析暂时调不通。系统不显示对照要点或建议，也不会用旧结果冒充这次的结论。',
-      pill: { tone: 'bad', label: 'AI 匹配服务当前不可用' },
+      pill: { tone: 'bad', label: 'AI 对照服务当前不可用' },
       body: (
         <>
           <Sec title="当前判定" hint="只写已经确认的事实">
             <Verdict items={[
-              { tone: 'bad', label: 'AI 匹配分析', value: '当前不可用' },
+              { tone: 'bad', label: 'AI 对照', value: '当前不可用' },
               { tone: 'ok', label: '本人简历任务', value: '仍可查看和打印' },
               { tone: 'warn', label: '其他 AI 能力', value: '需各自打开确认' },
             ]} />
@@ -285,7 +295,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
         </>
       ),
       cta: (
-        <Cta note="服务不可用时不显示任何匹配结论，也不保留半截结果。">
+        <Cta note="服务不可用时不显示任何对照结论，也不保留半截结果。">
           <Ghost label="返回目标选择" onClick={exits.backToPick} />
           <Primary label="重新提交分析" onClick={exits.retryAnalyze} />
         </Cta>

@@ -251,7 +251,8 @@ const SURFACES = [
     rendersBinding: 'AIGC_SCREEN_MARK',
     retired: ['请自行核对后再带走'],
   },
-  { audit: careerRow, file: 'src/pages/resume/CareerPlanPage.tsx', aigcMark: true },
+  // T46：AigcMark 随求职方案结果正文拆到 careerPlanView.tsx。仍要求渲染，不删这条。
+  { audit: careerRow, file: 'src/pages/resume/careerPlanView.tsx', aigcMark: true },
   { audit: careerRow, file: 'src/pages/resume/components/career-plan/CareerPlanSection.tsx', labelKey: 'BASE' },
   { audit: selfAssessRow, file: 'src/pages/resume/SelfAssessmentFlow.tsx', aigcMark: true },
   { audit: interviewReportRow, file: 'src/pages/interview/InterviewReportPage.tsx', labelKey: 'INTERVIEW_REPORT', retired: ['仅供本人面试练习'] },

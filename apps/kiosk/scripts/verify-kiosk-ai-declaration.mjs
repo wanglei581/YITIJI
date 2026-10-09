@@ -297,7 +297,11 @@ function sourceChecks() {
     fail('确认弹层必须用现有弹层，拒绝先说明再结束')
   }
   for (const file of NOTE_FILES) {
-    if (!read(file).includes('AiDeclarationNote')) fail(`${file} 缺少主按钮下的声明说明`)
+    // T46：简历对照选岗屏拆到 JobFitInteractiveViews.tsx。声明说明仍在主按钮下，并集覆盖，不删这条。
+    const source = file === 'src/pages/resume/JobFitPage.tsx'
+      ? `${read(file)}\n${read('src/pages/resume/jobFit/JobFitInteractiveViews.tsx')}`
+      : read(file)
+    if (!source.includes('AiDeclarationNote')) fail(`${file} 缺少主按钮下的声明说明`)
   }
   const note = read('src/ai/AiDeclarationNote.tsx')
   if (!note.includes('AI_DECLARATION_NOTE') || !note.includes('qx-ai-declaration-note')) {

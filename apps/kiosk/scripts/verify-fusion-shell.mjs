@@ -358,7 +358,8 @@ assert.match(
   /if\s*\(\s*insideRootStage\s*\)\s*return\s+children/,
   'KioskStageFit must render children only when already inside the KioskRoot stage',
 )
-const jobFitPage = await read('src/pages/resume/JobFitPage.tsx')
+// T46：usesKioskFluidViewport 随舞台拆到 JobFitStage.tsx。并集仍要求同一份谓词，不许再写第二套。
+const jobFitPage = `${await read('src/pages/resume/JobFitPage.tsx')}\n${await read('src/pages/resume/jobFit/JobFitStage.tsx')}`
 const legalDocPage = await read('src/pages/legal/LegalDocPage.tsx')
 assert.match(
   withoutComments(jobFitPage),
