@@ -35,6 +35,40 @@
 - 同类断言清点：只有这一条用例收集全部 `/api/v1/` 请求；路由巡检、隐私与会话提醒各组的零请求断言都限定在具体会员、打印、扫描或支付接口，不受预取影响（静态核对，浏览器以 CI 为准）。
 - 顺带：`service-hub-qx.spec.ts:126` 在 CI 首跑读到过 `checking`（重试通过），取快照前改为先等到 `ready` / `degraded` 终态，原有断言全部保留。
 - 验证（Codex 实现，合并窗口逐行审过并复跑）：一体机与后端类型检查、lint、一体机单测 306 条、无人值守门禁（白名单 0）、浏览器用例覆盖门禁、队列门禁完整通过；正式构建下两份用例各跑两遍共 16 条通过（端口平移到 48xx，监听进程确认是本目录的构建）。前任把 `account-assets-journey.spec.ts:53` 记成「换端口假红」是误判，CI 原端口上它是真红。其余浏览器组以本 PR 的 CI 和下一批批次验收为准。
+## 2026-10-08：开机打印防护的 Windows 用例收尾补清理（同分支 `claude/agent-boot-spool-guard`，#1281）
+
+- **问题：** 这个分支上 `windows-agent-installer` 五次全红（10/6 四次、10/8 一次），都红在「0.4.10 升级到候选版」那一步的前置检查：`C:\Program Files\AIJobPrintAgent` 已经存在。同一工作流同期在别的分支都是绿的。10/6、10/8 两次交接只看了主 CI 三项，没看这一条。
+- **原因：** 本分支新增的 Windows 用例 `verify:boot-spool-guard-windows` 排在升级测试前面。它会在 Program Files 和 ProgramData 下建 `AIJobPrintAgent` 目录（放防护脚本、测试配置、两份日志），结束时只删了文件，没删目录；升级测试要求这两个目录都不存在。
+- **改了什么：** 只改这一份 Windows 用例。开始前记下两个目录在不在；结束时把开始前没有的整个删掉，删不掉就在这一步直接报错。开始前就有的（装过 Agent 的机器）不动。产品代码、安装包、工作流都没改。
+- **此前没验到的范围：** 升级测试和排在它后面的两个作业（EXE、MSI 的全新安装 / 修复 / 卸载，内部签名）在这个分支上一次都没跑到过。下面 10/6 条目里写的「Windows 用例在 CI 跑」只覆盖防护用例本身；安装包新加的四个卸载动作（删两个计划任务、打印服务恢复自动并启动）到这次推送才第一次真跑，结果看 PR 上的 `windows-agent-installer` 运行。
+- **本机验证（2026-10-08）：** 用 `ts-node` 跑这份用例退出 0（本机不是 Windows，用例跳过，但会先做类型检查；故意写错类型能报 TS2322）。`tsc --noEmit -p .`、改动文件的 eslint、`verify:boot-spool-guard`、`verify-installer-inputs.mjs`、图谱 `--check` 均退出 0。
+- **停放、隐藏、改名、降级：** 无。
+
+## 2026-10-06：设备文档按走查清单对齐（只改文档，同分支 `claude/agent-boot-spool-guard`）
+
+- **卡纸不人为制造（产品负责人 10/6 定）：** 故障处置单 F2 与现场验收单 I.3 删掉夹皱纸、出纸中开前盖的做法，改成两件事：本地走查栈用模拟终端程序 `sim-agent.mjs printer jam`（走查分支 `origin/claude/full-walkthrough-20260929`）走五个时刻；真机遇到真卡纸时照表记录（时间、终端号、任务号、面板显示、取纸过程、用户屏幕、后台状态、有没有重复出页，不记纸上内容）。
+- **按走查窗口《出错演练清单》§7 对齐 11 处不一致**，行号按 `64b81e5d8` 回代码核对：出纸监控 90 秒预热 + 每面 3–8 秒、封顶 15 分钟；服务端 `printing` 20 分钟收口；告警页已是「心跳超 5 分钟」；进度页「如遇卡纸或缺纸…」已不存在；告警标题「打印任务失败：缺纸」；打印中断电可能落 `PRINTER_ERROR` 被画成卡纸；F1–F5 文案出处行号重排。「维护中」用户点确认才被挡、服务电话三处说法不一，是代码与告示问题，文档如实写现状并注明已报总指挥派代码修。F6、F7 与 §1 第 1–6 条的 Agent 行号这次没逐条重核，处置单开头已注明。
+- **处置单补上现场会碰到的：** 断网约 12–15 秒进度页就说「打印没有完成」、「重新打印」是新建一单可能出两份；「重新提交打印」是整份重打且不查打印机状态；Agent 失败收尾已自动清自己的队列作业，人工改为只核对；新增「F8 AI 不可用」（现场表现、没有 AI 类告警、怎么恢复）。
+- **打印机联网按方案 a（总指挥 10/6 定）：** 主机加一块 USB 有线网卡直连打印机网口，组成无网关小网（`192.168.50.1/24`、`192.168.50.2/24`，不填网关和 DNS），只为面板「扫描到共享文件夹」；上网仍走 CPE。母盘清单 G1 加一行、G10 加第 7 步；奔图文档第七节改成试点标配，保留「不把打印机接到 CPE 的网口上」；验收单 S.3 补前提。
+- **U 盘子文件夹（产品负责人 10/6「按推荐」）：** 验收单 S.8b 加一条：最外层、一层、两层子文件夹各放一个 PDF，只有前两个出现。
+- **智能插座远程断电（产品负责人 10/6 批准做）：** 处置单新增「远程断电重启」一节，推荐带独立 4G 卡的插座、待产品负责人拍板；验收单新增 S.13。草稿里「打印机也接在插座后面」与奔图手册（禁止多引线电源板）和母盘清单 E、F、G 段冲突，没有采用，打印机仍直插墙面插座，已报总指挥。
+- **10/6 晚产品负责人定接电：** 智能插座选带独立 4G 卡的；打印机直插带接地的墙面插座，不接智能插座。处置单「远程断电重启」、验收单 S.13、备件表改为已定；母盘清单 G 段加「站点要求」：机构提供打印机旁一个带接地的墙面插座（只给打印机用），另一个墙面插座给主机、屏幕、CPE，经智能插座供电。
+- **10/6 晚产品负责人定：一体机外壳先不做，等有人要买再做**，试点从头到尾用分体配置，10/3 的「机柜 11/13 前到货且测试通过才换上」取消。母盘清单 F 段（立式机柜）标「仅外壳订单适用」，G 段改为试点全程配置；G10 的 CPE 供电改为经智能插座那一路；验收单 S 段说明同步。终端程序和激活流程两种配置相同，批量激活方案不受影响。
+- **10/6 晚合规转来（总指挥）：** UPS 接法定为「墙面插座 → UPS → 4G 智能插座 → 主机、屏幕和 CPE」，UPS 不能接在智能插座后面（会挡住远程断电重启），试点可以不配 UPS——写进母盘清单 A 段「远程断电重启」与 G 段站点要求；远程断电范围补上屏幕和 CPE；CPE 的 WiFi 由「能关就关」改为全部关闭（采购选能完全关闭的型号），故障处置单删掉「只能用 WiFi 插座时」的备选。
+- **备件表：** 加 USB 有线网卡 1 块、网线 1 根、智能插座 1 个。
+- **停放、隐藏、改名、降级：** 无。没改代码、脚本、工作流。
+
+## 2026-10-06：开机打印防护与本机自愈两项（分支 `claude/agent-boot-spool-guard`，基于 `07e0ad943`）
+
+- **决定：** 产品负责人 10/6 批准。整机断电再上电时，Windows 打印服务比 Agent 起得早，会把没打完的作业再送一遍。专用一体机把 Spooler 改为手动启动；开机任务 `AIJobPrintBootSpoolGuard`（SYSTEM、系统启动时、最高权限、限时 3 分钟、失败不重试）在服务起来之前只删 `%SystemRoot%\System32\spool\PRINTERS` 的直接子文件（`*.SPL` / `*.SHD` / `*.TMP`，不递归、不跟链接、不删目录），再启动打印服务。删不掉就不启动，整机停打。打印服务已经在跑时什么都不删。安装当次不重启电脑，当时服务在跑也不删当前队列。
+- **工作电脑模式：** 传了 `-KeepPrinterQueueUnpaused` 不安装防护；若以前装过，卸掉任务并把 Spooler 恢复为自动且在运行。
+- **服务恢复：** 第一次 60 秒、第二次 300 秒，第三次及以后每 1800 秒。`reset` 仍为 1 天。`failureflag 1` 和启动诊断文件没改。安装脚本、WinSW xml、MSI 自定义动作三处一致。
+- **每日维护重启：** 默认 04:30，任务 `AIJobPrintDailyReboot`。队列有作业就等 10 分钟再看，最多 3 次，仍有作业当天不重启。`-DailyRebootAt off` 不注册，并卸掉已有任务。时间不是 `HH:mm` 也不是 `off` 时安装直接失败。KSK-001 每次重跑必须加 `-DailyRebootAt off`（发布当天仍不加 `-KeepPrinterQueueUnpaused`）。专用一体机用默认 04:30。打印服务没在运行时视为没有在打印，直接重启，日志记 `reboot-spooler-stopped`（演练记 `dry-run-reboot-spooler-stopped`）；服务在运行但查队列失败时仍不重启。
+- **卸载：** MSI/EXE 卸载会删掉 `AIJobPrintBootSpoolGuard` 和 `AIJobPrintDailyReboot`，并把 Spooler 恢复为自动且在运行。四个自定义动作都是 `Return="ignore"`，条件是 `REMOVE~="ALL" AND NOT UPGRADINGPRODUCTCODE`：大版本升级会卸掉旧产品，但升级后不会重跑安装脚本，这时不撤防护。万一没恢复，手工命令仍在母盘清单 G7。工作电脑模式重跑安装脚本会自动回退。
+- **版本与试点：** 版本号仍是 `0.4.13`。随下一个从这个分支打出来的安装包走。拔电实测通过之前不上试点。别的触发器仍可能提前拉起打印服务，防护会跳过；诊断只读采集 `sc.exe qtriggerinfo Spooler`，不删那些触发器。
+- **门禁：** 静态 `verify:boot-spool-guard` 进 CI Linux 的 Agent 段。Windows 用例 `verify:boot-spool-guard-windows` 挂进 `windows-agent-installer.yml` 的 `unsigned-exe-upgrade`（windows-2022），在 `build-staging` 之前。本机 macOS 跑该脚本只打印跳过并退出 0。已写好、待 CI。真机拔电没做。这次补上的卸载回退写进 `test-msi-lifecycle.ps1`，打印服务停止时的每日重启演练写进 `verify-boot-spool-guard-windows`，都还没在 Windows 上跑。
+- **本机验证（2026-10-06）：** `tsc --noEmit -p .` 退出 0。`verify:boot-spool-guard`、`verify:windows-service-recovery`、`verify:installer-inputs`、`verify:production-provisioning`、`verify:print-scan-agent` 退出 0。`node scripts/verify-repository-integrity.mjs` 退出 0（5117 个文件，6 个 workflow YAML）。`node scripts/generate-project-graph.mjs` 后 `--check` 通过，图谱 0 个文件变化。`verify:singleton-process` 退出 0。`verify:scan-watcher` 重跑退出 0（同一次在机器忙时有一条反向子进程超时，重跑通过）。`verify:task-reliability` 退出 1，两处都在本分支原有文件上、这次没改它们：`dead-letter list` 在 15 秒内没有退出（status 为 null）；内嵌的单实例检查限时 120 秒，身份竞争约 95 秒后整体超时。单独的 `verify:singleton-process` 已通过。其余 `package.json` 里能在 macOS 跑的 `verify*` 在本分支上此前已逐个退出 0；两个 Windows 专属脚本在 macOS 上跳过，靠 CI。反向测试（改坏后 `verify:boot-spool-guard` 必须非 0，再 `git checkout` 还原）：1 运行中也删，退出码 1；2 删除失败仍启动 Spooler，退出码 1；3 日志写进文件名，退出码 1；4 去掉工作电脑模式回退，退出码 1；5 第三次恢复改回 none，退出码 1；6 `-DailyRebootAt off` 仍注册，退出码 1。还原后工作区干净。
+- **停放、隐藏、改名、降级：** 无。没有新增岗位、招聘会、企业功能。
 
 ## 2026-10-06：AI 生成简历——只写公司没写职务的经历照样生成（后端半；分支 `claude/backend-hardening-20261006-resume-empty-role`，与一体机半同批合）
 ## 2026-10-06 夜：终端程序批量部署与激活方案定稿（分支 `claude/batch-activation-plan-1006`，只改文档）

@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
 
 重装未显式传值时，脚本只从 ACL 已受保护的现有配置保留 `scanWatchFolder`、`localApiAllowedOrigins`、`localApiPort` 与 `localApiBridgeToken`。生产默认只保留 API 同源 Origin 和显式传入的一体机 Origin；`http://localhost:5173`、`http://127.0.0.1:5173` 只有在临时现场调试时显式增加 `-AllowLocalDevelopmentOrigins` 才会写入。需要撤销已下线、失控或误配的历史 Origin 时，增加 `-ReplaceLocalApiAllowedOrigins` 并传入新的完整额外 Origin 列表；仅传替换开关而不传列表，可清除全部历史额外 Origin。`-KioskOrigins` / `-ReplaceKioskOrigins` 仅为旧命令兼容别名，新运维记录统一使用正式参数，禁止直接编辑受保护配置。
 
-安装脚本还会把一体机 Origin 写入 Edge 的 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`，并写入 `AllowFileSelectionDialogs=0`。现场必须在 `edge://policy` 确认策略生效；这些是整机策略，只能用于专用一体机。撤销可用 `-RemoveEdgeKioskPolicies`，或按受控卸载脚本删除三项策略。测试机同时是个人工作电脑时（如 KSK-001），加 `-KeepFileSelectionDialogs`：不写 `AllowFileSelectionDialogs`、并去掉已有的禁用值，否则那台电脑上的普通 Edge 也选不了文件；专用一体机不得加这个开关（2026-09-29）。
+安装脚本还会把一体机 Origin 写入 Edge 的 `LocalNetworkAccessAllowedForUrls`、`AudioCaptureAllowedUrls`，并写入 `AllowFileSelectionDialogs=0`。现场必须在 `edge://policy` 确认策略生效；这些是整机策略，只能用于专用一体机。撤销可用 `-RemoveEdgeKioskPolicies`，或按受控卸载脚本删除三项策略。测试机同时是个人工作电脑时（如 KSK-001），加 `-KeepFileSelectionDialogs`：不写 `AllowFileSelectionDialogs`、并去掉已有的禁用值，否则那台电脑上的普通 Edge 也选不了文件；专用一体机不得加这个开关（2026-09-29）。KSK-001 每次重跑还要加 `-DailyRebootAt off`，不注册每天 04:30 的整机重启。专用一体机不要传 `off`。时间不是 `HH:mm` 也不是 `off` 时，安装直接失败。
 
 如果 token 已经保存在 `%ProgramData%\AIJobPrintAgent\agent.token`：
 
@@ -82,7 +82,7 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 本轮可靠性 P0 已在本地代码与静态门禁层完成以下收口：配置文件开头的 UTF-8 BOM 会被兼容；启动时会分类报告无效配置或 token；这两类异常均不得领取打印任务或触发打印。配置与 token 写入采用原子替换；last-known-good 只保留为人工恢复候选，**不会**自动回退覆盖当前配置。启动诊断保持非阻塞，且本地诊断脚本只读。
 
-Windows 服务只配置有限的 SCM 恢复策略：首次失败后等待 60 秒，第二次失败后等待 300 秒，第三次不自动操作；失败计数每天重置。该策略只降低短暂进程失败后的人工介入压力，不证明服务、云端连接或硬件已经恢复。
+Windows 服务的 SCM 恢复策略：首次失败后等待 60 秒，第二次失败后等待 300 秒，第三次及以后每 1800 秒再试一次；失败计数每天重置。这不是无限快速重启。该策略只降低短暂进程失败后的人工介入压力，不证明服务、云端连接或硬件已经恢复。
 
 在 Windows 主机上可复制执行下列只读诊断命令：
 
