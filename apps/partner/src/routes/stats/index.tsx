@@ -54,6 +54,7 @@ import {
   type StatsPeriod,
 } from '../../services/api/stats'
 import { useRecruitmentHosting } from '../../services/capabilities'
+import { ServiceVisitsCard } from './ServiceVisitsCard'
 
 // ─── 时间范围选择器 ────────────────────────────────────────────────────────
 
@@ -331,17 +332,19 @@ export default function StatsPage() {
       // 周期只作用于同步概况；托管关闭时那一段不展示，选择器也就不给，免得点了没有任何变化。
       actions={recruitmentHosting ? <PeriodSelector value={period} onChange={setPeriod} /> : undefined}
     >
-      {state === 'loading' ? (
-        <LoadingState className="py-20" />
-      ) : state === 'error' || !data ? (
-        <ErrorState
-          className="py-20"
-          title="统计数据加载失败"
-          message="无法读取本机构统计数据。你的内容展示不受影响。"
-          onRetry={retry}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <ServiceVisitsCard />
+        {state === 'loading' ? (
+          <LoadingState className="py-20" />
+        ) : state === 'error' || !data ? (
+          <ErrorState
+            className="py-20"
+            title="统计数据加载失败"
+            message="无法读取本机构统计数据。你的内容展示不受影响。"
+            onRetry={retry}
+          />
+        ) : (
+          <>
           {/* 在架内容 —— 当前快照，不随周期变化 */}
           <section aria-label="在架内容">
             <div className="mb-2.5 flex items-center gap-2">
@@ -414,8 +417,9 @@ export default function StatsPage() {
             本后台不接收求职者简历。在架数字是打开页面时的最新情况。打印扫描的服务次数见
             <Link to="/terminals" className="mx-0.5 font-semibold text-primary-600 hover:underline">终端数据</Link>。
           </p>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </Page>
   )
 }

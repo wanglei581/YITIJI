@@ -12,6 +12,35 @@ export const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning'
   failed:    { badge: 'error',   label: '失败' },
   cancelled: { badge: 'default', label: '已取消' },
   abandoned: { badge: 'default', label: '已废弃' },
+  // 小程序订单详情同一套叫法：待到机 / 待现场支付。过期与取件状态用词一致。
+  pending_release: { badge: 'warning', label: '待到机' },
+  awaiting_payment: { badge: 'warning', label: '待现场支付' },
+  expired: { badge: 'default', label: '已过期' },
+}
+
+export interface StatusView {
+  badge: 'success' | 'error' | 'warning' | 'info' | 'default'
+  label: string
+  title?: string
+}
+
+function mappedStatus(
+  status: string | null | undefined,
+  table: Record<string, { badge: StatusView['badge']; label: string }>,
+): StatusView {
+  if (!status) return { badge: 'default', label: '—' }
+  const known = table[status]
+  if (known) return known
+  return { badge: 'default', label: `未归类（${status}）`, title: status }
+}
+
+/** 列表、详情、状态流转共用。未知值保留原值，悬停可见。 */
+export function taskStatusText(status: string | null | undefined): StatusView {
+  return mappedStatus(status, STATUS_MAP)
+}
+
+export function payStatusText(status: string | null | undefined): StatusView {
+  return mappedStatus(status, PAY_STATUS_MAP)
 }
 
 export const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
@@ -97,7 +126,12 @@ export const PICKUP_LABELS: Record<string, string> = {
 }
 export function pickupText(order: { pickupStatus: string; channel: string | null }): string {
   if (order.pickupStatus === 'none') return '—'
-  return PICKUP_LABELS[order.pickupStatus] ?? order.pickupStatus
+  return PICKUP_LABELS[order.pickupStatus] ?? `未归类（${order.pickupStatus}）`
+}
+
+export function pickupTitle(order: { pickupStatus: string }): string | undefined {
+  if (order.pickupStatus === 'none' || PICKUP_LABELS[order.pickupStatus]) return undefined
+  return order.pickupStatus
 }
 
 export function fmt(iso: string | null): string {

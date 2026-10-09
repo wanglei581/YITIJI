@@ -12279,7 +12279,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 240,
+      "reachableFileCount": 242,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12401,10 +12401,14 @@
           "component": "AuditPage",
           "endpoints": [
             "GET /admin/import-batches",
+            "GET /admin/orders",
+            "GET /admin/orders/:param",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/refund"
           ],
           "file": "apps/admin/src/routes/audit/index.tsx",
           "layout": [
@@ -12760,6 +12764,8 @@
             "DELETE /admin/orgs/:param/accounts/:param/action-tickets/current",
             "DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current",
             "GET /admin/import-batches",
+            "GET /admin/orders",
+            "GET /admin/orders/:param",
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
@@ -12775,6 +12781,8 @@
             "PATCH /admin/orgs/:param/accounts/:param/status",
             "PATCH /admin/orgs/:param/content-trust",
             "PATCH /admin/orgs/:param/status",
+            "POST /admin/orders/:param/mark-paid",
+            "POST /admin/orders/:param/refund",
             "POST /admin/orgs",
             "POST /admin/orgs/:param/accounts",
             "POST /admin/orgs/:param/accounts/:param/action-challenges",
@@ -13028,10 +13036,15 @@
         {
           "component": "UsersPage",
           "endpoints": [
+            "GET /admin/import-batches",
             "GET /admin/orders",
             "GET /admin/orders/:param",
             "GET /admin/users",
             "GET /admin/users/:param",
+            "PATCH /admin/fair-sources/:param/publish",
+            "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/job-sources/:param/publish",
+            "PATCH /admin/job-sources/:param/review",
             "POST /admin/orders/:param/mark-paid",
             "POST /admin/orders/:param/refund",
             "POST /admin/users/:param/closure",
@@ -13047,7 +13060,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 267
+      "sourceFileCount": 271
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16073,7 +16086,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 84,
+      "reachableFileCount": 86,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16491,7 +16504,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 85
+      "sourceFileCount": 87
     }
   },
   "dataModel": {
@@ -18293,6 +18306,9 @@
     "apps/admin/scripts/verify-honest-placeholders.mjs": [
       "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
+    "apps/admin/scripts/verify-measure-spacing.mjs": [
+      "apps/admin/scripts/verify-console-plain-copy.mjs"
+    ],
     "apps/admin/scripts/verify-user-closure-ui.mjs": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
@@ -18545,13 +18561,15 @@
     "apps/admin/src/routes/orders/orderDisplay.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "apps/admin/scripts/verify-user-closure-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs",
       "services/api/scripts/verify-api20-manual-refund.ts"
     ],
     "apps/admin/src/routes/orders/orderHonestyCopy.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "apps/admin/src/routes/orders/useOrderDetail.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs",
@@ -18703,6 +18721,11 @@
     "apps/admin/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/admin/src/routes/screen/measureUnit.ts": [
+      "apps/admin/scripts/verify-console-batch5-copy.mjs",
+      "apps/admin/scripts/verify-console-batch6-copy.mjs",
+      "apps/admin/scripts/verify-measure-spacing.mjs"
+    ],
     "apps/admin/src/routes/screen/metricLabels.ts": [
       "apps/admin/scripts/verify-console-batch5-copy.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
@@ -18832,6 +18855,9 @@
       "apps/admin/scripts/verify-user-closure-ui.mjs"
     ],
     "apps/admin/src/routes/users/UserStatusDialog.tsx": [
+      "apps/admin/scripts/verify-admin-users-ui.mjs"
+    ],
+    "apps/admin/src/routes/users/activityDisplay.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
     "apps/admin/src/routes/users/index.tsx": [
@@ -21957,6 +21983,9 @@
     "apps/partner/src/routes/screen/index.tsx": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
+    "apps/partner/src/routes/screen/measureUnit.ts": [
+      "apps/admin/scripts/verify-measure-spacing.mjs"
+    ],
     "apps/partner/src/routes/screen/metricLabels.ts": [
       "apps/admin/scripts/verify-console-screen-ui.mjs"
     ],
@@ -21990,6 +22019,9 @@
     ],
     "apps/partner/src/routes/sources/omitWebhookSecretOnce.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "apps/partner/src/routes/stats/ServiceVisitsCard.tsx": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/stats/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -22567,7 +22599,9 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "packages/shared/src/types/admin.ts": [
-      "apps/admin/scripts/verify-console-plain-copy.mjs"
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
+      "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs",
@@ -22677,6 +22711,7 @@
     ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
+      "apps/admin/scripts/verify-admin-users-ui.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
       "services/api/scripts/verify-org-type-enum-sync.ts",
       "services/api/scripts/verify-partner-smart-campus.ts"
@@ -28002,10 +28037,13 @@
           "apps/admin/scripts/verify-user-closure-ui.mjs",
           "apps/admin/src/routes/users/UserDetailDrawer.tsx",
           "apps/admin/src/routes/users/UserStatusDialog.tsx",
+          "apps/admin/src/routes/users/activityDisplay.ts",
           "apps/admin/src/routes/users/index.tsx",
           "apps/admin/src/routes/users/userPresentation.ts",
           "apps/admin/src/services/api/adminUsers.ts",
+          "packages/shared/src/types/admin.ts",
           "packages/shared/src/types/adminUsers.ts",
+          "packages/shared/src/types/partner.ts",
           "packages/ui/src/components/Drawer.tsx"
         ],
         "missing": []
@@ -28032,6 +28070,7 @@
           "apps/admin/src/routes/screen/TerminalTwinView.tsx",
           "apps/admin/src/routes/screen/UsageHostingOff.tsx",
           "apps/admin/src/routes/screen/aiScreenDisplay.ts",
+          "apps/admin/src/routes/screen/measureUnit.ts",
           "apps/admin/src/routes/screen/metricLabels.ts",
           "apps/admin/src/routes/screensaver/AssetUploadNotice.tsx",
           "apps/admin/src/routes/screensaver/AssetsTab.tsx",
@@ -28060,6 +28099,7 @@
           "apps/admin/src/routes/ai-services/aiLogDisplay.ts",
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/screen/UsageView.tsx",
+          "apps/admin/src/routes/screen/measureUnit.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
           "apps/partner/src/routes/terminals/terminalOpsFormat.ts",
@@ -28114,6 +28154,7 @@
           "apps/admin/scripts/verify-console-batch6-copy.mjs",
           "apps/admin/scripts/verify-console-batch7-copy.mjs",
           "apps/admin/scripts/verify-console-privacy-copy.mjs",
+          "apps/admin/scripts/verify-measure-spacing.mjs",
           "apps/admin/src/lib/auditActionLabels.ts",
           "apps/admin/src/lib/printErrorText.ts",
           "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
@@ -28175,6 +28216,8 @@
           "apps/admin/src/routes/audit/auditPayloadLabels.ts",
           "apps/admin/src/routes/audit/auditPresentation.ts",
           "apps/admin/src/routes/audit/index.tsx",
+          "apps/admin/src/routes/orders/orderDisplay.ts",
+          "apps/admin/src/routes/orders/orderHonestyCopy.ts",
           "apps/admin/src/routes/partners/ContentTrustCell.tsx",
           "apps/admin/src/routes/partners/PartnerTable.tsx",
           "apps/admin/src/routes/partners/contentTrustRules.ts",
@@ -28186,6 +28229,7 @@
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/profile/ComplianceRestrictions.tsx",
           "apps/partner/src/routes/profile/index.tsx",
+          "packages/shared/src/types/admin.ts",
           "packages/shared/src/types/partner.ts"
         ],
         "missing": []
@@ -28342,6 +28386,23 @@
         "@ai-job-print/admin::verify:job-ai-ops-dashboard-ui"
       ],
       "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/routes/screen/measureUnit.ts",
+          "apps/partner/src/routes/screen/measureUnit.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-measure-spacing.mjs",
+      "helper": true,
+      "inCi": false,
+      "package": "apps/admin",
+      "scriptNames": [],
+      "wired": false
     },
     {
       "asserts": {
@@ -32457,6 +32518,7 @@
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
+          "apps/partner/src/routes/stats/ServiceVisitsCard.tsx",
           "apps/partner/src/routes/stats/index.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsDrawer.tsx",
@@ -43334,6 +43396,17 @@
       },
       {
         "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/orders/orderDisplay.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
         "kind": "test",
         "mentions": [
@@ -43378,6 +43451,17 @@
         "mentions": [
           "apps/admin/package.json",
           "docs/progress/current-progress.md"
+        ],
+        "risk": "high",
+        "scope": "admin",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/admin/package.json"
+      },
+      {
+        "detail": "不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/admin/src/routes/users/activityDisplay.test.ts",
+        "kind": "test",
+        "mentions": [
+          "apps/admin/package.json"
         ],
         "risk": "high",
         "scope": "admin",
