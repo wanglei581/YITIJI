@@ -30,6 +30,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadPartnerUsage } from '../../services/api/consoleScreen'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
+import { measureUnit } from './measureUnit'
 import { OrgDailyTrendPanel, OrgTopPoliciesPanel, OrgUsageNotesPanel } from './PartnerUsageHostingOff'
 
 /**
@@ -213,7 +214,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                         <b>
                           {total.prefix ? <small>{total.prefix}</small> : null}
                           {total.text}
-                          <span className="twin-unit">次</span>
+                          <span className="twin-unit">{measureUnit(total.text, '次')}</span>
                         </b>
                       </div>
                     )
@@ -239,8 +240,8 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                 <>
                   <TwinTiles
                     items={[
-                      { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: '次', label: '今日浏览' },
-                      { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: '次', label: '今日打开来源平台' },
+                      { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: measureUnit(value.days.length ? twinSmall(value.days[0].browse) : '—', '次'), label: '今日浏览' },
+                      { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: measureUnit(value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', '次'), label: '今日打开来源平台' },
                     ]}
                   />
                   <p className="twin-cap twin-push">选「近 7 天」或「近 30 天」查看趋势</p>
@@ -306,7 +307,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                 items={TYPE_ORDER.flatMap((type): TwinTileItem[] => {
                   const row = value.byType.find((item) => item.type === type)
                   if (row) {
-                    return [{ value: twinSmall(row.browse), unit: '次浏览', label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
+                    return [{ value: twinSmall(row.browse), unit: measureUnit(twinSmall(row.browse), '次浏览'), label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
                   }
                   return []
                 })}

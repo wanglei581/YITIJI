@@ -9,9 +9,9 @@ import {
   classifyMicError,
   detectMicCapability,
   subscribeMicDeviceChange,
-  MIC_FAILURE_REASON,
-  MIC_REASON,
   MIC_STATUS_LABEL,
+  micFailureReasonLine,
+  micReasonLine,
   type MicCapabilityState,
 } from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
@@ -131,7 +131,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         if (asrOn && capability === 'available') {
           if (autoSwitch) setMode('voice')
         } else if (asrOn) {
-          setVoiceHint(MIC_REASON[capability])
+          setVoiceHint(micReasonLine(capability))
         }
       })
     }
@@ -158,7 +158,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     setError(null)
     void detectMicCapability().then((capability) => {
       setMicCapability(capability)
-      setVoiceHint(MIC_REASON[capability])
+      setVoiceHint(micReasonLine(capability))
       if (capability === 'available' && asrEnabled) setVoiceHint(null)
     })
   }
@@ -250,8 +250,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     // 能力门禁：去掉原生 disabled 后按钮真的可点，守卫必须在 handler 内部。
     if (micCapability !== null && micCapability !== 'available') {
       setMicError(true)
-      setVoiceHint(MIC_REASON[micCapability])
-      setError(MIC_FAILURE_REASON[micCapability])
+      setVoiceHint(micReasonLine(micCapability))
+      setError(micFailureReasonLine(micCapability))
       return
     }
     setError(null)
@@ -279,11 +279,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       const failure = classifyMicError(err)
       resetVoiceState()
       setMicError(true)
-      setError(MIC_FAILURE_REASON[failure])
+      setError(micFailureReasonLine(failure))
       // 归因为设备/权限/不支持时同步收紧能力门禁，语音入口随之置灰。
       if (failure === 'no-device' || failure === 'permission-denied' || failure === 'unsupported') {
         setMicCapability(failure)
-        setVoiceHint(MIC_REASON[failure])
+        setVoiceHint(micReasonLine(failure))
       }
     }
   }
@@ -357,7 +357,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   // 门禁置灰就必须有常显原因，一个都不能漏：硬件原因优先，其次是服务端未启用。
   const micBlockedReason =
     micCapability === null ? null
-    : micCapability !== 'available' ? MIC_REASON[micCapability]
+    : micCapability !== 'available' ? micReasonLine(micCapability)
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
 
@@ -467,7 +467,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           // 因此按钮仍可点击，短路守卫必须放在 handler 内部。
           if (!voiceAvailable) {
             if (micCapability !== null && micCapability !== 'available') {
-              setVoiceHint(MIC_REASON[micCapability])
+              setVoiceHint(micReasonLine(micCapability))
             }
             return
           }

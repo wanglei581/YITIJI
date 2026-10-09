@@ -9,6 +9,7 @@ import { LegalReadinessCard } from './LegalReadinessCard'
 import { SupportContactCard } from './SupportContactCard'
 import { DOC_TYPE_LABELS, DOC_TYPE_ORDER, activateConfirmText, docTypeLabel } from './legalDocMeta'
 import { legalDocsService, type LegalDocVersionView } from '../../services/api/legalDocs'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { formatDateTime } from '@ai-job-print/shared'
 
 // ─── 常量 ───────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ export default function LegalDocsPage() {
     legalDocsService
       .list()
       .then(setAllRows)
-      .catch((e: Error) => setError(e.message))
+      .catch((e: unknown) => setError(userMessageOf(e, '法务文档加载失败，请稍后重试')))
       .finally(() => setLoading(false))
   }
 
@@ -79,7 +80,7 @@ export default function LegalDocsPage() {
       await legalDocsService.activate(id)
       loadData()
     } catch (e) {
-      alert(`激活失败：${(e as Error).message}`)
+      setError(userMessageOf(e, '激活失败，请稍后重试'))
     } finally {
       setActivating(null)
     }

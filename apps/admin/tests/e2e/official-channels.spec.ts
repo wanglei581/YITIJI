@@ -62,7 +62,10 @@ test.describe('机构详情：官方域名（入驻核验）', () => {
     await expect(list.getByRole('listitem')).toHaveCount(2)
     await expect(list.getByRole('listitem').first()).toContainText('rencai-demo.gov.cn')
     await expect(list.getByRole('listitem').first()).toContainText('登记于 2026-09-20 10:30')
-    await expect(list.getByRole('listitem').first()).toContainText('登记人 mock-admin-001（管理员账号 ID）')
+    // 登记人只显示角色与尾号，完整管理员 ID 放悬停（与审计页操作人同一写法）
+    await expect(list.getByRole('listitem').first()).toContainText('登记人 管理员 · 尾号 in-001')
+    await expect(list.getByRole('listitem').first()).not.toContainText('mock-admin-001（')
+    await expect(list.getByRole('listitem').first().locator('[title="mock-admin-001"]')).toHaveCount(1)
     await expect(list.getByRole('listitem').nth(1)).toContainText('hrss.demo-city.gov.cn')
     await shot(page, 'domains-view', domains)
   })

@@ -42,6 +42,7 @@ import {
 import { orgsAdminService } from '../../services/api/orgsAdmin'
 import { MOCK_ORG_SCRIPTS } from '../../services/api/offlineAgencyGovernance'
 import { API_MODE, ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 共用样式 ─────────────────────────────────────────────────────────────────
 
@@ -196,7 +197,7 @@ export function AgencyForm({ open, editing, onClose, onSaved }: AgencyFormProps)
       setOrgs({ kind: 'ready', data: API_MODE === 'http' ? real : [...real, ...MOCK_SCRIPT_ORGS] })
     } catch (e) {
       const code = e instanceof ApiHttpError ? e.code : 'UNKNOWN'
-      const message = e instanceof Error ? e.message : '未知错误'
+      const message = userMessageOf(e, '机构列表加载失败，请稍后重试')
       setOrgs({ kind: 'error', code, message })
     }
   }, [])
@@ -228,7 +229,7 @@ export function AgencyForm({ open, editing, onClose, onSaved }: AgencyFormProps)
       onSaved()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '操作失败，请重试')
+      setError(userMessageOf(e, '机构没有保存，请检查后重试'))
     } finally {
       setBusy(false)
     }
@@ -294,7 +295,7 @@ export function AgencyForm({ open, editing, onClose, onSaved }: AgencyFormProps)
             <p className="mt-2 text-xs text-neutral-400">正在读取机构列表…</p>
           )}
 
-          {/* 「没拿到」：红色语气 + 错误码 + 重试，且**不渲染下拉** */}
+          {/* 「没拿到」：红色语气 + 中文原因 + 重试，且不渲染下拉。错误码不展示。 */}
           {orgs.kind === 'error' && (
             <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
               <p className="flex items-center gap-1.5 text-xs font-medium text-red-700">
@@ -302,7 +303,7 @@ export function AgencyForm({ open, editing, onClose, onSaved }: AgencyFormProps)
                 未能获取机构列表，无法确认有哪些来源机构可选
               </p>
               <p className="mt-1 text-[11px] text-red-600">
-                {orgs.message}（{orgs.code}）。这<strong className="font-semibold">不是</strong>「系统里没有机构可选」；
+                {userMessageOf(orgs, '机构列表加载失败，请稍后重试')}。这<strong className="font-semibold">不是</strong>「系统里没有机构可选」；
                 在列表恢复之前请勿据此判断该机构没有来源机构。
                 {form.sourceOrgId
                   ? `已保存的绑定（${form.sourceOrgId}）不会因为这次失败被清空。`

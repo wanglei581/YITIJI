@@ -25,6 +25,8 @@ import {
   type PrintParamSuggestionView,
 } from '../../services/api/materials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { machineCannotPrintLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff, type PrintHandoffContext } from './printHandoff'
 import { usePreviewPrintParams } from './usePreviewPrintParams'
@@ -134,6 +136,8 @@ export function PrintPreviewPage({
 } = {}) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
+  const contact = useSupportContact()
+  const faultLine = machineCannotPrintLine(contact)
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
   const file = handoff?.file ?? emptyFile
@@ -212,19 +216,19 @@ export function PrintPreviewPage({
     if (printerNotice) {
       next.push({ id: 'queue-gate', level: 'error', text: printerNotice })
     } else if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
-      next.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
+      next.push({ id: 'unknown', level: 'error', text: faultLine })
     } else if (printerKind === 'offline' || !printer.isOnline) {
-      next.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
+      next.push({ id: 'offline', level: 'error', text: faultLine })
     } else if (printer.errorCode === 'paperJam') {
-      next.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
+      next.push({ id: 'jam', level: 'error', text: faultLine })
     } else if (printer.errorCode === 'hardwareError' || printerKind === 'error') {
-      next.push({ id: 'hardware', level: 'error', text: '打印机异常，请联系工作人员检查后再打印' })
+      next.push({ id: 'hardware', level: 'error', text: faultLine })
     } else if (printer.errorCode === 'paperEmpty' || !printer.hasPaper) {
-      next.push({ id: 'paper', level: 'error', text: '打印机缺纸，请联系工作人员补纸' })
+      next.push({ id: 'paper', level: 'error', text: faultLine })
     }
-    if (printerKind === 'low_paper') next.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，建议补纸后再大批量打印' })
+    if (printerKind === 'low_paper') next.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，大批量打印可能打不完。' })
     return next
-  }, [printer, printerKind, printerNotice])
+  }, [faultLine, printer, printerKind, printerNotice])
 
   const hasBlockingWarning = warnings.some((warning) => warning.level === 'error') || !printerReady
   const selectedPages = useMemo(() => {
@@ -423,7 +427,7 @@ export function PrintPreviewPage({
     >
       <PrintDeskGuide step={3}
         title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
-        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? '现在不能放行到报价，请等状态返回或联系工作人员。' : '核对内容与参数，下一步看价格，最后带走打印件。'} />
+        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? `现在不能放行到报价。${faultLine}` : '核对内容与参数，下一步看价格，最后带走打印件。'} />
       <div className="qpd-device-strip" role="status">
         <div data-ready={printerReady ? 'true' : undefined}><span>打印机</span><strong>{printerLoading ? '正在检查' : printerLabel}</strong><small>{printerLoading ? '请稍候' : printerName}</small></div>
         <div><span>纸张</span><strong>A4</strong></div>

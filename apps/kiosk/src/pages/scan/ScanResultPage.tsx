@@ -10,6 +10,7 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { helpNeededLine, preferUnattended } from '../../copy/unattendedCopy'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
@@ -323,7 +324,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             {isNoFile ? (
               <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/help')}>
                 <HeadphonesIcon aria-hidden />
-                联系工作人员
+                问小青
               </button>
             ) : (
               <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/')}>
@@ -366,14 +367,16 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
               <p>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。</p>
             </>
           ) : (
-            <p>{reason ?? '扫描任务未能完成，请重试或联系工作人员'}</p>
+            <p>{reason
+              ? preferUnattended(reason, `扫描任务未能完成，请重试。${helpNeededLine()}。`)
+              : `扫描任务未能完成，请重试。${helpNeededLine()}。`}</p>
           )}
           {safeRescanLost ? (
             <p data-testid="scan-safe-rescan-lost">
               <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
               本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，
               你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
-              并且换一份材料或找工作人员。
+              {`并且换一份材料。${helpNeededLine()}。`}
             </p>
           ) : null}
         </ScanStatusPanel>
@@ -400,8 +403,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
                  * 而带着重扫两半的创建能成功，等于服务端已经把授权消费掉了。 */
                 rescanAuthorized
                   ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。'
-                  : '本机没有可用的安全重扫凭据：同一张纸原样再扫，系统可能按重复件拒收（两小时内），换一次扫描或找工作人员。',
-                isNoFile ? '这个编号问不出文件，反复点也是同一句结果。' : '同一份材料连续失败两次，就找工作人员。',
+                  : `本机没有可用的安全重扫凭据：同一张纸原样再扫，系统可能按重复件拒收（两小时内），换一次扫描。${helpNeededLine()}。`,
+                isNoFile ? '这个编号问不出文件，反复点也是同一句结果。' : `同一份材料连续失败两次。${helpNeededLine()}。`,
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="本机不会替系统补话">

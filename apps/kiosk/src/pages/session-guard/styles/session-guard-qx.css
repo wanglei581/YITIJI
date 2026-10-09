@@ -1,3 +1,15 @@
+/* 稿 04 顶栏下面直接是倒计时区，没有页头大标题。h1「使用时限」留给读屏，不占版面。
+   只作用在本页（.k8-session-timeout），不动共享壳。 */
+.k8-session-timeout .qx-pagehead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .sg-page { display: flex; flex-direction: column; min-height: 0; }
 .sg-hero {
   display: flex; align-items: center; gap: 48px;

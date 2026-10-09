@@ -19,6 +19,7 @@
 
 import { API_BASE_URL, API_MODE } from './client'
 import { getTerminalId } from './screensaver'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 
 /**
  * 封闭词表，与后端 dto/kiosk-feedback.dto.ts 的 KIOSK_FEEDBACK_ISSUE_CODES 一一对应。
@@ -131,7 +132,7 @@ export async function submitKioskFeedback(
     // 终端身份未解析 = 后端无法定位是哪台机器，也无法做按终端限流。失败关闭。
     throw new KioskFeedbackApiError(
       'NO_TERMINAL_IDENTITY',
-      '本机终端身份未确认，暂时无法提交反馈，请联系现场工作人员',
+      `本机终端身份未确认，暂时无法提交反馈。${machineUnusableLine()}`,
       0,
     )
   }

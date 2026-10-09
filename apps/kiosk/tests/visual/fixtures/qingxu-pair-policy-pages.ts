@@ -8,7 +8,7 @@
 //     另外登记成 runtime:* 对，左边一律配稿的 ready 并排看。
 // 48：五个分区按 ?tab= 进。政策与公告同走 GET /policies，按 kind 分开答（ApiRouter 只认路径，这里用
 //     page.route 按查询串分）；条件核对先用空作答探一次，再按作答比对：POST 第 1 次是探针、第 2 次是提交。
-import type { Page, Route } from '@playwright/test'
+import { expect, type Page, type Route } from '@playwright/test'
 import type { ApiRouter } from '../../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../../fixtures/recruitment-hosting'
 import type { QingxuPairTarget, RuntimePlan } from './qingxu-pair-targets'
@@ -28,7 +28,7 @@ const none = (reason: string): PolicyPagesPlan => ({ plan: { kind: 'none' }, rea
 
 const OC = '[data-kiosk-screen="official-channels"]'
 const CHANNELS = '/api/v1/terminals/KSK-001/official-channels'
-const ORG = '示例市公共就业服务中心'
+const ORG = '海川区公共就业服务中心'
 const ORG_CHANNELS = [
   { name: '市公共就业服务中心官网', url: 'https://jobs.example.gov.cn/', displayOrder: 1, organizationName: ORG },
   { name: '就业服务中心微信公众号', url: 'https://mp.example.gov.cn/jobs-official', displayOrder: 2, organizationName: ORG },
@@ -87,7 +87,7 @@ function policyItem(extra: Record<string, unknown> = {}) {
     content: '一、补贴对象：毕业学年内有就业创业意愿，且符合困难家庭、残疾、获得助学贷款等条件之一的高校毕业生。\n'
       + '二、申领方式：由学校统一组织申报，经人社部门审核后发放。\n三、补贴标准与申报时间以当年通知为准。',
     audience: 'graduate',
-    sourceName: '示例市人力资源和社会保障局',
+    sourceName: '海川区人力资源和社会保障局',
     syncTime: '2026-09-20T08:00:00.000Z',
     externalId: 'HRSS-2026-0918',
     publishedDate: '2026-09-18',
@@ -105,7 +105,7 @@ function noticeItem(extra: Record<string, unknown> = {}) {
     summary: '10 月 1 日起，失业保险金申领改为线上预审、窗口复核。',
     content: '自 2026 年 10 月 1 日起，失业保险金申领改为先在线上预审、再到经办窗口复核。\n'
       + '申领人需携带本人身份证件与解除或终止劳动合同证明，具体材料以经办窗口告知为准。',
-    sourceName: '示例市公共就业服务中心',
+    sourceName: '海川区公共就业服务中心',
     syncTime: '2026-09-22T08:00:00.000Z',
     externalId: 'NOTICE-2026-0922',
     publishedDate: '2026-09-22',
@@ -217,7 +217,7 @@ function checkResult(answeredCount: number, items: unknown[]) {
 /** 探针（空作答）：录了条件的政策，逐条都是「无法判定」。 */
 function probeResult() {
   return checkResult(0, [
-    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('示例市人力资源和社会保障局', 'HRSS-2026-0918'), 'some_conditions_unknown',
+    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('海川区人力资源和社会保障局', 'HRSS-2026-0918'), 'some_conditions_unknown',
       '按你填写的信息，有 0 条与已录入条件相符，2 条无法判定，需人工核对。', [
         cond('r1', 1, '毕业时间', 'unknown', 'ANSWER_MISSING', REASON.missing, '毕业学年内的高校毕业生', [basis('graduation_year', '毕业年份', null, null, 'unknown')]),
         cond('r2', 2, '困难条件', 'unknown', 'MANUAL_REVIEW_ONLY', REASON.manual, '符合困难家庭、残疾、获得助学贷款等条件之一', []),
@@ -228,12 +228,12 @@ function probeResult() {
 /** 提交（应届毕业生 · 本年度应届）：一条部分相符待人工核对，一条有一项不一致。 */
 function submitResult() {
   return checkResult(2, [
-    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('示例市人力资源和社会保障局', 'HRSS-2026-0918'), 'some_conditions_unknown',
+    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('海川区人力资源和社会保障局', 'HRSS-2026-0918'), 'some_conditions_unknown',
       '按你填写的信息，有 1 条与已录入条件相符，1 条无法判定，需人工核对。', [
         cond('r1', 1, '毕业时间', 'matched', 'ANSWER_MATCHES_RECORDED_CONDITION', REASON.matched, '毕业学年内的高校毕业生', [basis('graduation_year', '毕业年份', 'current_year', '本年度应届', 'matched')]),
         cond('r2', 2, '困难条件', 'unknown', 'MANUAL_REVIEW_ONLY', REASON.manual, '符合困难家庭、残疾、获得助学贷款等条件之一', []),
       ], { matched: 1, conflict: 0, unknown: 1, total: 2 }),
-    checkItem('pair-policy-002', '失业人员灵活就业社保补贴', source('示例市公共就业服务中心', null), 'some_conditions_conflict',
+    checkItem('pair-policy-002', '失业人员灵活就业社保补贴', source('海川区公共就业服务中心', null), 'some_conditions_conflict',
       '按你填写的信息，有 1 条与已录入条件不一致；另有 0 条相符、1 条无法判定。', [
         cond('r3', 1, '就业状态', 'conflict', 'ANSWER_CONFLICTS_WITH_RECORDED_CONDITION', REASON.conflict, '已办理失业登记、以灵活就业方式就业的人员', [basis('employment_status', '现在状态', 'fresh_graduate', '应届毕业生', 'conflict')]),
         cond('r4', 2, '户籍社保', 'unknown', 'ANSWER_MISSING', REASON.missing, '在本市以灵活就业人员身份参加社会保险', [basis('household_social', '户籍社保', null, null, 'unknown')]),
@@ -243,13 +243,14 @@ function submitResult() {
 
 function noRulesResult() {
   return checkResult(0, [
-    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('示例市人力资源和社会保障局', 'HRSS-2026-0918'), 'no_recorded_conditions',
+    checkItem('pair-policy-001', '高校毕业生一次性求职创业补贴', source('海川区人力资源和社会保障局', 'HRSS-2026-0918'), 'no_recorded_conditions',
       '该政策尚未录入可机械比对的条件，本次未做条件核对，需人工核对。', [], { matched: 0, conflict: 0, unknown: 0, total: 0 }, false),
   ])
 }
 
 const ELIG_WAIT: Record<string, string> = {
   'eligibility-probing': '.k8-elig .rq-state[data-kind="info"]',
+  'eligibility-backend-required': '.k8-elig .rq-state:has-text("本机现在做不了条件核对")',
   // 9/29 起这三屏是稿 48 的死路屏（.rq-deadend）；逗号后是改版前的状态卡，两版都认得出。
   'eligibility-no-policies': '.k8-elig .rq-deadend, .k8-elig-notice',
   'eligibility-no-rules': '.k8-elig .rq-deadend, .k8-elig-notice',
@@ -270,6 +271,8 @@ const POLICY_WAIT: Record<string, string> = {
   'source-missing': '[data-policy-section="library"] .rq-exit[aria-disabled="true"]',
   'source-invalid': '[data-policy-section="library"] .rq-exit[aria-disabled="true"]',
   'context-missing': '[data-policy-section="builtin"] .k8-policy-list-item.is-open',
+  'ai-unavailable': '[data-testid="renshi-policy-state-ai-unavailable"]',
+  'manual-view-source': '[data-testid="renshi-policy-state-manual-view-source"]',
 }
 
 const NOTICE_WAIT: Record<string, string> = {
@@ -283,13 +286,10 @@ const NOTICE_WAIT: Record<string, string> = {
 function renshiPlan(screen: string, state: string): PolicyPagesPlan {
   const path = `/renshi?tab=${screen}`
   if (screen === 'policy') {
-    if (state === 'ai-unavailable') return none('政策页不读 AI 可用性：小青入口只是跳转，连不上时由小青页自己说明；这一屏与 policy-ready 相同')
-    if (state === 'manual-view-source') return none('运行页没有单独的「人工核对」屏：原文与来源在展开条里常显，与 policy-ready 相同')
     const marker = POLICY_WAIT[state]
     return marker ? hit(marker, path) : none('没有现成注册器覆盖这一态')
   }
   if (screen === 'eligibility') {
-    if (state === 'eligibility-backend-required') return none('「本机现在做不了条件核对」只在未连接后端（API_MODE≠http）的构建里出现，并排截图用的是 http 构建')
     const marker = ELIG_WAIT[state]
     return marker ? hit(marker, path) : none('没有现成注册器覆盖这一态')
   }
@@ -307,6 +307,12 @@ async function see(page: Page, selector: string): Promise<void> {
 }
 
 function policyReply(tab: string, state: string): PolicyReply {
+  if (['ai-unavailable', 'manual-view-source', 'eligibility-backend-required'].includes(state)) {
+    return {
+      guides: [policyItem({ sourceName: '海川区人力资源和社会保障局' })],
+      notices: [noticeItem({ sourceName: '海川区公共就业服务中心' })],
+    }
+  }
   if (tab === 'policy' && state === 'loading') return 'hang'
   if (tab === 'policy' && state === 'request-error') return 'error'
   if (tab === 'policy' && state === 'policy-library-empty') return { guides: [], notices: [noticeItem()] }
@@ -352,6 +358,22 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
   const { screen: tab, state } = target
   page.setDefaultTimeout(12_000)
   await routePolicies(page, policyReply(tab, state))
+  api.respond('GET', '/api/v1/advisor/availability', { status: 200, json: { available: state !== 'ai-unavailable' } })
+  if (tab === 'eligibility' && state === 'eligibility-backend-required') {
+    // 此分支由服务层的未连接哨兵触发，不是 HTTP 503。只拦两条 /api/v1 读取，
+    // 用同一哨兵模拟未连接；不改构建模式、业务源码、页面 DOM 或问项。
+    await page.addInitScript(() => {
+      const fetchOriginal = window.fetch.bind(window)
+      window.fetch = (input, init) => {
+        const raw = input instanceof Request ? input.url : String(input)
+        const path = new URL(raw, window.location.href).pathname
+        if (path === '/api/v1/policies/eligibility-questions' || path === '/api/v1/policies/eligibility-check') {
+          return Promise.reject(new Error('ELIGIBILITY_BACKEND_REQUIRED'))
+        }
+        return fetchOriginal(input, init)
+      }
+    })
+  }
   if (tab === 'eligibility') registerEligibility(api, state)
 
   await page.goto(`/renshi?tab=${tab}`, { waitUntil: 'domcontentloaded' })
@@ -367,6 +389,13 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
     } else if (state === 'context-missing') {
       await see(page, '[data-policy-section="builtin"] .k8-policy-list-item')
       await page.locator('[data-policy-section="builtin"]').getByRole('button', { name: /职业技能培训/ }).click()
+    } else if (state === 'manual-view-source') {
+      await see(page, '[data-policy-section="library"] .k8-policy-list-item.is-open')
+      await expect(page.getByTestId('renshi-policy-manual-source')).toContainText('不经过 AI，自己对照')
+      await page.getByTestId('renshi-policy-manual-source').click()
+      await expect(page.locator('.qx-pagehead p')).toHaveText('自己核对，不经过 AI：直接看这条政策的原文与来源。')
+      await expect(page.locator('.rq-srcline')).toHaveText('自己核对：不经过 AI，直接看这条政策的原文与来源')
+      await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('自己核对')
     }
     return
   }
@@ -378,6 +407,13 @@ async function openRenshi(page: Page, api: ApiRouter, target: QingxuPairTarget):
       if (state !== 'eligibility-ask-partial') {
         await page.locator('.rq-cta-host .k8-elig-submit').click()
         await see(page, state === 'eligibility-result' ? '.k8-elig-headline' : 'text=正在比对…')
+        if (state === 'eligibility-result') {
+          const cards = page.locator('.k8-elig-card')
+          await expect(cards).toHaveCount(2)
+          await expect(cards.nth(0).locator('.k8-elig-card-src .k8-elig-chip').filter({ hasText: '外部编号' })).toHaveText('外部编号 HRSS-2026-0918')
+          await expect(cards.nth(1).locator('.k8-elig-card-src .k8-elig-chip')).toHaveCount(2)
+          await expect(cards.nth(1).locator('.k8-elig-card-src .k8-elig-chip').filter({ hasText: '外部编号' })).toHaveCount(0)
+        }
       }
     }
     return

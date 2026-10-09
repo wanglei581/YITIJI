@@ -9,10 +9,11 @@ import {
   classifyMicError,
   detectMicCapability,
   subscribeMicDeviceChange,
-  MIC_REASON,
+  micReasonLine,
   type MicCapabilityState,
 } from '../../utils/micCapability'
 import { isTerminalKiosk } from '../../services/api/screensaver'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 
 const MAX_RECORD_SECONDS = 58
 
@@ -129,7 +130,7 @@ export function AssistantHoldToTalk({
     : asrConfigured === null || mic === null
       ? '正在检查语音输入是否可用…'
       : asrReason(asrConfigured)
-        ?? (mic !== 'available' ? advisorUserReason(MIC_REASON[mic], '麦克风暂不可用，请使用文字输入。') : null)
+        ?? (mic !== 'available' ? advisorUserReason(micReasonLine(mic), '麦克风暂不可用，请使用文字输入。') : null)
 
   const blocked = Boolean(blockedReason) || mic === null || asrConfigured !== true
   const pressed = holdState === 'recording'
@@ -163,7 +164,7 @@ export function AssistantHoldToTalk({
       setError(
         failure === 'permission-denied'
           ? isTerminalKiosk()
-            ? '麦克风不可用，可以改用文字输入；如需语音请联系现场工作人员'
+            ? `麦克风不可用，可以改用文字输入；如需语音，${helpNeededLine()}。`
             : '麦克风权限未开启，请在地址栏允许麦克风后重试，或改用文字输入'
           : '麦克风不可用，请改用文字输入',
       )

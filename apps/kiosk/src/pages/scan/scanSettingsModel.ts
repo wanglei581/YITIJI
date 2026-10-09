@@ -1,4 +1,5 @@
 import type { ScanSessionCreateResponse } from '@ai-job-print/shared'
+import { helpNeededLine, networkDisconnectLine } from '../../copy/unattendedCopy'
 import type { SessionFailure } from './scanRescanRecovery'
 import type { ScanLiveState } from './scanWorkbenchSession'
 
@@ -24,11 +25,13 @@ export type SessionPhase = 'invalid' | 'loading' | 'success' | 'expired' | 'erro
  */
 export const SCAN_LIVE_NOT_DURABLE_FAILURE: SessionFailure = {
   title: '本机没能记住这次扫描',
-  description: '这次扫描确实建出来了，但本机没能把凭据记在这台机器上：'
-    + '写完读回来对不上。记不住就等于这一场随时会找不回来，所以本页没有向系统确认'
-    + '投递授权，而是把刚建的那条任务撤掉了 —— 系统里没有留下还在等文件的任务，'
-    + '你手上的纸不会被谁悄悄收走。现在请先别在面板上按开始：没有这次扫描来接收那份文件。'
-    + '请安全返回扫描首页，并叫现场工作人员看一眼这台机器的浏览器存储是不是被禁用或者写满了。',
+  get description() {
+    return '这次扫描确实建出来了，但本机没能把凭据记在这台机器上：'
+      + '写完读回来对不上。记不住就等于这一场随时会找不回来，所以本页没有向系统确认'
+      + '投递授权，而是把刚建的那条任务撤掉了 —— 系统里没有留下还在等文件的任务，'
+      + '你手上的纸不会被谁悄悄收走。现在请先别在面板上按开始：没有这次扫描来接收那份文件。'
+      + `请安全返回扫描首页。${helpNeededLine()}。`
+  },
 }
 
 /**
@@ -45,11 +48,13 @@ export const SCAN_LIVE_NOT_DURABLE_FAILURE: SessionFailure = {
  */
 export const SCAN_CLEANUP_HOLD_FAILURE: SessionFailure = {
   title: '这台机器还在收上一场扫描的尾',
-  description: '上一位用完之后，本机正在向系统确认他那一场扫描任务确实已经取消。'
-    + '确认之前不能建立新的一次扫描：系统会把面板上扫出来的文件交给这台机器上'
-    + '最早那条还在等文件的任务。现在就建立，你扫的那张纸可能会落到上一位名下。'
-    + '本机正在自动重试，确认到了这一页会自己往下走，不用你做什么。'
-    + '一直停在这里请叫现场工作人员看一眼这台机器的网络。',
+  get description() {
+    return '上一位用完之后，本机正在向系统确认他那一场扫描任务确实已经取消。'
+      + '确认之前不能建立新的一次扫描：系统会把面板上扫出来的文件交给这台机器上'
+      + '最早那条还在等文件的任务。现在就建立，你扫的那张纸可能会落到上一位名下。'
+      + '本机正在自动重试，确认到了这一页会自己往下走，不用你做什么。'
+      + `一直停在这里。${networkDisconnectLine()}。${helpNeededLine()}。`
+  },
 }
 
 /**
@@ -82,11 +87,29 @@ export function isValidCreatedSession(created: unknown): created is ScanSessionC
     && candidate.instructions.every((instruction) => typeof instruction === 'string' && instruction.trim().length > 0)
 }
 
+/**
+ * 屏上的剩余时间。超过 1 小时不再拼成「37996569:36」这种分钟数。
+ * 扫描设置、上传二维码、清场有效期都走这一处。
+ *
+ * · 非有限或 ≤0 →「0 分钟」
+ * · 不足 1 小时 →「N 分钟」（有剩余但不足 1 分钟时记 1 分钟）
+ * · 满 1 小时 →「约 N 小时」
+ */
+export function formatRemainingDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0 分钟'
+  const seconds = Math.floor(totalSeconds)
+  if (seconds >= 3600) {
+    const hours = Math.max(1, Math.round(seconds / 3600))
+    return `约 ${hours} 小时`
+  }
+  const minutes = Math.max(1, Math.ceil(seconds / 60))
+  return `${minutes} 分钟`
+}
+
 export function formatCountdown(expiresAt: string): string {
-  const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
-  const minutes = Math.floor(seconds / 60)
-  const remain = seconds % 60
-  return `${minutes}:${String(remain).padStart(2, '0')}`
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (!Number.isFinite(ms)) return '0 分钟'
+  return formatRemainingDuration(Math.floor(ms / 1000))
 }
 
 export function liveSessionStillValid(live: ScanLiveState | undefined): live is ScanLiveState {

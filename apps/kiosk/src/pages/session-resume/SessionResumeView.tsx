@@ -2,8 +2,8 @@ import type { PendingTask } from '../../services/api/pendingTasks'
 import {
   formatResumeAmount,
   formatResumeUpdatedAt,
-  RESUME_EMPTY_EXITS,
-  RESUME_UNAVAILABLE_EXITS,
+  resumeEmptyExits,
+  resumeUnavailableExits,
   resumeContinueRoute,
   resumeRowCopy,
   resumeVerdict,
@@ -56,7 +56,7 @@ export function SessionResumeView({
           </div>
         </div>
         <div className="sr-list" style={{ marginTop: 12 }}>
-          {RESUME_EMPTY_EXITS.map((item) => (
+          {resumeEmptyExits().map((item) => (
             <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
               <span>
                 <span className="sr-fn">{item.title}</span>
@@ -80,7 +80,7 @@ export function SessionResumeView({
           </div>
         </div>
         <div className="sr-list" style={{ marginTop: 12 }}>
-          {RESUME_UNAVAILABLE_EXITS.map((item) => (
+          {resumeUnavailableExits().map((item) => (
             <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
               <span>
                 <span className="sr-fn">{item.title}</span>

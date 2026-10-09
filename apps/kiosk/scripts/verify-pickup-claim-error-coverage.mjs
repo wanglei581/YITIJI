@@ -122,9 +122,12 @@ const httpAdapterStub = toDataUrl(`export class ApiHttpError extends Error {
 const sharedStub = toDataUrl(`export const LEGACY_PICKUP_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 export const PICKUP_CODE_LENGTH = 8
 export const PICKUP_CODE_MAX_INPUT_LENGTH = 10`)
-const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub })
+// 文案表按缓存联系方式生成；加载真实标准句模块，保留逐码运行时断言。
+const unattendedUrl = transpile('apps/kiosk/src/copy/unattendedCopy.ts')
+const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub, '../../copy/unattendedCopy': unattendedUrl })
 const cashierUrl = transpile('apps/kiosk/src/pages/print/cashierStatus.ts')
 const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
+  '../../copy/unattendedCopy': unattendedUrl,
   '@ai-job-print/shared': sharedStub,
   '../../services/api/httpAdapter': httpAdapterStub,
   './cashierStatus': cashierUrl,
@@ -133,7 +136,7 @@ const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
 const model = await import(modelUrl)
 const { ApiHttpError } = await import(httpAdapterStub)
 
-const table = model.PICKUP_CLAIM_MESSAGES
+const table = model.PICKUP_CLAIM_MESSAGES()
 if (!table || typeof table !== 'object') fail('pickupClaimModel 没有导出 PICKUP_CLAIM_MESSAGES')
 
 const missing = []
@@ -142,7 +145,7 @@ for (const code of [...serverCodes].sort()) {
   const said = model.pickupClaimMessage(new ApiHttpError(code, 'server says', 400))
   if (!registered) missing.push(code)
   else if (said !== table[code]) fail(`${code}：pickupClaimMessage 没有返回登记的文案（实际「${said}」）`)
-  else if (said === model.PICKUP_CLAIM_FALLBACK_MESSAGE) fail(`${code}：登记的文案等于兜底句`)
+  else if (said === model.PICKUP_CLAIM_FALLBACK_MESSAGE()) fail(`${code}：登记的文案等于兜底句`)
 }
 if (missing.length) fail(`一体机取件页没有登记这些认领失败码：${missing.join(', ')}`)
 else pass('服务端认领链路的每个码，一体机都有取件场景的登记文案')
@@ -153,9 +156,10 @@ for (const code of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
   assert.match(table[code], /到机码没有作废/)
   assert.doesNotMatch(table[code], /换一台/)
 }
-const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+// 无人值守后，干净原话仍透传；叫人到现场的旧原话必须换成标准句。
+const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码'
 assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', original, 400)), original)
-for (const bad of ['queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
+for (const bad of ['请找现场工作人员', 'queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
   assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', bad, 400)), table.PRINT_TERMINAL_QUEUE_HALTED)
 }
 pass('打印机拒绝保持可恢复分类；合格原话透传、不合格回退取件原话')
@@ -174,8 +178,8 @@ for (const code of CLOSED_REQUIRED) {
   const said = model.pickupClaimMessage(err)
   if (kind !== 'closed') fail(`${code}：应分类为 closed（码已是终态），实际 ${kind}`)
   if (/重试|重新输入|再试/.test(said)) fail(`${code}：文案「${said}」叫人重试，但这个码重输不会有别的结果`)
-  // 10/4 起现场无人值守：问小青、按《隐私政策》联系方式求助也是出路（「工作人员」留着，等全量替换线收掉）。
-  if (!/手机|工作人员|小程序|小青|联系方式/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机、问小青或联系方式）`)
+  // 标准句有号码时给服务电话、无号码时给隐私政策联系方式；两种都是可执行的求助出路。
+  if (!/手机|工作人员|小程序|小青|联系方式|服务电话/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机、问小青或联系方式）`)
 }
 if (model.failureScreen('closed') !== 'closed') fail('closed 失败没有映射到独立的 closed 屏')
 pass(`终态码 ${CLOSED_REQUIRED.length} 个：分类 closed、文案不含「重试」、给出路`)

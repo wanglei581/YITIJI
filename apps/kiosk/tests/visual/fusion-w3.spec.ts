@@ -2970,7 +2970,8 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await page.goto('/resume/job-fit/actions')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'missing-task')
-  await expect(page.getByText('请先完成一次岗位匹配参考').first()).toBeVisible()
+  // 稿 46（9/29）把用户可见的「岗位匹配参考」改成「简历对照」。路由与接口名不变。
+  await expect(page.getByText('请先完成一次简历对照').first()).toBeVisible()
   await captureDecisionViewports(page, 'actions-missing-task')
 
   api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 200, json: ACTIONS_RESULT })
@@ -3010,7 +3011,7 @@ test('job fit actions: a print result arriving after leaving does not hijack nav
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await captureDecisionViewports(page, 'actions-print-pending')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回对照结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   releasePrint!()
   await expect.poll(() => api.requestCount('POST', '/api/v1/resume/job-fit/t-act/print')).toBe(1)

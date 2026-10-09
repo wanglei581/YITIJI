@@ -1,4 +1,5 @@
 import { LEGAL_DOCS_NOT_PUBLISHED_COPY, MemberApiError, resolveMemberApiErrorMessage } from '../../services/auth/memberAuthApi'
+import { helpNeededLine, preferUnattended } from '../../copy/unattendedCopy'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
 
 const CODE_COPY: Readonly<Record<string, string>> = {
@@ -26,7 +27,7 @@ const CODE_COPY: Readonly<Record<string, string>> = {
   PHONE_CONFLICT: '该手机号已绑定其他账号，无法换绑。',
   // 2026-09-29 后端排雷新增（谁新增的码谁补文案；覆盖门禁 verify:backend-error-copy-coverage）
   REBIND_UNAVAILABLE: '暂时无法换绑，手机号没有改动。请稍后从验证旧手机号重新开始。',
-  ACCOUNT_UNAVAILABLE: '账号当前不可用，请联系现场工作人员。',
+  ACCOUNT_UNAVAILABLE: '账号当前不可用。',
   SMS_DAILY_TOTAL_LIMIT: '今天的短信验证码已发满，请明天再试，或用手机扫码登录。',
   SMS_TERMINAL_DAILY_LIMIT: '这台机器今天的短信验证码已发满，请用手机扫码登录，或明天再试。',
   SMS_BUDGET_UNAVAILABLE: '验证码服务暂时不可用，请稍后再试，或用手机扫码登录。',
@@ -43,6 +44,12 @@ export function accountDisplayMessage(message: string | null | undefined, fallba
 export function accountErrorMessage(error: unknown, fallback: string): string {
   // 协议未发布：一体机自己查出来的与服务端拒绝的，统一说同一句话，并告诉用户不登录能做什么。
   if (error instanceof MemberApiError && error.code === 'LEGAL_DOCS_NOT_PUBLISHED') return LEGAL_DOCS_NOT_PUBLISHED_COPY
+  // 电话在调用时再拼，不能写进上面的常量表，否则会话还没读到号码就被冻成「没号码」。
+  if (error instanceof MemberApiError && error.code === 'ACCOUNT_UNAVAILABLE') {
+    const recovery = `账号当前不可用。${helpNeededLine()}。`
+    const shown = accountDisplayMessage(error instanceof Error ? error.message : resolveMemberApiErrorMessage(error, recovery), recovery)
+    return preferUnattended(shown, recovery)
+  }
   const recovery = error instanceof MemberApiError ? CODE_COPY[error.code] ?? fallback : fallback
   return accountDisplayMessage(error instanceof Error ? error.message : resolveMemberApiErrorMessage(error, recovery), recovery)
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { XIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   createPlannedTerminal,
   type AdminOrganizationOption,
@@ -33,7 +34,7 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
       })
       onCreated(created.terminalCode)
     } catch (error) {
-      const message = error instanceof Error ? error.message : '预创建设备失败，请稍后重试'
+      const message = userMessageOf(error, '预创建设备失败，请稍后重试')
       setErrorMessage(message)
       onError(message)
     } finally {

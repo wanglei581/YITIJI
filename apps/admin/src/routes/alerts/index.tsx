@@ -12,9 +12,9 @@ import {
   type AlertAction,
   type AlertListView,
 } from '../../services/api/adminOps'
-import { ApiHttpError } from '../../services/api/client'
 import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from '../member-feedback/feedbackSla'
 import { alertDetailText } from './alertDetailText'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const TYPE_META: Record<
   AdminAlertItem['type'],
@@ -138,7 +138,7 @@ export default function AlertsPage() {
       })
       await load(view)
     } catch (err) {
-      setActionError(err instanceof ApiHttpError ? err.message : '处理失败，请刷新后重试')
+      setActionError(userMessageOf(err, '处理失败，请刷新后重试'))
     } finally {
       setBusyKey(null)
     }
