@@ -127,7 +127,7 @@ test('10/9 漏掉的两种说法进了词表：问工作人员、工作人员会
   assert.equal(copy.preferUnattended('码找不到可以问工作人员', '标准句'), '标准句')
   // 现在页面上的两句不能被自己的词表拦住。
   assert.equal(copy.containsStaffHandoff('求助'), false)
-  assert.equal(copy.containsStaffHandoff('看联系方式，或问小青'), false)
+  assert.equal(copy.containsStaffHandoff('联系我们或问小青'), false)
   assert.equal(copy.containsStaffHandoff(`选择这次遇到的问题。${copy.helpNeededLine(null)}`), false)
 })
 

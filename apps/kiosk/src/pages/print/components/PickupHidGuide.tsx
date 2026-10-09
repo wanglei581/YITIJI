@@ -281,7 +281,7 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
         <li>
           <button type="button" className="pch-out-btn" onClick={onHelp}>
             <b>求助</b>
-            <span>看联系方式，或问小青</span>
+            <span>联系我们或问小青</span>
           </button>
         </li>
       </ul>
