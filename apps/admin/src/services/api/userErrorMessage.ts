@@ -1,10 +1,11 @@
 /**
  * 管理员后台给操作者看的错误文案。
- * 适配器抛 ApiHttpError 时优先用已登记码表，其次用后端中文 message，
- * 英文技术串（statusText / HTTP_400）一律落到调用方兜底句。
+ * 适配器抛出的 ApiHttpError（按 name 识别，避免单测去加载带 import.meta.env 的 client）：
+ * 已登记码 → 中文；后端中文或其它非状态串 message → 原样；
+ * 英文状态串 / 401 / 5xx / 网络 → 中文；其余 → 调用方兜底句。
+ * 页面自己抛出的 TypeError 只有断网那几句才算网络问题。
+ * 普通 Error 没有中文时用兜底句，有中文则原样（本项目里手写的 Error 多是中文）。
  */
-import { ApiHttpError } from './client'
-
 const CODE_MESSAGES: Readonly<Record<string, string>> = {
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
   AUTH_REQUIRED: '登录已过期，请重新登录',
@@ -37,23 +38,59 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
 }
 
 const ENGLISH_STATUS_TEXT = /^(OK|Created|Bad Request|Unauthorized|Forbidden|Not Found|Conflict|Too Many Requests|Internal Server Error|Bad Gateway|Service Unavailable)$/i
+const HAS_CHINESE = /[\u4e00-\u9fff]/
+const NETWORK_TYPE_ERROR = /Failed to fetch|NetworkError|Load failed|network/i
+
+type HttpErrorLike = Error & { code: string; status: number }
+
+function isHttpError(error: unknown): error is HttpErrorLike {
+  if (!(error instanceof Error) || error.name !== 'ApiHttpError') return false
+  const record = error as { code?: unknown; status?: unknown }
+  return typeof record.code === 'string' && typeof record.status === 'number'
+}
+
+function fromHttpFields(
+  code: string,
+  message: string,
+  status: number,
+  fallback: string,
+  keepNonChinese: boolean,
+): string {
+  if (code && CODE_MESSAGES[code]) return CODE_MESSAGES[code]
+  const msg = message.trim()
+  const technical = !msg
+    || /^HTTP[_\s]?\d+/i.test(msg)
+    || ENGLISH_STATUS_TEXT.test(msg)
+    || msg === String(status)
+  if (!technical && (keepNonChinese || HAS_CHINESE.test(msg))) return msg
+  if (status === 0 || code === 'NETWORK_ERROR') return CODE_MESSAGES.NETWORK_ERROR
+  if (status === 401) return CODE_MESSAGES.AUTH_REQUIRED
+  if (status >= 500) return '服务暂时不可用，请稍后重试'
+  return fallback
+}
 
 export function userMessageOf(error: unknown, fallback: string): string {
-  if (error instanceof ApiHttpError) {
-    if (error.code && CODE_MESSAGES[error.code]) return CODE_MESSAGES[error.code]
-    const msg = error.message.trim()
-    if (
-      msg
-      && !/^HTTP[_\s]?\d+/i.test(msg)
-      && !ENGLISH_STATUS_TEXT.test(msg)
-      && msg !== String(error.status)
-    ) {
-      return msg
-    }
-    if (error.status === 0 || error.code === 'NETWORK_ERROR') return CODE_MESSAGES.NETWORK_ERROR
-    if (error.status === 401) return CODE_MESSAGES.AUTH_REQUIRED
-    if (error.status >= 500) return '服务暂时不可用，请稍后重试'
+  if (isHttpError(error)) return fromHttpFields(error.code, error.message, error.status, fallback, false)
+  if (error instanceof TypeError) {
+    if (NETWORK_TYPE_ERROR.test(error.message)) return CODE_MESSAGES.NETWORK_ERROR
+    return fallback
   }
-  if (error instanceof TypeError) return CODE_MESSAGES.NETWORK_ERROR
+  if (error instanceof Error) {
+    const msg = error.message.trim()
+    if (msg && HAS_CHINESE.test(msg)) return msg
+    return fallback
+  }
+  if (error && typeof error === 'object') {
+    const record = error as { code?: unknown; message?: unknown; status?: unknown }
+    if (typeof record.message === 'string' || typeof record.code === 'string') {
+      return fromHttpFields(
+        typeof record.code === 'string' ? record.code : '',
+        typeof record.message === 'string' ? record.message : '',
+        typeof record.status === 'number' ? record.status : 400,
+        fallback,
+        false,
+      )
+    }
+  }
   return fallback
 }

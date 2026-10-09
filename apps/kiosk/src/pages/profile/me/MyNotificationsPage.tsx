@@ -7,14 +7,17 @@ import { MemberLoadMore } from './MemberLoadMore'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  ArrowRightIcon,
   BellIcon,
   ClockIcon,
+  LockIcon,
   LogInIcon,
   MegaphoneIcon,
   MessageSquareIcon,
   PrinterIcon,
   RefreshCwIcon,
   SparklesIcon,
+  TriangleAlertIcon,
   WrenchIcon,
   CheckIcon,
   XIcon,
@@ -239,6 +242,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
                 </div>
               )
             })}
+            <MemberLoadMore {...pagination} />
             <div className="qx-me-legal">
               {unreadOnly ? '当前没有未读消息。未读筛选下没有消息；' : '当前没有消息通知。'}
               {canUseRemote ? '设备和服务状态有更新时，消息会按上面这几类出现在这里。' : '当前没有可读取的消息。连接真实服务并登录后，这里会显示本人消息。'}
@@ -252,12 +256,12 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
                 key={`${item.kind}-${item.id}`}
                 item={item}
                 busy={busy}
-                busyId={busyId}
                 onRead={() => void markRead(item)}
                 onDelete={() => void remove(item)}
                 onFeedback={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
               />
             ))}
+            <MemberLoadMore {...pagination} />
             <div className="qx-me-legal">只有与本人反馈关联的消息可以跳到反馈详情；其它消息不提供额外跳转，也不代表来源平台的处理结果。</div>
           </section>
         )}
@@ -285,7 +289,6 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       ctabar={ctabar}
     >
       {body}
-      {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}
     </QxMePage>
   )
 }
@@ -348,6 +351,14 @@ function notificationCtabar({
         </span>
       )
     }
+    if (uiState === 'all-empty') {
+      return (
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" data-route="/me/ai-records" onClick={() => navigate('/me/ai-records')}>
+          <ArrowRightIcon size={24} aria-hidden />
+          去我的记录
+        </button>
+      )
+    }
     if (!canUseRemote || unreadCount === 0) {
       return <span className="qx-btn" data-variant="primary" aria-disabled="true" aria-label="全部已读（当前没有未读消息）" data-testid="notifications-primary"><CheckIcon size={24} aria-hidden />全部已读</span>
     }
@@ -371,6 +382,7 @@ function CategoryStructRow({ cat, mode, index = 0 }: { cat: string; mode: 'lock'
   const meta = CATEGORY_META[cat]
   const Icon = meta.icon
   const tail = mode === 'lock' ? '登录后显示' : mode === 'loading' ? '读取中' : '本次未取到'
+  const TailIcon = mode === 'lock' ? LockIcon : mode === 'loading' ? ClockIcon : TriangleAlertIcon
   return (
     <div
       className="qx-me-row"
@@ -389,7 +401,7 @@ function CategoryStructRow({ cat, mode, index = 0 }: { cat: string; mode: 'lock'
       </span>
       <span className="qx-me-acts">
         <span className="qx-me-small" aria-disabled="true">
-          {mode === 'loading' ? <ClockIcon size={19} aria-hidden /> : null}
+          <TailIcon size={19} aria-hidden />
           {tail}
         </span>
       </span>
@@ -398,11 +410,10 @@ function CategoryStructRow({ cat, mode, index = 0 }: { cat: string; mode: 'lock'
 }
 
 function NotificationRow({
-  item, busy, busyId, onRead, onDelete, onFeedback,
+  item, busy, onRead, onDelete, onFeedback,
 }: {
   item: MemberNotificationItem
   busy: boolean
-  busyId: string | null
   onRead: () => void
   onDelete: () => void
   onFeedback: () => void
@@ -411,8 +422,6 @@ function NotificationRow({
   const Icon = meta.icon
   const feedbackRelated = item.relatedType === 'feedback_ticket' && item.relatedId
   const tid = `notifications-item-${item.id}`
-  const reading = busyId === `read-${item.kind}-${item.id}`
-  const deleting = busyId === `delete-${item.kind}-${item.id}`
   return (
     <div
       className="qx-me-row qx-me-notice-row"
@@ -429,9 +438,9 @@ function NotificationRow({
           <span className="qx-me-row-title">{item.title}</span>
           <span className="qx-me-chip">{meta.label}</span>
           {item.kind === 'broadcast' ? <span className="qx-me-chip">全站公告</span> : null}
+          <span className="qx-me-row-sub qx-me-notice-time">{formatTime(item.createdAt)}</span>
         </span>
         <span className="qx-me-notice-body">{item.content}</span>
-        <span className="qx-me-row-sub">{formatTime(item.createdAt)}</span>
         <span className="qx-me-row-foot">
           {feedbackRelated ? (
             <button type="button" className="qx-me-small" data-variant="primary" data-testid={`${tid}-feedback`} onClick={onFeedback}>
@@ -447,7 +456,7 @@ function NotificationRow({
               aria-disabled={busy || undefined}
               onClick={busy ? undefined : onRead}
             >
-              <CheckIcon size={19} aria-hidden />{reading ? '已读' : '已读'}
+              <CheckIcon size={19} aria-hidden />已读
             </button>
           ) : null}
           <button
@@ -457,7 +466,7 @@ function NotificationRow({
             aria-disabled={busy || undefined}
             onClick={busy ? undefined : onDelete}
           >
-            <XIcon size={19} aria-hidden />{deleting ? '删除' : '删除'}
+            <XIcon size={19} aria-hidden />删除
           </button>
         </span>
       </span>

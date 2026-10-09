@@ -165,6 +165,27 @@ for (const page of ['src/pages/resume/ResumeTemplateLibraryPage.tsx', 'src/pages
     `${page} avoids forbidden recruiting flow wording`,
   )
 }
+// 2026-10-07 稿 25：底栏右侧「遇到问题」进站内帮助页；边界收成一句，仍含「不收取简历给企业」。
+assertContains(
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  '遇到问题',
+  'Job material page keeps the design help affordance',
+)
+assertContains(
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  "navigate('/help')",
+  'Job material help affordance opens the in-app help page',
+)
+assertContains(
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  '费用以确认时显示为准',
+  'Job material footer keeps the design fee clause inside the single boundary sentence',
+)
+assertNotContains(
+  'src/pages/resume/JobMaterialLibraryPage.tsx',
+  ['找工作人员', '服务台'],
+  'Job material page does not add staffed-desk wording',
+)
 
 // ── 不伪造能力（CLAUDE.md §9）：AI 措辞必须与后端真实能力一致 ─────────────
 // 后端 services/api/src/job-materials 全链只做「固定模板 + 用户手填字段」渲染，

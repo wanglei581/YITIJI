@@ -3,6 +3,7 @@ import { Card, StatusBadge } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { getSmartCampusTerminals, saveSmartCampusConfig, type PartnerSmartCampusTerminal } from '../../services/api'
 import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   ActivityIcon,
   GraduationCapIcon,
@@ -142,7 +143,7 @@ function TerminalsPanel() {
       })
       .catch((err) => {
         if (!mounted) return
-        setError(err instanceof Error ? err.message : '终端配置加载失败')
+        setError(userMessageOf(err, '终端配置加载失败，请稍后重试'))
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -180,7 +181,7 @@ function TerminalsPanel() {
       setError(null)
       setSavedHint(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败，请稍后重试')
+      setError(userMessageOf(err, '保存失败，请稍后重试'))
     } finally {
       setSavingKey(null)
     }

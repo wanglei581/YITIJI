@@ -186,6 +186,9 @@ jobs:
           # 真跑一体机码表模块；已用过 / 已退款等终态码不许叫人重试。
           pnpm --filter @ai-job-print/kiosk verify:pickup-claim-error-coverage
           pnpm --filter @ai-job-print/kiosk verify:backend-error-copy-coverage
+          # 2026-10-06 无人值守：扫 apps/kiosk/src 字符串字面量，禁止再让用户去找现场工作人员。
+          # 纯静态，TypeScript AST，不连库、不起服务。白名单为空：注销统一句不含工作人员，不再放过。
+          pnpm verify:kiosk-unattended-copy
           # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
           # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-session-reporting
@@ -394,6 +397,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # 开机打印防护、服务第三次起 30 分钟重试、每日维护重启：只读脚本，不碰打印服务。
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher

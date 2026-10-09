@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberQaRecordItem } from '@ai-job-print/shared'
-import { SparklesIcon } from 'lucide-react'
+import { EyeIcon, PrinterIcon, SparklesIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyQaRecord } from '../../../services/api/memberAssets'
 import { formatTime } from '../assets/format'
 
@@ -29,7 +29,7 @@ export function QaRecords({ items, token, onDeleted }: { items: MemberQaRecordIt
     {items.map((item) => {
       const expired = Date.parse(item.expiresAt) <= Date.now()
       const planPath = `/ai/plan?${new URLSearchParams({ sessionId: item.sessionId, artifactId: item.artifactId })}`
-      return <div key={item.id} className="qx-me-row" data-record-kind="qa_pins">
+      return <div key={item.id} className="qx-me-row" data-flag={confirmId === item.id ? 'true' : undefined} data-record-kind="qa_pins">
         <span className="qx-me-row-ico" aria-hidden="true"><SparklesIcon size={28} /></span>
         <span className="qx-me-row-main">
           <span className="qx-me-row-head">
@@ -42,12 +42,12 @@ export function QaRecords({ items, token, onDeleted }: { items: MemberQaRecordIt
           {confirmId === item.id ? <span className="qx-me-reason">删除这份作业摘要后不可恢复。已导出的文件仍在「我的文档」，可在那里单独删除。</span> : null}
         </span>
         <span className="qx-me-acts">
-          {expired ? null : <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(planPath)}>打开</button>}
-          {expired ? null : <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(planPath)}>接着打印</button>}
+          {expired ? null : <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(planPath)}><EyeIcon size={19} aria-hidden />打开</button>}
+          {expired ? null : <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(planPath)}><PrinterIcon size={19} aria-hidden />接着打印</button>}
           {confirmId === item.id ? <>
             <button type="button" className="qx-me-small" disabled={busy} onClick={() => setConfirmId(null)}>取消</button>
-            <button type="button" className="qx-me-small" disabled={busy} onClick={() => void remove(item.id)}>{busy ? '正在删除…' : '确认删除'}</button>
-          </> : <button type="button" className="qx-me-small" disabled={busy} onClick={() => setConfirmId(item.id)}>删除</button>}
+            <button type="button" className="qx-me-small" data-variant="danger" disabled={busy} onClick={() => void remove(item.id)}><Trash2Icon size={19} aria-hidden />{busy ? '正在删除…' : '确认删除'}</button>
+          </> : <button type="button" className="qx-me-small" disabled={busy} onClick={() => setConfirmId(item.id)}><Trash2Icon size={19} aria-hidden />删除</button>}
         </span>
       </div>
     })}

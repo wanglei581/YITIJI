@@ -74,7 +74,11 @@ for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']
     await page.goto('/print/pickup-claim')
     await page.getByLabel('到机码输入框').fill('28491703')
     await expect(page.getByTestId('arrival-code-state-failed')).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText(message)
+    // 服务端旧句仍作为反例夹具；画面须换成到机码保留说明和标准求助句。
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText('你的到机码没有作废')
+    await expect(alert).toContainText(/服务电话|联系方式/)
+    await expect(alert).not.toContainText('工作人员')
     // 输入框清空：扫码枪再扫不会接在旧码后面拼出错码；「重试校验」用失败时记下的原码重发。
     await expect(page.getByLabel('到机码输入框')).toHaveValue('')
     // W-117：公共终端上被拒的码不得继续回显；重试仍应提交同一码。

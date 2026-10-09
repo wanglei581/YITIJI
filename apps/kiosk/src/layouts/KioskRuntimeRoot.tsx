@@ -3,6 +3,7 @@ import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
+import { useSupportContact } from '../hooks/useSupportContact'
 
 /**
  * Kiosk 终端业务路由的非视觉运行时根。
@@ -13,6 +14,8 @@ import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
  * 必须覆盖沉浸式页（/campus 等隐藏了视觉外壳的路由）。
  */
 export function KioskRuntimeRoot() {
+  // 进任何业务页都先取一次服务联系方式，后面各屏复用 5 分钟缓存。这里不渲染。
+  useSupportContact()
   return (
     <KioskBusyProvider>
       <AiDeclarationHost />

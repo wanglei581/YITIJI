@@ -114,6 +114,38 @@ export function InterviewScrollCue() {
   )
 }
 
+/** 稿里的「接下来」：一条一个去向，说明写在按钮里，不另开菜单。 */
+export function InterviewOptList({
+  rows,
+}: {
+  rows: Array<{ k: string; title: string; desc: string; onClick: () => void; go?: boolean }>
+}) {
+  return (
+    <div className="iv-optlist">
+      {rows.map((row) => (
+        <button key={row.title} type="button" className={row.go ? 'is-go' : undefined} onClick={row.onClick}>
+          <i aria-hidden="true">{row.k}</i>
+          <span>
+            <b>{row.title}</b>
+            <small>{row.desc}</small>
+          </span>
+          <em aria-hidden="true">›</em>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** 稿 29 的读取动效卡。只表示请求还在进行，不写已经生成或已经保存。 */
+export function InterviewLoadingCard({ label }: { label: string }) {
+  return (
+    <section className="iv-card iv-load" aria-live="polite">
+      <div className="iv-wave" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+      <b className="iv-load-label">{label}</b>
+    </section>
+  )
+}
+
 /** 卡片头：标题 + 右侧一句提示。`as="h2"` 时标题是真正的标题（读屏与测试都按标题找）。 */
 export function InterviewCardHead({ title, hint, as = 'b', id }: { title: string; hint?: string; as?: 'b' | 'h2'; id?: string }) {
   const Title = as

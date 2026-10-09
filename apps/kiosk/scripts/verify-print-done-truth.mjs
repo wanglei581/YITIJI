@@ -162,14 +162,17 @@ const checks = [
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
     assert.match(doneSource, /文件带走/)
-    assert.match(doneSource, /联系工作人员补打/)
+    // 新结果页求助走标准句 4；重新提交入口及未确认禁重提仍由相邻断言守住。
+    assert.match(doneSource, /printProblemLine\(contact\)/)
+    assert.doesNotMatch(doneSource, /联系工作人员补打/)
     assert.match(doneSource, /重新提交打印/)
     assert.match(doneSource, /issuePrintJobTakeawayUrl/)
     assert.match(doneSource, /retryPrintJob/)
     assert.doesNotMatch(doneRuntime, /const\s+handleRetry/)
   }],
   ['W-114 重提版本门槛给求职者下一步，提示在固定按钮栏', () => {
-    assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\? '这台机器的打印程序需要升级后才能重新提交，请找现场工作人员'/)
+    // 只升级打印程序时给通用求助标准句，保留原版本错误码与按钮栏定位断言。
+    assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\?\s*`这台机器的打印程序需要升级后才能重新提交。\$\{helpNeededLine\(contact\)\}`/)
     const retryActions = doneRuntime.slice(doneRuntime.indexOf('const retryButton ='), doneRuntime.indexOf('const takeawayNotices ='))
     const takeawayNotices = doneRuntime.slice(doneRuntime.indexOf('const takeawayNotices ='), doneRuntime.indexOf("if (visual === 'out-of-paper')"))
     assert.match(retryActions, /retryError &&[\s\S]*role="alert"[\s\S]*flex: '1 1 100%'[\s\S]*order: -1[\s\S]*\{retryError\}/)

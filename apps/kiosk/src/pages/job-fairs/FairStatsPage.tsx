@@ -9,6 +9,8 @@
 // isMockData 为真时整页降级为空态——商用模式不展示模拟统计。
 
 import { useEffect, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { FairLiveStatsDTO } from '@ai-job-print/shared'
 import {
@@ -50,6 +52,7 @@ function formatClock(iso: string): string {
 }
 
 export function FairStatsPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
@@ -115,7 +118,7 @@ export function FairStatsPage() {
         </DirState>
         <DirStrip>
           <DirStripItem icon={UsersIcon} title="看参展名单" desc="名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-          <DirStripItem icon={InfoIcon} tone="slate" title="找工作人员" desc="需要官方数据可以到服务台咨询" onClick={() => navigate('/help')} />
+          <DirStripItem icon={InfoIcon} tone="slate" title="问小青" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
         </DirStrip>
       </QxFairWorkbench>
     )

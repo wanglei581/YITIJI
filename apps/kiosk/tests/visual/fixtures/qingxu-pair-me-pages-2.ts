@@ -34,25 +34,14 @@ const NEW_ID = 'fb-new-1006'
 const NO_SCREEN = '运行页没有整屏态'
 
 const ACTIVITY_REASON: Record<string, string> = {
-  'claim-pending': `${NO_SCREEN}。点「立即领取」后按钮停在「领取中…」，整页仍是活动详情。`,
-  'claim-success': `${NO_SCREEN}。领取成功只在详情页上出一句「领取成功，已加入我的权益」。`,
-  'claim-error': `${NO_SCREEN}。领取失败只在详情页上出一句「领取失败，请稍后重试」。`,
-  ended: `${NO_SCREEN}。没有单独的结束页，仍是活动详情，库存标成「已结束」，领取按钮禁用。`,
-  'sold-out': `${NO_SCREEN}。没有单独的领完页，仍是活动详情，库存标成「已领完」，领取按钮禁用。`,
+  'claim-pending': '页头保持「活动详情」。主键按任务写成置灰的「正在领取…」，稿上是「返回我的权益」。',
+  'claim-success': '主键按任务写成「查看我的权益」，稿上是「去我的权益查看」。页头保持「活动详情」。',
+  'claim-error': '主键按任务写成「重试」，稿上是「看清条件再试一次」。失败说明只写这次没有记入、没有扣减名额。',
+  ended: '主键按任务置灰并写「已结束」，稿上是「看还在进行的活动」。页头保持「活动详情」。',
+  'sold-out': '主键按任务置灰并写「已领完」，稿上是「看别的活动」。页头保持「活动详情」。',
 }
 
-const FEEDBACK_REASON: Record<string, string> = {
-  'submit-busy': `${NO_SCREEN}。提交按钮停在禁用的「提交反馈」，data-state 仍是 form-list。`,
-  success: `${NO_SCREEN}。提交成功后停在这条工单上，顶上出一句「反馈已提交」。`,
-  failure: `${NO_SCREEN}。提交失败后仍停在表单，顶上出一句「提交失败，请检查登录状态或稍后重试」。`,
-  'reply-busy': `${NO_SCREEN}。「追加描述」停在禁用，data-state 仍是 detail-ready。`,
-  'close-busy': `${NO_SCREEN}。「关闭反馈」停在禁用，data-state 仍是 detail-ready。`,
-}
-
-const PRIVACY_REASON: Record<string, string> = {
-  success: `${NO_SCREEN}。撤回成功后弹层关掉，记录回到列表，顶上出一句「已撤回 AI 使用授权，请求已记录」。`,
-  failure: `${NO_SCREEN}。提交失败后确认弹层还在，顶上出一句「提交失败，请稍后重试」。`,
-}
+const PRIVACY_REASON: Record<string, string> = {}
 
 type JsonReply = { status: number; json: unknown }
 
@@ -277,33 +266,10 @@ function activityRuntime(state: string): string {
 function benefitsPlan(screen: string, state: string): MePages2Plan {
   if (screen === 'benefits') return hit(`[data-testid="benefits-state-${state}"]`, '/me/benefits')
   if (screen === 'activities') {
-    const marker = state === 'loading'
-      ? '[data-kiosk-screen="activities"] p:text-is("加载中…")'
-      : state === 'empty'
-        ? '[data-kiosk-screen="activities"] p:text-is("暂无可领取活动")'
-        : state === 'error'
-          ? '[data-kiosk-screen="activities"] p:text-is("出现了一些问题")'
-          : '[data-kiosk-screen="activities"] h2:text-is("海川区就业服务点 · 试运行打印服务")'
-    return hit(marker, '/activities')
+    return hit(`[data-testid="activities-state-${state}"]`, '/activities')
   }
   if (screen === 'activity') {
-    const marker = state === 'detail'
-      ? '[data-kiosk-screen="activity-detail"] button[aria-label="立即领取"]'
-      : state === 'signed-out'
-        ? '[data-kiosk-screen="activity-detail"] button[aria-label="登录后领取"]'
-        : state === 'claim-pending'
-          ? '[data-kiosk-screen="activity-detail"] button[aria-label="领取中…"]'
-          : state === 'claim-success'
-            ? '.k8-act-message.is-success'
-            : state === 'claim-error'
-              ? '.k8-act-message.is-error'
-              : state === 'ended'
-                ? '.k8-act-stock:text-is("已结束")'
-                : state === 'sold-out'
-                  ? '.k8-act-stock:text-is("已领完")'
-                  : null
-    if (!marker) return missing(`这一态没有现成注册器：activity/${state}`)
-    return hit(marker, activityRuntime(state), ACTIVITY_REASON[state] ?? null)
+    return hit(`[data-testid="activity-state-${state}"]`, activityRuntime(state), ACTIVITY_REASON[state] ?? null)
   }
   return missing(`这一态没有现成注册器：${screen}/${state}`)
 }
@@ -350,7 +316,7 @@ async function prepareBenefits(page: Page, api: ApiRouter, target: QingxuPairTar
   if (state === 'signed-out') await page.goto(runtime, { waitUntil: 'domcontentloaded' })
   else await loginTo(page, runtime)
   if (state !== 'claim-pending' && state !== 'claim-success' && state !== 'claim-error') return
-  const button = page.getByRole('button', { name: '立即领取', exact: true })
+  const button = page.getByRole('button', { name: '领取这项权益', exact: true })
   await button.waitFor({ state: 'visible', timeout: 20_000 })
   await button.click()
 }
@@ -400,13 +366,22 @@ const TICKETS: Ticket[] = [
     status: 'processing',
     createdAt: '2026-10-02T09:18:00.000+08:00',
     updatedAt: '2026-10-03T11:05:00.000+08:00',
-    replies: [{
-      id: 'rp-preview-1',
-      senderType: 'admin',
-      actorId: null,
-      content: '已经看到这条反馈。我们会在这台机器上对一下预览和出纸是不是同一处裁切。核对完把结果写在这条记录里，先不约具体时间。',
-      createdAt: '2026-10-03T11:05:00.000+08:00',
-    }],
+    replies: [
+      {
+        id: 'rp-preview-user',
+        senderType: 'user',
+        actorId: 'member-linxiaowen',
+        content: '晚上又打开预览看了一眼，最下面一行还是缺着。',
+        createdAt: '2026-10-02T21:08:00.000+08:00',
+      },
+      {
+        id: 'rp-preview-1',
+        senderType: 'admin',
+        actorId: null,
+        content: '已经看到这条反馈。我们会在这台机器上对一下预览和出纸是不是同一处裁切。核对完把结果写在这条记录里，先不约具体时间。',
+        createdAt: '2026-10-03T11:05:00.000+08:00',
+      },
+    ],
   }),
   ticket({
     id: DETAIL_ID,
@@ -415,14 +390,23 @@ const TICKETS: Ticket[] = [
     content: '10 月 1 日上午用简历诊断，转圈转了很久，最后也没有给出诊断。不知道是没生成，还是页面卡住了。',
     status: 'replied',
     createdAt: '2026-09-28T10:42:00.000+08:00',
-    updatedAt: '2026-09-29T15:18:00.000+08:00',
-    replies: [{
-      id: 'rp-ai-1',
-      senderType: 'admin',
-      actorId: null,
-      content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，告诉现场工作人员，我们查这台机器的网络。不承诺当天一定出结果。',
-      createdAt: '2026-09-29T15:18:00.000+08:00',
-    }],
+    updatedAt: '2026-10-02T15:18:00.000+08:00',
+    replies: [
+      {
+        id: 'rp-ai-user',
+        senderType: 'user',
+        actorId: 'member-linxiaowen',
+        content: '下午 3 点左右又试了一次，还是转圈。',
+        createdAt: '2026-10-01T20:40:00.000+08:00',
+      },
+      {
+        id: 'rp-ai-1',
+        senderType: 'admin',
+        actorId: null,
+        content: '诊断等待过久这件事我们已经记下。这次如果没有生成结果，可以再提交一次。还是一直转圈的话，可以拨打服务电话，我们远程查这台机器的网络。不承诺当天一定出结果。',
+        createdAt: '2026-10-02T15:18:00.000+08:00',
+      },
+    ],
   }),
   ticket({
     id: 'fb-font',
@@ -434,7 +418,7 @@ const TICKETS: Ticket[] = [
     updatedAt: '2026-09-24T09:30:00.000+08:00',
     replies: [
       { id: 'rp-font-1', senderType: 'user', actorId: 'member-linxiaowen', content: '主要是预览和底部按钮，站远一点看不清。', createdAt: '2026-09-23T11:12:00.000+08:00' },
-      { id: 'rp-font-2', senderType: 'admin', actorId: null, content: '字号我们按现场看屏幕的距离再核一遍。这条先关闭。之后如果还是看不清，可以再开一条新的反馈。', createdAt: '2026-09-24T09:30:00.000+08:00' },
+      { id: 'rp-font-2', senderType: 'admin', actorId: null, content: '字号我们按你站在机器前的距离再核一遍。这条先关闭。之后如果还是看不清，可以再开一条新的反馈。', createdAt: '2026-09-24T09:30:00.000+08:00' },
     ],
   }),
   ticket({
@@ -499,6 +483,24 @@ function listItem(item: Ticket) {
   return rest
 }
 
+// 量尺专用：运行时只有一条服务回复。不放进 TICKETS，13 态的列表排版不变。
+export const FEEDBACK_ONE_REPLY: Ticket = ticket({
+  id: 'fb-one-reply',
+  category: 'device',
+  title: '取件码页面停住了',
+  content: '扫完到机码之后，页面停在读取，没有进入取件。',
+  status: 'replied',
+  createdAt: '2026-10-04T16:12:00.000+08:00',
+  updatedAt: '2026-10-05T09:26:00.000+08:00',
+  replies: [{
+    id: 'rp-one-1',
+    senderType: 'admin',
+    actorId: null,
+    content: '取件页停住这件事已经记下。再试一次如果还是停在读取，把大概时间留在这条反馈里。先不约上门。',
+    createdAt: '2026-10-05T09:26:00.000+08:00',
+  }],
+})
+
 const NEW_TICKET: Ticket = ticket({
   id: NEW_ID,
   category: 'print',
@@ -510,18 +512,19 @@ const NEW_TICKET: Ticket = ticket({
 })
 
 function feedbackPlan(state: string): MePages2Plan {
+  // 「正在提交…」写在按钮里的 span 上。button:text-is 只认按钮自己的文本节点，配不到。
   const marker = state === 'submit-busy'
-    ? 'button[disabled]:text-is("提交反馈")'
+    ? 'button[disabled] span:text-is("正在提交…")'
     : state === 'success'
       ? '.fb-toast:text-is("反馈已提交")'
       : state === 'failure'
         ? '.fb-toast:text-is("提交失败，请检查登录状态或稍后重试")'
         : state === 'reply-busy'
-          ? 'button[disabled]:text-is("追加描述")'
+          ? 'button[disabled] span:text-is("正在提交…")'
           : state === 'close-busy'
-            ? 'button[disabled]:text-is("关闭反馈")'
+            ? 'button[disabled]:text-is("正在关闭…")'
             : `[data-testid="member-feedback-state-${state}"]`
-  return hit(marker, '/me/feedback', FEEDBACK_REASON[state] ?? null)
+  return hit(marker, '/me/feedback', null)
 }
 
 async function fillField(page: Page, name: string, value: string): Promise<void> {
@@ -559,6 +562,7 @@ async function prepareFeedback(page: Page, api: ApiRouter, state: string): Promi
   await loginTo(page, ticketId ? `/me/feedback?ticket=${ticketId}` : '/me/feedback')
   if (state === 'submit-busy' || state === 'success' || state === 'failure') {
     await show(page, '[data-testid="member-feedback-state-form-list"]')
+    await page.getByRole('button', { name: /^打印服务/ }).click()
     await fillField(page, '反馈内容', '打印预览页最下面一行字被裁掉了，打出来也少这一行。')
     await page.getByRole('button', { name: '提交反馈', exact: true }).click()
   }
@@ -582,11 +586,12 @@ async function prepareFeedback(page: Page, api: ApiRouter, state: string): Promi
 
 // ── 41 隐私与数据请求 ────────────────────────────────────────────
 
+// 两三条、类型混合、时间拉开。导出这一条是打电话申请后办完的：这台机器不提交导出。
+// 不放 delete。类型名「账号注销（暂未开放）」只在共享常量里，这条夹具不会把它送上屏。
 const PRIVACY_ROWS = [
-  { id: 'dr-20261004', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-10-04T15:20:00.000+08:00', handledAt: '2026-10-04T15:20:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260927', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-27T11:06:00.000+08:00', handledAt: '2026-09-27T11:06:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260919', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-19T16:42:00.000+08:00', handledAt: '2026-09-19T16:42:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
-  { id: 'dr-20260912', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-09-12T09:18:00.000+08:00', handledAt: '2026-09-12T09:18:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20261002', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-10-02T15:20:00.000+08:00', handledAt: '2026-10-02T15:20:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20260911', requestType: 'export', status: 'completed', requestedAt: '2026-09-11T11:06:00.000+08:00', handledAt: '2026-09-16T09:40:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
+  { id: 'dr-20260806', requestType: 'revoke_consent', status: 'completed', requestedAt: '2026-08-06T09:18:00.000+08:00', handledAt: '2026-08-06T09:18:00.000+08:00', executionStep: null, exportExpiresAt: null, failureCode: null, canRetry: false, canDownload: false },
 ]
 
 const PRIVACY_NEW = {
@@ -607,12 +612,7 @@ function privacyBody(items: unknown[]) {
 }
 
 function privacyPlan(state: string): MePages2Plan {
-  const marker = state === 'success'
-    ? '.pr-toast:text-is("已撤回 AI 使用授权，请求已记录")'
-    : state === 'failure'
-      ? '.pr-toast:text-is("提交失败，请稍后重试")'
-      : `[data-testid="member-privacy-state-${state}"]`
-  return hit(marker, '/me/privacy-requests', PRIVACY_REASON[state] ?? null)
+  return hit(`[data-testid="member-privacy-state-${state}"]`, '/me/privacy-requests', PRIVACY_REASON[state] ?? null)
 }
 
 async function preparePrivacy(page: Page, api: ApiRouter, state: string): Promise<void> {

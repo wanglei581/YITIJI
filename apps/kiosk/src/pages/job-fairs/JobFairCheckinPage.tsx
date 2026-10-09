@@ -11,6 +11,8 @@
 // 状态：guide | qr | empty | error（与稿同名）。
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate } from 'react-router-dom'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
@@ -118,6 +120,7 @@ function checkinTrustOf(fair: ExternalJobFairDTO) {
 }
 
 export function JobFairCheckinPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { getToken } = useAuth()
   const [fairs, setFairs] = useState<ExternalJobFairDTO[]>([])
@@ -186,14 +189,14 @@ export function JobFairCheckinPage() {
   const ctabar = uiState === 'error'
     ? (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找现场工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
         <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((v) => v + 1)}>重新加载</button>
       </>
     )
     : uiState === 'empty'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>询问现场工作人员</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>查看招聘会</button>
         </>
       )
@@ -232,7 +235,7 @@ export function JobFairCheckinPage() {
       ) : error ? (
         <>
           <DirState tone="error" testId="fair-checkin-error" title="入场入口列表这次没取到">
-            招聘会列表这次没读到，所以无法判断哪些场次有可用的入场入口。本机不显示缓存二维码，也不判断你的预约或签到状态。
+            招聘会列表这次没读到，所以无法判断哪些场次有可用的入场入口。本机不显示缓存二维码，也不判断你的预约或签到状态。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="回场次列表" desc="换一场看看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
@@ -242,11 +245,11 @@ export function JobFairCheckinPage() {
       ) : availableFairs.length === 0 ? (
         <>
           <DirState tone="empty" testId="fair-checkin-empty" title="暂无可展示的来源入场入口">
-            当前没有进行中或即将开始、且来源平台提供了入场入口的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。
+            当前没有进行中或即将开始、且来源平台提供了入场入口的招聘会。<b>这不代表你未预约</b>，本机不查个人记录。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="查看招聘会" desc="先看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
-            <DirStripItem icon={InfoIcon} tone="slate" title="询问现场工作人员" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
+            <DirStripItem icon={InfoIcon} tone="slate" title="问小青" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
           </DirStrip>
         </>
       ) : (

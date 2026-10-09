@@ -36,6 +36,7 @@ export async function submitInterviewAnswer(ctx: {
   setPhase: Dispatch<SetStateAction<InterviewSessionPhase>>
   setError: Dispatch<SetStateAction<string | null>>
   setMicError: Dispatch<SetStateAction<boolean>>
+  setNetworkFailure: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
   setAnswersRecorded: Dispatch<SetStateAction<boolean>>
   setQuestionIndex: Dispatch<SetStateAction<number>>
@@ -44,6 +45,7 @@ export async function submitInterviewAnswer(ctx: {
   if (ctx.voiceKind === 'requesting_permission' || ctx.voiceKind === 'transcribing') return
   const answer = args.text.trim()
   if (!args.skip && !answer) {
+    ctx.setNetworkFailure(false)
     ctx.setError('请输入回答内容，或选择跳过此题')
     return
   }
@@ -51,6 +53,7 @@ export async function submitInterviewAnswer(ctx: {
   const draftBefore = ctx.draft
   ctx.setError(null)
   ctx.setMicError(false)
+  ctx.setNetworkFailure(false)
   ctx.setFinishRecovery(null)
   ctx.setMessages((prev) => [...prev, { role: 'candidate', content: args.skip ? '跳过了这个问题' : answer, skipped: args.skip }])
   ctx.setDraft('')
@@ -88,7 +91,10 @@ export async function submitInterviewAnswer(ctx: {
       ctx.setDraft(answer)
       if (args.voiceMeta) ctx.setMode('text')
     }
+    const declined = aiDeclarationDeclineMessage(err)
+    const outage = isAiOutage(err)
     const base = aiDeclarationDeclineMessage(err) ?? (isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : userMessageOf(err, '提交失败，请重试'))
+    ctx.setNetworkFailure(!declined && !outage && (errorCodeOf(err) === 'NETWORK_ERROR' || err instanceof TypeError))
     ctx.setError(submitFailureMessage(base, draftRestored))
     ctx.setPhase('answering')
   }

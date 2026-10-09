@@ -61,6 +61,7 @@
     "GET /policies/:p",
     "GET /policies/eligibility-questions",
     "GET /print/price-config",
+    "GET /public/support-contact",
     "GET /resume/career-plan/:p",
     "GET /resume/export/pricing",
     "GET /resume/generate/:p",

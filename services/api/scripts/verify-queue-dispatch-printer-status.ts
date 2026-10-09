@@ -74,6 +74,9 @@ function assertKioskFailClosed(): void {
       /import \{[^}]+\} from '\.\.\/services\/api\/screensaver'\n/,
       'const getTerminalId = () => ""\nconst subscribeTerminalIdentity = () => () => undefined\n',
     )
+    // 本门禁只验 printerReady：隔离联系方式 hook 与提示文案，不替换真实状态映射。
+    .replace(/import \{ machineUnusableLine \} from '\.\.\/copy\/unattendedCopy'\n/, 'const machineUnusableLine = () => ""\n')
+    .replace(/import \{ useSupportContact \} from '\.\/useSupportContact'\n/, 'const useSupportContact = () => undefined\n')
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))
   const file = join(dir, 'map-terminal-printer-status.ts')
@@ -82,7 +85,11 @@ function assertKioskFailClosed(): void {
     `${stripped}
 const cleanup = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'queue_cleanup_failed' })
 const pause = mapTerminalPrinterStatus({ heartbeatOnline: true, printerStatus: 'queue_pause_failed' })
-if (cleanup.printerReady !== false || pause.printerReady !== false) process.exit(1)
+const assertPrinterMap = require('node:assert/strict')
+assertPrinterMap.equal(cleanup.printerReady, false, 'queue_cleanup_failed must fail closed')
+assertPrinterMap.equal(pause.printerReady, false, 'queue_pause_failed must fail closed')
+console.log('PASS kiosk queue_cleanup_failed printerReady=' + cleanup.printerReady)
+console.log('PASS kiosk queue_pause_failed printerReady=' + pause.printerReady)
 process.exit(0)
 `,
   )
@@ -93,6 +100,7 @@ process.exit(0)
     env: { ...process.env, TS_NODE_TRANSPILE_ONLY: '1' },
   })
   assert.equal(result.status, 0, result.stderr || result.stdout || 'kiosk mapper did not run')
+  process.stdout.write(result.stdout)
 }
 
 async function assertAlertsDisappear(status: (typeof STATUSES)[number], label: string): Promise<void> {
@@ -308,6 +316,8 @@ function assertMutationsFail(): void {
 }
 
 async function main(): Promise<void> {
+  // 无网络的前端映射先验，避免 HTTP 监听失败遮住 fail-closed 断言。
+  assertKioskFailClosed()
   for (const status of STATUSES) {
     assert.equal(UNAVAILABLE_PRINTER_STATUSES.has(status), true)
     assert.equal((await validate(plainToInstance(HeartbeatDto, { printerStatus: status }))).length, 0)
@@ -399,7 +409,6 @@ async function main(): Promise<void> {
   for (const status of STATUSES) {
     await assertAlertsDisappear(status, LABELS[status])
   }
-  assertKioskFailClosed()
   assertMutationsFail()
   console.log('PASS queue dispatch printer status')
 }

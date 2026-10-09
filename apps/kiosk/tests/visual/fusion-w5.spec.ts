@@ -379,6 +379,7 @@ test('feedback exposes the authenticated form and honest submit error through vi
 
   await loginThroughVisibleUi(page, '/me/feedback')
   await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await page.getByRole('button', { name: /^打印服务/ }).click()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
   await page.getByRole('button', { name: '提交反馈', exact: true }).click()
@@ -543,7 +544,11 @@ test('benefit activity detail keeps the shared shell, real content and return pa
 
   await page.goto('/activities/w5-benefit-detail')
   await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expectSharedPageShell(page, '权益活动详情')
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
   await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
   const backButton = page.getByRole('button', { name: /返回活动/ }).first()
@@ -551,6 +556,258 @@ test('benefit activity detail keeps the shared shell, real content and return pa
   await expectFusionAcceptance(page, errors)
   await backButton.click()
   await expect(page).toHaveURL(/\/activities$/)
+})
+
+function benefitActivityFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'w5-benefit-detail',
+    title: 'W5 打印服务体验权益',
+    description: '这是来自真实活动详情接口的验收内容。',
+    rulesText: '每人限领一次；仅用于现场打印服务。',
+    benefitType: 'free_quota',
+    sourceType: 'platform',
+    quantityTotal: 1,
+    stockTotal: 20,
+    stockRemaining: 8,
+    claimLimitPerUser: 1,
+    status: 'published',
+    validFrom: null,
+    validUntil: null,
+    grantValidDays: 30,
+    claimable: true,
+    claimed: false,
+    soldOut: false,
+    ended: false,
+    createdAt: '2026-07-24T00:00:00.000Z',
+    updatedAt: '2026-07-24T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+/** 稿 31：活动列表和详情都用青序顶栏，不再渲染终端编号，底部当前项是「我的」。 */
+async function expectBenefitQingxuShell(page: Page): Promise<void> {
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByTestId('qx-nav-profile')).toContainText('我的')
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('qx-nav-home')).not.toHaveAttribute('aria-current', 'page')
+}
+
+test('benefit activities list and detail drop the terminal code and mark 我的 current @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities')
+  await expect(page.getByTestId('activities-state-empty')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '可参加的活动', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+
+  await page.goto('/activities/w5-benefit-detail')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('signed-out benefit activity primary is 登录后领取 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(primary).toHaveText('登录后领取')
+  await expect(primary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
+test('activity footer primary stays on one line and the footnote stays under the buttons @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('登录后领取')
+  const row = page.locator('.act-cta-row')
+  await expect(row).toBeVisible()
+  await expect(row).not.toContainText('权益只对应本机服务与打印')
+  await expect(page.locator('.act-cta-row .act-truth')).toHaveCount(0)
+  await expect(page.locator('.act-truth')).toContainText('权益只对应本机服务与打印')
+
+  const keys = page.locator('.act-cta-row > .qx-btn, .act-cta-row > .qx-ai-help')
+  expect(await keys.count()).toBeGreaterThan(0)
+  for (let index = 0; index < await keys.count(); index += 1) {
+    const metrics = await keys.nth(index).evaluate((el) => {
+      const style = getComputedStyle(el)
+      const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      let lines = 0
+      if (node) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+      }
+      return {
+        whiteSpace: style.whiteSpace,
+        fontSize: Number.parseFloat(style.fontSize),
+        minHeight: Number.parseFloat(style.minHeight),
+        lines,
+      }
+    })
+    expect(metrics.whiteSpace, '底栏键必须 nowrap').toBe('nowrap')
+    expect(metrics.lines, '底栏主键主字必须一行').toBe(1)
+    expect(metrics.fontSize).toBeGreaterThanOrEqual(26)
+    expect(metrics.minHeight).toBeGreaterThanOrEqual(72)
+  }
+  await expectFusionAcceptance(page, errors)
+})
+
+test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerKioskShell(api)
+  // 会员令牌只在内存里。整页跳转会丢掉登录态，所以失败这条从活动列表点进去。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  const successId = 'spring-print-2026'
+  const failureId = 'resume-diagnosis-quota'
+  let springClaimed = false
+  api.respondWith('GET', `/api/v1/activities/${successId}`, () => ({
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: successId,
+        title: '春季现场打印体验',
+        description: '到店打印简历时，可领取一次黑白打印体验额度。',
+        claimed: springClaimed,
+      }),
+    },
+  }))
+  api.respondWith('POST', `/api/v1/activities/${successId}/claim`, () => {
+    springClaimed = true
+    return {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          id: 'grant-spring-print-2026',
+          benefitType: 'free_quota',
+          serviceKey: null,
+          title: '春季现场打印体验',
+          description: '到店打印简历时，可领取一次黑白打印体验额度。',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+          validFrom: null,
+          validUntil: null,
+          createdAt: '2026-07-24T00:00:00.000Z',
+        },
+      },
+    }
+  })
+  api.respond('GET', `/api/v1/activities/${failureId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: failureId,
+        title: '简历诊断体验次数',
+        description: '领取后记入本人权益，用于本机简历诊断。',
+        benefitType: 'ai_quota',
+        quantityTotal: 2,
+      }),
+    },
+  })
+  api.respond('POST', `/api/v1/activities/${failureId}/claim`, {
+    status: 409,
+    json: { error: { code: 'BENEFIT_ACTIVITY_NOT_CLAIMABLE', message: '当前不可领取' } },
+  })
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        total: 1,
+        items: [
+          benefitActivityFixture({
+            id: failureId,
+            title: '简历诊断体验次数',
+            description: '领取后记入本人权益，用于本机简历诊断。',
+            benefitType: 'ai_quota',
+            quantityTotal: 2,
+          }),
+        ],
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, `/activities/${successId}`)
+  const successPrimary = page.getByTestId('activity-primary')
+  await expect(successPrimary).toHaveText('领取这项权益')
+  await successPrimary.click()
+  await expect(page.getByTestId('activity-state-claim-success')).toBeVisible()
+  await expect(successPrimary).toHaveText('查看我的权益')
+  await expect(page.getByText('领取成功，已加入我的权益', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '返回活动列表', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/activities$/)
+  await page.getByTestId('activities-row-1').click()
+  await expect(page).toHaveURL(new RegExp(`/activities/${failureId}$`))
+  const failurePrimary = page.getByTestId('activity-primary')
+  await expect(failurePrimary).toHaveText('领取这项权益')
+  await failurePrimary.click()
+  await expect(page.getByTestId('activity-state-claim-error')).toBeVisible()
+  await expect(failurePrimary).toHaveText('重试')
+  await expect(failurePrimary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
+test('ended benefit activity primary stays disabled @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/summer-print-assist', {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: 'summer-print-assist',
+        title: '暑期简历打印协助',
+        description: '活动时间已经过去，不再提供领取入口。',
+        status: 'ended',
+        claimable: false,
+        ended: true,
+        validUntil: '2026-08-31T16:00:00.000Z',
+      }),
+    },
+  })
+
+  await page.goto('/activities/summer-print-assist')
+  await expect(page.getByTestId('activity-state-ended')).toBeVisible()
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('已结束')
+  await expect(primary).toBeDisabled()
+  await expectFusionAcceptance(page, errors)
 })
 
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
@@ -1500,8 +1757,8 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   await expect(rows.filter({ hasText: '历史打印.pdf' })).toContainText('暂无支付信息')
   await expect(rows.filter({ hasText: '成绩单.pdf' })).toContainText('待退款')
-  // 取件码提示只跟着服务端 pickupCode 走：四单里只有一单带码。
-  await expect(page.locator('.qx-me-chip', { hasText: '取件码' })).toHaveCount(1)
+  // 方案②把订单徽标改称「到机码」；仍只跟着服务端 pickupCode 走，四单仅一单带码。
+  await expect(page.locator('.qx-me-chip', { hasText: '到机码' })).toHaveCount(1)
   await expect(page.getByText('进行中任务每 5 秒自动更新')).toBeVisible()
   await assetShot(page, 'orders-ready')
   await assertNoElementCrossesViewport(page)
@@ -1516,13 +1773,27 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
-  await expect(paidRow.getByText('到机码', { exact: true })).toBeVisible()
+  // 列表徽标和详单都写「到机码」；这里精确核查展开的码面板，避免两个同名元素。
+  await expect(paidRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expect(paidRow.getByText('还能续打')).toHaveCount(0)
   await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
+  // 付过钱但没有待退款标记：有「已退款」金额行，不出现「如需退款」申请句。
+  await expect(paidRow).toContainText('已退款')
+  await expect(paidRow).not.toContainText('如需退款')
   await assetShot(page, 'orders-detail')
+
+  const refundRow = rows.filter({ hasText: '成绩单.pdf' })
+  await refundRow.getByRole('button', { name: '查看订单详单 成绩单.pdf' }).click()
+  await expect(refundRow).toContainText('如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。')
+  await expect(refundRow).not.toContainText('在手机上申请')
+
+  const historyRow = rows.filter({ hasText: '历史打印.pdf' })
+  await historyRow.getByRole('button', { name: '查看订单详单 历史打印.pdf' }).click()
+  await expect(historyRow).toContainText('暂无支付信息')
+  await expect(historyRow).not.toContainText('退款')
 
   await page.getByRole('button', { name: /加载更多（已加载 4 \/ 共 5 条）/ }).click()
   await expect(page.getByText('第二页取消的订单.pdf', { exact: true })).toBeVisible()
@@ -1568,7 +1839,8 @@ test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kio
   await loginThroughVisibleUi(page, '/me/print-orders')
   const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
   await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
-  await expect(resumeRow.getByText('到机码', { exact: true })).toBeVisible()
+  // 徽标与详单标题同名，定位真实码面板；不改变码的可见性条件。
+  await expect(resumeRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
   await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })

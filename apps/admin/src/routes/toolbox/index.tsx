@@ -7,6 +7,7 @@ import { ToolboxGovernancePanel } from './components/ToolboxGovernancePanel'
 import { ToolboxLaunchSummaryCard } from './components/ToolboxLaunchSummaryCard'
 import { TerminalToolboxPanel } from './components/TerminalToolboxPanel'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 type TabKey = 'governance' | 'hosts' | 'terminals'
 
@@ -44,23 +45,23 @@ export default function ToolboxPage() {
         if (terminalsResult.status === 'fulfilled') {
           setTerminals(terminalsResult.value)
         } else {
-          setTerminalsError(terminalsResult.reason instanceof Error ? terminalsResult.reason.message : '终端数据加载失败')
+          setTerminalsError(userMessageOf(terminalsResult.reason, '终端数据加载失败，请稍后重试'))
         }
         if (summaryResult.status === 'fulfilled') {
           setSummary(summaryResult.value)
         } else {
           setSummary(null)
-          setSummaryError(summaryResult.reason instanceof Error ? summaryResult.reason.message : '使用概览加载失败')
+          setSummaryError(userMessageOf(summaryResult.reason, '使用概览加载失败，请稍后重试'))
         }
         if (appsResult.status === 'fulfilled') {
           setApps(appsResult.value)
         } else {
-          setAppsError(appsResult.reason instanceof Error ? appsResult.reason.message : '微应用数据加载失败')
+          setAppsError(userMessageOf(appsResult.reason, '微应用数据加载失败，请稍后重试'))
         }
         if (hostsResult.status === 'fulfilled') {
           setHosts(hostsResult.value)
         } else {
-          setHostsError(hostsResult.reason instanceof Error ? hostsResult.reason.message : '域名白名单加载失败')
+          setHostsError(userMessageOf(hostsResult.reason, '域名白名单加载失败，请稍后重试'))
         }
       })
       .finally(() => setLoading(false))

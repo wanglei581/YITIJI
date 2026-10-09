@@ -12,6 +12,7 @@ import type { SmartCampusModules, SmartCampusTerminalView } from '@ai-job-print/
 import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { smartCampusService } from '../../services/api/smartCampus'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const MODULE_DEFS: { key: keyof SmartCampusModules; label: string; note?: string; frozen?: boolean }[] = [
   { key: 'welcome', label: '迎新指引' },
@@ -52,7 +53,7 @@ function TerminalConfigRow({
       setMsg('已保存')
       onSaved()
     } catch (error) {
-      setMsg(error instanceof Error && error.message ? error.message : '保存失败，请检查网络后重试')
+      setMsg(userMessageOf(error, '保存失败，请检查网络后重试'))
     } finally {
       setSaving(false)
     }

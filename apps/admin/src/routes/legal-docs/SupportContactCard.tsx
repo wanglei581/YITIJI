@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import { supportContactService } from '../../services/api/supportContact'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /** 与服务端公开接口没配时的默认服务时间一致。 */
 const DEFAULT_SERVICE_HOURS = '工作日 9:00–18:00'
@@ -25,7 +26,7 @@ export function SupportContactCard() {
         setPublished(data.miniappPublished)
       })
       .catch((reason: Error) => {
-        if (!cancelled) setError(reason.message)
+        if (!cancelled) setError(userMessageOf(reason, '读取服务联系方式失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -50,7 +51,7 @@ export function SupportContactCard() {
       setPublished(data.miniappPublished)
       setNotice('已保存。一体机和小程序最迟 5 分钟内按新的配置显示。')
     } catch (reason) {
-      setError((reason as Error).message)
+      setError(userMessageOf(reason, '保存服务联系方式失败，请检查后重试'))
     } finally {
       setSaving(false)
     }

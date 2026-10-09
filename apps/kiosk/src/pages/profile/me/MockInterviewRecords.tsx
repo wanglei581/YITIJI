@@ -1,5 +1,5 @@
 import type { MemberInterviewItem } from '@ai-job-print/shared'
-import { Trash2Icon } from 'lucide-react'
+import { EyeIcon, PrinterIcon, Trash2Icon } from 'lucide-react'
 import { KIcon } from '../../../components/kiosk-icon'
 import { formatTime } from '../assets/format'
 
@@ -45,17 +45,17 @@ export function MockInterviewRecords({
               {item.hasReport ? (
                 <>
                   <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`查看模拟面试报告 ${item.position}`}>
-                    打开
+                    <EyeIcon size={19} aria-hidden />打开
                   </button>
                   <button type="button" className="qx-me-small" onClick={() => onOpen(item.sessionId)} aria-label={`接着打印模拟面试报告 ${item.position}`}>
-                    接着打印
+                    <PrinterIcon size={19} aria-hidden />接着打印
                   </button>
                 </>
               ) : null}
               <button
                 type="button"
                 className={['qx-me-small me-delete-button', confirming ? 'is-confirm' : ''].join(' ')}
-                data-variant="danger"
+                data-variant={confirming ? 'danger' : undefined}
                 disabled={busyId === item.sessionId}
                 onClick={() => onDelete(item.sessionId)}
                 title={confirming ? '再次点击确认删除' : '删除'}

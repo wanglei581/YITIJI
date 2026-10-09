@@ -20,6 +20,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isSafeInternalPath } from '../../auth/returnPath'
+import { helpNeededLine, networkDisconnectLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
@@ -162,6 +164,7 @@ function verdictsFor(view: View, result: CheckResult | null): Verdict[] {
 const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 
 export default function ErrorOfflinePage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const location = useLocation()
   const [attempts, setAttempts] = useState(0)
@@ -319,7 +322,7 @@ export default function ErrorOfflinePage() {
               </div>
               <div className="k9s-truth" data-disclaimer="true" data-testid="system-state-truth">
                 <p><b>怎么判断</b>八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，<b>不会默认写成正常</b>。</p>
-                <p><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况；拿不准就找工作人员。</p>
+                <p><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况。{helpNeededLine(contact)}。</p>
               </div>
             </>
           )}
@@ -374,7 +377,7 @@ export default function ErrorOfflinePage() {
                 </div>
                 <div className="k9s-card">
                   <h3><span className="k9s-ic" data-tone="cinnabar"><Glyph name="clockoff" size={26} /></span>不预告什么时候好</h3>
-                  <p>屏幕上<b>不写「预计几点恢复」</b>。什么时候好由现场和系统决定，写个时间只会让你白等。</p>
+                  <p>屏幕上<b>不写「预计几点恢复」</b>。{networkDisconnectLine()}，写个时间只会让你白等。</p>
                 </div>
               </div>
             </section>

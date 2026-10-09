@@ -153,6 +153,29 @@
   .qx-resume-triage .qx-rt-kv div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
 
+/* ── 通道整屏（稿 21 usb / local / phone；按钮仍走页面底栏的「回到来源选择」） ── */
+.qx-resume-triage .qx-rt-channel { display: flex; flex-direction: column; gap: 14px; }
+.qx-resume-triage .qx-rt-channel-acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.qx-resume-triage .qx-rt-channel .qx-rt-note { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; }
+.qx-resume-triage .qx-rt-channel .qx-rt-note b { margin-right: 0; }
+.qx-resume-triage .qx-rt-steps {
+  margin: 0; padding: 4px 18px; list-style: none; border-radius: 28px;
+  background: var(--qx-surface); border: 1px solid var(--qx-line);
+}
+.qx-resume-triage .qx-rt-steps li {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  min-height: 72px;
+}
+.qx-resume-triage .qx-rt-steps li + li { border-top: 1px solid var(--qx-line); }
+.qx-resume-triage .qx-rt-steps i {
+  width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--qx-teal-soft); color: var(--qx-teal-d); font-style: normal; font-weight: 800;
+}
+.qx-resume-triage .qx-rt-steps strong { display: block; font-size: var(--qx-fs-aux); }
+.qx-resume-triage .qx-rt-steps em { display: block; font-style: normal; font-size: var(--qx-fs-aux); color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-steps li > span { font-size: var(--qx-fs-aux); font-weight: 700; color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-scan > .qx-btn { align-self: flex-start; }
+
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-triage .qx-rt-target *,
   .qx-resume-triage .resume-usb-panel * { animation: none !important; transition: none !important; }

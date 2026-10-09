@@ -54,16 +54,6 @@ const QX_ME_TAKE_ASSETS: readonly (readonly [string, string])[] = [
   ['问小青', '不知道下一步可以问怎么打'],
 ]
 
-/** 记录四个视图（含记录详情）照稿 38 的格子，文字按记录来说。 */
-const QX_ME_TAKE_RECORDS: readonly (readonly [string, string])[] = [
-  ['带走', '简历、AI 报告接着打开或打印'],
-  ['收藏', '收藏过的内容，登录后再打开'],
-  ['足迹', '浏览、跳转和自填的求职进度'],
-  ['只给你', '明细只在本人登录后出现'],
-  ['删除', 'AI 记录可删除，删后不能恢复'],
-  ['问小青', '不知道下一步可以问'],
-]
-
 const QX_ME_ASK = {
   notifications: { label: '问小青', draft: '收到这条通知，接下来我该怎么做？' },
   assets: { label: '问小青：怎么打', draft: '我的文档怎么打印？打印前要注意什么？' },
@@ -77,9 +67,7 @@ type QxMeAsk = { label: string; draft: string }
 
 function takeFor(view: QxMeView): readonly (readonly [string, string])[] | null {
   if (view === 'documents' || view === 'orders') return QX_ME_TAKE_ASSETS
-  if (view === 'resumes' || view === 'favorites' || view === 'ai-records' || view === 'activity' || view === 'activity-detail') {
-    return QX_ME_TAKE_RECORDS
-  }
+  // 稿 39 的四个记录页签及详情头图均不放六格。
   return null
 }
 
