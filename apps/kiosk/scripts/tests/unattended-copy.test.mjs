@@ -120,6 +120,17 @@ test('服务端原话叫人找现场工作人员时换成登记句，干净原�
   assert.equal(copy.containsStaffHandoff('缺纸时一体机会自动停止接单'), true)
 })
 
+test('10/9 漏掉的两种说法进了词表：问工作人员、工作人员会核实后现场处理', () => {
+  assert.equal(copy.containsStaffHandoff('问工作人员'), true)
+  assert.equal(copy.containsStaffHandoff('选择这次遇到的问题，工作人员会核实后现场处理'), true)
+  assert.equal(copy.containsStaffHandoff('卡纸需要现场处理'), true)
+  assert.equal(copy.preferUnattended('码找不到可以问工作人员', '标准句'), '标准句')
+  // 现在页面上的两句不能被自己的词表拦住。
+  assert.equal(copy.containsStaffHandoff('求助'), false)
+  assert.equal(copy.containsStaffHandoff('看联系方式，或问小青'), false)
+  assert.equal(copy.containsStaffHandoff(`选择这次遇到的问题。${copy.helpNeededLine(null)}`), false)
+})
+
 const clientStub = toDataUrl('export const API_BASE_URL = "/api/v1"')
 const screenStub = toDataUrl('export function getTerminalId() { return globalThis.__kioskTerminalId || "" }')
 const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supportContact.ts'), {

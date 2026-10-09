@@ -376,14 +376,14 @@ test.describe('真人走查（模拟数据）', () => {
     // 继续往下点：材料检查 → 打印参数 → 报价确认。每一步都断言「按钮真有去向」。
     // 不猜按钮名：每屏自动找「主 CTA」—— 排除返回/退出/更换/删除这类回退动作，
     // 取剩下里最后一个可用按钮（这套 UI 的主操作固定在底部操作条右侧）。
-    const BACKWARD = /返回|退出|上一步|更换|删除|重试|取消|问工作人员|再取一件/
+    const BACKWARD = /返回|退出|上一步|更换|删除|重试|取消|求助|再取一件/
     for (let hop = 0; hop < 6; hop += 1) {
       const before = new URL(page.url()).pathname
       const cands = await page.locator('button:visible').evaluateAll((els) =>
         els.map((e, i) => ({ i, t: (e.textContent ?? '').replace(/\s+/g, ' ').trim(), dis: (e as HTMLButtonElement).disabled === true })),
       )
       // 2.0 每页底部有「问小青：…」（规则 7），它是去顾问页的旁路，不是本步的前进按钮。
-      const fwd = cands.filter((c) => c.t && !c.dis && !/^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再取一件/.test(c.t))
+      const fwd = cands.filter((c) => c.t && !c.dis && !/^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|求助|再取一件/.test(c.t))
       const pick = fwd[fwd.length - 1]
       if (!pick) { console.log(`\n  第 ${hop + 1} 跳：${before} 上没有可用的前进按钮`); break }
       console.log(`\n  第 ${hop + 1} 跳：在 ${before} 点「${pick.t}」`)
@@ -462,7 +462,7 @@ test.describe('真人走查（模拟数据）', () => {
 
     // 底部导航（首页 / AI 顾问 / 我的）永远排在 DOM 最后，会被误当主 CTA —— 必须排除。
     // 「问小青：…」是 2.0 每页底部去顾问页的旁路（规则 7），不算前进。
-    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员/
+    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|求助/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = new URL(page.url()).pathname
       const cands = await page.locator('button:visible').evaluateAll((els) =>
@@ -642,7 +642,7 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 
-    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
+    const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|求助|再扫/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = page.url()
       const cands = await page.locator('button:visible').evaluateAll((els) =>

@@ -35,6 +35,10 @@ const FORBIDDEN = [
   '向现场工作人员出示',
   '出示给现场工作人员',
   '出示给工作人员',
+  // 10/9：取件页「码找不到了？」和打印大厅反馈弹窗各漏了一处，上面的组合拦不到。
+  '问工作人员',
+  '工作人员会核实',
+  '现场处理',
   '去服务台',
   // 10/6 总指挥：四个词整体禁用（不只「联系 / 找」开头的组合），注释与测试不算。
   '现场工作人员',
@@ -291,6 +295,18 @@ const probe = { violations: [], allowed: 0, used: new Set() }
 scanSource('apps/kiosk/src/probe.tsx', "export const probe = '请联系现场工作人员'\n", probe)
 if (probe.violations.length !== 1) {
   fail('反向探针没有拦住「请联系现场工作人员」')
+}
+
+// 10/9 漏掉的两处照原样做探针：一处是按钮里的 JSX 文本，一处是属性里的字符串。
+const missedProbe = { violations: [], allowed: 0, used: new Set() }
+scanSource(
+  'apps/kiosk/src/missed-probe.tsx',
+  'export const A = () => <button><b>问工作人员</b><span>帮你查订单</span></button>\n'
+    + 'export const B = () => <Dialog description="选择这次遇到的问题，工作人员会核实后现场处理" />\n',
+  missedProbe,
+)
+if (missedProbe.violations.length !== 2) {
+  fail('反向探针没有同时拦住「问工作人员」按钮和「工作人员会核实后现场处理」说明')
 }
 
 // 退款句守卫：没守卫的要拦住，有守卫的（比金额、paid 布尔量、免费分支另一侧）不能误拦。
