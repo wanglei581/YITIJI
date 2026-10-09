@@ -26,41 +26,56 @@ export interface ScanTypeOption {
   icon: LucideIcon
 }
 
-/** 类型卡文案按运行时真值：服务端不转换格式，不得写「生成 PDF」。 */
+/**
+ * 类型卡小标按 2.0 稿，但「生成 PDF」不能写：服务端存的是设备回传原字节，不转换。
+ * 小标用「按回传格式保存」顶替那一枚。
+ */
 export const SCAN_TYPE_OPTIONS: ScanTypeOption[] = [
   {
     type: 'resume',
     label: '简历扫描',
-    description: '扫描纸质简历，按设备回传格式保存，可进入 AI 识别与优化，也可打印',
-    chips: [{ label: '支持 AI 简历识别', tone: 'ok' }, { label: '按回传格式保存' }],
+    description: '扫描纸质简历，可进入 AI 识别与优化，也可拿去打印',
+    chips: [
+      { label: '支持 AI 简历识别', tone: 'ok' },
+      { label: '按回传格式保存' },
+      { label: '面板 4 步' },
+    ],
     icon: FileTextIcon,
   },
   {
     type: 'id',
     label: '证件扫描',
-    description: '扫描证件原件存档；证件类文件设有效期并自动清理',
-    chips: [{ label: '敏感文件 · 自动清理', tone: 'warn' }, { label: '按回传格式保存' }],
+    description: '扫描证件原件；证件类短期留存，不可延长保存期限',
+    chips: [
+      { label: '高敏 · 短期留存', tone: 'warn' },
+      { label: '按回传格式保存' },
+      { label: '正反面各扫一次' },
+    ],
     icon: CreditCardIcon,
   },
   {
     type: 'document',
     label: '普通文档',
-    description: '扫描通用材料，按设备回传格式保存；未登录不会进入「我的文档」',
-    chips: [{ label: '按回传格式保存' }, { label: '可打印' }],
+    description: '扫描通用材料；证书、成绩单、报到证这类都算',
+    chips: [
+      { label: '按回传格式保存' },
+      { label: '可拿去打印' },
+      { label: '面板 3 步' },
+    ],
     icon: ScanLineIcon,
   },
 ]
 
 export const SCAN_CHAIN = [
-  { title: '放好纸', copy: '把原稿放进扫描区', who: '你在打印机上操作', icon: FileTextIcon },
-  { title: '面板上按扫描', copy: '按屏幕上的开始键', who: '你在打印机上操作', icon: ScanLineIcon },
-  { title: '回到这台机器', copy: '文件回来后在这里确认', who: '这台屏幕自动等待', icon: MonitorIcon },
+  { title: '放纸', copy: '把材料放进进纸器，或平放在玻璃板上', who: '第 1 步', icon: FileTextIcon },
+  { title: '在打印机面板上按扫描', copy: '屏幕上没有开始扫描按钮', who: '第 2 步', icon: ScanLineIcon },
+  { title: '文件回到这台机器', copy: '扫完回到这里，等这份 PDF', who: '第 3 步', icon: MonitorIcon },
 ] as const
 
 export const SCAN_TRUTH = [
-  { title: '怎么做', body: '放好纸 → 面板上按扫描 → 回到这台机器等文件。' },
-  { title: '不显示什么', body: '没有页级扫描进度与逐张计数，也不猜具体硬件故障原因。' },
-  { title: '文件和费用', body: '文件按类型与保存规则管理；价格只在打印流程里由系统报价给出。' },
+  { title: '怎么扫', body: '放纸，在打印机面板上按扫描，文件回到这台机器。' },
+  { title: '这一页不做', body: '屏幕上不能远程开始扫描，也不显示扫到第几张。' },
+  { title: '彩色和双面', body: '本机暂未开通。费用到打印那一步再看实际价格。' },
 ] as const
 
 export interface ScanAsk {
@@ -71,9 +86,9 @@ export interface ScanAsk {
 
 export const SCAN_ASK = {
   setup: {
-    text: '扫描这一步，在机器面板上做。',
-    em: '在机器面板上做',
-    doing: '屏幕上没有「开始扫描」这个按钮 —— 本机不能远程驱动扫描仪。你在奔图面板上扫，文件回传到这里。',
+    text: '先放纸，再去打印机面板。',
+    em: '打印机面板',
+    doing: '在面板上按扫描，文件会回到这台机器。屏幕上没有开始扫描按钮。',
   },
   blocked: {
     text: '这一台现在不能建立这次扫描。',

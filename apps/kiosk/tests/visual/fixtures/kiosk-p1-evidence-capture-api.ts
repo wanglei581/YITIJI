@@ -604,10 +604,7 @@ export async function openScanSettingsCreateFailed(page: Page, api: ApiRouter): 
   await page.goto('/scan/start')
   const start = page.locator('[data-w2-page="scan-start"]')
   await start.waitFor({ state: 'visible', timeout: 15_000 })
-  const cta = page.getByRole('button', { name: /开始扫描|创建扫描|文档扫描|继续/ }).first()
-  if (await cta.count()) {
-    await cta.click()
-  } else {
-    await page.goto('/scan/settings')
-  }
+  // 先选类型再从真实按钮建会话，才能触发上面注册的创建失败响应。
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描', exact: true }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
 }

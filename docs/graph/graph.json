@@ -13451,7 +13451,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 713,
+      "reachableFileCount": 716,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16310,6 +16310,7 @@
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+            "apps/kiosk/src/pages/scan/styles/scan-workbench-stage-qx.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
             "apps/kiosk/src/styles/qingxu/shell.css",
@@ -16500,7 +16501,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 811
+      "sourceFileCount": 814
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21602,6 +21603,12 @@
       "apps/kiosk/scripts/verify-scan-session-truth.mjs",
       "scripts/verify-no-raw-error-render.mjs"
     ],
+    "apps/kiosk/src/pages/scan/ScanProgressSections.tsx": [
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/ScanResultOutcomeView.tsx": [
+      "apps/kiosk/scripts/verify-scan-session-truth.mjs"
+    ],
     "apps/kiosk/src/pages/scan/ScanResultPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-done-truth.mjs",
@@ -21668,6 +21675,9 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+    ],
+    "apps/kiosk/src/pages/scan/styles/scan-workbench-stage-qx.css": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx": [
@@ -29891,6 +29901,7 @@
           "apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx",
           "apps/kiosk/src/pages/scan/styles/scan-fusion.css",
           "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
+          "apps/kiosk/src/pages/scan/styles/scan-workbench-stage-qx.css",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
           "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
           "apps/kiosk/src/routes/index.tsx"
@@ -32558,6 +32569,8 @@
           "apps/kiosk/src/auth/kioskSensitiveSession.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
+          "apps/kiosk/src/pages/scan/ScanProgressSections.tsx",
+          "apps/kiosk/src/pages/scan/ScanResultOutcomeView.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsStatusView.tsx",

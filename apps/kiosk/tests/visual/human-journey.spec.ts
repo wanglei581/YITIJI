@@ -642,6 +642,12 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(3000)
     await step(page, s, 'F-scan-entry')
 
+    // 2.0 不预选类型；普通文档对应这趟夹具的 scanType: 'document'。
+    const documentType = page.getByRole('radio', { name: '选择扫描类型：普通文档', exact: true })
+    await documentType.click()
+    await expect(documentType).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('button', { name: '开始这次扫描', exact: true })).toBeEnabled()
+
     const BACK = /^(首页|AI ?顾问|我的)$|^问小青|返回|退出|上一步|更换|删除|重试|取消|问工作人员|再扫/
     for (let hop = 0; hop < 5; hop += 1) {
       const before = page.url()

@@ -1141,7 +1141,12 @@ for (const route of ['/scan', '/scan/start', '/scan/settings', '/scan/progress',
     `${route} is registered in QX_MIGRATED_ROUTES`,
   )
 }
-const scanWorkbenchQxCss = read('src/pages/scan/styles/scan-workbench-qx.css')
+/* 2026-10-06：主样式超过 500 行，面板 / 结果 / 底栏拆到 scan-workbench-stage-qx.css。
+ * 三条判据改为两份一起核，一条不减。触控下限那条原来只出现在后半。 */
+const scanWorkbenchQxCss = [
+  read('src/pages/scan/styles/scan-workbench-qx.css'),
+  read('src/pages/scan/styles/scan-workbench-stage-qx.css'),
+].join('\n')
 assert.match(scanWorkbenchQxCss, /var\(--qx-ink\)/, 'scan workbench CSS consumes Qingxu tokens')
 assert.match(scanWorkbenchQxCss, /--qx-tap-min|--qx-btn-h/, 'scan workbench CSS keeps the touch floor token')
 assert.doesNotMatch(scanWorkbenchQxCss, /#[0-9a-fA-F]{3,8}\b|rgb\(/, 'scan workbench CSS does not introduce raw color literals')
@@ -1163,10 +1168,12 @@ assert.match(
   /下一步会真实建立这次扫描/,
   'scan start explains when this scan is really created'
 )
+/* 2026-10-06：2.0 稿把状态条从「可创建扫描任务 · 需面板操作」改成「第 1 步 · 选扫描类型」。
+ * 旧句说的是「还没宣称硬件就绪」，新句仍不说扫描仪就绪；「下一步会真实建立这次扫描」另有断言。 */
 assert.match(
   scanStart,
-  /可创建扫描任务/,
-  'scan start uses task-creation copy instead of hardware ready'
+  /第 1 步 · 选扫描类型/,
+  'scan start uses the step label instead of hardware ready'
 )
 assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not claim scanner hardware ready')
 assert.doesNotMatch(scanStart, /盖板感知|盖板已关|免点击扫描/, 'scan start must not imply lid-sensing auto start')
@@ -1177,6 +1184,20 @@ assert.match(
   // 2026-09-13：四页合并后的真地址是 /scan?stage=settings（/scan/settings 只剩兼容重定向）。
   /navigate\(["']\/scan\?stage=settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
   'scan start carries a validated scan type into settings'
+)
+assert.match(scanStart, /开始这次扫描/, 'scan start primary action uses the 2.0 label')
+assert.match(scanStart, /先选一种材料/, 'scan start explains why the primary action is disabled')
+assert.match(scanStart, /就这三步/, 'scan start numbers the three panel steps')
+assert.match(scanStart, /扫完这份 PDF 能带走什么/, 'scan start keeps the 2.0 takeaway title')
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /问小青：扫描要怎么按/,
+  'scan chrome keeps the 2.0 ask-xiaoqing row',
+)
+assert.match(
+  read('src/pages/scan/ScanWorkbenchChrome.tsx'),
+  /我想扫描一份纸质材料。请告诉我怎么放纸，以及要在打印机面板上按哪里。/,
+  'ask-xiaoqing stores the draft sentence from the frozen 2.0 page',
 )
 const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
 assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')

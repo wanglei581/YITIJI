@@ -50,9 +50,9 @@
   [data-kiosk-stage-fit='off'] .sw-ty-ic { width: 48px; height: 48px; border-radius: 14px; }
   [data-kiosk-stage-fit='off'] .sw-ty-n { font-size: 20px; }
   [data-kiosk-stage-fit='off'] .sw-ty-d { font-size: 15px; }
-  [data-kiosk-stage-fit='off'] .sw-chain,
-  [data-kiosk-stage-fit='off'] .sw-chain-wrap { flex-direction: column; }
-  [data-kiosk-stage-fit='off'] .sw-chain-arrow { width: auto; height: 22px; transform: rotate(90deg); }
+  [data-kiosk-stage-fit='off'] .sw-chain { display: flex; flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .sw-chain-wrap { display: flex; flex-direction: column; }
+  [data-kiosk-stage-fit='off'] .sw-chain-arrow { display: flex; width: auto; height: 22px; transform: rotate(90deg); }
   [data-kiosk-stage-fit='off'] .sw-link b { font-size: 17px; }
   [data-kiosk-stage-fit='off'] .sw-link-c,
   [data-kiosk-stage-fit='off'] .sw-link-who { font-size: 14px; }
