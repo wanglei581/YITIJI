@@ -17,6 +17,11 @@ const routeCasesSource = read('tests/visual/fixtures/fusion-w6-route-cases.ts')
 const browserSpecSource = read('tests/visual/print-done-truth.spec.ts')
 
 const checks = [
+  ['结果未确认时底部按钮与说明区都不给「重新提交打印」', () => {
+    // 10/6 合规：按钮已按 !isUnconfirmed 隐藏，说明区收到的 canRetry 若不排除，会写「可点下方重新提交打印」却没有按钮。
+    assert.match(doneRuntime, /takeaway\?\.canRetry\s*&&\s*!isUnconfirmed/)
+    assert.match(doneRuntime, /canRetry=\{Boolean\(takeaway\?\.canRetry\)\s*&&\s*!isUnconfirmed\}/)
+  }],
   ['完成页读取真实打印任务接口', () => {
     assert.match(doneSource, /import\s*\{[^}]*getPrintJobStatus[^}]*\}\s*from\s*'\.\.\/\.\.\/services\/print\/printJobsApi'/)
     assert.match(doneSource, /getPrintJobStatus\(taskId\)/)

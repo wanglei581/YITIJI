@@ -73,7 +73,7 @@ async function stubMic(page: Page, scenario: MicScenario): Promise<void> {
   }, scenario)
 }
 
-async function gotoSession(page: Page): Promise<void> {
+async function gotoSession(page: Page, mode: 'text' | 'voice' = 'text'): Promise<Record<string, unknown>> {
   await page.goto('/interview/setup')
   await expectInterviewDirectionUnselected(page)
   await page.getByRole('button', { name: '选择行业 (20)' }).click()
@@ -85,8 +85,16 @@ async function gotoSession(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  if (mode === 'voice') {
+    await page.getByRole('button', { name: '语音回合（文字兜底）', exact: true }).click()
+  }
+  const posted = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/mock-interviews'
+  ))
   await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const body = (await posted).postDataJSON() as Record<string, unknown>
   await page.waitForURL(/\/interview\?stage=session/)
+  return body
 }
 
 // ── ① 没有音频输入设备时，绝不显示「语音可用」──────────────────────────
@@ -161,9 +169,38 @@ test('语音入口置灰而非消失，原因常显且点击无效 @mic-kiosk', 
 test('有可用麦克风时进入语音模式 @mic-kiosk', async ({ page, api }) => {
   interviewBaseline(api)
   await stubMic(page, 'available')
-  await gotoSession(page)
+  // 默认是纯文字。只有设置屏选了语音回合，才会在麦克风可用时进入语音。
+  const body = await gotoSession(page, 'voice')
 
+  expect(body.interactionMode).toBe('voice')
   await expect(page.getByText('语音回答可用')).toBeVisible()
   await expect(page.locator('[data-mic-reason]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /开始回答（语音）/ })).toBeVisible()
+})
+
+test('选纯文字时即使麦克风可用也停在文字 @mic-kiosk', async ({ page, api }) => {
+  interviewBaseline(api)
+  await stubMic(page, 'available')
+  const body = await gotoSession(page, 'text')
+
+  expect(body.interactionMode).toBe('text')
+  await expect(page.getByRole('textbox')).toBeVisible()
+  await expect(page.getByRole('button', { name: /开始回答（语音）/ })).toHaveCount(0)
+  await expect(page.getByText('语音回答可用')).toBeVisible()
+})
+
+test('选语音回合但没有麦克风时停在文字并写明原因 @mic-kiosk', async ({ page, api }) => {
+  interviewBaseline(api)
+  await stubMic(page, 'no-device')
+  const body = await gotoSession(page, 'voice')
+
+  expect(body.interactionMode).toBe('voice')
+  await expect(page.getByRole('textbox')).toBeVisible()
+  await expect(page.locator('[data-mic-reason]')).toContainText('本机没有麦克风')
+  await expect(page.getByRole('button', { name: /开始回答（语音）/ })).toHaveCount(0)
+  const guide = page.locator('[data-interview-state="mic-denied"]')
+  await expect(guide.getByRole('region', { name: '当前能力状态' })).toBeVisible()
+  await expect(guide.locator('.iv-head').getByText('这一场可以继续用文字答', { exact: true })).toBeVisible()
+  await expect(guide.locator('.iv-head').getByText('用文字答这一题', { exact: true })).toBeVisible()
+  await expect(guide.locator('.iv-head').getByText('重新检测前先排查', { exact: true })).toBeVisible()
 })

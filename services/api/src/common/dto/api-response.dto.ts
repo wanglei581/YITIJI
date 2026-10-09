@@ -30,6 +30,8 @@ export interface ErrorResponseBody {
     terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
     /** 前端可用的下一步标识（小写蛇形），如 export_ai_labeled；只在拒绝时附带。 */
     nextAction?: string
+    /** 仅 TERMINAL_COMMAND_PENDING：这台终端上那条还没结束的命令。 */
+    commandId?: string
   }
   requestId?: string
 }

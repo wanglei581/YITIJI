@@ -191,8 +191,10 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
                   重新检测
                 </button>
               ) : null}
-              {/* 不可用时不是「灰掉的按钮」：它必须说得出为什么，并且真的不导航。
-                  data-disabled-reason 与服务台同名，走查按同一个钩子取证。 */}
+            </>
+          ) : null}
+          <div className="iv-cta-row">
+            {gate ? (
               <button
                 type="button"
                 className="qx-btn"
@@ -205,12 +207,21 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
               >
                 设置一场练习
               </button>
-            </>
-          ) : (
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-              设置一场练习<em aria-hidden="true">→</em>
+            ) : (
+              <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
+                设置一场练习<em aria-hidden="true">→</em>
+              </button>
+            )}
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="ghost"
+              data-testid="interview-ai-advisor"
+              onClick={() => navigate('/assistant')}
+            >
+              AI 顾问
             </button>
-          )}
+          </div>
         </div>
       }
     >

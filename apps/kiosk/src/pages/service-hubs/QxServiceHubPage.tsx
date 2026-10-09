@@ -24,6 +24,8 @@ import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { HubGoalEntry, HubQuickEntry } from './serviceHubEntries'
+import { capChips, hubAiPartial, statusPill } from './serviceHubChrome'
 import { SERVICE_HUB_SPECS } from './serviceHubSpecs'
 import {
   capabilityKindFor,
@@ -34,6 +36,7 @@ import {
   type HubIconKey,
   type ServiceHubKey,
 } from './serviceHubModel'
+import { useHubAiAvailability } from './useHubAiAvailability'
 import './styles/service-hub-qx.css'
 
 /**
@@ -109,32 +112,6 @@ function shownCapability(source: HubCapability): HubCapability {
   return { ...source, ...RUNTIME_CARD_COPY[source.route] }
 }
 
-function capChips(state: HubAvailability): string[] {
-  if (state.apiDown) return ['能力配置 · 以办理时确认', '在线服务 · 暂不可用', '不联网内容 · 仍可进入']
-  if (state.apiChecking) return ['能力配置 · 以办理时确认', '在线服务 · 正在确认', '其他入口 · 确认后再进']
-  if (state.deviceOff) return ['能力配置 · 以办理时确认', '本机设备 · 暂不可用', '信息与 AI · 进入后确认']
-  if (state.deviceChecking) return ['能力配置 · 以办理时确认', '本机设备 · 正在确认', '信息与 AI · 进入后确认']
-  return ['能力配置 · 以办理时确认', '来源与流程 · 进入后确认', '本页只做分流']
-}
-
-/**
- * 顶栏状态胶囊：拿不到结论时必须说「正在确认」，不得默认 ok。
- *
- * apiDown 这条说的是「在线服务」而不是稿里的「AI能力」：`useApiReadiness` 判的是
- * `/health` 不可达（整个后端断开），不只是 AI。说成「AI能力不可用」会让用户以为
- * 岗位浏览、台账这些还能用。同理见 noticeCopy 与 serviceHubModel.needsBackend。
- */
-function statusPill(state: HubAvailability): { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string } {
-  // 注意：deviceOff / deviceChecking 在「本服务台没有设备能力」时恒为 false
-  // （见 QxServiceHubPage 的 deviceAware），所以岗位 / 招聘会 / 面试 / 政策
-  // 永远走不到下面两条设备分支——它们不该替打印机播报。
-  if (state.apiDown) return { tone: 'bad', label: '在线服务不可用' }
-  if (state.apiChecking) return { tone: 'unknown', label: '正在确认在线服务' }
-  if (state.deviceOff) return { tone: 'warn', label: '本机设备不可用' }
-  if (state.deviceChecking) return { tone: 'unknown', label: '正在确认本机设备' }
-  return { tone: 'ok', label: '能力与设备状态以办理时确认为准' }
-}
-
 /**
  * 分流提示条，五种状态各有各的话——照稿逐字，别合并成一句「服务异常」。
  *
@@ -172,7 +149,9 @@ function noticeCopy(state: HubAvailability): { title: string; detail: string } {
   if (state.deviceOff) {
     return {
       title: '本机设备当前不可用。',
-      detail: '当前入口中的信息浏览和AI服务仍可进入；涉及出纸或扫描的具体步骤请稍后再试。',
+      detail: state.aiDown
+        ? '依赖 AI 的入口也暂不可用；信息浏览仍可进入。涉及出纸或扫描的步骤请稍后再试。'
+        : '当前入口中的信息浏览和AI服务仍可进入；涉及出纸或扫描的具体步骤请稍后再试。',
     }
   }
   if (state.deviceChecking) {
@@ -181,20 +160,32 @@ function noticeCopy(state: HubAvailability): { title: string; detail: string } {
       detail: '检查完成前，涉及出纸或扫描的入口暂不开放；信息浏览和AI服务不受影响。',
     }
   }
+  if (state.aiDown) {
+    return {
+      title: 'AI能力当前不可用。',
+      detail: '不依赖AI的浏览、材料和本机服务仍可进入。',
+    }
+  }
+  if (state.aiChecking) {
+    return {
+      title: '正在确认AI能力。',
+      detail: '检查完成前，依赖 AI 的入口暂不开放；浏览、材料和本机服务不受影响。',
+    }
+  }
+  if (state.aiPartial) {
+    return {
+      title: '部分 AI 能力当前不可用。',
+      detail: '不可用的入口写了原因；不依赖这些能力的浏览、材料和本机服务仍可进入。',
+    }
+  }
   return { title: '进入具体服务后再确认实时能力。', detail: '本页只负责分流，不预报在线、名额、价格或办理结果。' }
 }
 
-/**
- * 五个服务台共用这一个页面，`hub` 决定用哪份规格——稿 16-service-hubs.html 本身就是
- * 一份 HTML 带 `?hub=` 渲染五种，骨架和诚实性声明的位置完全一致。
- *
- * 这五条是首页进任何业务域的**第一跳**：首页早已是青序流光，点进去掉回旧的深藏青壳，
- * 正是产品负责人最初投诉的「新旧页面交替」。
- */
 export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   const navigate = useNavigate()
   const spec = SERVICE_HUB_SPECS[hub]
   const { status: apiStatus, retry: retryApi } = useApiReadiness()
+  const aiProbe = useHubAiAvailability(apiStatus === 'ready')
 
   // 只有真有设备能力的服务台才探测本机设备。
   //
@@ -215,13 +206,20 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
   //
   // apiStatus !== 'ready' 的两半都 fail-closed：'unavailable' 是坏消息，
   // 'checking' 是还没有消息——两者都不构成放行理由。
-  const availability: HubAvailability = {
+  const availabilityBase = {
     apiDown: apiStatus === 'unavailable',
     apiChecking: apiStatus === 'checking',
     // hook 初次拉取期间 loading=true；拉完仍是 unknown 表示「测不出来」而非「坏了」，
     // 那种情况不拦设备卡（见 serviceHubModel.unavailableReason 的说明）。
     deviceOff: deviceAware && (device.kind === 'offline' || device.kind === 'error'),
     deviceChecking: deviceAware && device.loading,
+    aiDown: aiProbe.aiDown,
+    aiChecking: aiProbe.aiChecking,
+    features: aiProbe.features,
+  }
+  const availability: HubAvailability = {
+    ...availabilityBase,
+    aiPartial: hubAiPartial(spec, { ...availabilityBase, aiPartial: false }),
   }
   const apiBlocked = apiStatus !== 'ready'
   const notice = noticeCopy(availability)
@@ -289,9 +287,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
     )
   }
 
-  const NoticeIcon = availability.apiDown || availability.deviceOff
+  const NoticeIcon = availability.apiDown || availability.deviceOff || availability.aiDown || availability.aiPartial
     ? AlertTriangleIcon
-    : availability.apiChecking || availability.deviceChecking
+    : availability.apiChecking || availability.deviceChecking || availability.aiChecking
       ? LoaderCircleIcon
       : CheckCircle2Icon
   const truthTitle = hub === 'resume' ? '简历用不用，由你本人决定。' : spec.truthTitle
@@ -320,6 +318,7 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         data-hub={hub}
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
+        data-hub-ai={availability.aiChecking ? 'checking' : availability.aiDown ? 'down' : apiBlocked ? 'idle' : 'ready'}
       >
         {/* 稿 16 的深色导言：页头标题留给读屏（视觉上收进 1px），这里是站着能读到的那一块。 */}
         <section className="qx-hub-hero">
@@ -349,9 +348,11 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
               ? 'unavailable'
               : availability.deviceOff
                 ? 'degraded'
-                : availability.apiChecking || availability.deviceChecking
-                  ? 'checking'
-                  : 'ready'
+                : availability.aiDown || availability.aiPartial
+                  ? 'degraded'
+                  : availability.apiChecking || availability.deviceChecking || availability.aiChecking
+                    ? 'checking'
+                    : 'ready'
           }
           role="status"
           aria-live="polite"
@@ -363,6 +364,11 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
           </span>
           {availability.apiDown ? (
             <button type="button" className="qx-hub-retry" onClick={retryApi}>
+              <RefreshCwIcon size={20} aria-hidden="true" />
+              重新检测
+            </button>
+          ) : availability.aiDown ? (
+            <button type="button" className="qx-hub-retry" onClick={aiProbe.retry}>
               <RefreshCwIcon size={20} aria-hidden="true" />
               重新检测
             </button>
@@ -414,37 +420,16 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
                 : source
               const reason = unavailableReason(link.kind, link.route, availability)
               const Icon = HUB_ICON[link.icon]
-              if (reason) {
-                return (
-                  <div
-                    key={link.route}
-                    className="qx-hub-quick-item is-unavailable"
-                    role="group"
-                    aria-disabled="true"
-                    aria-label={`${link.title}：${reason}`}
-                    data-disabled-reason={`capability:${link.kind}`}
-                  >
-                    <Icon size={26} aria-hidden="true" />
-                    <span>
-                      <b>{link.title}</b>
-                      <span>{reason}</span>
-                    </span>
-                  </div>
-                )
-              }
               return (
-                <button
+                <HubQuickEntry
                   key={link.route}
-                  type="button"
-                  className="qx-hub-quick-item"
-                  onClick={() => navigate(link.route)}
-                >
-                  <Icon size={26} aria-hidden="true" />
-                  <span>
-                    <b>{link.title}</b>
-                    <span>{link.description}</span>
-                  </span>
-                </button>
+                  title={link.title}
+                  description={link.description}
+                  reason={reason}
+                  kind={link.kind}
+                  icon={Icon}
+                  onOpen={() => navigate(link.route)}
+                />
               )
             })}
           </div>
@@ -464,29 +449,14 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
             {spec.goals.map((goal) => {
               const kind = capabilityKindFor(spec, goal.route)
               const reason = unavailableReason(kind, goal.route, availability)
-              if (reason) {
-                return (
-                  <div
-                    key={goal.route}
-                    className="qx-hub-goal is-unavailable"
-                    role="group"
-                    aria-disabled="true"
-                    aria-label={`${goal.label}：${reason}`}
-                    data-disabled-reason={`capability:${kind}`}
-                  >
-                    {goal.label}
-                  </div>
-                )
-              }
               return (
-                <button
+                <HubGoalEntry
                   key={goal.route}
-                  type="button"
-                  className="qx-hub-goal"
-                  onClick={() => navigate(goal.route)}
-                >
-                  {goal.label}
-                </button>
+                  label={goal.label}
+                  reason={reason}
+                  kind={kind}
+                  onOpen={() => navigate(goal.route)}
+                />
               )
             })}
           </div>

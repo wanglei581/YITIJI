@@ -270,6 +270,7 @@ test('feedback submit posts the visible form payload and shows server failure @w
 
   await loginThroughVisibleUi(page, '/me/feedback')
   await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await page.getByRole('button', { name: /^打印服务/ }).click()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
 
@@ -322,6 +323,123 @@ test('ai-records complaint entry preselects AI 内容投诉 and posts category a
   expect(errors).toEqual([])
 })
 
+function createdFeedbackDetail() {
+  return {
+    id: 'fb-new-1006',
+    category: 'print',
+    title: '页面使用反馈',
+    content: '这是用于验证真实反馈提交成功后进入详情的合成说明。',
+    contactPhoneMasked: null,
+    terminalId: null,
+    relatedPrintTaskId: null,
+    status: 'pending',
+    createdAt: '2026-10-06T10:16:00.000+08:00',
+    updatedAt: '2026-10-06T10:16:00.000+08:00',
+    replies: [],
+  }
+}
+
+test('feedback submit stays disabled with a reason until category and ten characters are present @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  const blocked = page.getByRole('button', { name: '提交反馈（请先选择分类，并写满 10 个字）', exact: true })
+  await expect(blocked).toBeDisabled()
+  await expect(blocked).toContainText('请先选择分类，并写满 10 个字')
+  await page.getByLabel('反馈内容').fill('还不够十个字')
+  await expect(page.getByRole('button', { name: '提交反馈（请先选择分类，并写满 10 个字）', exact: true })).toBeDisabled()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback submit success opens the new ticket detail @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const detail = createdFeedbackDetail()
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+  api.respond('POST', '/api/v1/me/feedback', { status: 200, json: { success: true, data: detail } })
+  api.respond('GET', '/api/v1/me/feedback/fb-new-1006', { status: 200, json: { success: true, data: detail } })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByRole('button', { name: /^打印服务/ }).click()
+  await page.getByLabel('标题（选填）').fill(detail.title)
+  await page.getByLabel('反馈内容').fill(detail.content)
+  await page.getByRole('button', { name: '提交反馈', exact: true }).click()
+
+  await expect(page.getByTestId('member-feedback-state-success')).toBeVisible()
+  await expect(page.getByText('反馈已提交', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/ticket=fb-new-1006/)
+  await expect(page.getByRole('heading', { name: detail.title, exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback submit failure keeps the filled form @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/feedback', { status: 200, json: emptyPage(0) })
+  api.respond('POST', '/api/v1/me/feedback', {
+    status: 503,
+    json: { success: false, error: { code: 'W5_FEEDBACK_UNAVAILABLE', message: 'fixture unavailable' } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByRole('button', { name: /^打印服务/ }).click()
+  await page.getByLabel('标题（选填）').fill('页面使用反馈')
+  await page.getByLabel('联系电话（选填）').fill('13800138000')
+  await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败后内容还在的合成说明。')
+  await page.getByRole('button', { name: '提交反馈', exact: true }).click()
+
+  await expect(page.getByText('提交失败，请检查登录状态或稍后重试', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('标题（选填）')).toHaveValue('页面使用反馈')
+  await expect(page.getByLabel('联系电话（选填）')).toHaveValue('13800138000')
+  await expect(page.getByLabel('反馈内容')).toHaveValue('这是用于验证真实反馈提交失败后内容还在的合成说明。')
+  await expect(page.getByRole('button', { name: '重试提交', exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
+test('feedback detail back to list clears the ticket query @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  const item = {
+    id: 'fb-preview-cut',
+    category: 'print',
+    title: '打印预览页文字被截掉一行',
+    content: '简历预览最下面一行字被裁掉了，按预览打出来也少这一行。',
+    contactPhoneMasked: null,
+    terminalId: null,
+    relatedPrintTaskId: null,
+    status: 'processing',
+    createdAt: '2026-10-02T09:18:00.000+08:00',
+    updatedAt: '2026-10-03T11:05:00.000+08:00',
+  }
+  api.respond('GET', '/api/v1/me/feedback', {
+    status: 200,
+    json: { success: true, data: { items: [item], nextCursor: null, total: 1 } },
+  })
+  api.respond('GET', '/api/v1/me/feedback/fb-preview-cut', {
+    status: 200,
+    json: { success: true, data: { ...item, replies: [] } },
+  })
+
+  await loginThroughVisibleUi(page, '/me/feedback')
+  await page.getByTestId('member-feedback-ticket-fb-preview-cut').click()
+  await expect(page).toHaveURL(/ticket=fb-preview-cut/)
+  await expect(page.getByRole('heading', { name: item.title, exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '返回列表', exact: true }).click()
+  await expect(page).not.toHaveURL(/ticket=/)
+  await expect(page.getByRole('heading', { name: '提交反馈', exact: true })).toBeVisible()
+  await expectComplianceCopy(page)
+  expect(errors).toEqual([])
+})
+
 test('privacy revoke posts revoke_consent and does not claim account deletion @w5-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -356,8 +474,8 @@ test('privacy revoke posts revoke_consent and does not claim account deletion @w
   await expect(page.getByText('撤回 AI 使用授权').first()).toBeVisible()
   // 2026-09-30 A 批：旧名「岗位 AI 授权」与工程词「元数据」「step-up」不再上屏（稿 41）。
   await expect(page.getByText(/岗位 AI 授权|元数据|step-up/)).toHaveCount(0)
-  await expect(page.getByText('一体机未开放')).toBeVisible()
-  await expect(page.getByText('暂未开放').first()).toBeVisible()
+  await expect(page.getByText('一体机不提供')).toBeVisible()
+  await expect(page.getByText('一体机不办理')).toBeVisible()
   await page.getByTestId('member-privacy-revoke-entry').click()
   await expect(page.getByRole('dialog')).toBeVisible()
 
@@ -694,6 +812,251 @@ for (const item of ME_SHELL_PAGES) {
   })
 }
 
+const EXPORT_INVENTORY = '账号摘要、文件清单、AI 服务记录摘要、AI 用量（功能、时间、状态、金额）、打印订单、收藏、权益、浏览与打开来源记录、求职进度、通知、反馈、授权与历史请求'
+const EXPORT_TAIL = `导出的是本人资料清单（${EXPORT_INVENTORY}），不含文件原文与简历正文全文。`
+const EXPORT_WITH_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_TAIL}`
+const CLOSURE_WITH_PHONE = `这台机器上不办理注销。可以拨打服务电话 ${FIXTURE_SERVICE_PHONE}（${FIXTURE_SERVICE_HOURS}）申请。我们核实是你本人后，15 个工作日内处理。`
+const EXPORT_WITHOUT_PHONE = `公共屏上不导出个人资料。需要复制个人信息的，可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_TAIL}`
+const CLOSURE_WITHOUT_PHONE = '这台机器上不办理注销。可以查看《隐私政策》里的联系方式申请。我们核实是你本人后，15 个工作日内处理。'
+
+function privacyList(items: unknown[]) {
+  return {
+    status: 200,
+    json: { success: true, data: { items, nextCursor: null, capabilities: { accountClosureAvailable: false } } },
+  }
+}
+
+function privacyCreated(id: string) {
+  return {
+    id,
+    requestType: 'revoke_consent',
+    status: 'completed',
+    requestedAt: '2026-10-06T10:24:00.000+08:00',
+    handledAt: '2026-10-06T10:24:00.000+08:00',
+    executionStep: null,
+    exportExpiresAt: null,
+    failureCode: null,
+    canRetry: false,
+    canDownload: false,
+  }
+}
+
+test('小程序未发布且有电话时，隐私导出与注销只指向服务电话 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-state-login')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('也可以')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('也可以')
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  await expect(page.getByText('一体机不提供')).toBeVisible()
+  await expect(page.getByText('一体机不办理')).toBeVisible()
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('小程序未发布且无电话时，隐私导出与注销指向隐私政策联系方式 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  hideSupportContact(api)
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 404)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('也可以')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('也可以')
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  await expect(page.getByText(NO_PHONE_HINT).first()).toBeVisible()
+  const body = await page.locator('body').innerText()
+  expect(body.split('拨打服务电话').length - 1).toBe(0)
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('小程序已发布且有电话时，隐私导出与注销和未发布时逐字相同 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: FIXTURE_SERVICE_PHONE,
+        serviceHours: FIXTURE_SERVICE_HOURS,
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITH_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('小程序已发布且无电话时，隐私导出与注销和未发布时逐字相同 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: null,
+        serviceHours: null,
+        otherOnlineTerminalNearby: false,
+        miniappPublished: true,
+      },
+    },
+  })
+  const contact = page.waitForResponse((response) => response.url().includes('/api/v1/public/support-contact') && response.status() === 200)
+
+  await page.goto('/me/privacy-requests')
+  await contact
+  await expect(page.getByTestId('member-privacy-export-line')).toHaveText(EXPORT_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-closure-line')).toHaveText(CLOSURE_WITHOUT_PHONE)
+  await expect(page.getByTestId('member-privacy-export-line')).not.toContainText('小程序')
+  await expect(page.getByTestId('member-privacy-closure-line')).not.toContainText('小程序')
+  const body = await page.locator('body').innerText()
+  expect(body.split('拨打服务电话').length - 1).toBe(0)
+  await expectNoStaffHandoff(page)
+  expect(errors).toEqual([])
+})
+
+test('privacy revoke success opens the success screen @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([]))
+  api.respond('POST', '/api/v1/me/data-requests', {
+    status: 200,
+    json: { success: true, data: privacyCreated('req-ok') },
+  })
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await page.getByTestId('member-privacy-revoke-entry').click()
+  await page.getByRole('button', { name: '确认撤回', exact: true }).click()
+  await expect(page.getByTestId('member-privacy-state-success')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('已撤回 AI 使用授权，请求已记录')
+  await expect(page.getByTestId('member-privacy-dialog')).toHaveCount(0)
+  await expect(page.getByText('全部个人数据已删除')).toHaveCount(0)
+  await expect(page.getByText('账号注销成功')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('privacy revoke failure opens the failure screen and retry can succeed @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([]))
+  api.respondWith('POST', '/api/v1/me/data-requests', (attempt) => attempt === 1
+    ? { status: 400, json: { success: false, error: { code: 'DATA_REQUEST_UNAVAILABLE', message: 'upstream rejected' } } }
+    : { status: 200, json: { success: true, data: privacyCreated('req-retry') } })
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await page.getByTestId('member-privacy-revoke-entry').click()
+  await page.getByRole('button', { name: '确认撤回', exact: true }).click()
+  await expect(page.getByTestId('member-privacy-state-failure')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('授权没有变化')
+  await expect(page.getByTestId('member-privacy-result')).toContainText('提交失败，请稍后重试')
+  await expect(page.getByTestId('member-privacy-dialog')).toHaveCount(0)
+
+  await page.getByTestId('member-privacy-primary').click()
+  await expect(page.getByTestId('member-privacy-state-success')).toBeVisible()
+  await expect(page.getByTestId('member-privacy-result')).toContainText('已撤回 AI 使用授权，请求已记录')
+  expect(api.requestCount('POST', '/api/v1/me/data-requests')).toBe(2)
+  expect(errors).toEqual([])
+})
+
+test('privacy bottom bar fills the row and the honest note sits under the buttons @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/data-requests', privacyList([
+    privacyCreated('req-revoke'),
+    {
+      ...privacyCreated('req-export'),
+      requestType: 'export',
+      requestedAt: '2026-09-11T11:06:00.000+08:00',
+      handledAt: '2026-09-16T09:40:00.000+08:00',
+    },
+  ]))
+
+  await loginThroughVisibleUi(page, '/me/privacy-requests')
+  await expect(page.getByTestId('member-privacy-state-history-ready')).toBeVisible()
+  const exportSvg = await page.locator('[data-request-type="export"] .pr-ico svg').innerHTML()
+  const revokeSvg = await page.locator('[data-request-type="revoke_consent"] .pr-ico svg').first().innerHTML()
+  const capExportSvg = await page.locator('[data-capability="export"] .pr-ico svg').innerHTML()
+  expect(exportSvg).toBe(capExportSvg)
+  expect(exportSvg).not.toBe(revokeSvg)
+
+  const metrics = await page.evaluate(() => {
+    const bar = document.querySelector('.qx-ctabar')
+    const truth = document.querySelector('.pr-cta .pr-truth')
+    const row = document.querySelector('.pr-cta-row')
+    const buttons = [...document.querySelectorAll('.pr-cta-row > .qx-btn, .pr-cta-row > .qx-ai-help')]
+    if (!bar || !truth || !row || buttons.length !== 3) return null
+    const stage = document.querySelector('.kiosk-stage')
+    const transform = stage ? getComputedStyle(stage).transform : 'none'
+    const scale = transform === 'none' ? 1 : Number(/^matrix\(([^,]+)/.exec(transform)?.[1] ?? 1)
+    const barRect = bar.getBoundingClientRect()
+    const rowRect = row.getBoundingClientRect()
+    const truthRect = truth.getBoundingClientRect()
+    const sideInset = (rect: DOMRect) => ({
+      left: rect.left - barRect.left,
+      right: barRect.right - rect.right,
+    })
+    const boxes = buttons.map((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        width: rect.width,
+        height: rect.height,
+        y: rect.top,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        text: element.textContent ?? '',
+      }
+    })
+    return {
+      scale,
+      // 三键总宽对的是留边之后的内容宽度，不是整条底栏。
+      contentWidth: rowRect.width,
+      rowInset: sideInset(rowRect),
+      truthInset: sideInset(truthRect),
+      sum: boxes.reduce((total, box) => total + box.width, 0),
+      boxes,
+      truthY: truthRect.top,
+    }
+  })
+  expect(metrics).not.toBeNull()
+  expect(metrics!.sum / metrics!.contentWidth).toBeGreaterThanOrEqual(0.95)
+  expect(metrics!.rowInset.left / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.rowInset.right / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.truthInset.left / metrics!.scale).toBeGreaterThanOrEqual(16)
+  expect(metrics!.truthInset.right / metrics!.scale).toBeGreaterThanOrEqual(16)
+  for (const box of metrics!.boxes) {
+    expect(box.height / metrics!.scale, box.text).toBeGreaterThanOrEqual(72)
+    expect(box.scrollWidth, box.text).toBeLessThanOrEqual(box.clientWidth + 1)
+    expect(metrics!.truthY).toBeGreaterThan(box.y)
+  }
+  expect(errors).toEqual([])
+})
+
 function registerEmptyAccount(api: ApiRouter): void {
   registerMemberLogin(api)
   registerAssetCounts(api, { resumes: 0, documents: 0, orders: 0, favorites: 0, benefits: 0, ai: 0 })
@@ -983,6 +1346,208 @@ test('me error guide says 联系我们 and hides 拨打服务电话 when support
     await expect(third.locator('.qx-me-guide-p')).toHaveText(NO_PHONE_HINT)
     expect(await page.locator('body').innerText()).not.toContain('拨打服务电话')
     await expectNoStaffHandoff(page)
+  }
+  expect(errors).toEqual([])
+})
+
+
+/** 在等待失败后读取状态，避免只报告等待前的状态。 */
+async function withNotificationStateDiagnostics(page: Page, action: () => Promise<void>): Promise<void> {
+  try {
+    await action()
+  } catch (error: unknown) {
+    const markers = await page.locator('[data-testid^="notifications-state-"]').evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-testid')),
+    ).catch(() => ['状态标记读取失败'])
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`${detail}\n当时页面根状态标记：${markers.length ? markers.join('、') : '未找到 notifications-state-*'}`)
+  }
+}
+
+/** 复用九态并排图的夹具；只准备页面，不执行截图。 */
+async function prepareNotificationState(page: Page, api: ApiRouter, state: string): Promise<void> {
+  const { buildQingxuPairs } = await import('./fixtures/qingxu-pair-targets')
+  const { prepareMePages } = await import('./fixtures/qingxu-pair-me-pages')
+  const target = buildQingxuPairs().find((item) => item.nn === '35' && item.screen === 'main' && item.state === state)
+  expect(target, `消息夹具应包含状态：${state}`).toBeDefined()
+  registerShell(api)
+  await withNotificationStateDiagnostics(page, async () => {
+    await prepareMePages(page, api, target!)
+    await expect(page.getByTestId(`notifications-state-${state}`)).toBeVisible()
+  })
+}
+
+test('消息页置灰的主按钮画成置灰 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await prepareNotificationState(page, api, 'ready-all')
+  const primary = page.getByTestId('notifications-primary')
+  await expect(primary).toHaveText('全部标记为已读')
+  await expect(primary).not.toHaveAttribute('aria-disabled', 'true')
+  const enabledBackground = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+
+  for (const state of ['loading', 'operation-busy']) {
+    await prepareNotificationState(page, api, state)
+    await expect(primary, `${state} 主按钮应禁用`).toHaveAttribute('aria-disabled', 'true')
+    await expect.poll(async () => {
+      const background = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+      return `${state}：置灰背景=${background}；可点击背景=${enabledBackground}`
+    }, { message: `${state} 的计算背景色应与可点击主按钮不同` }).not.toContain(`置灰背景=${enabledBackground}；`)
+  }
+
+  // 九态夹具会登录并完成全部已读操作，保留消息且未读为零。
+  await prepareNotificationState(page, api, 'operation-toast')
+  await expect(primary).toHaveText('全部已读')
+  await expect(primary).toHaveAttribute('aria-disabled', 'true')
+  await expect.poll(async () => {
+    const background = await primary.evaluate((element) => getComputedStyle(element).backgroundColor)
+    return `无未读：置灰背景=${background}；可点击背景=${enabledBackground}`
+  }, { message: '无未读时的计算背景色应与可点击主按钮不同' }).not.toContain(`置灰背景=${enabledBackground}；`)
+  expect(errors).toEqual([])
+})
+
+test('消息全空时主按钮去我的记录 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await prepareNotificationState(page, api, 'all-empty')
+  registerMeShellLists(api)
+  const primary = page.getByTestId('notifications-primary')
+  await expect(primary).toHaveText('去我的记录')
+  await expect(primary).not.toHaveAttribute('aria-disabled')
+  await expect(primary).toBeEnabled()
+  await expect(primary).toHaveAttribute('data-route', '/me/ai-records')
+  await expect(primary.locator('svg')).toHaveCount(1)
+  await primary.click()
+  await expect(page).toHaveURL(/\/me\/ai-records$/)
+  expect(errors).toEqual([])
+})
+
+test('消息行时间在标题行右侧，四条和加载更多在首屏 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  const response = page.waitForResponse((reply) => new URL(reply.url()).pathname === '/api/v1/me/notifications' && reply.status() === 200)
+  await prepareNotificationState(page, api, 'ready-all')
+  const payload = await (await response).json() as { success: boolean; data: import('../../src/services/api/memberNotifications').MemberNotificationPage }
+  expect(payload.data.items.length, `现有夹具消息数=${payload.data.items.length}，应超过四条`).toBeGreaterThan(4)
+  // unreadOnly 改变 fetchPage，分页钩子会重新读取；页签切换保留内存登录态。
+  await withNotificationStateDiagnostics(page, async () => {
+    const unreadItems = payload.data.items.filter((item) => !item.isRead)
+    api.respond('GET', '/api/v1/me/notifications', {
+      status: 200,
+      json: { ...payload, data: { ...payload.data, items: unreadItems, total: unreadItems.length, nextCursor: null } },
+    })
+    const unreadResponse = page.waitForResponse((reply) => {
+      const url = new URL(reply.url())
+      return url.pathname === '/api/v1/me/notifications' && url.searchParams.get('unreadOnly') === 'true' && reply.status() === 200
+    })
+    await page.getByTestId('notifications-tab-unread').click()
+    await unreadResponse
+    await expect(page.getByTestId('notifications-state-ready-unread')).toBeVisible()
+
+    // 使用现有八条消息的首批四条，游标证明还有下一批，不另造消息。
+    api.respond('GET', '/api/v1/me/notifications', {
+      status: 200,
+      json: { ...payload, data: { ...payload.data, items: payload.data.items.slice(0, 4), nextCursor: payload.data.items[3].id } },
+    })
+    const allResponse = page.waitForResponse((reply) => {
+      const url = new URL(reply.url())
+      return url.pathname === '/api/v1/me/notifications' && !url.searchParams.has('unreadOnly') && reply.status() === 200
+    })
+    await page.getByTestId('notifications-tab-all').click()
+    await allResponse
+    await expect(page.getByTestId('notifications-state-ready-all')).toBeVisible()
+  })
+  const list = page.getByTestId('notifications-list')
+  const rows = list.locator('.qx-me-notice-row')
+  await expect(rows).toHaveCount(4)
+  const more = page.getByRole('button', { name: '加载更多', exact: true })
+  await expect(more).toHaveCount(1)
+  const scale = await stageScale(page)
+  expect(scale, `舞台缩放=${scale}`).toBeGreaterThan(0)
+  const measured = await list.evaluate((root) => {
+    const listRect = root.getBoundingClientRect()
+    const ratio = listRect.height / (root as HTMLElement).offsetHeight
+    return {
+      scrollTop: root.scrollTop,
+      top: listRect.top + root.clientTop * ratio,
+      bottom: listRect.top + (root.clientTop + root.clientHeight) * ratio,
+      rows: [...root.querySelectorAll('.qx-me-notice-row')].map((row) => {
+        const title = row.querySelector('.qx-me-row-title')!
+        const time = row.querySelector('.qx-me-notice-time')!
+        const titleRect = title.getBoundingClientRect()
+        const timeRect = time.getBoundingClientRect()
+        const timeStyle = getComputedStyle(time)
+        return {
+          title: title.textContent,
+          time: time.textContent,
+          sameHead: title.parentElement === time.parentElement && time.parentElement?.classList.contains('qx-me-row-head'),
+          centerDelta: Math.abs(titleRect.top + titleRect.height / 2 - timeRect.top - timeRect.height / 2),
+          titleRight: titleRect.right,
+          timeLeft: timeRect.left,
+          timeRight: timeRect.right,
+          headRight: time.parentElement!.getBoundingClientRect().right,
+          timeFont: parseFloat(timeStyle.fontSize),
+          timeWhiteSpace: timeStyle.whiteSpace,
+          timeOverflow: time.scrollWidth - time.clientWidth,
+          bottom: row.getBoundingClientRect().bottom,
+        }
+      }),
+    }
+  })
+  expect(measured.scrollTop, `首屏列表滚动位置=${measured.scrollTop}`).toBe(0)
+  // 和页面一样在浏览器时区格式化，避免 Node 进程的时区影响期望值。
+  const expectedTimes = await page.evaluate((timestamps) => timestamps.map((iso) => {
+    const d = new Date(iso)
+    const M = d.getMonth() + 1
+    const D = d.getDate()
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    return `${M}月${D}日 ${h}:${m}`
+  }), payload.data.items.slice(0, 4).map((item) => item.createdAt))
+  for (const [index, row] of measured.rows.entries()) {
+    const reading = `第${index + 1}条「${row.title}」：时间=${row.time}，中心差=${(row.centerDelta / scale).toFixed(2)}px，标题右边=${row.titleRight.toFixed(2)}，时间左右=${row.timeLeft.toFixed(2)}/${row.timeRight.toFixed(2)}，标题行右边=${row.headRight.toFixed(2)}，缩放=${scale}`
+    expect(row.sameHead, reading).toBe(true)
+    expect(row.centerDelta / scale, reading).toBeLessThan(16)
+    expect(row.timeLeft - row.titleRight, reading).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(row.headRight - row.timeRight) / scale, reading).toBeLessThanOrEqual(1)
+    expect(row.timeFont, `${reading}，时间字号=${row.timeFont}`).toBe(21)
+    expect(row.timeWhiteSpace, `${reading}，换行规则=${row.timeWhiteSpace}`).toBe('nowrap')
+    expect(row.timeOverflow, `${reading}，时间横向溢出=${row.timeOverflow}`).toBeLessThanOrEqual(1)
+    expect(row.time, reading).toBe(expectedTimes[index])
+  }
+  const fourthBottom = measured.rows[3].bottom
+  expect(fourthBottom, `第四条底边=${fourthBottom.toFixed(2)}，列表可见底边=${measured.bottom.toFixed(2)}，缩放=${scale}`).toBeLessThanOrEqual(measured.bottom)
+  const moreBox = await more.boundingBox()
+  expect(moreBox, '加载更多应有盒子').not.toBeNull()
+  const moreBottom = moreBox!.y + moreBox!.height
+  expect(moreBox!.y, `加载更多顶边=${moreBox!.y.toFixed(2)}，列表可见顶边=${measured.top.toFixed(2)}`).toBeGreaterThanOrEqual(measured.top)
+  expect(moreBottom, `加载更多底边=${moreBottom.toFixed(2)}，列表可见底边=${measured.bottom.toFixed(2)}，缩放=${scale}`).toBeLessThanOrEqual(measured.bottom)
+  expect(errors).toEqual([])
+})
+
+test('占位行胶囊带图标 @w5-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  for (const state of ['login', 'error']) {
+    await prepareNotificationState(page, api, state)
+    const mode = state === 'login' ? 'lock' : 'error'
+    const rows = page.locator(`[data-notification-category][data-slot-mode="${mode}"]`)
+    await expect(rows, `${state} 占位行数量应为六条`).toHaveCount(6)
+    const measured = await rows.evaluateAll((elements) => elements.map((row) => {
+      const capsule = row.querySelector('.qx-me-acts .qx-me-small')!
+      const icons = capsule.querySelectorAll('svg')
+      return {
+        category: row.getAttribute('data-notification-category'),
+        text: capsule.textContent,
+        count: icons.length,
+        width: icons[0]?.getAttribute('width'),
+        height: icons[0]?.getAttribute('height'),
+        icon: icons[0]?.getAttribute('class'),
+      }
+    }))
+    for (const row of measured) {
+      const reading = `${state} ${row.category} 胶囊「${row.text}」：图标数=${row.count}，尺寸=${row.width}×${row.height}，图标=${row.icon}`
+      expect(row.count, reading).toBe(1)
+      expect(row.width, reading).toBe('19')
+      expect(row.height, reading).toBe('19')
+      expect(row.icon, reading).toContain(state === 'login' ? 'lucide-lock' : 'lucide-triangle-alert')
+    }
   }
   expect(errors).toEqual([])
 })

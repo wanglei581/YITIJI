@@ -28,6 +28,8 @@
 //   - 不把到机码、金额、有效期经 URL 传递；凭证只能来自带登录态的服务端响应。
 //   - 不提供在线支付（材料包是到机器后现场付款），因此全链禁止 wx.requestPayment。
 
+const { reprintNoteText } = require('./support-contact')
+
 /** 服务端 CreatePackageOrderDto 允许进材料包的文件用途（ALLOWED_PURPOSES 同集合）。 */
 const PACKAGE_ALLOWED_PURPOSES = ['print_doc', 'resume_upload', 'resume_scan', 'cover_letter']
 
@@ -275,17 +277,25 @@ function statusDetail(order) {
 }
 
 /**
+ * 到机码：待到机，或服务端允许同码续打时展示。服务端没下发码就留空，
+ * 不在本地保留上一次拿到的码。
+ */
+function visiblePackageCode(order, status) {
+  const source = order || {}
+  const code = source.pickupCode ? String(source.pickupCode) : ''
+  if (!code) return ''
+  if ((status && status.key === 'waiting') || source.reprintAllowed === true) return code
+  return ''
+}
+
+/**
  * 列表行 → UI 行。
- *
- * 到机码只在服务端**确实下发**时展示：服务端的 visibleCode 判据是
- * `pickupStatus === 'pending' && 未过期`，已核销 / 已过期的订单直接给 null。
- * 前端不做第二套判据，也不在本地保留上一次拿到的码。
  */
 function toPackageRow(order, now) {
   const source = order || {}
   const status = resolvePackageStatus(source, now)
   const amountCents = parseAmountCents(source.amountCents)
-  const pickupRaw = status.key === 'waiting' && source.pickupCode ? String(source.pickupCode) : ''
+  const pickupRaw = visiblePackageCode(source, status)
   const itemCount = Number(source.itemCount)
   return {
     orderId: source.orderId || '',
@@ -299,6 +309,7 @@ function toPackageRow(order, now) {
     expiresText: formatExpireAt(source.expiresAt),
     pickupCode: formatPickupCode(pickupRaw),
     hasPickupCode: !!pickupRaw,
+    reprintNote: pickupRaw ? reprintNoteText(source) : '',
     statusDetail: statusDetail(source),
     statusKey: status.key,
     statusLabel: status.label,
@@ -481,6 +492,8 @@ module.exports = {
   statusText,
   statusDetail,
   toPackageRow,
+  visiblePackageCode,
+  reprintNoteText,
   mergePackageRows,
   describePackageError,
 }

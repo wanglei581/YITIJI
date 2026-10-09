@@ -1,11 +1,9 @@
 // 自我探索 · 倾向参考 —— 青序流光呈现原语（稿 34-self-assessment.html）。
 //
-// **这个文件里不许出现自我探索的业务文案。** 原因不是洁癖：
-// `services/api/scripts/verify-compliance.ts` 的 `SELF_ASSESSMENT_FILES` 是一张
-// 逐路径的扫描白名单（临床 / 量表 / 疾病 关键词），它点名的是
-// `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx`，不是本文件。把用户可见的
-// 中文搬到这里，等于把那条合规扫描绕过去 —— 而那条门禁在 services/ 下，本批不改。
-// 所以分工是：**文案全部留在 SelfAssessmentFlow.tsx，本文件只收结构与样式**。
+// 本文件只收结构与样式，不放自我探索的业务文案。
+// 临床词扫描只点名 SelfAssessmentFlow.tsx（services/api/scripts/verify-compliance.ts，
+// 不改 services）。同意来源门禁钉住的六句标题留在那个文件；没被钉住的拦截正文
+// 与结果空态在 SelfAssessmentInterceptFacts.tsx / SelfAssessmentResultEmpty.tsx。
 //
 // 触控：这里出现的每个 <button> 都会被 fusion-w6 的 expectTouchTargets 量到，
 // 换算回舞台 CSS px 后最小边必须 ≥48px。尺寸写在 self-assessment-qx.css，
@@ -50,6 +48,7 @@ export function SaFrame({
   ask,
   doing,
   rail,
+  steps,
   gate,
   back,
   ctabar,
@@ -66,6 +65,8 @@ export function SaFrame({
   doing: ReactNode
   /** 底部一行不可关闭的边界声明。 */
   rail: readonly string[]
+  /** 英雄区三步。文案由调用方传入，本文件不写业务句子。 */
+  steps?: readonly { n: string; text: string }[]
   /**
    * 「这一步能不能往下走、为什么」那一条。它**不进滚动区**：
    * 说明页的同意条款把一屏撑满之后，闸门条会被顶到折线以下 —— 1080×1920 实测过，
@@ -111,6 +112,11 @@ export function SaFrame({
                 <p className="sa-xq-doing">{doing}</p>
               </div>
             </div>
+            {steps && steps.length > 0 ? (
+              <ol className="sa-steps">
+                {steps.map((step) => <li key={step.n}><b>{step.n}</b>{step.text}</li>)}
+              </ol>
+            ) : null}
           </section>
 
           <div className="qx-scroll">{children}</div>
@@ -170,14 +176,14 @@ export function SaChips({ items }: { items: readonly { key: string; text: ReactN
 export function SaFlow({
   items,
 }: {
-  items: readonly { key: string; step: string; title: string; desc: string; current?: boolean }[]
+  items: readonly { key: string; step: string; title?: string; desc: string; current?: boolean }[]
 }) {
   return (
     <div className="sa-flow">
       {items.map((item) => (
         <div key={item.key} data-current={item.current ? 'true' : undefined}>
           <small>{item.step}</small>
-          <b>{item.title}</b>
+          {item.title ? <b>{item.title}</b> : null}
           <p>{item.desc}</p>
         </div>
       ))}
@@ -372,10 +378,16 @@ export function SaConfirmOverlay({
   )
 }
 
-/** 稿的 `.mini`：键值对。值缺失时由调用方传出「服务端未返回」的原话，不留空。 */
-export function SaMeta({ items }: { items: readonly { key: string; label: string; value: ReactNode; mono?: boolean }[] }) {
+/** 稿的 `.mini`：键值对。值缺失时由调用方传出「服务端未返回」的原话，不留空。三列只给拦截态的状态格。 */
+export function SaMeta({
+  cols = 2,
+  items,
+}: {
+  cols?: 2 | 3
+  items: readonly { key: string; label: string; value: ReactNode; mono?: boolean }[]
+}) {
   return (
-    <dl className="sa-meta">
+    <dl className="sa-meta" data-cols={cols === 3 ? '3' : undefined}>
       {items.map((item) => (
         <div key={item.key}>
           <dt>{item.label}</dt>
