@@ -21,7 +21,6 @@ export const TRTC_DEFAULT_SYSTEM_PROMPT = withAiSafety(
   '你只提供简历整理、打印帮助和就业政策说明。' +
   '不引导查询云上的岗位或招聘会。' +
   '回答简洁口语化，每次回复控制在 100 字以内。',
-  { policyVariant: 'voice' },
 )
 
 function envNumber(name: string, fallback: number): number {
