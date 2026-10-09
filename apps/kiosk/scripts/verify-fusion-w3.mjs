@@ -405,7 +405,7 @@ check(artifactBodyRule.includes('justify-content: space-evenly'), '作业正文�
 check(artifactBodyRule.includes('gap: 20px'), '作业正文保留稿的默认 20px 间距')
 const artifactCss = read('src/pages/ai-plan/styles/advisor-artifact-qx.css')
 const moreBelowHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const MORE_BELOW_HINT = '([^']+)'/)?.[1]
-check(moreBelowHint === '下面还有，往下滑', 'MORE_BELOW_HINT 导出唯一固定提示文字')
+check(moreBelowHint === '下面还有内容，手指往上滑', 'MORE_BELOW_HINT 导出唯一固定提示文字')
 const artifactPage = read('src/pages/ai-plan/AiPlanPage.tsx')
 check(/canScrollDown\s*&&\s*\(\s*<div className="aa-more-below">\s*<button[^>]*data-testid="advisor-artifact-more-below"[^>]*>\s*\{MORE_BELOW_HINT\}/.test(artifactPage), '下面还有按钮引用唯一常量，并由还能往下滑的状态控制渲染')
 check(/const MORE_BELOW_MIN_BODY = 240\b/.test(artifactPage), '正文可见高度不到 240px 不出提示（常量固定）')
@@ -415,7 +415,8 @@ check(artifactPage.includes('setCanScrollDown(hasRoom && moreBelow)'), '两个�
 check(artifactPage.includes('document.fonts.ready') && artifactPage.includes('new ResizeObserver(schedule)') && artifactPage.includes("body.addEventListener('scroll', schedule") && artifactPage.includes('window.requestAnimationFrame(measure)'), '挂载、字体就绪、尺寸变化与滚动均重算，使用动画帧节流')
 // 逐条看同名选择器，不能把第一条规则误当成整个层叠结果。
 const moreBelowButtonRules = [...stripCssComments(artifactCss).matchAll(/\.aa-more-below-button\s*\{([^}]*)\}/g)].map((match) => match[1])
-check(moreBelowButtonRules.some((body) => /(?:^|;)\s*min-height:\s*56px\s*;?/.test(body)), '下面还有按钮最小高度 56px')
+check(moreBelowButtonRules.some((body) => /(?:^|;)\s*min-height:\s*52px\s*;?/.test(body)), '下面还有按钮最小高度 52px')
+check(moreBelowButtonRules.some((body) => /(?:^|;)\s*background:\s*var\(--qx-deep\)\s*;?/.test(body)), '下面还有按钮使用稿的深色背景令牌')
 const moreBelowLayerRules = [...stripCssComments(artifactCss).matchAll(/\.aa-more-below\s*\{([^}]*)\}/g)].map((match) => match[1])
 check(moreBelowLayerRules.length > 0 && moreBelowLayerRules.every((body) => /(?:^|;)\s*position:\s*absolute\s*;?/.test(body)), '提示层绝对定位，不进文档流、不改正文高度')
 const artifactRootRules = [...stripCssComments(artifactCss).matchAll(/\.aa-root\s*\{([^}]*)\}/g)].map((match) => match[1])

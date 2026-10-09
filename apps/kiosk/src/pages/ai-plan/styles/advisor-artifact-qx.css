@@ -111,8 +111,9 @@
 }
 .aa-body::-webkit-scrollbar { display: none; }
 /* 正文还能往下滑时的提示（稿 52 只画了放得下的四条，这是稿上没画的状态）。
+ * 提示条的样子和那一句照稿 34 的 .scrollcue（深色条、高 52、字 21 加粗），两页说同一句话；这里多一步：可点。
  * 正文是 root 的最后一个流内子项；覆盖层贴其底边，绝对定位，不参与 flex 分高，也不加滚动高度。
- * 上面 48px 从透明渐到纸色，下面 72px 是纸色实底（和操作条所在的页面底色是同一个色），
+ * 上面 48px 从透明渐到纸色，下面 68px 是纸色实底（和操作条所在的页面底色是同一个色），
  * 按钮放在实底上：被底边切到的那行字淡出去，按钮后面不透出半截字。
  * 根容器只在出提示时才定位：平时不定位，别的状态（含手机宽度）的叠放顺序和原来逐像素一样。 */
 .aa-root:has(> .aa-more-below) { position: relative; }
@@ -120,30 +121,31 @@
   position: absolute;
   inset: auto 0 0;
   z-index: 1;
-  height: 120px;
+  height: 116px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 8px 8px;
+  padding: 0 0 8px;
   background: linear-gradient(to bottom, color-mix(in srgb, var(--qx-paper) 0%, transparent) 0, var(--qx-paper) 48px);
   pointer-events: none;
 }
 .aa-more-below-button {
-  min-height: 56px;
-  min-width: 240px;
+  min-height: 52px;
+  width: 100%;
   max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   padding: 8px 24px;
-  border: 1px solid var(--qx-line-2);
-  border-radius: 999px;
-  background: var(--qx-surface);
-  color: var(--qx-teal-d);
+  border: 0;
+  border-radius: 16px;
+  background: var(--qx-deep);
+  color: var(--qx-paper);
   font: inherit;
-  font-size: 22px;
+  font-size: 21px;
+  font-weight: 700;
   line-height: 1.4;
+  text-align: center;
   cursor: pointer;
   pointer-events: auto;
 }

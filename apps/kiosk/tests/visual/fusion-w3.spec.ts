@@ -2667,8 +2667,9 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     const bodyBox = (await body.boundingBox())!
     const barBox = (await page.locator('.qx-ctabar').boundingBox())!
     const viewport = page.viewportSize()!
-    expect(hintBox.height / scale, '提示点击框高度至少 56px').toBeGreaterThanOrEqual(56)
-    expect(hintBox.width / scale, '提示点击框宽度至少 240px').toBeGreaterThanOrEqual(240)
+    expect(hintBox.height / scale, '提示点击框高度不小于 48px（CLAUDE.md §9）').toBeGreaterThanOrEqual(48)
+    expect(Math.abs(hintBox.height / scale - 52), '提示点击框高度与稿的 52px 相差不超过 1px').toBeLessThanOrEqual(1)
+    expect(Math.abs((hintBox.width - bodyBox.width) / scale), '提示点击框与正文区同宽，相差不超过 2px').toBeLessThanOrEqual(2)
     expect(hintBox.y + hintBox.height, '提示下沿不盖住底部操作条').toBeLessThanOrEqual(barBox.y)
     expect(hintBox.y, '提示完整位于正文可见区内').toBeGreaterThanOrEqual(bodyBox.y)
     expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(bodyBox.y + bodyBox.height)
