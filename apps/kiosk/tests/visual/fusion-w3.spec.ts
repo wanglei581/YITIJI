@@ -2606,6 +2606,7 @@ async function readAdvisorContentLayout(page: Page) {
     const steps = document.querySelector('.aa-take-tx > .aa-steps')?.getBoundingClientRect()
     const warn = document.querySelector('.aa-take-tx > .aa-warn')?.getBoundingClientRect()
     const body = node('.aa-body'), list = node('.aa-qa .aa-scroll')
+    const hint = document.querySelector('[data-testid="advisor-artifact-one-pin-hint"]')?.getBoundingClientRect()
     const pins = [...list.querySelectorAll('.aa-pin')].map((pin) => pin.getBoundingClientRect())
     const texts = [...list.querySelectorAll('.aa-pin')].map((pin) => ({
       top: pin.querySelector('.aa-pin-c')!.getBoundingClientRect().top,
@@ -2616,6 +2617,7 @@ async function readAdvisorContentLayout(page: Page) {
       top: css(qa.top - box('.aa-legend').bottom),
       mid: css(take.top - qa.bottom), bot: css(box('.qx-ctabar').top - take.bottom),
       cardTail: css(qa.bottom - pins[pins.length - 1]!.bottom),
+      hintTail: hint ? css(qa.bottom - hint.bottom) : null,
       textGaps: texts.slice(1).map((text, index) => css(text.top - texts[index]!.bottom)),
       paperWidth: css(paper.width), paperHeight: css(paper.height),
       titleToSteps: steps ? css(steps.top - takeTitle.bottom) : null,
@@ -2658,11 +2660,18 @@ test('advisor artifact plans leftover height into content at every pin count @w3
       await page.evaluate(() => document.fonts.ready)
       const layout = await readAdvisorContentLayout(page)
       const count = item.pins.length
-      expect(layout.cardTail, `${item.name}：01 卡不拉空`).toBeLessThanOrEqual(34)
       if (count === 1) {
-        // 1 条只靠排版压不到 160 以内，等产品负责人定要不要加提示。
-        expect(Math.abs(layout.top - layout.bot), '一条上下余高对称').toBeLessThanOrEqual(4)
-      } else if (count <= 5) {
+        const hint = page.getByTestId('advisor-artifact-one-pin-hint')
+        await expect(hint).toBeVisible()
+        await expect(hint).toHaveText(/^这次只留下了 1 条/)
+        expect(layout.hintTail, '1 条：01 卡不拉空，卡片下沿贴近提示句').not.toBeNull()
+        expect(layout.hintTail!, '1 条：卡片下沿 − 提示句下沿 ≤ 34px').toBeLessThanOrEqual(34)
+        await assertNoLargeBlankBands(page, item.name)
+      } else {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
+        expect(layout.cardTail, `${item.name}：01 卡不拉空`).toBeLessThanOrEqual(34)
+      }
+      if (count >= 2 && count <= 5) {
         await assertNoLargeBlankBands(page, item.name)
         expect(layout.bodyOverflow, `${item.name}：正文不滚`).toBeLessThanOrEqual(2)
         expect(Math.max(...layout.textGaps) - Math.min(...layout.textGaps), `${item.name}：相邻文字等距`).toBeLessThanOrEqual(2)
@@ -2687,7 +2696,7 @@ test('advisor artifact plans leftover height into content at every pin count @w3
           expect(Math.abs(layout.hasBottomToPaper), '稿四条打印稿说明和纸样下沿对齐').toBeLessThanOrEqual(2)
           shell = layout
         }
-      } else {
+      } else if (count > 5) {
         expect(layout.bodyOverflow, `${item.name}：正文整页滚动`).toBeGreaterThan(40)
         expect(layout.listOverflow, '条目列表自己不滚').toBeLessThanOrEqual(2)
         expect(layout.firstTop, '顶部第一条完整露出').toBeGreaterThanOrEqual(layout.bodyTop)
@@ -2707,7 +2716,7 @@ test('advisor artifact plans leftover height into content at every pin count @w3
       }
     })
   }
-  for (const item of cases.slice(1, 3)) {
+  for (const item of cases.slice(0, 3)) {
     await test.step(`真实会话${item.name}，导航标明打印读不到`, async () => {
       const sessionId = `w3-content-unavailable-${item.pins.length}`
       api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, item.pins) })
@@ -2721,6 +2730,11 @@ test('advisor artifact plans leftover height into content at every pin count @w3
       expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '确实读取真实会话接口，不用预览夹具态冒充').toBeGreaterThan(0)
       await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
       await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+      if (item.pins.length === 1) {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toBeVisible()
+      } else {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
+      }
       await assertNoLargeBlankBands(page, `打印读不到${item.name}`)
     })
   }
@@ -2728,6 +2742,7 @@ test('advisor artifact plans leftover height into content at every pin count @w3
     await page.goto('/ai/plan?state=print-unavailable&capture=1')
     await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
     await expect(page.locator('.aa-pin')).toHaveCount(4)
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
     await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
     await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
     await page.evaluate(() => document.fonts.ready)
@@ -2737,6 +2752,51 @@ test('advisor artifact plans leftover height into content at every pin count @w3
     expect(Math.abs(layout.warnBottomToPaper!), '提示框和纸样下沿对齐').toBeLessThanOrEqual(2)
     await assertNoLargeBlankBands(page, '打印读不到稿四条')
   })
+  expect(runtimeErrors).toEqual([])
+})
+
+test('advisor artifact one-pin hint tells the truth about asking again @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  const sessionId = 'w3-one-pin-hint'
+  api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, [ADVISOR_REAL[0]!]) })
+  const chatSessionIds: string[] = []
+  await page.route('**/api/v1/assistant/chat', async (route) => {
+    const body = route.request().postDataJSON() as { sessionId: string }
+    chatSessionIds.push(body.sessionId)
+    await route.fulfill({ json: { ...assistantReply, sessionId: body.sessionId } })
+  })
+
+  for (const [index, question] of ['如何整理项目经历？', '再给一个建议'].entries()) {
+    await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+    await expect(page.locator('.aa-pin')).toHaveCount(1)
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toBeVisible()
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveText(/^这次只留下了 1 条/)
+    expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`)).toBeGreaterThan(0)
+    await page.getByRole('button', { name: '再问一轮', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/assistant')
+    const assistant = page.locator('[data-kiosk-screen="assistant"]')
+    await expect(assistant).toBeVisible()
+    // 新的一场：停在还没问过的默认态。这时对话区还没挂出来，所以气泡按整页数，不能只在对话区里数。
+    await expect(page.getByTestId('ai-cockpit-state-default')).toBeVisible()
+    await expect(page.locator('[data-message-role]')).toHaveCount(0)
+    await expect(assistant).not.toContainText(ADVISOR_REAL[0]!.content)
+    if (index === 1) {
+      await expect(assistant).not.toContainText('如何整理项目经历？')
+      await expect(assistant).not.toContainText(assistantReply.reply)
+    }
+    await page.getByLabel('输入咨询问题').fill(question)
+    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    const transcript = page.locator('.assistant-transcript')
+    await expect(transcript.locator('[data-message-kind="ai"]')).toContainText(assistantReply.reply)
+    await expect(transcript.locator('[data-message-role="user"]')).toContainText(question)
+    expect(chatSessionIds).toHaveLength(index + 1)
+    expect(chatSessionIds[index]).toEqual(expect.any(String))
+    expect(chatSessionIds[index]!.length).toBeGreaterThan(0)
+    expect(chatSessionIds[index]).not.toBe(sessionId)
+  }
+  expect(chatSessionIds[0]).not.toBe(chatSessionIds[1])
   expect(runtimeErrors).toEqual([])
 })
 
