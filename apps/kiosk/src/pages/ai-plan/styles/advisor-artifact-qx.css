@@ -4,7 +4,6 @@
  */
 
 .aa-root {
-  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -114,7 +113,9 @@
 /* 正文还能往下滑时的提示（稿 52 只画了放得下的四条，这是稿上没画的状态）。
  * 正文是 root 的最后一个流内子项；覆盖层贴其底边，绝对定位，不参与 flex 分高，也不加滚动高度。
  * 上面 48px 从透明渐到纸色，下面 72px 是纸色实底（和操作条所在的页面底色是同一个色），
- * 按钮放在实底上：被底边切到的那行字淡出去，按钮后面不透出半截字。 */
+ * 按钮放在实底上：被底边切到的那行字淡出去，按钮后面不透出半截字。
+ * 根容器只在出提示时才定位：平时不定位，别的状态（含手机宽度）的叠放顺序和原来逐像素一样。 */
+.aa-root:has(> .aa-more-below) { position: relative; }
 .aa-more-below {
   position: absolute;
   inset: auto 0 0;

@@ -2653,8 +2653,14 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
       (node as HTMLElement).offsetHeight / parseFloat(getComputedStyle(node).lineHeight)))
     for (const count of lineCounts) expect(count, '每条正文确实为两行').toBeCloseTo(2, 1)
   }
-  const expectHintBounds = async () => {
-    await expect(hint).toBeVisible()
+  const main = page.getByTestId('advisor-artifact-main')
+  const expectNoHint = async (where: string) => {
+    await expect(hint, `${where}：不该出提示`).toHaveCount(0)
+    // 根容器只在出提示时才定位；平时不定位，叠放顺序和没有这个提示时一样。
+    expect(await main.evaluate((node) => getComputedStyle(node).position), `${where}：不出提示时根容器不定位`).toBe('static')
+  }
+  const expectHintBounds = async (where: string) => {
+    await expect(hint, `${where}：还能往下滑时提示可见`).toBeVisible()
     expect(await hint.textContent(), '提示文字逐字相等').toBe(moreBelowText)
     const scale = await readEnabledStageScale(page)
     const hintBox = (await hint.boundingBox())!
@@ -2679,7 +2685,7 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     const before = await metrics()
     expect(before.scrollHeight, '前提：五条两行确实放不下').toBeGreaterThan(before.clientHeight + 8)
     await expectTwoLines()
-    await expectHintBounds()
+    await expectHintBounds('五条两行')
     await hint.click()
     await expect.poll(async () => (await metrics()).scrollTop, '点提示后正文向下滚动').toBeGreaterThan(before.scrollTop)
     await body.evaluate((node) => { node.scrollTop = node.scrollHeight })
@@ -2687,7 +2693,7 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
       const value = await metrics()
       return value.scrollHeight - value.clientHeight - value.scrollTop
     }, '先确认正文已经到底').toBeLessThanOrEqual(1)
-    await expect(hint).toHaveCount(0)
+    await expect(hint, '滚到底提示消失').toHaveCount(0)
     await body.evaluate((node) => { node.scrollTop = 0 })
     await expect(hint, '滚回顶部提示再出现').toBeVisible()
   })
@@ -2696,26 +2702,26 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     await expectTwoLines()
     const value = await metrics()
     expect(value.scrollHeight - value.clientHeight, '前提：四条两行放得下').toBeLessThanOrEqual(8)
-    await expect(hint).toHaveCount(0)
+    await expectNoHint('四条两行')
   })
   await test.step('稿上四条：放得下，不渲染提示', async () => {
     await openSession('w3-more-below-proto', ADVISOR_PROTO)
     const value = await metrics()
     expect(value.scrollHeight - value.clientHeight, '前提：稿上四条放得下').toBeLessThanOrEqual(2)
-    await expect(hint).toHaveCount(0)
+    await expectNoHint('稿上四条')
   })
   await test.step('十三条：提示可见', async () => {
     await openSession('w3-more-below-thirteen', [...ADVISOR_REAL, ...ADVISOR_TODO])
     const value = await metrics()
-    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight + 8)
-    await expectHintBounds()
+    expect(value.scrollHeight, '前提：十三条放不下').toBeGreaterThan(value.clientHeight + 8)
+    await expectHintBounds('十三条')
   })
   await test.step('打印读不到的六条：同一正文提示可见', async () => {
     await openSession('w3-more-below-unavailable', [...longPoints, ...longTodos], true)
     await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
     const value = await metrics()
-    expect(value.scrollHeight).toBeGreaterThan(value.clientHeight + 8)
-    await expectHintBounds()
+    expect(value.scrollHeight, '前提：六条两行放不下').toBeGreaterThan(value.clientHeight + 8)
+    await expectHintBounds('打印读不到')
   })
   await test.step('手机宽度 390：正文可见高度不够放提示时不渲染，够放时守同样的边界', async () => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -2723,8 +2729,8 @@ test('advisor artifact shows a more-below hint only while content is cut off @w3
     // 这一页的手机版式不在本条验收里，这里只管提示不乱出：不做点了滚不动的按钮。
     const value = await metrics()
     const fits = value.scrollHeight - value.clientHeight <= 8
-    if (value.clientHeight < minBody || fits) await expect(hint).toHaveCount(0)
-    else await expectHintBounds()
+    if (value.clientHeight < minBody || fits) await expectNoHint('手机宽度')
+    else await expectHintBounds('手机宽度')
   })
   expect(runtimeErrors).toEqual([])
 })
