@@ -67,7 +67,7 @@ export class MiniappCodeService {
     if (process.env['NODE_ENV'] === 'production') {
       if ((raw === 'trial' || raw === 'develop') && !MiniappCodeService.productionVersionWarningLogged) {
         MiniappCodeService.productionVersionWarningLogged = true
-        this.logger.warn('生产环境只出正式版小程序码，已忽略这个配置')
+        this.logger.warn('生产环境只出正式版小程序码，已忽略 WECHAT_MINIAPP_ENV_VERSION 里的体验版或开发版配置')
       }
       return 'release'
     }

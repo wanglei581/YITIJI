@@ -89,6 +89,9 @@ const versionCases: Array<[string, string | undefined, MiniappEnvVersion]> = [
   ['production', 'develop', 'release'],
   ['production', undefined, 'release'],
   ['production', 'release', 'release'],
+  // 生产里带空白的体验版写法同样被忽略并告警（非生产时它会被认成体验版，见上面那一例）。
+  ['production', ' trial ', 'release'],
+  ['production', 'beta', 'release'],
 ]
 
 async function versionChecks(): Promise<void> {
@@ -106,9 +109,9 @@ async function versionChecks(): Promise<void> {
       check(`${label}：两次实际微信请求版本正确`, requests.length === 2 && requests.every((request) => request.env_version === expected))
       check(`${label}：两次实际微信请求检查页面正确`, requests.every((request) => request.check_path === (expected === 'release')))
       check(`${label}：页面与 scene 原样传递且 token 缓存`, requests.every((request) => request.page === PAGE && request.scene === SCENE) && tokenCalls() === 1)
-      const shouldWarn = nodeEnv === 'production' && (configured === 'trial' || configured === 'develop')
+      const shouldWarn = nodeEnv === 'production' && ['trial', 'develop'].includes((configured ?? '').trim())
       check(`${label}：两次出码的告警数量与文字`, shouldWarn
-        ? logs.length === 1 && logs[0]!.includes('生产环境只出正式版小程序码，已忽略这个配置')
+        ? logs.length === 1 && logs[0]!.includes('生产环境只出正式版小程序码，已忽略 WECHAT_MINIAPP_ENV_VERSION 里的体验版或开发版配置')
         : logs.length === 0)
       if (shouldWarn) {
         const another = new MiniappCodeService()
