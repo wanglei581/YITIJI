@@ -29940,6 +29940,7 @@
           "src/pages/resume/ResumeExportPage.tsx"
         ],
         "dirs": [
+          "apps/kiosk/src/pages/ai-plan",
           "apps/kiosk/src/pages/assistant"
         ],
         "files": [
