@@ -6,6 +6,12 @@ export const PASSWORD_PROOF_STATE = {
 
 export type PasswordProofState = (typeof PASSWORD_PROOF_STATE)[keyof typeof PASSWORD_PROOF_STATE]
 
+export const PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE = '这个机构账号还没有完成持有人确认，暂时不能自己验证手机号。请联系平台运营，凭盖章确认函登记联系人手机号；登记后在登录页点「忘记密码」设置自己的密码即可。'
+
+export function partnerPhoneSelfVerifyReady(role: string, state: string): boolean {
+  return role !== 'partner' || state === PASSWORD_PROOF_STATE.OWNER_MANAGED
+}
+
 export function passwordProofState<T extends PasswordProofState>(state: T): T {
   return state
 }

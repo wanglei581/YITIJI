@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { partnerPhoneSelfVerifyReady } from '../src/auth/password-proof-state'
 
 const root = resolve(import.meta.dirname, '..')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
@@ -63,9 +64,12 @@ assert.match(
 )
 assert.match(
   initialPhoneBind,
-  /user\.role !== 'partner' \|\| user\.passwordProofState === PASSWORD_PROOF_STATE\.OWNER_MANAGED/,
+  /if \(partnerPhoneSelfVerifyReady\(user\.role, user\.passwordProofState\)\) return/,
   'Partner initial phone bind must reject admin-known temporary or legacy password proof',
 )
+for (const state of ['temporary', 'legacy', 'unknown']) assert.equal(partnerPhoneSelfVerifyReady('partner', state), false)
+assert.equal(partnerPhoneSelfVerifyReady('partner', 'owner_managed'), true)
+assert.equal(partnerPhoneSelfVerifyReady('admin', 'temporary'), true)
 assert.match(initialPhoneBind, /passwordProofState: PASSWORD_PROOF_STATE\.OWNER_MANAGED,[\s\S]*tokenVersion: user\.tokenVersion/)
 assert.ok(
   (authService.match(/this\.assertPartnerPasswordProofReady\(user\)/g) ?? []).length >= 3,
@@ -73,7 +77,7 @@ assert.ok(
 )
 assert.match(authService, /phoneEnc: user\.phoneEnc,[\s\S]*passwordProofState: PASSWORD_PROOF_STATE\.OWNER_MANAGED,[\s\S]*tokenVersion: user\.tokenVersion/)
 assert.match(authService, /jti: randomUUID\(\)/, 'Every newly issued internal JWT must carry a random login identifier')
-assert.match(authController, /ApiResponse<Omit<AuthedUser, 'sessionId'>>/)
+assert.match(authController, /ApiResponse<Omit<AuthedUser, 'sessionId'> & \{ phoneSelfVerifyReady: boolean \}>/)
 assert.doesNotMatch(
   authController.match(/me\(@CurrentUser\(\) user: AuthedUser\)[\s\S]*?\n  \}/)?.[0] ?? '',
   /ApiResponse\.ok\(user\)/,

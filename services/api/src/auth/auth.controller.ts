@@ -31,6 +31,8 @@ import {
 import { LoginDto } from './dto/login.dto'
 import { PartnerAccountActionRedisService } from '../common/redis/partner-account-action-redis.service'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
+import { partnerPhoneSelfVerifyReady } from './password-proof-state'
 
 @Controller('auth')
 export class AuthController {
@@ -43,6 +45,7 @@ export class AuthController {
     private readonly redis: RedisService,
     private readonly jwtService: JwtService,
     private readonly audit: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -284,8 +287,14 @@ export class AuthController {
   /** 校验 token 是否有效并回显当前用户(前端 boot 时常用) */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: AuthedUser): ApiResponse<Omit<AuthedUser, 'sessionId'>> {
-    return ApiResponse.ok({ userId: user.userId, role: user.role, orgId: user.orgId })
+  async me(@CurrentUser() user: AuthedUser): Promise<ApiResponse<Omit<AuthedUser, 'sessionId'> & { phoneSelfVerifyReady: boolean }>> {
+    const current = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.userId }, select: { role: true, passwordProofState: true },
+    })
+    return ApiResponse.ok({
+      userId: user.userId, role: user.role, orgId: user.orgId,
+      phoneSelfVerifyReady: partnerPhoneSelfVerifyReady(current.role, current.passwordProofState),
+    })
   }
 
   /**

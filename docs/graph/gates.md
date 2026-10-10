@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1944 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1947 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1166,7 +1166,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 51 个文件</summary>
+<summary><code>apps/partner/src/</code> — 54 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1183,7 +1183,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/jobs/components/JobQualitySummaryPanel.tsx` | `verify-job-quality-dashboard-ui.mjs` |
 | `apps/partner/src/routes/jobs/index.tsx` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-service-desk-jobs-ui.mjs` |
 | `apps/partner/src/routes/login/LegalDocsModal.tsx` | `verify-legal-doc-version.ts` |
-| `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs` |
+| `apps/partner/src/routes/login/PhoneVerificationGuide.tsx` | `verify-partner-phone-verify-guide.mjs` |
+| `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs`<br/>`verify-partner-phone-verify-guide.mjs` |
+| `apps/partner/src/routes/login/login.css` | `verify-partner-phone-verify-guide.mjs` |
 | `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | `verify-console-plain-copy.mjs` |
 | `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/ComplianceRestrictions.tsx` | `verify-console-privacy-copy.mjs` |
@@ -1220,7 +1222,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/services/api/stats.ts` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/terminalOps.ts` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/types.ts` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-jobfair-checkin.ts` |
-| `apps/partner/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs` |
+| `apps/partner/src/services/api/userErrorMessage.ts` | `verify-partner-phone-verify-guide.mjs` |
+| `apps/partner/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs`<br/>`verify-partner-phone-verify-guide.mjs` |
 
 </details>
 
@@ -2492,7 +2495,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/auth/partner-account-action.service.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/auth/partner-phone-rebind.service.ts` | `verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-pg-serialization-conflict.ts` |
 | `services/api/src/auth/password-login-attempts.ts` | `verify-internal-login-real-redis.ts` |
-| `services/api/src/auth/password-proof-state.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-admin-session-revocation.ts`<br/>`verify-internal-login-real-redis.ts`<br/>`verify-partner-contact-phone-registration.ts` |
+| `services/api/src/auth/password-proof-state.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-admin-session-revocation.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-internal-login-real-redis.ts`<br/>`verify-partner-account-action-schema.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/benefit-activities/admin-benefit-activities.controller.ts` | `verify-benefit-activities.ts` |
 | `services/api/src/benefit-activities/benefit-activities.controller.ts` | `verify-benefit-activities.ts` |
 | `services/api/src/benefit-activities/benefit-activities.service.ts` | `verify-benefit-activities.ts` |

@@ -25,6 +25,7 @@ import type { AuditService } from '../src/audit/audit.service'
 import { AuthController } from '../src/auth/auth.controller'
 import { AdminInitialPhoneBindService } from '../src/auth/admin-initial-phone-bind.service'
 import { AuthService } from '../src/auth/auth.service'
+import { PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE, partnerPhoneSelfVerifyReady } from '../src/auth/password-proof-state'
 import {
   InitialPhoneBindCancelDto,
   InitialPhoneBindStartDto,
@@ -73,6 +74,7 @@ async function expectCodeAndMessage(
   code: string,
   message: string,
   label: string,
+  status?: number,
 ): Promise<void> {
   try {
     await fn()
@@ -80,7 +82,8 @@ async function expectCodeAndMessage(
   } catch (e) {
     const actualCode = errCode(e)
     const actualMessage = errMessage(e)
-    if (actualCode === code && actualMessage === message) pass(label)
+    const actualStatus = (e as { getStatus?: () => number }).getStatus?.()
+    if (actualCode === code && actualMessage === message && (status === undefined || actualStatus === status)) pass(label)
     else fail(`${label} — 期望 ${code}/${message},实际: ${actualCode ?? (e as Error).message}/${actualMessage ?? ''}`)
   }
 }
@@ -366,6 +369,19 @@ async function main() {
     assertInternalAuthVerifyTarget(process.env)
     assertInitialPhoneBindRouteContract()
     assertAdminInitialPhoneBindRouteContract()
+    if (!['忘记密码', '确认函'].every((text) => PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE.includes(text)) ||
+      ['工作人员', '线下核验恢复'].some((text) => PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE.includes(text))) {
+      fail('指路文案必须说明确认函和忘记密码，不得保留含糊旧说法')
+    }
+    pass('guide. 统一文案包含确认函、忘记密码，排除含糊旧说法')
+    for (const role of ['partner', 'admin', 'kiosk']) {
+      for (const state of ['legacy', 'temporary', 'owner_managed', 'unknown']) {
+        if (partnerPhoneSelfVerifyReady(role, state) !== (role !== 'partner' || state === 'owner_managed')) {
+          fail(`guide. ${role}/${state} 改变了原有许可结果`)
+        }
+      }
+    }
+    pass('guide. 三种角色与三态及未知状态的许可结果保持不变')
     if (INTERNAL_OTP_CODE_TTL_SECONDS !== 300) fail('0c. 内部 OTP 有效期未固定为 300 秒')
     pass('0c. 内部 OTP 使用统一的 300 秒导出常量')
     await assertAdminInitialPhoneBindControllerDelegation()
@@ -562,6 +578,24 @@ async function main() {
     const byUsername = await auth.login(verified.username, passwordV1, 'partner')
     if (!byUsername.token || byUsername.user.orgId !== orgId) fail('1. 用户名密码登录失败')
     pass('1. 用户名密码登录仍可用')
+    const controller = Object.assign(Object.create(AuthController.prototype) as AuthController, {
+      authService: auth, initialPhoneBindService: initialPhoneBind, prisma,
+    })
+    for (const [account, ready] of [
+      [temporaryPrerecordedPartner, false], [unverified, true], [unboundAdmin, true],
+    ] as const) {
+      const portal = account.role as 'partner' | 'admin'
+      const loginResult = await controller.login({ loginId: account.username, password: passwordV1, portal }, '127.0.0.1')
+      if (!('user' in loginResult.data) || loginResult.data.user.phoneSelfVerifyReady !== ready) {
+        fail(`guide. ${portal}/${account.passwordProofState} 登录只读字段不正确`)
+      }
+      pass(`guide. 登录 ${portal}/${account.passwordProofState} phoneSelfVerifyReady=${ready}`)
+      const me = await controller.me({ userId: account.id, role: portal, orgId: account.orgId })
+      if (me.data.phoneSelfVerifyReady !== ready || Object.keys(me.data).sort().join(',') !== 'orgId,phoneSelfVerifyReady,role,userId') {
+        fail(`guide. ${portal}/${account.passwordProofState} 本人信息未只增加正确的是非值`)
+      }
+      pass(`guide. 本人信息 ${portal}/${account.passwordProofState} phoneSelfVerifyReady=${ready}`)
+    }
     const originalDateNow = Date.now
     Date.now = () => 1_790_000_000_000
     let sameSecondLoginA: Awaited<ReturnType<AuthService['login']>>
@@ -712,17 +746,24 @@ async function main() {
       'PHONE_NOT_BOUND',
       '8g. 旧 phone/verify 对未绑定账号仍拒绝，不作为首次绑定旁路',
     )
-    await expectCode(
-      () => auth.sendOwnPhoneBindCode(temporaryPrerecordedPartner.id, '127.0.0.1'),
+    const sentBeforeProofRejection = sms.sent.length
+    await expectCodeAndMessage(
+      () => controller.sendOwnPhoneCode({ userId: temporaryPrerecordedPartner.id, role: 'partner', orgId }, {}, '127.0.0.1'),
       'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+      PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE,
       '8h. temporary Partner 不能向管理员预录手机号发送验证码',
+      409,
     )
     await expectCode(
       () => auth.verifyOwnPhoneBindCode(temporaryPrerecordedPartner.id, '123456'),
       'ACCOUNT_PASSWORD_PROOF_NOT_READY',
       '8i. temporary Partner 不能验证管理员预录手机号',
     )
-    await auth.sendOwnPhoneBindCode(unverified.id, '127.0.0.1')
+    if (sms.sent.length !== sentBeforeProofRejection) fail('guide. temporary 账号被拒绝时仍发送了短信')
+    pass('guide. temporary 账号被拒绝时不发送短信')
+    const allowedCode = await controller.sendOwnPhoneCode({ userId: unverified.id, role: 'partner', orgId }, {}, '127.0.0.1')
+    if (!allowedCode.data.sent || sms.sent.length !== sentBeforeProofRejection + 1) fail('guide. owner_managed 发码未成功')
+    pass('guide. owner_managed 发码接口返回成功且确实交给短信发送器')
     const prerecordedCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(unverifiedPhone)}`)
     if (!prerecordedCode) fail('8j. owner-managed Partner 预录手机号没有生成验证码')
     await auth.verifyOwnPhoneBindCode(unverified.id, prerecordedCode)
@@ -730,7 +771,7 @@ async function main() {
     if (!verifiedPrerecorded.phoneVerifiedAt) fail('8j. owner-managed Partner 预录手机号无法完成验证')
     pass('8h-8j. 旧预录手机号入口按 Partner 持有人证明 fail closed')
 
-    const meResult = AuthController.prototype.me({
+    const meResult = await controller.me({
       userId: verified.id,
       role: 'partner',
       orgId,
@@ -1119,10 +1160,12 @@ async function main() {
       ['temporary', temporaryUnboundPartner.id, 101],
       ['legacy', legacyUnboundPartner.id, 102],
     ] as const) {
-      await expectCode(
-        () => initialPhoneBind.start(userId, passwordV1, phone('130', offset), '127.0.0.1'),
+      await expectCodeAndMessage(
+        () => controller.startInitialPhoneBind({ userId, role: 'partner', orgId }, { currentPassword: passwordV1, phone: phone('130', offset) }, '127.0.0.1'),
         'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+        PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE,
         `18a.${label} 密码不能绑定管理员控制的手机号并伪造持有人因子`,
+        409,
       )
     }
     if (sms.sent.length !== sentBeforeUntrustedBind) fail('18a. 非 owner-managed Partner 被拒绝前不应发送 OTP')

@@ -572,6 +572,7 @@ jobs:
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/partner verify:partner-relative-api-url
           pnpm --filter @ai-job-print/partner verify:partner-stats-contract
+          pnpm --filter @ai-job-print/partner verify:partner-phone-verify-guide
           pnpm --filter @ai-job-print/partner verify:partner-terminal-ops-honesty
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
@@ -1382,6 +1383,9 @@ jobs:
         # 合作机构后台此前 0 条浏览器用例。mock 模式预览包（vite --mode development），
         # 不连真实后端。命令走 package.json test:e2e，内部用 kiosk 已装的 Playwright。
         run: pnpm --filter @ai-job-print/partner test:e2e
+
+      - name: Run Partner phone verification guide browser E2E
+        run: pnpm --filter @ai-job-print/partner test:e2e --config=playwright.phone-guide.config.ts
 
       - name: Run Kiosk route sweep
         # 一体机全路由扫描：productionRoutePatterns 每条打开、不白屏、无 pageerror。

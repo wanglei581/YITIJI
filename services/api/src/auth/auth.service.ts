@@ -28,6 +28,7 @@ import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
 import {
   PASSWORD_PROOF_STATE,
+  PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE, partnerPhoneSelfVerifyReady,
   passwordProofState,
   passwordProofStateAfterSelfChange,
 } from './password-proof-state'
@@ -54,6 +55,7 @@ interface FullLoginResult {
     orgId:       string | null
     phoneMasked?: string
     phoneVerifiedAt?: string | null
+    phoneSelfVerifyReady: boolean
     emailMasked?: string
     emailVerifiedAt?: string | null
   }
@@ -598,6 +600,7 @@ export class AuthService {
         orgId: user.orgId,
         ...(user.phoneEnc ? { phoneMasked: maskPhoneFromEnc(user.phoneEnc) } : {}),
         phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
+        phoneSelfVerifyReady: partnerPhoneSelfVerifyReady(user.role, user.passwordProofState),
         ...(user.emailEnc ? { emailMasked: maskEmailFromEnc(user.emailEnc) } : {}),
         emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       },
@@ -649,11 +652,11 @@ export class AuthService {
   }
 
   private assertPartnerPasswordProofReady(user: Pick<InternalUser, 'role' | 'passwordProofState'>): void {
-    if (user.role !== 'partner' || user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED) return
+    if (partnerPhoneSelfVerifyReady(user.role, user.passwordProofState)) return
     throw new HttpException({
       error: {
         code: 'ACCOUNT_PASSWORD_PROOF_NOT_READY',
-        message: '该机构账号尚无独立持有人证明，请先完成线下核验恢复',
+        message: PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE,
       },
     }, HttpStatus.CONFLICT)
   }
