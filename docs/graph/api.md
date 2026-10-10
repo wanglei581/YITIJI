@@ -590,12 +590,12 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/ai-records` | MemberAssetsController.aiRecords | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/ai-records/:id` | MemberAssetsController.deleteAiRecord | — | — | — |
-| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
-| GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents` | MemberAssetsController.documents | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/documents/deleted` | MemberAssetsController.deletedDocuments | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/qa-records/:id` | MemberAssetsController.deleteQaRecord | — | — | — |
-| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
+| GET | `/api/v1/me/resumes` | MemberAssetsController.resumes | — | MemberAssetsService | AdvisorArtifact<br/>AdvisorSession<br/>AiResumeResult<br/>FileObject<br/>JobAiSession |
 | DELETE | `/api/v1/me/resumes/:id` | MemberAssetsController.deleteResume | — | — | — |
 
 ## `services/api/src/member-auth/member-auth.controller.ts`
