@@ -315,7 +315,7 @@ export function HelpCenterPage() {
               ) : (
                 <>
                   <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" onClick={() => navigate('/error-offline')}>看设备状态</button>
+                  <button type="button" onClick={() => navigate('/error-offline', { state: { inspect: true } })}>看设备状态</button>
                   <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}>问小青：这里没看懂</button>
                 </>
               )}

@@ -81,7 +81,7 @@ export function HomePage() {
           deviceStatus={deviceStatus}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
-          onOpenDevice={() => navigate('/error-offline')}
+          onOpenDevice={() => navigate('/error-offline', { state: { inspect: true } })}
           onEndPrevious={() => endKioskUse('handover')}
         />
         <nav className="qx-navbar" aria-label="主导航">

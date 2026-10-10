@@ -1109,6 +1109,30 @@ test('offline page follows a recovered health response in a fresh page @w5-kiosk
   await expectFusionAcceptance(page, errors)
 })
 
+test('device status opened to inspect checks at once and stays on the page with the result @w5-kiosk', async ({ page, api }) => {
+  // 真机 F-01：从首页「设备状态」、帮助页「看设备状态」进来（location.state.inspect）是来看结果的。
+  // 进页立刻检测、三项都读到时停在 read 态；「重新检测」也不把人送回首页。去掉 inspect 判断，本条在 URL 断言处转红。
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200,
+    json: { success: true, data: { isOnline: true, printerStatus: 'ready' } },
+  })
+  await page.goto('/help')
+  await page.getByRole('button', { name: '看设备状态', exact: true }).click()
+  await expect(page.getByTestId('system-state-state-read')).toBeVisible()
+  await expect(page).toHaveURL(/\/error-offline$/)
+  await expect(page.getByText('这次读到可用', { exact: true })).toHaveCount(2)
+  await expect(page.getByText(/最近一次检测：\d{2}:\d{2}/)).toBeVisible()
+  const before = api.requestCount('GET', '/api/v1/health')
+  await page.getByRole('button', { name: '重新检测', exact: true }).click()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/health')).toBe(before + 1)
+  await expect(page.getByTestId('system-state-state-read')).toBeVisible()
+  await expect(page).toHaveURL(/\/error-offline$/)
+  await expectFusionAcceptance(page, errors)
+})
+
 test('offline page backs off its automatic re-checks and resets on the online event @w5-kiosk', async ({ page, api }) => {
   // 自动重测：每多一次「检测完仍留在本页」间隔翻倍 10 → 20 → 40 秒、封顶 60 秒；「重新检测」立即执行；
   // online 事件归零并立即重测。提示里的次数与下一次间隔必须照实写（旧页写死「每 10 秒」）。
