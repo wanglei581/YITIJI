@@ -2598,6 +2598,158 @@ function qaPinsSession(sessionId: string, pins: Pin[]) {
   }
 }
 
+test('advisor artifact shows a more-below hint only while content is cut off @w3-kiosk', async ({ page, api }) => {
+  test.setTimeout(60_000)
+  terminalBaseline(api)
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  const moreBelowText = readFileSync('src/pages/ai-plan/advisorArtifactModel.ts', 'utf8')
+    .match(/export const MORE_BELOW_HINT = '([^']+)'/)?.[1]
+  expect(moreBelowText, '从唯一导出常量读取提示文字').toBeDefined()
+  const minBody = Number(readFileSync('src/pages/ai-plan/AiPlanPage.tsx', 'utf8')
+    .match(/const MORE_BELOW_MIN_BODY = (\d+)/)?.[1])
+  expect(minBody, '从页面常量读取出提示所需的正文最小可见高度').toBeGreaterThan(0)
+  // 两行一条的真实样子：要点在前、待办在后，出处各用各的。
+  const twoLine = (content: string): Pin => ({
+    content,
+    evidenceLevel: 'E3',
+    sourceNote: content.startsWith('待办：') ? '待办（请自行核对后执行）' : '由本次对话浓缩，仅供参考',
+  })
+  const longPoints = [
+    '自我介绍先说专业和年级，再讲在学校快递站分拣和盘点的经历，最后说明暑假可以实习两个月并接受轮班安排。',
+    '简历里补上快递站的实践经历，写清每天负责分拣和核对的件数，数字只用自己记得的真实记录，不确定的先留空。',
+    '面试被问到为什么选择仓储实习，可以结合自己盘点时认真核对的习惯说明优势，再讲希望学习库存管理的想法。',
+    '签实习协议之前核对工作地点和每天的工作时间，问清轮班安排与意外保险由谁办理，把尚未明确的问题记下来。',
+  ].map(twoLine)
+  const longTodos = [
+    '待办：面试前核对简历上的实践时间和联系方式，把快递站做过的事情按先后顺序整理好，准备一个真实的小例子。',
+    '待办：提前查好去实习地点的公交路线和出发时间，带上学生证和两份核对过的简历，给路上换乘留出足够的时间。',
+  ].map(twoLine)
+  const body = page.locator('.aa-body')
+  const hint = page.getByTestId('advisor-artifact-more-below')
+  const metrics = () => body.evaluate((node) => ({
+    scrollTop: node.scrollTop, clientHeight: node.clientHeight, scrollHeight: node.scrollHeight,
+  }))
+  // 提示是量完一帧才出来的。断言「没有」之前先等两帧，免得赶在它出来之前就看过了。
+  const settle = () => page.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  }))
+  const openSession = async (sessionId: string, pins: Pin[], printUnavailable = false) => {
+    api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, pins) })
+    if (printUnavailable) {
+      await page.goto('/ai/plan')
+      await page.evaluate((sessionId) => {
+        history.pushState({ usr: { printUnavailableReason: '打印状态暂时读不到' }, key: 'k', idx: 1 }, '', `/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }, sessionId)
+    } else {
+      await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+    }
+    await expect(page.getByTestId('advisor-artifact-main')).toHaveAttribute('data-state', printUnavailable ? 'print-unavailable' : 'qa-pins')
+    await expect(page.locator('.aa-pin')).toHaveCount(pins.length)
+    expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '通过真实会话接口读取正文').toBeGreaterThan(0)
+    await page.evaluate(() => document.fonts.ready)
+    await settle()
+  }
+  const expectTwoLines = async () => {
+    const lineCounts = await page.locator('.aa-pin-c').evaluateAll((nodes) => nodes.map((node) =>
+      (node as HTMLElement).offsetHeight / parseFloat(getComputedStyle(node).lineHeight)))
+    for (const count of lineCounts) expect(count, '每条正文确实为两行').toBeCloseTo(2, 1)
+  }
+  const main = page.getByTestId('advisor-artifact-main')
+  const expectNoHint = async (where: string) => {
+    await expect(hint, `${where}：不该出提示`).toHaveCount(0)
+    // 根容器只在出提示时才定位；平时不定位，叠放顺序和没有这个提示时一样。
+    expect(await main.evaluate((node) => getComputedStyle(node).position), `${where}：不出提示时根容器不定位`).toBe('static')
+  }
+  const expectHintBounds = async (where: string) => {
+    await expect(hint, `${where}：还能往下滑时提示可见`).toBeVisible()
+    expect(await hint.textContent(), '提示文字逐字相等').toBe(moreBelowText)
+    const scale = await readEnabledStageScale(page)
+    const hintBox = (await hint.boundingBox())!
+    const bodyBox = (await body.boundingBox())!
+    const barBox = (await page.locator('.qx-ctabar').boundingBox())!
+    const viewport = page.viewportSize()!
+    expect(hintBox.height / scale, '提示点击框高度不小于 48px（CLAUDE.md §9）').toBeGreaterThanOrEqual(48)
+    expect(Math.abs(hintBox.height / scale - 52), '提示点击框高度与稿的 52px 相差不超过 1px').toBeLessThanOrEqual(1)
+    expect(Math.abs((hintBox.width - bodyBox.width) / scale), '提示点击框与正文区同宽，相差不超过 2px').toBeLessThanOrEqual(2)
+    expect(hintBox.y + hintBox.height, '提示下沿不盖住底部操作条').toBeLessThanOrEqual(barBox.y)
+    expect(hintBox.y, '提示完整位于正文可见区内').toBeGreaterThanOrEqual(bodyBox.y)
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(bodyBox.y + bodyBox.height)
+    expect(hintBox.x).toBeGreaterThanOrEqual(0)
+    expect(hintBox.y).toBeGreaterThanOrEqual(0)
+    expect(hintBox.x + hintBox.width).toBeLessThanOrEqual(viewport.width)
+    expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(viewport.height)
+    // 提示是两头全圆的胶囊，四个角本来就不在形状里；取中心和四条边的中点往里收一点，确认点中的是它自己。
+    const hits = await hint.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const cx = box.left + box.width / 2
+      const cy = box.top + box.height / 2
+      const points: Array<[number, number]> = [[cx, cy], [box.left + 16, cy], [box.right - 16, cy], [cx, box.top + 4], [cx, box.bottom - 4]]
+      return points.map(([x, y]) => {
+        const top = document.elementFromPoint(x, y)
+        return Boolean(top && node.contains(top))
+      })
+    })
+    expect(hits, '提示自己点得中（中心和四边）').toEqual([true, true, true, true, true])
+    expect(await page.locator('.aa-more-below').evaluate((node) => getComputedStyle(node).pointerEvents), '渐隐层不接点击，不挡后面的内容').toBe('none')
+  }
+
+  await test.step('五条两行正文：有提示，点后向下，滚到底消失，滚回顶部再出现', async () => {
+    await openSession('w3-more-below-five', [...longPoints.slice(0, 3), ...longTodos])
+    const before = await metrics()
+    expect(before.scrollHeight, '前提：五条两行确实放不下').toBeGreaterThan(before.clientHeight + 8)
+    await expectTwoLines()
+    await expectHintBounds('五条两行')
+    await hint.click()
+    await expect.poll(async () => (await metrics()).scrollTop, '点提示后正文向下滚动').toBeGreaterThan(before.scrollTop)
+    await body.evaluate((node) => { node.scrollTop = node.scrollHeight })
+    await expect.poll(async () => {
+      const value = await metrics()
+      return value.scrollHeight - value.clientHeight - value.scrollTop
+    }, '先确认正文已经到底').toBeLessThanOrEqual(1)
+    await expect(hint, '滚到底提示消失').toHaveCount(0)
+    await body.evaluate((node) => { node.scrollTop = 0 })
+    await expect(hint, '滚回顶部提示再出现').toBeVisible()
+  })
+  await test.step('四条两行正文：放得下，不渲染提示', async () => {
+    await openSession('w3-more-below-four', [...longPoints.slice(0, 3), longTodos[0]!])
+    await expectTwoLines()
+    const value = await metrics()
+    expect(value.scrollHeight - value.clientHeight, '前提：四条两行放得下').toBeLessThanOrEqual(8)
+    await expectNoHint('四条两行')
+  })
+  await test.step('稿上四条：放得下，不渲染提示', async () => {
+    await openSession('w3-more-below-proto', ADVISOR_PROTO)
+    const value = await metrics()
+    expect(value.scrollHeight - value.clientHeight, '前提：稿上四条放得下').toBeLessThanOrEqual(2)
+    await expectNoHint('稿上四条')
+  })
+  await test.step('十三条：提示可见', async () => {
+    await openSession('w3-more-below-thirteen', [...ADVISOR_REAL, ...ADVISOR_TODO])
+    const value = await metrics()
+    expect(value.scrollHeight, '前提：十三条放不下').toBeGreaterThan(value.clientHeight + 8)
+    await expectHintBounds('十三条')
+  })
+  await test.step('打印读不到的六条：同一正文提示可见', async () => {
+    await openSession('w3-more-below-unavailable', [...longPoints, ...longTodos], true)
+    await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+    const value = await metrics()
+    expect(value.scrollHeight, '前提：六条两行放不下').toBeGreaterThan(value.clientHeight + 8)
+    await expectHintBounds('打印读不到')
+  })
+  await test.step('手机宽度 390：正文可见高度不够放提示时不渲染，够放时守同样的边界', async () => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openSession('w3-more-below-mobile', [...longPoints.slice(0, 3), ...longTodos])
+    // 这一页的手机版式不在本条验收里，这里只管提示不乱出：不做点了滚不动的按钮。
+    const value = await metrics()
+    const fits = value.scrollHeight - value.clientHeight <= 8
+    if (value.clientHeight < minBody || fits) await expectNoHint('手机宽度')
+    else await expectHintBounds('手机宽度')
+  })
+  expect(runtimeErrors).toEqual([])
+})
+
 /** 条目文字（含出处）的实际间距，不把行容器的增长误当成空卡片。 */
 async function readAdvisorContentLayout(page: Page) {
   const scale = await readEnabledStageScale(page)

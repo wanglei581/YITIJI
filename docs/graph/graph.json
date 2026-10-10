@@ -21465,6 +21465,9 @@
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
+    ],
     "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -21575,6 +21578,9 @@
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
+    ],
+    "apps/kiosk/src/pages/resume/self-assessment-qx.css": [
+      "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
     ],
     "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts": [
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
@@ -32307,7 +32313,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/renshi"
+        ],
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
@@ -32673,6 +32681,8 @@
           "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
           "apps/kiosk/src/pages/legal/legalDocModel.ts",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx",
+          "apps/kiosk/src/pages/resume/self-assessment-qx.css",
           "apps/kiosk/src/pages/resume/selfAssessmentConsent.ts",
           "apps/kiosk/src/pages/resume/selfAssessmentSession.ts",
           "apps/kiosk/src/pages/resume/useSelfAssessmentConsentBundle.ts",

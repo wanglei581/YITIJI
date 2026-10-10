@@ -9,7 +9,7 @@
 // 换算回舞台 CSS px 后最小边必须 ≥48px。尺寸写在 self-assessment-qx.css，
 // 不要在调用方用内联 style 压小。
 
-import { type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
@@ -26,6 +26,59 @@ export type SaScreen =
 export interface SaStatus {
   tone: 'ok' | 'warn' | 'bad' | 'unknown'
   label: string
+}
+
+function saScrollBehavior(): ScrollBehavior {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+}
+
+/**
+ * 只移动正文，把目标就近挪进可见区（按舞台缩放换回 CSS px）：目标在下面，让它的下沿贴住可见区下沿，
+ * 上文留在屏幕里；目标被上沿切到，让它的上沿贴住上沿；已经完整看得见就不动。
+ * 不能一律贴下沿：提示条只在没滑到底时占一行，从页底往回滚时它会冒出来把可见区压矮，贴下沿会把目标底部切掉。
+ */
+export function scrollSaTargetIntoView(scroll: HTMLDivElement | null, selector: string) {
+  const target = scroll?.querySelector<HTMLElement>(selector)
+  if (!scroll || !target) return
+  const box = scroll.getBoundingClientRect()
+  const scale = box.height / scroll.offsetHeight
+  if (!scale) return
+  const top = box.top + scroll.clientTop * scale
+  const bottom = top + scroll.clientHeight * scale
+  const rect = target.getBoundingClientRect()
+  const delta = rect.bottom > bottom + 1 ? rect.bottom - bottom : rect.top < top - 1 ? rect.top - top : 0
+  if (!delta) return
+  scroll.scrollTo({ top: Math.max(0, Math.min(scroll.scrollTop + delta / scale, scroll.scrollHeight - scroll.clientHeight)), behavior: saScrollBehavior() })
+}
+
+function useSaScrollCue(scrollRef: RefObject<HTMLDivElement>, text: string | undefined, children: ReactNode) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const scroll = scrollRef.current
+    if (!text || !scroll) return
+    let active = true
+    let frame: number | null = null
+    const schedule = () => {
+      if (!active || frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        setVisible(scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop > 24)
+      })
+    }
+    const observer = new ResizeObserver(schedule)
+    observer.observe(scroll)
+    scroll.querySelectorAll('*').forEach((child) => observer.observe(child))
+    scroll.addEventListener('scroll', schedule, { passive: true })
+    void document.fonts.ready.then(schedule)
+    schedule()
+    return () => {
+      active = false
+      if (frame !== null) cancelAnimationFrame(frame)
+      observer.disconnect()
+      scroll.removeEventListener('scroll', schedule)
+    }
+  }, [scrollRef, text, children])
+  return Boolean(text) && visible
 }
 
 /**
@@ -50,6 +103,8 @@ export function SaFrame({
   rail,
   steps,
   gate,
+  scrollCue,
+  scrollRef,
   back,
   ctabar,
   children,
@@ -73,12 +128,18 @@ export function SaFrame({
    * 用户看到的是一个灰按钮加一条看不见的解释。所以它和底部行动条一样固定在下方。
    */
   gate?: ReactNode
+  /** 可选正文提示，文字由调用方传入；不传时不占布局。 */
+  scrollCue?: string
+  scrollRef?: RefObject<HTMLDivElement>
   back: { label: string; onBack: () => void }
   ctabar: ReactNode
   children: ReactNode
 }) {
   const navigate = useNavigate()
   const terminalLabel = getTerminalCode() || '设备未绑定'
+  const localScrollRef = useRef<HTMLDivElement>(null)
+  const bodyRef = scrollRef ?? localScrollRef
+  const cueVisible = useSaScrollCue(bodyRef, scrollCue, children)
 
   return (
     <KioskStageFit>
@@ -119,7 +180,14 @@ export function SaFrame({
             ) : null}
           </section>
 
-          <div className="qx-scroll">{children}</div>
+          <div className="qx-scroll" ref={bodyRef}>{children}</div>
+
+          {cueVisible ? (
+            <button type="button" className="sa-scrollcue" data-testid="self-assessment-scrollcue"
+              onClick={() => bodyRef.current?.scrollBy({ top: bodyRef.current.clientHeight * 0.6, behavior: saScrollBehavior() })}>
+              {scrollCue}
+            </button>
+          ) : null}
 
           {gate}
 
@@ -197,9 +265,10 @@ export function SaFlow({
  * 它和主按钮的置灰是同一件事的两种表达，必须同时出现 —— 只置灰不给原因，
  * 用户读不到「为什么点不动」；只写原因不置灰，按钮会骗人。
  */
-export function SaGate({ tone, children }: { tone: 'ok' | 'warn'; children: ReactNode }) {
+export function SaGate({ tone, children, onClick }: { tone: 'ok' | 'warn'; children: ReactNode; onClick?: () => void }) {
   return (
-    <div className="sa-gate" data-tone={tone} data-testid="self-assessment-gate" role={tone === 'warn' ? 'status' : undefined}>
+    <div className="sa-gate" data-tone={tone} data-testid="self-assessment-gate" role={tone === 'warn' ? 'status' : undefined}
+      onClick={onClick} data-clickable={onClick ? 'true' : undefined}>
       <i aria-hidden="true">{tone === 'warn' ? '!' : '✓'}</i>
       <div>{children}</div>
     </div>

@@ -11,6 +11,7 @@ import { getAdvisorSession, printAdvisorArtifact } from '../../services/api/advi
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ArtifactBody, AdvisorHero, EvidenceLegend } from './AdvisorArtifactPanels'
 import {
+  MORE_BELOW_HINT,
   copyFor,
   deriveContentState,
   fixturePayload,
@@ -28,6 +29,9 @@ import {
 import './styles/advisor-artifact-qx.css'
 
 const READ_LIMIT = 3
+// 「下面还有」提示自己要盖住正文区底部 120px。正文可见高度不到它的两倍就不出：
+// 手机宽度下这一页的正文区高度是 0，出了也滚不动，不做点了没反应的按钮。
+const MORE_BELOW_MIN_BODY = 240
 
 function isNotFound(err: unknown): boolean {
   return err instanceof ApiHttpError && (
@@ -81,6 +85,8 @@ export function AiPlanPage() {
   const [readFailed, setReadFailed] = useState(false)
   const printLock = useRef(false)
   const requestSeq = useRef(0)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [canScrollDown, setCanScrollDown] = useState(false)
 
   const loadSession = useCallback(async () => {
     if (fixtureState || !sessionId) return
@@ -181,6 +187,44 @@ export function AiPlanPage() {
     && derivedState !== 'loading'
     && derivedState !== 'expired'
     && derivedState !== 'no-artifact'
+
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!body) return
+    let frame = 0
+    let disposed = false
+    const measure = () => {
+      frame = 0
+      const hasRoom = body.clientHeight >= MORE_BELOW_MIN_BODY
+      const moreBelow = body.scrollTop + body.clientHeight < body.scrollHeight - 8
+      setCanScrollDown(hasRoom && moreBelow)
+    }
+    const schedule = () => {
+      if (!disposed && !frame) frame = window.requestAnimationFrame(measure)
+    }
+    const observer = new ResizeObserver(schedule)
+    observer.observe(body)
+    // 只看容器会漏掉内容变长；每次正文换态后重新观察现有区块，不加布局包装。
+    for (const child of body.children) observer.observe(child)
+    body.addEventListener('scroll', schedule, { passive: true })
+    schedule()
+    void document.fonts.ready.then(schedule)
+    return () => {
+      disposed = true
+      window.cancelAnimationFrame(frame)
+      body.removeEventListener('scroll', schedule)
+      observer.disconnect()
+    }
+  }, [derivedState, payload, showStale])
+
+  const scrollDown = () => {
+    const body = bodyRef.current
+    if (!body) return
+    body.scrollBy({
+      top: body.clientHeight * 0.6,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    })
+  }
 
   const onPrint = async () => {
     if (!showPrint || printLock.current || !activeIds) return
@@ -312,9 +356,21 @@ export function AiPlanPage() {
           sub={copy.sub}
         />
         {showLegend ? <EvidenceLegend /> : null}
-        <div className="aa-body">
+        <div className="aa-body" ref={bodyRef}>
           <ArtifactBody state={derivedState} payload={payload} stale={showStale} reread={reread} />
         </div>
+        {canScrollDown && (
+          <div className="aa-more-below">
+            <button
+              type="button"
+              className="aa-more-below-button"
+              data-testid="advisor-artifact-more-below"
+              onClick={scrollDown}
+            >
+              {MORE_BELOW_HINT}
+            </button>
+          </div>
+        )}
       </div>
     </QxPageFrame>
   )
