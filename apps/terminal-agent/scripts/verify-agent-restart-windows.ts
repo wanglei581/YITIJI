@@ -127,7 +127,7 @@ process.on('SIGTERM', () => process.exit(0));
     const kioskBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
     const operatorBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/')
     const kioskChild = startFakeBrowser('--type=renderer', '--aijobprint-kiosk=1')
-    await until(() => ps(`@(Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" | Where-Object { $_.CommandLine -like '*--aijobprint-kiosk=1*' }).Count`) === '2', 15_000)
+    await until(() => ps(`@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'chrome.exe' -and $_.CommandLine -like '*--aijobprint-kiosk=1*' }).Count`) === '2', 15_000)
     for (let iteration = 0; iteration < 3; iteration++) {
       const started = performance.now()
       const old = readIdentity()
@@ -171,7 +171,9 @@ process.on('SIGTERM', () => process.exit(0));
     assert.equal(await requestServiceRestart({ taskName: task }), false)
   } finally {
     // No test task, service, nonce directory or newly-created product roots may survive.
-    for (const pid of browserPids) ps(`Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`)
+    // The marked one is already gone (that is the point). An empty pipeline keeps the exit code at 0;
+    // a bare Stop-Process on a missing id exits 1 under -Command even with SilentlyContinue.
+    for (const pid of browserPids) ps(`Get-Process -Id ${pid} -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0`)
     await until(() => browserPids.every((pid) => !alive(pid)), 15_000)
     if (existsSync(registration)) {
       ps(`if (Get-ScheduledTask -TaskName ${quote(task)} -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName ${quote(task)} }; ${uninstallTask}`)
