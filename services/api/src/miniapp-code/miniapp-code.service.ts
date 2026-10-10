@@ -8,10 +8,11 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common'
  * （产品负责人 2026-09-08：「整个项目操作和小程序都是相关联的」）。
  *
  * 微信侧约束（2026-09-08 对本项目 AppID 实测）：
- * - `getwxacodeunlimit` 生成的是**永久**小程序码，但**只对已发布版本有效**；
- *   未发布时返回 `errcode 41030 invalid page`（实测值，不是推测）。
- * - 因此 `env_version` 做成配置：`release`（已发布）/ `trial`（体验版，仅体验成员可扫）/
- *   `develop`（开发版）。发布前用 trial 验链路，发布后改环境变量即可对外，代码不动。
+ * - `getwxacodeunlimit` 生成的是**永久**小程序码；正式版检查页面是否在已发布版本里，
+ *   小程序未发布或该页未发布时返回 `errcode 41030 invalid page`。
+ * - `env_version` 可配 `release` / `trial` / `develop`；体验版、开发版只在非生产的
+ *   测试服务上出码，仅对应体验成员、开发成员可扫，且不检查页面。
+ * - 生产固定正式版并检查页面，忽略体验版、开发版配置。
  * - access_token 有效期 7200 秒且**有调用频次限制**，必须缓存，不能每次请求都换。
  *
  * fail-closed：未配置、微信报错、或返回的不是图片时，一律抛出可读错误，
@@ -49,6 +50,8 @@ export interface MiniappCodeResult {
 
 @Injectable()
 export class MiniappCodeService {
+  /** 同一进程内即使有多个服务实例，也只提醒一次生产配置被忽略。 */
+  private static productionVersionWarningLogged = false
   private readonly logger = new Logger(MiniappCodeService.name)
   private cachedToken: { value: string; expiresAt: number } | null = null
   /** 并发请求共享同一次换取，避免同时打微信换 token 触发频控。 */
@@ -61,6 +64,13 @@ export class MiniappCodeService {
 
   envVersion(): MiniappEnvVersion {
     const raw = (process.env['WECHAT_MINIAPP_ENV_VERSION'] ?? 'release').trim()
+    if (process.env['NODE_ENV'] === 'production') {
+      if ((raw === 'trial' || raw === 'develop') && !MiniappCodeService.productionVersionWarningLogged) {
+        MiniappCodeService.productionVersionWarningLogged = true
+        this.logger.warn('生产环境只出正式版小程序码，已忽略 WECHAT_MINIAPP_ENV_VERSION 里的体验版或开发版配置')
+      }
+      return 'release'
+    }
     return raw === 'trial' || raw === 'develop' ? raw : 'release'
   }
 
@@ -83,7 +93,7 @@ export class MiniappCodeService {
     const response = await this.postJson(`${CODE_URL}?access_token=${encodeURIComponent(token)}`, {
       scene,
       page,
-      check_path: true,
+      check_path: envVersion === 'release',
       env_version: envVersion,
     })
 
@@ -108,7 +118,7 @@ export class MiniappCodeService {
 
   /** 把微信错误码翻成运维看得懂的原因，而不是甩一个数字给用户。 */
   private userMessage(errcode: number | null): string {
-    if (errcode === 41030) return '小程序尚未发布，当前无法生成对外可扫的小程序码'
+    if (errcode === 41030) return '小程序还没发布，或这一页不在已发布的版本里，暂时出不了小程序码'
     if (errcode === 40001 || errcode === 40013) return '小程序凭据无效，请检查 AppID 与密钥'
     if (errcode === 45009) return '小程序码接口调用已达上限，请稍后再试'
     return '小程序码生成失败，请稍后再试'

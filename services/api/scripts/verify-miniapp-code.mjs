@@ -106,11 +106,10 @@ check(
 // ── 五、入参约束（微信对 scene 有硬限制）──────────────────────────────
 check('scene 长度与字符集受限', /SCENE_MAX_LENGTH/.test(service) && /SCENE_PATTERN/.test(service))
 check(
-  'page 只允许 pages/ 路径',
-  // 源码里的正则字面量是 `^pages\/...`（斜杠被转义），断言必须照实匹配，
-  // 写成 `^pages/` 会永远不命中 —— 2026-09-08 第一次就写错了。
-  controller.includes('^pages\\/'),
-  '任意 page 会被微信 check_path 拒，且可能被用来探测小程序结构',
+  'page 只允许名单里的七个 pages/ 路径',
+  /export const MINIAPP_CODE_PAGES/.test(controller) && /@IsIn\(MINIAPP_CODE_PAGES/.test(controller) &&
+    (controller.match(/'pages\/[A-Za-z0-9/_-]+'/g) ?? []).length === 7,
+  '必须使用导出的七页名单校验，具体放行和拒绝值由运行时断言验证',
 )
 check('生成接口有限流', /@Throttle\(/.test(controller))
 

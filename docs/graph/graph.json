@@ -26796,6 +26796,12 @@
     "services/api/src/member-privacy/member-privacy.types.ts": [
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
+    "services/api/src/miniapp-code/miniapp-code.controller.ts": [
+      "services/api/scripts/verify-miniapp-code-runtime.ts"
+    ],
+    "services/api/src/miniapp-code/miniapp-code.service.ts": [
+      "services/api/scripts/verify-miniapp-code-runtime.ts"
+    ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
       "services/api/scripts/verify-mock-interview.ts"
     ],
@@ -40170,6 +40176,25 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:miniapp-cloud-print-m2"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/miniapp-code/miniapp-code.controller.ts",
+          "services/api/src/miniapp-code/miniapp-code.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-miniapp-code-runtime.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:miniapp-code"
       ],
       "wired": true
     },
