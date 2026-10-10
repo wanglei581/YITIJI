@@ -112,7 +112,7 @@ function expiredStatus(
 
 export interface UseUploadSessionOptions {
   purpose?: FilePurpose
-  /** 为 false 时不签发、不轮询；等价于卸载冻结面板，不在服务端撤销（与卸载行为一致）。 */
+  /** 为 false 时不签发、不轮询；组件真实卸载时尽力作废未收文件的会话。 */
   enabled?: boolean
   onUploaded: (file: PhoneUploadedFile) => void
 }
@@ -120,6 +120,8 @@ export interface UseUploadSessionOptions {
 export interface UseUploadSessionResult {
   qrUrl: string | null
   expiresLabel: string
+  readonly waiting: boolean
+  readonly remainingSeconds: number
   snapshot: UploadSessionSnapshot
   refresh: () => Promise<void>
   confirm: () => Promise<void>
@@ -132,6 +134,8 @@ export function useUploadSession({
   onUploaded,
 }: UseUploadSessionOptions): UseUploadSessionResult {
   const { getToken, isLoggedIn } = useAuth()
+  const mountedRef = useRef(false)
+  const confirmingRef = useRef(false)
   const pollFailuresRef = useRef(0)
   const qrRef = useRef<QrState | null>(null)
   const statusRef = useRef<UploadSessionStatusResponse | null>(null)
@@ -149,6 +153,21 @@ export function useUploadSession({
 
   enabledRef.current = enabled
   onUploadedRef.current = onUploaded
+
+  // 和 ResumeUsbImportPanel 一样，effect 重放时重新置真；微任务只处理真实卸载。
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      queueMicrotask(() => {
+        if (mountedRef.current || confirmingRef.current) return
+        const existing = qrRef.current
+        const phase = statusRef.current?.status
+        if (!existing || phase === 'uploaded' || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired') return
+        void cancelUploadSession(existing.sessionId, existing.controlToken).catch(() => undefined)
+      })
+    }
+  }, [])
 
   useEffect(() => {
     qrRef.current = qr
@@ -178,11 +197,10 @@ export function useUploadSession({
     if (
       !enabled ||
       !qr ||
-      !status ||
-      status.status === 'uploaded' ||
-      status.status === 'confirmed' ||
-      status.status === 'cancelled' ||
-      status.status === 'expired'
+      status?.status === 'uploaded' ||
+      status?.status === 'confirmed' ||
+      status?.status === 'cancelled' ||
+      status?.status === 'expired'
     ) {
       return
     }
@@ -190,6 +208,10 @@ export function useUploadSession({
       setStatus((current) => expiredStatus(qr, current, purpose))
     }
   }, [enabled, now, purpose, qr, status])
+
+  const remainingSeconds = qr ? Math.max(0, Math.ceil((new Date(qr.expiresAt).getTime() - now) / 1000)) : 0
+  // 只算「码有效、文件还没到」：文件一到（uploaded）就不再算等待，页面回到正常的无操作计时（合规 10/10）。
+  const waiting = Boolean(enabled && qr && remainingSeconds > 0 && status?.status !== 'uploaded' && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
   const expiresLabel = useMemo(() => {
     if (!qr) return ''
@@ -237,6 +259,7 @@ export function useUploadSession({
         setError('会员登录已过期，已切换为临时上传；本次文件仅用于当前操作，不会自动归档到会员账号。')
         return fallback
       })
+      if (!mountedRef.current) return
       if (!enabledRef.current) return
       setQr({
         sessionId: created.sessionId,
@@ -274,8 +297,9 @@ export function useUploadSession({
       setError(null)
       return undefined
     }
-    void refresh()
-    return undefined
+    let disposed = false
+    queueMicrotask(() => { if (!disposed) void refresh() })
+    return () => { disposed = true }
   }, [enabled, refresh])
 
   useEffect(() => {
@@ -294,7 +318,9 @@ export function useUploadSession({
         .then((next) => {
           pollFailuresRef.current = 0
           if (!enabledRef.current) return
-          setStatus(next)
+          if (!mountedRef.current) return
+          setStatus(new Date(qr.expiresAt).getTime() <= Date.now() && (next.status === 'pending' || next.status === 'uploading')
+            ? expiredStatus(qr, next, purpose) : next)
         })
         .catch((err) => {
           pollFailuresRef.current += 1
@@ -315,12 +341,14 @@ export function useUploadSession({
 
   const confirm = useCallback(async () => {
     if (!status?.file || !qr || confirming) return
+    confirmingRef.current = true
     setConfirming(true)
     setConfirmFailed(false)
     setError(null)
     try {
       const result = await confirmUploadSession(qr.sessionId, qr.controlToken, getToken())
       const file = result.file
+      statusRef.current = { ...status, status: 'confirmed', file }
       onUploadedRef.current({
         name: file.filename,
         size: formatSize(file.sizeBytes),
@@ -336,6 +364,7 @@ export function useUploadSession({
       setConfirmFailed(true)
       setError(uploadSessionUserMessage(err, '确认失败，请刷新二维码重试。'))
     } finally {
+      confirmingRef.current = false
       setConfirming(false)
     }
   }, [confirming, getToken, qr, status])
@@ -387,6 +416,8 @@ export function useUploadSession({
   return {
     qrUrl: qr?.qrUrl ?? null,
     expiresLabel,
+    waiting,
+    remainingSeconds,
     snapshot,
     refresh,
     confirm,

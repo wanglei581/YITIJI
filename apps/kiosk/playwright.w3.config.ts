@@ -12,7 +12,7 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\.spec\.ts$/,
+  testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration|upload-scan-wait)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w3',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
