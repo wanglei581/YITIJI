@@ -273,6 +273,11 @@ test('首页会员续办条不显示含真名的打印文件名 @w1-kiosk', asyn
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
+  // 登录后的首页还会读「我的收藏」；不登记回包，夹具会按「有未处理的接口请求」判失败。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
 
   await loginThroughVisibleUi(page, '/')
   await expect(page.getByTestId('home-identity')).toHaveAttribute('data-state', 'member')
