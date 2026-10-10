@@ -38,6 +38,8 @@ if ([string]::IsNullOrWhiteSpace($LegacyConfigPath)) {
 }
 
 . (Join-Path $scriptRoot "service-identity.ps1")
+# The install script judges the runtime root with these helpers; use the same ones.
+. (Join-Path $scriptRoot "provisioning-runtime-security.ps1")
 
 $allowedDiagnosticCodes = @(
   "AGENT_CONFIG_NOT_FOUND",
@@ -218,21 +220,20 @@ function Get-RuntimeRootAclStatus([string]$Path) {
       return "unexpected"
     }
     $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
-    $trustedOwners = @("S-1-5-18", "S-1-5-32-544")
-    $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor `
-      [System.Security.AccessControl.FileSystemRights]::Modify -bor `
-      [System.Security.AccessControl.FileSystemRights]::Delete -bor `
-      [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
-      [System.Security.AccessControl.FileSystemRights]::TakeOwnership
-    foreach ($rule in $acl.Access) {
+    # Same write-boundary rules as Assert-RestrictedRuntime, for this one directory.
+    # A composite Write/Modify mask also matches read/execute bits, so a healthy
+    # Program Files install (Users: ReadAndExecute) always read as too_permissive.
+    foreach ($rule in @($acl.Access)) {
       if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+      if (-not (Test-FileSystemAccessRuleAppliesToItem $rule)) { continue }
+      if (-not (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) { continue }
       $sid = ConvertTo-SidValue $rule.IdentityReference
-      if ($trustedOwners -notcontains $sid -and ($rule.FileSystemRights -band $writeMask) -ne 0) {
+      if (-not (Test-IsPrivilegedRuntimeSid $sid)) {
         return "too_permissive"
       }
     }
     $ownerSid = ConvertTo-SidValue $acl.Owner
-    if ($trustedOwners -notcontains $ownerSid) { return "unexpected" }
+    if (-not (Test-IsPrivilegedRuntimeSid $ownerSid)) { return "unexpected" }
     return "ok"
   } catch {
     return "unavailable"

@@ -3,6 +3,7 @@ import { ALLOW_FIXTURES } from '../../utils/buildMode'
 // 夹具必须 ?capture=1 或 ?debug=1 才开，否则 fail-closed 回 no-artifact。
 
 export const ONE_PIN_HINT = '这次只留下了 1 条。想多带几条，可以点下面「再问一轮」重新问小青，聊完再保存一次要点，会另外生成一页；这一页到期前还能从「我的 AI 记录」打开。'
+export const MORE_BELOW_HINT = '下面还有内容，手指往上滑'
 
 export const ARTIFACT_STATES = [
   'no-artifact',

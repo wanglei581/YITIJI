@@ -61,7 +61,7 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
 })
 
 // P39 迁移（V6 纵切第一刀）后，这个入口改名叫「到机码核销」并移出「七件事」栅格。
-// 2026-10-06 方案②：到机码就是取件码。卡面上的「不是取件码」只用来和上传码消歧。
+// 2026-10-06 方案②：到机码就是取件码；2026-10-10 卡面徽标改为「就是取件码」。
 // 合同不变：入口必须可见、可点、落到 /print/pickup-claim。
 test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
@@ -74,9 +74,10 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   await page.goto('/print-scan')
   const entry = page.getByRole('button', { name: /到机码核销/ })
   await expect(entry).toBeVisible()
-  // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
-  // 2.0 卡面用徽标「不是取件码」区分（稿 10），不再重复长句。
-  await expect(entry).toContainText('不是取件码')
+  // 到机码就是取件、续打用的同一个码，不再有第二种取件码。
+  // 卡面用徽标「就是取件码」说明（定稿 10 的旧句待同步），不再重复长句。
+  await expect(entry).toContainText('就是取件码')
+  await expect(entry).not.toContainText('不是取件码')
   // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
   await expect(page.locator('[data-testid^="print-hub-cap-"]')).toHaveCount(8)
   await entry.click()
