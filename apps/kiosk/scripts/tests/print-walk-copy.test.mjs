@@ -181,6 +181,7 @@ test('0 元失败页不提已付金额，收费单保留订单事实', () => {
   assert.equal(progress.SAME_CODE_RESUME_LINE, '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。')
   assert.equal(progress.UNCONFIRMED_SAME_CODE_LINE, '没有的话，过 5 分钟回到这台机器，再输一次同一个到机码，可以整份重打（每单最多 2 次）。')
   assert.doesNotMatch(progress.SAME_CODE_RESUME_LINE + progress.UNCONFIRMED_SAME_CODE_LINE, /工作人员|收到提醒|免费|退款/)
+  assert.equal(progress.UNCONFIRMED_ONSITE_FREE_LINE, '没有的话，请回到打印重新选文件再打一次。')
   assert.doesNotMatch(progress.failureStaffDoing('free'), /工作人员|退款|实付|已付/)
   assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /这台机器暂时打不了/)
   assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额|退款/)
