@@ -17,6 +17,8 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { verifyAiCostUiCoverage } from './verify-ai-cost-ui-coverage'
 import { costTriStateRuntimeChecks, providerCompatRuntimeChecks } from './verify-ai-cost-runtime'
+import { vendorFromUrl } from '../src/ai/usage/ai-usage-meter'
+import { rateFor, priceTokens, estimateCostCny } from '../src/ai/usage/ai-pricing'
 
 const ROOT = join(__dirname, '..')
 const APPS_ROOT = join(ROOT, '..', '..', 'apps')
@@ -26,6 +28,27 @@ let failCount = 0
 
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
 function fail(msg: string) { failCount += 1; console.error(`  FAIL ${msg}`) }
+
+// 计量和日志共用价目，故放在成本覆盖门禁；预算门禁继续验证原有累计和限额。
+for (const host of ['tokenhub.tencentmaas.com', 'tokenhub.tencentmaas.cn']) {
+  if (vendorFromUrl(`https://${host}/v1/x`) === 'hunyuan') pass(`H1 ${host} 计量厂商为 hunyuan`)
+  else fail(`H1 ${host} 厂商识别错误`)
+}
+const millionUsage = { promptTokens: 1_000_000, completionTokens: 1_000_000, totalTokens: 2_000_000 }
+for (const label of ['hunyuan:hy3', 'llm:hunyuan:hy3']) {
+  if (priceTokens(label, millionUsage) === 5 && estimateCostCny(label, millionUsage) === 5) pass(`H2 ${label} 百万进百万出为 5 元`)
+  else fail(`H2 ${label} 计价错误`)
+}
+for (const model of ['deepseek-v4-flash', 'hy4-preview', 'qwen-plus']) {
+  for (const label of [`hunyuan:${model}`, `llm:hunyuan:${model}`]) {
+    if (rateFor(label, 1_000_000) === null && priceTokens(label, millionUsage) === undefined && estimateCostCny(label, millionUsage) === undefined) pass(`H3 ${label} 无核准价格，留空而非 0`)
+    else fail(`H3 ${label} 误套其它厂商价格`)
+  }
+}
+if (priceTokens('deepseek:deepseek-v4-flash', millionUsage) === 10) pass('H4 深度求索原价不变')
+else fail('H4 深度求索原价变化')
+if (priceTokens('qwen:qwen-plus', { promptTokens: 1000, completionTokens: 1000, totalTokens: 2000 }) === 0.0028) pass('H5 千问原价不变')
+else fail('H5 千问原价变化')
 
 function read(rel: string): string {
   const path = join(ROOT, rel)

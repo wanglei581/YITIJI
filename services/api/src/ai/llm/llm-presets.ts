@@ -1,13 +1,13 @@
 // ============================================================
 // LLM 预设注册表
 //
-// DeepSeek / 通义千问 / MiniMax / 鱼人 API 四家均兼容 OpenAI Chat Completions 接口，
+// DeepSeek / 通义千问 / MiniMax / 鱼人 API / 腾讯混元（TokenHub）五家均兼容 OpenAI Chat Completions 接口，
 // 因此统一用 { baseURL, model, apiKey } 三要素描述，单一 provider 即可对接。
 //
 // apiKey 只在服务端保存（加密落盘），绝不下发前端。
 // ============================================================
 
-export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren'
+export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren' | 'hunyuan'
 
 export interface LlmPreset {
   vendor:       LlmVendor
@@ -59,6 +59,14 @@ export const LLM_PRESETS: Record<LlmVendor, LlmPreset> = {
       'gpt-5.6-terra',
     ],
     docsUrl:      'https://yurenapi.cn',
+  },
+  hunyuan: {
+    vendor:       'hunyuan',
+    label:        '腾讯混元（TokenHub）',
+    baseURL:      'https://tokenhub.tencentmaas.com/v1',
+    defaultModel: 'hy3',
+    models:       ['hy3'],
+    docsUrl:      'https://cloud.tencent.com/document/product/1823',
   },
 }
 

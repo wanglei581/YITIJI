@@ -11,7 +11,7 @@ export { AI_USAGE_FEATURE_LABELS, AI_USAGE_VENDOR_LABELS } from '@ai-job-print/s
 // 功能 key 取值与服务端 llm-config.service.ts 的功能位 key 同源
 //（assistant_chat / resume_optimize / …），另有两个不在功能位表里的
 //（assistant_summary、unknown）。
-// 供应商 key：后端 VENDOR_BY_HOST 只会给出 deepseek / qwen / 主机名 / unknown。
+// 供应商 key：后端 VENDOR_BY_HOST 给出 deepseek / qwen / hunyuan / 主机名 / unknown。
 // ============================================================
 
 /** 功能 key → 中文名。来源：services/api/src/ai/llm/llm-config.service.ts 的功能位 label。 */

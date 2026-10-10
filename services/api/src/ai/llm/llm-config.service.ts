@@ -389,7 +389,13 @@ export class LlmConfigService {
   private fromEnv(): PersistedConfig {
     const vendor: LlmVendor = 'deepseek'
     const preset = LLM_PRESETS[vendor]
-    const envKey = process.env['AI_LLM_API_KEY'] || process.env['TRTC_LLM_API_KEY'] || ''
+    const trtcUrl = process.env['TRTC_LLM_API_URL']
+    let trtcUsesDeepseek = !trtcUrl
+    if (trtcUrl) {
+      try { trtcUsesDeepseek = new URL(trtcUrl).hostname === 'api.deepseek.com' }
+      catch { trtcUsesDeepseek = false }
+    }
+    const envKey = process.env['AI_LLM_API_KEY'] || (trtcUsesDeepseek ? process.env['TRTC_LLM_API_KEY'] : '') || ''
     // 只读 AI_LLM_MODEL；TRTC_LLM_MODEL 是数字人专用，不跨路由
     const envModel = (process.env['AI_LLM_MODEL'] || '').trim()
     return {
@@ -547,6 +553,17 @@ export class LlmConfigService {
     // 只在生效地址**变了**时判：白名单收紧前存下的地址不在单内时，管理员仍须能停用该功能、
     // 清掉疑似泄露的密钥、改提示词——这些不会让请求发往新地址；运行时 llmFetchJson 第一行照样拒绝单外地址。
     if (next.baseURL !== previousBaseURL) assertApprovedLlmBaseUrl(next.baseURL, '保存')
+    // 白名单先报；再防止换主机时把上一家的凭证发给新地址。
+    // next 尚未写回 cache，拒绝时内存、继承关系和落盘内容都保持原样。
+    if (next.baseURL !== previousBaseURL && patch.apiKey === undefined && next.apiKeyEncrypted &&
+        new URL(next.baseURL).hostname !== new URL(previousBaseURL).hostname) {
+      throw new BadRequestException({
+        error: {
+          code: 'AI_CONFIG_API_KEY_REQUIRED',
+          message: '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址',
+        },
+      })
+    }
 
     this.cache = { ...this.cache, [feature]: next }
     this.save()

@@ -18791,6 +18791,9 @@
       "apps/admin/scripts/verify-admin-phone-transfer-ui.mjs",
       "scripts/verify-datetime-honesty.mjs"
     ],
+    "apps/admin/src/routes/ai-config/index.tsx": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
     "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "scripts/verify-no-raw-error-render.mjs"
@@ -19344,6 +19347,9 @@
     ],
     "apps/admin/src/services/api/aiAccess.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
+    ],
+    "apps/admin/src/services/api/aiConfig.ts": [
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
     "apps/admin/src/services/api/aiUsage.ts": [
       "apps/admin/scripts/verify-job-ai-ops-dashboard-ui.mjs"
@@ -24479,6 +24485,7 @@
       "services/api/scripts/verify-ai-contract-mirror.mjs"
     ],
     "services/api/src/ai/llm/ai-config.controller.ts": [
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/ai/llm/ai-prompt-safety.ts": [
@@ -24495,6 +24502,7 @@
       "services/api/scripts/verify-ai-config.ts"
     ],
     "services/api/src/ai/llm/llm-chat.service.ts": [
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
@@ -24936,6 +24944,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-pricing.ts": [
+      "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -24952,6 +24961,7 @@
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
       "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -25022,6 +25032,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -25329,6 +25340,7 @@
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-config.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-bulk-publish.ts",
       "services/api/scripts/verify-content-trust-publish-gate.ts",
@@ -25674,6 +25686,9 @@
     ],
     "services/api/src/console-screen/console-screen.fleet.ts": [
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
+    ],
+    "services/api/src/console-screen/console-screen.usage.queries.ts": [
+      "services/api/scripts/verify-ai-cost-ui-coverage.ts"
     ],
     "services/api/src/content/content-signing.ts": [
       "services/api/scripts/verify-ad-asset-range.ts",
@@ -28274,6 +28289,7 @@
         "files": [
           "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
           "apps/admin/scripts/verify-admin-ai-usage-render.mjs",
+          "apps/admin/src/routes/ai-config/index.tsx",
           "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsageBreakdownTable.tsx",
           "apps/admin/src/routes/ai-services/AiUsagePanel.tsx",
@@ -28281,6 +28297,7 @@
           "apps/admin/src/routes/ai-services/aiUsageDisplay.ts",
           "apps/admin/src/routes/ai-services/index.tsx",
           "apps/admin/src/routes/dashboard/index.tsx",
+          "apps/admin/src/services/api/aiConfig.ts",
           "apps/admin/src/services/api/aiUsageDaily.ts",
           "apps/admin/src/services/api/userErrorMessage.ts",
           "packages/shared/src/aiDisplayLabels.ts",
@@ -35664,8 +35681,12 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/ai/llm/ai-config.controller.ts",
           "services/api/src/ai/llm/llm-base-url.ts",
-          "services/api/src/ai/llm/llm-config.service.ts"
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/decorators/current-user.decorator.ts"
         ],
         "missing": []
       },
@@ -35735,6 +35756,8 @@
           "services/api/src/ai/resume/llm-resume.service.ts",
           "services/api/src/ai/resume/llm-self-assessment.service.ts",
           "services/api/src/ai/resume/self-assessment.service.ts",
+          "services/api/src/ai/usage/ai-pricing.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
           "services/api/src/contract-review/contract-review-orchestrator.service.ts",
           "services/api/src/contract-review/contract-review-provider.service.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts",
@@ -35782,6 +35805,7 @@
           "services/api/src/ai/ai.controller.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/ai/resume/fair-visit-plan.service.ts",
+          "services/api/src/console-screen/console-screen.usage.queries.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts"
         ],

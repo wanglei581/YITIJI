@@ -47,6 +47,7 @@ export const AI_USAGE_FEATURE_LABELS: Readonly<Record<string, string>> = {
 export const AI_USAGE_VENDOR_LABELS: Readonly<Record<string, string>> = {
   deepseek: 'DeepSeek',
   qwen: '通义千问',
+  hunyuan: '腾讯混元',
   unknown: '未知厂商',
 }
 
