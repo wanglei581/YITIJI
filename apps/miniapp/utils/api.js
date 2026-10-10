@@ -743,11 +743,15 @@ const api = {
    *   1. 200 + status:'failed' + failReason —— 简历原文已按隐私策略清理,要重新上传简历
    *   2. 503 AI_CAREER_PLAN_FAILED       —— 两次模型调用都没过校验,可手动重试
    *   3. 404 CAREER_PLAN_NOT_FOUND       —— 只会出现在 GET/print,不会出现在这里
+   *
+   * 这一步会把简历原文发给 AI,所以和诊断、优化一样受「简历 AI 授权」管(resumeAi):
+   * 会员没授权或已撤回时服务端回 403 USER_AI_CONSENT_REQUIRED,请求层问一次确认框;
+   * 点「暂不使用」抛 AI_RESUME_NOT_CONSENTED,页面留在原页说明,不自动再问。
    */
   generateCareerPlan(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 职业规划'));
     return request(`/resume/career-plan/${taskId}`, {
-      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout, ai: 'generate', resumeAi: true,
     });
   },
 

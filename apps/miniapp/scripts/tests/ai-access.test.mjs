@@ -477,7 +477,79 @@ async function resumeAiConcurrentSharesOnePrompt(opts) {
   assert.equal((await b).ok, true)
 }
 
+const RESUME_AI_FIRST_SENTENCE = '简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把你上传或填写的简历内容发送到系统里的 AI 进行分析。'
+
+/**
+ * 职业规划也把简历原文发给 AI（第八次起服务端对它查 resume_ai）：经 api.generateCareerPlan
+ * 真发，会员没授权被 403 → 弹同一个确认框（第一句点到职业规划）→ 同意 → 写账号 → 重发一次。
+ */
+async function careerPlanAsksResumeAiOn403(opts) {
+  const ctx = memberWithAge(opts)
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('t1', ''), 2000)
+  await flush()
+  const first = ctx.aiCalls()[0]
+  assert.ok(first && first.url.endsWith('/resume/career-plan/t1'), '生成请求发出')
+  assert.equal(first.method, 'POST')
+  reply(first, 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1, '职业规划被拒也弹简历 AI 授权')
+  assert.match(ctx.wx.calls.modal[0].title, /简历 AI/)
+  assert.ok(ctx.wx.calls.modal[0].content.startsWith(RESUME_AI_FIRST_SENTENCE), '第一句是合规定的新句，点到职业规划')
+  assert.match(ctx.wx.calls.modal[0].content, /不会发送给企业或合作机构/)
+  assert.equal(ctx.aiCalls().length, 1, '同意之前不重发')
+  answer(ctx.wx.calls.modal[0], true)
+  await flush()
+  const grant = ctx.consentCalls()[0]
+  assert.ok(grant, '同意后写账号授权')
+  assert.equal(grant.data.scope, 'resume_ai')
+  reply(grant, 200, { data: { scope: 'resume_ai', granted: true } })
+  await flush()
+  assert.equal(ctx.aiCalls().length, 2, '重发一次')
+  reply(ctx.aiCalls()[1], 200, { status: 'completed', summary: '规划' })
+  const result = await pending
+  assert.equal(result.ok, true)
+  assert.equal(ctx.wx.calls.modal.length, 1, '全程只问一次')
+}
+
+/** 职业规划被拒后点「暂不使用」：不写授权、不重发、不再弹；交给页面的是可判的「没同意」。 */
+async function careerPlanDeclineStopsHere(opts) {
+  const ctx = memberWithAge(opts)
+  const api = ctx.load('api')
+  const pending = settle(api.generateCareerPlan('t1', ''))
+  await flush()
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 1)
+  answer(ctx.wx.calls.modal[0], false)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'AI_RESUME_NOT_CONSENTED')
+  assert.equal(ctx.ai.isDeclined(result.error), true)
+  assert.match(result.error.message, /没有发给 AI/)
+  await flush()
+  assert.equal(ctx.consentCalls().length, 0, '不写授权')
+  assert.equal(ctx.aiCalls().length, 1, '不重发')
+  assert.equal(ctx.wx.calls.modal.length, 1, '不反复弹')
+}
+
+/** 读已有规划、导出 PDF 不触发模型生成，不挂简历 AI 标记：收到同一个 403 原样交给页面，不弹框。 */
+async function careerPlanReadDoesNotPrompt(opts) {
+  const ctx = memberWithAge(opts)
+  const api = ctx.load('api')
+  const pending = settle(api.getCareerPlan('t1', ''))
+  await flush()
+  reply(ctx.aiCalls()[0], 403, CONSENT_403)
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'USER_AI_CONSENT_REQUIRED')
+  assert.equal(ctx.wx.calls.modal.length, 0)
+}
+
 const SCENARIOS = {
+  careerPlanAsksResumeAiOn403,
+  careerPlanDeclineStopsHere,
+  careerPlanReadDoesNotPrompt,
   resumeAiConsentRecoversOnce,
   resumeAiDeclineStopsHere,
   consent403OutsideResumePassesThrough,
@@ -547,6 +619,12 @@ const MUTATIONS = [
     swap('ai-access', "    if (!agreed) throw declinedError(RESUME_AI_SCOPE);\n", '')],
   ['简历授权框不单飞', 'resumeAiConcurrentSharesOnePrompt',
     swap('ai-access', '  if (resumeAiPending) return resumeAiPending;\n', '')],
+  ['职业规划不挂简历授权标记', 'careerPlanAsksResumeAiOn403',
+    swap('api', "timeout: config.aiTimeout, ai: 'generate', resumeAi: true,\n    });\n  },\n\n  /**\n   * 读取已生成的职业规划", "timeout: config.aiTimeout, ai: 'generate',\n    });\n  },\n\n  /**\n   * 读取已生成的职业规划")],
+  ['确认框第一句退回旧句', 'careerPlanAsksResumeAiOn403',
+    swap('ai-access', "content: '简历诊断、优化、生成，以及用到这份简历的版式调整、职业规划和模拟面试，会把", "content: '诊断、优化和生成会把")],
+  ['职业规划拒绝后照样重发', 'careerPlanDeclineStopsHere',
+    swap('ai-access', "    if (!agreed) throw declinedError(RESUME_AI_SCOPE);\n", '')],
   ['登录档位拒绝不提示', 'loginRequiredPromptsOnce',
     swap('api-legal-consent', "if (err && err.code === 'AI_LOGIN_REQUIRED') aiAccess.promptLogin();", '')],
 ]

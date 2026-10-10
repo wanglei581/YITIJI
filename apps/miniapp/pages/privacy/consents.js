@@ -38,8 +38,8 @@ function voiceRow(on, date, source, revoked) {
 }
 
 function resumeRow(on, date, revoked) {
-  if (on) return { on, text: `已授权${date ? `（${date}）` : ''}：简历诊断、优化、生成共用` }
-  return { on, text: revoked ? '已撤回：下次用简历 AI 前会先问你' : '还没有授权：第一次用简历诊断、优化、生成时会先问你' }
+  if (on) return { on, text: `已授权${date ? `（${date}）` : ''}：要把简历内容发给 AI 的功能共用` }
+  return { on, text: revoked ? '已撤回：下次用简历 AI 前会先问你' : '还没有授权：第一次用到要把简历内容发给 AI 的功能时会先问你' }
 }
 
 /**
@@ -86,8 +86,8 @@ function promptResume(page) {
   wx.showModal({
     title: granted ? '撤回简历 AI 授权' : '简历 AI 授权',
     content: granted
-      ? '撤回后，简历诊断、优化、生成会先问你，不同意就不发给 AI。已经生成的结果还在「我的」里，可以自己删。'
-      : '第一次用简历诊断、优化、生成时会先问你。同意后，简历内容发送到系统里的 AI 分析，结果只给你本人看。',
+      ? '撤回后，凡是要把简历内容发给 AI 的功能都会先问你，不同意就不发。已经生成的结果还在「我的」里，可以自己删。'
+      : '第一次用到要把简历内容发给 AI 的功能时会先问你。同意后，简历内容发送到系统里的 AI 分析，结果只给你本人看。',
     confirmText: granted ? '确认撤回' : '知道了',
     showCancel: granted,
     cancelText: '保留',
