@@ -3,13 +3,23 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import ts from 'typescript'
 import { requestServiceRestart } from '../src/agent/service-restart'
 
 const quote = (text: string) => `'${text.replace(/'/g, "''")}'`
+// The workflow step runs under pwsh 7, whose PSModulePath leaks into this process. Windows PowerShell 5.1
+// started with that value resolves the PowerShell 7 copy of Microsoft.PowerShell.Utility and loses its own
+// script-defined commands (first seen on CI: Get-FileHash "not recognized"). Drop it so 5.1 computes its default.
+function windowsPowerShellEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === 'psmodulepath') delete env[key]
+  }
+  return env
+}
 function ps(script: string): string {
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `$ErrorActionPreference='Stop'; ${script}`], { encoding: 'utf8', timeout: 60_000 })
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', `$ErrorActionPreference='Stop'; ${script}`], { encoding: 'utf8', timeout: 60_000, env: windowsPowerShellEnv() })
   assert.equal(result.status, 0, result.stderr || result.stdout || String(result.error))
   return result.stdout.trim()
 }
@@ -72,8 +82,13 @@ process.on('SIGINT', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));
 `)
     const inputs = JSON.parse(readFileSync(join(__dirname, '../installer/inputs.json'), 'utf8')) as { serviceWrapper: { url: string; sha256: string } }
-    ps(`Invoke-WebRequest -UseBasicParsing -Uri ${quote(inputs.serviceWrapper.url)} -OutFile ${quote(wrapper)};
-      if ((Get-FileHash -LiteralPath ${quote(wrapper)} -Algorithm SHA256).Hash -ne ${quote(inputs.serviceWrapper.sha256)}) { throw 'WinSW hash mismatch' }`)
+    ps(`Invoke-WebRequest -UseBasicParsing -Uri ${quote(inputs.serviceWrapper.url)} -OutFile ${quote(wrapper)}`)
+    // Hash in Node: no dependency on which PowerShell edition answers.
+    assert.equal(
+      createHash('sha256').update(readFileSync(wrapper)).digest('hex').toLowerCase(),
+      inputs.serviceWrapper.sha256.toLowerCase(),
+      'WinSW hash mismatch',
+    )
     const xmlEscape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
     writeFileSync(join(codeRoot, 'test-service.xml'), `<service><id>${service}</id><name>${service}</name><description>Isolated restart verification</description><executable>${xmlEscape(process.execPath)}</executable><arguments>&quot;${xmlEscape(fixture)}&quot;</arguments><stoptimeout>15 sec</stoptimeout><onfailure action="restart" delay="60 sec"/><log mode="roll"/></service>`)
     ps(`& ${quote(wrapper)} install; if ($LASTEXITCODE -ne 0) { throw 'WinSW install failed' }`)
@@ -107,7 +122,8 @@ process.on('SIGTERM', () => process.exit(0));
       assert.notEqual(current.startedAt, old.startedAt)
       assert.equal(ps(`@(Get-Process -Id ${old.pid} -ErrorAction SilentlyContinue).Count`), '0')
       await until(() => !existsSync(marker))
-      assert.match(readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog), /stage=complete result=success/)
+      // The controller removes the marker first and writes the final line right after; wait for the line.
+      await until(() => /stage=complete result=success/.test(readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog)), 10_000)
       assert.equal(existsSync(identity + '.error'), false)
       assert.ok(performance.now() - started < 45_000, 'complete normal restart must finish within 45 seconds')
       // Wait until controller has exited so the next on-demand run isn't ignored.
