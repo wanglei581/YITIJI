@@ -53,4 +53,13 @@ for (const file of walk(new URL('../../', root))) {
 for (const file of ['src/vite-env.d.ts', '.env.example']) assert.ok(read(file).includes('VITE_KIOSK_KEYBOARD_AVOID_MODE'), `${file} 须声明配置`)
 assert.ok(JSON.parse(read('package.json')).scripts['verify:kiosk-system-keyboard'], '须注册新门禁')
 assert.ok(readFileSync(new URL('../../.github/workflows/ci.yml', root), 'utf8').includes('verify:kiosk-system-keyboard'), 'CI 须执行新门禁')
+// 文字输入全部走系统键盘：页面自带的文字键盘停放（源码保留），不得再被任何页面或组件引入。
+const srcFiles = walk(new URL('src/', root)).filter((file) => /\.tsx?$/.test(file.pathname) && !file.pathname.includes('/src/components/kiosk-keyboard/'))
+for (const file of srcFiles) assert.ok(!/from ['"][^'"]*kiosk-keyboard\//.test(readFileSync(file, 'utf8')), `自带文字键盘已停放，不得再引入：${file.pathname}`)
+const assistant = code('src/pages/assistant/AssistantPage.tsx')
+const composer = assistant.slice(assistant.indexOf('id="assistant-question"'), assistant.indexOf('<div className="assistant-dock-row">'))
+assert.ok(composer.length > 0 && !/inputMode="none"/.test(composer), '小青输入框不得再声明 inputMode="none"（那会压住系统键盘）')
+assert.match(assistant, /if \(event\.nativeEvent\.isComposing \|\| event\.keyCode === 229\) return\s+if \(event\.key === 'Enter'/, '拼音选字时的回车必须先被放过，不能当成发送')
+assert.match(read('src/pages/print/PrintPickupClaimPage.tsx'), /id="pickup-code-input"[\s\S]{0,900}data-kiosk-keyboard="page"/, '取件码格配着页面数字键盘，须打标记压住系统键盘')
+assert.doesNotMatch(read('src/pages/profile/me/components/PhoneRebindPanel.tsx'), /data-kiosk-keyboard="page"/, '换绑三格没有页面数字键盘，靠系统键盘输入，不得打标记（否则无法输入）')
 console.log('PASS Kiosk 系统键盘共享层静态契约')

@@ -152,7 +152,9 @@ for (const [token, label] of [
   ['sessionId: requestSessionId', '请求会话标识'],
   ['requestTokenRef.current !== requestToken', '旧请求回写拦截'],
   ['chatWithAssistant({', '真实对话接口调用'],
-  ['<KioskKeyboard', '页内触控键盘'],
+  ['enterKeyHint="send"', '咨询输入框走系统触摸键盘（回车键提示为发送）'],
+  ['event.nativeEvent.isComposing', '拼音选字时的回车不发送'],
+  ['requestSystemKeyboard(inputRef.current)', '键盘按钮请求系统键盘'],
   ['role="log"', '消息列表日志语义'],
   ['aria-busy={loading}', '消息列表加载语义'],
   ['role="status"', '回复中状态语义'],
@@ -227,10 +229,11 @@ expectIncludes(
   'setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))',
   '原生输入更新受相同字符上限约束',
 )
-expectIncludes(
-  assistantPage,
-  'onChange={(value) => setInput(value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}',
-  '虚拟键盘更新受相同字符上限约束',
+// 2026-10-10：文字输入改走系统触摸键盘，页内文字键盘不再挂载；输入只剩 textarea 这一条路，
+// 它的上限由上面两条（maxLength 与 onChange 截断）守住。这里守「没有第二条绕过上限的输入路」。
+expect(
+  !assistantPage.includes('<KioskKeyboard'),
+  '小青页不再挂页内文字键盘（否则它的更新要另受字符上限约束）',
 )
 
 for (const token of [

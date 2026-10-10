@@ -368,6 +368,9 @@ export function PrintPickupClaimPage() {
       // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
       // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
       inputMode="numeric"
+      // 这一格由下面的页内键盘（和扫码器）输入；打上约定标记，共享的系统键盘管理会压住
+      // Windows 触摸键盘，免得两个键盘叠在一起。
+      data-kiosk-keyboard="page"
       // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
       // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
       maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
@@ -500,8 +503,8 @@ export function PrintPickupClaimPage() {
         />
       )}
 
-      {/* 页内键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
-          没有物理键盘的用户在扫码失败时原本无法输入到机码。确认键按稿收在键盘最后一行。 */}
+      {/* 页内键盘：到机码是纯数字（存量码带字母），用页面自己的键盘输入，不用输入法、也不留痕；
+          输入框打了 data-kiosk-keyboard="page"，系统触摸键盘不会跟着弹。确认键按稿收在键盘最后一行。 */}
       {showKeypad && (
         <PickupKeypadCard
           code={code}

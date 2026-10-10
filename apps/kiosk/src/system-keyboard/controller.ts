@@ -11,6 +11,14 @@ export function dismissSystemKeyboard(): void {
   window.dispatchEvent(new Event(KEYBOARD_VIEWPORT_EVENT))
 }
 
+/** 页面上的「键盘」按钮用：让输入框得焦，并在接口存在时请求系统键盘弹出。 */
+export function requestSystemKeyboard(field: HTMLInputElement | HTMLTextAreaElement | null): void {
+  if (!field || field.disabled || field.readOnly) return
+  field.focus({ preventScroll: true })
+  if (typeof window === 'undefined' || keyboardMode() === 'off') return
+  try { virtualKeyboard()?.show() } catch { /* 接口不可用时只得焦，由系统按自己的设置决定弹不弹。 */ }
+}
+
 export function startSystemKeyboard(isFluid: (width: number, height: number) => boolean): () => void {
   const mode = keyboardMode()
   if (mode === 'off') return () => {}

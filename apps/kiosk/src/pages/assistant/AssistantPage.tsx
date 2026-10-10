@@ -1,12 +1,12 @@
 // 稿 05 青序流光 2.0；状态只由真实请求、草稿与语音相位派生。
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HomeIcon, KeyboardIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
-import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
+import { dismissSystemKeyboard, requestSystemKeyboard } from '../../system-keyboard/controller'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
@@ -89,8 +89,6 @@ export function AssistantPage() {
 function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [callActive, setCallActive] = useState(false)
   const [voiceState, setVoiceState] = useState<CockpitVoiceState | null>(null)
-  const [keyboardOpen, setKeyboardOpen] = useState(false)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [selectedTaskId, setSelectedTaskId] = useState<ConsultationTask['id'] | null>(null)
   const [sendVoiceDirect, setSendVoiceDirect] = useState(false)
   const { isLoggedIn, getToken } = useAuth()
@@ -144,27 +142,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     if (messages.length <= 1 && !loading) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages, loading])
-
-  useEffect(() => {
-    if (keyboardOpen) inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [keyboardOpen])
-
-  // 软键盘避让：虚拟键盘固定在舞台底部、会盖住输入坞。量它的真实高度（offsetHeight 不受舞台缩放影响），
-  // 由 CSS 把整屏内容压到键盘上沿以上。收起即恢复，舱面与分区一项不删。
-  useEffect(() => {
-    if (!keyboardOpen) {
-      setKeyboardHeight(0)
-      return
-    }
-    // 键盘与工作台同在 .kassist 之下（工作台在语音态会被 inert，键盘不能放进去）。
-    const keyboard = workbenchRef.current?.parentElement?.querySelector<HTMLElement>('.kkb')
-    if (!keyboard) return
-    const measure = () => setKeyboardHeight(keyboard.offsetHeight)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(keyboard)
-    return () => observer.disconnect()
-  }, [keyboardOpen])
 
   useEffect(() => {
     const workbench = workbenchRef.current
@@ -271,8 +248,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       setProviderLabel(response.providerLabel)
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
-        // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
-        setKeyboardOpen(false)
+        // 输入条随即锁上，系统键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
+        dismissSystemKeyboard()
         setMessages((current) => [
           ...current,
           {
@@ -307,7 +284,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       // 锁住输入、转到不经过 AI 的四个入口；恢复后用户可点「重新检查 AI 顾问」再试。
       if (isAiOutage(error)) {
         setAiAvailability('unavailable')
-        setKeyboardOpen(false)
+        dismissSystemKeyboard()
         setMessages((current) => [
           ...current,
           { id: `err-${Date.now()}`, role: 'assistant', kind: 'error', text: advisorErrorMessage(error, 'AI 顾问现在停用，下面几项不经过 AI，照常能办。') },
@@ -326,6 +303,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 拼音选字时按的回车是「上屏」，不是「发送」。
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleSend()
@@ -414,8 +393,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }
 
   const openVoiceDialog = () => {
-    setKeyboardOpen(false)
     inputRef.current?.blur()
+    dismissSystemKeyboard()
     setCallActive(true)
   }
 
@@ -458,6 +437,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   let sectionNo = 0
   const nextNo = () => { sectionNo += 1; return sectionNo }
   const showPicker = (!hasUserTurn || cockpitState === 'composer') && !aiLocked
+  // 已经问过、答过的那一节，在用户接着打下一条草稿时仍叫「本次咨询」：「这条还没发出」说的是上面的新草稿，不是这一节。
+  const conversationSection = cockpitState === 'composer' ? COCKPIT_COPY['reply-real'].section : cockpitCopy.section
   // 语音转文字的系统消息 id 以 voice- 开头。没有用户发言时对话区本来不展开，
   // 没接通的说明会写进状态却看不见。有这类消息就把对话区展开。
   const showConversation = hasUserTurn || Boolean(toolboxScene || selectedTask) || advisorTask.isFailed
@@ -484,8 +465,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         data-kiosk-screen="assistant"
         className="assistant-workbench"
         data-cockpit-state={cockpitState}
-        data-kb-open={keyboardHeight > 0 || undefined}
-        style={keyboardHeight > 0 ? ({ '--kassist-kb-h': `${keyboardHeight}px` } as CSSProperties) : undefined}
       >
         <AdvisorCockpit state={cockpitState} contextLabel={contextLabel} readingSignals={{
           loading, lastTurn, providerLabel, aiLocked, voiceAvailable, cockpitState,
@@ -516,8 +495,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               <AdvisorSectionLabel
                 no={nextNo()}
                 id="assistant-conversation-title"
-                title={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[0] : '开场说明'}
-                hint={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[1] : '补充具体情况，再发送问题'}
+                title={hasUserTurn || cockpitState === 'ai-unavailable' ? conversationSection[0] : '开场说明'}
+                hint={hasUserTurn || cockpitState === 'ai-unavailable' ? conversationSection[1] : '补充具体情况，再发送问题'}
               />
               {(toolboxScene || selectedTask) && (
                 <div className="assistant-context-row">
@@ -621,9 +600,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             value={input}
             onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
             onKeyDown={handleKeyDown}
-            onFocus={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
-            onClick={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
-            inputMode="none"
+            enterKeyHint="send"
+            lang="zh-CN"
             aria-label="输入咨询问题"
             placeholder={aiLocked
               ? 'AI 顾问暂不可用，请先选择办事入口'
@@ -665,8 +643,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               aria-disabled={aiLocked || undefined}
               onClick={() => {
                 if (aiLocked) return
-                setKeyboardOpen(true)
-                focusComposer()
+                // 文字输入走系统触摸键盘：让输入框得焦并请求键盘弹出。
+                requestSystemKeyboard(inputRef.current)
               }}
             >
               <KeyboardIcon aria-hidden />
@@ -736,17 +714,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <LazyCallPanel onClose={closeVoiceDialog} onSwitchToText={switchVoiceToText} onStateChange={setVoiceState} />
         </Suspense>
       )}
-
-      <KioskKeyboard
-        open={keyboardOpen}
-        value={input}
-        onChange={(value) => setInput(value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
-        onEnter={handleSend}
-        onClose={() => {
-          setKeyboardOpen(false)
-          inputRef.current?.blur()
-        }}
-      />
     </section>
     </QxPageFrame>
   )

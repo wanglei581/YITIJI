@@ -5,6 +5,7 @@ export interface VirtualKeyboard extends EventTarget {
   overlaysContent: boolean
   readonly boundingRect: DOMRectReadOnly
   hide(): void
+  show(): void
 }
 export const KEYBOARD_VIEWPORT_EVENT = 'kiosk-system-keyboard:viewport'
 /** 浏览器用例在页面加载前写 window.__kioskKeyboardAvoidMode 来切模式；正式环境没人写它，走构建时的环境变量。 */
