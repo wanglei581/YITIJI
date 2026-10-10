@@ -149,7 +149,9 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   await expect(outOfPaper).not.toContainText('在手机上申请')
   await expect(outOfPaper).toContainText('订单和支付记录都保留着')
   // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
-  await expect(outOfPaper).toContainText('只有本页出现「重新提交打印」按钮时')
+  await expect(outOfPaper).toContainText('本页下方有「重新提交打印」按钮时，可以点它整份重打')
+  // 2026-10-10：旧句「只有……才能自己重打一次」和现行规则对不上（每单最多 2 次，还能回来输同一个码）。
+  await expect(outOfPaper).not.toContainText('才能自己重打一次')
   await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
 
   // 旧文案的四种说法一句都不许回来（含「不需要重新下单」这种把重试说成理所当然的兜底）。
@@ -373,7 +375,11 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
 
   const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
   await expect(jam).toBeVisible()
-  await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
+  await expect(jam).toContainText('你的订单还在')
+  // 2026-10-10：本页拿不到剩余次数，不再写「处理好后可以继续打印」；现场建的单没有到机码，也不出现同码接着打那句。
+  await expect(jam).not.toContainText('处理好后可以继续打印')
+  await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
+  await expect(jam).not.toContainText('当场处理')
   await expect(jam).not.toContainText('已付金额')
   await expect(jam).not.toContainText('已支付')
   // 付费卡纸态补回退款说明时，免费单仍不能出现退款句。
@@ -381,6 +387,76 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
+})
+
+// 2026-10-10 走查 W-165：出纸失败屏要说「回这台机器再输一次同一个到机码就能接着打」。
+// 只对「到机码单、0 元、服务端说还能重打」说；句里自带上限和用完后的下一步，第 3 次失败时也成立。
+const RESUME_LINE = '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。'
+for (const scenario of [
+  { name: 'pickup zero-yuan jam with canRetry', errorCode: 'PRINTER_ERROR', testId: 'print-fulfill-state-paper-jam', state: { pickupSource: true, amountCents: 0 }, canRetry: true, amountCents: 0, shown: true },
+  { name: 'pickup zero-yuan out-of-paper with canRetry', errorCode: 'PAPER_EMPTY', testId: 'print-fulfill-state-out-of-paper', state: { pickupSource: true, amountCents: 0 }, canRetry: true, amountCents: 0, shown: true },
+  { name: 'pickup zero-yuan jam the server will not retry', errorCode: 'PRINTER_ERROR', testId: 'print-fulfill-state-paper-jam', state: { pickupSource: true, amountCents: 0 }, canRetry: false, amountCents: 0, shown: false },
+  { name: 'pickup paid out-of-paper', errorCode: 'PAPER_EMPTY', testId: 'print-fulfill-state-out-of-paper', state: { pickupSource: true, amountCents: 200 }, canRetry: true, amountCents: 200, shown: false },
+  { name: 'on-site zero-yuan out-of-paper', errorCode: 'PAPER_EMPTY', testId: 'print-fulfill-state-out-of-paper', state: { amountCents: 0 }, canRetry: true, amountCents: 0, shown: false },
+]) {
+  test(`same-code resume line: ${scenario.name} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+      status: 200,
+      json: { taskId: W2_ORDER.taskId, status: 'failed', errorCode: scenario.errorCode, failureReasonForUser: '打印机暂时无法继续打印' },
+    })
+    api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+      status: 200,
+      json: {
+        signedUrl: '/api/v1/files/signed/takeaway-demo',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        filename: W2_FILE.name,
+        mimeType: 'application/pdf',
+        sizeBytes: 128,
+        orderId: W2_ORDER.orderId,
+        orderNo: W2_ORDER.orderNo,
+        payStatus: 'paid',
+        amountCents: scenario.amountCents,
+        canRetry: scenario.canRetry,
+      },
+    })
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', { ...flowState, ...scenario.state })
+    const screen = page.getByTestId(scenario.testId)
+    await expect(screen).toBeVisible()
+    if (scenario.shown) {
+      await expect(page.getByTestId('print-fulfill-resume-line')).toHaveText(RESUME_LINE)
+      await expect(page.getByTestId('print-fulfill-resume-line')).toBeInViewport()
+    } else {
+      await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
+      await expect(screen).not.toContainText('同一个到机码')
+    }
+    await expect(screen).not.toContainText('处理好后可以继续打印')
+    await expect(screen).not.toContainText('才能自己重打一次')
+    await expect(screen).not.toContainText('工作人员')
+    await expectTouchAndBounds(page)
+    await page.screenshot({ path: test.info().outputPath(`resume-line-${scenario.errorCode}-${scenario.shown ? 'shown' : 'hidden'}.png`), fullPage: true })
+    expect(errors).toEqual([])
+  })
+}
+
+test('completed done from a pickup code points reprints to the phone, not to on-site help @w2', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' },
+  })
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, pickupSource: true, amountCents: 0 })
+  const done = page.getByTestId('print-fulfill-state-completed')
+  await expect(done).toBeVisible()
+  await expect(done).toContainText('本机不会自动补打；要重打请在手机上重新下单。')
+  await expect(done).toContainText('拿走前当场核对')
+  await expect(done).not.toContainText('当场能处理')
+  await expect(done).not.toContainText('再印一份')
+  await expectTouchAndBounds(page)
+  await page.screenshot({ path: test.info().outputPath('fulfill-completed-pickup.png'), fullPage: true })
 })
 
 test('completed done says the paper is already out and never renders a pickup code @w2', async ({ page, api }) => {
@@ -418,6 +494,9 @@ test('completed done says the paper is already out and never renders a pickup co
   await expect(page.getByText(`打印有问题？${PHONE}，或问小青`, { exact: true })).toBeInViewport()
   await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
   await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
+  // 现场没有人：不说「当场能处理」；现场建的单要重打指向下方「再印一份」。
+  await expect(page.locator('[data-testid="print-fulfill-state-completed"]')).not.toContainText('当场能处理')
+  await expect(page.locator('[data-testid="print-fulfill-state-completed"]')).toContainText('本机不会自动补打；要重打请点下方「再印一份」。')
   await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
   await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
