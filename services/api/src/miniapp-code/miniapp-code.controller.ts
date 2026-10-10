@@ -3,6 +3,17 @@ import { Throttle } from '@nestjs/throttler'
 import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 import { MiniappCodeService } from './miniapp-code.service'
 
+/** 小程序码只允许这七页；加页要和小程序 app.json 一起改。 */
+export const MINIAPP_CODE_PAGES = [
+  'pages/resume-build/resume-build',
+  'pages/resume-upload/resume-upload',
+  'pages/self-explore/self-explore',
+  'pages/interview-entry/interview-entry',
+  'pages/job-materials/job-materials',
+  'pages/assistant/assistant',
+  'pages/kiosk-send/kiosk-send',
+] as const
+
 /**
  * 一体机取小程序码。
  *
@@ -10,10 +21,10 @@ import { MiniappCodeService } from './miniapp-code.service'
  * 而这类标识属于一次性凭据的一部分。POST + 不缓存是更保守的一侧。
  */
 class MiniappCodeRequestDto {
-  /** 目标页面路径，必须是小程序里真实存在的页（微信会 check_path）。 */
+  /** 目标页只接受名单；正式版微信检查已发布页面，非生产体验版、开发版不检查。 */
   @IsString()
   @MaxLength(128)
-  @Matches(/^pages\/[A-Za-z0-9/_-]+$/, { message: 'page 必须是 pages/ 开头的小程序页面路径' })
+  @IsIn(MINIAPP_CODE_PAGES, { message: 'page 必须是允许的小程序页面路径' })
   page!: string
 
   /** 透传给小程序的参数，微信限制 32 个可见字符。 */
