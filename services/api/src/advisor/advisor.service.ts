@@ -8,6 +8,8 @@ import { AdvisorArtifactService } from './advisor-artifact.service'
 import { AdvisorQaMemory } from './advisor-qa-memory'
 import {
   ADVISOR_DISCLAIMER,
+  ADVISOR_SESSION_TOPIC,
+  ASSISTANT_SUMMARY_TOPIC,
   COMPARE_LIMITS,
   SKILL_SPECS,
   SLOT_DRAFT_BLANK_POLICY,
@@ -39,6 +41,7 @@ export const MAX_ADVISOR_PINS = 40
 // 与 MockInterviewSession / AiResumeResult 同口径；拒绝一律 NOT_FOUND，不泄露会话是否存在。
 //
 // ⚠️ 对话不落库：QA 多轮上下文只在本进程内存里按 TTL 保留（见 QaMemory）。
+// 开场诉求只用于判型，同样不落库。
 // 这是设计页对用户的明文承诺，不要为了排查方便改成落表。
 // ============================================================
 
@@ -108,23 +111,17 @@ export class AdvisorService {
 
     const isAnonymous = !requester.endUserId
     const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
-    const trimmedTopic = topic.trim().slice(0, 600)
-    // 用户的开场诉求**就是**问答型的那一槽 —— 不预填的话，问答型会话会卡在
-    // 「必填项没答完」而永远出不了活（问答走 /ask，本来就不会再填一次 question 槽）。
-    // 槽位按全局 slotKey 存，所以这里无条件预填：后来改判成问答型时同样能直接开工。
-    const seededSlots: StoredSlots = {
-      question: { value: trimmedTopic.slice(0, slotSpecOf('question')!.maxChars), filledAt: new Date().toISOString() },
-    }
+    // 开场诉求只用于上面的判型；会话只存固定标签，输入槽由用户后续主动填写。
     const row = await this.prisma.advisorSession.create({
       data: {
         endUserId: requester.endUserId,
         accessTokenHash: accessToken ? hashToken(accessToken) : null,
         skill: classification.skill,
-        status: deriveStatus(classification.skill, seededSlots, false),
-        topic: trimmedTopic,
+        status: deriveStatus(classification.skill, {}, false),
+        topic: ADVISOR_SESSION_TOPIC,
         skillReason: classification.reason,
         skillSource: classification.source,
-        slotsJson: JSON.stringify(seededSlots),
+        slotsJson: JSON.stringify({}),
         expiresAt: new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000),
       },
     })
@@ -459,7 +456,8 @@ export class AdvisorService {
       /** llm / fallback / user_override —— fallback 时前端应说明「这次按关键词判的型」 */
       skillSource: row.skillSource,
       status: deriveStatus(skill, slots, artifacts.length > 0),
-      topic: row.topic,
+      // 存量 topic 可能含开场原话；只回传固定标签，旧值仍按到期策略清理。
+      topic: row.topic === ASSISTANT_SUMMARY_TOPIC ? ASSISTANT_SUMMARY_TOPIC : ADVISOR_SESSION_TOPIC,
       slots: slotViews(skill, slots),
       missingSlotKeys: missing,
       nextSlotKey: nextSlotKey(skill, slots),
