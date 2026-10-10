@@ -53,6 +53,7 @@ export function verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, repoRoot,
     const labels = runFile('apps/admin/src/routes/screen/metricLabels.ts', { '@ai-job-print/shared': shared, '@ai-job-print/ui': screenUi })
     const panels = runFile('apps/admin/src/routes/screen/UsageHostingOff.tsx', {
       '@ai-job-print/shared': shared, '@ai-job-print/ui': screenUi, './metricLabels': labels, './aiScreenDisplay': display,
+      './measureUnit': runFile('apps/admin/src/routes/screen/measureUnit.ts'),
     })
     const unknownRows = labels.aiOperationRows([{ operation: 'new_a', count: 0 }, { operation: 'parseResume', count: 6 }, { operation: 'new_b', count: null }])
     assert.equal(unknownRows[0].label, '其他 AI 服务（1）')

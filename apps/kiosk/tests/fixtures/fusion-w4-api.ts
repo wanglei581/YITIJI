@@ -195,6 +195,11 @@ export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void 
   }
 
   const respond = (path: string, data: unknown) => api.respond('GET', path, { status: 200, json: data })
+  // 面试设置屏会探测语音识别是否开启。不登记的话，进入设置屏就算未处理请求。
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
   respond('/api/v1/jobs', { success: true, data: [job], pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 } })
   respond('/api/v1/jobs/job-001', { success: true, data: job })
   respond('/api/v1/kiosk/offline-agencies', { data: [agency], total: 1, page: 1, pageSize: 10 })

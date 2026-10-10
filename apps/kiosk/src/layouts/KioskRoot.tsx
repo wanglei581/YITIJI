@@ -184,6 +184,8 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/help',
   /* 稿 48-policy-workspace（政策服务），2026-09-28 迁入。漏登记会让旧顶栏叠在青序页上。 */
   '/renshi',
+  /* 稿 31 活动列表。带 :id 的详情见 QX_MIGRATED_EXACT_PATTERNS，不用 /activities/ 宽前缀。 */
+  '/activities',
 ])
 const QX_MIGRATED_PREFIXES = [
   '/print-scan/feature/',
@@ -216,6 +218,8 @@ const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
   /^\/job-fairs\/[^/]+\/materials$/,
   /^\/job-fairs\/[^/]+\/visit-plan$/,
   /^\/job-fairs\/[^/]+\/stats$/,
+  // 稿 31 活动详情。只放行单段 ID，避免把以后新增的兄弟路由一并染成青序壳。
+  /^\/activities\/[^/]+$/,
 ]
 
 function isQxMigratedPath(pathname: string): boolean {

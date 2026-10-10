@@ -6,10 +6,6 @@ import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { AlertCircleIcon, UploadCloudIcon } from 'lucide-react'
-import {
-  type ResumeScoringDimensionKey,
-  type ResumeTargetContext,
-} from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
 import { ResumeSourceSummary } from './components/ResumeSourceSummary'
 import { ResumeGuestNote, ResumeSourceNavbar, ResumeSourcePrivacy, ResumeSummaryFileCard } from './components/ResumeSourceChrome'
@@ -22,8 +18,11 @@ import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/componen
 import { DiagnosisDirectionForm, type DiagnosisDirectionFields } from './components/DiagnosisDirectionForm'
 import { useUsbImportGate } from '../../hooks/useUsbImportGate'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
+import { ResumeSourceChannels } from './components/ResumeSourceChannels'
+import { sourcePhaseView, type UsbChannelPhase } from './components/resumeChannelCopy'
+import { useLocalPickerCancel, type LocalChannelPhase } from './components/useLocalPickerCancel'
 import { ResumeTriageHero } from './components/ResumeTriageHero'
-import { heroCopy, type SourceHeroKey } from './components/resumeSourceHero'
+import { type ResumeScoringDimensionKey, type ResumeTargetContext } from '@ai-job-print/shared'
 import { readScanHandoff } from './resumeScanHandoff'
 import { ResumeIntentSwitch } from './components/ResumeIntentSwitch'
 import { ResumeSourceCards } from './components/ResumeSourceCards'
@@ -44,7 +43,6 @@ import {
   receivableFormatView,
   resolveResumeScreen,
   scanFileFrom,
-  sourceFrameStatus,
   uploadErrorMessage,
   uploadOutcomeOf,
   type ResumeScreen,
@@ -55,11 +53,10 @@ import './resume-triage-qx.css'
 import './resume-triage-panels-qx.css'
 import './resume-r1-qx2.css'
 
-const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传，或联系现场工作人员。'
+const RESUME_USB_UNCONFIGURED_NOTE = (contact: ReturnType<typeof useSupportContact>) => `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine(contact)}`
 const NO_FABRICATION_NOTE = '报告按六个维度分别给出建议。系统不会编造「超过多少人」「必然提分」等无法验证的结论。'
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-const DEFAULT_SELECTED_DIMENSIONS: ResumeScoringDimensionKey[] = ['keyword', 'quantification', 'experience']
 const MAX_BYTES = 10 * 1024 * 1024
 
 function directedScreenRequest(): boolean {
@@ -82,9 +79,14 @@ export function ResumeSourcePage() {
   const retryFile = useRef<File | null>(null)
   const contact = useSupportContact()
   const kiosk = useTerminalKiosk()
-  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE)
+  const usbGate = useUsbImportGate(RESUME_USB_UNCONFIGURED_NOTE(contact))
   const [pickedChannel, setSelected] = useState<UploadChannel>(() => isTerminalKiosk() ? 'phone' : 'cloud')
   const selected = kiosk && pickedChannel === 'cloud' ? 'phone' : pickedChannel
+  const [channelScreen, setChannelScreen] = useState<null | 'usb' | 'phone' | 'local'>(null)
+  const [usbPhase, setUsbPhase] = useState<UsbChannelPhase>('usb-detecting')
+  const [localPhase, setLocalPhase] = useState<LocalChannelPhase>('local-guide')
+  useLocalPickerCancel(fileInputRef, channelScreen === 'local', () => setLocalPhase('local-cancelled'))
+  const [heldFile, setHeldFile] = useState<UploadedResumeFile | null>(null)
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(() => scanFileFrom(readScanHandoff(location.state)))
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
@@ -94,53 +96,31 @@ export function ResumeSourcePage() {
   const [uploadRecheck, setUploadRecheck] = useState(false)
   const [pendingName, setPendingName] = useState<string | null>(null)
   const [genericDiagnosis, setGenericDiagnosis] = useState(() => !directedScreenRequest())
-  const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
+  const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(['keyword', 'quantification', 'experience'])
   const [targetIndustry, setTargetIndustry] = useState('')
   const [targetJob, setTargetJob] = useState('')
   const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>(undefined)
   const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>(undefined)
   const [targetMajor, setTargetMajor] = useState('')
   const [targetDegree, setTargetDegree] = useState('')
+  const toggleDimension = (key: ResumeScoringDimensionKey) => setSelectedDimensions((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
+  const buildTargetContext = (): ResumeTargetContext => {
+    if (genericDiagnosis || ![targetIndustry, targetJob.trim(), targetExperience, targetScene, targetMajor.trim(), targetDegree.trim()].some(Boolean)) return { skipped: true }
+    return { industry: targetIndustry || undefined, targetJob: targetJob.trim() || undefined, experience: targetExperience, scene: targetScene, major: targetMajor.trim() || undefined, degree: targetDegree.trim() || undefined, skipped: false }
+  }
   const sourceBusy = uploading || phoneBusy || usbBusy
   useBusyLock(sourceBusy)
 
-  const rememberScreen = (next: ResumeScreen) => {
-    setSearchParams((params) => { params.set('screen', next); return params }, { replace: true })
-  }
-  // 确认屏由「已经有文件」推出来，地址不放文件名，也不强行写 screen=summary。
-  // 这样从解析页 replace 回来再后退，仍落在原来的 ?intent= 上。
-  const releaseScreen = () => {
-    if (!searchParams.get('screen')) return
-    setSearchParams((params) => { params.delete('screen'); return params }, { replace: true })
-  }
+  const rememberScreen = (next: ResumeScreen) => setSearchParams((params) => { params.set('screen', next); return params }, { replace: true })
+  // 确认屏不写 screen=summary，从解析页 replace 回来再后退，仍落在原来的 ?intent= 上。
+  const releaseScreen = () => { if (!searchParams.get('screen')) return; setSearchParams((params) => { params.delete('screen'); return params }, { replace: true }) }
   const screen = resolveResumeScreen(searchParams.get('screen'), Boolean(uploadedFile) && !uploading && !uploadUnknown && !error)
   const openDirectionSettings = () => {
     setGenericDiagnosis(false)
     rememberScreen('target')
   }
 
-  const toggleDimension = (key: ResumeScoringDimensionKey) => {
-    setSelectedDimensions((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
-  }
-  const buildTargetContext = (): ResumeTargetContext => {
-    if (genericDiagnosis || ![targetIndustry, targetJob.trim(), targetExperience, targetScene, targetMajor.trim(), targetDegree.trim()].some(Boolean)) return { skipped: true }
-    return {
-      industry: targetIndustry || undefined,
-      targetJob: targetJob.trim() || undefined,
-      experience: targetExperience,
-      scene: targetScene,
-      major: targetMajor.trim() || undefined,
-      degree: targetDegree.trim() || undefined,
-      skipped: false,
-    }
-  }
-  const leaveUnknown = () => {
-    setUploadUnknown(false)
-    setUploadRecheck(false)
-    setPendingName(null)
-    setError(null)
-    releaseScreen()
-  }
+  const leaveUnknown = () => { setUploadUnknown(false); setUploadRecheck(false); setPendingName(null); setError(null); releaseScreen() }
   const recheckUpload = () => {
     if (!uploadUnknown || uploadRecheck) return
     setUploadRecheck(true)
@@ -161,21 +141,56 @@ export function ResumeSourcePage() {
       setUploadedFile(null)
       setUploadUnknown(false)
     }
+    setHeldFile(null)
     setSelected(type)
-    if (type !== 'cloud') return
+    setChannelScreen(type === 'cloud' ? 'local' : type)
+    if (type === 'cloud') setLocalPhase('local-guide')
+  }
+  const closeChannel = () => {
+    setChannelScreen(null)
+    setHeldFile(null)
+    setLocalPhase('local-guide')
+    setError(null)
+    setSelected(isTerminalKiosk() ? 'phone' : 'cloud')
+  }
+  const openLocalPicker = () => {
+    setError(null)
+    setLocalPhase('local-guide')
     fileInputRef.current?.click()
+  }
+  const usePhoneChannel = () => {
+    setHeldFile(null)
+    setError(null)
+    setSelected('phone')
+    setChannelScreen('phone')
+  }
+  const continueHeld = () => {
+    if (!heldFile) return
+    setUploadedFile(heldFile)
+    setHeldFile(null)
+    setChannelScreen(null)
+    releaseScreen()
   }
 
   // 选中新文件才清上一份匿名结果。不挂在 mount / unmount 上。
   const acceptLocalFile = async (file: File) => {
     if (isTerminalKiosk()) return
+    const guidedLocal = channelScreen === 'local'
     setUploadedFile(null)
+    setHeldFile(null)
     setUploadUnknown(false)
     setUploadRecheck(false)
     setPendingName(file.name)
+    if (guidedLocal && file.size === 0) {
+      retryFile.current = null
+      setLocalPhase('local-unreadable')
+      setError('文件为空或大小未知')
+      return
+    }
     if (file.size > MAX_BYTES) {
       retryFile.current = file
       setError(`文件超过 10MB(${formatSize(file.size)}),请压缩后重试`)
+      if (guidedLocal) setLocalPhase('local-oversize')
       return
     }
     retryFile.current = file
@@ -192,21 +207,19 @@ export function ResumeSourcePage() {
       }
       retryFile.current = null
       setPendingName(null)
-      setUploadedFile({
-        name: uploaded.filename,
-        size: formatSize(uploaded.sizeBytes),
-        format: inferFormat(uploaded.mimeType || uploaded.filename),
-        fileId: uploaded.fileId,
-        fileUrl: uploaded.signedUrl,
-        mimeType: uploaded.mimeType,
-        channel: selected,
-      })
+      const received = {
+        name: uploaded.filename, size: formatSize(uploaded.sizeBytes),
+        format: inferFormat(uploaded.mimeType || uploaded.filename), fileId: uploaded.fileId,
+        fileUrl: uploaded.signedUrl, mimeType: uploaded.mimeType, channel: selected,
+      }
+      if (guidedLocal) { setHeldFile(received); setLocalPhase('local-ready') } else setUploadedFile(received)
       releaseScreen()
     } catch (err) {
       if (uploadOutcomeOf(err) === 'unknown') {
         retryFile.current = null
         setUploadUnknown(true)
       } else setError(uploadErrorMessage(err))
+      if (guidedLocal) setChannelScreen(null)
       releaseScreen()
     } finally {
       setUploading(false)
@@ -229,14 +242,12 @@ export function ResumeSourcePage() {
   const handlePhoneUploaded = (file: PhoneUploadedFile) => {
     clearAiResumeSession()
     setUploadedFile({ ...file, fileUrl: file.fileUrl })
-    setError(null)
-    setUploadUnknown(false)
-    releaseScreen()
+    setError(null); setUploadUnknown(false); releaseScreen()
   }
 
   const handleUsbUploaded = (file: ResumeUsbImportedFile) => {
     clearAiResumeSession()
-    setUploadedFile(file)
+    setHeldFile(file)
     setError(null)
     setUploadUnknown(false)
     releaseScreen()
@@ -249,11 +260,8 @@ export function ResumeSourcePage() {
         intent,
         source: uploadedFile.channel === 'scan' ? 'scan' : 'upload',
         file: {
-          name: uploadedFile.name,
-          size: uploadedFile.size,
-          format: uploadedFile.format,
-          fileUrl: uploadedFile.fileUrl,
-          mimeType: uploadedFile.mimeType,
+          name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format,
+          fileUrl: uploadedFile.fileUrl, mimeType: uploadedFile.mimeType,
         },
         fileId: uploadedFile.fileId,
         selectedDimensions: buildTargetContext().skipped ? [] : selectedDimensions,
@@ -279,16 +287,12 @@ export function ResumeSourcePage() {
   }
   const channelLabel = (channel: UploadedResumeFile['channel']) => channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
   const scanReady = uploadedFile?.channel === 'scan'
-  const heroKey: SourceHeroKey = screen === 'unknown' ? 'unknown'
-    : screen === 'target' || screen === 'target-context' || screen === 'target-profile' || screen === 'target-industry' ? screen
-    : uploading ? 'uploading' : uploadRecheck ? 'upload-rechecking' : uploadUnknown ? 'upload-unknown'
-    : error ? 'upload-failed' : screen === 'summary' ? (scanReady ? 'scan-ready' : 'staged')
-    : !uploadedFile && selected === 'usb' ? 'usb' : !uploadedFile && selected === 'phone' ? 'phone' : 'source'
-  const hero = heroCopy(heroKey, intent)
-  const formats = receivableFormatView(kiosk, wordConversionAvailable)
-  const frameStatus = sourceFrameStatus({
-    screen, uploading, receiving: phoneBusy || usbBusy, uploadUnknown, uploadRecheck, error: Boolean(error),
+  const phase = sourcePhaseView({
+    screen, intent, uploading, uploadRecheck, uploadUnknown, error, scanReady,
+    hasFile: Boolean(uploadedFile), selected, channelScreen, held: Boolean(heldFile),
+    usbPhase, localPhase, receiving: phoneBusy || usbBusy,
   })
+  const formats = receivableFormatView(kiosk, wordConversionAvailable)
   const helpLine = helpNeededLine(contact)
   const target = buildTargetContext()
   const generic = target.skipped === true
@@ -311,7 +315,7 @@ export function ResumeSourcePage() {
     <QxPageFrame
       title={title}
       subtitle={intent === 'optimize' ? '先完成必要诊断，再基于原文生成可编辑的优化版简历' : '上传简历文件，生成基于真实内容的结构化诊断报告'}
-      status={frameStatus}
+      status={phase.frameStatus}
       terminalLabel="AI 简历服务"
       back={{ label: '返回 AI 简历服务', onBack: () => navigate('/resume-service') }}
       navbar={<ResumeSourceNavbar />}
@@ -321,10 +325,13 @@ export function ResumeSourcePage() {
             <QxAiHelp label="问小青：帮我选诊断重点 →" draft="请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。" />
           </QxStepActions>
           {screen === 'source' ? (
-            !uploadBusyPanel ? <ResumeSourceActions disabled={sourceBusy} onGeneric={() => setGenericDiagnosis(true)} onOpenWorkbench={openDirectionSettings} /> : null
+            !channelScreen && !uploadBusyPanel ? <ResumeSourceActions disabled={sourceBusy} onGeneric={() => setGenericDiagnosis(true)} onOpenWorkbench={openDirectionSettings} /> : null
+          ) : null}
+          {screen === 'source' && channelScreen && !phase.usbOffline ? (
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={closeChannel}>回到来源选择</button>
           ) : null}
           {screen === 'source' && uploading ? <p className="qx-rt-ctxstrip">{helpLine}</p> : null}
-          {screen === 'source' && error ? (
+          {screen === 'source' && error && !(channelScreen === 'local' && (localPhase === 'local-oversize' || localPhase === 'local-unreadable')) ? (
             <>
               <button type="button" className="qx-btn" data-variant="ghost" onClick={() => fileInputRef.current?.click()}>{changeFileLabel}</button>
               <button type="button" className="qx-btn" data-variant="primary" onClick={retryUpload}>重试上传</button>
@@ -382,8 +389,8 @@ export function ResumeSourcePage() {
         </>
       )}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-screen={screen} data-dock={screen === 'target-context' || screen === 'target-profile' ? 'sendoff' : undefined} className="qx-resume-triage" data-takeaway="简历诊断报告">
-      <ResumeTriageHero eyebrow={title} ask={hero.ask} doing={hero.doing} flag={hero.flag} warn={hero.warn} rail={['current', 'todo', 'todo', 'todo']} />
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={phase.stateAttr} data-screen={screen} data-dock={screen === 'target-context' || screen === 'target-profile' ? 'sendoff' : undefined} className="qx-resume-triage" data-takeaway="简历诊断报告">
+      <ResumeTriageHero eyebrow={title} ask={phase.hero.ask} doing={phase.hero.doing} flag={phase.hero.flag} warn={phase.hero.warn} rail={['current', 'todo', 'todo', 'todo']} />
       {!kiosk && (
         <input ref={fileInputRef} type="file" aria-label="选择本机简历文件" accept={accept} className="hidden" onChange={handleFileChosen} />
       )}
@@ -391,7 +398,15 @@ export function ResumeSourcePage() {
         {screen === 'unknown' ? (
           <ResumeUnrecognized helpLine={helpLine} onSource={() => rememberScreen('source')} onHome={() => navigate('/')} onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} onGenerate={() => navigate('/resume/generate')} onPrint={() => navigate('/print-scan')} />
         ) : null}
-        {screen === 'source' ? (
+        <ResumeSourceChannels
+          screen={screen} channelScreen={channelScreen} heldFile={heldFile} localPhase={localPhase}
+          uploading={uploading} pendingName={pendingName} error={error} wordOpen={wordConversionAvailable}
+          usbGate={usbGate} helpLine={helpLine}
+          onPhoneUploaded={handlePhoneUploaded} onPhoneBusy={setPhoneBusy}
+          onUsbUploaded={handleUsbUploaded} onUsbBusy={setUsbBusy} onUsbPhase={setUsbPhase}
+          onOpenPicker={openLocalPicker} onUsePhone={usePhoneChannel} onContinue={continueHeld} onLeave={closeChannel}
+        />
+        {screen === 'source' && !channelScreen ? (
           <>
             <ResumeIntentSwitch heading="这次想让我做什么" intent={intent} disabled={sourceBusy} onChange={(value) => setSearchParams((params) => { params.set('intent', value); return params }, { replace: true })} />
             <ResumeGuestNote />
@@ -425,7 +440,7 @@ export function ResumeSourcePage() {
                     signedIn={Boolean(getToken())} pendingName={pendingName} helpLine={helpLine}
                   />
                 ) : (
-                  <button type="button" disabled={sourceBusy} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }} className="qx-rt-dropzone">
+                  <button type="button" disabled={sourceBusy} onClick={() => { if (!isTerminalKiosk()) { setLocalPhase('local-guide'); setChannelScreen('local') } }} className="qx-rt-dropzone">
                     <span className="ico"><UploadCloudIcon className="h-8 w-8" aria-hidden="true" /></span>
                     <strong>点击上传文件</strong>
                     <span>{wordConversionAvailable ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB' : '支持 PDF / 图片格式，单个文件最大 10MB'}</span>

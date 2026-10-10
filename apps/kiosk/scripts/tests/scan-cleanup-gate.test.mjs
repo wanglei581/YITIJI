@@ -76,8 +76,10 @@ export function readScanWorkbenchSession() {
       .replaceAll("'../../services/api/screensaver'", `'${screensaverStub}'`)
       .replaceAll("'./scanWorkbenchSession'", `'${sessionStub}'`),
   )
+  const unattendedUrl = toDataUrl(transpile('src/copy/unattendedCopy.ts', 'unattendedCopy.ts'))
   const modelUrl = toDataUrl(
-    `${transpile('src/pages/scan/scanSettingsModel.ts', 'scanSettingsModel.ts')}\n// instance ${seed}\n`,
+    `${transpile('src/pages/scan/scanSettingsModel.ts', 'scanSettingsModel.ts')}\n// instance ${seed}\n`
+      .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`),
   )
   const gateCode = `${transpile('src/pages/scan/scanCleanupGate.ts', 'scanCleanupGate.ts')}\n// instance ${seed}\n`
     .replaceAll("'./scanSettingsModel'", `'${modelUrl}'`)

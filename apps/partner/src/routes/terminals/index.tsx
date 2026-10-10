@@ -24,6 +24,7 @@ import { getOrgProfile } from '../../services/api/orgSelf'
 import { downloadCsv, safeFileName } from '../../lib/csv'
 import { TerminalOpsCards } from './TerminalOpsCards'
 import { TerminalOpsDrawer } from './TerminalOpsDrawer'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   METRIC_NOTES,
   RUN_STATE_VIEW,
@@ -104,7 +105,7 @@ export default function TerminalsPage() {
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        setErrorMessage(error instanceof Error ? error.message : '终端数据加载失败')
+        setErrorMessage(userMessageOf(error, '终端数据加载失败，请稍后重试'))
         setState('error')
       })
     return () => { cancelled = true }

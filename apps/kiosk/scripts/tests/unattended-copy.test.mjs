@@ -156,11 +156,17 @@ test('联系方式 404 与超时都缓存成最保守的一套', async () => {
   globalThis.__kioskTerminalId = 'KSK-001'
   const original = globalThis.fetch
   try {
-    globalThis.fetch = async (url) => {
-      assert.match(String(url), /\/api\/v1\/public\/support-contact\?terminalId=KSK-001$/)
+    let seenRequest
+    globalThis.fetch = async (url, init) => {
+      seenRequest = { url, init }
       return new Response('missing', { status: 404 })
     }
     const missed = await contactMod.loadSupportContact()
+    // 请求函数会捕获 fetch 失败；必须在外面断言，避免断言失败也被当成保守回落。
+    assert.ok(seenRequest, '必须真发出联系方式请求')
+    assert.match(String(seenRequest.url), /\/api\/v1\/public\/support-contact\?terminalId=KSK-001$/)
+    assert.equal(seenRequest.init.credentials, 'omit', '公开联系方式不携带浏览器身份凭证')
+    assert.deepEqual(seenRequest.init.headers, { Accept: 'application/json' }, '公开联系方式不附加会员鉴权头')
     assert.deepEqual(missed, copy.CONSERVATIVE_SUPPORT_CONTACT)
 
     contactMod.resetSupportContactCacheForTests()

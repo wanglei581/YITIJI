@@ -5,6 +5,7 @@ import { useCountdown } from '../../../../hooks/useCountdown'
 import { useAuth } from '../../../../auth/useAuth'
 import { exportResumeRecord } from '../../../../services/api'
 import { errorCodeOf, userMessageOf } from '../../../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
 import { formatFileSize } from '../resume-deliver/constants'
 import { ResumePricingBar } from '../resume-deliver/ResumePricingBar'
 import { useResumeExportPricing } from '../resume-deliver/useResumeExportPricing'
@@ -25,7 +26,11 @@ import { useStartPrintHandoff } from '../../../print/usePrintHandoff'
 
 function exportErrorMessage(err: unknown): string {
   const code = errorCodeOf(err)
-  if (code && EXPORT_ERROR_COPY[code]) return EXPORT_ERROR_COPY[code]
+  if (code && EXPORT_ERROR_COPY[code]) {
+    return code === 'RESUME_PDF_FONT_NOT_FOUND'
+      ? `${EXPORT_ERROR_COPY[code]}${helpNeededLine()}。`
+      : EXPORT_ERROR_COPY[code]
+  }
   return userMessageOf(err, '导出失败，这次没有生成文件。请稍后重试，或先打印原件。')
 }
 

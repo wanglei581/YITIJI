@@ -13,11 +13,9 @@
 // 那份还被 /resume/job-fit/actions 用着，两套色系不能在同一页相遇。
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
-import { BriefcaseIcon, CheckCircle2Icon, HelpCircleIcon, ListIcon, PrinterIcon, SearchIcon } from 'lucide-react'
-import { getJobs } from '../../services/api'
 import {
   analyzeJobFit,
   getJobFitConsentStatus,
@@ -28,69 +26,26 @@ import {
   revokeJobFitConsent,
 } from '../../services/api/jobFit'
 import { isAiOutage } from '../../ai/aiOutage'
-import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { readAiResumeSession } from './aiResumeSession'
-import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
-import { FitSkillMap } from './jobFit/FitSkillMap'
-import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
-import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
-import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import { buildJobFitStateView, type JobFitExits, type JobFitStaticState } from './jobFit/JobFitQxStates'
-import { CtaNote, Guardline, KitRows, ManualTargetFields, NextSteps, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
-import { JOB_FIT_NEXT_STEPS, type JobFitStepTarget } from './jobFit/jobFitResultSpec'
+import { DecisionCta, DecisionHero } from './jobFit/DecisionWorkspaceChrome'
+import { emphasizeTitle } from './jobFit/emphasizeTitle'
+import { ManualTargetFields } from './jobFit/jobFitQxKit'
+import { renderJobFitInteractive } from './jobFit/JobFitInteractiveViews'
+import { JobFitStage } from './jobFit/JobFitStage'
+import { usePublishedJobs } from './jobFit/usePublishedJobs'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
-import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
-import './job-fit-qx.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import './job-fit-qx.css'
 
-/**
- * 舞台缩放开关：与 `KioskRoot` 用同一套 `usesKioskFluidViewport`。
- *
- * /resume/job-fit 是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着
- * depth=2），拿不到 KioskRoot 算好的结果，只能同口径再算一次。这一页必须自己挂舞台，
- * 否则横屏电脑会漏缩。
- *
- * 为什么手机要关：`KioskStageFit` 默认 enabled，会把整张 1080×1920 稿等比缩到可视区。
- * 一体机上 scale≈1 没问题，但 390×844 手机上 scale≈0.36 —— 返回键量出来只有 23px、
- * 主操作 35px，正文小到读不了，触控下限（48px）全线失守。只有手机关掉缩放，
- * 改走真实流式布局（窄屏样式在 job-fit-qx.css 的 .jfq-root 段，随本页作用域）。
- * 横屏电脑不再关缩放，和一体机一样走 1080×1920 舞台。
- *
- * 一体机竖屏（1080×1920）不是紧凑视口 → 仍然是原来的定高舞台，稿 46 不受影响。
- */
-function useJobFitStage(): { enabled: boolean; layout: 'kiosk' | 'phone' | 'desktop' } {
-  const { viewportW, viewportH } = useKioskStageFit()
-  const isCompact = isKioskCompactViewport(viewportW, viewportH)
-  const isFluid = usesKioskFluidViewport(viewportW, viewportH)
-  if (!isFluid) return { enabled: true, layout: 'kiosk' }
-  return { enabled: false, layout: isCompact ? 'phone' : 'desktop' }
-}
-
-/**
- * 本页三个视图（静态屏 / 结果 / 选岗）共用的舞台外壳。
- * 保留 KioskStageFit 的 host/scaler/stage DOM，只切 enabled —— 与 KioskRoot 同样的做法，
- * 避免旋转屏幕时整个布局根被替换。
- *
- * 导出给宿主 46 的另外两条整屏 route（/resume/job-fit/actions、/resume/career-plan）：
- * 它们同样在 KioskRoot 之外，缩放判据必须是同一份，不能各抄一遍。
- */
-export function JobFitStage({ children }: { children: ReactNode }) {
-  const { enabled, layout } = useJobFitStage()
-  return (
-    <KioskStageFit enabled={enabled}>
-      <div className="jfq-root" data-jfq-layout={layout}>{children}</div>
-    </KioskStageFit>
-  )
-}
+export { JobFitStage }
 
 interface PageState {
   taskId?: string
@@ -129,16 +84,14 @@ export function JobFitPage() {
   const hosting = useRecruitmentHosting()
   const mode = hosting.enabled ? tab : 'manual'
   const [keyword, setKeyword] = useState('')
-  const [jobs, setJobs] = useState<ExternalJobDTO[]>([])
-  const [jobsLoading, setJobsLoading] = useState(true)
-  /** 岗位列表**读取失败**；与「关键词没搜到」必须分开呈现。 */
-  const [jobsError, setJobsError] = useState(false)
+  const { jobs, jobsLoading, jobsError } = usePublishedJobs(hosting.enabled, keyword)
   const [selectedJob, setSelectedJob] = useState<ExternalJobDTO | null>(null)
   const [manualTitle, setManualTitle] = useState('')
   const [manualReq, setManualReq] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [loadingLatest, setLoadingLatest] = useState(Boolean(taskId))
+  const [readDismissed, setReadDismissed] = useState(false)
   const [result, setResult] = useState<JobFitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** 分析本身失败，落成整屏 ai-down / failed；打印、撤回等失败仍留在当前屏。 */
@@ -156,6 +109,9 @@ export function JobFitPage() {
   const [anonymousConsentActive, setAnonymousConsentActive] = useState(false)
   const [revokingConsent, setRevokingConsent] = useState(false)
   const [rejectedTask, setRejectedTask] = useState(false)
+  const [ownWriteOpen, setOwnWriteOpen] = useState(false)
+  const [ownTitle, setOwnTitle] = useState('')
+  const [ownReq, setOwnReq] = useState('')
   const anonymousConsentRevisionRef = useRef(0)
   /**
    * 「取消分析，返回目标选择」（稿 analyzing 屏的主操作）。
@@ -163,29 +119,9 @@ export function JobFitPage() {
    * **这一屏不再采信那次返回**，晚到的结果不会把用户从选岗屏踢回结果屏。
    */
   const analysisRunRef = useRef(0)
+  const dismissLatestReadRef = useRef(false)
 
   useBusyLock(analyzing || printing || revokingConsent)
-
-  useEffect(() => {
-    if (!hosting.enabled) return
-    let cancelled = false
-    setJobsLoading(true)
-    getJobs({ keyword: keyword || undefined, page: 1, pageSize: 8 })
-      .then((res) => {
-        if (cancelled) return
-        setJobsError(false)
-        setJobs(res.data)
-      })
-      .catch(() => {
-        if (cancelled) return
-        // 「没搜到岗位」和「岗位列表没取回来」对用户是两件事，
-        // 原实现一律渲染成空列表，等于把故障说成没有结果（章程门槛①）。
-        setJobsError(true)
-        setJobs([])
-      })
-      .finally(() => { if (!cancelled) setJobsLoading(false) })
-    return () => { cancelled = true }
-  }, [keyword, hosting.enabled])
 
   useEffect(() => {
     setResult(null)
@@ -205,6 +141,8 @@ export function JobFitPage() {
       return
     }
     let cancelled = false
+    dismissLatestReadRef.current = false
+    setReadDismissed(false)
     setLoadingLatest(true)
     if (isAnonymous && accessToken) {
       void getJobFitConsentStatus(taskId, { accessToken })
@@ -221,10 +159,10 @@ export function JobFitPage() {
     }
     getLatestJobFit(taskId, { token: currentToken, accessToken })
       .then((res) => {
-        if (!cancelled) setResult(res.status === 'completed' ? res : null)
+        if (!cancelled && !dismissLatestReadRef.current) setResult(res.status === 'completed' ? res : null)
       })
       .catch((err: unknown) => {
-        if (cancelled) return
+        if (cancelled || dismissLatestReadRef.current) return
         // AI_TASK_NOT_FOUND = 解析行本身不认；JOB_FIT_NOT_FOUND = 解析还在、只是没做过匹配。
         if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
           setRejectedTask(true)
@@ -234,7 +172,7 @@ export function JobFitPage() {
         setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有可查看的对照结果，原结果可能已过期或删除；可填写要求重新对照。' : '对照结果这次没有读到，请检查网络后重试。')
       })
       .finally(() => {
-        if (!cancelled) setLoadingLatest(false)
+        if (!cancelled && !dismissLatestReadRef.current) setLoadingLatest(false)
       })
     return () => { cancelled = true }
   }, [taskId, accessToken, currentToken, isAnonymous])
@@ -251,12 +189,28 @@ export function JobFitPage() {
     assistant: () => navigate('/assistant'),
     backToPick: () => {
       analysisRunRef.current += 1
+      dismissLatestReadRef.current = true
+      setReadDismissed(true)
+      setLoadingLatest(false)
       setAnalyzing(false)
       setAnalysisFail(null)
       setResult(null)
     },
     retryAnalyze: () => { setAnalysisFail(null); void handleAnalyze() },
+    writeRequirements: () => setOwnWriteOpen(true),
   }
+
+  const writePanel = ownWriteOpen ? (
+    <div id="job-fit-own-requirements">
+      <p className="jfq-sec-copy">先把你看到的要求记在这里。没有可读取的简历任务时，这里不开始分析，也不写成已完成。</p>
+      <ManualTargetFields
+        title={ownTitle}
+        requirement={ownReq}
+        onTitleChange={setOwnTitle}
+        onRequirementChange={setOwnReq}
+      />
+    </div>
+  ) : null
 
   const navbar = (
     <QxAppNavbar
@@ -271,17 +225,17 @@ export function JobFitPage() {
    * 组件类型，React 会整棵卸载重建，输入焦点与滚动位置都会丢。
    */
   function staticScreen(screenState: JobFitStaticState, failMessage?: string | null) {
-    const view = buildJobFitStateView(screenState, exits, failMessage)
+    const view = buildJobFitStateView(screenState, exits, failMessage, writePanel)
     return (
       <JobFitStage>
         <QxPageFrame
           title={view.title}
-          subtitle={view.subtitle}
           status={view.pill}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
-          ctabar={view.cta}
+          ctabar={<DecisionCta>{view.cta}</DecisionCta>}
           navbar={navbar}
         >
+          <DecisionHero eyebrow="简历对照" title={emphasizeTitle(view.title)} copy={view.subtitle} echoesPageHead />
           <main
             className="qx-scroll"
             data-kiosk-domain="resume"
@@ -303,7 +257,7 @@ export function JobFitPage() {
   if (!taskId) return null
 
   // 托管状态没读到之前同样停在读取屏：否则打开托管的终端会先闪一下「只能手填」再变回来。
-  if (loadingLatest || hosting.status === 'loading') return staticScreen('loading')
+  if ((loadingLatest || hosting.status === 'loading') && !readDismissed) return staticScreen('loading')
 
   async function handleAnalyze() {
     if (!taskId) return
@@ -523,285 +477,15 @@ export function JobFitPage() {
   if (analyzing && !showAnonymousConsent && !showMemberConsent) return staticScreen('analyzing')
   if (analysisFail) return staticScreen(analysisFail.kind, analysisFail.message)
 
-  // ── 结果视图 ──────────────────────────────────────────────────────────────
-  if (result) {
-    /**
-     * 行动页入口只在**真有内容**时出现。
-     * 计数是确定性逻辑（数组长度相加），不是 AI 判断 —— 因此不标 E3。
-     */
-    const gapActionCount =
-      (result.gapPoints ?? []).length + (result.targetedSuggestions ?? []).length
-    // 系统内岗位的来源与「查看岗位」只在招聘内容托管打开时出现；关着时岗位页本来就进不去。
-    const showSource = hosting.enabled && Boolean(result.job?.sourceName)
-    const goStep = (target: JobFitStepTarget) => {
-      if (target === 'actions') { navigate('/resume/job-fit/actions', { state: { taskId, accessToken } }); return }
-      if (target === 'optimize') { exits.optimize(); return }
-      navigate('/resume/materials')
-    }
-    return (
-      <JobFitStage>
-        <QxPageFrame
-          title="简历对照"
-          subtitle="按你给的岗位要求，逐条列出简历里已经写到的和还没体现的；不分档、不打分，也不判断能否录用。"
-          status={{ tone: 'ok', label: '对照结果已返回' }}
-          back={{ label: '返回简历服务', onBack: exits.resumeHub }}
-          navbar={navbar}
-          ctabar={
-            <>
-              <CtaNote>对照只说明简历里写到了什么，不代表企业的真实评价。</CtaNote>
-              <button type="button" className="qx-btn" data-variant="ghost" disabled={printing} onClick={() => void handlePrint()}>
-                <PrinterIcon size={22} aria-hidden="true" />
-                {printing ? '生成中' : '打印报告'}
-              </button>
-              {hosting.enabled && result.job?.id ? (
-                <button type="button" className="qx-btn" data-variant="teal" onClick={() => { if (result.job?.id) navigate(`/jobs/${result.job.id}`) }}>
-                  <BriefcaseIcon size={22} aria-hidden="true" />
-                  查看岗位
-                </button>
-              ) : (
-                <button type="button" className="qx-btn" data-variant="teal" onClick={exits.backToPick}>
-                  换个岗位分析
-                </button>
-              )}
-              <button type="button" className="qx-btn" data-variant="primary" onClick={exits.optimize}>
-                优化简历
-              </button>
-            </>
-          }
-        >
-          <main
-            className="qx-scroll"
-            data-kiosk-domain="resume"
-            data-kiosk-screen="resume-job-fit"
-            data-state="result"
-            data-testid="resume-job-fit-state-result"
-          >
-            <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
-            <Sec title="对照概要" hint="仅供本人准备使用">
-              <DecisionSummaryBar
-                jobTitle={result.job?.title ?? '目标岗位'}
-                company={result.job?.company}
-                summary={result.summary}
-              />
-              <Guardline
-                head="只对照，不打分"
-                body="不分档、不给分数或通过率，也不等于录用结论；结果只供本人准备，不提供给企业。"
-              />
-            </Sec>
+  return renderJobFitInteractive({
+    result, hosting, navigate, taskId, accessToken, exits, printing, handlePrint, handleAnalyze, navbar,
+    resumeName, isAnonymous, anonymousConsentActive, revokingConsent, handleRevokeConsent,
+    notice, error, showAnonymousConsent, analyzing, consentError,
+    handleCancelAnonymousConsent, handleConfirmAnonymousConsent,
+    showMemberConsent, memberConsentBusy, handleCancelMemberConsent, handleConfirmMemberConsent,
+    setTab, tab, mode, keyword, setKeyword, jobsLoading, jobsError, jobs,
+    selectedJob, setSelectedJob, manualTitle, manualReq, setManualTitle, setManualReq,
+    memberConsentRequired, setShowMemberConsent,
+  })
 
-            <FitSkillMap
-              matchPoints={result.matchPoints ?? []}
-              gapPoints={result.gapPoints ?? []}
-              keywordCoverage={result.decisionSupport?.keywordCoverage}
-            />
-
-            {/*
-              「怎么办」已拆到 `/resume/job-fit/actions`（S2-2，矩阵 §3.5）：
-              本页专心做「差在哪」（已写到 / 还没体现两栏 + 关键词命中），
-              行动页专心做「怎么补」（差距项 + 定向改写 + 打印/改简历/备材料）。
-              原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
-            */}
-            {gapActionCount > 0 && (
-              <Sec title="下一步建议" hint="都是本机既有流程">
-                <p className="jfq-sec-copy">
-                  这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，单独放在一屏里。
-                </p>
-                <NextSteps items={JOB_FIT_NEXT_STEPS.map((step) => ({
-                  title: step.title,
-                  desc: step.desc,
-                  onClick: () => goStep(step.target),
-                }))} />
-              </Sec>
-            )}
-
-            {showSource && (
-              <Sec title="岗位来源" hint="以来源平台公示为准">
-                <div className="qx-card jfq-consent-card">
-                  <p>
-                    岗位来源：{result.job?.sourceName}{result.job?.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
-                  </p>
-                  <p>准备好之后，请前往来源平台完成投递。</p>
-                  {error && <p className="jfq-alert" role="alert">{error}</p>}
-                </div>
-              </Sec>
-            )}
-
-            {isAnonymous && anonymousConsentActive && (
-              <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
-            )}
-            {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
-            {error && !showSource && <p className="jfq-alert" role="alert">{error}</p>}
-          </main>
-        </QxPageFrame>
-      </JobFitStage>
-    )
-  }
-
-  // ── 选择视图 ──────────────────────────────────────────────────────────────
-  // 托管关闭时手填是唯一的路：之前在岗位列表里点过的岗位不再算进「目标岗位」。
-  const pickedJob = hosting.enabled ? selectedJob : null
-  // 检查单跟着当前这条路走：切到手填后，之前点过的岗位不算目标（「开始比对」也只认手填的名称）。
-  const target = mode === 'pick' ? pickedJob?.title : manualTitle.trim()
-  return (
-    <JobFitStage>
-      <QxPageFrame
-        title="简历对照"
-        subtitle="对照结果只给本人看，不分档、不打分。请核对简历和岗位要求后再开始。"
-        status={{ tone: 'unknown', label: '对照前请选好简历并确认授权' }}
-        back={{ label: '返回简历服务', onBack: exits.resumeHub }}
-        navbar={navbar}
-        ctabar={
-          <>
-            <CtaNote>对照结果不代表录用判断，也不会提供给企业；本平台不提供投递功能。</CtaNote>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={exits.resumeHub}>
-              返回简历服务
-            </button>
-            <span className="qx-ai-declaration-slot">
-              <button type="button" className="qx-btn" data-variant="primary" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
-                继续并确认授权
-              </button>
-              <AiDeclarationNote />
-            </span>
-          </>
-        }
-      >
-        {showAnonymousConsent && (
-          <AnonymousJobFitConsentDialog
-            busy={analyzing}
-            error={consentError}
-            onCancel={handleCancelAnonymousConsent}
-            onConfirm={() => void handleConfirmAnonymousConsent()}
-          />
-        )}
-        {/*
-          会员就地授权（S2-2 / 问题 F2）。复用岗位域的同一个弹窗与同一段法律文案 ——
-          同一个 scope `job_ai` 不能有两份说法。
-        */}
-        <JobAiConsentModal
-          open={showMemberConsent}
-          loading={memberConsentBusy}
-          error={consentError}
-          onCancel={handleCancelMemberConsent}
-          onConfirm={() => void handleConfirmMemberConsent()}
-        />
-        <main
-          className="qx-scroll"
-          data-kiosk-domain="resume"
-          data-kiosk-screen="resume-job-fit"
-          data-state="pick"
-          data-testid="resume-job-fit-state-pick"
-        >
-          <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
-          <Sec no="01" title={hosting.enabled ? '选择目标岗位' : '填一份岗位要求'} hint={hosting.enabled ? '系统岗位或手填目标，二选一' : 'AI 对照你的简历，只供本人分析'}>
-            {hosting.enabled ? (<div className="jfq-choices">
-              <button
-                type="button"
-                className="jfq-choice"
-                onClick={() => setTab('pick')}
-                aria-pressed={tab === 'pick'}
-              >
-                <h3>从已发布岗位中选择</h3>
-                <p>这里只展示已发布岗位的标题、来源与详情。</p>
-                <span>按来源数据选择</span>
-              </button>
-              <button
-                type="button"
-                className="jfq-choice"
-                onClick={() => setTab('manual')}
-                aria-pressed={tab === 'manual'}
-              >
-                <h3>手填目标岗位</h3>
-                <p>只填写目标名称与要求，不会把内容提供给企业，也不替你操作。</p>
-                <span>只供本人分析</span>
-              </button>
-            </div>) : null}
-
-            {mode === 'pick' ? (
-              <div className="jfq-field">
-                <small>目标岗位</small>
-                <div style={{ position: 'relative' }}>
-                  <SearchIcon size={22} aria-hidden="true" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--qx-ink-3)' }} />
-                  <input
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="搜索岗位名称 / 公司"
-                    aria-label="搜索岗位名称或公司"
-                    className="jfq-input"
-                    style={{ paddingLeft: 52 }}
-                  />
-                </div>
-                <div className="jfq-joblist" aria-busy={jobsLoading} aria-live="polite">
-                  {jobsLoading ? (
-                    <p className="jfq-sec-copy" role="status">正在加载岗位…</p>
-                  ) : jobsError ? (
-                    <p className="jfq-alert" role="alert">
-                      岗位列表这次没取回来（不是没有岗位）。可以稍后重试，或直接切到「手填目标岗位」——
-                      手填不依赖岗位库，照常能做简历对照。
-                    </p>
-                  ) : jobs.length === 0 ? (
-                    <p className="jfq-sec-copy">没有找到岗位，可切换「手填目标岗位」</p>
-                  ) : (
-                    jobs.map((j) => {
-                      const active = selectedJob?.id === j.id
-                      return (
-                        <button
-                          key={j.id}
-                          type="button"
-                          className="jfq-job"
-                          onClick={() => setSelectedJob(j)}
-                          aria-pressed={active}
-                          aria-label={`${j.title}，${j.company}，${active ? '已选择' : '未选择'}`}
-                        >
-                          <span className="jfq-job-tx">
-                            <b>{j.title}</b>
-                            <small>{j.company} · 来源：{j.sourceName}</small>
-                          </span>
-                          {active && <CheckCircle2Icon size={24} aria-hidden="true" />}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            ) : (
-              <ManualTargetFields
-                title={manualTitle}
-                requirement={manualReq}
-                onTitleChange={setManualTitle}
-                onRequirementChange={setManualReq}
-              />
-            )}
-          </Sec>
-
-          <Sec no="02" title="分析前检查" hint="三项齐备才启动" grow>
-            <PreflightChecklist
-              targetLabel={target || '尚未选择'}
-              hasTarget={Boolean(target)}
-              consentConfirmed={isAnonymous && anonymousConsentActive}
-              manualOnly={!hosting.enabled}
-            />
-            {error && <p className="jfq-alert" role="alert">{error}</p>}
-            {notice && <p className="jfq-notice" aria-live="polite">{notice}</p>}
-            {memberConsentRequired && (
-              <MemberJobFitConsentCard
-                busy={memberConsentBusy}
-                onAuthorize={() => setShowMemberConsent(true)}
-              />
-            )}
-            {isAnonymous && anonymousConsentActive && (
-              <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
-            )}
-          </Sec>
-
-          <Sec no="03" title="不做 AI 分析，也能先推进" hint="都是既有流程">
-            <KitRows items={[
-              { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程', onClick: exits.printHub },
-              ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
-              { icon: <HelpCircleIcon size={22} />, title: '问 AI 顾问怎么定目标', desc: '还没想清楚方向时，先把想法说出来', onClick: exits.assistant },
-            ]} />
-          </Sec>
-        </main>
-      </QxPageFrame>
-    </JobFitStage>
-  )
 }

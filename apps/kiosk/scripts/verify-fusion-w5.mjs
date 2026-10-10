@@ -64,9 +64,10 @@ const FROZEN = new Map([
   // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
   // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
   // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
-  // 2026-10-04 打印主线 0 元口径：新增 isFreeMemberOrder（已有支付状态，且金额为 0 或来源为 free）。
-  // 没有支付状态的历史订单仍不算免费。原有导出、实付不推算、待退款常量都没改。
-  // 冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 2026-10-06 合并：保留候选侧 isFreeMemberOrder（已有支付状态，且金额为 0 或来源为 free；
+  // 没有支付状态的历史订单仍不算免费）。同时免费单不再展示「待退款 / 已退款 / 退款中」，
+  // 状态改写「免费」；付过钱的单仍按 refundRequired 优先显示待退款。待退款说明不再写工作人员。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随这次合并前移。
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
   ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
@@ -204,7 +205,11 @@ assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still 
 assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
+/* 2026-10-06 稿 31 活动详情迁入青序流光，同强度替换页壳断言：
+ * KioskPageFrame / KioskPageHeader → QxPageFrame，并断言已退出 V6 壳。
+ * 下面的屏标、滚动容器 class、领取分支字符串保持原断言，不删。 */
+assert.match(benefitActivityDetail, /<QxPageFrame\b/, 'BenefitActivityDetailPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivityDetail, /KioskPageFrame|KioskPageHeader/, 'BenefitActivityDetailPage has left the V6 frame')
 assert.match(
   benefitActivityDetail,
   /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
@@ -359,6 +364,12 @@ assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is register
 assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+assert.match(kioskRootSrc, /['"]\/activities['"]/, '/activities is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)')
+assert.match(kioskRootSrc, /\/\^\\\/activities\\\/\[\^\/\]\+\$\//, '/activities/:id uses an exact pattern, not a wide prefix')
+const benefitActivitiesPage = read('src/pages/activities/BenefitActivitiesPage.tsx')
+assert.match(benefitActivitiesPage, /<QxPageFrame\b/, 'BenefitActivitiesPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivitiesPage, /KioskPageFrame|KioskPageHeader/, 'BenefitActivitiesPage has left the V6 frame')
+assert.match(benefitActivitiesPage, /data-kiosk-screen="activities"/, 'activities list keeps its stable screen marker')
 /* 文档与打印订单同属稿 38，是「文件资产 → 打印订单」这条跨端主链的两屏：
  * 页面换成青序壳却漏登记，KioskLayout 会在青序页上再叠一层旧顶栏和底栏（两套 chrome 同屏）。
  * 所以这里同时钉三件事：进了精确集合、页面不再挂旧壳、页面声明的分域视图就是这两张 Tab。 */

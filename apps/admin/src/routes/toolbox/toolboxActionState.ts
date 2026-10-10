@@ -3,6 +3,7 @@ import type {
   SaveToolboxConfigInput,
   TerminalToolboxConfigView,
 } from '@ai-job-print/shared'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { BLOCK_REASON_LABELS } from './constants.ts'
 
 export function normalizeToolboxDraftItem(item: KioskToolboxItem): KioskToolboxItem {
@@ -57,7 +58,7 @@ export function toolboxActionErrorMessage(error: unknown, fallback = '操作失�
   if (typeof candidate.message === 'string' && candidate.message.trim()) {
     const message = candidate.message.trim()
     const reason = Object.keys(BLOCK_REASON_LABELS).find((key) => message.endsWith(`: ${key}`))
-    return reason ? BLOCK_REASON_LABELS[reason] : message
+    return reason ? BLOCK_REASON_LABELS[reason] : userMessageOf(error, fallback)
   }
   return fallback
 }

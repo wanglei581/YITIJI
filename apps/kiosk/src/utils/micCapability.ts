@@ -20,6 +20,8 @@
 // 所以对外还提供 devicechange 订阅与手动重探。
 // ============================================================
 
+import { helpNeededLine } from '../copy/unattendedCopy'
+
 /** 语音入口的能力门禁状态。四态互斥，禁止合并。 */
 export type MicCapabilityState =
   /** 存在音频输入设备且权限未被拒绝 —— 可以进语音模式。 */
@@ -52,7 +54,7 @@ export const MIC_REASON: Record<MicCapabilityState, string | null> = {
   'no-device':
     '本机没有麦克风，请用文字作答。如果刚插入 USB 麦克风，点「重新检测麦克风」即可启用语音。',
   'permission-denied':
-    '麦克风权限没有打开：可以直接用文字作答。需要语音时，请在浏览器设置里允许麦克风后点「重新检测麦克风」；在一体机上请联系现场工作人员。',
+    '麦克风权限没有打开：可以直接用文字作答。需要语音时，请在浏览器设置里允许麦克风后点「重新检测麦克风」。',
   unsupported:
     '当前浏览器环境不支持麦克风采集（需要 HTTPS 或 localhost），请用文字作答。',
 }
@@ -62,11 +64,24 @@ export const MIC_FAILURE_REASON: Record<MicFailureState, string> = {
   available: '麦克风调用失败，可重新录音或改用文字输入',
   'no-device': '本机没有麦克风，请用文字作答',
   'permission-denied':
-    '麦克风权限没有打开，请改用文字输入；需要语音时请在浏览器设置里允许麦克风，一体机上请联系现场工作人员',
+    '麦克风权限没有打开，请改用文字输入；需要语音时请在浏览器设置里允许麦克风。',
   unsupported: '当前浏览器环境不支持麦克风采集，请用文字作答',
   busy: '麦克风被其他程序占用，请关闭占用程序后重试，或改用文字输入',
   timeout: '麦克风权限请求超时，请重试或改用文字输入',
   unknown: '麦克风调用失败，可重新录音或改用文字输入',
+}
+
+/** 展示用。权限被拒时在调用处拼上服务电话，不写进上面的常量表。 */
+export function micReasonLine(state: MicCapabilityState): string | null {
+  const base = MIC_REASON[state]
+  if (!base || state !== 'permission-denied') return base
+  return `${base}${helpNeededLine()}。`
+}
+
+export function micFailureReasonLine(state: MicFailureState): string {
+  const base = MIC_FAILURE_REASON[state]
+  if (state !== 'permission-denied') return base
+  return `${base}${helpNeededLine()}。`
 }
 
 function getMediaDevices(): MediaDevices | null {

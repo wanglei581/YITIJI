@@ -62,7 +62,7 @@ export function LinkedJobsSection({ detail, onMutated, readOnly = false }: { det
       onMutated()
       await search(keyword)
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '关联岗位没有加上，请稍后重试'))
     } finally {
       setBusy(false)
     }
@@ -78,7 +78,7 @@ export function LinkedJobsSection({ detail, onMutated, readOnly = false }: { det
       onMutated()
       await search(keyword)
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '关联岗位没有移除，请稍后重试'))
     } finally {
       setBusyJobId(null)
     }

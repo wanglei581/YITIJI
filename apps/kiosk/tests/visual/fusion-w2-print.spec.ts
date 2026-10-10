@@ -558,7 +558,8 @@ test('a terminal-session 401 on claim never replays the rejected session @w2', a
   await page.goto('/print/pickup-claim')
   await page.getByLabel('到机码输入框').pressSequentially('87654321', { delay: 5 })
 
-  await expect(page.getByRole('alert')).toHaveText(/这台机器的安全校验没通过/)
+  // 安全校验失败现在统一显示标准句 3；请求次数与拒绝票据的断言保留。
+  await expect(page.getByRole('alert')).toHaveText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。')
   await expect(page.getByText('订单核验成功')).toHaveCount(0)
   // 恰好一次，且带的就是那张票：没有用旧票重放，也没有在续期失败后继续发请求。
   expect(claimSessions).toEqual([TERMINAL_SESSION_FIXTURE])
@@ -1677,7 +1678,8 @@ test('a terminal-session 401 on Order-only release fails as terminal security, n
   // 原样外抛（续期失败可能是 TypeError），这里就会变成「网络连接失败」——
   // 把一次安全失败说成网络问题，现场工作人员会照着去查网线。
   const alert = page.locator('.cashier-qx-error')
-  await expect(alert).toHaveText(/这台机器的安全校验没通过/)
+  // 安全失败现在用标准句 3，不改下方禁止网络误报与请求次数的断言。
+  await expect(alert).toHaveText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。')
   await expect(alert).not.toHaveText(/网络连接失败/)
   await expect(page.locator('.qx-state-t', { hasText: '打印任务尚未建立' })).toBeVisible()
   await expect(page).toHaveURL(/\/print\/cashier$/)
@@ -1867,7 +1869,10 @@ test('failed print status displays only the safe user reason and no pickup code 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  const failed = page.locator('[data-testid="print-fulfill-state-failed"]')
+  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toHaveCount(0)
+  await expect(failed).toContainText('这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请拨打服务电话 18369161921（工作日 9:00–18:00）。')
+  await expect(failed).not.toContainText('换一台机器')
   await expect(page.getByText('agent stack and local path must stay hidden')).toHaveCount(0)
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
@@ -1908,7 +1913,8 @@ test('takeaway-url stays a payment-token recovery path with no terminal session 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-testid="print-fulfill-state-failed"]')).toContainText('这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请拨打服务电话 18369161921（工作日 9:00–18:00）。')
 
   const takeawayHeaders = (await takeawayRequest).headers()
   expect(takeawayHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)

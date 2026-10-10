@@ -1,6 +1,6 @@
 {
   "frozenAt": "2026-09-29",
-  "updatedAt": "2026-10-06",
+  "updatedAt": "2026-10-08",
   "note": "青序流光 2.0 最终版。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md、STATUS.md 不在冻结范围。",
   "files": {
     "00-standby.html": "f3a0dd5cdd58c8a6e75647ed8ab50f2f2738937b091b73c06a382dd78e44a131",
@@ -15,7 +15,7 @@
     "09-system-state.html": "8d91978b986f23b1ea514a22763efae59be26f13553d5768aee8168ef8857726",
     "10-print-hub.html": "00bda86110a6ca8ad190840aa256226561193b006eb68154b50ef65f7ffd4933",
     "11-arrival-code.html": "10633d8481129a5d92bd6ea7b93589dd41109d5d3d34a5934ffd6bfe8a8f4e24",
-    "12-file-source.html": "07d9eed31ac50cc86ee7cfa9ce29ef948d6a3ffbd62e84346837e97ca44d929c",
+    "12-file-source.html": "02852614de0846b77a7843ae02ec3834a17ccadfe26cff5b0917cc582dd9f3f7",
     "13-print-desk.html": "82e3bccba3a664245da14fcc75a32e584a59d61b44bea083ff82893b206731fd",
     "14-print-confirm.html": "3af05d538c300071eabad917f67d3a23836d49d04dfc58c137bd3b48822296d6",
     "15-print-fulfill.html": "4c078c98e957f49e445f92608bf72827c743c5c3ebfa5c62938a63920c6f34ab",

@@ -1,3 +1,4 @@
+import { peekSupportContact, helpNeededLine, machineUnusableLine } from '../../../copy/unattendedCopy'
 import type { SignStampPosition, SignStampSize } from '@ai-job-print/shared'
 import { FX, type SignStampStateId } from './constants'
 import type { ComposeResult, LiveSnapshot } from './signStampModel'
@@ -19,6 +20,7 @@ const BLOCK_CHIPS: StatusCopy['chips'] = [
 ]
 
 export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusCopy {
+  const contact = peekSupportContact()
   const place = `第 ${live.page} 页 · ${labelPos(live.position)} · ${labelSize(live.size)}`
   const copies: Partial<Record<SignStampStateId, StatusCopy>> = {
     'auth-unknown': {
@@ -49,7 +51,7 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'error',
       title: '这台机器还没登记',
       body: '签名要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
-      chips: [{ text: '不假设读不到就是可用' }, { text: '请联系现场工作人员' }],
+      chips: [{ text: '不假设读不到就是可用' }, { text: machineUnusableLine(contact) }],
     },
     'capability-loading': {
       kind: 'info',
@@ -61,13 +63,13 @@ export function statusCopy(state: SignStampStateId, live: LiveSnapshot): StatusC
       kind: 'lock',
       title: '这台机器没有开放签名',
       body: '管理员没有为这台机器开放「签名」。<b>未登记一律按不允许处理</b>，不做静默降级。',
-      chips: [{ text: '文档打印扫描不受影响', tone: 'ok' }, { text: '需要开放请联系工作人员' }],
+      chips: [{ text: '文档打印扫描不受影响', tone: 'ok' }, { text: helpNeededLine(contact) }],
     },
     'capability-maintenance': {
       kind: 'warn',
       title: '签名正在维护',
       body: '这台机器的签名功能被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
-      chips: [{ text: '维护是管理员登记的真实状态' }, { text: '恢复时间请问现场工作人员' }],
+      chips: [{ text: '维护是管理员登记的真实状态' }, { text: helpNeededLine(contact) }],
     },
     'capability-error': {
       kind: 'error',

@@ -4,6 +4,7 @@ import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { networkError, throwHttpError } from './throwHttpError'
+import { API_MODE } from './client'
 
 export interface AdvisorAccess {
   token?: string | null
@@ -90,4 +91,15 @@ export async function printAdvisorArtifact(
     expiresAt: body.expiresAt ?? '',
     printFileUrl: body.printFileUrl ?? '',
   }
+}
+
+/** 只读取公开可用性；演示模式与畸形回包都表示没读到，不推断模型状态。 */
+export async function getAdvisorAvailability(): Promise<boolean | undefined> {
+  if (API_MODE !== 'http') return undefined
+  const res = await request('/advisor/availability', { method: 'GET' })
+  if (!res.ok) await throwHttpError(res)
+  const body: unknown = await res.json()
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined
+  const available = (body as { available?: unknown }).available
+  return typeof available === 'boolean' ? available : undefined
 }

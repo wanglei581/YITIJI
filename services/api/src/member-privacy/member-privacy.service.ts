@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
+import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
 import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
@@ -89,6 +90,7 @@ export async function runSerializableTransaction<R>(
         ? await prisma.$transaction(operation, { isolationLevel: 'Serializable' })
         : await prisma.$transaction(operation)
     } catch (error) {
+      if (isPostgresBusyError(error)) throw error
       if (!isSerializationConflict(error)) throw error
       if (attempt === SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS) {
         throw new SerializableTransactionRetryExhaustedError()

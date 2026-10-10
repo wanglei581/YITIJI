@@ -77,9 +77,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/member/qr-login', url: '/member/qr-login?ticketId=w6-ticket', marker: screen('member-qr-login'), featureText: '手机确认登录' },
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '这个链接不能用来上传' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
-  { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
+  // 稿 46（9/29）：这一屏用户可见名称是「简历对照」。路由键 /resume/job-fit 不改。
+  { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '简历对照', requiresFusionRoot: false },
   // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
-  { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
+  { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次简历对照', requiresFusionRoot: false },
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '求职方案', requiresFusionRoot: false },
   { pattern: '/interview', url: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
   { pattern: '/interview/setup', url: '/interview/setup', expectedPath: '/interview', marker: screen('interview-setup'), featureText: '模拟面试' },
@@ -106,8 +107,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
   { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '你想解决' },
-  { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
-  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
+  // 2026-10-06 稿 31：页头改为常驻标题。空列表不再出现旧标题「权益活动」，详情页头是「活动详情」。
+  { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '可参加的活动' },
+  { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '活动详情' },
   { pattern: '/renshi', url: '/renshi', marker: '.w4-policy-page', featureText: '仅信息指引 · 不代办' },
   { pattern: '/campus', url: '/campus', marker: '[data-kiosk-component="page-frame"] .campus-proto', featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/campus/welcome', url: '/campus/welcome', marker: '[data-kiosk-component="page-frame"]', featureText: '校园招聘迎新指引' },

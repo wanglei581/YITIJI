@@ -3,7 +3,7 @@ import type { Page, Route } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
-import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
+import { assertNoLargeBlankBands, assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
@@ -13,6 +13,7 @@ import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
 import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
+import { setReactRouterState } from './fixtures/fusion-w2-state'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -178,6 +179,7 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   await chooseTargetedResumeDirection(page)
   await page.getByRole('button', { name: /U盘上传/ }).click()
   await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await page.getByRole('button', { name: '继续：确认这次办理' }).click()
   await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
   expect(uploadBody).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
@@ -246,6 +248,7 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
   await page.getByRole('button', { name: /my_pdf_resume\.jpg/ }).click()
+  await page.getByRole('button', { name: '继续：确认这次办理' }).click()
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="image"]')
   await expect(preview).toBeVisible()
@@ -1452,6 +1455,140 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
   }
 })
 
+/** 相邻区块：上一块下沿到下一块上沿。舞台缩放后的屏幕像素要除回 CSS 像素。 */
+async function readReportBandGaps(page: Page) {
+  const scale = await readEnabledStageScale(page)
+  const raw = await page.evaluate(() => {
+    const pageEl = document.querySelector('.rrp-page') as HTMLElement | null
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom }
+    }
+    const blocks = pageEl
+      ? [...pageEl.children].flatMap((node) => {
+        const rect = node.getBoundingClientRect()
+        if (rect.height <= 0) return []
+        const className = (node as HTMLElement).className
+        const name = node.getAttribute('data-testid')
+          || (typeof className === 'string' ? className.split(' ').find((item) => item.startsWith('rrp-')) : undefined)
+          || node.tagName.toLowerCase()
+        return [{ name, ...box(node) }]
+      })
+      : []
+    const rows = [...document.querySelectorAll('.rrp-exits .rrp-row')].map(box)
+    const scrolls = [...document.querySelectorAll('.rrp-page .rrp-scroll')].map((node) => {
+      const el = node as HTMLElement
+      return { overflowY: getComputedStyle(el).overflowY, extra: el.scrollHeight - el.clientHeight }
+    })
+    return {
+      justify: pageEl ? getComputedStyle(pageEl).justifyContent : '',
+      blocks,
+      rows,
+      pageBottom: pageEl ? pageEl.getBoundingClientRect().bottom : 0,
+      scrolls,
+    }
+  })
+  const css = (px: number) => px / scale
+  const gaps = raw.blocks.slice(1).map((block, index) => ({
+    from: raw.blocks[index]!.name,
+    to: block.name,
+    gap: css(block.top - raw.blocks[index]!.bottom),
+  }))
+  const rowGaps = raw.rows.slice(1).map((row, index) => css(row.top - raw.rows[index]!.bottom))
+  const last = raw.blocks[raw.blocks.length - 1]
+  return {
+    justify: raw.justify,
+    gaps,
+    rowGaps,
+    trailing: last ? css(raw.pageBottom - last.bottom) : 0,
+    scrolls: raw.scrolls,
+  }
+}
+
+test('resume report failure and no-report screens keep exit rows and close the open band @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 402 和返回格式坏都落到同一张诊断失败屏，版式相同，这里量这一张；无报告是另一张。
+  // 出路行读的是计算后的 min-height：行本身还会按余高拉高，把最小高度改回 73px 左右时这条必须红。
+  for (const state of ['diagnose-failed', 'no-context'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const stack = await readReportBandGaps(page)
+    expect(stack.justify, `${state} 从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${state}「${band.from}」到「${band.to}」不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${state}「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.rowGaps) {
+      expect(gap, `${state} 出路行之间不拉开`).toBeLessThanOrEqual(40)
+      expect(gap, `${state} 出路行不应互相盖住`).toBeGreaterThanOrEqual(-1)
+    }
+    expect(stack.trailing, `${state} 最后一块贴着正文底部`).toBeLessThanOrEqual(40)
+    expect(stack.trailing, `${state} 最后一块仍在正文里面`).toBeGreaterThanOrEqual(-1)
+    const minHeight = await page.locator('.rrp-exits .rrp-row').first().evaluate((el) => Number.parseFloat(getComputedStyle(el).minHeight))
+    expect(minHeight, `${state} 出路行最小高度`).toBeGreaterThanOrEqual(state === 'diagnose-failed' ? 104 : 88)
+    for (const scroll of stack.scrolls) {
+      expect(scroll.overflowY).not.toBe('auto')
+      expect(scroll.overflowY).not.toBe('scroll')
+      expect(scroll.extra).toBeLessThanOrEqual(2)
+    }
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+
+  await page.goto('/resume/report?capture=1&state=no-context&taskId=paircapture01')
+  const records = page.locator('.qx-ctabar').getByRole('button', { name: '我的诊断记录', exact: true })
+  await expect(records).toHaveAttribute('data-route', '/me/ai-records')
+  const upload = page.getByTestId('resume-report-primary')
+  await expect(upload).toHaveText('去上传简历')
+  await expect(upload).toHaveAttribute('data-route', '/resume/source')
+  await records.click()
+  await page.waitForURL((url) => url.pathname === '/me/ai-records')
+  await page.goto('/resume/report?capture=1&state=no-context&taskId=paircapture01')
+  await page.getByTestId('resume-report-primary').click()
+  await page.waitForURL((url) => url.pathname === '/resume/source')
+
+  await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
+  await expect(page.locator('.qx-ctabar').getByRole('button', { name: '返回首页', exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-report-primary')).toHaveText('重新解析')
+})
+
+test('resume report read-error and illegal screens keep exit rows and close the open band @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  // 读取失败、地址打不开只用这一屏已经接上的三条出路。出路行最小高度按稿是 88；
+  // 行本身还会按余高拉高，把其中一屏的最小高度改到 73px 左右时这条必须红。
+  const exits: Record<'read-error' | 'illegal', string[]> = {
+    'read-error': ['返回简历来源', '打开我的诊断记录', '去打印 / 扫描'],
+    illegal: ['返回简历来源', '打开我的诊断记录', '返回首页'],
+  }
+  for (const state of ['read-error', 'illegal'] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    const stack = await readReportBandGaps(page)
+    expect(stack.justify, `${state} 从上往下排`).toBe('flex-start')
+    for (const band of stack.gaps) {
+      expect(band.gap, `${state}「${band.from}」到「${band.to}」不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
+      expect(band.gap, `${state}「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
+    }
+    for (const gap of stack.rowGaps) {
+      expect(gap, `${state} 出路行之间不拉开`).toBeLessThanOrEqual(40)
+      expect(gap, `${state} 出路行不应互相盖住`).toBeGreaterThanOrEqual(-1)
+    }
+    expect(stack.trailing, `${state} 最后一块贴着正文底部`).toBeLessThanOrEqual(40)
+    expect(stack.trailing, `${state} 最后一块仍在正文里面`).toBeGreaterThanOrEqual(-1)
+    const rows = page.locator('.rrp-exits .rrp-row')
+    await expect(rows).toHaveCount(exits[state].length)
+    for (const [index, title] of exits[state].entries()) {
+      await expect(rows.nth(index)).toContainText(title)
+    }
+    const minHeight = await rows.first().evaluate((el) => Number.parseFloat(getComputedStyle(el).minHeight))
+    expect(minHeight, `${state} 出路行最小高度`).toBeGreaterThanOrEqual(88)
+    const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
+    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+})
+
 test('assistant first screen keeps composer and send above the Qingxu navbar @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/assistant')
@@ -1857,6 +1994,35 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await expect(reportNote).toContainText('也不会发送给任何企业。')
   await expect(page.getByText('模拟练习结果，仅供练习参考，不代表任何用人单位的评价或录用意见。')).toBeVisible()
   await expect(page.getByRole('heading', { name: '和目标岗位要求的对照' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '报告与打印状态' })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('本场练习报告', { exact: true })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('报告包含的复盘区', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('interview-report-overview')).toBeVisible()
+  await expect(page.getByText('综合表现概览', { exact: true })).toBeVisible()
+  await expect(page.getByText('五项能力维度', { exact: true })).toBeVisible()
+  await expect(page.getByText('下一轮准备', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('interview-report-review')).toBeVisible()
+  await expect(page.getByText('风险点', { exact: true })).toBeVisible()
+  await expect(page.getByText('高频问题', { exact: true })).toBeVisible()
+  await expect(page.getByText('STAR 建议', { exact: true })).toBeVisible()
+  await expect(page.getByText('表达结构基本完整，仍需用真实数据补充结果。')).toHaveCount(2)
+  await expect(page.getByText('回答顺序清楚')).toBeVisible()
+  await expect(page.getByText('能联系目标岗位')).toBeVisible()
+  await expect(page.getByText('只保留本人真实经历')).toBeVisible()
+  await expect(page.getByText('术语使用基本准确')).toBeVisible()
+  await expect(page.getByText('能回应追问')).toBeVisible()
+  await expect(page.getByText('结果量化不足')).toBeVisible()
+  await expect(page.getByText('你的具体贡献是什么？')).toBeVisible()
+  await expect(page.getByText('核实个人职责')).toBeVisible()
+  await expect(page.getByText('用真实行动回答')).toBeVisible()
+  await expect(page.getByText('交代背景')).toBeVisible()
+  await expect(page.getByText('说明任务')).toBeVisible()
+  await expect(page.getByText('说明行动')).toBeVisible()
+  await expect(page.getByText('说明结果')).toBeVisible()
+  await expect(page.getByText('不要编造数据')).toBeVisible()
+  await expect(page.getByText('复核简历事实')).toBeVisible()
+  await expect(page.getByText('准备真实项目例子')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
   await expect(page.getByText('前端开发工程师 · 互联网/科技 · HR 面试')).toHaveCount(2)
   await expect(page.getByText('岗位匹配度参考')).toHaveCount(0)
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
@@ -1979,6 +2145,191 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await expect(alert).toBeVisible()
   await expect(alert).toBeInViewport()
   await expect(alert).toContainText('AI 服务暂停中')
+})
+
+test('interview setup grays voice turns when recognition is off @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/setup')
+  const voice = page.getByRole('button', { name: '语音回合（文字兜底）', exact: true })
+  await expect(voice).toBeVisible()
+  await expect(voice).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('这台机器的语音识别暂时没开，这一场先用文字答。')
+  await expect(page.getByRole('button', { name: '纯文字', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('interview expired screen lists what remains and can start over @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/session')
+  const status = page.getByRole('region', { name: '这场练习的状态' })
+  await expect(status).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('接下来', { exact: true })).toBeVisible()
+  await expect(page.locator('.iv-head').getByText('这一场留下了什么', { exact: true })).toBeVisible()
+  await expect(status.getByText('已过期', { exact: true })).toBeVisible()
+  await expect(status.getByText('已失效', { exact: true })).toBeVisible()
+  await expect(status.getByText('不受影响', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新创建一场练习' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看本人练习记录' })).toBeVisible()
+  await expect(page.getByText('登录后可以保存和查看自己的练习报告。', { exact: true })).toBeVisible()
+  for (const text of ['按系统记录保留', '不保留', '未生成则不会补生成', '按文件留存期限管理']) {
+    await expect(page.getByText(text, { exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: '重新创建练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+})
+
+test('interview report still shows answer excerpts when the print copy leaves them out @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, { status: 200, json: interviewReport })
+  api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_ID}/report`, {
+    status: 200,
+    json: {
+      data: {
+        ...interviewReport.data,
+        includeAnswersInPrint: false,
+        qaExcerpts: [{
+          question: '请讲一次你把库存差异查清楚的经历。',
+          answerExcerpt: '我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。',
+          skipped: false,
+        }],
+      },
+    },
+  })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=report/)
+  await expect(page.getByRole('heading', { name: '问答摘录' })).toBeVisible()
+  await expect(page.getByText('你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。')).toBeVisible()
+  await expect(page.getByText('我按货位把进出记录对了一遍，发现夜班记到了隔壁库位。')).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+})
+
+test('interview report unavailable offers three real exits @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const openUnavailable = async () => {
+    await page.goto('/interview/report')
+    await expect(page.locator('[data-interview-state="report-unavailable"]')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '报告不存在或已过期' })).toBeVisible()
+    await expect(page.locator('.iv-head').getByText('对上原因，再选一条路', { exact: true })).toBeVisible()
+    await expect(page.locator('.iv-head').getByText('不受影响的入口', { exact: true })).toBeVisible()
+    await expect(page.getByText('工作人员')).toHaveCount(0)
+    await expect(page.getByText('服务台')).toHaveCount(0)
+  }
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '还没有完成过练习' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=setup/)
+  await expect(page.locator('[data-kiosk-screen="interview-setup"]')).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '报告已过期或换了入口' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+
+  await openUnavailable()
+  await page.getByRole('button', { name: '当前账号没有访问权限' }).click()
+  await expect(page).toHaveURL(/\/interview\?stage=reports/)
+  await expect(page.getByRole('heading', { name: '登录后可保存练习报告' })).toBeVisible()
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+})
+
+test('interview AI outage still prints the practice sheet @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/mock-interviews', { status: 200, json: interviewCreated })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/start`, {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PAUSED', message: 'AI 服务暂停中' } },
+  })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/practice-sheet`, {
+    status: 200,
+    json: {
+      data: {
+        fileId: 'pair-sheet',
+        filename: '通用题目与答案单.pdf',
+        sizeBytes: 48_000,
+        pageCount: 2,
+        signedUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=preview',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        printFileUrl: '/api/v1/files/pair-sheet/content?expires=4102444800000&sig=sheet',
+        variant: 'degraded',
+        questionCount: 4,
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents: 200,
+      billablePages: 2,
+      billingPageSource: 'detected',
+      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }],
+    },
+  })
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await dialog.getByRole('button', { name: '交通运输、仓储和邮政业', exact: true }).click()
+  await dialog.getByRole('button', { name: '完成' }).click()
+  await chooseInterviewExperience(page)
+  await page.getByPlaceholder(/输入目标岗位/).fill('仓储主管')
+  await page.getByRole('button', { name: '创建并开始练习' }).click()
+  const down = page.locator('[data-interview-state="ai-down"]')
+  await expect(down).toBeVisible()
+  await expect(down.getByRole('region', { name: '当前能力状态' })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('不靠 AI 也能做的事', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('语音回合', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('恢复后才重新开放', { exact: true })).toBeVisible()
+  await expect(down.locator('.iv-head').getByText('能力边界', { exact: true })).toBeVisible()
+  await expect(down.getByRole('button', { name: '语音回合（文字兜底）', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('这台机器的语音识别暂时没开，这一场先用文字答。')
+  await expect(page.getByTestId('interview-mode-voice-reason')).toContainText('AI 面试官暂时不能出题')
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByRole('button', { name: '打印通用题目与答案单', exact: true }).click()
+  await expect(page).toHaveURL(/\/print\/confirm/)
+})
+
+test('interview report pending names its sections while generating @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, () => new Promise(() => {}))
+  await beginTextInterview(page)
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  const pending = page.locator('[data-interview-state="report-pending"]')
+  await expect(pending).toBeVisible()
+  await expect(pending.getByRole('region', { name: '报告生成状态' })).toBeVisible()
+  await expect(pending.locator('.iv-head').getByText('报告只归纳这些', { exact: true })).toBeVisible()
+  await expect(pending.locator('.iv-head').getByText('等待时可以先做', { exact: true })).toBeVisible()
+})
+
+test('interview network error names its sections after a failed submit @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.abort('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, 'internetdisconnected')
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  const failed = page.locator('[data-interview-state="network-error"]')
+  await expect(failed).toBeVisible()
+  await expect(failed.getByRole('region', { name: '本次提交状态' })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('重试提交本题', { exact: true })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('这三种结果分别意味着', { exact: true })).toBeVisible()
+  await expect(failed.locator('.iv-head').getByText('不想重试的话', { exact: true })).toBeVisible()
+})
+
+test('interview tips AI advisor opens the assistant @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+  await page.goto('/interview?stage=tips')
+  await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toBeVisible()
+  await expect(page.getByTestId('interview-primary')).toHaveText(/设置一场练习/)
+  await expect(page.getByText('工作人员')).toHaveCount(0)
+  await expect(page.getByText('服务台')).toHaveCount(0)
+  await page.getByTestId('interview-ai-advisor').click()
+  await expect(page).toHaveURL(/\/assistant/)
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
 })
 
 const COVERED_EVIDENCE = '我做过两年社群运营，最多同时管 6 个群'
@@ -2204,179 +2555,248 @@ test('advisor artifact content state opens my documents @w3-kiosk', async ({ pag
   expect(runtimeErrors).toEqual([])
 })
 
-// 真实产物常常只有两三条。条目写具体的事，量的是相邻区块的空隙，不是「测试」占位。
-const SPARSE_PIN_TEXT = [
-  '面试时先说清自己在仓储实习里负责的盘点流程',
-  '投递前把成绩单和英语四级证书扫成一份 PDF',
-  '简历里的仓储实习写了盘点和出库核对，面试时可以按这个顺序讲',
-  '被问到为什么看文员岗时，可以把重点放在核对细、能坐得住',
-] as const
+type Pin = { content: string; evidenceLevel: 'E1' | 'E2' | 'E3'; sourceNote: string }
 
-const SPARSE_PIN_NOTES = [
-  '来源：你在第 3 轮说的原话',
-  '来源：你在第 6 轮说的原话',
-  '来源：本机已有的简历诊断结果',
-  'AI 的建议，仅供参考 —— 说不说、怎么说由你定',
-] as const
+// 真实「保存本次要点」的产出：服务端把对话浓缩成要点与待办，全是 E3；每条最长 80 字。
+const ADVISOR_REAL: Pin[] = [
+  { content: '你问到：我想找一份物流仓储方面的暑期实习，面试的时候怎么介绍自己比较好？', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '自我介绍先说专业和年级，再说在学校快递站做过三个月分拣和盘点，最后说能接受倒班。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '被问到为什么选仓储，可以说自己做事细、坐得住，盘点时很少出错。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '面试前把快递站那段经历补进简历的实践经历里，写清每天处理多少件。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '薪资先问清是按天还是按月结，有没有餐补和夜班补贴，再决定去不去。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '实习协议签之前看清有没有写工作地点、每天几小时和意外险由谁买。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '面试当天带身份证、学生证和两份打印好的简历，提前十分钟到。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+  { content: '如果对方问能做多久，照实说暑假两个月，开学前一周离岗。', evidenceLevel: 'E3', sourceNote: '由本次对话浓缩，仅供参考' },
+]
+const ADVISOR_TODO: Pin[] = [
+  { content: '待办：按小青的建议更新简历后，再到打印页打印一份核对', evidenceLevel: 'E3', sourceNote: '待办（请自行核对后执行）' },
+  { content: '待办：把成绩单和英语四级证书扫成一份 PDF，面试时一起带上', evidenceLevel: 'E3', sourceNote: '待办（请自行核对后执行）' },
+  { content: '待办：查一下去仓库的公交线路，算好路上要多久', evidenceLevel: 'E3', sourceNote: '待办（请自行核对后执行）' },
+  { content: '待办：把快递站实践经历补进简历，核对每天处理的件数', evidenceLevel: 'E3', sourceNote: '待办（请自行核对后执行）' },
+  { content: '待办：签实习协议前核对工作时间和意外险安排', evidenceLevel: 'E3', sourceNote: '待办（请自行核对后执行）' },
+]
+// 稿上的四条（与并排夹具 p52.ts 相同）。
+const ADVISOR_PROTO: Pin[] = [
+  { content: '我做过两年社群运营，最多同时管 6 个群。', evidenceLevel: 'E1', sourceNote: '来源：你在第 2 轮说的原话' },
+  { content: '你在本机的简历里写了「用户增长」相关经历，可以在面试里直接引用。', evidenceLevel: 'E2', sourceNote: '来源：本机已有的简历诊断结果' },
+  { content: '被问到离职原因时，可以把重点放在「想做更靠近用户的岗位」。', evidenceLevel: 'E3', sourceNote: 'AI 的建议，仅供参考 —— 说不说、怎么说由你定' },
+  { content: '我能接受青岛市内通勤，不接受长期出差。', evidenceLevel: 'E1', sourceNote: '来源：你在第 5 轮说的原话' },
+]
 
-const SPARSE_PIN_LEVELS = ['E1', 'E1', 'E2', 'E3'] as const
-
-function sparsePins(count: number) {
-  return Array.from({ length: count }, (_, index) => ({
-    content: SPARSE_PIN_TEXT[index % SPARSE_PIN_TEXT.length]!,
-    evidenceLevel: SPARSE_PIN_LEVELS[index % SPARSE_PIN_LEVELS.length]!,
-    sourceNote: SPARSE_PIN_NOTES[index % SPARSE_PIN_NOTES.length]!,
-  }))
-}
-
-function qaPinsSession(sessionId: string, count: number) {
+function qaPinsSession(sessionId: string, pins: Pin[]) {
   return {
-    sessionId,
-    expiresAt: '2099-01-01T00:00:00.000Z',
+    sessionId, expiresAt: '2099-01-01T00:00:00.000Z',
     artifacts: [{
-      artifactId: `${sessionId}-art`,
-      kind: 'qa_pins',
-      status: 'completed',
-      payload: { kind: 'qa_pins', title: '你钉住的条目', pins: sparsePins(count) },
-      provider: 'llm:deepseek',
-      printedFileId: null,
-      createdAt: '2026-10-06T00:00:00.000Z',
-      updatedAt: '2026-10-06T00:00:00.000Z',
-      expiresAt: '2099-01-01T00:00:00.000Z',
+      artifactId: `${sessionId}-art`, kind: 'qa_pins', status: 'completed',
+      payload: { kind: 'qa_pins', title: '小青本次要点', pins },
+      provider: 'llm:deepseek', printedFileId: null,
+      createdAt: '2026-10-06T00:00:00.000Z', updatedAt: '2026-10-06T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
     }],
   }
 }
 
-/** 相邻区块：上一块下沿到下一块上沿。舞台缩放后的屏幕像素要除回 CSS 像素。 */
-async function readAdvisorBandGaps(page: Page) {
+/** 条目文字（含出处）的实际间距，不把行容器的增长误当成空卡片。 */
+async function readAdvisorContentLayout(page: Page) {
   const scale = await readEnabledStageScale(page)
-  const raw = await page.evaluate(() => {
-    const pick = (selector: string) => document.querySelector(selector)
-    const box = (node: Element) => {
-      const rect = node.getBoundingClientRect()
-      return { top: rect.top, bottom: rect.bottom, height: rect.height }
-    }
-    const named = [
-      ['.aa-hero', '横幅'],
-      ['.aa-legend', '图例'],
-      ['[data-testid="advisor-artifact-qa"]', '01'],
-      ['[data-testid="advisor-artifact-take"]', '带走'],
-      ['.qx-ctabar', '底栏'],
-      ['.qx-navbar', '导航'],
-    ] as const
-    const blocks = named.flatMap(([selector, name]) => {
-      const node = pick(selector)
-      return node ? [{ name, ...box(node) }] : []
-    })
-    const card = pick('[data-testid="advisor-artifact-qa"]') as HTMLElement | null
-    const body = pick('.aa-body') as HTMLElement | null
-    const scroll = card?.querySelector('.aa-scroll') as HTMLElement | null
-    const header = card?.querySelector('.aa-sec-h')
-    const pins = [...(card?.querySelectorAll('.aa-pin') ?? [])].map(box)
+  return page.evaluate((scale) => {
+    const node = (selector: string) => document.querySelector<HTMLElement>(selector)!
+    const box = (selector: string) => node(selector).getBoundingClientRect()
+    const qa = box('.aa-qa'), take = box('.aa-take'), paper = box('.aa-paper')
+    const takeTitle = box('.aa-take-tx > .aa-sec-h'), has = box('.aa-take-tx > .aa-has')
+    const steps = document.querySelector('.aa-take-tx > .aa-steps')?.getBoundingClientRect()
+    const warn = document.querySelector('.aa-take-tx > .aa-warn')?.getBoundingClientRect()
+    const body = node('.aa-body'), list = node('.aa-qa .aa-scroll')
+    const hint = document.querySelector('[data-testid="advisor-artifact-one-pin-hint"]')?.getBoundingClientRect()
+    const pins = [...list.querySelectorAll('.aa-pin')].map((pin) => pin.getBoundingClientRect())
+    const texts = [...list.querySelectorAll('.aa-pin')].map((pin) => ({
+      top: pin.querySelector('.aa-pin-c')!.getBoundingClientRect().top,
+      bottom: (pin.querySelector('.aa-pin-s') ?? pin.querySelector('.aa-pin-c'))!.getBoundingClientRect().bottom,
+    }))
+    const css = (value: number) => value / scale
     return {
-      justify: body ? getComputedStyle(body).justifyContent : '',
-      blocks,
-      pins,
-      cardHeight: card ? card.getBoundingClientRect().height : 0,
-      headerBottom: header ? header.getBoundingClientRect().bottom : 0,
-      bodyBottom: body ? body.getBoundingClientRect().bottom : 0,
-      bodyScroll: body?.scrollHeight ?? 0,
-      bodyClient: body?.clientHeight ?? 0,
-      scrollScroll: scroll?.scrollHeight ?? 0,
-      scrollClient: scroll?.clientHeight ?? 0,
-      takeHeight: (pick('[data-testid="advisor-artifact-take"]') as HTMLElement | null)?.offsetHeight ?? 0,
-      barHeight: (pick('.qx-ctabar') as HTMLElement | null)?.offsetHeight ?? 0,
-      navHeight: (pick('.qx-navbar') as HTMLElement | null)?.offsetHeight ?? 0,
+      top: css(qa.top - box('.aa-legend').bottom),
+      mid: css(take.top - qa.bottom), bot: css(box('.qx-ctabar').top - take.bottom),
+      cardTail: css(qa.bottom - pins[pins.length - 1]!.bottom),
+      hintTail: hint ? css(qa.bottom - hint.bottom) : null,
+      textGaps: texts.slice(1).map((text, index) => css(text.top - texts[index]!.bottom)),
+      paperWidth: css(paper.width), paperHeight: css(paper.height),
+      titleToSteps: steps ? css(steps.top - takeTitle.bottom) : null,
+      stepsToHas: steps ? css(has.top - steps.bottom) : null,
+      hasBottomToPaper: css(has.bottom - paper.bottom),
+      hasToWarn: warn ? css(warn.top - has.bottom) : null,
+      warnBottomToPaper: warn ? css(warn.bottom - paper.bottom) : null,
+      bodyOverflow: body.scrollHeight - body.clientHeight, listOverflow: list.scrollHeight - list.clientHeight,
+      bodyTop: body.getBoundingClientRect().top, firstTop: pins[0]!.top,
+      firstBottom: pins[0]!.bottom, bodyBottom: body.getBoundingClientRect().bottom,
+      barHeight: css(box('.qx-ctabar').height), navHeight: css(box('.qx-navbar').height),
     }
-  })
-  const css = (px: number) => px / scale
-  const gaps = raw.blocks.slice(1).map((block, index) => ({
-    from: raw.blocks[index]!.name,
-    to: block.name,
-    gap: css(block.top - raw.blocks[index]!.bottom),
-  }))
-  const pinGaps = raw.pins.slice(1).map((pin, index) => css(pin.top - raw.pins[index]!.bottom))
-  const itemsHeight = raw.pins.length >= 2
-    ? css(raw.pins[raw.pins.length - 1]!.bottom - raw.pins[0]!.top)
-    : css(raw.pins[0]?.height ?? 0)
-  return {
-    justify: raw.justify,
-    gaps,
-    pinGaps,
-    cardHeight: css(raw.cardHeight),
-    itemsHeight,
-    headerToFirstPin: raw.pins.length ? css(raw.pins[0]!.top - raw.headerBottom) : 0,
-    trailing: css(raw.bodyBottom - (raw.blocks.find((block) => block.name === '带走')?.bottom ?? raw.bodyBottom)),
-    bodyOverflow: raw.bodyScroll - raw.bodyClient,
-    scrollOverflow: raw.scrollScroll - raw.scrollClient,
-    takeHeight: raw.takeHeight,
-    barHeight: raw.barHeight,
-    navHeight: raw.navHeight,
-  }
+  }, scale)
 }
 
-test('advisor artifact sparse pins stack from the top without open bands @w3-kiosk', async ({ page, api }) => {
+test('advisor artifact plans leftover height into content at every pin count @w3-kiosk', async ({ page, api }) => {
+  test.setTimeout(120_000)
   const runtimeErrors: string[] = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
   terminalBaseline(api)
-
-  for (const count of [2, 4]) {
-    const sessionId = `w3-pin-${count}`
-    api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, {
-      status: 200,
-      json: qaPinsSession(sessionId, count),
+  const cases = [
+    { name: '1 条', pins: [ADVISOR_REAL[0]!] },
+    { name: '2 条', pins: [ADVISOR_REAL[0]!, ADVISOR_TODO[0]!] },
+    { name: '3 条', pins: [ADVISOR_REAL[0]!, ADVISOR_REAL[1]!, ADVISOR_TODO[0]!] },
+    { name: '4 条稿四条', pins: ADVISOR_PROTO },
+    { name: '4 条有换行', pins: [...ADVISOR_REAL.slice(0, 3), ADVISOR_TODO[0]!] },
+    { name: '5 条', pins: [...ADVISOR_REAL.slice(0, 3), ...ADVISOR_TODO.slice(0, 2)] },
+    { name: '8 条', pins: [...ADVISOR_REAL.slice(0, 6), ...ADVISOR_TODO.slice(0, 2)] },
+    { name: '13 条', pins: [...ADVISOR_REAL, ...ADVISOR_TODO] },
+  ]
+  let shell: { barHeight: number; navHeight: number } | undefined
+  for (const [index, item] of cases.entries()) {
+    await test.step(item.name, async () => {
+      const sessionId = `w3-content-${index}`
+      api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, item.pins) })
+      await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+      await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'qa-pins')
+      await expect(page.locator('.aa-pin')).toHaveCount(item.pins.length)
+      await expect(page.getByTestId('advisor-artifact-cta-print')).toBeEnabled()
+      await page.evaluate(() => document.fonts.ready)
+      const layout = await readAdvisorContentLayout(page)
+      const count = item.pins.length
+      if (count === 1) {
+        const hint = page.getByTestId('advisor-artifact-one-pin-hint')
+        await expect(hint).toBeVisible()
+        await expect(hint).toHaveText(/^这次只留下了 1 条/)
+        expect(layout.hintTail, '1 条：01 卡不拉空，卡片下沿贴近提示句').not.toBeNull()
+        expect(layout.hintTail!, '1 条：卡片下沿 − 提示句下沿 ≤ 34px').toBeLessThanOrEqual(34)
+        await assertNoLargeBlankBands(page, item.name)
+      } else {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
+        expect(layout.cardTail, `${item.name}：01 卡不拉空`).toBeLessThanOrEqual(34)
+      }
+      if (count >= 2 && count <= 5) {
+        await assertNoLargeBlankBands(page, item.name)
+        expect(layout.bodyOverflow, `${item.name}：正文不滚`).toBeLessThanOrEqual(2)
+        expect(Math.max(...layout.textGaps) - Math.min(...layout.textGaps), `${item.name}：相邻文字等距`).toBeLessThanOrEqual(2)
+        expect(layout.textGaps.every((gap) => gap >= 51 && gap <= 133), '条目文字间距不超过增长上限').toBe(true)
+        expect(Math.abs(layout.paperWidth / layout.paperHeight / (210 / 297) - 1), '纸样保持 A4 比例').toBeLessThan(0.01)
+        expect(layout.paperWidth, '纸样宽度下限').toBeGreaterThanOrEqual(219.5)
+        expect(layout.paperWidth, '纸样宽度上限').toBeLessThanOrEqual(420.5)
+        expect(layout.mid, '01 到带走间距下限').toBeGreaterThanOrEqual(20)
+        expect(layout.mid, '01 到带走间距上限').toBeLessThanOrEqual(48)
+        if (count === 2 || count === 3) {
+          expect(layout.titleToSteps, `${item.name}：标题到两步留有间隔`).toBeGreaterThan(0)
+          expect(layout.stepsToHas, `${item.name}：两步到说明留有间隔`).toBeGreaterThan(0)
+          expect(layout.titleToSteps, `${item.name}：先增长两步到说明的间距`).toBeLessThanOrEqual(layout.stepsToHas!)
+        }
+        if (item.name === '4 条稿四条') {
+          for (const [actual, target] of [[layout.top, 46], [layout.mid, 46], [layout.bot, 25]]) {
+            expect(Math.abs(actual! - target!), '稿四条间距与原稿一致').toBeLessThanOrEqual(3)
+          }
+          expect(Math.abs(layout.paperWidth - 300), '稿四条纸样宽 300').toBeLessThanOrEqual(2)
+          expect(layout.titleToSteps, '稿四条两步紧跟标题，间距下限 14px').toBeGreaterThanOrEqual(14)
+          expect(layout.titleToSteps, '稿四条两步紧跟标题，间距上限 18px').toBeLessThanOrEqual(18)
+          expect(Math.abs(layout.hasBottomToPaper), '稿四条打印稿说明和纸样下沿对齐').toBeLessThanOrEqual(2)
+          shell = layout
+        }
+      } else if (count > 5) {
+        expect(layout.bodyOverflow, `${item.name}：正文整页滚动`).toBeGreaterThan(40)
+        expect(layout.listOverflow, '条目列表自己不滚').toBeLessThanOrEqual(2)
+        expect(layout.firstTop, '顶部第一条完整露出').toBeGreaterThanOrEqual(layout.bodyTop)
+        expect(layout.firstBottom, '第一条下沿在正文可见区内').toBeLessThanOrEqual(layout.bodyBottom)
+        expect(Math.abs(layout.paperWidth - 220), '长正文纸样缩到 220').toBeLessThanOrEqual(2)
+        expect(layout.barHeight, '底栏保持原高').toBeCloseTo(shell!.barHeight, 0)
+        expect(layout.navHeight, '导航保持原高').toBeCloseTo(shell!.navHeight, 0)
+        const end = await page.evaluate(() => {
+          const body = document.querySelector<HTMLElement>('.aa-body')!
+          body.scrollTop = body.scrollHeight
+          const take = document.querySelector('.aa-take')!.getBoundingClientRect()
+          return { top: take.top, bottom: take.bottom, bodyTop: body.getBoundingClientRect().top, bodyBottom: body.getBoundingClientRect().bottom, barTop: document.querySelector('.qx-ctabar')!.getBoundingClientRect().top }
+        })
+        expect(end.top, '滚到底带走卡上沿完整露出').toBeGreaterThanOrEqual(end.bodyTop)
+        expect(end.bottom, '滚到底带走卡下沿完整露出').toBeLessThanOrEqual(end.bodyBottom + 1)
+        expect(end.bottom, '底栏不盖住带走卡').toBeLessThanOrEqual(end.barTop + 1)
+      }
     })
-    await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
-    await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'qa-pins')
-    await expect(page.getByTestId('advisor-artifact-qa')).toBeVisible()
-    await expect(page.locator('.aa-pin')).toHaveCount(count)
-    await expect(page.getByText(SPARSE_PIN_TEXT[0])).toBeVisible()
-    const stack = await readAdvisorBandGaps(page)
-    // 01 卡用 flex-grow 吃掉余高之后，单看空隙分不出 space-evenly。
-    // 计算样式钉住 .aa-body：改回 space-evenly 时这条必须红。
-    expect(stack.justify, `${count} 条时正文从上往下排`).toBe('flex-start')
-    for (const band of stack.gaps) {
-      expect(band.gap, `${count} 条时「${band.from}」到「${band.to}」的空隙不超过 40px，量到 ${band.gap.toFixed(1)}`).toBeLessThanOrEqual(40)
-      expect(band.gap, `${count} 条时「${band.from}」不应盖住「${band.to}」`).toBeGreaterThanOrEqual(-1)
-    }
-    for (const gap of stack.pinGaps) {
-      expect(gap, `${count} 条时条目之间不拉开`).toBeLessThanOrEqual(40)
-    }
-    expect(stack.headerToFirstPin, `${count} 条时第一条贴着标题往下排`).toBeLessThanOrEqual(40)
-    expect(stack.headerToFirstPin, `${count} 条时标题不盖住第一条`).toBeGreaterThanOrEqual(-1)
-    expect(stack.cardHeight, `${count} 条时 01 卡片高于条目本身，余高在卡片里`).toBeGreaterThanOrEqual(stack.itemsHeight)
-    expect(stack.trailing, `${count} 条时带走区贴着正文底部，余高不堆在区块下面`).toBeLessThanOrEqual(40)
-    expect(stack.bodyOverflow, `${count} 条时一屏放得下，不应先滚`).toBeLessThanOrEqual(2)
-    expect(stack.barHeight, '底栏保持原高').toBeGreaterThanOrEqual(90)
-    expect(stack.navHeight, '导航保持原高').toBeGreaterThanOrEqual(100)
   }
+  for (const item of cases.slice(0, 3)) {
+    await test.step(`真实会话${item.name}，导航标明打印读不到`, async () => {
+      const sessionId = `w3-content-unavailable-${item.pins.length}`
+      api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, item.pins) })
+      await page.goto('/ai/plan')
+      await page.evaluate((sessionId) => {
+        history.pushState({ usr: { printUnavailableReason: '打印状态暂时读不到' }, key: 'k', idx: 1 }, '', `/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }, sessionId)
+      await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
+      await expect(page.locator('.aa-pin')).toHaveCount(item.pins.length)
+      expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`), '确实读取真实会话接口，不用预览夹具态冒充').toBeGreaterThan(0)
+      await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+      await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+      if (item.pins.length === 1) {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toBeVisible()
+      } else {
+        await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
+      }
+      await assertNoLargeBlankBands(page, `打印读不到${item.name}`)
+    })
+  }
+  await test.step('打印读不到稿四条，说明紧挨提示框并贴底', async () => {
+    await page.goto('/ai/plan?state=print-unavailable&capture=1')
+    await expect(page.locator('[data-kiosk-screen="advisor-artifact"]')).toHaveAttribute('data-state', 'print-unavailable')
+    await expect(page.locator('.aa-pin')).toHaveCount(4)
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveCount(0)
+    await expect(page.getByTestId('advisor-artifact-print-unavailable')).toBeVisible()
+    await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
+    await page.evaluate(() => document.fonts.ready)
+    const layout = await readAdvisorContentLayout(page)
+    expect(layout.hasToWarn, '说明和提示框不重叠').toBeGreaterThanOrEqual(0)
+    expect(layout.hasToWarn, '说明紧挨提示框，间隔不超过 6px').toBeLessThanOrEqual(6)
+    expect(Math.abs(layout.warnBottomToPaper!), '提示框和纸样下沿对齐').toBeLessThanOrEqual(2)
+    await assertNoLargeBlankBands(page, '打印读不到稿四条')
+  })
+  expect(runtimeErrors).toEqual([])
+})
 
-  const manyId = 'w3-pin-many'
-  api.respond('GET', `/api/v1/advisor/sessions/${manyId}`, {
-    status: 200,
-    json: qaPinsSession(manyId, 12),
+test('advisor artifact one-pin hint tells the truth about asking again @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  const sessionId = 'w3-one-pin-hint'
+  api.respond('GET', `/api/v1/advisor/sessions/${sessionId}`, { status: 200, json: qaPinsSession(sessionId, [ADVISOR_REAL[0]!]) })
+  const chatSessionIds: string[] = []
+  await page.route('**/api/v1/assistant/chat', async (route) => {
+    const body = route.request().postDataJSON() as { sessionId: string }
+    chatSessionIds.push(body.sessionId)
+    await route.fulfill({ json: { ...assistantReply, sessionId: body.sessionId } })
   })
-  await page.goto(`/ai/plan?sessionId=${manyId}&artifactId=${manyId}-art`)
-  await expect(page.locator('.aa-pin')).toHaveCount(12)
-  const crowded = await readAdvisorBandGaps(page)
-  expect(crowded.bodyOverflow, '条目多到放不下时由正文区整页滚动').toBeGreaterThan(40)
-  expect(crowded.scrollOverflow, '条目多时不改成卡片内部滚动').toBeLessThanOrEqual(2)
-  expect(crowded.takeHeight, '带走区不被压扁').toBeGreaterThanOrEqual(180)
-  expect(crowded.barHeight, '底栏不被挤掉').toBeGreaterThanOrEqual(90)
-  expect(crowded.navHeight, '导航不被挤掉').toBeGreaterThanOrEqual(100)
-  const covered = await page.evaluate(() => {
-    const body = document.querySelector('.aa-body') as HTMLElement | null
-    const take = document.querySelector('[data-testid="advisor-artifact-take"]')
-    const bar = document.querySelector('.qx-ctabar')
-    if (!body || !take || !bar) return null
-    body.scrollTop = body.scrollHeight
-    const takeBox = take.getBoundingClientRect()
-    const barBox = bar.getBoundingClientRect()
-    return { takeBottom: takeBox.bottom, barTop: barBox.top, barHeight: barBox.height }
-  })
-  expect(covered, '滚到底之后仍能量到底栏和带走区').not.toBeNull()
-  expect(covered!.barHeight, '滚到底栏仍在').toBeGreaterThanOrEqual(90)
-  expect(covered!.barTop - covered!.takeBottom, '底栏不盖住带走区').toBeGreaterThanOrEqual(-1)
+
+  for (const [index, question] of ['如何整理项目经历？', '再给一个建议'].entries()) {
+    await page.goto(`/ai/plan?sessionId=${sessionId}&artifactId=${sessionId}-art`)
+    await expect(page.locator('.aa-pin')).toHaveCount(1)
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toBeVisible()
+    await expect(page.getByTestId('advisor-artifact-one-pin-hint')).toHaveText(/^这次只留下了 1 条/)
+    expect(api.requestCount('GET', `/api/v1/advisor/sessions/${sessionId}`)).toBeGreaterThan(0)
+    await page.getByRole('button', { name: '再问一轮', exact: true }).click()
+    await page.waitForURL((url) => url.pathname === '/assistant')
+    const assistant = page.locator('[data-kiosk-screen="assistant"]')
+    await expect(assistant).toBeVisible()
+    // 新的一场：停在还没问过的默认态。这时对话区还没挂出来，所以气泡按整页数，不能只在对话区里数。
+    await expect(page.getByTestId('ai-cockpit-state-default')).toBeVisible()
+    await expect(page.locator('[data-message-role]')).toHaveCount(0)
+    await expect(assistant).not.toContainText(ADVISOR_REAL[0]!.content)
+    if (index === 1) {
+      await expect(assistant).not.toContainText('如何整理项目经历？')
+      await expect(assistant).not.toContainText(assistantReply.reply)
+    }
+    await page.getByLabel('输入咨询问题').fill(question)
+    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    const transcript = page.locator('.assistant-transcript')
+    await expect(transcript.locator('[data-message-kind="ai"]')).toContainText(assistantReply.reply)
+    await expect(transcript.locator('[data-message-role="user"]')).toContainText(question)
+    expect(chatSessionIds).toHaveLength(index + 1)
+    expect(chatSessionIds[index]).toEqual(expect.any(String))
+    expect(chatSessionIds[index]!.length).toBeGreaterThan(0)
+    expect(chatSessionIds[index]).not.toBe(sessionId)
+  }
+  expect(chatSessionIds[0]).not.toBe(chatSessionIds[1])
   expect(runtimeErrors).toEqual([])
 })
 
@@ -2540,7 +2960,8 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await page.goto('/resume/job-fit/actions')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'missing-task')
-  await expect(page.getByText('请先完成一次岗位匹配参考').first()).toBeVisible()
+  // 稿 46（9/29）把用户可见的「岗位匹配参考」改成「简历对照」。路由与接口名不变。
+  await expect(page.getByText('请先完成一次简历对照').first()).toBeVisible()
   await captureDecisionViewports(page, 'actions-missing-task')
 
   api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 200, json: ACTIONS_RESULT })
@@ -2580,7 +3001,7 @@ test('job fit actions: a print result arriving after leaving does not hijack nav
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await captureDecisionViewports(page, 'actions-print-pending')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回对照结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   releasePrint!()
   await expect.poll(() => api.requestCount('POST', '/api/v1/resume/job-fit/t-act/print')).toBe(1)
@@ -2804,7 +3225,9 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await page.getByRole('button', { name: /手机扫码/ }).click()
   await expect.poll(() => creates).toBe(1)
   try {
+    await page.getByRole('button', { name: '回到来源选择' }).click()
     await page.getByRole('button', { name: /本机文件/ }).click()
+    await page.getByRole('button', { name: '回到来源选择' }).click()
     await page.getByRole('button', { name: /手机扫码/ }).click()
   } finally {
     release()
@@ -2995,9 +3418,13 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   const localCard = page.getByTestId('resume-local-file-card')
   await expect(localCard).toBeEnabled()
   await expect(localCard).not.toContainText(KIOSK_LOCAL_REASON)
-  const chooser = page.waitForEvent('filechooser')
   await localCard.click()
+  await expect(page.getByRole('button', { name: '打开文件选择' })).toBeVisible()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: '打开文件选择' }).click()
   await (await chooser).setFiles([])
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
 
   await page.getByRole('button', { name: '设置诊断方向与目标背景' }).click()
   await expect(root).toHaveAttribute('data-screen', 'target')
@@ -3151,4 +3578,124 @@ test('T21b confirm screen, pinned sendoff, industry label and first-screen exits
   expect(unknownText).not.toContain('工作人员')
   expect(unknownText).not.toContain('服务台')
   await expect(page.getByRole('button', { name: '找现场工作人员' })).toHaveCount(0)
+})
+
+async function routeT21cUsb(page: Page, mode: 'list' | 'read-failed' | 'offline'): Promise<void> {
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const origin = new URL(page.url()).origin
+    const headers = {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers })
+      return
+    }
+    if (mode === 'offline') {
+      await route.abort('failed')
+      return
+    }
+    if (mode === 'read-failed') {
+      await route.fulfill({ status: 500, headers, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'USB_READ_FAILED', message: '读盘失败' } }) })
+      return
+    }
+    const path = new URL(request.url()).pathname
+    const present = true
+    if (path.endsWith('/status')) {
+      await route.fulfill({ status: 200, headers, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present, driveLabel: 'RESUME' } }) })
+      return
+    }
+    await route.fulfill({
+      status: 200, headers, contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { present, driveLabel: 'RESUME', files: [{ safeId: 't21c-sun', filename: '孙晓雯-仓储主管简历.pdf', extension: '.pdf', sizeBytes: 892_416 }] } }),
+    })
+  })
+}
+
+async function expectChannelHasNoStaff(page: Page): Promise<void> {
+  const text = withoutKnownStaffSentences(await page.locator('[data-kiosk-screen="resume-source"]').innerText())
+  expect(text).not.toContain('工作人员')
+  expect(text).not.toContain('服务台')
+  await expect(page.getByRole('button', { name: '找现场工作人员' })).toHaveCount(0)
+}
+
+test('T21c channel screens enter and return, and dead ends have an exit @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await routeT21cUsb(page, 'list')
+  await page.goto('/resume/source')
+  const root = page.locator('[data-kiosk-screen="resume-source"]')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'usb-list')
+  await expect(page.getByRole('button', { name: /孙晓雯-仓储主管简历\.pdf/ })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await page.unroute('http://127.0.0.1:9527/local/usb/**')
+  await routeT21cUsb(page, 'read-failed')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'usb-read-failed')
+  await expect(page.getByRole('button', { name: '重新读一次 U 盘' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await page.getByRole('button', { name: /本机文件/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'local-guide')
+  await expect(page.getByRole('button', { name: '打开文件选择' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: {
+    sessionId: 't21c-phone', uploadUrl: '/upload/phone', uploadToken: 't21c-upload', controlToken: 't21c-control', expiresAt: '2099-01-01T00:00:00.000Z',
+  } } })
+  api.respond('GET', '/api/v1/upload-sessions/t21c-phone', { status: 200, json: { success: true, data: {
+    sessionId: 't21c-phone', status: 'expired', purpose: 'resume_upload', mode: 'temporary',
+    file: null, requiresKioskConfirmation: false, expiresAt: '2000-01-01T00:00:00.000Z',
+  } } })
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await expect(root).toHaveAttribute('data-state', 'phone')
+  await expect(page.getByText('二维码已过期', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '刷新二维码' })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await page.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+
+  await setReactRouterState(page, '/resume/source', {
+    scanHandoff: {
+      fileId: 'file-t21c-scan',
+      file: { name: '孙晓雯-仓储主管简历.pdf', size: 892_416, format: 'pdf', fileUrl: '/w3-fixtures/sun-scan.pdf', mimeType: 'application/pdf' },
+    },
+  })
+  await expect(root).toHaveAttribute('data-state', 'scan-ready')
+  const scan = page.getByRole('region', { name: '扫描件交接' })
+  await expect(scan.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
+  await expect(scan.getByText('孙晓雯-仓储主管简历.pdf', { exact: true })).toBeVisible()
+  await expectChannelHasNoStaff(page)
+  await scan.getByRole('button', { name: '回到来源选择' }).click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
+  await expect(page.getByText('孙晓雯-仓储主管简历.pdf', { exact: true })).toHaveCount(0)
+})
+
+test('T21c usb offline screen keeps a way back to source choice @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await routeT21cUsb(page, 'offline')
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  const root = page.locator('[data-kiosk-screen="resume-source"]')
+  await expect(root).toHaveAttribute('data-state', 'usb-agent-offline')
+  await expect(page.getByRole('button', { name: '重试读 U 盘' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '改用手机扫码' })).toBeVisible()
+  const back = page.getByRole('button', { name: '回到来源选择' })
+  await expect(back).toHaveCount(1)
+  await expectChannelHasNoStaff(page)
+  await back.click()
+  await expect(root).toHaveAttribute('data-state', 'source')
+  await expect(page.getByTestId('resume-source-cards')).toBeVisible()
 })

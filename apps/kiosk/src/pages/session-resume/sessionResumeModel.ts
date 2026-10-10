@@ -1,5 +1,6 @@
 import type { OrderPayStatus } from '@ai-job-print/shared'
 import type { PendingPrintStatus, PendingTask } from '../../services/api/pendingTasks'
+import { helpNeededLine, peekSupportContact } from '../../copy/unattendedCopy'
 
 export type ResumeDest = 'payment' | 'print-progress'
 export type ResumeScreen = 'loading' | 'empty' | 'unavailable' | 'list'
@@ -104,8 +105,16 @@ export const RESUME_EMPTY_EXITS = [
   { id: 'help', title: '刚下过单却看不到', sub: '先确认是不是用另一个手机号建的单；这里只列当前登录账号名下的任务。', route: '/help' },
 ] as const
 
-export const RESUME_UNAVAILABLE_EXITS = [
-  { id: 'code', title: '用到机码继续', sub: '到机码还在有效期内、且就在这台机器上核销时，可以绕开这一页。', route: '/print/pickup-claim' },
-  { id: 'records', title: '去我的记录看看', sub: '打印订单和状态在我的记录里，同样能确认这一单还在不在。', route: '/me/activity' },
-  { id: 'help', title: '一直读不出来', sub: '按常见问题里的方式找现场工作人员，请他们帮你核对这一单的真实状态。', route: '/help' },
-] as const
+export function resumeUnavailableExits() {
+  return [
+    { id: 'code', title: '用到机码继续', sub: '到机码还在有效期内、且就在这台机器上核销时，可以绕开这一页。', route: '/print/pickup-claim' },
+    { id: 'records', title: '去我的记录看看', sub: '打印订单和状态在我的记录里，同样能确认这一单还在不在。', route: '/me/activity' },
+    { id: 'help', title: '一直读不出来', sub: `先停在这一页。${helpNeededLine()}。`, route: '/help' },
+  ] as const
+}
+
+/** 「手机上已经下过单」只在小程序已发布时出现。 */
+export function resumeEmptyExits() {
+  const published = peekSupportContact().miniappPublished
+  return RESUME_EMPTY_EXITS.filter((item) => item.id !== 'code' || published)
+}

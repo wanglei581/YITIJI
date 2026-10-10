@@ -283,6 +283,40 @@ async function main() {
       assert(okDraft.draft.includes('3 条') && okDraft.blanks.length === 1,
         'E1 正向：只用用户提供过的数字 → 通过，留白如实标出')
 
+      // 提醒属于问答；成稿数字校验不为提醒开例外。
+      const policyReminder = '以官方发布的原文和经办窗口的审核为准，可拨打 12333 咨询；在一体机上可到首页「查政策」看本机构发布的原文。'
+      assert(!JSON.stringify(slots).includes('12333'), 'E1 政策提醒 fixture：用户槽位没有热线数字')
+      const hotlineReminderDraft = JSON.stringify({
+        draft: `政策申请需核实当地原文。${policyReminder}`, blanks: [], summary: '请核实原文',
+      })
+      installFakeLlm([hotlineReminderDraft, hotlineReminderDraft])
+      await expectReject('ADVISOR_DRAFT_FAILED', 'E1 政策成稿：用户没给过 12333，结尾提醒含热线也必须失败',
+        () => llm.draft(slots, keys))
+      const inventedWithReminder = JSON.stringify({
+        draft: `可以领取 98765 元补贴。${policyReminder}`, blanks: [], summary: '成稿',
+      })
+      installFakeLlm([inventedWithReminder, inventedWithReminder])
+      await expectReject('ADVISOR_DRAFT_FAILED', 'E1 反向：带提醒的成稿仍拦用户未提供的其他数字',
+        () => llm.draft(slots, keys))
+      installFakeLlm([JSON.stringify({
+        answer: `政策申请需核实当地原文。${policyReminder}`, evidenceLevel: 'E3', sourceNote: '通用说明',
+      })])
+      const policyAnswer = await llm.answer('就业补贴怎样申请', [])
+      assert(policyAnswer.answer.endsWith(policyReminder), 'E1 政策问答：提醒不被 findViolation 拦，完整保留')
+
+      const hotlineAsAmount = JSON.stringify({
+        draft: '可以领取 12333 元补贴。', blanks: [], summary: '成稿',
+      })
+      installFakeLlm([hotlineAsAmount, hotlineAsAmount])
+      await expectReject('ADVISOR_DRAFT_FAILED', 'E1 反向：用户未提供热线数字时，不能把热线写成补贴金额',
+        () => llm.draft(slots, keys))
+      const userAmountSlots = parseSlots(JSON.stringify({
+        ...slots, extra_note: { value: '12333 元', filledAt: new Date().toISOString() },
+      }))
+      installFakeLlm([hotlineAsAmount])
+      const userAmountDraft = await llm.draft(userAmountSlots, keys)
+      assert(userAmountDraft.draft.includes('12333 元'), 'E1 政策成稿：用户提供过的热线同值金额仍放行')
+
       // E2 自称查库（C0 事实冻结抓到过的原型问题）
       const lookupClaim = JSON.stringify({
         answer: '我帮你查了系统里的记录，这类岗位一般不用解释空窗期。',

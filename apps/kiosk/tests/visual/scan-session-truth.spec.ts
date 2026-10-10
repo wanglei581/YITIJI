@@ -456,7 +456,8 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
   await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('这台机器的安全校验没通过，请联系现场工作人员', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)

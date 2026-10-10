@@ -22,7 +22,7 @@ export function MemberJobFitConsentCard({ onAuthorize, busy = false }: MemberJob
   return (
     <div className="qx-card jfq-consent-card" data-live="true">
       <p>
-        岗位匹配参考需要你先同意「岗位 AI 辅助」。结果只展示给你本人，不会共享给企业或合作机构。
+        简历对照需要你先同意「岗位 AI 辅助」。结果只展示给你本人，不会共享给企业或合作机构。
       </p>
       <button type="button" className="qx-btn" data-variant="primary" onClick={onAuthorize} disabled={busy}>
         {busy ? '正在授权…' : '开启岗位 AI 辅助'}

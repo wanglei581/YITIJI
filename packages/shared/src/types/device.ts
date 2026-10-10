@@ -86,8 +86,15 @@ export interface KioskTerminalConfig {
   jobBoard?: KioskJobBoardConfig
   /** 3.13 招聘内容托管。未下发时旧客户端只看 jobBoard。 */
   recruitmentHosting?: RecruitmentHostingPublicConfig
-  ai?: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
+  /** 全局 AI 开关。这里的 maintenance 是全机 AI 维护。 */
+  ai?: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean; maintenance?: boolean }
+  /**
+   * 本机此刻不接新单：enabled 为 false，或生命周期是
+   * maintenance / suspended / commissioning / planned / retired。
+   * 心跳超时不算。false 时 maintenanceMessage 为 null。
+   */
   maintenance?: boolean
+  maintenanceMessage?: string | null
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

@@ -271,6 +271,15 @@ async function sourceChain(served) {
   if (failures.length === before) ok('版本过期 400 → recover-consent，已答保留；按新版本重新确认后答案仍在并自动重交')
 }
 
+{
+  const before = failures.length
+  const flow = read('src/pages/resume/SelfAssessmentFlow.tsx')
+  for (const needle of ['为什么会这样', '这次作答现在的状态', '不显示你打开的链接参数内容', '还没有可查看的完成结果', '还不能进入作答', '本次作答已经提交']) {
+    if (!flow.includes(needle)) fail(`SelfAssessmentFlow.tsx: 拦截态缺少「${needle}」`)
+  }
+  if (failures.length === before) ok('拦截态写明为什么、当前状态和完成结果门槛，且不回显链接参数')
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // 五、法务文档页按章节标题打开
 // ════════════════════════════════════════════════════════════════════════

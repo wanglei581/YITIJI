@@ -45,6 +45,10 @@ model Terminal {
   /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
   /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
   lastHeartbeatAt   DateTime?
+  /// 本机每日免费打印上限（面）。null = 用平台设置 print.freeQuota.terminalDailySides。
+  /// 计划中 / 已退役触发器不拦这一列：前者只拦 agentToken、lifecycleStatus、credentialGeneration，
+  /// 后者只在身份列变化时拦截。
+  dailyFreePrintSides Int?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -55,10 +59,37 @@ model Terminal {
   capabilities TerminalCapability[]
   releaseTargets AgentReleaseTarget[]
   activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
+  commands     TerminalCommand[]
 
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+}
+
+// 远程重启终端程序。同一终端同时只能有一条未结束命令（pending / accepted）。
+// 条件唯一索引 TerminalCommand_terminalId_open_unique 只写在两份迁移里：
+// Prisma @@unique 表达不了 WHERE status IN ('pending','accepted')
+// （先例：ScanTask_terminalId_active_unique、User_single_backup_admin）。
+// 本表没有会员、订单、文件字段，不进注销清单。
+model TerminalCommand {
+  id                String    @id
+  terminalId        String
+  terminal          Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  type              String
+  status            String
+  requestedById     String
+  requestedBy       User      @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt       DateTime
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  finishedAt        DateTime?
+  completedVerified Boolean?
+  resultCode        String?
+
+  @@index([terminalId, requestedAt])
+  @@index([status, expiresAt])
+  @@index([status, acceptedAt])
+  @@index([requestedById])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────
@@ -859,6 +890,7 @@ model User {
   createdBenefitActivities BenefitActivity[]
   feedbackReplies FeedbackReply[]
   recruitmentReviewDecisions ReviewDecision[]
+  requestedTerminalCommands TerminalCommand[]
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
@@ -2008,6 +2040,20 @@ model AiUsageMonthlySummary {
   updatedAt        DateTime @updatedAt
 
   @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
+}
+
+/// 违法和不良信息词库。只存类别、词条和开关，不含用户提问。种子在代码里，这张表只记增删。
+model AiSafetyTerm {
+  id        String   @id @default(cuid())
+  category  String
+  term      String
+  kind      String
+  enabled   Boolean  @default(true)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, kind, term])
+  @@index([enabled])
 }
 
 model UserAiConsent {

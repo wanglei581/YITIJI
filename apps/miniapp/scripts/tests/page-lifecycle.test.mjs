@@ -7006,3 +7006,436 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
   assert.match(usbFaq.a, /U盘打印指引/)
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// 服务电话与同码续打（公开接口 + 订单 reprint 字段）
+// ══════════════════════════════════════════════════════════════════════
+
+function failedPickupOrder(extra) {
+  return Object.assign({
+    orderNo: 'NO-A',
+    pickupStatus: 'used',
+    taskStatus: 'failed',
+    pickupCode: '12345678',
+    amountCents: 0,
+    terminalId: 'T1',
+  }, extra || {})
+}
+
+async function bootPickup(order, supportResult) {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const support = deferred()
+  const api = {
+    getCloudPrintOrder: () => detail.promise,
+    getSupportContact: () => support.promise,
+  }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  detail.resolve(order)
+  await flush()
+  if (supportResult instanceof Error) support.reject(supportResult)
+  else support.resolve(supportResult)
+  await flush()
+  return page
+}
+
+function pageText(page) {
+  return JSON.stringify(page.data)
+}
+
+test('服务电话纯函数：合法号码留下，空值与带字母退回原提示，缺附近终端不建议换机', () => {
+  const sc = requireMiniapp('../utils/support-contact.js')
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const ok = sc.resolveSupportView({
+    servicePhone: '13800138000',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: true,
+    miniappPublished: true,
+  })
+  assert.equal(ok.phone, '13800138000')
+  assert.equal(ok.hours, '工作日 9:00–18:00')
+  assert.equal(ok.hint, '需要帮助可拨打服务电话 13800138000（工作日 9:00–18:00）')
+  assert.equal(ok.canCallPhone, true)
+  assert.equal(ok.suggestOtherTerminal, true)
+  assert.equal(Object.prototype.hasOwnProperty.call(ok, 'miniappPublished'), false)
+
+  const samples = [null, '', 13800138000, '13800abc000', '-------', '12-34']
+  for (let i = 0; i < samples.length; i += 1) {
+    const view = sc.resolveSupportView({ servicePhone: samples[i], serviceHours: '工作日 9:00–18:00' })
+    assert.equal(view.phone, null, JSON.stringify(samples[i]))
+    assert.equal(view.canCallPhone, false)
+    assert.equal(view.hint, SUPPORT_HINT)
+  }
+
+  const noHours = sc.resolveSupportView({ servicePhone: '  010-12345678  ' })
+  assert.equal(noHours.phone, '010-12345678')
+  assert.equal(noHours.hours, null)
+  assert.equal(noHours.hint, '需要帮助可拨打服务电话 010-12345678')
+  assert.equal(noHours.hint.indexOf('（'), -1)
+
+  const flags = [undefined, false, 'true', 1, null]
+  for (let i = 0; i < flags.length; i += 1) {
+    const view = sc.resolveSupportView({ servicePhone: '13800138000', otherOnlineTerminalNearby: flags[i] })
+    assert.equal(view.suggestOtherTerminal, false, JSON.stringify(flags[i]))
+  }
+  assert.equal(sc.resolveSupportView(undefined).suggestOtherTerminal, false)
+  assert.equal(sc.resolveSupportView(undefined).hint, SUPPORT_HINT)
+  const kept = sc.supportViewForTerminal({ otherOnlineTerminalNearby: true, servicePhone: '13800138000' }, 'T1')
+  const forced = sc.supportViewForTerminal({ otherOnlineTerminalNearby: true, servicePhone: '13800138000' }, '  ')
+  assert.equal(kept.suggestOtherTerminal, true)
+  assert.equal(forced.suggestOtherTerminal, false)
+})
+
+test('getSupportContact 带终端号时走公开接口且不带登录', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, (realApi) => realApi.getSupportContact('T 1'))
+  assert.equal(seen.length, 1)
+  const sent = seen[0]
+  assert.ok(String(sent.url).endsWith('/public/support-contact?terminalId=T%201'), sent.url)
+  assert.equal(sent.method, 'GET')
+  const names = Object.keys(sent.header || {}).map((k) => k.toLowerCase()).join('|')
+  assert.equal(('|' + names + '|').indexOf('|authorization|'), -1, names)
+})
+
+test('getSupportContact 空终端号不带查询参数', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, async (realApi) => {
+    await realApi.getSupportContact('')
+    await realApi.getSupportContact('   ')
+  })
+  assert.equal(seen.length, 2)
+  for (let i = 0; i < seen.length; i += 1) {
+    const url = String(seen[i].url)
+    assert.ok(url.endsWith('/public/support-contact'), url)
+    assert.equal(url.indexOf('?'), -1, url)
+    assert.equal(url.indexOf('terminalId'), -1, url)
+  }
+})
+
+test('取件页：接口失败时页面照常、hint 等于 SUPPORT_HINT', async () => {
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const page = await bootPickup(
+    { orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 0, terminalId: 'T1' },
+    new Error('down'),
+  )
+  assert.equal(page.data.state, 'ready')
+  assert.equal(page.data.supportHint, SUPPORT_HINT)
+  assert.equal(page.data.codeRaw, '12345678')
+  assert.equal(page.data.showQr, true)
+})
+
+test('取件页：接口给号码时 hint 含号码，且回到前台不再重复请求', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const orders = []
+  let supportCalls = 0
+  const support = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); orders.push(d); return d.promise },
+    getSupportContact: (id) => { supportCalls += 1; support.arg = id; return support.promise },
+  }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  orders[0].resolve({
+    orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: 'printing',
+    pickupCode: '12345678', amountCents: 0, terminalId: 'T 1',
+  })
+  await flush()
+  assert.equal(supportCalls, 1)
+  assert.equal(support.arg, 'T 1')
+  support.resolve({ servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false })
+  await flush()
+  assert.equal(page.data.state, 'ready')
+  assert.ok(String(page.data.supportHint).indexOf('13800138000') >= 0, page.data.supportHint)
+  assert.equal(page.data.canCallPhone, true)
+  assert.equal(page.data.supportPhone, '13800138000')
+  page.onShow()
+  orders[1].resolve({
+    orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: 'printing',
+    pickupCode: '12345678', amountCents: 0, terminalId: 'T 1',
+  })
+  await flush()
+  assert.equal(supportCalls, 1, '回到前台不再请求服务电话')
+})
+
+test('取件页：失败且还能续打时说明含次数且到机码可见', async () => {
+  const page = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }),
+    { servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: true },
+  )
+  assert.ok(String(page.data.statusDetail).indexOf('还能续打 2 次') >= 0, page.data.statusDetail)
+  assert.ok(String(page.data.statusDetail).indexOf('回到同一台一体机') >= 0, page.data.statusDetail)
+  assert.equal(page.data.statusTitle, '打印失败')
+  assert.equal(page.data.showQr, true)
+  assert.equal(page.data.codeRaw, '12345678')
+  assert.equal(String(page.data.statusDetail).indexOf('附近还有别的一体机'), -1)
+  const shown = String(page.data.statusLead) + (page.data.detailPhone ? page.data.supportPhone : '') + String(page.data.statusTail)
+  assert.equal(shown, page.data.statusDetail)
+  assert.equal(page.data.detailPhone, true)
+})
+
+test('取件页：续打态隐藏作废换新码，待到机仍显示', async () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/print-pickup/print-pickup.wxml'), 'utf8')
+  function openTag(marker) {
+    const at = wxml.indexOf(marker)
+    assert.ok(at >= 0, marker)
+    const start = wxml.lastIndexOf('<', at)
+    return wxml.slice(start, wxml.indexOf('>', start) + 1)
+  }
+  const reissueTag = openTag('bindtap="reissueCode"')
+  const voidNoteTag = openTag('点「作废换新码」')
+  assert.match(reissueTag, /wx:if="\{\{statusKey !== 'failed'\}\}"/)
+  const reissueAt = wxml.indexOf(reissueTag)
+  const reissueLabelAt = wxml.indexOf('作废换新码', reissueAt)
+  assert.ok(reissueLabelAt > reissueAt && reissueLabelAt < wxml.indexOf('</view>', reissueAt))
+  assert.match(voidNoteTag, /wx:if="\{\{statusKey !== 'failed'\}\}"/)
+  assert.match(voidNoteTag, /class="ph-share-note"/)
+  const reprintNoteAt = wxml.indexOf('这个码发给谁，谁就能到原来那台一体机接着打。')
+  assert.ok(reprintNoteAt > wxml.indexOf('点「作废换新码」'))
+  const reprintNoteTag = wxml.slice(wxml.lastIndexOf('<', reprintNoteAt), wxml.indexOf('>', reprintNoteAt) + 1)
+  assert.match(reprintNoteTag, /wx:else/)
+  assert.match(reprintNoteTag, /class="ph-share-note"/)
+  assert.equal(reprintNoteTag.indexOf('作废'), -1)
+  assert.equal(openTag('bindtap="copyCode"').indexOf('statusKey'), -1)
+  assert.equal(openTag('bindtap="shareCode"').indexOf('statusKey'), -1)
+
+  const failed = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }),
+    {},
+  )
+  assert.equal(failed.data.statusKey, 'failed')
+  assert.equal(failed.data.showQr, true)
+  const pending = await bootPickup(
+    { orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 0, terminalId: 'T1' },
+    {},
+  )
+  assert.equal(pending.data.statusKey, 'pending')
+  assert.equal(pending.data.showQr, true)
+})
+
+test('取件页：续打次数用尽时说明不能再打了，不再说还能续打', async () => {
+  const page = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 0 }),
+    { otherOnlineTerminalNearby: false },
+  )
+  assert.ok(String(page.data.statusDetail).indexOf('不能再打了') >= 0, page.data.statusDetail)
+  assert.ok(String(page.data.statusDetail).indexOf('可以回到订单重新打印') >= 0, page.data.statusDetail)
+  assert.equal(String(page.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.codeRaw, '')
+})
+
+test('取件页：续打字段缺失时两句都不出现', async () => {
+  const absent = await bootPickup(failedPickupOrder({}), {})
+  assert.equal(String(absent.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(String(absent.data.statusDetail).indexOf('不能再打了'), -1)
+  const nulled = await bootPickup(failedPickupOrder({ reprintAllowed: null, reprintRemaining: null }), {})
+  assert.equal(String(nulled.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(String(nulled.data.statusDetail).indexOf('不能再打了'), -1)
+})
+
+test('取件页：otherOnlineTerminalNearby 非 true 时任何文字都不含换一台', async () => {
+  const cases = [
+    { order: failedPickupOrder({}), support: { otherOnlineTerminalNearby: false, servicePhone: '13800138000' } },
+    { order: failedPickupOrder({}), support: { servicePhone: '13800138000' } },
+    { order: failedPickupOrder({}), support: new Error('down') },
+    { order: failedPickupOrder({ terminalId: '' }), support: { otherOnlineTerminalNearby: true, servicePhone: '13800138000' } },
+  ]
+  for (let i = 0; i < cases.length; i += 1) {
+    const page = await bootPickup(cases[i].order, cases[i].support)
+    const text = pageText(page)
+    assert.equal(text.indexOf('换一台'), -1, text)
+    assert.equal(text.indexOf('附近还有别的一体机'), -1, text)
+  }
+  const nearby = await bootPickup(
+    failedPickupOrder({}),
+    { otherOnlineTerminalNearby: true },
+  )
+  assert.ok(String(nearby.data.statusDetail).indexOf('附近还有别的一体机可用') >= 0, nearby.data.statusDetail)
+  assert.equal(pageText(nearby).indexOf('换一台'), -1)
+})
+
+test('订单详情：失败后仍允许续打才显示到机码', async () => {
+  async function load(raw) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const pending = []
+    const page = makeOrderDetail(wx, pending)
+    page.onLoad({ orderId: 'ord-A' })
+    page.onShow()
+    pending[0].resolve(raw)
+    await flush()
+    return page
+  }
+  const base = {
+    id: 'ord-A', orderNo: 'NO-A', payStatus: 'paid', pickupStatus: 'used',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, fileName: '简历.pdf',
+  }
+  const shown = await load(Object.assign({}, base, { reprintAllowed: true, reprintRemaining: 2 }))
+  assert.equal(shown.data.detail.pickup, '12-34-56-78')
+  assert.equal(shown.data.detail.reprintNote, '还能续打 2 次')
+  const hidden = await load(Object.assign({}, base, { reprintAllowed: false, reprintRemaining: 2 }))
+  assert.equal(hidden.data.detail.pickup, '')
+  assert.equal(hidden.data.detail.reprintNote, '')
+})
+
+test('订单列表：失败后 reprintAllowed 才显示到机码', () => {
+  const toUi = ordersToUi()
+  const shown = toUi({
+    id: 'pt-1', status: 'failed', payStatus: 'paid', fileName: '简历.pdf',
+    pickupCode: '12345678', pickupStatus: 'used', reprintAllowed: true, reprintRemaining: 2,
+  })
+  assert.equal(shown.pickup, '12-34-56-78')
+  assert.equal(shown.reprintNote, '还能续打 2 次')
+  const hidden = toUi({
+    id: 'pt-2', status: 'failed', payStatus: 'paid', pickupCode: '12345678',
+    pickupStatus: 'used', reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hidden.pickup, '')
+  assert.equal(hidden.reprintNote, '')
+})
+
+test('材料包：失败后 reprintAllowed 才显示到机码', async () => {
+  const pkg = requireMiniapp('../utils/package-order.js')
+  const shownRow = pkg.toPackageRow({
+    orderId: 'o1', pickupCode: '12345678', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', amountCents: 0, reprintAllowed: true, reprintRemaining: 1,
+  })
+  assert.equal(shownRow.pickupCode, '12-34-56-78')
+  assert.equal(shownRow.hasPickupCode, true)
+  assert.equal(shownRow.reprintNote, '还能续打 1 次')
+  const hiddenRow = pkg.toPackageRow({
+    orderId: 'o2', pickupCode: '12345678', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', amountCents: 0, reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hiddenRow.pickupCode, '')
+  assert.equal(hiddenRow.hasPickupCode, false)
+  assert.equal(hiddenRow.reprintNote, '')
+
+  async function openPackage(order) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const api = { getPackageOrder: () => detail.promise }
+    const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    detail.resolve(order)
+    await flush()
+    return page
+  }
+  const shown = await openPackage({
+    orderId: 'pkg-A', orderNo: 'PKG-A', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, items: [],
+    reprintAllowed: true, reprintRemaining: 2,
+  })
+  assert.equal(shown.data.pickupCode, '12-34-56-78')
+  assert.equal(shown.data.showQr, true)
+  assert.equal(shown.data.reprintNote, '还能续打 2 次')
+  const hidden = await openPackage({
+    orderId: 'pkg-A', orderNo: 'PKG-A', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, items: [],
+    reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hidden.data.pickupCode, '')
+  assert.equal(hidden.data.showQr, false)
+  assert.equal(hidden.data.reprintNote, '')
+})
+
+test('有服务电话时点号码会拨出，取消也静默', async () => {
+  const wx = createWx()
+  const calls = []
+  wx.makePhoneCall = (opts) => {
+    calls.push(opts.phoneNumber)
+    if (opts.fail) opts.fail({ errMsg: 'makePhoneCall:fail cancel' })
+  }
+  const support = deferred()
+  const api = { getSupportContact: () => support.promise }
+  const page = makePage('pages/print/print.js', { auth: createAuth('A'), api, wx })
+  page.onLoad()
+  support.resolve({ servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false })
+  await flush()
+  assert.equal(page.data.canCallPhone, true)
+  assert.equal(page.data.supportPhone, '13800138000')
+  assert.equal(page.data.supportHint, '需要帮助可拨打服务电话 13800138000（工作日 9:00–18:00）')
+  page.callSupport()
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0], '13800138000')
+  assert.equal(wx.calls.showToast.length, 0)
+
+  const wx2 = createWx()
+  wx2.makePhoneCall = (opts) => {
+    calls.push(opts.phoneNumber)
+    if (opts.fail) opts.fail({ errMsg: 'makePhoneCall:fail cancel' })
+  }
+  const detail = deferred()
+  const support2 = deferred()
+  const pickup = makePage('pages/print-pickup/print-pickup.js', {
+    auth: createAuth('A'),
+    api: {
+      getCloudPrintOrder: () => detail.promise,
+      getSupportContact: () => support2.promise,
+    },
+    wx: wx2,
+  })
+  pickup.onLoad({ orderId: 'ord-A' })
+  detail.resolve(failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }))
+  await flush()
+  support2.resolve({ servicePhone: '010-12345678', serviceHours: '工作日 9:00–18:00' })
+  await flush()
+  pickup.callSupport()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1], '010-12345678')
+  assert.equal(wx2.calls.showToast.length, 0)
+})
+
+// 「还能续打 N 次」只认 reprintAllowed === true：待到机的新码旁边不能出现续打次数，
+// 哪怕服务端顺带给了 reprintRemaining（审稿反向变异 10/6 发现的空档）。
+test('续打次数只在服务端允许续打时写，待到机的码旁不写', () => {
+  const { reprintNoteText } = requireMiniapp('../utils/support-contact.js')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 2 }), '还能续打 2 次')
+  assert.equal(reprintNoteText({ reprintAllowed: false, reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 0 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 1.5 }), '')
+})
+
+// AI 简历导出默认印「含人工智能辅助生成内容」（产品负责人 2026-10-06 晚拍板，服务端开关 10/9 打开）。
+// 导出之前就要让用户知道：生成页「导出设置」卡、优化页「导出优化稿」格式格下方各一句。
+test('AI 简历导出：生成页与优化页在导出处说明每页底部会印 AI 标注', () => {
+  const m = requireMiniapp('../utils/resume-build-model.js')
+  assert.match(m.RESUME_AI_LABEL_NOTE, /每页底部有一行小字：含人工智能辅助生成内容/)
+  for (const rel of ['pages/resume-build/resume-build.js', 'pages/resume-optimize/resume-optimize.js']) {
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx: createWx() })
+    assert.equal(page.data.aiLabelNote, m.RESUME_AI_LABEL_NOTE, `${rel} data.aiLabelNote`)
+  }
+  const build = fs.readFileSync(path.join(MINIAPP, 'pages/resume-build/resume-build.wxml'), 'utf8')
+  const card = build.slice(build.indexOf('<view class="section-t">导出设置</view>'))
+  assert.ok(card.indexOf('{{aiLabelNote}}') > 0 && card.indexOf('{{aiLabelNote}}') < card.indexOf('</view></view>'), '在「导出设置」卡内')
+  const opt = fs.readFileSync(path.join(MINIAPP, 'pages/resume-optimize/resume-optimize.wxml'), 'utf8')
+  const grid = opt.indexOf('<view class="format-grid">')
+  const note = opt.indexOf('{{aiLabelNote}}')
+  assert.ok(grid > 0 && note > grid && note < opt.indexOf('pricing-line', grid), '在「导出优化稿」格式格下方、价格说明之前')
+})
+
+// 还没有真实的大模型备案号时，不对用户（含读屏标签）说「备案号」，只说「备案情况」——
+// 读屏用户听到「备案号」会以为点进去能查到号码（合规窗口反方审查 10/6）。
+// 拿到深度求索备案号、写进后台「AI 服务说明」以后，这条断言连同文案一起改回带号码的写法。
+test('AI 服务说明入口：没有真号码之前只说「备案情况」，不说「备案号」', () => {
+  const stripComments = (src, ext) => ext === 'wxml'
+    ? src.replace(/<!--[\s\S]*?-->/g, '')
+    : src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const files = [
+    'pages/home/home.wxml', 'pages/assistant/assistant.wxml', 'pages/ai/ai.wxml',
+    'pages/about/about.js', 'pages/legal/legal.js', 'pages/help/help.js',
+  ]
+  for (const rel of files) {
+    const src = stripComments(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), rel.split('.').pop())
+    assert.doesNotMatch(src, /备案号/, `${rel} 用户看得到的文字里不该有「备案号」`)
+    assert.match(src, /备案情况/, `${rel} 应改成「备案情况」`)
+  }
+})

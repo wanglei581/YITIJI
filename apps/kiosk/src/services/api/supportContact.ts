@@ -70,6 +70,8 @@ async function requestSupportContact(): Promise<PublicSupportContact> {
     const query = terminalId ? `?terminalId=${encodeURIComponent(terminalId)}` : ''
     const response = await fetch(`${API_BASE_URL}/public/support-contact${query}`, {
       signal: controller.signal,
+      // 公开配置不需要会员身份；显式禁用同源 Cookie 与浏览器身份凭证。
+      credentials: 'omit',
       headers: { Accept: 'application/json' },
     })
     if (!response.ok) return remember(CONSERVATIVE_SUPPORT_CONTACT)

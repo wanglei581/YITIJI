@@ -35,7 +35,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { createPrismaClient } from '../src/prisma/create-client'
 import { StorageService } from '../src/storage/storage.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
-import { ClosureMemoryRedis, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
+import { ClosureMemoryRedis, collectBoundedFourDigitTokens, scanClosureDatabase, scanClosureRedis, type ClosureScanIdentity } from './support/member-closure-verification'
 
 // 不允许把外部未标记的库偷偷替换成临时库来绕过保护。
 assertIsolatedVerificationDatabase()
@@ -116,8 +116,13 @@ async function grant(id: string, action = 'close_account') {
   return token
 }
 
+// PG 作业里本门禁与种子、上百条门禁共用一个库；第 11 组按后四位边界反查，后四位必须避开库里已有的 4 位数。
+let takenTails: Set<string> | undefined
 async function member(nickname: string) {
-  const phone = `139${randomInt(10000000, 99999999)}`
+  takenTails ??= await collectBoundedFourDigitTokens(scanClient)
+  assert.ok(takenTails.size < 9000, `库里已有 ${takenTails.size} 个独立 4 位数，选不出不撞号的手机号`)
+  let phone: string
+  do phone = `139${randomInt(10000000, 99999999)}`; while (takenTails.has(phone.slice(-4)))
   const identity: ClosureScanIdentity = { phone, phoneHash: hashPhone(phone), phoneEnc: encryptPhone(phone),
     wxOpenId: `wx-${randomUUID()}`, nickname: `${nickname}·${tag.slice(0, 6)}-${memberIds.length}` }
   const row = await put('endUser', { ...identity, phone: undefined, status: 'active', enabled: true })
@@ -412,6 +417,11 @@ async function main() {
     const actualModels = Object.entries(metadata).filter(([, model]: any) => model.fields.some((field: any) => field.name === 'endUserId')).map(([name]) => name).sort()
     const expectedModels = [...CLOSURE_DELETE_MODELS, 'fileObject', 'order', 'printTask', 'orderSubmissionLedger', 'redemptionRecord', 'benefitGrant', 'benefitClaim', 'feedbackTicket', 'memberLegalConsent', 'userAiConsent', 'userDataRequest', 'aiUsageRecord', 'aiServiceLog', 'aiQuotaDaily', 'aiQuotaReservation'].map((name) => name[0].toUpperCase() + name.slice(1)).sort()
     assert.deepEqual(actualModels, expectedModels, '新增会员模型必须显式纳入注销处置')
+    const safetySchema = readFileSync(join(apiRoot, 'prisma/schema.prisma'), 'utf8')
+    const safetyAt = safetySchema.indexOf('model AiSafetyTerm {')
+    const safetyBlock = safetySchema.slice(safetyAt, safetySchema.indexOf('\nmodel ', safetyAt + 1))
+    assert.ok(safetyAt >= 0 && !/\bendUserId\b|\bmemberId\b/.test(safetyBlock), 'AiSafetyTerm 不含会员字段')
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('aiSafetyTerm'), false, 'AiSafetyTerm 不进注销清单')
     const platformSetting = metadata.PlatformSetting
     assert.ok(platformSetting, 'PlatformSetting 必须存在')
     assert.equal(
@@ -433,6 +443,17 @@ async function main() {
     const finalBlock = executorSource.slice(executorSource.indexOf('...newClosurePhoneIdentity()'), executorSource.indexOf('if (changed.count !== 1)', executorSource.indexOf('...newClosurePhoneIdentity()')))
     assert.ok(!/phoneHash\s*:|phoneEnc\s*:|hashPhone|initial\./.test(finalBlock), '墓碑不得使用原身份派生值覆盖')
     assert.deepEqual(readClosureRetentionYears(), { orders: null, consents: null })
+  })
+  await check('TerminalCommand 无会员字段且不进注销清单', async () => {
+    const models = (scanClient as { _runtimeDataModel: { models: Record<string, { fields: Array<{ name: string }> }> } })._runtimeDataModel.models
+    const command = models['TerminalCommand']
+    assert.ok(command, 'TerminalCommand 必须存在')
+    const names = command.fields.map((field) => field.name)
+    for (const forbidden of ['endUserId', 'memberId', 'phone', 'phoneHash', 'phoneEnc', 'nickname', 'orderId', 'fileId']) {
+      assert.equal(names.includes(forbidden), false, forbidden)
+    }
+    assert.equal((CLOSURE_DELETE_MODELS as readonly string[]).includes('terminalCommand'), false)
+    assert.equal(names.includes('endUserId'), false)
   })
   let newId = ''
   await check('4 原手机号重新登录产生新 id，本人文件/订单/AI列表全部为空', async () => {

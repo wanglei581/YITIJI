@@ -8,7 +8,7 @@
 //
 // 三条诚实性红线（CLAUDE.md §9）：
 //   1. 提交失败如实展示服务端返回的原因，绝不显示假成功。
-//   2. 成功文案只承诺「会核实并现场处理」。**不承诺退款，也不承诺推送回复** ——
+//   2. 成功文案只说「我们会核实这次打印记录」。不说现场有人接手，也不承诺退款或推送回复 ——
 //      匿名工单没有账号归属，后台连回复入口都不渲染
 //      （apps/admin/src/routes/member-feedback/index.tsx），
 //      写「我们会回复你」就是承诺一件系统结构上做不到的事。
@@ -25,6 +25,8 @@
 import { useEffect, useState } from 'react'
 import { KioskModal } from '@ai-job-print/ui'
 import { AlertCircleIcon, CheckCircle2Icon, SendIcon } from 'lucide-react'
+import { helpNeededLine, preferUnattended } from '../copy/unattendedCopy'
+import { userMessageOf } from '../services/api/userErrorMessage'
 import {
   KIOSK_FEEDBACK_CONTENT_MAX,
   KioskFeedbackApiError,
@@ -63,7 +65,7 @@ export function KioskFeedbackDialog({
   relatedScanTaskId,
   showSatisfaction = false,
   title = '反馈问题',
-  description = '选择这次遇到的问题，工作人员会核实打印记录后现场处理',
+  description = `选择这次遇到的问题。${helpNeededLine()}`,
 }: KioskFeedbackDialogProps) {
   const [issueCode, setIssueCode] = useState<KioskFeedbackIssueCode | null>(null)
   const [satisfaction, setSatisfaction] = useState<KioskFeedbackSatisfaction | null>(null)
@@ -99,12 +101,13 @@ export function KioskFeedbackDialog({
       })
       setReceipt(next)
     } catch (caught) {
-      // 如实展示：服务端给了原因就用服务端的（PII 拒绝 / 限流 / 终端无效），
-      // 拿不到原因也不编造成功。
+      // 干净的服务端原因原样留下（PII 拒绝 / 限流 / 终端无效）。
+      // 原话仍让用户去找现场的人时，改成登记过的那一句，不编造成功。
+      const fallback = `提交失败，反馈未送出。${helpNeededLine()}。`
       setError(
         caught instanceof KioskFeedbackApiError
-          ? caught.message
-          : '提交失败，反馈未送出，请联系现场工作人员',
+          ? preferUnattended(caught.message, userMessageOf(caught, fallback))
+          : fallback,
       )
     } finally {
       setSubmitting(false)
@@ -129,11 +132,10 @@ export function KioskFeedbackDialog({
           <p className="kiosk-fb-result-title">
             {receipt.deduplicated
               ? '这条反馈刚才已经提交过，系统没有重复建单'
-              : '反馈已提交，工作人员会核实这次打印记录后现场处理'}
+              : '反馈已提交，我们会核实这次打印记录'}
           </p>
           <p className="kiosk-fb-result-note">
-            本次为匿名反馈，系统不会把处理结果推送到账号。
-            如需当面跟进，请向现场工作人员出示下方反馈编号。
+            本次为匿名反馈，系统不会把处理结果推送到账号。请记下下方反馈编号。{helpNeededLine()}。
           </p>
           <div className="kiosk-fb-ticket">
             <span className="kiosk-fb-ticket-label">反馈编号</span>

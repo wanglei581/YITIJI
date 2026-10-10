@@ -421,6 +421,11 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
   // 2026-09-29 走查 W-01：AI 内容投诉说明与答复天数（C3）。只加行，不改守卫逻辑。
   'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
+  // C2-6（2026-10-06）：意见反馈按稿 40 拆成底栏、状态屏、行图标和提交规则。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts',
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
