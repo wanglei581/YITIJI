@@ -469,7 +469,7 @@ export function QxPrintHubView({
           <span className="ph-src-main">
             <span className="ph-src-name">
               {arrivalCode.title}
-              <span className="ph-tag">不是取件码</span>
+              <span className="ph-tag">就是取件码</span>
             </span>
             <span className="ph-src-desc">{emphasize(arrivalCode.description, arrivalCode.emphasis)}</span>
             {arrivalCode.stateNote ? (

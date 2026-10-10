@@ -72,7 +72,7 @@ export function NoticePanel({
         uploadDesc="不受公告影响"
         note="公告正文与来源链接都由发布机构提交，本机不改写、不补写。"
       >
-        公告由合作机构发布、管理员审核后展示，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。
+        公告由发布机构自己审核并发布，目前一条都没有。这是内容进度，不是读取失败；读取失败会另有一屏说明。
       </RqDeadEnd>
     )
   }
@@ -126,7 +126,7 @@ export function NoticePanel({
                       onClick={() => onOfficialEntry(notice, {
                         title: notice.title,
                         url: notice.externalUrl!,
-                        sourceKind: '合作机构发布 · 管理员审核',
+                        sourceKind: '机构发布 · 机构自己审核',
                         sourceDetail: notice.sourceName,
                       })}
                     >

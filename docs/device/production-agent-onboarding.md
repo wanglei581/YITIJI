@@ -87,7 +87,8 @@ Windows 服务的 SCM 恢复策略：首次失败后等待 60 秒，第二次失
 在 Windows 主机上可复制执行下列只读诊断命令：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1
+# 0.4.15 起诊断脚本随安装包，在安装目录的 provision 下；更早的安装包里没有它
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:ProgramFiles\AIJobPrintAgent\provision\diagnose-production-agent.ps1"
 sc.exe qfailure AIJobPrintAgent
 Get-CimInstance Win32_Service -Filter "Name='AIJobPrintAgent'" | Select-Object Name, State, StartMode, ProcessId, PathName
 ```

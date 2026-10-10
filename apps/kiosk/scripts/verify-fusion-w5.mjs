@@ -78,7 +78,10 @@ const FROZEN = new Map([
   // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
   ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
-  ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
+  // 2026-10-10：首页续办条不再显示文件名，保护公共屏隐私。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
+  // 旧哈希 d9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3。
+  ['src/pages/home/components/ContinuePanel.tsx', 'd4441ee3011eb7efa7560da14ea308adac223de65a41de48d228d108a83dda9b'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
   ['src/pages/home/components/ToolboxLaunchModals.tsx', 'bb79f207e4e1fbb22cdfc33239dbefc58cbdcd18f7df89adf08e4061354fe99c'],
   // 2026-08-18 重新冻结（PR #598 手机扫码上传公共界面收口）：刷新二维码时先 await 撤销
@@ -160,6 +163,7 @@ assert.equal(new Set(owned).size, W5_ROUTES_EXPANDED.length, 'W5 route inventory
 for (const [path, expected] of FROZEN) {
   assert.equal(sha256(path), expected, `frozen W5 dependency changed: ${path}`)
 }
+assert.doesNotMatch(read('src/pages/home/components/ContinuePanel.tsx'), /fileName/, '首页续办条不得读取文件名：公共屏上的文件名常带真名，明细应进入「我的 → 打印订单」由本人查看')
 
 const notifications = read('src/pages/placeholders/NotificationsPage.tsx')
 const activityDetail = read('src/pages/placeholders/MeActivityDetailPage.tsx')
