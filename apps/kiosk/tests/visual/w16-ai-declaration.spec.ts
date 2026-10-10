@@ -129,7 +129,7 @@ async function openAssistant(page: Page, api: ApiRouter): Promise<void> {
 
 async function sendQuestion(page: Page, text: string): Promise<void> {
   await page.getByLabel('输入咨询问题').fill(text)
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
 }
 
 async function shot(page: Page, name: string): Promise<void> {

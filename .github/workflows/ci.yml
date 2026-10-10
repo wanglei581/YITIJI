@@ -1308,6 +1308,7 @@ jobs:
           pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
           pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:fusion-shell
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-system-keyboard
           pnpm --filter @ai-job-print/kiosk verify:fusion-home
           pnpm --filter @ai-job-print/kiosk verify:fusion-w2
           pnpm --filter @ai-job-print/kiosk verify:fusion-w3
@@ -1342,6 +1343,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w4
           pnpm --filter @ai-job-print/kiosk test:browser:w5
           pnpm --filter @ai-job-print/kiosk test:browser:w6
+          pnpm --filter @ai-job-print/kiosk test:browser:system-keyboard
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           # 统一清场（W-42/W-43/W-75/W-64）正式构建走查：隐私硬截止保持默认，用本页时钟走 30 秒 / 60 秒 / 3 分钟出口。

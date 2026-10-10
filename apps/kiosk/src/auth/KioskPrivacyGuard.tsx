@@ -1,3 +1,4 @@
+import { dismissSystemKeyboard } from '../system-keyboard/controller'
 import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom'
@@ -43,6 +44,10 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'keydown',
   'mousemove',
   'wheel',
+  'input',
+  'compositionstart',
+  'compositionupdate',
+  'compositionend',
 ]
 
 interface PrivacyBoundary {
@@ -323,6 +328,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
 
   const claimClearing = useCallback((mode: 'hard' | 'screensaver'): boolean => {
     if (clearingModeRef.current !== null) return false
+    dismissSystemKeyboard()
     clearingModeRef.current = mode
     return true
   }, [])

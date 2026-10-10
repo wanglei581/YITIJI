@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 716,
+      "reachableFileCount": 718,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13639,7 +13639,6 @@
           ],
           "path": "/assistant",
           "styles": [
-            "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-content.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css",
@@ -16505,7 +16504,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 814
+      "sourceFileCount": 819
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18655,6 +18654,7 @@
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
@@ -19625,6 +19625,7 @@
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-kiosk-session-reporting.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-member-login-dialog.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
@@ -19650,7 +19651,8 @@
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
     ],
     "apps/kiosk/src/auth/kioskPresence.ts": [
-      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
     ],
     "apps/kiosk/src/auth/kioskSensitiveSession.ts": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
@@ -19704,7 +19706,8 @@
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
     "apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx": [
-      "apps/kiosk/scripts/verify-fusion-shell.mjs"
+      "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
     ],
     "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -19728,8 +19731,12 @@
     "apps/kiosk/src/hooks/useApiReadiness.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/hooks/useIdleTimer.ts": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
+    ],
     "apps/kiosk/src/hooks/useKioskStageFit.ts": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
     "apps/kiosk/src/hooks/useSmartCampusConfig.ts": [
@@ -19781,6 +19788,7 @@
     "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx": [
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs"
     ],
     "apps/kiosk/src/lib/capabilityReasons.ts": [
@@ -19855,6 +19863,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -20551,6 +20560,7 @@
     ],
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -20915,6 +20925,7 @@
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
@@ -22141,6 +22152,15 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
     ],
+    "apps/kiosk/src/system-keyboard/SystemKeyboardHost.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
+    ],
+    "apps/kiosk/src/system-keyboard/controller.ts": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
+    ],
+    "apps/kiosk/src/system-keyboard/dom.ts": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
+    ],
     "apps/kiosk/src/utils/maskPii.ts": [
       "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-public-screen-mask.mjs",
@@ -22153,7 +22173,8 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/vite-env.d.ts": [
-      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs"
+      "apps/kiosk/scripts/verify-assistant-trtc-guard.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs"
     ],
     "apps/kiosk/tests/fixtures/fusion-w4-api.ts": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
@@ -30879,6 +30900,37 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-shell-active-nav"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          "apps/kiosk/src/auth/KioskPrivacyGuard.tsx",
+          "apps/kiosk/src/auth/kioskPresence.ts",
+          "apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx",
+          "apps/kiosk/src/hooks/useIdleTimer.ts",
+          "apps/kiosk/src/hooks/useKioskStageFit.ts",
+          "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
+          "apps/kiosk/src/system-keyboard/SystemKeyboardHost.tsx",
+          "apps/kiosk/src/system-keyboard/controller.ts",
+          "apps/kiosk/src/system-keyboard/dom.ts",
+          "apps/kiosk/src/vite-env.d.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-system-keyboard"
       ],
       "wired": true
     },
@@ -44463,6 +44515,40 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/KioskKeyboard.tsx",
+        "kind": "component",
+        "mentions": [
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/components/kiosk-keyboard/KioskKeyboard.tsx",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/pinyinDict.ts",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

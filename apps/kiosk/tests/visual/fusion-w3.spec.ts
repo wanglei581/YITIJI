@@ -1654,7 +1654,7 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   await page.goto('/assistant')
   const input = page.getByLabel('输入咨询问题')
   await input.fill('如何整理项目经历？')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   await expect(page.getByRole('button', { name: '去做简历诊断' })).toBeVisible()
   await expect(page.getByText('禁止动作', { exact: true })).toHaveCount(0)
 
@@ -1667,7 +1667,7 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
 
   api.abort('POST', '/api/v1/assistant/chat', 'internetdisconnected')
   await input.fill('再给一个建议')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   // 稿 05 的 reply-error 标题；断网时说的是断网，不笼统说「AI 暂不可用」
   // （「AI 服务暂不可用」留给服务器只回了工程串的情况，见下面的用户话用例）。
   await expect(page.getByText('请求失败，没有回答', { exact: true })).toBeVisible()
@@ -1701,7 +1701,7 @@ test('assistant: AI budget exhausted locks the composer and offers non-AI entrie
   })
   await page.goto('/assistant')
   await page.getByLabel('输入咨询问题').fill('我该先做简历还是先看岗位？')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   await expect(page.getByRole('button', { name: /重新检查 AI 顾问/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /重试这一轮/ })).toHaveCount(0)
   await expect(page.locator('.assistant-send')).toHaveAttribute('aria-disabled', 'true')
@@ -1721,7 +1721,7 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
 
   const input = page.getByLabel('输入咨询问题')
   await input.fill('我该先做简历还是先看岗位？')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
 
   // 最关键的一条：预置话术正文一个字都不许出现在页面上。
   await expect(page.getByText('这一轮没有 AI 回答').first()).toBeVisible()
@@ -1801,7 +1801,7 @@ for (const provenance of [
     api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: { ...assistantMockFallbackReply, ...provenance } })
     await page.goto('/assistant')
     await page.getByLabel('输入咨询问题').fill('帮我准备一份材料清单')
-    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    await page.locator('.assistant-send').click()
     await expect(page.getByTestId('ai-cockpit-state-reply-not-ai')).toBeVisible()
     await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
     await expect(page.locator('.assistant-transcript [data-evidence="E3"]')).toHaveCount(0)
@@ -1820,7 +1820,7 @@ for (const [message, expected] of [
     api.respond('POST', '/api/v1/assistant/chat', { status: 503, json: { error: { code: 'AI_BUSY', message } } })
     await page.goto('/assistant')
     await page.getByLabel('输入咨询问题').fill('帮我准备面试')
-    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    await page.locator('.assistant-send').click()
     await expect(page.getByTestId('ai-cockpit-state-reply-error')).toBeVisible()
     await expect(page.getByText(expected, { exact: true })).toHaveCount(1)
     await expect(page.getByText(expected, { exact: true })).toBeVisible()
@@ -1845,7 +1845,7 @@ test('assistant masks displayed contact details while sending original input @w3
   await page.goto('/assistant')
   await page.getByLabel('输入咨询问题').fill(raw)
   await expect(page.getByTestId('cockpit-draft')).toContainText('138****5678')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   await expect(page.locator('[data-message-kind="ai"]')).toContainText('u***@example.com')
   await expect(page.locator('[data-message-kind="user"]')).toContainText('138****5678')
   await expect(page.locator('.assistant-transcript')).not.toContainText('13812345678')
@@ -1893,7 +1893,7 @@ test('assistant submitting waits for a response and preserves manual entries @w3
   })
   await page.goto('/assistant')
   await page.getByLabel('输入咨询问题').fill('简历怎么排到一页？')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   try {
     await expect(page.getByTestId('ai-cockpit-state-submitting')).toBeVisible()
     // 第一问时还没有哪一次回答确认过 AI 可用（availability 为 unknown）。共享 useAiTask 的约定
@@ -1917,7 +1917,7 @@ test('assistant submitting waits for a response and preserves manual entries @w3
     return { status: 200, json: assistantReply }
   })
   await page.getByLabel('输入咨询问题').fill('还有别的写法吗？')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   try {
     await expect(page.getByTestId('ai-cockpit-state-submitting')).toBeVisible()
     await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'running')
@@ -2949,7 +2949,7 @@ test('advisor artifact one-pin hint tells the truth about asking again @w3-kiosk
       await expect(assistant).not.toContainText(assistantReply.reply)
     }
     await page.getByLabel('输入咨询问题').fill(question)
-    await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+    await page.locator('.assistant-send').click()
     const transcript = page.locator('.assistant-transcript')
     await expect(transcript.locator('[data-message-kind="ai"]')).toContainText(assistantReply.reply)
     await expect(transcript.locator('[data-message-role="user"]')).toContainText(question)
@@ -3280,13 +3280,11 @@ test('assistant voice deadline warns then preserves text conversation @w3-kiosk'
   const transcript = page.locator('.assistant-transcript')
   const input = page.locator('textarea')
   await input.fill('我想整理简历')
-  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.assistant-send').click()
   await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
   const beforeTurn = (await page.locator('[data-message-kind="ai"]').first().textContent())?.trim() ?? ''
   expect(beforeTurn.length).toBeGreaterThan(0)
   await input.fill('继续帮我整理简历')
-  // 虚拟键盘的遮罩会挡住工具栏，先收起键盘再点语音咨询（与本文件其余用例同一做法）。
-  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '语音咨询', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '和小青语音咨询' })
   await dialog.getByRole('button', { name: /直接语音通话/ }).click()
