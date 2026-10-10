@@ -13,7 +13,7 @@ import '../styles/interview-workbench-qx.css'
 import '../styles/interview-qx2.css'
 
 /** 结束本场之后、报告返回之前。请求还在飞，不能把这一场说成还能继续答题。 */
-export function InterviewReportPending({ onOpenTips }: { onOpenTips: () => void }) {
+export function InterviewReportPending({ onOpenTips, endedAtDeadline = false }: { onOpenTips: () => void; endedAtDeadline?: boolean }) {
   return (
     <InterviewShell
       title={<>本场结束后，<em>正在生成报告</em>。</>}
@@ -42,6 +42,7 @@ export function InterviewReportPending({ onOpenTips }: { onOpenTips: () => void 
         data-ux-density="touch"
       >
         <div className="interview-flow__scroll">
+          {endedAtDeadline && <InterviewNotice>练习时间到了，这一场已自动结束。报告只算到点前已经提交的回答。</InterviewNotice>}
           <InterviewStatus
             label="报告生成状态"
             items={[
@@ -71,9 +72,9 @@ export function InterviewReportPending({ onOpenTips }: { onOpenTips: () => void 
             />
             <p className="iv-copy">这一场已经在收报告。请求还没返回时，不能把它说成还能继续答题。</p>
           </section>
-          <InterviewNotice>
+          {!endedAtDeadline && <InterviewNotice>
             生成失败时会回到作答页并写明原因。这里不展示固定评分，也不承诺报告已经保存。
-          </InterviewNotice>
+          </InterviewNotice>}
           <InterviewRail />
         </div>
       </div>

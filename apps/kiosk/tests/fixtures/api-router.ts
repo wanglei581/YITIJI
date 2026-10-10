@@ -154,6 +154,17 @@ export class ApiRouter {
           })
           return
         }
+        // 面试作答页挂载后会读一次会话来校准截止时刻（GET /mock-interviews/{id}）。
+        // 默认回一份不带时间字段的会话：页面按本机开场时刻走，既有用例不因这条新请求中断；
+        // 要测校准或失败的用例自行 respond 覆盖。
+        if (isInterviewSessionRead(request.method(), pathname)) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ data: { sessionId: decodeURIComponent(pathname.split('/').pop() ?? '') } }),
+          })
+          return
+        }
         this.#unhandledRequests.add(key)
         await route.abort('internetdisconnected')
         return
@@ -218,6 +229,13 @@ function isAnonymousDraftOrVersions(method: string, path: string): boolean {
   const normalized = method.trim().toUpperCase()
   if (!/^\/api\/v1\/resume\/records\/[^/]+\/(draft|versions)$/.test(path)) return false
   return normalized === 'GET' || normalized === 'PUT'
+}
+
+function isInterviewSessionRead(method: string, path: string): boolean {
+  if (method.trim().toUpperCase() !== 'GET') return false
+  const match = /^\/api\/v1\/mock-interviews\/([^/]+)$/.exec(path)
+  // capabilities 是同级固定路径（下面还有 /voice），不是会话号。
+  return match !== null && match[1] !== 'capabilities'
 }
 
 function requestKey(method: string, path: string): string {

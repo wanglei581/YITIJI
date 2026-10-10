@@ -9,11 +9,13 @@ export function useInterviewLivePersist(args: {
   messages: InterviewMessage[]
   questionIndex: number
   remainingSec: number
+  deadlineAtLocalMs: number
+  deadlineSource: 'server' | 'local'
   omitPrintAnswers: boolean
   answersRecorded: boolean
   interactionMode: InterviewInteractionMode
 }): void {
-  const { state, messages, questionIndex, remainingSec, omitPrintAnswers, answersRecorded, interactionMode } = args
+  const { state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource, omitPrintAnswers, answersRecorded, interactionMode } = args
   useEffect(() => {
     if (!state?.sessionId) return
     patchInterviewWorkbenchSession({
@@ -29,10 +31,12 @@ export function useInterviewLivePersist(args: {
         messages,
         questionIndex,
         remainingSec,
+        deadlineAtLocalMs,
+        deadlineSource,
         omitPrintAnswers,
         answersRecorded,
         interactionMode,
       },
     })
-  }, [state, messages, questionIndex, remainingSec, omitPrintAnswers, answersRecorded, interactionMode])
+  }, [state, messages, questionIndex, remainingSec, deadlineAtLocalMs, deadlineSource, omitPrintAnswers, answersRecorded, interactionMode])
 }
