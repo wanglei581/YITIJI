@@ -462,5 +462,9 @@ for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile
 const errorOfflineSrc = read('src/pages/placeholders/ErrorOfflinePage.tsx')
 assert.match(errorOfflineSrc, /key: 'jobs'[^\n]*name: '机构官方渠道'/, 'system state item 8 is 机构官方渠道 (hosting a)')
 assert.doesNotMatch(errorOfflineSrc, /name: '岗位与招聘会信息'|AI、岗位信息没有/, 'system state no longer lists recruitment info')
+// 2026-10-10 真机实操 F-03：这一页没有检测 U 盘的口，不能写死「暂未开通」（实测那台机器 U 盘是通的）。照定稿 09：用时再看。
+assert.match(errorOfflineSrc, /key: 'usb'[^\n]*dep: '插上之后才知道能不能读，这里不提前写成可用'/, 'system state USB row follows draft 09 and does not claim a status')
+assert.doesNotMatch(errorOfflineSrc, /暂未开通/, 'system state never says a capability is not enabled without checking it')
+assert.equal((errorOfflineSrc.match(/q\('用时再看'\)/g) || []).length, 4, 'USB verdict is 用时再看 in all four views')
 
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')
