@@ -33,6 +33,7 @@ import {
   verifyPasswordReset,
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
+import { PhoneVerificationGuide } from './PhoneVerificationGuide'
 import './login.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 type LoginMode = 'password' | 'sms'
@@ -258,6 +259,9 @@ export default function LoginPage() {
     const r = await sendOwnPhoneCode()
     setPhoneVerifyBusy(false)
     if (r.ok) phoneVerifyCountdown.start(r.cooldownSeconds || 60)
+    else if (r.code === 'ACCOUNT_PASSWORD_PROOF_NOT_READY') {
+      setPhoneVerifyUser({ ...phoneVerifyUser, phoneSelfVerifyReady: false })
+    }
     else setPhoneVerifyError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
@@ -612,7 +616,9 @@ export default function LoginPage() {
         </div>
       )}
 
-      {phoneVerifyUser && (
+      {phoneVerifyUser && (phoneVerifyUser.phoneSelfVerifyReady === false ? (
+        <PhoneVerificationGuide onClose={() => nav('/', { replace: true })} />
+      ) : (
         <div className="c-modal" role="dialog" aria-modal="true" aria-label="手机号本人验证">
           <form className="c-modal-card" onSubmit={confirmPhoneVerification}>
             <div className="c-modal-head">
@@ -666,7 +672,7 @@ export default function LoginPage() {
             </div>
           </form>
         </div>
-      )}
+      ))}
 
       {legalDoc && <LegalDocsModal initialDoc={legalDoc} onClose={() => setLegalDoc(null)} />}
 

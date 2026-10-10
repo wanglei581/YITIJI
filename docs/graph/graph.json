@@ -16509,7 +16509,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 86,
+      "reachableFileCount": 87,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -16927,7 +16927,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 87
+      "sourceFileCount": 88
     }
   },
   "dataModel": {
@@ -18561,6 +18561,7 @@
           "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
           "services/api/src/auth/admin-registered-phone-reset.ts",
+          "services/api/src/auth/auth.controller.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/initial-phone-bind.service.ts",
@@ -22441,8 +22442,15 @@
     "apps/partner/src/routes/login/LegalDocsModal.tsx": [
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
+    "apps/partner/src/routes/login/PhoneVerificationGuide.tsx": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
     "apps/partner/src/routes/login/index.tsx": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
+    "apps/partner/src/routes/login/login.css": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/partner/src/routes/policy/PolicyEmergencyNote.tsx": [
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -22582,8 +22590,12 @@
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
       "services/api/scripts/verify-jobfair-checkin.ts"
     ],
+    "apps/partner/src/services/api/userErrorMessage.ts": [
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
+    ],
     "apps/partner/src/services/auth/index.ts": [
-      "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
+      "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/partner/scripts/verify-partner-phone-verify-guide.mjs"
     ],
     "apps/terminal-agent/config/agent-config.example.json": [
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
@@ -25237,7 +25249,9 @@
     "services/api/src/auth/password-proof-state.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
+      "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
+      "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts"
     ],
     "services/api/src/benefit-activities/admin-benefit-activities.controller.ts": [
@@ -33159,6 +33173,28 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/partner/src/routes/login/PhoneVerificationGuide.tsx",
+          "apps/partner/src/routes/login/index.tsx",
+          "apps/partner/src/routes/login/login.css",
+          "apps/partner/src/services/api/userErrorMessage.ts",
+          "apps/partner/src/services/auth/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-phone-verify-guide.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-phone-verify-guide"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/companies/CompaniesTable.tsx",
@@ -38236,6 +38272,7 @@
           "services/api/src/auth/initial-phone-bind.service.ts",
           "services/api/src/auth/internal-auth-verify-target.ts",
           "services/api/src/auth/internal-otp.service.ts",
+          "services/api/src/auth/password-proof-state.ts",
           "services/api/src/common/crypto/phone-identity.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -40634,6 +40671,7 @@
           "services/api/src/auth/auth.controller.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/initial-phone-bind.service.ts",
+          "services/api/src/auth/password-proof-state.ts",
           "services/api/src/orgs/admin-org-account-view.ts",
           "services/api/src/orgs/admin-orgs.service.ts"
         ],

@@ -167,7 +167,7 @@ flowchart TD
 | **ToolboxApp** | 12 | ToolboxAppVersion | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAppVersion** | 14 | ToolboxApp | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxLaunchEvent** | 10 | — | 1 个文件<br/>`terminals/terminal-toolbox.service.ts` |
-| **User** | 29 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision、TerminalCommand | 25 个文件<br/>`admin-internal-accounts/admin-internal-accounts.service.ts`<br/>`admin-internal-accounts/admin-step-up.ts`<br/>`admin-internal-accounts/backup-admin-create.service.ts`<br/>… |
+| **User** | 29 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision、TerminalCommand | 26 个文件<br/>`admin-internal-accounts/admin-internal-accounts.service.ts`<br/>`admin-internal-accounts/admin-step-up.ts`<br/>`admin-internal-accounts/backup-admin-create.service.ts`<br/>… |
 | **UserAiConsent** | 8 | EndUser | 5 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 10 个文件<br/>`admin-users/admin-user-closure-read.ts`<br/>`member-privacy/member-closure-requests.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **UserNotification** | 10 | — | 1 个文件<br/>`member-privacy/member-closure.service.ts` |
