@@ -15,7 +15,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:ai-config
  */
 import 'dotenv/config'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { LlmConfigService } from '../src/ai/llm/llm-config.service'
@@ -237,6 +237,8 @@ async function hunyuanChecks(svc: LlmConfigService): Promise<void> {
     process.env['AI_ENDPOINT_ALLOWLIST_EXTRA'] = 'tokenhub.tencentmaas.com'
     await rejected(() => svc.update({ vendor: 'hunyuan' }), 'AI_CONFIG_API_KEY_REQUIRED', 'H4 放行后切混元不带密钥拒绝，配置原样')
     await rejected(() => svc.update({ baseURL: 'https://tokenhub.tencentmaas.com/v1' }), 'AI_CONFIG_API_KEY_REQUIRED', 'H4b 只改地址不改厂商也须换钥，配置原样')
+    // 前置：这个子键此刻确实还在继承父键，否则下面测的就不是「继承来的密钥」。
+    strictEqual(svc.getView('advisor_work').inheritedFrom, 'assistant_chat')
     await rejected(() => svc.update({ vendor: 'hunyuan' }, 'advisor_work'), 'AI_CONFIG_API_KEY_REQUIRED', 'H5 继承父功能位的子键换厂商不带密钥也拒绝')
     svc.update({ vendor: 'hunyuan', apiKey: 'verify-tencent-key' })
     strictEqual(svc.getApiKey(), 'verify-tencent-key')
@@ -289,7 +291,16 @@ async function hunyuanChecks(svc: LlmConfigService): Promise<void> {
     }
     pass('H14 两个 POST 只测试已存配置，附加的调用方地址/密钥不影响请求')
 
-    for (const url of [undefined, 'https://api.deepseek.com/v1/x', 'https://tokenhub.tencentmaas.com/v1/x', 'invalid-url']) {
+    // 期望值逐条写死、不从地址里推：主机名里带着 api.deepseek.com 字样的仿冒域名、
+    // 路径里带这串字的别家地址，都必须算「别家」。
+    for (const [url, reuse] of [
+      [undefined, true],
+      ['https://api.deepseek.com/v1/x', true],
+      ['https://tokenhub.tencentmaas.com/v1/x', false],
+      ['invalid-url', false],
+      ['https://api.deepseek.com.evil.example/v1/x', false],
+      ['https://evil.example/api.deepseek.com/v1/x', false],
+    ] as const) {
       const dir = mkdtempSync(join(tmpdir(), 'vac-env-'))
       try {
         process.env['FILE_STORAGE_DIR'] = dir
@@ -299,11 +310,36 @@ async function hunyuanChecks(svc: LlmConfigService): Promise<void> {
         else process.env['TRTC_LLM_API_URL'] = url
         const envSvc = new LlmConfigService()
         strictEqual(envSvc.getView().vendor, 'deepseek')
-        strictEqual(envSvc.getApiKey(), url === undefined || url.includes('api.deepseek.com') ? 'verify-trtc-only-key' : null)
+        strictEqual(envSvc.getApiKey(), reuse ? 'verify-trtc-only-key' : null)
         pass(`H15 fromEnv 数字人地址 ${url ?? '未设'}：仅深度求索可复用密钥`)
         process.env['AI_LLM_API_KEY'] = 'verify-ai-only-key'
         strictEqual(new LlmConfigService().getApiKey(), 'verify-ai-only-key')
         pass(`H16 fromEnv ${url ?? '未设'}：AI_LLM_API_KEY 优先且默认厂商不变`)
+      } finally { rmSync(dir, { recursive: true, force: true }) }
+    }
+
+    // 存量坏地址：白名单收紧前可能存下解析不了的地址。从它换到新地址时按「换了主机」要求重填密钥，
+    // 回的是 400 和那句人话，不能因为解析旧地址失败而报 500。
+    {
+      const dir = mkdtempSync(join(tmpdir(), 'vac-bad-'))
+      try {
+        const disk = JSON.parse(readFileSync(CONFIG_FILE, 'utf8')) as Record<string, Record<string, unknown>>
+        disk['assistant_chat'] = { ...disk['assistant_chat'], baseURL: 'not a url' }
+        writeFileSync(join(dir, 'ai-model-configs.json'), JSON.stringify(disk), 'utf8')
+        process.env['FILE_STORAGE_DIR'] = dir
+        const badSvc = new LlmConfigService()
+        strictEqual(badSvc.getView().baseURL, 'not a url')
+        strictEqual(badSvc.getApiKey(), SECRET)
+        let error: unknown
+        try { badSvc.update({ vendor: 'hunyuan' }) } catch (caught) { error = caught }
+        strictEqual(errCode(error), 'AI_CONFIG_API_KEY_REQUIRED')
+        strictEqual((error as { getStatus(): number }).getStatus(), 400)
+        strictEqual(badSvc.getView().baseURL, 'not a url')
+        strictEqual(badSvc.getApiKey(), SECRET)
+        badSvc.update({ vendor: 'hunyuan', apiKey: 'verify-after-bad-url' })
+        strictEqual(badSvc.getView().baseURL, 'https://tokenhub.tencentmaas.com/v1')
+        strictEqual(badSvc.getApiKey(), 'verify-after-bad-url')
+        pass('H17 原地址解析不了：不带密钥换地址回 400（不是 500）且配置不变，带新密钥能换走')
       } finally { rmSync(dir, { recursive: true, force: true }) }
     }
   } finally {

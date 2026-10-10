@@ -17,7 +17,7 @@ import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
 import { evaluateAiPlatform } from '../../config/ai-platform-config'
-import { assertApprovedLlmBaseUrl } from './llm-base-url'
+import { assertApprovedLlmBaseUrl, llmBaseUrlHostname } from './llm-base-url'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -389,12 +389,10 @@ export class LlmConfigService {
   private fromEnv(): PersistedConfig {
     const vendor: LlmVendor = 'deepseek'
     const preset = LLM_PRESETS[vendor]
+    // 数字人那把密钥只有在数字人确实指向深度求索时才拿来兜底（地址没设时它的默认就是深度求索）。
+    // 数字人换成别家后，这把就是别家的密钥，不能当深度求索的密钥发出去。
     const trtcUrl = process.env['TRTC_LLM_API_URL']
-    let trtcUsesDeepseek = !trtcUrl
-    if (trtcUrl) {
-      try { trtcUsesDeepseek = new URL(trtcUrl).hostname === 'api.deepseek.com' }
-      catch { trtcUsesDeepseek = false }
-    }
+    const trtcUsesDeepseek = !trtcUrl || llmBaseUrlHostname(trtcUrl) === 'api.deepseek.com'
     const envKey = process.env['AI_LLM_API_KEY'] || (trtcUsesDeepseek ? process.env['TRTC_LLM_API_KEY'] : '') || ''
     // 只读 AI_LLM_MODEL；TRTC_LLM_MODEL 是数字人专用，不跨路由
     const envModel = (process.env['AI_LLM_MODEL'] || '').trim()
@@ -555,8 +553,9 @@ export class LlmConfigService {
     if (next.baseURL !== previousBaseURL) assertApprovedLlmBaseUrl(next.baseURL, '保存')
     // 白名单先报；再防止换主机时把上一家的凭证发给新地址。
     // next 尚未写回 cache，拒绝时内存、继承关系和落盘内容都保持原样。
+    // 原地址解析不了（存量坏地址）时按「换了主机」处理：要求重填，而不是抛 500。
     if (next.baseURL !== previousBaseURL && patch.apiKey === undefined && next.apiKeyEncrypted &&
-        new URL(next.baseURL).hostname !== new URL(previousBaseURL).hostname) {
+        llmBaseUrlHostname(next.baseURL) !== llmBaseUrlHostname(previousBaseURL)) {
       throw new BadRequestException({
         error: {
           code: 'AI_CONFIG_API_KEY_REQUIRED',
