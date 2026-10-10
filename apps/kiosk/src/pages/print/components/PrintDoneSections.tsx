@@ -140,7 +140,7 @@ export function PrintJobSummaryCard({ file, params }: {
  * 缺纸按机器故障标准句说明。付过钱才写退款那一句；免费单不写退款。
  */
 export function PrintOutOfPaperPanel({
-  file, params, orderNo, failureReason, money, canRetry, takeaway,
+  file, params, orderNo, failureReason, money, canRetry, resumeLine, takeaway,
 }: {
   file: { name: string; pages: number | null } | null
   params: Partial<PrintJobParams> | null
@@ -152,6 +152,8 @@ export function PrintOutOfPaperPanel({
   money: OutOfPaperMoney
   /** 服务端 takeaway-url 的 canRetry；为真时底部才有「重新提交打印」。 */
   canRetry: boolean
+  /** 同码接着打的说明；不符合条件（现场单、付费单、不能重打）时传 null。 */
+  resumeLine: string | null
   /** 页面签发的「文件带走」区块（二维码 / 过期 / 签发失败），原样放在任务区之后。 */
   takeaway: ReactNode
 }) {
@@ -177,8 +179,9 @@ export function PrintOutOfPaperPanel({
             </div>
             <p className="pff-inbar-b">
               纸匣已空，这次打印<b>不会在加纸后自动继续</b>。出纸口里如果已经有纸，可以先拿走。{fault}
-              {paid ? '订单和支付记录都保留着' : '订单记录保留着'}；只有本页出现「重新提交打印」按钮时，才能自己重打一次{paid ? '，且不会重复收费。' : '。'}
+              {paid ? '订单和支付记录都保留着' : '订单记录保留着'}；本页下方有「重新提交打印」按钮时，可以点它整份重打{paid ? '，且不会重复收费。' : '。'}
             </p>
+            {resumeLine ? <p className="pff-inbar-b" data-testid="print-fulfill-resume-line">{resumeLine}</p> : null}
             <p className="pff-inbar-b pfd-reason"><span className="pfd-reason-k">设备上报</span><span>{failureReason}</span></p>
           </div>
           <PrintFeeBoundaryBar
@@ -239,7 +242,7 @@ export function PrintJamGuide({ orderNo }: { orderNo: string | null }) {
     <section className="pff-jam-fill" aria-label="处理之前先做这三件">
       <div className="pff-sec-h">
         <span className="t">处理之前先做这三件</span>
-        <span className="hint">当场处理最快</span>
+        <span className="hint">先别动机器</span>
       </div>
       <div className="pff-jam-steps">
         <div className="pff-step">

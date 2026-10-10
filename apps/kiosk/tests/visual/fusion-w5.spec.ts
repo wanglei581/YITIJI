@@ -1845,7 +1845,7 @@ test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kio
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
   await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
-  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单。')).toBeVisible()
   await expect(usedRow.getByText('还能续打')).toHaveCount(0)
 })
 
