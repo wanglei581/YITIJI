@@ -17,6 +17,22 @@
 export const ADVISOR_SKILLS = ['qa', 'slot_fill', 'compare'] as const
 export type AdvisorSkill = (typeof ADVISOR_SKILLS)[number]
 
+/**
+ * 判型说明：按作业型的固定句，模型判的和关键词兜底判的用同一套。
+ *
+ * 不保存、不返回模型自己写的判型理由 —— 它可以把用户的开场原话复述进去，
+ * 那等于换个栏位把「对话不保存」绕了过去。
+ */
+export const SKILL_REASONS: Readonly<Record<AdvisorSkill, string>> = {
+  compare: '你问的像是「够不够格」——有明确的两样东西要放一起看，所以按比对型办。',
+  slot_fill: '你说的像是「我不会写」——东西还不存在，得先问出来，所以按填槽型办。',
+  qa: '你问的是一个拿不准的判断，没有现成的两样东西可比——所以按问答型办。',
+}
+
+/** AdvisorSession.topic 只存这两个固定标签之一，不存用户原话。 */
+export const ADVISOR_SESSION_TOPIC = '顾问作业'
+export const ASSISTANT_SUMMARY_TOPIC = '小青对话要点'
+
 export function isAdvisorSkill(value: unknown): value is AdvisorSkill {
   return typeof value === 'string' && (ADVISOR_SKILLS as readonly string[]).includes(value)
 }
@@ -56,13 +72,6 @@ export interface AdvisorSlotSpec {
  * 槽位内容是**用户自己填的材料**，送模型前一律过 PII 遮盖（见 llm-advisor.service.ts）。
  */
 export const SLOT_SPECS: readonly AdvisorSlotSpec[] = [
-  // ── 问答型 ──
-  {
-    key: 'question',
-    prompt: '你想问什么？',
-    hint: '直接说就行，不用组织语言',
-    maxChars: 600,
-  },
   // ── 填槽型（对应设计页「帮你写一段自我介绍 · 共 4 问」）──
   {
     key: 'current_role',
@@ -127,8 +136,9 @@ export const SKILL_SPECS: Readonly<Record<AdvisorSkill, AdvisorSkillSpec>> = {
     skill: 'qa',
     label: '问答型',
     tagline: '有用的记得钉住 —— 对话不保存，钉住的能打成纸',
-    slotKeys: ['question'],
-    requiredSlotKeys: ['question'],
+    // 问答型没有输入槽：开场诉求只用来判型、不落库；追问走 /ask，只在进程内存里。
+    slotKeys: [],
+    requiredSlotKeys: [],
     artifactKind: 'qa_pins',
   },
   slot_fill: {
@@ -264,22 +274,13 @@ const SLOT_FILL_HINTS = [
  */
 export function classifySkillByKeyword(topic: string): { skill: AdvisorSkill; reason: string } {
   const text = topic.trim()
+  let skill: AdvisorSkill = 'qa'
   if (COMPARE_HINTS.some((hint) => text.includes(hint))) {
-    return {
-      skill: 'compare',
-      reason: '你问的像是「够不够格」——有明确的两样东西要放一起看，所以按比对型办。',
-    }
+    skill = 'compare'
+  } else if (SLOT_FILL_HINTS.some((hint) => text.includes(hint))) {
+    skill = 'slot_fill'
   }
-  if (SLOT_FILL_HINTS.some((hint) => text.includes(hint))) {
-    return {
-      skill: 'slot_fill',
-      reason: '你说的像是「我不会写」——东西还不存在，得先问出来，所以按填槽型办。',
-    }
-  }
-  return {
-    skill: 'qa',
-    reason: '你问的是一个拿不准的判断，没有现成的两样东西可比——所以按问答型办。',
-  }
+  return { skill, reason: SKILL_REASONS[skill] }
 }
 
 // ── 「本机比不了的」：服务端常量，不由模型生成 ────────────────

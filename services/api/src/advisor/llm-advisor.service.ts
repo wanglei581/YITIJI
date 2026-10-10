@@ -18,6 +18,7 @@ import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   ADVISOR_DISCLAIMER,
+  SKILL_REASONS,
   classifySkillByKeyword,
   isAdvisorSkill,
   type AdvisorSkill,
@@ -216,7 +217,7 @@ export class LlmAdvisorService {
       const skill = parsed?.skill
       const reason = typeof parsed?.reason === 'string' ? parsed.reason.trim().slice(0, 200) : ''
       if (isAdvisorSkill(skill) && reason && !findViolation(reason)) {
-        return { skill, reason, source: 'llm' }
+        return { skill, reason: SKILL_REASONS[skill], source: 'llm' }
       }
       this.logger.warn('advisor.classify invalid_output → keyword fallback')
     } catch {
