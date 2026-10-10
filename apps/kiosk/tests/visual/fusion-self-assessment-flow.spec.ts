@@ -98,7 +98,25 @@ async function twoFrames(page: Page) {
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
 }
 
-/** 先等字体，再按滚动区实际内沿量整块勾选框及最后一条说明；包含舞台缩放。 */
+/** 平滑滚动停稳：连续 12 帧 scrollTop 不变。 */
+async function scrollSettled(page: Page) {
+  await page.locator('.sa-qx .qx-scroll').evaluate((el) => new Promise<void>((resolve) => {
+    let last = el.scrollTop
+    let same = 0
+    const tick = () => {
+      if (el.scrollTop === last) same += 1
+      else { same = 0; last = el.scrollTop }
+      if (same >= 12) resolve()
+      else requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }))
+}
+
+/** 整张同意卡片（两个勾选框和最后一条说明都在里面）完整落在滚动区可见范围内。 */
+const CONSENT_IN_VIEW = { card: true, checkbox: true, sensitive: true, lastItem: true }
+
+/** 先等字体，再按滚动区实际内沿量同意卡片、两个勾选框及最后一条说明；包含舞台缩放。 */
 async function consentVisibility(page: Page) {
   return page.locator('.sa-qx .qx-scroll').evaluate(async (scroll) => {
     await document.fonts.ready
@@ -113,7 +131,9 @@ async function consentVisibility(page: Page) {
     }
     const required = scroll.querySelector('[data-testid="self-assessment-consent-required"]')
     return {
+      card: inside(scroll.querySelector('[data-testid="self-assessment-consent"]')),
       checkbox: inside(required) && inside(required?.closest('.sa-cbox') ?? null),
+      sensitive: inside(scroll.querySelector('[data-testid="self-assessment-consent-sensitive"]')),
       lastItem: inside(scroll.querySelector('[data-testid="self-assessment-consent-items"] li:last-child')),
     }
   })
@@ -325,42 +345,59 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await page.evaluate(() => document.fonts.ready)
     await twoFrames(page)
     expect((await consentVisibility(page)).checkbox, '前提：首屏必选勾选框不能完整可见').toBe(false)
-    await expect(cue).toBeVisible()
-    expect(SA_SCROLL_CUE).toBe('下面还有内容，手指往上滑')
-    expect(await cue.textContent()).toBe(SA_SCROLL_CUE)
+    await expect(cue, '首屏提示条可见').toBeVisible()
+    expect(SA_SCROLL_CUE, '常量逐字等于定稿句子').toBe('下面还有内容，手指往上滑')
+    expect(await cue.textContent(), '提示条文字逐字等于常量').toBe(SA_SCROLL_CUE)
     const cueBox = await cue.boundingBox()
     const gateBox = await gate.boundingBox()
     expect(cueBox).not.toBeNull()
     expect(gateBox).not.toBeNull()
-    expect(cueBox!.height).toBeGreaterThanOrEqual(48)
-    expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(gateBox!.y)
+    expect(cueBox!.height, '提示条高度不小于 48px（CLAUDE.md §9）').toBeGreaterThanOrEqual(48)
+    expect(Math.abs(cueBox!.height - 52), '提示条高度与稿的 52px 相差不超过 1px').toBeLessThanOrEqual(1)
+    expect(Math.abs(cueBox!.x - gateBox!.x), '提示条与红条左对齐').toBeLessThanOrEqual(2)
+    expect(Math.abs(cueBox!.width - gateBox!.width), '提示条与红条同宽').toBeLessThanOrEqual(2)
+    expect(cueBox!.y + cueBox!.height, '提示条在红条上方').toBeLessThanOrEqual(gateBox!.y)
     expect(cueBox!.x).toBeGreaterThanOrEqual(0)
     expect(cueBox!.y).toBeGreaterThanOrEqual(0)
     expect(cueBox!.x + cueBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
     expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
     const storedBefore = await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))
     const stillPending = async () => {
-      await expect(required).toHaveAttribute('aria-checked', 'false')
-      await expect(primary).toHaveAttribute('aria-disabled', 'true')
-      await expect(intro).toHaveAttribute('data-state', 'intro-consent-pending')
-      expect(await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))).toBe(storedBefore)
+      await expect(required, '没有替用户勾选').toHaveAttribute('aria-checked', 'false')
+      await expect(primary, '主按钮仍然置灰').toHaveAttribute('aria-disabled', 'true')
+      await expect(intro, '页面仍是待确认').toHaveAttribute('data-state', 'intro-consent-pending')
+      expect(await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1')), '没有写会话').toBe(storedBefore)
     }
 
     // aria-disabled 的按钮仍接受触控，用 force 绕过 Playwright 的 disabled 自动等待。
     await primary.click({ force: true })
-    await expect.poll(() => consentVisibility(page)).toEqual({ checkbox: true, lastItem: true })
+    await expect.poll(() => consentVisibility(page), { message: '点灰按钮后整张同意卡片可见' }).toEqual(CONSENT_IN_VIEW)
+    await stillPending()
+    // 已经完整看得见时再点，正文不动。
+    await scrollSettled(page)
+    const landed = await scroll.evaluate((el) => el.scrollTop)
+    await primary.click({ force: true })
+    await scrollSettled(page)
+    expect(await scroll.evaluate((el) => el.scrollTop), '同意卡片已经完整可见时再点，正文不动').toBe(landed)
     await stillPending()
 
     await scroll.evaluate((el) => el.scrollTo({ top: 0, behavior: 'instant' }))
     await twoFrames(page)
     await expect(cue).toBeVisible()
     await gate.click()
-    await expect.poll(() => consentVisibility(page)).toEqual({ checkbox: true, lastItem: true })
+    await expect.poll(() => consentVisibility(page), { message: '点红条后整张同意卡片可见' }).toEqual(CONSENT_IN_VIEW)
     await stillPending()
 
     await scroll.evaluate((el) => el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }))
     await twoFrames(page)
-    await expect(cue).toHaveCount(0)
+    await expect(cue, '滑到底提示条消失').toHaveCount(0)
+    await stillPending()
+    // 从页底往回：提示条会重新冒出来把可见区压矮，卡片仍要完整落在可见区里。
+    expect((await consentVisibility(page)).card, '前提：滑到底时同意卡片的标题行被上沿切掉').toBe(false)
+    await gate.click()
+    await expect.poll(() => consentVisibility(page), { message: '从页底点红条后整张同意卡片可见' }).toEqual(CONSENT_IN_VIEW)
+    await scrollSettled(page)
+    expect(await consentVisibility(page), '从页底点红条、停稳后整张同意卡片仍可见').toEqual(CONSENT_IN_VIEW)
     await stillPending()
 
     // 提示条自身也是可点的，点后移动正文但不改同意。
@@ -368,7 +405,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await twoFrames(page)
     await expect(cue).toBeVisible()
     await cue.click()
-    await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    await expect.poll(() => scroll.evaluate((el) => el.scrollTop), { message: '点提示条后正文向下滚动' }).toBeGreaterThan(0)
     await stillPending()
     await required.click()
     await twoFrames(page)
@@ -378,7 +415,7 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await expect(page).toHaveURL(/\/resume\/self-assessment\/questions$/)
     await expect(page.locator('[data-kiosk-screen="resume-self-assessment-quiz"]')).toBeVisible()
     await twoFrames(page)
-    await expect(cue).toHaveCount(0)
+    await expect(cue, '答题页没有提示条').toHaveCount(0)
   })
 
   test('旧版本会话提交被拒：回到重新确认，已答保留，确认后自动重交一次 @w3-kiosk', async ({ page, api }) => {

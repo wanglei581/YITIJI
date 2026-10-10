@@ -32,16 +32,23 @@ function saScrollBehavior(): ScrollBehavior {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
 }
 
-/** 只移动正文：按舞台缩放换回 CSS px，让目标下沿贴近滚动区下沿，保留上文。 */
+/**
+ * 只移动正文，把目标就近挪进可见区（按舞台缩放换回 CSS px）：目标在下面，让它的下沿贴住可见区下沿，
+ * 上文留在屏幕里；目标被上沿切到，让它的上沿贴住上沿；已经完整看得见就不动。
+ * 不能一律贴下沿：提示条只在没滑到底时占一行，从页底往回滚时它会冒出来把可见区压矮，贴下沿会把目标底部切掉。
+ */
 export function scrollSaTargetIntoView(scroll: HTMLDivElement | null, selector: string) {
   const target = scroll?.querySelector<HTMLElement>(selector)
   if (!scroll || !target) return
   const box = scroll.getBoundingClientRect()
   const scale = box.height / scroll.offsetHeight
   if (!scale) return
-  const bottom = box.top + (scroll.clientTop + scroll.clientHeight) * scale
-  const top = scroll.scrollTop + (target.getBoundingClientRect().bottom - bottom) / scale
-  scroll.scrollTo({ top: Math.max(0, Math.min(top, scroll.scrollHeight - scroll.clientHeight)), behavior: saScrollBehavior() })
+  const top = box.top + scroll.clientTop * scale
+  const bottom = top + scroll.clientHeight * scale
+  const rect = target.getBoundingClientRect()
+  const delta = rect.bottom > bottom + 1 ? rect.bottom - bottom : rect.top < top - 1 ? rect.top - top : 0
+  if (!delta) return
+  scroll.scrollTo({ top: Math.max(0, Math.min(scroll.scrollTop + delta / scale, scroll.scrollHeight - scroll.clientHeight)), behavior: saScrollBehavior() })
 }
 
 function useSaScrollCue(scrollRef: RefObject<HTMLDivElement>, text: string | undefined, children: ReactNode) {

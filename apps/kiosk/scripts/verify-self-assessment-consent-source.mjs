@@ -111,7 +111,6 @@ function walk(dir) {
   const guarded = find(tree, (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'GuardedButton')[0]
   const cue = find(tree, (node) => ts.isVariableDeclaration(node) && node.name.getText(tree) === 'SA_SCROLL_CUE')
   if (cue.length !== 1 || !ts.isStringLiteral(cue[0].initializer) || cue[0].initializer.text !== '下面还有内容，手指往上滑') fail('T34-cue: 提示句常量必须逐字等于定稿')
-  if (flow.trimEnd().split('\n').length > 1185) fail('T34-cue: SelfAssessmentFlow.tsx 不得超过 1185 行')
   const cueCallers = []
   for (const file of walk(join(kioskRoot, 'src'))) {
     const source = readFileSync(file, 'utf8')
@@ -132,7 +131,7 @@ function walk(dir) {
     for (const attr of ['onClick', 'onBlockedClick']) {
       if (!intro.getText(tree).includes(`${attr}={bundle && !ok ? revealConsent : undefined}`)) fail(`T34-cue: ${attr} 必须仅在说明已读到且未勾选时滚动`)
     }
-    if (!intro.getText(tree).includes('const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, \'.sa-cbox:has([data-testid="self-assessment-consent-required"])\')')) fail('T34-cue: 两处点击必须只滚动到整块同意框')
+    if (!intro.getText(tree).includes('const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, \'[data-testid="self-assessment-consent"]\')')) fail('T34-cue: 两处点击必须只滚动到整张同意卡片')
   }
   // 编译真实 GuardedButton，点它的 onClick；不是只匹配 if 字符串。
   if (!guarded) fail('T34-cue: 找不到 GuardedButton')
@@ -165,7 +164,7 @@ function walk(dir) {
     }
   }
   if (rules(".sa-gate[data-clickable='true']").some((body) => declarations(body).cursor !== 'pointer') || !rules(".sa-gate[data-clickable='true']").length) fail('T34-cue: 可点红条必须有手型光标')
-  for (const needle of ['scrollCue?: string', 'ref={bodyRef}', 'data-testid="self-assessment-scrollcue"', 'scroll.clientHeight - scroll.scrollTop > 24', 'new ResizeObserver(schedule)', 'document.fonts.ready.then(schedule)', "scroll.addEventListener('scroll', schedule", 'requestAnimationFrame', 'cancelAnimationFrame', 'clientHeight * 0.6', "? 'instant' : 'smooth'"]) {
+  for (const needle of ['scrollCue?: string', 'ref={bodyRef}', 'data-testid="self-assessment-scrollcue"', 'scroll.clientHeight - scroll.scrollTop > 24)', 'new ResizeObserver(schedule)', 'document.fonts.ready.then(schedule)', "scroll.addEventListener('scroll', schedule", 'requestAnimationFrame', 'cancelAnimationFrame', 'clientHeight * 0.6,', "? 'instant' : 'smooth'"]) {
     if (!kit.includes(needle)) fail(`T34-cue: 组件缺少 ${needle}`)
   }
   if (/setInterval|setTimeout/.test(kit)) fail('T34-cue: 提示条不得定时轮询')

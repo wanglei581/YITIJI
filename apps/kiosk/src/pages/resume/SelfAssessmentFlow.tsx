@@ -220,7 +220,7 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
 export function SelfAssessmentIntroPage() {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, '.sa-cbox:has([data-testid="self-assessment-consent-required"])')
+  const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, '[data-testid="self-assessment-consent"]')
   const session = useMemo(() => loadSession(), [])
   const consentBundle = useSelfAssessmentConsentBundle()
   useSelfAssessmentIdleExit()
