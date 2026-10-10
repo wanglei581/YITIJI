@@ -8,6 +8,7 @@ import {
   safeRoutePattern,
   stackFramesOnly,
 } from './error-log'
+import { isPostgresBusyError } from '../prisma/postgres-busy'
 
 function isMachineErrorCode(value: string): boolean {
   return /^[A-Z][A-Z0-9_]+$/.test(value)
@@ -109,7 +110,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let code = DEFAULT_ERROR_CODE
     let message: string = DEFAULT_ERROR_MESSAGE
-    let details: string[] | undefined
+    let details: string[] | FreePrintQuotaDetails | undefined
     let memberFileRetained = false
     let mismatchTerminal: MismatchTerminal | null | undefined
     let closureOrders: Array<{ orderNo: string; status: string }> | undefined
@@ -136,6 +137,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
           if (typeof err['message'] === 'string') message = err['message']
           if (Array.isArray(err['details'])) {
             details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
+          } else if (typeof err['code'] === 'string') {
+            details = pickFreePrintQuotaDetails(err['code'], err['details'])
           }
           // 只透传这个布尔与下面的下一步标识。其它未知字段（文件名、fileId、对象键）继续丢掉。
           if (err['memberFileRetained'] === true) memberFileRetained = true
@@ -178,6 +181,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = HttpStatus.FORBIDDEN
       code = 'ACCOUNT_UNAVAILABLE'
       message = '账号当前不可用'
+    }
+
+    // 锁等待（55P03）或语句超时（57014）。固定句，不回显驱动原文（里面可能有 SQL）。
+    // 领任务自己抛带 TERMINAL_CLAIM_BUSY 的 HttpException，不会走到这里。
+    if (!(exception instanceof HttpException) && isPostgresBusyError(exception)) {
+      status = HttpStatus.SERVICE_UNAVAILABLE
+      code = 'DB_BUSY'
+      message = '服务器忙，请稍后再试'
     }
 
     // Nest Throttler 429 的 body.message 含空格/非机器码（如 "ThrottlerException: Too Many Requests"），
@@ -273,4 +284,34 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const frames = stackFramesOnly(exception)
     this.logger.error(frames.length > 0 ? `${line}\n  ${frames.join('\n  ')}` : line)
   }
+}
+
+interface FreePrintQuotaDetails {
+  limit: number
+  used: number
+  remaining: number
+  requested: number
+  resetAt: string
+}
+
+const FREE_PRINT_QUOTA_CODES = new Set([
+  'PRINT_TERMINAL_DAILY_QUOTA_REACHED',
+  'PRINT_MEMBER_DAILY_QUOTA_REACHED',
+  'PRINT_GUEST_ORDER_QUOTA_EXCEEDED',
+])
+const FREE_PRINT_QUOTA_RESET_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
+
+/** 只放行这三条码的五个有界字段。其它对象形态的 details 继续丢掉。 */
+function pickFreePrintQuotaDetails(code: string, raw: unknown): FreePrintQuotaDetails | undefined {
+  if (!FREE_PRINT_QUOTA_CODES.has(code) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const row = raw as Record<string, unknown>
+  const picked = { limit: 0, used: 0, remaining: 0, requested: 0, resetAt: '' }
+  for (const key of ['limit', 'used', 'remaining', 'requested'] as const) {
+    const value = row[key]
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 1_000_000) return undefined
+    picked[key] = value
+  }
+  if (typeof row.resetAt !== 'string' || !FREE_PRINT_QUOTA_RESET_AT.test(row.resetAt)) return undefined
+  picked.resetAt = row.resetAt
+  return picked
 }

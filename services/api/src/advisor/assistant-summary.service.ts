@@ -1,11 +1,11 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import {
@@ -279,7 +279,7 @@ export class AssistantSummaryService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {

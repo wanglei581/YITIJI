@@ -20,8 +20,17 @@ import {
   paidReprintBlockReason,
   throwIfMemberReprintBlocked,
 } from './paid-reprint-eligibility'
+import { markPaidUnfulfilledRefundRequired, payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { reprintRequestedSides } from './free-print-quota.usage'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
-import { assertSelfServiceReprintRemaining, KIOSK_RETRY_LOG_CODE } from './self-service-reprint'
+import {
+  assertSelfServiceReprintRemaining,
+  KIOSK_RETRY_LOG_CODE,
+  selfServiceAnomalyDecision,
+  selfServiceReprintFlags,
+  throwSelfServiceAnomalyHalt,
+} from './self-service-reprint'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { isPrintableFileRecord, PrintPageCountService } from './print-page-count.service'
@@ -79,6 +88,10 @@ export interface PrintJobRetryResult {
   amountCents: number
   payStatus: OrderPayStatus
   status: string
+  /** 免费单、出纸未确认、冷却期已过。只在为真时出现。 */
+  mayHavePrinted?: boolean
+  /** 免费单、上次只出了一部分。只在为真时出现。 */
+  partialOutput?: boolean
 }
 
 export interface PrintJobAccessContext {
@@ -486,6 +499,12 @@ export class PrintJobsService {
           error: { code: 'PRINT_TERMINAL_NOT_ACTIVE', message: '目标终端已进入维护状态，不再接收新打印任务' },
         })
       }
+      await assertFreePrintQuota(tx, {
+        terminalId: targetTerminalId,
+        endUserId: ctx.endUserId ?? null,
+        requestedSides: billablePages * copies,
+        payableCents: payableCents({ amountCents: quote.amountCents, discountCents: 0 }),
+      })
       const task = await tx.printTask.create({
         data: {
           id:         taskId,
@@ -721,39 +740,65 @@ export class PrintJobsService {
         }
       }
     }
-    throwIfMemberReprintBlocked(paidReprintBlockReason({
-      status: task.status,
+    const preliminary = selfServiceAnomalyDecision({
       errorCode: task.errorCode,
-      hasOrder: true,
-      payStatus: order.payStatus,
-      file,
-      terminalId: task.terminalId,
-      skipAgentVersion: true,
-    }))
-    const fileId = task.fileId ?? file?.id
-    if (!fileId) {
-      throw new ConflictException({
-        error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
-      })
+      amountCents: order.amountCents,
+      discountCents: order.discountCents,
+      unconfirmedSince: task.completedAt,
+    })
+    if (preliminary.action === 'cooldown') throwSelfServiceAnomalyHalt('cooldown')
+    const fileId = task.fileId ?? file?.id ?? null
+    if (preliminary.action !== 'refund') {
+      throwIfMemberReprintBlocked(paidReprintBlockReason({
+        status: task.status,
+        errorCode: task.errorCode,
+        hasOrder: true,
+        payStatus: order.payStatus,
+        file,
+        terminalId: task.terminalId,
+        skipAgentVersion: true,
+        selfServiceAnomalyCleared: preliminary.action === 'reprint',
+      }))
+      if (!fileId) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
+        })
+      }
     }
-    const { url: freshFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    const freshFileUrl = fileId ? signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS).url : null
     const amountBefore = order.amountCents
 
-    await this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       await lockPrintTaskRow(tx, task.id)
       const liveTask = await tx.printTask.findUnique({
         where: { id: task.id },
-        select: { status: true, errorCode: true, terminalId: true },
+        select: { status: true, errorCode: true, terminalId: true, completedAt: true },
       })
+      const liveOrder = await tx.order.findUnique({
+        where: { id: order.id },
+        select: { id: true, payStatus: true, amountCents: true, discountCents: true, refundReason: true, taskStatus: true },
+      })
+      const liveDecision = selfServiceAnomalyDecision({
+        errorCode: liveTask?.errorCode,
+        amountCents: liveOrder?.amountCents ?? order.amountCents,
+        discountCents: liveOrder?.discountCents ?? order.discountCents,
+        unconfirmedSince: liveTask?.completedAt,
+      })
+      if (liveTask?.status === 'failed' && liveDecision.action === 'refund') {
+        if (liveOrder) await markPaidUnfulfilledRefundRequired(tx, liveOrder)
+        return { kind: 'refund' as const }
+      }
+      if (liveTask?.status === 'failed' && liveDecision.action === 'cooldown') return { kind: 'cooldown' as const }
       const agentVersion = await latestHeartbeatAgentVersion(tx, liveTask?.terminalId ?? task.terminalId)
       throwIfMemberReprintBlocked(paidReprintBlockReason({
         status: liveTask?.status ?? '',
         errorCode: liveTask?.errorCode,
         hasOrder: true,
-        payStatus: order.payStatus,
+        payStatus: liveOrder?.payStatus ?? order.payStatus,
         file,
         terminalId: liveTask?.terminalId ?? task.terminalId,
         agentVersion,
+        selfServiceAnomalyCleared: liveDecision.action === 'reprint',
       }))
 
       const activeTerminalLock = task.terminalId
@@ -768,6 +813,11 @@ export class PrintJobsService {
         })
       }
 
+      if (!fileId || !freshFileUrl) {
+        throw new ConflictException({
+          error: { code: 'PRINT_RETRY_FILE_UNAVAILABLE', message: REPRINT_BLOCKED_MESSAGE.file_unavailable },
+        })
+      }
       const liveFile = await tx.fileObject.findUnique({
         where: { id: fileId },
         select: { status: true, deletedAt: true, expiresAt: true },
@@ -778,6 +828,19 @@ export class PrintJobsService {
         })
       }
       await assertSelfServiceReprintRemaining(tx, task.id)
+      const quotaItem = await tx.orderItem.findFirst({
+        where: { printTaskId: task.id },
+        select: { billablePages: true, copies: true },
+      })
+      await assertFreePrintQuota(tx, {
+        terminalId: liveTask?.terminalId ?? task.terminalId ?? '',
+        endUserId: task.endUserId,
+        requestedSides: reprintRequestedSides(quotaItem, order, task.paramsJson),
+        payableCents: payableCents({
+          amountCents: liveOrder?.amountCents ?? order.amountCents,
+          discountCents: liveOrder?.discountCents ?? order.discountCents,
+        }),
+      })
 
       const updatedOrder = await tx.order.updateMany({
         where: {
@@ -814,7 +877,10 @@ export class PrintJobsService {
       await tx.printTaskStatusLog.create({
         data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: KIOSK_RETRY_LOG_CODE },
       })
+      return { kind: 'resumed' as const, notice: liveDecision.action === 'reprint' ? liveDecision.notice : null }
     })
+    if (outcome.kind === 'refund') throwSelfServiceAnomalyHalt('refund')
+    if (outcome.kind === 'cooldown') throwSelfServiceAnomalyHalt('cooldown')
 
     await this.audit.write({
       actorId: null, // 同上：会员 ID 记 payload.endUserId
@@ -845,12 +911,13 @@ export class PrintJobsService {
       amountCents: fresh.order.amountCents,
       payStatus: fresh.order.payStatus as OrderPayStatus,
       status: fresh.status,
+      ...selfServiceReprintFlags(outcome.notice),
     }
   }
 
   private canRetryPaidFailedJob(
-    task: { status: string; errorCode: string | null; terminalId: string | null; fileId: string | null },
-    order: { payStatus: string; taskStatus: string },
+    task: { status: string; errorCode: string | null; terminalId: string | null; fileId: string | null; completedAt: Date | null },
+    order: { payStatus: string; taskStatus: string; amountCents: number; discountCents: number },
     file: { status?: string | null; deletedAt?: Date | null; expiresAt?: Date | null } | null,
     terminal: { enabled: boolean; lifecycleStatus: string } | null,
     agentVersion: string | null,
@@ -858,6 +925,13 @@ export class PrintJobsService {
     if (task.fileId && !file) return false
     if (task.terminalId && (terminal?.enabled !== true || terminal.lifecycleStatus !== 'active')) return false
     if (order.taskStatus !== 'failed') return false
+    const anomaly = selfServiceAnomalyDecision({
+      errorCode: task.errorCode,
+      amountCents: order.amountCents,
+      discountCents: order.discountCents,
+      unconfirmedSince: task.completedAt,
+    })
+    if (anomaly.action === 'refund' || anomaly.action === 'cooldown') return false
     return paidReprintBlockReason({
       status: task.status,
       errorCode: task.errorCode,
@@ -866,6 +940,7 @@ export class PrintJobsService {
       file,
       terminalId: task.terminalId,
       agentVersion,
+      selfServiceAnomalyCleared: anomaly.action === 'reprint',
     }) === null
   }
 

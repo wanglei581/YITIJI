@@ -41,6 +41,14 @@ for (const [role, label] of [['system', '系统'], ['system-cli', '系统'], ['e
   const visible = auditPresentation.auditActorText({ ...auditRecord, actorRole: role })
   if (!visible.startsWith(label) || (label === '系统' && visible !== '系统')) fail(`操作人角色 ${role} 未中文化`)
 }
+// 操作人显示名：有就显示，null / 缺字段 / 空白 / 像手机号时退回角色和尾号；完整 actorId 仍只在悬停。
+for (const [actorDisplayName, expected] of [['张敏', '张敏'], ['青岛职业技术学院 · 李老师', '青岛职业技术学院 · 李老师'], [null, '管理员 · 尾号 6p0ssy'], [undefined, '管理员 · 尾号 6p0ssy'], ['  ', '管理员 · 尾号 6p0ssy'], ['13912345678', '管理员 · 尾号 6p0ssy']]) {
+  const record = { ...auditRecord, actorDisplayName }
+  if (auditPresentation.auditActorText(record) !== expected) fail(`操作人显示名 ${String(actorDisplayName)} 应显示为「${expected}」`)
+  const visible = textOf(columns4.map((c) => c.cell(record)))
+  if (!visible.includes(expected) || visible.includes(auditRecord.actorId)) fail('审计列表操作人列应显示同一文字，完整 actorId 只在悬停')
+}
+if (auditPresentation.auditActorText({ ...auditRecord, actorRole: 'system', actorId: null, actorDisplayName: null }) !== '系统') fail('系统操作没有显示名时应显示「系统」')
 // 真实抽屉：编号优先，只有内部 ID 时显示尾号，完整原值仅保留悬停。
 for (const numbered of [true, false]) {
   const internalId = 'terminal-private-123456'

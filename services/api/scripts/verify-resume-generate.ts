@@ -113,6 +113,35 @@ async function main(): Promise<void> {
   const genSvc = new LlmResumeGenerateService(configured as never)
   const genSvcOff = new LlmResumeGenerateService(unconfigured as never)
 
+  // 合法 DTO 也能触发实体上限；必须在实际生成调用点阻止不完整兜底外发。
+  {
+    const { plainToInstance } = await import('class-transformer')
+    const { validate } = await import('class-validator')
+    const { ResumeGenerateRequestDto } = await import('../src/ai/dto/resume-generate.dto')
+    const descriptions = Array.from({ length: 6 }, (_, group) => Array.from({ length: 45 }, (_, i) =>
+      `姓名：测${String.fromCharCode(0x4e00 + group * 45 + i)}`).join('\n'))
+    const dto = plainToInstance(ResumeGenerateRequestDto, {
+      basic: { name: '合成测试用户' }, intention: {},
+      education: descriptions.map((description) => ({ school: '合成学校', description })),
+      experience: [{ company: '合成公司', role: '', description: '手机号：138 0013 8000' }],
+      projects: [], skills: [], certificates: [],
+    })
+    if ((await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).length) fail('PII. 合成复现必须符合真实 DTO')
+    setResponses([])
+    let usageCalls = 0
+    try {
+      await genSvc.generate(dto, () => { usageCalls++ })
+      fail('PII. 异常兜底残留不应进入模型')
+    } catch (e) {
+      const ex = e as { getStatus?: () => number; getResponse?: () => unknown }
+      if (errCode(e) !== 'AI_INPUT_MASK_UNAVAILABLE' || ex.getStatus?.() !== 503) fail('PII. 应返回固定隐私错误码 / 503')
+      const response = JSON.stringify(ex.getResponse?.())
+      if (response.includes('138 0013 8000') || response.includes('姓名：测')) fail('PII. 错误响应不得回显输入')
+      if (llmCallCount !== 0 || usageCalls !== 0) fail('PII. 遮盖未完成不得调用模型或记录模型用量')
+      pass('PII. 合法 DTO 引擎超限 + 兜底残留 → 通用 503，无原文、模型 / 用量回调均 0')
+    }
+  }
+
   // ── 1+2. 结构性防编造 ───────────────────────────────────────────────────
   {
     setResponses([{ status: 200, content: validPolish() }])
