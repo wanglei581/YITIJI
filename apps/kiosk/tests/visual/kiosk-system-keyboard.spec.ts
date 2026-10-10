@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
+import { assistantReply } from './fixtures/fusion-w3-states'
 
 /**
  * 系统键盘共享层：在正式构建的真实反馈页（/me/feedback）上验。
@@ -202,5 +203,84 @@ test('上推着的时候按钮点得中；换页时通知系统键盘收起 @kio
   await page.waitForURL((url) => url.pathname !== '/me/feedback')
   // 换页可能伴随整页刷新，标记放 sessionStorage 才留得住。
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('kbd-fake-hidden'))).toBe('1')
+  await expect(pushed(page)).toHaveCount(0)
+})
+
+/** 小青对话页：不用登录。壳层接口照反馈页那一套，另加语音能力探测和对话接口。 */
+async function openAssistant(page: Page, api: ApiRouter, mode: Mode): Promise<void> {
+  registerApi(api)
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
+  api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: assistantReply })
+  await installFakeKeyboard(page, mode)
+  await page.goto('/assistant')
+  await expect(page.getByLabel('输入咨询问题')).toBeVisible()
+}
+
+test('小青页：输入框靠系统键盘，页面不再有自带文字键盘；拼音选字的回车不发送，平常的回车才发送 @kiosk', async ({ page, api }) => {
+  await openAssistant(page, api, 'push')
+  const input = page.getByLabel('输入咨询问题')
+  await expect(input).not.toHaveAttribute('inputmode', 'none')
+  await expect(input).not.toHaveAttribute('readonly', '')
+  await input.focus()
+  await expect(page.getByRole('group', { name: '虚拟键盘' })).toHaveCount(0)
+  await expect(input).toHaveAttribute('autocomplete', 'off')
+
+  let chatRequests = 0
+  page.on('request', (request) => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/assistant/chat') chatRequests += 1 })
+  await input.fill('柯望舟的简历怎么写')
+  // 拼音选字中的回车：浏览器报 isComposing / keyCode 229，页面必须当成「上屏」放过。
+  await input.evaluate((el) => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true }))
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, keyCode: 229 }))
+  })
+  await page.waitForTimeout(300)
+  expect(chatRequests, '选字的回车不该发出问题').toBe(0)
+  await expect(input).toHaveValue('柯望舟的简历怎么写')
+
+  await input.press('Enter')
+  await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
+  expect(chatRequests).toBe(1)
+})
+
+test('小青页：答过一问后再打字，新草稿那一节叫「这条还没发出」，已问已答的那一节仍叫「本次咨询」 @kiosk', async ({ page, api }) => {
+  await openAssistant(page, api, 'push')
+  const input = page.getByLabel('输入咨询问题')
+  await input.fill('我想整理简历')
+  await page.locator('.assistant-send').click()
+  await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
+  await expect(page.locator('#assistant-conversation-title')).toHaveText('本次咨询')
+
+  await input.fill('继续帮我整理简历')
+  await expect(page.locator('#assistant-task-title')).toHaveText('这条还没发出')
+  await expect(page.locator('#assistant-conversation-title')).toHaveText('本次咨询')
+  await expect(page.getByText('这条还没发出', { exact: true })).toHaveCount(1)
+})
+
+test('小青页：键盘盖住输入框时整页上推，发送按钮仍点得中；「拼音键盘」按钮让输入框得焦 @kiosk', async ({ page, api }) => {
+  await openAssistant(page, api, 'push')
+  const input = page.getByLabel('输入咨询问题')
+  await page.getByRole('button', { name: '拼音键盘', exact: true }).click()
+  await expect(input).toBeFocused()
+
+  const before = await fieldRect(page, '输入咨询问题')
+  const keyboardTop = Math.round(before.top + COVER_FROM_FIELD_TOP)
+  await setKeyboardTop(page, keyboardTop)
+  await expect.poll(async () => (await fieldRect(page, '输入咨询问题')).bottom).toBeLessThanOrEqual(keyboardTop - MARGIN + 1)
+  await input.pressSequentially('abc')
+  await page.locator('.assistant-send').click()
+  await expect(page.locator('[data-message-kind="ai"]')).toBeVisible()
+})
+
+test('取件码页：输入框配着页面数字键盘，得焦后压住系统键盘、不让位 @kiosk', async ({ page, api }) => {
+  registerApi(api)
+  await installFakeKeyboard(page, 'push')
+  await page.goto('/print/pickup-claim')
+  const code = page.locator('#pickup-code-input')
+  await expect(code).toBeVisible()
+  await code.focus()
+  await expect(code).toHaveAttribute('virtualkeyboardpolicy', 'manual')
+  await expect(code).toHaveAttribute('inputmode', 'none')
+  await setKeyboardTop(page, 600)
+  await page.waitForTimeout(200)
   await expect(pushed(page)).toHaveCount(0)
 })
