@@ -22580,6 +22580,9 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/inputs.json": [
+      "apps/terminal-agent/scripts/verify-agent-restart-windows.ts"
+    ],
     "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
     ],
@@ -22602,6 +22605,9 @@
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
+    ],
+    "apps/terminal-agent/scripts/remote-command-rework.helper.ts": [
+      "apps/terminal-agent/scripts/verify-remote-commands.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
@@ -22715,6 +22721,9 @@
       "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
+    ],
+    "apps/terminal-agent/src/agent/service-restart.ts": [
+      "apps/terminal-agent/scripts/verify-agent-restart-windows.ts"
     ],
     "apps/terminal-agent/src/agent/startup-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs"
@@ -33306,6 +33315,27 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "apps/terminal-agent/installer/provision"
+        ],
+        "files": [
+          "apps/terminal-agent/installer/inputs.json",
+          "apps/terminal-agent/src/agent/service-restart.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-agent-restart-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:agent-restart-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/terminal-agent/scripts/diagnose-production-agent.ps1",
@@ -33735,6 +33765,7 @@
         "files": [
           ".github/workflows/ci.yml",
           ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/remote-command-rework.helper.ts",
           "apps/terminal-agent/src/agent/heartbeat.ts",
           "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
           "apps/terminal-agent/src/agent/print-queue-hold.ts",
