@@ -11,6 +11,29 @@ function Write-RestartStage([string]$Stage, [string]$Result) {
   $line = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") + " stage=$Stage result=$Result"
   Add-Content -LiteralPath (Join-Path $logDir "agent-restart.log") -Value $line -Encoding ASCII
 }
+# Close only the kiosk browser the watchdog launched (it alone carries the marker switch;
+# an operator's own Edge or Chrome window never does). The watchdog in the user session
+# relaunches it within seconds with a fresh boot ticket, so the screen also picks up a newly
+# deployed page. Called only once the service is running again, because the relaunch needs
+# the Agent for that ticket. A failure here never fails the restart.
+function Stop-KioskBrowser {
+  $kioskMarker = "--aijobprint-kiosk=1"
+  try {
+    $stopped = 0
+    $candidates = @(Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'" -ErrorAction Stop)
+    foreach ($candidate in $candidates) {
+      $commandLine = [string]$candidate.CommandLine
+      # Browser main process only; its renderer and utility children exit with it.
+      if ($commandLine -like "*$kioskMarker*" -and $commandLine -notlike "*--type=*") {
+        Stop-Process -Id $candidate.ProcessId -Force -ErrorAction Stop
+        $stopped++
+      }
+    }
+    Write-RestartStage "browser" "stopped=$stopped"
+  } catch {
+    Write-RestartStage "browser" "failed"
+  }
+}
 try {
   $service = Get-Service -Name $ServiceName -ErrorAction Stop
   if (-not (Test-Path -LiteralPath $marker)) {
@@ -22,6 +45,7 @@ try {
     Write-RestartStage "resume" "marker-present"
     $service.Refresh()
     if ($service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running) {
+      Stop-KioskBrowser
       Remove-Item -LiteralPath $marker -Force
       Write-RestartStage "complete" "success"
       exit 0
@@ -40,6 +64,7 @@ try {
       if ($service.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) { $service.Start() }
       $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(60))
       Write-RestartStage "start" "running"
+      Stop-KioskBrowser
       Remove-Item -LiteralPath $marker -Force
       Write-RestartStage "complete" "success"
       exit 0

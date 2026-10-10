@@ -640,6 +640,26 @@ assert.match(restartController, /agent-restart\.state/)
 assert.match(restartController, /FromMinutes\(4\)/)
 assert.match(restartController, /\$attempt -le 5/)
 assert.doesNotMatch(restartController, /Spooler|PRINTERS|Remove-Item[^\n]*-Recurse/)
+// A restart also reopens the kiosk browser so the screen picks up a newly deployed page (F-15).
+// It may only ever touch the browser the watchdog launched: same marker, main process only.
+assert.match(restartController, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'restart controller must use the watchdog marker')
+assert.match(kioskWatchdog, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'watchdog marker changed without the restart controller')
+assert.match(restartController, /-like "\*\$kioskMarker\*" -and \$commandLine -notlike "\*--type=\*"/, 'only the marked browser main process may be stopped')
+assert.equal((restartController.match(/Stop-Process/g) ?? []).length, 1, 'the restart controller stops exactly one kind of process')
+assert.doesNotMatch(restartController, /taskkill|Stop-Process -Name|Get-Process/, 'never stop browsers by name')
+{
+  // Checked out as CRLF on Windows, LF elsewhere.
+  const controller = restartController.replace(/\r\n/g, '\n')
+  const body = controller.slice(controller.indexOf('try {\n  $service = Get-Service'))
+  const calls = [...body.matchAll(/Stop-KioskBrowser/g)].map((match) => match.index)
+  assert.equal(calls.length, 2, 'browser is reopened on both the normal and the resumed path')
+  const stopRequested = body.indexOf('$service.Stop()')
+  const running = body.indexOf('Write-RestartStage "start" "running"')
+  assert.ok(stopRequested > -1 && running > -1)
+  assert.ok(calls[1] > running, 'normal path: the browser may only be closed after the service is running again')
+  assert.ok(calls.every((index) => index < stopRequested || index > running || body.slice(0, index).includes('"resume" "marker-present"')), 'never close the browser before the service stop')
+  assert.match(body.slice(calls[0] - 160, calls[0]), /ServiceControllerStatus\]::Running\) \{\s*$/, 'resumed path: only when the service is already running')
+}
 assert.ok([...restartTask + restartController].every((char) => char.charCodeAt(0) < 128), 'restart scripts and logs must be ASCII')
 assert.match(productionInstaller, /Install-AgentRestartTask -ScriptPath \$agentRestartScript/)
 assert.match(productionInstaller, /Write-Host \(Get-AgentRestartStatusLine\)/)

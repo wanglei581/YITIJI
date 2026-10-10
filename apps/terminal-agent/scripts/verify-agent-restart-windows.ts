@@ -1,6 +1,6 @@
 /** Windows CI only: isolated WinSW service and on-demand SYSTEM task; no printer. */
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash, randomBytes } from 'node:crypto'
@@ -52,6 +52,18 @@ async function main(): Promise<void> {
   const trigger = join(stateDir, 'trigger')
   const helper = join(codeRoot, 'service-restart.js')
   const fixture = join(codeRoot, 'fixture.js')
+  // Stand-ins for browser processes: a copy of node.exe named chrome.exe, so Win32_Process reports
+  // Name = 'chrome.exe' and the switches below sit on a real command line. No real browser is started.
+  const fakeBrowser = join(codeRoot, 'chrome.exe')
+  const browserPids: number[] = []
+  const startFakeBrowser = (...switches: string[]): number => {
+    const child = spawn(fakeBrowser, ['-e', 'setInterval(() => {}, 1000)', '--', ...switches], { detached: true, stdio: 'ignore', windowsHide: true })
+    child.unref()
+    assert.ok(child.pid, 'fake browser did not start')
+    browserPids.push(child.pid)
+    return child.pid
+  }
+  const alive = (pid: number) => ps(`@(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Count`) === '1'
   const commands = `. ${quote(registration)};`
   const uninstallTask = `${commands} Uninstall-AgentRestartTask -TaskName ${quote(task)}`
   const installTask = `${commands} Install-AgentRestartTask -ScriptPath ${quote(controller)} -ServiceName ${quote(service)} -StateDir ${quote(stateDir)} -TaskName ${quote(task)}`
@@ -110,6 +122,12 @@ process.on('SIGTERM', () => process.exit(0));
     await until(() => existsSync(identity))
     const readIdentity = () => JSON.parse(readFileSync(identity, 'utf8')) as { pid: number; startedAt: string }
     const eventRecord = Number(ps(`(Get-WinEvent -LogName System -MaxEvents 1 -ErrorAction Stop).RecordId`))
+    // A restart reopens the kiosk browser: only the main process carrying the watchdog marker is closed.
+    copyFileSync(process.execPath, fakeBrowser)
+    const kioskBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
+    const operatorBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/')
+    const kioskChild = startFakeBrowser('--type=renderer', '--aijobprint-kiosk=1')
+    await until(() => ps(`@(Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" | Where-Object { $_.CommandLine -like '*--aijobprint-kiosk=1*' }).Count`) === '2', 15_000)
     for (let iteration = 0; iteration < 3; iteration++) {
       const started = performance.now()
       const old = readIdentity()
@@ -126,6 +144,15 @@ process.on('SIGTERM', () => process.exit(0));
       await until(() => /stage=complete result=success/.test(readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog)), 10_000)
       assert.equal(existsSync(identity + '.error'), false)
       assert.ok(performance.now() - started < 45_000, 'complete normal restart must finish within 45 seconds')
+      const restartLog = readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog)
+      // First restart closes the one marked main process; later restarts find none and still succeed.
+      assert.match(restartLog, iteration === 0 ? /stage=browser result=stopped=1\r?\n/ : /stage=browser result=stopped=0\r?\n/)
+      assert.ok(restartLog.indexOf('stage=start result=running') < restartLog.indexOf('stage=browser'), 'browser is closed only after the service is running again')
+      if (iteration === 0) {
+        await until(() => !alive(kioskBrowser), 10_000) // marked kiosk browser must be closed by the restart
+        assert.equal(alive(operatorBrowser), true, 'a browser without the marker must never be touched')
+        assert.equal(alive(kioskChild), true, 'only the browser main process is targeted')
+      }
       // Wait until controller has exited so the next on-demand run isn't ignored.
       await until(() => ps(`[string](Get-ScheduledTask -TaskName ${quote(task)}).State`) !== 'Running')
     }
@@ -139,10 +166,13 @@ process.on('SIGTERM', () => process.exit(0));
     await until(() => ps(`[string](Get-Service -Name ${quote(service)}).Status`) === 'Running')
     await until(() => !existsSync(marker))
     await until(() => ps(`[string](Get-ScheduledTask -TaskName ${quote(task)}).State`) !== 'Running')
+    assert.equal(alive(operatorBrowser), true, 'unmarked browser survived every restart')
     ps(uninstallTask)
     assert.equal(await requestServiceRestart({ taskName: task }), false)
   } finally {
     // No test task, service, nonce directory or newly-created product roots may survive.
+    for (const pid of browserPids) ps(`Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`)
+    await until(() => browserPids.every((pid) => !alive(pid)), 15_000)
     if (existsSync(registration)) {
       ps(`if (Get-ScheduledTask -TaskName ${quote(task)} -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName ${quote(task)} }; ${uninstallTask}`)
     }
