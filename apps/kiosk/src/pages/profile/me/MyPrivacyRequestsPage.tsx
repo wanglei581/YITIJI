@@ -79,6 +79,18 @@ function closureLine(contact: PublicSupportContact): string {
   return `这台机器上不办理注销。可以${phone}申请。我们核实是你本人后，15 个工作日内处理。`
 }
 
+/** 整句仍由原文案函数生成；只将标准电话片段里的号码和时间作为一组排版。 */
+function keepPhoneHoursTogether(text: string, contact: PublicSupportContact): ReactNode {
+  if (!contact.servicePhone?.trim() || !contact.serviceHours?.trim()) return text
+  const prefix = '拨打服务电话 '
+  const phoneLine = servicePhoneLine(contact)
+  if (!phoneLine.startsWith(prefix)) return text
+  const segment = phoneLine.slice(prefix.length)
+  const at = text.indexOf(segment)
+  if (at < 0) return text
+  return <>{text.slice(0, at)}<span data-testid="member-privacy-phone-hours" style={{ whiteSpace: 'nowrap' }}>{segment}</span>{text.slice(at + segment.length)}</>
+}
+
 function safeMessage(error: unknown, fallback: string): string {
   const detail = userMessageOf(error, fallback)
   if (containsStaffHandoff(detail)) return fallback
@@ -393,7 +405,7 @@ function CapabilityRows({
         <span className="pr-ico" data-tone="off" aria-hidden="true"><FileDownIcon size={28} /></span>
         <span className="pr-cap-main">
           <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.export}</span>
-          <span className="pr-cap-p" data-testid="member-privacy-export-line">{exportLine(contact)}</span>
+          <span className="pr-cap-p" data-testid="member-privacy-export-line">{keepPhoneHoursTogether(exportLine(contact), contact)}</span>
         </span>
         <span className="pr-flag">一体机不提供</span>
       </div>
@@ -401,7 +413,7 @@ function CapabilityRows({
         <span className="pr-ico" data-tone="off" aria-hidden="true"><Trash2Icon size={28} /></span>
         <span className="pr-cap-main">
           <span className="pr-cap-t">账号注销</span>
-          <span className="pr-cap-p" data-testid="member-privacy-closure-line">{closureLine(contact)}</span>
+          <span className="pr-cap-p" data-testid="member-privacy-closure-line">{keepPhoneHoursTogether(closureLine(contact), contact)}</span>
         </span>
         <span className="pr-flag">一体机不办理</span>
       </div>

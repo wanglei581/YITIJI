@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { BriefcaseIcon, LandmarkIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { BriefcaseIcon, ClockIcon, LandmarkIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
 import { helpNeededLine } from '../../../../copy/unattendedCopy'
 import { meErrorGuide } from './meErrorGuide'
 import { useOfficialChannels } from '../../../../hooks/useOfficialChannels'
@@ -9,14 +9,28 @@ import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../..
 import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
 
-export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
+/** 38 以图标启用「—」占位行；未传图标的 39 继续使用原骨架。 */
+export function QxMeSkeletonList({ count = 4, foot, placeholderIcon: Icon }: { count?: number; foot: string; placeholderIcon?: LucideIcon }) {
   return (
-    <section className="qx-me-list qx-me-grow" aria-label="正在加载的记录占位">
+    <section className="qx-me-list qx-me-grow" aria-label="正在加载的记录占位" role={Icon ? 'status' : undefined} aria-busy={Icon ? true : undefined}>
       {Array.from({ length: count }, (_, i) => (
-        <div className="qx-me-row" aria-hidden="true" key={i}>
-          <span className="qx-me-row-ico" data-tone="off" />
-          <span className="qx-me-row-main"><span className="qx-me-skel" /><span className="qx-me-skel qx-me-skel-s" /></span>
-          <span className="qx-me-acts"><span className="qx-me-skel" style={{ width: 110, height: 50, borderRadius: 16 }} /></span>
+        <div className="qx-me-row" data-dead={Icon ? 'true' : undefined} data-slot-mode={Icon ? 'loading' : undefined} aria-hidden="true" key={i}>
+          {Icon ? (
+            <>
+              <span className="qx-me-row-ico" data-tone="off"><Icon size={28} /></span>
+              <span className="qx-me-row-main">
+                <span className="qx-me-row-title"><span className="qx-me-slot">—</span></span>
+                <span className="qx-me-row-sub qx-me-row-foot"><span className="qx-me-slot">—</span><span className="qx-me-slot">—</span></span>
+              </span>
+              <span className="qx-me-acts"><span className="qx-me-small" aria-disabled="true"><ClockIcon size={19} />读取中</span></span>
+            </>
+          ) : (
+            <>
+              <span className="qx-me-row-ico" data-tone="off" />
+              <span className="qx-me-row-main"><span className="qx-me-skel" /><span className="qx-me-skel qx-me-skel-s" /></span>
+              <span className="qx-me-acts"><span className="qx-me-skel" style={{ width: 110, height: 50, borderRadius: 16 }} /></span>
+            </>
+          )}
         </div>
       ))}
       <div className="qx-me-legal">{foot}</div>
@@ -183,7 +197,7 @@ export function QxMeLoginBlock({
   )
 }
 
-export function QxMeLoadingBlock({ title, struct }: { title: string; struct?: ReactNode }) {
+export function QxMeLoadingBlock({ title, struct, placeholderIcon }: { title: string; struct?: ReactNode; placeholderIcon?: LucideIcon }) {
   return (
     <>
       <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
@@ -193,7 +207,7 @@ export function QxMeLoadingBlock({ title, struct }: { title: string; struct?: Re
           <div className="qx-me-legal">这次读取失败不会删除任何记录，也不会改动任何已保存的内容。</div>
         </section>
       ) : (
-        <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
+        <QxMeSkeletonList placeholderIcon={placeholderIcon} foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
       )}
       <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
     </>

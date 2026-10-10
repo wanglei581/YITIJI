@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 583,
+    "endpointCount": 588,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -11,7 +11,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities",
         "roles": [],
@@ -31,7 +32,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities/:id",
         "roles": [],
@@ -51,7 +53,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/activities/:id/claim",
         "roles": [],
@@ -116,7 +119,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/ad-assets/:id/content",
         "roles": [
@@ -139,7 +143,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets",
         "roles": [
@@ -162,7 +167,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets",
         "roles": [
@@ -185,7 +191,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/:id",
         "roles": [
@@ -208,7 +215,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/:id",
         "roles": [
@@ -231,7 +239,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-assets/external-video",
         "roles": [
@@ -254,7 +263,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists",
         "roles": [
@@ -277,7 +287,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists",
         "roles": [
@@ -300,7 +311,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists/:id",
         "roles": [
@@ -323,7 +335,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/ad-playlists/:id",
         "roles": [
@@ -343,6 +356,7 @@
         "models": [
           "AiUsageRecord",
           "AuditLog",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/admin/ai-access",
@@ -363,6 +377,7 @@
         "models": [
           "AiUsageRecord",
           "AuditLog",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/admin/ai-access",
@@ -561,6 +576,46 @@
         ]
       },
       {
+        "controller": "services/api/src/ai/safety/ai-safety-lexicon.controller.ts",
+        "handler": "AiSafetyLexiconController.get",
+        "method": "GET",
+        "models": [
+          "AiSafetyTerm",
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/ai-safety/lexicon",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/safety/ai-safety-lexicon.service.ts"
+        ],
+        "services": [
+          "AiSafetyLexiconService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/safety/ai-safety-lexicon.controller.ts",
+        "handler": "AiSafetyLexiconController.put",
+        "method": "PUT",
+        "models": [
+          "AiSafetyTerm",
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/admin/ai-safety/lexicon",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/safety/ai-safety-lexicon.service.ts"
+        ],
+        "services": [
+          "AiSafetyLexiconService"
+        ]
+      },
+      {
         "controller": "services/api/src/ai/usage/admin-ai-usage.controller.ts",
         "handler": "AdminAiUsageController.daily",
         "method": "GET",
@@ -604,7 +659,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/admin/ai/usage",
         "roles": [
@@ -670,7 +726,8 @@
         "handler": "AuditController.list",
         "method": "GET",
         "models": [
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/admin/audit-logs",
         "roles": [
@@ -692,7 +749,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities",
         "roles": [
@@ -714,7 +772,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities",
         "roles": [
@@ -736,7 +795,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id",
         "roles": [
@@ -758,7 +818,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/claims",
         "roles": [
@@ -780,7 +841,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/end",
         "roles": [
@@ -802,7 +864,8 @@
           "BenefitActivity",
           "BenefitClaim",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/benefit-activities/:id/publish",
         "roles": [
@@ -821,7 +884,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PriceConfig",
+          "User"
         ],
         "path": "/api/v1/admin/billing/price-config",
         "roles": [
@@ -840,7 +904,8 @@
         "method": "PUT",
         "models": [
           "AuditLog",
-          "PriceConfig"
+          "PriceConfig",
+          "User"
         ],
         "path": "/api/v1/admin/billing/price-config/:serviceKey",
         "roles": [
@@ -929,7 +994,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies",
         "roles": [
@@ -951,7 +1017,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies",
         "roles": [
@@ -973,7 +1040,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id",
         "roles": [
@@ -995,7 +1063,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id",
         "roles": [
@@ -1017,7 +1086,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/jobs",
         "roles": [
@@ -1039,7 +1109,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/jobs/:jobId",
         "roles": [
@@ -1061,7 +1132,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/linkable-jobs",
         "roles": [
@@ -1083,7 +1155,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/publish",
         "roles": [
@@ -1105,7 +1178,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/companies/:id/review",
         "roles": [
@@ -1241,7 +1315,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs",
         "roles": [
@@ -1269,7 +1344,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id",
         "roles": [
@@ -1297,7 +1373,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id",
         "roles": [
@@ -1325,7 +1402,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies",
         "roles": [
@@ -1353,7 +1431,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies/:companyId",
         "roles": [
@@ -1381,7 +1460,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/companies/:companyId",
         "roles": [
@@ -1409,7 +1489,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials",
         "roles": [
@@ -1437,7 +1518,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId",
         "roles": [
@@ -1465,7 +1547,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId",
         "roles": [
@@ -1493,7 +1576,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/materials/:materialId/publish",
         "roles": [
@@ -1521,7 +1605,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/stats",
         "roles": [
@@ -1549,7 +1634,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1577,7 +1663,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1605,7 +1692,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/venue-guide",
         "roles": [
@@ -1633,7 +1721,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones",
         "roles": [
@@ -1661,7 +1750,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones/:zoneId",
         "roles": [
@@ -1689,7 +1779,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/admin/fairs/:id/zones/:zoneId",
         "roles": [
@@ -1725,7 +1816,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id",
         "roles": [
@@ -1761,7 +1853,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id/replies",
         "roles": [
@@ -1785,7 +1878,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/feedback/:id/status",
         "roles": [
@@ -2028,7 +2122,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/enabled",
         "roles": [
@@ -2055,7 +2150,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/impact",
         "roles": [
@@ -2106,7 +2202,8 @@
           "JobFair",
           "JobSource",
           "PrintTask",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/admin/job-sync/sources/:sourceId/unpublish-content",
         "roles": [
@@ -2164,7 +2261,8 @@
         "models": [
           "AuditLog",
           "KioskJobBoardConfig",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/kiosk-job-board",
         "roles": [
@@ -2185,7 +2283,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions",
         "roles": [
@@ -2204,7 +2303,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions",
         "roles": [
@@ -2223,7 +2323,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions/:id",
         "roles": [
@@ -2242,7 +2343,8 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/admin/legal-doc-versions/:id/activate",
         "roles": [
@@ -2262,7 +2364,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits",
         "roles": [
@@ -2282,7 +2385,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits",
         "roles": [
@@ -2302,7 +2406,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits/:id/revoke",
         "roles": [
@@ -2322,7 +2427,8 @@
         "models": [
           "AuditLog",
           "BenefitGrant",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/admin/member-benefits/users",
         "roles": [
@@ -2342,6 +2448,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2363,6 +2470,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2384,6 +2492,7 @@
         "models": [
           "AuditLog",
           "EndUser",
+          "User",
           "UserAiConsent",
           "UserDataRequest"
         ],
@@ -2418,7 +2527,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/admin/notifications/broadcasts",
         "roles": [
@@ -2469,7 +2579,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies",
         "roles": [
@@ -2491,7 +2602,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id",
         "roles": [
@@ -2532,7 +2644,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id",
         "roles": [
@@ -2573,7 +2686,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs",
         "roles": [
@@ -2595,7 +2709,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs/:jobId",
         "roles": [
@@ -2617,7 +2732,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/jobs/:jobId",
         "roles": [
@@ -2639,7 +2755,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/publish",
         "roles": [
@@ -2661,7 +2778,8 @@
         "models": [
           "AuditLog",
           "OfflineAgency",
-          "OfflineJob"
+          "OfflineJob",
+          "User"
         ],
         "path": "/api/v1/admin/offline-agencies/:id/review",
         "roles": [
@@ -2728,7 +2846,8 @@
           "AuditLog",
           "FileObject",
           "Order",
-          "OrderItem"
+          "OrderItem",
+          "User"
         ],
         "path": "/api/v1/admin/orders/:id/mark-paid",
         "roles": [
@@ -2750,7 +2869,8 @@
           "Order",
           "PaymentAttempt",
           "PrintTask",
-          "Refund"
+          "Refund",
+          "User"
         ],
         "path": "/api/v1/admin/orders/:id/refund",
         "roles": [
@@ -2949,7 +3069,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -2968,7 +3089,8 @@
         "method": "PATCH",
         "models": [
           "AuditLog",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/content-trust",
         "roles": [
@@ -2991,7 +3113,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/official-channels",
         "roles": [
@@ -3034,7 +3157,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/verified-official-domains",
         "roles": [
@@ -3057,7 +3181,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/orgs/:id/verified-official-domains",
         "roles": [
@@ -3259,7 +3384,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources",
         "roles": [
@@ -3279,7 +3405,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/eligibility-rules",
         "roles": [
@@ -3301,7 +3428,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/publish",
         "roles": [
@@ -3323,7 +3451,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/policy-sources/:id/review",
         "roles": [
@@ -3382,7 +3511,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks",
         "roles": [
@@ -3407,7 +3537,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/:type/:taskId",
         "roles": [
@@ -3432,7 +3563,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/:type/:taskId/actions",
         "roles": [
@@ -3457,7 +3589,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/print-scan/tasks/print/:taskId/close-unpaid",
         "roles": [
@@ -3517,7 +3650,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles",
         "roles": [
@@ -3543,7 +3677,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles/:profileId",
         "roles": [
@@ -3569,7 +3704,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/agency-profiles/:profileId/branches/:branchId",
         "roles": [
@@ -3595,7 +3731,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications",
         "roles": [
@@ -3621,7 +3758,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications/:qualificationId",
         "roles": [
@@ -3647,7 +3785,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/organizations/:organizationId/qualifications/:qualificationId/evidence-access",
         "roles": [
@@ -3673,7 +3812,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/platform-directories",
         "roles": [
@@ -3699,7 +3839,8 @@
           "OnlinePlatformDirectory",
           "Organization",
           "PrintTask",
-          "QualificationRecord"
+          "QualificationRecord",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-content/platform-directories/:id",
         "roles": [
@@ -3729,7 +3870,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-emergency/circuit-break",
         "roles": [
@@ -3759,7 +3901,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/admin/recruitment-emergency/takedown",
         "roles": [
@@ -3786,7 +3929,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans",
         "roles": [
@@ -3813,7 +3957,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans",
         "roles": [
@@ -3840,7 +3985,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/admin/release-observation-plans/:planId",
         "roles": [
@@ -3969,7 +4115,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/screensaver/terminals",
         "roles": [
@@ -4011,7 +4158,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/support-contact",
         "roles": [
@@ -4031,7 +4179,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/support-contact",
         "roles": [
@@ -4085,7 +4234,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals",
         "roles": [
@@ -4270,7 +4420,8 @@
         "models": [
           "AuditLog",
           "KioskJobBoardConfig",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/job-board-config",
         "roles": [
@@ -4332,7 +4483,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/org",
         "roles": [
@@ -4364,7 +4516,8 @@
           "TerminalBindCode",
           "TerminalCredential",
           "TerminalHeartbeat",
-          "TerminalSmartCampusConfig"
+          "TerminalSmartCampusConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/profile",
         "roles": [
@@ -4389,7 +4542,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/screensaver-config",
         "roles": [
@@ -4412,7 +4566,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/screensaver-config",
         "roles": [
@@ -4457,7 +4612,8 @@
           "Terminal",
           "TerminalSmartCampusConfig",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/smart-campus-config",
         "roles": [
@@ -4502,7 +4658,8 @@
           "Terminal",
           "TerminalHeartbeat",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/admin/terminals/:terminalId/toolbox-config",
         "roles": [
@@ -4859,6 +5016,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users",
@@ -4884,6 +5042,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId",
@@ -4934,6 +5093,7 @@
           "Refund",
           "ScanTask",
           "StorageDeletion",
+          "User",
           "UserAiConsent",
           "UserDataRequest",
           "UserNotification"
@@ -4961,6 +5121,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/disable",
@@ -4986,6 +5147,7 @@
           "ExternalJumpLog",
           "FileObject",
           "PrintTask",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/admin/users/:endUserId/restore",
@@ -5008,7 +5170,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/availability",
         "roles": [],
@@ -5028,7 +5191,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions",
         "roles": [],
@@ -5048,7 +5212,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId",
         "roles": [],
@@ -5068,7 +5233,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print",
         "roles": [],
@@ -5088,7 +5254,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/ask",
         "roles": [],
@@ -5108,7 +5275,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins",
         "roles": [],
@@ -5128,7 +5296,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/pins/:pinId",
         "roles": [],
@@ -5148,7 +5317,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/run",
         "roles": [],
@@ -5168,7 +5338,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/skill",
         "roles": [],
@@ -5188,7 +5359,8 @@
           "AdvisorPin",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/slots",
         "roles": [],
@@ -5213,7 +5385,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/assistant/chat",
         "roles": [],
@@ -5255,7 +5428,8 @@
           "AdvisorArtifact",
           "AdvisorSession",
           "AiServiceLog",
-          "AuditLog"
+          "AuditLog",
+          "User"
         ],
         "path": "/api/v1/assistant/sessions/:sessionId/summary",
         "roles": [],
@@ -5631,7 +5805,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies",
         "roles": [],
@@ -5651,7 +5826,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/:id",
         "roles": [],
@@ -5671,7 +5847,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/:id/jobs",
         "roles": [],
@@ -5691,7 +5868,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/filters",
         "roles": [],
@@ -5711,7 +5889,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/companies/stats",
         "roles": [],
@@ -5893,7 +6072,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files",
         "roles": [
@@ -5915,7 +6095,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files",
         "roles": [],
@@ -5935,7 +6116,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id",
         "roles": [],
@@ -5957,7 +6139,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/complete",
         "roles": [],
@@ -5977,7 +6160,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/content",
         "roles": [],
@@ -5996,7 +6180,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/files/:id/convert",
         "roles": [],
@@ -6048,7 +6233,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/retention",
         "roles": [],
@@ -6070,7 +6256,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/:id/url",
         "roles": [],
@@ -6092,7 +6279,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/cleanup-expired",
         "roles": [
@@ -6126,7 +6314,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/lifecycle-summary",
         "roles": [
@@ -6148,7 +6337,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "PrintTask",
-          "StorageDeletion"
+          "StorageDeletion",
+          "User"
         ],
         "path": "/api/v1/files/upload-intent",
         "roles": [],
@@ -6230,7 +6420,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6253,7 +6444,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId",
         "roles": [],
@@ -6276,7 +6468,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:fairId/visit-plan/:taskId/print",
         "roles": [],
@@ -6458,7 +6651,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/materials",
         "roles": [],
@@ -6484,7 +6678,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/materials/:materialId/print-url",
         "roles": [],
@@ -6537,7 +6732,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/:id/venue-guide",
         "roles": [],
@@ -6590,7 +6786,8 @@
           "FairZone",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-fairs/materials/:materialId/content",
         "roles": [
@@ -6612,7 +6809,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/generate",
         "roles": [],
@@ -6632,7 +6830,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/summary",
         "roles": [],
@@ -6652,7 +6851,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6672,7 +6872,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6692,7 +6893,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates",
         "roles": [],
@@ -6712,7 +6914,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates/:id",
         "roles": [],
@@ -6732,7 +6935,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobMaterialTemplate",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/job-materials/templates/:id/publish",
         "roles": [],
@@ -7013,7 +7217,8 @@
         "method": "GET",
         "models": [
           "AuditLog",
-          "LegalDocVersion"
+          "LegalDocVersion",
+          "User"
         ],
         "path": "/api/v1/kiosk/legal/:type",
         "roles": [],
@@ -7125,6 +7330,63 @@
         ]
       },
       {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal",
+          "User"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal",
+          "User"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "KioskPrintQuotaController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal",
+          "User"
+        ],
+        "path": "/api/v1/kiosk/print-quota",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
         "controller": "services/api/src/screensaver/screensaver.controller.ts",
         "handler": "ScreensaverController.findAll",
         "method": "GET",
@@ -7229,7 +7491,8 @@
           "AuditLog",
           "DocumentProcessTask",
           "FileObject",
-          "PiiFinding"
+          "PiiFinding",
+          "User"
         ],
         "path": "/api/v1/materials/tasks/:id/manual-confirmation",
         "roles": [],
@@ -7450,7 +7713,8 @@
           "FairCompany",
           "Job",
           "JobFair",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/me/browse-logs/:id",
         "roles": [],
@@ -7535,7 +7799,8 @@
           "FairCompany",
           "Job",
           "JobFair",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/me/external-jump-logs/:id",
         "roles": [],
@@ -7598,7 +7863,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback",
         "roles": [],
@@ -7620,7 +7886,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback",
         "roles": [],
@@ -7642,7 +7909,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id",
         "roles": [],
@@ -7664,7 +7932,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id/close",
         "roles": [],
@@ -7686,7 +7955,8 @@
           "FeedbackTicket",
           "MemberNotification",
           "PrintTask",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/feedback/:id/replies",
         "roles": [],
@@ -7763,7 +8033,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/notifications",
         "roles": [],
@@ -7792,7 +8063,8 @@
           "AuditLog",
           "BroadcastReadState",
           "MemberNotification",
-          "SystemBroadcast"
+          "SystemBroadcast",
+          "User"
         ],
         "path": "/api/v1/me/notifications/:kind/:id/read",
         "roles": [],
@@ -7850,7 +8122,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders",
         "roles": [],
@@ -7871,7 +8144,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId",
         "roles": [],
@@ -7892,7 +8166,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId/cancel",
         "roles": [],
@@ -7931,7 +8206,8 @@
           "AuditLog",
           "FileObject",
           "Order",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/:orderId/reissue-pickup-code",
         "roles": [],
@@ -7952,7 +8228,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/cloud",
         "roles": [],
@@ -7973,7 +8250,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/me/print-orders/submissions/resolve",
         "roles": [],
@@ -8184,7 +8462,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/auth/step-up/sms-code",
         "roles": [],
@@ -8201,7 +8480,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/auth/step-up/verify",
         "roles": [],
@@ -8256,6 +8536,7 @@
           "AuditLog",
           "EndUser",
           "FileObject",
+          "User",
           "UserDataRequest"
         ],
         "path": "/api/v1/member/data-exports/:id/content",
@@ -8291,7 +8572,8 @@
         "method": "POST",
         "models": [
           "AuditLog",
-          "EndUser"
+          "EndUser",
+          "User"
         ],
         "path": "/api/v1/member/phone/rebind",
         "roles": [],
@@ -8334,7 +8616,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8357,7 +8640,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews",
         "roles": [],
@@ -8380,7 +8664,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8403,7 +8688,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id",
         "roles": [],
@@ -8426,7 +8712,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/answer",
         "roles": [],
@@ -8449,7 +8736,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/end",
         "roles": [],
@@ -8472,7 +8760,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/practice-sheet",
         "roles": [],
@@ -8495,7 +8784,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/report",
         "roles": [],
@@ -8518,7 +8808,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/report/print",
         "roles": [],
@@ -8541,7 +8832,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/start",
         "roles": [],
@@ -8564,7 +8856,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/transcribe",
         "roles": [],
@@ -8590,7 +8883,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/transcript/print",
         "roles": [],
@@ -8613,7 +8907,8 @@
           "MockInterviewReport",
           "MockInterviewSession",
           "MockInterviewTurn",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/mock-interviews/:id/turns/:idx/audio",
         "roles": [],
@@ -8645,7 +8940,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/code-pay",
         "roles": [],
@@ -8663,7 +8959,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay",
         "roles": [],
@@ -8681,7 +8978,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay-status",
         "roles": [],
@@ -8699,7 +8997,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/orders/:id/pay/reconcile",
         "roles": [],
@@ -8718,7 +9017,8 @@
           "AuditLog",
           "BenefitGrant",
           "Order",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/orders/:id/redeem",
         "roles": [],
@@ -8739,7 +9039,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package",
         "roles": [],
@@ -8760,7 +9061,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package",
         "roles": [],
@@ -8781,7 +9083,8 @@
           "Order",
           "OrderSubmissionLedger",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/orders/package/:id",
         "roles": [],
@@ -8820,7 +9123,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies",
         "roles": [
@@ -8842,7 +9146,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/:id",
         "roles": [
@@ -8864,7 +9169,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/:id/publish",
         "roles": [
@@ -8886,7 +9192,8 @@
           "CompanyProfile",
           "FairCompany",
           "Job",
-          "Organization"
+          "Organization",
+          "User"
         ],
         "path": "/api/v1/partner/companies/import",
         "roles": [
@@ -8998,7 +9305,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/archive",
         "roles": [
@@ -9023,7 +9331,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/rotate-credential",
         "roles": [
@@ -9077,7 +9386,8 @@
           "JobSource",
           "Organization",
           "PolicyPost",
-          "SyncLog"
+          "SyncLog",
+          "User"
         ],
         "path": "/api/v1/partner/data-sources/:id/unarchive",
         "roles": [
@@ -9431,7 +9741,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials",
         "roles": [
@@ -9454,7 +9765,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials",
         "roles": [
@@ -9477,7 +9789,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials/:materialId",
         "roles": [
@@ -9500,7 +9813,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/materials/:materialId",
         "roles": [
@@ -9552,7 +9866,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9575,7 +9890,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9598,7 +9914,8 @@
           "FairVenueFacility",
           "FairVenueGuide",
           "FairVenueHall",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/venue-guide",
         "roles": [
@@ -9619,7 +9936,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones",
         "roles": [
@@ -9640,7 +9958,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones",
         "roles": [
@@ -9661,7 +9980,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones/:zoneId",
         "roles": [
@@ -9682,7 +10002,8 @@
           "AuditLog",
           "FairCompany",
           "FairZone",
-          "JobFair"
+          "JobFair",
+          "User"
         ],
         "path": "/api/v1/partner/fairs/:id/zones/:zoneId",
         "roles": [
@@ -9869,7 +10190,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels",
         "roles": [
@@ -9892,7 +10214,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels",
         "roles": [
@@ -9915,7 +10238,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels/:id",
         "roles": [
@@ -9938,7 +10262,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/partner/official-channels/:id",
         "roles": [
@@ -9968,7 +10293,8 @@
           "PartnerOrgNotice",
           "PolicyPost",
           "RecruitmentCircuitBreak",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/org-notices",
         "roles": [
@@ -9990,7 +10316,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -10012,7 +10339,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies",
         "roles": [
@@ -10034,7 +10362,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -10056,7 +10385,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id",
         "roles": [
@@ -10076,7 +10406,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-preview",
         "roles": [
@@ -10096,7 +10427,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-rules",
         "roles": [
@@ -10116,7 +10448,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/eligibility-rules",
         "roles": [
@@ -10138,7 +10471,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/publish",
         "roles": [
@@ -10160,7 +10494,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/release",
         "roles": [
@@ -10182,7 +10517,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/partner/policies/:id/review",
         "roles": [
@@ -10373,7 +10709,8 @@
           "Terminal",
           "TerminalSmartCampusConfig",
           "TerminalToolboxConfig",
-          "ToolboxLaunchEvent"
+          "ToolboxLaunchEvent",
+          "User"
         ],
         "path": "/api/v1/partner/smart-campus/terminals/:terminalId/config",
         "roles": [
@@ -10488,7 +10825,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/payment/channels",
         "roles": [],
@@ -10506,7 +10844,8 @@
         "models": [
           "AuditLog",
           "Order",
-          "PaymentAttempt"
+          "PaymentAttempt",
+          "User"
         ],
         "path": "/api/v1/payment/sandbox/simulate",
         "roles": [],
@@ -10526,7 +10865,8 @@
           "Order",
           "PaymentAttempt",
           "PrintTask",
-          "Refund"
+          "Refund",
+          "User"
         ],
         "path": "/api/v1/payment/wechat/refund-notify",
         "roles": [],
@@ -10546,7 +10886,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/policies",
         "roles": [],
@@ -10566,7 +10907,8 @@
           "Organization",
           "PartnerOrgNotice",
           "PolicyPost",
-          "RecruitmentEmergencyHold"
+          "RecruitmentEmergencyHold",
+          "User"
         ],
         "path": "/api/v1/policies/:id",
         "roles": [],
@@ -10584,7 +10926,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/policies/eligibility-check",
         "roles": [],
@@ -10602,7 +10945,8 @@
         "models": [
           "AuditLog",
           "PolicyEligibilityRule",
-          "PolicyPost"
+          "PolicyPost",
+          "User"
         ],
         "path": "/api/v1/policies/eligibility-questions",
         "roles": [],
@@ -10651,7 +10995,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/convert/images-to-pdf",
         "roles": [],
@@ -10672,12 +11017,14 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs",
         "roles": [],
@@ -10700,7 +11047,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:orderId/release",
         "roles": [],
@@ -10721,12 +11069,14 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId",
         "roles": [],
@@ -10747,12 +11097,14 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId/retry",
         "roles": [],
@@ -10773,12 +11125,14 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Order",
+          "OrderItem",
           "PriceConfig",
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
           "TerminalCapability",
-          "TerminalHeartbeat"
+          "TerminalHeartbeat",
+          "User"
         ],
         "path": "/api/v1/print/jobs/:taskId/takeaway-url",
         "roles": [],
@@ -10801,7 +11155,8 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/jobs/claim-pickup",
         "roles": [],
@@ -10838,7 +11193,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/sign/compose",
         "roles": [],
@@ -10859,7 +11215,8 @@
           "FileObject",
           "PrintTask",
           "Terminal",
-          "TerminalCapability"
+          "TerminalCapability",
+          "User"
         ],
         "path": "/api/v1/print/sign/inspect",
         "roles": [],
@@ -10877,7 +11234,8 @@
         "models": [
           "AuditLog",
           "PlatformSetting",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/public/support-contact",
         "roles": [],
@@ -10899,7 +11257,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -10921,7 +11280,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId",
         "roles": [],
@@ -10943,7 +11303,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "MockInterviewSession",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/career-plan/:taskId/print",
         "roles": [],
@@ -10968,7 +11329,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/export/pricing",
         "roles": [],
@@ -10997,6 +11359,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate",
@@ -11028,7 +11391,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/generate/:taskId",
         "roles": [],
@@ -11057,6 +11421,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/generate/export",
@@ -11106,7 +11471,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/:taskId",
         "roles": [],
@@ -11127,7 +11493,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/:taskId/print",
         "roles": [],
@@ -11148,7 +11515,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent",
         "roles": [],
@@ -11169,7 +11537,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent/:taskId",
         "roles": [],
@@ -11190,7 +11559,8 @@
           "FairMaterialPrintBridge",
           "FileObject",
           "Job",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/job-fit/consent/:taskId",
         "roles": [],
@@ -11217,6 +11587,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/parse",
@@ -11246,7 +11617,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId",
         "roles": [],
@@ -11271,7 +11643,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/draft",
         "roles": [],
@@ -11298,6 +11671,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/draft",
@@ -11337,6 +11711,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/fact-check",
@@ -11364,7 +11739,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/layout-adjust",
         "roles": [],
@@ -11396,6 +11772,7 @@
           "PrintTask",
           "RedemptionRecord",
           "Terminal",
+          "User",
           "UserAiConsent"
         ],
         "path": "/api/v1/resume/records/:taskId/optimize",
@@ -11429,7 +11806,8 @@
           "JobMaterialTemplate",
           "PriceConfig",
           "PrintTask",
-          "RedemptionRecord"
+          "RedemptionRecord",
+          "User"
         ],
         "path": "/api/v1/resume/records/:taskId/versions",
         "roles": [],
@@ -11450,7 +11828,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment",
         "roles": [],
@@ -11471,7 +11850,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -11492,7 +11872,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId",
         "roles": [],
@@ -11512,7 +11893,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId/append",
         "roles": [],
@@ -11533,7 +11915,8 @@
           "AuditLog",
           "FairMaterialPrintBridge",
           "FileObject",
-          "PrintTask"
+          "PrintTask",
+          "User"
         ],
         "path": "/api/v1/resume/self-assessment/:taskId/print",
         "roles": [],
@@ -11767,7 +12150,8 @@
           "Organization",
           "RecruitmentCircuitBreak",
           "RecruitmentEmergencyHold",
-          "Terminal"
+          "Terminal",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/official-channels",
         "roles": [
@@ -11822,7 +12206,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/release-observation",
         "roles": [],
@@ -11847,7 +12232,8 @@
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
-          "TerminalReleaseObservation"
+          "TerminalReleaseObservation",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/release-observation-plan",
         "roles": [],
@@ -11960,7 +12346,8 @@
           "AdPlaylistItem",
           "AuditLog",
           "Terminal",
-          "TerminalScreensaverConfig"
+          "TerminalScreensaverConfig",
+          "User"
         ],
         "path": "/api/v1/terminals/:terminalId/screensaver",
         "roles": [
@@ -16539,7 +16926,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 113,
+    "modelCount": 114,
     "models": [
       {
         "fieldCount": 7,
@@ -16702,6 +17089,14 @@
         ]
       },
       {
+        "fieldCount": 7,
+        "name": "AiSafetyTerm",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/ai/safety/ai-safety-lexicon.service.ts"
+        ]
+      },
+      {
         "fieldCount": 13,
         "name": "AiServiceLog",
         "relations": [
@@ -16730,6 +17125,7 @@
           "EndUser"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-ai-alerts.ts",
           "services/api/src/ai/usage/ai-budget.service.ts",
           "services/api/src/ai/usage/ai-usage-retention.ts",
           "services/api/src/ai/usage/ai-usage-summary.ts",
@@ -17550,6 +17946,7 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
@@ -17570,7 +17967,10 @@
           "services/api/src/member-privacy/member-closure-retention.ts",
           "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/pickup-validity.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -17671,6 +18071,7 @@
         "name": "PlatformSetting",
         "relations": [],
         "usedBy": [
+          "services/api/src/print-jobs/free-print-quota.config.ts",
           "services/api/src/support-contact/support-contact.service.ts"
         ]
       },
@@ -17762,6 +18163,7 @@
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
           "services/api/src/print-jobs/pickup-code-resume.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
@@ -17924,7 +18326,7 @@
         ]
       },
       {
-        "fieldCount": 30,
+        "fieldCount": 31,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -17942,6 +18344,7 @@
         "usedBy": [
           "services/api/src/activity/activity.controller.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/derived-print-quota-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
@@ -17964,6 +18367,7 @@
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/policies/policy-scope.service.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
@@ -18146,6 +18550,7 @@
           "services/api/src/admin-internal-accounts/backup-admin-create.service.ts",
           "services/api/src/admin-internal-accounts/backup-admin-emergency-enable.ts",
           "services/api/src/admin-ops/admin-alert-actions.service.ts",
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
@@ -18262,6 +18667,7 @@
       "scripts/verify-ci-main-runs-complete.mjs",
       "scripts/verify-release-bundle.mjs",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
@@ -18361,6 +18767,7 @@
     "apps/admin/src/lib/auditActionLabels.ts": [
       "apps/admin/scripts/verify-admin-partner-contact-phone-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-terminal-remote-command.ts"
     ],
     "apps/admin/src/lib/printErrorText.ts": [
@@ -22555,6 +22962,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-contract-review-preprod-readiness.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
       "services/api/scripts/verify-job-info-ai-real-acceptance.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
@@ -23043,6 +23451,12 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts"
     ],
+    "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql": [
       "services/api/scripts/verify-release-observation-contract.mjs"
     ],
@@ -23051,6 +23465,9 @@
     ],
     "services/api/prisma/migrations/20260929230000_ai_usage_retention_summary/migration.sql": [
       "services/api/scripts/verify-ai-usage-retention.ts"
+    ],
+    "services/api/prisma/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
@@ -23098,6 +23515,9 @@
     "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql": [
       "services/api/scripts/verify-http-exception-filter.ts"
     ],
+    "services/api/prisma/postgres/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
@@ -23129,6 +23549,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
@@ -23136,6 +23557,7 @@
       "services/api/scripts/verify-jobfair-checkin.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-account-status.ts",
+      "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-data-request-contract.ts",
       "services/api/scripts/verify-partner-account-action-schema.ts",
       "services/api/scripts/verify-partner-org-self.ts",
@@ -23385,6 +23807,7 @@
       "services/api/scripts/verify-demo-company-unpublish.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
@@ -23409,6 +23832,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -23433,6 +23857,7 @@
     ],
     "services/api/scripts/support/minimal-pdf.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -23769,13 +24194,15 @@
     ],
     "services/api/src/admin-ops/derived-alert-identity.ts": [
       "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
-      "services/api/scripts/verify-admin-ops.ts"
+      "services/api/scripts/verify-admin-ops.ts",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/admin-ops/derived-alerts.ts": [
       "apps/admin/scripts/verify-console-plain-copy.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
@@ -23789,8 +24216,12 @@
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
+    "services/api/src/admin-print-scan/admin-print-scan.controller.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
@@ -23813,6 +24244,7 @@
     "services/api/src/advisor/advisor-artifact.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-beijing-display-time.ts"
     ],
     "services/api/src/advisor/advisor-artifact.types.ts": [
@@ -23842,6 +24274,7 @@
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
@@ -23850,6 +24283,7 @@
     "services/api/src/advisor/llm-advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
     "services/api/src/ai-access/admin-ai-access.controller.ts": [
@@ -23880,6 +24314,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
@@ -23893,6 +24328,7 @@
     ],
     "services/api/src/ai/ai-public-quota.service.ts": [
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -23915,6 +24351,7 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
@@ -23946,6 +24383,7 @@
       "services/api/scripts/verify-ai-persistence-consistency.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
@@ -24034,7 +24472,8 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/ai/llm/ai-prompt-safety.ts": [
-      "services/api/scripts/verify-ai-safety-aigc.ts"
+      "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/llm/assistant-channel.ts": [
       "services/api/scripts/verify-miniapp-review-backend.ts"
@@ -24050,6 +24489,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -24063,6 +24503,7 @@
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-kiosk-ai-capabilities.ts",
       "services/api/scripts/verify-llm-connectivity.ts",
@@ -24076,6 +24517,7 @@
     "services/api/src/ai/llm/llm-guard.ts": [
       "services/api/scripts/verify-ai-content-moderation.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-llm-guard.ts"
     ],
@@ -24124,10 +24566,14 @@
       "services/api/scripts/verify-ai-cost-runtime.ts"
     ],
     "services/api/src/ai/quota/ai-quota.policy.ts": [
-      "services/api/scripts/verify-ai-quota.ts"
+      "services/api/scripts/verify-ai-quota.ts",
+      "services/api/scripts/verify-free-print-quota.ts"
     ],
     "services/api/src/ai/quota/ai-quota.service.ts": [
       "services/api/scripts/verify-ai-quota.ts"
+    ],
+    "services/api/src/ai/quota/run-with-ai-quota.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/redis-inflight-lock.ts": [
       "services/api/scripts/verify-resume-optimize.ts"
@@ -24244,6 +24690,7 @@
     "services/api/src/ai/resume/llm-career-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-career-plan.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
@@ -24251,6 +24698,7 @@
     "services/api/src/ai/resume/llm-fair-visit-plan.service.ts": [
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-fair-visit-plan.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
@@ -24260,6 +24708,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-job-fit.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
@@ -24272,6 +24721,7 @@
     "services/api/src/ai/resume/llm-resume-generate.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
@@ -24282,6 +24732,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
@@ -24291,6 +24742,7 @@
     "services/api/src/ai/resume/llm-resume.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
@@ -24302,6 +24754,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
@@ -24351,6 +24804,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/resume/resume-draft-source.service.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
@@ -24423,9 +24877,37 @@
     ],
     "services/api/src/ai/resume/self-assessment.types.ts": [
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
+    ],
+    "services/api/src/ai/safety/ai-safety-lexicon.controller.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/ai-safety-lexicon.service.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/block-log.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/content-blocked.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/lexicon.seed.json": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/matcher.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/normalize.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/policy-constraint.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
+    ],
+    "services/api/src/ai/safety/refusal.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/self-assessment.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
@@ -24439,6 +24921,7 @@
     ],
     "services/api/src/ai/usage/ai-budget.service.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -24447,6 +24930,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-request-context.middleware.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -24457,6 +24941,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
+      "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts"
     ],
@@ -24495,6 +24980,7 @@
     ],
     "services/api/src/asr/asr.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -24528,6 +25014,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-audit-logs.ts",
@@ -24551,6 +25038,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -24563,6 +25051,7 @@
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -24591,6 +25080,7 @@
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -24731,6 +25221,7 @@
     ],
     "services/api/src/benefit-redemption/benefit-redemption.service.ts": [
       "services/api/scripts/verify-ai-quota.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-benefit-redemption.ts",
       "services/api/scripts/verify-payment-flow.ts",
@@ -24793,6 +25284,7 @@
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
@@ -24811,6 +25303,7 @@
     ],
     "services/api/src/common/crypto/secret-cipher.ts": [
       "services/api/scripts/verify-content-pipeline-e2e.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-llm-thinking-live-gate.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -24868,10 +25361,12 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-platform-degradation.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-contract-review-http.ts",
       "services/api/scripts/verify-error-observability.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-http-exception-filter.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
@@ -24883,6 +25378,7 @@
       "services/api/scripts/verify-member-qr-login.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
@@ -24903,6 +25399,7 @@
       "services/api/scripts/verify-content-pipeline-e2e.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-favorites-http.ts",
       "services/api/scripts/verify-kiosk-anonymous-feedback.ts",
       "services/api/scripts/verify-member-account-status.ts",
@@ -24922,10 +25419,12 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-change-password.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
@@ -24947,9 +25446,11 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-benefit-activities.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -25001,6 +25502,7 @@
     ],
     "services/api/src/common/pickup-code.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-idempotency.ts"
@@ -25010,6 +25512,9 @@
     ],
     "services/api/src/common/pii/pii-masker.ts": [
       "services/api/scripts/verify-llm-input-pii-mask.ts"
+    ],
+    "services/api/src/common/prisma/postgres-busy.ts": [
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts"
     ],
     "services/api/src/common/prisma/serialization-conflict.ts": [
       "services/api/scripts/verify-pg-serialization-conflict.ts"
@@ -25058,10 +25563,12 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-ai-public-quota.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-alert-push.cjs",
       "services/api/scripts/verify-backend-p0-http.ts",
       "services/api/scripts/verify-change-password.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -25201,6 +25708,7 @@
     ],
     "services/api/src/contract-review/contract-review-failure-reason.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
@@ -25219,6 +25727,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-contract-review-timeout.ts",
@@ -25399,6 +25908,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -25427,6 +25937,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-feature-keys.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
@@ -26236,12 +26747,14 @@
     "services/api/src/member-privacy/member-privacy.service.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-member-data-request-state-machine.ts",
       "services/api/scripts/verify-member-data-request-truth.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
@@ -26283,6 +26796,7 @@
     "services/api/src/mock-interview/mock-interview-llm.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -26462,6 +26976,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -26546,9 +27061,12 @@
       "services/api/scripts/verify-api20-manual-refund.ts",
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-payment-flow.ts",
+      "services/api/scripts/verify-pickup-code-resume.ts",
+      "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
     "services/api/src/payment/pickup-expiry-refund.service.ts": [
+      "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts"
     ],
     "services/api/src/payment/pickup-expiry-refund.task.ts": [
@@ -26561,6 +27079,7 @@
     "services/api/src/payment/price-config.seed.ts": [
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -26590,6 +27109,7 @@
       "services/api/scripts/verify-admin-billing.ts",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -26734,12 +27254,30 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-parameter-capability.ts"
     ],
+    "services/api/src/print-jobs/free-print-quota.controller.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.decide.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.policy.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/src/print-jobs/free-print-quota.usage.ts": [
+      "services/api/scripts/verify-free-print-quota.ts"
+    ],
     "services/api/src/print-jobs/material-check-policy.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "services/api/scripts/verify-derivation-kind.ts"
     ],
     "services/api/src/print-jobs/page-range.util.ts": [
       "services/api/scripts/verify-pricing.ts"
+    ],
+    "services/api/src/print-jobs/paid-reprint-eligibility.ts": [
+      "services/api/scripts/verify-pickup-code-resume.ts"
     ],
     "services/api/src/print-jobs/pickup-claim-lockout.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs",
@@ -26755,6 +27293,8 @@
     "services/api/src/print-jobs/pickup-order.service.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
@@ -26772,6 +27312,7 @@
     ],
     "services/api/src/print-jobs/print-jobs.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26789,6 +27330,7 @@
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-closed-pending-print-task-disposition.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-member-data-retention.ts",
@@ -26813,6 +27355,7 @@
     "services/api/src/print-jobs/print-page-count.service.ts": [
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-audit-postgres.ts",
@@ -26877,6 +27420,9 @@
       "services/api/scripts/verify-production-db-guard.ts",
       "services/api/scripts/verify-scan-tasks.ts"
     ],
+    "services/api/src/prisma/pg-session-timeouts.ts": [
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts"
+    ],
     "services/api/src/prisma/prisma.module.ts": [
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
@@ -26903,6 +27449,7 @@
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
@@ -26938,6 +27485,7 @@
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -26960,6 +27508,7 @@
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-kiosk-session.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
@@ -26999,6 +27548,7 @@
       "services/api/scripts/verify-partner-stats-contract.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-pg-serialization-conflict-postgres.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
@@ -27167,6 +27717,7 @@
       "services/api/scripts/verify-member-data-export-files.ts"
     ],
     "services/api/src/storage/storage.interface.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -27203,6 +27754,7 @@
       "services/api/scripts/verify-external-video-e2e.ts",
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -27279,6 +27831,7 @@
     ],
     "services/api/src/terminals/admin-terminals.controller.ts": [
       "services/api/scripts/verify-admin-print-scan.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-terminal-bind-code.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
       "services/api/scripts/verify-terminal-provisioning.ts"
@@ -27314,6 +27867,9 @@
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
+    "services/api/src/terminals/kiosk-terminal-maintenance.ts": [
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts"
+    ],
     "services/api/src/terminals/print-status-attempt.ts": [
       "services/api/scripts/verify-print-jobs.ts"
     ],
@@ -27332,6 +27888,7 @@
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
@@ -27373,7 +27930,9 @@
       "services/api/scripts/verify-terminal-network-diagnostics.ts"
     ],
     "services/api/src/terminals/terminal-identity.guard.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-session.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -27382,7 +27941,10 @@
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
     "services/api/src/terminals/terminal-session.service.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -27395,6 +27957,7 @@
     "services/api/src/terminals/terminal-toolbox.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
@@ -27414,8 +27977,10 @@
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "services/api/src/terminals/terminals-admin.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
@@ -27438,12 +28003,14 @@
       "services/api/scripts/verify-background-task-safety.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-rollout-config.ts",
       "services/api/scripts/verify-print-scan-first-release.ts",
@@ -27461,6 +28028,7 @@
     ],
     "services/api/src/terminals/terminals.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
       "services/api/scripts/verify-release-observation-contract.mjs",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
@@ -27476,7 +28044,9 @@
       "services/api/scripts/verify-terminal-remote-command.ts"
     ],
     "services/api/src/terminals/terminals.service.ts": [
+      "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
+      "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
@@ -27512,6 +28082,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
     ],
     "services/api/src/trtc/trtc-session-registry.service.ts": [
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts"
     ],
     "services/api/src/trtc/trtc.controller.ts": [
@@ -27525,6 +28096,7 @@
     "services/api/src/trtc/trtc.service.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts",
@@ -34674,6 +35246,8 @@
           "services/api/src/admin-ops/admin-ops.service.ts",
           "services/api/src/admin-ops/derived-alert-identity.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/ai/usage/ai-budget.service.ts",
+          "services/api/src/ai/usage/ai-usage-meter.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/filters/http-exception.filter.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
@@ -35436,6 +36010,73 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:ai-safety-aigc"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/src/ai/safety"
+        ],
+        "files": [
+          "apps/admin/src/lib/auditActionLabels.ts",
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/ai-public-quota.service.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/ai.service.ts",
+          "services/api/src/ai/llm/ai-prompt-safety.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-config.service.ts",
+          "services/api/src/ai/llm/llm-guard.ts",
+          "services/api/src/ai/quota/run-with-ai-quota.ts",
+          "services/api/src/ai/resume/llm-career-plan.service.ts",
+          "services/api/src/ai/resume/llm-fair-visit-plan.service.ts",
+          "services/api/src/ai/resume/llm-job-fit.service.ts",
+          "services/api/src/ai/resume/llm-resume-generate.service.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/llm-resume.service.ts",
+          "services/api/src/ai/resume/llm-self-assessment.service.ts",
+          "services/api/src/ai/resume/resume-draft-source.service.ts",
+          "services/api/src/ai/resume/self-assessment.types.ts",
+          "services/api/src/ai/safety/ai-safety-lexicon.controller.ts",
+          "services/api/src/ai/safety/ai-safety-lexicon.service.ts",
+          "services/api/src/ai/safety/block-log.ts",
+          "services/api/src/ai/safety/content-blocked.ts",
+          "services/api/src/ai/safety/lexicon.seed.json",
+          "services/api/src/ai/safety/matcher.ts",
+          "services/api/src/ai/safety/normalize.ts",
+          "services/api/src/ai/safety/policy-constraint.ts",
+          "services/api/src/ai/safety/refusal.ts",
+          "services/api/src/ai/usage/ai-request-context.middleware.ts",
+          "services/api/src/asr/asr.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/benefit-redemption/benefit-redemption.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/contract-review/contract-review-failure-reason.ts",
+          "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/job-ai/job-ai-llm.service.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/mock-interview/mock-interview-llm.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/trtc/trtc-session-registry.service.ts",
+          "services/api/src/trtc/trtc.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:ai-safety-lexicon"
       ],
       "wired": true
     },
@@ -37328,6 +37969,70 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "services"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          "docs/progress/current-progress.md",
+          "services/api/prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql",
+          "services/api/prisma/migrations/20260726003000_guard_retired_terminal/migration.sql",
+          "services/api/prisma/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql",
+          "services/api/prisma/postgres/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql",
+          "services/api/prisma/schema.prisma",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-ops/derived-alert-identity.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.controller.ts",
+          "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/ai/quota/ai-quota.policy.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/crypto/secret-cipher.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/guards/jwt-auth.guard.ts",
+          "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/pickup-code.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/payment/price-config.seed.ts",
+          "services/api/src/payment/pricing.service.ts",
+          "services/api/src/print-jobs/free-print-quota.controller.ts",
+          "services/api/src/print-jobs/free-print-quota.decide.ts",
+          "services/api/src/print-jobs/free-print-quota.policy.ts",
+          "services/api/src/print-jobs/free-print-quota.service.ts",
+          "services/api/src/print-jobs/free-print-quota.usage.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/print-jobs/print-jobs.controller.ts",
+          "services/api/src/print-jobs/print-jobs.service.ts",
+          "services/api/src/print-jobs/print-page-count.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.interface.ts",
+          "services/api/src/storage/storage.service.ts",
+          "services/api/src/terminals/admin-terminals.controller.ts",
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-free-print-quota.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:free-print-quota"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "services/api/scripts/lib/verify-governed-job-fit-runtime.ts",
@@ -38324,6 +39029,34 @@
         "dirs": [],
         "files": [
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/kiosk-terminal-maintenance.ts",
+          "services/api/src/terminals/terminal-identity.guard.ts",
+          "services/api/src/terminals/terminal-session.service.ts",
+          "services/api/src/terminals/terminal-toolbox.service.ts",
+          "services/api/src/terminals/terminals-admin.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts",
+          "services/api/src/terminals/terminals.controller.ts",
+          "services/api/src/terminals/terminals.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-kiosk-terminal-maintenance.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:kiosk-terminal-maintenance"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/file.types.ts",
           "services/api/src/files/files.controller.ts",
@@ -38781,6 +39514,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/prisma/schema.prisma",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/member-closure-verification.ts",
           "services/api/src/admin-users/admin-users.controller.ts",
@@ -40339,6 +41073,31 @@
         "dirs": [],
         "files": [
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/prisma/postgres-busy.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/prisma/pg-session-timeouts.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-pg-lock-timeout-postgres.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:pg-lock-timeout:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/serializable-race-barrier.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -40400,9 +41159,12 @@
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-provider.factory.ts",
           "services/api/src/payment/payment-session-token.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
+          "services/api/src/payment/pickup-expiry-refund.service.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/payment/refund.service.ts",
+          "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/print-jobs/print-page-count.service.ts",
@@ -40757,6 +41519,7 @@
           "services/api/src/files/signing.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/payment-session-token.ts",
+          "services/api/src/payment/pending-refund-signal.ts",
           "services/api/src/payment/price-config.seed.ts",
           "services/api/src/payment/pricing.service.ts",
           "services/api/src/print-jobs/dto/create-print-job.dto.ts",

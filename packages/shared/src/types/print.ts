@@ -438,4 +438,8 @@ export interface PrintJobRetryResult {
   amountCents: number
   payStatus: OrderPayStatus
   status: PrintTaskStatus | string
+  /** 免费单、出纸未确认、冷却期已过。只在为真时出现。 */
+  mayHavePrinted?: boolean
+  /** 免费单、上次只出了一部分。只在为真时出现。 */
+  partialOutput?: boolean
 }

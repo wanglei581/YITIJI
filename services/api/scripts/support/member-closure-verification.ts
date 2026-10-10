@@ -67,11 +67,10 @@ export const CLOSURE_AUDIT_PII_EXEMPTIONS: Record<string, readonly string[]> = {
 
 export interface ClosureScanIdentity { phone: string; phoneHash: string; phoneEnc: string; wxOpenId: string; nickname: string }
 
-/** 来自 Prisma 全模型的全部字符串/JSON列，不按已知保留表列白名单扫描。 */
-export async function scanClosureDatabase(client: AppPrismaClient, identity: ClosureScanIdentity, pair?: [string, string]) {
-  const tokens = [identity.phone, identity.phoneHash, identity.phoneEnc, identity.wxOpenId, identity.nickname]
-  const tail = new RegExp(`(?<![A-Za-z0-9])${identity.phone.slice(-4)}(?![A-Za-z0-9])`)
-  const hits: string[] = []; const exempted: string[] = []; const links: string[] = []
+type ClosureStringVisitor = (value: string, location: string, path: string, model: string, field: string, row: Record<string, unknown>) => void
+
+/** 遍历 Prisma 全模型的全部字符串/JSON列（JSON 的键与值都算），不按已知保留表列白名单。返回列数。 */
+async function visitClosureStrings(client: AppPrismaClient, onString: ClosureStringVisitor, onRow?: (model: string, row: Record<string, unknown>) => void) {
   let columns = 0
   const metadata = (client as unknown as { _runtimeDataModel: { models: Record<string, { fields: Array<{ name: string; kind: string; type: string }> }> } })._runtimeDataModel
   assert.ok(metadata?.models, 'Prisma 全模型元数据必须可用，禁止退化为已知表白名单')
@@ -83,8 +82,7 @@ export async function scanClosureDatabase(client: AppPrismaClient, identity: Clo
     const delegate = (client as unknown as Record<string, { findMany(args: unknown): Promise<Record<string, unknown>[]> }>)[model.name[0]!.toLowerCase() + model.name.slice(1)]!
     const rows = await delegate.findMany({ select: Object.fromEntries(fields.map((field) => [field.name, true])) })
     for (const row of rows) {
-      const rowText = JSON.stringify(row)
-      if (pair && pair.every((id) => rowText.includes(id))) links.push(`${model.name}:${row['id'] ?? ''}`)
+      onRow?.(model.name, row)
       for (const field of fields) {
         let value = row[field.name]
         if (value === null || value === undefined) continue
@@ -96,19 +94,46 @@ export async function scanClosureDatabase(client: AppPrismaClient, identity: Clo
             for (const [key, item] of Object.entries(child)) { visit(key, `${path}.<key>`); visit(item, path ? `${path}.${key}` : key) }
             return
           }
-          if (typeof child !== 'string' || !(tokens.some((token) => child.includes(token)) || tail.test(child))) return
-          const location = `${model.name}.${field.name}${path ? `.${path}` : ''}`
-          if (model.name === 'AuditLog' && field.name === 'payloadJson'
-            && (CLOSURE_AUDIT_PII_EXEMPTIONS[String(row['action'])] ?? []).includes(path)
-            && child === `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}`) {
-            exempted.push(`${location}: 历史审计不改写，待合规裁定`)
-          } else hits.push(location)
+          if (typeof child !== 'string') return
+          onString(child, `${model.name}.${field.name}${path ? `.${path}` : ''}`, path, model.name, field.name, row)
         }
         visit(value, '')
       }
     }
   }
+  return columns
+}
+
+/** 来自 Prisma 全模型的全部字符串/JSON列，不按已知保留表列白名单扫描。 */
+export async function scanClosureDatabase(client: AppPrismaClient, identity: ClosureScanIdentity, pair?: [string, string]) {
+  const tokens = [identity.phone, identity.phoneHash, identity.phoneEnc, identity.wxOpenId, identity.nickname]
+  const tail = new RegExp(`(?<![A-Za-z0-9])${identity.phone.slice(-4)}(?![A-Za-z0-9])`)
+  const hits: string[] = []; const exempted: string[] = []; const links: string[] = []
+  const columns = await visitClosureStrings(client, (child, location, path, model, field, row) => {
+    if (!(tokens.some((token) => child.includes(token)) || tail.test(child))) return
+    if (model === 'AuditLog' && field === 'payloadJson'
+      && (CLOSURE_AUDIT_PII_EXEMPTIONS[String(row['action'])] ?? []).includes(path)
+      && child === `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}`) {
+      exempted.push(`${location}: 历史审计不改写，待合规裁定`)
+    } else hits.push(location)
+  }, (model, row) => {
+    if (pair && pair.every((id) => JSON.stringify(row).includes(id))) links.push(`${model}:${row['id'] ?? ''}`)
+  })
   return { hits, exempted, links, columns }
+}
+
+/**
+ * 库里已经出现过的「前后不挨字母数字的 4 位数」。上面的后四位反查按这个边界匹配，
+ * 共享库里别的门禁和种子早就留下这类串（如种子岗位 job-uni-0041 / UNI-2026-JOB-0041），
+ * 测试手机号的后四位若恰好撞上就会误报。造会员前先收集一次、选号时避开，
+ * 扫描本身一列一行都不放过。
+ */
+export async function collectBoundedFourDigitTokens(client: AppPrismaClient) {
+  const taken = new Set<string>()
+  await visitClosureStrings(client, (child) => {
+    for (const match of child.matchAll(/(?<![A-Za-z0-9])(\d{4})(?![A-Za-z0-9])/g)) taken.add(match[1]!)
+  })
+  return taken
 }
 
 export async function scanClosureRedis(client: { scan(...args: unknown[]): Promise<[string, string[]]>; type(key: string): Promise<string>; get(key: string): Promise<string | null> }, identity: ClosureScanIdentity, oldId: string) {

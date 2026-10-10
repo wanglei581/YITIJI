@@ -39,8 +39,12 @@ export interface KioskTerminalConfigView {
   toolbox: KioskToolboxConfigView
   jobBoard: KioskJobBoardConfigView
   recruitmentHosting: RecruitmentHostingPublicView
-  ai: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean }
+  /** 全局 AI 开关。maintenance 是全机 AI 维护，与下面的本机 maintenance 分开。 */
+  ai: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean; maintenance: boolean }
+  /** 本机此刻不接新单。enabled 为 false，或生命周期是 maintenance / suspended / commissioning / planned / retired。 */
   maintenance: boolean
+  /** maintenance 为 false 时是 null。不包含管理员备注。 */
+  maintenanceMessage: string | null
   configVersion: string
   refreshIntervalMs: number
   serverTime: string

@@ -22,10 +22,10 @@
 //
 // 如果照抄 fail-closed，这类简历会直接打死简历诊断 / 岗位匹配 / 职业规划 —— 那是
 // 把一个已上线闭环换成不可用，违反「AI 是加速器不是前置条件，功能可退化不可瘫痪」。
-// 所以本文件的策略是：**遮盖照做，断言只用于观测**。
-//   - 相对现状（原文直送）是严格改善，不可能更差；
+// 所以正常路径的策略是：**遮盖照做，断言只用于观测**。
 //   - 断言未通过时不静默：落一条不含原文的 warn，供后续按真实样本收敛规则；
-//   - 任何异常路径都不会退回「送原文」，最差也走 FALLBACK_PATTERNS 兜底遮盖。
+//   - 引擎异常时先走 FALLBACK_PATTERNS，再作最终残留断言；只有安全的兜底结果
+//     可以返回。无法确认遮盖完成则以通用 503 停止送模，仍可用手工编辑与打印。
 //
 // 合规口径：本文件只负责「送模型前遮盖」。它不承诺遮盖 100% 完备，
 // 因此**不得**据此对用户宣称「简历不会出境」；同意授权文案仍须如实说明
@@ -34,7 +34,7 @@
 // 日志红线：本文件任何路径都不打印被处理的文本原文或摘录。
 // ============================================================
 
-import { Logger } from '@nestjs/common'
+import { Logger, ServiceUnavailableException } from '@nestjs/common'
 import { assertNoHighConfidencePii, maskContractPages } from './pii-masker'
 
 const logger = new Logger('LlmInputMask')
@@ -55,7 +55,7 @@ export const LLM_MASK_INPUT_LIMIT = MAX_MASK_INPUT_CHARS
 
 /**
  * 最后一道兜底：遮盖引擎本身抛错（理论上不该发生，输入已被规整并限长）时使用。
- * 只覆盖无歧义的高置信模式，宁可漏遮也不误伤正文；绝不退回送原文。
+ * 只覆盖无歧义的高置信模式；完成后仍须通过最终残留断言，不完整就停止送模。
  */
 const FALLBACK_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/(?<![0-9A-Za-z])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[0-9Xx](?![0-9A-Za-z])/gu, '身份证'],
@@ -107,6 +107,7 @@ function makeRestore(map: ReadonlyMap<string, string>): (value: string) => strin
  * 统一社会信用代码），**不遮**「姓名：」「甲方：」一类名称。
  * 给小青文字对话用 —— 称呼被遮掉，对话就接不上了；名字本身也不是高置信敏感项。
  * 简历链、模拟面试不传（名字照遮）。
+ * 引擎异常时，兜底的最终断言仍可能因姓名标签拒绝；此档不放宽异常档的安全要求。
  */
 export interface LlmInputMaskOptions {
   readonly keepNames?: boolean
@@ -120,8 +121,8 @@ export interface LlmInputMaskManyResult extends Omit<LlmInputMaskReversibleResul
 /**
  * 送模型前遮盖用户材料里的高置信 PII。
  *
- * 永不抛错、永不返回未处理的原文 —— 上游简历链一旦因为脱敏挂掉，
- * 等于用一个合规加固换掉一个已验证闭环。
+ * 正常路径保留简历日期等兼容行为；引擎异常后的兜底若仍有高置信残留，
+ * 抛通用 503，调用方不得继续发送材料。没有 PII 的安全正文可以保持原样。
  *
  * @param raw   用户材料原文（简历正文、扫描 OCR 文本等）
  * @param scene 只用于日志定位的场景标识，**不得**传入任何用户内容
@@ -154,7 +155,7 @@ export function maskUserTextForLlmReversible(
  * 引擎本来就按页处理、跨页共享编号，不存在越界问题。
  *
  * 用于：模拟面试（简历摘要 + 每轮作答）、小青对话（多轮历史）、简历生成（多条描述）。
- * 段数超过引擎页数上限（50）或总量超限时走兜底正则，仍然遮盖，不会退回原文。
+ * 段数超过引擎页数上限（50）或总量超限时走兜底正则；通过最终残留断言才返回。
  */
 export function maskUserTextsForLlmReversible(
   raws: readonly string[],
@@ -214,6 +215,18 @@ export function maskUserTextsForLlmReversible(
       }
       return text
     })
+    // 引擎已失效，不能把仅覆盖部分模式的正则结果当作遮盖成功继续送模。
+    // 正常路径的观测档不变；异常档的保守拒绝不影响手工编辑与打印。
+    try {
+      assertNoHighConfidencePii(texts.map((text, index) => ({ pageNumber: index + 1, text })))
+    } catch {
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'AI_INPUT_MASK_UNAVAILABLE',
+          message: 'AI输入隐私检查暂未完成，请稍后重试，或使用手工编辑与打印',
+        },
+      })
+    }
     return {
       texts,
       changed: texts.some((text, index) => text !== normalized[index]),

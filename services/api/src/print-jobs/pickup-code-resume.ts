@@ -11,6 +11,9 @@ import {
 } from './paid-reprint-eligibility'
 import { isPrintableFileRecord } from './print-page-count.service'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
+import { markPaidUnfulfilledRefundRequired, payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { reprintRequestedSides } from './free-print-quota.usage'
 import {
   PICKUP_CODE_RESUME,
   PICKUP_RESUME_LIMIT_REACHED,
@@ -20,7 +23,10 @@ import {
   PICKUP_RESUME_UNCONFIRMED_MESSAGE,
   SELF_SERVICE_REPRINT_LIMIT,
   SELF_SERVICE_REPRINT_LIMIT_MESSAGE,
+  selfServiceAnomalyDecision,
   selfServiceReprintCount,
+  throwSelfServiceAnomalyHalt,
+  type ReprintNotice,
 } from './self-service-reprint'
 
 /** 与会员重试、管理员重试同一档：Agent 仍能在半小时内拉到文件。 */
@@ -30,7 +36,7 @@ type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUn
 
 export type PickupResumeResult =
   | { action: 'replay' }
-  | { action: 'resumed'; order: OrderRecord }
+  | { action: 'resumed'; order: OrderRecord; mayHavePrinted: boolean; partialOutput: boolean }
 
 function conflict(code: string, message: string): never {
   throw new ConflictException({ error: { code, message } })
@@ -61,7 +67,7 @@ export async function resumeReleasedFailure(
   }
   const task = await prisma.printTask.findUnique({
     where: { id: order.printTaskId },
-    select: { id: true, status: true, errorCode: true, terminalId: true, fileId: true },
+    select: { id: true, status: true, errorCode: true, terminalId: true, fileId: true, completedAt: true },
   })
   if (!task || task.status !== 'failed' || task.terminalId !== terminalId) return { action: 'replay' }
   if (isPickupClaimWindowClosed(order)) throw new BadRequestException(EXPIRED)
@@ -73,40 +79,60 @@ export async function resumeReleasedFailure(
       })
     : null
   const agentVersion = await latestHeartbeatAgentVersion(prisma, task.terminalId)
-  const reason = paidReprintBlockReason({
-    status: task.status,
+  const preliminary = selfServiceAnomalyDecision({
     errorCode: task.errorCode,
-    hasOrder: true,
-    payStatus: order.payStatus,
-    file,
-    terminalId: task.terminalId,
-    agentVersion,
+    amountCents: order.amountCents,
+    discountCents: order.discountCents,
+    unconfirmedSince: task.completedAt,
   })
-  if (reason) throwResumeBlock(reason)
-  const used = await selfServiceReprintCount(prisma, task.id)
-  if (used >= SELF_SERVICE_REPRINT_LIMIT) {
-    conflict(PICKUP_RESUME_LIMIT_REACHED, SELF_SERVICE_REPRINT_LIMIT_MESSAGE)
+  if (preliminary.action === 'cooldown') throwSelfServiceAnomalyHalt('cooldown')
+  if (preliminary.action !== 'refund') {
+    const reason = paidReprintBlockReason({
+      status: task.status,
+      errorCode: task.errorCode,
+      hasOrder: true,
+      payStatus: order.payStatus,
+      file,
+      terminalId: task.terminalId,
+      agentVersion,
+      selfServiceAnomalyCleared: preliminary.action === 'reprint',
+    })
+    if (reason) throwResumeBlock(reason)
+    const used = await selfServiceReprintCount(prisma, task.id)
+    if (used >= SELF_SERVICE_REPRINT_LIMIT) {
+      conflict(PICKUP_RESUME_LIMIT_REACHED, SELF_SERVICE_REPRINT_LIMIT_MESSAGE)
+    }
+    if (!task.fileId || !isPrintableFileRecord(file)) throwResumeBlock('file_unavailable')
   }
-  const fileId = task.fileId
-  if (!fileId || !isPrintableFileRecord(file)) {
-    throwResumeBlock('file_unavailable')
-  }
-  const { url: freshFileUrl } = signFileUrl(fileId, RESUME_FILE_URL_TTL_MS)
+  const freshFileUrl = task.fileId && isPrintableFileRecord(file)
+    ? signFileUrl(task.fileId, RESUME_FILE_URL_TTL_MS).url
+    : null
 
-  await prisma.$transaction(async (tx) => {
+  const outcome = await prisma.$transaction(async (tx) => {
     await lockPrintTaskRow(tx, task.id)
     const liveTask = await tx.printTask.findUnique({
       where: { id: task.id },
-      select: { status: true, errorCode: true, terminalId: true, fileId: true },
+      select: { status: true, errorCode: true, terminalId: true, fileId: true, completedAt: true, paramsJson: true, endUserId: true },
     })
     const liveOrder = await tx.order.findUnique({ where: { id: order.id } })
     if (!liveTask || !liveOrder || liveTask.terminalId !== terminalId || liveOrder.printTaskId !== task.id) {
-      return
+      return { kind: 'replay' as const }
     }
     if (liveTask.status !== 'failed') {
       conflict(REPRINT_BLOCKED_CODE.not_failed, REPRINT_BLOCKED_MESSAGE.not_failed)
     }
     if (isPickupClaimWindowClosed(liveOrder)) throw new BadRequestException(EXPIRED)
+    const liveDecision = selfServiceAnomalyDecision({
+      errorCode: liveTask.errorCode,
+      amountCents: liveOrder.amountCents,
+      discountCents: liveOrder.discountCents,
+      unconfirmedSince: liveTask.completedAt,
+    })
+    if (liveDecision.action === 'refund') {
+      await markPaidUnfulfilledRefundRequired(tx, liveOrder)
+      return { kind: 'refund' as const }
+    }
+    if (liveDecision.action === 'cooldown') return { kind: 'cooldown' as const }
     const liveFile = liveTask.fileId
       ? await tx.fileObject.findUnique({
           where: { id: liveTask.fileId },
@@ -122,12 +148,25 @@ export async function resumeReleasedFailure(
       file: liveFile,
       terminalId: liveTask.terminalId,
       agentVersion: liveVersion,
+      selfServiceAnomalyCleared: liveDecision.action === 'reprint',
     })
     if (liveReason) throwResumeBlock(liveReason)
     const liveUsed = await selfServiceReprintCount(tx, task.id)
     if (liveUsed >= SELF_SERVICE_REPRINT_LIMIT) {
       conflict(PICKUP_RESUME_LIMIT_REACHED, SELF_SERVICE_REPRINT_LIMIT_MESSAGE)
     }
+    if (!freshFileUrl) throwResumeBlock('file_unavailable')
+    const quotaItem = await tx.orderItem.findFirst({
+      where: { printTaskId: task.id },
+      select: { billablePages: true, copies: true },
+    })
+    await assertFreePrintQuota(tx, {
+      terminalId: liveTask.terminalId ?? terminalId,
+      endUserId: liveTask.endUserId,
+      requestedSides: reprintRequestedSides(quotaItem, liveOrder, liveTask.paramsJson),
+      payableCents: payableCents(liveOrder),
+    })
+    const notice: ReprintNotice = liveDecision.action === 'reprint' ? liveDecision.notice : null
     const updatedOrder = await tx.order.updateMany({
       where: {
         id: order.id,
@@ -159,11 +198,21 @@ export async function resumeReleasedFailure(
     await tx.printTaskStatusLog.create({
       data: { taskId: task.id, fromStatus: 'failed', toStatus: 'pending', errorCode: PICKUP_CODE_RESUME },
     })
+    return { kind: 'resumed' as const, notice }
   })
+
+  if (outcome.kind === 'refund') throwSelfServiceAnomalyHalt('refund')
+  if (outcome.kind === 'cooldown') throwSelfServiceAnomalyHalt('cooldown')
+  if (outcome.kind !== 'resumed') return { action: 'replay' }
 
   const fresh = await prisma.order.findUnique({ where: { id: order.id } })
   if (!fresh || fresh.printTaskId !== task.id || fresh.taskStatus !== 'pending') {
     return { action: 'replay' }
   }
-  return { action: 'resumed', order: fresh }
+  return {
+    action: 'resumed',
+    order: fresh,
+    mayHavePrinted: outcome.notice === 'may_have_printed',
+    partialOutput: outcome.notice === 'partial_output',
+  }
 }

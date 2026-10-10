@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from 'lucide-react'
 import type { MemberFeedbackTicketDetail, MemberFeedbackTicketItem } from '../../../../services/api/memberFeedback'
 import { MemberLoadMore } from '../MemberLoadMore'
 import { formatTime } from '../../assets/format'
@@ -92,6 +93,7 @@ function FeedbackRow({
         <span className="qx-me-row-sub">{category.label} · {formatTime(item.updatedAt)}</span>
       </span>
       <span className="qx-me-st" data-tone={tone}>{status.label}</span>
+      <span className="fb-row-chevron" aria-hidden="true"><ChevronRightIcon /></span>
     </button>
   )
 }
