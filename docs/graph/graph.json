@@ -24310,6 +24310,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
     ],
@@ -24549,6 +24550,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-llm-guard.ts"
     ],
     "services/api/src/ai/llm/llm-http.ts": [
@@ -28120,6 +28122,9 @@
     ],
     "services/api/src/trtc/tencent-api.util.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts"
+    ],
+    "services/api/src/trtc/trtc-llm-safety.ts": [
+      "services/api/scripts/verify-assistant-device-fault.ts"
     ],
     "services/api/src/trtc/trtc-session-registry.service.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -36425,11 +36430,14 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/llm/assistant-channel.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/llm/llm-guard.ts",
           "services/api/src/ai/safety/block-log.ts",
           "services/api/src/ai/safety/device-fault.ts",
-          "services/api/src/ai/usage/ai-usage-context.ts"
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/trtc/trtc-llm-safety.ts"
         ],
         "missing": []
       },

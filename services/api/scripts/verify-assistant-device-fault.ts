@@ -10,14 +10,19 @@
  *   2. 固定回答的字：四样「不要」都在；没有承诺、没有电话号码、不叫人找现场的人
  *   3. 运行时：命中时一个请求都不发给模型、不进会话历史、不扣公网次数、不记成内容拦截；
  *      紧接着追问「能不能自己弄」同样不送模型；模型连不上时照样能答
+ *   4. 写给模型的约束句：小青文字、语音小青、作业面问答三处的提示词里都有（关键词兜不住的问法
+ *      和不经过后端的语音靠它）
  *
  * 不触网、不碰库（fetch 换成假实现）。
  * 运行：pnpm --filter @ai-job-print/api verify:assistant-device-fault
  */
-import { deviceFaultReply, isDeviceFaultQuestion } from '../src/ai/safety/device-fault'
+import { DEVICE_FAULT_PROMPT_RULE, deviceFaultReply, isDeviceFaultQuestion } from '../src/ai/safety/device-fault'
 import { clearSafetyBlocks, consumeSafetyRefund, recentSafetyBlocks } from '../src/ai/safety/block-log'
 import { scrubMiniappReply } from '../src/ai/llm/assistant-channel'
 import { LlmChatService } from '../src/ai/llm/llm-chat.service'
+import { buildGuardedSystemPrompt } from '../src/ai/llm/llm-guard'
+import { ADVISOR_QA_SYSTEM_PROMPT } from '../src/advisor/llm-advisor.service'
+import { guardTrtcLlmConfigJson } from '../src/trtc/trtc-llm-safety'
 import { ANONYMOUS_AI_CALLER, lazyAiRequestContext, runWithAiRequestContext } from '../src/ai/usage/ai-usage-context'
 
 let passCount = 0
@@ -209,6 +214,8 @@ async function runtimeChecks(): Promise<void> {
     check(sentBodies.length === 1 && normal.result.reply === '模型的回答', '阳性对照：正常咨询调了模型并拿到模型的回答')
     check(normal.refunded === false, '阳性对照：正常咨询不退次数')
     check((normal.result.actions ?? []).some((action) => action.route === '/print/upload'), '阳性对照：正常咨询带打印入口')
+    const systemPrompt = (JSON.parse(sentBodies[0]!) as { messages: Array<{ role: string; content: string }> }).messages[0]
+    check(systemPrompt?.role === 'system' && systemPrompt.content.includes(DEVICE_FAULT_PROMPT_RULE), '真正发给模型的系统提示词里带着设备故障那句约束')
 
     // 命中：一个请求都不发，回固定的话，不带跳转，不扣次，不记成内容拦截。
     const before = sentBodies.length
@@ -253,10 +260,40 @@ async function runtimeChecks(): Promise<void> {
   }
 }
 
+// ─── 4. 写给模型的约束句 ─────────────────────────────────────────────────────
+
+function promptChecks(): void {
+  // 字是合规定的（2026-10-10）。这里钉住每一个半句，改字要先过合规再来改这张表。
+  for (const must of [
+    '不要教用户打开机器、取纸、按机身按键或拔插电源',
+    '不要说已经有人收到提醒或会来处理',
+    '不要自己说出任何电话号码',
+    '不要提退款或订单状态',
+    '只提醒不要自行处理、可以稍后再来',
+    '请用户查看帮助页上的联系方式',
+    '先提醒离开机器',
+    '有明火或人身危险拨打 119',
+  ]) {
+    check(DEVICE_FAULT_PROMPT_RULE.includes(must), `约束句有「${must}」`)
+  }
+  const text = buildGuardedSystemPrompt({ systemPrompt: '你是就业服务助手' })
+  check(text.includes(DEVICE_FAULT_PROMPT_RULE), '小青文字对话的系统约束里有这一句')
+  const voice = buildGuardedSystemPrompt({ systemPrompt: '你是小青' }, { policyVariant: 'voice' })
+  check(voice.includes(DEVICE_FAULT_PROMPT_RULE), '语音小青的系统约束里有这一句')
+  // 语音小青的话由腾讯云直接调模型，不经过后端，关键词拦不到：下发给腾讯云的配置里必须带着这一句。
+  const trtc = JSON.parse(guardTrtcLlmConfigJson(
+    JSON.stringify({ LLMType: 'openai', SystemPrompt: '你是小青，说话简短' }), { systemPrompt: '兜底提示词' },
+  )) as { SystemPrompt?: string }
+  check(String(trtc.SystemPrompt).includes('你是小青，说话简短'), '阳性对照：下发给腾讯云的提示词确实是从配置拼出来的')
+  check(String(trtc.SystemPrompt).includes(DEVICE_FAULT_PROMPT_RULE), '下发给腾讯云的语音小青提示词里有这一句')
+  check(ADVISOR_QA_SYSTEM_PROMPT.includes(`6. ${DEVICE_FAULT_PROMPT_RULE}`), '作业面问答的提示词第 6 条是这一句')
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 小青设备故障固定回答 ===')
   tableChecks()
   replyChecks()
+  promptChecks()
   await runtimeChecks()
   console.log(`\nverify:assistant-device-fault ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
   if (failCount > 0) process.exitCode = 1
