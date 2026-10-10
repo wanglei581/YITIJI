@@ -50,6 +50,10 @@ model Terminal {
   /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
   /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
   lastHeartbeatAt   DateTime?
+  /// 本机每日免费打印上限（面）。null = 用平台设置 print.freeQuota.terminalDailySides。
+  /// 计划中 / 已退役触发器不拦这一列：前者只拦 agentToken、lifecycleStatus、credentialGeneration，
+  /// 后者只在身份列变化时拦截。
+  dailyFreePrintSides Int?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -2041,6 +2045,20 @@ model AiUsageMonthlySummary {
   updatedAt        DateTime @updatedAt
 
   @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
+}
+
+/// 违法和不良信息词库。只存类别、词条和开关，不含用户提问。种子在代码里，这张表只记增删。
+model AiSafetyTerm {
+  id        String   @id @default(cuid())
+  category  String
+  term      String
+  kind      String
+  enabled   Boolean  @default(true)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, kind, term])
+  @@index([enabled])
 }
 
 model UserAiConsent {

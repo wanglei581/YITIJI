@@ -131,8 +131,9 @@ export class AuditService {
       this.prisma.auditLog.count({ where }),
     ])
 
+    const names = await this.actorDisplayNames(records.map((r) => r.actorId))
     return {
-      items: records.map(this.toRecord),
+      items: records.map((r) => ({ ...this.toRecord(r), actorDisplayName: r.actorId ? names.get(r.actorId) ?? null : null })),
       total,
       limit,
       offset,
@@ -140,6 +141,31 @@ export class AuditService {
   }
 
   // ── 内部 ────────────────────────────────────────────────────────────────────
+
+  /**
+   * 审计列表的操作人显示名（只读）。内部账号取姓名，没有就用登录名；机构账号「机构名 · 账号名」；
+   * 系统操作、会员（不在 User 表）、账号已删除一律 null。任何情况都不带手机号：
+   * 姓名或登录名长得像手机号就跳过它。
+   */
+  private async actorDisplayNames(actorIds: Array<string | null>): Promise<Map<string, string | null>> {
+    const ids = [...new Set(actorIds.filter((id): id is string => typeof id === 'string' && id.length > 0))]
+    const result = new Map<string, string | null>()
+    if (ids.length === 0) return result
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, username: true, role: true, org: { select: { name: true } } },
+    })
+    for (const user of users) {
+      const own = safeDisplayPart(user.name) ?? safeDisplayPart(user.username)
+      if (!own) {
+        result.set(user.id, null)
+        continue
+      }
+      const orgName = user.role === 'partner' ? safeDisplayPart(user.org?.name ?? null) : null
+      result.set(user.id, orgName ? `${orgName} · ${own}` : own)
+    }
+    return result
+  }
 
   private safeStringify(payload: Record<string, unknown>): string {
     try {
@@ -178,4 +204,13 @@ export class AuditService {
       createdAt: r.createdAt.toISOString(),
     }
   }
+}
+
+/** 中国大陆手机号（含空格或短横分组）。显示名里出现就整段不用。 */
+const PHONE_LIKE = /1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}/
+
+function safeDisplayPart(value: string | null | undefined): string | null {
+  const trimmed = typeof value === 'string' ? value.trim() : ''
+  if (!trimmed || PHONE_LIKE.test(trimmed)) return null
+  return trimmed.slice(0, 64)
 }

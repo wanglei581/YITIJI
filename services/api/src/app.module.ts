@@ -40,6 +40,7 @@ import { MemberPrivacyModule } from './member-privacy/member-privacy.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
+import { FreePrintQuotaModule } from './print-jobs/free-print-quota.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
@@ -150,6 +151,7 @@ const redisUrl = process.env['REDIS_URL']
     SyncModule,
     TerminalsModule,
     PrintJobsModule,
+    FreePrintQuotaModule,
     TrtcModule,
     ContentModule,
     SmartCampusModule,

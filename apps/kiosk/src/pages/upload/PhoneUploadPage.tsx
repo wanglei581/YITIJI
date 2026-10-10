@@ -17,7 +17,9 @@ import {
   UploadIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
+
 import {
   useDocumentConversionCapabilities,
   WORD_CONVERSION_DISCLOSURE,
@@ -49,6 +51,11 @@ import {
   takeoverCopy,
   uploadView,
 } from './phoneUploadModel'
+
+// 10/8 产品负责人批准的文字偏离：稿上是『回到这台机器后』，手机上改说『一体机』，不要照稿改回去。
+const XIAOQING_FOOT = '回到一体机后，可以让小青接着看你的材料。小青不替你确认登录，也不替你发出文件。'
+/** 空文件、超限、格式、类型。红色预检说明放到文件信息上面，390×844 首屏看全。 */
+const PRECHECK_ERROR_STATES = new Set<string>(['empty-error', 'too-large', 'type-error', 'content-type-error'])
 
 /* 手机上传（/upload/phone）。视觉与口径真值：稿 51-phone-relay.html screen=phone-upload。
  * 手机端只有 fragment 里的 sessionId / token / purpose：purpose 可被随手改掉，只作未确认提示；
@@ -160,7 +167,20 @@ function FileBox({ file, removable, note, onRemove }: {
   )
 }
 
+function RelayFoot({ icon, text }: { icon: IconKey; text: string }) {
+  return (
+    <>
+      <p className="ph-up-xiaoqing">{XIAOQING_FOOT}</p>
+      <p className="ph-up-footer">
+        <Icon name={icon} />
+        <span>{text}</span>
+      </p>
+    </>
+  )
+}
+
 export function PhoneUploadPage() {
+  useSupportContact()
   const kiosk = useTerminalKiosk()
   const location = useLocation()
   const { capabilities: conversionCapabilities, loading: conversionLoading } = useDocumentConversionCapabilities()
@@ -180,10 +200,12 @@ export function PhoneUploadPage() {
   if (s.link !== linkKey) setS(initialSession(linkKey))
   const attemptRef = useRef(0)
   const flowRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLElement>(null)
 
   // 换态即回到顶部：结论、原因与下一步先落在首屏。
   useEffect(() => {
     flowRef.current?.scrollTo({ top: 0 })
+    contentRef.current?.scrollTo({ top: 0 })
   }, [s.state, issue])
 
   const confirmed = s.confirmed ? purposes[s.confirmed] : null
@@ -191,7 +213,9 @@ export function PhoneUploadPage() {
     ? uploadView(s.state, { file: s.file, typeIssue: s.typeIssue, unknownType: Boolean(s.file && !s.file.type), chips: policy.chips })
     : null
   const canPick = !kiosk && ready && view?.picker === 'ready'
+  const precheckError = PRECHECK_ERROR_STATES.has(s.state)
   const chrome = chromeCopy(issue, s.state, confirmed?.label ?? null)
+  const [subtitleLead, subtitleTail] = chrome.sub.split(' · ')
   const takeover = issue ? takeoverCopy(issue) : null
   const chipsText = policy.chips.join(' / ')
   const formatsNote = conversionCapabilities.wordToPdf
@@ -265,12 +289,12 @@ export function PhoneUploadPage() {
 
   return (
     <main className="fusion-w5 fusion-w5--auth k1-phone-upload service-desk" data-kiosk-screen="phone-upload" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile" data-phone-upload-state={issue ?? s.state} data-purpose={s.confirmed ?? 'unconfirmed'} data-purpose-confirmed={s.confirmed ? '1' : '0'}>
-      <section className="k1-phone-upload-content">
+      <section className="k1-phone-upload-content" ref={contentRef}>
         <header className="ph-up-relaybar">
           <span className="ph-up-seal" aria-hidden="true">职</span>
           <div className="ph-up-brand">
             <strong>职易达</strong>
-            <small>{chrome.sub}</small>
+            <small>{subtitleTail ? <><span>{subtitleLead} ·</span>{' '}<span>{subtitleTail}</span></> : subtitleLead}</small>
           </div>
           <span className="ph-up-tag">{chrome.tag}</span>
         </header>
@@ -302,6 +326,12 @@ export function PhoneUploadPage() {
                       {hinted && <span className="ph-up-unsure">链接里写着这次可能是「{hinted.label}」。本页无法核对这句话，也不按它决定任何事。</span>}
                     </span>
                   </p>
+                  {precheckError && view.fileNote && (
+                    <p className="ph-up-note" data-tone={view.fileNote.tone} data-testid="phone-upload-precheck-error">
+                      <Icon name={noteIcon(view.fileNote.tone, 'info')} />
+                      <span><Rich text={view.fileNote.text} /></span>
+                    </p>
+                  )}
                   {!view.facts && (
                     <ol className="ph-up-steps" aria-label="手机上传的三步">
                       {UPLOAD_STEPS.map((step, index) => (
@@ -310,7 +340,7 @@ export function PhoneUploadPage() {
                     </ol>
                   )}
                   {renderPicker(view.picker)}
-                  <FileBox file={s.file} removable={view.removable} note={view.fileNote} onRemove={removeFile} />
+                  <FileBox file={s.file} removable={view.removable} note={precheckError ? null : view.fileNote} onRemove={removeFile} />
                   {view.chips && (
                     <>
                       <div className="ph-up-sect">现在能发送的格式</div>
@@ -348,10 +378,7 @@ export function PhoneUploadPage() {
           )}
         </div>
 
-        <p className="ph-up-footer">
-          <Icon name={chrome.icon} />
-          <span>{chrome.foot}</span>
-        </p>
+        <RelayFoot icon={chrome.icon} text={chrome.foot} />
       </section>
     </main>
   )

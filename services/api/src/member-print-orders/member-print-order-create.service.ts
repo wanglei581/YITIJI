@@ -359,7 +359,7 @@ export class MemberPrintOrderCreateService {
     const terminalById = new Map(terminals.map((terminal) => [terminal.id, terminal]))
     const views = await arrivalViewsForOrders(this.prisma, rows)
     return rows.map((row) => {
-      const arrival = views.get(row.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null }
+      const arrival = views.get(row.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null, reprintNotice: null }
       return this.toView(row, arrival.pickupCode, row.terminalId ? terminalById.get(row.terminalId) : undefined, arrival)
     })
   }
@@ -507,7 +507,7 @@ export class MemberPrintOrderCreateService {
     order: OrderRecord,
     code: string | null,
     terminal?: TerminalSummary,
-    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining'> = { reprintAllowed: false, reprintRemaining: null },
+    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
     let lines: unknown[] = []
     try { lines = Array.isArray(JSON.parse(order.itemsJson)) ? JSON.parse(order.itemsJson) : [] } catch { lines = [] }
@@ -549,6 +549,7 @@ export class MemberPrintOrderCreateService {
       createdAt: order.createdAt.toISOString(),
       reprintAllowed: reprint.reprintAllowed,
       reprintRemaining: reprint.reprintRemaining,
+      reprintNotice: reprint.reprintNotice,
     }
   }
 }

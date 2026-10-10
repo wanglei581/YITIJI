@@ -390,6 +390,7 @@ export class MemberOrderTimelineService {
       claimableHere: isClaimableHere(order, input.verifiedTerminalId, input.now),
       reprintAllowed: pay.reprintAllowed,
       reprintRemaining: pay.reprintRemaining,
+      reprintNotice: pay.reprintNotice,
     }
   }
 }

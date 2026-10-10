@@ -67,7 +67,9 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
 }
 
 async function expectWarningWithinThreeSeconds(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/\/session-timeout$/, { timeout: 3_000 })
+  // toHaveURL 是轮询断言，间隔升到 1 秒后，3 秒窗口里最后一次读取大约落在第 2 秒；提醒按配置正好在闲置 2 秒时出现，
+  // 机器稍慢就会落在最后一次读取之后而被漏看。waitForURL 由路由跳转事件触发，三秒的要求不变。
+  await page.waitForURL(/\/session-timeout$/, { waitUntil: 'commit', timeout: 3_000 })
   await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible()
 }
 

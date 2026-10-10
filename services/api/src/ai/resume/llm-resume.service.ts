@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../safety/content-blocked'
 import { RESUME_SCORING_DIMENSIONS } from '../interfaces/ai-provider.interface'
 import type {
   ResumePriority,
@@ -286,7 +287,7 @@ export class LlmResumeService {
         { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_diagnosis', forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 不记请求/响应正文（可能回显简历文本），只抛明确错误。
       // 「忙」「超时」「连不上」三态各自独立成码，不合并 —— 合并等于放弃根因。
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。

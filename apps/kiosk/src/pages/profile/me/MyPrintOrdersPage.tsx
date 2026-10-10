@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
-import { ChevronDownIcon, FilesIcon, Loader2Icon, MessageSquareIcon, PrinterIcon, ReceiptIcon, TicketIcon } from 'lucide-react'
+import { ChevronDownIcon, FilesIcon, Loader2Icon, MessageSquareIcon, PrinterIcon, ReceiptIcon, ReceiptTextIcon, TicketIcon } from 'lucide-react'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
@@ -272,7 +272,7 @@ export function MyPrintOrdersPage() {
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看打印订单" desc="公共一体机不会在未登录时展示文件名、订单金额或取件码；游客打印不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    body = <QxMeLoadingBlock title="正在加载打印订单" />
+    body = <QxMeLoadingBlock title="正在加载打印订单" placeholderIcon={ReceiptTextIcon} />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已建立的订单不会因为这次失败而消失。" struct={struct} />
   } else if (items.length === 0) {

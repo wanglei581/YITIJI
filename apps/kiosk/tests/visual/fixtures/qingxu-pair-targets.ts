@@ -34,6 +34,7 @@ import { policyPagesExtraPairs, policyPagesPlan, preparePolicyPages } from './qi
 import { prepareResumePages, resumePagesExtraPairs, resumePagesPlan } from './qingxu-pair-resume-pages'
 import { mePagesPlan, prepareMePages } from './qingxu-pair-me-pages'
 import { mePages2Plan, prepareMePages2 } from './qingxu-pair-me-pages-2'
+import { prepareRelayPages, relayPagesPlan } from './qingxu-pair-relay-pages'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 export const PROTO_DIR = path.resolve(here, '../../../../../docs/design/kiosk-redesign-2026-08')
@@ -175,6 +176,8 @@ export type RuntimePlan =
   | { kind: 'me-pages' }
   /** 31 权益与活动、40 意见反馈、41 隐私与数据请求（qingxu-pair-me-pages-2.ts）。 */
   | { kind: 'me-pages-2' }
+  /** 51 手机接力：扫码登录 16 态、手机上传 13 态（qingxu-pair-relay-pages.ts）。 */
+  | { kind: 'relay-pages' }
 
 interface RawPair {
   screen: string
@@ -790,6 +793,7 @@ export function buildQingxuPairs(): QingxuPairTarget[] {
         ?? policyPagesPlan(file, pair.screen, pair.state)
         ?? mePagesPlan(file, pair.screen, pair.state)
         ?? mePages2Plan(file, pair.screen, pair.state)
+        ?? relayPagesPlan(file, pair.screen, pair.state)
       const decided = priority
         ? { plan: priority.plan, reason: priority.reason, marker: priority.marker }
         : planOf(file, pair.screen, pair.state, siblings)
@@ -918,6 +922,11 @@ export async function prepareRuntime(page: Page, api: ApiRouter, target: QingxuP
   if (target.plan.kind === 'me-pages-2') {
     registerEvidenceShell(api)
     await prepareMePages2(page, api, target)
+    return
+  }
+  if (target.plan.kind === 'relay-pages') {
+    registerEvidenceShell(api)
+    await prepareRelayPages(page, api, target)
     return
   }
   if (target.plan.kind === 'fair') {

@@ -36,11 +36,17 @@ async function main() {
   const ACT_BAD = `audit_vfy.bad_${sfx}`
   const ACT_FAIL = `audit_vfy.fail_${sfx}`
   const userId = `usr_vfy_${sfx}`
+  const partnerId = `usr_vfy_p_${sfx}`
+  const phoneNameId = `usr_vfy_ph_${sfx}`
+  const allPhoneId = `usr_vfy_ap_${sfx}`
+  const goneId = `usr_vfy_gone_${sfx}`
+  const orgId = `org_vfy_${sfx}`
 
   async function cleanup() {
     await prisma.auditLog.deleteMany({ where: { targetType: TT } })
     await prisma.auditLog.deleteMany({ where: { action: { in: [ACT_FAIL] } } })
-    await prisma.user.deleteMany({ where: { id: userId } })
+    await prisma.user.deleteMany({ where: { id: { in: [userId, partnerId, phoneNameId, allPhoneId, goneId] } } })
+    await prisma.organization.deleteMany({ where: { id: orgId } })
   }
 
   const rowByTarget = (targetId: string) =>
@@ -138,6 +144,40 @@ async function main() {
     const failCount = await audit.list({ action: ACT_FAIL })
     if (!threw && failCount.total === 0) pass('5. write 失败 best-effort：actorRole 违约 → 不抛、不落行')
     else fail(`5. best-effort 异常: threw=${threw} rows=${failCount.total}`)
+
+    // ── 6. actorDisplayName：姓名 / 机构名 · 账号名 / 系统 null / 已删除 null / 绝不带手机号 ──
+    await prisma.organization.create({ data: { id: orgId, name: '市南区就业服务中心', type: 'public_employment_service' } })
+    await prisma.user.create({ data: { id: partnerId, username: `nanqu_${sfx}`, passwordHash: 'x', name: '周敏', role: 'partner', orgId } })
+    await prisma.user.create({ data: { id: phoneNameId, username: `ops_${sfx}`, passwordHash: 'x', name: '139 0532 7781', role: 'admin' } })
+    await prisma.user.create({ data: { id: allPhoneId, username: '13905327781', passwordHash: 'x', name: '13905327781', role: 'admin' } })
+    await prisma.user.create({ data: { id: goneId, username: `gone_${sfx}`, passwordHash: 'x', name: '已离职管理员', role: 'admin' } })
+    for (const [actorId, actorRole, targetId] of [
+      [userId, 'admin', 'TID6'], [partnerId, 'partner', 'TID7'], [phoneNameId, 'admin', 'TID8'], [allPhoneId, 'admin', 'TID9'], [goneId, 'admin', 'TID10'],
+    ] as const) {
+      await audit.write({ actorId, actorRole, action: ACT_A, targetType: TT, targetId })
+    }
+    await prisma.user.delete({ where: { id: goneId } })
+    const displayOf = async (targetId: string) => (await audit.list({ targetType: TT, targetId })).items[0]?.actorDisplayName
+    const shown = {
+      admin: await displayOf('TID6'),
+      partner: await displayOf('TID7'),
+      phoneName: await displayOf('TID8'),
+      allPhone: await displayOf('TID9'),
+      gone: await displayOf('TID10'),
+      system: await displayOf('TID3'),
+    }
+    if (
+      shown.admin === '审计验证管理员' &&
+      shown.partner === '市南区就业服务中心 · 周敏' &&
+      shown.phoneName === `ops_${sfx}` &&
+      shown.allPhone === null &&
+      shown.gone === null &&
+      shown.system === null
+    ) pass('6. actorDisplayName：内部姓名、机构名 · 账号名、像手机号就换登录名或给 null、系统与已删除账号为 null')
+    else fail(`6. actorDisplayName 异常: ${JSON.stringify(shown)}`)
+    const listed = await audit.list({ targetType: TT, limit: 50 })
+    if (listed.items.every((item) => !/1[3-9]\d[\s-]?\d{4}[\s-]?\d{4}/.test(item.actorDisplayName ?? ''))) pass('6b. 列表里的显示名都不含手机号')
+    else fail('6b. 显示名里出现了手机号')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

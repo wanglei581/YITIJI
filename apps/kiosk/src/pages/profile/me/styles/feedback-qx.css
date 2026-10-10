@@ -221,12 +221,13 @@
 .fb-page .fb-list p,
 .fb-page .fb-list .qx-btn { font-size: 22px; }
 
-.qx-stage:has(.fb-page) .qx-ctabar {
+/* 与 41 同因：压过我的外壳的零 padding，整条底栏和脚注恢复舞台留边。 */
+.qx-stage:has(.qx-me-page.fb-page) > .qx-ctabar {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  padding-top: 10px;
-  padding-bottom: 8px;
+  padding: 10px var(--qx-gutter) 8px;
 }
 .fb-cta-row { display: flex; align-items: stretch; gap: 14px; width: 100%; }
 .qx-stage:has(.fb-page) .fb-cta-row > .qx-btn,
@@ -289,3 +290,6 @@
 @media (prefers-reduced-motion: reduce) {
   .fb-page, .fb-page * { animation: none !important; transition: none !important; }
 }
+
+.fb-row-chevron { flex: none; width: 40px; height: 40px; display: grid; place-items: center; color: var(--qx-ink-3); }
+.fb-row-chevron svg { width: 22px; height: 22px; }
