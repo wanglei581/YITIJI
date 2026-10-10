@@ -2655,6 +2655,23 @@ for (const [findingCount, redactedCount, keptCount, text] of [
     if (findingCount > 0) await expect(page.getByText('没发现需要遮挡的内容')).toHaveCount(0)
   })
 }
+// 真机实操 F-13（2026-10-10）：检出 5 处、用户全部保留时，预览与参数页的徽标写成了「没发现需要遮挡的内容」，
+// 和前一屏、后一屏都对不上。W-118 当时只修了确认页；这里钉住预览页。
+test('F-13 preview badge says kept-all instead of nothing-found when the user kept every finding @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+  await seedPrintHandoff(page, { materialCheck: {
+    inspectionTaskId: 'w2-inspection-001', piiTaskId: 'w2-pii_scan', piiRedactTaskId: 'w2-pii_redact',
+    checkedAt: NOW, findingCount: 5, redactedCount: 0, keptCount: 5, mode: 'checked',
+    redaction: { claim: 'nothing_to_redact', redactedFileId: null, appliedRedactedCount: 0, keptCount: 5, failedNoPositionCount: 0, reverifyRemainingCount: null, reverifyRan: false },
+  } })
+  await page.goto('/print/preview')
+  const badge = page.locator('.qpd-redaction-badge')
+  await expect(badge).toContainText('发现 5 处个人信息，你选择了全部保留 · 打印使用原件，纸上是完整信息')
+  await expect(badge).not.toContainText('没发现需要遮挡的内容')
+})
+
 // W-125：后台把 usb_import 关掉之后，深链接和二维码过期屏也要跟着停。
 // 这些用例打 @w2，靠 playwright.w2 注入的网桥令牌才能走到能力闸门；没令牌时页面停在「未配置」。
 function usbCapability(status: string, note: string | null = null) {
