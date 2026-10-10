@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
@@ -87,6 +88,7 @@ Page({
   },
 
   onLoad(options) {
+    absorb(options)
     this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20 })
     this._syncOptions()
 

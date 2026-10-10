@@ -1,4 +1,5 @@
 const app = getApp()
+const { validTo, uploadUrl, openParsedResult } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
@@ -94,6 +95,7 @@ Page({
   },
 
   onLoad(options) {
+    this._entryTo = validTo(options && options.to)
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
 
     const fileId = options.fileId || ''
@@ -443,9 +445,7 @@ Page({
     this.setData({ phase: 'parsing', done: true, atext: '解析完成', settleBlocked: false })
     setTimeout(() => {
       if (this._stopped) return
-      wx.redirectTo({
-        url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
-      })
+      openParsedResult(this._entryTo, taskId, wx)
     }, 500)
   },
 
@@ -517,7 +517,7 @@ Page({
   retry() {
     if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked || this.data.conflict) return
     if (this.data.phase === 'missing') {
-      wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+      wx.redirectTo({ url: uploadUrl(this._entryTo) })
       return
     }
     // 只有「明确失败」才直接重提。结果未知时刚才那次可能已经完成,
@@ -743,7 +743,7 @@ Page({
   },
 
   toUpload() {
-    wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.redirectTo({ url: uploadUrl(this._entryTo) })
   },
 
   back() {

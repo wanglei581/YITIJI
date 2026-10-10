@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api')
 
 const BASE_RESUME_EXT = ['pdf']
@@ -16,7 +17,8 @@ Page({
     wordConversionAvailable: false,
     wordConversionCopy: '正在确认 Word 转换能力；当前可先上传 PDF',
   },
-  onLoad() {
+  onLoad(options) {
+    this._entryTo = absorb(options).to
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     api.getDocumentConversionCapabilities()
       .then((capabilities) => {
@@ -70,7 +72,7 @@ Page({
           `fileFormat=${encodeURIComponent(this._extOf(fileName || res.filename))}`,
           `source=${purpose === 'resume_scan' ? 'scan' : 'upload'}`,
         ].join('&')
-        wx.navigateTo({ url: `/pages/resume-parse/resume-parse?${q}` })
+        wx.navigateTo({ url: `/pages/resume-parse/resume-parse?${q}${this._entryTo ? '&to=' + this._entryTo : ''}` })
       })
       .catch((err) => {
         wx.hideLoading()

@@ -2,6 +2,7 @@
 // 选择终端。调 GET /api/v1/terminals/public 获取真实在线终端列表。
 const app = getApp()
 const api = require('../../utils/api')
+const { recallTerminal } = require('../../utils/kiosk-entry')
 
 function decodeParam(value) {
   if (typeof value !== 'string' || !value) return ''
@@ -16,6 +17,8 @@ Page({
     isFreeOrder: false,
     stores: [],
     picked: '',
+    entryHint: '',
+    entryHintWarn: false,
     loading: true,
     loadError: '',
   },
@@ -35,16 +38,30 @@ Page({
   },
 
   _loadTerminals() {
-    this.setData({ loading: true, loadError: '' })
+    this.setData({ loading: true, loadError: '', entryHint: '' })
     api.getPublicTerminals()
       .then(data => {
         // 后端返回 PublicTerminalView[] 或包装在 data 字段里
         const list = Array.isArray(data) ? data : (data && data.data) || []
+        // 12 小时内从一体机扫码进来过：那台在线就预选（名称取自服务端列表，不取自码），仍要本人点确认。
+        // 那台不在列表里（接口只给在线的，离线、停用、编号对不上都是这样）就说明白，也不替他选别的，
+        // 免得只剩一台时被自动选中、回到原来那台却取不了件。
+        const terminalCode = recallTerminal()
+        const scanned = terminalCode ? list.find(item => item.terminalCode === terminalCode && item.isOnline) : null
+        let entryHint = ''
+        if (scanned) entryHint = `已为你选好扫码的那台：${scanned.displayName}。不是这台，可在下面换一台；核对后点「确认终端」。`
+        else if (terminalCode) {
+          entryHint = list.length
+            ? '你扫码的那台现在不在可选终端里（可能暂时离线），请在下面选别的终端，或稍后再试。'
+            : '你扫码的那台现在不在线，请稍后再试。'
+        }
         this.setData({
           stores: list,
           loading: false,
-          // 只有一个终端时自动选中
-          picked: list.length === 1 ? list[0].id : '',
+          // 没有扫码记录时照旧：只有一个终端时自动选中
+          picked: scanned ? scanned.id : (!terminalCode && list.length === 1 ? list[0].id : ''),
+          entryHint,
+          entryHintWarn: Boolean(entryHint) && !scanned,
         })
       })
       .catch(err => {

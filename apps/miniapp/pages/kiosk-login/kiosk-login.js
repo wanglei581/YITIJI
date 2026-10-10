@@ -8,6 +8,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { parseEntryCodePath } = require('../../utils/kiosk-entry')
 const { parseRelayText, parseMiniappCodePath } = require('../../utils/kiosk-relay-link')
 
 // 从扫码结果 URL 里提取 ticketId（容错：带或不带 domain 前缀）
@@ -212,6 +213,20 @@ Page({
       } catch (_) {
         this.setData({ phase: 'scan-error', errorMsg: '这张上传码读不出来，请回一体机重新生成后再扫' })
       }
+      return
+    }
+
+    const entry = parseEntryCodePath(path)
+    if (entry.kind === 'entry') {
+      const flow = this._flow
+      this.setData({ phase: 'idle' })
+      wx.navigateTo({
+        url: entry.url,
+        // 跳不过去不能没有反应：说清楚，并给出不靠这张码的做法。已经开始下一轮扫码就不再打扰。
+        fail: () => {
+          if (flow === this._flow) this.setData({ phase: 'scan-error', errorMsg: '这张码要去的页面现在打不开，请稍后再扫，或回一体机直接办理' })
+        },
+      })
       return
     }
 

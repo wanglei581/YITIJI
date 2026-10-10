@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const { plainAiMessageOf } = require('../../utils/user-error')
@@ -35,6 +36,7 @@ Page({
     creating:       false,
   },
   onLoad(options) {
+    absorb(options)
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     if (options.position) this.setData({ 'form.position': decodeURIComponent(options.position) })
   },

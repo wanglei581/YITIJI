@@ -36,6 +36,10 @@ const KEYS = {
   // 本机记下的两项本人声明 { age_14_plus?: { version, at }, voice_recording?: { version, at } }。
   // 只记「是否声明、哪一版文案、何时」，不记出生日期、手机号或录音。见 utils/ai-access.js。
   AI_DECLARATIONS: 'zyd_ai_declarations',
+
+  // 最近一次从一体机扫码进来时带的公开终端编号 { terminalCode, ts }，12 小时内供选机页预选。
+  // 编号认的是机器不是人；只在本机比对，不发给任何接口。见 utils/kiosk-entry.js。
+  KIOSK_ENTRY: 'zyd_kiosk_entry',
 };
 
 function get(key, fallback = null) {
