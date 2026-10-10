@@ -15,7 +15,7 @@ const advisorCall = read('src/hooks/useAiAdvisorCallSession.ts')
 const shell = read('src/layouts/KioskRoot.tsx')
 const topbar = read('src/components/kiosk-shell/KioskAppTopbar.tsx')
 
-// 拍板②：只有网络抖动 / 503 TERMINAL_SESSION_RETRYABLE 自动重试；401 TERMINAL_SESSION_INVALID 立即 fail-closed。
+// 拍板②：网络抖动 / 503 TERMINAL_SESSION_RETRYABLE 自动重试（2026-10-10 起网关 502 / 503 / 504 同样重试）；401 TERMINAL_SESSION_INVALID 立即 fail-closed。
 const transientBody = terminalAuth.match(/function transient\(error: unknown\): boolean \{([\s\S]*?)\n\}/)?.[1] ?? ''
 assert.ok(transientBody, 'terminalAuth must classify retryable errors in transient()')
 assert.match(transientBody, /503/, 'transient() must treat 503 TERMINAL_SESSION_RETRYABLE as retryable')

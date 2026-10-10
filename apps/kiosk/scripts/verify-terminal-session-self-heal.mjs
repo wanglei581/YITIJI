@@ -141,6 +141,84 @@ check(
   )
 }
 
+// ── 七、failed 不是终点：判死之后后台每分钟再试，网关 5xx 算可重试 ──────────
+// 防的是 2026-10-10 走查实测到的故障：开机换票那一下撞上一次网关 503（不带业务错误码），
+// 一次就判 failed，此后 4 分半不恢复，整页重开才好。读码还更宽：十分钟续期撞上服务器重启
+// 同样一去不回 —— 每次发布都可能让某台机器一直打不了，而现场没有人。
+// 行为由 scripts/tests/terminal-session-background-recovery.test.mjs 真跑（同一条 verify 命令里），
+// 这里只钉结构，免得那几条被改成「测试还在、路已经断了」。
+{
+  const transientBody = src.match(/function transient\(error: unknown\): boolean \{([\s\S]*?)\n\}/)?.[1] ?? ''
+  check(
+    '网关 502 / 503 / 504 算可重试',
+    /502/.test(transientBody) && /503/.test(transientBody) && /504/.test(transientBody),
+    '后端重启那几十秒里网关回的就是这三个',
+  )
+  check('可重试判定里没有 401', !/401/.test(transientBody), '作废的票重试不会变好')
+}
+{
+  const fn = src.slice(src.indexOf('function setState(next: TerminalSessionState): void'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '每次落到 failed 都排后台恢复',
+    /if \(next === 'failed'\) \{[\s\S]*?scheduleRecovery\(\)\n  \} else \{/.test(body),
+    '排在各个判死分支里迟早会漏一个',
+  )
+  check('离开 failed 就撤掉后台恢复', /\} else \{\n    cancelRecovery\(\)\n  \}/.test(body))
+  check(
+    '落到 failed 时撤掉残留的十分钟续期定时器',
+    /if \(next === 'failed'\) \{[\s\S]*?window\.clearTimeout\(refreshTimer\); refreshTimer = null[\s\S]*?\} else \{/.test(body),
+    '留着它会在恢复中途把状态翻回 checking',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function recoverInBackground'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '后台恢复不把状态改成 checking',
+    !/setState\('checking'\)/.test(body),
+    'checking 会让闸门去等在飞的续期；恢复期间必须照旧立即拦',
+  )
+  check('没恢复成且仍是 failed 时排下一轮', /catch \{\s*if \(state === 'failed'\) scheduleRecovery\(\)/.test(body))
+  check(
+    '后台恢复与 retryRefresh 共用同一把锁',
+    /refreshInflight = attempt\.finally\(\(\) => \{ refreshInflight = null \}\)/.test(body),
+    '否则恢复在飞时别处的 401 会并发出第二个续期请求',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function recoverOnce'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '续期只在服务端明确判作废时才改走「要新引导票」',
+    /if \(!sessionInvalid\(error\)\) return false/.test(body),
+    '服务器只是没回来就去换新会话，会把这一位办到一半的材料清掉',
+  )
+  check(
+    '带引导票打开而没换成的页不拿旧会话票续期',
+    /if \(!bootExchangeUnsettled && current && current !== rejectedSessionToken\)/.test(body),
+    '否则「换引导票即清场」可以被后台恢复绕开',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function retryRefreshOnce'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '续期主路同样不拿旧会话票（身份恢复回调、按台计请求的 401 都走这里）',
+    /for \(const delay of bootExchangeUnsettled \? \[\] : \[0, \.\.\.RETRY_DELAYS_MS\]\)/.test(body),
+    '只挡后台恢复一处，身份恢复回调仍能拿旧票续上而不清场',
+  )
+}
+{
+  const fn = src.slice(src.indexOf('async function awaitReadySessionOrFailClosed'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check(
+    '闸门没变：不是 ready 就抛 TERMINAL_SESSION_INVALID',
+    /if \(state !== 'ready'\) throw new ApiHttpError\('TERMINAL_SESSION_INVALID'/.test(body),
+  )
+  check('闸门不等后台恢复', !/recover/.test(body.replace(/\/\*[\s\S]*?\*\//g, '')))
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${failed.length === 0 ? '✅ ALL PASS' : `❌ ${failed.length} 项失败`} — 终端会话自愈`)
 process.exit(failed.length === 0 ? 0 : 1)
