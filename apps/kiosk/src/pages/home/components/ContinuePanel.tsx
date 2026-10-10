@@ -57,7 +57,8 @@ export function ContinuePanel() {
           setSuggestion({
             kind: 'print',
             title: '打印任务进行中',
-            detail: `${activePrint.fileName ?? '打印文件'} · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
+            // 公共屏不显示常带真名的文件名，明细进入「我的 → 打印订单」由本人再看。
+            detail: `打印文件 · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
             actionLabel: '查看进度',
             onGo: () => navigate('/me/print-orders'),
             icon: 'printer',

@@ -90,7 +90,9 @@ export const PICKUP_CLAIM_MESSAGES = (contact = peekSupportContact()): Readonly<
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',
   PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了',
-  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认，暂时不能接着打，请稍后再试',
+  // 只对实付 0 元、出纸结果未确认且未满 5 分钟的单出现（付费单回的是原路退款那句）。
+  // 后端回「请 5 分钟后再试」；这里把下一步说全：满 5 分钟后同机同码可以接着打。
+  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
   PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
