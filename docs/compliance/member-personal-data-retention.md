@@ -22,7 +22,7 @@
 | 模拟面试记录 | `MockInterviewSession` / `MockInterviewReport` | 匿名 2 小时；会员模拟面试 7 天 | 到期 cron 硬删；本人可删除 | 报告原文不写日志，不进入审计 payload |
 | 模拟面试回答与语音转写 | `MockInterviewTurn.content` / `.transcriptText` | 随所属会话（匿名 2 小时；会员 7 天） | 会话被硬删时级联物理删除 | 落库的是**未脱敏原文**（本人回看报告要看到自己的原话）；不写日志、不进审计 payload |
 | AI 助手对话 | 服务进程内存 `LlmChatService.sessions`（**不落库**） | 30 分钟无活动即淘汰；进程重启即失 | `pruneSessions` 按 TTL 主动淘汰 | 对话原文没有任何落库路径；审计只记 `sessionId / intent / provider` |
-| 顾问会话诉求与输入槽 | `AdvisorSession.topic` / `.slotsJson` / `AdvisorPin.content` | 24 小时（`ADVISOR_SESSION_TTL_HOURS`） | 到期由 `AdvisorRetentionTask` 每小时 cron 硬删，级联 pins/artifacts；删除写系统审计 | 落库的是**未脱敏原文**；脱敏只发生在送模型那一步，不回写本表；问答多轮上下文只在内存不落库 |
+| 顾问会话的输入槽与钉住条目 | `AdvisorSession.slotsJson` / `AdvisorPin.content`；`AdvisorSession.topic` 只存固定标签，不存用户原话 | 24 小时（`ADVISOR_SESSION_TTL_HOURS`） | 到期由 `AdvisorRetentionTask` 每小时 cron 硬删，级联 pins/artifacts；删除写系统审计 | 用户的开场诉求只用于判作业型：送模型前遮盖，判完即弃，**不落库**；判型理由存固定句，不存模型复述。用户自己填的材料和主动钉住的条目落库的是**未脱敏原文**；脱敏只发生在送模型那一步，不回写本表；问答多轮上下文只在内存不落库。第七次发布前落库的旧会话仍含用户原话，随 24 小时到期清完 |
 | 顾问产物 | `AdvisorArtifact.payloadJson` | 24 小时（`ADVISOR_ARTIFACT_TTL_HOURS`） | 会话过期时级联硬删；自身 TTL 先到时由同一 cron 单独硬删 | 打印生成的 PDF 是独立 `FileObject`，按其 `retentionPolicy` 留存，不随产物行消失 |
 | AI 逐次用量明细 | `AiUsageRecord` | 默认 90 天（与 `AiServiceLog` 相同，读 `AI_SERVICE_LOG_RETENTION_DAYS`） | 到期由 `AiResultCleanupTask` 先按月汇总再分批硬删；会员注销时 `endUserId` 置空（`detachMemberAiUsageRecords`），不删行 | 只存功能、厂商、型号、状态、tokens、金额和已验签终端、机构、会员号，不含用户文本。置空后明细不再指向这个人；金额留到到期清理才滚进月汇总。账号注销入口仍未开放，置空函数不从拒绝路径调用 |
 | AI 用量月汇总 | `AiUsageMonthlySummary` | 长期保留 | 不随明细到期删除 | 只有金额和次数（北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额、未计量次数），不含个人信息，不含会员、终端或机构号 |

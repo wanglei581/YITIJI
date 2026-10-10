@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -395,6 +396,30 @@ includes('src/pages/ai-plan/advisorArtifactModel.ts', '这份可以打印带走'
 includes('src/pages/ai-plan/advisorArtifactModel.ts', '还没有可带走的内容', 'empty and expired say nothing is ready to take')
 includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '正在读取'", 'loading pill says it is reading')
 includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '这次没读到'", 'error pill says this read failed')
+// T52-pin：保存本次要点后由小青整理条目；冻结稿的原文只允许留在注释里。
+for (const [file, copy] of [
+  ['src/pages/ai-plan/advisorArtifactModel.ts', '这次聊的要点，我都'],
+  ['src/pages/ai-plan/advisorArtifactModel.ts', '对话本身不保存，留下来的是我整理的这几条要点。'],
+  ['src/pages/ai-plan/AdvisorArtifactPanels.tsx', '这次对话的要点'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '聊完保存要点'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '带走：本次要点单'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '边问边聊，聊完点「保存本次要点」（要先登录）。对话本身不保存，小青把要点和待办整理成一页。'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '打印稿上有：这里的每一条要点，每条后面附出处和 E1 / E2 / E3。E3 是 AI 的判断，说不说由你定。'],
+]) includes(file, copy, '52 号作业面保留批准后的文字')
+for (const file of ts.sys.readDirectory(join(ROOT, 'src/pages/ai-plan'), ['.ts', '.tsx'])) {
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+  const strings = []
+  const visit = (node) => {
+    // AST 不读取注释；text 已解码 Unicode 转义，同时覆盖 JSX 正文和模板片段。
+    if (ts.isStringLiteralLike(node) || ts.isJsxText(node)
+      || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) strings.push(node.text)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  for (const forbidden of ['钉住', '工作人员', '服务台']) {
+    check(strings.every((value) => !value.includes(forbidden)), `${file.slice(ROOT.length + 1)} 的字符串不含「${forbidden}」`)
+  }
+}
 includes('src/pages/ai-plan/AiPlanPage.tsx', "isContentState(derivedState) || derivedState === 'print-unavailable'", 'print-unavailable keeps the legend with the body')
 includes('src/pages/ai-plan/AiPlanPage.tsx', '打开我的 AI 记录', 'empty state opens AI records with the design label')
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'data-testid="advisor-artifact-cta-redo"', 'expired state has a redo button')

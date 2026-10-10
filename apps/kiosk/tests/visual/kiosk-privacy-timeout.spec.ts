@@ -1324,7 +1324,8 @@ test('guest local favorites are wiped by the hard privacy deadline @privacy-kios
     window.localStorage.setItem('kiosk:jobFavorites:v1', JSON.stringify(['job-secret-previous-visitor']))
   })
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page).toHaveURL('http://127.0.0.1:4187/')
+  // 不写死 4187：本套件会换端口跑，断言的是清场前仍停在首页。
+  expect(new URL(page.url()).pathname).toBe('/')
 
   const before = await page.evaluate(() => window.localStorage.getItem('kiosk:jobFavorites:v1'))
   expect(before).toContain('job-secret-previous-visitor')
@@ -2096,7 +2097,8 @@ test('a member login cannot start a scan while the previous one is still being c
   await loginThroughVisibleUi(page, '/scan/start')
   await revoke.received(0)
 
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
 
   /* 服务端的租约取的是这台终端**最早**那条「已确认 + waiting + 未过期」的行。

@@ -292,10 +292,10 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
   switch (state) {
     case 'qa-pins':
       return {
-        heroBefore: '你钉住的，我都',
+        heroBefore: '这次聊的要点，我都',
         heroEm: '整理好了',
         heroAfter: '。',
-        sub: '对话本身不保存，只有你钉住的条目留了下来。',
+        sub: '对话本身不保存，留下来的是我整理的这几条要点。',
         statusLabel: '这份可以打印带走',
         statusTone: 'unknown',
       }
@@ -377,7 +377,7 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
 
 export const FIXTURE_QA: QaPinsPayload = {
   kind: 'qa_pins',
-  title: '你钉住的条目',
+  title: '这次对话的要点',
   pins: [
     { content: '我做过两年社群运营，最多同时管 6 个群。', evidenceLevel: 'E1', sourceNote: '来源：你在第 2 轮说的原话' },
     { content: '你在本机的简历里写了「用户增长」相关经历，可以在面试里直接引用。', evidenceLevel: 'E2', sourceNote: '来源：本机已有的简历诊断结果' },
@@ -429,7 +429,7 @@ export const FIXTURE_COMPARE_ALL: CompareReportPayload = {
 }
 
 export function fixturePayload(state: ProtoState): AdvisorArtifactPayload | null {
-  // 稿 52 的 print-unavailable 画的是钉住的四条，不是比对单。
+  // 稿 52 的 print-unavailable 画的是四条要点（稿上写的是「钉住」），不是比对单。
   if (state === 'qa-pins' || state === 'print-unavailable') return FIXTURE_QA
   if (state === 'slot-draft') return FIXTURE_SLOT
   if (state === 'slot-draft-blanks') return FIXTURE_SLOT_BLANKS
