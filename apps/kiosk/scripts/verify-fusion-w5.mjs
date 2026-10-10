@@ -9,6 +9,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 第八次 8-7：真实卸载作废未收文件的会话，StrictMode 重放和确认过程有守卫。
+for (const path of ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'src/pages/upload/hooks/useUploadSession.ts']) {
+  const source = read(path)
+  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'uploaded' \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken\)\.catch\(\(\) => undefined\)/, `8-7 ${path} 卸载静默作废且避开重放与确认`)
+}
+console.log('PASS 8-7 两套上传真实卸载静默作废')
+
 const W5_ROUTES = [
   '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
@@ -84,10 +91,11 @@ const FROZEN = new Map([
   // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
   // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
   // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-10-10 8-7 重新冻结：独立等待锁、到期提醒、真实卸载作废；新内容断言在哈希检查之前。
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb'],
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'b0bc57698222f876d5c5f1969c8d9247d7303da8032d0ffbd76c1a2449b3e59f'],
 ])
 
 function propertyName(node) {

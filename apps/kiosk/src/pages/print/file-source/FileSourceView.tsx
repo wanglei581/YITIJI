@@ -60,6 +60,7 @@ export interface FileSourceViewProps {
   phone: PhoneSessionView
   qrUrl: string | null
   expiresLabel: string
+  waitRemainingSeconds: number | null
   previewOpen: boolean
   previewToken: string | null
   localRejectKind: LocalRejectKind | null
@@ -168,7 +169,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
-    wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
+    wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel, waitRemainingSeconds,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
     onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
@@ -318,6 +319,18 @@ export function FileSourceView(props: FileSourceViewProps) {
       <ChannelGrid keys={channelKeys} active={tab} usbMode={usbMode} onSelect={onSelectChannel} />
     </section>
   )
+
+  const waitCountdown = waitRemainingSeconds === null ? '' : `${Math.floor(waitRemainingSeconds / 60)}:${String(waitRemainingSeconds % 60).padStart(2, '0')}`
+  const phoneWaitNotice = waitRemainingSeconds !== null ? (
+    <>
+      <FileSourceNote>等你传文件期间，这台机器不会自动退出。二维码到期后没有操作，就会自动退出。</FileSourceNote>
+      {waitRemainingSeconds > 0 && waitRemainingSeconds <= 60 && (
+        <div role="status" className="fs-status" data-kind="warn">
+          <div className="fs-status-p">二维码还剩 {waitCountdown}。还在传的话点一下屏幕，到期后可以在这里重新出码。</div>
+        </div>
+      )}
+    </>
+  ) : null
 
   const phonePanel = (
     <div className="fs-phone-slot">
@@ -556,7 +569,7 @@ export function FileSourceView(props: FileSourceViewProps) {
               ) : null}
               {phone.pendingName && ['phone-uploaded', 'phone-confirming', 'phone-confirm-failed', 'phone-cancel-requesting', 'phone-cancel-failed'].includes(screen) ? (
                 <><div className="fs-empty"><span className="fs-empty-ic"><FileTextIcon size={38} aria-hidden="true" /></span><span>{screen === 'phone-uploaded' ? '确认这一下要你在这台机器上点；确认前它还不是当前文件。' : screen === 'phone-confirming' ? '确认结果回来前，这份还没有进入本次办理。' : screen === 'phone-cancel-requesting' ? '取消结果回来前，这份仍然挂着，不说已经作废。' : screen === 'phone-cancel-failed' ? '取消没有确认成功，这份仍留着等你决定。' : '确认失败，当前文件仍然是空的。'}</span></div><FileSourceSteps title="接下来怎么走" items={screen.includes('cancel') ? ['系统答复之前不作废这份文件。', '没取消成功，可以重试或回去确认。', '两条路都不会凭空多出一份文件。'] : ['本机确认后才收进本次办理。', '成为当前文件后，手机上传页可以关了。', '下一步材料检查才会放行。']} /></>
-              ) : <div className="fs-phone-guide">{phonePanel}<div><FileSourceSteps title={screen === 'phone-expired' ? '这张已经不能用了' : screen === 'phone-cancelled' ? '再来一次也行' : '扫码 → 选文件 → 上传'} items={['手机打开相机或微信扫一扫。', '选择 PDF / JPG / PNG，单份 ≤ 10MB。', '系统收到后，回来这台机器确认。']} /><FileSourceNote>{screen === 'phone-status-unknown' ? '查询失败不等于已过期；可以再查一次，或重新出码。' : screen === 'phone-expired' || screen === 'phone-cancelled' ? '重新出码会建立新的上传，旧码不再收文件。' : '本机看不到你扫没扫，只认系统收到文件。'}</FileSourceNote></div></div>}
+              ) : <div className="fs-phone-guide">{phonePanel}<div><FileSourceSteps title={screen === 'phone-expired' ? '这张已经不能用了' : screen === 'phone-cancelled' ? '再来一次也行' : '扫码 → 选文件 → 上传'} items={['手机打开相机或微信扫一扫。', '选择 PDF / JPG / PNG，单份 ≤ 10MB。', '系统收到后，回来这台机器确认。']} /><FileSourceNote>{screen === 'phone-status-unknown' ? '查询失败不等于已过期；可以再查一次，或重新出码。' : screen === 'phone-expired' || screen === 'phone-cancelled' ? '重新出码会建立新的上传，旧码不再收文件。' : '本机看不到你扫没扫，只认系统收到文件。'}</FileSourceNote>{phoneWaitNotice}</div></div>}
             </div>
           </section>
           {screen === 'phone-generating' || screen === 'phone-gen-failed' ? switchRow : null}
