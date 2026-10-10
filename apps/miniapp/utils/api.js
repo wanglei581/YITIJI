@@ -1827,7 +1827,8 @@ const api = {
   createContractReview(payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     // 建任务要落库并校验同意快照，15 秒默认值偏紧。
-    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
+    // ai: 'generate'：和别的 AI 功能一样，先过未满 14 周岁的声明（服务端这条是 @AiUse('generate')）。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout, ai: 'generate' });
   },
 
   /**
@@ -1851,7 +1852,7 @@ const api = {
   confirmContractReview(id, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
-      method: 'POST', data: payload, needAuth: true,
+      method: 'POST', data: payload, needAuth: true, ai: 'generate',
       // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
       timeout: config.aiTimeout,
     });
