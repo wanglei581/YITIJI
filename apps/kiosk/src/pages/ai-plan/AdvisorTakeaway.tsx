@@ -15,9 +15,9 @@ function Glyph({ children }: { children: ReactNode }) {
 const KINDS = [
   {
     key: 'qa',
-    title: '边问边钉住',
-    chip: '带走：钉住的条目单',
-    text: '边问边聊，觉得有用的那句点「钉住」。对话本身不保存，钉住的条目整理成一页。',
+    title: '聊完保存要点',
+    chip: '带走：本次要点单',
+    text: '边问边聊，聊完点「保存本次要点」（要先登录）。对话本身不保存，小青把要点和待办整理成一页。',
     icon: (
       <Glyph>
         <path d="M12 17v5" />
@@ -122,7 +122,7 @@ function PaperCompare() {
 }
 
 const HAS_LINE: Record<PaperKind, string> = {
-  qa: '打印稿上有：你钉住的每一条，每条后面附出处和 E1 / E2 / E3。E3 是 AI 的判断，说不说由你定。',
+  qa: '打印稿上有：这里的每一条要点，每条后面附出处和 E1 / E2 / E3。E3 是 AI 的判断，说不说由你定。',
   slot: '打印稿上有：这段话、留空的地方，以及它依据的每一句原话。',
   compare: '打印稿上有：每条要求写没写到，写到的附你材料里的原文。',
 }

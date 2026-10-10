@@ -183,6 +183,9 @@ Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\collect-field-evidence.ps1") `
   -Destination (Join-Path $provisionRoot "collect-field-evidence.ps1")
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\diagnose-production-agent.ps1") `
+  -Destination (Join-Path $provisionRoot "diagnose-production-agent.ps1")
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $PSScriptRoot "provision\boot-spool-guard.ps1") `
   -Destination (Join-Path $provisionRoot "boot-spool-guard.ps1")
 Copy-WindowsPowerShellScript `

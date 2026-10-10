@@ -16,8 +16,8 @@
  *  4. 日志不出现用户原话：审计面模块里所有 logger/console 调用的模板插值，
  *     不得引用用户自由文本变量（长度 / 条数 / 错误码等元数据放行）。
  *  5. 审计 payload 不出现用户原话：audit.write 的 payload 键名同上。
- *  6. 「我的记录」反向锚：读路径必须把用户**原话**返回给本人，
- *     不得为了合规把展示内容换成 `[姓名_1]` 这类占位符。
+ *  6. 「我的记录」反向锚：本人保存的材料仍原样回读，不得换成 `[姓名_1]`；
+ *     顾问开场只用于判型、不落库，问答列表不拿存量开场原话当标题。
  *  7. advisor 专项回归锚 + 留存矩阵文档一致性。
  *
  * 刻意不检查「prompt 里有没有脱敏」——那是 verify:llm-input-pii-mask 的职责，
@@ -412,13 +412,24 @@ for (const readPath of ['async getSession(', 'private async reportDto(']) {
 }
 
 const advisorService = readRepo('services/api/src/advisor/advisor.service.ts')
+const createStart = advisorService.indexOf('async createSession(')
+const createBody = createStart < 0 ? '' : advisorService.slice(createStart, advisorService.indexOf('\n  }\n', createStart))
 assert(
-  /topic:\s*row\.topic/.test(advisorService),
-  '顾问会话回读仍返回用户自己写的诉求原文（topic: row.topic）',
+  createBody.length > 0 && !/trimmedTopic|question\s*:/.test(createBody)
+    && /topic:\s*ADVISOR_SESSION_TOPIC/.test(createBody),
+  '顾问建会话不保存开场话或 question，只写固定 topic 标签',
 )
+const assistantSummary = readRepo('services/api/src/advisor/assistant-summary.service.ts')
 assert(
-  !/mask\w*\(\s*trimmedTopic|topic:\s*mask/.test(advisorService),
-  '顾问会话落库的 topic 未被改写成占位符版本（本人回看要看到原话）',
+  !/firstUser/.test(assistantSummary) && /topic:\s*ASSISTANT_SUMMARY_TOPIC/.test(assistantSummary),
+  '小青保存要点不取 firstUser 落库，只写固定 topic 标签',
+)
+const memberAssets = readRepo('services/api/src/member-assets/member-assets.service.ts')
+const listStart = memberAssets.indexOf('async listAiRecords(')
+const listBody = listStart < 0 ? '' : memberAssets.slice(listStart, memberAssets.indexOf('\n  }\n', listStart))
+assert(
+  listBody.length > 0 && !/session:\s*\{\s*select:\s*\{\s*topic:/.test(listBody),
+  '问答记录列表查询不取会话 topic，避免显示存量开场原话',
 )
 
 // ── 7. 对话不落库承诺 + advisor 清理回归锚 ────────────────────────────────────

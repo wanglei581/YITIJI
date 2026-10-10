@@ -43,13 +43,14 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
 ].join('\n'))
 import { AdvisorArtifactService } from './advisor-artifact.service'
-import { ADVISOR_DISCLAIMER } from './advisor-skills'
+import { ADVISOR_DISCLAIMER, ASSISTANT_SUMMARY_TOPIC } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
 
 // ============================================================
 // 小青助手「本次要点」：把内存中的 assistant 会话浓缩成可打印 qa_pins。
 //
 // 不改 Prisma 模型：AdvisorSession.slotsJson.source = 'assistant' 标记来源。
+// 开场原话不落库：topic 只存固定标签，slotsJson 只留来源；AI 整理的要点照旧保存。
 // 匿名一律 404，不泄露「需要登录」。产物走既有 AdvisorArtifact.print。
 // 日志 / 审计只写元数据，不含对话正文或转写文本。
 // ============================================================
@@ -137,7 +138,6 @@ export class AssistantSummaryService {
       throw error
     }
 
-    const firstUser = userTurns[0]!.content.trim().slice(0, 600)
     const nowIso = new Date().toISOString()
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000)
     const row = await this.prisma.advisorSession.create({
@@ -146,12 +146,11 @@ export class AssistantSummaryService {
         accessTokenHash: null,
         skill: 'qa',
         status: 'completed',
-        topic: firstUser || '小青对话要点',
+        topic: ASSISTANT_SUMMARY_TOPIC,
         skillReason: '由小青助手本次对话浓缩',
         skillSource: 'llm',
         slotsJson: JSON.stringify({
           source: { value: 'assistant', filledAt: nowIso },
-          question: { value: firstUser, filledAt: nowIso },
         }),
         expiresAt,
       },

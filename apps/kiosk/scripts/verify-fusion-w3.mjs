@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -395,6 +396,30 @@ includes('src/pages/ai-plan/advisorArtifactModel.ts', '这份可以打印带走'
 includes('src/pages/ai-plan/advisorArtifactModel.ts', '还没有可带走的内容', 'empty and expired say nothing is ready to take')
 includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '正在读取'", 'loading pill says it is reading')
 includes('src/pages/ai-plan/advisorArtifactModel.ts', "statusLabel: '这次没读到'", 'error pill says this read failed')
+// T52-pin：保存本次要点后由小青整理条目；冻结稿的原文只允许留在注释里。
+for (const [file, copy] of [
+  ['src/pages/ai-plan/advisorArtifactModel.ts', '这次聊的要点，我都'],
+  ['src/pages/ai-plan/advisorArtifactModel.ts', '对话本身不保存，留下来的是我整理的这几条要点。'],
+  ['src/pages/ai-plan/AdvisorArtifactPanels.tsx', '这次对话的要点'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '聊完保存要点'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '带走：本次要点单'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '边问边聊，聊完点「保存本次要点」（要先登录）。对话本身不保存，小青把要点和待办整理成一页。'],
+  ['src/pages/ai-plan/AdvisorTakeaway.tsx', '打印稿上有：这里的每一条要点，每条后面附出处和 E1 / E2 / E3。E3 是 AI 的判断，说不说由你定。'],
+]) includes(file, copy, '52 号作业面保留批准后的文字')
+for (const file of ts.sys.readDirectory(join(ROOT, 'src/pages/ai-plan'), ['.ts', '.tsx'])) {
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+  const strings = []
+  const visit = (node) => {
+    // AST 不读取注释；text 已解码 Unicode 转义，同时覆盖 JSX 正文和模板片段。
+    if (ts.isStringLiteralLike(node) || ts.isJsxText(node)
+      || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) strings.push(node.text)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  for (const forbidden of ['钉住', '工作人员', '服务台']) {
+    check(strings.every((value) => !value.includes(forbidden)), `${file.slice(ROOT.length + 1)} 的字符串不含「${forbidden}」`)
+  }
+}
 includes('src/pages/ai-plan/AiPlanPage.tsx', "isContentState(derivedState) || derivedState === 'print-unavailable'", 'print-unavailable keeps the legend with the body')
 includes('src/pages/ai-plan/AiPlanPage.tsx', '打开我的 AI 记录', 'empty state opens AI records with the design label')
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'data-testid="advisor-artifact-cta-redo"', 'expired state has a redo button')
@@ -404,6 +429,35 @@ const artifactBodyRule = cssRuleBody(read('src/pages/ai-plan/styles/advisor-arti
 check(artifactBodyRule.includes('justify-content: space-evenly'), '作业正文保留稿的默认区块排法')
 check(artifactBodyRule.includes('gap: 20px'), '作业正文保留稿的默认 20px 间距')
 const artifactCss = read('src/pages/ai-plan/styles/advisor-artifact-qx.css')
+const moreBelowHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const MORE_BELOW_HINT = '([^']+)'/)?.[1]
+check(moreBelowHint === '下面还有内容，手指往上滑', 'MORE_BELOW_HINT 导出唯一固定提示文字')
+const artifactPage = read('src/pages/ai-plan/AiPlanPage.tsx')
+check(/canScrollDown\s*&&\s*\(\s*<div className="aa-more-below">\s*<button[^>]*data-testid="advisor-artifact-more-below"[^>]*>\s*\{MORE_BELOW_HINT\}/.test(artifactPage), '下面还有按钮引用唯一常量，并由还能往下滑的状态控制渲染')
+check(/const MORE_BELOW_MIN_BODY = 240\b/.test(artifactPage), '正文可见高度不到 240px 不出提示（常量固定）')
+check(artifactPage.includes('const hasRoom = body.clientHeight >= MORE_BELOW_MIN_BODY'), '正文可见高度够放提示才出，不做点了滚不动的按钮')
+check(/const moreBelow = body\.scrollTop \+ body\.clientHeight < body\.scrollHeight - 8(?!\d)/.test(artifactPage), '还能往下滑按正文剩余超过 8px 判断')
+check(artifactPage.includes('setCanScrollDown(hasRoom && moreBelow)'), '两个条件都满足才渲染提示')
+check(artifactPage.includes('document.fonts.ready') && artifactPage.includes('new ResizeObserver(schedule)') && artifactPage.includes("body.addEventListener('scroll', schedule") && artifactPage.includes('window.requestAnimationFrame(measure)'), '挂载、字体就绪、尺寸变化与滚动均重算，使用动画帧节流')
+// 逐条看同名选择器，不能把第一条规则误当成整个层叠结果。
+const moreBelowButtonRules = [...stripCssComments(artifactCss).matchAll(/\.aa-more-below-button\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(moreBelowButtonRules.some((body) => /(?:^|;)\s*min-height:\s*52px\s*;?/.test(body)), '下面还有按钮最小高度 52px')
+check(moreBelowButtonRules.some((body) => /(?:^|;)\s*background:\s*var\(--qx-deep\)\s*;?/.test(body)), '下面还有按钮使用稿的深色背景令牌')
+const moreBelowLayerRules = [...stripCssComments(artifactCss).matchAll(/\.aa-more-below\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(moreBelowLayerRules.length > 0 && moreBelowLayerRules.every((body) => /(?:^|;)\s*position:\s*absolute\s*;?/.test(body)), '提示层绝对定位，不进文档流、不改正文高度')
+const artifactRootRules = [...stripCssComments(artifactCss).matchAll(/\.aa-root\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(artifactRootRules.length > 0 && artifactRootRules.every((body) => !/(?:^|;)\s*position\s*:/.test(body)), '根容器平时不定位，不改别的状态的叠放顺序')
+check(/\.aa-root:has\(>\s*\.aa-more-below\)\s*\{\s*position:\s*relative;?\s*\}/.test(stripCssComments(artifactCss)), '根容器只在出提示时定位')
+const moreBelowLayerPointer = moreBelowLayerRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*pointer-events:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(moreBelowLayerPointer.length > 0 && moreBelowLayerPointer.every((value) => value === 'none'), '渐隐层不接点击，不挡后面的内容')
+const artifactBodyRules = [...stripCssComments(artifactCss).matchAll(/\.aa-body\s*\{([^}]*)\}/g)].map((match) => match[1])
+const bodyOverflowValues = artifactBodyRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*overflow-y:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(bodyOverflowValues.length > 0 && bodyOverflowValues.every((value) => value === 'auto'), '正文仍用 overflow-y: auto')
+const bodyScrollbarValues = artifactBodyRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*scrollbar-width:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(bodyScrollbarValues.length > 0 && bodyScrollbarValues.every((value) => value === 'none'), '正文滚动条仍由 scrollbar-width: none 隐藏')
+const artifactScrollbarRules = [...stripCssComments(artifactCss).matchAll(/\.aa-body::-webkit-scrollbar\s*\{([^}]*)\}/g)].map((match) => match[1])
+const webkitScrollbarValues = artifactScrollbarRules.flatMap((body) => [...body.matchAll(/(?:^|;)\s*display:\s*([^;]+)/g)].map((match) => match[1].trim()))
+check(webkitScrollbarValues.length > 0 && webkitScrollbarValues.every((value) => value === 'none'), 'WebKit 正文滚动条仍然隐藏')
+check(!stripCssComments(artifactCss).includes('scrollbar-gutter'), '正文不增加占宽度的滚动条预留')
 const onePinHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const ONE_PIN_HINT = '([^']+)'/)?.[1]
 check(Boolean(onePinHint?.startsWith('这次只留下了 1 条')), 'ONE_PIN_HINT 导出唯一提示常量并说明只有 1 条')
 for (const forbidden of ['工作人员', '服务台', '接着聊', '也收进来']) check(Boolean(onePinHint) && !onePinHint.includes(forbidden), `单条提示不含误导文案：${forbidden}`)
@@ -487,8 +541,10 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again', 'advisor artifact shows a more-below hint only while content is cut off']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
+  check(selfAssessmentSpec.includes('说明页提示往上滑，灰按钮与红条只滚到同意框、不代替同意 @w3-kiosk'), 'W3 browser scenario exists: intro scroll cue and consent remain separate')
+  check(!selfAssessmentSpec.includes('waitForTimeout'), 'self-assessment browser spec avoids fixed sleeps')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
 
