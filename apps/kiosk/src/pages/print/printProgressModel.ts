@@ -145,16 +145,41 @@ export function outOfPaperDoing(_money: OutOfPaperMoney, contact = peekSupportCo
   return machineCannotPrintLine(contact, { orderKept: true })
 }
 
-/** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
+/**
+ * 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。
+ * 不写「处理好后可以继续打印」：本页拿不到还剩几次，第 3 次失败时那句是错的。
+ * 能不能接着打由 SAME_CODE_RESUME_LINE 说。
+ */
 export function jamOrderKeptLine(fact: PaymentFact): string {
   return fact === 'paid'
     ? '你的订单和已付金额都保留着'
-    : '你的订单还在，处理好后可以继续打印'
+    : '你的订单还在'
 }
 
 /** 一般失败页小青区。收费单保留原句；0 元和金额未知改成不提钱的说法。 */
 export function failureStaffDoing(fact: PaymentFact, contact = peekSupportContact()): string {
-  return `${fact === 'paid' ? '订单和支付记录都在。' : '你的订单还在，处理好后可以继续打印。'}${helpNeededLine(contact)}`
+  return `${fact === 'paid' ? '订单和支付记录都在。' : '你的订单还在。'}${helpNeededLine(contact)}`
+}
+
+/**
+ * 出纸失败屏（卡纸 / 缺纸 / 一般失败）上的同码接着打说明。
+ * 后端规则（services/api/src/print-jobs/self-service-reprint.ts、pickup-code-resume.ts）：
+ * 只认出纸失败的那台机器、整份重出、每单自助最多 SELF_SERVICE_REPRINT_LIMIT = 2 次。
+ * 本页拿不到还剩几次，所以这句写成任何一次失败都成立的说法，次数用完后的下一步也在句里。
+ */
+export const SAME_CODE_RESUME_LINE =
+  '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。'
+
+/** 结果未确认屏的同码说明：实付 0 元的单满 5 分钟（后端 UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS）才放行。 */
+export const UNCONFIRMED_SAME_CODE_LINE =
+  '没有的话，过 5 分钟回到这台机器，再输一次同一个到机码，可以整份重打（每单最多 2 次）。'
+
+/**
+ * 只有「手机下的单、用到机码取、这单 0 元」才说同码接着打：
+ * 现场建的单没有到机码；付费单的未确认、部分出纸走原路退款，不说接着打。
+ */
+export function sameCodeResumeEligible(pickupSource: boolean | undefined, fact: PaymentFact): boolean {
+  return pickupSource === true && fact === 'free'
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */
