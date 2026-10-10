@@ -7223,7 +7223,8 @@ test('取件页：续打次数用尽时说明不能再打了，不再说还能�
     { otherOnlineTerminalNearby: false },
   )
   assert.ok(String(page.data.statusDetail).indexOf('不能再打了') >= 0, page.data.statusDetail)
-  assert.ok(String(page.data.statusDetail).indexOf('可以回到订单重新打印') >= 0, page.data.statusDetail)
+  assert.ok(String(page.data.statusDetail).indexOf('还要打，请重新下单') >= 0, page.data.statusDetail)
+  assert.equal(String(page.data.statusDetail).indexOf('回到订单重新打印'), -1, '失败的单在订单上没有重打按钮，不能这么说')
   assert.equal(String(page.data.statusDetail).indexOf('还能续打'), -1)
   assert.equal(page.data.showQr, false)
   assert.equal(page.data.codeRaw, '')

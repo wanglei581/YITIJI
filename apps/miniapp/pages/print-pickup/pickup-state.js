@@ -58,8 +58,10 @@ function resolveOrderState(order, support) {
       }
     }
     const remaining = wholeRemaining(order.reprintRemaining)
-    let action = '可以回到订单重新打印。'
-    if (remaining === 0) action = '不能再打了，可以回到订单重新打印。'
+    // 这一单失败后订单上没有「重打」的按钮：次数用完（或服务端不让续打）就只能重新下一单。
+    // 和一体机同一个说法（「还要打，请在手机上重新下单」），不说「回到订单重新打印」。
+    let action = '还要打，请重新下单。'
+    if (remaining === 0) action = '这一单不能再打了；还要打，请重新下单。'
     let detail = `请查看终端屏幕上的提示；${action}`
     if (view.suggestOtherTerminal === true) detail += '附近还有别的一体机可用。'
     detail += hint
