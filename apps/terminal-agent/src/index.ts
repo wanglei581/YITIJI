@@ -17,6 +17,7 @@ import {
 import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
 import { sendHeartbeat, startHeartbeat } from './agent/heartbeat'
+import { createProductionRemoteCommandHandler } from './agent/remote-commands'
 import { startScanWatcher } from './agent/scan-watcher'
 import { startTaskRunner } from './agent/task-runner'
 import { runAgentBoot } from './agent/boot-print-queue-order'
@@ -217,6 +218,7 @@ program
         panelPrinterStatus = observation.printerStatus
         if (observation.connected) panelLastHeartbeatAt = observation.observedAt
       },
+      onRemoteCommands: createProductionRemoteCommandHandler(config),
     }
     const authenticatedAtStartup = await sendHeartbeat(heartbeatOptions)
     if (authenticatedAtStartup) {

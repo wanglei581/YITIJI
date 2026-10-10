@@ -195,6 +195,12 @@ Copy-WindowsPowerShellScript `
   -Source (Join-Path $PSScriptRoot "provision\daily-reboot.ps1") `
   -Destination (Join-Path $provisionRoot "daily-reboot.ps1")
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\agent-restart.ps1") `
+  -Destination (Join-Path $provisionRoot "agent-restart.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\agent-restart-task.ps1") `
+  -Destination (Join-Path $provisionRoot "agent-restart-task.ps1")
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $PSScriptRoot "provision\daily-reboot-task.ps1") `
   -Destination (Join-Path $provisionRoot "daily-reboot-task.ps1")
 Copy-WindowsPowerShellScript `

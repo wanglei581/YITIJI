@@ -1,5 +1,43 @@
 # 当前开发进度
 
+## 2026-10-10：#1317 远程指令终端侧八处返工（PR #1317，第八次；叠在 #1358「0.4.15 打包」之上，版本仍为 0.4.15）
+
+- **范围与文件预算：** 修复远程重启/清空队列的回执、重复执行、领取空档、时钟偏差与启动标识降级；仅改终端运行时、安装载荷、Windows CI、三个设备清单及进度/生成图谱，未改 `services/api`、任何版本号、功能开放或合规文档。新增 6 个文件（SQLite 结果仓储、服务重启调用、两份计划任务脚本、两份验证脚本），无新外部依赖/页面/服务；新增表只有指令号、类型、结果、数量、完成时间。`db.ts` 仅加迁移建表；超过 800 行的扫描模块仅接现有闸门，不扩展流程。
+- **行为：** ACK 读取服务器五种 `data.result`；重启仅认 `accepted`，其余四值释放闸门并记已处理。网络/超时按 2/5/10 秒最多补发三次（初发加三次，共四次），同 ID 同载荷，全部失败不重启且可再次处理。清空结果在 ACK 前写入启动时打开的 SQLite，重复只补结果；服务器返回不同结果则更新本地及日志，24 小时保留，生产每分钟清理，库不可用记一行日志并退内存。
+- **闸门与时钟：** 恢复打印闸门返回后、领取前同步复查远程 hold；扫描候选进入同步 in-flight 集合前也查同一 hold。已接受重启后本进程保持 hold、不再执行后续指令。去掉本机墙钟判过期，清空执行前以首次收到时的单调时钟及服务器有效期差值检查。
+- **重启与载荷：** `AIJobPrintAgentRestart` 为 SYSTEM/最高权限/无触发器/单实例任务，正常停起指定 Agent 服务；标记支持停止后补启动，日志只含 ASCII 时间/阶段/结果，不碰 Spooler。两份脚本进入 staging/MSI，完全卸载删任务，升级保留；安装脚本各模式均注册，控制中心/现场采证增加状态。保留 #1358 随包诊断脚本和 `Assert-InstalledDiagnosis`。
+- **启动标识：** 模块级 `AGENT_STARTED_AT` 保持不变；400 降级当轮重发成功后，30 分钟间隔用单调时钟重新探测。每轮实际是否带字段显式传给处理器，未带字段的重启不执行/不 ACK/不记处理，清空照常。
+- **门禁：** 反向前完整 40 项检查均退出 0：36 项本机执行通过，4 项 Windows 专用项带类型检查后明确跳过。真实 SQLite 关闭/重开后的同 ID 补回执、实际 HTTP 超时后同号重试、服务器五结果、扫描 hold/释放后的同文件投递均已验证；反向后同一完整 40 项已全部复跑退出 0（36 项执行通过、4 项 Windows 跳过）；根完整性与图谱生成/--check 也通过。
+- **执行器异常与基线对照：** 首轮 180 秒外层时限截断了扫描套件，原未修改文件已从干净基线副本恢复；两条原有嵌套 `pnpm run` 触发本机自动依赖检查，尝试安装后因无 TTY 中止，未继续安装或改配置。改为展开脚本直接执行、足够时限后全过；`0c28f63b4` 的扫描套件/扫描健康/遥测/安装输入/签名契约对照也全过，正式改动用 `/tmp` 副本逐字恢复。
+- **反向测试：** 八项改坏检查全部令 `verify:remote-commands` 退出 1（行为断言失败，无类型编译失败）；每项先复制文件到 `/tmp`，再用副本原样恢复，不依赖提交，不使用 checkout/restore/stash。反向前后 `git diff --stat` 一字不差，全部正式文件的 SHA256 一致；反向后完整门禁已复跑全过，未留下改坏状态。
+- **尚未验证/发布条件：** 未运行真 Windows 服务、Windows PowerShell 5.1 解析/安装/升级、真后端或真机。Windows CI 已加临时 WinSW 服务/任务连续三次重启、无 7031/7034、停止标记补启动、任务缺失/注册/回滚/清理用例，尚未在 runner 运行。任务缺失、触发失败、非 Windows 或触发成功后 90 秒未停服仍走退出码 1 的兜底，仍计服务失败次数；只装新版而未重跑安装脚本的机器只有兜底。服务器返工必须先于此终端版本上线。
+- **收货（Claude，10/10 下午；上面各条是实现方 Codex 自报的）：** 逐行看过核心代码、两份重启脚本、安装包改动和新旧用例。在本机把终端程序 37 条 typecheck / verify 脚本加仓库完整性、图谱 `--check` 重跑一遍，39 条全部退出 0（4 条 Windows 专用用例在 macOS 上只过类型检查）；`verify:ci-gate-coverage` 通过。另外自己做了八项反向测试（服务器回别的结果也重启、恢复后不再查闸门、心跳总说带了启动标识、清空结果回执前不落库、扫描不看闸门、不记服务器回的结果、回执内容不合规也当成功、回执失败不重发），每项都让 `verify:remote-commands` 以断言失败退出 1，还原后恢复通过。退回了实现方对 `docs/progress/next-tasks.md` 的改动（不在范围内）。三份设备文档里那段说明挪了位置、改了措辞；现场验收单顺带改掉三处旧字样（E 段两处、H.3），并在 I.2 补了「同一个到机码接着打」的规则。**真 Windows 服务、计划任务、PowerShell 5.1 解析、安装卸载都还没验，以本 PR 的 `windows-agent-installer` 工作流为准；真机一关未过。**
+- **10/10 晚追加（终端四，总指挥已同意不新增指令类型）：重启时顺带重开一体机浏览器。** 起因是真机发现 F-15：发布新版后现场机器的一体机窗口不会自己换成新页面，要等浏览器被重新拉起。做法：`installer/provision/agent-restart.ps1` 在服务重新运行之后（正常路径和带标记续跑路径各一处）关掉命令行带 `--aijobprint-kiosk=1` 且不带 `--type=` 的 `msedge.exe` / `chrome.exe` 主进程，看门狗 5 秒一查会带新引导票重新拉起；必须排在服务起来之后，因为重新拉起要向终端程序要票。关浏览器失败只记一行日志（`stage=browser result=failed`），不让重启失败。走兜底退出（计划任务不可用、靠服务失败恢复拉起）的那条路不会重开浏览器。
+  - **门禁：** `verify:installer-inputs` 钉住标记与看门狗一致、只认主进程、只有一处 `Stop-Process`、不许按进程名关、停服务之前不许关；四个反向改坏退出码均为 1。`verify:agent-restart-windows` 加三只替身进程（node.exe 拷成 chrome.exe：带标记、不带标记、带标记加 `--type=renderer`），第一次重启后只有第一只没了，日志里 `stage=browser` 排在 `stage=start result=running` 之后；**这条只在 Windows 检查机上跑，本机没跑过，以安装包工作流为准。**
+  - **没验证的：** 真 Edge 一体机窗口被 SYSTEM 任务关掉后看门狗重新拉起、拉起后是新页面，都要在真机上看（三场预演里做）。后台「远程重启」按钮的说明要不要补一句「会同时重开一体机浏览器」，已转后端。
+  - **五关：** 照稿不涉及；真机、真服务、真人试用都没做；出错有路——关浏览器失败不影响重启本身。
+
+## 2026-10-06：远程指令先挡住领取，再查是否在忙（分支 `claude/agent-remote-commands-1006`，本地提交，未推送）
+
+- **问题：** `handle` 先 `await isBusy()`，到 `acceptRestart` / `clearQueue` 里才 `holdClaims`。两步之间领取循环可能刚好开始一单：重启会在有任务时退出，清空会删掉刚提交的作业。
+- **改法：** 过期指令仍直接回 `expired`，不挡领取。不过期的指令先 `holdClaims`，再查 `isBusy`。忙则先 `releaseClaims`，再回 `rejected_busy`。不忙则继续原来的重启或清空。重启回执失败仍 `releaseClaims`；清空结束仍在 `finally` 里 `releaseClaims`。
+- **领取请求算不算忙：** 算。`hasInFlightPrintWork()` 在 `claimRequestsInFlight > 0` 或有正在执行的打印任务时为真。计数在 `claimConfiguredPrintTasks` 里、发出领取请求之前同步加一，请求返回后在 `finally` 里减一，然后才把任务放进 `activePrintTasks`。所以「已经通过闸门、领取请求还在进行」会被看成忙，先挡后查就够，没有改 `task-runner` 或闸门。闸门检查和进入 `claim()` 之间还有一次已经决议的 `await`（恢复函数在闸门开着时立刻返回）；那一跳里计数仍是 0，不在「正在进行的领取请求」里。
+- **门禁：** `verify-remote-commands` 加了一条调用顺序用例。清空（不忙）和重启（忙）都记录调用顺序，断言 `isBusy` 被调用时 `holdClaims` 已经调用过。忙的重启还断言先放开领取，再回 `rejected_busy`。
+- **本机验证：** 在 `apps/terminal-agent` 下，`tsc --noEmit -p .` 退出 0；`ts-node scripts/verify-remote-commands.ts` 退出 0；`node scripts/verify-print-scan-agent.mjs` 退出 0。真机和真后端没跑。
+- 停放、隐藏、改名、降级：无。
+
+## 2026-10-06：终端程序接后台远程指令（分支 `claude/agent-remote-commands-1006`，本地提交 `85d616a63`，未推送）
+
+- **改了什么：** 心跳带上本进程启动时刻 `agentStartedAt`（进程启动时取一次，之后不变）。旧服务器开了字段白名单，不认识这个字段会回 400，终端会被看成离线。心跳若收到 400 且 `error.message` 或 `error.details` 指向 `agentStartedAt`，本进程停发该字段并立刻重发一次，日志记 `heartbeat: server does not accept agentStartedAt, disabled`。其他 400 仍按原来的失败处理。
+- **两种指令：** `restart_agent`、`clear_print_queue`。缺 id、认不出的类型、时间解析不了的，只记日志、不回执。同一条 id 只处理一次，一次只处理一条。过期回 `expired`。忙则回 `rejected_busy`，不执行。
+- **重启：** 不忙先回 `accepted`。回执成功后走现有的停止路径暂停队列，再以退出码 1 退出，交给 Windows 服务恢复策略拉起。回执失败不退出，领取闸门放开，下次心跳再处理。从回执发出到退出，不再领新单。
+- **清空：** 只删配置打印机上的全部作业，不按账号过滤，不碰别的打印机。删完再数一次，剩 0 回 `done`，否则回 `failed` 并带剩余个数。列或删失败时用最后一次读到的数，一次都没读到填 0。开着空闲暂停时清完仍保持暂停。非 Windows 不碰队列，回 `done` 且剩余 0。回执只有 `result` 和 `remainingJobs`。日志只记指令 id 前 8 位、类型、结果、数量。
+- **忙碌信号：** 扫描用 `scan-watcher.ts` 现成的 `inFlightPaths`（处理单个扫描件的整段，包含向服务端投递）。打印用本进程正在发出的领取请求，加上正在执行的打印任务。崩溃后留在本地库里的 `dispatching` / `spooled` 不单独算忙：下次领到同一单会报无法确认、不重打；若把这些旧行算忙，一次崩溃会把远程重启和清空一直拒绝掉。
+- **门禁：** `verify:remote-commands`（假后端，不建打印机）已挂进 `ci.yml`。`verify:remote-commands-windows`（两台本地端口打印机；清空只动配置的那台，含另一账号的作业；结束删掉测试打印机）已挂进 `windows-agent-installer.yml`。本机：Agent `tsc --noEmit` 退出 0；`package.json` 里全部 `verify*` 退出 0。其中 `verify:remote-commands-windows` 与 `verify:print-queue-residue-windows` 在 macOS 上打印 skipped 后退出 0，没有建打印机。`verify:scan-watcher`、`verify:task-reliability` 会临时改写源文件做反向变异，两条都跑完；跑完 `instance-lock.ts`、`scan-candidate-barrier.ts` 没有残留。仓库根 `verify-repository-integrity` 退出 0。项目图谱重新生成后 `--check` 通过，图谱文件没有变化。
+- **反向测试（先提交再改坏）：** 六条都让 `verify:remote-commands` 退出 1，然后 `git checkout` 还原。1 回执失败后仍然退出；2 忙的时候仍然清空（回执变成 `done`，期望是 `rejected_busy`）；3 全部作业分支按 SID 过滤；4 回执带上作业名；5 遇到指向 `agentStartedAt` 的 400 不降级（心跳返回失败）；6 `restart_agent` 回 `done` 而不是 `accepted`。还原后工作区干净。
+- **没验证：** 真 Windows 打印机没跑，真后端没跑。服务端（PR #1288 重启、#1303 清空队列，第八次 10/30）必须先于这个 Agent 上线。400 降级已经做了，旧服务器不会因为新字段把终端判离线。
+- 停放、隐藏、改名、降级：无。
+
 ## 2026-10-10：第七次三处屏上改字——首页续办条不显示文件名、到机码徽标改「就是取件码」、政策页四句改成机构自己审核发布（分支 `claude/kiosk-fe2-r7-copy-1010`）
 
 - **为什么：** 前两处是 10/10 全面评审核实「一体机这块屏是不是太复杂」时查出来的，总指挥派入第七次；第三处是合规窗口给的定稿。三处都是屏上的字露了不该露的，或者和实际做法对不上。

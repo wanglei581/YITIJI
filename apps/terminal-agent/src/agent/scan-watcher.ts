@@ -23,6 +23,7 @@
  * 挂到后一用户。
  */
 
+import { remoteClaimHoldReason } from './print-dispatch-gate'
 import {
   closeSync,
   constants as fsConstants,
@@ -273,6 +274,11 @@ function guessMimeType(filename: string): string {
  * 等待中任务、把同一份扫描件误发给另一个用户的严重问题）。
  */
 const inFlightPaths = new Set<string>()
+
+/** 有扫描件正在处理（含向服务端投递）时为 true。远程指令用它判断忙碌。 */
+export function isScanDeliveryInFlight(): boolean {
+  return inFlightPaths.size > 0
+}
 
 /**
  * 启动时识别出的历史 backlog 文件路径集合（resolved absolute path）。
@@ -669,7 +675,7 @@ export async function processCandidate(
   config: AgentConfig,
   deliverFile?: () => Promise<void>,
 ): Promise<void> {
-  if (isUnauthorized()) return
+  if (isUnauthorized() || remoteClaimHoldReason() !== null) return
   if (inFlightPaths.has(filePath)) {
     // 已经在被实时监听或另一轮清点处理，跳过，避免同一文件并发投递两次。
     return

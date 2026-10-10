@@ -705,6 +705,23 @@ export async function executeTask(
 
 let claimPausedUntil = 0
 let consecutiveClaimRateLimits = 0
+/** 本进程正在执行的打印任务。下载、派发、打印、入队未确认都在这一个集合里。 */
+const activePrintTasks = new Set<string>()
+/** 领取请求已经发出、任务还没放进 activePrintTasks 的窗口。 */
+let claimRequestsInFlight = 0
+
+/**
+ * 打印忙碌。本地库的 dispatching / spooled 写在这段执行里面，
+ * 崩溃后留下的旧行不单独算忙，否则远程清空和重启会被旧行一直拒绝。
+ */
+export function hasInFlightPrintWork(): boolean {
+  return claimRequestsInFlight > 0 || activePrintTasks.size > 0
+}
+
+export function __resetInFlightPrintWorkForTests(): void {
+  claimRequestsInFlight = 0
+  activePrintTasks.clear()
+}
 
 /** Test-only: clear module-level rate-limit state between verification cases. */
 export function __resetClaimRateLimitForTests(): void {
@@ -752,6 +769,7 @@ async function claimConfiguredPrintTasks(
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
   let tasks: ClaimTask[]
+  claimRequestsInFlight += 1
   try {
     const resp = await client.post<ClaimTask[]>(
       `/terminals/${config.terminalId}/tasks/claim`,
@@ -790,6 +808,8 @@ async function claimConfiguredPrintTasks(
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)
     }
     return
+  } finally {
+    claimRequestsInFlight -= 1
   }
 
   if (tasks.length === 0) return
@@ -810,6 +830,7 @@ async function claimConfiguredPrintTasks(
     }
 
     activeTasks.add(task.taskId)
+    activePrintTasks.add(task.taskId)
     log(`task-runner: claimed task ${task.taskId}`)
 
     try {
@@ -818,6 +839,7 @@ async function claimConfiguredPrintTasks(
       err(`task-runner: unhandled error in task ${task.taskId} — ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       activeTasks.delete(task.taskId)
+      activePrintTasks.delete(task.taskId)
     }
   }
 }
@@ -833,7 +855,7 @@ export interface TaskRunnerOptions {
 export function startTaskRunner(options: TaskRunnerOptions): TaskRunnerControl {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000
-  const activeTasks = new Set<string>()
+  const activeTasks = activePrintTasks
 
   if (interval < 5_000) {
     warn(

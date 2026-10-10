@@ -10,7 +10,7 @@
          绑定标记由 install-production-agent.ps1 在绑定成功后写入；未绑定的新装机保持手动 + 停止。
          只调用系统自带的 sc.exe、参数固定；启动失败不得让安装回滚（ServiceControl Start=install
          在 Windows CI 上实测 1920 → 1603），所以四个动作一律 Return="ignore"。
-         开机防护和每日重启由安装脚本注册。完全卸载时删掉这两个计划任务，并把打印服务恢复为自动且在运行。
+         开机防护和每日重启由安装脚本注册。完全卸载时删掉这三个计划任务，并把打印服务恢复为自动且在运行。
          大版本升级会卸掉旧产品，但升级后不会重跑安装脚本，所以条件带 NOT UPGRADINGPRODUCTCODE，升级时不撤防护。
          任务不存在、服务已在运行时 schtasks/sc 都会返回非 0，这四个动作同样 Return="ignore"。 -->
     <Property Id="AGENTBOUND" Secure="yes">
@@ -23,6 +23,7 @@
     <CustomAction Id="AgentServiceBestEffortStart" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; start aijobprintagent.exe" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveBootSpoolGuardTask" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintBootSpoolGuard&quot; /F" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveDailyRebootTask" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintDailyReboot&quot; /F" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="RemoveAgentRestartTask" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintAgentRestart&quot; /F" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RestoreSpoolerAutomatic" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; config Spooler start= auto" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="StartSpoolerService" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]sc.exe&quot; start Spooler" Execute="deferred" Impersonate="no" Return="ignore" />
 
@@ -33,7 +34,8 @@
       <Custom Action="AgentServiceBestEffortStart" After="AgentServiceRestoreFailureFlag" Condition="AGENTBOUND = &quot;#1&quot; AND NOT (REMOVE~=&quot;ALL&quot;)" />
       <Custom Action="RemoveBootSpoolGuardTask" After="StopServices" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="RemoveDailyRebootTask" After="RemoveBootSpoolGuardTask" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
-      <Custom Action="RestoreSpoolerAutomatic" After="RemoveDailyRebootTask" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveAgentRestartTask" After="RemoveDailyRebootTask" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RestoreSpoolerAutomatic" After="RemoveAgentRestartTask" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="StartSpoolerService" After="RestoreSpoolerAutomatic" Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
     </InstallExecuteSequence>
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -71,6 +73,8 @@
             <File Id="BootSpoolGuardScript" Source="$(var.StagingRoot)\provision\boot-spool-guard.ps1" Checksum="yes" />
             <File Id="BootSpoolGuardTaskScript" Source="$(var.StagingRoot)\provision\boot-spool-guard-task.ps1" Checksum="yes" />
             <File Id="DailyRebootScript" Source="$(var.StagingRoot)\provision\daily-reboot.ps1" Checksum="yes" />
+            <File Id="AgentRestartScript" Source="$(var.StagingRoot)\provision\agent-restart.ps1" Checksum="yes" />
+            <File Id="AgentRestartTaskScript" Source="$(var.StagingRoot)\provision\agent-restart-task.ps1" Checksum="yes" />
             <File Id="DailyRebootTaskScript" Source="$(var.StagingRoot)\provision\daily-reboot-task.ps1" Checksum="yes" />
             <File Id="ControlCenterLauncher" Source="$(var.StagingRoot)\provision\launch-control-center.vbs" KeyPath="yes" Checksum="yes" />
             <Shortcut

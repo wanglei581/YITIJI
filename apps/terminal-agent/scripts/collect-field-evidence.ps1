@@ -793,6 +793,12 @@ Invoke-CheckedItem -Id "5.6-22" -Name "开机打印防护任务" -Body {
   Add-EvidenceRow -Id "5.6-22" -Name "开机打印防护任务" -Value "present=true lastResult=$last" -Verdict "UNKNOWN"
 }
 
+Invoke-CheckedItem -Id "5.6-22R" -Name "Agent restart task" -Body {
+  $task = Get-ScheduledTask -TaskName "AIJobPrintAgentRestart" -ErrorAction SilentlyContinue
+  $present = $null -ne $task
+  Add-EvidenceRow -Id "5.6-22R" -Name "Agent restart task" -Value "present=$present" -Verdict "UNKNOWN"
+}
+
 Invoke-CheckedItem -Id "5.6-23" -Name "Spooler 启动类型" -Body {
   $spooler = Get-Service -Name "Spooler" -ErrorAction SilentlyContinue
   if ($null -eq $spooler) {

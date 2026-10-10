@@ -426,6 +426,8 @@ jobs:
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
+          # 假后端 + 可注入的清空/退出。不建打印机，不碰 Windows 队列。
+          pnpm run verify:remote-commands
           # ── 2026-08-16 门禁全量体检补回。三条都只做静态读取 / 注入桩：
           #    installer-inputs 校验安装器输入清单文本，printer-config 校验
           #    printerName 可配置（不硬编码型号），local-print-wake 走进程内

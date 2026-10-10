@@ -1075,6 +1075,12 @@ if ($dailyRebootMode -eq "off") {
 Write-Host (Get-DailyRebootStatusLine)
 # daily-reboot-install-end
 
+# All profiles, including work-computer mode, need normal service restart.
+. (Resolve-AgentProvisionSource "agent-restart-task.ps1")
+$agentRestartScript = Publish-AgentProvisionScript -SourcePath (Resolve-AgentProvisionSource "agent-restart.ps1")
+Install-AgentRestartTask -ScriptPath $agentRestartScript
+Write-Host (Get-AgentRestartStatusLine)
+
 if (-not $SkipHeartbeatVerify) {
   Write-Step "Verifying remote heartbeat"
   Start-Sleep -Seconds 8

@@ -31,8 +31,27 @@ export const PAUSE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000]
 
 let block: DispatchBlock | null = null
 
+/**
+ * 远程指令处理期间临时挡住领取。和上面的失败闸分开：
+ * 失败闸会在下一轮尝试恢复，这个不会，直到处理结束显式放开。
+ * 不改心跳里的 printerStatus。
+ */
+let remoteClaimHold: 'restart_agent' | 'clear_print_queue' | null = null
+
 export function isPrintDispatchBlocked(): boolean {
   return block !== null
+}
+
+export function holdPrintClaims(reason: 'restart_agent' | 'clear_print_queue'): void {
+  remoteClaimHold = reason
+}
+
+export function releasePrintClaims(): void {
+  remoteClaimHold = null
+}
+
+export function remoteClaimHoldReason(): 'restart_agent' | 'clear_print_queue' | null {
+  return remoteClaimHold
 }
 
 export function noteStartupPrintQueueFailure(part: 'pause' | 'cleanup'): void {
@@ -65,6 +84,7 @@ export function printerStatusForHeartbeat(queried: PrinterStatus): PrinterStatus
 
 export function __resetPrintDispatchGateForTests(): void {
   block = null
+  remoteClaimHold = null
 }
 
 export interface PrintDispatchRecovery {
@@ -109,8 +129,10 @@ export async function claimPrintTasksIfGateOpen(
   recovery: PrintDispatchRecovery,
   claim: () => Promise<void>,
 ): Promise<void> {
+  if (remoteClaimHold !== null) return // remote-command: claims held
   const mayClaim = await recoverPrintDispatchBeforeClaim(recovery)
   if (!mayClaim) return
+  if (remoteClaimHold !== null) return // remote-command: recheck after recovery
   await claim()
 }
 
