@@ -196,6 +196,12 @@ jobs:
           pnpm --filter ./apps/terminal-agent verify:boot-spool-guard-windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify normal Agent service restart with isolated WinSW service
+        shell: pwsh
+        run: |
+          pnpm --filter ./apps/terminal-agent verify:agent-restart-windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Same pre-staging window. Junction case uses New-Item -ItemType Junction.
       - name: Verify known legacy residue cleanup
         shell: pwsh

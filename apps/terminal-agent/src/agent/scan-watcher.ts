@@ -23,6 +23,7 @@
  * 挂到后一用户。
  */
 
+import { remoteClaimHoldReason } from './print-dispatch-gate'
 import {
   closeSync,
   constants as fsConstants,
@@ -674,7 +675,7 @@ export async function processCandidate(
   config: AgentConfig,
   deliverFile?: () => Promise<void>,
 ): Promise<void> {
-  if (isUnauthorized()) return
+  if (isUnauthorized() || remoteClaimHoldReason() !== null) return
   if (inFlightPaths.has(filePath)) {
     // 已经在被实时监听或另一轮清点处理，跳过，避免同一文件并发投递两次。
     return

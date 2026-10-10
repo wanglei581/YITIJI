@@ -2,6 +2,7 @@
  * 远程指令门禁。本地假后端，清空与退出都换成假实现。
  * 不建打印机，不碰 Windows 队列。反向改坏必须让本脚本非 0 退出。
  */
+import { verifyRemoteCommandRework } from './remote-command-rework.helper'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import { readFileSync } from 'node:fs'
@@ -77,13 +78,17 @@ interface AckRecord {
   body: Record<string, unknown>
 }
 
-interface FakeServer {
+export interface FakeServer {
   baseUrl: string
   heartbeats: HeartbeatRecord[]
   acks: AckRecord[]
   commands: unknown[] | null
   rejectStartedAt: boolean
   heartbeatStatus: number
+  ackResult: unknown | undefined
+  dropAcceptedResponse: boolean
+  timeoutAcceptedResponse: boolean
+  results: Map<string, unknown>
   ackStatus: number
   close: () => Promise<void>
 }
@@ -108,6 +113,10 @@ async function startServer(): Promise<FakeServer> {
     rejectStartedAt: false,
     heartbeatStatus: 200,
     ackStatus: 200,
+    ackResult: undefined,
+    dropAcceptedResponse: false,
+    timeoutAcceptedResponse: false,
+    results: new Map(),
     close: async () => undefined,
   }
   const server = http.createServer((req, res) => {
@@ -143,7 +152,7 @@ async function startServer(): Promise<FakeServer> {
         }
         const payload: Record<string, unknown> = { acknowledged: true }
         if (api.commands) {
-          payload.commands = api.commands
+          payload.commands = api.commands.filter((row) => !api.results.has(String((row as Record<string, unknown>)?.id)))
           api.commands = null
         }
         res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -154,9 +163,21 @@ async function startServer(): Promise<FakeServer> {
       if (req.method === 'POST' && ack) {
         const body = raw ? JSON.parse(raw) as Record<string, unknown> : {}
         api.acks.push({ commandId: decodeURIComponent(ack[1] ?? ''), body })
+        const id = decodeURIComponent(ack[1] ?? '')
+        const result = api.results.has(id) ? api.results.get(id) : (api.ackResult === undefined ? body['result'] : api.ackResult)
+        if (api.ackStatus === 200 && (api.dropAcceptedResponse || api.timeoutAcceptedResponse) && body['result'] === 'accepted') {
+          api.results.set(id, 'accepted')
+          const timeout = api.timeoutAcceptedResponse
+          api.dropAcceptedResponse = false
+          api.timeoutAcceptedResponse = false
+          if (timeout) return // client closes after its injected timeout
+          req.socket.destroy() // committed but response lost; no later heartbeat delivery
+          return
+        }
+        if (api.ackStatus === 200 && ['accepted', 'rejected_busy', 'expired', 'done', 'failed'].includes(String(result))) api.results.set(id, result)
         res.writeHead(api.ackStatus, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(api.ackStatus === 200
-          ? { success: true, data: { ok: true } }
+          ? { success: true, data: { result } }
           : { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: '服务器内部错误' } }))
         return
       }
@@ -243,6 +264,8 @@ function harness(): Harness {
 function processor(config: AgentConfig, state: Harness) {
   return createRemoteCommandProcessor({
     now: () => NOW,
+    sleep: async () => undefined,
+    requestServiceRestart: async () => false,
     isBusy: () => {
       state.busyCalls += 1
       return state.busy
@@ -287,7 +310,7 @@ function processor(config: AgentConfig, state: Harness) {
 async function beat(
   server: FakeServer,
   config: AgentConfig,
-  handle: (commands: unknown) => Promise<void>,
+  handle: (commands: unknown, context: { agentStartedAtSent: boolean }) => Promise<void>,
   commands?: unknown[],
 ): Promise<boolean> {
   server.commands = commands ?? null
@@ -316,7 +339,7 @@ function assertSources(): void {
   const restart = remote.slice(remote.indexOf('const acceptRestart'), remote.indexOf('const clearQueue'))
   assert.match(restart, /result:\s*'accepted'/)
   assert.doesNotMatch(restart, /result:\s*'done'/)
-  assert.match(restart, /if \(!ok\) \{\s*deps\.releaseClaims\(\)\s*return false/s)
+  assert.match(restart, /requestServiceRestart/)
   const scan = readFileSync(join(__dirname, '../src/agent/scan-watcher.ts'), 'utf8')
   assert.match(scan, /export function isScanDeliveryInFlight\(\): boolean \{\n  return inFlightPaths\.size > 0\n\}/)
   const hold = readFileSync(join(__dirname, '../src/agent/print-queue-hold.ts'), 'utf8')
@@ -385,6 +408,8 @@ async function assertHoldClaimsBeforeBusy(server: FakeServer, config: AgentConfi
   let busy = false
   const handle = createRemoteCommandProcessor({
     now: () => NOW,
+    sleep: async () => undefined,
+    requestServiceRestart: async () => false,
     isBusy: () => {
       calls.push('isBusy')
       return busy
@@ -512,12 +537,12 @@ async function main(): Promise<void> {
       const retryHandle = processor(config, retry)
       assert.equal(await beat(server, config, retryHandle, [command('tcmd_retryack', 'restart_agent', FUTURE)]), true)
       assert.equal(retry.exitCodes.length, 0)
-      assert.equal(server.acks.length, 1)
+      assert.equal(server.acks.length, 4)
       assert.equal(remoteClaimHoldReason(), null)
       server.ackStatus = 200
       assert.equal(await beat(server, config, retryHandle, [command('tcmd_retryack', 'restart_agent', FUTURE)]), true)
-      assert.equal(server.acks.length, 2)
-      assert.equal(server.acks[1]?.body['result'], 'accepted')
+      assert.equal(server.acks.length, 5)
+      assert.equal(server.acks[4]?.body['result'], 'accepted')
       assert.equal(retry.exitCodes.length, 1)
       assert.notEqual(retry.exitCodes[0], 0)
 
@@ -543,18 +568,20 @@ async function main(): Promise<void> {
 
       resetRuntime()
       server.acks.length = 0
+      server.ackResult = 'expired'
       const expired = harness()
       const expiredHandle = processor(config, expired)
       assert.equal(await beat(server, config, expiredHandle, [command('tcmd_expired', 'restart_agent', PAST)]), true)
       assert.equal(server.acks.length, 1)
-      assert.equal(server.acks[0]?.body['result'], 'expired')
+      assert.equal(server.acks[0]?.body['result'], 'accepted')
       assertAckShape(server.acks[0]!.body)
-      assert.equal(expired.busyCalls, 0)
+      assert.equal(expired.busyCalls, 1)
       assert.equal(expired.exitCodes.length, 0)
       assert.equal(expired.clearCalls, 0)
 
       resetRuntime()
       server.acks.length = 0
+      server.ackResult = undefined
       const bad = harness()
       const badHandle = processor(config, bad)
       assert.equal(await beat(server, config, badHandle, [
@@ -632,6 +659,7 @@ async function main(): Promise<void> {
       namesAreConfigured(broken.printerNames)
       assert.equal(logText().includes('remote-command: clear list failed before a count; remaining reported as 0'), true)
 
+      await verifyRemoteCommandRework(server, config, logText)
       for (const ack of server.acks) assertAckShape(ack.body)
       const forbidden = [
         ['job', JOB],

@@ -132,6 +132,7 @@ export async function claimPrintTasksIfGateOpen(
   if (remoteClaimHold !== null) return // remote-command: claims held
   const mayClaim = await recoverPrintDispatchBeforeClaim(recovery)
   if (!mayClaim) return
+  if (remoteClaimHold !== null) return // remote-command: recheck after recovery
   await claim()
 }
 

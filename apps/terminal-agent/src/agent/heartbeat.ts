@@ -20,6 +20,7 @@
  *   - failureCounter: incremented per failure for caller to monitor
  */
 
+import { performance } from 'node:perf_hooks'
 import os from 'os'
 import axios from 'axios'
 import type {
@@ -90,16 +91,20 @@ export interface HeartbeatOptions {
   /** Read on every send because heartbeat starts before the scan watcher. */
   getScanInputTelemetry?: () => ScanInputRuntimeTelemetry
   /** 心跳成功后处理服务端下发的远程指令。没有指令时不调用。 */
-  onRemoteCommands?: (commands: unknown) => Promise<void>
+  onRemoteCommands?: (commands: unknown, context: { agentStartedAtSent: boolean }) => Promise<void>
+  startedAtProbeIntervalMs?: number
+  monotonicNow?: () => number
 }
 
 /** 进程启动时取一次，之后不变。后端靠它判断重启是否已经完成。 */
 const AGENT_STARTED_AT = new Date().toISOString()
-/** 旧服务器 forbidNonWhitelisted 会因这个字段回 400。本进程内停发。 */
+/** 旧服务器 forbidNonWhitelisted 会因这个字段回 400。降级后每 30 分钟重新探测。 */
 let sendAgentStartedAt = true
+let nextStartedAtProbe = 0
 
 export function resetAgentStartedAtFallbackForTests(): void {
   sendAgentStartedAt = true
+  nextStartedAtProbe = 0
 }
 
 function validationText(value: unknown): string[] {
@@ -200,13 +205,17 @@ async function deliverHeartbeat(options: HeartbeatOptions, allowStartedAtFallbac
     payload.scanInputReason = scanInputTelemetry.reason
     payload.scanInputObservedAt = scanInputTelemetry.observedAt
   }
-  if (sendAgentStartedAt) payload.agentStartedAt = AGENT_STARTED_AT
+  const monotonicNow = options.monotonicNow ?? (() => performance.now())
+  const agentStartedAtSent = allowStartedAtFallback
+    && (sendAgentStartedAt || monotonicNow() >= nextStartedAtProbe)
+  if (agentStartedAtSent) payload.agentStartedAt = AGENT_STARTED_AT
 
   try {
     const resp = await client.put<HeartbeatResponse>(
       `/terminals/${config.terminalId}/heartbeat`,
       payload,
     )
+    if (agentStartedAtSent) sendAgentStartedAt = true
     log(`heartbeat: ✓ acknowledged`)
     notifyObservation(onObservation, {
       connected: true,
@@ -223,7 +232,7 @@ async function deliverHeartbeat(options: HeartbeatOptions, allowStartedAtFallbac
 
     if (options.onRemoteCommands && resp.data != null && Object.prototype.hasOwnProperty.call(resp.data, 'commands')) {
       try {
-        await options.onRemoteCommands(resp.data.commands)
+        await options.onRemoteCommands(resp.data.commands, { agentStartedAtSent })
       } catch {
         warn('remote-command: processing failed')
       }
@@ -237,10 +246,11 @@ async function deliverHeartbeat(options: HeartbeatOptions, allowStartedAtFallbac
   } catch (e) {
     if (
       allowStartedAtFallback
-      && sendAgentStartedAt
+      && agentStartedAtSent
       && heartbeatRejectsAgentStartedAt(e)
     ) {
       sendAgentStartedAt = false
+      nextStartedAtProbe = monotonicNow() + (options.startedAtProbeIntervalMs ?? 30 * 60 * 1000)
       log('heartbeat: server does not accept agentStartedAt, disabled')
       return deliverHeartbeat(options, false)
     }
