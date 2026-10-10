@@ -29,7 +29,16 @@
 // low/high/max（没有 none）；API 参考页把它写在 thinking 对象里、取值含 none。
 // `thinking: { type: 'disabled' }` 两页一致，是唯一没有歧义的写法。
 //
-// ── 为什么非 DeepSeek 返回空对象 ──────────────────────────────
+// ── 为什么混元也在这里关 ─────────────────────────────────────
+// 腾讯云「深度思考」（2026-10-10 访问）：
+// https://cloud.tencent.com/document/product/1823/131208
+// hy3、hy4-preview 默认开思考且强度 high，同样用 thinking.type=disabled 关闭。
+// 按 hy 加数字识别 TokenHub 思考模型，避免把旧平台 hunyuan-*、翻译 hy-mt2-*、
+// 角色 hy-role 误当成思考模型。复用请求体规则，不增添其它参数。
+// deepseekThinkingOff / isDeepseekModel 的导出名被调用点及门禁引用，保留名字；
+// isDeepseekModel 仍只判断 DeepSeek，混元由独立判断函数识别。
+//
+// ── 为什么其它模型返回空对象 ─────────────────────────────────
 // 千问 qwen-plus（Qwen3 商业版）官方默认不开思考，开关字段是 enable_thinking
 // （阿里云百炼「深度思考」页，2026-09-29 访问：
 // https://help.aliyun.com/zh/model-studio/deep-thinking）。给别家塞 DeepSeek
@@ -43,7 +52,7 @@
 // 门禁：verify:llm-thinking-off（运行时断言 + 全部调用点静态扫描）。
 // ============================================================
 
-/** 请求体里用来关闭 DeepSeek 思考模式的字段。 */
+/** 请求体里用来关闭 DeepSeek / TokenHub 混元思考模式的字段。 */
 export interface DeepseekThinkingOffFields {
   thinking: { type: 'disabled' }
 }
@@ -53,11 +62,16 @@ export function isDeepseekModel(model: unknown): boolean {
   return typeof model === 'string' && model.trim().toLowerCase().startsWith('deepseek')
 }
 
+/** TokenHub 混元思考模型：hy 后紧跟数字，去首尾空白、大小写不敏感。 */
+export function isHunyuanThinkingModel(model: unknown): boolean {
+  return typeof model === 'string' && /^hy\d/.test(model.trim().toLowerCase())
+}
+
 /**
  * 组请求体时展开用：`{ model, messages, ...deepseekThinkingOff(model) }`。
- * DeepSeek 系返回关闭思考的字段；其它厂商返回空对象（请求体不变）。
+ * DeepSeek 系及 TokenHub 混元思考模型返回关闭思考字段；其它模型返回空对象。
  * 每次返回新对象，调用方展开或修改都不会互相污染。
  */
 export function deepseekThinkingOff(model: unknown): DeepseekThinkingOffFields | Record<string, never> {
-  return isDeepseekModel(model) ? { thinking: { type: 'disabled' } } : {}
+  return isDeepseekModel(model) || isHunyuanThinkingModel(model) ? { thinking: { type: 'disabled' } } : {}
 }

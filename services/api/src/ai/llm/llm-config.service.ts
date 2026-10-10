@@ -17,7 +17,7 @@ import { withAiSafety } from './ai-prompt-safety'
 import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 import { auditTextHash, type AiConfigApiKeyAction, type LlmConfigAuditSnapshot } from './ai-config-audit'
 import { evaluateAiPlatform } from '../../config/ai-platform-config'
-import { assertApprovedLlmBaseUrl } from './llm-base-url'
+import { assertApprovedLlmBaseUrl, llmBaseUrlHostname } from './llm-base-url'
 
 export interface LlmConfig {
   vendor:       LlmVendor
@@ -389,7 +389,11 @@ export class LlmConfigService {
   private fromEnv(): PersistedConfig {
     const vendor: LlmVendor = 'deepseek'
     const preset = LLM_PRESETS[vendor]
-    const envKey = process.env['AI_LLM_API_KEY'] || process.env['TRTC_LLM_API_KEY'] || ''
+    // 数字人那把密钥只有在数字人确实指向深度求索时才拿来兜底（地址没设时它的默认就是深度求索）。
+    // 数字人换成别家后，这把就是别家的密钥，不能当深度求索的密钥发出去。
+    const trtcUrl = process.env['TRTC_LLM_API_URL']
+    const trtcUsesDeepseek = !trtcUrl || llmBaseUrlHostname(trtcUrl) === 'api.deepseek.com'
+    const envKey = process.env['AI_LLM_API_KEY'] || (trtcUsesDeepseek ? process.env['TRTC_LLM_API_KEY'] : '') || ''
     // 只读 AI_LLM_MODEL；TRTC_LLM_MODEL 是数字人专用，不跨路由
     const envModel = (process.env['AI_LLM_MODEL'] || '').trim()
     return {
@@ -547,6 +551,18 @@ export class LlmConfigService {
     // 只在生效地址**变了**时判：白名单收紧前存下的地址不在单内时，管理员仍须能停用该功能、
     // 清掉疑似泄露的密钥、改提示词——这些不会让请求发往新地址；运行时 llmFetchJson 第一行照样拒绝单外地址。
     if (next.baseURL !== previousBaseURL) assertApprovedLlmBaseUrl(next.baseURL, '保存')
+    // 白名单先报；再防止换主机时把上一家的凭证发给新地址。
+    // next 尚未写回 cache，拒绝时内存、继承关系和落盘内容都保持原样。
+    // 原地址解析不了（存量坏地址）时按「换了主机」处理：要求重填，而不是抛 500。
+    if (next.baseURL !== previousBaseURL && patch.apiKey === undefined && next.apiKeyEncrypted &&
+        llmBaseUrlHostname(next.baseURL) !== llmBaseUrlHostname(previousBaseURL)) {
+      throw new BadRequestException({
+        error: {
+          code: 'AI_CONFIG_API_KEY_REQUIRED',
+          message: '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址',
+        },
+      })
+    }
 
     this.cache = { ...this.cache, [feature]: next }
     this.save()

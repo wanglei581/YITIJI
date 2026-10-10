@@ -51,6 +51,7 @@ export const USAGE_FALLBACK_PROVIDERS = ['mock', 'stub'] as const
 const PROVIDER_LABELS: Record<string, string> = {
   'llm:deepseek': 'DeepSeek',
   'llm:qwen': '千问',
+  'llm:hunyuan': '腾讯混元',
   mock: '未就绪兜底',
   stub: '未就绪兜底',
 }

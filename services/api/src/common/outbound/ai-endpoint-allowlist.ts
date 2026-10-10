@@ -37,6 +37,7 @@
 //     同理千问只放 dashscope.aliyuncs.com，不放 `*.aliyuncs.com`（国际站是
 //     dashscope-intl.aliyuncs.com）。MiniMax、鱼人（llm-presets.ts 里有预设）不进默认单：
 //     docs/product/ai-provider-integration.md 写明「不进生产白名单」。
+//     腾讯混元（TokenHub）有预设、不进默认单；启用时在目标环境加 AI_ENDPOINT_ALLOWLIST_EXTRA=tokenhub.tencentmaas.com。
 //   - AI_ENDPOINT_ALLOWLIST：设置后**整张替换**默认单。
 //   - AI_ENDPOINT_ALLOWLIST_EXTRA：在上面那张单的基础上**追加**。
 //   写错的条目（带协议、端口、路径，`*`，或 `*.com` 这种一级后缀通配）一律忽略并告警 ——

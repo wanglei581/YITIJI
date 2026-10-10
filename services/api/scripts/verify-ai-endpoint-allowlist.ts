@@ -169,6 +169,17 @@ async function main(): Promise<void> {
   }
   check('A1b 默认单全部是精确主机名（不含通配）', DEFAULT_AI_ENDPOINT_ALLOWLIST.every((entry) => !entry.includes('*')))
 
+  for (const host of ['tokenhub.tencentmaas.com', 'tokenhub.tencentmaas.cn', 'tokenhub-intl.tencentmaas.com', 'api.hunyuan.cloud.tencent.com']) {
+    check(`H1 混元默认不放行 ${host}`, !allowedIn(`https://${host}/v1/x`) && reasonIn(`https://${host}/v1/x`) === 'host_not_allowed')
+  }
+  const hunyuanEnv = { AI_ENDPOINT_ALLOWLIST_EXTRA: 'tokenhub.tencentmaas.com' }
+  check('H2 精确追加后放行广州 TokenHub', allowedIn('https://tokenhub.tencentmaas.com/v1/x', hunyuanEnv))
+  for (const host of ['tokenhub-intl.tencentmaas.com', 'tokenhub.tencentmaas.com.evil.com', 'evil-tokenhub.tencentmaas.com', 'tokenhub.tencentmaas.cn']) {
+    check(`H3 追加仍拒绝 ${host}`, !allowedIn(`https://${host}/v1/x`, hunyuanEnv) && reasonIn(`https://${host}/v1/x`, hunyuanEnv) === 'host_not_allowed')
+  }
+  check('H4 追加也拒绝明文', !allowedIn('http://tokenhub.tencentmaas.com/v1/x', hunyuanEnv) && reasonIn('http://tokenhub.tencentmaas.com/v1/x', hunyuanEnv) === 'insecure_protocol')
+  check('H5 追加保留深度求索和千问', allowedIn(defaultHosts[0]![1], hunyuanEnv) && allowedIn(defaultHosts[1]![1], hunyuanEnv))
+
   const foreignOrArbitrary = [
     'https://api.openai.com/v1/chat/completions',
     'https://api.anthropic.com/v1/messages',

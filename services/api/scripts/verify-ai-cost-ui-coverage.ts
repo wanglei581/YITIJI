@@ -1,10 +1,13 @@
-import { AI_OPERATION_LABELS } from '../../../packages/shared/src/aiDisplayLabels'
+import { AI_OPERATION_LABELS, AI_USAGE_VENDOR_LABELS } from '../../../packages/shared/src/aiDisplayLabels'
+import { usageProviderLabel } from '../src/console-screen/console-screen.usage.queries'
 
 type Assert = (source: string, pattern: string | RegExp, label: string) => void
 export function verifyAiCostUiCoverage({ read, readApps, assertContains, assertNotContains, logSvc, NEW_OPS }: {
   read: (path: string) => string; readApps: (path: string) => string
   assertContains: Assert; assertNotContains: Assert; logSvc: string; NEW_OPS: string[]
 }) {
+assertContains(AI_USAGE_VENDOR_LABELS['hunyuan'] ?? '', /^腾讯混元$/, 'H1 用量共享映射显示腾讯混元')
+assertContains(usageProviderLabel('llm:hunyuan'), /^腾讯混元$/, 'H2 大屏日志厂商显示腾讯混元')
 // ─── 2. NON_TOKEN_BILLED_OPERATIONS ──────────────────────────────────────────
 
 assertContains(logSvc, 'NON_TOKEN_BILLED_OPERATIONS', 'NON_TOKEN_BILLED_OPERATIONS 已声明')

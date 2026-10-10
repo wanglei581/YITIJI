@@ -13,6 +13,8 @@
  *      报告里「你的回答」来自库里本人原话，不来自模型。
  *   2. 小青文字对话：本轮与历史都遮高置信项；姓名不遮；会话里存的仍是原话。
  *   3. 简历生成：自由文本可还原遮盖；产物里是真值不是占位符；模型编造的占位符不进简历。
+ * 另加一段「换一家模型服务方」的对照（第 4 段）：把小青对话的功能位配成腾讯混元（hy3），
+ * 遮盖、输入输出两道内容检查、拒答指令都和深度求索配置下一样生效。
  *
  * 全部为构造数据，不是真实个人信息。不触网（只连 127.0.0.1 上的假模型），不碰真实库。
  */
@@ -24,6 +26,8 @@ import { LlmChatService } from '../../src/ai/llm/llm-chat.service'
 import { LlmResumeGenerateService } from '../../src/ai/resume/llm-resume-generate.service'
 import type { ResumeGenerateInput } from '../../src/ai/interfaces/ai-provider.interface'
 import { maskUserTextForLlmText } from '../../src/common/pii/llm-input-mask'
+import { AI_SAFETY_NO_DISCRIMINATION, AI_SAFETY_NO_FABRICATION } from '../../src/ai/llm/ai-prompt-safety'
+import { AI_SAFETY_REFUSAL_INSTRUCTION, refusalMessage } from '../../src/ai/safety/refusal'
 
 export interface CallsiteCheckResult { pass: number; fail: number }
 
@@ -77,6 +81,7 @@ export async function runLlmPiiCallsiteChecks(): Promise<CallsiteCheckResult> {
     await mockInterviewChecks(config, bodies, (fn) => { replyFn = fn }, lastBody, ok, leaked)
     await assistantChatChecks(config, (fn) => { replyFn = fn }, lastBody, ok, leaked)
     await resumeGenerateChecks(config, (fn) => { replyFn = fn }, lastBody, ok, leaked)
+    await hunyuanRouteChecks(cfg, bodies, (fn) => { replyFn = fn }, lastBody, ok, leaked)
   } catch (error) {
     ok(false, `调用点: 运行时检查异常 ${error instanceof Error ? error.message : String(error)}`)
   } finally {
@@ -264,4 +269,62 @@ async function resumeGenerateChecks(
   ok(fabricated.experience[0]?.description === GEN_INPUT.experience[0]!.description,
     '简历生成: 模型编造的占位符不进简历，该条回退用户原文')
   ok(!PLACEHOLDER.test(JSON.stringify(fabricated)), '简历生成: 编造占位符场景下产物仍不含占位符')
+}
+
+// ─── 4. 功能位配成腾讯混元（TokenHub）时，同一套保护照样生效 ───────────────────
+//
+// 合规 2026-10-10 的要求：多一家模型服务方，就要有门禁证明遮盖、输入输出两道内容检查、
+// 拒答指令在这条路上同样生效。做法：同一句话分别按深度求索和混元两种配置各发一次
+// （地址都是本机假模型），比较真正发出去的两份请求体 —— 除模型名和关思考字段外必须逐字相同。
+// 以后谁给某一家加了分支、绕开了其中任何一道，这里会红。
+
+/** 只在本段使用的假禁词（管理员配置的禁词与内置词库走同一个检查函数）。 */
+const ROUTE_FORBIDDEN = '验证专用禁词甲'
+
+type RouteBody = { model?: unknown; thinking?: unknown; messages?: Array<{ role: string; content: string }> } & Record<string, unknown>
+
+async function hunyuanRouteChecks(
+  baseCfg: Record<string, unknown>, bodies: string[], setReply: SetReply, lastBody: () => string, ok: Ok, leaked: Leaked,
+): Promise<void> {
+  const chatFor = (vendor: string, model: string): LlmChatService => {
+    const cfg = { ...baseCfg, vendor, model, forbiddenWords: [ROUTE_FORBIDDEN] }
+    return new LlmChatService({ getApiKey: () => 'stub-key', getConfig: () => ({ ...cfg }), isReady: () => true } as never)
+  }
+  const message = `手机 ${PII.phone}，邮箱 ${PII.email}，身份证号：${PII.idNumber}，想问简历怎么改`
+  setReply(() => '好的，我记下了。')
+
+  await chatFor('deepseek', 'stub').chat({ message }, undefined, 'owner-route-ds')
+  const viaDeepseek = JSON.parse(lastBody()) as RouteBody
+  const hunyuan = chatFor('hunyuan', 'hy3')
+  const turn = await hunyuan.chat({ message }, undefined, 'owner-route-hy')
+  const raw = lastBody()
+  const viaHunyuan = JSON.parse(raw) as RouteBody
+
+  ok(viaHunyuan.model === 'hy3' && viaDeepseek.model === 'stub', '混元: 两份请求体确实分别按混元（hy3）和深度求索配置发出（阳性对照）')
+  ok(raw.includes('想问简历怎么改'), '混元: 请求带着本轮原话（阳性对照）')
+  ok(leaked(raw).length === 0, `混元: 请求体不含手机/证件/邮箱原文（残留: ${leaked(raw).join(',') || '无'}）`)
+  const system = viaHunyuan.messages?.[0]
+  ok(system?.role === 'system' && system.content.includes(AI_SAFETY_REFUSAL_INSTRUCTION), '混元: 系统提示词里带着拒答指令全文')
+  ok(system?.content.includes(AI_SAFETY_NO_FABRICATION) === true && system.content.includes(AI_SAFETY_NO_DISCRIMINATION),
+    '混元: 系统提示词里带着「不编造」「不歧视」两句')
+  ok(JSON.stringify(viaHunyuan.messages) === JSON.stringify(viaDeepseek.messages),
+    '混元: 发给模型的全部消息（系统约束 + 遮盖后的用户话）与深度求索配置下逐字相同')
+  const others = (body: RouteBody): string =>
+    JSON.stringify(Object.entries(body).filter(([key]) => !['model', 'thinking', 'messages'].includes(key)).sort(([a], [b]) => a.localeCompare(b)))
+  ok(others(viaHunyuan) === others(viaDeepseek), '混元: 除模型名和关思考字段外，请求体其余字段与深度求索配置下相同')
+  ok(JSON.stringify(viaHunyuan.thinking) === JSON.stringify({ type: 'disabled' }) && !('thinking' in viaDeepseek),
+    '混元: hy3 带关闭思考字段（对照用的 stub 模型不带）')
+
+  // 输入侧内容检查：命中后一个请求都不发，用户拿到固定拒答
+  const before = bodies.length
+  const blockedIn = await hunyuan.chat({ message: `帮我写一段${ROUTE_FORBIDDEN}的话`, sessionId: turn.sessionId }, undefined, 'owner-route-hy')
+  ok(bodies.length === before, '混元: 输入命中内容检查时没有向模型发请求')
+  ok(blockedIn.reply === refusalMessage('forbidden_word'), '混元: 输入命中时用户拿到的是固定拒答')
+
+  // 输出侧内容检查：模型回了不该回的，用户拿到的是固定拒答，不是模型原话
+  setReply(() => `可以，${ROUTE_FORBIDDEN}是这样的。`)
+  const blockedOut = await hunyuan.chat({ message: '那我下一步该准备什么？', sessionId: turn.sessionId }, undefined, 'owner-route-hy')
+  ok(bodies.length === before + 1, '混元: 这一轮确实向模型发了请求（阳性对照）')
+  ok(blockedOut.reply === refusalMessage('forbidden_word') && !blockedOut.reply.includes(ROUTE_FORBIDDEN),
+    '混元: 输出命中内容检查时用户拿到的是固定拒答，不是模型原话')
 }

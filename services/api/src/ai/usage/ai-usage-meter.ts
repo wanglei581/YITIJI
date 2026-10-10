@@ -89,6 +89,8 @@ export function beijingMonthKey(at: Date): string {
 const VENDOR_BY_HOST: Record<string, string> = {
   'api.deepseek.com': 'deepseek',
   'dashscope.aliyuncs.com': 'qwen',
+  'tokenhub.tencentmaas.com': 'hunyuan',
+  'tokenhub.tencentmaas.cn': 'hunyuan',
 }
 
 /** 按请求 URL 主机名映射厂商；认不出的记主机名（不记路径与查询串）。 */

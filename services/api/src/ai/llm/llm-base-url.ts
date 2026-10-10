@@ -33,6 +33,15 @@ export function assertApprovedLlmBaseUrl(raw: string, action: '保存' | '测试
 }
 
 /**
+ * 取模型地址的主机名，解析不了返回空串（不抛错）。
+ * 给「换没换主机」这类比较用：存量配置里可能留着白名单收紧前存下的坏地址，
+ * 比较时把它当成「和谁都不一样」，而不是让保存接口报 500。
+ */
+export function llmBaseUrlHostname(raw: string): string {
+  try { return new URL(raw.trim()).hostname } catch { return '' }
+}
+
+/**
  * 管理员配置的模型 baseURL 不得指向本机 / 内网 / 链路本地。
  * 只做字面主机名与 IP 判断，不在写入路径做 DNS（避免把配置页变成慢探测）。
  * 连通性测试端点会再拦一次，防止环境变量里已有的内网地址被「测试」打到。
