@@ -10,9 +10,9 @@ const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
 // 第八次 8-7：持屏幕忙锁和来源页自己的 busy 分开，码到期不延长。
-assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(active \|\| loading \|\| confirming\)/, '8-7 面板独立持忙碌锁')
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming\)/, '8-7 面板独立持忙碌锁，文件已到不再顺延')
 assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '8-7 打印等待有效会话时持忙碌锁')
-assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '8-7 打印等待锁受真实到期和终态约束')
+assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '8-7 打印等待锁受真实到期和终态约束')
 console.log('PASS 8-7 两套上传等待锁及到期边界')
 
 const directRoutes = new Map([
@@ -59,7 +59,7 @@ const frozenHashes = new Map([
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    'b0bc57698222f876d5c5f1969c8d9247d7303da8032d0ffbd76c1a2449b3e59f',
+    '68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

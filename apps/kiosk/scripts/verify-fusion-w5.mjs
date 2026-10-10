@@ -98,7 +98,7 @@ const FROZEN = new Map([
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'b0bc57698222f876d5c5f1969c8d9247d7303da8032d0ffbd76c1a2449b3e59f'],
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40'],
 ])
 
 function propertyName(node) {

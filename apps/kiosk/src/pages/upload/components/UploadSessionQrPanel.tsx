@@ -135,7 +135,8 @@ export function UploadSessionQrPanel({
 
   const active = Boolean(qr && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
-  useBusyLock(active || loading || confirming)
+  // 这把锁只管「码有效、文件还没到」这一段。文件一到，下一步在本机，屏上有文件名：回到正常的无操作计时（合规 10/10）。
+  useBusyLock((active && status?.status !== 'uploaded') || loading || confirming)
 
   useEffect(() => {
     const received = status?.status === 'uploaded' || confirming
@@ -380,7 +381,7 @@ export function UploadSessionQrPanel({
                   : `二维码有效期 ${expiresLabel || '10:00'}，文件最大 10MB。`}
             </p>
             {waiting && (
-              <p className="mt-2 text-sm leading-relaxed text-neutral-600">等你传文件期间，这台机器不会自动退出。二维码到期后没有操作，就会自动退出。</p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-600">等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</p>
             )}
             {waiting && remainingSeconds > 0 && remainingSeconds <= 60 && (
               <div role="status" className="mt-3 rounded-xl bg-error-bg px-3 py-2 text-sm font-semibold text-error-fg">

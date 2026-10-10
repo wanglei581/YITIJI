@@ -4,7 +4,7 @@ import { expect, test } from '../fixtures/kiosk-test'
 import { allowLocalBootTicket, registerPrivacyShell } from './fixtures/privacy-clear-shell'
 
 // playwright.w3.config.ts 已接入 testMatch 和 @w3-kiosk；仅用页面时钟，不改隐私时限。
-const NOTICE = '等你传文件期间，这台机器不会自动退出。二维码到期后没有操作，就会自动退出。'
+const NOTICE = '等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。'
 const CASES = [
   { label: '简历来源', path: '/resume/source', purpose: 'resume_upload', qr: '.resume-source-phone-session svg[width="150"]', renew: '刷新二维码', leave: '返回 AI 简历服务' },
   { label: '打印上传', path: '/print/upload?source=document&tab=qr', purpose: 'print_doc', qr: '[data-testid="file-source-qr"] svg', renew: '重新出一张码', leave: '返回打印扫描' },
@@ -20,6 +20,8 @@ async function openWaiting(page: Page, api: ApiRouter, item: Case) {
   let creates = 0
   const cancelled: { id: string; control: string | undefined }[] = []
   const sessions = new Map<string, string>()
+  // 置真后轮询回「文件已收到、等本机确认」。
+  const phone = { uploaded: false }
   // URL 函数按 pathname 匹配，兼容查询串；Node 的 Date.now 不参与会话到期计算。
   await page.route((url) => /^\/api\/v1\/upload-sessions(?:\/[^/]+)?$/.test(url.pathname), async (route) => {
     const request = route.request()
@@ -33,7 +35,7 @@ async function openWaiting(page: Page, api: ApiRouter, item: Case) {
     const id = new URL(request.url()).pathname.split('/').at(-1)!
     if (request.method() === 'DELETE') cancelled.push({ id, control: request.headers()['x-upload-session-control'] })
     // 即使轮询返回 pending，客户端仍须按真实 expiresAt 到期，不能被迟到的应答重新锁住。
-    await route.fulfill({ json: { success: true, data: { sessionId: id, status: request.method() === 'DELETE' ? 'cancelled' : 'pending', purpose: item.purpose, mode: 'temporary', file: null, requiresKioskConfirmation: false, expiresAt: sessions.get(id) } } })
+    await route.fulfill({ json: { success: true, data: { sessionId: id, status: request.method() === 'DELETE' ? 'cancelled' : phone.uploaded ? 'uploaded' : 'pending', purpose: item.purpose, mode: 'temporary', file: phone.uploaded ? { fileId: 'scan-wait-file', filename: '手机传来的文件.pdf', mimeType: 'application/pdf', sizeBytes: 2048 } : null, requiresKioskConfirmation: phone.uploaded, expiresAt: sessions.get(id) } } })
   })
   await page.goto(item.path)
   // 简历来源页要先点「手机扫码上传」这条来源，上传码面板才出现。
@@ -41,7 +43,7 @@ async function openWaiting(page: Page, api: ApiRouter, item: Case) {
   await expect(page.getByText(NOTICE, { exact: true })).toBeVisible()
   await expect(page.locator(item.qr)).toBeVisible()
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000)
-  return { cancelled, creates: () => creates }
+  return { cancelled, creates: () => creates, phone }
 }
 
 async function expectOriginalPage(page: Page, item: Case) {
@@ -159,3 +161,26 @@ for (const item of CASES) {
     expect(state.cancelled).toHaveLength(1)
   })
 }
+
+// 合规 10/10：文件已经传到、等本机点确认的那一段不算进顺延。这时屏上有文件名、下一步在本机，
+// 人在手机上看到「上传成功」后可能转身就走；打印上传页这一段原来就是 180 秒清场，不能被带成 10 分钟。
+test('打印上传：文件已收到后不再顺延，照常 150 秒预警、180 秒清场 @w3-kiosk', async ({ page, api }) => {
+  const item = CASES[1]
+  const state = await openWaiting(page, api, item)
+  await page.clock.runFor(100_000)
+  state.phone.uploaded = true
+  await page.clock.runFor(10_000)
+  await expect(page.getByText('手机传来的文件.pdf', { exact: false }).first()).toBeVisible()
+  // 收到文件后常驻说明和忙碌锁一起撤掉：屏上不再说「不会自动退出」。
+  await expect(page.getByText(NOTICE, { exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-screen="session-guard"]')).toHaveCount(0)
+  // 轮询几秒内就读到「已收到」，无操作计时从那一刻起算：130 秒时还没预警，再过 30 秒已在预警，再过 40 秒已清场。
+  await page.clock.runFor(130_000)
+  await expect(page.locator('[data-screen="session-guard"]')).toHaveCount(0)
+  await page.clock.runFor(30_000)
+  await expect(page).toHaveURL(/\/session-timeout$/)
+  await page.clock.runFor(40_000)
+  await expect(page).toHaveURL(/\/$/)
+  // 被清场时这个已收到文件的会话没有被悄悄确认。
+  expect(state.cancelled.every((entry) => entry.id === 'scan-wait-1')).toBe(true)
+})

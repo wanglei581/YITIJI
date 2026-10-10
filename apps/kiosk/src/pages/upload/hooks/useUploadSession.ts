@@ -210,7 +210,8 @@ export function useUploadSession({
   }, [enabled, now, purpose, qr, status])
 
   const remainingSeconds = qr ? Math.max(0, Math.ceil((new Date(qr.expiresAt).getTime() - now) / 1000)) : 0
-  const waiting = Boolean(enabled && qr && remainingSeconds > 0 && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
+  // 只算「码有效、文件还没到」：文件一到（uploaded）就不再算等待，页面回到正常的无操作计时（合规 10/10）。
+  const waiting = Boolean(enabled && qr && remainingSeconds > 0 && status?.status !== 'uploaded' && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
   const expiresLabel = useMemo(() => {
     if (!qr) return ''

@@ -323,7 +323,7 @@ export function FileSourceView(props: FileSourceViewProps) {
   const waitCountdown = waitRemainingSeconds === null ? '' : `${Math.floor(waitRemainingSeconds / 60)}:${String(waitRemainingSeconds % 60).padStart(2, '0')}`
   const phoneWaitNotice = waitRemainingSeconds !== null ? (
     <>
-      <FileSourceNote>等你传文件期间，这台机器不会自动退出。二维码到期后没有操作，就会自动退出。</FileSourceNote>
+      <FileSourceNote>等你传文件期间，这台机器不会自动退出，请不要走开。二维码到期后没有操作，就会自动退出。</FileSourceNote>
       {waitRemainingSeconds > 0 && waitRemainingSeconds <= 60 && (
         <div role="status" className="fs-status" data-kind="warn">
           <div className="fs-status-p">二维码还剩 {waitCountdown}。还在传的话点一下屏幕，到期后可以在这里重新出码。</div>
