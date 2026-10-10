@@ -40,6 +40,8 @@ export interface UsbDriveInfo {
   /** 盘符根路径，如 "E:\\"。仅在本模块内部使用，不出现在任何返回给前端的对象里。 */
   rootPath: string
   label: string | null
+  /** Windows 认不出这个盘的文件系统（要格式化才能用的那种）时为 false。缺省按可读处理。 */
+  readable?: boolean
 }
 
 /** 驱动/隐藏文件 provider 允许同步或异步实现：真实实现是异步 PowerShell，verify 注入同步假驱动。 */
@@ -56,12 +58,15 @@ export interface UsbFileListItem {
 export interface UsbFileListResult {
   present: boolean
   driveLabel: string | null
+  /** 盘插着但本机读不了（没有可识别的文件系统，或根目录打不开）。和「盘里没有能用的文件」不是一回事。 */
+  readable: boolean
   files: UsbFileListItem[]
 }
 
 export interface UsbStatus {
   present: boolean
   driveLabel: string | null
+  readable: boolean
 }
 
 export interface ConsumedUsbFile {
@@ -89,12 +94,32 @@ interface RawUsbFileEntry {
 async function runPowerShellJson(command: string): Promise<unknown> {
   const { stdout } = await execFileAsync(
     'powershell',
-    ['-NonInteractive', '-NoProfile', '-Command', command],
+    // Windows PowerShell 5.1 默认按系统代码页（中文系统是 GBK）往管道写，Node 这边按 UTF-8 读，
+    // 中文卷标、中文隐藏文件名就成了乱码。先把输出编码定成 UTF-8。
+    ['-NonInteractive', '-NoProfile', '-Command', `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`],
     { encoding: 'utf-8', timeout: 10_000, windowsHide: true },
   )
   const raw = stdout.trim()
   if (!raw) return null
   return JSON.parse(raw)
+}
+
+/**
+ * 从 Win32_LogicalDisk 的结果里挑一块盘。一个 U 盘可能被认成几个分区：
+ * 优先取有文件系统的那个；全都没有文件系统（Windows 提示要格式化）时取第一个并标成读不了。
+ */
+export function pickRemovableDrive(parsed: unknown): UsbDriveInfo | null {
+  const list = (Array.isArray(parsed) ? parsed : [parsed])
+    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+    .map((item) => ({
+      deviceId: String(item['DeviceID'] ?? '').trim(),
+      label: item['VolumeName'] != null ? String(item['VolumeName']).trim() : '',
+      fileSystem: item['FileSystem'] != null ? String(item['FileSystem']).trim() : '',
+    }))
+    .filter((item) => item.deviceId)
+  const chosen = list.find((item) => item.fileSystem) ?? list[0]
+  if (!chosen) return null
+  return { rootPath: `${chosen.deviceId}\\`, label: chosen.label || null, readable: chosen.fileSystem !== '' }
 }
 
 let driveDetectCache: { at: number; value: UsbDriveInfo | null } | null = null
@@ -114,17 +139,9 @@ export async function detectRemovableDrive(): Promise<UsbDriveInfo | null> {
   let value: UsbDriveInfo | null = null
   try {
     const parsed = await runPowerShellJson(
-      'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=2" | Select-Object DeviceID, VolumeName | ConvertTo-Json -Compress',
+      'Get-CimInstance Win32_LogicalDisk -Filter "DriveType=2" | Select-Object DeviceID, VolumeName, FileSystem | ConvertTo-Json -Compress',
     )
-    const list = Array.isArray(parsed) ? parsed : [parsed]
-    const first = list.find((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-    if (first) {
-      const deviceId = String(first['DeviceID'] ?? '').trim()
-      if (deviceId) {
-        const volumeName = first['VolumeName'] != null ? String(first['VolumeName']).trim() : ''
-        value = { rootPath: `${deviceId}\\`, label: volumeName || null }
-      }
-    }
+    value = pickRemovableDrive(parsed)
   } catch (e) {
     warn(`usb: detectRemovableDrive failed — ${e instanceof Error ? e.message : String(e)}`)
     value = null
@@ -162,6 +179,16 @@ async function listHiddenOrSystemNames(rootPath: string): Promise<Set<string>> {
  * 防止 U 盘上的链接把读取导向盘外文件。
  * 这样本函数在任意平台都可用真实临时目录做 verify，不依赖真实 Windows/U盘。
  */
+/** 根目录打不打得开。打不开的盘按「读不了」报，不报成「没有能用的文件」。 */
+export function isDriveRootReadable(rootPath: string): boolean {
+  try {
+    readdirSync(rootPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function enumerateDriveFiles(rootPath: string): RawUsbFileEntry[] {
   let names: string[]
   try {
@@ -232,7 +259,10 @@ export async function refreshUsbFileList(
   registry = new Map()
 
   const drive = await driveProvider()
-  if (!drive) return { present: false, driveLabel: null, files: [] }
+  if (!drive) return { present: false, driveLabel: null, readable: true, files: [] }
+  if (drive.readable === false || !isDriveRootReadable(drive.rootPath)) {
+    return { present: true, driveLabel: drive.label, readable: false, files: [] }
+  }
 
   const hidden = await hiddenNamesProvider(drive.rootPath)
   const raw = enumerateDriveFiles(drive.rootPath).filter((entry) => !hidden.has(entry.filename))
@@ -250,13 +280,15 @@ export async function refreshUsbFileList(
     return { safeId, filename: entry.filename, extension: entry.extension, sizeBytes: entry.sizeBytes }
   })
 
-  return { present: true, driveLabel: drive.label, files }
+  return { present: true, driveLabel: drive.label, readable: true, files }
 }
 
 /** 轻量状态查询，不触碰注册表（不使旧 safeId 失效），供 Kiosk 高频轮询"是否插入"。 */
 export async function getUsbStatus(driveProvider: UsbDriveProvider = detectRemovableDrive): Promise<UsbStatus> {
   const drive = await driveProvider()
-  return drive ? { present: true, driveLabel: drive.label } : { present: false, driveLabel: null }
+  return drive
+    ? { present: true, driveLabel: drive.label, readable: drive.readable !== false }
+    : { present: false, driveLabel: null, readable: true }
 }
 
 /**

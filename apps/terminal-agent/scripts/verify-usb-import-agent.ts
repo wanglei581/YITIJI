@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
@@ -11,6 +11,7 @@ import {
   consumeUsbFileOutcome,
   enumerateDriveFiles,
   getUsbStatus,
+  pickRemovableDrive,
   refreshUsbFileList,
   resetUsbRegistryForTest,
   type UsbDriveInfo,
@@ -199,9 +200,49 @@ async function verifyUsbFilesUnit(): Promise<void> {
     // refreshUsbFileList: 注入假驱动 + 假隐藏文件 provider，验证隐藏文件过滤生效、safeId 生成
     const driveProvider = (): UsbDriveInfo => ({ rootPath: dir, label: 'TEST-USB' })
     const hiddenNamesProvider = () => new Set(['secret-hidden.pdf'])
-    const listed = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    let listed = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
     assert.equal(listed.present, true)
     assert.equal(listed.driveLabel, 'TEST-USB')
+    assert.equal(listed.readable, true, 'a readable drive must be reported as readable')
+
+    // 读不了的盘（真机 F-10）：Windows 认不出文件系统，或根目录打不开，都要报 readable=false，
+    // 不能和「盘里没有能用的文件」混成一种。
+    const unreadableByFlag = await refreshUsbFileList(() => ({ rootPath: dir, label: null, readable: false }), hiddenNamesProvider)
+    assert.deepEqual(
+      { present: unreadableByFlag.present, readable: unreadableByFlag.readable, files: unreadableByFlag.files.length },
+      { present: true, readable: false, files: 0 },
+      'a drive without a recognized file system must be reported as present but unreadable, with no files',
+    )
+    const missingRoot = join(dir, 'no-such-root')
+    const unreadableByRoot = await refreshUsbFileList(() => ({ rootPath: missingRoot, label: 'X' }), hiddenNamesProvider)
+    assert.equal(unreadableByRoot.present, true)
+    assert.equal(unreadableByRoot.readable, false, 'a drive whose root cannot be listed must be reported as unreadable')
+    assert.deepEqual(await getUsbStatus(() => ({ rootPath: dir, label: 'A', readable: false })), { present: true, driveLabel: 'A', readable: false })
+    assert.deepEqual(await getUsbStatus(() => ({ rootPath: dir, label: 'A' })), { present: true, driveLabel: 'A', readable: true })
+    assert.deepEqual(await getUsbStatus(() => null), { present: false, driveLabel: null, readable: true })
+
+    // 一个 U 盘被认成两个分区：有文件系统的优先；都没有时取第一个并标成读不了。
+    assert.deepEqual(
+      pickRemovableDrive([
+        { DeviceID: 'G:', VolumeName: null, FileSystem: null },
+        { DeviceID: 'H:', VolumeName: '电脑店U盘', FileSystem: 'FAT32' },
+      ]),
+      { rootPath: 'H:\\', label: '电脑店U盘', readable: true },
+    )
+    assert.deepEqual(
+      pickRemovableDrive([{ DeviceID: 'G:', VolumeName: null, FileSystem: null }, { DeviceID: 'H:', VolumeName: '', FileSystem: '' }]),
+      { rootPath: 'G:\\', label: null, readable: false },
+    )
+    assert.deepEqual(pickRemovableDrive({ DeviceID: 'E:', VolumeName: ' 简历 ', FileSystem: 'exFAT' }), { rootPath: 'E:\\', label: '简历', readable: true })
+    assert.equal(pickRemovableDrive(null), null)
+    assert.equal(pickRemovableDrive([{ DeviceID: '' }]), null)
+
+    // 中文卷标乱码（真机 F-11）：PowerShell 的输出编码必须先定成 UTF-8，查询里必须带 FileSystem。
+    const usbSource = readFileSync(join(__dirname, '../src/usb/usb-files.ts'), 'utf8')
+    assert.match(usbSource, /\[Console\]::OutputEncoding = \[System\.Text\.Encoding\]::UTF8; \$\{command\}/, 'PowerShell output must be forced to UTF-8 before the command')
+    assert.match(usbSource, /Select-Object DeviceID, VolumeName, FileSystem/, 'drive query must read FileSystem')
+    // 上面几次刷新让第一轮的编号都失效了，重新列一次再往下走。
+    listed = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
     const listedNames = listed.files.map((f) => f.filename).sort()
     assert.deepEqual(listedNames, ['photo.jpg', 'resume.pdf'], 'hidden file must be excluded once flagged by hiddenNamesProvider')
     listed.files.forEach((f) => assert.match(f.safeId, /^[0-9a-f-]{36}$/, 'safeId must be a UUID, never an absolute path'))
@@ -243,8 +284,8 @@ async function verifyUsbFilesUnit(): Promise<void> {
 
     // 无驱动时的行为
     const noDrive = await refreshUsbFileList(() => null)
-    assert.deepEqual(noDrive, { present: false, driveLabel: null, files: [] })
-    assert.deepEqual(await getUsbStatus(() => null), { present: false, driveLabel: null })
+    assert.deepEqual(noDrive, { present: false, driveLabel: null, readable: true, files: [] })
+    assert.deepEqual(await getUsbStatus(() => null), { present: false, driveLabel: null, readable: true })
 
     // 读的那一下失败（Windows Defender 实时防护拦截可疑文件时 readFileSync 抛错）：
     // 要报 unreadable（让用户换文件），不能报 expired（会诱导「刷新后再点同一个」反复失败）；日志不得带文件名。
