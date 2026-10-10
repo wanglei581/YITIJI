@@ -157,6 +157,41 @@ test('a paid unconfirmed print offers the check line and a refund line @kiosk', 
   await expect(state).not.toContainText('联系工作人员')
 })
 
+// 2026-10-10 走查：未确认屏只说「等待人工核查」「请稍后再来」，没说过 5 分钟可以自己再输同一个码。
+// 后端规则：实付 0 元的到机码单，未确认满 5 分钟后同机同码可以整份重打；付费单走原路退款，不说接着打。
+test('a zero-yuan pickup-code unconfirmed print says to re-enter the same code after 5 minutes @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 0, pickupSource: true })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toContainText('没有的话，过 5 分钟回到这台机器，再输一次同一个到机码，可以整份重打（每单最多 2 次）。')
+  await expect(state).toContainText('系统已登记，这次结果没能确认')
+  await expect(state).toContainText('过 5 分钟可以回这台机器再输一次同一个到机码')
+  await expect(state).not.toContainText('等待人工核查')
+  await expect(state).not.toContainText('核实后给出结论')
+  await expect(state).not.toContainText('退款')
+  // 未确认时本页不给「重新提交打印」：5 分钟内点了也会被拒。
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
+})
+
+test('paid or on-site unconfirmed prints never mention the same-code resume @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 200, pickupSource: true })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toBeVisible()
+  await expect(state).not.toContainText('同一个到机码')
+  await openDoneWithState(page, { ...taskState, amountCents: 0 })
+  await expect(state).toBeVisible()
+  await expect(state).not.toContainText('同一个到机码')
+})
+
 test('a zero-yuan unconfirmed print does not mention a refund @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
