@@ -7,7 +7,7 @@ const PAST = '2020-01-01T00:00:00.000Z'
 
 const QA = {
   kind: 'qa_pins',
-  title: '你钉住的条目',
+  title: '这次对话的要点',
   pins: [
     { content: '我做过两年社群运营，最多同时管 6 个群。', evidenceLevel: 'E1', sourceNote: '来源：你在第 2 轮说的原话' },
     { content: '你在本机的简历里写了「用户增长」相关经历，可以在面试里直接引用。', evidenceLevel: 'E2', sourceNote: '来源：本机已有的简历诊断结果' },

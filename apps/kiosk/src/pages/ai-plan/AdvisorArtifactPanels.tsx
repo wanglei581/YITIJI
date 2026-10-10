@@ -96,7 +96,7 @@ export function QaPinsPanel({
 }) {
   return (
     <section className="aa-sec aa-qa" data-testid="advisor-artifact-qa" style={{ '--aa-pin-gaps': Math.max(0, payload.pins.length - 1) } as CSSProperties}>
-      <SectionHead n="01" title="你钉住的条目" hint={`共 ${payload.pins.length} 条 · 对话未保存`} stale={stale} reread={reread} />
+      <SectionHead n="01" title="这次对话的要点" hint={`共 ${payload.pins.length} 条 · 对话未保存`} stale={stale} reread={reread} />
       <div className="aa-scroll">
         {payload.pins.map((pin, index) => (
           <div className="aa-pin" data-e={pin.evidenceLevel} key={`${pin.evidenceLevel}-${index}`}>
