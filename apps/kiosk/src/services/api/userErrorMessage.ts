@@ -42,7 +42,7 @@ import { ApiHttpError } from './httpAdapter'
 export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
 
 const SHARED_USER_MESSAGES = (contact = peekSupportContact()): Readonly<Record<string, string>> => ({
-  NETWORK_ERROR: '网络连接失败，请检查网络后重试',
+  NETWORK_ERROR: '网络连接失败，请稍后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',

@@ -1671,7 +1671,7 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   // 稿 05 的 reply-error 标题；断网时说的是断网，不笼统说「AI 暂不可用」
   // （「AI 服务暂不可用」留给服务器只回了工程串的情况，见下面的用户话用例）。
   await expect(page.getByText('请求失败，没有回答', { exact: true })).toBeVisible()
-  await expect(page.getByText('网络连接失败，请检查网络后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('网络连接失败，请稍后重试', { exact: true })).toBeVisible()
 
   // 失败停在 failed，且降级是 ① manual —— 功能不消失，四条不依赖 AI 的真实入口在。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')

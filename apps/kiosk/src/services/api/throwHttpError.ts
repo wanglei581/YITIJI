@@ -43,5 +43,5 @@ export function networkError(err?: unknown): ApiHttpError {
   if (err instanceof Error && err.name === 'AbortError') {
     return new ApiHttpError('REQUEST_TIMEOUT', '本次请求响应超时，请重试', 408)
   }
-  return new ApiHttpError('NETWORK_ERROR', '网络连接失败，请检查网络后重试', 0)
+  return new ApiHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
 }
