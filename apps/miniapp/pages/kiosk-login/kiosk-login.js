@@ -8,17 +8,10 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { parseRelayText, parseMiniappCodePath } = require('../../utils/kiosk-relay-link')
 
 // 从扫码结果 URL 里提取 ticketId（容错：带或不带 domain 前缀）
 const TICKET_RE = /[?&]ticketId=([A-Za-z0-9_%-]{20,200})/
-
-/**
- * 一体机「手机扫码上传」的码：`<origin><path>#sessionId=xx&token=xx`。
- * 参数在 **fragment** 里而不是 query —— 一体机侧 buildPhoneUploadUrl 是这么拼的，
- * 用 `[?&]` 匹配不到，必须认 `#` 与 `&`。
- */
-const UPLOAD_SESSION_RE = /[#&]sessionId=([A-Za-z0-9_%-]{8,200})/
-const UPLOAD_TOKEN_RE = /[#&]token=([A-Za-z0-9_.%-]{8,400})/
 
 /** 票据总寿命（member-qr-login.service.ts 的 QR_TICKET_TTL）。status 回的是**剩余**秒数，不是它。 */
 const QR_TICKET_TTL_SECONDS = 180
@@ -190,9 +183,9 @@ Page({
     const flow = this._flow
     wx.scanCode({
       onlyFromCamera: true,
-      scanType: ['qrCode'],
+      scanType: ['qrCode', 'wxCode'],
       success: (res) => {
-        if (flow === this._flow) this._handleScanResult(res && res.result)
+        if (flow === this._flow) this._handleScanResult(res && res.result, res && res.path)
       },
       fail: (err) => {
         if (flow !== this._flow) return
@@ -205,24 +198,35 @@ Page({
     })
   },
 
-  _handleScanResult(raw) {
+  _handleScanResult(raw, path) {
     const text = typeof raw === 'string' ? raw : ''
-    // 一体机屏幕上有两类码：登录票据、手机上传会话。先按码型分流，
-    // 不能一律当登录码处理 —— 那会让扫上传码的人看到「这不是一体机登录码」，
-    // 而他扫的恰恰就是终端屏幕上的码。
-    const session = text.match(UPLOAD_SESSION_RE)
-    const token = text.match(UPLOAD_TOKEN_RE)
-    if (session && token) {
+    const code = parseMiniappCodePath(path)
+    const relay = code.kind === 'scene' ? code : parseRelayText(text)
+    if (relay.kind === 'scene' || relay.kind === 'credentials') {
       try {
         const url = '/pages/kiosk-send/kiosk-send'
-          + '?sessionId=' + encodeURIComponent(decodeURIComponent(session[1]))
-          + '&token=' + encodeURIComponent(decodeURIComponent(token[1]))
+          + (relay.kind === 'scene' ? '?scene=' + encodeURIComponent(relay.scene)
+            : '?sessionId=' + encodeURIComponent(relay.sessionId) + '&token=' + encodeURIComponent(relay.token))
         this.setData({ phase: 'idle' })
         wx.navigateTo({ url })
       } catch (_) {
         this.setData({ phase: 'scan-error', errorMsg: '这张上传码读不出来，请回一体机重新生成后再扫' })
       }
       return
+    }
+
+    // 纯解析器不会抛错；仍保留上传凭据解码失败时原有的专门提示。
+    const params = text.split(/[#?&]/).slice(1)
+    const sessionParam = params.find((part) => part.indexOf('sessionId=') === 0)
+    const tokenParam = params.find((part) => part.indexOf('token=') === 0)
+    if (sessionParam && tokenParam) {
+      try {
+        decodeURIComponent(sessionParam.slice('sessionId='.length))
+        decodeURIComponent(tokenParam.slice('token='.length))
+      } catch (_) {
+        this.setData({ phase: 'scan-error', errorMsg: '这张上传码读不出来，请回一体机重新生成后再扫' })
+        return
+      }
     }
 
     const match = text.match(TICKET_RE)

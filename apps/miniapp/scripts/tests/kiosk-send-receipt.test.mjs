@@ -55,6 +55,7 @@ function makeWx() {
     setChosen(file) { chosen = file },
     showLoading() { calls.loading += 1 },
     hideLoading() { calls.hide += 1 },
+    showActionSheet(opts) { opts.success({ tapIndex: 1 }) },
     chooseMessageFile(opts) {
       calls.choose += 1
       if (!chosen) {
