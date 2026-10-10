@@ -15,5 +15,7 @@ export function resolveInterviewSessionState(
     interviewerType: storedLive.interviewerType,
     position: storedLive.position,
     firstQuestion: storedLive.firstQuestion,
+    deadlineAtLocalMs: storedLive.deadlineAtLocalMs,
+    deadlineSource: storedLive.deadlineSource,
   }
 }

@@ -28,6 +28,8 @@ export async function submitInterviewAnswer(ctx: {
   messages: InterviewMessage[]
   draft: string
   voiceKind: InterviewVoiceState['kind']
+  sealedRef: MutableRefObject<boolean>
+  sealAtDeadline: () => void
   questionShownAtRef: MutableRefObject<number>
   setMessages: Dispatch<SetStateAction<InterviewMessage[]>>
   setDraft: Dispatch<SetStateAction<string>>
@@ -42,6 +44,7 @@ export async function submitInterviewAnswer(ctx: {
   setQuestionIndex: Dispatch<SetStateAction<number>>
 }): Promise<void> {
   const { args, state, access } = ctx
+  if (ctx.sealedRef.current) return
   if (ctx.voiceKind === 'requesting_permission' || ctx.voiceKind === 'transcribing') return
   const answer = args.text.trim()
   if (!args.skip && !answer) {
@@ -75,6 +78,8 @@ export async function submitInterviewAnswer(ctx: {
       access,
     )
     if (!args.skip) ctx.setAnswersRecorded(true)
+    if (res.timeUp === true) ctx.sealAtDeadline()
+    if (ctx.sealedRef.current) return
     if (res.done) {
       ctx.setPhase('done_suggest')
       return
@@ -84,6 +89,8 @@ export async function submitInterviewAnswer(ctx: {
     ctx.setPhase('answering')
   } catch (err) {
     ctx.setMessages((prev) => dropAppendedTurn(prev, lengthBefore))
+    if (errorCodeOf(err) === 'INTERVIEW_DEADLINE_REACHED') ctx.sealAtDeadline()
+    if (ctx.sealedRef.current) return
     const draftRestored = !args.skip
     if (args.skip) {
       ctx.setDraft(draftBefore)
@@ -100,7 +107,9 @@ export async function submitInterviewAnswer(ctx: {
   }
 }
 
-export async function finishInterview(ctx: {
+export interface InterviewFinishContext {
+  sealedRef: MutableRefObject<boolean>
+  setTimeUpVariant: Dispatch<SetStateAction<'no-answers' | 'report-failed'>>
   state: InterviewSessionRouteState
   access: InterviewAccess
   phase: InterviewSessionPhase
@@ -116,18 +125,22 @@ export async function finishInterview(ctx: {
   setError: Dispatch<SetStateAction<string | null>>
   setMicError: Dispatch<SetStateAction<boolean>>
   setFinishRecovery: Dispatch<SetStateAction<InterviewFinishRecovery | null>>
-}): Promise<void> {
-  const {
-    state, access, omitPrintAnswers, onGoStage, navigate, stopPlayback, resetVoiceState,
-    setPhase, setError, setMicError, setFinishRecovery,
-  } = ctx
-  if (ctx.voiceKind === 'requesting_permission' || ctx.voiceKind === 'transcribing' || ctx.phase === 'finishing') return
-  stopPlayback()
-  resetVoiceState()
-  setFinishRecovery(null)
-  setPhase('finishing')
-  setError(null)
-  setMicError(false)
+}
+
+/** 手动结束保留原来的语音守卫；到点直接调用请求函数。 */
+export async function finishInterview(ctx: InterviewFinishContext): Promise<void> {
+  if (ctx.sealedRef.current || ctx.voiceKind === 'requesting_permission' || ctx.voiceKind === 'transcribing' || ctx.phase === 'finishing') return
+  ctx.stopPlayback()
+  ctx.resetVoiceState()
+  ctx.setFinishRecovery(null)
+  ctx.setPhase('finishing')
+  ctx.setError(null)
+  ctx.setMicError(false)
+  await requestInterviewReport(ctx)
+}
+
+export async function requestInterviewReport(ctx: InterviewFinishContext): Promise<void> {
+  const { state, access, omitPrintAnswers, onGoStage, navigate } = ctx
   try {
     const report = await endInterview(state.sessionId, access, {
       includeAnswersInPrint: !omitPrintAnswers,
@@ -139,6 +152,12 @@ export async function finishInterview(ctx: {
     if (onGoStage) onGoStage('report')
     else navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
   } catch (err) {
+    // 手动结束的请求若跨过截止时刻，也不能恢复作答。
+    if (ctx.sealedRef.current) {
+      ctx.setTimeUpVariant(errorCodeOf(err) === 'INTERVIEW_NO_ANSWERS' ? 'no-answers' : 'report-failed')
+      ctx.setPhase('closed')
+      return
+    }
     const declined = aiDeclarationDeclineMessage(err)
     const classified = classifyInterviewFinishFailure({
       code: errorCodeOf(err),

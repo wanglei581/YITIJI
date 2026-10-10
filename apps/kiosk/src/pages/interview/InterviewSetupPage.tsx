@@ -50,6 +50,7 @@ import { InterviewResumePreview } from './InterviewResumePreview'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { deadlineFromLocalStart, deadlineFromServerTiming, readInterviewTiming, remainingSecAt } from './session/interviewDeadline'
 import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
@@ -220,6 +221,10 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
       setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      const now = Date.now()
+      const serverDeadline = deadlineFromServerTiming(readInterviewTiming(first), now)
+      const deadlineAtLocalMs = serverDeadline ?? deadlineFromLocalStart(duration, now)
+      const deadlineSource = serverDeadline === null ? 'local' : 'server'
       setProbed(true)
       patchInterviewWorkbenchSession({
         stage: 'session',
@@ -233,7 +238,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           firstQuestion: first.question ?? '',
           messages: [{ role: 'interviewer', content: first.question ?? '' }],
           questionIndex: 1,
-          remainingSec: duration * 60,
+          remainingSec: remainingSecAt(deadlineAtLocalMs, now),
+          deadlineAtLocalMs,
+          deadlineSource,
           omitPrintAnswers: false,
           interactionMode: mode,
         },
@@ -251,6 +258,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             interviewerType,
             position: pos,
             firstQuestion: first.question ?? '',
+            deadlineAtLocalMs,
+            deadlineSource,
             // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
             // 从未读过 qType。类型里声明过不等于有人消费。
           },
@@ -506,6 +515,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   <OptionButton key={item.key} active={duration === item.key} onClick={() => setDuration(item.key)}>{item.label}</OptionButton>
                 ))}
               </div>
+              <p className="iv-hint">到点自动结束。</p>
             </div>
           </div>
           <InterviewModePicker mode={interactionMode} voiceAsr={voiceAsr} onModeChange={setInteractionMode} />
