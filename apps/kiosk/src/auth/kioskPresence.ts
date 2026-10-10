@@ -18,7 +18,7 @@ import { KIOSK_HANDOVER_CONFIRM_MS } from './kioskIdleTiming'
 const SAME_TOUCH_MS = 1_000
 /** 进页那一刻，最近一下触碰在这之内就当它是「点进来的那一下」。 */
 const ENTRY_TOUCH_MS = 2_000
-const TOUCH_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const
+const TOUCH_EVENTS = ['pointerdown', 'touchstart', 'keydown', 'input', 'compositionstart', 'compositionupdate', 'compositionend'] as const
 
 let lastTouchAt: number | null = null
 let idleBeforeLastTouchMs = Number.POSITIVE_INFINITY

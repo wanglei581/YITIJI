@@ -14,6 +14,10 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'keydown',
   'mousemove',
   'wheel',
+  'input',
+  'compositionstart',
+  'compositionupdate',
+  'compositionend',
 ]
 
 export type IdleCallback = (scheduledAt: number) => void
