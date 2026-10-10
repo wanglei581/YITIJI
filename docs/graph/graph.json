@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 721,
+      "reachableFileCount": 718,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13639,7 +13639,6 @@
           ],
           "path": "/assistant",
           "styles": [
-            "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-call.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-content.css",
             "apps/kiosk/src/pages/assistant/assistant-qingxu-input.css",
@@ -19864,6 +19863,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -20560,6 +20560,7 @@
     ],
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/kiosk/scripts/verify-scan-input-safety.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -20924,6 +20925,7 @@
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-system-keyboard.mjs",
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
@@ -30913,6 +30915,9 @@
           "apps/kiosk/src/hooks/useIdleTimer.ts",
           "apps/kiosk/src/hooks/useKioskStageFit.ts",
           "apps/kiosk/src/layouts/KioskRuntimeRoot.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/kiosk/src/pages/profile/me/components/PhoneRebindPanel.tsx",
           "apps/kiosk/src/system-keyboard/SystemKeyboardHost.tsx",
           "apps/kiosk/src/system-keyboard/controller.ts",
           "apps/kiosk/src/system-keyboard/dom.ts",
@@ -44510,6 +44515,40 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/KioskKeyboard.tsx",
+        "kind": "component",
+        "mentions": [
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/kiosk-keyboard.css",
+        "kind": "style",
+        "mentions": [
+          "apps/kiosk/src/components/kiosk-keyboard/KioskKeyboard.tsx",
+          "docs/reviews/launch-audit-2026-09-05.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+        ],
+        "risk": "medium",
+        "scope": "kiosk",
+        "why": "仅被文档提及：docs/reviews/launch-audit-2026-09-05.md、docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/components/kiosk-keyboard/pinyinDict.ts",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
