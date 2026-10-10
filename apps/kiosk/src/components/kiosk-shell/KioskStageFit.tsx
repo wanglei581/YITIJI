@@ -1,5 +1,6 @@
 import { createContext, useContext, type CSSProperties, type ReactNode } from 'react'
-import { useKioskStageFit } from '../../hooks/useKioskStageFit'
+import { needsKeyboardHostHeight } from '../../system-keyboard/viewport.ts'
+import { useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 
 /**
  * 把一体机壳装进 1080×1920 舞台，按视口等比缩放居中。
@@ -20,8 +21,10 @@ export function KioskRootStageScope({ children }: { children: ReactNode }) {
 
 export function KioskStageFit({ children, enabled = true }: KioskStageFitProps) {
   const insideRootStage = useContext(KioskRootStageContext)
-  const { stageW, stageH, scale } = useKioskStageFit()
+  const { stageW, stageH, scale, viewportW, viewportH } = useKioskStageFit()
   if (insideRootStage) return children
+
+  const hostStyle: CSSProperties | undefined = enabled && needsKeyboardHostHeight(usesKioskFluidViewport(viewportW, viewportH)) ? { height: viewportH } : undefined
 
   const scalerStyle: CSSProperties = {
     width: enabled ? stageW * scale : '100vw',
@@ -36,7 +39,7 @@ export function KioskStageFit({ children, enabled = true }: KioskStageFitProps) 
   }
 
   return (
-    <div className="kiosk-stage-host" data-kiosk-stage-fit={enabled ? 'on' : 'off'}>
+    <div className="kiosk-stage-host" ref={(element) => { if (element && !hostStyle) element.removeAttribute('style') }} style={hostStyle} data-kiosk-stage-fit={enabled ? 'on' : 'off'}>
       <div className="kiosk-stage-scaler" style={scalerStyle}>
         <div className="kiosk-stage" style={stageStyle}>
           {children}
