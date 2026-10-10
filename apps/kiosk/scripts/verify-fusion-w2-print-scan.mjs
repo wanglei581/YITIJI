@@ -357,12 +357,17 @@ assert.match(
 )
 // 话术口径：卡面必须出现「到机码」。
 // 2026-10-06 方案②：到机码就是取件码，不再另有付款后的第二种码。
-// 「不是取件码」这句留下，是打印 Hub 把本入口和上传码分开，不是在维护旧的两码模型。
+// 2026-10-10 卡面徽标改为「就是取件码」，旧句「不是取件码」和方案②字面相反。
 assert.match(printScanHome, /到机码/, 'arrival-code entry uses the name 到机码')
 assert.match(
   printScanHomeView,
+  /就是取件码/,
+  '到机码视图源码必须含「就是取件码」'
+)
+assert.doesNotMatch(
+  printScanHomeView,
   /不是取件码/,
-  'arrival-code entry keeps the upload-code disambiguation 不是取件码'
+  '到机码视图源码不得含「不是取件码」'
 )
 // 核销的是订单而非新建打印任务，不得被本机打印/扫描能力探测结果关闭。
 // 只在 CARD_CAPABILITY_KEY 的字面量块内查找，避免正则跨越整个文件误报。
