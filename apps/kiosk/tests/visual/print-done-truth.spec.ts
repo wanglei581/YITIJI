@@ -192,6 +192,28 @@ test('paid or on-site unconfirmed prints never mention the same-code resume @kio
   await expect(state).not.toContainText('同一个到机码')
 })
 
+// 2026-10-10：现场建的 0 元单没有到机码，离开本页后没有重打入口，也没有人核查。
+// 屏上不许再写「等待人工核查」「核实后给出结论」，只说真能走的路：重新打一次。付费单原样不动。
+test('an on-site zero-yuan unconfirmed print tells the user to print again instead of waiting for a review @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 0 })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toContainText('请先看出纸口：有纸就取走。没有的话，请回到打印重新选文件再打一次。')
+  await expect(state).toContainText('系统已登记，这次结果没能确认')
+  await expect(state).not.toContainText('等待人工核查')
+  await expect(state).not.toContainText('核实后给出结论')
+  await expect(state).not.toContainText('同一个到机码')
+  await expect(state).not.toContainText('退款')
+
+  await openDoneWithState(page, { ...taskState, amountCents: 200 })
+  await expect(state).toContainText('等待人工核查')
+  await expect(state).not.toContainText('重新选文件再打一次')
+})
+
 test('a zero-yuan unconfirmed print does not mention a refund @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {

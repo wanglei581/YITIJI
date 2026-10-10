@@ -36,7 +36,7 @@ import {
   PrintJamGuide,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
-import { SAME_CODE_RESUME_LINE, UNCONFIRMED_SAME_CODE_LINE, doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint, sameCodeResumeEligible } from './printProgressModel'
+import { SAME_CODE_RESUME_LINE, UNCONFIRMED_ONSITE_FREE_LINE, UNCONFIRMED_SAME_CODE_LINE, doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint, sameCodeResumeEligible } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
@@ -513,6 +513,8 @@ export function PrintDonePage() {
     // 已确认失败且服务端说这单还能重打，才说同码接着打；结果未确认另有一句（要等 5 分钟）。
     const resumeLine = !isUnconfirmed && sameCode && Boolean(takeaway?.canRetry) ? SAME_CODE_RESUME_LINE : null
     const unconfirmedSameCode = isUnconfirmed && sameCode
+    // 现场建的 0 元单：没有到机码、离开本页后没有重打入口，也没有人核查，屏上只说真能走的路。
+    const unconfirmedOnsiteFree = isUnconfirmed && state.pickupSource !== true && payment === 'free'
     const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
     const ask = isUnconfirmed
       ? <>这次打印<em>结果未确认</em>。</>
@@ -522,12 +524,14 @@ export function PrintDonePage() {
     const doing = isUnconfirmed
       ? unconfirmedSameCode
         ? `系统已经登记。过 5 分钟可以回这台机器再输一次同一个到机码。${printProblemLine(contact)}`
-        : `系统已经正式登记，核实后给出结论。${printProblemLine(contact)}`
+        : unconfirmedOnsiteFree
+          ? `系统已经登记。没出纸的话，回到打印重新选文件再打一次。${printProblemLine(contact)}`
+          : `系统已经正式登记，核实后给出结论。${printProblemLine(contact)}`
       : jam
         ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
         : failureStaffDoing(payment, contact)
     const issueSub = isUnconfirmed
-      ? unconfirmedSameCode ? '系统已登记，这次结果没能确认' : '系统已明确登记，等待人工核查'
+      ? unconfirmedSameCode || unconfirmedOnsiteFree ? '系统已登记，这次结果没能确认' : '系统已明确登记，等待人工核查'
       : jam
         ? jamOrderKeptLine(payment)
         : '打印任务已经确认失败'
@@ -580,7 +584,9 @@ export function PrintDonePage() {
               {isUnconfirmed
                 ? unconfirmedSameCode
                   ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记。请先看出纸口：有纸就取走。{UNCONFIRMED_SAME_CODE_LINE}这笔订单已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
-                  : <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
+                  : unconfirmedOnsiteFree
+                    ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记。请先看出纸口：有纸就取走。{UNCONFIRMED_ONSITE_FREE_LINE}这笔订单已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
+                    : <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。{machineCannotPrintLine(contact, { orderKept: true })}已出的纸你先收好。</>
                   : failureReason}
