@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
@@ -23,6 +24,8 @@ import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION, SELF_ASSESSMENT_QUESTIONS_PATH
  */
 
 const MOCK_TASK_ID = 'sa-'.padEnd(40, 'a')
+const SA_SCROLL_CUE = readFileSync(new URL('../../src/pages/resume/SelfAssessmentFlow.tsx', import.meta.url), 'utf8')
+  .match(/^const SA_SCROLL_CUE = '([^']+)'$/m)?.[1]
 
 const success = (data: unknown) => ({ success: true, data })
 
@@ -88,6 +91,31 @@ async function columnGap(page: Page, state: string): Promise<number> {
     for (let i = 1; i < rects.length; i += 1) gaps.push(Math.max(0, rects[i].top - rects[i - 1].bottom))
     if (rects.length) gaps.push(Math.max(0, box.bottom - rects[rects.length - 1].bottom))
     return gaps.length ? Math.max(...gaps) : box.height
+  })
+}
+
+async function twoFrames(page: Page) {
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+}
+
+/** 先等字体，再按滚动区实际内沿量整块勾选框及最后一条说明；包含舞台缩放。 */
+async function consentVisibility(page: Page) {
+  return page.locator('.sa-qx .qx-scroll').evaluate(async (scroll) => {
+    await document.fonts.ready
+    const box = scroll.getBoundingClientRect()
+    const scale = box.height / (scroll as HTMLElement).offsetHeight
+    const top = box.top + scroll.clientTop * scale
+    const bottom = top + scroll.clientHeight * scale
+    const inside = (el: Element | null) => {
+      if (!el) return false
+      const rect = el.getBoundingClientRect()
+      return rect.top >= top - 1 && rect.bottom <= bottom + 1 && rect.left >= box.left && rect.right <= box.right
+    }
+    const required = scroll.querySelector('[data-testid="self-assessment-consent-required"]')
+    return {
+      checkbox: inside(required) && inside(required?.closest('.sa-cbox') ?? null),
+      lastItem: inside(scroll.querySelector('[data-testid="self-assessment-consent-items"] li:last-child')),
+    }
   })
 }
 
@@ -281,6 +309,76 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await page.getByTestId('self-assessment-consent-retry').click()
     await expect(page.getByTestId('self-assessment-consent-items').locator('li')).toHaveCount(served.consentItems.length)
     expect(api.requestCount('GET', SELF_ASSESSMENT_QUESTIONS_PATH)).toBe(2)
+  })
+
+  test('说明页提示往上滑，灰按钮与红条只滚到同意框、不代替同意 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api)
+    await page.goto('/resume/self-assessment/intro')
+    const intro = page.locator('[data-kiosk-screen="resume-self-assessment-intro"]')
+    const required = page.getByTestId('self-assessment-consent-required')
+    const primary = page.getByTestId('self-assessment-primary')
+    const gate = page.getByTestId('self-assessment-gate')
+    const cue = page.getByTestId('self-assessment-scrollcue')
+    const scroll = intro.locator('.qx-scroll')
+    await expect(intro).toHaveAttribute('data-state', 'intro-consent-pending')
+    await expect(page.getByTestId('self-assessment-consent-items').locator('li')).toHaveText(served.consentItems.map((item, i) => `${i + 1}${item}`))
+    await page.evaluate(() => document.fonts.ready)
+    await twoFrames(page)
+    expect((await consentVisibility(page)).checkbox, '前提：首屏必选勾选框不能完整可见').toBe(false)
+    await expect(cue).toBeVisible()
+    expect(SA_SCROLL_CUE).toBe('下面还有内容，手指往上滑')
+    expect(await cue.textContent()).toBe(SA_SCROLL_CUE)
+    const cueBox = await cue.boundingBox()
+    const gateBox = await gate.boundingBox()
+    expect(cueBox).not.toBeNull()
+    expect(gateBox).not.toBeNull()
+    expect(cueBox!.height).toBeGreaterThanOrEqual(48)
+    expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(gateBox!.y)
+    expect(cueBox!.x).toBeGreaterThanOrEqual(0)
+    expect(cueBox!.y).toBeGreaterThanOrEqual(0)
+    expect(cueBox!.x + cueBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+    expect(cueBox!.y + cueBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+    const storedBefore = await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))
+    const stillPending = async () => {
+      await expect(required).toHaveAttribute('aria-checked', 'false')
+      await expect(primary).toHaveAttribute('aria-disabled', 'true')
+      await expect(intro).toHaveAttribute('data-state', 'intro-consent-pending')
+      expect(await page.evaluate(() => sessionStorage.getItem('self_assessment_session_v1'))).toBe(storedBefore)
+    }
+
+    // aria-disabled 的按钮仍接受触控，用 force 绕过 Playwright 的 disabled 自动等待。
+    await primary.click({ force: true })
+    await expect.poll(() => consentVisibility(page)).toEqual({ checkbox: true, lastItem: true })
+    await stillPending()
+
+    await scroll.evaluate((el) => el.scrollTo({ top: 0, behavior: 'instant' }))
+    await twoFrames(page)
+    await expect(cue).toBeVisible()
+    await gate.click()
+    await expect.poll(() => consentVisibility(page)).toEqual({ checkbox: true, lastItem: true })
+    await stillPending()
+
+    await scroll.evaluate((el) => el.scrollTo({ top: el.scrollHeight, behavior: 'instant' }))
+    await twoFrames(page)
+    await expect(cue).toHaveCount(0)
+    await stillPending()
+
+    // 提示条自身也是可点的，点后移动正文但不改同意。
+    await scroll.evaluate((el) => el.scrollTo({ top: 0, behavior: 'instant' }))
+    await twoFrames(page)
+    await expect(cue).toBeVisible()
+    await cue.click()
+    await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    await stillPending()
+    await required.click()
+    await twoFrames(page)
+    await expect(primary).toBeEnabled()
+    await expect(primary).not.toHaveAttribute('aria-disabled', 'true')
+    await primary.click()
+    await expect(page).toHaveURL(/\/resume\/self-assessment\/questions$/)
+    await expect(page.locator('[data-kiosk-screen="resume-self-assessment-quiz"]')).toBeVisible()
+    await twoFrames(page)
+    await expect(cue).toHaveCount(0)
   })
 
   test('旧版本会话提交被拒：回到重新确认，已答保留，确认后自动重交一次 @w3-kiosk', async ({ page, api }) => {

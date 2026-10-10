@@ -92,6 +92,88 @@ function walk(dir) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// T34-cue：提示与滚动只能帮用户找到确认，不能代替本人勾选。
+// ════════════════════════════════════════════════════════════════════════
+{
+  const before = failures.length
+  const flow = read('src/pages/resume/SelfAssessmentFlow.tsx')
+  const kit = read('src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx')
+  const css = read('src/pages/resume/self-assessment-qx.css').replace(/\/\*[\s\S]*?\*\//g, '')
+  const parse = (file, source) => ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const find = (root, predicate) => {
+    const found = []
+    const visit = (node) => { if (predicate(node)) found.push(node); ts.forEachChild(node, visit) }
+    visit(root)
+    return found
+  }
+  const tree = parse('SelfAssessmentFlow.tsx', flow)
+  const intro = find(tree, (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'SelfAssessmentIntroPage')[0]
+  const guarded = find(tree, (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'GuardedButton')[0]
+  const cue = find(tree, (node) => ts.isVariableDeclaration(node) && node.name.getText(tree) === 'SA_SCROLL_CUE')
+  if (cue.length !== 1 || !ts.isStringLiteral(cue[0].initializer) || cue[0].initializer.text !== '下面还有内容，手指往上滑') fail('T34-cue: 提示句常量必须逐字等于定稿')
+  if (flow.trimEnd().split('\n').length > 1185) fail('T34-cue: SelfAssessmentFlow.tsx 不得超过 1185 行')
+  const cueCallers = []
+  for (const file of walk(join(kioskRoot, 'src'))) {
+    const source = readFileSync(file, 'utf8')
+    const fileTree = parse(file, source)
+    for (const node of find(fileTree, (n) => ts.isJsxAttribute(n) && n.name.getText(fileTree) === 'scrollCue')) {
+      cueCallers.push({ file: relative(kioskRoot, file), node, text: node.getText(fileTree), tag: node.parent.parent.tagName.getText(fileTree) })
+    }
+  }
+  if (cueCallers.length !== 1 || cueCallers[0].file !== 'src/pages/resume/SelfAssessmentFlow.tsx'
+    || cueCallers[0].tag !== 'SaFrame' || cueCallers[0].text !== 'scrollCue={SA_SCROLL_CUE}'
+    || !intro || cueCallers[0].node.pos < intro.pos || cueCallers[0].node.end > intro.end) fail('T34-cue: 只有说明页能向 SaFrame 传入提示句')
+  if (!intro) fail('T34-cue: 读不到说明页，无法检查勾选调用')
+  else {
+    const setterCalls = find(intro, (node) => ts.isCallExpression(node) && ts.isIdentifier(node.expression) && /^set[A-Z]/.test(node.expression.text))
+    const actual = setterCalls.map((node) => node.getText(tree)).sort()
+    const expected = ['setToggled({ version: bundle.version, checked: !ok })', 'setSensitive(!sensitive)'].sort()
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) fail('T34-cue: 说明页不得新增或改写勾选 setter 的调用')
+    for (const attr of ['onClick', 'onBlockedClick']) {
+      if (!intro.getText(tree).includes(`${attr}={bundle && !ok ? revealConsent : undefined}`)) fail(`T34-cue: ${attr} 必须仅在说明已读到且未勾选时滚动`)
+    }
+    if (!intro.getText(tree).includes('const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, \'.sa-cbox:has([data-testid="self-assessment-consent-required"])\')')) fail('T34-cue: 两处点击必须只滚动到整块同意框')
+  }
+  // 编译真实 GuardedButton，点它的 onClick；不是只匹配 if 字符串。
+  if (!guarded) fail('T34-cue: 找不到 GuardedButton')
+  else {
+    const jsx = toDataUrl('export const jsx = (type, props) => ({ type, props }); export const jsxs = jsx')
+    const compiled = ts.transpileModule(`${guarded.getText(tree)}\nexport { GuardedButton }`, {
+      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+    }).outputText.replaceAll('"react/jsx-runtime"', `'${jsx}'`)
+    const { GuardedButton } = await import(toDataUrl(compiled))
+    for (const blocked of [true, false]) {
+      let starts = 0
+      let reveals = 0
+      const rendered = GuardedButton({ blockedReason: blocked ? 'blocked' : null, onClick: () => { starts += 1 }, onBlockedClick: () => { reveals += 1 } })
+      rendered.props.children[0].props.onClick()
+      if (starts !== (blocked ? 0 : 1) || reveals !== (blocked ? 1 : 0)) fail('T34-cue: GuardedButton 被拦时不得调用 onClick；可用时不得调用拦截回调')
+    }
+    GuardedButton({ blockedReason: 'blocked', onClick: () => fail('T34-cue: 未传拦截回调仍不得放行') }).props.children[0].props.onClick()
+  }
+  const rules = (selector) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((m) => m[1].split(',').map((s) => s.trim()).includes(selector)).map((m) => m[2])
+  const declarations = (body) => Object.fromEntries(body.split(';').filter((part) => part.includes(':')).map((part) => part.split(':').map((s) => s.trim())))
+  const heroColor = rules('.sa-xq').map(declarations).findLast((rule) => rule.color)?.color
+  const cueRules = rules('.sa-scrollcue')
+  if (!cueRules.length) fail('T34-cue: 提示条样式缺失')
+  // 同名选择器逐条核对，完整属性值相等，8px 不会放过 80px。
+  for (const body of cueRules) {
+    const rule = declarations(body)
+    for (const [property, value] of Object.entries({ flex: 'none', display: 'flex', 'align-items': 'center', 'justify-content': 'center', height: '52px', margin: '0 0 8px', 'border-radius': '16px', background: 'var(--qx-deep)', color: heroColor, 'font-size': '21px', 'font-weight': '700' })) {
+      if (!value || rule[property] !== value) fail(`T34-cue: 每条提示样式的 ${property} 必须精确等于 ${value}`)
+    }
+  }
+  if (rules(".sa-gate[data-clickable='true']").some((body) => declarations(body).cursor !== 'pointer') || !rules(".sa-gate[data-clickable='true']").length) fail('T34-cue: 可点红条必须有手型光标')
+  for (const needle of ['scrollCue?: string', 'ref={bodyRef}', 'data-testid="self-assessment-scrollcue"', 'scroll.clientHeight - scroll.scrollTop > 24', 'new ResizeObserver(schedule)', 'document.fonts.ready.then(schedule)', "scroll.addEventListener('scroll', schedule", 'requestAnimationFrame', 'cancelAnimationFrame', 'clientHeight * 0.6', "? 'instant' : 'smooth'"]) {
+    if (!kit.includes(needle)) fail(`T34-cue: 组件缺少 ${needle}`)
+  }
+  if (/setInterval|setTimeout/.test(kit)) fail('T34-cue: 提示条不得定时轮询')
+  if (!(kit.indexOf('ref={bodyRef}') < kit.indexOf('data-testid="self-assessment-scrollcue"') && kit.indexOf('data-testid="self-assessment-scrollcue"') < kit.indexOf('{gate}'))) fail('T34-cue: 提示条必须在正文与红条之间')
+  if (failures.length === before) ok('T34-cue: 提示句、说明页独占、全部同名样式、只滚动和被拦按钮不放行均通过')
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // 二～四、编译真跑
 // ════════════════════════════════════════════════════════════════════════
 function memoryStorage() {

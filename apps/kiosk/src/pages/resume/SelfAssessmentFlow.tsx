@@ -99,6 +99,7 @@ import {
   SaNotice,
   SaPicks,
   SaReviewGrid,
+  scrollSaTargetIntoView,
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
@@ -111,6 +112,7 @@ import { useStartPrintHandoff } from '../print/usePrintHandoff'
 const SA_RAIL = ['结果仅供自我参考', '不打总分不排名', '不替代能力证明'] as const
 const SA_EYEBROW = '自我探索'
 const SA_TITLE = '自我探索 · 倾向参考'
+const SA_SCROLL_CUE = '下面还有内容，手指往上滑'
 /** 英雄区三步，四条路由都有。二十五是 v1 题库题数，敏感题为 0。 */
 const SA_STEPS = [
   { n: '1', text: '先读说明，勾选后再开始' },
@@ -136,12 +138,14 @@ const SA_SUBMITTED_HEAD = '本次作答已经提交'
  */
 function GuardedButton({
   blockedReason,
+  onBlockedClick,
   onClick,
   variant,
   testId,
   children,
 }: {
   blockedReason: string | null
+  onBlockedClick?: () => void
   onClick: () => void
   variant?: 'primary' | 'teal' | 'ghost' | 'danger'
   testId?: string
@@ -156,7 +160,7 @@ function GuardedButton({
         data-variant={variant}
         data-testid={testId}
         aria-disabled={blocked || undefined}
-        onClick={() => { if (!blocked) onClick() }}
+        onClick={() => { if (blocked) { onBlockedClick?.(); return } onClick() }}
       >
         {children}
       </button>
@@ -215,6 +219,8 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
 // ============================================================
 export function SelfAssessmentIntroPage() {
   const navigate = useNavigate()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const revealConsent = () => scrollSaTargetIntoView(scrollRef.current, '.sa-cbox:has([data-testid="self-assessment-consent-required"])')
   const session = useMemo(() => loadSession(), [])
   const consentBundle = useSelfAssessmentConsentBundle()
   useSelfAssessmentIdleExit()
@@ -255,13 +261,14 @@ export function SelfAssessmentIntroPage() {
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-intro"
+      scrollCue={SA_SCROLL_CUE} scrollRef={scrollRef}
       state={!bundle ? (consentBundle.state.status === 'error' ? 'intro-consent-error' : 'intro-consent-loading') : ok ? 'intro-ready' : 'intro-consent-pending'}
       status={status}
       ask={<>把职业倾向，<em>说得更明白</em>。</>}
       doing={<>{total} 道选择题，覆盖 {dimCount} 个方向；<b>算出各方向的强弱，不打总分、不排名，只给你自己看。</b></>}
       back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
       gate={
-        <SaGate tone={ok ? 'ok' : 'warn'}>
+        <SaGate tone={ok ? 'ok' : 'warn'} onClick={bundle && !ok ? revealConsent : undefined}>
           {!bundle
             ? <><b>同意说明还没有读到，暂时不能开始作答。</b>读到之后请逐条看完再勾选。</>
             : ok
@@ -275,7 +282,7 @@ export function SelfAssessmentIntroPage() {
         <>
           <GhostButton label="问小青" testId="self-assessment-ask" onClick={() => askXiaoqing(navigate)} />
           <GhostButton label="返回简历服务" route={SA_BACK_ROUTE} onClick={() => navigate(SA_BACK_ROUTE)} />
-          <GuardedButton variant="primary" testId="self-assessment-primary" onClick={start}
+          <GuardedButton variant="primary" testId="self-assessment-primary" onClick={start} onBlockedClick={bundle && !ok ? revealConsent : undefined}
             blockedReason={!bundle ? '同意说明还没有读到，读到并勾选后才能开始' : ok ? null : '需先勾选第一项同意才能开始作答'}>{startLabel}</GuardedButton>
         </>
       }
