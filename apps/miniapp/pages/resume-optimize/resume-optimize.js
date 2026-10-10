@@ -256,6 +256,7 @@ Page({
     this._fetch()
   },
 
+  toEntryUpload() { wx.navigateTo({ url: '/pages/resume-upload/resume-upload?to=opt' }) },
   tapReupload() {
     wx.navigateTo({
       url: '/pages/resume-parse/resume-parse',

@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 // 雷达绘制抽到同目录 radar.js：主文件越过 §8 的 500 行评估阈值，
 // 而绘制只依赖画布/数据/尺寸，是天然接缝。
 const radar = require('./radar')
@@ -143,6 +144,7 @@ Page({
   },
 
   onLoad(options) {
+    absorb(options)
     const opts = options || {}
     // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
     // 取不到就留空，走会员登录态。

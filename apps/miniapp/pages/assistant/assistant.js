@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
@@ -82,7 +83,8 @@ Page({
     disclaimer: 'AI 生成，仅供参考：小青的回答由 AI 生成，可能有错，请核对后再用。',
   },
 
-  onLoad() {
+  onLoad(options) {
+    absorb(options)
     const fallback = () => (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()).statusBarHeight
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20,

@@ -24,6 +24,8 @@
 const app = getApp()
 const api = require('../../utils/api')
 const { userMessageOf } = require('../../utils/user-error')
+const { parseRelayText } = require('../../utils/kiosk-relay-link')
+const uploadNames = require('../../utils/upload-name')
 
 const MAX_BYTES = 10 * 1024 * 1024
 // 与一体机 phoneUploadModel.receiptOf 的 SESSION_PURPOSES 相同。
@@ -85,19 +87,36 @@ Page({
     sent: [],
   },
 
-  onLoad(options) {
+  onLoad(options = {}) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
-
-    // 入口②：微信扫小程序码进来。scene 是微信 URL 编码过的，必须先解码。
-    const scene = options.scene ? decodeURIComponent(options.scene) : ''
-    if (scene) {
-      this._resolveScene(scene)
-      return
+    this._uploadToken = ''
+    let sessionId = ''
+    let token = ''
+    try {
+      // scene 优先；普通链接二维码的 q 整体先解码一次，再解析其中的参数。
+      if (options.scene) {
+        this._resolveScene(decodeURIComponent(options.scene))
+        return
+      }
+      if (options.q !== undefined) {
+        const relay = typeof options.q === 'string'
+          ? parseRelayText(decodeURIComponent(options.q)) : { kind: 'invalid' }
+        if (relay.kind === 'scene') {
+          this._resolveScene(relay.scene)
+          return
+        }
+        if (relay.kind === 'credentials') {
+          sessionId = relay.sessionId
+          token = relay.token
+        }
+      } else {
+        sessionId = options.sessionId ? decodeURIComponent(options.sessionId) : ''
+        token = options.token ? decodeURIComponent(options.token) : ''
+      }
+    } catch (_) {
+      sessionId = ''
+      token = ''
     }
-
-    // 入口①：小程序内扫码带进来的现成凭据。
-    const sessionId = options.sessionId ? decodeURIComponent(options.sessionId) : ''
-    const token = options.token ? decodeURIComponent(options.token) : ''
     // 令牌只留在内存，不进 data —— data 会随页面栈快照走，没必要让它多待一层。
     this._uploadToken = token
     this.setData({
@@ -163,13 +182,55 @@ Page({
 
   chooseAndSend() {
     if (this._sendBlocked()) return
+    wx.showActionSheet({
+      itemList: ['拍照或从相册选择', '从微信聊天中选择文件'],
+      success: (res) => {
+        if (this._sendBlocked()) return
+        if (res.tapIndex === 0) this._pickFromCamera()
+        else if (res.tapIndex === 1) this._pickFromChat()
+      },
+    })
+  },
+
+  _pickFromCamera() {
+    if (this._sendBlocked()) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['camera', 'album'],
+      sizeType: ['original'],
+      success: (res) => {
+        if (this._sendBlocked()) return
+        const file = (res.tempFiles || [])[0]
+        if (!file || !file.tempFilePath) return
+        if (file.size > MAX_BYTES) {
+          this.setData({ phase: 'error', canRetry: true, errorMsg: '单个文件不能超过 10MB，请压缩后重试' })
+          return
+        }
+        const ext = uploadNames.extOf(file.tempFilePath)
+        if (!ext) {
+          this.setData({ phase: 'error', canRetry: true, errorMsg: '无法识别照片格式，请重新选择' })
+          return
+        }
+        this._send({ path: file.tempFilePath, name: uploadNames.cameraFileName(ext), size: file.size })
+      },
+      fail: (err) => {
+        if (err && err.errMsg && err.errMsg.indexOf('cancel') >= 0) return
+        if (this._sendBlocked()) return
+        this.setData({ phase: 'error', canRetry: true, errorMsg: '选择照片失败，请重试' })
+      },
+    })
+  },
+
+  _pickFromChat() {
+    if (this._sendBlocked()) return
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
       success: (res) => {
+        if (this._sendBlocked()) return
         const file = (res.tempFiles || [])[0]
         if (!file) return
-        if (this._sendBlocked()) return
         if (file.size > MAX_BYTES) {
           this.setData({
             phase: 'error',

@@ -22,6 +22,11 @@
     <text>{{q.total && !isFreeOrder ? '请选择真实在线终端。到机核验后再现场支付与打印，终端状态以实时心跳为准。' : (isFreeOrder ? '当前为免费试运营。请选择真实在线终端，到机核验后直接进入打印队列。' : '请选择真实在线终端，到机核验后打印，终端状态以实时心跳为准。')}}</text>
   </view>
 
+  <view wx:if="{{entryHint}}" class="notice {{entryHintWarn ? 'warn' : 'info'}} rise-d2">
+    <text class="ficon {{entryHintWarn ? 'i-warning' : 'i-location'}} n-ic"></text>
+    <text>{{entryHint}}</text>
+  </view>
+
   <view class="store-list rise-d3">
     <!-- 空态：门店与机器状态需真实接口提供，未接入前不展示示例门店 -->
     <view wx:if="{{loading}}" class="empty">

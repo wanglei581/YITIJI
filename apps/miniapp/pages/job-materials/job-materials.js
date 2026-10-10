@@ -1,4 +1,5 @@
 const app = getApp()
+const { absorb } = require('../../utils/kiosk-entry')
 const api = require('../../utils/api')
 
 // 求职材料模板。**全程无 LLM**：服务端按模板 + 你填的字段直接渲染 PDF
@@ -31,7 +32,8 @@ Page({
     generating: false,
   },
 
-  onLoad() {
+  onLoad(options) {
+    absorb(options)
     this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20 })
     this.load()
   },

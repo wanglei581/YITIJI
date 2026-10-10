@@ -16,7 +16,7 @@
       <view class="guide-card">
         <text class="guide-icon ficon i-printer"></text>
         <view class="guide-title">已连上终端</view>
-        <view class="guide-desc">选一份文件传过去，终端屏幕上会自己出现。单个文件不超过 10MB。</view>
+        <view class="guide-desc">选一份文件或一张照片传过去，终端屏幕上会自己出现。单个不超过 10MB。</view>
         <button class="btn-primary" bindtap="chooseAndSend">选择文件</button>
       </view>
     </block>

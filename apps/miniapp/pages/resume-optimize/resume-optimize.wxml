@@ -12,6 +12,7 @@
     <view class="nt-title">未指定优化任务</view>
     <view class="nt-sub">请从简历诊断页发起 AI 优化</view>
     <view class="btn ghost tap nt-btn" bindtap="goBack">返回</view>
+    <view class="btn ghost tap nt-btn" bindtap="toEntryUpload">去上传简历</view>
   </view>
 
   <view wx:if="{{phase === 'loading'}}" class="running-state">
