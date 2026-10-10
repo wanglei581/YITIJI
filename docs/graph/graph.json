@@ -32255,7 +32255,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/pages/renshi"
+        ],
         "files": [
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/renshi/NoticePanel.tsx",
