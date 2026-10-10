@@ -122,7 +122,8 @@ test('普通网址入口先解整条网址一次，只取问号后的两项', ()
 })
 
 for (const q of ['https://example.cn/start?to=plan', 'https://example.cn/start?v=1',
-  'https://example.cn/start?k=-bad', 'https://example.cn/start#k=KSK-001', 'bad%ZZ']) {
+  'https://example.cn/start?k=-bad', 'https://example.cn/start#k=KSK-001',
+  'https://example.cn/start?v=1#&k=KSK-001&to=fit', 'bad%ZZ']) {
   test(`普通网址无编号入口：${q}`, () => {
     const h = harness()
     const result = h.entry.absorb({ q: q === 'bad%ZZ' ? q : encodeURIComponent(q) })
