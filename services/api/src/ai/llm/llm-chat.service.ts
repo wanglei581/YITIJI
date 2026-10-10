@@ -39,6 +39,8 @@ import {
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
 import { AiContentBlockedError, buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 import { refusalMessage } from '../safety/refusal'
+import { deviceFaultReply, isDeviceFaultQuestion } from '../safety/device-fault'
+import { requestQuotaRefund } from '../safety/block-log'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
@@ -68,6 +70,8 @@ interface SessionEntry {
   messages: ChatMessage[]
   updatedAt: number
   ownerKey: string
+  /** 上一轮回的是设备故障的固定回答：紧接着追问「能不能自己弄」也不送模型。 */
+  deviceFaultJustAnswered?: boolean
 }
 
 export function assistantOwnerKey(endUserId: string | null, ip: string | null): string {
@@ -353,10 +357,18 @@ export class LlmChatService {
       session = { messages: [], updatedAt: now, ownerKey }
       this.sessions.set(sessionId, session)
     }
+    const channel = resolveAssistantChannel(input.channel)
+    // 卡纸、缺纸、机器坏了这一类不送模型，回固定的话，不教人拆机（见 safety/device-fault.ts）。
+    // 这一问一答不进会话历史：原话没过内容检查，留在历史里下一轮会原样带给模型。
+    if (isDeviceFaultQuestion(input.message, session.deviceFaultJustAnswered)) {
+      session.deviceFaultJustAnswered = true
+      requestQuotaRefund()
+      return { sessionId, reply: deviceFaultReply(channel), intent: classifyIntent(input.message), actions: [] }
+    }
+    session.deviceFaultJustAnswered = false
     session.messages.push({ role: 'user', content: input.message })
     const skill = input.skill
 
-    const channel = resolveAssistantChannel(input.channel)
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
     const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
     const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded

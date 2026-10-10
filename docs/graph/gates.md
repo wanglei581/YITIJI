@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1946 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1947 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2327,7 +2327,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 619 个文件</summary>
+<summary><code>services/api/src/</code> — 620 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2389,10 +2389,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/llm/ai-config-audit.ts` | `verify-ai-contract-mirror.mjs` |
 | `services/api/src/ai/llm/ai-config.controller.ts` | `verify-ai-endpoint-allowlist.ts` |
 | `services/api/src/ai/llm/ai-prompt-safety.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts` |
-| `services/api/src/ai/llm/assistant-channel.ts` | `verify-miniapp-review-backend.ts` |
+| `services/api/src/ai/llm/assistant-channel.ts` | `verify-assistant-device-fault.ts`<br/>`verify-miniapp-review-backend.ts` |
 | `services/api/src/ai/llm/deepseek-thinking.ts` | `verify-llm-thinking-off.ts` |
 | `services/api/src/ai/llm/llm-base-url.ts` | `verify-ai-config.ts` |
-| `services/api/src/ai/llm/llm-chat.service.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
+| `services/api/src/ai/llm/llm-chat.service.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-cost-coverage.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-assistant-provider-label.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `services/api/src/ai/llm/llm-config.service.ts` | `verify-ai-config.ts`<br/>`verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-feature-keys.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-kiosk-ai-capabilities.ts`<br/>`verify-llm-connectivity.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-print-param-suggestion.ts` |
 | `services/api/src/ai/llm/llm-failure.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-llm-account-unavailable.ts` |
 | `services/api/src/ai/llm/llm-guard.ts` | `verify-ai-content-moderation.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-llm-guard.ts` |
@@ -2454,8 +2454,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/resume/self-assessment.types.ts` | `verify-self-assessment-consent-source.mjs`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assess-isolation.ts`<br/>`verify-compliance.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/ai/safety/ai-safety-lexicon.controller.ts` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/ai-safety-lexicon.service.ts` | `verify-ai-safety-lexicon.ts` |
-| `services/api/src/ai/safety/block-log.ts` | `verify-ai-safety-lexicon.ts` |
+| `services/api/src/ai/safety/block-log.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-assistant-device-fault.ts` |
 | `services/api/src/ai/safety/content-blocked.ts` | `verify-ai-safety-lexicon.ts` |
+| `services/api/src/ai/safety/device-fault.ts` | `verify-assistant-device-fault.ts` |
 | `services/api/src/ai/safety/lexicon.seed.json` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/matcher.ts` | `verify-ai-safety-lexicon.ts` |
 | `services/api/src/ai/safety/normalize.ts` | `verify-ai-safety-lexicon.ts` |
@@ -2466,7 +2467,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/usage/ai-budget.service.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-admin-ops.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-pricing.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-request-context.middleware.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
-| `services/api/src/ai/usage/ai-usage-context.ts` | `verify-ai-public-quota.ts`<br/>`verify-ai-quota.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
+| `services/api/src/ai/usage/ai-usage-context.ts` | `verify-ai-public-quota.ts`<br/>`verify-ai-quota.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-assistant-device-fault.ts` |
 | `services/api/src/ai/usage/ai-usage-meter.ts` | `verify-admin-ops.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/ai/usage/ai-usage-retention.ts` | `verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `services/api/src/ai/usage/ai-usage-summary.ts` | `verify-admin-ai-usage-contract.mjs`<br/>`verify-ai-usage-budget.ts` |
