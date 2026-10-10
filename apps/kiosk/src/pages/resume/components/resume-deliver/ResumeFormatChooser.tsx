@@ -29,6 +29,11 @@ function formatName(format: ResumeExportFormat): string {
   return FORMATS.find((item) => item.value === format)?.name ?? 'PDF'
 }
 
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+}
+
 export function ResumeFormatChooser(props: {
   screen: GeneratePreviewViewState
   format: ResumeExportFormat
@@ -240,6 +245,7 @@ export function ResumeFormatChooser(props: {
               : `${formatName(props.format)} 的页数固定是 0，也不套版式。这一份暂不开放打印。`}
           </p>
           <p className="qx-rg-note">导出后给你的是一条有时效的下载链接，过期后重导一次就有新链接。打印走另一条链接，下载链接进不了打印。</p>
+          <p className="qx-rg-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.format)}</p>
           <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
         </div>
       )}
@@ -249,7 +255,7 @@ export function ResumeFormatChooser(props: {
           <h2>接下来可以做的</h2>
           <div className="qx-rows">
             <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">{props.screen === 'export-failed' ? '换个格式再试一次' : '再导一份别的格式'}</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>
-            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">找工作人员帮忙</b><span className="qx-row-d">请工作人员看看当前提示，不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
+            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">问小青</b><span className="qx-row-d">按当前提示继续，不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
           </div>
           <div className="qx-rg-export-facts">
             <div><b>简历内容</b><span>导出只做排版与文件保存，不再润色</span></div>
@@ -261,7 +267,7 @@ export function ResumeFormatChooser(props: {
       )}
       <div className="qx-rg-help">
         <p>不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。</p>
-        <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={props.onHelp}>找工作人员</button>
+        <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={props.onHelp}>问小青</button>
       </div>
     </div>
   )

@@ -1,41 +1,130 @@
 // 隐私与数据请求 — /me/privacy-requests
-// 与 main 后端对齐：仅开放撤回授权；导出需再次验证本人（一体机无提交）；账号注销暂未开放。
-// 撤回的是 job_ai 授权，用户可见名写「AI 使用授权」（稿 41、账号设置页同名）。托管 a 下它仍被
-// /resume/job-fit 手填岗位要求那条路使用，所以撤回项保留，只改说法（2026-09-30 A 批）。
+// 一体机只提交「撤回 AI 使用授权」。导出和注销是说明，不能在这台机器上提交。
+// 资料清单只用共享的导出清单常量。范围横幅原文不上屏：里面有代办和注销未开放，和这台机器的口径冲突。
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  MEMBER_DATA_REQUEST_SCOPE,
+  MEMBER_DATA_EXPORT_INVENTORY,
   MEMBER_DATA_REQUEST_STATUS_LABEL,
   MEMBER_DATA_REQUEST_TYPE_HINT,
   MEMBER_DATA_REQUEST_TYPE_LABEL,
   formatDateTime,
   type MemberDataRequestItem,
+  type MemberDataRequestStatus,
 } from '@ai-job-print/shared'
-import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
-import { useAuth } from '../../../auth/useAuth'
+import {
+  CheckIcon,
+  ClockIcon,
+  FileDownIcon,
+  LockIcon,
+  ShieldOffIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  type LucideIcon,
+} from 'lucide-react'
+import {
+  containsStaffHandoff,
+  helpNeededLine,
+  servicePhoneLine,
+  type PublicSupportContact,
+} from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
+import { QxAiHelp } from '../../../components/qingxu/QxAiHelp'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
+import { useAuth } from '../../../auth/useAuth'
 import { createMyDataRequest, listMyDataRequests } from '../../../services/api/memberPrivacy'
 import { getTerminalCode } from '../../../services/api/screensaver'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { QxMemberNavbar } from '../components/QxMemberNavbar'
 import './styles/privacy-qx.css'
 
-function fmt(iso: string): string {
-  return formatDateTime(iso)
+const REVOKE_ASK_LABEL = '✧ 问小青：撤回会怎样'
+const REVOKE_ASK_DRAFT = '撤回 AI 使用授权以后，我的简历和记录会怎样？'
+const SUCCESS_TEXT = '已撤回 AI 使用授权，请求已记录'
+const FAILURE_FALLBACK = '提交失败，请稍后重试'
+const KEPT_ASSETS = '撤回不会删除简历、文档、打印订单或收藏；也不等于账号注销。'
+const BOUNDARY_NOTE = '结束这次办理，只清除本机登录和这一次的临时信息；已经提交的订单、文件和记录按各自保存期限管理。导出和注销这台机器都不办理，撤回授权也不会删除简历、文档、打印订单或收藏。'
+const EXPORT_INVENTORY_NOTE = `导出的是本人资料清单（${MEMBER_DATA_EXPORT_INVENTORY}），不含文件原文与简历正文全文。`
+
+type PrivacyUiState =
+  | 'login'
+  | 'loading'
+  | 'error'
+  | 'empty'
+  | 'history-ready'
+  | 'revoke-confirm'
+  | 'submitting'
+  | 'success'
+  | 'failure'
+
+type CapMode = 'open' | 'locked' | 'dialog' | 'revoked' | 'failed' | 'loading' | 'error'
+
+const TAKE = [
+  ['带走', '撤回后，下次使用会再问你'],
+  ['不删除', '简历、文档和订单都还在'],
+  ['只给你', '请求记录只有本人能看'],
+  ['导出', '这台机器不提供下载'],
+  ['注销', '这台机器上不办理'],
+  ['问小青', '撤回会怎样，可以问清楚'],
+] as const
+
+function exportLine(contact: PublicSupportContact): string {
+  const phone = servicePhoneLine(contact)
+  return `公共屏上不导出个人资料。需要复制个人信息的，可以${phone}申请。我们核实是你本人后，15 个工作日内处理。${EXPORT_INVENTORY_NOTE}`
 }
 
-type PrivacyUiState = 'login' | 'loading' | 'error' | 'empty' | 'history-ready' | 'revoke-confirm' | 'submitting'
+function closureLine(contact: PublicSupportContact): string {
+  const phone = servicePhoneLine(contact)
+  return `这台机器上不办理注销。可以${phone}申请。我们核实是你本人后，15 个工作日内处理。`
+}
+
+/** 整句仍由原文案函数生成；只将标准电话片段里的号码和时间作为一组排版。 */
+function keepPhoneHoursTogether(text: string, contact: PublicSupportContact): ReactNode {
+  if (!contact.servicePhone?.trim() || !contact.serviceHours?.trim()) return text
+  const prefix = '拨打服务电话 '
+  const phoneLine = servicePhoneLine(contact)
+  if (!phoneLine.startsWith(prefix)) return text
+  const segment = phoneLine.slice(prefix.length)
+  const at = text.indexOf(segment)
+  if (at < 0) return text
+  return <>{text.slice(0, at)}<span data-testid="member-privacy-phone-hours" style={{ whiteSpace: 'nowrap' }}>{segment}</span>{text.slice(at + segment.length)}</>
+}
+
+function safeMessage(error: unknown, fallback: string): string {
+  const detail = userMessageOf(error, fallback)
+  if (containsStaffHandoff(detail)) return fallback
+  return detail
+}
+
+function statusTone(status: MemberDataRequestStatus): 'ok' | 'wait' | 'run' | 'bad' {
+  if (status === 'completed') return 'ok'
+  if (status === 'failed' || status === 'rejected') return 'bad'
+  if (status === 'handling' || status === 'ready') return 'run'
+  return 'wait'
+}
+
+function capModeOf(uiState: PrivacyUiState): CapMode {
+  if (uiState === 'login') return 'locked'
+  if (uiState === 'loading') return 'loading'
+  if (uiState === 'error') return 'error'
+  if (uiState === 'success') return 'revoked'
+  if (uiState === 'failure') return 'failed'
+  if (uiState === 'revoke-confirm' || uiState === 'submitting') return 'dialog'
+  return 'open'
+}
 
 export function MyPrivacyRequestsPage() {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberDataRequestItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'error' | 'ready'>('loading')
-  const [message, setMessage] = useState<string | null>(null)
+  const [loadMessage, setLoadMessage] = useState<string | null>(null)
+  const [failMessage, setFailMessage] = useState<string | null>(null)
   const [confirmRevoke, setConfirmRevoke] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [outcome, setOutcome] = useState<'success' | 'failure' | null>(null)
 
   const load = async () => {
     const token = getToken()
@@ -45,13 +134,13 @@ export function MyPrivacyRequestsPage() {
       return
     }
     setLoadState('loading')
-    setMessage(null)
+    setLoadMessage(null)
     try {
       setItems(await listMyDataRequests(token))
       setLoadState('ready')
     } catch (error) {
       setLoadState('error')
-      setMessage(userMessageOf(error, '加载失败，请稍后重试'))
+      setLoadMessage(safeMessage(error, '加载失败，请稍后重试'))
     }
   }
 
@@ -59,6 +148,8 @@ export function MyPrivacyRequestsPage() {
     if (!isLoggedIn) {
       setLoadState('ready')
       setItems([])
+      setOutcome(null)
+      setConfirmRevoke(false)
       return
     }
     void load()
@@ -67,15 +158,18 @@ export function MyPrivacyRequestsPage() {
 
   const submitRevoke = async () => {
     const token = getToken()
-    if (!token) return
+    if (!token || busy) return
     setBusy(true)
     try {
       const created = await createMyDataRequest(token, 'revoke_consent')
-      setItems((prev) => [created, ...prev])
+      setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)])
       setConfirmRevoke(false)
-      setMessage('已撤回 AI 使用授权，请求已记录')
+      setFailMessage(null)
+      setOutcome('success')
     } catch (error) {
-      setMessage(userMessageOf(error, '提交失败，请稍后重试'))
+      setConfirmRevoke(false)
+      setFailMessage(safeMessage(error, FAILURE_FALLBACK))
+      setOutcome('failure')
     } finally {
       setBusy(false)
     }
@@ -91,167 +185,125 @@ export function MyPrivacyRequestsPage() {
           ? 'submitting'
           : confirmRevoke
             ? 'revoke-confirm'
-            : items.length === 0
-              ? 'empty'
-              : 'history-ready'
+            : outcome === 'success'
+              ? 'success'
+              : outcome === 'failure'
+                ? 'failure'
+                : items.length === 0
+                  ? 'empty'
+                  : 'history-ready'
 
-  const status = uiState === 'error'
-    ? { tone: 'bad' as const, label: '请求记录这次没有加载出来' }
-    : uiState === 'loading' || uiState === 'submitting'
-      ? { tone: 'unknown' as const, label: '正在处理隐私请求' }
-      : { tone: 'unknown' as const, label: '一体机只开放撤回 AI 使用授权' }
+  const layout = uiState === 'success' || uiState === 'failure'
+    ? 'result'
+    : uiState === 'history-ready' || uiState === 'revoke-confirm' || uiState === 'submitting'
+      ? 'list'
+      : 'state'
+  const locked = uiState === 'submitting' || uiState === 'revoke-confirm'
 
   return (
     <div
-      className="fusion-w5 fusion-w5--profile pr-root"
+      className="fusion-w5 fusion-w5--profile pr-root h-full"
       data-kiosk-screen="member-privacy-requests"
       data-state={uiState}
       data-testid={`member-privacy-state-${uiState}`}
     >
       <QxPageFrame
         title="隐私与数据请求"
-        subtitle="当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。"
-        status={status}
+        back={{ label: '返回账号设置', onBack: () => navigate('/me/settings') }}
+        status={{ tone: uiState === 'error' || uiState === 'failure' ? 'bad' : 'unknown', label: '隐私与数据请求' }}
         terminalLabel={getTerminalCode() || '就业服务大厅'}
-        ctabar={
+        ctabar={(
           <PrivacyCta
             uiState={uiState}
-            busy={busy}
-            onLogin={() => navigate('/login', { state: { from: '/me/privacy-requests' } })}
+            locked={locked}
             onSettings={() => navigate('/me/settings')}
-            onRetry={() => void load()}
-            onHelp={() => navigate('/help')}
+            onLogin={() => navigate('/login', { state: { from: '/me/privacy-requests' } })}
+            onRetryLoad={() => void load()}
             onRevoke={() => setConfirmRevoke(true)}
+            onRetrySubmit={() => void submitRevoke()}
+            onShowList={() => setOutcome(null)}
           />
-        }
+        )}
         navbar={<QxMemberNavbar current="profile" />}
       >
-        <div className="qx-scroll qx-grow pr-page">
-          {message ? (
-            <div role="status" className="pr-toast" data-tone={message.includes('失败') ? 'bad' : undefined}>
-              {message}
+        <div className="qx-me-page pr-page" data-layout={layout}>
+          <section className="qx-me-xq" aria-label="隐私与数据">
+            <div className="qx-me-xq-row">
+              <div className="qx-me-xq-face" aria-hidden="true">青</div>
+              <div>
+                <div className="qx-me-xq-eyebrow">隐私与数据</div>
+                <p className="qx-me-xq-ask">授权由你决定，<em>随时可以撤回</em>。</p>
+                <p className="qx-me-xq-doing">一体机本页只开放<b>撤回 AI 使用授权</b>；撤回不会删除简历、文档、打印订单或收藏。</p>
+              </div>
             </div>
-          ) : null}
+            <ol className="pr-take">
+              {TAKE.map(([label, text]) => (
+                <li key={label}><b>{label}</b>{text}</li>
+              ))}
+            </ol>
+          </section>
 
-          <p className="pr-legal">{MEMBER_DATA_REQUEST_SCOPE}</p>
-
-          {uiState === 'login' ? (
-            <div className="qx-state" data-tone="info" data-testid="member-privacy-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">请先登录</div>
-                <p className="qx-state-d">登录后可提交撤回 AI 使用授权，或查看本人相关请求记录。</p>
-              </span>
-            </div>
-          ) : null}
-
-          {uiState === 'loading' ? (
-            <div className="qx-state" data-tone="info">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">正在加载请求记录</div>
-                <p className="qx-state-d">返回前一律显示「—」，不会闪回上一位用户的记录。</p>
-              </span>
-            </div>
-          ) : null}
-
-          {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">请求记录这次没有加载出来</div>
-                <p className="qx-state-d">{message ?? '请稍后重试'}。本次加载失败不会撤回或恢复任何授权。</p>
-              </span>
-            </div>
-          ) : null}
-
-          {isLoggedIn && uiState !== 'loading' ? (
-            <section data-testid="member-privacy-capabilities" aria-label="可提交与暂未开放的请求">
-              <div className="pr-cap" data-capability="revoke_consent">
-                <span className="qx-row-ic"><ShieldOffIcon size={28} aria-hidden /></span>
-                <span className="pr-cap-main">
-                  <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.revoke_consent}</span>
-                  <span className="pr-cap-p">{MEMBER_DATA_REQUEST_TYPE_HINT.revoke_consent}</span>
+          <div className="pr-stack">
+            {uiState === 'login' ? (
+              <StateBanner
+                tone="lock"
+                icon={LockIcon}
+                title="登录后查看与提交隐私请求"
+                desc={<>公共一体机不会在未登录时展示任何授权状态或请求记录。<b>下面是这一页的真实能力范围。</b></>}
+                minis={['记录 —', '登录后回填']}
+              />
+            ) : null}
+            {uiState === 'loading' ? (
+              <StateBanner
+                tone="calm"
+                icon={ClockIcon}
+                title="正在加载请求记录"
+                desc={<>正在读取当前账号的隐私请求记录。<b>读取完成前不显示内容</b>，不会闪回上一位用户的记录。</>}
+                minis={['记录 —', '正在读取']}
+              />
+            ) : null}
+            {uiState === 'error' ? (
+              <StateBanner
+                tone="warn"
+                icon={TriangleAlertIcon}
+                title="请求记录这次没有加载出来"
+                desc={<>当前记录没有更新。<b>本次加载失败不会撤回或恢复任何授权</b>。{loadMessage ? `${loadMessage}。` : null}{helpNeededLine(contact)}</>}
+                minis={['记录 —', '这次没取到']}
+              />
+            ) : null}
+            {uiState === 'empty' ? (
+              <StateBanner
+                tone="calm"
+                icon={ShieldOffIcon}
+                title="还没有请求记录"
+                desc={<>提交撤回授权后，记录会出现在这里。<b>空就是空</b>，本页不会造记录让页面好看。</>}
+                minis={['记录 0', '本人可见']}
+              />
+            ) : null}
+            {uiState === 'success' ? (
+              <section className="pr-result" data-tone="ok" data-testid="member-privacy-result">
+                <span className="pr-result-ico" data-tone="calm" aria-hidden="true"><CheckIcon size={34} /></span>
+                <span>
+                  <b>{SUCCESS_TEXT}</b>
+                  <span>撤回不会删除简历、文档、打印订单或收藏。再次使用时需要重新确认授权。</span>
                 </span>
-                {confirmRevoke || busy ? (
-                  <span className="pr-flag" data-testid="member-privacy-revoke-entry">确认弹层已打开</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="qx-btn"
-                    data-variant="primary"
-                    data-testid="member-privacy-revoke-entry"
-                    onClick={() => setConfirmRevoke(true)}
-                  >
-                    撤回授权
-                  </button>
-                )}
-              </div>
-              <div className="pr-cap" data-off="true" data-capability="export">
-                <span className="qx-row-ic"><FileDownIcon size={28} aria-hidden /></span>
-                <span className="pr-cap-main">
-                  <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.export}</span>
-                  <span className="pr-cap-p">{MEMBER_DATA_REQUEST_TYPE_HINT.export}</span>
+              </section>
+            ) : null}
+            {uiState === 'failure' ? (
+              <section className="pr-result" data-tone="bad" data-testid="member-privacy-result">
+                <span className="pr-result-ico" data-tone="warn" aria-hidden="true"><TriangleAlertIcon size={34} /></span>
+                <span>
+                  <b>这次没有撤回</b>
+                  <span>授权没有变化。{failMessage ?? FAILURE_FALLBACK}。可以点「重试」再提交一次。</span>
                 </span>
-                <span className="pr-flag">一体机未开放</span>
-              </div>
-              <div className="pr-cap" data-off="true" data-capability="delete">
-                <span className="qx-row-ic"><Trash2Icon size={28} aria-hidden /></span>
-                <span className="pr-cap-main">
-                  <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.delete}</span>
-                  <span className="pr-cap-p">{MEMBER_DATA_REQUEST_TYPE_HINT.delete}</span>
-                </span>
-                <span className="pr-flag">暂未开放</span>
-              </div>
-            </section>
-          ) : null}
+              </section>
+            ) : null}
 
-          {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
-            <section aria-label="我的请求记录">
-              <div className="qx-sec-h">
-                <span className="t">我的请求记录</span>
-              </div>
-              {items.length === 0 ? (
-                <div className="qx-state" data-tone="empty">
-                  <span className="qx-state-ic" />
-                  <span>
-                    <div className="qx-state-t">暂无请求记录</div>
-                    <p className="qx-state-d">提交撤回授权后，记录会出现在这里。空就是空，本页不会造记录让页面好看。</p>
-                  </span>
-                </div>
-              ) : (
-                <div className="qx-rows">
-                  {items.map((item) => (
-                    <div key={item.id} className="qx-row" data-request-type={item.requestType} data-request-status={item.status}>
-                      <span className="qx-row-ic"><ShieldOffIcon size={24} aria-hidden /></span>
-                      <span className="qx-row-tx">
-                        <span className="qx-row-t">{MEMBER_DATA_REQUEST_TYPE_LABEL[item.requestType]}</span>
-                        <span className="qx-row-d">{fmt(item.requestedAt)}</span>
-                      </span>
-                      <span className="pr-flag">{MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          ) : null}
+            <CapabilityRows contact={contact} mode={capModeOf(uiState)} onRevoke={() => setConfirmRevoke(true)} />
 
-          <div className="pr-guide" aria-label="说明">
-            <div className="pr-guide-item">
-              <div className="pr-guide-k">撤回范围</div>
-              <div className="pr-guide-t">只影响 AI 使用授权</div>
-              <p className="pr-guide-p">不影响简历诊断、打印、收藏或已保存文件</p>
-            </div>
-            <div className="pr-guide-item">
-              <div className="pr-guide-k">再次使用</div>
-              <div className="pr-guide-t">需要重新确认</div>
-              <p className="pr-guide-p">下次使用时会再次请求授权</p>
-            </div>
-            <div className="pr-guide-item">
-              <div className="pr-guide-k">记录</div>
-              <div className="pr-guide-t">只留处理记录</div>
-              <p className="pr-guide-p">不会因此删除任何已有资产</p>
-            </div>
+            {uiState === 'login' || uiState === 'loading' || uiState === 'error' ? <p className="pr-note">{stateNote(uiState, contact)}</p> : null}
+            {layout !== 'state' ? <RequestList items={items} /> : null}
+            {layout !== 'list' ? <Guide state={uiState} contact={contact} /> : null}
           </div>
         </div>
       </QxPageFrame>
@@ -267,12 +319,10 @@ export function MyPrivacyRequestsPage() {
           >
             <h2 id="privacy-revoke-title">{busy ? '提交中…' : '确认撤回 AI 使用授权'}</h2>
             <p>{MEMBER_DATA_REQUEST_TYPE_HINT.revoke_consent}</p>
-            <p>撤回不会删除简历、文档、打印订单或收藏；也不等于账号注销。</p>
+            <p>{KEPT_ASSETS}</p>
             <p>点「确认撤回」后会提交一次请求并等待返回：<b>成功即完成撤回</b>，失败会提示稍后重试；本页不会提前显示成功。</p>
             <div className="pr-dlg-acts">
-              <button type="button" className="qx-btn" data-variant="ghost" disabled={busy} onClick={() => setConfirmRevoke(false)}>
-                取消
-              </button>
+              <button type="button" className="qx-btn" data-variant="ghost" disabled={busy} onClick={() => setConfirmRevoke(false)}>取消</button>
               <button type="button" className="qx-btn" data-variant="danger" disabled={busy} onClick={() => void submitRevoke()}>
                 {busy ? '提交中…' : '确认撤回'}
               </button>
@@ -284,56 +334,222 @@ export function MyPrivacyRequestsPage() {
   )
 }
 
-function PrivacyCta({
-  uiState,
-  busy,
-  onLogin,
-  onSettings,
-  onRetry,
-  onHelp,
+function stateNote(uiState: 'login' | 'loading' | 'error', contact: PublicSupportContact): string {
+  if (uiState === 'login') {
+    return '登录只用来确认「是你本人」。结束这次办理只清除本机登录状态和这一次的临时信息；订单、文件与记录按各自留存期限管理，不会因此删除。'
+  }
+  if (uiState === 'loading') return '返回前不展示上一位用户的记录。这次读取不会撤回或恢复任何授权。'
+  return `重试不会重复提交请求。${helpNeededLine(contact)}`
+}
+
+function StateBanner({
+  tone,
+  icon: Icon,
+  title,
+  desc,
+  minis,
+}: {
+  tone: 'lock' | 'warn' | 'calm'
+  icon: LucideIcon
+  title: string
+  desc: ReactNode
+  minis: string[]
+}) {
+  return (
+    <section className="pr-banner" data-testid="member-privacy-fallback" data-kind={tone}>
+      <span className="pr-banner-ico" data-tone={tone} aria-hidden="true"><Icon size={34} /></span>
+      <span className="pr-banner-main">
+        <b className="pr-banner-t">{title}</b>
+        <span className="pr-banner-p">{desc}</span>
+      </span>
+      <span className="pr-banner-mini">{minis.map((item) => <i key={item}>{item}</i>)}</span>
+    </section>
+  )
+}
+
+function CapabilityRows({
+  contact,
+  mode,
   onRevoke,
 }: {
-  uiState: PrivacyUiState
-  busy: boolean
-  onLogin: () => void
-  onSettings: () => void
-  onRetry: () => void
-  onHelp: () => void
+  contact: PublicSupportContact
+  mode: CapMode
   onRevoke: () => void
 }) {
-  if (uiState === 'login') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>返回账号设置</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onLogin}>
-          手机号登录
-        </button>
-      </>
-    )
-  }
-  if (uiState === 'error') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
-          重新加载
-        </button>
-      </>
-    )
-  }
+  const revokeTail = mode === 'dialog'
+    ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">等你确认</span>
+    : mode === 'revoked'
+      ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">已撤回 · 下次使用时重新确认</span>
+      : mode === 'failed'
+        ? <span className="pr-flag" data-testid="member-privacy-revoke-entry">授权没有变化</span>
+        : mode === 'open'
+          ? (
+            <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-revoke-entry" onClick={onRevoke}>
+              撤回授权
+            </button>
+          )
+          : <span className="pr-flag">{mode === 'locked' ? '登录后可用' : mode === 'loading' ? '正在读取' : '这次没取到'}</span>
+  const live = mode === 'open' || mode === 'dialog' || mode === 'failed'
+
   return (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>返回设置</button>
-      <button
-        type="button"
-        className="qx-btn"
-        data-variant="primary"
-        data-testid="member-privacy-primary"
-        disabled={busy || uiState === 'revoke-confirm' || uiState === 'submitting' || uiState === 'loading'}
-        onClick={onRevoke}
-      >
-        撤回 AI 使用授权
-      </button>
-    </>
+    <section className="pr-caps" data-testid="member-privacy-capabilities" aria-label="本页可以提交的请求和一体机上不办理的说明">
+      <div className="pr-cap" data-off={live ? undefined : 'true'} data-capability="revoke_consent">
+        <span className="pr-ico" data-tone={live ? 'plum' : 'off'} aria-hidden="true"><ShieldOffIcon size={28} /></span>
+        <span className="pr-cap-main">
+          <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.revoke_consent}</span>
+          <span className="pr-cap-p">{MEMBER_DATA_REQUEST_TYPE_HINT.revoke_consent}</span>
+        </span>
+        {revokeTail}
+      </div>
+      <div className="pr-cap" data-off="true" data-capability="export">
+        <span className="pr-ico" data-tone="off" aria-hidden="true"><FileDownIcon size={28} /></span>
+        <span className="pr-cap-main">
+          <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL.export}</span>
+          <span className="pr-cap-p" data-testid="member-privacy-export-line">{keepPhoneHoursTogether(exportLine(contact), contact)}</span>
+        </span>
+        <span className="pr-flag">一体机不提供</span>
+      </div>
+      <div className="pr-cap" data-off="true" data-capability="delete">
+        <span className="pr-ico" data-tone="off" aria-hidden="true"><Trash2Icon size={28} /></span>
+        <span className="pr-cap-main">
+          <span className="pr-cap-t">账号注销</span>
+          <span className="pr-cap-p" data-testid="member-privacy-closure-line">{keepPhoneHoursTogether(closureLine(contact), contact)}</span>
+        </span>
+        <span className="pr-flag">一体机不办理</span>
+      </div>
+    </section>
+  )
+}
+
+function requestMark(type: MemberDataRequestItem['requestType']): LucideIcon {
+  if (type === 'export') return FileDownIcon
+  if (type === 'delete') return Trash2Icon
+  return ShieldOffIcon
+}
+
+function RequestList({ items }: { items: MemberDataRequestItem[] }) {
+  return (
+    <section className="pr-list" aria-label="我的请求记录" data-testid="member-privacy-list">
+      {items.length === 0 ? (
+        <p className="pr-note">还没有提交过隐私数据请求。提交撤回授权后，记录会出现在这里。空就是空，本页不会造记录让页面好看。</p>
+      ) : (
+        <>
+          <p className="pr-note">每条记录的提交时间与处理状态都以实际记录为准。</p>
+          {items.map((item) => {
+            const Icon = requestMark(item.requestType)
+            return (
+              <div key={item.id} className="pr-row" data-request-type={item.requestType} data-request-status={item.status}>
+                <span className="pr-ico" data-tone="plum" aria-hidden="true"><Icon size={28} /></span>
+                <span className="pr-cap-main">
+                  <span className="pr-cap-t">{MEMBER_DATA_REQUEST_TYPE_LABEL[item.requestType]}</span>
+                  <span className="pr-cap-p">{formatDateTime(item.requestedAt)}</span>
+                </span>
+                <span className="pr-st" data-tone={statusTone(item.status)}>{MEMBER_DATA_REQUEST_STATUS_LABEL[item.status]}</span>
+              </div>
+            )
+          })}
+          <p className="pr-foot">请求记录只显示本人提交的隐私数据请求；撤回授权不会删除简历、文档、打印订单或收藏。</p>
+        </>
+      )}
+    </section>
+  )
+}
+
+function guideRows(state: PrivacyUiState, contact: PublicSupportContact): Array<[string, string, string]> {
+  if (state === 'loading') {
+    return [
+      ['读取范围', '只读当前账号', '不会展示其他账号的请求记录'],
+      ['显示规则', '不闪回旧记录', '上一位用户的内容不会残留在屏幕上'],
+      ['失败怎么办', '可以重试', '读取失败不会改动授权状态'],
+    ]
+  }
+  if (state === 'error') {
+    return [
+      ['授权状态', '未被改动', '这次加载失败不会撤回或恢复任何授权'],
+      ['先试这个', '重新加载', '重试不会重复提交请求'],
+      ['仍不行', '按本页的联系方式', helpNeededLine(contact)],
+    ]
+  }
+  if (state === 'login') {
+    return [
+      ['隐私', '只对本人可见', '请求记录与账号绑定，退出后本机不留明细'],
+      ['可做什么', '撤回 AI 使用授权', '撤回后再次使用时需重新确认'],
+      ['不会发生', '不删除已有资产', '简历、文档、打印订单与收藏都不受影响'],
+    ]
+  }
+  return [
+    ['撤回范围', '只影响 AI 使用授权', '不影响简历诊断、打印、收藏或已保存文件'],
+    ['再次使用', '需要重新确认', '下次使用时会再次请求授权'],
+    ['记录', '只留处理记录', '不会因此删除任何已有资产'],
+  ]
+}
+
+function Guide({ state, contact }: { state: PrivacyUiState; contact: PublicSupportContact }) {
+  return (
+    <section className="pr-guide" aria-label="说明">
+      {guideRows(state, contact).map(([k, title, text]) => (
+        <div key={k} className="pr-guide-item">
+          <div className="pr-guide-k">{k}</div>
+          <div className="pr-guide-t">{title}</div>
+          <p className="pr-guide-p">{text}</p>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function PrivacyCta({
+  uiState,
+  locked,
+  onSettings,
+  onLogin,
+  onRetryLoad,
+  onRevoke,
+  onRetrySubmit,
+  onShowList,
+}: {
+  uiState: PrivacyUiState
+  locked: boolean
+  onSettings: () => void
+  onLogin: () => void
+  onRetryLoad: () => void
+  onRevoke: () => void
+  onRetrySubmit: () => void
+  onShowList: () => void
+}) {
+  const primary = uiState === 'login'
+    ? { label: '手机号登录', disabled: false, onClick: onLogin }
+    : uiState === 'loading'
+      ? { label: '记录还未加载完成', disabled: true, onClick: onRevoke }
+      : uiState === 'error'
+        ? { label: '重新加载', disabled: false, onClick: onRetryLoad }
+        : uiState === 'failure'
+          ? { label: '重试', disabled: false, onClick: onRetrySubmit }
+          : uiState === 'success'
+            ? { label: '查看请求记录', disabled: false, onClick: onShowList }
+            : { label: '撤回 AI 使用授权', disabled: locked, onClick: onRevoke }
+
+  return (
+    <div className="pr-cta">
+      <div className="pr-cta-row">
+        <button type="button" className="qx-btn" data-variant="ghost" disabled={locked} onClick={onSettings}>‹ 返回账号设置</button>
+        {locked ? (
+          <button type="button" className="qx-ai-help" disabled>{REVOKE_ASK_LABEL}</button>
+        ) : (
+          <QxAiHelp label={REVOKE_ASK_LABEL} draft={REVOKE_ASK_DRAFT} testId="member-privacy-ask" />
+        )}
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="primary"
+          data-testid="member-privacy-primary"
+          disabled={primary.disabled}
+          onClick={primary.onClick}
+        >
+          {primary.label}
+        </button>
+      </div>
+      <p className="pr-truth"><b>诚实说明</b><span>{BOUNDARY_NOTE}</span></p>
+    </div>
   )
 }

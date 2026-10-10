@@ -39,7 +39,7 @@ import { useCountdown, useRipple } from './loginHooks'
 import { SecondFactorPanel } from './SecondFactorPanel'
 import type { AdminSecondFactorChallenge } from '../../services/auth/secondFactor'
 import './login.css'
-
+import { userMessageOf } from '../../services/api/userErrorMessage'
 type LoginMode = 'password' | 'sms'
 type ResetStep = 'identity' | 'code' | 'password'
 
@@ -163,7 +163,7 @@ export default function LoginPage() {
       setPassword('')
       setSecondFactor(r)
     } else if (r.ok) completeLogin(r.user, loginId.trim())
-    else raiseError(r.message || '登录失败')
+    else raiseError(userMessageOf(r, '登录失败，请检查账号后重试'))
   }
 
   const restartFromSecondFactor = useCallback((message: string | null) => {
@@ -186,14 +186,14 @@ export default function LoginPage() {
     } else if (r.ok && 'secondFactorRequired' in r) {
       raiseError('登录响应无效，请改用账号密码登录')
     } else if (r.ok) completeLogin(r.user, phone.trim())
-    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '登录失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(userMessageOf(r, '登录失败，请检查账号后重试'))
   }
 
   /** 开启短信第二步后，管理员入口只接受「账号密码 + 短信验证码」：发码与登录被拒时都切回密码登录并说明原因。 */
   function switchToPasswordIfSmsOnlyRejected(r: { code: string; message: string }): boolean {
     if (r.code !== 'AUTH_ADMIN_SMS_LOGIN_REQUIRES_PASSWORD') return false
     setMode('password')
-    raiseError(r.message || '管理员登录需要「账号密码 + 短信验证码」两步，请用账号密码登录')
+    raiseError(userMessageOf(r, '管理员登录需要「账号密码 + 短信验证码」两步，请用账号密码登录'))
     return true
   }
 
@@ -203,7 +203,7 @@ export default function LoginPage() {
     setError(null)
     const r = await sendLoginSmsCode(phone.trim())
     if (r.ok) smsCountdown.start(r.cooldownSeconds || 60)
-    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(r.message || '验证码发送失败')
+    else if (!switchToPasswordIfSmsOnlyRejected(r)) raiseError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
   async function startReset(e: FormEvent) {
@@ -212,7 +212,7 @@ export default function LoginPage() {
     if (!requireAgreement(setResetError)) return
     const r = await startPasswordReset(resetIdentity.trim())
     if (!r.ok) {
-      setResetError(r.message || '验证码发送失败')
+      setResetError(userMessageOf(r, '验证码没有发出，请稍后重试'))
       return
     }
     resetCountdown.start(r.cooldownSeconds || 60)
@@ -224,7 +224,7 @@ export default function LoginPage() {
     setResetError(null)
     const r = await verifyPasswordReset(resetIdentity.trim(), resetCode.trim())
     if (!r.ok) {
-      setResetError(r.message || '验证码校验失败')
+      setResetError(userMessageOf(r, '验证码没有通过，请重新输入后再试'))
       return
     }
     setResetTicket(r.resetTicket)
@@ -241,7 +241,7 @@ export default function LoginPage() {
     }
     const r = await completePasswordReset(resetTicket, newPassword)
     if (!r.ok) {
-      setResetError(r.message || '密码重置失败')
+      setResetError(userMessageOf(r, '密码重置失败，请稍后重试'))
       return
     }
     setResetOpen(false)
@@ -257,7 +257,7 @@ export default function LoginPage() {
     const r = await sendOwnPhoneCode()
     setPhoneVerifyBusy(false)
     if (r.ok) phoneVerifyCountdown.start(r.cooldownSeconds || 60)
-    else setPhoneVerifyError(r.message || '验证码发送失败')
+    else setPhoneVerifyError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
   async function confirmPhoneVerification(e: FormEvent) {
@@ -271,7 +271,7 @@ export default function LoginPage() {
       setPhoneVerifyUser(null)
       setSuccessVisible(true)
       window.setTimeout(() => nav('/', { replace: true }), SUCCESS_OVERLAY_MS)
-    } else setPhoneVerifyError(r.message || '手机号验证失败')
+    } else setPhoneVerifyError(userMessageOf(r, '手机号验证失败，请稍后重试'))
   }
 
   function openReset() {
@@ -587,7 +587,7 @@ export default function LoginPage() {
                     void startPasswordReset(resetIdentity.trim())
                       .then((r) => {
                         if (r.ok) resetCountdown.start(r.cooldownSeconds || 60)
-                        else setResetError(r.message || '验证码发送失败，请稍后重试')
+                        else setResetError(userMessageOf(r, '验证码发送失败，请稍后重试'))
                       })
                       .catch(() => setResetError('验证码发送失败，请检查网络后重试'))
                       .finally(() => setResendBusy(false))

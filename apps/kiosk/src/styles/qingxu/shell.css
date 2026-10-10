@@ -44,7 +44,14 @@
 }
 .qx-topbar-sub { font-size: var(--qx-fs-aux); opacity: .72; }
 .qx-topbar-spacer { flex: 1; }
-.qx-topbar-clock { font-family: var(--qx-mono); font-size: var(--qx-fs-body-lg); font-variant-numeric: tabular-nums; }
+/* 稿 03/05/06/10/12：.clock 在胶囊右侧，24px、字重 600、等宽数字、字距 1px。字号用既有 token，不另放大。 */
+.qx-topbar-clock {
+  flex: none;
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
 
 /* 内页顶栏是浅色纸面（原稿 51 张里内页无一例外：surface 底 + 一道细线，品牌章深底翠字）。
    运行页此前把它画成了深色色带，和下面那张深色任务头叠成两层深色，是「看起来不像原稿」的第一眼来源。

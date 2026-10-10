@@ -32,7 +32,10 @@ const HIT = (marker: string, runtimePath: string): PriorityPlan => ({
   runtimePath,
 })
 
-const LATER = '2099-01-01T00:00:00.000Z'
+/** 二维码、上传会话、扫描会话和文件链接：从造状态这一刻起 10 分钟，不写死 2099。 */
+function minutesFromNow(minutes = 10): string {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString()
+}
 const PHONE = '13800138000'
 const CODE = '123456'
 const UPLOAD_ID = 'pair-upload-1'
@@ -90,6 +93,20 @@ const PROFILE_NONE: Record<string, string> = {
 }
 
 function hitOf(nn: string, screen: string, state: string): PriorityPlan | null {
+  if (nn === '00') {
+    return HIT('[data-testid="standby-material-slot"] img', '/screensaver')
+  }
+  if (nn === '01') {
+    if (state === 'context') return HIT('[data-testid="home-context-region"] .continue', '/')
+    if (state === 'member') return HIT('[data-testid="home-identity"][data-state="member"]', '/')
+    return null
+  }
+  if (nn === '06') {
+    if (state === 'topic') return HIT('[data-testid="help-state-topic"]', '/help?state=topic&topic=print')
+    if (state === 'no-result') return HIT('[data-testid="help-state-no-result"]', '/help?state=no-result')
+    if (state === 'unavailable') return HIT('[data-testid="help-state-unavailable"]', '/help?state=unavailable')
+    return null
+  }
   if (nn === '13') {
     if (DESK_NONE[state]) return NONE(DESK_NONE[state])
     const preview = state === 'preview' || state.startsWith('capability-') || state.startsWith('device-') || state === 'file-unsupported'
@@ -194,7 +211,7 @@ function materialTask(kind: string, status: string, extra: Record<string, unknow
     result: extra.result ?? { mode: 'real', checks: { pageCount: 2, canPrint: true, canNormalize: true, targetPaperSize: 'A4', messages: [] } },
     errorCode: extra.errorCode ?? null,
     errorMessage: extra.errorMessage ?? null,
-    expiresAt: LATER,
+    expiresAt: minutesFromNow(),
     createdAt: '2026-07-24T00:00:00.000Z',
     updatedAt: '2026-07-24T00:00:00.000Z',
     ...(extra.findings ? { piiFindings: extra.findings } : {}),
@@ -407,7 +424,7 @@ async function openCashier(page: Page, api: ApiRouter, state: string): Promise<v
     expiresAt,
   })
   let snapshot = payBody('unpaid')
-  if (state === 'pending-qr') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', LATER))
+  if (state === 'pending-qr') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', minutesFromNow()))
   if (state === 'display-expired-reconciling') snapshot = payBody('paying', attempt('pending', 'weixin://pair-qr', '2000-01-01T00:00:00.000Z'))
   if (state === 'expired') snapshot = payBody('paying', attempt('expired', 'weixin://pair-qr', '2000-01-01T00:00:00.000Z'))
   if (state === 'pending-verification') snapshot = payBody('paying', attempt('expired', null, null))
@@ -478,7 +495,7 @@ async function openFulfill(page: Page, api: ApiRouter, state: string): Promise<v
     status: 200,
     json: {
       signedUrl: '/api/v1/files/pair-takeaway/content',
-      expiresAt: LATER,
+      expiresAt: minutesFromNow(),
       filename: 'w2-sample.pdf',
       mimeType: 'application/pdf',
       sizeBytes: 128,
@@ -507,16 +524,31 @@ async function openFulfill(page: Page, api: ApiRouter, state: string): Promise<v
 function uploadFileView() {
   return {
     fileId: 'pair-phone-file',
-    filename: '手机简历.pdf',
-    sizeBytes: 12000,
+    filename: '求职信_陈思远.pdf',
+    sizeBytes: 96 * 1024,
     mimeType: 'application/pdf',
     sha256: 'b'.repeat(64),
-    fileExpiresAt: LATER,
+    fileExpiresAt: minutesFromNow(),
     fileUrl: '/api/v1/files/pair-phone-file/content',
   }
 }
 
-function installUpload(api: ApiRouter, status: string, expiresAt = LATER): void {
+const LOCAL_RESUME = {
+  filename: '个人简历_张晓雨.pdf',
+  sizeBytes: 186 * 1024,
+}
+
+/** 同一分钟、同一份文件都不许重复。safe-1 仍是点击选择器用的那一份简历。 */
+const USB_FILES = [
+  { safeId: 'safe-1', filename: '个人简历_张晓雨.pdf', extension: 'pdf', sizeBytes: 186 * 1024 },
+  { safeId: 'safe-2', filename: '成绩单_2025秋.pdf', extension: 'pdf', sizeBytes: 842 * 1024 },
+  { safeId: 'safe-3', filename: '职业资格证书.pdf', extension: 'pdf', sizeBytes: Math.round(1.6 * 1024 * 1024) },
+  { safeId: 'safe-4', filename: '身份证正面.jpg', extension: 'jpg', sizeBytes: Math.round(2.4 * 1024 * 1024) },
+  { safeId: 'safe-5', filename: '身份证反面.jpg', extension: 'jpg', sizeBytes: Math.round(2.1 * 1024 * 1024) },
+  { safeId: 'safe-6', filename: '英语四级成绩单.pdf', extension: 'pdf', sizeBytes: 640 * 1024 },
+]
+
+function installUpload(api: ApiRouter, status: string, expiresAt = minutesFromNow()): void {
   api.respond('POST', '/api/v1/upload-sessions', envelope({
     sessionId: UPLOAD_ID,
     uploadUrl: '/upload/phone',
@@ -560,7 +592,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         : state === 'phone-cancelled' ? 'cancelled'
           : state === 'phone-expired' ? 'expired'
             : 'pending'
-    installUpload(api, status, state === 'phone-expired' ? '2000-01-01T00:00:00.000Z' : LATER)
+    installUpload(api, status, state === 'phone-expired' ? '2000-01-01T00:00:00.000Z' : minutesFromNow())
     if (state === 'phone-generating') api.respondWith('POST', '/api/v1/upload-sessions', () => hang())
     if (state === 'phone-gen-failed') {
       api.respond('POST', '/api/v1/upload-sessions', { status: 500, json: { error: { code: 'UPLOAD_SESSION_FAILED', message: '二维码生成失败' } } })
@@ -568,7 +600,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
     if (state === 'phone-status-unknown') {
       api.respondWith('GET', `/api/v1/upload-sessions/${UPLOAD_ID}`, (n) => n === 1
         ? { status: 503, json: { error: { code: 'UPLOAD_STATUS_UNKNOWN', message: '状态暂时读不到' } } }
-        : envelope({ sessionId: UPLOAD_ID, status: 'pending', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: true, expiresAt: LATER }))
+        : envelope({ sessionId: UPLOAD_ID, status: 'pending', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: true, expiresAt: minutesFromNow() }))
     }
     if (state === 'phone-waiting') api.respondWith('DELETE', `/api/v1/upload-sessions/${UPLOAD_ID}`, () => hang())
     if (state === 'phone-confirming') api.respondWith('POST', `/api/v1/upload-sessions/${UPLOAD_ID}/confirm`, () => hang())
@@ -591,7 +623,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
       }
       if (path === '/local/usb/files' && method === 'GET') {
         if (state === 'usb-detecting') { await hang(); return }
-        const files = state === 'usb-empty' ? [] : [{ safeId: 'safe-1', filename: '简历.pdf', extension: 'pdf', sizeBytes: 12000 }]
+        const files = state === 'usb-empty' ? [] : USB_FILES
         await json(route, 200, { success: true, data: { present: true, driveLabel: 'PAIRUSB', files } })
         return
       }
@@ -607,7 +639,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
         }
         await json(route, 200, {
           success: true,
-          data: { fileId: 'pair-usb-file', filename: '简历.pdf', sizeBytes: 12000, mimeType: 'application/pdf', sha256: 'd'.repeat(64), fileUrl: '/api/v1/files/pair-usb-file/content', fileUrlExpiresAt: LATER },
+          data: { fileId: 'pair-usb-file', filename: LOCAL_RESUME.filename, sizeBytes: LOCAL_RESUME.sizeBytes, mimeType: 'application/pdf', sha256: 'd'.repeat(64), fileUrl: '/api/v1/files/pair-usb-file/content', fileUrlExpiresAt: minutesFromNow() },
         })
         return
       }
@@ -621,8 +653,8 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
   if (state === 'local-ready') {
     api.respond('POST', '/api/v1/files/kiosk-upload', envelope({
       fileId: 'pair-local-file',
-      filename: 'sample.pdf',
-      sizeBytes: 128,
+      filename: LOCAL_RESUME.filename,
+      sizeBytes: LOCAL_RESUME.sizeBytes,
       mimeType: 'application/pdf',
       sha256: 'c'.repeat(64),
       signedUrl: '/w2-fixtures/sample-visible.pdf',
@@ -657,7 +689,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
       }
       await input.setInputFiles(oversize)
     } else {
-      await input.setInputFiles({ name: 'sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.1\n') })
+      await input.setInputFiles({ name: LOCAL_RESUME.filename, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.1\n') })
     }
   }
   await see(page, `[data-testid="file-source-state-${state}"]`)
@@ -683,7 +715,7 @@ async function openScan(page: Page, api: ApiRouter, state: string): Promise<void
   const created = {
     scanTaskId: SCAN_ID,
     controlToken: SCAN_TOKEN,
-    expiresAt: LATER,
+    expiresAt: minutesFromNow(),
     instructions: ['把简历朝下放入稿台'],
   }
   if (state === 'create-loading') api.respondWith('POST', '/api/v1/scan/sessions', () => hang())
@@ -700,7 +732,7 @@ async function openScan(page: Page, api: ApiRouter, state: string): Promise<void
     await see(page, `[data-state="${state}"]`)
     return
   }
-  const live = { scanTaskId: SCAN_ID, controlToken: SCAN_TOKEN, instructions: ['把简历朝下放入稿台'], expiresAt: LATER }
+  const live = { scanTaskId: SCAN_ID, controlToken: SCAN_TOKEN, instructions: ['把简历朝下放入稿台'], expiresAt: minutesFromNow() }
   api.respond('POST', `/api/v1/scan/sessions/${SCAN_ID}/ack`, envelope({ scanTaskId: SCAN_ID, deliveryAckedAt: '2026-07-24T00:00:01.000Z' }))
   if (state === 'polling') api.respondWith('GET', `/api/v1/scan/sessions/${SCAN_ID}`, () => hang())
   else if (state === 'poll-failed') {
@@ -714,7 +746,7 @@ async function openScan(page: Page, api: ApiRouter, state: string): Promise<void
       file: null,
       errorCode: null,
       errorMessage: null,
-      expiresAt: LATER,
+      expiresAt: minutesFromNow(),
     }))
   }
   if (state === 'waiting-delivery' || state === 'polling' || state === 'poll-failed' || state === 'cancelling') {
@@ -957,9 +989,82 @@ async function openProfile(page: Page, api: ApiRouter, state: string): Promise<v
   else await see(page, '[role="alert"]')
 }
 
+async function openStandby(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (window.location.pathname !== '/screensaver') return
+    window.history.replaceState({
+      usr: {
+        playlist: {
+          enabled: true,
+          idleTimeoutSec: 180,
+          items: [{
+            id: 'pair-standby-poster',
+            type: 'image',
+            url: '/assets/bg-standby.jpg',
+            mimeType: 'image/jpeg',
+            durationSec: 60,
+            sha256: 'pair-standby-bg-standby-jpg',
+          }],
+        },
+      },
+      key: 'pair-standby',
+      idx: 0,
+    }, '', '/screensaver')
+  })
+  await page.goto('/screensaver', { waitUntil: 'domcontentloaded' })
+  await see(page, '[data-testid="standby-material-slot"] img')
+}
+
+function homePrintingOrder() {
+  return {
+    id: 'ord-print-zhang-20260928',
+    orderNo: 'ORD-20260928-1842',
+    status: 'printing',
+    fileName: '个人简历_张晓雨.pdf',
+    createdAt: '2026-09-28T10:18:00.000Z',
+    completedAt: null,
+    copies: 2,
+    colorMode: 'bw',
+    duplex: 'long-edge',
+    paperSize: 'A4',
+    pageRange: 'all',
+    amountCents: 0,
+    payStatus: 'paid',
+    paymentSource: 'free',
+    billablePages: 2,
+  }
+}
+
+async function openHome(page: Page, api: ApiRouter, state: string): Promise<void> {
+  registerMemberLogin(api)
+  const printing = state === 'context'
+  api.respond('GET', '/api/v1/me/print-orders', envelope(printing
+    ? { items: [homePrintingOrder()], nextCursor: null, total: 1 }
+    : { items: [], nextCursor: null, total: 0 }))
+  api.respond('GET', '/api/v1/me/resumes', envelope({ items: [], nextCursor: null, total: 0 }))
+  await loginThroughVisibleUi(page, '/')
+  await see(page, printing
+    ? '[data-testid="home-context-region"] .continue'
+    : '[data-testid="home-identity"][data-state="member"]')
+}
+
+async function openHelp(page: Page, state: string): Promise<void> {
+  const path = state === 'topic'
+    ? '/help?state=topic&topic=print'
+    : state === 'no-result'
+      ? '/help?state=no-result'
+      : '/help?state=unavailable'
+  const marker = state === 'topic' ? 'topic' : state === 'no-result' ? 'no-result' : 'unavailable'
+  await page.goto(path, { waitUntil: 'domcontentloaded' })
+  await see(page, `[data-testid="help-state-${marker}"]`)
+}
+
 export async function preparePrioritySeed(page: Page, api: ApiRouter, target: QingxuPairTarget): Promise<void> {
   page.setDefaultTimeout(12_000)
   const state = target.state
+  if (target.nn === '00') return openStandby(page)
+  if (target.nn === '01') return openHome(page, api, state)
+  if (target.nn === '06') return openHelp(page, state)
   if (target.nn === '13') return openDesk(page, api, state)
   if (target.nn === '14') return openConfirm(page, api, state)
   if (target.nn === '32') {

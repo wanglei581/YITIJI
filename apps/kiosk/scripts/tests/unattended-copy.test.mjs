@@ -120,6 +120,17 @@ test('服务端原话叫人找现场工作人员时换成登记句，干净原�
   assert.equal(copy.containsStaffHandoff('缺纸时一体机会自动停止接单'), true)
 })
 
+test('10/9 漏掉的两种说法进了词表：问工作人员、工作人员会核实后现场处理', () => {
+  assert.equal(copy.containsStaffHandoff('问工作人员'), true)
+  assert.equal(copy.containsStaffHandoff('选择这次遇到的问题，工作人员会核实后现场处理'), true)
+  assert.equal(copy.containsStaffHandoff('卡纸需要现场处理'), true)
+  assert.equal(copy.preferUnattended('码找不到可以问工作人员', '标准句'), '标准句')
+  // 现在页面上的两句不能被自己的词表拦住。
+  assert.equal(copy.containsStaffHandoff('求助'), false)
+  assert.equal(copy.containsStaffHandoff('联系我们或问小青'), false)
+  assert.equal(copy.containsStaffHandoff(`选择这次遇到的问题。${copy.helpNeededLine(null)}`), false)
+})
+
 const clientStub = toDataUrl('export const API_BASE_URL = "/api/v1"')
 const screenStub = toDataUrl('export function getTerminalId() { return globalThis.__kioskTerminalId || "" }')
 const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supportContact.ts'), {
@@ -156,11 +167,17 @@ test('联系方式 404 与超时都缓存成最保守的一套', async () => {
   globalThis.__kioskTerminalId = 'KSK-001'
   const original = globalThis.fetch
   try {
-    globalThis.fetch = async (url) => {
-      assert.match(String(url), /\/api\/v1\/public\/support-contact\?terminalId=KSK-001$/)
+    let seenRequest
+    globalThis.fetch = async (url, init) => {
+      seenRequest = { url, init }
       return new Response('missing', { status: 404 })
     }
     const missed = await contactMod.loadSupportContact()
+    // 请求函数会捕获 fetch 失败；必须在外面断言，避免断言失败也被当成保守回落。
+    assert.ok(seenRequest, '必须真发出联系方式请求')
+    assert.match(String(seenRequest.url), /\/api\/v1\/public\/support-contact\?terminalId=KSK-001$/)
+    assert.equal(seenRequest.init.credentials, 'omit', '公开联系方式不携带浏览器身份凭证')
+    assert.deepEqual(seenRequest.init.headers, { Accept: 'application/json' }, '公开联系方式不附加会员鉴权头')
     assert.deepEqual(missed, copy.CONSERVATIVE_SUPPORT_CONTACT)
 
     contactMod.resetSupportContactCacheForTests()

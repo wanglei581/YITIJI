@@ -10,7 +10,9 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
-import { ClockIcon, EyeIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
+import { ClockIcon, EyeIcon, FileIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
+import { DocumentAccessBanner, type DocumentAccessIntent, type DocumentAccessPhase } from './documents/DocumentAccessBanner'
+import { accessLinkExpired, documentFormatTag, documentRoleLabel, isScannedDocument, matchesDocumentFilter, type DocumentListFilter } from './documents/documentClassify'
 import {
   deleteMyDocument,
   fetchAccessUrl,
@@ -54,6 +56,13 @@ const SIGNABLE_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 
 
 type SelectableRetentionPolicy = FileRetentionUpdateRequest['retentionPolicy']
 type Hint = { tone: 'ok' | 'bad'; text: string }
+type DocumentAccess = {
+  phase: DocumentAccessPhase
+  doc: MemberDocumentItem
+  intent: DocumentAccessIntent
+  expiresAt?: string
+  convertedFrom?: MemberDocumentItem
+}
 
 function retentionLabel(policy: FileRetentionPolicy | null | undefined, expiresAt: string | null): string {
   if (policy && RETENTION_LABELS[policy]) return RETENTION_LABELS[policy]
@@ -107,9 +116,9 @@ export function MyDocumentsPage() {
   const { isLoggedIn, getToken } = useAuth()
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<Hint | null>(null)
-  const [opening, setOpening] = useState<string | null>(null)
+  const [access, setAccess] = useState<DocumentAccess | null>(null)
   const [preview, setPreview] = useState<{ url: string; filename: string; mimeType: string } | null>(null)
-  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [docFilter, setDocFilter] = useState<DocumentListFilter>('all')
   const [signingId, setSigningId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -122,12 +131,31 @@ export function MyDocumentsPage() {
   const fetchPage = useCallback((cursor?: string) => getMyDocuments(token, { pageSize: 50, cursor }), [token])
   const pagination = useMemberCursorPage<MemberDocumentItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
   const { items, state: state, setItems } = pagination
+  const opening = access?.phase === 'loading' && access.intent === 'preview' ? access.doc.id : null
+  const printingId = access?.phase === 'loading' && access.intent === 'print' ? access.doc.id : null
 
   useEffect(() => {
     if (!hint) return
     const t = setTimeout(() => setHint(null), 3000)
     return () => clearTimeout(t)
   }, [hint])
+
+  useEffect(() => {
+    if (!access || access.phase !== 'ready' || !access.expiresAt) return
+    const ms = new Date(access.expiresAt).getTime() - Date.now()
+    if (!Number.isFinite(ms) || ms <= 0) {
+      setPreview(null)
+      setAccess((current) => (current && current.phase === 'ready' ? { ...current, phase: 'expired' } : current))
+      return
+    }
+    // 超过 2^31-1 毫秒的定时器会立刻触发。有效期远在这之外时，不在这一屏倒计时。
+    if (ms > 2_147_000_000) return
+    const timer = window.setTimeout(() => {
+      setPreview(null)
+      setAccess((current) => (current && current.phase === 'ready' ? { ...current, phase: 'expired' } : current))
+    }, ms)
+    return () => window.clearTimeout(timer)
+  }, [access])
 
   useEffect(() => {
     if (!confirmId) return
@@ -146,14 +174,16 @@ export function MyDocumentsPage() {
     if (opening || printingId || signingId || busyId || retentionBusy || convertingId) return
     const token = getToken()
     if (!token) return
-    setOpening(doc.id)
+    setAccess({ phase: 'loading', doc, intent: 'preview' })
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
-      setPreview({ url: res.url, filename: doc.filename, mimeType: doc.mimeType })
+      const fresh = !accessLinkExpired(res.expiresAt)
+      if (fresh) setPreview({ url: res.url, filename: doc.filename, mimeType: doc.mimeType })
+      else setPreview(null)
+      setAccess({ phase: fresh ? 'ready' : 'expired', doc, intent: 'preview', expiresAt: res.expiresAt })
     } catch {
-      setHint({ tone: 'bad', text: '文档打开失败，可能已到期或被清理' })
-    } finally {
-      setOpening(null)
+      setPreview(null)
+      setAccess({ phase: 'error', doc, intent: 'preview' })
     }
   }
 
@@ -169,9 +199,13 @@ export function MyDocumentsPage() {
     }
     const token = getToken()
     if (!token) return
-    setPrintingId(doc.id)
+    setAccess({ phase: 'loading', doc, intent: 'print', convertedFrom })
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
+      if (accessLinkExpired(res.expiresAt)) {
+        setAccess({ phase: 'expired', doc, intent: 'print', expiresAt: res.expiresAt, convertedFrom })
+        return
+      }
       if (!res.printFileUrl) throw new Error('打印链接未就绪')
       const file = {
         name: doc.filename,
@@ -193,10 +227,9 @@ export function MyDocumentsPage() {
         file,
         idDocument: doc.purpose === 'id_scan' || convertedFrom?.purpose === 'id_scan',
       })
-    } catch (error) {
-      setHint({ tone: 'bad', text: userMessageOf(error, '打印链接生成失败，可能已到期或被清理') })
-    } finally {
-      setPrintingId(null)
+      setAccess({ phase: 'ready', doc, intent: 'print', expiresAt: res.expiresAt, convertedFrom })
+    } catch {
+      setAccess({ phase: 'error', doc, intent: 'print', convertedFrom })
     }
   }
 
@@ -291,8 +324,8 @@ export function MyDocumentsPage() {
       tone="slate"
       icon={<FilesIcon size={32} />}
       label="文档资产"
-      big={items.length}
-      desc="查看和打印时才换取短期访问链接；到期或删除后不可恢复"
+      big={state === 'ready' ? pagination.total : '—'}
+      desc="预览、打印时才临时调取文件；到期或删除后就打不开了"
       minis={[`可用 ${availableCount}`, `长期 ${items.filter((doc) => doc.expiresAt === null).length}`, `到期 ${items.length - availableCount}`]}
     />
   )
@@ -309,7 +342,7 @@ export function MyDocumentsPage() {
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看我的文档" desc="公共一体机不会在未登录时展示文件名、保存期限或访问链接；游客上传不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    body = <QxMeLoadingBlock title="正在加载我的文档" />
+    body = <QxMeLoadingBlock title="正在加载我的文档" placeholderIcon={FileIcon} />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="文档这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的文件不会因为这次失败而消失。" struct={struct} />
   } else if (items.length === 0 && !pagination.nextCursor) {
@@ -319,8 +352,8 @@ export function MyDocumentsPage() {
         <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
           <span className="qx-me-banner-ico" aria-hidden="true"><FilesIcon size={34} /></span>
           <span className="qx-me-banner-main">
-            <h2 className="qx-me-banner-t">还没有文档</h2>
-            <span className="qx-me-banner-p">保存简历 / 打印材料等文档后，这里会显示你的文档记录。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
+            <h2 className="qx-me-banner-t">还没有保存的文档</h2>
+            <span className="qx-me-banner-p">这个账号下没有已保存的文件。还没有任何记录。办过之后会列在这里。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
@@ -329,20 +362,53 @@ export function MyDocumentsPage() {
           <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质材料" desc="把纸质简历或证明扫成 PDF；未登录扫描件不会进入我的文档" label="去扫描" route="/scan" testid="member-assets-start-scan" onClick={() => navigate('/scan')} />
           <div className="qx-me-legal">添加或扫描之后，可以回到这里继续预览、打印和签名。</div>
         </section>
-        <QxMeGuide items={[['怎么产生', '登录后上传或扫描', '游客上传不会自动归入你的账号'], ['能做什么', '预览、打印、签名', '从同一份文件继续办'], ['留存', '按系统的保存期限管理', '到期后无法恢复，需要请提前打印']]} />
+        <QxMeGuide items={[['怎么产生', '上传或扫描之后', '手机传输、U 盘、本机扫描都可以'], ['能做什么', '预览、打印、签名', '从同一份文件继续办'], ['留存', '按系统期限管理', '到期后无法恢复，需要请提前打印']]} />
       </>
     )
   } else {
+    const countsKnown = state === 'ready'
+    const filterCount = (filter: DocumentListFilter) => countsKnown
+      ? items.filter((doc) => matchesDocumentFilter(doc, filter)).length
+      : null
+    const countText = (value: number | null) => (value === null ? '—' : String(value))
+    const visibleDocs = items.filter((doc) => matchesDocumentFilter(doc, docFilter))
+    const hasMore = Boolean(pagination.nextCursor)
+    const retryAccess = () => {
+      if (!access || access.phase === 'loading') return
+      if (access.intent === 'print') void print(access.doc, access.convertedFrom)
+      else void open(access.doc)
+    }
     body = (
       <>
         {summary}
+        <div className="qx-me-tabbar" data-n="3" role="group" aria-label="我的文档分类">
+          {([
+            ['all', '全部', countsKnown ? pagination.total : null],
+            ['printable', '可打印', filterCount('printable')],
+            ['scan', '扫描件', filterCount('scan')],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              className="qx-me-tab"
+              aria-current={docFilter === key ? 'true' : undefined}
+              data-testid={`member-assets-filter-${key}`}
+              title={key !== 'all' && hasMore ? '当前显示的数量，往下还有更多' : undefined}
+              onClick={() => setDocFilter(key)}
+            >
+              {label}<i>{countText(count)}</i>
+            </button>
+          ))}
+        </div>
+        {access ? <DocumentAccessBanner phase={access.phase} intent={access.intent} onRetry={retryAccess} /> : null}
         <section className="qx-me-list qx-me-grow" data-testid="member-assets-list" aria-label="我的文档">
-          {items.map((doc) => {
+          {visibleDocs.map((doc) => {
             const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
             const confirming = confirmId === doc.id
             const busy = busyId === doc.id
-            const openingThis = opening === doc.id
             const printingThis = printingId === doc.id
+            const role = documentRoleLabel(doc)
+            const RoleIcon = isScannedDocument(doc) ? ScanLineIcon : FileTextIcon
             const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
             const reprintBlocked = !isDocumentReprintable(doc)
             const viewDisabled = expired || isAnyPending
@@ -354,31 +420,24 @@ export function MyDocumentsPage() {
             // 置灰原因常显在行内：一体机是触屏，没有 hover，写在 title 里永远读不到。
             const printReasonId = reprintBlocked ? `doc-print-blocked-${doc.id}` : !printable && !expired ? `doc-print-format-${doc.id}` : undefined
             return (
-              <article key={doc.id} className="qx-me-asset-item" data-server-slot="document" data-expired={expired || undefined} data-testid="member-assets-document">
+              <article key={doc.id} className="qx-me-row qx-me-doc-row" data-server-slot="document" data-expired={expired || undefined} data-testid="member-assets-document">
                 <div className="qx-me-asset-main">
-                  <span className="qx-me-row-ico" data-tone={expired ? 'off' : 'slate'} aria-hidden="true"><FileTextIcon size={28} /></span>
+                  <span className="qx-me-row-ico" data-tone={expired ? 'off' : role?.tone === 'clay' ? 'clay' : role?.tone === 'teal' ? undefined : 'slate'} aria-hidden="true"><RoleIcon size={28} /></span>
                   <div className="qx-me-row-main">
-                    <p className="qx-me-row-title qx-me-asset-name">{doc.filename}</p>
-                    <p className="qx-me-row-sub">
-                      {formatBytes(doc.sizeBytes)} · {formatTime(doc.createdAt)}
-                      {doc.expiresAt === null ? ' · 长期保存' : expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
-                    </p>
-                    <div className="qx-me-row-foot">
-                      <span className="qx-me-chip" data-tone={expired ? 'bad' : undefined}>
-                        <ClockIcon size={16} aria-hidden="true" />
-                        {retentionLabel(doc.retentionPolicy, doc.expiresAt)}
-                      </span>
-                      {canChangeRetention && (
-                        <button type="button" disabled={isAnyPending} aria-expanded={retentionOpen} onClick={() => setRetentionPanelId(retentionOpen ? null : doc.id)} className="qx-me-small">
-                          修改保存期限
-                        </button>
-                      )}
+                    <div className="qx-me-row-head">
+                      {role ? <span className="qx-me-chip qx-me-doc-role" data-tone={role.tone || undefined}>{role.label}</span> : null}
+                      <p className="qx-me-row-title qx-me-asset-name">{doc.filename}</p>
                     </div>
+                    <p className="qx-me-row-sub">
+                      <span className="qx-me-chip">{documentFormatTag(doc)}</span>
+                      <span className="qx-me-chip">{formatTime(doc.createdAt)}</span>
+                      <span className="qx-me-chip" data-tone={expired ? 'bad' : undefined}>{retentionLabel(doc.retentionPolicy, doc.expiresAt)}</span>
+                    </p>
                   </div>
                   <div className="qx-me-acts">
                     <button type="button" disabled={viewDisabled} onClick={() => void open(doc)} className="qx-me-small">
                       <EyeIcon size={19} aria-hidden="true" />
-                      {expired ? '已到期' : openingThis ? '打开中' : '查看'}
+                      {expired ? '已到期' : '预览'}
                     </button>
                     <button
                       type="button"
@@ -390,8 +449,13 @@ export function MyDocumentsPage() {
                       data-variant={printDisabled ? undefined : 'primary'}
                     >
                       <PrinterIcon size={19} aria-hidden="true" />
-                      {reprintBlocked ? '重新打印' : printingThis ? '准备中' : '打印'}
+                      {reprintBlocked ? '重新打印' : printingThis ? '准备中' : '用于打印'}
                     </button>
+                    {canChangeRetention && (
+                      <button type="button" disabled={isAnyPending} aria-expanded={retentionOpen} onClick={() => setRetentionPanelId(retentionOpen ? null : doc.id)} className="qx-me-small">
+                        修改保存期限
+                      </button>
+                    )}
                     {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
                       <button type="button" disabled={isAnyPending} onClick={() => void signStamp(doc)} title="在该文档上叠加本人手写签名图片" className="qx-me-small">
                         <PenToolIcon size={19} aria-hidden="true" />
@@ -410,6 +474,19 @@ export function MyDocumentsPage() {
                       <Trash2Icon size={19} aria-hidden="true" />
                       {busy ? '删除中' : confirming ? '确认删除' : '删除'}
                     </button>
+                    <DocumentConvertAction
+                      fileId={doc.id}
+                      fileName={doc.filename}
+                      mimeType={doc.mimeType}
+                      token={getToken()}
+                      busy={isAnyPending}
+                      reprintable={isDocumentReprintable(doc)}
+                      onConverted={() => setReloadKey((key) => key + 1)}
+                      onError={(text) => setHint({ tone: 'bad', text })}
+                      onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
+                      onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
+                      onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc), doc)}
+                    />
                   </div>
                 </div>
                 {retentionOpen && canChangeRetention && (
@@ -429,24 +506,15 @@ export function MyDocumentsPage() {
                 {!reprintBlocked && !printable && !expired && (
                   <p id={`doc-print-format-${doc.id}`} className="qx-me-reason">该文件格式暂不支持打印</p>
                 )}
-                <DocumentConvertAction
-                  fileId={doc.id}
-                  fileName={doc.filename}
-                  mimeType={doc.mimeType}
-                  token={getToken()}
-                  busy={isAnyPending}
-                  reprintable={isDocumentReprintable(doc)}
-                  onConverted={() => setReloadKey((key) => key + 1)}
-                  onError={(text) => setHint({ tone: 'bad', text })}
-                  onBusyChange={(next) => setConvertingId(next ? doc.id : null)}
-                  onPreview={(convertedId) => void open(documentForConvertedPdf(items, convertedId, doc))}
-                  onPrint={(convertedId) => void print(documentForConvertedPdf(items, convertedId, doc), doc)}
-                />
               </article>
             )
           })}
+          {visibleDocs.length === 0 ? (
+            <div className="qx-me-legal">{hasMore ? '当前显示的文件里没有这一类，可以先加载更多。' : '这一类里还没有文件。'}</div>
+          ) : null}
           <div className="qx-me-legal">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</div>
         </section>
+        <QxMeGuide items={[['会显示什么', '办完才出现', '不写死文件名或时间'], ['继续办理', '从同一文件接着办', '预览、打印、签名共用一份'], ['留存', '按保存期限', '到期或删除后无法再打开']]} />
       </>
     )
   }
@@ -500,5 +568,5 @@ const DOING: Record<'login' | 'loading' | 'error' | 'empty' | 'ready', ReactNode
   loading: <>正在读取最新记录，<b>返回前一律显示「—」</b>。</>,
   error: <>列表这次没有更新，<b>重试不会重复创建记录</b>。</>,
   empty: <>还没有保存的文件。<b>先添加或扫描一份</b>，之后可以从这里继续办。</>,
-  ready: <>查看、打印和签名，<b>从同一份文件继续</b>。</>,
+  ready: <>预览、打印和签名，<b>从同一份文件继续</b>。</>,
 }

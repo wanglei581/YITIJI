@@ -19,6 +19,7 @@ import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'l
 import { CapabilityCenter } from './CapabilityCenter'
 import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
 import { PrintRetryButton } from './PrintRetryButton'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   adminPrintScanService,
   type AdminPrintScanTaskDetail,
@@ -26,7 +27,6 @@ import {
   type AdminPrintScanTaskPage,
   type PrintScanTaskType,
 } from '../../services/api/printScan'
-
 // ─── 展示映射 ─────────────────────────────────────────────────────────────────
 
 const TASK_TYPE_TABS: { value: PrintScanTaskType; label: string; implemented: boolean }[] = [
@@ -206,7 +206,7 @@ function TaskCenter() {
       return 'success'
     } catch (e) {
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(userMessageOf(e, '打印任务加载失败，请稍后重试'))
       return 'failed'
     } finally {
       if (seq === loadSeq.current) setLoading(false)
@@ -228,7 +228,7 @@ function TaskCenter() {
       const result = await adminPrintScanService.getTaskDetail(item.type, item.taskId)
       if (seq === detailSeq.current) setDetail(result)
     } catch (e) {
-      if (seq === detailSeq.current) setActionError(e instanceof Error ? e.message : '详情加载失败')
+      if (seq === detailSeq.current) setActionError(userMessageOf(e, '打印任务详情加载失败，请稍后重试'))
     }
   }
 
@@ -250,7 +250,7 @@ function TaskCenter() {
       await adminPrintScanService.applyTaskAction(subject.type, subject.taskId, action)
     } catch (e) {
       if (actionQueryKey === queryKeyRef.current) {
-        setActionError(e instanceof Error ? e.message : '操作失败')
+        setActionError(userMessageOf(e, '打印任务操作失败，请稍后重试'))
       }
       setActionBusy(false)
       setActionTaskId(null)

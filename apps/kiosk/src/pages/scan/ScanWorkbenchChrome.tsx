@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { useAuth } from '../../auth/useAuth'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { revokeLiveScanSession } from './scanSessionRevoke'
@@ -16,6 +18,7 @@ import {
   type ScanWorkbenchState,
 } from './scanWorkbench'
 import './styles/scan-workbench-qx.css'
+import './styles/scan-workbench-stage-qx.css'
 import './styles/scan-workbench-compact-qx.css'
 
 export function scanTerminalLabel(): string {
@@ -103,6 +106,23 @@ export function ScanWorkbenchShell({
         {/* 稿 18：底部三列口径是一次性说明，只在起点（选类型）出现，不每一屏复读 ——
             后面各屏把这块高度还给当前任务；各屏自己的「不猜 / 不改判」写在各自的卡里。 */}
         {state === 'setup' ? <ScanTruth /> : null}
+        {/* 问小青放在正文末尾、操作条之外：顶栏返回已经叫「返回打印扫描」，
+            再放进 .qx-ctabar 会让按操作条取名的用例一次命中两个。离开仍走 leaveScanFlow。 */}
+        <div className="sw-airow">
+          <QxStepActions prevLabel="返回打印扫描" onPrev={() => leaveScanFlow('/print-scan')}>
+            <button
+              type="button"
+              className="qx-ai-help"
+              data-testid="scan-workbench-ask"
+              onClick={() => {
+                rememberAssistantDraft('我想扫描一份纸质材料。请告诉我怎么放纸，以及要在打印机面板上按哪里。')
+                leaveScanFlow('/assistant')
+              }}
+            >
+              问小青：扫描要怎么按 →
+            </button>
+          </QxStepActions>
+        </div>
       </div>
     </QxPageFrame>
   )
@@ -125,6 +145,7 @@ export function ScanHero({
       <div className="sw-xq-row">
         <div className="sw-xq-face" aria-hidden="true">青</div>
         <div className="sw-xq-main">
+          <div className="sw-xq-eyebrow">材料扫描</div>
           <h2 className="sw-xq-ask">
             {i < 0 ? (
               ask
@@ -188,7 +209,7 @@ export function ScanTypeCards({
   selected,
   onPick,
 }: {
-  selected: ScanType
+  selected: ScanType | null
   onPick: (type: ScanType) => void
 }) {
   return (

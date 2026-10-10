@@ -3,6 +3,7 @@ import { formatCount, formatDateTime } from '@ai-job-print/shared'
 import { Card, StatusBadge } from '@ai-job-print/ui'
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getDeviceFleetOverview,
   type DeviceFleetConfigArea,
@@ -107,7 +108,7 @@ export default function TerminalFleetOverview() {
   const loading = status === 'loading' && data === undefined
   const initialLoadFailed = status === 'error' && data === undefined
   const errorMessage = error
-    ? (error instanceof Error ? error.message : '设备总览加载失败')
+    ? (userMessageOf(error, '请稍后重试'))
     : null
   const hasConfigurationIssue = Boolean(
     data && (

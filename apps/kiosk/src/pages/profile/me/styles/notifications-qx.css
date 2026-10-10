@@ -1,9 +1,17 @@
 @import './qx-me-shared.css';
 
+.qx-me-list > .qx-me-notice-row { align-items: flex-start; }
+.qx-me-notice-row .qx-me-row-head { flex-wrap: nowrap; }
+.qx-me-notice-row .qx-me-row-title { min-width: 0; overflow-wrap: anywhere; }
+.qx-me-notice-row .qx-me-row-head > :not(.qx-me-row-title) { flex-shrink: 0; }
+.qx-me-notice-row .qx-me-notice-time { margin-top: 0; margin-left: auto; white-space: nowrap; }
 .qx-me-notice-body {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
   margin-top: 8px;
-  font-size: 18px;
+  font-size: 21px;
   line-height: 1.5;
   color: var(--qx-ink-2);
 }

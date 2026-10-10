@@ -49,6 +49,8 @@ export class ApiHttpError extends Error {
 }
 `)
 
+const unattendedUrl = toDataUrl(transpile('src/copy/unattendedCopy.ts'))
+
 let seed = 0
 async function loadReplayModule() {
   seed += 1
@@ -65,12 +67,14 @@ async function loadRecoveryModule() {
   )
   const userErrors = toDataUrl(
     transpile('src/services/api/userErrorMessage.ts')
-      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`),
+      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)
+      .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`),
   )
   const code = transpile('src/pages/scan/scanRescanRecovery.ts')
     .replaceAll("'../../services/api/httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)
     .replaceAll("'../../services/api/userErrorMessage'", `'${userErrors}'`)
     .replaceAll("'./scanCreateReplay'", `'${replay}'`)
+    .replaceAll("'../../copy/unattendedCopy'", `'${unattendedUrl}'`)
   return import(toDataUrl(`${code}\n// instance ${seed}\n`))
 }
 

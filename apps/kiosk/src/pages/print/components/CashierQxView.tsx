@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { PrintAiHelp } from './PrintAiHelp'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
@@ -296,7 +297,7 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
           </div>
         ))}
       </dl>
-      <p className="cashier-qx-p">{props.amountCents === 0 ? '如需核对出纸结果，请联系现场工作人员。' : props.refundAssistanceCopy + '。'}</p>
+      <p className="cashier-qx-p">{typeof props.amountCents === 'number' && props.amountCents > 0 ? props.refundAssistanceCopy : `如需核对出纸结果，${helpNeededLine()}。`}</p>
     </section>
   )
 }
@@ -476,8 +477,8 @@ export function CashierQxDock({
         <p>
           <b>异常处理</b>
           {billingChannel === 'sandbox'
-            ? '本次走的是测试支付通道，不产生真实账单；结果长时间未更新时请联系工作人员。'
-            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单，再联系工作人员。`}
+            ? `本次走的是测试支付通道，不产生真实账单。结果长时间未更新时，${helpNeededLine()}。`
+            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单。${helpNeededLine()}。`}
         </p>
       </div>
     </>

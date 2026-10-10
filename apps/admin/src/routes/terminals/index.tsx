@@ -23,6 +23,7 @@ import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { TerminalDetailDrawer } from './TerminalDetailDrawer'
 import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 import { lifecycleView } from './terminalStatusViews'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 const FILTERS = ['全部', '在线', '离线'] as const
@@ -154,7 +155,7 @@ export default function TerminalsPage() {
       void refresh().catch(() => undefined)
       setNotice({ type: 'success', text: `已更新终端 ${terminal.terminalCode} 的设备档案，一体机下一轮配置刷新后生效` })
     } catch (error) {
-      setNotice({ type: 'error', text: error instanceof Error ? error.message : '设备档案保存失败，请稍后重试' })
+      setNotice({ type: 'error', text: userMessageOf(error, '设备档案保存失败，请稍后重试') })
     } finally {
       setProfileSaving(false)
     }
@@ -183,7 +184,7 @@ export default function TerminalsPage() {
       void refresh().catch(() => undefined)
       setNotice({ type: 'success', text: result.newOrgId ? `已绑定终端 ${terminal.terminalCode} → ${result.orgName ?? result.newOrgId}（保存成功，一体机下一轮拉取后生效）` : `已解绑终端 ${terminal.terminalCode}（保存成功）` })
     } catch (error) {
-      setNotice({ type: 'error', text: error instanceof Error ? error.message : '保存失败，请稍后重试' })
+      setNotice({ type: 'error', text: userMessageOf(error, '保存失败，请稍后重试') })
     } finally {
       setSaving(false)
     }
@@ -200,7 +201,7 @@ export default function TerminalsPage() {
       void refresh().catch(() => undefined)
       setNotice({ type: 'success', text: `已${result.enabled ? '启用' : '停用'}终端 ${terminal.terminalCode}，一体机下一轮配置刷新后生效` })
     } catch (error) {
-      setNotice({ type: 'error', text: error instanceof Error ? error.message : '终端状态更新失败，请稍后重试' })
+      setNotice({ type: 'error', text: userMessageOf(error, '终端状态更新失败，请稍后重试') })
     } finally {
       setStatusSavingId(null)
     }

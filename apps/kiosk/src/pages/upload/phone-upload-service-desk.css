@@ -77,13 +77,13 @@
   color: var(--m-deep); background: linear-gradient(145deg, var(--m-emerald), var(--m-teal)); font-family: var(--m-serif); font-size: 21px; font-weight: 900;
 }
 .k1-phone-upload .ph-up-brand { position: relative; z-index: 1; min-width: 0; flex: 1; }
-.k1-phone-upload .ph-up-brand strong { display: block; font-family: var(--m-serif); font-size: 16px; font-weight: 800; letter-spacing: 1.5px; }
+.k1-phone-upload .ph-up-brand strong { display: block; font-family: var(--m-serif); font-size: 18px; font-weight: 800; letter-spacing: 1.5px; }
 .k1-phone-upload .ph-up-brand small {
-  display: block; margin-top: 2px; overflow: hidden; color: rgba(242, 239, 228, .72); font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap;
+  display: block; margin-top: 2px; color: rgba(242, 239, 228, .72); font-size: 15px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere;
 }
 .k1-phone-upload .ph-up-tag {
   position: relative; z-index: 1; display: inline-flex; flex: 0 0 auto; align-items: center; height: 26px; padding: 0 11px;
-  border: 1px solid rgba(46, 230, 168, .34); border-radius: 13px; color: var(--m-emerald2); font-size: 12px; font-weight: 700; letter-spacing: .5px;
+  border: 1px solid rgba(46, 230, 168, .34); border-radius: 13px; color: var(--m-emerald2); font-size: 15px; font-weight: 700; letter-spacing: .5px;
 }
 .k1-phone-upload .ph-up-wave { position: relative; height: 12px; flex: 0 0 auto; background: var(--m-paper); }
 .k1-phone-upload .ph-up-wave::before {
@@ -107,16 +107,16 @@
   display: grid; width: 64px; height: 64px; place-items: center; border-radius: 20px; color: var(--m-wheat-d); background: var(--m-wheat-soft);
 }
 .k1-phone-upload .ph-up-glyph svg { width: 30px; height: 30px; }
-.k1-phone-upload .ph-up-statecard h1 { margin-top: 15px; font-family: var(--m-serif); font-size: 19px; font-weight: 800; line-height: 1.36; }
-.k1-phone-upload .ph-up-statecard p { max-width: 280px; margin-top: 9px; color: var(--m-muted); font-size: 13.5px; line-height: 1.65; }
+.k1-phone-upload .ph-up-statecard h1 { margin-top: 15px; font-family: var(--m-serif); font-size: 22px; font-weight: 800; line-height: 1.35; }
+.k1-phone-upload .ph-up-statecard p { max-width: 280px; margin-top: 9px; color: var(--m-muted); font-size: 16px; line-height: 1.5; }
 
 /* ── 去处行：未经核对的提示降一级，页面不按它决定任何事 ── */
 .k1-phone-upload .ph-up-target {
   display: flex; flex: 0 0 auto; align-items: flex-start; gap: 9px; padding: 11px 13px;
-  border: 1px solid var(--m-line); border-radius: 14px; color: var(--m-ink2); background: var(--m-surface); font-size: 13px; line-height: 1.5;
+  border: 1px solid var(--m-line); border-radius: 14px; color: var(--m-ink2); background: var(--m-surface); font-size: 16px; line-height: 1.5;
 }
 .k1-phone-upload .ph-up-target > svg { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; color: var(--m-teal-d); }
-.k1-phone-upload .ph-up-unsure { display: block; margin-top: 5px; color: var(--m-muted); font-size: 12px; line-height: 1.5; }
+.k1-phone-upload .ph-up-unsure { display: block; margin-top: 5px; color: var(--m-muted); font-size: 15px; line-height: 1.45; }
 
 /* ── 三步条：只写「接下来怎么做」，不是进度 ── */
 .k1-phone-upload .ph-up-steps {
@@ -124,11 +124,11 @@
 }
 .k1-phone-upload .ph-up-steps li {
   position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 5px;
-  color: var(--m-ink2); font-size: 12.5px; font-weight: 650; line-height: 1.35; text-align: center;
+  color: var(--m-ink2); font-size: 15px; font-weight: 650; line-height: 1.45; text-align: center;
 }
 .k1-phone-upload .ph-up-steps li + li::before { content: '›'; position: absolute; left: -11px; top: 50%; color: var(--m-line2); transform: translateY(-50%); }
 .k1-phone-upload .ph-up-step-no {
-  display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; color: var(--m-teal-d); background: var(--m-teal-soft); font-size: 12px; font-weight: 800;
+  display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; color: var(--m-teal-d); background: var(--m-teal-soft); font-size: 15px; font-weight: 800;
 }
 
 /* ── 选择区：整块可点；不可选的四种模式各有色，wait / unknown 用麦色（停一下，别动），dead 用失败色 ── */
@@ -139,11 +139,11 @@
 }
 .k1-phone-upload .ph-up-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; opacity: 0; }
 .k1-phone-upload .ph-up-picker-ic svg { width: 30px; height: 30px; }
-.k1-phone-upload .ph-up-picker b { font-size: 17.5px; font-weight: 800; letter-spacing: .5px; }
-.k1-phone-upload .ph-up-hint { max-width: 270px; color: var(--m-hint); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-picker b { font-size: 17px; font-weight: 800; letter-spacing: .5px; }
+.k1-phone-upload .ph-up-hint { max-width: 270px; color: var(--m-hint); font-size: 15px; line-height: 1.45; }
 .k1-phone-upload .ph-up-pill {
   display: flex; min-height: 48px; align-items: center; justify-content: center; margin-top: 2px; padding: 0 26px;
-  border-radius: 24px; color: var(--m-surface); background: var(--m-teal); font-size: 15.5px; font-weight: 750; letter-spacing: 1px;
+  border-radius: 24px; color: var(--m-surface); background: var(--m-teal); font-size: 17px; font-weight: 750; letter-spacing: 1px;
 }
 .k1-phone-upload .ph-up-picker[aria-disabled='true'] { border-color: var(--m-line2); color: var(--m-muted); background: var(--m-disabled-bg); cursor: default; }
 .k1-phone-upload .ph-up-picker[aria-disabled='true'] :is(.ph-up-hint, .ph-up-picker-ic) { color: var(--m-muted); }
@@ -160,7 +160,7 @@
 .k1-phone-upload .ph-up-filebox {
   display: flex; flex: 0 0 auto; flex-direction: column; gap: 8px; padding: 12px 13px; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface);
 }
-.k1-phone-upload .ph-up-fb-head { display: flex; align-items: center; font-size: 13px; font-weight: 800; }
+.k1-phone-upload .ph-up-fb-head { display: flex; align-items: center; font-size: 16px; font-weight: 800; }
 .k1-phone-upload .ph-up-fb-head span { margin-left: auto; color: var(--m-muted); font-weight: 650; }
 .k1-phone-upload .ph-up-file { display: flex; align-items: center; gap: 10px; }
 .k1-phone-upload .ph-up-file-icon {
@@ -168,8 +168,8 @@
 }
 .k1-phone-upload .ph-up-file-icon svg { width: 20px; height: 20px; }
 .k1-phone-upload .ph-up-file-meta { min-width: 0; flex: 1; }
-.k1-phone-upload .ph-up-file-meta b { display: block; overflow: hidden; font-size: 14.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.k1-phone-upload .ph-up-file-meta small { display: block; margin-top: 2px; color: var(--m-muted); font-size: 12px; }
+.k1-phone-upload .ph-up-file-meta b { display: block; overflow: hidden; font-size: 16px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.k1-phone-upload .ph-up-file-meta small { display: block; margin-top: 2px; color: var(--m-muted); font-size: 15px; line-height: 1.45; }
 .k1-phone-upload .ph-up-remove {
   display: grid; width: 48px; height: 48px; flex: 0 0 auto; place-items: center;
   border: 1px solid var(--m-line2); border-radius: 12px; color: var(--m-muted); background: var(--m-paper); transition: transform 120ms var(--m-ease);
@@ -177,16 +177,16 @@
 .k1-phone-upload .ph-up-remove svg { width: 20px; height: 20px; }
 .k1-phone-upload .ph-up-remove[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
 .k1-phone-upload .ph-up-empty {
-  display: flex; min-height: 44px; align-items: center; justify-content: center; border: 1px dashed var(--m-line2); border-radius: 12px; color: var(--m-muted); font-size: 13px;
+  display: flex; min-height: 44px; align-items: center; justify-content: center; border: 1px dashed var(--m-line2); border-radius: 12px; color: var(--m-muted); font-size: 15px; line-height: 1.45;
 }
 
 /* ── 状态条：轨道只表达「没开始 / 正在进行 / 结束」三件事，没有百分比 ── */
 .k1-phone-upload .ph-up-progress {
   display: flex; flex: 0 0 auto; flex-direction: column; gap: 9px; padding: 13px 14px; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface);
 }
-.k1-phone-upload .ph-up-pg-head { display: flex; align-items: center; gap: 9px; font-size: 14.5px; }
+.k1-phone-upload .ph-up-pg-head { display: flex; align-items: center; gap: 9px; font-size: 16px; }
 .k1-phone-upload .ph-up-pg-head b { font-weight: 800; }
-.k1-phone-upload .ph-up-pg-head span { margin-left: auto; color: var(--m-muted); font-size: 12.5px; text-align: right; }
+.k1-phone-upload .ph-up-pg-head span { margin-left: auto; color: var(--m-muted); font-size: 15px; line-height: 1.45; text-align: right; }
 .k1-phone-upload .ph-up-track { height: 8px; overflow: hidden; border-radius: 4px; background: var(--m-track); }
 .k1-phone-upload .ph-up-track i { display: block; width: 100%; height: 100%; border-radius: 4px; }
 .k1-phone-upload .ph-up-track i[data-fill='idle'] { background: repeating-linear-gradient(90deg, var(--m-track-idle) 0 8px, transparent 8px 16px); }
@@ -198,12 +198,12 @@
 .k1-phone-upload .ph-up-track i[data-fill='error'] { background: var(--m-cinnabar); }
 /* 结果未知：既不是成功也不是失败，斜纹表达「这一格填不出来」 */
 .k1-phone-upload .ph-up-track i[data-fill='unknown'] { background: repeating-linear-gradient(45deg, var(--m-wheat-line) 0 9px, var(--m-wait-stripe) 9px 18px); }
-.k1-phone-upload .ph-up-note { display: flex; align-items: flex-start; gap: 8px; color: var(--m-muted); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-note { display: flex; align-items: flex-start; gap: 8px; color: var(--m-muted); font-size: 15px; line-height: 1.45; }
 .k1-phone-upload .ph-up-note > svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; }
 .k1-phone-upload .ph-up-note[data-tone='error'] { color: var(--m-cinnabar-d); }
 .k1-phone-upload .ph-up-note[data-tone='warn'] { color: var(--m-warn-ink); }
 .k1-phone-upload .ph-up-note[data-tone='ok'] { color: var(--m-teal-d); }
-.k1-phone-upload .ph-up-server-note { color: var(--m-ink2); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-server-note { color: var(--m-ink2); font-size: 15px; line-height: 1.45; }
 
 /* ── 已收到 ── */
 .k1-phone-upload .ph-up-done {
@@ -212,37 +212,44 @@
 }
 .k1-phone-upload .ph-up-done-glyph { display: grid; width: 56px; height: 56px; place-items: center; border-radius: 18px; color: var(--m-teal-d); background: var(--m-surface); }
 .k1-phone-upload .ph-up-done-glyph svg { width: 26px; height: 26px; }
-.k1-phone-upload .ph-up-done h1 { font-family: var(--m-serif); font-size: 18.5px; font-weight: 800; }
-.k1-phone-upload .ph-up-done > span:last-child { max-width: 262px; font-size: 13px; line-height: 1.6; }
+.k1-phone-upload .ph-up-done h1 { font-family: var(--m-serif); font-size: 22px; font-weight: 800; line-height: 1.35; }
+.k1-phone-upload .ph-up-done > span:last-child { max-width: 262px; font-size: 16px; line-height: 1.5; }
 .k1-phone-upload .ph-up-notice {
   display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--m-teal-line); border-radius: 12px;
-  color: var(--m-deep2); background: var(--m-teal-soft); font-size: 13px; line-height: 1.55;
+  color: var(--m-deep2); background: var(--m-teal-soft); font-size: 15px; line-height: 1.45;
 }
 .k1-phone-upload .ph-up-notice > svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; }
 
 /* ── 格式标签 ── */
-.k1-phone-upload .ph-up-sect { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; padding-top: 2px; color: var(--m-ink2); font-size: 12.5px; font-weight: 800; letter-spacing: .6px; }
+.k1-phone-upload .ph-up-sect { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; padding-top: 2px; color: var(--m-ink2); font-size: 15px; font-weight: 800; letter-spacing: .6px; line-height: 1.45; }
 .k1-phone-upload .ph-up-sect::after { content: ''; flex: 1; height: 1px; background: var(--m-line); }
 .k1-phone-upload .ph-up-chips { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 6px; }
 .k1-phone-upload .ph-up-chip {
   display: inline-flex; min-height: 30px; align-items: center; padding: 0 11px; border: 1px solid var(--m-line2); border-radius: 15px;
-  color: var(--m-ink2); background: var(--m-paper); font-size: 12.5px; font-weight: 700;
+  color: var(--m-ink2); background: var(--m-paper); font-size: 15px; font-weight: 700; line-height: 1.45;
 }
 
 /* ── 事实表：时限、留存、恢复路径这类必须写清楚的话 ── */
 .k1-phone-upload .ph-up-facts { display: flex; flex: 0 0 auto; flex-direction: column; overflow: hidden; border: 1px solid var(--m-line); border-radius: 16px; background: var(--m-surface); }
 .k1-phone-upload .ph-up-facts > div { display: flex; gap: 11px; padding: 10px 13px; border-top: 1px solid var(--m-line); }
 .k1-phone-upload .ph-up-facts > div:first-child { border-top: 0; }
-.k1-phone-upload .ph-up-facts dt { flex: 0 0 74px; color: var(--m-muted); font-size: 12.5px; font-weight: 800; line-height: 1.6; }
-.k1-phone-upload .ph-up-facts dd { min-width: 0; flex: 1; color: var(--m-ink2); font-size: 12.5px; line-height: 1.6; }
+.k1-phone-upload .ph-up-facts dt { flex: 0 0 74px; color: var(--m-muted); font-size: 15px; font-weight: 800; line-height: 1.45; }
+.k1-phone-upload .ph-up-facts dd { min-width: 0; flex: 1; color: var(--m-ink2); font-size: 15px; line-height: 1.45; }
 .k1-phone-upload .ph-up-facts b { color: var(--m-ink); font-weight: 800; }
 
 /* ── 页脚隐私条 ── */
 .k1-phone-upload .ph-up-footer {
   display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; padding: 11px 18px 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--m-line); color: var(--m-muted); background: var(--m-surface); font-size: 12px; line-height: 1.55;
+  border-top: 1px solid var(--m-line); color: var(--m-muted); background: var(--m-surface); font-size: 15px; line-height: 1.45;
 }
 .k1-phone-upload .ph-up-footer > svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--m-teal-d); }
+.k1-phone-upload .ph-up-xiaoqing {
+  margin: 0 18px 8px; color: var(--m-teal-d); font-size: 15px; line-height: 1.45;
+}
+
+/* 9/28 留白：链接不可用、签名不可用只有一张状态卡。grow 藏掉，余量分到说明表上下。 */
+.k1-phone-upload:is([data-phone-upload-state='invalid'], [data-phone-upload-state='signature-blocked']) .ph-up-grow { display: none; }
+.k1-phone-upload:is([data-phone-upload-state='invalid'], [data-phone-upload-state='signature-blocked']) .ph-up-facts { margin-top: auto; margin-bottom: auto; }
 
 .k1-phone-upload .ph-up-picker:not([aria-disabled='true']):active { transform: scale(.985); }
 .k1-phone-upload .ph-up-remove:not([aria-disabled='true']):active { transform: scale(.94); }
@@ -250,6 +257,19 @@
 .k1-phone-upload button:focus-visible { outline: 3px solid var(--m-teal); outline-offset: 2px; }
 .k1-phone-upload .ph-up-flow > * { animation: ph-up-rise 240ms var(--m-ease) both; }
 .k1-phone-upload .ph-up-takeover > * { animation: ph-up-rise 240ms var(--m-ease) both; }
+
+/* 比 390×844 稿矮或窄：整页滚动，页脚全文排在内容最后，选择文件按钮仍保持主操作尺寸。 */
+@media (max-height: 843px), (max-width: 389px) {
+  .k1-phone-upload .k1-phone-upload-content { overflow-y: auto; overscroll-behavior: contain; }
+  .k1-phone-upload .ph-up-flow { overflow: visible; flex: none; gap: 8px; }
+  .k1-phone-upload .ph-up-target { gap: 6px; padding: 8px; }
+  .k1-phone-upload .ph-up-steps { padding-top: 6px; padding-bottom: 6px; }
+  .k1-phone-upload .ph-up-picker { gap: 8px; padding: 12px; }
+  /* 长格式说明排在主按钮之后，全部保留并可继续滚动阅读。 */
+  .k1-phone-upload .ph-up-hint { order: 1; }
+  .k1-phone-upload .ph-up-xiaoqing { flex: 0 0 auto; }
+  .k1-phone-upload .ph-up-pill { min-height: 56px; }
+}
 
 /* 宽屏（平板、桌面、1080×1920 竖屏）：同一列居中成 390 宽；够高时收成 844 高的手机卡 */
 @media (min-width: 431px) {

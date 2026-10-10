@@ -6,6 +6,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { createScanSession } from '../../services/api/scanTasks'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
 import { acknowledgeScanDelivery, type ScanAckCredentials } from './scanDeliveryAck'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
@@ -299,7 +300,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           title: '这台机器的安全校验没通过',
           description: userMessageOf(
             { code: 'TERMINAL_SESSION_INVALID' },
-            '这台机器的安全校验没通过，请联系现场工作人员',
+            machineUnusableLine(),
           ),
         })
         setPhase('error')
@@ -775,14 +776,14 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
+      <ScanSec no="01" title="照着做：全在机器面板上" hint="系统给出原文，本机不改写" grow>
         <ScanPanelMock
           instructions={instructions.map((instruction) => instruction)}
           scanLabel={SCAN_TYPE_LABELS[scanType]}
         />
       </ScanSec>
-      <ScanSec no="02" title="现在能做什么" hint="按系统结果继续">
-        <ScanChain active={0} />
+      <ScanSec no="02" title="现在在第一段" hint="做到哪一步，不是完成百分比">
+        <ScanChain active={1} />
       </ScanSec>
       {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂
           **挂载那一刻**那个 ref：每帧重算会把一个刚在本页建成的会话说成「本页重载过」。 */}

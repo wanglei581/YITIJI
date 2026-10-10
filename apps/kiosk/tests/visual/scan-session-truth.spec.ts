@@ -61,7 +61,8 @@ async function fulfillCreatedSession(route: Route): Promise<void> {
 
 async function enterSettingsFromVisibleStart(page: Page): Promise<void> {
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
 }
 
@@ -150,9 +151,12 @@ test('scan start does not probe a nonexistent device endpoint and carries explic
 
   await page.goto('/scan/start')
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
-  const next = page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ })
-  await expect(next).toBeEnabled()
+  const next = page.getByRole('button', { name: '开始这次扫描', exact: true })
+  await expect(next).toBeDisabled()
+  await expect(page.getByTestId('scan-workbench-disabled-reason')).toHaveText('先选一种材料')
   expect(deviceRequests()).toBe(0)
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await expect(next).toBeEnabled()
 
   await next.click()
   await page.waitForURL(/\/scan\?stage=settings/)
@@ -351,7 +355,8 @@ test('leaving while creation is in flight cancels the late-created session once 
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /\u4e0b\u4e00\u6b65/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await createReceived
   await page.getByRole('button', { name: '\u5b89\u5168\u8fd4\u56de\u626b\u63cf\u9996\u9875' }).first().click()
   await page.waitForURL(/\/scan(\?stage=start)?$|\/scan\?stage=start/)
@@ -456,7 +461,8 @@ test('a revoked terminal session fails the creation closed and is not retried @k
   // 换票失败后还会向本机 Agent 要一张新引导票（默认配置里配了桥接令牌），
   // 连不上要等一次 4 秒超时才落到 fail-closed —— 这条断言要能等过那一段。
   await expect(page.getByText('这台机器的安全校验没通过', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('这台机器的安全校验没通过，请联系现场工作人员', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   await page.waitForTimeout(500)
@@ -628,7 +634,7 @@ test('leaving the whole scan flow from the top bar revokes the server task once 
   await page.goto('/scan?stage=settings')
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: '返回打印扫描' }).click()
+  await page.locator('.qx-topbar-back').click()
   await page.waitForURL(/\/print-scan$/)
   await expect.poll(() => revokes().length).toBe(1)
   // 复水进来的这一场也确认过一次：本机不知道当初确认过没有，而 ACK 幂等。
@@ -674,7 +680,8 @@ test('a scan session that arrives after the user left is revoked and never writt
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
 
@@ -859,7 +866,8 @@ test('a terminal session that recovers after the abandoned task was revoked neve
   })
 
   await page.goto('/scan/start')
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await createReceived
   await expect(page.getByText('正在创建扫描任务', { exact: false }).first()).toBeVisible()
 
@@ -930,7 +938,8 @@ test('a create deferred by a terminal refresh still goes out once the new ticket
   await refreshArrived
   expect(await terminalSessionStateOf(page), '续期在飞时会话状态必须真的是 checking').toBe('checking')
 
-  await page.getByRole('button', { name: /下一步/ }).click()
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await page.waitForURL(/\/scan\?stage=settings/)
   // 换票没出结果之前：不抢跑创建请求（抢跑只会拿回 401），也不谎称正在建扫描会话。
   await expect(page.getByText('正在做这台机器的安全校验', { exact: true }).first()).toBeVisible()

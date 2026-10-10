@@ -183,6 +183,18 @@ Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\collect-field-evidence.ps1") `
   -Destination (Join-Path $provisionRoot "collect-field-evidence.ps1")
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\boot-spool-guard.ps1") `
+  -Destination (Join-Path $provisionRoot "boot-spool-guard.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\boot-spool-guard-task.ps1") `
+  -Destination (Join-Path $provisionRoot "boot-spool-guard-task.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\daily-reboot.ps1") `
+  -Destination (Join-Path $provisionRoot "daily-reboot.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\daily-reboot-task.ps1") `
+  -Destination (Join-Path $provisionRoot "daily-reboot-task.ps1")
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\service-identity.ps1") `
   -Destination (Join-Path $provisionRoot "service-identity.ps1")
 Copy-WindowsPowerShellScript `

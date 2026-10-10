@@ -1,3 +1,5 @@
+import { helpNeededLine, refundApplyLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 // ============================================================
 // 打印订单详单（支付信息区，C5 P0b）。
 //
@@ -30,7 +32,6 @@ import {
   pageRangeDisplay,
   publicOrderNo,
   paymentSourceLabel,
-  PENDING_REFUND_EXPLANATION,
   PENDING_REFUND_LABEL,
   recordedAmountDisplay,
 } from './paymentCopy'
@@ -49,6 +50,7 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 }
 
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const payStatus = item.payStatus ?? null
   const orderNo = publicOrderNo(item.orderNo)
@@ -67,7 +69,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
+          <span>（该订单未关联支付记录。{helpNeededLine(contact)}）</span>
         </p>
       ) : isFreeMemberOrder(item) ? null : (
         <div className="me-payment-grid">
@@ -93,11 +95,11 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </div>
       )}
 
-      {item.refundRequired === true && (
+      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 && !isFreeMemberOrder(item) && (
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {isFreeMemberOrder(item) ? '本单已确认未出纸，退款由工作人员处理。' : PENDING_REFUND_EXPLANATION}
+          {refundApplyLine(contact)}
         </p>
       )}
 

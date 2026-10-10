@@ -189,6 +189,11 @@ jobs:
         shell: pwsh
         run: |
           pnpm --filter ./apps/terminal-agent verify:remote-commands-windows
+      # Same pre-staging window. Stops Spooler on this runner and restores Automatic + Running.
+      - name: Verify boot spool guard and daily reboot dry-run
+        shell: pwsh
+        run: |
+          pnpm --filter ./apps/terminal-agent verify:boot-spool-guard-windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # Same pre-staging window. Junction case uses New-Item -ItemType Junction.

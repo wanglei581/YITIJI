@@ -121,15 +121,25 @@ export class SmartCampusService {
   }
 
   async listSmartCampusTerminals(): Promise<SmartCampusTerminalView[]> {
+    // 列两类终端：已有智慧校园配置的；以及归属「可管智慧校园」机构（学校就业中心）的启用、未退役终端，
+    // config 可为 null —— 管理员才能给学校终端开第一份配置（10/6 两后台窗口报「暂无终端」）。
+    // 与学校无关、也没配置过的终端仍不列（#891 ⑯ 的过滤口径保留）。预置但尚未注册的配置行在下面补上。
     const configs = await this.prisma.terminalSmartCampusConfig.findMany()
-    const terminalRefs = [...new Set(configs.map((config) => config.terminalId))]
-    const terminals = terminalRefs.length === 0
-      ? []
-      : await this.prisma.terminal.findMany({
-          where: { OR: [{ id: { in: terminalRefs } }, { terminalCode: { in: terminalRefs } }] },
-          include: { org: { select: { id: true, name: true } }, heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
-          orderBy: { registeredAt: 'desc' },
-        })
+    const configRefs = [...new Set(configs.map((config) => config.terminalId))]
+    const candidates = await this.prisma.terminal.findMany({
+      where: {
+        OR: [
+          ...(configRefs.length > 0 ? [{ id: { in: configRefs } }, { terminalCode: { in: configRefs } }] : []),
+          { enabled: true, lifecycleStatus: { not: 'retired' }, orgId: { not: null } },
+        ],
+      },
+      include: { org: { select: { id: true, name: true, type: true } }, heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
+      orderBy: { registeredAt: 'desc' },
+    })
+    const configRefSet = new Set(configRefs)
+    const terminals = candidates.filter((t) =>
+      configRefSet.has(t.id) || configRefSet.has(t.terminalCode) ||
+      (t.enabled && t.lifecycleStatus !== 'retired' && !!t.org && partnerOrgTypeCan(t.org.type, 'manageSmartCampus')))
     const byTerminal = new Map(configs.map((c) => [c.terminalId, c]))
     const now = Date.now()
 

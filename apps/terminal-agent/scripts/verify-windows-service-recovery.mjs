@@ -260,7 +260,7 @@ assert.match(serviceRecovery, /failure/, 'service recovery must configure sc.exe
 assert.match(serviceRecovery, /reset=/, 'service recovery must set a reset period')
 assert.match(serviceRecovery, /86400/, 'service recovery reset period must be one day')
 assert.match(serviceRecovery, /actions=/, 'service recovery must configure actions')
-assertIncludes(serviceRecovery, 'restart/60000/restart/300000/""/0', 'service recovery must use two finite restarts and a no-action third failure')
+assertIncludes(serviceRecovery, 'restart/60000/restart/300000/restart/1800000', '两次快速重启，之后每 30 分钟重试，不无限快速重启')
 assert.match(serviceRecovery, /failureflag/, 'service recovery must enable failure handling for non-crash failures')
 assert.match(serviceRecovery, /qfailure/, 'service recovery must read back the configured policy')
 assert.match(serviceRecovery, /\$\{ServiceName\}:/, 'service recovery status text must parse in Windows PowerShell 5.1')

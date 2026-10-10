@@ -1,3 +1,5 @@
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { ReactNode } from 'react'
 import { KioskNumpad } from '../../../components/kiosk-numpad/KioskNumpad'
 import {
@@ -278,8 +280,8 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
         </li>
         <li>
           <button type="button" className="pch-out-btn" onClick={onHelp}>
-            <b>问工作人员</b>
-            <span>帮你查订单</span>
+            <b>求助</b>
+            <span>联系我们或问小青</span>
           </button>
         </li>
       </ul>
@@ -306,6 +308,7 @@ export function PickupFailurePanel({
   onHelp: () => void
   onHome: () => void
 }) {
+  const contact = useSupportContact()
   if (failure === 'locked' || failure === 'network') {
     const locked = failure === 'locked'
     return (
@@ -321,9 +324,9 @@ export function PickupFailurePanel({
         </div>
         <p className="pcp-block-body">
           {locked ? (
-            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行；着急的话请找现场工作人员。</>
+            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行。{helpNeededLine(contact)}。</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸；如果仍拿不到结果，请找工作人员核实订单。</>
+            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{helpNeededLine(contact)}。</>
           )}
         </p>
         <div className="pcp-actions">
@@ -331,7 +334,7 @@ export function PickupFailurePanel({
             <>
               <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHome}>先回首页</button>
               <button type="button" className="qx-btn pcp-act pcp-act--staff" data-testid="arrival-code-primary" onClick={onHelp}>
-                联系工作人员获取帮助
+                求助
               </button>
             </>
           ) : (
@@ -339,7 +342,7 @@ export function PickupFailurePanel({
               <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onRetry}>
                 重试校验
               </button>
-              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
+              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>求助</button>
             </>
           )}
         </div>
@@ -384,7 +387,7 @@ export function PickupFailurePanel({
           {failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
         <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
-          {failure === 'invalid' ? '查看取码说明 / 找工作人员' : '找工作人员'}
+          {failure === 'invalid' ? '查看取码说明 / 求助' : '求助'}
         </button>
       </div>
     </>

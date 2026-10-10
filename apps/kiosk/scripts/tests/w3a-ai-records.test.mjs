@@ -12,9 +12,11 @@ function load(file, mocks = {}, globals = {}) {
   const source = readFileSync(resolve(root, file), 'utf8')
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText
   const exports = {}
-  vm.runInNewContext(output, { exports, require: (id) => id in mocks ? mocks[id] : realRequire(id), setTimeout, clearTimeout, URLSearchParams, ...globals })
+  vm.runInNewContext(output, { exports, require: (id) => id in mocks ? mocks[id] : id.endsWith('copy/unattendedCopy') ? unattendedCopy : realRequire(id), setTimeout, clearTimeout, URLSearchParams, ...globals })
   return exports
 }
+// 错误文案和 U 盘面板现在引用无人值守句。装真模块，不改原先的断言。
+const unattendedCopy = load('src/copy/unattendedCopy.ts')
 const plain = (value) => JSON.parse(JSON.stringify(value))
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b }); return { promise, resolve, reject } }
 

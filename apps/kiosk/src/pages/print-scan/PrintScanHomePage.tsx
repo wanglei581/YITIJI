@@ -1,3 +1,5 @@
+import { machineCannotPrintLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 // ============================================================
 // PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
@@ -314,6 +316,7 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 }
 
 export function PrintScanHomePage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
   // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
@@ -471,11 +474,7 @@ export function PrintScanHomePage() {
   const pill = HUB_PILL[hubState]
   const printerUnavailable = {
     label: device.printerLabel,
-    notice: device.printer.errorCode === 'paperEmpty'
-      ? '打印机缺纸，请找现场工作人员加纸'
-      : device.kind === 'offline'
-        ? '打印机当前无法连接，请找现场工作人员'
-        : '打印机异常，请找现场工作人员检查',
+    notice: machineCannotPrintLine(contact),
   }
 
   return (
@@ -543,7 +542,6 @@ export function PrintScanHomePage() {
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
-        description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
     </QxPageFrame>
   )

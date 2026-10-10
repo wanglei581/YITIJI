@@ -8,6 +8,8 @@
 //   ② 关键字 / 状态走服务端查询，地区 / 日期 / 收藏只在已取回集合内筛——页面必须说清楚。
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate } from 'react-router-dom'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
@@ -37,6 +39,7 @@ const ALL_STATUS = ['全部', '即将开始', '进行中', '已结束'] as const
 const STATUS_FILTER_MAP: Record<string, string> = { 即将开始: 'upcoming', 进行中: 'ongoing', 已结束: 'ended' }
 
 export function JobFairsPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [region, setRegion] = useState<RegionSelection>({})
@@ -128,7 +131,7 @@ export function JobFairsPage() {
     : uiState === 'error'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>问小青</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
         </>
       )
@@ -153,7 +156,7 @@ export function JobFairsPage() {
       ) : uiState === 'error' ? (
         <>
           <DirState tone="error" testId="fair-list-error" title="场次名单这次没取到">
-            请求失败了。本机<b>不显示上一次的缓存场次</b>，避免你按已经结束的时间地点白跑一趟。
+            请求失败了。本机<b>不显示上一次的缓存场次</b>，避免你按已经结束的时间地点白跑一趟。{helpNeededLine(contact)}
           </DirState>
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="岗位信息" desc="岗位和招聘会不是同一份名单，可能还能打开" onClick={() => navigate('/jobs')} />

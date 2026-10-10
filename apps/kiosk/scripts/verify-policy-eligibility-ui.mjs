@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
@@ -282,6 +283,54 @@ check(
   `F4. 条件核对可点元素 min-height 全部 ≥56px（实测：${minHeights.join('/') || '未采集到'}）`,
 )
 check(packageJson.includes('"verify:policy-eligibility-ui"'), 'F5. package.json 注册 verify:policy-eligibility-ui')
+
+// ── G. 发布方给了外部编号才显示整格（执行真实结果组件，不以注释充当实现）──
+try {
+  const react = require_('react')
+  const output = ts.transpileModule(results, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText
+  const resultModule = { exports: {} }
+  const resultRequire = (name) => {
+    if (name === './eligibilityOutcome') return mod
+    if (name === './components') return { EligibilityStepBar: () => null }
+    return require_(name)
+  }
+  new Function('require', 'exports', 'module', output)(resultRequire, resultModule.exports, resultModule)
+  const renderSource = (externalId) => {
+    const html = renderToStaticMarkup(react.createElement(resultModule.exports.EligibilityResults, {
+      result: {
+        items: [{
+          policyId: 'policy-source-check', title: '外部编号显示核对', conditionsRecorded: true,
+          overall: 'all_recorded_conditions_matched', overallLabel: '已录入条件相符', conditions: [],
+          source: { sourceName: '发布机构', syncTime: '2026-10-08T08:00:00.000Z', externalId },
+        }], answeredCount: 0, disclaimer: '不是资格认定',
+      },
+      questions: { questions: [] }, onRestart: () => {}, ctaHost: null,
+    }))
+    const sourceHtml = /<p class="k8-elig-card-src">([\s\S]*?)<\/p>/.exec(html)?.[1]
+    if (!sourceHtml) throw new Error('未渲染结果卡来源区')
+    return sourceHtml
+  }
+  const withId = renderSource('HRSS-2026-1008')
+  check(
+    /<span class="k8-elig-chip">外部编号 <b>HRSS-2026-1008<\/b><\/span>/.test(withId)
+      && (withId.match(/<span /g) ?? []).length === 3,
+    'G1. 发布方给了编号：真实结果卡显示外部编号整格与原值',
+  )
+  for (const externalId of [null, '']) {
+    const withoutId = renderSource(externalId)
+    check(
+      !withoutId.includes('外部编号') && !withoutId.includes(['来源', '未提供'].join(''))
+        && (withoutId.match(/<span /g) ?? []).length === 2
+        && withoutId.includes('来源机构 <b>发布机构</b>')
+        && withoutId.includes('同步时间 <b>2026-10-08</b>'),
+      `G2. 编号为 ${externalId === null ? 'null' : '空字符串'}：整格不渲染，仅保留来源机构与同步时间`,
+    )
+  }
+} catch (err) {
+  fail(`G. 结果卡来源区渲染错误：${err.message}`)
+}
 
 // ── 自检：断言用的正则必须真的能匹配到东西（空匹配不等于通过）────────────
 // 反例夹具：把两种「空」串线、用原生 disabled、跳通用上传页 —— 这些必须被抓住。

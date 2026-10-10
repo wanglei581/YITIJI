@@ -22,6 +22,30 @@ function cssRuleBody(source, selector) {
   return stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
 }
 
+function braceBody(source, marker) {
+  const at = source.indexOf(marker)
+  if (at < 0) return ''
+  const open = source.indexOf('{', at + marker.length)
+  if (open < 0) return ''
+  let depth = 0
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '{') depth += 1
+    else if (char === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open, index + 1)
+    }
+  }
+  return ''
+}
+
+function betweenMarkers(source, start, end) {
+  const at = source.indexOf(start)
+  if (at < 0) return ''
+  const stop = source.indexOf(end, at + start.length)
+  return source.slice(at, stop < 0 ? source.length : stop)
+}
+
 function splitSelectorList(source) {
   const selectors = []
   let current = ''
@@ -129,7 +153,8 @@ const frozen = {
   // 2026-10-06 重新冻结：live 后若一直没有远端音量也没有字幕，12 秒提示、30 秒结束会话并转文字。
   // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
   // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
-  'src/hooks/useAiAdvisorCallSession.ts': '9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4',
+  // 第四段仅换设备身份不可用文案，并取会话联系方式；身份、声明、通话清理逻辑未改，重冻字节哈希。
+  'src/hooks/useAiAdvisorCallSession.ts': 'a46c0f19d40071879703ed9cf46934fcf0aa0bf9e465fef79b589398291efda9',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
@@ -248,8 +273,10 @@ check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limi
 // /resume/job-fit 仍是 KioskRoot 之外的整屏路由（fusion-w6 的 expectedFullScreen 钉着 depth=2），
 // 所以迁进青序流光之后舞台缩放必须自己挂 KioskStageFit —— QxPageFrame 本身不缩放，
 // 少挂这一层，1080×1920 的稿在别的分辨率上会直接溢出屏幕。
-includes('src/pages/resume/JobFitPage.tsx', 'KioskStageFit', 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
-check(!read('src/pages/resume/JobFitPage.tsx').includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
+// T46：KioskStageFit 随舞台拆到 jobFit/JobFitStage.tsx（500 行上限）。断言改为壳与舞台的并集，不删除「必须挂舞台」。
+const jobFitStageSources = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/jobFit/JobFitStage.tsx')}`
+check(jobFitStageSources.includes('KioskStageFit'), 'job-fit keeps the fixed 1080x1920 stage after the Qingxu migration')
+check(!jobFitStageSources.includes('KioskFullscreenShell'), 'job-fit has left the V6 fullscreen chrome')
 // 宿主 46 的另外两条整屏 route 复用 JobFitPage 导出的同一个舞台（缩放判据只有一份）；
 // /resume/templates 在 KioskRoot 之内，舞台由 KioskRoot 负责，页面不得再挂第二层缩放。
 for (const path of ['src/pages/resume/CareerPlanPage.tsx', 'src/pages/resume/JobFitActionsPage.tsx']) {
@@ -279,8 +306,9 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
-// 2026-09-28 稿 21 v2 summary 明确为文件 → 办理摘要 → 可展开的方向设置。
-// 旧双栏 / 0.9 比例是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 2026-09-28 稿 21 v2 曾把方向设置收成可展开的 details。T21a-fix1 按新稿改成独立画面。
+// 旧双栏 / 0.9 比例仍是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 「设置随时能打开」改成：按钮切到 target，工作台每一屏都有回到来源的出路。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
 const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
 check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses the design-21 vertical summary stage')
@@ -288,7 +316,17 @@ check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersi
 check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
 check(/flex-direction:\s*column/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source keeps file and summary in one vertical column')
 check(resumeSource.indexOf('<ResumeSourceSummary') < resumeSource.indexOf('<DiagnosisDirectionForm'), 'read-only summary precedes editable direction settings')
-check(resumeSource.includes('<details className="qx-rt-settings">'), 'direction settings remain accessible through the design disclosure')
+{
+  const openBody = braceBody(resumeSource, 'const openDirectionSettings =')
+  const actions = read('src/pages/resume/components/ResumeSourceActions.tsx')
+  check(actions.includes('设置诊断方向与目标背景') && resumeSource.includes('onOpenWorkbench={openDirectionSettings}') && openBody.includes("rememberScreen('target')"), 'direction settings button switches the screen to target')
+  const targetBlock = betweenMarkers(resumeSource, "{screen === 'target' ? (", "{(screen === 'target-context'")
+  const contextBlock = betweenMarkers(resumeSource, "{(screen === 'target-context' || screen === 'target-profile') ? (", "{screen === 'target-industry'")
+  const industryBlock = betweenMarkers(resumeSource, "{screen === 'target-industry' ? (", "{screen === 'summary'")
+  check(targetBlock.includes("rememberScreen('source')"), 'target screen can return to the source screen')
+  check(contextBlock.includes("rememberScreen('source')"), 'target context can return to the source screen')
+  check(industryBlock.includes("rememberScreen('target-context')") && contextBlock.includes("rememberScreen('source')"), 'industry screen can return to source through target context')
+}
 check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
@@ -362,6 +400,29 @@ includes('src/pages/ai-plan/AiPlanPage.tsx', '打开我的 AI 记录', 'empty st
 includes('src/pages/ai-plan/AiPlanPage.tsx', 'data-testid="advisor-artifact-cta-redo"', 'expired state has a redo button')
 includes('src/pages/ai-plan/AiPlanPage.tsx', '回去重做一次', 'expired redo uses the design label')
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'justify-content: space-evenly', 'body spreads leftover space as gaps')
+const artifactBodyRule = cssRuleBody(read('src/pages/ai-plan/styles/advisor-artifact-qx.css'), '.aa-body')
+check(artifactBodyRule.includes('justify-content: space-evenly'), '作业正文保留稿的默认区块排法')
+check(artifactBodyRule.includes('gap: 20px'), '作业正文保留稿的默认 20px 间距')
+const artifactCss = read('src/pages/ai-plan/styles/advisor-artifact-qx.css')
+const onePinHint = read('src/pages/ai-plan/advisorArtifactModel.ts').match(/export const ONE_PIN_HINT = '([^']+)'/)?.[1]
+check(Boolean(onePinHint?.startsWith('这次只留下了 1 条')), 'ONE_PIN_HINT 导出唯一提示常量并说明只有 1 条')
+for (const forbidden of ['工作人员', '服务台', '接着聊', '也收进来']) check(Boolean(onePinHint) && !onePinHint.includes(forbidden), `单条提示不含误导文案：${forbidden}`)
+includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', 'data-testid="advisor-artifact-one-pin-hint"', '单条提示保留测试标记')
+check(/payload\.pins\.length === 1\s*&&\s*\(\s*<p className="aa-more" data-testid="advisor-artifact-one-pin-hint">\{ONE_PIN_HINT\}<\/p>\s*\)/.test(read('src/pages/ai-plan/AdvisorArtifactPanels.tsx')), '提示仅由 pins.length === 1 控制，并引用唯一常量')
+check(Boolean(cssRuleBody(artifactCss, '.aa-more')), '单条提示有 aa-more 样式')
+// 同一个选择器在样式里有两条规则（上面那条只管不增长），只取第一条会把这条断言变成恒真，所以逐条看。
+const onlyPinRules = [...stripCssComments(artifactCss).matchAll(/\.aa-qa \.aa-pin:only-child\s*\{([^}]*)\}/g)].map((match) => match[1])
+check(onlyPinRules.some((body) => body.includes('padding: 30px 0 36px')), '只有 1 条时条目上下多留一点（padding: 30px 0 36px）')
+check(cssRuleBody(artifactCss, '.aa-body:has(.aa-pin:only-child) > .aa-take').includes('max-height: 736px'), '只有 1 条时纸样上限放到 736px')
+check(cssRuleBody(artifactCss, '.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before').includes('max-height: 137px'), '打印读不到时右栏先长的那处上限仍是 137px（2 条以上不变）')
+check(cssRuleBody(artifactCss, '.aa-body:has(.aa-pin:only-child) .aa-take-tx:has(> .aa-warn)::before').includes('max-height: 165px'), '只有 1 条又读不到打印时，右栏先长的那处上限放到 165px')
+check(artifactCss.includes('.aa-take-tx::after') && cssRuleBody(artifactCss, '.aa-body:has(> .aa-qa) .aa-take-tx::after').includes('max-height: 135px'), '带走卡右栏用伪元素先增长稿上已有间距，上限 135px')
+check(!artifactCss.includes('.aa-steps { margin-block: auto'), '带走卡两步不再用自动外边距上下居中')
+check(!cssRuleBody(artifactCss, '.aa-body > .aa-qa').includes('flex: 1 0 auto') && !artifactCss.includes("[data-testid='advisor-artifact-qa']"), '01 卡不再按旧规则拉空')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', '.aa-body:has(> .aa-qa)', '按实际条目面板规划空间，也覆盖打印读不到态')
+includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', '--aa-pin-gaps', '条目间距数决定可吸收的余高')
+includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', "'--aa-pin-gaps': Math.max(0, payload.pins.length - 1)", '组件按实际条目数设置间距数')
+for (const position of ['top', 'mid', 'bot']) includes('src/pages/ai-plan/AdvisorArtifactPanels.tsx', `data-p="${position}"`, `条目面板有 ${position} 间距占位`)
 includes('src/pages/ai-plan/styles/advisor-artifact-qx.css', 'font-size: 42px', 'hero sentence uses the 2.0 size')
 check(!read('src/pages/ai-plan/AiPlanPage.tsx').includes('qx-grow'), 'artifact page no longer stretches cards with qx-grow')
 for (const file of [
@@ -403,7 +464,15 @@ check(!read('src/pages/interview/InterviewReportPage.tsx').includes('岗位匹�
 check(!read('src/pages/interview/InterviewReportPage.tsx').includes('练习表现等级'), 'interview report must not say 练习表现等级')
 includes('src/pages/interview/InterviewSetupPage.tsx', "label: 'HR 面试'", 'setup interviewer label is HR 面试')
 includes('src/pages/interview/InterviewSessionPage.tsx', "hr: 'HR 面试'", 'session interviewer label is HR 面试')
-const jobGuidancePresentation = `${read('src/pages/resume/JobFitPage.tsx')}\n${read('src/pages/resume/CareerPlanPage.tsx')}\n${read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx')}`
+const jobGuidancePresentation = [
+  read('src/pages/resume/JobFitPage.tsx'),
+  read('src/pages/resume/jobFit/JobFitInteractiveViews.tsx'),
+  read('src/pages/resume/jobFitActionsView.tsx'),
+  read('src/pages/resume/CareerPlanPage.tsx'),
+  read('src/pages/resume/careerPlanView.tsx'),
+  read('src/pages/resume/careerPlanUnreadyView.tsx'),
+  read('src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx'),
+].join('\n')
 for (const forbidden of ['录用概率', '保证录用', '一键投递', '立即投递']) check(!jobGuidancePresentation.includes(forbidden), `job guidance rejects ${forbidden}`)
 for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pages/assistant/AssistantPage.tsx').includes(forbidden), `assistant avoids ${forbidden}`)
 // 其他页交来的问题（v2 草稿约定）只经 services/assistantDraft 读一次就删；顾问页自己不写存储，
@@ -418,7 +487,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
   for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }

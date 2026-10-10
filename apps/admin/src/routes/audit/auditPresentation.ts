@@ -1,9 +1,14 @@
 import type { AuditLogRecord } from '../../services/api/audit'
 import { USER_STATUS_LABELS } from '../users/userPresentation'
 import { taskStatusLabel } from '../screen/metricLabels'
+import { PAY_STATUS_MAP, STATUS_MAP } from '../orders/orderDisplay'
 import { getAuditRoleLabel, getAuditTargetLabel } from '../../lib/auditActionLabels'
+import { auditScopedValue } from './auditPayloadLabels'
 
+/** 操作人：服务端给了显示名就用；没有（系统、会员、已删除账号、旧接口）退回「角色 · 尾号」。显示名若像手机号等敏感文本也退回。 */
 export function auditActorText(record: AuditLogRecord): string {
+  const name = record.actorDisplayName?.trim()
+  if (name && safeAuditText(name) === name) return name
   const role = getAuditRoleLabel(record.actorRole)
   if (role === '系统') return '系统'
   return record.actorId ? `${role} · 尾号 ${record.actorId.slice(-6)}` : role
@@ -71,9 +76,17 @@ export function sanitizeAuditValue(value: unknown, key = ''): unknown {
   const safe = safeAuditText(value)
   if (safe !== value) return safe
   if (key === 'sections') return Object.prototype.hasOwnProperty.call(SECTION_LABELS, value) ? SECTION_LABELS[value] : value
-  if (['fromStatus', 'toStatus', 'status', 'result'].includes(key)) {
-    const label = USER_STATUS_LABELS[value as keyof typeof USER_STATUS_LABELS] ?? taskStatusLabel(value)
-    return typeof label === 'string' ? label : value
+  const scoped = auditScopedValue(key, value)
+  if (scoped) return scoped
+  if (['fromStatus', 'toStatus', 'status', 'result', 'oldStatus', 'newStatus', 'previousStatus', 'nextStatus'].includes(key)) {
+    if (Object.prototype.hasOwnProperty.call(USER_STATUS_LABELS, value)) {
+      return USER_STATUS_LABELS[value as keyof typeof USER_STATUS_LABELS]
+    }
+    const screenLabel = taskStatusLabel(value)
+    if (typeof screenLabel === 'string' && screenLabel !== value) return screenLabel
+    if (Object.prototype.hasOwnProperty.call(STATUS_MAP, value)) return STATUS_MAP[value].label
+    if (Object.prototype.hasOwnProperty.call(PAY_STATUS_MAP, value)) return PAY_STATUS_MAP[value].label
+    return value
   }
   return value
 }
