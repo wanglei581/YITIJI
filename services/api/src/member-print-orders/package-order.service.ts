@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
-import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
+import { encryptSecret } from '../common/crypto/secret-cipher'
 import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { aggregatePrintPriceQuotes, OrderQuoteService, priceChanged } from '../payment/order-quote.service'
@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CreatePackageOrderDto } from './dto/create-package-order.dto'
+import { arrivalViewForOrder, arrivalViewsForOrders, type ArrivalReprintFields } from '../print-jobs/self-service-reprint'
 import { assertMemberPrintOrderIdempotencyKey } from './member-print-order-create.service'
 import {
   acquireOrderSubmissionLease,
@@ -256,7 +257,8 @@ export class PackageOrderService {
       targetId: order.id,
       payload: { terminalId: terminal.id, itemCount: order.orderItems.length, amountCents },
     })
-    return this.toView(settled, code)
+    const createdView = await arrivalViewForOrder(this.prisma, settled)
+    return this.toView(settled, createdView.pickupCode ?? code, createdView)
     } finally {
       if (!completed) {
         await releaseOrderSubmissionLease(this.prisma, { endUserId, idempotencyKey: key, leaseToken })
@@ -268,7 +270,8 @@ export class PackageOrderService {
     const order = await this.requireOwned(endUserId, orderId)
     await this.expireIfNeeded(order)
     const fresh = await this.requireOwned(endUserId, orderId)
-    return this.toView(fresh, this.visibleCode(fresh))
+    const arrival = await arrivalViewForOrder(this.prisma, fresh)
+    return this.toView(fresh, arrival.pickupCode, arrival)
   }
 
   /**
@@ -287,7 +290,7 @@ export class PackageOrderService {
    *   2. **不返回逐文件明细**（items）。列表只回条目数，明细进详情页拿。
    *
    * 到机码照常返回：找回它正是本端点存在的理由，且判据与 detail 完全一致
-   * （visibleCode：pending + unpaid/paying/paid 且未过期才给），不另开一套口径。
+   * （可取，或失败后仍可续打），不另开一套口径。
    */
   async list(endUserId: string, page: MemberPageQuery) {
     await this.expireExpiredForUser(endUserId)
@@ -298,18 +301,25 @@ export class PackageOrderService {
       include: { orderItems: { select: { id: true } } },
       ...memberPageArgs(page),
     })
-    return buildMemberPage(rows, page, total, (order) => ({
-      orderId: order.id,
-      orderNo: order.orderNo,
-      pickupCode: this.visibleCode(order),
-      expiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
-      pickupStatus: order.pickupStatus,
-      payStatus: order.payStatus,
-      taskStatus: order.taskStatus,
-      amountCents: order.amountCents,
-      itemCount: order.orderItems.length,
-      createdAt: order.createdAt.toISOString(),
-    }))
+    const views = await arrivalViewsForOrders(this.prisma, rows)
+    return buildMemberPage(rows, page, total, (order) => {
+      const arrival = views.get(order.id) ?? { pickupCode: null, reprintAllowed: false, reprintRemaining: null, reprintNotice: null }
+      return {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        pickupCode: arrival.pickupCode,
+        expiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null,
+        pickupStatus: order.pickupStatus,
+        payStatus: order.payStatus,
+        taskStatus: order.taskStatus,
+        amountCents: order.amountCents,
+        itemCount: order.orderItems.length,
+        createdAt: order.createdAt.toISOString(),
+        reprintAllowed: arrival.reprintAllowed,
+        reprintRemaining: arrival.reprintRemaining,
+        reprintNotice: arrival.reprintNotice,
+      }
+    })
   }
 
   private findOwnedByIdempotencyKey(endUserId: string, idempotencyKey: string) {
@@ -338,7 +348,8 @@ export class PackageOrderService {
       await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
       order = await this.requireOwned(endUserId, row.id)
     }
-    return this.toView(order, this.visibleCode(order))
+    const arrival = await arrivalViewForOrder(this.prisma, order)
+    return this.toView(order, arrival.pickupCode, arrival)
   }
 
   /**
@@ -426,26 +437,10 @@ export class PackageOrderService {
     })
   }
 
-  /**
-   * 到机码在 unpaid/paying/paid 时可见：材料包是「手机组包拿码 → 到机器 → 现场付款 → 出纸」。
-   * closed / refund* / failed 必须隐藏，避免过期关单或退款后仍把码画给用户。
-   * 不套用单文件 `pickupCodeVisibleFor`（那条线只在 paid 后出码）。
-   */
-  private visibleCode(order: {
-    pickupStatus: string
-    payStatus: string
-    pickupCodeExpiresAt: Date | null
-    pickupCodeEnc: string | null
-  }): string | null {
-    if (order.pickupStatus !== 'pending') return null
-    if (!['unpaid', 'paying', 'paid'].includes(order.payStatus)) return null
-    if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date() || !order.pickupCodeEnc) return null
-    try { return decryptSecret(order.pickupCodeEnc) } catch { return null }
-  }
-
   private toView(
     order: { id: string; orderNo: string; terminalId: string | null; printTaskId: string | null; pickupCodeExpiresAt: Date | null; pickupStatus: string; payStatus: string; taskStatus: string; amountCents: number; orderItems: Array<{ seq: number; fileId: string; colorMode: string; duplex: string; copies: number; pageRange: string | null; billablePages: number; amountCents: number; status: string; printTaskId: string | null }> },
     pickupCode: string | null,
+    reprint: Pick<ArrivalReprintFields, 'reprintAllowed' | 'reprintRemaining' | 'reprintNotice'> = { reprintAllowed: false, reprintRemaining: null, reprintNotice: null },
   ) {
     return {
       orderId: order.id,
@@ -475,6 +470,9 @@ export class PackageOrderService {
         status: item.status,
         printTaskId: item.printTaskId,
       })),
+      reprintAllowed: reprint.reprintAllowed,
+      reprintRemaining: reprint.reprintRemaining,
+      reprintNotice: reprint.reprintNotice,
     }
   }
 }

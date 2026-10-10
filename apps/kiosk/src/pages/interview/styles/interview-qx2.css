@@ -271,7 +271,8 @@
 }
 [data-qx-interview] .iv-panel .iv-copy { margin-top: 8px; }
 
-[data-qx-interview] .iv-alert {
+[data-qx-interview] .iv-alert,
+.interview-qx-cta > .iv-alert {
   margin: 0;
   padding: 13px 18px;
   border: 1px solid var(--qx-cinnabar-line);
@@ -301,6 +302,19 @@
   line-height: 1.5;
 }
 [data-qx-interview] .iv-empty.is-bad h2 { color: var(--qx-cinnabar-d); }
+[data-qx-interview] .iv-empty .iv-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 24px;
+  background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar-d);
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1;
+}
 
 [data-qx-interview] .iv-history {
   display: flex;
@@ -638,4 +652,254 @@
 [data-qx-interview] [aria-label='合规提示'] {
   font-size: var(--qx-fs-aux) !important;
   line-height: 1.45;
+}
+
+/* 设置屏底栏在 [data-qx-interview] 外面，两颗按钮按内容撑开会一宽一窄。 */
+.iv-setup-declaration {
+  width: 100%;
+}
+.iv-setup-declaration .qx-ai-declaration-note {
+  margin: 0 0 8px;
+  font-size: var(--qx-fs-aux);
+  line-height: 1.4;
+}
+.iv-setup-cta > .qx-btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+[data-qx-interview] .interview-option[aria-disabled='true'] {
+  opacity: 0.48;
+  border-color: var(--qx-line) !important;
+  background: var(--qx-paper) !important;
+  color: var(--qx-ink-3) !important;
+}
+
+[data-qx-interview] .iv-resume-preview {
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--qx-line);
+  border-radius: 18px;
+  background: var(--qx-paper);
+}
+[data-qx-interview] .iv-resume-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  margin: 0 auto;
+}
+
+[data-qx-interview] .iv-optlist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+[data-qx-interview] .iv-optlist button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 88px;
+  padding: 16px 18px;
+  border: 1px solid var(--qx-line);
+  border-radius: 20px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  text-align: left;
+}
+[data-qx-interview] .iv-optlist button i {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 16px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-style: normal;
+  font-weight: 800;
+  font-size: var(--qx-fs-aux);
+}
+[data-qx-interview] .iv-optlist .t,
+[data-qx-interview] .iv-optlist button > span {
+  flex: 1;
+  min-width: 0;
+}
+[data-qx-interview] .iv-optlist button b {
+  display: block;
+  font-size: var(--qx-fs-body-lg);
+  font-weight: 800;
+}
+[data-qx-interview] .iv-optlist button small {
+  display: block;
+  margin-top: 4px;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux);
+  line-height: 1.4;
+}
+[data-qx-interview] .iv-optlist button em {
+  margin-left: auto;
+  color: var(--qx-ink-3);
+  font-style: normal;
+  font-size: var(--qx-fs-sec);
+}
+[data-qx-interview] .iv-optlist button.is-go {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+}
+[data-qx-interview] .iv-optlist button.is-go em { color: var(--qx-teal-d); }
+
+[data-qx-interview] .iv-report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+[data-qx-interview] .iv-report-grid > div {
+  padding: 18px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+}
+[data-qx-interview] .iv-report-grid i {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+  font-style: normal;
+  font-weight: 800;
+  font-size: var(--qx-fs-aux);
+}
+[data-qx-interview] .iv-report-grid b {
+  display: block;
+  margin-top: 12px;
+  font-size: var(--qx-fs-sec);
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-qx-interview] .iv-report-grid p {
+  margin-top: 8px;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-body);
+  line-height: 1.45;
+}
+
+[data-qx-interview] .iv-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+[data-qx-interview] .iv-mini-list > div {
+  padding: 14px 16px;
+  border: 1px solid var(--qx-line);
+  border-radius: 18px;
+  background: var(--qx-paper);
+}
+[data-qx-interview] .iv-mini-list small,
+[data-qx-interview] .iv-mini-list h2 {
+  display: block;
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-sec);
+  font-weight: 800;
+  line-height: 1.3;
+}
+[data-qx-interview] .iv-mini-list p,
+[data-qx-interview] .iv-mini-list li {
+  margin-top: 8px;
+  color: var(--qx-ink-2);
+  font-size: var(--qx-fs-body);
+  line-height: 1.5;
+}
+[data-qx-interview] .iv-mini-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-qx-interview] .iv-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+[data-qx-interview] .iv-checklist > div {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--qx-ink);
+  font-size: var(--qx-fs-body);
+  line-height: 1.45;
+}
+[data-qx-interview] .iv-checklist i {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1.5px solid var(--qx-line-2);
+  border-radius: 8px;
+  color: var(--qx-teal-d);
+  font-style: normal;
+  font-weight: 800;
+}
+
+[data-qx-interview].interview-report [aria-label='合规提示'],
+[data-qx-interview].interview-report .iv-copy,
+[data-qx-interview].interview-expired .iv-copy {
+  font-size: var(--qx-fs-body) !important;
+  line-height: 1.5;
+}
+
+[data-qx-interview] .iv-load {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 20px;
+  text-align: center;
+}
+[data-qx-interview] .iv-load .iv-wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  height: 64px;
+}
+[data-qx-interview] .iv-load .iv-wave i {
+  display: block;
+  width: 8px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--qx-teal-d, #0f6e56);
+  animation: iv-wave 1s ease-in-out infinite;
+}
+[data-qx-interview] .iv-load .iv-wave i:nth-child(2) { animation-delay: .12s; }
+[data-qx-interview] .iv-load .iv-wave i:nth-child(3) { animation-delay: .24s; }
+[data-qx-interview] .iv-load .iv-wave i:nth-child(4) { animation-delay: .36s; }
+[data-qx-interview] .iv-load .iv-wave i:nth-child(5) { animation-delay: .48s; }
+[data-qx-interview] .iv-load-label {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+@keyframes iv-wave {
+  0%, 100% { height: 16px; }
+  50% { height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-interview] .iv-load .iv-wave i {
+    animation: none;
+    height: 28px;
+  }
+}
+
+@media (max-width: 720px) {
+  [data-qx-interview] .iv-report-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -39,6 +39,31 @@ const flowState = {
   ...W2_ORDER,
 }
 
+const PHONE = '拨打服务电话 18369161921（工作日 9:00–18:00）'
+const SENTENCE_2 = `这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请${PHONE}。`
+const SENTENCE_2_NEARBY = `这台机器暂时打不了，我们已经收到提醒，会尽快处理。你可以换一台机器继续，或稍后再来；需要帮助请${PHONE}。`
+const SENTENCE_5 = `如需退款，请${PHONE}，我们核实后原路退回。`
+const PRIVACY_PHONE = '查看《隐私政策》里的联系方式'
+
+function supportContact(api: ApiRouter, patch: { nearby?: boolean; miniapp?: boolean; missing?: boolean }): void {
+  if (patch.missing) {
+    api.respond('GET', '/api/v1/public/support-contact', { status: 404, json: { success: false } })
+    return
+  }
+  api.respond('GET', '/api/v1/public/support-contact', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: patch.nearby === true,
+        miniappPublished: patch.miniapp === true,
+      },
+    },
+  })
+}
+
 async function expectTouchAndBounds(page: Page): Promise<void> {
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
@@ -106,7 +131,7 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
 
   await expect(page.locator('[data-testid="print-fulfill-state-out-of-paper"]')).toBeVisible()
   await expect(page.getByText('打印机缺纸', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toHaveCount(0)
   await expect(page.getByText('agent stack must stay hidden')).toHaveCount(0)
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
 
@@ -117,8 +142,12 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
-  await expect(outOfPaper).toContainText('联系现场工作人员')
-  await expect(outOfPaper).toContainText('订单和已付金额都保留着')
+  await expect(outOfPaper).toContainText(SENTENCE_2)
+  await expect(outOfPaper).toContainText(SENTENCE_5)
+  await expect(outOfPaper).not.toContainText('换一台机器')
+  await expect(outOfPaper).not.toContainText('这单还在，手机上能看到')
+  await expect(outOfPaper).not.toContainText('在手机上申请')
+  await expect(outOfPaper).toContainText('订单和支付记录都保留着')
   // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
   await expect(outOfPaper).toContainText('只有本页出现「重新提交打印」按钮时')
   await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
@@ -151,12 +180,13 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   await expect(steps.nth(0)).toContainText('本机不知道出了几页')
   await expect(steps.nth(2)).toContainText(`订单号 ${W2_ORDER.orderNo}`)
   // 服务端不回已出页数、也没有费用处理结果：不许出现页数进度或退款承诺。
-  for (const banned of ['已出 1', '等待加纸', '退款', '自动续打后']) {
+  for (const banned of ['已出 1', '等待加纸', '已为你退款', '退款成功', '在手机上申请', '自动续打后']) {
     await expect(outOfPaper, `缺纸页不得出现「${banned}」`).not.toContainText(banned)
   }
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('联系工作人员处理')
-  await expect(outOfPaper.getByRole('status')).toContainText('暂时无法签发带走链接，请联系工作人员')
+  // 打印异常页的求助入口已统一命名为「求助」，仍去 /help。
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('求助')
+  await expect(outOfPaper.getByRole('status').filter({ hasText: '暂时无法签发带走链接' })).toContainText(`暂时无法签发带走链接。需要帮助？${PHONE}`)
 
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper.png'), fullPage: true })
@@ -274,9 +304,25 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   await page.goto('/print/done')
   await setReactRouterState(page, '/print/done', flowState)
 
-  await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toBeVisible()
+  const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
+  await expect(jam).toBeVisible()
+  await expect(jam).toContainText(SENTENCE_5)
+  await expect(jam).not.toContainText('在手机上申请')
+  await expect(jam).not.toContainText('换一台机器')
+  await expect(jam).toContainText('你的订单和已付金额都保留着')
+  // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
+  if (page.viewportSize()?.width === 1080) {
+    const geo = await page.evaluate(() => {
+      const scroller = document.querySelector('.pff-page') as HTMLElement
+      const box = scroller.getBoundingClientRect()
+      const lastBottom = Math.max(...[...scroller.children].map((el) => el.getBoundingClientRect().bottom))
+      return { trailingBlank: box.bottom - lastBottom }
+    })
+    expect(geo.trailingBlank, '卡纸失败页不许整行留白 ≥160px').toBeLessThan(160)
+  }
   await page.screenshot({ path: test.info().outputPath('fulfill-paper-jam.png'), fullPage: true })
 
   await page.getByRole('button', { name: '重新提交打印' }).click()
@@ -291,6 +337,49 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   ])
   await expect(page.locator('[data-w2-page="print-progress"]')).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('free paper jam keeps the order without mentioning payment @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PRINTER_ERROR',
+      failureReasonForUser: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: false,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0 })
+
+  const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
+  await expect(jam).toBeVisible()
+  await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
+  await expect(jam).not.toContainText('已付金额')
+  await expect(jam).not.toContainText('已支付')
+  // 付费卡纸态补回退款说明时，免费单仍不能出现退款句。
+  await expect(jam).not.toContainText('退款')
+  // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -325,7 +414,8 @@ test('completed done says the paper is already out and never renders a pickup co
   await expect(page.getByText('从出纸口取走', { exact: false })).toBeVisible()
   await expect(page.getByText('请取走纸张', { exact: true })).toHaveCount(0)
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
+  // 完成页核查提示换成标准句 4，仍必须在首屏。
+  await expect(page.getByText(`打印有问题？${PHONE}，或问小青`, { exact: true })).toBeInViewport()
   await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
   await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
   await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
@@ -346,4 +436,91 @@ test('direct done visit without task context stays unknown @w2', async ({ page, 
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-unknown.png'), fullPage: true })
   expect(errors).toEqual([])
+})
+
+async function openOutOfPaper(page: Page, api: ApiRouter, state: object): Promise<ReturnType<Page['locator']>> {
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PAPER_EMPTY',
+      failureReasonForUser: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 404,
+    json: { error: { code: 'PRINT_TASK_NOT_FOUND', message: '打印任务不存在或无权访问' } },
+  })
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', state)
+  await page.waitForURL('**/print/done')
+  const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
+  await expect(outOfPaper).toBeVisible()
+  return outOfPaper
+}
+
+test('zero-yuan out-of-paper page does not mention a refund @w2', async ({ page, api }) => {
+  registerShell(api)
+  const outOfPaper = await openOutOfPaper(page, api, { ...flowState, amountCents: 0 })
+  await expect(outOfPaper).toContainText('免费试运营')
+  await expect(outOfPaper).toContainText(SENTENCE_2)
+  await expect(outOfPaper).not.toContainText('退款')
+  await expect(outOfPaper).not.toContainText('已付')
+  await expect(outOfPaper).not.toContainText('换一台机器')
+  await expect(page.getByRole('button', { name: '查看订单说明' })).toBeVisible()
+})
+
+test('out-of-paper mentions another machine only when one is online nearby @w2', async ({ page, api }) => {
+  registerShell(api)
+  supportContact(api, { nearby: true })
+  const outOfPaper = await openOutOfPaper(page, api, flowState)
+  await expect(outOfPaper).toContainText(SENTENCE_2_NEARBY)
+  await expect(outOfPaper).toContainText('换一台机器')
+  await expect(outOfPaper).not.toContainText('请稍后再来；需要帮助')
+})
+
+test('out-of-paper says the order stays on the phone only after the miniapp is published @w2', async ({ page, api }) => {
+  registerShell(api)
+  supportContact(api, { miniapp: true })
+  const outOfPaper = await openOutOfPaper(page, api, flowState)
+  await expect(outOfPaper).toContainText('这单还在，手机上能看到。')
+  await expect(outOfPaper).not.toContainText('换一台机器')
+})
+
+test('out-of-paper still renders when support contact is missing @w2', async ({ page, api }) => {
+  registerShell(api)
+  supportContact(api, { missing: true })
+  const outOfPaper = await openOutOfPaper(page, api, flowState)
+  await expect.poll(() => api.requestCount('GET', '/api/v1/public/support-contact')).toBeGreaterThan(0)
+  await expect(outOfPaper).toContainText(PRIVACY_PHONE)
+  await expect(outOfPaper).toContainText('打印机缺纸')
+  await expect(outOfPaper).not.toContainText('18369161921')
+  await expect(outOfPaper).not.toContainText('换一台机器')
+  await expect(outOfPaper).not.toContainText('这单还在，手机上能看到')
+})
+
+test('zero-yuan confirmed failure does not mention a refund @w2', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: {
+      taskId: W2_ORDER.taskId,
+      status: 'failed',
+      errorCode: 'PRINTER_ERROR',
+      failureReasonForUser: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理',
+    },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 404,
+    json: { error: { code: 'PRINT_TASK_NOT_FOUND', message: '打印任务不存在或无权访问' } },
+  })
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0 })
+  const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
+  await expect(jam).toBeVisible()
+  await expect(page.getByText('免费试运营，本单 0 元')).toBeVisible()
+  await expect(jam).toContainText(SENTENCE_2)
+  await expect(page.getByText('退款')).toHaveCount(0)
+  await expect(jam).not.toContainText('联系工作人员')
 })

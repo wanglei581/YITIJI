@@ -6,15 +6,15 @@ import { hashPickupCode } from '../common/pickup-code'
 import {
   CLAIMED_UNPAID_LEASE_EXPIRE_DATA,
   claimedUnpaidExpiredLeaseWhere,
-  isLiveKioskPickupLease,
-  isPickupWindowClosed,
 } from '../payment/order-status.service'
-import { PICKUP_VALIDITY_FROM_PAYMENT_MS } from '../payment/pickup-validity'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { assertFileContentIntegrity } from '../files/file-content-integrity'
+import { payableCents } from '../payment/pending-refund-signal'
+import { assertFreePrintQuota } from './free-print-quota.decide'
+import { printOrderSideCount } from './verified-print-parameters'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { StorageService } from '../storage/storage.service'
 import {
@@ -24,6 +24,10 @@ import {
 } from './pickup-claim-lockout'
 import { consumePickupClaimRate } from './pickup-claim-rate-limit'
 import { maskPickupFileName } from './pickup-file-mask'
+import { isPickupClaimWindowClosed } from './pickup-claim-window'
+import { resumeReleasedFailure } from './pickup-code-resume'
+
+export { isPickupClaimWindowClosed }
 
 /**
  * 视为「钱已经在退回路上」的支付态：这三个态下不得出纸，也不得推进取件状态。
@@ -42,31 +46,6 @@ export const PICKUP_RELEASED_REPLAY_MS = 10 * 60 * 1000
  * 两个入口只在「怎么找到这张单」上不同，找到之后走同一段 {@link PickupOrderService.settleClaim}。
  */
 export type PickupClaimVia = 'pickup_code' | 'member_order'
-
-/**
- * 取件窗口是否已关：未认领过期、付款已满 7 天，或 claimed 未付租约已过。
- * 核销判定与「我的订单」列表的 claimableHere 共用这一处，两边不会各算一套。
- */
-export function isPickupClaimWindowClosed(
-  order: {
-    pickupCodeExpiresAt: Date | null
-    pickupStatus: string
-    printTaskId: string | null
-    payStatus: string
-    pickupClaimedAt: Date | null
-    paidAt: Date | null
-    pickupCodeHash: string | null
-  },
-  now: Date = new Date(),
-): boolean {
-  const paymentWindowClosed = Boolean(
-    order.paidAt
-    && order.pickupCodeHash
-    && !isLiveKioskPickupLease(order, now)
-    && order.paidAt.getTime() + PICKUP_VALIDITY_FROM_PAYMENT_MS <= now.getTime(),
-  )
-  return isPickupWindowClosed(order, now) || paymentWindowClosed
-}
 
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -154,9 +133,18 @@ export class PickupOrderService {
         },
       })
     }
-    // 已核销：同一终端、核销后 10 分钟内再输同一码，把上次放行视图再交出去。
-    // 不建任务、不出纸、不改状态。其它终端或超过 10 分钟仍拒绝。不计入锁定。
+    // 已核销：失败且仍可自助续打时，把同一个任务拉回待打印。
+    // 其余情况仍是同一终端、核销后 10 分钟内回放上次放行视图。不计入锁定。
     if (order.pickupStatus === 'used' || order.printTaskId) {
+      const resumed = await resumeReleasedFailure(this.prisma, order, terminal.id)
+      if (resumed.action === 'resumed') {
+        return {
+          ...this.releasedView(resumed.order),
+          resumed: true as const,
+          ...(resumed.mayHavePrinted ? { mayHavePrinted: true as const } : {}),
+          ...(resumed.partialOutput ? { partialOutput: true as const } : {}),
+        }
+      }
       return this.replayReleasedClaim(order, terminal.id)
     }
     // 未认领过期、付款已满 7 天，或 claimed 未付租约已过：落 expired 并拒绝。
@@ -197,6 +185,16 @@ export class PickupOrderService {
     // 打印机检查放在过期、状态、文件、能力判定之后、任何写库之前：
     // 过期码仍先说「已过期」，不能被说成「到机码没有作废」；被拒时不认领、不建任务、不计输错。
     await assertTerminalPrinterAvailable(this.prisma, terminal.id, process.env, via === 'member_order' ? 'claim_here' : 'pickup')
+    // 免费额度在写库前先预判一次：被拒时不认领、不抵失败计数，订单保持待领取，明天还能直接领。
+    // release 事务里同口径再判一次，那一次才是并发下的准绳。
+    await assertFreePrintQuota(this.prisma, {
+      terminalId: terminal.id,
+      endUserId: order.endUserId,
+      requestedSides: firstItem
+        ? firstItem.billablePages * firstItem.copies
+        : printOrderSideCount([], { billablePages: order.billablePages, printParamsJson: order.printParamsJson }),
+      payableCents: payableCents(order),
+    })
 
     if (order.pickupStatus === 'pending') {
       const claimed = await this.prisma.order.updateMany({
@@ -313,6 +311,18 @@ export class PickupOrderService {
             ...(item.pageRange ? { pageRange: item.pageRange } : {}),
           })
         : current.printParamsJson
+      await tx.terminal.updateMany({
+        where: { id: terminal.id, enabled: true, lifecycleStatus: 'active' },
+        data: { lifecycleStatus: 'active' },
+      })
+      await assertFreePrintQuota(tx, {
+        terminalId: terminal.id,
+        endUserId: current.endUserId,
+        requestedSides: item
+          ? item.billablePages * item.copies
+          : printOrderSideCount([], { billablePages: current.billablePages, printParamsJson: taskParams }),
+        payableCents: payableCents(current),
+      })
       await tx.printTask.create({
         data: {
           id: taskId,

@@ -3,6 +3,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MegaphoneIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   memberNotificationsAdminApi,
   type AdminBroadcastItem,
@@ -51,7 +52,7 @@ export default function MemberNotificationsPage() {
       setState('ready')
     } catch (error) {
       setState('error')
-      setMessage(error instanceof Error ? error.message : '广播列表加载失败')
+      setMessage(userMessageOf(error, '广播列表加载失败，请稍后重试'))
     }
   }, [])
 
@@ -76,7 +77,7 @@ export default function MemberNotificationsPage() {
       setContent('')
       await load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '广播创建失败')
+      setMessage(userMessageOf(error, '广播没有创建，请检查后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -93,7 +94,7 @@ export default function MemberNotificationsPage() {
       setMessage('广播已撤回')
       await load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '广播撤回失败')
+      setMessage(userMessageOf(error, '广播没有撤回，请稍后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -115,7 +116,7 @@ export default function MemberNotificationsPage() {
       }
     >
       <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-        广播内容用于系统维护、设备服务、文件处理和打印服务说明；后端会拦截不合规内容并在此显示错误。
+        广播内容用于系统维护、设备服务、文件处理和打印服务说明；系统会拦截不合规内容并在此显示错误。
       </div>
 
       {message && (
@@ -192,7 +193,7 @@ export default function MemberNotificationsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p title={item.title ?? undefined} className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
                         <span className={['rounded-full px-2.5 py-1 text-xs font-medium', CATEGORY_CLASS[item.category]].join(' ')}>
                           {CATEGORY_LABEL[item.category]}
                         </span>

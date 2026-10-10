@@ -19,8 +19,8 @@
  */
 import type { PrismaService } from '../prisma/prisma.service'
 import { countKioskVisitsByTerminal } from '../kiosk-session/kiosk-session.queries'
-import { SCREEN_MIN_AGGREGATE_SAMPLE, SCREEN_UNAVAILABLE_REASON, type ScreenMetric } from './console-screen.types'
-import { availableMetric, unavailableMetric } from './console-screen.metric'
+import { SCREEN_UNAVAILABLE_REASON, type ScreenMetric } from './console-screen.types'
+import { availableMetric, unavailableMetric, suppressAggregateCount } from './console-screen.metric'
 
 export const VISIT_SOURCE = 'KioskSession.startedAt'
 /** 快照与单台的服务人次窗口：上海自然日零点到现在。 */
@@ -76,7 +76,7 @@ export async function countTerminalVisits(
 export function visitMetric(loaded: VisitLoaded, window: string, suppressSmall: boolean): ScreenMetric<number> {
   if (!loaded.ok) return unavailableMetric(VISIT_SOURCE, window, loaded.reason)
   const count = loaded.value
-  if (suppressSmall && count > 0 && count < SCREEN_MIN_AGGREGATE_SAMPLE) {
+  if (suppressSmall && suppressAggregateCount(count) === null) {
     return unavailableMetric(VISIT_SOURCE, window, SCREEN_UNAVAILABLE_REASON.sampleBelowThreshold)
   }
   return availableMetric(VISIT_SOURCE, window, count)

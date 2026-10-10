@@ -16,8 +16,8 @@
  *  4. 日志不出现用户原话：审计面模块里所有 logger/console 调用的模板插值，
  *     不得引用用户自由文本变量（长度 / 条数 / 错误码等元数据放行）。
  *  5. 审计 payload 不出现用户原话：audit.write 的 payload 键名同上。
- *  6. 「我的记录」反向锚：读路径必须把用户**原话**返回给本人，
- *     不得为了合规把展示内容换成 `[姓名_1]` 这类占位符。
+ *  6. 「我的记录」反向锚：本人保存的材料仍原样回读，不得换成 `[姓名_1]`；
+ *     顾问开场只用于判型、不落库，问答列表不拿存量开场原话当标题。
  *  7. advisor 专项回归锚 + 留存矩阵文档一致性。
  *
  * 刻意不检查「prompt 里有没有脱敏」——那是 verify:llm-input-pii-mask 的职责，
@@ -186,8 +186,16 @@ const NO_TTL_REGISTRY: Record<string, string> = {
     '同意记录必须与账号同生命周期，撤回写 revokedAt 而不是删除；不含用户自由文本',
   AiUsageRecord:
     'P1-2a 逐次计量账，只落功能/厂商/型号/状态/tokens/金额与已验签终端、机构、会员号，无用户文本。留存与 AiServiceLog 相同：AI_SERVICE_LOG_RETENTION_DAYS 默认 90 天，由 AiResultCleanupTask 到期先按月汇总再硬删。会员注销只把 endUserId 置空（外键 SetNull，且 detachMemberAiUsageRecords），不删未到期的金额行。TRTC 数字人、ASR、TTS、OCR 本期不计量、不写本表。',
+  AiQuotaDaily:
+    '按人次数额度的每日计数，只有账号、用途、北京日期、已用次数，无用户文本；按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiResultCleanupTask 调 AiQuotaService.purgeExpired 定期硬删',
+  AiQuotaReservation:
+    '一次 AI 操作的预占记录，只有操作号哈希、账号、终端、用途、来源、日期与结果编号，无用户文本；已结算的按 AI_SERVICE_LOG_RETENTION_DAYS 由 AiQuotaService.purgeExpired 定期硬删',
+  RedemptionRecord:
+    '权益核销流水（机构发放的 AI 次数被用掉一次记一行），属财务与权益账，只有权益号、用途、数量与幂等键，无用户文本；随订单与权益流水的保留期走，不随 AI 会话 TTL 走',
   AiUsageMonthlySummary:
     '按月费用汇总，只存北京时间月份、功能、厂商、型号、状态、调用次数、已计量金额与未计量次数；不含会员、终端、机构或任何用户文本，长期保留，不随明细到期删除。',
+  AiSafetyTerm:
+    '只存类别、词条和开关，没有会员、终端或用户提问；种子在代码里，账号注销不删这张表。',
 }
 
 const writtenModels = new Map<string, string[]>()
@@ -404,13 +412,24 @@ for (const readPath of ['async getSession(', 'private async reportDto(']) {
 }
 
 const advisorService = readRepo('services/api/src/advisor/advisor.service.ts')
+const createStart = advisorService.indexOf('async createSession(')
+const createBody = createStart < 0 ? '' : advisorService.slice(createStart, advisorService.indexOf('\n  }\n', createStart))
 assert(
-  /topic:\s*row\.topic/.test(advisorService),
-  '顾问会话回读仍返回用户自己写的诉求原文（topic: row.topic）',
+  createBody.length > 0 && !/trimmedTopic|question\s*:/.test(createBody)
+    && /topic:\s*ADVISOR_SESSION_TOPIC/.test(createBody),
+  '顾问建会话不保存开场话或 question，只写固定 topic 标签',
 )
+const assistantSummary = readRepo('services/api/src/advisor/assistant-summary.service.ts')
 assert(
-  !/mask\w*\(\s*trimmedTopic|topic:\s*mask/.test(advisorService),
-  '顾问会话落库的 topic 未被改写成占位符版本（本人回看要看到原话）',
+  !/firstUser/.test(assistantSummary) && /topic:\s*ASSISTANT_SUMMARY_TOPIC/.test(assistantSummary),
+  '小青保存要点不取 firstUser 落库，只写固定 topic 标签',
+)
+const memberAssets = readRepo('services/api/src/member-assets/member-assets.service.ts')
+const listStart = memberAssets.indexOf('async listAiRecords(')
+const listBody = listStart < 0 ? '' : memberAssets.slice(listStart, memberAssets.indexOf('\n  }\n', listStart))
+assert(
+  listBody.length > 0 && !/session:\s*\{\s*select:\s*\{\s*topic:/.test(listBody),
+  '问答记录列表查询不取会话 topic，避免显示存量开场原话',
 )
 
 // ── 7. 对话不落库承诺 + advisor 清理回归锚 ────────────────────────────────────

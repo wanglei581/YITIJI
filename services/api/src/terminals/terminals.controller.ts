@@ -41,7 +41,8 @@ import { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto
 import { ReportReleaseObservationDto } from './dto/report-release-observation.dto'
 import { ReleaseObservationService } from './release-observation.service'
 import { TerminalSessionService } from './terminal-session.service'
-import { TerminalIdentityGuard } from './terminal-identity.guard'
+import { TerminalCommandService } from './terminal-commands.service'
+import { AllowDisabledTerminalIdentity, TerminalIdentityGuard } from './terminal-identity.guard'
 import { ExchangeTerminalSessionDto } from './dto/exchange-terminal-session.dto'
 
 @Controller()
@@ -52,6 +53,7 @@ export class TerminalsController {
     private readonly capabilities: TerminalCapabilitiesService,
     private readonly releases: ReleaseObservationService,
     private readonly terminalSessions: TerminalSessionService,
+    private readonly terminalCommands: TerminalCommandService,
   ) {}
 
   // ── 1. Register ──────────────────────────────────────────────────────────
@@ -79,7 +81,9 @@ export class TerminalsController {
     @Body() dto: HeartbeatDto,
     @Headers('authorization') auth: string | undefined,
   ) {
-    return this.terminalsService.heartbeat(terminalId, dto, auth)
+    return this.terminalCommands.decorateHeartbeat(terminalId, dto.agentStartedAt, () =>
+      this.terminalsService.heartbeat(terminalId, dto, auth),
+    )
   }
 
   // F0.5 only: the Agent receives release identity for observation. It never
@@ -137,7 +141,9 @@ export class TerminalsController {
   }
 
   // GET /api/v1/terminals/:terminalId/config
+  // 首页每 5 分钟拉一次。停用后既有会话仍可读本接口，好把暂停文案带回去；缺票或票对不上仍是 401。
   @Get('terminals/:terminalId/config')
+  @AllowDisabledTerminalIdentity()
   @HttpCode(HttpStatus.OK)
   @UseGuards(TerminalIdentityGuard)
   getTerminalConfig(@Param('terminalId') terminalId: string) {

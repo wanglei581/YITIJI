@@ -124,6 +124,10 @@ test('职业规划：consent_outdated 时在依据旁说明并给去自我探索
 test('职业规划：null 或缺省时什么都不显示', () => {
   assert.equal(renderToStaticMarkup(createElement(careerNote.CareerPlanSelfAssessmentExcluded, { excluded: null, onGo() {} })), '')
   assert.equal(renderToStaticMarkup(createElement(careerNote.CareerPlanSelfAssessmentExcluded, { excluded: undefined, onGo() {} })), '')
-  const page = readFileSync(join(root, 'src/pages/resume/CareerPlanPage.tsx'), 'utf8')
+  // T46：结果正文拆到 careerPlanView.tsx。排除说明仍必须挂在规划结果上，并集覆盖，不删这条。
+  const page = [
+    readFileSync(join(root, 'src/pages/resume/CareerPlanPage.tsx'), 'utf8'),
+    readFileSync(join(root, 'src/pages/resume/careerPlanView.tsx'), 'utf8'),
+  ].join('\n')
   assert.match(page, /<CareerPlanSelfAssessmentExcluded excluded=\{plan\.selfAssessmentExcluded\} onGo=\{goSelfAssessment\} \/>/)
 })

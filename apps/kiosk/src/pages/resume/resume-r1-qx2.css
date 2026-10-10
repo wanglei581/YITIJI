@@ -12,11 +12,11 @@
 .qx-resume-triage { font-size: var(--qx-fs-body); }
 .qx-resume-triage .qx-rt-xq { min-height: 280px; display: flex; flex-direction: column; justify-content: center; }
 .qx-resume-triage .qx-rt-eyebrow { font-family: var(--qx-sans); font-size: var(--qx-fs-aux); letter-spacing: 2px; color: var(--qx-paper); }
-.qx-resume-triage .qx-rt-title { font-size: var(--qx-fs-greeting); line-height: 1.4; }
+.qx-resume-triage .qx-rt-title { font-size: var(--qx-fs-page); line-height: 1.4; }
 .qx-resume-triage .qx-rt-doing { font-size: var(--qx-fs-body); line-height: var(--qx-lh-body); }
 .qx-resume-triage .qx-rt-rail { margin-top: 20px; }
 .qx-resume-triage .qx-rt-rail li { font-size: var(--qx-fs-body); }
-.qx-resume-triage .qx-rt-scroll, .qx-resume-triage .qx-rt-wait { padding-top: 54px; padding-bottom: 18px; }
+.qx-resume-triage .qx-rt-scroll, .qx-resume-triage .qx-rt-wait { padding-top: 18px; padding-bottom: 18px; }
 .qx-resume-triage .qx-rt-scroll > *, .qx-resume-triage .qx-rt-wait > * { flex-shrink: 0; }
 .qx-resume-triage .qx-rt-sec-h { font-size: var(--qx-fs-sec); line-height: 1.4; }
 .qx-resume-triage .qx-rt-split { display: flex; flex-direction: column; gap: 18px; }
@@ -65,10 +65,10 @@
 .rrp-idbar, .rrp-banner, .rrp-dir { order: 1; }
 .rrp-cbar { order: 2; min-height: 132px; display: flex; align-items: center; }
 .rrp-cgrid { width: 100%; }
-.rrp-prov { display: none; }
 .rrp-segs { order: 3; margin-top: 8px; }
 .rrp-zone { order: 4; }
-.rrp-zone .rrp-scroll { max-height: 440px; overflow-y: auto; overscroll-behavior: contain; }
+/* 七块和另外三个页签按内容往下排。超出 1920 时滚的是整页（.qx-scroll），不再在块里开小滚框。 */
+.rrp-zone .rrp-scroll { max-height: none; overflow: visible; }
 .rrp-export-panel { order: 5; }
 .rrp-explanation { order: 6; }
 .rrp-jobfit, .rrp-self { order: 7; }
@@ -79,8 +79,81 @@
 .rrp-page :is(.rrp-export-reason, .qx-rd-price, .qx-rd-price p) { font-size: var(--qx-fs-aux); line-height: var(--qx-lh-body); }
 .rrp-page .rrp-jobfit { min-height: 56px; }
 .rrp-page .rrp-self { margin: 0; font-size: var(--qx-fs-aux); }
-.rrp-page[data-state='diagnose-failed'] .rrp-state,
-.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal']) .rrp-state:first-of-type { min-height: 210px; }
+/* 没报告的这几屏按内容排进一屏：任务头不再撑到 188。能力未接通的出口行收到 72（仍不低于 64）。
+   读取失败、地址打不开、诊断失败、无报告在下面按稿的最小高度把余高分给出路行。 */
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) {
+  gap: 8px; padding-top: 8px; padding-bottom: 8px;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-head {
+  min-height: 0;
+}
+.rrp-page:is([data-state='no-context'], [data-state='read-error'], [data-state='unavailable'], [data-state='illegal'], [data-state='diagnose-failed']) .rrp-state {
+  padding-top: 14px; padding-bottom: 14px;
+}
+.rrp-page[data-state='unavailable'] .rrp-row {
+  min-height: 72px;
+}
+.rrp-page[data-state='unavailable'] .rrp-checks .list > div {
+  min-height: 64px;
+}
+/* 诊断失败 / 无报告：稿上出口行至少 104 / 88，诊断失败的自查格至少 84。
+   整页从上往下排，卡片间距回到本页的 12px；余高分给出路按钮，不在卡片下面留一整条空白。
+   按钮盒子计入叶子法。状态卡不设最小高度，也不恢复块内小滚框。
+   无报告不加「再读一次」：这一态没有任务编号，重读没有可请求的记录。 */
+.rrp-page:is([data-state='diagnose-failed'], [data-state='no-context']) {
+  gap: 12px;
+  justify-content: flex-start;
+}
+.rrp-page:is([data-state='diagnose-failed'], [data-state='no-context']) .rrp-state {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+.rrp-page:is([data-state='diagnose-failed'], [data-state='no-context']) > .rrp-exits {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rrp-page[data-state='diagnose-failed'] .rrp-row { min-height: 104px; }
+.rrp-page[data-state='no-context'] .rrp-row { min-height: 88px; }
+.rrp-page[data-state='diagnose-failed'] .rrp-exits .rows {
+  flex: 1 0 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(104px, 1fr);
+}
+.rrp-page[data-state='no-context'] .rrp-exits .rows {
+  flex: 1 0 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(88px, 1fr);
+}
+.rrp-page[data-state='diagnose-failed'] .rrp-checks .list > div { min-height: 84px; }
+.rrp-page[data-state='no-context'] .rrp-checks .list > div { min-height: 74px; }
+/* 读取失败 / 地址打不开：稿上出口行至少 88（.row 按内容定高），自查格回到稿上的 74。
+   整页从上往下排，卡片间距回到 12px；余高分给出路按钮，不拉说明卡。
+   只用这两屏已经接上的三条出路，不补稿上多出来的入口。 */
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) {
+  gap: 12px;
+  justify-content: flex-start;
+}
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-state {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) > .rrp-exits {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rrp-page[data-state='read-error'] .rrp-row { min-height: 88px; }
+.rrp-page[data-state='illegal'] .rrp-row { min-height: 88px; }
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-exits .rows {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+.rrp-page[data-state='read-error'] .rrp-exits .rows { grid-auto-rows: minmax(88px, 1fr); }
+.rrp-page[data-state='illegal'] .rrp-exits .rows { grid-auto-rows: minmax(88px, 1fr); }
+.rrp-page:is([data-state='read-error'], [data-state='illegal']) .rrp-checks .list > div { min-height: 74px; }
 
 /* 稿 23：只读任务区在上，概览 / 编辑工作区在触达区，按钮保持真实动作。 */
 .qx-stage:has(:is(.qx-resume-optimize, .qx-resume-compare)) .qx-pagehead {
@@ -131,7 +204,10 @@
   .qx-resume-triage .qx-rt-title { font-size: var(--qx-fs-sec); }
   .qx-resume-triage .qx-rt-doing { font-size: var(--qx-fs-aux); }
   .qx-resume-triage .qx-rt-scroll, .qx-resume-triage .qx-rt-wait { padding-top: 14px; }
-  .qx-resume-triage .qx-rt-settings .qx-rt-dimchips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-resume-triage .qx-rt-settings .qx-rt-dimchips,
+  .qx-resume-triage .qx-rt-dimchips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-resume-triage .qx-rt-jobcats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qx-resume-triage .qx-rt-sendoff dl { grid-template-columns: 1fr 1fr; }
   .qx-resume-triage .qx-rt-side { min-width: 0; }
   .qx-resume-triage .qx-rt-settings summary span { display: block; margin-left: 0; }
   .qx-resume-triage .qx-rt-rail li { font-size: var(--qx-fs-aux); }
@@ -142,11 +218,234 @@
   .rrp-head-tag { display: none; }
   .rrp-head { min-height: 0; }
   .rrp-page .rrp-export { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rrp-zone .rrp-scroll { max-height: 480px; }
   .qx-r1-stats { flex-wrap: wrap; }
   .qx-r1-stats span { min-width: 85px; }
   .qx-stage:has(:is(.qx-resume-optimize, .qx-resume-compare)) .qx-pagehead { min-height: 0; padding: 16px; }
   .qx-stage:has(.qx-resume-compare) .qx-ctabar .qx-step-actions { grid-column: 1 / -1; }
   .qx-resume-compare .qxc-progress { flex-wrap: wrap; }
   .qx-resume-compare .qxc-progress-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* 最终稿取件页：办理意图、方向摘要常驻，上传按钮随内容排，两个既有出口并排。 */
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-title {
+  font-size: var(--qx-fs-greeting);
+  line-height: 1.4;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'] { min-height: 0; overflow: hidden; }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 28px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 320px; }
+.qx-resume-triage .qx-rt-seg b { font-size: var(--qx-fs-body-lg); }
+.qx-resume-triage .qx-rt-seg button { min-height: 96px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone { flex: none; min-height: 76px; padding: 14px 20px; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 12px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone > span:not(.ico) { font-size: var(--qx-fs-aux); }
+.qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-dropzone .ico { width: 48px; height: 48px; }
+.qx-resume-triage .qx-rt-quick-exits { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.qx-resume-triage .qx-rt-quick-exits .qx-rt-alt { padding: 14px; }
+.qx-resume-triage .qx-rt-note > button { margin-left: 12px; color: var(--qx-wheat-d); font: inherit; font-weight: 700; min-height: 48px; }
+.rrp-page[data-state='report-empty'] :is(.rrp-state, .rrp-exits, .rrp-checks) { order: 3; }
+.rrp-page[data-state='report-empty'] .rrp-cbar { min-height: 0; }
+@media (max-width: 640px) {
+  /* 窄屏沿用整页滚动：内层不再自成滚动盒，否则来源卡会被裁住且滑不到。 */
+  .qx-resume-triage[data-kiosk-screen='resume-source'] { overflow-y: auto; }
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-scroll {
+    flex: none; overflow: visible; min-height: 0; padding-bottom: 8px;
+  }
+  [data-kiosk-stage-fit='off'] .qx-stage:has(.qx-resume-triage[data-kiosk-screen='resume-source']) .qx-navbar { height: 72px; }
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-xq { min-height: 0; padding: 12px 14px 8px; }
+  .qx-resume-triage .qx-rt-title,
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-title { font-size: var(--qx-fs-body-lg); line-height: 1.26; }
+  .qx-resume-triage .qx-rt-doing { font-size: var(--qx-fs-aux); }
+  .qx-resume-triage .qx-rt-rail { margin-top: 8px; }
+  .qx-resume-triage .qx-rt-rail li { font-size: var(--qx-fs-aux); line-height: 1.25; }
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-pick .qx-rt-sec-h { font-size: var(--qx-fs-body-lg); }
+  /* 手机先看到来源选择；办理意图与未登录说明仍在同一滚动区内。 */
+  .qx-resume-triage[data-kiosk-screen='resume-source'] .qx-rt-pick { order: -1; }
+  .qx-resume-triage .qx-rt-quick-exits { grid-template-columns: 1fr; }
+}
+
+/* 稿 21 取件首屏、目标工作台与确认屏。只加 .qx-rt- 规则。 */
+.qx-rt-source-actions { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; }
+.qx-rt-source-actions .qx-btn { flex: 1 1 280px; min-height: var(--qx-btn-h); }
+@media (max-width: 640px) {
+  .qx-rt-source-actions .qx-btn { flex-basis: 140px; min-height: 56px; }
+}
+.qx-rt-ctxstrip { flex: 1 0 100%; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; color: var(--qx-ink-2); }
+.qx-resume-triage .qx-rt-src .n { font-size: var(--qx-fs-sec); line-height: 1.3; }
+.qx-resume-triage .qx-rt-src[data-unavailable='kiosk'] { opacity: 1; cursor: not-allowed; background: var(--qx-paper); color: var(--qx-ink-3); border-style: dashed; }
+.qx-resume-triage .qx-rt-src[data-unavailable='kiosk'] .n,
+.qx-resume-triage .qx-rt-src[data-unavailable='kiosk'] .go { color: var(--qx-ink-2); white-space: normal; }
+.qx-resume-triage .qx-rt-dimchips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.qx-resume-triage .qx-rt-dimchip { min-height: 64px; }
+.qx-resume-triage .qx-rt-dimchip[data-off='true'] {
+  border-style: dashed; color: var(--qx-ink-3); background: var(--qx-paper); cursor: default;
+}
+.qx-resume-triage .qx-rt-jobcats {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px;
+}
+.qx-resume-triage .qx-rt-jcat {
+  min-height: 64px; padding: 8px 10px; border-radius: 16px; cursor: pointer; text-align: left;
+  border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink-2);
+  font-size: var(--qx-fs-aux); font-weight: 700; line-height: 1.3; white-space: normal;
+}
+.qx-resume-triage .qx-rt-jcat[aria-current='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-jcat[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+.qx-resume-triage .qx-rt-jcat[data-more='true'] { border-style: dashed; }
+.qx-resume-triage .qx-rt-jpanel {
+  padding: 14px 16px; border-radius: 18px; border: 1px solid var(--qx-line); background: var(--qx-paper);
+}
+.qx-resume-triage .qx-rt-jpanel .ops { display: flex; flex-wrap: wrap; gap: 8px; }
+.qx-resume-triage .qx-rt-fmt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--qx-ink-3); }
+.qx-resume-triage .qx-rt-fmt i {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 0 11px; border-radius: 10px;
+  font-style: normal; font-weight: 700; background: var(--qx-surface); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
+}
+.qx-resume-triage .qx-rt-report { display: flex; flex-direction: column; gap: 10px; }
+.qx-resume-triage .qx-rt-report p { margin: 0; padding: 12px 16px; border-radius: 16px; background: var(--qx-surface); border: 1px solid var(--qx-line); line-height: 1.45; }
+.qx-resume-triage .qx-rt-work { display: flex; flex-direction: column; gap: 16px; }
+.qx-resume-triage .qx-rt-block { display: flex; flex-direction: column; gap: 12px; }
+.qx-resume-triage .qx-rt-mh { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.qx-resume-triage .qx-rt-mh b { display: block; font-size: var(--qx-fs-sec); }
+.qx-resume-triage .qx-rt-mh small,
+.qx-resume-triage .qx-rt-sendoff small { display: block; color: var(--qx-ink-3); font-size: var(--qx-fs-aux); }
+.qx-resume-triage .qx-rt-indchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.qx-resume-triage .qx-rt-indchips .qx-rt-chip { white-space: normal; min-height: 64px; }
+.qx-resume-triage .qx-rt-indsheet { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qx-resume-triage .qx-rt-indsheet button {
+  min-height: 64px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; text-align: left; cursor: pointer;
+  border-radius: 16px; border: 1px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink);
+}
+.qx-resume-triage .qx-rt-indsheet i { flex: none; width: 34px; font-style: normal; font-weight: 800; color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-indsheet button[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.qx-resume-triage .qx-rt-sendoff { padding: 16px; border-radius: 22px; border: 1px solid var(--qx-line); background: var(--qx-surface); }
+.qx-resume-triage .qx-rt-sendoff dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 12px 0; }
+.qx-resume-triage .qx-rt-sendoff dl div { min-height: 64px; padding: 8px 12px; border-radius: 14px; background: var(--qx-paper); }
+.qx-resume-triage .qx-rt-sendoff dt { color: var(--qx-ink-3); font-size: var(--qx-fs-aux); }
+.qx-resume-triage .qx-rt-sendoff dd { margin: 4px 0 0; font-weight: 700; }
+.qx-resume-triage .qx-rt-lead {
+  min-height: 68px; padding: 0 20px; border-radius: 16px; text-align: left; cursor: pointer; font-weight: 700;
+  border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink-2);
+}
+.qx-resume-triage .qx-rt-lead[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.qx-resume-triage .qx-rt-sectors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.qx-resume-triage .qx-rt-sector {
+  min-height: 72px; min-width: 0; display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 18px; text-align: left; cursor: pointer;
+  border: 1.5px solid var(--qx-line); background: var(--qx-surface); color: var(--qx-ink);
+}
+@media (max-width: 640px) {
+  .qx-resume-triage .qx-rt-sectors { grid-template-columns: 1fr; }
+}
+.qx-resume-triage .qx-rt-sector i { flex: none; width: 36px; font-style: normal; font-weight: 800; color: var(--qx-teal-d); }
+.qx-resume-triage .qx-rt-sector b { font-size: var(--qx-fs-body); font-weight: 700; line-height: 1.35; }
+.qx-resume-triage .qx-rt-sector[aria-pressed='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
+.qx-resume-triage .qx-rt-industry { display: flex; flex-direction: column; gap: 14px; }
+.qx-resume-triage .qx-rt-settings .qx-rt-direction { min-width: 0; }
+
+/* 来源首屏在 1080×1920 里要同时看见「没有电子简历 / 只想打印原件」和底栏主按钮。
+   只收这一屏的任务头、来源卡和投放区，目标工作台的 320px 任务头不动。
+   投放区 76px 的底线仍由上面那条规则钉住。 */
+@media (min-width: 641px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-srcs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-xq {
+  min-height: 0;
+  padding: 12px 22px 10px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-face {
+  width: 56px;
+  height: 56px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-title {
+  margin-top: 2px;
+  font-size: var(--qx-fs-body-lg);
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-doing { margin-top: 4px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail { margin-top: 6px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-seg button { min-height: 72px; }
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-src {
+  min-height: 0;
+  padding: 12px 14px;
+  gap: 6px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-src .ico {
+  width: 40px;
+  height: 40px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-dropzone {
+  min-height: 56px;
+  padding: 8px 16px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-quick-exits .qx-rt-alt {
+  min-height: 64px;
+  padding: 8px 14px;
+}
+.qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-scroll {
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.qx-resume-triage[data-dock='sendoff'] .qx-rt-scroll { flex: 1; min-height: 0; }
+.qx-resume-triage[data-dock='sendoff'] .qx-rt-sendoff {
+  flex: none;
+  position: relative;
+  z-index: 1;
+}
+
+/* 390×844：任务头、四步轨和来源标题把来源卡组顶出滚动视口。
+   只收这一屏、并且只在已有的 640 窄屏查询里收；1080 仍用上面不带媒体查询的来源首屏尺寸。 */
+@media (max-width: 640px) {
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] {
+    padding-top: 6px;
+    gap: 6px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-xq {
+    padding: 6px 12px 4px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-eyebrow {
+    line-height: 1.2;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-title {
+    margin-top: 0;
+    font-size: var(--qx-fs-aux);
+    line-height: 1.25;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-doing {
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail {
+    margin-top: 4px;
+    padding-top: 4px;
+    gap: 2px 8px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail li {
+    gap: 6px;
+    line-height: 1.2;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-rail i {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-scroll {
+    padding-top: 0;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick {
+    gap: 4px;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick .qx-rt-sec-h {
+    font-size: var(--qx-fs-aux);
+    line-height: 1.25;
+  }
+  .qx-resume-triage[data-kiosk-screen='resume-source'][data-screen='source'] .qx-rt-pick .qx-rt-sec-h small {
+    margin-top: 0;
+    line-height: 1.25;
+  }
 }

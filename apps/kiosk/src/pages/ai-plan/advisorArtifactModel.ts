@@ -2,6 +2,8 @@ import { ALLOW_FIXTURES } from '../../utils/buildMode'
 // 小青作业面：三种真实产物的形状、8 态派生、capture 夹具。
 // 夹具必须 ?capture=1 或 ?debug=1 才开，否则 fail-closed 回 no-artifact。
 
+export const ONE_PIN_HINT = '这次只留下了 1 条。想多带几条，可以点下面「再问一轮」重新问小青，聊完再保存一次要点，会另外生成一页；这一页到期前还能从「我的 AI 记录」打开。'
+
 export const ARTIFACT_STATES = [
   'no-artifact',
   'loading',
@@ -290,12 +292,12 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
   switch (state) {
     case 'qa-pins':
       return {
-        heroBefore: '你钉住的，我都',
+        heroBefore: '这次聊的要点，我都',
         heroEm: '整理好了',
         heroAfter: '。',
-        sub: '对话本身不保存，只有你钉住的条目留了下来。',
-        statusLabel: '这一趟的产物已生成',
-        statusTone: 'ok',
+        sub: '对话本身不保存，留下来的是我整理的这几条要点。',
+        statusLabel: '这份可以打印带走',
+        statusTone: 'unknown',
       }
     case 'slot-draft':
       return {
@@ -303,8 +305,8 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroEm: '可以直接念',
         heroAfter: '的话。',
         sub: '下面这段全部来自你自己说过的话，我只做了拼接。',
-        statusLabel: '这一趟的产物已生成',
-        statusTone: 'ok',
+        statusLabel: '这份可以打印带走',
+        statusTone: 'unknown',
       }
     case 'slot-draft-blanks':
       return {
@@ -312,8 +314,8 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroEm: '可以直接念',
         heroAfter: '的话。',
         sub: '还有几处你没答，我留了空 —— 不替你编。',
-        statusLabel: '这一趟的产物已生成',
-        statusTone: 'ok',
+        statusLabel: '这份可以打印带走',
+        statusTone: 'unknown',
       }
     case 'compare-report':
     case 'compare-all-covered':
@@ -322,8 +324,8 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroEm: '有没有写到',
         heroAfter: '。',
         sub: '只比「有没有写到」，不评价「写得好不好」。',
-        statusLabel: '这一趟的产物已生成',
-        statusTone: 'ok',
+        statusLabel: '这份可以打印带走',
+        statusTone: 'unknown',
       }
     case 'expired':
       return {
@@ -331,7 +333,7 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroEm: '已经过期',
         heroAfter: '了。',
         sub: '公共终端按留存期清理，过期后不再展示正文。',
-        statusLabel: '没有可看的产物',
+        statusLabel: '还没有可带走的内容',
         statusTone: 'unknown',
       }
     case 'print-unavailable':
@@ -341,24 +343,24 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroAfter: '。',
         sub: '正文仍可看，打印按钮先不放出来。',
         statusLabel: '打印能力读不到',
-        statusTone: 'warn',
+        statusTone: 'unknown',
       }
     case 'loading':
       return {
-        heroBefore: '正在把这一趟的产物',
+        heroBefore: '正在把刚做好的作业',
         heroEm: '读回来',
         heroAfter: '。',
-        sub: '读到之前这一页不假装已经有结果。',
-        statusLabel: '正在读取产物',
+        sub: '读到之前不显示任何结果。',
+        statusLabel: '正在读取',
         statusTone: 'unknown',
       }
     case 'error':
       return {
-        heroBefore: '这一趟的产物',
+        heroBefore: '刚做好的作业',
         heroEm: '这次没读到',
         heroAfter: '。',
-        sub: '不是没有做过，是这一次请求没有成功。',
-        statusLabel: '产物读取失败',
+        sub: '不是没有做过，是这一次没读回来。',
+        statusLabel: '这次没读到',
         statusTone: 'bad',
       }
     default:
@@ -367,7 +369,7 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
         heroEm: '还没有',
         heroAfter: '能带走的东西。',
         sub: '先去问小青，产出的东西会回到这一页。',
-        statusLabel: '没有可看的产物',
+        statusLabel: '还没有可带走的内容',
         statusTone: 'unknown',
       }
   }
@@ -375,7 +377,7 @@ export function copyFor(state: ArtifactViewState): ArtifactCopy {
 
 export const FIXTURE_QA: QaPinsPayload = {
   kind: 'qa_pins',
-  title: '你钉住的条目',
+  title: '这次对话的要点',
   pins: [
     { content: '我做过两年社群运营，最多同时管 6 个群。', evidenceLevel: 'E1', sourceNote: '来源：你在第 2 轮说的原话' },
     { content: '你在本机的简历里写了「用户增长」相关经历，可以在面试里直接引用。', evidenceLevel: 'E2', sourceNote: '来源：本机已有的简历诊断结果' },
@@ -386,12 +388,12 @@ export const FIXTURE_QA: QaPinsPayload = {
 
 export const FIXTURE_SLOT: SlotDraftPayload = {
   kind: 'slot_draft',
-  draft: '我做过两年社群运营，最多同时管 6 个群，日常处理入群审核、活动通知和答疑。\n去年负责的一次线下招聘会宣讲，从建群到活动结束一共来了 180 多人。\n我想换到更靠近用户的岗位，因为我更喜欢直接听到用户怎么说。',
+  draft: '我做过两年社群运营，最多同时管 6 个群，日常处理入群审核、活动通知和答疑。\n去年负责的一次线下活动宣讲，从建群到活动结束一共来了 180 多人。\n我想换到更靠近用户的岗位，因为我更喜欢直接听到用户怎么说。',
   blanks: [],
   summary: '由你自己说过的话拼接',
   basedOn: [
     { slotKey: 'current_role', prompt: '现在做什么', value: '社群运营，两年，最多同时管 6 个群' },
-    { slotKey: 'best_achievement', prompt: '最拿得出手的结果', value: '线下招聘会宣讲来了 180 多人' },
+    { slotKey: 'best_achievement', prompt: '最拿得出手的结果', value: '线下活动宣讲来了 180 多人' },
     { slotKey: 'why_this_job', prompt: '为什么想做这个岗位', value: '想更靠近用户，喜欢直接听用户怎么说' },
   ],
 }
@@ -404,10 +406,10 @@ export const FIXTURE_SLOT_BLANKS: SlotDraftPayload = {
 export const FIXTURE_COMPARE: CompareReportPayload = {
   kind: 'compare_report',
   summary: '5 条要求里有 2 条没写到',
-  extras: [{ point: '有基础的平面设计能力', note: '岗位没提，面试时可以主动说' }],
+  extras: [{ point: '有基础的平面设计能力', note: '要求里没写，面试时可以主动说' }],
   items: [
     { requirement: '两年以上社群或用户运营经验', verdict: 'covered', evidence: '我做过两年社群运营，最多同时管 6 个群' },
-    { requirement: '有线下活动组织经验', verdict: 'covered', evidence: '线下招聘会宣讲，从建群到活动结束一共来了 180 多人' },
+    { requirement: '有线下活动组织经验', verdict: 'covered', evidence: '线下活动宣讲，从建群到活动结束一共来了 180 多人' },
     { requirement: '熟练使用数据分析工具（如 Excel / SQL）', verdict: 'missing', evidence: '材料里没有出现相关表述。要是你会，补一句写清「用什么工具、做到什么程度」。' },
     { requirement: '有内容撰写或短视频经验', verdict: 'missing', evidence: '材料里没有出现相关表述。' },
     { requirement: '本科及以上学历', verdict: 'not_a_capability', evidence: '这是硬性条件，不是能写进材料的能力，本机不做判定。' },
@@ -427,10 +429,11 @@ export const FIXTURE_COMPARE_ALL: CompareReportPayload = {
 }
 
 export function fixturePayload(state: ProtoState): AdvisorArtifactPayload | null {
-  if (state === 'qa-pins') return FIXTURE_QA
+  // 稿 52 的 print-unavailable 画的是四条要点（稿上写的是「钉住」），不是比对单。
+  if (state === 'qa-pins' || state === 'print-unavailable') return FIXTURE_QA
   if (state === 'slot-draft') return FIXTURE_SLOT
   if (state === 'slot-draft-blanks') return FIXTURE_SLOT_BLANKS
   if (state === 'compare-report') return FIXTURE_COMPARE
-  if (state === 'compare-all-covered' || state === 'print-unavailable') return FIXTURE_COMPARE
+  if (state === 'compare-all-covered') return FIXTURE_COMPARE_ALL
   return null
 }

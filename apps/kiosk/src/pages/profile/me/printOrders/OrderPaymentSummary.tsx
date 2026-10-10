@@ -1,3 +1,5 @@
+import { helpNeededLine, refundApplyLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 // ============================================================
 // 打印订单详单（支付信息区，C5 P0b）。
 //
@@ -6,9 +8,10 @@
 //   单双面 / 彩黑 / 份数缺值显示「未记录」，不默认成单面或黑白。页范围没传显示「全部页」。双面不计价，不渲染金额项。
 // - 关联 Order 缺失（payStatus 为 null，历史订单）→ 支付区只显示「暂无支付信息」，
 //   不显示金额 0、不推断支付状态。
-// - 有 Order → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
+// - 有 Order 且不是 0 元单 → 展示后端真实字段：下单金额、优惠/权益抵扣、已退款、支付状态、来源、计费页数。
+//   0 元单（金额为 0 或来源为免费）整块不展示，避免把免费说成支付、实付或抵扣。
 //   实付：金额为 0 时写「0 元（免费试运营）」；其余没有单独的实付字段，标「未记录」，不按应付减优惠推算。
-// - 取件码仅在后端返回时渲染（门控在服务端）。
+// - 到机码（pickupCode）仅在后端返回时渲染（门控在服务端）。续打句只转发订单上的 reprint 字段。
 // - 「再打一份」本批不做订单侧直连（PrintTask 无可重签文件源），
 //   只提供「去我的文档再打印」诚实引导：走我的文档重签 URL → 打印确认，
 //   天然创建新 PrintTask + 新 Order，绝不复用旧任务或旧签名链接。
@@ -23,12 +26,12 @@ import {
   copiesDisplay,
   duplexDisplay,
   formatAmountCents,
+  isFreeMemberOrder,
   memberPayStatusLabel,
   netPaidDisplay,
   pageRangeDisplay,
   publicOrderNo,
   paymentSourceLabel,
-  PENDING_REFUND_EXPLANATION,
   PENDING_REFUND_LABEL,
   recordedAmountDisplay,
 } from './paymentCopy'
@@ -47,6 +50,7 @@ function DetailRow({ label, value, hint }: { label: string; value: string; hint?
 }
 
 export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const payStatus = item.payStatus ?? null
   const orderNo = publicOrderNo(item.orderNo)
@@ -65,9 +69,9 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
+          <span>（该订单未关联支付记录。{helpNeededLine(contact)}）</span>
         </p>
-      ) : (
+      ) : isFreeMemberOrder(item) ? null : (
         <div className="me-payment-grid">
           <DetailRow
             label="下单金额"
@@ -91,15 +95,15 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
         </div>
       )}
 
-      {item.refundRequired === true && (
+      {item.refundRequired === true && typeof item.amountCents === 'number' && item.amountCents > 0 && !isFreeMemberOrder(item) && (
         <p className="me-note" role="status">
           <strong>{PENDING_REFUND_LABEL}</strong>
           {' '}
-          {PENDING_REFUND_EXPLANATION}
+          {refundApplyLine(contact)}
         </p>
       )}
 
-      {item.pickupCode && <PickupCodePanel code={item.pickupCode} />}
+      {item.pickupCode && <PickupCodePanel code={item.pickupCode} reprintAllowed={item.reprintAllowed} reprintRemaining={item.reprintRemaining} />}
 
       <button
         type="button"

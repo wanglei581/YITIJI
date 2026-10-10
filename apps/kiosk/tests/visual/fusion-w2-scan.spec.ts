@@ -292,12 +292,16 @@ test('scan start creates only after explicit continuation @w2', async ({ page, a
 
   await page.goto('/scan/start')
   await expect(page.getByText(/下一步会真实建立这次扫描/).first()).toBeVisible()
-  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
-  const next = page.getByRole('button', { name: /下一步 · 建立这次扫描/ })
-  await expect(next).toBeEnabled()
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
+  const next = page.getByRole('button', { name: '开始这次扫描', exact: true })
+  await expect(next).toBeDisabled()
+  await expect(page.getByTestId('scan-workbench-disabled-reason')).toHaveText('先选一种材料')
+  await expect(page.getByRole('button', { name: '问小青：扫描要怎么按' })).toBeVisible()
   // 稿 18：底部三列口径是一次性说明，只在选类型这一屏出现，后面各屏不复读。
   await expect(page.getByTestId('scan-workbench-truth')).toBeVisible()
   expect(legacyDeviceRequests).toBe(0)
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await expect(next).toBeEnabled()
   const createRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/scan/sessions',
   )
@@ -323,6 +327,7 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
   await page.goto('/scan/start')
   await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '开始这次扫描', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
   await expectHealthy(page, errors)
 })
@@ -575,7 +580,7 @@ test.describe('scan result at 390x844', () => {
     await expect(aiButton).toBeEnabled()
 
     // 顶栏、操作条、底栏不许被横幅盖住（修复前 .sw-xq 溢出正文区，压在打印主按钮上）。
-    await assertTapTargetPointerHit(page.getByRole('button', { name: '返回打印扫描' }))
+    await assertTapTargetPointerHit(page.locator('.qx-topbar-back'))
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '重新扫描' }))
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '拿去打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
@@ -647,7 +652,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
   await expect(scanBlock).toBeVisible()
   await expect(scanBlock.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   await expect(scanBlock.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
-  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+  await expect(page.locator('.qx-pill')).toHaveText('第 2 步 · 确认这次办理')
 
   // 晚到的第一次结果放行后，页面仍停在来源页 —— 不被带去报告页。
   const late = page.waitForResponse('**/api/v1/resume/parse')
@@ -659,7 +664,7 @@ test('resume scan return keeps the file and an unresolved parse never auto-posts
 
   // 再次进入仍是同一份扫描件；第一次结果未知时，不能自动再发一次 AI 请求。
   await chooseGenericResumeDirection(page)
-  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.getByRole('button', { name: 'AI 诊断，看改进建议' }).click()
   await page.waitForURL('**/resume/parse')
   await expect(page.getByRole('button', { name: '原样再试一次' })).toBeVisible()
   expect(parseBodies).toHaveLength(1)
@@ -766,7 +771,7 @@ test('resume scan-ready track title stays horizontal at 390x844 @w2', async ({ p
   expect(swapBox!.height).toBeGreaterThanOrEqual(48)
   expect(swapBox!.width).toBeGreaterThanOrEqual(48)
   // 顶栏胶囊在 390 下折两行：原先逐字断行，第二行只剩一个「认」。现在只在「 · 」处断，不裁字、不藏字。
-  await expect(page.locator('.qx-pill')).toHaveText('扫描件已交接 · 待确认')
+  await expect(page.locator('.qx-pill')).toHaveText('第 2 步 · 确认这次办理')
   await assertQxPillReadable(page, '/resume/source scan-ready 390')
   await page.screenshot({ path: testInfo.outputPath('qx-resume-scan-ready-390.png'), fullPage: false })
   await expectHealthy(page, errors)
@@ -932,7 +937,7 @@ test('qingxu scan workbench captures 1080x1920 evidence @w2', async ({ page, api
   }
 
   await page.goto('/scan/start')
-  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
   await shot('qx-scan-start.png')
 
   registerScanCapability(api, 'maintenance', '扫描仪正在保养')
@@ -1408,4 +1413,168 @@ test.describe('scan result full-screen preview at 390x844', () => {
     await expect(dialog).toHaveCount(0)
     await expectHealthy(page, errors)
   })
+})
+
+const SCAN_PAPER_DRAFT = '我想扫描一份纸质材料。请告诉我怎么放纸，以及要在打印机面板上按哪里。'
+
+function registerAssistantVoice(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+function scanZone(page: Page, no: string) {
+  return page.locator('.sw-sec').filter({
+    has: page.locator('.sw-no', { hasText: new RegExp(`^${no}$`) }),
+  })
+}
+
+async function expectScanFooter(page: Page): Promise<void> {
+  const row = page.locator('.sw-airow')
+  await expect(row.getByRole('button', { name: '返回打印扫描', exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: '问小青：扫描要怎么按 →', exact: true })).toBeVisible()
+  await expect(row).not.toContainText('工作人员')
+}
+
+async function expectPaperDraft(page: Page, api: ApiRouter): Promise<void> {
+  await page.locator('.sw-airow').getByRole('button', { name: '问小青：扫描要怎么按 →', exact: true }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  const draft = page.getByLabel('输入咨询问题')
+  await expect(draft).toHaveValue(SCAN_PAPER_DRAFT)
+  await expect(draft).not.toContainText('工作人员')
+  expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+}
+
+test('scan workbench 2.0 leaves every material unselected until the user picks 简历扫描 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/scan/start')
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
+  const radios = page.getByRole('radio')
+  await expect(radios).toHaveCount(3)
+  for (const radio of await radios.all()) {
+    await expect(radio).toHaveAttribute('aria-checked', 'false')
+  }
+  const wrap = page.locator('.sw-cta-wrap')
+  const start = wrap.getByRole('button', { name: '开始这次扫描', exact: true })
+  await expect(start).toBeDisabled()
+  await expect(wrap.getByTestId('scan-workbench-disabled-reason')).toHaveText('先选一种材料')
+  await expect(page.locator('[data-qx-page="scan-workbench"]')).not.toContainText('工作人员')
+
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await expect(page.getByRole('radio', { name: '选择扫描类型：简历扫描' })).toHaveAttribute('aria-checked', 'true')
+  await expect(start).toBeEnabled()
+  await expect(wrap.getByTestId('scan-workbench-disabled-reason')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+test('scan workbench 2.0 keeps 返回打印扫描 and 问小青 on every screen @w2', async ({ page, api }) => {
+  test.setTimeout(90_000)
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  registerShell(api)
+  registerAssistantVoice(api)
+  registerScanCapability(api, 'available')
+  registerCreatedScan(api)
+  registerScanAck(page, api)
+  await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(scanStatus('waiting')),
+    })
+  })
+
+  await page.goto('/scan/start')
+  await expect(page.getByText('第 1 步 · 选扫描类型', { exact: true })).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 503,
+    json: { error: { code: 'CAPABILITY_UNAVAILABLE', message: '能力状态暂不可用' } },
+  })
+  await page.goto('/scan/start')
+  await expect(page.locator('[data-state="unknown"]')).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  registerScanCapability(api, 'available')
+  await page.goto('/scan?stage=start&mode=usb-panel')
+  await expect(page.locator('[data-state="usb-panel"]')).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  await page.goto('/scan/start')
+  await page.getByRole('radio', { name: '选择扫描类型：简历扫描' }).click()
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
+  await page.waitForURL(/\/scan\?stage=settings/)
+  await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  await seedScanLive(page)
+  await page.goto('/scan?stage=progress')
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  await seedScanResult(page, { scanType: 'resume', outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
+  await page.goto('/scan?stage=result')
+  await expect(page.locator('[data-state="wait-timeout"]')).toBeVisible()
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  await seedScanResult(page, resultState)
+  await page.goto('/scan?stage=result')
+  await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
+  await expectPdfCompleted(binary)
+  await expectScanFooter(page)
+  await expectPaperDraft(page, api)
+
+  expect(errors).toEqual([])
+})
+
+test('scan workbench 2.0 shows an unreadable capability in zone 02 with no enabled start @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 503,
+    json: { error: { code: 'CAPABILITY_UNAVAILABLE', message: '能力状态暂不可用' } },
+  })
+
+  await page.goto('/scan/start')
+  await expect(page.locator('[data-state="unknown"]')).toBeVisible()
+  const card = scanZone(page, '02').getByTestId('scan-workbench-fallback')
+  await expect(card).toContainText('能力状态暂不可用')
+  await expect(card).toContainText('本机未能读取扫描能力配置')
+  await expect(card).not.toContainText('工作人员')
+  await expect(scanZone(page, '01').getByTestId('scan-workbench-fallback')).toHaveCount(0)
+  await expect(scanZone(page, '03').getByTestId('scan-workbench-fallback')).toHaveCount(0)
+  // 读不到时不给可点的「开始这次扫描」。这屏的主行动被挡住，理由写在按钮旁边。
+  await expect(page.getByRole('button', { name: '开始这次扫描', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('scan-workbench-disabled-reason')).toHaveText('能力确认前不会创建扫描任务')
+  await expectScanFooter(page)
+  await expectHealthy(page, errors)
+})
+
+test('scan workbench 2.0 shows a wait timeout in the result zone 02 with a next step @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await seedScanResult(page, { scanType: 'resume', outcome: 'expired', success: false, reason: '扫描超时，请返回重新开始' })
+  await page.goto('/scan?stage=result')
+  await expect(page.locator('[data-w2-page="scan-result"]')).toHaveAttribute('data-state', 'wait-timeout')
+  const card = scanZone(page, '02').getByTestId('scan-workbench-fallback')
+  await expect(card).toContainText('等待超时，这次没有拿到文件')
+  await expect(card).toContainText('扫描超时，请返回重新开始')
+  await expect(card).not.toContainText('工作人员')
+  await expect(scanZone(page, '01').getByTestId('scan-workbench-fallback')).toHaveCount(0)
+  await expect(scanZone(page, '03')).toContainText('现在怎么办')
+  await expect(scanZone(page, '03')).toContainText('重新开始一次扫描')
+  await expect(page.getByRole('button', { name: '重新开始一次扫描', exact: true })).toBeEnabled()
+  await expectScanFooter(page)
+  await expectHealthy(page, errors)
 })

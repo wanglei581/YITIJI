@@ -96,6 +96,20 @@ console.log('\nE. 共享技术码')
   assert(/登录/.test(e.message || ''), `登录失效给出中文提示（实际「${e.message}」）`)
 }
 
+// AI 额度提示通过真实 request 链路到达所有共享错误映射的页面。
+console.log('AI 额度：恢复时间和手动路径')
+for (const [code, required] of [
+  ['AI_BUDGET_EXHAUSTED', ['今天', '明天恢复', '模板', '手动填写', '打印照常']],
+  ['AI_BUDGET_UNAVAILABLE', ['暂时', '稍后再试', '手动填写', '打印照常']],
+]) {
+  for (const message of [code, SERVER_GENERIC_MESSAGE, '服务端原文']) {
+    const e = await errorOf(503, { success: false, error: { code, message } })
+    assert(required.every(word => e.message?.includes(word)), `${code} 有下一步且不被原文覆盖：${e.message}`)
+    assert(!/价格|购买|充值/.test(e.message || ''), `${code} 不引导付费`)
+    assert(e.code === code, `${code} 保留错误码`)
+  }
+}
+
 // G. 登录失败必须说得出原因
 //
 // 2026-09-08 回归：本模块首版把登录链路的码一并挡在 fail-closed 之外，用户在

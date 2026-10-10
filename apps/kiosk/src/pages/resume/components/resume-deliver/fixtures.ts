@@ -21,6 +21,36 @@ export const SYNTHETIC_RESUME: GeneratedResume = {
   certificates: ['合成证书'],
 }
 
+/** 23 号并排和 capture 用的示例简历。合成样本标记仍留在总览上，人名写成真人会写的一份。 */
+export const PAGE23_CAPTURE_RESUME: GeneratedResume = {
+  basic: { name: '孙晓雯', phone: '13853201826', email: 'sunxiaowen@example.com', city: '青岛' },
+  intention: { position: '仓储专员', city: '青岛', jobType: '全职' },
+  summary: '青岛职业技术学院物流管理 2026 届。在青岛某物流公司仓储部实习，按入库单核对货位并整理当日台账。',
+  education: [{ school: '青岛职业技术学院', major: '物流管理', degree: '专科', period: '2023-2026', description: '在校完成仓储与配送课程。' }],
+  experience: [{
+    company: '青岛某物流公司',
+    role: '仓储部实习生',
+    period: '2025-2026',
+    description: '在仓储部按入库单核对货位，并整理了当日台账。主导盘点并完成 5000 条记录校验。',
+  }],
+  projects: [{ name: '校园快递驿站整理', role: '组员', description: '按班级统计待取件，核对货架编号。' }],
+  skills: ['入库核对', 'Excel 台账'],
+  certificates: ['物流员职业资格'],
+}
+
+export const PAGE23_CAPTURE_MODULES: ResumeOptimizeModule[] = [
+  {
+    title: '仓储实习',
+    before: '在仓储部按入库单核对货位。',
+    after: '在仓储部按入库单核对货位，并整理了当日台账。',
+  },
+  {
+    title: '盘点记录',
+    before: '参与过一次盘点。',
+    after: '主导盘点并完成 5000 条记录校验。',
+  },
+]
+
 export const SYNTHETIC_MODULES: ResumeOptimizeModule[] = [
   {
     title: '经历表达',

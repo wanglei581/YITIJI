@@ -591,7 +591,7 @@ const passwordSubmitText = passwordSubmit?.getText(pageSourceFile) ?? ''
 if (
   passwordSubmitText.includes('finally {') &&
   passwordSubmitText.includes('setSubmitting(false)') &&
-  passwordSubmitText.includes("setPwError(r.message || '修改失败，请重试')") &&
+  passwordSubmitText.includes("setPwError(userMessageOf(r, '密码没有修改，请检查当前密码后重试'))") &&
   passwordSubmitText.includes('window.setTimeout(() => logout(), 1200)')
 ) {
   pass('所有异常路径都会恢复提交状态,成功后强制退出重新登录')

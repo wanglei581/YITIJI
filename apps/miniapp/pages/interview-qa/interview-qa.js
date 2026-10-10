@@ -2,7 +2,7 @@ const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const voice = require('../../utils/voice-recorder')
-const { userMessageOf } = require('../../utils/user-error')
+const { userMessageOf, plainAiMessageOf } = require('../../utils/user-error')
 const aiEntries = require('../../utils/ai-entries')
 
 Page({
@@ -55,11 +55,11 @@ Page({
         myAnswer:       '',
       })
     } catch (err) {
-      const code = err.error?.code || err.code || ''
+      const code = (err && err.code) || ''
       if (code === 'INTERVIEW_SESSION_NOT_FOUND') {
         this._fail('面试会话不存在或无权访问')
       } else {
-        this._fail(err.error?.message || err.message || '面试初始化失败。AI 不可用时可打印通用题目单。')
+        this._fail(plainAiMessageOf(err, '面试初始化失败。AI 不可用时可打印通用题目单。'))
       }
     }
   },
@@ -98,7 +98,13 @@ Page({
     } catch (err) {
       // 提交失败：恢复答题状态，保留已输入内容
       this.setData({ phase: 'running' })
-      wx.showToast({ title: err.error?.message || '提交失败，请重试', icon: 'none' })
+      // 原话在 err.message（utils/request.js）。用弹窗不用 toast：toast 只有两行，长一点的原话会被截断
+      wx.showModal({
+        title: '这一题没有提交成功',
+        content: plainAiMessageOf(err, '提交失败，请重试。已输入的回答还在。'),
+        showCancel: false,
+        confirmText: '知道了',
+      })
     }
   },
   _fail(failMsg) { this.setData({ phase: 'failed', failMsg }) },

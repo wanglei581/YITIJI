@@ -27,8 +27,17 @@ export interface MemberPrintOrderItem {
   paymentSource?: PaymentSource | null
   billablePages?: number | null
   billingPageSource?: BillingPageSource | null
-  /** 取件凭证码；仅 paid 且未退款/非终态时返回，否则 null（走 pickupCodeVisibleFor 门控）。 */
+  /** 到机码。可取，或失败后仍可续打时解密下发；否则 null。不再读明文列。 */
   pickupCode?: string | null
+  /** 绑定的那台终端此刻用同一个到机码能否把失败任务拉回待打印。 */
+  reprintAllowed?: boolean
+  /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
+  reprintRemaining?: number | null
+  /**
+   * 免费单的出纸提示。may_have_printed = 上次结果未确认（含冷却期内）；
+   * partial_output = 上次只出了一部分。付费单与普通失败为 null。
+   */
+  reprintNotice?: 'may_have_printed' | 'partial_output' | null
   // ── C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）：无 Order 一律 null ──
   /** 已退金额累计（分）；未退款为 0，无 Order 为 null。 */
   refundedAmountCents?: number | null
@@ -131,7 +140,14 @@ export interface MemberOrderTimelineItem {
   displayStatus: MemberOrderTimelineDisplayStatus
   arrivalCodeExpiresAt: string | null
   hasArrivalCode: boolean
+  /** 到机码。可取，或失败后仍可续打时解密下发；否则 null。不再读明文列。 */
   pickupCode: string | null
+  /** 绑定的那台终端此刻用同一个到机码能否把失败任务拉回待打印。 */
+  reprintAllowed: boolean
+  /** 剩余自助续打次数（0–2）。没有任务，或没有到机码哈希的现场单，为 null。 */
+  reprintRemaining: number | null
+  /** 免费单出纸提示。付费单与普通失败为 null。 */
+  reprintNotice: 'may_have_printed' | 'partial_output' | null
   terminal: MemberOrderTimelineTerminal | null
   claimableHere: boolean
 }

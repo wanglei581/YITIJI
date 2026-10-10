@@ -11,6 +11,9 @@ import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
 import { assertSmsTrustedEgressConfig } from './member-auth/sms/sms-egress-config'
 import { resolveTrustProxyHops } from './config/trust-proxy'
+import { installUnhandledRejectionGuard } from './common/process/background-task'
+import { RedisService } from './common/redis/redis.service'
+import { deliverOpsAlert } from './admin-ops/admin-alert-push.service'
 
 // rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
 // 防真实入口与测试口径漂移 —— C5-6 双模型审查修复的守护点）。
@@ -54,6 +57,28 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // express 接管 json body parser,带 verify 回调写入 req.rawBody
     bodyParser: false,
+  })
+  // 进程级兜底：未处理的 Promise 拒绝不再让整个 API 退出（Node 22 默认会退）。记日志（只记错误类型、
+  // 错误码与位置，不记 message）并推企业微信告警，每小时最多一条。同步未捕获异常仍按默认退出。
+  // 见 src/common/process/background-task.ts 与门禁 verify:background-task-safety。
+  installUnhandledRejectionGuard({
+    log: (line) => console.error(`[ERROR] ${line}`),
+    alert: async (summary, hourBucket) => {
+      await deliverOpsAlert({
+        redis: app.get(RedisService),
+        webhook: process.env['ALERT_WEBHOOK_URL']?.trim() || null,
+        fetchImpl: globalThis.fetch.bind(globalThis),
+        alert: {
+          subjectKey: 'api_unhandled_rejection:global',
+          episodeToken: hourBucket,
+          type: 'api_unhandled_rejection',
+          severity: 'error',
+          title: `API 后台出现未处理的错误（进程未退出）：${summary}`,
+          terminalCode: null,
+        },
+        state: 'firing',
+      })
+    },
   })
   // 可信反代跳数：生产必须显式 TRUST_PROXY_HOPS=1..9；禁止 true。
   // 配置后 Express 填充 req.ip，控制器只读 req.ip，不得手解析 X-Forwarded-For。

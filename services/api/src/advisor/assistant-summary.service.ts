@@ -1,11 +1,11 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import {
@@ -26,7 +26,7 @@ import {
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
-import { llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
+import { llmEndpointNotAllowedError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { LlmChatService, assistantOwnerKey } from '../ai/llm/llm-chat.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
@@ -43,13 +43,14 @@ export const ASSISTANT_SUMMARY_SYSTEM_PROMPT = withAiSafety([
   '只输出 JSON（不要 markdown 代码块）：{"highlights":["要点"],"todos":["待办"]}',
 ].join('\n'))
 import { AdvisorArtifactService } from './advisor-artifact.service'
-import { ADVISOR_DISCLAIMER } from './advisor-skills'
+import { ADVISOR_DISCLAIMER, ASSISTANT_SUMMARY_TOPIC } from './advisor-skills'
 import type { QaPinsPayload } from './advisor-artifact.types'
 
 // ============================================================
 // 小青助手「本次要点」：把内存中的 assistant 会话浓缩成可打印 qa_pins。
 //
 // 不改 Prisma 模型：AdvisorSession.slotsJson.source = 'assistant' 标记来源。
+// 开场原话不落库：topic 只存固定标签，slotsJson 只留来源；AI 整理的要点照旧保存。
 // 匿名一律 404，不泄露「需要登录」。产物走既有 AdvisorArtifact.print。
 // 日志 / 审计只写元数据，不含对话正文或转写文本。
 // ============================================================
@@ -137,7 +138,6 @@ export class AssistantSummaryService {
       throw error
     }
 
-    const firstUser = userTurns[0]!.content.trim().slice(0, 600)
     const nowIso = new Date().toISOString()
     const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000)
     const row = await this.prisma.advisorSession.create({
@@ -146,12 +146,11 @@ export class AssistantSummaryService {
         accessTokenHash: null,
         skill: 'qa',
         status: 'completed',
-        topic: firstUser || '小青对话要点',
+        topic: ASSISTANT_SUMMARY_TOPIC,
         skillReason: '由小青助手本次对话浓缩',
         skillSource: 'llm',
         slotsJson: JSON.stringify({
           source: { value: 'assistant', filledAt: nowIso },
-          question: { value: firstUser, filledAt: nowIso },
         }),
         expiresAt,
       },
@@ -279,7 +278,7 @@ export class AssistantSummaryService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'assistant_summary', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
@@ -304,9 +303,7 @@ export class AssistantSummaryService {
       tokenUsage: normalizeLlmUsage(data?.usage),
     })
     if (!res.ok) {
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_PROVIDER_ERROR', message: '生成本次要点失败，请稍后重试' },
-      })
+      throw llmUpstreamStatusError('本次要点', res.status, res.data)
     }
     const raw = data?.choices?.[0]?.message?.content?.trim()
     if (!raw) {

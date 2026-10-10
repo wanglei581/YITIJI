@@ -22,6 +22,7 @@ import {
   type PrintPriceChangedQuote,
 } from '../../services/print/printJobsApi'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine, machineCannotPrintLine, machineUnusableLine, printProblemLine } from '../../copy/unattendedCopy'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
@@ -29,6 +30,7 @@ import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
+import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
 import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
 import { PrintConfirmView } from './components/PrintConfirmView'
@@ -116,23 +118,24 @@ export function PrintConfirmPage() {
   } = usePrintConfirmHandoff(capability)
   const file: PrintFile = handoff?.file ?? { name: '未知文件', size: '-', pages: null }
   const {
+    kind: printerKind,
+    printer,
     printerReady,
     printerLabel,
     printerNotice,
     loading: printerLoading,
-    kind: printerKind,
-    printer,
   } = useTerminalDeviceStatus()
   const printerBlocked = printerLoading || !printerReady
+  // 缺纸、离线、异常仍写明「当前不能下单，不会扣费」（0 元单在传入前剥掉这句）。求助改走标准句 2。
   const printerBlockedReason = printerLoading
     ? '正在确认打印机状态，请稍候'
     : printerNotice
       ? printerNotice
       : printer.errorCode === 'paperEmpty'
-        ? '打印机缺纸，当前不能下单，不会扣费。请联系工作人员补纸后再试。'
+        ? `打印机缺纸，当前不能下单，不会扣费。${machineCannotPrintLine()}`
         : printerKind === 'offline'
-          ? `${printerLabel}。当前不能下单，不会扣费。请联系工作人员检查设备后再试。`
-          : `${printerLabel}。当前不能下单，不会扣费。请联系工作人员。`
+          ? `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
+          : `${printerLabel}。当前不能下单，不会扣费。${machineCannotPrintLine()}`
   const adjusted = adjustments.length > 0
   const materialCheck = handoff?.materialCheck
   const source = handoff?.source
@@ -142,6 +145,7 @@ export function PrintConfirmPage() {
   const [submitting, setSubmitting] = useState(false)
   const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
   const [abandoning, setAbandoning] = useState(false)
+  const [piiCheckRequired, setPiiCheckRequired] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
   const [quoteNonce, setQuoteNonce] = useState(0)
@@ -179,6 +183,7 @@ export function PrintConfirmPage() {
   const benefitCardEnabled = API_MODE === 'http' && hasFileContext && !queryInvalid && !waitingCapability && !ordered
   const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
   const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
+  const freePricing = quote.status === 'ready' ? quote.amountCents === 0 : priceCfg.status === 'ready' && priceCfg.unitCents === 0
 
   useEffect(() => {
     if (API_MODE !== 'http') return
@@ -205,7 +210,7 @@ export function PrintConfirmPage() {
         const code = errorCodeOf(err)
         const reason =
           code === 'PRINTER_UNAVAILABLE' || code === 'PRINT_JOB_TOO_LARGE' || code === 'PRINT_TERMINAL_QUEUE_HALTED'
-            ? userMessageOf(err, '请稍后重试或联系现场工作人员')
+            ? userMessageOf(err, `请稍后重试。${helpNeededLine()}。`)
             : '页数以实际结果为准，确认前不显示金额'
         setQuoteState({ key: quoteKey, view: { status: 'unavailable', reason, code } })
       })
@@ -286,13 +291,13 @@ export function PrintConfirmPage() {
       label: '色彩模式',
       value: colorAdjusted ? '彩色本机暂未开通，' : COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode,
       off: colorAdjusted,
-      note: colorAdjusted ? '已按黑白报价' : undefined,
+      note: colorAdjusted ? (freePricing ? '已改为黑白' : '已按黑白报价') : undefined,
     },
     {
       label: '单双面',
       value: duplexAdjusted ? '双面本机暂未开通，' : DUPLEX_LABEL[params.duplex] ?? params.duplex,
       off: duplexAdjusted,
-      note: duplexAdjusted ? '已按单面报价' : undefined,
+      note: duplexAdjusted ? (freePricing ? '已改为单面' : '已按单面报价') : undefined,
     },
     { label: '版式', value: `${params.pagesPerSheet} 版/页` },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
@@ -344,7 +349,7 @@ export function PrintConfirmPage() {
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
         { code: 'TERMINAL_SESSION_INVALID' },
-        '这台机器的安全校验没通过，请联系现场工作人员',
+        machineUnusableLine(),
       ))
       return
     }
@@ -397,7 +402,7 @@ export function PrintConfirmPage() {
             setMergedMaterial(next)
             setPriceNotice({
               key: quoteKeyOf(next.printFileUrl, params),
-              text: '已生成合并版（简历+自我探索），费用已按合并后的最终文件重新报价。本次还没有建单，请核对新金额后再点确认。',
+              text: freePricing ? '已生成合并版（简历+自我探索），正在核定最终文件的页数。本次还没有建单，请核对页数后再点确认。' : '已生成合并版（简历+自我探索），费用已按合并后的最终文件重新报价。本次还没有建单，请核对新金额后再点确认。',
             })
             return
           }
@@ -446,12 +451,17 @@ export function PrintConfirmPage() {
           else setQuoteNonce((n) => n + 1)
           setPriceNotice({
             key: quoteKey,
-            text: current
+            text: current?.amountCents === 0
+              ? '页数与参数已更新，本次没有建单。请核对后再点确认打印。'
+              : current
               ? `价格已更新：你确认的是 ${formatCents(quote.amountCents)}，现在应付 ${formatCents(current.amountCents)}。本次没有建单，也没有扣款；请核对新金额后再点确认。`
               : '价格已更新，本次没有建单，也没有扣款。正在重新获取报价，请核对新金额后再确认。',
           })
+        } else if (errorCodeOf(err) === 'PRINT_PII_SCAN_REQUIRED') {
+          setPiiCheckRequired(true)
+          setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
         } else {
-          setSubmitError(userMessageOf(err, '提交失败，请稍后重试或联系现场工作人员'))
+          setSubmitError(userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`))
         }
       } finally {
         if (!leaving) {
@@ -482,15 +492,22 @@ export function PrintConfirmPage() {
             : '页数以实际结果为准，确认前不显示金额'
 
   const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
+  const decisionSummary = materialCheck ? printPrivacyDecisionSummary(materialCheck) : null
+  // 裁决摘要修正“全保留”的说法；定位失败、复检残留等既有警告仍然保留。
+  const privacySummary = materialCheck?.redaction?.claim === 'nothing_to_redact'
+    ? decisionSummary
+    : [decisionSummary, redactionBadge?.text].filter(Boolean).join(' ') || null
   const amountText = quote.status === 'ready' ? formatCents(quote.amountCents).replace(/^¥/, '') : ''
   const pill = PILL[screen]
+  const pricingPill = freePricing && screen === 'quoting' ? { tone: 'unknown' as const, label: '正在核定页数' }
+    : freePricing && screen === 'quote-failed' ? { tone: 'bad' as const, label: '页数核定未完成 · 未建单' } : pill
   const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
     ? { tone: 'unknown' as const, label: '状态未知' }
-    : pill
+    : pricingPill
 
   // 金额变了（服务端 409 或生成了合并版）：按钮写明新金额，用户再点的就是这一笔。
   const reconfirmLabel = activeNotice && quote.status === 'ready'
-    ? `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
+    ? quote.amountCents === 0 ? `核对后确认打印${appendEligible ? '（合并版）' : ''}` : `按新金额 ${formatCents(quote.amountCents)} 确认${appendEligible ? '（合并版）' : ''}`
     : null
 
   const primaryLabel = terminalSession === 'checking'
@@ -537,7 +554,22 @@ export function PrintConfirmPage() {
   const waitButton = (label: string) => (
     <button type="button" className="qx-btn" data-variant="primary" disabled aria-disabled="true">{label}</button>
   )
-  const actions = screen === 'missing-context' ? (
+  const returnToMaterialCheck = () => {
+    if (!handoff) return
+    // 显式新一轮：保留当前文件、来源与参数，不再复用可能落后于服务端闸门的任务。
+    const kept = patchPrintHandoff(handoff.contextId, {
+      materialCheck: undefined, inspectionTask: undefined, normalizeTask: undefined,
+      piiTask: undefined, piiRedactTask: undefined,
+    })
+    if (!kept) {
+      setSubmitError('这份文件已失效，请重新选择文件。')
+      return
+    }
+    navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
+  }
+  const actions = piiCheckRequired ? (
+    <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
+  ) : screen === 'missing-context' ? (
     <>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>我的打印订单</button>
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>重新选文件</button>
@@ -561,11 +593,11 @@ export function PrintConfirmPage() {
   ) : sidesOverLimit ? (
     <>{backButton()}{confirmButton('确认打印')}</>
   ) : screen === 'quoting' ? (
-    <>{backButton()}{waitButton('获取报价后可继续')}</>
+    <>{backButton()}{waitButton(freePricing ? '页数核定后可继续' : '获取报价后可继续')}</>
   ) : screen === 'quote-failed' ? (
     <>
       {backButton()}
-      <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQuoteNonce((n) => n + 1)}>重新报价</button>
+      <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQuoteNonce((n) => n + 1)}>{freePricing ? '重新核定页数' : '重新报价'}</button>
     </>
   ) : screen === 'benefit-unverified' ? (
     <>
@@ -611,8 +643,8 @@ export function PrintConfirmPage() {
             <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
           </>
         )}
-        <li>提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。</li>
-        <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
+        <li>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</li>
+        <li>打印完成请从出纸口取件。{printProblemLine()}。</li>
       </ol>
     </section>
   )
@@ -622,7 +654,7 @@ export function PrintConfirmPage() {
       // 直达打印台参数页（不经旧地址重定向）；是哪一份文件由交接上下文决定。
       back={{ label: '返回预览与参数', onBack: () => navigate('/print/desk?step=preview') }}
       // 稿 14 没有独立页头：小青区就是页头。标题留给读屏，视觉上由小青区承担。
-      title="报价确认"
+      title={freePricing ? '确认打印' : '报价确认'}
       status={status}
       terminalLabel="就业服务大厅"
       navbar={
@@ -631,6 +663,7 @@ export function PrintConfirmPage() {
     >
       <PrintConfirmView
         step={4}
+        freePricing={freePricing}
         screen={screen}
         invalidReason={
           (handoffInvalid ? problem : null)
@@ -646,13 +679,13 @@ export function PrintConfirmPage() {
         quote={quote}
         costCalcLabel={costCalcLabel}
         amountText={amountText}
-        benefitView={benefitView}
-        redactionText={redactionBadge?.text ?? null}
+        benefitView={freePricing ? null : benefitView}
+        redactionText={privacySummary}
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}
-        printerBlockedReason={printerBlockedReason}
+        printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
-        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, '这台机器的安全校验没通过，请联系现场工作人员')}
+        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}

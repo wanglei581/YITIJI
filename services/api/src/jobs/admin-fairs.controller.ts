@@ -23,6 +23,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { AdminFairsService, FAIR_MATERIAL_MAX_BYTES } from './admin-fairs.service'
 import { verifyFairMaterialSignature } from './fair-material-signing'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import {
   SaveFairCompanyDto,
   SaveFairZoneDto,
@@ -256,8 +257,12 @@ export class AdminFairsController {
     @Query('expires') expires: string,
     @Query('sig') sig: string,
     @Res() res: Response,
+    @Query('scope') scope?: string,
   ): Promise<void> {
-    if (!expires || !sig || !verifyFairMaterialSignature(materialId, expires, sig)) {
+    // 托管关闭时只放行管理员用途的签名（scope=admin，验签按 scope 重算，不能靠改 URL 冒充）。这是有意的：
+    // 管理员查看与紧急下架是托管关闭后保留的能力。已知的余量：关闭前后 10 分钟内已签发给管理员的预览链接
+    // 仍能打开到过期（H2-1，走查登记，评估为可接受——链接只发给管理员本人，有效期 10 分钟）。
+    if ((!isRecruitmentContentHostingEnabled() && scope !== 'admin') || !expires || !sig || !verifyFairMaterialSignature(materialId, expires, sig, scope)) {
       throw new UnauthorizedException({ error: { code: 'MATERIAL_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
     const { buffer, mimeType } = await this.fairs.readMaterialContent(materialId)

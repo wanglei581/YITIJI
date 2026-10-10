@@ -9,13 +9,15 @@
  *     「只读 GET /admin/users（…**封禁开关后置**），访问写审计」——「后置」是排期
  *   - docs/product/user-center-commercial-closure-plan-2026-07.md:115 的状态图
  *     直接写着 `Active --> Disabled: 管理员封禁`
- * 现在补齐该 P1 能力，只读边界随之挪到 **disable / restore 两条写路径**：
- * 适配器仍不得出现第三条写路径或 PATCH/PUT/DELETE，且停用必须走二次确认、
- * 必须填原因、后果文案必须与实际代码行为一致。边界是挪位置，不是撤掉。
+ * 2026-10-04：经任务包授权新增管理员注销路径（后端 PR #1221）。
+ * 允许 disable / restore / closure 三条写路径；注销须核对尾号、事由与来源，
+ * 二次确认并写审计，相关正向行为由 verify-user-closure-ui.mjs 运行验证。
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import ts from 'typescript'
+import vm from 'node:vm'
+import { verifyUserClosure } from './verify-user-closure-ui.mjs'
 
 const root = process.cwd()
 const paths = {
@@ -52,8 +54,7 @@ const shared = readFileSync(paths.shared, 'utf8')
 const drawerPrimitive = readFileSync(paths.drawerPrimitive, 'utf8')
 const runtime = `${page}\n${drawer}\n${statusDialog}\n${presentation}\n${service}\n${shared}`
 
-// 适配器写边界：只读两条 GET + disable / restore 两条写路径，此外一条都不许有。
-// 想加第三条写路径必须先改这里，顺带被迫回答「后端写不写审计、要不要二次确认」。
+// 适配器写边界：GET 列表/详情，POST 停用/恢复/注销，此外不许扩写。
 const exportedFns = [...service.matchAll(/export function (\w+)\(/g)].map((match) => match[1]).sort()
 const httpVerbs = [...service.matchAll(/method:\s*'([A-Z]+)'/g)].map((match) => match[1])
 const writeVerbs = httpVerbs.filter((verb) => verb !== 'GET')
@@ -62,13 +63,14 @@ if (
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/disable`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/restore`') &&
-  JSON.stringify(exportedFns) === JSON.stringify(['disable', 'getDetail', 'list', 'restore']) &&
+  service.includes('`/admin/users/${encodeURIComponent(endUserId)}/closure`') &&
+  JSON.stringify(exportedFns) === JSON.stringify(['closeUserAccount', 'disable', 'getDetail', 'list', 'restore']) &&
   writeVerbs.length === 1 && writeVerbs[0] === 'POST' &&
   !/\b(PATCH|PUT|DELETE)\b|mockAdapter|MOCK_/.test(service)
 ) {
-  pass('API 适配器：真实 GET 列表/详情 + disable/restore 两条写路径，无 mock、无其它写方法')
+  pass('API 适配器：真实 GET 列表/详情 + disable/restore/closure 三条写路径，无 mock、无其它写方法')
 } else {
-  fail('API 适配器只允许 GET 列表/详情与 disable/restore 两条写路径（单一 POST 通道，禁 PATCH/PUT/DELETE）')
+  fail('API 适配器只允许 GET 列表/详情与 disable/restore/closure 三条写路径（单一 POST 通道，禁 PATCH/PUT/DELETE）')
 }
 
 const pageTokens = [
@@ -81,7 +83,7 @@ const pageTokens = [
   '重置',
   '刷新',
   '查看详情',
-  'Pagination',
+  'ConsoleTable',
   '暂无注册用户',
   '未找到符合条件的用户',
 ]
@@ -241,5 +243,82 @@ if (page.includes('UserDetailDrawer') && !page.includes('UsersIcon')) {
 } else {
   fail('用户页仍可能是占位实现')
 }
+
+const drawerCode = drawer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const cardStart = drawerCode.indexOf('function ActivityCard')
+const cardEnd = drawerCode.indexOf('export function UserDetailDrawer')
+const card = cardStart >= 0 && cardEnd > cardStart ? drawerCode.slice(cardStart, cardEnd) : ''
+for (const call of ['activityCategoryText(activity)', 'activityStatusText(activity)', 'activityActionText(activity)', 'activityTerminalText(activity.terminalId)']) {
+  if (!card.includes(call)) fail(`最近活动没有调用 ${call}`)
+}
+for (const raw of ['activity.category ??', 'activity.status ||', 'activity.status ??', 'activity.terminalId ??', '{activity.category}', '{activity.status}', '{activity.terminalId}', '{activity.action}']) {
+  if (card.includes(raw)) fail(`最近活动仍直接渲染原值：${raw}`)
+}
+
+function loadActivityModule() {
+  const cache = new Map()
+  const partner = loadPlain(join(root, '../../packages/shared/src/types/partner.ts'))
+  const adminTypes = loadPlain(join(root, '../../packages/shared/src/types/admin.ts'))
+  const stubs = {
+    '@ai-job-print/shared': {
+      formatDateTime: (value) => String(value ?? ''),
+      formatYuan: (value) => String(value),
+      AI_OPERATION_LABELS: {},
+      AI_USAGE_FEATURE_LABELS: {},
+      ...partner,
+      ...adminTypes,
+    },
+    '@ai-job-print/ui': { screenCount: (value) => String(value) },
+  }
+  function loadPlain(file) {
+    return load(file, {})
+  }
+  function load(file, localStubs) {
+    if (cache.has(file)) return cache.get(file)
+    const js = ts.transpileModule(readFileSync(file, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+      fileName: file,
+    }).outputText
+    const exportsBox = {}
+    const mod = { exports: exportsBox }
+    const req = (id) => {
+      const table = Object.keys(localStubs).length ? localStubs : stubs
+      if (Object.prototype.hasOwnProperty.call(table, id)) return table[id]
+      if (!id.startsWith('.')) throw new Error(`最近活动模块出现未登记依赖 ${id}（${file}）`)
+      const base = join(dirname(file), id)
+      return load(base.endsWith('.ts') || base.endsWith('.tsx') ? base : `${base}.ts`, stubs)
+    }
+    vm.runInNewContext(js, { module: mod, exports: exportsBox, require: req }, { filename: file })
+    cache.set(file, mod.exports)
+    return mod.exports
+  }
+  return load(join(root, 'src/routes/users/activityDisplay.ts'), stubs)
+}
+
+const activity = loadActivityModule()
+const samples = [
+  activity.activityCategoryText({ type: 'file', category: 'resume_upload:application/pdf', status: 'active', action: null }),
+  activity.activityStatusText({ type: 'file', category: 'resume_upload:application/pdf', status: 'active', action: null }),
+  activity.activityStatusText({ type: 'print', category: null, status: 'pending_release', action: null }),
+  activity.activityStatusText({ type: 'print', category: null, status: 'completed', action: null }),
+  activity.activityCategoryText({ type: 'ai', category: 'optimize_confirmed', status: 'completed', action: null }),
+  activity.activityCategoryText({ type: 'ai', category: 'parse_intent', status: 'completed', action: null }),
+  activity.activityTerminalText('t_09fd272201b6588e'),
+]
+const visible = samples.map((item) => item.label).join('\n')
+if (samples[0].label !== '上传简历（PDF）' || samples[1].label !== '上传完成' || samples[2].label !== '待到机' || samples[3].label !== '已完成') {
+  fail(`最近活动中文不对：${visible}`)
+}
+if (samples[4].label !== '简历优化确认稿' || samples[5].label !== '简历诊断提交') fail(`AI 类别中文不对：${samples[4].label} / ${samples[5].label}`)
+if (samples[6].label !== '终端（尾号 b6588e）' || samples[6].title !== 't_09fd272201b6588e' || samples[6].label.includes('t_')) {
+  fail(`终端应显示尾号，完整 ID 只放悬停：${samples[6].label}`)
+}
+if (/\b(completed|active|optimize_confirmed|parse_intent|resume_upload|application\/pdf|pending_release)\b/.test(visible) || visible.includes('t_')) {
+  fail(`最近活动可见文字仍有英文枚举或内部 ID：${visible}`)
+}
+const unknown = activity.activityCategoryText({ type: 'ai', category: 'future_kind', status: null, action: null })
+if (unknown.label !== '未归类（future_kind）' || unknown.title !== 'future_kind') fail('未知类别必须保留原值')
+pass('最近活动状态、类别和终端走中文映射，可见文字不含英文枚举与 t_ 内部 ID')
+await verifyUserClosure({ root, pass, fail, presentationModule })
 
 console.log('\nALL PASS')

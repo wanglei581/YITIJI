@@ -8,6 +8,7 @@ import {
   safeRoutePattern,
   stackFramesOnly,
 } from './error-log'
+import { isPostgresBusyError } from '../prisma/postgres-busy'
 
 function isMachineErrorCode(value: string): boolean {
   return /^[A-Z][A-Z0-9_]+$/.test(value)
@@ -17,6 +18,14 @@ function isMachineErrorCode(value: string): boolean {
 function isNextActionId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-z][a-z0-9_]{2,63}$/.test(value)
 }
+
+/** 未结束命令冲突时回传的命令 id。只接受有界标识，避免把任意文本带回响应。 */
+function isTerminalCommandId(value: unknown): value is string {
+  return typeof value === 'string' && /^[\w-]{8,80}$/.test(value)
+}
+
+/** 迁移 20261003090000 里触发器抛出的错误文本，两边必须一字不差。 */
+const MEMBER_CLOSED_WRITE_FORBIDDEN = 'MEMBER_CLOSED_WRITE_FORBIDDEN'
 
 /** 500 的兜底句。只有真的是服务端故障时才该出现这句。 */
 const DEFAULT_ERROR_CODE = 'INTERNAL_SERVER_ERROR'
@@ -101,10 +110,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let code = DEFAULT_ERROR_CODE
     let message: string = DEFAULT_ERROR_MESSAGE
-    let details: string[] | undefined
+    let details: string[] | FreePrintQuotaDetails | undefined
     let memberFileRetained = false
     let mismatchTerminal: MismatchTerminal | null | undefined
+    let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
+    let commandId: string | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -126,13 +137,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
           if (typeof err['message'] === 'string') message = err['message']
           if (Array.isArray(err['details'])) {
             details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
+          } else if (typeof err['code'] === 'string') {
+            details = pickFreePrintQuotaDetails(err['code'], err['details'])
           }
           // 只透传这个布尔与下面的下一步标识。其它未知字段（文件名、fileId、对象键）继续丢掉。
           if (err['memberFileRetained'] === true) memberFileRetained = true
           // 会员本机领取走错机器：给本人看该去哪台（网点名）。只认这一个错误码、只取三个字符串列。
           if (err['code'] === 'PICKUP_TERMINAL_MISMATCH') mismatchTerminal = pickMismatchTerminal(err['terminal'])
           // 页面不能是死胡同：拒绝时附一个下一步标识，前端据此挂按钮。
+          if (err['code'] === 'CLOSURE_BLOCKED_BY_OPEN_ORDERS' && Array.isArray(err['orders'])) {
+            closureOrders = err['orders'].filter((row): row is { orderNo: string; status: string } =>
+              Boolean(row && typeof row === 'object' && typeof row.orderNo === 'string' && row.orderNo.length <= 128
+                && typeof row.status === 'string' && /^[a-z_]{1,64}$/.test(row.status)))
+              .map((row) => ({ orderNo: row.orderNo, status: row.status }))
+          }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
+          // 同一终端已有未结束命令时，把那条命令的 id 交回管理员。只认这一个错误码，并且只接受有界 id。
+          if (err['code'] === 'TERMINAL_COMMAND_PENDING' && isTerminalCommandId(err['commandId'])) {
+            commandId = err['commandId']
+          }
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
           if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
@@ -150,6 +173,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
           message = b['message']
         }
       }
+    }
+
+    // 账号进入注销后，数据库触发器会拒绝再往它名下写个人数据（迟到写入防线）。这不是服务器故障：
+    // 统一答成「账号当前不可用」，和登录入口对停用 / 注销中账号的口径一致，不让它塌成 500。
+    if (!(exception instanceof HttpException) && String((exception as { message?: unknown } | null)?.message ?? '').includes(MEMBER_CLOSED_WRITE_FORBIDDEN)) {
+      status = HttpStatus.FORBIDDEN
+      code = 'ACCOUNT_UNAVAILABLE'
+      message = '账号当前不可用'
+    }
+
+    // 锁等待（55P03）或语句超时（57014）。固定句，不回显驱动原文（里面可能有 SQL）。
+    // 领任务自己抛带 TERMINAL_CLAIM_BUSY 的 HttpException，不会走到这里。
+    if (!(exception instanceof HttpException) && isPostgresBusyError(exception)) {
+      status = HttpStatus.SERVICE_UNAVAILABLE
+      code = 'DB_BUSY'
+      message = '服务器忙，请稍后再试'
     }
 
     // Nest Throttler 429 的 body.message 含空格/非机器码（如 "ThrottlerException: Too Many Requests"），
@@ -209,7 +248,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(details ? { details } : {}),
         ...(memberFileRetained ? { memberFileRetained: true as const } : {}),
         ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
+        ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
+        ...(commandId ? { commandId } : {}),
       },
       requestId: request.requestId,
     }
@@ -243,4 +284,34 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const frames = stackFramesOnly(exception)
     this.logger.error(frames.length > 0 ? `${line}\n  ${frames.join('\n  ')}` : line)
   }
+}
+
+interface FreePrintQuotaDetails {
+  limit: number
+  used: number
+  remaining: number
+  requested: number
+  resetAt: string
+}
+
+const FREE_PRINT_QUOTA_CODES = new Set([
+  'PRINT_TERMINAL_DAILY_QUOTA_REACHED',
+  'PRINT_MEMBER_DAILY_QUOTA_REACHED',
+  'PRINT_GUEST_ORDER_QUOTA_EXCEEDED',
+])
+const FREE_PRINT_QUOTA_RESET_AT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
+
+/** 只放行这三条码的五个有界字段。其它对象形态的 details 继续丢掉。 */
+function pickFreePrintQuotaDetails(code: string, raw: unknown): FreePrintQuotaDetails | undefined {
+  if (!FREE_PRINT_QUOTA_CODES.has(code) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const row = raw as Record<string, unknown>
+  const picked = { limit: 0, used: 0, remaining: 0, requested: 0, resetAt: '' }
+  for (const key of ['limit', 'used', 'remaining', 'requested'] as const) {
+    const value = row[key]
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 1_000_000) return undefined
+    picked[key] = value
+  }
+  if (typeof row.resetAt !== 'string' || !FREE_PRINT_QUOTA_RESET_AT.test(row.resetAt)) return undefined
+  picked.resetAt = row.resetAt
+  return picked
 }

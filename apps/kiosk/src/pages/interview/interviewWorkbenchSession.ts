@@ -12,6 +12,16 @@ import {
 
 export const INTERVIEW_WORKBENCH_SESSION_KEY = 'ai-job-print:current-interview-workbench'
 
+export type InterviewInteractionMode = 'text' | 'voice'
+
+export interface InterviewResumeFile {
+  fileId: string
+  name: string
+  mimeType?: string
+  fileUrl?: string
+  format?: string
+}
+
 export interface InterviewSetupDraft {
   directionSelectionVersion: 1
   interviewerType: InterviewerType
@@ -20,7 +30,9 @@ export interface InterviewSetupDraft {
   experience: InterviewExperience | ''
   difficulty: InterviewDifficulty
   duration: InterviewDuration
-  resumeFile: { fileId: string; name: string } | null
+  /** 建场时发给服务端。缺省按纯文字，不在作答页自动改成语音。 */
+  interactionMode: InterviewInteractionMode
+  resumeFile: InterviewResumeFile | null
   pendingSession: { sessionId: string; accessToken?: string } | null
   aiOutage: string | null
   startFailed: boolean
@@ -39,6 +51,10 @@ export interface InterviewLiveState {
   questionIndex: number
   remainingSec: number
   omitPrintAnswers: boolean
+  /** 本场至少一次非跳过的 answer 接口成功过。缺省当没有。 */
+  answersRecorded?: boolean
+  /** 设置屏选的交互方式。缺省纯文字，刷新后也不自动改成语音。 */
+  interactionMode?: InterviewInteractionMode
 }
 
 export interface InterviewReportHandle {
@@ -65,11 +81,22 @@ function parseSetupDraft(raw: unknown): InterviewSetupDraft | undefined {
   if (typeof raw.experience !== 'string') return undefined
   if (typeof raw.difficulty !== 'string') return undefined
   if (typeof raw.duration !== 'number') return undefined
-  const resumeFile = raw.resumeFile === null
-    ? null
-    : isRecord(raw.resumeFile) && typeof raw.resumeFile.fileId === 'string' && typeof raw.resumeFile.name === 'string'
-      ? { fileId: raw.resumeFile.fileId, name: raw.resumeFile.name }
-      : null
+  // 简历字段就地解析。门禁会把本函数单独抽出去跑，不能再调用旁边的辅助函数。
+  let resumeFile: InterviewResumeFile | null = null
+  if (isRecord(raw.resumeFile)) {
+    const fileId = raw.resumeFile.fileId
+    const name = raw.resumeFile.name
+    if (typeof fileId === 'string' && typeof name === 'string') {
+      const text = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined)
+      resumeFile = {
+        fileId,
+        name,
+        mimeType: text(raw.resumeFile.mimeType),
+        fileUrl: text(raw.resumeFile.fileUrl),
+        format: text(raw.resumeFile.format),
+      }
+    }
+  }
   const pendingSession = raw.pendingSession === null || raw.pendingSession === undefined
     ? null
     : isRecord(raw.pendingSession) && typeof raw.pendingSession.sessionId === 'string'
@@ -89,6 +116,7 @@ function parseSetupDraft(raw: unknown): InterviewSetupDraft | undefined {
       ? raw.experience as InterviewExperience : '',
     difficulty: raw.difficulty as InterviewDifficulty,
     duration: raw.duration as InterviewDuration,
+    interactionMode: raw.interactionMode === 'voice' ? 'voice' : 'text',
     resumeFile,
     pendingSession,
     aiOutage: typeof raw.aiOutage === 'string' ? raw.aiOutage : null,
@@ -124,6 +152,8 @@ function parseLive(raw: unknown): InterviewLiveState | undefined {
     questionIndex: typeof raw.questionIndex === 'number' ? raw.questionIndex : 1,
     remainingSec: typeof raw.remainingSec === 'number' ? raw.remainingSec : 0,
     omitPrintAnswers: raw.omitPrintAnswers === true,
+    answersRecorded: raw.answersRecorded === true,
+    interactionMode: raw.interactionMode === 'voice' ? 'voice' : raw.interactionMode === 'text' ? 'text' : undefined,
   }
 }
 

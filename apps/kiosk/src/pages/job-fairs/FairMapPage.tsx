@@ -14,6 +14,8 @@
 //   verify:visible-actions-truth 是纯文本扫描，连注释一起查。）
 
 import { useEffect, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import type {
   FairBoothDTO,
@@ -55,6 +57,7 @@ const FACILITY_ICON: Record<FairVenueFacilityType, typeof InfoIcon> = {
 }
 
 export function FairMapPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const fairId = id ?? ''
@@ -185,7 +188,7 @@ export function FairMapPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="看参展名单" desc="到场前挑好想去的几家，省时间" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-            <DirStripItem icon={InfoIcon} tone="slate" title="到了现场问工作人员" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
+            <DirStripItem icon={InfoIcon} tone="slate" title="问小青" desc={helpNeededLine(contact)} onClick={() => navigate('/help')} />
           </DirStrip>
         </>
       ) : (

@@ -68,7 +68,12 @@ if (existsSync(resolve(root, responsivePath))) {
   check(css.includes('prefers-reduced-motion'), '缺少 reduced-motion 合同')
 }
 
-const session = read('src/pages/interview/InterviewSessionPage.tsx')
+// 提交 / 结束的调用在 interviewTurnActions.ts。会话页过 500 行门禁后挪走，
+// 下面的调用形状断言改为两份一起扫，一条不减。
+const session = [
+  read('src/pages/interview/InterviewSessionPage.tsx'),
+  read('src/pages/interview/session/interviewTurnActions.ts'),
+].join('\n')
 for (const path of [
   'src/pages/interview/session/types.ts',
   'src/pages/interview/session/InterviewSessionPanels.tsx',
@@ -125,7 +130,7 @@ try {
   assert.ok(setup.includes("{industry || '尚未选择'}"), '未选行业如实显示')
   assert.ok(setup.includes('请本人填写目标岗位、选择行业和经验后再开始'), '必须选的方向在开始前说明')
   const start = new Function('context', executable(`const {
-    position, industry, experience, interviewerType, difficulty, duration, resumeFile,
+    position, industry, experience, interviewerType, difficulty, duration, interactionMode, resumeFile,
     setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
@@ -134,7 +139,7 @@ try {
     const requests = []
     const errors = []
     const context = {
-      ...draft, duration: 5, resumeFile: null,
+      ...draft, duration: 5, resumeFile: null, interactionMode: 'text',
       setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
       patchInterviewWorkbenchSession: noop, onGoStage: noop,
@@ -156,7 +161,12 @@ try {
     assert.ok(result.errors.at(-1)?.includes(expected), `缺少${expected}提示本人填写或选择`)
   }
   const result = await runStart({ position: '  机械工程师  ' })
-  assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5 }, 'start'], '本人选项原样创建后再开始')
+  // 2026-10-06：建场请求带 interactionMode。handleStart 和 position、duration 一样，
+  // 直接读组件里的 interactionMode。门禁单独执行时从上面的上下文取这个值，缺省是 text。
+  // 这条期望钉住默认纯文字；没有删掉创建体里的其他字段。
+  assert.deepEqual(result.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5, interactionMode: 'text' }, 'start'], '本人选项原样创建后再开始')
+  const voice = await runStart({ position: '  机械工程师  ', interactionMode: 'voice' })
+  assert.deepEqual(voice.requests, [{ interviewerType: 'hr', industry: '制造业', position: '机械工程师', experience: 'y3_5', difficulty: 'standard', durationMin: 5, interactionMode: 'voice' }, 'start'], '指定语音回合时请求体带 interactionMode: voice')
   check(true, '模拟面试不预选与本人选择校验')
 } catch (error) {
   check(false, `模拟面试不预选与本人选择校验：${error.message}`)
@@ -182,6 +192,48 @@ for (const token of [
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
+// 交互方式与简历预览从设置页拆出后，属于这两块的字样改从新文件读。一条不删。
+const modePicker = read('src/pages/interview/InterviewModePicker.tsx')
+const resumePreview = read('src/pages/interview/InterviewResumePreview.tsx')
+const modePickerTokens = new Set([
+  '交互方式',
+  '纯文字',
+  '语音回合（文字兜底）',
+  '这台机器的语音识别暂时没开，这一场先用文字答。',
+])
+for (const token of [
+  '交互方式',
+  '纯文字',
+  '语音回合（文字兜底）',
+  '这台机器的语音识别暂时没开，这一场先用文字答。',
+  '这种格式不能在这里预览，不影响这场练习。',
+  'interactionMode: mode',
+  '这场练习的状态',
+  '这一场留下了什么',
+  '报告包含的复盘区',
+  '问答摘录',
+  '不把回答印进打印件',
+]) {
+  const haystack = token.startsWith('这场') || token.startsWith('这一场')
+    ? read('src/pages/interview/session/InterviewSessionInvalid.tsx')
+    : token === '报告包含的复盘区' || token === '问答摘录' || token === '不把回答印进打印件'
+      ? read(pages[2])
+      : modePickerTokens.has(token)
+        ? modePicker
+        : token === '这种格式不能在这里预览，不影响这场练习。'
+          ? resumePreview
+          : setup
+  check(haystack.includes(token), `面试 2.0 合同缺失：${token}`)
+}
+check(setup.includes('<InterviewModePicker'), '设置页必须渲染 InterviewModePicker')
+check(setup.includes('<InterviewResumePreview'), '设置页必须渲染 InterviewResumePreview')
+let handleStartSource = ''
+try {
+  handleStartSource = sourceNode(setupAst, 'handleStart')
+} catch {
+  handleStartSource = ''
+}
+check(handleStartSource.includes('interactionMode: mode'), 'interactionMode: mode 必须留在页面的 handleStart 里')
 
 for (const token of [
   'answerInterview(',
@@ -235,6 +287,8 @@ for (const token of ['getMyInterviews(', 'deleteMyInterview(', '!isLoggedIn', "'
 const tips = read(pages[3])
 const tipsRuntime = withoutComments(tips)
 check(tips.includes("navigate('/interview/setup')"), 'Tips 缺少真实面试入口')
+check(tips.includes("navigate('/assistant')"), 'Tips 缺少 AI 顾问入口')
+check(tips.includes('AI 顾问'), 'Tips 底栏缺少 AI 顾问')
 check(!tipsRuntime.includes('window.print') && !tipsRuntime.includes('打印准备清单'), 'Tips 不得新增未接线打印能力')
 
 const allPages = withoutComments(pages.map(read).join('\n'))

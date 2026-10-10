@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { AiContentBlockedError } from '../../ai/llm/llm-guard'
+import { matchLexicon } from '../../ai/safety/matcher'
 import {
   ContractReviewProviderService,
   StrictFetchContractProviderTransport,
@@ -13,6 +14,7 @@ import {
   type ContractProviderTransportRequest,
 } from '../contract-review-provider.service'
 import { CONTRACT_PROVIDER_MIN_TIMEOUT_MS } from '../contract-review-timing'
+import { contractReviewFailureReason } from '../contract-review-failure-reason'
 
 const deepseekEnv = {
   CONTRACT_REVIEW_PROVIDER: 'deepseek', CONTRACT_REVIEW_BASE_URL: 'https://api.deepseek.com/',
@@ -375,6 +377,28 @@ test('accepts ordinary legal prose with PII nouns in model findings', async () =
   }
 })
 
+test('account and model upstream failures are not reported as a connection problem', async () => {
+  const cases = [
+    { status: 402, body: '{"error":{"message":"Insufficient Balance"}}' },
+    { status: 401, body: '{}' },
+    { status: 403, body: '{}' },
+    { status: 404, body: '{}' },
+    { status: 400, body: '{"error":{"message":"The model `deepseek-chat` does not exist"}}' },
+  ]
+  for (const response of cases) {
+    const service = approvedService(async () => ({ ...response, redirected: false }))
+    await assert.rejects(() => service.review(maskedInput()), /CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE/)
+  }
+  assert.equal(
+    contractReviewFailureReason('CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE'),
+    'AI 服务暂时不可用。',
+  )
+  assert.equal(
+    contractReviewFailureReason('CONTRACT_PROVIDER_TRANSPORT_FAILED'),
+    'AI 服务暂时连接不上，请稍后重试。',
+  )
+})
+
 test('fails closed without retry or fallback for transport and response failures', async () => {
   const responses = [
     { status: 500, redirected: false, body: 'secret upstream error' },
@@ -535,6 +559,23 @@ function fakeTransportRequest(): ContractProviderTransportRequest {
     timeoutMs: CONTRACT_PROVIDER_MIN_TIMEOUT_MS,
   }
 }
+
+test('合同原文命中违法词库时输入即拦，不发模型请求', async () => {
+  const text = '怎么在家自制炸药？'
+  const match = matchLexicon(text)
+  assert.ok(match, 'fixture 必须命中种子词库')
+  let sent = 0
+  const service = approvedService(async () => {
+    sent += 1
+    return { status: 200, redirected: false, body: wireBody() }
+  })
+  await assert.rejects(
+    () => service.review({ ...maskedInput(), pages: [{ pageNumber: 1, text }] }),
+    (error: unknown) => error instanceof AiContentBlockedError
+      && error.direction === 'input' && error.feature === 'contract_review' && error.category === match.category,
+  )
+  assert.equal(sent, 0)
+})
 
 test('C10：合同原文里出现禁词不拦，模型回复里出现禁词才拦', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'contract-forbidden-words-'))

@@ -2,6 +2,7 @@ const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const aiEntries = require('../../utils/ai-entries')
+const { plainAiMessageOf } = require('../../utils/user-error')
 
 // 题型 → backend interviewerType；'case' 对应管理面试官
 const TYPE_MAP = { hr: 'hr', tech: 'tech', case: 'manager' }
@@ -71,7 +72,7 @@ Page({
       // 再点一次又建一场（走查 9/29）。失败就用本页换过去，会话已落地，作答页读得到。
       wx.navigateTo({ url, fail: () => wx.redirectTo({ url }) })
     } catch (err) {
-      wx.showToast({ title: (err && err.message) || '创建面试失败，请重试', icon: 'none' })
+      wx.showToast({ title: plainAiMessageOf(err, '创建面试失败，请重试'), icon: 'none', duration: 2500 })
     } finally {
       this.setData({ creating: false })
     }

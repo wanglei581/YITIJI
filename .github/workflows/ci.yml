@@ -71,8 +71,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
-      # 招聘内容托管生产默认关。既有 verify 要看打开后的行为，必须显式打开。
-      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
+      # 主作业按生产配置（托管关闭）跑；需要打开的门禁在脚本里自己打开，元门禁 verify:recruitment-hosting-gate-declares 钉住。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -186,12 +186,17 @@ jobs:
           # 真跑一体机码表模块；已用过 / 已退款等终态码不许叫人重试。
           pnpm --filter @ai-job-print/kiosk verify:pickup-claim-error-coverage
           pnpm --filter @ai-job-print/kiosk verify:backend-error-copy-coverage
+          # 2026-10-06 无人值守：扫 apps/kiosk/src 字符串字面量，禁止再让用户去找现场工作人员。
+          # 纯静态，TypeScript AST，不连库、不起服务。白名单为空：注销统一句不含工作人员，不再放过。
+          pnpm verify:kiosk-unattended-copy
           # 服务人次上报（KioskSession 契约 v1）：接线 AST 取证 + 上报器单测真跑；
           # 白名单对照服务端 kiosk-session.types.ts 源码文本，不 import、不连库。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-session-reporting
           # 统一清场（隐私 P0，W-42/W-43/W-75/W-64/B-12）：所有离场出口经 endKioskUse、首页登录态不露个人信息、
           # 个人资产页进门前 30 秒「还是你吗？」。源码文本断言 + 四步顺序与 30 秒判据单测真跑，不连网。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
+          # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
@@ -334,6 +339,14 @@ jobs:
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
 
+      - name: Production builds are not React development builds
+        # 10/4 W-118：走查栈用 NODE_ENV=development 构出了 React 开发版，StrictMode 把挂载副作用执行两遍，造出成对请求的假象。
+        run: pnpm verify:prod-react-build
+
+      - name: Kiosk web font subset covers every character in source
+        # 10/6 一体机打包思源宋体 / 思源黑体子集（Qingxu Serif / Qingxu Sans）；新文案里的字不在子集就会退回系统字体。在构建之后跑，顺带核对产物里有字体文件。
+        run: pnpm verify:kiosk-font-subset
+
       - name: Release provenance fixture
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
         run: pnpm --filter @ai-job-print/api verify:release-provenance
@@ -384,6 +397,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # 开机打印防护、服务第三次起 30 分钟重试、每日维护重启：只读脚本，不碰打印服务。
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
@@ -429,6 +444,14 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Verify terminal remote command
+        working-directory: services/api
+        run: pnpm verify:terminal-remote-command
+
+      - name: Verify recruitment hosting gate declarations
+        working-directory: services/api
+        run: pnpm verify:recruitment-hosting-gate-declares
 
       - name: Verify alert push runtime gate
         working-directory: services/api
@@ -601,6 +624,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-stats-contract
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:free-print-quota
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
           # 彩色/双面按终端能力开放（fail-closed）：未登记的终端必须拒绝，
           # 且彩色订单必须按彩色价目计价 —— 误放的代价是用户按彩色付费拿到黑白纸。
@@ -633,6 +657,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config
+          pnpm --filter @ai-job-print/api verify:kiosk-terminal-maintenance
           pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
@@ -724,9 +749,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
           pnpm --filter @ai-job-print/api verify:ai-content-moderation
+          pnpm --filter @ai-job-print/api verify:ai-safety-lexicon
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version
+          pnpm --filter @ai-job-print/api verify:support-contact
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-auth-races
           pnpm --filter @ai-job-print/api verify:member-step-up
@@ -747,6 +774,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -757,6 +785,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
@@ -779,6 +808,9 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
+          pnpm --filter @ai-job-print/api verify:ai-quota
+          # 后台定时任务一次失败不能让 API 进程退出（10/6 P0：P2028 让 Node 22 直接退出）；import src，放在建库之后。
+          pnpm --filter @ai-job-print/api verify:background-task-safety
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:kiosk-session
@@ -849,6 +881,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-outcome
           pnpm --filter @ai-job-print/api verify:benefit-activities
           pnpm --filter @ai-job-print/api verify:change-password
+          # 管理员 / 合作机构登录凭证即时失效：退出撤销当前 jti；改密、停用、删除、角色版本变化后旧凭证 401。真 HTTP + 临时 Redis + 隔离库。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-session-revocation
           pnpm --filter @ai-job-print/api verify:change-password:target-guard
           pnpm --filter @ai-job-print/api verify:internal-auth-phone:target-guard
           pnpm --filter @ai-job-print/api verify:contract-review:http
@@ -959,8 +993,8 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
-      # 与 build-and-verify 相同：既有 verify 显式打开招聘内容托管，未设置即关只由专门门禁覆盖。
-      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true'
+      # 主作业按生产配置（托管关闭）跑；需要打开的门禁在脚本里自己打开，元门禁 verify:recruitment-hosting-gate-declares 钉住。
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -1057,6 +1091,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment
@@ -1070,6 +1105,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-budget
           # P1-2a 计量表留存：与 AiServiceLog 同一保留期，到期先按月汇总再分批删；汇总表无个人字段。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-usage-retention
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:ai-quota:postgres
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
@@ -1130,6 +1166,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-request-contract
           pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          VERIFICATION_DATABASE_TARGET=isolated MEMBER_CLOSURE_REAL_REDIS=1 VERIFICATION_REDIS_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-closure
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
@@ -1199,6 +1236,7 @@ jobs:
           # DriverAdapterError（不是 P2034），重试逻辑必须认得出，不能变成 500。
           pnpm --filter @ai-job-print/api verify:pg-serialization-conflict
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-serialization-conflict:postgres
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:pg-lock-timeout:postgres
           pnpm --filter @ai-job-print/api verify:partner-contact-phone-registration
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
@@ -1230,7 +1268,14 @@ jobs:
     # 下次它又开始撞线时：**先量一次再调，别直接加十分钟**。
     # 量法：gh api repos/<owner>/<repo>/actions/runs/<id>/jobs，
     # 用 started_at / completed_at 算时长；只看 conclusion=success 的那些定基线。
-    timeout-minutes: 70
+    #
+    # 2026-10-10 重量（照上面的量法，10/9 的七次 success）：
+    #   53.3 / 54.3 / 60.0 / 61.1 / 67.8 / 68.5 / 69.4 分钟；
+    #   另有一次（运行 37931363853）跑满 70 分钟，被停在最后一步路由巡检，显示成 cancelled。
+    # 用例组从定 70 那时的 9 组涨到 16 组，外加两个后台 5 组，每组都要重新构建一次。
+    # 100 让最差观测（69.4）仍有 44% 余量，和上次定 70 是同一个算法。
+    # 根治是把这个作业拆成并行的几段（排第八次）；在那之前往这一步里再串新用例组，先重量再加。
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
 
@@ -1324,6 +1369,12 @@ jobs:
         working-directory: apps/admin
         run: node scripts/run-e2e.mjs --config=playwright.screen.config.ts
 
+      - name: Run Admin member-closure browser E2E
+        # 会员账号注销的管理员执行：mock 包里用户列表恒为空，走不到注销对话框，
+        # 所以与大屏一样用 VITE_API_MODE=http 构建 + page.route 夹具单独跑（不访问真实用户）。
+        working-directory: apps/admin
+        run: node scripts/run-e2e.mjs --config=playwright.users.config.ts
+
       - name: Run Partner data-screen browser E2E
         run: pnpm --filter @ai-job-print/partner test:e2e:screen
 
@@ -1381,6 +1432,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Diagnose BOS access
+        continue-on-error: true
+        env:
+          BOS_RELEASE_ACCESS_KEY: ${{ secrets.BOS_RELEASE_ACCESS_KEY }}
+          BOS_RELEASE_SECRET_KEY: ${{ secrets.BOS_RELEASE_SECRET_KEY }}
+        run: node scripts/release-bundle/bos-object.mjs diagnose
+
       - name: Read BOS deployed baseline
         id: bos-baseline
         continue-on-error: true
@@ -1402,18 +1460,50 @@ jobs:
           BASE_SHA: ${{ steps.bos-baseline.outputs.base }}
         run: |
           RELEASE_SHA="$GITHUB_SHA"
-          if [ -z "${BASE_SHA:-}" ] || ! git merge-base --is-ancestor "$BASE_SHA" "$RELEASE_SHA"; then
-            echo '无可用基线，本次发布将回退到 GitHub 拉取'
-            exit 0
-          fi
           BUNDLE="release-$RELEASE_SHA.bundle"
           CHECKSUM="release-$RELEASE_SHA.sha256"
+          # 读不到基线，或基线不是本次发布的祖先时，仍然出包。
+          # 先用 14 天前的提交；没有再用根提交之外最早的可用提交。
+          # 根提交（git rev-list --max-parents=0）不能当排除基线，再没有就打完整包。
+          # 服务器端 git bundle verify 发现前置提交不全时，仍回退 GitHub 拉取。
+          if [ -n "${BASE_SHA:-}" ] && [ "$BASE_SHA" != "$RELEASE_SHA" ] && git merge-base --is-ancestor "$BASE_SHA" "$RELEASE_SHA"; then
+            echo "基线来源：latest-deployed"
+          else
+            FALLBACK_SHA="$(git rev-list -1 --before="14 days ago" "$RELEASE_SHA" || true)"
+            if [ -n "$FALLBACK_SHA" ] && [ "$FALLBACK_SHA" != "$RELEASE_SHA" ] && git merge-base --is-ancestor "$FALLBACK_SHA" "$RELEASE_SHA"; then
+              BASE_SHA="$FALLBACK_SHA"
+              echo "基线来源：14 天前兜底"
+            else
+              ROOTS="$(git rev-list --max-parents=0 "$RELEASE_SHA" || true)"
+              EARLIEST_SHA=""
+              if [ -n "$ROOTS" ]; then
+                EARLIEST_SHA="$(git rev-list --reverse "$RELEASE_SHA" | while IFS= read -r sha; do
+                  if ! printf '%s\n' "$ROOTS" | grep -qx "$sha"; then
+                    printf '%s\n' "$sha"
+                    break
+                  fi
+                done || true)"
+              fi
+              if [ -n "$EARLIEST_SHA" ] && [ "$EARLIEST_SHA" != "$RELEASE_SHA" ] && git merge-base --is-ancestor "$EARLIEST_SHA" "$RELEASE_SHA"; then
+                BASE_SHA="$EARLIEST_SHA"
+                echo "基线来源：最早提交兜底"
+              else
+                BASE_SHA=""
+                echo "基线来源：完整包"
+              fi
+            fi
+          fi
           # git bundle 的 rev 必须能命名成 ref：传裸 SHA 会以
           # "fatal: Refusing to create empty bundle." 退出 128（2026-09-07 实测，
           # 因为 continue-on-error 这一步一直"绿着"却从未上传过任何包）。
           # actions/checkout 让 HEAD 正好指向 GITHUB_SHA，用具名 ref 才有 bundle 头。
           git update-ref refs/release/target "$RELEASE_SHA"
-          git bundle create "$BUNDLE" refs/release/target "^$BASE_SHA"
+          if [ -n "$BASE_SHA" ]; then
+            git bundle create "$BUNDLE" refs/release/target "^$BASE_SHA"
+          else
+            git bundle create "$BUNDLE" refs/release/target
+            echo "完整包大小：$(wc -c < "$BUNDLE" | tr -d '[:space:]') 字节"
+          fi
           git bundle verify "$BUNDLE"
           sha256sum "$BUNDLE" | sed "s|  $BUNDLE$|  release.bundle|" > "$CHECKSUM"
           node scripts/release-bundle/bos-object.mjs put "$BUNDLE" "$BUNDLE"

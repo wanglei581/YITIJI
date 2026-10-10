@@ -196,9 +196,23 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await page.getByRole('button', { name: '可采纳的全部采纳' }).click()
   await expect(page.getByText('已采纳 1 条；跳过 1 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。')).toBeVisible()
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
-  await page.getByText('选择草稿').click()
-  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
-  await expect(page.getByText('团队协作 · 已采纳')).toBeVisible()
+  // 旧「选择草稿」折叠项并进草稿预览浮层。对照页的选择还不写进导出稿，所以两条在稿里仍是改写。
+  await page.getByTestId('resume-optimize-final-open').click()
+  const item1 = page.getByTestId('resume-optimize-final-item-1')
+  const item2 = page.getByTestId('resume-optimize-final-item-2')
+  await expect(page.getByTestId('resume-optimize-final-export')).toContainText('主导数据整理，完成 5000 条记录校验。')
+  await expect(page.getByTestId('resume-optimize-final-export')).toContainText('对齐需求，持续跟进问题至闭环。')
+  // 旧可见文案「项目成果 · 待定」拆成标题和选择。
+  await expect(item1.getByText('项目成果', { exact: true })).toBeVisible()
+  await expect(item1.getByText('待定', { exact: true })).toBeVisible()
+  await expect(item1).toHaveAttribute('data-choice', 'todo')
+  await expect(item1).toHaveAttribute('data-used', '改写')
+  // 旧可见文案「团队协作 · 已采纳」同样拆开。已采纳是对照页上的选择，导出稿里这一句仍是改写。
+  await expect(item2.getByText('团队协作', { exact: true })).toBeVisible()
+  await expect(item2.getByText('已采纳', { exact: true })).toBeVisible()
+  await expect(item2).toHaveAttribute('data-choice', 'optimized')
+  await expect(item2).toHaveAttribute('data-used', '改写')
+  await page.getByTestId('resume-optimize-final-close').click()
 
   await page.getByRole('checkbox', { name: /5000/ }).check()
   await page.getByRole('checkbox', { name: /主导/ }).check()
@@ -210,8 +224,12 @@ test('对照页批量采纳跳过未确认事实且清空后回到待定 @kiosk'
   await expect(page.getByRole('button', { name: '用改写' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: /5000/ })).not.toBeChecked()
   await expect(page.getByRole('checkbox', { name: /主导/ })).not.toBeChecked()
-  await expect(page.getByText('项目成果 · 待定')).toBeVisible()
-  await expect(page.getByText('团队协作 · 待定')).toBeVisible()
+  await page.getByTestId('resume-optimize-final-open').click()
+  // 旧文案「项目成果 · 待定」「团队协作 · 待定」：清空后两条选择都回到待定。
+  await expect(page.getByTestId('resume-optimize-final-item-1')).toHaveAttribute('data-choice', 'todo')
+  await expect(page.getByTestId('resume-optimize-final-item-1').getByText('待定', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-optimize-final-item-2')).toHaveAttribute('data-choice', 'todo')
+  await expect(page.getByTestId('resume-optimize-final-item-2').getByText('待定', { exact: true })).toBeVisible()
 })
 
 const GENERATE_TASK_ID = 'gen-preview-1'
@@ -240,7 +258,7 @@ test('生成预览空态按稿只留两个出口且都能到达 @kiosk', async (
   registerGeneratePreviewBaseline(api)
   await page.goto('/resume/generate/preview')
   await expect(page.locator('[data-kiosk-screen="resume-generate-preview"]')).toBeVisible()
-  await expect(page.getByText('生成结果已清除')).toBeVisible()
+  await expect(page.getByText('这一份要从头填')).toBeVisible()
   await expect(page.getByRole('button', { name: '重新填写生成', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新填写', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-home')).toHaveText('返回服务大厅')
@@ -352,11 +370,185 @@ test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async (
     json: { error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新生成简历' } },
   })
   await page.goto('/resume/generate/preview?taskId=missing-task')
-  await expect(page.getByText('没有可看的结果')).toBeVisible()
+  await expect(page.getByText('没有可预览的结果')).toBeVisible()
   await expect(page.getByText('青岛求职者')).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('去填资料')
   await page.getByTestId('resume-generate-preview-cta-source').click()
   await expect(page).toHaveURL(/\/resume\/source$/)
   await expect(page.locator('[data-kiosk-screen="resume-source"]')).toBeVisible()
+})
+
+const LONG_COMPANY = '在门店负责日常运营并完成季度复盘'
+const SHORT_COMPANY = '青序门店'
+
+function titledGenerateResume(
+  experience: Array<{ company: string; role: string; period: string; description: string }>,
+) {
+  return {
+    basic: { name: '标题样本', phone: '13800001111', city: '青岛' },
+    intention: { position: '门店运营', city: '青岛' },
+    summary: '核对过的经历摘要。',
+    education: [{ school: '青岛大学', major: '工商管理', degree: '本科', period: '2018-2022', description: '完成本科学业。' }],
+    experience,
+    projects: [{ name: '门店陈列项目', role: '执行', description: '按店里的陈列标准摆货。' }],
+    skills: ['TypeScript'],
+    certificates: ['英语四级'],
+  }
+}
+
+async function openGenerateTitleEditor(
+  page: Page,
+  api: Parameters<typeof registerW4Api>[0],
+  taskId: string,
+  experience: Array<{ company: string; role: string; period: string; description: string }>,
+): Promise<void> {
+  registerGeneratePreviewBaseline(api)
+  api.respond('GET', `/api/v1/resume/generate/${taskId}`, {
+    status: 200,
+    json: {
+      taskId,
+      status: 'completed',
+      providerName: 'deepseek',
+      resume: titledGenerateResume(experience),
+      missingHints: [],
+    },
+  })
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'gen-entry-file',
+      filename: 'AI简历_标题样本.pdf',
+      sizeBytes: 2048,
+      pageCount: 1,
+      signedUrl: '/e2e-fixtures/entry-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/gen-entry-file/content?expires=1&sig=test',
+    },
+  })
+  await page.route('**/e2e-fixtures/entry-resume.pdf', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',
+  }))
+  await page.goto(`/resume/generate/preview?taskId=${encodeURIComponent(taskId)}`)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toBeVisible()
+}
+
+async function confirmGenerateExportFacts(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '导出前核对事实' })
+  await expect(dialog).toBeVisible()
+  const boxes = dialog.getByRole('checkbox')
+  const count = await boxes.count()
+  expect(count).toBeGreaterThan(0)
+  for (let i = 0; i < count; i += 1) await boxes.nth(i).click()
+  await dialog.getByRole('button', { name: '确认导出' }).click()
+}
+
+async function generateExportBody(page: Page): Promise<{ experience?: Array<{ company?: string }> }> {
+  const pending = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await page.getByTestId('resume-generate-preview-cta-export').click()
+  await page.getByTestId('resume-generate-preview-cta-confirm-export').click()
+  await confirmGenerateExportFacts(page)
+  return (await pending).postDataJSON() as { experience?: Array<{ company?: string }> }
+}
+
+test('生成预览页改公司名后预览和导出都用改后的短名 @kiosk', async ({ page, api }) => {
+  await openGenerateTitleEditor(page, api, 'r6-gen-title-edit', [
+    { company: LONG_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
+  ])
+  const company = page.getByRole('textbox', { name: '第 1 条经历的公司' })
+  await expect(company).toHaveValue(LONG_COMPANY)
+  await expect(page.getByRole('textbox', { name: '第 1 条教育的学校' })).toHaveValue('青岛大学')
+  await expect(page.getByRole('textbox', { name: '第 1 条教育的专业' })).toHaveValue('工商管理')
+  await expect(page.getByText('本科 · 2018-2022', { exact: true })).toBeVisible()
+  await expect(page.locator('p', { hasText: '门店陈列项目 · 执行' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: /项目的名称|项目的职务/ })).toHaveCount(0)
+
+  await company.fill(SHORT_COMPANY)
+  await expect(company).toHaveValue(SHORT_COMPANY)
+  await expect(page.getByText(LONG_COMPANY)).toHaveCount(0)
+  const body = await generateExportBody(page)
+  expect(body.experience?.map((item) => item.company)).toEqual([SHORT_COMPANY])
+})
+
+test('生成预览页删掉一条经历需确认，取消不变，确认后预览和导出都不再带它 @kiosk', async ({ page, api }) => {
+  await openGenerateTitleEditor(page, api, 'r6-gen-title-delete', [
+    { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
+    { company: LONG_COMPANY, role: '运营', period: '2020-2021', description: '这一条是解析多出来的。' },
+  ])
+  const extra = page.getByRole('button', { name: '删掉这一条，第 2 条经历' })
+  const scale = await stageScaleOf(page)
+  const box = await extra.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.height / scale).toBeGreaterThanOrEqual(48)
+  expect(box!.width / scale).toBeGreaterThanOrEqual(48)
+  await extra.click()
+  const dialog = page.getByRole('dialog', { name: '确定删掉这一条吗？' })
+  await expect(dialog.getByRole('heading', { name: '确定删掉这一条吗？' })).toBeVisible()
+  await expect(dialog.getByText('删了以后导出和打印都不会再带这一条。')).toBeVisible()
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue(SHORT_COMPANY)
+  await expect(page.getByRole('textbox', { name: '第 2 条经历的公司' })).toHaveValue(LONG_COMPANY)
+
+  await extra.click()
+  await dialog.getByRole('button', { name: '确定', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '第 2 条经历的公司' })).toHaveCount(0)
+  await expect(page.getByText(LONG_COMPANY)).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue(SHORT_COMPANY)
+
+  const body = await generateExportBody(page)
+  expect(JSON.stringify(body.experience ?? [])).not.toContain(LONG_COMPANY)
+
+  await page.getByRole('button', { name: '关闭文件预览' }).click()
+  await page.getByRole('button', { name: '返回预览' }).click()
+  await page.getByRole('button', { name: '删掉这一条，第 1 条经历' }).click()
+  await page.getByRole('dialog', { name: '确定删掉这一条吗？' }).getByRole('button', { name: '确定', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: /条经历的公司/ })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: /实习 \/ 工作经历/ })).toHaveCount(0)
+})
+
+test('生成预览页公司名空着不拦导出、超过 100 字才就地提示并拦住 @kiosk', async ({ page, api }) => {
+  await openGenerateTitleEditor(page, api, 'r6-gen-title-invalid', [
+    { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
+  ])
+  const company = page.getByRole('textbox', { name: '第 1 条经历的公司' })
+  const role = page.getByRole('textbox', { name: '第 1 条经历的职务' })
+  const goExport = page.getByTestId('resume-generate-preview-cta-export')
+  // 10/6：原件没写公司 / 职务时如实留空，和服务端 DTO 一致，空着不提示也不拦（走查 W-119 回归）。
+  await company.fill('')
+  await role.fill('')
+  await expect(page.getByText(/不能空/)).toHaveCount(0)
+  await expect(goExport).not.toHaveAttribute('aria-disabled', 'true')
+  await company.fill('司'.repeat(101))
+  await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
+  await expect(goExport).toHaveAttribute('aria-disabled', 'true')
+  await goExport.click({ force: true })
+  await expect(page.getByRole('heading', { name: '选导出格式' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '导出前核对事实' })).toHaveCount(0)
+  await expect(page.locator('[data-entry-field="experience-0-company"]')).toBeFocused()
+
+  await company.fill('司'.repeat(101))
+  await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
+  await expect(page.getByText('公司名不能空')).toHaveCount(0)
+  await goExport.click({ force: true })
+  await page.waitForTimeout(400)
+  expect(api.requestCount('POST', '/api/v1/resume/generate/export')).toBe(0)
+})
+
+test('生成预览页删掉一条经历后没删的那条仍在导出里 @kiosk', async ({ page, api }) => {
+  await openGenerateTitleEditor(page, api, 'r6-gen-title-kept', [
+    { company: SHORT_COMPANY, role: '店员', period: '2022-2024', description: '负责门店日常运营。' },
+    { company: LONG_COMPANY, role: '运营', period: '2020-2021', description: '这一条是解析多出来的。' },
+  ])
+  await page.getByRole('button', { name: '删掉这一条，第 2 条经历' }).click()
+  await page.getByRole('dialog', { name: '确定删掉这一条吗？' }).getByRole('button', { name: '确定', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '第 1 条经历的公司' })).toHaveValue(SHORT_COMPANY)
+
+  const body = await generateExportBody(page)
+  const companies = body.experience?.map((item) => item.company) ?? []
+  expect(companies).toContain(SHORT_COMPANY)
+  expect(companies).not.toContain(LONG_COMPANY)
 })

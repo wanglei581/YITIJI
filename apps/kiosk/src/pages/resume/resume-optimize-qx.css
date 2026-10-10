@@ -67,6 +67,7 @@
 
 .qx-rd-side .qx-card h3 { margin: 0; font-size: 20px; }
 .qx-rd-side .qx-card > p { margin: 6px 0 10px; font-size: 15px; line-height: 1.4; color: var(--qx-ink-3); }
+.qx-rd-side .qx-card > p.qx-rd-aigc-note { font-size: var(--qx-fs-body); }
 
 .qx-rd-compress { width: 100%; margin-top: 10px; min-height: var(--qx-btn-h); }
 .qx-rd-tpl, .qx-rd-fmt { display: grid; gap: 8px; }
@@ -114,7 +115,8 @@
 
 .qx-rd-export-actions { display: flex; flex-direction: column; gap: 10px; }
 .qx-rd-export-actions .qx-btn { width: 100%; }
-.qx-rd-export-actions .qx-btn[aria-disabled='true'] {
+.qx-rd-export-actions .qx-btn[aria-disabled='true'],
+.qx-opt-cta > .qx-btn[aria-disabled='true'] {
   background: var(--qx-line-2);
   border-color: var(--qx-line);
   color: var(--qx-ink-3);

@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -359,7 +360,7 @@ export class MockInterviewLlmService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'mock_interview', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
@@ -381,7 +382,7 @@ export class MockInterviewLlmService {
     if (!res.ok) {
       this.logger.error(`interview.llm upstream_non_2xx status=${res.status}`)
       onLlmCall?.({ provider: providerLabel })
-      throw llmUpstreamStatusError('AI 模拟面试服务', res.status)
+      throw llmUpstreamStatusError('AI 模拟面试服务', res.status, res.data)
     }
     const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })

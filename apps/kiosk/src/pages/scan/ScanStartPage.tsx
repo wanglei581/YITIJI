@@ -19,6 +19,7 @@ import {
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { patchScanWorkbenchSession, readScanWorkbenchSession } from './scanWorkbenchSession'
+import { machineUnusableLine } from '../../copy/unattendedCopy'
 
 /** 能力门禁态：禁止伪装硬件已就绪。 */
 type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
@@ -41,7 +42,8 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
   const [params, setSearchParams] = useSearchParams()
   const usbPanel = params.get('mode') === 'usb-panel'
   const storedType = readScanWorkbenchSession()?.scanType
-  const [selected, setSelected] = useState<ScanType>(storedType ?? 'resume')
+  /* 2.0：进来不替用户选中简历。只有本机登记里已经有类型时才恢复。 */
+  const [selected, setSelected] = useState<ScanType | null>(storedType ?? null)
   const [gate, setGate] = useState<ScanGate>('loading')
   const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -88,7 +90,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? { tone: 'bad' as const, label: '扫描能力暂未开放' }
           : gate === 'unknown'
             ? { tone: 'unknown' as const, label: '能力状态暂不可用' }
-            : { tone: 'ok' as const, label: '可创建扫描任务 · 需面板操作' }
+            : { tone: 'ok' as const, label: '第 1 步 · 选扫描类型' }
 
   const subtitle = usbPanel
     ? '这是打印机自己的独立能力，不经过屏幕上的扫描流程'
@@ -109,14 +111,14 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
           : blocked
             ? undefined
-            : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
+            : ['这台机器的接收目录已由管理员配好，面板上直接选就行，不用你填任何地址。']
       }
       ctabar={
         usbPanel ? (
           <ScanCta>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
               <HeadphonesIcon aria-hidden="true" />
-              联系工作人员
+              问小青
             </button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>
               完成后回打印扫描
@@ -133,7 +135,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             </button>
           </ScanCta>
         ) : (
-          <ScanCta>
+          <ScanCta reason={selected ? undefined : '先选一种材料'}>
             <button
               type="button"
               className="qx-btn"
@@ -152,7 +154,9 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               type="button"
               className="qx-btn"
               data-variant="primary"
+              disabled={selected === null}
               onClick={() => {
+                if (!selected) return
                 patchScanWorkbenchSession({
                   stage: 'settings',
                   scanType: selected,
@@ -166,7 +170,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 navigate('/scan?stage=settings', { state: { scanType: selected } })
               }}
             >
-              下一步 · 建立这次扫描
+              开始这次扫描
             </button>
           </ScanCta>
         )
@@ -206,31 +210,40 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
-                <p>不要在本页反复点击。请联系工作人员确认机型、固件和现场 USB 配置。</p>
+                <p>不要在本页反复点击。{machineUnusableLine()}</p>
               </ScanNoteCard>
             </div>
           </ScanSec>
         </>
       ) : blocked ? (
         <>
-          <ScanStatusPanel
-            tone={gate === 'loading' ? 'info' : 'error'}
-            title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
-            breathe={gate === 'loading'}
-            chips={[
-              { label: gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放', tone: 'warn' },
-              { label: '不会创建扫描任务' },
-            ]}
+          <ScanSec no="01" title="就这三步" hint="放纸，在打印机面板上按扫描，文件回到这台机器">
+            <ScanChain active={-1} />
+          </ScanSec>
+          <ScanSec
+            no="02"
+            title="现在这一步"
+            hint={gate === 'loading' ? '先等这一页读完配置' : gate === 'unknown' ? '读不到时不会假装已经开通' : '没开通就不会建这次扫描'}
           >
-            <p>
-              {gate === 'loading'
-                ? '正在读取这台机器的扫描配置。'
-                : gate === 'unknown'
-                  ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
-                  : (blockedNote ?? '工作人员还没有给这台机器开通扫描，或这项能力正在维护、暂未开通。')}
-            </p>
-          </ScanStatusPanel>
-          <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
+            <ScanStatusPanel
+              tone={gate === 'loading' ? 'info' : 'error'}
+              title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
+              breathe={gate === 'loading'}
+              chips={[
+                { label: gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放', tone: 'warn' },
+                { label: '不会创建扫描任务' },
+              ]}
+            >
+              <p>
+                {gate === 'loading'
+                  ? '正在读取这台机器的扫描配置。'
+                  : gate === 'unknown'
+                    ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
+                    : (blockedNote ?? `这台机器的扫描还没开通，或这项能力正在维护。${machineUnusableLine()}`)}
+              </p>
+            </ScanStatusPanel>
+          </ScanSec>
+          <ScanSec no="03" title="你现在还能做什么" hint="扫描之外的路照常可用">
             <div className="sw-grid2">
               <ScanNoteCard title="你现在还能做什么">
                 <ScanPlan items={[
@@ -239,7 +252,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   '改用面板扫描到 U 盘：不经过屏幕上的扫描流程，文件只进你的 U 盘。',
                 ]} />
               </ScanNoteCard>
-              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查这台机器是否开通了扫描。">
+              <ScanNoteCard title="确认能力" foot={`若长时间未恢复，${machineUnusableLine()}`}>
                 <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
                 <div className="sw-cta-row sw-note-actions">
                   <button
@@ -254,7 +267,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   </button>
                   <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
                     <HeadphonesIcon aria-hidden="true" />
-                    联系工作人员
+                    问小青
                   </button>
                 </div>
               </ScanNoteCard>
@@ -263,29 +276,33 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
         </>
       ) : (
         <>
-          <ScanSec no="01" title="这个流程是这样" hint="四段都走完，文件才到你手上">
+          <ScanSec no="01" title="就这三步" hint="放纸，在打印机面板上按扫描，文件回到这台机器">
             <ScanChain active={-1} />
           </ScanSec>
-          <ScanSec no="02" title="要扫什么" hint={`扫描服务 · 已选「${SCAN_TYPE_LABELS[selected]}」`}>
+          <ScanSec
+            no="02"
+            title="要扫什么"
+            hint={selected ? `已选「${SCAN_TYPE_LABELS[selected]}」` : '先选类型，再开始这次扫描'}
+          >
             <ScanTypeCards selected={selected} onPick={setSelected} />
           </ScanSec>
-          <ScanSec no="03" title="动手之前先看两件事" grow>
+          <ScanSec no="03" title="动手之前" grow>
             <div className="sw-grid2">
               <ScanNoteCard
                 title="为什么屏幕上没有「开始扫描」"
-                foot="合同类材料的扫描从「合同审阅」工作台发起，本屏不重复开口子。"
+                foot="这一页只扫简历、证件和普通文档"
               >
-                <p>这台一体机的扫描<b>只能在奔图自己的操作面板上启动</b>，网页不能远程驱动扫描仪。本机负责建立这次扫描、转达系统给出的操作说明、等文件回来。</p>
-                <p>所以这一屏不会有「一键扫描」，也不会有扫到第几张的进度。</p>
+                <p>扫描要在<b>打印机自己的面板上按</b>。这一页不能远程开始，也不显示扫到第几张。</p>
+                <p>本机负责建立这次扫描、转达系统给出的操作说明、等文件回来。</p>
               </ScanNoteCard>
               <ScanNoteCard
-                title="扫完之后这份文件能干什么"
-                foot="费用以办理时系统报价与现场规则为准。未登录扫描件不会进入「我的文档」。"
+                title="扫完这份 PDF 能带走什么"
+                foot="彩色和双面本机暂未开通"
               >
                 <ScanPlan items={[
-                  '简历扫描件可以进 AI 识别，做诊断与优化。',
-                  '拿去打印：到打印流程重新选定，由系统报价后出纸。',
-                  '留存按文件类型与系统的规则；本屏无登录步骤，匿名件不进「我的文档」。',
+                  '简历可以接着做 AI 识别',
+                  '拿去打印时再看实际价格',
+                  '未登录扫描件不会进入「我的文档」',
                 ]} />
               </ScanNoteCard>
             </div>

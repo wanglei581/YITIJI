@@ -50,6 +50,10 @@ model Terminal {
   /// 最近一次 Agent 心跳写入的时间，只在心跳时写。null = 从未心跳。
   /// 不能用 lastSeenAt 代替：它是 @updatedAt，后台改名、改点位等任何编辑都会刷新它。
   lastHeartbeatAt   DateTime?
+  /// 本机每日免费打印上限（面）。null = 用平台设置 print.freeQuota.terminalDailySides。
+  /// 计划中 / 已退役触发器不拦这一列：前者只拦 agentToken、lifecycleStatus、credentialGeneration，
+  /// 后者只在身份列变化时拦截。
+  dailyFreePrintSides Int?
 
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
@@ -60,10 +64,37 @@ model Terminal {
   capabilities TerminalCapability[]
   releaseTargets AgentReleaseTarget[]
   activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
+  commands     TerminalCommand[]
 
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+}
+
+// 远程重启终端程序。同一终端同时只能有一条未结束命令（pending / accepted）。
+// 条件唯一索引 TerminalCommand_terminalId_open_unique 只写在两份迁移里：
+// Prisma @@unique 表达不了 WHERE status IN ('pending','accepted')
+// （先例：ScanTask_terminalId_active_unique、User_single_backup_admin）。
+// 本表没有会员、订单、文件字段，不进注销清单。
+model TerminalCommand {
+  id                String    @id
+  terminalId        String
+  terminal          Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  type              String
+  status            String
+  requestedById     String
+  requestedBy       User      @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt       DateTime
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  finishedAt        DateTime?
+  completedVerified Boolean?
+  resultCode        String?
+
+  @@index([terminalId, requestedAt])
+  @@index([status, expiresAt])
+  @@index([status, acceptedAt])
+  @@index([requestedById])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────
@@ -864,6 +895,7 @@ model User {
   createdBenefitActivities BenefitActivity[]
   feedbackReplies FeedbackReply[]
   recruitmentReviewDecisions ReviewDecision[]
+  requestedTerminalCommands TerminalCommand[]
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
@@ -2015,6 +2047,20 @@ model AiUsageMonthlySummary {
   @@unique([monthKey, featureKey, vendor, model, status], map: "AiUsageMonthly_dims_key")
 }
 
+/// 违法和不良信息词库。只存类别、词条和开关，不含用户提问。种子在代码里，这张表只记增删。
+model AiSafetyTerm {
+  id        String   @id @default(cuid())
+  category  String
+  term      String
+  kind      String
+  enabled   Boolean  @default(true)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, kind, term])
+  @@index([enabled])
+}
+
 model UserAiConsent {
   id             String    @id @default(cuid())
   endUserId      String
@@ -2208,6 +2254,7 @@ model BenefitGrant {
   endUserId         String
   endUser           EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
   benefitType       String
+  serviceKey        String?
   title             String
   description       String?
   quantityTotal     Int?
@@ -3210,11 +3257,11 @@ model ScreensaverContent {
 //   1. 输入槽（用户自己填的、他自己知道要留在这台机器上的内容）
 //   2. 用户**主动钉住**的条目（AdvisorPin）
 //   3. 已生成的产物（AdvisorArtifact）
-// QA 的多轮上下文只在服务进程内存里按 TTL 保留，重启即失，不写任何表。
+// 开场诉求只用于判型、不落库；QA 的多轮上下文只在服务进程内存里按 TTL 保留，重启即失，不写任何表。
 // 因此不要为了「方便排查」再加一张 AdvisorTurn —— 那会直接违反页面对用户的承诺。
 //
-// ⚠️ 留存口径：上面这三样保存的都是**用户本人写的原话**（topic / slotsJson /
-// AdvisorPin.content / AdvisorArtifact.payloadJson），一律未脱敏。因此 expiresAt
+// ⚠️ 留存口径：topic 只存固定标签；slotsJson / AdvisorPin.content /
+// AdvisorArtifact.payloadJson 仍保存未脱敏原文。因此 expiresAt
 // 不是「读取时过滤」的软标记，而是必须被物理执行的删除期限 ——
 // 由 AdvisorRetentionTask（每小时 cron）硬删过期会话（级联 pins/artifacts）与过期产物。
 // 期限口径同步在 docs/compliance/member-personal-data-retention.md。
@@ -3232,16 +3279,12 @@ model AdvisorSession {
   /** collecting（还在补输入）| ready（必填槽齐了）| completed（已出产物）| abandoned */
   status          String   @default("collecting")
   /**
-   * 用户原始诉求，用于判型与后续继续作业。
-   *
-   * ⚠️ 落库的是**未脱敏的原文**（advisor.service.ts: `topic.trim().slice(0, 600)`）。
-   * 脱敏只发生在送模型那一步（llm-advisor.service.ts 的 maskUserTextForLlmText），
-   * 是另一份临时字符串，不回写本字段。用户在页面上要看到自己写的原话，所以这里
-   * 刻意不存占位符版本。防线是：短 TTL + 到期物理删除（AdvisorRetentionTask）
+   * 只存固定标签「顾问作业」或「小青对话要点」，开场诉求只用于判型、不落库。
+   * 存量原话不做数据清洗，仍靠短 TTL + 到期物理删除（AdvisorRetentionTask）
    * + 归属门禁（loadOwned）+ 不进日志 / 不进审计 payload。
    */
   topic           String
-  /** 判型理由，页面顶部「你说的是…所以按 X 型办」照此展示 */
+  /** 固定判型说明，不保存模型可能复述开场诉求的判型理由；改型与小青摘要也只写固定说明 */
   skillReason     String?
   /** 判型来源：llm（模型判的）| fallback（模型不可用，关键词兜底）| user_override（用户改的） */
   skillSource     String   @default("llm")
@@ -3318,4 +3361,53 @@ model JobMaterialTemplate {
   updatedByUserId    String?
 
   @@index([status, sortOrder])
+}
+
+// 会员 FileObject 硬删后的物理删除重试账本；不保存会员/文件身份。
+model StorageDeletion {
+  id         String @id @default(cuid())
+  storageKey String @unique
+  bucket     String
+  attempts   Int @default(0)
+  lastError  String?
+  createdAt  DateTime @default(now())
+}
+
+// AI 按人次数账本：member:<id> / terminal:<id> 隔离身份空间；guest 桶跨服务共享。
+model AiQuotaDaily {
+  endUserId String
+  bucket    String
+  day       String
+  used      Int @default(0)
+
+  @@id([endUserId, bucket, day])
+}
+
+model AiQuotaReservation {
+  id             String @id @default(cuid())
+  operationKey   String @unique
+  endUserId      String?
+  terminalId     String?
+  bucket         String
+  source         String
+  day            String
+  benefitGrantId String?
+  resultRef      String?
+  status         String
+  reservedAt     DateTime @default(now())
+  settledAt      DateTime?
+
+  @@index([endUserId, bucket, day])
+  @@index([status, reservedAt])
+}
+
+// 平台级公开键值。没有 endUserId，不是会员数据，不进注销删除或置空清单。
+// 为什么不复用现成表：一体机统一配置按终端；法务文档是带版本的正文；
+// 价目属于收费；线下网点电话属于招聘内容；Redis 上的 AI 开关会过期。
+// 服务电话只由管理员写入，本模型与迁移不放任何号码。
+model PlatformSetting {
+  key       String   @id
+  value     String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

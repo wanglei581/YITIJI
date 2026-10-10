@@ -1,5 +1,5 @@
 import { SCREEN_MIN_AGGREGATE_SAMPLE, type ScreenContentType, type ScreenUsageRange } from './console-screen.types'
-import { daysAgoStart, recruitmentHostingLimit, shanghaiDayKey, shanghaiDayStart } from './console-screen.metric'
+import { recruitmentHostingLimit, shanghaiDayKey, shanghaiDayStart } from './console-screen.metric'
 import { partnerSourceOrgWhere, type PartnerOrgId } from './console-screen.org'
 import type { PrismaService } from '../prisma/prisma.service'
 
@@ -59,14 +59,20 @@ export function usageProviderLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider
 }
 
-export function suppressSmallCount(count: number): number | null {
-  return count >= SCREEN_MIN_AGGREGATE_SAMPLE ? count : null
-}
+export { suppressAggregateCount as suppressSmallCount } from './console-screen.metric'
 
 export function usageWindow(range: ScreenUsageRange, now: Date): { from: Date; to: Date } {
   if (range === 'today') return { from: shanghaiDayStart(now), to: now }
-  if (range === '7d') return { from: daysAgoStart(now, 7), to: now }
-  return { from: daysAgoStart(now, 30), to: now }
+  const to = shanghaiDayStart(now)
+  const days = range === '7d' ? 7 : 30
+  return { from: new Date(to.getTime() - days * DAY_MS), to }
+}
+
+/** 多日的午夜终点排除；今日与独立热力/脉冲仍可读到当前时刻。 */
+export function usageTimeBounds(from: Date, to: Date): { gte: Date; lt?: Date; lte?: Date } {
+  return from.getTime() < to.getTime() && shanghaiDayStart(to).getTime() === to.getTime()
+    ? { gte: from, lt: to }
+    : { gte: from, lte: to }
 }
 
 export function shanghaiHour(date: Date): number {
@@ -75,7 +81,7 @@ export function shanghaiHour(date: Date): number {
 
 export function usageDayKeys(from: Date, to: Date): string[] {
   const keys: string[] = []
-  for (let cursor = shanghaiDayStart(from).getTime(); cursor <= to.getTime(); cursor += DAY_MS) {
+  for (let cursor = shanghaiDayStart(from).getTime(); cursor < to.getTime(); cursor += DAY_MS) {
     keys.push(shanghaiDayKey(new Date(cursor)))
   }
   return keys
@@ -99,9 +105,9 @@ export interface UsageTimeline {
 }
 
 interface CreatedReader {
-  count(args: { where: { createdAt: { gte: Date; lte: Date } } }): Promise<number>
+  count(args: { where: { createdAt: { gte: Date; lt?: Date; lte?: Date } } }): Promise<number>
   findMany(args: {
-    where: { createdAt: { gte: Date; lte: Date } }
+    where: { createdAt: { gte: Date; lt?: Date; lte?: Date } }
     select: { createdAt: true }
     take: number
   }): Promise<Array<{ createdAt: Date }>>
@@ -125,7 +131,7 @@ export async function loadUsageTimeline(
     { lane: 'print', reader: prisma.printTask },
     { lane: 'print', reader: prisma.scanTask },
   ]
-  const where = { createdAt: { gte: from, lte: to } }
+  const where = { createdAt: usageTimeBounds(from, to) }
   const counts = await Promise.all(readers.map((item) => item.reader.count({ where })))
   const rows = counts.reduce((sum, count) => sum + count, 0)
   if (rows > rowCap) return { capped: true, rows, lanes: emptyLanes() }
@@ -181,13 +187,13 @@ export interface AdminUsageFacts {
   resumeExported: number
 }
 
-function paidWhere(from: Date, to: Date): { payStatus: 'paid'; paidAt: { gte: Date; lte: Date } } {
-  return { payStatus: 'paid', paidAt: { gte: from, lte: to } }
+function paidWhere(from: Date, to: Date): { payStatus: 'paid'; paidAt: { gte: Date; lt?: Date; lte?: Date } } {
+  return { payStatus: 'paid', paidAt: usageTimeBounds(from, to) }
 }
 
 /** 完成时间优先 completedAt。只标了 printOutcome=printed 且没有 completedAt 的，用 updatedAt。 */
 function printedWhere(from: Date, to: Date) {
-  const span = { gte: from, lte: to }
+  const span = usageTimeBounds(from, to)
   return {
     OR: [
       { status: 'completed', completedAt: span },
@@ -208,7 +214,7 @@ export async function loadAdminUsageFacts(
   from: Date,
   to: Date,
 ): Promise<AdminUsageFacts> {
-  const created = { createdAt: { gte: from, lte: to } }
+  const created = { createdAt: usageTimeBounds(from, to) }
   const paid = paidWhere(from, to)
   const [
     paidOrders,
@@ -344,7 +350,7 @@ export async function loadPartnerUsageFacts(
   rowCap: number,
 ): Promise<PartnerUsageFacts> {
   const owned = await loadOwnedContent(prisma, orgId)
-  const created = { gte: from, lte: to }
+  const created = usageTimeBounds(from, to)
   const byType = []
   const topCandidates: PartnerUsageFacts['top'] = []
   let browseRows = 0

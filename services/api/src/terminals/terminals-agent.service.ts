@@ -6,6 +6,7 @@
 // Admin 管理端逻辑见 TerminalAdminService。
 // ============================================================
 
+import { describeBackgroundError, scheduleBackground } from '../common/process/background-task'
 import crypto from 'crypto'
 import {
   Injectable,
@@ -17,10 +18,13 @@ import {
   ConflictException,
   ForbiddenException,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { isISO8601 } from 'class-validator'
 import { TERMINAL_CLAIM_INTERVAL_MS } from '../common/throttler/terminal-throttle'
+import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { PrismaService } from '../prisma/prisma.service'
+import { claimTransactionTimeoutMs, resolvePgSessionTimeouts } from '../prisma/pg-session-timeouts'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl } from '../files/signing'
 import { isPrintableFileRecord } from '../print-jobs/print-page-count.service'
@@ -75,6 +79,12 @@ type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 
 const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
 
 class PrintTaskClaimRaceError extends Error {}
+
+/** SQLite 不传，沿用 Prisma 默认 5 秒。PostgreSQL 必须晚于 lock_timeout，见 claimTransactionTimeoutMs。 */
+function claimTransactionOptions(dbKind: string): { timeout: number } | undefined {
+  if (dbKind !== 'postgres') return undefined
+  return { timeout: claimTransactionTimeoutMs(resolvePgSessionTimeouts(process.env).lockTimeoutMs) }
+}
 
 // API-03：claim 时重签文件 URL 的有效期。Agent 出纸监控封顶 15 分钟，再加上下载重试，
 // 仍低于这里的 30 分钟，与建单时的 PRINT_JOB_FILE_URL_TTL_MS 同口径。
@@ -234,8 +244,11 @@ export class TerminalAgentService implements OnModuleInit {
     if (shouldSeedTestPrintTask()) {
       await this.seedPrintTask()
     }
-    const timer = setInterval(() => void this.resetExpiredClaims(), 30_000)
-    timer.unref()
+    // 30 秒回收一次过期领取。失败（例如 Prisma P2028 事务起不来）只记日志、下一轮再试——
+    // 直接 `void this.resetExpiredClaims()` 会把一次 reject 变成未处理的拒绝，整个 API 进程退出。
+    scheduleBackground(() => this.resetExpiredClaims(), 30_000, (error) => {
+      this.logger.warn(`RESET_EXPIRED_CLAIMS_FAILED ${describeBackgroundError(error)}`)
+    })
   }
 
   // ── 1. Register ──────────────────────────────────────────────────────────────
@@ -535,10 +548,14 @@ export class TerminalAgentService implements OnModuleInit {
             })
           }
           return tx.printTask.findUnique({ where: { id: task.id } })
-        })
+        }, claimTransactionOptions(this.prisma.dbKind))
       } catch (error) {
         if (error instanceof PrintTaskClaimRaceError) claimed = null
-        else throw error
+        else if (isPostgresBusyError(error)) {
+          throw new ServiceUnavailableException({
+            error: { code: 'TERMINAL_CLAIM_BUSY', message: '服务器忙，稍后自动重试' },
+          })
+        } else throw error
       }
 
       if (!claimed) break
@@ -868,7 +885,7 @@ export class TerminalAgentService implements OnModuleInit {
   findTerminalByRef(terminalRef: string) {
     return this.prisma.terminal.findFirst({
       where: this.terminalRefWhere(terminalRef),
-      select: { id: true, terminalCode: true, enabled: true, lastSeenAt: true },
+      select: { id: true, terminalCode: true, enabled: true, lifecycleStatus: true, lastSeenAt: true },
     })
   }
 

@@ -15,6 +15,8 @@ const pagePath = join(root, 'src/routes/print-scan/index.tsx')
 const retryButtonPath = join(root, 'src/routes/print-scan/PrintRetryButton.tsx')
 // 「设备能力」板块 2026-09-29 从 index.tsx 原样拆到独立文件；能力开关相关断言改读这里，强度不变。
 const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
+const clearButtonPath = join(root, 'src/routes/print-scan/ClearCapabilityButton.tsx')
+const signaturePath = join(root, 'src/routes/print-scan/SignatureCapabilityRow.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
 const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
@@ -35,10 +37,14 @@ if (!existsSync(pagePath)) fail('print-scan page is missing')
 if (!existsSync(servicePath)) fail('printScan service is missing')
 if (!existsSync(closeFormPath)) fail('controlled unpaid-print close form is missing')
 if (!existsSync(capabilityPath)) fail('print-scan capability center is missing')
+if (!existsSync(clearButtonPath)) fail('capability clear button is missing')
+if (!existsSync(signaturePath)) fail('signature capability row is missing')
 if (!existsSync(retryButtonPath)) fail('print retry button is missing')
 const page = readFileSync(pagePath, 'utf8')
 const retryUi = readFileSync(retryButtonPath, 'utf8')
 const cap = readFileSync(capabilityPath, 'utf8')
+const clearButton = readFileSync(clearButtonPath, 'utf8')
+const signatureRow = readFileSync(signaturePath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
 const closeForm = readFileSync(closeFormPath, 'utf8')
 const routes = readFileSync(routesPath, 'utf8')
@@ -88,8 +94,21 @@ if (retiredRetryHits.length === 0) {
 } else {
   fail(`apps/admin source still contains the retired retry code prefix: ${retiredRetryHits.join(', ')}`)
 }
-for (const forbidden of ['release', 'forceRelease', '强制释放', '标记已支付', '标记退款', 'DELETE']) {
+for (const forbidden of ['release', 'forceRelease', '强制释放', '标记已支付', '标记退款']) {
   if (service.includes(forbidden)) fail(`service contains forbidden operation: ${forbidden}`)
+}
+const deleteCount = service.split('DELETE').length - 1
+const capabilityDeleteComment = 'DELETE /admin/terminals/:terminalId/capabilities/:key'
+if (
+  deleteCount === 2 &&
+  service.includes(capabilityDeleteComment) &&
+  service.includes("method: 'DELETE'") &&
+  service.includes('clearCapability:') &&
+  !/\/tasks\/[^'"\n]*DELETE|DELETE[^.\n]{0,80}tasks/.test(service)
+) {
+  pass('the only DELETE clears one terminal capability back to unconfigured')
+} else {
+  fail('DELETE must appear exactly twice and only for capability clear, never on tasks')
 }
 if (/action: 'retry' \| 'cancel'|AdminPrintScanAction = 'retry' \| 'cancel'/.test(service)) {
   pass('service action union is limited to retry/cancel')
@@ -264,10 +283,85 @@ if (forceReprintCount === 1 && !retryUi.includes(forceReprintNote)) {
 } else {
   fail(`force reprint note must appear once on the page and not inside each button, found ${forceReprintCount}`)
 }
-if (page.includes("setActionError(e instanceof Error ? e.message : '操作失败')")) {
-  pass('rejected retry keeps the server message')
+if (page.includes("setActionError(userMessageOf(e, '打印任务操作失败，请稍后重试'))")) {
+  pass('rejected task action shows a Chinese fallback instead of the raw error')
 } else {
-  fail('retry failure must surface the server error message')
+  fail('retry failure must surface userMessageOf, not the raw error message')
+}
+
+// 10. 未登记行的「调整为」不预选 cap.status。列表对缺行固定回 not_verified，
+// 直接登记会把仍跟随部署设置（managed 下放行）的能力写成关闭。
+const capabilityRow = cap.slice(cap.indexOf('function CapabilityRow('))
+if (!capabilityRow.includes('function CapabilityRow(')) fail('CapabilityRow source block is missing')
+const blankInitial = "useState<PrintScanCapabilityStatus | ''>(cap.configured ? cap.status : '')"
+const blankReset = "setStatus(cap.configured ? cap.status : '')"
+if (
+  capabilityRow.includes(blankInitial) &&
+  capabilityRow.includes(blankReset) &&
+  !/useState<[^>\n]+>\(\s*cap\.status\s*\)/.test(capabilityRow) &&
+  !/setStatus\(\s*cap\.status\s*\)/.test(capabilityRow) &&
+  !cap.includes('未登记的行允许不改任何内容、原样登记')
+) {
+  pass('unconfigured rows start blank; configured rows still start from the saved status')
+} else {
+  fail('unconfigured rows must initialize and reset to empty string; configured rows must keep cap.status; the old “原样登记” note must be gone')
+}
+const placeholder = `{!cap.configured && (
+            <option value="" disabled>
+              请选择
+            </option>
+          )}`
+if (capabilityRow.includes(placeholder)) {
+  pass('unconfigured rows show a disabled 请选择 placeholder and configured rows do not')
+} else {
+  fail('unconfigured rows must render a disabled placeholder option 请选择, gated by !cap.configured')
+}
+if (
+  capabilityRow.includes("const savable = cap.configured ? dirty : status !== ''") &&
+  capabilityRow.includes('disabled={!savable || saving}') &&
+  capabilityRow.includes("if (status === '') return") &&
+  capabilityRow.includes("{!cap.configured && status === '' && <span className=\"whitespace-nowrap\">请先选择要登记的状态</span>}") &&
+  !capabilityRow.includes('dirty || !cap.configured')
+) {
+  pass('register stays disabled with a hint until a status is chosen; a chosen status can be registered')
+} else {
+  fail('unconfigured register must stay disabled until status !== \'\', show 请先选择要登记的状态, and become savable once a status is chosen')
+}
+
+const restoreTrigger = clearButton.match(/<button[\s\S]*?恢复未配置\s*<\/button>/)?.[0] ?? ''
+if (
+  capabilityRow.includes('{cap.configured && <ClearCapabilityButton') &&
+  signatureRow.includes('{cap.configured && <ClearCapabilityButton') &&
+  !capabilityRow.includes('window.confirm') &&
+  !clearButton.includes('window.confirm') &&
+  !signatureRow.includes('window.confirm') &&
+  !cap.includes('window.confirm')
+) {
+  pass('only configured rows offer 恢复未配置, and the confirm is not window.confirm')
+} else {
+  fail('恢复未配置 must be gated by cap.configured on both row kinds, without window.confirm')
+}
+if (
+  clearButton.includes('恢复未配置') &&
+  clearButton.includes('跟随服务器的默认设置') &&
+  clearButton.includes('确认恢复') &&
+  restoreTrigger.includes('onClick={() => setOpen(true)}') &&
+  !restoreTrigger.includes('onConfirm') &&
+  clearButton.includes('onConfirm()') &&
+  !clearButton.includes('clearCapability')
+) {
+  pass('restore click only opens the in-page confirm; the request stays with the caller')
+} else {
+  fail('restore button must open a confirm that says 跟随服务器的默认设置 and must not call clearCapability itself')
+}
+if (
+  cap.includes('clearCapability') &&
+  cap.includes('已恢复为未配置') &&
+  cap.includes('这一项本来就未配置')
+) {
+  pass('successful clear refreshes with 已恢复为未配置, and cleared:false says it was already unconfigured')
+} else {
+  fail('capability center must call clearCapability and show both success notices')
 }
 
 console.log('\nverify-admin-print-scan-ui: ok')

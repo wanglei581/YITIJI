@@ -15,7 +15,8 @@ export default defineConfig({
   // cashier-qx 的 5 条用例打的就是 @w2，却一直不在这条 testMatch 里，而默认 config 的 kiosk project 只吃 @kiosk ——
   // 于是它**哪个套件都跑不到**（2026-09-08 实测）。归位到这里。
   // print-handoff：商用收口 P0-5 第二、三批的打印交接回归（H1–H7），同属打印链，归 W2。
-  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx|pickup-claim-receipt|print-handoff)\.spec\.ts$/,
+  // print-progress-offline：N-2 断网不判打印失败。打的是 @w2，必须进这条 testMatch，否则默认 config 只吃 @kiosk。
+  testMatch: /(?:fusion-w2-(?:print|scan|tools)|print-hub-qx|print-fulfill-qx|cashier-qx|pickup-claim-receipt|print-handoff|print-progress-offline)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w2',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
@@ -47,7 +48,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',
+    // W-125：U 盘闸门用例要能看见后台能力。没注入网桥令牌时，页面停在「未配置」短路上，维护中和已开通对不上。
+    command: 'VITE_API_MODE=http VITE_E2E_MOCK_TERMINAL_SESSION_TOKEN=playwright-terminal-session-fixture VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w2-synthetic-bridge-token pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',
     url: 'http://127.0.0.1:4182',
     reuseExistingServer: false,
     timeout: 180_000,

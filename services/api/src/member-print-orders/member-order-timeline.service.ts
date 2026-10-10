@@ -7,7 +7,7 @@
  * 映射口径不另起：参数白名单用 parseSafeParams / sanitizePrintParams，
  * 支付与取件凭证字段用 memberOrderPaymentFields，状态口径见 member-order-timeline.status.ts。
  *
- * 公共屏约束：不从库里读 pickupCodeEnc，到机码明文在这里根本拿不到；只给 hasArrivalCode。
+ * 到机码只在可取或可续打时解密下发，字段仍叫 pickupCode。没有哈希的现场单保持 null。
  */
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { parseMemberPageQuery } from '../common/utils/member-page'
@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TerminalSessionService } from '../terminals/terminal-session.service'
 import { MemberPrintOrderCreateService } from './member-print-order-create.service'
 import { memberOrderPaymentFields, parseSafeParams, sanitizePrintParams } from './member-print-orders.service'
+import { arrivalViewsForOrders, type ArrivalReprintFields } from '../print-jobs/self-service-reprint'
 import {
   MEMBER_ORDER_TIMELINE_KIND_FILTERS,
   MEMBER_ORDER_TIMELINE_STATUS_FILTERS,
@@ -115,13 +116,14 @@ function afterCursor(cursor: TimelineCursor | null, kind: MemberOrderTimelineKin
   return { OR: or }
 }
 
-/** Order 上时间线要用的列。**刻意不含 pickupCodeEnc**：到机码明文不进这条链路。 */
+/** Order 上时间线要用的列。不含明文列；到机码只从 pickupCodeEnc 解密。 */
 const ORDER_SELECT = {
   id: true,
   orderNo: true,
   terminalId: true,
   printTaskId: true,
   pickupCodeHash: true,
+  pickupCodeEnc: true,
   pickupStatus: true,
   payStatus: true,
   taskStatus: true,
@@ -132,7 +134,6 @@ const ORDER_SELECT = {
   paymentSource: true,
   billablePages: true,
   billingPageSource: true,
-  pickupCode: true,
   refundedAt: true,
   refundedAmountCents: true,
   discountCents: true,
@@ -241,6 +242,11 @@ export class MemberOrderTimelineService {
     const terminalById = new Map<string, MemberOrderTimelineTerminal>(terminals.map((t) => [t.id, t]))
     const terminalOf = (id: string | null) => (id ? terminalById.get(id) ?? null : null)
     const now = new Date()
+    const arrivalViews = await arrivalViewsForOrders(this.prisma, [
+      ...taskRows.flatMap((task) => (task.order ? [task.order] : [])),
+      ...cloudRows,
+      ...packageRows,
+    ], now)
 
     const rows: SortableRow[] = []
     for (const task of taskRows) {
@@ -265,6 +271,7 @@ export class MemberOrderTimelineService {
           terminal: terminalOf(task.terminalId),
           verifiedTerminalId,
           now,
+          arrival: order ? arrivalViews.get(order.id) ?? null : null,
         }),
       })
     }
@@ -289,6 +296,7 @@ export class MemberOrderTimelineService {
           terminal: terminalOf(order.terminalId),
           verifiedTerminalId,
           now,
+          arrival: arrivalViews.get(order.id) ?? null,
         }),
       })
     }
@@ -315,6 +323,7 @@ export class MemberOrderTimelineService {
           terminal: terminalOf(order.terminalId),
           verifiedTerminalId,
           now,
+          arrival: arrivalViews.get(order.id) ?? null,
         }),
       })
     }
@@ -345,9 +354,10 @@ export class MemberOrderTimelineService {
     terminal: MemberOrderTimelineTerminal | null
     verifiedTerminalId: string | null
     now: Date
+    arrival: ArrivalReprintFields | null
   }): MemberOrderTimelineItem {
     const { order } = input
-    const pay = memberOrderPaymentFields(order)
+    const pay = memberOrderPaymentFields(order, input.arrival)
     return {
       kind: input.kind,
       id: input.id,
@@ -378,6 +388,9 @@ export class MemberOrderTimelineService {
       pickupCode: pay.pickupCode,
       terminal: input.terminal,
       claimableHere: isClaimableHere(order, input.verifiedTerminalId, input.now),
+      reprintAllowed: pay.reprintAllowed,
+      reprintRemaining: pay.reprintRemaining,
+      reprintNotice: pay.reprintNotice,
     }
   }
 }

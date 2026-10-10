@@ -1,3 +1,4 @@
+import { formatCount } from '@ai-job-print/shared'
 // Partner 数据统计页 — /stats
 //
 // 数据来源：getPartnerStats() → GET /partner/stats?period=week|month|quarter
@@ -53,13 +54,14 @@ import {
   type StatsPeriod,
 } from '../../services/api/stats'
 import { useRecruitmentHosting } from '../../services/capabilities'
+import { ServiceVisitsCard } from './ServiceVisitsCard'
 
 // ─── 时间范围选择器 ────────────────────────────────────────────────────────
 
 const PERIODS: { value: StatsPeriod; label: string }[] = [
-  { value: 'week',    label: '本周' },
-  { value: 'month',   label: '本月' },
-  { value: 'quarter', label: '本季度' },
+  { value: 'week',    label: '近 7 天（截至昨天）' },
+  { value: 'month',   label: '近 30 天（截至昨天）' },
+  { value: 'quarter', label: '近 90 天（截至昨天）' },
 ]
 
 function PeriodSelector({
@@ -118,7 +120,7 @@ function SnapshotRow({ snapshot, recruitmentHosting }: { snapshot: PartnerStatsR
             <div className="min-w-0">
               <p className="text-[11.5px] font-medium text-neutral-500">{item.label}</p>
               <p className="mt-0.5 text-[1.4rem] font-bold tabular-nums leading-none text-neutral-900">
-                {item.value.toLocaleString()}
+                {formatCount(item.value)}
               </p>
             </div>
           </Card>
@@ -160,11 +162,14 @@ function SyncMetrics({ sync }: { sync: PartnerStatsResponse['sync'] }) {
         <Card key={item.label} className="p-4">
           <p className="text-[11.5px] font-medium text-neutral-500">{item.label}</p>
           <p className="mt-1.5 text-[1.5rem] font-bold tabular-nums leading-none text-neutral-900">
-            {item.metric.current.toLocaleString()}
-            {item.suffix ?? ''}
+            {item.suffix === '%'
+              ? sync.totalBatches.current > 0 ? `${item.metric.current}%` : '—'
+              : formatCount(item.metric.current)}
           </p>
           <p className="mt-1.5">
-            <DeltaText metric={item.metric} />
+            {item.suffix === '%' && sync.totalBatches.current === 0
+              ? <span className="text-[10.5px] text-neutral-400">本周期无同步记录，不给百分比</span>
+              : <DeltaText metric={item.metric} />}
           </p>
         </Card>
       ))}
@@ -195,7 +200,7 @@ function StatusDistCard({ dist }: { dist: PartnerStatsResponse['statusDist'] }) 
             <div className="mb-1 flex items-center justify-between text-xs text-neutral-600">
               <span className="font-medium">{b.label}</span>
               <span className="tabular-nums">
-                {b.count} 次 · {pct}%
+                {formatCount(b.count)} 次 · {pct}%
               </span>
             </div>
             <div className={`h-2 w-full overflow-hidden rounded-full ${b.bg}`}>
@@ -204,7 +209,7 @@ function StatusDistCard({ dist }: { dist: PartnerStatsResponse['statusDist'] }) 
           </div>
         )
       })}
-      <p className="pt-1 text-xs text-neutral-400">共 {total} 个同步批次</p>
+      <p className="pt-1 text-xs text-neutral-400">共 {formatCount(total)} 个同步批次</p>
     </div>
   )
 }
@@ -251,10 +256,10 @@ function NoActivityState({
   if (activeSources === 0) {
     reason = '本机构当前没有启用中的数据源，因此不会产生同步批次。先去数据源页配置并启用一个来源。'
   } else if (adminPending > 0) {
-    reason = `本机构有 ${adminPending} 条岗位、招聘会或企业资料还在等管理员审核，审核通过并发布后才会在终端展示。`
-      + (policyPending > 0 ? `另有 ${policyPending} 条政策待本机构自行审核发布。` : '')
+    reason = `本机构有 ${formatCount(adminPending)} 条岗位、招聘会或企业资料尚未发布：审核发布入口尚未开放（平台不代审、不代发），通过并发布后才会在终端展示。`
+      + (policyPending > 0 ? `另有 ${formatCount(policyPending)} 条政策待本机构自行审核发布。` : '')
   } else if (policyPending > 0) {
-    reason = `本机构有 ${policyPending} 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。`
+    reason = `本机构有 ${formatCount(policyPending)} 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。`
   } else if (!hasContent) {
     reason = '本机构还没有已发布的内容，先导入岗位或招聘会，通过审核后即可在终端展示。'
   } else {
@@ -327,17 +332,19 @@ export default function StatsPage() {
       // 周期只作用于同步概况；托管关闭时那一段不展示，选择器也就不给，免得点了没有任何变化。
       actions={recruitmentHosting ? <PeriodSelector value={period} onChange={setPeriod} /> : undefined}
     >
-      {state === 'loading' ? (
-        <LoadingState className="py-20" />
-      ) : state === 'error' || !data ? (
-        <ErrorState
-          className="py-20"
-          title="统计数据加载失败"
-          message="无法读取本机构统计数据。你的内容展示不受影响。"
-          onRetry={retry}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <ServiceVisitsCard />
+        {state === 'loading' ? (
+          <LoadingState className="py-20" />
+        ) : state === 'error' || !data ? (
+          <ErrorState
+            className="py-20"
+            title="统计数据加载失败"
+            message="无法读取本机构统计数据。你的内容展示不受影响。"
+            onRetry={retry}
+          />
+        ) : (
+          <>
           {/* 在架内容 —— 当前快照，不随周期变化 */}
           <section aria-label="在架内容">
             <div className="mb-2.5 flex items-center gap-2">
@@ -348,12 +355,12 @@ export default function StatsPage() {
             <SnapshotRow snapshot={data.snapshot} recruitmentHosting={recruitmentHosting} />
             {recruitmentHosting && data.snapshot.pendingReview > data.snapshot.pendingReviewPolicies && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies}</strong> 条岗位、招聘会或企业资料待管理员审核，通过并发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{formatCount(data.snapshot.pendingReview - data.snapshot.pendingReviewPolicies)}</strong> 条岗位、招聘会或企业资料尚未发布：审核发布入口尚未开放（平台不代审、不代发）。
               </p>
             )}
             {data.snapshot.pendingReviewPolicies > 0 && (
               <p className="mt-2.5 text-xs text-neutral-500">
-                另有 <strong className="tabular-nums text-neutral-700">{data.snapshot.pendingReviewPolicies}</strong> 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。
+                另有 <strong className="tabular-nums text-neutral-700">{formatCount(data.snapshot.pendingReviewPolicies)}</strong> 条政策待本机构自行审核，审核通过并确认发布后才会在终端展示。
               </p>
             )}
           </section>
@@ -410,8 +417,9 @@ export default function StatsPage() {
             本后台不接收求职者简历。在架数字是打开页面时的最新情况。打印扫描的服务次数见
             <Link to="/terminals" className="mx-0.5 font-semibold text-primary-600 hover:underline">终端数据</Link>。
           </p>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </Page>
   )
 }

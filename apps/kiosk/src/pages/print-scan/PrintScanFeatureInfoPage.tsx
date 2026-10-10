@@ -10,6 +10,8 @@
 // ============================================================
 
 import type { CSSProperties } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
@@ -61,7 +63,7 @@ const COPY_CASE_ICON: Record<CopyGuideCase['key'], typeof CopyIcon> = {
 
 const RECORD_LINKS: readonly (QxPrintQuickLinkView & { to: string })[] = [
   { key: 'documents', icon: FilesIcon, title: '我的文档', description: '已上传 / 生成的文件', to: '/me/documents' },
-  { key: 'print-orders', icon: PrinterIcon, title: '打印订单', description: '任务状态与取件凭证码', to: '/me/print-orders' },
+  { key: 'print-orders', icon: PrinterIcon, title: '打印订单', description: '任务状态与到机码', to: '/me/print-orders' },
 ]
 
 function featureState(key: string | undefined): HubFeatureState {
@@ -72,6 +74,7 @@ function featureState(key: string | undefined): HubFeatureState {
 
 export function PrintScanFeatureInfoPage() {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const { key } = useParams<{ key: string }>()
   const hubState = featureState(key)
   const found = hubState !== 'feature-not-found'
@@ -96,7 +99,7 @@ export function PrintScanFeatureInfoPage() {
         ctabar={
           <>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-              联系工作人员
+              求助
             </button>
             <button
               type="button"
@@ -257,7 +260,7 @@ export function PrintScanFeatureInfoPage() {
                       <span className="ph-note-ic" data-tone="wheat" aria-hidden="true"><Icon size={24} /></span>
                       <b>{item.title}</b>
                     </span>
-                    <span className="d"><PrintHubEmphasis text={item.body} marks={['「身份证复印」', '「票据复印」']} /></span>
+                    <span className="d"><PrintHubEmphasis text={item.pending ? `${item.body}${helpNeededLine(contact)}` : item.body} marks={['「身份证复印」', '「票据复印」']} /></span>
                   </div>
                 )
               })}
@@ -271,7 +274,7 @@ export function PrintScanFeatureInfoPage() {
               testId="print-hub-copy-take-original"
             >
               <p className="ph-state-p">
-                复印件和原件一起带走。原件落下了，请找现场工作人员。
+                复印件和原件一起带走。原件落下了，{helpNeededLine(contact)}。
               </p>
             </PrintHubState>
           </section>

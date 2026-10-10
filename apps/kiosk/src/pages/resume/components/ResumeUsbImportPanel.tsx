@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { userMessageOf } from '../../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
+import { useUsbImportGate, type UsbImportGate } from '../../../hooks/useUsbImportGate'
 import { useAuth } from '../../../auth/useAuth'
+import type { ReactNode } from 'react'
+import type { UsbChannelPhase } from './resumeChannelCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -23,8 +27,26 @@ export interface ResumeUsbImportedFile {
 }
 
 interface ResumeUsbImportPanelProps {
+  /** 来源页已经查过就传进来，避免再闪一次「正在确认」。面试设置页不传，面板自己查。 */
+  gate?: UsbImportGate
   onUploaded: (file: ResumeUsbImportedFile) => void
   onBusyChange?: (busy: boolean) => void
+  /** 默认 inline，面试设置页不传。来源页整屏才传入这块渲染。 */
+  layout?: 'inline' | 'screen'
+  onPhase?: (phase: UsbChannelPhase) => void
+  renderScreen?: (model: UsbScreenModel) => ReactNode
+}
+
+export interface UsbScreenModel {
+  phase: UsbChannelPhase
+  status: UsbStatus | null
+  files: UsbFileListItem[] | null
+  loading: boolean
+  error: string | null
+  importFault: { name: string; message: string } | null
+  importingName: string | null
+  onImport: (item: UsbFileListItem) => void
+  onRedetect: () => void
 }
 
 const MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -47,19 +69,54 @@ function inferFormat(mimeType: string, filename: string): string {
   return 'unknown'
 }
 
-export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
+function panelUsbUnconfiguredNote(): string {
+  return `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine()}。`
+}
+
+function usbPhaseOf(input: {
+  importingId: string | null
+  importFault: { name: string } | null
+  error: string | null
+  faultCode: string | null
+  status: UsbStatus | null
+  files: UsbFileListItem[] | null
+}): UsbChannelPhase {
+  if (input.importingId) return 'usb-importing'
+  if (input.importFault) return 'usb-import-failed'
+  if (input.error) return input.faultCode === 'LOCAL_AGENT_UNREACHABLE' ? 'usb-agent-offline' : 'usb-read-failed'
+  if (input.status?.present && input.files && input.files.length > 0) return 'usb-list'
+  if (input.status?.present && input.files && input.files.length === 0) return 'usb-empty'
+  if (input.status && !input.status.present) return 'usb-wait'
+  return 'usb-detecting'
+}
+
+export function ResumeUsbImportPanel({
+  gate: gateFromParent, onUploaded, onBusyChange, layout = 'inline', onPhase, renderScreen,
+}: ResumeUsbImportPanelProps) {
+  const ownGate = useUsbImportGate(panelUsbUnconfiguredNote())
+  const gate = gateFromParent ?? ownGate
   const { getToken } = useAuth()
   const mountedRef = useRef(true)
   const [status, setStatus] = useState<UsbStatus | null>(null)
   const [files, setFiles] = useState<UsbFileListItem[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [importingId, setImportingId] = useState<string | null>(null)
+  const [importingName, setImportingName] = useState<string | null>(null)
+  const [importFault, setImportFault] = useState<{ name: string; message: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [faultCode, setFaultCode] = useState<string | null>(null)
+  const [pollNonce, setPollNonce] = useState(0)
   const configured = isUsbImportConfigured()
+  const phase = usbPhaseOf({ importingId, importFault, error, faultCode, status, files })
 
   useEffect(() => {
     onBusyChange?.(importingId !== null)
   }, [importingId, onBusyChange])
+
+  useEffect(() => {
+    if (layout !== 'screen') return
+    onPhase?.(phase)
+  }, [layout, onPhase, phase])
 
   useEffect(() => {
     mountedRef.current = true
@@ -70,7 +127,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   }, [onBusyChange])
 
   useEffect(() => {
-    if (!configured || importingId) return undefined
+    if (!configured || gate.state !== 'allowed' || importingId || importFault) return undefined
     let cancelled = false
     let timer: number | undefined
 
@@ -82,11 +139,16 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         setStatus(nextStatus)
         setFiles(nextStatus.present ? (await listUsbFiles()).files.filter((item) => item.sizeBytes <= MAX_RESUME_BYTES) : null)
         setError(null)
+        setFaultCode(null)
       } catch (err) {
         if (cancelled) return
         setStatus(null)
         setFiles(null)
-        setError(userMessageOf(err, 'U盘读取失败，请重新插入或联系现场工作人员'))
+        const code = errorCodeOf(err) ?? null
+        setFaultCode(code)
+        setError(code === 'LOCAL_AGENT_UNREACHABLE'
+          ? userMessageOf(err, '无法连接这台机器的本机程序，请确认设备正常后重试')
+          : userMessageOf(err, `U盘读取失败，请重新插入。${helpNeededLine()}。`))
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -100,11 +162,22 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [configured, importingId])
+  }, [configured, gate.state, importingId, importFault, pollNonce])
+
+  const redetect = () => {
+    setStatus(null)
+    setFiles(null)
+    setError(null)
+    setFaultCode(null)
+    setImportFault(null)
+    setPollNonce((nonce) => nonce + 1)
+  }
 
   const importFile = async (item: UsbFileListItem) => {
     setImportingId(item.safeId)
+    setImportingName(item.filename)
     setError(null)
+    setImportFault(null)
     try {
       const uploaded = await uploadUsbFile(item.safeId, 'resume_upload', getToken())
       if (!uploaded.fileUrl) throw new Error('U盘文件已上传，但预览链接未生成，请重新选择')
@@ -120,9 +193,15 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       })
     } catch (err) {
       if (!mountedRef.current) return
-      setError(userMessageOf(err, 'U盘文件导入失败，请重试'))
-      setFiles(null)
-      setStatus(null)
+      const message = userMessageOf(err, 'U盘文件导入失败，请重试')
+      if (layout === 'screen') {
+        setImportFault({ name: item.filename, message })
+        setError(null)
+      } else {
+        setError(message)
+        setFiles(null)
+        setStatus(null)
+      }
     } finally {
       if (mountedRef.current) setImportingId(null)
     }
@@ -134,9 +213,43 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         compact
         tone="empty"
         title="这台机器暂未开通 U 盘导入"
-        description="请改用手机扫码上传，或联系现场工作人员。"
+        description={`请改用手机扫码上传。${helpNeededLine()}。`}
       />
     )
+  }
+
+  if (gate.state !== 'allowed') {
+    return (
+      <KioskStatePanel
+        compact
+        tone={gate.state === 'unknown' ? 'error' : gate.state === 'loading' ? 'loading' : 'permission'}
+        title={
+          gate.state === 'loading'
+            ? (gate.note ?? '正在确认本机是否开通 U 盘导入…')
+            : gate.state === 'unknown'
+              ? '暂时确认不了'
+              : 'U盘上传现在不能用'
+        }
+        description={
+          gate.state === 'loading'
+            ? '确认完成前不会读取 U 盘，也不会列出文件。'
+            : (gate.note ?? undefined)
+        }
+        actions={gate.state === 'unknown' ? (
+          <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-usb-retry" onClick={gate.retry}>
+            重新检查
+          </button>
+        ) : undefined}
+      />
+    )
+  }
+
+  if (layout === 'screen' && gate.state === 'allowed' && renderScreen) {
+    return renderScreen({
+      phase, status, files, loading, error, importFault, importingName,
+      onImport: (item) => void importFile(item),
+      onRedetect: redetect,
+    })
   }
 
   return (
@@ -181,7 +294,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       )}
 
       <div className="resume-usb-panel__actions mt-4 flex justify-end">
-        <Button size="sm" variant="secondary" disabled={loading || importingId !== null} onClick={() => { setStatus(null); setFiles(null); setError(null) }}>
+        <Button size="sm" variant="secondary" disabled={loading || importingId !== null} onClick={redetect}>
           <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
           重新检测
         </Button>

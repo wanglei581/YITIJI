@@ -25,6 +25,7 @@
 
 .cashier-qx-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cashier-qx-scroll { gap: 20px; padding-top: 18px; padding-bottom: 16px; justify-content: flex-start; }
+.cashier-qx-page[data-qx-state='no-order'] .cashier-qx-scroll { justify-content: space-evenly; }
 
 /* ── 小青意图带 ─────────────────────────────────────────────── */
 .cashier-qx-xq {
@@ -258,6 +259,11 @@
 .cashier-qx-side > [aria-label='订单信息'] > .cashier-qx-p { margin-top: 20px; }
 .cashier-qx-paycol > .cashier-qx-instrument { flex: none; }
 .cashier-qx-paycol .cashier-fail-card { flex: none; }
+/* 没有支付工具的状态（免费单等）：两列等高并接住下方余高，不留整行空白。 */
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) { flex: 1 1 auto; align-items: stretch; max-height: 620px; }
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-amount,
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-side > [aria-label='订单信息'] { flex: 1; }
+.cashier-qx-paywrap:not(:has(.cashier-qx-instrument)) .cashier-qx-kv { flex: 1; justify-content: space-between; }
 
 .cashier-qx-amount {
   position: relative;

@@ -9,6 +9,7 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { type CSSProperties, type ReactNode } from 'react'
+import { machineCannotPrintLine } from '../../../copy/unattendedCopy'
 import { PrintAiHelp } from '../../print/components/PrintAiHelp'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import {
@@ -69,6 +70,7 @@ interface QxPrintHubViewProps {
   mfp: MfpStatus
   /** 打印闸门合上：沿用 device-off 的停用样式，只换短标题和说明。 */
   orderPaused?: { label: string; notice: string }
+  printerUnavailable?: { label: string; notice: string }
   colorDuplexLabel: string
   capabilities: readonly QxPrintCapabilityView[]
   arrivalCode: QxPrintArrivalCodeView
@@ -264,9 +266,13 @@ function hubDoing(state: HubPageState): ReactNode {
 function HubBanner({
   hubState,
   orderPaused,
+  printerUnavailable,
+  usableServices,
 }: {
   hubState: HubPageState
   orderPaused?: { label: string; notice: string }
+  printerUnavailable?: { label: string; notice: string }
+  usableServices: string
 }) {
   switch (hubState) {
     case 'capability-loading':
@@ -308,12 +314,12 @@ function HubBanner({
         <PrintHubState
           kind="warn"
           icon={<InfoIcon size={28} />}
-          heading={orderPaused ? orderPaused.label : '打印扫描一体机离线 —— 要出纸的停了，其余照常'}
+          heading={orderPaused ? orderPaused.label : `${printerUnavailable?.label ?? '打印机暂不可用'} · 出纸类暂停`}
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
             {orderPaused ? orderPaused.notice : (
-              <>打印机当前<b>无法连接</b>。手机扫码上传、格式转换、签名仍可使用。</>
+              <>{printerUnavailable?.notice ?? machineCannotPrintLine()}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
             )}
           </p>
         </PrintHubState>
@@ -326,7 +332,7 @@ function HubBanner({
 function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string) {
   return (
     <div className="ph-axes" data-testid="print-hub-axes" data-probe={probe} data-mfp={mfp}>
-      <span>文件检查 → 设置参数 → 确认价格</span>
+      <span>文件检查 → 设置参数 → 确认打印</span>
       <span>按 A4 出纸 · {colorDuplexLabel}</span>
     </div>
   )
@@ -337,6 +343,7 @@ export function QxPrintHubView({
   probe,
   mfp,
   colorDuplexLabel,
+  printerUnavailable,
   capabilities,
   arrivalCode,
   quickLinks,
@@ -353,6 +360,7 @@ export function QxPrintHubView({
 }: QxPrintHubViewProps) {
   const ArrivalIcon = arrivalCode.icon
   const showBanner = hubState !== 'default'
+  const usableServices = capabilities.filter((item) => item.actionable && ['phone-upload', 'usb-import', 'convert', 'sign'].includes(item.key)).map((item) => item.title).join('、')
   const checking = probe === 'loading'
 
   return (
@@ -372,7 +380,7 @@ export function QxPrintHubView({
 
       {showBanner ? (
         <section className="ph-fallback" key={hubState}>
-          <HubBanner hubState={hubState} orderPaused={orderPaused} />
+          <HubBanner hubState={hubState} orderPaused={orderPaused} printerUnavailable={printerUnavailable} usableServices={usableServices} />
         </section>
       ) : null}
 
@@ -478,16 +486,16 @@ export function QxPrintHubView({
       <div className="ph-actions">
         <button type="button" onClick={onBack}>上一步</button>
         {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
-        {showBanner ? <button type="button" onClick={onHelp}>联系工作人员</button> : null}
+        {showBanner ? <button type="button" onClick={onHelp}>求助</button> : null}
         <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
       </div>
       <footer className="ph-foot">
-        <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务与价格，以办理时显示为准。</div></div>
+        <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务，以办理时显示为准。</div></div>
         {notices.length > 0 ? (
           // 全文逐字保留，只是默认收起：开关常驻底注右侧，点开在底注上方展开（原生 details，键盘 / 读屏可达）。
           <details className="ph-notices" data-disclaimer="true">
             <summary>
-              <span>隐私、电子签与价格说明</span>
+              <span>隐私与电子签说明</span>
               <span className="ph-notices-go">点开看全文</span>
             </summary>
             <p>{HUB_TRUTH.map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>

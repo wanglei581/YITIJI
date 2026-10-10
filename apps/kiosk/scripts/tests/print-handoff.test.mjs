@@ -64,9 +64,11 @@ async function loadHandoff() {
   globalThis.window = { sessionStorage: storage }
   const session = transpile(join(kioskRoot, 'src/pages/print/printMaterialSession.ts'))
   const policy = transpile(join(kioskRoot, 'src/pages/print/printHandoffPolicy.ts'))
+  const unattended = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
   const handoff = transpile(join(kioskRoot, 'src/pages/print/printHandoff.ts'), {
     './printMaterialSession': session,
     './printHandoffPolicy': policy,
+    '../../copy/unattendedCopy': unattended,
   })
   const mod = await import(`${handoff}#${seq}`)
   const sessionMod = await import(`${session}#${seq}`)
@@ -138,7 +140,8 @@ test('U1c sessionStorage 写不进时报 storage_unavailable，不静默退回',
   assert.equal(target.ok, false)
   assert.equal(target.path, '/print/confirm')
   assert.deepEqual(target.state, { printHandoffError: 'storage_unavailable' })
-  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息，请找现场工作人员/)
+  assert.match(h.printHandoffFailureText('storage_unavailable'), /本机暂时无法保存打印信息。需要帮助？/)
+  assert.doesNotMatch(h.printHandoffFailureText('storage_unavailable'), /找现场工作人员/)
 })
 
 test('U2 归属：游客→游客、游客→会员（改绑）、同一次登录通过；换人 / 变游客 / 刷新后标记丢了一律不符并清掉', async () => {
@@ -231,7 +234,10 @@ test('U6 存储里查不到会员 id、令牌、手机号', async () => {
   const owner = h.printHandoffOwnerFor(user)
   assert.equal(owner.kind, 'member')
   assert.ok(typeof owner.mark === 'string' && owner.mark.length >= 8, '本次登录的随机标记')
-  for (const secret of ['7788', '9999', '8000', '张三']) assert.ok(!owner.mark.includes(secret), `标记里不许带 ${secret}`)
+  // 标记是随机十六进制串，查 4 位数字片段会偶然撞上（CI 红过一次）；查的是整段会员字段有没有被带进去。
+  for (const secret of [user.id, user.token, user.phoneMasked, '13800138000', user.nickname]) assert.ok(!owner.mark.includes(secret), `标记里不许带 ${secret}`)
+  const sameFields = h.printHandoffOwnerFor({ ...user }).mark
+  assert.notEqual(sameFields, owner.mark, '同样的会员字段换一次登录，标记也不同：标记不是由会员字段算出来的')
   assert.deepEqual(h.printHandoffOwnerFor(user), owner, '同一次登录拿到同一个标记')
   assert.notEqual(h.printHandoffOwnerFor({ ...user }).mark, owner.mark, '重新登录（新的登录对象）换新标记')
   assert.deepEqual(h.printHandoffOwnerFor(null), { kind: 'guest' })

@@ -1,7 +1,7 @@
 import { useMemberCursorPage } from './useMemberCursorPage'
 import { MemberLoadMore } from './MemberLoadMore'
 import { QaRecords } from './QaRecords'
-import { aiRecordPath, recordUnavailableReason } from './aiRecordNavigation'
+import { aiRecordPath, aiRecordPrintPath, recordUnavailableReason } from './aiRecordNavigation'
 import { clearResumeReferences } from '../../resume/clearResumeReferences'
 // AI 服务记录 — /me/ai-records（本人，仅元数据）。
 // 删除成功只在服务端回执后展示；确认超时回到未确认，不乐观移除。
@@ -17,7 +17,9 @@ import type {
 } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
+  EyeIcon,
   FileCheckIcon,
+  PrinterIcon,
   RouteIcon,
   SparklesIcon,
   Trash2Icon,
@@ -87,6 +89,7 @@ export function MyAiRecordsPage() {
   const hosting = useRecruitmentHosting()
   const hostingOpen = hosting.enabled
   const hostingKnown = hosting.status === 'ready'
+  const listRef = useRef<HTMLElement>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [confirmExpired, setConfirmExpired] = useState(false)
@@ -256,19 +259,48 @@ export function MyAiRecordsPage() {
                     ? 'delete-confirm'
                     : 'ready'
 
+  const structMode = !isLoggedIn ? 'lock' : state === 'loading' ? 'loading' : 'error'
   const struct = (
     <>
-      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-0" />
-      <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-1" />
-      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-ai-records-2" /> : null}
+      <QxMeStructRow icon={FileCheckIcon} title="简历诊断与优化记录" desc="只存服务记录，不存原文与模型输出" mode={structMode} testid="member-records-struct-ai-records-0" />
+      <QxMeStructRow icon={RouteIcon} title="职业规划建议记录" desc="阶段性行动建议的服务记录" mode={structMode} testid="member-records-struct-ai-records-1" />
+      <QxMeStructRow icon={SparklesIcon} title="模拟面试反馈" desc="练完的逐题反馈，可打开可打印" mode={structMode} testid="member-records-struct-ai-records-interview" />
+      {hostingOpen ? <QxMeStructRow icon={BriefcaseIcon} title="岗位 AI 参考记录" desc="基于公开岗位内容的解读记录" mode={structMode} testid="member-records-struct-ai-records-2" /> : null}
     </>
   )
+
+  // 仅滚动 AI 列表。确认行展开后按舞台实际缩放换算，让警告与操作整行可见。
+  // 同时覆盖子组件的小青作业确认，不触碰任何确认时限或删除请求。
+  useEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const reveal = (row: HTMLElement) => {
+      const box = list.getBoundingClientRect()
+      const scale = box.height / list.offsetHeight
+      if (!scale) return
+      const top = box.top + list.clientTop * scale
+      const bottom = top + list.clientHeight * scale
+      const target = row.getBoundingClientRect()
+      if (target.bottom > bottom) list.scrollTop += (target.bottom - bottom) / scale
+      else if (target.top < top) list.scrollTop -= (top - target.top) / scale
+    }
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        const row = mutation.target as HTMLElement
+        if (row.matches('.qx-me-row[data-flag="true"]')) reveal(row)
+      }
+    })
+    observer.observe(list, { subtree: true, attributes: true, attributeFilter: ['data-flag'] })
+    const row = list.querySelector<HTMLElement>('.qx-me-row[data-flag="true"]')
+    if (row) reveal(row)
+    return () => observer.disconnect()
+  }, [isLoggedIn, state, empty])
 
   let body: ReactNode
   if (!isLoggedIn) {
     body = <QxMeLoginBlock title="登录后查看 AI 服务记录" desc="AI 服务记录只在登录后与账号绑定；公共一体机不保存游客记录。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
-    body = <QxMeLoadingBlock title="正在加载 AI 服务记录" />
+    body = <QxMeLoadingBlock title="正在加载 AI 服务记录" struct={struct} />
   } else if (state === 'error') {
     body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
   } else if (empty) {
@@ -303,7 +335,7 @@ export function MyAiRecordsPage() {
           desc="仅展示本人服务记录，不展示简历原文、诊断正文或模型原始输出"
           minis={[`已加载 ${totalCount} 条`, `小青作业共 ${qaPage.total} 条`]}
         />
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="AI 服务记录">
+        <section ref={listRef} className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="AI 服务记录">
           <QaRecords items={qaPage.items} token={token ?? null} onDeleted={() => setReloadKey((key) => key + 1)} />
           <MemberLoadMore {...qaPage} label="加载更多小青作业" />
           <MockInterviewRecords
@@ -335,7 +367,9 @@ export function MyAiRecordsPage() {
             const kind = KIND_META[item.kind] ?? { label: 'AI 服务记录', hint: '本人 AI 服务记录', tone: 'slate' as const }
             const status = STATUS_META[item.status]
             const openPath = aiRecordPath(item)
+            const printPath = aiRecordPrintPath(item)
             const openReason = recordUnavailableReason(item)
+            const fairReady = hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && Boolean(item.ref.id) && item.status === 'completed'
             const confirming = confirmId === item.id
             const expired = confirmExpired && !confirmId && items[0]?.id === item.id
             const busy = busyId === item.id
@@ -353,12 +387,14 @@ export function MyAiRecordsPage() {
                   {confirming && item.kind === 'parse' ? <span className="qx-me-reason">删除这条诊断记录时，会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。</span> : null}
                   {expired ? <span className="qx-me-reason">上一次确认已超时失效，删除未执行；需要重新点击删除。</span> : null}
                   {confirming ? <span className="qx-me-reason">成功即完成删除，失败会提示稍后重试；本页不会提前显示成功。</span> : null}
-                  {hostingOpen && item.kind === 'fair_visit_plan' && item.ref?.type === 'job_fair' && item.ref.id && item.status === 'completed' ? (
-                    <button type="button" className="qx-me-small" style={{ marginTop: 8 }} onClick={() => openFairPlan(item)}>打开这场招聘会规划</button>
+                  {fairReady ? (
+                    <button type="button" className="qx-me-small" style={{ marginTop: 8 }} onClick={() => openFairPlan(item)}><EyeIcon size={19} aria-hidden />打开这场招聘会规划</button>
                   ) : null}
                 </span>
                 <span className="qx-me-acts">
-                  {openPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(openPath)}>打开</button> : null}
+                  {openPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(openPath)}><EyeIcon size={19} aria-hidden />打开</button> : null}
+                  {printPath ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => navigate(printPath)}><PrinterIcon size={19} aria-hidden />接着打印</button> : null}
+                  {fairReady ? <button type="button" className="qx-me-small" disabled={busy} onClick={() => openFairPlan(item)}><PrinterIcon size={19} aria-hidden />接着打印</button> : null}
                   {confirming ? (
                     <>
                       <button type="button" className="qx-me-small" aria-label="取消删除这条记录" onClick={() => setConfirmId(null)}>
@@ -378,7 +414,6 @@ export function MyAiRecordsPage() {
                     <button
                       type="button"
                       className="qx-me-small"
-                      data-variant="danger"
                       aria-disabled={busy || undefined}
                       title={confirming ? '再次点击确认删除' : '删除'}
                       aria-label={confirming ? '再次点击确认删除 AI 服务记录' : '删除 AI 服务记录'}

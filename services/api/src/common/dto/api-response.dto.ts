@@ -20,14 +20,24 @@ export interface ErrorResponseBody {
   error: {
     code: string
     message: string
-    /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"] */
-    details?: string[]
+    /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"]。免费打印额度三条码则是有界数字对象。 */
+    details?: string[] | {
+      limit: number
+      used: number
+      remaining: number
+      requested: number
+      resetAt: string
+    }
+    /** 管理员注销阻塞清单，只含订单号与状态。 */
+    orders?: Array<{ orderNo: string; status: string }>
     /** 手机上传二维码已过期，但文件已经记在会员名下。只有 true，不带文件名。 */
     memberFileRetained?: true
     /** 仅 PICKUP_TERMINAL_MISMATCH（会员本机领取走错机器）：该单绑定的网点，给本人看。 */
     terminal?: { id: string; displayName: string | null; locationLabel: string | null } | null
     /** 前端可用的下一步标识（小写蛇形），如 export_ai_labeled；只在拒绝时附带。 */
     nextAction?: string
+    /** 仅 TERMINAL_COMMAND_PENDING：这台终端上那条还没结束的命令。 */
+    commandId?: string
   }
   requestId?: string
 }

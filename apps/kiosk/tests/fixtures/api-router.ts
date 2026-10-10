@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { kioskAiCapabilityItems } from '../../src/pages/service-hubs/serviceHubModel'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -26,6 +27,14 @@ export class ApiRouter {
 
   constructor(page: Page) {
     this.#page = page
+    // 首页也读取同一公开价目；旧用例保留非零默认，免费/失败用例显式覆盖。
+    this.respond('GET', '/api/v1/print/price-config', {
+      status: 200,
+      json: { billingEnabled: true, items: [
+        { serviceKey: 'print_bw_page', unitCents: 20, unit: 'page', description: '黑白打印' },
+        { serviceKey: 'print_color_page', unitCents: 50, unit: 'page', description: '彩色打印' },
+      ] },
+    })
     // 包 F：优化 / 生成预览 / 导出页挂载时都会读导出收费口径（GET /resume/export/pricing）。
     // 默认按「免费」应答，让所有既有用例不因这条新请求中断；收费 / 未开放态的用例自行 respond 覆盖。
     this.respond('GET', '/api/v1/resume/export/pricing', {
@@ -71,6 +80,34 @@ export class ApiRouter {
     // 自我探索同意页挂载时读题目与同一版的同意说明（#1119）。默认按服务端当前这一版应答；
     // 要测「说明没取到」的用例自行 respond 覆盖。
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
+    // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
+    this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
+    // 服务中心在 /health 就绪后读 GET /kiosk/ai/capabilities。默认全部可用，
+    // 避免既有用例把生成式入口误判成置灰；要测关闭或降级的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/kiosk/ai/capabilities', {
+      status: 200,
+      json: { success: true, data: { items: kioskAiCapabilityItems('available') } },
+    })
+    // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
+    // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
+    // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/public/support-contact', {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          servicePhone: '18369161921',
+          serviceHours: '工作日 9:00–18:00',
+          otherOnlineTerminalNearby: false,
+          miniappPublished: false,
+        },
+      },
+    })
+    // 48 政策页挂载时读取 AI 可用性。默认可用，降级或失败态的用例自行 respond 覆盖。
+    this.respond('GET', '/api/v1/advisor/availability', {
+      status: 200,
+      json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,

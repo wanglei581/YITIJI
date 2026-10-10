@@ -1,3 +1,5 @@
+import { REFUSAL_BASE, REFUSAL_C2, REFUSAL_DANGER } from '../ai/safety/refusal'
+
 /**
  * 失败原因的**对外白名单**：内部机器码 → 用户看得懂的一句话。
  *
@@ -42,6 +44,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = Object.freeze({
   // ── 上游可用性 ────────────────────────────────────────────────────────────
   CONTRACT_PROVIDER_TRANSPORT_FAILED:
     'AI 服务暂时连接不上，请稍后重试。',
+  // 401/402/403 与模型名无效：不是网络不通，重试也不会变好。不向用户解释账户或状态码。
+  CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE:
+    'AI 服务暂时不可用。',
   CONTRACT_PROVIDER_NOT_APPROVED:
     'AI 合同分析服务当前未开放，请稍后再试。',
   CONTRACT_PROVIDER_CONFIG_INVALID:
@@ -83,6 +88,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = Object.freeze({
     '上一次分析被中断且无法继续，请重新发起。',
   CONTRACT_REVIEW_SAFETY_REJECTED:
     'AI 给出的结果未通过安全检查，已丢弃，请重试。',
+  CONTRACT_REVIEW_CONTENT_BLOCKED: REFUSAL_BASE,
+  CONTRACT_REVIEW_CONTENT_BLOCKED_DANGER: `${REFUSAL_BASE}${REFUSAL_DANGER}`,
+  CONTRACT_REVIEW_CONTENT_BLOCKED_C2: `${REFUSAL_BASE}${REFUSAL_C2}`,
 
   // ── 任务一致性 ────────────────────────────────────────────────────────────
   CONTRACT_REVIEW_SOURCE_CHANGED:

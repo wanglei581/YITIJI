@@ -61,7 +61,11 @@ const files = {
   // ⑦ 能力级停用（AI_PAUSED / AI_BUDGET_* 等）落到手动路径的接线
   assistantPage: kiosk('src/pages/assistant/AssistantPage.tsx'),
   selfAssessmentFlow: kiosk('src/pages/resume/SelfAssessmentFlow.tsx'),
-  interviewSession: kiosk('src/pages/interview/InterviewSessionPage.tsx'),
+  // 作答失败处理在 interviewTurnActions.ts：会话页已到 500 行门禁，表达式挪走后这里两份一起扫，断言不减。
+  interviewSession: [
+    kiosk('src/pages/interview/InterviewSessionPage.tsx'),
+    kiosk('src/pages/interview/session/interviewTurnActions.ts'),
+  ].join('\n'),
   contractReviewHome: kiosk('src/pages/contract-review/ContractReviewHomePage.tsx'),
   contractReviewProcessing: kiosk('src/pages/contract-review/ContractReviewProcessingPage.tsx'),
 }
@@ -164,6 +168,14 @@ assert(
 
 // C：不伪造 —— 诊断没跑出来就不许给任何结论。
 must('reportExits', '不拿通用建议顶替', '失败态必须写明不给结论，不用通用建议冒充诊断')
+must(
+  'reportExits',
+  '这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。',
+  '拿不到原件时说人话：离开这一页再回来就拿不到了',
+)
+mustNot('reportExits', '文件凭证', '出路文案不再说文件凭证')
+must('reportExits', 'className="rrp-ic"', '出路行左边有图标')
+must('reportExits', 'className="rrp-go"', '能走的出路行右边有圆形箭头')
 
 // ── ② 访谈式生成失败 → 已答内容能变成纸带走 ─────────────────────────────────
 // 原型口径：10-resume-interview.html:394「把已答的部分导出成草稿带走」/ :523「草稿 ≠ 成文简历」
@@ -439,6 +451,9 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
       // 后端拆码后新增（services/api/src/ai/llm/llm-failure.ts）：
       // 只代表 fetch 层根本没连上，不再混着 429 / 5xx / 空回复。
       'AI_PROVIDER_UNREACHABLE',
+      // 上游 401/402/403 与模型名无效：配置恢复前每次都失败。
+      'AI_PROVIDER_ACCOUNT_UNAVAILABLE',
+      'AI_PROVIDER_MODEL_INVALID',
       // 服务端能力级停用（ai-access.service.ts enforce 在调模型之前拦下，503）：
       // 后台暂停、出站白名单不放行、当日金额上限已到、读不到当日花费。重试不会变好。
       'AI_PAUSED',
@@ -452,6 +467,7 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     // 必须在表里的码：这几个进不了表，页面就会把「AI 停用」当成「这次没成」继续叫人重试。
     const MUST_BE_OUTAGE = [
       'AI_PROVIDER_NOT_CONFIGURED', 'AI_PAUSED', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE',
+      'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID',
     ]
     for (const code of MUST_BE_OUTAGE) {
       assert(
@@ -541,6 +557,21 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     /setGenerating\(true\)\s*\n\s*setAiOutage\(null\)/,
     '用户主动生成时必须先清除 aiOutage，否则上一次失败会把能力判定粘住',
   )
+  must(
+    'careerPlan',
+    /AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）/,
+    '能力级失败必须显示手动出路，而不是服务端原文',
+  )
+  mustNot(
+    'careerPlan',
+    /error\.message/,
+    '职业规划页不得把服务端 message 原文显示给用户',
+  )
+  mustNot(
+    'careerPlan',
+    /function errorMessageOf/,
+    '职业规划页不得再保留「有 message 就原样显示」的取值函数',
+  )
 }
 
 // ── ⑦ 能力级停用：不叫人重试，落到手动路径 ─────────────────────────────────
@@ -575,10 +606,10 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     } else if (errorsMod.__loadError) {
       failures.push(`aiOutage: 声明错误模块无法加载（${errorsMod.__loadError.message}）`)
     } else {
-      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED']) {
+      for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED', 'AI_BUDGET_UNAVAILABLE', 'AI_ENDPOINT_NOT_ALLOWED', 'AI_PROVIDER_NOT_CONFIGURED', 'AI_PROVIDER_ACCOUNT_UNAVAILABLE', 'AI_PROVIDER_MODEL_INVALID']) {
         assert(mod.isAiOutage({ code, status: 503 }) === true, `aiOutage.isAiOutage 不认 ${code} —— 页面会把 AI 停用当成一次失败继续叫人重试`)
       }
-      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
+      for (const code of ['AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'AI_PROVIDER_REQUEST_ERROR', 'REQUEST_TIMEOUT', 'NETWORK_ERROR', 'AI_DECLARATION_DECLINED', 'AI_DECLARATION_CLEARED']) {
         assert(mod.isAiOutage({ code, status: 503 }) === false, `aiOutage.isAiOutage 把单次失败 ${code} 判成了能力级停用`)
       }
       const declined = new errorsMod.AiDeclarationDeclinedError('age_14_plus')
@@ -609,7 +640,11 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     'assistantPage: 能力级停用必须置 unavailable 并在「本轮失败（可重试）」之前返回')
   // 自我探索：停用时不给「重试这一次」。
   must('selfAssessmentFlow', /taskAiDown\s*\n?\s*\? \{ retryHint: '[^']+' \}/, 'AI 停用时自我探索结果屏不得给「重试这一次」')
-  must('interviewSession', /setError\(aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  // W-129：作答失败要把草稿放回输入框，停用提示后面再补一句「还在输入框里」。
+  // 因此不再要求 setError( 直接粘在表达式前面。表达式本身（停用提示 / 「提交失败，请重试」兜底）必须原样保留，
+  // 并且只能经 submitFailureMessage 接后缀，不能另写一套停用文案。
+  must('interviewSession', /aiDeclarationDeclineMessage\(err\) \?\? \(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : userMessageOf\(err, '提交失败，请重试'\)\)/, 'AI 停用时模拟面试作答失败不得叫人重试')
+  must('interviewSession', /setError\(submitFailureMessage\(base, draftRestored\)\)/, '作答失败的补充说明必须接在原提示后面，且只在草稿真的放回输入框时出现')
   must('interviewSession', /setError\(isAiOutage\(err\) \? INTERVIEW_AI_DOWN_HINT : `\$\{msg\}，可重新录音或改用文字输入`\)/, 'AI 停用时语音转写失败不得叫人重新录音')
   must('contractReviewHome', /setError\(isAiOutage\(err\)/, 'AI 停用时合同风险提示不得说成文件格式问题叫人重试')
   must('contractReviewProcessing', /setError\(declined \?\? \(isAiOutage\(err\)\s*\?\s*'[^']*暂时审不了[^']*'\s*:\s*'确认失败，请重试'\)\)/, 'AI 停用时合同确认失败不得叫人重试')

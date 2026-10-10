@@ -1,3 +1,5 @@
+import { peekSupportContact } from '../../copy/unattendedCopy'
+
 // ============================================================
 // printHubContent — 打印域 Hub 的文案与状态轴
 //
@@ -112,7 +114,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: true,
     help: '材料体检：读一遍文件，给出页数、能不能按 A4 打，以及有没有身份证号一类隐私片段。打印参数不代你设。',
     aiDown: '没有体检结论，也没有隐私提示。页数、纸张、份数、双面照旧由你自己设，照常出纸。',
-    deviceOff: '停。出纸要这台机器；文件可以先传上来存着，换一台再打。',
+    deviceOff: '停。出纸要这台机器；文件可以先传上来存着，请稍后再来打。',
   },
   {
     cap: 'phone',
@@ -120,7 +122,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: false,
     help: '不帮。传文件这一步纯粹是搬运，用不到模型；体检与隐私检查在「文档打印」那一步做。',
     aiDown: '不受影响。',
-    deviceOff: '照常可用。文件不经过打印机，先传上来存进「我的文档」，换机取回来打。',
+    deviceOff: '照常可用。文件不经过打印机，先传上来存进「我的文档」，稍后再来取回出纸。',
   },
   {
     cap: 'scan',
@@ -152,7 +154,7 @@ export const PRINT_HUB_AI_EXPLAINER: readonly PrintHubAiExplainerRow[] = [
     isAi: false,
     help: '不帮。页序由你用「上移 / 下移」自己排，本机不识别方向、不自动排序，合并这一步纯粹是版式处理。',
     aiDown: '不受影响。',
-    deviceOff: '照常可用。合并文件不需要打印机；合完先保存，需要出纸时换一台机器。',
+    deviceOff: '照常可用。合并文件不需要打印机；合完先保存，需要出纸时请稍后再来。',
   },
   {
     cap: 'sign',
@@ -177,18 +179,18 @@ export interface PrintHubBandCopy {
 
 /** 原型 39-print-hub.html:542-554（data-when="device-off"）。 */
 export const PRINT_HUB_DEVICE_OFF_BAND: PrintHubBandCopy = {
-  title: '打印扫描一体机离线 —— 要出纸的停了，其余照常',
+  title: '打印机暂不可用 · 出纸类暂停',
   chip: 'AI 不受影响',
   act: '停的是同一台机器上的打印与扫描：文档打印、照片打印、材料扫描、证件照出片',
   lines: [
     {
       k: '照常可办',
-      v: '手机扫码上传、格式转换、签名不经过这台打印机，现在就能用；我的文档、打印订单、异常反馈也照常。',
+      v: '不依赖打印机的服务，请按卡片上显示的可用状态选择；我的文档、打印订单、异常反馈也照常。',
     },
-    { k: '代价', v: '这一趟拿不到纸。文件传上来、拼好、签好之后要换一台机器才出得了纸。' },
+    { k: '代价', v: '这一趟拿不到纸。文件可以先传上来、拼好、签好，出纸请稍后再来。' },
     {
       k: '备选',
-      v: '先把材料存进「我的文档」，或找现场工作人员。离线已自动上报运维，本机不替系统承诺恢复时间。',
+      v: '先把材料存进「我的文档」。需要帮助？查看《隐私政策》里的联系方式。离线已自动上报运维，本机不替系统承诺恢复时间。',
     },
   ],
 }
@@ -197,11 +199,11 @@ export const PRINT_HUB_DEVICE_OFF_BAND: PrintHubBandCopy = {
 export const PRINT_HUB_PROBE_UNKNOWN_BAND: PrintHubBandCopy = {
   title: '服务状态无法确认',
   chip: '暂不开放任务',
-  act: '这次打印扫描都开不了 —— 请重新检测，或换一台机器',
+  act: '这次打印扫描都开不了 —— 请重新检测，或请稍后再来',
   lines: [
     {
       k: '还能做什么',
-      v: '「我的打印记录」三个入口不受影响；已存进「我的文档」的文件换机也能取回来打，或找现场工作人员。',
+      v: '「我的打印记录」三个入口不受影响；已存进「我的文档」的文件仍在。需要帮助？查看《隐私政策》里的联系方式。',
     },
   ],
 }
@@ -213,7 +215,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_BAND: PrintHubBandCopy = {
  * 「暂时无法确认这台机器开放了哪些服务」口径写。
  */
 export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
-  '暂时查不到这台机器能用哪些功能，所以先都不开放，免得你点进去才发现办不了。请点「重新检测」，或找工作人员；已经下过单的，到机码照常能用。'
+  '暂时查不到这台机器能用哪些功能，所以先都不开放，免得你点进去才发现办不了。请点「重新检测」。已经下过单的，到机码照常能用。需要帮助？查看《隐私政策》里的联系方式。'
 
 // ── 分组标题右侧的副文案（随两条轴切换） ─────────────────────
 
@@ -225,7 +227,7 @@ export const PRINT_HUB_PROBE_UNKNOWN_TECH_NOTE =
 export function capabilityGroupHint(probe: ProbeStatus, mfp: MfpStatus, locked = false): string {
   if (probe === 'loading') return '正在确认可用服务，请稍候'
   if (probe !== 'ok') return '查不到可用服务，请点页底「重新检测」'
-  if (mfp === 'unavailable') return '一体机确认离线'
+  if (mfp === 'unavailable') return '打印机暂不可用'
   if (locked) return '部分能力被管理员关闭'
   return '选一项开始准备材料'
 }
@@ -243,7 +245,7 @@ export const HUB_PILL: Record<
   default: { tone: 'unknown', label: '能力与设备状态以办理时确认' },
   'capability-error': { tone: 'bad', label: '服务状态无法确认 · 任务暂不开放' },
   locked: { tone: 'warn', label: '部分能力已被管理员关闭' },
-  'device-off': { tone: 'warn', label: '一体机离线 · 出纸类暂停' },
+  'device-off': { tone: 'warn', label: '打印机暂不可用 · 出纸类暂停' },
   'feature-id-photo': { tone: 'warn', label: '证件照尚未开放' },
   'feature-copy': { tone: 'unknown', label: '复印在打印机面板上操作' },
   'feature-not-found': { tone: 'warn', label: '能力说明不存在' },
@@ -261,7 +263,7 @@ export const HUB_ASK: Record<HubUiState, { text: string; em: string }> = {
 }
 
 export const HUB_TRUTH = [
-  { k: '办理提醒', v: '价格在确认页核对；按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' },
+  { k: '办理提醒', v: '按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理。' },
 ] as const
 
 /**
@@ -274,7 +276,11 @@ export const HUB_TRUTH = [
  */
 export function arrivalCodeHint(signedIn: boolean, probe: ProbeStatus, mfp: MfpStatus): string {
   if (probe !== 'ok') return '本机服务状态无法确认 · 核销前先确认这台能不能出纸'
-  if (mfp === 'unavailable') return '这台出不了纸 · 核销前先换一台空闲机器'
+  if (mfp === 'unavailable') {
+    return peekSupportContact().otherOnlineTerminalNearby
+      ? '这台出不了纸 · 核销前先换一台空闲机器'
+      : '这台出不了纸 · 核销前请稍后再来'
+  }
   if (!signedIn) return '凭码办理 · 不登录也能核销'
   return '输到机码，直接认领这一单'
 }
@@ -284,18 +290,13 @@ export function arrivalCodeStateNote(probe: ProbeStatus, mfp: MfpStatus): string
   if (probe === 'loading') return '正在确认这台机器能不能出纸；核销本身不受影响。'
   if (probe !== 'ok')
     return '本机连能不能出纸都读不到：核销能办，但这一趟可能拿不到纸。'
-  if (mfp === 'unavailable')
-    return '这台机器现在出不了纸。核销完也拿不到纸，建议换一台空闲机器再核销。'
+  if (mfp === 'unavailable') {
+    return peekSupportContact().otherOnlineTerminalNearby
+      ? '这台机器现在出不了纸。核销完也拿不到纸，建议换一台空闲机器再核销。'
+      : '这台机器现在出不了纸。核销完也拿不到纸，请稍后再来。'
+  }
   return undefined
 }
-
-/**
- * 底部常驻声明的第三句。前两句复用 packages/shared 的 COMPLIANCE_COPY
- * （受 verify:compliance-copy 门禁保护，不在本页另抄一份）。
- * 价格这句只给指向、不含任何数字，与 verify:price-single-source 一致。
- */
-export const PRINT_HUB_PRICE_NOTICE =
-  '本页不核价、不结算，价格以打印工作台核价与现场公示价为准。'
 
 export function deriveHubUiState(input: {
   probe: ProbeStatus
@@ -367,7 +368,7 @@ export const COPY_GUIDE_STEPS: readonly CopyGuideStep[] = [
  * 手册只写了「点身份证复印 → 调好设置 → 点复印」，没写证件放在玻璃哪里、正反面怎么翻、
  * 屏幕会不会提示翻面。【待 Windows 窗口现场核实后填写】在那之前不编造位置，只给一句指路。
  */
-export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。'
+export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕提示。'
 
 export interface CopyGuideCase {
   key: 'id-card' | 'receipt' | 'duplex'

@@ -28,7 +28,7 @@
     <view class="pickup-hero status-{{statusKey}}">
       <view class="ph-status-dot"></view>
       <text class="ph-status-text">{{statusTitle}}</text>
-      <text class="ph-status-detail">{{statusDetail}}</text>
+      <text class="ph-status-detail">{{statusLead}}<text wx:if="{{detailPhone}}" class="tap" hover-class="tap-press" bindtap="callSupport" role="button" aria-label="拨打服务电话">{{supportPhone}}</text>{{statusTail}}</text>
 
       <view class="pickup-qr-card" wx:if="{{showQr}}">
         <canvas
@@ -49,13 +49,14 @@
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
         <text class="ph-hint">二维码与下方到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
-        <!-- 到机码三个动作（9/25 拍板第 5 条：可以给别人代取，一次性，可作废重发）。 -->
+        <!-- 到机码动作：复制、分享给代取人始终在。作废换新码只给待到机；续打（打印失败）后端不让作废重发。 -->
         <view class="ph-acts">
           <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">复制</view>
           <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
-          <view class="ph-act tap {{reissuing ? 'off' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+          <view wx:if="{{statusKey !== 'failed'}}" class="ph-act tap {{reissuing ? 'off' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
         </view>
-        <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点「作废换新码」，旧码马上失效。</text>
+        <text wx:if="{{statusKey !== 'failed'}}" class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点「作废换新码」，旧码马上失效。</text>
+        <text wx:else class="ph-share-note">这个码发给谁，谁就能到原来那台一体机接着打。</text>
       </block>
 
       <view class="status-visual" wx:else>
@@ -88,7 +89,7 @@
 
     <view class="next-card" wx:elif="{{statusKey === 'queued' || statusKey === 'printing'}}">
       <view class="next-title">订单已进入终端打印流程</view>
-      <view class="next-text">请不要离开设备。若长时间没有出纸，请先查看终端错误提示，再联系现场工作人员。</view>
+      <view class="next-text">请不要离开设备。若长时间没有出纸，请先查看终端屏幕上的提示；<text wx:if="{{canCallPhone}}">需要帮助可拨打服务电话 <text class="tap" hover-class="tap-press" bindtap="callSupport" role="button" aria-label="拨打服务电话">{{supportPhone}}</text>{{supportHoursText}}</text><text wx:else>{{supportHint}}</text></view>
     </view>
 
     <view class="info-card" wx:if="{{orderNo || taskStatus || pickupStatus}}">

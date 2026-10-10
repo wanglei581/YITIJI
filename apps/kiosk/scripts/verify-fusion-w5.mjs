@@ -40,7 +40,11 @@ const FROZEN = new Map([
   // 旧哈希 dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae。
   // 2026-09-28 用词：账号设置说明「登录状态与会话说明」改为「登录状态与公共设备使用说明」。
   // 入口条数、路由、图标都没变。旧哈希 3b05eac00356d5e5c59912752a105bdb268c2bec5b0b57bc455a2a69d63103e0。
-  ['src/pages/profile/profileEntries.ts', 'c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3'],
+  // 2026-10-06 C2-3：产品负责人 10/4 方案②，取件凭证码取消，到机码是唯一的码。
+  // 「打印订单」说明从「取件码、打印状态」改为「打印进度与出纸状态」。
+  // 入口条数、路由、图标都没变。冻结契约不放宽，仍逐字节校验，只是基线随有意改动前移。
+  // 旧哈希 c3eab9286546efab60ec8e3e5dfe9f1a4724c0e17e27f09e159a541ac4ef83e3。
+  ['src/pages/profile/profileEntries.ts', 'c75cce264658aa3bc10451fc38195a8b45ec7ef6e4edfdc278510134c06e860d'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   // 2026-09-29 走查 W-01：反馈分类补「AI 内容投诉」（ai_content，C3）。纯追加：
@@ -60,7 +64,12 @@ const FROZEN = new Map([
   // 2026-09-29 W-51：价目为 0 或免费来源时实付写「0 元（免费试运营）」；页范围没传写「全部页」；
   // 订单号只认 ORD-。非 0 元仍标未记录，继续禁止用应付减优惠推算。
   // 旧哈希 af818425cc5f0ab1fa634d4be09dbe7920dbc0c61d5312dd77b4fa476dbe50fb。
-  ['src/pages/profile/me/printOrders/paymentCopy.ts', '50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b'],
+  // 2026-10-06 合并：保留候选侧 isFreeMemberOrder（已有支付状态，且金额为 0 或来源为 free；
+  // 没有支付状态的历史订单仍不算免费）。同时免费单不再展示「待退款 / 已退款 / 退款中」，
+  // 状态改写「免费」；付过钱的单仍按 refundRequired 优先显示待退款。待退款说明不再写工作人员。
+  // 冻结契约不放宽，仍逐字节校验，只是基线随这次合并前移。
+  // 旧哈希 50f3278ee897efe7c10b90990d4aacab4e17e0e3a5758d0b2cafb7f3aab61a7b。
+  ['src/pages/profile/me/printOrders/paymentCopy.ts', 'e7737e8cc24952dc69e2d6a38aa46e556fa8accc5145da043a415e35dc9f2cc7'],
   ['src/pages/profile/me/printOrders/statusRefresh.ts', '61c86d39d8a4c576ec9b9c2ca2b92d08ee463a6874737cc4a7df70e36103ad8f'],
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
@@ -196,7 +205,11 @@ assert.match(activityDetail, /screen="activity-detail"/, 'activity detail still 
 assert.match(activityDetail, /<section className="me-detail-scroll">/, 'activity detail keeps its neutral scroll wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to the shell')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
+/* 2026-10-06 稿 31 活动详情迁入青序流光，同强度替换页壳断言：
+ * KioskPageFrame / KioskPageHeader → QxPageFrame，并断言已退出 V6 壳。
+ * 下面的屏标、滚动容器 class、领取分支字符串保持原断言，不删。 */
+assert.match(benefitActivityDetail, /<QxPageFrame\b/, 'BenefitActivityDetailPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivityDetail, /KioskPageFrame|KioskPageHeader/, 'BenefitActivityDetailPage has left the V6 frame')
 assert.match(
   benefitActivityDetail,
   /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
@@ -351,6 +364,12 @@ assert.match(kioskRootSrc, /['"]\/me\/favorites['"]/, '/me/favorites is register
 assert.match(kioskRootSrc, /['"]\/me\/ai-records['"]/, '/me/ai-records is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity['"]/, '/me/activity is registered as a Qingxu migrated route')
 assert.match(kioskRootSrc, /['"]\/me\/activity\/['"]/, '/me/activity/:id uses a precise prefix')
+assert.match(kioskRootSrc, /['"]\/activities['"]/, '/activities is registered in QX_MIGRATED_ROUTES (exact set, not a prefix)')
+assert.match(kioskRootSrc, /\/\^\\\/activities\\\/\[\^\/\]\+\$\//, '/activities/:id uses an exact pattern, not a wide prefix')
+const benefitActivitiesPage = read('src/pages/activities/BenefitActivitiesPage.tsx')
+assert.match(benefitActivitiesPage, /<QxPageFrame\b/, 'BenefitActivitiesPage uses the Qingxu page frame')
+assert.doesNotMatch(benefitActivitiesPage, /KioskPageFrame|KioskPageHeader/, 'BenefitActivitiesPage has left the V6 frame')
+assert.match(benefitActivitiesPage, /data-kiosk-screen="activities"/, 'activities list keeps its stable screen marker')
 /* 文档与打印订单同属稿 38，是「文件资产 → 打印订单」这条跨端主链的两屏：
  * 页面换成青序壳却漏登记，KioskLayout 会在青序页上再叠一层旧顶栏和底栏（两套 chrome 同屏）。
  * 所以这里同时钉三件事：进了精确集合、页面不再挂旧壳、页面声明的分域视图就是这两张 Tab。 */
@@ -422,6 +441,17 @@ for (const [path, expected] of A_BATCH_EYEBROWS) {
 }
 assert.doesNotMatch(read('src/pages/print-scan/SignStampPage.tsx'), /固定原型数据|<b>演示<\/b>/, 'sign page sample bar says 示例, never 原型/演示')
 assert.doesNotMatch(read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'), /合成演示/, 'sign page CTA reasons do not say 合成演示')
+assert.match(
+  read('src/pages/print-scan/sign-stamp/constants.ts'),
+  /我确认本人拥有该本人手写签名的使用授权，仅用于本人材料的版式整理/,
+  'sign authorization sentence follows the v2 draft',
+)
+assert.match(read('src/pages/print-scan/SignStampPage.tsx'), /问小青：签名放在哪一页/, 'sign page asks 小青 where to place the signature')
+assert.doesNotMatch(
+  read('src/pages/print-scan/SignStampPage.tsx'),
+  /purpose="signature_image"/,
+  'sign page does not create a signature_image upload session',
+)
 assert.doesNotMatch(qxMeChrome, /服务元数据/, 'member record tab hint does not say 元数据')
 assert.doesNotMatch(read('src/pages/profile/me/MockInterviewRecords.tsx'), /元数据/, 'mock interview legal line does not say 元数据')
 for (const path of ['src/pages/profile/me/MyResumesPage.tsx', 'src/pages/profile/me/MyAiRecordsPage.tsx', 'src/pages/profile/me/JobAiSessionRecords.tsx']) {

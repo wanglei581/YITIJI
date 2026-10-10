@@ -12,9 +12,9 @@
 //     链接只放内存、只认这一次生成的文件，不上屏、不进地址栏。演示对象不给预览（稿 25 的全屏预览层版式未照搬）。
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { JobMaterialDocumentTemplate, JobMaterialGenerateResponse, JobMaterialTemplateType } from '@ai-job-print/shared'
+import type { JobMaterialDocumentTemplate, JobMaterialGenerateResponse } from '@ai-job-print/shared'
 import {
-  AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, EyeIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
+  AlertTriangleIcon, CheckCircle2Icon, ChevronRightIcon, ClockIcon, FileTextIcon, FolderOpenIcon, InfoIcon, PenLineIcon, PrinterIcon, SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
@@ -22,155 +22,19 @@ import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
 import { fetchAccessUrl } from '../../services/api/memberAssets'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { API_MODE } from '../../services/api/client'
 import { clearJobMaterialDraft, readJobMaterialDraft, saveJobMaterialDraft, type JobMaterialDraftForm } from './jobMaterialDraft'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import {
+  ALWAYS_REQUIRED, Banner, fieldDomId, FileCard, FILTERS, formatBytes, isRequired, previewPathOf,
+  StateBlock, STATUS_SCREENS, typeFilterLabel, TYPE_LABEL, VIEW, type FieldKey, type Filter, type Screen,
+} from './jobMaterialLibraryParts'
 import './resume-materials-qx.css'
 
-const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const
-type Filter = (typeof FILTERS)[number]
-type FieldKey = keyof JobMaterialDraftForm
-type Tone = 'ok' | 'warn' | 'bad' | 'unknown'
-type Screen = 'loading' | 'error' | 'empty' | 'select' | 'submitting' | 'failed' | 'generated' | 'generated-no-print' | 'demo-result'
-
-const TYPE_LABEL: Record<Exclude<JobMaterialTemplateType, 'resume_template'>, string> = {
-  cover_letter: '求职信', thank_you: '感谢信', portfolio_cover: '作品集封面', materials_checklist: '材料清单',
-}
 const EMPTY_FORM: JobMaterialDraftForm = { applicantName: '', targetRole: '', targetOrganization: '', keyStrengths: '', notes: '' }
-/** 生成接口的两个必填入参：无论模板怎么标，这两项空着都不发请求。 */
-const ALWAYS_REQUIRED: Partial<Record<FieldKey, string>> = { applicantName: '姓名', targetRole: '目标岗位' }
-
-/**
- * 每一屏的顶栏胶囊与副标题（取自稿 25 的 PILL / SUB）。
- * 不伪造能力（CLAUDE.md §9）：本页后端 services/api/src/job-materials 全链没有 LLM 调用，
- * 产物由 job-material-templates.ts 的固定模板 + 用户手填字段渲染而成。
- * 因此这里只能写「模板生成」，不得宣称由 AI 撰写；
- * verify:job-material-library-ui 会按后端真实能力守住这条文案。
- */
-const VIEW: Record<Screen, [Tone, string, string]> = {
-  loading: ['unknown', '正在读取已发布模板', '返回前不展示模板名称或数量。'],
-  error: ['bad', '模板列表读取失败', '读取失败不伪装成空列表。'],
-  empty: ['warn', '当前没有已发布模板', '读取成功，但已发布模板数量为 0。'],
-  select: ['ok', '固定模板生成 · 内容由你填写','选择已发布模板，填写真实信息后按固定模板生成本人可查看、可打印的 PDF。'],
-  submitting: ['unknown', '正在生成 PDF', '真实文件返回前不显示文件名和打印入口。'],
-  failed: ['bad', '本次文件生成失败', '失败就是失败，不用示例文件顶替结果。'],
-  generated: ['ok', '真实文件已生成 · 可打印', '文件已进入本人文档；有打印凭证才能去打印。'],
-  'generated-no-print': ['warn', '文件已生成 · 打印凭证未就绪', '文件存在，但没有打印凭证就不进入打印确认。'],
-  'demo-result': ['warn', '演示结果 · 无真实文件', '演示模式不保存真实文件。'],
-}
-
-/** 目录没有可填的模板时（读取中 / 失败 / 空）整屏说明；三者各是独立状态，互不冒充。 */
-const STATUS_SCREENS = {
-  loading: {
-    kind: 'info', icon: <ClockIcon size={32} aria-hidden="true" />, title: '正在读取已发布的求职材料模板', action: null, facts: null,
-    desc: '读取完成前不显示模板名称或数量；读取失败和空列表是两个独立状态。', why: '读取期间不显示任何模板，也不保存任何选择。',
-  },
-  error: {
-    kind: 'error', icon: <AlertTriangleIcon size={32} aria-hidden="true" />, title: '模板列表读取失败', action: '重新读取',
-    desc: '这次没有读到模板，不会拿内置默认模板或上一次的列表冒充当前目录。', why: '重新读取只再要一次目录，不改动你填过的内容。',
-    facts: ['这次失败没有造成什么', '范围很窄', [['没有', '用内置默认模板或示例模板顶替'], ['没有', '生成文件、打印任务或费用'],
-      ['仍可用', '打印、扫描与简历诊断三条流程'], ['仍可用', '我的文档里此前生成过的材料'],
-      ['自动重试', '没有 —— 只有点「重新读取」才会再请求一次'], ['失败原因', '不显示在屏幕上，只说明这次读不到']]],
-  },
-  empty: {
-    kind: 'warn', icon: <InfoIcon size={32} aria-hidden="true" />, title: '当前没有已发布的求职材料模板', action: '重新读取一次',
-    desc: '读取成功，但这次没有已发布的模板。发布后会出现在这里；本机不拿示例模板补位。', why: '模板发布后目录会出现在这一页，不需要你做设置。',
-    facts: ['空列表和读取失败不是一回事', '已读取成功', [['这次读取', '已完成，没有报错'], ['已发布模板', '0 条'],
-      ['本机不会', '拿示例模板或旧模板补位'], ['已生成过的材料', '不受影响，仍在我的文档里'],
-      ['费用', '没有产生任何生成或打印费用'], ['恢复方式', '模板发布后自动出现，不需要你做设置']]],
-  },
-} as const
-
-function fileKindLabel(mimeType: string): string {
-  if (mimeType === 'application/pdf') return 'PDF'
-  if (mimeType.startsWith('image/')) return '图片'
-  return '文档'
-}
-
-function formatBytes(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return '未知'
-  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
-
-function formatTime(iso: string | null): string {
-  const date = iso ? new Date(iso) : null
-  if (!date || Number.isNaN(date.getTime())) return '未返回'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function typeFilterLabel(type: JobMaterialDocumentTemplate['type']): Filter {
-  if (type === 'cover_letter') return '求职信'
-  if (type === 'thank_you') return '感谢信'
-  if (type === 'portfolio_cover') return '作品集'
-  return '材料清单'
-}
-
-const isRequired = (field: JobMaterialDocumentTemplate['fields'][number]) => field.required || field.key in ALWAYS_REQUIRED
-/** 只有服务端真实落库的文件才有预览入口：演示对象、缺文件编号或缺预览端点都不给，本页也不自己拼地址。 */
-const previewPathOf = (file: JobMaterialGenerateResponse, demo: boolean) => (!demo && file.fileId && file.previewUrlPath ? file.previewUrlPath : null)
-const fieldDomId = (key: FieldKey) => `material-field-${key}`
-
-function StateBlock({ kind, icon, title, size, children }: { kind: 'info' | 'warn' | 'error'; icon: ReactNode; title: string; size?: 'sm'; children: ReactNode }) {
-  return <div className="qx-rm-state" data-kind={kind} data-size={size}><h2>{icon}{title}</h2><p>{children}</p></div>
-}
-
-function Banner({ tone, icon, alert, children }: { tone?: 'warn' | 'bad'; icon: ReactNode; alert?: boolean; children: ReactNode }) {
-  return <div className="qx-rm-banner" data-tone={tone} role={alert ? 'alert' : undefined}>{icon}<span>{children}</span></div>
-}
-
-function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
-  file: JobMaterialGenerateResponse; demo: boolean; onPreview?: () => void; previewBusy?: boolean; previewError?: string
-}) {
-  const canPrint = Boolean(file.printFileUrl)
-  const rows: Array<[string, string, boolean?]> = [
-    ['文件名', file.filename],
-    ['页数', file.pageCount > 0 ? `${file.pageCount} 页` : '未返回', file.pageCount <= 0],
-    ['大小', formatBytes(file.sizeBytes)],
-    ['类型', fileKindLabel(file.mimeType)],
-    ['文件编号', demo ? '演示对象不会保存' : file.fileId, demo],
-    ['查看链接有效至', demo ? '演示对象没有临时链接' : formatTime(file.signedUrlExpiresAt), demo],
-    ['文件留存到', demo ? '不保存' : formatTime(file.fileExpiresAt), demo || !file.fileExpiresAt],
-    ['打印凭证', canPrint ? '已就绪（只交给打印确认页）' : '未返回（打印保持禁用）', !canPrint],
-  ]
-  const head = demo ? '演示对象 · 未保存真实文件' : canPrint ? '真实 PDF 已生成 · 已进入我的文档' : '真实 PDF 已生成 · 打印凭证未就绪'
-  return (
-    <div className="qx-rm-file" data-tone={demo ? 'demo' : canPrint ? 'ok' : 'warn'} data-print-ready={canPrint ? '1' : '0'} data-testid="material-workshop-file">
-      <div className="qx-rm-file-h">
-        <FileTextIcon size={28} aria-hidden="true" />
-        <span className="tx">
-          <b>{head}</b>
-          <span>{demo ? `已生成 ${file.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。` : `已生成 ${file.filename}，文件已进入我的文档。`}</span>
-        </span>
-        <span className="badge">{demo ? '演示对象' : '当前文件'}</span>
-      </div>
-      <div className="qx-rm-grid">
-        {rows.map(([label, value, off]) => <div key={label}><u>{label}</u><b data-off={off ? 'true' : undefined}>{value}</b></div>)}
-      </div>
-      {/* 预览失败就写在按钮旁边（点哪儿就在哪儿说），只讲预览这一件事，不说成生成或上传失败。 */}
-      {onPreview ? (
-        <div className="qx-rm-file-act" data-tone={previewError ? 'bad' : undefined}>
-          <button type="button" className="qx-btn" data-variant="teal" disabled={previewBusy} onClick={onPreview}>
-            <EyeIcon size={22} aria-hidden="true" /> {previewBusy ? '正在打开预览…' : '预览文件'}
-          </button>
-          {previewError ? (
-            <span role="alert"><AlertTriangleIcon size={18} aria-hidden="true" /> 预览没能打开：{previewError}。预览失败不代表文件生成失败，文件以本卡信息为准；可以再点一次，或稍后到我的文档里查看。</span>
-          ) : <span>凭本人登录现换一次短期查看链接，只在本页弹窗里显示，不保存。</span>}
-        </div>
-      ) : null}
-      <p className="qx-rm-foot">下面这些都是这次生成的结果；查看链接不在屏幕上展示。</p>
-      {demo ? <p id="material-docs-blocked" className="qx-rm-reason">演示模式未保存真实文件，我的文档里不会有这一份。</p> : null}
-      {!canPrint ? (
-        <p id="material-print-blocked" className="qx-rm-reason">{demo ? DEMO_MODE_NO_REAL_FILE_REASON : '打印链接未就绪，请重新生成后再试'}</p>
-      ) : null}
-    </div>
-  )
-}
 
 export function JobMaterialLibraryPage() {
   const navigate = useNavigate()
@@ -336,6 +200,13 @@ export function JobMaterialLibraryPage() {
   const btn = (variant: 'ghost' | 'primary', label: ReactNode, onClick: () => void) => (
     <button type="button" className="qx-btn" data-variant={variant} onClick={onClick}>{label}</button>
   )
+  // 稿 25 底栏一句边界：不代投递与「不收取简历给企业」合并，费用句照稿。核对页数挪到生成后的说明。
+  const truthBar = (
+    <div className="qx-rm-truth" data-testid="material-workshop-truth">
+      <p>模板按你填的内容排版，不调用 AI；不代投递，系统不收取求职者简历给企业，费用以确认时显示为准。</p>
+      <button type="button" className="qx-rm-help" onClick={() => navigate('/help')}>遇到问题</button>
+    </div>
+  )
 
   // 模板读不到时的四个既有出口（稿 25 的 manualFallback）；这一块吸收整屏余量。
   const fallbackRows = (
@@ -392,7 +263,7 @@ export function JobMaterialLibraryPage() {
       </div>
       {demoMode ? <Banner tone="warn" icon={<InfoIcon size={20} aria-hidden="true" />}>演示模式不会保存真实文件，也不会开放打印。</Banner> : null}
       {draftRestored && !generated ? (
-        <Banner icon={<CheckCircle2Icon size={20} aria-hidden="true" />}>
+        <Banner testId="material-workshop-draft-restored" icon={<CheckCircle2Icon size={20} aria-hidden="true" />}>
           <b>草稿已原样带回。</b>确认下面的内容无误，再点「生成可打印版」——登录本身不会自动替你提交。
         </Banner>
       ) : null}
@@ -433,8 +304,15 @@ export function JobMaterialLibraryPage() {
     const status = STATUS_SCREENS[screen]
     body = (
       <>
+        {screen !== 'loading' && <div className="qx-rm-after">
+          <b>{screen === 'empty' ? '模板发布后' : '重新读取会'}</b>
+          <span className="st"><i>1</i>{screen === 'empty' ? '目录里自动出现' : '只重发这一次目录请求'}</span><span className="sep">›</span>
+          <span className="st"><i>2</i>{screen === 'empty' ? '你选好模板再填写' : '不改动你填过的内容'}</span><span className="sep">›</span>
+          <span className="st"><i>3</i>{screen === 'empty' ? '生成可打印 PDF' : '读到才显示模板名'}</span>
+        </div>}
         <StateBlock kind={status.kind} icon={status.icon} title={status.title}>
           {screen === 'error' ? <span className="qx-rm-alert" role="alert">{error}</span> : null}{status.desc}
+          {status.action ? btn('primary', status.action, reload) : null}
         </StateBlock>
         {status.facts ? (
           <div className="qx-rm-facts">
@@ -447,7 +325,34 @@ export function JobMaterialLibraryPage() {
         {fallbackRows}
       </>
     )
-    cta = <><p className="why">{status.why}</p>{status.action ? btn('primary', status.action, reload) : btn('ghost', '返回简历服务', goResumeHub)}</>
+    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}
+      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions>{truthBar}</>
+  } else if ((screen === 'submitting' || screen === 'failed') && selected) {
+    const waiting = screen === 'submitting'
+    const statusRows = waiting
+      ? [['请求', '已经提交，正在生成文件'], ['已核对', '姓名与目标岗位非空'], ['还没有确认', '文件、页数、大小、保存期限与打印链接'], ['办理进度', '等待系统返回，不显示百分比或预计时间'], ['成功之后', '先核对返回文件，再决定带走或打印'], ['失败之后', '保留填写内容，由你决定是否再试']]
+      : [['这次结果', '系统未返回可使用的文件'], ['打印', '没有可交接的文件，不会自动打印'], ['仍然保留', '你刚才填写的内容'], ['已有材料', '不改动我的文档里此前生成的材料'], ['可能原因', '必填项不完整、模板停用或生成失败，以当前提示为准'], ['再试一次', '由你点击提交，不会自动重试']]
+    body = <>
+      <div className="qx-rm-after"><b>{waiting ? '接下来' : '再试一次会'}</b>
+        <span className="st"><i>1</i>{waiting ? '等待系统返回文件' : '沿用你填写的内容'}</span><span className="sep">›</span>
+        <span className="st"><i>2</i>{waiting ? '核对完整内容' : '重新提交这一份'}</span><span className="sep">›</span>
+        <span className="st"><i>3</i>{waiting ? '有链接才能去打印' : '成功才显示文件卡'}</span>
+      </div>
+      <StateBlock kind={waiting ? 'info' : 'error'} icon={waiting ? <ClockIcon size={32} /> : <AlertTriangleIcon size={32} />} title={waiting ? `正在生成《${selected.title}》这一份 PDF` : '这次没能生成出来'}>
+        {waiting ? '请求已提交；返回真实文件前不展示结果文件名、页数或打印入口。' : <span role="alert">这次没能生成出来：{submitError}。你填写的内容还在，可以回表单核对后再试。</span>}
+      </StateBlock>
+      <div className="qx-rm-facts"><div className="qx-rm-facts-h">{waiting ? '这次提交的内容' : '这次失败的确切范围'}<span>{waiting ? '只发这些项，不含简历原文' : '只影响这一次办理'}</span></div>
+        <div className="qx-rm-grid">{(waiting ? selected.fields.map((field) => [field.label, form[field.key]?.trim() || '未填']) : statusRows).map(([label, value]) => <div key={label}><u>{label}</u><b>{value}</b></div>)}</div>
+      </div>
+      {waiting && <div className="qx-rm-facts"><div className="qx-rm-facts-h">这一刻的确切状态<span>等待系统返回</span></div><div className="qx-rm-grid">{statusRows.map(([label, value]) => <div key={label}><u>{label}</u><b>{value}</b></div>)}</div></div>}
+      {waiting ? <div className="qx-rm-facts"><div className="qx-rm-facts-h">这次用的是哪一份模板<span>{TYPE_LABEL[selected.type]}</span></div><div className="qx-rm-grid"><div><u>模板名称</u><b>{selected.title}</b></div><div><u>适用场景</u><b>{selected.recommendedFor}</b></div></div></div> : fallbackRows}
+    </>
+    cta = <>
+      <p className="why">{waiting ? '正在等待结果，内容已提交；此时不再重复生成。' : '回表单核对内容后，再由你点击生成。'}</p>
+      {waiting ? <button type="button" className="qx-btn" data-variant="primary" disabled>正在生成 PDF…</button> : btn('primary', '改一改再试一次', () => setSubmitError(null))}
+      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="请先问我的材料用途和真实经历，帮我整理可以填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions>
+      {truthBar}
+    </>
   } else {
     body = (
       <>
@@ -500,7 +405,7 @@ export function JobMaterialLibraryPage() {
     cta = generated && !submitting && !submitError ? (
       <>
         <p className="why qx-rm-why-full" data-testid="material-workshop-why">
-          这一份是刚生成的文件；改动模板或填写内容后这张文件卡会收起，需要重新生成。
+          这一份是刚生成的文件；改动模板或填写内容后这张文件卡会收起，需要重新生成。生成后请先核对文件内容和页数。
           {demoMode ? '演示模式不保存真实文件，我的文档与打印都停用。' : generated.printFileUrl ? '' : '本次没有打印凭证，只有打印被禁用，我的文档不受影响。'}
         </p>
         {btn('ghost', '重新生成一份', () => void handleGenerate())}
@@ -521,6 +426,7 @@ export function JobMaterialLibraryPage() {
           onClick={() => { if (generated.printFileUrl) printGenerated(generated) }}>
           <PrinterIcon size={22} aria-hidden="true" /> 打印材料
         </button>
+        {truthBar}
       </>
     ) : (
       <>
@@ -535,6 +441,7 @@ export function JobMaterialLibraryPage() {
             testId="material-workshop-ai-help"
           />
         </QxStepActions>
+        {truthBar}
       </>
     )
   }
@@ -552,9 +459,6 @@ export function JobMaterialLibraryPage() {
         <section className="qx-scroll qx-rm-scroll" data-kiosk-domain="resume" data-kiosk-screen="resume-materials"
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">
           {body}
-          <p className="qx-rm-truth">
-            模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。费用以确认时显示为准。
-          </p>
         </section>
       </QxPageFrame>
       {generated && currentPreview?.url ? (

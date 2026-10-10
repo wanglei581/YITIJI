@@ -2,6 +2,7 @@ const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const aiEntries = require('../../utils/ai-entries')
+const { plainAiMessageOf } = require('../../utils/user-error')
 
 // 模拟面试合规口径（合规窗口 9/29 裁定，C9 于 9/28 拍板）：练习表现等级整个不显示，也不换别的叫法——
 // 分档读起来像用人单位的结论。服务端的 overall.level 原样留在数据里（overallLevel），页面不渲染。
@@ -72,9 +73,9 @@ Page({
       })
       this._render(dto)
     } catch (err) {
-      const code = err.error?.code || ''
+      const code = (err && err.code) || ''
       if (code === 'INTERVIEW_SESSION_NOT_FOUND') this._fail('面试会话不存在或无权访问')
-      else this._fail(err.error?.message || 'AI 报告生成失败，请稍后重试')
+      else this._fail(plainAiMessageOf(err, 'AI 报告生成失败，请稍后重试'))
     }
   },
   _render(dto) {
@@ -107,7 +108,12 @@ Page({
       const pages = Number(file.pageCount) > 0 ? Number(file.pageCount) : ''
       wx.navigateTo({ url: `/pages/print-upload/print-upload?fileId=${file.fileId}&name=${name}&pages=${pages}` })
     } catch (err) {
-      wx.showToast({ title: err.error?.message || '打印请求失败，请重试', icon: 'none' })
+      wx.showModal({
+        title: '复盘报告没有生成',
+        content: (err && err.message) || '打印请求失败，请重试',
+        showCancel: false,
+        confirmText: '知道了',
+      })
     } finally {
       this.setData({ printing: false })
     }

@@ -23,7 +23,7 @@ Page({
       ? '本平台提供 AI 简历工具与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。AI 生成的内容仅供参考。'
       : '本平台提供求职材料模板与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。',
     links2: [
-      { id: 'ai',       title: 'AI 服务说明', sub: '所用模型与备案号' },
+      { id: 'ai',       title: 'AI 服务说明', sub: '所用模型与备案情况' },
       { id: 'operator', title: '经营者信息', sub: '名称、证照与联系方式' },
     ].filter(function(item) { return AI_ENABLED || item.id !== 'ai' }),
   },

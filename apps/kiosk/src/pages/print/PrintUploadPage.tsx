@@ -25,6 +25,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -48,6 +49,7 @@ import {
   type PrintMaterialSource,
 } from './printMaterialSession'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { useUsbImportGate } from '../../hooks/useUsbImportGate'
 import { FileSourceView } from './file-source/FileSourceView'
 import {
   classifyLocalFile,
@@ -181,7 +183,11 @@ export function PrintUploadPage() {
   const [localRejectKind, setLocalRejectKind] = useState<LocalRejectKind | null>(null)
   const [blockedName, setBlockedName] = useState<string | null>(null)
   const [blockedMeta, setBlockedMeta] = useState<string | null>(null)
-  const [usbConfigured] = useState(() => isUsbImportConfigured())
+  const usbBridgeReady = isUsbImportConfigured()
+  const usbGate = useUsbImportGate()
+  const usbHold = usbBridgeReady && usbGate.state !== 'allowed'
+    ? { state: usbGate.state, note: usbGate.note, onRetry: usbGate.retry }
+    : null
   const [usbStatus, setUsbStatus] = useState<UsbStatus | null>(null)
   const [usbFiles, setUsbFiles] = useState<UsbFileListItem[] | null>(null)
   const [usbError, setUsbError] = useState<string | null>(null)
@@ -199,7 +205,7 @@ export function PrintUploadPage() {
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
 
   useEffect(() => {
-    if (tab !== 'usb' || !usbConfigured || file || usbUploading || usbSelected) return undefined
+    if (tab !== 'usb' || usbGate.state !== 'allowed' || file || usbUploading || usbSelected) return undefined
     let cancelled = false
 
     const poll = async () => {
@@ -228,7 +234,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, '暂时无法读取 U 盘，请重试或联系工作人员'))
+        setUsbError(userMessageOf(err, `暂时无法读取 U 盘，请重试。${helpNeededLine()}。`))
       }
     }
 
@@ -242,7 +248,7 @@ export function PrintUploadPage() {
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [tab, usbConfigured, file, usbUploading, usbSelected, usbPollKey])
+  }, [tab, usbGate.state, file, usbUploading, usbSelected, usbPollKey])
 
   // 上传成功只把文件放进本页；点「下一步」才整份写打印交接上下文。
   // 以前上传成功就写，不点下一步也留在本机，会被下一位或下一个来源当成「上一份」复水。
@@ -427,7 +433,7 @@ export function PrintUploadPage() {
     localRejectKind,
     uploadError,
     phone,
-    usbConfigured,
+    usbConfigured: usbBridgeReady,
     usbAgentOffline,
     usbPresent: usbStatus ? usbStatus.present : null,
     usbFilesKnown: usbFiles !== null,
@@ -466,7 +472,9 @@ export function PrintUploadPage() {
       showFileChannel={showFileChannel}
       showScan={!isResumePrint}
       tab={tab}
-      usbMode={!usbConfigured ? 'unavailable' : usbAgentOffline ? 'offline' : 'ok'}
+      usbMode={!usbBridgeReady ? 'unavailable' : usbAgentOffline ? 'offline' : 'ok'}
+      usbHold={usbHold}
+      usbSwitchAllowed={usbGate.state === 'allowed'}
       currentFile={file}
       blockedName={blockedName}
       blockedMeta={blockedMeta}

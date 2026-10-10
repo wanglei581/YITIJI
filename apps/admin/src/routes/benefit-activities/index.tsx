@@ -3,6 +3,7 @@ import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@a
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { GiftIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   benefitActivitiesAdminApi,
   type AdminBenefitActivityClaimItem,
@@ -159,7 +160,7 @@ export default function BenefitActivitiesPage() {
       await loadClaims(saved.id)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '保存失败')
+      setMessage(userMessageOf(error, '权益活动没有保存，请检查后重试'))
     }
   }
 
@@ -171,7 +172,7 @@ export default function BenefitActivitiesPage() {
       setSelected(saved)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '发布失败')
+      setMessage(userMessageOf(error, '权益活动没有发布，请稍后重试'))
     }
   }
 
@@ -183,14 +184,14 @@ export default function BenefitActivitiesPage() {
       setSelected(saved)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '下架失败')
+      setMessage(userMessageOf(error, '权益活动没有下架，请稍后重试'))
     }
   }
 
   return (
     <Page
       title="权益活动"
-      subtitle="配置用户可领取的服务权益活动；领取后生成 BenefitGrant，进入用户「我的权益」"
+      subtitle="配置用户可领取的服务权益活动；领取后记入会员权益，进入用户「我的权益」"
       actions={
         <button
           type="button"
@@ -234,8 +235,8 @@ export default function BenefitActivitiesPage() {
                         <span className={['rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>
                           {STATUS_LABEL[item.status]}
                         </span>
-                        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500">{item.sourceType}</span>
-                        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500">{item.benefitType}</span>
+                        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500">{SOURCE_TYPES.find((type) => type.value === item.sourceType)?.label ?? '其他来源'}</span>
+                        <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500">{BENEFIT_TYPES.find((type) => type.value === item.benefitType)?.label ?? '其他权益'}</span>
                       </div>
                       <p className="mt-2 text-sm font-semibold text-neutral-900">{item.title}</p>
                       <p className="mt-1 text-xs text-neutral-400">
@@ -267,7 +268,7 @@ export default function BenefitActivitiesPage() {
         <div className="flex flex-col gap-4">
           <Card className="p-4">
             <p className="mb-3 text-sm font-semibold text-neutral-900">{selected ? '活动详情' : '新建活动'}</p>
-            <form onSubmit={(event) => void submit(event)} className="space-y-3">
+            <form lang="zh-CN" onSubmit={(event) => void submit(event)} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-neutral-500">活动标题</label>
                 <input
@@ -355,12 +356,12 @@ export default function BenefitActivitiesPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-neutral-500">开始时间</label>
-                  <input value={form.validFrom} disabled={!selectedEditable} onChange={(event) => setForm((f) => ({ ...f, validFrom: event.target.value }))} type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50" />
+                  <label className="text-xs font-medium text-neutral-500">开始时间（年/月/日 时:分）</label>
+                  <input value={form.validFrom} disabled={!selectedEditable} onChange={(event) => setForm((f) => ({ ...f, validFrom: event.target.value }))} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-neutral-500">结束时间</label>
-                  <input value={form.validUntil} disabled={!selectedEditable} onChange={(event) => setForm((f) => ({ ...f, validUntil: event.target.value }))} type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50" />
+                  <label className="text-xs font-medium text-neutral-500">结束时间（年/月/日 时:分）</label>
+                  <input value={form.validUntil} disabled={!selectedEditable} onChange={(event) => setForm((f) => ({ ...f, validUntil: event.target.value }))} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50" />
                 </div>
               </div>
               <div>

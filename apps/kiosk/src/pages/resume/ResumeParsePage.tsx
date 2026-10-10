@@ -13,7 +13,8 @@ import { resumeProcessCopy } from './resumeUserCopy'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
-import { aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
+import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
+import { AI_OUTAGE_CODES, aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
 import { inspectionSignalsEncrypted } from '../print/components/printPreviewKind'
 import {
   canonicalResumeParsePayload,
@@ -36,6 +37,9 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeTriageHero } from './components/ResumeTriageHero'
 import { frameCopy, ResumeParseUnknownNote, type ParseView, type ShownTerminal } from './ResumeParseOutcomeNote'
 import { buildScanHandoff } from './resumeScanHandoff'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
+import { ResumeWithoutAi } from './components/ResumeWithoutAi'
 import {
   RESUME_SCORING_DIMENSIONS,
   type ResumeParseResponse,
@@ -89,6 +93,7 @@ export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, getToken } = useAuth()
+  const contact = useSupportContact()
   const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
 
@@ -136,7 +141,7 @@ export function ResumeParsePage() {
           setPendingTask(task)
           setStorageBlocked(true)
           setOutcome('unknown')
-          setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，原样再试一次；退出后匿名结果可能无法找回。')
+          setBlockNote('这台机器没有把这次结果的查看方式存好。请留在这一页，用原来这一次再试；离开之后，没登录时的结果可能找不回来。')
           return
         }
       }
@@ -167,7 +172,7 @@ export function ResumeParsePage() {
         setOutcome('unknown')
         setRecheck('replay')
         setStorageBlocked(true)
-        setBlockNote('本机没能安全释放这次解析标识。请原样再试一次，不要开始新的解析。')
+        setBlockNote('这台机器没能安全清掉这次的办理标记。请用原来这一次再试，不要另起一次解析。')
       }
       return false
     }
@@ -186,7 +191,7 @@ export function ResumeParsePage() {
     if (knownTaskId && result.taskId && result.taskId !== knownTaskId) {
       setOutcome('unknown')
       setRecheck('replay')
-      setBlockNote('这次重查返回了另一个编号，没有收下，也没有另起一次解析。')
+      setBlockNote('这次查到的不是刚才那一次，没有收下，也没有另起一次解析。')
       return
     }
     const anonymous = ownerId === null
@@ -197,7 +202,7 @@ export function ResumeParsePage() {
         setPendingTask({ taskId: result.taskId })
         setOutcome('unknown')
         setRecheck('replay')
-        setBlockNote('这次解析有了编号，但答复里没有匿名读取凭证。请原样再试一次，不要开始新的解析。')
+        setBlockNote('这次解析已经有了编号，但没有带回未登录时用来查看结果的方式。请用原来这一次再试，不要另起一次解析。')
         return
       }
       if (!kept) {
@@ -211,7 +216,7 @@ export function ResumeParsePage() {
         setPendingTask({ taskId: result.taskId, accessToken })
         setStorageBlocked(true)
         setOutcome('unknown')
-        setBlockNote('本机没有把这次解析的读取凭证存牢。请留在此页，原样再试一次；退出后匿名结果可能无法找回。')
+        setBlockNote('这台机器没有把这次结果的查看方式存好。请留在这一页，用原来这一次再试；离开之后，没登录时的结果可能找不回来。')
         return
       }
       keptTokenRef.current = { taskId: result.taskId, accessToken }
@@ -221,21 +226,25 @@ export function ResumeParsePage() {
     if (!samePerson(ownerId)) return
     if (result.status !== 'completed') {
       if (result.status === 'failed') {
+        const capability = typeof result.failCode === 'string' && AI_OUTAGE_CODES.has(result.failCode)
+        const reason = capability
+          ? 'AI 暂时不可用，你可以先打印原件或手动填写简历'
+          : (result.failReason ?? '简历解析未能完成，请重试')
         if (!result.taskId) {
-          navigateFail(result.failReason ?? '简历解析未能完成，请重试')
+          navigateFail(reason, undefined, capability, result.failCode)
           return
         }
         // 凭证已在上面写后读回。同一次意图清掉之后，报告页「重新解析」才会铸新的一对请求头。
-        if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开失败报告，也没有另起一次解析。')) return
-        navigateFail(result.failReason ?? '简历解析未能完成，请重试', {
+        if (!await dropHeldIntent(ownerId, '这次的办理标记已经不在，没有打开失败说明，也没有另起一次解析。')) return
+        navigateFail(reason, {
           taskId: result.taskId,
           accessToken: keptTokenRef.current?.accessToken,
-        })
+        }, capability, result.failCode)
         return
       }
       if (result.status !== 'pending' && result.status !== 'processing') {
         setBlockNote(result.taskId
-          ? '解析已经提交并拿到了编号，但收到的答复不完整。'
+          ? '解析已经提交并拿到了编号，但收到的内容不完整。'
           : '没有收到完整结果，暂时无法确认这次解析是否完成。')
       }
       setOutcome('unknown')
@@ -246,7 +255,7 @@ export function ResumeParsePage() {
       setBlockNote('没有收到完整结果，暂时无法确认这次解析是否完成。')
       return
     }
-    if (!await dropHeldIntent(ownerId, '本机解析标识已不在，没有打开结果，也没有另起一次解析。')) return
+    if (!await dropHeldIntent(ownerId, '这次的办理标记已经不在，没有打开结果，也没有另起一次解析。')) return
     navigate('/resume/report', {
       state: {
         ...state,
@@ -297,7 +306,7 @@ export function ResumeParsePage() {
       if (!samePerson(ownerId)) return
       if (intentRef.current && prepared.headers.intent !== intentRef.current) {
         setOutcome('unknown')
-        setBlockNote('这次重查没能沿用原来的解析标识，没有另起一次解析。')
+        setBlockNote('这次没能沿用原来的那一次，没有另起一次解析。')
         if (knownTaskId) setRecheck('replay')
         return
       }
@@ -317,7 +326,7 @@ export function ResumeParsePage() {
       // 与公共额度 429 同样处理：只清对得上的本机意图，转明确失败屏 —— 那一屏有不用 AI 的出路
       // （打印我上传的原件、自查清单），且不再给「重新解析」。
       if (isAiOutage(err)) {
-        if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开失败页，也没有另起一次解析。')) {
+        if (await dropHeldIntent(ownerId, '这次的办理标记对不上，没有打开失败说明，也没有另起一次解析。')) {
           navigateFail(aiErrorMessageOf(err, 'AI 现在停用，暂时做不了简历诊断'), undefined, true)
         }
         return
@@ -375,8 +384,8 @@ export function ResumeParsePage() {
       }
       // 公共额度 429 发生在记账之前，同键重试仍会被拒。只清对得上的本机意图，避免下次换材料被卡住。
       if (err instanceof ApiHttpError && err.status === 429 && aiErrorCodeOf(err) === 'AI_PUBLIC_QUOTA_EXCEEDED') {
-        if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开拒绝页，也没有另起一次解析。')) {
-          navigateFail(aiErrorMessageOf(err, '今日 AI 解析次数已用完'))
+        if (await dropHeldIntent(ownerId, '这次的办理标记对不上，没有打开拒绝说明，也没有另起一次解析。')) {
+          navigateFail(aiErrorMessageOf(err, AI_PUBLIC_QUOTA_EXCEEDED_COPY))
         }
         return
       }
@@ -478,12 +487,12 @@ export function ResumeParsePage() {
       }
       if (isTaskNotFound(err)) {
         setRecheck('not-found')
-        setBlockNote('以这台机器当前的登录状态和读取凭证，查不到这一次的结果。没有另起一次解析。')
+        setBlockNote('按这台机器现在的登录状态，查不到这一次的结果。没有另起一次解析。')
         return
       }
       if (held && parseErrorOutcome(err) === 'unknown') {
         setRecheck('replay')
-        setBlockNote('查询结果时没有拿到可信答复。请原样再试一次，不要开始新的解析。')
+        setBlockNote('这次没有查到可信的结果。请用原来这一次再试，不要另起一次解析。')
         return
       }
       setRecheck('error')
@@ -567,7 +576,7 @@ export function ResumeParsePage() {
       back={{ label: '返回简历来源', onBack: leaveToSource }}
       ctabar={<><QxStepActions><QxAiHelp label="问小青：解析没完成怎么办 →" draft="我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。" /></QxStepActions>{ctabar}</>}
     >
-      <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qx-resume-triage" data-takeaway="简历诊断报告">
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} data-recheck={recheck === 'checking' ? 'checking' : undefined} className="qx-resume-triage" data-takeaway="简历诊断报告">
         <ResumeTriageHero
           eyebrow={state?.intent === 'optimize' ? 'AI 简历优化' : 'AI 简历诊断'}
           ask={copy.ask}
@@ -587,8 +596,10 @@ export function ResumeParsePage() {
       <div className="qx-rt-wait">
         <section className="qx-rt-fail" data-tone="warn">
           <h2 className="qx-rt-fail-t"><XCircleIcon size={24} aria-hidden="true" />未找到简历文件</h2>
-          <p>请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析。</p>
+          <p>请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析，也不会自动挑一份文件。</p>
         </section>
+        <ResumeWithoutAi onGenerate={() => navigate('/resume/generate')} onPrint={() => navigate('/print-scan')} />
+        <p className="qx-rt-hint" data-testid="resume-help-line">{helpNeededLine(contact)}</p>
       </div>,
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/resume/source')}>
         回到来源选择
@@ -636,14 +647,14 @@ export function ResumeParsePage() {
                     : terminal?.mode === 'blocked'
                       ? '不能继续这次解析'
                       : (pendingTask ? '解析还没出最终结果' : '没等到解析结果'))
-                : '正在等待真实解析结果…'}
+                : '正在等待最终解析结果'}
           </h2>
           {/* 文件信息 chips */}
           {!failed && (
             <div className="qx-rt-chips">
               <span>{fileName}</span>
               {fileSize && <span>{fileSize} · {sourceLabel}</span>}
-              <span>处理内容说明 · 非实时阶段</span>
+              <span>这次要看的内容，不是进度</span>
             </div>
           )}
         </section>
@@ -709,7 +720,7 @@ export function ResumeParsePage() {
     <>
       <p className="why">
         <CheckIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
-        返回仅停止本机等待，不会撤回已提交的服务请求；简历原文不会发送给企业，也不进入平台候选人简历库。
+        返回仅停止本机等待，不会撤回已经交出去的解析；简历原文不会发送给企业，也不进入平台候选人简历库。
       </p>
       {outcome === 'unknown' ? (
         <>
@@ -728,7 +739,7 @@ export function ResumeParsePage() {
             </button>
           ) : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
             <button type="button" className="qx-btn" data-variant="primary" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
-              {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
+              {recheck === 'checking' ? '正在查刚才这一次' : '再查刚才这一次的结果'}
             </button>
           ) : (
             <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-replay" onClick={replaySame}>

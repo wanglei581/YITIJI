@@ -1,3 +1,5 @@
+import { peekSupportContact, helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 // ============================================================
 // PrintProgressPage — 青序流光 15-print-fulfill /print/progress
 //
@@ -13,6 +15,7 @@
 //   printing            → step 2 "打印中"
 //   completed           → navigate to /print/done (success)
 //   failed / cancelled / abandoned → navigate to /print/done (failure / 终态)
+//   查询抛错（断网 / 超时 / 5xx）→ 留在本页。读不到不是打印失败。
 //
 // 稿 15 九态里本页只承接 printing 与 client-status-timeout，其余七态怎么落见 printProgressModel 头注。
 // ============================================================
@@ -41,7 +44,7 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
-import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
+import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintProgressLinkNotice, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import './styles/print-fulfill-qx.css'
 import {
   FAIL_REASONS,
@@ -56,7 +59,7 @@ import {
   reprintHint,
   paymentLead,
   paymentPill,
-  PRINT_PROGRESS_QUIET_COPY,
+  printProgressQuietCopy,
   PRINT_PROGRESS_QUIET_MS,
   progressFailurePresentation,
   progressStatusFingerprint,
@@ -64,11 +67,19 @@ import {
   tlItemClass,
   type Step,
 } from './printProgressModel'
+import {
+  OFFLINE_DETAIL,
+  OFFLINE_TITLE,
+  POLL_INTERVAL_MS,
+  UNCONFIRMED_COPY,
+  holdsPrintBusyLock,
+  isUnreadablePollError,
+  reducePollLink,
+  type PollLinkPhase,
+  type PollLinkState,
+} from './printProgressPolling'
 
-const POLL_INTERVAL_MS = 3000
-const POLL_FAIL_LIMIT = 5
 const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000
-const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'
 
 function realStatusPresentation(status: BackendJobStatus | null) {
   switch (status) {
@@ -124,6 +135,7 @@ function realStatusPresentation(status: BackendJobStatus | null) {
 }
 
 export function PrintProgressPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as Record<string, unknown> | null
@@ -140,7 +152,7 @@ export function PrintProgressPage() {
   const isSim = canSimulate
 
   const shouldFail = canSimulate && state?.simulateFailure === true
-  const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
+  const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS()[0]
 
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
   const [backendStatus, setBackendStatus] = useState<BackendJobStatus | null>(null)
@@ -150,19 +162,27 @@ export function PrintProgressPage() {
   const [progressQuiet, setProgressQuiet] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [simDone, setSimDone]   = useState(false)
-  const [statusReadError, setStatusReadError] = useState(false)
-  // 「重新查询状态」只是让轮询从头再来一轮（立即查一次 + 重新计 10 分钟），不重下单、不重复扣费。
+  // 「重新查询状态」只是立刻再问一次，不重下单、不重复扣费。
+  // 它不是「读到了状态」，10 分钟未确认窗口仍从最后一次读到算起。
   const [pollEpoch, setPollEpoch] = useState(0)
+  const [linkPhase, setLinkPhase] = useState<PollLinkPhase>('live')
+  const linkPhaseRef            = useRef<PollLinkPhase>('live')
+  const lastReadableAtRef       = useRef<number | null>(null)
   const cancelRef               = useRef(false)
-  const pollFailsRef            = useRef(0)
   const simTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wakeRequestedTaskIdRef  = useRef<string | null>(null)
-
-  useBusyLock(
-    (useRealApi && !failed && !timedOut) ||
-    (isSim && !failed && !simDone),
-  )
+  const resultUnconfirmed = linkPhase === 'unconfirmed'
+  const linkOffline = linkPhase === 'offline'
+  // 断网、结果未确认都持锁；隐私守卫的顺延上限保证不会锁死（见 holdsPrintBusyLock 注释）。
+  useBusyLock(holdsPrintBusyLock({
+    useRealApi,
+    failed,
+    timedOut,
+    resultUnconfirmed,
+    isSim,
+    simDone,
+  }))
 
   const navigateFail = useCallback(
     (reason: string) => {
@@ -190,7 +210,7 @@ export function PrintProgressPage() {
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
-    navigateFail(FAIL_REASONS[0])
+    navigateFail(FAIL_REASONS()[0])
   }, [navigateFail])
 
   const recheckStatus = useCallback(() => {
@@ -235,7 +255,23 @@ export function PrintProgressPage() {
 
     // 每一轮轮询自带停止标记：重新查询 / 离页时，上一轮在飞的请求回来也不再改页面。
     let stopped = false
-    pollFailsRef.current = 0
+    let requestGen = 0
+    // 沿用上一轮的断网 / 未确认相位，避免重新查询的空档露出「再印一份」。
+    // 时刻不拨回现在：按钮不是一次成功的状态读取。
+    if (lastReadableAtRef.current == null) lastReadableAtRef.current = Date.now()
+    const link: PollLinkState = {
+      phase: linkPhaseRef.current,
+      consecutiveUnreadable: 0,
+      lastReadableAtMs: lastReadableAtRef.current,
+    }
+    const linkRef = { current: link }
+    const publishLink = (next: PollLinkState) => {
+      linkRef.current = next
+      lastReadableAtRef.current = next.lastReadableAtMs
+      if (linkPhaseRef.current === next.phase) return
+      linkPhaseRef.current = next.phase
+      setLinkPhase(next.phase)
+    }
     const fingerprintRef = { current: '' }
     let quietTimer: ReturnType<typeof setTimeout> | null = null
     const clearQuietTimer = () => {
@@ -265,47 +301,44 @@ export function PrintProgressPage() {
 
     const tick = async () => {
       if (stopped) return
+      const gen = ++requestGen
       try {
         const result = await getPrintJobStatus(taskId)
-        if (stopped) return
+        if (stopped || gen !== requestGen) return
+        const reduced = reducePollLink(linkRef.current, { kind: 'readable', status: result.status }, Date.now())
+        publishLink(reduced.state)
         noteProgress(result)
 
-        if (result.status === 'completed') {
+        if (reduced.terminal === 'success') {
           stopped = true
           navigateSuccess()
           return
         }
-        if (result.status === 'failed') {
+        if (reduced.terminal === 'failure') {
           stopped = true
+          if (result.status === 'cancelled' || result.status === 'abandoned') {
+            navigateFail(
+              result.failureReasonForUser
+                ?? (result.status === 'cancelled'
+                  ? `任务已取消。${helpNeededLine(peekSupportContact())}`
+                  : `任务已结束。${helpNeededLine(peekSupportContact())}`),
+            )
+            return
+          }
           navigateFail(
-            result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS[0],
+            result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS()[0],
           )
           return
         }
-        if (result.status === 'cancelled' || result.status === 'abandoned') {
-          stopped = true
-          navigateFail(
-            result.failureReasonForUser
-              ?? (result.status === 'cancelled'
-                ? '任务已取消，请联系现场工作人员确认订单'
-                : '任务已结束，请联系现场工作人员确认订单'),
-          )
-          return
-        }
-        pollFailsRef.current = 0
-        setStatusReadError(false)
         backendStatusRef.current = result.status
         setBackendStatus(result.status)
         if (result.status === 'printing') setTimedOut(false)
         setCurrent(backendStatusToStep(result.status))
-      } catch {
-        if (stopped) return
-        pollFailsRef.current += 1
-        setStatusReadError(true)
-        if (pollFailsRef.current >= POLL_FAIL_LIMIT) {
-          stopped = true
-          navigateFail(`${STATUS_READ_ERROR_TEXT}，请联系工作人员`)
-        }
+      } catch (error) {
+        if (stopped || gen !== requestGen) return
+        if (!isUnreadablePollError(error)) return
+        const reduced = reducePollLink(linkRef.current, { kind: 'unreadable' }, Date.now())
+        publishLink(reduced.state)
       }
     }
 
@@ -316,6 +349,8 @@ export function PrintProgressPage() {
     const onTimeout = () => {
       if (stopped) return
       if (backendStatusRef.current === 'printing') { timeoutTimer = setTimeout(onTimeout, REAL_POLL_TIMEOUT_MS); return }
+      // 连续读不到走「结果未确认」，不用这条「查得到但没有终态」的超时把人送去旧面板。
+      if (linkRef.current.phase !== 'live') { timeoutTimer = setTimeout(onTimeout, REAL_POLL_TIMEOUT_MS); return }
       setTimedOut(true)
     }
     timeoutTimer = setTimeout(onTimeout, REAL_POLL_TIMEOUT_MS)
@@ -330,7 +365,7 @@ export function PrintProgressPage() {
 
   const currentIdx = stepIndex(current)
   const realStatus = realStatusPresentation(backendStatus)
-  const failureView = progressFailurePresentation(knownFailure ?? '')
+  const failureView = progressFailurePresentation(knownFailure ?? '', contact)
   const showFailure = failed && !isSim
 
   const file   = (state?.file  as PrintFileState | undefined) ?? null
@@ -358,13 +393,17 @@ export function PrintProgressPage() {
 
   const timeoutPill = payment === 'paid' && amountCents != null
     ? `已付 ${formatCents(amountCents)} · 状态查询中`
-    : isFreeOrder ? '本次未收款 · 状态查询中' : '状态查询中'
-  const frameStatus = timedOut
-    ? { tone: 'warn' as const, label: timeoutPill }
-    : failed
+    : isFreeOrder ? '免费试运营 · 状态查询中' : '状态查询中'
+  const frameStatus = resultUnconfirmed
+    ? { tone: 'warn' as const, label: '结果未确认' }
+    : linkOffline
+      ? { tone: 'warn' as const, label: '网络中断' }
+      : timedOut
+        ? { tone: 'warn' as const, label: timeoutPill }
+        : failed
       ? { tone: 'bad' as const, label: isSim ? '演示失败' : failureView.badge }
       : progressQuiet
-        ? { tone: 'warn' as const, label: isFreeOrder ? '本次未收款 · 进度未更新' : '进度未更新' }
+        ? { tone: 'warn' as const, label: isFreeOrder ? '免费试运营 · 进度未更新' : '进度未更新' }
       : backendStatus == null && useRealApi
         ? { tone: 'unknown' as const, label: '状态未知' }
         : { tone: 'ok' as const, label: pillLabel }
@@ -454,11 +493,13 @@ export function PrintProgressPage() {
       label: isSim ? '打印演示' : '打印中',
       desc: isSim
         ? '演示：未出纸，无真实打印动作'
-        : progressQuiet
-          ? PRINT_PROGRESS_QUIET_COPY
-          : backendStatus === 'printing'
-            ? '打印机正在出纸，请在出纸口等候'
-            : '终端开始打印后才会出纸',
+        : linkPhase !== 'live'
+          ? (resultUnconfirmed ? '请先看出纸口' : OFFLINE_DETAIL)
+          : progressQuiet
+            ? printProgressQuietCopy()
+            : backendStatus === 'printing'
+              ? '打印机正在出纸，请在出纸口等候'
+              : '终端开始打印后才会出纸',
     },
     {
       key: 'pickup',
@@ -471,11 +512,15 @@ export function PrintProgressPage() {
 
   const stageHeading = isSim
     ? (simDone ? '演示流程已结束' : '流程演示中')
-    : showFailure
-      ? failureView.headerTitle
-      : progressQuiet
-        ? PRINT_PROGRESS_QUIET_COPY
-        : realStatus.stageTitle
+    : resultUnconfirmed
+      ? '没法确认这单打完了没有'
+      : linkOffline
+        ? OFFLINE_TITLE
+        : showFailure
+          ? failureView.headerTitle
+          : progressQuiet
+            ? printProgressQuietCopy()
+            : realStatus.stageTitle
   const stageLine = isSim
     ? (simDone ? '未真实打印，可返回首页或重新上传' : '仅演示进度步骤，未建单、未支付、未出纸')
     : realStatus.stageSubtitle
@@ -485,39 +530,51 @@ export function PrintProgressPage() {
   const copiesText = params?.copies && params.copies > 1 ? `${params.copies} 份依次打印。` : ''
   const askTitle = isSim
     ? (simDone ? <>演示流程已结束，<em>未真实打印</em>。</> : <>流程演示中，<em>不会出纸</em>。</>)
-    : timedOut
-      ? <>暂时<em>查不到</em>打印结果。</>
-      : showFailure
-        ? <>{failureView.ask}</>
-        : progressQuiet
-          ? <>{PRINT_PROGRESS_QUIET_COPY}</>
-        : <>{paymentLead(payment)}<em>{realStatus.askPhase}</em>。</>
+    : resultUnconfirmed
+      ? <>{UNCONFIRMED_COPY}</>
+      : linkOffline
+        ? <>{OFFLINE_TITLE}</>
+        : timedOut
+          ? <>暂时<em>查不到</em>打印结果。</>
+          : showFailure
+            ? <>{failureView.ask}</>
+            : progressQuiet
+              ? <>{printProgressQuietCopy()}</>
+            : <>{paymentLead(payment)}<em>{realStatus.askPhase}</em>。</>
   const askDoing = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
-    : timedOut
-      ? '这不代表成功或失败，只是本机暂时没拿到最新状态。'
-      : showFailure
-        ? failureView.doing
-        : progressQuiet
-          ? '这一句只说明进度没有再更新，不代表已经打完，也不代表已经失败。'
-        : failed
-          ? '马上转到结果页，按已经登记的原因说明下一步。'
-        : backendStatus === 'printing'
-          ? `${copiesText}你可以先在旁边等，不用贴着机器。`
-          : realStatus.headerSubtitle
+    : resultUnconfirmed
+      ? '请先看出纸口。网络恢复后可以打开我的打印订单查看这单。'
+      : linkOffline
+        ? OFFLINE_DETAIL
+        : timedOut
+          ? '这不代表成功或失败，只是本机暂时没拿到最新状态。'
+          : showFailure
+            ? failureView.doing
+            : progressQuiet
+              ? '这一句只说明进度没有再更新，不代表已经打完，也不代表已经失败。'
+            : failed
+              ? '马上转到结果页，按已经登记的原因说明下一步。'
+            : backendStatus === 'printing'
+              ? `${copiesText}你可以先在旁边等，不用贴着机器。`
+              : realStatus.headerSubtitle
 
-  const view = isSim ? 'demo' : timedOut ? 'client-status-timeout' : failed ? 'failed' : 'printing'
+  const view = isSim ? 'demo' : resultUnconfirmed ? 'result-unconfirmed' : linkOffline ? 'network-offline' : timedOut ? 'client-status-timeout' : failed ? 'failed' : 'printing'
   const jobState: PrintJobState = isSim
     ? { tone: simDone ? 'wait' : 'doing', label: simDone ? '演示结束' : '演示中' }
-    : timedOut
-      ? { tone: 'wait', label: '状态查询中' }
-      : showFailure
-        ? { tone: 'err' as const, label: failureView.badge }
-        : progressQuiet
-          ? { tone: 'wait' as const, label: '进度未更新' }
-        : failed
-          ? { tone: 'err' as const, label: '出错' }
-        : { tone: backendStatus === 'printing' ? 'doing' as const : 'wait' as const, label: realStatus.badge }
+    : resultUnconfirmed
+      ? { tone: 'wait', label: '结果未确认' }
+      : linkOffline
+        ? { tone: 'wait', label: '网络中断' }
+        : timedOut
+          ? { tone: 'wait', label: '状态查询中' }
+          : showFailure
+            ? { tone: 'err' as const, label: failureView.badge }
+            : progressQuiet
+              ? { tone: 'wait' as const, label: '进度未更新' }
+            : failed
+              ? { tone: 'err' as const, label: '出错' }
+            : { tone: backendStatus === 'printing' ? 'doing' as const : 'wait' as const, label: realStatus.badge }
   const endLabel = failed
     ? '正在核对结果，暂不能结束清空'
     : backendStatus === 'printing'
@@ -530,7 +587,7 @@ export function PrintProgressPage() {
   return (
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
-      title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
+      title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : resultUnconfirmed ? '结果未确认' : linkOffline ? '网络中断' : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
       status={frameStatus}
       terminalLabel="就业服务大厅"
       ctabar={
@@ -538,6 +595,16 @@ export function PrintProgressPage() {
           <span className="why">
             {simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页'}
           </span>
+        ) : (resultUnconfirmed || linkOffline) ? (
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            data-testid="print-fulfill-primary"
+            onClick={recheckStatus}
+          >
+            重新查询状态
+          </button>
         ) : (timedOut ? (
           <>
             <button
@@ -550,7 +617,7 @@ export function PrintProgressPage() {
               重新查询状态
             </button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>
-              联系工作人员
+              求助
             </button>
           </>
         ) : showFailure ? (
@@ -585,8 +652,9 @@ export function PrintProgressPage() {
       data-pff-head="xq"
       data-screen="print-fulfill"
       data-state={view}
+      data-print-link={useRealApi ? linkPhase : undefined}
       data-progress-quiet={progressQuiet ? 'true' : undefined}
-      data-testid={timedOut ? 'print-fulfill-state-client-status-timeout' : failed ? 'print-fulfill-state-failed' : 'print-fulfill-state-printing'}
+      data-testid={resultUnconfirmed ? 'print-fulfill-state-result-unconfirmed' : timedOut && linkPhase === 'live' ? 'print-fulfill-state-client-status-timeout' : failed ? 'print-fulfill-state-failed' : 'print-fulfill-state-printing'}
       className="qx-scroll pff-page pfp-page"
     >
       <section className="pff-xq">
@@ -606,7 +674,7 @@ export function PrintProgressPage() {
         </div>
       )}
 
-      {timedOut ? (
+      {timedOut && linkPhase === 'live' ? (
         <PrintStatusTimeoutPanel
           jobRow={jobRow}
           payment={payment}
@@ -647,7 +715,7 @@ export function PrintProgressPage() {
                           : isDone || (isSim && simDone)
                             ? (isSim ? '演示结束' : '完成')
                             : isActive
-                              ? (showFailure ? '打印未完成' : progressQuiet ? '进度未更新' : useRealApi ? realStatus.activeHint : '演示中…')
+                              ? (showFailure ? '打印未完成' : linkPhase !== 'live' ? (resultUnconfirmed ? '结果未确认' : '网络中断') : progressQuiet ? '进度未更新' : useRealApi ? realStatus.activeHint : '演示中…')
                               : '未开始'}
                       </span>
                     </span>
@@ -657,16 +725,8 @@ export function PrintProgressPage() {
                 )
               })}
             </div>
-            {useRealApi && statusReadError && !failed && (
-              <div className="pff-inbar" data-tone="wheat" role="status">
-                <div className="pff-inbar-h">
-                  <span className="pff-inbar-ic"><AlertTriangleIcon aria-hidden="true" /></span>
-                  <span>
-                    {STATUS_READ_ERROR_TEXT}
-                    <small>正在自动重试；读不到状态不代表打印失败</small>
-                  </span>
-                </div>
-              </div>
+            {useRealApi && linkPhase !== 'live' && !failed && (
+              <PrintProgressLinkNotice phase={resultUnconfirmed ? 'unconfirmed' : 'offline'} />
             )}
             {showFailure ? <PrintProgressFailureNote wayOut={failureView.wayOut} /> : null}
           </div>
@@ -704,7 +764,7 @@ export function PrintProgressPage() {
           </div>
           <div className="pff-out-main">
             <div className="pff-out-status">
-              {backendStatus === 'printing' && !progressQuiet ? (
+              {linkPhase === 'live' && backendStatus === 'printing' && !progressQuiet ? (
                 <span className="pff-pulse"><i /><i /><i />正在出纸</span>
               ) : (
                 stageHeading
@@ -722,7 +782,9 @@ export function PrintProgressPage() {
                 : <>开始出纸后，纸从<b>打印机出纸口</b>出来。</>)}
             </div>
             {!isSim && (
-              <p className="pfp-out-note">请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。页数来自文件信息，不逐页播报。</p>
+              linkPhase === 'live' ? (
+                <p className="pfp-out-note">请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。页数来自文件信息，不逐页播报。</p>
+              ) : null
             )}
           </div>
         </div>
@@ -730,8 +792,8 @@ export function PrintProgressPage() {
 
       {/* 查询超时时 busy lock 已释放、空闲清场会照常计时，「打印期间不会清空」不再成立，
           求助也改由底部两枚按钮承接（稿 client-status-timeout 态同样没有这两节）。 */}
-      {!isSim && (timedOut ? null : (
-        <>
+      {/* 断网仍持锁，「打印期间不会清空」成立。结果未确认已放锁，这句不再说。 */}
+      {!isSim && !timedOut && !resultUnconfirmed && (
         <section className="pff-sec" aria-label="你的文件，走完就清">
           <div className="pff-sec-h"><span className="t">你的文件，走完就清</span></div>
           <div className="pff-wipe" data-live="false">
@@ -741,33 +803,37 @@ export function PrintProgressPage() {
             </div>
           </div>
         </section>
+      )}
 
+      {/* 常见情况里有「打印失败」。断网和结果未确认都不是打印结论，整节先不显示。 */}
+      {!isSim && (
+        !timedOut && linkPhase === 'live' ? (
         <section className="pff-sec" aria-label="常见情况处理">
           <div className="pff-sec-h">
             <span className="t">遇到这些情况怎么办</span>
-            <span className="hint">找现场工作人员最快</span>
+            <span className="hint">{helpNeededLine(contact)}</span>
           </div>
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
               <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口或找现场工作人员。查了很久仍没有最终结果时，本页也会另外提示。</p></li>
+              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请先看出纸口。{helpNeededLine(contact)}。查了很久仍没有最终结果时，本页也会另外提示。</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
                 <CreditCardIcon aria-hidden="true" />
                 <p>
                   {isFreeOrder
-                    ? <><b>打印失败</b>：本次未收款，记录已保存，请找现场工作人员核对。</>
+                    ? <><b>打印失败</b>：订单记录保留。{helpNeededLine(contact)}。</>
                     : payment === 'paid'
-                      ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
-                      : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>
+                      ? <><b>已支付但打印失败</b>：订单与支付记录都在。{amountCents != null && amountCents > 0 ? refundApplyLine(contact) : helpNeededLine(contact)}</>
+                      : <><b>打印失败</b>：订单记录已保存。{helpNeededLine(contact)}。</>
                   }
                 </p>
               </li>
             </ul>
             <div className="pff-help" data-testid="print-fulfill-fallback">
-              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{machineCannotPrintLine(contact, { orderKept: true })}</span>
               <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                联系工作人员
+                求助
               </button>
             </div>
             <PrintAiHelp
@@ -776,8 +842,8 @@ export function PrintProgressPage() {
             />
           </div>
         </section>
-        </>
-      ))}
+        ) : null
+      )}
 
       {isSim && (
         <section className="qx-card pff-info" aria-label="演示说明">
@@ -792,7 +858,7 @@ export function PrintProgressPage() {
       )}
 
       <span className="pfp-live" role="status" aria-live="polite">
-        {isSim ? (simDone ? '演示已结束' : '演示进行中') : timedOut ? '状态查询超时' : failed && !isSim ? failureView.badge : progressQuiet ? '进度未更新' : realStatus.badge}
+        {isSim ? (simDone ? '演示已结束' : '演示进行中') : resultUnconfirmed ? '结果未确认' : linkOffline ? '网络中断' : timedOut ? '状态查询超时' : failed && !isSim ? failureView.badge : progressQuiet ? '进度未更新' : realStatus.badge}
       </span>
 
       {import.meta.env.DEV && canSimulate && !failed && (

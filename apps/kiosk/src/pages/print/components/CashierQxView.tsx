@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { PrintAiHelp } from './PrintAiHelp'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
@@ -91,14 +92,14 @@ export function CashierQxView(props: CashierQxViewProps) {
           <div className="cashier-qx-xq-row">
             <div className="cashier-qx-xq-face" aria-hidden="true">青</div>
             <div className="cashier-qx-xq-main">
-              <div className="cashier-qx-xq-eyebrow">付款</div>
+              <div className="cashier-qx-xq-eyebrow">{free ? '确认打印' : '付款'}</div>
               <p className="cashier-qx-xq-ask">{copy.ask[0]}</p>
               <p className="cashier-qx-xq-doing">{copy.ask[1]}</p>
             </div>
           </div>
           <ol className="cashier-qx-xq-steps">
-            <li><b>1</b>看清本页结果<small>先确认是等待、成功、失败、关闭还是退款。</small></li>
-            <li><b>2</b>不重复付款<small>结果异常或长时间未更新时，先查看支付账单。</small></li>
+            <li><b>1</b>看清本页结果<small>{free ? '查看订单记录与打印状态。' : '先确认是等待、成功、失败、关闭还是退款。'}</small></li>
+            <li><b>2</b>{free ? '核对订单' : '不重复付款'}<small>{free ? '任务未建立时，只恢复同一打印任务。' : '结果异常或长时间未更新时，先查看支付账单。'}</small></li>
             <li><b>3</b>按底部按钮继续<small>当前可用的处理动作已经放在屏幕下方。</small></li>
           </ol>
         </section>
@@ -157,6 +158,7 @@ function Pickers(props: CashierQxViewProps & {
   activeMethod: PaymentMethod | null
   note: readonly [string, string] | null
 }) {
+  const free = props.amountCents === 0
   const busy = props.issuing || props.codeSubmitting
   const channelDisabled = !props.enabled || busy
   const methodDisabled = !props.enabled || busy || !props.selectedChannel
@@ -164,7 +166,7 @@ function Pickers(props: CashierQxViewProps & {
   return (
     <section className="cashier-qx-modes" aria-label="支付方式选择">
       <div className="cashier-qx-picker" data-kind="channels">
-        <span className="cashier-qx-picker-label">支付通道</span>
+        <span className="cashier-qx-picker-label">{free ? '办理方式' : '支付通道'}</span>
         {showChannels ? props.channels.map((channel) => (
           <button
             key={channel}
@@ -223,7 +225,7 @@ function AmountCard(props: CashierQxViewProps & { free: boolean }) {
     : !known
       ? '金额暂不可用，请从我的打印订单重新进入查看。'
       : props.free
-        ? '免费试运营 · 本单实付 0 元 · 本次未收款'
+        ? '免费试运营'
         : state === 'refunding' || state === 'partial-refunded' || state === 'refunded'
           ? '本单实付金额来自已建订单；退款金额与到账时间以支付渠道账单为准，本机不估算'
           : state === 'expired' || state === 'attempt-failed'
@@ -231,10 +233,10 @@ function AmountCard(props: CashierQxViewProps & { free: boolean }) {
             : '本单实付金额来自已建订单，本机不重新计算'
   return (
     <div className="cashier-qx-amount">
-      <div className="cashier-qx-amount-lb">{label}</div>
+      <div className="cashier-qx-amount-lb">{props.free ? '办理方式' : label}</div>
       {known ? (
         <strong className="cashier-qx-amount-num" data-cashier-amount="" data-quote-status="known">
-          {formatCents(props.amountCents ?? 0)}
+          {props.free ? '免费' : formatCents(props.amountCents ?? 0)}
         </strong>
       ) : (
         <strong className="cashier-qx-amount-num" data-quote-status="unavailable">金额暂不可用</strong>
@@ -282,7 +284,7 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
   } else {
     rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
-  if (props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
+  if (props.amountCents !== 0 && props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
   rows.push(...props.rows)
   return (
     <section className="cashier-qx-group" aria-label="订单信息">
@@ -295,7 +297,7 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
           </div>
         ))}
       </dl>
-      <p className="cashier-qx-p">{props.refundAssistanceCopy}。</p>
+      <p className="cashier-qx-p">{typeof props.amountCents === 'number' && props.amountCents > 0 ? props.refundAssistanceCopy : `如需核对出纸结果，${helpNeededLine()}。`}</p>
     </section>
   )
 }
@@ -382,7 +384,7 @@ function SideNote({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
               ? ['请稍候', '你可能刚好在最后一秒完成付款。确认结果前，请勿再次支付。']
               : state === 'release-failed'
                 ? ctx.free
-                  ? ['会不会扣钱', '这一单报价为 0，本来就不收款；重试只重新创建打印任务。']
+                  ? ['重试会做什么', '重试只重新创建同一打印任务，订单记录保留。']
                   : ['为什么不会重新收款', '这里只重试创建同一打印任务，不会再次收款。']
                 : state === 'attempt-channel-unknown'
                   ? ['为什么不替你挑一个', '猜错会让你扫到一张不属于这一单的码，也可能把别人的付款结果当成你的。宁可这里停住。']
@@ -425,12 +427,16 @@ function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
     ? state === 'pending-qr'
       ? '支付尝试已经创建。请勿切换方式、重复付款或重新下单。'
       : '读满十八位并提交后才会向支付平台发起；在那之前仍可改回屏幕上的码或更换通道。'
-    : state === 'free-order' || state === 'release-failed'
-      ? '本次只恢复或创建打印任务，不进入收款流程。'
+    : ctx.free
+      ? '本次只恢复或创建同一打印任务，订单记录保留。'
+      : state === 'release-failed'
+        ? '本次只恢复或创建打印任务，不进入收款流程。'
       : state === 'paid'
         ? '付款已经确认；接下来去打印进度页查看出纸。'
         : '请按页面提示处理；支付结果长时间未更新时，先查看支付账单。'
-  const flow = scan
+  const flow = ctx.free
+    ? [['1. 核对订单', '查看本页订单记录和打印状态。'], ['2. 按按钮继续', '只恢复或创建同一打印任务。'], ['3. 等待出纸', '打印开始后，请留在出纸口旁取件。']]
+    : scan
     ? [['1. 核对金额', '只认当前订单返回的实际金额。'], ['2. 只操作一次', '请勿重复扫码或重复出示手机付款码。'], ['3. 等待结果确认', '付款码不会完整显示或保存在这台机器上。']]
     : [['1. 看清本页结果', '先确认是等待、成功、失败、关闭还是退款。'], ['2. 不重复付款', '结果异常或长时间未更新时，先查看支付账单。'], ['3. 按底部按钮继续', '当前可用的处理动作已经放在屏幕下方。']]
   return (
@@ -471,8 +477,8 @@ export function CashierQxDock({
         <p>
           <b>异常处理</b>
           {billingChannel === 'sandbox'
-            ? '本次走的是测试支付通道，不产生真实账单；结果长时间未更新时请联系工作人员。'
-            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单，再联系工作人员。`}
+            ? `本次走的是测试支付通道，不产生真实账单。结果长时间未更新时，${helpNeededLine()}。`
+            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单。${helpNeededLine()}。`}
         </p>
       </div>
     </>

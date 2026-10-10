@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import { PRINT_SCAN_CAPABILITY_STATUSES } from '../terminal-capabilities.types'
 
 export class UpdateTerminalCapabilityDto {
@@ -9,4 +9,11 @@ export class UpdateTerminalCapabilityDto {
   @IsString()
   @MaxLength(200)
   note?: string
+
+  /** null = 用全局默认。缺省表示这次不改这一列。 */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  dailyFreePrintSides?: number | null
 }

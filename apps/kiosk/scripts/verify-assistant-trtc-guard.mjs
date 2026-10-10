@@ -143,6 +143,13 @@ expectMatches(
   /terminalProtectedFetch\([\s\S]*?\/trtc\/session['"`]/,
   'TRTC session create uses terminalProtectedFetch',
 )
+expectIncludes(callHook, 'session.maxSessionSeconds', 'TRTC hook reads the server session limit')
+expectIncludes(callHook, 'Date.parse(session.expiresAt)', 'TRTC hook uses the server deadline including connection time')
+expectMatches(callHook, /checkDeadline[\s\S]*?remaining > 0[\s\S]*?startedRef\.current = false[\s\S]*?sessionEpochRef\.current \+= 1[\s\S]*?void cleanup\(\)[\s\S]*?setPhase\('expired'\)/, 'deadline invalidates the session and releases backend/SDK before text fallback')
+expectIncludes(callPanel, "call.phase === 'expired'", 'voice panel switches to text when the hook expires')
+expectIncludes(callPanel, '本次语音通话还剩 1 分钟', 'voice panel warns one minute before expiry')
+expectIncludes(assistantPage, '语音通话已到本次上限，已为你转成文字对话，可以继续问', 'text conversation explains the automatic switch')
+expectMatches(assistantPage, /setMessages\(previous => \[\.\.\.previous/, 'automatic fallback appends to the existing transcript')
 const stopBackend = callHook.slice(callHook.indexOf('function stopBackendTask'), callHook.indexOf('export type CallPhase'))
 expectIncludes(stopBackend, 'fetch(', 'TRTC stop stays a keepalive fetch')
 expectNotMatches(stopBackend, /terminalProtectedFetch/, 'TRTC stop does not wait on a terminal session')

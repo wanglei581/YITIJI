@@ -3,7 +3,7 @@
 //
 // 2026-09-25 迁入青序稿 08-legal：文档切换 → 文档头 → 按章节读（左目录 + 右单章）→
 // 「哪一版算数 / 看不懂这一章」两张卡；另有 loading / error / not-found 三态照稿。
-// 页壳是 QxPageFrame；舞台缩放与 JobFitStage 同一判据（竖屏一体机缩放，窄屏 / 横屏按真实宽度排）。
+// 页壳是 QxPageFrame；舞台缩放与 JobFitStage 同一判据（竖屏一体机与横屏电脑缩放，只有手机按真实宽度排）。
 //
 // 正文口径（稿头注释 + G6 + verify:legal-doc-version 第 12 项）：
 // - 正文只来自 GET /kiosk/legal/{docType} 的当前有效版本；取到之前只放槽位，不显示任何条款。
@@ -22,7 +22,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { useKioskStageFit } from '../../hooks/useKioskStageFit'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { API_BASE_URL } from '../../services/api'
 import {
   FROM_TARGETS, findSectionIndex, formatPublishedAt, readDocLoad, readFromKey, readSectionTitle, splitLegalSections,
@@ -115,7 +117,6 @@ const PRIVACY_SECTIONS: Section[] = [
   {
     title: '五、联系我们',
     paragraphs: [
-      '如对个人信息保护有任何疑问或需要协助，请联系现场工作人员或通过终端公示的运营方联系方式与我们沟通。',
       '本政策正式版本以运营方发布为准；如本页内容与正式发布版本不一致，以正式发布版本为准。',
     ],
   },
@@ -152,6 +153,7 @@ async function fetchLegalDoc(docType: DocMeta['docType'], signal: AbortSignal): 
 }
 
 export function LegalDocPage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const location = useLocation()
   const { doc } = useParams<{ doc: string }>()
@@ -161,8 +163,7 @@ export function LegalDocPage() {
   const fromKey = readFromKey(location.search)
   const sectionTitle = readSectionTitle(location.search)
   const { viewportW, viewportH } = useKioskStageFit()
-  const compact = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
-  const fluid = compact || (viewportW > 960 && viewportW > viewportH)
+  const fluid = usesKioskFluidViewport(viewportW, viewportH)
 
   const [loads, setLoads] = useState<Record<DocKey, DocLoad>>({ terms: { status: 'loading' }, privacy: { status: 'loading' } })
   // 请求失败后，用户主动点「看本机留存文本」才显示；重试时清掉，让重试结果说话。
@@ -206,7 +207,22 @@ export function LegalDocPage() {
     () => (docLoad?.status === 'ready' ? splitLegalSections(docLoad.content) : null),
     [docLoad],
   )
-  const sections: Section[] = servedSections ?? meta?.sections ?? []
+  const localSections = useMemo(() => {
+    const base = meta?.sections ?? []
+    if (meta?.key !== 'privacy') return base
+    return base.map((section) => (
+      section.title === '五、联系我们'
+        ? {
+            ...section,
+            paragraphs: [
+              `如对个人信息保护有任何疑问或需要协助，${helpNeededLine(contact)}。`,
+              ...section.paragraphs,
+            ],
+          }
+        : section
+    ))
+  }, [contact, meta])
+  const sections: Section[] = servedSections ?? localSections
   const chapterKey = `${docKey ?? ''}:${view}`
   // 没点过目录时，按 `?section=` 打开到标题包含它的那一章；找不到停在开头。
   const sectionTarget = findSectionIndex(sections, sectionTitle)
@@ -289,7 +305,7 @@ export function LegalDocPage() {
               <p>左上角和下面的返回按钮，会回到<b>你进来的那一页</b>；来路不明时统一回首页，不会把你甩到别处。</p>
             </LegalCard>
             <LegalCard tone="teal" glyph="desk" title="要找别的文件">
-              <p>屏幕上只提供这两份。其他材料请找<b>现场工作人员</b>，或按运营方公示的方式联系。</p>
+              <p>屏幕上只提供这两份。其他材料，{helpNeededLine(contact)}。</p>
             </LegalCard>
           </div>
         </LegalSec>
@@ -343,7 +359,7 @@ export function LegalDocPage() {
               </button>
             </LegalCard>
             <LegalCard tone="teal" glyph="desk" title="现在就要看">
-              <p>找<b>现场工作人员</b>索取现行版本，或按运营方公示的方式联系。</p>
+              <p>{helpNeededLine(contact)}，以索取现行版本。</p>
               <p className="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p>
               <button type="button" className="legal-doc-inbtn is-ghost" data-testid="legal-local-text"
                       onClick={() => setLocalOptIn((prev) => ({ ...prev, [meta.key]: true }))}>
@@ -365,7 +381,7 @@ export function LegalDocPage() {
         </LegalSec>
         <LegalSec>
           <StateBlock kind="warn" glyph="clock" title="什么时候能读到">
-            <p className="legal-doc-state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，请找现场工作人员索取。</p>
+            <p className="legal-doc-state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，{helpNeededLine(contact)}。</p>
           </StateBlock>
         </LegalSec>
       </>
@@ -386,7 +402,7 @@ export function LegalDocPage() {
           <div className="legal-doc-state is-compact" data-kind="warn" role="status" data-testid="legal-doc-fallback-warning">
             <h2 className="legal-doc-state-h"><Glyph name="warn" size={28} />本机留存文本，不作为正式版本</h2>
             <p className="legal-doc-state-p">
-              当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。请稍后重试，或向现场工作人员索取正式文本。
+              当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。请稍后重试。{helpNeededLine(contact)}。
             </p>
           </div>
         </LegalSec>
@@ -397,7 +413,7 @@ export function LegalDocPage() {
         <LegalSec>
           <div className="legal-doc-grid2">
             <LegalCard tone="wheat" glyph="info" title="哪一版算数">
-              <p>本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。</p>
+              <p>本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准。{helpNeededLine(contact)}。</p>
             </LegalCard>
             <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
               <p className="fine">AI 顾问只转述运营方发布的正文。<b>正文没取到时这个入口先关着</b>，不拿留存文本去讲。</p>
@@ -440,7 +456,7 @@ export function LegalDocPage() {
           <div className="legal-doc-grid2">
             <LegalCard tone="wheat" glyph="info" title="哪一版算数">
               <p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>
-              <p className="fine">以上为运营方当前发布的有效版本；如有疑问可咨询现场工作人员。</p>
+              <p className="fine">以上为运营方当前发布的有效版本。{helpNeededLine(contact)}。</p>
             </LegalCard>
             <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
               <p className="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。本页不会把正文自动发过去，到那边说出想问的章节即可。</p>

@@ -282,6 +282,11 @@ const small = (value: number): number | null => (value > 0 && value < 5 ? null :
 export function partnerUsage(range: string): ScreenUsageSnapshot {
   const safe: ScreenUsageRange = isUsageRange(range) ? range : 'today'
   const nowMs = Date.now()
+  const start = new Date(nowMs + 8 * 3600000)
+  start.setUTCHours(0, 0, 0, 0)
+  const midnight = start.getTime() - 8 * 3600000
+  const until = safe === 'today' ? nowMs : midnight
+  const from = safe === 'today' ? midnight : midnight - (safe === '7d' ? 7 : 30) * 86400000
   const n = safe === '30d' ? 30 : safe === '7d' ? 7 : 1
   const k = n === 1 ? 1 : n === 7 ? 6 : 24
   const browse = [38, 44, 29, 52, 61, 3, 47, 58, 66, 41, 35, 72, 80, 64, 59, 0, 48, 55, 62, 70, 76, 68, 49, 57, 83, 91, 74, 66, 88, 79]
@@ -289,7 +294,7 @@ export function partnerUsage(range: string): ScreenUsageSnapshot {
   const days: Array<{ date: string; browse: number | null; sourceOpens: number | null }> = []
   for (let i = n - 1; i >= 0; i -= 1) {
     const j = (n - 1 - i) % browse.length
-    days.push({ date: shanghaiDate(i), browse: small(browse[j]), sourceOpens: small(opens[j]) })
+    days.push({ date: shanghaiDate(i + (safe === 'today' ? 0 : 1)), browse: small(browse[j]), sourceOpens: small(opens[j]) })
   }
   const content: ScreenPartnerContentUsageValue = {
     coverage: 'members_only',
@@ -305,7 +310,7 @@ export function partnerUsage(range: string): ScreenUsageSnapshot {
     generatedAt: isoAgo(7),
     audience: 'partner',
     range: safe,
-    window: { timezone: 'Asia/Shanghai', from: new Date(nowMs - n * 86_400_000).toISOString(), to: new Date(nowMs).toISOString() },
+    window: { timezone: 'Asia/Shanghai', from: new Date(from).toISOString(), to: new Date(until).toISOString() },
     status: 'ok',
     degraded: false,
     limits: { minAggregateSample: 5, recruitmentHosting: 'enabled' },
@@ -338,7 +343,7 @@ export function partnerUsageVisitsFailed(range: string): ScreenUsageSnapshot {
 /**
  * 托管关闭的信息使用，照 console-screen.usage.service.ts / usage.queries.ts 写：
  *   - partnerContent 只下发政策一类（byType 过滤到 policy）；
- *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），少于 5（含 0）→ null；
+ *   - partnerDaily 只数政策的浏览与打开来源入口（countsTowardPartnerDaily），0 保留；1–4 → null；≥5 原样；
  *   - partnerTop 只从政策里挑，浏览达到 5 次才列，每条的浏览不超过政策浏览合计（今日 21 / 近 7 天 126 / 近 30 天 504）。
  * 各块的数两两不撞（使用概况、每日趋势的峰值与孤立点、热门政策）：每屏一个数只出现一次的体检靠这个分辨复述。
  */
@@ -346,7 +351,7 @@ const POLICY_DAILY = [
   [21, 8], [16, 6], [9, 3], [18, 7], [24, 9], [2, 0], [15, 5], [19, 6], [22, 8], [13, 4], [11, 5], [25, 10], [27, 11], [20, 7], [17, 6],
   [0, 0], [14, 5], [18, 6], [21, 8], [23, 9], [26, 10], [22, 8], [15, 5], [19, 7], [28, 11], [31, 12], [24, 9], [21, 8], [29, 11], [26, 10],
 ] as const
-const suppressed = (value: number): number | null => (value >= 5 ? value : null)
+const suppressed = small
 
 export function partnerUsageHostingOff(range: string): ScreenUsageSnapshot {
   const base = partnerUsage(range)
@@ -431,18 +436,18 @@ export function partnerTwin(id: string): ScreenTerminalTwin | null {
   const now = Date.now()
   const printing = cell.activity === 'printing'
   const printerState = cell.health === 'offline' ? 'offline' : cell.health === 'unknown' ? 'unknown' : cell.health === 'degraded' ? 'error' : printing ? 'printing' : 'ready'
-  const seg = (fromH: number, toH: number, state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown') => ({
-    from: new Date(now - fromH * 3600_000).toISOString(),
-    to: new Date(now - toH * 3600_000).toISOString(),
+  const seg = (fromH: number, toH: number, state: 'idle' | 'alert' | 'offline' | 'unknown') => ({
+    from: new Date(now - fromH * 3600_000).toISOString().slice(0, 16) + 'Z',
+    to: new Date(now - toH * 3600_000).toISOString().slice(0, 16) + 'Z',
     state,
   })
   return {
-    generatedAt: new Date(now).toISOString(),
+    generatedAt: new Date(now).toISOString().slice(0, 16) + 'Z',
     audience: 'partner',
     terminal: { id, code: cell.terminalCode, displayName: `${cell.locationLabel} · 一楼`, areaLabel: cell.areaLabel, locationLabel: cell.locationLabel, geo: null },
     status: {
       health: cell.health,
-      lastHeartbeatAt: cell.health === 'unknown' ? null : new Date(now - (cell.health === 'offline' ? 1_260_000 : 3000)).toISOString(),
+      lastHeartbeatAt: cell.health === 'unknown' ? null : new Date(now - (cell.health === 'offline' ? 1_260_000 : 3000)).toISOString().slice(0, 16) + 'Z',
       onlineWindowSeconds: 180,
       agentVersion: cell.health === 'unknown' ? null : '0.9.4',
       wiredNetwork: cell.health === 'unknown' ? null : 'connected',
@@ -455,16 +460,16 @@ export function partnerTwin(id: string): ScreenTerminalTwin | null {
       duplexEnabled: true,
     }),
     scanner: ok('TerminalHeartbeat+ScanTask', 'current', { state: 'ready', label: null }),
-    currentTask: ok('PrintTask.status', 'current', printing ? { pages: 6, colorMode: 'bw', startedAt: new Date(now - 30_000).toISOString() } : null),
+    currentTask: ok('PrintTask.status', 'current', printing ? { pages: 6, colorMode: 'bw', startedAt: new Date(now - 30_000).toISOString().slice(0, 16) + 'Z' } : null),
     today: { printPages: 22, printTasks: null, scans: null, failed: 0, visits: na('KioskSession.startedAt', 'shanghai-day', 'sample_below_threshold') },
     consumables: na('TerminalHeartbeat', 'current', 'no_consumable_or_geo_fields'),
-    timeline24h: ok('TerminalHeartbeat+PrintTask', '24h', [
+    timeline24h: ok('TerminalHeartbeat', '24h', [
       seg(24, 15, 'offline'),
-      seg(15, 8, 'idle'),
-      seg(8, 7.6, 'printing'),
-      seg(7.6, 2, 'idle'),
+      seg(15, 2, 'idle'),
+
+
       seg(2, 1.8, 'alert'),
-      seg(1.8, 0, printing ? 'printing' : 'idle'),
+      seg(1.8, 0, 'idle'),
     ]),
   }
 }

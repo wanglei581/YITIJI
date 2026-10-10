@@ -5,6 +5,11 @@ import { ResumeExportResult } from './ResumeExportResult'
 import { ResumePricingBar } from './ResumePricingBar'
 import type { ResumeExportPricing } from '@ai-job-print/shared'
 
+function resumeExportAigcNote(format: ResumeExportFormat): string {
+  if (format === 'txt' || format === 'md') return '导出的文件末尾有一行：含人工智能辅助生成内容'
+  return '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
+}
+
 export function ResumeDeliverPanel(props: {
   layout: Required<ResumeLayoutSettings>
   onLayoutChange: (next: Required<ResumeLayoutSettings>) => void
@@ -24,6 +29,9 @@ export function ResumeDeliverPanel(props: {
   pricingLoading: boolean
   blockedReason: string | null
   exportBlocked: boolean
+  /** 公司、职务、学校、专业不合法时只禁用简历导出和打印，不禁用修改清单。 */
+  contentBlocked?: boolean
+  onContentBlocked?: () => void
   onRequestExport: () => void
   onChangeList?: () => void
   changeListBusy?: boolean
@@ -38,6 +46,8 @@ export function ResumeDeliverPanel(props: {
   const formatLabel = EXPORT_FORMAT_OPTIONS.find((item) => item.value === props.exportFormat)?.label ?? 'PDF'
   const printReady = Boolean(props.exported?.printFileUrl)
   const previewReady = Boolean(props.exported?.signedUrl)
+  const resumeBlocked = props.exportBlocked || Boolean(props.contentBlocked)
+  const printBlocked = Boolean(props.contentBlocked) || !printReady || props.printNavigating
 
   return (
     <aside className="qx-rd-side" aria-label="排版与导出">
@@ -102,6 +112,7 @@ export function ResumeDeliverPanel(props: {
           ))}
         </div>
         <p>PDF 直接打印；Word/TXT/Markdown 供到手机保存。导出成功后才会出现预览与打印入口。</p>
+        <p className="qx-rd-aigc-note" data-testid="resume-export-aigc-note">{resumeExportAigcNote(props.exportFormat)}</p>
         <ResumePricingBar pricing={props.pricing} loading={props.pricingLoading} blockedReason={props.blockedReason} />
       </div>
 
@@ -123,9 +134,12 @@ export function ResumeDeliverPanel(props: {
           type="button"
           className="qx-btn"
           data-variant="primary"
-          aria-disabled={props.exportBlocked || undefined}
+          aria-disabled={resumeBlocked || undefined}
           aria-describedby={props.blockedReason ? 'resume-export-blocked-reason' : undefined}
-          onClick={() => { if (!props.exportBlocked) props.onRequestExport() }}
+          onClick={() => {
+            if (props.contentBlocked) { props.onContentBlocked?.(); return }
+            if (!props.exportBlocked) props.onRequestExport()
+          }}
         >
           {props.exporting ? '正在生成文件…' : `导出 ${formatLabel}`}
         </button>
@@ -150,8 +164,11 @@ export function ResumeDeliverPanel(props: {
             type="button"
             className="qx-btn"
             data-variant="teal"
-            aria-disabled={!printReady || props.printNavigating || undefined}
-            onClick={() => { if (printReady && !props.printNavigating) props.onPrint() }}
+            aria-disabled={printBlocked || undefined}
+            onClick={() => {
+              if (props.contentBlocked) { props.onContentBlocked?.(); return }
+              if (printReady && !props.printNavigating) props.onPrint()
+            }}
           >
             {props.printNavigating ? '正在进入打印确认…' : printReady ? (props.printLabel ?? '去打印优化版') : '打印链接未就绪'}
           </button>

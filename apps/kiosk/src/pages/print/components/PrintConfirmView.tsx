@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { FileTextIcon, LockIcon } from 'lucide-react'
 import type { PrintParamAdjustment } from '@ai-job-print/shared'
 import type { PrintBenefitView } from '../../../services/api/benefits'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { ASK, type PrintConfirmScreen, type QuoteView } from '../printConfirmModel'
 import type { PrintFileState } from '../printMaterialSession'
 import {
@@ -26,6 +27,7 @@ export type { SummaryRow }
 
 type Props = {
   step: 4
+  freePricing: boolean
   screen: PrintConfirmScreen
   invalidReason: string
   file: PrintFileState
@@ -56,7 +58,7 @@ type Props = {
   onLogin: () => void
 }
 
-function Steps({ idle, step }: { idle: boolean; step: 4 }) {
+function Steps({ idle, step, freePricing }: { idle: boolean; step: 4; freePricing: boolean }) {
   return (
     <div className="pcf-steps" aria-label="打印流程">
       {STEPS.map((label, index) => {
@@ -65,7 +67,7 @@ function Steps({ idle, step }: { idle: boolean; step: 4 }) {
         return (
           <div key={label} className="pcf-step" data-state={state || undefined} aria-current={state === 'on' ? 'step' : undefined}>
             <i aria-hidden="true" />
-            {label}
+            {freePricing && index === 3 ? '确认打印' : label}
           </div>
         )
       })}
@@ -73,15 +75,15 @@ function Steps({ idle, step }: { idle: boolean; step: 4 }) {
   )
 }
 
-function Advisor({ screen, doingOverride }: { screen: PrintConfirmScreen; doingOverride?: string | null }) {
-  const { title } = ASK[screen]
-  const doing = doingOverride ?? ASK[screen].doing
+function Advisor({ screen, doingOverride, freePricing }: { screen: PrintConfirmScreen; doingOverride?: string | null; freePricing: boolean }) {
+  const title = freePricing ? screen === 'quote-failed' ? ['暂时', '无法核定页数', '。'] : ['先核对', '打印内容', '。'] : ASK[screen].title
+  const doing = freePricing ? screen === 'quote-failed' ? '文件和参数已保留，本次没有创建订单。' : '核对页数和参数后再确认打印。' : doingOverride ?? ASK[screen].doing
   return (
     <section className="pcf-xq" aria-label="小青提示">
       <div className="pcf-xq-row">
         <div className="pcf-xq-face" aria-hidden="true">青</div>
         <div className="pcf-xq-main">
-          <div className="pcf-xq-eyebrow">核对价格</div>
+          <div className="pcf-xq-eyebrow">{freePricing ? '核对打印内容' : '核对价格'}</div>
           <p className="pcf-xq-ask">{title[0]}<em>{title[1]}</em>{title[2]}</p>
           <p className="pcf-xq-doing">{doing}</p>
         </div>
@@ -92,7 +94,7 @@ function Advisor({ screen, doingOverride }: { screen: PrintConfirmScreen; doingO
 
 export function PrintConfirmView(props: Props) {
   const {
-    screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
+    freePricing, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
     amountText, benefitView, redactionText, materialDemo, printerBlocked, printerBlockedReason,
     terminalFailed, terminalFailedText, selfAssessment, printNotes, actions,
     submitError, onLogin,
@@ -115,13 +117,13 @@ export function PrintConfirmView(props: Props) {
       data-state={screen}
       data-testid={`print-confirm-state-${screen}`}
     >
-      <Advisor screen={screen} doingOverride={capabilityDoing} />
-      <Steps idle={idle} step={props.step} />
+      <Advisor screen={screen} doingOverride={capabilityDoing} freePricing={freePricing} />
+      <Steps idle={idle} step={props.step} freePricing={freePricing} />
 
-      {printerBlocked && !idle ? <div className="pcf-alert" role="status">{printerBlockedReason}</div> : null}
+      {printerBlocked && !idle && !(quote.status === 'unavailable' && quote.code === 'PRINT_TERMINAL_QUEUE_HALTED') ? <div className="pcf-alert" role="status">{printerBlockedReason}</div> : null}
       {terminalFailed ? <div className="pcf-alert" data-tone="error" role="alert">{terminalFailedText}</div> : null}
       {adjustments.length > 0 && screen !== 'capability-invalid-params' ? (
-        <div className="pcf-alert">彩色或双面本机暂未开通，已改回目前能打的参数。改回之后的参数才参与报价。</div>
+        <div className="pcf-alert">彩色或双面本机暂未开通，已改回目前能打的参数。{freePricing ? '请按改回后的参数核对打印内容。' : '改回之后的参数才参与报价。'}</div>
       ) : null}
 
       {screen === 'missing-context' ? (
@@ -195,7 +197,7 @@ export function PrintConfirmView(props: Props) {
         </>
       ) : null}
 
-      {screen === 'capability-invalid-params' ? (
+      {!freePricing && screen === 'capability-invalid-params' ? (
         <>
           {/* 9/29 定稿（稿 14）：不拦截。灰色的项本机暂未开通，已按能打的参数照常报价，主按钮可点。 */}
           <Sec no="01" title="核对打印内容" hint="灰色的项本机暂未开通，已按能用的参数报价">
@@ -220,7 +222,7 @@ export function PrintConfirmView(props: Props) {
                   slot: quote.status !== 'ready',
                 },
                 { label: '计价参数', value: pricedParamsLabel },
-                { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
+                { label: '计费方式', value: quote.status === 'unavailable' ? '未获取' : costCalcLabel, slot: quote.status !== 'ready', cost: true },
                 { label: '小计', value: quote.status === 'ready' ? `¥${amountText}` : '无法显示', slot: quote.status !== 'ready' },
               ]} />
             </div>
@@ -263,7 +265,7 @@ export function PrintConfirmView(props: Props) {
         </>
       ) : null}
 
-      {screen === 'quoting' || screen === 'quote-failed' || quotedLike ? (
+      {!freePricing && (screen === 'quoting' || screen === 'quote-failed' || quotedLike) ? (
         <>
           <Sec no="01" title="核对打印内容" hint={screen === 'quote-failed' ? '文件和参数都保留着' : undefined}>
             <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
@@ -301,7 +303,7 @@ export function PrintConfirmView(props: Props) {
                   value: quote.status === 'ready' ? `${quote.billablePages} 页` : quote.status === 'loading' ? '正在计算' : '未获取',
                   slot: quote.status !== 'ready',
                 },
-                { label: '计费方式', value: costCalcLabel, slot: quote.status !== 'ready', cost: true },
+                { label: '计费方式', value: quote.status === 'unavailable' ? '未获取' : costCalcLabel, slot: quote.status !== 'ready', cost: true },
                 {
                   label: '权益抵扣',
                   value: screen === 'benefit-unverified'
@@ -324,7 +326,7 @@ export function PrintConfirmView(props: Props) {
               <Chips items={[{ text: '正在获取报价', tone: 'live' }, '尚未创建订单', '尚未扣费']} />
             ) : null}
             {screen === 'quote-failed' ? (
-              <div className="pcf-grid2">
+              <div className="pcf-grid2" data-single={quote.status === 'unavailable' && quote.code === 'PRINT_TERMINAL_QUEUE_HALTED' || undefined}>
                 {quote.status === 'unavailable' && quote.code === 'PRINT_TERMINAL_QUEUE_HALTED' ? null : <div className="pcf-pgrp">
                   <h4>可能的原因</h4>
                   <Plan items={['本机与系统之间网络中断。', '参数里有本机暂未开通的项，系统直接拒绝报价。']} />
@@ -395,6 +397,34 @@ export function PrintConfirmView(props: Props) {
           {/* 权益卡不占 01→02→03 的主路：本轮权益只展示、不核销，不改变本单金额。
               放在 03 之后，1080 首屏才能看到完整的确认卡与主按钮。 */}
           {benefitView ? <BenefitCard view={benefitView} onLogin={onLogin} /> : null}
+          {printNotes}
+        </>
+      ) : null}
+
+      {freePricing && (screen === 'quoting' || screen === 'quote-failed' || quotedLike || screen === 'capability-invalid-params') ? (
+        <>
+          <Sec no="01" title="核对打印内容">
+            <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
+            {selfAssessment}
+          </Sec>
+          <Sec no="02" title="页数核定" hint={screen === 'quoting' ? '正在核定页数' : screen === 'quote-failed' ? '页数核定未完成' : '免费试运营'}>
+            {quote.status === 'unavailable' ? <div className="pcf-state" data-tone="warn" role="status"><p>{quote.reason.includes('确认前不显示金额') ? `暂时无法核定页数，请重试。${helpNeededLine()}。` : quote.reason}</p></div> : null}
+            {quote.status === 'ready' ? <span data-testid="print-confirm-amount">免费试运营</span> : null}
+            <FeeLines rows={[
+              { label: '打印页数', value: quote.status === 'ready' ? `${quote.billablePages} 页` : quote.status === 'loading' ? '正在核定' : '未获取', slot: quote.status !== 'ready' },
+              { label: '打印参数', value: pricedParamsLabel },
+            ]} />
+            <p className="pcf-reason">文件和参数都保留着，{screen === 'quote-failed' ? '本次没有创建订单。' : '确认后才创建订单。'}</p>
+          </Sec>
+          <Sec no="03" title={screen === 'quote-failed' ? '现在可以怎么办' : '确认打印'}>
+            <ConfirmCard
+              freePricing
+              tone={screen === 'quote-failed' ? 'error' : undefined}
+              note={screen === 'quoting' ? '页数核定后才可继续。' : screen === 'quote-failed' ? '可以重新核定页数，或返回修改参数。' : '免费试运营。确认后直接开始打印，请在出纸口取件。'}
+              alert={submitError}
+              actions={actions}
+            />
+          </Sec>
           {printNotes}
         </>
       ) : null}

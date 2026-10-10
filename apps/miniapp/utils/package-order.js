@@ -28,6 +28,8 @@
 //   - 不把到机码、金额、有效期经 URL 传递；凭证只能来自带登录态的服务端响应。
 //   - 不提供在线支付（材料包是到机器后现场付款），因此全链禁止 wx.requestPayment。
 
+const { reprintNoteText } = require('./support-contact')
+
 /** 服务端 CreatePackageOrderDto 允许进材料包的文件用途（ALLOWED_PURPOSES 同集合）。 */
 const PACKAGE_ALLOWED_PURPOSES = ['print_doc', 'resume_upload', 'resume_scan', 'cover_letter']
 
@@ -69,7 +71,7 @@ const PAY_STATUS_LABELS = {
 }
 const TASK_STATUS_LABELS = {
   pending: '排队中',
-  pending_release: '等待到机释放',
+  pending_release: '到机核销后开始打印',
   awaiting_payment: '等待现场付款',
   claimed: '终端已领取',
   printing: '打印中',
@@ -275,17 +277,25 @@ function statusDetail(order) {
 }
 
 /**
+ * 到机码：待到机，或服务端允许同码续打时展示。服务端没下发码就留空，
+ * 不在本地保留上一次拿到的码。
+ */
+function visiblePackageCode(order, status) {
+  const source = order || {}
+  const code = source.pickupCode ? String(source.pickupCode) : ''
+  if (!code) return ''
+  if ((status && status.key === 'waiting') || source.reprintAllowed === true) return code
+  return ''
+}
+
+/**
  * 列表行 → UI 行。
- *
- * 到机码只在服务端**确实下发**时展示：服务端的 visibleCode 判据是
- * `pickupStatus === 'pending' && 未过期`，已核销 / 已过期的订单直接给 null。
- * 前端不做第二套判据，也不在本地保留上一次拿到的码。
  */
 function toPackageRow(order, now) {
   const source = order || {}
   const status = resolvePackageStatus(source, now)
   const amountCents = parseAmountCents(source.amountCents)
-  const pickupRaw = status.key === 'waiting' && source.pickupCode ? String(source.pickupCode) : ''
+  const pickupRaw = visiblePackageCode(source, status)
   const itemCount = Number(source.itemCount)
   return {
     orderId: source.orderId || '',
@@ -299,6 +309,7 @@ function toPackageRow(order, now) {
     expiresText: formatExpireAt(source.expiresAt),
     pickupCode: formatPickupCode(pickupRaw),
     hasPickupCode: !!pickupRaw,
+    reprintNote: pickupRaw ? reprintNoteText(source) : '',
     statusDetail: statusDetail(source),
     statusKey: status.key,
     statusLabel: status.label,
@@ -380,7 +391,7 @@ const PACKAGE_ERROR_COPY = {
   // 不说机器码、不说心跳时间戳：服务端那句原文说的是「本机打印机」，那是写给站在一体机
   // 前的人的；用户此刻在手机上，"本机"会被读成他的手机。该码不在 user-error.js 的
   // PASSTHROUGH 白名单里，request.js 会把 message 清空，于是这里这句中文真正生效。
-  PRINTER_UNAVAILABLE: { title: '该服务点打印机暂时出不了纸', text: '这台一体机的打印机当前离线、缺纸或故障，服务端不会受理材料包。缺纸或卡纸现场工作人员处理后，回到这一页重新核价就能继续；也可以换一个服务点。', recover: 'retry' },
+  PRINTER_UNAVAILABLE: { title: '该服务点打印机暂时出不了纸', text: '这台一体机的打印机当前离线、缺纸或故障，服务端不会受理材料包。可以稍后回到这一页重新核定，或换一个服务点。', recover: 'retry' },
   // 终端的打印队列闸门合上、Agent 已停领（#1150）。和上一条不是一回事：这不是缺纸卡纸，
   // 现场处理不了、重新核价也不会过，用户能做的是换一个服务点。服务端原话不带「本机」，
   // 已进 PASSTHROUGH，text 优先用它；这里的 text 只在服务端没给原话时兜底。
@@ -481,6 +492,8 @@ module.exports = {
   statusText,
   statusDetail,
   toPackageRow,
+  visiblePackageCode,
+  reprintNoteText,
   mergePackageRows,
   describePackageError,
 }

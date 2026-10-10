@@ -244,15 +244,16 @@ for (const marker of [
 }
 
 /* 2026-09-08 青序流光迁移（稿 30-my-profile）：ProfilePage 不再直接写
- * navigate('/me/notifications')，消息通知移到了页面自己的磁贴列表
- * （ProfilePage.tsx 的 `{ icon: BellIcon, title: '消息通知', to: '/me/notifications' }`）。
- * 形状变了，能力没变——把一条形状锚点换成两条能力锚点，只增不减。
+ * navigate('/me/notifications')，消息通知移到了页面自己的磁贴列表。
+ * C2-2（2026-10-06）：磁贴在 ProfileHomeStates.tsx（四行带说明），不再写在 ProfilePage.tsx。
+ * 形状变了，能力没变——两条能力锚点改为两份源码一起读，一条不删。
  * 同一处替换也已应用于 verify-lightflow-profile-entry.mjs。 */
+const profileActions = `${profile}\n${read('src/pages/profile/components/ProfileHomeStates.tsx')}`
 for (const [marker, message] of [
   ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
   ['消息通知', 'ProfilePage 仍展示消息通知入口'],
 ]) {
-  expectIncludes(profile, marker, message)
+  expectIncludes(profileActions, marker, message)
 }
 for (const marker of ['onPrintFile', 'onDeleteResume', 'onDeleteScan', 'onDeleteAiRecord']) {
   expectIncludes(records, marker, `ProfileSessionRecords preserves ${marker}`)
@@ -356,7 +357,8 @@ expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录�
 expectIncludes(settingsPage, '公共终端使用说明', '账号设置保留公共终端使用说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
 // Wave 2 已实现换绑，只有注销和数据导出仍未开放
-expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
+expectIncludes(settingsPage, '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请', '账号设置写清注销与复制个人信息怎么申请')
+expectIncludes(settingsPage, '我们核实是你本人后，15 个工作日内处理', '账号设置写清核实与时限')
 
 expectIncludes(aiRecordsPage, "import './styles/member-records-qx.css'", 'AI服务记录引入青序记录页 CSS')
 expectIncludes(aiRecordsPage, 'QxMePage', 'AI服务记录使用青序记录壳')
@@ -388,6 +390,9 @@ const allowedProfileLandingChanged = new Set([
   'apps/kiosk/src/pages/profile/styles/profile-qx.css',
   'apps/kiosk/src/pages/profile/assets/useMemberAssetCounts.ts',
   'apps/kiosk/src/pages/profile/components/ProfileHeader.tsx',
+  // C2-2（2026-10-06）：稿 30 的状态条、四行通知、底部操作条从 ProfilePage 拆出，
+  // 让主文件停在 500 行内。能力仍由本守卫和 lightflow 的 profileActions 钉住，不是新入口。
+  'apps/kiosk/src/pages/profile/components/ProfileHomeStates.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileSessionRecords.tsx',
   'apps/kiosk/src/pages/profile/components/ProfileContinueCard.tsx',
@@ -416,6 +421,11 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
   // 2026-09-29 走查 W-01：AI 内容投诉说明与答复天数（C3）。只加行，不改守卫逻辑。
   'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
+  // C2-6（2026-10-06）：意见反馈按稿 40 拆成底栏、状态屏、行图标和提交规则。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts',
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
@@ -428,6 +438,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
   'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  // C 路 C1-3（2026-10-06）：我的文档页内照稿。分类与访问链接横幅拆到 documents/，
+  // 主文件仍保留打印、预览、删除、签名与保存期限。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/documents/documentClassify.ts',
+  'apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx',
   'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
   'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
@@ -438,6 +452,9 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
   'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
   'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  // C 路 C1-6（2026-10-06）文案审查：失败指引第三格收成一份。
+  // 从组件文件导出非组件函数会触发 react-refresh 警告，所以单独成这个小文件。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts',
   'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
   'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',

@@ -341,7 +341,7 @@ export class ResumeExportGateService {
 }
 
 function labelFor(mode: ResumeExportMode, unitCents: number): string {
-  if (mode === 'free') return '当前免费，不扣权益'
+  if (mode === 'free') return '免费试运营'
   if (mode === 'charged') return `本次导出需核销 1 次权益（定价 ¥${(unitCents / 100).toFixed(2)} / 次）`
   return '简历导出当前不可用（价目已停用，不是免费）'
 }

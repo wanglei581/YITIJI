@@ -1,6 +1,13 @@
 // pages/print-pickup/pickup-state.js
 // 取件页的纯函数：金额、码的分组、倒计时文案、订单状态 → 屏幕状态。从 print-pickup.js 拆出来
 // （那个文件超过 800 行，CLAUDE.md §8 不再往里堆功能）。只服务取件页，不进 utils/。
+const { SUPPORT_HINT } = require('../../utils/user-error')
+const {
+  resolveSupportView,
+  supportFields,
+  splitDetailPhone,
+  reprintNoteText,
+} = require('../../utils/support-contact')
 
 function parseAmountCents(value) {
   if (value === undefined || value === null || value === '') return null
@@ -22,7 +29,14 @@ function formatCountdown(ms) {
   return hours > 0 ? `${hours}小时${minutes}分钟后过期` : `${Math.max(1, minutes)}分钟后过期`
 }
 
-function resolveOrderState(order) {
+function wholeRemaining(value) {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  return value
+}
+
+function resolveOrderState(order, support) {
+  const view = support && typeof support === 'object' ? support : resolveSupportView(null)
+  const hint = view.hint || SUPPORT_HINT
   const pickupStatus = String(order.pickupStatus || '')
   const taskStatus = String(order.taskStatus || '')
   const isFreeOrder = parseAmountCents(order.amountCents) === 0
@@ -34,10 +48,25 @@ function resolveOrderState(order) {
     return { key: 'cancelled', title: '订单已取消', detail: '本次到机码已经失效。', showQr: false }
   }
   if (taskStatus === 'failed') {
-    return { key: 'failed', title: '打印失败', detail: '请查看终端提示，或联系现场工作人员处理。', showQr: false }
+    const note = reprintNoteText(order)
+    if (order.reprintAllowed === true && note) {
+      return {
+        key: 'failed',
+        title: '打印失败',
+        detail: `回到同一台一体机，再输一次这个到机码，可以接着打（${note}）。${hint}`,
+        showQr: true,
+      }
+    }
+    const remaining = wholeRemaining(order.reprintRemaining)
+    let action = '可以回到订单重新打印。'
+    if (remaining === 0) action = '不能再打了，可以回到订单重新打印。'
+    let detail = `请查看终端屏幕上的提示；${action}`
+    if (view.suggestOtherTerminal === true) detail += '附近还有别的一体机可用。'
+    detail += hint
+    return { key: 'failed', title: '打印失败', detail, showQr: false }
   }
   if (taskStatus === 'abandoned') {
-    return { key: 'abandoned', title: '打印任务已终止', detail: '请返回订单页重新发起，或联系现场工作人员处理。', showQr: false }
+    return { key: 'abandoned', title: '打印任务已终止', detail: `请回到订单页重新发起。${hint}`, showQr: false }
   }
   if (taskStatus === 'completed') {
     return { key: 'completed', title: '打印已完成', detail: '请及时取走纸张并检查是否齐全。', showQr: false }
@@ -56,4 +85,23 @@ function resolveOrderState(order) {
   return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }
 }
 
-module.exports = { parseAmountCents, formatCode, formatCountdown, resolveOrderState }
+function paintOrder(order, support, codeRaw, codeText, hasCode) {
+  const view = support && typeof support === 'object' ? support : resolveSupportView(null)
+  const status = resolveOrderState(order, view)
+  const fields = supportFields(view)
+  const show = !!(status.showQr && hasCode)
+  const split = splitDetailPhone(status.detail, fields.canCallPhone ? fields.supportPhone : '')
+  return Object.assign({
+    statusKey: status.key,
+    statusTitle: status.title,
+    statusDetail: status.detail,
+    statusLead: split.lead,
+    statusTail: split.tail,
+    detailPhone: split.hit,
+    showQr: show,
+    codeRaw: show ? codeRaw : '',
+    code: show ? codeText : '',
+  }, fields)
+}
+
+module.exports = { parseAmountCents, formatCode, formatCountdown, resolveOrderState, paintOrder }

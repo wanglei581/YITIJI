@@ -1,5 +1,8 @@
 import { AlertCircleIcon, ClockIcon, PencilLineIcon } from 'lucide-react'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
+import type { InterviewFinishRecovery } from './interviewAnswerRecovery'
+import { InterviewMicGuide } from './InterviewMicGuide'
+import { InterviewNetworkError } from './InterviewNetworkError'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
@@ -17,6 +20,10 @@ interface InterviewAnswerDockProps {
   voiceAvailable: boolean
   /** 语音不可用的常显原因（无设备 / 无权限 / 不支持）。可用时为 null。 */
   micBlockedReason: string | null
+  networkFailure: boolean
+  /** 设置屏选了语音回合，但这一场麦克风或语音服务不可用。 */
+  voiceEntryBlocked: boolean
+  onBackToText: () => void
   onRecheckMic: () => void
   onDraftChange: (value: string) => void
   onReviewChange: (value: string) => void
@@ -28,6 +35,11 @@ interface InterviewAnswerDockProps {
   onSkip: () => void
   onSubmitText: () => void
   onFinish: () => void
+  finishRecovery: InterviewFinishRecovery | null
+  onContinueAnswering: () => void
+  onLeaveInterview: () => void
+  onOpenTips: () => void
+  onRetryReport: () => void
   omitPrintAnswers: boolean
   onOmitPrintAnswersChange: (value: boolean) => void
 }
@@ -35,10 +47,20 @@ interface InterviewAnswerDockProps {
 export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
   const {
     micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
-    draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
+    draft, voiceAvailable, micBlockedReason, networkFailure, voiceEntryBlocked, onBackToText,
+    onRecheckMic, onDraftChange, onReviewChange,
     onReviewSubmit, onRetryVoice, onStopRecording, onUseText, onUseVoice, onSkip,
-    onSubmitText, onFinish, omitPrintAnswers, onOmitPrintAnswersChange,
+    onSubmitText, onFinish, finishRecovery, onContinueAnswering, onLeaveInterview,
+    onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange,
   } = props
+  if (networkFailure) {
+    return (
+      <footer className="interview-session__answer-dock">
+        <InterviewNetworkError error={error} onBackToText={onBackToText} onOpenTips={onOpenTips} />
+      </footer>
+    )
+  }
+
   const answerStatus =
     phase === 'done_suggest' ? '本场已完成'
     : mode === 'voice' && voice.kind === 'recording' ? '作答中 · 语音录制'
@@ -69,6 +91,18 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         </div>
       )}
       {error && !micError && <p className="interview-session__error" role="alert">{error}</p>}
+      {finishRecovery === 'no-answers' && !micError && (
+        <div className="iv-tbar" data-testid="interview-finish-recovery">
+          <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onContinueAnswering}>继续答题</button>
+          <button type="button" className="qx-btn" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>
+        </div>
+      )}
+      {finishRecovery === 'outage' && !micError && (
+        <div className="iv-tbar" data-testid="interview-finish-recovery">
+          <button type="button" className="qx-btn" data-variant="teal" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
+          <button type="button" className="qx-btn" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button>
+        </div>
+      )}
 
       <label className="interview-session__omit-print">
         <input
@@ -112,6 +146,13 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           </div>
         </>
       ) : (
+        <InterviewMicGuide
+          active={voiceEntryBlocked && !micError}
+          reason={micBlockedReason}
+          onRecheck={onRecheckMic}
+          onOpenTips={onOpenTips}
+          onUseText={onUseText}
+        >
         <div className="interview-session__text-grid">
           <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} aria-label="本题回答" placeholder="在这里输入你的回答，最多 2000 字" />
           <div className="iv-tbar">
@@ -136,12 +177,15 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
             <p className="interview-session__mic-reason" data-mic-reason role="status">
               <AlertCircleIcon aria-hidden="true" />
               <span>{micBlockedReason}</span>
-              <button type="button" className="interview-session__mic-recheck" onClick={onRecheckMic}>
-                重新检测麦克风
-              </button>
+              {!voiceEntryBlocked && (
+                <button type="button" className="interview-session__mic-recheck" onClick={onRecheckMic}>
+                  重新检测麦克风
+                </button>
+              )}
             </p>
           )}
         </div>
+        </InterviewMicGuide>
       )}
       <AiDeclarationNote />
       <p className="interview-session__privacy-note"><ClockIcon aria-hidden="true" />模拟练习仅供本人参考，对话内容不会发送给任何企业</p>

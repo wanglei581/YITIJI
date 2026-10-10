@@ -1,3 +1,5 @@
+import { machineCannotPrintLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 // ============================================================
 // PrintScanHomePage — 打印扫描 Hub（青序流光 10-print-hub）。
 //
@@ -16,7 +18,6 @@ import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
   type PrintScanCapabilityKey,
-  type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +39,7 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { getTerminalId, subscribeTerminalIdentity } from '../../services/api/screensaver'
 import {
+  CAPABILITY_STATUS_NOTES,
   loadConfiguredCapabilities,
   resolveCapabilityOverride,
   type CapabilitiesLoadResult,
@@ -50,7 +52,6 @@ import {
   COPY_GUIDE_KEY,
   COPY_GUIDE_ROUTE,
   HUB_PILL,
-  PRINT_HUB_PRICE_NOTICE,
   arrivalCodeStateNote,
   capabilityGroupHint,
   colorDuplexChip,
@@ -248,10 +249,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
  * 到机码核销 —— 手机上已经下过单的人的入口。
  * 原型 39-print-hub.html:585-627（PR #644 补入），单独一行、不进七张卡的栅格。
  *
- * ⚠ 命名：后端与小程序下单页都叫它「到机码」（pickup-order.service.ts 的
- * 错误文案「到机码无效或已过期」、小程序 print-pay 的「提交并生成到机码」），
- * 它与付款后才生成的「取件凭证码」(Order.pickupCode) 是两个码。原型据此
- * 把卡面写成「到机码核销 · 不是取件码」。生产此前把两个码都叫「取件码」。
+ * ⚠ 命名：方案②（2026-10-06）起，到机码就是唯一的取件码。
+ * 卡面仍写「不是取件码」，是和上传码消歧（verify-fusion-w2-print-scan 断言这句），
+ * 不是在说还有第二种取件码。
  *
  * ⚠ 门禁：刻意不登记进 CARD_CAPABILITY_KEY，也不随 MFP 轴停用 ——
  * 核销的是订单而非新建本机打印任务。原型在 device-off / 探测失败时把这张卡
@@ -279,14 +279,6 @@ const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
   sign: 'signature_stamp',
 }
 
-const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> = {
-  available: null,
-  testing: '测试中，暂未对用户开放',
-  maintenance: '维护中，暂时不可用',
-  unsupported: '本机不支持此项服务',
-  not_verified: '本机暂未开通',
-}
-
 /** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
 const FEEDBACK_QUICK_LINK_KEY = 'feedback'
 
@@ -302,7 +294,7 @@ const QUICK_LINKS: readonly (QxPrintQuickLinkView & { to?: string })[] = [
     key: 'print-orders',
     icon: PrinterIcon,
     title: '打印订单',
-    description: '查看订单与取件凭证码',
+    description: '查看订单与到机码',
     to: '/me/print-orders',
   },
   {
@@ -324,8 +316,10 @@ function toProbeStatus(load: CapabilitiesLoadResult | { status: 'loading' }): Pr
 }
 
 export function PrintScanHomePage() {
+  const contact = useSupportContact()
   const navigate = useNavigate()
   const device = useTerminalDeviceStatus()
+  // Hub 只选办理入口，使用中性文案；价目由后续打印确认页读取，离开扫描不额外取价。
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
@@ -478,12 +472,16 @@ export function PrintScanHomePage() {
     )
   const hubState = deriveHubUiState({ probe, mfp, locked })
   const pill = HUB_PILL[hubState]
+  const printerUnavailable = {
+    label: device.printerLabel,
+    notice: machineCannotPrintLine(contact),
+  }
 
   return (
     <QxPageFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title="打印扫描服务"
-      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : pill}
+      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
       terminalLabel="就业服务大厅"
       navbar={
         <PrintHubNavbar
@@ -497,6 +495,7 @@ export function PrintScanHomePage() {
         hubState={hubState}
         probe={probe}
         mfp={mfp}
+        printerUnavailable={printerUnavailable}
         orderPaused={
           hubState === 'device-off' && device.printerNotice
             ? { label: device.printerLabel, notice: device.printerNotice }
@@ -526,12 +525,11 @@ export function PrintScanHomePage() {
             : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={device.printerNotice ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
+        capabilityGroupHint={mfp === 'unavailable' && confirmed ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
         recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
-          PRINT_HUB_PRICE_NOTICE,
         ]}
         onRetry={loadCapabilities}
         onHelp={() => navigate('/help')}
@@ -544,7 +542,6 @@ export function PrintScanHomePage() {
         open={feedbackOpen}
         onClose={() => setFeedbackOpen(false)}
         issueOptions={PRINT_HUB_ISSUE_OPTIONS}
-        description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
     </QxPageFrame>
   )

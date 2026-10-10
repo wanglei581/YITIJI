@@ -36,6 +36,22 @@ export async function assertNoElementCrossesViewport(page: Page): Promise<void> 
   expect(overflowingElements, '不得包含越过视口边界的元素').toEqual([])
 }
 
+/**
+ * 舞台开启时读 `.kiosk-stage` 的 scale。关闭或不存在时返回 1。
+ * 屏上像素要折回设计像素时用它做除数；手机流式布局不能再除一次。
+ */
+export async function readEnabledStageScale(page: Page): Promise<number> {
+  const stage = page.locator('[data-kiosk-stage-fit="on"] .kiosk-stage')
+  if ((await stage.count()) === 0) return 1
+  return stage.first().evaluate((element) => {
+    const transform = getComputedStyle(element).transform
+    if (!transform || transform === 'none') return 1
+    const match = /^matrix\(([^,]+)/.exec(transform)
+    const value = match ? Number(match[1]) : 1
+    return Number.isFinite(value) && value > 0 ? value : 1
+  })
+}
+
 /** 量 bounding box，并用 elementFromPoint 确认 ≥48px 区域内真能命中该控件。 */
 export async function assertTapTargetPointerHit(locator: Locator): Promise<void> {
   const box = await locator.boundingBox()
@@ -98,8 +114,9 @@ export async function assertQxPillReadable(page: Page, where: string): Promise<v
   expect(lines.length, detail).toBeLessThanOrEqual(2)
   expect(Math.min(...lines.map((line) => line.length)), `${detail}：有一行只剩一个字`).toBeGreaterThanOrEqual(2)
   if (text.includes(' · ')) {
-    for (const phrase of text.split('·').map((part) => part.replace(/\s/g, '')).filter(Boolean)) {
-      expect(lines.some((line) => line.includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
+    const compact = (value: string) => value.replace(/\s/g, '')
+    for (const phrase of text.split('·').map((part) => compact(part)).filter(Boolean)) {
+      expect(lines.some((line) => compact(line).includes(phrase)), `${detail}：「${phrase}」被拆到两行`).toBe(true)
     }
   }
 }
@@ -137,4 +154,61 @@ export async function assertDialogWithinViewport(page: Page): Promise<void> {
   expect(bounds.y).toBeGreaterThanOrEqual(0)
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height)
+}
+
+/** 与 audit-qingxu-v2-drafts.mjs 的 BLANK_PROBE 逐行同口径：截图像素，y 60–1900。 */
+export async function readPixelBlankBands(page: Page) {
+  await page.evaluate(() => document.fonts.ready)
+  const shot = await page.screenshot({ scale: 'css' })
+  return page.evaluate(async ({ b64, top, bottom }) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height)
+    const half = width >> 1
+    const left = new Uint8Array(height)
+    const right = new Uint8Array(height)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4
+        const lo = Math.min(data[i]!, data[i + 1]!, data[i + 2]!)
+        const hi = Math.max(data[i]!, data[i + 1]!, data[i + 2]!)
+        if (lo < 165 || (hi - lo > 45 && lo < 220)) {
+          if (x < half) left[y] = 1
+          else right[y] = 1
+          if (left[y] && right[y]) break
+        }
+      }
+    }
+    const longest = (ink: (y: number) => number) => {
+      let best: [number, number, number] = [0, 0, 0]
+      let start = -1
+      for (let y = top; y <= Math.min(bottom, height); y++) {
+        const blank = y < Math.min(bottom, height) && !ink(y)
+        if (blank && start < 0) start = y
+        if (!blank && start >= 0) {
+          if (y - start > best[0]) best = [y - start, start, y]
+          start = -1
+        }
+      }
+      return best
+    }
+    return {
+      full: longest((y) => left[y]! || right[y]!),
+      left: longest((y) => left[y]!),
+      right: longest((y) => right[y]!),
+    }
+  }, { b64: shot.toString('base64'), top: 60, bottom: 1900 })
+}
+
+export async function assertNoLargeBlankBands(page: Page, label: string): Promise<void> {
+  const bands = await readPixelBlankBands(page)
+  expect(bands.full[0], `${label}：整行最长空白 < 160px`).toBeLessThan(160)
+  expect(bands.left[0], `${label}：左半最长空白 < 240px`).toBeLessThan(240)
+  expect(bands.right[0], `${label}：右半最长空白 < 240px`).toBeLessThan(240)
 }

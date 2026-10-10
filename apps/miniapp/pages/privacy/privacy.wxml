@@ -71,7 +71,7 @@
     <view class="grp-label">个人信息请求</view>
     <view class="pr-card">
       <view class="pr-line"><text class="pr-k">自己办</text><text class="pr-v">{{selfHelpLine}}</text></view>
-      <view class="pr-line"><text class="pr-k">办不了的</text><text class="pr-v">例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。</text></view>
+      <view class="pr-line"><text class="pr-k">办不了的</text><text class="pr-v">{{accountClosureAvailable ? '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。' : '例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。'}}</text></view>
       <view class="pr-line"><text class="pr-k">多久答复</text><text class="pr-v">核实是你本人后，{{privacyRequestDays}} 个工作日内处理；办不了的会告诉你理由。</text></view>
       <view class="pr-acts">
         <view class="pr-btn tap" hover-class="tap-press" bindtap="toFeedback" role="button" aria-label="去意见反馈">去意见反馈</view>
@@ -157,12 +157,22 @@
           <view class="pv-main">
             <view class="pv-t danger">账号注销</view>
             <view class="pv-s" wx:if="{{!capabilityLoaded}}">正在读取服务端状态…</view>
-            <view class="pv-s" wx:elif="{{accountClosureAvailable}}">服务端已开放；不可逆，需二次确认</view>
+            <view class="pv-s" wx:elif="{{activeClosure}}">{{activeClosure.statusLabel}}</view>
+            <view class="pv-s" wx:elif="{{accountClosureAvailable}}">提交申请后由我们核实处理；不可逆，需短信验证</view>
             <view class="pv-s" wx:else>服务端当前未开放线上自助注销，提交会被拒绝</view>
           </view>
           <text class="ficon i-right pv-go danger"></text>
         </view>
       </view>
+
+      <!-- 注销说明：会删什么、保留什么、多久处理完。只在服务端开放注销时出现。 -->
+      <block wx:if="{{accountClosureAvailable}}">
+        <view class="grp-label">账号注销说明</view>
+        <view class="pr-card">
+          <view class="pr-line" wx:for="{{closureNotes}}" wx:key="k"><text class="pr-k">{{item.k}}</text><text class="pr-v">{{item.v}}</text></view>
+          <view class="pr-line"><text class="pr-k">多久处理</text><text class="pr-v">核实是你本人后，{{privacyRequestDays}} 个工作日内处理完。处理完成后会自动退出登录；处理之前可以撤回。</text></view>
+        </view>
+      </block>
 
       <!-- 处理记录 -->
       <view class="grp-label">处理记录</view>
@@ -180,6 +190,7 @@
           </view>
           <view class="rq-sub">{{item.requestedAtText}}</view>
           <view wx:if="{{item.failureText}}" class="rq-sub warn">{{item.failureText}}</view>
+          <view wx:if="{{item.canCancel}}" class="ef-btn tap" hover-class="tap-press" bindtap="cancelClosure" data-id="{{item.id}}" role="button" aria-label="撤回注销申请">撤回申请</view>
         </view>
       </view>
     </block>

@@ -16,8 +16,10 @@ import { fileURLToPath } from 'node:url'
 //   3. 一体机反馈相关文案不出现退款 / 赔付字样，也不承诺推送回复。
 //   4. 前端 issueCode 词表与后端 DTO 白名单逐项一致（漂移即 FAIL）。
 //
-// 注意：PrintCashierPage 的「本机不提供自助退款」是**允许**出现「退款」的唯一位置 ——
-// 那句话本身就是在声明不提供退款，且定案要求它继续为真，因此不在扫描范围内。
+// 注意：PrintCashierPage 的「本机不提供自助退款」继续为真。
+// 2026-10-06 标准句 5 只在金额 > 0 时出现，完成页源码不得写「退款」字面量，
+// 必须走 refundApplyLine()，并且调用处挂在 amountCents > 0 上。
+// 弹层、提交面、打印 Hub 仍然整段禁止退款 / 赔付字样。
 // ============================================================
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -93,9 +95,15 @@ expectMatches(
 // ── 3. 诚实性与退款红线 ──
 console.log('\n[3] 诚实性与退款红线')
 const REFUND_COPY = /退款|退费|赔付|理赔|返还费用/
-for (const [label, source] of [['弹层', dialogSrc], ['提交面', clientSrc], ['打印完成页', doneSrc], ['打印 Hub', hubSrc]]) {
+for (const [label, source] of [['弹层', dialogSrc], ['提交面', clientSrc], ['打印 Hub', hubSrc]]) {
   expectNoMatch(source, REFUND_COPY, `${label}不出现退款 / 赔付字样`)
 }
+expectNoMatch(doneSrc, REFUND_COPY, '打印完成页源码不写退款字面量；付费句只走 refundApplyLine')
+expectMatches(
+  doneSrc,
+  /amountCents != null && amountCents > 0 \? refundApplyLine\(contact\)/,
+  '打印完成页只在金额大于 0 时调用退款句',
+)
 // 匿名工单没有账号可送达：后台连回复入口都不渲染，前端不得承诺回复。
 expectNoMatch(dialogSrc, /会回复你|回复您|我们会回复/, '不承诺向匿名用户推送回复（系统结构上做不到）')
 expectMatches(dialogSrc, /本次为匿名反馈，系统不会把处理结果推送到账号/, '如实说明匿名工单不会推送处理结果')
@@ -108,10 +116,12 @@ expectNoMatch(dialogSrc, /已退款|退款成功|已受理退款/, '不显示任
 // 定案：收银页那句「本机不提供自助退款」必须继续为真，不得被删。
 console.log('\n[4] 收银页既有口径保持为真')
 const cashierSrc = read(CASHIER)
+expectMatches(cashierSrc, /refundApplyLine\(\)/, '收银页退款说明改走标准句 5，不再写找现场工作人员')
+expectMatches(cashierSrc, /本机不提供自助退款/, '收银页「本机不提供自助退款」文案保留')
 expectMatches(
   cashierSrc,
-  /如需退款请联系现场工作人员协助处理，本机不提供自助退款/,
-  '收银页「本机不提供自助退款」文案保留',
+  /amountCents != null && amountCents > 0 \? refundAssistanceCopy\(\)/,
+  '收银页只在金额大于 0 时给出退款说明',
 )
 
 // ── 5. 前后端词表一致 ──

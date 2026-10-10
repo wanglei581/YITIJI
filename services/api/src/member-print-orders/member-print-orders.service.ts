@@ -6,8 +6,12 @@ import type {
 } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
-import { pickupCodeVisibleFor } from '../payment/order-status.service'
 import { isPaidUnfulfilledRefundRequired } from '../payment/pending-refund-signal'
+import {
+  arrivalViewsForOrders,
+  EMPTY_ARRIVAL_REPRINT,
+  type ArrivalReprintFields,
+} from '../print-jobs/self-service-reprint'
 import type { OrderPayStatus, PaymentSource, PrintPriceLine } from '../payment/payment.types'
 import { createPaymentSessionToken } from '../payment/payment-session-token'
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
@@ -136,7 +140,6 @@ export type MemberOrderPaymentSource = {
   paymentSource: string | null
   billablePages: number | null
   billingPageSource: string | null
-  pickupCode: string | null
   /** 没有哈希的是现场单。视图不得把认领不了的明文下发出去。 */
   pickupCodeHash: string | null
   taskStatus: string
@@ -148,15 +151,15 @@ export type MemberOrderPaymentSource = {
 
 /**
  * 「我的打印订单」支付字段的唯一口径：历史无 Order 一律 null，不编造。
- * 取件凭证码还要有 pickupCodeHash，并走 pickupCodeVisibleFor 门控（仅 paid 且未退款、任务未进入完成/取消/失败终态）。
+ * pickupCode 只可能是到机码或 null，由调用方传入的 arrival 决定，不读明文列。
  * `/me/print-orders` 与跨端时间线共用，不许在别处另写一套。
  */
-export function memberOrderPaymentFields(order: MemberOrderPaymentSource | null) {
-  // 现场单没有哈希，即使明文列还有历史值也不下发。有哈希时才走可见性门控。
-  const pickupCode =
-    order && order.pickupCodeHash != null && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
-      ? order.pickupCode
-      : null
+export function memberOrderPaymentFields(
+  order: MemberOrderPaymentSource | null,
+  arrival?: ArrivalReprintFields | null,
+) {
+  const view = order ? (arrival ?? EMPTY_ARRIVAL_REPRINT) : EMPTY_ARRIVAL_REPRINT
+  const pickupCode = view.pickupCode
   return {
     // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
     amountCents: order ? order.amountCents : null,
@@ -174,6 +177,9 @@ export function memberOrderPaymentFields(order: MemberOrderPaymentSource | null)
           refundReason: order.refundReason,
         })
       : null,
+    reprintAllowed: view.reprintAllowed,
+    reprintRemaining: view.reprintRemaining,
+    reprintNotice: view.reprintNotice,
   }
 }
 
@@ -206,6 +212,7 @@ export class MemberPrintOrdersService {
         order: {
           select: {
             id: true,
+            orderNo: true,
             // 任务上没记终端时用订单上的终端兜底显示网点名。
             terminalId: true,
             amountCents: true,
@@ -213,8 +220,13 @@ export class MemberPrintOrdersService {
             paymentSource: true,
             billablePages: true,
             billingPageSource: true,
-            pickupCode: true,
             pickupCodeHash: true,
+            pickupCodeEnc: true,
+            pickupStatus: true,
+            pickupCodeExpiresAt: true,
+            pickupClaimedAt: true,
+            paidAt: true,
+            printTaskId: true,
             taskStatus: true,
             refundedAt: true,
             // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。
@@ -236,6 +248,10 @@ export class MemberPrintOrdersService {
           select: { id: true, displayName: true, locationLabel: true },
         })).map((t) => [t.id, t]))
       : new Map<string, { id: string; displayName: string | null; locationLabel: string | null }>()
+    const arrivalViews = await arrivalViewsForOrders(
+      this.prisma,
+      rows.flatMap((row) => (row.order ? [row.order] : [])),
+    )
     return buildMemberPage(rows, page, total, (r) => {
       const terminal = r.terminal ?? (r.order?.terminalId ? fallbackTerminals.get(r.order.terminalId) ?? null : null)
       const params = parseSafeParams(r.paramsJson)
@@ -252,9 +268,10 @@ export class MemberPrintOrdersService {
         pageRange: params.pageRange,
         // 单件订单经 Order.printTaskId 关联本任务；材料包子任务才在 PrintTask.orderId 上。
         orderId: r.order?.id ?? r.orderId ?? null,
+        orderNo: r.order?.orderNo ?? null,
         terminal: terminal ? { id: terminal.id, displayName: terminal.displayName ?? null, locationLabel: terminal.locationLabel ?? null } : null,
         failureCode: r.status === 'failed' && r.errorCode && MEMBER_VISIBLE_FAILURE_CODES.has(r.errorCode) ? r.errorCode : null,
-        ...memberOrderPaymentFields(r.order),
+        ...memberOrderPaymentFields(r.order, r.order ? arrivalViews.get(r.order.id) : null),
       }
     })
   }

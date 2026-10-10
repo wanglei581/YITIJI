@@ -16,7 +16,7 @@
  *      pickupClaimMessage / classifyClaimFailure。
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -122,9 +122,12 @@ const httpAdapterStub = toDataUrl(`export class ApiHttpError extends Error {
 const sharedStub = toDataUrl(`export const LEGACY_PICKUP_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 export const PICKUP_CODE_LENGTH = 8
 export const PICKUP_CODE_MAX_INPUT_LENGTH = 10`)
-const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub })
+// 文案表按缓存联系方式生成；加载真实标准句模块，保留逐码运行时断言。
+const unattendedUrl = transpile('apps/kiosk/src/copy/unattendedCopy.ts')
+const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub, '../../copy/unattendedCopy': unattendedUrl })
 const cashierUrl = transpile('apps/kiosk/src/pages/print/cashierStatus.ts')
 const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
+  '../../copy/unattendedCopy': unattendedUrl,
   '@ai-job-print/shared': sharedStub,
   '../../services/api/httpAdapter': httpAdapterStub,
   './cashierStatus': cashierUrl,
@@ -133,7 +136,7 @@ const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
 const model = await import(modelUrl)
 const { ApiHttpError } = await import(httpAdapterStub)
 
-const table = model.PICKUP_CLAIM_MESSAGES
+const table = model.PICKUP_CLAIM_MESSAGES()
 if (!table || typeof table !== 'object') fail('pickupClaimModel 没有导出 PICKUP_CLAIM_MESSAGES')
 
 const missing = []
@@ -142,7 +145,7 @@ for (const code of [...serverCodes].sort()) {
   const said = model.pickupClaimMessage(new ApiHttpError(code, 'server says', 400))
   if (!registered) missing.push(code)
   else if (said !== table[code]) fail(`${code}：pickupClaimMessage 没有返回登记的文案（实际「${said}」）`)
-  else if (said === model.PICKUP_CLAIM_FALLBACK_MESSAGE) fail(`${code}：登记的文案等于兜底句`)
+  else if (said === model.PICKUP_CLAIM_FALLBACK_MESSAGE()) fail(`${code}：登记的文案等于兜底句`)
 }
 if (missing.length) fail(`一体机取件页没有登记这些认领失败码：${missing.join(', ')}`)
 else pass('服务端认领链路的每个码，一体机都有取件场景的登记文案')
@@ -153,9 +156,10 @@ for (const code of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
   assert.match(table[code], /到机码没有作废/)
   assert.doesNotMatch(table[code], /换一台/)
 }
-const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+// 无人值守后，干净原话仍透传；叫人到现场的旧原话必须换成标准句。
+const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码'
 assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', original, 400)), original)
-for (const bad of ['queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
+for (const bad of ['请找现场工作人员', 'queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
   assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', bad, 400)), table.PRINT_TERMINAL_QUEUE_HALTED)
 }
 pass('打印机拒绝保持可恢复分类；合格原话透传、不合格回退取件原话')
@@ -174,7 +178,8 @@ for (const code of CLOSED_REQUIRED) {
   const said = model.pickupClaimMessage(err)
   if (kind !== 'closed') fail(`${code}：应分类为 closed（码已是终态），实际 ${kind}`)
   if (/重试|重新输入|再试/.test(said)) fail(`${code}：文案「${said}」叫人重试，但这个码重输不会有别的结果`)
-  if (!/手机|工作人员|小程序/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机或找工作人员）`)
+  // 标准句有号码时给服务电话、无号码时给隐私政策联系方式；两种都是可执行的求助出路。
+  if (!/手机|工作人员|小程序|小青|联系方式|服务电话/.test(said)) fail(`${code}：文案「${said}」没有给出路（回手机、问小青或联系方式）`)
 }
 if (model.failureScreen('closed') !== 'closed') fail('closed 失败没有映射到独立的 closed 屏')
 pass(`终态码 ${CLOSED_REQUIRED.length} 个：分类 closed、文案不含「重试」、给出路`)
@@ -266,6 +271,92 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   } else if (!/claimSuccessDestination\(result\)/.test(page)) {
     fail('取件页没有按真实状态选择去向')
   } else pass('取件页使用 printTaskStatus 分流')
+}
+
+// W-117：执行真实显示表达式，失败码仅能用于内存重试，不能出现在公共屏幕码格。
+{
+  const page = read('apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx')
+  const expression = /const display = ([^\n]+)/.exec(page)?.[1]
+  if (!expression) fail('到机码页缺少码格显示表达式')
+  else {
+    const display = new Function('state', 'failure', 'code', `return (${expression})`)
+    for (const value of ['28491703', 'AB23456789']) {
+      if (display('error', { code: value }, value) !== '') fail('失败屏泄露刚提交的到机码')
+      else pass(`失败屏不显示 ${value.length} 位到机码`)
+      if (display('idle', null, value) !== value) fail('正常输入态不能隐藏本人当前输入')
+    }
+  }
+  if (!/handleClaim\(failure\.code\)/.test(page)) fail('重试必须仍使用内存原码')
+}
+
+// 方案②：三个续打错误码的句子与分类。不放进 CLOSED_REQUIRED——
+// 次数用尽和已经出过一部分纸的句子没有「手机 / 工作人员 / 小程序」；
+// 出纸未确认的句子含「请稍后再试」，按可恢复处理。
+{
+  const limit = '这单已经接着打过 2 次，不能再打了'
+  const unconfirmed = '这单的出纸结果还没确认，暂时不能接着打，请稍后再试'
+  const partial = '这单已经出了一部分纸，不能整单重打'
+  const already = '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。'
+  const resume = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
+  for (const [code, sentence, kind] of [
+    ['PICKUP_RESUME_LIMIT_REACHED', limit, 'closed'],
+    ['PICKUP_RESUME_UNCONFIRMED', unconfirmed, 'other'],
+    ['PICKUP_RESUME_PARTIAL_OUTPUT', partial, 'closed'],
+  ]) {
+    const err = new ApiHttpError(code, 'server says', 409)
+    if (model.pickupClaimMessage(err) !== sentence) fail(`${code} 文案不是后端那句`)
+    else if (model.classifyClaimFailure(err) !== kind) fail(`${code} 应分类为 ${kind}，实际 ${model.classifyClaimFailure(err)}`)
+    else pass(`${code}：${kind}，文案与后端一致`)
+  }
+  if (table.PICKUP_CODE_ALREADY_USED !== already) fail('PICKUP_CODE_ALREADY_USED 没有改成不找人的说法')
+  else pass('PICKUP_CODE_ALREADY_USED：出路是重新下单或问小青，不找现场工作人员、不叫原地重输')
+  if (model.PICKUP_SAME_CODE_RESUME_NOTE !== resume) fail('到机码页续打说明丢了或改了次数以外的承诺')
+  else pass('到机码页续打说明只承诺每单最多 2 次')
+}
+
+// 方案②口径：一体机源码的字符串字面量与 JSX 文本不得再出现旧说法。
+// 扫的是 apps/kiosk/src，不扫注释、测试和门禁脚本（否定断言要保留这几个词）。
+// 阳性对照：扫不到「两种码，别搞混」或续打说明，说明遍历坏了，不能算通过。
+{
+  const banned = ['取件凭证码', '出示给工作人员', '出示给现场工作人员']
+  const hits = []
+  let sawTwoCodes = false
+  let sawResumeNote = false
+  const resumeNote = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
+  const textsOf = (sf) => {
+    const texts = []
+    const visit = (node) => {
+      if (ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)) {
+        texts.push(node.text)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sf)
+    return texts
+  }
+  const walk = (dir) => {
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, ent.name)
+      if (ent.isDirectory()) {
+        if (ent.name === 'node_modules' || ent.name === 'dist') continue
+        walk(abs)
+        continue
+      }
+      if (!/\.tsx?$/.test(ent.name) || ent.name.endsWith('.d.ts')) continue
+      const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.ES2022, true, ent.name.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+      for (const text of textsOf(sf)) {
+        if (text.includes('两种码，别搞混')) sawTwoCodes = true
+        if (text.includes(resumeNote)) sawResumeNote = true
+        for (const phrase of banned) {
+          if (text.includes(phrase)) hits.push(`${abs.slice(kioskRoot.length + 1)} 含「${phrase}」`)
+        }
+      }
+    }
+  }
+  walk(join(kioskRoot, 'src'))
+  if (!sawTwoCodes || !sawResumeNote) fail('口径扫描没有扫到「两种码，别搞混」或续打说明（遍历坏了，不能算通过）')
+  else if (hits.length) fail(`一体机源码仍有旧说法：${hits.slice(0, 8).join('；')}`)
+  else pass('一体机源码的字符串与 JSX 文本不再出现取件凭证码或出示给工作人员')
 }
 
 if (failures > 0) {

@@ -7,6 +7,8 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
 import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'lucide-react'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { getMyBenefits } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
 import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
@@ -19,6 +21,7 @@ const TYPE_META: Record<BenefitType, { label: string; tone: 'teal' | 'wheat' | '
   coupon: { label: '优惠券', tone: 'teal' },
   free_quota: { label: '免费次数', tone: 'wheat' },
   package_entitlement: { label: '套餐额度', tone: 'plum' },
+  ai_quota: { label: 'AI 次数', tone: 'teal' },
   subsidy_eligibility_hint: { label: '政策资格提示', tone: 'slate' },
 }
 
@@ -116,17 +119,7 @@ export function MyBenefitsPage() {
               <p className="bf-legal">只显示整体等待，不画百分比，也不显示上一次的权益。</p>
             </>
           ) : null}
-          {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error" data-testid="benefits-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">权益台账这次没取到</div>
-                <p className="qx-state-d">
-                  请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。
-                </p>
-              </span>
-            </div>
-          ) : null}
+          {uiState === 'error' ? <BenefitsLoadError /> : null}
           {uiState === 'empty' ? (
             <div className="qx-state" data-tone="info" data-testid="benefits-fallback">
               <span className="qx-state-ic" />
@@ -181,6 +174,22 @@ export function MyBenefitsPage() {
           {isLoggedIn && loadState === 'ready' ? <MemberLoadMore {...pagination} /> : null}
         </div>
       </QxPageFrame>
+    </div>
+  )
+}
+
+function BenefitsLoadError() {
+  const contact = useSupportContact()
+  return (
+    <div className="qx-state" data-tone="error" data-testid="benefits-fallback">
+      <span className="qx-state-ic" />
+      <span>
+        <div className="qx-state-t">权益台账这次没取到</div>
+        <p className="qx-state-d">
+          请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。
+          {helpNeededLine(contact)}
+        </p>
+      </span>
     </div>
   )
 }
@@ -272,7 +281,7 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>帮助中心</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
           重新加载
         </button>

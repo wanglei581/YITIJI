@@ -126,7 +126,7 @@ export function useOrderDetail(refresh: () => unknown) {
       setDetail(updated)
       setAbandonConfirmOpen(false)
     } catch (err) {
-      const msg = err instanceof ApiHttpError ? err.message : '操作失败，请重试'
+      const msg = userMessageOf(err, '操作失败，请重试')
       setAbandonError(msg)
     } finally {
       setAbandonSubmitting(false)
@@ -148,7 +148,7 @@ export function useOrderDetail(refresh: () => unknown) {
       setVerifyOpen(null)
       setVerifyConfirm('')
     } catch (err) {
-      setVerifyError(err instanceof ApiHttpError ? err.message : '操作失败，请重试')
+      setVerifyError(userMessageOf(err, '操作失败，请重试'))
     } finally {
       setVerifySubmitting(false)
     }

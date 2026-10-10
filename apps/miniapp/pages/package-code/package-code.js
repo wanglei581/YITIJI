@@ -43,10 +43,14 @@ Page({
     pickupStatus: '',
     taskStatus: '',
     showQr: false,
+    reprintNote: '',
     qrStatus: 'loading',   // loading | ready | error
     qrSizePx: QR_SIZE_PX,
     onsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
     noCancelNotice: pkg.PACKAGE_NO_CANCEL_NOTICE,
+    onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
+    noCancelNoticeFree: pkg.PACKAGE_NO_CANCEL_NOTICE_FREE,
+    statusDetail: '',
   },
 
   onLoad(options) {
@@ -195,7 +199,7 @@ Page({
     if (token && !this._guard.accepts(token)) return
     this._clearCredentials()
     this.setData({
-      ready: false, loading: false, pickupCode: '', showQr: false,
+      ready: false, loading: false, pickupCode: '', showQr: false, reprintNote: '',
       // 登录了却拿不到会员 id 时不说「请先登录」——那句话会让用户以为自己没登录。
       loadErrorTitle: auth.isLoggedIn() ? '登录状态不完整' : '请先登录',
       loadError: auth.isLoggedIn()
@@ -249,7 +253,7 @@ Page({
     // 只清 data 的话，切后台再回来那一帧会用上一位用户的码重绘出一张可扫的二维码。
     this._codeRaw = ''
     this._drawToken = null
-    this.setData({ pickupCode: '', showQr: false, qrStatus: 'loading', ready: false })
+    this.setData({ pickupCode: '', showQr: false, reprintNote: '', qrStatus: 'loading', ready: false })
   },
 
   loadOrder() {
@@ -283,20 +287,22 @@ Page({
       .then((order) => {
         if (!this._accepts(token)) return
         const status = pkg.resolvePackageStatus(order)
-        // 服务端的 visibleCode 判据（pending 且未过期）已经决定了给不给码；
-        // 前端不做第二套判据，只忠实反映「有没有拿到」。
-        const code = order && order.pickupCode ? String(order.pickupCode) : ''
+        // 待到机，或服务端允许同码续打时，才展示这一次下发的到机码。
+        const code = pkg.visiblePackageCode(order, status)
         const codeUsable = PICKUP_CODE_RE.test(code)
         this.setData({
           ready: true,
           loading: false,
           orderNo: (order && order.orderNo) || '',
           pickupCode: pkg.formatPickupCode(code),
+          reprintNote: code ? pkg.reprintNoteText(order) : '',
           fileCount: Array.isArray(order && order.items) ? order.items.length : 0,
           expireTime: pkg.formatExpireAt(order && order.expiresAt),
           amountText: pkg.formatAmount(order && order.amountCents),
           // 只有服务端给出大于 0 的金额才说付款；试点免费（0）与读不到金额都不提钱
           paidOrder: (pkg.parseAmountCents(order && order.amountCents) || 0) > 0,
+          // 三个状态用中文标签（0 元订单不出「付款」那一段），不把 pending_release 这类英文值给用户看
+          statusDetail: pkg.statusDetail(order),
           statusLabel: status.label,
           statusTone: status.tone,
           payStatus: (order && order.payStatus) || '',
@@ -323,6 +329,7 @@ Page({
           loading: false,
           pickupCode: '',
           showQr: false,
+          reprintNote: '',
           loadErrorTitle: shown.title,
           loadError: shown.text,
           loadRecover: shown.recover,

@@ -1,11 +1,10 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
 import { EyeIcon } from 'lucide-react'
-import type { ChangeEvent, Ref } from 'react'
+import type { ChangeEvent, ReactNode, Ref } from 'react'
 import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
   MAX_IMAGES,
-  MAX_OUTPUT_BYTES,
   advisorCopy,
   formatBytes,
   outputFileName,
@@ -17,6 +16,7 @@ import {
 import {
   AddRow,
   Band,
+  ConvertImagesCta,
   EmptyBody,
   ErrorBand,
   ImageList,
@@ -26,8 +26,32 @@ import {
   UsbGap,
 } from './ConvertImagesPanels'
 
+/** 只拆顾问文案里写死的 em / b。用户文件名不走这里。 */
+function renderMarks(text: string): ReactNode {
+  const parts = text.split(/(<\/?(?:em|b)>)/)
+  const out: ReactNode[] = []
+  let tag: 'em' | 'b' | null = null
+  parts.forEach((part, index) => {
+    if (part === '<em>' || part === '<b>') {
+      tag = part === '<em>' ? 'em' : 'b'
+      return
+    }
+    if (part === '</em>' || part === '</b>') {
+      tag = null
+      return
+    }
+    if (!part) return
+    if (tag === 'em') out.push(<em key={index}>{part}</em>)
+    else if (tag === 'b') out.push(<b key={index}>{part}</b>)
+    else out.push(part)
+  })
+  return out
+}
+
 interface ConvertImagesViewProps {
   loggedIn: boolean
+  /** 仅 `?example=1` 时为真。示例条不给真实用户。 */
+  example: boolean
   /** 转换响应的真信号；缺省（尚未转换 / 旧响应）时完成态两句都不说。 */
   hasEndUser: boolean | undefined
   kiosk: boolean
@@ -68,17 +92,47 @@ interface ConvertImagesViewProps {
   onPrint: () => void
   onLogin: () => void
   onDocuments: () => void
-  onHelp: () => void
   onBack: () => void
+}
+
+function ReqPanel({ count, note }: { count: number; note?: ReactNode }) {
+  return (
+    <div className="i2p-pgrp" data-testid="img2pdf-req">
+      <h4>同一批只算一次</h4>
+      <div className="i2p-kv">
+        <div><span>重试、再查</span><b data-testid="img2pdf-reqid">还算同一次</b></div>
+        <div><span>顺序一变</span><b>就算新的一批</b></div>
+        <div><span>这批图片</span><b>{count} 张，按上面的顺序</b></div>
+      </div>
+      <div className="i2p-band-p">
+        系统认这一批图，只看<b>有哪几张、谁先谁后</b>。
+        {note ?? <>同一批图片、同一个顺序，<b>始终算同一次</b>：重试、断线重连、找回结果都按这一次算，系统不会因此多生成一份。</>}
+      </div>
+    </div>
+  )
 }
 
 export function ConvertImagesView(props: ConvertImagesViewProps) {
   const {
-    loggedIn, hasEndUser, kiosk, phase, images, selected, uploading, generating, rechecking,
+    loggedIn, example, hasEndUser, kiosk, phase, images, selected, uploading, generating, rechecking,
     showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
   } = props
-  const advisor = advisorCopy(phase, images.length, error)
+  const advisor = advisorCopy(phase, images.length, error, hasEndUser)
   const busy = uploading || generating || rechecking
+  const orderLocked = phase === 'converting' || phase === 'rechecking' || phase === 'completed'
+    || error?.kind === 'known-failed' || error?.kind === 'in-progress' || error?.kind === 'result-unknown'
+  const saved = phase === 'completed' ? hasEndUser === true : loggedIn
+  const section = phase === 'completed'
+    ? { title: '这份 PDF 的每一页', hint: `${images.length} 页 · 点开可逐页看完整` }
+    : phase === 'converting'
+      ? { title: '正在合成的就是这个顺序', hint: `${images.length} / ${MAX_IMAGES} 张 · 顺序不变` }
+      : error?.kind === 'known-failed' || error?.kind === 'in-progress' || error?.kind === 'result-unknown'
+        ? { title: '图片和顺序都保留着', hint: `${images.length} / ${MAX_IMAGES} 张 · 顺序不变` }
+        : phase === 'uploading' && images.length > 0
+          ? { title: '已经在列表里的还在', hint: `${images.length} / ${MAX_IMAGES} 张` }
+          : atLimit
+            ? { title: '已经到上限', hint: `${images.length} / ${MAX_IMAGES} 张 · 一张一页` }
+            : { title: '排好顺序', hint: `${images.length} / ${MAX_IMAGES} 张 · 一张一页` }
   const addDisabled = busy || atLimit
   const addReason = uploading ? '这一张还在上传' : atLimit ? '已达 20 张上限' : generating ? '正在合成' : '请稍候'
 
@@ -89,11 +143,18 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
           <div className="i2p-xq-face" aria-hidden>青</div>
           <div>
             <div className="i2p-xq-eyebrow">图片转 PDF</div>
-            <div className="i2p-xq-ask">{advisor.ask}</div>
-            <div className="i2p-xq-doing">{advisor.doing}</div>
+            <div className="i2p-xq-ask">{renderMarks(advisor.ask)}</div>
+            <div className="i2p-xq-doing">{renderMarks(advisor.doing)}</div>
           </div>
         </div>
       </section>
+
+      {example && phase !== 'empty' ? (
+        <div className="i2p-fxbar" role="note" data-testid="img2pdf-fixture">
+          <span className="i2p-fx-b">示例</span>
+          <span>这一屏是示例：图片、文件名和转换结果都是示例，<b>不是哪位用户的文件</b>。</span>
+        </div>
+      ) : null}
 
       <div className="i2p-scroll qx-grow">
         {phase === 'usb' ? <UsbGap /> : null}
@@ -104,28 +165,29 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
 
         {phase === 'uploading' ? (
           <Band kind="info" title="正在上传这一张" breathe chips={['一次一张', '没有进度回传', '结果未确认前不合成']}>
-            <div className="i2p-band-p">本机一次上传一张。<b>系统不回传上传进度百分比</b>，所以这里不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。</div>
+            <div className="i2p-band-p">本机一次上传一张。<b>系统不回传上传进度百分比</b>，所以不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。</div>
             <div className="i2p-band-p">这一张没确认成功之前，不会进列表，也不会改变已经排好的顺序。</div>
           </Band>
         ) : null}
 
         {phase === 'converting' ? (
-          <Band kind="info" title="正在合成 PDF" breathe chips={['一次性请求', '无进度回传', '结果回来才算完成']}>
-            <div className="i2p-band-p">请求<b>已经发出去了</b>，按你排好的顺序合成一份 PDF，一张图一页。</div>
-            <div className="i2p-band-p">这是一次性请求，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条。结果回来之前，这一屏不会自己变。</div>
+          <Band kind="info" title="正在合成 PDF" breathe chips={['已交给系统', '无进度回传', '结果回来才算完成']}>
+            <div className="i2p-band-p">这一批<b>已经交给系统了</b>，按你排好的顺序合成一份 PDF，一张图一页。</div>
+            <div className="i2p-band-p">合成要一次做完，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条，也没有「还需几秒」。结果回来之前，这一屏不会自己变。</div>
           </Band>
         ) : null}
 
         {phase === 'rechecking' ? (
-          <Band kind="info" title="正在用同一个标记再查一次" breathe chips={['同一个标记', '没有另起一次', '不会自动变完成']}>
-            <div className="i2p-band-p">正在拿同一个标记去问系统这一次的结果。<b>没有另起一次</b>，也没有换标记，所以不会多出第二份 PDF。</div>
+          <Band kind="info" title="正在再查刚才那一次" breathe chips={['还是刚才那一次', '没有重新提交', '不会自动变完成']}>
+            <div className="i2p-band-p">正在问<b>刚才那一次</b>的结果。<b>没有当作新的一次再交</b>，所以不会多出第二份 PDF。</div>
+            <div className="i2p-band-p">这一屏<b>不会自己变成完成</b>：没有百分比，也没有计时器。</div>
           </Band>
         ) : null}
 
         {phase === 'completed' && result ? (
           <Band
             kind="info"
-            title={recovered ? '用同一个标记把结果找回来了' : 'PDF 已生成'}
+            title={recovered ? '刚才那一次的结果找回来了' : 'PDF 已生成'}
             chips={[
               '系统已返回结果',
               '一张图一页 · A4',
@@ -135,7 +197,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             ]}
           >
             <div className="i2p-band-p">
-              系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
+              合成结果回来了：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
               {hasEndUser === false ? (
                 <>
                   <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
@@ -155,13 +217,14 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
           <>
             <div className="i2p-sec-label">
               <span className="no">01</span>
-              <span className="t">{phase === 'completed' ? '这份 PDF 的每一页' : atLimit ? '已经到上限' : '排好顺序'}</span>
-              <span className="hint">{images.length} / {MAX_IMAGES} 张 · 一张一页</span>
+              <span className="t">{section.title}</span>
+              <span className="hint">{section.hint}</span>
             </div>
             <ImageList
               images={images}
-              selected={phase === 'completed' ? null : selected}
-              onSelect={phase === 'completed' ? () => undefined : props.onSelect}
+              mode={phase === 'completed' ? 'output' : 'edit'}
+              selected={orderLocked ? null : selected}
+              onSelect={orderLocked ? () => undefined : props.onSelect}
               onPreview={phase === 'completed' ? props.onPreviewOutput : props.onPreviewInput}
             />
             {phase === 'completed' ? (
@@ -170,9 +233,11 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                   <EyeIcon size={24} />逐页完整查看这份 PDF
                 </button>
               </div>
-            ) : (
+            ) : orderLocked ? null : (
               <>
-                <SelBar selected={selected} count={images.length} onMove={props.onMove} onRemove={props.onRemove} />
+                {phase === 'uploading' ? null : (
+                  <SelBar selected={selected} count={images.length} onMove={props.onMove} onRemove={props.onRemove} />
+                )}
                 <AddRow disabled={addDisabled} reason={addReason} kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
               </>
             )}
@@ -198,32 +263,38 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
 
         {phase !== 'empty' && phase !== 'usb' ? (
           <div className="i2p-grid2">
-            {phase === 'completed' && result ? (
+            {phase === 'uploading' ? (
+              <Rules />
+            ) : phase === 'completed' && result ? (
               <div className="i2p-pgrp" data-testid="img2pdf-outfacts">
                 <h4>这份文件</h4>
                 <div className="i2p-kv">
                   <div><span>文件名</span><b>{outputFileName(result.pages)}</b></div>
-                  <div><span>文件标识</span><b data-testid="img2pdf-fileid">{result.fileId}</b></div>
+                  <div><span>怎么认</span><b data-testid="img2pdf-fileid">看文件名和页数</b></div>
                   <div><span>页数</span><b>{result.pages} 页（每张图一页）</b></div>
-                  <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 {formatBytes(MAX_OUTPUT_BYTES)}）</b></div>
-                  <div><span>校验值</span><b>{result.fileMd5.slice(0, 12)}…（系统返回的前 12 位）</b></div>
-                  <div><span>打印链接</span><b>临时链接，30 分钟内有效</b></div>
+                  <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 15 MB）</b></div>
+                  <div><span>排版</span><b>A4，一张图一页，不裁切</b></div>
+                  <div><span>打印链接</span><b>临时下载链接，30 分钟内有效</b></div>
                 </div>
               </div>
+            ) : phase === 'converting' || error?.kind === 'known-failed' ? (
+              <ReqPanel
+                count={images.length}
+                note={error?.kind === 'known-failed'
+                  ? <>明确失败之后，刚才那一次<b>不再占着</b>，所以<b>原样重试</b>是安全的，不会被当成重复提交挡回来。</>
+                  : <>离开这一页<b>不会取消</b>这次合成；回来之后<b>再查刚才那一次</b>就行，不要另起一次新的。</>}
+              />
             ) : (
-              <Retention loggedIn={loggedIn} />
+              <Retention saved={saved} />
             )}
-            {phase === 'completed' && !recovered ? (
-              <Retention loggedIn={loggedIn} />
+            {phase === 'uploading' ? (
+              <ReqPanel count={images.length} note={<>这一批还没提交；你点「合成」那一下，才算正式交了这一次。</>} />
+            ) : phase === 'completed' && !recovered ? (
+              <Retention saved={saved} />
+            ) : phase === 'converting' || error?.kind === 'known-failed' ? (
+              <Rules />
             ) : requestKey ? (
-              <div className="i2p-pgrp" data-testid="img2pdf-req">
-                <h4>这一次的标记</h4>
-                <div className="i2p-kv">
-                  <div><span>标记</span><b data-testid="img2pdf-reqid">{requestKey}</b></div>
-                  <div><span>这批图片</span><b>{images.length} 张，按上面的顺序</b></div>
-                </div>
-                <div className="i2p-band-p">同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，系统不会因此多生成一份。</div>
-              </div>
+              <ReqPanel count={images.length} />
             ) : (
               <Rules />
             )}
@@ -231,12 +302,35 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
       </div>
 
+      <div className="i2p-actions">
+        <ConvertImagesCta
+          phase={phase}
+          imageCount={images.length}
+          error={error}
+          generating={generating}
+          rechecking={rechecking}
+          uploading={uploading}
+          hasEndUser={hasEndUser}
+          onBack={props.onBack}
+          onConvert={props.onConvert}
+          onRecheck={props.onRecheck}
+          onNewKey={props.onNewKey}
+          onRestoreOrder={props.onRestoreOrder}
+          onPrint={props.onPrint}
+          onLogin={props.onLogin}
+          onDocuments={props.onDocuments}
+          onCancelUpload={props.onCancelUpload}
+          onCloseUsb={props.onCloseUsb}
+          onPickLocal={props.onPickLocal}
+        />
+      </div>
+
       <div className="i2p-truth" data-testid="img2pdf-truth">
         <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
-        <div><b>进度</b>合成是一次性请求，系统不回传进度，所以不画百分比，也不用计时器假装做完了。</div>
+        <div><b>进度</b>合成需要一点时间，做完才会告诉你。这里不显示百分比。</div>
         <div>
           <b>留存</b>
-          {loggedIn
+          {saved
             ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长。'
             : '未登录时 PDF 不会进入「我的文档」，也不下载到这台公用机器。'}
         </div>

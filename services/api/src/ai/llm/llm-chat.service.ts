@@ -28,9 +28,17 @@ import {
   llmTimeoutMessage,
 } from './llm-http'
 import { deepseekThinkingOff } from './deepseek-thinking'
-import { llmEndpointNotAllowedError } from './llm-failure'
+import {
+  llmEmptyResponseError,
+  llmEndpointNotAllowedError,
+  llmExceptionMessage,
+  llmNotConfiguredError,
+  llmUnreachableError,
+  llmUpstreamStatusError,
+} from './llm-failure'
 import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-allowlist'
-import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords, safeRefusalReply } from './llm-guard'
+import { AiContentBlockedError, buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
+import { refusalMessage } from '../safety/refusal'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { withAiSafety } from './ai-prompt-safety'
 import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
@@ -227,12 +235,13 @@ function safeLogValue(value: unknown, maxChars = 80): string {
  * 送模型前遮盖用户说的话（本轮 + 历史），只遮高置信项：手机号 / 证件号 / 银行卡 / 邮箱 / 带标签的住址。
  * **姓名不遮**（keepNames）：称呼被遮掉，对话就接不上了。
  *
- * 会话里存的是原话，只在发出去的那一刻遮 —— 二选一选这个，理由：
- *   - 会话转写会交还给本人：「小青本次要点」（advisor/assistant-summary.service.ts）
- *     拿它的第一句原话当记录标题存进本人的练习记录；存成遮盖后的，用户会在自己的记录里
- *     看到「[手机号_1]」。那条链路送模型前自己会再遮一次，不受影响。
+ * 内存里的会话转写存的是原话（不落库），只在发出去的那一刻遮 —— 二选一选这个，理由：
  *   - 历史整体一起遮，占位符编号跨轮一致（第 1 轮和第 3 轮的同一个手机号都是 [手机号_1]），
  *     模型仍能看懂「用户前后说的是同一个号码」。
+ *   - 「小青本次要点」（advisor/assistant-summary.service.ts）读这份转写来浓缩要点，
+ *     送模型前自己会再遮一次；它不把任何一句原话写进数据库（记录标题是固定文字）。
+ *     2026-10-09 之前它会把历史里第一条用户原话存进会话 topic 和 question 槽（列表标题一直用产物自己的标题），「存成遮盖后的会让用户在自己的
+ *     记录里看到占位符」那条旧理由已不成立。
  * 小青自己的回复不遮：模型只见过遮盖后的文本，回复里不会有用户的原始号码。
  */
 function maskUserTurnsForLlm(messages: readonly ChatMessage[]): ChatMessage[] {
@@ -319,7 +328,7 @@ export class LlmChatService {
     const cfg = this.config.getConfig('assistant_chat')
 
     if (!apiKey || !cfg.enabled) {
-      throw new ServiceUnavailableException('AI 模型未配置或未启用')
+      throw llmNotConfiguredError()
     }
 
     const now = Date.now()
@@ -361,9 +370,7 @@ export class LlmChatService {
       rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, cfg.forbiddenWords, onLlmCall)
     } catch (error) {
       if (error instanceof AiContentBlockedError) {
-        // 命中禁词：和输出侧原有做法一样给礼貌拒答，不报错。
-        const reply = safeRefusalReply(configuredForbiddenWords(cfg.forbiddenWords))
-          || '这个问题超出当前助手的服务范围，请换一个合规问题。'
+        const reply = refusalMessage(error.category)
         // 被拦的原话不能留在会话历史里：下一轮会带着整段历史再发给模型，检查点会再次命中，
         // 这个会话之后每句话都会被拒答。输出侧命中时用户原话没问题，保留它，把拒答记进历史。
         if (error.direction === 'input') session.messages.pop()
@@ -451,16 +458,17 @@ export class LlmChatService {
       this.logger.error(
         `LLM 请求失败: category=network_error feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
-      throw new ServiceUnavailableException('AI 模型连接失败')
+      throw llmUnreachableError('AI 模型')
     }
 
     if (!res.ok) {
       // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
       onLlmCall?.({ provider: providerLabel })
+      // 只记状态码与状态短语，不记响应正文（可能回显用户原文）。
       this.logger.error(
         `LLM 上游错误: category=upstream_non_2xx status=${res.status} statusText=${safeLogValue(res.statusText)} feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
-      throw new ServiceUnavailableException(`AI 模型返回错误 (${res.status})`)
+      throw llmUpstreamStatusError('AI 模型', res.status, res.data)
     }
 
     const data = res.data as {
@@ -471,7 +479,7 @@ export class LlmChatService {
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
-      throw new ServiceUnavailableException('AI 模型未返回内容')
+      throw llmEmptyResponseError('AI 模型')
     }
     return reply
   }
@@ -482,7 +490,7 @@ export class LlmChatService {
       const apiKey = this.config.getApiKey(feature)
       const cfg = this.config.getConfig(feature)
       if (!apiKey || !cfg.enabled) {
-        throw new ServiceUnavailableException('AI 模型未配置或未启用')
+        throw llmNotConfiguredError()
       }
       const messages: ChatMessage[] = [
         { role: 'system', content: buildGuardedSystemPrompt(cfg) },
@@ -491,7 +499,7 @@ export class LlmChatService {
       const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages, cfg.forbiddenWords)
       return { ok: true, reply: enforceForbiddenWords(rawReply, cfg.forbiddenWords) }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      return { ok: false, error: llmExceptionMessage(err) }
     }
   }
 }

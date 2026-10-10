@@ -310,7 +310,7 @@ for (const scenario of [
     const jobs = await routeJobs(page, [{ status: 409, unitCents: scenario.toUnit }, { status: 201, unitCents: scenario.toUnit }])
 
     await openConfirm(page)
-    await expect(amountCard(page)).toHaveText(yuan(from))
+    await expect(amountCard(page)).toHaveText(from === 0 ? '免费试运营' : yuan(from))
     await originalConfirm(page).click()
 
     // 409 之后：屏上换成服务端现价，明确说没建单，按钮写明新金额；停在确认页。
@@ -489,8 +489,32 @@ test('quote queue halt shows original guidance without unrelated possible causes
   api.respond('POST', '/api/v1/orders/quote', { status: 400, json: { error: { code: 'PRINT_TERMINAL_QUEUE_HALTED', message } } })
   await openConfirmWith(page, W2_PRINT_PARAMS)
   await expect(page.getByTestId('print-confirm-state-quote-failed')).toBeVisible()
-  await expect(page.getByText(message, { exact: false }).first()).toBeVisible()
+  await expect(page.getByText(message, { exact: true })).toHaveCount(1)
+  await expect(page.getByText(message, { exact: true })).toBeVisible()
+  await expect(page.locator('.pcf-grid2[data-single]')).toBeVisible()
   await expect(page.getByText('可能的原因', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/网络中断|参数里有本机暂未开通/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: /确认并付款|确认打印/ })).toHaveCount(0)
 })
+
+for (const state of ['loading', 'failed'] as const) {
+  test(`zero-price ${state} uses page verification without charging copy @kiosk`, async ({ page, api }) => {
+    registerShell(api, [])
+    registerPriceConfig(api, [0])
+    let release: () => void = () => {}
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    await page.route('**/api/v1/orders/quote', async (route) => {
+      if (state === 'loading') await pending
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE' } }) })
+    })
+    try {
+      await openConfirm(page)
+      await expect(page.getByRole('button', { name: state === 'loading' ? '页数核定后可继续' : '重新核定页数' })).toBeVisible()
+      const screen = page.locator('[data-w2-page="print-confirm"]')
+      await expect(screen).toContainText('页数核定')
+      await expect(screen).not.toContainText(/报价|核对价格|本次未收款|不扣|费用|付款|抵扣/)
+    } finally {
+      release()
+    }
+  })
+}

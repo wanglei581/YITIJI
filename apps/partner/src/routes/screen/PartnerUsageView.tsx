@@ -1,3 +1,4 @@
+import { formatDate } from '@ai-job-print/shared'
 import { useCallback, useMemo } from 'react'
 import { replaceIfChanged, useRefreshable } from '@ai-job-print/refresh'
 import {
@@ -29,6 +30,7 @@ import {
 } from '@ai-job-print/ui'
 import { loadPartnerUsage } from '../../services/api/consoleScreen'
 import { TwinShell, TwinShellEmpty, failureOf, stampText, type ScreenChrome, type ShellMeta } from './screenView'
+import { measureUnit } from './measureUnit'
 import { OrgDailyTrendPanel, OrgTopPoliciesPanel, OrgUsageNotesPanel } from './PartnerUsageHostingOff'
 
 /**
@@ -37,7 +39,7 @@ import { OrgDailyTrendPanel, OrgTopPoliciesPanel, OrgUsageNotesPanel } from './P
  * 口径（与后端统计接口一致，面板说明里逐条写明）：
  *   - 只含登录会员的行为记录；匿名浏览按小时计数接入后纳入。
  *   - 按内容当前的来源机构归属计入本机构（内容换了机构，历史记录跟着内容走）。
- *   - 任何分组少于 5 次一律显示「少于 5」（服务端已置空），合计里有未知就写「至少」，不补数。
+ *   - 1 至 4 次不给数字，写『少于 5』；0 照常显示（服务端将 1–4 置空），合计里有未知就写「至少」，不补数。
  *   - 「打开来源平台入口」不是投递或预约结果；本平台不收简历、不代投递。
  *   - 默认看近 7 天：小机构按天多是「少于 5」，一周才看得出东西；地址栏上的 range 优先，非法值按没写处理。
  *   - 招聘内容托管关闭时服务端只下发政策一类（variant="org-usage"，见 PartnerUsageHostingOff.tsx）：
@@ -50,14 +52,14 @@ const SUBTITLE = '数字孪生 · 信息使用'
 const POLL_SECONDS = 60
 const RANGES: ReadonlyArray<{ key: ScreenUsageRange; label: string }> = [
   { key: 'today', label: '今日' },
-  { key: '7d', label: '近 7 天' },
-  { key: '30d', label: '近 30 天' },
+  { key: '7d', label: '近 7 天（截至昨天）' },
+  { key: '30d', label: '近 30 天（截至昨天）' },
 ]
-const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天', '30d': '近 30 天' }
+const RANGE_LABEL: Record<ScreenUsageRange, string> = { today: '今日', '7d': '近 7 天（截至昨天）', '30d': '近 30 天（截至昨天）' }
 const TYPE_ORDER: readonly ScreenContentType[] = ['job', 'job_fair', 'policy', 'company_profile']
 const TYPE_LABEL: Record<ScreenContentType, string> = { job: '岗位信息', job_fair: '招聘会', policy: '政策公告', company_profile: '企业资料' }
 const TYPE_TAG: Record<ScreenContentType, string> = { job: '岗位', job_fair: '招聘会', policy: '政策', company_profile: '企业' }
-const MEMBERS_NOTE = '只含登录会员的浏览、收藏与打开来源平台入口记录，按内容当前的来源机构归属计入本机构；少于 5 次不显示。'
+const MEMBERS_NOTE = '只含登录会员的浏览、收藏与打开来源平台入口记录，按内容当前的来源机构归属计入本机构；1 至 4 次不给数字，写『少于 5』；0 照常显示。'
 
 type TypeRow = ScreenPartnerContentUsageValue['byType'][number]
 
@@ -70,7 +72,7 @@ function viewRange(raw: string | null): ScreenUsageRange {
 
 function usageMeta(usage: ScreenUsageSnapshot): ShellMeta {
   const failed = Object.values(usage.metrics).filter((m) => m && m.available === false && m.reason === 'source_query_failed').length
-  return { generatedAtText: stampText(usage.generatedAt), status: usage.status, failedSlices: failed, access: '访问口径：仅本机构已登录后台会话可见；只出聚合数字，少于 5 次不显示' }
+  return { generatedAtText: stampText(usage.generatedAt), summaryMinutes: 5, status: usage.status, failedSlices: failed, access: '访问口径：本机构后台登录可见、仅聚合；1 至 4 次不给数字，写『少于 5』；0 照常显示' }
 }
 
 /** 按固定顺序排四类；服务端没下发的类型不凭空补一行（契约里四类总是齐的）。 */
@@ -116,7 +118,7 @@ function NotesPanel({ visits }: { visits: ScreenUsageSnapshot['metrics']['visits
       <ul className="twin-notes">
         <li>只统计登录会员的浏览、收藏与打开来源平台入口</li>
         <li>按内容当前的来源机构归属计入本机构</li>
-        <li>任何分组少于 5 次都不显示具体数字</li>
+        <li>1 至 4 次不给数字，写『少于 5』；0 照常显示</li>
         <li>打开来源平台入口不是投递或预约结果，本平台不收简历、不代投递</li>
       </ul>
       <div className="twin-kv twin-push">
@@ -179,6 +181,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
       subtitle={`${SUBTITLE} · ${rangeText}`}
       layout="city"
       toolbar={toolbar}
+      reportingWindowText={usage.data.range === 'today' ? undefined : `${formatDate(usage.data.window.from)} 至 ${formatDate(new Date(Date.parse(usage.data.window.to) - 1).toISOString())}（截至昨天）`}
       meta={usageMeta(usage.data)}
       pollSeconds={POLL_SECONDS}
       failure={usage.failure}
@@ -211,7 +214,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                         <b>
                           {total.prefix ? <small>{total.prefix}</small> : null}
                           {total.text}
-                          <span className="twin-unit">次</span>
+                          <span className="twin-unit">{measureUnit(total.text, '次')}</span>
                         </b>
                       </div>
                     )
@@ -231,14 +234,14 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
             title="每日趋势"
             sub={rangeText}
             metric={u.partnerDaily}
-            source="按上海自然日统计本机构信息的浏览与打开来源平台入口次数。少于 5 次的日子画成底部的斜纹带，不连线、不补数；前后都少于 5 的那一天单独画点并写出次数。"
+            source="按上海自然日统计本机构信息的浏览与打开来源平台入口次数。1 至 4 次的日子画成底部的斜纹带，不连线、不补数；0 照常显示；前后都是 1 至 4 次的那一天单独画点并写出次数。"
             render={(value) =>
               value.days.length <= 1 ? (
                 <>
                   <TwinTiles
                     items={[
-                      { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: '次', label: '今日浏览' },
-                      { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: '次', label: '今日打开来源平台' },
+                      { value: value.days.length ? twinSmall(value.days[0].browse) : '—', unit: measureUnit(value.days.length ? twinSmall(value.days[0].browse) : '—', '次'), label: '今日浏览' },
+                      { value: value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', unit: measureUnit(value.days.length ? twinSmall(value.days[0].sourceOpens) : '—', '次'), label: '今日打开来源平台' },
                     ]}
                   />
                   <p className="twin-cap twin-push">选「近 7 天」或「近 30 天」查看趋势</p>
@@ -304,7 +307,7 @@ export function PartnerUsageView({ chrome }: { chrome: ScreenChrome }) {
                 items={TYPE_ORDER.flatMap((type): TwinTileItem[] => {
                   const row = value.byType.find((item) => item.type === type)
                   if (row) {
-                    return [{ value: twinSmall(row.browse), unit: '次浏览', label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
+                    return [{ value: twinSmall(row.browse), unit: measureUnit(twinSmall(row.browse), '次浏览'), label: TYPE_LABEL[type], hint: `收藏 ${twinSmall(row.favorites)} · 来源 ${twinSmall(row.sourceOpens)}` }]
                   }
                   return []
                 })}

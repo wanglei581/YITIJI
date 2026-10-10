@@ -267,7 +267,7 @@ test.describe('partner screen navigation', () => {
     await open(page, '/screen/usage?range=today')
     // 企业资料今日浏览 4 次 → 服务端给 null
     const company = tile(panel(page, /^按信息类型$/), '企业资料')
-    await expect(company.locator('b')).toHaveText('少于 5次浏览')
+    await expect(company.locator('b')).toHaveText('少于 5 次浏览')
     await expect(company.locator('b')).not.toContainText('0')
     // 收藏：少于 5 的类型不画成零长条，在脚注里点名
     const fav = panel(page, /^收藏$/)
@@ -281,8 +281,8 @@ test.describe('partner screen navigation', () => {
 
     await tabLink(page, '终端孪生').click()
     const today = panel(page, /^今日服务$/)
-    await expect(tile(today, '打印任务').locator('b')).toHaveText('少于 5单')
-    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5次')
+    await expect(tile(today, '打印任务').locator('b')).toHaveText('少于 5 单')
+    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5 次')
     await expect(tile(today, '打印页数').locator('b')).toHaveText('22页')
   })
 
@@ -293,14 +293,14 @@ test.describe('partner screen navigation', () => {
 
     await open(page, '/screen/usage')
     await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
-    await expect(chips.getByRole('button', { name: '近 7 天', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(chips.getByRole('button', { name: '近 7 天（截至昨天）', exact: true })).toHaveAttribute('aria-pressed', 'true')
     expect(usageUrls()[0], '没写 range 时第一次就取近 7 天').toBe('/api/v1/partner/screen/usage?range=7d')
     await expectLocation(page, '/screen/usage', {})
 
     await chips.getByRole('button', { name: '今日', exact: true }).click()
     await expectLocation(page, '/screen/usage', { range: 'today' })
     await expect(page.locator('.twin-hd-sub')).toContainText('今日')
-    await chips.getByRole('button', { name: '近 7 天', exact: true }).click()
+    await chips.getByRole('button', { name: '近 7 天（截至昨天）', exact: true }).click()
     await expectLocation(page, '/screen/usage', {})
     await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
 
@@ -319,10 +319,10 @@ test.describe('partner screen navigation', () => {
     await open(page, `/screen/usage?range=bogus&orgId=org-evil&org_id=${MOCK_PARTNER_ORG_ID}`)
     await expect(page.getByRole('heading', { name: USAGE_TITLE, exact: true })).toBeVisible()
     const chips = page.getByRole('group', { name: '统计时间' })
-    await expect(chips.getByRole('button', { name: '近 7 天', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(chips.getByRole('button', { name: '近 7 天（截至昨天）', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await chips.getByRole('button', { name: '今日', exact: true }).click()
     await expect(page.locator('.twin-hd-sub')).toContainText('今日')
-    await chips.getByRole('button', { name: '近 30 天', exact: true }).click()
+    await chips.getByRole('button', { name: '近 30 天（截至昨天）', exact: true }).click()
     await expect(page.locator('.twin-hd-sub')).toContainText('近 30 天')
     await tabLink(page, '机构总览').click()
     await expect(panel(page, /^本机构终端$/)).toBeVisible()

@@ -1,5 +1,6 @@
+import { formatCount } from '@ai-job-print/shared'
 import { useCallback, useEffect, useState } from 'react'
-import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Building2Icon, SearchIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
@@ -72,18 +73,18 @@ export default function CompaniesPage() {
     <Page
       title="企业展示管理"
       subtitle="来源企业展示信息查看 — 展示资料 · 岗位关联（只读，保留紧急下架；不参与招聘闭环）"
-      actions={<p className="max-w-sm text-right text-xs text-neutral-500">本平台不代建、不代审、不代发企业资料；如有违法违规内容，请用紧急下架。</p>}
     >
       <RecruitmentHostingNotice hosting={hosting} subject="企业资料" />
+      {hosting.status === 'ready' && hosting.enabled && <p className="mb-4 text-xs text-neutral-500">本平台不代建、不代审、不代发企业资料；如有违法违规内容，请用紧急下架。</p>}
       {/* 筛选条 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <select className={`${inputCls} w-auto`} value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
+        <select className={`${inputCls} !w-auto`} value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
           {REVIEW_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <select className={`${inputCls} w-auto`} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
+        <select className={`${inputCls} !w-auto`} value={publishStatus} onChange={(e) => setPublishStatus(e.target.value)}>
           {PUBLISH_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <div className="flex flex-1 gap-2 sm:max-w-sm">
+        <div className="flex min-w-[220px] flex-1 gap-2 sm:max-w-sm">
           <input
             className={inputCls}
             placeholder="按企业名称搜索"
@@ -117,23 +118,21 @@ export default function CompaniesPage() {
 
       {listState === 'ready' && rows.length > 0 && (
         <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
+          <ConsoleTable items={rows} page={1} pageSize={Math.max(rows.length, 1)} total={rows.length} onPageChange={() => undefined}
+            renderHeader={() => (
+              <tr>
                   {['企业名称', '来源机构', '地区', '行业', '类型', '审核状态', '发布状态', '关联岗位', '操作'].map((h) => (
                     <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-900/[0.06]">
-                {rows.map((c) => (
+            )}
+            renderRow={(c) => (
                   <tr key={c.id} className="cursor-pointer hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500" onClick={() => setSelectedId(c.id)} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(c.id) } }} aria-label={`查看企业 ${c.name}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Building2Icon className="h-4 w-4 shrink-0 text-neutral-400" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-neutral-800">{c.name}</p>
+                          <p className="max-w-64 truncate font-medium text-neutral-800" title={c.name}>{c.name}</p>
                           {c.fairParticipant && <p className="text-xs text-neutral-400">招聘会参展</p>}
                         </div>
                       </div>
@@ -148,7 +147,7 @@ export default function CompaniesPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <StatusBadge dot status={PUBLISH_BADGE[c.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[c.publishStatus]?.label ?? c.publishStatus} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{formatCount(c.linkedJobCount)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <button
@@ -174,10 +173,7 @@ export default function CompaniesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            )} />
         </Card>
       )}
 

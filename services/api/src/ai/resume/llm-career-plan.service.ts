@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../safety/content-blocked'
 import { LlmConfigService } from '../llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -31,6 +32,7 @@ export const CAREER_PLAN_SYSTEM_PROMPT = withAiSafety(
   '"directions":[{"title":"方向名","why":"简历里已有事实的延伸","firstStep":"第一步行动"}](1-3 个),' +
   '"skillPlan":[{"skill":"要提升的能力","action":"具体行动","timeframe":"阶段，如 1-3 个月"}](2-4 条),' +
   '"actionChecklist":["近期可执行行动"](3-6 条)}',
+  { policyVariant: 'draft' },
 )
 
 // ============================================================
@@ -277,7 +279,7 @@ export class LlmCareerPlanService {
         { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'career_plan', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
       if (error instanceof LlmBusyError) {
@@ -297,7 +299,7 @@ export class LlmCareerPlanService {
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`careerplan.llm upstream_non_2xx status=${res.status}`)
-      throw llmUpstreamStatusError('AI 职业规划服务', res.status)
+      throw llmUpstreamStatusError('AI 职业规划服务', res.status, res.data)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>

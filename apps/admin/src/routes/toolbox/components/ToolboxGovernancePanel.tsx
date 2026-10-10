@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, StatusBadge } from '@ai-job-print/ui'
 import { toolboxService, type ToolboxAdminAppView, type ToolboxAppVersion, type ToolboxTerminalView } from '../../../services/api/toolbox'
-import { BLOCK_REASON_LABELS, CATEGORY_OPTIONS, PRIORITY_OPTIONS, RISK_OPTIONS, STATUS_LABELS } from '../constants'
+import { formatCount } from '@ai-job-print/shared'
+import { ENTRY_TYPE_LABELS, BLOCK_REASON_LABELS, CATEGORY_OPTIONS, PRIORITY_OPTIONS, RISK_OPTIONS, STATUS_LABELS } from '../constants'
 import { runToolboxAction } from '../toolboxActionState'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 type EntryType = 'internal_route' | 'web_app' | 'qr_code' | 'mini_program_qr' | 'ai_skill'
 
@@ -66,7 +68,7 @@ export function ToolboxGovernancePanel({
     setVersionLoading(true)
     toolboxService.listVersions(selectedApp.appKey)
       .then(setVersions)
-      .catch((error) => setMessage(error instanceof Error ? error.message : '加载版本失败'))
+      .catch((error) => setMessage(userMessageOf(error, '版本列表加载失败，请稍后重试')))
       .finally(() => setVersionLoading(false))
   }
 
@@ -75,7 +77,7 @@ export function ToolboxGovernancePanel({
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setMessage('')
     const result = await runToolboxAction(action, success)
-    setMessage(result.message)
+    setMessage(userMessageOf(result, '百宝箱操作没有完成，请稍后重试'))
     if (!result.ok) return
     onRefresh()
     loadVersions()
@@ -136,7 +138,7 @@ export function ToolboxGovernancePanel({
 
         <h2 className="mt-5 text-base font-bold text-neutral-900">创建微应用</h2>
         <div className="mt-3 grid gap-3">
-          <input value={appForm.appKey} onChange={(e) => setAppForm({ ...appForm, appKey: e.target.value.trim().toLowerCase() })} placeholder="app-key，例如 contract-review" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
+          <input value={appForm.appKey} onChange={(e) => setAppForm({ ...appForm, appKey: e.target.value.trim().toLowerCase() })} placeholder="应用标识，例如 contract-review" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           <input value={appForm.title} onChange={(e) => setAppForm({ ...appForm, title: e.target.value })} placeholder="应用名称" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           <input value={appForm.shortDescription} onChange={(e) => setAppForm({ ...appForm, shortDescription: e.target.value })} placeholder="一句话说明" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           <div className="grid gap-3 md:grid-cols-3">
@@ -172,7 +174,7 @@ export function ToolboxGovernancePanel({
               <input value={versionForm.qrTargetUrl} onChange={(e) => setVersionForm({ ...versionForm, qrTargetUrl: e.target.value })} placeholder={versionForm.entryType === 'qr_code' ? '扫码目标地址，用于合规审计和运营声明' : '小程序目标说明，用于合规审计和运营声明'} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
             </div>
           ) : (
-            <input value={versionForm.target} onChange={(e) => setVersionForm({ ...versionForm, target: e.target.value })} placeholder="站内路由、HTTPS 地址或 assistant intent" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
+            <input value={versionForm.target} onChange={(e) => setVersionForm({ ...versionForm, target: e.target.value })} placeholder="站内页面路径、HTTPS 地址或 AI 助手任务标识" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           )}
           <textarea value={versionForm.disclaimer} onChange={(e) => setVersionForm({ ...versionForm, disclaimer: e.target.value })} placeholder="免责声明，高风险/受限应用必填" className="min-h-20 rounded-lg border border-neutral-200 px-3 py-2 text-sm" />
           <label className="flex items-center gap-2 text-sm text-neutral-600">
@@ -215,7 +217,7 @@ export function ToolboxGovernancePanel({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-neutral-900">v{version.version}</span>
                 <StatusBadge dot status={badgeStatus(version.status)} label={STATUS_LABELS[version.status] ?? version.status} />
-                <span className="text-xs text-neutral-400">{version.snapshot.launch?.entryType}</span>
+                <span className="text-xs text-neutral-400">{ENTRY_TYPE_LABELS[version.snapshot.launch?.entryType ?? ''] ?? '其他入口'}</span>
               </div>
               {version.snapshot.disclaimers?.length > 0 && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">免责声明：{version.snapshot.disclaimers.join('；')}</p>
@@ -231,7 +233,7 @@ export function ToolboxGovernancePanel({
           <div className="border-t border-neutral-100 px-4 py-3">
             <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="驳回原因" className="h-9 w-full rounded-lg border border-neutral-200 px-3 text-xs" />
             {selectedApp && <Button className="mt-3" size="sm" variant="danger" onClick={suspendSelectedApp}>熔断当前应用</Button>}
-            <p className="mt-2 text-xs text-neutral-400">可发布终端数：{terminals.length}。发布失败时会展示 BLOCK_REASON_LABELS 对应的拦截原因。</p>
+            <p className="mt-2 text-xs text-neutral-400">可发布终端数：{formatCount(terminals.length)}。发布失败时会说明具体原因。</p>
           </div>
         </div>
       </Card>

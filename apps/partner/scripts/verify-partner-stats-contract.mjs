@@ -169,7 +169,7 @@ mustContain(
 // B6. 空态必须解释原因并给下一步，而不是一句「暂无数据」
 mustContain(
   PAGE,
-  ['去数据源配置', '查看同步日志', '没有启用中的数据源', '等管理员审核'],
+  ['去数据源配置', '查看同步日志', '没有启用中的数据源', '审核发布入口尚未开放（平台不代审、不代发）'],
   'B6. /stats 空态给出原因与下一步动作',
 )
 mustNotContain(
@@ -292,7 +292,7 @@ mustContain(
 )
 mustContain(
   OPS_FORMAT,
-  ['统计窗口', '服务人次', 'AI 可用率', 'METRIC_NOTES.sample', "value === null ? '少于 5'"],
+  ['统计窗口', '服务人次', 'AI 可用率', 'METRIC_NOTES.sample', "value === null ? '样本不足，不显示'"],
   'D5. 导出 CSV 表头前写统计窗口与两项「暂不能统计」原因；1–4 不显示具体数字',
 )
 mustContain(
@@ -322,5 +322,23 @@ mustContain(
   ["'/terminals':  'terminals'", "label: '终端数据'"],
   'D8. 侧栏「数据与账号」组有「终端数据」入口',
 )
+
+const statsCode = readCode(PAGE)
+const visitsAt = statsCode.indexOf('<ServiceVisitsCard')
+const statsErrorAt = statsCode.indexOf('统计数据加载失败')
+if (visitsAt < 0 || statsErrorAt < 0 || visitsAt > statsErrorAt) {
+  fail('数据统计页顶部必须先渲染服务人次卡，且不挂在统计数据自己的失败分支里')
+}
+const visitsCode = readCode('src/routes/stats/ServiceVisitsCard.tsx')
+for (const token of ["getPartnerTerminalOperations('week')", 'visitText(data, data.totals.visitCount)', '近 7 天（截至昨天）', 'to="/terminals"', '查看各终端明细', 'userMessageOf(', 'aria-label="服务人次"']) {
+  if (!visitsCode.includes(token)) fail(`服务人次卡缺少 ${token}`)
+}
+const errorAt = visitsCode.indexOf("state === 'error'")
+const readyAt = visitsCode.indexOf("state === 'ready'")
+if (errorAt < 0 || readyAt < errorAt) fail('服务人次卡必须区分失败和成功')
+const errorSlice = visitsCode.slice(errorAt, readyAt)
+if (!errorSlice.includes('<ErrorState')) fail('服务人次取数失败必须用本页出错态')
+if (/visitCount\s*\?\?\s*0|visitCount\s*\|\|\s*0|>\s*0\s*</.test(errorSlice)) fail('服务人次取数失败不得显示 0')
+pass('D9. 数据统计页服务人次卡取终端数据接口，失败不显示 0')
 
 console.log('\nALL PASS')

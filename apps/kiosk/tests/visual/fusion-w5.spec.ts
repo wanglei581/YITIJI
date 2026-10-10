@@ -379,6 +379,7 @@ test('feedback exposes the authenticated form and honest submit error through vi
 
   await loginThroughVisibleUi(page, '/me/feedback')
   await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await page.getByRole('button', { name: /^打印服务/ }).click()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
   await page.getByRole('button', { name: '提交反馈', exact: true }).click()
@@ -451,7 +452,7 @@ test('activity detail renders an honest missing-record empty state after visible
   await loginThroughVisibleUi(page, '/me/activity/missing-w5-record')
   await expect(page.getByRole('heading', { name: '未找到这条记录' })).toBeVisible()
   await expect(
-    page.getByText('记录可能已清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
+    page.getByText('记录可能已按留存期限清理，或不属于当前登录账号。本页不会拿别的记录顶替。', { exact: true }),
   ).toBeVisible()
   await expectFusionAcceptance(page, errors)
   pagination.assertNoUnhandledRequests()
@@ -543,7 +544,11 @@ test('benefit activity detail keeps the shared shell, real content and return pa
 
   await page.goto('/activities/w5-benefit-detail')
   await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expectSharedPageShell(page, '权益活动详情')
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
   await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
   const backButton = page.getByRole('button', { name: /返回活动/ }).first()
@@ -551,6 +556,258 @@ test('benefit activity detail keeps the shared shell, real content and return pa
   await expectFusionAcceptance(page, errors)
   await backButton.click()
   await expect(page).toHaveURL(/\/activities$/)
+})
+
+function benefitActivityFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'w5-benefit-detail',
+    title: 'W5 打印服务体验权益',
+    description: '这是来自真实活动详情接口的验收内容。',
+    rulesText: '每人限领一次；仅用于现场打印服务。',
+    benefitType: 'free_quota',
+    sourceType: 'platform',
+    quantityTotal: 1,
+    stockTotal: 20,
+    stockRemaining: 8,
+    claimLimitPerUser: 1,
+    status: 'published',
+    validFrom: null,
+    validUntil: null,
+    grantValidDays: 30,
+    claimable: true,
+    claimed: false,
+    soldOut: false,
+    ended: false,
+    createdAt: '2026-07-24T00:00:00.000Z',
+    updatedAt: '2026-07-24T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+/** 稿 31：活动列表和详情都用青序顶栏，不再渲染终端编号，底部当前项是「我的」。 */
+async function expectBenefitQingxuShell(page: Page): Promise<void> {
+  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('.qx-topbar')).not.toContainText('KSK-001')
+  await expect(page.locator('.ui-kiosk-page-header')).toHaveCount(0)
+  await expect(page.getByTestId('qx-nav-profile')).toContainText('我的')
+  await expect(page.getByTestId('qx-nav-profile')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('qx-nav-home')).not.toHaveAttribute('aria-current', 'page')
+}
+
+test('benefit activities list and detail drop the terminal code and mark 我的 current @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: { success: true, data: { items: [], total: 0 } },
+  })
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities')
+  await expect(page.getByTestId('activities-state-empty')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '可参加的活动', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+
+  await page.goto('/activities/w5-benefit-detail')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '活动详情', exact: true })).toBeVisible()
+  await expectBenefitQingxuShell(page)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('signed-out benefit activity primary is 登录后领取 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(page.getByTestId('activity-state-signed-out')).toBeVisible()
+  await expect(primary).toHaveText('登录后领取')
+  await expect(primary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
+test('activity footer primary stays on one line and the footnote stays under the buttons @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: { success: true, data: benefitActivityFixture() },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('登录后领取')
+  const row = page.locator('.act-cta-row')
+  await expect(row).toBeVisible()
+  await expect(row).not.toContainText('权益只对应本机服务与打印')
+  await expect(page.locator('.act-cta-row .act-truth')).toHaveCount(0)
+  await expect(page.locator('.act-truth')).toContainText('权益只对应本机服务与打印')
+
+  const keys = page.locator('.act-cta-row > .qx-btn, .act-cta-row > .qx-ai-help')
+  expect(await keys.count()).toBeGreaterThan(0)
+  for (let index = 0; index < await keys.count(); index += 1) {
+    const metrics = await keys.nth(index).evaluate((el) => {
+      const style = getComputedStyle(el)
+      const node = Array.from(el.childNodes).reverse().find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())
+      let lines = 0
+      if (node) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
+      }
+      return {
+        whiteSpace: style.whiteSpace,
+        fontSize: Number.parseFloat(style.fontSize),
+        minHeight: Number.parseFloat(style.minHeight),
+        lines,
+      }
+    })
+    expect(metrics.whiteSpace, '底栏键必须 nowrap').toBe('nowrap')
+    expect(metrics.lines, '底栏主键主字必须一行').toBe(1)
+    expect(metrics.fontSize).toBeGreaterThanOrEqual(26)
+    expect(metrics.minHeight).toBeGreaterThanOrEqual(72)
+  }
+  await expectFusionAcceptance(page, errors)
+})
+
+test('benefit claim enters success, and a failed claim keeps 重试 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerKioskShell(api)
+  // 会员令牌只在内存里。整页跳转会丢掉登录态，所以失败这条从活动列表点进去。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  const successId = 'spring-print-2026'
+  const failureId = 'resume-diagnosis-quota'
+  let springClaimed = false
+  api.respondWith('GET', `/api/v1/activities/${successId}`, () => ({
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: successId,
+        title: '春季现场打印体验',
+        description: '到店打印简历时，可领取一次黑白打印体验额度。',
+        claimed: springClaimed,
+      }),
+    },
+  }))
+  api.respondWith('POST', `/api/v1/activities/${successId}/claim`, () => {
+    springClaimed = true
+    return {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          id: 'grant-spring-print-2026',
+          benefitType: 'free_quota',
+          serviceKey: null,
+          title: '春季现场打印体验',
+          description: '到店打印简历时，可领取一次黑白打印体验额度。',
+          quantityTotal: 1,
+          quantityRemaining: 1,
+          status: 'active',
+          sourceType: 'platform',
+          validFrom: null,
+          validUntil: null,
+          createdAt: '2026-07-24T00:00:00.000Z',
+        },
+      },
+    }
+  })
+  api.respond('GET', `/api/v1/activities/${failureId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: failureId,
+        title: '简历诊断体验次数',
+        description: '领取后记入本人权益，用于本机简历诊断。',
+        benefitType: 'ai_quota',
+        quantityTotal: 2,
+      }),
+    },
+  })
+  api.respond('POST', `/api/v1/activities/${failureId}/claim`, {
+    status: 409,
+    json: { error: { code: 'BENEFIT_ACTIVITY_NOT_CLAIMABLE', message: '当前不可领取' } },
+  })
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        total: 1,
+        items: [
+          benefitActivityFixture({
+            id: failureId,
+            title: '简历诊断体验次数',
+            description: '领取后记入本人权益，用于本机简历诊断。',
+            benefitType: 'ai_quota',
+            quantityTotal: 2,
+          }),
+        ],
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, `/activities/${successId}`)
+  const successPrimary = page.getByTestId('activity-primary')
+  await expect(successPrimary).toHaveText('领取这项权益')
+  await successPrimary.click()
+  await expect(page.getByTestId('activity-state-claim-success')).toBeVisible()
+  await expect(successPrimary).toHaveText('查看我的权益')
+  await expect(page.getByText('领取成功，已加入我的权益', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '返回活动列表', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/activities$/)
+  await page.getByTestId('activities-row-1').click()
+  await expect(page).toHaveURL(new RegExp(`/activities/${failureId}$`))
+  const failurePrimary = page.getByTestId('activity-primary')
+  await expect(failurePrimary).toHaveText('领取这项权益')
+  await failurePrimary.click()
+  await expect(page.getByTestId('activity-state-claim-error')).toBeVisible()
+  await expect(failurePrimary).toHaveText('重试')
+  await expect(failurePrimary).toBeEnabled()
+  await expectFusionAcceptance(page, errors)
+})
+
+test('ended benefit activity primary stays disabled @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities/summer-print-assist', {
+    status: 200,
+    json: {
+      success: true,
+      data: benefitActivityFixture({
+        id: 'summer-print-assist',
+        title: '暑期简历打印协助',
+        description: '活动时间已经过去，不再提供领取入口。',
+        status: 'ended',
+        claimable: false,
+        ended: true,
+        validUntil: '2026-08-31T16:00:00.000Z',
+      }),
+    },
+  })
+
+  await page.goto('/activities/summer-print-assist')
+  await expect(page.getByTestId('activity-state-ended')).toBeVisible()
+  const primary = page.getByTestId('activity-primary')
+  await expect(primary).toHaveText('已结束')
+  await expect(primary).toBeDisabled()
+  await expectFusionAcceptance(page, errors)
 })
 
 test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
@@ -1358,14 +1615,14 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   // 置灰原因常显在行内（触屏没有 hover，title 读不到）。
   await expect(page.getByText('该文件格式暂不支持打印', { exact: true })).toBeVisible()
   await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期' })).toBeDisabled()
-  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '打印' })).toBeDisabled()
+  await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '用于打印' })).toBeDisabled()
   await assetShot(page, 'documents-ready')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
 
   // 查看：凭本人 token 现换短期链接，在当前页内预览。
   const previewRequest = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/v1/files/doc-photo/preview-url')
-  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' }).click()
+  await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' }).click()
   expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
   await expect(dialog).toBeVisible()
@@ -1382,7 +1639,8 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   await page.getByRole('button', { name: '同意并保存' }).click()
   await expect(page.getByTestId('member-assets-toast')).toHaveText('保存期限已更新')
   expect(api.requestCount('PATCH', '/api/v1/files/doc-long/retention')).toBe(1)
-  await expect(longRow.locator('.qx-me-chip')).toContainText('保存 6 个月')
+  // 2026-10-06 C1-3：一行里分类标签和三个小标签都用 .qx-me-chip。按「保存 6 个月」这一枚定位，期限回填这件事不放宽。
+  await expect(longRow.locator('.qx-me-chip', { hasText: '保存 6 个月' })).toBeVisible()
 
   // 删除：两步确认，服务端成功后才从列表移除。
   const zipRow = rows.filter({ hasText: '作品集源文件.zip' })
@@ -1397,7 +1655,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
   )
-  await longRow.getByRole('button', { name: '打印', exact: true }).click()
+  await longRow.getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
   expect((await inspectionCreated).postDataJSON()).toMatchObject({ kind: 'inspection', sourceFileId: 'doc-long' })
@@ -1442,7 +1700,7 @@ test('documents: derived AI output skips the material check and goes straight to
   const quoteRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote',
   )
-  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '打印', exact: true }).click()
+  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '用于打印', exact: true }).click()
   await page.waitForURL('**/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
@@ -1463,7 +1721,7 @@ test('documents and orders: error then empty come from the server, never a cache
   await assetShot(page, 'documents-error')
   api.respond('GET', '/api/v1/me/documents', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '还没有文档' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还没有保存的文档' })).toBeVisible()
   await expect(page.getByRole('region', { name: '文档资产概览' })).toContainText('0')
   await expectFusionAcceptance(page, errors)
 
@@ -1499,8 +1757,8 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   await expect(rows.filter({ hasText: '历史打印.pdf' })).toContainText('暂无支付信息')
   await expect(rows.filter({ hasText: '成绩单.pdf' })).toContainText('待退款')
-  // 取件码提示只跟着服务端 pickupCode 走：四单里只有一单带码。
-  await expect(page.locator('.qx-me-chip', { hasText: '取件码' })).toHaveCount(1)
+  // 方案②把订单徽标改称「到机码」；仍只跟着服务端 pickupCode 走，四单仅一单带码。
+  await expect(page.locator('.qx-me-chip', { hasText: '到机码' })).toHaveCount(1)
   await expect(page.getByText('进行中任务每 5 秒自动更新')).toBeVisible()
   await assetShot(page, 'orders-ready')
   await assertNoElementCrossesViewport(page)
@@ -1515,9 +1773,27 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   const paidRow = rows.filter({ hasText: '个人简历.pdf' }).first()
   await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
   await expect(paidRow.getByText('W5K7Q2', { exact: true })).toBeVisible()
+  // 列表徽标和详单都写「到机码」；这里精确核查展开的码面板，避免两个同名元素。
+  await expect(paidRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  await expect(paidRow.getByText('还能续打')).toHaveCount(0)
+  await expect(paidRow.getByText('不能再打了')).toHaveCount(0)
   await expect(paidRow.getByText('下单金额')).toBeVisible()
   await expect(paidRow.getByRole('button', { name: '去我的文档再打印' })).toBeVisible()
+  // 付过钱但没有待退款标记：有「已退款」金额行，不出现「如需退款」申请句。
+  await expect(paidRow).toContainText('已退款')
+  await expect(paidRow).not.toContainText('如需退款')
   await assetShot(page, 'orders-detail')
+
+  const refundRow = rows.filter({ hasText: '成绩单.pdf' })
+  await refundRow.getByRole('button', { name: '查看订单详单 成绩单.pdf' }).click()
+  await expect(refundRow).toContainText('如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。')
+  await expect(refundRow).not.toContainText('在手机上申请')
+
+  const historyRow = rows.filter({ hasText: '历史打印.pdf' })
+  await historyRow.getByRole('button', { name: '查看订单详单 历史打印.pdf' }).click()
+  await expect(historyRow).toContainText('暂无支付信息')
+  await expect(historyRow).not.toContainText('退款')
 
   await page.getByRole('button', { name: /加载更多（已加载 4 \/ 共 5 条）/ }).click()
   await expect(page.getByText('第二页取消的订单.pdf', { exact: true })).toBeVisible()
@@ -1527,6 +1803,70 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded
+})
+
+test('orders: reprint notice follows reprintAllowed and reprintRemaining @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const canResume = memberOrder({
+    id: 'order-resume',
+    fileName: '还能续打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '28491703',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: true,
+    reprintRemaining: 1,
+  })
+  const usedUp = memberOrder({
+    id: 'order-used-up',
+    fileName: '不能再打的简历.pdf',
+    amountCents: 300,
+    payStatus: 'paid',
+    paymentSource: 'offline',
+    billablePages: 3,
+    pickupCode: '39502814',
+    discountCents: 0,
+    refundedAmountCents: 0,
+    reprintAllowed: false,
+    reprintRemaining: 0,
+  })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([canResume, usedUp]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const resumeRow = page.getByTestId('member-assets-order').filter({ hasText: '还能续打的简历.pdf' })
+  await resumeRow.getByRole('button', { name: '查看订单详单 还能续打的简历.pdf' }).click()
+  // 徽标与详单标题同名，定位真实码面板；不改变码的可见性条件。
+  await expect(resumeRow.locator('.me-pickup-panel').getByText('到机码', { exact: true })).toBeVisible()
+  await expect(resumeRow.getByText('还能续打 1 次')).toBeVisible()
+  await expect(page.getByText('取件凭证码')).toHaveCount(0)
+  const usedRow = page.getByTestId('member-assets-order').filter({ hasText: '不能再打的简历.pdf' })
+  await usedRow.getByRole('button', { name: '查看订单详单 不能再打的简历.pdf' }).click()
+  await expect(usedRow.getByText('这单已经接着打过 2 次，不能再打了。')).toBeVisible()
+  await expect(usedRow.getByText('还能续打')).toHaveCount(0)
+})
+
+// 走查 N3（10/4）：0 元单的列表与详单不出现支付、金额机制的说法；收费单的金额明细原样保留。
+test('orders: free orders speak without payment terms while paid orders keep the amount detail @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const free = memberOrder({ id: 'order-free', fileName: '免费简历.pdf', amountCents: 0, payStatus: 'paid', paymentSource: 'free', billablePages: 2, discountCents: 0, refundedAmountCents: 0 })
+  const paid = memberOrder({ id: 'order-paid', amountCents: 300, payStatus: 'paid', paymentSource: 'offline', billablePages: 3, discountCents: 0, refundedAmountCents: 0 })
+  api.respond('GET', '/api/v1/me/print-orders', memberPage([free, paid]))
+  api.respond('GET', '/api/v1/me/feedback', memberPage([]))
+  await loginThroughVisibleUi(page, '/me/print-orders')
+  const rows = page.getByTestId('member-assets-order')
+  await expect(rows).toHaveCount(2)
+  const freeRow = rows.filter({ hasText: '免费简历.pdf' })
+  await expect(freeRow).toContainText('免费')
+  await freeRow.getByRole('button', { name: '查看订单详单 免费简历.pdf' }).click()
+  await expect(freeRow).not.toContainText(/支付|实付|优惠|权益抵扣|已退款|价格/)
+  const paidRow = rows.filter({ hasText: '个人简历.pdf' })
+  await paidRow.getByRole('button', { name: '查看订单详单 个人简历.pdf' }).click()
+  await expect(paidRow.getByText('下单金额')).toBeVisible()
 })
 
 test('documents and orders stay operable at 390x844 without overlap @w5-mobile', async ({ page, api }) => {
@@ -1549,7 +1889,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
     await docRows.nth(index).scrollIntoViewIfNeeded()
     await expectNameClearOfActions(docRows.nth(index))
   }
-  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' })
+  const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '预览' })
   await view.scrollIntoViewIfNeeded()
   await assertTapTargetPointerHit(view)
   await view.click()
@@ -1635,14 +1975,21 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   await page.goto('/me/settings')
   await expectQxSettingsShell(page, 'anonymous')
   await expect(page.getByRole('region', { name: '登录引导' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(2)
+  // 协议与帮助是三行（两份协议 + 帮助中心），不再是协议两行。
+  // 入口叫「帮助中心」，不叫「帮助与求助」：现场无人值守，不能让人以为能叫到人。
+  await expect(page.getByRole('region', { name: '协议与帮助' }).getByRole('button')).toHaveCount(3)
+  await expect(page.getByTestId('member-settings-help')).toContainText('帮助中心')
+  await expect(page.getByTestId('member-settings-help')).toContainText('常见问题与操作说明。')
   await expect(page.getByRole('region', { name: '隐私与 AI 授权管理' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /换绑手机号|切换账号|隐私与数据请求/ })).toHaveCount(0)
   // 游客只看到登录后会出现哪几项：不可点、明确「登录后可用」。
   const locked = page.getByRole('region', { name: '登录后才出现的账号操作' }).locator('[aria-disabled="true"]')
   await expect(locked).toHaveCount(3)
   await expect(locked.filter({ hasText: '登录后可用' })).toHaveCount(3)
-  await expect(page.getByText('账号注销和数据导出尚未开放', { exact: false })).toBeVisible()
+  // 10/3 口径，与《隐私政策》一致：注销与复制个人信息按三条渠道人工申请，核实是本人后 15 个工作日内处理。
+  await expect(page.getByText('注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请', { exact: false })).toBeVisible()
+  await expect(page.getByText('我们核实是你本人后，15 个工作日内处理', { exact: false })).toBeVisible()
+  await expect(page.getByText('数据导出尚未开放', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '公共终端使用说明' })).toContainText('退出本机登录并清除这一次的临时信息')
   await settingsShot(page, 'guest')
   expect(api.requestCount('GET', CONSENT_STATUS)).toBe(0)
@@ -1811,7 +2158,7 @@ for (const failure of [
     await expect(panel).not.toContainText('HTTP 500')
     await panel.getByRole('button', { name: '重新登录核对', exact: true }).click()
     await page.waitForURL((url) => url.pathname === '/login')
-    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请联系现场工作人员。')).toBeVisible()
+    await expect(page.getByText('请用新手机号登录核对换绑结果；如有困难，请按《隐私政策》里的电话、邮箱联系我们。')).toBeVisible()
     await expectTokenNotPersisted(page)
   }
   expect(api.requestCount('POST', PHONE_REBIND)).toBe(1)

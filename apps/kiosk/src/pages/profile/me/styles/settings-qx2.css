@@ -1,7 +1,7 @@
 /* 30 v2：只作用于账号设置和换绑页，不改变其它会员页面。 */
 .settings-page { width: 100%; height: 100%; color: var(--qx-ink); }
-.settings-page .qx-pagehead { min-height: 80px; }
-.settings-body { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.settings-page .qx-pagehead { min-height: 64px; }
+.settings-body { display: flex; flex-direction: column; gap: 14px; padding-top: 0; padding-bottom: 0; }
 .settings-body > * { flex-shrink: 0; }
 .settings-identity {
   display: flex; align-items: center; gap: 18px;
@@ -17,11 +17,11 @@
   color: var(--qx-deep);
 }
 .settings-idtx { flex: 1; min-width: 0; }
-.settings-identity b { display: block; margin: 0; font-size: var(--qx-fs-page); font-weight: 700; }
+.settings-identity b { display: block; margin: 0; font-size: 32px; font-weight: 700; }
 .settings-idsub { display: block; margin-top: 4px; font-size: var(--qx-fs-aux-lg); line-height: 1.4; }
 .settings-idstat { flex: none; text-align: right; font-size: var(--qx-fs-aux-lg); line-height: 1.35; white-space: nowrap; }
 .settings-page .qx-me-list { border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
-.settings-page .qx-me-row { display: flex; align-items: center; width: 100%; min-height: 96px; gap: 18px; padding: 14px 20px; border: 0; border-bottom: 1px solid var(--qx-line); background: transparent; text-align: left; color: inherit; }
+.settings-page .qx-me-row { display: flex; align-items: center; width: 100%; min-height: 84px; gap: 18px; padding: 10px 20px; border: 0; border-bottom: 1px solid var(--qx-line); background: transparent; text-align: left; color: inherit; }
 .settings-page .qx-me-row:last-child { border-bottom: 0; }
 .settings-page .qx-me-row-ico { flex: none; width: 56px; height: 56px; display: grid; place-items: center; color: var(--qx-teal-d); background: var(--qx-teal-soft); border-radius: var(--qx-r); }
 .settings-page .qx-me-row-main { flex: 1; min-width: 0; }
@@ -34,10 +34,14 @@
 .settings-page .qx-me-settings-consent { display: flex; align-items: center; gap: 18px; padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
 .settings-page .qx-me-acts { display: flex; gap: 8px; flex-direction: column; }
 .settings-page .qx-me-small, .settings-resend button { min-height: 56px; padding: 0 18px; font-size: var(--qx-fs-body); border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); color: var(--qx-teal-d); background: var(--qx-surface); }
-.settings-note { padding: 16px 20px; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.45; background: var(--qx-teal-soft); border-radius: var(--qx-r); }
-.settings-note h2 { margin: 0 0 8px; font-size: var(--qx-fs-body-lg); }
+.settings-note { padding: 18px 22px; margin: 0; font-size: var(--qx-fs-aux-lg); line-height: 1.55; background: var(--qx-surface); border: 1px solid var(--qx-line); border-left: 4px solid var(--qx-slate); border-radius: var(--qx-r); }
+.settings-note h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: var(--qx-fs-body-lg); font-weight: 700; }
+.settings-sec { display: flex; align-items: baseline; gap: 14px; }
+.settings-sec .hint { margin-left: auto; font-size: var(--qx-fs-aux-lg); font-weight: 600; color: var(--qx-ink-2); }
 .settings-note p { margin: 0; }
 .settings-page .qx-ctabar .qx-btn { flex: 1; }
+/* 稿 30：返回我的窄（min-width 220），主按钮约 1 : 3.5。 */
+.settings-page .qx-ctabar .qx-btn[data-narrow='1'] { flex: none; min-width: 220px; }
 .settings-page button:disabled { opacity: .55; cursor: default; }
 .settings-page button:focus-visible, .settings-confirm button:focus-visible { outline: 3px solid var(--qx-teal-d); outline-offset: -3px; }
 .settings-confirm { position: fixed; inset: 0; margin: auto; width: min(860px, 90vw); max-height: 85vh; padding: 32px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r); color: var(--qx-ink); background: var(--qx-surface); font-family: var(--qx-sans); }
@@ -83,7 +87,8 @@
   [data-kiosk-stage-fit='off'] .settings-page .qx-me-row-ico { width: 48px; height: 48px; }
   [data-kiosk-stage-fit='off'] .settings-page .qx-me-pending { max-width: 64px; }
   [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar { flex-wrap: wrap; padding: 12px 16px; }
-  [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar .qx-btn { flex-basis: 100%; min-height: 56px; padding: 8px 12px; font-size: var(--qx-fs-body); }
+  [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar .qx-btn,
+  [data-kiosk-stage-fit='off'] .settings-page .qx-ctabar .qx-btn[data-narrow='1'] { flex: 1 1 100%; min-width: 0; min-height: 56px; padding: 8px 12px; font-size: var(--qx-fs-body); }
   [data-kiosk-stage-fit='off'] .settings-page .qx-navbar { height: 88px; }
   [data-kiosk-stage-fit='off'] .settings-page .qx-step-actions { flex-wrap: wrap; }
   [data-kiosk-stage-fit='off'] .settings-page .qx-ai-help { white-space: normal; text-align: left; }
@@ -91,3 +96,17 @@
   [data-kiosk-stage-fit='off'] .settings-resend { flex-wrap: wrap; }
   [data-kiosk-stage-fit='off'] .settings-pad button { min-height: 64px; }
 }
+
+/* 稿 30 的换绑说明与实际进度分开，稀疏态也按顺序读完。 */
+.settings-page .settings-form { padding: 24px 26px; }
+.settings-page .settings-form .settings-facts { margin-top: 20px; }
+.settings-page .settings-facts div { padding: 22px 24px; line-height: 1.5; }
+.settings-page .settings-note { border: 1px solid var(--qx-line); border-left: 4px solid var(--qx-slate); background: var(--qx-surface); }
+.settings-page .settings-note + .settings-note { border-left: 4px solid var(--qx-slate); }
+.settings-rebind .settings-body { gap: 28px; }
+
+.settings-page .settings-body { justify-content: space-between; gap: 12px; padding-top: 0; padding-bottom: 0; }
+/* 换绑页间距写在上面，两条选择器同权重，必须再写一次才不会被默认态的 12px 盖掉。 */
+.settings-page.settings-rebind .settings-body { gap: 28px; }
+
+.settings-rebind[data-state='phone-code-expired'] .settings-pad button { min-height: 76px; }

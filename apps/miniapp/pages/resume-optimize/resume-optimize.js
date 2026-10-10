@@ -20,6 +20,7 @@ const FORMATS = [
 Page({
   data: {
     statusBarHeight: 20,
+    aiLabelNote: buildModel.RESUME_AI_LABEL_NOTE,
     phase: 'no-task',
     taskId: '',
     needReupload: false,
@@ -35,7 +36,7 @@ Page({
     exportResult: null,
     exportDisabledReason: '',
     pricingStatus: 'loading',
-    pricing: { mode: 'unavailable', text: '正在确认导出价格…', disabledReason: '正在确认导出价格，请稍候。' },
+    pricing: { mode: 'unavailable', text: '正在确认能否导出…', disabledReason: '正在确认能否导出，请稍候。' },
     benefitGrantId: '',
     exportDisabled: true,
     exportCountdown: '',
@@ -207,7 +208,7 @@ Page({
     this._pricingSeq = seq
     this.setData({
       pricingStatus: 'loading',
-      pricing: { mode: 'unavailable', text: '正在确认导出价格…', disabledReason: '正在确认导出价格，请稍候。' },
+      pricing: { mode: 'unavailable', text: '正在确认能否导出…', disabledReason: '正在确认能否导出，请稍候。' },
       benefitGrantId: '',
     }, () => this._syncExportAvailability())
 
@@ -226,10 +227,10 @@ Page({
       })
       .catch((err) => {
         if (this._gone || seq !== this._pricingSeq) return
-        const reason = (err && err.message) || '暂时无法确认导出价格'
+        const reason = (err && err.message) || '暂时无法确认能否导出'
         this.setData({
           pricingStatus: 'failed',
-          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，为避免误扣权益，当前不能导出。` },
+          pricing: { mode: 'unavailable', text: reason, disabledReason: `${reason}，当前不能导出。` },
           benefitGrantId: '',
         }, () => this._syncExportAvailability())
       })
@@ -239,7 +240,7 @@ Page({
     let reason = ''
     if (this.data.phase !== 'done') reason = '优化失败或尚未完成，暂时不能导出。'
     else if (!this.data.opt || !this.data.opt.hasOptimizedResume) reason = '服务端没有返回结构化优化稿，暂时不能生成文件。'
-    else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认导出价格，请稍候。'
+    else if (this.data.pricingStatus !== 'ready') reason = this.data.pricing.disabledReason || '正在确认能否导出，请稍候。'
     else if (this.data.pricing.disabledReason) reason = this.data.pricing.disabledReason
     else if (this.data.pricing.mode === 'charged' && !this.data.benefitGrantId) reason = '未取得可核销权益，当前不能导出。'
     else if (this.data.factsBlockedReason) reason = this.data.factsBlockedReason

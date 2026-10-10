@@ -7,7 +7,8 @@ import {
 import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
-import { assertContentAllowed } from '../ai/llm/llm-guard'
+import { assertContentAllowed, assertLexiconAllowed } from '../ai/llm/llm-guard'
+import { isAccountOrModelUpstream } from '../ai/llm/llm-failure'
 import { startLlmUsageMeter } from '../ai/usage/ai-usage-meter'
 import { isAiEndpointAllowed } from '../common/outbound/ai-endpoint-allowlist'
 
@@ -289,6 +290,8 @@ export class ContractReviewProviderService {
       response_format: { type: 'json_object' },
       temperature: 0,
     }
+    const userContent = JSON.stringify({ pages: input.pages, partyFacts: input.partyFacts })
+    assertLexiconAllowed(userContent, 'input', { feature: 'contract_review' })
     let response: unknown
     try {
       response = await this.transport.send({
@@ -311,6 +314,15 @@ export class ContractReviewProviderService {
     const transportResponse = response as Record<string, unknown>
     const status = transportResponse['status']
     if (typeof status !== 'number' || !Number.isInteger(status) || status < 200 || status >= 300 || transportResponse['redirected'] !== false) {
+      // 401/402/403 与模型名问题不是「连不上」：配置恢复前每次都失败。500 仍走连接失败。
+      if (
+        typeof status === 'number' &&
+        Number.isInteger(status) &&
+        transportResponse['redirected'] === false &&
+        isAccountOrModelUpstream(status, transportResponse['body'])
+      ) {
+        throw new Error('CONTRACT_PROVIDER_ACCOUNT_UNAVAILABLE')
+      }
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
     }
     const body = transportResponse['body']

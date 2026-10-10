@@ -11,6 +11,7 @@
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-print-scan
  */
+import 'reflect-metadata'
 import 'dotenv/config'
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-admin-print-scan-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-admin-print-scan-action-secret-0123456789'
@@ -29,6 +30,10 @@ import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { GUARDS_METADATA } from '@nestjs/common/constants'
+import { Reflector } from '@nestjs/core'
+import { RolesGuard } from '../src/common/guards/roles.guard'
+import { AdminTerminalsController } from '../src/terminals/admin-terminals.controller'
 import * as apiContract from '../src/terminals/terminal-capabilities.types'
 import * as sharedContract from '../../../packages/shared/src/types/printScanCapability'
 
@@ -388,7 +393,7 @@ async function main() {
       409,
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       'PRINT_JOB_UNCONFIRMED retry → 409 + 精确业务错误码',
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
     )
     const [unconfirmedTaskAfter, unconfirmedOrderAfter, unconfirmedLogCountAfter, unconfirmedTaskCountAfter] = await Promise.all([
       prisma.printTask.findUniqueOrThrow({ where: { id: unconfirmedTaskId } }),
@@ -405,7 +410,7 @@ async function main() {
     ) {
       fail('PRINT_JOB_UNCONFIRMED retry 拒绝后 PrintTask、Order、状态日志和任务总数必须完全不变')
     }
-    await expectRetryReason(unconfirmedTaskId, '打印结果未确认，不能重新提交，请联系工作人员核查', '未确认')
+    await expectRetryReason(unconfirmedTaskId, '这单的出纸结果还没确认，请 5 分钟后再试', '未确认')
     pass('PRINT_JOB_UNCONFIRMED retry 拒绝路径零副作用（任务/订单/日志/任务总数不变）')
     const unconfirmedDetail = await printScan.getTaskDetail('print', unconfirmedTaskId)
     if (unconfirmedDetail.type !== 'print' || unconfirmedDetail.printOutcome !== null) {
@@ -424,7 +429,7 @@ async function main() {
       409,
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       '核查后仍禁止 retry',
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
     )
     pass('print-scan 展示 printOutcome，核查后仍禁止重试且不改 errorCode')
 
@@ -464,7 +469,7 @@ async function main() {
       409,
       'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
       'PARTIAL_OUTPUT retry → 409 + 精确业务错误码',
-      '这单已经出了一部分纸，不能整单重打；需要补打请另下新单',
+      '这单只出了一部分纸',
     )
     const [partialAfter, partialOrderAfter, partialLogsAfter] = await Promise.all([
       prisma.printTask.findUniqueOrThrow({ where: { id: partialTaskId } }),
@@ -481,7 +486,7 @@ async function main() {
     ) {
       fail('PARTIAL_OUTPUT retry 拒绝后任务、订单和状态日志必须保持不变')
     }
-    await expectRetryReason(partialTaskId, '这单已经出了一部分纸，不能整单重打；需要补打请另下新单', '只出一部分')
+    await expectRetryReason(partialTaskId, '这单只出了一部分纸', '只出一部分')
     pass('管理员重试 PARTIAL_OUTPUT 被拒，任务状态不变')
 
     const unpaidRetryTaskId = `pt_vps_unpaid_retry_${suffix}`
@@ -638,7 +643,7 @@ async function main() {
     })
     await expectRetryReason(
       retiredUnconfirmedTaskId,
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
       '退役终端上的未确认仍先报未确认',
     )
 
@@ -1356,6 +1361,145 @@ async function main() {
     await capabilities.assertUserTaskAllowed(terminalId, 'signature_stamp')
     pass('签名盖章只有管理员逐台配成可用后才放行')
 
+    // ── 5b. 清除能力配置，回到「未配置」──────────────────────────────────────
+    {
+      const guards = Reflect.getMetadata(GUARDS_METADATA, AdminTerminalsController) as Array<{ name?: string }> | undefined
+      const guardNames = (guards ?? []).map((guard) => guard.name)
+      if (!guardNames.includes('JwtAuthGuard') || !guardNames.includes('RolesGuard')) {
+        fail('清除接口所在控制器必须挂 JwtAuthGuard + RolesGuard，否则非管理员不是 403')
+      }
+      const rolesGuard = new RolesGuard(new Reflector())
+      const ctxFor = (role: 'admin' | 'partner' | 'kiosk' | null) => ({
+        getHandler: () => AdminTerminalsController.prototype.clearCapability,
+        getClass: () => AdminTerminalsController,
+        switchToHttp: () => ({
+          getRequest: () => ({ user: role ? { userId: closeOperatorId, role, orgId: null } : undefined }),
+        }),
+      })
+      for (const role of ['partner', 'kiosk'] as const) {
+        await expectHttpError(
+          async () => { rolesGuard.canActivate(ctxFor(role) as never) },
+          403,
+          `非管理员（${role}）清除终端能力 → 403`,
+        )
+      }
+      if (rolesGuard.canActivate(ctxFor('admin') as never) !== true) fail('管理员清除终端能力应放行')
+      pass('清除接口只允许管理员')
+
+      const controller = new AdminTerminalsController({} as never, capabilities, new AuditService(prisma))
+      const adminUser = { userId: closeOperatorId, role: 'admin' as const, orgId: null }
+      const auditReq = { headers: { 'user-agent': 'verify-capability-clear' }, requestId: `clear_${suffix}` }
+      const terminalCode = `VPS-${suffix}`
+      const piiNote = '张三 13800138000'
+
+      await expectHttpError(
+        () => controller.clearCapability(terminalId, 'teleport', adminUser, auditReq),
+        400,
+        '清除非法能力键 → 400',
+      )
+      await expectHttpError(
+        () => controller.clearCapability(`missing_${suffix}`, 'scan', adminUser, auditReq),
+        404,
+        '清除不存在的终端 → 404',
+      )
+
+      const absent = await controller.clearCapability(terminalId, 'usb_import', adminUser, auditReq)
+      if (absent.data.cleared !== false) fail('本来就没有的能力行应幂等成功且 cleared=false')
+      const absentLogs = await prisma.auditLog.count({
+        where: { action: 'terminal.capability.cleared', targetId: terminalCode },
+      })
+      if (absentLogs !== 0) fail('本来就没有的能力行不得写审计')
+      pass('清除不存在的能力行：成功且不写审计')
+
+      await capabilities.upsert(terminalId, 'document_print', 'maintenance', piiNote, closeOperatorId)
+      const cleared = await controller.clearCapability(terminalId, 'document_print', adminUser, auditReq)
+      if (!cleared.data.cleared || cleared.data.capabilityKey !== 'document_print' || cleared.data.terminalCode !== terminalCode) {
+        fail('清除已登记的能力行应返回 cleared=true')
+      }
+      const rowGone = await prisma.terminalCapability.findUnique({
+        where: { terminalId_capabilityKey: { terminalId, capabilityKey: 'document_print' } },
+      })
+      if (rowGone) fail('清除后能力行应消失')
+      const listedAfter = await capabilities.listForTerminal(terminalId)
+      const documentAfter = listedAfter.capabilities.find((item) => item.capabilityKey === 'document_print')
+      if (documentAfter?.configured !== false) fail('清除后 list 应回到 configured=false')
+
+      const logs = await prisma.auditLog.findMany({
+        where: { action: 'terminal.capability.cleared', targetId: terminalCode },
+      })
+      if (logs.length !== 1) fail(`清除应只写一条审计，实际 ${logs.length}`)
+      const payload = JSON.parse(logs[0]?.payloadJson ?? '{}') as Record<string, unknown>
+      const payloadKeys = Object.keys(payload).sort()
+      if (payloadKeys.join(',') !== 'capabilityKey,hadNote,previousStatus,terminalCode') {
+        fail(`审计 payload 只能有终端号、能力键、删前状态、备注是否存在，实际 ${payloadKeys.join(',')}`)
+      }
+      if (payload['terminalCode'] !== terminalCode || payload['capabilityKey'] !== 'document_print') {
+        fail('审计 payload 的终端号或能力键不对')
+      }
+      if (payload['previousStatus'] !== 'maintenance' || payload['hadNote'] !== true) {
+        fail(`审计 payload 删前状态或备注标记不对：${JSON.stringify(payload)}`)
+      }
+      const payloadText = JSON.stringify(payload)
+      if (payloadText.includes('13800138000') || payloadText.includes('张三') || payloadText.includes(piiNote)) {
+        fail('审计 payload 不得带备注原文或个人信息')
+      }
+      pass('清除已登记能力：删行、写一条审计、payload 无个人信息')
+
+      const again = await controller.clearCapability(terminalId, 'document_print', adminUser, auditReq)
+      if (again.data.cleared !== false) fail('重复清除应幂等成功且 cleared=false')
+      const logsAfterRepeat = await prisma.auditLog.count({
+        where: { action: 'terminal.capability.cleared', targetId: terminalCode },
+      })
+      if (logsAfterRepeat !== 1) fail(`重复清除不得再写审计，实际 ${logsAfterRepeat} 条`)
+      pass('重复清除幂等且只写一次审计')
+
+      setPrintScanCapabilityModeForTest('managed')
+      await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
+      pass('清除后 managed 模式回到未配置放行')
+      setPrintScanCapabilityModeForTest('strict')
+      await expectHttpErrorCode(
+        () => capabilities.assertUserTaskAllowed(terminalId, 'document_print'),
+        403,
+        'CAPABILITY_NOT_CONFIGURED',
+        '清除后 strict 模式回到未配置拒绝',
+      )
+      setPrintScanCapabilityModeForTest('managed')
+
+      await capabilities.upsert(terminalId, 'signature_stamp', 'available', undefined, closeOperatorId)
+      await controller.clearCapability(terminalId, 'signature_stamp', adminUser, auditReq)
+      for (const mode of ['managed', 'strict'] as const) {
+        setPrintScanCapabilityModeForTest(mode)
+        await expectHttpErrorCode(
+          () => capabilities.assertUserTaskAllowed(terminalId, 'signature_stamp'),
+          403,
+          'CAPABILITY_NOT_CONFIGURED',
+          `清除签名盖章后 ${mode} 模式默认拒绝`,
+        )
+      }
+      setPrintScanCapabilityModeForTest('managed')
+      pass('清除 DEFAULT_DENY 键后回到未登记即拒绝')
+
+      await capabilities.upsert(terminalId, 'color_print', 'available', '彩色已验', closeOperatorId)
+      await capabilities.assertPrintParamsAllowed(terminalId, { colorMode: 'color' })
+      await controller.clearCapability(terminalId, 'color_print', adminUser, auditReq)
+      await expectHttpErrorCode(
+        () => capabilities.assertPrintParamsAllowed(terminalId, { colorMode: 'color' }),
+        403,
+        'PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL',
+        '彩色清除后拒绝',
+      )
+      await capabilities.upsert(terminalId, 'duplex_print', 'available', undefined, closeOperatorId)
+      await capabilities.assertPrintParamsAllowed(terminalId, { duplex: 'duplex_long_edge' })
+      await controller.clearCapability(terminalId, 'duplex_print', adminUser, auditReq)
+      await expectHttpErrorCode(
+        () => capabilities.assertPrintParamsAllowed(terminalId, { duplex: 'duplex_long_edge' }),
+        403,
+        'PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL',
+        '双面清除后拒绝',
+      )
+      pass('彩色 / 双面清除后回到未登记即拒绝')
+    }
+
     // 真实集成：ScanTasksService.create 在 scan 配为非 available 时拒绝
     await capabilities.upsert(terminalId, 'scan', 'maintenance', '扫描仪送修', 'admin_1')
     const scanSvc = new ScanTasksService(prisma, null as never, capabilities)
@@ -1389,7 +1533,7 @@ async function main() {
   } finally {
     setPrintScanCapabilityModeForTest(null)
     // 清理本脚本创建的数据（依赖 Terminal onDelete: Cascade 清 capability/scan/print）
-    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdPrintTaskIds, ...createdPaymentAttemptIds] } } }).catch(() => undefined)
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdPrintTaskIds, ...createdPaymentAttemptIds, `VPS-${suffix}`] } } }).catch(() => undefined)
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdPrintTaskIds } } }).catch(() => undefined)

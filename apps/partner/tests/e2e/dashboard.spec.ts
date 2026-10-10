@@ -34,6 +34,19 @@ test.describe('工作台（mock 口径）', () => {
     await assertPageHonest(page, errors)
   })
 
+  test('1280 宽度下同步表在自己的容器滚动', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await gotoPartner(page, '/', '工作台')
+    await waitForMockList(page)
+    const section = page.getByRole('region', { name: '最近同步记录' })
+    await expect(section.getByText('市人才网 API（演示）')).toBeVisible()
+    const table = section.locator('table')
+    await expect(table.locator('thead th', { hasText: /^数据源$/ })).toBeVisible()
+    const scroller = table.locator('..')
+    await expect(scroller).toHaveCSS('overflow-x', 'auto')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  })
+
   test('退出登录回到登录页', async ({ page }) => {
     await gotoPartner(page, '/', '工作台')
     await page.getByRole('button', { name: '退出登录' }).click()

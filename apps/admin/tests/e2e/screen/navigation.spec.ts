@@ -309,7 +309,7 @@ test.describe('admin screen navigation', () => {
 
     await tabLink(page, '终端孪生').click()
     const today = panel(page, /^今日服务$/)
-    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5次')
+    await expect(tile(today, '扫描').locator('b')).toHaveText('少于 5 次')
     await expect(today).toContainText('今日打印失败 少于 5 次')
     // 阳性对照：真实的数照常出
     await expect(tile(today, '打印页数').locator('b')).toHaveText('36页')
@@ -321,10 +321,10 @@ test.describe('admin screen navigation', () => {
     await expect(page.getByRole('heading', { name: USAGE_TITLE, exact: true })).toBeVisible()
     const chips = page.getByRole('group', { name: '统计时间' })
     await expect(chips.getByRole('button', { name: '今日', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await chips.getByRole('button', { name: '近 7 天', exact: true }).click()
+    await chips.getByRole('button', { name: '近 7 天（截至昨天）', exact: true }).click()
     await expectLocation(page, '/screen/usage', { range: '7d' })
     await expect(page.locator('.twin-hd-sub')).toContainText('近 7 天')
-    await chips.getByRole('button', { name: '近 30 天', exact: true }).click()
+    await chips.getByRole('button', { name: '近 30 天（截至昨天）', exact: true }).click()
     await expectLocation(page, '/screen/usage', { range: '30d' })
     await expect(page.locator('.twin-hd-sub')).toContainText('近 30 天')
     const usage = log.urls.filter((url) => url.includes('/usage'))

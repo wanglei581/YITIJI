@@ -46,6 +46,13 @@ export const ANONYMOUS_AI_CALLER: Readonly<AiCallerIdentity> = Object.freeze({
 export interface AiRequestContext {
   /** 本请求的调用方身份；第一次调用时解析，之后返回同一个结果。永不 reject。 */
   identity(): Promise<AiCallerIdentity>
+  /**
+   * 请求头里的终端编号。未验签，只给内容拦截日志用，不进计量账。
+   * 没有就不要设，日志写 none。
+   */
+  terminalCode?: string
+  /** 内容拦截后置位。调用方消费一次再退公网次数，避免回滚做两次。 */
+  safetyRefund?: boolean
 }
 
 const store = new AsyncLocalStorage<AiRequestContext>()
@@ -115,8 +122,10 @@ async function resolveVerifiedTerminal(headers: HeaderBag, deps: AiCallerResolve
   let orgId: string | null = null
   try {
     const terminal = await deps.prisma.terminal.findUnique({ where: { id: terminalId }, select: { orgId: true } })
-    orgId = terminal?.orgId ?? null
+    if (!terminal) return { terminalId: null, terminalVerified: false, orgId: null }
+    orgId = terminal.orgId ?? null
   } catch {
+    // 会话令牌已验签通过，只是查机构失败：终端身份仍算已验签（否则数据库一抖动，整厅终端都会挤进同一个出口 IP 池）。
     orgId = null
   }
   return { terminalId, terminalVerified: true, orgId }

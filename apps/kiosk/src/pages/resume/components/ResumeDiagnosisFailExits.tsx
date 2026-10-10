@@ -16,9 +16,9 @@
 // 样式只用报告页既有的 rrp-exits / rrp-row / rrp-checks（resume-report-qx.css，行高 88px）。
 // ============================================================
 
-import type { CSSProperties } from 'react'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpenIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
+import { BookOpenIcon, ChevronRightIcon, QrCodeIcon, PrinterIcon } from 'lucide-react'
 import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { MANUAL_CHECKS } from '../resume-report-model'
 
@@ -39,10 +39,15 @@ interface Props {
 
 /** 拿不到这份原件时的真实原因。写在按钮旁边常驻可见，不放 tooltip。 */
 const NO_PRINT_URL_REASON =
-  '这里拿不到这份原件的文件凭证（刷新或重新进入后不会保留）。请回到简历来源重新选取文件，再去打印。'
+  '这里拿不到你刚上传的那份原件（离开这一页再回来就拿不到了）。请回到简历来源重新选取文件，再去打印。'
 
-/** 置灰行：沿用 rrp-row 的尺寸，只换虚线与弱化色，读得出「点不动」。 */
-const DEAD_ROW: CSSProperties = { borderStyle: 'dashed', color: 'var(--qx-ink-3)', cursor: 'not-allowed' }
+function RowIcon({ children }: { children: ReactNode }) {
+  return <span className="rrp-ic" aria-hidden="true">{children}</span>
+}
+
+function RowGo() {
+  return <span className="rrp-go" aria-hidden="true"><ChevronRightIcon size={22} /></span>
+}
 
 export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
   const navigate = useNavigate()
@@ -73,48 +78,50 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
           {file?.name ? `「${file.name}」的解析没有完成。` : '这次没有生成诊断报告。'}
           这一屏不给任何诊断结论 —— 没跑出来就是没有，不拿通用建议顶替。
         </p>
+        {!canPrintOriginal ? (
+          <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginBottom: 12 }}>
+            {NO_PRINT_URL_REASON}
+          </p>
+        ) : null}
         <div className="rows" style={{ display: 'grid', gap: 10 }}>
           {canPrintOriginal ? (
             <button type="button" className="rrp-row" onClick={printOriginal} data-route="/print/material-check">
-              <PrinterIcon size={26} aria-hidden="true" />
+              <RowIcon><PrinterIcon size={26} /></RowIcon>
               <span className="tx"><b>打印我上传的原件</b><span>不需要 AI，先检查个人信息再打印</span></span>
+              <RowGo />
             </button>
           ) : (
-            <div>
-              {/*
-                真 <button> + aria-disabled，不加原生 disabled：
-                置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
-                这里刻意不绑 onClick，按下去不会有任何副作用。
-              */}
-              <button
-                type="button"
-                className="rrp-row"
-                aria-disabled="true"
-                aria-describedby="resume-fail-print-reason"
-                style={DEAD_ROW}
-              >
-                <PrinterIcon size={26} aria-hidden="true" />
-                <span className="tx"><b>打印我上传的原件</b><span>本次不可用</span></span>
-              </button>
-              <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginTop: 8 }}>
-                {NO_PRINT_URL_REASON}
-              </p>
-            </div>
+            /*
+              真 <button> + aria-disabled，不加原生 disabled：
+              置灰的按钮也必须能被 Tab 到、被读屏读到，并且读得到「为什么点不动」。
+              这里刻意不绑 onClick，按下去不会有任何副作用。
+              原因放在网格外面：网格行会分掉余高，包一层 div 的话长高的是外层，按钮仍是矮的。
+            */
+            <button
+              type="button"
+              className="rrp-row"
+              aria-disabled="true"
+              aria-describedby="resume-fail-print-reason"
+            >
+              <RowIcon><PrinterIcon size={26} /></RowIcon>
+              <span className="tx"><b>打印我上传的原件</b><span>本次不可用</span></span>
+            </button>
           )}
           <button type="button" className="rrp-row" onClick={() => navigate('/print-scan')} data-route="/print-scan">
-            <PrinterIcon size={26} aria-hidden="true" />
+            <RowIcon><PrinterIcon size={26} /></RowIcon>
             <span className="tx"><b>去打印 / 扫描其他材料</b><span>打印扫描不依赖 AI，照常可用</span></span>
+            <RowGo />
           </button>
-          <>
-              <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
-                <BookOpenIcon size={26} aria-hidden="true" />
-                <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
-              </button>
-              <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
-                <QrCodeIcon size={26} aria-hidden="true" />
-                <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
-              </button>
-</>
+          <button type="button" className="rrp-row" onClick={() => navigate('/policy-service')} data-route="/policy-service">
+            <RowIcon><BookOpenIcon size={26} /></RowIcon>
+            <span className="tx"><b>查政策</b><span>查看本机构发布的政策与办理说明</span></span>
+            <RowGo />
+          </button>
+          <button type="button" className="rrp-row" onClick={() => navigate('/official-channels')} data-route="/official-channels">
+            <RowIcon><QrCodeIcon size={26} /></RowIcon>
+            <span className="tx"><b>本机构官方渠道</b><span>扫码查看本机构官网或官方账号</span></span>
+            <RowGo />
+          </button>
         </div>
       </section>
       <section className="rrp-checks" data-testid="resume-report-fallback">

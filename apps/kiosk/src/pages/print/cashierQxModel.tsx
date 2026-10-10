@@ -13,6 +13,7 @@ import {
   ScanLineIcon,
   Undo2Icon,
 } from 'lucide-react'
+import { helpNeededLine, machineUnusableLine, refundApplyLine } from '../../copy/unattendedCopy'
 import { PAY_CHANNEL_LABEL } from './cashierStatus'
 import type { CashierSnapshot, PaymentMethod } from './CashierPaymentPanel'
 
@@ -156,11 +157,11 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
       }
     case 'free-order':
       return {
-        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '本次无需付款',
+        kind: 'info', icon: <CheckCircle2Icon aria-hidden="true" />, title: '免费试运营',
         paras: ['订单已经创建，可以直接开始打印。'],
-        chips: [['ok', '订单已建立'], [undefined, '免费试运营'], [undefined, '本次未收款']],
-        rows: [['收款情况', '免费试运营 · 本次未收款'], ['下一步', '开始打印']],
-        ask: [<>这一单<em>不用付款</em>。</>, <>下一步的实际价格为 0。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
+        chips: [['ok', '订单已建立'], [undefined, '免费试运营']],
+        rows: [['办理方式', '免费试运营'], ['下一步', '开始打印']],
+        ask: [<>这一单<em>免费试运营</em>。</>, <>确认后可以开始打印。<b>订单已经建好了</b>，我只负责把任务交给打印机。</>],
       }
     case 'channel-loading':
       return {
@@ -173,7 +174,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'channel-empty':
       return {
         kind: 'lock', icon: <LockIcon aria-hidden="true" />, title: '当前设备暂不支持在线付款',
-        paras: ['订单已保留，本次没有发起支付。请联系现场工作人员处理。'],
+        paras: [`订单已保留，本次没有发起支付。${machineUnusableLine()}`],
         chips: [['bad', '暂不支持在线付款'], [undefined, '订单已保留']],
         rows: [['可用通道', '无'], ['本机是否发起支付', '否']],
         ask: [<>这台机器<em>收不了款</em>。</>, '管理员还没开通任何收款方式。订单在，本机没有发起支付。'],
@@ -247,7 +248,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'pending-verification':
       return {
         kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款结果暂未确认',
-        paras: [<>请先查看你的{ch || '支付'}账单，<b>不要重复付款</b>。仍无法确认时请联系工作人员。</>],
+        paras: [<>请先查看你的{ch || '支付'}账单，<b>不要重复付款</b>。仍无法确认时，{helpNeededLine()}。</>],
         chips: [['warn', '结果未确认'], ['bad', '请勿重复扫码']],
         rows: [['本次支付', '结果暂未确认'], ['下一步', `先查${ch || '支付'}账单`]],
         ask: [<>结果<em>还没定</em>。</>, <>渠道可能还在处理。<b>先核实，别重复扫码。</b></>],
@@ -263,14 +264,14 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'release-failed':
       return c.free
         ? {
-            kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '本次无需付款，打印任务尚未建立',
+            kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '免费试运营，打印任务尚未建立',
             paras: [
-              <>订单已经创建，<b>本机没有向你收过钱</b>，只是这次创建打印任务没有完成。</>,
-              <>重试只会重新创建同一个打印任务，<b>不会发起收款，也不会另开新订单</b>。</>,
+              <>订单已经创建，只是这次<b>创建打印任务没有完成</b>。</>,
+              <>重试只会重新创建同一个打印任务，<b>不会另开新订单</b>。</>,
             ],
             chips: [['ok', '订单已建立'], [undefined, '免费试运营'], ['warn', '打印任务待恢复']],
-            rows: [['收款情况', '免费试运营 · 本次未收款'], ['打印任务', '尚未建立']],
-            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '本次未收款。这里只重试创建同一打印任务，不会向你收款。'],
+            rows: [['办理方式', '免费试运营'], ['打印任务', '尚未建立']],
+            ask: [<>这一单<em>免费试运营</em>，任务没建成。</>, '这里只重试创建同一打印任务，订单记录保留。'],
           }
         : {
             kind: 'warn', icon: <AlertTriangleIcon aria-hidden="true" />, title: '付款已确认，打印任务尚未建立',
@@ -324,7 +325,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'order-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单支付已失败',
-        paras: [<>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>如支付账单有扣款记录，请联系工作人员核对。</>],
+        paras: [c.free
+          ? <>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>{helpNeededLine()}</>
+          : <>系统把订单支付状态记为失败终态。<b>这张订单不能继续付款，也不能再出码。</b>{refundApplyLine()}</>],
         chips: [['bad', '订单支付失败'], [undefined, '禁止重新付款']],
         rows: [['订单支付状态', '失败（已经确认）'], ['能否再付', '不能，需重新下单']],
         ask: [<>订单支付<em>已经失败</em>。</>, '这是订单终态，不能再付；要打印请重新下单。'],
@@ -334,7 +337,9 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '订单已超时关闭',
         paras: [
           '已经确认这张订单已经关闭。这张订单不能再出收款码，也不能继续支付。',
-          '要打的话，回去重新发起一次打印，重新报价、重新下单。如果你的支付账单里确实有这一笔，请拿订单号找工作人员核对。',
+          c.free
+            ? `要打的话，回去重新发起一次打印。${helpNeededLine()}`
+            : `要打的话，回去重新发起一次打印，重新报价、重新下单。${refundApplyLine()}`,
         ],
         chips: [['bad', '订单已关闭'], [undefined, '不能再出码']],
         rows: [['订单状态', '已关闭（已经确认）'], ['能否再付', '不能，需重新下单']],
@@ -357,7 +362,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
         kind: 'warn', icon: <Undo2Icon aria-hidden="true" />, title: '这一单发生了部分退款',
         paras: [
           <>这笔订单处于<b>部分退款</b>。订单金额只退回了一部分，这类订单仍然一律不放行出纸。</>,
-          '请到「我的打印订单」查看，或找现场工作人员核对。金额只认系统订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。',
+          `请到「我的打印订单」查看。${helpNeededLine()}金额只认系统订单详情与支付渠道账单，本机不自行计算，也不提供继续支付或继续打印入口。`,
         ],
         chips: [['warn', '退款待核对'], [undefined, '不放行出纸']],
         rows: [['订单状态', '部分退款（已经确认）'], ['能否出纸', '否']],
@@ -383,12 +388,12 @@ export function cashierQxPill(state: CashierQxState, opts: { locked: boolean; fr
   label: string
 } {
   if (opts.locked && (state === 'pending' || state === 'channel-selected')) return { tone: 'warn', label: '重新出码 · 沿用本单金额' }
-  if (state === 'release-failed' && opts.free) return { tone: 'warn', label: '无需付款 · 打印任务待恢复' }
+  if (state === 'release-failed' && opts.free) return { tone: 'warn', label: '免费试运营 · 打印任务待恢复' }
   if (state === 'channel-selected' && opts.single) return { tone: 'unknown', label: '唯一可用通道 · 请选择扫码方式' }
   const PILL: Record<CashierQxState, readonly ['ok' | 'warn' | 'bad' | 'unknown', string]> = {
     'no-order': ['warn', '没有待支付的订单'],
     'session-expired': ['warn', '支付这次办理已过期'],
-    'free-order': ['ok', '无需付款 · 订单已建立'],
+    'free-order': ['ok', '免费试运营 · 订单已建立'],
     'channel-loading': ['unknown', '正在读取支付通道'],
     'channel-empty': ['bad', '未启用任何支付通道'],
     'channel-failed': ['bad', '支付通道读取失败'],
@@ -428,7 +433,8 @@ export const INSTRUMENT_STATES: ReadonlySet<CashierQxState> = new Set([
 export const PICKERS_ENABLED: ReadonlySet<CashierQxState> = new Set(['pending', 'channel-selected', 'pending-scan'])
 /** 没有通道可摆时，两格各换成一句说明（稿 32 picker-note）；不摆假按钮。 */
 export function pickerNote(state: CashierQxState, free: boolean, channelCount: number): readonly [string, string] | null {
-  if (free || state === 'no-order' || state === 'session-expired') return ['本次不涉及付款', '本次不需要扫码']
+  if (free) return ['免费试运营', '按下方按钮继续']
+  if (state === 'no-order' || state === 'session-expired') return ['本次不涉及付款', '本次不需要扫码']
   if (state === 'channel-loading') return ['正在读取本机可用的支付通道', '读到通道后才能选择']
   if (state === 'channel-failed') return ['暂时读不到本机可用的支付通道', '没有可用支付通道，暂不能扫码']
   if (state === 'channel-empty') return ['本机未启用任何支付通道', '没有可用支付通道，暂不能扫码']

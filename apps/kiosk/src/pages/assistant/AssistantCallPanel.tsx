@@ -10,15 +10,47 @@ import { AdvisorManualEntries } from './AdvisorConversation'
 import { advisorDisplayText, advisorUserReason } from './advisorUserCopy'
 import { COCKPIT_COPY, type CockpitVoiceState } from './advisorScenes'
 import { isTerminalKiosk } from '../../services/api/screensaver'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 
 interface AssistantCallPanelProps {
   onClose: () => void
-  onSwitchToText: () => void
+  onSwitchToText: (expiredSubtitle?: string, reason?: 'limit' | 'silent') => void
   /** 把 TRTC 的真实相位上报给舱面（标题 · 胶囊 · 语音通道读数）。 */
   onStateChange?: (state: CockpitVoiceState) => void
+}
+
+function AdvisorSilentNotice({
+  busy,
+  onUseText,
+  onRetry,
+}: {
+  busy: boolean
+  onUseText: () => void
+  onRetry: () => void
+}) {
+  return (
+    <div className="assistant-voice-silent" data-testid="assistant-voice-silent" role="status">
+      <h3>小青这边没有声音，也没有字幕</h3>
+      <p>可能是网络或语音服务没接通。可以改用文字继续问。</p>
+      <div className="assistant-voice-silent-actions">
+        <button
+          type="button"
+          className="assistant-voice-silent-action assistant-voice-silent-action--primary"
+          data-testid="assistant-voice-silent-to-text"
+          disabled={busy}
+          onClick={onUseText}
+        >
+          改用文字继续问
+        </button>
+        <button type="button" className="assistant-voice-silent-action" disabled={busy} onClick={onRetry}>
+          重新连接
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function MiniList({ title, items }: { title: string; items: readonly string[] }) {
@@ -64,6 +96,18 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     return () => window.clearTimeout(focusTimer)
   }, [call.phase])
 
+  // 到点转文字只做一次：父组件回调引用变化或清理期间又来一条字幕，都不能再插一遍提示。
+  const expiredHandledRef = useRef(false)
+  useEffect(() => {
+    if (call.phase === 'expired' && !expiredHandledRef.current) {
+      expiredHandledRef.current = true
+      onSwitchToText(call.subtitle || '')
+    }
+  }, [call.phase, call.subtitle, onSwitchToText])
+
+  // 没声音的自动转文字也只做一次。重新连接会清掉，下一通可以再判。
+  const silentHandledRef = useRef(false)
+
   const runExit = useCallback(async (afterEnd: () => void) => {
     if (endingRef.current) return
     endingRef.current = true
@@ -76,6 +120,15 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
     }
     afterEnd()
   }, [call])
+
+  const switchSilentToText = useCallback(() => {
+    if (silentHandledRef.current || endingRef.current) return
+    silentHandledRef.current = true
+    void runExit(() => onSwitchToText(undefined, 'silent'))
+  }, [onSwitchToText, runExit])
+  useEffect(() => {
+    if (call.phase === 'live' && call.silentStage === 'fallback') switchSilentToText()
+  }, [call.phase, call.silentStage, switchSilentToText])
 
   const closeDialog = useCallback(() => {
     if (call.phase === 'gate') {
@@ -92,11 +145,12 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
   }, [runExit])
 
   const switchToText = useCallback(() => {
-    void runExit(onSwitchToText)
+    void runExit(() => onSwitchToText())
   }, [onSwitchToText, runExit])
 
   const retryCall = useCallback(async () => {
     if (endingRef.current) return
+    silentHandledRef.current = false
     endingRef.current = true
     setEnding(true)
     try {
@@ -212,7 +266,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                   <small>尚未开放</small>
                 </span>
               </button>
-              <button type="button" className="assistant-voice-choice" onClick={onSwitchToText}>
+              <button type="button" className="assistant-voice-choice" onClick={() => onSwitchToText()}>
                 <KIcon name="chat" />
                 <span className="assistant-voice-choice-copy">
                   <strong>继续用文字</strong>
@@ -233,7 +287,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               {call.errMsg ? <p className="assistant-voice-error-message">{advisorUserReason(call.errMsg, '语音暂不可用，请稍后再试。')}</p> : null}
             </div>
             <div className="assistant-voice-twocol">
-              <MiniList title="现在可做什么" items={['重新连接，再试一次', '改用文字，继续提问', '连续失败请找现场工作人员']} />
+              <MiniList title="现在可做什么" items={['重新连接，再试一次', '改用文字，继续提问', `连续失败时，${helpNeededLine()}。`]} />
               <MiniList title="也可以直接办理" items={['打印或扫描自己的材料', '查看政策和办事说明', '管理已有的简历文件']} />
             </div>
             {/* 稿 05：语音没建立不影响这四项。点进去会卸载本面板，会话清理由 useAiAdvisorCallSession 负责。 */}
@@ -278,6 +332,10 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               </>
             )}
 
+            {call.limitWarning && (
+              <p className="assistant-voice-privacy" role="status">本次语音通话还剩 1 分钟，到点会转成文字对话，可以继续问。</p>
+            )}
+
             {call.needResume && call.phase === 'live' && (
               <button type="button" className="assistant-voice-resume" onClick={() => void call.resumePlay()}>
                 <KIcon name="phone" />
@@ -299,6 +357,13 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
                 </p>
               </div>
             )}
+            {call.phase === 'live' && call.silentStage === 'prompt' && (
+              <AdvisorSilentNotice
+                busy={ending}
+                onUseText={switchSilentToText}
+                onRetry={() => void retryCall()}
+              />
+            )}
             </div>
 
             {call.phase === 'connecting' && <AdvisorManualEntries variant="rail" />}
@@ -307,7 +372,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText, onStateChange }: A
               <div className="assistant-voice-card assistant-voice-mic-warning" data-kind="warn" role="status">
                 <h3><KIcon name="mic-off" />浏览器没有授予麦克风权限</h3>
                 <p>{isTerminalKiosk()
-                  ? '当前为只听模式：小青能说，你这边的声音传不过去。可以改用文字；如需语音请联系现场工作人员。'
+                  ? `当前为只听模式：小青能说，你这边的声音传不过去。可以改用文字；如需语音，${helpNeededLine()}。`
                   : '当前为只听模式：小青能说，你这边的声音传不过去。可以在浏览器里允许麦克风后「重新尝试授权」，也可以直接改用文字。'}</p>
               </div>
             )}

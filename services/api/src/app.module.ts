@@ -40,6 +40,7 @@ import { MemberPrivacyModule } from './member-privacy/member-privacy.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
+import { FreePrintQuotaModule } from './print-jobs/free-print-quota.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
@@ -57,6 +58,7 @@ import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.modul
 import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
+import { SupportContactModule } from './support-contact/support-contact.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
@@ -149,6 +151,7 @@ const redisUrl = process.env['REDIS_URL']
     SyncModule,
     TerminalsModule,
     PrintJobsModule,
+    FreePrintQuotaModule,
     TrtcModule,
     ContentModule,
     SmartCampusModule,
@@ -166,6 +169,7 @@ const redisUrl = process.env['REDIS_URL']
     KioskSessionModule,
     HelpModule,
     LegalModule,
+    SupportContactModule,
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,

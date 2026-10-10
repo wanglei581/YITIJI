@@ -96,7 +96,7 @@ function Assert-ControlCenterSmoke {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
   if ($LASTEXITCODE -ne 0) { throw "Terminal control center smoke test failed" }
   $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
-  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.13") {
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.14") {
     throw "Terminal control center smoke snapshot is invalid"
   }
 }
@@ -273,6 +273,29 @@ function Export-LifecycleEvidence([string]$Phase) {
   }
 }
 
+function Restore-LifecycleSpooler {
+  foreach ($taskName in @("AIJobPrintBootSpoolGuard", "AIJobPrintDailyReboot")) {
+    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($null -ne $task) {
+      Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    }
+  }
+  & "$env:SystemRoot\System32\sc.exe" config Spooler start= auto | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not restore Spooler to Automatic (sc config exit code $LASTEXITCODE)" }
+  $spooler = Get-Service -Name "Spooler"
+  if ($spooler.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
+    Start-Service -Name "Spooler"
+    $spooler.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(60))
+  }
+  $readback = (& "$env:SystemRoot\System32\sc.exe" qc Spooler 2>&1 | Out-String)
+  if ($readback -notmatch "AUTO_START") { throw "Spooler restore readback was not Automatic: $readback" }
+  $spooler.Refresh()
+  if ($spooler.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
+    throw "Spooler restore did not leave the service Running"
+  }
+}
+
+$lifecyclePassed = $false
 try {
 if (Test-Path -LiteralPath $installRoot) {
   throw "Lifecycle test requires an unused runner: $installRoot already exists"
@@ -300,6 +323,10 @@ foreach ($relativeProvisionPath in @(
   "provision\service-identity.ps1",
   "provision\terminal-control-center.ps1",
   "provision\launch-control-center.vbs",
+  "provision\boot-spool-guard.ps1",
+  "provision\boot-spool-guard-task.ps1",
+  "provision\daily-reboot.ps1",
+  "provision\daily-reboot-task.ps1",
   "kiosk\kiosk-watchdog.ps1",
   "kiosk\register-kiosk-watchdog.ps1",
   "kiosk\launch-kiosk.cmd"
@@ -307,6 +334,23 @@ foreach ($relativeProvisionPath in @(
   if (-not (Test-Path -LiteralPath (Join-Path $installRoot $relativeProvisionPath) -PathType Leaf)) {
     throw "Provisioning payload is missing after install: $relativeProvisionPath"
   }
+}
+# The MSI ships the scripts but does not register the tasks. Install them from
+# the payload, then prove uninstall deletes both and puts Spooler back.
+# The daily trigger is twelve hours ahead so it cannot fire during this run.
+. (Join-Path $installRoot "provision\boot-spool-guard-task.ps1")
+. (Join-Path $installRoot "provision\daily-reboot-task.ps1")
+Install-BootSpoolGuard -GuardScriptPath (Join-Path $installRoot "provision\boot-spool-guard.ps1")
+Install-DailyRebootTask -At ((Get-Date).AddHours(12).ToString("HH:mm")) -ScriptPath (Join-Path $installRoot "provision\daily-reboot.ps1")
+if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue)) {
+  throw "Boot spool guard task missing after install"
+}
+if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintDailyReboot" -ErrorAction SilentlyContinue)) {
+  throw "Daily reboot task missing after install"
+}
+$installedSpoolerQc = (& "$env:SystemRoot\System32\sc.exe" qc Spooler 2>&1 | Out-String)
+if ($installedSpoolerQc -notmatch "DEMAND_START") {
+  throw "Spooler was not Manual after boot spool guard install: $installedSpoolerQc"
 }
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory is missing after install"
@@ -395,7 +439,8 @@ if ($null -eq $service -or $service.StartMode -ne "Auto") {
 $failurePolicy = (& "$env:SystemRoot\System32\sc.exe" qfailure $serviceName 2>&1 | Out-String)
 if ($failurePolicy -notmatch 'RESET_PERIOD[^:]*:\s*86400' -or
     $failurePolicy -notmatch 'RESTART -- Delay = 60000' -or
-    $failurePolicy -notmatch 'RESTART -- Delay = 300000') {
+    $failurePolicy -notmatch 'RESTART -- Delay = 300000' -or
+    $failurePolicy -notmatch 'RESTART -- Delay = 1800000') {
   throw "Bound repair did not restore the expected service failure policy: $failurePolicy"
 }
 $failureFlagPolicy = (& "$env:SystemRoot\System32\sc.exe" qfailureflag $serviceName 2>&1 | Out-String)
@@ -424,6 +469,14 @@ if ($null -eq (Get-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -E
 & "$env:SystemRoot\System32\sc.exe" config $serviceName start= disabled | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Could not disable the service before uninstall (sc config exit code $LASTEXITCODE)" }
 
+# Stop Spooler so uninstall has to switch it to Automatic and start it.
+# sc.exe start returns non-zero when the service is already running, and deleting
+# a missing task does too; those actions use Return="ignore" and must still leave
+# the service Running here.
+Stop-Service -Name "Spooler" -Force
+$stoppedSpooler = Get-Service -Name "Spooler"
+$stoppedSpooler.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Stopped, [TimeSpan]::FromSeconds(60))
+
 Invoke-Msi -Arguments @("/x", $resolvedMsi) -LogName "uninstall.log"
 if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
   throw "Service still exists after uninstall"
@@ -440,11 +493,44 @@ if (Test-Path -LiteralPath $panelShortcutPath) {
 if (Test-Path -LiteralPath $desktopShortcutPath) {
   throw "Terminal control center desktop shortcut remains after uninstall"
 }
+if ($null -ne (Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue)) {
+  throw "Boot spool guard task remains after uninstall"
+}
+if ($null -ne (Get-ScheduledTask -TaskName "AIJobPrintDailyReboot" -ErrorAction SilentlyContinue)) {
+  throw "Daily reboot task remains after uninstall"
+}
+$spoolerDeadline = [DateTime]::UtcNow.AddSeconds(60)
+do {
+  $uninstalledSpoolerQc = (& "$env:SystemRoot\System32\sc.exe" qc Spooler 2>&1 | Out-String)
+  $uninstalledSpooler = Get-Service -Name "Spooler"
+  if ($uninstalledSpoolerQc -match "AUTO_START" -and $uninstalledSpooler.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running) {
+    break
+  }
+  Start-Sleep -Milliseconds 500
+} while ([DateTime]::UtcNow -lt $spoolerDeadline)
+if ($uninstalledSpoolerQc -notmatch "AUTO_START") {
+  throw "Spooler was not Automatic after uninstall: $uninstalledSpoolerQc"
+}
+if ((Get-Service -Name "Spooler").Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
+  throw "Spooler was not Running after uninstall"
+}
 
+$lifecyclePassed = $true
 Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true boundRepairRestored=true"
 } finally {
   Export-LifecycleEvidence -Phase "final"
   if ($boundMarkerWritten) {
     Remove-ItemProperty -LiteralPath $boundRegistryPath -Name "Bound" -ErrorAction SilentlyContinue
+  }
+  $restoreError = $null
+  try {
+    Restore-LifecycleSpooler
+  } catch {
+    $restoreError = $_
+  }
+  if ($null -ne $restoreError) {
+    $restoreMessage = "Spooler restore failed: $($restoreError.Exception.Message)"
+    if ($lifecyclePassed) { throw $restoreMessage }
+    Write-Warning $restoreMessage
   }
 }

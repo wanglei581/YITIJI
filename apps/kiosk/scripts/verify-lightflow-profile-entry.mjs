@@ -181,13 +181,15 @@ for (const marker of [
 for (const marker of [
   'reserveBannerSpace',
   'onLogin',
-  'onOpenSettings',
   'className="pf-idcard"',
   'className="pf-idtx"',
   'className="pf-idname"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
 }
+/* C2-2（稿 30 2.0，2026-10-06）：身份卡不再接收 onOpenSettings。
+ * 公共屏不显示昵称，「账号设置」改放底部操作条（ProfileHomeStates 的
+ * data-testid="profile-account"）。能力断言留在下面的 profileActions，不删。 */
 
 /* 2026-09-08 青序流光迁移（稿 30-my-profile）：
  * ProfileHeader 不再持有 onLogout / onOpenNotifications，ProfilePage 也不再直接写
@@ -195,14 +197,17 @@ for (const marker of [
  * **形状变了，能力没变**，所以把上面三条「这个字符串在不在」换成下面四条
  * 「这几件事还能不能做」。条数 3 → 4，只增不减。
  * 退出键按稿 30 叫「结束使用」（稿里 13 处这么写，「退出登录」只出现在说明文字里，
- * 见 30-my-profile.html:519「离开前请点『结束使用』；这会退出登录并清掉…」）。 */
+ * 见 30-my-profile.html:519「离开前请点『结束使用』；这会退出登录并清掉…」）。
+ * C2-2：这四行和游客登录锚点拆到 ProfileHomeStates.tsx，ProfilePage 才停在 500 行内。
+ * 形状变了，能力没变，所以两份源码一起读，断言一条不删。 */
+const profileActions = `${profile}\n${read('src/pages/profile/components/ProfileHomeStates.tsx')}`
 for (const [marker, message] of [
   ["'/me/notifications'", 'ProfilePage 仍能到达消息通知'],
   ['消息通知', 'ProfilePage 仍展示消息通知入口'],
   ['结束使用', 'ProfilePage 仍提供退出（稿 30 的「结束使用」）'],
   ['onEnd', 'ProfilePage 的退出键接着真实的结束会话动作'],
 ]) {
-  expectIncludes(profile, marker, message)
+  expectIncludes(profileActions, marker, message)
 }
 expectNotIncludes(header, 'kp-profile-boundary', 'ProfileHeader removes the non-prototype boundary panel')
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
@@ -327,9 +332,9 @@ expectMatches(
   /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/,
   'Profile icon actions exceed the 48px secondary touch-target minimum',
 )
-expectIncludes(profile, 'data-testid="profile-login"', 'Profile 底部保留游客登录锚点')
-expectIncludes(profile, 'onClick={onLogin}', 'Profile 底部保留游客登录操作')
-expectIncludes(profile, 'data-testid="profile-account"', 'Profile 底部保留账号设置操作')
+expectIncludes(profileActions, 'data-testid="profile-login"', 'Profile 底部保留游客登录锚点')
+expectIncludes(profileActions, 'onClick={onLogin}', 'Profile 底部保留游客登录操作')
+expectIncludes(profileActions, 'data-testid="profile-account"', 'Profile 底部保留账号设置操作')
 const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
 expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css consumes Qingxu tokens')
 expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css keeps the 48px touch floor')
@@ -397,6 +402,10 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   // 包 L1 第 1 次（2026-09-07）：我的文档 Word 转 PDF 入口拆子组件，避免主文件超 500 行。
   'apps/kiosk/src/pages/profile/me/components/DocumentConvertAction.tsx',
+  // C 路 C1-3（2026-10-06）：我的文档页内照稿。分类与访问链接横幅拆到 documents/，
+  // 主文件仍保留打印、预览、删除、签名与保存期限。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/documents/documentClassify.ts',
+  'apps/kiosk/src/pages/profile/me/documents/DocumentAccessBanner.tsx',
   'apps/kiosk/src/pages/profile/me/components/documentReprint.ts',
   'apps/kiosk/src/pages/profile/me/components/RetentionConfirmOverlay.tsx',
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
@@ -430,6 +439,9 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/qx/QxMeChrome.tsx',
   'apps/kiosk/src/pages/profile/me/qx/QxMeStateBits.tsx',
+  // C 路 C1-6（2026-10-06）文案审查：失败指引第三格收成一份。
+  // 从组件文件导出非组件函数会触发 react-refresh 警告，所以单独成这个小文件。只加行，不改守卫逻辑。
+  'apps/kiosk/src/pages/profile/me/qx/meErrorGuide.ts',
   'apps/kiosk/src/pages/profile/me/styles/qx-me-shared.css',
   'apps/kiosk/src/pages/profile/me/styles/notifications-qx.css',
   'apps/kiosk/src/pages/profile/me/styles/member-records-qx.css',
@@ -443,6 +455,11 @@ const allowedMeChanges = new Set([
   // 只加行，不动断言逻辑。
   'apps/kiosk/src/pages/profile/me/feedback/types.ts',
   'apps/kiosk/src/pages/profile/me/feedback/aiComplaint.ts',
+  // C2-6（2026-10-06）：意见反馈按稿 40 拆成底栏、状态屏、行图标和提交规则。只加行，不动断言逻辑。
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackCtaBar.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackMark.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/FeedbackStateBody.tsx',
+  'apps/kiosk/src/pages/profile/me/feedback/feedbackRules.ts',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

@@ -1,3 +1,5 @@
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import type { ReactNode } from 'react'
 import { KioskNumpad } from '../../../components/kiosk-numpad/KioskNumpad'
 import {
@@ -14,7 +16,13 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
-import { LEGACY_KEYS, type ClaimSuccessCopy, type PickupFailure, type PickupScreen } from '../pickupClaimModel'
+import {
+  LEGACY_KEYS,
+  PICKUP_SAME_CODE_RESUME_NOTE,
+  type ClaimSuccessCopy,
+  type PickupFailure,
+  type PickupScreen,
+} from '../pickupClaimModel'
 
 // 到机码页（原型 11-arrival-code.html）的展示件。只接收页面算好的数据与回调，
 // 不发请求、不判定成败；认领、终端身份与离页作废都在 PrintPickupClaimPage 里。
@@ -103,22 +111,21 @@ export function PickupHidGuide({
   )
 }
 
+/** 方案②：到机码就是取件码，不再单列第三种码。函数名沿用，避免改动页面对这张卡的引用锚点。
+ *  续打说明放在这一栏，不放键盘说明：键盘说明多一行会在 1280×720 横屏把「确认校验」挤出可视区。 */
 export function PickupThreeCodeCard() {
   return (
-    <section className="qx-card pcp-ab" aria-label="三种码的区别">
-      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />三种码，别搞混</h2>
+    <section className="qx-card pcp-ab" aria-label="两种码的区别">
+      <h2 className="pcp-ab-t"><InfoIcon size={22} aria-hidden="true" />两种码，别搞混</h2>
       <div className="pcp-ab-cols">
         <div className="pcp-ab-col is-current">
           <b>到机码 · 本页用</b>
-          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
+          <span>{PICKUP_CODE_LENGTH} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。取件和接着打都用它。</span>
+          <span className="pcp-ab-note">{PICKUP_SAME_CODE_RESUME_NOTE}</span>
         </div>
         <div className="pcp-ab-col">
           <b>上传码 · 手机传文件用</b>
           <span>用于把手机文件传到本机。</span>
-        </div>
-        <div className="pcp-ab-col">
-          <b>取件凭证码 · 取纸/补打用</b>
-          <span>取纸时出示给工作人员，不在本页输入。</span>
         </div>
       </div>
     </section>
@@ -273,8 +280,8 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
         </li>
         <li>
           <button type="button" className="pch-out-btn" onClick={onHelp}>
-            <b>问工作人员</b>
-            <span>帮你查订单</span>
+            <b>求助</b>
+            <span>联系我们或问小青</span>
           </button>
         </li>
       </ul>
@@ -301,6 +308,7 @@ export function PickupFailurePanel({
   onHelp: () => void
   onHome: () => void
 }) {
+  const contact = useSupportContact()
   if (failure === 'locked' || failure === 'network') {
     const locked = failure === 'locked'
     return (
@@ -316,9 +324,9 @@ export function PickupFailurePanel({
         </div>
         <p className="pcp-block-body">
           {locked ? (
-            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行；着急的话请找现场工作人员。</>
+            <>这是为了防止有人在公共机器上反复试码。停用<b>过一段时间会自动解除</b>，你的码不会因为停用而作废，到时候再输就行。{helpNeededLine(contact)}。</>
           ) : (
-            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸；如果仍拿不到结果，请找工作人员核实订单。</>
+            <>可以用<b>同一串码重试校验</b>，系统会按这台机器核对已认领状态，不会因此重复出纸。如果仍拿不到结果，{helpNeededLine(contact)}。</>
           )}
         </p>
         <div className="pcp-actions">
@@ -326,7 +334,7 @@ export function PickupFailurePanel({
             <>
               <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHome}>先回首页</button>
               <button type="button" className="qx-btn pcp-act pcp-act--staff" data-testid="arrival-code-primary" onClick={onHelp}>
-                联系工作人员获取帮助
+                求助
               </button>
             </>
           ) : (
@@ -334,7 +342,7 @@ export function PickupFailurePanel({
               <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onRetry}>
                 重试校验
               </button>
-              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
+              <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>求助</button>
             </>
           )}
         </div>
@@ -379,7 +387,7 @@ export function PickupFailurePanel({
           {failure === 'printer' ? '重试校验' : '清除，重新输入'}
         </button>
         <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
-          {failure === 'invalid' ? '查看取码说明 / 找工作人员' : '找工作人员'}
+          {failure === 'invalid' ? '查看取码说明 / 求助' : '求助'}
         </button>
       </div>
     </>

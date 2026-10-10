@@ -1,3 +1,4 @@
+import { peekSupportContact, helpNeededLine, machineCannotPrintLine, machineUnusableLine, preferUnattended } from '../../copy/unattendedCopy'
 /**
  * 「给用户看的错误文案」的唯一收敛点。
  *
@@ -35,13 +36,17 @@ import { ApiHttpError } from './httpAdapter'
 /**
  * 跨页面通用的技术性失败。这些码与「用户此刻在做什么」无关，因此可以给统一文案；
  * 与具体业务有关的失败一律留给调用方兜底句，那里才知道用户是在导出还是在转写。
+ *
+ * 公共额度用完（429 `AI_PUBLIC_QUOTA_EXCEEDED`）各页共用下面这一句，不写价格、购买或充值。
  */
-const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
+export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
+
+const SHARED_USER_MESSAGES = (contact = peekSupportContact()): Readonly<Record<string, string>> => ({
   NETWORK_ERROR: '网络连接失败，请检查网络后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_UNAVAILABLE: '这个到机码对应的文件暂时不可用，请联系现场工作人员',
+  PICKUP_CODE_UNAVAILABLE: `这个到机码对应的文件暂时不可用。${helpNeededLine(contact)}`,
   // 2026-09-07 产品裁决「退款则不出文件」：服务端在任何状态写入前拦下，这里给同义稳定文案。
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
   PICKUP_CODE_LENGTH: '到机码位数不对，请重新输入',
@@ -49,6 +54,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   REQUEST_TIMEOUT: '本次请求响应超时，请重试',
   RATE_LIMITED: '当前使用的人较多，请稍后再试',
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
+  // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
+  AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
@@ -59,34 +66,46 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   // 演示模式：verify-ai-down-fallbacks.mjs 要求解析页透出**真实原因**，
   // 不许把它抹成通用文案，因此必须在白名单里有自己的说法。
   MOCK_MODE: '当前为演示模式，未连接真实 AI 服务',
-  AI_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
-  AI_PROVIDER_NOT_CONFIGURED: 'AI 能力尚未启用，请联系现场工作人员',
+  AI_NOT_CONFIGURED: `AI 能力尚未启用。${helpNeededLine(contact)}`,
+  AI_PROVIDER_NOT_CONFIGURED: `AI 能力尚未启用。${helpNeededLine(contact)}`,
   AI_PROVIDER_UNREACHABLE: 'AI 服务暂时连不上，请稍后重试',
-  TERMINAL_NOT_READY: '本机设备未就绪，请联系现场工作人员后再试',
-  TERMINAL_ID_REQUIRED: '本机设备未就绪，请联系现场工作人员后再试',
-  TERMINAL_SESSION_INVALID: '这台机器的安全校验没通过，请联系现场工作人员',
+  AI_PROVIDER_ACCOUNT_UNAVAILABLE: 'AI 暂时不可用，你可以先按这一页的手动方式继续',
+  AI_PROVIDER_MODEL_INVALID: 'AI 暂时不可用，你可以先按这一页的手动方式继续',
+  TERMINAL_NOT_READY: machineUnusableLine(contact),
+  TERMINAL_ID_REQUIRED: machineUnusableLine(contact),
+  TERMINAL_SESSION_INVALID: machineUnusableLine(contact),
   TERMINAL_SESSION_RETRYABLE: '这台机器正在做安全校验，请稍候',
-  ONLINE_PAYMENT_DISABLED: '本机暂未开通线上支付，请改用其他支付方式或联系现场工作人员',
-  PRINTER_UNAVAILABLE: '打印机当前不可用（离线、缺纸或故障），请稍后再试或联系现场工作人员',
+  ONLINE_PAYMENT_DISABLED: `本机暂未开通线上支付，请改用其他支付方式。${helpNeededLine(contact)}`,
+  PRINTER_UNAVAILABLE: machineCannotPrintLine(contact),
   // #1150 方案 A：只给「终端队列闸门停领」用的新码，不占用上面的 PRINTER_UNAVAILABLE。
   // 原话通过透传形状检查就原样显示；缺失或不像人话时回退这句。
-  PRINT_TERMINAL_QUEUE_HALTED: '这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端',
+  // 无人值守：现场只有这一台，本机回退句不叫人「换一台终端」，改标准句 3。
+  PRINT_TERMINAL_QUEUE_HALTED: machineUnusableLine(contact),
   SCAN_TERMINAL_BUSY: '本机正在扫描中，请等待当前任务完成后再试',
-  SCAN_TERMINAL_DISABLED: '本机扫描功能已停用，请联系现场工作人员',
+  SCAN_TERMINAL_DISABLED: `本机扫描功能已停用。${helpNeededLine(contact)}`,
   SCAN_SESSION_EXPIRED: '这次扫描已过期，请返回重新开始',
   INVALID_SCAN_SESSION: '扫描任务未创建成功，请返回重试',
   PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED: '检测到上一笔支付待核实，请先等待自动确认或点击核实',
   PAYMENT_ATTEMPT_PENDING: '已有支付正在处理中，请勿重复扫码',
   // 该码含「受理未知」（出码超时/中断）与「已受理但本地回填失败」两支，本机都无从判定是否扣款。
   // 因此固定文案只说未知结果，既不断言「已受理」，也不落 5xx「请稍后重试」诱导重复支付。
-  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: '支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对，并联系现场工作人员核实该笔订单',
+  PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED: `支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对。${helpNeededLine(contact)}`,
   RECONCILE_TOO_FREQUENT: '核实过于频繁，请稍候几秒再试',
   RECONCILE_UNSUPPORTED: '当前通道不支持主动核实，请继续等待支付结果',
   LOCAL_AGENT_UNREACHABLE: '无法连接这台机器的本机程序，请确认设备正常后重试',
-  LOCAL_USB_BRIDGE_TOKEN_MISSING: '这台机器还没配好 U 盘导入，请联系现场工作人员',
+  LOCAL_USB_BRIDGE_TOKEN_MISSING: `这台机器还没配好 U 盘导入。${helpNeededLine(contact)}`,
+  // 2026-10-04 Agent 本地接口：读的那一下失败（多半是 Windows Defender 拦下了可疑文件，或文件已被隔离）。
+  // 重试同一个文件不会成功，所以不说「请重试」，直接让用户换一个。
+  LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
+  // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
+  LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
+  // 2026-10-04 能力中心把这台机器的 U 盘导入配成非「可用」。重试过不了，改走手机扫码。
+  LOCAL_USB_DISABLED: '这台机器暂未开放 U 盘导入，请用手机扫码上传',
+  // 2026-10-04 查能力开关失败、超时或返回对不上。当时确认不了是否开放，不要当成已开放。
+  LOCAL_USB_CAPABILITY_UNKNOWN: '暂时确认不了 U 盘导入是否开放，请稍后再试或用手机扫码上传',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
-  NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',
+  NO_TERMINAL_IDENTITY: machineUnusableLine(contact),
   KIOSK_FEEDBACK_RATE_LIMITED: '反馈提交过于频繁，请稍后再试',
   KIOSK_FEEDBACK_PII_REJECTED: '反馈内容含不宜提交的个人信息，请删改后再试',
   KIOSK_FEEDBACK_EMPTY: '请填写问题说明后再提交',
@@ -105,7 +124,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   AI_BUDGET_UNAVAILABLE: '暂时核对不了 AI 额度，为防超支先暂停 AI；打印、扫描照常可用',
   // 2026-09-29 P1-3 出站白名单：服务商地址未核准，这次没有发出请求（覆盖门禁 verify:backend-error-copy-coverage）
   AI_ENDPOINT_NOT_ALLOWED: 'AI 服务暂时不可用，本次没有生成结果；打印、扫描照常可用',
-}
+})
 
 /**
  * 「服务端文案可直接展示」的码白名单。
@@ -123,7 +142,7 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
  * #1150 的 services/api/src，码名按拍板登记）。服务端把这句写成给一体机前求职者看的话，
  * 原文可能与下面的固定句不完全相同，固定覆盖会把原话吞掉。
  * 它同时留在 SHARED_USER_MESSAGES：原话缺失，或通不过下面的形状检查，就回退到
- * 「这台终端暂停接打印单，暂不能下单，请稍后再试或换一台终端」。
+ * 标准句 3（`machineUnusableLine`，这台机器暂时不能用）。
  * `PRINTER_UNAVAILABLE` 不进这张表，固定文案一个字不改。
  *
  * 加码进这张表的判据（三条都要满足）：
@@ -174,28 +193,30 @@ export function errorCodeOf(error: unknown): string | undefined {
  * 「操作失败」），因为未知错误码一律落到它 —— 它是用户实际会看到的那句话。
  */
 export function userMessageOf(error: unknown, fallback: string): string {
+  const contact = peekSupportContact()
+  const messages = SHARED_USER_MESSAGES(contact)
   const code = errorCodeOf(error)
   // 透传先于固定覆盖。目前只有 PRINT_TERMINAL_QUEUE_HALTED 两张表都在：
   // 原话过形状检查就显示原话，否则落到下面的固定文案。没进透传表的码行为不变。
   if (code && PASSTHROUGH_MESSAGE_CODES.has(code)) {
     const serverMessage = displayableServerMessage(error)
-    if (serverMessage) return serverMessage
+    if (serverMessage) return preferUnattended(serverMessage, messages[code] ?? fallback)
   }
-  if (code && code in SHARED_USER_MESSAGES) return SHARED_USER_MESSAGES[code] as string
+  if (code && code in messages) return messages[code] as string
   // 浏览器 fetch 失败是 TypeError。普通 Error('Failed to fetch') 仍走兜底——
   // verify-kiosk-runtime-error-boundary 钉死不得按 message 文本猜测。
-  if (error instanceof TypeError) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
+  if (error instanceof TypeError) return messages.NETWORK_ERROR as string
   if (error instanceof ApiHttpError) {
-    if (error.status === 0) return SHARED_USER_MESSAGES.NETWORK_ERROR as string
-    if (error.status === 429) return SHARED_USER_MESSAGES.RATE_LIMITED as string
-    if (error.status === 401) return SHARED_USER_MESSAGES.MEMBER_AUTH_REQUIRED as string
-    if (error.status >= 500) return '服务暂时不可用，请稍后重试或联系现场工作人员'
+    if (error.status === 0) return messages.NETWORK_ERROR as string
+    if (error.status === 429) return messages.RATE_LIMITED as string
+    if (error.status === 401) return messages.MEMBER_AUTH_REQUIRED as string
+    if (error.status >= 500) return `服务暂时不可用，请稍后重试。${helpNeededLine(contact)}`
   }
   return fallback
 }
 
 /** 门禁与测试用：暴露白名单本体，避免各处重新抄一份码表造成漂移。 */
-export const SHARED_USER_MESSAGE_CODES = Object.freeze(Object.keys(SHARED_USER_MESSAGES))
+export const SHARED_USER_MESSAGE_CODES = Object.freeze(Object.keys(SHARED_USER_MESSAGES()))
 
 /** 门禁与测试用：暴露透传码白名单，同样避免各处重抄造成漂移。 */
 export const PASSTHROUGH_USER_MESSAGE_CODES = Object.freeze([...PASSTHROUGH_MESSAGE_CODES])

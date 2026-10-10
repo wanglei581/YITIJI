@@ -1,23 +1,24 @@
-/* 小青作业面 · 青序流光
- * 视觉真值：docs/design/kiosk-redesign-2026-08/52-advisor-artifact.html
- * 令牌只走 --qx-*，不写裸色。
+/* 小青作业面 · 青序流光 2.0
+ * 视觉真值：docs/design/kiosk-redesign-2026-08-v2/52-advisor-artifact.html
+ * 令牌只走 --qx-*。字号按稿 qx2：小青这句 42，说明 23，眉题/图例/出处 21，分区标题 30，条目 24，按钮 27。
  */
 
 .aa-root {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  gap: 16px;
-  padding: 8px 0 12px;
+  gap: 20px;
+  padding: 26px 0 0;
 }
 
 .aa-hero {
   flex: none;
   display: flex;
-  gap: 24px;
+  gap: 26px;
   align-items: flex-start;
-  padding: 28px 32px;
-  border-radius: 28px;
+  padding: 34px 36px;
+  border-radius: 32px;
   background: linear-gradient(135deg, var(--qx-deep) 0%, var(--qx-deep-2) 100%);
   color: var(--qx-paper);
 }
@@ -37,11 +38,11 @@
   color: var(--qx-emerald);
 }
 .aa-hero-kicker {
-  font-size: var(--qx-fs-aux-lg);
+  font-size: 21px;
   letter-spacing: 2px;
   color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
 }
-/* 稿 52（2.0）顶栏下直接是小青横幅，没有独立页头。页头的 h1 只留给读屏与导航核对，不占版面。 */
+/* 稿 52 顶栏下直接是小青横幅。页头的 h1 只留给读屏，不占版面。 */
 .qx-stage:has(.aa-root) > .qx-pagehead {
   position: absolute;
   width: 1px;
@@ -55,26 +56,19 @@
 .aa-hero-q {
   margin: 8px 0 0;
   font-family: var(--qx-serif);
-  font-size: 36px;
+  font-size: 42px;
   line-height: 1.34;
   font-weight: 700;
 }
-.aa-hero-q em {
-  font-style: normal;
-  color: var(--qx-emerald);
-}
+.aa-hero-q em { font-style: normal; color: var(--qx-emerald); }
 .aa-hero-sub {
   margin: 12px 0 0;
-  font-size: 20px;
+  font-size: 23px;
   line-height: 1.6;
-  color: color-mix(in srgb, var(--qx-paper) 82%, transparent);
+  color: color-mix(in srgb, var(--qx-paper) 92%, transparent);
 }
 
-.aa-legend {
-  flex: none;
-  display: flex;
-  gap: 12px;
-}
+.aa-legend { flex: none; display: flex; gap: 12px; }
 .aa-lg {
   flex: 1;
   min-width: 0;
@@ -85,7 +79,7 @@
   border-radius: 18px;
   background: var(--qx-surface);
   border: 1px solid var(--qx-line);
-  font-size: 17px;
+  font-size: 21px;
   color: var(--qx-ink-2);
 }
 .aa-lg b {
@@ -96,74 +90,149 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
 }
 .aa-lg[data-e='E1'] b { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .aa-lg[data-e='E2'] b { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .aa-lg[data-e='E3'] b { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 
+/* 稿 52 第 242–253 行的 2.0 覆盖：默认竖向拉开区块，不拉空卡片。 */
 .aa-body {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: space-evenly;
+  gap: 20px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
+.aa-body::-webkit-scrollbar { display: none; }
+/* 条目面板按内容吸收余高，打印读不到但仍有条目时也适用。
+ * 四条基准：top 26 加正文外的 20 = 46，mid 46，bot 25。
+ * 各处下限 0 / 20 / 0，基准合计正好占完稿上四条的余高，不长不缩。
+ * 增长权重 31、50、条目间距数 × 80、170 是各处最多再长的像素。
+ * 收缩量 flex-shrink × flex-basis：26、26、25、113 是各处最多能缩的像素；
+ * 按能吸收多少分配，各处一起到头。带走卡 486 = 纸高 424 + 内边距 60 + 边框 2；
+ * 373 / 656 对应纸高 311 / 594，宽 220 / 420，保持 A4 比例。
+ */
+.aa-body:has(> .aa-qa) { justify-content: flex-start; gap: 0; }
+/* 到上限后仍剩的高度（只有一条时出现）上下平分；放不下时归零，从顶部滚。
+   只有一条时已加提示，并增大条目内边距与纸样上限来分配余高。 */
+.aa-body:has(> .aa-qa)::before,
+.aa-body:has(> .aa-qa)::after { content: ''; flex: 1 0 0px; }
+.aa-gap { display: block; min-height: 0; }
+.aa-gap[data-p='top'] { flex: 31 1 26px; max-height: 57px; }
+.aa-gap[data-p='mid'] { flex: 0 0.565 46px; min-height: 20px; }
+.aa-gap[data-p='bot'] { flex: 50 1 25px; max-height: 75px; }
+.aa-body > .aa-qa { flex: calc(var(--aa-pin-gaps, 0) * 80) 0 auto; }
+.aa-qa .aa-scroll { flex: 1 1 auto; display: flex; flex-direction: column; }
+.aa-qa .aa-pin {
+  flex: 1 0 auto;
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 16px;
+  align-items: start; align-content: center;
+}
+/* 首尾各用中间条目一半的增长权重，并贴上 / 贴下：相邻文字等距，分隔线居中。 */
+.aa-qa .aa-pin:first-child { flex-grow: 0.5; align-content: start; }
+.aa-qa .aa-pin:last-child { flex-grow: 0.5; align-content: end; }
+.aa-qa .aa-pin:only-child { flex-grow: 0; }
+.aa-body:has(> .aa-qa) > .aa-take { flex: 170 0.2325 486px; min-height: 373px; max-height: 656px; }
+.aa-body:has(> .aa-qa) .aa-paper { align-self: stretch; width: auto; min-height: 311px; }
+/* 纸样没放大时照稿排：两步紧跟标题，打印稿说明贴底；打印读不到时说明和提示框一起贴底。
+   纸样放大后，先把稿上已有的空隙长到上限，再让另一处长。两个伪元素留出空隙，order 把它们放到对应位置。 */
+.aa-body:has(> .aa-qa) .aa-has { margin-top: 0; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-sec-h { order: 1; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-steps { order: 3; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-has { order: 5; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-has:has(+ .aa-warn) { order: 3; }
+.aa-body:has(> .aa-qa) .aa-take-tx > .aa-warn { order: 5; }
+.aa-body:has(> .aa-qa) .aa-take-tx::before { content: ''; order: 2; flex: 1 1 0px; }
+.aa-body:has(> .aa-qa) .aa-take-tx::after { content: ''; order: 4; flex: 1000 1 0px; max-height: 135px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::before { flex: 1000 1 0px; max-height: 137px; }
+.aa-body:has(> .aa-qa) .aa-take-tx:has(> .aa-warn)::after { flex: 1 1 0px; max-height: none; }
+/* 打印读不到时底栏少了深色按钮，卡片到灰字本来就更空，底部间距只再长一点。 */
+.aa-root[data-state='print-unavailable'] .aa-gap[data-p='bot'] { flex-grow: 5; max-height: 30px; }
+
 .aa-sec {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   background: var(--qx-surface);
   border: 1px solid var(--qx-line);
   border-radius: 24px;
-  padding: 24px 26px;
+  padding: 30px 32px;
 }
 .aa-sec-h {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
-.aa-sec-n { font-size: 17px; color: var(--qx-teal-d); font-weight: 700; letter-spacing: 1px; }
-.aa-sec-t { font-size: 27px; font-weight: 700; }
-.aa-sec-hint { margin-left: auto; font-size: 18px; color: var(--qx-ink-3); }
-.aa-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+.aa-sec-n { font-size: 21px; color: var(--qx-teal-d); font-weight: 700; letter-spacing: 1px; }
+.aa-sec-t { font-size: 30px; font-weight: 700; }
+.aa-sec-side {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
 }
+/* 稿 .sec-hint：提示是标题行的直接子项时贴最右。读不到最新时提示和「重新读取」包在 .aa-sec-side 里，整组靠右。 */
+.aa-sec-h > .aa-sec-hint { margin-left: auto; }
+.aa-sec-hint { font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
+.aa-stale { font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
+.aa-scroll { flex: none; overflow: visible; }
 
 .aa-pin {
   display: flex;
   gap: 16px;
-  padding: 18px 0;
+  padding: 26px 0;
   border-top: 1px solid var(--qx-line);
 }
-.aa-pin:first-child { border-top: 0; padding-top: 0; }
+.aa-pin:first-child { border-top: 0; }
 .aa-pin-e {
   flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
 }
 .aa-pin[data-e='E1'] .aa-pin-e { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .aa-pin[data-e='E2'] .aa-pin-e { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
 .aa-pin[data-e='E3'] .aa-pin-e { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
-.aa-pin-c { margin: 0; font-size: 22px; line-height: 1.62; }
-.aa-pin-s { margin: 8px 0 0; font-size: 17px; color: var(--qx-ink-3); }
+.aa-pin-c { margin: 0; font-size: 24px; line-height: 1.5; }
+.aa-pin-s { margin: 10px 0 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-3); }
+
+/* 只有 1 条时的提示：虚线隔开，字号和「打印稿上有…」那句同一档。 */
+.aa-more {
+  margin: 0;
+  padding-top: 24px;
+  border-top: 1px dashed var(--qx-line-2);
+  font-size: 22px;
+  line-height: 1.55;
+  color: var(--qx-ink-2);
+}
+/* 只有 1 条：这一条上下多留一点，纸样可以再放大一档（高 674、宽 477），剩下的高度就够分了。 */
+.aa-qa .aa-pin:only-child { padding: 30px 0 36px; }
+.aa-body:has(.aa-pin:only-child) > .aa-take { max-height: 736px; }
+/* 只有 1 条又读不到打印：纸样更高，右栏先长的那处多给一点（137 → 165），和下面那处更匀。
+   只给这一种情形；2 条以上保持 137，右栏两处间距仍是 189 / 188。 */
+.aa-body:has(.aa-pin:only-child) .aa-take-tx:has(> .aa-warn)::before { max-height: 165px; }
 
 .aa-draft {
   margin: 0;
-  font-size: 23px;
-  line-height: 1.78;
+  font-size: 24px;
+  line-height: 1.6;
   white-space: pre-wrap;
-  padding: 22px 24px;
+  padding: 26px 28px;
   border-radius: 18px;
   background: var(--qx-paper);
   border: 1px solid var(--qx-line);
@@ -175,28 +244,29 @@
   background: var(--qx-wheat-soft);
   border: 1px solid var(--qx-line-2);
 }
-.aa-blanks-t { margin: 0; font-size: 20px; font-weight: 700; color: var(--qx-wheat-d); }
-.aa-blanks-l { margin: 10px 0 0; font-size: 19px; line-height: 1.7; color: var(--qx-ink-2); white-space: pre-wrap; }
-.aa-based { margin-top: 18px; }
-.aa-based-t { margin: 0 0 10px; font-size: 19px; color: var(--qx-ink-3); }
+.aa-blanks-t { margin: 0; font-size: 22px; font-weight: 700; color: var(--qx-wheat-d); }
+.aa-blanks-l { margin: 10px 0 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-2); white-space: pre-wrap; }
+.aa-based { margin-top: 22px; }
+.aa-based-t { margin: 0 0 6px; font-size: 22px; line-height: 1.45; color: var(--qx-ink-3); }
 .aa-based-i {
   display: flex;
   gap: 14px;
-  padding: 14px 0;
+  padding: 18px 0;
   border-top: 1px dashed var(--qx-line-2);
-  font-size: 19px;
+  font-size: 23px;
+  line-height: 1.5;
 }
 .aa-based-i:first-of-type { border-top: 0; }
-.aa-based-k { flex: none; width: 200px; color: var(--qx-ink-3); }
+.aa-based-k { flex: none; width: 240px; color: var(--qx-ink-3); }
 .aa-based-v { flex: 1; min-width: 0; color: var(--qx-ink); }
 
 .aa-cmp {
   display: flex;
   gap: 16px;
-  padding: 18px 0;
+  padding: 24px 0;
   border-top: 1px solid var(--qx-line);
 }
-.aa-cmp:first-child { border-top: 0; padding-top: 0; }
+.aa-cmp:first-child { border-top: 0; }
 .aa-cmp-v {
   flex: none;
   width: 104px;
@@ -205,21 +275,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
 }
 .aa-cmp[data-v='covered'] .aa-cmp-v { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .aa-cmp[data-v='missing'] .aa-cmp-v { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar); }
 .aa-cmp[data-v='not_a_capability'] .aa-cmp-v { background: var(--qx-plum-soft); color: var(--qx-plum-d); }
-.aa-cmp-r { margin: 0; font-size: 22px; line-height: 1.55; font-weight: 600; }
-.aa-cmp-e { margin: 8px 0 0; font-size: 19px; line-height: 1.66; color: var(--qx-ink-2); }
+.aa-cmp-r { margin: 0; font-size: 24px; line-height: 1.5; font-weight: 600; }
+.aa-cmp-e,
 .aa-quote {
   margin: 8px 0 0;
+  font-size: 21px;
+  line-height: 1.45;
+  color: var(--qx-ink-2);
+}
+.aa-quote {
   padding: 4px 0 4px 14px;
   border-left: 3px solid var(--qx-teal);
   color: var(--qx-ink);
-  font-size: 19px;
-  line-height: 1.66;
 }
 .aa-extras {
   margin-top: 18px;
@@ -228,23 +301,21 @@
   background: var(--qx-slate-soft);
   border: 1px solid var(--qx-line);
 }
-.aa-extras-t { margin: 0; font-size: 20px; font-weight: 700; color: var(--qx-slate-d); }
-.aa-extras-l { margin: 10px 0 0; font-size: 19px; line-height: 1.72; color: var(--qx-ink-2); white-space: pre-wrap; }
+.aa-extras-t { margin: 0; font-size: 22px; font-weight: 700; color: var(--qx-slate-d); }
+.aa-extras-l { margin: 10px 0 0; font-size: 21px; line-height: 1.45; color: var(--qx-ink-2); white-space: pre-wrap; }
 
 .aa-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 16px;
-  padding: 48px 32px;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 28px;
 }
 .aa-state-ic {
-  width: 120px;
-  height: 120px;
-  border-radius: 36px;
+  flex: none;
+  width: 104px;
+  height: 104px;
+  border-radius: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -253,7 +324,193 @@
 }
 .aa-state[data-tone='warn'] .aa-state-ic { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 .aa-state[data-tone='error'] .aa-state-ic { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); }
-.aa-state-t { margin: 0; font-size: 31px; font-weight: 700; }
-.aa-state-d { margin: 0; font-size: 21px; line-height: 1.72; color: var(--qx-ink-2); max-width: 660px; }
+.aa-state-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.aa-state-t { margin: 0; font-size: 32px; font-weight: 700; }
+.aa-state-d { margin: 0; font-size: 22px; line-height: 1.5; color: var(--qx-ink-2); max-width: none; }
 
+.aa-kind {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 32px 0;
+  border-top: 1px solid var(--qx-line);
+}
+.aa-kind:first-of-type { border-top: 0; }
+.aa-kind-ic {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.aa-kind-ic[data-k='qa'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
+.aa-kind-ic[data-k='slot'] { background: var(--qx-slate-soft); color: var(--qx-slate-d); }
+.aa-kind-ic[data-k='cmp'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+.aa-kind-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.aa-kind-h { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.aa-kind-tx b { font-size: 28px; font-weight: 700; }
+.aa-kind-d { font-size: 23px; line-height: 1.55; color: var(--qx-ink-2); }
+.aa-kind-tx em {
+  font-style: normal;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--qx-teal-d);
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--qx-teal-soft);
+}
+
+.aa-take { flex-direction: row; align-items: stretch; gap: 30px; }
+.aa-paper {
+  flex: none;
+  align-self: flex-start;
+  width: 300px;
+  aspect-ratio: 210 / 297;
+  background: var(--qx-on-solid);
+  border: 1px solid var(--qx-line-2);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--qx-ink) 12%, transparent);
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.aa-paper .pp-t { display: block; height: 16px; width: 62%; border-radius: 4px; background: var(--qx-ink); }
+.aa-paper .pp-m {
+  display: block;
+  height: 9px;
+  width: 40%;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--qx-ink-3) 45%, var(--qx-paper));
+}
+.aa-paper .pp-body { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: 12px; }
+.aa-paper .pp-r { display: grid; grid-template-columns: 26px 1fr; gap: 7px 10px; align-items: center; }
+.aa-paper .pp-e { grid-row: span 2; width: 26px; height: 26px; border-radius: 7px; }
+.aa-paper .pp-e.sm { grid-row: auto; width: 20px; height: 20px; border-radius: 6px; }
+.aa-paper .pp-r:has(.pp-e.sm) { grid-template-columns: 20px 1fr; }
+.aa-paper .pp-r[data-e='E1'] .pp-e { background: var(--qx-teal); }
+.aa-paper .pp-r[data-e='E2'] .pp-e { background: var(--qx-slate); }
+.aa-paper .pp-r[data-e='E3'] .pp-e { background: var(--qx-wheat); }
+.aa-paper .pp-r[data-v='ok'] .pp-e { background: var(--qx-teal); }
+.aa-paper .pp-r[data-v='miss'] .pp-e { background: var(--qx-cinnabar); }
+.aa-paper .pp-r[data-v='na'] .pp-e { background: var(--qx-plum); }
+.aa-paper .pp-l {
+  display: block;
+  height: 9px;
+  width: 100%;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--qx-ink-3) 55%, var(--qx-paper));
+}
+.aa-paper .pp-l.w6 { width: 60%; }
+.aa-paper .pp-l.w7 { width: 70%; }
+.aa-paper .pp-l.w8 { width: 80%; }
+.aa-paper .pp-l.w9 { width: 90%; }
+.aa-paper .pp-sub { margin: 8px 0 0; }
+.aa-paper .pp-f {
+  display: block;
+  height: 8px;
+  width: 55%;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--qx-ink-3) 55%, var(--qx-paper));
+}
+.aa-take-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.aa-take .aa-sec-h { margin-bottom: 16px; }
+.aa-steps { list-style: none; display: flex; flex-direction: column; gap: 18px; margin: 0; padding: 0; }
+.aa-steps li { display: flex; gap: 16px; align-items: flex-start; font-size: 23px; line-height: 1.5; }
+.aa-steps li b {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--qx-deep);
+  color: var(--qx-on-solid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+/* 句子里的下划线链接。上下内边距撑点击框，等量负外边距不改行高。 */
+.aa-doc-link {
+  display: inline;
+  margin: -14px 0;
+  padding: 14px 0;
+  color: var(--qx-teal-d);
+  font-weight: 700;
+  line-height: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.aa-has {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px dashed var(--qx-line-2);
+  font-size: 22px;
+  line-height: 1.55;
+  color: var(--qx-ink-2);
+}
+.aa-warn {
+  margin-top: 4px;
+  padding: 20px 22px;
+  border-radius: 18px;
+  background: var(--qx-wheat-soft);
+  border: 1px solid var(--qx-line-2);
+}
+.aa-warn b { display: block; font-size: 24px; color: var(--qx-wheat-d); }
+.aa-warn p { margin: 8px 0 0; font-size: 22px; line-height: 1.55; color: var(--qx-ink-2); }
+
+.aa-root[data-state='no-artifact'] .aa-paper,
+.aa-root[data-state='expired'] .aa-paper,
+.aa-root[data-state='loading'] .aa-paper,
+.aa-root[data-state='error'] .aa-paper {
+  width: 250px;
+  padding: 22px 20px;
+  gap: 14px;
+}
+.aa-root[data-state='slot-draft-blanks'] .aa-paper,
+.aa-root[data-state='compare-all-covered'] .aa-paper {
+  width: 220px;
+  padding: 20px 18px;
+  gap: 12px;
+}
+.aa-root[data-state='slot-draft'] .aa-paper { width: 330px; }
+.aa-root[data-state='compare-report'] .aa-paper { display: none; }
+.aa-root[data-state='compare-report'] .aa-steps { flex-direction: row; gap: 24px; }
+.aa-root[data-state='compare-report'] .aa-steps li { flex: 1; }
+
+.aa-reread {
+  flex: none;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid var(--qx-line-2);
+  background: var(--qx-paper);
+  color: var(--qx-teal-d);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.qx-stage:has(.aa-root) > .qx-ctabar {
+  gap: 16px;
+  padding: 22px var(--qx-gutter) 18px;
+  border-top: 0;
+  background: transparent;
+}
+.qx-stage:has(.aa-root) > .qx-ctabar .qx-btn {
+  min-height: 96px;
+  height: 96px;
+  padding: 0 40px;
+  border-radius: 26px;
+  font-size: 27px;
+}
 .qx-ctabar .aa-cta-print { flex: 1; min-width: 0; }
+.aa-cta-note {
+  flex: 1;
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.6;
+  color: var(--qx-ink-3);
+}

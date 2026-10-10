@@ -1,15 +1,19 @@
-import { formatDateTime, type AdminUserActivityItem, type AdminUserDetailResult } from '@ai-job-print/shared'
+import { formatDateTime, type AdminUserClosureResult, type AdminUserActivityItem, type AdminUserDetailResult } from '@ai-job-print/shared'
 import { Card, Drawer, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { XIcon } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ApiHttpError } from '../../services/api/client'
 import { getDetail } from '../../services/api/adminUsers'
-import { ACTIVITY_TYPE_LABELS } from './userPresentation'
+import { getUser } from '../../services/auth'
+import { activityActionText, activityCategoryText, activityStatusText, activityTerminalText } from './activityDisplay'
+import { UserClosureDialog } from './UserClosureDialog'
+import { ACTIVITY_TYPE_LABELS, USER_STATUS_LABELS, CLOSURE_SOURCE_LABELS, canCloseUser, hasPendingClosure, userPhone } from './userPresentation'
 
 interface UserDetailDrawerProps {
   endUserId: string | null
   onClose: () => void
   onMissing: () => void
+  onClosureSuccess: (result: AdminUserClosureResult) => void
 }
 
 type DetailState = 'idle' | 'loading' | 'ready' | 'error' | 'notfound'
@@ -23,16 +27,20 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
-function DetailField({ label, value }: { label: string; value: string }) {
+function DetailField({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div>
       <dt className="text-xs text-neutral-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-medium text-neutral-800">{value}</dd>
+      <dd title={title} className="mt-1 break-words text-sm font-medium text-neutral-800">{value}</dd>
     </div>
   )
 }
 
 function ActivityCard({ activity }: { activity: AdminUserActivityItem }) {
+  const category = activityCategoryText(activity)
+  const action = activityActionText(activity)
+  const status = activityStatusText(activity)
+  const terminal = activityTerminalText(activity.terminalId)
   return (
     <li className="rounded-lg border border-neutral-100 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -40,18 +48,20 @@ function ActivityCard({ activity }: { activity: AdminUserActivityItem }) {
         <time className="text-xs text-neutral-400" dateTime={activity.occurredAt} title={formatDateTime(activity.occurredAt)}>{formatDateTime(activity.occurredAt)}</time>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-        <DetailField label="类别" value={activity.category ?? '—'} />
-        <DetailField label="动作" value={activity.action ?? '—'} />
-        <DetailField label="状态" value={activity.status || '—'} />
-        <DetailField label="终端" value={activity.terminalId ?? '—'} />
+        <DetailField label="类别" value={category.label} title={category.title} />
+        <DetailField label="动作" value={action.label} title={action.title} />
+        <DetailField label="状态" value={status.label} title={status.title} />
+        <DetailField label="终端" value={terminal.label} title={terminal.title} />
       </dl>
     </li>
   )
 }
 
-export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDrawerProps) {
+export function UserDetailDrawer({ endUserId, onClose, onMissing, onClosureSuccess }: UserDetailDrawerProps) {
   const [state, setState] = useState<DetailState>('idle')
   const [detail, setDetail] = useState<AdminUserDetailResult | null>(null)
+  const [closureOpen, setClosureOpen] = useState(false)
+  const closureTriggerRef = useRef<HTMLButtonElement>(null)
   const [retryKey, setRetryKey] = useState(0)
   const requestSequence = useRef(0)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -60,6 +70,7 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
   useEffect(() => {
     if (!endUserId) {
       requestSequence.current += 1
+      setClosureOpen(false)
       setState('idle')
       setDetail(null)
       return
@@ -91,13 +102,16 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
     return () => cancelAnimationFrame(frame)
   }, [endUserId])
 
+  useEffect(() => { if (contentRef.current) contentRef.current.inert = closureOpen }, [closureOpen])
+
   const close = useCallback(() => {
+    if (closureOpen) return
     if (state === 'notfound') onMissing()
     onClose()
-  }, [onClose, onMissing, state])
+  }, [onClose, onMissing, state, closureOpen])
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab') return
+    if (closureOpen || event.key !== 'Tab') return
     const content = contentRef.current
     if (!content) return
 
@@ -139,14 +153,15 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
     : []
 
   return (
+    <>
     <Drawer open={endUserId !== null} onClose={close} ariaLabel="用户详情" size="lg">
-      <div ref={contentRef} onKeyDown={handleKeyDown}>
+      <div ref={contentRef} onKeyDown={handleKeyDown} aria-hidden={closureOpen || undefined}>
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 ref={titleRef} tabIndex={-1} className="text-lg font-semibold text-neutral-900 outline-none">
               用户详情
             </h2>
-            <p className="mt-1 text-sm text-neutral-500">只读查看用户基本信息与服务使用概况</p>
+            <p className="mt-1 text-sm text-neutral-500">查看用户基本信息与服务使用概况</p>
           </div>
           <button type="button" onClick={close} aria-label="关闭用户详情" className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100">
             <XIcon className="h-4 w-4" aria-hidden />
@@ -182,13 +197,26 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
               <h3 className="text-sm font-semibold text-neutral-900">基本信息</h3>
               <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <DetailField label="昵称" value={detail.user.nickname?.trim() || '未设置昵称'} />
-                <DetailField label="手机号" value={detail.user.maskedPhone} />
-                <DetailField label="账号状态" value={detail.user.enabled ? '正常' : '已停用'} />
+                <DetailField label="手机号" value={userPhone(detail.user)} />
+                <DetailField label="账号状态" value={USER_STATUS_LABELS[detail.user.status]} />
                 <DetailField label="最近登录" value={detail.user.lastLoginAt ? formatDateTime(detail.user.lastLoginAt) : '暂无登录记录'} />
                 <DetailField label="注册时间" value={formatDateTime(detail.user.createdAt)} />
                 <DetailField label="更新时间" value={formatDateTime(detail.user.updatedAt)} />
               </dl>
             </Card>
+
+            {detail.user.closureRequest && <Card className="p-4">
+              <h3 className="text-sm font-semibold">{detail.user.closureRequest.source === 'offline' ? '注销办理记录' : '注销申请'}</h3>
+              {hasPendingClosure(detail.user) && <p role="status" className="mt-2 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">该会员已申请注销，等待管理员执行</p>}
+              <dl className="mt-3 grid grid-cols-2 gap-4">
+                <DetailField label={detail.user.closureRequest.source === 'offline' ? '登记时间' : '申请时间'} value={formatDateTime(detail.user.closureRequest.requestedAt)} />
+                <DetailField label="来源" value={CLOSURE_SOURCE_LABELS[detail.user.closureRequest.source]} />
+              </dl>
+            </Card>}
+            {getUser()?.role === 'admin' && canCloseUser(detail.user) && <section aria-label="账号操作" className="rounded-lg border border-red-200 p-4">
+              <h3 className="mb-2 text-sm font-semibold">账号操作</h3>
+              <button ref={closureTriggerRef} type="button" onClick={() => setClosureOpen(true)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">注销账号</button>
+            </section>}
 
             <section aria-labelledby="user-stats-title">
               <h3 id="user-stats-title" className="text-sm font-semibold text-neutral-900">服务使用统计</h3>
@@ -220,5 +248,15 @@ export function UserDetailDrawer({ endUserId, onClose, onMissing }: UserDetailDr
         )}
       </div>
     </Drawer>
+    {closureOpen && detail && <UserClosureDialog user={detail.user} onClose={() => {
+      setClosureOpen(false)
+      requestAnimationFrame(() => closureTriggerRef.current?.focus())
+    }} onSuccess={(result) => {
+      setClosureOpen(false)
+      setRetryKey((value) => value + 1)
+      onClosureSuccess(result)
+      requestAnimationFrame(() => titleRef.current?.focus())
+    }} />}
+    </>
   )
 }

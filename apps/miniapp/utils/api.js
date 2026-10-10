@@ -1935,7 +1935,8 @@ const api = {
    * @param {{idempotencyKey:string, stepUpToken?:string}} opts
    *   idempotencyKey 必填且必须是 UUID 形态，服务端正则 [1-8] 版本位 + [89ab] variant 位，
    *   全局唯一：重试必须复用同一个 key，换 key 会被当成新请求。
-   *   stepUpToken 仅 export 需要（action=export_data_request），走 header 而非 body。
+   *   stepUpToken 走 header 而非 body：export 用 action=export_data_request，delete（账号注销申请）用 action=close_account。
+   *   注销申请受理后 status=pending（executionStep=awaiting_admin）；已有一条待处理的会幂等返回原来那条。
    */
   createMemberDataRequest(requestType, opts = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
@@ -1944,6 +1945,15 @@ const api = {
     return request('/me/data-requests', {
       method: 'POST', data: { requestType }, header, needAuth: true,
     });
+  },
+
+  /**
+   * 撤回本人还在待处理的注销申请。只对 requestType='delete' 且 status='pending' 有效，成功后 status=cancelled；
+   * 已开始执行的撤不了（409 DATA_REQUEST_INVALID_TRANSITION）。
+   */
+  cancelMemberDataRequest(requestId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
+    return request(`/me/data-requests/${encodeURIComponent(requestId)}/cancel`, { method: 'POST', needAuth: true });
   },
 
   /**
@@ -2037,5 +2047,19 @@ api.appendSelfAssessmentToResume = function appendSelfAssessmentToResume(taskId,
     needAuth: true,
     timeout: 60000,
     ai: 'generate',
+  });
+};
+
+/**
+ * 公开服务电话。不登录。terminalId 为空就不带查询参数。
+ * 后端: GET /api/v1/public/support-contact
+ */
+api.getSupportContact = function getSupportContact(terminalId) {
+  if (config.USE_MOCK) return Promise.reject(mockUnavailable('服务电话'));
+  const ref = typeof terminalId === 'string' ? terminalId.trim() : '';
+  // 路径必须是字面量：契约门禁只抽 request('…') / request(`…`)，变量拼出来的路径会被漏掉。
+  if (!ref) return request('/public/support-contact', { method: 'GET', needAuth: false });
+  return request(`/public/support-contact?terminalId=${encodeURIComponent(ref)}`, {
+    method: 'GET', needAuth: false,
   });
 };

@@ -221,17 +221,24 @@ export class MemberAuthService {
     source: LegalConsentSource
     ipAddress?: string
   }): Promise<void> {
-    await this.prisma.memberLegalConsent.create({
-      data: {
-        endUserId: input.endUserId,
-        termsVersion: input.termsVersion,
-        privacyVersion: input.privacyVersion,
-        termsDocVersionId: input.termsDocVersionId,
-        privacyDocVersionId: input.privacyDocVersionId,
-        source: input.source,
-        ipAddress: input.ipAddress ?? null,
-      },
-    })
+    try {
+      await this.prisma.memberLegalConsent.create({
+        data: {
+          endUserId: input.endUserId,
+          termsVersion: input.termsVersion,
+          privacyVersion: input.privacyVersion,
+          termsDocVersionId: input.termsDocVersionId,
+          privacyDocVersionId: input.privacyDocVersionId,
+          source: input.source,
+          ipAddress: input.ipAddress ?? null,
+        },
+      })
+    } catch (error) {
+      // 账号已进入注销：数据库拒绝再往它名下写同意记录（迟到写入防线）。按登录入口同一口径答「账号不可用」，
+      // 不把数据库错误原样抛出去。
+      if (String((error as { message?: unknown } | null)?.message ?? '').includes('MEMBER_CLOSED_WRITE_FORBIDDEN')) throw this.accountUnavailable()
+      throw error
+    }
   }
 
   /** 原子消费短信验证码并创建/更新 EndUser；不签发 token，供 QR 确认阶段使用。 */
@@ -282,6 +289,12 @@ export class MemberAuthService {
     }
 
     return { id: user.id, phoneMasked: maskPhone(phone), nickname: user.nickname }
+  }
+
+  /** 账号仍是可登录状态（启用且 active）；否则统一 ACCOUNT_UNAVAILABLE。写任何会员名下的数据之前用它先挡。 */
+  async assertAccountLoginable(endUserId: string): Promise<void> {
+    const current = await this.prisma.endUser.findUnique({ where: { id: endUserId }, select: { enabled: true, status: true } })
+    if (!current || !current.enabled || current.status !== 'active') throw this.accountUnavailable()
   }
 
   async issueLoginForUser(user: MemberAuthUser): Promise<MemberLoginResult> {

@@ -49,5 +49,6 @@ export function maskPhone(phone: string): string {
 
 /** 从 phoneEnc 解密并脱敏(给 /me、登录响应用,明文不出服务端)。 */
 export function maskPhoneFromEnc(phoneEnc: string): string {
+  if (phoneEnc.startsWith('anonymized:')) return '***'
   return maskPhone(decryptSecret(phoneEnc))
 }

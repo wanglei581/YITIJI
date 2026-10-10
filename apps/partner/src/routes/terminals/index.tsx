@@ -5,8 +5,8 @@
 // mock 模式的示例在页面上明确标注「演示数据」。
 //
 // 本页只展示服务端算好的口径（见 services/api/src/orgs/partner-terminal-ops.ts）：
-//   - 服务人次、AI 可用率当前算不出来，照实写「暂不能统计」并说明原因，不拿别的数冒充；
-//   - 1–4 的计数服务端已置空，页面写「少于 5」，不自行估算；
+//   - 服务人次已接入真实会话计数；AI 调用尚无终端归属，AI 可用率暂不能统计，照实写「暂不能统计」并说明原因，不拿别的数冒充；
+//   - 1–4 的计数服务端已置空，页面写「样本不足，不显示」（含补充隐藏），不自行估算；
 //   - 导出 CSV 只把已过服务端白名单的这份数据原样写出，不另查任何明细。
 
 import { formatDateTime } from '@ai-job-print/shared'
@@ -24,6 +24,7 @@ import { getOrgProfile } from '../../services/api/orgSelf'
 import { downloadCsv, safeFileName } from '../../lib/csv'
 import { TerminalOpsCards } from './TerminalOpsCards'
 import { TerminalOpsDrawer } from './TerminalOpsDrawer'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   METRIC_NOTES,
   RUN_STATE_VIEW,
@@ -42,17 +43,17 @@ import {
 } from './terminalOpsFormat'
 
 const PERIODS: { value: TerminalOpsPeriod; label: string }[] = [
-  { value: 'week', label: '近 7 天' },
-  { value: 'month', label: '近 30 天' },
-  { value: 'quarter', label: '近 90 天' },
+  { value: 'week', label: '近 7 天（截至昨天）' },
+  { value: 'month', label: '近 30 天（截至昨天）' },
+  { value: 'quarter', label: '近 90 天（截至昨天）' },
 ]
 
-const FILTERS = ['全部', '在线', '有未恢复故障'] as const
+const FILTERS = ['全部', '在线', '截至昨天未恢复'] as const
 type Filter = (typeof FILTERS)[number]
 
 function matchesFilter(row: TerminalOpsRow, filter: Filter): boolean {
   if (filter === '在线') return row.online
-  if (filter === '有未恢复故障') return row.faults.unrecovered
+  if (filter === '截至昨天未恢复') return row.faults.unrecovered
   return true
 }
 
@@ -104,7 +105,7 @@ export default function TerminalsPage() {
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        setErrorMessage(error instanceof Error ? error.message : '终端数据加载失败')
+        setErrorMessage(userMessageOf(error, '终端数据加载失败，请稍后重试'))
         setState('error')
       })
     return () => { cancelled = true }
@@ -119,7 +120,7 @@ export default function TerminalsPage() {
   const counts: Record<Filter, number> = {
     全部: data?.terminals.length ?? 0,
     在线: data?.terminals.filter((row) => row.online).length ?? 0,
-    有未恢复故障: data?.terminals.filter((row) => row.faults.unrecovered).length ?? 0,
+    截至昨天未恢复: data?.terminals.filter((row) => row.faults.unrecovered).length ?? 0,
   }
 
   async function exportCsv() {
@@ -144,7 +145,7 @@ export default function TerminalsPage() {
     { id: 'unconfirmed', header: '未确认出纸', align: 'right', cell: (row) => countText(row.output.unconfirmed) },
     { id: 'offline', header: '离线', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.offlineCount} 次 · ${minutesText(row.faults.offlineMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
     { id: 'printerFault', header: '打印机故障', align: 'right', cell: (row) => row.faults.reportedInWindow ? `${row.faults.printerFaultCount} 次 · ${minutesText(row.faults.printerFaultMinutes)}` : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
-    { id: 'unrecovered', header: '未恢复', align: 'right', cell: (row) => row.faults.reportedInWindow ? (row.faults.unrecovered ? <span className="font-semibold text-error-fg">未恢复</span> : <span className="text-neutral-500">无</span>) : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
+    { id: 'unrecovered', header: '截至昨天未恢复', align: 'right', cell: (row) => row.faults.reportedInWindow ? (row.faults.unrecovered ? <span className="font-semibold text-error-fg">未恢复</span> : <span className="text-neutral-500">无</span>) : <span className="text-xs text-neutral-500" title={FAULTS_NOT_REPORTED}>无法统计</span> },
   ]
 
   return (

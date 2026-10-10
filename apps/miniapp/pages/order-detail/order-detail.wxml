@@ -45,7 +45,7 @@
             <text class="od-val">{{detail.spec}}</text>
           </view>
           <view class="od-row">
-            <text class="od-label">金额</text>
+            <text class="od-label">{{detail.paid ? '金额' : '本次打印'}}</text>
             <text class="od-val">{{detail.price}}</text>
           </view>
           <view class="od-row">
@@ -59,7 +59,8 @@
         <view class="od-pickup">
           <view class="od-pickup-label">到机码</view>
           <view class="od-pickup-code">{{detail.pickup}}</view>
-          <view class="od-pickup-hint">到店后在一体机扫码或手动输入到机码</view>
+          <view class="od-pickup-hint" wx:if="{{detail.reprintNote}}">{{detail.reprintNote}}</view>
+          <view class="od-pickup-hint">到一体机前扫码或手动输入到机码</view>
         </view>
       </view>
 

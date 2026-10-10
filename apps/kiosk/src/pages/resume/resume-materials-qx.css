@@ -180,11 +180,21 @@
 }
 .qx-resume-materials .qx-rm-facts .qx-rm-grid div { padding: 10px 18px; }
 /* 整屏状态的余量吸收块：兜底出口列表（稿 25 alt-row 134px 起），行高随余量拉伸但封顶，不撑成空卡。 */
-.qx-resume-materials .qx-rm-alt { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
-.qx-resume-materials .qx-rm-alt .qx-rows { flex: 1 0 auto; max-height: 760px; display: flex; flex-direction: column; }
-.qx-resume-materials .qx-rm-alt .qx-row { flex: 1 0 auto; min-height: 134px; }
-.qx-resume-materials .qx-rm-truth { flex: none; margin: 0; padding: 12px 0 4px; border-top: 1px solid var(--qx-line); font-size: 20px; line-height: 1.45; color: var(--qx-ink-3); }
+.qx-resume-materials .qx-rm-alt { flex: none; display: flex; flex-direction: column; gap: 10px; }
+.qx-resume-materials .qx-rm-alt .qx-rows { flex: none; max-height: 760px; display: flex; flex-direction: column; }
+.qx-resume-materials .qx-rm-alt .qx-row { flex: none; min-height: 134px; }
+/* 稿 25 .truth：底栏最后一行，左一句边界，右「遇到问题」。order 高于上一步（5），贴在导航上方。 */
+.qx-resume-materials .qx-rm-truth {
+  order: 6; flex: 1 0 100%; display: flex; align-items: center; gap: 16px;
+  margin: 0; padding: 8px 0 0; border-top: 1px solid var(--qx-line);
+  font-size: 20px; line-height: 1.45; color: var(--qx-ink-3);
+}
+.qx-resume-materials .qx-rm-truth p { flex: 1 1 auto; min-width: 0; margin: 0; }
 .qx-resume-materials .qx-rm-truth b { font-weight: 600; color: var(--qx-ink-2); }
+.qx-resume-materials .qx-rm-help {
+  flex: none; min-height: 48px; padding: 0 14px; border: 0; border-radius: var(--qx-r-s);
+  background: transparent; font: inherit; font-size: 20px; font-weight: 600; color: var(--qx-teal-d); cursor: pointer;
+}
 
 /* ── 操作条：说明与按钮同排；结果态说明独占一行，三个出口等分 ───────── */
 .qx-resume-materials .qx-ctabar { flex-wrap: wrap; }
@@ -201,6 +211,8 @@
   [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-pagehead p { min-width: 0; font-size: 15px; }
   [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar { gap: 10px; padding: 12px var(--qx-gutter); }
   [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar .why { flex: 1 1 100%; font-size: 14px; }
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-truth,
+  [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-rm-help { font-size: 14px; }
   [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-btn { min-height: 52px; padding: 0 12px; gap: 6px; font-size: 16px; white-space: nowrap; }
   /* 三个出口放不下一排：主操作独占一行，两个次要出口并排，文字不折成两行。 */
   [data-kiosk-stage-fit='off'] .qx-resume-materials .qx-ctabar .qx-btn[data-variant='primary'] { flex: 1 1 100%; }
@@ -226,3 +238,9 @@
 @media (prefers-reduced-motion: reduce) {
   .qx-resume-materials *, .qx-resume-materials *::before, .qx-resume-materials *::after { transition: none !important; animation: none !important; }
 }
+
+/* 最终稿状态卡内重读，底部只放上一步与顾问；状态出口按内容排。 */
+.qx-resume-materials .qx-rm-state p > .qx-btn { display: flex; width: fit-content; margin-top: 22px; }
+.qx-resume-materials .qx-rm-after { min-height: 104px; }
+.qx-resume-materials .qx-step-actions { order: 5; }
+.qx-resume-materials .qx-rm-alt .qx-row-ic { background: var(--qx-teal-soft); border-color: var(--qx-teal-line); color: var(--qx-teal-d); }

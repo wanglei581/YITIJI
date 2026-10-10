@@ -237,8 +237,11 @@ pass('contentTrustPublishable 与 content-trust.ts 的「active 且未归档」�
 // ---------------------------------------------------------------------------
 const panelText = readOrFail(PANEL)
 const panelAst = sourceFile(PANEL, panelText)
-const pageText = readOrFail(PARTNERS_PAGE)
+const pageText = ['index.tsx', 'OrgDetailDrawer.tsx', 'PartnerTable.tsx', 'orgPresentation.ts', 'ContentTrustCell.tsx'].map((f) => readOrFail(join(dirname(PARTNERS_PAGE), f))).join('\n')
 const pageAst = sourceFile(PARTNERS_PAGE, pageText)
+for (const [file, tag] of [['index.tsx', 'OrgDetailDrawer'], ['index.tsx', 'PartnerTable'], ['OrgDetailDrawer.tsx', 'OrgContentTrustPanel'], ['PartnerTable.tsx', 'ContentTrustCell']]) {
+  if (!new RegExp(`<${tag}[\\s/>]`).test(readOrFail(join(adminRoot, 'src/routes/partners', file)))) fail(`机构入口接线缺失：${file} -> ${tag}`)
+}
 
 function calledMethods(ast, methodName) {
   return collect(

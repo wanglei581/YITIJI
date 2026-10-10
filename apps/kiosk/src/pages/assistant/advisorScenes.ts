@@ -9,6 +9,7 @@
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
 import type { KioskIconName } from '../../components/kiosk-icon'
 import { isRecruitmentRoute } from '../../hooks/useRecruitmentHosting'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 
 export interface ConsultationTask {
   id: 'resume' | 'interview' | 'jobs' | 'workplace'
@@ -344,13 +345,15 @@ export const ADVISOR_MANUAL_DETAILS: Record<(typeof ADVISOR_MANUAL_ENTRIES)[numb
  * 四格不留空。子项取自 /help 首屏已有的分类卡与三步自助（稿 06），不编造能力。
  */
 const ADVISOR_HELP_ENTRY = { label: '帮助中心', route: '/help', hint: '查常见问题与操作方法', icon: 'help' } as const
-const ADVISOR_HELP_DETAILS: readonly string[] = ['按要办的事找：登录、简历、打印、政策', '常见问题：点开就有做法和对应入口', '卡住了先自己试三步，再找工作人员']
+const ADVISOR_HELP_DETAILS_HEAD: readonly string[] = ['按要办的事找：登录、简历、打印、政策', '常见问题：点开就有做法和对应入口']
 
 export function advisorManualEntries(hostingOpen: boolean): ReadonlyArray<{ label: string; route: string; hint: string; icon: KioskIconName }> {
   return hostingOpen ? ADVISOR_MANUAL_ENTRIES : ADVISOR_MANUAL_ENTRIES.map((entry) => (isRecruitmentRoute(entry.route) ? ADVISOR_HELP_ENTRY : entry))
 }
 
 export function advisorManualDetails(route: string): readonly string[] {
-  if (route === ADVISOR_HELP_ENTRY.route) return ADVISOR_HELP_DETAILS
+  if (route === ADVISOR_HELP_ENTRY.route) {
+    return [...ADVISOR_HELP_DETAILS_HEAD, `卡住了先自己试三步。${helpNeededLine()}。`]
+  }
   return (ADVISOR_MANUAL_DETAILS as Record<string, readonly string[] | undefined>)[route] ?? []
 }

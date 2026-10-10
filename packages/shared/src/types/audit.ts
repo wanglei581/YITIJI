@@ -47,6 +47,7 @@ export type AuditAction =
   | 'resume.self_assessment_withdraw'
   | 'assistant.chat_message'
   | 'auth.password_change_self'
+  | 'auth.logout'
   | 'auth.phone_initial_bind_start'
   | 'auth.phone_initial_bind_complete'
   | 'auth.phone_initial_bind_cancel'
@@ -119,6 +120,8 @@ export interface AuditLogRecord {
   userAgent: string | null
   requestId: string | null
   createdAt: string  // ISO
+  /** 操作人显示名（只读）：内部账号姓名或登录名；机构账号「机构名 · 账号名」；系统、会员、已删除账号为 null。绝不含手机号。 */
+  actorDisplayName?: string | null
 }
 
 /** 审计列表查询(Admin)。 */

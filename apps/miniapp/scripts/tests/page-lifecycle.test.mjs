@@ -6473,7 +6473,7 @@ test('orders：失败行按服务端白名单码说原因，只认 5 个码', ()
     PAPER_EMPTY: '打印机缺纸，这次没有出纸；需要的话可重新打印',
     PRINTER_ERROR: '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
     PRINTER_OFFLINE: '打印机离线，这次没有出纸；需要的话可重新打印',
-    PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸；没拿到纸请找当时那台终端的工作人员核对，不会自动重打',
+    PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸，不会自动重打；没拿到纸可以重新下单',
     PARTIAL_OUTPUT: '只打出了一部分，没有整单重打；需要的话请重新下单',
   }
   for (const [code, note] of Object.entries(expected)) {
@@ -6505,4 +6505,937 @@ test('orders：到机码过期说清没打印；已完成、待到机不写', ()
 test('orders：模板在规格行下方显示原因，复用规格行样式', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/orders/orders.wxml'), 'utf8')
   assert.match(wxml, /<view class="oc-spec" wx:if="\{\{item\.reasonNote\}\}">\{\{item\.reasonNote\}\}<\/view>/)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// 错误原话：请求层把给用户看的原话放在 err.message、错误码放在 err.code（utils/request.js）。
+// 这几页此前读的是不存在的 err.error，原话永远读不到，只剩兜底句（走查登记）。
+// ══════════════════════════════════════════════════════════════════════
+
+const serverError = (message, code, statusCode = 400) => Object.assign(new Error(message), { code, statusCode })
+// 请求层对额度码给的是通用句（带「先用模板手动填写」）；模拟面试、小青没有模板可填，页面换成只说事实的那句（MP-K18-6）
+const QUOTA_MSG = '今天的 AI 额度已用完，明天恢复；这一步可以先用模板手动填写，打印照常可用'
+const QUOTA_PLAIN = '今天的 AI 次数用完了，明天恢复。'
+const NET_MSG = '网络连接失败，请检查网络后重试'
+const netError = () => Object.assign(new Error(NET_MSG), { statusCode: -1, wxErrMsg: 'request:fail timeout' })
+
+test('interview-qa：提交答案失败时把服务端原话给用户看，已输入的回答保留', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
+    [serverError('', 'SOME_MACHINE_CODE', 500), '提交失败，请重试。已输入的回答还在。'],
+  ]) {
+    const wx = createWx()
+    const api = {
+      startInterview: () => Promise.resolve({ questionIndex: 1, questionTarget: 5, question: '请做自我介绍', qType: 'intro' }),
+      answerInterview: () => Promise.reject(err),
+    }
+    const page = makePage('pages/interview-qa/interview-qa.js', { auth: createAuth('A'), api, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    assert.equal(page.data.phase, 'running')
+    page.inputAnswer({ detail: { value: '我做过三年行政排班。' } })
+    page.tapSubmit()
+    await flush()
+    assert.equal(wx.calls.showModal.length, 1)
+    assert.equal(wx.calls.showModal[0].content, shown)
+    assert.equal(page.data.phase, 'running', '回到可作答')
+    assert.equal(page.data.myAnswer, '我做过三年行政排班。', '已输入的回答不丢')
+  }
+})
+
+test('interview-qa：开场失败同样显示原话；会话不存在按错误码认', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
+    [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
+  ]) {
+    const wx = createWx()
+    const page = makePage('pages/interview-qa/interview-qa.js', { auth: createAuth('A'), api: { startInterview: () => Promise.reject(err) }, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+    assert.equal(page.data.failMsg, shown)
+  }
+})
+
+test('interview-result：生成报告失败时显示服务端原话；会话不存在按错误码认；没有原话才用兜底句', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
+    [serverError('', 'INTERVIEW_SESSION_NOT_FOUND', 404), '面试会话不存在或无权访问'],
+    [serverError('', undefined, 500), 'AI 报告生成失败，请稍后重试'],
+  ]) {
+    const wx = createWx()
+    const api = {
+      getInterviewReport: () => Promise.reject(serverError('', 'INTERVIEW_REPORT_NOT_READY', 404)),
+      endInterview: () => Promise.reject(err),
+    }
+    const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+    page.onLoad({ sessionId: 's1' })
+    await flush()
+    await flush()
+    assert.equal(page.data.phase, 'failed')
+    assert.equal(page.data.failMsg, shown)
+  }
+})
+
+test('interview-result：打印复盘报告失败时显示服务端原话', async () => {
+  const wx = createWx()
+  const api = {
+    getInterviewReport: () => Promise.resolve({ endedAt: '2026-10-03T02:00:00Z', position: '行政助理', report: { overall: { summary: '结构清楚。' }, expression: ['表达清楚'] } }),
+    printInterviewReport: () => Promise.reject(serverError('这份报告已按隐私策略清理，请重新练习一次。', 'INTERVIEW_REPORT_PURGED', 410)),
+  }
+  const page = makePage('pages/interview-result/interview-result.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ sessionId: 's1' })
+  await flush()
+  page.tapPrint()
+  await flush()
+  assert.equal(wx.calls.showModal.length, 1)
+  assert.equal(wx.calls.showModal[0].content, '这份报告已按隐私策略清理，请重新练习一次。')
+  assert.equal(page.data.printing, false)
+})
+
+test('print-store：终端列表加载失败时显示服务端原话', async () => {
+  const wx = createWx()
+  const api = { getPublicTerminals: () => Promise.reject(serverError('服务点列表暂时取不到，请稍后再试。', 'TERMINALS_UNAVAILABLE', 503)) }
+  const page = makePage('pages/print-store/print-store.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({ fileId: 'f1', name: 'a.pdf' })
+  await flush()
+  assert.equal(page.data.loadError, '服务点列表暂时取不到，请稍后再试。')
+})
+
+test('页面不读 err.error：请求层的错误对象上没有这个字段', () => {
+  const dir = path.join(MINIAPP, 'pages')
+  const hits = []
+  for (const name of fs.readdirSync(dir)) {
+    const file = path.join(dir, name, `${name}.js`)
+    if (!fs.existsSync(file)) continue
+    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      if (/\berr(or)?\.error\b|\be\.error\b/.test(line) && !/^\s*(\/\/|\*)/.test(line)) hits.push(`pages/${name}/${name}.js:${i + 1}`)
+    })
+  }
+  assert.deepEqual(hits, [])
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// K18 走查登记（10/3）：断网英文、英文状态值、免费时仍提钱、额度提示不贴切
+// ══════════════════════════════════════════════════════════════════════
+
+test('请求层：断网/超时不把微信的英文 errMsg 给用户看，统一成一句中文，原文留在 wxErrMsg', async () => {
+  const wx = createWx()
+  wx.request = (opts) => opts.fail({ errMsg: 'request:fail timeout' })
+  wx.uploadFile = (opts) => opts.fail({ errMsg: 'uploadFile:fail net::ERR_INTERNET_DISCONNECTED' })
+  ACTIVE_WX = wx
+  const { request, uploadFile } = requireMiniapp('../utils/request.js')
+  for (const run of [
+    () => request('/print/price-config', { method: 'GET', needAuth: false }),
+    () => uploadFile('/files/upload', '/tmp/a.pdf', { needAuth: false }),
+  ]) {
+    const err = await run().then(() => null, (e) => e)
+    assert.ok(err, '必须失败')
+    assert.equal(err.message, NET_MSG)
+    assert.equal(err.statusCode, -1)
+    assert.match(err.wxErrMsg, /fail/)
+    assert.doesNotMatch(err.message, /[A-Za-z]{4,}/, '给用户看的句子里不带英文')
+  }
+})
+
+test('plainAiMessageOf：额度两码只说事实，其余与 userMessageOf 一致；四个页面都用它', () => {
+  const ue = requireMiniapp('../utils/user-error.js')
+  assert.equal(ue.plainAiMessageOf(serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), 'x'), QUOTA_PLAIN)
+  assert.equal(ue.plainAiMessageOf(serverError('', 'AI_BUDGET_UNAVAILABLE', 503), 'x'), 'AI 暂时用不了，请稍后再试。')
+  for (const s of Object.values(ue.AI_QUOTA_PLAIN_MESSAGES)) assert.doesNotMatch(s, /模板|手动填写/)
+  for (const err of [netError(), serverError('', 'SOME_MACHINE_CODE', 500), serverError('', 'AI_PAUSED', 503)]) {
+    assert.equal(ue.plainAiMessageOf(err, '兜底句'), ue.userMessageOf(err, '兜底句'))
+  }
+  for (const rel of ['pages/interview-entry/interview-entry.js', 'pages/interview-qa/interview-qa.js', 'pages/interview-result/interview-result.js', 'pages/assistant/assistant.js']) {
+    assert.match(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), /plainAiMessageOf\(err, '/, rel)
+  }
+})
+
+test('interview-entry：创建面试失败，额度用完只说明天恢复', async () => {
+  const wx = createWx()
+  const api = { createInterview: () => Promise.reject(serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429)) }
+  const page = makePage('pages/interview-entry/interview-entry.js', { auth: createAuth('A'), api, wx })
+  page.onLoad({})
+  page.inputPosition({ detail: { value: '行政助理' } })
+  await page.tapStart()
+  await flush()
+  assert.equal(page.data.creating, false)
+  assert.ok(wx.calls.showToast.includes(QUOTA_PLAIN), JSON.stringify(wx.calls.showToast))
+})
+
+test('微信接口失败的英文 errMsg 不直接当成给用户看的句子', () => {
+  // `(err && err.errMsg) || '中文'` 这种写法里 errMsg 几乎总有值，中文兜底永远轮不到（走查 MP-K18-3 同类）
+  const hits = []
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(path.join(MINIAPP, dir))) {
+      const rel = `${dir}/${name}`
+      if (fs.statSync(path.join(MINIAPP, rel)).isDirectory()) { walk(rel); continue }
+      if (!name.endsWith('.js')) continue
+      fs.readFileSync(path.join(MINIAPP, rel), 'utf8').split('\n').forEach((line, i) => {
+        if (/\(\w+ && \w+\.errMsg\) \|\| '[^']|\b\w+\.errMsg \|\| '[^']/.test(line) && !/^\s*(\/\/|\*)/.test(line)) hits.push(`${rel}:${i + 1}`)
+      })
+    }
+  }
+  walk('pages'); walk('utils')
+  assert.deepEqual(hits, [])
+})
+
+test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', () => {
+  for (const [dl, expected] of [
+    [(opts) => opts.fail({ errMsg: 'downloadFile:fail unknown reason' }), '打开原文失败，请检查网络后重试。'],
+    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '服务端返回 403，预览链接可能已过期'],
+  ]) {
+    const wx = createWx()
+    wx.downloadFile = dl
+    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api: {}, wx })
+    page.setData({ fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
+    page.openDoc()
+    assert.equal(wx.calls.showModal.length, 1)
+    assert.equal(wx.calls.showModal[0].content, expected)
+  }
+})
+
+test('隐私页导出：微信接口失败给中文，英文原文只留在 wxErrMsg', async () => {
+  const wx = createWx()
+  wx.shareFileMessage = (opts) => opts.fail({ errMsg: 'shareFileMessage:fail cancel' })
+  wx.downloadFile = (opts) => opts.fail({ errMsg: 'downloadFile:fail timeout' })
+  ACTIVE_WX = wx
+  const exportFile = requireMiniapp('../pages/privacy/export-file.js')
+  const err = await exportFile.shareExportFile('/x/a.json', 'a.json').then(() => null, (e) => e)
+  assert.ok(err)
+  assert.doesNotMatch(err.message, /[A-Za-z]{4,}/)
+  assert.match(err.message, /[\u4e00-\u9fa5]/)
+  assert.equal(err.wxErrMsg, 'shareFileMessage:fail cancel')
+})
+
+test('assistant：小青回复失败，额度用完只说明天恢复；断网给中文', async () => {
+  for (const [err, shown] of [
+    [serverError(QUOTA_MSG, 'AI_BUDGET_EXHAUSTED', 429), QUOTA_PLAIN],
+    [netError(), NET_MSG],
+    [serverError('', 'SOME_MACHINE_CODE', 500), '小青暂时无法回复，请稍后再试。'],
+  ]) {
+    const wx = createWx()
+    const page = makePage('pages/assistant/assistant.js', { auth: createAuth('A'), api: { assistantChat: () => Promise.reject(err) }, wx })
+    await page._send('简历怎么改')
+    await flush()
+    const last = page.data.messages[page.data.messages.length - 1]
+    assert.equal(last.role, 'ai')
+    assert.equal(last.text, shown)
+    assert.equal(page.data.sending, false)
+  }
+})
+
+test('package-code：状态行用中文，0 元订单不提付款；大于 0 的照旧说付款', async () => {
+  for (const [amountCents, paid] of [[0, false], [200, true]]) {
+    const wx = createWx()
+    const order = { ...A_PACKAGE, amountCents, payStatus: paid ? 'unpaid' : 'paid' }
+    const page = makePage('pages/package-code/package-code.js', { auth: createAuth('A'), api: { getPackageOrder: () => Promise.resolve(order) }, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    await flush()
+    assert.doesNotMatch(page.data.statusDetail, /[a-z_]{4,}/, '不出现 pending_release 这类英文值')
+    assert.match(page.data.statusDetail, /取件 待到机核销/)
+    assert.equal(/付款/.test(page.data.statusDetail), paid)
+    assert.doesNotMatch(page.data.onsiteNoticeFree + page.data.noCancelNoticeFree, /付款/)
+    assert.ok(page.data.onsiteNoticeFree.length > 10 && page.data.noCancelNoticeFree.length > 10)
+  }
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/package-code/package-code.wxml'), 'utf8')
+  assert.ok(!/\{\{(pickupStatus|taskStatus|payStatus)\}\}/.test(wxml), '模板不直接显示服务端状态值')
+})
+
+test('order-detail：0 元订单这一行不叫「金额」；到机前的任务态显示中文', async () => {
+  for (const [amountCents, paid] of [[0, false], [150, true]]) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const pending = []
+    const page = makeOrderDetail(wx, pending)
+    page.onLoad({ orderId: 'ord-A' })
+    page.onShow()
+    pending[0].resolve({ ...A_ORDER, amountCents, payStatus: paid ? 'unpaid' : 'paid', taskStatus: 'pending_release' })
+    await flush()
+    assert.equal(page.data.detail.paid, paid)
+    assert.equal(page.data.detail.statusLabel, '待到机')
+    assert.equal(page.data.detail.statusTone, 'wheat')
+  }
+})
+
+test('还不知道金额的页面只用不提钱的说明：材料包组包、选服务点、订单列表空态', () => {
+  const pkg = requireMiniapp('../utils/package-order.js')
+  for (const [rel, keys] of [
+    ['pages/package-create/package-create.js', ['onsiteNoticeFree', 'noCancelNoticeFree']],
+    ['pages/store-select/store-select.js', ['onsiteNoticeFree']],
+    ['pages/orders/orders.js', ['pkgOnsiteNotice']],
+  ]) {
+    const wx = createWx()
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx })
+    for (const k of keys) {
+      assert.ok(typeof page.data[k] === 'string' && page.data[k].length > 10, `${rel} data.${k}`)
+      assert.doesNotMatch(page.data[k], /付款|支付|金额/, `${rel} data.${k}`)
+    }
+    assert.ok(!JSON.stringify(page.data).includes(pkg.PACKAGE_ONSITE_NOTICE), `${rel} 不带含「不付款」的那句`)
+  }
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// 账号注销申请（现有「隐私与数据」页）：申请 → 短信二次验证 → 已受理 → 可撤回
+// 契约：后端窗口 2026-10-04。purpose=close_account；受理后 status=pending；撤回 POST /me/data-requests/:id/cancel
+// ══════════════════════════════════════════════════════════════════════
+
+function makePrivacy({ available = true, items = [], createResult, cancelResult } = {}) {
+  const wx = createWx()
+  const modals = []
+  wx.showModal = (opts) => { modals.push(opts); if (opts.success) opts.success({ confirm: true }) }
+  const calls = { sms: [], verify: [], create: [], cancel: [], list: 0 }
+  const state = { items: items.slice() }
+  const api = {
+    listMemberDataRequests: () => { calls.list += 1; return Promise.resolve({ items: state.items, nextCursor: null, capabilities: { accountClosureAvailable: available } }) },
+    sendMemberStepUpCode: (action) => { calls.sms.push(action); return Promise.resolve({ challengeId: 'ch-1', phoneMasked: '138****0840', cooldownSeconds: 60, expiresInSeconds: 300 }) },
+    verifyMemberStepUp: (challengeId, code) => { calls.verify.push([challengeId, code]); return Promise.resolve({ stepUpToken: 'tok-1' }) },
+    createMemberDataRequest: (type, opts) => { calls.create.push([type, opts]); return createResult ? createResult() : Promise.resolve({ id: 'rq-1', requestType: 'delete', status: 'pending' }) },
+    cancelMemberDataRequest: (id) => { calls.cancel.push(id); return cancelResult ? cancelResult() : Promise.resolve({ id, status: 'cancelled' }) },
+    getMemberAiConsentStatus: () => Promise.resolve({}),
+  }
+  const auth = createAuth('A')
+  const page = makePage('pages/privacy/privacy.js', { auth, api, wx })
+  return { page, wx, modals, calls, state, auth }
+}
+const PENDING_CLOSURE = { id: 'rq-1', requestType: 'delete', status: 'pending', requestedAt: '2026-10-04T02:00:00Z' }
+
+test('privacy 注销：申请要过短信二次验证（close_account），受理后说「已受理，等待处理」', async () => {
+  const { page, modals, calls } = makePrivacy()
+  page.onLoad(); page.onShow()
+  await flush()
+  assert.equal(page.data.accountClosureAvailable, true)
+  assert.ok(page.data.closureNotes.length >= 4, '说明：会删除 / 会保留 / 手机号 / 有订单时')
+
+  page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(calls.sms, ['close_account'], '发的是注销专用的二次验证短信')
+  assert.equal(calls.create.length, 0, '没验证之前不提交申请')
+  assert.equal(page.data.su.open, true)
+
+  page.onCodeInput({ detail: { value: '123456' } })
+  page.submitStepUp()
+  await flush(); await flush()
+  assert.equal(calls.create.length, 1)
+  const [type, opts] = calls.create[0]
+  assert.equal(type, 'delete')
+  assert.equal(opts.stepUpToken, 'tok-1', '带着二次验证凭证提交')
+  assert.match(opts.idempotencyKey, /^[0-9a-f-]{36}$/)
+  const done = modals[modals.length - 1]
+  assert.equal(done.title, '已受理，等待处理')
+  assert.match(done.content, /还没有注销/)
+  assert.match(done.content, /15 个工作日/)
+  assert.match(done.content, /自动退出登录/)
+  assert.match(done.content, /撤回/)
+  page.onUnload()
+})
+
+test('privacy 注销：服务端没开放时不走验证码，照旧如实说明；状态没读到时不猜', async () => {
+  const closed = makePrivacy({ available: false })
+  closed.page.onLoad(); closed.page.onShow()
+  await flush()
+  closed.page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(closed.calls.sms, [], '没开放就不发注销验证码')
+  assert.match(closed.modals[0].content, /未开放/)
+  closed.page.onUnload()
+
+  const early = makePrivacy()
+  early.page.onLoad()
+  early.page.setData({ isLoggedIn: true })
+  early.page.requestAccountClosure()
+  assert.equal(early.modals.length, 0)
+  assert.deepEqual(early.calls.sms, [])
+  assert.ok(early.wx.calls.showToast.some((t) => /正在读取/.test(t)))
+})
+
+test('privacy 注销：已有待处理的申请时不重复提交，可以撤回；撤回失败如实说', async () => {
+  const { page, modals, calls, state } = makePrivacy({ items: [PENDING_CLOSURE] })
+  page.onLoad(); page.onShow()
+  await flush()
+  const row = page.data.requests[0]
+  assert.equal(row.statusLabel, '已受理，等待处理')
+  assert.equal(row.canCancel, true)
+  assert.equal(page.data.activeClosure.id, 'rq-1')
+  assert.equal(page.data.hasActiveExport, false, '等人工处理的注销申请不触发轮询')
+  assert.ok(!page._poll, '没有挂轮询定时器')
+
+  page.requestAccountClosure()
+  await flush()
+  assert.deepEqual(calls.sms, [], '已有申请时不再发验证码')
+  assert.equal(modals[modals.length - 1].title, '已有注销申请')
+
+  state.items = [{ ...PENDING_CLOSURE, status: 'cancelled' }]
+  page.cancelClosure({ currentTarget: { dataset: { id: 'rq-1' } } })
+  await flush(); await flush()
+  assert.deepEqual(calls.cancel, ['rq-1'])
+  assert.equal(page.data.requests[0].canCancel, false)
+  assert.equal(page.data.activeClosure, null)
+  page.onUnload()
+
+  const late = makePrivacy({
+    items: [PENDING_CLOSURE],
+    cancelResult: () => Promise.reject(serverError('这条申请已经开始处理，不能撤回了', 'DATA_REQUEST_INVALID_TRANSITION', 409)),
+  })
+  late.page.onLoad(); late.page.onShow()
+  await flush()
+  late.page.cancelClosure({ currentTarget: { dataset: { id: 'rq-1' } } })
+  await flush(); await flush()
+  assert.equal(late.modals[late.modals.length - 1].title, '没有撤回成功')
+  late.page.onUnload()
+})
+
+test('privacy 注销：服务端的原话能到用户眼前；幂等键的工程话换成能照着做的一句', () => {
+  const ue = requireMiniapp('../utils/user-error.js')
+  const dr = requireMiniapp('../pages/privacy/data-rights.js')
+  // 请求层只放行登记过的码的原话（后端窗口 2026-10-04 逐句给出）
+  for (const [code, msg] of [
+    ['STEP_UP_TOKEN_INVALID', '二次验证凭证无效或已过期'],
+    ['ACCOUNT_UNAVAILABLE', '账号当前不可用'],
+    ['DATA_REQUEST_INVALID_TRANSITION', '只能撤回尚未执行的注销申请'],
+    ['DATA_REQUEST_INVALID_TRANSITION', '申请状态已变化'],
+    ['DATA_REQUEST_NOT_FOUND', '数据请求不存在'],
+  ]) {
+    assert.equal(ue.displayableServerMessage(msg, code), msg, code)
+    assert.equal(dr.errText(serverError(msg, code, 409)), `${msg}（${code}）`)
+  }
+  for (const code of ['INVALID_IDEMPOTENCY_KEY', 'IDEMPOTENCY_KEY_REUSED']) {
+    const shown = dr.errText(serverError('幂等键已用于其他数据请求', code, 409))
+    assert.doesNotMatch(shown, /幂等/)
+    assert.match(shown, /重新进入后再试/)
+  }
+  // 打印下单也用 IDEMPOTENCY_KEY_REUSED，全局表不能给它定说法
+  assert.ok(!Object.prototype.hasOwnProperty.call(ue.SHARED_USER_MESSAGES, 'IDEMPOTENCY_KEY_REUSED'))
+  const kept = dr.CLOSURE_NOTES.find((n) => n.k === '会保留')
+  assert.match(kept.v, /权益领取与核销流水/)
+})
+
+test('privacy 注销：退出登录后不再挂着上一位的注销申请', async () => {
+  const { page, auth } = makePrivacy({ items: [PENDING_CLOSURE] })
+  page.onLoad(); page.onShow()
+  await flush()
+  assert.equal(page.data.activeClosure.id, 'rq-1')
+  auth.logout()
+  page.onShow()
+  await flush()
+  assert.equal(page.data.activeClosure, null, '共用手机上换人或退出后，不能还显示上一位的「已受理，等待处理」')
+  assert.equal(page.data.requests.length, 0)
+  assert.equal(page.data.capabilityLoaded, false)
+  page.onUnload()
+})
+
+test('privacy 注销：撤回走真实请求层，打到 POST /me/data-requests/:id/cancel', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, (realApi) => realApi.cancelMemberDataRequest('rq 1'))
+  assert.equal(seen.error, undefined, String(seen.error && seen.error.message))
+  assert.equal(seen.length, 1, '真的发出去了一次请求')
+  assert.equal(seen[0].method, 'POST')
+  assert.match(String(seen[0].url), /\/me\/data-requests\/rq%201\/cancel$/)
+})
+
+test('privacy 注销：模板里开放时有说明块、待处理状态行、「本页下方申请」的指引', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/privacy/privacy.wxml'), 'utf8')
+  // 说明块只在服务端开放注销时出现，逐行来自 data.closureNotes
+  assert.match(wxml, /<block wx:if="\{\{accountClosureAvailable\}\}">[\s\S]*?wx:for="\{\{closureNotes\}\}"[\s\S]*?<\/block>/)
+  // 入口下面：有进行中的注销申请时写它的状态，排在「已开放」那句之前
+  const row = wxml.indexOf('bindtap="requestAccountClosure"')
+  const active = wxml.indexOf('wx:elif="{{activeClosure}}">{{activeClosure.statusLabel}}', row)
+  const open = wxml.indexOf('wx:elif="{{accountClosureAvailable}}"', row)
+  assert.ok(row > 0 && active > row && open > active, '状态行在开放说明之前')
+  // 「办不了的」那行：开放后告诉用户注销在本页下方申请
+  assert.match(wxml, /accountClosureAvailable \? '[^']*注销账号在本页下方申请/)
+})
+
+test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
+  let n = 0
+  const { page, modals, calls } = makePrivacy({
+    createResult: () => (++n === 1 ? Promise.reject(netError()) : Promise.resolve({ id: 'rq-1', requestType: 'delete', status: 'pending' })),
+  })
+  page.onLoad(); page.onShow()
+  await flush()
+  for (let round = 0; round < 2; round += 1) {
+    page.requestAccountClosure()
+    await flush()
+    page.onCodeInput({ detail: { value: '123456' } })
+    page.submitStepUp()
+    await flush(); await flush()
+  }
+  assert.equal(calls.create.length, 2)
+  assert.equal(modals.some((m) => m.title === '注销申请没有提交成功'), true)
+  assert.equal(calls.create[0][1].idempotencyKey, calls.create[1][1].idempotencyKey, '重试复用同一个幂等键')
+  assert.equal(calls.sms.length, 2, '重试同样要重新过二次验证')
+  page.onUnload()
+})
+
+test('简历导出：免费时只写「当前免费」，不提权益', () => {
+  const N = requireMiniapp('../utils/normalize.js')
+  assert.equal(N.resumeExportPricing({ mode: 'free' }, true).text, '当前免费')
+  assert.match(N.resumeExportPricing({ mode: 'charged', unitCents: 300, benefit: { available: 1 } }, true).text, /权益/, '收费时原样保留')
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// U 盘打印指引：按一体机实际能力说（2026-10-06，评审 P0）
+// Terminal Agent 只列 U 盘最外层的 pdf/jpg/jpeg/png（apps/terminal-agent/src/usb/usb-files.ts）；
+// 彩色、双面、U 盘导入都按终端逐台开通，默认关闭。
+// ══════════════════════════════════════════════════════════════════════
+
+test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，彩色双面说按机器开通', () => {
+  const page = makePage('pages/usb-import/usb-import.js', { auth: createAuth('A'), api: {}, wx: createWx() })
+  const formats = Array.from(page.data.formats)
+  assert.equal(formats.join('|'), 'PDF|JPG|PNG', '与 usb-files.ts 的 ALLOWED_USB_EXTENSIONS 对应')
+  const steps = page.data.steps.map((s) => `${s.title} ${s.desc}`).join('\n')
+  assert.match(steps, /另存为 PDF/)
+  // 产品负责人 10/6：Agent 多读一层子文件夹，文字统一说「最外层和下一层文件夹」
+  assert.match(steps, /最外层和下一层文件夹/)
+  assert.doesNotMatch(steps, /不要放进文件夹|不进子文件夹/, '与 Agent 实际行为一致')
+  assert.match(steps, /15MB/)
+  assert.match(steps, /「U 盘导入打印」/, '入口名与一体机打印扫描页的卡片标题一致')
+  assert.match(steps, /彩色、双面按每台机器开通[^。]*暂未开通/)
+  assert.doesNotMatch(steps, /右下方|黑白\/彩色/, '不写口位置、不把彩色说成一定能选')
+  assert.match(page.data.formatNote, /另存为 PDF/)
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/usb-import/usb-import.wxml'), 'utf8')
+  assert.match(wxml, /暂未开通/)
+  assert.match(wxml, /\{\{formatNote\}\}/)
+  const help = makePage('pages/help/help.js', { auth: createAuth('A'), api: {}, wx: createWx() })
+  const usbFaq = help.data.faqs.find((f) => f.id === 'usb')
+  assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
+  assert.match(usbFaq.a, /U盘打印指引/)
+})
+
+// ══════════════════════════════════════════════════════════════════════
+// 服务电话与同码续打（公开接口 + 订单 reprint 字段）
+// ══════════════════════════════════════════════════════════════════════
+
+function failedPickupOrder(extra) {
+  return Object.assign({
+    orderNo: 'NO-A',
+    pickupStatus: 'used',
+    taskStatus: 'failed',
+    pickupCode: '12345678',
+    amountCents: 0,
+    terminalId: 'T1',
+  }, extra || {})
+}
+
+async function bootPickup(order, supportResult) {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const support = deferred()
+  const api = {
+    getCloudPrintOrder: () => detail.promise,
+    getSupportContact: () => support.promise,
+  }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  detail.resolve(order)
+  await flush()
+  if (supportResult instanceof Error) support.reject(supportResult)
+  else support.resolve(supportResult)
+  await flush()
+  return page
+}
+
+function pageText(page) {
+  return JSON.stringify(page.data)
+}
+
+test('服务电话纯函数：合法号码留下，空值与带字母退回原提示，缺附近终端不建议换机', () => {
+  const sc = requireMiniapp('../utils/support-contact.js')
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const ok = sc.resolveSupportView({
+    servicePhone: '13800138000',
+    serviceHours: '工作日 9:00–18:00',
+    otherOnlineTerminalNearby: true,
+    miniappPublished: true,
+  })
+  assert.equal(ok.phone, '13800138000')
+  assert.equal(ok.hours, '工作日 9:00–18:00')
+  assert.equal(ok.hint, '需要帮助可拨打服务电话 13800138000（工作日 9:00–18:00）')
+  assert.equal(ok.canCallPhone, true)
+  assert.equal(ok.suggestOtherTerminal, true)
+  assert.equal(Object.prototype.hasOwnProperty.call(ok, 'miniappPublished'), false)
+
+  const samples = [null, '', 13800138000, '13800abc000', '-------', '12-34']
+  for (let i = 0; i < samples.length; i += 1) {
+    const view = sc.resolveSupportView({ servicePhone: samples[i], serviceHours: '工作日 9:00–18:00' })
+    assert.equal(view.phone, null, JSON.stringify(samples[i]))
+    assert.equal(view.canCallPhone, false)
+    assert.equal(view.hint, SUPPORT_HINT)
+  }
+
+  const noHours = sc.resolveSupportView({ servicePhone: '  010-12345678  ' })
+  assert.equal(noHours.phone, '010-12345678')
+  assert.equal(noHours.hours, null)
+  assert.equal(noHours.hint, '需要帮助可拨打服务电话 010-12345678')
+  assert.equal(noHours.hint.indexOf('（'), -1)
+
+  const flags = [undefined, false, 'true', 1, null]
+  for (let i = 0; i < flags.length; i += 1) {
+    const view = sc.resolveSupportView({ servicePhone: '13800138000', otherOnlineTerminalNearby: flags[i] })
+    assert.equal(view.suggestOtherTerminal, false, JSON.stringify(flags[i]))
+  }
+  assert.equal(sc.resolveSupportView(undefined).suggestOtherTerminal, false)
+  assert.equal(sc.resolveSupportView(undefined).hint, SUPPORT_HINT)
+  const kept = sc.supportViewForTerminal({ otherOnlineTerminalNearby: true, servicePhone: '13800138000' }, 'T1')
+  const forced = sc.supportViewForTerminal({ otherOnlineTerminalNearby: true, servicePhone: '13800138000' }, '  ')
+  assert.equal(kept.suggestOtherTerminal, true)
+  assert.equal(forced.suggestOtherTerminal, false)
+})
+
+test('getSupportContact 带终端号时走公开接口且不带登录', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, (realApi) => realApi.getSupportContact('T 1'))
+  assert.equal(seen.length, 1)
+  const sent = seen[0]
+  assert.ok(String(sent.url).endsWith('/public/support-contact?terminalId=T%201'), sent.url)
+  assert.equal(sent.method, 'GET')
+  const names = Object.keys(sent.header || {}).map((k) => k.toLowerCase()).join('|')
+  assert.equal(('|' + names + '|').indexOf('|authorization|'), -1, names)
+})
+
+test('getSupportContact 空终端号不带查询参数', async () => {
+  const wx = createWx()
+  useRealAuth(wx, 'A')
+  const seen = await captureRequest(wx, async (realApi) => {
+    await realApi.getSupportContact('')
+    await realApi.getSupportContact('   ')
+  })
+  assert.equal(seen.length, 2)
+  for (let i = 0; i < seen.length; i += 1) {
+    const url = String(seen[i].url)
+    assert.ok(url.endsWith('/public/support-contact'), url)
+    assert.equal(url.indexOf('?'), -1, url)
+    assert.equal(url.indexOf('terminalId'), -1, url)
+  }
+})
+
+test('取件页：接口失败时页面照常、hint 等于 SUPPORT_HINT', async () => {
+  const { SUPPORT_HINT } = requireMiniapp('../utils/user-error.js')
+  const page = await bootPickup(
+    { orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 0, terminalId: 'T1' },
+    new Error('down'),
+  )
+  assert.equal(page.data.state, 'ready')
+  assert.equal(page.data.supportHint, SUPPORT_HINT)
+  assert.equal(page.data.codeRaw, '12345678')
+  assert.equal(page.data.showQr, true)
+})
+
+test('取件页：接口给号码时 hint 含号码，且回到前台不再重复请求', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const orders = []
+  let supportCalls = 0
+  const support = deferred()
+  const api = {
+    getCloudPrintOrder: () => { const d = deferred(); orders.push(d); return d.promise },
+    getSupportContact: (id) => { supportCalls += 1; support.arg = id; return support.promise },
+  }
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api, wx })
+  page.onLoad({ orderId: 'ord-A' })
+  orders[0].resolve({
+    orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: 'printing',
+    pickupCode: '12345678', amountCents: 0, terminalId: 'T 1',
+  })
+  await flush()
+  assert.equal(supportCalls, 1)
+  assert.equal(support.arg, 'T 1')
+  support.resolve({ servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false })
+  await flush()
+  assert.equal(page.data.state, 'ready')
+  assert.ok(String(page.data.supportHint).indexOf('13800138000') >= 0, page.data.supportHint)
+  assert.equal(page.data.canCallPhone, true)
+  assert.equal(page.data.supportPhone, '13800138000')
+  page.onShow()
+  orders[1].resolve({
+    orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: 'printing',
+    pickupCode: '12345678', amountCents: 0, terminalId: 'T 1',
+  })
+  await flush()
+  assert.equal(supportCalls, 1, '回到前台不再请求服务电话')
+})
+
+test('取件页：失败且还能续打时说明含次数且到机码可见', async () => {
+  const page = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }),
+    { servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: true },
+  )
+  assert.ok(String(page.data.statusDetail).indexOf('还能续打 2 次') >= 0, page.data.statusDetail)
+  assert.ok(String(page.data.statusDetail).indexOf('回到同一台一体机') >= 0, page.data.statusDetail)
+  assert.equal(page.data.statusTitle, '打印失败')
+  assert.equal(page.data.showQr, true)
+  assert.equal(page.data.codeRaw, '12345678')
+  assert.equal(String(page.data.statusDetail).indexOf('附近还有别的一体机'), -1)
+  const shown = String(page.data.statusLead) + (page.data.detailPhone ? page.data.supportPhone : '') + String(page.data.statusTail)
+  assert.equal(shown, page.data.statusDetail)
+  assert.equal(page.data.detailPhone, true)
+})
+
+test('取件页：续打态隐藏作废换新码，待到机仍显示', async () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/print-pickup/print-pickup.wxml'), 'utf8')
+  function openTag(marker) {
+    const at = wxml.indexOf(marker)
+    assert.ok(at >= 0, marker)
+    const start = wxml.lastIndexOf('<', at)
+    return wxml.slice(start, wxml.indexOf('>', start) + 1)
+  }
+  const reissueTag = openTag('bindtap="reissueCode"')
+  const voidNoteTag = openTag('点「作废换新码」')
+  assert.match(reissueTag, /wx:if="\{\{statusKey !== 'failed'\}\}"/)
+  const reissueAt = wxml.indexOf(reissueTag)
+  const reissueLabelAt = wxml.indexOf('作废换新码', reissueAt)
+  assert.ok(reissueLabelAt > reissueAt && reissueLabelAt < wxml.indexOf('</view>', reissueAt))
+  assert.match(voidNoteTag, /wx:if="\{\{statusKey !== 'failed'\}\}"/)
+  assert.match(voidNoteTag, /class="ph-share-note"/)
+  const reprintNoteAt = wxml.indexOf('这个码发给谁，谁就能到原来那台一体机接着打。')
+  assert.ok(reprintNoteAt > wxml.indexOf('点「作废换新码」'))
+  const reprintNoteTag = wxml.slice(wxml.lastIndexOf('<', reprintNoteAt), wxml.indexOf('>', reprintNoteAt) + 1)
+  assert.match(reprintNoteTag, /wx:else/)
+  assert.match(reprintNoteTag, /class="ph-share-note"/)
+  assert.equal(reprintNoteTag.indexOf('作废'), -1)
+  assert.equal(openTag('bindtap="copyCode"').indexOf('statusKey'), -1)
+  assert.equal(openTag('bindtap="shareCode"').indexOf('statusKey'), -1)
+
+  const failed = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }),
+    {},
+  )
+  assert.equal(failed.data.statusKey, 'failed')
+  assert.equal(failed.data.showQr, true)
+  const pending = await bootPickup(
+    { orderNo: 'NO-A', pickupStatus: 'pending', taskStatus: '', pickupCode: '12345678', amountCents: 0, terminalId: 'T1' },
+    {},
+  )
+  assert.equal(pending.data.statusKey, 'pending')
+  assert.equal(pending.data.showQr, true)
+})
+
+test('取件页：续打次数用尽时说明不能再打了，不再说还能续打', async () => {
+  const page = await bootPickup(
+    failedPickupOrder({ reprintAllowed: true, reprintRemaining: 0 }),
+    { otherOnlineTerminalNearby: false },
+  )
+  assert.ok(String(page.data.statusDetail).indexOf('不能再打了') >= 0, page.data.statusDetail)
+  assert.ok(String(page.data.statusDetail).indexOf('可以回到订单重新打印') >= 0, page.data.statusDetail)
+  assert.equal(String(page.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(page.data.showQr, false)
+  assert.equal(page.data.codeRaw, '')
+})
+
+test('取件页：续打字段缺失时两句都不出现', async () => {
+  const absent = await bootPickup(failedPickupOrder({}), {})
+  assert.equal(String(absent.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(String(absent.data.statusDetail).indexOf('不能再打了'), -1)
+  const nulled = await bootPickup(failedPickupOrder({ reprintAllowed: null, reprintRemaining: null }), {})
+  assert.equal(String(nulled.data.statusDetail).indexOf('还能续打'), -1)
+  assert.equal(String(nulled.data.statusDetail).indexOf('不能再打了'), -1)
+})
+
+test('取件页：otherOnlineTerminalNearby 非 true 时任何文字都不含换一台', async () => {
+  const cases = [
+    { order: failedPickupOrder({}), support: { otherOnlineTerminalNearby: false, servicePhone: '13800138000' } },
+    { order: failedPickupOrder({}), support: { servicePhone: '13800138000' } },
+    { order: failedPickupOrder({}), support: new Error('down') },
+    { order: failedPickupOrder({ terminalId: '' }), support: { otherOnlineTerminalNearby: true, servicePhone: '13800138000' } },
+  ]
+  for (let i = 0; i < cases.length; i += 1) {
+    const page = await bootPickup(cases[i].order, cases[i].support)
+    const text = pageText(page)
+    assert.equal(text.indexOf('换一台'), -1, text)
+    assert.equal(text.indexOf('附近还有别的一体机'), -1, text)
+  }
+  const nearby = await bootPickup(
+    failedPickupOrder({}),
+    { otherOnlineTerminalNearby: true },
+  )
+  assert.ok(String(nearby.data.statusDetail).indexOf('附近还有别的一体机可用') >= 0, nearby.data.statusDetail)
+  assert.equal(pageText(nearby).indexOf('换一台'), -1)
+})
+
+test('订单详情：失败后仍允许续打才显示到机码', async () => {
+  async function load(raw) {
+    const wx = createWx()
+    useRealAuth(wx, 'A')
+    const pending = []
+    const page = makeOrderDetail(wx, pending)
+    page.onLoad({ orderId: 'ord-A' })
+    page.onShow()
+    pending[0].resolve(raw)
+    await flush()
+    return page
+  }
+  const base = {
+    id: 'ord-A', orderNo: 'NO-A', payStatus: 'paid', pickupStatus: 'used',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, fileName: '简历.pdf',
+  }
+  const shown = await load(Object.assign({}, base, { reprintAllowed: true, reprintRemaining: 2 }))
+  assert.equal(shown.data.detail.pickup, '12-34-56-78')
+  assert.equal(shown.data.detail.reprintNote, '还能续打 2 次')
+  const hidden = await load(Object.assign({}, base, { reprintAllowed: false, reprintRemaining: 2 }))
+  assert.equal(hidden.data.detail.pickup, '')
+  assert.equal(hidden.data.detail.reprintNote, '')
+})
+
+test('订单列表：失败后 reprintAllowed 才显示到机码', () => {
+  const toUi = ordersToUi()
+  const shown = toUi({
+    id: 'pt-1', status: 'failed', payStatus: 'paid', fileName: '简历.pdf',
+    pickupCode: '12345678', pickupStatus: 'used', reprintAllowed: true, reprintRemaining: 2,
+  })
+  assert.equal(shown.pickup, '12-34-56-78')
+  assert.equal(shown.reprintNote, '还能续打 2 次')
+  const hidden = toUi({
+    id: 'pt-2', status: 'failed', payStatus: 'paid', pickupCode: '12345678',
+    pickupStatus: 'used', reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hidden.pickup, '')
+  assert.equal(hidden.reprintNote, '')
+})
+
+test('材料包：失败后 reprintAllowed 才显示到机码', async () => {
+  const pkg = requireMiniapp('../utils/package-order.js')
+  const shownRow = pkg.toPackageRow({
+    orderId: 'o1', pickupCode: '12345678', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', amountCents: 0, reprintAllowed: true, reprintRemaining: 1,
+  })
+  assert.equal(shownRow.pickupCode, '12-34-56-78')
+  assert.equal(shownRow.hasPickupCode, true)
+  assert.equal(shownRow.reprintNote, '还能续打 1 次')
+  const hiddenRow = pkg.toPackageRow({
+    orderId: 'o2', pickupCode: '12345678', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', amountCents: 0, reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hiddenRow.pickupCode, '')
+  assert.equal(hiddenRow.hasPickupCode, false)
+  assert.equal(hiddenRow.reprintNote, '')
+
+  async function openPackage(order) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const api = { getPackageOrder: () => detail.promise }
+    const page = makePage('pages/package-code/package-code.js', { auth, api, wx })
+    page.onLoad({ orderId: 'pkg-A' })
+    page.onShow()
+    detail.resolve(order)
+    await flush()
+    return page
+  }
+  const shown = await openPackage({
+    orderId: 'pkg-A', orderNo: 'PKG-A', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, items: [],
+    reprintAllowed: true, reprintRemaining: 2,
+  })
+  assert.equal(shown.data.pickupCode, '12-34-56-78')
+  assert.equal(shown.data.showQr, true)
+  assert.equal(shown.data.reprintNote, '还能续打 2 次')
+  const hidden = await openPackage({
+    orderId: 'pkg-A', orderNo: 'PKG-A', pickupStatus: 'used', payStatus: 'paid',
+    taskStatus: 'failed', pickupCode: '12345678', amountCents: 0, items: [],
+    reprintAllowed: false, reprintRemaining: 2,
+  })
+  assert.equal(hidden.data.pickupCode, '')
+  assert.equal(hidden.data.showQr, false)
+  assert.equal(hidden.data.reprintNote, '')
+})
+
+test('有服务电话时点号码会拨出，取消也静默', async () => {
+  const wx = createWx()
+  const calls = []
+  wx.makePhoneCall = (opts) => {
+    calls.push(opts.phoneNumber)
+    if (opts.fail) opts.fail({ errMsg: 'makePhoneCall:fail cancel' })
+  }
+  const support = deferred()
+  const api = { getSupportContact: () => support.promise }
+  const page = makePage('pages/print/print.js', { auth: createAuth('A'), api, wx })
+  page.onLoad()
+  support.resolve({ servicePhone: '13800138000', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false })
+  await flush()
+  assert.equal(page.data.canCallPhone, true)
+  assert.equal(page.data.supportPhone, '13800138000')
+  assert.equal(page.data.supportHint, '需要帮助可拨打服务电话 13800138000（工作日 9:00–18:00）')
+  page.callSupport()
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0], '13800138000')
+  assert.equal(wx.calls.showToast.length, 0)
+
+  const wx2 = createWx()
+  wx2.makePhoneCall = (opts) => {
+    calls.push(opts.phoneNumber)
+    if (opts.fail) opts.fail({ errMsg: 'makePhoneCall:fail cancel' })
+  }
+  const detail = deferred()
+  const support2 = deferred()
+  const pickup = makePage('pages/print-pickup/print-pickup.js', {
+    auth: createAuth('A'),
+    api: {
+      getCloudPrintOrder: () => detail.promise,
+      getSupportContact: () => support2.promise,
+    },
+    wx: wx2,
+  })
+  pickup.onLoad({ orderId: 'ord-A' })
+  detail.resolve(failedPickupOrder({ reprintAllowed: true, reprintRemaining: 2 }))
+  await flush()
+  support2.resolve({ servicePhone: '010-12345678', serviceHours: '工作日 9:00–18:00' })
+  await flush()
+  pickup.callSupport()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1], '010-12345678')
+  assert.equal(wx2.calls.showToast.length, 0)
+})
+
+// 「还能续打 N 次」只认 reprintAllowed === true：待到机的新码旁边不能出现续打次数，
+// 哪怕服务端顺带给了 reprintRemaining（审稿反向变异 10/6 发现的空档）。
+test('续打次数只在服务端允许续打时写，待到机的码旁不写', () => {
+  const { reprintNoteText } = requireMiniapp('../utils/support-contact.js')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 2 }), '还能续打 2 次')
+  assert.equal(reprintNoteText({ reprintAllowed: false, reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintRemaining: 2 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 0 }), '')
+  assert.equal(reprintNoteText({ reprintAllowed: true, reprintRemaining: 1.5 }), '')
+})
+
+// AI 简历导出默认印「含人工智能辅助生成内容」（产品负责人 2026-10-06 晚拍板，服务端开关 10/9 打开）。
+// 导出之前就要让用户知道：生成页「导出设置」卡、优化页「导出优化稿」格式格下方各一句。
+test('AI 简历导出：生成页与优化页在导出处说明每页底部会印 AI 标注', () => {
+  const m = requireMiniapp('../utils/resume-build-model.js')
+  assert.match(m.RESUME_AI_LABEL_NOTE, /每页底部有一行小字：含人工智能辅助生成内容/)
+  for (const rel of ['pages/resume-build/resume-build.js', 'pages/resume-optimize/resume-optimize.js']) {
+    const page = makePage(rel, { auth: createAuth('A'), api: {}, wx: createWx() })
+    assert.equal(page.data.aiLabelNote, m.RESUME_AI_LABEL_NOTE, `${rel} data.aiLabelNote`)
+  }
+  const build = fs.readFileSync(path.join(MINIAPP, 'pages/resume-build/resume-build.wxml'), 'utf8')
+  const card = build.slice(build.indexOf('<view class="section-t">导出设置</view>'))
+  assert.ok(card.indexOf('{{aiLabelNote}}') > 0 && card.indexOf('{{aiLabelNote}}') < card.indexOf('</view></view>'), '在「导出设置」卡内')
+  const opt = fs.readFileSync(path.join(MINIAPP, 'pages/resume-optimize/resume-optimize.wxml'), 'utf8')
+  const grid = opt.indexOf('<view class="format-grid">')
+  const note = opt.indexOf('{{aiLabelNote}}')
+  assert.ok(grid > 0 && note > grid && note < opt.indexOf('pricing-line', grid), '在「导出优化稿」格式格下方、价格说明之前')
+})
+
+// 还没有真实的大模型备案号时，不对用户（含读屏标签）说「备案号」，只说「备案情况」——
+// 读屏用户听到「备案号」会以为点进去能查到号码（合规窗口反方审查 10/6）。
+// 拿到深度求索备案号、写进后台「AI 服务说明」以后，这条断言连同文案一起改回带号码的写法。
+test('AI 服务说明入口：没有真号码之前只说「备案情况」，不说「备案号」', () => {
+  const stripComments = (src, ext) => ext === 'wxml'
+    ? src.replace(/<!--[\s\S]*?-->/g, '')
+    : src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const files = [
+    'pages/home/home.wxml', 'pages/assistant/assistant.wxml', 'pages/ai/ai.wxml',
+    'pages/about/about.js', 'pages/legal/legal.js', 'pages/help/help.js',
+  ]
+  for (const rel of files) {
+    const src = stripComments(fs.readFileSync(path.join(MINIAPP, rel), 'utf8'), rel.split('.').pop())
+    assert.doesNotMatch(src, /备案号/, `${rel} 用户看得到的文字里不该有「备案号」`)
+    assert.match(src, /备案情况/, `${rel} 应改成「备案情况」`)
+  }
 })

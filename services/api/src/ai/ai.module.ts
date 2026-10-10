@@ -1,3 +1,4 @@
+import { AiQuotaModule } from './quota/ai-quota.module'
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
 import { FilesModule } from '../files/files.module'
@@ -59,16 +60,19 @@ import { DiagnosisReportPdfService } from './resume/diagnosis-report-pdf.service
 import { KioskAiCapabilitiesController } from './kiosk-ai-capabilities.controller'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { ResumeDraftSourceService } from './resume/resume-draft-source.service'
+import { AiSafetyLexiconController } from './safety/ai-safety-lexicon.controller'
+import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
-  imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
-  controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
+  imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
+  controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
   providers: [
     AiService,
     AiLogService,
+    AiSafetyLexiconService,
     // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。
     AiPublicQuotaService,
     ResumeParseSubmissionService,

@@ -36,10 +36,13 @@ export interface TwinTerminalTwinLike {
   /** 服务端对 1–4 的计数给 null（少于 5 不显示），0 仍给 0。 */
   today: { printPages: number | null; printTasks: number | null; scans: number | null; failed: number | null; visits: ScreenMetricLike<number> }
   consumables: ScreenMetricLike<{ paper: string | null; toner: string | null }>
-  timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'printing' | 'alert' | 'offline' | 'unknown' }>>
+  /** 分钟精度的心跳可用性；不表达打印时段。 */
+  timeline24h: ScreenMetricLike<Array<{ from: string; to: string; state: 'idle' | 'alert' | 'offline' | 'unknown' }>>
 }
 
 export interface TwinTerminalBoardProps {
+  /** 打印失败后的处置提示；默认管理员原句，机构可传联系平台运营。 */
+  failureGuidance?: string
   twin: TwinTerminalTwinLike
   /** ISO → 上海时区「HH:mm:ss」。 */
   formatClock: (iso: string) => string
@@ -53,6 +56,11 @@ const SCANNER_TEXT = { ready: '就绪', busy: '使用中', error: '暂不可用'
 const WIRED_TEXT: Record<string, string> = { connected: '有线已连接', disconnected: '有线已断开', unknown: '有线状态未知' }
 
 /** 终端级计数也守「少于 5 不显示」：服务端已把 1–4 置 null；这里再兜一层，防旧服务端直接给出小数字。 */
+/** 「少于 5」与量词之间留一个空格（「少于 5 次」）；普通数字仍紧贴量词（「36页」）。 */
+function tileUnit(value: string, unit: string): string {
+  return value === '少于 5' ? ` ${unit}` : unit
+}
+
 function smallCount(value: number | null): string {
   if (value === null || (value > 0 && value < 5)) return '少于 5'
   return screenCount(value)
@@ -132,7 +140,7 @@ function timelineTicks(twin: TwinTerminalTwinLike, formatClock: (iso: string) =>
   return ticks
 }
 
-export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassignedAreaLabel }: TwinTerminalBoardProps) {
+export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassignedAreaLabel, failureGuidance = '详情见打印扫描运维' }: TwinTerminalBoardProps) {
   const state = twinTerminalState({ health: twin.status.health, activity: null, alert: null })
   const current = twin.currentTask.available ? twin.currentTask.value : null
   const printing = current !== null
@@ -193,15 +201,15 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
         <TwinPanel title="今日服务" sub="本机 · 上海自然日" source="今日打印页数只统计这台机器今天已经出纸的页数（打印页数乘以份数，按出纸完成时间，上海自然日）。打印任务、扫描按今天新建的次数计，打印失败按今天发生的失败次数计。打印页数、打印任务、扫描、打印失败大于 0 且少于 5 时只显示「少于 5」。服务人次是今天在这台机器上开始的使用次数。1 到 4 次显示「少于 5」，取不到时显示「暂时取不到」。">
           <TwinTiles
             items={[
-              { value: smallCount(twin.today.printPages), unit: '页', label: '打印页数' },
-              { value: smallCount(twin.today.printTasks), unit: '单', label: '打印任务' },
-              { value: smallCount(twin.today.scans), unit: '次', label: '扫描' },
+              { value: smallCount(twin.today.printPages), unit: tileUnit(smallCount(twin.today.printPages), '页'), label: '打印页数' },
+              { value: smallCount(twin.today.printTasks), unit: tileUnit(smallCount(twin.today.printTasks), '单'), label: '打印任务' },
+              { value: smallCount(twin.today.scans), unit: tileUnit(smallCount(twin.today.scans), '次'), label: '扫描' },
               twin.today.visits.available
-                ? { value: smallCount(twin.today.visits.value), unit: '人次', label: '服务人次' }
+                ? { value: smallCount(twin.today.visits.value), unit: tileUnit(smallCount(twin.today.visits.value), '人次'), label: '服务人次' }
                 : { label: '服务人次', unavailableReason: twin.today.visits.reason },
             ]}
           />
-          {twin.today.failed === null || twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，详情见打印扫描运维</p> : null}
+          {twin.today.failed === null || twin.today.failed > 0 ? <p className="twin-cap">今日打印失败 {smallCount(twin.today.failed)} 次，{failureGuidance}</p> : null}
         </TwinPanel>
       </TwinSlot>
 
@@ -210,18 +218,19 @@ export function TwinTerminalBoard({ twin, formatClock, formatDateTime, unassigne
           title="24 小时状态"
           sub="近 24 小时 · 至现在"
           metric={twin.timeline24h}
-          source={`由终端心跳与打印任务推导：心跳后 ${twin.status.onlineWindowSeconds} 秒内算在线，缺口算离线，打印机异常心跳算告警。`}
+          source={`由终端心跳推导：心跳后 ${twin.status.onlineWindowSeconds} 秒内算在线，缺口算离线，打印机异常心跳算告警。`}
           render={(segments) => (
             <>
               <TwinTimeline segments={segments} ticks={timelineTicks(twin, formatClock)} />
               <TwinLegend
                 items={[
                   { state: 'ok', label: '在线空闲' },
-                  { state: 'pr', label: '打印中' },
                   { state: 'wa', label: '告警' },
                   { state: 'off', label: '离线' },
+                  { state: 'un', label: '未上报' },
                 ]}
               />
+              <p className="twin-cap">打印时段不在状态带上单独标出，今日打印单数见上方。</p>
               <p className="twin-cap twin-push">纸盒、碳粉余量需 Windows Agent 上报后显示；接入前不估算。</p>
             </>
           )}

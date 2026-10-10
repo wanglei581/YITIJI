@@ -1,10 +1,10 @@
+import { ComplianceRestrictions } from './ComplianceRestrictions'
 import { PARTNER_TYPE_LABELS, type PartnerType } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import {
   MODULE_LABELS,
   ORG_CONTENT_TRUST_STATUS_LABELS,
   ORG_CONTENT_TRUST_UNSET_LABEL,
-  PROHIBITED_MODULES,
   SCENE_TEMPLATE_LABELS,
   formatDate,
   formatDateTime,
@@ -29,11 +29,25 @@ import {
 import { getOrgProfile, updateOrgProfile, type PartnerOrgProfile } from '../../services/api/orgSelf'
 import { OfficialChannelsSection } from './OfficialChannelsSection'
 import { useRecruitmentHosting } from '../../services/capabilities'
+import { userMessageOf } from '../../services/api/userErrorMessage'
+
+/** 招聘类模块（岗位信息、招聘会、外部投递跳转）：平台关闭招聘内容托管时标「暂不开放」。与 apps/admin/src/routes/partners/orgPresentation.ts 的 isParkedModule 同一清单。 */
+const PARKED_RECRUITMENT_MODULES = ['job_info', 'job_fair', 'external_apply_redirect']
 
 // ─── 机构资料（审计修复：原 MOCK_PROFILE 硬编码已删除，全部走 /partner/profile 真实数据）──
 // 机构自助仅可改 联系人/联系电话；名称、类型、场景模板、启用模块由管理员管理（运营边界）。
 // 内容信任状态（contentTrustStatus）为发布闸门依据，由平台管理员人工核验与标记。
 
+
+function contactPhoneText(phone: string | null | undefined): string {
+  if (!phone?.trim()) return '—'
+  // 已有掩码不可还原或减少星号。
+  if (phone.includes('*')) return phone
+  const digits = phone.replace(/\D/g, '')
+  if (/^1[3-9]\d{9}$/.test(digits)) return `${digits.slice(0, 3)}${'*'.repeat(4)}${digits.slice(-4)}`
+  if (digits.length >= 7) return `${digits.slice(0, 3)}${'*'.repeat(digits.length - 5)}${digits.slice(-2)}`
+  return '已登记'
+}
 
 function trustStatusLabel(status: OrgContentTrustStatus | null | undefined): string {
   if (!status) return ORG_CONTENT_TRUST_UNSET_LABEL
@@ -100,7 +114,7 @@ export default function ProfilePage() {
       setProfile(updated)
       setEditing(false)
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '保存失败，请稍后重试')
+      setSaveError(userMessageOf(err, '保存失败，请稍后重试'))
     } finally {
       setSaving(false)
     }
@@ -149,7 +163,7 @@ export default function ProfilePage() {
           </div>
           <div className="space-y-3 text-sm">
             <Row label="联系人" value={profile.contact || <span className="text-neutral-400">未填写</span>} />
-            <Row label="联系电话" value={profile.contactPhone || <span className="text-neutral-400">未填写</span>} />
+            <Row label="联系电话" value={contactPhoneText(profile.contactPhone)} />
             <Row
               label="合作状态"
               value={
@@ -179,7 +193,8 @@ export default function ProfilePage() {
         <Card className="p-6">
           <h3 className="mb-3 text-sm font-medium text-neutral-700">接入概况</h3>
           <div className="space-y-3 text-sm">
-            <Row label="数据源" value={`${profile.sourceCount} 个`} />
+            {/* 托管 a：数据源管理在平台关闭招聘内容托管时不开放，不显示这一行，免得机构以为要去配数据源 */}
+            {recruitmentHosting && <Row label="数据源" value={`${profile.sourceCount} 个`} />}
             <Row label="机构账号" value={`${profile.accountCount} 个`} />
           </div>
           <p className="mt-4 rounded-lg bg-neutral-50 px-3 py-2.5 text-xs leading-relaxed text-neutral-500">
@@ -332,11 +347,21 @@ export default function ProfilePage() {
             <p className="text-xs text-neutral-400">暂未配置启用模块，请联系平台管理员开通</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {profile.enabledModules.map((m) => (
-                <span key={m} className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-600">
-                  {(MODULE_LABELS as Record<string, string>)[m] ?? m}
-                </span>
-              ))}
+              {profile.enabledModules.map((m) => {
+                const label = (MODULE_LABELS as Record<string, string>)[m] ?? m
+                // 托管 a：招聘类模块在平台关闭托管时不对外开放；只改标签，不改机构的模块配置（与管理员后台同口径）
+                const parked = !recruitmentHosting && PARKED_RECRUITMENT_MODULES.includes(m)
+                return (
+                  <span
+                    key={m}
+                    className={parked
+                      ? 'rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-400'
+                      : 'rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-600'}
+                  >
+                    {parked ? `${label}（暂不开放）` : label}
+                  </span>
+                )
+              })}
             </div>
           )}
         </div>
@@ -347,13 +372,7 @@ export default function ProfilePage() {
             <span className="text-xs font-medium text-neutral-500">合规限制 — 永久禁用功能</span>
           </div>
           <p className="mb-2 text-xs text-neutral-400">以下功能属于招聘闭环，无论任何配置均不允许启用：</p>
-          <div className="flex flex-wrap gap-1.5">
-            {PROHIBITED_MODULES.map((m) => (
-              <span key={m} className="rounded bg-error-bg px-2 py-0.5 text-xs text-error-fg line-through">
-                {m}
-              </span>
-            ))}
-          </div>
+          <ComplianceRestrictions />
         </div>
       </Card>
 

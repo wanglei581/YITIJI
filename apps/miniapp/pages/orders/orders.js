@@ -17,6 +17,7 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
+const { reprintNoteText } = require('../../utils/support-contact')
 const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
@@ -95,7 +96,7 @@ const FAILURE_NOTES = {
   PAPER_EMPTY:           '打印机缺纸，这次没有出纸；需要的话可重新打印',
   PRINTER_ERROR:         '打印机故障（可能卡纸），这次没有出纸；需要的话可重新打印',
   PRINTER_OFFLINE:       '打印机离线，这次没有出纸；需要的话可重新打印',
-  PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸；没拿到纸请找当时那台终端的工作人员核对，不会自动重打',
+  PRINT_JOB_UNCONFIRMED: '已发到打印机，但没确认出纸，不会自动重打；没拿到纸可以重新下单',
   PARTIAL_OUTPUT:        '只打出了一部分，没有整单重打；需要的话请重新下单',
 }
 // 到机码过期：这张单没有打印，用户能做的是重新下单。
@@ -115,8 +116,9 @@ function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
   const amountCents = parseAmountCents(item.amountCents)
   const effectiveStatus = item.status || item.taskStatus || ''
-  // 到机码只在尚未核销的 Order-only 阶段展示；扫码 claimed 或创建 PrintTask 后立即撤下。
-  const pickupRaw = !item.status && item.pickupStatus === 'pending' ? (item.pickupCode || '') : ''
+  // 到机码：尚未核销的 Order-only 阶段展示；失败后服务端仍允许同码续打时也展示。
+  const pendingCode = !item.status && item.pickupStatus === 'pending'
+  const pickupRaw = (pendingCode || item.reprintAllowed === true) ? (item.pickupCode || '') : ''
   const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
                : (pickupRaw && ds.key === 'waiting')              ? 'pickup'
                : null
@@ -141,6 +143,7 @@ function toUiItem(item) {
     reasonNote:  reasonNoteOf(item, effectiveStatus),
     pickup:      fmtCode(pickupRaw),
     pickupRaw,
+    reprintNote: pickupRaw ? reprintNoteText(item) : '',
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
     payStatus:   item.payStatus || '',
@@ -187,7 +190,7 @@ Page({
     // 用户已经看到的订单不该因为下一页失败而消失。
     pkgMoreErrorText: '',
     pkgTotal: 0,
-    pkgOnsiteNotice: pkg.PACKAGE_ONSITE_NOTICE,
+    pkgOnsiteNotice: pkg.PACKAGE_ONSITE_NOTICE_FREE,
   },
 
   onLoad() {
