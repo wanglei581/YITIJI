@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const aiEntries = require('../../utils/ai-entries')
 
 function relDate(iso) {
   try {
@@ -159,22 +160,22 @@ Page({
 
   openResume(e) {
     const taskId = e.currentTarget.dataset.taskId
-    if (taskId) wx.navigateTo({ url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}` })
+    if (taskId) wx.navigateTo({ url: aiEntries.href(aiEntries.resumeDiagnoseUrl, 'taskId=' + encodeURIComponent(taskId)) })
   },
 
   optimize(e) {
     const taskId = e.currentTarget.dataset.taskId
-    if (taskId) wx.navigateTo({ url: `/pages/resume-optimize/resume-optimize?taskId=${encodeURIComponent(taskId)}` })
+    if (taskId) wx.navigateTo({ url: aiEntries.href(aiEntries.resumeOptimizeUrl, 'taskId=' + encodeURIComponent(taskId)) })
   },
 
   noop() {}, // 阻止事件冒泡用的空处理
 
   diagnose(e) {
-    wx.navigateTo({ url: '/pages/resume-diagnose/resume-diagnose' })
+    wx.navigateTo({ url: aiEntries.resumeDiagnoseUrl })
   },
 
   upload() {
-    wx.navigateTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
   goLogin() {

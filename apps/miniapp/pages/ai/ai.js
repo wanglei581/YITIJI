@@ -1,5 +1,7 @@
 // pages/ai/ai.js
 const app = getApp()
+const aiEntries = require('../../utils/ai-entries')
+const { syncTabBar } = require('../../utils/tab-bar-index')
 
 Page({
   data: {
@@ -86,9 +88,7 @@ Page({
   },
 
   onShow() {
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 })
-    }
+    syncTabBar(this, aiEntries.aiTab)
   },
 
   tapEntry(e) {
@@ -97,23 +97,24 @@ Page({
       // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
       // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
       // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
-      build:     '/pages/resume-build/resume-build',
-      voice:     '/pages/resume-voice/resume-voice',
-      diagnose:  '/pages/resume-diagnose/resume-diagnose',
-      optimize:  '/pages/resume-optimize/resume-optimize',
+      build:     aiEntries.resumeBuildUrl,
+      voice:     aiEntries.resumeVoiceUrl,
+      diagnose:  aiEntries.resumeDiagnoseUrl,
+      optimize:  aiEntries.resumeOptimizeUrl,
       documents: '/pages/documents/documents',
       materials: '/pages/job-materials/job-materials',
-      match:     '/pages/job-fit/job-fit',
-      interview: '/pages/interview-entry/interview-entry',
-      explore:   '/pages/self-explore/self-explore',
-      plan:      '/pages/career-plan/career-plan',
+      match:     aiEntries.jobFitUrl,
+      interview: aiEntries.interviewEntryUrl,
+      explore:   aiEntries.selfExploreUrl,
+      plan:      aiEntries.careerPlanUrl,
     }
     const url = routes[id]
     if (url) wx.navigateTo({ url })
   },
 
   tapChat() {
-    wx.navigateTo({ url: '/pages/assistant/assistant' })
+    if (!aiEntries.assistantUrl) return
+    wx.navigateTo({ url: aiEntries.assistantUrl })
   },
 
   // C1：所用模型名称与备案号写在后台发布的「AI 服务说明」里，这里是它的入口。
@@ -127,13 +128,14 @@ Page({
   },
 
   toRecords() {
-    wx.navigateTo({ url: '/pages/ai-records/ai-records' })
+    if (!aiEntries.aiRecordsUrl) return
+    wx.navigateTo({ url: aiEntries.aiRecordsUrl })
   },
 
   onShareAppMessage() {
     return {
       title: 'AI 工具 · 简历与面试准备',
-      path:  '/pages/ai/ai',
+      path: aiEntries.aiTab,
     }
   },
 })

@@ -72,10 +72,10 @@
         </view>
       </view>
 
-      <view class="section-row">
+      <view class="section-row" wx:if="{{entries.length > 4}}">
         <text class="section-title">更多功能</text>
       </view>
-      <view class="menu-card">
+      <view class="menu-card" wx:if="{{entries.length > 4}}">
         <view
           class="menu-item tap"
           wx:for="{{entries}}"
@@ -99,7 +99,8 @@
       </view>
 
       <!-- 与法务试运行版隐私政策同一口径：不在这里另写受托方清单，以后台发布的隐私政策为准。 -->
-      <view class="privacy-note">你的简历、文档、打印订单和 AI 记录只对你本人可见。个人信息怎么处理、交给哪些受托方，以<text class="privacy-link" bindtap="tapPrivacyPolicy">《隐私政策》</text>为准。</view>
+      <view wx:if="{{aiEnabled}}" class="privacy-note">你的简历、文档、打印订单和 AI 记录只对你本人可见。个人信息怎么处理、交给哪些受托方，以<text class="privacy-link" bindtap="tapPrivacyPolicy">《隐私政策》</text>为准。</view>
+      <view wx:else class="privacy-note">你的文档和打印订单只对你本人可见。个人信息怎么处理、交给哪些受托方，以<text class="privacy-link" bindtap="tapPrivacyPolicy">《隐私政策》</text>为准。</view>
       <view class="tab-spacer"></view>
     </view>
   </scroll-view>

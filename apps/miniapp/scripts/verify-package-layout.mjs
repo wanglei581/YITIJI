@@ -26,6 +26,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -38,7 +39,14 @@ const bad = (name, detail) => { fails.push(name); console.log(`  ✗ ${name} —
 const KB = 1024
 const MAIN_BUDGET = 1024 * KB
 const SUB_BUDGET = 1024 * KB
-const MAIN_PAGES = ['pages/home/home', 'pages/launch/launch', 'pages/ai/ai', 'pages/print/print', 'pages/me/me']
+const require = createRequire(import.meta.url)
+const { VARIANT } = require(path.join(ROOT, 'utils/build-variant.js'))
+const variantSpec = JSON.parse(read('review-variants/variants.json'))[VARIANT]
+const MAIN_PAGES = []
+for (const tab of (variantSpec && variantSpec.tabs) || []) {
+  MAIN_PAGES.push(tab.pagePath)
+  if (tab.pagePath === 'pages/home/home') MAIN_PAGES.push('pages/launch/launch')
+}
 
 const app = JSON.parse(read('app.json'))
 const packOptions = JSON.parse(read('project.config.json')).packOptions || {}
@@ -48,9 +56,10 @@ const DEV_DIRS = new Set(['.claude', '.git', 'node_modules', 'scripts', 'tools']
 
 // ── 1. 主包页面 ──────────────────────────────────────────────
 const mainPages = app.pages || []
+const mainLabel = `主包只有 Tab 页和登录页（${VARIANT}，${MAIN_PAGES.length} 页，首页排第一）`
 if (mainPages.length === MAIN_PAGES.length && mainPages[0] === MAIN_PAGES[0] &&
-    MAIN_PAGES.every((p) => mainPages.includes(p))) ok(`主包只有四个 Tab 页和登录页（${mainPages.length} 页，首页排第一）`)
-else bad('主包只有四个 Tab 页和登录页', `实际：${mainPages.join(', ')}`)
+    MAIN_PAGES.every((p) => mainPages.includes(p)) && mainPages.every((p, i) => p === MAIN_PAGES[i])) ok(mainLabel)
+else bad(mainLabel, `实际：${mainPages.join(', ')}`)
 
 // ── 2. 分包结构 ──────────────────────────────────────────────
 const subs = app.subpackages || app.subPackages || []

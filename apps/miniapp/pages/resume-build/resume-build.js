@@ -4,6 +4,7 @@ const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
 const model = require('../../utils/resume-build-model')
 const view = require('./resume-build-view')
+const aiEntries = require('../../utils/ai-entries')
 
 /** 三段可重复条目的规格。key 就是 data 里的数组名，wxml 通过 data-group 指过来。 */
 const ROWS = {
@@ -508,7 +509,7 @@ Page({
       || String((form.intention && form.intention.position) || '').trim())
     const open = () => {
       wx.navigateTo({
-        url: '/pages/resume-voice/resume-voice',
+        url: aiEntries.resumeVoiceUrl,
         fail() { wx.showToast({ title: '页面打开失败', icon: 'none' }) },
       })
     }

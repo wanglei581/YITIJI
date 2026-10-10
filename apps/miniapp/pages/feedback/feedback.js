@@ -3,13 +3,16 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { AI_ENABLED } = require('../../utils/build-variant')
 
 // ai_content（C3）：AI 内容投诉，服务端 member-feedback.dto.ts 的 FEEDBACK_CATEGORIES 里有这一类。
 // 个人信息请求不在这里开类别：在「隐私与数据」自助办，办不了的按那里写的方式联系（9/28 C3 口径）。
 const CAT_LABEL = { device: '设备使用', print: '打印服务', file_process: '文件处理', general: '一般建议', ai_content: 'AI 内容投诉' }
 // 答复时限（D5，律师再核）。写在页面上，也是对用户的承诺，改之前先改法务文档。
 const AI_COMPLAINT_REPLY_DAYS = 5
-const CATEGORIES = Object.keys(CAT_LABEL).map((value) => ({ value, label: CAT_LABEL[value] }))
+const CATEGORIES = Object.keys(CAT_LABEL)
+  .filter((value) => AI_ENABLED || value !== 'ai_content')
+  .map((value) => ({ value, label: CAT_LABEL[value] }))
 const STATUS_LABEL = { pending: '待处理', processing: '处理中', replied: '已回复', closed: '已关闭' }
 const STATUS_TONE = { pending: 'wheat', processing: 'teal', replied: 'ok', closed: '' }
 const PHONE_RE = /^1[3-9]\d{9}$/
@@ -66,6 +69,7 @@ Page({
   data: {
     statusBarHeight: 20,
     loggedIn: false,
+    aiEnabled: AI_ENABLED,
     categories: CATEGORIES,
     category: 'general',
     title: '',
@@ -84,7 +88,8 @@ Page({
   },
 
   onLoad(options) {
-    const preset = options && CAT_LABEL[options.category] ? options.category : ''
+    let preset = options && CAT_LABEL[options.category] ? options.category : ''
+    if (!AI_ENABLED && preset === 'ai_content') preset = ''
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 20,
       aiReplyDays: AI_COMPLAINT_REPLY_DAYS,
@@ -124,6 +129,7 @@ Page({
 
   setCategory(e) {
     const value = e.currentTarget.dataset.value
+    if (!AI_ENABLED && value === 'ai_content') return
     if (CAT_LABEL[value]) this.setData({ category: value })
   },
 

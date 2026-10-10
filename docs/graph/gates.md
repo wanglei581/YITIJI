@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（15）
+## 有脚本名但不在 CI 执行闭包里（16）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -41,6 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
+| `apps/miniapp/scripts/make-review-variant.mjs` | `@ai-job-print/miniapp::review-variant` |
 | `apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts` | `terminal-agent::verify:boot-spool-guard-windows` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
@@ -71,7 +72,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1944 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1953 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1069,12 +1070,12 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/miniapp/custom-tab-bar/index.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/custom-tab-bar/index.js` | `make-review-variant.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-review-variant.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/miniapp/pages/</code> — 35 个文件</summary>
+<summary><code>apps/miniapp/pages/</code> — 36 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1087,6 +1088,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/pages/documents/documents.js` | `verify-word-conversion-ui.mjs`<br/>`verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/fairs/fairs.js` | `verify-empty-state-honesty.mjs` |
 | `apps/miniapp/pages/help/help.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/pages/home/home.js` | `verify-review-variant.mjs` |
 | `apps/miniapp/pages/job-fit/job-fit.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/launch/launch.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/pages/me/me.js` | `verify-miniapp-static.mjs` |
@@ -1126,23 +1128,38 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/miniapp/scripts/</code> — 3 个文件</summary>
+<summary><code>apps/miniapp/review-variants/</code> — 1 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `apps/miniapp/scripts/privacy-api-inventory.json` | `verify-package-layout.mjs` |
-| `apps/miniapp/scripts/tests/page-lifecycle.test.mjs` | `verify-package-chain.mjs` |
-| `apps/miniapp/scripts/verify-miniapp-static.mjs` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/review-variants/variants.json` | `make-review-variant.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-package-layout.mjs`<br/>`verify-review-variant.mjs`<br/>`verify-miniapp-review-backend.ts` |
 
 </details>
 
 <details>
-<summary><code>apps/miniapp/utils/</code> — 12 个文件</summary>
+<summary><code>apps/miniapp/scripts/</code> — 7 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
+| `apps/miniapp/scripts/make-review-variant.mjs` | `verify-review-variant.mjs` |
+| `apps/miniapp/scripts/privacy-api-inventory.json` | `make-review-variant.mjs`<br/>`verify-package-layout.mjs`<br/>`verify-review-variant.mjs` |
+| `apps/miniapp/scripts/tests/page-lifecycle.test.mjs` | `verify-package-chain.mjs` |
+| `apps/miniapp/scripts/verify-miniapp-static.mjs` | `verify-miniapp-static.mjs`<br/>`verify-review-variant.mjs` |
+| `apps/miniapp/scripts/verify-package-layout.mjs` | `verify-review-variant.mjs` |
+| `apps/miniapp/scripts/verify-review-scope.mjs` | `verify-review-variant.mjs` |
+| `apps/miniapp/scripts/verify-review-variant.mjs` | `verify-review-variant.mjs` |
+
+</details>
+
+<details>
+<summary><code>apps/miniapp/utils/</code> — 15 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/miniapp/utils/ai-entries.js` | `make-review-variant.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-review-variant.mjs` |
 | `apps/miniapp/utils/api.js` | `verify-word-conversion-ui.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-miniapp-cloud-print-m2.ts` |
 | `apps/miniapp/utils/auth.js` | `verify-miniapp-static.mjs` |
+| `apps/miniapp/utils/build-variant.js` | `make-review-variant.mjs`<br/>`verify-miniapp-static.mjs`<br/>`verify-package-layout.mjs`<br/>`verify-review-variant.mjs`<br/>`verify-miniapp-review-backend.ts` |
 | `apps/miniapp/utils/config.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/normalize.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/order-submission-reconcile.js` | `verify-package-chain.mjs` |
@@ -1153,6 +1170,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/miniapp/utils/print-order-idempotency.js` | `verify-package-chain.mjs` |
 | `apps/miniapp/utils/request.js` | `verify-miniapp-static.mjs` |
 | `apps/miniapp/utils/storage.js` | `verify-miniapp-static.mjs`<br/>`verify-package-chain.mjs` |
+| `apps/miniapp/utils/voice-recorder.js` | `make-review-variant.mjs`<br/>`verify-review-variant.mjs` |
 
 </details>
 

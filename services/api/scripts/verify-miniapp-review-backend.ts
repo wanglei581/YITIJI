@@ -153,14 +153,32 @@ function startStub(queue: string[], seen: string[]): Promise<{ server: Server; u
   })
 }
 
+function fullMiniappPages(current: string[]): string[] {
+  const variantSrc = readFileSync(resolve(__dirname, '../../../apps/miniapp/utils/build-variant.js'), 'utf8')
+  const variant = (variantSrc.match(/VARIANT:\s*['"]([^'"]+)['"]/) ?? [])[1]
+  if (variant !== 'full' && variant !== 'no-ai') fail(`无法识别小程序打包版本：${variant || '空'}`)
+  if (variant === 'full') return [...current].sort()
+  const spec = JSON.parse(readFileSync(resolve(__dirname, '../../../apps/miniapp/review-variants/variants.json'), 'utf8')) as {
+    full?: { aiPages?: string[] }
+  }
+  const aiPages = spec.full?.aiPages ?? []
+  if (!aiPages.length) fail('variants.json 的 full.aiPages 为空')
+  return [...new Set([...current, ...aiPages.map((name) => `pages/${name}/${name}`)])].sort()
+}
+
 async function main() {
   const appJsonPath = resolve(__dirname, '../../../apps/miniapp/app.json')
   const fromApp = pagesFromAppJson(readFileSync(appJsonPath, 'utf8'))
   const fromConst = [...MINIAPP_REGISTERED_PAGES].sort()
-  if (fromApp.join('\n') !== fromConst.join('\n')) {
-    fail(`小程序页面常量与 app.json 不一致：app=${fromApp.length} const=${fromConst.length}`)
+  const fullSet = fullMiniappPages(fromApp)
+  if (fullSet.join('\n') !== fromConst.join('\n')) {
+    const onlyFull = fullSet.filter((page) => !fromConst.includes(page))
+    const onlyConst = fromConst.filter((page) => !fullSet.includes(page))
+    fail(`小程序页面常量必须等于完整版页面集合：完整版 ${fullSet.length} 常量 ${fromConst.length}；只在完整版 ${onlyFull.slice(0, 6).join(',')}；只在常量 ${onlyConst.slice(0, 6).join(',')}`)
   }
-  pass('1. 小程序页面常量与 app.json（含分包）一致')
+  const outside = fromApp.filter((page) => !fromConst.includes(page))
+  if (outside.length) fail(`当前 app.json 含完整版之外的页面：${outside.join(',')}`)
+  pass('1. 小程序页面常量等于完整版，当前 app.json 是其子集')
 
   if (JOB_FIT_SYSTEM_PROMPT.includes('投递请引导用户前往岗位来源平台')) fail('2. 提示词仍有第 4 条')
   if (JOB_FIT_SYSTEM_PROMPT.includes('优先选择更匹配的岗位')) fail('2. 提示词仍有第 5 条')

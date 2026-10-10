@@ -2,6 +2,7 @@ const app = getApp();
 const api = require('../../utils/api');
 const history = require('../../utils/history');
 const favorites = require('../../utils/favorites');
+const aiEntries = require('../../utils/ai-entries');
 
 Page({
   data: {
@@ -113,7 +114,7 @@ Page({
       return;
     }
     const title = encodeURIComponent(j.title || '');
-    wx.navigateTo({ url: `/pages/job-fit/job-fit?jobId=${id}&jobTitle=${title}` });
+    wx.navigateTo({ url: aiEntries.href(aiEntries.jobFitUrl, 'jobId=' + id + '&jobTitle=' + title) });
   },
 
   tapExternalApply() {

@@ -37,7 +37,7 @@
     </view>
 
     <!-- C6：两项声明。登录着显示账号里的记录，没登录显示本机的。 -->
-    <view class="grp-label">年龄声明与 AI 授权</view>
+    <view class="grp-label">{{consentGroupLabel}}</view>
     <view class="pv-group">
       <view wx:if="{{consents.error}}" class="pv-item">
         <view class="pv-main"><view class="pv-s">{{consents.error}}</view></view>
@@ -49,14 +49,14 @@
             <view class="pv-s">{{consents.age.text}}</view>
           </view>
         </view>
-        <view class="pv-item tap" hover-class="tap-press" bindtap="tapVoiceConsent" role="button" aria-label="录音单独同意，{{consents.voice.text}}">
+        <view wx:if="{{aiEnabled}}" class="pv-item tap" hover-class="tap-press" bindtap="tapVoiceConsent" role="button" aria-label="录音单独同意，{{consents.voice.text}}">
           <view class="pv-main">
             <view class="pv-t">录音单独同意</view>
             <view class="pv-s">{{consents.voice.text}}</view>
           </view>
           <text class="pv-act">{{consents.voice.on ? '撤回' : '查看'}}</text>
         </view>
-        <view wx:if="{{consents.resume}}" class="pv-item tap" hover-class="tap-press" bindtap="tapResumeConsent" role="button" aria-label="简历 AI 授权，{{consents.resume.text}}">
+        <view wx:if="{{aiEnabled && consents.resume}}" class="pv-item tap" hover-class="tap-press" bindtap="tapResumeConsent" role="button" aria-label="简历 AI 授权，{{consents.resume.text}}">
           <view class="pv-main">
             <view class="pv-t">简历 AI 授权</view>
             <view class="pv-s">{{consents.resume.text}}</view>
@@ -70,7 +70,7 @@
     <!-- 个人信息请求：不在意见反馈里开类别（C3），自助入口、联系方式、答复时限写在这里。 -->
     <view class="grp-label">个人信息请求</view>
     <view class="pr-card">
-      <view class="pr-line"><text class="pr-k">自己办</text><text class="pr-v">登录后在本页导出数据、撤回授权；在「我的文档」「我的简历」「AI 服务记录」里删除。</text></view>
+      <view class="pr-line"><text class="pr-k">自己办</text><text class="pr-v">{{selfHelpLine}}</text></view>
       <view class="pr-line"><text class="pr-k">办不了的</text><text class="pr-v">{{accountClosureAvailable ? '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。' : '例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。'}}</text></view>
       <view class="pr-line"><text class="pr-k">多久答复</text><text class="pr-v">核实是你本人后，{{privacyRequestDays}} 个工作日内处理；办不了的会告诉你理由。</text></view>
       <view class="pr-acts">
@@ -146,7 +146,7 @@
 
       <!-- 授权与注销 -->
       <view class="pv-group">
-        <view class="pv-item tap" hover-class="tap-press" bindtap="revokeConsent">
+        <view wx:if="{{aiEnabled}}" class="pv-item tap" hover-class="tap-press" bindtap="revokeConsent">
           <view class="pv-main">
             <view class="pv-t">撤回 AI 分析授权</view>
             <view class="pv-s">立即生效；不删除简历、文档或打印订单</view>

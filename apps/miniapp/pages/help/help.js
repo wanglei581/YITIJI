@@ -1,10 +1,9 @@
 // pages/help/help.js
 const app = getApp()
+const { AI_ENABLED } = require('../../utils/build-variant')
+const aiEntries = require('../../utils/ai-entries')
 
-Page({
-  data: {
-    statusBarHeight: 20,
-    faqs: [
+const ALL_FAQS = [
       {
         id: 'pickup',
         q: '打印后多久能取件？',
@@ -38,7 +37,20 @@ Page({
         q: '我的简历文件安全吗？',
         a: '你的简历和文件只关联在你本人账号下，通过有时效的链接访问，可以随时删除。个人信息怎么处理、交给哪些受托方，以《隐私政策》为准。',
       },
-    ],
+]
+
+const AI_FAQ_IDS = { ai: true, model: true, complain: true }
+
+function visibleFaqs() {
+  if (AI_ENABLED) return ALL_FAQS
+  return ALL_FAQS.filter(function(item) { return !AI_FAQ_IDS[item.id] })
+}
+
+Page({
+  data: {
+    statusBarHeight: 20,
+    aiEnabled: AI_ENABLED,
+    faqs: visibleFaqs(),
     openId: null,
   },
 
@@ -54,8 +66,8 @@ Page({
   },
 
   askAI() {
-    // 跳到 AI 助手 tab
-    wx.switchTab({ url: '/pages/ai/ai' })
+    if (!AI_ENABLED || !aiEntries.aiTab) return
+    wx.switchTab({ url: aiEntries.aiTab })
   },
 
   goFeedback() {
