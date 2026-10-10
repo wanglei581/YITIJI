@@ -337,7 +337,7 @@ async function handleUsbRoute(
     if (await usbImportClosedResponse(config, res, origin)) return
     const result = await refreshUsbFileList()
     const files: LocalUsbFileItem[] = result.files
-    const response: LocalUsbListResponse = { present: result.present, driveLabel: result.driveLabel, files }
+    const response: LocalUsbListResponse = { present: result.present, driveLabel: result.driveLabel, readable: result.readable, files }
     sendEnvelope(res, 200, response, origin)
     return
   }

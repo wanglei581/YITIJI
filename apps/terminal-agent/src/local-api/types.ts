@@ -64,6 +64,8 @@ export interface LocalAgentPanelStatus {
 export interface LocalUsbStatusResponse {
   present: boolean
   driveLabel: string | null
+  /** 盘插着但本机读不了时为 false。旧版终端程序不带这个字段，前端按 true 处理。 */
+  readable: boolean
 }
 
 export interface LocalUsbFileItem {
