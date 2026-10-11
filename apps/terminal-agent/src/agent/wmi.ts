@@ -209,7 +209,10 @@ export async function getDiskFreeGB(): Promise<number> {
  *                   NOT map this to 'completed' or 'paper_empty'; treat as unconfirmed.
  *   'completed'   - JobStatus explicitly contains Complete/Completed/Printed
  *   'paper_empty' - JobStatus contains "PaperOut" (explicit driver report — NOT Pantum CM2800ADN)
- *   'error'       - Jammed / Error / UserIntervention / Deleting (explicit driver error flags)
+ *   'error'       - Jammed / Error / UserIntervention (explicit driver error flags)
+ *   'removing'    - Deleting / Deleted without a device-fault flag: Windows is taking the job
+ *                   out of the queue. Neither a device fault nor completion; the caller decides
+ *                   from what it saw before and after.
  *   'not_found'   - printer exists but no job matching taskId
  *   'unknown'     - non-Windows, query failure, or printer not found
  */
@@ -379,8 +382,10 @@ export function parsePrintJobStatus(
   // The job is leaving the queue. Windows reports Deleting for every job it removes,
   // including the normal clean-up of a job that just finished printing, so this flag
   // alone says nothing about the device. 2026-10-10 field case (F-18): a one-page job
-  // printed correctly, the 1.5 s poll happened to land on the clean-up, and the order
-  // was recorded as PRINTER_ERROR ("paper jam" on screen). With Printed/Complete in the
+  // printed correctly and the order was recorded as PRINTER_ERROR ("paper jam" on
+  // screen) while the printer was idle and the queue empty. The raw status of that job
+  // has not been retrieved yet; a poll landing on the clean-up is the reading of the
+  // code that fits, not an observed fact. With Printed/Complete in the
   // same sample the spooler has stated completion; without it the caller decides from
   // what it saw before and after (see monitorPrintJob). Never 'error', never 'completed'
   // on its own. Retained keeps its indeterminate meaning here too (see below), so

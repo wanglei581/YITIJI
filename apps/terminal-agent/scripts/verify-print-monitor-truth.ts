@@ -317,8 +317,9 @@ async function main(): Promise<void> {
       expectedFailed: true,
       expectedErrorCode: 'PRINTER_ERROR',
     },
-    // F-18 (2026-10-10 real device): paper came out, the poll landed on Windows removing
-    // the finished job, and the order was recorded as PRINTER_ERROR.
+    // F-18 (2026-10-10 real device): paper came out and the order was recorded as
+    // PRINTER_ERROR. Reading of the code (raw status not retrieved yet): the poll landed
+    // on Windows removing the finished job.
     {
       name: 'job seen printing, then being removed, then gone is completion — not a device error',
       statuses: ['printing', 'removing', 'not_found'],
@@ -326,8 +327,21 @@ async function main(): Promise<void> {
       expectedErrorCode: '',
     },
     {
-      name: 'retained job seen being removed, then gone, follows the observed-then-removed rule',
+      name: 'job only ever seen retained, then removed, then gone is unconfirmed (Retained may mean waiting for paper)',
       statuses: ['retained', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'retained job removed with a matching PrintService 307 confirms completion',
+      statuses: ['retained', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
+      name: 'job seen printing, then retained, then removed, then gone follows the observed-then-removed rule',
+      statuses: ['printing', 'retained', 'removing', 'not_found'],
       expectedFailed: false,
       expectedErrorCode: '',
     },
@@ -405,6 +419,42 @@ async function main(): Promise<void> {
       assert.equal(parsed.rawStatus, rawStatus, `${rawStatus}: raw status is kept for the task record`)
     } catch (error) {
       failures.push(`${rawStatus}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Raw status strings through the real parser into the real monitor: the two halves
+  // must agree on combined flags, and a failure must come from the sample that carried it.
+  const rawSequences: Array<{ name: string; raws: string[]; failed: boolean; code: string; raw?: string; warn?: RegExp }> = [
+    { name: 'F-18 as read from the code', raws: ['Printing', 'Printing', 'Deleting', 'not_found'], failed: false, code: '' },
+    { name: 'finished job caught mid clean-up with the spooler flag', raws: ['Printing', 'Deleting, Printed'], failed: false, code: '' },
+    { name: 'jam reported while the job is being removed', raws: ['Printing', 'Deleting', 'Deleting, Jammed'], failed: true, code: 'PRINTER_ERROR', raw: 'Deleting, Jammed' },
+    { name: 'device error reported after removal started', raws: ['Printing', 'Deleting', 'Error'], failed: true, code: 'PRINTER_ERROR', raw: 'Error' },
+    { name: 'user intervention reported after removal started', raws: ['Deleting', 'UserIntervention, Deleting'], failed: true, code: 'PRINTER_ERROR', raw: 'UserIntervention, Deleting' },
+    { name: 'two paper-out samples after removal started', raws: ['Printing', 'Deleting', 'Deleting, PaperOut', 'PaperOut'], failed: true, code: 'PAPER_EMPTY', raw: 'PaperOut' },
+    { name: 'paper-out, then removed, then gone', raws: ['Printing', 'PaperOut', 'Deleting', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED' },
+    { name: 'retained only, then deleted, then gone', raws: ['Printing, Retained', 'Deleted', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleted' },
+    { name: 'first sample already in removal, then gone', raws: ['Deleting', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleting', warn: /only ever seen while Windows was removing it/ },
+    { name: 'still in removal at the timeout', raws: ['Printing', 'Deleting'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleting', warn: /still being removed/ },
+    { name: 'left removal and kept printing until the timeout is not reported as stuck in removal', raws: ['Deleting', 'Printing'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', warn: /remained active/ },
+  ]
+  for (const sequence of rawSequences) {
+    try {
+      let now = 0
+      let cursor = 0
+      const last = sequence.raws.at(-1) ?? 'not_found'
+      const result = await monitorPrintJob('Configured Printer', 'task-monitor-test', 10, 1, {
+        platform: 'win32',
+        now: () => now,
+        sleep: async (ms) => { now += Math.max(ms, 1) },
+        queryStatus: async () => parsePrintJobStatus(sequence.raws[cursor++] ?? last),
+        queryCompletionEvent: async () => false,
+      })
+      assert.equal(result.failed, sequence.failed, `${sequence.name}: terminal disposition`)
+      assert.equal(result.errorCode, sequence.code, `${sequence.name}: errorCode`)
+      if (sequence.raw !== undefined) assert.equal(result.rawStatus, sequence.raw, `${sequence.name}: the failure carries the sample that caused it`)
+      if (sequence.warn) assert.match(result.warn ?? '', sequence.warn, `${sequence.name}: diagnostic`)
+    } catch (error) {
+      failures.push(`${sequence.name}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

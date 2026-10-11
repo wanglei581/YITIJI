@@ -45,8 +45,10 @@ interface MonitorDependencies {
  *   - A job seen while Windows is removing it (Deleting/Deleted) is neither a device
  *     fault nor completion. It is the visible half of "queue removal": the outcome is
  *     decided by the same evidence as a job that simply disappears — a matching 307
- *     event, or having seen the job active beforehand. A job only ever seen while
- *     being removed, or stuck in removal until the timeout, is PRINT_JOB_UNCONFIRMED.
+ *     event, or having seen the job printing (without Retained) beforehand. A job only
+ *     ever seen while being removed, a job seen only as Retained before its removal
+ *     (Retained may mean "waiting for paper", and a retained job is not removed by a
+ *     normal finish), or one still in removal at the timeout, is PRINT_JOB_UNCONFIRMED.
  *   - If the job never appears (taskId not in DocumentName), the query remains
  *     unknown, or monitoring times out, return failed+PRINT_JOB_UNCONFIRMED.
  *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
@@ -96,11 +98,14 @@ export async function monitorPrintJob(
   let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
   let removalSeen = false
   let removalRawStatus: string | undefined
+  let printingSeenOnce = false  // seen in the queue without Retained
+  let lastStatus: PrintJobMonitorStatus | undefined
 
   while (now() < deadline) {
     await wait(pollIntervalMs)
 
     const { status, rawStatus } = await queryStatus(printerName, spoolKey)
+    lastStatus = status
 
     switch (status) {
       case 'paper_empty':
@@ -166,6 +171,7 @@ export async function monitorPrintJob(
       case 'printing':
         // Job still spooling/rendering (no Retained flag yet).
         activeJobSeenOnce = true
+        printingSeenOnce = true
         paperEmptyCount = 0
         notFoundCount = 0
         break
@@ -181,6 +187,15 @@ export async function monitorPrintJob(
         }
         if (await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
+        }
+        if (removalSeen && !printingSeenOnce && activeJobSeenOnce) {
+          // Only ever Retained, then removed. A finished retained job stays in the queue,
+          // so this removal came from elsewhere and Retained itself may have meant
+          // "waiting for paper". Not completion evidence.
+          return unconfirmedOutcome(
+            'a retained job was removed from the queue without a completion event; completion cannot be confirmed',
+            removalRawStatus,
+          )
         }
         if (activeJobSeenOnce) {
           // 已知边界，保持既有语义：作业曾经出现在队列里，随后查不到，并且没有完成事件，就判为完成。
@@ -230,7 +245,7 @@ export async function monitorPrintJob(
     return unconfirmedOutcome(retainedMsg, 'Printing, Retained (timeout)')
   }
 
-  if (removalSeen) {
+  if (lastStatus === 'removing') {
     return unconfirmedOutcome(
       `print queue monitoring timed out after ${timeoutMs}ms ` +
         '(the job was still being removed from the queue; completion cannot be confirmed)',

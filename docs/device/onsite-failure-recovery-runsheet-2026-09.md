@@ -258,7 +258,7 @@ Get-Service | Where-Object { $_.Name -match 'AIJob|aijobprintagent' } |
 ### ② 系统应该怎么反应
 
 - 预检：`DetectedErrorState=8`（Jammed）→ `'error'` → `PRINTER_ERROR`（`wmi.ts:33` 注释；`task-runner.ts:151-164`）。打印**开始后**才卡纸，预检已经过了。
-- 监控：`JobStatus` 含 `jammed` / `error` / `userintervention` / `deleting` / `deleted` / `cancelled` → 立即 `PRINTER_ERROR`（`wmi.ts:366-376`，`print-job-monitor.ts:114-125`）。`jammed` 时 Agent 内部消息带「可能卡纸」，其余写「设备异常」；用户端只看到白名单句（`print-jobs.service.ts:128`）。
+- 监控：`JobStatus` 含 `jammed` / `error` / `userintervention` / `cancelled` → 立即 `PRINTER_ERROR`（`wmi.ts` 的 `parsePrintJobStatus`，`print-job-monitor.ts` 的 `case 'error'`）。`deleting` / `deleted` 自 0.4.16 起不再算设备出错（真机 F-18：纸出来了却报卡纸）：Windows 清理刚打完的任务也是这个状态，终端程序接着查，按前后看到的情况记完成或「结果未确认」；0.4.15 及以前的版本仍会当场报 `PRINTER_ERROR`。`jammed` 时 Agent 内部消息带「可能卡纸」，其余写「设备异常」；用户端只看到白名单句（`print-jobs.service.ts:128`）。
 - 打印机**断电**时队列若报 `Error`，也走这一条，被当成卡纸（见 F4 ②）。
 - 驱动不置这些位：与 F1 相同，落入 `PRINT_JOB_UNCONFIRMED`，不自动重印。
 - 心跳若报到 `'error'`：生产拦新单（开关打开时）；一体机确认页不能下单。
