@@ -223,7 +223,7 @@ export function PrintOutOfPaperPanel({
                   : <>可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>，请不要重新下单。</>
                 : paid
                   ? <>记下<b>{orderRef}</b>。{refundApplyLine()}不要重新下单再打一次，那会变成两笔费用。</>
-                  : <>记下<b>{orderRef}</b>，回到订单重新打印。</>}
+                  : <>记下<b>{orderRef}</b>。还要打，请重新选文件再打一次。</>}
             </span>
           </div>
         </div>
