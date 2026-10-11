@@ -118,7 +118,9 @@ const checks = [
     assert.match(doneRuntime, /idDocument \? '拿走前记得核一下页数，证件原件和复印件一起带走/)
     // 服务端与 Agent 都没有加水印的实现：页面不得让用户去核对一个并不存在的水印。
     assert.doesNotMatch(doneRuntime, /仅供求职使用」?\s*(<\/?b>)?\s*水印|页数和水印/)
-    assert.match(doneRuntime, /: '拿走前记得核一下页数，少页当场能处理。'/)
+    assert.match(doneRuntime, /: '拿走前记得核一下页数和清晰度。'/)
+    // 现场没有人：完成页不得再说「当场能处理」。
+    assert.doesNotMatch(doneRuntime, /当场能处理|都能当场处理/)
     const handoff = read('src/pages/print/printHandoff.ts')
     const confirm = read('src/pages/print/PrintConfirmPage.tsx')
     const scan = read('src/pages/scan/ScanResultPage.tsx')
