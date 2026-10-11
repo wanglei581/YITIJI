@@ -317,6 +317,58 @@ async function main(): Promise<void> {
       expectedFailed: true,
       expectedErrorCode: 'PRINTER_ERROR',
     },
+    // F-18 (2026-10-10 real device): paper came out, the poll landed on Windows removing
+    // the finished job, and the order was recorded as PRINTER_ERROR.
+    {
+      name: 'job seen printing, then being removed, then gone is completion — not a device error',
+      statuses: ['printing', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'retained job seen being removed, then gone, follows the observed-then-removed rule',
+      statuses: ['retained', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'job being removed with a matching PrintService 307 confirms completion',
+      statuses: ['removing'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
+      name: 'job only ever seen while being removed is unconfirmed, neither completed nor a device error',
+      statuses: ['removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'job stuck in removal until timeout is unconfirmed, not a device error',
+      statuses: ['printing', 'removing'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'paper-out signal is not washed out by a later removal',
+      statuses: ['printing', 'paper_empty', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'paper-out then removal with a 307 event is still not completion',
+      statuses: ['paper_empty', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      completionEvent: true,
+    },
+    {
+      name: 'a device error after removal started is still a device error',
+      statuses: ['printing', 'removing', 'error'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINTER_ERROR',
+    },
   ]
 
   for (const scenario of scenarios) {
@@ -327,15 +379,40 @@ async function main(): Promise<void> {
     }
   }
 
+  // Queue removal is not a device fault and not completion on its own (F-18).
+  const removalStates: Array<[string, PrintJobMonitorStatus]> = [
+    ['Deleting', 'removing'],
+    ['Deleted', 'removing'],
+    ['Cancelled', 'error'],
+    ['Canceled', 'error'],
+    ['Printed, Cancelled', 'error'],
+    ['Deleting, Cancelled', 'error'],
+    ['Printed, Retained, Deleted', 'removing'],
+    ['Printing, Deleting', 'removing'],
+    ['Retained, Deleted', 'removing'],
+    ['Deleting, Printed', 'completed'],
+    ['Printed, Deleted', 'completed'],
+    ['Error, Deleting', 'error'],
+    ['Deleting, Jammed', 'error'],
+    ['Deleting, UserIntervention', 'error'],
+    ['Deleting, PaperOut', 'paper_empty'],
+    ['Printed, Deleting, PaperOut', 'paper_empty'],
+  ]
+  for (const [rawStatus, expected] of removalStates) {
+    try {
+      const parsed = parsePrintJobStatus(rawStatus)
+      assert.equal(parsed.status, expected, `${rawStatus}: queue removal classification`)
+      assert.equal(parsed.rawStatus, rawStatus, `${rawStatus}: raw status is kept for the task record`)
+    } catch (error) {
+      failures.push(`${rawStatus}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   const explicitFailures = [
-    'Deleting',
-    'Deleted',
-    'Cancelled',
-    'Canceled',
     'Jammed',
     'Error',
     'UserIntervention',
-    'Retained, Deleted',
+    'Printing, Error',
     'Printed, PaperOut',
   ]
   for (const rawStatus of explicitFailures) {

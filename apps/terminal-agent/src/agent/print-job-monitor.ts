@@ -42,6 +42,11 @@ interface MonitorDependencies {
  *   - Only an explicit spooler completion, or an observed active job followed by
  *     queue removal, confirms completed. This confirms the Windows spooler
  *     lifecycle only; it does not prove that paper physically reached the user.
+ *   - A job seen while Windows is removing it (Deleting/Deleted) is neither a device
+ *     fault nor completion. It is the visible half of "queue removal": the outcome is
+ *     decided by the same evidence as a job that simply disappears — a matching 307
+ *     event, or having seen the job active beforehand. A job only ever seen while
+ *     being removed, or stuck in removal until the timeout, is PRINT_JOB_UNCONFIRMED.
  *   - If the job never appears (taskId not in DocumentName), the query remains
  *     unknown, or monitoring times out, return failed+PRINT_JOB_UNCONFIRMED.
  *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
@@ -89,6 +94,8 @@ export async function monitorPrintJob(
   let notFoundCount = 0
   let activeJobSeenOnce = false
   let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
+  let removalSeen = false
+  let removalRawStatus: string | undefined
 
   while (now() < deadline) {
     await wait(pollIntervalMs)
@@ -112,7 +119,7 @@ export async function monitorPrintJob(
         break
 
       case 'error': {
-        // Covers Jammed / Error / UserIntervention / Deleting — explicit driver error flags.
+        // Covers Jammed / Error / UserIntervention — explicit driver error flags.
         const isJammed = rawStatus?.toLowerCase().includes('jammed') ?? false
         return {
           failed: true,
@@ -130,6 +137,20 @@ export async function monitorPrintJob(
         // Keep polling — in case the driver eventually reports an explicit PaperOut or Error.
         activeJobSeenOnce = true
         seenRetainedOnce = true
+        notFoundCount = 0
+        paperEmptyCount = 0
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
+        break
+
+      case 'removing':
+        // Windows is taking the job out of the queue. Not a device fault (F-18) and not
+        // completion by itself. Keep polling: the next sample is normally 'not_found',
+        // where the usual evidence rules apply. activeJobSeenOnce is deliberately left
+        // untouched — a job first seen while being removed was never seen printing.
+        removalSeen = true
+        removalRawStatus = rawStatus
         notFoundCount = 0
         paperEmptyCount = 0
         if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
@@ -170,6 +191,13 @@ export async function monitorPrintJob(
         notFoundCount++
         paperEmptyCount = 0
         if (notFoundCount >= NOT_FOUND_LIMIT) {
+          if (removalSeen) {
+            return unconfirmedOutcome(
+              'the job was only ever seen while Windows was removing it and no completion ' +
+                'event followed; completion cannot be confirmed',
+              removalRawStatus,
+            )
+          }
           return unconfirmedOutcome(
             `job not found in queue after ${NOT_FOUND_LIMIT} polls ` +
               `(${(NOT_FOUND_LIMIT * pollIntervalMs / 1000).toFixed(1)}s); ` +
@@ -200,6 +228,14 @@ export async function monitorPrintJob(
       `cannot distinguish completed vs paper-empty via Get-PrintJob); ` +
       `reporting PRINT_JOB_UNCONFIRMED — operator must check device`
     return unconfirmedOutcome(retainedMsg, 'Printing, Retained (timeout)')
+  }
+
+  if (removalSeen) {
+    return unconfirmedOutcome(
+      `print queue monitoring timed out after ${timeoutMs}ms ` +
+        '(the job was still being removed from the queue; completion cannot be confirmed)',
+      removalRawStatus,
+    )
   }
 
   const warnMsg = activeJobSeenOnce

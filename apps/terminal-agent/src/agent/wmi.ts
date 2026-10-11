@@ -219,6 +219,7 @@ export type PrintJobMonitorStatus =
   | 'completed'
   | 'paper_empty'
   | 'error'
+  | 'removing'
   | 'not_found'
   | 'unknown'
 
@@ -360,20 +361,35 @@ export function parsePrintJobStatus(
   // JobStatus can be a comma-separated list of flags (e.g. "Printing, PaperOut")
   const flags = raw.toLowerCase()
 
-  // Explicit failure flags are checked first. This priority prevents a combined
-  // state such as "Retained, Deleted" or "Printed, PaperOut" from being treated
-  // as completion.
+  // Explicit device-fault flags are checked first. This priority prevents a combined
+  // state such as "Printed, PaperOut" or "Error, Deleting" from being treated as
+  // completion or as an ordinary queue removal.
   if (flags.includes('paperout')) return { status: 'paper_empty', rawStatus: raw }
   if (
     flags.includes('jammed') ||
     flags.includes('error') ||
     flags.includes('userintervention') ||
-    flags.includes('deleting') ||
-    flags.includes('deleted') ||
+    // Not a value Get-PrintJob is documented to return; kept as a failure exactly as before.
     flags.includes('cancelled') ||
     flags.includes('canceled')
   ) {
     return { status: 'error', rawStatus: raw }
+  }
+
+  // The job is leaving the queue. Windows reports Deleting for every job it removes,
+  // including the normal clean-up of a job that just finished printing, so this flag
+  // alone says nothing about the device. 2026-10-10 field case (F-18): a one-page job
+  // printed correctly, the 1.5 s poll happened to land on the clean-up, and the order
+  // was recorded as PRINTER_ERROR ("paper jam" on screen). With Printed/Complete in the
+  // same sample the spooler has stated completion; without it the caller decides from
+  // what it saw before and after (see monitorPrintJob). Never 'error', never 'completed'
+  // on its own. Retained keeps its indeterminate meaning here too (see below), so
+  // "Retained, Deleted" and "Printed, Retained, Deleted" are not completion.
+  if (flags.includes('deleting') || flags.includes('deleted')) {
+    const spoolerSaysPrinted =
+      !flags.includes('retained') &&
+      (flags.includes('completed') || flags.includes('complete') || flags.includes('printed'))
+    return { status: spoolerSaysPrinted ? 'completed' : 'removing', rawStatus: raw }
   }
 
   // 'Retained' — the Windows spooler kept a copy of the job after submitting it to the
