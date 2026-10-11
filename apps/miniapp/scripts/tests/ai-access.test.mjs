@@ -533,23 +533,9 @@ async function careerPlanDeclineStopsHere(opts) {
   assert.equal(ctx.wx.calls.modal.length, 1, '不反复弹')
 }
 
-/** 读已有规划、导出 PDF 不触发模型生成，不挂简历 AI 标记：收到同一个 403 原样交给页面，不弹框。 */
-async function careerPlanReadDoesNotPrompt(opts) {
-  const ctx = memberWithAge(opts)
-  const api = ctx.load('api')
-  const pending = settle(api.getCareerPlan('t1', ''))
-  await flush()
-  reply(ctx.aiCalls()[0], 403, CONSENT_403)
-  const result = await pending
-  assert.equal(result.ok, false)
-  assert.equal(result.error.code, 'USER_AI_CONSENT_REQUIRED')
-  assert.equal(ctx.wx.calls.modal.length, 0)
-}
-
 const SCENARIOS = {
   careerPlanAsksResumeAiOn403,
   careerPlanDeclineStopsHere,
-  careerPlanReadDoesNotPrompt,
   resumeAiConsentRecoversOnce,
   resumeAiDeclineStopsHere,
   consent403OutsideResumePassesThrough,

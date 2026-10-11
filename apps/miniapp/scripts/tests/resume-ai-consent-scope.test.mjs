@@ -6,7 +6,8 @@
  *     他自己再点一次才重新走。
  *   - 模拟面试入口页：小程序上的模拟面试不带简历（不传 resumeFileId），所以这一项在小程序上
  *     不会被这项授权拦。以后谁要让它带简历，要先把「被拒后退回不带简历」接上，这条才许改。
- *   - 隐私页「简历 AI 授权」一行和弹窗：两句是合规定的字，说的是「凡是要把简历内容发给 AI 的功能」。
+ *   - 隐私页「简历 AI 授权」：弹窗两句是合规逐字定的；那一行的状态小字（已授权、还没有授权）
+ *     是照同一句式写、合规看过同意的；「已撤回」那句没动。三种状态各验一次。
  *
  * 末尾是反向变异。由 verify:page-lifecycle 拉起。
  */
@@ -93,7 +94,12 @@ async function interviewEntrySendsNoResume({ source } = {}) {
     source,
     modules: {
       api: { createInterview: (p) => { sent.push(p); return Promise.resolve({ sessionId: 's1', accessToken: '', questionTarget: 6 }) } },
-      storage: { KEYS: { INTERVIEW_SESSION: 'INTERVIEW_SESSION' }, get: () => null, set: () => true },
+      // 本机明明存着一份已解析的简历、名下也有简历文件：入口页照样不带。
+      storage: {
+        KEYS: { INTERVIEW_SESSION: 'INTERVIEW_SESSION', RESUME_TASK: 'RESUME_TASK' },
+        get: (key) => (key === 'RESUME_TASK' ? { taskId: 't1', fileId: 'f1', accessToken: '', fileName: '简历.pdf' } : null),
+        set: () => true,
+      },
     },
   })
   const page = instantiate(def)
@@ -169,6 +175,16 @@ async function privacyResumeRowAndDialogs({ source } = {}) {
   off.wx.calls.modal[0].success({ confirm: true })
   await flush()
   assert.equal(off.revokes.length, 0)
+
+  // 已撤回：和「从没授权」分开说；点开同样只是说明，没有可撤的。
+  const gone = loadConsents({ source, rows: [{ scope: 'resume_ai', granted: false, revokedAt: '2026-10-10T03:00:00Z' }] })
+  const viewGone = await gone.consents.load()
+  assert.equal(viewGone.resume.on, false)
+  assert.equal(viewGone.resume.text, '已撤回：下次用简历 AI 前会先问你')
+  const pageGone = { data: { consents: viewGone }, setData(p) { Object.assign(this.data, p) }, loadConsents() {} }
+  gone.consents.promptResume(pageGone)
+  assert.equal(gone.wx.calls.modal[0].content, NOT_GRANTED_TEXT)
+  assert.equal(gone.wx.calls.modal[0].showCancel, false)
 }
 
 const SCENARIOS = { careerPlanDeclineStaysOnPage, interviewEntrySendsNoResume, privacyResumeRowAndDialogs }
@@ -196,6 +212,10 @@ const MUTATIONS = [
     mutated(CONSENTS, '凡是要把简历内容发给 AI 的功能都会先问你，不同意就不发。', '简历诊断、优化、生成会先问你，不同意就不发给 AI。')],
   ['没授权弹窗退回旧句', 'privacyResumeRowAndDialogs',
     mutated(CONSENTS, "'第一次用到要把简历内容发给 AI 的功能时会先问你。同意后", "'第一次用简历诊断、优化、生成时会先问你。同意后")],
+  ['已撤回说成从没授权', 'privacyResumeRowAndDialogs',
+    mutated(CONSENTS, "text: revoked ? '已撤回：下次用简历 AI 前会先问你' : ", "text: ")],
+  ['已授权小字退回只点三项', 'privacyResumeRowAndDialogs',
+    mutated(CONSENTS, '：要把简历内容发给 AI 的功能共用', '：简历诊断、优化、生成共用')],
   ['没点确认就撤回', 'privacyResumeRowAndDialogs',
     mutated(CONSENTS, '      if (!granted || !r.confirm) return\n      page.setData({ busy: \'正在撤回…\' })\n      api.revokeAiConsent(aiAccess.RESUME_AI_SCOPE)', '      if (!granted) return\n      page.setData({ busy: \'正在撤回…\' })\n      api.revokeAiConsent(aiAccess.RESUME_AI_SCOPE)')],
 ]
