@@ -63,4 +63,36 @@ const keydown = assistant.slice(assistant.indexOf('const handleKeyDown'), assist
 assert.ok(/isComposing/.test(keydown) && /compositionEndedAtRef/.test(keydown), '拼音选字时的回车必须先被放过（选字中、以及刚结束选字的那一下），不能当成发送')
 assert.match(read('src/pages/print/PrintPickupClaimPage.tsx'), /id="pickup-code-input"[\s\S]{0,900}data-kiosk-keyboard="page"/, '取件码格配着页面数字键盘，须打标记压住系统键盘')
 assert.doesNotMatch(read('src/pages/profile/me/components/PhoneRebindPanel.tsx'), /data-kiosk-keyboard="page"/, '换绑三格没有页面数字键盘，靠系统键盘输入，不得打标记（否则无法输入）')
+// 输入类型提示：电话、邮箱、搜索格要告诉系统键盘该出哪种面板。只认写在标签上的 aria-label、id、name、type
+// （旁边另放文字说明的格子认不出来，那几格在下面点名）；页面自带键盘的格子和不打字的格子不管。
+const HINT_RULES = [
+  [/邮箱|e-?mail/i, ['email'], '邮箱格须 inputMode="email"'],
+  [/电话|手机号|phone|mobile/i, ['tel', 'numeric'], '电话格须 inputMode="tel"（只收数字的可用 numeric）'],
+  [/搜索|search/i, ['search'], '搜索格须 inputMode="search"'],
+]
+// 云上已关、只留给私有化部署的目录页不在这次范围内。
+const HINT_SKIP = /\/src\/(?:pages\/(?:jobs|companies|job-fairs|offline-agencies)\/|components\/qingxu\/directory\/)/
+let hintChecked = 0
+for (const file of srcFiles.filter((f) => f.pathname.endsWith('.tsx') && !HINT_SKIP.test(f.pathname))) {
+  const source = ts.createSourceFile(file.pathname, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const visit = (node) => {
+    if ((ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) && node.tagName.getText(source) === 'input') {
+      const attr = Object.fromEntries(node.attributes.properties.filter(ts.isJsxAttribute).map((a) => [a.name.getText(source), a.initializer && ts.isStringLiteral(a.initializer) ? a.initializer.text : a.initializer?.getText(source) ?? '']))
+      const typing = !['file', 'checkbox', 'radio', 'range', 'hidden'].includes(attr.type) && attr['data-kiosk-keyboard'] !== 'page' && attr.inputMode !== 'none' && !('readOnly' in attr)
+      const what = [attr['aria-label'], attr.id, attr.name, attr.type].filter(Boolean).join(' ')
+      const rule = typing ? HINT_RULES.find(([pattern]) => pattern.test(what)) : undefined
+      if (rule) {
+        hintChecked += 1
+        const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
+        assert.ok(rule[1].includes(attr.inputMode) || (rule[1][0] === 'search' && attr.type === 'search'), `${rule[2]}：${file.pathname}:${line}`)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+}
+assert.ok(hintChecked >= 3, `输入类型提示检查没有扫到格子（只扫到 ${hintChecked} 个），多半是扫描本身坏了`)
+// 这两格的「联系电话」「邮箱」写在旁边的文字里，上面的扫描认不出，单独点名。
+const basicStep = read('src/pages/resume/components/ResumeGenerateBasicStep.tsx')
+assert.ok(/inputMode="tel"/.test(basicStep) && /inputMode="email"/.test(basicStep), '生成简历基本信息的电话、邮箱两格须各带对应的 inputMode')
 console.log('PASS Kiosk 系统键盘共享层静态契约')
