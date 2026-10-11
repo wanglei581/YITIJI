@@ -114,9 +114,9 @@ export function UsbImportHoldNotice({ hold }: { hold: UsbImportHold }) {
   )
 }
 
-export function FileSourceNote({ children }: { children: ReactNode }) {
+export function FileSourceNote({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <div className="fs-note">
+    <div className="fs-note" data-testid={testId}>
       <span className="sq" aria-hidden="true" />
       <span>{children}</span>
     </div>
@@ -282,17 +282,20 @@ export function ChannelGrid({
   active,
   usbMode,
   onSelect,
+  locked = false,
 }: {
   keys: UploadTab[]
   active: UploadTab | null
   usbMode: 'ok' | 'unavailable' | 'offline'
   onSelect: (key: UploadTab) => void
+  locked?: boolean
 }) {
   return (
     <div className="w2-print-upload-source-grid fs-chs" data-count={keys.length} data-testid="file-source-channels">
       {keys.map((key) => {
         const copy = CHANNEL_COPY[key]
-        const disabled = key === 'usb' && usbMode !== 'ok'
+        const usbClosed = key === 'usb' && usbMode !== 'ok'
+        const disabled = locked || usbClosed
         const desc =
           key === 'usb' && usbMode === 'unavailable'
             ? '本机暂未开通 U 盘导入，请改用手机上传。'
@@ -327,7 +330,7 @@ export function ChannelGrid({
               <span>{copy.name}</span>
               {key === 'qr' ? <span className="fs-tag">一体机首选</span> : null}
               {key === 'file' ? <span className="fs-tag mut">备用通道</span> : null}
-              {disabled && note ? <span className="fs-tag mut">{note}</span> : null}
+              {usbClosed && note ? <span className="fs-tag mut">{note}</span> : null}
             </span>
             <span className="fs-ch-d">{desc}</span>
             <span className="fs-ch-f">{limit}</span>

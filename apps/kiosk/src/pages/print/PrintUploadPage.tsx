@@ -40,7 +40,8 @@ import {
   WORD_CONVERSION_DISCLOSURE,
   WORD_CONVERSION_UNAVAILABLE_COPY,
 } from '../../services/api/documentConversion'
-import { useTerminalSessionState } from '../../hooks/useTerminalSessionState'
+import { usePrintSessionBlocked } from '../../hooks/useTerminalSessionState'
+import { useSessionRecoveryNotice } from '../../hooks/useSessionRecoveryNotice'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import { useStartPrintHandoff } from './usePrintHandoff'
 import {
@@ -204,10 +205,11 @@ export function PrintUploadPage() {
   const showFileChannel = !useTerminalKiosk()
   const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
-  const terminalSession = useTerminalSessionState()
+  const printSessionBlocked = usePrintSessionBlocked()
+  const recoveryNotice = useSessionRecoveryNotice()
 
   useEffect(() => {
-    if (terminalSession === 'failed') return undefined
+    if (printSessionBlocked) return undefined
     if (tab !== 'usb' || usbGate.state !== 'allowed' || file || usbUploading || usbSelected) return undefined
     let cancelled = false
 
@@ -251,7 +253,7 @@ export function PrintUploadPage() {
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [terminalSession, tab, usbGate.state, file, usbUploading, usbSelected, usbPollKey])
+  }, [printSessionBlocked, tab, usbGate.state, file, usbUploading, usbSelected, usbPollKey])
 
   // 上传成功只把文件放进本页；点「下一步」才整份写打印交接上下文。
   // 以前上传成功就写，不点下一步也留在本机，会被下一位或下一个来源当成「上一份」复水。
@@ -279,7 +281,7 @@ export function PrintUploadPage() {
     persistFile(nextFile, 'qr')
   }, [persistFile])
 
-  const phoneEnabled = terminalSession !== 'failed' && tab === 'qr' && channelActive && !file
+  const phoneEnabled = !printSessionBlocked && tab === 'qr' && channelActive && !file
   const phoneSession = useUploadSession({
     purpose: 'print_doc',
     enabled: phoneEnabled,
@@ -469,7 +471,7 @@ export function PrintUploadPage() {
       pageTitle={pageTitle}
       pageSubtitle={pageSubtitle}
       terminalLabel=""
-      status={qxStatusFromDevice(device)}
+      status={printSessionBlocked ? { tone: 'warn', label: '这台机器现在下不了打印单' } : qxStatusFromDevice(device)}
       orderPausedNotice={device.printerNotice}
       isResumePrint={isResumePrint}
       showFileChannel={showFileChannel}
@@ -496,7 +498,8 @@ export function PrintUploadPage() {
       inputRef={inputRef}
       printAccept={printAccept}
       photoOnly={Boolean(isPhotoEntry)}
-      sessionBlocked={terminalSession === 'failed'}
+      sessionBlocked={printSessionBlocked}
+      recoveryNotice={recoveryNotice}
       onFileInputChange={handleFileChange}
       onSelectChannel={activateChannel}
       onOpenPicker={() => {

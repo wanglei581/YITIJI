@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -683,27 +683,61 @@ assert.equal(
   1,
   'print upload uses one QR upload session hook'
 )
-assert.match(printUploadPage, /useTerminalSessionState\(/, '选文件页读取本机会话状态')
+assert.match(printUploadPage, /usePrintSessionBlocked\(/, '选文件页用上一次定下来的本机会话')
 assert.match(
-  printUploadPage,
-  /const phoneEnabled = terminalSession !== 'failed' && tab === 'qr' && channelActive && !file/,
-  '本机会话 failed 时不签发手机上传会话',
+  read('src/hooks/useTerminalSessionState.ts'),
+  /if \(session === 'ready' \|\| session === 'failed'\) settledPrintSession = session/,
+  'checking 不改写已定下来的打印拦截',
 )
 assert.match(
   printUploadPage,
-  /if \(terminalSession === 'failed'\) return undefined/,
-  '本机会话 failed 时不轮询 U 盘',
+  /const phoneEnabled = !printSessionBlocked && tab === 'qr' && channelActive && !file/,
+  '本机会话拦住打印时不签发手机上传会话',
 )
-assert.match(printUploadView, /FileSourceSessionBlocked/, '选文件页 failed 时改走说明块')
-const sessionBlocked = read('src/pages/print/file-source/FileSourceSessionBlocked.tsx')
-assert.match(sessionBlocked, /这台机器现在下不了打印单/, '选文件说明块使用标题定句')
 assert.match(
-  sessionBlocked,
+  printUploadPage,
+  /if \(printSessionBlocked\) return undefined/,
+  '本机会话拦住打印时不轮询 U 盘',
+)
+assert.match(printUploadView, /FileSourceSessionHold/, '选文件页 failed 时留着来源选择、来源卡置灰')
+assert.equal(
+  existsSync(join(kioskRoot, 'src/pages/print/file-source/FileSourceSessionBlocked.tsx')),
+  false,
+  '整屏阻断组件已删',
+)
+const sessionHold = read('src/pages/print/file-source/FileSourceSessionHold.tsx')
+assert.match(sessionHold, /这台机器现在下不了打印单/, '选文件说明块使用标题定句')
+assert.match(
+  sessionHold,
   /机器会自己再试，恢复后这里会自动变回可用。你可以等一会儿，或稍后再来。/,
   '选文件说明块使用正文定句',
 )
-assert.match(sessionBlocked, /返回首页/, '选文件说明块只有返回首页这一个动作')
-assert.doesNotMatch(sessionBlocked, /useUploadSession\(/, '说明块不得再开一条上传会话')
+assert.match(sessionHold, /locked/, '来源卡在这一态置灰')
+assert.doesNotMatch(sessionHold, /返回首页/, '这一态不再单独放返回首页')
+assert.doesNotMatch(sessionHold, /ExistingSourceLinks/, '这一态不显示扫描原件和我的文档')
+assert.doesNotMatch(sessionHold, /还没有文件。选择一种方式上传/, '这一态不催人现在上传')
+assert.doesNotMatch(sessionHold, /useUploadSession\(/, '说明块不得再开一条上传会话')
+assert.match(printUploadPage, /这台机器现在下不了打印单/, '选文件页顶栏在拦住时使用同一句')
+assert.match(printUploadView, /recoveryNotice/, '选文件页能挂上换票清场那一句')
+assert.match(printUploadView, /file-source-recovery-notice/, '选文件页清场提示有稳定锚点')
+const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
+assert.match(recoveryNoticeHook, /刚才选的材料已经清掉，要重新传/, '换票清场提示使用定句')
+assert.match(read('src/pages/home/components/QxHomeView.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点')
+function sourceFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(ts|tsx)$/.test(entry.name) ? [path] : []
+  })
+}
+const recoveryCalls = sourceFiles(join(kioskRoot, 'src')).flatMap((path) => {
+  const text = readFileSync(path, 'utf8')
+  const count = (text.match(/(?<!function )takeTerminalSessionRecoveryCleared\s*\(/g) ?? []).length
+  return count > 0 ? [{ path, count }] : []
+})
+assert.equal(recoveryCalls.length, 1, 'takeTerminalSessionRecoveryCleared 在 src 下只有一个调用文件')
+assert.equal(recoveryCalls[0]?.count, 1, 'takeTerminalSessionRecoveryCleared 在 src 下只有一个调用点')
+assert.match(recoveryCalls[0]?.path ?? '', /useSessionRecoveryNotice\.ts$/, '唯一调用点在恢复提示模块')
 assert.doesNotMatch(
   printUpload,
   /<UploadSessionQrPanel\b/,

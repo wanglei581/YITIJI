@@ -2332,3 +2332,37 @@ test('home print status tells the truth when this machine cannot place a print o
   await expect(page.getByText('打印扫描', { exact: true }).first()).toBeVisible()
   expect(errors).toEqual([])
 })
+
+test('home print status stays on the failed line while this machine session is checking again @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  let releaseChecking: () => void = () => undefined
+  const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async (requestNumber) => {
+    if (requestNumber > 1) await checkingGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(pill).toHaveText('打印机在线')
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('checking')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  releaseChecking()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  expect(errors).toEqual([])
+})

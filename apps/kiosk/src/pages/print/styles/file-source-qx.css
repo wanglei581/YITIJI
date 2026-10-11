@@ -607,32 +607,30 @@
   .fs-page .fs-sec.qx-grow > .qx-card { min-height: 0; }
 }
 
-/* 本机会话 failed：沿用状态卡和主按钮，整块占住原来源选择的主区域。
-   状态卡吸收这一区的高度，说明在卡内居中；主按钮留在这块区域的底部。 */
-.fs-page[data-state='session-failed'] > .fs-session-block {
+/* 本机会话 failed：来源选择原样留着。说明块保持自然高度。
+   多出来的高度分给来源卡和下面两张说明小卡，避免中间留出大片空白。 */
+.fs-page[data-state='session-failed'] .fs-hero { min-height: 308px; }
+.fs-page[data-state='session-failed'] .fs-truth { margin-top: 0; }
+.fs-page[data-state='session-failed'] .fs-hold-sources,
+.fs-page[data-state='session-failed'] .fs-hold-notes {
   flex: 1 1 auto;
-  display: flex;
   min-height: 0;
 }
-.fs-page[data-state='session-failed'] > .fs-session-block > .qx-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 28px;
-  min-height: 100%;
-  padding: 28px 32px;
-}
-.fs-page[data-state='session-failed'] > .fs-session-block > .qx-card > .fs-status {
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-chs,
+.fs-page[data-state='session-failed'] .fs-hold-notes .fs-split {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 308px;
+  align-items: stretch;
 }
-.fs-page[data-state='session-failed'] .fs-status-h { font-size: var(--qx-fs-page); }
-.fs-page[data-state='session-failed'] .qx-btn {
-  flex: none;
-  width: 100%;
-  min-height: var(--qx-btn-h-lg);
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-chs {
+  grid-template-rows: minmax(220px, 1fr);
+}
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-ch,
+.fs-page[data-state='session-failed'] .fs-hold-notes .fs-mini {
+  flex: 1 1 auto;
+  min-height: 220px;
+}
+@media (max-width: 760px) {
+  .fs-page[data-state='session-failed'] .fs-hero { min-height: 0; }
+  .fs-page[data-state='session-failed'] .fs-hold-sources .fs-ch,
+  .fs-page[data-state='session-failed'] .fs-hold-notes .fs-mini { min-height: 0; }
 }

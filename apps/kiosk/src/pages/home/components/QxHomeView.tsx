@@ -24,6 +24,7 @@ import type { SmartCampusCapabilityState } from '../../../hooks/useSmartCampusCo
 import type { TerminalDeviceStatusView } from '../../../hooks/useTerminalDeviceStatus'
 import type { ToolboxCapabilityState } from '../../../hooks/useToolboxConfig'
 import { hasKioskSensitiveSession } from '../../../auth/kioskSensitiveSession'
+import { dismissSessionRecoveryNotice } from '../../../hooks/useSessionRecoveryNotice'
 import { homeStandbyNote, publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { useTerminalKiosk } from '../../../services/api/screensaver'
@@ -71,6 +72,7 @@ interface QxHomeViewProps {
   officialChannelCount: number
   deviceStatus: HomeDeviceStatus
   printSessionFailed?: boolean
+  recoveryNotice?: string | null
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
   onOpenDevice: () => void
@@ -134,6 +136,7 @@ export function QxHomeView({
   officialChannelCount,
   deviceStatus,
   printSessionFailed = false,
+  recoveryNotice = null,
   continueSlot,
   onAction,
   onOpenDevice,
@@ -146,8 +149,7 @@ export function QxHomeView({
   const priceKnown = price.status === 'ready' && bwUnit !== null && colorUnit !== null
   const paidPrint = priceKnown && (bwUnit > 0 || colorUnit > 0)
   const freePrint = priceKnown && bwUnit === 0 && colorUnit === 0
-  const [now, setNow] = useState(() => new Date())
-  const [introDone, setIntroDone] = useState(false)
+  const [now, setNow] = useState(() => new Date()); const [introDone, setIntroDone] = useState(false)
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 10_000)
     return () => window.clearInterval(timer)
@@ -163,11 +165,8 @@ export function QxHomeView({
   const job = jobCopy(jobs)
   const toolboxKnown = toolbox.status === 'ready' && Boolean(toolbox.configVersion)
   const campusKnown = campus.status === 'ready' && Boolean(campus.configVersion)
-  const toolboxReady = toolboxKnown && toolbox.enabled
-  const campusReady = campusKnown && campus.enabled
-  const readyPrintEyebrow = paidPrint
-    ? '先看价格再出纸 · 带走：打印件'
-    : freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'
+  const toolboxReady = toolboxKnown && toolbox.enabled; const campusReady = campusKnown && campus.enabled
+  const readyPrintEyebrow = paidPrint ? '先看价格再出纸 · 带走：打印件' : freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'
   const printEyebrow = printSessionFailed ? '这台机器现在下不了打印单' : device.loading ? printStatus.note : device.printerReady ? readyPrintEyebrow : device.printerLabel
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
@@ -219,12 +218,13 @@ export function QxHomeView({
         </button>
 
         <div className="qx-home-continue" data-testid="home-context-region">
-          {continueSlot}
+          <div onClick={dismissSessionRecoveryNotice}>{continueSlot}</div>
           <div className="qx-home-empty-context" role="status">
             <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
             <span>
               <strong>这台机器上没有待继续的办理</strong>
               <small>{standbyNote}</small>
+              {recoveryNotice ? <small data-testid="home-session-recovery-notice">{recoveryNotice}</small> : null}
             </span>
           </div>
         </div>
@@ -235,7 +235,7 @@ export function QxHomeView({
             <span>每项最后都会给你一样东西</span>
           </div>
           <div className="qx-home-section-actions">
-            <HomeIdentityActions isLoggedIn={isLoggedIn} onLogin={() => onAction('login')} onEndPrevious={onEndPrevious} />
+            <HomeIdentityActions isLoggedIn={isLoggedIn} onLogin={() => onAction('login')} onEndPrevious={() => { dismissSessionRecoveryNotice(); onEndPrevious() }} />
             <button type="button" className="qx-home-device-link" data-testid="home-device-status" onClick={onOpenDevice}>
               设备状态
             </button>

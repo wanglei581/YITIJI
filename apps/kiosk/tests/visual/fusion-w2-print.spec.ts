@@ -2880,23 +2880,18 @@ test('print upload stays closed until this machine session is ready again @w2', 
       },
     },
   })
-  let releaseUpload: () => void = () => undefined
-  const uploadGate = new Promise<void>((resolve) => { releaseUpload = resolve })
-  api.respondWith('POST', '/api/v1/upload-sessions', async () => {
-    await uploadGate
-    return {
-      status: 200,
-      json: {
-        success: true,
-        data: {
-          sessionId,
-          uploadUrl: '/upload/phone',
-          uploadToken: 'r8-upload-token',
-          controlToken: 'r8-control',
-          expiresAt,
-        },
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        uploadUrl: '/upload/phone',
+        uploadToken: 'r8-upload-token',
+        controlToken: 'r8-control',
+        expiresAt,
       },
-    }
+    },
   })
   api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
     requestNumber === 1
@@ -2907,32 +2902,47 @@ test('print upload stays closed until this machine session is ready again @w2', 
       : { status: 200, json: { sessionToken: 'w2-recovered-terminal-session' } }
   ))
 
-  await page.goto('/print-scan')
-  await expect(page.getByText('打印扫描', { exact: true }).first()).toBeVisible()
+  await page.goto('/print/upload?source=document')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(page.getByTestId('file-source-channels')).toBeVisible()
+
   await startTerminalSessionRefresh(page)
   await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
-
-  await softNavigate(page, '/print/upload?source=document&tab=qr', null)
   const blocked = page.getByTestId('file-source-state-session-failed')
   await expect(blocked).toBeVisible()
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
   await expect(blocked.getByText(SESSION_FAILED_LINE, { exact: true })).toBeVisible()
   await expect(blocked.getByText(SESSION_RECOVERY_LINE, { exact: true })).toBeVisible()
-  const homeButton = blocked.getByRole('button', { name: '返回首页', exact: true })
-  await expect(homeButton).toBeVisible()
-  const homeBox = await homeButton.boundingBox()
-  expect(homeBox?.height ?? 0).toBeGreaterThanOrEqual(56)
-  await expect(page.getByTestId('file-source-channels')).toHaveCount(0)
+  await expect(page.getByText('文件从哪来', { exact: true })).toBeVisible()
+  await expect(page.getByText('第三方网盘尚未接入', { exact: true })).toBeVisible()
+  await expect(page.getByText('两个上限不一样', { exact: true })).toBeVisible()
+  await expect(page.getByText('还没有文件。选择一种方式上传', { exact: false })).toHaveCount(0)
+  await expect(page.getByTestId('file-source-scan-source')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-member-source')).toHaveCount(0)
   await expect(page.getByTestId('file-source-qr')).toHaveCount(0)
-  await expect(page.getByTestId('file-source-hero')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '返回首页', exact: true })).toHaveCount(0)
+  const qrCard = page.getByTestId('file-source-ch-qr')
+  await expect(qrCard).toBeVisible()
+  await expect(qrCard).toBeDisabled()
+  const exit = page.getByTestId('file-source-exit')
+  await expect(exit).toBeEnabled()
+  const exitBox = await exit.boundingBox()
+  expect(exitBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  await qrCard.click({ force: true })
   await page.waitForTimeout(400)
   expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(0)
+  await expect(blocked).toBeVisible()
+  await expect(page.getByTestId('file-source-qr')).toHaveCount(0)
 
   await startTerminalSessionRefresh(page)
   await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
-  await expect.poll(() => api.requestCount('POST', '/api/v1/upload-sessions')).toBeGreaterThan(0)
-  await expect(page.getByTestId('file-source-channels')).toBeVisible()
   await expect(blocked).toHaveCount(0)
-  releaseUpload()
+  await expect(pill).toHaveText('打印机在线')
+  await expect(qrCard).toBeEnabled()
+  await qrCard.click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/upload-sessions')).toBeGreaterThan(0)
   await expectHealthy(page, errors, 'print-upload')
 })
 
@@ -2970,4 +2980,87 @@ test('print confirm button lights up again after this machine session recovers @
   await expect(payButton).toBeEnabled()
   await expect(page.locator('.pcf-alert[role="alert"]')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('print upload keeps the failed line while this machine session is checking again @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  let releaseChecking: () => void = () => undefined
+  const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async (requestNumber) => {
+    if (requestNumber > 1) await checkingGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/print/upload?source=document')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  await expect(pill).toHaveText('打印机在线')
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('checking')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-state-session-failed')).toBeVisible()
+  releaseChecking()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+const RECOVERY_NOTICE = '刚才选的材料已经清掉，要重新传'
+const RECOVERY_BOOT_TICKET = 'w2-recovery-boot-ticket-0123456789abcd'
+
+test('home says previous materials were cleared after a new ticket rebuild @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+  await page.route(LOCAL_BOOT_TICKET_URL, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { bootTicket: RECOVERY_BOOT_TICKET } }),
+    })
+  })
+  api.respond('POST', '/api/v1/terminals/session-token', {
+    status: 200,
+    json: { sessionToken: 'w2-rebuilt-terminal-session' },
+  })
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
+    status: 401,
+    json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+
+  await page.goto('/')
+  await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => api.requestCount('POST', '/api/v1/terminals/session-token')).toBe(1)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+
+  await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  await softNavigate(page, '/', null)
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+
+  await page.locator('[data-action="print-hub"]').click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await expectHealthy(page, errors)
 })

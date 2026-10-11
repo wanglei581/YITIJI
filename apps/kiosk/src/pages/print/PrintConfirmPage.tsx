@@ -32,7 +32,7 @@ import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
-import { useTerminalSessionState } from '../../hooks/useTerminalSessionState'
+import { usePrintSessionBlocked, useTerminalSessionState } from '../../hooks/useTerminalSessionState'
 import { PrintConfirmView } from './components/PrintConfirmView'
 import {
   COLOR_MODE_LABEL,
@@ -144,6 +144,7 @@ export function PrintConfirmPage() {
   const isContractReport = Boolean(contractReport)
   const [submitting, setSubmitting] = useState(false)
   const terminalSession = useTerminalSessionState()
+  const printSessionBlocked = usePrintSessionBlocked()
   const [abandoning, setAbandoning] = useState(false)
   const [piiCheckRequired, setPiiCheckRequired] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -683,7 +684,7 @@ export function PrintConfirmPage() {
         materialDemo={materialCheck?.mode === 'demo'}
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
-        terminalFailed={terminalSession === 'failed'}
+        terminalFailed={printSessionBlocked}
         terminalFailedText={`${userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}机器会自己再试，恢复后这里的按钮会重新亮起。`}
         selfAssessment={selfAssessment}
         printNotes={printNotes}

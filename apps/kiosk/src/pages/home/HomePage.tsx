@@ -1,6 +1,7 @@
 // HomePage — 青序流光 2.0 首页。视觉真值：docs/design/kiosk-redesign-2026-08-v2/01-home.html。
 // 本页只负责读取真实状态与执行封闭 action；展示细节交给 QxHomeView。
 
+import { useEffect } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
@@ -8,7 +9,8 @@ import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
-import { useTerminalSessionState } from '../../hooks/useTerminalSessionState'
+import { dismissSessionRecoveryNotice, readSessionRecoveryOnHomeMount, useSessionRecoveryNotice } from '../../hooks/useSessionRecoveryNotice'
+import { usePrintSessionBlocked } from '../../hooks/useTerminalSessionState'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinuePanel } from './components/ContinuePanel'
 import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
@@ -29,8 +31,10 @@ export function HomePage() {
   const auth = useAuth()
   const { endKioskUse } = useKioskSessionControl()
   const device = useOutletContext<TerminalDeviceStatusView>()
-  const terminalSession = useTerminalSessionState()
-  const printSessionFailed = terminalSession === 'failed'
+  const printSessionBlocked = usePrintSessionBlocked()
+  const printSessionFailed = printSessionBlocked
+  const recoveryNotice = useSessionRecoveryNotice()
+  useEffect(() => { readSessionRecoveryOnHomeMount() }, [])
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
   // 招聘内容托管（3.13）：没打开时首页不摆岗位、招聘会入口；两个 hook 自己也不发请求。
@@ -47,6 +51,8 @@ export function HomePage() {
     if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled)) return
     if ((actionId === 'jobs-hub' || actionId === 'fairs-hub') && !recruitment.enabled) return
     if (actionId === 'official-channels' && officialChannelCount === 0) return
+
+    dismissSessionRecoveryNotice()
 
     if (actionId === 'login') {
       navigate('/login', { state: { from: '/' } })
@@ -85,9 +91,10 @@ export function HomePage() {
           officialChannelCount={officialChannelCount}
           deviceStatus={deviceStatus}
           printSessionFailed={printSessionFailed}
+          recoveryNotice={recoveryNotice}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
-          onOpenDevice={() => navigate('/error-offline')}
+          onOpenDevice={() => { dismissSessionRecoveryNotice(); navigate('/error-offline') }}
           onEndPrevious={() => endKioskUse('handover')}
         />
         <nav className="qx-navbar" aria-label="主导航">
