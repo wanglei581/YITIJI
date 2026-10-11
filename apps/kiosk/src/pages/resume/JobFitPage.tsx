@@ -169,7 +169,7 @@ export function JobFitPage() {
           return
         }
         setResult(null)
-        setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有可查看的对照结果，原结果可能已过期或删除；可填写要求重新对照。' : '对照结果这次没有读到，请检查网络后重试。')
+        setNotice(err instanceof JobFitApiError && err.code === 'JOB_FIT_NOT_FOUND' ? '这份简历还没有对照结果，填写岗位要求就可以对照。' : '对照结果这次没有读到，请检查网络后重试。')
       })
       .finally(() => {
         if (!cancelled && !dismissLatestReadRef.current) setLoadingLatest(false)
