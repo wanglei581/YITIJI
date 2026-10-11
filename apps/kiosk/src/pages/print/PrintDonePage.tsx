@@ -496,6 +496,7 @@ export function PrintDonePage() {
               canRetry={Boolean(takeaway?.canRetry) && !isUnconfirmed}
               resumeLine={Boolean(takeaway?.canRetry) && !isUnconfirmed && sameCodeResumeEligible(state.pickupSource, money.fact) ? SAME_CODE_RESUME_LINE : null}
               takeaway={takeawayNotices}
+              pickupSource={state.pickupSource === true}
             />
             <PrintAiHelp
               label="问小青：取纸或异常怎么办 →"

@@ -423,6 +423,41 @@ test('free out-of-paper order that cannot be resubmitted tells the user to print
   expect(errors).toEqual([])
 })
 
+// 到机码单是手机上下的，文件不在本机（agy 反方评审指出）。
+test('free out-of-paper pickup-code order that cannot be resubmitted sends the user back to the phone @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'failed', errorCode: 'PAPER_EMPTY', failureReasonForUser: '打印机缺纸' },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: false,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0, pickupSource: true })
+
+  const todo = page.getByRole('region', { name: '处理之前先做这三件' })
+  await expect(todo).toContainText(`记下订单号 ${W2_ORDER.orderNo}。还要打，请在手机上重新下单。`)
+  await expect(todo).not.toContainText('回到订单重新打印')
+  await expect(todo).not.toContainText('重新选文件')
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
 // 2026-10-10 走查 W-165：出纸失败屏要说「回这台机器再输一次同一个到机码就能接着打」。
 // 只对「到机码单、0 元、服务端说还能重打」说；句里自带上限和用完后的下一步，第 3 次失败时也成立。
 const RESUME_LINE = '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。'
