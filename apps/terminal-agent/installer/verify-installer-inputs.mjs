@@ -499,7 +499,9 @@ assert.match(printLogScript, /\b4194304\b/)
 assert.match(printLogScript, /function Enable-PrintCompletionLog/)
 assert.match(printLogScript, /function Get-PrintCompletionLogStatusLine/)
 assert.match(printLogScript, /print-completion-log: enabled=\$enabled maxBytes=\$maxBytes retention=\$retention/)
-assert.match(printLogScript, /\$enabled = "unknown"/)
+assert.match(printLogScript, /\$config\.LogMode = \$circular/, 'retention must be set to overwrite-oldest')
+assert.match(printLogScript, /if \(\$changed\) \{\s*\$config\.SaveChanges\(\)/, 'changes must be saved')
+assert.equal((printLogScript.match(/\$enabled = "unknown"/g) ?? []).length, 2, 'status line must fall back to unknown in the catch as well as at the start')
 assert.doesNotMatch(
   printLogScript,
   /wevtutil(?:\.exe)?\s+cl\b|Clear-EventLog|Remove-EventLog|\/ab:true|ClearLog\s*\(/i,
@@ -515,7 +517,21 @@ assert.ok(
   'print completion log setup must sit between boot spool guard and daily reboot',
 )
 const printInstall = productionInstaller.slice(printInstallStart, printInstallEnd)
-assert.match(printInstall, /Resolve-AgentProvisionSource "print-completion-log\.ps1"/)
+// Resolve-AgentProvisionSource ends in Fail (exit 1) when the file is missing; an optional
+// evidence channel must never take the installer down, so every step sits inside one try.
+assert.doesNotMatch(printInstall.replace(/^#.*$/gm, ''), /Resolve-AgentProvisionSource/, 'the print completion log block must not use the exiting resolver')
+{
+  const block = printInstall.replace(/\r\n/g, '\n')
+  const tryAt = block.indexOf('try {')
+  const catchAt = block.indexOf('} catch {')
+  assert.ok(tryAt >= 0 && catchAt > tryAt, 'print completion log block needs a try/catch')
+  const guarded = block.slice(tryAt, catchAt)
+  for (const step of ['Test-Path -LiteralPath $printCompletionLog', '. $printCompletionLog', 'Enable-PrintCompletionLog', 'Get-PrintCompletionLogStatusLine']) {
+    assert.ok(guarded.includes(step), `must be inside the try: ${step}`)
+  }
+  const outside = block.slice(0, tryAt) + block.slice(block.indexOf('}', catchAt + 9) + 1)
+  assert.doesNotMatch(outside.replace(/^#.*$/gm, ''), /\S/, 'nothing in the print completion log block may run outside the try/catch')
+}
 assert.match(printInstall, /Enable-PrintCompletionLog/)
 assert.match(printInstall, /Write-WarnLine/)
 assert.match(printInstall, /Get-PrintCompletionLogStatusLine/)

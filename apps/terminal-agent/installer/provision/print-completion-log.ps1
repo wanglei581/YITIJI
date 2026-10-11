@@ -5,7 +5,7 @@
 # The Agent reads event 307 from this log to tell that a print job finished.
 # Windows leaves the log disabled until an administrator enables it.
 # Configuration uses System.Diagnostics.Eventing.Reader.EventLogConfiguration.
-# Setting the size and overwrite mode does not delete records already stored.
+# Nothing here clears the log. Stored records stay subject to the overwrite-oldest policy.
 # A second run that finds the same settings writes nothing.
 #
 # There is no disable function. Uninstall must not turn this log off or empty it.
