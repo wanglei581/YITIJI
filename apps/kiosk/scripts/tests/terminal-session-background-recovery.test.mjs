@@ -467,6 +467,18 @@ test('后台恢复在飞时别处又要续期：等同一次，不并发出第�
   assert.equal(page.counts.refresh, refreshesBefore + 1)
 })
 
+test('页面刚打开、没有网址票也没有会话票，直接向本机 Agent 要票换成：不算「恢复清过场」', async () => {
+  const page = await load({
+    pageUrl: PLAIN_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    respond: (kind, nth) => (kind === 'agent' ? agentTicket() : session(`session-${kind}-${nth}`)),
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  assert.equal(page.counts.agent, 1)
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), false, '第一次换票时机器前没有人的材料可清，不该让页面说「材料已清掉」')
+})
+
 test('后台恢复的间隔带随机量：同一批机器不在同一秒回来', async () => {
   const page = await load({
     pageUrl: BOOT_PAGE,
