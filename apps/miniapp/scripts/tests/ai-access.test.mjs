@@ -503,6 +503,7 @@ async function careerPlanAsksResumeAiOn403(opts) {
   const grant = ctx.consentCalls()[0]
   assert.ok(grant, '同意后写账号授权')
   assert.equal(grant.data.scope, 'resume_ai')
+  assert.equal(ctx.aiCalls().length, 1, '账号授权写成之前不重发')
   reply(grant, 200, { data: { scope: 'resume_ai', granted: true } })
   await flush()
   assert.equal(ctx.aiCalls().length, 2, '重发一次')
