@@ -646,7 +646,13 @@ assert.match(restartController, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'resta
 assert.match(kioskWatchdog, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'watchdog marker changed without the restart controller')
 assert.match(restartController, /-like "\*\$kioskMarker\*" -and \$commandLine -notlike "\*--type=\*"/, 'only the marked browser main process may be stopped')
 assert.equal((restartController.match(/Stop-Process/g) ?? []).length, 1, 'the restart controller stops exactly one kind of process')
-assert.doesNotMatch(restartController, /taskkill|Stop-Process -Name|Get-Process/, 'never stop browsers by name')
+assert.match(restartController, /Stop-Process -Id \$candidate\.ProcessId -Force -ErrorAction Stop/, 'stop by process id; -Force because the task has no desktop to confirm on')
+assert.doesNotMatch(restartController, /taskkill|Stop-Process -Name|Get-Process|\.Kill\(/, 'never stop browsers by name or by another route')
+// Both sides must look at the same two browsers: the watchdog prefers Edge, so dropping msedge.exe here
+// would leave the production browser open while every chrome.exe stand-in test stays green.
+const kioskBrowserFilter = `-Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'"`
+assert.ok(restartController.includes(kioskBrowserFilter), 'restart controller must consider both Edge and Chrome')
+assert.ok(kioskWatchdog.includes(kioskBrowserFilter), 'watchdog browser filter changed without the restart controller')
 {
   // Checked out as CRLF on Windows, LF elsewhere.
   const controller = restartController.replace(/\r\n/g, '\n')
@@ -654,11 +660,26 @@ assert.doesNotMatch(restartController, /taskkill|Stop-Process -Name|Get-Process/
   const calls = [...body.matchAll(/Stop-KioskBrowser/g)].map((match) => match.index)
   assert.equal(calls.length, 2, 'browser is reopened on both the normal and the resumed path')
   const stopRequested = body.indexOf('$service.Stop()')
+  const resumed = body.indexOf('Write-RestartStage "resume" "marker-present"')
+  const firstExit = body.indexOf('exit 0')
   const running = body.indexOf('Write-RestartStage "start" "running"')
-  assert.ok(stopRequested > -1 && running > -1)
-  assert.ok(calls[1] > running, 'normal path: the browser may only be closed after the service is running again')
-  assert.ok(calls.every((index) => index < stopRequested || index > running || body.slice(0, index).includes('"resume" "marker-present"')), 'never close the browser before the service stop')
+  assert.ok(stopRequested > -1 && resumed > stopRequested && firstExit > resumed && running > firstExit)
+  // Resumed path: inside the branch that has just seen the service Running, before that branch exits.
+  assert.ok(calls[0] > resumed && calls[0] < firstExit, 'resumed path: the call sits in the already-running branch')
   assert.match(body.slice(calls[0] - 160, calls[0]), /ServiceControllerStatus\]::Running\) \{\s*$/, 'resumed path: only when the service is already running')
+  // Normal path: after the wait for Running has returned, before this attempt reports success.
+  assert.ok(calls[1] > running && calls[1] < body.indexOf('exit 0', running), 'normal path: the browser may only be closed after the service is running again')
+  // No watchdog, no closing: nothing would bring the browser back. The check comes before any process is stopped.
+  const helper = controller.slice(controller.indexOf('function Stop-KioskBrowser'), controller.indexOf('try {\n  $service = Get-Service'))
+  const watchdogCheck = helper.indexOf(`-match '(^|[\\\\/"\\s])kiosk-watchdog\\.ps1'`)
+  const skipped = helper.indexOf('Write-RestartStage "browser" "skipped=no-watchdog"')
+  assert.ok(watchdogCheck > -1, 'the watchdog is recognised by its script name, not by any powershell.exe')
+  assert.ok(helper.includes(`-Filter "Name = 'powershell.exe'"`), 'the watchdog runs under Windows PowerShell')
+  assert.ok(skipped > watchdogCheck && helper.indexOf('return', skipped) > skipped && helper.indexOf('return', skipped) < helper.indexOf('Stop-Process'), 'without a watchdog the browser is left alone')
+  assert.match(kioskRegister, /"-File", \('"\{0\}"' -f \$watchdogScript\)/, 'the watchdog task must keep the script path on its command line')
+  // One browser that is already gone must not keep the others from being closed.
+  assert.match(helper, /try \{\s*Stop-Process[^\n]*\n\s*\$stopped\+\+\s*\} catch \{\s*\$failed\+\+\s*\}/, 'a failed stop is counted, not fatal to the loop')
+  assert.ok(helper.includes('Write-RestartStage "browser" "stopped=$stopped failed=$failed"'))
 }
 assert.ok([...restartTask + restartController].every((char) => char.charCodeAt(0) < 128), 'restart scripts and logs must be ASCII')
 assert.match(productionInstaller, /Install-AgentRestartTask -ScriptPath \$agentRestartScript/)

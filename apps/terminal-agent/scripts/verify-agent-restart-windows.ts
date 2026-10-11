@@ -52,18 +52,46 @@ async function main(): Promise<void> {
   const trigger = join(stateDir, 'trigger')
   const helper = join(codeRoot, 'service-restart.js')
   const fixture = join(codeRoot, 'fixture.js')
-  // Stand-ins for browser processes: a copy of node.exe named chrome.exe, so Win32_Process reports
-  // Name = 'chrome.exe' and the switches below sit on a real command line. No real browser is started.
-  const fakeBrowser = join(codeRoot, 'chrome.exe')
-  const browserPids: number[] = []
-  const startFakeBrowser = (...switches: string[]): number => {
-    const child = spawn(fakeBrowser, ['-e', 'setInterval(() => {}, 1000)', '--', ...switches], { detached: true, stdio: 'ignore', windowsHide: true })
+  // Stand-ins for browser processes: copies of node.exe named chrome.exe and msedge.exe, so Win32_Process
+  // reports those names and the switches below sit on a real command line. No real browser is started.
+  const fakeChrome = join(codeRoot, 'chrome.exe')
+  const fakeEdge = join(codeRoot, 'msedge.exe')
+  // Stand-in for the watchdog: Windows PowerShell running a script of that name which only sleeps.
+  const fakeWatchdogScript = join(codeRoot, 'kiosk-watchdog.ps1')
+  // Every stand-in still to be cleaned up. A pid leaves the set once it is known to be gone, so the
+  // clean-up never touches a pid the system may have handed to something else in the meantime.
+  const standIns = new Set<number>()
+  const track = (pid: number | undefined, what: string): number => {
+    assert.ok(pid, `${what} did not start`)
+    standIns.add(pid)
+    return pid
+  }
+  const startFakeBrowser = (executable: string, ...switches: string[]): number => {
+    const child = spawn(executable, ['-e', 'setInterval(() => {}, 1000)', '--', ...switches], { detached: true, stdio: 'ignore', windowsHide: true })
     child.unref()
-    assert.ok(child.pid, 'fake browser did not start')
-    browserPids.push(child.pid)
-    return child.pid
+    return track(child.pid, 'fake browser')
+  }
+  const startFakeWatchdog = (): number => {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', fakeWatchdogScript], { detached: true, stdio: 'ignore', windowsHide: true, env: windowsPowerShellEnv() })
+    child.unref()
+    return track(child.pid, 'fake watchdog')
   }
   const alive = (pid: number) => ps(`@(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Count`) === '1'
+  // Looked up by pid, so the query text itself never carries a name the controller searches for.
+  const commandLineOf = (pid: number) => ps(`[string](Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue).CommandLine`)
+  const expectGone = async (pid: number, ms = 10_000): Promise<void> => {
+    await until(() => !alive(pid), ms)
+    standIns.delete(pid)
+  }
+  const stopStandIn = async (pid: number): Promise<void> => {
+    // An empty pipeline keeps the exit code at 0; a bare Stop-Process on a missing id exits 1 under -Command.
+    ps(`Get-Process -Id ${pid} -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0`)
+    await expectGone(pid, 15_000)
+  }
+  const restartLogPath = join(stateDir, 'logs/agent-restart.log')
+  const restartLogLength = () => (existsSync(restartLogPath) ? readFileSync(restartLogPath, 'utf8').length : 0)
+  const restartLogSince = (offset: number) => (existsSync(restartLogPath) ? readFileSync(restartLogPath, 'utf8').slice(offset) : '')
+  const taskIdle = () => ps(`[string](Get-ScheduledTask -TaskName ${quote(task)}).State`) !== 'Running'
   const commands = `. ${quote(registration)};`
   const uninstallTask = `${commands} Uninstall-AgentRestartTask -TaskName ${quote(task)}`
   const installTask = `${commands} Install-AgentRestartTask -ScriptPath ${quote(controller)} -ServiceName ${quote(service)} -StateDir ${quote(stateDir)} -TaskName ${quote(task)}`
@@ -122,16 +150,23 @@ process.on('SIGTERM', () => process.exit(0));
     await until(() => existsSync(identity))
     const readIdentity = () => JSON.parse(readFileSync(identity, 'utf8')) as { pid: number; startedAt: string }
     const eventRecord = Number(ps(`(Get-WinEvent -LogName System -MaxEvents 1 -ErrorAction Stop).RecordId`))
-    // A restart reopens the kiosk browser: only the main process carrying the watchdog marker is closed.
-    copyFileSync(process.execPath, fakeBrowser)
-    const kioskBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
-    const operatorBrowser = startFakeBrowser('--kiosk', 'https://example.invalid/')
-    const kioskChild = startFakeBrowser('--type=renderer', '--aijobprint-kiosk=1')
-    await until(() => ps(`@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'chrome.exe' -and $_.CommandLine -like '*--aijobprint-kiosk=1*' }).Count`) === '2', 15_000)
+    // A restart reopens the kiosk browser: only main processes carrying the watchdog marker are closed,
+    // Edge and Chrome alike, and only while a watchdog is there to bring the browser back.
+    copyFileSync(process.execPath, fakeChrome)
+    copyFileSync(process.execPath, fakeEdge)
+    writeFileSync(fakeWatchdogScript, 'Start-Sleep -Seconds 1800\r\n', 'ascii')
+    const watchdog = startFakeWatchdog()
+    await until(() => commandLineOf(watchdog).includes('kiosk-watchdog.ps1'), 15_000)
+    const kioskBrowser = startFakeBrowser(fakeChrome, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
+    const kioskEdge = startFakeBrowser(fakeEdge, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
+    const operatorBrowser = startFakeBrowser(fakeChrome, '--kiosk', 'https://example.invalid/')
+    const operatorEdge = startFakeBrowser(fakeEdge, '--kiosk', 'https://example.invalid/')
+    const kioskChild = startFakeBrowser(fakeChrome, '--type=renderer', '--aijobprint-kiosk=1')
+    await until(() => [kioskBrowser, kioskEdge, kioskChild].every((pid) => commandLineOf(pid).includes('--aijobprint-kiosk=1')), 15_000)
     for (let iteration = 0; iteration < 3; iteration++) {
       const started = performance.now()
       const old = readIdentity()
-      const beforeLog = existsSync(join(stateDir, 'logs/agent-restart.log')) ? readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').length : 0
+      const beforeLog = restartLogLength()
       writeFileSync(trigger, 'restart')
       await until(() => {
         try { return readIdentity().pid !== old.pid } catch { return false }
@@ -141,20 +176,58 @@ process.on('SIGTERM', () => process.exit(0));
       assert.equal(ps(`@(Get-Process -Id ${old.pid} -ErrorAction SilentlyContinue).Count`), '0')
       await until(() => !existsSync(marker))
       // The controller removes the marker first and writes the final line right after; wait for the line.
-      await until(() => /stage=complete result=success/.test(readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog)), 10_000)
+      await until(() => /stage=complete result=success/.test(restartLogSince(beforeLog)), 10_000)
       assert.equal(existsSync(identity + '.error'), false)
       assert.ok(performance.now() - started < 45_000, 'complete normal restart must finish within 45 seconds')
-      const restartLog = readFileSync(join(stateDir, 'logs/agent-restart.log'), 'utf8').slice(beforeLog)
-      // First restart closes the one marked main process; later restarts find none and still succeed.
-      assert.match(restartLog, iteration === 0 ? /stage=browser result=stopped=1\r?\n/ : /stage=browser result=stopped=0\r?\n/)
+      const restartLog = restartLogSince(beforeLog)
+      // First restart closes the two marked main processes; later restarts find none and still succeed.
+      assert.match(restartLog, iteration === 0 ? /stage=browser result=stopped=2 failed=0\r?\n/ : /stage=browser result=stopped=0 failed=0\r?\n/)
       assert.ok(restartLog.indexOf('stage=start result=running') < restartLog.indexOf('stage=browser'), 'browser is closed only after the service is running again')
       if (iteration === 0) {
-        await until(() => !alive(kioskBrowser), 10_000) // marked kiosk browser must be closed by the restart
+        // Marked kiosk browsers must be closed by the restart, whichever of the two browsers they are.
+        await expectGone(kioskBrowser)
+        await expectGone(kioskEdge)
         assert.equal(alive(operatorBrowser), true, 'a browser without the marker must never be touched')
+        assert.equal(alive(operatorEdge), true, 'a browser without the marker must never be touched')
         assert.equal(alive(kioskChild), true, 'only the browser main process is targeted')
       }
       // Wait until controller has exited so the next on-demand run isn't ignored.
-      await until(() => ps(`[string](Get-ScheduledTask -TaskName ${quote(task)}).State`) !== 'Running')
+      await until(taskIdle)
+    }
+    // Resumed run with the service already Running (an earlier run was cut short after the start):
+    // the service is not stopped again, and the browser is still reopened.
+    {
+      const resumedBrowser = startFakeBrowser(fakeEdge, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
+      await until(() => commandLineOf(resumedBrowser).includes('--aijobprint-kiosk=1'), 15_000)
+      const before = readIdentity()
+      const beforeLog = restartLogLength()
+      writeFileSync(marker, 'stopping')
+      assert.equal(await requestServiceRestart({ taskName: task }), true)
+      await until(() => /stage=complete result=success/.test(restartLogSince(beforeLog)))
+      const resumedLog = restartLogSince(beforeLog)
+      assert.match(resumedLog, /stage=resume result=marker-present\r?\n/)
+      assert.match(resumedLog, /stage=browser result=stopped=1 failed=0\r?\n/)
+      assert.doesNotMatch(resumedLog, /stage=stop /, 'a resumed run must not stop a service that is already running')
+      assert.equal(existsSync(marker), false)
+      assert.equal(readIdentity().pid, before.pid, 'the running service is left untouched on the resumed path')
+      await expectGone(resumedBrowser)
+      await until(taskIdle)
+    }
+    // No watchdog: nothing would bring the browser back, so it is left open and the restart still completes.
+    await stopStandIn(watchdog)
+    const unwatchedBrowser = startFakeBrowser(fakeChrome, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
+    await until(() => commandLineOf(unwatchedBrowser).includes('--aijobprint-kiosk=1'), 15_000)
+    {
+      const old = readIdentity()
+      const beforeLog = restartLogLength()
+      writeFileSync(trigger, 'restart')
+      await until(() => {
+        try { return readIdentity().pid !== old.pid } catch { return false }
+      })
+      await until(() => /stage=complete result=success/.test(restartLogSince(beforeLog)))
+      assert.match(restartLogSince(beforeLog), /stage=browser result=skipped=no-watchdog\r?\n/)
+      assert.equal(alive(unwatchedBrowser), true, 'without a watchdog the kiosk browser must be left running')
+      await until(taskIdle)
     }
     // Use XML event data, not localized message text; log access failures remain failures.
     const crashes = ps(`$events=@(Get-WinEvent -LogName System -ErrorAction Stop | Where-Object { $_.RecordId -gt ${eventRecord} -and ($_.Id -eq 7031 -or $_.Id -eq 7034) });
@@ -165,16 +238,19 @@ process.on('SIGTERM', () => process.exit(0));
     assert.equal(await requestServiceRestart({ taskName: task }), true)
     await until(() => ps(`[string](Get-Service -Name ${quote(service)}).Status`) === 'Running')
     await until(() => !existsSync(marker))
-    await until(() => ps(`[string](Get-ScheduledTask -TaskName ${quote(task)}).State`) !== 'Running')
+    await until(taskIdle)
     assert.equal(alive(operatorBrowser), true, 'unmarked browser survived every restart')
+    assert.equal(alive(operatorEdge), true, 'unmarked browser survived every restart')
+    assert.equal(alive(unwatchedBrowser), true, 'still no watchdog: the marked browser stays')
     ps(uninstallTask)
     assert.equal(await requestServiceRestart({ taskName: task }), false)
   } finally {
     // No test task, service, nonce directory or newly-created product roots may survive.
-    // The marked one is already gone (that is the point). An empty pipeline keeps the exit code at 0;
-    // a bare Stop-Process on a missing id exits 1 under -Command even with SilentlyContinue.
-    for (const pid of browserPids) ps(`Get-Process -Id ${pid} -ErrorAction SilentlyContinue | Stop-Process -Force; exit 0`)
-    await until(() => browserPids.every((pid) => !alive(pid)), 15_000)
+    // Only stand-ins not yet known to be gone are touched. One that cannot be stopped must not keep
+    // the task, the service and the directories below from being removed.
+    for (const pid of [...standIns]) {
+      try { await stopStandIn(pid) } catch (error) { console.error(`stand-in ${pid} could not be stopped`, error) }
+    }
     if (existsSync(registration)) {
       ps(`if (Get-ScheduledTask -TaskName ${quote(task)} -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName ${quote(task)} }; ${uninstallTask}`)
     }

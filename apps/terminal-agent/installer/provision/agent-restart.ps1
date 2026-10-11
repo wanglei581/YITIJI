@@ -15,21 +15,37 @@ function Write-RestartStage([string]$Stage, [string]$Result) {
 # an operator's own Edge or Chrome window never does). The watchdog in the user session
 # relaunches it within seconds with a fresh boot ticket, so the screen also picks up a newly
 # deployed page. Called only once the service is running again, because the relaunch needs
-# the Agent for that ticket. A failure here never fails the restart.
+# the Agent for that ticket. Skipped when no watchdog is running: nothing would bring the
+# browser back, and on an unattended machine an old page is better than a bare desktop.
+# A failure here never fails the restart.
 function Stop-KioskBrowser {
   $kioskMarker = "--aijobprint-kiosk=1"
   try {
+    # The watchdog is a powershell.exe running kiosk-watchdog.ps1 (scheduled task or by hand).
+    # The separator in front keeps register-kiosk-watchdog.ps1 from counting as one.
+    $watchdogs = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
+      Where-Object { ([string]$_.CommandLine) -match '(^|[\\/"\s])kiosk-watchdog\.ps1' })
+    if ($watchdogs.Count -eq 0) {
+      Write-RestartStage "browser" "skipped=no-watchdog"
+      return
+    }
     $stopped = 0
+    $failed = 0
     $candidates = @(Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'" -ErrorAction Stop)
     foreach ($candidate in $candidates) {
       $commandLine = [string]$candidate.CommandLine
       # Browser main process only; its renderer and utility children exit with it.
       if ($commandLine -like "*$kioskMarker*" -and $commandLine -notlike "*--type=*") {
-        Stop-Process -Id $candidate.ProcessId -Force -ErrorAction Stop
-        $stopped++
+        # One that already exited, or will not die, must not keep the others from being closed.
+        try {
+          Stop-Process -Id $candidate.ProcessId -Force -ErrorAction Stop
+          $stopped++
+        } catch {
+          $failed++
+        }
       }
     }
-    Write-RestartStage "browser" "stopped=$stopped"
+    Write-RestartStage "browser" "stopped=$stopped failed=$failed"
   } catch {
     Write-RestartStage "browser" "failed"
   }
