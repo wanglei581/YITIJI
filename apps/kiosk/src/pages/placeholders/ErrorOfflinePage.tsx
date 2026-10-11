@@ -18,6 +18,7 @@
 //
 // 2026-10-10 真机 F-01：从首页「设备状态」或帮助页「看设备状态」进来的是来「看」的（location.state.inspect），
 // 进页立刻检测一次，检测完留在本页把结果摆出来（三项都读到时是 read 态），不自动把人送走；
+// 这种进法下 60 秒没人触碰就回首页（本页在 KioskRoot 之外，整机的无操作清场管不到）。
 // 不带 inspect 的进法（直接打开本页、断网恢复那条路）照旧：连得上且打印机读到可用就回首页。
 // ============================================================
 
@@ -120,6 +121,9 @@ const AUTO_CHECK_MAX_MS = 60_000
 function autoCheckDelayMs(streak: number): number {
   return Math.min(AUTO_CHECK_BASE_MS * 2 ** streak, AUTO_CHECK_MAX_MS)
 }
+
+/** 来看状态（inspect）时，本页没人触碰多久回首页。 */
+const INSPECT_IDLE_RETURN_MS = 60_000
 
 async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
   const terminalId = getTerminalId()
@@ -244,8 +248,30 @@ export default function ErrorOfflinePage() {
 
   useEffect(() => {
     // 来看状态的人不用先等 10 秒、也不用自己点：进页就检测一次。
-    if (inspect) void retry()
+    // 排到下一拍再发：开发模式下 effect 会被连跑两遍，头一遍的在清理时取消，只发一次请求。
+    if (!inspect) return
+    const timer = window.setTimeout(() => void retry(), 0)
+    return () => window.clearTimeout(timer)
   }, [inspect, retry])
+
+  useEffect(() => {
+    // 本页在 KioskRoot 之外，整机的无操作清场管不到这里。来看状态的人看完走开后，
+    // 60 秒没有任何触碰就回首页，交还给首页那一套待机与清场；自动再检测不算触碰。
+    if (!inspect) return
+    let timer = 0
+    const arm = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => navigate('/', { replace: true }), INSPECT_IDLE_RETURN_MS)
+    }
+    arm()
+    window.addEventListener('pointerdown', arm)
+    window.addEventListener('keydown', arm)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', arm)
+      window.removeEventListener('keydown', arm)
+    }
+  }, [inspect, navigate])
 
   useEffect(() => {
     // 网络恢复：退避归零，立刻重测。
@@ -292,17 +318,17 @@ export default function ErrorOfflinePage() {
     read: {
       glyph: 'radar', label: '这次检测三项都读到了',
       title: <>这次检测<em>三项都读到了</em></>,
-      copy: <>这次检测里，这台机器<b>连得上服务器</b>，本机程序连得上，打印机<b>读到可用</b>。其余五项没有单独的检测口，照实写成未检测或随请求确认。</>,
+      copy: <>这次检测里，这台机器<b>连得上服务器</b>，本机程序连得上，打印机<b>读到可用</b>。其余五项要到用的时候才知道。</>,
       note: <>能不能出纸，<b>要到打印那一步才知道</b>；先别在这里下结论</>,
     },
     offline: {
       glyph: 'wifioff', label: '本机连不上服务器',
       title: <>和服务器<em>连不上</em></>,
       copy: inspect
-        ? <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上了这一页会照实更新。</>
+        ? <>传文件、算价、AI 都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上了这一页会照实更新。</>
         : safeFrom
-        ? <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</>
-        : <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
+        ? <>传文件、算价、AI 都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</>
+        : <>传文件、算价、AI 都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
       note: <>已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</>,
     },
   }
