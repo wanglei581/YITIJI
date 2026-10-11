@@ -2947,7 +2947,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/trtc/trtc-session-registry.service.ts` | `verify-ai-safety-lexicon.ts`<br/>`verify-trtc-session-deadline.ts` |
 | `services/api/src/trtc/trtc.controller.ts` | `verify-ai-access.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.module.ts` | `verify-trtc-terminal-http.ts` |
-| `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-assistant-device-fault.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/upload-sessions/upload-scene.ts` | `verify-upload-scene.ts` |
 | `services/api/src/upload-sessions/upload-session-object-delete.ts` | `verify-upload-sessions.ts` |
 | `services/api/src/upload-sessions/upload-sessions.controller.ts` | `verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-upload-sessions.ts` |
