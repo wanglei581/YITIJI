@@ -130,6 +130,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const declaringRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const compositionEndedAtRef = useRef(Number.NEGATIVE_INFINITY)
   const voiceTriggerRef = useRef<HTMLButtonElement>(null)
   const workbenchRef = useRef<HTMLDivElement>(null)
 
@@ -176,6 +177,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     const text = raw.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH).trim()
     // 已确认回落到预置话术时不再发请求：既不刷成本，也不制造一个空转的 running 态。
     if (!text || loading || declaringRef.current || aiAvailability === 'unavailable') return
+    // 发出后输入框会锁住等回答：把系统键盘收起来，免得它盖着回答。
+    dismissSystemKeyboard()
     const assistantRequestMessage = selectedTask
       ? `当前咨询主题：${selectedTask.label}\n用户问题：${text}`
       : text
@@ -303,8 +306,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // 拼音选字时按的回车是「上屏」，不是「发送」。
+    // 拼音选字时按的回车是「上屏」，不是「发送」。有的输入法先结束选字、紧接着才送来这一下回车，
+    // 所以刚结束选字的那一小会儿（120 毫秒）里的回车也放过。
     if (event.nativeEvent.isComposing || event.keyCode === 229) return
+    if (event.key === 'Enter' && event.timeStamp - compositionEndedAtRef.current < 120) return
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleSend()
@@ -600,6 +605,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             value={input}
             onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
             onKeyDown={handleKeyDown}
+            onCompositionEnd={(event) => { compositionEndedAtRef.current = event.timeStamp }}
             enterKeyHint="send"
             lang="zh-CN"
             aria-label="输入咨询问题"

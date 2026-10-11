@@ -25,8 +25,10 @@ export function readKeyboardRect(): Rect {
     return { top, bottom, left: rect.left, right: rect.right, height: Math.max(0, bottom - top) }
   }
   const vv = window.visualViewport
-  const height = vv ? inferKeyboardHeight(window.innerHeight, vv.height, vv.offsetTop, isSystemField(document.activeElement)) : 0
-  return { top: window.innerHeight - height, bottom: window.innerHeight, left: 0, right: window.innerWidth, height }
+  const height = vv ? inferKeyboardHeight(window.innerHeight, vv.height, isSystemField(document.activeElement)) : 0
+  // 键盘顶边就是可视区底边；可视区若被浏览器平移过（offsetTop），要把平移量算进去。
+  const top = vv && height > 0 ? vv.offsetTop + vv.height : window.innerHeight
+  return { top, bottom: top + height, left: 0, right: window.innerWidth, height }
 }
 
 /** 舞台与管理器读同一个实时结果；不依赖 resize 监听器先后顺序。 */

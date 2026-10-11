@@ -20,8 +20,9 @@ export function classifyKeyboardField(field: FieldDescription): 'system' | 'page
   return field.pageKeyboard ? 'page' : 'system'
 }
 
-export function inferKeyboardHeight(innerHeight: number, viewportHeight: number, offsetTop: number, editable: boolean): number {
-  const height = innerHeight - viewportHeight - offsetTop
+/** 没有键盘接口时的推断：键盘压矮了可视区，矮掉的那一截就是键盘高度（可视区被平移了多少与高度无关）。 */
+export function inferKeyboardHeight(innerHeight: number, viewportHeight: number, editable: boolean): number {
+  const height = innerHeight - viewportHeight
   return editable && Number.isFinite(height) && height > 120 ? Math.max(0, height) : 0
 }
 

@@ -16,6 +16,8 @@ export function requestSystemKeyboard(field: HTMLInputElement | HTMLTextAreaElem
   if (!field || field.disabled || field.readOnly) return
   field.focus({ preventScroll: true })
   if (typeof window === 'undefined' || keyboardMode() === 'off') return
+  // 按规范 show() 只对 virtualkeyboardpolicy="manual" 的格子生效；普通格子靠「触摸点按后得焦」由浏览器和系统自己弹。
+  // 这一下在真触摸屏上弹不弹，要真机验。
   try { virtualKeyboard()?.show() } catch { /* 接口不可用时只得焦，由系统按自己的设置决定弹不弹。 */ }
 }
 
@@ -66,7 +68,7 @@ export function startSystemKeyboard(isFluid: (width: number, height: number) => 
   const update = () => {
     cancelAnimationFrame(frame)
     cancelAnimationFrame(settleFrame)
-    clearPush()
+    // 这里不先归位：从一格点到另一格时，先砸回原位再推上去会闪一下。归位和重推都交给 avoid（同一帧内量完再写）。
     syncOverlay()
     const original = { width: Math.round(vv?.width || window.innerWidth), height: Math.round(vv?.height || window.innerHeight) }
     readKeyboardViewport(original, fluid())
@@ -76,12 +78,19 @@ export function startSystemKeyboard(isFluid: (width: number, height: number) => 
   }
   // 手指按下的那一刻焦点就会换（输入框失焦、按钮得焦）：这时若立刻把页面放回原位，按钮会从手指下滑走、这一下点不中。
   // 所以按着的时候先不动，等抬手、点击派发完再归位。
+  const touching = new Set<number>()
   let pressing = false
   let blurPending = false
   let releaseTimer = 0
   let stuckTimer = 0
+  // 一只手扶着屏、另一只手点按钮：要等最后一个触点离开才算抬手。
+  const lifted = (event: PointerEvent) => {
+    touching.delete(event.pointerId)
+    if (touching.size === 0) released()
+  }
   const released = () => {
     window.clearTimeout(stuckTimer)
+    touching.clear()
     pressing = false
     if (!blurPending) return
     blurPending = false
@@ -89,7 +98,13 @@ export function startSystemKeyboard(isFluid: (width: number, height: number) => 
     releaseTimer = window.setTimeout(update, 0)
   }
   // 抬手事件万一没收到（手指滑出屏幕边缘），5 秒后自己放开，免得页面一直停在上推位置。
-  const pressed = () => {
+  const pressed = (event: PointerEvent) => {
+    touching.add(event.pointerId)
+    // 手指落在配着页面键盘的格子上：赶在得焦之前把「别弹系统键盘」写上，等得焦再写就晚了。
+    if (!fluid()) {
+      const field = keyboardField(event.target)
+      if (field) prepareKeyboardField(field)
+    }
     pressing = true
     window.clearTimeout(stuckTimer)
     stuckTimer = window.setTimeout(released, 5000)
@@ -117,8 +132,8 @@ export function startSystemKeyboard(isFluid: (width: number, height: number) => 
   document.addEventListener('focusout', blurred, true)
   document.addEventListener('scroll', scrolled, true)
   window.addEventListener('pointerdown', pressed, true)
-  window.addEventListener('pointerup', released, true)
-  window.addEventListener('pointercancel', released, true)
+  window.addEventListener('pointerup', lifted, true)
+  window.addEventListener('pointercancel', lifted, true)
   window.addEventListener('resize', update)
   window.addEventListener(KEYBOARD_VIEWPORT_EVENT, scrolled)
   vv?.addEventListener('resize', update)
@@ -132,8 +147,8 @@ export function startSystemKeyboard(isFluid: (width: number, height: number) => 
     document.removeEventListener('focusout', blurred, true)
     document.removeEventListener('scroll', scrolled, true)
     window.removeEventListener('pointerdown', pressed, true)
-    window.removeEventListener('pointerup', released, true)
-    window.removeEventListener('pointercancel', released, true)
+    window.removeEventListener('pointerup', lifted, true)
+    window.removeEventListener('pointercancel', lifted, true)
     window.clearTimeout(releaseTimer)
     window.clearTimeout(stuckTimer)
     window.removeEventListener('resize', update)
