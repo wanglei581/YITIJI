@@ -2485,6 +2485,7 @@ model MockInterviewSession {
   resumeFileId    String?  // 可选:上传简历 fileId(原文不落本表)
   resumeDigest    String?  // 提取后的简历文本(仅会话期使用,随会话 TTL 清理)
   startedAt       DateTime?
+  deadlineAt      DateTime? // 只有一体机带标记开始的场次才有；空 = 不限时
   endedAt         DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

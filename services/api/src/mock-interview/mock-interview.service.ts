@@ -7,6 +7,7 @@ import { FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
+import { INTERVIEW_ANSWER_GRACE_MS, deadlineAtFromStart, interviewDeadlineFields, interviewDeadlineReachedException, isPastDeadline } from './mock-interview-deadline'
 import {
   buildQaExcerpts,
   parseStoredInterviewReport,
@@ -88,6 +89,9 @@ export class MockInterviewService {
     questionIndex: number
     questionTarget: number
     done: false
+    deadlineAt: string | null
+    serverNow: string
+    timeUp: boolean
   }>()
   private readonly endLock: RedisInflightLock
 
@@ -167,13 +171,14 @@ export class MockInterviewService {
     return { sessionId: row.id, questionTarget: row.questionTarget, ...(accessToken ? { accessToken } : {}) }
   }
 
-  async start(sessionId: string, requester: InterviewRequester) {
+  async start(sessionId: string, requester: InterviewRequester, opts?: { hardDeadline?: boolean }) {
     // 鉴权必须在合并之前：否则无权请求会复用已授权 worker 的 Promise。
     await this.loadAuthorized(sessionId, requester)
-    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester))
+    const hardDeadline = opts?.hardDeadline === true
+    return this.startInflight.run(this.coalesceKey(sessionId, requester), () => this.startOnce(sessionId, requester, hardDeadline))
   }
 
-  private async startOnce(sessionId: string, requester: InterviewRequester) {
+  private async startOnce(sessionId: string, requester: InterviewRequester, hardDeadline: boolean) {
     const session = await this.loadAuthorized(sessionId, requester)
     const claimed = await this.prisma.mockInterviewSession.updateMany({
       where: { id: session.id, status: 'configured' },
@@ -189,17 +194,25 @@ export class MockInterviewService {
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
       const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
-      await this.prisma.mockInterviewTurn.create({
-        data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
-      })
-      return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const }
+      const writtenAt = new Date()
+      const deadlineAt = hardDeadline ? deadlineAtFromStart(writtenAt, session.durationMin) : null
+      await this.prisma.$transaction([
+        this.prisma.mockInterviewTurn.create({
+          data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
+        }),
+        this.prisma.mockInterviewSession.update({ where: { id: session.id }, data: { deadlineAt } }),
+      ])
+      return {
+        question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const,
+        ...interviewDeadlineFields(deadlineAt, new Date()),
+      }
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
       await this.prisma.$transaction([
         this.prisma.mockInterviewTurn.deleteMany({ where: { sessionId: session.id } }),
         this.prisma.mockInterviewSession.updateMany({
           where: { id: session.id, status: 'in_progress' },
-          data: { status: 'configured', startedAt: null },
+          data: { status: 'configured', startedAt: null, deadlineAt: null },
         }),
       ])
       throw error
@@ -223,6 +236,9 @@ export class MockInterviewService {
     if (session.status !== 'in_progress') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
     }
+    if (isPastDeadline(session.deadlineAt, new Date(), INTERVIEW_ANSWER_GRACE_MS)) {
+      throw interviewDeadlineReachedException()
+    }
     const turns = await this.prisma.mockInterviewTurn.findMany({ where: { sessionId: session.id }, orderBy: { idx: 'asc' } })
     const asked = turns.filter((t) => t.role === 'interviewer').length
     if (asked === 0) {
@@ -237,6 +253,16 @@ export class MockInterviewService {
     if (!input.skip && !lastIsCandidate && answerText.length === 0) {
       throw new BadRequestException({ error: { code: 'INTERVIEW_ANSWER_EMPTY', message: '请输入回答内容，或选择跳过此题' } })
     }
+    const storeAnswer = () => lastIsCandidate ? Promise.resolve() : this.persistCandidate(session.id, turns.length, input, answerText)
+    const finished = (deadlineAt: Date | null) => ({
+      done: true as const, questionIndex: asked, questionTarget: session.questionTarget,
+      ...interviewDeadlineFields(deadlineAt, new Date()),
+    })
+    // 进门时已经过点、但仍在 3 秒宽限内：不调模型，只存这条回答。
+    if (isPastDeadline(session.deadlineAt, new Date(), 0)) {
+      await storeAnswer()
+      return finished(session.deadlineAt)
+    }
 
     const candidateContent = lastIsCandidate ? last.content : (input.skip ? '（跳过）' : answerText)
     const candidateSkipped = lastIsCandidate ? last.skipped : !!input.skip
@@ -250,26 +276,8 @@ export class MockInterviewService {
     }))
 
     if (asked >= session.questionTarget) {
-      if (!lastIsCandidate) {
-        try {
-          await this.prisma.mockInterviewTurn.create({
-            data: {
-              sessionId: session.id,
-              idx: turns.length,
-              role: 'candidate',
-              content: input.skip ? '（跳过）' : answerText,
-              skipped: !!input.skip,
-              inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
-              transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
-              transcriptEdited: input.transcriptEdited === true,
-              answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
-            },
-          })
-        } catch (error) {
-          if (!isUniqueConflict(error)) throw error
-        }
-      }
-      return { done: true, questionIndex: asked, questionTarget: session.questionTarget }
+      await storeAnswer()
+      return finished(session.deadlineAt)
     }
 
     const qUsage = new AiUsageAccumulator()
@@ -279,26 +287,24 @@ export class MockInterviewService {
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript }, qUsage.add)
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
+      const deadlineAt = await this.currentDeadline(session.id)
+      if (isPastDeadline(deadlineAt, new Date(), 0)) {
+        await storeAnswer()
+        return finished(deadlineAt)
+      }
       throw error
     }
     this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'success', session.endUserId)
+    const deadlineAt = await this.currentDeadline(session.id)
+    if (isPastDeadline(deadlineAt, new Date(), 0)) {
+      await storeAnswer()
+      return finished(deadlineAt)
+    }
 
     try {
       await this.prisma.$transaction(async (tx) => {
         if (!lastIsCandidate) {
-          await tx.mockInterviewTurn.create({
-            data: {
-              sessionId: session.id,
-              idx: turns.length,
-              role: 'candidate',
-              content: input.skip ? '（跳过）' : answerText,
-              skipped: !!input.skip,
-              inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
-              transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
-              transcriptEdited: input.transcriptEdited === true,
-              answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
-            },
-          })
+          await tx.mockInterviewTurn.create({ data: this.candidateTurnData(session.id, turns.length, input, answerText) })
         }
         await tx.mockInterviewTurn.create({
           data: {
@@ -316,7 +322,14 @@ export class MockInterviewService {
       }
       throw error
     }
-    return { done: false, question: q.question, qType: q.qType, questionIndex: asked + 1, questionTarget: session.questionTarget }
+    return {
+      done: false as const,
+      question: q.question,
+      qType: q.qType,
+      questionIndex: asked + 1,
+      questionTarget: session.questionTarget,
+      ...interviewDeadlineFields(deadlineAt, new Date()),
+    }
   }
 
   /** 结束并生成练习报告（幂等：已有报告直接返回）。 */
@@ -445,6 +458,7 @@ export class MockInterviewService {
       durationMin: session.durationMin,
       questionTarget: session.questionTarget,
       turns: turns.map((t) => ({ idx: t.idx, role: t.role, qType: t.qType, content: t.content, skipped: t.skipped })),
+      ...interviewDeadlineFields(session.deadlineAt, new Date()),
     }
   }
 
@@ -650,6 +664,31 @@ export class MockInterviewService {
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────────────
+
+  private candidateTurnData(sessionId: string, idx: number, input: { skip?: boolean; inputMode?: string; transcriptText?: string; transcriptEdited?: boolean; answerDurationSec?: number }, answerText: string) {
+    return {
+      sessionId, idx, role: 'candidate' as const,
+      content: input.skip ? '（跳过）' : answerText,
+      skipped: !!input.skip,
+      inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
+      transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
+      transcriptEdited: input.transcriptEdited === true,
+      answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
+    }
+  }
+
+  private async persistCandidate(sessionId: string, idx: number, input: { skip?: boolean; inputMode?: string; transcriptText?: string; transcriptEdited?: boolean; answerDurationSec?: number }, answerText: string): Promise<void> {
+    try {
+      await this.prisma.mockInterviewTurn.create({ data: this.candidateTurnData(sessionId, idx, input, answerText) })
+    } catch (error) {
+      if (!isUniqueConflict(error)) throw error
+    }
+  }
+
+  private async currentDeadline(sessionId: string): Promise<Date | null> {
+    const row = await this.prisma.mockInterviewSession.findUnique({ where: { id: sessionId }, select: { deadlineAt: true } })
+    return row?.deadlineAt ?? null
+  }
 
   /**
    * A-6：落 AiServiceLog（仅元数据）。

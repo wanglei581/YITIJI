@@ -11,6 +11,7 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
+import { interviewDeadlineReachedException } from './mock-interview-deadline'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
 import { InterviewTranscriptPrintService } from './interview-transcript-print.service'
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
@@ -49,6 +50,12 @@ export class CreateInterviewDto {
   /** 交互方式偏好:voice=语音回合制(文字兜底);text=纯文字 */
   @IsOptional() @IsIn(['text', 'voice'])
   interactionMode?: string
+}
+
+export class StartInterviewDto {
+  /** 一体机传 true 才到点结束；不传或不是 true，这场不限时。 */
+  @IsOptional() @IsBoolean()
+  hardDeadline?: boolean
 }
 
 export class InterviewAnswerDto {
@@ -140,8 +147,10 @@ export class MockInterviewController {
   @PaidAiThrottle(10)
   @AiUse('generate')
 
-  async start(@Param('id') id: string, @Req() req: ReqLike) {
-    return ApiResponse.ok(await this.service.start(id, await this.requesterOf(req)))
+  async start(@Param('id') id: string, @Body() dto: StartInterviewDto, @Req() req: ReqLike) {
+    return ApiResponse.ok(await this.service.start(id, await this.requesterOf(req), {
+      hardDeadline: dto?.hardDeadline === true,
+    }))
   }
 
   @Post(':id/answer')
@@ -175,7 +184,8 @@ export class MockInterviewController {
   ) {
     // 先做归属校验(借 getSession 的门禁;不存在/越权统一 404),再消费音频
     const requester = await this.requesterOf(req)
-    await this.service.getSession(id, requester)
+    const session = await this.service.getSession(id, requester)
+    if (session.timeUp) throw interviewDeadlineReachedException()
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
     }
@@ -211,6 +221,7 @@ export class MockInterviewController {
   async questionAudio(@Param('id') id: string, @Param('idx') idx: string, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const session = await this.service.getSession(id, requester)
+    if (session.timeUp) throw interviewDeadlineReachedException()
     const turnIdx = Number(idx)
     const turn = session.turns.find((t) => t.idx === turnIdx)
     if (!turn || turn.role !== 'interviewer') {

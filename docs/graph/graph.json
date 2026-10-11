@@ -17833,7 +17833,7 @@
         ]
       },
       {
-        "fieldCount": 21,
+        "fieldCount": 22,
         "name": "MockInterviewSession",
         "relations": [
           "MockInterviewReport",
