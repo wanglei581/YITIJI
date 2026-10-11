@@ -101,7 +101,7 @@ async function openWaiting(page: Page, api: ApiRouter, item: ScanOpen) {
   return { cancelled, creates: () => creates, phone }
 }
 
-async function expectOriginalPage(page: Page, item: Case) {
+async function expectOriginalPage(page: Page, item: typeof CASES[number]) {
   await expect(page).toHaveURL((url) => url.pathname === item.path.split('?')[0])
   await expect(page.locator(item.qr)).toBeVisible()
   await expect(page.locator('[data-screen="session-guard"]')).toHaveCount(0)
@@ -296,6 +296,11 @@ for (const item of HELD) {
   })
 
   test(`${item.label}：文件已收到、没人点确认，150 秒进预警、180 秒清场回首页 @w3-kiosk`, async ({ page, api }) => {
+    // 记下每一次确认请求：被清场不等于替人点了确认。
+    const confirms: string[] = []
+    page.on('request', (request) => {
+      if (/\/upload-sessions\/[^/]+\/confirm$/.test(new URL(request.url()).pathname)) confirms.push(request.url())
+    })
     const state = await openWaiting(page, api, item)
     await page.clock.runFor(100_000)
     state.phone.uploaded = true
@@ -311,6 +316,7 @@ for (const item of HELD) {
     await expect(page).toHaveURL(/\/session-timeout$/)
     await page.clock.runFor(40_000)
     await expect(page).toHaveURL(/\/$/)
+    expect(confirms).toEqual([])
     expect(state.cancelled.every((entry) => entry.id === 'scan-wait-1')).toBe(true)
   })
 }

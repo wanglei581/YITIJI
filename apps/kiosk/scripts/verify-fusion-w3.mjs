@@ -148,7 +148,8 @@ const frozen = {
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40',
+  // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -555,7 +556,7 @@ if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const selfAssessmentSpec = read('tests/visual/fusion-self-assessment-flow.spec.ts')
   includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow|w16-ai-declaration|upload-scan-wait)\\.spec\\.ts$/', 'W3 browser config collects W3, the sensitive self-assessment preview, and the W-16 declaration scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
-  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
+  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token', 'VITE_ENABLE_CONTRACT_REVIEW=true']) check(config.includes(env), `W3 browser build pins ${env}`)
   for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'assistant refuses to present mock fallback as an AI answer', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report', 'advisor artifact eight proto states fit the kiosk stage', 'advisor artifact renders covered evidence as a quotation', 'advisor artifact print-unavailable state has no print button', 'advisor artifact print waits for the server receipt', 'advisor artifact no-artifact shows the three jobs and opens AI records', 'advisor artifact expired offers only a redo', 'advisor artifact content state opens my documents', 'advisor artifact plans leftover height into content at every pin count', 'resume report failure and no-report screens keep exit rows and close the open band', 'resume report read-error and illegal screens keep exit rows and close the open band', 'advisor artifact one-pin hint tells the truth about asking again', 'advisor artifact shows a more-below hint only while content is cut off']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
   check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   check(selfAssessmentSpec.includes('说明页提示往上滑，灰按钮与红条只滚到同意框、不代替同意 @w3-kiosk'), 'W3 browser scenario exists: intro scroll cue and consent remain separate')

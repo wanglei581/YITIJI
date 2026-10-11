@@ -10,7 +10,7 @@ const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
 // 第八次 8-7：持屏幕忙锁和来源页自己的 busy 分开，码到期不延长。
-assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming\)/, '8-7 面板独立持忙碌锁，文件已到不再顺延')
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming \|\| cancelling\)/, '8-7 面板独立持忙碌锁，文件已到不再顺延')
 assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '8-7 打印等待有效会话时持忙碌锁')
 assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '8-7 打印等待锁受真实到期和终态约束')
 // 合规 10/10：这五页自己的清场锁不含扫码面板的忙。面板在「码有效、文件还没到」时自己持锁；文件到了就放开。
@@ -22,11 +22,12 @@ const pageClearLocks = [
   ['src/pages/print-scan/sign-stamp/useSignStampFlow.ts', 'useBusyLock(busy)'],
 ]
 for (const [file, expected] of pageClearLocks) {
-  const text = read(file)
-  assert.ok(text.includes(expected), `${file} 的清场锁不含扫码面板的忙：应有 ${expected}`)
-  const arg = text.match(/useBusyLock\(([^)]*)\)/)?.[1] ?? ''
+  // 去掉注释后，文件里**每一处** useBusyLock 调用都要查：只看第一处的话，再加一把锁就绕过去了。
+  const text = read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const calls = [...text.matchAll(/useBusyLock\(([^\n]*)\)\s*$/gm)].map((match) => `useBusyLock(${match[1]})`)
+  assert.deepEqual(calls, [expected], `${file} 只许有一处清场锁，且不含扫码面板的忙：应为 ${expected}`)
   assert.doesNotMatch(
-    arg,
+    calls.join('\n'),
     /\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/,
     `${file} 的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr`,
   )
@@ -77,7 +78,8 @@ const frozenHashes = new Map([
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40',
+    // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
+    '29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

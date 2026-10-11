@@ -130,13 +130,15 @@ export function UploadSessionQrPanel({
   const [status, setStatus] = useState<UploadSessionStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
   const active = Boolean(qr && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
   // 这把锁只管「码有效、文件还没到」这一段。文件一到，下一步在本机，屏上有文件名：回到正常的无操作计时（合规 10/10）。
-  useBusyLock((active && status?.status !== 'uploaded') || loading || confirming)
+  // 取消请求在途的那几秒也算正在办事（文件已收到时点取消，上面那一项已经放开了）。
+  useBusyLock((active && status?.status !== 'uploaded') || loading || confirming || cancelling)
 
   useEffect(() => {
     const received = status?.status === 'uploaded' || confirming
@@ -327,11 +329,13 @@ export function UploadSessionQrPanel({
 
   const handleCancel = async () => {
     if (!qr) return
+    setCancelling(true)
     try {
       await cancelUploadSession(qr.sessionId, qr.controlToken)
     } catch {
       // best-effort only
     } finally {
+      setCancelling(false)
       setQr(null)
       setStatus(null)
       setError(null)
