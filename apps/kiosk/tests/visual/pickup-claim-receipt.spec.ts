@@ -91,7 +91,8 @@ for (const printerCode of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']
 }
 
 for (const scenario of [
-  { code: 'PICKUP_RESUME_LIMIT_REACHED', message: '这单已经接着打过 2 次，不能再打了', state: 'arrival-code-state-closed' },
+  // 次数用尽：后端只回前半句，一体机补上下一步，所以屏上是这整句。
+  { code: 'PICKUP_RESUME_LIMIT_REACHED', message: '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单', state: 'arrival-code-state-closed' },
   { code: 'PICKUP_RESUME_UNCONFIRMED', message: '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打', state: 'arrival-code-state-failed' },
   { code: 'PICKUP_RESUME_PARTIAL_OUTPUT', message: '这单已经出了一部分纸，不能整单重打', state: 'arrival-code-state-closed' },
 ]) {
