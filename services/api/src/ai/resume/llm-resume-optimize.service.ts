@@ -29,6 +29,8 @@ import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-all
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
+import { foldCjkRadicals } from '../../common/text/cjk-radical-fold'
+import type { OptimizeRejectRule } from './resume-optimize-reject-rule'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { detectResumeName, RESUME_STRUCTURE_PROMPT_RULE } from './resume-structure'
@@ -229,7 +231,9 @@ export class LlmResumeOptimizeService {
     // 拿原文校验会让模型回包里的 `[手机号_1]` 判不在原文而整单作废。
     // 产物是用户要打印的简历，因此最后用 restore() 把占位符换回真值（restore 只在
     // 服务端内存里发生，真值从未离开本进程）。
-    const original = extractedText ?? ''
+    // 库里早先存下的简历文字可能还带着部首字符（新上传的在抽取时已经换掉）：在入口换一次，
+    // 后面的遮盖、章节识别、送模型、事实串比对用的都是同一份常用字文本。
+    const original = foldCjkRadicals(extractedText ?? '')
     const input = original.slice(0, MAX_INPUT_CHARS)
     const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
     const baseline = buildOriginalCoverage(original, report, input.length, masked.restore)
@@ -254,7 +258,8 @@ export class LlmResumeOptimizeService {
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
       )
-      const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
+      let rejectRule: OptimizeRejectRule | undefined
+      const result = this.parseAndValidate(raw, text, cfg.forbiddenWords, (rule) => { rejectRule = rule })
       if (result) {
         const restored = restoreOptimizeResult(result, masked.restore)
         const missing = missingOriginalEntries(restored.optimizedResume, baseline)
@@ -265,7 +270,9 @@ export class LlmResumeOptimizeService {
         firstMissing = missing
         retryHint = `${OPTIMIZE_RETRY_HINT}\n${originalCoverageRetryHint(missing, text, masked.restore)}`
       }
-      this.logger.warn(`resume optimize: invalid output (attempt ${attempt}/2)`)
+      // 只记是哪条规则判的（规则名是固定的几个词），不记输出内容，也不记简历原文。
+      // 走到这里而 result 有值，说明输出合法但漏了原文里的经历条目，要带着提示重试一次。
+      this.logger.warn(`resume optimize: invalid output (attempt ${attempt}/2) rule=${result ? 'missing_entries' : rejectRule ?? 'unknown'}`)
     }
 
     if (firstValid) {
@@ -429,30 +436,48 @@ export class LlmResumeOptimizeService {
 
   // ── 解析 + 防编造校验 ───────────────────────────────────────────────────────
 
-  private parseAndValidate(raw: string, originalText: string, forbiddenWords: string[]): OptimizeResult | null {
+  private parseAndValidate(
+    raw: string,
+    originalText: string,
+    forbiddenWords: string[],
+    /** 整份被判作废时回报是哪条规则（只有规则名）。 */
+    onReject?: (rule: OptimizeRejectRule) => void,
+  ): OptimizeResult | null {
+    const reject = (rule: OptimizeRejectRule): null => {
+      onReject?.(rule)
+      return null
+    }
     const jsonStr = extractJson(raw)
-    if (!jsonStr) return null
+    if (!jsonStr) return reject('not_json')
     let parsed: unknown
     try {
       parsed = JSON.parse(jsonStr)
     } catch {
-      return null
+      return reject('not_json')
     }
-    if (!parsed || typeof parsed !== 'object') return null
+    if (!parsed || typeof parsed !== 'object') return reject('not_json')
     const obj = parsed as Record<string, unknown>
     const rawResume = obj['resume']
-    if (!rawResume || typeof rawResume !== 'object') return null
+    if (!rawResume || typeof rawResume !== 'object') return reject('no_resume_object')
 
     const normText = normalizeResumeFactText(originalText)
     const inText = makeFactMatcher(originalText)
     const blocked = [...OPTIMIZE_GUARD_TERMS, ...forbiddenWords]
+    // clean() 返回 null 时是哪条规则：超长，还是命中拦截词
+    let cleanRule: OptimizeRejectRule = 'guard_term'
     const clean = (value: unknown, maxLen: number): string | null => {
       if (typeof value !== 'string') return ''
       const trimmed = value.trim()
-      if (maxLen === MAX_OPTIMIZE_DESC_CHARS && trimmed.length > MAX_OPTIMIZE_DESC_CHARS) return null
+      if (maxLen === MAX_OPTIMIZE_DESC_CHARS && trimmed.length > MAX_OPTIMIZE_DESC_CHARS) {
+        cleanRule = 'desc_too_long'
+        return null
+      }
       const text = maxLen === MAX_OPTIMIZE_DESC_CHARS ? trimmed : trimmed.slice(0, maxLen)
       // 承诺类表述出现在任何输出文本 → 整体判非法(重试;绝不带承诺出简历)
-      if (text && containsForbiddenWord(text, blocked)) return null
+      if (text && containsForbiddenWord(text, blocked)) {
+        cleanRule = 'guard_term'
+        return null
+      }
       return text
     }
 
@@ -461,7 +486,7 @@ export class LlmResumeOptimizeService {
     const intentionRaw = (r['intention'] ?? {}) as Record<string, unknown>
 
     const summary = clean(r['summary'], MAX_SUMMARY_CHARS)
-    if (summary === null) return null
+    if (summary === null) return reject(cleanRule)
 
     // basic:姓名/电话/邮箱必须出现在原文(电话邮箱被改一个数字都不行),否则置空
     const nameRaw = typeof basicRaw['name'] === 'string' ? basicRaw['name'].trim().slice(0, 50) : ''
@@ -488,9 +513,11 @@ export class LlmResumeOptimizeService {
       const degree = strOf(item, 'degree', 20)
       // 2B 收口补强:学历/专业同为高危篡改点(如 大专→本科),必须在原文中出现;
       // 原文没有时模型应留空(inText('') 合法),写了但不在原文 → 整体非法
-      if (!inText(school) || !inText(major) || !inText(degree)) return null
+      if (!inText(school)) return reject('education_school')
+      if (!inText(major)) return reject('education_major')
+      if (!inText(degree)) return reject('education_degree')
       const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
-      if (description === null) return null
+      if (description === null) return reject(cleanRule)
       if (![school, major, degree, strOf(item, 'period', 40), description].some(Boolean)) continue
       education.push({
         school,
@@ -505,9 +532,9 @@ export class LlmResumeOptimizeService {
     for (const item of asArray(r['experience'], 8)) {
       const company = strOf(item, 'company', 100)
       const role = strOf(item, 'role', 60)
-      if (!inText(company)) return null
+      if (!inText(company)) return reject('experience_company')
       const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
-      if (description === null) return null
+      if (description === null) return reject(cleanRule)
       if (![company, role, strOf(item, 'period', 40), description].some(Boolean)) continue
       experience.push({ company, role, period: strOf(item, 'period', 40) || undefined, description })
     }
@@ -515,9 +542,9 @@ export class LlmResumeOptimizeService {
     const projects: GeneratedResume['projects'] = []
     for (const item of asArray(r['projects'], 6)) {
       const projectName = strOf(item, 'name', 100)
-      if (!inText(projectName)) return null
+      if (!inText(projectName)) return reject('project_name')
       const description = clean(item['description'], MAX_OPTIMIZE_DESC_CHARS)
-      if (description === null) return null
+      if (description === null) return reject(cleanRule)
       if (![projectName, strOf(item, 'role', 60), description].some(Boolean)) continue
       projects.push({ name: projectName, role: strOf(item, 'role', 60) || undefined, description })
     }
@@ -525,7 +552,7 @@ export class LlmResumeOptimizeService {
     const skills: string[] = []
     for (const skill of asStrArray(r['skills'], 20)) {
       const cleaned = clean(skill, MAX_SKILL_CHARS)
-      if (cleaned === null) return null
+      if (cleaned === null) return reject(cleanRule)
       if (cleaned) skills.push(cleaned)
     }
 
@@ -533,7 +560,7 @@ export class LlmResumeOptimizeService {
     for (const cert of asStrArray(r['certificates'], 15)) {
       const trimmed = cert.trim().slice(0, 60)
       if (!trimmed) continue
-      if (!inText(trimmed)) return null // 证书是高风险编造点:不在原文即整体非法
+      if (!inText(trimmed)) return reject('certificate') // 证书是高风险编造点:不在原文即整体非法
       certificates.push(trimmed)
     }
 
@@ -543,7 +570,7 @@ export class LlmResumeOptimizeService {
       const title = strOf(item, 'title', 60)
       const before = strOf(item, 'before', MAX_MODULE_TEXT_CHARS)
       const after = clean(item['after'], MAX_MODULE_TEXT_CHARS)
-      if (after === null) return null
+      if (after === null) return reject(cleanRule)
       if (!title || !before || !after) continue
       if (before.length < MIN_BEFORE_CHARS) continue
       if (!normText.includes(normalizeResumeFactText(before))) continue

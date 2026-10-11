@@ -5,6 +5,8 @@
  * 事实核对墙只报告「能不能在原文里找到」，不替用户改字、不推断录用。
  */
 
+import { foldCjkRadicals } from '../../common/text/cjk-radical-fold'
+
 export type ResumeFactKind = 'school' | 'company' | 'period' | 'certificate' | 'phone' | 'email'
 
 export interface ResumeFactItem {
@@ -17,9 +19,16 @@ export interface ResumeFactMatch extends ResumeFactItem {
   foundInOriginal: boolean
 }
 
-/** 与优化防编造校验同一归一：去空白与常见标点，再小写。 */
+/**
+ * 与优化防编造校验同一归一：先把部首字符换回外形相同的常用字，再去空白与常见标点、小写。
+ *
+ * 为什么要先换部首字符（真机实操 F-24）：有些 PDF 的文字层里「青、大、心、车」存的是
+ * 外形相同的部首字符，模型按常用字写，逐字比就对不上，学校、学历、公司、证书全判成
+ * 「不在原文」。两边都折一次，库里早先存下的旧文字也能对上。只换编码，不放宽规则：
+ * 原文里没有的学校、公司照样对不上。
+ */
 export function normalizeResumeFactText(text: string): string {
-  return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
+  return foldCjkRadicals(text).replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
 }
 
 /**

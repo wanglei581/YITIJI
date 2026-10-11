@@ -745,6 +745,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
           pnpm --filter @ai-job-print/api verify:resume-template-fill
           pnpm --filter @ai-job-print/api verify:resume-optimize
+          # 真机实操 F-24（2026-10-11）：PDF 文字层里的部首字符换回常用字，防编造校验不再把照抄原文的输出判作废。
+          pnpm --filter @ai-job-print/api verify:resume-radical-fold
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
