@@ -284,7 +284,6 @@ export function renderJobFitInteractive(p: {
                     onChange={(e) => setKeyword(e.target.value)}
                     placeholder="搜索岗位名称 / 公司"
                     aria-label="搜索岗位名称或公司"
-                    inputMode="search"
                     className="jfq-input"
                     style={{ paddingLeft: 52 }}
                   />
