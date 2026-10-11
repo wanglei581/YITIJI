@@ -25,6 +25,9 @@ import { ADVISOR_QA_SYSTEM_PROMPT } from '../src/advisor/llm-advisor.service'
 import { guardTrtcLlmConfigJson } from '../src/trtc/trtc-llm-safety'
 import { ANONYMOUS_AI_CALLER, lazyAiRequestContext, runWithAiRequestContext } from '../src/ai/usage/ai-usage-context'
 
+// 招聘内容托管按线上口径关着跑（小青的跳转过滤读这个开关）；本脚本不验证招聘内容。
+process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+
 let passCount = 0
 let failCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
