@@ -8,6 +8,10 @@ const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
 const RETRY_WINDOW_MS = 60_000
 const REQUEST_TIMEOUT_MS = 4_000
+// 判 failed 之后后台每隔这么久再试一次。本机 Agent 的取票口每分钟限 6 次（看门狗与页面共用），一分钟一次不会挤占。
+// 另加一段随机量：服务器重启时同一批机器会同时掉进 failed，不错开就会在同一秒一起回来敲门。
+const RECOVERY_INTERVAL_MS = 60_000
+const RECOVERY_JITTER_MS = 15_000
 // 本地 Agent 桥接：会话票失效后由页面自行重新引导用（与看门狗取票同一来源、同一端点）。
 const LOCAL_AGENT_BASE_URL = ((import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim() || 'http://127.0.0.1:9527').replace(/\/+$/, '')
 const LOCAL_BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
@@ -21,10 +25,33 @@ export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 
 let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
 let refreshTimer: number | null = null
+let recoveryTimer: number | null = null
+// 这一页是带着引导票打开的，而那张票没换成：此后只许走「向本机 Agent 要新票」那条路恢复
+// （那条路换票即清场），任何一条路都不拿标签页里可能留着的旧会话票续期（见 retryRefreshOnce、recoverOnce）。
+// 置真之后能回到 ready 的只剩 reBootstrapFromLocalAgent，它成功时归零。
+let bootExchangeUnsettled = false
+// 后台恢复时被服务端明确判作废的那张会话票。票本身不删（终端停用期间读配置还要带它），
+// 只是后台恢复不再拿同一张票每分钟去续一次。
+let rejectedSessionToken: string | null = null
+// 状态是否已经离开过最初那次 checking。用来区分「页面刚打开时的第一次换票」和「之后的重建」：
+// 只有后者才可能清掉正在机器前的人留下的材料。
+let hadSettledState = false
+// 上一次重建会话清过场、而页面还没来取走这件事。只能读一次，见 takeTerminalSessionRecoveryCleared。
+let recoveryClearedPending = false
 const listeners = new Set<(next: TerminalSessionState) => void>()
 
+// failed 不再是终点：每次落到 failed 都排一次后台恢复，离开 failed 就撤掉。
+// 放在这里而不是各个判死的分支里，是为了以后新增的判死分支不会漏排。
 function setState(next: TerminalSessionState): void {
   state = next
+  if (next === 'failed') {
+    // 十分钟续期交给后台恢复接手：留着它会在恢复中途把状态翻回 checking，再跑一遍 60 秒重试窗口。
+    if (refreshTimer !== null) { window.clearTimeout(refreshTimer); refreshTimer = null }
+    scheduleRecovery()
+  } else {
+    cancelRecovery()
+  }
+  if (next !== 'checking') hadSettledState = true
   listeners.forEach((listener) => listener(next))
 }
 
@@ -151,11 +178,15 @@ async function asHttpError(response: Response): Promise<ApiHttpError> {
   return new ApiHttpError(error.code, error.message, response.status)
 }
 
-// 只有网络抖动 / 超时 / 服务端明确的 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动）才自动重试；
-// 401 TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 网络抖动 / 超时自动重试；502 / 503 / 504 不看错误码一律重试 —— 既包括服务端明确的
+// 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动），也包括后端重启那几十秒里网关回的错误页（没有业务错误码）。
+// 2026-10-10 走查实测：开机换票那一下撞上一次不带错误码的 503，此前一次就判死，4 分半不恢复。
+// TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 引导票是读出即删的：网关超时而后端其实已经用掉它时，重发会得到「作废」，由调用方改向本机 Agent 要新票。
 function transient(error: unknown): boolean {
   if (error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')) return true
-  return error instanceof ApiHttpError && error.status === 503 && error.code === 'TERMINAL_SESSION_RETRYABLE'
+  if (!(error instanceof ApiHttpError)) return false
+  return error.status === 502 || error.status === 503 || error.status === 504
 }
 
 function sessionInvalid(error: unknown): boolean {
@@ -175,7 +206,8 @@ async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
   let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
-  for (const delay of [0, ...RETRY_DELAYS_MS]) {
+  // 带引导票打开而没换成的页不拿旧会话票续期，直接走下面「要新引导票」那条路（换票即清场）。
+  for (const delay of bootExchangeUnsettled ? [] : [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
       await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
@@ -210,6 +242,11 @@ async function reBootstrapFromLocalAgent(): Promise<boolean> {
   } catch {
     return false
   }
+  bootExchangeUnsettled = false
+  rejectedSessionToken = null
+  // exchangeBootTicket 换成即清场。页面第一次打开时那次不算（没有人的材料可清）；
+  // 之后的每一次重建都记一笔，由页面取走后照实告诉用户。
+  if (hadSettledState) recoveryClearedPending = true
   setState('ready')
   scheduleRefresh()
   return true
@@ -219,6 +256,80 @@ function scheduleRefresh(): void {
   if (API_MODE !== 'http') return
   if (refreshTimer !== null) window.clearTimeout(refreshTimer)
   refreshTimer = window.setTimeout(() => { void retryRefresh().catch(() => undefined) }, 10 * 60_000)
+}
+
+/**
+ * failed 之后的后台恢复。
+ *
+ * 存在的理由：此前判 failed 就是终点 —— 开机换票与十分钟续期两条路失败后都不再排下一次，
+ * 状态是 failed 时打印放行类请求又在发出之前就被闸门拦下（见 awaitReadySessionOrFailClosed），
+ * 于是没有任何东西会再去换票。服务器每重启一次（例如每次发布），只要正好撞上某台机器的
+ * 开机换票或续期，这台机器就一直打不了，直到有人重开浏览器；而现场没有人。
+ *
+ * 不放宽的三条：
+ *   · 后台恢复自己不改状态：它在飞时 state 仍是 failed，闸门照旧立即拦，
+ *     也不把屏幕在「校验中 / 没通过」之间每分钟来回翻一次。
+ *     只有一种交叉会让状态在恢复在飞时离开 failed：标签页里没有会话票，终端身份恢复回调此刻又来
+ *     初始化一次（initializeTerminalSessionOnce 的无票分支置 checking，并且自己也去要一张引导票）。
+ *     那时闸门等的是在飞的这一次，等出 ready 才放行、等不出照旧拦 —— 没有会话就不能下单这条不变。
+ *   · 恢复只走已有的两条路：拿当前会话票续期，或向本机 Agent 要新引导票再换（换票即清场）。
+ *     没有新的凭据来源，普通浏览器里（没有桥接令牌、没有会话票）什么都换不到，仍然 failed。
+ *   · 每轮只试一次，不在轮内重试；服务器没回来就等下一轮。
+ *
+ * 一直试下去、不设上限，是有意的：终端被后台停用后又恢复、服务器停了半天又回来，
+ * 现场都没有人去重开浏览器。每台机器每轮至多一次续期加一次取票：只有会话票被服务端明确判作废的
+ * 那一轮两样都做（先拿它再确认一次，作废了才去要新票），其余各轮只做一样。
+ */
+function scheduleRecovery(): void {
+  if (API_MODE !== 'http') return
+  if (recoveryTimer !== null) window.clearTimeout(recoveryTimer)
+  recoveryTimer = window.setTimeout(() => {
+    recoveryTimer = null
+    void recoverInBackground()
+  }, RECOVERY_INTERVAL_MS + Math.floor(Math.random() * RECOVERY_JITTER_MS))
+}
+
+function cancelRecovery(): void {
+  if (recoveryTimer === null) return
+  window.clearTimeout(recoveryTimer)
+  recoveryTimer = null
+}
+
+async function recoverInBackground(): Promise<void> {
+  if (state !== 'failed') return
+  // 别的换票正在飞（身份恢复回调重新初始化、按台计请求触发的续期）：让它先出结果，本轮只往后排。
+  if (refreshInflight || initInflight) { scheduleRecovery(); return }
+  // 与 retryRefresh 共用同一把锁：恢复在飞时别处再要续期，等的是这一次，不会并发出第二个续期请求。
+  // 状态此刻是 failed 而不是 checking，所以下单类请求的闸门不等它（见 awaitReadySessionOrFailClosed）；
+  // 例外只有 scheduleRecovery 上方写的那一种交叉。
+  const attempt = recoverOnce().then((recovered) => {
+    if (!recovered) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
+  })
+  refreshInflight = attempt.finally(() => { refreshInflight = null })
+  try {
+    await refreshInflight
+  } catch {
+    if (state === 'failed') scheduleRecovery()
+  }
+}
+
+/** 试一次。成功返回 true 并已置为 ready、重排续期。 */
+async function recoverOnce(): Promise<boolean> {
+  const current = token()
+  if (!bootExchangeUnsettled && current && current !== rejectedSessionToken) {
+    try {
+      await refreshOnce(REQUEST_TIMEOUT_MS)
+      setState('ready')
+      scheduleRefresh()
+      return true
+    } catch (error) {
+      // 会话票多半还有效，只是服务器还没回来或暂时答不了：等下一轮，别急着换新会话把这一位的材料清掉。
+      // 只有服务端明确说这张票作废了，才往下走「要新引导票」那条路。
+      if (!sessionInvalid(error)) return false
+      rejectedSessionToken = current
+    }
+  }
+  return reBootstrapFromLocalAgent()
 }
 
 let initInflight: Promise<void> | null = null
@@ -268,10 +379,27 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
       if (!transient(error)) break
     }
   }
+  // URL 上那张票只有 60 秒、只能用一次，到这里已经指望不上。与续期那条路一样，判死之前
+  // 先向本机 Agent 要一张新票；还不行才 failed，之后由后台恢复每分钟再要一次。
+  bootExchangeUnsettled = true
+  if (await reBootstrapFromLocalAgent()) return
   setState('failed')
 }
 
 export function terminalSessionState(): TerminalSessionState { return state }
+
+/**
+ * 上一次恢复是不是把本机这一位留下的材料清掉了。只能读一次：读到 true 之后自己复位。
+ *
+ * 只在「用本机 Agent 的新引导票重建会话」成功之后为 true（那条路换票即清场），而且不含页面
+ * 刚打开时的第一次换票。拿原会话票续上的恢复不清场，这里是 false。只存在内存里，整页重载就没了。
+ * 页面用它决定要不要说一句「刚才选的材料已经清掉、要重新传」；它不参与任何放行判断。
+ */
+export function takeTerminalSessionRecoveryCleared(): boolean {
+  const cleared = recoveryClearedPending
+  recoveryClearedPending = false
+  return cleared
+}
 
 export function subscribeTerminalSession(listener: (next: TerminalSessionState) => void): () => void {
   listeners.add(listener)
@@ -289,7 +417,8 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
  *
  * 边界三条，一条都不放宽：
  *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）
- *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死。
+ *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死
+ *     （failed 之后的后台恢复成功会把状态改回 ready，但 state 还是 failed 时本函数不等它）。
  *   · 自己绝不发起续期。等的永远是别人已经在飞的那个 Promise，因此并发业务请求
  *     仍然只对应一次 /session-token/refresh。
  *   · 等失败不降级：统一抛 TERMINAL_SESSION_INVALID，不把续期的原始错误（可能是
@@ -394,7 +523,7 @@ export async function terminalProtectedFetch(
   if (replay) return replay
   if (response.ok) return response
   const error = await asHttpError(response.clone())
-  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
+  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动与 502 / 503 / 504 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
   // 刷新最长可达 60 秒。人已离页或本机已清场时不重放：原 401 的 body 还没被读过
