@@ -17,7 +17,7 @@
 - 使用 Windows DPAPI LocalMachine 加密保存 `agentToken`；
 - 将 `%ProgramData%\AIJobPrintAgent`（及 `agent.token`）ACL 收紧为 **SYSTEM + Administrators**，并禁用继承；
 - 安装/启动 `AIJobPrintAgent` Windows 服务，并设置开机自启；
-- 安装程序会打开 Windows 的打印服务运行日志（PrintService/Operational），用途是确认打印任务是否打完；上限 4 MB、满了覆盖最旧的；卸载时不关闭。
+- 安装程序会尝试打开 Windows 的打印服务运行日志（PrintService/Operational）：上限 4 MB、满了覆盖最旧的；打不开只警告、不挡安装；卸载时不关闭、不清空。用途是给「打印任务已送完」留一条系统层面的凭据（事件 307），它不证明纸已经实际出来。
 - 校验远程心跳在线。
 
 使用后台一次性绑定码（推荐商用流程）：

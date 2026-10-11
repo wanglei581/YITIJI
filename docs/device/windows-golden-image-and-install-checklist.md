@@ -243,7 +243,7 @@ A11c 会阻止**新接入**的键盘类设备，扫码器在系统看来就是�
 - 专用一体机**不加** `-KeepFileSelectionDialogs`，也**不传** `-DailyRebootAt off`（默认每天 04:30 重启）。重跑配置用控制中心按钮即可。KSK-001 这台工作电脑不要用这个按钮：命令行必须加 `-KeepFileSelectionDialogs -DailyRebootAt off`。
 - **开机打印防护已开启**（专用一体机）：控制中心显示「开机打印防护：已开启」。判据是计划任务 `AIJobPrintBootSpoolGuard` 存在，且 `sc.exe qc Spooler` 的启动类型是 `DEMAND_START`（手动）。装的时候如果打印服务已经在跑，这一次不删当前队列、也不重启电脑。
 - **每日维护重启时间**（专用一体机）：控制中心显示「每日维护重启：04:30」。KSK-001 必须是「未开启」。
-- 安装程序会打开 Windows 的打印服务运行日志（PrintService/Operational），用途是确认打印任务是否打完；上限 4 MB、满了覆盖最旧的；卸载时不关闭。
+- 安装程序会尝试打开 Windows 的打印服务运行日志（PrintService/Operational）：上限 4 MB、满了覆盖最旧的；打不开只警告、不挡安装；卸载时不关闭、不清空。用途是给「打印任务已送完」留一条系统层面的凭据（事件 307），它不证明纸已经实际出来。
 - **MSI/EXE 卸载会自动删任务并恢复打印服务。** 万一没恢复，用下面的命令手工恢复，读回必须是 `AUTO_START` 并且 `RUNNING`：
 
 ```bat
