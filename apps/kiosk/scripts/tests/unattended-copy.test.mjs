@@ -192,3 +192,26 @@ test('联系方式 404 与超时都缓存成最保守的一套', async () => {
     contactMod.resetSupportContactCacheForTests()
   }
 })
+
+// 2026-10-11（合规 10/10 定字）：断网时远程指令到不了机器，帮助页是说明书、不写「我们已经收到提醒」。
+test('断网句不承诺收到提醒和远程处理；帮助页不写机器故障已收到提醒', async () => {
+  assert.equal(copy.networkDisconnectLine(), '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来')
+  const { readdirSync, statSync } = await import('node:fs')
+  const stripComments = (code) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const walk = (dir) => readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name)
+    return statSync(full).isDirectory() ? walk(full) : /\.tsx?$/.test(name) ? [full] : []
+  })
+  const files = walk(join(kioskRoot, 'src'))
+  assert.ok(files.length > 300, `源码文件数不对：${files.length}`)
+  for (const file of files) {
+    const code = stripComments(readFileSync(file, 'utf8'))
+    assert.doesNotMatch(code, /远程处理/, `${file} 不得再说「远程处理」`)
+    assert.doesNotMatch(code, /机器故障我们(?:已经|会)收到提醒/, `${file} 不得再写「机器故障我们已经收到提醒」`)
+  }
+  const help = readFileSync(join(kioskRoot, 'src/pages/help/HelpCenterPage.tsx'), 'utf8')
+  assert.match(help, /hint="打不了请稍后再来"/)
+  assert.match(help, /机器暂时打不了时，请稍后再来。/)
+  const status = readFileSync(join(kioskRoot, 'src/pages/placeholders/ErrorOfflinePage.tsx'), 'utf8')
+  assert.match(status, /写个时间只会让你白等。\{networkDisconnectLine\(\)\}。/)
+})
