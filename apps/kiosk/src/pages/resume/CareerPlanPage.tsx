@@ -158,7 +158,7 @@ export function CareerPlanPage() {
         if (cancelled || !isLive(run)) return
         const code = errorCodeOf(err)
         // 没有规划记录是正常态：说明还没生成过，但这一趟证明了后端可达。
-        if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); setError('这份简历还没有可查看的职业规划，原结果可能已过期或删除；可重新生成。'); return }
+        if (code === 'CAREER_PLAN_NOT_FOUND') { setProbed(true); setError('这份简历还没有职业规划，可以现在生成。'); return }
         // 前置校验的落点：后端不认这个 taskId，继续留在本页只会让用户白点一次生成。
         if (code === 'AI_TASK_NOT_FOUND') { setRejectedTask(true); return }
         if (AI_OUTAGE_CODES.has(code)) {
