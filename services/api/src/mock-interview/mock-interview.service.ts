@@ -194,18 +194,18 @@ export class MockInterviewService {
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
       const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
+      const opened = { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const }
+      if (!hardDeadline) {
+        await this.prisma.mockInterviewTurn.create({ data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content } })
+        return { ...opened, ...interviewDeadlineFields(null, new Date()) }
+      }
       const writtenAt = new Date()
-      const deadlineAt = hardDeadline ? deadlineAtFromStart(writtenAt, session.durationMin) : null
+      const deadlineAt = deadlineAtFromStart(writtenAt, session.durationMin)
       await this.prisma.$transaction([
-        this.prisma.mockInterviewTurn.create({
-          data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content },
-        }),
+        this.prisma.mockInterviewTurn.create({ data: { sessionId: session.id, idx: 0, role: 'interviewer', qType: q.qType, content, createdAt: writtenAt } }),
         this.prisma.mockInterviewSession.update({ where: { id: session.id }, data: { deadlineAt } }),
       ])
-      return {
-        question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false as const,
-        ...interviewDeadlineFields(deadlineAt, new Date()),
-      }
+      return { ...opened, ...interviewDeadlineFields(deadlineAt, new Date()) }
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
       await this.prisma.$transaction([
@@ -260,6 +260,7 @@ export class MockInterviewService {
     })
     // 进门时已经过点、但仍在 3 秒宽限内：不调模型，只存这条回答。
     if (isPastDeadline(session.deadlineAt, new Date(), 0)) {
+      // 到点后这一场已经结束，同一题的重复提交按「已经收下」处理，库里留的是先到的那一条。
       await storeAnswer()
       return finished(session.deadlineAt)
     }
@@ -287,16 +288,19 @@ export class MockInterviewService {
       q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript }, qUsage.add)
     } catch (error) {
       this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
-      const deadlineAt = await this.currentDeadline(session.id)
+      const deadlineAt = session.deadlineAt ? await this.currentDeadline(session.id).catch(() => { throw error }) : null
       if (isPastDeadline(deadlineAt, new Date(), 0)) {
+        // 到点后这一场已经结束，同一题的重复提交按「已经收下」处理，库里留的是先到的那一条。
         await storeAnswer()
         return finished(deadlineAt)
       }
       throw error
     }
     this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'success', session.endUserId)
-    const deadlineAt = await this.currentDeadline(session.id)
-    if (isPastDeadline(deadlineAt, new Date(), 0)) {
+    const deadlineAt = session.deadlineAt ? await this.currentDeadline(session.id).catch(() => session.deadlineAt) : null
+    const decidedAt = new Date()
+    if (isPastDeadline(deadlineAt, decidedAt, 0)) {
+      // 到点后这一场已经结束，同一题的重复提交按「已经收下」处理，库里留的是先到的那一条。
       await storeAnswer()
       return finished(deadlineAt)
     }
@@ -328,7 +332,7 @@ export class MockInterviewService {
       qType: q.qType,
       questionIndex: asked + 1,
       questionTarget: session.questionTarget,
-      ...interviewDeadlineFields(deadlineAt, new Date()),
+      ...interviewDeadlineFields(deadlineAt, decidedAt),
     }
   }
 

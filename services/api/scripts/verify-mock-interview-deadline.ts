@@ -70,6 +70,7 @@ Logger.overrideLogger(new SilentLogger())
 interface LlmHold { markArrived: () => void; gate: Promise<void> }
 interface LlmJob { status: number; content: string; hold: LlmHold | null }
 const llmQueue: LlmJob[] = []
+const llmBodies: string[] = []
 let llmRequests = 0
 
 function enqueue(status: number, content: string): void {
@@ -90,9 +91,11 @@ function enqueueHold(status: number, content: string): { arrived: Promise<void>;
 function startStub(): Promise<{ server: Server; url: string }> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
-      req.on('data', () => undefined)
+      const chunks: Buffer[] = []
+      req.on('data', (chunk: Buffer) => { chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)) })
       req.on('end', () => {
         llmRequests += 1
+        llmBodies.push(Buffer.concat(chunks).toString('utf8'))
         const job = llmQueue.shift() ?? { status: 200, content: DEFAULT_Q, hold: null }
         const send = () => {
           if (res.writableEnded) return
@@ -148,6 +151,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 let baseUrl = ''
+const answerSuccesses: Array<Record<string, unknown>> = []
 
 async function api(method: string, path: string, auth: Auth, json?: unknown): Promise<HttpResult> {
   const headers = authHeaders(auth)
@@ -162,7 +166,12 @@ async function api(method: string, path: string, auth: Auth, json?: unknown): Pr
   if (text) {
     try { parsed = JSON.parse(text) } catch { parsed = null }
   }
-  return { status: res.status, body: asRecord(parsed), text }
+  const root = asRecord(parsed)
+  if (method === 'POST' && path.endsWith('/answer') && (res.status === 200 || res.status === 201) && root?.['success'] === true) {
+    const data = asRecord(root['data'])
+    if (data) answerSuccesses.push(data)
+  }
+  return { status: res.status, body: root, text }
 }
 
 async function transcribe(id: string, auth: Auth): Promise<HttpResult> {
@@ -235,26 +244,28 @@ function scanLiterals(): void {
   const root = join(__dirname, '..', '..', '..')
   const skip = new Set(['node_modules', '.git', 'dist', '.tmp', 'coverage', '.turbo', '.next'])
   const hits: Array<{ file: string; message: number; code: number }> = []
+  const scanned: string[] = []
   const walk = (dir: string): void => {
-    let names: string[]
-    try { names = readdirSync(dir) } catch { return }
+    const names = readdirSync(dir)
     for (const name of names) {
       if (skip.has(name)) continue
       const full = join(dir, name)
-      let st: ReturnType<typeof statSync>
-      try { st = statSync(full) } catch { continue }
+      const st = statSync(full)
       if (st.isDirectory()) { walk(full); continue }
       if (!/\.(ts|tsx|js|mjs|cjs|sql|prisma|md|json)$/.test(name)) continue
-      let text = ''
-      try { text = readFileSync(full, 'utf8') } catch { continue }
+      const text = readFileSync(full, 'utf8')
+      scanned.push(full)
       const message = countQuoted(text, EXPECTED_MESSAGE)
       const code = countQuoted(text, EXPECTED_CODE)
       if (message || code) hits.push({ file: full, message, code })
     }
   }
   walk(root)
+  const deadlineFile = join('mock-interview', 'mock-interview-deadline.ts')
+  check(scanned.length > 200, `文案扫描读到的文件数大于 200（实际 ${scanned.length}）`)
+  check(scanned.some((file) => file.endsWith(deadlineFile)), '新文件 mock-interview-deadline.ts 在被扫描到的文件里')
   const only = hits.length === 1 ? hits[0] : undefined
-  check(!!only && only.file.endsWith(`${join('mock-interview', 'mock-interview-deadline.ts')}`) && only.message === 1 && only.code === 1,
+  check(!!only && only.file.endsWith(deadlineFile) && only.message === 1 && only.code === 1,
     `409 的话和 code 只在新文件里各出现一处（实际 ${hits.map((h) => `${h.file}#m${h.message}c${h.code}`).join(' | ') || '零处'}）`)
 }
 
@@ -449,6 +460,7 @@ async function main(): Promise<void> {
       { label: 'hardDeadline 为 false', json: { hardDeadline: false } },
     ]
     const unflaggedStarts: Record<string, unknown>[] = []
+    const unflaggedOpen: Array<{ id: string; auth: Auth; label: string }> = []
     let openId = ''
     let openAuth: Auth = NONE
     for (const item of unflaggedBodies) {
@@ -466,6 +478,7 @@ async function main(): Promise<void> {
       const row = await prisma.mockInterviewSession.findUnique({ where: { id: created.id } })
       check(row?.deadlineAt === null && row?.status === 'in_progress', `不带标记（${item.label}）库里截止时刻为空`)
       unflaggedStarts.push(data)
+      unflaggedOpen.push({ id: created.id, auth: created.auth, label: item.label })
       openId = created.id
       openAuth = created.auth
     }
@@ -476,6 +489,15 @@ async function main(): Promise<void> {
       && row['questionTarget'] === unflaggedStarts[0]?.['questionTarget']
       && row['deadlineAt'] === null && row['timeUp'] === false),
       '三种不带标记的开始，原有字段彼此相同')
+
+    for (const item of unflaggedOpen.slice(0, -1)) {
+      enqueue(200, JSON.stringify({ question: `${item.label}的下一题`, qType: 'experience' }))
+      const answered = dataOf(await api('POST', `/mock-interviews/${item.id}/answer`, item.auth, { answer: `${item.label}的回答` }), `不带标记回答（${item.label}）`)
+      check(answered['done'] === false && answered['question'] === `${item.label}的下一题`
+        && answered['deadlineAt'] === null && answered['timeUp'] === false,
+        `不带标记（${item.label}）正常回答一题，拿到下一题，三个字段对`)
+      assertIsoNow(answered['serverNow'], `不带标记回答（${item.label}）`)
+    }
 
     await prisma.mockInterviewSession.update({
       where: { id: openId },
@@ -515,9 +537,12 @@ async function main(): Promise<void> {
       const again = await start(created.id, created.auth, { hardDeadline: true })
       const againErr = errorOf(again)
       const row = await prisma.mockInterviewSession.findUnique({ where: { id: created.id } })
+      const firstTurn = (await loadTurns(created.id)).find((t) => t.idx === 0)
       check(again.status === 400 && againErr.code === 'INTERVIEW_ALREADY_STARTED' && llmRequests === againLlm
         && row?.deadlineAt?.toISOString() === data['deadlineAt'],
         `再调开始仍是 400，不打模型，库里截止时刻不变（${minutes} 分钟）`)
+      check(!!row?.deadlineAt && !!firstTurn && row.deadlineAt.getTime() - firstTurn.createdAt.getTime() === span,
+        `${minutes} 分钟场次的截止时刻减去第 0 轮 createdAt 恰好等于 ${minutes} 分钟`)
       const got = dataOf(await api('GET', `/mock-interviews/${created.id}`, created.auth), `读取 ${minutes} 分钟`)
       check(got['deadlineAt'] === data['deadlineAt'] && got['timeUp'] === false, `GET 回的截止时刻和开始时是同一个（${minutes} 分钟）`)
       assertIsoNow(got['serverNow'], `${minutes} 分钟读取`)
@@ -555,6 +580,7 @@ async function main(): Promise<void> {
       const spoken = dataOf(await api('POST', `/mock-interviews/${id}/turns/0/audio`, auth), `${label} 到点前播报`)
       check(heard['text'] === '转写对照句' && asrCalls === asrBefore + 1, `${label} 到点前转写调了语音识别（对照：次数 +1）`)
       check(spoken['format'] === 'mp3' && ttsCalls === ttsBefore + 1, `${label} 到点前播报调了语音合成（对照：次数 +1）`)
+      const bodiesBeforeAnswer = llmBodies.length
       enqueue(200, JSON.stringify({ question: `${label}的下一题`, qType: 'experience' }))
       const answered = dataOf(await api('POST', `/mock-interviews/${id}/answer`, auth, { answer: `${label}到点前的回答` }), `${label} 到点前回答`)
       const midTurns = await loadTurns(id)
@@ -562,6 +588,8 @@ async function main(): Promise<void> {
         && answered['timeUp'] === false && answered['deadlineAt'] === started['deadlineAt']
         && midTurns.some((t) => t.role === 'interviewer' && t.content === `${label}的下一题`),
         `${label} 到点前回答正常出下一题，三个字段对，假模型请求数涨过`)
+      check((llmBodies[bodiesBeforeAnswer] ?? '').includes(`${label}到点前的回答`),
+        `${label} 出题请求正文里有刚交的这条回答`)
       assertIsoNow(answered['serverNow'], `${label} 到点前回答`)
 
       await setDeadline(id, -1)
@@ -649,6 +677,7 @@ async function main(): Promise<void> {
     {
       const created = await create(memberA, 5)
       dataOf(await start(created.id, created.auth, { hardDeadline: true }), '失败且过点开始')
+      const interviewerBefore = (await loadTurns(created.id)).filter((t) => t.role === 'interviewer').length
       const hold = enqueueHold(500, '')
       const logsBefore = await failedQuestionLogs()
       const llmBefore = llmRequests
@@ -657,11 +686,12 @@ async function main(): Promise<void> {
       const data = dataOf(res, '失败且过点')
       await aiLog.flush()
       const turns = await loadTurns(created.id)
-      check(res.status < 300 && data['done'] === true && data['timeUp'] === true
+      check(res.status < 300 && data['done'] === true && data['timeUp'] === true && !('question' in data)
         && llmRequests === llmBefore + 1
         && turns.some((t) => t.content === '失败时已经过点的回答')
+        && turns.filter((t) => t.role === 'interviewer').length === interviewerBefore
         && (await failedQuestionLogs()) === logsBefore + 1,
-        '模型失败且已经过点：回答在库里，返回已结束，不是报错，失败日志照旧记一条')
+        '模型失败且已经过点：回答在库里，没有下一题，面试官轮次没增加，返回已结束，失败日志照旧记一条')
 
       const fresh = await create(memberA, 5)
       dataOf(await start(fresh.id, fresh.auth, { hardDeadline: true }), '失败且没过点开始')
@@ -674,28 +704,42 @@ async function main(): Promise<void> {
       const freshTurns = await loadTurns(fresh.id)
       check(denied.status === 503 && deniedErr.code === 'AI_PROVIDER_ERROR'
         && llmRequests === llmNotPast + 1
+        && freshTurns.some((t) => t.role === 'interviewer' && t.idx === 0)
         && !freshTurns.some((t) => t.role === 'candidate')
         && (await failedQuestionLogs()) === logsNotPast + 1,
-        '模型失败且没过点：报原来的错，回答不在库里，失败日志照旧有')
+        '模型失败且没过点：报原来的错，第一题还在，回答不在库里，失败日志照旧有')
+      enqueue(200, JSON.stringify({ question: '失败后重交的下一题', qType: 'experience' }))
+      const retried = dataOf(await api('POST', `/mock-interviews/${fresh.id}/answer`, fresh.auth, { answer: '失败时还没过点的回答' }), '失败后重交')
+      const retriedTurns = await loadTurns(fresh.id)
+      check(retried['done'] === false && retried['question'] === '失败后重交的下一题'
+        && retriedTurns.some((t) => t.role === 'candidate' && t.content === '失败时还没过点的回答'),
+        '没过点失败后同一条回答再交一次：模型正常，拿到下一题，回答在库里')
     }
 
     // ── 结束：只用已存回答；没回答 400；出报告失败后回答仍 409 ───────────────
     {
       const stored = '已存回答_只此一句'
+      const rejected = '过点后不该进报告的回答'
       const created = await create(NONE, 5)
       dataOf(await start(created.id, created.auth, { hardDeadline: true }), '出报告开始')
       await setDeadline(created.id, -1000)
       const llmBefore = llmRequests
       dataOf(await api('POST', `/mock-interviews/${created.id}/answer`, created.auth, { answer: stored }), '出报告前的宽限回答')
       check(llmRequests === llmBefore, '出报告前这条宽限回答没有打模型（对照后面出报告会打）')
+      await setDeadline(created.id, -3500)
+      const rejectLlm = llmRequests
+      assert409(await api('POST', `/mock-interviews/${created.id}/answer`, created.auth, { answer: rejected }), '出报告前过点 3.5 秒')
+      check(llmRequests === rejectLlm && !(await loadTurns(created.id)).some((t) => t.content === rejected),
+        '过点 3.5 秒的回答被拒绝，没有入库，也没有打模型')
       enqueue(200, REPORT_JSON)
+      const bodiesAtEnd = llmBodies.length
       const ended = dataOf(await api('POST', `/mock-interviews/${created.id}/end`, created.auth, {}), '过点后结束')
+      const reportBody = llmBodies.slice(bodiesAtEnd).join('\n')
       const excerpts = Array.isArray(ended['qaExcerpts']) ? ended['qaExcerpts'] as Array<Record<string, unknown>> : []
       const answers = excerpts.map((row) => row['answerExcerpt']).filter((item) => item != null)
-      check(llmRequests === llmBefore + 1 && answers.length === 1 && answers[0] === stored
-        && !JSON.stringify(ended['report'] ?? {}).includes(stored)
-        && !JSON.stringify(ended).includes('没说过的句子'),
-        '过点后结束，报告摘录只有库里这条回答')
+      check(llmRequests === llmBefore + 1 && reportBody.includes(stored) && !reportBody.includes(rejected)
+        && answers.length === 1 && answers[0] === stored,
+        '过点后结束：出报告请求里有被收下的回答、没有被拒的那条，摘录也只有被收下的')
 
       const empty = await create(NONE, 5)
       dataOf(await start(empty.id, empty.auth, { hardDeadline: true }), '零回答开始')
@@ -724,6 +768,22 @@ async function main(): Promise<void> {
       check(llmRequests === answerLlm, '报告失败后再回答仍被截止挡住，没有打模型')
     }
 
+    // ── 到点后同一题连交两次：都按已结束返回，库里只留先到的那条 ───────────────
+    {
+      const created = await create(memberA, 5)
+      dataOf(await start(created.id, created.auth, { hardDeadline: true }), '重复提交开始')
+      await setDeadline(created.id, -1000)
+      const llmBefore = llmRequests
+      const first = dataOf(await api('POST', `/mock-interviews/${created.id}/answer`, created.auth, { answer: '重复提交第一次' }), '到点后第一次提交')
+      const second = dataOf(await api('POST', `/mock-interviews/${created.id}/answer`, created.auth, { answer: '重复提交第二次内容不同' }), '到点后第二次提交')
+      const answers = (await loadTurns(created.id)).filter((t) => t.role === 'candidate')
+      check(first['done'] === true && first['timeUp'] === true
+        && second['done'] === true && second['timeUp'] === true
+        && llmRequests === llmBefore
+        && answers.length === 1 && answers[0]?.content === '重复提交第一次',
+        '到点后同一题连交两次都已结束，库里只留第一次，假模型没有收到请求')
+    }
+
     // ── AI 暂停：读取走真实守卫，生成被拦住 ───────────────────────────────────
     {
       const llmBefore = llmRequests
@@ -737,6 +797,9 @@ async function main(): Promise<void> {
       await setFlags(false)
       assert409(await api('POST', `/mock-interviews/${memberSession.id}/answer`, memberSession.auth, { answer: '暂停解开后' }), '暂停解开后回答')
     }
+
+    check(answerSuccesses.length > 0 && answerSuccesses.every((row) => !(row['done'] === false && row['timeUp'] === true)),
+      `回答接口的成功返回里没有 done 为 false 同时 timeUp 为 true（共 ${answerSuccesses.length} 条）`)
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } finally {
