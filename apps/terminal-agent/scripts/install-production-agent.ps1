@@ -1065,6 +1065,18 @@ if ($KeepPrinterQueueUnpaused) {
 Write-Host (Get-BootSpoolGuardStatusLine)
 # boot-spool-guard-install-end
 
+# print-completion-log-install-begin
+# Install-time only. Resolve, do not Publish: no scheduled task calls this script.
+$printCompletionLog = Resolve-AgentProvisionSource "print-completion-log.ps1"
+. $printCompletionLog
+try {
+  Enable-PrintCompletionLog
+} catch {
+  Write-WarnLine "Print completion log was not enabled: $($_.Exception.Message)"
+}
+Write-Host (Get-PrintCompletionLogStatusLine)
+# print-completion-log-install-end
+
 # daily-reboot-install-begin
 if ($dailyRebootMode -eq "off") {
   Uninstall-DailyRebootTask
