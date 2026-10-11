@@ -86,7 +86,7 @@ export function InterviewTimeUp({ variant, answersRecorded, onLeave, onRestart, 
             </div>
           </section>
           <InterviewNotice>
-            这一场已经封存，不能再补答，也不会把没提交的内容并进报告。
+            这一场已经结束，不能再补答，也不会把没提交的内容并进报告。
           </InterviewNotice>
           <InterviewRail />
         </div>
