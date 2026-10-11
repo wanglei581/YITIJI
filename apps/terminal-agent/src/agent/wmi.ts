@@ -352,6 +352,47 @@ export async function hasPrintServiceCompletionEvent(
   return output?.trim().toLowerCase() === 'true'
 }
 
+/**
+ * Whether Microsoft-Windows-PrintService/Operational is switched on.
+ * 'unknown' means the configuration could not be read. Read-only: the script
+ * must not enable, disable, or clear the log.
+ */
+export type PrintCompletionLogState = 'enabled' | 'disabled' | 'unknown'
+
+/**
+ * Windows PowerShell 5.1 probe. Get-WinEvent -ListLog reads IsEnabled and
+ * writes enabled, disabled, or unknown. It does not change log settings.
+ */
+export function buildPrintServiceCompletionLogStateScript(): string {
+  return [
+    'try {',
+    "  $log = Get-WinEvent -ListLog 'Microsoft-Windows-PrintService/Operational' -ErrorAction Stop",
+    "  if ($log.IsEnabled) { 'enabled' } else { 'disabled' }",
+    '} catch {',
+    "  'unknown'",
+    '}',
+  ].join('\n')
+}
+
+/** Whole string, after trim and lower-case, must be exactly enabled or disabled. */
+export function parsePrintCompletionLogState(output: string | null): PrintCompletionLogState {
+  const normalized = output?.trim().toLowerCase()
+  if (normalized === 'enabled' || normalized === 'disabled') return normalized
+  return 'unknown'
+}
+
+/** Never throws. Non-Windows does not spawn PowerShell. */
+export async function getPrintServiceCompletionLogState(): Promise<PrintCompletionLogState> {
+  if (process.platform !== 'win32') return 'unknown'
+  try {
+    return parsePrintCompletionLogState(
+      await runPowerShell(buildPrintServiceCompletionLogStateScript()),
+    )
+  } catch {
+    return 'unknown'
+  }
+}
+
 /** Pure JobStatus parser, exported for deterministic fault-injection verification. */
 export function parsePrintJobStatus(
   output: string | null,

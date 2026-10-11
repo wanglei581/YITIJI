@@ -7,8 +7,12 @@ if (process.platform !== 'win32') {
 }
 
 const require = createRequire(import.meta.url)
-const { buildPrintServiceCompletionEventScript } = require('../dist/agent/wmi.js')
+const {
+  buildPrintServiceCompletionEventScript,
+  buildPrintServiceCompletionLogStateScript,
+} = require('../dist/agent/wmi.js')
 const script = buildPrintServiceCompletionEventScript()
+const logStateScript = buildPrintServiceCompletionLogStateScript()
 
 assert.match(
   script,
@@ -98,4 +102,48 @@ assert.equal(
   'unrelated LocalSystem documents on the same queue must not confirm',
 )
 
+function runLogStateFixture(statement) {
+  const fixtureScript =
+    'function Get-WinEvent { param([string]$ListLog, [string]$ErrorAction); ' +
+    statement +
+    ' }; ' +
+    logStateScript
+  const result = spawnSync(
+    'powershell',
+    ['-NonInteractive', '-NoProfile', '-Command', fixtureScript],
+    { encoding: 'utf8' },
+  )
+  assert.equal(result.status, 0, `PowerShell log-state fixture failed: ${result.stderr}`)
+  return result.stdout.trim().toLowerCase()
+}
+
+assert.equal(
+  runLogStateFixture('[pscustomobject]@{ IsEnabled = $true }'),
+  'enabled',
+  'an enabled Operational log must report enabled',
+)
+assert.equal(
+  runLogStateFixture('[pscustomobject]@{ IsEnabled = $false }'),
+  'disabled',
+  'a disabled Operational log must report disabled',
+)
+assert.equal(
+  runLogStateFixture("throw 'log unreadable'"),
+  'unknown',
+  'a failing log configuration read must report unknown',
+)
+
+const liveLogState = spawnSync(
+  'powershell',
+  ['-NonInteractive', '-NoProfile', '-Command', logStateScript],
+  { encoding: 'utf8' },
+)
+assert.equal(liveLogState.status, 0, `live log-state query failed: ${liveLogState.stderr}`)
+const liveState = liveLogState.stdout.trim().toLowerCase()
+assert.ok(
+  liveState === 'enabled' || liveState === 'disabled',
+  `live log-state query must report enabled or disabled, got ${JSON.stringify(liveState)}`,
+)
+
 console.log('PRINTSERVICE_COMPLETION_PASS taskId=true genericPantum=true unrelated=false')
+console.log(`PRINTSERVICE_LOG_STATE_PASS fixture=enabled,disabled,unknown live=${liveState}`)

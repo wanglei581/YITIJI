@@ -47,8 +47,8 @@ import { claimPrintTasksIfGateOpen, preparePrinterForDispatch, settlePrinterAfte
 import { computeMonitorTimeoutMs } from './print-monitor-timeout'
 
 export { computeMonitorTimeoutMs }
-import { monitorPrintJob } from './print-job-monitor'
-import { getPrinterPreflight, type PrinterPreflight, type PrintJobMonitorStatus } from './wmi'
+import { monitorPrintJob, type CompletionEvidenceChannel } from './print-job-monitor'
+import { getPrinterPreflight, type PrinterPreflight, type PrintCompletionLogState, type PrintJobMonitorStatus } from './wmi'
 
 export { monitorPrintJob }
 export type { MonitorOutcome } from './print-job-monitor'
@@ -303,6 +303,8 @@ type ExecuteTaskMonitorOverride = {
     taskId: string,
     dispatchedAtMs: number,
   ) => Promise<boolean>
+  queryCompletionLogState?: () => Promise<PrintCompletionLogState>
+  evidenceChannel?: CompletionEvidenceChannel
 }
 
 /** 生产调用不传时走真实打印命令和本机队列监控。门禁通过这个参数注入桩。 */
@@ -600,8 +602,8 @@ export async function executeTask(
       // PaperOut requires 2 consecutive confirmations to guard against transient
       // driver state flicker.
       // Ambiguous outcomes (timeout / never observed / monitor unavailable) fail
-      // closed. Only an explicit spooler completion or an observed job followed
-      // by queue removal may reach the server as completed.
+      // closed. Explicit completion is reported as completed. Queue removal
+      // without a completion record is completed only when inferred, and logged.
       const monitorTimeoutMs = computeMonitorTimeoutMs(task.billablePages, task.params?.copies, task.params)
       log(`task ${task.taskId}: monitoring print queue for up to ${monitorTimeoutMs / 1000}s (pages=${task.billablePages ?? '?'} copies=${task.params?.copies ?? 1})`)
       const monitorOutcome = await monitorPrintJob(
@@ -619,6 +621,9 @@ export async function executeTask(
       // Log monitor warn regardless of failed/completed (covers Retained timeout detail).
       if (monitorOutcome.warn) {
         warn(`task ${task.taskId}: print queue monitor: ${monitorOutcome.warn}`)
+      }
+      if (!monitorOutcome.failed && monitorOutcome.inferred) {
+        warn(`task ${task.taskId}: print result inferred from queue removal — no completion record (${monitorOutcome.inferred})`)
       }
 
       if (monitorOutcome.failed) {
