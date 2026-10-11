@@ -68,7 +68,8 @@ export function ConvertImagesPage() {
   const [previewFailed, setPreviewFailed] = useState(false)
   const sentRef = useRef(false)
 
-  useBusyLock(uploading || generating || qrBusy || rechecking)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(uploading || generating || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = useTerminalKiosk()

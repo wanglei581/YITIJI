@@ -109,7 +109,8 @@ export function ResumeSourcePage() {
     return { industry: targetIndustry || undefined, targetJob: targetJob.trim() || undefined, experience: targetExperience, scene: targetScene, major: targetMajor.trim() || undefined, degree: targetDegree.trim() || undefined, skipped: false }
   }
   const sourceBusy = uploading || phoneBusy || usbBusy
-  useBusyLock(sourceBusy)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(uploading || usbBusy)
 
   const rememberScreen = (next: ResumeScreen) => setSearchParams((params) => { params.set('screen', next); return params }, { replace: true })
   // 确认屏不写 screen=summary，从解析页 replace 回来再后退，仍落在原来的 ?intent= 上。

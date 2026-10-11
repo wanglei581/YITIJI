@@ -111,7 +111,8 @@ export function useSignStampFlow() {
   const [cap, setCap] = useState<CapStatus>('loading')
   const [terminalId, setTerminalId] = useState(() => getTerminalId())
 
-  useBusyLock(busy || qrBusy || showQr)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(busy)
 
   useEffect(() => {
     setTerminalId(getTerminalId())
