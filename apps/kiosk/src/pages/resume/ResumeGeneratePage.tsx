@@ -321,8 +321,11 @@ export function ResumeGeneratePage() {
             className="qx-btn"
             data-variant="primary"
             data-testid="resume-generate-primary"
-            disabled={generating || Boolean(aiOutage)}
-            onClick={() => { if (!aiOutage) void handleGenerate() }}
+            // 这里刻意**不看** aiOutage：能力级失败一旦把这颗钮禁掉，AI 恢复了也亮不回来
+            // （清掉 aiOutage 的只有 runGenerate，而它只能从这颗钮进）。和职业规划页同一做法：
+            // 不轮询、不自动重探，用户再按一次才再发一次真实请求，由结果重新决定。
+            disabled={generating}
+            onClick={() => void handleGenerate()}
           >
             <SparklesIcon className="h-5 w-5" aria-hidden="true" />
             {generating ? '正在整理…' : '让 AI 整理成新简历'}

@@ -188,6 +188,55 @@ test('AI 不可用时按原样导出仍能走到打印交接 @kiosk', async ({ p
   await expect(page).toHaveURL(/\/print\//)
 })
 
+test('AI 不可用过一次之后恢复了，同一页再点一次就能整理 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: {
+      taskId: 'gen-outage-2',
+      status: 'failed',
+      failCode: 'AI_PROVIDER_NOT_CONFIGURED',
+      failReason: '模型账户不可用',
+    },
+  })
+  await page.goto('/resume/generate')
+  await fillRequired(page)
+  const primary = page.getByRole('button', { name: '让 AI 整理成新简历' })
+  await primary.click()
+  await expect(page.getByText('AI 暂时不可用，你可以先导出并打印已填的内容')).toBeVisible()
+  // 手动那条路照旧在；AI 那颗钮不灰，但页面不自己去重探。
+  await expect(page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })).toBeEnabled()
+  await expect(primary).toBeEnabled()
+  await expectNoStaff(page)
+
+  // 还没恢复时再点：照实再问一次，仍然落回同一条手动出路，不卡死。
+  await primary.click()
+  await expect(page.getByText('AI 暂时不可用，你可以先导出并打印已填的内容')).toBeVisible()
+  await expect(primary).toBeEnabled()
+
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: {
+      taskId: 'gen-recovered-1',
+      status: 'completed',
+      providerName: 'deepseek',
+      resume: {
+        basic: { name: '孙晓雯', city: '青岛' },
+        intention: { position: '仓储管理员', city: '青岛' },
+        summary: '想找仓储或客服的工作。',
+        education: [],
+        experience: [],
+        projects: [],
+        skills: [],
+        certificates: [],
+      },
+      missingHints: [],
+    },
+  })
+  await primary.click()
+  await expect(page).toHaveURL(/\/resume\/generate\/preview$/)
+})
+
 test('带着已填内容从预览回来，跳过第 0 屏 @kiosk', async ({ page, api }) => {
   registerW4Api(api)
   api.respond('POST', '/api/v1/resume/generate', {

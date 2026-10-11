@@ -188,6 +188,13 @@ must('generate', /<AiTaskRegion/, '生成页失败态必须挂 AiTaskRegion（fa
 // 一律用 manual 则是宣称草稿等价于 AI 润色（伪造能力，CLAUDE.md §9）。
 must('generate', /mode: 'blocked'/, 'ai-down（能力级故障）必须走 blocked')
 must('generate', /mode: 'result-unavailable'/, '本次失败但服务可用时必须走 result-unavailable，不得说成能力不可用')
+// 粘滞死锁防线（走查 10/10 B 件）：能力级失败后「让 AI 整理成新简历」不得被 aiOutage 禁掉，
+// 否则 AI 恢复了也点不了、这一页没有再试；用户主动再点时必须先清 aiOutage。
+mustNot('generate', /disabled=\{[^}]*aiOutage[^}]*\}/, '生成钮不得被 aiOutage 禁用 —— 一次能力级失败后 AI 恢复了也无法再试')
+mustNot('generate', /if \(!aiOutage\) void handleGenerate\(\)/, '生成钮的点击不得被 aiOutage 拦掉')
+mustHandler('generate', 'runGenerate', [
+  [/setAiOutage\(null\)/, '用户主动生成时必须清掉上一次的 aiOutage，由这次请求的结果重新决定'],
+])
 mustNot('generate', /mode: 'manual'/, '草稿不是 AI 润色的等价替代，不得套 manual')
 must('generate', /没有丢/, 'stillAvailable 必须如实告诉用户已填内容没丢')
 must('generate', /onClick: \(\) => void handleExportDraft\(\)/, '降级动作必须真的挂到草稿导出处理器上')
