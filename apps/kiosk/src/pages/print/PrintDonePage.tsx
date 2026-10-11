@@ -508,7 +508,9 @@ export function PrintDonePage() {
     }
 
     const jam = visual === 'paper-jam'
-    const payment = paymentFactOf(amountCents)
+    // 到机码单从认领页过来时不带金额（认领放行的回包里没有）：金额未知时改认服务端订单回执，和缺纸那一支同一个取法。
+    // 现场建的单带着建单时的金额，照旧用它。
+    const payment = amountCents == null && takeaway ? outOfPaperMoneyOf(takeaway, amountCents).fact : paymentFactOf(amountCents)
     const sameCode = sameCodeResumeEligible(state.pickupSource, payment)
     // 已确认失败且服务端说这单还能重打，才说同码接着打；结果未确认另有一句（要等 5 分钟）。
     const resumeLine = !isUnconfirmed && sameCode && Boolean(takeaway?.canRetry) ? SAME_CODE_RESUME_LINE : null

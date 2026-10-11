@@ -177,6 +177,54 @@ test('a zero-yuan pickup-code unconfirmed print says to re-enter the same code a
   await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
 })
 
+// 2026-10-11 走查实走：真的到机码单从认领页过来时不带金额（上一条用例是手工塞了 amountCents: 0，和真实不符）。
+// 金额要从服务端订单回执里认；回执取不到时保持保守说法，不猜成 0 元。
+test('a real pickup-code order without a flow amount reads the amount from the server receipt @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const receipt = (amountCents: number) => ({
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo', expiresAt: '2099-01-01T00:00:00.000Z', filename: '取件文件.pdf',
+      mimeType: 'application/pdf', sizeBytes: 128, orderId: 'order-pickup-1', orderNo: 'ORD-20261011-4D2B2B1101',
+      payStatus: 'paid', amountCents, canRetry: true,
+    },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  const pickupState = { taskId: TASK_ID, pickupSource: true, file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 1, colorMode: 'bw', duplex: 'simplex' } }
+
+  // 回执取不到（404）：不知道金额，不说同码接着打。
+  await openDoneWithState(page, pickupState)
+  const unconfirmed = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(unconfirmed).toBeVisible()
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+
+  // 回执说 0 元：说 5 分钟后同码整份重打，不再写等待人工核查。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openDoneWithState(page, pickupState)
+  await expect(unconfirmed).toContainText('过 5 分钟可以回这台机器再输一次同一个到机码')
+  await expect(unconfirmed).not.toContainText('等待人工核查')
+  await expect(unconfirmed).not.toContainText('核实后给出结论')
+
+  // 回执说收过钱：不说同码接着打。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(200))
+  await openDoneWithState(page, pickupState)
+  await expect(unconfirmed).toBeVisible()
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+
+  // 卡纸屏：0 元、服务端说还能重打，出现同码接着打那一句。
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINTER_ERROR', failureReasonForUser: '打印机可能卡纸或发生设备故障' },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openDoneWithState(page, pickupState)
+  await expect(page.getByTestId('print-fulfill-state-paper-jam')).toBeVisible()
+  await expect(page.getByTestId('print-fulfill-resume-line')).toContainText('回来再输一次同一个到机码就能接着打')
+})
+
 test('paid or on-site unconfirmed prints never mention the same-code resume @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
