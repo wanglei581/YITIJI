@@ -20,7 +20,7 @@ export function QaRecords({ items, token, onDeleted }: { items: MemberQaRecordIt
     setBusy(true)
     setError(null)
     try { await deleteMyQaRecord(token, id); setConfirmId(null); onDeleted() }
-    catch { setError('删除没有完成，请检查网络后重试。') }
+    catch { setError('删除没有完成，请稍后重试。') }
     finally { setBusy(false) }
   }
   return <>
