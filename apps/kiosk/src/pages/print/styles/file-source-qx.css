@@ -606,3 +606,33 @@
   .fs-page .fs-qr-live svg { width: min(300px, 100%); }
   .fs-page .fs-sec.qx-grow > .qx-card { min-height: 0; }
 }
+
+/* 本机会话 failed：沿用状态卡和主按钮，整块占住原来源选择的主区域。
+   状态卡吸收这一区的高度，说明在卡内居中；主按钮留在这块区域的底部。 */
+.fs-page[data-state='session-failed'] > .fs-session-block {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+.fs-page[data-state='session-failed'] > .fs-session-block > .qx-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 28px;
+  min-height: 100%;
+  padding: 28px 32px;
+}
+.fs-page[data-state='session-failed'] > .fs-session-block > .qx-card > .fs-status {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 308px;
+}
+.fs-page[data-state='session-failed'] .fs-status-h { font-size: var(--qx-fs-page); }
+.fs-page[data-state='session-failed'] .qx-btn {
+  flex: none;
+  width: 100%;
+  min-height: var(--qx-btn-h-lg);
+}

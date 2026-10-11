@@ -157,6 +157,13 @@ for (const [path, expected] of FROZEN) {
 }
 assert.doesNotMatch(read('src/pages/home/components/ContinuePanel.tsx'), /fileName/, '首页续办条不得读取文件名：公共屏上的文件名常带真名，明细应进入「我的 → 打印订单」由本人查看')
 
+const homePage = read('src/pages/home/HomePage.tsx')
+const homeView = read('src/pages/home/components/QxHomeView.tsx')
+assert.match(homePage, /useTerminalSessionState\(/, '首页读取本机会话状态')
+assert.match(homePage, /terminalSession === 'failed'/, '首页只在本机会话 failed 时改设备状态，checking 保持原样')
+assert.match(homePage, /这台机器现在下不了打印单/, '首页顶栏在本机会话 failed 时使用定句')
+assert.match(homeView, /printSessionFailed \? '这台机器现在下不了打印单'/, '首页打印入口在本机会话 failed 时使用同一句')
+
 const notifications = read('src/pages/placeholders/NotificationsPage.tsx')
 const activityDetail = read('src/pages/placeholders/MeActivityDetailPage.tsx')
 const meShell = read('src/pages/profile/me/MeListShell.tsx')

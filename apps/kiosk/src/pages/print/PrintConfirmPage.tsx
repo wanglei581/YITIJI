@@ -32,7 +32,7 @@ import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
-import { subscribeTerminalSession, terminalSessionState, type TerminalSessionState } from '../../services/terminalAuth'
+import { useTerminalSessionState } from '../../hooks/useTerminalSessionState'
 import { PrintConfirmView } from './components/PrintConfirmView'
 import {
   COLOR_MODE_LABEL,
@@ -143,7 +143,7 @@ export function PrintConfirmPage() {
   const contractReport = state?.contractReport
   const isContractReport = Boolean(contractReport)
   const [submitting, setSubmitting] = useState(false)
-  const [terminalSession, setTerminalSession] = useState<TerminalSessionState>(() => terminalSessionState())
+  const terminalSession = useTerminalSessionState()
   const [abandoning, setAbandoning] = useState(false)
   const [piiCheckRequired, setPiiCheckRequired] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -157,7 +157,6 @@ export function PrintConfirmPage() {
     Boolean(file.fileId) &&
     (file.mimeType === undefined || file.mimeType === 'application/pdf')
 
-  useEffect(() => subscribeTerminalSession(setTerminalSession), [])
   // 自我探索合并版只生成一次；二次确认复用同一份材料，不重复生成。
   const [mergedMaterial, setMergedMaterial] = useState<{ printFileUrl: string; name: string } | null>(null)
   const mergedFileUrl = appendEligible ? mergedMaterial?.printFileUrl ?? null : null
@@ -685,7 +684,7 @@ export function PrintConfirmPage() {
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={terminalSession === 'failed'}
-        terminalFailedText={userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}
+        terminalFailedText={`${userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}机器会自己再试，恢复后这里的按钮会重新亮起。`}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}

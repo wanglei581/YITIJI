@@ -683,6 +683,27 @@ assert.equal(
   1,
   'print upload uses one QR upload session hook'
 )
+assert.match(printUploadPage, /useTerminalSessionState\(/, '选文件页读取本机会话状态')
+assert.match(
+  printUploadPage,
+  /const phoneEnabled = terminalSession !== 'failed' && tab === 'qr' && channelActive && !file/,
+  '本机会话 failed 时不签发手机上传会话',
+)
+assert.match(
+  printUploadPage,
+  /if \(terminalSession === 'failed'\) return undefined/,
+  '本机会话 failed 时不轮询 U 盘',
+)
+assert.match(printUploadView, /FileSourceSessionBlocked/, '选文件页 failed 时改走说明块')
+const sessionBlocked = read('src/pages/print/file-source/FileSourceSessionBlocked.tsx')
+assert.match(sessionBlocked, /这台机器现在下不了打印单/, '选文件说明块使用标题定句')
+assert.match(
+  sessionBlocked,
+  /机器会自己再试，恢复后这里会自动变回可用。你可以等一会儿，或稍后再来。/,
+  '选文件说明块使用正文定句',
+)
+assert.match(sessionBlocked, /返回首页/, '选文件说明块只有返回首页这一个动作')
+assert.doesNotMatch(sessionBlocked, /useUploadSession\(/, '说明块不得再开一条上传会话')
 assert.doesNotMatch(
   printUpload,
   /<UploadSessionQrPanel\b/,

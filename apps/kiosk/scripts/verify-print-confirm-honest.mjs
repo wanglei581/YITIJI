@@ -1167,6 +1167,23 @@ if (!/aria-label=\{label\}/.test(confirmCopy)) {
   pass('主按钮读屏与可见文字一致')
 }
 
+const confirmPage = read(CONFIRM)
+if (!confirmPage.includes('useTerminalSessionState()')) {
+  fail('确认页要读取本机会话状态')
+} else {
+  pass('确认页读取本机会话状态')
+}
+if (!confirmPage.includes('机器会自己再试，恢复后这里的按钮会重新亮起。')) {
+  fail('确认页 failed 说明后要补上自动恢复这句')
+} else {
+  pass('确认页带上自动恢复这句')
+}
+if (!/userMessageOf\(\{ code: 'TERMINAL_SESSION_INVALID' \}, machineUnusableLine\(\)\)\}机器会自己再试，恢复后这里的按钮会重新亮起。/.test(confirmPage)) {
+  fail('自动恢复这句必须接在现有说明后面')
+} else {
+  pass('自动恢复这句接在现有说明后面')
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
   process.exit(1)

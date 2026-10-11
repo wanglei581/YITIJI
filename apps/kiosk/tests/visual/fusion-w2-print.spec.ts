@@ -2853,3 +2853,121 @@ test('expired phone upload offers the usb switch when usb import is available @w
   await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
 })
+
+const LOCAL_BOOT_TICKET_URL = 'http://127.0.0.1:9527/local/terminal-boot-ticket'
+const SESSION_FAILED_LINE = '这台机器现在下不了打印单'
+const SESSION_RECOVERY_LINE = '机器会自己再试，恢复后这里会自动变回可用。你可以等一会儿，或稍后再来。'
+const CONFIRM_RECOVERY_LINE = '机器会自己再试，恢复后这里的按钮会重新亮起。'
+
+test('print upload stays closed until this machine session is ready again @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  const sessionId = 'r8-upload'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'pending',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: null,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+  let releaseUpload: () => void = () => undefined
+  const uploadGate = new Promise<void>((resolve) => { releaseUpload = resolve })
+  api.respondWith('POST', '/api/v1/upload-sessions', async () => {
+    await uploadGate
+    return {
+      status: 200,
+      json: {
+        success: true,
+        data: {
+          sessionId,
+          uploadUrl: '/upload/phone',
+          uploadToken: 'r8-upload-token',
+          controlToken: 'r8-control',
+          expiresAt,
+        },
+      },
+    }
+  })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
+    requestNumber === 1
+      ? {
+          status: 401,
+          json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+        }
+      : { status: 200, json: { sessionToken: 'w2-recovered-terminal-session' } }
+  ))
+
+  await page.goto('/print-scan')
+  await expect(page.getByText('打印扫描', { exact: true }).first()).toBeVisible()
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+
+  await softNavigate(page, '/print/upload?source=document&tab=qr', null)
+  const blocked = page.getByTestId('file-source-state-session-failed')
+  await expect(blocked).toBeVisible()
+  await expect(blocked.getByText(SESSION_FAILED_LINE, { exact: true })).toBeVisible()
+  await expect(blocked.getByText(SESSION_RECOVERY_LINE, { exact: true })).toBeVisible()
+  const homeButton = blocked.getByRole('button', { name: '返回首页', exact: true })
+  await expect(homeButton).toBeVisible()
+  const homeBox = await homeButton.boundingBox()
+  expect(homeBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  await expect(page.getByTestId('file-source-channels')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-qr')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-hero')).toHaveCount(0)
+  await page.waitForTimeout(400)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(0)
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  await expect.poll(() => api.requestCount('POST', '/api/v1/upload-sessions')).toBeGreaterThan(0)
+  await expect(page.getByTestId('file-source-channels')).toBeVisible()
+  await expect(blocked).toHaveCount(0)
+  releaseUpload()
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('print confirm button lights up again after this machine session recovers @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
+    requestNumber === 1
+      ? {
+          status: 401,
+          json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+        }
+      : { status: 200, json: { sessionToken: 'w2-recovered-terminal-session' } }
+  ))
+
+  await seedMaterialSession(page)
+  await page.goto('/print/confirm')
+  const payButton = page.getByRole('button', { name: '确认并去付款', exact: true })
+  await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
+  await expect(payButton).toBeEnabled()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  const alert = page.locator('.pcf-alert[role="alert"]')
+  await expect(alert).toContainText(CONFIRM_RECOVERY_LINE)
+  await expect(alert).toContainText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。')
+  const blockedButton = page.getByRole('button', { name: '这台机器的安全校验没通过', exact: true })
+  await expect(blockedButton).toBeDisabled()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  await expect(payButton).toBeEnabled()
+  await expect(page.locator('.pcf-alert[role="alert"]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})

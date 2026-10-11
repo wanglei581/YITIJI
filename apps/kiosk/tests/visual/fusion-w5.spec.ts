@@ -2267,3 +2267,68 @@ test('settings stays operable at 390x844 without overlap @w5-mobile', async ({ p
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(dialog).toHaveCount(0)
 })
+
+const LOCAL_BOOT_TICKET_URL = 'http://127.0.0.1:9527/local/terminal-boot-ticket'
+const SESSION_FAILED_LINE = '这台机器现在下不了打印单'
+
+async function startTerminalSessionRefresh(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { startRefresh: () => void } }).__terminalSessionE2E
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法驱动终端会话状态')
+    hooks.startRefresh()
+  })
+}
+
+async function terminalSessionStateOf(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { state: () => string } }).__terminalSessionE2E
+    return hooks ? hooks.state() : 'missing'
+  })
+}
+
+test('home print status tells the truth when this machine cannot place a print order @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+
+  let openRefresh: () => void = () => undefined
+  const refreshGate = new Promise<void>((resolve) => { openRefresh = resolve })
+  let markRefreshArrived: () => void = () => undefined
+  const refreshArrived = new Promise<void>((resolve) => { markRefreshArrived = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    markRefreshArrived()
+    await refreshGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(printTile.getByText('先看价格再出纸 · 带走：打印件')).toBeVisible()
+  await expect(page.getByText('改简历', { exact: true })).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await refreshArrived
+  expect(await terminalSessionStateOf(page), '续期在飞时必须是 checking').toBe('checking')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(page.getByText(SESSION_FAILED_LINE)).toHaveCount(0)
+
+  openRefresh()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  await expect(page.getByText('先看价格再出纸 · 带走：打印件')).toHaveCount(0)
+  await expect(page.getByText('改简历', { exact: true })).toBeVisible()
+  await expect(page.getByText('练面试', { exact: true })).toBeVisible()
+
+  await printTile.click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.getByText('打印扫描', { exact: true }).first()).toBeVisible()
+  expect(errors).toEqual([])
+})

@@ -8,6 +8,7 @@ import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
+import { useTerminalSessionState } from '../../hooks/useTerminalSessionState'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinuePanel } from './components/ContinuePanel'
 import { QxHomeNavbar, QxHomeView } from './components/QxHomeView'
@@ -28,6 +29,8 @@ export function HomePage() {
   const auth = useAuth()
   const { endKioskUse } = useKioskSessionControl()
   const device = useOutletContext<TerminalDeviceStatusView>()
+  const terminalSession = useTerminalSessionState()
+  const printSessionFailed = terminalSession === 'failed'
   const toolbox = useToolboxCapabilityState()
   const campus = useSmartCampusCapabilityState()
   // 招聘内容托管（3.13）：没打开时首页不摆岗位、招聘会入口；两个 hook 自己也不发请求。
@@ -54,15 +57,17 @@ export function HomePage() {
     navigate(HOME_V6_ROUTES[actionId], topic ? { state: { topic } } : undefined)
   }
 
-  const deviceStatus = device.loading
-    ? { tone: 'unknown' as const, label: '设备检查中' }
-    : device.printerReady
-      ? { tone: 'ok' as const, label: device.printerLabel }
-      : device.kind === 'error'
-        ? { tone: 'bad' as const, label: device.printerLabel }
-        : device.kind === 'offline'
-          ? { tone: 'warn' as const, label: device.printerLabel }
-          : { tone: 'unknown' as const, label: '状态未知' }
+  const deviceStatus = printSessionFailed
+    ? { tone: 'warn' as const, label: '这台机器现在下不了打印单' }
+    : device.loading
+      ? { tone: 'unknown' as const, label: '设备检查中' }
+      : device.printerReady
+        ? { tone: 'ok' as const, label: device.printerLabel }
+        : device.kind === 'error'
+          ? { tone: 'bad' as const, label: device.printerLabel }
+          : device.kind === 'offline'
+            ? { tone: 'warn' as const, label: device.printerLabel }
+            : { tone: 'unknown' as const, label: '状态未知' }
 
   return (
     <div className="qx-home-host">
@@ -79,6 +84,7 @@ export function HomePage() {
           recruitment={recruitment}
           officialChannelCount={officialChannelCount}
           deviceStatus={deviceStatus}
+          printSessionFailed={printSessionFailed}
           continueSlot={<ContinuePanel />}
           onAction={handleAction}
           onOpenDevice={() => navigate('/error-offline')}

@@ -28,6 +28,7 @@ import {
   NowFileCard,
   PhoneQrSlot,
 } from './FileSourceBits'
+import { FileSourceSessionBlocked } from './FileSourceSessionBlocked'
 import '../styles/file-source-qx.css'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 
@@ -39,6 +40,8 @@ export interface FileSourceViewProps {
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   /** 打印闸门合上时的可见说明。页头说明在本页只留给读屏，这句要出现在画面上。 */
   orderPausedNotice?: string
+  /** 本机会话 failed。不渲染来源、二维码和文件入口。 */
+  sessionBlocked?: boolean
   isResumePrint: boolean
   showFileChannel: boolean
   showScan: boolean
@@ -165,6 +168,13 @@ function disabledReason(screen: FileSourceScreen): string | null {
 }
 
 export function FileSourceView(props: FileSourceViewProps) {
+  if (props.sessionBlocked) {
+    return <FileSourceSessionBlocked
+      pageTitle={props.pageTitle} pageSubtitle={props.pageSubtitle} terminalLabel={props.terminalLabel}
+      status={props.status} onBack={props.onBack} onHome={props.onHome}
+      onAdvisor={props.onAdvisor} onProfile={props.onProfile}
+    />
+  }
   const {
     screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,

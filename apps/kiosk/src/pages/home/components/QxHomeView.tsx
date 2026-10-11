@@ -70,6 +70,7 @@ interface QxHomeViewProps {
   recruitment: RecruitmentHostingState
   officialChannelCount: number
   deviceStatus: HomeDeviceStatus
+  printSessionFailed?: boolean
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
   onOpenDevice: () => void
@@ -132,6 +133,7 @@ export function QxHomeView({
   recruitment,
   officialChannelCount,
   deviceStatus,
+  printSessionFailed = false,
   continueSlot,
   onAction,
   onOpenDevice,
@@ -166,7 +168,7 @@ export function QxHomeView({
   const readyPrintEyebrow = paidPrint
     ? '先看价格再出纸 · 带走：打印件'
     : freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'
-  const printEyebrow = device.loading ? printStatus.note : device.printerReady ? readyPrintEyebrow : device.printerLabel
+  const printEyebrow = printSessionFailed ? '这台机器现在下不了打印单' : device.loading ? printStatus.note : device.printerReady ? readyPrintEyebrow : device.printerLabel
   const recruitmentOpen = recruitment.enabled
   const channelsTile = !recruitmentOpen && officialChannelCount > 0
   const greeting = greetingWord(now)
@@ -249,7 +251,7 @@ export function QxHomeView({
             description="手机扫码传文件、插 U 盘，或扫描原件"
             foot="开始选择材料"
             badge={printEyebrow}
-            statusText={device.loading ? undefined : printStatus.note}
+            statusText={printSessionFailed || device.loading ? undefined : printStatus.note}
             icon={PrinterIcon}
             size="feature"
             panelAttrs={{ 'data-home-device-panel': '', 'data-panel-state': device.loading ? 'loading' : device.kind }}
