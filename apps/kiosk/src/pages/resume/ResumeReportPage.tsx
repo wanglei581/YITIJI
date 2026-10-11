@@ -229,7 +229,8 @@ export function ResumeReportPage() {
    * 只有**明确失败**会到这里：解析结果未知留在解析页（稿 21 parse-unknown），不转成失败屏。
    * 「重新解析」是一次新的提交（新的 AI 调用），因此只放在服务端明确说没成的这一屏。
    */
-  const stepActions = <QxStepActions onPrev={() => navigate('/resume/source')}><QxAiHelp label="问小青：先改哪几处 →" draft="请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。" /></QxStepActions>
+  // 「问小青：先改哪几处」预填的问题指向这份报告；失败、读不到、空报告这些态没有报告可问，不摆（稿 22 这些态也没有）。
+  const stepActions = <QxStepActions onPrev={() => navigate('/resume/source')}>{showsReportBody(viewState) ? <QxAiHelp label="问小青：先改哪几处 →" draft="请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。" /> : null}</QxStepActions>
   // AI 停用时再解析一次也不会变好：不给「重新解析」，主按钮回简历来源（那里可以换办别的），
   // 不用 AI 的出路（打印原件、自查清单）就在本屏下方。
   const failCta = state.aiDown ? (
