@@ -363,6 +363,7 @@ export class LlmChatService {
     if (isDeviceFaultQuestion(input.message, session.deviceFaultJustAnswered)) {
       session.deviceFaultJustAnswered = true
       requestQuotaRefund()
+      this.logger.log(`设备故障固定回答 channel=${channel}`) // 只记次数，不记原话
       return { sessionId, reply: deviceFaultReply(channel), intent: classifyIntent(input.message), actions: [] }
     }
     session.deviceFaultJustAnswered = false

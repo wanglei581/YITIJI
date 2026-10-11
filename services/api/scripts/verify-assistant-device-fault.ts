@@ -71,6 +71,65 @@ const MUST_INTERCEPT = [
   '我能自己把卡住的纸抽出来吗',
   '怎么把纸取出来',
   '把盖子打开可以吗',
+  // 口语、倒装、只说半句（反方评审逐条推出来的漏拦，2026-10-10）
+  '纸卡里面了',
+  '纸卡进去了',
+  '纸塞在里面了',
+  '卡在里面的纸怎么拿出来',
+  '打印机没有纸了',
+  '机器没有纸了',
+  '打印纸没了',
+  '纸张用光了',
+  '打印机没有墨了',
+  '没粉了',
+  '打印机怎么加墨',
+  '为什么无法打印',
+  '不能打印了怎么办',
+  '打印到一半卡住了',
+  '打了一半停了',
+  '印了一半卡了',
+  '打印机不吐纸',
+  '打出来全是白纸',
+  '打印出来有一条黑线',
+  '打印机用不了了',
+  '这台机器不能用了',
+  '机器卡了怎么办',
+  '打印机声音好大',
+  '前盖盖不上了',
+  '纸盒关不上',
+  '有纸卡着',
+  '里面卡了张纸',
+  '纸出不来',
+  '怎么没出纸',
+  '出纸口没东西',
+  '打了没反应',
+  '点了打印没反应',
+  '纸打歪了',
+  '打出来的纸是皱的',
+  '纸撕破了',
+  '是不是坏了',
+  '这破机器',
+  '打印机亮红灯',
+  '红灯一直闪',
+  '显示离线',
+  '打印机脱机',
+  '连不上打印机',
+  '有股怪味',
+  '被电了一下',
+  '机器嗡嗡响',
+  '噼里啪啦响',
+  '机器很烫',
+  '我把线拔了',
+  '要不要拔线',
+  '重启一下试试',
+  '我把它关了重开',
+  '长按电源',
+  '我想踢这台机器两脚',
+  '打印机怎么开机',
+  '我想给这台机器关机再开',
+  '打印出来是空白的',
+  '机器有点问题',
+  '电源键在哪',
   '复印机坏掉了怎么修',
   '可以自己修打印机吗',
   '谁负责修这台打印机',
@@ -112,12 +171,63 @@ const MUST_NOT_INTERCEPT = [
   '键盘打不出李字',
   '服务电话打不了',
   '人社局电话多少',
+  // 「打不出」「打不了」的别的意思；「能不能打印」是在问规定；「粉」不是碳粉
+  '我简历打不出亮点怎么办',
+  '和领导打不了交道怎么办',
+  '这个公司离家太远我打不了卡',
+  '这个岗位我打不了包票',
+  '能不能打印身份证',
+  '证件照能换粉色底吗',
+  '我做自媒体没粉丝怎么办',
+  '打印不动产登记证明要带什么',
+  '用这台机器打印不动产证明可以吗',
+  '我对这台机器的使用有问题想问',
+  '一体机几点关机',
+  '这份简历打印出来有很多空白，怎么调整版式',
+  '我的纸质简历卡在哪一步了',
+  // 提到了机器、屏幕，但问的是怎么用，不是坏了
+  '这台机器能拍证件照吗',
+  '这台机器怎么用',
+  '这台机器可以扫描吗',
+  '一体机支持微信支付吗',
+  '这台机器能打印彩色吗',
+  '本机支持哪些格式',
+  '屏幕上的字太小了',
+  '机器会保存我的文件吗',
+  '这台机器关机了我的文件还在吗',
+  '一体机几点开机',
+  '显示的二维码扫不了',
+  '提示登录失败',
+  '提示文件格式错误怎么办',
+  '提示密码错误',
+  '上传文件报错了',
+  // 坏的是别的东西；字面上撞词的求职话题
+  '我的U盘好像坏了读不出来',
+  '我手机好像坏了',
+  '被电话面试了怎么准备',
+  '公司选拔线上面试怎么准备',
+  '工作压力大到冒烟',
+  '我没有墨迹的习惯',
+  '我的简历被卡住了没人回复',
+  '投了简历没反应怎么办',
+  '我一紧张就卡住了',
+  '脑子一片空白怎么办',
+  '我会修电脑能找什么工作',
+  '汽车维修专业好就业吗',
+  '我在工厂开机器三年了',
+  '打印社保证明',
+  '怎么退款',
+  // 说的是面试，不是眼前这台机器
+  '刚才面试官问我打印机卡纸怎么处理，我该怎么回答',
   '那我自己能弄吗',
   '教我怎么取',
 ] as const
 
 /** 只有上一轮刚回过固定回答时才拦的追问。 */
-const FOLLOW_UPS = ['那我自己能弄吗', '教我怎么取', '我自己修一下行吗', '什么时候有人来修'] as const
+const FOLLOW_UPS = [
+  '那我自己能弄吗', '教我怎么取', '我自己修一下行吗', '什么时候有人来修', '谁来处理', '多久能修好',
+  '我要不要拍两下', '踢一脚能好吗', '按哪个键',
+] as const
 
 /** 上一轮是固定回答、这一句已经换了话题：要放回给模型，不能把人困在固定回答里。 */
 const MOVED_ON = [
@@ -128,6 +238,8 @@ const MOVED_ON = [
   '那我自己来写吧',
   '那帮我看看简历吧，我自己写的',
   '那我先去别处打印，这一段自己的经历帮我改改',
+  '我辅修了法学有用吗',
+  '教我怎么处理人际关系',
   '好的谢谢',
 ] as const
 
@@ -230,6 +342,7 @@ async function runtimeChecks(): Promise<void> {
     // 紧接着追问能不能自己弄：同样不送模型。
     const followUp = await inRequest(() => chat.chat({ message: '那我自己能弄吗', sessionId: normal.result.sessionId, channel: 'kiosk' } as never))
     check(sentBodies.length === before && followUp.result.reply === deviceFaultReply('kiosk'), '追问：不送模型，仍是固定回答')
+    check(followUp.refunded === true, '追问：同样退回公网次数')
 
     // 换回正常话题：照常调模型；刚才那两问和固定回答都不在发给模型的历史里。
     const back = await inRequest(() => chat.chat({ message: '帮我看看简历怎么写', sessionId: normal.result.sessionId, channel: 'kiosk' } as never))
@@ -243,18 +356,21 @@ async function runtimeChecks(): Promise<void> {
     check(sentBodies.length === before + 2 && later.result.reply === '模型的回答', '正常一轮之后：「那我自己能弄吗」照常交给模型')
 
     // 一体机带咨询主题的前缀、小程序渠道。
-    const prefixed = await inRequest(() => chat.chat({ message: '当前咨询主题：打印帮助\n用户问题：没纸了', channel: 'kiosk' } as never))
+    const prefixed = await inRequest(() => chat.chat({ message: '当前咨询主题：简历与求职材料\n用户问题：没纸了', channel: 'kiosk' } as never))
     check(sentBodies.length === before + 2 && prefixed.result.reply === deviceFaultReply('kiosk'), '带咨询主题前缀：照样命中')
+    check(prefixed.refunded === true, '带咨询主题前缀：同样退回公网次数')
     const viaMiniapp = await inRequest(() => chat.chat({ message: '一体机卡纸了', channel: 'miniapp' } as never))
     check(sentBodies.length === before + 2 && viaMiniapp.result.reply === deviceFaultReply('miniapp'), '小程序渠道：拿到小程序的固定回答')
+    check(viaMiniapp.refunded === true, '小程序渠道：同样退回公网次数')
 
     // 模型连不上：正常咨询报错（阳性对照），故障求助照样能答。
     modelDown = true
     let normalFailed = false
     try { await chat.chat({ message: '帮我看看简历怎么写', channel: 'kiosk' } as never) } catch { normalFailed = true }
     check(normalFailed, '模型连不上：正常咨询报错（阳性对照）')
-    const whileDown = await chat.chat({ message: '机器冒烟了', channel: 'kiosk' } as never)
-    check(whileDown.reply === deviceFaultReply('kiosk'), '模型连不上：故障求助照样拿到固定回答')
+    const whileDown = await inRequest(() => chat.chat({ message: '机器冒烟了', channel: 'kiosk' } as never))
+    check(whileDown.result.reply === deviceFaultReply('kiosk'), '模型连不上：故障求助照样拿到固定回答')
+    check(whileDown.refunded === true, '模型连不上：故障求助同样退回公网次数')
   } finally {
     ;(globalThis as { fetch: unknown }).fetch = savedFetch
   }
