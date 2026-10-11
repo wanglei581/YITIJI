@@ -464,6 +464,8 @@ export interface ChatOutput {
    * AiService 显式重建，不会带上它。
    */
   usage?: AiUsageReport
+  /** true 表示这段回答是固定提示（设备故障时的安全提醒），不是模型生成的；没有这个字段或为 false 时和原来一样 */
+  fixedNotice?: boolean
 }
 
 /**

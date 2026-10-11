@@ -367,6 +367,8 @@ export interface AssistantChatResponse {
   providerLabel?: string
   /** 等价于 providerLabel?.startsWith('llm:')；缺失或 false 都不得呈现为 AI 回答 */
   aiGenerated?: boolean
+  /** true 表示这段回答是固定提示（设备故障时的安全提醒），不是模型生成的；没有这个字段或为 false 时和原来一样 */
+  fixedNotice?: boolean
 }
 
 // ─── AI 简历生成（阶段2A）──────────────────────────────────────
