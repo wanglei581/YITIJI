@@ -33,6 +33,11 @@ let bootExchangeUnsettled = false
 // 后台恢复时被服务端明确判作废的那张会话票。票本身不删（终端停用期间读配置还要带它），
 // 只是后台恢复不再拿同一张票每分钟去续一次。
 let rejectedSessionToken: string | null = null
+// 状态是否已经离开过最初那次 checking。用来区分「页面刚打开时的第一次换票」和「之后的重建」：
+// 只有后者才可能清掉正在机器前的人留下的材料。
+let hadSettledState = false
+// 上一次重建会话清过场、而页面还没来取走这件事。只能读一次，见 takeTerminalSessionRecoveryCleared。
+let recoveryClearedPending = false
 const listeners = new Set<(next: TerminalSessionState) => void>()
 
 // failed 不再是终点：每次落到 failed 都排一次后台恢复，离开 failed 就撤掉。
@@ -46,6 +51,7 @@ function setState(next: TerminalSessionState): void {
   } else {
     cancelRecovery()
   }
+  if (next !== 'checking') hadSettledState = true
   listeners.forEach((listener) => listener(next))
 }
 
@@ -238,6 +244,9 @@ async function reBootstrapFromLocalAgent(): Promise<boolean> {
   }
   bootExchangeUnsettled = false
   rejectedSessionToken = null
+  // exchangeBootTicket 换成即清场。页面第一次打开时那次不算（没有人的材料可清）；
+  // 之后的每一次重建都记一笔，由页面取走后照实告诉用户。
+  if (hadSettledState) recoveryClearedPending = true
   setState('ready')
   scheduleRefresh()
   return true
@@ -374,6 +383,19 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
 
 export function terminalSessionState(): TerminalSessionState { return state }
 
+/**
+ * 上一次恢复是不是把本机这一位留下的材料清掉了。只能读一次：读到 true 之后自己复位。
+ *
+ * 只在「用本机 Agent 的新引导票重建会话」成功之后为 true（那条路换票即清场），而且不含页面
+ * 刚打开时的第一次换票。拿原会话票续上的恢复不清场，这里是 false。只存在内存里，整页重载就没了。
+ * 页面用它决定要不要说一句「刚才选的材料已经清掉、要重新传」；它不参与任何放行判断。
+ */
+export function takeTerminalSessionRecoveryCleared(): boolean {
+  const cleared = recoveryClearedPending
+  recoveryClearedPending = false
+  return cleared
+}
+
 export function subscribeTerminalSession(listener: (next: TerminalSessionState) => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
@@ -496,7 +518,7 @@ export async function terminalProtectedFetch(
   if (replay) return replay
   if (response.ok) return response
   const error = await asHttpError(response.clone())
-  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
+  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动与 502 / 503 / 504 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
   // 刷新最长可达 60 秒。人已离页或本机已清场时不重放：原 401 的 body 还没被读过

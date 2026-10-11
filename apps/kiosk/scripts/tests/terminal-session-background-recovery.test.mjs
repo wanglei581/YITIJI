@@ -191,6 +191,7 @@ for (const status of [502, 503, 504]) {
     assert.equal(page.counts.exchange, 2, '同一张引导票重发一次')
     assert.equal(page.counts.agent, 0, '重试成功就不必向本机 Agent 要新票')
     assert.equal(page.storage.getItem(TOKEN_KEY), 'session-after-retry')
+    assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), false, '页面刚打开时的第一次换票不算「恢复清过场」')
     assert.ok(!page.states.includes('failed'), '屏上不该闪过一次「没通过」')
   })
 }
@@ -225,6 +226,8 @@ test('开机换票整窗口都失败：先 failed，服务器回来后一分钟�
   assert.equal(page.counts.exchange, exchangesBefore + 1)
   assert.match(String(page.calls.at(-1).body), new RegExp(AGENT_TICKET), '换的是本机 Agent 给的新票')
   assert.equal(page.clears(), 1, '换引导票即清场这条没变')
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), true, '走新引导票恢复并清了场：页面要能知道')
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), false, '只能读一次')
 
   // 恢复后不再有后台恢复在跑；十分钟后正常续期。
   const afterRecovery = page.calls.length
@@ -278,6 +281,7 @@ test('十分钟续期撞上服务器重启：failed 期间下单类请求照旧�
   await page.advance(MINUTE)
   assert.equal(page.mod.terminalSessionState(), 'ready')
   assert.equal(page.clears(), 1, '用原会话票续上的，这一位办到一半的材料不该被清')
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), false, '没清场的恢复不该让页面说「材料已清掉」')
   assert.notEqual(page.storage.getItem(TOKEN_KEY), tokenBeforeOutage)
 
   const response = await page.mod.terminalProtectedFetch('http://127.0.0.1:5173/api/v1/print-jobs/claim', { method: 'POST' })
@@ -314,6 +318,7 @@ test('后台续期被服务端明确判作废：改向本机 Agent 要新票，�
   await page.advance(MINUTE)
   assert.equal(page.mod.terminalSessionState(), 'ready')
   assert.equal(page.clears(), clearsBefore + 1)
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), true)
 })
 
 test('普通浏览器（没有桥接令牌、没有会话票）：永远 failed，后台恢复不出网', async () => {

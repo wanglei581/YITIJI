@@ -219,6 +219,24 @@ check(
   check('闸门不等后台恢复', !/recover/.test(body.replace(/\/\*[\s\S]*?\*\//g, '')))
 }
 
+// ── 八、「这次恢复清过场」只是给页面照实说话用的标记，不参与放行 ──────────
+{
+  const fn = src.slice(src.indexOf('export function takeTerminalSessionRecoveryCleared'))
+  const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
+  check('标记读一次就复位', /recoveryClearedPending = false/.test(body) && /return cleared/.test(body))
+  const reboot = src.slice(src.indexOf('async function reBootstrapFromLocalAgent'))
+  const rebootBody = reboot.slice(0, reboot.indexOf('\n}\n') + 3)
+  check(
+    '标记只在用新引导票重建成功后置位，且不含页面刚打开那一次',
+    /if \(hadSettledState\) recoveryClearedPending = true/.test(rebootBody) &&
+      src.split('recoveryClearedPending = true').length === 2,
+    '续期成功也置位的话，页面会对没被清场的人说「材料已清掉」',
+  )
+  const gate = src.slice(src.indexOf('async function awaitReadySessionOrFailClosed'))
+  const gateBody = gate.slice(0, gate.indexOf('\n}\n') + 3)
+  check('闸门不读这个标记', !/recoveryClearedPending|takeTerminalSessionRecoveryCleared/.test(gateBody))
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${failed.length === 0 ? '✅ ALL PASS' : `❌ ${failed.length} 项失败`} — 终端会话自愈`)
 process.exit(failed.length === 0 ? 0 : 1)
