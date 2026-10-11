@@ -1319,6 +1319,7 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
     await assertNoHorizontalOverflow(page)
     await expect(page.locator('.qx-body')).not.toContainText(/服务端|能力探测|未验收|终端编号|内部文件号/)
     await expect(page.getByRole('button', { name: /^问小青：/ })).toBeVisible()
+    if (route.startsWith('/resume/report')) await expect(page.getByRole('button', { name: '问小青：先改哪几处 →' })).toBeVisible()
     if (route === '/resume/source') {
       const direction = await page.locator('.qx-rt-side').boundingBox()
       expect(direction!.width).toBeGreaterThanOrEqual(440)
@@ -1447,11 +1448,22 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
 
   for (const state of ['no-context', 'read-error', 'unavailable', 'illegal', 'diagnose-failed'] as const) {
     await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    // 没有报告的态不摆「问小青：先改哪几处」（它预填的问题指向一份不存在的报告）；「上一步」还在。
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    await expect(page.getByRole('button', { name: /问小青：先改哪几处/ })).toHaveCount(0)
+    await expect(page.locator('.qx-ctabar .qx-step-prev')).toBeVisible()
     const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
     expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
     const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
     const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
     expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
+  }
+
+  // 空报告同样没有可问的内容；内容少的报告仍是报告，入口要在。
+  for (const [state, count] of [['report-empty', 0], ['report-minimal', 1]] as const) {
+    await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
+    await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
+    await expect(page.getByRole('button', { name: /问小青：先改哪几处/ })).toHaveCount(count)
   }
 })
 
