@@ -356,6 +356,10 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
   await page.route('**/w3-fixtures/optimized-resume.pdf', (route) =>
     route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
   )
+  // 导出后的页内预览取同站地址（F-20），不是下载直链。
+  await page.route('**/api/v1/files/optimized-file-w3/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
   terminalBaseline(api)
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
   api.respond('GET', '/api/v1/resume/export/pricing', {
@@ -394,7 +398,7 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
     await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
   }
   await expect(dialog).toBeVisible()
-  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/optimized-resume.pdf')
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/api/v1/files/optimized-file-w3/content?expires=1&sig=test')
   await expect(dialog.getByText('手机扫码保存')).toBeVisible()
   expect(page.context().pages()).toHaveLength(pageCount)
   await page.getByRole('button', { name: '关闭文件预览' }).click()

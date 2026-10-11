@@ -418,6 +418,8 @@ async function openEntryEditor(
       printFileUrl: '/api/v1/files/entry-file/content?expires=1&sig=test',
     },
   })
+  // 导出后的页内预览取同站地址（F-20），不是下载直链。
+  await page.route('**/api/v1/files/entry-file/content**', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }))
   await page.route('**/e2e-fixtures/entry-resume.pdf', (route) => route.fulfill({
     status: 200,
     contentType: 'application/pdf',
@@ -659,6 +661,8 @@ test('草稿预览的全文和导出请求里的优化稿一致 @kiosk', async (
       printFileUrl: '/api/v1/files/preview-match-file/content?expires=1&sig=test',
     },
   })
+  // 导出后的页内预览取同站地址（F-20），不是下载直链。
+  await page.route('**/api/v1/files/entry-file/content**', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }))
   await page.route('**/e2e-fixtures/entry-resume.pdf', (route) => route.fulfill({
     status: 200,
     contentType: 'application/pdf',

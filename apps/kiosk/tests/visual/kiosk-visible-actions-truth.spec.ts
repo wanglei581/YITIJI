@@ -324,6 +324,15 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
   await page.route('**/e2e-fixtures/generated-resume.pdf', (route) =>
     route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }),
   )
+  // F-20：页内预览取的是经我们服务器出文件的同站地址，不是下载直链（线上直链在对象存储域名下，页面取不到）。
+  const directLinkFetches: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/e2e-fixtures/generated-resume.pdf') directLinkFetches.push(request.resourceType())
+  })
+  await page.route('**/api/v1/files/gen-export-1/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' }),
+  )
+  const previewFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/gen-export-1/content')
 
   const generateGet = page.waitForRequest((request) => (
     request.method() === 'GET' && new URL(request.url()).pathname === `/api/v1/resume/generate/${GENERATE_TASK_ID}`
@@ -361,6 +370,8 @@ test('生成预览读回真实结果后导出 payload 正确 @kiosk', async ({ p
   expect(payload.basic?.name).toBe('青岛求职者')
   expect(payload.factsConfirmedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
   await expect(page.getByRole('dialog', { name: 'AI简历_青岛求职者.pdf' })).toBeVisible()
+  await previewFetch
+  expect(directLinkFetches).toEqual([])
 })
 
 test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async ({ page, api }) => {
@@ -427,6 +438,12 @@ async function openGenerateTitleEditor(
     },
   })
   await page.route('**/e2e-fixtures/entry-resume.pdf', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/pdf',
+    body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',
+  }))
+  // 导出后的页内预览取同站地址（F-20）。
+  await page.route('**/api/v1/files/gen-entry-file/content**', (route) => route.fulfill({
     status: 200,
     contentType: 'application/pdf',
     body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n',

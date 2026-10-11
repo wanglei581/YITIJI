@@ -448,7 +448,7 @@ export function ResumeGeneratePreviewPage() {
           <ResumeFactConfirmDialog facts={facts} unconfirmed={unconfirmed} busy={exporting} onCancel={() => setFactOpen(false)} onConfirm={(at) => { void handleExport(at) }} />
         )}
         {previewOpen && exported?.signedUrl && (
-          <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
+          <FilePreviewDialog fileUrl={exportFormat === 'pdf' && exported.printFileUrl ? exported.printFileUrl : exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
     </QxPageFrame>

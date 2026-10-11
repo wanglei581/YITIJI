@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1946 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1947 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -433,7 +433,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 577 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 578 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -820,6 +820,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizePageDialogs.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -843,7 +844,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportIssues.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
