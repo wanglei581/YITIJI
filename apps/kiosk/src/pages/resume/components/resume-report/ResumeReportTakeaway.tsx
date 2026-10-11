@@ -226,7 +226,7 @@ export function ResumeReportTakeaway(props: {
       </div>
       {previewOpen && exported?.signedUrl ? (
         <FilePreviewDialog
-          fileUrl={exported.signedUrl}
+          fileUrl={exported.printFileUrl || exported.signedUrl}
           fileName={exported.filename}
           mimeType="application/pdf"
           format="pdf"

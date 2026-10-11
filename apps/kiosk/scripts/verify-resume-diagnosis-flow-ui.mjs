@@ -673,6 +673,18 @@ assert.match(labels(renderResult({ ...fileProps, kind: 'change_list', savedToDoc
 for (const savedToDocuments of [false, undefined]) assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments })), /已存入/, '未确认保存时不说已存入')
 assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: true, exported: { ...fileProps.exported, signedUrl: '' } })), /已存入/, '无真实文件不能宣称已存入')
 assert.doesNotMatch(labels(renderResult({ ...fileProps, savedToDocuments: false })), /未登录/, '会员保存失败不冒充未登录')
+// F-20：页内预览取同站的 printFileUrl（对象存储直链跨站取不到）；没有才退回直链。二维码始终是直链。
+function nodesOf(node, type, out = []) { if (node && typeof node === 'object') { if (node.type === type) out.push(node); (node.children ?? []).forEach((child) => nodesOf(child, type, out)) } return out }
+const sameSite = '/api/v1/files/f1/content?expires=1&sig=x'
+const withPrint = renderResult({ ...fileProps, exported: { ...fileProps.exported, printFileUrl: sameSite } })
+assert.equal(nodesOf(withPrint, 'preview')[0]?.props.fileUrl, sameSite, 'F-20 有 printFileUrl 时预览用同站地址')
+assert.equal(nodesOf(withPrint, 'qr')[0]?.props.value, fileProps.exported.signedUrl, 'F-20 二维码仍是下载直链')
+assert.equal(nodesOf(renderResult(fileProps), 'preview')[0]?.props.fileUrl, fileProps.exported.signedUrl, 'F-20 没有 printFileUrl 时退回直链')
+assertIncludes(read('src/pages/resume/ResumeGeneratePreviewPage.tsx'), "<FilePreviewDialog fileUrl={exportFormat === 'pdf' && exported.printFileUrl ? exported.printFileUrl : exported.signedUrl}", 'F-20 生成导出后的大预览窗用同站地址')
+assertIncludes(read('src/pages/resume/ResumeGeneratePreviewPage.tsx'), 'phoneDownloadUrl={exported.signedUrl}', 'F-20 大预览窗的手机扫码仍是下载直链')
+assertIncludes(read('src/pages/resume/components/resume-deliver/OptimizePageDialogs.tsx'), 'props.exported.printFileUrl ? props.exported.printFileUrl : props.exported.signedUrl}', 'F-20 优化导出后的大预览窗用同站地址')
+assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx'), 'fileUrl={exported.printFileUrl || exported.signedUrl}', 'F-20 诊断报告带走的大预览窗用同站地址')
+assert.equal(nodesOf(renderResult({ ...fileProps, formatLabel: 'Word', exported: { ...fileProps.exported, printFileUrl: sameSite } }), 'preview').length, 0, 'F-20 非 PDF 不出页内预览，也就不会拿 PDF 副本冒充')
 const pageSource = read('src/pages/resume/ResumeOptimizePage.tsx')
 const ownershipEffect = /useEffect\(\(\) => \{\n    if \(exportKind !== 'resume'[\s\S]*?\}, \[exported, exportKind, token, setSavedToDocuments\]\)/.exec(pageSource)?.[0]
 assert.ok(ownershipEffect, '优化稿实际查询本人的文件归属')

@@ -83,7 +83,9 @@ export function OptimizePageDialogs(props: {
       )}
       {props.previewOpen && props.exported?.signedUrl && (
         <props.filePreview
-          fileUrl={props.exported.signedUrl}
+          // PDF 才换：页内预览自己取字节，直链在对象存储域名下取不到；printFileUrl 同站（F-20）。
+          // Word 等格式的 printFileUrl 是另一份 PDF 副本，文件名对不上，仍给直链。
+          fileUrl={(props.exportKind === 'change_list' || props.exportFormat === 'pdf') && props.exported.printFileUrl ? props.exported.printFileUrl : props.exported.signedUrl}
           fileName={props.exported.filename}
           format={props.exportKind === 'change_list' ? 'pdf' : props.exportFormat}
           mimeType={props.exportKind === 'change_list' ? 'application/pdf' : undefined}
