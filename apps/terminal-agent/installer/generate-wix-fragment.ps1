@@ -19,6 +19,7 @@ $excluded = @(
   "provision/boot-spool-guard-task.ps1",
   "provision/daily-reboot.ps1",
   "provision/daily-reboot-task.ps1",
+  "provision/print-completion-log.ps1",
   "kiosk/kiosk-watchdog.ps1",
   "kiosk/register-kiosk-watchdog.ps1",
   "kiosk/launch-kiosk.cmd"

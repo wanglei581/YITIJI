@@ -353,6 +353,7 @@ foreach ($relativeProvisionPath in @(
   "provision\boot-spool-guard-task.ps1",
   "provision\daily-reboot.ps1",
   "provision\daily-reboot-task.ps1",
+  "provision\print-completion-log.ps1",
   "kiosk\kiosk-watchdog.ps1",
   "kiosk\register-kiosk-watchdog.ps1",
   "kiosk\launch-kiosk.cmd"
@@ -364,10 +365,13 @@ foreach ($relativeProvisionPath in @(
 # The MSI ships the scripts but does not register the tasks. Install them from
 # the payload, then prove uninstall deletes both and puts Spooler back.
 # The daily trigger is twelve hours ahead so it cannot fire during this run.
+# This test does not run install-production-agent.ps1, so enable the print log here.
 . (Join-Path $installRoot "provision\boot-spool-guard-task.ps1")
 . (Join-Path $installRoot "provision\daily-reboot-task.ps1")
+. (Join-Path $installRoot "provision\print-completion-log.ps1")
 Install-BootSpoolGuard -GuardScriptPath (Join-Path $installRoot "provision\boot-spool-guard.ps1")
 Install-DailyRebootTask -At ((Get-Date).AddHours(12).ToString("HH:mm")) -ScriptPath (Join-Path $installRoot "provision\daily-reboot.ps1")
+Enable-PrintCompletionLog
 if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue)) {
   throw "Boot spool guard task missing after install"
 }
@@ -377,6 +381,17 @@ if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintDailyReboot" -ErrorAction 
 $installedSpoolerQc = (& "$env:SystemRoot\System32\sc.exe" qc Spooler 2>&1 | Out-String)
 if ($installedSpoolerQc -notmatch "DEMAND_START") {
   throw "Spooler was not Manual after boot spool guard install: $installedSpoolerQc"
+}
+$printCompletionLog = New-Object -TypeName System.Diagnostics.Eventing.Reader.EventLogConfiguration -ArgumentList "Microsoft-Windows-PrintService/Operational"
+try {
+  if (-not $printCompletionLog.IsEnabled) {
+    throw "PrintService Operational log is not enabled after install"
+  }
+  if ($printCompletionLog.MaximumSizeInBytes -ne 4194304) {
+    throw "PrintService Operational log MaximumSizeInBytes is $($printCompletionLog.MaximumSizeInBytes), expected 4194304"
+  }
+} finally {
+  $printCompletionLog.Dispose()
 }
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory is missing after install"
@@ -539,6 +554,17 @@ if ($uninstalledSpoolerQc -notmatch "AUTO_START") {
 }
 if ((Get-Service -Name "Spooler").Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
   throw "Spooler was not Running after uninstall"
+}
+$printCompletionLogAfterUninstall = New-Object -TypeName System.Diagnostics.Eventing.Reader.EventLogConfiguration -ArgumentList "Microsoft-Windows-PrintService/Operational"
+try {
+  if (-not $printCompletionLogAfterUninstall.IsEnabled) {
+    throw "PrintService Operational log must stay enabled after uninstall"
+  }
+  if ($printCompletionLogAfterUninstall.MaximumSizeInBytes -ne 4194304) {
+    throw "PrintService Operational log MaximumSizeInBytes is $($printCompletionLogAfterUninstall.MaximumSizeInBytes), expected 4194304"
+  }
+} finally {
+  $printCompletionLogAfterUninstall.Dispose()
 }
 
 $lifecyclePassed = $true

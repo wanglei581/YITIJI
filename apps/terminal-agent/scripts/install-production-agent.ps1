@@ -1065,6 +1065,24 @@ if ($KeepPrinterQueueUnpaused) {
 Write-Host (Get-BootSpoolGuardStatusLine)
 # boot-spool-guard-install-end
 
+# print-completion-log-install-begin
+# Install-time only. Resolve, do not Publish: no scheduled task calls this script.
+# Optional evidence channel: a missing or broken script must not stop the install, so this
+# does not use Resolve-AgentProvisionSource (it exits the installer when the file is absent).
+try {
+  $printCompletionLog = Join-Path $PSScriptRoot "print-completion-log.ps1"
+  if (-not (Test-Path -LiteralPath $printCompletionLog -PathType Leaf)) {
+    $printCompletionLog = Join-Path $PSScriptRoot "..\installer\provision\print-completion-log.ps1"
+  }
+  if (-not (Test-Path -LiteralPath $printCompletionLog -PathType Leaf)) { throw "print-completion-log.ps1 was not found" }
+  . $printCompletionLog
+  Enable-PrintCompletionLog
+  Write-Host (Get-PrintCompletionLogStatusLine)
+} catch {
+  Write-WarnLine "Print completion log was not enabled: $($_.Exception.Message)"
+}
+# print-completion-log-install-end
+
 # daily-reboot-install-begin
 if ($dailyRebootMode -eq "off") {
   Uninstall-DailyRebootTask

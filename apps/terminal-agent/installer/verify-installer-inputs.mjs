@@ -269,6 +269,7 @@ for (const staged of [
   'provision/boot-spool-guard-task.ps1',
   'provision/daily-reboot.ps1',
   'provision/daily-reboot-task.ps1',
+  'provision/print-completion-log.ps1',
 ]) {
   assert.match(wixFragment, new RegExp(staged.replace(/[./]/g, '\\$&')), `${staged} must be excluded from the auto-generated payload fragment`)
   assert.match(staging, new RegExp(staged.split('/')[1].replace(/\./g, '\\.')), `${staged} must be staged`)
@@ -488,6 +489,64 @@ assert.match(lifecycle, /Daily reboot task remains after uninstall/)
 assert.match(lifecycle, /Spooler was not Automatic after uninstall/)
 assert.match(lifecycle, /Spooler was not Running after uninstall/)
 assert.match(lifecycle, /Restore-LifecycleSpooler/)
+assert.match(lifecycle, /Enable-PrintCompletionLog/)
+assert.match(lifecycle, /MaximumSizeInBytes -ne 4194304/)
+assert.match(lifecycle, /PrintService Operational log must stay enabled after uninstall/)
+const printLogScript = read('provision/print-completion-log.ps1')
+assert.doesNotMatch(printLogScript, /[^\x00-\x7F]/, 'print completion log script must be ASCII')
+assert.match(printLogScript, /Microsoft-Windows-PrintService\/Operational/)
+assert.match(printLogScript, /\b4194304\b/)
+assert.match(printLogScript, /function Enable-PrintCompletionLog/)
+assert.match(printLogScript, /function Get-PrintCompletionLogStatusLine/)
+assert.match(printLogScript, /print-completion-log: enabled=\$enabled maxBytes=\$maxBytes retention=\$retention/)
+assert.match(printLogScript, /\$config\.LogMode = \$circular/, 'retention must be set to overwrite-oldest')
+assert.match(printLogScript, /if \(\$changed\) \{\s*\$config\.SaveChanges\(\)/, 'changes must be saved')
+assert.equal((printLogScript.match(/\$enabled = "unknown"/g) ?? []).length, 2, 'status line must fall back to unknown in the catch as well as at the start')
+assert.doesNotMatch(
+  printLogScript,
+  /wevtutil(?:\.exe)?\s+cl\b|Clear-EventLog|Remove-EventLog|\/ab:true|ClearLog\s*\(/i,
+  'print completion log script must not clear the log',
+)
+assert.doesNotMatch(printLogScript, /function\s+(?:Disable|Uninstall)-PrintCompletionLog/)
+const printInstallStart = productionInstaller.indexOf('# print-completion-log-install-begin')
+const printInstallEnd = productionInstaller.indexOf('# print-completion-log-install-end')
+assert.ok(printInstallStart >= 0 && printInstallEnd > printInstallStart, 'print completion log install block must be marked')
+assert.ok(
+  productionInstaller.indexOf('# boot-spool-guard-install-end') < printInstallStart &&
+    printInstallEnd < productionInstaller.indexOf('# daily-reboot-install-begin'),
+  'print completion log setup must sit between boot spool guard and daily reboot',
+)
+const printInstall = productionInstaller.slice(printInstallStart, printInstallEnd)
+// Resolve-AgentProvisionSource ends in Fail (exit 1) when the file is missing; an optional
+// evidence channel must never take the installer down, so every step sits inside one try.
+assert.doesNotMatch(printInstall.replace(/^#.*$/gm, ''), /Resolve-AgentProvisionSource/, 'the print completion log block must not use the exiting resolver')
+{
+  const block = printInstall.replace(/\r\n/g, '\n')
+  const tryAt = block.indexOf('try {')
+  const catchAt = block.indexOf('} catch {')
+  assert.ok(tryAt >= 0 && catchAt > tryAt, 'print completion log block needs a try/catch')
+  const guarded = block.slice(tryAt, catchAt)
+  for (const step of ['Test-Path -LiteralPath $printCompletionLog', '. $printCompletionLog', 'Enable-PrintCompletionLog', 'Get-PrintCompletionLogStatusLine']) {
+    assert.ok(guarded.includes(step), `must be inside the try: ${step}`)
+  }
+  const outside = block.slice(0, tryAt) + block.slice(block.indexOf('}', catchAt + 9) + 1)
+  assert.doesNotMatch(outside.replace(/^#.*$/gm, ''), /\S/, 'nothing in the print completion log block may run outside the try/catch')
+}
+assert.match(printInstall, /Enable-PrintCompletionLog/)
+assert.match(printInstall, /Write-WarnLine/)
+assert.match(printInstall, /Get-PrintCompletionLogStatusLine/)
+assert.doesNotMatch(printInstall, /Publish-AgentProvisionScript/, 'install-time log script must not be published for a scheduled task')
+assert.doesNotMatch(printInstall, /\bFail\b/, 'a print completion log failure must warn and continue')
+const printLogClear = /wevtutil(?:\.exe)?\s+cl\b|Clear-EventLog|Remove-EventLog|\/ab:true|\/e:false|IsEnabled\s*=\s*\$false|ClearLog\s*\(/i
+for (const surface of [
+  wix,
+  productionInstaller,
+  read('provision/boot-spool-guard-task.ps1'),
+  read('provision/daily-reboot-task.ps1'),
+  printLogScript,
+]) {
+  assert.doesNotMatch(surface, printLogClear, 'uninstall must not disable or clear the print completion log')
+}
 assert.ok(lifecycle.includes('URL=http://127\\.0\\.0\\.1:9527/local/panel'))
 assert.match(lifecycle, /Start Menu shortcut remains after uninstall/)
 assert.match(workflow, /artifacts\/evidence\/fresh-msi-lifecycle-logs\//)

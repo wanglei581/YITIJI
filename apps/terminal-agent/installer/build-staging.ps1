@@ -198,6 +198,9 @@ Copy-WindowsPowerShellScript `
   -Source (Join-Path $PSScriptRoot "provision\daily-reboot-task.ps1") `
   -Destination (Join-Path $provisionRoot "daily-reboot-task.ps1")
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\print-completion-log.ps1") `
+  -Destination (Join-Path $provisionRoot "print-completion-log.ps1")
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\service-identity.ps1") `
   -Destination (Join-Path $provisionRoot "service-identity.ps1")
 Copy-WindowsPowerShellScript `
