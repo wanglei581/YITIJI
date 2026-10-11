@@ -119,7 +119,7 @@ expectAbsent(panelSrc, /取件凭证码|出示给工作人员|出示给现场工
 expectMatches(panelSrc, /reprintAllowed === true && typeof reprintRemaining === 'number'/, '还能续打只在 reprintAllowed 为真且剩余次数是数字时出现')
 expectMatches(panelSrc, /还能续打 \$\{reprintRemaining\} 次/, '续打句带上剩余次数，不写死次数以外的承诺')
 expectMatches(panelSrc, /reprintAllowed === false && reprintRemaining === 0/, '次数用尽只在 reprintAllowed 为假且剩余为 0 时出现')
-expectMatches(panelSrc, /这单已经接着打过 2 次，不能再打了。/, '次数用尽的句子与后端一致')
+expectMatches(panelSrc, /这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单。/, '次数用尽的句子以后端那句开头，并说出下一步')
 expectMatches(summarySrc, /reprintAllowed=\{item\.reprintAllowed\}/, '详单把 reprintAllowed 原样传给面板')
 expectMatches(summarySrc, /reprintRemaining=\{item\.reprintRemaining\}/, '详单把 reprintRemaining 原样传给面板')
 {
