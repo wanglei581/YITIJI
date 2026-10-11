@@ -13,6 +13,24 @@ const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming\)/, '8-7 面板独立持忙碌锁，文件已到不再顺延')
 assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '8-7 打印等待有效会话时持忙碌锁')
 assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '8-7 打印等待锁受真实到期和终态约束')
+// 合规 10/10：这五页自己的清场锁不含扫码面板的忙。面板在「码有效、文件还没到」时自己持锁；文件到了就放开。
+const pageClearLocks = [
+  ['src/pages/contract-review/ContractReviewHomePage.tsx', 'useBusyLock(submitting)'],
+  ['src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)'],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', 'useBusyLock(uploading || generating || rechecking)'],
+  ['src/pages/interview/InterviewSetupPage.tsx', 'useBusyLock(creating || uploading || printingSheet || usbBusy)'],
+  ['src/pages/print-scan/sign-stamp/useSignStampFlow.ts', 'useBusyLock(busy)'],
+]
+for (const [file, expected] of pageClearLocks) {
+  const text = read(file)
+  assert.ok(text.includes(expected), `${file} 的清场锁不含扫码面板的忙：应有 ${expected}`)
+  const arg = text.match(/useBusyLock\(([^)]*)\)/)?.[1] ?? ''
+  assert.doesNotMatch(
+    arg,
+    /\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/,
+    `${file} 的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr`,
+  )
+}
 console.log('PASS 8-7 两套上传等待锁及到期边界')
 
 const directRoutes = new Map([

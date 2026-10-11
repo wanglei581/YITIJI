@@ -371,7 +371,11 @@ includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'i
 // 下一题请求挪到 interviewTurnActions.ts（会话页 500 行门禁）。断言仍要求真实 answerInterview，并要求会话页还走这条提交。
 includes('src/pages/interview/session/interviewTurnActions.ts', 'answerInterview(', 'interview keeps question progression')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'submitInterviewAnswer(', 'interview page still submits answers through the extracted turn')
-includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'upload busy lock remains')
+includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || usbBusy)', '简历来源页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(read('src/pages/resume/ResumeSourcePage.tsx').match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'),
+  '简历来源页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')

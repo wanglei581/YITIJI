@@ -58,7 +58,6 @@ export function ConvertImagesPage() {
   const [rechecking, setRechecking] = useState(false)
   const [error, setError] = useState<ConvertError | null>(null)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
   const [recovered, setRecovered] = useState(false)
@@ -353,7 +352,6 @@ export function ConvertImagesPage() {
         onLocalFile={(event) => void handleLocalFile(event)}
         onShowQr={() => { setUsbOpen(false); setShowQr(true) }}
         onPhoneUploaded={handlePhoneUploaded}
-        onQrBusy={setQrBusy}
         onOpenUsb={() => { setShowQr(false); setUsbOpen(true) }}
         onCloseUsb={() => setUsbOpen(false)}
         onSelect={handleSelect}

@@ -77,7 +77,6 @@ export function ContractReviewHomePage() {
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
   const [loadingConsent, setLoadingConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -278,7 +277,6 @@ export function ContractReviewHomePage() {
                   })
                   setError(null)
                 }}
-                onBusyChange={setQrBusy}
               />
             )
           ) : (

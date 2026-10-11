@@ -174,7 +174,7 @@ try {
 check(setup.indexOf('createInterview(') < setup.indexOf('startInterview('), '创建与启动面试顺序被改变')
 for (const token of [
   'kioskUploadFile',
-  'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
+  'useBusyLock(creating || uploading || printingSheet || usbBusy)',
   'UploadSessionQrPanel',
   'ResumeUsbImportPanel',
   "purpose=\"resume_upload\"",
@@ -192,6 +192,12 @@ for (const token of [
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
+const setupLockArg = withoutComments(setup).match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'
+check(setupLockArg === 'creating || uploading || printingSheet || usbBusy', '面试设置页的清场锁不含扫码面板的忙')
+check(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(setupLockArg),
+  '面试设置页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 // 交互方式与简历预览从设置页拆出后，属于这两块的字样改从新文件读。一条不删。
 const modePicker = read('src/pages/interview/InterviewModePicker.tsx')
 const resumePreview = read('src/pages/interview/InterviewResumePreview.tsx')

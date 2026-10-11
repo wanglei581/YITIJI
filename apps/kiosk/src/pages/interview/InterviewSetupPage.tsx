@@ -117,7 +117,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [resumePreviewOpen, setResumePreviewOpen] = useState(false)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -560,7 +559,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                       setResumePreviewOpen(false)
                       setResumeFile({ fileId: file.fileId, name: file.name, mimeType: file.mimeType, fileUrl: file.fileUrl, format: file.format })
                     }}
-                    onBusyChange={setQrBusy}
                   />
                 ) : resumeChannel === 'usb' ? (
                   <ResumeUsbImportPanel
