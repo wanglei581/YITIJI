@@ -94,6 +94,8 @@ export interface GenerateHandoff {
   step: number
   seg?: HistorySeg
   form?: GenerateFormSnapshot
+  /** 优化失败后从诊断内容块带入。只有同时带了 form 才在表单顶上出提示。 */
+  carried?: boolean
 }
 
 export interface GenerateBoot extends GenerateFormSnapshot {
@@ -102,6 +104,8 @@ export interface GenerateBoot extends GenerateFormSnapshot {
   seg: HistorySeg
   reviewing: boolean
   forcedState: string | null
+  /** 只有交接里有 form 且 carried === true 时为真。 */
+  carried: boolean
 }
 
 export const EMPTY_EDU: ResumeGenEducation = { school: '', major: '', degree: '', period: '', description: '' }
@@ -211,6 +215,7 @@ export function bootGenerate(search: string, locationState: unknown): GenerateBo
       seg: querySeg,
       reviewing: raw === 'review',
       forcedState: raw === 'validate-name' || raw === 'validate-position' ? raw : null,
+      carried: false,
     }
   }
 
@@ -223,8 +228,9 @@ export function bootGenerate(search: string, locationState: unknown): GenerateBo
       seg: isSeg(handoff.seg) ? handoff.seg : 'exp',
       reviewing: false,
       forcedState: null,
+      carried: Boolean(handoff.form) && handoff.carried === true,
     }
   }
 
-  return { ...blank, phase: 'entry', step: 0, seg: 'exp', reviewing: false, forcedState: null }
+  return { ...blank, phase: 'entry', step: 0, seg: 'exp', reviewing: false, forcedState: null, carried: false }
 }

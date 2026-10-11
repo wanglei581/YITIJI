@@ -31,6 +31,7 @@ import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
 import { ResumeAigcBadge } from './components/resume-deliver/ResumeAigcBadge'
 import { OptimizeWorkArea } from './components/resume-deliver/OptimizeWorkArea'
 import { OptimizeEmptyState } from './components/resume-deliver/OptimizeEmptyState'
+import { useManualEditCarry } from './useManualEditCarry'
 import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitle, optimizeStatusCapsule } from './components/resume-deliver/optimizeStateCopy'
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
@@ -87,6 +88,7 @@ export function ResumeOptimizePage() {
     ?? (usingSessionTask ? session?.accessToken : undefined)
   const token = getToken()
   const access = { token, accessToken }
+  const manualCarry = useManualEditCarry(taskId, accessToken)
   const pricing = useResumeExportPricing(access, token)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const {
@@ -375,8 +377,9 @@ export function ResumeOptimizePage() {
         {view !== 'ready' && (
           <OptimizeEmptyState
             onReport={goToReport}
-            onManualEdit={() => navigate('/resume/generate')}
+            onManualEdit={manualCarry.onManualEdit}
             onMyResumes={() => navigate('/me/resumes')}
+            manualPending={manualCarry.manualPending}
           />
         )}
         {view === 'ready' && !(editorOpen && showOverview) && (!showOverview || choicePending || (Boolean(token) && draft.loading)) && (
