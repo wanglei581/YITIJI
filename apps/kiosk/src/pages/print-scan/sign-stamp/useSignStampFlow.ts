@@ -90,7 +90,6 @@ export function useSignStampFlow() {
   const [result, setResult] = useState<ComposeResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [docStage, setDocStage] = useState<DocStage>('idle')
   const [stampStage, setStampStage] = useState<StampStage>('idle')
   const [docErr, setDocErr] = useState<LiveSnapshot['docErr']>(null)
@@ -435,7 +434,6 @@ export function useSignStampFlow() {
     pan: displayLive.pan,
     derived: displayLive.derived,
     showQr,
-    qrBusy,
     docInputRef,
     stampInputRef,
     localDisabled,
@@ -451,7 +449,6 @@ export function useSignStampFlow() {
     goMaterialCheck,
     addAnother,
     setShowQr,
-    setQrBusy,
     setDocStage,
     setStampStage,
     setPage,
