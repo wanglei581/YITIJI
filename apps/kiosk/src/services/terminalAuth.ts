@@ -267,14 +267,18 @@ function scheduleRefresh(): void {
  * 开机换票或续期，这台机器就一直打不了，直到有人重开浏览器；而现场没有人。
  *
  * 不放宽的三条：
- *   · 恢复期间 state 一直是 failed。没有会话就不能下单这条不变，闸门照旧立即拦；
+ *   · 后台恢复自己不改状态：它在飞时 state 仍是 failed，闸门照旧立即拦，
  *     也不把屏幕在「校验中 / 没通过」之间每分钟来回翻一次。
+ *     只有一种交叉会让状态在恢复在飞时离开 failed：标签页里没有会话票，终端身份恢复回调此刻又来
+ *     初始化一次（initializeTerminalSessionOnce 的无票分支置 checking，并且自己也去要一张引导票）。
+ *     那时闸门等的是在飞的这一次，等出 ready 才放行、等不出照旧拦 —— 没有会话就不能下单这条不变。
  *   · 恢复只走已有的两条路：拿当前会话票续期，或向本机 Agent 要新引导票再换（换票即清场）。
  *     没有新的凭据来源，普通浏览器里（没有桥接令牌、没有会话票）什么都换不到，仍然 failed。
  *   · 每轮只试一次，不在轮内重试；服务器没回来就等下一轮。
  *
  * 一直试下去、不设上限，是有意的：终端被后台停用后又恢复、服务器停了半天又回来，
- * 现场都没有人去重开浏览器。每台机器每分钟至多一次续期或一次取票。
+ * 现场都没有人去重开浏览器。每台机器每轮至多一次续期加一次取票：只有会话票被服务端明确判作废的
+ * 那一轮两样都做（先拿它再确认一次，作废了才去要新票），其余各轮只做一样。
  */
 function scheduleRecovery(): void {
   if (API_MODE !== 'http') return
@@ -296,7 +300,8 @@ async function recoverInBackground(): Promise<void> {
   // 别的换票正在飞（身份恢复回调重新初始化、按台计请求触发的续期）：让它先出结果，本轮只往后排。
   if (refreshInflight || initInflight) { scheduleRecovery(); return }
   // 与 retryRefresh 共用同一把锁：恢复在飞时别处再要续期，等的是这一次，不会并发出第二个续期请求。
-  // 状态此刻是 failed 而不是 checking，所以下单类请求的闸门不会等它（见 awaitReadySessionOrFailClosed）。
+  // 状态此刻是 failed 而不是 checking，所以下单类请求的闸门不等它（见 awaitReadySessionOrFailClosed）；
+  // 例外只有 scheduleRecovery 上方写的那一种交叉。
   const attempt = recoverOnce().then((recovered) => {
     if (!recovered) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   })
@@ -413,7 +418,7 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
  * 边界三条，一条都不放宽：
  *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）
  *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死
- *     （failed 之后的后台恢复成功会把状态改回 ready，但本函数不等它）。
+ *     （failed 之后的后台恢复成功会把状态改回 ready，但 state 还是 failed 时本函数不等它）。
  *   · 自己绝不发起续期。等的永远是别人已经在飞的那个 Promise，因此并发业务请求
  *     仍然只对应一次 /session-token/refresh。
  *   · 等失败不降级：统一抛 TERMINAL_SESSION_INVALID，不把续期的原始错误（可能是

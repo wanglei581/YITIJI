@@ -214,10 +214,12 @@ test('开机换票整窗口都失败：先 failed，服务器回来后一分钟�
 
   // 服务器还没回来：每分钟只向本机 Agent 要一次，状态一直是 failed。
   const before = page.calls.length
+  const statesAtFailure = page.states.length
   await page.advance(3 * MINUTE)
   assert.equal(page.mod.terminalSessionState(), 'failed')
   assert.deepEqual(page.since(before).map((call) => call.kind), ['agent', 'agent', 'agent'], '每分钟一次，轮内不重试')
-  assert.ok(!page.states.slice(page.states.lastIndexOf('failed')).includes('checking'), '后台恢复期间不把状态翻成 checking')
+  // 从判 failed 那一刻记起，之后一次状态通知都不该有：翻成 checking 再翻回 failed 也算翻动。
+  assert.deepEqual(page.states.slice(statesAtFailure), [], '后台恢复期间不把状态翻成 checking')
 
   serverUp = true
   const exchangesBefore = page.counts.exchange
@@ -413,12 +415,19 @@ test('被判作废的会话票不每分钟重发；续期定时器交给后台�
   const deadToken = page.storage.getItem(TOKEN_KEY)
   const refreshesAtFailure = page.counts.refresh
   const statesAtFailure = page.states.length
+  const callsAtFailure = page.calls.length
 
   // 跨过原本的十分钟续期点（开机后第 10 分钟）。
   await page.advance(9 * MINUTE)
   assert.equal(page.mod.terminalSessionState(), 'failed')
   assert.equal(page.counts.refresh, refreshesAtFailure + 1, '同一张已判作废的票，后台只再确认一次')
-  assert.ok(page.counts.agent >= 9, `之后每分钟只向本机 Agent 要票：${page.counts.agent}`)
+  // 九分钟九轮：第一轮拿那张票再确认一次、被判作废后接着向本机 Agent 要一次票；其余八轮只要票。
+  // 钉精确序列而不是下界：同一轮里连要两次票、或者某一轮又去续期，下界都挡不住。
+  assert.deepEqual(
+    page.since(callsAtFailure).map((call) => call.kind),
+    ['refresh', ...Array.from({ length: 9 }, () => 'agent')],
+    '每轮只向本机 Agent 要一次票',
+  )
   assert.deepEqual(page.states.slice(statesAtFailure), [], 'failed 期间状态不该再翻动（残留的续期定时器会把它翻成 checking）')
   assert.equal(page.storage.getItem(TOKEN_KEY), deadToken, '票本身不删：停用期间读配置还要带它')
 })
@@ -465,6 +474,145 @@ test('后台恢复在飞时别处又要续期：等同一次，不并发出第�
   assert.equal(page.calls.at(-1).sessionHeader, 'session-after-shared-recovery')
   assert.equal(page.mod.terminalSessionState(), 'ready')
   assert.equal(page.counts.refresh, refreshesBefore + 1)
+})
+
+test('十分钟续期被服务端明确判作废：这一轮的重试窗口里同一张票只发一次，不照 2 / 5 / 10 / 20 秒重发', async () => {
+  let revoked = false
+  const page = await load({
+    pageUrl: BOOT_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    respond: (kind, nth) => {
+      if (!revoked) return kind === 'agent' ? agentTicket() : session(`session-${kind}-${nth}`)
+      return kind === 'agent' ? 'network' : invalid()
+    },
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+
+  revoked = true
+  const before = page.calls.length
+  await page.advance(10 * MINUTE) // 十分钟续期到点
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.deepEqual(page.since(before).map((call) => call.kind), ['refresh', 'agent'], '作废的票只发一次，随后向本机 Agent 要一次新票')
+  // 续期自己的 60 秒重试窗口走到头之前（后台恢复最早在第 60 秒），不该再有任何请求。
+  await page.advance(MINUTE - 1)
+  assert.deepEqual(page.since(before).map((call) => call.kind), ['refresh', 'agent'], '重试窗口内不重发同一张作废的票')
+})
+
+const CLAIM_URL = 'http://127.0.0.1:5173/api/v1/print-jobs/claim'
+const drain = async () => { for (let turn = 0; turn < 10; turn += 1) await flush() }
+const orFail = (promise, message) => Promise.race([promise, drain().then(() => { throw new Error(message) })])
+
+/**
+ * 摆出后台恢复在飞时状态离开 failed 的唯一一种交叉：标签页里没有会话票，后台恢复正向本机 Agent 要票，
+ * 终端身份恢复回调此刻又来初始化一次（没有会话票时这条路把状态置成 checking，并且自己也去要一张票）。
+ * 两次要票的应答都被按住，由用例决定谁先回来、回来的是什么。
+ */
+async function recoveryMeetsReinitialization() {
+  let agentUp = false
+  const agentGates = []
+  const page = await load({
+    pageUrl: PLAIN_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    respond: (kind, nth) => {
+      if (kind === 'business') return json(200, {})
+      if (kind === 'agent') {
+        if (!agentUp) return 'network'
+        return new Promise((resolve) => { agentGates.push((answer = agentTicket()) => resolve(answer)) })
+      }
+      return session(`session-${kind}-${nth}`)
+    },
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.equal(page.storage.getItem(TOKEN_KEY), null)
+
+  agentUp = true
+  await page.advance(MINUTE) // 后台恢复向本机 Agent 要票，应答被按住
+  assert.equal(agentGates.length, 1)
+  assert.equal(page.mod.terminalSessionState(), 'failed', '后台恢复自己不改状态')
+
+  const statesBefore = page.states.length
+  const init = page.mod.initializeTerminalSession()
+  await drain()
+  assert.equal(page.mod.terminalSessionState(), 'checking')
+  assert.equal(agentGates.length, 2, '两边要的都是本机引导票')
+  assert.equal(page.counts.refresh, 0, '没有会话票，谁也不该去续期')
+
+  // 状态是 checking 且有一次换票在飞：下单类请求等它的结果，会话没换成之前一个字节都不发。
+  let claimSettled = false
+  const claim = page.mod.terminalProtectedFetch(CLAIM_URL, { method: 'POST' })
+  claim.then(() => { claimSettled = true }, () => { claimSettled = true })
+  await drain()
+  assert.equal(claimSettled, false, '在飞的那一次出结果之前，下单类请求不该有结果')
+  assert.equal(page.counts.business, 0, '没有会话就不能下单')
+
+  return { page, agentGates, init, claim, statesBefore }
+}
+
+test('没有会话票、后台恢复在飞时身份恢复回调又来初始化一次：两边都只走「要新引导票」那条路，下单类请求等到会话真的换成才发出', async () => {
+  const { page, agentGates, init, claim, statesBefore } = await recoveryMeetsReinitialization()
+
+  agentGates[0]() // 后台恢复那一次先回来，换成了
+  const response = await orFail(claim, '会话换成之后下单类请求没有发出')
+  assert.equal(response.status, 200)
+  assert.equal(page.calls.at(-1).kind, 'business')
+  assert.equal(page.calls.at(-1).sessionHeader, page.storage.getItem(TOKEN_KEY), '发出去时带的是刚换成的会话票')
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+
+  agentGates[1]() // 初始化那一次后回来：再换一张，同样清场
+  await orFail(init, '初始化没有收尾')
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  assert.equal(page.counts.refresh, 0)
+  assert.ok(page.counts.exchange >= 1)
+  assert.equal(page.clears(), page.counts.exchange, '每换一次引导票都清一次场')
+  assert.equal(page.mod.takeTerminalSessionRecoveryCleared(), true, '清过场，页面要能知道')
+  assert.ok(!page.states.slice(statesBefore).includes('failed'), '这次交叉里屏上不该闪回「没通过」')
+
+  // 不留尾巴：之后十分钟里只有一次正常续期，没有后台恢复还在跑。
+  const after = page.calls.length
+  await page.advance(10 * MINUTE)
+  assert.deepEqual(page.since(after).map((call) => call.kind), ['refresh'])
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+})
+
+test('同一种交叉里在飞的那一次没换成：等它的下单类请求照旧被拦，不因为状态是 checking 就放出去', async () => {
+  const { page, agentGates, init, claim } = await recoveryMeetsReinitialization()
+
+  agentGates[0](gateway(503)) // 后台恢复那一次没要到票；初始化那一次还按着，状态仍是 checking
+  await assert.rejects(
+    orFail(claim, '在飞的那一次失败之后，下单类请求没有收尾'),
+    (error) => error.code === 'TERMINAL_SESSION_INVALID' && error.status === 401,
+  )
+  assert.equal(page.mod.terminalSessionState(), 'checking')
+  assert.equal(page.counts.business, 0, '没有会话就不能下单：状态是 checking 不等于有会话')
+  assert.equal(page.counts.exchange, 0)
+
+  agentGates[1]() // 初始化那一次回来并换成：机器照样恢复，不会停在 checking
+  await orFail(init, '初始化没有收尾')
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  const response = await page.mod.terminalProtectedFetch(CLAIM_URL, { method: 'POST' })
+  assert.equal(response.status, 200)
+  assert.equal(page.calls.at(-1).sessionHeader, page.storage.getItem(TOKEN_KEY))
+})
+
+test('同一种交叉里两边都没换成：回到 failed，后台恢复接着每分钟再试', async () => {
+  const { page, agentGates, init, claim } = await recoveryMeetsReinitialization()
+
+  agentGates[0](gateway(503))
+  await assert.rejects(orFail(claim, '下单类请求没有收尾'), (error) => error.code === 'TERMINAL_SESSION_INVALID')
+  agentGates[1](gateway(503))
+  await orFail(init, '初始化没有收尾')
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.equal(page.counts.business, 0)
+
+  // 没有卡死：下一分钟后台恢复照常再向本机 Agent 要一次票。
+  const before = agentGates.length
+  await page.advance(MINUTE)
+  assert.equal(agentGates.length, before + 1, '回到 failed 之后后台恢复必须接着排')
+  agentGates.at(-1)()
+  await drain()
+  assert.equal(page.mod.terminalSessionState(), 'ready')
 })
 
 test('页面刚打开、没有网址票也没有会话票，直接向本机 Agent 要票换成：不算「恢复清过场」', async () => {
