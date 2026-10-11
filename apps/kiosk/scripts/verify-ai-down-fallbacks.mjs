@@ -65,6 +65,7 @@ const files = {
   interviewSession: [
     kiosk('src/pages/interview/InterviewSessionPage.tsx'),
     kiosk('src/pages/interview/session/interviewTurnActions.ts'),
+    kiosk('src/pages/interview/session/useInterviewRecording.ts'),
   ].join('\n'),
   contractReviewHome: kiosk('src/pages/contract-review/ContractReviewHomePage.tsx'),
   contractReviewProcessing: kiosk('src/pages/contract-review/ContractReviewProcessingPage.tsx'),

@@ -12,7 +12,7 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /interview-mic-capability\.spec\.ts$/,
+  testMatch: /interview-(mic-capability|deadline)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-mic-capability',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),

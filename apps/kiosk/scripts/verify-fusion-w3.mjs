@@ -146,7 +146,8 @@ const frozen = {
   // 属本批次「跨页上下文：要么消费，要么别传」清理的一部分；
   // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
   // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
-  'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
+  // A1 增加截止时刻与来源；A2 仅增加 closed 阶段，原有字段与语音状态保留，继续逐字节冻结。
+  'src/pages/interview/session/types.ts': '45bb7bc66885477b3f6f661c2387226e4be04a198d4502e1f321aa4f81d71960',
   // 2026-09-29 重新冻结（W-16）：语音会话在写成「正在连接」之前先完成使用声明。
   // 未同意就不发创建请求，也不把画面停在连接中。停止接口仍是 keepalive fetch。
   // 旧哈希 365da6215997c51c4f8d4a2f41ca623302431fefe2e463864c42c06c760c3a29。
@@ -356,7 +357,8 @@ includes('src/pages/resume/ResumeParsePage.tsx', 'submitResumeParse(', 'resume p
 includes('src/pages/resume/ResumeReportPage.tsx', 'extractionNotice', 'resume report keeps OCR provenance')
 includes('src/pages/assistant/AssistantPage.tsx', 'chatWithAssistant({', 'assistant keeps the real text request')
 includes('src/pages/assistant/AssistantPage.tsx', "import('./AssistantCallPanel')", 'assistant keeps TRTC lazy loading')
-includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'interview keeps real ASR review')
+includes('src/pages/interview/session/useInterviewRecording.ts', 'transcribeAnswer(', 'interview keeps real ASR review')
+includes('src/pages/interview/InterviewSessionPage.tsx', 'useInterviewRecording({', 'interview page still wires the real recording and ASR hook')
 // 下一题请求挪到 interviewTurnActions.ts（会话页 500 行门禁）。断言仍要求真实 answerInterview，并要求会话页还走这条提交。
 includes('src/pages/interview/session/interviewTurnActions.ts', 'answerInterview(', 'interview keeps question progression')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'submitInterviewAnswer(', 'interview page still submits answers through the extracted turn')

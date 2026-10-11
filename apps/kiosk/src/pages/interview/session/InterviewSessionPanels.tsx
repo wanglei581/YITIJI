@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import type { InterviewMessage, InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
+import { INTERVIEW_DEADLINE_WARN_SEC } from './interviewDeadline'
 
 type PillTone = 'gray' | 'blue' | 'red' | 'green'
 
@@ -60,6 +61,7 @@ export function InterviewSessionPanels({
     .filter((message) => message.role === 'interviewer')
     .slice(-2, -1)[0]?.content
 
+  const deadlineWarning = remainingSec >= 1 && remainingSec <= INTERVIEW_DEADLINE_WARN_SEC && phase !== 'finishing'
   const micTone = micStatusTone === 'green' ? 'ok' : micStatusTone === 'red' ? 'off' : undefined
 
   return (
@@ -70,9 +72,18 @@ export function InterviewSessionPanels({
           items={[
             { k: '麦克风', v: micStatusLabel, tone: micTone },
             { k: '语音播报', v: ttsLabel, tone: ttsOfficial ? 'ok' : undefined },
-            { k: '剩余时间', v: formatInterviewClock(remainingSec), tone: timeUp ? 'off' : 'ok' },
+            { k: '剩余时间', v: formatInterviewClock(remainingSec), tone: deadlineWarning || timeUp ? 'off' : 'ok' },
           ]}
         />
+        {deadlineWarning && (
+          // 紧跟在「剩余时间」下面：放在页面底部那条提示里，第一屏看不到。
+          <section className="interview-session__notice" role="status" data-testid="interview-deadline-warning">
+            <ShieldCheckIcon aria-hidden="true" />
+            <div>
+              <p>还剩不到 1 分钟。到点会自动结束这一场，没提交的回答不算进报告。</p>
+            </div>
+          </section>
+        )}
         <section className="interview-session__question-card">
           <div className="interview-session__card-head">
             <span className="interview-session__card-icon">
@@ -105,12 +116,11 @@ export function InterviewSessionPanels({
         <InterviewNotice>
           提交后才会进入下一题。这次没发出去时，页面会留下原因，你可以再试一次。
         </InterviewNotice>
-        {(voiceHint || timeUp) && (
+        {voiceHint && (
           <section className="interview-session__notice" role="status">
             <ShieldCheckIcon aria-hidden="true" />
             <div>
-              {voiceHint && <p>{voiceHint}</p>}
-              {timeUp && phase !== 'finishing' && <p>练习时长已到，回答完当前问题后点「结束本场练习」。</p>}
+              <p>{voiceHint}</p>
             </div>
           </section>
         )}

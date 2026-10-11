@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 716,
+      "reachableFileCount": 721,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16505,7 +16505,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 814
+      "sourceFileCount": 819
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20183,6 +20183,9 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
     ],
+    "apps/kiosk/src/pages/interview/session/interviewDeadline.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
     "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -20192,6 +20195,15 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/useInterviewClosure.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
+    ],
+    "apps/kiosk/src/pages/interview/session/useInterviewRecording.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
+      "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
     ],
     "apps/kiosk/src/pages/interview/styles/interview-report.css": [
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
@@ -29437,6 +29449,7 @@
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
+          "apps/kiosk/src/pages/interview/session/useInterviewRecording.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
@@ -29970,6 +29983,7 @@
           "apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
+          "apps/kiosk/src/pages/interview/session/useInterviewRecording.ts",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
@@ -31130,8 +31144,11 @@
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionInvalid.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewSessionPanels.tsx",
+          "apps/kiosk/src/pages/interview/session/interviewDeadline.ts",
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
+          "apps/kiosk/src/pages/interview/session/useInterviewClosure.ts",
+          "apps/kiosk/src/pages/interview/session/useInterviewRecording.ts",
           "apps/kiosk/src/pages/interview/styles/interview-report.css",
           "apps/kiosk/src/pages/interview/styles/interview-responsive.css",
           "apps/kiosk/src/pages/interview/styles/interview-session.css",
@@ -31339,6 +31356,7 @@
           ".github/workflows/ci.yml",
           "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "apps/kiosk/src/pages/interview/session/InterviewAnswerDock.tsx",
+          "apps/kiosk/src/pages/interview/session/useInterviewRecording.ts",
           "apps/kiosk/src/utils/micCapability.ts"
         ],
         "missing": []

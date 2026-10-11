@@ -25,7 +25,7 @@ const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8')
 
 const files = {
   capability: read('src/utils/micCapability.ts'),
-  session: read('src/pages/interview/InterviewSessionPage.tsx'),
+  session: [read('src/pages/interview/InterviewSessionPage.tsx'), read('src/pages/interview/session/useInterviewRecording.ts')].join('\n'),
   dock: read('src/pages/interview/session/InterviewAnswerDock.tsx'),
 }
 

@@ -3,14 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
 import { resolveInterviewSessionState } from './session/resolveInterviewSessionState'
-import { fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
-import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
+import { fetchQuestionAudio, getVoiceCapability } from '../../services/api/interview'
 import {
-  classifyMicError,
   detectMicCapability,
   subscribeMicDeviceChange,
   MIC_STATUS_LABEL,
-  micFailureReasonLine,
   micReasonLine,
   type MicCapabilityState,
 } from '../../utils/micCapability'
@@ -22,19 +19,21 @@ import { InterviewReportPending } from './session/InterviewReportPending'
 import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { speakInterview } from './session/speakInterview'
+import { useInterviewSessionDeadline } from './session/useInterviewDeadline'
+import { InterviewTimeUp } from './session/InterviewTimeUp'
+import { useInterviewClosure } from './session/useInterviewClosure'
+import { useInterviewRecording } from './session/useInterviewRecording'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
-import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
-import { userMessageOf } from '../../services/api/userErrorMessage'
-import { isAiOutage } from '../../ai/aiOutage'
-import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
+import { errorCodeOf } from '../../services/api/userErrorMessage'
 import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
-import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
+import { submitInterviewAnswer } from './session/interviewTurnActions'
 
 const advisorPortrait = '/assets/ai-advisor.png'
 
@@ -46,7 +45,7 @@ const INTERVIEWER_LABEL: Record<string, string> = {
   final: '终面负责人',
 }
 
-const MAX_RECORD_SEC = 58
+
 
 export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: InterviewStage) => void } = {}) {
   const navigate = useNavigate()
@@ -64,7 +63,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   )
   const [questionIndex, setQuestionIndex] = useState(storedLive?.questionIndex ?? 1)
   const [draft, setDraft] = useState('')
-  const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
+  const [phase, setPhaseState] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
   const [networkFailure, setNetworkFailure] = useState(false)
   const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
@@ -73,7 +72,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     Boolean(state?.sessionId && storedLive?.sessionId === state.sessionId && storedLive.answersRecorded),
   )
   const [finishRecovery, setFinishRecovery] = useState<InterviewFinishRecovery | null>(null)
-  const [remainingSec, setRemainingSec] = useState(storedLive?.remainingSec ?? (state?.durationMin ?? 5) * 60)
+  const sealedRef = useRef(false)
+  const sealCallbackRef = useRef<() => void>(() => undefined)
+  const { remainingSec, deadlineAtLocalMs, deadlineSource, markDeadlineReached } = useInterviewSessionDeadline(state, storedLive, getToken, () => sealCallbackRef.current())
+  const deadlineRef = useRef(deadlineAtLocalMs)
+  deadlineRef.current = deadlineAtLocalMs
   const listRef = useRef<HTMLDivElement>(null)
 
   const [asrEnabled, setAsrEnabled] = useState(false)
@@ -86,10 +89,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const [speaking, setSpeaking] = useState(false)
   const [voiceHint, setVoiceHint] = useState<string | null>(null)
   const [micError, setMicError] = useState(false)
-  const recorderRef = useRef<WavRecorder | null>(null)
-  const recordTimerRef = useRef<number | null>(null)
-  const recordStartedAtRef = useRef<number | null>(null)
-  const [recordSec, setRecordSec] = useState(0)
   const questionShownAtRef = useRef(Date.now())
 
   useBusyLock(
@@ -105,6 +104,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     messages,
     questionIndex,
     remainingSec,
+    deadlineAtLocalMs,
+    deadlineSource,
     omitPrintAnswers,
     answersRecorded,
     interactionMode: entryInteractionMode,
@@ -176,22 +177,41 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     setSpeaking(false)
   }
 
+  // 定时器被浏览器延后时，入口仍按绝对截止时刻封场。
+  const sealIfExpired = () => {
+    if (!sealedRef.current && Date.now() >= deadlineRef.current) sealCallbackRef.current()
+    return sealedRef.current
+  }
+  const { recordSec, maxRecordSec, resetVoiceState, startRecording, stopRecording } = useInterviewRecording({
+    state, access, sealedRef, sealIfExpired, sealAtDeadline: () => sealCallbackRef.current(), micCapability,
+    setMicCapability, setMicError, setVoiceHint, setError, setVoice, setMode, stopPlayback,
+  })
+  const { sealed, timeUpVariant, pendingAnswerRef, setPhase, sealAtDeadline, finish, retryReport } = useInterviewClosure({
+    state, access, phase, sealedRef, onSealed: markDeadlineReached, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
+    onGoStage, navigate, stopPlayback, resetVoiceState,
+    setPhase: setPhaseState, setError, setMicError, setFinishRecovery,
+  })
+  sealCallbackRef.current = sealAtDeadline
+
   useEffect(() => {
     questionShownAtRef.current = Date.now()
-    if (mode !== 'voice' || !lastInterviewerMsg || !state?.sessionId) return
+    if (sealedRef.current || mode !== 'voice' || !lastInterviewerMsg || !state?.sessionId) return
     let cancelled = false
     if (ttsOfficial) {
       fetchQuestionAudio(state.sessionId, lastInterviewerTurnIdx, accessRef.current)
         .then(({ audio }) => {
-          if (cancelled) return
+          if (cancelled || sealedRef.current) return
           const el = new Audio(`data:audio/mpeg;base64,${audio}`)
           audioRef.current = el
-          el.onplay = () => setSpeaking(true)
-          el.onended = () => setSpeaking(false)
-          el.onerror = () => { setSpeaking(false); speakInterview(lastInterviewerMsg, setSpeaking) }
-          void el.play().catch(() => speakInterview(lastInterviewerMsg, setSpeaking))
+          el.onplay = () => { if (!sealedRef.current) setSpeaking(true) }
+          el.onended = () => { if (!sealedRef.current) setSpeaking(false) }
+          el.onerror = () => { if (!sealedRef.current) { setSpeaking(false); speakInterview(lastInterviewerMsg, setSpeaking) } }
+          void el.play().catch(() => { if (!sealedRef.current) speakInterview(lastInterviewerMsg, setSpeaking) })
         })
-        .catch(() => { if (!cancelled) speakInterview(lastInterviewerMsg, setSpeaking) })
+        .catch((err) => {
+          if (errorCodeOf(err) === 'INTERVIEW_DEADLINE_REACHED') sealCallbackRef.current()
+          if (!cancelled && !sealedRef.current) speakInterview(lastInterviewerMsg, setSpeaking)
+        })
     } else {
       speakInterview(lastInterviewerMsg, setSpeaking)
     }
@@ -200,17 +220,10 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   }, [lastInterviewerMsg, mode, ttsOfficial])
 
   useEffect(() => {
-    const t = setInterval(() => setRemainingSec((s) => (s > 0 ? s - 1 : 0)), 1000)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, phase, voice.kind])
 
   useEffect(() => () => {
-    recorderRef.current?.cancel()
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
     stopPlayback()
   }, [])
 
@@ -223,113 +236,32 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     )
   }
 
-  if (phase === 'finishing') {
+  if (phase === 'closed') {
+    return <InterviewTimeUp variant={timeUpVariant} answersRecorded={answersRecorded}
+      onLeave={() => navigate('/interview-service')}
+      onRestart={() => onGoStage ? onGoStage('setup') : navigate('/interview/setup')}
+      onRetry={retryReport}
+      onOpenTips={() => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))} />
+  }
+
+  if (phase === 'finishing' || remainingSec === 0) {
     return (
       <InterviewReportPending
+        endedAtDeadline={sealed || remainingSec === 0}
         onOpenTips={() => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))}
       />
     )
   }
 
-  const resetVoiceState = () => {
-    recorderRef.current?.cancel()
-    recorderRef.current = null
-    recordStartedAtRef.current = null
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
-    setRecordSec(0)
-    setVoice({ kind: 'idle' })
-  }
-
-  const fallbackToText = (reason: string) => {
-    resetVoiceState()
-    setMode('text')
-    setVoiceHint(reason)
-  }
-
-  const startRecording = async () => {
-    // 能力门禁：去掉原生 disabled 后按钮真的可点，守卫必须在 handler 内部。
-    if (micCapability !== null && micCapability !== 'available') {
-      setMicError(true)
-      setVoiceHint(micReasonLine(micCapability))
-      setError(micFailureReasonLine(micCapability))
-      return
-    }
-    setError(null)
-    setMicError(false)
-    setVoiceHint(null)
-    stopPlayback()
-    setVoice({ kind: 'requesting_permission' })
-    try {
-      const recorder = await startWavRecorder()
-      const startedAt = Date.now()
-      recorderRef.current = recorder
-      recordStartedAtRef.current = startedAt
-      setRecordSec(0)
-      setVoice({ kind: 'recording', startedAt })
-      recordTimerRef.current = window.setInterval(() => {
-        setRecordSec((s) => {
-          if (s + 1 >= MAX_RECORD_SEC) void stopRecording()
-          return s + 1
-        })
-      }, 1000)
-    } catch (err) {
-      // 关键：按 error.name 归因。NotFoundError 是「没有设备」，
-      // NotAllowedError 才是「权限问题」——旧代码把两者都说成权限问题，
-      // 让没有麦克风的用户去翻浏览器设置，而那里什么都查不出来。
-      const failure = classifyMicError(err)
-      resetVoiceState()
-      setMicError(true)
-      setError(micFailureReasonLine(failure))
-      // 归因为设备/权限/不支持时同步收紧能力门禁，语音入口随之置灰。
-      if (failure === 'no-device' || failure === 'permission-denied' || failure === 'unsupported') {
-        setMicCapability(failure)
-        setVoiceHint(micReasonLine(failure))
-      }
-    }
-  }
-
-  const stopRecording = async () => {
-    const recorder = recorderRef.current
-    if (!recorder) return
-    recorderRef.current = null
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
-    const startedAt = recordStartedAtRef.current ?? Date.now()
-    const durationSec = Math.max(1, Math.min(MAX_RECORD_SEC, Math.round((Date.now() - startedAt) / 1000)))
-    recordStartedAtRef.current = null
-    setVoice({ kind: 'transcribing' })
-    try {
-      const wav = await recorder.stop()
-      const { text } = await transcribeAnswer(state.sessionId, wav, access)
-      setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
-    } catch (err) {
-      const declined = aiDeclarationDeclineMessage(err)
-      const msg = declined ?? userMessageOf(err, '语音转写失败')
-      if (declined) {
-        setVoice({ kind: 'idle' })
-        setError(declined)
-      } else if (!isAiOutage(err) && (msg.includes('未启用') || msg.includes('未配置'))) {
-        fallbackToText(`${msg}，请使用文字输入完成练习`)
-      } else {
-        setVoice({ kind: 'idle' })
-        setError(isAiOutage(err) ? INTERVIEW_AI_DOWN_HINT : `${msg}，可重新录音或改用文字输入`)
-      }
-    }
-  }
-
   const submit = (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
-    void submitInterviewAnswer({
-      args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
+    if (sealIfExpired()) return
+    const pending = submitInterviewAnswer({
+      args, state, access, messages, draft, sealedRef, sealAtDeadline, voiceKind: voice.kind, questionShownAtRef,
       setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError, setNetworkFailure,
       setFinishRecovery, setAnswersRecorded, setQuestionIndex,
     })
-  }
-
-  const finish = () => {
-    void finishInterview({
-      state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
-      onGoStage, navigate, stopPlayback, resetVoiceState,
-      setPhase, setError, setMicError, setFinishRecovery,
-    })
+    pendingAnswerRef.current = pending
+    void pending.finally(() => { if (pendingAnswerRef.current === pending) pendingAnswerRef.current = null })
   }
 
   const interviewerLabel = INTERVIEWER_LABEL[state.interviewerType] ?? '面试官'
@@ -436,7 +368,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         mode={mode}
         voice={voice}
         recordSec={recordSec}
-        maxRecordSec={MAX_RECORD_SEC}
+        maxRecordSec={maxRecordSec}
         draft={draft}
         voiceAvailable={voiceAvailable}
         micBlockedReason={micBlockedReason}

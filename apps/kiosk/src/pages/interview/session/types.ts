@@ -6,6 +6,8 @@ export interface InterviewSessionRouteState {
   interviewerType: string
   position: string
   firstQuestion?: string
+  deadlineAtLocalMs?: number
+  deadlineSource?: 'server' | 'local'
 }
 
 export interface InterviewMessage {
@@ -14,7 +16,7 @@ export interface InterviewMessage {
   skipped?: boolean
 }
 
-export type InterviewSessionPhase = 'answering' | 'thinking' | 'finishing' | 'done_suggest'
+export type InterviewSessionPhase = 'answering' | 'thinking' | 'finishing' | 'done_suggest' | 'closed'
 
 export type InterviewVoiceState =
   | { kind: 'idle' }

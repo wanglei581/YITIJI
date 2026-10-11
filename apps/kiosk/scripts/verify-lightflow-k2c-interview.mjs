@@ -73,6 +73,8 @@ if (existsSync(resolve(root, responsivePath))) {
 const session = [
   read('src/pages/interview/InterviewSessionPage.tsx'),
   read('src/pages/interview/session/interviewTurnActions.ts'),
+  read('src/pages/interview/session/useInterviewRecording.ts'),
+  read('src/pages/interview/session/useInterviewClosure.ts'),
 ].join('\n')
 for (const path of [
   'src/pages/interview/session/types.ts',
@@ -103,6 +105,10 @@ const executable = (source) => ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText
 try {
+  const timingJs = ts.transpileModule(read('src/pages/interview/session/interviewDeadline.ts'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText
+  const timing = await import(`data:text/javascript;charset=utf-8,${encodeURIComponent(timingJs)}`)
   const initial = new Function('useState', 'setupDraft', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return [
     ${sourceNode(setupAst, '[industry, setIndustry]')},
     ${sourceNode(setupAst, '[experience, setExperience]')},
@@ -133,12 +139,14 @@ try {
     position, industry, experience, interviewerType, difficulty, duration, interactionMode, resumeFile,
     setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
+    deadlineFromServerTiming, readInterviewTiming, deadlineFromLocalStart, remainingSecAt,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
   const noop = () => {}
   async function runStart(values) {
     const requests = []
     const errors = []
     const context = {
+      ...timing,
       ...draft, duration: 5, resumeFile: null, interactionMode: 'text',
       setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
@@ -252,7 +260,9 @@ for (const token of [
   check(session.includes(token), `${pages[1]} — Session 状态/清场合同缺失：${token}`)
 }
 check(
-  /useEffect\(\(\) => \(\) => \{[\s\S]*?recorderRef\.current\?\.cancel\(\)[\s\S]*?clearInterval\(recordTimerRef\.current\)[\s\S]*?stopPlayback\(\)/.test(session),
+  /useEffect\(\(\) => \(\) => \{[\s\S]*?recorderRef\.current\?\.cancel\(\)[\s\S]*?clearInterval\(recordTimerRef\.current\)/.test(read('src/pages/interview/session/useInterviewRecording.ts')) &&
+  /useEffect\(\(\) => \(\) => \{\s*stopPlayback\(\)/.test(read('src/pages/interview/InterviewSessionPage.tsx')) &&
+  session.includes('useInterviewRecording({'),
   'Session 卸载时的录音、计时器和播放清场合同缺失',
 )
 

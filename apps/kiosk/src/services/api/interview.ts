@@ -11,6 +11,7 @@ import type {
   CreateInterviewInput,
   CreateInterviewResponse,
   InterviewQuestionResponse,
+  InterviewSessionDetail,
   InterviewReportResponse,
   InterviewPracticeSheetResponse,
   InterviewPrintResponse,
@@ -20,6 +21,13 @@ import { rethrowAiDeclaration } from '../../ai/aiDeclarationErrors'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { terminalAttributedFetch } from '../terminalAuth'
 import { API_BASE_URL, API_MODE } from './client'
+
+type InterviewTimingFields = Partial<{
+  startedAt: string | null
+  deadlineAt: string | null
+  serverNow: string
+  timeUp: boolean
+}>
 
 export interface InterviewAccess {
   token?: string | null
@@ -115,19 +123,19 @@ export function createInterview(
   return call<CreateInterviewResponse>('/mock-interviews', access, { method: 'POST', body: input })
 }
 
-export function startInterview(sessionId: string, access: InterviewAccess): Promise<InterviewQuestionResponse> {
+export function startInterview(sessionId: string, access: InterviewAccess): Promise<InterviewQuestionResponse & InterviewTimingFields> {
   if (API_MODE !== 'http') {
     mockIdx = 1
     return Promise.resolve({ done: false, question: MOCK_QUESTIONS[0], qType: 'intro', questionIndex: 1, questionTarget: MOCK_QUESTIONS.length })
   }
-  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: {} })
+  return call<InterviewQuestionResponse & InterviewTimingFields>(`/mock-interviews/${encodeURIComponent(sessionId)}/start`, access, { method: 'POST', body: { hardDeadline: true } })
 }
 
 export function answerInterview(
   sessionId: string,
   input: { answer?: string; skip?: boolean; inputMode?: 'text' | 'voice'; transcriptText?: string; transcriptEdited?: boolean; answerDurationSec?: number },
   access: InterviewAccess,
-): Promise<InterviewQuestionResponse> {
+): Promise<InterviewQuestionResponse & InterviewTimingFields> {
   if (API_MODE !== 'http') {
     if (mockIdx >= MOCK_QUESTIONS.length) {
       return Promise.resolve({ done: true, questionIndex: MOCK_QUESTIONS.length, questionTarget: MOCK_QUESTIONS.length })
@@ -136,7 +144,12 @@ export function answerInterview(
     mockIdx += 1
     return Promise.resolve({ done: false, question: q, qType: 'experience', questionIndex: mockIdx, questionTarget: MOCK_QUESTIONS.length })
   }
-  return call<InterviewQuestionResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/answer`, access, { method: 'POST', body: input })
+  return call<InterviewQuestionResponse & InterviewTimingFields>(`/mock-interviews/${encodeURIComponent(sessionId)}/answer`, access, { method: 'POST', body: input })
+}
+
+export function getInterviewSession(sessionId: string, access: InterviewAccess): Promise<InterviewSessionDetail & InterviewTimingFields> {
+  if (API_MODE !== 'http') return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不读取服务端会话', 0))
+  return call<InterviewSessionDetail & InterviewTimingFields>(`/mock-interviews/${encodeURIComponent(sessionId)}`, access)
 }
 
 export function endInterview(
