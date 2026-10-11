@@ -58,6 +58,12 @@ export function clearSafetyBlocks(): void {
   ring.length = 0
 }
 
+/** 这一轮没调模型、回的是固定的话（设备故障）：退回本次公网次数，但不记成内容拦截。 */
+export function requestQuotaRefund(): void {
+  const ctx = currentAiRequestContext()
+  if (ctx) ctx.safetyRefund = true
+}
+
 /** 调用方消费一次。公网次数回滚不是幂等的，所以这里清掉标记，避免再减一次。 */
 export function consumeSafetyRefund(): boolean {
   const ctx = currentAiRequestContext()
