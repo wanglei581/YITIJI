@@ -22679,6 +22679,9 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
     ],
+    "apps/terminal-agent/src/agent/print-job-monitor.ts": [
+      "apps/terminal-agent/scripts/verify-print-monitor-truth.ts"
+    ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
     ],
@@ -33522,6 +33525,7 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/terminal-agent/src/agent/print-job-monitor.ts",
           "apps/terminal-agent/src/agent/printer-status-map.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/wmi.ts",
