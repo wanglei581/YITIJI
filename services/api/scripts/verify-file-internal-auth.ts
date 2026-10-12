@@ -22,6 +22,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { FilesController } from '../src/files/files.controller'
 import { canAccessFile, type FileRequester } from '../src/files/files.service'
+import { signFileUrl } from '../src/files/signing'
 import {
   canActorUseUploadPurpose,
   rawUploadByteLimitForPurpose,
@@ -560,6 +561,64 @@ async function main(): Promise<void> {
     assert.equal(canActorUseUploadPurpose('admin_upload', null), false)
     assert.equal(canActorUseUploadPurpose('print_doc', 'kiosk'), true)
     assert.equal(canActorUseUploadPurpose('partner_image', 'partner'), true)
+  })
+
+  const contentBytes = Buffer.from('%PDF-1.4\nresume-cache-control\n%%EOF\n')
+  const contentFileId = 'file-content-cache-control'
+  let signedContent: Promise<{ statusCode: number; headers: Record<string, string>; body: Buffer | undefined }> | undefined
+  const readSignedContent = () => {
+    signedContent ??= (async () => {
+      const files = {
+        readContent: async (id: string) => {
+          assert.equal(id, contentFileId)
+          return { buffer: contentBytes, mimeType: 'application/pdf', filename: 'resume.pdf', purpose: 'resume' }
+        },
+      }
+      const controller = new FilesController(
+        files as never,
+        { write: async () => undefined, writeRequired: async () => 'unused' } as never,
+        jwt,
+        {} as never,
+        {} as never,
+      )
+      const signed = signFileUrl(contentFileId, 60_000)
+      const parsed = new URL(signed.url, 'http://internal.local')
+      const headers: Record<string, string> = {}
+      const response = {
+        statusCode: 200,
+        body: undefined as Buffer | undefined,
+        setHeader(name: string, value: string | number) {
+          headers[name] = String(value)
+        },
+        status(code: number) {
+          this.statusCode = code
+          return this
+        },
+        send(payload: Buffer) {
+          this.body = payload
+        },
+      }
+      await controller.content(
+        contentFileId,
+        parsed.searchParams.get('expires') ?? '',
+        parsed.searchParams.get('sig') ?? '',
+        undefined,
+        response as never,
+      )
+      return { statusCode: response.statusCode, headers, body: response.body }
+    })()
+    return signedContent
+  }
+
+  await scenario('GET /files/:id/content 的 Cache-Control 恰好是 no-store', async () => {
+    const response = await readSignedContent()
+    assert.equal(response.headers['Cache-Control'], 'no-store')
+  })
+
+  await scenario('GET /files/:id/content 同一条请求的状态码与正文与改缓存头之前一致', async () => {
+    const response = await readSignedContent()
+    assert.equal(response.statusCode, 200)
+    assert.ok(response.body?.equals(contentBytes), '正文必须仍是 readContent 返回的原字节')
   })
 
   resetRedisCooldownForTests()

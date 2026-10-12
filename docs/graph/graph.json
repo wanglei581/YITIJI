@@ -25947,6 +25947,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
+      "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-free-print-quota.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
@@ -37961,7 +37962,8 @@
           "services/api/src/files/collect-raw-upload-body.ts",
           "services/api/src/files/file-validation.ts",
           "services/api/src/files/files.controller.ts",
-          "services/api/src/files/files.service.ts"
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts"
         ],
         "missing": []
       },
