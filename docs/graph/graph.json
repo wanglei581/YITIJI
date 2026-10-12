@@ -23823,6 +23823,7 @@
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-community-daily-brief.ts",
       "services/api/scripts/verify-demo-company-unpublish.ts",
@@ -24284,6 +24285,7 @@
     ],
     "services/api/src/advisor/advisor-skills.ts": [
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/advisor.controller.ts": [
@@ -24295,6 +24297,7 @@
     "services/api/src/advisor/advisor.service.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/assistant-summary.service.ts": [
@@ -24302,6 +24305,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts"
@@ -24310,6 +24314,7 @@
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts"
@@ -24345,6 +24350,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-assess-isolation.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-career-plan.ts",
@@ -24520,6 +24526,7 @@
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -24920,12 +24927,14 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/safety/block-log.ts": [
-      "services/api/scripts/verify-ai-safety-lexicon.ts"
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts"
     ],
     "services/api/src/ai/safety/content-blocked.ts": [
       "services/api/scripts/verify-ai-safety-lexicon.ts"
     ],
     "services/api/src/ai/safety/device-fault.ts": [
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts"
     ],
     "services/api/src/ai/safety/lexicon.seed.json": [
@@ -24973,6 +24982,7 @@
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-device-fault.ts"
     ],
     "services/api/src/ai/usage/ai-usage-meter.ts": [
@@ -25052,6 +25062,7 @@
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -27494,6 +27505,7 @@
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-assistant-device-fault-intercept.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-audit-logs.ts",
       "services/api/scripts/verify-backend-p0-http.ts",
@@ -28140,6 +28152,7 @@
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-assistant-device-fault.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-llm-thinking-off.ts",
       "services/api/scripts/verify-trtc-session-deadline.ts",
@@ -36428,12 +36441,42 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/advisor/advisor-skills.ts",
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/assistant-summary.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/ai/llm/llm-chat.service.ts",
+          "services/api/src/ai/safety/block-log.ts",
+          "services/api/src/ai/safety/device-fault.ts",
+          "services/api/src/ai/usage/ai-usage-context.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-assistant-device-fault-intercept.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:assistant-device-fault"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/advisor/llm-advisor.service.ts",
           "services/api/src/ai/llm/llm-chat.service.ts",
           "services/api/src/ai/llm/llm-guard.ts",
           "services/api/src/ai/safety/device-fault.ts",
           "services/api/src/ai/usage/ai-usage-context.ts",
-          "services/api/src/trtc/trtc-llm-safety.ts"
+          "services/api/src/trtc/trtc-llm-safety.ts",
+          "services/api/src/trtc/trtc.service.ts"
         ],
         "missing": []
       },
