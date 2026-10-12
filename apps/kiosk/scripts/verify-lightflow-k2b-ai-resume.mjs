@@ -230,6 +230,7 @@ const carryProgram = [
   sourceNode(carrySource, 'DIAGNOSIS_MASK_PLACEHOLDER'),
   sourceNode(carrySource, 'CARRIED_NOTE'),
   sourceNode(carrySource, 'keptLines'),
+  sourceNode(carrySource, 'keepFirstListItems'),
   sourceNode(carrySource, 'resumeBlocksToGenerateForm'),
   'return { resumeBlocksToGenerateForm, CARRIED_NOTE, DIAGNOSIS_MASK_PLACEHOLDER, clampText, clampListText, splitList, LIMITS, TEXT_LIMITS };',
 ].join('\n')
@@ -291,6 +292,7 @@ const longSkill = '一二三四五六七八九十'.repeat(5)
 const skillOnly = toForm([block('skill', '技能', [longSkill, 'Excel'])])
 expect(skillOnly !== null && skillOnly.form.skillsText === carryApi.clampListText(`${longSkill}\nExcel`, carryApi.TEXT_LIMITS.skill), '超长技能按条封顶')
 expect(skillOnly !== null && !skillOnly.form.skillsText.includes(longSkill), '超长技能不是整段原样带入')
+expect(skillOnly !== null && skillOnly.form.skillsText === `${longSkill.slice(0, carryApi.TEXT_LIMITS.skill)}\nExcel`, '超长技能每条留前面那些字（期望值直接截出来，不借用被测函数）')
 expect(skillOnly !== null && skillOnly.seg === 'exp', '只带了技能时经历页签用 exp')
 const longIntro = '我'.repeat(520)
 const introOnly = toForm([block('selfintro', '自我评价', [longIntro])])
@@ -311,6 +313,11 @@ const manySkills = toForm([block('skill', '技能', manySkillLines)])
 const carriedSkillItems = manySkills ? carryApi.splitList(manySkills.form.skillsText, skillTotal) : []
 expect(carriedSkillItems.length === carryApi.LIMITS.skills, `技能超过 ${carryApi.LIMITS.skills} 条时只带前 ${carryApi.LIMITS.skills} 条（实际 ${carriedSkillItems.length}）`)
 expect(carriedSkillItems.join('|') === skillItems.slice(0, carryApi.LIMITS.skills).join('|'), '技能按原顺序整条地取前面的，不从条中间截')
+const manyJoined = manySkillLines.join('\n')
+expect(manySkills !== null && manyJoined.startsWith(manySkills.form.skillsText) && manySkills.form.skillsText.length < manyJoined.length, '技能超过上限时留下的是原文开头一段，逐字不变')
+const compoundSkill = '熟练使用办公软件（含Excel、Word），具备数据统计分析能力'
+const compound = toForm([block('skill', '技能', [compoundSkill])])
+expect(compound !== null && compound.form.skillsText === compoundSkill, '一句话里带顿号、逗号的技能照原样带入，不拆成碎片')
 
 // 遮盖占位的类别要和后端一致：后端多一种类别而前端常量没跟上，带占位的行就会进表单、印到新简历上。
 const repoRead = (relativePath) => readFileSync(join(kioskRoot, '..', '..', relativePath), 'utf8')

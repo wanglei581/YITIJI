@@ -8,7 +8,6 @@ import {
   clampListText,
   clampText,
   emptyForm,
-  splitList,
   type GenerateFormSnapshot,
   type HistorySeg,
 } from './components/resumeGenerateModel'
@@ -46,6 +45,28 @@ function keptLines(blocks: readonly ResumeContentBlock[] | null | undefined, key
 }
 
 /**
+ * 按提交时的切法（逗号、顿号、换行，同 resumeGenerateModel 的 splitList）数条目，只留前 max 条。
+ * 留下的部分逐字不变：一句话里带顿号也照原样显示，提交时怎么切和原来一样。
+ */
+function keepFirstListItems(text: string, max: number): string {
+  let count = 0
+  let current = ''
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (ch === ',' || ch === '，' || ch === '、' || ch === '\n') {
+      if (current.trim()) {
+        count += 1
+        if (count >= max) return text.slice(0, i)
+      }
+      current = ''
+      continue
+    }
+    current += ch
+  }
+  return text
+}
+
+/**
  * 从诊断内容块搬进「从零生成」表单。
  * 只搬教育 / 工作 / 项目的长文本，以及技能、自我评价。
  * 姓名、城市、手机号、邮箱、意向岗位等小格一律留空。
@@ -64,11 +85,8 @@ export function resumeBlocksToGenerateForm(
   const educationText = keptLines(blocks, 'education').join('\n')
   const experienceText = keptLines(blocks, 'experience').join('\n')
   const projectText = keptLines(blocks, 'project').join('\n')
-  // 提交时技能只取前 LIMITS.skills 条（splitList）；这里先按条截到同样条数，屏上看到的就是会提交的。
-  const skillsText = clampListText(
-    splitList(keptLines(blocks, 'skill').join('\n'), LIMITS.skills).join('\n'),
-    TEXT_LIMITS.skill,
-  )
+  // 提交时技能只取前 LIMITS.skills 条（splitList）；这里按同样的切法截到同样条数，屏上看到的就是会提交的。
+  const skillsText = clampListText(keepFirstListItems(keptLines(blocks, 'skill').join('\n'), LIMITS.skills), TEXT_LIMITS.skill)
   const selfIntro = clampText(keptLines(blocks, 'selfintro').join('\n'), TEXT_LIMITS.selfIntro)
   if (!educationText && !experienceText && !projectText && !skillsText && !selfIntro) return null
 

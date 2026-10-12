@@ -177,8 +177,9 @@ test('优化没生成出来时手动修改把已读出的内容带进第 1 步 @
     }
     return parts.join('\n')
   })
-  expect(stored.includes('在成品仓理货和拣货')).toBe(false)
-  expect(stored.includes(NOTE)).toBe(false)
+  for (const piece of [...EDU_LINES, ...EXP_LINES, ...PROJ_LINES, '仓储理货', ...INTRO_LINES, NOTE]) {
+    expect(stored.includes(piece), `浏览器存储里不该有：${piece}`).toBe(false)
+  }
 })
 
 test('取报告失败时仍进第 0 屏且没有带入提示 @kiosk', async ({ page, api }) => {
@@ -272,5 +273,49 @@ test('从第 0 屏正常填写时没有带入提示 @kiosk', async ({ page, api 
   await expect(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
   await page.getByTestId('resume-generate-primary').click()
   await expect(page.locator('[data-generate-state="input-basic"]')).toBeVisible()
+  await expect(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
+})
+
+const OPTIMIZED_RESUME = {
+  basic: { name: '孙晓雯', phone: '', city: '青岛' },
+  intention: { position: '仓储管理员', city: '青岛' },
+  summary: '三年成品仓理货经验，熟悉按单拣货与复核。',
+  education: [{ school: '青岛职业技术学院', major: '物流管理', degree: '大专', period: '2019-2022' }],
+  experience: [],
+  projects: [],
+  skills: ['Excel', '仓储理货'],
+  certificates: [],
+}
+
+test('取报告还没回来时同一页重试出了结果，报告回来后不再把人带走 @kiosk', async ({ page, api }) => {
+  const taskId = 'carry-g-2099'
+  const recordPath = `/api/v1/resume/records/${taskId}`
+  registerOptimizeShell(api)
+  registerFailedOptimize(api, taskId)
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('GET', recordPath, async () => {
+    await gate
+    return { status: 200, json: recordBody(taskId, carriedBlocks()) }
+  })
+  await openFailedOptimize(page, taskId)
+  const manual = page.getByTestId('resume-optimize-empty-manual')
+  await manual.click()
+  await expect.poll(() => api.requestCount('GET', recordPath)).toBe(1)
+  await expect(manual).toBeDisabled()
+
+  api.respond('GET', `/api/v1/resume/records/${taskId}/optimize`, {
+    status: 200,
+    json: { taskId, status: 'completed', providerName: 'llm', modules: [], optimizedResume: OPTIMIZED_RESUME },
+  })
+  await page.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(page.getByTestId('resume-optimize-empty-paths')).toHaveCount(0)
+
+  // 对照：「连点两下」那条同样放行后会跳到生成页；这里退路区已收起，放行后必须留在原页。
+  const recordDone = page.waitForResponse((response) => new URL(response.url()).pathname === recordPath)
+  release()
+  await recordDone
+  await page.waitForTimeout(400)
+  await expect(page).toHaveURL(/\/resume\/optimize/)
   await expect(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
 })

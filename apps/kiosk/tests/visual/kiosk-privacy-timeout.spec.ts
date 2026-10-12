@@ -2201,7 +2201,7 @@ test('carried resume form is hard-cleared and browser back cannot restore it @pr
   registerKioskShell(api)
   const carriedLine = '隐私回归：在成品仓理货和拣货，一天大约处理 80 单'
   const handoff = {
-    step: 0,
+    step: 2,
     seg: 'exp',
     carried: true,
     form: {
@@ -2222,6 +2222,8 @@ test('carried resume form is hard-cleared and browser back cannot restore it @pr
   }, handoff)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByTestId('resume-generate-carried-note')).toBeVisible()
+  // 先确认带入的那段确实摆在屏上，后面「清干净了」的断言才有意义。
+  await expect(page.getByTestId('resume-generate-exp-0').locator('textarea')).toHaveValue(carriedLine)
   await markCurrentDocument(page, 'carried-form-document')
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
@@ -2237,7 +2239,7 @@ test('carried resume form is hard-cleared and browser back cannot restore it @pr
     const parts: string[] = [JSON.stringify(window.history.state ?? null)]
     for (let i = 0; i < localStorage.length; i += 1) parts.push(localStorage.getItem(localStorage.key(i) ?? '') ?? '')
     for (let i = 0; i < sessionStorage.length; i += 1) parts.push(sessionStorage.getItem(sessionStorage.key(i) ?? '') ?? '')
-    return parts.some((part) => part.includes(line))
+    return parts.some((part) => part.includes(line) || part.includes('隐私回归：做事按单核对'))
   }, carriedLine)
   expect.soft(leaked).toBe(false)
 })

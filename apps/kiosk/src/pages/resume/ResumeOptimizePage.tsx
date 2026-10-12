@@ -88,7 +88,6 @@ export function ResumeOptimizePage() {
     ?? (usingSessionTask ? session?.accessToken : undefined)
   const token = getToken()
   const access = { token, accessToken }
-  const manualCarry = useManualEditCarry(taskId, accessToken)
   const pricing = useResumeExportPricing(access, token)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const {
@@ -140,6 +139,7 @@ export function ResumeOptimizePage() {
   }
   const resolved = resolveOptimizeView(query, live)
   const view = resolved.view
+  const manualCarry = useManualEditCarry(taskId, accessToken, view !== 'ready')
   const resume = optimizedResume
   const assembledResult = resume ? applyResumeDecisionsWithStatus(resume, modules, decisions) : null
   const assembled = assembledResult?.resume ?? null
