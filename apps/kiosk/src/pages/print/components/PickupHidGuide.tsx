@@ -352,7 +352,8 @@ export function PickupFailurePanel({
 
   // 终态码（已用过、已退款、文件失效……）：在这台机器上重输不会有别的结果，
   // 主操作给「回到首页」把屏让给下一位；输另一个码是次要出口。不出现「重试 / 重新输入同一个码」。
-  if (failure === 'closed') {
+  // 当天的量用完（quota）今天再输也一样，按钮同一组；它的屏头不是 closed 那一句（码明天还能用）。
+  if (failure === 'closed' || failure === 'quota') {
     return (
       <>
         <div id="pcp-error-msg" className="pcp-strip pcp-strip--error pcp-enter" role="alert">
