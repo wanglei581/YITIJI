@@ -177,6 +177,76 @@ test('a zero-yuan pickup-code unconfirmed print says to re-enter the same code a
   await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
 })
 
+// 2026-10-11 走查实走：真的到机码单从认领页过来时不带金额（上一条用例是手工塞了 amountCents: 0，和真实不符）。
+// 金额要从服务端订单回执里认；回执取不到时保持保守说法，不猜成 0 元。
+test('a real pickup-code order without a flow amount reads the amount from the server receipt @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const receipt = (amountCents: number) => ({
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo', expiresAt: '2099-01-01T00:00:00.000Z', filename: '取件文件.pdf',
+      mimeType: 'application/pdf', sizeBytes: 128, orderId: 'order-pickup-1', orderNo: 'ORD-20261011-4D2B2B1101',
+      payStatus: 'paid', amountCents, canRetry: true,
+    },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  // 真实流程里认领放行会发一张支付会话凭证并一路带到本页；金额不带。
+  const pickupState = { taskId: TASK_ID, pickupSource: true, paymentSessionToken: 'pst-pickup-demo', file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 1, colorMode: 'bw', duplex: 'simplex' } }
+  // 回执是进页后才去取的：每次都等它回来再下结论，否则否定断言会在回执到之前就过了。
+  const openAndAwaitReceipt = async () => {
+    const receiptBack = page.waitForResponse((res) => res.url().includes(`/print/jobs/${TASK_ID}/takeaway-url`))
+    await openDoneWithState(page, pickupState)
+    await receiptBack
+  }
+
+  // 回执取不到（404）：不知道金额，保持原来的保守说法，不说同码接着打，顶栏不猜金额。
+  await openAndAwaitReceipt()
+  const unconfirmed = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(unconfirmed).toContainText('等待人工核查')
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+  await expect(page.getByText('订单保留 · 打印结果未确认')).toBeVisible()
+
+  // 回执说 0 元：说 5 分钟后同码整份重打，不再写等待人工核查；顶栏和按钮跟着认 0 元。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openAndAwaitReceipt()
+  await expect(unconfirmed).toContainText('过 5 分钟可以回这台机器再输一次同一个到机码')
+  await expect(unconfirmed).not.toContainText('等待人工核查')
+  await expect(unconfirmed).not.toContainText('核实后给出结论')
+  await expect(unconfirmed).not.toContainText('退款')
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印结果未确认')).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看订单说明' })).toBeVisible()
+
+  // 回执说收过钱：不说同码接着打；顶栏说已付，退款说明在。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(200))
+  await openAndAwaitReceipt()
+  await expect(unconfirmed).toContainText('如需退款')
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+  await expect(page.getByText(/已付 .+ · 打印结果未确认/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
+
+  // 卡纸屏、收过钱：说已付金额保留，就得同时有退款说明；不说同码接着打。
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINTER_ERROR', failureReasonForUser: '打印机可能卡纸或发生设备故障' },
+  })
+  await openAndAwaitReceipt()
+  const jam = page.getByTestId('print-fulfill-state-paper-jam')
+  await expect(jam).toContainText('你的订单和已付金额都保留着')
+  await expect(jam).toContainText('如需退款')
+  await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
+
+  // 卡纸屏：0 元、服务端说还能重打，出现同码接着打那一句；不提钱。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openAndAwaitReceipt()
+  await expect(jam).toContainText('你的订单还在')
+  await expect(page.getByTestId('print-fulfill-resume-line')).toContainText('回来再输一次同一个到机码就能接着打')
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印机卡纸')).toBeVisible()
+  await expect(jam).not.toContainText('退款')
+})
+
 test('paid or on-site unconfirmed prints never mention the same-code resume @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
