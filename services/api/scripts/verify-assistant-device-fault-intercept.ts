@@ -6,12 +6,13 @@
  */
 import 'dotenv/config'
 import 'reflect-metadata'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createClient } from '@libsql/client'
 import {
   DEVICE_FAULT_PROMPT_RULE,
+  DEVICE_FAULT_SOURCE_NOTE,
   deviceFaultReply,
   hasHandsOnMachineInstruction,
   isAboutJobContent,
@@ -117,6 +118,15 @@ const MUST_INTERCEPT = [
   '加纸',
   '装纸',
   '换纸',
+  '机器卡了怎么办',
+  '怎么没出纸',
+  '打印出来是空白的',
+  // 求职字样加上「这台、本机、正在打」仍是眼前这台，照拦。原表里已有的不算在这五句里。
+  '我在写简历，可是这台打印机卡纸了怎么弄',
+  '面试材料正在打，本机不出纸了',
+  '简历里怎么写，但这台打印机卡纸了',
+  '应聘的时候本机正在打，卡纸了怎么办',
+  '面试官问我，可是这台机器现在冒烟了',
 ]
 
 const MUST_NOT_INTERCEPT = [
@@ -263,6 +273,12 @@ const MUST_NOT_INTERCEPT = [
   '黄灯亮了',
   '卡低了',
   '机器没声音',
+  // 纯求职内容放行。原表里已有的不算在这五句里。
+  '简历里怎么写负责处理打印机卡纸',
+  '应聘设备维护岗，面试官问卡纸怎么排查，怎么回答',
+  '怎么描述一段处理打印机缺纸的工作经历',
+  '岗位要求里写了会处理卡纸，这段我该怎么写',
+  '求职信里要不要提自己会换硒鼓',
   '岗位要求：能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作',
 ]
 const OUTPUT_MUST_REPLACE = [
@@ -380,7 +396,32 @@ function tableChecks(): void {
   check(isDeviceFaultQuestion(piece), '同一句卡纸截短之后仍然拦')
 }
 
+const SOURCE_NOTE = '这是固定的安全提示，不是 AI 的判断。'
+
+function countLiteral(dir: string, sentence: string): number {
+  let count = 0
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'prisma') continue
+      count += countLiteral(path, sentence)
+    } else if (entry.name.endsWith('.ts')) {
+      const text = readFileSync(path, 'utf8')
+      let from = 0
+      while (from < text.length) {
+        const at = text.indexOf(sentence, from)
+        if (at < 0) break
+        count += 1
+        from = at + sentence.length
+      }
+    }
+  }
+  return count
+}
+
 function wordingChecks(): void {
+  check(DEVICE_FAULT_SOURCE_NOTE === SOURCE_NOTE, '出处说明常量逐字等于合规定的那句')
+  check(countLiteral(join(process.cwd(), 'src'), SOURCE_NOTE) === 1, '出处说明在源码里只写一处')
   check(deviceFaultReply('kiosk') === KIOSK_REPLY, '一体机固定的话逐字等于原文')
   check(deviceFaultReply('miniapp') === MINIAPP_REPLY, '小程序固定的话逐字等于原文')
   for (const text of [KIOSK_REPLY, MINIAPP_REPLY]) {
@@ -435,6 +476,23 @@ function installFetch(): void {
 
 const inRequest = <T>(fn: () => Promise<T>) =>
   runWithAiRequestContext(lazyAiRequestContext(async () => ({ ...ANONYMOUS_AI_CALLER })), fn)
+
+async function captureWrites<T>(bucket: string[], fn: () => Promise<T>): Promise<T> {
+  const origOut = process.stdout.write.bind(process.stdout)
+  const origErr = process.stderr.write.bind(process.stderr)
+  const wrap = (orig: typeof process.stdout.write): typeof process.stdout.write => (chunk, ...rest) => {
+    bucket.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'))
+    return orig(chunk, ...rest)
+  }
+  process.stdout.write = wrap(origOut)
+  process.stderr.write = wrap(origErr)
+  try {
+    return await fn()
+  } finally {
+    process.stdout.write = origOut
+    process.stderr.write = origErr
+  }
+}
 
 async function chatRuntime(chat: LlmChatService): Promise<void> {
   clearSafetyBlocks()
@@ -511,27 +569,37 @@ async function chatRuntime(chat: LlmChatService): Promise<void> {
 
   modelReply = HANDS_ON
   const outBefore = sent.length
-  const replaced = await inRequest(async () => {
+  const outLogs: string[] = []
+  const replaced = await captureWrites(outLogs, () => inRequest(async () => {
     const out = await chat.chat({ message: '卡住了怎么办', channel: 'kiosk' })
     return { out, refund: consumeSafetyRefund() }
-  })
+  }))
+  const outLogText = outLogs.join('')
   check(sent.length === outBefore + 1, '输出侧：确实发了请求')
   check(replaced.out.reply === KIOSK_REPLY && replaced.out.fixedNotice === true, '输出侧：换成固定的话，fixedNotice')
   check((replaced.out.actions ?? []).length === 0, '输出侧：不带跳转')
   check(replaced.refund === false, '输出侧命中不退次数')
+  check(outLogText.includes('模型回答含动手指导，已换成固定回答 channel=kiosk'), '输出侧：只记一行不含内容的日志')
+  check(!outLogText.includes(HANDS_ON) && !outLogText.includes('打开前盖') && !outLogText.includes('卡住了怎么办'), '输出侧：日志里没有动手指导和用户原话')
   modelReply = '下一轮正常回答。'
   const nextBefore = sent.length
   await inRequest(() => chat.chat({ message: '好的，先看简历', sessionId: replaced.out.sessionId, channel: 'kiosk' }))
   const nextBody = JSON.stringify(sent[nextBefore]?.messages ?? [])
   check(nextBody.includes(KIOSK_REPLY) && !nextBody.includes('打开前盖') && !nextBody.includes(HANDS_ON), '输出侧：下一轮历史里是固定的话，不是教人开盖的话')
+  check(!nextBody.includes(HANDS_ON), '输出侧：会话历史没有假模型的动手指导')
 
-  modelReply = HANDS_ON
-  const jobBefore = sent.length
-  const job = await inRequest(async () => {
-    const out = await chat.chat({ message: '面试官问我打印机卡纸怎么处理，我该怎么答', channel: 'kiosk' })
-    return { out, refund: consumeSafetyRefund() }
-  })
-  check(sent.length === jobBefore + 1 && job.out.reply === HANDS_ON && job.out.fixedNotice !== true && job.refund === false, '求职内容：同一段动手指导原样返回，没有 fixedNotice')
+  for (const message of ['面试官问我怎么处理打印机卡纸，我该怎么答', '面试官问我打印机卡纸怎么处理，我该怎么答']) {
+    modelReply = HANDS_ON
+    const jobBefore = sent.length
+    const job = await inRequest(async () => {
+      const out = await chat.chat({ message, channel: 'kiosk' })
+      return { out, refund: consumeSafetyRefund() }
+    })
+    const jobBody = JSON.stringify(sent[jobBefore]?.messages ?? [])
+    check(sent.length === jobBefore + 1, `求职内容仍调模型：${message}`)
+    check(jobBody.includes(DEVICE_FAULT_PROMPT_RULE), `求职内容的请求里仍有约束句：${message}`)
+    check(job.out.reply === HANDS_ON && job.out.fixedNotice !== true && job.refund === false, `求职内容两头都不拦：${message}`)
+  }
 }
 
 async function advisorRuntime(): Promise<void> {
@@ -606,7 +674,7 @@ async function advisorRuntime(): Promise<void> {
     const logsAfter = await prisma.aiServiceLog.findMany({ select: { id: true } })
     check(sent.length === askBefore, '作业面输入侧：没有调模型')
     check(blocked.answer === KIOSK_REPLY && blocked.evidenceLevel === 'E3', '作业面输入侧：回答是一体机固定的话，证据等级 E3')
-    check(blocked.sourceNote === '固定提示，不是 AI 的判断。' && blocked.disclaimer === ADVISOR_DISCLAIMER, '作业面输入侧：出处说明和免责声明')
+    check(blocked.sourceNote === SOURCE_NOTE && blocked.sourceNote === DEVICE_FAULT_SOURCE_NOTE && blocked.disclaimer === ADVISOR_DISCLAIMER, '作业面输入侧：出处说明和免责声明')
     check(blocked.canPin === false && blocked.fixedNotice === true && blocked.persistence === 'not_saved', '作业面输入侧：不能钉住，fixedNotice')
     check(typeof blocked.providerLabel === 'string' && blocked.providerLabel.startsWith('llm:'), '作业面输入侧：其余字段仍有 providerLabel')
     check(memoryOf(first.sessionId).length === 0, '作业面输入侧：内存里没留')
@@ -620,11 +688,17 @@ async function advisorRuntime(): Promise<void> {
     await aiLog.flush()
     const added = (await prisma.aiServiceLog.findMany()).filter((row) => !logsMid.includes(row.id))
     check(sent.length === outBefore + 1, '作业面输出侧：调了模型')
-    check(replaced.answer === KIOSK_REPLY && replaced.sourceNote === '固定提示，不是 AI 的判断。', '作业面输出侧：回答换成固定的话')
+    check(replaced.answer === KIOSK_REPLY && replaced.sourceNote === SOURCE_NOTE, '作业面输出侧：回答换成固定的话')
     check(replaced.canPin === false && replaced.fixedNotice === true, '作业面输出侧：不能钉住，fixedNotice')
     const remembered = memoryOf(second.sessionId)
-    check(remembered.length === 2 && remembered[1]?.content === KIOSK_REPLY && !remembered[1]?.content.includes('打开前盖'), '作业面输出侧：内存里留的是固定的话')
+    const rememberedText = JSON.stringify(remembered)
+    check(remembered.length === 2 && remembered[1]?.content === KIOSK_REPLY && !rememberedText.includes(HANDS_ON) && !rememberedText.includes('打开前盖'), '作业面输出侧：内存里留的是固定的话，没有动手指导')
+    const addedText = JSON.stringify(added)
     check(added.length === 1 && added[0]?.status === 'success', '作业面输出侧：AI 日志照常记成功')
+    check(!addedText.includes(HANDS_ON) && !addedText.includes('打开前盖') && !addedText.includes('卡住了怎么办'), '作业面输出侧：AI 日志没有动手指导和用户原话')
+    const audits = await prisma.auditLog.findMany({ where: { targetId: second.sessionId } })
+    const auditText = JSON.stringify(audits)
+    check(!auditText.includes(HANDS_ON) && !auditText.includes('卡住了怎么办'), '作业面输出侧：审计里没有动手指导和用户原话')
 
     const third = await openQa()
     const normalBefore = sent.length
@@ -633,6 +707,16 @@ async function advisorRuntime(): Promise<void> {
     check(sent.length === normalBefore + 1, '作业面正常问答：调了模型')
     check(normal.answer === '空窗期可以在简历里用一两句话说明当时在做什么。' && normal.canPin === true && normal.fixedNotice !== true, '作业面正常问答：原样返回，可以钉住，没有 fixedNotice')
     check(memoryOf(third.sessionId).some((turn) => turn.content.includes('空窗期')), '作业面正常问答：内存里留的是模型的话')
+
+    const jobAsk = '面试官问我怎么处理打印机卡纸，我该怎么答'
+    const fourth = await openQa()
+    const jobAskBefore = sent.length
+    replyQueue.push(handsJson)
+    const jobAnswer = await advisor.ask(fourth.sessionId, jobAsk, { endUserId: null, accessToken: fourth.accessToken })
+    const jobAskBody = JSON.stringify(sent[jobAskBefore]?.messages ?? [])
+    check(sent.length === jobAskBefore + 1, '作业面求职内容：调了模型')
+    check(jobAskBody.includes(DEVICE_FAULT_PROMPT_RULE), '作业面求职内容：请求里仍有约束句')
+    check(jobAnswer.answer === HANDS_ON && jobAnswer.fixedNotice !== true && jobAnswer.canPin === true, '作业面求职内容：两头都不拦，没有 fixedNotice')
 
     const chat = new LlmChatService(configStub as never)
     const endUserId = `eu_fault_${Date.now()}`

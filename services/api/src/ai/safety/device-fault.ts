@@ -36,6 +36,12 @@ export function deviceFaultReply(channel: DeviceFaultChannel): string {
   return channel === 'miniapp' ? MINIAPP_REPLY : KIOSK_REPLY
 }
 
+/**
+ * 作业面问答的出处说明。输入侧、输出侧都用这一句，源码里只写在这里。
+ * 页面上的标叫「安全提示」，由前端写，后端不出这个标。字由合规六 2026-10-11 定。
+ */
+export const DEVICE_FAULT_SOURCE_NOTE = '这是固定的安全提示，不是 AI 的判断。'
+
 const TOPIC_PREFIX = /^当前咨询主题：[^\n]*\n用户问题：/
 const MAX_FAULT_QUESTION_CHARS = 160
 const MAX_FOLLOW_UP_CHARS = 40
