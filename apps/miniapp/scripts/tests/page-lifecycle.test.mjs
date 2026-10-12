@@ -6951,6 +6951,19 @@ test('privacy 注销：模板里开放时有说明块、待处理状态行、「
   assert.match(wxml, /accountClosureAvailable \? '[^']*注销账号在本页下方申请/)
 })
 
+test('privacy 注销：「办不了的」那行分三种——没登录说登录后申请，登录且开放说本页下方申请，其余照旧找我们', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/privacy/privacy.wxml'), 'utf8')
+  const line = (/<text class="pr-k">办不了的<\/text><text class="pr-v">\{\{([\s\S]*?)\}\}<\/text>/.exec(wxml) || [])[1]
+  assert.ok(line, '找不到「办不了的」那一行')
+  // 能力位只有登录后读得到。合规十一 10/12：没登录这一支的条件用 !isLoggedIn，不能用「能力位为假」——
+  // 登录了但能力位还在读、读失败、服务端说不能注销时它也是假，那时说「登录后申请」不对。
+  const m = /^!isLoggedIn \? '([^']*)' : \(accountClosureAvailable \? '([^']*)' : '([^']*)'\)$/.exec(line.trim())
+  assert.ok(m, `「办不了的」那行三种情况的结构变了：${line}`)
+  assert.equal(m[1], '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号登录后在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。')
+  assert.equal(m[2], '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。')
+  assert.equal(m[3], '例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。')
+})
+
 test('privacy 注销：提交失败时如实说，幂等键留着给下一次重试用', async () => {
   let n = 0
   const { page, modals, calls } = makePrivacy({
