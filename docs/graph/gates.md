@@ -433,7 +433,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 577 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 579 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -465,7 +465,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/auth/memberSessionExpiryExit.ts` | `verify-kiosk-end-use.mjs`<br/>`verify-member-session-closure.mjs` |
 | `apps/kiosk/src/auth/returnPath.ts` | `verify-member-session-closure.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/auth/useKioskSessionReporting.ts` | `verify-kiosk-session-reporting.mjs` |
-| `apps/kiosk/src/components/FileContentPreview.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/components/FileContentPreview.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/components/FilePreviewDialog.tsx` | `verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | `verify-device-status-honest.mjs` |
 | `apps/kiosk/src/components/KioskFeedbackDialog.tsx` | `verify-kiosk-feedback-entry.mjs` |
@@ -820,6 +820,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizePageDialogs.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -827,6 +828,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx` | `verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx` | `verify-ai-artifact-print-url-contract.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/facts.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/generatePreviewQuery.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -843,7 +845,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportIssues.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
@@ -951,7 +953,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/client.ts` | `verify-production-real-services.mjs`<br/>`verify-deploy-gates-in-sync.mjs` |
 | `apps/kiosk/src/services/api/companies.ts` | `verify-companies.ts` |
 | `apps/kiosk/src/services/api/contractReview.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-contract-review-report-print.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-member-session-closure.mjs` |
-| `apps/kiosk/src/services/api/documentConversion.ts` | `verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/services/api/documentConversion.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/services/api/fairVisitPlan.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/services/api/filesHttpAdapter.ts` | `verify-member-session-closure.mjs` |
 | `apps/kiosk/src/services/api/filesMockAdapter.ts` | `verify-file-retention-ui.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |

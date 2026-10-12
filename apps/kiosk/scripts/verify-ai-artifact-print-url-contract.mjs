@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const kioskRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = path.resolve(kioskRoot, '../..')
@@ -139,9 +140,10 @@ expectNoMatch(fairMaterialsPage, /fileUrl:\s*(?:latest\.)?previewUrl/, '招聘�
 
 // ── P28 自我探索（S2-7 接线）──────────────────────────────────────────────
 // 报告 PDF 有两条出口，用途不同、URL 不能互换：
-//   页内预览 → signedUrl（COS 签名，只给画布预览 / 扫码带走）
+//   页内预览：会按 PDF 画且有 printFileUrl 时用同站 printFileUrl（页面自己 fetch 字节；对象存储直链跨站取不到），没有才退回 signedUrl
+//   手机扫码 / 二维码 → signedUrl（整页打开，仍用下载直链）
 //   打印交接 → printFileUrl（内部 HMAC，/print/jobs 只认这个）
-// 交换二者的后果是「点了打印但打不出来」，而页面已经把用户送进了核价流程。
+// 交换打印与下载的后果是「点了打印但打不出来」，而页面已经把用户送进了核价流程。
 expectMatch(selfAssessment, /fileUrl:\s*printed\.printFileUrl/, '自我探索打印交接只传内部 HMAC printFileUrl')
 expectNoMatch(selfAssessment, /fileUrl:\s*printed\.signedUrl/, '自我探索不得把预览签名 URL 传给打印任务')
 expectMatch(selfAssessment, /if\s*\(\s*!printed\?\.printFileUrl\s*\)\s*return/, '自我探索缺内部打印 URL 时不进入打印')
@@ -154,6 +156,89 @@ expectMatch(
 // 读屏跳过，用户读不到「为什么灰」（CLAUDE.md §9 / ai/AiTaskRegion.tsx 同一口径）。
 expectNoMatch(selfAssessment, /\sdisabled=\{/, '自我探索置灰不使用原生 disabled')
 expectMatch(selfAssessment, /aria-disabled=\{blocked \|\| undefined\}/, '自我探索置灰走 aria-disabled')
+
+// ── F-20b：剩下五处页内 PDF 预览改取同站地址 ────────────────────────────────
+// JSX 写成 fileUrl={…} 时，上面「fileUrl: 标识符」的正则看不住花括号。这里按整段表达式断言，并真执行。
+const filePreview = read('apps/kiosk/src/components/FileContentPreview.tsx')
+const versionsPanel = read('apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx')
+const conversionApi = read('apps/kiosk/src/services/api/documentConversion.ts')
+
+function sourceNode(text, name) {
+  const ast = ts.createSourceFile('fixture.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let found
+  function visit(node) {
+    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name?.getText(ast) === name) found = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  if (!found) throw new Error(`source node ${name} missing`)
+  const body = ts.isVariableDeclaration(found) ? `const ${found.getText(ast)};` : found.getText(ast).replace(/^export /, '')
+  return body
+}
+function executable(text) {
+  return ts.transpileModule(text, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
+  }).outputText
+}
+const previewModule = { exports: {} }
+new Function('exports', executable([
+  sourceNode(conversionApi, 'WORD_EXTENSIONS'),
+  sourceNode(conversionApi, 'WORD_MIME_TYPES'),
+  sourceNode(conversionApi, 'isWordDocument'),
+  sourceNode(filePreview, 'resolvePreviewKind'),
+  sourceNode(filePreview, 'inPagePreviewUrl'),
+  'exports.inPagePreviewUrl = inPagePreviewUrl',
+].join('\n')))(previewModule.exports)
+const inPagePreviewUrl = previewModule.exports.inPagePreviewUrl
+const SAME = '/api/v1/files/f-20b/content?expires=1&sig=test'
+const DIRECT = 'https://cos.example.invalid/object.pdf'
+const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+const expectEqual = (actual, expected, message) => actual === expected ? pass(message) : fail(`${message} — got ${JSON.stringify(actual)}, want ${JSON.stringify(expected)}`)
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.pdf', mimeType: 'application/pdf' }), SAME, 'inPagePreviewUrl：PDF 且有同站地址时用同站地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: '', fileName: 'a.pdf', mimeType: 'application/pdf' }), DIRECT, 'inPagePreviewUrl：空的同站地址退回原地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, fileName: 'a.pdf', mimeType: 'application/pdf' }), DIRECT, 'inPagePreviewUrl：没有同站地址退回原地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.png', mimeType: 'image/png' }), DIRECT, 'inPagePreviewUrl：图片仍用原地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.docx', mimeType: WORD_MIME }), DIRECT, 'inPagePreviewUrl：Word 仍用原地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.bin', mimeType: 'application/octet-stream', format: 'pdf' }), SAME, 'inPagePreviewUrl：只标了 pdf 格式时仍按 PDF 取同站地址')
+expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: '报告.pdf' }), SAME, 'inPagePreviewUrl：扩展名是 pdf 时取同站地址')
+
+// 下面三处是写死的「同站地址 || 原地址」，按源码原文断言。对一段固定的字再求值只是在测 || 运算，测不出东西，不做（agy 反方指出）。
+expectMatch(selfAssessment, /fileUrl=\{printed\.printFileUrl \|\| printed\.signedUrl\}/, '自我探索页内预览：有 printFileUrl 用它，否则退回 signedUrl')
+expectMatch(selfAssessment, /phoneDownloadUrl=\{printed\.signedUrl\}/, '自我探索手机扫码仍是下载直链')
+expectNoMatch(selfAssessment, /fileUrl=\{printed\.signedUrl\}/, '自我探索页内预览不得再只取下载直链')
+
+expectMatch(versionsPanel, /fileUrl=\{preview\.printFileUrl \|\| preview\.url\}/, '已确认版本页内预览：有 printFileUrl 用它，否则退回 url')
+expectMatch(versionsPanel, /printFileUrl:\s*access\.printFileUrl/, '已确认版本把 preview-url 回包里的 printFileUrl 存进预览状态')
+expectMatch(versionsPanel, /if\s*\(\s*!access\.url\s*\)/, '已确认版本「没有可用的预览链接」仍看 access.url')
+expectMatch(versionsPanel, /phoneDownloadUrl=\{preview\.url\}/, '已确认版本手机扫码仍是下载直链')
+expectNoMatch(versionsPanel, /fileUrl=\{preview\.url\}/, '已确认版本页内预览不得再只取下载直链')
+
+expectMatch(
+  materialsPage,
+  /setPreview\(\{\s*file,\s*url:\s*res\.url,\s*printFileUrl:\s*res\.printFileUrl\s*\}\)/,
+  '求职材料库预览把 preview-url 回包的 url 与 printFileUrl 一起留下',
+)
+expectMatch(
+  materialsPage,
+  /fileUrl=\{inPagePreviewUrl\(\{\s*url:\s*currentPreview\.url \?\? '',\s*printFileUrl:\s*currentPreview\.printFileUrl,\s*fileName:\s*generated\.filename,\s*mimeType:\s*generated\.mimeType,\s*\}\)\}/,
+  '求职材料库页内预览经 inPagePreviewUrl：PDF 用同站地址，否则用原地址',
+)
+expectNoMatch(materialsPage, /fileUrl=\{currentPreview\.url\}/, '求职材料库页内预览不得再只取 preview-url 的 url')
+
+expectMatch(
+  myDocumentsPage,
+  /setPreview\(\{\s*url:\s*res\.url,\s*printFileUrl:\s*res\.printFileUrl,/,
+  '我的文档预览仍先存 res.url，并带上 printFileUrl',
+)
+expectMatch(
+  myDocumentsPage,
+  /fileUrl=\{inPagePreviewUrl\(\{\s*url:\s*preview\.url,\s*printFileUrl:\s*preview\.printFileUrl,\s*fileName:\s*preview\.filename,\s*mimeType:\s*preview\.mimeType,\s*\}\)\}/,
+  '我的文档页内预览经 inPagePreviewUrl：PDF 用同站地址，图片和 Word 用原地址',
+)
+expectNoMatch(myDocumentsPage, /fileUrl=\{preview\.url\}/, '我的文档页内预览不得再只取 preview.url')
+
+expectMatch(filePreview, /setConvertedUrl\(result\.printFileUrl \|\| result\.signedUrl\)/, 'Word 转 PDF 后的页内预览：有 printFileUrl 用它，否则退回 signedUrl')
+expectNoMatch(filePreview, /setConvertedUrl\(result\.signedUrl\)/, 'Word 转 PDF 后的预览不得再只取 signedUrl')
 
 // ── 产物打印链接有效期 30 分钟（9/29 主执行窗口提）────────────────────────────
 // 看完报告、改完参数再点打印常超过 5 分钟；默认 5 分钟会让确认页报「打印链接已过期」。
