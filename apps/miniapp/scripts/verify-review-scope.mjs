@@ -22,7 +22,40 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8')
+const readAt = (rootDir, rel) => fs.readFileSync(path.join(rootDir, rel), 'utf8')
+const read = (rel) => readAt(ROOT, rel)
+
+/**
+ * 上传包里写死、但指向未注册页面的 `/pages/<名>/<名>`。
+ * verify-review-variant.mjs 复用同一条规则检查不含 AI 版。
+ */
+export function collectUnregisteredRouteRefs(rootDir) {
+  const app = JSON.parse(readAt(rootDir, 'app.json'))
+  const registered = new Set([
+    ...(app.pages || []),
+    ...(app.subpackages || app.subPackages || []).flatMap((pkg) => (pkg.pages || []).map((page) => `${pkg.root}/${page}`)),
+  ])
+  const ignored = new Set(((JSON.parse(readAt(rootDir, 'project.config.json')).packOptions || {}).ignore || [])
+    .filter((entry) => entry && entry.type === 'folder').map((entry) => entry.value))
+  const skip = new Set(['.claude', 'node_modules', '.git', 'scripts', 'tools'])
+  const deadRefs = []
+  ;(function walk(dir) {
+    for (const entry of fs.readdirSync(path.join(rootDir, dir), { withFileTypes: true })) {
+      const rel = dir ? `${dir}/${entry.name}` : entry.name
+      if (skip.has(entry.name) || ignored.has(rel)) continue
+      if (entry.isDirectory()) walk(rel)
+      else if (/\.(js|wxml)$/.test(entry.name)) {
+        const src = readAt(rootDir, rel)
+        for (const matched of src.matchAll(/\/pages\/([a-z0-9-]+)\/\1\b/g)) {
+          if (!registered.has(`pages/${matched[1]}/${matched[1]}`)) deadRefs.push(`${rel} → ${matched[0]}`)
+        }
+      }
+    }
+  })('')
+  return [...new Set(deadRefs)]
+}
+
+function main() {
 let pass = 0
 const fails = []
 const ok = (name) => { pass += 1; console.log(`  ✓ ${name}`) }
@@ -73,15 +106,11 @@ const packed = []
   }
 })('')
 
-const deadRefs = []
+const deadRefs = collectUnregisteredRouteRefs(ROOT)
 const ctaHits = []
 const navToTab = []
 for (const f of packed) {
   const src = read(f)
-  // 只认规范页面路径 /pages/<名>/<同名>：注释里提到一体机源码路径（如 pages/resume/selfAssessmentSession）不会误报。
-  for (const m of src.matchAll(/\/pages\/([a-z0-9-]+)\/\1\b/g)) {
-    if (!registered.has(`pages/${m[1]}/${m[1]}`)) deadRefs.push(`${f} → ${m[0]}`)
-  }
   for (const word of RECRUITMENT_CTAS) if (src.includes(word)) ctaHits.push(`${f}「${word}」`)
   for (const m of src.matchAll(/navigateTo\(\{\s*url:\s*[`'"]([^`'"?]+)/g)) {
     if (tabs.includes(m[1])) navToTab.push(`${f} → ${m[1]}`)
@@ -127,3 +156,7 @@ else ok('简历对照页不展示等级与总评，只列已写到 / 还没体�
 
 console.log(`\n${pass} PASS / ${fails.length} FAIL（首发审核范围）`)
 if (fails.length) process.exit(1)
+}
+
+const invokedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (invokedDirectly) main()

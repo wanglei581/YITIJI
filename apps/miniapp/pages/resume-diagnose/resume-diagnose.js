@@ -4,6 +4,7 @@ const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
 const fileUrls = require('../../utils/file-url')
+const aiEntries = require('../../utils/ai-entries')
 
 // 结果未就绪时的轮询节奏(与解析页一致口径)
 const POLL_INTERVAL = 3000
@@ -282,7 +283,7 @@ Page({
   },
 
   toUpload() {
-    wx.navigateTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
   retry() {
@@ -307,7 +308,7 @@ Page({
       `fileFormat=${encodeURIComponent(extension)}`,
       'source=upload',
     ].join('&')
-    wx.redirectTo({ url: `/pages/resume-parse/resume-parse?${query}` })
+    wx.redirectTo({ url: aiEntries.href(aiEntries.resumeParseUrl, query) })
   },
 
   /** 展开某条建议/风险的完整内容(长文本在列表里会被截断) */
@@ -324,7 +325,7 @@ Page({
 
   tapOptimize() {
     // 优化端点由用户点击后触发真实模型调用，taskId 用于归属校验和结果持久化。
-    wx.navigateTo({ url: `/pages/resume-optimize/resume-optimize?taskId=${this.data.taskId}` })
+    wx.navigateTo({ url: aiEntries.href(aiEntries.resumeOptimizeUrl, 'taskId=' + this.data.taskId) })
   },
 
   printOriginal() {

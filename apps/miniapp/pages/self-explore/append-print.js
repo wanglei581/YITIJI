@@ -2,6 +2,7 @@
 // 选择器留在本页，不跳「我的文档」，也不走 opener 事件通道。
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const aiEntries = require('../../utils/ai-entries')
 
 const SELECTABLE_PURPOSES = ['resume_upload', 'resume_scan']
 const RESUME_PAGE_SIZE = 50
@@ -122,7 +123,7 @@ const methods = {
 
   goUploadResumeForAppend() {
     if (this.data.appending) return
-    wx.navigateTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
   confirmAppendToResume() {

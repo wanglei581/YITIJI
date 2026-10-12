@@ -45,7 +45,7 @@
            改为对话入口条：圆头像 + 她「说」的一句话 + 箭头，像微信里一个真人在讲话。
            真人形象保留（对低数字素养用户，"有个人在帮我"比抽象图标更可信），
            但裁成 220px 头像后仅 7KB，远低于图片预算。 -->
-      <view class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" role="button" aria-label="打开小青 AI 职业助手">
+      <view wx:if="{{aiEnabled}}" class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="{{assistantUrl}}" role="button" aria-label="打开小青 AI 职业助手">
         <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" aria-hidden="true" />
         <view class="qing-copy">
           <view class="qing-name">小青 · AI 职业助手</view>
@@ -54,9 +54,9 @@
         <view class="qing-go"><text class="ficon i-right"></text></view>
       </view>
 
-      <view class="info-card" style="margin-top:22rpx">
+      <view wx:if="{{aiEnabled}}" class="info-card" style="margin-top:22rpx">
         <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
-              data-url="/pages/resume-voice/resume-voice"
+              data-url="{{voiceUrl}}"
               role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
           <view class="info-icon soft-indigo"><text class="ficon i-comment"></text></view>
           <view class="info-copy">
@@ -67,6 +67,7 @@
         </view>
       </view>
 
+      <block wx:if="{{aiEnabled}}">
       <view class="section-head">
         <text class="section-title">常用服务</text>
         <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看全部 AI 工具">全部 AI 工具</text>
@@ -86,6 +87,7 @@
           <text class="service-title">{{item.title}}</text>
         </view>
       </view>
+      </block>
 
       <view class="print-banner tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/documents/documents" role="button" aria-label="从我的文档发起打印">
         <view class="print-icon"><text class="ficon i-printer"></text></view>
@@ -106,7 +108,7 @@
           </view>
           <view class="info-arrow"><text class="ficon i-right"></text></view>
         </view>
-        <view class="info-row tap" hover-class="tap-press" bindtap="tapDaily" role="button" aria-label="今日提醒，快到期的到机码和平台通知">
+        <view wx:if="{{aiEnabled}}" class="info-row tap" hover-class="tap-press" bindtap="tapDaily" role="button" aria-label="今日提醒，快到期的到机码和平台通知">
           <view class="info-icon soft-amber"><text class="ficon i-bell"></text></view>
           <view class="info-copy">
             <text class="info-title">今日提醒</text>
@@ -116,12 +118,12 @@
         </view>
       </view>
 
-      <view class="home-note">AI 生成，仅供参考，请核对后再使用。</view>
+      <view wx:if="{{aiEnabled}}" class="home-note">AI 生成，仅供参考，请核对后再使用。</view>
       <!-- 电子商务法第十五条：首页持续公示经营者信息（或指向它的链接）；AI 服务说明里公示模型名称与备案号（C1）。 -->
       <view class="home-legal">
         <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" role="link" aria-label="经营者信息">经营者信息</text>
-        <text class="home-legal-sep" aria-hidden="true">·</text>
-        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案情况">AI 服务说明</text>
+        <text wx:if="{{aiEnabled}}" class="home-legal-sep" aria-hidden="true">·</text>
+        <text wx:if="{{aiEnabled}}" class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案情况">AI 服务说明</text>
       </view>
       <view class="tab-spacer"></view>
     </view>

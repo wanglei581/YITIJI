@@ -122,6 +122,10 @@
       {
         "value": "pages/membership",
         "type": "folder"
+      },
+      {
+        "value": "review-variants",
+        "type": "folder"
       }
     ],
     "include": []

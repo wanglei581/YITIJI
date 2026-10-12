@@ -7,14 +7,16 @@
       <text class="ficon i-aim launch-icon-ic"></text>
     </view>
     <view class="launch-brand">职易达</view>
-    <view class="launch-sub">AI 简历 · 文档打印</view>
+    <view wx:if="{{aiEnabled}}" class="launch-sub">AI 简历 · 文档打印</view>
+    <view wx:else class="launch-sub">求职材料 · 文档打印</view>
     <view class="launch-slogan">简历和材料，手机上准备好，到机器前直接打印</view>
   </view>
 
   <view class="launch-btns">
     <view class="sheet-handle"></view>
     <view class="sheet-title">登录后继续</view>
-    <view class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
+    <view wx:if="{{aiEnabled}}" class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
+    <view wx:else class="sheet-sub">同步本人文档和打印订单</view>
 
     <!-- 正式版协议没发布（C4）：先说清楚为什么不能登录、不登录还能做什么。 -->
     <view wx:if="{{legalBlocked}}" class="launch-blocked" role="alert">

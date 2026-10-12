@@ -2,7 +2,8 @@
 // 用 AI、录音和上传简历之前的两项本人声明（C6），以及 AI 登录档位的登录提示（C7），
 // 在小程序这一端的唯一落点。只管三件事：本机记下的声明、随请求带的声明头、三个提示框。
 // 写服务端的那一半（/me/ai-consents）在 utils/api-legal-consent.js —— 端点只出现在
-// api 门面里，契约门禁才读得到。本模块只依赖 storage，request.js 可以直接引用它而不成环。
+// api 门面里，契约门禁才读得到。本模块只依赖 storage、user-error 和 build-variant（都不引用
+// request），request.js 可以直接引用它而不成环。
 //
 // 服务端口径（services/api/src/ai-access/ai-access.service.ts、
 // services/api/src/common/privacy/client-declaration.ts）：
@@ -17,6 +18,7 @@
 
 const storage = require('./storage');
 const { SHARED_USER_MESSAGES } = require('./user-error');
+const { AI_ENABLED } = require('./build-variant');
 
 const AGE_SCOPE = 'age_14_plus';
 const VOICE_SCOPE = 'voice_recording';
@@ -163,7 +165,10 @@ function askScope(scope) {
   if (scope === AGE_SCOPE) {
     return showModal({
       title: '你已年满 14 周岁吗？',
-      content: '使用 AI 分析、语音转文字和上传简历之前需要确认。未满 14 周岁的，需要监护人同意后才能使用，小程序暂时办不了。',
+      // 不含 AI 的提审版里，这个框只在上传文件和打印前的隐私检查时弹出，正文不提 AI 和语音（合规八 10/12 定的乙稿）。
+      content: AI_ENABLED
+        ? '使用 AI 分析、语音转文字和上传简历之前需要确认。未满 14 周岁的，需要监护人同意后才能使用，小程序暂时办不了。'
+        : '上传或打印文件之前需要确认。未满 14 周岁的，需要监护人同意后才能使用，小程序暂时办不了。',
       confirmText: '已满',
       cancelText: '未满',
     });

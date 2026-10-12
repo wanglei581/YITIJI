@@ -18,6 +18,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { AI_ENABLED } = require('../../utils/build-variant')
 const exportFile = require('./export-file')
 const dr = require('./data-rights')
 const consents = require('./consents')
@@ -45,6 +46,11 @@ Page({
 
     // 年龄声明与录音同意（C6）。登录着读服务端，没登录读本机，见 ./consents.js。
     consents: { loaded: false, error: '', age: {}, voice: {}, resume: null },
+    aiEnabled: AI_ENABLED,
+    consentGroupLabel: AI_ENABLED ? '年龄声明与 AI 授权' : '年龄声明',
+    selfHelpLine: AI_ENABLED
+      ? '登录后在本页导出数据、撤回授权；在「我的文档」「我的简历」「AI 服务记录」里删除。'
+      : '登录后在本页导出数据；在「我的文档」里删除文件。',
     privacyRequestDays: consents.PRIVACY_REQUEST_DAYS,
 
     busy: '',
@@ -450,7 +456,9 @@ Page({
     const content = unavailable
       ? '服务端当前未开放线上自助注销，提交后会被服务端直接拒绝，你会看到它的原话。'
         + '本入口不会删除简历、文档或打印订单。'
-        + '现在就能做的：导出我的数据、撤回 AI 分析授权、在「我的文档」里删除文件、退出登录。'
+        + (AI_ENABLED
+          ? '现在就能做的：导出我的数据、撤回 AI 分析授权、在「我的文档」里删除文件、退出登录。'
+          : '现在就能做的：导出我的数据、在「我的文档」里删除文件、退出登录。')
       : `账号注销不可逆，会删什么、保留什么见本页说明。提交后由我们核实处理，${this.data.privacyRequestDays} 个工作日内处理完；处理之前可以在本页撤回。`
         + '确认后会向你账号绑定的手机号发送验证码。'
 

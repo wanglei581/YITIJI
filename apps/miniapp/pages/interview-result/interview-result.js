@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
+const aiEntries = require('../../utils/ai-entries')
 const { plainAiMessageOf } = require('../../utils/user-error')
 
 // 模拟面试合规口径（合规窗口 9/29 裁定，C9 于 9/28 拍板）：练习表现等级整个不显示，也不换别的叫法——
@@ -117,5 +118,5 @@ Page({
       this.setData({ printing: false })
     }
   },
-  tapRetry() { wx.navigateTo({ url: '/pages/interview-entry/interview-entry' }) },
+  tapRetry() { wx.navigateTo({ url: aiEntries.interviewEntryUrl }) },
 })

@@ -2,6 +2,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
+const aiEntries = require('../../utils/ai-entries')
 
 /**
  * AI 参会准备单（场次未结束）/ AI 参会回顾（场次已结束）。
@@ -426,7 +427,7 @@ Page({
   },
 
   tapUpload() {
-    wx.navigateTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.navigateTo({ url: aiEntries.resumeUploadUrl })
   },
 
   tapLogin() {

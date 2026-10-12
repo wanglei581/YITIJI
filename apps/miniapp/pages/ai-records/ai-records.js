@@ -2,15 +2,16 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const qa = require('./qa-records')
+const aiEntries = require('../../utils/ai-entries')
 
 /** 后端真实 kind → 展示与现有结果页。没有结果页的类型保持诚实状态展示。 */
 const KIND_META = {
-  parse:           { type: 'resume',  title: '简历诊断',   icon: 'i-file-search', tone: 'plum', route: '/pages/resume-diagnose/resume-diagnose' },
-  optimize:        { type: 'resume',  title: '简历优化',   icon: 'i-edit',        tone: 'teal', route: '/pages/resume-optimize/resume-optimize' },
-  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '/pages/resume-build/resume-build' },
-  job_fit:         { type: 'job',     title: '简历对照',   icon: 'i-link',        tone: 'teal', route: '/pages/job-fit/job-fit' },
-  career_plan:     { type: 'career',  title: '职业规划',   icon: 'i-compass',     tone: 'plum', route: '/pages/career-plan/career-plan' },
-  self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: '/pages/self-explore/self-explore' },
+  parse:           { type: 'resume',  title: '简历诊断',   icon: 'i-file-search', tone: 'plum', route: aiEntries.resumeDiagnoseUrl },
+  optimize:        { type: 'resume',  title: '简历优化',   icon: 'i-edit',        tone: 'teal', route: aiEntries.resumeOptimizeUrl },
+  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: aiEntries.resumeBuildUrl },
+  job_fit:         { type: 'job',     title: '简历对照',   icon: 'i-link',        tone: 'teal', route: aiEntries.jobFitUrl },
+  career_plan:     { type: 'career',  title: '职业规划',   icon: 'i-compass',     tone: 'plum', route: aiEntries.careerPlanUrl },
+  self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: aiEntries.selfExploreUrl },
 }
 
 // 一体机上生成的「招聘会规划」记录在小程序里不展示：招聘会页已停放，
@@ -84,7 +85,7 @@ function mapInterview(item) {
     statusLabel: item.hasReport ? '已完成' : '无报告',
     icon: 'i-form',
     tone: 'plum',
-    route: '/pages/interview-result/interview-result',
+    route: aiEntries.interviewResultUrl,
     canOpen: Boolean(item.hasReport && item.sessionId),
     noRouteReason: '',
     actionLabel: item.hasReport ? '查看报告' : '查看状态',

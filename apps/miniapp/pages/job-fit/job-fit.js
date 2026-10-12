@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const aiEntries = require('../../utils/ai-entries')
 
 /**
  * 简历对照（原「岗位匹配参考」，后端能力名仍是 job_fit）。
@@ -292,13 +293,13 @@ Page({
     }
     const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.manualTitle || '')
     wx.navigateTo({
-      url: `/pages/resume-optimize/resume-optimize?taskId=${encodeURIComponent(this.data.taskId)}&from=jobFit&position=${position}`,
+      url: aiEntries.href(aiEntries.resumeOptimizeUrl, 'taskId=' + encodeURIComponent(this.data.taskId) + '&from=jobFit&position=' + position),
     })
   },
 
   tapPracticeInterview() {
     const position = encodeURIComponent((this.data.fit && this.data.fit.job.title) || this.data.manualTitle || '')
-    wx.navigateTo({ url: `/pages/interview-entry/interview-entry?position=${position}&from=jobFit` })
+    wx.navigateTo({ url: aiEntries.href(aiEntries.interviewEntryUrl, 'position=' + position + '&from=jobFit') })
   },
 
   tapRevokeConsent() {
@@ -329,7 +330,7 @@ Page({
   },
 
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
-  toUpload() { wx.navigateTo({ url: '/pages/resume-upload/resume-upload' }) },
+  toUpload() { wx.navigateTo({ url: aiEntries.resumeUploadUrl }) },
   retry() {
     if (this.data.historyMode) {
       if (!auth.isLoggedIn()) {
@@ -349,6 +350,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '简历对照', path: '/pages/job-fit/job-fit' }
+    return { title: '简历对照', path: aiEntries.jobFitUrl }
   },
 })

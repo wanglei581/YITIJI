@@ -4,21 +4,22 @@ const auth = require('../../utils/auth')
 const voice = require('../../utils/voice-recorder')
 const aiAccess = require('../../utils/ai-access')
 const { userMessageOf, plainAiMessageOf } = require('../../utils/user-error')
+const aiEntries = require('../../utils/ai-entries')
 
 // 后端 route 字符串 → 小程序页面路径映射（后端返回 actions[].route 时使用）。
 // 没有映射的 route 会被丢掉（见 _send 里的 .filter）：服务端给一体机的岗位、招聘会、
 // 人社专区三类卡片在小程序里不出现——对应页面已停放，
 // 小程序首发按非招聘类目提审（compliance-boundary.md §1.1）。
 const ROUTE_MAP = {
-  '/resume/source':    '/pages/resume-upload/resume-upload',
-  '/resume/report':    '/pages/resume-diagnose/resume-diagnose',
-  '/resume/optimize':  '/pages/resume-optimize/resume-optimize',
-  '/career-plan':      '/pages/career-plan/career-plan',
-  '/job-fit':          '/pages/job-fit/job-fit',
-  '/interview':        '/pages/interview-entry/interview-entry',
+  '/resume/source':    aiEntries.resumeUploadUrl,
+  '/resume/report':    aiEntries.resumeDiagnoseUrl,
+  '/resume/optimize':  aiEntries.resumeOptimizeUrl,
+  '/career-plan':      aiEntries.careerPlanUrl,
+  '/job-fit':          aiEntries.jobFitUrl,
+  '/interview':        aiEntries.interviewEntryUrl,
   '/print':            '/pages/print/print',
   '/print/upload':     '/pages/print-upload/print-upload',
-  '/ai-records':       '/pages/ai-records/ai-records',
+  '/ai-records':       aiEntries.aiRecordsUrl,
 }
 
 // 请求带 channel=miniapp 之后（C12），服务端回的 route 已经是小程序页面路径，而且只会是 app.json
@@ -33,7 +34,8 @@ function cardUrlOf(route) {
 
 // Tab 页只能 switchTab 进，navigateTo 会直接失败（「打印」成为 Tab 后，
 // 开场卡片「怎么打印文件」和服务端 /print 卡片都会落到这里）。
-const TAB_PAGES = ['/pages/home/home', '/pages/ai/ai', '/pages/print/print', '/pages/me/me']
+const TAB_PAGES = ['/pages/home/home', '/pages/print/print', '/pages/me/me']
+if (aiEntries.aiTab) TAB_PAGES.push(aiEntries.aiTab)
 
 function iconForRoute(route) {
   if (/resume|career|job-fit/.test(route)) return 'file-text'
@@ -58,7 +60,7 @@ Page({
         role: 'ai',
         text: '你好，我是小青。简历怎么改、面试怎么准备、文件怎么打印，都可以问我。想从哪里开始？',
         cards: [
-          { id: 'resume', icon: 'file-text', tone: 'plum', title: '诊断我的简历', sub: 'AI 分析并给出优化建议', url: '/pages/resume-upload/resume-upload' },
+          { id: 'resume', icon: 'file-text', tone: 'plum', title: '诊断我的简历', sub: 'AI 分析并给出优化建议', url: aiEntries.resumeUploadUrl },
           { id: 'print',  icon: 'printer',   tone: 'teal', title: '怎么打印文件', sub: '上传、扫码或在一体机上打印',  url: '/pages/print/print' },
         ],
       },
@@ -108,7 +110,7 @@ Page({
   },
 
   back() {
-    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/ai/ai' }) } })
+    wx.navigateBack({ fail() { if (aiEntries.aiTab) wx.switchTab({ url: aiEntries.aiTab }) } })
   },
 
   tapCard(e) {
@@ -305,7 +307,7 @@ Page({
         if (res.tapIndex === 0) {
           this.setData({ messages: [this.data.messages[0]], sessionId: '' })
         } else if (res.tapIndex === 1) {
-          wx.navigateTo({ url: '/pages/ai-records/ai-records' })
+          if (aiEntries.aiRecordsUrl) wx.navigateTo({ url: aiEntries.aiRecordsUrl })
         } else if (res.tapIndex === 2) {
           this.openAiDisclaimer()
         } else if (res.tapIndex === 3) {
@@ -325,6 +327,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: 'AI 顾问小青', path: '/pages/assistant/assistant' }
+    return { title: 'AI 顾问小青', path: aiEntries.assistantUrl }
   },
 })

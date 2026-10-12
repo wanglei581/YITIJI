@@ -7,6 +7,7 @@
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const aiAccess = require('../../utils/ai-access')
+const { AI_ENABLED } = require('../../utils/build-variant')
 
 // 个人信息请求的处理时限（D5，律师再核）。与法务试运行版隐私政策第五条一致，改之前先改法务文档。
 const PRIVACY_REQUEST_DAYS = 15
@@ -28,7 +29,9 @@ function ageRow(on, date, source) {
     on,
     text: on
       ? `已声明${date ? `（${date}${source}）` : ''}`
-      : '还没有声明：第一次用 AI、上传简历或录音时会先问你',
+      // 不含 AI 版：照实说什么时候问（上传文件、打印前的隐私检查会弹年龄确认框；合规十 10/12 定字）。
+      // 打印前不再问年龄以后，这句改成「第一次上传文件时会先问你」。
+      : (AI_ENABLED ? '还没有声明：第一次用 AI、上传简历或录音时会先问你' : '还没有声明：第一次上传或打印文件时会先问你'),
   }
 }
 

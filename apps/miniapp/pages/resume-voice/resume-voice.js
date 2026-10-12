@@ -6,6 +6,7 @@ const voice = require('../../utils/voice-recorder')
 const aiAccess = require('../../utils/ai-access')
 const { userMessageOf } = require('../../utils/user-error')
 const Q = require('./resume-voice-questions')
+const aiEntries = require('../../utils/ai-entries')
 
 const PROBE_MAX_S = Math.floor(voice.PROBE_MAX_MS / 1000)
 const QUESTION_MAX_S = Math.floor(voice.QUESTION_MAX_MS / 1000)
@@ -88,7 +89,7 @@ Page({
 
   goTypedForm() {
     wx.redirectTo({
-      url: '/pages/resume-build/resume-build',
+      url: aiEntries.resumeBuildUrl,
       fail() { wx.showToast({ title: '页面打开失败', icon: 'none' }) },
     })
   },
@@ -361,7 +362,7 @@ Page({
       ts: Date.now(),
     })
     wx.redirectTo({
-      url: '/pages/resume-build/resume-build?from=voice',
+      url: aiEntries.href(aiEntries.resumeBuildUrl, 'from=voice'),
       fail: () => {
         storage.remove(storage.KEYS.RESUME_VOICE_HANDOFF)
         wx.showToast({ title: '没法打开预览页', icon: 'none' })

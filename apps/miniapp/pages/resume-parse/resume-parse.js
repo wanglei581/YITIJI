@@ -4,6 +4,7 @@ const auth = require('../../utils/auth')
 const storage = require('../../utils/storage')
 const intentStore = require('../../utils/resume-parse-intent')
 const session = require('../../utils/resume-parse-session')
+const aiEntries = require('../../utils/ai-entries')
 
 /**
  * 本次解析包含的环节。
@@ -444,7 +445,7 @@ Page({
     setTimeout(() => {
       if (this._stopped) return
       wx.redirectTo({
-        url: `/pages/resume-diagnose/resume-diagnose?taskId=${encodeURIComponent(taskId)}`,
+        url: aiEntries.href(aiEntries.resumeDiagnoseUrl, 'taskId=' + encodeURIComponent(taskId)),
       })
     }, 500)
   },
@@ -517,7 +518,7 @@ Page({
   retry() {
     if (this.data.quotaReleaseBlocked || this.data.fileChanged || this.data.fileChangedBlocked || this.data.terminalCharge || this.data.terminalBlocked || this.data.conflict) return
     if (this.data.phase === 'missing') {
-      wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+      wx.redirectTo({ url: aiEntries.resumeUploadUrl })
       return
     }
     // 只有「明确失败」才直接重提。结果未知时刚才那次可能已经完成,
@@ -739,11 +740,11 @@ Page({
 
   /** 没有编号但已登录:这一次若已完成,会出现在本人的 AI 服务记录里。 */
   toAiRecords() {
-    wx.navigateTo({ url: '/pages/ai-records/ai-records' })
+    wx.navigateTo({ url: aiEntries.aiRecordsUrl })
   },
 
   toUpload() {
-    wx.redirectTo({ url: '/pages/resume-upload/resume-upload' })
+    wx.redirectTo({ url: aiEntries.resumeUploadUrl })
   },
 
   back() {

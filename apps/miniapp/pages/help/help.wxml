@@ -12,7 +12,7 @@
     </view>
   </view>
 
-  <view class="content has-bar">
+  <view class="content {{aiEnabled ? 'has-bar' : ''}}">
 
     <!-- FAQ 折叠列表 -->
     <view class="section-t">热门问答</view>
@@ -32,7 +32,7 @@
       </view>
     </view>
 
-    <view class="notice info">
+    <view wx:if="{{aiEnabled}}" class="notice info">
       <text class="ficon i-info n-ic"></text>
       <view>没找到答案？可以问 AI 助手小青。</view>
     </view>
@@ -47,7 +47,7 @@
 
   </view>
 
-  <view class="actionbar">
+  <view wx:if="{{aiEnabled}}" class="actionbar">
     <view class="btn primary block tap" hover-class="tap-press" bindtap="askAI">问小青</view>
   </view>
 

@@ -19,7 +19,7 @@
       <view class="ab-mark"><text class="ficon i-aim ab-ic"></text></view>
       <view class="ab-name">职易达</view>
       <view class="ab-ver">版本 1.0.2</view>
-      <view class="ab-slogan">AI 简历工具 · 文档打印服务</view>
+      <view class="ab-slogan">{{slogan}}</view>
     </view>
 
     <!-- 链接组1：协议与隐私 -->
@@ -59,7 +59,7 @@
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
-      <view>本平台提供 AI 简历工具与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。AI 生成的内容仅供参考。</view>
+      <view>{{notice}}</view>
     </view>
 
     <view class="ab-foot">© 2026 职易达</view>
