@@ -101,6 +101,11 @@ test('progress renders Agent-polled pending job fields and never claims printed 
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
   await expect(page.getByText('机身灯亮绿')).toHaveCount(0)
+  // 正常打印中没有发生故障：求助条只给求助句，不能说「暂时打不了」「已经收到提醒」（合规十 10/12 答复第四节 A）。
+  const printingHelp = page.getByTestId('print-fulfill-state-printing').getByTestId('print-fulfill-fallback')
+  await expect(printingHelp).toContainText('需要帮助？')
+  await expect(printingHelp).not.toContainText('暂时打不了')
+  await expect(printingHelp).not.toContainText('已经收到提醒')
   expect(polls.length, '必须向 GET /print/jobs/:taskId 发出真实轮询').toBeGreaterThan(0)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-printing.png'), fullPage: true })

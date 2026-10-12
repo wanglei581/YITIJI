@@ -503,7 +503,7 @@ var GUIDE = {
   login:[['隐私','只对本人可见','工单与账号绑定，退出后本机不留明细'],['联系方式','选填手机号','只在需要确认设备或文件问题时使用'],['另一条路','不想登录也能反馈','打印完成页有免登录的问题反馈入口']],
   unavailable:[['当前状态','未连接会员服务','没有会员令牌时不做本地假提交'],['能做什么','先完成登录','登录后即可提交并查看本人工单'],['另一条路','免登录反馈','打印完成页的问题反馈只提交、不建档']],
   loading:[['读取范围','只读当前账号','不会展示其他账号的工单'],['显示规则','不闪回旧工单','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会丢失草稿']],
-  error:[['数据','已提交工单不受影响','这次加载失败不会删除任何工单'],['先试这个','检查网络后重试','重试不会重复创建工单'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  error:[['数据','已提交工单不受影响','这次加载失败不会删除任何工单'],['先试这个','请稍后重试','重试不会重复创建工单'],['仍不行','帮助中心','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）']],
   detail:[['沟通记录','由本人与运营组成','服务回复只代表运营处理意见，不代表最终结论'],['追加描述','至少 1 个字','追加不会改变工单分类'],['关闭反馈','关闭后不能再追加','如仍有问题，请新建一条反馈']],
   form:[['写什么','说清现象与位置','例如在哪一页、点了什么、出现什么'],['分类','按上面四类选','分类只影响流转，不影响是否受理'],['时限','不承诺回复时限','是否回复与处理时间由现场运营决定']]
 };
@@ -673,10 +673,10 @@ function renderBody(state, related, reason, ticketId){
     return {layout:'state', html:
       banner('warn','plug','当前无法提交反馈','没有连接到会员服务，或当前没有有效的会员登录。<b>本页不做本地假提交</b>：连接真实服务并登录后，才可查看和提交本人反馈。',['共 —','服务未连接'])
       + previewList(CATEGORIES.map(function(c){ return catRow(c,'off'); }).join(''),
-          '这四类反馈都需要会员服务在线才能建档。<b>现在仍然可以走的路</b>：在打印完成页用免登录的问题反馈，或直接找现场工作人员。',
+          '这四类反馈都需要会员服务在线才能建档。<b>现在仍然可以走的路</b>：在打印完成页用免登录的问题反馈。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）',
           '当前不可提交的反馈分类')
       + guide('unavailable')
-      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'chat'}),
+      + ctaBar([link('帮助中心','06-help.html','/help',SCREEN+'-help',{icon:'chat'}),
           '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent('/me/feedback')))+'" data-route="/login" data-login-from="/me/feedback" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
   }
   if(state==='loading'){
@@ -691,9 +691,9 @@ function renderBody(state, related, reason, ticketId){
     return {layout:'state', html:
       banner('warn','warn','反馈列表这次没有加载出来','当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>；已提交的反馈不会因为这次失败而丢失。',['共 —','本次未取到'])
       + previewList(CATEGORIES.map(function(c){ return catRow(c,'off'); }).join(''),
-          '重试不会重复创建工单。多次重试仍失败时，可以让现场工作人员协助处理。','本次未取到的工单分类')
+          '重试不会重复创建工单。多次重试仍不成功的话，可以稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）','本次未取到的工单分类')
       + guide('error')
-      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'chat'}),
+      + ctaBar([link('帮助中心','06-help.html','/help',SCREEN+'-help',{icon:'chat'}),
           link('重新加载', href('loading'), '/me/feedback', SCREEN+'-primary', {primary:true})])};
   }
   if(state==='detail-loading'){
