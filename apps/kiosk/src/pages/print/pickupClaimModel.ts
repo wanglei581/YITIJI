@@ -192,6 +192,8 @@ export type PickupScreen =
   | 'locked'
   | 'network-error'
   | 'closed'
+  // 当天额度不够。屏头合规十一 10/12 定，待产品负责人点头。
+  | 'quota'
   | 'failed'
   | 'success'
   | 'hid'
@@ -199,6 +201,8 @@ export type PickupScreen =
 export function failureScreen(failure: PickupFailure): PickupScreen {
   if (failure === 'invalid') return 'invalid-or-expired'
   if (failure === 'closed') return 'closed'
+  // 额度单独一屏：屏头不是 failed 的「没能完成校验」，也不进 closed（码明天还能用）。
+  if (failure === 'quota') return 'quota'
   if (failure === 'locked') return 'locked'
   if (failure === 'network') return 'network-error'
   return 'failed'

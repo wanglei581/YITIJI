@@ -120,8 +120,9 @@ for (const scenario of [
   { code: 'PRINT_RETRY_FILE_UNAVAILABLE', status: 409, server: '打印文件已过期或已清理，不能重新提交', screen: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单', state: 'arrival-code-state-closed' },
   { code: 'PRINT_RETRY_AGENT_VERSION', status: 409, server: '这台终端的打印程序版本过旧，升级到 0.4.13 后才能重新提交', screen: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。', state: 'arrival-code-state-closed' },
   // 两种额度后端回 429：要按码认，不能当成「人多限流」。码明天还能用，所以不进「不能再用来取件」那一屏。
-  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', status: 429, server: '今天这台机器的免费打印量已用完，明天 0 点恢复。', screen: '这台机器今天剩下的打印量不够打这一单，明天恢复。明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。', state: 'arrival-code-state-failed' },
-  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', status: 429, server: '你今天已免费打印 1 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。', screen: '你今天剩下的打印量不够打这一单，明天恢复。明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。', state: 'arrival-code-state-failed' },
+  // 屏头单独一句（合规十一 10/12，待产品负责人点头）；红条和两颗按钮不改。
+  { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', status: 429, server: '今天这台机器的免费打印量已用完，明天 0 点恢复。', screen: '这台机器今天剩下的打印量不够打这一单，明天恢复。明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。', state: 'arrival-code-state-quota' },
+  { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', status: 429, server: '你今天已免费打印 1 面，达到每日上限，明天 0 点恢复。确有急用，可以拨打屏幕上的服务电话。', screen: '你今天剩下的打印量不够打这一单，明天恢复。明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。', state: 'arrival-code-state-quota' },
 ]) {
   test(`pickup ${scenario.code} says what happened and offers home instead of retyping @w2`, async ({ page, api }) => {
     api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', { status: 200, json: { enabled: false, idleTimeoutSec: 180, items: [] } })
@@ -145,8 +146,12 @@ for (const scenario of [
     await expect(screen).not.toContainText('工作人员')
     await expect(page.getByTestId('arrival-code-primary')).toHaveText('回到首页')
     // 当天的量不够时换一个 0 元单的码也一样被拒，次要出口是求助；文件失效、程序太旧才给输另一个码。
-    await expect(page.locator('.pcp-actions').getByRole('button', { name: scenario.state === 'arrival-code-state-failed' ? '求助' : '输另一个到机码', exact: true })).toBeVisible()
+    await expect(page.locator('.pcp-actions').getByRole('button', { name: scenario.state === 'arrival-code-state-quota' ? '求助' : '输另一个到机码', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '清除，重新输入' })).toHaveCount(0)
+    if (scenario.state === 'arrival-code-state-quota') {
+      await expect(page.locator('.qx-pagehead p')).toHaveText('这个到机码今天打不了。')
+      await expect(page.getByText('没能完成校验')).toHaveCount(0)
+    }
   })
 }
 

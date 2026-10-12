@@ -339,11 +339,20 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     else pass(`${code}：${kind}，是合规定的那句`)
   }
   // 额度用完的码明天还能用：不许进「这个到机码不能再用来取件」那一屏，但按钮要和 closed 同一组。
-  if (model.failureScreen('quota') !== 'failed') fail('quota 不该映射到 closed 屏（码明天还能用）')
+  // 2026-10-12 第八次：旧断言钉死 failureScreen('quota') === 'failed'，屏头就只能是「没能完成校验」。
+  // 合规十一定额度单独一屏，屏头改成「这个到机码今天打不了。」（待产品负责人点头），所以这里改成必须等于 quota。
+  if (model.failureScreen('quota') === 'closed') fail('quota 不该映射到 closed 屏（码明天还能用）')
+  else if (model.failureScreen('quota') !== 'quota') fail(`quota 应映射到独立屏，实际 ${model.failureScreen('quota')}`)
+  else pass('quota 单独一屏，屏头不再用 failed 的「没能完成校验」')
   {
     const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
-    if (!/failure === 'closed' \|\| failure === 'quota'/.test(read(rel))) fail(`${rel}：quota 没有和 closed 共用「回到首页 / 输另一个到机码」那组按钮`)
+    const guide = read(rel)
+    if (!/failure === 'closed' \|\| failure === 'quota'/.test(guide)) fail(`${rel}：quota 没有和 closed 共用「回到首页 / 输另一个到机码」那组按钮`)
     else pass('quota 与 closed 共用「回到首页」那组按钮，屏头不同')
+    if (!/这个到机码<b>今天打不了<\/b>。/.test(guide)) fail(`${rel}：额度屏头不是「这个到机码今天打不了。」`)
+    else pass('额度屏头是「这个到机码今天打不了。」')
+    if (!/case 'failed':[\s\S]{0,160}没能完成校验/.test(guide)) fail(`${rel}：failed 屏头不再是「没能完成校验」`)
+    else pass('failed 屏头仍是「没能完成校验」')
   }
   // 全站共用码表：现场建单撞额度时不许落到「429 一律说人较多」。
   for (const [code, sentence] of [['PRINT_TERMINAL_DAILY_QUOTA_REACHED', terminalQuota], ['PRINT_MEMBER_DAILY_QUOTA_REACHED', memberQuota]]) {
