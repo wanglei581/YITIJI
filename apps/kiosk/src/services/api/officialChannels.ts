@@ -69,12 +69,17 @@ export function parseOfficialChannels(body: unknown): OfficialChannelsResponse {
 }
 
 /**
- * 读渠道最多等这么久。真机走查 F-23：请求挂住时页面一直「正在读取本终端的官方渠道」，
+ * 渠道页读渠道最多等这么久。真机走查 F-23：请求挂住时页面一直「正在读取本终端的官方渠道」，
  * 160 秒不变直到清场。超时就按「这次没有读取成功」处理，页面给现成的「重新读取」。
+ * 只给有人盯着「正在读取」的地方用（渠道页、点码前复查）；首页磁贴是后台静默读取，
+ * 不显示读取中，慢一点回来也照样摆磁贴，不加上限（加了反而要等五分钟后的下一轮才出来）。
  */
 export const OFFICIAL_CHANNELS_TIMEOUT_MS = 15_000
 
-export async function getOfficialChannels(terminalId: string): Promise<OfficialChannelsResponse> {
+export async function getOfficialChannels(
+  terminalId: string,
+  options?: { timeoutMs?: number },
+): Promise<OfficialChannelsResponse> {
   // 本地 mock 模式没有后端：按「没有渠道」处理，不编渠道。
   if (API_MODE !== 'http') return emptyOfficialChannels()
   if (!terminalId.trim()) throw new Error('getOfficialChannels failed: missing terminal id')
@@ -83,6 +88,8 @@ export async function getOfficialChannels(terminalId: string): Promise<OfficialC
     `${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/official-channels`,
     window.location.origin,
   )
+  const timeoutMs = options?.timeoutMs
+  if (timeoutMs === undefined) return readOfficialChannels(url.toString())
   // 计时把等本机会话就绪、发请求、读回包都算进去：卡在哪一段，到点都一样落到失败态。
   const controller = new AbortController()
   let timer: number | undefined
@@ -90,7 +97,7 @@ export async function getOfficialChannels(terminalId: string): Promise<OfficialC
     timer = window.setTimeout(() => {
       controller.abort()
       reject(new ApiHttpError('REQUEST_TIMEOUT', 'official channels request timed out', 0))
-    }, OFFICIAL_CHANNELS_TIMEOUT_MS)
+    }, timeoutMs)
   })
   try {
     return await Promise.race([readOfficialChannels(url.toString(), controller.signal), timedOut])
@@ -99,7 +106,7 @@ export async function getOfficialChannels(terminalId: string): Promise<OfficialC
   }
 }
 
-async function readOfficialChannels(url: string, signal: AbortSignal): Promise<OfficialChannelsResponse> {
+async function readOfficialChannels(url: string, signal?: AbortSignal): Promise<OfficialChannelsResponse> {
   const res = await terminalProtectedFetch(url, {
     method: 'GET',
     headers: { Accept: 'application/json' },

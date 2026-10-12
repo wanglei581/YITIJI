@@ -12,6 +12,7 @@ import {
   emptyOfficialChannels,
   getCachedOfficialChannels,
   getOfficialChannels,
+  OFFICIAL_CHANNELS_TIMEOUT_MS,
   peekCachedOfficialChannels,
   storeOfficialChannels,
   type OfficialChannelItem,
@@ -46,7 +47,7 @@ function initialState(fresh: boolean): OfficialChannelsState {
 
 async function readChannels(terminalId: string, fresh: boolean): Promise<OfficialChannelsResponse> {
   if (!fresh) return getCachedOfficialChannels(terminalId)
-  const next = await getOfficialChannels(terminalId)
+  const next = await getOfficialChannels(terminalId, { timeoutMs: OFFICIAL_CHANNELS_TIMEOUT_MS })
   storeOfficialChannels(terminalId, next)
   return next
 }
@@ -99,7 +100,7 @@ export function useOfficialChannels(options?: { fresh?: boolean }): OfficialChan
       return emptyOfficialChannels()
     }
     try {
-      const next = await getOfficialChannels(terminalId)
+      const next = await getOfficialChannels(terminalId, { timeoutMs: OFFICIAL_CHANNELS_TIMEOUT_MS })
       storeOfficialChannels(terminalId, next)
       setState({ status: 'ready', items: next.items, legacyPlatforms: next.legacyPlatforms })
       return next

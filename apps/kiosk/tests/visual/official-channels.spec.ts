@@ -373,6 +373,7 @@ test('loading: neutral, never claims "none configured" before the answer arrives
 
 // 真机走查 F-23：请求挂住时页面一直「正在读取」，直到清场。15 秒没回就落到现成的失败态，重新读取能用。
 test('a channels request that never answers falls back to the honest failure after 15 seconds @w1-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   const never = deferred()
   api.respondWith('GET', CHANNELS, async (requestNumber) => {
@@ -382,6 +383,8 @@ test('a channels request that never answers falls back to the honest failure aft
   await page.clock.install()
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'loading')
+  // 先确认请求已经发出，计时才是从请求起算的。
+  await expect.poll(() => api.requestCount('GET', CHANNELS)).toBe(1)
 
   // 14 秒还在等：不提前下结论。
   await page.clock.runFor(14_000)
@@ -400,6 +403,7 @@ test('a channels request that never answers falls back to the honest failure aft
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   await expectChannelCards(page, 'org', ORG_SORTED)
   never.resolve()
+  expect(errors).toEqual([])
 })
 
 // ── 渠道页：b 版本的「其他来源平台」 ─────────────────────────────────────────
