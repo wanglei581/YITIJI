@@ -4,7 +4,9 @@ import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
 import { DocumentConversionService } from '../../document-conversion/document-conversion.service'
 import { OcrService } from './ocr/ocr.service'
+import { foldPdfTextItemsByFont, type FontFoldDocument } from '../../common/pdf/cjk-radical-font-fold'
 import { extractPdfTextItems, openUnpdfDocument, type PdfTextItem } from '../../common/pdf/pdfjs-document'
+import { countCjkRadicals, foldCjkRadicals } from '../../common/text/cjk-radical-fold'
 import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
   ResumeExtractionConfidence,
@@ -227,6 +229,7 @@ export class ResumeExtractionService {
   ): Promise<ResumeExtractionResult> {
     let rawText = ''
     let pageCount: number | undefined
+    let fontFoldChars = 0
     let pdf: unknown
     try {
       pdf = await openUnpdfDocument(new Uint8Array(buffer))
@@ -245,8 +248,11 @@ export class ResumeExtractionService {
           // mergePages 会把所有换行压成空格。Word 导出的简历靠 y / hasEOL 断行，
           // 同一行的多项按 x 拼接，页与页、行与行之间保留换行。
           const extracted = await extractPdfTextItems(pdf)
+          // 先按字体换例外，再拼行。位置、行序、拼行都不动；clean() 里的整表换仍在后面。
+          const folded = await foldPdfTextItemsByFont(pdf as FontFoldDocument, extracted.items)
+          fontFoldChars = folded.fontFoldChars
           pageCount = extracted.totalPages
-          rawText = assembleResumePdfLines(extracted.items)
+          rawText = assembleResumePdfLines(folded.items)
         } catch {
           return this.fail(
             fileId,
@@ -278,7 +284,7 @@ export class ResumeExtractionService {
     if (this.meaningfulLen(rawText) < MIN_TEXT_CHARS) {
       if (this.ocr.activeProviderName === 'disabled') {
         if (this.meaningfulLen(rawText) > 0) {
-          return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt)
+          return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt, [], fontFoldChars)
         }
         return this.fail(
           fileId,
@@ -290,7 +296,7 @@ export class ResumeExtractionService {
       }
       return this.extractScannedPdfOcr(fileId, buffer, pageCount ?? 0, startedAt)
     }
-    return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt)
+    return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt, [], fontFoldChars)
   }
 
   /**
@@ -382,6 +388,7 @@ export class ResumeExtractionService {
     pageCount: number | undefined,
     startedAt: number,
     extraWarnings: string[] = [],
+    fontFoldChars = 0,
   ): ResumeExtractionResult {
     const cleaned = this.clean(rawText)
     if (this.meaningfulLen(cleaned) < MIN_TEXT_CHARS) {
@@ -406,7 +413,13 @@ export class ResumeExtractionService {
     }
 
     const charCount = text.length
-    this.logMeta('extract.ok', { fileId, textSource, charCount, pageCount, ms: Date.now() - startedAt })
+    // radicalChars：原始文字层里被换回常用字的部首字符个数（只记个数，用来看这类文件有多常见）
+    const radicalChars = countCjkRadicals(rawText)
+    this.logMeta('extract.ok', {
+      fileId, textSource, charCount, pageCount, ms: Date.now() - startedAt,
+      ...(radicalChars > 0 ? { radicalChars } : {}),
+      ...(fontFoldChars > 0 ? { fontFoldChars } : {}),
+    })
     return {
       ok: true,
       fileId,
@@ -454,9 +467,13 @@ export class ResumeExtractionService {
     return i >= 0 ? name.slice(i).toLowerCase() : ''
   }
 
-  /** 规整空白：压缩水平空白、收敛换行、trim（不破坏正文内容）。 */
+  /**
+   * 规整空白：压缩水平空白、收敛换行、trim（不破坏正文内容）。
+   * 先把部首字符换回外形相同的常用字（见 common/text/cjk-radical-fold.ts）：有些 PDF 的文字层
+   * 存的是部首字符，不换的话后面的章节识别、事实串比对都会把同一个字当成两个字。
+   */
   private clean(text: string): string {
-    return (text ?? '')
+    return foldCjkRadicals(text ?? '')
       .replace(/[\t\f\v ]+/g, ' ')
       .replace(/ *\n */g, '\n')
       .replace(/\n{3,}/g, '\n\n')

@@ -1,0 +1,151 @@
+// ============================================================
+// 把「部首字符」换回外形相同的常用字（真机实操 F-24，2026-10-11）
+//
+// 起因：有些 PDF 的文字层里，「青、大、工、日、月、一、用、金、心、车、手、长」这类字存的不是
+// 常用字的编码，而是 Unicode「康熙部首」（U+2F00–U+2FD5）和「部首补充」（U+2E80–U+2EF3）
+// 两段里外形相同的部首字符。苹果电脑上「打印成 PDF」出来的文件常见。人眼看不出区别，
+// 程序逐字比就是两个字：简历优化的防编造校验要求学校、学历、公司、证书逐字出现在原文里，
+// 模型按常用字写「青岛」「大专」，原文里是部首版的「⻘岛」「⼤专」，于是整份结果被判作废。
+//
+// 这里只换这两段编码：全角标点、全角数字、兼容区汉字等一律不动（不能用整段 NFKC，
+// 那会把「，」折成「,」）。U+2E80 没有对应的常用字，原样保留。
+//
+// 对照表出处：Unicode 字符数据库的 Equivalent_Unified_Ideograph 属性（Unicode 13.0），
+// 由本机 perl 5.34 自带的 Unicode 数据逐个取出，不是手写的。源数组仍是 328 对，不要手改。
+// 进表时丢掉两类，遇到时原样保留：对应字码点大于 U+FFFF 的 13 对（一个部首会变成两个
+// UTF-16 单元，下游按长度截断时会切出半个字），以及 U+2E95「⺕」（Unicode 15 起对应字
+// 改为 U+2B739，也在基本平面之外；源数组里这条是旧数据的「彐」，两种对应都不用）。
+// 这两类都不是常用字的替身。进表 314 条。康熙部首那 214 条与
+// String.prototype.normalize('NFKC') 的结果逐条相同（门禁 verify:resume-radical-fold 运行时核对）。
+// 要更新这张表：重新从 Unicode 数据生成，不要手改单个字。
+// ============================================================
+
+/** 每一项是「部首字符 + 对应的常用字」。部首补充 114 条。 */
+const CJK_RADICALS_SUPPLEMENT_PAIRS: readonly string[] = [
+  '⺁厂', '⺂乛', '⺃乚', '⺄乙', '⺅亻', '⺆冂', '⺇𠘨', '⺈刀', '⺉刂', '⺊卜', '⺋㔾', '⺌小',
+  '⺍小', '⺎兀', '⺏尣', '⺐尢', '⺑𡯂', '⺒巳', '⺓幺', '⺔彑', '⺕彐', '⺖忄', '⺗心', '⺘扌',
+  '⺙攵', '⺛旡', '⺜日', '⺝月', '⺞歺', '⺟母', '⺠民', '⺡氵', '⺢氺', '⺣灬', '⺤爫', '⺥爫',
+  '⺦丬', '⺧牛', '⺨犭', '⺩王', '⺪𤴔', '⺫目', '⺬示', '⺭礻', '⺮𥫗', '⺯糹', '⺰纟', '⺱罓',
+  '⺲罒', '⺳㓁', '⺴冗', '⺵𦉫', '⺶羊', '⺷𦍌', '⺸𦍋', '⺹耂', '⺺肀', '⺻聿', '⺼肉', '⺽𦥑',
+  '⺾艹', '⺿艹', '⻀艹', '⻁虎', '⻂衤', '⻃覀', '⻄西', '⻅见', '⻆角', '⻇𧢲', '⻈讠', '⻉贝',
+  '⻊𧾷', '⻋车', '⻌辶', '⻍辶', '⻎辶', '⻏邑', '⻐钅', '⻑長', '⻒镸', '⻓长', '⻔门', '⻕𨸏',
+  '⻖阝', '⻗雨', '⻘青', '⻙韦', '⻚页', '⻛风', '⻜飞', '⻝食', '⻞𩙿', '⻟飠', '⻠饣', '⻡𩠐',
+  '⻢马', '⻣骨', '⻤鬼', '⻥鱼', '⻦鸟', '⻧卤', '⻨麦', '⻩黄', '⻪黾', '⻫斉', '⻬齐', '⻭歯',
+  '⻮齿', '⻯竜', '⻰龙', '⻱龜', '⻲亀', '⻳龟',
+]
+
+/** 康熙部首 214 条。 */
+const KANGXI_RADICAL_PAIRS: readonly string[] = [
+  '⼀一', '⼁丨', '⼂丶', '⼃丿', '⼄乙', '⼅亅', '⼆二', '⼇亠', '⼈人', '⼉儿', '⼊入', '⼋八',
+  '⼌冂', '⼍冖', '⼎冫', '⼏几', '⼐凵', '⼑刀', '⼒力', '⼓勹', '⼔匕', '⼕匚', '⼖匸', '⼗十',
+  '⼘卜', '⼙卩', '⼚厂', '⼛厶', '⼜又', '⼝口', '⼞囗', '⼟土', '⼠士', '⼡夂', '⼢夊', '⼣夕',
+  '⼤大', '⼥女', '⼦子', '⼧宀', '⼨寸', '⼩小', '⼪尢', '⼫尸', '⼬屮', '⼭山', '⼮巛', '⼯工',
+  '⼰己', '⼱巾', '⼲干', '⼳幺', '⼴广', '⼵廴', '⼶廾', '⼷弋', '⼸弓', '⼹彐', '⼺彡', '⼻彳',
+  '⼼心', '⼽戈', '⼾戶', '⼿手', '⽀支', '⽁攴', '⽂文', '⽃斗', '⽄斤', '⽅方', '⽆无', '⽇日',
+  '⽈曰', '⽉月', '⽊木', '⽋欠', '⽌止', '⽍歹', '⽎殳', '⽏毋', '⽐比', '⽑毛', '⽒氏', '⽓气',
+  '⽔水', '⽕火', '⽖爪', '⽗父', '⽘爻', '⽙爿', '⽚片', '⽛牙', '⽜牛', '⽝犬', '⽞玄', '⽟玉',
+  '⽠瓜', '⽡瓦', '⽢甘', '⽣生', '⽤用', '⽥田', '⽦疋', '⽧疒', '⽨癶', '⽩白', '⽪皮', '⽫皿',
+  '⽬目', '⽭矛', '⽮矢', '⽯石', '⽰示', '⽱禸', '⽲禾', '⽳穴', '⽴立', '⽵竹', '⽶米', '⽷糸',
+  '⽸缶', '⽹网', '⽺羊', '⽻羽', '⽼老', '⽽而', '⽾耒', '⽿耳', '⾀聿', '⾁肉', '⾂臣', '⾃自',
+  '⾄至', '⾅臼', '⾆舌', '⾇舛', '⾈舟', '⾉艮', '⾊色', '⾋艸', '⾌虍', '⾍虫', '⾎血', '⾏行',
+  '⾐衣', '⾑襾', '⾒見', '⾓角', '⾔言', '⾕谷', '⾖豆', '⾗豕', '⾘豸', '⾙貝', '⾚赤', '⾛走',
+  '⾜足', '⾝身', '⾞車', '⾟辛', '⾠辰', '⾡辵', '⾢邑', '⾣酉', '⾤釆', '⾥里', '⾦金', '⾧長',
+  '⾨門', '⾩阜', '⾪隶', '⾫隹', '⾬雨', '⾭靑', '⾮非', '⾯面', '⾰革', '⾱韋', '⾲韭', '⾳音',
+  '⾴頁', '⾵風', '⾶飛', '⾷食', '⾸首', '⾹香', '⾺馬', '⾻骨', '⾼高', '⾽髟', '⾾鬥', '⾿鬯',
+  '⿀鬲', '⿁鬼', '⿂魚', '⿃鳥', '⿄鹵', '⿅鹿', '⿆麥', '⿇麻', '⿈黃', '⿉黍', '⿊黑', '⿋黹',
+  '⿌黽', '⿍鼎', '⿎鼓', '⿏鼠', '⿐鼻', '⿑齊', '⿒齒', '⿓龍', '⿔龜', '⿕龠',
+]
+
+function buildTable(pairs: readonly string[]): Map<string, string> {
+  const table = new Map<string, string>()
+  for (const pair of pairs) {
+    // 按码点拆。对应字在基本平面之外时是两个 UTF-16 单元，不进表。
+    const [radical, ...unified] = Array.from(pair)
+    const target = unified.length === 1 ? unified[0] : undefined
+    if (!radical || !target) continue
+    // U+2E95「⺕」：新版 Unicode 的对应字在基本平面之外，旧对应「彐」也不用。
+    if (radical === '⺕') continue
+    if ((target.codePointAt(0) ?? 0) > 0xFFFF) continue
+    table.set(radical, target)
+  }
+  return table
+}
+
+const RADICAL_TO_UNIFIED: ReadonlyMap<string, string> = buildTable([
+  ...CJK_RADICALS_SUPPLEMENT_PAIRS,
+  ...KANGXI_RADICAL_PAIRS,
+])
+
+/** 进表条目按顺序连起来的 SHA-256。门禁里另抄一份字面量对照，不引用这个常量。 */
+export const CJK_RADICAL_TABLE_SHA256 = 'cb5090b73386fa7b7f26f241ae77bd03af86875539fc98e833a1288d7db74fa4'
+
+/** 进表条目数（源数组 328 对，去掉 14 对之后）。 */
+export const CJK_RADICAL_TABLE_SIZE = RADICAL_TO_UNIFIED.size
+
+/** 供门禁逐条核对；业务代码请用 foldCjkRadicals。 */
+export function cjkRadicalTableEntries(): Array<[radical: string, unified: string]> {
+  return [...RADICAL_TO_UNIFIED.entries()]
+}
+
+const RADICAL_CHAR = /[\u2E80-\u2FDF]/gu
+const HAS_RADICAL_CHAR = /[\u2E80-\u2FDF]/u
+
+/**
+ * 把文本里的部首字符换回外形相同的常用字；别的字符一个不动。
+ * 幂等；没有部首字符时原样返回同一个字符串。
+ */
+export function foldCjkRadicals(text: string): string {
+  if (typeof text !== 'string' || text.length === 0) return typeof text === 'string' ? text : ''
+  if (!HAS_RADICAL_CHAR.test(text)) return text
+  return text.replace(RADICAL_CHAR, (ch) => RADICAL_TO_UNIFIED.get(ch) ?? ch)
+}
+
+/**
+ * 只换字符串叶子（诊断报告里的摘录、证据原文等）。数字、布尔不动。
+ * 返回新值，不改传入的对象。
+ */
+export function foldCjkRadicalStrings<T>(value: T): T {
+  if (typeof value === 'string') return foldCjkRadicals(value) as T
+  if (Array.isArray(value)) return value.map((item) => foldCjkRadicalStrings(item)) as T
+  if (value !== null && typeof value === 'object') {
+    const copy: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      copy[key] = foldCjkRadicalStrings((value as Record<string, unknown>)[key])
+    }
+    return copy as T
+  }
+  return value
+}
+
+/** 真正会被换掉的部首字符个数（在对照表里的才算；只用于日志，不含任何原文）。 */
+export function countCjkRadicals(text: string): number {
+  if (typeof text !== 'string' || text.length === 0) return 0
+  return Array.from(text).filter((ch) => RADICAL_TO_UNIFIED.has(ch)).length
+}
+
+function valueHasRadical(value: unknown): boolean {
+  if (typeof value === 'string') return HAS_RADICAL_CHAR.test(value)
+  if (Array.isArray(value)) return value.some((item) => valueHasRadical(item))
+  if (value !== null && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((item) => valueHasRadical(item))
+  }
+  return false
+}
+
+/**
+ * 模型回复里用 \\u 转义写的部首，要等 JSON 解析之后才是部首字符。
+ * 能解析、且某个字符串叶子里有部首：换掉字符串叶子再序列化。
+ * 能解析但没有部首：原样返回，不改空格和键序。
+ * 解析不了：按纯文本换。
+ */
+export function foldCjkRadicalsInJsonText(text: string): string {
+  if (typeof text !== 'string' || text.length === 0) return typeof text === 'string' ? text : ''
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return foldCjkRadicals(text)
+  }
+  if (!valueHasRadical(parsed)) return text
+  return JSON.stringify(foldCjkRadicalStrings(parsed))
+}

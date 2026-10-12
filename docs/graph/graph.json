@@ -24473,6 +24473,8 @@
       "services/api/scripts/verify-resume-layout-adjust.ts",
       "services/api/scripts/verify-resume-layout-export.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
@@ -24768,7 +24770,9 @@
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-real-resume-diagnosis.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
-      "services/api/scripts/verify-resume-optimize.ts"
+      "services/api/scripts/verify-resume-optimize.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/ai/resume/llm-resume.service.ts": [
       "services/api/scripts/verify-ai-cost-coverage.ts",
@@ -24849,10 +24853,13 @@
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
-      "services/api/scripts/verify-resume-extraction.ts"
+      "services/api/scripts/verify-resume-extraction.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/ai/resume/resume-fact-match.ts": [
-      "services/api/scripts/verify-resume-draft-versions.ts"
+      "services/api/scripts/verify-resume-draft-versions.ts",
+      "services/api/scripts/verify-resume-radical-fold.ts"
     ],
     "services/api/src/ai/resume/resume-pdf.service.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -25526,6 +25533,9 @@
     "services/api/src/common/pdf/cjk-font.ts": [
       "services/api/scripts/verify-cjk-font.ts"
     ],
+    "services/api/src/common/pdf/cjk-radical-font-fold.ts": [
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
+    ],
     "services/api/src/common/pdf/pdfjs-document.ts": [
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -25536,6 +25546,7 @@
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-resume-layout-adjust.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts",
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
@@ -25645,6 +25656,10 @@
       "services/api/scripts/verify-trtc-terminal-http.ts",
       "services/api/scripts/verify-upload-scene.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts"
+    ],
+    "services/api/src/common/text/cjk-radical-fold.ts": [
+      "services/api/scripts/verify-resume-radical-fold.ts",
+      "services/api/scripts/verify-resume-radical-font-fold.ts"
     ],
     "services/api/src/common/throttler/terminal-throttle.ts": [
       "services/api/scripts/verify-ai-throttle-dimension.ts",
@@ -42926,6 +42941,53 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:resume-parse-intent"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/ai/resume/resume-fact-match.ts",
+          "services/api/src/common/text/cjk-radical-fold.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-radical-fold.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-radical-fold"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/fixtures"
+        ],
+        "files": [
+          "services/api/src/ai/interfaces/ai-provider.interface.ts",
+          "services/api/src/ai/resume/llm-resume-optimize.service.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/common/pdf/cjk-radical-font-fold.ts",
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/common/text/cjk-radical-fold.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-resume-radical-font-fold.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:resume-radical-fold"
       ],
       "wired": true
     },
