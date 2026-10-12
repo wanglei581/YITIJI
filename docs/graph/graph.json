@@ -20518,6 +20518,7 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "apps/kiosk/scripts/verify-price-single-source.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
@@ -31394,6 +31395,7 @@
         ],
         "files": [
           "apps/kiosk/src/copy/unattendedCopy.ts",
+          "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx",
