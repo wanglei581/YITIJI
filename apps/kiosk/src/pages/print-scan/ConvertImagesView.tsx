@@ -1,6 +1,6 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
 import { EyeIcon } from 'lucide-react'
-import type { ChangeEvent, ReactNode, Ref } from 'react'
+import { useEffect, useRef, type ChangeEvent, type ReactNode, type Ref } from 'react'
 import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
@@ -118,6 +118,11 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
     showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
   } = props
   const advisor = advisorCopy(phase, images.length, error, hasEndUser)
+  // 扫码面板加在页面下方：点了「手机扫码上传一张」要把它带进视野，不然按了像没反应（走查六第十四节）。
+  const qrRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (showQr) qrRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [showQr])
   const busy = uploading || generating || rechecking
   const orderLocked = phase === 'converting' || phase === 'rechecking' || phase === 'completed'
     || error?.kind === 'known-failed' || error?.kind === 'in-progress' || error?.kind === 'result-unknown'
@@ -251,6 +256,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
 
         {showQr ? (
+          <div className="i2p-qr" ref={qrRef} data-testid="img2pdf-qr-panel">
           <UploadSessionQrPanel
             purpose="print_doc"
             title="手机扫码添加图片"
@@ -259,6 +265,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             onUploaded={props.onPhoneUploaded}
             onBusyChange={props.onQrBusy}
           />
+          </div>
         ) : null}
 
         {phase !== 'empty' && phase !== 'usb' ? (

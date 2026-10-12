@@ -127,6 +127,62 @@ async function fulfillFixtureImage(page: Page): Promise<void> {
   )
 }
 
+// 走查六第十四节：空态点「手机扫码上传一张」后，扫码面板加在页面下方，把上面的示意卡挤扁、字叠在一起；
+// 面板主按钮只有 150×48、字 14px。要求：示意卡里每一行不互相压住；面板进视野；面板按钮高 ≥ 56px、字 ≥ 20px。
+test('conversion page phone QR panel does not squeeze the empty example and uses touch-size buttons @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: { success: true, data: { sessionId: 'w2-convert-qr', uploadUrl: '/upload/phone', uploadToken: 'w2-convert-qr-token', controlToken: 'w2-convert-qr-control', expiresAt: '2099-01-01T00:00:00.000Z' } },
+  })
+  api.respond('GET', '/api/v1/upload-sessions/w2-convert-qr', {
+    status: 200,
+    json: { success: true, data: { sessionId: 'w2-convert-qr', status: 'pending', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: true, expiresAt: '2099-01-01T00:00:00.000Z' } },
+  })
+
+  await page.goto('/print-scan/convert')
+  await page.getByTestId('img2pdf-add-phone').click()
+  const panel = page.getByTestId('img2pdf-qr-panel')
+  await expect(panel).toBeVisible()
+  await expect(panel).toBeInViewport()
+
+  // 示意卡里的行、右边三步各自不重叠（被挤扁时下一行会压到上一行上）。
+  const overlaps = await page.evaluate(() => {
+    const pane = '[data-testid="img2pdf-empty-pane"]'
+    const groups = [
+      [...document.querySelectorAll(`${pane} .ep-l > *`)],
+      [...document.querySelectorAll(`${pane} .ep-r > *`)],
+      [...document.querySelectorAll('[data-testid="img2pdf-empty-slots"] > *')],
+      [...document.querySelectorAll(`${pane} .i2p-epsteps > *`)],
+    ]
+    const hits: string[] = []
+    // 容器装不下自己的内容（被挤扁时内容溢出、叠到下一块上）。
+    for (const el of document.querySelectorAll(`${pane} .i2p-ghostwrap, ${pane} .i2p-epsteps`)) {
+      if (el.scrollHeight > el.clientHeight + 1) hits.push(`${el.className} 内容 ${el.scrollHeight} > 可见 ${el.clientHeight}`)
+    }
+    for (const items of groups) {
+      const rects = items.map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0)
+      for (let i = 1; i < rects.length; i += 1) {
+        if (rects[i].top < rects[i - 1].bottom - 1) hits.push(`${Math.round(rects[i - 1].bottom)}>${Math.round(rects[i].top)}`)
+      }
+    }
+    return { hits, counts: groups.map((g) => g.length) }
+  })
+  expect(overlaps.counts.every((n) => n >= 2), '阳性对照：两组都量到了至少两行').toBe(true)
+  expect(overlaps.hits, '示意卡被挤扁、行与行叠在一起').toEqual([])
+
+  for (const name of ['刷新二维码', '取消', '确认加入待合并列表']) {
+    const button = panel.getByRole('button', { name, exact: true })
+    await expect(button).toBeVisible()
+    const box = await button.boundingBox()
+    expect(box?.height ?? 0, `「${name}」触控高度`).toBeGreaterThanOrEqual(56)
+    const size = await button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(size, `「${name}」字号`).toBeGreaterThanOrEqual(20)
+  }
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
 test('conversion page renders a server conversion error without fabricating output @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   await fulfillFixtureImage(page)

@@ -478,6 +478,22 @@
   display: flex; gap: 11px; align-items: center;
 }
 
+/* 手机扫码面板（共用的 UploadSessionQrPanel 是冻结文件，只从外面换装；走查六第十四节）。
+   ① 面板加进来后，空态那张「列表会长成这样」示意卡保持自身高度，整页在 .i2p-scroll 里滚，
+      不再被挤扁、卡里的字叠在一起；② 面板里的旧按钮放大到触屏下限 56px，字用辅助字阶。 */
+.i2p-scroll:has(.i2p-qr) .i2p-epane { flex: none; }
+.i2p-qr { flex: none; }
+.i2p-qr > * { padding: 20px 22px; border-radius: 28px; border: 1px solid var(--qx-line); background: var(--qx-surface); box-shadow: none; }
+.i2p-qr h2 { font-size: var(--qx-fs-body-lg); color: var(--qx-ink); }
+.i2p-qr p { font-size: var(--qx-fs-aux); line-height: 1.55; color: var(--qx-ink-2); }
+.i2p-qr .flex-wrap > button {
+  min-height: 56px; padding: 0 18px; border-radius: 18px; font-size: var(--qx-fs-aux); font-weight: 700;
+  border: 1.5px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink-2);
+}
+.i2p-qr .flex-wrap > button:last-child:not(:disabled) { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+.i2p-qr .bg-error-bg { border-radius: 14px; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: var(--qx-fs-aux); }
+.i2p-qr .bg-success-bg { border-radius: 14px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: var(--qx-fs-aux); }
+
 /* 无障碍隐藏。不用传统的 margin:-1px —— 那会把元素推到 left=-1，
    踩中 fusion-w6-routes 的「不得包含越过视口边界的元素」断言
    （判据 rect.left >= -0.5）。改用 clip-path 裁剪，元素留在原位不出界，
