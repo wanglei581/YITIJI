@@ -4,12 +4,21 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import {
+  createCompletionEvidenceChannel,
+  type InferredCompletionReason,
+} from '../src/agent/print-job-monitor'
+import {
   buildPrintServiceCompletionEventScript,
+  buildPrintServiceCompletionLogStateScript,
   buildWin32PrinterProbeScript,
   configuredPrinterNameMatches,
   mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
+  parseCompletionEventRead,
+  parsePrintCompletionLogState,
   parsePrintJobStatus,
+  type CompletionEventRead,
+  type PrintCompletionLogState,
   type PrintJobMonitorStatus,
 } from '../src/agent/wmi'
 import { ESCAPE_WQL_LITERAL_FUNCTION, escapeWqlLiteral } from '../src/agent/wql-literal'
@@ -18,12 +27,34 @@ import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
 
 interface Scenario {
   name: string
-  statuses: PrintJobMonitorStatus[]
+  statuses?: PrintJobMonitorStatus[]
+  /** Raw JobStatus strings, parsed by parsePrintJobStatus before the monitor sees them. */
+  raws?: string[]
   expectedFailed: boolean
   expectedErrorCode: string
   completionEvent?: boolean
+  /** 1-based index of the completion-event query that returns true. Earlier queries return false. */
+  completionTrueOnQuery?: number
+  /** Each 307 query returns the next entry (boolean stub or found/not_found/unreadable). Shorter tails fall through. */
+  completionReads?: Array<boolean | CompletionEventRead>
   initialNow?: number
   dispatchedAtMs?: number
+  /** Defaults to disabled so existing scenarios keep their previous disposition. */
+  logState?: PrintCompletionLogState
+  logStateRejects?: boolean
+  /** When true, the fresh channel is already proven for Configured Printer. */
+  proveChannel?: boolean
+  timeoutMs?: number
+  expectedInferred?: InferredCompletionReason
+  expectedWarn?: RegExp
+  unexpectedWarn?: RegExp[]
+  expectedStatusQueries?: number
+  expectedLogStateQueries?: number
+  /** Number of 307 reads the monitor made. */
+  expectedCompletionQueries?: number
+  expectedRawStatus?: string
+  /** After the run, whether this queue's channel is proven. Another queue must stay unproven. */
+  expectChannelProven?: boolean
 }
 
 function verifyPrintServiceCompletionScriptContract(): void {
@@ -126,44 +157,149 @@ function verifyPrintServiceCompletionScriptContract(): void {
   )
 }
 
+function verifyCompletionEventReadContract(): void {
+  assert.equal(parseCompletionEventRead('true'), 'found')
+  assert.equal(parseCompletionEventRead(' True \r\n'), 'found')
+  assert.equal(parseCompletionEventRead('false'), 'not_found')
+  assert.equal(parseCompletionEventRead(null), 'unreadable')
+  assert.equal(parseCompletionEventRead(''), 'unreadable')
+  assert.equal(parseCompletionEventRead('true\nfalse'), 'unreadable')
+  assert.equal(parseCompletionEventRead('error'), 'unreadable')
+}
+
+function verifyCompletionLogStateContract(): void {
+  assert.equal(parsePrintCompletionLogState('enabled'), 'enabled')
+  assert.equal(parsePrintCompletionLogState(' Enabled \r\n'), 'enabled')
+  assert.equal(parsePrintCompletionLogState('disabled'), 'disabled')
+  assert.equal(parsePrintCompletionLogState(null), 'unknown')
+  assert.equal(parsePrintCompletionLogState(''), 'unknown')
+  assert.equal(parsePrintCompletionLogState('enabled\nextra'), 'unknown')
+  assert.equal(parsePrintCompletionLogState('True'), 'unknown')
+
+  const script = buildPrintServiceCompletionLogStateScript()
+  assert.match(script, /Microsoft-Windows-PrintService\/Operational/, 'log-state probe names the Operational log')
+  assert.match(script, /IsEnabled/, 'log-state probe reads IsEnabled')
+  assert.match(script, /catch/, 'log-state probe catches read failures')
+  assert.doesNotMatch(script, /wevtutil/, 'log-state probe must not change logging')
+  assert.doesNotMatch(script, /SaveChanges/, 'log-state probe must not save log changes')
+  assert.doesNotMatch(script, /Set-/, 'log-state probe must not call a Set- cmdlet')
+  assert.doesNotMatch(script, /Clear-/, 'log-state probe must not clear the log')
+  assert.doesNotMatch(script, /Limit-EventLog/, 'log-state probe must not resize the log')
+}
+
 async function runScenario(scenario: Scenario): Promise<void> {
   let now = scenario.initialNow ?? 0
   let cursor = 0
-  const fallback = scenario.statuses.at(-1) ?? 'unknown'
+  let statusQueries = 0
+  let completionQueries = 0
+  let logStateQueries = 0
+  const fallback = scenario.statuses?.at(-1) ?? 'unknown'
+  const evidenceChannel = createCompletionEvidenceChannel()
+  if (scenario.proveChannel) evidenceChannel.markProven('Configured Printer')
+  const unhandled: unknown[] = []
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason)
+  }
+  if (scenario.logStateRejects) process.on('unhandledRejection', onUnhandled)
 
-  const result = await monitorPrintJob('Configured Printer', 'task-monitor-test', 10, 1, {
-    platform: 'win32',
-    now: () => now,
-    sleep: async (ms) => {
-      now += Math.max(ms, 1)
-    },
-    queryStatus: async () => ({
-      status: scenario.statuses[cursor++] ?? fallback,
-      rawStatus: fallback === 'printing' ? 'Printing' : undefined,
-    }),
-    dispatchedAtMs: scenario.dispatchedAtMs,
-    queryCompletionEvent: async (printerName, taskId, dispatchedAtMs) => {
-      assert.equal(printerName, 'Configured Printer', `${scenario.name}: completion printer`)
-      assert.equal(taskId, 'task-monitor-test', `${scenario.name}: completion taskId`)
-      if (scenario.dispatchedAtMs !== undefined) {
-        assert.equal(
-          dispatchedAtMs,
-          scenario.dispatchedAtMs,
-          `${scenario.name}: completion dispatch lower bound`,
-        )
-      }
-      return scenario.completionEvent ?? false
-    },
-  })
+  let result: Awaited<ReturnType<typeof monitorPrintJob>>
+  try {
+    result = await monitorPrintJob(
+      'Configured Printer',
+      'task-monitor-test',
+      scenario.timeoutMs ?? 10,
+      1,
+      {
+        platform: 'win32',
+        now: () => now,
+        sleep: async (ms) => {
+          now += Math.max(ms, 1)
+        },
+        queryStatus: async () => {
+          statusQueries += 1
+          if (scenario.raws) {
+            const raw = scenario.raws[cursor++] ?? scenario.raws.at(-1) ?? 'not_found'
+            return parsePrintJobStatus(raw)
+          }
+          return {
+            status: scenario.statuses?.[cursor++] ?? fallback,
+            rawStatus: fallback === 'printing' ? 'Printing' : undefined,
+          }
+        },
+        dispatchedAtMs: scenario.dispatchedAtMs,
+        queryCompletionEvent: async (printerName, taskId, dispatchedAtMs) => {
+          assert.equal(printerName, 'Configured Printer', `${scenario.name}: completion printer`)
+          assert.equal(taskId, 'task-monitor-test', `${scenario.name}: completion taskId`)
+          if (scenario.dispatchedAtMs !== undefined) {
+            assert.equal(
+              dispatchedAtMs,
+              scenario.dispatchedAtMs,
+              `${scenario.name}: completion dispatch lower bound`,
+            )
+          }
+          completionQueries += 1
+          if (scenario.completionReads) {
+            const read = scenario.completionReads[completionQueries - 1]
+            if (read !== undefined) return read
+          }
+          if (scenario.completionTrueOnQuery !== undefined) {
+            return completionQueries === scenario.completionTrueOnQuery
+          }
+          return scenario.completionEvent ?? false
+        },
+        queryCompletionLogState: async () => {
+          logStateQueries += 1
+          if (scenario.logStateRejects) throw new Error('completion log state unreadable')
+          return scenario.logState ?? 'disabled'
+        },
+        evidenceChannel,
+      },
+    )
+    if (scenario.logStateRejects) {
+      await new Promise((resolve) => setImmediate(resolve))
+      assert.equal(unhandled.length, 0, `${scenario.name}: unhandled rejection`)
+    }
+  } finally {
+    if (scenario.logStateRejects) process.off('unhandledRejection', onUnhandled)
+  }
 
   assert.equal(result.failed, scenario.expectedFailed, `${scenario.name}: terminal disposition`)
   assert.equal(result.errorCode, scenario.expectedErrorCode, `${scenario.name}: errorCode`)
+  assert.equal(result.inferred, scenario.expectedInferred, `${scenario.name}: inferred`)
+  if (scenario.expectedWarn) {
+    assert.match(result.warn ?? '', scenario.expectedWarn, `${scenario.name}: warn`)
+  }
+  for (const pattern of scenario.unexpectedWarn ?? []) {
+    assert.doesNotMatch(result.warn ?? '', pattern, `${scenario.name}: unexpected warn ${pattern}`)
+  }
+  if (scenario.expectedStatusQueries !== undefined) {
+    assert.equal(statusQueries, scenario.expectedStatusQueries, `${scenario.name}: status queries`)
+  }
+  if (scenario.expectedLogStateQueries !== undefined) {
+    assert.equal(logStateQueries, scenario.expectedLogStateQueries, `${scenario.name}: log-state queries`)
+  }
+  if (scenario.expectedCompletionQueries !== undefined) {
+    assert.equal(completionQueries, scenario.expectedCompletionQueries, `${scenario.name}: completion reads`)
+  }
+  if (scenario.expectedRawStatus !== undefined) {
+    assert.equal(result.rawStatus, scenario.expectedRawStatus, `${scenario.name}: rawStatus`)
+  }
+  if (scenario.expectChannelProven !== undefined) {
+    assert.equal(
+      evidenceChannel.isProven('Configured Printer'),
+      scenario.expectChannelProven,
+      `${scenario.name}: this queue proven`,
+    )
+    assert.equal(evidenceChannel.isProven('Other Printer'), false, `${scenario.name}: other queue unproven`)
+  }
 }
 
 async function main(): Promise<void> {
   const failures: string[] = []
 
   verifyPrintServiceCompletionScriptContract()
+  verifyCompletionEventReadContract()
+  verifyCompletionLogStateContract()
 
   const imageTaskId = 'ptask_kiosk_0123456789abcdef'
   const fixedUuid = '11111111-2222-4333-8444-555555555555'
@@ -212,9 +348,12 @@ async function main(): Promise<void> {
   try {
     const nonWindows = await monitorPrintJob('Configured Printer', 'task-non-windows', 10, 1, {
       platform: 'darwin',
+      queryCompletionLogState: async () => 'disabled',
+      evidenceChannel: createCompletionEvidenceChannel(),
     })
     assert.equal(nonWindows.failed, true, 'monitor unavailable must not confirm completed')
     assert.equal(nonWindows.errorCode, 'PRINT_JOB_UNCONFIRMED')
+    assert.equal(nonWindows.inferred, undefined)
   } catch (error) {
     failures.push(`monitor unavailable: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -279,6 +418,7 @@ async function main(): Promise<void> {
       statuses: ['printing', 'not_found'],
       expectedFailed: false,
       expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
     },
     {
       name: 'explicit completed status confirms completion',
@@ -317,6 +457,468 @@ async function main(): Promise<void> {
       expectedFailed: true,
       expectedErrorCode: 'PRINTER_ERROR',
     },
+    // F-18 (2026-10-10 real device): paper came out and the order was recorded as
+    // PRINTER_ERROR. Reading of the code (raw status not retrieved yet): the poll landed
+    // on Windows removing the finished job.
+    {
+      name: 'job seen printing, then being removed, then gone is completion — not a device error',
+      statuses: ['printing', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+    },
+    {
+      name: 'job only ever seen retained, then removed, then gone is unconfirmed (Retained may mean waiting for paper)',
+      statuses: ['retained', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'retained job removed with a matching PrintService 307 confirms completion',
+      statuses: ['retained', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
+      name: 'job seen printing, then retained, then removed, then gone follows the observed-then-removed rule',
+      statuses: ['printing', 'retained', 'removing', 'not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+    },
+    {
+      name: 'job being removed with a matching PrintService 307 confirms completion',
+      statuses: ['removing'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
+      name: 'job only ever seen while being removed is unconfirmed, neither completed nor a device error',
+      statuses: ['removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'job stuck in removal until timeout is unconfirmed, not a device error',
+      statuses: ['printing', 'removing'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'paper-out signal is not washed out by a later removal',
+      statuses: ['printing', 'paper_empty', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'paper-out then removal with a 307 event is still not completion',
+      statuses: ['paper_empty', 'removing', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      completionEvent: true,
+    },
+    {
+      name: 'a device error after removal started is still a device error',
+      statuses: ['printing', 'removing', 'error'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINTER_ERROR',
+    },
+    {
+      name: 'enabled and proven: printing then gone with no 307 is unconfirmed after the grace polls',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 5,
+      expectedLogStateQueries: 1,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: Printing then Deleting then gone with no 307 is unconfirmed and keeps Deleting',
+      raws: ['Printing', 'Deleting', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedRawStatus: 'Deleting',
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a 307 that arrives on the third query still completes without inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionTrueOnQuery: 3,
+      expectedFailed: false,
+      expectedErrorCode: '',
+    },
+    {
+      name: 'enabled and proven: a not_found between printing samples is a missed read, then Printed completes',
+      raws: ['Printing', 'not_found', 'Printing', 'Printed'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedStatusQueries: 4,
+    },
+    {
+      name: 'enabled and proven: grace restarts when the job is seen again after a missed read',
+      raws: ['Printing', 'not_found', 'Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: retained then gone with no 307 is unconfirmed',
+      raws: ['Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 5,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: the window ends during the grace period',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedWarn: /monitoring window ended[\s\S]*no completion event/,
+      unexpectedWarn: [/remained active/, /Retained/],
+    },
+    {
+      name: 'enabled but this queue has never matched a 307: disappearance is an unverified inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unverified',
+    },
+    {
+      name: 'log disabled even if a 307 was read before: disappearance is a disabled-log inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'disabled',
+      proveChannel: true,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+    },
+    {
+      name: 'unreadable log configuration even if a 307 was read before: disappearance is an unknown-log inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'unknown',
+      proveChannel: true,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unknown',
+    },
+    {
+      name: 'log disabled: Printing then not_found completes as a disabled-log inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'disabled',
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+    },
+    {
+      name: 'log disabled: Printing then Deleting then not_found matches the no-Deleting inference',
+      raws: ['Printing', 'Deleting', 'not_found'],
+      logState: 'disabled',
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+    },
+    {
+      name: 'a matching 307 marks this queue proven and leaves another queue unproven',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      completionEvent: true,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectChannelProven: true,
+    },
+    {
+      name: 'no 307 leaves a fresh channel unproven',
+      raws: ['Printing', 'not_found'],
+      logState: 'disabled',
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+      expectChannelProven: false,
+    },
+    {
+      name: 'a rejecting log-state query does not fail the monitor and is treated as unknown',
+      raws: ['Printing', 'not_found'],
+      logStateRejects: true,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unknown',
+      expectedLogStateQueries: 1,
+    },
+    {
+      name: 'paper-empty still wins over the grace rule when the log is enabled and proven',
+      raws: ['Printing', 'PaperOut', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedWarn: /paper-empty/,
+      expectedStatusQueries: 3,
+    },
+    {
+      name: 'enabled and proven: Retained reappearance clears the absence count',
+      raws: ['Printing', 'not_found', 'Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: Deleting reappearance clears the absence count and keeps Deleting',
+      raws: ['Printing', 'not_found', 'Deleting', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedRawStatus: 'Deleting',
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a Retained job leaves and the window ends during the grace period',
+      raws: ['Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedWarn: /had left the queue/,
+      unexpectedWarn: [/Retained/],
+    },
+    {
+      name: 'enabled and proven: four unreadable reads after the job leaves complete as completion_log_unreadable',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+      expectedStatusQueries: 5,
+    },
+    {
+      name: 'enabled and proven: unreadable reads do not count toward the four confirmed absences',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['not_found', 'unreadable', 'not_found', 'unreadable', 'not_found', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: once an absence is confirmed, four unreadable reads do not complete the job',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [
+        'not_found', 'unreadable', 'unreadable', 'unreadable', 'unreadable',
+        'not_found', 'not_found', 'not_found',
+      ],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 9,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: an absence confirmed after three unreadable reads blocks the unreadable inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [
+        'unreadable', 'unreadable', 'unreadable', 'not_found', 'unreadable',
+        'not_found', 'not_found', 'not_found',
+      ],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 9,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: the window ends after one confirmed absence and one unreadable read',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['not_found', 'unreadable'],
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 3,
+      expectedWarn: /had left the queue/,
+    },
+    {
+      name: 'enabled and proven: a Printing reappearance clears the unreadable count',
+      raws: ['Printing', 'not_found', 'not_found', 'not_found', 'Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [
+        'unreadable', 'unreadable', 'unreadable', 'unreadable',
+        'not_found', 'not_found', 'not_found', 'not_found',
+      ],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 10,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a Retained reappearance clears the unreadable count',
+      raws: ['Printing', 'not_found', 'not_found', 'not_found', 'Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [
+        'unreadable', 'unreadable', 'unreadable', 'not_found', 'unreadable',
+        'not_found', 'not_found', 'not_found', 'not_found',
+      ],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 10,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a Deleting reappearance clears the unreadable count',
+      raws: ['Printing', 'not_found', 'not_found', 'not_found', 'Deleting', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [
+        'unreadable', 'unreadable', 'unreadable', 'not_found', 'unreadable',
+        'not_found', 'not_found', 'not_found', 'not_found',
+      ],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 10,
+      expectedRawStatus: 'Deleting',
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: an unreadable read before a paper-out signal never becomes an inferred completion at the timeout',
+      statuses: ['printing', 'not_found', 'paper_empty', 'unknown'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable'],
+      timeoutMs: 8,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedWarn: /remained active/,
+    },
+    {
+      name: 'enabled and proven: a confirmed absence read while Get-PrintJob failed blocks the unreadable inference',
+      statuses: ['printing', 'not_found', 'unknown', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'not_found', 'unreadable', 'unreadable', 'unreadable'],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 9,
+      expectedCompletionQueries: 8,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: the window ends right after a confirmed absence read while Get-PrintJob failed',
+      statuses: ['printing', 'not_found', 'unknown'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'not_found'],
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 3,
+      expectedCompletionQueries: 2,
+      expectedWarn: /had left the queue/,
+    },
+    {
+      name: 'enabled and proven: a no-event read while Get-PrintJob failed, before the job ever left, does not count',
+      statuses: ['printing', 'unknown', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['not_found', 'unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      timeoutMs: 20,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+      expectedStatusQueries: 6,
+      expectedCompletionQueries: 5,
+    },
+    {
+      name: 'enabled and proven: a later found event completes without inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable', 'not_found', 'found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedStatusQueries: 5,
+    },
+    {
+      name: 'enabled and proven: the window ends with only unreadable reads and no confirmed absence',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable'],
+      timeoutMs: 3,
+      expectedCompletionQueries: 2,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+    },
+    {
+      name: 'log disabled: unreadable reads still complete as a disabled-log inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'disabled',
+      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+      expectedStatusQueries: 2,
+    },
+    {
+      name: 'legacy boolean true still counts as found and marks the channel',
+      raws: ['not_found'],
+      logState: 'enabled',
+      completionReads: [true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectChannelProven: true,
+    },
+    {
+      name: 'legacy boolean false still counts as a confirmed absence on a proven queue',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [false, false, false, false],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 5,
+      expectedWarn: /no completion event/,
+      expectChannelProven: true,
+    },
   ]
 
   for (const scenario of scenarios) {
@@ -327,15 +929,79 @@ async function main(): Promise<void> {
     }
   }
 
+  // Queue removal is not a device fault and not completion on its own (F-18).
+  const removalStates: Array<[string, PrintJobMonitorStatus]> = [
+    ['Deleting', 'removing'],
+    ['Deleted', 'removing'],
+    ['Cancelled', 'error'],
+    ['Canceled', 'error'],
+    ['Printed, Cancelled', 'error'],
+    ['Deleting, Cancelled', 'error'],
+    ['Printed, Retained, Deleted', 'removing'],
+    ['Printing, Deleting', 'removing'],
+    ['Retained, Deleted', 'removing'],
+    ['Deleting, Printed', 'completed'],
+    ['Printed, Deleted', 'completed'],
+    ['Error, Deleting', 'error'],
+    ['Deleting, Jammed', 'error'],
+    ['Deleting, UserIntervention', 'error'],
+    ['Deleting, PaperOut', 'paper_empty'],
+    ['Printed, Deleting, PaperOut', 'paper_empty'],
+  ]
+  for (const [rawStatus, expected] of removalStates) {
+    try {
+      const parsed = parsePrintJobStatus(rawStatus)
+      assert.equal(parsed.status, expected, `${rawStatus}: queue removal classification`)
+      assert.equal(parsed.rawStatus, rawStatus, `${rawStatus}: raw status is kept for the task record`)
+    } catch (error) {
+      failures.push(`${rawStatus}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // Raw status strings through the real parser into the real monitor: the two halves
+  // must agree on combined flags, and a failure must come from the sample that carried it.
+  const rawSequences: Array<{ name: string; raws: string[]; failed: boolean; code: string; raw?: string; warn?: RegExp; inferred?: InferredCompletionReason }> = [
+    { name: 'F-18 as read from the code', raws: ['Printing', 'Printing', 'Deleting', 'not_found'], failed: false, code: '', inferred: 'completion_log_disabled' },
+    { name: 'finished job caught mid clean-up with the spooler flag', raws: ['Printing', 'Deleting, Printed'], failed: false, code: '' },
+    { name: 'jam reported while the job is being removed', raws: ['Printing', 'Deleting', 'Deleting, Jammed'], failed: true, code: 'PRINTER_ERROR', raw: 'Deleting, Jammed' },
+    { name: 'device error reported after removal started', raws: ['Printing', 'Deleting', 'Error'], failed: true, code: 'PRINTER_ERROR', raw: 'Error' },
+    { name: 'user intervention reported after removal started', raws: ['Deleting', 'UserIntervention, Deleting'], failed: true, code: 'PRINTER_ERROR', raw: 'UserIntervention, Deleting' },
+    { name: 'two paper-out samples after removal started', raws: ['Printing', 'Deleting', 'Deleting, PaperOut', 'PaperOut'], failed: true, code: 'PAPER_EMPTY', raw: 'PaperOut' },
+    { name: 'paper-out, then removed, then gone', raws: ['Printing', 'PaperOut', 'Deleting', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED' },
+    { name: 'retained only, then deleted, then gone', raws: ['Printing, Retained', 'Deleted', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleted' },
+    { name: 'first sample already in removal, then gone', raws: ['Deleting', 'not_found'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleting', warn: /only ever seen while Windows was removing it/ },
+    { name: 'still in removal at the timeout', raws: ['Printing', 'Deleting'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', raw: 'Deleting', warn: /still being removed/ },
+    { name: 'left removal and kept printing until the timeout is not reported as stuck in removal', raws: ['Deleting', 'Printing'], failed: true, code: 'PRINT_JOB_UNCONFIRMED', warn: /remained active/ },
+  ]
+  for (const sequence of rawSequences) {
+    try {
+      let now = 0
+      let cursor = 0
+      const last = sequence.raws.at(-1) ?? 'not_found'
+      const result = await monitorPrintJob('Configured Printer', 'task-monitor-test', 10, 1, {
+        platform: 'win32',
+        now: () => now,
+        sleep: async (ms) => { now += Math.max(ms, 1) },
+        queryStatus: async () => parsePrintJobStatus(sequence.raws[cursor++] ?? last),
+        queryCompletionEvent: async () => false,
+        queryCompletionLogState: async () => 'disabled',
+        evidenceChannel: createCompletionEvidenceChannel(),
+      })
+      assert.equal(result.failed, sequence.failed, `${sequence.name}: terminal disposition`)
+      assert.equal(result.errorCode, sequence.code, `${sequence.name}: errorCode`)
+      assert.equal(result.inferred, sequence.inferred, `${sequence.name}: inferred`)
+      if (sequence.raw !== undefined) assert.equal(result.rawStatus, sequence.raw, `${sequence.name}: the failure carries the sample that caused it`)
+      if (sequence.warn) assert.match(result.warn ?? '', sequence.warn, `${sequence.name}: diagnostic`)
+    } catch (error) {
+      failures.push(`${sequence.name}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   const explicitFailures = [
-    'Deleting',
-    'Deleted',
-    'Cancelled',
-    'Canceled',
     'Jammed',
     'Error',
     'UserIntervention',
-    'Retained, Deleted',
+    'Printing, Error',
     'Printed, PaperOut',
   ]
   for (const rawStatus of explicitFailures) {

@@ -209,7 +209,10 @@ export async function getDiskFreeGB(): Promise<number> {
  *                   NOT map this to 'completed' or 'paper_empty'; treat as unconfirmed.
  *   'completed'   - JobStatus explicitly contains Complete/Completed/Printed
  *   'paper_empty' - JobStatus contains "PaperOut" (explicit driver report — NOT Pantum CM2800ADN)
- *   'error'       - Jammed / Error / UserIntervention / Deleting (explicit driver error flags)
+ *   'error'       - Jammed / Error / UserIntervention (explicit driver error flags)
+ *   'removing'    - Deleting / Deleted without a device-fault flag: Windows is taking the job
+ *                   out of the queue. Neither a device fault nor completion; the caller decides
+ *                   from what it saw before and after.
  *   'not_found'   - printer exists but no job matching taskId
  *   'unknown'     - non-Windows, query failure, or printer not found
  */
@@ -219,6 +222,7 @@ export type PrintJobMonitorStatus =
   | 'completed'
   | 'paper_empty'
   | 'error'
+  | 'removing'
   | 'not_found'
   | 'unknown'
 
@@ -312,7 +316,22 @@ export function buildPrintServiceCompletionEventScript(): string {
 }
 
 /**
- * Confirm that Windows PrintService recorded Event ID 307 for this exact task.
+ * Result of one PrintService 307 read.
+ * 'unreadable' is a failed read (timeout, PowerShell did not start, or the
+ * output was not exactly true/false). It is not evidence that the event is absent.
+ */
+export type CompletionEventRead = 'found' | 'not_found' | 'unreadable'
+
+/** Pure. Trim and lower-case the whole string. true → found, false → not_found, otherwise unreadable. */
+export function parseCompletionEventRead(output: string | null): CompletionEventRead {
+  const normalized = output?.trim().toLowerCase()
+  if (normalized === 'true') return 'found'
+  if (normalized === 'false') return 'not_found'
+  return 'unreadable'
+}
+
+/**
+ * Ask Windows PrintService whether it recorded Event ID 307 for this exact task.
  *
  * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
  * `Printing, Retained` even after the spooler emitted its completion event. We
@@ -322,13 +341,19 @@ export function buildPrintServiceCompletionEventScript(): string {
  *      value "打印文档", and the exact queue and LocalSystem identity match.
  * This remains Windows spooler completion evidence; it does not prove that
  * paper physically exited.
+ *
+ * A failed read stays 'unreadable' instead of collapsing into "no event".
+ * Never throws. Non-Windows, or arguments that fail the checks below, are
+ * unreadable. Errors Get-WinEvent swallows inside the script still come back
+ * as 'false' (not_found): only a PowerShell that timed out, did not start, or
+ * printed something else is reported as unreadable.
  */
-export async function hasPrintServiceCompletionEvent(
+export async function readPrintServiceCompletionEvent(
   printerName: string,
   taskId: string,
   dispatchedAtMs: number,
-): Promise<boolean> {
-  if (process.platform !== 'win32') return false
+): Promise<CompletionEventRead> {
+  if (process.platform !== 'win32') return 'unreadable'
 
   const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
   if (
@@ -337,15 +362,60 @@ export async function hasPrintServiceCompletionEvent(
     printerName.trim().length === 0 ||
     !Number.isFinite(dispatchedAtMs)
   ) {
-    return false
+    return 'unreadable'
   }
   const safeSince = Math.max(0, Math.floor(dispatchedAtMs))
 
-  const output = await runPowerShell(
-    buildPrintServiceCompletionEventScript(),
-    JSON.stringify({ taskId: safeTaskId, printerName, dispatchedAtMs: safeSince }),
-  )
-  return output?.trim().toLowerCase() === 'true'
+  try {
+    const output = await runPowerShell(
+      buildPrintServiceCompletionEventScript(),
+      JSON.stringify({ taskId: safeTaskId, printerName, dispatchedAtMs: safeSince }),
+    )
+    return parseCompletionEventRead(output)
+  } catch {
+    return 'unreadable'
+  }
+}
+
+/**
+ * Whether Microsoft-Windows-PrintService/Operational is switched on.
+ * 'unknown' means the configuration could not be read. Read-only: the script
+ * must not enable, disable, or clear the log.
+ */
+export type PrintCompletionLogState = 'enabled' | 'disabled' | 'unknown'
+
+/**
+ * Windows PowerShell 5.1 probe. Get-WinEvent -ListLog reads IsEnabled and
+ * writes enabled, disabled, or unknown. It does not change log settings.
+ */
+export function buildPrintServiceCompletionLogStateScript(): string {
+  return [
+    'try {',
+    "  $log = Get-WinEvent -ListLog 'Microsoft-Windows-PrintService/Operational' -ErrorAction Stop",
+    "  if ($log.IsEnabled) { 'enabled' } else { 'disabled' }",
+    '} catch {',
+    "  'unknown'",
+    '}',
+  ].join('\n')
+}
+
+/** Whole string, after trim and lower-case, must be exactly enabled or disabled. */
+export function parsePrintCompletionLogState(output: string | null): PrintCompletionLogState {
+  const normalized = output?.trim().toLowerCase()
+  if (normalized === 'enabled' || normalized === 'disabled') return normalized
+  return 'unknown'
+}
+
+/** Never throws. Non-Windows does not spawn PowerShell. */
+export async function getPrintServiceCompletionLogState(): Promise<PrintCompletionLogState> {
+  if (process.platform !== 'win32') return 'unknown'
+  try {
+    return parsePrintCompletionLogState(
+      await runPowerShell(buildPrintServiceCompletionLogStateScript()),
+    )
+  } catch {
+    return 'unknown'
+  }
 }
 
 /** Pure JobStatus parser, exported for deterministic fault-injection verification. */
@@ -360,20 +430,37 @@ export function parsePrintJobStatus(
   // JobStatus can be a comma-separated list of flags (e.g. "Printing, PaperOut")
   const flags = raw.toLowerCase()
 
-  // Explicit failure flags are checked first. This priority prevents a combined
-  // state such as "Retained, Deleted" or "Printed, PaperOut" from being treated
-  // as completion.
+  // Explicit device-fault flags are checked first. This priority prevents a combined
+  // state such as "Printed, PaperOut" or "Error, Deleting" from being treated as
+  // completion or as an ordinary queue removal.
   if (flags.includes('paperout')) return { status: 'paper_empty', rawStatus: raw }
   if (
     flags.includes('jammed') ||
     flags.includes('error') ||
     flags.includes('userintervention') ||
-    flags.includes('deleting') ||
-    flags.includes('deleted') ||
+    // Not a value Get-PrintJob is documented to return; kept as a failure exactly as before.
     flags.includes('cancelled') ||
     flags.includes('canceled')
   ) {
     return { status: 'error', rawStatus: raw }
+  }
+
+  // The job is leaving the queue. Windows reports Deleting for every job it removes,
+  // including the normal clean-up of a job that just finished printing, so this flag
+  // alone says nothing about the device. 2026-10-10 field case (F-18): a one-page job
+  // printed correctly and the order was recorded as PRINTER_ERROR ("paper jam" on
+  // screen) while the printer was idle and the queue empty. The raw status of that job
+  // has not been retrieved yet; a poll landing on the clean-up is the reading of the
+  // code that fits, not an observed fact. With Printed/Complete in the
+  // same sample the spooler has stated completion; without it the caller decides from
+  // what it saw before and after (see monitorPrintJob). Never 'error', never 'completed'
+  // on its own. Retained keeps its indeterminate meaning here too (see below), so
+  // "Retained, Deleted" and "Printed, Retained, Deleted" are not completion.
+  if (flags.includes('deleting') || flags.includes('deleted')) {
+    const spoolerSaysPrinted =
+      !flags.includes('retained') &&
+      (flags.includes('completed') || flags.includes('complete') || flags.includes('printed'))
+    return { status: spoolerSaysPrinted ? 'completed' : 'removing', rawStatus: raw }
   }
 
   // 'Retained' — the Windows spooler kept a copy of the job after submitting it to the
