@@ -394,6 +394,13 @@ export function PrintUploadPage() {
     })
   }
 
+  // 换新票清场时存储里的材料已经没了，屏上内存里那份也要一起清，不然提示说清掉了、屏上还挂着文件。
+  const clearCurrentFileRef = useRef<() => void>(() => undefined)
+  const recoveryNoticeShown = recoveryNotice !== null
+  useEffect(() => {
+    if (recoveryNoticeShown) clearCurrentFileRef.current()
+  }, [recoveryNoticeShown])
+
   const clearCurrentFile = () => {
     setFile(null)
     setFileOrigin(null)
@@ -401,6 +408,7 @@ export function PrintUploadPage() {
     setUploadError(null)
     clearPrintMaterialSession()
   }
+  clearCurrentFileRef.current = clearCurrentFile
 
   const activateChannel = (key: UploadTab) => {
     if (isTerminalKiosk() && key === 'file') return

@@ -430,3 +430,19 @@ export function FileSourceTruth() {
     </div>
   )
 }
+
+/** 来源选择下面那两张说明小卡：正常的「还没选来源」和本机会话没好时共用，字只在这里写一次。 */
+export function SourceChooserNotes() {
+  return (
+    <div className="fs-split">
+      <div className="fs-mini" data-static="true">
+        <h4>第三方网盘尚未接入</h4>
+        <p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。</p>
+      </div>
+      <div className="fs-mini" data-static="true">
+        <h4>两个上限不一样</h4>
+        <p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。Word 是否可收由本机转换能力决定，能力关闭时请另存为 PDF。</p>
+      </div>
+    </div>
+  )
+}

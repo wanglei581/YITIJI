@@ -12,11 +12,25 @@ export function useTerminalSessionState(): TerminalSessionState {
   return session
 }
 
-// 三处页面共用。只有 ready / failed 改写；checking 保持上一次。还没定过时按没失败。
+// 三处页面共用「上一次定下来的状态」：只有 ready / failed 改写，checking 保持上一次；还没定过按没失败。
+// 记在模块里、由订阅改写：哪个页面都没挂着时状态变了也照样记下，回到首页不会拿到过期的那一次。
 let settledPrintSession: 'ready' | 'failed' | null = null
+let watchingSettled = false
+
+function settle(next: TerminalSessionState): void {
+  if (next === 'ready' || next === 'failed') settledPrintSession = next
+}
+
+function ensureSettledWatch(): void {
+  if (watchingSettled) return
+  watchingSettled = true
+  settle(terminalSessionState())
+  subscribeTerminalSession(settle)
+}
 
 export function usePrintSessionBlocked(): boolean {
-  const session = useTerminalSessionState()
-  if (session === 'ready' || session === 'failed') settledPrintSession = session
+  ensureSettledWatch()
+  // 订阅本身也会让组件在状态变化时重渲染，读到的是订阅里已经记好的值。
+  useTerminalSessionState()
   return settledPrintSession === 'failed'
 }
