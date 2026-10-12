@@ -3189,7 +3189,12 @@ test('print-only says sentence 4 on home and the four print pages, and confirm p
   await page.goto('/print/desk?step=preview')
   await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeVisible()
   await setRecoveryView(page, { clearScope: 'print-only' })
-  await expect(page.getByTestId('print-preview-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  const previewNotice = page.getByTestId('print-preview-recovery-notice')
+  await expect(previewNotice).toHaveText(RECOVERY_NOTICE)
+  // 收货改：打印台的提示条在页头大卡下面，和确认页、选文件页同一层。
+  const deskGuide = await page.locator('.qpd-guide').boundingBox()
+  const previewNoticeBox = await previewNotice.boundingBox()
+  expect(previewNoticeBox?.y ?? 0).toBeGreaterThan((deskGuide?.y ?? 0) + (deskGuide?.height ?? 0) - 1)
   await expect(page.getByText(W2_FILE.name, { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
 
@@ -3558,5 +3563,22 @@ test('material check with a file shows sentence 2 when failed and sentence 5 whe
   await setRecoveryView(page, { deferred: true })
   await expect(hold).toContainText(PRINT_DEFERRED_LINE)
   await expect(page.getByTestId('print-session-end-use')).toBeVisible()
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('the tap that folds sentence 4 still lands on the button under it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/confirm')
+  await expect(page.getByTestId('print-confirm-state-missing-context')).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('print-confirm-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 第一下就点句子下面的按钮。句子一收整页上挪；要是按下就收，抬手时手指底下已经换了东西，这一下会点空。
+  await page.getByRole('button', { name: '重新选文件', exact: true }).click()
+  await expect(page).toHaveURL(/\/print\/upload\?source=document$/)
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })

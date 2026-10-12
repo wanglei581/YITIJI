@@ -23,28 +23,35 @@ let expiryTimer: number | null = null
 let watching = false
 let wantsHome = false
 let dropEpoch = 0
-let pointerBound = false
+let tapBound = false
 const listeners = new Set<() => void>()
 
 function emit(): void {
   for (const listener of listeners) listener()
 }
 
-/** 亮起期间听下一次触屏。捕获阶段挂上，不 preventDefault、不 stopPropagation，这一下照常点到按钮。 */
-function onDocumentPointerDown(): void {
+/**
+ * 亮起期间听下一次触屏：这一下点完（click）或手指滑走（pointercancel）就收。
+ * 不在按下（pointerdown）时收：句子一没，下面整页往上挪，抬手时手指底下已经换了东西，
+ * 这一下会点空或点到别的按钮。click 走到捕获阶段时点中的是谁已经定了，按钮照常生效。
+ * 捕获阶段挂上，不 preventDefault、不 stopPropagation。
+ */
+function onDocumentTapEnd(): void {
   dismissSessionRecoveryNotice()
 }
 
-function bindPointerDismiss(): void {
-  if (pointerBound || typeof document === 'undefined') return
-  pointerBound = true
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
+function bindTapDismiss(): void {
+  if (tapBound || typeof document === 'undefined') return
+  tapBound = true
+  document.addEventListener('click', onDocumentTapEnd, true)
+  document.addEventListener('pointercancel', onDocumentTapEnd, true)
 }
 
-function unbindPointerDismiss(): void {
-  if (!pointerBound || typeof document === 'undefined') return
-  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
-  pointerBound = false
+function unbindTapDismiss(): void {
+  if (!tapBound || typeof document === 'undefined') return
+  document.removeEventListener('click', onDocumentTapEnd, true)
+  document.removeEventListener('pointercancel', onDocumentTapEnd, true)
+  tapBound = false
 }
 
 function clearNotice(): void {
@@ -53,7 +60,7 @@ function clearNotice(): void {
     window.clearTimeout(expiryTimer)
     expiryTimer = null
   }
-  unbindPointerDismiss()
+  unbindTapDismiss()
 }
 
 function arm(text: string, goHome: boolean): void {
@@ -70,7 +77,7 @@ function arm(text: string, goHome: boolean): void {
     clearNotice()
     emit()
   }, NOTICE_MS)
-  bindPointerDismiss()
+  bindTapDismiss()
   emit()
 }
 

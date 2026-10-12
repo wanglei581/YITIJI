@@ -140,7 +140,7 @@ export function PrintPreviewPage({
   const navigate = useNavigate()
   const printSessionBlocked = usePrintSessionBlocked()
   const recoveryStrip = (
-    <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" />
+    <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" belowGuide />
   )
   const holdStatus = printSessionBlocked
     ? { tone: 'warn' as const, label: PRINT_SESSION_HOLD_TITLE }
@@ -324,8 +324,8 @@ export function PrintPreviewPage({
           </PrintDeskFooter>
         )}
       >
-        {recoveryStrip}
         <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选文件，检查后再设置打印参数。" />
+        {recoveryStrip}
         <div className="qpd-context-empty" data-w2-page="print-preview" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertTriangleIcon aria-hidden="true" /></span>
@@ -369,8 +369,8 @@ export function PrintPreviewPage({
           </PrintDeskFooter>
         )}
       >
-        {recoveryStrip}
         <PrintDeskGuide step={2} title={<>先完成<em>材料检查</em>。</>} detail="逐项检查并确认隐私处理，再核对打印参数。" />
+        {recoveryStrip}
         <div className="qpd-guard" data-w2-page="print-preview" data-qx-state="check-required">
           <div className="qx-state" data-tone="error">
             <span className="qx-state-ic"><AlertTriangleIcon /></span>
@@ -438,10 +438,10 @@ export function PrintPreviewPage({
         </PrintDeskFooter>
       )}
     >
-      {recoveryStrip}
       <PrintDeskGuide step={3}
         title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
         detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? `现在不能放行到报价。${faultLine}` : '核对内容与参数，下一步看价格，最后带走打印件。'} />
+      {recoveryStrip}
       <div className="qpd-device-strip" role="status">
         <div data-ready={printerReady ? 'true' : undefined}><span>打印机</span><strong>{printerLoading ? '正在检查' : printerLabel}</strong><small>{printerLoading ? '请稍候' : printerName}</small></div>
         <div><span>纸张</span><strong>A4</strong></div>

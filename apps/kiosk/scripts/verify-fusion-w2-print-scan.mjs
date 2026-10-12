@@ -728,8 +728,12 @@ const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
 assert.match(recoveryNoticeHook, /机器刚恢复，刚才选的材料已经清掉，要重新传/, '换票清场提示使用第 4 句')
 assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点（上下文区 10/12 拆到 HomeContextRegion）')
 // 第四轮：第 4、第 6 句只说一次。下一次触屏收起且不吞掉这次触摸；进页前先读清场范围再订阅。
-assert.match(recoveryNoticeHook, /addEventListener\(\s*'pointerdown'/, '清场提示亮起时在 document 上听下一次触屏')
-assert.match(recoveryNoticeHook, /removeEventListener\(\s*'pointerdown'/, '提示收起时摘掉触屏监听')
+// 收货改：不在按下时收。句子一没整页上挪，抬手时手指底下换了东西，这一下会点空或点错；改成点完（click）或滑走（pointercancel）才收。
+for (const type of ['click', 'pointercancel']) {
+  assert.match(recoveryNoticeHook, new RegExp(`addEventListener\\(\\s*'${type}'`), `清场提示亮起时在 document 上听 ${type}`)
+  assert.match(recoveryNoticeHook, new RegExp(`removeEventListener\\(\\s*'${type}'`), `提示收起时摘掉 ${type} 监听`)
+}
+assert.doesNotMatch(recoveryNoticeHook, /addEventListener\(\s*'pointerdown'/, '不在按下时收起清场提示')
 assert.doesNotMatch(recoveryNoticeHook, /stopPropagation\(\)/, '触屏收起不吞掉这次触摸')
 assert.doesNotMatch(recoveryNoticeHook, /preventDefault\(\)/, '触屏收起不取消这次触摸')
 assert.match(
@@ -768,6 +772,16 @@ assert.equal(
   2,
   '材料检查没文件和有文件两支都挂提示条',
 )
+// 收货改：打印台两页的提示条一律在页头大卡下面（和确认页、选文件页同一层），不再压在大卡上面。
+{
+  const materialCheck = read('src/pages/print/PrintMaterialCheckPage.tsx')
+  const preview = read('src/pages/print/PrintPreviewPage.tsx')
+  assert.doesNotMatch(materialCheck, /<PrintFlowRecoveryStrip[^>]*\/>\s*<PrintDeskGuide\b/, '材料检查的提示条不在页头大卡上面')
+  assert.equal((materialCheck.match(/<PrintFlowRecoveryStrip[^>]*\bbelowGuide\b/g) ?? []).length, 2, '材料检查两支提示条都按大卡下面留白')
+  assert.doesNotMatch(preview, /\{recoveryStrip\}\s*<PrintDeskGuide\b/, '预览页的提示条不在页头大卡上面')
+  assert.equal((preview.match(/<PrintDeskGuide\b[\s\S]*?\/>\s*\{recoveryStrip\}/g) ?? []).length, 3, '预览页三支都在页头大卡后面挂提示条')
+  assert.match(preview, /<PrintFlowRecoveryStrip[^>]*\bbelowGuide\b/, '预览页提示条按大卡下面留白')
+}
 assert.match(
   read('src/pages/print/PrintConfirmPage.tsx'),
   /recoveryNotice=\{<PrintRecoveryNotice/,
