@@ -61,11 +61,15 @@ function setState(next: TerminalSessionState): void {
   listeners.forEach((listener) => listener(next))
 }
 
-/** 下一次恢复是不是只能换新票。只在 failed 时可能为真。 */
-function needsNewTicketNow(): boolean {
-  if (state !== 'failed') return false
+/** 恢复是不是只能换新票（不看状态）：带引导票没换成、标签页里没有票，或当前票已被服务端判作废。 */
+function newTicketRequired(): boolean {
   const current = token()
   return bootExchangeUnsettled || !current || current === rejectedSessionToken
+}
+
+/** 下一次恢复是不是只能换新票。只在 failed 时可能为真。 */
+function needsNewTicketNow(): boolean {
+  return state === 'failed' && newTicketRequired()
 }
 
 /**
@@ -89,7 +93,9 @@ function touchRecoveryView(mutate: () => void): void {
   })
 }
 
+// 「压着」= 要换新票才能恢复。原票只是暂时续不上（503、超时）时停住但不标：下一轮先拿原票续，续上不清场。
 function holdRecoveryForOtherContent(): void {
+  if (!newTicketRequired()) return
   touchRecoveryView(() => { recoveryDeferred = true })
 }
 
@@ -294,6 +300,7 @@ async function retryRefreshOnce(): Promise<void> {
  * 推迟只发生在这里，四个调用点都经过这个函数，不在调用点上各判一次。
  * 页面刚打开（hadSettledState 为假）不判。已经 settled 且还有别的内容：取票前停一次，
  * 取到票、换票前再停一次（取票最长 4 秒，这期间人可能开始填东西）。停住时不换票。
+ * 停住时只有确实要换新票才标「压着」；原票只是暂时续不上（503、超时）不标，下一轮先拿原票续。
  * 拿原票续期的 refreshOnce 不经过这里。
  */
 async function reBootstrapFromLocalAgent(): Promise<boolean> {

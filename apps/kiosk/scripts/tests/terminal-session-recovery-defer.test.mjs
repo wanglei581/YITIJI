@@ -261,6 +261,41 @@ for (const outage of ['503', 'timeout']) {
   })
 }
 
+test('服务器暂时回不来、清单 with-other：不取票，也不标压着；回来后拿原票续上', async () => {
+  let serverUp = true
+  const page = await load({
+    pageUrl: PLAIN_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    storedToken: STORED,
+    scope: () => 'with-other',
+    respond: (kind, nth) => {
+      // 本机 Agent 不跟服务器一起停，照常给票：取票数为 0 才说明是被判断拦下的，不是取不到。
+      if (kind === 'agent') return agentTicket()
+      if (!serverUp) return gateway(503)
+      return session(`session-${kind}-${nth}`)
+    },
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  const agents = page.counts.agent
+  const exchanges = page.counts.exchange
+  serverUp = false
+  await page.advance(10 * MINUTE)
+  await page.advance(MINUTE)
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.equal(page.counts.agent, agents, '有别的内容，不向本机 Agent 取票')
+  assert.equal(page.counts.exchange, exchanges)
+  assert.equal(page.mod.terminalSessionRecoveryNeedsNewTicket(), false)
+  assert.equal(page.mod.terminalSessionRecoveryDeferred(), false, '原票没被判作废，不算压着：页面不该叫人先结束使用')
+  assert.equal(page.clears(), 0)
+  serverUp = true
+  await page.advance(MINUTE)
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  assert.equal(page.clears(), 0, '拿原票续上，不清场')
+  assert.equal(page.counts.agent, agents)
+  assert.equal(page.mod.terminalSessionRecoveryDeferred(), false)
+})
+
 test('带引导票没换成、标签页里没有票：要换新票', async () => {
   const page = await load({
     pageUrl: BOOT_PAGE,
