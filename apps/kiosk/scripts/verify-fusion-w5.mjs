@@ -10,9 +10,10 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
 // 第八次 8-7：真实卸载作废未收文件的会话，StrictMode 重放和确认过程有守卫。
+// 2026-10-12：已传到未确认（uploaded）也在卸载时作废（合规 10/11），不再在跳过条件里；作废请求带 keepalive，清场整页重开也送得到。
 for (const path of ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'src/pages/upload/hooks/useUploadSession.ts']) {
   const source = read(path)
-  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'uploaded' \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken\)\.catch\(\(\) => undefined\)/, `8-7 ${path} 卸载静默作废且避开重放与确认`)
+  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken, \{ keepalive: true \}\)\.catch\(\(\) => undefined\)/, `8-7 ${path} 卸载静默作废（含已传到未确认）、带 keepalive，且避开重放与确认`)
 }
 console.log('PASS 8-7 两套上传真实卸载静默作废')
 
@@ -99,7 +100,8 @@ const FROZEN = new Map([
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb'],
+  // 2026-10-12：离页、清场时对「文件已传到、还没确认」的会话也作废，作废请求带 keepalive（合规 10/11 定第八次做）。旧哈希 29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '0c055a6728f8685595ed618d87359f2c0ff63e0a43a35d6e4b6173dd2b82bc7a'],
 ])
 
 function propertyName(node) {

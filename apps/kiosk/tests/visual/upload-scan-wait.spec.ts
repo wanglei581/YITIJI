@@ -317,6 +317,8 @@ for (const item of HELD) {
     await page.clock.runFor(40_000)
     await expect(page).toHaveURL(/\/$/)
     expect(confirms).toEqual([])
-    expect(state.cancelled.every((entry) => entry.id === 'scan-wait-1')).toBe(true)
+    // 2026-10-12（合规 10/11，第八次）：人走了、文件已传到没确认，清场时这一份当场作废（服务端连文件一起删），
+    // 只作废这一个会话、带它自己的控制令牌、只发一次。以前这里跳过已收到的会话，一个作废请求都没有。
+    expect(state.cancelled).toEqual([{ id: 'scan-wait-1', control: 'control-scan-wait-1' }])
   })
 }

@@ -79,7 +79,8 @@ const frozenHashes = new Map([
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
     // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
-    '29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb',
+    // 2026-10-12：离页、清场时对「文件已传到、还没确认」的会话也作废，带 keepalive（合规 10/11，第八次）。旧哈希 29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb。
+    '0c055a6728f8685595ed618d87359f2c0ff63e0a43a35d6e4b6173dd2b82bc7a',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

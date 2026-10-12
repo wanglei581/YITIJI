@@ -149,7 +149,8 @@ const frozen = {
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb',
+  // 2026-10-12：离页、清场时对「文件已传到、还没确认」的会话也作废，作废请求带 keepalive（合规 10/11 定第八次做）。旧哈希 29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '0c055a6728f8685595ed618d87359f2c0ff63e0a43a35d6e4b6173dd2b82bc7a',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

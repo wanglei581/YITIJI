@@ -161,8 +161,10 @@ export function UploadSessionQrPanel({
         if (mountedRef.current || confirmingRef.current) return
         const existing = qrRef.current
         const phase = statusRef.current?.status
-        if (!existing || phase === 'uploaded' || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired') return
-        void cancelUploadSession(existing.sessionId, existing.controlToken).catch(() => undefined)
+        // 文件已经传到、还没在一体机上确认（uploaded）也作废：人已经离开或被清场，这份文件再留着没用，
+        // 服务端作废时连文件一起删（合规 10/11：够用就删）。确认中的那一次由 confirmingRef 挡住，不会被误作废。
+        if (!existing || phase === 'confirmed' || phase === 'cancelled' || phase === 'expired') return
+        void cancelUploadSession(existing.sessionId, existing.controlToken, { keepalive: true }).catch(() => undefined)
       })
     }
   }, [])
