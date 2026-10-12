@@ -258,7 +258,7 @@ Get-Service | Where-Object { $_.Name -match 'AIJob|aijobprintagent' } |
 ### ② 系统应该怎么反应
 
 - 预检：`DetectedErrorState=8`（Jammed）→ `'error'` → `PRINTER_ERROR`（`wmi.ts:33` 注释；`task-runner.ts:151-164`）。打印**开始后**才卡纸，预检已经过了。
-- 监控：`JobStatus` 含 `jammed` / `error` / `userintervention` / `cancelled` → 立即 `PRINTER_ERROR`（`wmi.ts` 的 `parsePrintJobStatus`，`print-job-monitor.ts` 的 `case 'error'`）。`deleting` / `deleted` 自 0.4.16 起不再算设备出错（真机 F-18：纸出来了却报卡纸）：Windows 清理刚打完的任务也是这个状态，终端程序接着查，按前后看到的情况记完成或「结果未确认」；0.4.15 及以前的版本仍会当场报 `PRINTER_ERROR`。「前后看到的情况」的规矩（0.4.16 起）：这台机器的 Windows 打印完成记录（PrintService/Operational）开着、并且终端程序本次启动以来读到过这台打印机的完成事件时，任务离开队列后要等到完成事件 307 才记完成，约 6 到 10 秒等不到就记「结果未确认」；没开或读不到时照旧按「见过在打、后来没了」记完成，终端程序日志里会多一行 `print result inferred from queue removal`，括号里是原因。`jammed` 时 Agent 内部消息带「可能卡纸」，其余写「设备异常」；用户端只看到白名单句（`print-jobs.service.ts:128`）。
+- 监控：`JobStatus` 含 `jammed` / `error` / `userintervention` / `cancelled` → 立即 `PRINTER_ERROR`（`wmi.ts` 的 `parsePrintJobStatus`，`print-job-monitor.ts` 的 `case 'error'`）。`deleting` / `deleted` 自 0.4.16 起不再算设备出错（真机 F-18：纸出来了却报卡纸）：Windows 清理刚打完的任务也是这个状态，终端程序接着查，按前后看到的情况记完成或「结果未确认」；0.4.15 及以前的版本仍会当场报 `PRINTER_ERROR`。「前后看到的情况」的规矩（0.4.16 起）：这台机器的 Windows 打印完成记录（PrintService/Operational）开着、并且终端程序本次启动以来读到过这台打印机的完成事件时，任务离开队列后要等到完成事件 307 才记完成，约 6 到 10 秒确实查到没有就记「结果未确认」（查询本身失败——PowerShell 超时、起不来——不算没有；这一段里一次都没确实查到没有、连着 4 次都读不到时，按推断记完成，原因 `completion_log_unreadable`）；没开或读不到时照旧按「见过在打、后来没了」记完成，终端程序日志里会多一行 `print result inferred from queue removal`，括号里是原因。`jammed` 时 Agent 内部消息带「可能卡纸」，其余写「设备异常」；用户端只看到白名单句（`print-jobs.service.ts:128`）。
 - 打印机**断电**时队列若报 `Error`，也走这一条，被当成卡纸（见 F4 ②）。
 - 驱动不置这些位：与 F1 相同，落入 `PRINT_JOB_UNCONFIRMED`，不自动重印。
 - 心跳若报到 `'error'`：生产拦新单（开关打开时）；一体机确认页不能下单。
