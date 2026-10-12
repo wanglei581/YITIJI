@@ -219,22 +219,38 @@ check(
   check('闸门不等后台恢复', !/recover/.test(body.replace(/\/\*[\s\S]*?\*\//g, '')))
 }
 
-// ── 八、「这次恢复清过场」只是给页面照实说话用的标记，不参与放行 ──────────
+// ── 八、「上一次恢复清掉了什么」只是给页面照实说话用的标记，不参与放行 ──────────
 {
-  const fn = src.slice(src.indexOf('export function takeTerminalSessionRecoveryCleared'))
+  const fn = src.slice(src.indexOf('export function takeTerminalSessionRecoveryClearScope'))
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3)
-  check('标记读一次就复位', /recoveryClearedPending = false/.test(body) && /return cleared/.test(body))
+  check('标记读一次就复位', /recoveryClearScope = 'none'/.test(body) && /return scope/.test(body))
   const reboot = src.slice(src.indexOf('async function reBootstrapFromLocalAgent'))
   const rebootBody = reboot.slice(0, reboot.indexOf('\n}\n') + 3)
   check(
-    '标记只在用新引导票重建成功后置位，且不含页面刚打开那一次',
-    /if \(hadSettledState\) recoveryClearedPending = true/.test(rebootBody) &&
-      src.split('recoveryClearedPending = true').length === 2,
-    '续期成功也置位的话，页面会对没被清场的人说「材料已清掉」',
+    '标记只在 hadSettledState 为真时记，且只记一处',
+    /if \(hadSettledState\) recoveryClearScope = clearedScope/.test(rebootBody)
+      && src.split('recoveryClearScope = clearedScope').length === 2,
+    '续期成功也记的话，页面会对没被清场的人说清过；记两处就会有一条不看 hadSettledState',
   )
   const gate = src.slice(src.indexOf('async function awaitReadySessionOrFailClosed'))
   const gateBody = gate.slice(0, gate.indexOf('\n}\n') + 3)
-  check('闸门不读这个标记', !/recoveryClearedPending|takeTerminalSessionRecoveryCleared/.test(gateBody))
+  check('闸门不读这个标记', !/recoveryClearScope|takeTerminalSessionRecoveryClearScope/.test(gateBody))
+  check(
+    '闸门函数体里不出现 Deferred、NeedsNewTicket、ClearScope',
+    !/Deferred|NeedsNewTicket|ClearScope/.test(gateBody),
+  )
+  const ticketAt = rebootBody.indexOf('requestLocalBootTicket()')
+  const exchangeAt = rebootBody.indexOf('exchangeBootTicket(')
+  const firstHold = rebootBody.indexOf("kioskSensitiveSessionScope() === 'with-other'")
+  const secondHold = rebootBody.indexOf("kioskSensitiveSessionScope() === 'with-other'", firstHold + 1)
+  check(
+    '取票之前：有别的内容就不往下走',
+    firstHold > -1 && ticketAt > firstHold,
+  )
+  check(
+    '换票之前：有别的内容就不往下走',
+    secondHold > ticketAt && exchangeAt > secondHold,
+  )
 }
 
 const failed = results.filter((r) => !r.ok)
