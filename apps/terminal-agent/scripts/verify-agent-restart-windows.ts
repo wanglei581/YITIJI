@@ -72,13 +72,16 @@ async function main(): Promise<void> {
     return track(child.pid, 'fake browser')
   }
   const startFakeWatchdog = (): number => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', fakeWatchdogScript], { detached: true, stdio: 'ignore', windowsHide: true, env: windowsPowerShellEnv() })
+    // Not detached: Node's detached flag starts a Windows child with no console at all, and
+    // Windows PowerShell exits at once without one (first CI run: the stand-in was gone before
+    // its command line could be read). windowsHide alone gives it a hidden console, like the task does.
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', fakeWatchdogScript], { stdio: 'ignore', windowsHide: true, env: windowsPowerShellEnv() })
     child.unref()
     return track(child.pid, 'fake watchdog')
   }
   const alive = (pid: number) => ps(`@(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Count`) === '1'
   // Looked up by pid, so the query text itself never carries a name the controller searches for.
-  const commandLineOf = (pid: number) => ps(`[string](Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}" -ErrorAction SilentlyContinue).CommandLine`)
+  const commandLineOf = (pid: number) => ps(`[string](Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}' -ErrorAction SilentlyContinue).CommandLine`)
   const expectGone = async (pid: number, ms = 10_000): Promise<void> => {
     await until(() => !alive(pid), ms)
     standIns.delete(pid)
@@ -156,7 +159,8 @@ process.on('SIGTERM', () => process.exit(0));
     copyFileSync(process.execPath, fakeEdge)
     writeFileSync(fakeWatchdogScript, 'Start-Sleep -Seconds 1800\r\n', 'ascii')
     const watchdog = startFakeWatchdog()
-    await until(() => commandLineOf(watchdog).includes('kiosk-watchdog.ps1'), 15_000)
+    await until(() => commandLineOf(watchdog).includes('kiosk-watchdog.ps1'))
+    assert.equal(alive(watchdog), true, 'the watchdog stand-in must keep running')
     const kioskBrowser = startFakeBrowser(fakeChrome, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
     const kioskEdge = startFakeBrowser(fakeEdge, '--kiosk', 'https://example.invalid/', '--aijobprint-kiosk=1')
     const operatorBrowser = startFakeBrowser(fakeChrome, '--kiosk', 'https://example.invalid/')
