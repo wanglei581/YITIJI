@@ -5,6 +5,7 @@ import { HEALTHY_PRINTER_STATUS_VALUES, isHealthyPrinterStatus, isLowPaperWarnin
 import { TERMINAL_ONLINE_WINDOW_MS } from '../terminals/printer-availability'
 import { collectPrintQuotaAlerts, resolvePrintQuotaAlert } from './derived-print-quota-alerts'
 import { collectAiDerivedAlerts, resolveAiDerivedAlert } from './derived-ai-alerts'
+import { printerRecoveredExclusion } from './print-failed-recovery'
 import {
   buildSubjectKey,
   offlineEpisodeToken,
@@ -211,11 +212,16 @@ const PAID_PENDING_FILE_UNAVAILABLE_SELECT = {
  *
  * 退款排除:RefundService 完成路径只写 Order.payStatus='refunded',
  * 明确不改 PrintTask / printOutcome。这里按订单退款态过滤,禁止伪造出纸结果。
+ *
+ * 机器已恢复（print-failed-recovery.ts）也写在这份 where 里：列表、计数、单条查证走同一份，
+ * 不在查出结果后再滤，否则 firingTotal 和 omitted 会对不上。
  */
-function failedTaskWhere(nowMs: number) {
+async function failedTaskWhere(prisma: PrismaService, nowMs: number) {
+  const lookbackStart = new Date(nowMs - FAILED_LOOKBACK_MS)
+  const recovered = await printerRecoveredExclusion(prisma, lookbackStart)
   return {
     status: 'failed',
-    updatedAt: { gte: new Date(nowMs - FAILED_LOOKBACK_MS) },
+    updatedAt: { gte: lookbackStart },
     // SQL 的 NOT IN 不匹配 NULL,必须显式收未核查任务,否则普通失败告警会全灭。
     AND: [
       {
@@ -226,6 +232,7 @@ function failedTaskWhere(nowMs: number) {
       },
       // 已退款订单不再报警。退款路径写的是 Order.payStatus,不是 printOutcome。
       { NOT: { order: { payStatus: 'refunded' } } },
+      ...(recovered ? [recovered] : []),
     ],
   }
 }
@@ -473,7 +480,7 @@ export async function collectDerivedAlerts(
   // 终端类告警一台终端最多一条,总数就是列表长度,不存在截断。
   const terminalAlertCount = alerts.length
 
-  const where = failedTaskWhere(nowMs)
+  const where = await failedTaskWhere(prisma, nowMs)
   const [failedTasks, failedTotal] = await Promise.all([
     prisma.printTask.findMany({
       where,
@@ -544,7 +551,7 @@ export async function resolveDerivedAlert(
 
   if (type === 'print_failed') {
     const task = (await prisma.printTask.findFirst({
-      where: { id: subjectId, ...failedTaskWhere(nowMs) },
+      where: { id: subjectId, ...(await failedTaskWhere(prisma, nowMs)) },
       select: FAILED_TASK_SELECT,
     })) as unknown as FailedTaskRow | null
     if (!task || task.order?.payStatus === 'refunded') return null

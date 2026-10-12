@@ -712,7 +712,9 @@ async function main() {
       {
         id: taskOk, terminalId: tOnline, fileUrl: 'https://internal/secret-url', fileMd5: 'deadbeef',
         paramsJson: JSON.stringify({ fileName: '验证文件.pdf', copies: 2, colorMode: 'black_white', paperSize: 'A4' }),
-        status: 'completed', completedAt: new Date(),
+        // 完成时间早于本文件里回拨过 updatedAt 的失败（第 7 节那条是两小时前）。
+        // 同终端在失败之后出纸，会让没收到钱的状态类失败不再告警；这一条成功单不是在测那个。
+        status: 'completed', completedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
       },
       {
         id: taskFailed, terminalId: tOnline, fileUrl: 'https://internal/secret-url-2', fileMd5: 'cafebabe',
