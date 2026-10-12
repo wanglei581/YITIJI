@@ -153,7 +153,8 @@ Page({
   },
 
   goBack() {
-    wx.navigateBack()
+    // 直接扫码进来时本页在页面栈底，navigateBack 会失败、点了没反应；退不回去就回首页（和传文件页同一写法）。
+    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
   },
 
   /** 丢掉当前这一轮，回到当前账号的起点。 */

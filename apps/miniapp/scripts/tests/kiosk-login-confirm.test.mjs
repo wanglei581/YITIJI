@@ -40,14 +40,19 @@ function httpError(statusCode, code, message = '') {
   return err
 }
 
-function harness({ status = () => Promise.resolve(pending()), confirm = () => Promise.resolve({ status: 'confirmed' }) } = {}) {
+function harness({ status = () => Promise.resolve(pending()), confirm = () => Promise.resolve({ status: 'confirmed' }), backFails = false } = {}) {
   const session = { loggedIn: true, gen: 1 }
-  const calls = { status: [], confirm: [], navigate: [], modal: 0 }
+  const calls = { status: [], confirm: [], navigate: [], modal: 0, back: 0, tab: [] }
   let scanResult = LOGIN_CODE
   const wx = {
     scanCode(opts) { opts.success({ result: scanResult }) },
     navigateTo(opts) { calls.navigate.push(opts.url) },
-    navigateBack() {},
+    // backFails：本页在页面栈底（直接扫码进来），微信的 navigateBack 走 fail。
+    navigateBack(opts) {
+      calls.back += 1
+      if (backFails && opts && typeof opts.fail === 'function') opts.fail({ errMsg: 'navigateBack:fail cannot navigate back at first page.' })
+    },
+    switchTab(opts) { calls.tab.push(opts.url) },
     // 旧实现用系统弹窗确认；新实现应在页面里确认。为了让旧实现也能走完（从而在断言上判红
     // 而不是在替身上崩掉），这里照样给一个一律点「确认」的弹窗。
     showModal(opts) { calls.modal += 1; opts.success({ confirm: true }) },
@@ -330,4 +335,18 @@ test('确认被 401 拒绝：不算已确认，页面回到当前登录态', asy
   await env.scanAndConfirm()
   assert.notEqual(env.page.data.phase, 'confirmed')
   assert.equal(env.page.data.isLoggedIn, false)
+})
+
+test('直接扫码进来时本页在栈底：点「返回」退不回去就回首页，不是点了没反应', () => {
+  const bottom = harness({ backFails: true })
+  bottom.page.goBack()
+  assert.equal(bottom.calls.back, 1)
+  assert.equal(bottom.calls.tab.length, 1)
+  assert.equal(bottom.calls.tab[0], '/pages/home/home')
+
+  // 从首页点进来的（能退回上一页）：照常退一页，不跳首页。
+  const normal = harness()
+  normal.page.goBack()
+  assert.equal(normal.calls.back, 1)
+  assert.equal(normal.calls.tab.length, 0)
 })
