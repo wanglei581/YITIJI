@@ -41611,7 +41611,7 @@
       "inCi": true,
       "package": "@ai-job-print/api",
       "scriptNames": [
-        "@ai-job-print/api::verify:admin-ops"
+        "@ai-job-print/api::verify:print-failed-alert-recovery"
       ],
       "wired": true
     },
