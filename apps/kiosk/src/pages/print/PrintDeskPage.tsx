@@ -15,6 +15,7 @@ import {
   type PrintHandoffRouteState,
 } from './printHandoff'
 import { usePrintHandoffOwner } from './usePrintHandoff'
+import { useRecoveryDroppedHandoff } from '../../hooks/useSessionRecoveryNotice'
 
 /**
  * 青序流光 13-print-desk：材料检查（第 2 步）与预览参数（第 3 步）同页分阶段。
@@ -35,7 +36,8 @@ export function PrintDeskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- location.state 随 location.key 一起变
     [owner, location.key],
   )
-  const handoff = resolved.status === 'ok' ? resolved.context : null
+  const storedHandoff = resolved.status === 'ok' ? resolved.context : null
+  const handoff = useRecoveryDroppedHandoff(storedHandoff)
   const problem = printHandoffProblemText(resolved.status)
   const previewAuthorized = handoff
     ? handoff.checkPolicy === 'exempt' || isPrintDeskPreviewAuthorized(handoff.materialCheck, handoff.file)

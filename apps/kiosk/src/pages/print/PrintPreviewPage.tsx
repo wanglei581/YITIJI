@@ -15,6 +15,7 @@ import {
   type PrintScale,
 } from '@ai-job-print/shared'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { usePrintSessionBlocked } from '../../hooks/useTerminalSessionState'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
@@ -37,6 +38,8 @@ import { isPrintDeskPreviewAuthorized, privacyPreviewGate } from './printDeskMod
 import { FilePreviewPanel } from './components/PrintPreviewPanel'
 import { previewKindForFile } from './components/printPreviewKind'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
+import { PrintFlowRecoveryStrip } from './PrintFlowRecoveryStrip'
+import { PRINT_SESSION_HOLD_TITLE } from './printSessionHoldCopy'
 import './styles/print-desk-qx.css'
 
 type PrintFile = PrintFileState
@@ -135,6 +138,13 @@ export function PrintPreviewPage({
   onBackToCheck?: () => void
 } = {}) {
   const navigate = useNavigate()
+  const printSessionBlocked = usePrintSessionBlocked()
+  const recoveryStrip = (
+    <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" />
+  )
+  const holdStatus = printSessionBlocked
+    ? { tone: 'warn' as const, label: PRINT_SESSION_HOLD_TITLE }
+    : null
   const { getToken } = useAuth()
   const contact = useSupportContact()
   const faultLine = machineCannotPrintLine(contact)
@@ -258,6 +268,7 @@ export function PrintPreviewPage({
   }
 
   const handleNext = () => {
+    if (printSessionBlocked) return
     if (!materialCheckComplete || (privacyGate.kind === 'confirm' && !privacyConfirmed)) return
     if (pageRange === 'custom') {
       if (!customRange.trim()) {
@@ -304,7 +315,7 @@ export function PrintPreviewPage({
         back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="预览与打印参数"
         subtitle="第 3 步 / 共 4 步 · 必须先有真实文件和材料检查结果"
-        status={{ tone: 'warn', label: '没有待处理的文件' }}
+        status={holdStatus ?? { tone: 'warn', label: '没有待处理的文件' }}
         ctabar={(
           <PrintDeskFooter onBack={() => navigate(uploadPath)}>
             <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
@@ -313,6 +324,7 @@ export function PrintPreviewPage({
           </PrintDeskFooter>
         )}
       >
+        {recoveryStrip}
         <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选文件，检查后再设置打印参数。" />
         <div className="qpd-context-empty" data-w2-page="print-preview" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">
@@ -335,7 +347,7 @@ export function PrintPreviewPage({
         navbar={<PrintDeskNavbar />}
         title="预览与打印参数"
         subtitle="隐私预检不可绕过"
-        status={{ tone: 'bad', label: '材料检查尚未完成' }}
+        status={holdStatus ?? { tone: 'bad', label: '材料检查尚未完成' }}
         ctabar={(
           <PrintDeskFooter onBack={() => navigate(uploadPath)}>
             <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate(uploadPath)}>返回选文件</button>
@@ -357,6 +369,7 @@ export function PrintPreviewPage({
           </PrintDeskFooter>
         )}
       >
+        {recoveryStrip}
         <PrintDeskGuide step={2} title={<>先完成<em>材料检查</em>。</>} detail="逐项检查并确认隐私处理，再核对打印参数。" />
         <div className="qpd-guard" data-w2-page="print-preview" data-qx-state="check-required">
           <div className="qx-state" data-tone="error">
@@ -398,7 +411,7 @@ export function PrintPreviewPage({
         navbar={<PrintDeskNavbar />}
       title="预览与打印参数"
       subtitle="第 3 步 / 共 4 步 · 逐页核对文件，再确认份数、颜色、单双面和页范围"
-      status={status}
+      status={holdStatus ?? status}
       ctabar={(
         <PrintDeskFooter onBack={() => exempt ? backToPrevious() : onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>
           {exempt ? (
@@ -419,12 +432,13 @@ export function PrintPreviewPage({
                     ? '打印机当前不可用，不能进入报价确认。'
                     : '下一步核对价格，确认前不会收费。'}
           </p>
-          <button className="qx-btn" data-variant="primary" type="button" disabled={printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed)} onClick={handleNext}>
+          <button className="qx-btn" data-variant="primary" type="button" disabled={printSessionBlocked || printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed)} onClick={handleNext}>
             {privacyGate.kind === 'confirm' && !privacyConfirmed ? '请先确认隐私处理结果' : printerLoading ? '设备检测中…' : printerNotice ? printerLabel : hasBlockingWarning ? '打印机不可用' : '下一步：核对价格'}
           </button>
         </PrintDeskFooter>
       )}
     >
+      {recoveryStrip}
       <PrintDeskGuide step={3}
         title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
         detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? `现在不能放行到报价。${faultLine}` : '核对内容与参数，下一步看价格，最后带走打印件。'} />

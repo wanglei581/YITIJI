@@ -30,9 +30,13 @@ import { countPagesInRange } from './pageRange'
 import { clearPrintMaterialSession, printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff } from './printHandoff'
 import { usePrintConfirmHandoff } from './usePrintConfirmHandoff'
+import { useRecoveryDroppedHandoff } from '../../hooks/useSessionRecoveryNotice'
+import { usePrintSessionBlocked, usePrintSessionDeferred, useTerminalSessionState } from '../../hooks/useTerminalSessionState'
+import { EndThisUseButton } from './EndThisUseButton'
+import { PrintRecoveryNotice } from './PrintFlowRecoveryStrip'
+import { PRINT_CONFIRM_RETRY_LINE, PRINT_SESSION_DEFERRED_LINE, PRINT_SESSION_HOLD_TITLE } from './printSessionHoldCopy'
 import { printPrivacyDecisionSummary } from './printDeskModel'
 import { materialRedactionBadge } from './piiRedaction'
-import { usePrintSessionBlocked, useTerminalSessionState } from '../../hooks/useTerminalSessionState'
 import { PrintConfirmView } from './components/PrintConfirmView'
 import {
   COLOR_MODE_LABEL,
@@ -113,9 +117,9 @@ export function PrintConfirmPage() {
   if (queryInvalid && invalidReason) invalidReasonRef.current = invalidReason
   const state = location.state as LocationState | null
   const capability = usePrintParamCapability()
-  const {
-    handoff, problem, handoffInvalid, returnPath, ordered, params, adjustments, waitingCapability, paperNote,
-  } = usePrintConfirmHandoff(capability)
+  const loaded = usePrintConfirmHandoff(capability)
+  const handoff = useRecoveryDroppedHandoff(loaded.handoff)
+  const { problem, handoffInvalid, returnPath, ordered, params, adjustments, waitingCapability, paperNote } = loaded
   const file: PrintFile = handoff?.file ?? { name: '未知文件', size: '-', pages: null }
   const {
     kind: printerKind,
@@ -145,6 +149,8 @@ export function PrintConfirmPage() {
   const [submitting, setSubmitting] = useState(false)
   const terminalSession = useTerminalSessionState()
   const printSessionBlocked = usePrintSessionBlocked()
+  const printSessionDeferred = usePrintSessionDeferred()
+  const terminalHoldLine = printSessionDeferred ? PRINT_SESSION_DEFERRED_LINE : PRINT_CONFIRM_RETRY_LINE
   const [abandoning, setAbandoning] = useState(false)
   const [piiCheckRequired, setPiiCheckRequired] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -501,7 +507,9 @@ export function PrintConfirmPage() {
   const pill = PILL[screen]
   const pricingPill = freePricing && screen === 'quoting' ? { tone: 'unknown' as const, label: '正在核定页数' }
     : freePricing && screen === 'quote-failed' ? { tone: 'bad' as const, label: '页数核定未完成 · 未建单' } : pill
-  const status = printerLoading && (screen === 'quoted' || screen === 'zero-amount')
+  const status = printSessionBlocked
+    ? { tone: 'warn' as const, label: PRINT_SESSION_HOLD_TITLE }
+    : printerLoading && (screen === 'quoted' || screen === 'zero-amount')
     ? { tone: 'unknown' as const, label: '状态未知' }
     : pricingPill
 
@@ -567,7 +575,7 @@ export function PrintConfirmPage() {
     }
     navigate('/print/desk?step=check', { state: { printContextId: kept.contextId } })
   }
-  const actions = piiCheckRequired ? (
+  const screenActions = piiCheckRequired ? (
     <button type="button" className="qx-btn" data-variant="primary" style={{ minHeight: 56 }} onClick={returnToMaterialCheck}>回到材料检查</button>
   ) : screen === 'missing-context' ? (
     <>
@@ -606,6 +614,12 @@ export function PrintConfirmPage() {
     </>
   ) : (
     <>{backButton()}{confirmButton(primaryLabel)}</>
+  )
+  const actions = (
+    <>
+      {printSessionDeferred ? <EndThisUseButton /> : null}
+      {screenActions}
+    </>
   )
 
   const selfAssessment = !isContractReport && selfAssessmentSnapshot?.taskId ? (
@@ -661,6 +675,7 @@ export function PrintConfirmPage() {
         <QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />
       }
     >
+      <PrintRecoveryNotice testId="print-confirm-recovery-notice" />
       <PrintConfirmView
         step={4}
         freePricing={freePricing}
@@ -685,7 +700,7 @@ export function PrintConfirmPage() {
         printerBlocked={printerBlocked}
         printerBlockedReason={freePricing ? printerBlockedReason.replace('不会扣费。', '') : printerBlockedReason}
         terminalFailed={printSessionBlocked}
-        terminalFailedText={`${userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}机器会自己再试，恢复后这里的按钮会重新亮起。`}
+        terminalFailedText={`${userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, machineUnusableLine())}${terminalHoldLine}`}
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}

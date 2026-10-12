@@ -1,51 +1,41 @@
-import { useEffect, useState } from 'react'
-import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
-import { INTERVIEW_WORKBENCH_SESSION_KEY } from '../pages/interview/interviewWorkbenchSession'
-import { SESSION_STORAGE_KEY as SELF_ASSESSMENT_SESSION_KEY } from '../pages/resume/selfAssessmentSession'
-import { SCAN_WORKBENCH_SESSION_KEY } from '../pages/scan/scanWorkbenchSession'
-import { ASSISTANT_DRAFT_KEY } from '../services/assistantDraft'
-import { RESUME_PARSE_INTENT_STORAGE_KEY } from '../services/resumeParseIntent'
+import { useEffect, useRef, useState } from 'react'
+import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
 import {
   subscribeTerminalSession,
-  takeTerminalSessionRecoveryCleared,
-  terminalSessionState,
+  takeTerminalSessionRecoveryClearScope,
 } from '../services/terminalAuth'
 
-/** 换新票清场后给还站在机器前的人看的那一句。一个字不改。 */
-export const SESSION_RECOVERY_NOTICE = '刚才选的材料已经清掉，要重新传'
+/**
+ * print-only：人还在首页或打印线上，当页说这一句。
+ * 字面：合规六建议、前端二七拟、合规九定。屏上只许这句，不另写。
+ */
+export const SESSION_RECOVERY_NOTICE = '机器刚恢复，刚才选的材料已经清掉，要重新传'
+
+/** with-other：先回首页，首页说这一句。字面来源同上。 */
+export const SESSION_RECOVERY_NOTICE_OTHER = '机器刚恢复，这台机器上刚才的内容已经清掉，要重新开始。'
+
 const NOTICE_MS = 120_000
-const CLEAR_BATCH_MIN = 3
 
-// 与 kioskSensitiveSession 清掉的 sessionStorage 键一致。本机清场会在同一轮删掉一整批。
-const CLEAR_KEYS = new Set<string>([
-  'ai-job-print:current-print-material-check',
-  'ai-job-print:current-ai-resume',
-  RESUME_PARSE_INTENT_STORAGE_KEY,
-  'ai-job-print:job-material-draft:v1',
-  SELF_ASSESSMENT_SESSION_KEY,
-  INTERVIEW_WORKBENCH_SESSION_KEY,
-  SCAN_WORKBENCH_SESSION_KEY,
-  ASSISTANT_DRAFT_KEY,
-  AI_DECLARATION_SESSION_KEY,
-])
-
-type Notice = { until: number; clearSeq: number }
+type Notice = { until: number; text: string }
 
 let notice: Notice | null = null
 let expiryTimer: number | null = null
 let watching = false
-let batchSerial = 0
-let openBatch: { id: number; keys: Set<string> } | null = null
+let wantsHome = false
+let dropEpoch = 0
 const listeners = new Set<() => void>()
 
 function emit(): void {
   for (const listener of listeners) listener()
 }
 
-function arm(): void {
-  if (!takeTerminalSessionRecoveryCleared()) return
-  const seq = openBatch?.id ?? batchSerial
-  notice = { until: Date.now() + NOTICE_MS, clearSeq: seq }
+function arm(text: string, goHome: boolean): void {
+  dropEpoch += 1
+  // 存储里的打印交接一并清掉。已经打开的页面靠 dropEpoch 丢掉内存里那一份；
+  // 之后新选的文件编号不同，不会被这次清场再吞掉。
+  clearPrintMaterialSession()
+  wantsHome = goHome
+  notice = { until: Date.now() + NOTICE_MS, text }
   if (expiryTimer !== null) window.clearTimeout(expiryTimer)
   expiryTimer = window.setTimeout(() => {
     expiryTimer = null
@@ -54,6 +44,21 @@ function arm(): void {
     emit()
   }, NOTICE_MS)
   emit()
+}
+
+/** 全应用只在这里读一次清场范围。'none' 不说话，也不拆掉已经亮着的那一句。 */
+function consume(): void {
+  const scope = takeTerminalSessionRecoveryClearScope()
+  if (scope === 'print-only') arm(SESSION_RECOVERY_NOTICE, false)
+  else if (scope === 'with-other') arm(SESSION_RECOVERY_NOTICE_OTHER, true)
+}
+
+function ensureWatch(): void {
+  if (watching || typeof window === 'undefined') return
+  watching = true
+  // 恢复可能发生在订阅之前，先读一次。
+  consume()
+  subscribeTerminalSession(() => consume())
 }
 
 export function dismissSessionRecoveryNotice(): void {
@@ -66,39 +71,17 @@ export function dismissSessionRecoveryNotice(): void {
   emit()
 }
 
-function noteSensitiveRemoval(key: string): void {
-  if (!CLEAR_KEYS.has(key)) return
-  if (!openBatch) {
-    batchSerial += 1
-    const batch = { id: batchSerial, keys: new Set<string>() }
-    openBatch = batch
-    queueMicrotask(() => {
-      if (openBatch === batch) openBatch = null
-      if (!notice) return
-      if (batch.keys.size >= CLEAR_BATCH_MIN && notice.clearSeq < batch.id) dismissSessionRecoveryNotice()
-    })
-  }
-  openBatch.keys.add(key)
-}
-
-function ensureWatch(): void {
-  if (watching || typeof window === 'undefined') return
-  watching = true
-  subscribeTerminalSession((next) => {
-    if (next === 'ready') arm()
-  })
-  const storage = window.sessionStorage
-  const original = storage.removeItem.bind(storage)
-  storage.removeItem = (key: string) => {
-    original(key)
-    noteSensitiveRemoval(key)
-  }
-}
-
-/** 首页挂载时读一次：恢复可能发生在订阅建立之前。 */
+/** 首页挂载时确保已经在看。不再自己读第二遍。 */
 export function readSessionRecoveryOnHomeMount(): void {
   ensureWatch()
-  if (terminalSessionState() === 'ready') arm()
+}
+
+export function sessionRecoveryWantsHome(): boolean {
+  return wantsHome
+}
+
+export function acknowledgeSessionRecoveryHome(): void {
+  wantsHome = false
 }
 
 export function useSessionRecoveryNotice(): string | null {
@@ -111,5 +94,28 @@ export function useSessionRecoveryNotice(): string | null {
   }, [])
   void version
   if (!notice || Date.now() >= notice.until) return null
-  return SESSION_RECOVERY_NOTICE
+  return notice.text
+}
+
+export function useSessionRecoveryDropEpoch(): number {
+  const [epoch, setEpoch] = useState(dropEpoch)
+  useEffect(() => {
+    ensureWatch()
+    const listener = () => setEpoch(dropEpoch)
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  }, [])
+  return epoch
+}
+
+/**
+ * 清场发生在这一页已经挂上之后：内存里的交接作废，120 秒提示收起后也不复水。
+ * 清场之后才挂上的页面不在这里吞——存储已清，读到的就是新的一份或空的。
+ */
+export function useRecoveryDroppedHandoff<T>(handoff: T | null): T | null {
+  const epoch = useSessionRecoveryDropEpoch()
+  const mountedAt = useRef(epoch)
+  const [hidden, setHidden] = useState(false)
+  if (!hidden && epoch !== mountedAt.current) setHidden(true)
+  return hidden ? null : handoff
 }

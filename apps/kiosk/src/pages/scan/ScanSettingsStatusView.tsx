@@ -17,6 +17,9 @@ import {
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import type { TerminalSessionState } from '../../services/terminalAuth'
 import { networkDisconnectLine } from '../../copy/unattendedCopy'
+import { usePrintSessionDeferred } from '../../hooks/useTerminalSessionState'
+import { EndThisUseButton } from '../print/EndThisUseButton'
+import { SCAN_SESSION_DEFERRED_LINE } from '../print/printSessionHoldCopy'
 
 /**
  * 设置页「还不能去面板操作」的那几屏。
@@ -99,6 +102,7 @@ export function ScanSettingsStatusView({
   handleAckRetry,
   handleQuietPeriodRetry,
 }: ScanSettingsStatusViewProps) {
+  const sessionDeferred = usePrintSessionDeferred()
   /* 会话建成了，投递授权还没到手。它压在其它分支**之上**：phase 已经是 success，
    * 按旧判据这一屏会直接画出面板操作指引 —— 而那正是这次要挡掉的动作。 */
   const awaitingAck = phase === 'success' && ackState !== 'acked'
@@ -129,6 +133,8 @@ export function ScanSettingsStatusView({
       : phase === 'loading'
         ? '正在等系统建好这次扫描，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '这次没有可用的扫描。'
+  const sessionHold = sessionDeferred && failure?.title === '这台机器的安全校验没通过'
+  const shownDescription = sessionHold ? SCAN_SESSION_DEFERRED_LINE : description
   const status = awaitingAck
     ? ackRetryable
       ? { tone: 'warn' as const, label: '投递授权未确认' }
@@ -175,7 +181,7 @@ export function ScanSettingsStatusView({
       page="scan-settings"
       state={workbenchState}
       title={title}
-      subtitle={description}
+      subtitle={shownDescription}
       status={status}
       layout="spread"
       ctabar={
@@ -230,13 +236,15 @@ export function ScanSettingsStatusView({
               重新开始一次扫描
             </button>
           ) : (
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              disabled
-              aria-disabled="true"
-            >
+            <>
+              {sessionHold ? <EndThisUseButton testId="scan-session-end-use" /> : null}
+              <button
+                type="button"
+                className="qx-btn"
+                data-variant="primary"
+                disabled
+                aria-disabled="true"
+              >
               {phase === 'loading'
                 ? '等系统返回这次扫描'
                 /* 这一支上任务**建过**（随后被本页撤掉），说「未创建」就是句假话。 */
@@ -245,7 +253,8 @@ export function ScanSettingsStatusView({
                   /* 这一支上一个请求都没发过，说「未创建扫描任务」不算错，但没说出
                      为什么按不了 —— 用户会以为是自己哪一步做漏了。 */
                   : cleanupHolding ? '等本机收完上一场的尾' : '未创建扫描任务'}
-            </button>
+              </button>
+            </>
           )}
         </ScanCta>
       }
@@ -287,7 +296,7 @@ export function ScanSettingsStatusView({
                 ]
         }
       >
-        <p>{description}</p>
+        <p>{shownDescription}</p>
         {phase === 'loading' && !awaitingAck ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
         {/* 没拿到投递授权的窗口必须说出「现在扫也不会进这一场」。不说的话用户看到
             「扫描任务已创建」就转身去按开始，而服务端此刻还不肯把文件投给这一场。 */}

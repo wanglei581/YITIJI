@@ -41,7 +41,7 @@ import {
   WORD_CONVERSION_UNAVAILABLE_COPY,
 } from '../../services/api/documentConversion'
 import { usePrintSessionBlocked } from '../../hooks/useTerminalSessionState'
-import { useSessionRecoveryNotice } from '../../hooks/useSessionRecoveryNotice'
+import { SESSION_RECOVERY_NOTICE, useSessionRecoveryNotice } from '../../hooks/useSessionRecoveryNotice'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import { useStartPrintHandoff } from './usePrintHandoff'
 import {
@@ -206,7 +206,8 @@ export function PrintUploadPage() {
   const tab = !showFileChannel && selectedTab === 'file' ? 'qr' : selectedTab
   const wordHint = wordConversionAvailable ? wordOpenCopy : wordClosedCopy
   const printSessionBlocked = usePrintSessionBlocked()
-  const recoveryNotice = useSessionRecoveryNotice()
+  const recoveryNoticeAll = useSessionRecoveryNotice()
+  const recoveryNotice = recoveryNoticeAll === SESSION_RECOVERY_NOTICE ? recoveryNoticeAll : null
 
   useEffect(() => {
     if (printSessionBlocked) return undefined
@@ -396,7 +397,7 @@ export function PrintUploadPage() {
 
   // 换新票清场时存储里的材料已经没了，屏上内存里那份也要一起清，不然提示说清掉了、屏上还挂着文件。
   const clearCurrentFileRef = useRef<() => void>(() => undefined)
-  const recoveryNoticeShown = recoveryNotice !== null
+  const recoveryNoticeShown = recoveryNoticeAll !== null
   useEffect(() => {
     if (recoveryNoticeShown) clearCurrentFileRef.current()
   }, [recoveryNoticeShown])

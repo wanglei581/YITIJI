@@ -39,6 +39,7 @@ import {
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
+import { PrintFlowRecoveryStrip } from './PrintFlowRecoveryStrip'
 import { manualOriginalPrintCheck, shareMaterialChecks } from './printDeskModel'
 import './styles/print-desk-qx.css'
 
@@ -581,6 +582,8 @@ export function PrintMaterialCheckPage({
           </PrintDeskFooter>
         )}
       >
+        {/* 参数页清场后文件没了，打印台会把这一步拉回来。第 4 句留在这里，不跟着预览页一起卸掉。 */}
+        <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" />
         <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选好要打印的材料，再检查文件与个人信息。" />
         <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">

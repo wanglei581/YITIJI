@@ -18,12 +18,16 @@ export function HomeContextRegion({
   return (
     <div className="qx-home-continue" data-testid="home-context-region" onClickCapture={dismissSessionRecoveryNotice}>
       {continueSlot}
+      {recoveryNotice ? (
+        <p className="qx-home-recovery-notice" data-testid="home-session-recovery-notice" role="status">
+          {recoveryNotice}
+        </p>
+      ) : null}
       <div className="qx-home-empty-context" role="status">
         <span className="qx-home-context-icon" aria-hidden="true"><HistoryIcon /></span>
         <span>
           <strong>这台机器上没有待继续的办理</strong>
           <small>{standbyNote}</small>
-          {recoveryNotice ? <small data-testid="home-session-recovery-notice">{recoveryNotice}</small> : null}
         </span>
       </div>
     </div>

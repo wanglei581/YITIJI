@@ -1173,15 +1173,22 @@ if (!confirmPage.includes('useTerminalSessionState()')) {
 } else {
   pass('确认页读取本机会话状态')
 }
-if (!confirmPage.includes('机器会自己再试，恢复后这里的按钮会重新亮起。')) {
-  fail('确认页 failed 说明后要补上自动恢复这句')
+// 第三轮：没压着时第 3 句换成「材料被清掉就要重新传」。仍接在现有说明后面；压着时同一位置换成第 5 句。
+const confirmRetryLine = '机器会自己再试。恢复后这里的按钮会重新亮起；要是恢复时这里的材料被清掉了，就要重新传一次。'
+if (!read('src/pages/print/printSessionHoldCopy.ts').includes(confirmRetryLine)) {
+  fail('确认页没压着时的第 3 句必须是第三轮定句')
 } else {
-  pass('确认页带上自动恢复这句')
+  pass('确认页第 3 句已换成第三轮定句')
 }
-if (!/userMessageOf\(\{ code: 'TERMINAL_SESSION_INVALID' \}, machineUnusableLine\(\)\)\}机器会自己再试，恢复后这里的按钮会重新亮起。/.test(confirmPage)) {
-  fail('自动恢复这句必须接在现有说明后面')
+if (!/userMessageOf\(\{ code: 'TERMINAL_SESSION_INVALID' \}, machineUnusableLine\(\)\)\}\$\{terminalHoldLine\}/.test(confirmPage)) {
+  fail('自动恢复这句必须接在现有说明后面（压着时换成第 5 句，仍接在同一处）')
 } else {
   pass('自动恢复这句接在现有说明后面')
+}
+if (!confirmPage.includes('printSessionDeferred ? PRINT_SESSION_DEFERRED_LINE : PRINT_CONFIRM_RETRY_LINE')) {
+  fail('确认页压着时必须改用第 5 句，没压着才用第 3 句')
+} else {
+  pass('确认页按是否压着切换第 5 句和第 3 句')
 }
 
 if (failures > 0) {
