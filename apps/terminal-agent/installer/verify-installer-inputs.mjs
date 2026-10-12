@@ -292,7 +292,9 @@ assert.match(kioskWatchdog, /default \{ \$candidates = \$edge \}/, 'auto mode mu
 assert.doesNotMatch(kioskWatchdog, /\$edge \+ \$chrome|\$chrome \+ \$edge/, 'auto mode must not fall back to Chrome')
 assert.match(kioskWatchdog, /-ieq "chrome\.exe"\) \{[\s\S]{0,900}\$arguments = @\("--incognito"\) \+ \$arguments/, 'an explicitly chosen Chrome must start incognito')
 assert.match(kioskWatchdog, /IncognitoModeAvailability[\s\S]{0,200}-eq 1\)[\s\S]{0,300}throw/, 'Chrome with incognito disabled by policy must not start')
-assert.match(kioskWatchdog, /App Paths\\msedge\.exe/, 'auto mode looks up the registered Edge path before giving up')
+for (const key of ['HKLM:\\SOFTWARE\\Microsoft', 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft', 'HKCU:\\SOFTWARE\\Microsoft']) {
+  assert.ok(kioskWatchdog.includes(`"${key}\\Windows\\CurrentVersion\\App Paths\\msedge.exe"`), `auto mode looks up the registered Edge path (${key}) before giving up`)
+}
 assert.match(kioskWatchdog, /--no-first-run/)
 assert.match(kioskWatchdog, /--user-data-dir=\$profileRoot/)
 assert.match(kioskWatchdog, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'watchdog must only track browsers it launched')
