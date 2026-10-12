@@ -122,3 +122,30 @@ export function countCjkRadicals(text: string): number {
   if (typeof text !== 'string' || text.length === 0) return 0
   return Array.from(text).filter((ch) => RADICAL_TO_UNIFIED.has(ch)).length
 }
+
+function valueHasRadical(value: unknown): boolean {
+  if (typeof value === 'string') return HAS_RADICAL_CHAR.test(value)
+  if (Array.isArray(value)) return value.some((item) => valueHasRadical(item))
+  if (value !== null && typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((item) => valueHasRadical(item))
+  }
+  return false
+}
+
+/**
+ * 模型回复里用 \\u 转义写的部首，要等 JSON 解析之后才是部首字符。
+ * 能解析、且某个字符串叶子里有部首：换掉字符串叶子再序列化。
+ * 能解析但没有部首：原样返回，不改空格和键序。
+ * 解析不了：按纯文本换。
+ */
+export function foldCjkRadicalsInJsonText(text: string): string {
+  if (typeof text !== 'string' || text.length === 0) return typeof text === 'string' ? text : ''
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return foldCjkRadicals(text)
+  }
+  if (!valueHasRadical(parsed)) return text
+  return JSON.stringify(foldCjkRadicalStrings(parsed))
+}

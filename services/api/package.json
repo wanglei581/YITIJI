@@ -252,7 +252,7 @@
     "verify:resume-voice-generate": "node -r @swc-node/register scripts/verify-resume-voice-generate.ts && pnpm run verify:assistant-voice",
     "verify:assistant-voice": "node -r @swc-node/register scripts/verify-assistant-voice.ts",
     "verify:resume-optimize": "pnpm run verify:resume-optimize-live-gate && node -r @swc-node/register scripts/verify-resume-optimize.ts",
-    "verify:resume-radical-fold": "node -r @swc-node/register scripts/verify-resume-radical-fold.ts",
+    "verify:resume-radical-fold": "node -r @swc-node/register scripts/verify-resume-radical-fold.ts && node -r @swc-node/register scripts/verify-resume-radical-font-fold.ts",
     "verify:resume-optimize-live-gate": "node -r @swc-node/register scripts/verify-resume-optimize-live-gate.ts",
     "probe:resume-optimize-live": "node -r @swc-node/register scripts/check-resume-optimize-live.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",

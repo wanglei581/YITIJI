@@ -29,7 +29,7 @@ import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-all
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
-import { foldCjkRadicalStrings, foldCjkRadicals } from '../../common/text/cjk-radical-fold'
+import { foldCjkRadicalStrings, foldCjkRadicals, foldCjkRadicalsInJsonText } from '../../common/text/cjk-radical-fold'
 import type { OptimizeRejectRule } from './resume-optimize-reject-rule'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -231,21 +231,21 @@ export class LlmResumeOptimizeService {
     // 拿原文校验会让模型回包里的 `[手机号_1]` 判不在原文而整单作废。
     // 产物是用户要打印的简历，因此最后用 restore() 把占位符换回真值（restore 只在
     // 服务端内存里发生，真值从未离开本进程）。
-    // 库里早先存下的简历文字可能还带着部首字符（新上传的在抽取时已经换掉）：在入口换一次，
-    // 后面的遮盖、章节识别、送模型、事实串比对用的都是同一份常用字文本。
+    // 库里早先存下的简历文字可能还带着部首字符（新上传的在抽取时已经换掉）：在入口换一次，后面的遮盖、章节识别、送模型、事实串比对用的都是同一份常用字文本。
     const original = foldCjkRadicals(extractedText ?? '')
     const input = original.slice(0, MAX_INPUT_CHARS)
     const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
-    // 旧报告摘录仍是部首字符。只换字符串叶子，返回新对象，不改报告本身。
-    const baseline = buildOriginalCoverage(original, foldCjkRadicalStrings(report), input.length, masked.restore)
+    // 旧报告摘录仍是部首字符。只换字符串叶子，返回新对象，不改报告本身。覆盖检查和提示词用同一份。
+    const foldedReport = foldCjkRadicalStrings(report)
+    const baseline = buildOriginalCoverage(original, foldedReport, input.length, masked.restore)
     const text = masked.text
-    const reportBrief = report.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
+    const reportBrief = foldedReport.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: OPTIMIZE_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `${directionPrompt}诊断报告摘要:${reportBrief}\n改进建议:${(report.suggestions ?? []).join(';')}\n\n简历原文:\n${text}`,
+        content: `${directionPrompt}诊断报告摘要:${reportBrief}\n改进建议:${(foldedReport.suggestions ?? []).join(';')}\n\n简历原文:\n${text}`,
       },
     ]
 
@@ -795,5 +795,5 @@ function extractJson(raw: string): string | null {
   const start = cleaned.indexOf('{')
   const end = cleaned.lastIndexOf('}')
   if (start < 0 || end <= start) return null
-  return cleaned.slice(start, end + 1)
+  return foldCjkRadicalsInJsonText(cleaned.slice(start, end + 1))
 }
