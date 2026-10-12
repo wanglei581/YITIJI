@@ -23,6 +23,7 @@
 // 一张码只收一份；收到之后不再发送，避免后一次失败把已收到盖掉。
 const app = getApp()
 const api = require('../../utils/api')
+const aiAccess = require('../../utils/ai-access')
 const { userMessageOf } = require('../../utils/user-error')
 
 const MAX_BYTES = 10 * 1024 * 1024
@@ -62,6 +63,9 @@ function receiptAccepted(body, sessionId) {
 }
 
 function classifySendError(err) {
+  // 年龄确认点了「未满」：上传请求还没发出去（先问声明、再发请求，见 utils/api-legal-consent.js 的 runAi），
+  // 文件没到终端，这张码也没用掉。照实说原因、可以重选，不能归成「结果未知」把人卡住。
+  if (aiAccess.isDeclined(err)) return 'declined'
   const status = err && typeof err.statusCode === 'number' ? err.statusCode : -1
   const code = err && typeof err.code === 'string' ? err.code : ''
   if (DEAD_CODES[code]) return 'dead'
@@ -79,7 +83,8 @@ Page({
     phase: 'idle',
     // scene 兑换失败：码已被消费，不提供重试
     sceneFailed: false,
-    // 只有服务端明确拒收、会话仍可能再收一份时为 true。结果未知和死码都不重传。
+    // 服务端明确拒收、或年龄确认点了「未满」（根本没发出去），会话仍可能再收一份时为 true。
+    // 结果未知和死码都不重传。
     canRetry: false,
     errorMsg: '',
     sent: [],
@@ -222,7 +227,7 @@ Page({
         if (attempt !== this._sendAttempt) return
         wx.hideLoading()
         const kind = classifySendError(err)
-        if (kind === 'rejected') {
+        if (kind === 'rejected' || kind === 'declined') {
           this.setData({
             phase: 'error',
             canRetry: true,

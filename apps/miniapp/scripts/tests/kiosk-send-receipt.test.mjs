@@ -5,6 +5,7 @@
  * 都会变成兑现，而不是拒绝。只有 status=uploaded、file.fileId、真实会话用途，
  * 且 sessionId 就是这一次，才能说已收到。空的、缺字段的、别的会话的，都是结果未知。
  * 网络和 5xx 同样未知，不能再传一次；服务端明确拒收才允许重选。
+ * 年龄确认点了「未满」时请求根本没发出去，照实说原因，也允许重选。
  *
  * 由 verify:page-lifecycle 拉起，并因此进入 verify:static。不发网络请求。
  */
@@ -12,6 +13,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
@@ -25,6 +27,7 @@ const UNKNOWN_COPY = '这次上传的结果还不确定。请回到一体机屏�
 const BUSY_COPY = '这个二维码正在处理一次上传。请回到一体机屏幕查看，不要重复发送。'
 const DEAD_COPY = '这个二维码已经不能再传。请回到一体机屏幕确认；如果上面没有这份文件，请重新生成二维码。'
 const REJECT_FALLBACK = '系统没有收下这份文件，可以重新选择后再试'
+const AGE_DECLINED_COPY = '未满 14 周岁需要监护人同意后才能使用，小程序暂时办不了'
 
 function receipt(overrides = {}) {
   return {
@@ -45,6 +48,30 @@ function httpError(statusCode, code, message) {
   if (code) err.code = code
   if (message) err.serverMessage = message
   return err
+}
+
+/**
+ * 年龄确认点「未满」时上传接口拿到的那个错误，用真代码造：utils/ai-access.js 的 promptScope
+ * 在提示框选「未满」时抛出它（runAi 先问声明、再发请求，所以这时文件根本没发出去）。
+ * 页面引用的是同一份 ai-access 模块，用来判断的 isDeclined 也是真的。
+ */
+async function ageDeclinedError() {
+  const aiAccess = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))('./ai-access.js')
+  const saved = globalThis.wx
+  globalThis.wx = {
+    getStorageSync: () => '',
+    setStorageSync() {},
+    showModal(opts) { opts.success({ confirm: false, cancel: true }) },
+  }
+  try {
+    return await aiAccess.promptScope(aiAccess.AGE_SCOPE).then(
+      () => { throw new Error('选「未满」应当被拒绝') },
+      (err) => err,
+    )
+  } finally {
+    if (saved === undefined) delete globalThis.wx
+    else globalThis.wx = saved
+  }
 }
 
 function makeWx() {
@@ -311,6 +338,39 @@ test('本地就拦住的大文件没有发出去，仍可以重选', async () =>
   assert.equal(/10MB/.test(env.page.data.errorMsg), true)
   env.page.retry()
   assert.equal(env.page.data.phase, 'idle')
+})
+
+test('年龄确认点了「未满」：文件没发出去，照实说原因，不说结果未知，可以重选', async () => {
+  const declined = await ageDeclinedError()
+  assert.equal(declined.code, 'AI_AGE_NOT_DECLARED')
+  assert.equal(typeof declined.statusCode, 'undefined')
+  let next = Promise.reject(declined)
+  const env = harness(() => next)
+  env.openDirect()
+  env.page._send(FILE)
+  await flush()
+  assert.equal(env.page.data.phase, 'error')
+  assert.equal(env.page.data.canRetry, true)
+  assert.equal(env.page.data.sceneFailed, false)
+  assert.equal(env.page.data.sent.length, 0)
+  assert.equal(env.page.data.errorMsg, AGE_DECLINED_COPY)
+  assert.equal(/结果还不确定|不要在这里重复发送|回到一体机/.test(env.page.data.errorMsg), false)
+  assert.equal(env.wx.calls.hide, 1)
+
+  // 重选后还是这一个会话、内存里的同一个令牌；这次确认了就能传到。
+  env.page.retry()
+  assert.equal(env.page.data.phase, 'idle')
+  const second = deferred()
+  next = second.promise
+  env.wx.setChosen(FILE)
+  env.page.chooseAndSend()
+  assert.equal(env.uploads.length, 2)
+  assert.deepEqual(env.uploads[1].slice(0, 2), [SESSION, TOKEN])
+  assertTokenStaysInMemory(env.page)
+  second.resolve(receipt())
+  await flush()
+  assert.equal(env.page.data.phase, 'done')
+  assert.equal(env.page.data.sent.length, 1)
 })
 
 test('scene 兑换失败或回执不完整都不重试兑换，令牌不进 data', async () => {
