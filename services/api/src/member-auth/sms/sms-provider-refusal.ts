@@ -23,6 +23,10 @@ const EXACT: Readonly<Record<string, SmsProviderRefusalCategory>> = {
   'FailedOperation.SignatureIncorrectOrUnapproved': 'signature_or_template',
   'FailedOperation.TemplateIncorrectOrUnapproved': 'signature_or_template',
   'LimitExceeded.AppDailyLimit': 'app_daily_limit',
+  // 整个应用的日上限还分中国大陆、国际/港澳台两条（官方 Go SDK tencentcloud/sms/v20210111/errors.go 有这两个码）；
+  // 打满了换哪个号都发不出，算整体拒发。
+  'LimitExceeded.AppMainlandChinaDailyLimit': 'app_daily_limit',
+  'LimitExceeded.AppGlobalDailyLimit': 'app_daily_limit',
   template_missing: 'config',
   endpoint_not_allowed: 'config',
 }

@@ -97,6 +97,8 @@ async function main(): Promise<void> {
     ['UnauthorizedOperation.SmsSdkAppIdVerifyFail', 'auth_or_account'],
     ['UnauthorizedOperation.ServiceSuspendDueToArrears', 'auth_or_account'],
     ['LimitExceeded.AppDailyLimit', 'app_daily_limit'],
+    ['LimitExceeded.AppMainlandChinaDailyLimit', 'app_daily_limit'],
+    ['LimitExceeded.AppGlobalDailyLimit', 'app_daily_limit'],
     ['template_missing', 'config'],
     ['endpoint_not_allowed', 'config'],
   ] as const
@@ -120,7 +122,8 @@ async function main(): Promise<void> {
     undefined,
     null,
     'FailedOperation.ContainSensitiveWord',
-    'LimitExceeded.AppMainlandChinaDailyLimit',
+    // 只发中国大陆短信；按国际国家/地区的日上限不代表换号也发不出，不推。
+    'LimitExceeded.AppCountryOrRegionDailyLimit',
     'AuthFailure',
     'UnauthorizedOperation',
   ]
