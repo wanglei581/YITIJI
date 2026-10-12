@@ -336,7 +336,7 @@ export class FilesController {
     const dispType = disposition === 'attachment' ? 'attachment' : 'inline'
     res.setHeader('Content-Type', mimeType)
     res.setHeader('Content-Disposition', `${dispType}; filename="${encodeURIComponent(filename)}"`)
-    res.setHeader('Cache-Control', 'private, max-age=300')
+    res.setHeader('Cache-Control', 'no-store')
     res.send(buffer)
   }
 
