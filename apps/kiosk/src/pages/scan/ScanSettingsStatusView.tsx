@@ -16,7 +16,7 @@ import {
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import type { TerminalSessionState } from '../../services/terminalAuth'
-import { networkDisconnectLine } from '../../copy/unattendedCopy'
+import { networkDisconnectLine, TAKE_ORIGINAL_REMINDER } from '../../copy/unattendedCopy'
 import { usePrintSessionDeferred } from '../../hooks/useTerminalSessionState'
 import { EndThisUseButton } from '../print/EndThisUseButton'
 import { SCAN_SESSION_DEFERRED_LINE } from '../print/printSessionHoldCopy'
@@ -133,7 +133,7 @@ export function ScanSettingsStatusView({
       : phase === 'loading'
         ? '正在等系统建好这次扫描，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '这次没有可用的扫描。'
-  const sessionHold = sessionDeferred && failure?.title === '这台机器的安全校验没通过'
+  const sessionHold = sessionDeferred && failure?.kind === 'terminal-session'
   const shownDescription = sessionHold ? SCAN_SESSION_DEFERRED_LINE : description
   const status = awaitingAck
     ? ackRetryable
@@ -181,7 +181,7 @@ export function ScanSettingsStatusView({
       page="scan-settings"
       state={workbenchState}
       title={title}
-      subtitle={shownDescription}
+      subtitle={sessionHold ? null : shownDescription}
       status={status}
       layout="spread"
       ctabar={
@@ -297,6 +297,7 @@ export function ScanSettingsStatusView({
         }
       >
         <p>{shownDescription}</p>
+        {sessionHold ? <p data-testid="scan-take-original">{TAKE_ORIGINAL_REMINDER}</p> : null}
         {phase === 'loading' && !awaitingAck ? <p>这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
         {/* 没拿到投递授权的窗口必须说出「现在扫也不会进这一场」。不说的话用户看到
             「扫描任务已创建」就转身去按开始，而服务端此刻还不肯把文件投给这一场。 */}

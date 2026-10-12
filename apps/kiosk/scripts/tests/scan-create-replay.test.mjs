@@ -288,6 +288,14 @@ test('通用拒绝码仍然落到原来那一屏，没有被 child 那一条顶�
   assert.match(verdict.failure.description, /可能按重复件拒收/)
 })
 
+test('本机会话无效带 terminal-session 类型，其它确定失败不带', async () => {
+  const { classifyCreateFailure } = await loadRecoveryModule()
+  const session = classifyCreateFailure(new ApiHttpError('TERMINAL_SESSION_INVALID', '终端安全会话无效', 401))
+  assert.equal(session.failure.kind, 'terminal-session')
+  const busy = classifyCreateFailure(new ApiHttpError('SCAN_TERMINAL_BUSY', '本机正在扫描中', 409))
+  assert.equal(busy.failure.kind, undefined)
+})
+
 test('替身没有漂移：真 ApiHttpError 仍然是 code + status 的那三件套', async () => {
   // 上面所有 case 都跑在替身上。真那一份哪天改了字段名，这条会红。
   const source = readFileSync(join(root, 'src/services/api/httpAdapter.ts'), 'utf8')

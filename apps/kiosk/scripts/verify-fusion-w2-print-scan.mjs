@@ -727,6 +727,57 @@ const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
 // 第三轮：print-only 的当页句改成完整第 4 句（合规六建议、前端二七拟、合规九定）。旧的短句不再单独出现。
 assert.match(recoveryNoticeHook, /机器刚恢复，刚才选的材料已经清掉，要重新传/, '换票清场提示使用第 4 句')
 assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点（上下文区 10/12 拆到 HomeContextRegion）')
+// 第四轮：第 4、第 6 句只说一次。下一次触屏收起且不吞掉这次触摸；进页前先读清场范围再订阅。
+assert.match(recoveryNoticeHook, /addEventListener\(\s*'pointerdown'/, '清场提示亮起时在 document 上听下一次触屏')
+assert.match(recoveryNoticeHook, /removeEventListener\(\s*'pointerdown'/, '提示收起时摘掉触屏监听')
+assert.doesNotMatch(recoveryNoticeHook, /stopPropagation\(\)/, '触屏收起不吞掉这次触摸')
+assert.doesNotMatch(recoveryNoticeHook, /preventDefault\(\)/, '触屏收起不取消这次触摸')
+assert.match(
+  recoveryNoticeHook,
+  /function ensureWatch\(\)[^{]*\{[\s\S]*?consume\(\)[\s\S]*?subscribeTerminalSession\(/,
+  '进页前先读一次清场范围，再订阅',
+)
+assert.match(
+  read('src/pages/screensaver/ScreensaverPage.tsx'),
+  /dismissSessionRecoveryNotice\(\)/,
+  '进待机屏时收起清场提示',
+)
+const takeOriginal = "别忘了取走玻璃上或进纸口里的原件（身份证等）"
+assert.match(
+  read('src/copy/unattendedCopy.ts'),
+  new RegExp(`export const TAKE_ORIGINAL_REMINDER = '${takeOriginal}'`),
+  '取走原件那句提成一个常量，字面不变',
+)
+const featureInfo = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
+const scanStatus = read('src/pages/scan/ScanSettingsStatusView.tsx')
+assert.match(featureInfo, /TAKE_ORIGINAL_REMINDER/, '打印大厅说明页引用取走原件常量')
+assert.doesNotMatch(featureInfo, new RegExp(takeOriginal), '打印大厅说明页不再内嵌这句字面')
+assert.match(scanStatus, /TAKE_ORIGINAL_REMINDER/, '扫描结束使用屏引用同一个取走原件常量')
+assert.match(scanStatus, /failure\?\.kind === 'terminal-session'/, '扫描压着按失败类型认，不按中文标题')
+assert.doesNotMatch(scanStatus, /failure\?\.title === '这台机器的安全校验没通过'/, '扫描压着不再比较中文标题')
+assert.match(scanStatus, /subtitle=\{sessionHold \? null : shownDescription\}/, '压着时第 5 句不进页头副标题，屏上和读屏只留一处')
+assert.match(read('src/pages/scan/ScanSettingsPage.tsx'), /kind: 'terminal-session'/, '扫描页本地失败带上类型')
+assert.match(read('src/pages/scan/scanRescanRecovery.ts'), /kind: 'terminal-session'/, '扫描创建失败带上类型')
+assert.match(
+  sessionHold,
+  /<FileSourceStatus[\s\S]*<div className="fs-status-act">[\s\S]*<EndThisUseButton \/>[\s\S]*<\/FileSourceStatus>/,
+  '选文件页结束使用按钮放进状态卡',
+)
+assert.equal(
+  (read('src/pages/print/PrintMaterialCheckPage.tsx').match(/<PrintFlowRecoveryStrip\b/g) ?? []).length,
+  2,
+  '材料检查没文件和有文件两支都挂提示条',
+)
+assert.match(
+  read('src/pages/print/PrintConfirmPage.tsx'),
+  /recoveryNotice=\{<PrintRecoveryNotice/,
+  '确认页清场句交给视图，不再压在页头大卡上面',
+)
+assert.match(
+  read('src/pages/print/components/PrintConfirmView.tsx'),
+  /<Steps idle=\{idle\} step=\{props\.step\} freePricing=\{freePricing\} \/>\s*\{recoveryNotice\}/,
+  '确认页清场句在四步条下面',
+)
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)

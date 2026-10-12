@@ -3197,7 +3197,11 @@ test('print-only says sentence 4 on home and the four print pages, and confirm p
   const pay = page.getByRole('button', { name: '确认并去付款', exact: true })
   await expect(pay).toBeEnabled()
   await setRecoveryView(page, { clearScope: 'print-only' })
-  await expect(page.getByTestId('print-confirm-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  const confirmNotice = page.getByTestId('print-confirm-recovery-notice')
+  await expect(confirmNotice).toHaveText(RECOVERY_NOTICE)
+  const confirmCard = await page.locator('section.pcf-xq').boundingBox()
+  const confirmNoticeBox = await confirmNotice.boundingBox()
+  expect(confirmNoticeBox?.y ?? 0).toBeGreaterThan((confirmCard?.y ?? 0) + (confirmCard?.height ?? 0) - 1)
   await expect(pay).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新选文件', exact: true })).toBeEnabled()
   await expect(page.getByTestId('print-confirm-state-missing-context')).toBeVisible()
@@ -3253,7 +3257,21 @@ test('deferred session replaces the retry line and offers end-this-use on print 
   await expect(held).not.toContainText(SESSION_RECOVERY_LINE)
   const endUse = page.getByTestId('print-session-end-use')
   await expect(endUse).toBeVisible()
-  expect((await endUse.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(56)
+  const endBox = await endUse.boundingBox()
+  const statusBox = await page.getByTestId('file-source-status').boundingBox()
+  expect(endBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(endBox?.width ?? 0).toBeLessThan((statusBox?.width ?? 0) - 40)
+  const endFonts = await page.evaluate(() => {
+    const end = document.querySelector('[data-testid="print-session-end-use"]')
+    const footer = document.querySelector('.print-upload-footer .qx-btn')
+    return {
+      inside: Boolean(end?.closest('[data-testid="file-source-status"]')),
+      end: end ? getComputedStyle(end).fontSize : '',
+      footer: footer ? getComputedStyle(footer).fontSize : '',
+    }
+  })
+  expect(endFonts.inside).toBe(true)
+  expect(endFonts.end).toBe(endFonts.footer)
 
   let releaseChecking: () => void = () => undefined
   const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
@@ -3301,8 +3319,11 @@ test('deferred session replaces the retry line and offers end-this-use on print 
   await setRecoveryView(page, { deferred: true })
   await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
   await expect(page).toHaveURL(/\/scan\?stage=settings/)
-  // 页头和状态卡各有一份同一句，这是扫描失败屏原来的两处说明，不是叠了两层。
-  await expect(page.getByText(SCAN_DEFERRED_LINE, { exact: true }).first()).toBeVisible()
+  // 压着时第 5 句只留在状态卡。spread 下页头副标题被裁成给读屏的 1px，所以不再传入。
+  const scanDeferred = page.getByText(SCAN_DEFERRED_LINE, { exact: true })
+  await expect(scanDeferred).toHaveCount(1)
+  await expect(scanDeferred).toBeVisible()
+  await expect(page.getByTestId('scan-take-original')).toHaveText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
   const scanEnd = page.getByTestId('scan-session-end-use')
   await expect(scanEnd).toBeVisible()
   expect((await scanEnd.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(56)
@@ -3394,5 +3415,148 @@ test('print-only notice folds itself after 120 seconds @w2', async ({ page, api 
   await expect(notice).toHaveText(RECOVERY_NOTICE)
   await page.clock.runFor(1_000)
   await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only notice on home dismisses on the next touch and stays gone on the print line @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 顶栏占位是空的 flex 项，首页还把它 display:none，Playwright 判定不可点。
+  // 点页头里这句说明（不是按钮），捕获阶段的触屏照样收起提示。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
+  await page.locator('[data-action="print-hub"]').click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only notice on the upload page dismisses on the next touch without swallowing it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/upload?source=document')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('file-source-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 顶栏占位高度为 0（align-items:center 的空 flex 项），点页头大卡右侧空白。
+  await page.getByTestId('file-source-hero').click({ position: { x: 860, y: 36 } })
+  await expect(notice).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/upload/)
+  // 这次触屏没有把按钮吃掉：退出键仍会离开本页。source=document 的出口是首页。
+  await page.getByTestId('file-source-exit').click()
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('entering the screensaver dismisses the print-only notice without a reload @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+  let releasePlaylist: () => void = () => undefined
+  const playlistGate = new Promise<void>((resolve) => { releasePlaylist = resolve })
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/screensaver', async () => {
+    await playlistGate
+    return {
+      status: 200,
+      json: {
+        enabled: true,
+        idleTimeoutSec: 4,
+        items: [{
+          id: 'r8-screensaver',
+          type: 'image',
+          url: 'https://warning.invalid/screensaver.png',
+          mimeType: 'image/png',
+          durationSec: 30,
+          sha256: 'r8-screen-fixture',
+        }],
+      },
+    }
+  })
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  await page.evaluate(() => { (window as unknown as { __r8Stay?: number }).__r8Stay = 1 })
+  releasePlaylist()
+  await expect(page).toHaveURL(/\/screensaver$/, { timeout: 8_000 })
+  await expect(page.locator('[data-kiosk-screen="screensaver"]')).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __r8Stay?: number }).__r8Stay)).toBe(1)
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  // 地址先变、首页后画。等首页真画出来再数提示，避免数到「还没画」的 0。
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  // 句子和首页同一帧画出来。toHaveCount(0) 会在「还没画」时立刻算过，所以这里读已经画上的字。
+  expect(await page.evaluate(() => document.body.innerText.includes('机器刚恢复，刚才选的材料已经清掉'))).toBe(false)
+  expect(await page.evaluate(() => (window as unknown as { __r8Stay?: number }).__r8Stay)).toBe(1)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only already stored before mount shows sentence 4 on the first screen @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+  await page.addInitScript(() => {
+    let hooks: { setRecoveryView?: (view: { clearScope?: string }) => void } | undefined
+    Object.defineProperty(window, '__terminalSessionE2E', {
+      configurable: true,
+      enumerable: true,
+      get: () => hooks,
+      set: (value: { setRecoveryView?: (view: { clearScope?: string }) => void }) => {
+        hooks = value
+        value?.setRecoveryView?.({ clearScope: 'print-only' })
+      },
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('material check with a file shows sentence 2 when failed and sentence 5 when deferred @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const body = route.request().postDataJSON() as { kind?: string }
+    await route.fulfill({
+      status: 201,
+      json: { success: true, data: { ...materialTask('inspection'), id: `w2-${body.kind ?? 'inspection'}`, status: 'processing', result: null } },
+    })
+  })
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection', {
+    status: 200,
+    json: { success: true, data: { ...materialTask('inspection'), status: 'processing', result: null } },
+  })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  await expect(page.getByText('这一页没有文件')).toHaveCount(0)
+
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  const hold = page.getByTestId('print-preview-session-hold')
+  await expect(hold).toContainText(SESSION_RECOVERY_LINE)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+  const guide = await page.locator('.qpd-guide').boundingBox()
+  const failedBox = await hold.boundingBox()
+  expect(failedBox?.y ?? 0).toBeGreaterThan((guide?.y ?? 0) + (guide?.height ?? 0) - 1)
+
+  await setRecoveryView(page, { deferred: true })
+  await expect(hold).toContainText(PRINT_DEFERRED_LINE)
+  await expect(page.getByTestId('print-session-end-use')).toBeVisible()
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })

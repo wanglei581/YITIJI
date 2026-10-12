@@ -2423,7 +2423,11 @@ test('with-other sends the person home from interview and says sentence 6 @w5-ki
   await expect(page.locator('[data-interview-workbench]')).toBeVisible()
   await setRecoveryView(page, { clearScope: 'with-other' })
   await expect(page).toHaveURL((url) => url.pathname === '/')
-  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE_OTHER)
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE_OTHER)
+  // 顶栏占位在首页是 display:none。点页头说明句，下一次触屏收起第 6 句。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

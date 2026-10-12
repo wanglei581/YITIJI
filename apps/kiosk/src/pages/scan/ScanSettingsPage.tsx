@@ -302,6 +302,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             { code: 'TERMINAL_SESSION_INVALID' },
             machineUnusableLine(),
           ),
+          kind: 'terminal-session',
         })
         setPhase('error')
       }

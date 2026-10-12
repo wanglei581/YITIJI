@@ -675,8 +675,8 @@ export function PrintConfirmPage() {
         <QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />
       }
     >
-      <PrintRecoveryNotice testId="print-confirm-recovery-notice" />
       <PrintConfirmView
+        recoveryNotice={<PrintRecoveryNotice testId="print-confirm-recovery-notice" />}
         step={4}
         freePricing={freePricing}
         screen={screen}

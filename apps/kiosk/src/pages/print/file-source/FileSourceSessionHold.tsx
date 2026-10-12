@@ -16,9 +16,13 @@ export function FileSourceSessionHold({
   return (
     <>
       <FileSourceStatus kind="warn" title="这台机器现在下不了打印单">
-        {deferred ? PRINT_SESSION_DEFERRED_LINE : PRINT_SESSION_RETRY_LINE}
+        <div className="fs-status-p">{deferred ? PRINT_SESSION_DEFERRED_LINE : PRINT_SESSION_RETRY_LINE}</div>
+        {deferred ? (
+          <div className="fs-status-act">
+            <EndThisUseButton />
+          </div>
+        ) : null}
       </FileSourceStatus>
-      {deferred ? <EndThisUseButton /> : null}
       <section className="fs-sec fs-hold-sources">
         <div className="fs-sec-h">
           <span className="no">01</span>

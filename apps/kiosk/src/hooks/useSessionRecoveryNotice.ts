@@ -23,10 +23,37 @@ let expiryTimer: number | null = null
 let watching = false
 let wantsHome = false
 let dropEpoch = 0
+let pointerBound = false
 const listeners = new Set<() => void>()
 
 function emit(): void {
   for (const listener of listeners) listener()
+}
+
+/** 亮起期间听下一次触屏。捕获阶段挂上，不 preventDefault、不 stopPropagation，这一下照常点到按钮。 */
+function onDocumentPointerDown(): void {
+  dismissSessionRecoveryNotice()
+}
+
+function bindPointerDismiss(): void {
+  if (pointerBound || typeof document === 'undefined') return
+  pointerBound = true
+  document.addEventListener('pointerdown', onDocumentPointerDown, true)
+}
+
+function unbindPointerDismiss(): void {
+  if (!pointerBound || typeof document === 'undefined') return
+  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+  pointerBound = false
+}
+
+function clearNotice(): void {
+  notice = null
+  if (expiryTimer !== null) {
+    window.clearTimeout(expiryTimer)
+    expiryTimer = null
+  }
+  unbindPointerDismiss()
 }
 
 function arm(text: string, goHome: boolean): void {
@@ -40,9 +67,10 @@ function arm(text: string, goHome: boolean): void {
   expiryTimer = window.setTimeout(() => {
     expiryTimer = null
     if (!notice || notice.until > Date.now()) return
-    notice = null
+    clearNotice()
     emit()
   }, NOTICE_MS)
+  bindPointerDismiss()
   emit()
 }
 
@@ -63,11 +91,7 @@ function ensureWatch(): void {
 
 export function dismissSessionRecoveryNotice(): void {
   if (!notice) return
-  notice = null
-  if (expiryTimer !== null) {
-    window.clearTimeout(expiryTimer)
-    expiryTimer = null
-  }
+  clearNotice()
   emit()
 }
 
@@ -87,9 +111,11 @@ export function acknowledgeSessionRecoveryHome(): void {
 export function useSessionRecoveryNotice(): string | null {
   const [version, setVersion] = useState(0)
   useEffect(() => {
-    ensureWatch()
+    // 先挂上再读。ensureWatch 里那一次 consume 会当场通知；监听若排在后面，首屏这一句就丢了。
     const listener = () => setVersion((value) => value + 1)
     listeners.add(listener)
+    ensureWatch()
+    setVersion((value) => value + 1)
     return () => { listeners.delete(listener) }
   }, [])
   void version
@@ -100,9 +126,10 @@ export function useSessionRecoveryNotice(): string | null {
 export function useSessionRecoveryDropEpoch(): number {
   const [epoch, setEpoch] = useState(dropEpoch)
   useEffect(() => {
-    ensureWatch()
     const listener = () => setEpoch(dropEpoch)
     listeners.add(listener)
+    ensureWatch()
+    setEpoch(dropEpoch)
     return () => { listeners.delete(listener) }
   }, [])
   return epoch

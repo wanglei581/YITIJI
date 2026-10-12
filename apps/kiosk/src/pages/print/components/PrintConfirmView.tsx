@@ -54,6 +54,8 @@ type Props = {
   printNotes: ReactNode
   /** 03 卡内动作行（稿 .cfm-act）：返回 / 主操作，由页面按本屏状态给出。 */
   actions: ReactNode
+  /** 清场第 4 句。放在页头大卡和四步条下面，和选文件页同一层。 */
+  recoveryNotice?: ReactNode
   submitError: string | null
   onLogin: () => void
 }
@@ -97,7 +99,7 @@ export function PrintConfirmView(props: Props) {
     freePricing, screen, invalidReason, file, summaryRows, adjustments, paperNote, pricedParamsLabel, quote, costCalcLabel,
     amountText, benefitView, redactionText, materialDemo, printerBlocked, printerBlockedReason,
     terminalFailed, terminalFailedText, selfAssessment, printNotes, actions,
-    submitError, onLogin,
+    recoveryNotice, submitError, onLogin,
   } = props
   const idle = screen === 'missing-context' || screen === 'invalid-context'
   const quotedLike = screen === 'quoted' || screen === 'benefit-unverified' || screen === 'zero-amount'
@@ -119,6 +121,7 @@ export function PrintConfirmView(props: Props) {
     >
       <Advisor screen={screen} doingOverride={capabilityDoing} freePricing={freePricing} />
       <Steps idle={idle} step={props.step} freePricing={freePricing} />
+      {recoveryNotice}
 
       {printerBlocked && !idle && !(quote.status === 'unavailable' && quote.code === 'PRINT_TERMINAL_QUEUE_HALTED') ? <div className="pcf-alert" role="status">{printerBlockedReason}</div> : null}
       {terminalFailed ? <div className="pcf-alert" data-tone="error" role="alert">{terminalFailedText}</div> : null}

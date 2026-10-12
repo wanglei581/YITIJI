@@ -154,6 +154,11 @@ export function refundApplyLine(contact?: PublicSupportContact | null): string {
   return `如需退款，请${servicePhoneLine(contact)}，我们核实后原路退回。`
 }
 
+/**
+ * 结束使用时提醒取走原件。字面已定，打印大厅说明页和扫描「结束这次使用」那一屏共用，不另写一句。
+ */
+export const TAKE_ORIGINAL_REMINDER = '别忘了取走玻璃上或进纸口里的原件（身份证等）'
+
 /** 一体机主机靠 4G CPE 上网。提到网络断开时用这一句，不叫用户自己查线。 */
 export function networkDisconnectLine(): string {
   return '网络断开时，我们会收到提醒并远程处理'
