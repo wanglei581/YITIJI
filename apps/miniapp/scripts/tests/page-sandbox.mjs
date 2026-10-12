@@ -7,6 +7,9 @@
  * 只含与具体页面无关的部分：可控 Promise、flush、页面加载器、带路径的 setData。
  * wx / auth / api 替身仍由各测试自己给（每个测试要控制的故障不一样）。
  *
+ * 注入版本时，开关和路由表要成套给（variantModules）：测的就是真实会发布的那一组，
+ * 不是「开关关掉、路由表仍是另一版」这种发不出去的组合。
+ *
  * 放在 scripts/tests/ 下：scripts/project-graph/gates.mjs 把这里排除在「门禁脚本」之外。
  */
 import assert from 'node:assert/strict'
@@ -18,6 +21,60 @@ import { fileURLToPath } from 'node:url'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const requireMiniapp = createRequire(path.join(MINIAPP, 'utils', 'entry.js'))
+
+function readVariantName() {
+  try {
+    const text = fs.readFileSync(path.join(MINIAPP, 'utils/build-variant.js'), 'utf8')
+    return (text.match(/VARIANT:\s*'([^']+)'/) || [])[1] || ''
+  } catch {
+    return ''
+  }
+}
+
+/** 完整路由表：目录是不含 AI 版时原件在 stash，否则就是当前的 utils/ai-entries.js。 */
+function fullAiEntriesFile() {
+  if (readVariantName() === 'no-ai') {
+    return path.join(MINIAPP, 'review-variants/stash/utils/ai-entries.js')
+  }
+  return path.join(MINIAPP, 'utils/ai-entries.js')
+}
+
+/**
+ * 从完整路由表派生空路由表。规则与 verify-review-variant.mjs 的 entryKeyProblems
+ * 对生成结果的要求一致：键不变；函数恒返回空串；数组换成空数组；其余换成 null。
+ */
+function emptyAiEntries(full) {
+  const empty = {}
+  for (const key of Object.keys(full)) {
+    const value = full[key]
+    if (typeof value === 'function') empty[key] = function emptyHref() { return '' }
+    else if (Array.isArray(value)) empty[key] = []
+    else empty[key] = null
+  }
+  return empty
+}
+
+/**
+ * 成套版本替身。注入时开关和路由表一起给，测的就是真实发布的组合。
+ *
+ * 边界：替身只换页面自己直接 require 的这两个模块。页面目录下以 ./ 开头的辅助模块走 Node 的
+ * require，它们自己读的仍是目录当前版本（现在这样的文件有 pages/privacy/consents.js，它读 AI_ENABLED）。
+ * 在完整版目录里给页面注入 no-ai 时，这类辅助模块仍按完整版跑：只会让断言它的用例变红，不会变成假的通过；
+ * 它在不含 AI 版里的真实行为，由 review-variant.test.mjs「整条 verify:static 链」那条在临时副本里跑到。
+ * @param {'full'|'no-ai'} name
+ */
+export function variantModules(name) {
+  if (name !== 'full' && name !== 'no-ai') {
+    throw new Error(`variantModules 只接受 'full' 或 'no-ai'，收到 ${JSON.stringify(name)}`)
+  }
+  const full = requireMiniapp(fullAiEntriesFile())
+  return {
+    'build-variant': name === 'full'
+      ? { VARIANT: 'full', AI_ENABLED: true }
+      : { VARIANT: 'no-ai', AI_ENABLED: false },
+    'ai-entries': name === 'full' ? full : emptyAiEntries(full),
+  }
+}
 
 // ⚠ vm.createContext 建的是**另一个 realm**：沙箱里造出来的数组 / 对象不是宿主
 //   Array、Object 的实例。所以断言一律用 length / 字段比较，不要用 deepStrictEqual
@@ -36,12 +93,44 @@ export function deferred() {
 export const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 /**
+ * 不含 AI 版要停放的页面目录。完整版返回 null：停放页只随完整版发布，
+ * 完整版下走不到后面的 stash 替换。
+ */
+function noAiParkedFolders() {
+  let variant = ''
+  try {
+    const text = fs.readFileSync(path.join(MINIAPP, 'utils/build-variant.js'), 'utf8')
+    variant = (text.match(/VARIANT:\s*'([^']+)'/) || [])[1] || ''
+  } catch {
+    return null
+  }
+  if (variant !== 'no-ai') return null
+  const all = JSON.parse(fs.readFileSync(path.join(MINIAPP, 'review-variants/variants.json'), 'utf8'))
+  const spec = all[variant]
+  return new Set((spec && spec.aiPages) || [])
+}
+
+function pageFolder(relPath) {
+  const norm = String(relPath).split(path.sep).join('/')
+  return (norm.match(/^pages\/([^/]+)\//) || [])[1] || ''
+}
+
+/** 页面 require 的是不是 utils 下的模块（不含更深层的路径）。 */
+function isUtilsModuleId(id) {
+  const norm = String(id).split('\\').join('/')
+  return /(?:^|\/)utils\/[^/]+$/.test(norm)
+}
+
+/**
  * 在沙箱里真实执行一个页面源码，返回 Page() 收到的配置对象。
  * @param {string} relPath 相对 apps/miniapp 的路径
  * @param {string} [source] 给了就跑这份源码（变异测试用），相对 require 仍按 relPath 的目录解析
  */
 export function loadPageDefinition(relPath, { wx, modules, timers = [], source }) {
   const src = typeof source === 'string' ? source : fs.readFileSync(path.join(MINIAPP, relPath), 'utf8')
+  // 停放页拿 stash 里的完整版 utils；在包里的页不换，用目录当前版本。
+  const parkedFolders = noAiParkedFolders()
+  const useStash = parkedFolders !== null && parkedFolders.has(pageFolder(relPath))
   let pageDef = null
   const sandbox = {
     console,
@@ -52,7 +141,16 @@ export function loadPageDefinition(relPath, { wx, modules, timers = [], source }
       // 页面自己目录下的模块（如 print-pickup/pickup-state.js）：按页面目录解析，用真实实现。
       if (id.startsWith('./')) return requireMiniapp(path.join(MINIAPP, path.dirname(relPath), id))
       const name = id.replace(/^.*\//, '').replace(/\.js$/, '')
+      // 测试注入的替身仍然最高，stash 不能盖过它。
       if (Object.prototype.hasOwnProperty.call(modules, name)) return modules[name]
+      // stash 只替换本页直接 require 的 utils 模块。停放页自己目录下以 ./ 开头的辅助模块
+      // 走的是上面 Node 自己的 require，它们自己再引用关键模块时不经过这里的替换
+      // （现在这样的文件有 pages/self-explore/append-print.js）。
+      // 后果只会是不含 AI 状态下相关用例变红，不会变成假的通过。
+      if (useStash && isUtilsModuleId(id)) {
+        const stashed = path.join(MINIAPP, 'review-variants/stash/utils', `${name}.js`)
+        if (fs.existsSync(stashed)) return requireMiniapp(stashed)
+      }
       // 其余一律用真实实现（它们都是无 wx 依赖的纯模块）。
       return requireMiniapp(`../utils/${name}.js`)
     },

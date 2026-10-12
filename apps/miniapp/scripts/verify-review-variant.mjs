@@ -3,8 +3,10 @@
  * 小程序完整版 / 不含 AI 提审版一致性。
  *
  * (a) 当前目录的注册页、tab、隐私分类与 review-variants/variants.json 一致。
- * (b) 临时副本里生成 no-ai，再跑 static / review-scope / package-layout 和本门禁的 (a)；
+ * (b) 起点是完整版：临时副本里生成 no-ai，再跑 static / review-scope / package-layout 和本门禁的 (a)；
  *     然后 --variant full 还原，关键文件与副本原件逐字节相同。
+ *     起点已经是不含 AI 版：先对这份跑那四条内层检查，再还原到 stash 里的完整版原件并重跑内层检查，
+ *     最后再生成 no-ai，关键文件和 stash 原件都要逐字节回到起点。
  * (c) no-ai 已注册页面的 wxml/js 不写死指向 aiPages 的路由（复用 verify-review-scope 的扫描）。
  *     另外：完整版里这些路由字面量只允许出现在 utils/ai-entries.js；
  *     不含 AI 版把该文件换成空版本后，js/wxml（除 scripts/、review-variants/）里也没有。
@@ -317,10 +319,94 @@ function runNode(cwd, args, env) {
   return result
 }
 
+const INNER_COMMANDS = [
+  ['scripts/verify-miniapp-static.mjs'],
+  ['scripts/verify-review-scope.mjs'],
+  ['scripts/verify-package-layout.mjs'],
+  ['scripts/verify-review-variant.mjs'],
+]
+
+function tailOf(result) {
+  return `${result.stdout || ''}\n${result.stderr || ''}`.trim().split('\n').slice(-25).join('\n')
+}
+
+function checkRoundTripFromNoAi(tmp) {
+  const stashDir = path.join(tmp, 'review-variants/stash')
+  const missing = KEY_FILES.filter((rel) => !fs.existsSync(path.join(stashDir, rel)))
+  if (missing.length) {
+    bad('不含 AI 起点缺少 stash 原件', missing.join('、'))
+    return
+  }
+  const startFiles = KEY_FILES.map((rel) => fs.readFileSync(path.join(tmp, rel)))
+  const startStash = KEY_FILES.map((rel) => fs.readFileSync(path.join(stashDir, rel)))
+  const env = { ...process.env, MINIAPP_REVIEW_VARIANT_INNER: '1' }
+  for (const args of INNER_COMMANDS) {
+    const result = runNode(tmp, args, env)
+    if (result.status !== 0) {
+      bad(`不含 AI 起点的内层检查 ${args[0]}`, tailOf(result))
+      return
+    }
+  }
+  ok('不含 AI 起点：static、review-scope、package-layout、本门禁 (a)(c)(d) 通过')
+
+  const restored = runNode(tmp, ['scripts/make-review-variant.mjs', '--variant', 'full'])
+  if (restored.status !== 0) {
+    bad('不含 AI 起点还原 full', tailOf(restored))
+    return
+  }
+  const notRestored = KEY_FILES.filter((rel, index) => !startStash[index].equals(fs.readFileSync(path.join(tmp, rel))))
+  if (notRestored.length) {
+    bad('不含 AI 起点还原 full：关键文件与 stash 原件不一致', notRestored.join('、'))
+    return
+  }
+  if (fs.existsSync(stashDir)) {
+    bad('不含 AI 起点还原 full：stash 还在', 'review-variants/stash')
+    return
+  }
+  ok('不含 AI 起点还原 full：关键文件与 stash 原件逐字节相同，stash 已删')
+
+  for (const args of INNER_COMMANDS) {
+    const result = runNode(tmp, args, env)
+    if (result.status !== 0) {
+      bad(`不含 AI 起点还原后的完整版内层检查 ${args[0]}`, tailOf(result))
+      return
+    }
+  }
+  ok('不含 AI 起点还原后的完整版：内层检查通过')
+
+  const regenerated = runNode(tmp, ['scripts/make-review-variant.mjs', '--variant', 'no-ai'])
+  if (regenerated.status !== 0) {
+    bad('不含 AI 起点再生成 no-ai', tailOf(regenerated))
+    return
+  }
+  const fileDrift = KEY_FILES.filter((rel, index) => !startFiles[index].equals(fs.readFileSync(path.join(tmp, rel))))
+  if (fileDrift.length) {
+    bad('不含 AI 起点再生成 no-ai：关键文件与起点不一致', fileDrift.join('、'))
+    return
+  }
+  const stashDrift = KEY_FILES.filter((rel, index) => {
+    const file = path.join(stashDir, rel)
+    return !fs.existsSync(file) || !startStash[index].equals(fs.readFileSync(file))
+  })
+  if (!fs.existsSync(stashDir)) {
+    bad('不含 AI 起点再生成 no-ai：stash 缺失', 'review-variants/stash')
+    return
+  }
+  if (stashDrift.length) {
+    bad('不含 AI 起点再生成 no-ai：stash 原件与起点不一致', stashDrift.join('、'))
+    return
+  }
+  ok('不含 AI 起点再生成 no-ai：关键文件与 stash 原件都回到起点')
+}
+
 function checkRoundTrip() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-'))
   try {
     copyMiniapp(tmp)
+    if (variantOf(tmp).name === 'no-ai') {
+      checkRoundTripFromNoAi(tmp)
+      return
+    }
     const before = KEY_FILES.map((rel) => fs.readFileSync(path.join(tmp, rel)))
     const env = { ...process.env, MINIAPP_REVIEW_VARIANT_INNER: '1' }
     const generated = runNode(tmp, ['scripts/make-review-variant.mjs', '--variant', 'no-ai'])
