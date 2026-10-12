@@ -167,9 +167,11 @@ const frozen = {
   // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
   // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
   // 第四段仅换设备身份不可用文案，并取会话联系方式；身份、声明、通话清理逻辑未改，重冻字节哈希。
-  'src/hooks/useAiAdvisorCallSession.ts': 'a46c0f19d40071879703ed9cf46934fcf0aa0bf9e465fef79b589398291efda9',
+  // 2026-10-11 第七次改字：连接超时那句不再叫人「检查网络」，基线随这次有意改动前移（只这一句）。
+  'src/hooks/useAiAdvisorCallSession.ts': 'd552f415a69cd6419273515f8dfe6163258055946291d2bd070f5cbb802c8598',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
+check(!read('src/hooks/useAiAdvisorCallSession.ts').includes('检查网络') && read('src/hooks/useAiAdvisorCallSession.ts').includes('连接超时（30s），请稍后重试'), '语音通话连接超时不叫人检查网络')
 
 const cssFiles = [
   'src/pages/resume/styles/resume-fusion-common.css',

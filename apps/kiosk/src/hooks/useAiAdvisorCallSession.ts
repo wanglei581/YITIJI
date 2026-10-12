@@ -277,7 +277,7 @@ export function useAiAdvisorCallSession() {
       } catch (fetchErr) {
         clearTimeout(timeoutId)
         if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-          throw new Error('连接超时（30s），请检查网络后重试')
+          throw new Error('连接超时（30s），请稍后重试')
         }
         throw fetchErr
       }

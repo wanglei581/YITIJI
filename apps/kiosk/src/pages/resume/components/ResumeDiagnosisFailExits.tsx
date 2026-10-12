@@ -76,7 +76,6 @@ export function ResumeDiagnosisFailExits({ file, fileId }: Props) {
         <div className="rrp-zh">这些都不需要 AI<span>现在就能做</span></div>
         <p className="rrp-export-reason" style={{ marginBottom: 12 }}>
           {file?.name ? `「${file.name}」的解析没有完成。` : '这次没有生成诊断报告。'}
-          这一屏不给任何诊断结论 —— 没跑出来就是没有，不拿通用建议顶替。
         </p>
         {!canPrintOriginal ? (
           <p id="resume-fail-print-reason" className="rrp-export-reason" style={{ marginBottom: 12 }}>

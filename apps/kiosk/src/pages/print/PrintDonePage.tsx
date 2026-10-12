@@ -1,4 +1,4 @@
-import { peekSupportContact, helpNeededLine, machineCannotPrintLine, preferUnattended, printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { peekSupportContact, helpNeededLine, machineCannotPrintLine, preferUnattended, printProblemLine, refundApplyLine, resolveSupportContact } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -36,7 +36,7 @@ import {
   PrintJamGuide,
   PrintOutOfPaperPanel,
 } from './components/PrintDoneSections'
-import { doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint } from './printProgressModel'
+import { SAME_CODE_RESUME_LINE, UNCONFIRMED_ONSITE_FREE_LINE, UNCONFIRMED_SAME_CODE_LINE, doneTakeaway, failureStaffDoing, jamOrderKeptLine, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint, sameCodeResumeEligible } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
 
@@ -129,7 +129,7 @@ export function PrintDonePage() {
   const { file, params } = state
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
-  const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
+  const flowAmountCents = typeof state.amountCents === 'number' ? state.amountCents : null
   const displayOrderNo = publicOrderNo(typeof state.orderNo === 'string' ? state.orderNo : null)
   const idDocument = state.idDocument === true
 
@@ -153,6 +153,9 @@ export function PrintDonePage() {
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
 
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
+  // 到机码单从认领页过来时不带金额（认领放行的回包里没有）。出错屏会向服务端要订单回执：回执写明已结清时，
+  // 整屏（顶栏、说明、按钮、退款句）都认回执上的金额，和缺纸那一支同一个口径。进页带了金额的仍用带来的。
+  const amountCents = flowAmountCents ?? (takeaway?.payStatus === 'paid' ? takeaway.amountCents : null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
@@ -494,7 +497,9 @@ export function PrintDonePage() {
               money={money}
               // 结果未确认时底部不给「重新提交打印」，说明区也不能写「可点下方重新提交打印」：两处同一条件。
               canRetry={Boolean(takeaway?.canRetry) && !isUnconfirmed}
+              resumeLine={Boolean(takeaway?.canRetry) && !isUnconfirmed && sameCodeResumeEligible(state.pickupSource, money.fact) ? SAME_CODE_RESUME_LINE : null}
               takeaway={takeawayNotices}
+              pickupSource={state.pickupSource === true}
             />
             <PrintAiHelp
               label="问小青：取纸或异常怎么办 →"
@@ -508,6 +513,12 @@ export function PrintDonePage() {
 
     const jam = visual === 'paper-jam'
     const payment = paymentFactOf(amountCents)
+    const sameCode = sameCodeResumeEligible(state.pickupSource, payment)
+    // 已确认失败且服务端说这单还能重打，才说同码接着打；结果未确认另有一句（要等 5 分钟）。
+    const resumeLine = !isUnconfirmed && sameCode && Boolean(takeaway?.canRetry) ? SAME_CODE_RESUME_LINE : null
+    const unconfirmedSameCode = isUnconfirmed && sameCode
+    // 现场建的 0 元单：没有到机码、离开本页后没有重打入口，也没有人核查，屏上只说真能走的路。
+    const unconfirmedOnsiteFree = isUnconfirmed && state.pickupSource !== true && payment === 'free'
     const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
     const ask = isUnconfirmed
       ? <>这次打印<em>结果未确认</em>。</>
@@ -515,12 +526,16 @@ export function PrintDonePage() {
         ? <>纸<em>卡住了</em>，别硬拉。</>
         : <>打印失败，<em>请稍后再来</em>。</>
     const doing = isUnconfirmed
-      ? `系统已经正式登记，核实后给出结论。${printProblemLine(contact)}`
+      ? unconfirmedSameCode
+        ? `系统已经登记。过 5 分钟可以回这台机器再输一次同一个到机码。${printProblemLine(contact)}`
+        : unconfirmedOnsiteFree
+          ? `系统已经登记。没出纸的话，回到打印重新选文件再打一次。${printProblemLine(contact)}`
+          : `系统已经正式登记，核实后给出结论。${printProblemLine(contact)}`
       : jam
         ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
         : failureStaffDoing(payment, contact)
     const issueSub = isUnconfirmed
-      ? '系统已明确登记，等待人工核查'
+      ? unconfirmedSameCode || unconfirmedOnsiteFree ? '系统已登记，这次结果没能确认' : '系统已明确登记，等待人工核查'
       : jam
         ? jamOrderKeptLine(payment)
         : '打印任务已经确认失败'
@@ -571,7 +586,11 @@ export function PrintDonePage() {
             </div>
             <p className="pff-issue-body">
               {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
+                ? unconfirmedSameCode
+                  ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记。请先看出纸口：有纸就取走。{UNCONFIRMED_SAME_CODE_LINE}这笔订单已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
+                  : unconfirmedOnsiteFree
+                    ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记。请先看出纸口：有纸就取走。{UNCONFIRMED_ONSITE_FREE_LINE}这笔订单已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
+                    : <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{machineCannotPrintLine(contact, { orderKept: true })}</>
                 : jam
                   ? <>请<b>不要自己打开机器或拽纸</b>。{machineCannotPrintLine(contact, { orderKept: true })}已出的纸你先收好。</>
                   : failureReason}
@@ -582,6 +601,7 @@ export function PrintDonePage() {
           {(publicOrderNo(takeaway?.orderNo) ?? displayOrderNo) ? (
             <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
           ) : null}
+          {resumeLine ? <p className="pff-out-sub" data-testid="print-fulfill-resume-line">{resumeLine}</p> : null}
           <p className="pff-out-sub">{printProblemLine(contact)}</p>
           {amountCents != null && amountCents > 0 ? <p className="pff-out-sub">{refundApplyLine(contact)}</p> : null}
           {takeawayNotices}
@@ -595,6 +615,8 @@ export function PrintDonePage() {
   // 成功态才到这里：loading / unknown / failed / feeInfo 均已 return。
   // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
   const hasEndUser = state.hasEndUser
+  // 小程序没发布时，这一条不把人往小程序引（后台「小程序已发布」开关，随公开联系信息下发；没取到按没发布）。
+  const miniappPublished = resolveSupportContact(contact).miniappPublished
 
   return (
     <QxPageFrame
@@ -634,7 +656,7 @@ export function PrintDonePage() {
       navbar={navbar}
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="qx-scroll pff-page">
-        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数，少页当场能处理。'} />
+        <PrintDoneXq ask={<>都打好了，<em>从出纸口拿走</em>。</>} doing={idDocument ? '拿走前记得核一下页数，证件原件和复印件一起带走。' : '拿走前记得核一下页数和清晰度。'} />
 
         <div className="qx-card">
           <div className="pff-done-layout">
@@ -654,7 +676,7 @@ export function PrintDonePage() {
               </div>
               <div className="pff-step">
                 <span className="pff-step-no">2</span>
-                <span className="pff-step-txt">当场核对<b>页数和清晰度</b>，少页、卡纸、印花了都能当场处理。</span>
+                <span className="pff-step-txt">当场核对<b>页数和清晰度</b>。少页或印花了，本机不会自动补打；{state.pickupSource ? '要重打请在手机上重新下单。' : '要重打请点下方「再印一份」。'}</span>
               </div>
               {idDocument ? (
                 <div className="pff-step">
@@ -666,7 +688,7 @@ export function PrintDonePage() {
             <aside className="pff-done-side" aria-label="取件核对">
               <b>已在本机出纸</b>
               <span>{displayOrderNo ? `订单号 ${displayOrderNo}` : '核对页数'}</span>
-              <span>少页当场能处理</span>
+              <span>拿走前当场核对</span>
             </aside>
           </div>
         </div>
@@ -677,8 +699,12 @@ export function PrintDonePage() {
               <span className="pff-inbar-ic"><SmartphoneIcon aria-hidden="true" /></span>
               <span>
                 {hasEndUser
-                  ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
-                  : <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>}
+                  ? miniappPublished
+                    ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
+                    : <>这单已经记在你的账号里<small>在这台机器的「我的 → 打印订单」就能看到</small></>
+                  : miniappPublished
+                    ? <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>
+                    : <>本次打印未关联账号<small>想留下订单记录，下次打印前可先登录</small></>}
               </span>
             </div>
           </div>
