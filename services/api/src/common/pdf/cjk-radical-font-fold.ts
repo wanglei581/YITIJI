@@ -102,6 +102,7 @@ export interface FontFoldOutcome {
   items: PdfTextItem[][]
   fontFoldChars: number
   fontFoldMismatchPages: number
+  fontFoldErrorPages: number
 }
 
 function fontBaseName(page: FontFoldPage, fontKey: string | undefined): string {
@@ -120,8 +121,10 @@ function visibleItems(content: { items?: TextContentItem[] } | undefined): TextC
 
 /**
  * 用 extractPdfTextItems 的条目做底，只替换 str。
+ * 这一页已抽出的文字里没有例外表的键：这一页不再去取（不调 getTextContent、getOperatorList）。
  * 某一页两边条数对不上：这一页不改，也不去查字体。
- * 这一页的文字里没有例外表的键：不调 getOperatorList。
+ * 某一页取字体出错：这一页原样留着、记一页，不往外抛——按字体换只是补救，
+ * 不能让改动前抽得出来的简历变成「PDF 解析失败」；后面 clean() 的整表换照旧。
  */
 export async function foldPdfTextItemsByFont(
   pdf: FontFoldDocument,
@@ -130,6 +133,7 @@ export async function foldPdfTextItemsByFont(
   const next = items.map((page) => page.map((item) => ({ ...item })))
   let fontFoldChars = 0
   let fontFoldMismatchPages = 0
+  let fontFoldErrorPages = 0
   const pageCount = typeof pdf.numPages === 'number' ? pdf.numPages : items.length
   const limit = Math.max(pageCount, items.length)
   for (let index = 0; index < limit; index += 1) {
@@ -137,26 +141,31 @@ export async function foldPdfTextItemsByFont(
       fontFoldMismatchPages += 1
       continue
     }
-    const page = await pdf.getPage(index + 1)
-    const contentItems = visibleItems(await page.getTextContent())
     const extracted = next[index] ?? []
-    if (contentItems.length !== extracted.length) {
-      fontFoldMismatchPages += 1
-      continue
-    }
-    const pageText = `${contentItems.map((item) => item.str ?? '').join('')}${extracted.map((item) => item.str).join('')}`
-    if (!hasExceptionChar(pageText)) continue
-    await page.getOperatorList()
-    for (let j = 0; j < extracted.length; j += 1) {
-      const map = mapForFont(fontBaseName(page, contentItems[j]?.fontName))
-      if (!map) continue
-      const item = extracted[j]
-      if (!item) continue
-      const applied = applyMap(item.str, map)
-      extracted[j] = { ...item, str: applied.text }
-      fontFoldChars += applied.changed
+    if (!hasExceptionChar(extracted.map((item) => item.str).join(''))) continue
+    try {
+      const page = await pdf.getPage(index + 1)
+      const contentItems = visibleItems(await page.getTextContent())
+      if (contentItems.length !== extracted.length) {
+        fontFoldMismatchPages += 1
+        continue
+      }
+      await page.getOperatorList()
+      let pageChars = 0
+      const replaced = extracted.map((item, j) => {
+        const map = mapForFont(fontBaseName(page, contentItems[j]?.fontName))
+        if (!map) return item
+        const applied = applyMap(item.str, map)
+        pageChars += applied.changed
+        return { ...item, str: applied.text }
+      })
+      next[index] = replaced
+      fontFoldChars += pageChars
+    } catch {
+      fontFoldErrorPages += 1
     }
   }
   if (fontFoldMismatchPages > 0) logger.log(JSON.stringify({ fontFoldMismatchPages }))
-  return { items: next, fontFoldChars, fontFoldMismatchPages }
+  if (fontFoldErrorPages > 0) logger.warn(JSON.stringify({ fontFoldErrorPages }))
+  return { items: next, fontFoldChars, fontFoldMismatchPages, fontFoldErrorPages }
 }

@@ -68,18 +68,21 @@ function textItem(str: string): PdfTextItem {
   return { str, x: 10, y: 700, width: 12, height: 12, fontSize: 12, hasEOL: false }
 }
 
-function makePdf(pages: PageSpec[]) {
+function makePdf(pages: PageSpec[], opts: { failOperatorListOnPage?: number } = {}) {
   let operatorCalls = 0
+  let textCalls = 0
   const pdf: FontFoldDocument = {
     numPages: pages.length,
     async getPage(pageNumber: number) {
       const spec = pages[pageNumber - 1]!
       return {
         async getTextContent() {
+          textCalls += 1
           return { items: spec.content.map((item) => ({ ...item })) }
         },
         async getOperatorList() {
           operatorCalls += 1
+          if (opts.failOperatorListOnPage === pageNumber) throw new Error('operator list failed')
           return {}
         },
         commonObjs: {
@@ -90,7 +93,7 @@ function makePdf(pages: PageSpec[]) {
     },
   }
   const items = pages.map((page) => page.extracted.map(textItem))
-  return { pdf, items, operatorCalls: () => operatorCalls }
+  return { pdf, items, operatorCalls: () => operatorCalls, textCalls: () => textCalls }
 }
 
 function onePage(str: string, font: string, fontName = 'f1'): PageSpec {
@@ -145,6 +148,24 @@ async function fontChecks(): Promise<void> {
   const quietOut = await foldPdfTextItemsByFont(quiet.pdf, quiet.items)
   check(quiet.operatorCalls() === 0 && quietOut.items[0]?.[0]?.str === '\u2ED8岛广东' && quietOut.fontFoldChars === 0,
     '页里没有例外字符时 getOperatorList 一次都没被调')
+  check(quiet.textCalls() === 0, '页里没有例外字符时这一页不再取一遍文字（getTextContent 一次都没被调）')
+
+  logLines.length = 0
+  const broken = makePdf([
+    onePage('⼲', 'ABCDEF+STHeitiSC-Light'),
+    onePage('⼲', 'ABCDEF+STHeitiSC-Light'),
+  ], { failOperatorListOnPage: 1 })
+  let brokenThrew = false
+  const brokenOut = await foldPdfTextItemsByFont(broken.pdf, broken.items).catch(() => {
+    brokenThrew = true
+    return null
+  })
+  const brokenLog = logLines.find((line) => line.includes('fontFoldErrorPages')) ?? ''
+  check(!brokenThrew && brokenOut?.items[0]?.[0]?.str === '⼲' && brokenOut?.items[1]?.[0]?.str === '广'
+    && brokenOut?.fontFoldErrorPages === 1 && brokenOut?.fontFoldChars === 1,
+    '某一页取字体出错：不往外抛，这一页原样留着，另一页照常换')
+  check(brokenLog.includes('"fontFoldErrorPages":1') && !brokenLog.includes('STHeiti') && !RADICAL_BLOCK.test(brokenLog),
+    '取字体出错的页数记在日志里，日志不含原文，也不含字体名')
   const loud = makePdf([onePage('\u2F32', 'ABCDEF+STHeitiSC-Light')])
   await foldPdfTextItemsByFont(loud.pdf, loud.items)
   check(loud.operatorCalls() === 1, '有例外字符时 getOperatorList 被调了')
