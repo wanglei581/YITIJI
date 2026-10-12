@@ -3601,8 +3601,51 @@ test('a touch that turns into a scroll also folds sentence 4 @w2', async ({ page
   await expect(notice).toHaveText(RECOVERY_NOTICE)
   // 手指按下后滑动，浏览器接管滚动时只发 pointercancel、不发 click。这也算一次触屏，句子要收。
   await page.evaluate(() => {
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
     document.body.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch' }))
   })
   await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('a press that began before sentence 4 appeared does not fold it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  const law = await page.locator('.qx-home-hero-law').boundingBox()
+  await page.mouse.move((law?.x ?? 0) + 24, (law?.y ?? 0) + (law?.height ?? 0) / 2)
+  // 手指先按着，这时句子才亮：抬手那一下不算「下一次触屏」，本人还没看清不能就收了。
+  await page.mouse.down()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  await page.mouse.up()
+  await page.waitForTimeout(900)
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 句子亮起之后才按下的这一下才收。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('a press on a greyed-out button still folds sentence 4 after release @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/upload?source=document')
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('file-source-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  const next = page.getByTestId('file-source-primary')
+  await expect(next).toBeDisabled()
+  // 置灰按钮不发 click。这一下也是触屏，抬手后稍等就收。
+  await next.click({ force: true })
+  await expect(notice).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/upload/)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })

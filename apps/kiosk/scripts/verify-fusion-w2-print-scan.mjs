@@ -728,12 +728,14 @@ const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
 assert.match(recoveryNoticeHook, /机器刚恢复，刚才选的材料已经清掉，要重新传/, '换票清场提示使用第 4 句')
 assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点（上下文区 10/12 拆到 HomeContextRegion）')
 // 第四轮：第 4、第 6 句只说一次。下一次触屏收起且不吞掉这次触摸；进页前先读清场范围再订阅。
-// 收货改：不在按下时收。句子一没整页上挪，抬手时手指底下换了东西，这一下会点空或点错；改成点完（click）或滑走（pointercancel）才收。
-for (const type of ['click', 'pointercancel']) {
+// 收货改：不在按下时收。句子一没整页上挪，抬手时手指底下换了东西，这一下会点空或点错；
+// 改成句子亮起后才按下的那一下点完（click）、滑走（pointercancel）或抬手后稍等（置灰按钮不发 click）再收。
+for (const type of ['pointerdown', 'pointerup', 'click', 'pointercancel']) {
   assert.match(recoveryNoticeHook, new RegExp(`addEventListener\\(\\s*'${type}'`), `清场提示亮起时在 document 上听 ${type}`)
   assert.match(recoveryNoticeHook, new RegExp(`removeEventListener\\(\\s*'${type}'`), `提示收起时摘掉 ${type} 监听`)
 }
-assert.doesNotMatch(recoveryNoticeHook, /addEventListener\(\s*'pointerdown'/, '不在按下时收起清场提示')
+assert.match(recoveryNoticeHook, /addEventListener\(\s*'pointerdown',\s*onPressStart,/, '按下交给 onPressStart')
+assert.match(recoveryNoticeHook, /function onPressStart\(\): void \{\s*pressedSinceArm = true\s*\}/, '按下时只记一笔、不收起清场提示')
 assert.doesNotMatch(recoveryNoticeHook, /stopPropagation\(\)/, '触屏收起不吞掉这次触摸')
 assert.doesNotMatch(recoveryNoticeHook, /preventDefault\(\)/, '触屏收起不取消这次触摸')
 assert.match(

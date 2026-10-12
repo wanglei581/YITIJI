@@ -24,6 +24,10 @@ let watching = false
 let wantsHome = false
 let dropEpoch = 0
 let tapBound = false
+let pressedSinceArm = false
+let releaseTimer: number | null = null
+/** 抬手后等 click 的上限。按在置灰按钮上不发 click，过了这段还没等到也照样收。 */
+const RELEASE_GRACE_MS = 600
 const listeners = new Set<() => void>()
 
 function emit(): void {
@@ -31,26 +35,50 @@ function emit(): void {
 }
 
 /**
- * 亮起期间听下一次触屏：这一下点完（click）或手指滑走（pointercancel）就收。
- * 不在按下（pointerdown）时收：句子一没，下面整页往上挪，抬手时手指底下已经换了东西，
- * 这一下会点空或点到别的按钮。click 走到捕获阶段时点中的是谁已经定了，按钮照常生效。
+ * 「下一次触屏」＝句子亮起之后才按下的那一下。
+ * 按下（pointerdown）时只记一笔、不收：句子一没整页往上挪，抬手时手指底下已经换了东西，
+ * 这一下会点空或点到别的按钮。等这一下点完（click）或滑走（pointercancel）再收——click 走到
+ * 捕获阶段时点中的是谁已经定了，按钮照常生效；按在置灰按钮上不发 click，抬手后 RELEASE_GRACE_MS 收。
+ * 句子亮起前就按着的那一下不算，免得本人还没看清就收了。
  * 捕获阶段挂上，不 preventDefault、不 stopPropagation。
  */
-function onDocumentTapEnd(): void {
-  dismissSessionRecoveryNotice()
+function onPressStart(): void {
+  pressedSinceArm = true
+}
+
+function onPressEnd(): void {
+  if (pressedSinceArm) dismissSessionRecoveryNotice()
+}
+
+function onRelease(): void {
+  if (!pressedSinceArm) return
+  if (releaseTimer !== null) window.clearTimeout(releaseTimer)
+  releaseTimer = window.setTimeout(() => {
+    releaseTimer = null
+    dismissSessionRecoveryNotice()
+  }, RELEASE_GRACE_MS)
 }
 
 function bindTapDismiss(): void {
   if (tapBound || typeof document === 'undefined') return
   tapBound = true
-  document.addEventListener('click', onDocumentTapEnd, true)
-  document.addEventListener('pointercancel', onDocumentTapEnd, true)
+  document.addEventListener('pointerdown', onPressStart, true)
+  document.addEventListener('pointerup', onRelease, true)
+  document.addEventListener('click', onPressEnd, true)
+  document.addEventListener('pointercancel', onPressEnd, true)
 }
 
 function unbindTapDismiss(): void {
+  pressedSinceArm = false
+  if (releaseTimer !== null) {
+    window.clearTimeout(releaseTimer)
+    releaseTimer = null
+  }
   if (!tapBound || typeof document === 'undefined') return
-  document.removeEventListener('click', onDocumentTapEnd, true)
-  document.removeEventListener('pointercancel', onDocumentTapEnd, true)
+  document.removeEventListener('pointerdown', onPressStart, true)
+  document.removeEventListener('pointerup', onRelease, true)
+  document.removeEventListener('click', onPressEnd, true)
+  document.removeEventListener('pointercancel', onPressEnd, true)
   tapBound = false
 }
 
@@ -77,6 +105,12 @@ function arm(text: string, goHome: boolean): void {
     clearNotice()
     emit()
   }, NOTICE_MS)
+  // 新的一句：之前按着、还没抬手的那一下不算。
+  pressedSinceArm = false
+  if (releaseTimer !== null) {
+    window.clearTimeout(releaseTimer)
+    releaseTimer = null
+  }
   bindTapDismiss()
   emit()
 }

@@ -2,8 +2,9 @@ import type { ReactNode } from 'react'
 import { HistoryIcon } from 'lucide-react'
 
 /**
- * 首页「继续上次办理」那一块。没有待继续的办理时显示空态；本机会话换新票清过场时，
- * 空态里多一行提示。收起不挂在这一块上：文档上的下一次触屏、进待机屏、到点，都会收。
+ * 首页「继续上次办理」那一块。没有待继续的办理时显示空态。本机会话换新票清过场时，
+ * 这一块最上面多一行提示，单独一行、不在空态里（有待继续卡时空态被藏，句子仍看得见）。
+ * 收起不挂在这一块上：句子亮起后的下一次触屏、进待机屏、到点，都会收。
  */
 export function HomeContextRegion({
   continueSlot,
