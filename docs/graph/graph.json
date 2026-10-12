@@ -22342,6 +22342,9 @@
     "apps/miniapp/scripts/verify-miniapp-static.mjs": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
+    "apps/miniapp/utils/api-legal-consent.js": [
+      "apps/miniapp/scripts/verify-package-chain.mjs"
+    ],
     "apps/miniapp/utils/api.js": [
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs",
       "apps/miniapp/scripts/verify-miniapp-static.mjs",
@@ -33015,6 +33018,7 @@
           "apps/miniapp/pages/print-pickup/print-pickup.js",
           "apps/miniapp/pages/store-select/store-select.js",
           "apps/miniapp/scripts/tests/page-lifecycle.test.mjs",
+          "apps/miniapp/utils/api-legal-consent.js",
           "apps/miniapp/utils/api.js",
           "apps/miniapp/utils/order-submission-reconcile.js",
           "apps/miniapp/utils/package-order-idempotency.js",
