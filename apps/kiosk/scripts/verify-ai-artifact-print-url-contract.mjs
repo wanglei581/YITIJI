@@ -202,29 +202,12 @@ expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.doc
 expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: 'a.bin', mimeType: 'application/octet-stream', format: 'pdf' }), SAME, 'inPagePreviewUrl：只标了 pdf 格式时仍按 PDF 取同站地址')
 expectEqual(inPagePreviewUrl({ url: DIRECT, printFileUrl: SAME, fileName: '报告.pdf' }), SAME, 'inPagePreviewUrl：扩展名是 pdf 时取同站地址')
 
-function grab(source, pattern, message) {
-  const match = source.match(pattern)
-  if (!match) { fail(`${message} — ${pattern}`); return null }
-  pass(message)
-  return match[1]
-}
-function evalPick(expr, name, value) {
-  return new Function(name, `return ${expr};`)(value)
-}
-const selfExpr = grab(selfAssessment, /fileUrl=\{(printed\.printFileUrl \|\| printed\.signedUrl)\}/, '自我探索页内预览：有 printFileUrl 用它，否则退回 signedUrl')
-if (selfExpr) {
-  expectEqual(evalPick(selfExpr, 'printed', { printFileUrl: SAME, signedUrl: DIRECT }), SAME, '自我探索表达式：有同站地址时用同站地址')
-  expectEqual(evalPick(selfExpr, 'printed', { signedUrl: DIRECT }), DIRECT, '自我探索表达式：没有同站地址时退回直链')
-  expectEqual(evalPick(selfExpr, 'printed', { printFileUrl: '', signedUrl: DIRECT }), DIRECT, '自我探索表达式：空同站地址退回直链')
-}
+// 下面三处是写死的「同站地址 || 原地址」，按源码原文断言。对一段固定的字再求值只是在测 || 运算，测不出东西，不做（agy 反方指出）。
+expectMatch(selfAssessment, /fileUrl=\{printed\.printFileUrl \|\| printed\.signedUrl\}/, '自我探索页内预览：有 printFileUrl 用它，否则退回 signedUrl')
 expectMatch(selfAssessment, /phoneDownloadUrl=\{printed\.signedUrl\}/, '自我探索手机扫码仍是下载直链')
 expectNoMatch(selfAssessment, /fileUrl=\{printed\.signedUrl\}/, '自我探索页内预览不得再只取下载直链')
 
-const versionExpr = grab(versionsPanel, /fileUrl=\{(preview\.printFileUrl \|\| preview\.url)\}/, '已确认版本页内预览：有 printFileUrl 用它，否则退回 url')
-if (versionExpr) {
-  expectEqual(evalPick(versionExpr, 'preview', { printFileUrl: SAME, url: DIRECT }), SAME, '已确认版本表达式：有同站地址时用同站地址')
-  expectEqual(evalPick(versionExpr, 'preview', { url: DIRECT }), DIRECT, '已确认版本表达式：没有同站地址时退回直链')
-}
+expectMatch(versionsPanel, /fileUrl=\{preview\.printFileUrl \|\| preview\.url\}/, '已确认版本页内预览：有 printFileUrl 用它，否则退回 url')
 expectMatch(versionsPanel, /printFileUrl:\s*access\.printFileUrl/, '已确认版本把 preview-url 回包里的 printFileUrl 存进预览状态')
 expectMatch(versionsPanel, /if\s*\(\s*!access\.url\s*\)/, '已确认版本「没有可用的预览链接」仍看 access.url')
 expectMatch(versionsPanel, /phoneDownloadUrl=\{preview\.url\}/, '已确认版本手机扫码仍是下载直链')
@@ -254,12 +237,7 @@ expectMatch(
 )
 expectNoMatch(myDocumentsPage, /fileUrl=\{preview\.url\}/, '我的文档页内预览不得再只取 preview.url')
 
-const convertExpr = grab(filePreview, /setConvertedUrl\((result\.printFileUrl \|\| result\.signedUrl)\)/, 'Word 转 PDF 后的页内预览：有 printFileUrl 用它，否则退回 signedUrl')
-if (convertExpr) {
-  expectEqual(evalPick(convertExpr, 'result', { printFileUrl: SAME, signedUrl: DIRECT }), SAME, 'Word 转 PDF 表达式：有同站地址时用同站地址')
-  expectEqual(evalPick(convertExpr, 'result', { printFileUrl: '', signedUrl: DIRECT }), DIRECT, 'Word 转 PDF 表达式：空同站地址退回直链')
-  expectEqual(evalPick(convertExpr, 'result', { signedUrl: DIRECT }), DIRECT, 'Word 转 PDF 表达式：没有同站地址时退回直链')
-}
+expectMatch(filePreview, /setConvertedUrl\(result\.printFileUrl \|\| result\.signedUrl\)/, 'Word 转 PDF 后的页内预览：有 printFileUrl 用它，否则退回 signedUrl')
 expectNoMatch(filePreview, /setConvertedUrl\(result\.signedUrl\)/, 'Word 转 PDF 后的预览不得再只取 signedUrl')
 
 // ── 产物打印链接有效期 30 分钟（9/29 主执行窗口提）────────────────────────────
