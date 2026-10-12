@@ -112,7 +112,7 @@ export function MyFavoritesPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的收藏" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="收藏这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="收藏这次没有加载出来" desc="当前列表没有更新。请稍后重试；已有收藏不会因为这次失败而消失。" struct={struct} />
   } else if (items.length === 0) {
     body = (
       <>

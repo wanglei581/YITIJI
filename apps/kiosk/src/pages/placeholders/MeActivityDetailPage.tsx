@@ -87,7 +87,7 @@ export default function MeActivityDetailPage() {
   } else if (state === 'loading') {
     inner = <QxMeLoadingBlock title="正在读取这条记录" struct={struct} />
   } else if (state === 'error') {
-    inner = <QxMeErrorBlock title="这条记录这次没有读到" desc="当前没有读到这条记录。请检查网络后重试。" struct={struct} />
+    inner = <QxMeErrorBlock title="这条记录这次没有读到" desc="当前没有读到这条记录。请稍后重试。" struct={struct} />
   } else if (!record || !item) {
     inner = (
       <>
