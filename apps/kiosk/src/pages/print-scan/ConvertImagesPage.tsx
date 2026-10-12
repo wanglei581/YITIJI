@@ -58,7 +58,6 @@ export function ConvertImagesPage() {
   const [rechecking, setRechecking] = useState(false)
   const [error, setError] = useState<ConvertError | null>(null)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbOpen, setUsbOpen] = useState(false)
   const [result, setResult] = useState<Awaited<ReturnType<typeof convertImagesToPdf>> | null>(null)
   const [recovered, setRecovered] = useState(false)
@@ -68,7 +67,8 @@ export function ConvertImagesPage() {
   const [previewFailed, setPreviewFailed] = useState(false)
   const sentRef = useRef(false)
 
-  useBusyLock(uploading || generating || qrBusy || rechecking)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(uploading || generating || rechecking)
 
   const atLimit = images.length >= MAX_IMAGES
   const kiosk = useTerminalKiosk()
@@ -352,7 +352,6 @@ export function ConvertImagesPage() {
         onLocalFile={(event) => void handleLocalFile(event)}
         onShowQr={() => { setUsbOpen(false); setShowQr(true) }}
         onPhoneUploaded={handlePhoneUploaded}
-        onQrBusy={setQrBusy}
         onOpenUsb={() => { setShowQr(false); setUsbOpen(true) }}
         onCloseUsb={() => setUsbOpen(false)}
         onSelect={handleSelect}

@@ -161,7 +161,7 @@ expectCssContract('src/pages/resume/resume-library-lightflow.css', [
 
 for (const [sourceCode, marker, label] of [
   [source, 'const sourceBusy = uploading || phoneBusy || usbBusy', 'source combines every upload channel into one busy state'],
-  [source, 'useBusyLock(sourceBusy)', 'source keeps the combined upload busy lock'],
+  [source, 'useBusyLock(uploading || usbBusy)', '简历来源页的清场锁不含扫码面板的忙'],
   [source, 'UploadSessionQrPanel', 'source keeps phone upload session'],
   [parse, 'submitResumeParse(', 'parse keeps real resume parse request'],
   [parse, 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'parse keeps minimal session only'],
@@ -181,6 +181,11 @@ for (const [sourceCode, marker, label] of [
 ]) {
   expectIncludes(sourceCode, marker, label)
 }
+const sourceLockArg = source.match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'
+expect(
+  !/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(sourceLockArg),
+  '简历来源页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr',
+)
 
 expect(
   !existsSync(join(kioskRoot, 'src/pages/resume/ResumeExportPage.tsx')),

@@ -90,7 +90,6 @@ export function useSignStampFlow() {
   const [result, setResult] = useState<ComposeResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [showQr, setShowQr] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [docStage, setDocStage] = useState<DocStage>('idle')
   const [stampStage, setStampStage] = useState<StampStage>('idle')
   const [docErr, setDocErr] = useState<LiveSnapshot['docErr']>(null)
@@ -111,7 +110,8 @@ export function useSignStampFlow() {
   const [cap, setCap] = useState<CapStatus>('loading')
   const [terminalId, setTerminalId] = useState(() => getTerminalId())
 
-  useBusyLock(busy || qrBusy || showQr)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(busy)
 
   useEffect(() => {
     setTerminalId(getTerminalId())
@@ -434,7 +434,6 @@ export function useSignStampFlow() {
     pan: displayLive.pan,
     derived: displayLive.derived,
     showQr,
-    qrBusy,
     docInputRef,
     stampInputRef,
     localDisabled,
@@ -450,7 +449,6 @@ export function useSignStampFlow() {
     goMaterialCheck,
     addAnother,
     setShowQr,
-    setQrBusy,
     setDocStage,
     setStampStage,
     setPage,

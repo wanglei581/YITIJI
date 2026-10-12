@@ -74,7 +74,6 @@ interface ConvertImagesViewProps {
   onLocalFile: (event: ChangeEvent<HTMLInputElement>) => void
   onShowQr: () => void
   onPhoneUploaded: (file: PhoneUploadedFile) => void
-  onQrBusy: (busy: boolean) => void
   onOpenUsb: () => void
   onCloseUsb: () => void
   onSelect: (index: number) => void
@@ -257,7 +256,6 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             description="手机扫码上传一张图片，确认后自动加入待合并列表；可重复扫码继续添加。"
             confirmLabel="确认加入待合并列表"
             onUploaded={props.onPhoneUploaded}
-            onBusyChange={props.onQrBusy}
           />
         ) : null}
 
