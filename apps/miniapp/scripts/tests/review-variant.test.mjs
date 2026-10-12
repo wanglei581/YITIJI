@@ -2,7 +2,8 @@
  * 不含 AI 的提审版：页面 data 里的入口、tab 下标、生成后再还原逐字节相同。
  * 往返认起点：手头已经是不含 AI 版时，还原到 stash 里的完整版原件，再生成回来必须回到起点。
  * 这条往返在完整版目录里也用子进程真跑一遍（手改要红），不靠目录当前停在哪个版本。
- * 注入版本时开关和路由表成套给（variantModules），测的就是真实发布的组合。
+ * 注入版本时，页面直接引用的开关和路由表成套给（variantModules）；页面目录下的辅助模块管不到，见 page-sandbox 的注释。
+ * 「看版本的字」逐字对定稿的用例在 review-variant-copy.test.mjs。
  * 停放页只随完整版发布，沙箱要让它拿到 stash 里的完整版路由表；在包里的页拿到不含 AI 的真实模块。
  * 不含 AI 版的整条 verify:static 链在临时副本里再跑一遍，完整版目录的普通测试就能走到停放页的 stash 分支。
  */
@@ -78,34 +79,6 @@ test('AI_ENABLED=false 时首页、我的、关于、反馈、隐私不带 AI �
   assert.equal(String(privacy.data.consentGroupLabel).includes('AI'), false)
   assert.equal(String(privacy.data.selfHelpLine).includes('AI'), false)
   assert.equal(String(privacy.data.selfHelpLine).includes('简历'), false)
-})
-
-// 登录页人人都会看到。不含 AI 的提审版里，品牌下那行和「登录后继续」下那行不提 AI 和简历（合规八 10/12 定字）。
-test('不含 AI 版登录页两句不提 AI，完整版那两句原样', () => {
-  const noAi = instantiate(loadPageDefinition('pages/launch/launch.js', { wx, modules: { ...variantModules('no-ai'), api: {}, auth: {} } }))
-  assert.equal(noAi.data.aiEnabled, false)
-  const full = instantiate(loadPageDefinition('pages/launch/launch.js', { wx, modules: { ...variantModules('full'), api: {}, auth: {} } }))
-  assert.equal(full.data.aiEnabled, true)
-
-  // 两句都是看版本的一对：完整版原句挂在 aiEnabled 上，紧跟着不含 AI 的那句。
-  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/launch/launch.wxml'), 'utf8')
-  assert.match(wxml, /<view wx:if="\{\{aiEnabled\}\}" class="launch-sub">AI 简历 · 文档打印<\/view>\s*<view wx:else class="launch-sub">求职材料 · 文档打印<\/view>/)
-  assert.match(wxml, /<view wx:if="\{\{aiEnabled\}\}" class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录<\/view>\s*<view wx:else class="sheet-sub">同步本人文档和打印订单<\/view>/)
-  // 登录页别处没有不看版本的「AI」。
-  const lines = wxml.replace(/<!--[\s\S]*?-->/g, '').split('\n').filter((line) => line.includes('AI'))
-  for (const line of lines) assert.match(line, /wx:if="\{\{aiEnabled\}\}"/, `登录页这行提到 AI 却不看版本：${line.trim()}`)
-})
-
-// 不含 AI 版里材料模板页没有入口：关于页那句和审核说明都不能说有模板（合规八 10/12 定字）。
-// 哪天给模板页加了入口，再连同这条一起改。
-test('不含 AI 版关于页和审核说明都不提材料模板，完整版那句不变', () => {
-  const noAi = page('pages/about/about.js')
-  assert.equal(noAi.data.notice, '本平台提供求职材料与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。')
-  const full = instantiate(loadPageDefinition('pages/about/about.js', { wx, modules: variantModules('full') }))
-  assert.equal(full.data.notice.includes('AI'), true)
-  assert.notEqual(full.data.notice, noAi.data.notice)
-  const notes = JSON.parse(fs.readFileSync(path.join(MINIAPP, 'review-variants/variants.json'), 'utf8'))
-  assert.equal(notes['no-ai'].reviewNote.includes('模板'), false)
 })
 
 test('full → no-ai → full 关键文件逐字节还原', () => {

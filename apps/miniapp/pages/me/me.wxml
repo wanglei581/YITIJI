@@ -23,7 +23,9 @@
             <view wx:if="{{isLoggedIn}}" class="profile-meta">{{user.phoneMasked || '已登录并同步本人数据'}}</view>
             <!-- 未登录态原本没有任何说明行，用户只看到一个标题。
                  补一句真实状态与登录后能得到什么，与登录按钮同属一个 wx:else 分支。 -->
-            <view wx:else class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
+            <view wx:elif="{{aiEnabled}}" class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
+            <!-- 不含 AI 的提审版里没有简历这一栏，不说「同步简历」（合规十 10/12 定字）。 -->
+            <view wx:else class="profile-meta">未登录 · 登录后同步本人文档与打印订单</view>
           </view>
           <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" role="button" aria-label="打开账号设置">
             <text class="ficon i-right"></text>

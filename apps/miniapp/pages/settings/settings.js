@@ -1,6 +1,12 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { AI_ENABLED } = require('../../utils/build-variant')
+
+// 不含 AI 的提审版里没有简历这一栏，退出提示不说「同步简历」（合规十 10/12 定字）。
+const LOGOUT_COPY = AI_ENABLED
+  ? '退出后需重新登录才能同步简历、文档与打印记录。'
+  : '退出后需重新登录才能同步文档与打印记录。'
 
 Page({
   data: {
@@ -40,7 +46,7 @@ Page({
     if (this.data.loggingOut) return
     wx.showModal({
       title: '退出登录',
-      content: '退出后需重新登录才能同步简历、文档与打印记录。',
+      content: LOGOUT_COPY,
       confirmText: '退出',
       confirmColor: '#b5643c',
       success: (r) => {

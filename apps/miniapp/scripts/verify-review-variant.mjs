@@ -84,6 +84,12 @@ function checkDefinitions(all) {
       problems.push('不含 AI 版隐私分类不是完整版去掉麦克风')
     }
     if (full.tabs.length !== 4 || noAi.tabs.length !== 3) problems.push('Tab 数量不对')
+    // 不含 AI 版的隐私用途句（他照着填公众平台表单）：登记的类别要在该版本的隐私分类里，句子不提 AI、大模型、生成。
+    for (const [category, purpose] of Object.entries(noAi.privacyPurposes || {})) {
+      if (!noAi.privacyCategories.includes(category)) problems.push(`不含 AI 版用途句登记了没声明的类别「${category}」`)
+      const hits = noteProblems(String(purpose))
+      if (hits.length) problems.push(`不含 AI 版「${category}」用途句含有 ${hits.join('、')}`)
+    }
   }
   if (problems.length) bad('版本定义', problems.join('；'))
   else ok('版本定义：两版类目、隐私分类与 aiPages')
@@ -165,6 +171,21 @@ function checkTree(root) {
   const declared = JSON.parse(readAt(root, 'scripts/privacy-api-inventory.json')).declared.map((item) => item.category)
   if (declared.join('|') !== (spec.privacyCategories || []).join('|')) bad('隐私分类', declared.join('、'))
   else ok('隐私清单分类与版本定义一致')
+
+  if (variant.name === 'no-ai') {
+    // 生成出来的清单就是他要照着填后台的那几句：登记了的要逐字等于版本定义，没登记的（照搬完整版的）也不能提 AI。
+    const purposes = spec.privacyPurposes || {}
+    const purposeProblems = []
+    for (const item of JSON.parse(readAt(root, 'scripts/privacy-api-inventory.json')).declared) {
+      if (Object.prototype.hasOwnProperty.call(purposes, item.category) && item.purpose !== purposes[item.category]) {
+        purposeProblems.push(`「${item.category}」用途句不是版本定义里那句`)
+      }
+      const hits = noteProblems(String(item.purpose))
+      if (hits.length) purposeProblems.push(`「${item.category}」用途句含有 ${hits.join('、')}`)
+    }
+    if (purposeProblems.length) bad('不含 AI 版隐私用途句', purposeProblems.join('；'))
+    else ok('不含 AI 版隐私用途句与版本定义一致，不提 AI、大模型、生成')
+  }
 
   if (variant.name === 'no-ai') {
     const hits = collectUnregisteredRouteRefs(root).filter((ref) => aiPages.some((name) => ref.includes(`/pages/${name}/${name}`)))

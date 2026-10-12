@@ -122,13 +122,24 @@ function applyTabBar(tabs) {
   write('custom-tab-bar/index.js', replaced)
 }
 
-function applyPrivacy(categories) {
-  const text = read('scripts/privacy-api-inventory.json')
-  if (categories.includes('麦克风')) return
-  if (!text.includes('"category": "麦克风"')) return
-  const replaced = text.replace(/\s*\{\s*"category": "麦克风"[\s\S]*?\},/, '')
-  if (replaced === text) throw new Error('隐私清单里的麦克风条目没去掉')
-  write('scripts/privacy-api-inventory.json', replaced)
+/**
+ * 隐私清单按版本定义重写：只留 privacyCategories 里的类别（不含 AI 版去掉麦克风），
+ * privacyPurposes 里登记了的类别换成该版本自己的用途句（他照这几句填公众平台表单，
+ * 不含 AI 版不能照搬完整版那几句里的「AI 识别整理」「AI 分析」「简历」；字由合规十 10/12 定）。
+ * 清单原文就是 JSON.stringify(…, null, 2) 的格式，重写不改别处排版；--variant full 照旧从 stash 逐字节还原。
+ */
+function applyPrivacy(categories, purposes) {
+  const inventory = JSON.parse(read('scripts/privacy-api-inventory.json'))
+  const declared = (inventory.declared || []).filter((item) => categories.includes(item.category))
+  const kept = declared.map((item) => item.category)
+  if (kept.join('|') !== categories.join('|')) throw new Error(`隐私清单的类别和版本定义对不上：${kept.join('、')}`)
+  for (const [category, purpose] of Object.entries(purposes || {})) {
+    const item = declared.find((entry) => entry.category === category)
+    if (!item) throw new Error(`隐私清单里没有「${category}」，改不了它的用途句`)
+    item.purpose = purpose
+  }
+  inventory.declared = declared
+  write('scripts/privacy-api-inventory.json', `${JSON.stringify(inventory, null, 2)}\n`)
 }
 
 function applyVoiceStub() {
@@ -206,7 +217,7 @@ if (target === 'no-ai') {
   applyAppJson(spec.aiPages, spec.tabs)
   applyIgnore(spec.aiPages)
   applyTabBar(spec.tabs)
-  applyPrivacy(spec.privacyCategories)
+  applyPrivacy(spec.privacyCategories, spec.privacyPurposes)
   applyVoiceStub()
   writeVariant('no-ai', false)
   writeEmptyAiEntries()

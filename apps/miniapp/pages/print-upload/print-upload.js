@@ -1,5 +1,12 @@
 const api = require('../../utils/api')
 const pricing = require('../../utils/print-pricing')
+const { AI_ENABLED } = require('../../utils/build-variant')
+
+// 不含 AI 的提审版里没有 AI 成果可选，这两句不提「真实 AI 成果」（合规十 10/12 定字）。
+const NO_FILE_HINT = AI_ENABLED ? '从本人文档或真实 AI 成果选择' : '从本人文档选择'
+const NO_FILE_GATE_COPY = AI_ENABLED
+  ? '本版本只允许从本人已上传文档或真实 AI 成果进入打印，不能用占位文件建单。'
+  : '本版本只允许从本人已上传文档进入打印，不能用占位文件建单。'
 
 // 后端 print_doc 只收 PDF/JPG/PNG，扩展名足以判型，不必为一个徽章多打一次网络请求。
 function extLabelOf(name) {
@@ -30,6 +37,7 @@ Page({
     statusBarHeight: 20,
     // 文件内容始终留在服务端；页面只持有本人文件 id 和安全元数据。
     file: { name: '未选择文件', pages: 0, size: '—' },
+    noFileHint: NO_FILE_HINT,
     fileExt: 'FILE',
     fileId: '',
     hasFile: false,
@@ -200,7 +208,7 @@ Page({
     if (!this.data.fileId) {
       wx.showModal({
         title: '尚未选择文件',
-        content: '本版本只允许从本人已上传文档或真实 AI 成果进入打印，不能用占位文件建单。',
+        content: NO_FILE_GATE_COPY,
         confirmText: '选择文档',
         success: (res) => { if (res.confirm) this.chooseSource() },
       })
