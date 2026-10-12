@@ -153,7 +153,7 @@ export interface AdvisorAnswer {
   /** 出处说明：这条结论凭什么。打印时随条目带上。 */
   sourceNote: string
   disclaimer: string
-  /** true 表示这段回答是固定提示（设备故障时的安全提醒），不是模型生成的；没有这个字段或为 false 时和原来一样 */
+  /** true 表示这段回答是设备故障时的安全提示，不是模型生成的。页面上的标由前端写成「安全提示」，后端不出这个标。没有这个字段或为 false 时和原来一样 */
   fixedNotice?: boolean
 }
 

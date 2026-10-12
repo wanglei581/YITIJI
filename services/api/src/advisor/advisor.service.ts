@@ -25,7 +25,7 @@ import {
   type StoredSlots,
 } from './advisor-skills'
 import type { AdvisorArtifactPayload } from './advisor-artifact.types'
-import { deviceFaultReply, hasHandsOnMachineInstruction, isAboutJobContent, isDeviceFaultQuestion } from '../ai/safety/device-fault'
+import { DEVICE_FAULT_SOURCE_NOTE, deviceFaultReply, hasHandsOnMachineInstruction, isAboutJobContent, isDeviceFaultQuestion } from '../ai/safety/device-fault'
 
 export const MAX_ADVISOR_PINS = 40
 
@@ -313,7 +313,7 @@ export class AdvisorService {
         sessionId,
         answer: deviceFaultReply('kiosk'),
         evidenceLevel: 'E3' as const,
-        sourceNote: '固定提示，不是 AI 的判断。',
+        sourceNote: DEVICE_FAULT_SOURCE_NOTE,
         disclaimer: ADVISOR_DISCLAIMER,
         canPin: false,
         persistence: 'not_saved' as const,
@@ -335,7 +335,7 @@ export class AdvisorService {
       answer = {
         ...answer,
         answer: deviceFaultReply('kiosk'),
-        sourceNote: '固定提示，不是 AI 的判断。',
+        sourceNote: DEVICE_FAULT_SOURCE_NOTE,
       }
       fixedNotice = true
     }
