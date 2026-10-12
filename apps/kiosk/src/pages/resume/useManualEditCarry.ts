@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
@@ -25,8 +25,12 @@ export function useManualEditCarry(taskId: string | undefined, accessToken: stri
     return () => { alive.current = false }
   }, [])
 
-  useEffect(() => {
+  // 用 useLayoutEffect：和这次提交同步执行，旧请求的回调插不进「页面已切到结果、作废还没生效」的空档
+  // （useEffect 要等下一个任务才跑，Codex 复核 c8f5b85d6 时指出）。作废的同时按钮当场复位，不等旧请求回来。
+  useLayoutEffect(() => {
     generation.current += 1
+    busy.current = false
+    setManualPending(false)
   }, [taskId, active])
 
   const onManualEdit = useCallback(() => {
