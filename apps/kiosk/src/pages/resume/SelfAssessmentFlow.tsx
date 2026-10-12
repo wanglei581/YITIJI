@@ -938,8 +938,9 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             <GhostButton label="问小青" testId="self-assessment-ask" onClick={() => askXiaoqing(navigate)} />
           )}
           {/* 34 号稿结果屏底栏主按钮是「打印本次结果」、直接去打印确认。PDF 生成后换成它（走 handoffToPrint），
-              一直在底栏；以前只在结果最底下的卡里，真机上要下滑才找得到。 */}
-          {printed ? (
+              一直在底栏；以前只在结果最底下的卡里，真机上要下滑才找得到。弹窗里重新生成期间仍显示「生成 PDF 中…」，
+              免得这时交出旧文件。 */}
+          {printed && !printing ? (
             <GuardedButton variant="primary" testId="self-assessment-primary" onClick={handoffToPrint}
               blockedReason={printed.printFileUrl ? null : '打印链接未就绪，这份文件暂时送不到打印工作台；页内预览与扫码带走不受影响。'}>打印本次结果</GuardedButton>
           ) : (
