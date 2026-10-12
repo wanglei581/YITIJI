@@ -207,9 +207,13 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   await sameSiteFetch
   expect(directLinkFetches).toEqual([])
   await expect(page).toHaveURL(/\/resume\/materials$/)
-  expect(await page.locator('body').innerText()).not.toContain(PREVIEW_PDF)
+  const previewBodyText = await page.locator('body').innerText()
+  expect(previewBodyText).not.toContain(PREVIEW_PDF)
+  expect(previewBodyText).not.toContain('/api/v1/files/jm-fixture-001/content')
   await dialog.getByRole('button', { name: '关闭文件预览' }).click()
   await expect(dialog).toHaveCount(0)
+  // 开一次预览只取一次址；下面换成不带同站地址的回包再开一次。
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
 
   api.respond('GET', PREVIEW_URL, {
     status: 200,

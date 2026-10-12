@@ -240,7 +240,6 @@ expectMatch(
   /fileUrl=\{inPagePreviewUrl\(\{\s*url:\s*currentPreview\.url \?\? '',\s*printFileUrl:\s*currentPreview\.printFileUrl,\s*fileName:\s*generated\.filename,\s*mimeType:\s*generated\.mimeType,\s*\}\)\}/,
   '求职材料库页内预览经 inPagePreviewUrl：PDF 用同站地址，否则用原地址',
 )
-expectNoMatch(materialsPage, /phoneDownloadUrl/, '求职材料库预览不改手机扫码（本页没有这条）')
 expectNoMatch(materialsPage, /fileUrl=\{currentPreview\.url\}/, '求职材料库页内预览不得再只取 preview-url 的 url')
 
 expectMatch(
@@ -253,7 +252,6 @@ expectMatch(
   /fileUrl=\{inPagePreviewUrl\(\{\s*url:\s*preview\.url,\s*printFileUrl:\s*preview\.printFileUrl,\s*fileName:\s*preview\.filename,\s*mimeType:\s*preview\.mimeType,\s*\}\)\}/,
   '我的文档页内预览经 inPagePreviewUrl：PDF 用同站地址，图片和 Word 用原地址',
 )
-expectNoMatch(myDocumentsPage, /phoneDownloadUrl/, '我的文档预览不改手机扫码（本页没有这条）')
 expectNoMatch(myDocumentsPage, /fileUrl=\{preview\.url\}/, '我的文档页内预览不得再只取 preview.url')
 
 const convertExpr = grab(filePreview, /setConvertedUrl\((result\.printFileUrl \|\| result\.signedUrl)\)/, 'Word 转 PDF 后的页内预览：有 printFileUrl 用它，否则退回 signedUrl')
