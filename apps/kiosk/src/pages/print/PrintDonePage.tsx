@@ -129,7 +129,7 @@ export function PrintDonePage() {
   const { file, params } = state
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
-  const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
+  const flowAmountCents = typeof state.amountCents === 'number' ? state.amountCents : null
   const displayOrderNo = publicOrderNo(typeof state.orderNo === 'string' ? state.orderNo : null)
   const idDocument = state.idDocument === true
 
@@ -153,6 +153,9 @@ export function PrintDonePage() {
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
 
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
+  // 到机码单从认领页过来时不带金额（认领放行的回包里没有）。出错屏会向服务端要订单回执：回执写明已结清时，
+  // 整屏（顶栏、说明、按钮、退款句）都认回执上的金额，和缺纸那一支同一个口径。进页带了金额的仍用带来的。
+  const amountCents = flowAmountCents ?? (takeaway?.payStatus === 'paid' ? takeaway.amountCents : null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
@@ -508,9 +511,7 @@ export function PrintDonePage() {
     }
 
     const jam = visual === 'paper-jam'
-    // 到机码单从认领页过来时不带金额（认领放行的回包里没有）：金额未知时改认服务端订单回执，和缺纸那一支同一个取法。
-    // 现场建的单带着建单时的金额，照旧用它。
-    const payment = amountCents == null && takeaway ? outOfPaperMoneyOf(takeaway, amountCents).fact : paymentFactOf(amountCents)
+    const payment = paymentFactOf(amountCents)
     const sameCode = sameCodeResumeEligible(state.pickupSource, payment)
     // 已确认失败且服务端说这单还能重打，才说同码接着打；结果未确认另有一句（要等 5 分钟）。
     const resumeLine = !isUnconfirmed && sameCode && Boolean(takeaway?.canRetry) ? SAME_CODE_RESUME_LINE : null
