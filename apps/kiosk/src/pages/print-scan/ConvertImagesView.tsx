@@ -1,6 +1,6 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
 import { EyeIcon } from 'lucide-react'
-import type { ChangeEvent, ReactNode, Ref } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode, type Ref } from 'react'
 import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
@@ -118,6 +118,17 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
     showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
   } = props
   const advisor = advisorCopy(phase, images.length, error, hasEndUser)
+  // 扫码面板加在页面下方：点了「手机扫码上传一张」要把它带进视野，不然按了像没反应（走查六第十四节）。
+  // 面板已经开着时再点一次入口也要滚过去（取消只清会话，不关面板）。
+  const qrRef = useRef<HTMLDivElement>(null)
+  const [qrRevealTick, setQrRevealTick] = useState(0)
+  useEffect(() => {
+    if (showQr) qrRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [showQr, qrRevealTick])
+  const onShowQr = () => {
+    props.onShowQr()
+    setQrRevealTick((tick) => tick + 1)
+  }
   const busy = uploading || generating || rechecking
   const orderLocked = phase === 'converting' || phase === 'rechecking' || phase === 'completed'
     || error?.kind === 'known-failed' || error?.kind === 'in-progress' || error?.kind === 'result-unknown'
@@ -160,7 +171,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         {phase === 'usb' ? <UsbGap /> : null}
 
         {phase === 'empty' ? (
-          <EmptyBody kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
+          <EmptyBody kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={onShowQr} onOpenUsb={props.onOpenUsb} />
         ) : null}
 
         {phase === 'uploading' ? (
@@ -238,7 +249,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                 {phase === 'uploading' ? null : (
                   <SelBar selected={selected} count={images.length} onMove={props.onMove} onRemove={props.onRemove} />
                 )}
-                <AddRow disabled={addDisabled} reason={addReason} kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
+                <AddRow disabled={addDisabled} reason={addReason} kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={onShowQr} onOpenUsb={props.onOpenUsb} />
               </>
             )}
           </>
@@ -251,6 +262,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
 
         {showQr ? (
+          <div className="i2p-qr" ref={qrRef} data-testid="img2pdf-qr-panel">
           <UploadSessionQrPanel
             purpose="print_doc"
             title="手机扫码添加图片"
@@ -259,6 +271,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
             onUploaded={props.onPhoneUploaded}
             onBusyChange={props.onQrBusy}
           />
+          </div>
         ) : null}
 
         {phase !== 'empty' && phase !== 'usb' ? (
