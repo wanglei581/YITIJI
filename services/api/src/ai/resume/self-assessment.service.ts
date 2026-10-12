@@ -473,7 +473,7 @@ export class SelfAssessmentService {
     })
     const uploaded = await this.files.upload({
       buffer,
-      filename: `self-assessment-${taskId}.pdf`,
+      filename: '职业自我探索结果.pdf',
       mimeType: 'application/pdf',
       // §1.2: 报告 PDF 走 self_assessment_report 用途,触发 sensitive 留存/标签;
       //      不再用 print_doc (normal),否则审计/Cron 会误聚合普通打印件。
