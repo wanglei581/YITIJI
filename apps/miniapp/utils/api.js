@@ -1526,18 +1526,18 @@ const api = {
     });
   },
 
-  /** 打印前隐私检查；会员 token 保证只能检查本人文件。 */
+  /** 打印前隐私检查；会员 token 保证只能检查本人文件。服务端已豁免 AI 闸门（materials.controller 的 AiUseExempt，AI 挂了原件照样能打），这里不挂 ai、不问年龄。 */
   createPrintPiiScan(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request('/materials/tasks', {
-      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
   decidePrintPiiFindings(taskId, decisions) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
     return request(`/materials/tasks/${encodeURIComponent(taskId)}/pii-findings/decisions`, {
-      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',
+      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout,
     });
   },
 
