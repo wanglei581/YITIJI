@@ -618,8 +618,10 @@ test('daily quota blocks the same quote and keeps the alert through a refresh @k
     await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
 
     await leaveConfirmAndReturn(page)
+    // 报价还在重取：主按钮照旧是本来就灰的「获取报价后可继续」，不提前换成付款字样；红条一直在。
     await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
-    await expect(payButton(page)).toBeDisabled()
+    await expect(page.getByRole('button', { name: '获取报价后可继续', exact: true })).toBeDisabled()
+    await expect(payButton(page)).toHaveCount(0)
 
     releaseSecondQuote()
     await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()

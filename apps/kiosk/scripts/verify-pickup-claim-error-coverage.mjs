@@ -360,6 +360,16 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     if (shared !== sentence) fail(`共用码表 ${code} 应是「${sentence}」，实际「${shared}」`)
     else pass(`共用码表 ${code}：照实说量用完、明天恢复`)
   }
+  // 确认页额度置灰的内存表：报价键里带这一位的文件签名链接，进待机屏不整页重载时表会留到下一位，
+  // 所以表里只许存摘要。读、写、判三处都得先过 quotaHoldId。
+  {
+    const rel = 'apps/kiosk/src/pages/print/PrintConfirmPage.tsx'
+    const page = read(rel)
+    const uses = page.match(/quotaHolds\.(get|set|has)\(([^,)]*)/g) ?? []
+    if (uses.length < 3) fail(`${rel}：额度置灰表的读、写、判不足三处（实际 ${uses.length}）`)
+    else if (uses.some((use) => !/\(quotaHoldId\(quoteKey$/.test(use))) fail(`${rel}：额度置灰表有一处没先过 quotaHoldId：${uses.join('；')}`)
+    else pass('额度置灰表只存报价键摘要，不留文件链接')
+  }
   // 无效、过期、不属于这台机器三种仍是同一句（防试探），句尾有回手机的路。
   for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {
     if (table[code] !== invalid) fail(`${code} 不是那一句共用的话（实际「${table[code]}」）`)

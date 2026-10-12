@@ -112,8 +112,20 @@ const QUOTA_ORDER_CODES = new Set(['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_
  * 记在模块内存，不进 sessionStorage / localStorage：返回修改会卸载本页，组件 state 留不住红条；
  * 同一组参数再进来键还在，所以仍灰、红条也还在。参数一变 quoteKey 对不上，按钮亮、红条收起。
  * 刷新或关页即忘。只存这两句已有红条，不加新字。
+ * 键只存报价键的摘要：报价键里带着这一位的文件签名链接，进待机屏不整页重载，表会留到下一位。
  */
-const quotaBlockedByQuoteKey = new Map<string, string>()
+const quotaHolds = new Map<string, string>()
+
+function quotaHoldId(quoteKey: string): string {
+  let a = 0x811c9dc5
+  let b = 0x5bd1e995
+  for (let i = 0; i < quoteKey.length; i += 1) {
+    const c = quoteKey.charCodeAt(i)
+    a = Math.imul(a ^ c, 0x01000193)
+    b = Math.imul(b ^ c, 0x27d4eb2d)
+  }
+  return `${(a >>> 0).toString(36)}.${(b >>> 0).toString(36)}.${quoteKey.length}`
+}
 
 function isDailyQuotaCopy(text: string | null): boolean {
   return text === PRINT_TERMINAL_DAILY_QUOTA_COPY || text === PRINT_MEMBER_DAILY_QUOTA_COPY
@@ -179,7 +191,7 @@ export function PrintConfirmPage() {
   // 报价只对「最终出纸文件 + 这组参数」有效：键一变，旧报价与迟到的响应都不算数。
   const quoteKey = quoteKeyOf(mergedFileUrl ?? file.fileUrl, params)
   // 同一组参数的额度红条。键对不上就是 null：按钮亮，下面也不再拿旧的额度句当红条。
-  const quotaHold = quotaBlockedByQuoteKey.get(quoteKey) ?? null
+  const quotaHold = quotaHolds.get(quotaHoldId(quoteKey)) ?? null
   const [quoteState, setQuoteState] = useState<{ key: string; view: QuoteView } | null>(null)
   const quote = useMemo<QuoteView>(
     () => (API_MODE !== 'http' ? { status: 'demo' } : quoteState?.key === quoteKey ? quoteState.view : { status: 'loading' }),
@@ -365,7 +377,7 @@ export function PrintConfirmPage() {
 
   const handleConfirm = async () => {
     // 这一组参数已经撞上当天额度：点不到，也不许先把红条清掉再发请求。
-    if (quotaBlockedByQuoteKey.has(quoteKey)) return
+    if (quotaHolds.has(quotaHoldId(quoteKey))) return
     if (terminalSession === 'checking') return
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
@@ -484,7 +496,7 @@ export function PrintConfirmPage() {
         } else {
           const message = userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`)
           const code = errorCodeOf(err)
-          if (code && QUOTA_ORDER_CODES.has(code)) quotaBlockedByQuoteKey.set(quoteKey, message)
+          if (code && QUOTA_ORDER_CODES.has(code)) quotaHolds.set(quotaHoldId(quoteKey), message)
           setSubmitError(message)
         }
       } finally {
@@ -616,9 +628,9 @@ export function PrintConfirmPage() {
     </>
   ) : sidesOverLimit ? (
     <>{backButton()}{confirmButton('确认打印')}</>
-  ) : screen === 'quoting' && quotaHold === null ? (
+  ) : screen === 'quoting' ? (
     <>{backButton()}{waitButton(freePricing ? '页数核定后可继续' : '获取报价后可继续')}</>
-  ) : screen === 'quote-failed' && quotaHold === null ? (
+  ) : screen === 'quote-failed' ? (
     <>
       {backButton()}
       <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQuoteNonce((n) => n + 1)}>{freePricing ? '重新核定页数' : '重新报价'}</button>
