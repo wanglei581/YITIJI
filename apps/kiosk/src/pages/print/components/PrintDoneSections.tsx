@@ -140,7 +140,7 @@ export function PrintJobSummaryCard({ file, params }: {
  * 缺纸按机器故障标准句说明。付过钱才写退款那一句；免费单不写退款。
  */
 export function PrintOutOfPaperPanel({
-  file, params, orderNo, failureReason, money, canRetry, resumeLine, takeaway,
+  file, params, orderNo, failureReason, money, canRetry, resumeLine, takeaway, pickupSource,
 }: {
   file: { name: string; pages: number | null } | null
   params: Partial<PrintJobParams> | null
@@ -152,6 +152,8 @@ export function PrintOutOfPaperPanel({
   money: OutOfPaperMoney
   /** 服务端 takeaway-url 的 canRetry；为真时底部才有「重新提交打印」。 */
   canRetry: boolean
+  /** 到机码单是手机上下的，文件不在本机：不能重打时叫人回手机下单，不叫人在本机选文件。 */
+  pickupSource?: boolean
   /** 同码接着打的说明；不符合条件（现场单、付费单、不能重打）时传 null。 */
   resumeLine: string | null
   /** 页面签发的「文件带走」区块（二维码 / 过期 / 签发失败），原样放在任务区之后。 */
@@ -223,7 +225,7 @@ export function PrintOutOfPaperPanel({
                   : <>可点下方<b>重新提交打印</b>：同一订单<b>整份重打</b>，请不要重新下单。</>
                 : paid
                   ? <>记下<b>{orderRef}</b>。{refundApplyLine()}不要重新下单再打一次，那会变成两笔费用。</>
-                  : <>记下<b>{orderRef}</b>，回到订单重新打印。</>}
+                  : <>记下<b>{orderRef}</b>。还要打，{pickupSource ? '请在手机上重新下单。' : '请重新选文件再打一次。'}</>}
             </span>
           </div>
         </div>
