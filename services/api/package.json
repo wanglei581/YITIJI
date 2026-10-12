@@ -362,7 +362,7 @@
     "verify:self-assessment-consent": "node -r @swc-node/register --test src/ai/resume/__tests__/self-assessment-consent.test.ts src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts",
     "verify:self-assessment-ai-gate": "node -r @swc-node/register scripts/verify-self-assessment-ai-gate.ts",
     "verify:launch-audit-p5": "node -r @swc-node/register --test src/common/__tests__/launch-audit-p5.test.ts",
-    "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts",
+    "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts && node -r @swc-node/register scripts/verify-self-assessment-bank-sync.ts",
     "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts",
     "verify:throttle-dimension": "node -r @swc-node/register scripts/verify-throttle-dimension.ts",
