@@ -7,8 +7,8 @@
  * 只含与具体页面无关的部分：可控 Promise、flush、页面加载器、带路径的 setData。
  * wx / auth / api 替身仍由各测试自己给（每个测试要控制的故障不一样）。
  *
- * 注入版本时，开关和路由表要成套给（variantModules）：测的就是真实会发布的那一组，
- * 不是「开关关掉、路由表仍是另一版」这种发不出去的组合。
+ * 注入版本时，开关和路由表要成套给（variantModules）：页面直接引用的这两个模块和真实发布的一致，
+ * 不是「开关关掉、路由表仍是另一版」这种发不出去的组合。页面目录下的辅助模块不在其列，见 variantModules 的注释。
  *
  * 放在 scripts/tests/ 下：scripts/project-graph/gates.mjs 把这里排除在「门禁脚本」之外。
  */
@@ -59,8 +59,10 @@ function emptyAiEntries(full) {
  *
  * 边界：替身只换页面自己直接 require 的这两个模块。页面目录下以 ./ 开头的辅助模块走 Node 的
  * require，它们自己读的仍是目录当前版本（现在这样的文件有 pages/privacy/consents.js，它读 AI_ENABLED）。
- * 在完整版目录里给页面注入 no-ai 时，这类辅助模块仍按完整版跑：只会让断言它的用例变红，不会变成假的通过；
- * 它在不含 AI 版里的真实行为，由 review-variant.test.mjs「整条 verify:static 链」那条在临时副本里跑到。
+ * 在完整版目录里给页面注入 no-ai 时，这类辅助模块仍按完整版跑：这种注入写的断言碰不到它们的不含 AI 分支，
+ * 断言要是只看页面自己的字段，照样会绿，不能当成测过了辅助模块。它们在不含 AI 版里的真实行为，由
+ * review-variant.test.mjs「整条 verify:static 链」那条在临时副本里跑到；要专门断言它们，得像 ai-access.test
+ * 那样直接换掉 build-variant 的源码再加载。
  * @param {'full'|'no-ai'} name
  */
 export function variantModules(name) {
