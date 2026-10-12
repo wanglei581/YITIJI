@@ -201,7 +201,7 @@ export function reprintHintLine(
     return `没打完？同一个到机码再输一次就能接着打（还能续打 ${reprintRemaining} 次）。`
   }
   if (reprintRemaining !== 0) return null
-  return `这单不能再续打了，回到订单重新打印，或${servicePhoneLine(contact)}。`
+  return `这单不能再接着打了。还要打，请重新下单，或${servicePhoneLine(contact)}。`
 }
 
 /**
