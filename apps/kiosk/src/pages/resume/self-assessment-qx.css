@@ -37,6 +37,25 @@
   overflow: hidden;
 }
 
+.sa-scrollcue {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+  font-size: 21px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sa-gate[data-clickable='true'] { cursor: pointer; }
+
 /* ── 小青横幅（稿 .hero） ─────────────────────────────────────── */
 .sa-xq {
   flex: none;

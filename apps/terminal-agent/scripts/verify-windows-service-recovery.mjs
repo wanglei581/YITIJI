@@ -341,6 +341,21 @@ for (const status of ['missing', 'ok', 'too_permissive', 'unexpected', 'unavaila
   assertIncludes(aclInspector, `"${status}"`, `ACL inspector vocabulary must include ${status}`)
 }
 assert.doesNotMatch(aclInspector, /Set-Acl|SetAccessRuleProtection|AddAccessRule/, 'ACL inspector must remain read-only')
+// The install script accepts a Program Files runtime root by the shared write-boundary
+// rules. The diagnosis must reach the same verdict, or a healthy install reads as broken.
+assert.match(diagnosis, /provisioning-runtime-security\.ps1/, 'diagnosis must load the shared runtime ACL helper')
+const runtimeRootInspector = sourceBetween(diagnosis, /function Get-RuntimeRootAclStatus\(/, /\nfunction /)
+for (const helper of ['Test-FileSystemAccessRuleAppliesToItem', 'Test-WriteLikeFileSystemRights', 'Test-IsPrivilegedRuntimeSid']) {
+  assertIncludes(runtimeRootInspector, helper, `runtime root inspector must apply the shared ${helper} rule`)
+}
+assert.match(runtimeRootInspector, /Test-IsPrivilegedRuntimeSid\s+\$sid\b/, 'runtime root inspector must judge each write-like rule by the shared privileged SID list')
+assert.match(runtimeRootInspector, /Test-IsPrivilegedRuntimeSid\s+\$ownerSid\b/, 'runtime root inspector must judge the owner by the shared privileged SID list')
+assert.doesNotMatch(runtimeRootInspector, /S-1-\d/, 'runtime root inspector must not carry its own SID list')
+assert.doesNotMatch(
+  runtimeRootInspector,
+  /FileSystemRights\]::(?:Write|Modify)\b/,
+  'runtime root inspector must not use composite masks that also match read/execute bits',
+)
 
 const configStatusStart = diagnosis.lastIndexOf('$configFieldStatus = [pscustomobject]@{')
 assert.notEqual(configStatusStart, -1, 'diagnosis must calculate field status through a PSCustomObject')

@@ -250,8 +250,8 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
  * 原型 39-print-hub.html:585-627（PR #644 补入），单独一行、不进七张卡的栅格。
  *
  * ⚠ 命名：方案②（2026-10-06）起，到机码就是唯一的取件码。
- * 卡面仍写「不是取件码」，是和上传码消歧（verify-fusion-w2-print-scan 断言这句），
- * 不是在说还有第二种取件码。
+ * 卡面徽标写「就是取件码」（verify-fusion-w2-print-scan 断言这句）；
+ * 2026-10-10 由「不是取件码」改来，因为旧句和方案②字面相反。
  *
  * ⚠ 门禁：刻意不登记进 CARD_CAPABILITY_KEY，也不随 MFP 轴停用 ——
  * 核销的是订单而非新建本机打印任务。原型在 device-off / 探测失败时把这张卡
