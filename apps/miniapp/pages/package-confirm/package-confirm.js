@@ -104,8 +104,8 @@ Page({
     onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
     noCancelNoticeFree: pkg.PACKAGE_NO_CANCEL_NOTICE_FREE,
     quoteFree: false,
-    // 默认**不勾选**。模板里那句是「我已阅读并同意《打印服务协议》」并链到
-    // /pages/legal/legal —— 那是一份法律文件的同意，预先替用户勾上等于替他声明
+    // 默认**不勾选**。模板里那句是「我已阅读并同意《用户服务协议》」并链到
+    // /pages/legal/legal?type=terms_of_service —— 那是一份法律文件的同意，预先替用户勾上等于替他声明
     // 「已阅读」。本仓库同类同意的既有口径就是显式勾选：`pages/launch/launch.js`
     // 的 `agreed: false`、`pages/self-explore` 的「（必选）」。本页此前是唯一的例外。
     agreedToTerms: false,
@@ -211,7 +211,7 @@ Page({
    *      再也走不到「确认下单」——报价永远不会变成 ready。
    *   `submitting`      —— 上一位按下「确认下单」那一刻的按钮锁。留着就是一个
    *      写着「提交中…」且按不动的页面，而并没有任何请求在跑。
-   *   `agreedToTerms`   —— 那是**上一位本人**对《打印服务协议》的同意。替下一位
+   *   `agreedToTerms`   —— 那是**上一位本人**对《用户服务协议》的同意。替下一位
    *      保留这个勾选，等于替他声明「我已阅读并同意」——与本页默认不勾选同一条理由。
    */
   _resetForIdentity() {
@@ -687,7 +687,8 @@ Page({
   },
 
   viewTerms() {
-    wx.navigateTo({ url: '/pages/legal/legal' })
+    // 勾选句里写的是哪份协议，就打开哪份：同意的对象要和点开看到的文件同名（合规十 10/12）。
+    wx.navigateTo({ url: '/pages/legal/legal?type=terms_of_service' })
   },
 
   /**
