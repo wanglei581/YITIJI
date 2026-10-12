@@ -559,7 +559,7 @@ function rPartial(){
     moneyBar('这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请拨打服务电话 18369161921（工作日 9:00–18:00）。'))+
   stepsCard('处理之前先做这三件','先看出纸口',
     ['把出纸口里<b>已经出来的 2 页</b>取走并收好，别留在机器上。',
-     '证件页确认带 <b>「仅供求职使用」水印</b>。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。',
+     '证件页确认带 <b>「仅供求职使用」水印</b>。',
      '记下<b>订单号 '+ORDER.no+'</b>，补打和费用核查都靠它。'])+
   endBar('<a class="end-btn ghost m-press" href="?state=refund-info">查看退款说明</a>'+
          '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">求助<em>→</em></a>');
@@ -621,7 +621,7 @@ function rUnconfirmed(){
   stepsCard('离开之前先做这三件','登记已经生成，不必守在机器旁',
     ['把出纸口里<b>已经出来的纸取走收好</b>，它是核查时的实物依据。',
      '记下<b>订单号 '+ORDER.no+'</b>，之后凭它查这次登记。',
-     '不要重新下单再打一次，<b>可能变成两笔费用</b>；如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。'])+
+     '不要重新下单再打一次，<b>可能变成两笔费用</b>。'])+
   endBar('<a class="end-btn ghost m-press" href="?state=refund-info">查看退款说明</a>'+
          '<a class="end-btn staff m-press" href="06-help.html" data-testid="'+SCREEN+'-primary">求助<em>→</em></a>');
 }
@@ -674,8 +674,8 @@ var R={
     body:'可能原因：卡纸、缺纸或设备临时故障。<b>不要重复支付</b>。这台机器暂时打不了，我们已经收到提醒，会尽快处理。请稍后再来；需要帮助请拨打服务电话 18369161921（工作日 9:00–18:00）。',
     money:'',
     steps:['<b>不要再付一次</b>：这一单已经付过，重复支付会多出一笔。',
-           '看一眼出纸口和纸匣。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。',
-           '记下<b>订单号 '+ORDER.no+'</b>。如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。']});},
+           '看一眼出纸口和纸匣。',
+           '记下<b>订单号 '+ORDER.no+'</b>。']});},
   'client-status-timeout':rTimeout,
   'result-unconfirmed':rUnconfirmed,
   'refund-info':rRefund
