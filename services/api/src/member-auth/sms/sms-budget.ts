@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common'
 import { tryRedis } from '../../common/redis/redis-degradation'
 import type { RedisService } from '../../common/redis/redis.service'
+import { scheduleSmsProviderRefusalAlert } from './sms-provider-refusal'
 import { createSmsSender, SmsSendError, type SmsSender, type SmsSendMeta } from './sms-sender'
 
 /**
@@ -21,6 +22,8 @@ import { createSmsSender, SmsSendError, type SmsSender, type SmsSendMeta } from 
  *   Redis 核不了额度时不发（503），宁可暂停验证码也不放任无上限地发。
  * - 只有服务商**明确拒发**（返回了具体错误码，没有计费）才退回预留；超时、网络中断以及任何认不出的
  *   异常都不退（短信可能已经发出并计费；宁可少发几条，也不让额度被异常反复刷穿，agy 9/29 反例 4.2）。
+ * - 服务商整体拒发（换号也发不出）时顺手推一条运维告警，同一类一天一次。不等待：
+ *   推送失败不能挡住原来的报错，也不能拖慢返回。两个工厂共用这里。
  *
  * 为什么单独成文件：它包的是发送器，而发送器被两个模块（内部账号、会员）各自注册一份；
  * 放进任何一个业务服务都覆盖不到另一个。
@@ -148,6 +151,15 @@ export class BudgetedSmsSender implements SmsSender {
       await send()
     } catch (error) {
       if (isExplicitProviderRejection(error)) await this.release(reserved)
+      // 整体拒发才推。不等待：推送失败只在推送函数里记一行 warn，原来的错误照样往上抛。
+      if (error instanceof SmsSendError) {
+        scheduleSmsProviderRefusalAlert({
+          providerCode: error.providerCode,
+          day,
+          redis: this.redis,
+          logger: this.logger,
+        })
+      }
       throw error
     }
   }
