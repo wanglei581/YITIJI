@@ -9,11 +9,11 @@
 //   services/api/src/member-privacy/member-data-export.service.ts   23h 有效期、10MB、500 行/分区
 //   packages/shared/src/types/memberPrivacy.ts                    UI 诚实文案 SSOT
 //
-// ⚠️ 账号注销：后端 create() 对 requestType='delete' 在任何副作用之前固定抛
-//   ACCOUNT_CLOSURE_NOT_AVAILABLE，且 list() 的 capabilities.accountClosureAvailable
-//   是写死的 false。本页因此不编造任何注销进度，只做两件真事：
-//   把服务端的能力位如实显示出来，以及在用户确认后真的把请求发给服务端、
-//   把服务端的原话（错误码 + 文案）原样回显。后端哪天放开，本页无需改动即可工作。
+// ⚠️ 账号注销：服务端已开放（10/4 注销方案：本人申请、管理员执行），list() 的
+//   capabilities.accountClosureAvailable 现在恒为 true。本页照能力位显示，不编造注销进度；
+//   能力位只有登录后读得到——没登录时「办不了的」那行单独说「注销账号登录后在本页下方申请」，
+//   登录了但能力位还没读到、读失败或服务端说不能注销时，照旧说去意见反馈或按联系方式找我们（合规十一 10/12）。
+//   申请时把服务端的原话（错误码 + 文案）原样回显。
 
 const app = getApp()
 const api = require('../../utils/api')
