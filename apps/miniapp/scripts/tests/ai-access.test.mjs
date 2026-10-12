@@ -144,6 +144,44 @@ async function declineBlocksRequest(opts) {
   assert.equal(ctx.ai.isDeclared('age_14_plus'), false)
 }
 
+/**
+ * 14 周岁确认框的正文跟着打包版本走：不含 AI 的提审版里不提 AI、语音和简历（合规八 10/12 定的乙稿）。
+ * 标题和两个按钮两版一样。
+ */
+const AGE_PROMPT_CONTENT = {
+  full: '使用 AI 分析、语音转文字和上传简历之前需要确认。未满 14 周岁的，需要监护人同意后才能使用，小程序暂时办不了。',
+  'no-ai': '上传或打印文件之前需要确认。未满 14 周岁的，需要监护人同意后才能使用，小程序暂时办不了。',
+}
+
+/** 把 build-variant 换成生成脚本写出的那一版。ai-access 只读开关、不读路由表，所以只换这一个。 */
+function withVariant(variant, mutate) {
+  const flag = variant === 'full' ? "{ VARIANT: 'full', AI_ENABLED: true }" : "{ VARIANT: 'no-ai', AI_ENABLED: false }"
+  return (name, source) => {
+    if (name === 'build-variant') return `module.exports = ${flag}\n`
+    return mutate ? mutate(name, source) : source
+  }
+}
+
+/** 上传前的年龄确认：两版各问一次，正文逐字对；选「未满」不上传。不靠目录当前停在哪个版本。 */
+async function agePromptFollowsVariant(opts = {}) {
+  for (const variant of ['full', 'no-ai']) {
+    const ctx = createRuntime({ ...opts, mutate: withVariant(variant, opts.mutate) })
+    const pending = settle(ctx.net.uploadFile('/files/kiosk-upload', 'wxfile://a.pdf', { name: 'file', ai: 'upload' }))
+    await flush()
+    const modal = ctx.wx.calls.modal[0]
+    assert.ok(modal, `${variant}：上传前先弹年龄确认`)
+    assert.equal(modal.title, '你已年满 14 周岁吗？')
+    assert.equal(modal.content, AGE_PROMPT_CONTENT[variant], `${variant} 的确认框正文`)
+    assert.equal(modal.confirmText, '已满')
+    assert.equal(modal.cancelText, '未满')
+    answer(modal, false)
+    const result = await pending
+    assert.equal(result.ok, false)
+    assert.equal(result.error.code, 'AI_AGE_NOT_DECLARED')
+    assert.equal(ctx.wx.calls.upload.length, 0, '选「未满」不上传')
+  }
+}
+
 /** 会员：新声明先写服务端再发 AI 请求；AI 请求带令牌、不带声明头。 */
 async function memberGrantsFirstAndSendsNoHeaders(opts) {
   const ctx = createRuntime(opts)
@@ -484,6 +522,7 @@ const SCENARIOS = {
   resumeAiConcurrentSharesOnePrompt,
   anonymousGenerateAsksAgeThenSendsHeaders,
   declineBlocksRequest,
+  agePromptFollowsVariant,
   memberGrantsFirstAndSendsNoHeaders,
   voiceAsksBothInOrder,
   declarationRequiredRecoversOnce,
@@ -535,6 +574,8 @@ const MUTATIONS = [
     swap('api-legal-consent', 'if (fresh && auth.isLoggedIn()) return grantAiConsent(scope).catch(() => null);', 'if (false) return null;')],
   ['拒绝后照发请求', 'declineBlocksRequest',
     swap('ai-access', '      if (!agreed) throw declinedError(scope);\n', '')],
+  ['不含 AI 版确认框仍写 AI', 'agePromptFollowsVariant',
+    swap('ai-access', '      content: AI_ENABLED\n', '      content: true\n')],
   ['小青不带渠道', 'assistantChatSendsMiniappChannel',
     swap('api', "const body = { message, channel: 'miniapp' };", 'const body = { message };')],
   ['简历授权 403 不接', 'resumeAiConsentRecoversOnce',

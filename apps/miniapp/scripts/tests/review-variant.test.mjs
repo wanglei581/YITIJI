@@ -80,6 +80,22 @@ test('AI_ENABLED=false 时首页、我的、关于、反馈、隐私不带 AI �
   assert.equal(String(privacy.data.selfHelpLine).includes('简历'), false)
 })
 
+// 登录页人人都会看到。不含 AI 的提审版里，品牌下那行和「登录后继续」下那行不提 AI 和简历（合规八 10/12 定字）。
+test('不含 AI 版登录页两句不提 AI，完整版那两句原样', () => {
+  const noAi = instantiate(loadPageDefinition('pages/launch/launch.js', { wx, modules: { ...variantModules('no-ai'), api: {}, auth: {} } }))
+  assert.equal(noAi.data.aiEnabled, false)
+  const full = instantiate(loadPageDefinition('pages/launch/launch.js', { wx, modules: { ...variantModules('full'), api: {}, auth: {} } }))
+  assert.equal(full.data.aiEnabled, true)
+
+  // 两句都是看版本的一对：完整版原句挂在 aiEnabled 上，紧跟着不含 AI 的那句。
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/launch/launch.wxml'), 'utf8')
+  assert.match(wxml, /<view wx:if="\{\{aiEnabled\}\}" class="launch-sub">AI 简历 · 文档打印<\/view>\s*<view wx:else class="launch-sub">求职材料 · 文档打印<\/view>/)
+  assert.match(wxml, /<view wx:if="\{\{aiEnabled\}\}" class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录<\/view>\s*<view wx:else class="sheet-sub">同步本人文档和打印订单<\/view>/)
+  // 登录页别处没有不看版本的「AI」。
+  const lines = wxml.replace(/<!--[\s\S]*?-->/g, '').split('\n').filter((line) => line.includes('AI'))
+  for (const line of lines) assert.match(line, /wx:if="\{\{aiEnabled\}\}"/, `登录页这行提到 AI 却不看版本：${line.trim()}`)
+})
+
 test('full → no-ai → full 关键文件逐字节还原', () => {
   if (CHAIN_INNER) return // 防递归，不是跳过检查
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-test-'))

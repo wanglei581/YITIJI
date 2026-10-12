@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { AI_ENABLED } = require('../../utils/build-variant')
 
 // 只允许回到已经明确需要登录的现有页面，禁止把任意 query 当成跳转地址。
 // 「我的权益」「合同审查」两页已停放（首发按非招聘类目提审，compliance-boundary.md §1.1），
@@ -21,6 +22,8 @@ function safeReturnTo(raw) {
 Page({
   data: {
     statusBarHeight: 20,
+    // 不含 AI 的提审版里，品牌下那行和「登录后继续」下那行不提 AI 和简历（字由合规八 10/12 定）。
+    aiEnabled: AI_ENABLED,
     agreed: false,
     // 登录模式：false = 微信一键（默认），true = 短信验证码（内嵌表单）
     showSms: false,
