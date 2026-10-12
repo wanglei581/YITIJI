@@ -24,6 +24,8 @@ import { CURRENT_SELF_ASSESSMENT_CONSENT_VERSION, SELF_ASSESSMENT_QUESTIONS_PATH
  */
 
 const MOCK_TASK_ID = 'sa-'.padEnd(40, 'a')
+const SA_DIRECT_PDF = '/self-assessment-fixtures/report.pdf'
+const SA_SAME_SITE_PDF = '/api/v1/files/sa-file-001/content?expires=1&sig=test'
 const SA_SCROLL_CUE = readFileSync(new URL('../../src/pages/resume/SelfAssessmentFlow.tsx', import.meta.url), 'utf8')
   .match(/^const SA_SCROLL_CUE = '([^']+)'$/m)?.[1]
 
@@ -212,12 +214,20 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
         filename: 'self-assessment-001.pdf',
         sizeBytes: 12345,
         pageCount: 2,
-        signedUrl: '/self-assessment-fixtures/report.pdf',
+        signedUrl: SA_DIRECT_PDF,
+        printFileUrl: SA_SAME_SITE_PDF,
         signedUrlExpiresAt: '2099-01-01T00:00:00.000Z',
         expiresAt: '2099-01-01T00:00:00.000Z',
       },
     })
-    await page.route('**/self-assessment-fixtures/report.pdf', (route) =>
+    const directLinkFetches: string[] = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === SA_DIRECT_PDF) directLinkFetches.push(request.resourceType())
+    })
+    await page.route(`**${SA_DIRECT_PDF}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+    )
+    await page.route('**/api/v1/files/sa-file-001/content**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
     )
     await page.addInitScript(({ key, value }) => {
@@ -235,15 +245,57 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
 
     await page.goto('/resume/self-assessment/result')
     const pageCount = page.context().pages().length
+    const sameSiteFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/sa-file-001/content')
     await page.getByRole('button', { name: /生成 PDF 预览/ }).click()
     const dialog = page.getByRole('dialog', { name: 'self-assessment-001.pdf' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/self-assessment-fixtures/report.pdf')
+    await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', SA_SAME_SITE_PDF)
+    await sameSiteFetch
+    expect(directLinkFetches).toEqual([])
     await expect(dialog.getByText('手机扫码保存')).toBeVisible()
     expect(page.context().pages()).toHaveLength(pageCount)
     await page.getByRole('button', { name: '关闭文件预览' }).click()
     await expect(dialog).toHaveCount(0)
     expect(page.context().pages()).toHaveLength(pageCount)
+  })
+
+  test('自评 PDF 回包没有 printFileUrl 时页内预览退回直链 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api)
+    api.respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/print`, {
+      status: 200,
+      json: {
+        fileId: 'sa-file-001',
+        filename: 'self-assessment-001.pdf',
+        sizeBytes: 12345,
+        pageCount: 2,
+        signedUrl: SA_DIRECT_PDF,
+        signedUrlExpiresAt: '2099-01-01T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    })
+    await page.route(`**${SA_DIRECT_PDF}`, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+    )
+    await page.addInitScript(({ key, value }) => {
+      sessionStorage.setItem(key, JSON.stringify(value))
+    }, {
+      key: 'self_assessment_session_v1',
+      value: {
+        answers: {},
+        consent: { nonSensitive: true, sensitive: false },
+        taskId: MOCK_TASK_ID,
+        accessToken: 'mock-anon-token-deadbeef',
+        result: submissionData,
+      },
+    })
+
+    await page.goto('/resume/self-assessment/result')
+    const directFetch = page.waitForRequest((request) => new URL(request.url()).pathname === SA_DIRECT_PDF)
+    await page.getByRole('button', { name: /生成 PDF 预览/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'self-assessment-001.pdf' })
+    await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', SA_DIRECT_PDF)
+    await directFetch
+    await expect(dialog.getByText('手机扫码保存')).toBeVisible()
   })
 
   test('§1.3 + §1.5: 撤回 DELETE 真网络可达 @kiosk', async ({ page, api }) => {

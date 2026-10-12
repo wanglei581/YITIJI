@@ -15,6 +15,7 @@ const GENERATE = '/api/v1/job-materials/generate'
 /** 预览端点取自 FILE.previewUrlPath（经 API 前缀）；返回的短期链接指向一份夹具 PDF，由 page.route 应答。 */
 const PREVIEW_URL = '/api/v1/files/jm-fixture-001/preview-url'
 const PREVIEW_PDF = '/w3-fixtures/materials-preview.pdf'
+const PREVIEW_SAME_SITE = '/api/v1/files/jm-fixture-001/content?expires=1&sig=test'
 const VIEWPORTS = [{ width: 1080, height: 1920 }, { width: 390, height: 844 }] as const
 
 const FIELDS = [
@@ -189,19 +190,38 @@ test('material workshop: catalog, signed-out draft handoff, inline validation an
   expect(api.requestCount('GET', PREVIEW_URL)).toBe(0)
   api.respond('GET', PREVIEW_URL, {
     status: 200,
-    json: { success: true, data: { fileId: 'jm-fixture-001', url: PREVIEW_PDF, expiresAt: '2099-01-01T02:30:00.000Z', disposition: 'inline' } },
+    json: { success: true, data: { fileId: 'jm-fixture-001', url: PREVIEW_PDF, printFileUrl: PREVIEW_SAME_SITE, expiresAt: '2099-01-01T02:30:00.000Z', disposition: 'inline' } },
+  })
+  const directLinkFetches: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === PREVIEW_PDF) directLinkFetches.push(request.resourceType())
   })
   await page.route(`**${PREVIEW_PDF}`, (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  await page.route('**/api/v1/files/jm-fixture-001/content**', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
   const previewSent = page.waitForRequest((req) => new URL(req.url()).pathname === PREVIEW_URL)
+  const sameSiteFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/jm-fixture-001/content')
   await card.getByRole('button', { name: '预览文件' }).click()
   expect((await previewSent).headers().authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '校招自荐信.pdf' })
-  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', PREVIEW_PDF)
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', PREVIEW_SAME_SITE)
+  await sameSiteFetch
+  expect(directLinkFetches).toEqual([])
   await expect(page).toHaveURL(/\/resume\/materials$/)
   expect(await page.locator('body').innerText()).not.toContain(PREVIEW_PDF)
   await dialog.getByRole('button', { name: '关闭文件预览' }).click()
   await expect(dialog).toHaveCount(0)
-  expect(api.requestCount('GET', PREVIEW_URL)).toBe(1)
+
+  api.respond('GET', PREVIEW_URL, {
+    status: 200,
+    json: { success: true, data: { fileId: 'jm-fixture-001', url: PREVIEW_PDF, expiresAt: '2099-01-01T02:30:00.000Z', disposition: 'inline' } },
+  })
+  const directFetch = page.waitForRequest((request) => new URL(request.url()).pathname === PREVIEW_PDF)
+  await card.getByRole('button', { name: '预览文件' }).click()
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', PREVIEW_PDF)
+  await directFetch
+  await dialog.getByRole('button', { name: '关闭文件预览' }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(api.requestCount('GET', PREVIEW_URL)).toBe(2)
 
   // 改字段就收起文件卡：屏幕上不留一张与当前草稿对不上的「已生成」。
   await page.locator('#material-field-notes').fill('希望语气稳重')

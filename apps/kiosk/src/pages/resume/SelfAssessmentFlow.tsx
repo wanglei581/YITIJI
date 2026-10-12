@@ -1051,7 +1051,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
 
       {previewOpen && printed ? (
         <FilePreviewDialog
-          fileUrl={printed.signedUrl} fileName={printed.filename} mimeType="application/pdf"
+          fileUrl={printed.printFileUrl || printed.signedUrl} fileName={printed.filename} mimeType="application/pdf"
           phoneDownloadUrl={printed.signedUrl} expiresAt={printed.expiresAt} regenerating={printing}
           onRegenerate={() => { void handlePrint() }} onClose={() => setPreviewOpen(false)}
         />

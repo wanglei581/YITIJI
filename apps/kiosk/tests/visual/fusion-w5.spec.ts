@@ -1456,6 +1456,8 @@ test('AI record delete waits for the server and keeps the row on failure @w5-kio
 
 const LONG_DOC_NAME = '2026届秋招-应聘材料合集-个人简历与成绩单与获奖证书与实习证明-扫描合并版-最终确认稿-请勿外传.pdf'
 const FUTURE = '2099-03-01T00:00:00.000Z'
+const PHOTO_PREVIEW_URL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/%3E'
+const PHOTO_PRINT_URL = '/api/v1/files/doc-photo/content?expires=1&sig=test'
 
 function memberDocument(overrides: Record<string, unknown>): Record<string, unknown> {
   const id = String(overrides.id)
@@ -1586,7 +1588,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   api.respond('GET', '/api/v1/me/documents', memberPage(MEMBER_DOCUMENTS))
   api.respond('GET', '/api/v1/files/doc-photo/preview-url', {
     status: 200,
-    json: { success: true, data: { fileId: 'doc-photo', url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/%3E', expiresAt: FUTURE, disposition: 'inline' } },
+    json: { success: true, data: { fileId: 'doc-photo', url: PHOTO_PREVIEW_URL, printFileUrl: PHOTO_PRINT_URL, expiresAt: FUTURE, disposition: 'inline' } },
   })
   api.respond('PATCH', '/api/v1/files/doc-long/retention', {
     status: 200,
@@ -1626,6 +1628,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
   await expect(dialog).toBeVisible()
+  await expect(dialog.locator('img')).toHaveAttribute('src', PHOTO_PREVIEW_URL)
   await assetShot(page, 'documents-preview')
   await assertTapTargetPointerHit(dialog.getByRole('button', { name: '关闭预览' }))
   await dialog.getByRole('button', { name: '关闭预览' }).click()
@@ -1705,6 +1708,52 @@ test('documents: derived AI output skips the material check and goes straight to
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
   expect(api.requestCount('POST', '/api/v1/materials/tasks'), '派生产物不进材料检查').toBe(0)
+  expect(errors).toEqual([])
+})
+
+test('documents: PDF preview uses the same-site content URL and falls back without it @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  const directPdf = '/w5-fixtures/my-doc-direct.pdf'
+  const sameSite = '/api/v1/files/doc-pdf-same/content?expires=1&sig=test'
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-pdf-same', filename: '同站预览.pdf' }),
+    memberDocument({ id: 'doc-pdf-direct', filename: '直链预览.pdf' }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-pdf-same/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-same', url: directPdf, printFileUrl: sameSite, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  api.respond('GET', '/api/v1/files/doc-pdf-direct/preview-url', {
+    status: 200,
+    json: { success: true, data: { fileId: 'doc-pdf-direct', url: directPdf, expiresAt: FUTURE, disposition: 'inline' } },
+  })
+  const directLinkFetches: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === directPdf) directLinkFetches.push(request.resourceType())
+  })
+  await page.route('**/api/v1/files/doc-pdf-same/content**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route(`**${directPdf}`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  const sameFetch = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/v1/files/doc-pdf-same/content')
+  await page.getByTestId('member-assets-document').filter({ hasText: '同站预览.pdf' }).getByRole('button', { name: '预览', exact: true }).click()
+  const sameDialog = page.getByRole('dialog', { name: '同站预览.pdf' })
+  await expect(sameDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', sameSite)
+  await sameFetch
+  expect(directLinkFetches).toEqual([])
+  await sameDialog.getByRole('button', { name: '关闭预览' }).click()
+
+  const directFetch = page.waitForRequest((request) => new URL(request.url()).pathname === directPdf)
+  await page.getByTestId('member-assets-document').filter({ hasText: '直链预览.pdf' }).getByRole('button', { name: '预览', exact: true }).click()
+  const directDialog = page.getByRole('dialog', { name: '直链预览.pdf' })
+  await expect(directDialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', directPdf)
+  await directFetch
   expect(errors).toEqual([])
 })
 
@@ -1877,7 +1926,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
   api.respond('GET', '/api/v1/me/print-orders', memberPage(MEMBER_ORDERS))
   api.respond('GET', '/api/v1/files/doc-photo/preview-url', {
     status: 200,
-    json: { success: true, data: { fileId: 'doc-photo', url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/%3E', expiresAt: FUTURE, disposition: 'inline' } },
+    json: { success: true, data: { fileId: 'doc-photo', url: PHOTO_PREVIEW_URL, printFileUrl: PHOTO_PRINT_URL, expiresAt: FUTURE, disposition: 'inline' } },
   })
 
   await loginThroughVisibleUi(page, '/me/documents', { checkLoginPage: false })
@@ -1895,6 +1944,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
   await view.click()
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
   await expect(dialog).toBeVisible()
+  await expect(dialog.locator('img')).toHaveAttribute('src', PHOTO_PREVIEW_URL)
   await assetShot(page, 'mobile-documents-preview')
   const dialogBox = await dialog.boundingBox()
   expect(dialogBox!.x).toBeGreaterThanOrEqual(0)

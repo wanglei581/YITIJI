@@ -22,7 +22,7 @@ import {
 } from '../../../services/api/memberAssets'
 import { documentsLoggedInTruth, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { useAuth } from '../../../auth/useAuth'
-import { FileContentPreview } from '../../../components/FileContentPreview'
+import { FileContentPreview, inPagePreviewUrl } from '../../../components/FileContentPreview'
 import { formatTime } from '../assets/format'
 import { useStartPrintHandoff } from '../../print/usePrintHandoff'
 import { DocumentConvertAction } from './components/DocumentConvertAction'
@@ -117,7 +117,7 @@ export function MyDocumentsPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<Hint | null>(null)
   const [access, setAccess] = useState<DocumentAccess | null>(null)
-  const [preview, setPreview] = useState<{ url: string; filename: string; mimeType: string } | null>(null)
+  const [preview, setPreview] = useState<{ url: string; printFileUrl?: string; filename: string; mimeType: string } | null>(null)
   const [docFilter, setDocFilter] = useState<DocumentListFilter>('all')
   const [signingId, setSigningId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -178,7 +178,7 @@ export function MyDocumentsPage() {
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
       const fresh = !accessLinkExpired(res.expiresAt)
-      if (fresh) setPreview({ url: res.url, filename: doc.filename, mimeType: doc.mimeType })
+      if (fresh) setPreview({ url: res.url, printFileUrl: res.printFileUrl, filename: doc.filename, mimeType: doc.mimeType })
       else setPreview(null)
       setAccess({ phase: fresh ? 'ready' : 'expired', doc, intent: 'preview', expiresAt: res.expiresAt })
     } catch {
@@ -547,7 +547,17 @@ export function MyDocumentsPage() {
               <h2 id="document-preview-title">{preview.filename}</h2>
               <button type="button" onClick={() => setPreview(null)} className="qx-me-small">关闭预览</button>
             </header>
-            <FileContentPreview className="min-h-0 flex-1 rounded-none border-0" fileUrl={preview.url} fileName={preview.filename} mimeType={preview.mimeType} />
+            <FileContentPreview
+              className="min-h-0 flex-1 rounded-none border-0"
+              fileUrl={inPagePreviewUrl({
+                url: preview.url,
+                printFileUrl: preview.printFileUrl,
+                fileName: preview.filename,
+                mimeType: preview.mimeType,
+              })}
+              fileName={preview.filename}
+              mimeType={preview.mimeType}
+            />
           </section>
         </div>
       )}
