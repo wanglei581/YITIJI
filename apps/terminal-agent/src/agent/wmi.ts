@@ -316,43 +316,6 @@ export function buildPrintServiceCompletionEventScript(): string {
 }
 
 /**
- * Confirm that Windows PrintService recorded Event ID 307 for this exact task.
- *
- * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
- * `Printing, Retained` even after the spooler emitted its completion event. We
- * accept a successful 307 after this dispatch began when either:
- *   1. raw XML contains the exact sanitized task correlation id; or
- *   2. a driver replaced the document name with the field-verified generic
- *      value "打印文档", and the exact queue and LocalSystem identity match.
- * This remains Windows spooler completion evidence; it does not prove that
- * paper physically exited.
- */
-export async function hasPrintServiceCompletionEvent(
-  printerName: string,
-  taskId: string,
-  dispatchedAtMs: number,
-): Promise<boolean> {
-  if (process.platform !== 'win32') return false
-
-  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
-  if (
-    safeTaskId.length === 0 ||
-    safeTaskId !== taskId ||
-    printerName.trim().length === 0 ||
-    !Number.isFinite(dispatchedAtMs)
-  ) {
-    return false
-  }
-  const safeSince = Math.max(0, Math.floor(dispatchedAtMs))
-
-  const output = await runPowerShell(
-    buildPrintServiceCompletionEventScript(),
-    JSON.stringify({ taskId: safeTaskId, printerName, dispatchedAtMs: safeSince }),
-  )
-  return output?.trim().toLowerCase() === 'true'
-}
-
-/**
  * Result of one PrintService 307 read.
  * 'unreadable' is a failed read (timeout, PowerShell did not start, or the
  * output was not exactly true/false). It is not evidence that the event is absent.
@@ -368,9 +331,22 @@ export function parseCompletionEventRead(output: string | null): CompletionEvent
 }
 
 /**
- * Same query as hasPrintServiceCompletionEvent, but a failed read stays
- * 'unreadable' instead of collapsing into false. Never throws.
- * Non-Windows, or arguments rejected by the same checks, are unreadable.
+ * Ask Windows PrintService whether it recorded Event ID 307 for this exact task.
+ *
+ * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
+ * `Printing, Retained` even after the spooler emitted its completion event. We
+ * accept a successful 307 after this dispatch began when either:
+ *   1. raw XML contains the exact sanitized task correlation id; or
+ *   2. a driver replaced the document name with the field-verified generic
+ *      value "打印文档", and the exact queue and LocalSystem identity match.
+ * This remains Windows spooler completion evidence; it does not prove that
+ * paper physically exited.
+ *
+ * A failed read stays 'unreadable' instead of collapsing into "no event".
+ * Never throws. Non-Windows, or arguments that fail the checks below, are
+ * unreadable. Errors Get-WinEvent swallows inside the script still come back
+ * as 'false' (not_found): only a PowerShell that timed out, did not start, or
+ * printed something else is reported as unreadable.
  */
 export async function readPrintServiceCompletionEvent(
   printerName: string,

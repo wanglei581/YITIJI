@@ -83,13 +83,15 @@ interface MonitorDependencies {
  *     enabled and this process has already read a matching 307 for this queue,
  *     "seen in the queue, then gone" waits COMPLETION_EVIDENCE_GRACE_POLLS.
  *     A previous read does not mean this read succeeds. A not_found read counts
- *     toward PRINT_JOB_UNCONFIRMED. An unreadable read does not: that many failed
- *     reads complete as inferred 'completion_log_unreadable'. When that log is
- *     off, its configuration could not be read, or this queue has not been
- *     matched yet, the same disappearance still counts as completed and is
- *     marked inferred. A failed read on those paths is treated like a missing
- *     event. This is the Windows spooler lifecycle only; it does not prove that
- *     paper physically reached the user.
+ *     toward PRINT_JOB_UNCONFIRMED. An unreadable read does not, and that many
+ *     failed reads complete as inferred 'completion_log_unreadable' only while no
+ *     read in this stretch has confirmed the absence: once one has, failed reads
+ *     decide nothing and polling goes on (same order as the timeout rule below).
+ *     When that log is off, its configuration could not be read, or this queue
+ *     has not been matched yet, the same disappearance still counts as completed
+ *     and is marked inferred. A failed read on those paths is treated like a
+ *     missing event. This is the Windows spooler lifecycle only; it does not
+ *     prove that paper physically reached the user.
  *   - A job seen while Windows is removing it (Deleting/Deleted) is neither a device
  *     fault nor completion. It is the visible half of "queue removal": the outcome is
  *     decided by the same evidence as a job that simply disappears — a matching 307,
@@ -290,7 +292,9 @@ export async function monitorPrintJob(
         if (activeJobSeenOnce) {
           // 完成记录开着、并且本进程已经对这台队列读到过 307（读到过不等于这一次读得到）：
           // 沿用本轮开头那一次读取。not_found 计入 goneWithoutEventPolls，满 COMPLETION_EVIDENCE_GRACE_POLLS 记结果未确认。
-          // unreadable 不加那一格，另计 unreadableEventReads，满同一个次数则按推断记完成，原因 completion_log_unreadable。
+          // unreadable 不加那一格，另计 unreadableEventReads；这一段里一次「确实没有」都没读到时，满同一个次数按推断记完成，
+          // 原因 completion_log_unreadable。已经读到过「确实没有」的，读取失败不再作数，接着查：和监视到点时的先后一致
+          // （只要确实查过没有，就不因为后来读不到而记成打好了）。
           // 记录没开、配置读不到，或开着但还没对上过这台队列：仍按见过在打、后来没了记完成，并标成推断。读取失败在这些路径上仍等于没查到。
           // 这只说明 Windows 假脱机不再留着这份作业，不证明纸已经出来。
           const state = await completionLogState
@@ -305,7 +309,10 @@ export async function monitorPrintJob(
               }
             } else if (completionRead === 'unreadable') {
               unreadableEventReads += 1
-              if (unreadableEventReads >= COMPLETION_EVIDENCE_GRACE_POLLS) {
+              if (
+                goneWithoutEventPolls === 0 &&
+                unreadableEventReads >= COMPLETION_EVIDENCE_GRACE_POLLS
+              ) {
                 return {
                   failed: false,
                   errorCode: '',
