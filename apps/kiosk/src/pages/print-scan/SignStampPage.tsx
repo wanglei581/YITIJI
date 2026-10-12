@@ -229,7 +229,6 @@ export function SignStampPage() {
               description="手机扫码上传一份 PDF，确认后自动进入下一步。"
               confirmLabel="确认使用该文档"
               onUploaded={flow.handlePhoneUploaded}
-              onBusyChange={flow.setQrBusy}
             />
           </div>
         ) : null}

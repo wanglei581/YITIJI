@@ -104,10 +104,19 @@ export function confirmUploadSession(
   })
 }
 
-export function cancelUploadSession(sessionId: string, controlToken: string): Promise<UploadSessionCancelResponse> {
+/**
+ * `keepalive`：离页、清场时发的那一次用。清场最后会整页重开，普通请求可能被浏览器连同页面一起掐掉；
+ * keepalive 让这次作废在页面关掉后仍能送达（DELETE 没有请求体，不受 keepalive 64KB 限制影响）。
+ */
+export function cancelUploadSession(
+  sessionId: string,
+  controlToken: string,
+  options?: { keepalive?: boolean },
+): Promise<UploadSessionCancelResponse> {
   return requestJson<UploadSessionCancelResponse>(`/upload-sessions/${encodeURIComponent(sessionId)}`, {
     method: 'DELETE',
     controlToken,
+    keepalive: options?.keepalive,
   })
 }
 

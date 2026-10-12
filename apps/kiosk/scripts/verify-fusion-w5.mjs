@@ -9,6 +9,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 第八次 8-7：真实卸载作废未收文件的会话，StrictMode 重放和确认过程有守卫。
+// 2026-10-12：已传到未确认（uploaded）也在卸载时作废（合规 10/11），不再在跳过条件里；作废请求带 keepalive，清场整页重开也送得到。
+for (const path of ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'src/pages/upload/hooks/useUploadSession.ts']) {
+  const source = read(path)
+  assert.match(source, /mountedRef\.current = true[\s\S]*return \(\) => \{[\s\S]*mountedRef\.current = false[\s\S]*queueMicrotask\(\(\) => \{[\s\S]*if \(mountedRef\.current \|\| confirmingRef\.current\) return[\s\S]*if \(!existing \|\| phase === 'confirmed' \|\| phase === 'cancelled' \|\| phase === 'expired'\) return[\s\S]*void cancelUploadSession\(existing\.sessionId, existing\.controlToken, \{ keepalive: true \}\)\.catch\(\(\) => undefined\)/, `8-7 ${path} 卸载静默作废（含已传到未确认）、带 keepalive，且避开重放与确认`)
+}
+console.log('PASS 8-7 两套上传真实卸载静默作废')
+
 const W5_ROUTES = [
   '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
@@ -87,10 +95,13 @@ const FROZEN = new Map([
   // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
   // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
   // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-10-10 8-7 重新冻结：独立等待锁、到期提醒、真实卸载作废；新内容断言在哈希检查之前。
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb'],
+  // 2026-10-11：取消请求在途时也持锁（文件已收到后点取消，等待锁已放开）。旧哈希 68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40。
+  // 2026-10-12：离页、清场时对「文件已传到、还没确认」的会话也作废，作废请求带 keepalive（合规 10/11 定第八次做）。旧哈希 29f46f9df338e9ecbba0489ea4bb5d3df429270996c8afe02003bcd024e1e9bb。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '0c055a6728f8685595ed618d87359f2c0ff63e0a43a35d6e4b6173dd2b82bc7a'],
 ])
 
 function propertyName(node) {

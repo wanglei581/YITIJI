@@ -139,7 +139,12 @@ assertIncludes(source, 'DiagnosisDirectionForm', 'source page extracts diagnosis
 assertIncludes(source, 'targetContext:', 'source page passes target context to parse')
 assertIncludes(source, 'selectedDimensions:', 'source page passes selected dimensions to parse')
 assertIncludes(source, 'const sourceBusy = uploading || phoneBusy || usbBusy', 'source page combines every upload channel into one busy state')
-assertIncludes(source, 'useBusyLock(sourceBusy)', 'source page prevents standby during every upload channel')
+assertIncludes(source, 'useBusyLock(uploading || usbBusy)', '简历来源页的清场锁不含扫码面板的忙')
+const sourceLockArg = source.match(/useBusyLock\(([^)]*)\)/)?.[1] ?? 'qrBusy'
+if (/\b(?:qrBusy|phoneBusy|sourceBusy|showQr)\b/.test(sourceLockArg)) {
+  throw new Error('简历来源页的 useBusyLock 实参不得再出现 qrBusy / phoneBusy / sourceBusy / showQr')
+}
+console.log('PASS 简历来源页的 useBusyLock 实参不含扫码面板的忙')
 assertNotIncludes(source, 'Windows Agent 盘符直达待真机接入', 'source page removes internal usb implementation copy')
 assertNotIncludes(source, '不直接连接第三方网盘', 'source page removes internal cloud implementation copy')
 

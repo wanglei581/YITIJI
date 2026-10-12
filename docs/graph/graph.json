@@ -20006,6 +20006,7 @@
     "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-contract-review-session.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -20141,6 +20142,7 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
@@ -20649,6 +20651,7 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
@@ -21276,6 +21279,7 @@
     ],
     "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
@@ -21806,7 +21810,8 @@
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts": [
-      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/upload/phone-upload-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -29878,6 +29883,8 @@
           "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx",
           "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesPanels.tsx",
           "apps/kiosk/src/pages/print-scan/ConvertImagesView.tsx",
@@ -29925,6 +29932,7 @@
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
           "apps/kiosk/src/pages/print/styles/print-upload.css",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
@@ -29981,6 +29989,7 @@
           "apps/kiosk/src/pages/interview/session/interviewTurnActions.ts",
           "apps/kiosk/src/pages/interview/session/types.ts",
           "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+          "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
           "apps/kiosk/src/pages/resume/JobFitPage.tsx",
@@ -30149,6 +30158,7 @@
           "apps/kiosk/src/pages/toolbox/toolbox-zone.css",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx",
+          "apps/kiosk/src/pages/upload/hooks/useUploadSession.ts",
           "apps/kiosk/src/pages/upload/phone-upload-service-desk.css",
           "apps/kiosk/src/routes/index.tsx"
         ],

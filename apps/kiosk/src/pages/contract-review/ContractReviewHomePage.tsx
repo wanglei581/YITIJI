@@ -77,12 +77,12 @@ export function ContractReviewHomePage() {
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
   const [loadingConsent, setLoadingConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useBusyLock(submitting || qrBusy)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(submitting)
 
   useEffect(() => {
     // 上传页不恢复上一份合同；浏览器返回到这里也立即丢弃易失凭证与结果。
@@ -277,7 +277,6 @@ export function ContractReviewHomePage() {
                   })
                   setError(null)
                 }}
-                onBusyChange={setQrBusy}
               />
             )
           ) : (

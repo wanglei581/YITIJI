@@ -117,7 +117,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [resumePreviewOpen, setResumePreviewOpen] = useState(false)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [qrBusy, setQrBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -143,7 +142,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    */
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
 
-  useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
+  // 扫码面板自己持「码有效、文件还没到」那把锁（#1376）；文件到了以后回到正常的无操作清场，这里不再把面板的忙算进来（合规 10/10）。
+  useBusyLock(creating || uploading || printingSheet || usbBusy)
 
   useEffect(() => {
     patchInterviewWorkbenchSession({
@@ -559,7 +559,6 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                       setResumePreviewOpen(false)
                       setResumeFile({ fileId: file.fileId, name: file.name, mimeType: file.mimeType, fileUrl: file.fileUrl, format: file.format })
                     }}
-                    onBusyChange={setQrBusy}
                   />
                 ) : resumeChannel === 'usb' ? (
                   <ResumeUsbImportPanel
