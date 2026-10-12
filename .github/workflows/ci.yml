@@ -506,7 +506,7 @@ jobs:
           # 报 Cannot find module '../generated/prisma/client'。
           pnpm --filter @ai-job-print/api verify:assistant-provider-label
           # 真机实操 F-04（2026-10-10）：小青文字、语音、作业面三处提示词里都带着「不教人拆机」那一句约束。
-          pnpm --filter @ai-job-print/api verify:assistant-device-fault
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:assistant-device-fault
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:ai-feature-keys
           # 2026-09-03 新增：断言 shared 与 API 两侧 AI 类型契约一致，
