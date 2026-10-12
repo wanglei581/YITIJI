@@ -537,12 +537,20 @@ function registerHomeLists(api: ApiRouter): void {
   })
 }
 
-/** 点底部「首页」再后退：客户端跳转，不重载文档，模块内存里的额度记录还在。 */
+/**
+ * 点底部「首页」再后退：客户端跳转，不重载文档，模块内存里的额度记录还在。
+ * 首页按需加载：没画出来就后退，路由过渡会被放弃，确认页根本没卸载，测不到「回来」。
+ * 所以等首页真画出来、确认页真卸载了再后退；回来后用页面上的标记证明文档没重载。
+ */
 async function leaveConfirmAndReturn(page: Page): Promise<void> {
+  await page.evaluate(() => { (window as unknown as { __quotaStay?: number }).__quotaStay = 1 })
   await page.locator('nav.qx-navbar').getByRole('button', { name: '首页', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toHaveCount(0)
   await page.goBack()
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __quotaStay?: number }).__quotaStay)).toBe(1)
 }
 
 async function setHandoffCopies(page: Page, copies: number): Promise<void> {
