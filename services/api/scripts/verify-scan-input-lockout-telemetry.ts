@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import 'reflect-metadata'
+import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 
@@ -119,6 +120,59 @@ async function main(): Promise<void> {
   assert.equal(oldAgentProjection?.scanInputReason, null)
   assert.equal(oldAgentProjection?.scanInputObservedAt, null)
 
+  // 打印完成记录开关 + 推断单数：存最近一次心跳，后台记录读得到；老版本不带则为 null；
+  // 坏值与不认识的字段仍是 400（入参白名单没有放宽）。
+  const pipe = new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: () => new BadRequestException({
+      error: { code: 'VALIDATION_FAILED', message: '请求参数校验失败' },
+    }),
+  })
+  const acceptHeartbeat = async (body: object) => pipe.transform(body, { type: 'body', metatype: HeartbeatDto })
+  const heartbeatStatus = async (body: object): Promise<number> => {
+    try {
+      await acceptHeartbeat(body)
+      return 200
+    } catch (error) {
+      return error instanceof BadRequestException ? error.getStatus() : 0
+    }
+  }
+  const reported = await acceptHeartbeat({
+    status: 'online',
+    printCompletionLog: 'enabled',
+    printResultsInferred: 3,
+  })
+  await agent.heartbeat(terminalId, reported, 'Bearer redacted')
+  assert.equal(latestHeartbeat?.printCompletionLog, 'enabled')
+  assert.equal(latestHeartbeat?.printResultsInferred, 3)
+  const reportedProjection = (await admin.listTerminalsForAdmin()).terminals[0]
+  assert.equal(reportedProjection?.printCompletionLog, 'enabled')
+  assert.equal(reportedProjection?.printResultsInferred, 3)
+  assert.equal(await heartbeatStatus({ printCompletionLog: 'disabled', printResultsInferred: 0 }), 200)
+  assert.equal(await heartbeatStatus({ printCompletionLog: 'unknown', printResultsInferred: 1000000 }), 200)
+
+  const omitted = await acceptHeartbeat({ status: 'online' })
+  assert.equal(await heartbeatStatus({ status: 'online' }), 200, 'old Agents that omit both fields stay 200')
+  await agent.heartbeat(terminalId, omitted, 'Bearer redacted')
+  assert.equal(latestHeartbeat?.printCompletionLog, null)
+  assert.equal(latestHeartbeat?.printResultsInferred, null)
+  const omittedProjection = (await admin.listTerminalsForAdmin()).terminals[0]
+  assert.equal(omittedProjection?.printCompletionLog, null)
+  assert.equal(omittedProjection?.printResultsInferred, null)
+
+  for (const invalid of [
+    { printCompletionLog: 'on' },
+    { printResultsInferred: -1 },
+    { printResultsInferred: 1.5 },
+    { printResultsInferred: '3' },
+    { printResultsInferred: 1000001 },
+    { printCompletionLog: 'enabled', printResultsInferred: 1, notARealField: true },
+  ]) {
+    assert.equal(await heartbeatStatus(invalid), 400, `expected 400 for ${JSON.stringify(invalid)}`)
+  }
+
   for (const invalidSemanticDto of [
     { scanInputHealth: 'locked_out', scanInputAction: 'none', scanInputReason: 'watcher_error', scanInputObservedAt: '2026-09-13T10:20:30.123Z' },
     { scanInputHealth: 'locked_out', scanInputAction: 'restart_required', scanInputReason: null, scanInputObservedAt: '2026-09-13T10:20:30.123Z' },
@@ -149,6 +203,16 @@ async function main(): Promise<void> {
     assert.match(model, /scanInputAction\s+String\?/)
     assert.match(model, /scanInputReason\s+String\?/)
     assert.match(model, /scanInputObservedAt\s+DateTime\?/)
+    assert.match(model, /printCompletionLog\s+String\?/)
+    assert.match(model, /printResultsInferred\s+Int\?/)
+  }
+  for (const migrationPath of [
+    'prisma/migrations/20261012130000_heartbeat_print_result_basis/migration.sql',
+    'prisma/postgres/migrations/20261012130000_heartbeat_print_result_basis/migration.sql',
+  ]) {
+    const migration = readFileSync(join(root, migrationPath), 'utf8')
+    assert.match(migration, /ADD COLUMN "printCompletionLog"/)
+    assert.match(migration, /ADD COLUMN "printResultsInferred"/)
   }
   for (const migrationPath of [
     'prisma/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql',

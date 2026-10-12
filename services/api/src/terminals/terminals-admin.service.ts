@@ -81,6 +81,8 @@ export interface AdminTerminalView {
   scanInputAction: string | null
   scanInputReason: string | null
   scanInputObservedAt: string | null
+  printCompletionLog: string | null
+  printResultsInferred: number | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
@@ -283,6 +285,8 @@ export class TerminalAdminService {
             scanInputAction: true,
             scanInputReason: true,
             scanInputObservedAt: true,
+            printCompletionLog: true,
+            printResultsInferred: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -342,6 +346,8 @@ export class TerminalAdminService {
         scanInputAction: hb?.scanInputAction ?? null,
         scanInputReason: hb?.scanInputReason ?? null,
         scanInputObservedAt: hb?.scanInputObservedAt?.toISOString() ?? null,
+        printCompletionLog: hb?.printCompletionLog ?? null,
+        printResultsInferred: hb?.printResultsInferred ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: normalizeDiskFreeGb(hb?.diskFreeGb),

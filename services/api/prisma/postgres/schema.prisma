@@ -295,6 +295,8 @@ model TerminalHeartbeat {
   scanInputAction            String?
   scanInputReason            String?
   scanInputObservedAt        DateTime?
+  printCompletionLog         String?
+  printResultsInferred       Int?
   agentVersion               String?
   ipAddress                  String?
   diskFreeGb                 Float?

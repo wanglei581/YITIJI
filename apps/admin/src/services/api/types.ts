@@ -170,6 +170,10 @@ export interface AdminTerminalRecord {
   scanInputAction?: 'none' | 'restart_required' | string | null
   scanInputReason?: string | null
   scanInputObservedAt?: string | null
+  /** 最近一次心跳里的 Windows 打印完成记录开关。老版本终端不报时为缺省。 */
+  printCompletionLog?: 'enabled' | 'disabled' | 'unknown' | string | null
+  /** 最近一次心跳里、本次启动以来靠推断记成打好了的单数。老版本终端不报时为缺省。 */
+  printResultsInferred?: number | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null

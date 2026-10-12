@@ -1,7 +1,8 @@
-import { IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator'
+import { IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
 import { Type } from 'class-transformer'
 
 const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
+const PRINT_COMPLETION_LOGS = ['enabled', 'disabled', 'unknown'] as const
 const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
 export const SCAN_INPUT_HEALTHS = ['healthy', 'locked_out', 'unknown'] as const
 export const SCAN_INPUT_ACTIONS = ['none', 'restart_required'] as const
@@ -120,4 +121,16 @@ export class HeartbeatDto {
   @MaxLength(64)
   @ValidateIf((_object, value) => value !== undefined)
   agentStartedAt?: string
+
+  /** 这台机器开没开 Windows 打印完成记录。老版本不带时，心跳照常接受。 */
+  @IsIn(PRINT_COMPLETION_LOGS)
+  @IsOptional()
+  printCompletionLog?: (typeof PRINT_COMPLETION_LOGS)[number]
+
+  /** 本次启动以来靠推断记成打好了的单数。只收 0 到 1000000 的整数。老版本不带时，心跳照常接受。 */
+  @IsInt()
+  @Min(0)
+  @Max(1000000)
+  @IsOptional()
+  printResultsInferred?: number
 }

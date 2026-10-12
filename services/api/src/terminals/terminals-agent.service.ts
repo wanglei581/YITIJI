@@ -413,6 +413,8 @@ export class TerminalAgentService implements OnModuleInit {
         printerStatus: dto.printerStatus ?? null,
         wiredNetworkStatus: dto.wiredNetworkStatus ?? null,
         printerNetworkStatus: dto.printerNetworkStatus ?? null,
+        printCompletionLog: dto.printCompletionLog ?? null,
+        printResultsInferred: dto.printResultsInferred ?? null,
         localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         scanInputHealth: dto.scanInputHealth ?? null,
         scanInputAction: dto.scanInputAction ?? null,
