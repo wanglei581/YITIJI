@@ -29,7 +29,7 @@ import { AiEndpointNotAllowedError } from '../../common/outbound/ai-endpoint-all
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { withAiSafety } from '../llm/ai-prompt-safety'
 import { makeFactMatcher, normalizeResumeFactText } from './resume-fact-match'
-import { foldCjkRadicals } from '../../common/text/cjk-radical-fold'
+import { foldCjkRadicalStrings, foldCjkRadicals } from '../../common/text/cjk-radical-fold'
 import type { OptimizeRejectRule } from './resume-optimize-reject-rule'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -236,7 +236,8 @@ export class LlmResumeOptimizeService {
     const original = foldCjkRadicals(extractedText ?? '')
     const input = original.slice(0, MAX_INPUT_CHARS)
     const masked = maskUserTextForLlmReversible(input, 'resume_optimize')
-    const baseline = buildOriginalCoverage(original, report, input.length, masked.restore)
+    // 旧报告摘录仍是部首字符。只换字符串叶子，返回新对象，不改报告本身。
+    const baseline = buildOriginalCoverage(original, foldCjkRadicalStrings(report), input.length, masked.restore)
     const text = masked.text
     const reportBrief = report.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
@@ -254,10 +255,11 @@ export class LlmResumeOptimizeService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: retryHint }]
-      const raw = await this.callLlm(
+      // 模型回复里的部首字符先换成常用字，否则覆盖回配会把同一段经历再补一条。
+      const raw = foldCjkRadicals(await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, onLlmCall,
-      )
+      ))
       let rejectRule: OptimizeRejectRule | undefined
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords, (rule) => { rejectRule = rule })
       if (result) {
@@ -345,10 +347,11 @@ export class LlmResumeOptimizeService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
-      const raw = await this.callLlm(
+      // 与优化同一口径：模型原始回复里的部首字符先换成常用字，再做事实校验。
+      const raw = foldCjkRadicals(await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
         `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, input.onLlmCall,
-      )
+      ))
       const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
       if (result) {
         // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；

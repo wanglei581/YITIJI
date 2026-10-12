@@ -11,7 +11,11 @@
 // 那会把「，」折成「,」）。U+2E80 没有对应的常用字，原样保留。
 //
 // 对照表出处：Unicode 字符数据库的 Equivalent_Unified_Ideograph 属性（Unicode 13.0），
-// 由本机 perl 5.34 自带的 Unicode 数据逐个取出，不是手写的。康熙部首那 214 条与
+// 由本机 perl 5.34 自带的 Unicode 数据逐个取出，不是手写的。源数组仍是 328 对，不要手改。
+// 进表时丢掉两类，遇到时原样保留：对应字码点大于 U+FFFF 的 13 对（一个部首会变成两个
+// UTF-16 单元，下游按长度截断时会切出半个字），以及 U+2E95「⺕」（Unicode 15 起对应字
+// 改为 U+2B739，也在基本平面之外；源数组里这条是旧数据的「彐」，两种对应都不用）。
+// 这两类都不是常用字的替身。进表 314 条。康熙部首那 214 条与
 // String.prototype.normalize('NFKC') 的结果逐条相同（门禁 verify:resume-radical-fold 运行时核对）。
 // 要更新这张表：重新从 Unicode 数据生成，不要手改单个字。
 // ============================================================
@@ -55,9 +59,14 @@ const KANGXI_RADICAL_PAIRS: readonly string[] = [
 function buildTable(pairs: readonly string[]): Map<string, string> {
   const table = new Map<string, string>()
   for (const pair of pairs) {
-    // 按码点拆：有十来个部首的对应字在基本平面之外，是两个 UTF-16 单元
+    // 按码点拆。对应字在基本平面之外时是两个 UTF-16 单元，不进表。
     const [radical, ...unified] = Array.from(pair)
-    if (radical && unified.length === 1) table.set(radical, unified[0]!)
+    const target = unified.length === 1 ? unified[0] : undefined
+    if (!radical || !target) continue
+    // U+2E95「⺕」：新版 Unicode 的对应字在基本平面之外，旧对应「彐」也不用。
+    if (radical === '⺕') continue
+    if ((target.codePointAt(0) ?? 0) > 0xFFFF) continue
+    table.set(radical, target)
   }
   return table
 }
@@ -67,10 +76,10 @@ const RADICAL_TO_UNIFIED: ReadonlyMap<string, string> = buildTable([
   ...KANGXI_RADICAL_PAIRS,
 ])
 
-/** 对照表全部内容的校验值（部首与对应字按表内顺序连起来的 SHA-256），门禁用它发现手改。 */
-export const CJK_RADICAL_TABLE_SHA256 = 'cd6187e8599038dcc09dacf1053c1497a4476e6f0a34c6e8231df2d50ec740a3'
+/** 进表条目按顺序连起来的 SHA-256。门禁里另抄一份字面量对照，不引用这个常量。 */
+export const CJK_RADICAL_TABLE_SHA256 = 'cb5090b73386fa7b7f26f241ae77bd03af86875539fc98e833a1288d7db74fa4'
 
-/** 对照表条目数（部首补充 + 康熙部首）。 */
+/** 进表条目数（源数组 328 对，去掉 14 对之后）。 */
 export const CJK_RADICAL_TABLE_SIZE = RADICAL_TO_UNIFIED.size
 
 /** 供门禁逐条核对；业务代码请用 foldCjkRadicals。 */
@@ -91,8 +100,25 @@ export function foldCjkRadicals(text: string): string {
   return text.replace(RADICAL_CHAR, (ch) => RADICAL_TO_UNIFIED.get(ch) ?? ch)
 }
 
-/** 文本里部首字符的个数（只用于日志和排查，不含任何原文）。 */
+/**
+ * 只换字符串叶子（诊断报告里的摘录、证据原文等）。数字、布尔不动。
+ * 返回新值，不改传入的对象。
+ */
+export function foldCjkRadicalStrings<T>(value: T): T {
+  if (typeof value === 'string') return foldCjkRadicals(value) as T
+  if (Array.isArray(value)) return value.map((item) => foldCjkRadicalStrings(item)) as T
+  if (value !== null && typeof value === 'object') {
+    const copy: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      copy[key] = foldCjkRadicalStrings((value as Record<string, unknown>)[key])
+    }
+    return copy as T
+  }
+  return value
+}
+
+/** 真正会被换掉的部首字符个数（在对照表里的才算；只用于日志，不含任何原文）。 */
 export function countCjkRadicals(text: string): number {
   if (typeof text !== 'string' || text.length === 0) return 0
-  return text.match(RADICAL_CHAR)?.length ?? 0
+  return Array.from(text).filter((ch) => RADICAL_TO_UNIFIED.has(ch)).length
 }

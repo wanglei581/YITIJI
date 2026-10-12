@@ -12,7 +12,8 @@
  *      原文里没有的学校、公司、学历照样找不到（只换编码，不放宽规则）
  *   3. 抽取：识别出来的文字带部首字符时，交出去的简历文字已经是常用字；日志只记个数
  *   4. 简历优化整条链（假模型）：库里旧文字带部首字符、模型按常用字写，不再被判作废；
- *      真编造照样作废；每一条作废规则的名字都进了日志，日志里没有任何简历内容
+ *      真编造照样作废；每一条作废规则的名字都进了日志，日志里没有任何简历内容；
+ *      模型输出或旧报告摘录里的部首字符，不会让同一段经历出现两次，也不会把经历丢掉
  *
  * 不触网、不碰库（fetch 换成假实现）。
  * 运行：pnpm --filter @ai-job-print/api verify:resume-radical-fold
@@ -20,7 +21,6 @@
 import { createHash } from 'node:crypto'
 import { Logger } from '@nestjs/common'
 import {
-  CJK_RADICAL_TABLE_SHA256,
   CJK_RADICAL_TABLE_SIZE,
   cjkRadicalTableEntries,
   countCjkRadicals,
@@ -59,11 +59,23 @@ const inRadicalBlocks = (ch: string) => {
 
 // ─── 1. 对照表 ───────────────────────────────────────────────────────────────
 
+/** 进表内容的校验值，字面量抄在门禁里，不引用被测模块导出的常量。 */
+const EXPECTED_CJK_RADICAL_TABLE_SHA256 = 'cb5090b73386fa7b7f26f241ae77bd03af86875539fc98e833a1288d7db74fa4'
+/** 源数组里不进表的 14 个部首：13 个对应字在基本平面之外，再加上 U+2E95。 */
+const DROPPED_RADICALS = [
+  '\u2E87', '\u2E91', '\u2E95', '\u2EAA', '\u2EAE', '\u2EB5', '\u2EB7', '\u2EB8',
+  '\u2EBD', '\u2EC7', '\u2ECA', '\u2ED5', '\u2EDE', '\u2EE1',
+]
+
 function tableChecks(): void {
   const entries = cjkRadicalTableEntries()
-  check(entries.length === 328 && CJK_RADICAL_TABLE_SIZE === 328, `对照表 328 条（部首补充 114 + 康熙部首 214），实际 ${entries.length}`)
+  check(entries.length === 314 && CJK_RADICAL_TABLE_SIZE === 314, `对照表 314 条（源数组 328 对里，对应字超出基本平面的 13 条和 U+2E95 不进表），实际 ${entries.length}`)
   const digest = createHash('sha256').update(entries.map(([radical, unified]) => radical + unified).join(''), 'utf8').digest('hex')
-  check(digest === CJK_RADICAL_TABLE_SHA256, '对照表内容和登记的校验值一致（没有被手改过单个字）')
+  check(digest === EXPECTED_CJK_RADICAL_TABLE_SHA256, '对照表内容和门禁里另抄的校验值一致（没有被手改过单个字）')
+  const outsideBmp = entries.filter(([, unified]) => unified.length !== 1 || (unified.codePointAt(0) ?? 0) > 0xFFFF)
+  check(outsideBmp.length === 0, `表里没有任何一条的对应字在基本平面之外（超出的 ${outsideBmp.length} 条）`)
+  check(DROPPED_RADICALS.length === 14 && DROPPED_RADICALS.every((ch) => foldCjkRadicals(ch) === ch && !entries.some(([radical]) => radical === ch)),
+    '被拿掉的 14 个部首不在表里，遇到时原样保留')
 
   const badShape = entries.filter(([radical, unified]) =>
     Array.from(radical).length !== 1 || Array.from(unified).length !== 1 || !inRadicalBlocks(radical) || inRadicalBlocks(unified) || !/^\p{Script=Han}$/u.test(unified))
@@ -90,6 +102,10 @@ function tableChecks(): void {
   // 只动这两段编码。
   const untouched = '，。；：、（）《》“”１２３ＡＢｃ＠ 　豈〇㇀⿰⺀abc ABC 123 😀\n\t'
   check(foldCjkRadicals(untouched) === untouched, '全角标点、全角数字字母、兼容区汉字、笔画、结构描述符、U+2E80、英文数字、表情、空白都原样不动')
+  const compat = '\uF900'
+  check(foldCjkRadicals(compat) === compat && compat !== '\u8C48', '兼容区汉字（U+F900）原样不动；这不是普通字「豈」')
+  check(countCjkRadicals('\u2E80') === 0 && countCjkRadicals(DROPPED_RADICALS.join('')) === 0 && countCjkRadicals('\u2ED8\u2F24') === 2,
+    '个数只数对照表里真会被换掉的字符，不数整个码点区间')
   const plain = '青岛职业技术学院 · 物流管理（大专）'
   check(foldCjkRadicals(plain) === plain && countCjkRadicals(plain) === 0, '本来就是常用字的文本原样返回')
   const mixed = withRadicals(plain)
@@ -223,7 +239,7 @@ async function optimizeChecks(): Promise<void> {
     prompts.push(String(init.body))
     return { ok: true, status: 200, statusText: 'OK', json: async () => ({ choices: [{ message: { content: reply } }] }) } as Response
   }
-  const run = async (originalText: string, mutate?: Mutate, raw?: string) => {
+  const run = async (originalText: string, mutate?: Mutate, raw?: string, report: ResumeReport = REPORT) => {
     const output = faithfulOutput()
     mutate?.(output)
     reply = raw ?? JSON.stringify(output)
@@ -231,7 +247,7 @@ async function optimizeChecks(): Promise<void> {
     prompts.length = 0
     logLines.length = 0
     try {
-      const result = await service.optimize(originalText, REPORT)
+      const result = await service.optimize(originalText, report)
       return { result, code: '', calls, rules: rulesInLog() }
     } catch (error) {
       const response = (error as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
@@ -251,12 +267,72 @@ async function optimizeChecks(): Promise<void> {
     '优化稿里学校、学历、两家单位、叉车证都在')
     const FACT_RULES = ['education_school', 'education_major', 'education_degree', 'experience_company', 'project_name', 'certificate']
     check(!fixed.rules.some((rule) => FACT_RULES.includes(rule)), `没有任何一次是被「事实不在原文」判作废的（日志里的规则：${fixed.rules.join('、') || '无'}）`)
-    check(prompts.length >= 1 && prompts.every((body) => body.includes('青岛职业技术学院') && !/[⺀-⿟]/u.test(body)),
+    check(prompts.length >= 1 && prompts.every((body) => body.includes('青岛职业技术学院') && !/[\u2E80-\u2FDF]/u.test(body)),
       '送给模型的简历原文已经是常用字，一个部首字符都没有')
     check(!!fixed.result && fixed.result.modules.length === 1, '新旧对比那一条的「优化前」片段在带部首字符的原文里也对得上，没有被丢掉')
 
     const plain = await run(RESUME_PLAIN)
     check(!!plain.result && plain.code === '' && plain.result.optimizedResume.education[0]?.school === '青岛职业技术学院', '原文本来就是常用字：照常拿到优化稿（没有变差）')
+
+    // 模型把「青」写成部首字符：事实校验认得出，但覆盖回配必须也认得出，否则会再补一条。
+    const radicalModel = await run(RESUME_RADICAL, undefined, JSON.stringify(faithfulOutput()).replaceAll('青', '\u2ED8'))
+    const radicalResume = radicalModel.result?.optimizedResume
+    const radicalSchools = radicalResume?.education.map((item) => item.school) ?? []
+    const radicalCompanies = radicalResume?.experience.map((item) => item.company) ?? []
+    const radicalCerts = radicalResume?.certificates ?? []
+    check(!!radicalResume && radicalModel.code === '', `模型输出里「青」是部首字符：拿到了优化稿（错误码：${radicalModel.code || '无'}）`)
+    check(radicalSchools.length === 1 && radicalSchools[0] === '青岛职业技术学院'
+      && radicalCompanies.length === 2
+      && radicalCompanies.filter((item) => item === '青岛海润物流有限公司').length === 1
+      && radicalCompanies.filter((item) => item === '城阳分拣中心').length === 1
+      && radicalCerts.length === 3
+      && radicalCerts.filter((item) => item === '叉车证（N1，2023 年取得）').length === 1
+      && radicalCerts.filter((item) => item === '物流服务师（四级）').length === 1
+      && radicalCerts.filter((item) => item === 'C1 驾照').length === 1,
+    '学校、公司、证书每一项在结果里只出现一次')
+
+    // 覆盖锚点只有 contentBlocks[].lines。这段没有栏目标题，单位名也不含「公司 / 中心」，
+    // 认不出经历就靠报告摘录。摘录和原文都带部首字符；模型没写这段，但写了非空简介。
+    const anchorPlain = [
+      '李明',
+      '青岛服务部 2020.09 – 2023.06',
+      '负责来访接待登记。',
+      '青岛海润物流有限公司 仓储专员 2023.07 – 2025.08',
+      '负责日常收货。',
+    ].join('\n')
+    const anchorReport: ResumeReport = {
+      sections: REPORT.sections,
+      suggestions: [],
+      contentBlocks: [{ key: 'experience', label: '工作经历', lines: [withRadicals('青岛服务部 2020.09 – 2023.06')] }],
+    }
+    const anchorOutput = {
+      resume: {
+        basic: { name: '李明', phone: '', email: '', city: '' },
+        intention: { position: '', city: '' },
+        summary: '做事细致。',
+        education: [],
+        experience: [{ company: '青岛海润物流有限公司', role: '仓储专员', period: '2023.07 – 2025.08', description: '负责日常收货。' }],
+        projects: [], skills: [], certificates: [],
+      },
+      modules: [],
+    }
+    const anchored = await run(withRadicals(anchorPlain), undefined, JSON.stringify(anchorOutput), anchorReport)
+    const anchoredCompanies = anchored.result?.optimizedResume.experience.map((item) => item.company) ?? []
+    check(!!anchored.result && anchored.code === '', `诊断摘录带部首字符：拿到了优化稿（错误码：${anchored.code || '无'}）`)
+    check(anchoredCompanies.filter((item) => item.includes('青岛服务部')).length === 1
+      && anchoredCompanies.filter((item) => item.includes('青岛海润物流有限公司')).length === 1,
+    '原文里的每段经历都在（服务部靠摘录锚点保住，没有因为简介非空被丢掉）')
+
+    const omitted = await run(RESUME_RADICAL, (output) => {
+      const experience = resumeOf(output)['experience'] as Array<Record<string, unknown>>
+      resumeOf(output)['experience'] = experience.filter((item) => item['company'] !== '城阳分拣中心')
+    })
+    const omittedCompanies = omitted.result?.optimizedResume.experience.map((item) => item.company) ?? []
+    check(!!omitted.result && omitted.code === '' && omitted.rules.includes('missing_entries'),
+      `漏了城阳分拣中心：日志有 missing_entries（实际：${omitted.rules.join('、') || '无'}），并且拿到了优化稿`)
+    check(omittedCompanies.filter((item) => item.includes('城阳分拣中心')).length === 1
+      && omittedCompanies.filter((item) => item.includes('青岛海润物流有限公司')).length === 1,
+    '漏掉的那段经历被补回，另一段没有因此多出一条')
 
     // 真编造照样作废，而且日志说得出是哪条规则；每点一次仍是两次调用。
     const cases: Array<[label: string, rule: string, mutate: Mutate | undefined, raw?: string]> = [
