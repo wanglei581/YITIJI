@@ -14,8 +14,10 @@ import {
   configuredPrinterNameMatches,
   mapWin32PrinterPreflight,
   mapWin32PrinterQuery,
+  parseCompletionEventRead,
   parsePrintCompletionLogState,
   parsePrintJobStatus,
+  type CompletionEventRead,
   type PrintCompletionLogState,
   type PrintJobMonitorStatus,
 } from '../src/agent/wmi'
@@ -33,6 +35,8 @@ interface Scenario {
   completionEvent?: boolean
   /** 1-based index of the completion-event query that returns true. Earlier queries return false. */
   completionTrueOnQuery?: number
+  /** Each 307 query returns the next entry (boolean stub or found/not_found/unreadable). Shorter tails fall through. */
+  completionReads?: Array<boolean | CompletionEventRead>
   initialNow?: number
   dispatchedAtMs?: number
   /** Defaults to disabled so existing scenarios keep their previous disposition. */
@@ -151,6 +155,16 @@ function verifyPrintServiceCompletionScriptContract(): void {
   )
 }
 
+function verifyCompletionEventReadContract(): void {
+  assert.equal(parseCompletionEventRead('true'), 'found')
+  assert.equal(parseCompletionEventRead(' True \r\n'), 'found')
+  assert.equal(parseCompletionEventRead('false'), 'not_found')
+  assert.equal(parseCompletionEventRead(null), 'unreadable')
+  assert.equal(parseCompletionEventRead(''), 'unreadable')
+  assert.equal(parseCompletionEventRead('true\nfalse'), 'unreadable')
+  assert.equal(parseCompletionEventRead('error'), 'unreadable')
+}
+
 function verifyCompletionLogStateContract(): void {
   assert.equal(parsePrintCompletionLogState('enabled'), 'enabled')
   assert.equal(parsePrintCompletionLogState(' Enabled \r\n'), 'enabled')
@@ -222,6 +236,10 @@ async function runScenario(scenario: Scenario): Promise<void> {
             )
           }
           completionQueries += 1
+          if (scenario.completionReads) {
+            const read = scenario.completionReads[completionQueries - 1]
+            if (read !== undefined) return read
+          }
           if (scenario.completionTrueOnQuery !== undefined) {
             return completionQueries === scenario.completionTrueOnQuery
           }
@@ -275,6 +293,7 @@ async function main(): Promise<void> {
   const failures: string[] = []
 
   verifyPrintServiceCompletionScriptContract()
+  verifyCompletionEventReadContract()
   verifyCompletionLogStateContract()
 
   const imageTaskId = 'ptask_kiosk_0123456789abcdef'
@@ -649,6 +668,112 @@ async function main(): Promise<void> {
       expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
       expectedWarn: /paper-empty/,
       expectedStatusQueries: 3,
+    },
+    {
+      name: 'enabled and proven: Retained reappearance clears the absence count',
+      raws: ['Printing', 'not_found', 'Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: Deleting reappearance clears the absence count and keeps Deleting',
+      raws: ['Printing', 'not_found', 'Deleting', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedRawStatus: 'Deleting',
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a Retained job leaves and the window ends during the grace period',
+      raws: ['Printing, Retained', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedWarn: /had left the queue/,
+      unexpectedWarn: [/Retained/],
+    },
+    {
+      name: 'enabled and proven: four unreadable reads after the job leaves complete as completion_log_unreadable',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+      expectedStatusQueries: 5,
+    },
+    {
+      name: 'enabled and proven: unreadable reads do not count toward the four confirmed absences',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['not_found', 'unreadable', 'not_found', 'unreadable', 'not_found', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 7,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: a later found event completes without inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable', 'not_found', 'found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedStatusQueries: 5,
+    },
+    {
+      name: 'enabled and proven: the window ends with only unreadable reads and no confirmed absence',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      timeoutMs: 3,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+    },
+    {
+      name: 'log disabled: unreadable reads still complete as a disabled-log inference',
+      raws: ['Printing', 'not_found'],
+      logState: 'disabled',
+      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_disabled',
+      expectedStatusQueries: 2,
+    },
+    {
+      name: 'legacy boolean true still counts as found and marks the channel',
+      raws: ['not_found'],
+      logState: 'enabled',
+      completionReads: [true],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectChannelProven: true,
+    },
+    {
+      name: 'legacy boolean false still counts as a confirmed absence on a proven queue',
+      raws: ['Printing', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: [false, false, false, false],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 5,
+      expectedWarn: /no completion event/,
+      expectChannelProven: true,
     },
   ]
 

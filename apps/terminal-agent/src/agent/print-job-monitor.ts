@@ -7,7 +7,8 @@
 import {
   getPrintJobStatus,
   getPrintServiceCompletionLogState,
-  hasPrintServiceCompletionEvent,
+  readPrintServiceCompletionEvent,
+  type CompletionEventRead,
   type PrintCompletionLogState,
   type PrintJobMonitorStatus,
 } from './wmi'
@@ -18,6 +19,7 @@ export type InferredCompletionReason =
   | 'completion_log_disabled'    // the Operational log is off on this machine
   | 'completion_log_unknown'     // its configuration could not be read
   | 'completion_log_unverified'  // the log is on, but no matching 307 has been read for this queue since the process started
+  | 'completion_log_unreadable'  // 记录开着、以前读到过，但这张单的几次读取都失败了
 
 export interface MonitorOutcome {
   failed: boolean
@@ -25,7 +27,7 @@ export interface MonitorOutcome {
   errorMessage?: string
   rawStatus?: string
   warn?: string
-  /** Set only when completion was inferred from "seen in the queue, then gone" without a completion event or a Printed status. The value says why evidence was not required. */
+  /** Set only when completion was inferred from "seen in the queue, then gone" without a 307 or a Printed status. Says why a completion event was not required, or that the required reads failed. */
   inferred?: InferredCompletionReason
 }
 
@@ -63,7 +65,7 @@ interface MonitorDependencies {
     printerName: string,
     taskId: string,
     dispatchedAtMs: number,
-  ) => Promise<boolean>
+  ) => Promise<boolean | CompletionEventRead>
   /** Defaults to getPrintServiceCompletionLogState. One call per monitor. */
   queryCompletionLogState?: () => Promise<PrintCompletionLogState>
   /** Defaults to sharedCompletionEvidenceChannel. */
@@ -79,11 +81,15 @@ interface MonitorDependencies {
  *   - A matching PrintService 307, or a queue status that already says Printed,
  *     confirms completed and is not marked inferred. When the Operational log is
  *     enabled and this process has already read a matching 307 for this queue,
- *     "seen in the queue, then gone" waits COMPLETION_EVIDENCE_GRACE_POLLS for a
- *     307 and otherwise returns PRINT_JOB_UNCONFIRMED. When that log is off,
- *     unreadable, or not yet proven for this queue, the same disappearance still
- *     counts as completed and is marked inferred. This is the Windows spooler
- *     lifecycle only; it does not prove that paper physically reached the user.
+ *     "seen in the queue, then gone" waits COMPLETION_EVIDENCE_GRACE_POLLS.
+ *     A previous read does not mean this read succeeds. A not_found read counts
+ *     toward PRINT_JOB_UNCONFIRMED. An unreadable read does not: that many failed
+ *     reads complete as inferred 'completion_log_unreadable'. When that log is
+ *     off, its configuration could not be read, or this queue has not been
+ *     matched yet, the same disappearance still counts as completed and is
+ *     marked inferred. A failed read on those paths is treated like a missing
+ *     event. This is the Windows spooler lifecycle only; it does not prove that
+ *     paper physically reached the user.
  *   - A job seen while Windows is removing it (Deleting/Deleted) is neither a device
  *     fault nor completion. It is the visible half of "queue removal": the outcome is
  *     decided by the same evidence as a job that simply disappears — a matching 307,
@@ -93,9 +99,11 @@ interface MonitorDependencies {
  *     at the timeout, is PRINT_JOB_UNCONFIRMED.
  *   - If the job never appears (taskId not in DocumentName), the query remains
  *     unknown, or monitoring times out, return failed+PRINT_JOB_UNCONFIRMED.
- *     A timeout after the job has already left the queue without a completion
- *     event is also PRINT_JOB_UNCONFIRMED, ahead of the Retained / still-printing
- *     diagnoses.
+ *     A timeout after the job has already left the queue with a confirmed absence
+ *     (goneWithoutEventPolls > 0) is PRINT_JOB_UNCONFIRMED, ahead of the Retained /
+ *     still-printing diagnoses. A timeout after it left with only failed reads
+ *     (unreadableEventReads > 0 and goneWithoutEventPolls === 0) is inferred
+ *     'completion_log_unreadable'.
  *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
  *
  * @param printerName     Windows printer name (from config)
@@ -114,7 +122,7 @@ export async function monitorPrintJob(
   const queryStatus = dependencies.queryStatus ?? getPrintJobStatus
   const wait = dependencies.sleep ?? sleep
   const now = dependencies.now ?? Date.now
-  const queryCompletionEvent = dependencies.queryCompletionEvent ?? hasPrintServiceCompletionEvent
+  const queryCompletionEvent = dependencies.queryCompletionEvent ?? readPrintServiceCompletionEvent
   const queryCompletionLogState =
     dependencies.queryCompletionLogState ?? getPrintServiceCompletionLogState
   const evidenceChannel = dependencies.evidenceChannel ?? sharedCompletionEvidenceChannel
@@ -136,8 +144,9 @@ export async function monitorPrintJob(
   // we fail closed. A fast job may leave the queue before the first poll, but that
   // is indistinguishable from DocumentName mismatch or query/driver failure.
   const NOT_FOUND_LIMIT = 5
-  // After a seen job leaves a queue whose completion log is enabled and already
-  // proven readable, wait this many further misses for event 307.
+  // After a seen job leaves a queue whose completion log is enabled and for which
+  // this process has already read a matching 307, wait this many further polls.
+  // not_found and unreadable are counted apart. A previous read does not mean this read succeeds.
   const COMPLETION_EVIDENCE_GRACE_POLLS = 4
 
   const dispatchedAtMs = Number.isFinite(dependencies.dispatchedAtMs)
@@ -158,11 +167,18 @@ export async function monitorPrintJob(
   let printingSeenOnce = false  // seen in the queue without Retained
   let lastStatus: PrintJobMonitorStatus | undefined
   let goneWithoutEventPolls = 0
+  let unreadableEventReads = 0
 
-  const readCompletionEvent = async (): Promise<boolean> => {
-    const found = await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)
-    if (found) evidenceChannel.markProven(printerName)
-    return found
+  const readCompletionEvent = async (): Promise<CompletionEventRead> => {
+    const read = await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)
+    let normalized: CompletionEventRead = 'not_found'
+    if (read === true || read === 'found') normalized = 'found'
+    else if (read === 'unreadable') normalized = 'unreadable'
+    // A task is dispatched only to this configured printer. An event that
+    // carries this task id is this job's event, so reading it shows that this
+    // queue's completion record can be read and matched.
+    if (normalized === 'found') evidenceChannel.markProven(printerName)
+    return normalized
   }
 
   while (now() < deadline) {
@@ -177,6 +193,7 @@ export async function monitorPrintJob(
         paperEmptyCount++
         notFoundCount = 0
         goneWithoutEventPolls = 0
+        unreadableEventReads = 0
         // Require 2 consecutive PaperOut confirmations before declaring failure.
         if (paperEmptyCount >= 2) {
           return {
@@ -210,7 +227,8 @@ export async function monitorPrintJob(
         notFoundCount = 0
         paperEmptyCount = 0
         goneWithoutEventPolls = 0
-        if (!paperEmptySeen && await readCompletionEvent()) {
+        unreadableEventReads = 0
+        if (!paperEmptySeen && (await readCompletionEvent()) === 'found') {
           return { failed: false, errorCode: '' }
         }
         break
@@ -225,7 +243,8 @@ export async function monitorPrintJob(
         notFoundCount = 0
         paperEmptyCount = 0
         goneWithoutEventPolls = 0
-        if (!paperEmptySeen && await readCompletionEvent()) {
+        unreadableEventReads = 0
+        if (!paperEmptySeen && (await readCompletionEvent()) === 'found') {
           return { failed: false, errorCode: '' }
         }
         break
@@ -242,9 +261,10 @@ export async function monitorPrintJob(
         paperEmptyCount = 0
         notFoundCount = 0
         goneWithoutEventPolls = 0
+        unreadableEventReads = 0
         break
 
-      case 'not_found':
+      case 'not_found': {
         // A small job can finish and leave a non-retained queue before the
         // first Get-PrintJob sample. Event 307 is stronger evidence than queue
         // visibility when it carries this exact taskId after dispatch.
@@ -253,7 +273,9 @@ export async function monitorPrintJob(
             'the job disappeared after a paper-empty signal; completion cannot be confirmed',
           )
         }
-        if (await readCompletionEvent()) {
+        // One read for this poll. The evidence branch below reuses it.
+        const completionRead = await readCompletionEvent()
+        if (completionRead === 'found') {
           return { failed: false, errorCode: '' }
         }
         if (removalSeen && !printingSeenOnce && activeJobSeenOnce) {
@@ -266,17 +288,30 @@ export async function monitorPrintJob(
           )
         }
         if (activeJobSeenOnce) {
-          // 完成记录开着、并且本进程已经对这台队列读到过 307：离开队列后宽限内仍没有完成事件，记结果未确认。
-          // 记录没开、配置读不到，或开着但还没对上过这台队列：仍按见过在打、后来没了记完成，并标成推断。
+          // 完成记录开着、并且本进程已经对这台队列读到过 307（读到过不等于这一次读得到）：
+          // 沿用本轮开头那一次读取。not_found 计入 goneWithoutEventPolls，满 COMPLETION_EVIDENCE_GRACE_POLLS 记结果未确认。
+          // unreadable 不加那一格，另计 unreadableEventReads，满同一个次数则按推断记完成，原因 completion_log_unreadable。
+          // 记录没开、配置读不到，或开着但还没对上过这台队列：仍按见过在打、后来没了记完成，并标成推断。读取失败在这些路径上仍等于没查到。
           // 这只说明 Windows 假脱机不再留着这份作业，不证明纸已经出来。
           const state = await completionLogState
           if (state === 'enabled' && evidenceChannel.isProven(printerName)) {
-            goneWithoutEventPolls += 1
-            if (goneWithoutEventPolls >= COMPLETION_EVIDENCE_GRACE_POLLS) {
-              return unconfirmedOutcome(
-                'the job left the queue; the completion record on this machine is enabled and readable; no completion event within the grace period',
-                removalSeen ? removalRawStatus : undefined,
-              )
+            if (completionRead === 'not_found') {
+              goneWithoutEventPolls += 1
+              if (goneWithoutEventPolls >= COMPLETION_EVIDENCE_GRACE_POLLS) {
+                return unconfirmedOutcome(
+                  'the job left the queue; the completion record on this machine is enabled and readable; no completion event within the grace period',
+                  removalSeen ? removalRawStatus : undefined,
+                )
+              }
+            } else if (completionRead === 'unreadable') {
+              unreadableEventReads += 1
+              if (unreadableEventReads >= COMPLETION_EVIDENCE_GRACE_POLLS) {
+                return {
+                  failed: false,
+                  errorCode: '',
+                  inferred: 'completion_log_unreadable',
+                }
+              }
             }
             break
           }
@@ -303,11 +338,13 @@ export async function monitorPrintJob(
           )
         }
         break
+      }
 
       case 'unknown':
         // Get-PrintJob can fail independently of the Operational event log.
         // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
-        if (!paperEmptySeen && await readCompletionEvent()) {
+        // A failed 307 read here is still treated as no event.
+        if (!paperEmptySeen && (await readCompletionEvent()) === 'found') {
           return { failed: false, errorCode: '' }
         }
         paperEmptyCount = 0
@@ -322,6 +359,15 @@ export async function monitorPrintJob(
       `monitoring window ended after ${timeoutMs}ms: the job had left the queue and no completion event was observed`,
       removalSeen ? removalRawStatus : undefined,
     )
+  }
+
+  // Left the queue, and every completion read in that stretch failed. No confirmed absence.
+  if (unreadableEventReads > 0 && goneWithoutEventPolls === 0) {
+    return {
+      failed: false,
+      errorCode: '',
+      inferred: 'completion_log_unreadable',
+    }
   }
 
   if (seenRetainedOnce) {

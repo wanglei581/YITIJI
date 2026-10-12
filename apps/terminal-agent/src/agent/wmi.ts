@@ -353,6 +353,55 @@ export async function hasPrintServiceCompletionEvent(
 }
 
 /**
+ * Result of one PrintService 307 read.
+ * 'unreadable' is a failed read (timeout, PowerShell did not start, or the
+ * output was not exactly true/false). It is not evidence that the event is absent.
+ */
+export type CompletionEventRead = 'found' | 'not_found' | 'unreadable'
+
+/** Pure. Trim and lower-case the whole string. true → found, false → not_found, otherwise unreadable. */
+export function parseCompletionEventRead(output: string | null): CompletionEventRead {
+  const normalized = output?.trim().toLowerCase()
+  if (normalized === 'true') return 'found'
+  if (normalized === 'false') return 'not_found'
+  return 'unreadable'
+}
+
+/**
+ * Same query as hasPrintServiceCompletionEvent, but a failed read stays
+ * 'unreadable' instead of collapsing into false. Never throws.
+ * Non-Windows, or arguments rejected by the same checks, are unreadable.
+ */
+export async function readPrintServiceCompletionEvent(
+  printerName: string,
+  taskId: string,
+  dispatchedAtMs: number,
+): Promise<CompletionEventRead> {
+  if (process.platform !== 'win32') return 'unreadable'
+
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
+  if (
+    safeTaskId.length === 0 ||
+    safeTaskId !== taskId ||
+    printerName.trim().length === 0 ||
+    !Number.isFinite(dispatchedAtMs)
+  ) {
+    return 'unreadable'
+  }
+  const safeSince = Math.max(0, Math.floor(dispatchedAtMs))
+
+  try {
+    const output = await runPowerShell(
+      buildPrintServiceCompletionEventScript(),
+      JSON.stringify({ taskId: safeTaskId, printerName, dispatchedAtMs: safeSince }),
+    )
+    return parseCompletionEventRead(output)
+  } catch {
+    return 'unreadable'
+  }
+}
+
+/**
  * Whether Microsoft-Windows-PrintService/Operational is switched on.
  * 'unknown' means the configuration could not be read. Read-only: the script
  * must not enable, disable, or clear the log.
