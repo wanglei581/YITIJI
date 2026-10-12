@@ -71,6 +71,7 @@ async function visibleText(buffer: Buffer): Promise<string> {
   return text.replace(/\s+/gu, '')
 }
 const squash = (s: string) => s.replace(/\s+/gu, '')
+const SELF_ASSESSMENT_REPORT_PDF = '职业自我探索结果.pdf'
 
 async function makePdf(pages: number): Promise<Buffer> {
   const doc = await PDFDocument.create()
@@ -248,7 +249,7 @@ async function gateStates(): Promise<void> {
     let printed: { printFileUrl?: string } | null = null
     const printCode = await codeOf(async () => { printed = await w.call('print', reader, () => w.controller.print(r.taskId, reader)) })
     check(`${tag}：只有打分的报告照常能打印（拿到打印链接）`, printCode === 'PASS' && Boolean((printed as { printFileUrl?: string } | null)?.printFileUrl), `实际 ${printCode}`)
-    const pdf = w.uploads.find((u) => u.filename.startsWith('self-assessment-'))
+    const pdf = w.uploads.find((u) => u.filename === SELF_ASSESSMENT_REPORT_PDF)
     if (pdf) {
       const info = await readPdfInfo(pdf.buffer)
       const text = await visibleText(pdf.buffer)
@@ -284,8 +285,9 @@ async function normalState(): Promise<void> {
 
   const reader = anonReq({ 'x-resume-access-token': String(r.accessToken) })
   await w.call('print', reader, () => w.controller.print(r.taskId, reader))
-  const pdf = w.uploads.find((u) => u.filename.startsWith('self-assessment-'))!
-  const info = await readPdfInfo(pdf.buffer)
+  const pdf = w.uploads.find((u) => u.filename === SELF_ASSESSMENT_REPORT_PDF)
+  check('生成的自我探索 PDF 文件名恰好是 职业自我探索结果.pdf', pdf?.filename === SELF_ASSESSMENT_REPORT_PDF)
+  const info = await readPdfInfo(pdf!.buffer)
   check('正常：含 AI 解读的打印件照旧带 AIGC 标识', info['AIGenerated'] === 'true' && Boolean(info['AIGC']))
 
   // 含 AI 内容的记录，AI 暂停 / 未开通时打印、附加照旧被拦（不借「手动路径」绕过去）
@@ -393,7 +395,7 @@ async function complianceReject(): Promise<void> {
   let printed: { printFileUrl?: string } | null = null
   const printCode = await codeOf(async () => { printed = await w.call('print', reader, () => w.controller.print(r.taskId, reader)) })
   check('合规拒答：打分能打印', printCode === 'PASS' && Boolean(printed?.printFileUrl), `实际 ${printCode}`)
-  const pdf = w.uploads.find((u) => u.filename.startsWith('self-assessment-'))
+  const pdf = w.uploads.find((u) => u.filename === SELF_ASSESSMENT_REPORT_PDF)
   if (pdf) {
     const text = await visibleText(pdf.buffer)
     const line = squash(`${EXPECTED[0]!.label}（强度 ${EXPECTED[0]!.strength}/5）`)
