@@ -28,6 +28,7 @@ import { AdvisorService } from '../src/advisor/advisor.service'
 import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
 import { ASSISTANT_SUMMARY_SYSTEM_PROMPT, AssistantSummaryService } from '../src/advisor/assistant-summary.service'
 import { ADVISOR_DISCLAIMER } from '../src/advisor/advisor-skills'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 
@@ -127,6 +128,10 @@ const MUST_INTERCEPT = [
   '简历里怎么写，但这台打印机卡纸了',
   '应聘的时候本机正在打，卡纸了怎么办',
   '面试官问我，可是这台机器现在冒烟了',
+  '打印机怎么维修',
+  '打印出来的字是歪的',
+  '什么时候能修好',
+  '我能自己修吗',
 ]
 
 const MUST_NOT_INTERCEPT = [
@@ -279,6 +284,16 @@ const MUST_NOT_INTERCEPT = [
   '怎么描述一段处理打印机缺纸的工作经历',
   '岗位要求里写了会处理卡纸，这段我该怎么写',
   '求职信里要不要提自己会换硒鼓',
+  '这份简历打印出来有很多空白，怎么调整版式',
+  '简历打出来有一大片空白',
+  '我想在这台一体机上打印空白表格',
+  '点了其它按钮没反应',
+  '其它功能没反应',
+  '学校有没有打印机维修专业',
+  '工作压力大到冒烟',
+  '身份证复印放歪了怎么重新印',
+  '已经修好了，现在能打了吗',
+  '我自己弄好了',
   '岗位要求：能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作能处理打印机卡纸并完成材料归档与接待记录填写工作',
 ]
 const OUTPUT_MUST_REPLACE = [
@@ -314,6 +329,18 @@ const OUTPUT_MUST_REPLACE = [
   '往纸盒里放入一些纸。',
   '请给纸盘补充纸张。',
   '在纸仓加入纸再打。',
+  '不用担心，关掉电源，再打开前盖取出卡纸就好。',
+  '不要慌，打开前盖取出卡纸即可。',
+  '无需担心，先拔掉电源线，等一分钟再插上。',
+  '不要紧，按一下机身上的电源键重启一下就好。',
+  '别着急，打开前盖，把卡住的纸慢慢抽出来。',
+  '不要打开前盖，请打开后盖把纸取出来。',
+  '不要直接拔掉电源，先关闭电源再拔掉插头。',
+  '把卡在里面的纸轻轻拉出来就好。',
+  '清理进纸口卡住的纸就可以了。',
+  '你可以按电源键尝试重启。',
+  '请先关机，等一分钟后再开机。',
+  '先将硒鼓取出，看看有没有异物。',
 ]
 
 const OUTPUT_MUST_KEEP = [
@@ -344,6 +371,10 @@ const OUTPUT_MUST_KEEP = [
   '请不要拉扯纸张，也不要拔插电源。',
   '帮助中心的联系方式在首页帮助中心里。',
   '取出纸张后请核对页数。',
+  '别打开前盖，也别拔电源，稍后再来。',
+  '打印完成后请及时取出文件，避免卡纸。',
+  '面试前请关闭手机电源。',
+  '别担心，请不要自己打开前盖，可以稍后再来。',
 ]
 
 function duplicates(rows: readonly string[]): string[] {
@@ -376,11 +407,13 @@ function tableChecks(): void {
   const bothOut = OUTPUT_MUST_REPLACE.filter((row) => keepOut.has(row))
   check(bothIn.length === 0, `输入侧两张表没有同一句${bothIn.length ? `：${bothIn[0]}` : ''}`)
   check(bothOut.length === 0, `输出侧两张表没有同一句${bothOut.length ? `：${bothOut[0]}` : ''}`)
+  const interceptFollowUp = new Set(['什么时候能修好', '我能自己修吗'])
+  const passFollowUp = new Set(['已经修好了，现在能打了吗', '我自己弄好了'])
   for (const row of MUST_INTERCEPT) {
-    check(isDeviceFaultQuestion(row), `输入侧必须拦：${row.replace(/\n/g, ' / ')}`)
+    check(isDeviceFaultQuestion(row, interceptFollowUp.has(row)), `输入侧必须拦：${row.replace(/\n/g, ' / ')}`)
   }
   for (const row of MUST_NOT_INTERCEPT) {
-    check(!isDeviceFaultQuestion(row), `输入侧不许拦：${row.replace(/\n/g, ' / ')}`)
+    check(!isDeviceFaultQuestion(row, passFollowUp.has(row)), `输入侧不许拦：${row.replace(/\n/g, ' / ')}`)
   }
   for (const row of OUTPUT_MUST_REPLACE) {
     check(hasHandsOnMachineInstruction(row), `输出侧必须换掉：${row}`)
@@ -603,6 +636,7 @@ async function chatRuntime(chat: LlmChatService): Promise<void> {
 }
 
 async function advisorRuntime(): Promise<void> {
+  if (process.env['DATABASE_URL']) assertIsolatedVerificationDatabase()
   const fallbackDbDir = process.env['DATABASE_URL'] ? null : mkdtempSync(join(tmpdir(), 'verify-device-fault-'))
   if (fallbackDbDir) process.env['DATABASE_URL'] = `file:${join(fallbackDbDir, 'verify.db')}`
   if (fallbackDbDir) {
@@ -641,6 +675,7 @@ async function advisorRuntime(): Promise<void> {
   const memoryOf = (sessionId: string) =>
     (advisor as unknown as { qaMemory: { read: (id: string) => Array<{ role: string; content: string }> } }).qaMemory.read(sessionId)
   const createdIds: string[] = []
+  let createdEndUserId: string | undefined
   const aiLogIdsBefore = new Set((await prisma.aiServiceLog.findMany({ select: { id: true } })).map((row) => row.id))
   const classifyJson = JSON.stringify({ skill: 'qa', reason: '你在问一个拿不准的判断。' })
   const normalJson = JSON.stringify({
@@ -650,7 +685,7 @@ async function advisorRuntime(): Promise<void> {
   })
   const handsJson = JSON.stringify({
     answer: HANDS_ON,
-    evidenceLevel: 'E3',
+    evidenceLevel: 'E1',
     sourceNote: '这是通行做法，算参考。',
   })
 
@@ -689,6 +724,7 @@ async function advisorRuntime(): Promise<void> {
     const added = (await prisma.aiServiceLog.findMany()).filter((row) => !logsMid.includes(row.id))
     check(sent.length === outBefore + 1, '作业面输出侧：调了模型')
     check(replaced.answer === KIOSK_REPLY && replaced.sourceNote === SOURCE_NOTE, '作业面输出侧：回答换成固定的话')
+    check(replaced.evidenceLevel === 'E3', '作业面输出侧：动手指导换成固定的话时，证据等级是 E3')
     check(replaced.canPin === false && replaced.fixedNotice === true, '作业面输出侧：不能钉住，fixedNotice')
     const remembered = memoryOf(second.sessionId)
     const rememberedText = JSON.stringify(remembered)
@@ -719,7 +755,8 @@ async function advisorRuntime(): Promise<void> {
     check(jobAnswer.answer === HANDS_ON && jobAnswer.fixedNotice !== true && jobAnswer.canPin === true, '作业面求职内容：两头都不拦，没有 fixedNotice')
 
     const chat = new LlmChatService(configStub as never)
-    const endUserId = `eu_fault_${Date.now()}`
+    createdEndUserId = `eu_fault_${Date.now()}`
+    const endUserId = createdEndUserId
     await prisma.endUser.create({ data: { id: endUserId, phoneHash: endUserId, phoneEnc: endUserId, nickname: 'verify' } })
     modelReply = '先看教育经历，再写一段项目。'
     const chatted = await inRequest(() => chat.chat({ message: '帮我看看简历怎么写', channel: 'kiosk' }, undefined, assistantOwnerKey(endUserId, null)))
@@ -750,7 +787,7 @@ async function advisorRuntime(): Promise<void> {
     if (leftoverLogs.length > 0) {
       await prisma.aiServiceLog.deleteMany({ where: { id: { in: leftoverLogs } } })
     }
-    await prisma.endUser.deleteMany({ where: { id: { startsWith: 'eu_fault_' } } })
+    if (createdEndUserId) await prisma.endUser.deleteMany({ where: { id: createdEndUserId } })
     await prisma.onModuleDestroy()
     if (fallbackDbDir) rmSync(fallbackDbDir, { recursive: true, force: true })
   }

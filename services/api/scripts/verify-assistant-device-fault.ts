@@ -12,12 +12,13 @@
  *      以及开语音会话时真正下发给腾讯云的配置里，都带着这一句
  *
  * 它不验证模型听不听这句话——那要接真模型问十种说法留样本，归走查。
- * 「按关键词判成设备故障、不送模型、回固定的话」是另一条改动，不在这条门禁里。
+ * 「卡住了怎么办」输入侧不拦，照样送模型，用来核对提示词里有这一句。
+ * 「打印机卡纸怎么办」由输入侧拦下：不发请求，回固定的话。
  *
  * 不触网、不碰库（fetch 换成假实现）。
  * 运行：pnpm --filter @ai-job-print/api verify:assistant-device-fault
  */
-import { DEVICE_FAULT_PROMPT_RULE } from '../src/ai/safety/device-fault'
+import { DEVICE_FAULT_PROMPT_RULE, deviceFaultReply } from '../src/ai/safety/device-fault'
 import { LlmChatService } from '../src/ai/llm/llm-chat.service'
 import { buildGuardedSystemPrompt } from '../src/ai/llm/llm-guard'
 import { ADVISOR_QA_SYSTEM_PROMPT, LlmAdvisorService } from '../src/advisor/llm-advisor.service'
@@ -149,14 +150,14 @@ async function runtimeChecks(): Promise<void> {
   const userOf = (body: SentBody | undefined) => (body?.messages ?? []).filter((message) => message.role === 'user').map((message) => message.content).join('\n')
 
   try {
-    // 这条改动不拦任何问法：问卡纸照样送模型，只是系统提示词里多了那一句。
+    // 「卡住了怎么办」输入侧不拦，照样送模型，只是系统提示词里多了那一句。
     for (const channel of ['kiosk', 'miniapp'] as const) {
       const label = channel === 'kiosk' ? '一体机' : '小程序'
       const before = sent.length
-      const result = await inRequest(() => chat.chat({ message: '打印机卡纸怎么办', channel } as never))
+      const result = await inRequest(() => chat.chat({ message: '卡住了怎么办', channel } as never))
       const body = sent[before]
       check(sent.length === before + 1 && result.reply === '模型的回答', `${label}小青文字：这一问照常送给了模型（阳性对照）`)
-      check(userOf(body).includes('打印机卡纸怎么办'), `${label}小青文字：发出去的就是这一问（阳性对照）`)
+      check(userOf(body).includes('卡住了怎么办'), `${label}小青文字：发出去的就是这一问（阳性对照）`)
       check(systemOf(body).includes('你是就业服务助手'), `${label}小青文字：系统提示词来自配置（阳性对照）`)
       check(systemOf(body).includes(DEVICE_FAULT_PROMPT_RULE), `${label}小青文字：真正发给模型的系统提示词里带着这一句`)
     }
@@ -164,10 +165,18 @@ async function runtimeChecks(): Promise<void> {
     // 带技能的对话在公共约束后面再接一段技能说明，这一句不能因此丢掉。
     {
       const before = sent.length
-      await inRequest(() => chat.chat({ message: '打印机卡纸怎么办', channel: 'kiosk', skill: 'company_research' } as never))
+      await inRequest(() => chat.chat({ message: '卡住了怎么办', channel: 'kiosk', skill: 'company_research' } as never))
       const system = systemOf(sent[before])
       check(sent.length === before + 1 && system.includes('AI 企业面试速查'), '带技能的小青文字：技能说明确实接进了系统提示词（阳性对照）')
       check(system.includes(DEVICE_FAULT_PROMPT_RULE), '带技能的小青文字：真正发给模型的系统提示词里带着这一句')
+    }
+
+    for (const channel of ['kiosk', 'miniapp'] as const) {
+      const label = channel === 'kiosk' ? '一体机' : '小程序'
+      const before = sent.length
+      const result = await inRequest(() => chat.chat({ message: '打印机卡纸怎么办', channel } as never))
+      check(sent.length === before && result.reply === deviceFaultReply(channel) && result.fixedNotice === true,
+        `${label}小青文字：问「打印机卡纸怎么办」没有发请求，回的是固定的话，fixedNotice`)
     }
 
     modelReply = JSON.stringify({ answer: '先别自己动机器，可以稍后再来。', evidenceLevel: 'E3', sourceNote: '这是通行做法，算参考。' })

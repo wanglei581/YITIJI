@@ -336,6 +336,7 @@ export class AdvisorService {
         ...answer,
         answer: deviceFaultReply('kiosk'),
         sourceNote: DEVICE_FAULT_SOURCE_NOTE,
+        evidenceLevel: 'E3',
       }
       fixedNotice = true
     }
