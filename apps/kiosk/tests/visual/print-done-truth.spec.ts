@@ -567,3 +567,22 @@ test('pickup completed receipt directs a reorder to the phone only after the min
   await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
 })
+
+// 2026-10-11（合规四 10/10）：完成屏「这单在哪能看到」那一条，小程序没发布时不把人往小程序引。
+for (const scenario of [
+  { name: 'logged-in order before the miniapp is published points to this machine', miniapp: false, hasEndUser: true, title: '这单已经记在你的账号里', sub: '在这台机器的「我的 → 打印订单」就能看到' },
+  { name: 'logged-in order after the miniapp is published points to the miniapp', miniapp: true, hasEndUser: true, title: '这单已经在你的小程序里', sub: '打开「我的 → 打印订单」就能看到' },
+  { name: 'guest order before the miniapp is published does not mention the miniapp', miniapp: false, hasEndUser: false, title: '本次打印未关联账号', sub: '想留下订单记录，下次打印前可先登录' },
+  { name: 'guest order after the miniapp is published keeps the miniapp line', miniapp: true, hasEndUser: false, title: '本次打印未关联账号', sub: '如需在小程序留存订单记录，下次打印前可先登录' },
+]) {
+  test(`completed receipt: ${scenario.name} @kiosk`, async ({ page, api }) => {
+    registerShell(api)
+    supportContact(api, { miniapp: scenario.miniapp })
+    api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
+    await openDoneWithState(page, { ...taskState, hasEndUser: scenario.hasEndUser })
+    const bar = page.locator('.pff-inbar')
+    await expect(bar).toContainText(scenario.title)
+    await expect(bar).toContainText(scenario.sub)
+    if (!scenario.miniapp) await expect(bar).not.toContainText('小程序')
+  })
+}
