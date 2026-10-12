@@ -87,6 +87,8 @@ interface MonitorDependencies {
  *     failed reads complete as inferred 'completion_log_unreadable' only while no
  *     read in this stretch has confirmed the absence: once one has, failed reads
  *     decide nothing and polling goes on (same order as the timeout rule below).
+ *     Once the job has left the queue, a not_found read taken while Get-PrintJob
+ *     itself failed ('unknown') counts as a confirmed absence too.
  *     When that log is off, its configuration could not be read, or this queue
  *     has not been matched yet, the same disappearance still counts as completed
  *     and is marked inferred. A failed read on those paths is treated like a
@@ -347,15 +349,30 @@ export async function monitorPrintJob(
         break
       }
 
-      case 'unknown':
+      case 'unknown': {
         // Get-PrintJob can fail independently of the Operational event log.
         // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
-        // A failed 307 read here is still treated as no event.
-        if (!paperEmptySeen && (await readCompletionEvent()) === 'found') {
-          return { failed: false, errorCode: '' }
+        if (!paperEmptySeen) {
+          const unknownRead = await readCompletionEvent()
+          if (unknownRead === 'found') {
+            return { failed: false, errorCode: '' }
+          }
+          // 已经在「离开队列后等完成记录」这一段里（两个计数只在要证据时才会走起来）：这次队列查询失败不等于任务回来了，
+          // 查到「确实没有」照样算一次，和 not_found 分支同一个门槛；不然它会被丢掉，后面几次读不到就把这张单推断成打好了。
+          // 读不到在这里不作数；这一段还没开始时（任务没离开过队列），确实没有也不算——那时它可能还在打。
+          if (unknownRead === 'not_found' && (goneWithoutEventPolls > 0 || unreadableEventReads > 0)) {
+            goneWithoutEventPolls += 1
+            if (goneWithoutEventPolls >= COMPLETION_EVIDENCE_GRACE_POLLS) {
+              return unconfirmedOutcome(
+                'the job left the queue; the completion record on this machine is enabled and readable; no completion event within the grace period',
+                removalSeen ? removalRawStatus : undefined,
+              )
+            }
+          }
         }
         paperEmptyCount = 0
         break
+      }
     }
   }
 

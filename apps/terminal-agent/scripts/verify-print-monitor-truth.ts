@@ -50,6 +50,8 @@ interface Scenario {
   unexpectedWarn?: RegExp[]
   expectedStatusQueries?: number
   expectedLogStateQueries?: number
+  /** Number of 307 reads the monitor made. */
+  expectedCompletionQueries?: number
   expectedRawStatus?: string
   /** After the run, whether this queue's channel is proven. Another queue must stay unproven. */
   expectChannelProven?: boolean
@@ -275,6 +277,9 @@ async function runScenario(scenario: Scenario): Promise<void> {
   }
   if (scenario.expectedLogStateQueries !== undefined) {
     assert.equal(logStateQueries, scenario.expectedLogStateQueries, `${scenario.name}: log-state queries`)
+  }
+  if (scenario.expectedCompletionQueries !== undefined) {
+    assert.equal(completionQueries, scenario.expectedCompletionQueries, `${scenario.name}: completion reads`)
   }
   if (scenario.expectedRawStatus !== undefined) {
     assert.equal(result.rawStatus, scenario.expectedRawStatus, `${scenario.name}: rawStatus`)
@@ -823,6 +828,45 @@ async function main(): Promise<void> {
       expectedWarn: /remained active/,
     },
     {
+      name: 'enabled and proven: a confirmed absence read while Get-PrintJob failed blocks the unreadable inference',
+      statuses: ['printing', 'not_found', 'unknown', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'not_found', 'unreadable', 'unreadable', 'unreadable'],
+      timeoutMs: 20,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 9,
+      expectedCompletionQueries: 8,
+      expectedWarn: /no completion event/,
+    },
+    {
+      name: 'enabled and proven: the window ends right after a confirmed absence read while Get-PrintJob failed',
+      statuses: ['printing', 'not_found', 'unknown'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['unreadable', 'not_found'],
+      timeoutMs: 3,
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      expectedStatusQueries: 3,
+      expectedCompletionQueries: 2,
+      expectedWarn: /had left the queue/,
+    },
+    {
+      name: 'enabled and proven: a no-event read while Get-PrintJob failed, before the job ever left, does not count',
+      statuses: ['printing', 'unknown', 'not_found'],
+      logState: 'enabled',
+      proveChannel: true,
+      completionReads: ['not_found', 'unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      timeoutMs: 20,
+      expectedFailed: false,
+      expectedErrorCode: '',
+      expectedInferred: 'completion_log_unreadable',
+      expectedStatusQueries: 6,
+      expectedCompletionQueries: 5,
+    },
+    {
       name: 'enabled and proven: a later found event completes without inference',
       raws: ['Printing', 'not_found'],
       logState: 'enabled',
@@ -837,8 +881,9 @@ async function main(): Promise<void> {
       raws: ['Printing', 'not_found'],
       logState: 'enabled',
       proveChannel: true,
-      completionReads: ['unreadable', 'unreadable', 'unreadable', 'unreadable'],
+      completionReads: ['unreadable', 'unreadable'],
       timeoutMs: 3,
+      expectedCompletionQueries: 2,
       expectedFailed: false,
       expectedErrorCode: '',
       expectedInferred: 'completion_log_unreadable',
