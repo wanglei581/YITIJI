@@ -219,6 +219,8 @@ const modelSource = read('src/pages/resume/components/resumeGenerateModel.ts')
 const carrySource = read('src/pages/resume/resumeBlocksToGenerateForm.ts')
 const carryProgram = [
   sourceNode(modelSource, 'TEXT_LIMITS'),
+  sourceNode(modelSource, 'LIMITS'),
+  sourceNode(modelSource, 'splitList'),
   sourceNode(modelSource, 'clampText'),
   sourceNode(modelSource, 'clampListText'),
   sourceNode(modelSource, 'EMPTY_EDU'),
@@ -229,7 +231,7 @@ const carryProgram = [
   sourceNode(carrySource, 'CARRIED_NOTE'),
   sourceNode(carrySource, 'keptLines'),
   sourceNode(carrySource, 'resumeBlocksToGenerateForm'),
-  'return { resumeBlocksToGenerateForm, CARRIED_NOTE, clampText, clampListText, TEXT_LIMITS };',
+  'return { resumeBlocksToGenerateForm, CARRIED_NOTE, DIAGNOSIS_MASK_PLACEHOLDER, clampText, clampListText, splitList, LIMITS, TEXT_LIMITS };',
 ].join('\n')
 const carryApi = new Function(executable(carryProgram))()
 const toForm = carryApi.resumeBlocksToGenerateForm
@@ -298,7 +300,28 @@ const eduOnly = toForm([block('education', '教育经历', ['只剩教育'])])
 expect(eduOnly !== null && eduOnly.seg === 'edu' && eduOnly.form.experience[0].description === '', '只带了教育时落在 edu，工作描述留空')
 const projOnly = toForm([block('project', '项目经历', ['只剩项目'])])
 expect(projOnly !== null && projOnly.seg === 'proj' && projOnly.form.projects.length === 1, '只带了项目时落在 proj')
-expect(carryApi.CARRIED_NOTE === NOTE, '提示句逐字等于定稿')
+expect(carryApi.CARRIED_NOTE === NOTE, '提示句逐字等于任务包给的原句（不在定稿上，等产品负责人定字）')
+
+// 技能：提交时只取前 LIMITS.skills 条（splitList）。带进来的要先按条截到同样条数，屏上看到的就是会提交的。
+const skillTotal = carryApi.LIMITS.skills + 5
+const skillItems = Array.from({ length: skillTotal }, (_, i) => `技能${i + 1}`)
+const perLine = Math.ceil(skillTotal / 6)
+const manySkillLines = Array.from({ length: 6 }, (_, line) => skillItems.slice(line * perLine, (line + 1) * perLine).join('、')).filter(Boolean)
+const manySkills = toForm([block('skill', '技能', manySkillLines)])
+const carriedSkillItems = manySkills ? carryApi.splitList(manySkills.form.skillsText, skillTotal) : []
+expect(carriedSkillItems.length === carryApi.LIMITS.skills, `技能超过 ${carryApi.LIMITS.skills} 条时只带前 ${carryApi.LIMITS.skills} 条（实际 ${carriedSkillItems.length}）`)
+expect(carriedSkillItems.join('|') === skillItems.slice(0, carryApi.LIMITS.skills).join('|'), '技能按原顺序整条地取前面的，不从条中间截')
+
+// 遮盖占位的类别要和后端一致：后端多一种类别而前端常量没跟上，带占位的行就会进表单、印到新简历上。
+const repoRead = (relativePath) => readFileSync(join(kioskRoot, '..', '..', relativePath), 'utf8')
+const maskCategoryLine = repoRead('services/api/src/common/pii/pii-masker.ts').match(/type MaskCategory =([^\n]+)/u)
+const backendMaskCategories = maskCategoryLine ? [...maskCategoryLine[1].matchAll(/'([^']+)'/gu)].map((m) => m[1]) : []
+expect(backendMaskCategories.length > 0, '读得出后端 pii-masker.ts 的遮盖类别')
+for (const category of backendMaskCategories) {
+  expect(carryApi.DIAGNOSIS_MASK_PLACEHOLDER.test(`电话 [${category}_1]`), `前端认得后端遮盖类别「${category}」`)
+}
+const backendToken = repoRead('services/api/src/common/pii/llm-input-mask.ts').match(/const PLACEHOLDER_TOKEN =\s*\/(.+)\/[a-z]*/u)
+expect(Boolean(backendToken) && backendToken[1] === carryApi.DIAGNOSIS_MASK_PLACEHOLDER.source, '前端遮盖占位和后端 PLACEHOLDER_TOKEN 写法逐字一致')
 
 function countSentence(dir, sentence) {
   let count = 0

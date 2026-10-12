@@ -3,10 +3,12 @@ import {
   EMPTY_EDU,
   EMPTY_EXP,
   EMPTY_PROJ,
+  LIMITS,
   TEXT_LIMITS,
   clampListText,
   clampText,
   emptyForm,
+  splitList,
   type GenerateFormSnapshot,
   type HistorySeg,
 } from './components/resumeGenerateModel'
@@ -62,7 +64,11 @@ export function resumeBlocksToGenerateForm(
   const educationText = keptLines(blocks, 'education').join('\n')
   const experienceText = keptLines(blocks, 'experience').join('\n')
   const projectText = keptLines(blocks, 'project').join('\n')
-  const skillsText = clampListText(keptLines(blocks, 'skill').join('\n'), TEXT_LIMITS.skill)
+  // 提交时技能只取前 LIMITS.skills 条（splitList）；这里先按条截到同样条数，屏上看到的就是会提交的。
+  const skillsText = clampListText(
+    splitList(keptLines(blocks, 'skill').join('\n'), LIMITS.skills).join('\n'),
+    TEXT_LIMITS.skill,
+  )
   const selfIntro = clampText(keptLines(blocks, 'selfintro').join('\n'), TEXT_LIMITS.selfIntro)
   if (!educationText && !experienceText && !projectText && !skillsText && !selfIntro) return null
 

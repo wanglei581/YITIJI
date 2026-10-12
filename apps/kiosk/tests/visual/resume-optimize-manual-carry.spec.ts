@@ -1,9 +1,11 @@
+import { join } from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
 import { registerW4Api } from '../fixtures/fusion-w4-api'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 
-const SHOTS = '/Users/wanglei/.cache/claude-lanes/qxb-1007/t7/f25-shots'
+/** 本机看图才存截图：设了 F25_SHOTS_DIR 才存，CI 和别的机器上不存。 */
+const SHOTS = process.env.F25_SHOTS_DIR ?? ''
 const NOTE = '已带入你简历里的内容，请逐项核对'
 
 const EDU_LINES = ['青岛职业技术学院物流管理', '在校做过仓库理货实训']
@@ -85,10 +87,11 @@ async function expectInViewport(locator: Locator): Promise<void> {
 }
 
 async function shot(page: Page, name: string): Promise<void> {
+  if (!SHOTS) return
   await page.locator('[data-kiosk-screen="resume-generate"]').evaluate((element) => {
     element.scrollTop = 0
   })
-  await page.screenshot({ path: `${SHOTS}/${name}` })
+  await page.screenshot({ path: join(SHOTS, name) })
 }
 
 test('优化没生成出来时手动修改把已读出的内容带进第 1 步 @kiosk', async ({ page, api }) => {
