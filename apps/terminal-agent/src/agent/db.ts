@@ -162,6 +162,14 @@ CREATE TABLE IF NOT EXISTS scan_deletion_audit (
 CREATE INDEX IF NOT EXISTS idx_scan_deletion_audit_pending
   ON scan_deletion_audit (pendingReport, createdAt);
 
+CREATE TABLE IF NOT EXISTS remote_command_results (
+  commandId TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  result TEXT NOT NULL,
+  remainingJobs INTEGER NOT NULL,
+  finishedAt TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS agent_metadata (
   metadataKey   TEXT PRIMARY KEY,
   metadataValue TEXT NOT NULL,

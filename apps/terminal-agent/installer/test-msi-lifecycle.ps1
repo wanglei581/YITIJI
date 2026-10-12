@@ -298,7 +298,7 @@ function Export-LifecycleEvidence([string]$Phase) {
 }
 
 function Restore-LifecycleSpooler {
-  foreach ($taskName in @("AIJobPrintBootSpoolGuard", "AIJobPrintDailyReboot")) {
+  foreach ($taskName in @("AIJobPrintBootSpoolGuard", "AIJobPrintDailyReboot", "AIJobPrintAgentRestart")) {
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $task) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -352,6 +352,8 @@ foreach ($relativeProvisionPath in @(
   "provision\boot-spool-guard.ps1",
   "provision\boot-spool-guard-task.ps1",
   "provision\daily-reboot.ps1",
+  "provision\agent-restart.ps1",
+  "provision\agent-restart-task.ps1",
   "provision\daily-reboot-task.ps1",
   "kiosk\kiosk-watchdog.ps1",
   "kiosk\register-kiosk-watchdog.ps1",
@@ -366,6 +368,9 @@ foreach ($relativeProvisionPath in @(
 # The daily trigger is twelve hours ahead so it cannot fire during this run.
 . (Join-Path $installRoot "provision\boot-spool-guard-task.ps1")
 . (Join-Path $installRoot "provision\daily-reboot-task.ps1")
+. (Join-Path $installRoot "provision\agent-restart-task.ps1")
+Install-AgentRestartTask -ScriptPath (Join-Path $installRoot "provision\agent-restart.ps1")
+if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintAgentRestart" -ErrorAction SilentlyContinue)) { throw "Agent restart task missing" }
 Install-BootSpoolGuard -GuardScriptPath (Join-Path $installRoot "provision\boot-spool-guard.ps1")
 Install-DailyRebootTask -At ((Get-Date).AddHours(12).ToString("HH:mm")) -ScriptPath (Join-Path $installRoot "provision\daily-reboot.ps1")
 if ($null -eq (Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue)) {
@@ -522,6 +527,7 @@ if (Test-Path -LiteralPath $desktopShortcutPath) {
 if ($null -ne (Get-ScheduledTask -TaskName "AIJobPrintBootSpoolGuard" -ErrorAction SilentlyContinue)) {
   throw "Boot spool guard task remains after uninstall"
 }
+if ($null -ne (Get-ScheduledTask -TaskName "AIJobPrintAgentRestart" -ErrorAction SilentlyContinue)) { throw "Agent restart task survived uninstall" }
 if ($null -ne (Get-ScheduledTask -TaskName "AIJobPrintDailyReboot" -ErrorAction SilentlyContinue)) {
   throw "Daily reboot task remains after uninstall"
 }

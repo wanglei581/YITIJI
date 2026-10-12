@@ -187,6 +187,11 @@ export interface HeartbeatPayload {
   scanInputAction?: ScanInputRequiredAction
   scanInputReason?: ScanInputLockoutReason | null
   scanInputObservedAt?: string
+  /**
+   * 本进程启动时刻，启动时取一次，之后不变。
+   * 旧服务器不认识这个字段时会 400，心跳会在本进程内停发它。
+   */
+  agentStartedAt?: string
 }
 
 export interface HeartbeatResponse {
@@ -196,6 +201,11 @@ export interface HeartbeatResponse {
     heartbeatIntervalMs?: number
     claimIntervalMs?: number
   }
+  /**
+   * 待执行的远程指令。没有指令时服务端不带这个字段。
+   * 形状在处理前校验，这里保持未知。
+   */
+  commands?: unknown
 }
 
 // ── Task claim ────────────────────────────────────────────────────────────────

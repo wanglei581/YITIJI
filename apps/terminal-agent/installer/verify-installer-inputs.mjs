@@ -112,11 +112,13 @@ const serviceRecoveryActionIds = [
 const spoolerUninstallActionIds = [
   'RemoveBootSpoolGuardTask',
   'RemoveDailyRebootTask',
+  'RemoveAgentRestartTask',
   'RestoreSpoolerAutomatic',
   'StartSpoolerService',
 ]
 const spoolerUninstallCommands = new Map([
   ['RemoveBootSpoolGuardTask', '&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintBootSpoolGuard&quot; /F'],
+  ['RemoveAgentRestartTask', '&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintAgentRestart&quot; /F'],
   ['RemoveDailyRebootTask', '&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;AIJobPrintDailyReboot&quot; /F'],
   ['RestoreSpoolerAutomatic', '&quot;[System64Folder]sc.exe&quot; config Spooler start= auto'],
   ['StartSpoolerService', '&quot;[System64Folder]sc.exe&quot; start Spooler'],
@@ -125,7 +127,7 @@ const expectedCustomActionIds = [...serviceRecoveryActionIds, ...spoolerUninstal
 assert.deepEqual(
   customActions.map((attributes) => attributes.get('Id')),
   expectedCustomActionIds,
-  'MSI CustomAction set must be the four service recovery actions followed by the four spooler-guard uninstall actions',
+  'MSI CustomAction set must be the four service recovery actions followed by the five guard/restart uninstall actions',
 )
 for (const attributes of customActions) {
   assert.deepEqual(
@@ -268,6 +270,8 @@ for (const staged of [
   'provision/boot-spool-guard.ps1',
   'provision/boot-spool-guard-task.ps1',
   'provision/daily-reboot.ps1',
+  'provision/agent-restart.ps1',
+  'provision/agent-restart-task.ps1',
   'provision/daily-reboot-task.ps1',
 ]) {
   assert.match(wixFragment, new RegExp(staged.replace(/[./]/g, '\\$&')), `${staged} must be excluded from the auto-generated payload fragment`)
@@ -621,5 +625,67 @@ assert.match(secureScanPath, /FILE_TRAVERSE/, 'pinned directory handles must sup
 assert.match(secureScanMutation, /FileDispositionInfo/, 'deletion must target an already verified handle')
 assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?finalizeTrustedWindowsCandidate[\s\S]*?return\s*\}/, 'Windows finalize must return after the native boundary without Node fallback')
 assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?sweepTrustedWindowsUnclaimed[\s\S]*?return\s*\}/, 'Windows sweep must return after the native boundary without Node fallback')
+
+
+// Normal restart task must ship and remain installed across upgrade.
+const restartTask = read('provision/agent-restart-task.ps1')
+const restartController = read('provision/agent-restart.ps1')
+assert.match(restartTask, /New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest/)
+assert.doesNotMatch(restartTask, /New-ScheduledTaskTrigger/)
+assert.match(restartTask, /-ExecutionTimeLimit \(New-TimeSpan -Minutes 5\)/)
+assert.match(restartTask, /-RestartInterval \(New-TimeSpan -Minutes 1\) -RestartCount 3/)
+assert.match(restartTask, /-MultipleInstances IgnoreNew/)
+assert.match(restartTask, /ReparsePoint/)
+assert.match(restartController, /agent-restart\.state/)
+assert.match(restartController, /FromMinutes\(4\)/)
+assert.match(restartController, /\$attempt -le 5/)
+assert.doesNotMatch(restartController, /Spooler|PRINTERS|Remove-Item[^\n]*-Recurse/)
+// A restart also reopens the kiosk browser so the screen picks up a newly deployed page (F-15).
+// It may only ever touch the browser the watchdog launched: same marker, main process only.
+assert.match(restartController, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'restart controller must use the watchdog marker')
+assert.match(kioskWatchdog, /\$kioskMarker = "--aijobprint-kiosk=1"/, 'watchdog marker changed without the restart controller')
+assert.match(restartController, /-like "\*\$kioskMarker\*" -and \$commandLine -notlike "\*--type=\*"/, 'only the marked browser main process may be stopped')
+assert.equal((restartController.match(/Stop-Process/g) ?? []).length, 1, 'the restart controller stops exactly one kind of process')
+assert.match(restartController, /Stop-Process -Id \$candidate\.ProcessId -Force -ErrorAction Stop/, 'stop by process id; -Force because the task has no desktop to confirm on')
+assert.doesNotMatch(restartController, /taskkill|Stop-Process -Name|Get-Process|\.Kill\(/, 'never stop browsers by name or by another route')
+// Both sides must look at the same two browsers: the watchdog prefers Edge, so dropping msedge.exe here
+// would leave the production browser open while every chrome.exe stand-in test stays green.
+const kioskBrowserFilter = `-Filter "Name = 'msedge.exe' OR Name = 'chrome.exe'"`
+assert.ok(restartController.includes(kioskBrowserFilter), 'restart controller must consider both Edge and Chrome')
+assert.ok(kioskWatchdog.includes(kioskBrowserFilter), 'watchdog browser filter changed without the restart controller')
+{
+  // Checked out as CRLF on Windows, LF elsewhere.
+  const controller = restartController.replace(/\r\n/g, '\n')
+  const body = controller.slice(controller.indexOf('try {\n  $service = Get-Service'))
+  const calls = [...body.matchAll(/Stop-KioskBrowser/g)].map((match) => match.index)
+  assert.equal(calls.length, 2, 'browser is reopened on both the normal and the resumed path')
+  const stopRequested = body.indexOf('$service.Stop()')
+  const resumed = body.indexOf('Write-RestartStage "resume" "marker-present"')
+  const firstExit = body.indexOf('exit 0')
+  const running = body.indexOf('Write-RestartStage "start" "running"')
+  assert.ok(stopRequested > -1 && resumed > stopRequested && firstExit > resumed && running > firstExit)
+  // Resumed path: inside the branch that has just seen the service Running, before that branch exits.
+  assert.ok(calls[0] > resumed && calls[0] < firstExit, 'resumed path: the call sits in the already-running branch')
+  assert.match(body.slice(calls[0] - 160, calls[0]), /ServiceControllerStatus\]::Running\) \{\s*$/, 'resumed path: only when the service is already running')
+  // Normal path: after the wait for Running has returned, before this attempt reports success.
+  assert.ok(calls[1] > running && calls[1] < body.indexOf('exit 0', running), 'normal path: the browser may only be closed after the service is running again')
+  // No watchdog, no closing: nothing would bring the browser back. The check comes before any process is stopped.
+  const helper = controller.slice(controller.indexOf('function Stop-KioskBrowser'), controller.indexOf('try {\n  $service = Get-Service'))
+  const watchdogCheck = helper.indexOf(`-match '(^|[\\\\/"\\s])kiosk-watchdog\\.ps1'`)
+  const skipped = helper.indexOf('Write-RestartStage "browser" "skipped=no-watchdog"')
+  assert.ok(watchdogCheck > -1, 'the watchdog is recognised by its script name, not by any powershell.exe')
+  assert.ok(helper.includes(`-Filter "Name = 'powershell.exe'"`), 'the watchdog runs under Windows PowerShell')
+  assert.ok(skipped > watchdogCheck && helper.indexOf('return', skipped) > skipped && helper.indexOf('return', skipped) < helper.indexOf('Stop-Process'), 'without a watchdog the browser is left alone')
+  assert.match(kioskRegister, /"-File", \('"\{0\}"' -f \$watchdogScript\)/, 'the watchdog task must keep the script path on its command line')
+  // One browser that is already gone must not keep the others from being closed.
+  assert.match(helper, /try \{\s*Stop-Process[^\n]*\n\s*\$stopped\+\+\s*\} catch \{\s*\$failed\+\+\s*\}/, 'a failed stop is counted, not fatal to the loop')
+  assert.ok(helper.includes('Write-RestartStage "browser" "stopped=$stopped failed=$failed"'))
+}
+assert.ok([...restartTask + restartController].every((char) => char.charCodeAt(0) < 128), 'restart scripts and logs must be ASCII')
+assert.match(productionInstaller, /Install-AgentRestartTask -ScriptPath \$agentRestartScript/)
+assert.match(productionInstaller, /Write-Host \(Get-AgentRestartStatusLine\)/)
+assert.match(msiLifecycle, /Install-AgentRestartTask -ScriptPath/)
+assert.match(msiLifecycle, /Agent restart task survived uninstall/)
+assert.match(controlCenter, /agentRestartRegistered/)
 
 console.log('ALL PASS: Windows Agent installer inputs')

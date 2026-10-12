@@ -86,6 +86,7 @@ function Get-ControlCenterSnapshot {
     serviceInstalled = $null -ne $service
     serviceStatus = if ($null -ne $service) { [string]$service.Status } else { "NotInstalled" }
     serviceStartType = if ($null -ne $service) { [string]$service.StartType } else { "NotInstalled" }
+    agentRestartRegistered = $null -ne (Get-ScheduledTask -TaskName "AIJobPrintAgentRestart" -ErrorAction SilentlyContinue)
     kioskWatchdogRegistered = $null -ne (Get-ScheduledTask -TaskName $kioskTaskName -ErrorAction SilentlyContinue)
     kioskWatchdogAvailable = Test-Path -LiteralPath $kioskRegisterScript -PathType Leaf
     bootSpoolGuardEnabled = $bootSpoolGuardEnabled
@@ -276,9 +277,10 @@ $serviceText = New-Label "服务：正在检查" 316 14 300 26
 $versionText = New-Label "版本：0.4.15" 640 14 180 26
 $statusText = New-Label "正在读取本机状态…" 22 46 820 24
 $statusText.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#64748B")
-$bootGuardText = New-Label "开机打印防护：正在检查" 22 74 400 26
-$dailyRebootText = New-Label "每日维护重启：正在检查" 440 74 400 26
-$summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText, $bootGuardText, $dailyRebootText))
+$bootGuardText = New-Label "开机打印防护：正在检查" 22 74 275 26
+$dailyRebootText = New-Label "每日维护重启：正在检查" 305 74 275 26
+$agentRestartText = New-Label "Agent 服务重启：正在检查" 590 74 275 26
+$summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText, $bootGuardText, $dailyRebootText, $agentRestartText))
 $form.Controls.Add($summary)
 
 $settings = New-Object System.Windows.Forms.GroupBox
@@ -375,6 +377,7 @@ function Refresh-View {
   $kioskText.ForeColor = if ($snapshot.kioskWatchdogRegistered) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
   $bootGuardText.Text = if ($snapshot.bootSpoolGuardEnabled) { "开机打印防护：已开启" } else { "开机打印防护：未开启" }
   $bootGuardText.ForeColor = if ($snapshot.bootSpoolGuardEnabled) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }
+  $agentRestartText.Text = if ($snapshot.agentRestartRegistered) { "Agent 服务重启：已注册" } else { "Agent 服务重启：未注册" }
   $dailyRebootText.Text = "每日维护重启：$($snapshot.dailyRebootLabel)"
   $dailyOn = $snapshot.dailyRebootLabel -ne "未开启" -and $snapshot.dailyRebootLabel -ne "未知"
   $dailyRebootText.ForeColor = if ($dailyOn) { [System.Drawing.ColorTranslator]::FromHtml("#15803D") } else { [System.Drawing.ColorTranslator]::FromHtml("#B45309") }

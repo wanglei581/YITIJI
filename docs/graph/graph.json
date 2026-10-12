@@ -18667,6 +18667,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
@@ -18706,6 +18707,7 @@
     ],
     ".github/workflows/windows-agent-installer.yml": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -22589,6 +22591,9 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/inputs.json": [
+      "apps/terminal-agent/scripts/verify-agent-restart-windows.ts"
+    ],
     "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
       "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
     ],
@@ -22611,6 +22616,9 @@
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
+    ],
+    "apps/terminal-agent/scripts/remote-command-rework.helper.ts": [
+      "apps/terminal-agent/scripts/verify-remote-commands.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
@@ -22654,6 +22662,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "apps/terminal-agent/src/agent/instance-lock.ts": [
@@ -22677,14 +22686,17 @@
     ],
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
     ],
     "apps/terminal-agent/src/agent/print-queue-hold.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
-      "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+      "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
+      "apps/terminal-agent/scripts/verify-remote-commands-windows.ts",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts"
     ],
     "apps/terminal-agent/src/agent/print-task-temp-cleanup.ts": [
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs"
@@ -22697,6 +22709,9 @@
     ],
     "apps/terminal-agent/src/agent/release-observation.ts": [
       "apps/terminal-agent/scripts/verify-release-observation-boundary.mjs"
+    ],
+    "apps/terminal-agent/src/agent/remote-commands.ts": [
+      "apps/terminal-agent/scripts/verify-remote-commands.ts"
     ],
     "apps/terminal-agent/src/agent/scan-candidate-barrier.ts": [
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts",
@@ -22714,8 +22729,12 @@
     "apps/terminal-agent/src/agent/scan-watcher.ts": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-watcher.ts"
+    ],
+    "apps/terminal-agent/src/agent/service-restart.ts": [
+      "apps/terminal-agent/scripts/verify-agent-restart-windows.ts"
     ],
     "apps/terminal-agent/src/agent/startup-diagnostics.ts": [
       "apps/terminal-agent/scripts/verify-agent-config-resilience.mjs"
@@ -22732,6 +22751,7 @@
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/types.ts": [
@@ -22739,6 +22759,7 @@
       "apps/terminal-agent/scripts/verify-local-qr-proxy.ts",
       "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-scan-deletion-audit.ts",
       "apps/terminal-agent/scripts/verify-scan-input-health.ts",
       "apps/terminal-agent/scripts/verify-scan-input-lockout-telemetry.ts",
@@ -22750,7 +22771,8 @@
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
-      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts"
+      "apps/terminal-agent/scripts/verify-print-retry-attempt.ts",
+      "apps/terminal-agent/scripts/verify-remote-commands-windows.ts"
     ],
     "apps/terminal-agent/src/agent/wql-literal.ts": [
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
@@ -22766,6 +22788,7 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-print-scan-agent.mjs",
       "apps/terminal-agent/scripts/verify-printer-config.mjs",
+      "apps/terminal-agent/scripts/verify-remote-commands.ts",
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/local-api/origin-guard.ts": [
@@ -33320,6 +33343,27 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "apps/terminal-agent/installer/provision"
+        ],
+        "files": [
+          "apps/terminal-agent/installer/inputs.json",
+          "apps/terminal-agent/src/agent/service-restart.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-agent-restart-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:agent-restart-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/terminal-agent/scripts/diagnose-production-agent.ps1",
@@ -33720,6 +33764,53 @@
       "package": "terminal-agent",
       "scriptNames": [
         "terminal-agent::verify:release-observation-boundary"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/terminal-agent/src/agent/print-queue-hold.ts",
+          "apps/terminal-agent/src/agent/wmi.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-remote-commands-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:remote-commands-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/remote-command-rework.helper.ts",
+          "apps/terminal-agent/src/agent/heartbeat.ts",
+          "apps/terminal-agent/src/agent/print-dispatch-gate.ts",
+          "apps/terminal-agent/src/agent/print-queue-hold.ts",
+          "apps/terminal-agent/src/agent/remote-commands.ts",
+          "apps/terminal-agent/src/agent/scan-watcher.ts",
+          "apps/terminal-agent/src/agent/task-runner.ts",
+          "apps/terminal-agent/src/agent/types.ts",
+          "apps/terminal-agent/src/index.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-remote-commands.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:remote-commands"
       ],
       "wired": true
     },
