@@ -144,6 +144,31 @@ async function declineBlocksRequest(opts) {
   assert.equal(ctx.ai.isDeclared('age_14_plus'), false)
 }
 
+/**
+ * 打印前隐私检查：服务端已豁免 AI 闸门（materials.controller 的 AiUseExempt，AI 挂了原件照样能打），
+ * 小程序这两步不问年龄、直接发。登录着、本机没声明过——要是还挂着 ai 标记，这里会先弹年龄框、不发请求。
+ */
+async function printPiiScanNotGated(opts) {
+  const ctx = createRuntime(opts)
+  const api = ctx.load('api')
+  loginAs(ctx)
+  const scan = settle(api.createPrintPiiScan('file-1'))
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 0, '打印前隐私检查不弹年龄确认')
+  const scanCall = ctx.wx.calls.request.find((c) => c.url.endsWith('/materials/tasks'))
+  assert.ok(scanCall, '隐私检查直接发出')
+  reply(scanCall, 200, { success: true, data: { id: 't-1', piiFindings: [] } })
+  assert.equal((await scan).ok, true)
+  const decide = settle(api.decidePrintPiiFindings('t-1', []))
+  await flush()
+  assert.equal(ctx.wx.calls.modal.length, 0, '确认隐私检查结果也不弹年龄确认')
+  const decideCall = ctx.wx.calls.request.find((c) => c.url.includes('/pii-findings/decisions'))
+  assert.ok(decideCall, '确认结果直接发出')
+  reply(decideCall, 200, { success: true, data: { ok: true } })
+  assert.equal((await decide).ok, true)
+  assert.equal(ctx.ai.isDeclared('age_14_plus'), false, '没替他记年龄声明')
+}
+
 /** 会员：新声明先写服务端再发 AI 请求；AI 请求带令牌、不带声明头。 */
 async function memberGrantsFirstAndSendsNoHeaders(opts) {
   const ctx = createRuntime(opts)
@@ -484,6 +509,7 @@ const SCENARIOS = {
   resumeAiConcurrentSharesOnePrompt,
   anonymousGenerateAsksAgeThenSendsHeaders,
   declineBlocksRequest,
+  printPiiScanNotGated,
   memberGrantsFirstAndSendsNoHeaders,
   voiceAsksBothInOrder,
   declarationRequiredRecoversOnce,
@@ -535,6 +561,9 @@ const MUTATIONS = [
     swap('api-legal-consent', 'if (fresh && auth.isLoggedIn()) return grantAiConsent(scope).catch(() => null);', 'if (false) return null;')],
   ['拒绝后照发请求', 'declineBlocksRequest',
     swap('ai-access', '      if (!agreed) throw declinedError(scope);\n', '')],
+  ['打印隐私检查又挂上 AI 标记', 'printPiiScanNotGated',
+    swap('api', "data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,\n",
+      "data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout, ai: 'generate',\n")],
   ['小青不带渠道', 'assistantChatSendsMiniappChannel',
     swap('api', "const body = { message, channel: 'miniapp' };", 'const body = { message };')],
   ['简历授权 403 不接', 'resumeAiConsentRecoversOnce',
