@@ -129,7 +129,7 @@ export function PrintDonePage() {
   const { file, params } = state
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
-  const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
+  const flowAmountCents = typeof state.amountCents === 'number' ? state.amountCents : null
   const displayOrderNo = publicOrderNo(typeof state.orderNo === 'string' ? state.orderNo : null)
   const idDocument = state.idDocument === true
 
@@ -153,6 +153,9 @@ export function PrintDonePage() {
   const visual = resultState === 'failed' ? failVisual(verification?.errorCode) : resultState
 
   const [takeaway, setTakeaway] = useState<PrintJobTakeawayUrl | null>(null)
+  // 到机码单从认领页过来时不带金额（认领放行的回包里没有）。出错屏会向服务端要订单回执：回执写明已结清时，
+  // 整屏（顶栏、说明、按钮、退款句）都认回执上的金额，和缺纸那一支同一个口径。进页带了金额的仍用带来的。
+  const amountCents = flowAmountCents ?? (takeaway?.payStatus === 'paid' ? takeaway.amountCents : null)
   const [takeawayError, setTakeawayError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
