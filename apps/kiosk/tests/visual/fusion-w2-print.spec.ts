@@ -3582,3 +3582,20 @@ test('the tap that folds sentence 4 still lands on the button under it @w2', asy
   await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })
+
+test('a touch that turns into a scroll also folds sentence 4 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 手指按下后滑动，浏览器接管滚动时只发 pointercancel、不发 click。这也算一次触屏，句子要收。
+  await page.evaluate(() => {
+    document.body.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch' }))
+  })
+  await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
