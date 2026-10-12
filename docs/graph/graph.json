@@ -24892,7 +24892,8 @@
     "services/api/src/ai/resume/self-assessment-questions.ts": [
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-self-assessment-bank-sync.ts"
     ],
     "services/api/src/ai/resume/self-assessment-scoring.ts": [
       "services/api/scripts/verify-self-assessment-ai-gate.ts",
@@ -43157,6 +43158,24 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:self-assessment-ai-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/ai/resume/self-assessment-questions.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-self-assessment-bank-sync.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:assess-isolation"
       ],
       "wired": true
     },
