@@ -23813,7 +23813,8 @@
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-sms-budget.ts",
-      "services/api/scripts/verify-sms-egress-limits.ts"
+      "services/api/scripts/verify-sms-egress-limits.ts",
+      "services/api/scripts/verify-sms-provider-refusal-alert.ts"
     ],
     "services/api/scripts/support/isolated-verification-database.ts": [
       "services/api/scripts/verify-admin-login-hardening.ts",
@@ -26570,7 +26571,8 @@
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts",
-      "services/api/scripts/verify-sms-egress-limits.ts"
+      "services/api/scripts/verify-sms-egress-limits.ts",
+      "services/api/scripts/verify-sms-provider-refusal-alert.ts"
     ],
     "services/api/src/member-auth/sms/sms-code-throttle.ts": [
       "services/api/scripts/verify-sms-egress-limits.ts"
@@ -26581,6 +26583,9 @@
     "services/api/src/member-auth/sms/sms-egress-limits.ts": [
       "services/api/scripts/verify-sms-egress-limits.ts"
     ],
+    "services/api/src/member-auth/sms/sms-provider-refusal.ts": [
+      "services/api/scripts/verify-sms-provider-refusal-alert.ts"
+    ],
     "services/api/src/member-auth/sms/sms-sender.ts": [
       "services/api/scripts/verify-ai-endpoint-allowlist.ts",
       "services/api/scripts/verify-change-password.ts",
@@ -26590,6 +26595,7 @@
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-sms-budget.ts",
+      "services/api/scripts/verify-sms-provider-refusal-alert.ts",
       "services/api/scripts/verify-sms-provider.ts",
       "services/api/scripts/verify-sms-send.ts"
     ],
@@ -43230,6 +43236,27 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:sms-egress-limits"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/internal-auth-verify-harness.ts",
+          "services/api/src/member-auth/sms/sms-budget.ts",
+          "services/api/src/member-auth/sms/sms-provider-refusal.ts",
+          "services/api/src/member-auth/sms/sms-sender.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-sms-provider-refusal-alert.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:sms-send"
       ],
       "wired": true
     },
