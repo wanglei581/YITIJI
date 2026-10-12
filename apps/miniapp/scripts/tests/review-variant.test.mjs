@@ -96,6 +96,18 @@ test('不含 AI 版登录页两句不提 AI，完整版那两句原样', () => {
   for (const line of lines) assert.match(line, /wx:if="\{\{aiEnabled\}\}"/, `登录页这行提到 AI 却不看版本：${line.trim()}`)
 })
 
+// 不含 AI 版里材料模板页没有入口：关于页那句和审核说明都不能说有模板（合规八 10/12 定字）。
+// 哪天给模板页加了入口，再连同这条一起改。
+test('不含 AI 版关于页和审核说明都不提材料模板，完整版那句不变', () => {
+  const noAi = page('pages/about/about.js')
+  assert.equal(noAi.data.notice, '本平台提供求职材料与文档打印服务，不提供招聘信息、岗位投递或人力资源服务。')
+  const full = instantiate(loadPageDefinition('pages/about/about.js', { wx, modules: variantModules('full') }))
+  assert.equal(full.data.notice.includes('AI'), true)
+  assert.notEqual(full.data.notice, noAi.data.notice)
+  const notes = JSON.parse(fs.readFileSync(path.join(MINIAPP, 'review-variants/variants.json'), 'utf8'))
+  assert.equal(notes['no-ai'].reviewNote.includes('模板'), false)
+})
+
 test('full → no-ai → full 关键文件逐字节还原', () => {
   if (CHAIN_INNER) return // 防递归，不是跳过检查
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'miniapp-variant-test-'))
