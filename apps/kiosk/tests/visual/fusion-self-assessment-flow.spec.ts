@@ -244,6 +244,63 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     await page.getByRole('button', { name: '关闭文件预览' }).click()
     await expect(dialog).toHaveCount(0)
     expect(page.context().pages()).toHaveLength(pageCount)
+    // 这份夹具没有 printFileUrl：底栏主按钮照样换成「打印本次结果」，但置灰并写明原因。
+    const blockedPrint = page.locator('.qx-ctabar').getByTestId('self-assessment-primary')
+    await expect(blockedPrint).toHaveText('打印本次结果')
+    await expect(blockedPrint).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('.qx-ctabar').getByText('打印链接未就绪')).toBeVisible()
+  })
+
+  test('PDF 生成后底栏主按钮换成稿上的「打印本次结果」，不用下滑、点了进打印确认页 @w3-kiosk', async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerSelfAssessmentApi(api)
+    // 这次带上服务端签出的打印地址；稿 34 结果屏底栏主按钮是「打印本次结果」、直接去打印确认。
+    api.respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/print`, {
+      status: 200,
+      json: success({
+        fileId: 'sa-file-001', filename: 'self-assessment-001.pdf', sizeBytes: 12345, pageCount: 2,
+        signedUrl: '/self-assessment-fixtures/report.pdf', printFileUrl: '/self-assessment-fixtures/print-file.pdf',
+        signedUrlExpiresAt: '2099-01-01T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+      }),
+    })
+    api.respond('POST', '/api/v1/orders/quote', { status: 200, json: { amountCents: 200, billablePages: 2, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }] } })
+    await page.route('**/self-assessment-fixtures/*.pdf', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+    )
+    const quotedFileUrls: string[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote') {
+        quotedFileUrls.push(String((request.postDataJSON() as { fileUrl?: unknown } | null)?.fileUrl))
+      }
+    })
+    await page.addInitScript(({ key, value }) => {
+      sessionStorage.setItem(key, JSON.stringify(value))
+    }, {
+      key: 'self_assessment_session_v1',
+      value: { answers: {}, consent: { nonSensitive: true, sensitive: false }, taskId: MOCK_TASK_ID, accessToken: 'mock-anon-token-deadbeef', result: submissionData },
+    })
+
+    await page.goto('/resume/self-assessment/result')
+    const ctabar = page.locator('.qx-ctabar')
+    await expect(ctabar.getByTestId('self-assessment-print')).toHaveText('生成 PDF 预览')
+    await expect(ctabar.getByText('打印本次结果')).toHaveCount(0)
+    await ctabar.getByTestId('self-assessment-print').click()
+    await expect(page.getByRole('dialog', { name: 'self-assessment-001.pdf' })).toBeVisible()
+    await page.getByRole('button', { name: '关闭文件预览' }).click()
+
+    const printButton = ctabar.getByTestId('self-assessment-primary')
+    await expect(printButton).toHaveText('打印本次结果')
+    await expect(printButton).not.toHaveAttribute('aria-disabled', 'true')
+    await expect(printButton).toBeInViewport({ ratio: 1 })
+    await expect(ctabar.getByTestId('self-assessment-print')).toHaveCount(0)
+    await expect(page.getByText('去打印工作台核价')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '页内预览 PDF' })).toHaveCount(1)
+    await printButton.click()
+    await page.waitForURL((url) => url.pathname === '/print/confirm')
+    await expect(page.locator('.print-file-name')).toHaveText('self-assessment-001.pdf')
+    await expect.poll(() => quotedFileUrls).toContain('/self-assessment-fixtures/print-file.pdf')
+    expect(quotedFileUrls).not.toContain('/self-assessment-fixtures/report.pdf')
+    expect(errors).toEqual([])
   })
 
   test('§1.3 + §1.5: 撤回 DELETE 真网络可达 @kiosk', async ({ page, api }) => {
