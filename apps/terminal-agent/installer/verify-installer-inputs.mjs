@@ -292,8 +292,16 @@ assert.match(kioskWatchdog, /default \{ \$candidates = \$edge \}/, 'auto mode mu
 assert.doesNotMatch(kioskWatchdog, /\$edge \+ \$chrome|\$chrome \+ \$edge/, 'auto mode must not fall back to Chrome')
 assert.match(kioskWatchdog, /-ieq "chrome\.exe"\) \{[\s\S]{0,900}\$arguments = @\("--incognito"\) \+ \$arguments/, 'an explicitly chosen Chrome must start incognito')
 assert.match(kioskWatchdog, /IncognitoModeAvailability[\s\S]{0,200}-eq 1\)[\s\S]{0,300}throw/, 'Chrome with incognito disabled by policy must not start')
-for (const key of ['HKLM:\\SOFTWARE\\Microsoft', 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft', 'HKCU:\\SOFTWARE\\Microsoft']) {
+assert.match(kioskWatchdog, /if \(\$availability -eq 1\) \{\r?\n\s*Write-Log "Chrome incognito is disabled by policy[^\r\n]*\r?\n\s*throw "Chrome incognito is disabled by policy"/, 'the policy refusal must be unconditional once the value is 1')
+for (const key of ['HKLM:\\SOFTWARE\\Microsoft', 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft']) {
   assert.ok(kioskWatchdog.includes(`"${key}\\Windows\\CurrentVersion\\App Paths\\msedge.exe"`), `auto mode looks up the registered Edge path (${key}) before giving up`)
+}
+assert.doesNotMatch(kioskWatchdog, /HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths/i, 'Edge lookup trusts only machine-wide App Paths: a per-user key is writable without admin rights')
+{
+  const start = kioskWatchdog.indexOf('function Resolve-KioskBrowser')
+  const end = kioskWatchdog.indexOf('function Get-KioskProcess')
+  assert.ok(start > -1 && end > start, 'Resolve-KioskBrowser must come before Get-KioskProcess')
+  assert.deepEqual(kioskWatchdog.slice(start, end).match(/\$candidates\s*\+?=[^\r\n]*\$chrome/g), ['$candidates = $chrome'], 'only an explicit -Browser chrome may put Chrome into the candidates')
 }
 assert.match(kioskWatchdog, /--no-first-run/)
 assert.match(kioskWatchdog, /--user-data-dir=\$profileRoot/)

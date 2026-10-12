@@ -3,7 +3,8 @@
 # Runs in the interactive (auto-login) user session, started by the
 # "AIJobPrintKioskWatchdog" scheduled task at logon. It keeps exactly one
 # full-screen kiosk browser pointed at the terminal site:
-#   - starts Edge (preferred) or Chrome in --kiosk mode with a dedicated profile
+#   - starts Edge in --kiosk mode with a dedicated profile (Chrome only when -Browser chrome
+#     is given, and then with --incognito)
 #   - restarts it when the process exits or crashes, with backoff
 #   - gets only a one-minute boot ticket from the loopback Agent; it never reads Agent credentials
 #
@@ -62,7 +63,7 @@ function Resolve-KioskBrowser([string]$Preference) {
     # phone numbers and e-mail addresses one person typed would be saved to disk and offered to the
     # next person. Never switch silently to a browser path nobody has verified on a kiosk: without
     # Edge the watchdog stops and says so. Chrome must be chosen explicitly (-Browser chrome) and
-    # then always starts incognito (see Start-KioskBrowser).
+    # is then started with --incognito (see Start-KioskBrowser).
     default { $candidates = $edge }
   }
   foreach ($candidate in $candidates) {
@@ -72,18 +73,22 @@ function Resolve-KioskBrowser([string]$Preference) {
   }
   if ($Preference -ne "chrome") {
     # Edge installed somewhere else: ask Windows where msedge.exe is registered before giving up.
+    # Only the two machine-wide keys: a per-user key can be written without admin rights.
     foreach ($key in @(
       "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
-      "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
-      "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+      "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
     )) {
+      if (-not (Test-Path -LiteralPath $key)) { continue }
       try {
         $registered = [string](Get-ItemProperty -LiteralPath $key -ErrorAction Stop).'(default)'
         $registered = $registered.Trim().Trim('"')
         if ($registered -and [System.IO.Path]::GetFileName($registered) -ieq "msedge.exe" -and (Test-Path -LiteralPath $registered -PathType Leaf)) {
           return $registered
         }
-      } catch {}
+        Write-Log "App Paths entry is not a usable msedge.exe ($key): $registered"
+      } catch {
+        Write-Log "App Paths entry could not be read ($key): $($_.Exception.Message)"
+      }
     }
   }
   return $null
@@ -185,9 +190,9 @@ function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
 $executable = Resolve-KioskBrowser -Preference $Browser
 if ($null -eq $executable) {
   if ($Browser -eq "chrome") {
-    Write-Log "Chrome was requested (-Browser chrome) but is not installed; watchdog cannot start"
+    Write-Log "Chrome was requested (-Browser chrome) but chrome.exe was not found in the standard paths; watchdog cannot start"
   } else {
-    Write-Log "Microsoft Edge not found; -Browser $Browser does not fall back to Chrome (Chrome --kiosk is not private); watchdog cannot start"
+    Write-Log "Microsoft Edge not found (standard paths, machine App Paths); -Browser $Browser does not fall back to Chrome (Chrome --kiosk is not private); watchdog cannot start"
   }
   throw "No supported kiosk browser installed"
 }
