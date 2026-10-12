@@ -41,6 +41,15 @@ import { ApiHttpError } from './httpAdapter'
  */
 export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明天恢复；可以先打印原件。'
 
+/**
+ * 打印当天的量用完（429 `PRINT_TERMINAL_DAILY_QUOTA_REACHED` / `PRINT_MEMBER_DAILY_QUOTA_REACHED`）。
+ * 按北京时间自然日算、0 点恢复，当天重试不会成功。合规 2026-10-12 定字：不出现「免费」、价格或购买。
+ * 后端判的是「今天已用 + 在途 + 这一单 > 上限」，不一定是用到零，所以说「剩下的不够打这一单」，不说「已经用完」。
+ * 到机码页在这两句后面各接一句下一步（见 pickupClaimModel）。
+ */
+export const PRINT_TERMINAL_DAILY_QUOTA_COPY = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+export const PRINT_MEMBER_DAILY_QUOTA_COPY = '你今天剩下的打印量不够打这一单，明天恢复。'
+
 const SHARED_USER_MESSAGES = (contact = peekSupportContact()): Readonly<Record<string, string>> => ({
   NETWORK_ERROR: '网络连接失败，请稍后重试',
   // 到机码（取件码）：服务端 message 本就是面向用户的中文，这里给同义的稳定文案，避免落到通用兜底
@@ -56,6 +65,9 @@ const SHARED_USER_MESSAGES = (contact = peekSupportContact()): Readonly<Record<s
   AI_RATE_LIMITED: '当前使用的人较多，请稍后再试',
   // 公共日额度：当天重试不会成功。不要并进上面的普通限流句。
   AI_PUBLIC_QUOTA_EXCEEDED: AI_PUBLIC_QUOTA_EXCEEDED_COPY,
+  // 这两个码后端回的也是 429：不登记就会落到下面「429 一律说人较多」，说的不是实情。
+  PRINT_TERMINAL_DAILY_QUOTA_REACHED: PRINT_TERMINAL_DAILY_QUOTA_COPY,
+  PRINT_MEMBER_DAILY_QUOTA_REACHED: PRINT_MEMBER_DAILY_QUOTA_COPY,
   AI_BUSY: 'AI 服务正忙，请稍后再试',
   FILE_TOO_LARGE: '文件过大，请压缩后重试',
   PRINT_JOB_TOO_LARGE: '每单最多打印 100 面，请分几单打印',
