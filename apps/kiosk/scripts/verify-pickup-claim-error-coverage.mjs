@@ -347,7 +347,7 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   {
     const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
     const guide = read(rel)
-    if (!/failure === 'closed' \|\| failure === 'quota'/.test(guide)) fail(`${rel}：quota 没有和 closed 共用「回到首页 / 输另一个到机码」那组按钮`)
+    if (!/failure === 'closed' \|\| failure === 'quota'/.test(guide)) fail(`${rel}：quota 没有和 closed 共用「回到首页」那组出口（次要出口额度是「求助」，closed 是「输另一个到机码」）`)
     else pass('quota 与 closed 共用「回到首页」那组按钮，屏头不同')
     if (!/这个到机码<b>今天打不了<\/b>。/.test(guide)) fail(`${rel}：额度屏头不是「这个到机码今天打不了。」`)
     else pass('额度屏头是「这个到机码今天打不了。」')
@@ -360,15 +360,18 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     if (shared !== sentence) fail(`共用码表 ${code} 应是「${sentence}」，实际「${shared}」`)
     else pass(`共用码表 ${code}：照实说量用完、明天恢复`)
   }
-  // 确认页额度置灰的内存表：报价键里带这一位的文件签名链接，进待机屏不整页重载时表会留到下一位，
-  // 所以表里只许存摘要。读、写、判三处都得先过 quotaHoldId。
+  // 确认页额度置灰的内存表：进待机屏不整页重载，表会留到下一位。所以键要带这一份交接的编号
+  // （同一份公共文件、同参数，下一位不被上一位的额度挡住），只存摘要（不留文件签名链接），
+  // 值只许是码表给的那句红条。读、写、判三处都走同一个键。
   {
     const rel = 'apps/kiosk/src/pages/print/PrintConfirmPage.tsx'
     const page = read(rel)
-    const uses = page.match(/quotaHolds\.(get|set|has)\(([^,)]*)/g) ?? []
-    if (uses.length < 3) fail(`${rel}：额度置灰表的读、写、判不足三处（实际 ${uses.length}）`)
-    else if (uses.some((use) => !/\(quotaHoldId\(quoteKey$/.test(use))) fail(`${rel}：额度置灰表有一处没先过 quotaHoldId：${uses.join('；')}`)
-    else pass('额度置灰表只存报价键摘要，不留文件链接')
+    const uses = page.match(/quotaHolds\.(get|set|has)\([^)]*\)/g) ?? []
+    if (!/const quotaHoldKey = quotaHoldId\(`\$\{handoff\?\.contextId \?\? ''\}\|\$\{quoteKey\}`\)/.test(page)) fail(`${rel}：置灰键没按「交接编号 + 报价键」取摘要`)
+    else if (uses.length < 3) fail(`${rel}：额度置灰表的读、写、判不足三处（实际 ${uses.length}）`)
+    else if (uses.some((use) => !/^quotaHolds\.(get|has)\(quotaHoldKey\)$|^quotaHolds\.set\(quotaHoldKey, message\)$/.test(use))) fail(`${rel}：额度置灰表有一处没走 quotaHoldKey 或存了别的值：${uses.join('；')}`)
+    else if (!/const message = userMessageOf\(err, /.test(page)) fail(`${rel}：写进置灰表的值不是码表那句红条`)
+    else pass('额度置灰表按交接编号加报价键存摘要，值只是那句红条')
   }
   // 无效、过期、不属于这台机器三种仍是同一句（防试探），句尾有回手机的路。
   for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {

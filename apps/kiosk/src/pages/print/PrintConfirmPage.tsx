@@ -108,11 +108,12 @@ function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams):
 const QUOTA_ORDER_CODES = new Set(['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED'])
 
 /**
- * 现场建单撞上当天额度后，主按钮按报价键置灰，红条原文跟键记在一起。
+ * 现场建单撞上当天额度后，主按钮按「这一份交接 + 报价键」置灰，红条原文跟键记在一起。
  * 记在模块内存，不进 sessionStorage / localStorage：返回修改会卸载本页，组件 state 留不住红条；
  * 同一组参数再进来键还在，所以仍灰、红条也还在。参数一变 quoteKey 对不上，按钮亮、红条收起。
  * 刷新或关页即忘。只存这两句已有红条，不加新字。
- * 键只存报价键的摘要：报价键里带着这一位的文件签名链接，进待机屏不整页重载，表会留到下一位。
+ * 进待机屏不整页重载，表会留到下一位，所以：键里带交接编号（每次选文件、每位用户都不同），
+ * 同一份公共文件、同一组参数，下一位来打不会被上一位的额度挡住；键只存摘要，不留文件签名链接。
  */
 const quotaHolds = new Map<string, string>()
 
@@ -191,7 +192,8 @@ export function PrintConfirmPage() {
   // 报价只对「最终出纸文件 + 这组参数」有效：键一变，旧报价与迟到的响应都不算数。
   const quoteKey = quoteKeyOf(mergedFileUrl ?? file.fileUrl, params)
   // 同一组参数的额度红条。键对不上就是 null：按钮亮，下面也不再拿旧的额度句当红条。
-  const quotaHold = quotaHolds.get(quotaHoldId(quoteKey)) ?? null
+  const quotaHoldKey = quotaHoldId(`${handoff?.contextId ?? ''}|${quoteKey}`)
+  const quotaHold = quotaHolds.get(quotaHoldKey) ?? null
   const [quoteState, setQuoteState] = useState<{ key: string; view: QuoteView } | null>(null)
   const quote = useMemo<QuoteView>(
     () => (API_MODE !== 'http' ? { status: 'demo' } : quoteState?.key === quoteKey ? quoteState.view : { status: 'loading' }),
@@ -377,7 +379,7 @@ export function PrintConfirmPage() {
 
   const handleConfirm = async () => {
     // 这一组参数已经撞上当天额度：点不到，也不许先把红条清掉再发请求。
-    if (quotaHolds.has(quotaHoldId(quoteKey))) return
+    if (quotaHolds.has(quotaHoldKey)) return
     if (terminalSession === 'checking') return
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
@@ -496,7 +498,7 @@ export function PrintConfirmPage() {
         } else {
           const message = userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`)
           const code = errorCodeOf(err)
-          if (code && QUOTA_ORDER_CODES.has(code)) quotaHolds.set(quotaHoldId(quoteKey), message)
+          if (code && QUOTA_ORDER_CODES.has(code)) quotaHolds.set(quotaHoldKey, message)
           setSubmitError(message)
         }
       } finally {

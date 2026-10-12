@@ -572,7 +572,7 @@ const PRICE_CONFIG_JSON = {
   ],
 }
 
-test('daily quota blocks the same quote and keeps the alert through a refresh @kiosk', async ({ page, api }) => {
+test('daily quota blocks the same quote and keeps the alert through a re-quote and a return @kiosk', async ({ page, api }) => {
   registerShell(api, [])
   registerHomeLists(api)
   let releasePrice = () => undefined
@@ -626,7 +626,8 @@ test('daily quota blocks the same quote and keeps the alert through a refresh @k
     await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
 
     await leaveConfirmAndReturn(page)
-    // 报价还在重取：主按钮照旧是本来就灰的「获取报价后可继续」，不提前换成付款字样；红条一直在。
+    // 报价还在重取：红条一直在（条件①）；主按钮照旧是本来就灰的「获取报价后可继续」，不提前换成付款字样。
+    // 等待按钮本来就灰，这里只钉「不换字」；额度置灰的证据在报价回来之后那几行。
     await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
     await expect(page.getByRole('button', { name: '获取报价后可继续', exact: true })).toBeDisabled()
     await expect(payButton(page)).toHaveCount(0)
@@ -700,4 +701,36 @@ test('a non-quota create failure keeps the confirm button enabled @kiosk', async
   await payButton(page).click()
   await expect.poll(() => jobs).toBe(2)
   await expect(payButton(page)).toBeEnabled()
+})
+
+test('the next handoff with the same file and params is not blocked by the previous quota @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerHomeLists(api)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  let jobs = 0
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    jobs += 1
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 1 面' } }),
+    })
+  })
+
+  await openConfirm(page)
+  await payButton(page).click()
+  await expect(payButton(page)).toBeDisabled()
+  await expect(confirmAlert(page)).toHaveText(MEMBER_QUOTA_COPY)
+
+  // 下一位：同一份文件、同一组参数，但是新的一份交接（换了编号）。页面没重载，模块内存里上一位的记录还在。
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null, contextId: 'w2ctx-000000000002' })
+  await leaveConfirmAndReturn(page)
+  await expect(payButton(page)).toBeEnabled()
+  await expect(page.getByText(MEMBER_QUOTA_COPY)).toHaveCount(0)
+  await payButton(page).click()
+  await expect.poll(() => jobs).toBe(2)
 })
