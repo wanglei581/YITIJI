@@ -674,6 +674,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
+          # 打印失败告警在同一台之后打成功、且没有钱要退时自己消失（真机「假卡纸」）。单独一条，不挂在 admin-ops 后面（大屏快照门禁 1m 钉着 admin-ops 的脚本）。
+          pnpm --filter @ai-job-print/api verify:print-failed-alert-recovery
           # 给人看的时间按北京时间（W-78）。不连库。
           pnpm --filter @ai-job-print/api verify:beijing-display-time
           pnpm --filter @ai-job-print/api verify:console-screen-snapshot

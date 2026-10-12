@@ -18143,6 +18143,7 @@
         "usedBy": [
           "services/api/src/admin-ops/admin-ops.service.ts",
           "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/admin-ops/print-failed-recovery.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/console-screen/console-screen.fleet.ts",
@@ -24204,7 +24205,8 @@
       "services/api/scripts/verify-admin-ops.ts"
     ],
     "services/api/src/admin-ops/admin-alert-push.service.ts": [
-      "services/api/scripts/verify-alert-push.cjs"
+      "services/api/scripts/verify-alert-push.cjs",
+      "services/api/scripts/verify-print-failed-alert-recovery.ts"
     ],
     "services/api/src/admin-ops/admin-ops.controller.ts": [
       "services/api/scripts/verify-admin-ops.ts"
@@ -24224,6 +24226,7 @@
       "services/api/scripts/verify-admin-ops.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-print-failed-alert-recovery.ts",
       "services/api/scripts/verify-queue-dispatch-printer-status.ts"
     ],
     "services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts": [
@@ -25632,6 +25635,7 @@
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
+      "services/api/scripts/verify-print-failed-alert-recovery.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-recruitment-content-http.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts",
@@ -27600,6 +27604,7 @@
       "services/api/scripts/verify-policy-eligibility.ts",
       "services/api/scripts/verify-pricing.ts",
       "services/api/scripts/verify-print-color-duplex-capability.ts",
+      "services/api/scripts/verify-print-failed-alert-recovery.ts",
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-public-fair-demo-guard.ts",
@@ -41586,6 +41591,27 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:print-conversion"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/admin-ops/admin-alert-push.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-print-failed-alert-recovery.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:print-failed-alert-recovery"
       ],
       "wired": true
     },
