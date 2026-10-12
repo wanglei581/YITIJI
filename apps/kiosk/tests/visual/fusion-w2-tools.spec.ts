@@ -182,7 +182,8 @@ test('conversion page phone QR panel does not squeeze the empty example and uses
     const size = await button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
     expect(size, `「${name}」字号`).toBeGreaterThanOrEqual(20)
   }
-  // 还没上传时「确认加入」不能点，样子要和旁边可点的按钮分得开（核查 10/12：原来一个样）。
+  // 还没上传时「确认加入」不能点，样子要和旁边可点的按钮分得开。共用按钮组件本来就会变淡；
+  // 这里守的是本页换装（.i2p-qr 改了边框和底色）不能把这个变淡盖掉。
   const confirm = panel.getByRole('button', { name: '确认加入待合并列表', exact: true })
   await expect(confirm).toBeDisabled()
   const opacity = await confirm.evaluate((el) => parseFloat(getComputedStyle(el).opacity))
