@@ -321,8 +321,8 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   const fileGone = '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单'
   const tooOld = '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。'
   const next = '明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。'
-  const terminalQuota = '这台机器今天的打印量已经用完，明天恢复。'
-  const memberQuota = '你今天的打印量已经用完，明天恢复。'
+  const terminalQuota = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+  const memberQuota = '你今天剩下的打印量不够打这一单，明天恢复。'
   const invalid = '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
   for (const [code, status, sentence, kind] of [
     ['PRINT_RETRY_FILE_UNAVAILABLE', 409, fileGone, 'closed'],

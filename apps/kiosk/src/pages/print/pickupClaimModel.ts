@@ -116,7 +116,8 @@ export const PICKUP_CLAIM_MESSAGES = (contact = peekSupportContact()): Readonly<
   PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  // 以下四个只在同码接着打时出现（pickup-code-resume.ts 走重打资格与当天额度）。2026-10-12 合规定字。
+  // 以下四个：文件失效、程序太旧只在同码接着打时出现（重打资格）；两种当天的量在第一次认领、放行和同码接着打时都会出现。
+  // 2026-10-12 合规定字。
   PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   // 后端那句写的是版本号和升级，是给我们自己看的，不上屏。
   PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',

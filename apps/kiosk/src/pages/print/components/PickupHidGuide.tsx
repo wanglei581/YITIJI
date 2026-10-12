@@ -352,7 +352,8 @@ export function PickupFailurePanel({
 
   // 终态码（已用过、已退款、文件失效……）：在这台机器上重输不会有别的结果，
   // 主操作给「回到首页」把屏让给下一位；输另一个码是次要出口。不出现「重试 / 重新输入同一个码」。
-  // 当天的量用完（quota）今天再输也一样，按钮同一组；它的屏头不是 closed 那一句（码明天还能用）。
+  // 当天的量不够（quota）今天再输也一样，主按钮同样回首页；它的屏头不是 closed 那一句（码明天还能用）。
+  // 次要出口给「求助」不给「输另一个到机码」：这台机器当天的量不够时，换一个 0 元单的码也一样被拒。
   if (failure === 'closed' || failure === 'quota') {
     return (
       <>
@@ -364,9 +365,15 @@ export function PickupFailurePanel({
           <button type="button" className="qx-btn pcp-act pcp-act--go" data-testid="arrival-code-primary" onClick={onHome}>
             回到首页
           </button>
-          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onReset}>
-            输另一个到机码
-          </button>
+          {failure === 'quota' ? (
+            <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onHelp}>
+              求助
+            </button>
+          ) : (
+            <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onReset}>
+              输另一个到机码
+            </button>
+          )}
         </div>
       </>
     )

@@ -44,10 +44,11 @@ export const AI_PUBLIC_QUOTA_EXCEEDED_COPY = '今天的 AI 次数用完了，明
 /**
  * 打印当天的量用完（429 `PRINT_TERMINAL_DAILY_QUOTA_REACHED` / `PRINT_MEMBER_DAILY_QUOTA_REACHED`）。
  * 按北京时间自然日算、0 点恢复，当天重试不会成功。合规 2026-10-12 定字：不出现「免费」、价格或购买。
+ * 后端判的是「今天已用 + 在途 + 这一单 > 上限」，不一定是用到零，所以说「剩下的不够打这一单」，不说「已经用完」。
  * 到机码页在这两句后面各接一句下一步（见 pickupClaimModel）。
  */
-export const PRINT_TERMINAL_DAILY_QUOTA_COPY = '这台机器今天的打印量已经用完，明天恢复。'
-export const PRINT_MEMBER_DAILY_QUOTA_COPY = '你今天的打印量已经用完，明天恢复。'
+export const PRINT_TERMINAL_DAILY_QUOTA_COPY = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+export const PRINT_MEMBER_DAILY_QUOTA_COPY = '你今天剩下的打印量不够打这一单，明天恢复。'
 
 const SHARED_USER_MESSAGES = (contact = peekSupportContact()): Readonly<Record<string, string>> => ({
   NETWORK_ERROR: '网络连接失败，请稍后重试',
