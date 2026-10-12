@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <!-- 青序流光 2.0 改动清单
+- 2026-10-12 产品负责人同意（方向草案第九节，总指挥四 10/12 转达）：证件照停放。能力卡去掉证件照横卡，「签名」改成占满第三行的横卡（第三行按横卡自身高度，前两行均分余高），八格变七张不留空格；「能力说明不存在」那一态只留复印一项（删去证件照的字，复印的字与运行页一致）；证件照说明态停放（函数留在文件里，不进状态表、不可达）。
 - 9/29 定稿：签名只保留本人手写签名，能力卡「签名盖章」改名「签名」（卡内说明「放入本人手写签名」、去处「带走：签好的 PDF」不变），一体机离线那一态说明里的「签名盖章」同改「签名」。能力键、路由、data-testid 不改。
 - 2026-09-28 用词复核（规则 4）：用户可见工程词和英文眉题改成人话。彩色、双面写本机暂未开通。版式和状态参数不动。
 - 2026-09-28 修重叠：带顶部提示的状态里，能力卡改成横排，把高度让给证件照横卡，不再压住「已下过单」标题。
@@ -19,8 +20,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>打印扫描 · 职易达</title>
 <!--
-  route: /print-scan（服务 Hub） + /print-scan/feature/:key（能力说明页，当前只有 key=id-photo）
-  state: capability-loading | default | capability-error | locked | device-off | feature-id-photo | feature-not-found
+  route: /print-scan（服务 Hub） + /print-scan/feature/:key（能力说明页；10/12 起证件照停放，旧地址回打印扫描首页）
+  state: capability-loading | default | capability-error | locked | device-off | feature-not-found（feature-id-photo 10/12 停放）
   api:  GET /api/v1/terminals/:terminalId/capabilities   —— 能力探测轴（匿名只读，只回 configured=true 的键）
         GET /api/v1/terminals/:terminalId/printer-status —— 一体机(MFP)轴，fail-closed：null / 心跳过期 / 请求失败一律不算在线
   两轴分治（对齐 apps/kiosk/src/pages/print-scan/printHubContent.ts 与 PrintScanHomePage.tsx:345-385）：
@@ -254,11 +255,16 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
    2. 带提示条的四个态（检查中 / 读取失败 / 被关掉 / 离线）：横排小卡定高 180，多出的高度分到提示条、01、02 三段之间。
    3. 证件照说明、能力说明不存在两态：不再把「开放后会做什么」「证件照说明」拉成空盒，按内容定高；
       两条替代路径和三个去处放大成主角，剩下的空白用 margin-top:auto 分到区块之间。 */
-.sec.grow .grid3{grid-template-rows:repeat(3,1fr)!important;align-content:stretch!important}
-.cap.wide{grid-column:2/-1}
+.sec.grow .grid3{grid-template-rows:1fr 1fr auto!important;align-content:stretch!important}
+.cap.wide{grid-column:1/-1}
 #body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow{flex:none;margin-top:auto!important;padding-top:20px}
 #body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow .grid3{flex:none;grid-template-rows:repeat(3,minmax(180px,auto))!important}
 #body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .cap:not(.wide){align-content:center}
+/* 10/12 证件照停放后第三行只剩签名横卡，余高再堆到区块之间会出现整行空白：四个带提示条的态里改由卡片区吃掉余高，
+   三行各自加高、内容居中（横卡同理），区块之间只留固定间距。 */
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow{flex:1 1 auto!important;margin-top:28px!important;padding-top:0}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.grow .grid3{flex:1 1 auto!important;grid-template-rows:repeat(3,minmax(180px,1fr))!important}
+#body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.last{margin-top:28px!important;padding-top:0}
 #body-root:is([data-state="device-off"],[data-state="capability-loading"],[data-state="capability-error"],[data-state="locked"]) .sec.last{margin-top:auto!important;padding-top:36px}
 #body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .sec{margin-top:auto!important;padding-top:20px}
 #body-root:is([data-state="feature-id-photo"],[data-state="feature-not-found"]) .sec.fill,
@@ -326,13 +332,12 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
     <a href="?state=capability-error" data-s="capability-error">capability-error</a>
     <a href="?state=locked" data-s="locked">locked</a>
     <a href="?state=device-off" data-s="device-off">device-off</a>
-    <a href="?state=feature-id-photo" data-s="feature-id-photo">feature-id-photo</a>
     <a href="?state=feature-not-found" data-s="feature-not-found">feature-not-found</a>
   </div>
 </div>
 <script>
 var SCREEN='print-hub';
-var STATES=['capability-loading','default','capability-error','locked','device-off','feature-id-photo','feature-not-found'];
+var STATES=['capability-loading','default','capability-error','locked','device-off','feature-not-found'];
 var ICO={
  phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M9 14.5l3 3 3-3"/><path d="M12 17.5v-6"/>',
  usb:'<path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8"/><rect x="5" y="8" width="14" height="12" rx="3"/><path d="M12 12v4"/>',
@@ -372,11 +377,9 @@ var CAPS=[
   d:'多张图片合成 PDF',foot:'带走：合并 PDF',
   href:'19-img2pdf.html',route:'/print-scan/convert',mfp:false},
  {key:'sign',capKey:'signature_stamp',n:'签名',ic:'sign',bg:'var(--clay-soft)',st:'#9e5330',
-  d:'放入本人手写签名',foot:'带走：签好的 PDF',
-  href:'20-sign-stamp.html',route:'/print-scan/sign',mfp:false},
- {key:'id-photo',capKey:'id_photo',n:'证件照',ic:'idcard',bg:'var(--wheat-soft)',st:'#8a6219',
-  d:'尚未开放，可查看说明',foot:'说明页 · 未开放',wide:true,
-  href:'10-print-hub.html?state=feature-id-photo',route:'/print-scan/feature/id-photo',mfp:false}
+  d:'放入本人手写签名',foot:'带走：签好的 PDF',wide:true,
+  href:'20-sign-stamp.html',route:'/print-scan/sign',mfp:false}
+ /* 证件照 10/12 停放：{key:'id-photo',capKey:'id_photo',n:'证件照',…,route:'/print-scan/feature/id-photo'} */
 ];
 /* CAPABILITY_STATUS_NOTES 逐字对齐运行时 */
 var NOTES={testing:'测试中，暂未对用户开放',maintenance:'维护中，暂时不可用',unsupported:'这台机器不支持这项功能',not_verified:'本机暂未开通'};
@@ -464,6 +467,7 @@ V['device-off']=function(){
   '<div class="state-h">'+svg('info','currentColor',28)+'打印扫描一体机离线 —— 要出纸的停了，其余照常</div>'+
   '<div class="state-p">这一条来自设备状态轮询的<b>确定离线</b>结果。手机扫码上传、格式转换、签名不经过这台打印机，照常可用。</div></div></section>');
 };
+/* 证件照说明态：10/12 停放，不在 STATES 里，页面上到不了；留着备将来重新打开。 */
 V['feature-id-photo']=function(){
  return '<section class="sec"><div class="state" data-kind="warn" data-testid="print-hub-idphoto-unavailable">'+
   '<div class="state-h">'+svg('idcard','currentColor',28)+'证件照：本机尚未开放</div>'+
@@ -491,13 +495,13 @@ V['feature-id-photo']=function(){
 V['feature-not-found']=function(){
  return '<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
   '<div class="state-h">'+svg('info','currentColor',28)+'没有这项能力说明</div>'+
-  '<div class="state-p">地址里带了一个本机<b>不认识的能力名称</b>。当前只有「证件照」一项有说明页。</div>'+
+  '<div class="state-p">地址里带了一个本机<b>不认识的能力名称</b>。当前只有「复印」一项有说明页。</div>'+
   '<div class="state-p">多半是旧二维码或旧链接。回打印扫描首页重新选一次即可。</div></div></section>'+
   '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">可以直接去的地方</span></div>'+quickLinks()+'</section>'+
-  '<section class="sec grow last"><div class="sec-label"><span class="no serif">02</span><span class="t">本机现在有哪些能力说明</span><span class="hint">只有证件照一项</span></div>'+
-  '<div class="blk" style="flex:1"><div class="state-h">'+svg('idcard','currentColor',28)+'证件照说明</div>'+
-  '<div class="state-p">目前只有证件照提供未开放说明和替代路径。其他陌生名称不会进入办理流程，请回打印扫描首页重新选择。</div>'+
-  '<div class="meta"><a class="chip press" href="10-print-hub.html?state=feature-id-photo" data-route="/print-scan/feature/id-photo">看证件照说明</a>'+
+  '<section class="sec grow last"><div class="sec-label"><span class="no serif">02</span><span class="t">本机现在有哪些能力说明</span><span class="hint">只有复印一项</span></div>'+
+  '<div class="blk" style="flex:1"><div class="state-h">'+svg('copy','currentColor',28)+'复印说明</div>'+
+  '<div class="state-p">复印有打印机面板的操作步骤。其他陌生名称不会进入办理流程，请回打印扫描首页重新选择。</div>'+
+  '<div class="meta"><a class="chip press" href="10-print-hub.html" data-route="/print-scan/feature/copy">看复印步骤</a>'+
   '<a class="chip press" href="10-print-hub.html" data-route="/print-scan">回打印扫描首页</a></div></div></section>'+
   '<div class="ctabar"><a class="btn ghost press" href="../kiosk-redesign-2026-08/06-help.html" data-route="/help">联系工作人员</a>'+
   '<a class="btn primary press" style="flex:1.6" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">返回打印扫描</a></div>';
