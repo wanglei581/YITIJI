@@ -18436,7 +18436,7 @@
         ]
       },
       {
-        "fieldCount": 16,
+        "fieldCount": 18,
         "name": "TerminalHeartbeat",
         "relations": [
           "Terminal"
@@ -23490,6 +23490,9 @@
     "services/api/prisma/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql": [
       "services/api/scripts/verify-free-print-quota.ts"
     ],
+    "services/api/prisma/migrations/20261012130000_heartbeat_print_result_basis/migration.sql": [
+      "services/api/scripts/verify-scan-input-lockout-telemetry.ts"
+    ],
     "services/api/prisma/postgres/migrations/20260701123000_add_toolbox_launch_events/migration.sql": [
       "services/api/scripts/verify-toolbox-launch-events.ts"
     ],
@@ -23538,6 +23541,9 @@
     ],
     "services/api/prisma/postgres/migrations/20261006120000_add_terminal_daily_free_print_sides/migration.sql": [
       "services/api/scripts/verify-free-print-quota.ts"
+    ],
+    "services/api/prisma/postgres/migrations/20261012130000_heartbeat_print_result_basis/migration.sql": [
+      "services/api/scripts/verify-scan-input-lockout-telemetry.ts"
     ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -43040,7 +43046,9 @@
         ],
         "files": [
           "services/api/prisma/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql",
+          "services/api/prisma/migrations/20261012130000_heartbeat_print_result_basis/migration.sql",
           "services/api/prisma/postgres/migrations/20260913210000_add_scan_input_lockout_telemetry/migration.sql",
+          "services/api/prisma/postgres/migrations/20261012130000_heartbeat_print_result_basis/migration.sql",
           "services/api/prisma/postgres/schema.prisma",
           "services/api/prisma/schema.prisma",
           "services/api/src/terminals/dto/heartbeat.dto.ts",

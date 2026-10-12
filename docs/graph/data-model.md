@@ -157,7 +157,7 @@ flowchart TD
 | **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCommand** | 13 | Terminal、User | 1 个文件<br/>`terminals/terminal-commands.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 16 | Terminal | 7 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
+| **TerminalHeartbeat** | 18 | Terminal | 7 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
