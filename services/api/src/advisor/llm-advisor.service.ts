@@ -11,6 +11,7 @@ import {
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
+import { DEVICE_FAULT_PROMPT_RULE } from '../ai/safety/device-fault'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
@@ -34,6 +35,7 @@ export const ADVISOR_QA_SYSTEM_PROMPT = withAiSafety(
   '\n3. 不替用户做投递或预约决定，不代收简历；岗位申请只能引导用户去来源平台。' +
   '\n4. 没有依据时必须明说「本机没有你所在行业的具体数据，这条算参考」，不要编出处。' +
   '\n5. sourceNote 要如实写清这条结论凭什么：是通行做法，还是基于用户自己说过的话。' +
+  `\n6. ${DEVICE_FAULT_PROMPT_RULE}` +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"answer":"回答正文（200 字以内，口语化，可分点）",' +
   '"evidenceLevel":"E1|E2|E3",' +

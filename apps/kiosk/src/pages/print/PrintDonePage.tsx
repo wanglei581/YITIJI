@@ -1,4 +1,4 @@
-import { peekSupportContact, helpNeededLine, machineCannotPrintLine, preferUnattended, printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { peekSupportContact, helpNeededLine, machineCannotPrintLine, preferUnattended, printProblemLine, refundApplyLine, resolveSupportContact } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -496,6 +496,7 @@ export function PrintDonePage() {
               canRetry={Boolean(takeaway?.canRetry) && !isUnconfirmed}
               resumeLine={Boolean(takeaway?.canRetry) && !isUnconfirmed && sameCodeResumeEligible(state.pickupSource, money.fact) ? SAME_CODE_RESUME_LINE : null}
               takeaway={takeawayNotices}
+              pickupSource={state.pickupSource === true}
             />
             <PrintAiHelp
               label="问小青：取纸或异常怎么办 →"
@@ -611,6 +612,8 @@ export function PrintDonePage() {
   // 成功态才到这里：loading / unknown / failed / feeInfo 均已 return。
   // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
   const hasEndUser = state.hasEndUser
+  // 小程序没发布时，这一条不把人往小程序引（后台「小程序已发布」开关，随公开联系信息下发；没取到按没发布）。
+  const miniappPublished = resolveSupportContact(contact).miniappPublished
 
   return (
     <QxPageFrame
@@ -693,8 +696,12 @@ export function PrintDonePage() {
               <span className="pff-inbar-ic"><SmartphoneIcon aria-hidden="true" /></span>
               <span>
                 {hasEndUser
-                  ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
-                  : <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>}
+                  ? miniappPublished
+                    ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
+                    : <>这单已经记在你的账号里<small>在这台机器的「我的 → 打印订单」就能看到</small></>
+                  : miniappPublished
+                    ? <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>
+                    : <>本次打印未关联账号<small>想留下订单记录，下次打印前可先登录</small></>}
               </span>
             </div>
           </div>
