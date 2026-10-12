@@ -9,6 +9,12 @@ const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
+// 第八次 8-7：持屏幕忙锁和来源页自己的 busy 分开，码到期不延长。
+assert.match(read('src/pages/upload/components/UploadSessionQrPanel.tsx'), /useBusyLock\(\(active && status\?\.status !== 'uploaded'\) \|\| loading \|\| confirming\)/, '8-7 面板独立持忙碌锁，文件已到不再顺延')
+assert.match(read('src/pages/print/PrintUploadPage.tsx'), /useBusyLock\([^\n]*phoneSession\.waiting\)/, '8-7 打印等待有效会话时持忙碌锁')
+assert.match(read('src/pages/upload/hooks/useUploadSession.ts'), /const waiting = Boolean\(enabled && qr && remainingSeconds > 0 && status\?\.status !== 'uploaded' && status\?\.status !== 'confirmed' && status\?\.status !== 'cancelled' && status\?\.status !== 'expired'\)/, '8-7 打印等待锁受真实到期和终态约束')
+console.log('PASS 8-7 两套上传等待锁及到期边界')
+
 const directRoutes = new Map([
   ['/print-scan', 'PrintScanHomePage'],
   ['/print-scan/feature/:key', 'PrintScanFeatureInfoPage'],
@@ -47,12 +53,13 @@ const frozenHashes = new Map([
   // 卸载时补报不忙。刷新仍先撤销旧会话，已上传时刷新按钮仍不可点。
   // 冻结契约不放宽，仍逐字节校验。卸载清理由 verify:resume-phone-upload-ui 断言。
   // 旧哈希 6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0。
+  // 2026-10-10 8-7 重新冻结：独立等待锁、到期提醒、真实卸载作废；新内容断言在哈希检查之前。
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
   [
     'src/pages/upload/components/UploadSessionQrPanel.tsx',
-    '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+    '68c6b0182a8b32fe68a2d37e0954d0a2f43f007c4a7ce2d3748cffbbdce94c40',
   ],
   [
     'src/pages/print/DevSandboxControls.tsx',

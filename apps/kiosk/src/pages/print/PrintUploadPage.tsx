@@ -283,7 +283,7 @@ export function PrintUploadPage() {
     onUploaded: handleQrUploaded,
   })
   const phone = phoneSession.snapshot
-  useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling)
+  useBusyLock(uploading || usbUploading || phone.loading || phone.confirming || phone.cancelling || phoneSession.waiting)
 
   const uploadLocalFile = useCallback(async (selected: File) => {
     if (isTerminalKiosk()) return
@@ -487,6 +487,7 @@ export function PrintUploadPage() {
       phone={phone}
       qrUrl={phoneSession.qrUrl}
       expiresLabel={phoneSession.expiresLabel}
+      waitRemainingSeconds={phoneSession.waiting && !phone.pendingName ? phoneSession.remainingSeconds : null}
       previewOpen={previewOpen}
       previewToken={getToken()}
       localRejectKind={localRejectKind}
