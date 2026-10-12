@@ -68,6 +68,12 @@ export function parseOfficialChannels(body: unknown): OfficialChannelsResponse {
   }
 }
 
+/**
+ * 读渠道最多等这么久。真机走查 F-23：请求挂住时页面一直「正在读取本终端的官方渠道」，
+ * 160 秒不变直到清场。超时就按「这次没有读取成功」处理，页面给现成的「重新读取」。
+ */
+export const OFFICIAL_CHANNELS_TIMEOUT_MS = 15_000
+
 export async function getOfficialChannels(terminalId: string): Promise<OfficialChannelsResponse> {
   // 本地 mock 模式没有后端：按「没有渠道」处理，不编渠道。
   if (API_MODE !== 'http') return emptyOfficialChannels()
@@ -77,10 +83,28 @@ export async function getOfficialChannels(terminalId: string): Promise<OfficialC
     `${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/official-channels`,
     window.location.origin,
   )
-  const res = await terminalProtectedFetch(url.toString(), {
+  // 计时把等本机会话就绪、发请求、读回包都算进去：卡在哪一段，到点都一样落到失败态。
+  const controller = new AbortController()
+  let timer: number | undefined
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = window.setTimeout(() => {
+      controller.abort()
+      reject(new ApiHttpError('REQUEST_TIMEOUT', 'official channels request timed out', 0))
+    }, OFFICIAL_CHANNELS_TIMEOUT_MS)
+  })
+  try {
+    return await Promise.race([readOfficialChannels(url.toString(), controller.signal), timedOut])
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
+async function readOfficialChannels(url: string, signal: AbortSignal): Promise<OfficialChannelsResponse> {
+  const res = await terminalProtectedFetch(url, {
     method: 'GET',
     headers: { Accept: 'application/json' },
     credentials: 'include',
+    signal,
   })
   if (!res.ok) {
     let code = 'UNKNOWN_ERROR'

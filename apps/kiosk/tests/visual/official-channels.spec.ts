@@ -371,6 +371,37 @@ test('loading: neutral, never claims "none configured" before the answer arrives
   expect(seen.every(Boolean), '答复之前既没出现卡片，也没说「暂未配置」').toBe(true)
 })
 
+// 真机走查 F-23：请求挂住时页面一直「正在读取」，直到清场。15 秒没回就落到现成的失败态，重新读取能用。
+test('a channels request that never answers falls back to the honest failure after 15 seconds @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  const never = deferred()
+  api.respondWith('GET', CHANNELS, async (requestNumber) => {
+    if (requestNumber === 1) await never.promise
+    return { status: 200, json: { items: ORG_CHANNELS, legacyPlatforms: [] } }
+  })
+  await page.clock.install()
+  await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'loading')
+
+  // 14 秒还在等：不提前下结论。
+  await page.clock.runFor(14_000)
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'loading')
+  await expect(page.getByText('暂未配置官方渠道')).toHaveCount(0)
+
+  // 过了 15 秒：照实说这次没读成功，不冒充「没有渠道」，不直出英文错误。
+  await page.clock.runFor(2_000)
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'error')
+  await expect(page.getByTestId('official-channels-error').locator('.qx-state-t')).toHaveText('官方渠道这次没有读取成功')
+  await expect(page.locator('.qx-pill')).toHaveText('渠道读取失败')
+  await expect(page.getByTestId('official-channels-empty')).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText('timed out')
+
+  await page.getByRole('button', { name: '重新读取', exact: true }).click()
+  await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
+  await expectChannelCards(page, 'org', ORG_SORTED)
+  never.resolve()
+})
+
 // ── 渠道页：b 版本的「其他来源平台」 ─────────────────────────────────────────
 
 test('version b: legacy platforms get a second section with the same cards @w1-kiosk', async ({ page, api }) => {
