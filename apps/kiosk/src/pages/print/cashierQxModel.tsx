@@ -182,7 +182,7 @@ export function copyFor(state: CashierQxState, c: CopyContext): StateCopy {
     case 'channel-failed':
       return {
         kind: 'error', icon: <AlertTriangleIcon aria-hidden="true" />, title: '支付方式加载失败',
-        paras: ['本次没有发起支付。请检查网络后重新读取支付通道。'],
+        paras: ['本次没有发起支付。请稍后重新读取支付通道。'],
         chips: [['bad', '加载失败'], [undefined, '尚未发起支付']],
         rows: [['通道请求', '失败'], ['本机是否发起支付', '否']],
         ask: [<>支付通道<em>没读到</em>。</>, '读不到就不出码。这个状态下本机没有发起任何支付。'],
