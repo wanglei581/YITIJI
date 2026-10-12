@@ -314,6 +314,13 @@ check(
 check(viewOnly.includes('usePrintPriceConfig()') && viewOnly.includes("unitCentsFor(price.config, 'black_white')") && viewOnly.includes("unitCentsFor(price.config, 'color')"), '首页复用真实打印价目，两种单价都要读取')
 check(viewOnly.includes("price.status === 'ready' && bwUnit !== null && colorUnit !== null") && viewOnly.includes('priceKnown && (bwUnit > 0 || colorUnit > 0)') && viewOnly.includes('priceKnown && bwUnit === 0 && colorUnit === 0'), '收费、免费与未知价目分开，不把缺价当成免费')
 check(viewOnly.includes("{paidPrint ? ' · 收费以现场公示为准' : ''}") && viewOnly.includes("freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'"), '0 元与未知价目不显示价格、报价或收费说明')
-check(viewOnly.includes('这台机器上没有待继续的办理') && viewOnly.includes('{continueSlot}'), '保留清场说明（W-42）与真实续办卡')
+// 2026-10-12：上下文区拆到 HomeContextRegion（首页视图要守 320 行，不许靠把语句挤到一行过关）。
+// 断言跟着搬过去：首页视图必须把真实续办卡交给它，它必须同时画续办卡和清场说明。
+const contextRegion = read('src/pages/home/components/HomeContextRegion.tsx')
+check(
+  viewOnly.includes('<HomeContextRegion continueSlot={continueSlot}')
+    && contextRegion.includes('这台机器上没有待继续的办理') && contextRegion.includes('{continueSlot}'),
+  '保留清场说明（W-42）与真实续办卡',
+)
 
 console.log('\nALL PASS — 青序流光首页视觉、动作、门控与响应式合同成立\n')

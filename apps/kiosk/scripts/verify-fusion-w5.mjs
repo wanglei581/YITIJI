@@ -162,13 +162,13 @@ const homeView = read('src/pages/home/components/QxHomeView.tsx')
 assert.match(homePage, /usePrintSessionBlocked\(/, '首页用上一次定下来的本机会话')
 assert.match(
   read('src/hooks/useTerminalSessionState.ts'),
-  /if \(session === 'ready' \|\| session === 'failed'\) settledPrintSession = session/,
+  /if \(next === 'ready' \|\| next === 'failed'\) settledPrintSession = next/,
   'checking 不改写已定下来的打印拦截，首页不再把 checking 当成没失败',
 )
 assert.doesNotMatch(homePage, /terminalSession === 'failed'/, '首页不再直接把 checking 当成没失败')
 assert.match(homePage, /这台机器现在下不了打印单/, '首页顶栏在本机会话 failed 时使用定句')
 assert.match(homeView, /printSessionFailed \? '这台机器现在下不了打印单'/, '首页打印入口在本机会话 failed 时使用同一句')
-assert.match(homeView, /home-session-recovery-notice/, '首页清场提示挂在现成提示条里')
+assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示挂在现成提示条里（上下文区 10/12 拆到 HomeContextRegion）')
 assert.match(read('src/hooks/useSessionRecoveryNotice.ts'), /刚才选的材料已经清掉，要重新传/, '首页清场提示使用定句')
 
 const notifications = read('src/pages/placeholders/NotificationsPage.tsx')

@@ -686,7 +686,7 @@ assert.equal(
 assert.match(printUploadPage, /usePrintSessionBlocked\(/, '选文件页用上一次定下来的本机会话')
 assert.match(
   read('src/hooks/useTerminalSessionState.ts'),
-  /if \(session === 'ready' \|\| session === 'failed'\) settledPrintSession = session/,
+  /if \(next === 'ready' \|\| next === 'failed'\) settledPrintSession = next/,
   'checking 不改写已定下来的打印拦截',
 )
 assert.match(
@@ -722,7 +722,7 @@ assert.match(printUploadView, /recoveryNotice/, '选文件页能挂上换票清�
 assert.match(printUploadView, /file-source-recovery-notice/, '选文件页清场提示有稳定锚点')
 const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
 assert.match(recoveryNoticeHook, /刚才选的材料已经清掉，要重新传/, '换票清场提示使用定句')
-assert.match(read('src/pages/home/components/QxHomeView.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点')
+assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点（上下文区 10/12 拆到 HomeContextRegion）')
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
