@@ -19673,6 +19673,7 @@
       "apps/kiosk/scripts/verify-kiosk-session-reporting.mjs"
     ],
     "apps/kiosk/src/components/FileContentPreview.tsx": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
@@ -21408,6 +21409,9 @@
     "apps/kiosk/src/pages/resume/components/resume-deliver/ResumePricingBar.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
@@ -21907,6 +21911,7 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/documentConversion.ts": [
+      "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
     "apps/kiosk/src/services/api/fairVisitPlan.ts": [
@@ -29380,6 +29385,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
@@ -29389,6 +29395,8 @@
           "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/ResumeVersionsPanel.tsx",
+          "apps/kiosk/src/services/api/documentConversion.ts",
           "packages/shared/src/types/ai.ts",
           "packages/shared/src/types/fairDto.ts",
           "packages/shared/src/types/file.ts",
