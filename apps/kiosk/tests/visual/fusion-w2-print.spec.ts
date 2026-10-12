@@ -3439,6 +3439,8 @@ test('print-only notice on home dismisses on the next touch and stays gone on th
   await page.locator('[data-action="print-hub"]').click()
   await expect(page).toHaveURL(/\/print-scan$/)
   await softNavigate(page, '/print/upload?source=document', null)
+  // 先等选文件页画出来再数：没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
   await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })
@@ -3459,8 +3461,11 @@ test('print-only notice on the upload page dismisses on the next touch without s
   // 这次触屏没有把按钮吃掉：退出键仍会离开本页。source=document 的出口是首页。
   await page.getByTestId('file-source-exit').click()
   await expect(page).toHaveURL((url) => url.pathname === '/')
+  // 先等页面画出来再数：没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('qx-home')).toBeVisible()
   await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
   await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
   await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })
@@ -3579,6 +3584,8 @@ test('the tap that folds sentence 4 still lands on the button under it @w2', asy
   // 第一下就点句子下面的按钮。句子一收整页上挪；要是按下就收，抬手时手指底下已经换了东西，这一下会点空。
   await page.getByRole('button', { name: '重新选文件', exact: true }).click()
   await expect(page).toHaveURL(/\/print\/upload\?source=document$/)
+  // 这一下也把句子收了：先等选文件页画出来再数，没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
   await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
   expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })
