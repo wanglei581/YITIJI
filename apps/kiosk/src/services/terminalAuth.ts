@@ -258,13 +258,15 @@ async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
   let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
-  let sawInvalid = false
+  let invalidToken: string | null = null
   // 带引导票打开而没换成的页不拿旧会话票续期，直接走下面「要新引导票」那条路（换票即清场）。
   for (const delay of bootExchangeUnsettled ? [] : [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
       await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
     }
+    // 这一次续期带的就是这张票（refreshOnce 同步读当前票，中间没有 await）。
+    const attemptToken = token()
     try {
       const remainingMs = startedAt + RETRY_WINDOW_MS - Date.now()
       if (remainingMs <= 0) break
@@ -274,15 +276,16 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
-      if (sessionInvalid(error)) sawInvalid = true
+      if (sessionInvalid(error)) invalidToken = attemptToken
       if (!transient(error)) break
     }
   }
-  // 这一张票服务端已经明确作废。记下来之后，「要换新票」立刻为真，后台也不再拿它续一次。
+  // 服务端明确作废的那一张票记下来：「要换新票」立刻为真，后台也不再拿它续一次。
+  // 只记收到作废的那一张，而且它还是当前票才记——续期在途时初始化可能已换上新票，不能把新票记成作废。
   // 空转的那条初始错误（带引导票没换成、循环一次都没跑）不算，那种页本来就不续旧票。
-  if (sawInvalid) {
-    const current = token()
-    if (current) touchRecoveryView(() => { rejectedSessionToken = current })
+  if (invalidToken && token() === invalidToken) {
+    const rejected = invalidToken
+    touchRecoveryView(() => { rejectedSessionToken = rejected })
   }
   // 刷新走不通了（票被吊销 / 过期，或暂时连不上）。在放弃之前，向本机 Agent 要一张新引导票
   // 重新建会话 —— 这是看门狗重启浏览器时走的同一条路，页面自己走一遍就不必等浏览器重启。
@@ -468,7 +471,7 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
 
 export function terminalSessionState(): TerminalSessionState { return state }
 
-/** 现在压着没恢复：要换新票才能恢复，但这台机器上还有这一位的别的内容，所以在等他结束使用。只在 failed 时为真。 */
+/** 压着没恢复：上一轮要换新票、但还有这一位的别的内容，停住等他结束使用。只在 failed 时为真；不实时读清单，内容变了下一轮（60–75 秒）才跟着变。 */
 export function terminalSessionRecoveryDeferred(): boolean {
   return state === 'failed' && recoveryDeferred
 }

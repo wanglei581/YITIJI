@@ -1,5 +1,6 @@
 /**
- * 本机会话测试的装载工具。从 terminal-session-background-recovery.test.mjs 原样搬出。
+ * 本机会话测试的装载工具。从 terminal-session-background-recovery.test.mjs 搬出，原有部分行为不变；
+ * 另加了两个参数 scope、mockToken（见下）。
  * 时钟和定时器由测试推着走；node 装不起来的依赖换成替身。
  *
  * scope：不传时替身恒回 'print-only'（不推迟，清场范围仍能和「没记过」区分开）。

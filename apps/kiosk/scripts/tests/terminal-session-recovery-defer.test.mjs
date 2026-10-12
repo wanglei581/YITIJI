@@ -18,6 +18,7 @@ import {
   invalid,
   session,
   agentTicket,
+  flush,
 } from './helpers/terminal-session-harness.mjs'
 
 const realDateNow = Date.now
@@ -247,8 +248,8 @@ test('网址票没换成后向 Agent 要票，清单 with-other：照旧换票�
   assert.equal(page.mod.takeTerminalSessionRecoveryClearScope(), 'none')
 })
 
-for (const outage of ['503', 'timeout']) {
-  test(`服务器暂时回不来（${outage === 'timeout' ? '续期超时' : '续期 503'}）：不要新票、不压着，回来后拿原票续上`, async () => {
+for (const outage of ['503', 'network']) {
+  test(`服务器暂时回不来（${outage === 'network' ? '断网，fetch 抛错' : '续期 503'}）：不要新票、不压着，回来后拿原票续上`, async () => {
     let serverUp = true
     const page = await load({
       pageUrl: PLAIN_PAGE,
@@ -256,7 +257,7 @@ for (const outage of ['503', 'timeout']) {
       storedToken: STORED,
       scope: () => 'none',
       respond: (kind, nth) => {
-        if (!serverUp) return outage === 'timeout' ? 'network' : gateway(503)
+        if (!serverUp) return outage === 'network' ? 'network' : gateway(503)
         return kind === 'agent' ? agentTicket() : session(`session-${kind}-${nth}`)
       },
     })
@@ -313,6 +314,84 @@ test('服务器暂时回不来、清单 with-other：不取票，也不标压着
   assert.equal(page.clears(), 0, '拿原票续上，不清场')
   assert.equal(page.counts.agent, agents)
   assert.equal(page.mod.terminalSessionRecoveryDeferred(), false)
+})
+
+test('续期回 401 时票已经被别的路换掉：只记收到作废的那一张，不把新票记成作废', async () => {
+  let arm = false
+  let releaseRefresh = null
+  const page = await load({
+    pageUrl: PLAIN_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    storedToken: STORED,
+    scope: () => (arm ? 'with-other' : 'none'),
+    respond: (kind, nth) => {
+      if (kind === 'agent') return agentTicket()
+      // 武装后的第一次续期：应答按住，由用例决定什么时候回 401。之后的续期照常续上。
+      if (arm && kind === 'refresh' && !releaseRefresh) return new Promise((resolve) => { releaseRefresh = () => resolve(invalid()) })
+      return session(`session-${kind}-${nth}`)
+    },
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  arm = true
+  await page.advance(10 * MINUTE)
+  assert.equal(typeof releaseRefresh, 'function', '十分钟续期发出去了')
+  // 续期在途时，别的路（比如初始化换成了网址票）已经写上一张新票。
+  page.storage.setItem(TOKEN_KEY, 'replaced-while-refreshing')
+  releaseRefresh()
+  await flush()
+  await page.advance(0)
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.equal(page.mod.terminalSessionRecoveryNeedsNewTicket(), false, '作废的是旧票，新票不该被记成作废')
+  assert.equal(page.mod.terminalSessionRecoveryDeferred(), false)
+  assert.equal(page.counts.agent, 0, '不该为一张有效的票去要新引导票')
+  await page.advance(MINUTE)
+  assert.equal(page.mod.terminalSessionState(), 'ready', '下一轮拿这张新票续上')
+  assert.equal(page.clears(), 0, '全程不清场')
+})
+
+test('并发重建后回到 ready 会清掉留下的「压着」：之后只是暂时连不上时不误报', async () => {
+  let agentUp = false
+  let scope = 'none'
+  let serverDown = false
+  const agentGates = []
+  const page = await load({
+    pageUrl: PLAIN_PAGE,
+    bridgeToken: BRIDGE_TOKEN,
+    scope: () => scope,
+    respond: (kind, nth) => {
+      if (kind === 'business') return json(200, {})
+      if (kind === 'agent') {
+        if (!agentUp) return 'network'
+        return new Promise((resolve) => { agentGates.push(() => resolve(agentTicket())) })
+      }
+      if (serverDown) return gateway(503)
+      return session(`session-${kind}-${nth}`)
+    },
+  })
+  await page.settle(page.mod.initializeTerminalSession())
+  assert.equal(page.mod.terminalSessionState(), 'failed', '开机时本机 Agent 不在，没换成')
+  agentUp = true
+  await page.advance(MINUTE) // 后台恢复：清单 none，过了取票前判断，向本机要票，应答按住
+  assert.equal(agentGates.length, 1)
+  scope = 'with-other'
+  const init = page.mod.initializeTerminalSession() // 身份恢复回调再初始化：没有票、又有别的内容 → 压着
+  await flush()
+  await page.advance(0)
+  assert.equal(agentGates.length, 1, '压着的那一路不取票')
+  scope = 'none' // 人把那份东西删了
+  agentGates[0]() // 先前那一路取到票：换票前清单是 none，换成、清场、回到 ready
+  await page.settle(init)
+  await page.advance(0)
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  // 回到 ready 之后服务器暂时回不来，这时又有别的内容：原票还在、没被判作废，不该读到「压着」。
+  serverDown = true
+  scope = 'with-other'
+  await page.advance(10 * MINUTE)
+  await page.advance(MINUTE)
+  assert.equal(page.mod.terminalSessionState(), 'failed')
+  assert.equal(page.mod.terminalSessionRecoveryNeedsNewTicket(), false)
+  assert.equal(page.mod.terminalSessionRecoveryDeferred(), false, '并发那一轮留下的「压着」回到 ready 时就该清掉')
 })
 
 test('带引导票没换成、标签页里没有票：要换新票', async () => {
