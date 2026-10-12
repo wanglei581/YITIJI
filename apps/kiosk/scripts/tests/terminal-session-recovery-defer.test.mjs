@@ -110,6 +110,25 @@ test('后台恢复、原票被判作废、清单 print-only：当轮取票换票
   assert.equal(page.mod.takeTerminalSessionRecoveryClearScope(), 'none')
 })
 
+test('清掉了什么要在清场之前判：清完清单就空了，照样报 print-only', async () => {
+  let phase = 'settle'
+  let clearsAtStart = Infinity
+  let pageRef = null
+  // 替身照真实清单的样子：清场一发生就是空的。清场之后才判的话只会读到 none。
+  const { page, revoke } = await readyThenOutage(() => {
+    if (phase !== 'print') return 'none'
+    return pageRef.clears() > clearsAtStart ? 'none' : 'print-only'
+  })
+  pageRef = page
+  revoke()
+  clearsAtStart = page.clears()
+  phase = 'print'
+  await page.advance(MINUTE)
+  assert.equal(page.mod.terminalSessionState(), 'ready')
+  assert.equal(page.clears(), clearsAtStart + 1)
+  assert.equal(page.mod.takeTerminalSessionRecoveryClearScope(), 'print-only')
+})
+
 test('十分钟续期回 401 作废、清单 with-other：当场不取票，后台第一轮不再续这张票', async () => {
   let arm = false
   const page = await load({
