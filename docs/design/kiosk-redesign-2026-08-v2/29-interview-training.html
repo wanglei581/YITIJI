@@ -785,7 +785,7 @@ function reportsError(){
   mark('reports-error');
   base('历史报告暂时<em>没有加载完成</em>。','网络或服务异常时，不能把上一次展示内容当成当前结果，也不能清空后假装删除成功。');
   body.innerHTML='<section class="card empty tight bad"><div><div class="e">!</div><h2>暂时无法加载练习报告</h2>'
-    +'<p>请检查网络后重试。没有拿到本人列表时，不显示任何固定历史、报告评分或删除结果。</p></div></section>'
+    +'<p>请稍后重试。没有拿到本人列表时，不显示任何固定历史、报告评分或删除结果。</p></div></section>'
     +statusbar('加载失败后的状态',[['本人列表','未返回','off'],['已有记录','未被清空','ok'],['删除结果','未确认']])
     +'<section class="card"><div class="head"><b>这次失败没有改动什么</b><span>两条事实</span></div>'
     +'<div class="fields"><div class="field"><small>本人记录</small><b>未被改动</b></div>'
