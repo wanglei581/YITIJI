@@ -132,13 +132,15 @@ async function fulfillFixtureImage(page: Page): Promise<void> {
 test('conversion page phone QR panel does not squeeze the empty example and uses touch-size buttons @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
+  // 二维码按真实情况 10 分钟有效，屏上倒计时才像样。
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
   api.respond('POST', '/api/v1/upload-sessions', {
     status: 200,
-    json: { success: true, data: { sessionId: 'w2-convert-qr', uploadUrl: '/upload/phone', uploadToken: 'w2-convert-qr-token', controlToken: 'w2-convert-qr-control', expiresAt: '2099-01-01T00:00:00.000Z' } },
+    json: { success: true, data: { sessionId: 'w2-convert-qr', uploadUrl: '/upload/phone', uploadToken: 'w2-convert-qr-token', controlToken: 'w2-convert-qr-control', expiresAt } },
   })
   api.respond('GET', '/api/v1/upload-sessions/w2-convert-qr', {
     status: 200,
-    json: { success: true, data: { sessionId: 'w2-convert-qr', status: 'pending', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: true, expiresAt: '2099-01-01T00:00:00.000Z' } },
+    json: { success: true, data: { sessionId: 'w2-convert-qr', status: 'pending', purpose: 'print_doc', mode: 'temporary', file: null, requiresKioskConfirmation: true, expiresAt } },
   })
 
   await page.goto('/print-scan/convert')
