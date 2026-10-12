@@ -491,6 +491,8 @@
   border: 1.5px solid var(--qx-line-2); background: var(--qx-paper); color: var(--qx-ink-2);
 }
 .i2p-qr .flex-wrap > button:last-child:not(:disabled) { border-color: var(--qx-teal); background: var(--qx-teal); color: var(--qx-on-solid); }
+/* 还不能点的按钮（没上传前的「确认加入」、处理中的几个）要一眼看出不能点，不和旁边可点的描边按钮一个样。 */
+.i2p-qr .flex-wrap > button:disabled { opacity: .45; border-style: dashed; cursor: not-allowed; }
 .i2p-qr .bg-error-bg { border-radius: 14px; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); font-size: var(--qx-fs-aux); }
 .i2p-qr .bg-success-bg { border-radius: 14px; background: var(--qx-teal-soft); color: var(--qx-teal-d); font-size: var(--qx-fs-aux); }
 

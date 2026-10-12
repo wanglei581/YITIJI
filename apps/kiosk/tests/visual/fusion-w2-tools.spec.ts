@@ -182,6 +182,13 @@ test('conversion page phone QR panel does not squeeze the empty example and uses
     const size = await button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
     expect(size, `「${name}」字号`).toBeGreaterThanOrEqual(20)
   }
+  // 还没上传时「确认加入」不能点，样子要和旁边可点的按钮分得开（核查 10/12：原来一个样）。
+  const confirm = panel.getByRole('button', { name: '确认加入待合并列表', exact: true })
+  await expect(confirm).toBeDisabled()
+  const opacity = await confirm.evaluate((el) => parseFloat(getComputedStyle(el).opacity))
+  const refreshOpacity = await panel.getByRole('button', { name: '刷新二维码', exact: true }).evaluate((el) => parseFloat(getComputedStyle(el).opacity))
+  expect(opacity, '不可点的按钮要明显变淡').toBeLessThan(refreshOpacity)
+
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 
