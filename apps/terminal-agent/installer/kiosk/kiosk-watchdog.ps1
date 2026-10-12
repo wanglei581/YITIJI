@@ -3,7 +3,8 @@
 # Runs in the interactive (auto-login) user session, started by the
 # "AIJobPrintKioskWatchdog" scheduled task at logon. It keeps exactly one
 # full-screen kiosk browser pointed at the terminal site:
-#   - starts Edge (preferred) or Chrome in --kiosk mode with a dedicated profile
+#   - starts Edge in --kiosk mode with a dedicated profile (Chrome only when -Browser chrome
+#     is given, and then with --incognito)
 #   - restarts it when the process exits or crashes, with backoff
 #   - gets only a one-minute boot ticket from the loopback Agent; it never reads Agent credentials
 #
@@ -57,11 +58,37 @@ function Resolve-KioskBrowser([string]$Preference) {
   switch ($Preference) {
     "edge" { $candidates = $edge }
     "chrome" { $candidates = $chrome }
-    default { $candidates = $edge + $chrome }
+    # auto only accepts Edge. Edge's --kiosk with --edge-kiosk-type=fullscreen runs an InPrivate
+    # session; Chrome's --kiosk is not private, and --user-data-dir below is a fixed directory, so
+    # phone numbers and e-mail addresses one person typed would be saved to disk and offered to the
+    # next person. Never switch silently to a browser path nobody has verified on a kiosk: without
+    # Edge the watchdog stops and says so. Chrome must be chosen explicitly (-Browser chrome) and
+    # is then started with --incognito (see Start-KioskBrowser).
+    default { $candidates = $edge }
   }
   foreach ($candidate in $candidates) {
     if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
       return $candidate
+    }
+  }
+  if ($Preference -ne "chrome") {
+    # Edge installed somewhere else: ask Windows where msedge.exe is registered before giving up.
+    # Only the two machine-wide keys: a per-user key can be written without admin rights.
+    foreach ($key in @(
+      "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe",
+      "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+    )) {
+      if (-not (Test-Path -LiteralPath $key)) { continue }
+      try {
+        $registered = [string](Get-ItemProperty -LiteralPath $key -ErrorAction Stop).'(default)'
+        $registered = $registered.Trim().Trim('"')
+        if ($registered -and [System.IO.Path]::GetFileName($registered) -ieq "msedge.exe" -and (Test-Path -LiteralPath $registered -PathType Leaf)) {
+          return $registered
+        }
+        Write-Log "App Paths entry is not a usable msedge.exe ($key): $registered"
+      } catch {
+        Write-Log "App Paths entry could not be read ($key): $($_.Exception.Message)"
+      }
     }
   }
   return $null
@@ -143,6 +170,18 @@ function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
     "--user-data-dir=$profileRoot",
     $kioskMarker
   )
+  if ([System.IO.Path]::GetFileName($Executable) -ieq "chrome.exe") {
+    # Chrome's --kiosk is not private: without this, form history is written under --user-data-dir.
+    # A policy that turns incognito off makes Chrome ignore --incognito silently, so refuse instead.
+    foreach ($policyKey in @("HKLM:\SOFTWARE\Policies\Google\Chrome", "HKCU:\SOFTWARE\Policies\Google\Chrome")) {
+      $availability = (Get-ItemProperty -LiteralPath $policyKey -Name IncognitoModeAvailability -ErrorAction SilentlyContinue).IncognitoModeAvailability
+      if ($availability -eq 1) {
+        Write-Log "Chrome incognito is disabled by policy ($policyKey); refusing to start a non-private kiosk browser"
+        throw "Chrome incognito is disabled by policy"
+      }
+    }
+    $arguments = @("--incognito") + $arguments
+  }
   $process = Start-Process -FilePath $Executable -ArgumentList $arguments -PassThru
   Write-Log "started kiosk browser pid=$($process.Id) exe=$Executable bootTicket=$($LaunchUrl -ne $Url)"
   return $process
@@ -150,7 +189,11 @@ function Start-KioskBrowser([string]$Executable, [string]$LaunchUrl) {
 
 $executable = Resolve-KioskBrowser -Preference $Browser
 if ($null -eq $executable) {
-  Write-Log "no supported browser found (Edge or Chrome); watchdog cannot start"
+  if ($Browser -eq "chrome") {
+    Write-Log "Chrome was requested (-Browser chrome) but chrome.exe was not found in the standard paths; watchdog cannot start"
+  } else {
+    Write-Log "Microsoft Edge not found (standard paths, machine App Paths); -Browser $Browser does not fall back to Chrome (Chrome --kiosk is not private); watchdog cannot start"
+  }
   throw "No supported kiosk browser installed"
 }
 
