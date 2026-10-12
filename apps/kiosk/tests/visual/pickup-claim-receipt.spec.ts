@@ -145,7 +145,7 @@ for (const scenario of [
     await expect(screen).not.toContainText('工作人员')
     await expect(page.getByTestId('arrival-code-primary')).toHaveText('回到首页')
     // 当天的量不够时换一个 0 元单的码也一样被拒，次要出口是求助；文件失效、程序太旧才给输另一个码。
-    await expect(page.getByRole('button', { name: scenario.state === 'arrival-code-state-failed' ? '求助' : '输另一个到机码' })).toBeVisible()
+    await expect(page.locator('.pcp-actions').getByRole('button', { name: scenario.state === 'arrival-code-state-failed' ? '求助' : '输另一个到机码', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '清除，重新输入' })).toHaveCount(0)
   })
 }
