@@ -200,3 +200,131 @@ test('failed boot-ticket exchange keeps the session still in use', async () => {
   assert.equal(mod.terminalSessionState(), 'failed')
   assert.equal(calls.length, 1)
 })
+
+const DECLARATION_KEY = 'ai-job-print:ai-declaration:v1'
+const RESUME_KEY = 'ai-job-print:current-ai-resume'
+const SCAN_KEY = 'ai-job-print:current-scan-workbench'
+const INTERVIEW_KEY = 'ai-job-print:current-interview-workbench'
+
+/** 真实的清单模块。清场和范围判断都走它，不另抄一份键表。 */
+async function loadSensitive() {
+  seed += 1
+  const session = memoryStorage()
+  const local = memoryStorage()
+  globalThis.window = {
+    sessionStorage: session,
+    localStorage: local,
+    setTimeout: (fn, ms) => {
+      const id = setTimeout(fn, ms)
+      if (typeof id === 'object' && id && typeof id.unref === 'function') id.unref()
+      return id
+    },
+    clearTimeout: (id) => clearTimeout(id),
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  globalThis.sessionStorage = session
+  globalThis.localStorage = local
+
+  const questionsStub = toDataUrl('export const SELF_ASSESSMENT_QUESTIONS_V1 = { dimensions: [] }\n')
+  const scanTypeStub = toDataUrl(`
+export function isScanType(value) {
+  return value === 'resume' || value === 'id' || value === 'document'
+}
+`)
+  const cleanupStub = toDataUrl('export function beginScanSessionCleanup() {}\n')
+  const interviewModelUrl = toDataUrl(`${transpile('src/pages/interview/interviewWorkbenchModel.ts')}\n// ${seed}\n`)
+  const scanModelUrl = toDataUrl(`${transpile('src/pages/scan/scanWorkbenchModel.ts')}\n// ${seed}\n`)
+  const leaf = (relativePath) => toDataUrl(`${transpile(relativePath)}\n// ${seed}\n`)
+  const selfAssessmentCode = `${transpile('src/pages/resume/selfAssessmentSession.ts')}\n// ${seed}\n`
+    .replaceAll("from '@ai-job-print/shared'", `from '${questionsStub}'`)
+  const scanSessionCode = `${transpile('src/pages/scan/scanWorkbenchSession.ts')}\n// ${seed}\n`
+    .replaceAll("from './scanWorkbench'", `from '${scanTypeStub}'`)
+    .replaceAll("from './scanWorkbenchModel'", `from '${scanModelUrl}'`)
+  const interviewCode = `${transpile('src/pages/interview/interviewWorkbenchSession.ts')}\n// ${seed}\n`
+    .replaceAll("from './interviewWorkbenchModel'", `from '${interviewModelUrl}'`)
+  const assistantDraftCode = transpile('src/services/assistantDraft.ts').replaceAll("from 'react'", `from '${import.meta.resolve('react')}'`)
+  const declarationVersions = toDataUrl(`${transpile('src/ai/aiDeclarationVersions.ts')}\n// ${seed}\n`)
+  const declarationSessionCode = `${transpile('src/ai/aiDeclarationSession.ts')}\n// ${seed}\n`
+    .replaceAll("from './aiDeclarationVersions'", `from '${declarationVersions}'`)
+  const contractUrl = leaf('src/pages/contract-review/contractReviewSession.ts')
+  const sensitiveCode = `${transpile('src/auth/kioskSensitiveSession.ts')}\n// ${seed}\n`
+    .replaceAll("from '../ai/aiDeclarationSession'", `from '${toDataUrl(declarationSessionCode)}'`)
+    .replaceAll("from '../ai/aiDeclarationVersions'", `from '${declarationVersions}'`)
+    .replaceAll("from '../pages/print/printMaterialSession'", `from '${leaf('src/pages/print/printMaterialSession.ts')}'`)
+    .replaceAll("from '../pages/resume/aiResumeSession'", `from '${leaf('src/pages/resume/aiResumeSession.ts')}'`)
+    .replaceAll("from '../services/resumeParseIntent'", `from '${leaf('src/services/resumeParseIntent.ts')}'`)
+    .replaceAll("from '../services/assistantDraft'", `from '${toDataUrl(assistantDraftCode)}'`)
+    .replaceAll("from '../pages/resume/jobMaterialDraft'", `from '${leaf('src/pages/resume/jobMaterialDraft.ts')}'`)
+    .replaceAll("from '../pages/resume/selfAssessmentSession'", `from '${toDataUrl(selfAssessmentCode)}'`)
+    .replaceAll("from '../pages/interview/interviewWorkbenchSession'", `from '${toDataUrl(interviewCode)}'`)
+    .replaceAll("from '../pages/scan/scanWorkbenchSession'", `from '${toDataUrl(scanSessionCode)}'`)
+    .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
+    .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
+    .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${contractUrl}'`)
+  const sensitive = await import(toDataUrl(sensitiveCode))
+  const contract = await import(contractUrl)
+  return { sensitive, contract, session, local }
+}
+
+test('真清场之后 AI 使用声明键也没了', async () => {
+  const { mod, session } = await loadTerminalAuth({ exchangeOk: true })
+  session.setItem(DECLARATION_KEY, '{"scopes":["age_14_plus"]}')
+  await mod.initializeTerminalSession()
+  assert.equal(session.getItem(DECLARATION_KEY), null)
+})
+
+test('kioskSensitiveSessionScope：什么都没有是 none', async () => {
+  const { sensitive } = await loadSensitive()
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'none')
+})
+
+test('kioskSensitiveSessionScope：只有打印材料是 print-only', async () => {
+  const { sensitive, session } = await loadSensitive()
+  session.setItem(PRINT_KEY, PRINT_VALUE)
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'print-only')
+})
+
+test('kioskSensitiveSessionScope：打印材料加 AI 声明仍是 print-only', async () => {
+  const { sensitive, session } = await loadSensitive()
+  session.setItem(PRINT_KEY, PRINT_VALUE)
+  session.setItem(DECLARATION_KEY, '{"scopes":["age_14_plus"]}')
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'print-only')
+})
+
+test('kioskSensitiveSessionScope：只有 AI 声明是 none', async () => {
+  const { sensitive, session } = await loadSensitive()
+  session.setItem(DECLARATION_KEY, '{"scopes":["age_14_plus"]}')
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'none')
+})
+
+for (const [key, label] of [[RESUME_KEY, '简历'], [SCAN_KEY, '扫描'], [INTERVIEW_KEY, '面试']]) {
+  test(`kioskSensitiveSessionScope：有${label}是 with-other`, async () => {
+    const { sensitive, session } = await loadSensitive()
+    session.setItem(key, '{}')
+    assert.equal(sensitive.kioskSensitiveSessionScope(), 'with-other')
+  })
+}
+
+test('kioskSensitiveSessionScope：只有本机收藏是 with-other', async () => {
+  const { sensitive, local } = await loadSensitive()
+  local.setItem(FAVORITE_KEY, FAVORITE_VALUE)
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'with-other')
+})
+
+test('kioskSensitiveSessionScope：合同审查会话在是 with-other', async () => {
+  const { sensitive, contract } = await loadSensitive()
+  contract.startContractReviewSession({
+    taskId: 'task-1',
+    contractType: 'labor',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    ownerMemberId: null,
+  })
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'with-other')
+})
+
+test('kioskSensitiveSessionScope：sessionStorage.getItem 抛错按 with-other', async () => {
+  const { sensitive, session } = await loadSensitive()
+  session.getItem = () => { throw new Error('sessionStorage blocked') }
+  assert.equal(sensitive.kioskSensitiveSessionScope(), 'with-other')
+})

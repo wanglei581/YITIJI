@@ -88,7 +88,7 @@ async function loadTerminalAuth({ terminalId, respond }) {
     "from './api/screensaver'": `export function getTerminalId() { return globalThis[${JSON.stringify(idName)}] }\n`,
     "from './api/httpAdapter'": 'export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.code = code; this.status = status } }\n',
     "from './api/throwHttpError'": 'export async function readHttpError(r) { const b = await r.json().catch(() => ({})); return { code: b?.error?.code ?? "UNKNOWN_ERROR", message: b?.error?.message ?? "" } }\n',
-    "from '../auth/kioskSensitiveSession'": 'export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\n',
+    "from '../auth/kioskSensitiveSession'": 'export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }\n',
   }
   let code = `${transpile('src/services/terminalAuth.ts')}\n// ${seed}\n`.replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
   for (const [from, stub] of Object.entries(stubs)) {

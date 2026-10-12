@@ -260,7 +260,7 @@ function sourceChecks() {
   const auth = read('src/services/terminalAuth.ts')
   const imports = [...auth.matchAll(/^import .+$/gm)].map((match) => match[0])
   const expectedImports = [
-    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'",
+    "import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue, kioskSensitiveSessionScope, type KioskClearScope } from '../auth/kioskSensitiveSession'",
     "import { API_BASE_URL, API_MODE } from './api/client'",
     "import { ApiHttpError } from './api/httpAdapter'",
     "import { getTerminalId } from './api/screensaver'",
@@ -405,7 +405,7 @@ async function loadRuntime({ terminalId = '', enforced = null, grantOk = false, 
     "from './api/screensaver'": toDataUrl(`export function getTerminalId() { return ${JSON.stringify(terminalId)} }\n`),
     "from './api/httpAdapter'": toDataUrl('export class ApiHttpError extends Error { constructor(code, message, status) { super(message); this.name = "ApiHttpError"; this.code = code; this.status = status } }\n'),
     "from './api/throwHttpError'": toDataUrl('export async function readHttpError(r) { const b = await r.json().catch(() => ({})); return { code: b?.error?.code ?? "UNKNOWN_ERROR", message: b?.error?.message ?? "" } }\n'),
-    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\n'),
+    "from '../auth/kioskSensitiveSession'": toDataUrl('export function clearKioskSensitiveSession() {}\nexport function clearKioskSharedDeviceResidue() {}\nexport function kioskSensitiveSessionScope() { return "none" }\n'),
   }
   let authCode = `${transpile('src/services/terminalAuth.ts')}${tag}`.replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
   for (const [from, url] of Object.entries(stubs)) {
