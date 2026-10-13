@@ -158,7 +158,7 @@ export class SelfAssessmentController {
 
   /**
    * 合并「自我探索 + 简历 PDF」，生成新的可打印 PDF 文件。
-   * 仅本人持有本人简历与自我探索记录时调用。
+   * 有会员主人的简历只认本人；没有会员主人的，只认持有本次签名地址的调用方。
    */
   @Post(':taskId/append')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
@@ -173,6 +173,7 @@ export class SelfAssessmentController {
       taskId,
       requester: await this.requesterOf(req),
       resumeFileId: body.resumeFileId,
+      resumeFileUrl: body.resumeFileUrl,
       auditCtx: auditContextOf(req),
       // 含 AI 解读时按 export 档过闸：本接口只合并已有 PDF，不调模型。
       gates: this.aiGates(req, 'export'),
