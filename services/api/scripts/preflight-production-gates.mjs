@@ -71,6 +71,11 @@ function parseArgs(argv) {
     }
     fail('PREFLIGHT_USAGE: unknown argument（只接受 --env-file / --force-true / --force-value）')
   }
+  for (const [key] of forceValue) {
+    if (forceTrue.includes(key)) {
+      fail('PREFLIGHT_USAGE: --force-value 与 --force-true 不得使用同一键')
+    }
+  }
   return { envFile, forceTrue, forceValue }
 }
 
@@ -81,16 +86,20 @@ function parseForceTrue(raw) {
     .filter(Boolean)
 }
 
-/** KEY=VALUE 逗号分隔。键名必须是大写下划线，值不许含逗号和换行。违反只报 PREFLIGHT_USAGE，不回显值。 */
+/** KEY=VALUE 逗号分隔。键名必须是大写下划线，值不许含逗号和换行。
+ *  空项、同一参数里重复的键都报 PREFLIGHT_USAGE，不回显值。 */
 function parseForceValue(raw) {
   const text = String(raw)
   if (/[\r\n]/.test(text)) {
     fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
   }
   const pairs = []
+  const seen = new Set()
   for (const part of text.split(',')) {
     const trimmed = part.trim()
-    if (!trimmed) continue
+    if (!trimmed) {
+      fail('PREFLIGHT_USAGE: --force-value 不许有空项')
+    }
     const eq = trimmed.indexOf('=')
     if (eq <= 0) {
       fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
@@ -100,6 +109,10 @@ function parseForceValue(raw) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(key) || /[\r\n,]/.test(value)) {
       fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
     }
+    if (seen.has(key)) {
+      fail('PREFLIGHT_USAGE: --force-value 不许重复键')
+    }
+    seen.add(key)
     pairs.push([key, value])
   }
   return pairs

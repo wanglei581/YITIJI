@@ -559,9 +559,14 @@ function assertRecruitmentLockCases(): void {
     '生产 + 私有化 + 托管开 + 两项只有空格 → 拒',
   )
   expectAllowed(privateReady, '生产 + 私有化 + 托管开 + 两项齐全 → 通过')
-  expectAllowed(
+  expectRejected(
     { ...privateReady, DEPLOYMENT_OWNERSHIP: ' Customer_Private ' },
-    '生产 + 归属写成 Customer_Private（带空格）+ 两项齐全 → 按私有化通过',
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 归属写成 Customer_Private（带空格）→ 拒绝（LOCKED）',
+  )
+  expectAllowed(
+    { ...privateReady, DEPLOYMENT_OWNERSHIP: 'customer_private ' },
+    '生产 + 归属写成 customer_private（尾部空格）+ 两项齐全 → 通过',
   )
   expectAllowed(PROD_OK, '生产 + 托管关 + 归属不写 → 通过')
   expectAllowed(
@@ -590,7 +595,20 @@ function assertRecruitmentLockCopy(): void {
   )
   const locked = recruitmentLockProductionError('locked_vendor_cloud')
   const missing = recruitmentLockProductionError('operator_self_report_missing')
-  const texts = [notice, startupOn, locked?.message ?? '', missing?.message ?? '']
+  const vendorOnNonProd =
+    '[WARN] RECRUITMENT_LOCK: 非生产环境：部署归属=我方云；招聘内容托管=开（生产环境会拒绝启动）'
+  const privateMissingNonProd =
+    '[WARN] RECRUITMENT_LOCK: 非生产环境：部署归属=客户私有化部署；招聘内容托管=开；运营单位自报缺项（生产环境会拒绝启动）'
+  const vendorOn = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({ RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }),
+  )
+  const privateOnMissing = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({
+      DEPLOYMENT_OWNERSHIP: 'customer_private',
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
+    }),
+  )
+  const texts = [notice, startupOn, locked?.message ?? '', missing?.message ?? '', vendorOn, privateOnMissing]
   for (const text of texts) {
     if (text.includes('已核验') || text.includes('已认证') || text.includes('持证') || text.includes('认证')) {
       throw new Error(`文案含禁用词：${text}`)
@@ -605,20 +623,19 @@ function assertRecruitmentLockCopy(): void {
   if (startupPrivateOff !== '[INFO] RECRUITMENT_LOCK: 部署归属=客户私有化部署；招聘内容托管=关') {
     throw new Error(`私有化托管关启动日志不符：${startupPrivateOff}`)
   }
-  const vendorOn = recruitmentLockStartupLine(
-    evaluateRecruitmentLock({ RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }),
-  )
-  if (vendorOn !== '[INFO] RECRUITMENT_LOCK: 部署归属=我方云；招聘内容托管=开') {
-    throw new Error(`我方云托管开的启动日志必须照实写开：${vendorOn}`)
+  if (vendorOn !== vendorOnNonProd) {
+    throw new Error(`我方云托管开的非生产启动日志不符：${vendorOn}`)
   }
-  const privateOnMissing = recruitmentLockStartupLine(
-    evaluateRecruitmentLock({
-      DEPLOYMENT_OWNERSHIP: 'customer_private',
-      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
-    }),
-  )
-  if (privateOnMissing !== '[INFO] RECRUITMENT_LOCK: 部署归属=客户私有化部署；招聘内容托管=开') {
+  if (privateOnMissing !== privateMissingNonProd) {
     throw new Error(`缺自报时不得写成已自报：${privateOnMissing}`)
+  }
+  for (const text of [vendorOn, privateOnMissing]) {
+    if (!text.includes('非生产环境')) {
+      throw new Error(`非生产启动日志必须写明非生产环境：${text}`)
+    }
+    if (text.includes('已核验') || text.includes('已认证') || text.includes('持证')) {
+      throw new Error(`非生产启动日志含禁用词：${text}`)
+    }
   }
   if (
     startupOn !==
@@ -643,10 +660,11 @@ function assertPreflightForceValue(): void {
       rmSync(dir, { recursive: true, force: true })
     }
   }
-  const expectFail = (extraArgs: string[], needle: string, label: string) => {
+  const expectFail = (extraArgs: string[], needle: string, label: string, hiddenValues: string[] = []) => {
     const result = run(extraArgs)
-    if (result.status === 0 || !result.output.includes(needle)) {
-      throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} output=${result.output.slice(0, 500)}`)
+    const leaked = hiddenValues.find((value) => result.output.includes(value))
+    if (result.status === 0 || !result.output.includes(needle) || leaked) {
+      throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} leaked=${leaked ?? ''} output=${result.output.slice(0, 500)}`)
     }
     console.log(`  PASS ${label}`)
   }
@@ -660,6 +678,24 @@ function assertPreflightForceValue(): void {
     ['--force-value', 'deployment_ownership=vendor_cloud'],
     'PREFLIGHT_USAGE',
     '键名小写 → PREFLIGHT_USAGE',
+  )
+  expectFail(
+    ['--force-value', 'DEPLOYMENT_OWNERSHIP=zz-empty-sentinel,'],
+    'PREFLIGHT_USAGE',
+    '--force-value 空项 → PREFLIGHT_USAGE',
+    ['zz-empty-sentinel'],
+  )
+  expectFail(
+    ['--force-value', 'DUP_FORCE_KEY=zz-dup-one,DUP_FORCE_KEY=zz-dup-two'],
+    'PREFLIGHT_USAGE',
+    '--force-value 重复键 → PREFLIGHT_USAGE',
+    ['zz-dup-one', 'zz-dup-two'],
+  )
+  expectFail(
+    ['--force-true', 'PRINT_REQUIRE_PII_SCAN', '--force-value', 'PRINT_REQUIRE_PII_SCAN=zz-overlap-secret'],
+    'PREFLIGHT_USAGE',
+    '--force-value 与 --force-true 同名键 → PREFLIGHT_USAGE',
+    ['zz-overlap-secret'],
   )
 }
 
