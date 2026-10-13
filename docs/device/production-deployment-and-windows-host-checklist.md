@@ -475,9 +475,10 @@ SOFFICE_PATH="$SOFFICE_PATH" pnpm --filter ./services/api verify:document-conver
 - [x] 前端静态服务或 nginx 重启策略明确。
   **证据（2026-09-07，deploy 日志）**：`=== 重载 nginx ===` 后 `2026/09/07 23:26:30 [notice] … signal process started`，job 以 `✅ 部署完成` 收尾。
 - [x] 日志路径固定，日志轮转已配置。
-  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`/root/.pm2/logs/ai-job-print-api-{out,error}.log`；`pm2-logrotate` 配置 `max_size 50M` / `retain 7` / `rotateInterval 0 0 * * *`。
-  **待取证（服务器只读）**：`pm2 conf pm2-logrotate; ls -l ~/.pm2/logs /var/log/nginx | head`
-  （旁证：PM2 模块 `pm2-logrotate 3.0.0` `status=online`；**路径与保留份数未读出**。）
+  **现值（2026-10-14 21:48，合规窗口服务器只读核对）**：`pm2-logrotate` 配置 `max_size 50M` / `retain 200` / `compress true` / `rotateInterval 0 0 * * *`；`/etc/logrotate.d/nginx` 是 `daily` + `rotate 200`（文件修改时间 2026-10-13 21:15:43），管 nginx 日志的只有这一份；访问日志文件是 `-rw-r----- www-data adm`。2026-10-13 由 PM2 `retain 7`、nginx `rotate 14` 改来，依据《网络安全法》第二十三条第（三）项（网络日志不少于六个月；按日历月算最长的半年 184 天，留了余量）。旧日志找不回，留存从 10/13 往后攒，满六个月约在 2027 年 4 月。
+  **证据（2026-09-07，发布 lane 服务器只读取证；主持人复核应用侧数字）**：`/root/.pm2/logs/ai-job-print-api-{out,error}.log`；`pm2-logrotate` 配置 `max_size 50M` / `retain 7` / `rotateInterval 0 0 * * *`。（9/07 旧值，留作对照。）
+  **复查（服务器只读）**：`pm2 conf pm2-logrotate; grep -n -E 'daily|weekly|rotate' /etc/logrotate.d/nginx; grep -rl '/var/log/nginx' /etc/logrotate.d/`
+  （9/07 旁证：PM2 模块 `pm2-logrotate 3.0.0` `status=online`；当时路径与保留份数未读出，10/13 已读出，见上。）
 - [x] 日志级别生产可控，不输出敏感正文。
   **证据（2026-09-08 约 00:20，总指挥窗口生产只读实测）**：`pm2 logs --lines 500 | grep -cEi 'sk-|api[_-]?key|Bearer eyJ|BEGIN PRIVATE|access_token'` → **命中 0 行**。取证方式本身安全：只计数、不打印命中行。
   **未验，且取证方式本身有风险**：抽查日志内容可能读到敏感数据。**取证时只做模式匹配、不打印命中行**（统计命中数并报出条目，不回显内容）—— 验证动作自己不能制造它要防的风险。待有服务器只读权限者按此方式执行。
