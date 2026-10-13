@@ -302,7 +302,7 @@ export function MyAiRecordsPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载 AI 服务记录" struct={struct} />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请稍后重试；已有记录不会因为这次失败而消失。" struct={struct} />
   } else if (empty) {
     body = (
       <>

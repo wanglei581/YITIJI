@@ -45,7 +45,7 @@
         **没有城市、工作性质、薪资、证书、语言**，本页也不做这些入口
     apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx + services/files/usbImportApi.ts
       - isUsbImportConfigured() 为假 → 「当前终端未配置U盘导入」（配置缺失，用户无法自解）
-      - LOCAL_AGENT_UNREACHABLE → 「无法连接本机的本地服务，可以找现场工作人员看一下」（服务未起，可重试）
+      - LOCAL_AGENT_UNREACHABLE → 「无法连接这台机器的本机程序，请确认设备正常后重试」（服务未起，可重试）
       - getUsbStatus() → {present,driveLabel}；2000ms 轮询；listUsbFiles() 客户端只留 ≤10MB
       - apps/terminal-agent/src/usb/usb-files.ts：ALLOWED_USB_EXTENSIONS 只有 .pdf/.jpg/.jpeg/.png，
         MAX_USB_FILE_BYTES=15MB，MAX_USB_FILES_LISTED=200，**只枚举根目录、不进子文件夹**，
@@ -2161,8 +2161,7 @@ R['usb-wait']=function(){
       PROTO_STATIC_USB
     ])+
     chanBlock('usb')+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'primary',n:'我插好了，重新检测',href:url({state:'usb-detecting'}),tid:'rs-primary'}]);
+    acts([{k:'primary',n:'我插好了，重新检测',href:url({state:'usb-detecting'}),tid:'rs-primary'}]);
 };
 R['usb-detecting']=function(){
   rail(0);pill('U 盘 · 读取中');
@@ -2196,8 +2195,7 @@ R['usb-detecting']=function(){
       {v:'<b>界面示例</b>：这是读 U 盘时的样子。'}
     ])+
     chanBlock('usb')+
-    acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})},
-          {k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'}]);
+    acts([{k:'ghost',n:'换一种来源',href:url({state:'source'})}]);
 };
 R['usb-list']=function(){
   rail(0);pill('U 盘 · 选一份','ok');
@@ -2291,24 +2289,23 @@ R['usb-unavailable']=function(){
     trackBar('U 盘通道未开通','warnt')+
     '<div class="blk m-fade-in"><div class="fail lockf" data-testid="rs-usb-unavailable">'+
       '<div class="ft">'+svg(I_LOCK,22,'currentColor',2)+'这台机器没开通读 U 盘</div>'+
-      '<div class="fbdy">请联系工作人员检查<b>这台机器的 U 盘读取</b>。'+
+      '<div class="fbdy">请改用<b>手机扫码上传</b>。'+
       '这是这台机器的<b>配置缺失，不是你的操作问题，也不是重试能解决的</b>；'+
       '在此之前，插着的 U 盘不会被本机读取，也不会有文件被复制走。另外两条通道照常可用。</div></div></div>'+
     '<div class="blk grow">'+head('还能用的两条通道','都在这台机器上完成',true)+
       chanBoard('','usb','本机未开通，先走另外两条')+
       rowsCard([
         {v:'把入口锁上而不是留一个点不动的按钮，是因为<b>能不能读盘取决于本机配置</b>。'},
-        {v:'工作人员处理完配置后 U 盘入口会自己恢复，<b>不需要你在这一页做什么</b>。'},
+        {v:'管理员开通后 U 盘入口会自己恢复，<b>不需要你在这一页做什么</b>。'},
         PROTO_STATIC_USB
       ])+'</div>'+
     '<div class="blk grow">'+head('现场分工','各做各的那一件')+
       tri([
-        {no:'1',n:'工作人员：开通 U 盘读取',d:'在这台机器上把 U 盘读取配好，配完入口自己恢复。',go:'你在页面上做不了',warn:true},
+        {no:'1',n:'管理员：开通 U 盘读取',d:'把这台机器的 U 盘读取配好，配完入口自己恢复。',go:'你在页面上做不了',warn:true},
         {no:'2',n:'你现在：换一条通道',d:'手机扫码和本机文件都不走 U 盘读取，现在就能把简历送进来。',go:'现在就能走',warn:true},
         {no:'3',n:'你的设置：都还在',d:'诊断方向、重点维度和目标背景不会因为换通道被清掉。',go:'不用重新点',warn:true}
       ])+'</div>'+
-    acts([{k:'ghost',n:'报障 · 找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'primary',n:'改用手机扫码上传',href:url({state:'phone-generating'}),tid:'rs-primary'}]);
+    acts([{k:'primary',n:'改用手机扫码上传',href:url({state:'phone-generating'}),tid:'rs-primary'}]);
 };
 R['usb-agent-offline']=function(){
   rail(0);pill('U 盘 · 暂时没连上','bad');
@@ -2319,14 +2316,14 @@ R['usb-agent-offline']=function(){
     trackBar('读 U 盘暂时没连上','badt')+
     stepBoard('usb',1,'bad','读 U 盘没连上，这一步没结果')+
     '<div class="blk m-fade-in"><div class="fail" data-testid="rs-usb-agent-offline">'+
-      '<div class="ft">'+svg(I_PLUG,22,'currentColor',2)+'这台机器读 U 盘暂时没连上，可以找现场工作人员看一下</div>'+
+      '<div class="ft">'+svg(I_PLUG,22,'currentColor',2)+'这台机器读 U 盘暂时没连上</div>'+
       '<div class="fbdy">和「没开通」不是一回事：这台机器<b>是开通了 U 盘导入的</b>，读 U 盘的功能只是这一刻没起来或刚重启。'+
-      '<b>可以重试；工作人员现场重启一下通常几十秒就能恢复。</b></div></div></div>'+
+      '<b>可以重试。</b>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）</div></div></div>'+
     '<div class="blk grow">'+head('三条路，按顺序试','',true)+
       tri([
         {no:'1',n:'先重试一次连接',d:'刚重启的话，等几秒再试一次通常就通了。',go:'重试连接 →',href:url({state:'usb-detecting'}),warn:true},
-        {no:'2',n:'叫工作人员看一眼',d:'读 U 盘的功能要在这台机器上重启，你在页面上做不了。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help',warn:true},
-        {no:'3',n:'先用另外两条通道',d:'手机扫码和本机文件不用读 U 盘，现在就能用。',go:'改用手机扫码 →',href:url({state:'phone-generating'}),warn:true}
+        {no:'2',n:'改用手机扫码',d:'手机扫码不读 U 盘，现在就能用。',go:'改用手机扫码 →',href:url({state:'phone-generating'}),warn:true},
+        {no:'3',n:'换一条通道',d:'另外两条都在来源页，不读 U 盘。',go:'去选择 →',href:url({state:'source',source:''}),warn:true}
       ])+'</div>'+
     rowsCard([
       {v:'没连上的时候，本机<b>既读不到盘，也不会显示任何缓存过的文件列表</b>。'},
@@ -2383,8 +2380,7 @@ R['usb-importing']=function(){
       {v:'盘上这一份已经导入过了，中途离开也不能再导一次 —— 要重新读盘再选。'+
          '这一屏不会真的读 U 盘，<b>不产生任何真实导入结果</b>。'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已发出的导入不受影响',href:url({state:'source'})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已发出的导入不受影响',href:url({state:'source'})}]);
 };
 R['usb-import-failed']=function(){
   rail(0);pill('U 盘 · 导入失败','bad');
@@ -2684,8 +2680,7 @@ R['phone-generating']=function(){
          '万一系统那边最后还是开好了这次上传，它<b>10 分钟后自行到期</b>，也可以出码后再撤销。'},
       {v:'界面示例：这一屏<b>不会真的生成上传码</b>。'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已发出的出码请求不受影响',href:url({state:'source'})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已发出的出码请求不受影响',href:url({state:'source'})}]);
 };
 R['phone-gen-failed']=function(){
   rail(0);pill('手机扫码 · 出码失败','bad');
@@ -2767,8 +2762,7 @@ R['phone-ready']=function(){
          '<b>撤销拿到结果才换下一步</b>；换新码同理，<b>撤销没成功就不会给你新码</b>，免得两张码同时能用。'},
       PROTO_STATIC_QR
     ]),
-    acts:[{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
+    acts:[{k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
           {k:'primary',n:'重新出一张码<br>先撤销这一张',href:revokeHref('refresh'),tid:'rs-primary'}]
   });
 };
@@ -2796,8 +2790,7 @@ R['phone-waiting']=function(){
          '<b>拿到撤销结果之后</b>才换来源或出新码；<b>撤销没成功就不给新码</b>。'},
       PROTO_STATIC_QR
     ]),
-    acts:[{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
+    acts:[{k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
           {k:'primary',n:'重新出一张码<br>先撤销这一张',href:revokeHref('refresh'),tid:'rs-primary'}]
   });
 };
@@ -2824,8 +2817,7 @@ R['phone-status-unknown']=function(){
          '<b>撤销没成功就不出新码</b>，不然旁人手里的旧码和新码会同时可用。'},
       PROTO_STATIC_QR
     ]),
-    acts:[{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
+    acts:[{k:'ghost',n:'撤销这张码<br>撤销后再换来源',href:revokeHref('leave')},
           {k:'primary',n:'重新出一张码<br>先撤销这一张',href:revokeHref('refresh'),tid:'rs-primary'}]
   });
 };
@@ -2909,7 +2901,7 @@ R['phone-confirm-failed']=function(){
         {t:'现在能做的',items:[
           '重新出一张码：<b>先撤销这次上传</b>，撤成功再出新码。',
           '改用 U 盘或本机文件这两条通道送同一份简历。',
-          '反复失败就找现场工作人员看一眼。'
+          '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'
         ]},
         {t:'这里没有发生的',items:[
           '<b>没有进入解析</b>，没有任何诊断内容被生成。',
@@ -2980,8 +2972,7 @@ R['phone-cancelling']=function(){
          '这张码到底作没作废，一律以<b>系统结果</b>为准。'},
       PROTO_STATIC_QR
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已发出的撤销不受影响',href:url({state:'source'})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已发出的撤销不受影响',href:url({state:'source'})}]);
 };
 R['phone-cancelled']=function(){
   rail(0);pill('手机扫码 · 已撤销','warn');
@@ -3042,7 +3033,6 @@ R['phone-cancel-failed']=function(){
       pickCard({ico:I_FOLDER,n:'改用本机文件',d:'不经过这次上传，先下载到本机再选。',go:'去选择 →',href:url({state:'local-guide'}),alt:true})+
     '</div>'+
     acts([{k:'ghost',n:'回到刚才那一步',href:url({state:from}),tid:'rs-back-to-origin'},
-          {k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'primary',n:'重试撤销这次上传',href:revokeHref(why,from),tid:'rs-primary'}]);
 };
 
@@ -3066,8 +3056,7 @@ R['uploading']=function(){
       {no:'2',n:'这一步没有取消入口',d:'上传是一次性请求，发出去就没有可以叫停的开关；<b>离开这一页不会撤回</b>已经发出的传输。',go:'系统行为'},
       {no:'3',n:'屏幕先锁在这一步',d:'有结果之前不进待机、不自动跳走，免得你人还在、屏幕先切走。',go:'系统行为'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已发出的上传不受影响',href:url({state:'source'})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已发出的上传不受影响',href:url({state:'source'})}]);
 };
 R['upload-failed']=function(){
   rail(0);pill('上传失败 · 可重试','bad');
@@ -3121,8 +3110,7 @@ R['parsing']=function(){
         '不会用「稍后再试」糊弄过去，失败会写明原因。'
       ]})+
     acts([{k:'ghost',n:'先离开这一步<br>已提交的解析不受影响',href:url({state:'source'})},
-          {k:'demo',n:'看诊断报告',href:'22-resume-report.html',route:'/resume/report'},
-          {k:'ghost',n:'等太久<br>找工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'}]);
+          {k:'demo',n:'看诊断报告',href:'22-resume-report.html',route:'/resume/report'}]);
 };
 R['parse-failed']=function(){
   rail(1);pill('解析失败 · 可重试','bad');
@@ -3177,8 +3165,7 @@ R['missing-file']=function(){
            : '<b>临时上传的那一份已经按 1 小时的短期策略清理掉了</b>')+'。'},
       {v:'本页只说明这一步没有可用文件，<b>不代表系统已经删除了什么</b>。'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'primary',n:'回到来源选择',href:url({state:'source',source:''}),tid:'rs-primary'}]);
+    acts([{k:'primary',n:'回到来源选择',href:url({state:'source',source:''}),tid:'rs-primary'}]);
 };
 R['unknown']=function(){
   rail(0);pill('无法识别的状态','warn');
@@ -3194,7 +3181,7 @@ R['unknown']=function(){
       tri([
         {no:'1',n:'回到来源选择',d:'从头开始这次简历服务，重新挑一种取件方式。',go:'去选择 →',href:url({state:'source',source:''})},
         {no:'2',n:'回首页换一项',d:'打印扫描、岗位信息、招聘会都在首页入口里。',go:'回首页 →',href:'01-home.html',route:'/'},
-        {no:'3',n:'找现场工作人员',d:'不确定该走哪一步，可以让工作人员帮你看一眼。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'}
+        {no:'3',n:'问一句小青',d:'说不清要办什么，先问该走哪一步。',go:'去问 →',href:'../kiosk-redesign-2026-08/05-ai-cockpit.html',route:'/assistant'}
       ])+'</div>'+
     '<div class="blk grow">'+head('或者直接去这几件事','都是这台机器上的现有入口')+'<div class="picks">'+
       pickCard({ico:I_PRINT,n:'打印 / 扫描',d:'打印文件、复印、扫描原件都在这里。',go:'去打印 →',href:'10-print-hub.html',route:'/print-scan'})+
@@ -3308,7 +3295,7 @@ R['scan-unavailable']=function(){
       tri([
         {no:'1',n:'换一种来源送同一份',d:'U 盘、本机文件、手机扫码这三条都在，简历一样能做 AI '+INTENT_COPY[intent].verb+'。',go:'去选择 →',href:url({state:'source',source:''}),warn:true},
         {no:'2',n:'只想打印原件',d:'不做 AI，直接把手里的材料按原样打出来；打印通道不依赖这条交接。',go:'去打印 →',href:'10-print-hub.html',route:'/print-scan'},
-        {no:'3',n:'让工作人员开通',d:'这条交接由现场管理端配置，用户侧改不了。',go:'去求助 →',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help',warn:true}
+        {no:'3',n:'管理员：开通这条交接',d:'这条交接由管理员配置，用户侧改不了。',go:'你在页面上做不了',warn:true}
       ])+
       rowsCard([
         {k:'缺的是什么',v:'把扫描件送进 AI 简历的<b>那一条交接</b>没开通<em>　缺的是本机设置，不是你的操作问题</em>'},
@@ -3317,7 +3304,6 @@ R['scan-unavailable']=function(){
         {k:'重试有没有用',v:'<b>没有</b><em>　这条交接由现场管理端配置，重试多少次都不会变</em>'}
       ],'kv')+'</div>'+
     acts([{k:'ghost',n:'回扫描工作台',href:'../kiosk-redesign-2026-08/18-scan-workbench.html',route:'/scan/result'},
-          {k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
           {k:'primary',n:'换一种来源',href:url({state:'source',source:''}),tid:'rs-primary'}]);
 };
 R['scan-failed']=function(){
@@ -3412,8 +3398,7 @@ R['upload-rechecking']=function(){
       {no:'2',n:'这一步没有取消入口',d:'查询已经发出去了，没有可以叫停的开关；<b>离开这一页不会撤回</b>它。',go:'系统行为'},
       {no:'3',n:'结果只有三种',d:'查到成功、查到失败、还是查不到 —— 是哪一种由这一次的结果决定，本页不挑。',go:'系统行为'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已发出的查询不受影响',href:url({state:'source',source:''})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已发出的查询不受影响',href:url({state:'source',source:''})}]);
 };
 R['parse-unknown']=function(){
   rail(1);pill('解析结果未知 · 不重发','warn');
@@ -3458,8 +3443,7 @@ R['parse-rechecking']=function(){
       {no:'2',n:'这一步没有取消入口',d:'查询已经发出去了，没有可以叫停的开关；<b>离开这一页不会撤回</b>它。',go:'系统行为'},
       {no:'3',n:'结果只有三种',d:'查到成功、查到失败、还是查不到 —— 是哪一种由这一次的结果决定，本页不挑。',go:'系统行为'}
     ])+
-    acts([{k:'ghost',n:'找现场工作人员',href:'../kiosk-redesign-2026-08/06-help.html',route:'/help'},
-          {k:'ghost',n:'先离开这一步<br>已提交的解析不受影响',href:url({state:'source',source:''})}]);
+    acts([{k:'ghost',n:'先离开这一步<br>已提交的解析不受影响',href:url({state:'source',source:''})}]);
 };
 
 /* ================= 文件预览：同一 route 内的「看文件」主内容 ================= */
