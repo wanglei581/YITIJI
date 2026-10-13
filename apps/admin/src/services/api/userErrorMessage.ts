@@ -28,6 +28,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   ORDER_INVALID_TRANSITION: '当前支付状态不允许此操作',
   VALIDATION_FAILED: '提交内容未通过校验，请检查后重试',
   CONTENT_TRUST_INACTIVE: '来源机构内容信任未生效，无法发布',
+  ORG_CONTENT_TRUST_REQUIRED: '该机构还没有被标记为内容可信，不能发布。请先在「合作机构」里完成内容可信核验。',
   // 3.13 招聘内容托管与紧急下架
   RECRUITMENT_HOSTING_DISABLED: '本平台已关闭招聘内容托管，这项操作不可用',
   EMERGENCY_TAKEDOWN_IRREVERSIBLE: '该内容已被紧急下架，或所属机构 / 来源已熔断，不能再发布',

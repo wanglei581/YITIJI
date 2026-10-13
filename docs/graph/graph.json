@@ -19420,7 +19420,8 @@
     ],
     "apps/admin/src/services/api/userErrorMessage.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
-      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+      "apps/admin/scripts/verify-admin-ai-usage-ui.mjs",
+      "apps/partner/scripts/verify-partner-content-trust-hints.mjs"
     ],
     "apps/admin/src/services/auth/index.ts": [
       "apps/admin/scripts/logout-keepalive.test.mjs",
@@ -22448,13 +22449,18 @@
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/partner/src/routes/policy/index.tsx": [
+      "apps/partner/scripts/verify-partner-content-trust-hints.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/profile/ComplianceRestrictions.tsx": [
       "apps/admin/scripts/verify-console-privacy-copy.mjs"
     ],
+    "apps/partner/src/routes/profile/OfficialChannelsSection.tsx": [
+      "apps/partner/scripts/verify-partner-content-trust-hints.mjs"
+    ],
     "apps/partner/src/routes/profile/index.tsx": [
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
+      "apps/partner/scripts/verify-partner-content-trust-hints.mjs",
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
     ],
     "apps/partner/src/routes/screen/PartnerGrid.tsx": [
@@ -22581,6 +22587,9 @@
       "apps/partner/scripts/verify-job-quality-dashboard-ui.mjs",
       "services/api/scripts/verify-job-customer-sample-readiness.ts",
       "services/api/scripts/verify-jobfair-checkin.ts"
+    ],
+    "apps/partner/src/services/api/userErrorMessage.ts": [
+      "apps/partner/scripts/verify-partner-content-trust-hints.mjs"
     ],
     "apps/partner/src/services/auth/index.ts": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs"
@@ -33161,6 +33170,28 @@
       "package": "@ai-job-print/partner",
       "scriptNames": [
         "@ai-job-print/partner::verify:job-quality-dashboard-ui"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/admin/src/services/api/userErrorMessage.ts",
+          "apps/partner/src/routes/policy/index.tsx",
+          "apps/partner/src/routes/profile/OfficialChannelsSection.tsx",
+          "apps/partner/src/routes/profile/index.tsx",
+          "apps/partner/src/services/api/userErrorMessage.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/partner/scripts/verify-partner-content-trust-hints.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/partner",
+      "scriptNames": [
+        "@ai-job-print/partner::verify:partner-content-trust-hints"
       ],
       "wired": true
     },

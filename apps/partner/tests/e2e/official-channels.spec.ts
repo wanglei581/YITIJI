@@ -50,7 +50,7 @@ function channelRow(section: Locator, name: string): Locator {
 test.describe('本机构官方渠道（机构资料页，mock 口径）', () => {
   test('列表：域名只读；正常渠道可启停与编辑；平台已紧急下架的一行冻结，只剩归档', async ({ page }) => {
     const { section, errors } = await openProfile(page)
-    await expect(section).toContainText('这里维护的二维码只出现在本机构自己的一体机终端上，用户扫码后打开本机构的官方网站或官方账号。')
+    await expect(section).toContainText('这里维护的二维码只出现在本机构自己的一体机终端上，并且要本机构通过平台内容可信核验后才会显示；用户扫码后打开本机构的官方网站或官方账号。')
     await expect(section).toContainText('对应一体机「本机构官方渠道」页')
 
     const domains = section.getByRole('list', { name: '可用官方域名' })

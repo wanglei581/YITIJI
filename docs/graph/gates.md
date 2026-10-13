@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1950 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -367,7 +367,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/services/api/sourcePaging.ts` | `verify-source-publish-actions.mjs` |
 | `apps/admin/src/services/api/toolbox.ts` | `verify-toolbox-review-ui.mjs`<br/>`verify-toolbox-launch-events.ts` |
 | `apps/admin/src/services/api/types.ts` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-admin-terminal-bind-code-ui.mjs`<br/>`verify-admin-terminal-network-diagnostics-ui.mjs`<br/>`verify-job-ai-ops-dashboard-ui.mjs`<br/>`verify-jobfair-checkin.ts`<br/>`verify-print-scan-first-release.ts` |
-| `apps/admin/src/services/api/userErrorMessage.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/services/api/userErrorMessage.ts` | `verify-admin-ai-access-ui.mjs`<br/>`verify-admin-ai-usage-ui.mjs`<br/>`verify-partner-content-trust-hints.mjs` |
 | `apps/admin/src/services/auth/index.ts` | `logout-keepalive.test.mjs`<br/>`verify-admin-account-settings-ui.mjs`<br/>`verify-admin-login-second-factor.mjs`<br/>`verify-admin-phone-transfer-ui.mjs`<br/>`verify-partner-account-action-ui.mjs` |
 | `apps/admin/src/services/auth/secondFactor.ts` | `verify-admin-login-second-factor.mjs` |
 
@@ -1168,7 +1168,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 51 个文件</summary>
+<summary><code>apps/partner/src/</code> — 53 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1187,9 +1187,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/login/LegalDocsModal.tsx` | `verify-legal-doc-version.ts` |
 | `apps/partner/src/routes/login/index.tsx` | `verify-admin-account-settings-ui.mjs` |
 | `apps/partner/src/routes/policy/PolicyEmergencyNote.tsx` | `verify-console-plain-copy.mjs` |
-| `apps/partner/src/routes/policy/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/policy/index.tsx` | `verify-partner-content-trust-hints.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/profile/ComplianceRestrictions.tsx` | `verify-console-privacy-copy.mjs` |
-| `apps/partner/src/routes/profile/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/profile/OfficialChannelsSection.tsx` | `verify-partner-content-trust-hints.mjs` |
+| `apps/partner/src/routes/profile/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-partner-content-trust-hints.mjs`<br/>`verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/screen/PartnerGrid.tsx` | `verify-console-screen-details.mjs`<br/>`verify-console-screen-ui.mjs` |
 | `apps/partner/src/routes/screen/PartnerTerminalView.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/partner/src/routes/screen/PartnerUsageHostingOff.tsx` | `verify-console-screen-details.mjs` |
@@ -1222,6 +1223,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/services/api/stats.ts` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/terminalOps.ts` | `verify-honest-placeholders.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/services/api/types.ts` | `verify-job-quality-dashboard-ui.mjs`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-jobfair-checkin.ts` |
+| `apps/partner/src/services/api/userErrorMessage.ts` | `verify-partner-content-trust-hints.mjs` |
 | `apps/partner/src/services/auth/index.ts` | `verify-admin-account-settings-ui.mjs` |
 
 </details>

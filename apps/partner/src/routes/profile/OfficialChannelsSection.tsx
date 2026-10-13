@@ -71,7 +71,11 @@ function VerifiedDomains({ domains }: { domains: string[] | null }) {
  * 每个写操作都以服务端返回为准：成功后才改列表、才说「已保存 / 已启用 / 已归档」；
  * 失败时写出服务端的中文原因，列表保持原样。
  */
-export function OfficialChannelsSection() {
+/** 一体机只显示「内容可信且未归档」机构的渠道（后端 official-channels.service 的过滤）。两种原因分开说；不承诺何时恢复——渠道自己的启用、域名、紧急下架也会让它不显示。 */
+const CHANNEL_HINT_UNTRUSTED = '本机构还没有通过平台的内容可信核验，下面的渠道暂时不会在一体机上显示。'
+const CHANNEL_HINT_ARCHIVED = '本机构已归档，下面的渠道暂时不会在一体机上显示。'
+
+export function OfficialChannelsSection({ publishable, archived }: { publishable: boolean; archived: boolean }) {
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [loadError, setLoadError] = useState('')
   const [items, setItems] = useState<OfficialChannelPartnerItem[]>([])
@@ -146,6 +150,11 @@ export function OfficialChannelsSection() {
 
   return (
     <Card className="mt-6 p-6" role="region" aria-labelledby="official-channels-title">
+      {!publishable && (
+        <p role="status" className="mb-4 rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
+          {archived ? CHANNEL_HINT_ARCHIVED : CHANNEL_HINT_UNTRUSTED}
+        </p>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50">
@@ -169,7 +178,7 @@ export function OfficialChannelsSection() {
       </div>
 
       <p className="mt-4 text-sm leading-relaxed text-neutral-600">
-        {'这里维护的二维码只出现在本机构自己的一体机终端上，用户扫码后打开本机构的官方网站或官方账号。'
+        {'这里维护的二维码只出现在本机构自己的一体机终端上，并且要本机构通过平台内容可信核验后才会显示；用户扫码后打开本机构的官方网站或官方账号。'
           + '渠道由本机构自行维护；平台只在违法违规、权利人投诉等紧急情况下紧急下架，下架后不能恢复。'}
       </p>
 
@@ -205,7 +214,7 @@ export function OfficialChannelsSection() {
             icon={QrCodeIcon}
             title="还没有添加官方渠道"
             description={canAdd
-              ? '点右上角「添加渠道」，二维码会出现在本机构自己的一体机上。'
+              ? '点右上角「添加渠道」；本机构通过平台内容可信核验后，二维码会出现在本机构自己的一体机上。'
               : '平台登记本机构的官方域名之后，才能在这里添加渠道。'}
           />
         )}
