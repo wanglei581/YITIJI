@@ -2,8 +2,8 @@
  * 小青页固定安全提示（pages/assistant）：真跑页面，api / auth 是替身。
  *
  * 钉住的是第 33 条小程序这半：
- *   - 后端 fixedNotice 严格等于 true 时，最后一条记下这个标记，正文照原文，不挂「AI 服务不可用」那句；
- *   - 没有这个字段，或值是字符串 'true'、数字 1，就和原来一样；
+ *   - 后端 fixedNotice 严格等于 true 时，最后一条记下这个标记，正文照原文，不挂「AI 服务不可用」那句，引导卡清空；
+ *   - 没有这个字段，或值是字符串 'true'、数字 1、false、null，就和原来一样；
  *   - 模板只在不是加载中、且 fixedNotice 为真时，于正文上方标「安全提示」四个字；
  *   - 这条样式只用页面里已经在用的麦色变量，不新写颜色。
  *
@@ -81,6 +81,7 @@ test('a. fixedNotice 为 true 时记下标记，正文照原文，不挂预置�
   assert.equal(last.fixedNotice, true)
   assert.equal(last.text, FIXED_REPLY)
   assert.equal(last.fallbackNote, '')
+  // actions 是空的，这条只钉住空 actions；真正证明「为真时清空引导卡」的是 h。
   assert.equal(last.cards.length, 0)
   assert.equal(page.data.sending, false)
 })
@@ -116,8 +117,8 @@ test('d. 没有 fixedNotice 的真实模型回答，不挂说明', async () => {
   assert.equal(last.fallbackNote, '')
 })
 
-test('e. 字符串 true 和数字 1 都不算固定安全提示', async () => {
-  for (const fixedNotice of ['true', 1]) {
+test('e. 字符串 true、数字 1、false 和 null 都不算固定安全提示', async () => {
+  for (const fixedNotice of ['true', 1, false, null]) {
     for (const aiGenerated of [true, false]) {
       const { last } = await send({
         fixedNotice,
@@ -149,14 +150,53 @@ function viewTags(src) {
   return tags
 }
 
+/** 先去掉 <!-- … -->，后面的检查（含「只允许空白」）都看去注释后的文本。 */
+function stripXmlComments(src) {
+  return src.replace(/<!--[\s\S]*?-->/g, '')
+}
+
+/** 「安全提示」所在 view 的开标签。不要求 wx:if 和 class 谁先谁后。 */
+function noticeOpenTag(src) {
+  const at = src.indexOf('安全提示')
+  if (at < 0) return null
+  const start = src.lastIndexOf('<', at)
+  if (start < 0 || !src.startsWith('<view', start)) return null
+  const end = src.indexOf('>', start)
+  if (end < 0 || end > at) return null
+  return src.slice(start, end + 1)
+}
+
+test('h. 同一组 actions：fixedNotice 为真时引导卡清空，没有该字段时出两张卡', async () => {
+  const actions = [
+    { label: '去打印', route: '/print' },
+    { label: '诊断简历', route: '/resume/report' },
+  ]
+  const noticed = await send({
+    fixedNotice: true,
+    aiGenerated: true,
+    actions,
+    reply: FIXED_REPLY,
+  })
+  assert.equal(noticed.last.cards.length, 0, '固定安全提示下引导卡应清空')
+
+  const plain = await send({
+    aiGenerated: true,
+    actions,
+    reply: '可以先去打印，也可以诊断简历。',
+  })
+  assert.equal(plain.last.cards.length, 2, '这组 actions 没有 fixedNotice 时应出两张卡')
+})
+
 test('f. 模板只在非加载中的固定提示上方标「安全提示」，不打断加载与正文的配对', () => {
-  const wxml = readPage('pages/assistant/assistant.wxml')
+  const wxml = stripXmlComments(readPage('pages/assistant/assistant.wxml'))
   assert.equal(wxml.split('安全提示').length - 1, 1, '「安全提示」全文应恰好出现一次')
 
-  const tag = wxml.match(/<view\s+wx:if="([^"]+)"\s+class="msg-notice-tag">安全提示<\/view>/)
-  assert.ok(tag, '「安全提示」应写在 class 为 msg-notice-tag 的 view 上')
-  assert.equal(tag[1].includes('item.fixedNotice'), true, '小标的 wx:if 里要有 item.fixedNotice')
-  assert.equal(tag[1].includes('!item.loading'), true, '小标的 wx:if 里要有 !item.loading')
+  const openTag = noticeOpenTag(wxml)
+  const wxIf = openTag && openTag.match(/\bwx:if="([^"]*)"/)
+  const cls = openTag && openTag.match(/\bclass="([^"]*)"/)
+  assert.ok(openTag && wxIf && cls && cls[1] === 'msg-notice-tag', '「安全提示」应写在 class 为 msg-notice-tag 的 view 上')
+  assert.equal(wxIf[1].includes('item.fixedNotice'), true, '小标的 wx:if 里要有 item.fixedNotice')
+  assert.equal(wxIf[1].includes('!item.loading'), true, '小标的 wx:if 里要有 !item.loading')
 
   const aiAt = wxml.indexOf("item.role === 'ai'")
   const userAt = wxml.indexOf("item.role === 'user'")
