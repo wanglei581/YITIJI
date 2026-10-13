@@ -54,6 +54,8 @@ export function reportBlocksSubtitle(blockCount: number): string {
 export const GUEST_TAKEAWAY_COPY = '登录后可存我的文档，本次可扫码带走'
 export const SAVED_TO_DOCUMENTS_COPY = '已存入我的文档'
 export const EXPORT_BEFORE_PRINT_COPY = '请先导出 PDF，成功后才能打印或扫码带走。'
+/** 只给诊断报告导出成功后的预览失败用。不传时预览仍是前半句。 */
+export const REPORT_EXPORT_PREVIEW_FAILURE_COPY = '预览没能生成，打印仍按原文件。报告已生成，可扫码带走或直接打印。'
 export const EXPORT_ERROR_COPY: Record<string, string> = {
   AI_RESULT_NOT_READY: '诊断结果还没准备好，请稍后再导出。刷新本页或重新诊断后再试。',
   RESUME_PDF_FONT_NOT_FOUND: '这次无法生成报告文件，请稍后再试。',

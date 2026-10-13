@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1949 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -433,7 +433,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 577 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 578 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -784,7 +784,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/shared.ts` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/usePolicyAdvisorAvailability.ts` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/usePolicyFocus.ts` | `verify-renshi-policy-ui.mjs` |
-| `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w3a-ai-records.mjs` |
+| `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-resume-report-qx.mjs`<br/>`verify-w3a-ai-records.mjs` |
 | `apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs` |
 | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-shell.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
@@ -795,7 +795,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-decisions.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-resume-report-qx.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-word-conversion-ui.mjs` |
 | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-phone-upload-ui.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-w3a-ai-records.mjs`<br/>`verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/aiResumeSession.ts` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
@@ -843,7 +843,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportIssues.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-print-parameter-capability.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
@@ -871,10 +871,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-optimize-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-r1-qx2.css` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-fixture.ts` | `verify-resume-report-qx.mjs` |
-| `apps/kiosk/src/pages/resume/resume-report-model.ts` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/resume-report-model.ts` | `verify-print-parameter-capability.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-report-qx.css` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-panels-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-qx.css` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/resumeReportFrom.ts` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | `verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/self-assessment-qx.css` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-self-assessment-consent-source.mjs` |

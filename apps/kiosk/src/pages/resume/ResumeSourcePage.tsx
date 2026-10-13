@@ -24,6 +24,7 @@ import { useLocalPickerCancel, type LocalChannelPhase } from './components/useLo
 import { ResumeTriageHero } from './components/ResumeTriageHero'
 import { type ResumeScoringDimensionKey, type ResumeTargetContext } from '@ai-job-print/shared'
 import { readScanHandoff } from './resumeScanHandoff'
+import { readReportFrom } from './resumeReportFrom'
 import { ResumeIntentSwitch } from './components/ResumeIntentSwitch'
 import { ResumeSourceCards } from './components/ResumeSourceCards'
 import { ResumeExtraExits } from './components/ResumeExtraExits'
@@ -69,6 +70,7 @@ export function ResumeSourcePage() {
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const intent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
+  const reportFrom = readReportFrom(searchParams.get('from'))
   const title = intent === 'optimize' ? 'AI 简历优化' : 'AI 简历诊断'
   const { getToken } = useAuth()
   const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
@@ -266,6 +268,7 @@ export function ResumeSourcePage() {
         fileId: uploadedFile.fileId,
         selectedDimensions: buildTargetContext().skipped ? [] : selectedDimensions,
         targetContext: buildTargetContext(),
+        ...(reportFrom ? { from: reportFrom } : {}),
       },
     })
   }

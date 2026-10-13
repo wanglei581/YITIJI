@@ -34,6 +34,8 @@ interface FileContentPreviewProps {
   onPdfPageCount?: (pageCount: number) => void
   /** 实际渲染成了哪一种（含渲染失败后的 unavailable），给外层决定能摆哪些查看控件。 */
   onKindChange?: (kind: PreviewKind) => void
+  /** PDF 预览画不出来时的整句。不传则仍用画布组件自己的默认句。 */
+  failureMessage?: string
 }
 
 function resolvePreviewKind(
@@ -81,6 +83,7 @@ export function FileContentPreview({
   showPdfPager,
   onPdfPageCount,
   onKindChange,
+  failureMessage,
 }: FileContentPreviewProps) {
   const [renderFailed, setRenderFailed] = useState(false)
   const [convertedUrl, setConvertedUrl] = useState<string | null>(null)
@@ -147,6 +150,7 @@ export function FileContentPreview({
             page={canvasPage}
             fit={canvasFit}
             showPager={canvasPager}
+            failureMessage={failureMessage}
             onReady={({ pageCount }) => onPdfPageCount?.(pageCount)}
             className={`h-full min-h-0 ${compact ? 'min-h-[240px]' : 'min-h-[360px]'}`}
           />
