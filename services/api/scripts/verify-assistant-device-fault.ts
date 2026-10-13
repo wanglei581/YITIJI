@@ -30,7 +30,7 @@ let failCount = 0
 
 /** 合规三 10/10 定字，前缀照系统约束其它行。门禁钉这句原文，不从实现里再 import。 */
 const SALARY_PROMPT_RULE =
-  '薪资：谈到薪资时，只讲怎么了解行情、怎么谈，不给出具体的行业或岗位薪资数字；用户自己说出的数字可以引用。'
+  '薪资：谈到薪资时，只讲怎么了解行情、怎么谈，不给出具体的行业或岗位薪资数字；用户自己说出的数字可以引用，但不评价它在这个行业或岗位里是高是低、合不合理。'
 
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
 function fail(msg: string) { failCount += 1; console.error(`  FAIL ${msg}`) }
