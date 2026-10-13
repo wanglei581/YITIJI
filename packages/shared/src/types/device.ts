@@ -84,7 +84,7 @@ export interface KioskTerminalConfig {
   smartCampus: KioskSmartCampusConfig
   toolbox: KioskToolboxConfig
   jobBoard?: KioskJobBoardConfig
-  /** 3.13 招聘内容托管。未下发时旧客户端只看 jobBoard。 */
+  /** 旧版一体机缺 `recruitmentHosting` 时看 `jobBoard`；本版起一体机缺这一项按关；服务端始终下发这一项。 */
   recruitmentHosting?: RecruitmentHostingPublicConfig
   /** 全局 AI 开关。这里的 maintenance 是全机 AI 维护。 */
   ai?: { loginGate: 'off' | 'before_export' | 'before_generate'; declarationEnforced: boolean; paused: boolean; maintenance?: boolean }
