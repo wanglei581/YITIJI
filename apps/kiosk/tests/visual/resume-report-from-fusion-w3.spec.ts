@@ -7,6 +7,8 @@ import { chooseGenericResumeDirection } from './fixtures/direction-selection'
 
 const CAREER_PLAN_RETURN = '继续做职业规划'
 const EXPORT_PREVIEW_FAILURE = '预览没能生成，打印仍按原文件。报告已生成，可扫码带走或直接打印。'
+const PREVIEW_FAILURE_HEAD = '预览没能生成，打印仍按原文件。'
+const PREVIEW_FAILURE_TAIL = '报告已生成，可扫码带走或直接打印'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -120,4 +122,94 @@ test('an unrecognized from on the source page does not offer a return to career 
   await uploadAndOpenReport(page)
   await expect(page.getByTestId('resume-report-career-plan')).toHaveCount(0)
   await expect(page.getByRole('button', { name: CAREER_PLAN_RETURN })).toHaveCount(0)
+})
+
+test('rediagnose from a career-plan report keeps the source marker @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  registerDiagnosis(api)
+  api.respond('GET', '/api/v1/resume/career-plan/resume-w3-public-fixture', {
+    status: 404,
+    json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } },
+  })
+
+  await page.goto('/resume/career-plan')
+  await expect(page.locator('[data-kiosk-screen="resume-career-plan"][data-state="missing-task"]')).toBeVisible()
+  await page.getByRole('button', { name: '去上传简历', exact: true }).click()
+  await expect(page).toHaveURL(/\/resume\/source\?intent=diagnose&from=career-plan$/)
+  await uploadAndOpenReport(page)
+  await expect(page.getByTestId('resume-report-career-plan')).toHaveText(CAREER_PLAN_RETURN)
+
+  await page.getByRole('button', { name: '重新诊断', exact: true }).click()
+  await expect(page).toHaveURL(/\/resume\/source\?intent=diagnose&from=career-plan$/)
+  await uploadAndOpenReport(page)
+  await expect(page.getByTestId('resume-report-career-plan')).toHaveText(CAREER_PLAN_RETURN)
+})
+
+test('a career-plan report that cannot be read hides the return @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  api.respond('POST', '/api/v1/resume/parse', {
+    status: 200,
+    json: {
+      taskId: diagnosis.taskId,
+      accessToken: diagnosis.accessToken,
+      status: 'completed',
+      providerName: diagnosis.providerName,
+    },
+  })
+  api.respond('GET', '/api/v1/resume/records/resume-w3-public-fixture', {
+    status: 503,
+    json: { success: false, error: { code: 'AI_PROVIDER_ERROR', message: 'upstream' } },
+  })
+  api.respond('GET', '/api/v1/resume/career-plan/resume-w3-public-fixture', {
+    status: 404,
+    json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } },
+  })
+
+  await page.goto('/resume/career-plan')
+  await expect(page.locator('[data-kiosk-screen="resume-career-plan"][data-state="missing-task"]')).toBeVisible()
+  await page.getByRole('button', { name: '去上传简历', exact: true }).click()
+  await expect(page).toHaveURL(/\/resume\/source\?intent=diagnose&from=career-plan$/)
+  await uploadAndOpenReport(page)
+
+  await expect(page.getByTestId('resume-report-state-read-error')).toBeVisible()
+  expect(await page.evaluate(() => (window.history.state as { usr?: { from?: string } } | null)?.usr?.from ?? null)).toBe('career-plan')
+  await expect(page.getByTestId('resume-report-career-plan')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: CAREER_PLAN_RETURN })).toHaveCount(0)
+})
+
+test('change list export preview failure keeps only the first sentence @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  registerDiagnosis(api)
+  api.respond('POST', '/api/v1/resume/records/resume-w3-public-fixture/export', {
+    status: 200,
+    json: {
+      fileId: 'file-w3-change-list',
+      filename: '修改清单.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 1200,
+      pageCount: 1,
+      signedUrl: '/w3-fixtures/change-list.pdf',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      printFileUrl: '/w3-fixtures/change-list-print.pdf',
+      savedToDocuments: false,
+      aiGenerated: true,
+    },
+  })
+  await page.route('**/w3-fixtures/change-list.pdf', (route) => route.fulfill({ status: 404, body: 'missing' }))
+
+  await page.goto('/resume/source?intent=diagnose')
+  await uploadAndOpenReport(page)
+  const exported = page.waitForRequest((request) =>
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/records/resume-w3-public-fixture/export',
+  )
+  await page.getByTestId('resume-report-change-list').click()
+  expect((await exported).postDataJSON()).toMatchObject({ kind: 'change_list' })
+  await expect(page.getByTestId('resume-report-export-actions')).toHaveAttribute('data-exported', '1')
+  await expect(page.getByTestId('resume-report-export-result')).toHaveAttribute('data-kind', 'change_list')
+  await page.getByTestId('resume-report-qr').click()
+  const dialog = page.getByRole('dialog', { name: '修改清单.pdf' })
+  await expect(dialog.getByText(PREVIEW_FAILURE_HEAD, { exact: true })).toBeVisible()
+  await expect(dialog.getByText(PREVIEW_FAILURE_TAIL)).toHaveCount(0)
+  await expect(dialog.getByText(EXPORT_PREVIEW_FAILURE, { exact: true })).toHaveCount(0)
 })

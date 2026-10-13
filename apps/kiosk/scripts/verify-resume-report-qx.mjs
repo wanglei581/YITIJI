@@ -109,7 +109,24 @@ assert(has(files.model, 'evidenceCountOfBlock'), 'block tags count evidence line
 assert(has(files.issues, '条证据'), 'structure blocks show how many evidence lines they hit')
 assert(has(files.actions, 'data-testid="resume-report-career-plan"'), 'normal report actions can show the career-plan return')
 assert(has(files.actions, 'reportFrom ?'), 'the career-plan return stays off unless the whitelist marker arrived')
-assert(!has(files.page, '继续做职业规划'), 'the failure screen does not hardcode the career-plan return')
+{
+  const marker = 'data-testid="resume-report-career-plan"'
+  const hits = files.actions.split(marker).length - 1
+  assert(hits === 1, 'resume-report-career-plan appears once')
+  const lastIf = files.actions.lastIndexOf('if (viewState ===')
+  const returns = lastIf >= 0 ? [...files.actions.slice(lastIf).matchAll(/\breturn\b/g)] : []
+  const normalReturnAt = lastIf + (returns[1]?.index ?? -1)
+  const markerAt = files.actions.indexOf(marker)
+  assert(
+    lastIf >= 0 && returns.length >= 2 && markerAt > normalReturnAt,
+    'resume-report-career-plan sits in the normal report branch, after the last viewState return',
+  )
+}
+assert(
+  has(files.actions, '`/resume/source?intent=${intent}${reportFrom ? `&from=${reportFrom}` : \'\'}`'),
+  'rediagnose keeps the whitelist from marker and does not read raw route state',
+)
+assert(!has(files.actions, 'state.from'), 'rediagnose does not splice the raw route-state string')
 const reportFrom = read('src/pages/resume/resumeReportFrom.ts')
 assert(has(reportFrom, "'career-plan'") && has(reportFrom, '继续做职业规划') && has(reportFrom, 'hasOwnProperty'), 'report source whitelist only accepts career-plan')
 assert(has(read('src/pages/resume/CareerPlanPage.tsx'), 'from=career-plan'), 'career plan is the entry that stamps the marker')

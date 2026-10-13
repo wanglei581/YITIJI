@@ -206,9 +206,9 @@ expect(/正在准备预览/.test(pdfCanvas) && /预览没能生成，打印仍�
 expect(/net::ERR_ABORTED/.test(pdfFrame) && /blob URL/.test(pdfFrame), 'PdfPreviewFrame 说明并避免卸载时的 PDF document abort')
 
 const PREVIEW_FAILURE_TAIL = '报告已生成，可扫码带走或直接打印'
+const PREVIEW_FAILURE_TAIL_COPY = '后半句只写在 resume-report-model.ts 的常量里，带走区只引用常量'
 const PREVIEW_FAILURE_TAIL_FILES = new Set([
   'src/pages/resume/resume-report-model.ts',
-  'src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx',
 ])
 function walkSrcFiles(dir, acc = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -226,7 +226,7 @@ const tailHits = walkSrcFiles(srcRoot)
 expect(tailHits.length > 0, '诊断报告导出成功后的预览失败句带后半句')
 expect(
   tailHits.every((rel) => PREVIEW_FAILURE_TAIL_FILES.has(rel)),
-  `后半句只出现在诊断报告常量和带走区，实际：${tailHits.join(', ') || '（没有）'}`,
+  `${PREVIEW_FAILURE_TAIL_COPY}，实际：${tailHits.join(', ') || '（没有）'}`,
 )
 const takeaway = read(kioskRoot, 'src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx')
 expect(
@@ -234,8 +234,8 @@ expect(
   '诊断报告导出成功后的预览把后半句传进预览层，修改清单仍用默认句',
 )
 expect(
-  !takeaway.includes(PREVIEW_FAILURE_TAIL) || takeaway.includes('REPORT_EXPORT_PREVIEW_FAILURE_COPY'),
-  '带走区引用常量，不另写一句',
+  !takeaway.includes(PREVIEW_FAILURE_TAIL),
+  PREVIEW_FAILURE_TAIL_COPY,
 )
 
 console.log('\nALL PASS')

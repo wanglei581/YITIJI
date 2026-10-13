@@ -66,7 +66,7 @@ export function ResumeReportCta({ viewState, canOptimize, intent, reportFrom, wh
   return (
     <>
       <p className="why" id="resume-report-why">{why}</p>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/resume/source?intent=${intent}`)} data-route="/resume/source">
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/resume/source?intent=${intent}${reportFrom ? `&from=${reportFrom}` : ''}`)} data-route="/resume/source">
         {intent === 'optimize' ? '重新上传' : '重新诊断'}
       </button>
       {reportFrom ? (
