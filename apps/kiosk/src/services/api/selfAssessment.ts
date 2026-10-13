@@ -116,16 +116,17 @@ export function withdrawSelfAssessment(taskId: string, access: SelfAssessmentAcc
   return call<{ deleted: true }>(`/resume/self-assessment/${encodeURIComponent(taskId)}`, access, { method: 'DELETE' })
 }
 
-/** 合并「自我探索 + 简历 PDF」生成新的可打印 PDF。 */
+/** 合并「自我探索 + 简历 PDF」生成新的可打印 PDF。resumeFileUrl 是本次文件的签名地址。 */
 export function appendSelfAssessmentToResume(
   taskId: string,
   resumeFileId: string,
+  resumeFileUrl: string,
   access: SelfAssessmentAccess,
 ): Promise<SelfAssessmentPrintResponse> {
   if (API_MODE !== 'http') return Promise.reject(new SelfAssessmentApiError('MOCK_MODE', '演示模式不生成合并 PDF', 0))
   return call<SelfAssessmentPrintResponse>(
     `/resume/self-assessment/${encodeURIComponent(taskId)}/append`,
     access,
-    { method: 'POST', body: { resumeFileId } },
+    { method: 'POST', body: { resumeFileId, resumeFileUrl } },
   )
 }

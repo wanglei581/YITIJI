@@ -389,6 +389,7 @@ export function PrintConfirmPage() {
             const merged = await appendSelfAssessmentToResume(
               selfAssessmentSnapshot.taskId,
               file.fileId,
+              file.fileUrl,
               { token: getToken(), accessToken: selfAssessmentSnapshot.accessToken ?? null },
             )
             if (!merged.printFileUrl) {
