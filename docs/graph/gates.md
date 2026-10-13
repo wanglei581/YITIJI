@@ -2360,7 +2360,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/advisor/advisor-qa-memory.ts` | `verify-conversation-memory-forget.ts` |
 | `services/api/src/advisor/advisor-retention.task.ts` | `verify-advisor-work.ts`<br/>`verify-ai-user-text-retention.ts` |
 | `services/api/src/advisor/advisor-skills.ts` | `verify-advisor-work.ts`<br/>`verify-assistant-voice.ts` |
-| `services/api/src/advisor/advisor.controller.ts` | `verify-ai-access.ts` |
+| `services/api/src/advisor/advisor.controller.ts` | `verify-ai-access.ts`<br/>`verify-conversation-memory-forget.ts` |
 | `services/api/src/advisor/advisor.module.ts` | `verify-ai-user-text-retention.ts`<br/>`verify-conversation-memory-forget.ts` |
 | `services/api/src/advisor/advisor.service.ts` | `verify-advisor-work.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-conversation-memory-forget.ts` |
 | `services/api/src/advisor/assistant-summary.service.ts` | `verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-conversation-memory-forget.ts`<br/>`verify-llm-account-unavailable.ts`<br/>`verify-resume-parse-intent-http.ts` |

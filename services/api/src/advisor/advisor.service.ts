@@ -61,6 +61,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+/** 只认作业归属失败这一个码。别的错误（例如库不可用）必须原样抛出去。 */
+function isAdvisorSessionMissing(error: unknown): boolean {
+  if (!(error instanceof NotFoundException)) return false
+  const body = error.getResponse() as { error?: { code?: string } }
+  return body.error?.code === 'ADVISOR_SESSION_NOT_FOUND'
+}
+
 export interface AdvisorRequester {
   endUserId: string | null
   accessToken: string | null
@@ -386,6 +393,20 @@ export class AdvisorService {
   async printArtifact(sessionId: string, artifactId: string, requester: AdvisorRequester) {
     const row = await this.loadOwned(sessionId, requester)
     return this.artifacts.print(artifactId, row.id, { endUserId: row.endUserId })
+  }
+
+  /**
+   * 一体机清场：归属对得上才丢掉这一次作业的问答内存。
+   * 找不到、过期、不是本人都当已经清掉。不删库里的作业。
+   */
+  async forgetSession(sessionId: string, requester: AdvisorRequester): Promise<{ forgotten: number }> {
+    try {
+      await this.loadOwned(sessionId, requester)
+    } catch (error: unknown) {
+      if (isAdvisorSessionMissing(error)) return { forgotten: 0 }
+      throw error
+    }
+    return { forgotten: this.qaMemory.forget(sessionId) ? 1 : 0 }
   }
 
   // ── 内部 ──────────────────────────────────────────────────

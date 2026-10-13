@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`589` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`590` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -86,6 +86,7 @@
 | GET | `/api/v1/advisor/sessions/:sessionId` | CreateAdvisorSessionDto.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
 | POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | CreateAdvisorSessionDto.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
 | POST | `/api/v1/advisor/sessions/:sessionId/ask` | CreateAdvisorSessionDto.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
+| POST | `/api/v1/advisor/sessions/:sessionId/forget` | CreateAdvisorSessionDto.forget | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
 | POST | `/api/v1/advisor/sessions/:sessionId/pins` | CreateAdvisorSessionDto.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
 | DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | CreateAdvisorSessionDto.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |
 | POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog<br/>User |

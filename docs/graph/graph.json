@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 589,
+    "endpointCount": 590,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -5258,6 +5258,27 @@
           "User"
         ],
         "path": "/api/v1/advisor/sessions/:sessionId/ask",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/advisor/advisor.service.ts"
+        ],
+        "services": [
+          "AdvisorService"
+        ]
+      },
+      {
+        "controller": "services/api/src/advisor/advisor.controller.ts",
+        "handler": "CreateAdvisorSessionDto.forget",
+        "method": "POST",
+        "models": [
+          "AdvisorArtifact",
+          "AdvisorPin",
+          "AdvisorSession",
+          "AiServiceLog",
+          "AuditLog",
+          "User"
+        ],
+        "path": "/api/v1/advisor/sessions/:sessionId/forget",
         "roles": [],
         "serviceFiles": [
           "services/api/src/advisor/advisor.service.ts"
@@ -24302,7 +24323,8 @@
       "services/api/scripts/verify-assistant-voice.ts"
     ],
     "services/api/src/advisor/advisor.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor.module.ts": [
       "services/api/scripts/verify-ai-user-text-retention.ts",
@@ -37319,6 +37341,7 @@
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/advisor/advisor-artifact.service.ts",
           "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/advisor/advisor.controller.ts",
           "services/api/src/advisor/advisor.module.ts",
           "services/api/src/advisor/advisor.service.ts",
           "services/api/src/advisor/assistant-summary.service.ts",

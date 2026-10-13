@@ -6,7 +6,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:conversation-memory-forget
  */
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -17,6 +17,7 @@ import { AssistantSessionForgetController } from '../src/ai/assistant-session-fo
 import { AssistantSessionsForgetDto } from '../src/ai/dto/assistant-sessions-forget.dto'
 import { AiLogService } from '../src/ai/ai-log.service'
 import { LlmChatService, assistantOwnerKey } from '../src/ai/llm/llm-chat.service'
+import { AdvisorController } from '../src/advisor/advisor.controller'
 import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
 import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
 import { AdvisorService } from '../src/advisor/advisor.service'
@@ -113,6 +114,7 @@ async function main(): Promise<void> {
     const forgetSrc = readSrc('src/ai/assistant-session-forget.controller.ts')
     const aiController = readSrc('src/ai/ai.controller.ts')
     const advisorSrc = readSrc('src/advisor/advisor.service.ts')
+    const advisorControllerSrc = readSrc('src/advisor/advisor.controller.ts')
     const providersBlock = /providers:\s*\[([\s\S]*?)\]/.exec(advisorModule)?.[1] ?? ''
     const deleteBody = methodSlice(assetsSrc, 'async deleteQaRecord(')
     const logoutBody = methodSlice(authSrc, 'async logout(')
@@ -137,6 +139,7 @@ async function main(): Promise<void> {
     )
     check(advisorSrc.includes('u:${row.endUserId}'), '接线：作业追问写入内存时带上会员归属')
     check(forgetSrc.includes("@Post('assistant/sessions/forget')"), '接线：清场路由是 POST /assistant/sessions/forget')
+    check(advisorControllerSrc.includes("@Post('sessions/:sessionId/forget')") && methodSlice(advisorSrc, 'async forgetSession(').includes('this.loadOwned('), '接线：作业清场路由是 @Post(\'sessions/:sessionId/forget\')，调了 loadOwned')
     check(forgetSrc.includes('@TerminalScopedThrottle(12)') && aiController.includes('@TerminalScopedThrottle(12)'), '场景 5 阳性：清场和 /assistant/chat 都是每分钟 12 次的同一套限流')
     check(forgetSrc.includes('@AiUseExempt(') && !/@AiUse\(/.test(forgetSrc) && !/publicQuota|\.consume\(|aiLog/.test(forgetSrc), '场景 5：清场不扣次数、不算 AI 调用、不进 AI 闸门')
     check(/private readonly sessions = new Map</.test(chatSrc) && !/prisma\./.test(chatSrc), '阳性：小青对话仍只在这个文件的内存 Map 里，不落库')
@@ -405,6 +408,55 @@ async function main(): Promise<void> {
         && memory.read(workFresh).some((turn) => turn.content.includes(markFresh)),
       '场景 6 阳性：清扫之后新写的会话，再扫 1 秒仍然在',
     )
+
+    // ── 场景 7 ────────────────────────────────────────────────────────────
+    const forgetHandler = advisorControllerSrc.slice(advisorControllerSrc.indexOf("@Post('sessions/:sessionId/forget')"))
+    check(forgetHandler.includes('@AiUseExempt(') && !/@AiUse\(/.test(forgetHandler) && !/publicQuota|\.consume\(|aiLog/.test(forgetHandler), '场景 7：作业清场不扣次数、不算 AI 调用、不进 AI 闸门')
+    const anonToken = `tok-${randomUUID()}`
+    const otherToken = `tok-${randomUUID()}`
+    const workAnon = `verify-work-fa-${randomUUID()}`
+    const workOther = `verify-work-fb-${randomUUID()}`
+    const workMember = `verify-work-fm-${randomUUID()}`
+    async function createAnon(id: string, token: string): Promise<void> {
+      await prisma!.advisorSession.create({
+        data: { id, accessTokenHash: createHash('sha256').update(token, 'utf8').digest('hex'), topic: '顾问作业', skill: 'qa', expiresAt: future },
+      })
+    }
+    await createAnon(workAnon, anonToken)
+    await createAnon(workOther, otherToken)
+    await createQa(userF, workMember, `verify-art-fm-${randomUUID()}`)
+    const qAnon = `匿名清场原话${randomUUID()}`
+    const qOther = `旁路作业原话${randomUUID()}`
+    const qMember = `会员清场原话${randomUUID()}`
+    await advisor.ask(workAnon, qAnon, { endUserId: null, accessToken: anonToken })
+    await advisor.ask(workOther, qOther, { endUserId: null, accessToken: otherToken })
+    await advisor.ask(workMember, qMember, { endUserId: userF, accessToken: null })
+    check(memory.read(workAnon).some((turn) => turn.content.includes(qAnon)), '场景 7 阳性：清场前，匿名作业的问答内存里有这一轮原话')
+    const advisorController = new AdvisorController(advisor, jwt, redis as never, prisma)
+    const anonReq = (token: string) => ({ headers: { 'x-advisor-access-token': token } })
+    const wrong = await advisorController.forget(workAnon, anonReq(`bad-${randomUUID()}`))
+    const stolenMember = await advisorController.forget(workAnon, { headers: { authorization: `Bearer ${bearer(userF2)}` } })
+    check(wrong.forgotten === 0 && stolenMember.forgotten === 0 && memory.read(workAnon).some((turn) => turn.content.includes(qAnon)), '场景 7：错的令牌或别的会员来清 → forgotten:0，那条内存还在')
+    const cleared = await advisorController.forget(workAnon, anonReq(anonToken))
+    check(cleared.forgotten === 1 && memory.read(workAnon).length === 0, `场景 7：正确令牌清匿名作业 → forgotten:1，内存没了（实际 ${cleared.forgotten}）`)
+    const again = await advisorController.forget(workAnon, anonReq(anonToken))
+    check(again.forgotten === 0, `场景 7：再清一次 → forgotten:0（实际 ${again.forgotten}）`)
+    check(memory.read(workOther).some((turn) => turn.content.includes(qOther)), '场景 7：另一个作业的内存不受影响')
+    const memberCleared = await advisorController.forget(workMember, { headers: { authorization: `Bearer ${bearer(userF)}` } })
+    check(memberCleared.forgotten === 1 && memory.read(workMember).length === 0, `场景 7：会员本人来清 → forgotten:1（实际 ${memberCleared.forgotten}）`)
+    check(!!await prisma.advisorSession.findUnique({ where: { id: workAnon } }) && !!await prisma.advisorSession.findUnique({ where: { id: workMember } }), '场景 7：作业还在，只清了内存')
+    const realDelegate = prisma.advisorSession
+    let dbStatus = 0
+    Object.defineProperty(prisma, 'advisorSession', { configurable: true, get: () => new Proxy(realDelegate, { get(target, prop, receiver) {
+      if (prop === 'findUnique') return () => Promise.reject(new Error('database unavailable'))
+      const value = Reflect.get(target, prop, receiver)
+      return typeof value === 'function' ? value.bind(target) : value
+    } }) })
+    try {
+      await advisorController.forget(workOther, anonReq(otherToken))
+      dbStatus = 200
+    } catch { dbStatus = 500 } finally { delete (prisma as { advisorSession?: unknown }).advisorSession }
+    check(dbStatus === 500 && memory.read(workOther).some((turn) => turn.content.includes(qOther)), '场景 7：数据库不可用时不回 forgotten:0，错误照常抛出，另一个作业还在')
 
     console.log(`\nverify:conversation-memory-forget ${failCount === 0 ? '通过' : '未通过'}：PASS ${passCount} / FAIL ${failCount}`)
     if (failCount > 0) process.exitCode = 1
