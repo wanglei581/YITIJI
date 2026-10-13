@@ -212,7 +212,7 @@ export type CockpitState =
   | 'reply-real' | 'reply-not-ai' | 'reply-error' | 'ai-unavailable'
   | CockpitVoiceState
 
-/** 一轮返回在舱面上的归类。fixed-notice 不改舱面文案。 */
+/** 一轮返回在舱面上的归类。fixed-notice 主标题走默认态，「回答来源」读数写「未取得 AI 回答」。 */
 export type AdvisorResultTurn = 'ai' | 'not-ai' | 'error' | 'fixed-notice'
 
 export interface CockpitSignals {

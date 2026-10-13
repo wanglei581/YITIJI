@@ -67,10 +67,11 @@ must(
   'response.reply 只允许出现在已判定为真实模型回答之后',
 )
 must('conversation', /kind === 'ai' &&[\s\S]{0,120}EvidenceBadge level="E3"/, 'E3「AI 判断」徽章只允许挂在真实模型回答上')
+must('conversation', /kind === 'ai' &&[\s\S]{0,120}AI 生成 · 供参考/, '「AI 生成 · 供参考」只允许挂在真实模型回答上')
 
-// ── ②b 设备故障固定提示：正文照后端原文，小标是「安全提示」，不挂 E3 ──
-// 模型就绪时服务端仍盖 aiGenerated。若把 fixedNotice 并进「不是 AI」那一支，
-// 正文会被藏掉；若仍走 kind === 'ai'，就会挂上 E3。两条都不许。
+// ── ②b 设备故障固定提示：正文照后端原文，小标是「安全提示」 ──
+// 小标那几行只确认字和样式。E3 与「AI 生成 · 供参考」要在整个对话组件里数，
+// 不能只在这三行里找「没有」。固定提示这一轮不改 AI 可用性。
 must('provider', /function isFixedNoticeReply/, '固定提示必须有单独判定，不得并进 isAiGeneratedReply')
 must('provider', /fixedNotice === true/, 'fixedNotice 只认布尔 true，缺失与 false 都不是固定提示')
 must('page', /isFixedNoticeReply\(response\)/, '页面必须用统一判定决定这轮是不是固定提示')
@@ -117,15 +118,26 @@ assert(/\breturn\b/.test(noticeBranch), 'page: 固定提示分支必须提前 re
 assert(!noticeBranch.includes("kind: 'ai'"), 'page: 固定提示不得标成 AI 回答')
 assert(!noticeBranch.includes("kind: 'not-ai'"), 'page: 固定提示不得走「这一轮没有 AI 回答」')
 assert(!noticeBranch.includes('buildNonAiNotice'), 'page: 固定提示不得换成非 AI 说明')
+assert(!noticeBranch.includes('setAiAvailability'), 'page: 固定提示分支不许改 AI 可用性')
 
 const fixedBubble = parenBlockAfter(files.conversation, "msg.kind === 'fixed-notice'")
 assert(fixedBubble.includes('安全提示'), 'conversation: fixedNotice 气泡挂「安全提示」')
 assert(fixedBubble.includes('kiosk-ev--e3'), 'conversation: 「安全提示」复用 E3 小标的警示样式')
 assert(fixedBubble.includes('data-fixed-notice="true"'), 'conversation: 固定提示小标带 data-fixed-notice，不靠证据等级')
-assert(!fixedBubble.includes('EvidenceBadge'), 'conversation: 固定提示气泡不挂 E3')
-assert(!fixedBubble.includes('data-evidence'), 'conversation: 固定提示气泡不写证据等级')
-assert(!fixedBubble.includes('AI 生成 · 供参考'), 'conversation: 固定提示气泡不写「AI 生成 · 供参考」')
-assert(!fixedBubble.includes('AI 判断'), 'conversation: 固定提示气泡不写「AI 判断」')
+
+function countOf(source, needle) {
+  let count = 0
+  let from = 0
+  while (from < source.length) {
+    const at = source.indexOf(needle, from)
+    if (at < 0) break
+    count += 1
+    from = at + needle.length
+  }
+  return count
+}
+assert(countOf(files.conversation, 'EvidenceBadge level="E3"') === 1, 'conversation: EvidenceBadge level="E3" 只出现一次')
+assert(countOf(files.conversation, 'AI 生成 · 供参考') === 1, 'conversation: 「AI 生成 · 供参考」只出现一次')
 
 // ── ③ 可用性是实测值，不得写死 ────────────────────────────────────────────
 must('page', /useState<AiAvailability>\('unknown'\)/, '首次进入的可用性必须是诚实的 unknown')
@@ -197,7 +209,7 @@ assert(provider.isFixedNoticeReply({ fixedNotice: false }) === false, 'provider:
 assert(provider.isFixedNoticeReply({}) === false, 'provider: fixedNotice 缺失')
 assert(
   provider.isAiGeneratedReply({ providerLabel: 'llm:test', aiGenerated: true, fixedNotice: true }) === true,
-  'provider: fixedNotice 不改模型来源判定，避免被收成非 AI 后藏正文',
+  'provider: isAiGeneratedReply 只看通道、不看 fixedNotice；固定提示由页面先行分流',
 )
 const copy = loadPureModule('src/pages/assistant/advisorUserCopy.ts', {
   '../../utils/maskPii': loadPureModule('src/utils/maskPii.ts'),

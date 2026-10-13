@@ -270,10 +270,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
       setProviderLabel(response.providerLabel)
-      // 固定提示先于「是不是模型回答」。模型就绪时服务端仍盖 aiGenerated，
-      // 若先走下面两支，要么标成 AI，要么把正文换成「没有 AI 回答」。
+      // 固定提示先分流：正文照后端原文，然后返回。
+      // 这一轮不改 AI 可用性。固定话可能根本没调模型，不能写成可用，也不能写成不可用。
       if (isFixedNoticeReply(response)) {
-        if (isAiGeneratedReply(response)) setAiAvailability('available')
         setMessages((current) => [
           ...current,
           {
