@@ -22944,6 +22944,7 @@
       "services/api/scripts/verify-file-assets-trial-acceptance.ts"
     ],
     "docs/device/production-deployment-runbook.md": [
+      "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-cos-lifecycle-policy.ts"
     ],
     "docs/device/windows-host-acceptance-runbook.md": [
@@ -25164,6 +25165,9 @@
     "services/api/src/auth/admin-initial-phone-bind.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts",
       "services/api/scripts/verify-internal-auth-phone.ts"
+    ],
+    "services/api/src/auth/admin-login-second-factor.ts": [
+      "services/api/scripts/verify-admin-login-hardening.ts"
     ],
     "services/api/src/auth/admin-phone-transfer.service.ts": [
       "services/api/scripts/verify-admin-phone-transfer.ts"
@@ -35263,8 +35267,10 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "docs/device/production-deployment-runbook.md",
           "services/api/scripts/support/internal-auth-verify-harness.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/auth/admin-login-second-factor.ts",
           "services/api/src/auth/auth.service.ts",
           "services/api/src/auth/first-admin-bootstrap.ts",
           "services/api/src/auth/internal-otp.service.ts",

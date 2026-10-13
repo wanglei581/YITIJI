@@ -507,7 +507,7 @@ export default function LoginPage() {
           )}
 
           <div className="c-cardfoot">
-            <span>无法登录？联系超级管理员协助处理</span>
+            <span>无法登录？请联系系统维护人员处理。</span>
             <span>验证码 5 分钟内有效</span>
           </div>
         </div>
@@ -636,7 +636,7 @@ export default function LoginPage() {
             )}
 
             <div className="c-modal-foot">
-              无法自助找回？联系<b>超级管理员</b>在后台重置，重置操作将记录审计日志。
+              无法自助找回？请联系系统维护人员处理。
             </div>
           </div>
         </div>

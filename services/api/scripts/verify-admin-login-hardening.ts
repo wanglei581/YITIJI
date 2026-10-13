@@ -10,6 +10,7 @@
  *       验证码错不作废凭证、对了才签发；凭证一次性、改密后作废、伪造无效；登录用途的验证码过不了第二步；
  *       没绑手机的管理员被拒；管理员「只用短信登录」被关；合作机构不受影响；首位管理员受控改密不受影响。
  *   [D] /health 的 Redis 降级影响声明写明「内部账号新登录不可用」（HTTP 实测在 verify:redis-degradation-truth）。
+ *   [F] 运维手册的退路写法和代码一致：关只认空 / off / false / 0；no、disabled、none、sms 按开。
  *
  * 真实 Prisma（隔离 SQLite）+ 共享内存 Redis（原子预留语义与生产 Lua 一致）+ 捕获短信，不连外网。
  */
@@ -18,6 +19,8 @@ import 'dotenv/config'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { randomBytes, randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import { CapturingSmsSender, MemoryRedis, RecordingAudit, errorCode } from './support/internal-auth-verify-harness'
 
@@ -422,6 +425,31 @@ async function main(): Promise<void> {
     check('REDIS_DEGRADED_IMPACT 声明「内部账号新登录」在 Redis 不可用时不可用',
       (REDIS_DEGRADED_IMPACT as Record<string, string>)['internal-password-login'] === 'unavailable',
       JSON.stringify(REDIS_DEGRADED_IMPACT))
+
+    // ── [F] 运维手册的退路写法和代码一致（不依赖告警次数）────────────────
+    console.log('\n[F] 运维手册退路与开关取值')
+    {
+      const runbook = readFileSync(join(__dirname, '../../../docs/device/production-deployment-runbook.md'), 'utf8')
+      check('手册含 ADMIN_LOGIN_SECOND_FACTOR=off', runbook.includes('ADMIN_LOGIN_SECOND_FACTOR=off'))
+      check('手册含 ADMIN_LOGIN_SECOND_FACTOR=sms', runbook.includes('ADMIN_LOGIN_SECOND_FACTOR=sms'))
+      check('手册含反例词 no 与 disabled', /\bno\b/.test(runbook) && /\bdisabled\b/.test(runbook))
+      const { adminSecondFactorRequired } = await import('../src/auth/admin-login-second-factor')
+      const key = 'ADMIN_LOGIN_SECOND_FACTOR'
+      const previous = process.env[key]
+      try {
+        for (const value of ['off', 'OFF', ' off ', 'false', '0', '']) {
+          process.env[key] = value
+          check(`开关值 ${JSON.stringify(value)} 为关`, adminSecondFactorRequired() === false)
+        }
+        for (const value of ['no', 'disabled', 'none', 'sms']) {
+          process.env[key] = value
+          check(`开关值 ${JSON.stringify(value)} 为开`, adminSecondFactorRequired() === true)
+        }
+      } finally {
+        if (previous === undefined) delete process.env[key]
+        else process.env[key] = previous
+      }
+    }
   } finally {
     await cleanup()
   }
