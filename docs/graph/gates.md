@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1949 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -433,7 +433,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 577 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 578 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -945,6 +945,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/api/ai.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/services/api/aiHttpAdapter.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-export-facts-contract.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-llm-timeout-concurrency.ts` |
 | `apps/kiosk/src/services/api/aiMockAdapter.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-toolbox-ai-skill-intents.ts` |
+| `apps/kiosk/src/services/api/aiSessionForget.ts` | `verify-ai-requests-terminal-session.mjs` |
 | `apps/kiosk/src/services/api/benefitActivities.ts` | `verify-member-session-closure.mjs` |
 | `apps/kiosk/src/services/api/campusRecruitmentStats.ts` | `verify-campus-recruitment-stats.ts` |
 | `apps/kiosk/src/services/api/careerPlan.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-member-session-closure.mjs` |

@@ -68,6 +68,8 @@ export function registerPrivacyShell(api: ApiRouter): void {
     json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
   })
   api.respond('POST', '/api/v1/member/auth/logout', { status: 200, json: { success: true } })
+  api.respond('POST', '/api/v1/assistant/sessions/forget', { status: 200, json: { forgotten: 0 } })
+  api.respond('POST', '/api/v1/advisor/sessions/:sessionId/forget', { status: 200, json: { forgotten: 0 } })
   const emptyPage = { success: true, data: { items: [], nextCursor: null, total: 0 } }
   for (const path of [
     '/api/v1/me/favorites',

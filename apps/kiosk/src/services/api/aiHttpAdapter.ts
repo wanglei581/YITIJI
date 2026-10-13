@@ -48,6 +48,7 @@ import {
   type ResumeParseIntentHeaders,
 } from '../resumeParseIntent'
 import { terminalAttributedFetch } from '../terminalAuth'
+import { rememberAdvisorSession, rememberAssistantSession } from './aiSessionForget'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { networkError } from './throwHttpError'
@@ -297,7 +298,9 @@ export const aiHttpAdapter = {
   },
 
   async chatWithAssistant(req: AssistantChatRequest, token?: string | null): Promise<AssistantChatResponse> {
-    return post<AssistantChatResponse>('/assistant/chat', req, token, LLM_TIMEOUT_MS)
+    const res = await post<AssistantChatResponse>('/assistant/chat', req, token, LLM_TIMEOUT_MS)
+    rememberAssistantSession(res.sessionId)
+    return res
   },
 
   // ── 阶段2A AI 简历生成 ──────────────────────────────────────
@@ -323,12 +326,15 @@ export const aiHttpAdapter = {
   },
 
   async summarizeAssistantSession(sessionId: string, token: string): Promise<AssistantSessionSummaryResponse> {
-    return post<AssistantSessionSummaryResponse>(
+    const res = await post<AssistantSessionSummaryResponse>(
       `/assistant/sessions/${encodeURIComponent(sessionId)}/summary`,
       {},
       token,
       LLM_TIMEOUT_MS,
     )
+    // 回包字段是 advisorSessionId（作业号，cuid）。会员令牌清场时再带，这里只登记作业号。
+    rememberAdvisorSession(res.advisorSessionId)
+    return res
   },
 
   async exportGeneratedResume(

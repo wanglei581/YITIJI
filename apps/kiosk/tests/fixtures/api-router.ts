@@ -108,6 +108,16 @@ export class ApiRouter {
       status: 200,
       json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
     })
+    // 清场会发这两条忘掉小青对话 / 作业内存的请求。默认回 0，免得老用例撞「没登记的请求」。
+    // 作业号在路径里，requestKey 把它们收成同一条。
+    this.respond('POST', '/api/v1/assistant/sessions/forget', {
+      status: 200,
+      json: { forgotten: 0 },
+    })
+    this.respond('POST', '/api/v1/advisor/sessions/:sessionId/forget', {
+      status: 200,
+      json: { forgotten: 0 },
+    })
     // 包 N2：/campus/freshman-insights 挂载时读校招聚合。默认空集合，避免冒烟撞 Unhandled API。
     this.respond('GET', '/api/v1/kiosk/campus/recruitment-stats', {
       status: 200,
@@ -232,5 +242,10 @@ function requestKey(method: string, path: string): string {
     throw new Error(`ApiRouter path must not include a query string or fragment: ${path}`)
   }
 
-  return `${normalizedMethod} ${path}`
+  // 清场按作业号逐个发 forget。登记和计数都收成这一条，真实路径仍原样发出。
+  const canonical = path.replace(
+    /^\/api\/v1\/advisor\/sessions\/[^/]+\/forget$/,
+    '/api/v1/advisor/sessions/:sessionId/forget',
+  )
+  return `${normalizedMethod} ${canonical}`
 }

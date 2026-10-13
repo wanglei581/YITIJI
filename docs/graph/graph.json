@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 716,
+      "reachableFileCount": 717,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16505,7 +16505,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 814
+      "sourceFileCount": 815
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21875,6 +21875,9 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "services/api/scripts/verify-toolbox-ai-skill-intents.ts"
+    ],
+    "apps/kiosk/src/services/api/aiSessionForget.ts": [
+      "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs"
     ],
     "apps/kiosk/src/services/api/benefitActivities.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
@@ -29492,6 +29495,7 @@
           "apps/kiosk/src/hooks/useAiAdvisorCallSession.ts",
           "apps/kiosk/src/services/api/advisor.ts",
           "apps/kiosk/src/services/api/aiHttpAdapter.ts",
+          "apps/kiosk/src/services/api/aiSessionForget.ts",
           "apps/kiosk/src/services/api/careerPlan.ts",
           "apps/kiosk/src/services/api/contractReview.ts",
           "apps/kiosk/src/services/api/fairVisitPlan.ts",

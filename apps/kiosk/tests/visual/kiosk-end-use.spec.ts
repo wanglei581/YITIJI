@@ -279,3 +279,102 @@ test('idle timeout exit: 3 minutes untouched → logged out, deep link reads not
   await expectNoTraceOf(page, WANG)
   await expectNextPersonSeesNothing(page, calls, WANG, '13-after-idle')
 })
+
+/** 夹具回的小青会话号：32 位小写十六进制，和服务端 randomBytes(16) 同一形状。 */
+const ASSISTANT_SESSION_ID = '0123456789abcdef0123456789abcdef'
+const ASSISTANT_REPLY = '按真实经历写成三段，分别写做过什么、怎么做的、结果如何。'
+
+function registerAssistantChat(api: ApiRouter): void {
+  api.respond('POST', '/api/v1/assistant/chat', {
+    status: 200,
+    json: {
+      sessionId: ASSISTANT_SESSION_ID,
+      reply: ASSISTANT_REPLY,
+      intent: 'general',
+      actions: [],
+      providerLabel: 'llm:deepseek',
+      aiGenerated: true,
+    },
+  })
+}
+
+interface WatchedPost {
+  order: number
+  path: string
+  auth: string | null
+  body: string | null
+}
+
+/** 记下清场发出的忘掉对话，以及会员登出。顺序按请求实际发出的先后。 */
+function watchForgetAndLogout(page: Page): WatchedPost[] {
+  const posts: WatchedPost[] = []
+  page.on('request', (request: Request) => {
+    if (request.method() !== 'POST') return
+    const path = new URL(request.url()).pathname
+    if (path !== '/api/v1/assistant/sessions/forget' && path !== '/api/v1/member/auth/logout') return
+    posts.push({
+      order: posts.length + 1,
+      path,
+      auth: request.headers()['authorization'] ?? null,
+      body: request.postData(),
+    })
+  })
+  return posts
+}
+
+async function askXiaoqing(page: Page): Promise<void> {
+  await page.getByLabel('输入咨询问题').fill('如何整理项目经历？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByText(ASSISTANT_REPLY)).toBeVisible()
+}
+
+test('会员问过小青，结束使用时带着令牌忘掉这次对话，而且早于登出 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const posts = watchForgetAndLogout(page)
+  await routeMembers(page, api)
+  registerAssistantChat(api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+
+  await nav(page, 'AI 顾问').click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await askXiaoqing(page)
+  // 虚拟键盘还盖着底栏，先收起再走导航。
+  await page.getByRole('button', { name: '收起键盘', exact: true }).click()
+
+  // 时钟停着，刚点过，进「我的」不问「还是你吗？」。
+  await nav(page, '我的').click()
+  await expect(page).toHaveURL(/\/profile$/)
+  await page.getByRole('button', { name: '结束使用', exact: true }).click()
+  await expectLoggedOutHome(page)
+
+  const forgets = posts.filter((post) => post.path === '/api/v1/assistant/sessions/forget')
+  const logout = posts.find((post) => post.path === '/api/v1/member/auth/logout')
+  const bearer = forgets.find((post) => post.auth === `Bearer ${WANG.token}`)
+  expect(bearer, `应有一条带会员令牌的忘掉对话，实际 ${JSON.stringify(forgets)}`).toBeTruthy()
+  expect(JSON.parse(bearer?.body ?? '{}').sessionIds).toEqual([ASSISTANT_SESSION_ID])
+  expect(logout, '结束使用应发出登出').toBeTruthy()
+  expect(bearer!.order).toBeLessThan(logout!.order)
+})
+
+test('游客问过小青，结束使用时不带令牌忘掉这次对话 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const posts = watchForgetAndLogout(page)
+  registerPrivacyShell(api)
+  registerAssistantChat(api)
+  await allowLocalBootTicket(page)
+
+  await page.goto('/assistant')
+  await askXiaoqing(page)
+
+  // 停在顾问页（不是空操作的首页）。150 秒进「还在用吗？」，点结束，不要一次快进到自动清场。
+  await page.clock.runFor(151_000)
+  await expect(page.getByTestId('session-guard-clear')).toBeVisible()
+  await page.getByTestId('session-guard-clear').click()
+  await expectLoggedOutHome(page)
+
+  const forgets = posts.filter((post) => post.path === '/api/v1/assistant/sessions/forget')
+  expect(forgets, `游客应只发一条不带令牌的忘掉对话，实际 ${JSON.stringify(forgets)}`).toHaveLength(1)
+  expect(forgets[0]?.auth).toBeNull()
+  expect(JSON.parse(forgets[0]?.body ?? '{}').sessionIds).toEqual([ASSISTANT_SESSION_ID])
+})

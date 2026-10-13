@@ -794,6 +794,7 @@ async function loadClearance() {
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
+    .replaceAll("from '../services/api/aiSessionForget'", `from '${toDataUrl('export function forgetAiSessions() {}\n')}'`)
   const sensitive = await import(toDataUrl(sensitiveCode))
   const declaration = await import(sessionUrl)
   return { sensitive, declaration, session }

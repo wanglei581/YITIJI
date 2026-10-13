@@ -373,6 +373,7 @@ try {
       } }
       if (name === './httpAdapter') return { ApiHttpError: Error }
       if (name === './throwHttpError') return { networkError: (err) => err, throwHttpError: async () => { throw new Error('读取失败') } }
+      if (name === './aiSessionForget') return { rememberAdvisorSession() {} }
       throw new Error(`未登记依赖：${name}`)
     })
     const actual = await module.getAdvisorAvailability()
