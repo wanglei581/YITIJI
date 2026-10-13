@@ -9,6 +9,7 @@ import {
   MaxLength,
   Min,
   Validate,
+  ValidateIf,
   ValidatorConstraint,
   type ValidationArguments,
   type ValidatorConstraintInterface,
@@ -39,7 +40,7 @@ function terminalIdOf(req: ReqLike): string | null {
 @ValidatorConstraint({ name: 'loginCheckboxSourceOnlyForAge', async: false })
 class LoginCheckboxSourceOnlyForAge implements ValidatorConstraintInterface {
   validate(source: unknown, args: ValidationArguments): boolean {
-    if (source === undefined || source === null) return true
+    if (source === undefined) return true
     return (args.object as { scope?: unknown }).scope === 'age_14_plus'
   }
 
@@ -52,7 +53,8 @@ class GrantAiConsentDto {
   @IsIn(CONSENT_SCOPES)
   scope!: MemberAiConsentScope
 
-  @IsOptional()
+  // 只在没带这个字段时跳过；带了 null、空串或别的值都要过下面两条（IsOptional 会把 null 当没带）。
+  @ValidateIf((_object, value) => value !== undefined)
   @IsIn(['login_checkbox'])
   @Validate(LoginCheckboxSourceOnlyForAge)
   source?: 'login_checkbox'

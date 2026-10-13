@@ -35,12 +35,21 @@ export const VOICE_RECORDING_CONSENT_COPY =
   '转写完成后不保留音频。不做声纹识别。' +
   '你可以在隐私页撤回这项同意；撤回后新的录音不会再开始。'
 
-/** 导出按版本还原当时屏上的原文。表里只存版本号，对不上的版本给 null，不编一句。 */
+/**
+ * 导出按版本还原当时屏上的原文。表里只存版本号，对不上的版本给 null，不编一句。
+ * 键写版本的字面值、不引「当前版本」常量：当前版本以后会升，旧记录仍要查得到当时那句。
+ * 只许加行，不许改旧行的原文（旧记录是证据）；门禁逐字钉着每一行。
+ */
+const CONSENT_DECLARATION_TEXT_BY_VERSION: Readonly<Record<string, string>> = Object.freeze({
+  'age-14-plus-v1': AGE_14_PLUS_CONSENT_COPY,
+  'age-14-plus-login-v1': AGE_14_PLUS_LOGIN_CONSENT_COPY,
+  'voice-recording-v1': VOICE_RECORDING_CONSENT_COPY,
+})
+
 export function consentDeclarationText(consentVersion: string): string | null {
-  if (consentVersion === CURRENT_AGE_14_PLUS_CONSENT_VERSION) return AGE_14_PLUS_CONSENT_COPY
-  if (consentVersion === AGE_14_PLUS_LOGIN_CONSENT_VERSION) return AGE_14_PLUS_LOGIN_CONSENT_COPY
-  if (consentVersion === CURRENT_VOICE_RECORDING_CONSENT_VERSION) return VOICE_RECORDING_CONSENT_COPY
-  return null
+  return Object.prototype.hasOwnProperty.call(CONSENT_DECLARATION_TEXT_BY_VERSION, consentVersion)
+    ? CONSENT_DECLARATION_TEXT_BY_VERSION[consentVersion]!
+    : null
 }
 
 export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, string>> = {
@@ -148,6 +157,11 @@ export class MemberPrivacyService {
     source?: 'login_checkbox',
   ): Promise<MemberAiConsentStatus> {
     this.assertScope(scope)
+    if (source !== undefined && source !== 'login_checkbox') {
+      throw new BadRequestException({
+        error: { code: 'VALIDATION_FAILED', message: 'source 只收 login_checkbox' },
+      })
+    }
     if (source === 'login_checkbox') {
       if (scope !== 'age_14_plus') {
         throw new BadRequestException({

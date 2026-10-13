@@ -18,6 +18,7 @@ import { AiAccessService, type AiAccessConfig } from '../src/ai-access/ai-access
 import { MemberDataExportMapper } from '../src/member-privacy/member-data-export.mapper'
 import { GrantAiConsentDto } from '../src/member-privacy/member-privacy.controller'
 import {
+  consentDeclarationText,
   MemberPrivacyService,
   AGE_14_PLUS_CONSENT_COPY,
   AGE_14_PLUS_LOGIN_CONSENT_COPY,
@@ -113,9 +114,11 @@ function assertLoginGranted(status: MemberAiConsentStatus, label: string): void 
 function loginCheckboxSentence(wxml: string): string {
   const start = wxml.indexOf('我已阅读并同意')
   const end = wxml.indexOf('周岁', start)
-  if (start < 0 || end < 0) fail('勾选句里找不到「我已阅读并同意」到「周岁」')
-  const slice = wxml.slice(start, end + '周岁'.length)
-  return slice.replace(/<[^>]+>/g, '').replace(/[ \t]*\r?\n[ \t]*/g, '')
+  // 截到「周岁」所在那一段的结束标签为止：句尾再加字（同一段里）也要比出来，不能截到「周岁」就停。
+  const close = end < 0 ? -1 : wxml.indexOf('</view>', end)
+  if (start < 0 || end < 0 || close < 0) fail('勾选句里找不到「我已阅读并同意」到「周岁」所在那一段的结尾')
+  const slice = wxml.slice(start, close)
+  return slice.replace(/<[^>]+>/g, '').replace(/[ \t]*\r?\n[ \t]*/g, '').trim()
 }
 
 function assertCopyEqual(screen: string, expected: string): void {
@@ -273,6 +276,9 @@ async function main(): Promise<void> {
       const badBodies: Array<[string, object]> = [
         ['voice_recording 带 login_checkbox', { scope: 'voice_recording', source: 'login_checkbox' }],
         ['source 不是 login_checkbox', { scope: 'age_14_plus', source: 'other' }],
+        ['source 是 null', { scope: 'age_14_plus', source: null }],
+        ['source 是空串', { scope: 'age_14_plus', source: '' }],
+        ['job_ai 带 source:null', { scope: 'job_ai', source: null }],
         ['不认识的字段', { scope: 'age_14_plus', source: 'login_checkbox', extraField: 'no' }],
       ]
       for (const [label, body] of badBodies) {
@@ -294,6 +300,13 @@ async function main(): Promise<void> {
       } catch (error) {
         if (isVerifyFailure(error)) throw error
         assertValidationFailed(error, '5. 服务端 voice_recording 带 source')
+      }
+      try {
+        await privacy.grantConsent(endUserId, 'age_14_plus', null, 'other' as never)
+        fail('5. 服务端接受了不认识的 source')
+      } catch (error) {
+        if (isVerifyFailure(error)) throw error
+        assertValidationFailed(error, '5. 服务端不认识的 source')
       }
       const after = await prisma.userAiConsent.count({ where: { endUserId } })
       if (after !== 0) fail('5. 拒绝时仍写了记录')
@@ -376,6 +389,18 @@ async function main(): Promise<void> {
       if (textOf('voice-recording-v1') !== VOICE_RECORDING_CONSENT_COPY) fail('8. 录音同意原文不对')
       if (CURRENT_VOICE_RECORDING_CONSENT_VERSION !== 'voice-recording-v1') fail('8. 录音版本常量变了')
       if (textOf(UNKNOWN_VERSION) !== null) fail(`8. 其它版本应是 null，实际 ${String(textOf(UNKNOWN_VERSION))}`)
+      // 旧记录是证据：每个已上线版本的原文逐字钉死。屏上的字要变，另起新版本号，不许改这里的旧句。
+      const HISTORY: Array<[string, string]> = [
+        ['age-14-plus-v1', '我确认本人已年满14周岁。本声明不收集出生日期。'],
+        ['age-14-plus-login-v1', '我已阅读并同意《用户服务协议》和《隐私政策》，并确认已年满 14 周岁'],
+        ['voice-recording-v1', '录音只用于把你说的话转成文字，供简历整理、模拟面试作答或向小青提问。'
+          + '音频会交给当前启用的语音识别服务处理（腾讯云或百度智能云，以实际配置的一家为准）。'
+          + '转写完成后不保留音频。不做声纹识别。'
+          + '你可以在隐私页撤回这项同意；撤回后新的录音不会再开始。'],
+      ]
+      for (const [version, text] of HISTORY) {
+        if (consentDeclarationText(version) !== text) fail(`8. ${version} 的原文被改了：旧记录是证据，改字要另起版本`)
+      }
       if (textOf(LOGIN_VERSION) === textOf(PROMPT_VERSION)) fail('8. 登录版本和弹框版本给了同一句')
     })
 
@@ -401,6 +426,15 @@ async function main(): Promise<void> {
           reported = error instanceof Error && error.message.includes('不一致')
         }
         if (!reported) fail(`9. 改坏一个字后比较没有报不一致：${file}`)
+        const appended = wxml.replace('并确认已年满 14 周岁', '并确认已年满 14 周岁（另加一句）')
+        if (appended === wxml) fail(`9. 句尾阳性对照没有改到 ${file} 里的字`)
+        let tailReported = false
+        try {
+          assertCopyEqual(loginCheckboxSentence(appended), AGE_14_PLUS_LOGIN_CONSENT_COPY)
+        } catch (error) {
+          tailReported = error instanceof Error && error.message.includes('不一致')
+        }
+        if (!tailReported) fail(`9. 句尾多出字后比较没有报不一致：${file}`)
       }
       pass(`9. 比过 ${pages.length} 个登录勾选页`)
     })
