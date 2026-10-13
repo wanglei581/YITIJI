@@ -432,7 +432,8 @@ async function main(): Promise<void> {
       const runbook = readFileSync(join(__dirname, '../../../docs/device/production-deployment-runbook.md'), 'utf8')
       check('手册含 ADMIN_LOGIN_SECOND_FACTOR=off', runbook.includes('ADMIN_LOGIN_SECOND_FACTOR=off'))
       check('手册含 ADMIN_LOGIN_SECOND_FACTOR=sms', runbook.includes('ADMIN_LOGIN_SECOND_FACTOR=sms'))
-      check('手册含反例词 no 与 disabled', /\bno\b/.test(runbook) && /\bdisabled\b/.test(runbook))
+      // 钉新小节那句原话：只查整词 no 会被手册别处的 `--no-…` 之类参数顶替掉
+      check('手册写明 no、disabled 反而是开', runbook.includes('写成 `no`、`disabled`') && runbook.includes('一律按开处理'))
       const { adminSecondFactorRequired } = await import('../src/auth/admin-login-second-factor')
       const key = 'ADMIN_LOGIN_SECOND_FACTOR'
       const previous = process.env[key]
