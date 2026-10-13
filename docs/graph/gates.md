@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1949 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1610,12 +1610,13 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>docs/design/kiosk-redesign-2026-08-v2/</code> — 3 个文件</summary>
+<summary><code>docs/design/kiosk-redesign-2026-08-v2/</code> — 4 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `docs/design/kiosk-redesign-2026-08-v2/01-home.html` | `verify-kiosk-end-use.mjs` |
 | `docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html` | `verify-p39-print-hub-fidelity.mjs` |
+| `docs/design/kiosk-redesign-2026-08-v2/15-print-fulfill.html` | `verify-print-done-truth.mjs` |
 | `docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html` | `extract-service-hub-specs.mjs`<br/>`verify-service-entry-readiness.mjs` |
 
 </details>
