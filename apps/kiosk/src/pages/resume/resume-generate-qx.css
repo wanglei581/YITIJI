@@ -22,10 +22,11 @@
   gap: 16px;
   min-width: 0;
 }
-/* 稿 24 核对底栏：两颗次要按钮按字宽，主按钮那层占满剩下的宽度。
+/* 稿 24 核对底栏：三颗都按字宽起步、平分剩下的宽度（稿上量得 上一步约 246、不用 AI 约 360、让 AI 整理约 358），
+   所以中间那颗和主按钮差不多宽，「上一步」最窄。
    高度不在这里写：次要按钮沿用 .qx-btn 的常规高度（和改动前底栏里的「上一步」一样），稿上两颗次要按钮也是同高。 */
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-btn {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   white-space: nowrap;
 }
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-ai-declaration-slot {

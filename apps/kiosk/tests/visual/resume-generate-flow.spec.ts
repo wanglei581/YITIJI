@@ -472,10 +472,11 @@ async function expectSameRow(page: Page, locators: Locator[]) {
     expect(left.y < right.y + right.height && right.y < left.y + left.height).toBe(true)
     expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1)
   }
-  const primary = boxes[boxes.length - 1]
-  for (let i = 0; i < boxes.length - 1; i += 1) {
-    expect(primary.width).toBeGreaterThan(boxes[i].width)
-  }
+  // 稿 24 核对底栏三颗按字宽起步、平分剩下的宽度：中间那颗和主按钮差不多宽，「上一步」最窄。
+  // 防的是主次反过来——主按钮缩成字宽、次要按钮被撑开。
+  const [first, middle, primary] = [boxes[0], boxes[1], boxes[boxes.length - 1]]
+  expect(primary.width).toBeGreaterThanOrEqual(middle.width * 0.9)
+  expect(first.width).toBeLessThan(middle.width)
 }
 
 test('核对步可以不用 AI 导出原样草稿 @kiosk', async ({ page, api }) => {
@@ -533,6 +534,9 @@ test('核对步原样导出失败不算 AI 失败 @kiosk', async ({ page, api })
   await expect(page.locator('.kiosk-ai-fallback')).toHaveCount(0)
   await expect(draft).toBeVisible()
   await expect(draft).toBeEnabled()
+  // 导出结束后另两颗也要回到可点，不能锁死在导出中的状态。
+  await expect(page.getByRole('button', { name: '让 AI 整理成新简历' })).toBeEnabled()
+  await expect(page.locator('.qx-rg-review-bar').getByRole('button', { name: '上一步' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })).toHaveCount(0)
   expect(api.requestCount('POST', '/api/v1/resume/generate')).toBe(0)
 })
@@ -604,6 +608,8 @@ test('AI 已经失败后再导出原样草稿失败，失败区不收起 @kiosk'
   await expect(alert).toBeVisible()
   await expect(alert).toBeInViewport()
   await expect(alert).toContainText('服务暂时不可用，请稍后重试')
+  // 两件都失败时胶囊说最近这一件；AI 那件仍由兜底区和它的原因写着。
+  await expect(page.locator('.qx-pill')).toHaveText('原样草稿 · 导出失败')
   await expect(fallback).toBeVisible()
   await expect(page.getByText('AI 简历生成失败，请稍后重试').first()).toBeVisible()
   await expect(page.getByTestId('resume-generate-draft-export')).toHaveCount(0)
