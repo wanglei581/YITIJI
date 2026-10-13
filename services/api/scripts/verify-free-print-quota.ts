@@ -27,7 +27,7 @@ import { BadRequestException, Module, ValidationPipe, type ValidationError } fro
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { AuditService } from '../src/audit/audit.service'
-import { quotaResetsAt } from '../src/ai/quota/ai-quota.policy'
+import { quotaDay, quotaResetsAt } from '../src/ai/quota/ai-quota.policy'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -182,6 +182,12 @@ function quotaDetails(result: CallResult): NonNullable<ErrorBody['details']> {
 
 async function main(): Promise<void> {
   assertStatic()
+  // 钉在启动时的北京自然日、且不早于中午；四小时前仍在当天，较晚启动时心跳也不会过期。
+  const startedAt = new Date()
+  const beijingNoon = new Date(`${quotaDay(startedAt)}T12:00:00+08:00`)
+  const pinnedNow = new Date(Math.max(startedAt.getTime(), beijingNoon.getTime()))
+  const hoursAgo = (hours: number) => new Date(pinnedNow.getTime() - hours * 3600_000)
+  const minutesAgo = (minutes: number) => new Date(pinnedNow.getTime() - minutes * 60_000)
   const dir = mkdtempSync(join(tmpdir(), 'free-print-quota-'))
   const databasePath = join(dir, 'verify-free-print-quota.db')
   const databaseUrl = `file:${databasePath}`
@@ -263,6 +269,7 @@ async function main(): Promise<void> {
 
   const app = await NestFactory.create(FixtureModule, { logger: false, abortOnError: false })
   try {
+    setFreePrintQuotaClock(() => pinnedNow)
     app.setGlobalPrefix('api/v1')
     app.useGlobalPipes(new ValidationPipe({
       whitelist: true,
@@ -330,9 +337,9 @@ async function main(): Promise<void> {
         },
       })
       if (extra['enabled'] !== false && extra['lifecycleStatus'] !== 'planned') {
-        store.set(`term:session:sess-${id}`, JSON.stringify({ terminalId: id, generation: 0, issuedAt: new Date().toISOString() }))
+        store.set(`term:session:sess-${id}`, JSON.stringify({ terminalId: id, generation: 0, issuedAt: pinnedNow.toISOString() }))
         await prisma.terminalHeartbeat.create({
-          data: { terminalId: id, status: 'online', printerStatus: 'idle', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: new Date() },
+          data: { terminalId: id, status: 'online', printerStatus: 'idle', localTaskDatabaseAvailable: true, agentVersion: '0.4.13', createdAt: pinnedNow },
         })
       }
     }
@@ -374,7 +381,7 @@ async function main(): Promise<void> {
     }): Promise<string> {
       seq += 1
       const id = `ptask-seed-${seq}`
-      const at = input.createdAt ?? input.completedAt ?? new Date(Date.now() - seq * 60_000)
+      const at = input.createdAt ?? input.completedAt ?? minutesAgo(seq)
       const fileId = input.fileId === undefined ? 'file-kiosk' : input.fileId
       await prisma.printTask.create({
         data: {
@@ -432,7 +439,7 @@ async function main(): Promise<void> {
     assert.equal(guestData.member, null)
     assert.equal(guestData.terminal.limit, 300)
     assert.equal(guestData.guestPerOrderLimit, 20)
-    assert.equal(guestData.resetAt, quotaResetsAt(new Date()))
+    assert.equal(guestData.resetAt, quotaResetsAt(pinnedNow))
     console.log('PASS 游客余量：会员为 null，缺省 300/20，没会话 401')
 
     const invalidQuota = await call('PUT', '/api/v1/admin/print-free-quota', {
@@ -466,7 +473,7 @@ async function main(): Promise<void> {
     assert.equal((cleared.json.data as { dailyFreePrintSides: number | null }).dailyFreePrintSides, null)
     console.log('PASS 单台覆盖：越界 400，10 与 null 都落审计')
 
-    await seedPaper({ terminalId: JIMO, sides: 40, completedAt: new Date(Date.now() - 3 * 3600_000) })
+    await seedPaper({ terminalId: JIMO, sides: 40, completedAt: hoursAgo(3) })
     const isolated = await call('GET', '/api/v1/kiosk/print-quota', undefined, kioskHeaders(SHIBEI))
     assert.equal((isolated.json.data as { terminal: { used: number } }).terminal.used, 0)
     console.log('PASS 余量按本机过滤，不算即墨那 40 面')
@@ -504,8 +511,8 @@ async function main(): Promise<void> {
     console.log('PASS 两单在途时第三单被拒，used 仍只算已出纸')
 
     await clearTasks(SHIBEI)
-    await seedPaper({ terminalId: LICANG, sides: 5, endUserId: MEMBER, completedAt: new Date(Date.now() - 2 * 3600_000), fileId: 'file-member' })
-    await seedPaper({ terminalId: LICANG, sides: 9, endUserId: OTHER, completedAt: new Date(Date.now() - 90 * 60_000) })
+    await seedPaper({ terminalId: LICANG, sides: 5, endUserId: MEMBER, completedAt: hoursAgo(2), fileId: 'file-member' })
+    await seedPaper({ terminalId: LICANG, sides: 9, endUserId: OTHER, completedAt: minutesAgo(90) })
     await call('PUT', `/api/v1/admin/terminals/${SHIBEI}/capabilities/document_print`, {
       status: 'available', dailyFreePrintSides: null,
     }, adminHeaders)
@@ -524,36 +531,36 @@ async function main(): Promise<void> {
     console.log('PASS 会员跨机器累计，不含周宁的用量，响应不带别的网点')
 
     await clearTasks(SHIBEI)
-    await seedPaper({ terminalId: SHIBEI, sides: 6, status: 'failed', errorCode: 'PRINT_SPOOL_FAILED', completedAt: new Date(Date.now() - 50 * 60_000) })
-    await seedPaper({ terminalId: SHIBEI, sides: 4, status: 'completed', errorCode: 'PRINT_JOB_UNCONFIRMED', completedAt: new Date(Date.now() - 40 * 60_000) })
-    await seedPaper({ terminalId: SHIBEI, sides: 8, status: 'completed', withOrder: false, completedAt: new Date(Date.now() - 35 * 60_000), fileId: null })
+    await seedPaper({ terminalId: SHIBEI, sides: 6, status: 'failed', errorCode: 'PRINT_SPOOL_FAILED', completedAt: minutesAgo(50) })
+    await seedPaper({ terminalId: SHIBEI, sides: 4, status: 'completed', errorCode: 'PRINT_JOB_UNCONFIRMED', completedAt: minutesAgo(40) })
+    await seedPaper({ terminalId: SHIBEI, sides: 8, status: 'completed', withOrder: false, completedAt: minutesAgo(35), fileId: null })
     const ignored = await call('GET', '/api/v1/kiosk/print-quota', undefined, kioskHeaders(SHIBEI))
     assert.equal((ignored.json.data as { terminal: { used: number } }).terminal.used, 0)
     console.log('PASS 失败、未确认、没有订单行的任务不计面数')
 
     await prisma.terminal.update({ where: { id: LAOSHAN }, data: { dailyFreePrintSides: 10 } })
-    await seedPaper({ terminalId: LAOSHAN, sides: 8, completedAt: new Date(Date.now() - 4 * 3600_000) })
-    await seedPaper({ terminalId: DISABLED, sides: 100, completedAt: new Date() })
-    await seedPaper({ terminalId: PLANNED, sides: 100, completedAt: new Date(), fileId: null, withOrder: true })
+    await seedPaper({ terminalId: LAOSHAN, sides: 8, completedAt: hoursAgo(4) })
+    await seedPaper({ terminalId: DISABLED, sides: 100, completedAt: pinnedNow })
+    await seedPaper({ terminalId: PLANNED, sides: 100, completedAt: pinnedNow, fileId: null, withOrder: true })
     await clearTasks(JIMO)
-    await seedPaper({ terminalId: JIMO, sides: 30, status: 'pending', completedAt: null, createdAt: new Date() })
-    let collected = await collectDerivedAlerts(prisma, new Date())
+    await seedPaper({ terminalId: JIMO, sides: 30, status: 'pending', completedAt: null, createdAt: pinnedNow })
+    let collected = await collectDerivedAlerts(prisma, pinnedNow)
     let laoshanAlert = collected.alerts.find((item) => item.type === 'print_terminal_quota_high' && item.subjectId === LAOSHAN)
     assert.equal(laoshanAlert?.severity, 'warning')
     assert.equal(laoshanAlert?.title, `终端 ${LAOSHAN_NAME} 今日免费打印量已达 8 / 10 面`)
-    assert.equal(laoshanAlert?.episodeToken, new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10))
+    assert.equal(laoshanAlert?.episodeToken, quotaDay(pinnedNow))
     assert.equal(collected.alerts.some((item) => item.type === 'print_terminal_quota_high' && (item.subjectId === DISABLED || item.subjectId === PLANNED || item.subjectId === JIMO)), false)
     assert.ok(collected.firingTotal >= collected.alerts.filter((item) => item.type === 'print_terminal_quota_high').length)
     await prisma.order.updateMany({ where: { terminalId: LAOSHAN }, data: { billablePages: 10 } })
-    collected = await collectDerivedAlerts(prisma, new Date())
+    collected = await collectDerivedAlerts(prisma, pinnedNow)
     laoshanAlert = collected.alerts.find((item) => item.type === 'print_terminal_quota_high' && item.subjectId === LAOSHAN)
     assert.equal(laoshanAlert?.severity, 'error')
-    const resolved = await resolveDerivedAlert(prisma, 'print_terminal_quota_high', LAOSHAN, new Date())
+    const resolved = await resolveDerivedAlert(prisma, 'print_terminal_quota_high', LAOSHAN, pinnedNow)
     assert.equal(resolved?.severity, 'error')
     await prisma.order.updateMany({ where: { terminalId: LAOSHAN }, data: { billablePages: 7 } })
-    collected = await collectDerivedAlerts(prisma, new Date())
+    collected = await collectDerivedAlerts(prisma, pinnedNow)
     assert.equal(collected.alerts.some((item) => item.type === 'print_terminal_quota_high' && item.subjectId === LAOSHAN), false)
-    assert.equal(await resolveDerivedAlert(prisma, 'print_terminal_quota_high', LAOSHAN, new Date()), null)
+    assert.equal(await resolveDerivedAlert(prisma, 'print_terminal_quota_high', LAOSHAN, pinnedNow), null)
     console.log('PASS 告警：8/10 warning，10/10 error，7/10、停用、计划中、只在途都不报')
 
     const listed = await call('GET', '/api/v1/admin/terminals', undefined, adminHeaders)
@@ -565,7 +572,7 @@ async function main(): Promise<void> {
 
     await clearTasks(SHIBEI)
     await prisma.terminal.update({ where: { id: SHIBEI }, data: { dailyFreePrintSides: 2 } })
-    await seedPaper({ terminalId: SHIBEI, sides: 2, completedAt: new Date(Date.now() - 20 * 60_000) })
+    await seedPaper({ terminalId: SHIBEI, sides: 2, completedAt: minutesAgo(20) })
     await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 20 } })
     const paid = await createJob(SHIBEI, 1)
     assert.equal(paid.status, 201, JSON.stringify(paid.json))
@@ -605,7 +612,7 @@ async function main(): Promise<void> {
             paramsJson: JSON.stringify({ copies: 1 }),
             status: input.taskState ?? 'failed',
             errorCode: input.errorCode ?? 'PRINT_SPOOL_FAILED',
-            createdAt: new Date(),
+            createdAt: pinnedNow,
           },
         })
       }
@@ -619,7 +626,7 @@ async function main(): Promise<void> {
           discountCents: input.discountCents,
           payStatus: 'paid',
           paymentSource: input.amountCents - input.discountCents > 0 ? 'offline' : 'free',
-          paidAt: new Date(),
+          paidAt: pinnedNow,
           billablePages: input.sides,
           printParamsJson: JSON.stringify({ copies: 1 }),
           taskStatus: input.taskStatus ?? 'pending',
@@ -627,8 +634,8 @@ async function main(): Promise<void> {
           pickupStatus: input.pickupStatus ?? 'pending',
           pickupCodeHash: hashPickupCode(input.code),
           pickupCodeEnc: encryptSecret(input.code),
-          pickupCodeCreatedAt: new Date(),
-          pickupCodeExpiresAt: new Date(Date.now() + 24 * 3600_000),
+          pickupCodeCreatedAt: pinnedNow,
+          pickupCodeExpiresAt: new Date(pinnedNow.getTime() + 24 * 3600_000),
           sourceFileId: fileId,
           sourceFileSha256: sha,
           sourceFileName: '求职登记表.pdf',
@@ -718,10 +725,10 @@ async function main(): Promise<void> {
     await seedPaper({
       terminalId: SHIBEI,
       sides: 9,
-      completedAt: new Date('2026-10-06T06:00:00.000Z'),
-      createdAt: new Date('2026-10-06T06:00:00.000Z'),
+      completedAt: hoursAgo(6),
+      createdAt: hoursAgo(6),
     })
-    setFreePrintQuotaClock(() => new Date('2026-10-06T16:01:00.000Z'))
+    setFreePrintQuotaClock(() => new Date(Date.parse(quotaResetsAt(pinnedNow)) + 60_000))
     const restored = await createJob(SHIBEI, 1)
     assert.equal(restored.status, 201, JSON.stringify(restored.json))
     setFreePrintQuotaClock(null)
