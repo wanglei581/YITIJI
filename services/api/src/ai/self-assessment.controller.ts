@@ -158,7 +158,7 @@ export class SelfAssessmentController {
 
   /**
    * 合并「自我探索 + 简历 PDF」，生成新的可打印 PDF 文件。
-   * 有会员主人的简历只认本人；没有会员主人的，只认持有本次签名地址的调用方。
+   * 有会员主人的简历只认本人；没有会员主人的，只认持有这份文件有效签名地址的调用方。
    */
   @Post(':taskId/append')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })

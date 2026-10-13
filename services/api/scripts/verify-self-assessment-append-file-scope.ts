@@ -2,8 +2,11 @@
  * verify:self-assessment-append-file-scope
  *
  * 自我探索附录只取本人或本次会话持有的简历文件。
- * 有会员主人的文件只认本人；没有会员主人的文件只认持有本次签名地址的调用方。
+ * 有会员主人的文件只认本人；没有会员主人的文件只认持有这份文件有效签名地址的调用方。
  * 对不上时按「简历文件不存在」拒绝，不合并、不落新文件、不写成功审计、不回地址。
+ *
+ * 场景1 会员文件；场景2 没有会员主人的文件；场景3 先认人、再看状态和用途（确认之前的各种不对回同一句话，
+ * 只收简历类和普通打印文档）；场景4 一体机与接口的静态接线。成功的合并在审计里记下凭什么取的文件。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:self-assessment-append-file-scope
  */
@@ -15,7 +18,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-self-assessment-append-file-scope
 import { createHash, createHmac, randomBytes } from 'crypto'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-import { Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common'
 import { PDFDocument } from 'pdf-lib'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -118,12 +121,12 @@ async function main(): Promise<void> {
   const accessToken = randomBytes(24).toString('hex')
   const createdFileIds: string[] = []
 
-  async function uploadPdf(endUserId: string | null): Promise<string> {
+  async function uploadPdf(endUserId: string | null, purpose: 'print_doc' | 'resume_upload' | 'resume_scan' = 'print_doc'): Promise<string> {
     const uploaded = await files.upload({
       buffer: await onePagePdf(),
       filename: 'resume.pdf',
       mimeType: 'application/pdf',
-      purpose: 'print_doc',
+      purpose,
       uploaderId: null,
       endUserId,
       createdBy: 'verify_append_file_scope',
@@ -133,12 +136,15 @@ async function main(): Promise<void> {
     return uploaded.fileId
   }
 
-  async function appendAuditCount(): Promise<number> {
+  async function appendAuditCount(access?: 'owner' | 'signed_url'): Promise<number> {
     return prisma.auditLog.count({
       where: {
         action: 'resume.self_assessment_print',
         targetId: taskId,
-        payloadJson: { contains: '"mode":"append"' },
+        AND: [
+          { payloadJson: { contains: '"mode":"append"' } },
+          ...(access ? [{ payloadJson: { contains: `"resumeAccess":"${access}"` } }] : []),
+        ],
       },
     })
   }
@@ -175,19 +181,40 @@ async function main(): Promise<void> {
     label: string,
     requester: { endUserId: string | null; accessToken: string | null },
     resumeFileId: string,
-    resumeFileUrl?: string,
+    resumeFileUrl: string | undefined,
+    access: 'owner' | 'signed_url',
   ): Promise<void> {
     const filesBefore = await prisma.fileObject.count()
-    const auditsBefore = await appendAuditCount()
+    const auditsBefore = await appendAuditCount(access)
     const out = await service.appendToResume({ taskId, requester, resumeFileId, resumeFileUrl })
     if (!out.printFileUrl || !PRINT_URL.test(out.printFileUrl)) {
       fail(`${label}：没有返回本次合并文件的签名地址`)
     }
     createdFileIds.push(out.fileId)
     const filesAfter = await prisma.fileObject.count()
-    const auditsAfter = await appendAuditCount()
+    const auditsAfter = await appendAuditCount(access)
     if (filesAfter !== filesBefore + 1) fail(`${label}：合并文件没有多出一条，${filesBefore} -> ${filesAfter}`)
-    if (auditsAfter !== auditsBefore + 1) fail(`${label}：没有成功审计`)
+    if (auditsAfter !== auditsBefore + 1) fail(`${label}：审计里没有记下按 ${access} 取的文件`)
+    pass(label)
+  }
+
+  /** 认人通过之后才轮到格式：持有有效签名地址的调用方会被告知不是 PDF。 */
+  async function expectNotPdf(label: string, run: () => Promise<unknown>): Promise<void> {
+    const filesBefore = await prisma.fileObject.count()
+    let caught: unknown
+    try {
+      const result = await run()
+      fail(`${label}：应当拒绝，实际返回了结果 ${JSON.stringify(result).slice(0, 180)}`)
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+      caught = error
+    }
+    const status = caught instanceof BadRequestException ? caught.getStatus() : 0
+    const payload = (caught instanceof BadRequestException ? caught.getResponse() : caught) as { error?: { code?: string } }
+    if (status !== 400 || payload.error?.code !== 'RESUME_FILE_NOT_PDF') {
+      fail(`${label}：应当是不是 PDF，实际 status=${status} code=${payload.error?.code ?? ''}`)
+    }
+    if ((await prisma.fileObject.count()) !== filesBefore) fail(`${label}：多出了文件`)
     pass(label)
   }
 
@@ -243,15 +270,25 @@ async function main(): Promise<void> {
     const other = { endUserId: memberB, accessToken }
     const anon = { endUserId: null, accessToken }
 
-    await expectAppended('场景1 会员文件本人', owner, memberFileId)
+    await expectAppended('场景1 会员文件本人', owner, memberFileId, undefined, 'owner')
     await expectRejected('场景1 另一个会员', () => service.appendToResume({
       taskId, requester: other, resumeFileId: memberFileId,
     }))
     await expectRejected('场景1 未登录', () => service.appendToResume({
       taskId, requester: anon, resumeFileId: memberFileId,
     }))
+    await expectRejected('场景1 另一个会员带着这份文件的有效签名地址', () => service.appendToResume({
+      taskId, requester: other, resumeFileId: memberFileId, resumeFileUrl: signFileUrl(memberFileId).url,
+    }))
+    await expectRejected('场景1 未登录带着这份文件的有效签名地址', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: memberFileId, resumeFileUrl: signFileUrl(memberFileId).url,
+    }))
 
-    await expectAppended('场景2 有效签名地址', anon, ownerlessFileId, signFileUrl(ownerlessFileId).url)
+    await expectAppended('场景2 有效签名地址', anon, ownerlessFileId, signFileUrl(ownerlessFileId).url, 'signed_url')
+    await expectRejected('场景2 已登录会员不带签名地址', () => service.appendToResume({
+      taskId, requester: other, resumeFileId: ownerlessFileId,
+    }))
+    await expectAppended('场景2 已登录会员带有效签名地址', other, ownerlessFileId, signFileUrl(ownerlessFileId).url, 'signed_url')
     await expectRejected('场景2 不带', () => service.appendToResume({
       taskId, requester: anon, resumeFileId: ownerlessFileId,
     }))
@@ -269,7 +306,41 @@ async function main(): Promise<void> {
       anon,
       ownerlessFileId,
       `https://kiosk.example${signFileUrl(ownerlessFileId).url}`,
+      'signed_url',
     )
+
+    // 场景3：先认人，再看状态和用途。认人之前的各种不对与「编号不存在」同一句话。
+    const missingFileId = `vascope_missing_${suffix}`
+    await expectRejected('场景3 编号不存在', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: missingFileId, resumeFileUrl: signFileUrl(missingFileId).url,
+    }))
+    const notPdfFileId = await uploadPdf(null)
+    await prisma.fileObject.update({ where: { id: notPdfFileId }, data: { mimeType: 'image/png' } })
+    await expectRejected('场景3 不是 PDF 且不带签名地址', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: notPdfFileId,
+    }))
+    await expectNotPdf('场景3 不是 PDF 但带有效签名地址（对照：认人之后才说格式）', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: notPdfFileId, resumeFileUrl: signFileUrl(notPdfFileId).url,
+    }))
+    const deletedFileId = await uploadPdf(null)
+    await prisma.fileObject.update({ where: { id: deletedFileId }, data: { deletedAt: new Date(), status: 'deleted' } })
+    await expectRejected('场景3 已删除且不带签名地址', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: deletedFileId,
+    }))
+    await expectRejected('场景3 已删除但带有效签名地址', () => service.appendToResume({
+      taskId, requester: anon, resumeFileId: deletedFileId, resumeFileUrl: signFileUrl(deletedFileId).url,
+    }))
+    for (const purpose of ['contract_upload', 'contract_review_report', 'id_scan', 'fair_material'] as const) {
+      const fileId = await uploadPdf(null)
+      await prisma.fileObject.update({ where: { id: fileId }, data: { purpose } })
+      await expectRejected(`场景3 用途 ${purpose} 带有效签名地址也不合并`, () => service.appendToResume({
+        taskId, requester: anon, resumeFileId: fileId, resumeFileUrl: signFileUrl(fileId).url,
+      }))
+    }
+    for (const purpose of ['resume_upload', 'resume_scan'] as const) {
+      const fileId = await uploadPdf(null, purpose)
+      await expectAppended(`场景3 用途 ${purpose} 照常合并（对照）`, anon, fileId, signFileUrl(fileId).url, 'signed_url')
+    }
   } finally {
     await cleanup()
   }
