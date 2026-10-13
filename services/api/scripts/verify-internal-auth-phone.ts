@@ -369,11 +369,11 @@ async function main() {
     assertInternalAuthVerifyTarget(process.env)
     assertInitialPhoneBindRouteContract()
     assertAdminInitialPhoneBindRouteContract()
-    if (!['忘记密码', '《账号联系人确认函》'].every((text) => PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE.includes(text)) ||
+    if (!['忘记密码', '《账号联系人确认函》', '还没有登记，或者收不到验证码的'].every((text) => PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE.includes(text)) ||
       ['工作人员', '线下核验恢复', '持有人确认', '机构确认函'].some((text) => PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE.includes(text))) {
-      fail('指路文案必须说明《账号联系人确认函》和忘记密码，不得保留含糊旧说法')
+      fail('指路文案必须说明《账号联系人确认函》、忘记密码，并覆盖还没有登记或收不到验证码的情形，不得保留含糊旧说法')
     }
-    pass('guide. 统一文案包含《账号联系人确认函》、忘记密码，排除含糊旧说法')
+    pass('guide. 统一文案包含《账号联系人确认函》、忘记密码、还没有登记或收不到验证码的情形，排除含糊旧说法')
     for (const role of ['partner', 'admin', 'kiosk']) {
       for (const state of ['legacy', 'temporary', 'owner_managed', 'unknown']) {
         if (partnerPhoneSelfVerifyReady(role, state) !== (role !== 'partner' || state === 'owner_managed')) {

@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { checkAgreement } from './e2e/helpers'
 
-const body = '这个账号是平台代为开通的，还没有登记使用人的手机号，暂时不能在这里自己验证。'
-const nextStep = '请联系平台运营，提交盖章的《账号联系人确认函》（写明联系人姓名和手机号），由平台登记这个手机号。登记后回到登录页点「忘记密码」，用这个手机号收验证码、设置你自己的密码，验证就完成了。'
+const body = '这个账号是平台代为开通的，暂时不能在这里自己验证手机号。'
+const nextStep = '平台登记了你的手机号之后，回到登录页点「忘记密码」，用这个手机号收验证码、设置你自己的密码，验证就完成了。还没有登记，或者收不到验证码的，请联系平台运营，提交盖章的《账号联系人确认函》（写明联系人姓名和手机号）。'
 const before = '在这之前，仍可用账号和密码登录、正常使用后台；手机号登录和自助找回密码暂时用不了。'
 
 async function loginFixture(page: Page, ready: boolean | undefined, rejected = false) {
