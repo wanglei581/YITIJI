@@ -526,7 +526,7 @@ function tabbar(n, items){
 var GUIDE = {
   login:[['隐私','只对本人可见','退出或超时后，本机不保留任何明细'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['边界','本机不代收简历','报名和投递不在这台机器上办']],
   loading:[['读取范围','只读当前账号','不会展示其他账号的数据'],['显示规则','不闪回旧记录','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会改动任何已有数据']],
-  error:[['数据','已保存内容不受影响','这次加载失败不会删除任何记录'],['先试这个','检查网络后重试','重试不会重复创建记录'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  error:[['数据','已保存内容不受影响','这次加载失败不会删除任何记录'],['先试这个','请稍后重试','重试不会重复创建记录'],['仍不行','拨打服务电话','18369161921（工作日 9:00–18:00）']],
   'not-found':[['可能原因','记录已被清理','记录按各自留存期限清理'],['也可能','不属于当前账号','记录只对本人可见'],['下一步','回列表重新选择','列表里只显示本人记录']],
   'empty-resumes':[['怎么产生','登录后上传或生成','游客上传不会自动绑定到账号'],['这里显示什么','只有基本信息','不展示简历原文或诊断正文'],['留存','原始简历短留存','到期后无法恢复']],
   'empty-favorites':[['怎么产生','在详情页点收藏','政策和机构渠道可以收藏'],['这里显示什么','只有收藏行为','不含投递或预约结果'],['去哪儿办','来源平台','投递与预约都在来源平台完成']],
@@ -891,9 +891,9 @@ function errorState(view, state, title, desc){
   return {layout:'state', html:
     banner('warn','warn', title, desc + '<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项一律显示「—」。', ['共 —','本次未取到'])
     + previewList(structRows(view,'error'),
-        '重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的内容结构')
+        '重试不会重复创建记录，也不会改动已保存的内容。多次重试仍不成功的话，可以稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）','本次未取到的内容结构')
     + guide('error')
-    + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help'),
+    + ctaBar([link('帮助中心','06-help.html','/help',SCREEN+'-help'),
               askLink(),
               link('重新加载', href(view, state), VIEWS[view].route, SCREEN+'-primary',{primary:true})])};
 }
@@ -913,7 +913,7 @@ function renderBody(view, state, tab){
   if(view==='resumes'){
     if(state==='login') return loginState('resumes','登录后查看我的简历','公共一体机不会在未登录时展示简历文件名、任务或诊断记录；游客上传不会自动绑定到账号。');
     if(state==='loading') return loadingState('resumes','正在加载我的简历');
-    if(state==='error') return errorState('resumes','loading','简历记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已保存的简历不会因为这次失败而消失。');
+    if(state==='error') return errorState('resumes','loading','简历记录这次没有加载出来','当前列表没有更新。请稍后重试；已保存的简历不会因为这次失败而消失。');
     if(state==='empty') return emptyState('resumes','resume','还没有登录后保存的简历',
       '公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历才会出现在这里。',
       startRow('up','','上传一份现有简历','上传后可以做诊断、优化，并生成可打印的版本','去上传','21-resume-triage.html','/resume/source',SCREEN+'-start-upload')
@@ -925,7 +925,7 @@ function renderBody(view, state, tab){
   if(view==='favorites'){
     if(state==='login') return loginState('favorites','登录后查看我的收藏','收藏只在登录后与账号绑定；公共一体机不保存游客的收藏。');
     if(state==='loading') return loadingState('favorites','正在加载我的收藏');
-    if(state==='error') return errorState('favorites','loading','收藏这次没有加载出来','当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。');
+    if(state==='error') return errorState('favorites','loading','收藏这次没有加载出来','当前列表没有更新。请稍后重试；已有收藏不会因为这次失败而消失。');
     if(state==='empty') return emptyState('favorites','heart','还没有收藏',
       '在政策或机构官方渠道页点收藏之后，才会出现在这里。',
       startRow('policy','slate','看看政策说明','官方说明和材料清单','看政策','48-policy-workspace.html?state=policy-ready','/renshi?tab=policy',SCREEN+'-start-policy')
@@ -937,7 +937,7 @@ function renderBody(view, state, tab){
   if(view==='ai-records'){
     if(state==='login') return loginState('ai-records','登录后查看 AI 服务记录','AI 服务记录只在登录后与账号绑定；公共一体机不保存游客记录。');
     if(state==='loading') return loadingState('ai-records','正在加载 AI 服务记录');
-    if(state==='error') return errorState('ai-records','loading','AI 服务记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
+    if(state==='error') return errorState('ai-records','loading','AI 服务记录这次没有加载出来','当前列表没有更新。请稍后重试；已有记录不会因为这次失败而消失。');
     if(state==='empty') return emptyState('ai-records','robot','还没有 AI 服务记录',
       '完成简历诊断、优化、模拟面试或职业规划之后，记录才会出现在这里。',
       startRow('doc','','做一次简历诊断','诊断结果会生成一条可回看的服务记录','去诊断','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose',SCREEN+'-start-diagnose')
@@ -949,7 +949,7 @@ function renderBody(view, state, tab){
   if(view==='activity'){
     if(state==='login') return loginState('activity','登录后查看本人记录','游客看过的内容不会留到下一次，这台机器也不保存浏览历史。');
     if(state==='loading') return loadingState('activity','正在加载本人记录');
-    if(state==='error') return errorState('activity','loading','记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
+    if(state==='error') return errorState('activity','loading','记录这次没有加载出来','当前列表没有更新。请稍后重试；已有记录不会因为这次失败而消失。');
     if(state==='browse-empty') return activityBody('browse', true);
     if(state==='jump-empty') return activityBody('jump', true);
     if(state==='jump-ready') return activityBody('jump', false);
@@ -957,7 +957,7 @@ function renderBody(view, state, tab){
   }
   if(state==='login') return loginState('activity-detail','登录后查看本人记录','游客看过的内容不会留到下一次。这条记录只对本人可见。');
   if(state==='loading') return loadingState('activity-detail','正在读取这条记录');
-  if(state==='error') return errorState('activity-detail','loading','这条记录这次没有读到','当前没有读到这条记录。请检查网络后重试。');
+  if(state==='error') return errorState('activity-detail','loading','这条记录这次没有读到','当前没有读到这条记录。请稍后重试。');
   if(state==='not-found') return {layout:'state', html:
       banner('','empty','未找到这条记录','记录可能已按留存期限清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b>', ['—'])
       + previewList(structRows('activity-detail','error'),

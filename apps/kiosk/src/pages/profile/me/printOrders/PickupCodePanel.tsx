@@ -15,7 +15,7 @@ function resumeNotice(reprintAllowed?: boolean, reprintRemaining?: number | null
     return `没打完？回到出纸失败的那台机器上再输一次这个到机码就能接着打（还能续打 ${reprintRemaining} 次）。`
   }
   if (reprintAllowed === false && reprintRemaining === 0) {
-    return '这单已经接着打过 2 次，不能再打了。'
+    return '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单。'
   }
   return null
 }

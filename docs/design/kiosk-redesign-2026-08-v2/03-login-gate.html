@@ -521,10 +521,10 @@ V['phone-send-failed']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('warn','currentColor',28)+'短信通道没把这条码发出去</div>'+
    '<div class="state-p">短信没发出去。刚准备好的验证码和等待时间<b>会一起作废</b>，所以之前收到的码同样作废，必须重新获取；也正因为冷却被删了，可以立刻重试。</div>'+
-   '<div class="state-p">这不是你填错了，也不是账号问题。连着几次都失败，请找现场工作人员。</div></div></section>'+
+   '<div class="state-p">这不是你填错了，也不是账号问题。连着几次都失败，请拨打服务电话 18369161921（工作日 9:00–18:00）。</div></div></section>'+
    phoneFields({hint:'可以立刻重试，冷却已被清掉',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneEcho:true,
     codeNote:'旧码已作废，重新获取之前这里没有可填的内容。'})+anonRow(),
-  cta:btnA('ghost','06-help.html','/help','联系工作人员')+
+  cta:btnA('ghost','06-help.html','/help','问小青')+
    btnGate('primary','立刻重新获取',P('phone','phone-sending'),'login-gate-primary','1.6')};
 };
 V['phone-verifying']=function(){
@@ -590,7 +590,7 @@ V['qr-expired']=function(){
  return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
    '<div class="state-h">'+svg('clock','currentColor',28)+'这张二维码已经过期</div>'+
    '<div class="state-p">票据从生成起只活 <b>180 秒</b>，现在已经不能用了。手机上继续操作也不会成功。</div>'+
-   '<div class="state-p">重新生成一张再扫即可，不影响你的账号，也不需要联系工作人员。</div></div></section>'+
+   '<div class="state-p">重新生成一张再扫即可，不影响你的账号。</div></div></section>'+
    '<section class="sec last"><div class="qrwrap">'+qrSlot('二维码已失效','重新生成后，新的二维码会显示在这里。')+
    qrSide(['点下面的「重新生成二维码」。','用手机重新扫新的二维码。','在手机上确认后回到这台机器继续。'],
     '也可以直接改用手机号登录，两条路走到的是同一个账号。')+'</div></section>'+anonRow('02'),
@@ -619,9 +619,9 @@ V['qr-error']=function(){
       「建议先走手机号登录」原卡片的话挪进右栏底卡 */
    '<section class="sec last"><div class="qrwrap">'+qrSlot('二维码未能获取','<b>本页不推测原因</b>，也不显示一张可能已经失效的二维码让你白扫。')+
    qrSide(['用手机相机或微信扫左边的二维码。','在手机上填手机号和短信验证码，确认<b>你面前这台机器</b>的登录请求。','手机提示已确认后回到这台机器 —— 登录还要这台机器再换一次登录态。'],
-    '<b>建议先走手机号登录。</b>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请找现场工作人员。')+'</div></section>'+
+    '<b>建议先走手机号登录。</b>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请拨打服务电话 18369161921（工作日 9:00–18:00）。')+'</div></section>'+
    anonRow('02'),
-  cta:btnA('ghost','06-help.html','/help','联系工作人员')+
+  cta:btnA('ghost','06-help.html','/help','问小青')+
    btnA('primary',P('phone','phone-idle'),'/login','改用手机号登录','login-gate-primary','1.6')};
 };
 

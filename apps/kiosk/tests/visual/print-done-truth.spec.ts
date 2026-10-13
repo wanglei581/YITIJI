@@ -157,6 +157,133 @@ test('a paid unconfirmed print offers the check line and a refund line @kiosk', 
   await expect(state).not.toContainText('联系工作人员')
 })
 
+// 2026-10-10 走查：未确认屏只说「等待人工核查」「请稍后再来」，没说过 5 分钟可以自己再输同一个码。
+// 后端规则：实付 0 元的到机码单，未确认满 5 分钟后同机同码可以整份重打；付费单走原路退款，不说接着打。
+test('a zero-yuan pickup-code unconfirmed print says to re-enter the same code after 5 minutes @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 0, pickupSource: true })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toContainText('没有的话，过 5 分钟回到这台机器，再输一次同一个到机码，可以整份重打（每单最多 2 次）。')
+  await expect(state).toContainText('系统已登记，这次结果没能确认')
+  await expect(state).toContainText('过 5 分钟可以回这台机器再输一次同一个到机码')
+  await expect(state).not.toContainText('等待人工核查')
+  await expect(state).not.toContainText('核实后给出结论')
+  await expect(state).not.toContainText('退款')
+  // 未确认时本页不给「重新提交打印」：5 分钟内点了也会被拒。
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
+})
+
+// 2026-10-11 走查实走：真的到机码单从认领页过来时不带金额（上一条用例是手工塞了 amountCents: 0，和真实不符）。
+// 金额要从服务端订单回执里认；回执取不到时保持保守说法，不猜成 0 元。
+test('a real pickup-code order without a flow amount reads the amount from the server receipt @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  const receipt = (amountCents: number) => ({
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo', expiresAt: '2099-01-01T00:00:00.000Z', filename: '取件文件.pdf',
+      mimeType: 'application/pdf', sizeBytes: 128, orderId: 'order-pickup-1', orderNo: 'ORD-20261011-4D2B2B1101',
+      payStatus: 'paid', amountCents, canRetry: true,
+    },
+  })
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  // 真实流程里认领放行会发一张支付会话凭证并一路带到本页；金额不带。
+  const pickupState = { taskId: TASK_ID, pickupSource: true, paymentSessionToken: 'pst-pickup-demo', file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 1, colorMode: 'bw', duplex: 'simplex' } }
+  // 回执是进页后才去取的：每次都等它回来再下结论，否则否定断言会在回执到之前就过了。
+  const openAndAwaitReceipt = async () => {
+    const receiptBack = page.waitForResponse((res) => res.url().includes(`/print/jobs/${TASK_ID}/takeaway-url`))
+    await openDoneWithState(page, pickupState)
+    await receiptBack
+  }
+
+  // 回执取不到（404）：不知道金额，保持原来的保守说法，不说同码接着打，顶栏不猜金额。
+  await openAndAwaitReceipt()
+  const unconfirmed = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(unconfirmed).toContainText('等待人工核查')
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+  await expect(page.getByText('订单保留 · 打印结果未确认')).toBeVisible()
+
+  // 回执说 0 元：说 5 分钟后同码整份重打，不再写等待人工核查；顶栏和按钮跟着认 0 元。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openAndAwaitReceipt()
+  await expect(unconfirmed).toContainText('过 5 分钟可以回这台机器再输一次同一个到机码')
+  await expect(unconfirmed).not.toContainText('等待人工核查')
+  await expect(unconfirmed).not.toContainText('核实后给出结论')
+  await expect(unconfirmed).not.toContainText('退款')
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印结果未确认')).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看订单说明' })).toBeVisible()
+
+  // 回执说收过钱：不说同码接着打；顶栏说已付，退款说明在。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(200))
+  await openAndAwaitReceipt()
+  await expect(unconfirmed).toContainText('如需退款')
+  await expect(unconfirmed).not.toContainText('同一个到机码')
+  await expect(page.getByText(/已付 .+ · 打印结果未确认/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
+
+  // 卡纸屏、收过钱：说已付金额保留，就得同时有退款说明；不说同码接着打。
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINTER_ERROR', failureReasonForUser: '打印机可能卡纸或发生设备故障' },
+  })
+  await openAndAwaitReceipt()
+  const jam = page.getByTestId('print-fulfill-state-paper-jam')
+  await expect(jam).toContainText('你的订单和已付金额都保留着')
+  await expect(jam).toContainText('如需退款')
+  await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
+
+  // 卡纸屏：0 元、服务端说还能重打，出现同码接着打那一句；不提钱。
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
+  await openAndAwaitReceipt()
+  await expect(jam).toContainText('你的订单还在')
+  await expect(page.getByTestId('print-fulfill-resume-line')).toContainText('回来再输一次同一个到机码就能接着打')
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印机卡纸')).toBeVisible()
+  await expect(jam).not.toContainText('退款')
+})
+
+test('paid or on-site unconfirmed prints never mention the same-code resume @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 200, pickupSource: true })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toBeVisible()
+  await expect(state).not.toContainText('同一个到机码')
+  await openDoneWithState(page, { ...taskState, amountCents: 0 })
+  await expect(state).toBeVisible()
+  await expect(state).not.toContainText('同一个到机码')
+})
+
+// 2026-10-10：现场建的 0 元单没有到机码，离开本页后没有重打入口，也没有人核查。
+// 屏上不许再写「等待人工核查」「核实后给出结论」，只说真能走的路：重新打一次。付费单原样不动。
+test('an on-site zero-yuan unconfirmed print tells the user to print again instead of waiting for a review @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+  })
+  await openDoneWithState(page, { ...taskState, amountCents: 0 })
+  const state = page.getByTestId('print-fulfill-state-result-unconfirmed')
+  await expect(state).toContainText('请先看出纸口：有纸就取走。没有的话，请回到打印重新选文件再打一次。')
+  await expect(state).toContainText('系统已登记，这次结果没能确认')
+  await expect(state).not.toContainText('等待人工核查')
+  await expect(state).not.toContainText('核实后给出结论')
+  await expect(state).not.toContainText('同一个到机码')
+  await expect(state).not.toContainText('退款')
+
+  await openDoneWithState(page, { ...taskState, amountCents: 200 })
+  await expect(state).toContainText('等待人工核查')
+  await expect(state).not.toContainText('重新选文件再打一次')
+})
+
 test('a zero-yuan unconfirmed print does not mention a refund @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
@@ -510,3 +637,22 @@ test('pickup completed receipt directs a reorder to the phone only after the min
   await expect(page.getByText('要再打一份请在手机上重新下单', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-fulfill-reprint')).toHaveCount(0)
 })
+
+// 2026-10-11（合规四 10/10）：完成屏「这单在哪能看到」那一条，小程序没发布时不把人往小程序引。
+for (const scenario of [
+  { name: 'logged-in order before the miniapp is published points to this machine', miniapp: false, hasEndUser: true, title: '这单已经记在你的账号里', sub: '在这台机器的「我的 → 打印订单」就能看到' },
+  { name: 'logged-in order after the miniapp is published points to the miniapp', miniapp: true, hasEndUser: true, title: '这单已经在你的小程序里', sub: '打开「我的 → 打印订单」就能看到' },
+  { name: 'guest order before the miniapp is published does not mention the miniapp', miniapp: false, hasEndUser: false, title: '本次打印未关联账号', sub: '想留下订单记录，下次打印前可先登录' },
+  { name: 'guest order after the miniapp is published keeps the miniapp line', miniapp: true, hasEndUser: false, title: '本次打印未关联账号', sub: '如需在小程序留存订单记录，下次打印前可先登录' },
+]) {
+  test(`completed receipt: ${scenario.name} @kiosk`, async ({ page, api }) => {
+    registerShell(api)
+    supportContact(api, { miniapp: scenario.miniapp })
+    api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
+    await openDoneWithState(page, { ...taskState, hasEndUser: scenario.hasEndUser })
+    const bar = page.locator('.pff-inbar')
+    await expect(bar).toContainText(scenario.title)
+    await expect(bar).toContainText(scenario.sub)
+    if (!scenario.miniapp) await expect(bar).not.toContainText('小程序')
+  })
+}
