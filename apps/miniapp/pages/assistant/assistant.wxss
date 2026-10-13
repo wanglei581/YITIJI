@@ -117,3 +117,6 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   font-size: var(--fs-xs); color: var(--warn); line-height: 1.55;
 }
 .mf-ic { flex-shrink: 0; margin-top: 2rpx; }
+/* 固定回答的小标，挂在正文上方。只在后端标明这段是固定话、且气泡不是加载中时出。
+   颜色沿用上面降级提示那一套，不新写色值。 */
+.msg-notice-tag { display: inline-flex; margin-bottom: 10rpx; padding: 4rpx 14rpx; border: 1px solid var(--wheat-soft); border-radius: var(--r-xs); background: var(--wheat-wash); color: var(--warn); font-size: var(--fs-xs); font-weight: 650; line-height: 1.5; }
