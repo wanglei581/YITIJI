@@ -4,6 +4,7 @@
  * 锁住：只收 32 位小写十六进制、去重、只留最近 10 个；取走即清空；
  * 非 http 不发；小青有令牌发两次、没令牌发一次；作业凭据三种；
  * fetch 抛错不往外抛；每次都带 keepalive。
+ * 接线：读作业成功才登记、读失败不登记（编译 advisor.ts 真跑）；小青总结回了作业号也登记。
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -224,4 +225,51 @@ test('没有登记时不发；fetch 同步抛错或拒绝都不往外抛', async
   } finally {
     restore()
   }
+})
+
+/**
+ * 接线：读作业成功才登记（号 + 这次的凭据），读失败不登记。编译 advisor.ts 真跑，
+ * 删掉 getAdvisorSession 里那一行登记、或挪到「读失败就抛」之前，这条就红。
+ */
+async function loadAdvisorApi(response) {
+  seed += 1
+  const key = `__advisorForgetProbe${seed}`
+  const probe = { response, remembered: [] }
+  globalThis[key] = probe
+  const stub = (code) => toDataUrl(`${code}\n// ${seed}\n`)
+  const ref = `globalThis[${JSON.stringify(key)}]`
+  const code = `${transpile('src/services/api/advisor.ts')}\n// ${seed}\n`
+    .replaceAll("from '../terminalAuth'", `from '${stub(`export async function terminalAttributedFetch() { return ${ref}.response }`)}'`)
+    .replaceAll("from './aiSessionForget'", `from '${stub(`export function rememberAdvisorSession(...args) { ${ref}.remembered.push(args) }`)}'`)
+    .replaceAll("from './client'", `from '${stub("export const API_BASE_URL = '/api/v1'\nexport const API_MODE = 'http'")}'`)
+    .replaceAll("from './httpAdapter'", `from '${stub('export class ApiHttpError extends Error {}')}'`)
+    .replaceAll("from './throwHttpError'", `from '${stub("export const networkError = (err) => err\nexport async function throwHttpError() { throw new Error('读取失败') }")}'`)
+  const mod = await import(toDataUrl(code))
+  return { mod, probe, restore() { delete globalThis[key] } }
+}
+
+test('读作业成功才登记作业号和这次的凭据；读失败不登记', async () => {
+  const ok = await loadAdvisorApi({ ok: true, status: 200, json: async () => ({ id: 'clsessionread0000000000001' }) })
+  try {
+    await ok.mod.getAdvisorSession('clsessionread0000000000001', { accessToken: 'anon-access-7f3a' })
+    assert.deepEqual(ok.probe.remembered, [['clsessionread0000000000001', { accessToken: 'anon-access-7f3a' }]])
+  } finally {
+    ok.restore()
+  }
+  const bad = await loadAdvisorApi({ ok: false, status: 404, json: async () => ({}) })
+  try {
+    await assert.rejects(bad.mod.getAdvisorSession('clsessionread0000000000002', { accessToken: 'anon-access-7f3a' }))
+    assert.deepEqual(bad.probe.remembered, [], '读失败不许登记')
+  } finally {
+    bad.restore()
+  }
+})
+
+test('接线：小青总结回了作业号也登记（aiHttpAdapter 的 summarizeAssistantSession）', () => {
+  const src = readFileSync(join(root, 'src/services/api/aiHttpAdapter.ts'), 'utf8')
+  const start = src.indexOf('async summarizeAssistantSession(')
+  assert.ok(start >= 0, '找不到 summarizeAssistantSession')
+  const end = src.indexOf('\n  },', start)
+  assert.ok(end > start, '找不到 summarizeAssistantSession 的结尾')
+  assert.match(src.slice(start, end), /rememberAdvisorSession\(res\.advisorSessionId\)/)
 })
