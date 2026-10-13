@@ -119,38 +119,105 @@ function joinApiPath(...parts) {
   return `/${joined}`.replace(/\/{2,}/g, '/').replace(/(.)\/$/, '$1')
 }
 
+const CONTROLLER_DECORATOR_PATTERN = /@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/g
+// TS 语法里装饰器和 class 之间只能隔着别的装饰器，所以 @Controller 后面第一个 class
+// 声明就是它装饰的类。带不带 export 都认：控制器写成 `class X` 再 `export { X }` 时，
+// 只认 `export class` 会落到后面别的类上 —— 正是 locateControllers 要修的那种错。
+const CLASS_DECLARATION_PATTERN = /\b(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\s+([\w$]+)/g
 const HTTP_DECORATOR_PATTERN =
   /@(Get|Post|Put|Patch|Delete|All|Head|Options)\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/g
 
-/** 解析一个 controller 文件，返回 { className, prefix, endpoints[], injections } */
-export function parseController(file, fileSet) {
-  const text = stripComments(readText(file))
-  if (!text) return null
-
-  const controllerMatch = /@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/.exec(text)
-  if (!controllerMatch) return null
-  const prefix = controllerMatch[1] ?? ''
-
-  const classMatch = /export\s+class\s+([\w$]+)/.exec(text)
-  const className = classMatch ? classMatch[1] : path.posix.basename(file)
-
-  // 构造器注入：属性名 → 类名
-  const injections = new Map()
-  const ctorMatch = /constructor\s*\(([\s\S]*?)\)\s*\{/.exec(text)
-  if (ctorMatch) {
-    for (const [, prop, type] of ctorMatch[1].matchAll(
-      /(?:private|public|protected|readonly|\s)+([\w$]+)\s*:\s*([\w$]+)/g,
-    )) {
-      injections.set(prop, type)
-    }
-  }
-
-  // 类级守卫 / 角色
-  const classRoles = sorted(
-    [...text.slice(0, controllerMatch.index + 400).matchAll(/@Roles\(([^)]*)\)/g)].flatMap((m) =>
+function rolesIn(text) {
+  return sorted(
+    [...text.matchAll(/@Roles\(([^)]*)\)/g)].flatMap((m) =>
       m[1].split(',').map((r) => r.trim().replace(/['"`]/g, '')),
     ),
   )
+}
+
+/**
+ * 文件里每个 @Controller 各自定位它装饰的类：类名、路由前缀、构造器注入表、类级角色。
+ *
+ * 不能取「文件里第一个 export class / 第一个 constructor」。2026-10-13 实测三种错：
+ *   - 入参 DTO 写在控制器前面（advisor、job-fit、mock-interview 等），端点全记在 DTO 名下；
+ *   - 一个文件两个控制器（member-privacy、job-materials 等），第二个控制器的端点被记成
+ *     第一个的路由前缀、类名和注入表 —— `GET /me/data-requests` 在图谱里成了
+ *     `GET /me/ai-consents`，按真实路径反而查不到；
+ *   - 类级角色原来取「@Controller 后 400 字」，类上没写 @Roles 时会吃进第一个方法的
+ *     @Roles('admin')，同类里没写 @Roles 的终端接口于是被记成要 admin。
+ *
+ * 所以：到下一个 @Controller 之前都算本控制器的地盘；类名取装饰器后第一个 class 声明，
+ * 构造器只在那个类体里找，类级角色只看类体开始之前的装饰器。类或类体找不到时保持原来的
+ * 兜底：类名退回文件名，构造器在地盘里找，角色仍按「装饰器后 400 字」。
+ */
+function locateControllers(text, file) {
+  const decorators = [...text.matchAll(CONTROLLER_DECORATOR_PATTERN)]
+  const controllers = []
+
+  decorators.forEach((decorator, k) => {
+    const decoratorEnd = decorator.index + decorator[0].length
+    const limit = k + 1 < decorators.length ? decorators[k + 1].index : text.length
+    // @UseGuards / @Roles 也可能写在 @Controller 前面，所以从上一个控制器的类体结束处算起
+    const regionStart = k === 0 ? 0 : controllers[k - 1].end
+
+    CLASS_DECLARATION_PATTERN.lastIndex = decoratorEnd
+    const declaration = CLASS_DECLARATION_PATTERN.exec(text)
+    const declared = declaration !== null && declaration.index < limit
+    const bodyOpen = declared ? text.indexOf('{', declaration.index + declaration[0].length) : -1
+    const hasBody = bodyOpen !== -1 && bodyOpen < limit
+    const bodyClose = hasBody ? Math.min(matchBrace(text, bodyOpen), limit - 1) : -1
+
+    // 构造器注入：属性名 → 类名
+    const injections = new Map()
+    const ctorScope = hasBody
+      ? text.slice(bodyOpen, bodyClose + 1)
+      : text.slice(decoratorEnd, limit)
+    const ctorMatch = /constructor\s*\(([\s\S]*?)\)\s*\{/.exec(ctorScope)
+    if (ctorMatch) {
+      for (const [, prop, type] of ctorMatch[1].matchAll(
+        /(?:private|public|protected|readonly|\s)+([\w$]+)\s*:\s*([\w$]+)/g,
+      )) {
+        injections.set(prop, type)
+      }
+    }
+
+    controllers.push({
+      start: decorator.index,
+      end: hasBody ? bodyClose + 1 : decoratorEnd,
+      className: declared ? declaration[1] : path.posix.basename(file),
+      prefix: decorator[1] ?? '',
+      injections,
+      // 类级守卫 / 角色
+      roles: rolesIn(
+        text.slice(regionStart, hasBody ? bodyOpen : Math.min(decorator.index + 400, limit)),
+      ),
+    })
+  })
+
+  return controllers
+}
+
+/** 端点归它前面最近的那个 @Controller。 */
+function controllerAt(controllers, index) {
+  let owner = controllers[0]
+  for (const controller of controllers) {
+    if (controller.start < index) owner = controller
+  }
+  return owner
+}
+
+/** 解析一个 controller 文件，返回 { file, controllers[], endpoints[], classFiles } */
+export function parseController(file, fileSet) {
+  return parseControllerSource(file, readText(file), fileSet)
+}
+
+/** 同 parseController，但源码由调用方给（解析器自检用夹具，不读盘）。 */
+export function parseControllerSource(file, source, fileSet) {
+  const text = stripComments(source)
+  if (!text) return null
+
+  const controllers = locateControllers(text, file)
+  if (controllers.length === 0) return null
 
   const endpoints = []
   HTTP_DECORATOR_PATTERN.lastIndex = 0
@@ -158,6 +225,7 @@ export function parseController(file, fileSet) {
   while ((match = HTTP_DECORATOR_PATTERN.exec(text)) !== null) {
     const method = match[1].toUpperCase()
     const subPath = match[2] ?? ''
+    const owner = controllerAt(controllers, match.index)
 
     // 装饰器之后到方法体：跳过其余装饰器，抓方法名和方法体
     const after = text.slice(match.index + match[0].length)
@@ -169,23 +237,19 @@ export function parseController(file, fileSet) {
 
     // 装饰器与方法之间的 @Roles（方法级）
     const between = sigMatch ? after.slice(0, sigMatch.index + sigMatch[0].length) : ''
-    const methodRoles = sorted(
-      [...between.matchAll(/@Roles\(([^)]*)\)/g)].flatMap((m) =>
-        m[1].split(',').map((r) => r.trim().replace(/['"`]/g, '')),
-      ),
-    )
+    const methodRoles = rolesIn(between)
 
     const calledServices = sorted(
       [...body.matchAll(/this\.([\w$]+)\.[\w$]+\s*\(/g)]
-        .map((m) => injections.get(m[1]))
+        .map((m) => owner.injections.get(m[1]))
         .filter(Boolean),
     )
 
     endpoints.push({
       method,
-      path: joinApiPath(API_GLOBAL_PREFIX.slice(1), prefix, subPath),
-      handler: `${className}.${handler}`,
-      roles: methodRoles.length > 0 ? methodRoles : classRoles,
+      path: joinApiPath(API_GLOBAL_PREFIX.slice(1), owner.prefix, subPath),
+      handler: `${owner.className}.${handler}`,
+      roles: methodRoles.length > 0 ? methodRoles : owner.roles,
       services: calledServices,
     })
   }
@@ -205,12 +269,165 @@ export function parseController(file, fileSet) {
 
   return {
     file,
-    className,
-    prefix,
+    controllers: controllers.map(({ className, prefix }) => ({ className, prefix })),
     endpoints: endpoints.sort((a, b) =>
       a.path === b.path ? a.method.localeCompare(b.method) : a.path < b.path ? -1 : 1,
     ),
     classFiles,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 解析器自检
+// ---------------------------------------------------------------------------
+// buildBackend 解析 controller 之前先跑一遍（与 verify-repository-integrity 的
+// verifyConflictMarkerDetector 同一做法）：解析器一旦退回「取文件里第一个」，
+// `pnpm graph` / `pnpm graph:check` 当场失败，错的归属不会悄悄写进 docs/graph/。
+//
+// 夹具只放源码、不写文件路径：本文件自己也在门禁路径抽取的范围里，带扩展名的路径
+// 字面量会被记成「断言了一个不存在的文件」。
+
+const CONTROLLER_PARSER_FIXTURES = [
+  {
+    // DTO 带构造器是刻意的：没有它，旧实现取「文件里第一个 constructor」也会碰巧取对，
+    // 注入表这一半就测不出回退。
+    name: '入参 DTO 写在控制器前面',
+    source: `
+export class GrantAiConsentDto {
+  constructor(readonly scope: string, readonly version: string) {}
+}
+
+@Controller('me/ai-consents')
+@UseGuards(EndUserAuthGuard)
+export class MemberPrivacyController {
+  constructor(private readonly privacy: MemberPrivacyService) {}
+
+  @Post()
+  grantConsent(@Body() body: GrantAiConsentDto) {
+    return this.privacy.grantConsent(body)
+  }
+}
+`,
+    expected: [
+      {
+        method: 'POST',
+        path: '/api/v1/me/ai-consents',
+        handler: 'MemberPrivacyController.grantConsent',
+        roles: [],
+        services: ['MemberPrivacyService'],
+      },
+    ],
+  },
+  {
+    // 第一个类上没写 @Roles、第一个方法写了：终端接口不能跟着变成 admin。
+    // 第二个控制器的路由前缀、类名、注入表、类级角色都得是它自己的。
+    name: '一个文件两个控制器',
+    source: `
+@Controller()
+export class ContentController {
+  constructor(private readonly content: ContentService) {}
+
+  @Get('admin/ad-assets')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  listAssets() {
+    return this.content.listAssets()
+  }
+
+  @Get('terminals/:terminalId/screensaver')
+  getKioskPlaylist(@Param('terminalId') terminalId: string) {
+    return this.content.getKioskPlaylist(terminalId)
+  }
+}
+
+@Controller('partner/screen')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('partner')
+export class PartnerScreenUsageController {
+  constructor(private readonly usage: ConsoleScreenUsageService) {}
+
+  @Get('usage')
+  getPartnerUsage() {
+    return this.usage.getPartnerUsage()
+  }
+}
+`,
+    expected: [
+      {
+        method: 'GET',
+        path: '/api/v1/admin/ad-assets',
+        handler: 'ContentController.listAssets',
+        roles: ['admin'],
+        services: ['ContentService'],
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/partner/screen/usage',
+        handler: 'PartnerScreenUsageController.getPartnerUsage',
+        roles: ['partner'],
+        services: ['ConsoleScreenUsageService'],
+      },
+      {
+        method: 'GET',
+        path: '/api/v1/terminals/:terminalId/screensaver',
+        handler: 'ContentController.getKioskPlaylist',
+        roles: [],
+        services: ['ContentService'],
+      },
+    ],
+  },
+  {
+    // 控制器自己没有构造器（仓库里真有这样的）时，不能去拿后面别的类的构造器：
+    // 字段初始化的 logger 不是注入，后面那个类构造器里同名的 logger 也不是它的。
+    name: '控制器没有构造器，后面的类有',
+    source: `
+@Controller('help')
+export class HelpController {
+  private readonly logger = new Logger(HelpController.name)
+
+  @Get('topics')
+  listTopics() {
+    this.logger.log('list help topics')
+    return HELP_TOPICS
+  }
+}
+
+export class HelpTopicAuditor {
+  constructor(private readonly logger: AuditLogService) {}
+}
+`,
+    expected: [
+      {
+        method: 'GET',
+        path: '/api/v1/help/topics',
+        handler: 'HelpController.listTopics',
+        roles: [],
+        services: [],
+      },
+    ],
+  },
+]
+
+/** 不通过就抛错（与 verifyConflictMarkerDetector 一致），调用方不必判返回值。 */
+export function verifyControllerParser() {
+  for (const fixture of CONTROLLER_PARSER_FIXTURES) {
+    const parsed = parseControllerSource('selfcheck.controller.ts', fixture.source, new Set())
+    const actual = (parsed?.endpoints ?? []).map(
+      ({ method, path: endpointPath, handler, roles, services }) => ({
+        method,
+        path: endpointPath,
+        handler,
+        roles,
+        services,
+      }),
+    )
+    if (JSON.stringify(actual) !== JSON.stringify(fixture.expected)) {
+      throw new Error(
+        `controller 解析器自检失败（${fixture.name}）：\n` +
+          `  期望 ${JSON.stringify(fixture.expected)}\n` +
+          `  实际 ${JSON.stringify(actual)}`,
+      )
+    }
   }
 }
 

@@ -25,6 +25,7 @@ import {
   parsePrismaSchema,
   prismaAccessorMap,
   serviceDataClosure,
+  verifyControllerParser,
 } from './backend.mjs'
 import {
   buildDirIndex,
@@ -126,6 +127,9 @@ function buildFrontend(fileSet) {
 }
 
 function buildBackend(fileSet) {
+  // 解析器先过自检：它一旦回退，下面所有 controller 的端点归属都会跟着记错（见 backend.mjs）
+  verifyControllerParser()
+
   const schemaFile = `${API_ROOT}/prisma/schema.prisma`
   const models = parsePrismaSchema(schemaFile)
   const accessors = prismaAccessorMap(models)

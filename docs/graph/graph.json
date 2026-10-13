@@ -123,9 +123,7 @@
           "User"
         ],
         "path": "/api/v1/ad-assets/:id/content",
-        "roles": [
-          "admin"
-        ],
+        "roles": [],
         "serviceFiles": [
           "services/api/src/content/content.service.ts"
         ],
@@ -409,22 +407,6 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.getAll",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/admin/ai-config",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
         "handler": "AiConfigController.update",
         "method": "PUT",
         "models": [],
@@ -441,44 +423,12 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.getOne",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/admin/ai-config/:featureKey",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.updateOne",
-        "method": "PUT",
-        "models": [],
-        "path": "/api/v1/admin/ai-config/:featureKey",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.testOne",
+        "handler": "AiConfigController.test",
         "method": "POST",
         "models": [
           "AiServiceLog"
         ],
-        "path": "/api/v1/admin/ai-config/:featureKey/test",
+        "path": "/api/v1/admin/ai-config/test",
         "roles": [
           "admin"
         ],
@@ -493,12 +443,60 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.test",
+        "handler": "AiConfigsController.getAll",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.getOne",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs/:featureKey",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.updateOne",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs/:featureKey",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.testOne",
         "method": "POST",
         "models": [
           "AiServiceLog"
         ],
-        "path": "/api/v1/admin/ai-config/test",
+        "path": "/api/v1/admin/ai-configs/:featureKey/test",
         "roles": [
           "admin"
         ],
@@ -1998,6 +1996,121 @@
         ]
       },
       {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.summary",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/admin/job-materials/summary",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.templates",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/admin/job-materials/templates",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.createTemplate",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/admin/job-materials/templates",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.updateTemplate",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/admin/job-materials/templates/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.publishTemplate",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "JobMaterialTemplate",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/admin/job-materials/templates/:id/publish",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
+        ]
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getJobSources",
         "method": "GET",
@@ -3466,6 +3579,48 @@
         ]
       },
       {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "AdminPrintFreeQuotaController.get",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal",
+          "User"
+        ],
+        "path": "/api/v1/admin/print-free-quota",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
+        "handler": "AdminPrintFreeQuotaController.update",
+        "method": "PUT",
+        "models": [
+          "AuditLog",
+          "PlatformSetting",
+          "Terminal",
+          "User"
+        ],
+        "path": "/api/v1/admin/print-free-quota",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/print-jobs/free-print-quota.service.ts"
+        ],
+        "services": [
+          "FreePrintQuotaService"
+        ]
+      },
+      {
         "controller": "services/api/src/print-jobs/admin-print-jobs.controller.ts",
         "handler": "AdminPrintJobsController.abandonPending",
         "method": "POST",
@@ -3855,7 +4010,7 @@
       },
       {
         "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
-        "handler": "EmergencyTakedownDto.circuitBreak",
+        "handler": "RecruitmentEmergencyController.circuitBreak",
         "method": "POST",
         "models": [
           "AuditLog",
@@ -3886,7 +4041,7 @@
       },
       {
         "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
-        "handler": "EmergencyTakedownDto.takedown",
+        "handler": "RecruitmentEmergencyController.takedown",
         "method": "POST",
         "models": [
           "AuditLog",
@@ -4071,7 +4226,7 @@
       },
       {
         "controller": "services/api/src/console-screen/console-screen.usage.controller.ts",
-        "handler": "UsageRangeQueryDto.getAdminUsage",
+        "handler": "AdminUsageController.getAdminUsage",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -5163,7 +5318,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.availability",
+        "handler": "AdvisorController.availability",
         "method": "GET",
         "models": [
           "AdvisorArtifact",
@@ -5184,7 +5339,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.create",
+        "handler": "AdvisorController.create",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5205,7 +5360,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.get",
+        "handler": "AdvisorController.get",
         "method": "GET",
         "models": [
           "AdvisorArtifact",
@@ -5226,7 +5381,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.print",
+        "handler": "AdvisorController.print",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5247,7 +5402,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.ask",
+        "handler": "AdvisorController.ask",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5268,7 +5423,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.pin",
+        "handler": "AdvisorController.pin",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5289,7 +5444,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.unpin",
+        "handler": "AdvisorController.unpin",
         "method": "DELETE",
         "models": [
           "AdvisorArtifact",
@@ -5310,7 +5465,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.run",
+        "handler": "AdvisorController.run",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5331,7 +5486,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.switchSkill",
+        "handler": "AdvisorController.switchSkill",
         "method": "PATCH",
         "models": [
           "AdvisorArtifact",
@@ -5352,7 +5507,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.fillSlot",
+        "handler": "AdvisorController.fillSlot",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -6790,9 +6945,7 @@
           "User"
         ],
         "path": "/api/v1/job-fairs/materials/:materialId/content",
-        "roles": [
-          "admin"
-        ],
+        "roles": [],
         "serviceFiles": [
           "services/api/src/jobs/admin-fairs.service.ts"
         ],
@@ -6823,27 +6976,6 @@
       },
       {
         "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.summary",
-        "method": "GET",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/job-materials/summary",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
         "handler": "JobMaterialsController.templates",
         "method": "GET",
         "models": [
@@ -6861,116 +6993,6 @@
         ],
         "services": [
           "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.templates",
-        "method": "GET",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/job-materials/templates",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.createTemplate",
-        "method": "POST",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/job-materials/templates",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.updateTemplate",
-        "method": "PATCH",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/job-materials/templates/:id",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.publishTemplate",
-        "method": "PATCH",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "JobMaterialTemplate",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/job-materials/templates/:id/publish",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-ai/job-ai.controller.ts",
-        "handler": "JobAiController.list",
-        "method": "GET",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "ContractReviewTask",
-          "Job",
-          "JobAiRecommendation",
-          "JobAiSession",
-          "KioskJobBoardConfig",
-          "Terminal",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/jobs",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-ai.service.ts",
-          "services/api/src/terminals/kiosk-job-board.service.ts"
-        ],
-        "services": [
-          "JobAiService",
-          "KioskJobBoardService"
         ]
       },
       {
@@ -6998,28 +7020,6 @@
         ],
         "services": [
           "JobsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-ai/job-ai.controller.ts",
-        "handler": "JobAiController.remove",
-        "method": "DELETE",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "ContractReviewTask",
-          "Job",
-          "JobAiRecommendation",
-          "JobAiSession",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/jobs/:id",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-ai.service.ts"
-        ],
-        "services": [
-          "JobAiService"
         ]
       },
       {
@@ -7349,44 +7349,6 @@
         ]
       },
       {
-        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
-        "handler": "KioskPrintQuotaController.get",
-        "method": "GET",
-        "models": [
-          "AuditLog",
-          "PlatformSetting",
-          "Terminal",
-          "User"
-        ],
-        "path": "/api/v1/kiosk/print-quota",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/print-jobs/free-print-quota.service.ts"
-        ],
-        "services": [
-          "FreePrintQuotaService"
-        ]
-      },
-      {
-        "controller": "services/api/src/print-jobs/free-print-quota.controller.ts",
-        "handler": "KioskPrintQuotaController.update",
-        "method": "PUT",
-        "models": [
-          "AuditLog",
-          "PlatformSetting",
-          "Terminal",
-          "User"
-        ],
-        "path": "/api/v1/kiosk/print-quota",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/print-jobs/free-print-quota.service.ts"
-        ],
-        "services": [
-          "FreePrintQuotaService"
-        ]
-      },
-      {
         "controller": "services/api/src/screensaver/screensaver.controller.ts",
         "handler": "ScreensaverController.findAll",
         "method": "GET",
@@ -7541,16 +7503,6 @@
       },
       {
         "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.list",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/me/ai-consents",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
         "handler": "MemberPrivacyController.grantConsent",
         "method": "POST",
         "models": [
@@ -7565,36 +7517,6 @@
         "services": [
           "MemberPrivacyService"
         ]
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.create",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/me/ai-consents",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.cancel",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/me/ai-consents/:id/cancel",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.authorizeDownload",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/me/ai-consents/:id/download-authorizations",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
       },
       {
         "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
@@ -7726,6 +7648,86 @@
         "services": [
           "ActivityService",
           "AuditService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.list",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "User",
+          "UserAiConsent",
+          "UserDataRequest"
+        ],
+        "path": "/api/v1/me/data-requests",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-privacy/member-data-request.service.ts"
+        ],
+        "services": [
+          "MemberDataRequestService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "User",
+          "UserAiConsent",
+          "UserDataRequest"
+        ],
+        "path": "/api/v1/me/data-requests",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-privacy/member-data-request.service.ts"
+        ],
+        "services": [
+          "MemberDataRequestService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.cancel",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "User",
+          "UserAiConsent",
+          "UserDataRequest"
+        ],
+        "path": "/api/v1/me/data-requests/:id/cancel",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-privacy/member-data-request.service.ts"
+        ],
+        "services": [
+          "MemberDataRequestService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.authorizeDownload",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "EndUser",
+          "FileObject",
+          "User",
+          "UserDataRequest"
+        ],
+        "path": "/api/v1/me/data-requests/:id/download-authorizations",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-privacy/member-data-export-download.service.ts"
+        ],
+        "services": [
+          "MemberDataExportDownloadService"
         ]
       },
       {
@@ -7971,6 +7973,54 @@
         ]
       },
       {
+        "controller": "services/api/src/job-ai/job-ai.controller.ts",
+        "handler": "MemberJobAiSessionsController.list",
+        "method": "GET",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "ContractReviewTask",
+          "Job",
+          "JobAiRecommendation",
+          "JobAiSession",
+          "KioskJobBoardConfig",
+          "Terminal",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/me/job-ai-sessions",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-ai/job-ai.service.ts",
+          "services/api/src/terminals/kiosk-job-board.service.ts"
+        ],
+        "services": [
+          "JobAiService",
+          "KioskJobBoardService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-ai/job-ai.controller.ts",
+        "handler": "MemberJobAiSessionsController.remove",
+        "method": "DELETE",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "ContractReviewTask",
+          "Job",
+          "JobAiRecommendation",
+          "JobAiSession",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/me/job-ai-sessions/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-ai/job-ai.service.ts"
+        ],
+        "services": [
+          "JobAiService"
+        ]
+      },
+      {
         "controller": "services/api/src/job-applications/job-applications.controller.ts",
         "handler": "JobApplicationsController.list",
         "method": "GET",
@@ -8026,6 +8076,54 @@
         ],
         "services": [
           "JobApplicationsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "MemberMockInterviewController.list",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/me/mock-interviews",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "services": [
+          "MockInterviewService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "MemberMockInterviewController.remove",
+        "method": "DELETE",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask",
+          "User"
+        ],
+        "path": "/api/v1/me/mock-interviews/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "services": [
+          "MockInterviewService"
         ]
       },
       {
@@ -8090,23 +8188,13 @@
       },
       {
         "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
-        "handler": "MemberPrintOrdersController.list",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/me/print-orders",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
-        "handler": "MemberPrintOrdersController.list",
+        "handler": "MemberPendingTasksController.list",
         "method": "GET",
         "models": [
           "PrintTask",
           "Terminal"
         ],
-        "path": "/api/v1/me/print-orders",
+        "path": "/api/v1/me/pending-tasks",
         "roles": [],
         "serviceFiles": [
           "services/api/src/member-print-orders/member-print-orders.service.ts"
@@ -8114,6 +8202,16 @@
         "services": [
           "MemberPrintOrdersService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.list",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/print-orders",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
@@ -8610,31 +8708,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.list",
-        "method": "GET",
-        "models": [
-          "AiServiceLog",
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewReport",
-          "MockInterviewSession",
-          "MockInterviewTurn",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/mock-interviews",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/mock-interview/mock-interview.service.ts"
-        ],
-        "services": [
-          "MockInterviewService"
-        ]
-      },
-      {
-        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.create",
+        "handler": "MockInterviewController.create",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8658,31 +8732,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.remove",
-        "method": "DELETE",
-        "models": [
-          "AiServiceLog",
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewReport",
-          "MockInterviewSession",
-          "MockInterviewTurn",
-          "PrintTask",
-          "User"
-        ],
-        "path": "/api/v1/mock-interviews/:id",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/mock-interview/mock-interview.service.ts"
-        ],
-        "services": [
-          "MockInterviewService"
-        ]
-      },
-      {
-        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.get",
+        "handler": "MockInterviewController.get",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -8706,7 +8756,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.answer",
+        "handler": "MockInterviewController.answer",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8730,7 +8780,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.end",
+        "handler": "MockInterviewController.end",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8754,7 +8804,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.practiceSheet",
+        "handler": "MockInterviewController.practiceSheet",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8778,7 +8828,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.report",
+        "handler": "MockInterviewController.report",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -8802,7 +8852,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.print",
+        "handler": "MockInterviewController.print",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8826,7 +8876,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.start",
+        "handler": "MockInterviewController.start",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8850,7 +8900,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.transcribe",
+        "handler": "MockInterviewController.transcribe",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8878,7 +8928,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.printTranscript",
+        "handler": "MockInterviewController.printTranscript",
         "method": "POST",
         "models": [
           "AuditLog",
@@ -8901,7 +8951,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.questionAudio",
+        "handler": "MockInterviewController.questionAudio",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -8929,7 +8979,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.voiceCapability",
+        "handler": "MockInterviewController.voiceCapability",
         "method": "GET",
         "models": [],
         "path": "/api/v1/mock-interviews/capabilities/voice",
@@ -10282,7 +10332,7 @@
       },
       {
         "controller": "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts",
-        "handler": "EmergencyTakedownDto.notices",
+        "handler": "RecruitmentEmergencyController.notices",
         "method": "GET",
         "models": [
           "AuditLog",
@@ -10537,7 +10587,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
-        "handler": "UpdateOwnOrgProfileDto.getProfile",
+        "handler": "PartnerOrgController.getProfile",
         "method": "GET",
         "models": [
           "AuditLog",
@@ -10557,7 +10607,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
-        "handler": "UpdateOwnOrgProfileDto.updateProfile",
+        "handler": "PartnerOrgController.updateProfile",
         "method": "PUT",
         "models": [
           "AuditLog",
@@ -10647,7 +10697,7 @@
       },
       {
         "controller": "services/api/src/console-screen/console-screen.usage.controller.ts",
-        "handler": "UsageRangeQueryDto.getPartnerUsage",
+        "handler": "PartnerUsageController.getPartnerUsage",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -10672,7 +10722,7 @@
         ],
         "path": "/api/v1/partner/screen/usage",
         "roles": [
-          "admin"
+          "partner"
         ],
         "serviceFiles": [
           "services/api/src/console-screen/console-screen.usage.service.ts"
@@ -10731,7 +10781,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-stats.controller.ts",
-        "handler": "PartnerStatsQueryDto.getStats",
+        "handler": "PartnerStatsController.getStats",
         "method": "GET",
         "models": [
           "CompanyProfile",
@@ -10787,7 +10837,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-stats.controller.ts",
-        "handler": "PartnerStatsQueryDto.getTerminalOperations",
+        "handler": "PartnerStatsController.getTerminalOperations",
         "method": "GET",
         "models": [
           "CompanyProfile",
@@ -11445,7 +11495,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.analyze",
+        "handler": "JobFitController.analyze",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -11467,7 +11517,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.latest",
+        "handler": "JobFitController.latest",
         "method": "GET",
         "models": [
           "AiResumeResult",
@@ -11489,7 +11539,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.print",
+        "handler": "JobFitController.print",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -11511,7 +11561,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.grantConsent",
+        "handler": "JobFitController.grantConsent",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -11533,7 +11583,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.revokeConsent",
+        "handler": "JobFitController.revokeConsent",
         "method": "DELETE",
         "models": [
           "AiResumeResult",
@@ -11555,7 +11605,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.consentStatus",
+        "handler": "JobFitController.consentStatus",
         "method": "GET",
         "models": [
           "AiResumeResult",
@@ -12158,9 +12208,7 @@
           "User"
         ],
         "path": "/api/v1/terminals/:terminalId/official-channels",
-        "roles": [
-          "admin"
-        ],
+        "roles": [],
         "serviceFiles": [
           "services/api/src/official-channels/official-channels.service.ts"
         ],
@@ -12354,9 +12402,7 @@
           "User"
         ],
         "path": "/api/v1/terminals/:terminalId/screensaver",
-        "roles": [
-          "admin"
-        ],
+        "roles": [],
         "serviceFiles": [
           "services/api/src/content/content.service.ts"
         ],
@@ -12376,9 +12422,7 @@
           "ToolboxLaunchEvent"
         ],
         "path": "/api/v1/terminals/:terminalId/smart-campus",
-        "roles": [
-          "admin"
-        ],
+        "roles": [],
         "serviceFiles": [
           "services/api/src/smart-campus/smart-campus.service.ts"
         ],
