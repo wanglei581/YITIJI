@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
@@ -69,7 +69,7 @@ export interface AdvisorRequester {
 @Injectable()
 export class AdvisorService {
   /** 进程内存，不落库。重启即失 —— 这是刻意的，不是缺陷，理由见 advisor-qa-memory.ts。 */
-  private readonly qaMemory = new AdvisorQaMemory()
+  private readonly qaMemory: AdvisorQaMemory
 
   constructor(
     private readonly prisma: PrismaService,
@@ -77,7 +77,10 @@ export class AdvisorService {
     private readonly artifacts: AdvisorArtifactService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
-  ) {}
+    @Optional() @Inject(AdvisorQaMemory) qaMemory?: AdvisorQaMemory,
+  ) {
+    this.qaMemory = qaMemory ?? new AdvisorQaMemory()
+  }
 
   /**
    * 可用性探针。
@@ -316,7 +319,12 @@ export class AdvisorService {
       throw error
     }
     this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-    this.qaMemory.append(sessionId, question.trim().slice(0, 600), answer.answer)
+    this.qaMemory.append(
+      sessionId,
+      question.trim().slice(0, 600),
+      answer.answer,
+      row.endUserId ? `u:${row.endUserId}` : null,
+    )
     return {
       sessionId,
       ...answer,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
+import { ConversationMemoryModule } from '../common/conversation-memory.module'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberClosureReceiptGuard } from '../common/guards/member-closure-receipt.guard'
 import { TerminalsModule } from '../terminals/terminals.module'
@@ -24,6 +25,7 @@ import { RedisService } from '../common/redis/redis.service'
  */
 @Module({
   imports: [
+    ConversationMemoryModule,
     JwtModule.registerAsync({
       useFactory: () => {
         const secret = process.env['JWT_SECRET']

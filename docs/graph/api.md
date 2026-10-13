@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`588` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`589` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -121,6 +121,12 @@
 | GET | `/api/v1/resume/records/:taskId/optimize` | AiController.getResumeOptimize | — | AiService<br/>AuditService<br/>BenefitRedemptionService<br/>MemberPrivacyService<br/>ResumeDraftSourceService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>ContractReviewTask<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>KioskSession<br/>Order<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>Terminal<br/>User<br/>UserAiConsent |
 | GET | `/api/v1/resume/records/:taskId/versions` | AiController.listResumeVersions | — | AiService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>BenefitGrant<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobMaterialTemplate<br/>PriceConfig<br/>PrintTask<br/>RedemptionRecord<br/>User |
 | POST | `/api/v1/resume/voice/transcribe` | AiController.transcribeResumeVoice | — | AiLogService<br/>AsrService | AiServiceLog |
+
+## `services/api/src/ai/assistant-session-forget.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/api/v1/assistant/sessions/forget` | AssistantSessionForgetController.forget | — | — | — |
 
 ## `services/api/src/ai/career-plan.controller.ts`
 
