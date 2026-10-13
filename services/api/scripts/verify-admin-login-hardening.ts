@@ -438,6 +438,8 @@ async function main(): Promise<void> {
       const key = 'ADMIN_LOGIN_SECOND_FACTOR'
       const previous = process.env[key]
       try {
+        delete process.env[key]
+        check('开关没配（变量不存在）为关', adminSecondFactorRequired() === false)
         for (const value of ['off', 'OFF', ' off ', 'false', '0', '']) {
           process.env[key] = value
           check(`开关值 ${JSON.stringify(value)} 为关`, adminSecondFactorRequired() === false)
