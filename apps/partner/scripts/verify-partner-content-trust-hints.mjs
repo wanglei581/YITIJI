@@ -5,7 +5,7 @@
  *    用带英文接口路径的中文原文去查时，返回表里那句，不含 PATCH、/api/v1、contentTrustStatus。
  *    表里没有的错误码加带中文的原文，仍原样返回（查表顺序：先按码，查不到才看原文）。
  * 2. 渠道区块只在不可发布时含那句提示；资料页把 publishable 传进去。
- * 3. 政策页合规提示末尾有「现场没有工作人员」那句，原句「此类内容审核将不予通过」仍在。
+ * 3. 政策页合规提示末尾有「现场没有工作人员」那句，前半句已改成「此类内容本机构审核时请不予通过」（政策由机构自审）。
  *
  * Run: pnpm --filter @ai-job-print/partner verify:partner-content-trust-hints
  */
@@ -29,7 +29,7 @@ const PARTNER_COPY = '本机构还没有通过平台的内容可信核验，暂�
 const ADMIN_COPY = '该机构还没有被标记为内容可信，不能发布。请先在「合作机构」里完成内容可信核验。'
 const CHANNEL_HINT = '本机构还没有通过平台的内容可信核验，下面的渠道暂时不会在一体机上显示。核验通过后自动恢复显示。'
 const POLICY_SENTENCE = '一体机现场没有工作人员,正文里请不要写"找现场工作人员""叫工作人员看机器"这类话;需要到线下办理的,请写清本机构的办理地址、时间或电话。'
-const POLICY_OLD = '此类内容审核将不予通过。'
+const POLICY_OLD = '此类内容本机构审核时请不予通过。'
 const BACKEND_RAW = '来源机构「演示机构」(org-demo) 未通过内容信任核验：当前 contentTrustStatus=pending，发布要求 active 且未归档。请先完成来源授权核验，再由管理员 PATCH /api/v1/admin/orgs/:id/content-trust 把该机构标成内容可信，然后重试发布。'
 const UNLISTED_RAW = '这个错误码没有登记，这句中文应原样返回。'
 
@@ -110,7 +110,8 @@ console.log('PASS 2 渠道区块只在不可发布时显示提示，且接了 pu
 
 const policy = read(POLICY)
 assert.ok(policy.includes(POLICY_SENTENCE), '政策页合规提示末尾缺少「现场没有工作人员」那句')
-assert.ok(policy.includes(`${POLICY_OLD}${POLICY_SENTENCE}`), '原句「此类内容审核将不予通过」必须原样留在新句前面')
-console.log('PASS 3 政策页合规提示含新句，原句仍在')
+assert.ok(!policy.includes('此类内容审核将不予通过'), '旧说法「此类内容审核将不予通过」读着像平台在审，应已改掉')
+assert.ok(policy.includes(`${POLICY_OLD}${POLICY_SENTENCE}`), '「此类内容本机构审核时请不予通过」（产品负责人 10/13 17:05 点头，合规十原文）必须在新句前面')
+console.log('PASS 3 政策页合规提示含新句，前半句已改成「本机构审核时请不予通过」')
 
 console.log('verify:partner-content-trust-hints passed')
