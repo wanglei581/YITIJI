@@ -112,7 +112,7 @@ export function MeListShell({
         ) : state === 'loading' ? (
           <KioskStatePanel tone="loading" title="正在加载本人记录" description="请稍候，不会展示其他账号的数据" />
         ) : state === 'error' ? (
-          <KioskStatePanel tone="error" title="暂时无法加载" description="请检查网络后重试" actions={<Button onClick={onRetry}>重新加载</Button>} />
+          <KioskStatePanel tone="error" title="暂时无法加载" description="请稍后重试" actions={<Button onClick={onRetry}>重新加载</Button>} />
         ) : isEmpty ? (
           <Card className="p-4">
             <KioskStatePanel

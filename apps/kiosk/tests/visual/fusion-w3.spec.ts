@@ -2434,7 +2434,9 @@ test('advisor artifact print-unavailable state has no print button @w3-kiosk', a
   await expect(page.getByText('带走这一页')).toBeVisible()
   await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
-  await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
+  // 回话单第 2 条（10/12 产品负责人「稿上的字可以改」）：底栏这句改成和带走区同一句话，旧的「做页面的人的话」不再出现。
+  await expect(page.locator('.aa-cta-note')).toHaveText('打印能力读不到，打印按钮先不放出来。等打印恢复后回到这里再打。')
+  await expect(page.getByText('不做点了没反应的按钮', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '再问一轮' })).toBeVisible()
   await assertTapTargetPointerHit(page.getByTestId('advisor-artifact-cta-back'))
   await page.getByTestId('advisor-artifact-cta-back').click()

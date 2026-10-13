@@ -889,9 +889,9 @@ V['mic-denied']=function(){
  return '<section class="sec" data-screen="ai-cockpit-voice">'+head('01','没拿到麦克风权限','语音不可用')
   +'<div class="state fit" data-kind="warn" data-testid="cockpit-mic-denied">'
   +'<div class="state-h">'+svg('micoff','currentColor',26)+'浏览器没有授予麦克风权限</div>'
-  +'<div class="state-p">语音咨询开不了。可以在系统或浏览器设置里允许后再试，也可以直接用文字。</div>'
+  +'<div class="state-p">语音咨询开不了。可以直接用文字。</div>'
   +'<div class="twocol">'
-  +miniList('现在可做什么',['改用文字咨询，回答能力一样','让现场工作人员开权限后重试','下面四项不用麦克风也能办'])
+  +miniList('现在可做什么',['改用文字咨询，回答能力一样','如需语音，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。','下面四项不用麦克风也能办'])
   +miniList('页面不会做',['不反复弹授权打断你','不假装语音已经可用','不记录任何声音'])
   +'</div></div></section>'
   +railFull('02','这四项不用麦克风，现在就能办');
@@ -902,7 +902,7 @@ V['voice-error']=function(){
   +'<div class="state-h">'+svg('alert','currentColor',26)+'这次没连上语音服务</div>'
   +'<div class="state-p">页面不推测失败原因，也不展示任何模拟对话。文字咨询和下面四个入口都不受影响。</div>'
   +'<div class="twocol">'
-  +miniList('现在可做什么',['底部「重试语音」会重新走一次真实申请','底部「改用文字咨询」回到输入框','连续失败请找现场工作人员'])
+  +miniList('现在可做什么',['底部「重试语音」会重新走一次真实申请','底部「改用文字咨询」回到输入框','连续失败时，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。'])
   +miniList('这次没有发生',['没有进入通话房间','没有采集或上传声音','没有生成任何对话记录'])
   +'</div></div></section>'
   +railFull('02','语音没建立不影响下面四项');
