@@ -17,6 +17,7 @@ import { AssistantSessionForgetController } from '../src/ai/assistant-session-fo
 import { AssistantSessionsForgetDto } from '../src/ai/dto/assistant-sessions-forget.dto'
 import { AiLogService } from '../src/ai/ai-log.service'
 import { LlmChatService, assistantOwnerKey } from '../src/ai/llm/llm-chat.service'
+import { maskUserTextsForLlmText } from '../src/common/pii/llm-input-mask'
 import { AdvisorController } from '../src/advisor/advisor.controller'
 import { AdvisorQaMemory } from '../src/advisor/advisor-qa-memory'
 import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
@@ -35,6 +36,14 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+
+/**
+ * 进对话内容的测试标记不带数字：发给模型前的遮盖会把 UUID 里连着的数字（如「1345-4828-977」）
+ * 当成手机号、银行卡遮掉，标记就对不上了（10/13 实测 5000 个里 33 个被改，门禁偶发红）。
+ */
+function textMark(label: string): string {
+  return `${label}${randomUUID().replace(/-/g, '').replace(/\d/g, (d) => 'ghijklmnop'[Number(d)]!)}`
+}
 
 let passCount = 0
 let failCount = 0
@@ -220,8 +229,12 @@ async function main(): Promise<void> {
     const userB = `verify-b-${randomUUID()}`
     await createUser(userA)
     await createUser(userB)
-    const markA = `甲会员上一轮原话${randomUUID()}`
-    const markB = `乙会员上一轮原话${randomUUID()}`
+    const markA = textMark('甲会员上一轮原话')
+    const markB = textMark('乙会员上一轮原话')
+    // 自检：老写法的标记会被遮盖改掉（门禁偶发红的原因），新写法不会。
+    const oldStyle = '乙会员上一轮原话0627c99c-1345-4828-977d-3df0fa3e31ce'
+    check(maskUserTextsForLlmText([oldStyle], 'assistant_chat', { keepNames: true })[0] !== oldStyle, '自检阳性：带连号数字的 UUID 标记会被遮盖改掉')
+    check([markA, markB].every((mark) => !/\d/.test(mark) && maskUserTextsForLlmText([mark], 'assistant_chat', { keepNames: true })[0] === mark), '自检：进对话的测试标记不含数字，遮盖不改它')
     const firstA = await chatTurn(`u:${userA}`, undefined, markA)
     const secondA = await chatTurn(`u:${userA}`, firstA.result.sessionId, '甲会员接着问')
     check(firstA.calls === 1 && userText(firstA.body).includes(markA), '场景 1 阳性：甲的第一轮原话确实发给了模型')
@@ -241,7 +254,7 @@ async function main(): Promise<void> {
     // ── 场景 2 ────────────────────────────────────────────────────────────
     const userS = `verify-s-${randomUUID()}`
     await createUser(userS)
-    const markS = `要点原话${randomUUID()}`
+    const markS = textMark('要点原话')
     const summaryChat = await chatTurn(`u:${userS}`, undefined, markS)
     const beforeSummary = chat.getOwnedTranscript(summaryChat.result.sessionId, `u:${userS}`)
     check(!!beforeSummary && beforeSummary.some((turn) => turn.content.includes(markS)), '场景 2 阳性：删记录前，原来的小青会话还在，转写里有这一轮原话')
@@ -270,8 +283,8 @@ async function main(): Promise<void> {
     const artifactQ2 = `verify-art-q2-${randomUUID()}`
     await createQa(userQ, workQ, artifactQ)
     await createQa(userQ2, workQ2, artifactQ2)
-    const questionQ = `作业甲的原话${randomUUID()}`
-    const questionQ2 = `作业乙的原话${randomUUID()}`
+    const questionQ = textMark('作业甲的原话')
+    const questionQ2 = textMark('作业乙的原话')
     await advisor.ask(workQ, questionQ, { endUserId: userQ, accessToken: null })
     await advisor.ask(workQ2, questionQ2, { endUserId: userQ2, accessToken: null })
     check(memory.read(workQ).some((turn) => turn.content.includes(questionQ)), '场景 3 阳性：删记录前，这个作业的问答内存里有原话')
@@ -285,8 +298,8 @@ async function main(): Promise<void> {
     const userL2 = `verify-l2-${randomUUID()}`
     await createUser(userL)
     await createUser(userL2)
-    const markL = `登出前原话${randomUUID()}`
-    const markL2 = `另一个会员的原话${randomUUID()}`
+    const markL = textMark('登出前原话')
+    const markL2 = textMark('另一个会员的原话')
     const loggedIn = await chatTurn(`u:${userL}`, undefined, markL)
     const otherMember = await chatTurn(`u:${userL2}`, undefined, markL2)
     const workL = `verify-work-l-${randomUUID()}`
@@ -294,9 +307,9 @@ async function main(): Promise<void> {
     const anonWork = `verify-work-anon-${randomUUID()}`
     await createQa(userL, workL, `verify-art-l-${randomUUID()}`)
     await createQa(userL2, workL2, `verify-art-l2-${randomUUID()}`)
-    const questionL = `登出前作业原话${randomUUID()}`
-    const questionL2 = `另一个会员作业原话${randomUUID()}`
-    const questionAnon = `匿名作业原话${randomUUID()}`
+    const questionL = textMark('登出前作业原话')
+    const questionL2 = textMark('另一个会员作业原话')
+    const questionAnon = textMark('匿名作业原话')
     await advisor.ask(workL, questionL, { endUserId: userL, accessToken: null })
     await advisor.ask(workL2, questionL2, { endUserId: userL2, accessToken: null })
     memory.append(anonWork, questionAnon, '匿名回答', null)
@@ -321,15 +334,15 @@ async function main(): Promise<void> {
     const userF2 = `verify-f2-${randomUUID()}`
     await createUser(userF)
     await createUser(userF2)
-    const markF = `清场前原话${randomUUID()}`
-    const markF2 = `别人的清场原话${randomUUID()}`
+    const markF = textMark('清场前原话')
+    const markF2 = textMark('别人的清场原话')
     const mine = await chatTurn(`u:${userF}`, undefined, markF)
     const continued = await chatTurn(`u:${userF}`, mine.result.sessionId, '清场前接着问')
     check(userText(continued.body).includes(markF), '场景 5 阳性：清自己的会话之前，续聊请求里带着原话')
     const theirs = await chatTurn(`u:${userF2}`, undefined, markF2)
     const ipMine = '10.8.1.1'
     const ipOther = '10.8.1.2'
-    const markIp = `来源地址甲的原话${randomUUID()}`
+    const markIp = textMark('来源地址甲的原话')
     const anon = await chatTurn(assistantOwnerKey(null, ipMine), undefined, markIp)
     const fetchesBeforeForget = sent.length
     const forgotten = await controller.forget(
@@ -369,8 +382,8 @@ async function main(): Promise<void> {
 
     // ── 场景 6 ────────────────────────────────────────────────────────────
     check(CRON_SWEEP.test(chatSrc) && CRON_SWEEP.test(memorySrc), '场景 6：小青对话和作业问答都是每分钟调用 sweep，不等下一次有人来才清')
-    const markOld = `三十一分钟前的原话${randomUUID()}`
-    const markOld2 = `另一段三十一分钟前的原话${randomUUID()}`
+    const markOld = textMark('三十一分钟前的原话')
+    const markOld2 = textMark('另一段三十一分钟前的原话')
     const old1 = await chatTurn(`u:${userF}`, undefined, markOld)
     const old2 = await chatTurn(`u:${userF2}`, undefined, markOld2)
     const workOld = `verify-work-old-${randomUUID()}`
@@ -397,7 +410,7 @@ async function main(): Promise<void> {
         && memory.read(workOld2).length === 0,
       '场景 6：拨过 30 分钟后跑一次清扫，没有任何人再调用，这几段会话已经不在',
     )
-    const markFresh = `清扫之后新写的原话${randomUUID()}`
+    const markFresh = textMark('清扫之后新写的原话')
     const fresh = await chatTurn(`u:${userF}`, undefined, markFresh)
     const workFresh = `verify-work-fresh-${randomUUID()}`
     memory.append(workFresh, markFresh, '新回答', `u:${userF}`)
@@ -425,9 +438,9 @@ async function main(): Promise<void> {
     await createAnon(workAnon, anonToken)
     await createAnon(workOther, otherToken)
     await createQa(userF, workMember, `verify-art-fm-${randomUUID()}`)
-    const qAnon = `匿名清场原话${randomUUID()}`
-    const qOther = `旁路作业原话${randomUUID()}`
-    const qMember = `会员清场原话${randomUUID()}`
+    const qAnon = textMark('匿名清场原话')
+    const qOther = textMark('旁路作业原话')
+    const qMember = textMark('会员清场原话')
     await advisor.ask(workAnon, qAnon, { endUserId: null, accessToken: anonToken })
     await advisor.ask(workOther, qOther, { endUserId: null, accessToken: otherToken })
     await advisor.ask(workMember, qMember, { endUserId: userF, accessToken: null })

@@ -25607,6 +25607,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
+      "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/common/pii/pii-masker.ts": [
@@ -37357,6 +37358,7 @@
           "services/api/src/common/conversation-memory-bridge.ts",
           "services/api/src/common/conversation-memory.module.ts",
           "services/api/src/common/guards/end-user-auth.guard.ts",
+          "services/api/src/common/pii/llm-input-mask.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/member-assets/member-assets.module.ts",
           "services/api/src/member-assets/member-assets.service.ts",
