@@ -519,11 +519,12 @@ export function PrintDonePage() {
     const unconfirmedSameCode = isUnconfirmed && sameCode
     // 现场建的 0 元单：没有到机码、离开本页后没有重打入口，也没有人核查，屏上只说真能走的路。
     const unconfirmedOnsiteFree = isUnconfirmed && state.pickupSource !== true && payment === 'free'
-    const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
+    // 终端报的卡纸不一定是卡纸（2026-10-11）。标题和大卡不咬定卡纸；顶栏用任务行里现成的「打印中断」，不把新标题塞进胶囊。
+    const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机出了点问题，这次可能没打完' : '打印失败'
     const ask = isUnconfirmed
       ? <>这次打印<em>结果未确认</em>。</>
       : jam
-        ? <>纸<em>卡住了</em>，别硬拉。</>
+        ? <>卡纸、缺纸、没出全？<em>别硬拉纸</em>。</>
         : <>打印失败，<em>请稍后再来</em>。</>
     const doing = isUnconfirmed
       ? unconfirmedSameCode
@@ -543,7 +544,7 @@ export function PrintDonePage() {
       <QxPageFrame
         title={issueTitle}
         subtitle={isUnconfirmed ? '这次无法确认是否已经出纸' : '打印任务已经确认失败'}
-        status={{ tone: 'bad', label: `${paidLabel} · ${issueTitle}` }}
+        status={{ tone: 'bad', label: `${paidLabel} · ${jam ? '打印中断' : issueTitle}` }}
         terminalLabel="就业服务大厅"
         ctabar={
           <>
