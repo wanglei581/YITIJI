@@ -184,6 +184,12 @@ await check('C1 null key 显示「无已验签终端 / 无机构」；已知 key
   assert.equal(display.aiUsageKeyName('vendor', 'api.somehost.com'), 'api.somehost.com', '认不出的厂商 key（主机名）必须原样显示')
 })
 
+await check('H1 混元厂商显示腾讯混元，未知厂商仍原样', () => {
+  const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+  assert.equal(display.aiUsageKeyName('vendor', 'hunyuan'), '腾讯混元')
+  assert.equal(display.aiUsageKeyName('vendor', 'unregistered'), 'unregistered')
+})
+
 await check('C2 AI 金额统一四位小数', () => {
   const display = load('src/routes/ai-services/aiUsageDisplay.ts', {})
   assert.equal(display.formatCny(1.1), '¥1.1000')

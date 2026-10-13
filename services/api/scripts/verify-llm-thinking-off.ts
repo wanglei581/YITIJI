@@ -70,6 +70,13 @@ for (const name of ['qwen-plus', 'MiniMax-M2', 'hunyuan-turbo', '', undefined, 4
     JSON.stringify(deepseekThinkingOff(name)))
 }
 check(isDeepseekModel('deepseek-flash') && !isDeepseekModel('qwen-plus'), 'isDeepseekModel 与 deepseekThinkingOff 口径一致')
+for (const name of ['hy3', 'HY3', '  hy3  ', 'hy4-preview']) {
+  check(deepEq(deepseekThinkingOff(name), OFF), `H1 ${JSON.stringify(name)} 关闭混元思考`)
+  check(!isDeepseekModel(name), `H2 ${JSON.stringify(name)} 不改变 isDeepseekModel 语义`)
+}
+for (const name of ['hunyuan-turbos-latest', 'hy-mt2-pro', 'hy-role', 'hyper-x']) {
+  check(deepEq(deepseekThinkingOff(name), {}), `H3 ${name} 不加思考字段`)
+}
 {
   const a = deepseekThinkingOff('deepseek-flash') as { thinking: { type: string } }
   a.thinking.type = 'enabled'
@@ -80,6 +87,10 @@ check(isDeepseekModel('deepseek-flash') && !isDeepseekModel('qwen-plus'), 'isDee
 console.log('── R4 TRTC 小青 LLMConfig ──')
 const trtcBase = { llmType: 'openai', apiKey: 'test-key', apiUrl: 'https://api.deepseek.com/v1/chat/completions', systemPrompt: 'sp' }
 const LEGACY_KEYS = ['LLMType', 'Model', 'APIKey', 'APIUrl', 'SystemPrompt', 'History', 'Streaming']
+{
+  const cfg = JSON.parse(buildTrtcLlmConfigJson({ ...trtcBase, model: 'hy3', apiUrl: 'https://tokenhub.tencentmaas.com/v1/chat/completions' })) as Record<string, unknown>
+  check(deepEq(cfg['ExtraBody'], OFF), 'H4 数字人 hy3 带 ExtraBody 关闭思考')
+}
 for (const model of ['deepseek-v4-flash', 'deepseek-flash']) {
   const cfg = JSON.parse(buildTrtcLlmConfigJson({ ...trtcBase, model })) as Record<string, unknown>
   check(deepEq(cfg['ExtraBody'], OFF), `默认 LLMConfig（${model}）带 ExtraBody.thinking=disabled`, JSON.stringify(cfg['ExtraBody']))
@@ -243,6 +254,9 @@ async function main(): Promise<void> {
   check(deepEq(ds?.['thinking'], OFF['thinking']), '模型 deepseek-flash：上游收到 thinking.type=disabled', JSON.stringify(ds?.['thinking']))
   const qw = await captureJobExplainBody('qwen-plus')
   check(qw !== null && !('thinking' in qw), '模型 qwen-plus：上游请求体里没有 thinking 字段', JSON.stringify(qw && Object.keys(qw)))
+  const hy = await captureJobExplainBody('hy3')
+  check(deepEq(hy?.['thinking'], OFF['thinking']), 'H5 真调用 hy3：上游收到关闭思考字段')
+  check(hy !== null && qw !== null && deepEq(Object.keys(hy).filter((key) => key !== 'thinking').sort(), Object.keys(qw).sort()), 'H6 真调用 hy3：除思考字段外没有新增字段')
 
   clearTimeout(watchdog)
   console.log(`\n${failed === 0 ? 'PASSED' : 'FAILED'}  verify:llm-thinking-off  ${passed} 通过 / ${failed} 失败`)

@@ -62,7 +62,10 @@ export interface TrtcLlmConfigInput {
  *   据此推断 ExtraBody 的内容并进上游请求体顶层（官方没有明写合并方式，需真机对话核对一次）。
  *   DeepSeek 的关闭写法与文字版各功能
  *   共用 deepseekThinkingOff()，保证两边口径一致。
- *   非 DeepSeek 模型不加 ExtraBody，配置与改动前逐字相同。
+ *   腾讯混元 TokenHub 的思考模型（hy3 这类「hy 加数字」）用的是同一个字段，同样会带上
+ *   ExtraBody（判断在 deepseek-thinking.ts）；数字人接混元后这段有没有真的透传到上游，
+ *   同样没有真机对话核过。
+ *   其它模型不加 ExtraBody，配置与改动前逐字相同。
  */
 export function buildTrtcLlmConfigJson(input: TrtcLlmConfigInput, overrideJson?: string): string {
   if (overrideJson) return overrideJson

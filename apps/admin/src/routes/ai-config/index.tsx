@@ -1,7 +1,7 @@
 // ============================================================
 // Admin AI 大模型配置页
 //
-// 管理员选择/配置对话大模型（DeepSeek / 通义千问 / MiniMax）：
+// 管理员选择/配置对话大模型（DeepSeek / 通义千问 / MiniMax / 鱼人 / 腾讯混元 TokenHub）：
 //   - 按功能配置 assistant_chat / resume_diagnosis / planned 能力
 //   - 选择厂商 → 自动套用 baseURL/默认模型
 //   - 填写 API Key（写入后端加密保存，不回显）
@@ -36,6 +36,10 @@ const RECRUITMENT_HOSTED_FEATURES: ReadonlySet<AiModelFeatureKey> = new Set<AiMo
 /** 与侧栏「AI大模型」统一：AI 与中文功能名之间不留空格。 */
 function featureText(text: string): string { return text.replace(/AI\s+(?=[\u4e00-\u9fff])/g, 'AI') }
 
+function hostOf(value: string): string {
+  try { return new URL(value).hostname } catch { return '' }
+}
+
 export default function AiConfigPage() {
   const hosting = useRecruitmentHosting()
   const [loading, setLoading] = useState(true)
@@ -63,6 +67,7 @@ export default function AiConfigPage() {
   const [savedTip, setSavedTip]     = useState(false)
 
   const currentPreset = presets.find((p) => p.vendor === vendor)
+  const needsApiKey = Boolean(cfg && (vendor !== cfg.vendor || hostOf(baseURL) !== hostOf(cfg.baseURL)))
   const currentFeature = features.find((f) => f.key === selectedFeature)
   const inheritedFeature = cfg?.inheritedFrom
     ? features.find((feature) => feature.key === cfg.inheritedFrom)
@@ -326,7 +331,7 @@ export default function AiConfigPage() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className={inputCls}
-              placeholder="如 deepseek-v4-flash"
+              placeholder={currentPreset?.defaultModel ?? '请输入模型标识'}
             />
             <datalist id="model-options">
               {currentPreset?.models.map((m) => <option key={m} value={m} />)}
@@ -349,9 +354,12 @@ export default function AiConfigPage() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               className={inputCls}
-              placeholder={cfg?.apiKeyConfigured ? '已保存，留空则不修改' : '请输入 API Key'}
+              placeholder={needsApiKey ? '请重新填写这一家的 API Key' : cfg?.apiKeyConfigured ? '已保存，留空则不修改' : '请输入 API Key'}
               autoComplete="off"
             />
+            {needsApiKey && !apiKey && (
+              <p className="mt-1 text-xs text-neutral-500">换了模型服务地址，需要重新填写这一家的 API Key</p>
+            )}
           </div>
 
           {/* baseURL */}

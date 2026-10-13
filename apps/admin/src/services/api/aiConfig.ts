@@ -2,7 +2,7 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
-export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren'
+export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren' | 'hunyuan'
 export type AiModelFeatureKey =
   | 'assistant_chat'
   | 'mock_interview'
@@ -96,6 +96,7 @@ const DEMO_PRESETS: LlmPreset[] = [
   { vendor: 'qwen', label: '通义千问', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-plus', models: ['qwen-plus'], docsUrl: 'https://help.aliyun.com' },
   { vendor: 'minimax', label: 'MiniMax', baseURL: 'https://api.minimax.chat/v1', defaultModel: 'MiniMax-Text-01', models: ['MiniMax-Text-01'], docsUrl: 'https://platform.minimaxi.com' },
   { vendor: 'yuren', label: '雨人', baseURL: 'https://api.yuren.example/v1', defaultModel: 'yuren-chat', models: ['yuren-chat'], docsUrl: 'https://example.com' },
+  { vendor: 'hunyuan', label: '腾讯混元（TokenHub）', baseURL: 'https://tokenhub.tencentmaas.com/v1', defaultModel: 'hy3', models: ['hy3'], docsUrl: 'https://cloud.tencent.com/document/product/1823' },
 ]
 
 function demoConfig(featureKey: AiModelFeatureKey, inheritedFrom: AiModelFeatureKey | null = null): AiConfigView {

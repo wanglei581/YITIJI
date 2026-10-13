@@ -119,6 +119,11 @@ function tierFor(tiers: Tier[], promptTokens: number): TokenRate {
  */
 export function rateFor(label: string, promptTokens: number): TokenRate | null {
   const normalized = label.toLowerCase()
+  // 腾讯云广州价格（2026-10-10 访问）：https://cloud.tencent.com/document/product/1823/130055
+  // Hy3 每百万 token 输入 1 元、输出 4 元；缓存未单独采集，按普通输入估算。
+  // TokenHub 托管的其它模型没有本表已核价格，必须留空，不能套 DeepSeek 官方价。
+  const hunyuan = normalized.match(/^(?:llm:)?hunyuan:(.+)$/)
+  if (hunyuan) return hunyuan[1] === 'hy3' ? { input: 1, output: 4 } : null
   if (normalized.includes('deepseek')) {
     return normalized.includes('flash') ? DEEPSEEK_FLASH_PEAK : DEEPSEEK_PRO_PEAK
   }

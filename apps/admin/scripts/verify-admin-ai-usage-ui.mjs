@@ -144,6 +144,12 @@ function createReactRuntime() {
   let pending = []
   const changed = (prev, next) => !prev || !next || prev.length !== next.length || next.some((v, i) => !Object.is(v, prev[i]))
   const react = {
+    useCallback(callback, deps) {
+      const i = cursor++
+      const prev = slots[i]
+      if (!prev || changed(prev.deps, deps)) slots[i] = { deps, callback }
+      return slots[i].callback
+    },
     useState(initial) {
       const i = cursor++
       if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial
@@ -230,6 +236,65 @@ const act = {
 const iconStub = new Proxy({}, { get: (_, name) => (typeof name === 'string' && name.endsWith('Icon') ? () => null : undefined) })
 const userErrorMessage = load('src/services/api/userErrorMessage.ts', { './client': clientStub('http') })
 const displayModule = load('src/routes/ai-services/aiUsageDisplay.ts', {})
+
+await check('H2 AI配置预设自动五家；换厂商或主机空密钥显示提示，同主机改路径不提示；服务端错误原话显示', async () => {
+  const adapter = load('src/services/api/aiConfig.ts', {
+    './client': clientStub('mock'),
+    '../auth': { authHeader: () => ({}), redirectToLogin: () => undefined },
+  })
+  const data = await adapter.aiConfigApi.get()
+  assert.equal(data.presets.length, 5)
+  const hy = data.presets.find((preset) => preset.vendor === 'hunyuan')
+  assert.equal(hy.baseURL, 'https://tokenhub.tencentmaas.com/v1')
+  assert.equal(hy.defaultModel, 'hy3')
+  data.configs.assistant_chat.apiKeyConfigured = true
+  const runtime = createReactRuntime()
+  const passthrough = ({ children }) => sharedElement('div', { children })
+  const message = '模型服务地址换了，请重新填写这一家的 API Key；原来的密钥不会发给新地址'
+  const page = load('src/routes/ai-config/index.tsx', {
+    './ai-config.css': {},
+    react: runtime.react,
+    'react/jsx-runtime': runtime.jsxRuntime,
+    '@ai-job-print/ui': { Card: passthrough, Button: (props) => sharedElement('button', props), LoadingState: () => null, ErrorState: passthrough },
+    'lucide-react': iconStub,
+    '../Page': { Page: passthrough },
+    '../../services/api/aiConfig': { aiConfigApi: { get: async () => data, update: async () => { throw new ApiHttpError('AI_CONFIG_API_KEY_REQUIRED', message, 400) } } },
+    '../components/recruitment/useRecruitmentHosting': { useRecruitmentHosting: () => ({ status: 'ready', enabled: false }) },
+    '../../services/api/userErrorMessage': userErrorMessage,
+  }, { URL, setTimeout: () => 0, window: { confirm: () => true } })
+  const view = runtime.mount(page.default)
+  let tree = await view.settle()
+  const hint = '换了模型服务地址，需要重新填写这一家的 API Key'
+  assert.doesNotMatch(textOf(tree), /换了模型服务地址/)
+  assert.equal(buttons(tree, '腾讯混元（TokenHub）').length, 1)
+  act.click(buttons(tree, '腾讯混元（TokenHub）')[0])
+  tree = view.render()
+  assert.ok(textOf(tree).includes(hint))
+  let keyInput = find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0]
+  assert.equal(keyInput.props.placeholder, '请重新填写这一家的 API Key')
+  keyInput.props.onChange({ target: { value: 'verify-new-key' } })
+  tree = view.render()
+  assert.ok(!textOf(tree).includes(hint), '已填新密钥时不重复提示')
+  keyInput = find(tree, (node) => node.type === 'input' && node.props.type === 'password')[0]
+  keyInput.props.onChange({ target: { value: '' } })
+  // 切回原厂商，再单独修改主机：同样要提示。
+  act.click(buttons(tree, 'DeepSeek')[0])
+  tree = view.render()
+  let urlInput = find(tree, (node) => node.type === 'input' && node.props.value === 'https://api.deepseek.com')[0]
+  urlInput.props.onChange({ target: { value: 'https://api.deepseek.com/another/v1' } })
+  tree = view.render()
+  assert.ok(!textOf(tree).includes(hint), '同主机路径变化不提示换钥')
+  urlInput = find(tree, (node) => node.type === 'input' && node.props.value === 'https://api.deepseek.com/another/v1')[0]
+  urlInput.props.onChange({ target: { value: 'https://tokenhub.tencentmaas.com/v1' } })
+  tree = view.render()
+  assert.ok(textOf(tree).includes(hint), '只改主机也提示换钥')
+  const save = find(tree, (node) => node.type === 'button' && textOf(node.children).includes('保存配置'))[0]
+  assert.ok(save)
+  await save.props.onClick()
+  tree = await view.settle()
+  assert.ok(textOf(tree).includes(message), '后端拒绝保存的中文 message 原样显示')
+  view.unmount()
+})
 const breakdownModule = load('src/routes/ai-services/AiUsageBreakdownTable.tsx', {
   'react/jsx-runtime': sharedJsx,
   './aiUsageDisplay': displayModule,
