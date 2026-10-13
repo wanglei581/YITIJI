@@ -251,8 +251,9 @@ test('a real pickup-code order without a flow amount reads the amount from the s
   await expect(page.locator('.qx-pagehead h1')).toHaveText('打印机出了点问题，这次可能没打完')
   await expect(jam.locator('.pff-issue-t')).toHaveText('打印机出了点问题，这次可能没打完')
   await expect(jam.locator('.pff-xq-ask')).toHaveText('卡纸、缺纸、没出全？别硬拉纸。')
-  await expect(page.getByText('打印机卡纸', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('卡住了')).toHaveCount(0)
+  // 整页查：读屏标题、故障卡、大卡和下面各行都不再出现旧说法（「打印机卡纸故障」这类残留也拦得住）。
+  await expect(page.locator('body')).not.toContainText('打印机卡纸')
+  await expect(page.locator('body')).not.toContainText('卡住了')
   await expect(jam).not.toContainText('退款')
   await assertNoHorizontalOverflow(page)
   const pillClockGap = await page.evaluate(() => {
@@ -262,10 +263,16 @@ test('a real pickup-code order without a flow amount reads the amount from the s
     return clock.left - pill.right
   })
   expect(pillClockGap, '顶栏胶囊右边界不得越过时间').toBeGreaterThanOrEqual(0)
-  const titleFit = await page.locator('.qx-pagehead h1').evaluate((el) => ({
-    full: (el.textContent ?? '').trim(),
-    clipped: el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().right > window.innerWidth + 0.5,
-  }))
+  // 这一屏页头被 clip-path 收成读屏专用（print-fulfill-qx.css），看得见的标题是故障卡里那一行，量它。
+  const titleFit = await jam.locator('.pff-issue-t').evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const card = el.closest('.pff-issue')?.getBoundingClientRect()
+    return {
+      full: (el.textContent ?? '').trim(),
+      clipped: !card || rect.width < 1 || rect.height < 1 || el.scrollWidth > el.clientWidth + 1
+        || rect.right > card.right + 0.5 || rect.right > window.innerWidth + 0.5,
+    }
+  })
   expect(titleFit).toEqual({ full: '打印机出了点问题，这次可能没打完', clipped: false })
 
   // 打印失败屏：胶囊仍是金额 · 标题，不用「打印中断」。

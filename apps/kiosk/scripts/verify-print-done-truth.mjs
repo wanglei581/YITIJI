@@ -187,8 +187,10 @@ const checks = [
     assert.match(browserSpecSource, /卡纸、缺纸、没出全？别硬拉纸。/)
     assert.match(browserSpecSource, /免费试运营，本单 0 元 · 打印失败/)
     assert.match(browserSpecSource, /已付 ¥2\.00 · 打印失败/)
-    assert.match(browserSpecSource, /getByText\('打印机卡纸', \{ exact: true \}\)/)
-    assert.match(browserSpecSource, /getByText\('卡住了'\)/)
+    // 否定检查查整页，量标题量看得见的故障卡那一行（页头在这一屏只给读屏）。
+    assert.match(browserSpecSource, /locator\('body'\)\)\.not\.toContainText\('打印机卡纸'\)/)
+    assert.match(browserSpecSource, /locator\('body'\)\)\.not\.toContainText\('卡住了'\)/)
+    assert.match(browserSpecSource, /jam\.locator\('\.pff-issue-t'\)\.evaluate/)
     assert.match(browserSpecSource, /assertNoHorizontalOverflow\(page\)/)
     assert.doesNotMatch(browserSpecSource, /免费试运营，本单 0 元 · 打印机卡纸/)
     const fulfill = read('../../docs/design/kiosk-redesign-2026-08-v2/15-print-fulfill.html')
