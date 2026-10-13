@@ -89,6 +89,11 @@
       "reason": "未配置默认 90 秒（+15 秒可见预警），只作用于诊断报告 / 优化 / 我的文档等结果页，不改全局 180 秒。公共终端结果页含本人简历内容，默认值本身就是更紧的隐私防线，不设不会放宽（包 G / P0-10）。"
     },
     {
+      "name": "VITE_KIOSK_KEYBOARD_AVOID_MODE",
+      "status": "safe-default",
+      "reason": "未配置默认 push（系统触摸键盘弹出时，把被挡住的输入框所在那一层上推到键盘上方）。可选 shrink / scroll / off，真触摸屏看过后再定是否改；不设不影响没有系统键盘的环境（键盘不出现时共享层不改任何渲染）。"
+    },
+    {
       "name": "VITE_KIOSK_PRIVACY_BUSY_DEFER_SEC",
       "status": "safe-default",
       "reason": "未配置默认 900 秒（15 分钟）。它只在忙碌锁持有期间（语音通话、支付待扫码、AI 生成中）顺延硬隐私截止的上限；不设即走默认，硬截止本身仍为 VITE_KIOSK_PRIVACY_IDLE_SEC，不会因缺配而不清场。"

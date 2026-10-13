@@ -1,3 +1,4 @@
+import { SystemKeyboardHost } from '../system-keyboard/SystemKeyboardHost'
 import { Outlet } from 'react-router-dom'
 import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
@@ -19,6 +20,7 @@ export function KioskRuntimeRoot() {
   return (
     <KioskBusyProvider>
       <AiDeclarationHost />
+      <SystemKeyboardHost />
       <KioskPrivacyGuard>
         <KioskHidScanGuard />
         <Outlet />
