@@ -2194,3 +2194,52 @@ test('an orphan session-timeout route hard-clears and revokes the scan task @pri
   // 恰好一次：读完登记之后再数一遍，中途没有冒出第二发。
   expect(revokes()).toHaveLength(1)
 })
+
+test('carried resume form is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
+  // 简历优化失败后点「手动逐项修改」，诊断读到的内容只放在路由状态里带进生成表单（不落存储）。
+  // 清场后这些内容不能留在屏上，也不能靠浏览器后退找回（合规六 10/11 要的那条）。
+  registerKioskShell(api)
+  const carriedLine = '隐私回归：在成品仓理货和拣货，一天大约处理 80 单'
+  const handoff = {
+    step: 2,
+    seg: 'exp',
+    carried: true,
+    form: {
+      basic: { name: '', phone: '', email: '', city: '' },
+      intention: { position: '', city: '', jobType: '', salary: '' },
+      education: [{ school: '', major: '', degree: '', period: '', description: '' }],
+      experience: [{ company: '', role: '', period: '', description: carriedLine }],
+      projects: [],
+      skillsText: '仓储理货',
+      certsText: '',
+      selfIntro: '隐私回归：做事按单核对',
+    },
+  }
+
+  await page.goto('/')
+  await page.evaluate((state) => {
+    window.history.pushState({ usr: { generateHandoff: state }, key: 'privacy-carried-form', idx: 1 }, '', '/resume/generate')
+  }, handoff)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('resume-generate-carried-note')).toBeVisible()
+  // 先确认带入的那段确实摆在屏上，后面「清干净了」的断言才有意义。
+  await expect(page.getByTestId('resume-generate-exp-0').locator('textarea')).toHaveValue(carriedLine)
+  await markCurrentDocument(page, 'carried-form-document')
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect.soft(new URL(page.url()).pathname).toBe('/')
+  expect.soft(await readDocumentMarker(page)).toBeNull()
+  await expect.soft(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
+
+  await page.goBack({ waitUntil: 'domcontentloaded' })
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe('/')
+  await expect.soft(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
+  const leaked = await page.evaluate((line) => {
+    const parts: string[] = [JSON.stringify(window.history.state ?? null)]
+    for (let i = 0; i < localStorage.length; i += 1) parts.push(localStorage.getItem(localStorage.key(i) ?? '') ?? '')
+    for (let i = 0; i < sessionStorage.length; i += 1) parts.push(sessionStorage.getItem(sessionStorage.key(i) ?? '') ?? '')
+    return parts.some((part) => part.includes(line) || part.includes('隐私回归：做事按单核对'))
+  }, carriedLine)
+  expect.soft(leaked).toBe(false)
+})

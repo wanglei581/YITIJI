@@ -15,6 +15,8 @@ export function OptimizeEmptyState(props: {
   onReport: () => void
   onManualEdit: () => void
   onMyResumes: () => void
+  /** 正在取诊断报告、准备带进表单。只停用「手动逐项修改」这一颗。 */
+  manualPending?: boolean
 }) {
   const exits = [
     {
@@ -57,23 +59,28 @@ export function OptimizeEmptyState(props: {
           <span>三条都不动你的原件</span>
         </div>
         <div className="qx-rows" data-testid="resume-optimize-empty-paths">
-          {exits.map(({ title, description, icon: Icon, route, testId, action }) => (
-            <button
-              key={testId}
-              type="button"
-              className="qx-row qx-optimize-empty__row"
-              data-route={route}
-              data-testid={testId}
-              onClick={action}
-            >
-              <span className="qx-row-ic" aria-hidden="true"><Icon size={28} /></span>
-              <span className="qx-row-tx">
-                <b className="qx-row-t">{title}</b>
-                <span className="qx-row-d">{description}</span>
-              </span>
-              <span className="qx-row-go" aria-hidden="true"><ChevronRightIcon size={24} /></span>
-            </button>
-          ))}
+          {exits.map(({ title, description, icon: Icon, route, testId, action }) => {
+            const manualBusy = testId === 'resume-optimize-empty-manual' && Boolean(props.manualPending)
+            return (
+              <button
+                key={testId}
+                type="button"
+                className="qx-row qx-optimize-empty__row"
+                data-route={route}
+                data-testid={testId}
+                disabled={manualBusy || undefined}
+                aria-busy={manualBusy ? true : undefined}
+                onClick={action}
+              >
+                <span className="qx-row-ic" aria-hidden="true"><Icon size={28} /></span>
+                <span className="qx-row-tx">
+                  <b className="qx-row-t">{title}</b>
+                  <span className="qx-row-d">{description}</span>
+                </span>
+                <span className="qx-row-go" aria-hidden="true"><ChevronRightIcon size={24} /></span>
+              </button>
+            )
+          })}
         </div>
       </section>
 

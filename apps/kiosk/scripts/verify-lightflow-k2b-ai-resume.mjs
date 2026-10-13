@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => {
@@ -191,6 +192,192 @@ expectIncludes(
   '<Navigate to="/resume/optimize" replace />',
   'AI-07 /resume/export redirects to the real optimize export',
 )
+
+// 优化失败后「手动逐项修改」把诊断内容块带回生成表单。这一块自己执行转换函数。
+console.log('\n=== 手动逐项修改：诊断内容块带回生成表单 ===')
+
+function sourceNode(text, name) {
+  const ast = ts.createSourceFile('fixture.ts', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  let found
+  function visit(node) {
+    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name?.getText(ast) === name) found = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  if (!found) throw new Error(`source node ${name} missing`)
+  const raw = found.getText(ast).replace(/^export\s+/u, '')
+  return ts.isVariableDeclaration(found) ? `const ${raw};` : raw
+}
+
+function executable(text) {
+  return ts.transpileModule(text, {
+    compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+}
+
+const modelSource = read('src/pages/resume/components/resumeGenerateModel.ts')
+const carrySource = read('src/pages/resume/resumeBlocksToGenerateForm.ts')
+const carryProgram = [
+  sourceNode(modelSource, 'TEXT_LIMITS'),
+  sourceNode(modelSource, 'LIMITS'),
+  sourceNode(modelSource, 'splitList'),
+  sourceNode(modelSource, 'clampText'),
+  sourceNode(modelSource, 'clampListText'),
+  sourceNode(modelSource, 'EMPTY_EDU'),
+  sourceNode(modelSource, 'EMPTY_EXP'),
+  sourceNode(modelSource, 'EMPTY_PROJ'),
+  sourceNode(modelSource, 'emptyForm'),
+  sourceNode(carrySource, 'DIAGNOSIS_MASK_PLACEHOLDER'),
+  sourceNode(carrySource, 'CARRIED_NOTE'),
+  sourceNode(carrySource, 'keptLines'),
+  sourceNode(carrySource, 'keepFirstListItems'),
+  sourceNode(carrySource, 'resumeBlocksToGenerateForm'),
+  'return { resumeBlocksToGenerateForm, CARRIED_NOTE, DIAGNOSIS_MASK_PLACEHOLDER, clampText, clampListText, splitList, LIMITS, TEXT_LIMITS };',
+].join('\n')
+const carryApi = new Function(executable(carryProgram))()
+const toForm = carryApi.resumeBlocksToGenerateForm
+const NOTE = '已带入你简历里的内容，请逐项核对'
+
+function block(key, label, lines) {
+  return { key, label, lines }
+}
+
+const eduLines = ['  青岛职业技术学院物流管理  ', '', '在校做过仓库理货实训']
+const expLines = ['在成品仓理货和拣货', '联系电话 [手机号_1]', '一天大约处理 80 单', '   ', '按货位把货配齐']
+const projLines = ['和同学轮班收发快递', '邮箱 [邮箱_2] 不要印', '登记取件码']
+const skillLines = ['Excel', '仓储理货']
+const introLines = ['做事按单核对', '有问题会先问清楚再动手']
+const full = toForm([
+  block('basic', '基础信息', ['孙晓雯', '13800001111', 'sun@example.com', '青岛']),
+  block('objective', '求职目标', ['仓储管理员', '全职', '青岛', '面议']),
+  block('education', '教育经历', eduLines),
+  block('experience', '工作经历', expLines),
+  block('project', '项目经历', projLines),
+  block('skill', '技能', skillLines),
+  block('selfintro', '自我评价', introLines),
+])
+const eduText = '青岛职业技术学院物流管理\n在校做过仓库理货实训'
+const expText = '在成品仓理货和拣货\n一天大约处理 80 单\n按货位把货配齐'
+const projText = '和同学轮班收发快递\n登记取件码'
+const dumped = JSON.stringify(full)
+
+expect(toForm(undefined) === null, 'undefined 返回 null')
+expect(toForm([]) === null, '空数组返回 null')
+expect(toForm([block('basic', '基础信息', ['孙晓雯', '13800001111'])]) === null, '只有 basic 返回 null')
+expect(toForm([block('objective', '求职目标', ['仓储管理员'])]) === null, '只有 objective 返回 null')
+expect(full !== null, '五块里带得出内容时不返回 null')
+if (full) {
+  for (const key of ['name', 'phone', 'email', 'city']) {
+    expect(full.form.basic[key] === '', `basic.${key} 留空`)
+  }
+  for (const key of ['position', 'city', 'jobType', 'salary']) {
+    expect(full.form.intention[key] === '', `intention.${key} 留空`)
+  }
+  expect(!dumped.includes('[手机号_1]') && !dumped.includes('[邮箱_2]'), '含遮盖占位的行不在结果里')
+  expect(full.form.education.length === 1, '教育只带一条')
+  expect(full.form.education[0].description === eduText, '教育长文本等于各行用换行连起来')
+  expect(full.form.education[0].school === '' && full.form.education[0].major === '' && full.form.education[0].degree === '' && full.form.education[0].period === '', '教育的学校专业学历时间留空')
+  expect(full.form.experience.length === 1, '工作只带一条')
+  expect(full.form.experience[0].description === expText, '工作长文本等于各行用换行连起来')
+  expect(full.form.experience[0].company === '' && full.form.experience[0].role === '' && full.form.experience[0].period === '', '工作的公司职位时间留空')
+  expect(full.form.projects.length === 1, '项目只带一条')
+  expect(full.form.projects[0].description === projText, '项目长文本等于各行用换行连起来')
+  expect(full.form.projects[0].name === '' && full.form.projects[0].role === '', '项目名称和角色留空')
+  expect(full.form.skillsText === carryApi.clampListText(skillLines.join('\n'), carryApi.TEXT_LIMITS.skill), '技能按 clampListText 封顶')
+  expect(full.form.selfIntro === carryApi.clampText(introLines.join('\n'), carryApi.TEXT_LIMITS.selfIntro), '自我评价按 clampText 封顶')
+  expect(full.form.certsText === '', '证书不从内容块带入')
+  expect(full.seg === 'exp', '带了工作经历落在 exp')
+}
+const longSkill = '一二三四五六七八九十'.repeat(5)
+const skillOnly = toForm([block('skill', '技能', [longSkill, 'Excel'])])
+expect(skillOnly !== null && skillOnly.form.skillsText === carryApi.clampListText(`${longSkill}\nExcel`, carryApi.TEXT_LIMITS.skill), '超长技能按条封顶')
+expect(skillOnly !== null && !skillOnly.form.skillsText.includes(longSkill), '超长技能不是整段原样带入')
+expect(skillOnly !== null && skillOnly.form.skillsText === `${longSkill.slice(0, carryApi.TEXT_LIMITS.skill)}\nExcel`, '超长技能每条留前面那些字（期望值直接截出来，不借用被测函数）')
+expect(skillOnly !== null && skillOnly.seg === 'exp', '只带了技能时经历页签用 exp')
+const longIntro = '我'.repeat(520)
+const introOnly = toForm([block('selfintro', '自我评价', [longIntro])])
+expect(introOnly !== null && introOnly.form.selfIntro === carryApi.clampText(longIntro, carryApi.TEXT_LIMITS.selfIntro), '超长自我评价按 clampText 封顶')
+expect(introOnly !== null && introOnly.form.selfIntro.length === 500, '自我评价封顶 500 字')
+const eduOnly = toForm([block('education', '教育经历', ['只剩教育'])])
+expect(eduOnly !== null && eduOnly.seg === 'edu' && eduOnly.form.experience[0].description === '', '只带了教育时落在 edu，工作描述留空')
+const projOnly = toForm([block('project', '项目经历', ['只剩项目'])])
+expect(projOnly !== null && projOnly.seg === 'proj' && projOnly.form.projects.length === 1, '只带了项目时落在 proj')
+expect(carryApi.CARRIED_NOTE === NOTE, '提示句逐字等于任务包给的原句（不在定稿上，等产品负责人定字）')
+
+// 技能：提交时只取前 LIMITS.skills 条（splitList）。带进来的要先按条截到同样条数，屏上看到的就是会提交的。
+const skillTotal = carryApi.LIMITS.skills + 5
+const skillItems = Array.from({ length: skillTotal }, (_, i) => `技能${i + 1}`)
+const perLine = Math.ceil(skillTotal / 6)
+const manySkillLines = Array.from({ length: 6 }, (_, line) => skillItems.slice(line * perLine, (line + 1) * perLine).join('、')).filter(Boolean)
+const manySkills = toForm([block('skill', '技能', manySkillLines)])
+const carriedSkillItems = manySkills ? carryApi.splitList(manySkills.form.skillsText, skillTotal) : []
+expect(carriedSkillItems.length === carryApi.LIMITS.skills, `技能超过 ${carryApi.LIMITS.skills} 条时只带前 ${carryApi.LIMITS.skills} 条（实际 ${carriedSkillItems.length}）`)
+expect(carriedSkillItems.join('|') === skillItems.slice(0, carryApi.LIMITS.skills).join('|'), '技能按原顺序整条地取前面的，不从条中间截')
+const manyJoined = manySkillLines.join('\n')
+expect(manySkills !== null && manyJoined.startsWith(manySkills.form.skillsText) && manySkills.form.skillsText.length < manyJoined.length, '技能超过上限时留下的是原文开头一段，逐字不变')
+const compoundSkill = '熟练使用办公软件（含Excel、Word），具备数据统计分析能力'
+const compound = toForm([block('skill', '技能', [compoundSkill])])
+expect(compound !== null && compound.form.skillsText === compoundSkill, '一句话里带顿号、逗号的技能照原样带入，不拆成碎片')
+
+// 遮盖占位的类别要和后端一致：后端多一种类别而前端常量没跟上，带占位的行就会进表单、印到新简历上。
+const repoRead = (relativePath) => readFileSync(join(kioskRoot, '..', '..', relativePath), 'utf8')
+const maskCategoryLine = repoRead('services/api/src/common/pii/pii-masker.ts').match(/type MaskCategory =([^\n]+)/u)
+const backendMaskCategories = maskCategoryLine ? [...maskCategoryLine[1].matchAll(/'([^']+)'/gu)].map((m) => m[1]) : []
+expect(backendMaskCategories.length > 0, '读得出后端 pii-masker.ts 的遮盖类别')
+for (const category of backendMaskCategories) {
+  expect(carryApi.DIAGNOSIS_MASK_PLACEHOLDER.test(`电话 [${category}_1]`), `前端认得后端遮盖类别「${category}」`)
+}
+const backendToken = repoRead('services/api/src/common/pii/llm-input-mask.ts').match(/const PLACEHOLDER_TOKEN =\s*\/(.+)\/[a-z]*/u)
+expect(Boolean(backendToken) && backendToken[1] === carryApi.DIAGNOSIS_MASK_PLACEHOLDER.source, '前端遮盖占位和后端 PLACEHOLDER_TOKEN 写法逐字一致')
+
+function countSentence(dir, sentence) {
+  let count = 0
+  const files = []
+  const walk = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (/\.(tsx?|css)$/u.test(entry.name)) {
+        const text = readFileSync(path, 'utf8')
+        let from = 0
+        while (from <= text.length) {
+          const at = text.indexOf(sentence, from)
+          if (at < 0) break
+          count += 1
+          files.push(path)
+          from = at + sentence.length
+        }
+      }
+    }
+  }
+  walk(dir)
+  return { count, files }
+}
+const sentenceHits = countSentence(join(kioskRoot, 'src'), NOTE)
+expect(sentenceHits.count === 1, `apps/kiosk/src 里提示句只出现一次（实际 ${sentenceHits.count}：${sentenceHits.files.join(', ')}）`)
+
+const generatePage = read('src/pages/resume/ResumeGeneratePage.tsx')
+expect(
+  /\{boot\.carried \? \([\s\S]{0,400}data-testid="resume-generate-carried-note"/u.test(generatePage),
+  '生成页只在 boot.carried 为真时出提示',
+)
+expect(generatePage.split('resume-generate-carried-note').length === 2, '提示 testid 只写了一处')
+
+const emptyState = read('src/pages/resume/components/resume-deliver/OptimizeEmptyState.tsx')
+for (const marker of [
+  "title: '返回诊断报告'",
+  "description: '看清楚要改哪几处，再决定怎么改'",
+  "route: '/resume/report'",
+  "title: '手动逐项修改'",
+  "description: '自己填写并原样导出草稿，不经过模型'",
+  "route: '/resume/generate'",
+  "title: '打开我的简历'",
+  "description: '查看和整理已保存的版本'",
+  "route: '/me/resumes'",
+  'data-route={route}',
+]) {
+  expect(emptyState.includes(marker), `OptimizeEmptyState 三条退路的字和 data-route 没变：${marker}`)
+}
 
 if (failures > 0) {
   console.error(`\n${failures} K2b LightFlow contract checks failed`)
