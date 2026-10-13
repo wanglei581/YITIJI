@@ -11,7 +11,7 @@ import { AiLogService } from '../src/ai/ai-log.service'
 import { AdvisorService } from '../src/advisor/advisor.service'
 import { AdvisorRetentionTask } from '../src/advisor/advisor-retention.task'
 import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
-import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
+import { AdvisorPdfService, advisorGenerationMethodText } from '../src/advisor/advisor-pdf.service'
 import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
 import { AIGC_VISIBLE_HEADER } from '../src/common/pdf/aigc-label'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
@@ -615,6 +615,20 @@ async function main() {
         'G9a 同纸有原有逐条比对标题，无问答使用提示标题')
       assert(compareText.includes(squash('本机比不了的')) && !compareText.includes(squash(takeawayNotePolicy)),
         'G9b 同纸有原有比对边界标题，无问答官方原文说明')
+
+      for (const provider of ['llm:deepseek:deepseek-v4-flash', 'llm:hunyuan:hy3', 'llm:deepseek', 'llm', ''] as const) {
+        assert(advisorGenerationMethodText(provider) === 'AI 生成',
+          `G10 生成方式 ${provider === '' ? '空串' : provider} → AI 生成`)
+      }
+      for (const [kind, text] of printedText) {
+        assert(text.includes(squash('生成方式：AI 生成')) && !text.includes('llm:') && !text.includes('server:pins'),
+          `G11 ${kind} 纸上写「生成方式：AI 生成」，不含 llm: 或 server:pins`)
+      }
+      assert(emptyText.includes(squash('生成方式：按你钉住的要点排版'))
+        && !emptyText.includes('llm:') && !emptyText.includes('server:pins'),
+        'G12 本次要点单纸上写「生成方式：按你钉住的要点排版」，不含 llm: 或 server:pins')
+      assert(advisorGenerationMethodText('server:pins') === '按你钉住的要点排版',
+        'G13 server:pins 的显示字是「按你钉住的要点排版」')
       restoreFetch()
     }
 

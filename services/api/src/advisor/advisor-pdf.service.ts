@@ -22,6 +22,15 @@ const VERDICT_LABEL: Record<string, string> = {
   not_a_capability: '不是能力项',
 }
 
+/**
+ * 纸上「生成方式」给求职者看的字。产物表仍存内部来源标识（审计、用量靠它）。
+ * 只有只排钉住要点的那一种（server:pins）另写；其余一律标 AI 生成，避免漏标。
+ */
+export function advisorGenerationMethodText(provider: string): string {
+  if (provider === 'server:pins') return '按你钉住的要点排版'
+  return 'AI 生成'
+}
+
 @Injectable()
 export class AdvisorPdfService {
   private readonly logger = new Logger(AdvisorPdfService.name)
@@ -55,7 +64,7 @@ export class AdvisorPdfService {
 
     doc.fontSize(18).fillColor('#111827').text(this.titleOf(payload))
     doc.moveDown(0.3)
-    doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 生成方式：${meta.providerLabel}`)
+    doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 生成方式：${advisorGenerationMethodText(meta.providerLabel)}`)
     doc.moveDown(0.2)
     doc.fontSize(9).fillColor('#9ca3af').text(
       `${ADVISOR_DISCLAIMER}。${AIGC_VISIBLE_HEADER}。本机不代收简历、不做平台内投递，也不预测录用结果或承诺薪资；` +
