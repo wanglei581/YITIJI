@@ -127,12 +127,21 @@ test('profile signed-out reads no member totals and keeps recruitment copy at ze
   await expect(page.getByRole('region', { name: '我的资产' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '登录与不登录的分界' })).toBeVisible()
   await expect(page.getByText('这台机器是公共终端')).toBeVisible()
+  // 2026-10-13 回话单第 24 条：没登录也能从「我的」进帮助中心，不经登录。字与登录后那一行相同。
+  const helpRow = page.getByTestId('profile-help')
+  await expect(helpRow).toHaveCount(1)
+  await expect(helpRow).toContainText('帮助中心')
+  await expect(helpRow).toContainText('常见问题与操作说明。')
+  await assertTapTargetPointerHit(helpRow)
   await expectComplianceCopy(page)
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
   await assertTapTargetPointerHit(page.getByTestId('profile-primary'))
   await assertTapTargetPointerHit(page.locator('.pf-idbtn'))
   await page.screenshot({ path: test.info().outputPath('profile-signed-out.png'), fullPage: true })
+  await helpRow.click()
+  await expect(page).toHaveURL(/\/help$/)
+  await expect(page).not.toHaveURL(/\/login/)
   expect(errors).toEqual([])
 })
 
@@ -1084,6 +1093,8 @@ async function expectEmptyThirdRow(page: Page, title: string, absent: string): P
   const third = page.getByTestId('profile-empty-start-third')
   await expect(third).toContainText(title)
   await expect(third).not.toContainText(absent)
+  // 登录后「通知与支持」里仍只有原来那一行帮助中心，没登录新增的那行不会在这里再出现一次。
+  await expect(page.getByTestId('profile-help')).toHaveCount(1)
   await expect(page.getByTestId('profile-help')).toContainText('帮助中心')
   await expect(page.getByTestId('profile-help')).toContainText('常见问题与操作说明。')
 }

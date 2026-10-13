@@ -335,6 +335,14 @@ expectMatches(
 expectIncludes(profileActions, 'data-testid="profile-login"', 'Profile 底部保留游客登录锚点')
 expectIncludes(profileActions, 'onClick={onLogin}', 'Profile 底部保留游客登录操作')
 expectIncludes(profileActions, 'data-testid="profile-account"', 'Profile 底部保留账号设置操作')
+// 2026-10-13 回话单第 24 条：没登录的「我的」多一行帮助中心。字与 ProfileSupportRows 登录后那一行相同，点击直达 /help，不经登录。
+// 只钉 SignedOutBody，登录后那组「通知与支持」不在这段里。
+const signedOutBody = read('src/pages/profile/components/ProfileHomeStates.tsx').match(/export function SignedOutBody\(\) \{[\s\S]*?\n\}\n\nexport function EmptyStartRows/)?.[0] ?? ''
+expect(signedOutBody.length > 0, 'SignedOutBody 仍在 ProfileHomeStates，后面接着 EmptyStartRows')
+expectIncludes(signedOutBody, 'data-testid="profile-help"', '没登录「我的」有帮助中心这一行')
+expectIncludes(signedOutBody, '帮助中心', '没登录帮助中心标题用登录后那一行的现成字')
+expectIncludes(signedOutBody, '常见问题与操作说明。', '没登录帮助中心说明用登录后那一行的现成字')
+expectIncludes(signedOutBody, "navigate('/help')", '没登录帮助中心直接去 /help，不经登录')
 const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
 expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css consumes Qingxu tokens')
 expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css keeps the 48px touch floor')
