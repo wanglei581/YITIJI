@@ -27,6 +27,11 @@ process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
 
 let passCount = 0
 let failCount = 0
+
+/** 合规三 10/10 定字，前缀照系统约束其它行。门禁钉这句原文，不从实现里再 import。 */
+const SALARY_PROMPT_RULE =
+  '薪资：谈到薪资时，只讲怎么了解行情、怎么谈，不给出具体的行业或岗位薪资数字；用户自己说出的数字可以引用。'
+
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
 function fail(msg: string) { failCount += 1; console.error(`  FAIL ${msg}`) }
 function check(ok: boolean, msg: string) { if (ok) pass(msg); else fail(msg) }
@@ -58,6 +63,7 @@ function compositionChecks(): void {
   const text = buildGuardedSystemPrompt({ systemPrompt: '你是就业服务助手' })
   check(text.includes('你是就业服务助手'), '阳性对照：小青文字的系统约束确实是从配置拼出来的')
   check(text.includes(DEVICE_FAULT_PROMPT_RULE), '小青文字对话的系统约束里有这一句')
+  check(text.includes(SALARY_PROMPT_RULE), '小青文字对话的系统约束里有薪资这一句')
   const voice = buildGuardedSystemPrompt({ systemPrompt: '你是小青' }, { policyVariant: 'voice' })
   check(voice.includes(DEVICE_FAULT_PROMPT_RULE), '语音小青的系统约束里有这一句')
 
@@ -67,6 +73,7 @@ function compositionChecks(): void {
   )) as { SystemPrompt?: string }
   check(String(trtc.SystemPrompt).includes('你是小青，说话简短'), '阳性对照：下发给腾讯云的提示词确实是从配置拼出来的')
   check(String(trtc.SystemPrompt).includes(DEVICE_FAULT_PROMPT_RULE), '下发给腾讯云的语音小青提示词里有这一句')
+  check(String(trtc.SystemPrompt).includes(SALARY_PROMPT_RULE), '下发给腾讯云的语音小青提示词里有薪资这一句')
 
   const ruleAt = ADVISOR_QA_SYSTEM_PROMPT.indexOf(`\n6. ${DEVICE_FAULT_PROMPT_RULE}`)
   const formatAt = ADVISOR_QA_SYSTEM_PROMPT.indexOf('只输出 JSON')
