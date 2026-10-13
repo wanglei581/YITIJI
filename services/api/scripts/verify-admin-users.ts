@@ -24,7 +24,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createClient } from '@libsql/client'
-import { GUARDS_METADATA, HEADERS_METADATA, METHOD_METADATA } from '@nestjs/common/constants'
+import { GUARDS_METADATA, HEADERS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { RequestMethod } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -233,13 +233,23 @@ async function main(): Promise<void> {
       requestId: controllerContext.requestId,
     } as unknown as Parameters<AdminUsersController['list']>[2]
     await controller.list(Object.assign(new ListAdminUsersDto(), { phone }), admin, request)
+    const postResult = await controller.search(Object.assign(new ListAdminUsersDto(), { phone }), admin, request)
+    assert.equal(postResult.total, 1)
+    assert.equal(postResult.items[0]?.id, endUserId)
+    assert.equal(JSON.stringify(postResult).includes(phone), false)
+    pass('POST /admin/users/search 请求体手机号命中且响应脱敏')
+    await expectCode('ADMIN_USER_SEARCH_CONFLICT', 'POST 手机号与昵称互斥', () =>
+      controller.search(Object.assign(new ListAdminUsersDto(), { phone, keyword: '会员' }), admin, request),
+    )
     const controllerAudit = await prisma.auditLog.findFirst({
       where: { requestId: controllerContext.requestId.slice(0, 128) },
     })
     assert.equal(controllerAudit?.ipAddress, '127.0.0.2')
     assert.equal(controllerAudit?.userAgent?.length, 512)
     assert.equal(controllerAudit?.requestId?.length, 128)
-    pass('审计元数据忽略伪造转发头并限制长度')
+    assert.equal(controllerAudit?.action, 'admin.user.phone_search')
+    assert.equal(controllerAudit?.payloadJson.includes(phone), false)
+    pass('POST 查人审计照写，元数据忽略伪造转发头并限制长度')
 
     const disabled = await service.list({ page: 1, pageSize: 20, enabled: false }, context)
     // 夹具里 enabled=false 的三位：历史停用、注销中、已匿名化。
@@ -536,6 +546,7 @@ async function createActivityCapFixtures(
 const EXPECTED_ROUTE_VERBS: Record<string, number> = {
   closure: RequestMethod.POST,
   list: RequestMethod.GET,
+  search: RequestMethod.POST,
   getDetail: RequestMethod.GET,
   disable: RequestMethod.POST,
   restore: RequestMethod.POST,
@@ -550,7 +561,7 @@ function verifyControllerMetadata(): void {
 
   const prototype = AdminUsersController.prototype as unknown as Record<string, unknown>
   const methods = Object.getOwnPropertyNames(prototype).filter((name) => name !== 'constructor')
-  assert.deepEqual(methods.sort(), ['closure', 'disable', 'getDetail', 'list', 'restore'])
+  assert.deepEqual(methods.sort(), ['closure', 'disable', 'getDetail', 'list', 'restore', 'search'])
   for (const name of methods) {
     assert.equal(
       Reflect.getMetadata(METHOD_METADATA, prototype[name] as object),
@@ -560,12 +571,13 @@ function verifyControllerMetadata(): void {
     const headers = (Reflect.getMetadata(HEADERS_METADATA, prototype[name] as object) ?? []) as Array<{ name: string; value: string }>
     assert.ok(headers.some((header) => header.name.toLowerCase() === 'cache-control' && header.value === 'no-store'))
   }
+  assert.equal(Reflect.getMetadata(PATH_METADATA, prototype.search as object), 'search')
 
   // 写边界：允许 closure / disable / restore 三条。想加第三条写路径必须先改这里，
   // 顺带被迫回答「它写不写审计、要不要 reason」——这就是这条断言存在的意义。
-  const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET)
+  const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET && name !== 'search')
   assert.deepEqual(writeMethods.sort(), ['closure', 'disable', 'restore'])
-  pass('Controller 暴露 2 个 GET + closure/disable/restore 三条写路径，动词与禁缓存头均正确')
+  pass('Controller 暴露 2 个 GET + POST search + 三条写路径，动词与禁缓存头均正确')
 }
 
 function verifyContractParity(): void {

@@ -84,7 +84,7 @@ export const memberBenefitsAdminApi = {
         501,
       ))
     }
-    return request(`/admin/member-benefits/users?phone=${encodeURIComponent(phone)}`)
+    return request('/admin/member-benefits/users/search', { method: 'POST', body: { phone } })
   },
   list(endUserId: string): Promise<{ items: AdminBenefitGrantItem[]; total: number }> {
     if (API_MODE !== 'http' || !endUserId) return Promise.resolve(EMPTY)

@@ -23,7 +23,7 @@ async function setup(page: Page, options: { code?: string; pending?: boolean; cl
         return json({ endUserId: user.id, status: 'anonymized', changed: options.changed !== false })
       }
       if (url.pathname.endsWith('/closure-user')) return json({ user: { ...user, updatedAt: '2026-10-04T02:00:00Z' }, stats: { fileCount: 0, printTaskCount: 0, aiResultCount: 0, browseCount: 0, externalJumpCount: 0 }, recentActivities: [], retentionNotice: '展示当前留存记录' })
-      return json({ items: [user], total: 60, page: Number(url.searchParams.get('page') ?? 1), pageSize: 20 })
+      return json({ items: [user], total: 60, page: Number(request.postDataJSON()?.page ?? 1), pageSize: 20 })
     }
     if (url.pathname.endsWith('/auth/me')) return json({ success: true, data: { userId: MOCK_ADMIN_AUTH.user.id, role: 'admin', orgId: null } })
     if (url.pathname.endsWith('/admin/alerts')) return json({ success: true, data: [] })
@@ -67,7 +67,7 @@ test('注销筛选三个取值发送参数、写 URL、回首页；1280 无横�
     await page.getByRole('button', { name: '下一页' }).click()
     await expect(page).toHaveURL(/page=2/)
     await page.getByLabel('注销', { exact: true }).selectOption(closure)
-    await expect.poll(() => calls.at(-1)?.url.searchParams.get('closure')).toBe(closure)
+    await expect.poll(() => calls.at(-1)?.body?.closure).toBe(closure)
     await expect(page).toHaveURL(new RegExp(`closure=${closure}`))
     await expect(page).toHaveURL(/page=1/)
   }
@@ -119,7 +119,10 @@ for (const changed of [true, false]) test(`成功 changed=${changed} 刷新列�
   await confirm(page)
   await expect(page.getByRole('dialog', { name: '注销账号', exact: true })).toHaveCount(0)
   await expect(page.getByRole('status').getByText(changed ? '已注销' : '该账号此前已注销', { exact: true })).toBeVisible()
-  await expect.poll(() => calls.slice(before).filter((call) => call.method === 'GET').length).toBe(2)
+  await expect.poll(() => calls.slice(before).filter((call) =>
+    (call.method === 'POST' && call.url.pathname.endsWith('/admin/users/search'))
+    || (call.method === 'GET' && call.url.pathname.endsWith('/admin/users/closure-user')),
+  ).length).toBe(2)
   const detail = page.getByRole('dialog', { name: '用户详情' })
   await expect(detail.getByText('已注销', { exact: true })).toBeVisible()
   await expect(detail.getByText('***', { exact: true })).toBeVisible()

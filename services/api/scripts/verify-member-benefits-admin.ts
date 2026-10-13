@@ -16,10 +16,14 @@ import { randomUUID } from 'crypto'
 import { rmSync } from 'fs'
 import { createClient } from '@libsql/client'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
+import { Module, ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
+import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
+import { RedisService } from '../src/common/redis/redis.service'
 import { ROLES_KEY, type UserRole } from '../src/common/decorators/roles.decorator'
 import { encryptPhone, hashPhone } from '../src/common/crypto/phone-identity'
 import { MemberBenefitsService } from '../src/member-benefits/member-benefits.service'
@@ -113,6 +117,54 @@ async function main() {
     if (!JSON.stringify(search).includes(phone)) pass('1b. 搜索响应不含明文手机号')
     else fail('1b. 搜索响应泄露明文手机号')
 
+    // 真正经过 Nest 路由、DTO 与角色守卫的 HTTP 查询。
+    const originalAuth = JwtAuthGuard.prototype.canActivate
+    JwtAuthGuard.prototype.canActivate = async function (context) {
+      const request = context.switchToHttp().getRequest<{ headers: { authorization?: string }; user?: AuthedUser }>()
+      request.user = { userId: adminId, role: request.headers.authorization === 'Bearer partner-test' ? 'partner' : 'admin', orgId: null }
+      return true
+    }
+    @Module({
+      controllers: [AdminMemberBenefitsController],
+      providers: [
+        { provide: AdminMemberBenefitsService, useValue: adminBenefits },
+        { provide: JwtService, useValue: {} },
+        { provide: PrismaService, useValue: prisma },
+        { provide: RedisService, useValue: {} },
+        JwtAuthGuard,
+        RolesGuard,
+      ],
+    })
+    class SearchHttpModule {}
+    const app = await NestFactory.create(SearchHttpModule, { logger: false, abortOnError: false })
+    try {
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
+      await app.listen(0, '127.0.0.1')
+      const port = (app.getHttpServer().address() as { port: number }).port
+      const url = `http://127.0.0.1:${port}/admin/member-benefits/users/search`
+      const post = (value: string, authorization = 'Bearer admin-test') => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: authorization },
+        body: JSON.stringify({ phone: value }),
+      })
+      const hit = await post(phone)
+      const hitBody = await hit.json() as { data: { items: Array<{ endUserId: string; phoneMasked: string }> } }
+      if (hit.status === 200 && hit.headers.get('cache-control') === 'no-store'
+        && hitBody.data.items[0]?.endUserId === endUserId && !JSON.stringify(hitBody).includes(phone)) {
+        pass('1c. HTTP POST 手机号命中、响应脱敏且 no-store')
+      } else fail(`1c. HTTP POST 命中异常：${hit.status} ${JSON.stringify(hitBody)}`)
+      const miss = await post('13800139999')
+      const missBody = await miss.json() as { data: { items: unknown[] } }
+      if (miss.status === 200 && missBody.data.items.length === 0) pass('1d. HTTP POST 未命中返回空数组')
+      else fail(`1d. HTTP POST 未命中异常：${miss.status} ${JSON.stringify(missBody)}`)
+      const denied = await post(phone, 'Bearer partner-test')
+      if (denied.status === 403) pass('1e. HTTP POST 非管理员被 RolesGuard 拒绝')
+      else fail(`1e. HTTP POST 非管理员状态：${denied.status}`)
+    } finally {
+      await app.close()
+      JwtAuthGuard.prototype.canActivate = originalAuth
+    }
+
     // 2. 发放权益。
     const granted = await adminBenefits.grant(admin, {
       endUserId,
@@ -181,7 +233,11 @@ async function main() {
     const actions = logs.map((l) => l.action)
     if (actions.includes('member_benefit.grant') && actions.includes('member_benefit.revoke')) pass('6a. grant/revoke 均写入 AuditLog')
     else fail(`6a. 审计动作缺失：${JSON.stringify(actions)}`)
-    if (actions.includes('member_benefit.search')) pass('6b. 手机号搜索写入 AuditLog')
+    const searchLogs = logs.filter((l) => l.action === 'member_benefit.search')
+    if (searchLogs.length >= 3 && searchLogs.every((l) => {
+      const payload = JSON.parse(l.payloadJson) as Record<string, unknown>
+      return Object.keys(payload).sort().join(',') === 'matched,phoneMasked' && typeof payload.phoneMasked === 'string'
+    })) pass('6b. HTTP 搜索审计只含 phoneMasked 与既有 matched')
     else fail(`6b. 手机号搜索审计缺失：${JSON.stringify(actions)}`)
     if (!logs.some((l) => l.payloadJson.includes(phone))) pass('6c. AuditLog payload 不含明文手机号')
     else fail('6c. AuditLog payload 泄露明文手机号')

@@ -2,7 +2,7 @@
 // Admin 内部账号名册 Service（3.9，对接 services/api admin-internal-accounts 模块）
 //
 // 端点（均需 admin 登录态）：
-//   GET   /admin/internal-accounts                         名册（admin/partner/kiosk）
+//   POST  /admin/internal-accounts/search                  名册（admin/partner/kiosk）
 //   PATCH /admin/internal-accounts/:id/status              启停管理员账号
 //   POST  /admin/internal-accounts/backup-admin/start      建备用管理员第一步（发码）
 //   POST  /admin/internal-accounts/backup-admin/verify     第二步（验码建号）
@@ -202,15 +202,15 @@ export function listInternalAccounts(query: InternalAccountListQuery): Promise<I
   if (API_MODE !== 'http') {
     return Promise.resolve({ items: [], total: 0, page: query.page, pageSize: toAllowedPageSize(query.pageSize) })
   }
-  const params = new URLSearchParams()
-  params.set('page', String(Math.max(1, Math.trunc(query.page) || 1)))
-  params.set('pageSize', String(toAllowedPageSize(query.pageSize)))
-  if (query.role) params.set('role', query.role)
-  if (query.enabled !== undefined) params.set('enabled', String(query.enabled))
-  if (query.orgId) params.set('orgId', query.orgId)
   const keyword = query.keyword?.trim().slice(0, 50)
-  if (keyword) params.set('keyword', keyword)
-  return request<InternalAccountListResult>('GET', `/admin/internal-accounts?${params.toString()}`, undefined, isListResult)
+  return request<InternalAccountListResult>('POST', '/admin/internal-accounts/search', {
+    page: Math.max(1, Math.trunc(query.page) || 1),
+    pageSize: toAllowedPageSize(query.pageSize),
+    ...(query.role ? { role: query.role } : {}),
+    ...(query.enabled === undefined ? {} : { enabled: String(query.enabled) }),
+    ...(query.orgId ? { orgId: query.orgId } : {}),
+    ...(keyword ? { keyword } : {}),
+  }, isListResult)
 }
 
 /** 只支持 role=admin 的账号；partner 账号请到合作机构管理页启停。 */

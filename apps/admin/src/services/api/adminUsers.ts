@@ -57,9 +57,8 @@ async function parse<T>(response: Response, closure = false): Promise<T> {
   return response.json() as Promise<T>
 }
 
-async function get<T>(path: string, query?: URLSearchParams): Promise<T> {
-  const queryString = query?.toString()
-  const response = await fetch(`${API_BASE_URL}${path}${queryString ? `?${queryString}` : ''}`, {
+async function get<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
     headers: { Accept: 'application/json', ...authHeader() },
     credentials: 'include',
@@ -67,7 +66,7 @@ async function get<T>(path: string, query?: URLSearchParams): Promise<T> {
   return parse<T>(response)
 }
 
-/** 写通道仅供停用、恢复与管理员注销，均由服务端执行并写审计。 */
+/** POST 通道承载请求体；停用、恢复与管理员注销由服务端执行并写审计。 */
 async function post<T>(path: string, body: unknown, closure = false): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -119,17 +118,10 @@ export function list(query: AdminUserListQuery): Promise<AdminUserListResult> {
       pageSize: query.pageSize,
     })
   }
-  const params = new URLSearchParams({
-    page: String(query.page),
-    pageSize: String(query.pageSize),
+  return post<AdminUserListResult>('/admin/users/search', {
+    ...query,
+    enabled: query.enabled === undefined ? undefined : String(query.enabled),
   })
-  if (query.keyword) params.set('keyword', query.keyword)
-  if (query.phone) params.set('phone', query.phone)
-  if (query.closure) params.set('closure', query.closure)
-  if (query.enabled !== undefined) params.set('enabled', String(query.enabled))
-  if (query.registeredFrom) params.set('registeredFrom', query.registeredFrom)
-  if (query.registeredTo) params.set('registeredTo', query.registeredTo)
-  return get<AdminUserListResult>('/admin/users', params)
 }
 
 export function getDetail(endUserId: string): Promise<AdminUserDetailResult> {
