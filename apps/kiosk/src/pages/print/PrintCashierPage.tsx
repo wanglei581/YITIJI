@@ -205,7 +205,7 @@ export function PrintCashierPage() {
         if (cancelRef.current) return
         setChannels([])
         setChannelLoadState('error')
-        setIssueError(userMessageOf(err, '获取支付通道失败，请检查网络后重试'))
+        setIssueError(userMessageOf(err, '获取支付通道失败，请稍后重试'))
       }
     })()
     return () => {

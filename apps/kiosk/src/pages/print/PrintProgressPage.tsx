@@ -1,4 +1,4 @@
-import { peekSupportContact, helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { peekSupportContact, helpNeededLine, refundApplyLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 // ============================================================
 // PrintProgressPage — 青序流光 15-print-fulfill /print/progress
@@ -831,7 +831,7 @@ export function PrintProgressPage() {
               </li>
             </ul>
             <div className="pff-help" data-testid="print-fulfill-fallback">
-              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{machineCannotPrintLine(contact, { orderKept: true })}</span>
+              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{helpNeededLine(contact)}。</span>
               <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
                 求助
               </button>

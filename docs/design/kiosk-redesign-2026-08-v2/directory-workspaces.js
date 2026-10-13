@@ -372,18 +372,18 @@ function offlineList (state) {
       svg('building', 'currentColor', 26) + '当前条件没有匹配的机构',
       ['换个关键词或检索方式再试一次。',
         '机构信息需要管理员<b>审核发布</b>后才会出现在目录里。',
-        '也可以到前台，让工作人员按纸质名单帮你找。']) +
+        '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）']) +
       '<div class="meta"><a class="chip press" href="?state=list-ready" data-testid="' + tid('clear-filter') + '">清除条件重新查询</a>' +
-      '<a class="chip press" href="06-help.html" data-route="/help" data-testid="' + tid('help') + '">联系工作人员</a></div>' +
+      '<a class="chip press" href="06-help.html" data-route="/help" data-testid="' + tid('help') + '">求助</a></div>' +
       guide('换条件时先看三项', ['机构所在区域是否方便到达。', '服务项目是否与当前材料或岗位有关。', '来源编号与门店公示是否能互相核对。']) + '</div>'
   } else if (state === 'list-error') {
     results = '<div class="rbox">' + box('error', 'result-error',
       svg('alert', 'currentColor', 26) + '机构名单没取到',
       ['这次请求失败了。本机<b>不会用示例机构顶替真实结果</b>，所以目录先空着。',
-        '可以重试；重试仍失败时，请到前台找工作人员。']) +
+        '可以重试。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）']) +
       '<div class="meta"><a class="chip press" href="?state=list-ready" data-testid="' + tid('retry') + '">重试</a>' +
-      '<a class="chip press" href="06-help.html" data-route="/help" data-testid="' + tid('help') + '">联系工作人员</a></div>' +
-      guide('请求失败时仍能做', ['保留当前关键词，先重试一次。', '改看已审核发布的岗位信息。', '到前台按纸质名单核对机构与门店。']) + '</div>'
+      '<a class="chip press" href="06-help.html" data-route="/help" data-testid="' + tid('help') + '">求助</a></div>' +
+      guide('请求失败时仍能做', ['保留当前关键词，先重试一次。', '改看已审核发布的岗位信息。', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。']) + '</div>'
   } else {
     var filtered = state === 'list-filtered'
     results = '<div class="rbox">' +
@@ -421,7 +421,7 @@ function offlineAgency (state) {
     sec('', '仍然可以继续', '', exitList([
       stripItem('?state=agency-ready', '/offline-agencies/:id', 'ae-retry', 'building', 'teal', '重新加载机构详情', '再次请求当前机构'),
       stripItem('?state=list-ready', '/offline-agencies', 'ae-list', 'list', 'slate', '返回机构目录', '保留目录主任务'),
-      stripItem('06-help.html', '/help', 'ae-help', 'info', 'clay', '联系工作人员', '现场核对纸质名单')
+      stripItem('06-help.html', '/help', 'ae-help', 'info', 'clay', '求助', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）')
     ]), 'grow last', true) +
     cta([ghost('16-service-hubs.html?hub=jobs', '/jobs-service', 'ae-back', '返回岗位服务'),
       primary('?state=agency-ready', '/offline-agencies/:id', '重新加载')])
@@ -439,7 +439,7 @@ function offlineAgency (state) {
       stripItem('?state=list-ready', '/offline-agencies', 'nf-list', 'building', 'teal', '回机构目录', '重新检索已发布机构'),
       stripItem('26-browse-list.html', '/jobs', 'nf-jobs', 'brief', 'wheat', '看岗位信息', '第三方来源岗位，带来源与同步时间'),
       stripItem('28-jobfair-enhanced.html', '/job-fairs', 'nf-fairs', 'booth', 'slate', '看招聘会', '现场时间、地点与参展名单'),
-      stripItem('06-help.html', '/help', 'nf-help', 'info', 'clay', '联系工作人员', '现场按纸质名单帮你确认门店')
+      stripItem('06-help.html', '/help', 'nf-help', 'info', 'clay', '求助', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）')
     ]) + noteline('info', OFFLINE_BOUNDARY), 'grow last', true) +
     cta([ghost('16-service-hubs.html?hub=jobs', '/jobs-service', 'nf-back', '返回岗位服务'),
       primary('?state=list-ready', '/offline-agencies', '回机构目录重选')])
@@ -506,7 +506,7 @@ function offlineJob (state) {
       '<li><span class="mk">!</span><span>门店地址 —— 未返回，无法给到店指引</span></li>' +
       '<li><span class="mk">!</span><span>来源编号 —— 未返回，无法溯源核对</span></li>' +
       '</ul><div class="reason">线下岗位没有「平台内投递」这条路：本机既不代收简历也不代投递，来源不足时就是没有下一步。</div></div>' +
-      guide('不要按不完整信息出发', ['回机构目录重新选择有地址和来源编号的机构。', '先准备本人材料，不把文件交给不明来源。', '需要确认时请现场工作人员核对纸质名单。']), 'grow', true) +
+      guide('不要按不完整信息出发', ['回机构目录重新选择有地址和来源编号的机构。', '先准备本人材料，不把文件交给不明来源。', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。']), 'grow', true) +
     sec('03', '现在可以怎么办', '两条真的能走的路', strip([
       stripItem('?state=list-ready', '/offline-agencies', 'si-list', 'building', 'teal',
         '回机构目录重新找', '目录里的机构带地址与来源编号'),
@@ -706,7 +706,7 @@ function companyDetail (state) {
 
 /* ── 44 招聘会参展企业详情 ─────────────────────────────── */
 var FAIR_BOUNDARY = '本机不接收简历、不代投递：投递扫码去来源平台，或现场到展位当面咨询。'
-var FAIR_PRINT_NOTE = '打印企业资料与岗位清单需要后台支持，本机暂不可用；需要纸质资料请到前台咨询。'
+var FAIR_PRINT_NOTE = '打印企业资料与岗位清单需要后台支持，本机暂不可用；需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'
 
 function fairCompany (state) {
   if (state === 'loading') {
@@ -733,7 +733,7 @@ function fairCompany (state) {
           '现场以主办方公布的展位图和名单为准，回列表重新选一家。'])) +
     sec('', '', '',
       guide('现场核对顺序', ['先看主办方展位图和企业全称。', '再看现场岗位牌或企业纸质清单。',
-        '仍不一致时交给现场工作人员确认。'])) +
+        '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。'])) +
     sec('', '现在可以怎么办', '都是本机真的能打开的页面', exitList([
       stripItem('28-jobfair-enhanced.html', '/job-fairs/:id/companies', 'nf-list', 'booth', 'wheat',
         '参展企业列表', '回本场名单重新选一家'),
@@ -742,9 +742,9 @@ function fairCompany (state) {
       stripItem('12-file-source.html?source=document&tab=file', '/print/upload', 'nf-print', 'print', 'clay',
         '先打好纸质简历', '展位现场收纸质简历很常见'),
       stripItem('06-help.html', '/help', 'nf-help', 'info', 'slate',
-        '现场工作人员', '手上有主办方纸质名单')
+        '问小青', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）')
     ]) + noteline('info', FAIR_BOUNDARY), 'grow last', true) +
-    cta([ghost('06-help.html', '/help', 'nf-help-bar', '联系工作人员'),
+    cta([ghost('06-help.html', '/help', 'nf-help-bar', '问小青'),
       primary('28-jobfair-enhanced.html', '/job-fairs/:id/companies', '返回参展企业列表')])
   }
   if (state === 'qr') {
@@ -773,7 +773,7 @@ function fairCompany (state) {
         stripItem('28-jobfair-enhanced.html', '/job-fairs/:id/companies', 'empty-back', 'booth', 'wheat',
           '回参展企业列表', '换一家企业或按展区找'),
         stripItem('06-help.html', '/help', 'empty-help', 'info', 'slate',
-          '联系工作人员', '按纸质名单帮你确认')
+          '问小青', '需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）')
       ]) + '</div>'
     : '<div class="rbox">' +
       '<div class="rhead"><span class="rn">现场岗位</span><span>共 ' + slot('—') + ' 条</span>' +
@@ -800,7 +800,7 @@ function fairCompany (state) {
     '</div>', '', true) +
   sec('02', '现场岗位', empty ? '名单里有企业，岗位清单为空' : '真实清单由主办方提供', positions, 'grow', true) +
   sec('', '', '', (empty ? noteline('info', FAIR_BOUNDARY) : aiInline(aiStep)) +
-    noteline('print', FAIR_PRINT_NOTE, link('06-help.html', '/help', 'print-help', 'chip', '联系工作人员'), 'warn'), 'last') +
+    noteline('print', FAIR_PRINT_NOTE, link('06-help.html', '/help', 'print-help', 'chip', '问小青'), 'warn'), 'last') +
   cta(blocked
     ? [off('apply-qr-blocked', 'btn ghost', '扫码投递', tid('apply-reason')),
       why(tid('apply-reason'), '该来源未提供可用的投递链接，请到来源平台查询该职位', 'why'),

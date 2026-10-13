@@ -101,6 +101,11 @@ test('progress renders Agent-polled pending job fields and never claims printed 
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
   await expect(page.getByText('已打印', { exact: true })).toHaveCount(0)
   await expect(page.getByText('机身灯亮绿')).toHaveCount(0)
+  // 正常打印中没有发生故障：求助条只给求助句，不能说「暂时打不了」「已经收到提醒」（合规十 10/12 答复第四节 A）。
+  const printingHelp = page.getByTestId('print-fulfill-state-printing').getByTestId('print-fulfill-fallback')
+  await expect(printingHelp).toContainText('需要帮助？')
+  await expect(printingHelp).not.toContainText('暂时打不了')
+  await expect(printingHelp).not.toContainText('已经收到提醒')
   expect(polls.length, '必须向 GET /print/jobs/:taskId 发出真实轮询').toBeGreaterThan(0)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-printing.png'), fullPage: true })
@@ -386,6 +391,75 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   await expect(jam).not.toContainText('退款')
   // 2026-10-06：卡纸三步不再叫人找工作人员，区域名改成「处理之前先做这三件」。
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+// 2026-10-11：服务端说不能重打的 0 元缺纸单，第 3 步不再写「回到订单重新打印」——「我的 → 打印订单」里没有重打入口。
+test('free out-of-paper order that cannot be resubmitted tells the user to print again from a file @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'failed', errorCode: 'PAPER_EMPTY', failureReasonForUser: '打印机缺纸' },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: false,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0 })
+
+  const todo = page.getByRole('region', { name: '处理之前先做这三件' })
+  await expect(todo).toContainText(`记下订单号 ${W2_ORDER.orderNo}。还要打，请重新选文件再打一次。`)
+  await expect(todo).not.toContainText('回到订单重新打印')
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+// 到机码单是手机上下的，文件不在本机（agy 反方评审指出）。
+test('free out-of-paper pickup-code order that cannot be resubmitted sends the user back to the phone @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'failed', errorCode: 'PAPER_EMPTY', failureReasonForUser: '打印机缺纸' },
+  })
+  api.respond('POST', `/api/v1/print/jobs/${W2_ORDER.taskId}/takeaway-url`, {
+    status: 200,
+    json: {
+      signedUrl: '/api/v1/files/signed/takeaway-demo',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      filename: W2_FILE.name,
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      orderId: W2_ORDER.orderId,
+      orderNo: W2_ORDER.orderNo,
+      payStatus: 'paid',
+      amountCents: 0,
+      canRetry: false,
+    },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', { ...flowState, amountCents: 0, pickupSource: true })
+
+  const todo = page.getByRole('region', { name: '处理之前先做这三件' })
+  await expect(todo).toContainText(`记下订单号 ${W2_ORDER.orderNo}。还要打，请在手机上重新下单。`)
+  await expect(todo).not.toContainText('回到订单重新打印')
+  await expect(todo).not.toContainText('重新选文件')
+  await expect(page.getByRole('button', { name: '重新提交打印' })).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

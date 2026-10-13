@@ -689,24 +689,24 @@ function blockReason(){
    ['我的文档','38-member-assets.html?state=documents-ready','/me/documents','sign-stamp-docs'],null);
  if(M.terminal==='missing')return B('error','这台机器还没登记',
    '签名要先确认这台机器能不能用。读不到登记信息就<b>无法确认是否允许使用</b>，因此不放行。',
-   ['不假设「读不到就是可用」。','请联系现场工作人员登记这台机器。'],
-   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+   ['不假设「读不到就是可用」。','这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。'],
+   ['问小青','05-ai-cockpit.html','/assistant','sign-stamp-help'],null);
  if(M.cap==='loading')return B('info','正在确认这台机器能不能签名',
    '还没拿到这台机器是否开放「签名」的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
    ['读取中不等于可用，也不等于不可用。','这里不画进度条：系统不回传进度。'],
-   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null,true);
+   ['问小青','05-ai-cockpit.html','/assistant','sign-stamp-help'],null,true);
  if(M.cap==='disabled')return B('lock','这台机器没有开放签名',
    '管理员没有为这台机器开放「签名」。<b>未登记一律按不允许处理</b>，不做静默降级。',
-   ['文档打印、材料扫描、格式转换不受影响。','需要开放请联系现场工作人员。'],
-   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+   ['文档打印、材料扫描、格式转换不受影响。','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],
+   ['问小青','05-ai-cockpit.html','/assistant','sign-stamp-help'],null);
  if(M.cap==='maintenance')return B('warn','签名正在维护',
    '这台机器的签名功能被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
-   ['维护是管理员登记的真实状态，不是这一页猜的。','恢复时间请问现场工作人员。'],
-   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+   ['维护是管理员登记的真实状态，不是这一页猜的。','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],
+   ['问小青','05-ai-cockpit.html','/assistant','sign-stamp-help'],null);
  if(M.cap==='error')return B('error','还没确认能不能签名',
    '没能确认这台机器能不能签名。<b>确认之前不放行</b>——不说能用，也不说不能用。',
-   ['这一次没确认，先不当成不能用。','重试仍失败请联系现场工作人员。'],
-   ['联系工作人员','06-help.html','/help','sign-stamp-help'],['重试读取',null,null]);
+   ['这一次没确认，先不当成不能用。','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],
+   ['问小青','05-ai-cockpit.html','/assistant','sign-stamp-help'],['重试读取',null,null]);
  if(M.fromUnknown)return B('warn','认不出你是从哪里进来的',
    '来路参数不在允许的内部白名单里，<b>返回已安全回落到「打印扫描」</b>。原始来路值既不接受，也不回显。',
    ['外部地址一律不作为返回落点。','不会照着来路参数渲染任何内容。'],

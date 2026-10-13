@@ -619,7 +619,7 @@ V['empty']=function(){
         chips:['打印订单','我的文档','服务记录']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
         title:'刚下过单却看不到',sub:'先确认是不是<b>用另一个手机号</b>建的单；这里只列当前登录账号名下的任务。',
-        chips:['换号核对','现场求助']}),
+        chips:['换号核对','拨打服务电话']}),
   /* 列表里已有「直接办新的 / 查以前办过的」，底栏不再放同样的去向。 */
   cta: '<a class="btn primary press" href="03-login-gate.html?from='+encodeURIComponent(ROUTE)+'" data-route="/login" data-testid="'+SCREEN+'-primary">换个手机号再查一次</a>'
  };
@@ -645,8 +645,8 @@ V['unavailable']=function(){
         title:'去我的记录看看',sub:'打印订单和状态在我的记录里，同样能确认这一单还在不在。',
         chips:['打印订单','订单状态']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
-        title:'一直读不出来',sub:'按常见问题里的方式找现场工作人员，请他们帮你核对这一单的真实状态。',
-        chips:['常见问题','现场求助']}),
+        title:'一直读不出来',sub:'先停在这一页。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。',
+        chips:['常见问题','拨打服务电话']}),
   /* 「先重试一次」已在列表里，底栏不再放第二个重新读取。 */
   cta: '<a class="btn primary press" href="09-system-state.html" data-route="/error-offline" data-testid="'+SCREEN+'-primary">看看机器现在能不能打</a>'
  };
@@ -669,8 +669,8 @@ V['session-expired']=function(){
         title:'手机上下过单',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，不用先登录也能继续。',
         chips:['输入到机码','扫码核销']})
    + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
-        title:'登录遇到问题',sub:'收不到验证码、换了手机号，可以先看常见问题，或请现场工作人员协助。',
-        chips:['常见问题','现场求助']}),
+        title:'登录遇到问题',sub:'收不到验证码、换了手机号，可以先看常见问题，或拨打服务电话 18369161921（工作日 9:00–18:00）。',
+        chips:['常见问题','拨打服务电话']}),
   /* 列表里已有登录、打印、到机码三条，底栏只留一个不同的主按钮。 */
   cta: '<a class="btn primary press" href="'+LOGIN+'" data-route="/login" data-testid="'+SCREEN+'-primary">'+svg('lock',26)+'去登录并回到这一页</a>'
  };
