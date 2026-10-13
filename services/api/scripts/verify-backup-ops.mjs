@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, readdirSync, utimesSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawnSync, spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
@@ -26,6 +26,16 @@ stub('rclone', `echo "rclone:$*" >> "${log}"; if [[ "$1" == copy && "\${STUB_RCL
 stub('cp', `dest=""; for arg in "$@"; do dest="$arg"; done; /bin/cp "$@"; status=$?; if [[ "$status" != 0 ]]; then exit "$status"; fi; if [[ "\${STUB_MIRROR_CORRUPT:-}" == 1 ]]; then if [[ -d "$dest" ]]; then echo corrupt >> "$dest"/postgres_*.dump; else echo corrupt >> "$dest"; fi; fi`)
 stub('psql', `echo "psql:$*" >> "${log}"; sql=""; prev=""; for arg in "$@"; do if [[ "$prev" == "-c" ]]; then sql="$arg"; fi; prev="$arg"; done; case "$sql" in *"FROM pg_database"*) if [[ "\${STUB_DB_EXISTS:-}" == 1 ]]; then printf '1\\n'; fi ;; *"migration_name"*) printf '%s\\n' "$DRILL_STUB_LATEST_MIGRATION" ;; *"information_schema.tables"*) printf '4\\n' ;; *"count(*)"*) printf '2\\n' ;; *) ;; esac`)
 stub('prisma', `echo "prisma:$* POSTGRES_URL=$POSTGRES_URL DATABASE_URL=$DATABASE_URL" >> "${log}"; exit 0`)
+if (process.platform === 'darwin') stub('flock', `exec python3 - "$@" <<'PY'
+import fcntl, sys, time
+args=sys.argv[1:]
+fd=int(args[-1]); deadline=time.monotonic()+float(args[args.index('-w')+1]) if '-w' in args else time.monotonic()
+while True:
+    try: fcntl.flock(fd, fcntl.LOCK_EX|fcntl.LOCK_NB); break
+    except BlockingIOError:
+        if '-n' in args or time.monotonic()>=deadline: sys.exit(1)
+        time.sleep(.05)
+PY`)
 const baseEnv = {
   ...process.env,
   PATH: `${bin}:${process.env.PATH}`,
@@ -243,5 +253,112 @@ assert.match(restoreLog, /CREATE DATABASE "offsite_drill"/)
 assert.match(restoreLog, /DROP DATABASE "offsite_drill"/)
 assert.doesNotMatch(restoreLog, /DROP DATABASE "postgres"/)
 assert.equal(readdirSync(path.join(root, 'prisma/postgres/migrations')).includes(latestName), true)
+
+// 发布与每日备份共用同一个导出清理实现；只在临时目录造数据。
+const helper = process.env.VERIFY_PRERELEASE_HELPER || path.join(repoRoot, '.github/scripts/prune-prerelease-dumps.mjs')
+const stamp = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+const prereleaseRoot = path.join(dir, 'prerelease')
+mkdirSync(prereleaseRoot)
+const putGroup = (folder, stem, { ok = false, partial = false, storage = false } = {}) => {
+  writeFileSync(path.join(folder, `${stem}.dump`), 'full database')
+  mkdirSync(path.join(folder, `${stem}.runtime`, 'services/api/storage'), { recursive: true })
+  if (ok) writeFileSync(path.join(folder, `${stem}.ok`), 'ok')
+  if (partial) writeFileSync(path.join(folder, `${stem}.runtime.partial`), 'writing')
+  if (storage) writeFileSync(path.join(folder, `${stem}.runtime`, 'services/api/storage/upload.txt'), 'user file')
+}
+const old = `pre-old-${stamp(40)}`
+const thirty = `pre-thirty-${stamp(30)}`
+const recent = `pre-recent-${stamp(2)}`
+const partial = `pre-writing-${stamp(40)}`
+const legacy = 'pre-legacy-no-utc'
+const orphan = `pre-orphan-${stamp(40)}`
+putGroup(prereleaseRoot, old, { ok: true, storage: true })
+putGroup(prereleaseRoot, thirty)
+putGroup(prereleaseRoot, recent)
+putGroup(prereleaseRoot, partial, { partial: true })
+putGroup(prereleaseRoot, legacy)
+putGroup(prereleaseRoot, 'legacy-group')
+writeFileSync(path.join(prereleaseRoot, `${orphan}.dump`), 'finished dump, runtime copy failed')
+const oldTime = new Date(Date.now() - 40 * 86400000)
+utimesSync(path.join(prereleaseRoot, `${legacy}.dump`), oldTime, oldTime)
+const runPrune = (folder, args = []) => spawnSync('node', [helper, '--root', folder, ...args], {
+  env: { ...baseEnv, PRERELEASE_ALERT_WEBHOOK_URL: 'https://wecom.invalid/hook' }, encoding: 'utf8',
+})
+writeFileSync(log, '')
+const dryPrune = runPrune(prereleaseRoot, ['--dry-run'])
+assert.equal(dryPrune.status, 0, dryPrune.stderr)
+assert.match(runPrune(prereleaseRoot, ['--list-stems']).stdout, /legacy-group/, '组数清理仍识别旧式非 pre 组名')
+assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${old}\\.dump`))
+assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${thirty}\\.dump`))
+assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${orphan}\\.dump`))
+assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${legacy}\\.dump source=dump-mtime`))
+assert.match(dryPrune.stdout, new RegExp(`${old} storage_has_files=true`))
+assert.ok(!existsSync(path.join(prereleaseRoot, '.prune-last-success')) && existsSync(path.join(prereleaseRoot, `${old}.dump`)), '干跑只列不删，也不写状态')
+const cleaned = runPrune(prereleaseRoot)
+assert.equal(cleaned.status, 0, cleaned.stderr)
+for (const stem of [old, thirty, legacy, orphan]) {
+  assert.ok(!existsSync(path.join(prereleaseRoot, `${stem}.dump`)) && existsSync(path.join(prereleaseRoot, `${stem}.dump.expired`)), `${stem} 到期删除并留标记`)
+}
+assert.ok(existsSync(path.join(prereleaseRoot, `${old}.ok`)) && existsSync(path.join(prereleaseRoot, `${old}.runtime`)), '成功锚点和运行目录保留')
+assert.ok(existsSync(path.join(prereleaseRoot, `${recent}.dump`)) && existsSync(path.join(prereleaseRoot, `${partial}.dump`)), '未到期和写入中的组不动')
+assert.ok(existsSync(path.join(prereleaseRoot, 'legacy-group.dump')), '共用到期清理只触碰发布前 pre- 组')
+assert.match(cleaned.stderr, /组名无法解析 UTC.*pre-legacy-no-utc/, '旧组按 dump 本身修改时间删时告警')
+assert.match(readFileSync(log, 'utf8'), /curl:/, '无法解析 UTC 的告警送到现有 webhook')
+assert.match(readFileSync(path.join(prereleaseRoot, '.prune-last-success'), 'utf8'), /last_success=\d{4}-\d{2}-\d{2}/)
+
+const lockRoot = path.join(dir, 'prerelease-lock')
+mkdirSync(lockRoot)
+putGroup(lockRoot, old)
+const lockReady = path.join(dir, 'prerelease-lock-ready')
+const locked = spawn('bash', ['-c', `exec 9>"${lockRoot}/.prune.lock"; flock -n 9; echo ready > "${lockReady}"; exec sleep 5`], { env: baseEnv, stdio: 'ignore' })
+try {
+  const deadline = Date.now() + 2000
+  while (!existsSync(lockReady) && Date.now() < deadline) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
+  assert.ok(existsSync(lockReady), '夹具进程取得发布锁')
+  writeFileSync(log, '')
+  result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: lockRoot, PRERELEASE_PRUNE_HELPER: helper })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /BACKUP_OK/)
+  assert.match(result.stdout, /PRERELEASE_SKIP: 发布锁占用/)
+  assert.ok(existsSync(path.join(lockRoot, `${old}.dump`)), '发布持锁时每日清理跳过')
+  assert.doesNotMatch(readFileSync(log, 'utf8'), /curl:/, '首日无状态文件不推连续失败告警')
+} finally { locked.kill() }
+const waitUnlock = Date.now() + 2000
+while (locked.exitCode === null && Date.now() < waitUnlock) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
+result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: lockRoot, PRERELEASE_PRUNE_HELPER: helper })
+assert.equal(result.status, 0, result.stderr)
+assert.ok(existsSync(path.join(lockRoot, `${old}.dump.expired`)), '发布结束后每日备份拿锁清理')
+
+const skipRoot = path.join(dir, 'prerelease-skip')
+mkdirSync(skipRoot)
+writeFileSync(log, '')
+result = runPrune(skipRoot, ['--event', 'skipped'])
+assert.equal(result.status, 0, result.stderr)
+assert.doesNotMatch(readFileSync(log, 'utf8'), /curl:/, '首日没状态文件不告警')
+writeFileSync(path.join(skipRoot, '.prune-last-success'), `first_seen=${new Date(Date.now() - 86400000).toISOString().slice(0, 10)}\n`)
+result = runPrune(skipRoot, ['--event', 'skipped'])
+assert.match(result.stderr, /连续两天未清成/)
+assert.match(readFileSync(log, 'utf8'), /curl:/, '连续两天没有清成推告警')
+
+const errorRoot = path.join(dir, 'prerelease-error')
+mkdirSync(errorRoot)
+putGroup(errorRoot, old)
+writeFileSync(path.join(errorRoot, '.prune-last-success'), 'broken\n')
+writeFileSync(log, '')
+result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: errorRoot, PRERELEASE_PRUNE_HELPER: helper })
+assert.equal(result.status, 0, '清理错误不让每日备份失败')
+assert.match(result.stderr, /PRERELEASE_WARN: 发布前导出清理失败/)
+assert.match(result.stdout, /BACKUP_OK/)
+assert.ok(existsSync(path.join(errorRoot, `${old}.dump`)), '清理错误前未删 dump')
+assert.match(readFileSync(log, 'utf8'), /curl:/, '清理错误告警')
+
+const sameRoot = path.join(dir, 'prerelease-same')
+mkdirSync(sameRoot)
+putGroup(sameRoot, old)
+putGroup(sameRoot, recent)
+result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: sameRoot, PRERELEASE_PRUNE_HELPER: helper })
+assert.equal(result.status, 0, result.stderr)
+assert.deepEqual(readdirSync(sameRoot).filter((name) => name.startsWith('pre-') && /\.(dump|dump\.expired)$/.test(name)).sort(),
+  [`${old}.dump.expired`, `${recent}.dump`].sort(), '每日调用与直接调用同一夹具结论一致')
 
 console.log('backup ops gates passed')

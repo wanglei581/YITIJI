@@ -18647,6 +18647,10 @@
     ".ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    ".github/scripts/prune-prerelease-dumps.mjs": [
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     ".github/workflows/ci.yml": [
       "apps/kiosk/scripts/verify-browser-spec-coverage.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
@@ -34351,6 +34355,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          ".github/scripts/prune-prerelease-dumps.mjs",
           ".github/workflows/deploy.yml",
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
@@ -36648,6 +36653,7 @@
           "services/api/prisma/postgres/migrations"
         ],
         "files": [
+          ".github/scripts/prune-prerelease-dumps.mjs",
           "docs/device/postgres-operations.md",
           "services/api/scripts/rclone-offsite.conf.example",
           "services/api/scripts/restore-offsite-drill.sh"

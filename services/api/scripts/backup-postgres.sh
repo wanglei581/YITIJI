@@ -138,3 +138,27 @@ fi
 find "$BACKUP_DIR" -type f -name 'postgres_*.dump' -mtime "+$((RETENTION_DAYS - 1))" -delete
 printf '%s %s\n' "$stamp" "$(basename "$target")" > "$BACKUP_DIR/LAST_SUCCESS"
 echo "BACKUP_OK: $target"
+# 每日备份成功以后，用与发布相同的实现清理发布前全库导出。
+# 拿不到发布锁只记一次跳过；失败告警，但当天每日备份仍算成功。
+prerelease_root="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
+prerelease_helper="${PRERELEASE_PRUNE_HELPER:-$(dirname "${BASH_SOURCE[0]}")/../../../.github/scripts/prune-prerelease-dumps.mjs}"
+if [[ ! -d "$prerelease_root" ]]; then
+  echo "PRERELEASE_SKIP: 发布前备份目录不存在" >&2
+elif [[ ! -f "$prerelease_helper" ]] || ! command -v flock >/dev/null 2>&1; then
+  send_failure_alert "【职易达告警】发布前导出清理脚本或 flock 缺失"
+  echo "PRERELEASE_WARN: 发布前导出清理脚本或 flock 缺失" >&2
+else
+  if ! exec 9>"$prerelease_root/.prune.lock"; then
+    send_failure_alert "【职易达告警】发布前导出清理锁无法打开"
+    echo "PRERELEASE_WARN: 发布前导出清理锁无法打开" >&2
+  else
+    if flock -n 9; then
+      if ! PRERELEASE_ALERT_WEBHOOK_URL="$alert_webhook" node "$prerelease_helper" --root "$prerelease_root"; then
+        echo "PRERELEASE_WARN: 发布前导出清理失败，当天备份仍成功" >&2
+      fi
+    else
+      PRERELEASE_ALERT_WEBHOOK_URL="$alert_webhook" node "$prerelease_helper" --root "$prerelease_root" --event skipped || echo "PRERELEASE_WARN: 发布锁跳过状态记录失败" >&2
+    fi
+    exec 9>&-
+  fi
+fi

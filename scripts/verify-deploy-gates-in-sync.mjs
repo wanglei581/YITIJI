@@ -225,11 +225,13 @@ if (
   else fail('API-only 必须在所有 nginx/static/latest-deployed 操作之前 exit 0')
 
   const packagedHelper =
-    deployWorkflow.includes('sparse-checkout: .github/scripts/deploy-api-release.sh') &&
+    /sparse-checkout:\s*\|\s*\n\s+\.github\/scripts\/deploy-api-release\.sh\s*\n\s+\.github\/scripts\/prune-prerelease-dumps\.mjs/.test(deployWorkflow) &&
     deployWorkflow.includes('sparse-checkout-cone-mode: false') &&
     deployWorkflow.includes('payload=$(gzip -c "$HELPER" | base64 -w 0)') &&
-    deployWorkflow.includes('CONTROL_PLANE_DEPLOY_HELPER_SHA256')
-  if (packagedHelper) pass('工作流从自身提交打包 API 发布 helper，并携带 SHA-256')
+    deployWorkflow.includes('prune_payload=$(gzip -c "$PRUNE_HELPER" | base64 -w 0)') &&
+    deployWorkflow.includes('CONTROL_PLANE_DEPLOY_HELPER_SHA256') &&
+    deployWorkflow.includes('CONTROL_PLANE_PRUNE_HELPER_SHA256')
+  if (packagedHelper) pass('工作流从自身提交打包发布与导出清理 helper，并携带 SHA-256')
   else fail('工作流必须打包当前控制面 helper；不能在检出旧目标后读取目标提交里的旧脚本')
 
   const controlPlaneRef =
@@ -243,6 +245,8 @@ if (
       'printf \'%s\' "$CONTROL_PLANE_DEPLOY_HELPER_B64" | base64 --decode | gzip -d'
     ) &&
     deployWorkflow.includes('sha256sum -c -') &&
+    deployWorkflow.includes('"$CONTROL_PLANE_PRUNE_HELPER" | sha256sum -c -') &&
+    deployWorkflow.includes('PRERELEASE_PRUNE_HELPER="$CONTROL_PLANE_PRUNE_HELPER"') &&
     deployWorkflow.includes('bash "$CONTROL_PLANE_HELPER"') &&
     !deployWorkflow.includes('bash .github/scripts/deploy-api-release.sh')
   if (verifiedHelper) pass('远端校验并执行控制面 helper，不执行目标提交内的旧 helper')

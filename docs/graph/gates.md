@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1949 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1950 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -92,6 +92,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/requirements.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/review.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json` | `verify-profile-commercial-first-batch.mjs` |
+
+</details>
+
+<details>
+<summary><code>.github/scripts/prune-prerelease-dumps.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/scripts/prune-prerelease-dumps.mjs` | `verify-deploy-rollback.mjs`<br/>`verify-backup-ops.mjs` |
 
 </details>
 
