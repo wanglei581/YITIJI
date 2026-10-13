@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import ts from 'typescript'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 function read(path) {
@@ -321,8 +321,55 @@ assertIncludes(layoutControls, 'min-w-[48px]', 'layout control choices meet the 
   }
   console.log('PASS source screen keeps the dimension list off the first screen and still offers direction settings')
 }
-// 「不编造结论」仍必须写在上传页本身，不能只藏进工作台。
-assertIncludes(source, '系统不会编造', 'source page keeps the no-fabrication statement outside the collapsed area')
+// 「不编造结论」：来源页照 2.0 稿不放这句，承诺放在诊断方向屏「报告固定包含这些内容」里；
+// 产出不出这类结论靠后端简历 AI 的约束，不靠页面上这句话。10/12 合规十判：照稿删掉来源各屏挂的那条（第八次）。
+{
+  const DIRECTION_FORM = 'src/pages/resume/components/DiagnosisDirectionForm.tsx'
+  const directionForm = read(DIRECTION_FORM)
+  assertIncludes(
+    directionForm,
+    '系统不会编造「超过多少人」「排名超过多少份简历」这类无法验证的结论，也不承诺提分幅度、不做录用预测、不做企业匹配。',
+    'diagnosis direction screen keeps the full no-fabrication statement',
+  )
+  // 这份表单也挂在目标设置屏（part="context"，ContextPanel 及其后的子组件）：那句只许在 REPORT_ROWS 里出现一次，
+  // 且只由 FocusPanel（诊断方向屏）渲染。
+  {
+    const focusAt = directionForm.indexOf('function FocusPanel')
+    const contextAt = directionForm.indexOf('function ContextPanel')
+    if (focusAt < 0 || contextAt < focusAt) throw new Error('DiagnosisDirectionForm no longer has FocusPanel before ContextPanel; re-check where the no-fabrication statement renders')
+    if (directionForm.split('无法验证的结论').length !== 2) throw new Error('the no-fabrication statement must appear exactly once in DiagnosisDirectionForm (REPORT_ROWS)')
+    if (!directionForm.slice(focusAt, contextAt).includes('REPORT_ROWS')) throw new Error('FocusPanel (diagnosis direction screen) no longer renders REPORT_ROWS')
+    const contextPart = directionForm.slice(contextAt)
+    for (const marker of ['REPORT_ROWS', '系统不会编造', '无法验证的结论', '报告按六个维度']) {
+      if (contextPart.includes(marker)) throw new Error(`the target-context part of DiagnosisDirectionForm renders the no-fabrication note: ${marker}`)
+    }
+    console.log('PASS the no-fabrication statement renders only on the diagnosis direction screen')
+  }
+  // 来源各屏 = 来源页本身 + 它在 src/pages/resume 里一层层引用到的文件（U 盘屏就隔了一层）。
+  // 诊断方向表单整份不在这里扫（上面已逐段钉过）；跨出 src/pages/resume 的共用组件（如手机扫码的上传码面板）
+  // 别的页也在用，不扫，由 fusion-w3 的 T21c 用例逐屏兜住。
+  const sourceScreenFiles = new Map([['src/pages/resume/ResumeSourcePage.tsx', source]])
+  const queue = ['src/pages/resume/ResumeSourcePage.tsx']
+  while (queue.length > 0) {
+    const from = queue.shift()
+    for (const [, spec] of sourceScreenFiles.get(from).matchAll(/from '(\.{1,2}\/[^']+)'/g)) {
+      if (spec.endsWith('.css')) continue
+      const base = posix.normalize(posix.join(posix.dirname(from), spec))
+      if (!base.startsWith('src/pages/resume/')) continue
+      const file = [`${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`].find((path) => readOptional(path) !== '')
+      if (!file) throw new Error(`${from} imports ${spec} but the file is missing`)
+      if (file === DIRECTION_FORM || sourceScreenFiles.has(file)) continue
+      sourceScreenFiles.set(file, read(file))
+      queue.push(file)
+    }
+  }
+  for (const [file, text] of sourceScreenFiles) {
+    for (const marker of ['系统不会编造', '无法验证的结论', '报告按六个维度']) {
+      if (text.includes(marker)) throw new Error(`${file} puts the no-fabrication note back on a source screen: ${marker}`)
+    }
+  }
+  console.log(`PASS source screens do not repeat the no-fabrication note (${sourceScreenFiles.size} files)`)
+}
 
 // ── R5b 上传成功与预览失败不得同屏互相打脸 ────────────────────────────────
 // 事故原样：文件卡写「已就绪」，正下方预览卡写「预览链接不可用或已过期，请重新上传文件」。

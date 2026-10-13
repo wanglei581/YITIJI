@@ -5,7 +5,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { AlertCircleIcon, UploadCloudIcon } from 'lucide-react'
+import { UploadCloudIcon } from 'lucide-react'
 import { kioskUploadFile } from '../../services/api'
 import { ResumeSourceSummary } from './components/ResumeSourceSummary'
 import { ResumeGuestNote, ResumeSourceNavbar, ResumeSourcePrivacy, ResumeSummaryFileCard } from './components/ResumeSourceChrome'
@@ -54,7 +54,6 @@ import './resume-triage-panels-qx.css'
 import './resume-r1-qx2.css'
 
 const RESUME_USB_UNCONFIGURED_NOTE = (contact: ReturnType<typeof useSupportContact>) => `这台机器暂未开通 U 盘导入。请改用手机扫码上传。${helpNeededLine(contact)}`
-const NO_FABRICATION_NOTE = '报告按六个维度分别给出建议。系统不会编造「超过多少人」「必然提分」等无法验证的结论。'
 const BASE_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp'
 const WORD_ACCEPT = '.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const MAX_BYTES = 10 * 1024 * 1024
@@ -480,12 +479,6 @@ export function ResumeSourcePage() {
           <DiagnosisDirectionForm part="context" forceMore={screen === 'target-profile'} {...formProps} />
         ) : null}
         {screen === 'target-industry' ? <ResumeIndustrySheet value={targetIndustry} onChange={setTargetIndustry} /> : null}
-        {screen === 'target' || screen === 'unknown' ? null : (
-          <p className="qx-rt-note" data-tone="warn">
-            <AlertCircleIcon size={18} aria-hidden="true" style={{ display: 'inline', marginRight: 6, verticalAlign: '-3px' }} />
-            {NO_FABRICATION_NOTE}
-          </p>
-        )}
       </div>
       {(screen === 'target-context' || screen === 'target-profile') ? (
         <ResumeTargetSendoff generic={genericDiagnosis} intent={intent} selectedDimensions={selectedDimensions} targetIndustry={targetIndustry} targetJob={targetJob} targetExperience={targetExperience} targetScene={targetScene} targetMajor={targetMajor} targetDegree={targetDegree} />
