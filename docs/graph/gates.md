@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1949 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1679,7 +1679,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `docs/device/production-deployment-runbook.md` | `verify-cos-lifecycle-policy.ts` |
+| `docs/device/production-deployment-runbook.md` | `verify-admin-login-hardening.ts`<br/>`verify-cos-lifecycle-policy.ts` |
 
 </details>
 
@@ -2327,7 +2327,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 621 个文件</summary>
+<summary><code>services/api/src/</code> — 622 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2480,6 +2480,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/audit/audit.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-billing.ts`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-orders-refund.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-admin-pending-dispose.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-admin-users.ts`<br/>`verify-advisor-work.ts`<br/>`verify-ai-quota.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-assistant-voice.ts`<br/>`verify-audit-logs.ts`<br/>`verify-backend-p0-http.ts`<br/>`verify-benefit-activities.ts`<br/>`verify-benefit-redemption.ts`<br/>`verify-bulk-publish.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-career-plan.ts`<br/>`verify-change-password.ts`<br/>`verify-companies.ts`<br/>`verify-content-trust-publish-gate.ts`<br/>`verify-cos-files.ts`<br/>`verify-demo-company-unpublish.ts`<br/>`verify-derivation-kind.ts`<br/>`verify-document-page-count.ts`<br/>`verify-external-video-e2e.ts`<br/>`verify-fair-company-positions.ts`<br/>`verify-fair-info-fields.ts`<br/>`verify-fair-list-integrity.ts`<br/>`verify-fair-visit-review.ts`<br/>`verify-feedback-notifications.ts`<br/>`verify-field-mapping-rule.ts`<br/>`verify-free-print-quota.ts`<br/>`verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-job-fit.ts`<br/>`verify-job-materials.ts`<br/>`verify-job-review.ts`<br/>`verify-job-sync.ts`<br/>`verify-jobfair-campus-priority.ts`<br/>`verify-jobfair-review.ts`<br/>`verify-jobfair-venue-guide.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-kiosk-terminal-maintenance.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-materials-processing.ts`<br/>`verify-member-benefits-admin.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-data-request-contract.ts`<br/>`verify-member-data-request-truth.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-audit-postgres.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-qa-records.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-mock-interview.ts`<br/>`verify-official-channels.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-edit.ts`<br/>`verify-partner-email-login-alias.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-partner-org-self.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pg-lock-timeout-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-policies.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-policy-eligibility.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-public-fair-demo-guard.ts`<br/>`verify-publish-expiry-completeness.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-recruitment-emergency-scope.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-redemption-audit.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-draft-versions.ts`<br/>`verify-resume-export-formats.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-generate.ts`<br/>`verify-resume-layout-export.ts`<br/>`verify-resume-optimize.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-resume-template-fill.ts`<br/>`verify-scan-deletion-audit-reporting.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-screensaver-content.ts`<br/>`verify-support-contact.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/audit/audit.types.ts` | `verify-console-plain-copy.mjs`<br/>`verify-assess-isolation.ts`<br/>`verify-change-password.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/auth/admin-initial-phone-bind.service.ts` | `verify-admin-phone-transfer.ts`<br/>`verify-internal-auth-phone.ts` |
+| `services/api/src/auth/admin-login-second-factor.ts` | `verify-admin-login-hardening.ts` |
 | `services/api/src/auth/admin-phone-transfer.service.ts` | `verify-admin-phone-transfer.ts` |
 | `services/api/src/auth/admin-registered-phone-reset.ts` | `verify-partner-contact-phone-registration.ts` |
 | `services/api/src/auth/auth.controller.ts` | `verify-change-password.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-partner-account-action-schema.ts` |

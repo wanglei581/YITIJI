@@ -191,6 +191,12 @@ check('E5 有效期走完回到账号密码', /expiresIn === 0\)\s*onRestart\(/.
 check('E6 失败按分流处理：retry 留在本步，其余回到账号密码',
   /secondFactorFailureAction\(failure\.code\) === 'retry'/.test(panel) && /onRestart\(message\)/.test(panel))
 check('E7 面板有「返回重新输入账号密码」出口', panel.includes('返回重新输入账号密码') && panel.includes('onRestart(null)'))
+check('E8 找回密码弹窗底部是「无法自助找回？请联系系统维护人员处理。」',
+  page.includes('无法自助找回？请联系系统维护人员处理。'))
+check('E9 卡片底部是「无法登录？请联系系统维护人员处理。」',
+  page.includes('无法登录？请联系系统维护人员处理。'))
+check('E10 登录页不再含「在后台重置」和「联系超级管理员」',
+  !page.includes('在后台重置') && !page.includes('联系超级管理员'))
 
 if (failures > 0) {
   console.error(`\n${failures} FAIL`)
