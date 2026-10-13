@@ -66,6 +66,7 @@ function compositionChecks(): void {
   check(text.includes(SALARY_PROMPT_RULE), '小青文字对话的系统约束里有薪资这一句')
   const voice = buildGuardedSystemPrompt({ systemPrompt: '你是小青' }, { policyVariant: 'voice' })
   check(voice.includes(DEVICE_FAULT_PROMPT_RULE), '语音小青的系统约束里有这一句')
+  check(voice.includes(SALARY_PROMPT_RULE), '语音小青的系统约束里有薪资这一句')
 
   // 语音小青的话由腾讯云直接调模型，不经过后端：下发给腾讯云的配置里必须带着这一句。
   const trtc = JSON.parse(guardTrtcLlmConfigJson(
@@ -75,6 +76,8 @@ function compositionChecks(): void {
   check(String(trtc.SystemPrompt).includes(DEVICE_FAULT_PROMPT_RULE), '下发给腾讯云的语音小青提示词里有这一句')
   check(String(trtc.SystemPrompt).includes(SALARY_PROMPT_RULE), '下发给腾讯云的语音小青提示词里有薪资这一句')
 
+  // 作业面问答也是小青，有自己单独的系统提示词（不经过 buildGuardedSystemPrompt）：设备故障那条两处都加了，薪资这句同样两处都要有
+  check(ADVISOR_QA_SYSTEM_PROMPT.includes(`\n7. ${SALARY_PROMPT_RULE.replace(/^薪资：/, '')}`), '作业面问答的系统提示词里有薪资这一句（第 7 条）')
   const ruleAt = ADVISOR_QA_SYSTEM_PROMPT.indexOf(`\n6. ${DEVICE_FAULT_PROMPT_RULE}`)
   const formatAt = ADVISOR_QA_SYSTEM_PROMPT.indexOf('只输出 JSON')
   check(ruleAt > 0, '作业面问答的提示词第 6 条是这一句')

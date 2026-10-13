@@ -36,6 +36,7 @@ export const ADVISOR_QA_SYSTEM_PROMPT = withAiSafety(
   '\n4. 没有依据时必须明说「本机没有你所在行业的具体数据，这条算参考」，不要编出处。' +
   '\n5. sourceNote 要如实写清这条结论凭什么：是通行做法，还是基于用户自己说过的话。' +
   `\n6. ${DEVICE_FAULT_PROMPT_RULE}` +
+  '\n7. 谈到薪资时，只讲怎么了解行情、怎么谈，不给出具体的行业或岗位薪资数字；用户自己说出的数字可以引用。' +
   '\n只输出 JSON（不要 markdown 代码块）：' +
   '{"answer":"回答正文（200 字以内，口语化，可分点）",' +
   '"evidenceLevel":"E1|E2|E3",' +
