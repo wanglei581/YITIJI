@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { consentDeclarationText } from './member-privacy.service'
 
 export const MEMBER_EXPORT_SCHEMA_VERSION = 'member-data-export-v1'
 export const MEMBER_EXPORT_SECTION_ROW_LIMIT = 500
@@ -348,7 +349,10 @@ export class MemberDataExportMapper {
         },
         notifications: this.toJsonRecords(notifications),
         feedback: this.toJsonRecords(feedback),
-        consents: this.toJsonRecords(consents),
+        consents: this.toJsonRecords(consents.map((row) => ({
+          ...row,
+          declarationText: consentDeclarationText(row.consentVersion),
+        }))),
         requests: this.toJsonRecords(requests),
       },
     }

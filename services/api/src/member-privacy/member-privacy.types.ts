@@ -12,10 +12,15 @@ export type MemberDataRequestStatus =
 
 export interface MemberAiConsentStatus {
   scope: MemberAiConsentScope
+  /** 这个范围当前版本。不是这条记录写下时的版本。 */
   consentVersion: string
   granted: boolean
   grantedAt: string | null
   revokedAt: string | null
+  /** granted 时是这条记录自己的版本，否则 null。 */
+  grantedVersion: string | null
+  /** granted 时：登录勾选版本为 login_checkbox，其余为 prompt；未声明为 null。 */
+  grantedSource: 'login_checkbox' | 'prompt' | null
 }
 
 export interface MemberDataRequestItem {

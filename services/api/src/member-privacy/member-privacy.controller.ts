@@ -1,6 +1,19 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  Validate,
+  ValidateIf,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface,
+} from 'class-validator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -24,10 +37,30 @@ function terminalIdOf(req: ReqLike): string | null {
   return headerOf(req, 'x-terminal-id')?.slice(0, 64) ?? null
 }
 
+@ValidatorConstraint({ name: 'loginCheckboxSourceOnlyForAge', async: false })
+class LoginCheckboxSourceOnlyForAge implements ValidatorConstraintInterface {
+  validate(source: unknown, args: ValidationArguments): boolean {
+    if (source === undefined) return true
+    return (args.object as { scope?: unknown }).scope === 'age_14_plus'
+  }
+
+  defaultMessage(): string {
+    return 'source 只适用于年满 14 周岁声明'
+  }
+}
+
 class GrantAiConsentDto {
   @IsIn(CONSENT_SCOPES)
   scope!: MemberAiConsentScope
+
+  // 只在没带这个字段时跳过；带了 null、空串或别的值都要过下面两条（IsOptional 会把 null 当没带）。
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['login_checkbox'])
+  @Validate(LoginCheckboxSourceOnlyForAge)
+  source?: 'login_checkbox'
 }
+
+export { GrantAiConsentDto }
 
 class RevokeAiConsentParamsDto {
   @IsIn(CONSENT_SCOPES)
@@ -70,7 +103,7 @@ export class MemberPrivacyController {
     @Req() req: ReqLike
   ) {
     return ApiResponse.ok(
-      await this.privacy.grantConsent(user.endUserId, dto.scope, terminalIdOf(req))
+      await this.privacy.grantConsent(user.endUserId, dto.scope, terminalIdOf(req), dto.source)
     )
   }
 
