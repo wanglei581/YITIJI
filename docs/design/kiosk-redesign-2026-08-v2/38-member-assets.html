@@ -11,7 +11,7 @@
          orders-login   | orders-loading   | orders-empty   | orders-ready   | orders-error
   api: GET /api/v1/me/documents      → { items, nextCursor, total }
        GET /api/v1/me/print-orders   → { items, nextCursor, total }
-  fallback: 未登录只引导登录并带 ?from=；加载失败保留重试与「联系工作人员」；空列表不造数据；
+  fallback: 未登录只引导登录并带 ?from=；加载失败保留重试与「帮助中心」；空列表不造数据；
             不可预览格式诚实降级，不声称已生成预览。
   真话边界（本批次修复要点）：
     ① ready 的每一行都是**办理后显示结构位**：文件名、格式页数、时间、留存期限、订单状态一律不写死，
@@ -356,8 +356,8 @@ function accessState(suffix, intent){
     guide('error')+ctaBar([back,askLink(),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   if(suffix==='access-error') return {layout:'state',html:
     banner('warn','warn','这次没有取得可用链接','可能是网络失败、文件已到期或已被清理；本页<b>这里不猜测具体原因</b>，也不沿用上一次的链接。',['用途：'+action,'未创建新订单'])+
-    listWrap(slotRow('documents',0,'error')+otherDocRows(false),'失败不会删除文件；反复失败时可联系现场工作人员核对。','访问链接获取失败')+
-    guide('error')+ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
+    listWrap(slotRow('documents',0,'error')+otherDocRows(false),'失败不会删除文件；多次重试仍不成功的话，可以稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）','访问链接获取失败')+
+    guide('error')+ctaBar([link('帮助中心','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),link('重新取得链接',href('documents-access-loading','intent='+intent),'/me/documents',SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   return {layout:'state',html:
     banner('calm','info',isPrint?'打印凭证已就绪':'预览链接已就绪',isPrint
       ? '文件编号、打印凭证和默认打印参数会交给打印确认页；<b>这些内容不出现在地址栏</b>。'
@@ -483,7 +483,7 @@ function chips(kind, filter){
 var GUIDE = {
   login:[['隐私','未登录不显示','公共终端不会展示文件名、订单号或取件凭证'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['不登录也能用','打印与扫描','当场办完的打印、扫描不需要账号']],
   loading:[['读取范围','只读当前账号','不会展示其他账号的文件与订单'],['显示规则','不闪回旧列表','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会删除任何文件或订单']],
-  error:[['数据','已有内容不受影响','这次加载失败不会删除任何文件或订单'],['先试这个','检查网络后重试','重试不会重复创建订单'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  error:[['数据','已有内容不受影响','这次加载失败不会删除任何文件或订单'],['先试这个','请稍后重试','重试不会重复创建订单'],['仍不行','拨打服务电话','18369161921（工作日 9:00–18:00）']],
   'empty-documents':[['怎么产生','上传或扫描之后','手机传输、U 盘、本机扫描都可以'],['能做什么','预览、打印、签名','从同一份文件继续办'],['留存','按系统期限管理','到期后无法恢复，需要请提前打印']],
   'empty-orders':[['怎么产生','确认打印并建单后','订单在收银台确认后建立'],['能看到什么','处理进度与结果','状态一律以实际记录为准'],['再打印','会新建订单','重新核价后建立一笔新订单']],
   'ready-documents':[['会显示什么','办完才出现','不写死文件名或时间'],['继续办理','从同一文件接着办','预览、打印、签名共用一份'],['留存','按保存期限','到期或删除后无法再打开']],
@@ -527,7 +527,7 @@ function viewFor(kind, suffix, filter){
       : stepRow(0,'print','clay','发起一次打印','选文件、定参数、确认价格后建立订单','去打印','10-print-hub.html','/print-scan',SCREEN+'-start-print')
         + stepRow(1,'doc','','先从我的文档选文件','已保存的文件可以直接拿来打印','去文档',href('documents-ready'),'/me/documents',SCREEN+'-start-docs')
         + stepRow(2,'clock','teal','已经打过但没看到？','订单状态以实际记录为准，可稍后重新加载',' 重新加载',href('orders-loading'),'/me/print-orders',SCREEN+'-start-reload')
-        + stepRow(3,'help','','订单对不上，找现场工作人员','报订单号即可，由工作人员协助核对','联系工作人员','06-help.html','/help',SCREEN+'-start-help');
+        + stepRow(3,'help','','订单对不上','拨打服务电话 18369161921（工作日 9:00–18:00），报订单号即可','帮助中心','06-help.html','/help',SCREEN+'-start-help');
     return {layout:'state', html:
       banner('','empty', docs?'还没有保存的文档':'还没有打印订单',
         docs?'这个账号下没有已保存的文件。还没有任何记录。办过之后会列在这里。'
@@ -544,9 +544,9 @@ function viewFor(kind, suffix, filter){
       banner('warn','warn', (docs?'文档':'订单')+'这次没有加载出来',
         '当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项一律显示「—」；已有的文件和订单不会因为这次失败而消失。', ['共 —','本次未取到'])
       + listWrap([0,1,2,3].map(function(i){return slotRow(kind,i,'error');}).join(''),
-          '重试不会重复创建订单，也不会改动已有文件。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的列表结构')
+          '重试不会重复创建订单，也不会改动已有文件。多次重试仍不成功的话，可以稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）','本次未取到的列表结构')
       + guide('error')
-      + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),
+      + ctaBar([link('帮助中心','06-help.html','/help',SCREEN+'-help',{icon:'help'}),askLink(),
                 link('重新加载', href(kind+'-loading'), d.route, SCREEN+'-primary',{primary:true,icon:'refresh'})])};
   }
   /* ready：主内容优先，四行是四类**结果位**（角色不同、内容组合不同），值一律办理后显示 */

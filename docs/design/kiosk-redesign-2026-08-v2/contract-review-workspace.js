@@ -563,7 +563,7 @@ function findList (expandedId) {
 function printReason (enabled) {
   return enabled
     ? noteline('print', '报告只含<b>风险提示，不含合同原件</b>；生成成功后系统会优先清理原合同，随后进入既有报价与打印确认。')
-    : noteline('alert', '<b>报告打印暂未开放：</b>本机尚未开启合同报告打印，因此这一步不会生成文件、不产生费用。需要纸质版请找现场工作人员。',
+    : noteline('alert', '<b>报告打印暂未开放：</b>本机尚未开启合同报告打印，因此这一步不会生成文件、不产生费用。',
       'warn', tid('print-reason'))
 }
 function resultCta (opts) {

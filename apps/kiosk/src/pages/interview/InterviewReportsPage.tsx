@@ -146,7 +146,7 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
             <section className="iv-card iv-empty is-bad">
               <div>
                 <h2>暂时无法加载练习报告</h2>
-                <p>请检查网络后重试。没有拿到本人列表时，不显示任何固定历史。</p>
+                <p>请稍后重试。没有拿到本人列表时，不显示任何固定历史。</p>
               </div>
             </section>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => setReloadKey((k) => k + 1)}>重试加载</button>

@@ -34,7 +34,7 @@
   ai-consent: 用户主动点「用大白话讲这一章」才进入 /assistant
   ai-output: 通俗转述与举例，可忽略；**不构成法律结论**，不改变条款效力，不判定用户是否符合某条
   ai-failure: AI 顾问不可用不影响阅读、切换文档、切换章节、调字号与返回来源
-  ai-fallback: 章节目录 + 原文阅读 + 字号调整 + 现场工作人员
+  ai-fallback: 章节目录 + 原文阅读 + 字号调整 + 服务电话
   ai-persistence: 本页不产生 AI 记录
   原型演示控制: ?doc= 切文档；?state= 切展示状态；?sec= 选章节；?from= 受控返回；
                 ?capture=1 冻结时钟；?flat=1 关非必要动效；?debug=1 显演示面板。
@@ -329,7 +329,7 @@ var DOCS={
    {t:'四、您的权利',lead:'你能对自己的数据做什么。',
     cover:['本人可查看、下载、删除','数据仅本人可见','管理员因运维访问会留审计日志']},
    {t:'五、联系我们',lead:'有疑问找谁。',
-    cover:['现场工作人员','终端公示的运营方联系方式','正式版本以运营方发布为准']}
+    cover:['拨打服务电话','终端公示的运营方联系方式','正式版本以运营方发布为准']}
   ]}
 };
 /* 受控返回来源：只认这四个键，未知一律回首页，不接受任意路径。 */
@@ -398,7 +398,7 @@ function aboutCards(){
  return '<section class="sec"><div class="grid2">'+
   '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>哪一版算数</h3>'+
   '<p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>'+
-  '<p class="fine">对条款有疑问，可以找现场工作人员，或按「联系我们」里的方式联系运营方。</p></div>'+
+  '<p class="fine">对条款有疑问，可以拨打服务电话 18369161921（工作日 9:00–18:00），或按「联系我们」里的方式联系运营方。</p></div>'+
   '<div class="card"><h3><span class="ci" style="background:var(--plum-soft);color:var(--plum-d)">'+svg('spark',26)+'</span>看不懂这一章</h3>'+
   '<p class="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。</p>'+
   '<a class="inbtn" href="05-ai-cockpit.html" data-route="/assistant" data-testid="legal-ai-explain">用大白话讲这一章'+svg('arrow',22)+'</a></div>'+
@@ -454,7 +454,7 @@ V['not-found']=function(){
     '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('info',26)+'</span>读完回哪里</h3>'+
     '<p>左上角和下面的返回按钮，会回到<b>你进来的那一页</b>；来路不明时统一回首页，不会把你甩到别处。</p></div>'+
     '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('desk',26)+'</span>要找别的文件</h3>'+
-    '<p>屏幕上只提供这两份。其他材料请找<b>现场工作人员</b>，或按运营方公示的方式联系。</p></div>'+
+    '<p>屏幕上只提供这两份。其他材料，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。</p></div>'+
     '</div></section>'+
    '<section class="sec"><div class="state" data-kind="warn">'+
     '<div class="state-h">'+svg('info','28')+'这一页不影响你办事</div>'+
@@ -477,7 +477,7 @@ V['error']=function(){
     '<p>多数是一次性的网络波动，<b>重试一下</b>通常就能读到。</p>'+
     '<a class="inbtn" href="?doc='+DOC.key+'&state=loading&from='+fromKey+'" data-testid="legal-retry">重新取正文'+svg('arrow',22)+'</a></div>'+
     '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('desk',26)+'</span>现在就要看</h3>'+
-    '<p>找<b>现场工作人员</b>索取现行版本，或按运营方公示的方式联系。</p>'+
+    '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00），以索取现行版本。</p>'+
     '<p class="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p></div>'+
     '</div></section>'+
    '<section class="sec"><div class="grid2">'+
@@ -489,7 +489,7 @@ V['error']=function(){
     '</div></section>'+
    '<section class="sec"><div class="state" data-kind="warn">'+
     '<div class="state-h">'+svg('clock','28')+'什么时候能读到</div>'+
-    '<div class="state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，请找现场工作人员索取。</div></div></section>',
+    '<div class="state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。</div></div></section>',
   cta:'<a class="btn ghost" href="'+BACK.href+'" data-route="'+BACK.route+'">'+BACK.label+'</a>'+
    '<a class="btn primary" style="flex:1.3" href="?doc='+DOC.key+'&state=loading&from='+fromKey+'" data-testid="legal-primary">'+svg('refresh','26')+'重新取正文</a>'
  };

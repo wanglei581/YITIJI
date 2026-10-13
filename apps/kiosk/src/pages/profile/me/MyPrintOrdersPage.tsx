@@ -274,7 +274,7 @@ export function MyPrintOrdersPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载打印订单" placeholderIcon={ReceiptTextIcon} />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已建立的订单不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请稍后重试；已建立的订单不会因为这次失败而消失。" struct={struct} />
   } else if (items.length === 0) {
     body = (
       <>
