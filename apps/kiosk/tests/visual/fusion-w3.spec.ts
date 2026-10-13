@@ -3501,6 +3501,7 @@ test('按原样导出不显示人工智能标注说明 @w3-kiosk', async ({ page
 
   const draftExport = page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })
   await expect(draftExport).toBeVisible()
+  await expect(page.getByRole('button', { name: '不用 AI，导出原样草稿', exact: true })).toHaveCount(0)
   await expect(page.getByText(PAGE_AIGC_NOTE)).toHaveCount(0)
   await expect(page.getByText(FILE_AIGC_NOTE)).toHaveCount(0)
   await expect(page.getByTestId('resume-export-aigc-note')).toHaveCount(0)

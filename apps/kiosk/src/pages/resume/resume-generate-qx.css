@@ -13,6 +13,24 @@
 }
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar { flex-wrap: wrap; }
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-step-actions { flex: 1 0 100%; }
+/* 核对步三颗同一行：上一步、不用 AI 导出、让 AI 整理。问小青仍独占下一行。 */
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-btn {
+  flex: 1 1 auto;
+  min-width: auto;
+  min-height: 56px;
+  white-space: nowrap;
+}
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-ai-declaration-slot {
+  flex: 0 0 auto;
+}
 
 .qx-resume-generate .rg-xq {
   flex: none;

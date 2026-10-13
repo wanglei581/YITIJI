@@ -10,6 +10,7 @@
 - 生成主按钮明确 AI 整理成新简历，结果头增加 AI 生成供参考标签（规则 3、7）。
 - 技术披露条改成简短示例资料标记，事实边界保留一处（规则 4）。
 - AI 帮助采用原顾问页支持的 composer 与这次办理草稿协议，预填本步问题，由用户确认发送；不伪造 AI 回答（规则 7）。
+- 10/13 核对屏底栏补一颗次要按钮「不用 AI，导出原样草稿」，样式照本稿生成失败态的原样草稿（打印图标、次要按钮），点了去原样草稿排版。只改这一屏。
 -->
 <html lang="zh-CN">
 <head>
@@ -456,6 +457,9 @@ textarea.fin{padding:14px 18px;line-height:1.5;resize:none;min-height:104px}
 .xq{min-height:0}
 #body-root{padding-top:16px}
 .helper{margin-top:8px}
+/* 核对屏底栏三颗同一行，字不折行。主按钮仍是 primary wide。 */
+#body-root[data-state="review"] .ctabar{flex-wrap:nowrap}
+#body-root[data-state="review"] .ctabar .btn{white-space:nowrap}
 /* 9/28 留白（产品负责人：一屏不许留大片空白，也不许把内容挤出屏幕；不加区块、不改结构、不改文字、字阶不做大）
    1. 候选词每组标题行的「点第二次取消 / 可以多选」靠右（同卡片标题右侧提示的做法），只有两三个候选的组不再只占左半边；只动候选词组，别处的同类说明行不动。
    2. 基本信息（含姓名未填）：卡片余量从 space-evenly 改 space-around，首尾只留半份，不再在卡片底部堆一整条空带。
@@ -1180,6 +1184,7 @@ V.review=function(){
    (h.length?'还有 <b>'+h.length+' 处</b>可补充，生成后可逐条核对。':'按当前内容算，没有缺失提示。')+'</span></p></div>'+
   helperStrip('可以慢慢核对，准备好后再点生成。',SCREEN+'-rv')+
   ctabar(b({cls:'btn ghost',go:'input-strengths',tid:SCREEN+'-prev',label:svg('back',24)+'上一步'})+
+   b({cls:'btn ghost',go:'draft-exporting',tid:SCREEN+'-review-draft',label:svg('print',24)+'不用 AI，导出原样草稿'})+
    b({cls:'btn primary wide',go:'generating',tid:SCREEN+'-primary',label:svg('spark',26)+'让 AI 整理成新简历'}));
  return body;
 };

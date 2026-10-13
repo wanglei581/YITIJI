@@ -1,6 +1,6 @@
 {
   "frozenAt": "2026-09-29",
-  "updatedAt": "2026-10-12",
+  "updatedAt": "2026-10-13",
   "note": "青序流光 2.0 最终版。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md、STATUS.md 不在冻结范围。",
   "files": {
     "00-standby.html": "f3a0dd5cdd58c8a6e75647ed8ab50f2f2738937b091b73c06a382dd78e44a131",
@@ -27,7 +27,7 @@
     "22-resume-report.html": "140c8985c9cf49e6583ef4428b8ccd654c13b3a91ba9c538aa368c1aa539e2cc",
     "22-resume-report.proposal.html": "2aa72375c7dd3661dd9b2ff631af9ab87eb80395ec446ce4df5a4e95abdf192f",
     "23-resume-optimize.html": "aff800fc320546bf523601f924831898e82c87dfdc842d96bf82cbae7a6e548c",
-    "24-resume-generate.html": "454a2c860b467373c839011a3fed6c97b56f65fec6e33ed749e7bba9c956935c",
+    "24-resume-generate.html": "88bd2541f8ca4b19a63af5c7888797cbb7fadb73f4f786a6d811ea101ce98cab",
     "25-material-workshop.html": "767d53b4941262b200e0f2cd82b1de04d1de9ceca98aa968d1c116b604403159",
     "29-interview-training.html": "3eb5712a697704d92f94cdd12c62dec765e157026d53f6e5e35ea7e28b629bb1",
     "30-my-profile.html": "60acd2b887d8b7dfcca2667a3a3754c2912cce7b437d7f12b0b0462acbc5184c",

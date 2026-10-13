@@ -23,7 +23,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateAdvisor, ResumeGenerateAiRow, ResumeGenerateReviewBar } from './components/ResumeGenerateQxChrome'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { ResumeGenerateEntry } from './components/ResumeGenerateEntry'
@@ -294,12 +294,36 @@ export function ResumeGeneratePage() {
               ? '核对 · 准备提交一次'
               : `第 ${step + 1} 步 / 共 4 步 · ${STEPS[step].title}`
 
+  const reviewPrimary = (
+    <span className="qx-ai-declaration-slot">
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="primary"
+        data-testid="resume-generate-primary"
+        // 这里刻意**不看** aiOutage：能力级失败一旦把这颗钮禁掉，AI 恢复了也亮不回来
+        // （清掉 aiOutage 的只有 runGenerate，而它只能从这颗钮进）。和职业规划页同一做法：
+        // 不轮询、不自动重探，用户再按一次才再发一次真实请求，由结果重新决定。
+        disabled={generating}
+        onClick={() => void handleGenerate()}
+      >
+        <SparklesIcon className="h-5 w-5" aria-hidden="true" />
+        {generating ? '正在整理…' : '让 AI 整理成新简历'}
+      </button>
+      <AiDeclarationNote />
+    </span>
+  )
+  const showPlainDraft = reviewing && !aiTask.isFailed
   const ctabar = (
     <>
       {phase === 'entry' ? (
         <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-generate-primary" onClick={() => openStep(0)}>
           开始填写（第 1 步）
         </button>
+      ) : showPlainDraft ? (
+        <ResumeGenerateReviewBar generating={generating} exportingDraft={exportingDraft} onBack={() => setReviewing(false)} onExportDraft={() => void handleExportDraft()}>
+          {reviewPrimary}
+        </ResumeGenerateReviewBar>
       ) : (
         <button
           type="button"
@@ -308,32 +332,14 @@ export function ResumeGeneratePage() {
           disabled={generating}
           onClick={() => {
             if (reviewing) { setReviewing(false); return }
-            if (step === 0) navigate('/resume/source')
+            if (step === 0) navigate('/resume-service')
             else setStep((current) => current - 1)
           }}
         >
           {reviewing || step > 0 ? '上一步' : '返回简历服务'}
         </button>
       )}
-      {phase !== 'entry' && (reviewing ? (
-        <span className="qx-ai-declaration-slot">
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            data-testid="resume-generate-primary"
-            // 这里刻意**不看** aiOutage：能力级失败一旦把这颗钮禁掉，AI 恢复了也亮不回来
-            // （清掉 aiOutage 的只有 runGenerate，而它只能从这颗钮进）。和职业规划页同一做法：
-            // 不轮询、不自动重探，用户再按一次才再发一次真实请求，由结果重新决定。
-            disabled={generating}
-            onClick={() => void handleGenerate()}
-          >
-            <SparklesIcon className="h-5 w-5" aria-hidden="true" />
-            {generating ? '正在整理…' : '让 AI 整理成新简历'}
-          </button>
-          <AiDeclarationNote />
-        </span>
-      ) : step < 3 ? (
+      {phase !== 'entry' && !showPlainDraft && (reviewing ? reviewPrimary : step < 3 ? (
         <button
           type="button"
           className="qx-btn"
@@ -362,7 +368,7 @@ export function ResumeGeneratePage() {
         tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : reviewing ? 'ok' : 'unknown',
         label: statusLabel,
       }}
-      back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
+      back={{ label: '返回简历服务', onBack: () => navigate('/resume-service') }}
       navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={ctabar}
     >

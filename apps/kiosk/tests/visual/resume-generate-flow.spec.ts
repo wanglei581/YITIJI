@@ -1,5 +1,6 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '../fixtures/kiosk-test'
+import type { ApiRouter } from '../fixtures/api-router'
 import { registerW4Api } from '../fixtures/fusion-w4-api'
 
 const HELP_LINE = /需要帮助？/
@@ -176,6 +177,8 @@ test('AI 不可用时按原样导出仍能走到打印交接 @kiosk', async ({ p
   await fillRequired(page)
   await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
   await expect(page.getByText('AI 暂时不可用，你可以先导出并打印已填的内容')).toBeVisible()
+  await expect(page.getByRole('button', { name: '不用 AI，导出原样草稿', exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('resume-generate-draft-export')).toHaveCount(0)
   await expectNoStaff(page)
   const exported = page.waitForRequest((request) => (
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
@@ -416,4 +419,119 @@ test('四个没有结果的预览屏各自成文，且没有工作人员 @kiosk'
   await expect(page.getByText('AI 生成，仅供参考')).toHaveCount(0)
   await expectHelpLine(page)
   await expectNoStaff(page)
+})
+
+function allowResumeHub(api: ApiRouter) {
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
+  })
+}
+
+function allowDraftPrint(api: ApiRouter) {
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'draft-plain-1',
+      filename: '简历草稿_孙晓雯.pdf',
+      sizeBytes: 2048,
+      pageCount: 1,
+      signedUrl: '/e2e-fixtures/draft-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/draft-plain-1/content?expires=1&sig=test',
+    },
+  })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents: 100,
+      billablePages: 1,
+      billingPageSource: 'detected',
+      priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 1, amountCents: 100 }],
+    },
+  })
+}
+
+async function stageScaleOf(page: Page): Promise<number> {
+  const transform = await page.locator('.kiosk-stage').evaluate((element) => getComputedStyle(element).transform)
+  return transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
+}
+
+async function expectSameRow(page: Page, locators: Locator[]) {
+  const scale = await stageScaleOf(page)
+  const boxes = []
+  for (const locator of locators) {
+    const box = await locator.boundingBox()
+    expect(box).not.toBeNull()
+    boxes.push(box!)
+    expect(box!.height / scale).toBeGreaterThanOrEqual(56)
+  }
+  for (let i = 1; i < boxes.length; i += 1) {
+    const left = boxes[i - 1]
+    const right = boxes[i]
+    expect(left.y < right.y + right.height && right.y < left.y + left.height).toBe(true)
+  }
+}
+
+test('核对步可以不用 AI 导出原样草稿 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  allowDraftPrint(api)
+  await page.goto('/resume/generate')
+  await fillRequired(page)
+  const draft = page.getByTestId('resume-generate-draft-export')
+  const primary = page.getByRole('button', { name: '让 AI 整理成新简历' })
+  const back = page.locator('.qx-rg-review-bar').getByRole('button', { name: '上一步' })
+  await expect(draft).toHaveText('不用 AI，导出原样草稿')
+  await expect(primary).toBeVisible()
+  await expectSameRow(page, [back, draft, primary])
+  const lines = await draft.evaluate((element) => {
+    const text = [...element.childNodes].reverse().find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+    if (!text) return 0
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    return range.getClientRects().length
+  })
+  expect(lines).toBe(1)
+
+  const exported = page.waitForRequest((request) => (
+    request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
+  ))
+  await draft.click()
+  await expect(page.getByRole('dialog', { name: '确认使用简历 AI' })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/resume/generate')).toBe(0)
+  const posted = await exported
+  const body = posted.postDataJSON() as { draft?: boolean; basic?: { name?: string } }
+  expect(body.draft).toBe(true)
+  expect(body.basic?.name).toBe('孙晓雯')
+  await expect(page).toHaveURL(/\/print\//)
+})
+
+test('生成页返回简历服务去简历中心 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  allowResumeHub(api)
+  await page.goto('/resume/generate')
+  await page.locator('.qx-topbar-back').click({ force: true })
+  await expect(page).toHaveURL(/\/resume-service$/)
+  await expect(page.locator('[data-hub="resume"]')).toBeVisible()
+
+  await page.goto('/resume/generate')
+  await page.getByTestId('resume-generate-primary').click()
+  await page.locator('.qx-ctabar').getByRole('button', { name: '返回简历服务', exact: true }).click()
+  await expect(page).toHaveURL(/\/resume-service$/)
+  await expect(page.locator('[data-hub="resume"]')).toBeVisible()
+})
+
+test('生成预览返回简历服务去简历中心 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  allowResumeHub(api)
+  await page.goto('/resume/generate/preview')
+  await page.getByTestId('resume-generate-preview-exit-source').click()
+  await expect(page).toHaveURL(/\/resume-service$/)
+  await expect(page.locator('[data-hub="resume"]')).toBeVisible()
+
+  await page.goto('/resume/generate/preview?state=preview-no-result&capture=1')
+  await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
+  await page.getByTestId('resume-generate-preview-cta-source').click()
+  await expect(page).toHaveURL(/\/resume-service$/)
+  await expect(page.locator('[data-hub="resume"]')).toBeVisible()
 })

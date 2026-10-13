@@ -51,7 +51,7 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
   }
   if (props.view === 'session-lost' || props.view === 'illegal') {
     rows.push(
-      <ExitRow key="source" icon={I.file} title="返回简历服务" desc="上传、诊断、优化都在那一页" to="/resume/source" testid="resume-generate-preview-exit-source" onNavigate={go} />,
+      <ExitRow key="source" icon={I.file} title="返回简历服务" desc="上传、诊断、优化都在那一页" to="/resume-service" testid="resume-generate-preview-exit-source" onNavigate={go} />,
     )
   }
   if (props.view === 'preview-no-result') {
@@ -144,7 +144,7 @@ export function GeneratePreviewCta(props: {
   if (props.view === 'preview-no-result') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" data-route="/resume/source" data-testid="resume-generate-preview-cta-source" onClick={props.onSource}>返回简历服务</button>
+        <button type="button" className="qx-btn" data-variant="ghost" data-route="/resume-service" data-testid="resume-generate-preview-cta-source" onClick={props.onSource}>返回简历服务</button>
         <button type="button" className="qx-btn" data-variant="primary" data-route="/resume/generate" data-testid="resume-generate-preview-cta-refill" onClick={props.onRefill}>去填资料</button>
       </>
     )

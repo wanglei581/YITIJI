@@ -374,9 +374,13 @@ test('生成预览读回失败展示空态而不是伪造结果 @kiosk', async (
   await expect(page.getByText('青岛求职者')).toHaveCount(0)
   await expect(page.getByTestId('resume-generate-preview-cta-source')).toHaveText('返回简历服务')
   await expect(page.getByTestId('resume-generate-preview-cta-refill')).toHaveText('去填资料')
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
+  })
   await page.getByTestId('resume-generate-preview-cta-source').click()
-  await expect(page).toHaveURL(/\/resume\/source$/)
-  await expect(page.locator('[data-kiosk-screen="resume-source"]')).toBeVisible()
+  await expect(page).toHaveURL(/\/resume-service$/)
+  await expect(page.locator('[data-hub="resume"]')).toBeVisible()
 })
 
 const LONG_COMPANY = '在门店负责日常运营并完成季度复盘'

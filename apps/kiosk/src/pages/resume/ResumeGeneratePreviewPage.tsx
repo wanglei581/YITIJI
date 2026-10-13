@@ -314,7 +314,7 @@ export function ResumeGeneratePreviewPage() {
     formatName: FORMAT_NAME[exportFormat],
     canRetry,
     onHome: () => go('/'),
-    onSource: () => go('/resume/source'),
+    onSource: () => go('/resume-service'),
     onRefill: refill,
     onRetry: () => { setRestoreFailed(false); setRestoring(true); setRetryNonce((n) => n + 1) },
     onOpenExport: openExport,

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { PrinterIcon } from 'lucide-react'
 import { QxAiHelp, QxStepActions } from '../../../components/qingxu/QxAiHelp'
 
 /** 稿 24 底部那条问小青：预填本步问题，顾问页不自动发送。 */
@@ -31,5 +32,37 @@ export function ResumeGenerateAiRow() {
     <QxStepActions>
       <QxAiHelp label="让小青帮我整理经历 →" draft={GENERATE_AI_DRAFT} testId="resume-generate-ai-help" />
     </QxStepActions>
+  )
+}
+
+/**
+ * 核对步底栏。AI 失败、不可用、本人不同意那几态不渲染这一条，
+ * 那些态仍用原来的「导出并打印我填的内容（未经 AI 润色）」。
+ */
+export function ResumeGenerateReviewBar(props: {
+  generating: boolean
+  exportingDraft: boolean
+  onBack: () => void
+  onExportDraft: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="qx-rg-review-bar">
+      <button type="button" className="qx-btn" data-variant="ghost" disabled={props.generating} onClick={props.onBack}>
+        上一步
+      </button>
+      <button
+        type="button"
+        className="qx-btn"
+        data-variant="ghost"
+        data-testid="resume-generate-draft-export"
+        disabled={props.exportingDraft || props.generating}
+        onClick={props.onExportDraft}
+      >
+        <PrinterIcon className="h-5 w-5" aria-hidden="true" />
+        不用 AI，导出原样草稿
+      </button>
+      {props.children}
+    </div>
   )
 }
