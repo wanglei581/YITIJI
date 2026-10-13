@@ -18,7 +18,7 @@ import {
 } from '@ai-job-print/shared'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
-import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { PRINT_MEMBER_DAILY_QUOTA_COPY, PRINT_TERMINAL_DAILY_QUOTA_COPY, SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 
 /**
  * 认领失败的五种屏。
@@ -30,9 +30,11 @@ import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../ser
  *   后面排队的人也跟着用不了。出路写在各码自己的文案里。
  *   方案②起，次数用尽和已经出过一部分纸也归这里：再输同一个到机码也不会整单重打。
  *   出纸结果还没确认（PICKUP_RESUME_UNCONFIRMED）不在这里，过一会儿再输可能可以。
+ * - quota：当天的打印量用完（这台机器的或本人的）。今天在这台机器上再输多少次都一样，按钮和 closed 同一组；
+ *   但码明天还能用，所以不进 closed 屏（那一屏写的是「这个到机码不能再用来取件」）。
  * - other：其余明确业务拒绝（本机不能打印、隐私检查未完成、限流、并发冲突等），稍后可能恢复。
  */
-export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'printer' | 'other'
+export type PickupFailure = 'invalid' | 'locked' | 'network' | 'closed' | 'quota' | 'printer' | 'other'
 
 const INVALID_CODES = new Set([
   'PICKUP_CODE_INVALID',
@@ -56,7 +58,20 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
   'FILE_CONTENT_CHANGED',
   'PICKUP_RESUME_LIMIT_REACHED',
   'PICKUP_RESUME_PARTIAL_OUTPUT',
+  // 同码接着打被拒：文件已清理、这台机器的打印程序太旧。再输同一个码永远不会成。
+  'PRINT_RETRY_FILE_UNAVAILABLE',
+  'PRINT_RETRY_AGENT_VERSION',
 ])
+
+/** 当天的量用完：后端回的是 429，要按码认，不能按状态码当成「人多限流」。 */
+const DAILY_QUOTA_CODES = new Set(['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED'])
+
+/**
+ * 不存在、已过期、不属于这台机器三种情况共用这一句，不分开说（防试探）。
+ * 2026-10-12 合规定字加后半句：真过期的人照着「核对后重新输入」再输多少次都一样，要给出回手机的路。
+ */
+const PICKUP_INVALID_MESSAGE = '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
+const PICKUP_QUOTA_NEXT_STEP = '明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。'
 
 /**
  * 锁定时一行版的说法（hid 指引屏只有一个错误位）。共享码表不登记 PICKUP_CLAIM_LOCKED，
@@ -83,14 +98,17 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
 export const PICKUP_CLAIM_MESSAGES = (contact = peekSupportContact()): Readonly<Record<string, string>> => ({
   PRINT_TERMINAL_QUEUE_HALTED: `你的到机码没有作废，请稍后再来这台终端输码。${machineUnusableLine(contact)}`,
   PRINTER_UNAVAILABLE: `你的到机码没有作废，请稍后再来这台终端输码。${machineCannotPrintLine(contact, { orderKept: true })}`,
-  PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
-  PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_CODE_INVALID: PICKUP_INVALID_MESSAGE,
+  PICKUP_CODE_EXPIRED: PICKUP_INVALID_MESSAGE,
   // 2026-10-06 方案②：同机且任务失败会走续打；别的机器回 PICKUP_CODE_INVALID。
   // 这个码只在同机、任务排队/打印中/已完成且过了 10 分钟回放时出现，原地重输仍是同一个错，
   // 所以不写「再输一次试试」，也不找人；没拿到纸给问小青或隐私政策联系方式（标准句接上服务电话后再换）。
   PICKUP_CODE_ALREADY_USED: '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。',
-  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了',
-  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认，暂时不能接着打，请稍后再试',
+  // 后端只回「不能再打了」；这里补上下一步。被拒时不知道这单付没付钱，不写「免费」。
+  PICKUP_RESUME_LIMIT_REACHED: '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单',
+  // 只对实付 0 元、出纸结果未确认且未满 5 分钟的单出现（付费单回的是原路退款那句）。
+  // 后端回「请 5 分钟后再试」；这里把下一步说全：满 5 分钟后同机同码可以接着打。
+  PICKUP_RESUME_UNCONFIRMED: '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打',
   PICKUP_RESUME_PARTIAL_OUTPUT: '这单已经出了一部分纸，不能整单重打',
   PICKUP_CODE_UNAVAILABLE: '这个到机码已经不能使用。请在手机小程序「我的 → 打印订单」查看这笔订单，需要的话重新下单',
   ORDER_REFUNDED: '本单已退款，不再出纸。款项按原路退回，可在小程序「我的 → 打印订单」查看退款进度',
@@ -98,6 +116,13 @@ export const PICKUP_CLAIM_MESSAGES = (contact = peekSupportContact()): Readonly<
   PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
+  // 以下四个：文件失效、程序太旧只在同码接着打时出现（重打资格）；两种当天的量在第一次认领、放行和同码接着打时都会出现。
+  // 2026-10-12 合规定字。
+  PRINT_RETRY_FILE_UNAVAILABLE: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
+  // 后端那句写的是版本号和升级，是给我们自己看的，不上屏。
+  PRINT_RETRY_AGENT_VERSION: '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。',
+  PRINT_TERMINAL_DAILY_QUOTA_REACHED: `${PRINT_TERMINAL_DAILY_QUOTA_COPY}${PICKUP_QUOTA_NEXT_STEP}`,
+  PRINT_MEMBER_DAILY_QUOTA_REACHED: `${PRINT_MEMBER_DAILY_QUOTA_COPY}${PICKUP_QUOTA_NEXT_STEP}`,
   PRINT_PII_SCAN_REQUIRED: `这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次。${helpNeededLine(contact)}`,
   PII_SCAN_STALE: '这份文件在隐私检查后又改过，暂时不能打印。请在手机上重新检查后再来取件',
   PRINT_PII_MANUAL_CONFIRM_REQUIRED: '这份文件的隐私检查没有完整覆盖，需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件',
@@ -110,7 +135,7 @@ export const PICKUP_CLAIM_MESSAGES = (contact = peekSupportContact()): Readonly<
   PRINT_TERMINAL_NOT_FOUND: TERMINAL_NOT_READY_MESSAGE(contact),
   TERMINAL_ID_REQUIRED: TERMINAL_NOT_READY_MESSAGE(contact),
   ORDER_NOT_FOUND: '没有找到这笔订单，请核对到机码后重新输入',
-  PICKUP_TERMINAL_MISMATCH: '到机码无效或已过期，请核对后重新输入',
+  PICKUP_TERMINAL_MISMATCH: PICKUP_INVALID_MESSAGE,
   PICKUP_NOT_CLAIMED: ORDER_BUSY_MESSAGE(contact),
   ORDER_NOT_PAID: ORDER_BUSY_MESSAGE(contact),
   ORDER_RELEASE_INVALID_STATE: ORDER_BUSY_MESSAGE(contact),
@@ -123,6 +148,7 @@ export function classifyClaimFailure(error: unknown): PickupFailure {
   if (code && INVALID_CODES.has(code)) return 'invalid'
   if (code === 'PICKUP_CLAIM_LOCKED') return 'locked'
   if (code && PICKUP_CLOSED_CODES.has(code)) return 'closed'
+  if (code && DAILY_QUOTA_CODES.has(code)) return 'quota'
   if (code && NETWORK_CODES.has(code)) return 'network'
   // 浏览器 fetch 失败是 TypeError；httpAdapter 把「连不上」记为 status 0。
   if (error instanceof TypeError) return 'network'

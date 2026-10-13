@@ -166,11 +166,22 @@ test('0 元实付写免费试运营，其余仍标未记录且不推算', () => 
 // 缺纸说明改走标准句 2，不再写已付金额（金额只留在 outOfPaperPill）。
 test('0 元失败页不提已付金额，收费单保留订单事实', () => {
   assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
-  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
-  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
+  // 2026-10-10：不再写「处理好后可以继续打印」。本页拿不到剩余次数，第 3 次失败时那句是错的。
+  assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在')
+  assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在')
   assert.equal(progress.failureStaffDoing('paid'), '订单和支付记录都在。需要帮助？查看《隐私政策》里的联系方式')
-  assert.equal(progress.failureStaffDoing('free'), '你的订单还在，处理好后可以继续打印。需要帮助？查看《隐私政策》里的联系方式')
-  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在，处理好后可以继续打印。需要帮助？查看《隐私政策》里的联系方式')
+  assert.equal(progress.failureStaffDoing('free'), '你的订单还在。需要帮助？查看《隐私政策》里的联系方式')
+  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在。需要帮助？查看《隐私政策》里的联系方式')
+  // 同码接着打只对「到机码单且 0 元」说；句里带上限和用完后的下一步，不叫人找谁。
+  assert.equal(progress.sameCodeResumeEligible(true, 'free'), true)
+  assert.equal(progress.sameCodeResumeEligible(true, 'paid'), false)
+  assert.equal(progress.sameCodeResumeEligible(true, 'unknown'), false)
+  assert.equal(progress.sameCodeResumeEligible(false, 'free'), false)
+  assert.equal(progress.sameCodeResumeEligible(undefined, 'free'), false)
+  assert.equal(progress.SAME_CODE_RESUME_LINE, '没打完？等这台机器能打了，回来再输一次同一个到机码就能接着打（整份重打），每单最多 2 次；2 次用完后，请在手机上重新下单。')
+  assert.equal(progress.UNCONFIRMED_SAME_CODE_LINE, '没有的话，过 5 分钟回到这台机器，再输一次同一个到机码，可以整份重打（每单最多 2 次）。')
+  assert.doesNotMatch(progress.SAME_CODE_RESUME_LINE + progress.UNCONFIRMED_SAME_CODE_LINE, /工作人员|收到提醒|免费|退款/)
+  assert.equal(progress.UNCONFIRMED_ONSITE_FREE_LINE, '没有的话，请回到打印重新选文件再打一次。')
   assert.doesNotMatch(progress.failureStaffDoing('free'), /工作人员|退款|实付|已付/)
   assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /这台机器暂时打不了/)
   assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额|退款/)

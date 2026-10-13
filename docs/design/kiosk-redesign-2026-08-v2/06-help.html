@@ -11,17 +11,16 @@
     **没有帮助内容接口**，也没有工单、回访或故障上报通道。条目内的入口走真实 React 路由
     （/login、/print/upload、/scan/start、/jobs、/renshi?tab=policy、/legal/privacy、/me/documents 等）。
   fallback: 分类参数不在受控清单 → no-result；页面内容没渲染出来 → unavailable，
-    只给「重新打开帮助 / 返回首页 / 找现场工作人员」三条真实出路。
+    只给「重新打开帮助 / 返回首页 / 需要帮助」三条真实出路。
   诚实边界（本页唯一正确说法）：
-    本页不能替用户联系工作人员，也不会自动上报故障；点了任何按钮都不代表已经有人受理。
-    服务台位置与值守时间以现场公示为准，静态页不写死窗口号和时段。
-    服务电话号码贴在机身，屏上不显示（防止被替换成假号码）。
+    本页不能替用户拨出电话，点了任何按钮都不代表已经有人受理。
+    服务电话号码与服务时间从 PublicSupportContact 读，不写死；本稿按用例夹具号码展开。
   ai-mode: AI-CONTEXT（COVERAGE-MATRIX 031）
   ai-input: 用户自己描述的问题；本页不预读简历、订单、支付或设备状态
   ai-consent: 仅在用户主动点「问 AI 顾问」后进入 /assistant，本页不预传上下文
   ai-output: 操作建议与页面指引，可忽略、可追问；不判定设备、订单、支付、登录或办理结果
-  ai-failure: AI 顾问不可用时，六个分类、故障自助三步、现场人工与服务电话全部照常可用
-  ai-fallback: 分类卡 + 自助三步 + 现场人工 + 机身电话，全程不依赖 AI
+  ai-failure: AI 顾问不可用时，六个分类、故障自助三步、服务电话全部照常可用
+  ai-fallback: 分类卡 + 自助三步 + 服务电话，全程不依赖 AI
   ai-persistence: 本页不产生 AI 记录；记录归 /assistant 自身契约
   原型演示控制: ?state= 切展示状态；?topic= 选分类；?capture=1 冻结时钟；?flat=1 关非必要动效；?debug=1 显演示面板。
 -->
@@ -143,7 +142,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 </style>
 <!--
 青序流光 2.0 · 06 帮助（分类首页；topic=account 的问答仍在）
-9/28 留白：各态的区块在竖向均匀拉开（放不下时照旧顶端对齐）；「没有这个分类」的六张分类卡与找人两卡按原稿松度排；「帮助没显示出来」的三条改成三行（左步骤名、右做法），另外两组卡片按原稿内边距与行距。文字与区块一个没加没减。
+9/28 留白：各态的区块在竖向均匀拉开（放不下时照旧顶端对齐）；「没有这个分类」的六张分类卡与「遇到问题怎么办」两卡按原稿松度排；「帮助没显示出来」的三条改成三行（左步骤名、右做法），另外两组卡片按原稿内边距与行距。文字与区块一个没加没减。
 规则 1：分类卡落到 y≥500。头图里用本页已有的三步标题填高，不留空档。
 规则 2：页标题 38，问题 28，答案 23，辅助 21，主按钮 27，一行写完。
 规则 4：眉题去掉英文 HELP。
@@ -221,7 +220,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 
   <div class="truth" data-disclaimer="true" data-testid="help-truth">
     <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态，机器能不能用请看设备状态页。</div>
-    <div><b>求助怎么算数</b>本页不能替你联系工作人员，也不会自动上报故障；要人处理请直接找现场工作人员，或拨机身上的服务电话。</div>
+    <div><b>求助怎么算数</b>机器故障我们已经收到提醒。网络断开时，我们会收到提醒并远程处理。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
   </div>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -320,13 +319,13 @@ function selfHelp(no){
   '</div></section>';
 }
 function humanDesk(no){
- return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">自己解决不了，找人</span><span class="hint">这两条才真的有人处理</span></div>'+
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">遇到问题怎么办</span><span class="hint">机器故障我们会收到提醒</span></div>'+
   '<div class="grid2">'+
-  '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('desk',26)+'</span>找现场工作人员</h3>'+
-  '<p>机器故障、退费、开票都由现场处理。<b>服务台位置和值守时间以现场公示为准</b>，屏幕上不写死。</p>'+
-  '<p class="warnline">本页不会替你联系工作人员，也不会自动上报；点任何按钮都不等于已经有人受理。</p></div>'+
-  '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('phone',26)+'</span>拨机身上的服务电话</h3>'+
-  '<p>号码<b>贴在机身上</b>，屏幕上不显示 —— 屏上的号码可能被人替换，机身上的不会。</p>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('phone',26)+'</span>需要帮助</h3>'+
+  '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒，会尽快处理。</p>'+
+  '<p class="warnline">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>网络断开</h3>'+
+  '<p>网络断开时，我们会收到提醒并远程处理。</p>'+
   '<p>打之前先记下屏幕上的<b>订单号或到机码</b>，对方靠这个才查得到你这一单。</p></div>'+
   '</div></section>';
 }
@@ -373,7 +372,7 @@ V['topic']=function(t){
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">直接去办</span><span class="hint">看完就能动手</span></div>'+
     '<div class="linkrow">'+lk+'</div></section>'+
    '<section class="sec"><div class="state" data-kind="warn"><div class="state-h">'+svg('warn','28')+'这里没答上你的问题</div>'+
-    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。<b>要人处理的事（退费、开票、机器故障）只能找现场工作人员</b>，本页不会替你转达。</div></div></section>'+
+    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。机器故障我们已经收到提醒。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你转达。</div></div></section>'+
    selfHelp('03'),
   cta:'<a class="btn ghost" href="06-help.html" data-route="/help">返回分类</a>'+
    '<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
@@ -404,12 +403,12 @@ V['unavailable']=function(){
   body:'<section class="sec"><div class="state" data-kind="warn" data-testid="help-fallback">'+
     '<div class="state-h">'+svg('warn','28')+'帮助内容没显示出来</div>'+
     '<div class="state-p">帮助内容是<b>装在这台机器上的</b>，不用再去取一份新的。这里空白通常说明这一页没打开完整 —— 不是你操作错了，也不代表机器整体坏了。</div>'+
-    '<div class="state-p">本页<b>不会自动上报这次异常</b>；要人排查请按下面第三条找现场工作人员。</div></div></section>'+
+    '<div class="state-p">本页<b>不会自动上报这次异常</b>；要人排查请按下面第三条。</div></div></section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">按顺序试这三条</span><span class="hint">前两条自己就能做</span></div>'+
     '<div class="grid3">'+
     '<div class="card"><h3><span class="step-no serif">1</span>重新打开帮助</h3><p>点下面的<b>重新打开帮助</b>，页面会重新加载一次内容。</p></div>'+
     '<div class="card"><h3><span class="step-no serif">2</span>回首页再进来</h3><p>回首页重新进入要办的服务；<b>正在办的打印任务不会因此取消</b>。</p></div>'+
-    '<div class="card"><h3><span class="step-no serif">3</span>找现场工作人员</h3><p>连着两次都打不开，就直接找人；<b>屏幕这边不会替你报修</b>。</p></div>'+
+    '<div class="card"><h3><span class="step-no serif">3</span>需要帮助</h3><p>连着两次都打不开。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒。</p></div>'+
     '</div></section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">这不影响你办事</span><span class="hint">帮助页只是补充</span></div>'+
     '<div class="grid2">'+

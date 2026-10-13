@@ -271,7 +271,7 @@ export function RenshiPage() {
             ? '公告与政策一起读取，读回来之前不显示任何条目。'
             : notices.length === 0
               ? '当前一条公告都没有；这是内容进度，不是读取失败。'
-              : '公告由合作机构发布、管理员审核后展示，正文与来源链接原样呈现。',
+              : '公告由发布机构自己审核并发布，正文与来源链接原样呈现。',
         status: pill,
         source: policyState === 'ready' ? noticeSourceLine : null,
       }

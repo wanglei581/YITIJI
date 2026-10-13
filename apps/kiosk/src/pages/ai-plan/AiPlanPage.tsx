@@ -337,7 +337,7 @@ export function AiPlanPage() {
             </button>
           ) : null}
           {derivedState === 'print-unavailable' ? (
-            <p className="aa-cta-note">打印能力读不到，按钮先不放出来 —— 不做点了没反应的按钮。</p>
+            <p className="aa-cta-note">打印能力读不到，打印按钮先不放出来。等打印恢复后回到这里再打。</p>
           ) : null}
           {printError ? <p className="aa-cta-note" role="status">{printError}</p> : null}
         </>

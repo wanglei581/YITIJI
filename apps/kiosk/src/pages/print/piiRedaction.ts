@@ -391,6 +391,10 @@ export function materialRedactionBadge(
     return { text: '本机未能在这份文件上定位遮挡 · 打印使用原件', tone: 'warning' }
   }
   if (summary.claim === 'nothing_to_redact') {
+    // 两种子情况不能合成一句（同 piiRedactionCopy）：检出了但本人全部保留，不是「没发现」。
+    if (Number.isSafeInteger(summary.keptCount) && summary.keptCount > 0) {
+      return { text: `发现 ${summary.keptCount} 处个人信息，你选择了全部保留 · 打印使用原件，纸上是完整信息`, tone: 'danger' }
+    }
     return { text: '没发现需要遮挡的内容 · 打印使用原件', tone: 'warning' }
   }
   if (!summary.claim || !summary.redactedFileId) {

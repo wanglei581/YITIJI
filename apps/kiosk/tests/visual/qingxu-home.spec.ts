@@ -3,6 +3,7 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { loginThroughVisibleUi, registerMemberLogin } from './fixtures/kiosk-p1-evidence-capture-api'
 
 function homeFair(): Record<string, unknown> {
   const startTime = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
@@ -236,6 +237,54 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await primary.click()
   await expect(page).toHaveURL(/\/assistant$/)
   expect(runtimeErrors).toEqual([])
+})
+
+test('首页会员续办条不显示含真名的打印文件名 @w1-kiosk', async ({ page, api }) => {
+  registerHomeApi(api, [])
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/print-orders', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{
+          id: 'qx-home-print-privacy',
+          orderNo: 'ORD-20261010-0001',
+          fileName: 'AI简历_韩建军.pdf',
+          status: 'printing',
+          createdAt: '2026-10-10T00:00:00.000Z',
+          completedAt: null,
+          copies: 1,
+          colorMode: 'bw',
+          duplex: 'simplex',
+          paperSize: 'A4',
+          pageRange: 'all',
+          amountCents: 0,
+          payStatus: 'paid',
+          paymentSource: 'free',
+          billablePages: 1,
+        }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/resumes', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  // 登录后的首页还会读「我的收藏」；不登记回包，夹具会按「有未处理的接口请求」判失败。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+
+  await loginThroughVisibleUi(page, '/')
+  await expect(page.getByTestId('home-identity')).toHaveAttribute('data-state', 'member')
+  const context = page.getByTestId('home-context-region')
+  await expect(context.getByText('打印任务进行中', { exact: true })).toBeVisible()
+  await expect(context.getByText('打印文件 · 打印中', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText('韩建军')
 })
 
 test('home ready state defers capability claims to entry without hiding the real device pill @w1-kiosk', async ({ page, api }) => {

@@ -1671,7 +1671,7 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   // 稿 05 的 reply-error 标题；断网时说的是断网，不笼统说「AI 暂不可用」
   // （「AI 服务暂不可用」留给服务器只回了工程串的情况，见下面的用户话用例）。
   await expect(page.getByText('请求失败，没有回答', { exact: true })).toBeVisible()
-  await expect(page.getByText('网络连接失败，请检查网络后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('网络连接失败，请稍后重试', { exact: true })).toBeVisible()
 
   // 失败停在 failed，且降级是 ① manual —— 功能不消失，四条不依赖 AI 的真实入口在。
   await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
@@ -2434,7 +2434,9 @@ test('advisor artifact print-unavailable state has no print button @w3-kiosk', a
   await expect(page.getByText('带走这一页')).toBeVisible()
   await expect(page.getByTestId('advisor-artifact-cta-print')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '打印带走' })).toHaveCount(0)
-  await expect(page.getByText('打印能力读不到，按钮先不放出来', { exact: false })).toBeVisible()
+  // 回话单第 2 条（10/12 产品负责人「稿上的字可以改」）：底栏这句改成和带走区同一句话，旧的「做页面的人的话」不再出现。
+  await expect(page.locator('.aa-cta-note')).toHaveText('打印能力读不到，打印按钮先不放出来。等打印恢复后回到这里再打。')
+  await expect(page.getByText('不做点了没反应的按钮', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '再问一轮' })).toBeVisible()
   await assertTapTargetPointerHit(page.getByTestId('advisor-artifact-cta-back'))
   await page.getByTestId('advisor-artifact-cta-back').click()

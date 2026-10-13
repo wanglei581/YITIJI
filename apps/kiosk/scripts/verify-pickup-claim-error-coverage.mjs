@@ -134,6 +134,7 @@ const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
   '../../services/api/userErrorMessage': userErrorUrl,
 })
 const model = await import(modelUrl)
+const userError = await import(userErrorUrl)
 const { ApiHttpError } = await import(httpAdapterStub)
 
 const table = model.PICKUP_CLAIM_MESSAGES()
@@ -290,11 +291,11 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
 }
 
 // 方案②：三个续打错误码的句子与分类。不放进 CLOSED_REQUIRED——
-// 次数用尽和已经出过一部分纸的句子没有「手机 / 工作人员 / 小程序」；
-// 出纸未确认的句子含「请稍后再试」，按可恢复处理。
+// 已经出过一部分纸的句子没有「手机 / 工作人员 / 小程序」；次数用尽的句子在后端那句后面补了下一步（手机上重新下单）；
+// 出纸未确认的句子写明「5 分钟后在这台机器上再输一次同一个到机码」，按可恢复处理。
 {
-  const limit = '这单已经接着打过 2 次，不能再打了'
-  const unconfirmed = '这单的出纸结果还没确认，暂时不能接着打，请稍后再试'
+  const limit = '这单已经接着打过 2 次，不能再打了。还要打，请在手机上重新下单'
+  const unconfirmed = '这单的出纸结果还没确认。5 分钟后在这台机器上再输一次同一个到机码，就能接着打'
   const partial = '这单已经出了一部分纸，不能整单重打'
   const already = '这个到机码已经用过，这单已经交给打印机，不能再次取件。要再打一份，请重新下单；没拿到纸，可以问小青，或查看《隐私政策》里的联系方式。'
   const resume = '没打完？回到出纸失败的那台机器上，再输一次同一个到机码就能接着打，每单最多 2 次。'
@@ -312,6 +313,49 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
   else pass('PICKUP_CODE_ALREADY_USED：出路是重新下单或问小青，不找现场工作人员、不叫原地重输')
   if (model.PICKUP_SAME_CODE_RESUME_NOTE !== resume) fail('到机码页续打说明丢了或改了次数以外的承诺')
   else pass('到机码页续打说明只承诺每单最多 2 次')
+}
+
+// 2026-10-12：同码接着打被拒的四种 + 到机码过期。这四个码不在 pickup-order.service.ts 里（在重打资格与当天额度里），
+// 上面按文件抽码抽不到，所以逐码钉：句子是合规定的那句、分类不许落回「清除，重新输入」那一组。
+{
+  const fileGone = '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单'
+  const tooOld = '这台机器暂时不能用同一个到机码接着打。还要打，请在手机上重新下单。'
+  const next = '明天可以再来输这个到机码；到机码过期了的话，请在手机上重新下单。'
+  const terminalQuota = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+  const memberQuota = '你今天剩下的打印量不够打这一单，明天恢复。'
+  const invalid = '到机码无效或已过期，请核对后重新输入。核对后还是不行的，请在手机上查看这笔订单，需要的话重新下单。'
+  for (const [code, status, sentence, kind] of [
+    ['PRINT_RETRY_FILE_UNAVAILABLE', 409, fileGone, 'closed'],
+    ['PRINT_RETRY_AGENT_VERSION', 409, tooOld, 'closed'],
+    ['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 429, terminalQuota + next, 'quota'],
+    ['PRINT_MEMBER_DAILY_QUOTA_REACHED', 429, memberQuota + next, 'quota'],
+  ]) {
+    const err = new ApiHttpError(code, '后端原话：免费 0.4.13', status)
+    const said = model.pickupClaimMessage(err)
+    const got = model.classifyClaimFailure(err)
+    if (said !== sentence) fail(`${code} 屏上的话不是合规定的那句（实际「${said}」）`)
+    else if (got !== kind) fail(`${code} 应分类为 ${kind}，实际 ${got}`)
+    else if (/免费|人较多|请重试|版本|升级/.test(said)) fail(`${code} 的话里有不该上屏的字：「${said}」`)
+    else pass(`${code}：${kind}，是合规定的那句`)
+  }
+  // 额度用完的码明天还能用：不许进「这个到机码不能再用来取件」那一屏，但按钮要和 closed 同一组。
+  if (model.failureScreen('quota') !== 'failed') fail('quota 不该映射到 closed 屏（码明天还能用）')
+  {
+    const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
+    if (!/failure === 'closed' \|\| failure === 'quota'/.test(read(rel))) fail(`${rel}：quota 没有和 closed 共用「回到首页 / 输另一个到机码」那组按钮`)
+    else pass('quota 与 closed 共用「回到首页」那组按钮，屏头不同')
+  }
+  // 全站共用码表：现场建单撞额度时不许落到「429 一律说人较多」。
+  for (const [code, sentence] of [['PRINT_TERMINAL_DAILY_QUOTA_REACHED', terminalQuota], ['PRINT_MEMBER_DAILY_QUOTA_REACHED', memberQuota]]) {
+    const shared = userError.userMessageOf(new ApiHttpError(code, '后端原话', 429), '兜底')
+    if (shared !== sentence) fail(`共用码表 ${code} 应是「${sentence}」，实际「${shared}」`)
+    else pass(`共用码表 ${code}：照实说量用完、明天恢复`)
+  }
+  // 无效、过期、不属于这台机器三种仍是同一句（防试探），句尾有回手机的路。
+  for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {
+    if (table[code] !== invalid) fail(`${code} 不是那一句共用的话（实际「${table[code]}」）`)
+  }
+  pass('无效 / 过期 / 不属于这台机器：同一句，句尾给回手机的路')
 }
 
 // 方案②口径：一体机源码的字符串字面量与 JSX 文本不得再出现旧说法。

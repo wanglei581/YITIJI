@@ -84,7 +84,7 @@ async function call<T>(
       keepalive: options.keepalive,
     })
   } catch {
-    throw new MemberApiError('NETWORK_ERROR', '网络连接失败，请检查网络后重试', 0)
+    throw new MemberApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
   }
 
   if (!res.ok) {

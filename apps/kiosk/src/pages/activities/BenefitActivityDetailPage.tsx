@@ -33,7 +33,7 @@ type DetailUi = 'loading' | 'error' | 'claim-pending' | 'claim-error' | 'claim-s
 function claimErrorText(error: unknown): string {
   const status = error instanceof BenefitActivitiesApiError ? error.status : undefined
   if (status === 0) {
-    const mapped = userMessageOf(error, '网络连接失败，请检查网络后重试')
+    const mapped = userMessageOf(error, '网络连接失败，请稍后重试')
     return `${mapped} 这一页没有收到成功结果。没有在这里显示已领取。如果网络中断，请稍后打开「我的权益」核对。`
   }
   return userMessageOf(error, '这次没有领取成功。没有记入你的权益，也没有扣减名额。')

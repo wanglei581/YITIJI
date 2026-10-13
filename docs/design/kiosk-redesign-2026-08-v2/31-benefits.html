@@ -29,9 +29,9 @@
   ai-mode: AI-EXPLAIN（覆盖矩阵 024 / 032 / 033）
   ai-input: 仅本页已返回的活动规则、权益状态与失败原因
   ai-consent: 页内不放 AI 生成控件；用户主动去底栏「AI 顾问」才进入 AI
-  ai-output: 只把规则和状态解释成人话，并给出人工处理建议；不改变资格、领取与核销结果
+  ai-output: 只把规则和状态解释成人话，并告诉你该找谁处理；不改变资格、领取与核销结果
   ai-failure: 不适用（本页不发起 AI 调用）
-  ai-fallback: 规则原文常驻可读，看不懂可找现场工作人员
+  ai-fallback: 规则原文常驻可读，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）
   ai-persistence: 本页不生成 AI 记录
   原型演示控制：状态只通过 ?screen= 与 ?state= 切换（?debug=1 显示演示面板）
   验收范围：静态原型表现；不证明 React 接线、API 可用、真实活动数据、领取或核销
@@ -449,7 +449,7 @@ var VIEWS={
     return tabs('benefits')
       +'<div class="scroll center">'+stateBlock('error','alert','权益台账这次没取到',
         '请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或失效，你会白跑一趟。',
-        '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
+        '<a class="btn ghost press" href="06-help.html" data-route="/help">帮助中心</a>'
         +askBtn('benefits')
         +'<a class="btn primary press" href="31-benefits.html?state=loading" data-route="/me/benefits" data-testid="benefits-primary">重新加载</a>')
       +ledgerRules()+serviceAlts('benefits')+'</div>';
@@ -490,7 +490,7 @@ var VIEWS={
     return tabs('activities')
       +'<div class="scroll center">'+stateBlock('error','alert','活动列表这次没取到',
         '请求失败。本机<b>不拿旧的活动顶替</b>，避免你按已经结束的规则白跑一趟。',
-        '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员</a>'
+        '<a class="btn ghost press" href="06-help.html" data-route="/help">遇到问题</a>'
         +askBtn('activities')
         +'<a class="btn primary press" href="31-benefits.html?screen=activities&state=loading" data-route="/activities" data-testid="activities-primary">重新加载</a>',
         'activities')
@@ -524,7 +524,7 @@ var VIEWS={
   'activity:claim-error':function(){
     return '<div class="scroll center">'+stateBlock('error','alert','这次没有领取成功',
       '实际结果是失败，可能是不符合条件、已经领过，或者活动状态刚刚变了。<b>失败就是失败</b>，本机不会先显示成功再默默回滚。',
-      '<a class="btn ghost press" href="06-help.html" data-route="/help">找工作人员核对</a>'
+      '<a class="btn ghost press" href="06-help.html" data-route="/help">遇到问题</a>'
       +askBtn('activity')
       +'<a class="btn primary press" href="31-benefits.html?screen=activity" data-route="/activities/:id" data-testid="activity-primary">看清条件再试一次</a>','activity')
       +activityDetail(['领取未成功','bad'])
