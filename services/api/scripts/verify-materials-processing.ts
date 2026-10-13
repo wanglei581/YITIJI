@@ -78,6 +78,8 @@ async function expectBadRequest(label: string, fn: () => Promise<unknown>) {
 }
 
 async function main() {
+  const { holdOwnerlessMaterialFileUrl } = await import('./support/hold-ownerless-material-file-url')
+  holdOwnerlessMaterialFileUrl()
   console.log('\n=== Phase A-2 materials document-processing verification ===')
   const prisma = new PrismaService()
   await prisma.onModuleInit()

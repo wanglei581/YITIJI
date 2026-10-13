@@ -20,7 +20,7 @@ export interface InterviewSetupDraft {
   experience: InterviewExperience | ''
   difficulty: InterviewDifficulty
   duration: InterviewDuration
-  resumeFile: { fileId: string; name: string } | null
+  resumeFile: { fileId: string; name: string; fileUrl?: string } | null
   pendingSession: { sessionId: string; accessToken?: string } | null
   aiOutage: string | null
   startFailed: boolean
@@ -70,7 +70,13 @@ function parseSetupDraft(raw: unknown): InterviewSetupDraft | undefined {
   const resumeFile = raw.resumeFile === null
     ? null
     : isRecord(raw.resumeFile) && typeof raw.resumeFile.fileId === 'string' && typeof raw.resumeFile.name === 'string'
-      ? { fileId: raw.resumeFile.fileId, name: raw.resumeFile.name }
+      ? {
+          fileId: raw.resumeFile.fileId,
+          name: raw.resumeFile.name,
+          ...(typeof raw.resumeFile.fileUrl === 'string' && raw.resumeFile.fileUrl
+            ? { fileUrl: raw.resumeFile.fileUrl }
+            : {}),
+        }
       : null
   const pendingSession = raw.pendingSession === null || raw.pendingSession === undefined
     ? null

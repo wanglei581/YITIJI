@@ -35,6 +35,7 @@ import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { REDIS_CLIENT, RedisService } from '../src/common/redis/redis.service'
 import { FilesService } from '../src/files/files.service'
+import { signFileUrl } from '../src/files/signing'
 import { CURRENT_RESUME_AI_CONSENT_VERSION, MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaModule } from '../src/prisma/prisma.module'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -682,6 +683,7 @@ async function verifyKeyedFilePreflight(): Promise<void> {
           fileName: input.fileName ?? 'resume.pdf',
           fileFormat: 'pdf',
           source: 'upload',
+          fileAccessUrl: signFileUrl(input.fileId).url,
         }),
       })
       return { status: res.status, body: await res.json() as PreflightHttpBody }
