@@ -31,9 +31,20 @@ export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 // 3.14 本机构官方渠道也走这里的单条紧急下架（targetType='official_channel'）。
 // 官方渠道不是招聘内容托管：托管开关开或关都能下架。
 
+export interface RecruitmentOperatorSelfReportView {
+  name: string
+  licenseNumber: string
+}
+
+export interface RecruitmentHostingFlag {
+  enabled: boolean
+  /** 仅私有化且托管开、两项都填了时有值。我方云为 null。 */
+  operatorSelfReport: RecruitmentOperatorSelfReportView | null
+}
+
 export interface RecruitmentEmergencyServiceInterface {
   /** 部署级托管开关。true = 私有化部署（b）打开；false = 我们云上默认关闭。 */
-  getHostingEnabled(): Promise<boolean>
+  getHostingEnabled(): Promise<RecruitmentHostingFlag>
   takedown(input: RecruitmentEmergencyTakedownInput): Promise<RecruitmentEmergencyTakedownResult>
   circuitBreak(input: RecruitmentCircuitBreakInput): Promise<RecruitmentCircuitBreakResult>
 }
@@ -79,6 +90,16 @@ function unwrap<T extends object>(body: unknown, requiredKey: keyof T): T {
   throw new ApiHttpError('UNEXPECTED_RESPONSE', '服务端返回的内容无法识别，请刷新列表核对处置是否生效', 200)
 }
 
+function readOperatorSelfReport(
+  value: AdminRecruitmentHostingStatus['recruitmentHosting']['operatorSelfReport'] | undefined,
+): RecruitmentOperatorSelfReportView | null {
+  if (!value) return null
+  const name = value.name.trim()
+  const licenseNumber = value.licenseNumber.trim()
+  if (!name || !licenseNumber) return null
+  return { name, licenseNumber }
+}
+
 const httpAdapter: RecruitmentEmergencyServiceInterface = {
   async getHostingEnabled() {
     const body = await request<{ data?: AdminRecruitmentHostingStatus }>('GET', '/admin/system/recruitment-hosting')
@@ -86,7 +107,7 @@ const httpAdapter: RecruitmentEmergencyServiceInterface = {
     if (!flag || typeof flag.enabled !== 'boolean') {
       throw new ApiHttpError('UNEXPECTED_RESPONSE', '服务端没有返回招聘内容托管状态', 200)
     }
-    return flag.enabled
+    return { enabled: flag.enabled, operatorSelfReport: readOperatorSelfReport(flag.operatorSelfReport) }
   },
   async takedown(input) {
     const body = await request<unknown>('POST', '/admin/recruitment-emergency/takedown', input)
@@ -124,7 +145,7 @@ function assertMockReason(reasonCode: string, reasonText: string): void {
 
 const mockAdapter: RecruitmentEmergencyServiceInterface = {
   async getHostingEnabled() {
-    return mockHostingEnabled()
+    return { enabled: mockHostingEnabled(), operatorSelfReport: null }
   },
   async takedown(input) {
     assertMockReason(input.reasonCode, input.reasonText)

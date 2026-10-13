@@ -27669,6 +27669,11 @@
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts",
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
     ],
+    "services/api/src/recruitment-hosting/deployment-ownership.ts": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
+    ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
       "services/api/scripts/verify-official-channels.ts",
       "services/api/scripts/verify-recruitment-emergency-scope.ts"
@@ -34327,7 +34332,8 @@
           "apps/partner/src/services/api/client.ts",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -34349,7 +34355,8 @@
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -41840,7 +41847,8 @@
         "files": [
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },

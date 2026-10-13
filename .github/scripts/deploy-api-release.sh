@@ -99,6 +99,9 @@ REQUIRED_PRODUCTION_GATES=(
   PRINT_REQUIRE_PRINTER_ONLINE
 )
 
+# 我方发布流程把部署归属固定写成我方云（招聘锁，合规边界 §1.1 2026-10-12）。
+FIXED_PRODUCTION_VALUES=( DEPLOYMENT_OWNERSHIP=vendor_cloud )
+
 # 备份保留策略：按发布分组保留最近 N 组，其余删除。
 #
 # 背景（2026-08-09 真实事故）：根分区 40GB 被备份撑到 100%，可用仅剩 1GiB，
@@ -400,6 +403,19 @@ if [ -n "$MISSING_TARGET_GATES" ]; then
   exit 1
 fi
 
+TARGET_OWNERSHIP_SOURCE="$DEPLOY_PATH/services/api/src/recruitment-hosting/deployment-ownership.ts"
+if [ ! -f "$TARGET_OWNERSHIP_SOURCE" ]; then
+  echo "::error::目标提交缺少部署归属文件 services/api/src/recruitment-hosting/deployment-ownership.ts" >&2
+  exit 1
+fi
+for FIXED_PAIR in "${FIXED_PRODUCTION_VALUES[@]}"; do
+  FIXED_KEY="${FIXED_PAIR%%=*}"
+  if ! grep -Eq "(^|[^A-Z_])${FIXED_KEY}([^A-Z_]|$)" "$TARGET_OWNERSHIP_SOURCE"; then
+    echo "::error::目标提交的部署归属文件不认识固定键：$FIXED_KEY" >&2
+    exit 1
+  fi
+done
+
 # 0b 之前先记一次盘，成功或中止的摘要都用这个数当 DISK_AVAIL_MB_BEFORE。
 # mkdir 只为了 du 有目录可量；真正的备份文件还没写。
 mkdir -p "$BACKUP_ROOT"
@@ -488,7 +504,8 @@ echo "=== 3c. 生产运行闸门预检（目标提交代码 × 服务器真实 .
 # 做启动闸门预检，并叠加 3b 将写入的 KEY=true。失败必须在 pg_dump 之前中止。
 if ! node services/api/scripts/preflight-production-gates.mjs \
   --env-file "$API_DIR/.env" \
-  --force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"; then
+  --force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")" \
+  --force-value "$(IFS=,; echo "${FIXED_PRODUCTION_VALUES[*]}")"; then
   echo "::error::生产闸门预检失败，发布在备份前中止（线上未动）"
   exit 1
 fi
@@ -646,6 +663,34 @@ for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
   trap - EXIT
   echo "  已持久化 $GATE_KEY=true"
 done
+for FIXED_PAIR in "${FIXED_PRODUCTION_VALUES[@]}"; do
+  FIXED_KEY="${FIXED_PAIR%%=*}"
+  FIXED_VALUE="${FIXED_PAIR#*=}"
+  ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
+  cleanup_env_tmp() {
+    rm -f -- "$ENV_TMP"
+  }
+  trap cleanup_env_tmp EXIT
+  awk -v key="$FIXED_KEY" -v value="$FIXED_VALUE" '
+    BEGIN { written = 0 }
+    $0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {
+      if (!written) {
+        print key "=" value
+        written = 1
+      }
+      next
+    }
+    { print }
+    END {
+      if (!written) print key "=" value
+    }
+  ' "$ENV_FILE" > "$ENV_TMP"
+  chmod --reference="$ENV_FILE" "$ENV_TMP"
+  chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
+  mv -f -- "$ENV_TMP" "$ENV_FILE"
+  trap - EXIT
+  echo "  已持久化 $FIXED_KEY"
+done
 
 echo "=== 4. 在目标提交内构建 API ==="
 # 构建已在备份前（1b）完成，供 3c 加载目标提交 dist。此处确认产物仍在；
@@ -706,6 +751,7 @@ echo "=== 7. 重启 PM2 并就绪检查（${HEALTH_URL}） ==="
 PM2_RESTARTED=true
 export COMMIT="$TARGET_SHA"
 export PRINT_REQUIRE_PRINTER_ONLINE=true
+export "${FIXED_PRODUCTION_VALUES[@]}"
 export PRINT_REQUIRE_PII_SCAN=true
 pm2 restart "$PM2_NAME" --update-env
 for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do

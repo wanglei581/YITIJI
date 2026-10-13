@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 生产运行闸门预检：用目标提交**构建产物**里的 assertProductionRuntimeGates()
- * 检查服务器真实 .env（可叠加 --force-true，对应 deploy 3b 将写入的键）。
+ * 检查服务器真实 .env（可叠加 --force-true 与 --force-value，对应 deploy 3b 将写入的键）。
  *
  * 为何加载 dist、不用 `node -r @swc-node/register` 跑 TS：
  *   线上启动入口是 `node dist/main.js`（package.json "start"）。tsc 的
@@ -15,9 +15,11 @@
  * 用法：
  *   node services/api/scripts/preflight-production-gates.mjs \
  *     --env-file /srv/ai-job-print/services/api/.env \
- *     --force-true PRINT_REQUIRE_PII_SCAN,PRINT_REQUIRE_PRINTER_ONLINE
+ *     --force-true PRINT_REQUIRE_PII_SCAN,PRINT_REQUIRE_PRINTER_ONLINE \
+ *     --force-value DEPLOYMENT_OWNERSHIP=vendor_cloud
  *
- * 不打印任何 .env 值；日志里只允许出现键名。失败只打印 Error.message，不打堆栈。
+ * 不打印任何 .env 值；日志里只允许出现键名。--force-true 与 --force-value 同样不打印值。
+ * 失败只打印 Error.message，不打堆栈。
  */
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
@@ -35,6 +37,7 @@ function fail(message) {
 function parseArgs(argv) {
   let envFile = ''
   let forceTrue = []
+  let forceValue = []
   for (let i = 2; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === '--env-file') {
@@ -56,9 +59,19 @@ function parseArgs(argv) {
       forceTrue = parseForceTrue(arg.slice('--force-true='.length))
       continue
     }
-    fail('PREFLIGHT_USAGE: unknown argument（只接受 --env-file / --force-true）')
+    if (arg === '--force-value') {
+      const raw = argv[i + 1] ?? ''
+      i += 1
+      forceValue = parseForceValue(raw)
+      continue
+    }
+    if (arg.startsWith('--force-value=')) {
+      forceValue = parseForceValue(arg.slice('--force-value='.length))
+      continue
+    }
+    fail('PREFLIGHT_USAGE: unknown argument（只接受 --env-file / --force-true / --force-value）')
   }
-  return { envFile, forceTrue }
+  return { envFile, forceTrue, forceValue }
 }
 
 function parseForceTrue(raw) {
@@ -66,6 +79,30 @@ function parseForceTrue(raw) {
     .split(',')
     .map((key) => key.trim())
     .filter(Boolean)
+}
+
+/** KEY=VALUE 逗号分隔。键名必须是大写下划线，值不许含逗号和换行。违反只报 PREFLIGHT_USAGE，不回显值。 */
+function parseForceValue(raw) {
+  const text = String(raw)
+  if (/[\r\n]/.test(text)) {
+    fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
+  }
+  const pairs = []
+  for (const part of text.split(',')) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const eq = trimmed.indexOf('=')
+    if (eq <= 0) {
+      fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
+    }
+    const key = trimmed.slice(0, eq).trim()
+    const value = trimmed.slice(eq + 1)
+    if (!/^[A-Z][A-Z0-9_]*$/.test(key) || /[\r\n,]/.test(value)) {
+      fail('PREFLIGHT_USAGE: --force-value 键名必须是大写下划线，值不许含逗号和换行')
+    }
+    pairs.push([key, value])
+  }
+  return pairs
 }
 
 /**
@@ -164,7 +201,7 @@ function loadGates() {
 }
 
 function main() {
-  const { envFile, forceTrue } = parseArgs(process.argv)
+  const { envFile, forceTrue, forceValue } = parseArgs(process.argv)
   if (!envFile) {
     fail('PREFLIGHT_ENV_FILE_REQUIRED: --env-file <path> 必填')
   }
@@ -185,6 +222,9 @@ function main() {
       fail(`PREFLIGHT_FORCE_TRUE_INVALID_KEY: ${key}`)
     }
     parsed[key] = 'true'
+  }
+  for (const [key, value] of forceValue) {
+    parsed[key] = value
   }
   parsed.NODE_ENV = 'production'
 
