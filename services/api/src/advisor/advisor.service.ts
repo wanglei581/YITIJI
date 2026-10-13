@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { LlmAdvisorService } from './llm-advisor.service'
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { AdvisorQaMemory } from './advisor-qa-memory'
@@ -61,6 +62,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
+/** 只认作业归属失败这一个码。别的错误（例如库不可用）必须原样抛出去。 */
+function isAdvisorSessionMissing(error: unknown): boolean {
+  if (!(error instanceof NotFoundException)) return false
+  const body = error.getResponse() as { error?: { code?: string } }
+  return body.error?.code === 'ADVISOR_SESSION_NOT_FOUND'
+}
+
 export interface AdvisorRequester {
   endUserId: string | null
   accessToken: string | null
@@ -69,7 +77,7 @@ export interface AdvisorRequester {
 @Injectable()
 export class AdvisorService {
   /** 进程内存，不落库。重启即失 —— 这是刻意的，不是缺陷，理由见 advisor-qa-memory.ts。 */
-  private readonly qaMemory = new AdvisorQaMemory()
+  private readonly qaMemory: AdvisorQaMemory
 
   constructor(
     private readonly prisma: PrismaService,
@@ -77,7 +85,10 @@ export class AdvisorService {
     private readonly artifacts: AdvisorArtifactService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
-  ) {}
+    @Optional() @Inject(AdvisorQaMemory) qaMemory?: AdvisorQaMemory,
+  ) {
+    this.qaMemory = qaMemory ?? new AdvisorQaMemory()
+  }
 
   /**
    * 可用性探针。
@@ -316,7 +327,13 @@ export class AdvisorService {
       throw error
     }
     this.recordAiLog(usage, startedAt, 'success', row.endUserId)
-    this.qaMemory.append(sessionId, question.trim().slice(0, 600), answer.answer)
+    // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
+    this.qaMemory.append(
+      sessionId,
+      maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
+      answer.answer,
+      row.endUserId ? `u:${row.endUserId}` : null,
+    )
     return {
       sessionId,
       ...answer,
@@ -378,6 +395,20 @@ export class AdvisorService {
   async printArtifact(sessionId: string, artifactId: string, requester: AdvisorRequester) {
     const row = await this.loadOwned(sessionId, requester)
     return this.artifacts.print(artifactId, row.id, { endUserId: row.endUserId })
+  }
+
+  /**
+   * 一体机清场：归属对得上才丢掉这一次作业的问答内存。
+   * 找不到、过期、不是本人都当已经清掉。不删库里的作业。
+   */
+  async forgetSession(sessionId: string, requester: AdvisorRequester): Promise<{ forgotten: number }> {
+    try {
+      await this.loadOwned(sessionId, requester)
+    } catch (error: unknown) {
+      if (isAdvisorSessionMissing(error)) return { forgotten: 0 }
+      throw error
+    }
+    return { forgotten: this.qaMemory.forget(sessionId) ? 1 : 0 }
   }
 
   // ── 内部 ──────────────────────────────────────────────────

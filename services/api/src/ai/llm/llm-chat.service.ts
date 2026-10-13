@@ -9,7 +9,9 @@
 // ============================================================
 
 import { createHash, randomBytes } from 'crypto'
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
+import { ConversationMemoryBridge } from '../../common/conversation-memory-bridge'
 import type {
   AssistantAction,
   AssistantIntent,
@@ -270,7 +272,12 @@ export class LlmChatService {
   private readonly logger = new Logger(LlmChatService.name)
   private readonly sessions = new Map<string, SessionEntry>()
 
-  constructor(private readonly config: LlmConfigService) {}
+  constructor(
+    private readonly config: LlmConfigService,
+    @Optional() @Inject(ConversationMemoryBridge) bridge?: ConversationMemoryBridge,
+  ) {
+    bridge?.bindChatOwner((ownerKey) => this.forgetOwner(ownerKey))
+  }
 
   private pruneSessions(now: number): void {
     for (const [id, s] of this.sessions) {
@@ -313,6 +320,38 @@ export class LlmChatService {
       .filter((message): message is ChatMessage & { role: 'user' | 'assistant' } =>
         message.role === 'user' || message.role === 'assistant')
       .map((message) => ({ role: message.role, content: message.content }))
+  }
+
+  /** 归属对得上才删这一段对话。对不上、找不到，都不报错。 */
+  forgetSession(sessionId: string, ownerKey: string): boolean {
+    const id = sessionId.trim()
+    if (!id || !ownerKey) return false
+    const session = this.sessions.get(id)
+    if (!session || session.ownerKey !== ownerKey) return false
+    this.sessions.delete(id)
+    return true
+  }
+
+  /** 删掉这个归属下的全部小青对话，返回删了几段。 */
+  forgetOwner(ownerKey: string): number {
+    if (!ownerKey) return 0
+    let removed = 0
+    for (const [id, session] of this.sessions) {
+      if (session.ownerKey !== ownerKey) continue
+      this.sessions.delete(id)
+      removed += 1
+    }
+    return removed
+  }
+
+  /** 空闲超过 SESSION_TTL_MS 的会话立刻丢掉。每分钟扫，不等下一次对话。 */
+  @Cron(CronExpression.EVERY_MINUTE)
+  sweep(now = Date.now()): number {
+    const before = this.sessions.size
+    this.pruneSessions(now)
+    const removed = before - this.sessions.size
+    if (removed > 0) this.logger.log(`assistant.session_swept removed=${removed}`)
+    return removed
   }
 
   async chat(

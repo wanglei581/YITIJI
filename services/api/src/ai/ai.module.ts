@@ -1,5 +1,7 @@
 import { AiQuotaModule } from './quota/ai-quota.module'
 import { Module } from '@nestjs/common'
+import { ConversationMemoryModule } from '../common/conversation-memory.module'
+import { AssistantSessionForgetController } from './assistant-session-forget.controller'
 import { AuthModule } from '../auth/auth.module'
 import { FilesModule } from '../files/files.module'
 import { AsrModule } from '../asr/asr.module'
@@ -67,8 +69,8 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   // AiAccessModule：自我探索提交 / 打印在接口内按同一 AI 闸门判定（打分不被 AI 闸门拦）
-  imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule],
-  controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController],
+  imports: [AiQuotaModule, AuthModule, FilesModule, AsrModule, BenefitRedemptionModule, MemberPrivacyModule, JobMaterialsModule, TerminalsModule, AiAccessModule, ConversationMemoryModule],
+  controllers: [AiController, ResumeReportExportController, KioskAiCapabilitiesController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController, AiSafetyLexiconController, AssistantSessionForgetController],
   providers: [
     AiService,
     AiLogService,
@@ -131,6 +133,6 @@ import { AiSafetyLexiconService } from './safety/ai-safety-lexicon.service'
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   // 导出 OcrService 供 MaterialsModule 复用做打印材料真实内容扫描（文件体检真实化）。
-  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService],
+  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService, OcrService, LlmChatService],
 })
 export class AiModule {}

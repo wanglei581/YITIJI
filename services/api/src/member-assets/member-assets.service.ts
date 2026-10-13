@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
+import { AdvisorQaMemory } from '../advisor/advisor-qa-memory'
+import { LlmChatService } from '../ai/llm/llm-chat.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import type {
@@ -65,7 +67,11 @@ interface ResumeDraftMeta {
 
 @Injectable()
 export class MemberAssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(AdvisorQaMemory) private readonly qaMemory?: AdvisorQaMemory,
+    @Optional() @Inject(LlmChatService) private readonly chat?: LlmChatService,
+  ) {}
 
   /** 我的简历：本人 parse（上传诊断，附「是否已生成优化版」）+ generate（AI 生成）列表。 */
   async listResumes(
@@ -314,6 +320,8 @@ export class MemberAssetsService {
     if (!artifact) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
     const result = await this.prisma.advisorSession.deleteMany({ where: { id: artifact.sessionId, endUserId } })
     if (!result.count) throw new NotFoundException({ error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '小青作业不存在或已删除' } })
+    this.qaMemory?.forget(artifact.sessionId)
+    this.chat?.forgetOwner(`u:${endUserId}`)
     return { deleted: true }
   }
 
