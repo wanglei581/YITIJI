@@ -174,6 +174,11 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/assistant/AssistantPage.tsx',
     'apps/kiosk/src/pages/assistant/assistant-qingxu.css',
+    // 2026-10-12 第七次改字（产品负责人 10/12「稿上的字可以改」，PR #1420）：反馈页和「我的」各列表的失败态
+    // 「请检查网络后重试」一并改「请稍后重试」，同一个提交。这三页各只改失败态说明那一句，不改数据与流程。
+    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   ].includes(file) &&
   ([
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',

@@ -276,6 +276,8 @@ export const page29: ResumePageFixture = {
         return hit('text=青岛某物流公司 · 仓储主管', '/interview?stage=reports')
       case 'reports-empty-member':
         return hit('text=还没有练习报告', '/interview?stage=reports')
+      case 'reports-error':
+        return hit('text=暂时无法加载练习报告', '/interview?stage=reports')
       case 'network-error':
         return hit('text=这三种结果分别意味着', '/interview?stage=session')
       case 'transcript-review':
@@ -439,6 +441,18 @@ export const page29: ResumePageFixture = {
       await loginToReports(page)
       const marker = target.state === 'reports-ready' ? '青岛某物流公司 · 仓储主管' : '还没有练习报告'
       await page.getByText(marker).waitFor({ state: 'visible' })
+      return
+    }
+    if (target.state === 'reports-error') {
+      // 回话单第 2 条（10/12）：这一屏的「请稍后重试」要和稿并排对过，补上列表读取失败的造法。
+      registerMemberLogin(api)
+      registerAuthenticatedMemberApis(api)
+      api.respond('GET', '/api/v1/me/mock-interviews', {
+        status: 500,
+        json: { success: false, error: { code: 'INTERNAL_ERROR', message: '列表暂时读不到' } },
+      })
+      await loginToReports(page)
+      await page.getByText('暂时无法加载练习报告').waitFor({ state: 'visible' })
       return
     }
     if (target.state === 'network-error') {

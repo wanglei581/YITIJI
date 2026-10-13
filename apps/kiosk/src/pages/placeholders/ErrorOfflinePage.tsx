@@ -66,7 +66,7 @@ const CAPS: { key: string; glyph: GlyphName; tone: string; name: string; dep: st
   { key: 'agent', glyph: 'desk', tone: 'teal', name: '这台机器的本机程序', dep: '没有单独的检测口，只能从机器上报的信号间接看' },
   { key: 'printer', glyph: 'printer', tone: 'teal', name: '打印机', dep: '读机器上报的状态；「没读到」和「离线」不合并' },
   { key: 'scan', glyph: 'scan', tone: 'slate', name: '扫描件的存放', dep: '扫出来的文件先存在这台机器上再送走；没有单独的检测口' },
-  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插盘后由这台机器读取；这条能力暂未开通' },
+  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插上之后才知道能不能读，这里不提前写成可用' },
   { key: 'pay', glyph: 'gauge', tone: 'clay', name: '付款', dep: '没有单独的检测口，到收银台真付一次才知道' },
   { key: 'ai', glyph: 'spark', tone: 'plum', name: 'AI 服务', dep: '没有单独的检测口，用到哪个 AI 功能时当场确认' },
   // 稿 09 规则 5（托管 a）：这一项叫「机构官方渠道」，不在我们云上做招聘入口。key 不改，判定仍是「随请求确认」。
@@ -148,17 +148,17 @@ async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
 function verdictsFor(view: View, result: CheckResult | null): Verdict[] {
   const q = (label: string): Verdict => [label, 'q']
   if (view === 'checking') {
-    return [q('检测中'), q('检测中'), q('检测中'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    return [q('检测中'), q('检测中'), q('检测中'), q('未检测'), q('用时再看'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
   }
   if (view === 'offline') {
     const unread: Verdict = ['没读到', 'warn']
-    return [['这次连不上', 'bad'], unread, unread, q('未检测'), q('暂未开通'), unread, unread, unread]
+    return [['这次连不上', 'bad'], unread, unread, q('未检测'), q('用时再看'), unread, unread, unread]
   }
   if (view === 'partial' && result?.printer) {
     const agent: Verdict = result.printer.heartbeatOnline ? ['这次连得上', 'ok'] : ['没读到', 'warn']
-    return [['这次连得上', 'ok'], agent, result.printer.verdict, q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    return [['这次连得上', 'ok'], agent, result.printer.verdict, q('未检测'), q('用时再看'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
   }
-  return [q('未检测'), q('未检测'), q('未检测'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+  return [q('未检测'), q('未检测'), q('未检测'), q('未检测'), q('用时再看'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
 }
 
 const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`

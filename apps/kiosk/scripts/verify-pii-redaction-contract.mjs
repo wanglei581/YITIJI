@@ -365,8 +365,20 @@ check('徽标:not_supported 说明打印使用原件', () => {
   const badge = materialRedactionBadge(summaryOf({ claim: 'not_supported', redactedFileId: null }))
   assert.match(badge.text, /打印使用原件/)
 })
+// 2026-10-10 真机实操 F-13：检出 5 处、用户全部保留时，预览与参数页的徽标写成了「没发现需要遮挡的内容」。
+check('徽标:nothing_to_redact 但有保留项 → 说发现几处、你选择了全部保留,不说没发现', () => {
+  const badge = materialRedactionBadge(summaryOf({ claim: 'nothing_to_redact', redactedFileId: null, keptCount: 5 }))
+  assert.equal(badge.text, '发现 5 处个人信息，你选择了全部保留 · 打印使用原件，纸上是完整信息')
+  assert.equal(badge.tone, 'danger')
+  assert.doesNotMatch(badge.text, /没发现/)
+})
+check('徽标:nothing_to_redact 且保留数为 0 → 仍说没发现需要遮挡的内容', () => {
+  const badge = materialRedactionBadge(summaryOf({ claim: 'nothing_to_redact', redactedFileId: null, keptCount: 0 }))
+  assert.equal(badge.text, '没发现需要遮挡的内容 · 打印使用原件')
+})
 check('徽标:nothing_to_redact 说没发现需要遮挡的内容', () => {
-  const badge = materialRedactionBadge(summaryOf({ claim: 'nothing_to_redact', redactedFileId: null }))
+  // 夹具默认带 1 处保留；「没发现」只对一处都没检出成立，所以这里显式给 0。
+  const badge = materialRedactionBadge(summaryOf({ claim: 'nothing_to_redact', redactedFileId: null, keptCount: 0 }))
   assert.match(badge.text, /没发现需要遮挡的内容/)
   assert.match(badge.text, /打印使用原件/)
 })
