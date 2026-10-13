@@ -789,6 +789,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
+          # 作业面追问：第二轮真实出站请求里，历史中的手机号必须已是占位。
+          pnpm --filter @ai-job-print/api verify:advisor-qa-history-mask
           # B10：删记录、登出、清场时清掉进程内对话原话。脚本自建临时库。
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:conversation-memory-forget
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
@@ -1097,6 +1099,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:llm-account-unavailable
           pnpm --filter @ai-job-print/api verify:advisor-work
+          pnpm --filter @ai-job-print/api verify:advisor-qa-history-mask
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:self-assessment
           pnpm --filter @ai-job-print/api verify:self-assessment-consent

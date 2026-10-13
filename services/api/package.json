@@ -303,6 +303,7 @@
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
     "verify:llm-account-unavailable": "node -r @swc-node/register scripts/verify-llm-account-unavailable.ts",
     "verify:advisor-work": "node -r @swc-node/register scripts/verify-advisor-work.ts",
+    "verify:advisor-qa-history-mask": "node -r @swc-node/register scripts/verify-advisor-qa-history-mask.ts",
     "verify:career-plan-degraded": "node -r @swc-node/register scripts/verify-career-plan-degraded.ts",
     "verify:llm-timeout-concurrency": "node -r @swc-node/register scripts/verify-llm-timeout-concurrency.ts",
     "verify:ai-endpoint-allowlist": "node -r @swc-node/register scripts/verify-ai-endpoint-allowlist.ts",

@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import { LlmAdvisorService } from './llm-advisor.service'
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { AdvisorQaMemory } from './advisor-qa-memory'
@@ -326,9 +327,10 @@ export class AdvisorService {
       throw error
     }
     this.recordAiLog(usage, startedAt, 'success', row.endUserId)
+    // 内存不留原话。场景名与这一问发给模型时相同；模型回答只见过遮盖后的文本，照旧存。
     this.qaMemory.append(
       sessionId,
-      question.trim().slice(0, 600),
+      maskUserTextForLlmText(question.trim().slice(0, 600), 'advisor_qa'),
       answer.answer,
       row.endUserId ? `u:${row.endUserId}` : null,
     )

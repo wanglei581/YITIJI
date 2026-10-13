@@ -15,7 +15,7 @@ import { DEVICE_FAULT_PROMPT_RULE } from '../ai/safety/device-fault'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError, llmEndpointNotAllowedError } from '../ai/llm/llm-failure'
 import { AiEndpointNotAllowedError } from '../common/outbound/ai-endpoint-allowlist'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
-import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import { maskUserTextForLlmText, maskUserTextsForLlmText } from '../common/pii/llm-input-mask'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
 import {
   ADVISOR_DISCLAIMER,
@@ -232,7 +232,8 @@ export class LlmAdvisorService {
   // ── 2. 问答型 ──────────────────────────────────────────────
 
   /**
-   * 回答一轮。history 是**进程内存里的**上下文，不落库（设计页：对话不保存）。
+   * 回答一轮。history 是进程内存里的上下文，不落库（设计页：对话不保存）。
+   * 用户发言写入内存前已遮盖；拼进本次请求前，历史用户轮和本轮问题再一起遮一遍。
    */
   async answer(
     question: string,
@@ -241,17 +242,30 @@ export class LlmAdvisorService {
   ): Promise<AdvisorAnswer> {
     const sys = ADVISOR_QA_SYSTEM_PROMPT
 
-    const masked = maskUserTextForLlmText(question.slice(0, 600), 'advisor_qa')
+    const recent = history.slice(-6)
+    const historyUsers = recent.filter((turn) => turn.role === 'user').map((turn) => turn.content)
+    // 一次遮完：历史里若仍有原话，和本轮同一个号码共用占位编号。已经是占位的文字再遮一遍保持原样。
+    const maskedPieces = maskUserTextsForLlmText(
+      [...historyUsers, question.slice(0, 600)],
+      'advisor_qa',
+    )
+    const maskedQuestion = maskedPieces[maskedPieces.length - 1] ?? ''
+    const maskedHistoryUsers = maskedPieces.slice(0, -1)
     const parts: string[] = []
-    if (history.length > 0) {
-      const transcript = history
-        .slice(-6)
-        .map((turn) => `${turn.role === 'user' ? '用户' : '你'}：${turn.content}`)
+    if (recent.length > 0) {
+      let userIndex = 0
+      const transcript = recent
+        .map((turn) => {
+          if (turn.role !== 'user') return `你：${turn.content}`
+          const content = maskedHistoryUsers[userIndex] ?? ''
+          userIndex += 1
+          return `用户：${content}`
+        })
         .join('\n')
-      // 历史里的用户发言在入内存前已遮盖过一次，这里不重复遮盖模型自己的输出
+      // 上面只再遮了用户轮。模型回答照原文拼上：它只见过遮盖后的文本。
       parts.push(`【本轮之前的对话（不保存，仅本次会话内存）】\n${transcript.slice(0, 2000)}`)
     }
-    parts.push(`【用户这一问】${masked}`)
+    parts.push(`【用户这一问】${maskedQuestion}`)
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
       const raw = await this.callLlm(sys, parts.join('\n\n'), ctx.onLlmCall)

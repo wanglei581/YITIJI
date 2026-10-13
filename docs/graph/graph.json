@@ -24296,6 +24296,7 @@
     ],
     "services/api/src/advisor/advisor-artifact.service.ts": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -24306,12 +24307,14 @@
       "services/api/scripts/verify-advisor-work.ts"
     ],
     "services/api/src/advisor/advisor-pdf.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-cjk-font.ts"
     ],
     "services/api/src/advisor/advisor-qa-memory.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor-retention.task.ts": [
@@ -24331,6 +24334,7 @@
       "services/api/scripts/verify-conversation-memory-forget.ts"
     ],
     "services/api/src/advisor/advisor.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-assistant-voice.ts",
@@ -24347,6 +24351,7 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts"
     ],
     "services/api/src/advisor/llm-advisor.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
@@ -24380,6 +24385,7 @@
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
     ],
     "services/api/src/ai/ai-log.service.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-runtime.ts",
@@ -25098,6 +25104,7 @@
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -25607,6 +25614,7 @@
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-conversation-memory-forget.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
@@ -27553,6 +27561,7 @@
       "services/api/scripts/verify-admin-print-scan.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
+      "services/api/scripts/verify-advisor-qa-history-mask.ts",
       "services/api/scripts/verify-advisor-work.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
@@ -35682,6 +35691,32 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:admin-users"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/advisor/advisor-artifact.service.ts",
+          "services/api/src/advisor/advisor-pdf.service.ts",
+          "services/api/src/advisor/advisor-qa-memory.ts",
+          "services/api/src/advisor/advisor.service.ts",
+          "services/api/src/advisor/llm-advisor.service.ts",
+          "services/api/src/ai/ai-log.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-advisor-qa-history-mask.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:advisor-qa-history-mask"
       ],
       "wired": true
     },
