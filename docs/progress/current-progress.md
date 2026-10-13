@@ -13,7 +13,7 @@
 - **接手与复核：** 一体机前端一八做到 `c8f5b85d6` 到线停下，一体机前端一九接着做：Codex 只复核 `c8f5b85d6`，指出作废靠 useEffect 还留一个窄窗口，`2f7b5d5a4` 改成 useLayoutEffect、作废时按钮当场复位。
 - **验证（Claude 本机）：** 类型检查过，eslint 0 错，`verify:lightflow-k2b-ai-resume` 过；浏览器用例在并入候选 `cff5f314b` 后的头上跑：隐私组本机 1 条、UTC 2 条，默认组（手动带入、优化草稿、生成流程）本机、UTC 各 29 条，w3 整组 UTC 117 条，全过；反向检查把作废判断换成 `void mine`，「重试出了结果」那条用例红在断言上，盖回复绿（前任设计的删整行写法会让类型检查失败，是假红，已改）。
 - **CI 覆盖：** 新用例挂进 `test:browser:journeys`（`verify:kiosk-browser-spec-coverage` 指出原先没有 CI 步骤会跑它）；一体机 112 条门禁按 UTC 跑，除这一条（已补）外对基线没有新增不过的。
-- 10/13 照回话单第 20 条换成新句（产品负责人 10/12 22:40 按推荐定，合规十二同意）：门禁 `verify:lightflow-k2b-ai-resume` 和 `resume-optimize-manual-carry.spec.ts` 跟着改；常量改回旧句时门禁红在「逐字等于新句」「全仓一处」两条、用例红在表单顶上那句。
+- 10/13 照回话单第 20 条换成新句（产品负责人 10/12 22:40 按推荐定，合规十二同意）：门禁 `verify:lightflow-k2b-ai-resume` 和 `resume-optimize-manual-carry.spec.ts` 跟着改；门禁另加一条「`apps/kiosk/src` 里不许再有定字前的旧句」（旧句听着像整份都带进来了，agy 反方提的）。反向检查：常量改回旧句，门禁红在「逐字等于新句」「新句在 `apps/kiosk/src` 里只出现一次（实际 0）」「不许有旧句」三条，用例红在表单顶上那句；只往源码注释里塞一句旧句，门禁红在「不许有旧句」。一体机 112 条门禁按 UTC 跑，对基线没有新增不过的。
 
 ## 2026-10-11：第七次再补七处改字——不在定稿上的「检查网络」都换成「稍后重试」（分支 `claude/kiosk-fe1-r7-copy2-1011`）
 

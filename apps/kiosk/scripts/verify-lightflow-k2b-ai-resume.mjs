@@ -355,6 +355,10 @@ function countSentence(dir, sentence) {
 }
 const sentenceHits = countSentence(join(kioskRoot, 'src'), NOTE)
 expect(sentenceHits.count === 1, `apps/kiosk/src 里提示句只出现一次（实际 ${sentenceHits.count}：${sentenceHits.files.join(', ')}）`)
+// 定字前的旧句说「你简历里的内容」，听着像整份都带进来了；合规要「部分」照实，旧句不许回到页面上。
+const OLD_NOTE = '已带入你简历里的内容，请逐项核对'
+const oldHits = countSentence(join(kioskRoot, 'src'), OLD_NOTE)
+expect(oldHits.count === 0, `apps/kiosk/src 里没有定字前的旧句（实际 ${oldHits.count}：${oldHits.files.join(', ')}）`)
 
 const generatePage = read('src/pages/resume/ResumeGeneratePage.tsx')
 expect(
