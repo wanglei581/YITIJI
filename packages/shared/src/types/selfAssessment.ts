@@ -73,7 +73,7 @@ export interface SelfAssessmentAnswerV1 {
  * 一体机与小程序展示的条款、链接、勾选框文字必须与下面这组常量逐字相同。
  * 门禁：`verify:self-assessment-consent`。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v2.2026-09-29'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v3.2026-10-13'
 
 /**
  * 与 `SELF_ASSESSMENT_CONSENT_VERSION` 配套的条款原文，按展示顺序。
@@ -85,7 +85,7 @@ export const SELF_ASSESSMENT_CONSENT_ITEMS = [
   '作答后可在结果页一键撤回 / 物理删除；不留存本人答案原文。',
   '本工具不评估「适合 / 不适合」任何岗位或职业，亦不构成能力证明。',
   '5 段解读由 AI 生成（E3 · 仅供参考）；维度强度由固定权重算出，不经过 AI。',
-  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
+  '本工具面向年满 14 周岁的用户；未满 14 周岁的，须在监护人同意并陪同下使用，不提供 AI 解读。',
 ] as const
 
 /**
