@@ -33,9 +33,9 @@ const SELF_HELP_STEPS = [
 ] as const
 
 const CATEGORIES: { key: string; label: string; summary: string; icon: LucideIcon; tone: Tone }[] = [
-  { key: 'account', label: '登录与账号', summary: '要不要登录、为什么变回游客、怎么换账号', icon: UserIcon, tone: 'teal' },
+  { key: 'account', label: '登录与账号', summary: '要不要登录、收不到验证码、为什么变回游客、怎么换账号', icon: UserIcon, tone: 'teal' },
   { key: 'resume', label: 'AI简历服务', summary: '能做什么、会不会保证面试或录用', icon: SparklesIcon, tone: 'plum' },
-  { key: 'print', label: '打印与扫描', summary: '怎么打印、扫描件保存在哪', icon: PrinterIcon, tone: 'slate' },
+  { key: 'print', label: '打印与扫描', summary: '怎么打印、卡纸和没出纸、U 盘读不出、扫描件保存在哪', icon: PrinterIcon, tone: 'slate' },
   { key: 'policy', label: '政策服务', summary: '能不能代申请补贴', icon: LandmarkIcon, tone: 'wheat' },
   { key: 'channels', label: '机构官方渠道', summary: '本机构的官方渠道在哪看、内容谁负责', icon: QrCodeIcon, tone: 'slate' },
   { key: 'jobs', label: '岗位与招聘会', summary: '能不能在这里办理岗位申请', icon: BriefcaseBusinessIcon, tone: 'slate' },
@@ -88,6 +88,11 @@ function buildFaq(hostingOpen: boolean): QA[] {
     },
     {
       categoryKey: 'account', category: '登录与账号',
+      q: '收不到短信验证码怎么办？',
+      a: '先核对手机号有没有输错。验证码 6 位、5 分钟内有效，60 秒后可以重新获取；也看看手机有没有把短信拦进了骚扰短信。还是收不到，可以先不登录继续用——打印、扫描、复印、机构官方渠道和政策查询都不需要账号；也可以改用扫码登录，在手机上确认。',
+    },
+    {
+      categoryKey: 'account', category: '登录与账号',
       q: '为什么离开或刷新后又变回游客了？',
       a: '本终端是公共设备，登录只留在当前这一次。页面刷新、离开或闲置超时会自动退出登录并清掉这次留下的内容，这是公共终端的正常保护行为。',
     },
@@ -113,6 +118,21 @@ function buildFaq(hostingOpen: boolean): QA[] {
       q: '怎么打印文件？',
       a: '在「文档打印」上传文件，核对打印参数与现场公示价目后确认输出。打印任务一经确认开始输出，纸张耗材即发生消耗，请在确认前核对参数。',
       link: { label: '文档打印', route: '/print/upload' },
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: '打印时卡纸了怎么办？',
+      a: '别自己打开机器，也别拽纸——撕在里面更难取，也可能弄坏机器。先把出纸口里已经出来的纸取走收好，记下屏幕上的订单号。用到机码打印、屏上提示可以接着打的，回到这台机器再输一次同一个到机码就能接着打，每单最多 2 次。需要帮助请看本页「遇到问题怎么办」里的服务电话。',
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: '确认打印以后没出纸怎么办？',
+      a: '先看屏幕上这一单的状态：还在打印的，请在出纸口旁等一会儿。屏上写「打印结果未确认」时，照屏上的提示办：用到机码打印的，过 5 分钟回这台机器再输一次同一个到机码；在这台机器上打的 0 元单，可以回到打印重新选文件再打一次。登录过的，可以在「我的 → 打印订单」按订单号查。付过钱的单子先别重新下单，照屏上提示办，或打服务电话问。需要帮助请看本页「遇到问题怎么办」里的服务电话。',
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: 'U 盘插上了读不出来怎么办？',
+      a: '这台机器开通了 U 盘导入的，U 盘插在机器右侧的 USB 口。屏上只列最外层和下一层文件夹里能打印的文件（PDF、JPG、PNG，单份不超过 15MB）。读不出来先点「重新读一次 U 盘」，或换个 U 盘再读一次；还不行就改用手机扫码上传。',
     },
     {
       categoryKey: 'print', category: '打印与扫描',

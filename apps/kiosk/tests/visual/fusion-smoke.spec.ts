@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF } from '../fixtures/recruitment-hosting'
@@ -99,6 +99,55 @@ async function assertHelpCenterFilingInfo(page: Page) {
   await expect(filingInfo).toContainText('职易达AI')
 }
 
+const HELP_SMS_ANSWER = '先核对手机号有没有输错。验证码 6 位、5 分钟内有效，60 秒后可以重新获取；也看看手机有没有把短信拦进了骚扰短信。还是收不到，可以先不登录继续用——打印、扫描、复印、机构官方渠道和政策查询都不需要账号；也可以改用扫码登录，在手机上确认。'
+const HELP_JAM_ANSWER = '别自己打开机器，也别拽纸——撕在里面更难取，也可能弄坏机器。先把出纸口里已经出来的纸取走收好，记下屏幕上的订单号。用到机码打印、屏上提示可以接着打的，回到这台机器再输一次同一个到机码就能接着打，每单最多 2 次。需要帮助请看本页「遇到问题怎么办」里的服务电话。'
+const HELP_NO_PAPER_ANSWER = '先看屏幕上这一单的状态：还在打印的，请在出纸口旁等一会儿。屏上写「打印结果未确认」时，照屏上的提示办：用到机码打印的，过 5 分钟回这台机器再输一次同一个到机码；在这台机器上打的 0 元单，可以回到打印重新选文件再打一次。登录过的，可以在「我的 → 打印订单」按订单号查。付过钱的单子先别重新下单，照屏上提示办，或打服务电话问。需要帮助请看本页「遇到问题怎么办」里的服务电话。'
+const HELP_USB_ANSWER = '这台机器开通了 U 盘导入的，U 盘插在机器右侧的 USB 口。屏上只列最外层和下一层文件夹里能打印的文件（PDF、JPG、PNG，单份不超过 15MB）。读不出来先点「重新读一次 U 盘」，或换个 U 盘再读一次；还不行就改用手机扫码上传。'
+
+async function expectSentenceFullyVisible(locator: Locator) {
+  await locator.scrollIntoViewIfNeeded()
+  const fit = await locator.evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    let top = 0
+    let bottom = window.innerHeight
+    let left = 0
+    let right = window.innerWidth
+    for (let node = el.parentElement; node && node !== document.documentElement; node = node.parentElement) {
+      const style = getComputedStyle(node)
+      const clipsY = style.overflowY === 'hidden' || style.overflowY === 'clip' || style.overflowY === 'auto' || style.overflowY === 'scroll'
+      const clipsX = style.overflowX === 'hidden' || style.overflowX === 'clip' || style.overflowX === 'auto' || style.overflowX === 'scroll'
+      if (!clipsY && !clipsX) continue
+      const box = node.getBoundingClientRect()
+      if (clipsY) {
+        top = Math.max(top, box.top)
+        bottom = Math.min(bottom, box.bottom)
+      }
+      if (clipsX) {
+        left = Math.max(left, box.left)
+        right = Math.min(right, box.right)
+      }
+    }
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      clipTop: top,
+      clipBottom: bottom,
+      inside: rect.top >= top - 1 && rect.bottom <= bottom + 1 && rect.left >= left - 1 && rect.right <= right + 1,
+    }
+  })
+  expect(fit.inside, `整句要落在可见区域内 ${JSON.stringify(fit)}`).toBe(true)
+}
+
+async function scrollHelpToEnd(page: Page) {
+  await page.evaluate(() => {
+    for (const node of [document.querySelector('.k1-help-scroll'), document.querySelector('.qx-stage'), document.scrollingElement]) {
+      if (node && node.scrollHeight > node.clientHeight + 1) node.scrollTop = node.scrollHeight
+    }
+  })
+}
+
 test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ page, api }) => {
   expect(productionRoutePatterns).toContain('/session-timeout')
   registerHomeShellApi(api)
@@ -159,9 +208,50 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
     await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
     await expect(page.locator('.ui-kiosk-topbar')).toHaveCount(0)
     const categories = page.getByRole('group', { name: '按分类筛选常见问题' })
-    await expect(categories.getByRole('button', { name: /登录与账号.*3 问/ })).toBeVisible()
+    // 2026-10-13 回话单第 25 条：登录与账号加了「收不到短信验证码怎么办？」，分类卡从 3 问改为 4 问。
+    // 打印与扫描在「怎么打印文件？」后加了卡纸、没出纸、U 盘三条，从 2 问改为 5 问。
+    await expect(categories.getByRole('button', { name: /登录与账号.*4 问/ })).toBeVisible()
+    await expect(categories.getByRole('button', { name: /要不要登录、收不到验证码、为什么变回游客、怎么换账号/ })).toBeVisible()
+    await expect(categories.getByRole('button', { name: /打印与扫描.*5 问/ })).toBeVisible()
+    await expect(categories.getByRole('button', { name: /怎么打印、卡纸和没出纸、U 盘读不出、扫描件保存在哪/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /一定要登录才能使用吗/ })).toHaveCount(0)
-    await categories.getByRole('button', { name: /登录与账号.*3 问/ }).click()
+    await categories.getByRole('button', { name: /打印与扫描.*5 问/ }).click()
+    await expect(page.locator('.k1-help-question strong')).toHaveText([
+      '怎么打印文件？',
+      '打印时卡纸了怎么办？',
+      '确认打印以后没出纸怎么办？',
+      'U 盘插上了读不出来怎么办？',
+      '扫描的文件保存在哪里？',
+    ])
+    for (const answer of [HELP_JAM_ANSWER, HELP_NO_PAPER_ANSWER, HELP_USB_ANSWER]) {
+      const paragraph = page.locator('.k1-help-answer p', { hasText: answer })
+      await expect(paragraph).toHaveText(answer)
+      await expectSentenceFullyVisible(paragraph)
+    }
+    await scrollHelpToEnd(page)
+    const edges = await page.evaluate(() => {
+      const last = document.querySelector('.k1-help-faq-list')?.lastElementChild
+      const miss = document.querySelector('.k1-help-miss')
+      const bar = document.querySelector('.qx-ctabar')
+      if (!last || !miss || !bar) return null
+      return {
+        lastBottom: last.getBoundingClientRect().bottom,
+        missBottom: miss.getBoundingClientRect().bottom,
+        barTop: bar.getBoundingClientRect().top,
+      }
+    })
+    expect(edges, '最后一条问答和「这里没答上你的问题」要能量到底边').not.toBeNull()
+    expect(edges!.lastBottom).toBeLessThan(edges!.barTop)
+    expect(edges!.missBottom).toBeLessThan(edges!.barTop)
+    await assertNoHorizontalOverflow(page)
+    await page.getByRole('button', { name: '返回分类', exact: true }).click()
+    await page.getByRole('group', { name: '按分类筛选常见问题' }).getByRole('button', { name: /登录与账号.*4 问/ }).click()
+    const smsQuestion = page.locator('.k1-help-question strong', { hasText: '收不到短信验证码怎么办？' })
+    await expect(smsQuestion).toHaveText('收不到短信验证码怎么办？')
+    await expectSentenceFullyVisible(smsQuestion)
+    const smsAnswer = page.locator('.k1-help-answer p', { hasText: HELP_SMS_ANSWER })
+    await expect(smsAnswer).toHaveText(HELP_SMS_ANSWER)
+    await expectSentenceFullyVisible(smsAnswer)
     const question = page.getByRole('button', { name: /一定要登录才能使用吗/ })
     await expect(question).toBeVisible()
     await question.click()

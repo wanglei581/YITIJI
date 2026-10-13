@@ -252,3 +252,86 @@ test('查询超时屏和 06、15 号稿不把未确认的状态说成已经收�
   assert.match(timeout, /moneyBar\('请先看出纸口。'\)/)
   assert.doesNotMatch(timeout, /已经收到提醒|暂时打不了/)
 })
+
+// 2026-10-13 回话单第 25 条（第八次）：帮助中心补四问。问句、答句、两条概要都是定字，
+// 不许改字、不许加句。第 2 问必须夹在「怎么打印文件？」和「扫描的文件保存在哪里？」之间，
+// 挪到扫描那条后面这条要红。06 号稿去掉 <b> 后答句必须与运行页整句相同。
+test('帮助中心四问按定字写在运行页和 06 号稿，答句不叫人、不说提醒、不说退款', () => {
+  const help = readFileSync(join(kioskRoot, 'src/pages/help/HelpCenterPage.tsx'), 'utf8')
+  const draft = readFileSync(join(kioskRoot, '../../docs/design/kiosk-redesign-2026-08-v2/06-help.html'), 'utf8')
+  const faqs = [
+    ['收不到短信验证码怎么办？', '先核对手机号有没有输错。验证码 6 位、5 分钟内有效，60 秒后可以重新获取；也看看手机有没有把短信拦进了骚扰短信。还是收不到，可以先不登录继续用——打印、扫描、复印、机构官方渠道和政策查询都不需要账号；也可以改用扫码登录，在手机上确认。', '先不登录继续用'],
+    ['打印时卡纸了怎么办？', '别自己打开机器，也别拽纸——撕在里面更难取，也可能弄坏机器。先把出纸口里已经出来的纸取走收好，记下屏幕上的订单号。用到机码打印、屏上提示可以接着打的，回到这台机器再输一次同一个到机码就能接着打，每单最多 2 次。需要帮助请看本页「遇到问题怎么办」里的服务电话。', '别自己打开机器，也别拽纸'],
+    ['确认打印以后没出纸怎么办？', '先看屏幕上这一单的状态：还在打印的，请在出纸口旁等一会儿。屏上写「打印结果未确认」时，照屏上的提示办：用到机码打印的，过 5 分钟回这台机器再输一次同一个到机码；在这台机器上打的 0 元单，可以回到打印重新选文件再打一次。登录过的，可以在「我的 → 打印订单」按订单号查。付过钱的单子先别重新下单，照屏上提示办，或打服务电话问。需要帮助请看本页「遇到问题怎么办」里的服务电话。', '付过钱的单子先别重新下单'],
+    ['U 盘插上了读不出来怎么办？', '这台机器开通了 U 盘导入的，U 盘插在机器右侧的 USB 口。屏上只列最外层和下一层文件夹里能打印的文件（PDF、JPG、PNG，单份不超过 15MB）。读不出来先点「重新读一次 U 盘」，或换个 U 盘再读一次；还不行就改用手机扫码上传。', '重新读一次 U 盘'],
+  ]
+  const banned = ['工作人员', '现场', '已经收到提醒', '会收到提醒', '退款']
+  assert.ok(help.includes("summary: '要不要登录、收不到验证码、为什么变回游客、怎么换账号'"))
+  assert.ok(help.includes("summary: '怎么打印、卡纸和没出纸、U 盘读不出、扫描件保存在哪'"))
+  assert.ok(draft.includes("brief:'要不要登录、收不到验证码、为什么会退出、怎么换账号'"))
+  assert.ok(draft.includes("brief:'怎么打印、卡纸和没出纸、U 盘读不出、到机码在哪用、扫描件去哪了'"))
+
+  const answerIn = (source, question) => {
+    const at = source.indexOf(`q: '${question}'`)
+    assert.ok(at >= 0, `运行页缺少问句 ${question}`)
+    const block = source.slice(at, source.indexOf('},', at))
+    assert.equal(block.includes('link'), false, `${question} 不带入口按钮`)
+    const matched = block.match(/a: '([^']*)'/)
+    assert.ok(matched, `运行页缺少答句 ${question}`)
+    return matched[1]
+  }
+  const draftAnswer = (question) => {
+    const token = `['${question}','`
+    const start = draft.indexOf(token)
+    assert.ok(start >= 0, `06 号稿缺少问句 ${question}`)
+    const from = start + token.length
+    let end = from
+    while (end < draft.length && draft[end] !== "'") end += draft[end] === '\\' ? 2 : 1
+    return draft.slice(from, end)
+  }
+
+  for (const [question, answer, emphasis] of faqs) {
+    const runtime = answerIn(help, question)
+    assert.equal(runtime, answer, question)
+    for (const word of banned) assert.equal(runtime.includes(word), false, `${question} 答句不得含「${word}」`)
+    const raw = draftAnswer(question)
+    assert.deepEqual(raw.match(/<b>[^<]*<\/b>/g), [`<b>${emphasis}</b>`], `${question} 稿里只强调这一处`)
+    assert.equal(raw.replace(/<\/?b>/g, ''), answer, `06 号稿去掉强调后应与运行页同句：${question}`)
+  }
+  if (draftAnswer(faqs[3][0]).includes('「<b>重新读一次 U 盘</b>」') === false) {
+    assert.fail('第 4 问的强调必须包在「」里面的「重新读一次 U 盘」')
+  }
+
+  const runtimeOrder = [
+    '一定要登录才能使用吗？',
+    '收不到短信验证码怎么办？',
+    '为什么离开或刷新后又变回游客了？',
+    '怎么打印文件？',
+    '打印时卡纸了怎么办？',
+    '确认打印以后没出纸怎么办？',
+    'U 盘插上了读不出来怎么办？',
+    '扫描的文件保存在哪里？',
+  ]
+  let seen = -1
+  for (const question of runtimeOrder) {
+    const at = help.indexOf(`q: '${question}'`)
+    assert.ok(at > seen, `${question} 的位置不对`)
+    seen = at
+  }
+  const draftOrder = [
+    '一定要登录才能用吗？',
+    '收不到短信验证码怎么办？',
+    '为什么离开一下就变回未登录了？',
+    '怎么打印文件？',
+    '打印时卡纸了怎么办？',
+    '确认打印以后没出纸怎么办？',
+    'U 盘插上了读不出来怎么办？',
+    '手机上建的单，到机器上怎么用？',
+  ]
+  seen = -1
+  for (const question of draftOrder) {
+    const at = draft.indexOf(`['${question}'`)
+    assert.ok(at > seen, `06 号稿 ${question} 的位置不对`)
+    seen = at
+  }
+})
