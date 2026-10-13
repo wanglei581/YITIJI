@@ -116,15 +116,55 @@ async function grant(id: string, action = 'close_account') {
   return token
 }
 
-// PG 作业里本门禁与种子、上百条门禁共用一个库；第 11 组按后四位边界反查，后四位必须避开库里已有的 4 位数。
+// 第 11 组按「前后不挨字母数字的四位数」反查尾号。先避开库里已有的，再避开本文件写死的日期。
+// 微信标识、手机号密文是身份本身，写法不动；里面若出现已占的四位数就换一次，最多 8 次，用尽即失败。
+const MAX_IDENTITY_DRAWS = 8
+const HYPHENATED_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+const FIXTURE_DAY = '2026-10-03'
+
+/** 和身份无关的夹具随机串：连续十六进制，不会出现被连字符隔开的四位数字。 */
+function closureFixtureToken(): string {
+  return randomUUID().replace(/-/g, '')
+}
+function boundedFourDigits(value: string): string[] {
+  return [...value.matchAll(/(?<![A-Za-z0-9])(\d{4})(?![A-Za-z0-9])/g)].map((match) => match[1]!)
+}
+function tailCollides(value: string, blocked: Set<string>, tail: string): boolean {
+  const groups = boundedFourDigits(value)
+  return groups.includes(tail) || groups.some((group) => blocked.has(group))
+}
+
 let takenTails: Set<string> | undefined
 async function member(nickname: string) {
-  takenTails ??= await collectBoundedFourDigitTokens(scanClient)
-  assert.ok(takenTails.size < 9000, `库里已有 ${takenTails.size} 个独立 4 位数，选不出不撞号的手机号`)
-  let phone: string
-  do phone = `139${randomInt(10000000, 99999999)}`; while (takenTails.has(phone.slice(-4)))
-  const identity: ClosureScanIdentity = { phone, phoneHash: hashPhone(phone), phoneEnc: encryptPhone(phone),
-    wxOpenId: `wx-${randomUUID()}`, nickname: `${nickname}·${tag.slice(0, 6)}-${memberIds.length}` }
+  if (!takenTails) {
+    takenTails = await collectBoundedFourDigitTokens(scanClient)
+    for (const day of [FIXTURE_DAY, new Date().toISOString().slice(0, 10)]) {
+      for (const group of boundedFourDigits(day)) takenTails.add(group)
+    }
+  }
+  const taken = takenTails
+  assert.ok(taken.size < 9000, `库里已有 ${taken.size} 个独立 4 位数，选不出不撞号的手机号`)
+  let phone = ''
+  let wxOpenId = ''
+  let phoneEnc = ''
+  let reserved = false
+  for (let attempt = 0; attempt < MAX_IDENTITY_DRAWS && !reserved; attempt += 1) {
+    do phone = `139${randomInt(10000000, 99999999)}`; while (taken.has(phone.slice(-4)))
+    const tail = phone.slice(-4)
+    for (let draw = 0; draw < MAX_IDENTITY_DRAWS; draw += 1) {
+      const openId = `wx-${randomUUID()}`
+      const enc = encryptPhone(phone)
+      if (tailCollides(openId, taken, tail) || tailCollides(enc, taken, tail)) continue
+      wxOpenId = openId
+      phoneEnc = enc
+      for (const group of [...boundedFourDigits(openId), ...boundedFourDigits(enc), tail]) taken.add(group)
+      reserved = true
+      break
+    }
+  }
+  assert.ok(reserved, '测试手机号和身份随机值避让 8 次后仍撞号')
+  const identity: ClosureScanIdentity = { phone, phoneHash: hashPhone(phone), phoneEnc,
+    wxOpenId, nickname: `${nickname}·${tag.slice(0, 6)}-${memberIds.length}` }
   const row = await put('endUser', { ...identity, phone: undefined, status: 'active', enabled: true })
   memberIds.push(row.id); return { id: row.id as string, identity }
 }
@@ -132,10 +172,10 @@ async function member(nickname: string) {
 async function fixture(id: string, identity: ClosureScanIdentity) {
   const expiresAt = new Date(Date.now() + 86400_000)
   const terminalId = `closure-terminal-${id}`
-  await put('terminal', { id: terminalId, terminalCode: terminalId, agentToken: randomUUID(), deviceFingerprint: randomUUID(), displayName: '市民服务中心东厅' })
+  await put('terminal', { id: terminalId, terminalCode: terminalId, agentToken: closureFixtureToken(), deviceFingerprint: closureFixtureToken(), displayName: '市民服务中心东厅' })
   const fileIds: string[] = []; const objectKeys: string[] = []
   for (const purpose of ['resume_upload', 'print_doc', 'contract_upload', 'contract_review_report', 'resume_scan', 'member_data_export']) {
-    const storageKey = `users/${id}/${randomUUID()}.pdf`
+    const storageKey = `users/${id}/${closureFixtureToken()}.pdf`
     const buffer = Buffer.from(`%PDF-1.4\n${identity.nickname} ${identity.phone} 求职材料`)
     await storage.putObject(storageKey, buffer, 'application/pdf')
     const file = await put('fileObject', { storageKey, filename: `${identity.nickname}的求职材料.pdf`, bucket: 'local-fs', region: 'local', mimeType: 'application/pdf',
@@ -145,7 +185,7 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   }
   // 覆盖历史 ownerId 归属、无 endUserId 的派生文件和尚未绑定的上传会话。
   for (const kind of ['owner_alias', 'derived', 'upload_pending']) {
-    const storageKey = `temporary/${randomUUID()}.pdf`
+    const storageKey = `temporary/${closureFixtureToken()}.pdf`
     const buffer = Buffer.from(`%PDF-1.4 ${identity.nickname} ${identity.phone}`)
     await storage.putObject(storageKey, buffer, 'application/pdf')
     const file = await put('fileObject', { storageKey, filename: `${identity.nickname}的扫描材料.pdf`, bucket: 'local-fs', region: 'local',
@@ -155,11 +195,11 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
       ...(kind === 'derived' ? { sourceFileId: fileIds[0] } : {}) })
     fileIds.push(file.id); objectKeys.push(storageKey)
     if (kind === 'upload_pending') {
-      const sessionId = randomUUID()
+      const sessionId = closureFixtureToken()
       await key(`upload_session:${sessionId}`, JSON.stringify({ sessionId, endUserId: id, file: { fileId: file.id } }))
     }
   }
-  const task = await put('printTask', { id: randomUUID(), terminalId, endUserId: id, fileUrl: `/files/${fileIds[0]}/content`, fileId: fileIds[0], fileMd5: identity.phoneHash,
+  const task = await put('printTask', { id: closureFixtureToken(), terminalId, endUserId: id, fileUrl: `/files/${fileIds[0]}/content`, fileId: fileIds[0], fileMd5: identity.phoneHash,
     status: 'completed', paramsJson: JSON.stringify({ fileName: `${identity.nickname}.pdf`, phone: identity.phone, copies: 1 }) })
   const order = await put('order', { orderNo: `M${randomInt(10000000, 99999999)}${randomInt(10000000, 99999999)}`, endUserId: id, terminalId,
     printTaskId: task.id, payStatus: 'paid', taskStatus: 'completed', pickupStatus: 'used', amountCents: 200,
@@ -169,30 +209,30 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await prisma.printTask.update({ where: { id: task.id }, data: { orderId: order.id } })
   await put('orderItem', { orderId: order.id, seq: 1, fileId: fileIds[0], colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 2, amountCents: 200, status: 'completed', printTaskId: task.id })
   await put('printTaskStatusLog', { taskId: task.id, fromStatus: 'printing', toStatus: 'completed', errorCode: null })
-  await put('orderSubmissionLedger', { endUserId: id, idempotencyKey: randomUUID(), orderKind: 'print', payloadHash: identity.phoneHash, status: 'succeeded', orderId: order.id })
+  await put('orderSubmissionLedger', { endUserId: id, idempotencyKey: closureFixtureToken(), orderKind: 'print', payloadHash: identity.phoneHash, status: 'succeeded', orderId: order.id })
   await put('paymentAttempt', { orderId: order.id, channel: 'sandbox', amountCents: 200, status: 'success', prepayId: identity.wxOpenId,
-    qrCodeContent: `sandboxpay://${identity.phone}`, channelTxnNo: randomUUID(), failReason: identity.nickname })
-  await put('refund', { orderId: order.id, refundNo: randomUUID(), amountCents: 50, status: 'success', reason: `${identity.nickname} ${identity.phone} 多付`, channel: 'offline' })
+    qrCodeContent: `sandboxpay://${identity.phone}`, channelTxnNo: closureFixtureToken(), failReason: identity.nickname })
+  await put('refund', { orderId: order.id, refundNo: closureFixtureToken(), amountCents: 50, status: 'success', reason: `${identity.nickname} ${identity.phone} 多付`, channel: 'offline' })
   const activity = await put('benefitActivity', { title: '秋季求职材料公益打印', benefitType: 'free_quota' })
   const benefit = await put('benefitGrant', { endUserId: id, benefitType: 'free_quota', title: `${identity.nickname}的打印权益`, quantityTotal: 10, quantityRemaining: 8, status: 'active', description: identity.phone })
   await put('benefitClaim', { endUserId: id, benefitGrantId: benefit.id, activityId: activity.id })
-  await put('redemptionRecord', { endUserId: id, benefitRef: benefit.id, kind: 'free_quota', serviceType: 'print', serviceRefId: task.id, idempotencyKey: randomUUID() })
+  await put('redemptionRecord', { endUserId: id, benefitRef: benefit.id, kind: 'free_quota', serviceType: 'print', serviceRefId: task.id, idempotencyKey: closureFixtureToken() })
   const interview = await put('mockInterviewSession', { endUserId: id, interviewerType: 'hr', industry: '软件服务', position: '产品助理', experience: 'fresh', difficulty: 'standard', expiresAt, resumeDigest: identity.nickname })
   await put('mockInterviewTurn', { sessionId: interview.id, idx: 1, role: 'candidate', content: `${identity.nickname} ${identity.phone}`, transcriptText: identity.nickname })
   await put('mockInterviewReport', { sessionId: interview.id, payloadJson: JSON.stringify({ candidate: identity.nickname }), expiresAt })
   const advisor = await put('advisorSession', { endUserId: id, skill: 'qa', topic: `我是${identity.nickname}，电话${identity.phone}`, expiresAt })
   await put('advisorPin', { sessionId: advisor.id, idx: 1, content: identity.nickname, evidenceLevel: 'E2' })
   await put('advisorArtifact', { sessionId: advisor.id, kind: 'qa_pins', provider: 'fallback', payloadJson: JSON.stringify({ phone: identity.phone }), fileId: fileIds[1], expiresAt })
-  await put('aiResumeResult', { taskId: randomUUID(), endUserId: id, kind: 'parse', status: 'completed', provider: 'fallback', payloadJson: JSON.stringify({ nickname: identity.nickname }), expiresAt })
+  await put('aiResumeResult', { taskId: closureFixtureToken(), endUserId: id, kind: 'parse', status: 'completed', provider: 'fallback', payloadJson: JSON.stringify({ nickname: identity.nickname }), expiresAt })
   await put('jobAiSession', { endUserId: id, operation: 'job_fit', status: 'completed', intentJson: JSON.stringify({ nickname: identity.nickname }), expiresAt })
   const doc = await put('documentProcessTask', { endUserId: id, kind: 'pii', sourceFileId: fileIds[1], resultFileId: fileIds[1], expiresAt })
   await put('piiFinding', { taskId: doc.id, type: 'phone', label: '电话', snippet: identity.phone })
   await put('contractReviewTask', { endUserId: id, sourceFileId: fileIds[2], resultFileId: fileIds[3], contractType: 'labor', consentVersion: 'v1', consentedAt: new Date(), consentScopeHash: identity.phoneHash,
     disclaimerVersion: 'v1', rulePackVersion: 'v1', schemaVersion: 'v1', resultJson: JSON.stringify({ name: identity.nickname }), expiresAt })
   await put('scanTask', { terminalId, endUserId: id, scanType: 'resume', status: 'expired', fileId: fileIds[4], expiresAt })
-  await put('browseLog', { endUserId: id, targetType: 'policy', targetId: randomUUID(), targetTitle: identity.nickname, expiresAt })
-  await put('externalJumpLog', { endUserId: id, targetType: 'policy', targetId: randomUUID(), action: 'external_open', targetTitle: identity.nickname, expiresAt })
-  await put('favorite', { endUserId: id, targetType: 'policy', targetId: randomUUID(), title: identity.nickname })
+  await put('browseLog', { endUserId: id, targetType: 'policy', targetId: closureFixtureToken(), targetTitle: identity.nickname, expiresAt })
+  await put('externalJumpLog', { endUserId: id, targetType: 'policy', targetId: closureFixtureToken(), action: 'external_open', targetTitle: identity.nickname, expiresAt })
+  await put('favorite', { endUserId: id, targetType: 'policy', targetId: closureFixtureToken(), title: identity.nickname })
   await put('jobApplication', { endUserId: id, companyName: '青岛海岸软件服务有限公司', positionTitle: '产品助理', note: identity.phone, channel: 'external_self_reported' })
   // H2-3：托管打开时期留下的「关联系统岗位」的求职进度。托管关闭后列表把它整条隐藏，但库里还在，注销时同样要删。
   const linkOrg = await put('organization', { id: `closure-org-${id}`, name: '崂山区公共就业服务中心', type: 'licensed_hr_agency' })
@@ -201,14 +241,14 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
     reviewStatus: 'approved', publishStatus: 'published' })
   await put('jobApplication', { endUserId: id, jobId: linkedJob.id, companyName: '青岛崂山某配送服务有限公司', positionTitle: '仓库理货员', channel: 'external_self_reported' })
   await put('userNotification', { memberId: id, type: 'legacy', title: '打印材料通知', content: identity.nickname })
-  await put('kioskSession', { memberId: id, terminalId, orgId: null, clientSessionId: randomUUID(), categoriesJson: JSON.stringify([identity.nickname]), expiresAt })
+  await put('kioskSession', { memberId: id, terminalId, orgId: null, clientSessionId: closureFixtureToken(), categoriesJson: JSON.stringify([identity.nickname]), expiresAt })
   await put('memberNotification', { endUserId: id, title: '材料已打印', content: identity.nickname })
   // AI 按人次数账本：每日计数键是 `member:<id>`，预占记录存原始会员号。
-  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${id}`, bucket: 'ai_resume', day: '2026-10-03', used: 3 } })
+  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${id}`, bucket: 'ai_resume', day: FIXTURE_DAY, used: 3 } })
   await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: id, bucket: 'ai_resume',
-    source: 'daily', day: '2026-10-03', status: 'committed', resultRef: `resume-${randomUUID()}` } })
+    source: 'daily', day: FIXTURE_DAY, status: 'committed', resultRef: `resume-${closureFixtureToken()}` } })
   await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: id, bucket: 'ai_assistant',
-    source: 'daily', day: '2026-10-03', status: 'reserved' } })
+    source: 'daily', day: FIXTURE_DAY, status: 'reserved' } })
   const broadcast = await put('systemBroadcast', { title: '东厅打印机维护通知', content: '下午开放使用' })
   await put('broadcastReadState', { endUserId: id, broadcastId: broadcast.id })
   const ticket = await put('feedbackTicket', { endUserId: id, terminalId, category: 'print', content: `${identity.nickname} ${identity.phone} 尾号 ${identity.phone.slice(-4)} 请处理`, contactPhoneEnc: identity.phoneEnc })
@@ -221,9 +261,29 @@ async function fixture(id: string, identity: ClosureScanIdentity) {
   await put('auditLog', { actorRole: 'end_user', action: 'member.phone.rebind', targetType: 'EndUser', targetId: id,
     payloadJson: JSON.stringify({ oldPhoneMasked: `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}` }) })
   for (const prefix of ['code', 'attempt', 'cooldown', 'daily']) await key(`member:sms:${prefix}:${identity.phoneHash}`, '1')
-  await key(`member:step-up:challenge:${randomUUID()}:meta`, JSON.stringify({ endUserId: id }))
-  await key(`member:qr:${randomUUID()}`, JSON.stringify({ user: { id, nickname: identity.nickname, phoneMasked: `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}` } }))
+  await key(`member:step-up:challenge:${closureFixtureToken()}:meta`, JSON.stringify({ endUserId: id }))
+  await key(`member:qr:${closureFixtureToken()}`, JSON.stringify({ user: { id, nickname: identity.nickname, phoneMasked: `${identity.phone.slice(0, 3)}****${identity.phone.slice(-4)}` } }))
   return { orderId: order.id as string, taskId: task.id as string, fileIds, objectKeys, terminalId }
+}
+
+/** 夹具写进库、且和身份无关的随机字段。自检读库，不读生成函数的返回值。 */
+async function opaqueFixtureTokens(endUserId: string, built: { terminalId: string; orderId: string; taskId: string; fileIds: string[] }) {
+  const terminal = await prisma.terminal.findUniqueOrThrow({ where: { id: built.terminalId } })
+  const refund = await prisma.refund.findFirstOrThrow({ where: { orderId: built.orderId } })
+  const attempt = await prisma.paymentAttempt.findFirstOrThrow({ where: { orderId: built.orderId } })
+  const task = await prisma.printTask.findUniqueOrThrow({ where: { id: built.taskId } })
+  const ledger = await prisma.orderSubmissionLedger.findFirstOrThrow({ where: { orderId: built.orderId } })
+  const redemption = await prisma.redemptionRecord.findFirstOrThrow({ where: { endUserId } })
+  const files = await prisma.fileObject.findMany({ where: { id: { in: built.fileIds } } })
+  const resume = await prisma.aiResumeResult.findFirstOrThrow({ where: { endUserId } })
+  const browse = await prisma.browseLog.findFirstOrThrow({ where: { endUserId } })
+  const jump = await prisma.externalJumpLog.findFirstOrThrow({ where: { endUserId } })
+  const favorite = await prisma.favorite.findFirstOrThrow({ where: { endUserId } })
+  const kiosk = await prisma.kioskSession.findFirstOrThrow({ where: { memberId: endUserId } })
+  const quota = await prisma.aiQuotaReservation.findFirstOrThrow({ where: { endUserId, resultRef: { not: null } } })
+  return [terminal.agentToken, terminal.deviceFingerprint, refund.refundNo, attempt.channelTxnNo ?? '', task.id,
+    ledger.idempotencyKey, redemption.idempotencyKey, resume.taskId, browse.targetId, jump.targetId, favorite.targetId,
+    kiosk.clientSessionId ?? '', quota.resultRef ?? '', ...files.map((file) => file.storageKey)]
 }
 
 async function main() {
@@ -232,10 +292,46 @@ async function main() {
   await put('user', { id: admin.userId, username: `closure-admin-${tag}`, name: '运营管理员', passwordHash: 'not-a-login-password', role: 'admin' })
   const owned = await member('林知远'); const other = await member('沈嘉宁')
   const ownedFixture = await fixture(owned.id, owned.identity); const otherFixture = await fixture(other.id, other.identity)
+  const tail = owned.identity.phone.slice(-4)
+  await check('阳性对照：自由文本里的测试尾号必须被扫出来', async () => {
+    const terminal = await prisma.terminal.findUniqueOrThrow({ where: { id: ownedFixture.terminalId } })
+    const planted = `联系电话尾号 ${tail}`
+    await prisma.terminal.update({ where: { id: terminal.id }, data: { displayName: planted } })
+    try {
+      const scan = await scanClosureDatabase(scanClient, owned.identity)
+      assert.ok(scan.hits.includes('Terminal.displayName'), `自由文本尾号未被扫出: ${scan.hits.join(',')}`)
+    } finally {
+      await prisma.terminal.update({ where: { id: terminal.id }, data: { displayName: terminal.displayName } })
+    }
+  })
+  await check('撞号重现：旧造法写进设备指纹会被扫出，夹具随机字段不再是带连字符的 UUID', async () => {
+    const terminal = await prisma.terminal.findUniqueOrThrow({ where: { id: ownedFixture.terminalId } })
+    const colliding = `aaaaaaaa-${tail}-4aaa-8aaa-aaaaaaaaaaaa`
+    await prisma.terminal.update({ where: { id: terminal.id }, data: { deviceFingerprint: colliding } })
+    try {
+      const scan = await scanClosureDatabase(scanClient, owned.identity)
+      assert.ok(scan.hits.includes('Terminal.deviceFingerprint'), `旧造法未被扫出: ${scan.hits.join(',')}`)
+    } finally {
+      await prisma.terminal.update({ where: { id: terminal.id }, data: { deviceFingerprint: terminal.deviceFingerprint } })
+    }
+    const minted = closureFixtureToken()
+    assert.equal(HYPHENATED_UUID.test(minted), false, minted)
+    assert.equal(boundedFourDigits(minted).length, 0, minted)
+    for (const [id, built] of [[owned.id, ownedFixture], [other.id, otherFixture]] as const) {
+      for (const value of await opaqueFixtureTokens(id, built)) {
+        assert.equal(HYPHENATED_UUID.test(value), false, `夹具仍写出带连字符的 UUID: ${value}`)
+        assert.equal(boundedFourDigits(value).includes(tail), false, `夹具随机值撞上测试尾号: ${value}`)
+      }
+    }
+    const otherRow = await prisma.endUser.findUniqueOrThrow({ where: { id: other.id } })
+    for (const value of [otherRow.wxOpenId ?? '', otherRow.phoneEnc]) {
+      assert.equal(boundedFourDigits(value).includes(tail), false, '另一会员的身份随机值撞上测试尾号')
+    }
+  })
   // 阳性对照：会员号以本人会员号开头的另一行（等值删不会碰它，前缀删会误删它）。
-  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${owned.id}9`, bucket: 'ai_resume', day: '2026-10-03', used: 1 } })
+  await prisma.aiQuotaDaily.create({ data: { endUserId: `member:${owned.id}9`, bucket: 'ai_resume', day: FIXTURE_DAY, used: 1 } })
   await prisma.aiQuotaReservation.create({ data: { operationKey: randomBytes(32).toString('hex'), endUserId: `${owned.id}9`, bucket: 'ai_resume',
-    source: 'daily', day: '2026-10-03', status: 'committed', resultRef: 'resume-prefix-control' } })
+    source: 'daily', day: FIXTURE_DAY, status: 'committed', resultRef: 'resume-prefix-control' } })
   const input: MemberClosureInput = { source: 'offline', offlineEvidenceNo: `ZX-${tag.slice(0, 8)}`, reasonText: '本人到场申请注销', phoneLast4: owned.identity.phone.slice(-4) }
   const page = { cursor: null, pageSize: 20 }
   const beforeOther = new Map<string, number>()
@@ -291,10 +387,10 @@ async function main() {
     // 材料包订单过期时只改订单状态、不改明细；明细停在 pending 不能算在途。
     const abandoned = await put('order', { orderNo: `M${randomInt(10000000, 99999999)}${randomInt(10000000, 99999999)}`, endUserId: owned.id,
       payStatus: 'closed', taskStatus: 'expired', pickupStatus: 'expired', amountCents: 0 })
-    await put('orderItem', { orderId: abandoned.id, seq: 1, fileId: randomUUID(), colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 3, amountCents: 0, status: 'pending' })
+    await put('orderItem', { orderId: abandoned.id, seq: 1, fileId: closureFixtureToken(), colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 3, amountCents: 0, status: 'pending' })
     const unpaid = await put('order', { orderNo: `M${randomInt(10000000, 99999999)}${randomInt(10000000, 99999999)}`, endUserId: owned.id,
       payStatus: 'unpaid', taskStatus: 'pending', pickupStatus: 'none', amountCents: 300 })
-    await put('orderItem', { orderId: unpaid.id, seq: 1, fileId: randomUUID(), colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 3, amountCents: 0, status: 'pending' })
+    await put('orderItem', { orderId: unpaid.id, seq: 1, fileId: closureFixtureToken(), colorMode: 'black_white', duplex: 'simplex', copies: 1, billablePages: 3, amountCents: 0, status: 'pending' })
     // 直接跑在途检查（尾号核验排在它前面，走 execute 会被别的错误遮住）；后面的第 7、9 组再带着这两张订单真执行一次。
     await (closure as any).assertNoOpenOrders(prisma, owned.id)
     // 对照：同一张已付款订单，明细停在待处理且取件未过期 → 仍然要挡。
@@ -545,7 +641,7 @@ async function verifyHttp(newId: string, oldInput: MemberClosureInput) {
     assert.equal(response.status, 201); const row = (await response.json() as any).data
     assert.equal((await call(`me/data-requests/${row.id}/cancel`, 'POST')).status, 201)
     assert.equal((await call(`admin/users/${newId}/closure`, 'POST', closureInput, adminToken)).status, 409)
-    const order = await put('order', { endUserId: newId, orderNo: `HTTP-${randomUUID()}`, payStatus: 'paid', taskStatus: 'completed', pickupStatus: 'pending', amountCents: 100 })
+    const order = await put('order', { endUserId: newId, orderNo: `HTTP-${closureFixtureToken()}`, payStatus: 'paid', taskStatus: 'completed', pickupStatus: 'pending', amountCents: 100 })
     const offlineInput = { ...closureInput, source: 'offline', offlineEvidenceNo: `HTTP-${tag}` }
     const blocked = await call(`admin/users/${newId}/closure`, 'POST', offlineInput, adminToken)
     assert.equal(blocked.status, 409)
