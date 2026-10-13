@@ -473,9 +473,10 @@ async function expectSameRow(page: Page, locators: Locator[]) {
     expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1)
   }
   // 稿 24 核对底栏三颗按字宽起步、平分剩下的宽度：中间那颗和主按钮差不多宽，「上一步」最窄。
-  // 防的是主次反过来——主按钮缩成字宽、次要按钮被撑开。
+  // 中间那颗字多一个，运行页约 410 对 367（0.89）。防的是主次反过来——主按钮缩成字宽、
+  // 次要按钮被撑开，那时只有约 0.70，所以线划在 0.85。
   const [first, middle, primary] = [boxes[0], boxes[1], boxes[boxes.length - 1]]
-  expect(primary.width).toBeGreaterThanOrEqual(middle.width * 0.9)
+  expect(primary.width).toBeGreaterThanOrEqual(middle.width * 0.85)
   expect(first.width).toBeLessThan(middle.width)
 }
 
