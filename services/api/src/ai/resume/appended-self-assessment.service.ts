@@ -15,7 +15,8 @@ import { PDFDocument } from 'pdf-lib'
 import { appendAigcPages } from '../../common/pdf/aigc-label'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
-import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl, verifyFileSignature } from '../../files/signing'
+import { assertGuestFileProof } from '../../files/file-access-proof'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
   SelfAssessmentService,
@@ -88,15 +89,8 @@ export class AppendedSelfAssessmentService {
     const resumeAccess = resumeRow.endUserId ? 'owner' : 'signed_url'
     if (resumeRow.endUserId) {
       if (opts.requester.endUserId !== resumeRow.endUserId) throw resumeMissing()
-    } else {
-      const grant = parseResumeContentGrant(opts.resumeFileUrl)
-      if (
-        !grant
-        || grant.fileId !== opts.resumeFileId
-        || !verifyFileSignature(grant.fileId, grant.expires, grant.sig)
-      ) {
-        throw resumeMissing()
-      }
+    } else if (!assertGuestFileProof(opts.resumeFileId, opts.resumeFileUrl)) {
+      throw resumeMissing()
     }
     if (resumeRow.deletedAt || !APPENDABLE_RESUME_PURPOSES.has(resumeRow.purpose)) throw resumeMissing()
     if (resumeRow.mimeType !== 'application/pdf') {
@@ -229,32 +223,6 @@ export class AppendedSelfAssessmentService {
  * 合同原件、签约风险报告、证件扫描、招聘会资料等不在其中，它们各有自己的打印和留存规则。
  */
 const APPENDABLE_RESUME_PURPOSES: ReadonlySet<string> = new Set(['resume_upload', 'resume_scan', 'print_doc'])
-
-const RESUME_CONTENT_PATH = /^\/api\/v1\/files\/([^/]+)\/content$/
-
-/** 从签名地址取出编号、到期时间与签名。路径或查询串对不上则返回空。 */
-function parseResumeContentGrant(resumeFileUrl: string | undefined): { fileId: string; expires: string; sig: string } | null {
-  if (!resumeFileUrl) return null
-  let parsed: URL
-  try {
-    parsed = new URL(resumeFileUrl, 'http://local')
-  } catch {
-    return null
-  }
-  const matched = RESUME_CONTENT_PATH.exec(parsed.pathname)
-  if (!matched?.[1]) return null
-  let fileId: string
-  try {
-    fileId = decodeURIComponent(matched[1])
-  } catch {
-    return null
-  }
-  if (parsed.pathname !== `/api/v1/files/${fileId}/content`) return null
-  const expires = parsed.searchParams.get('expires')
-  const sig = parsed.searchParams.get('sig')
-  if (!expires || !sig) return null
-  return { fileId, expires, sig }
-}
 
 /** 只拷页、不动 Info：用于不含 AI 内容的追加页（与 appendAigcPages 同一套 pdf-lib 拷页写法）。 */
 async function appendPlainPages(resumePdf: Buffer, appendixPdf: Buffer): Promise<{ buffer: Buffer; pageCount: number }> {

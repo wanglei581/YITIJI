@@ -105,7 +105,7 @@ const MOCK_REPORT: InterviewReportResponse = {
 // ── 导出函数 ──────────────────────────────────────────────────────────────────
 
 export function createInterview(
-  input: CreateInterviewInput & { interactionMode?: 'text' | 'voice' },
+  input: CreateInterviewInput & { interactionMode?: 'text' | 'voice'; fileAccessUrl?: string },
   access: InterviewAccess,
 ): Promise<CreateInterviewResponse> {
   if (API_MODE !== 'http') {

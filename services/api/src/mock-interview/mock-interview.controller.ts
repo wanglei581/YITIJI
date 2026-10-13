@@ -46,6 +46,10 @@ export class CreateInterviewDto {
   @IsOptional() @IsString() @MaxLength(64)
   resumeFileId?: string
 
+  /** 没有会员主人的简历须带本次签名地址。 */
+  @IsOptional() @IsString() @MaxLength(1024)
+  fileAccessUrl?: string
+
   /** 交互方式偏好:voice=语音回合制(文字兜底);text=纯文字 */
   @IsOptional() @IsIn(['text', 'voice'])
   interactionMode?: string

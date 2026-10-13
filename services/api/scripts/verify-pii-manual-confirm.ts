@@ -37,6 +37,8 @@ async function outcome(op: () => Promise<unknown>): Promise<{ ok: true; value: u
 const describe = (r: Awaited<ReturnType<typeof outcome>>) => (r.ok ? '成功' : `失败 ${r.status ?? '-'} ${r.code ?? ''}`)
 
 async function main(): Promise<void> {
+  const { holdOwnerlessMaterialFileUrl } = await import('./support/hold-ownerless-material-file-url')
+  holdOwnerlessMaterialFileUrl()
   const { PrismaService } = await import('../src/prisma/prisma.service')
   const { MaterialsService } = await import('../src/materials/materials.service')
   const { MaterialsManualConfirmationService, PII_MANUAL_CONFIRMABLE_MODES } = await import('../src/materials/materials-manual-confirmation.service')

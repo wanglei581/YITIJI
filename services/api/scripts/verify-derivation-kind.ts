@@ -277,7 +277,7 @@ async function main(): Promise<void> {
     const materials = new MaterialsService(prisma, storage, ocr as never, {} as never)
     const confirmations = new MaterialsManualConfirmationService(prisma, audit, materials)
     const requester = { kind: 'member' as const, endUserId }
-    const created = await materials.createTask({ sourceFileId: imagePdf.fileId, kind: 'pii_scan' } as never, requester).then((v) => ({ ok: true as const, v }), (e) => ({ ok: false as const, code: codeOf(e) }))
+    const created = await materials.createTask({ sourceFileId: imagePdf.fileId, kind: 'pii_scan', fileAccessUrl: signFileUrl(imagePdf.fileId).url } as never, requester).then((v) => ({ ok: true as const, v }), (e) => ({ ok: false as const, code: codeOf(e) }))
     check('材料检查能对图片转 PDF 产物建隐私检查任务', created.ok, created.ok ? '' : created.code)
     if (created.ok) {
       const task = await prisma.documentProcessTask.findFirst({ where: { sourceFileId: imagePdf.fileId, kind: 'pii_scan' }, orderBy: { createdAt: 'desc' } })

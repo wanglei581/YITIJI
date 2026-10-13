@@ -157,6 +157,8 @@ function verifyForbiddenClaimCopy(): void {
 }
 
 async function main() {
+  const { holdOwnerlessMaterialFileUrl } = await import('./support/hold-ownerless-material-file-url')
+  holdOwnerlessMaterialFileUrl()
   console.log('\n=== 隐私遮挡（一级 · 文字层 PDF）验证 ===')
   verifyForbiddenClaimCopy()
   const prisma = new PrismaService()
