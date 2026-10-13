@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { KEYBOARD_VIEWPORT_EVENT, readKeyboardViewport } from '../system-keyboard/viewport.ts'
 
 /** 一体机设计稿纸面（竖屏触控基准）。 */
 export const KIOSK_STAGE_WIDTH = 1080
@@ -16,9 +17,9 @@ export interface KioskStageFit {
 function readViewportSize(): { width: number; height: number } {
   const vv = window.visualViewport
   if (vv && vv.width > 0 && vv.height > 0) {
-    return { width: Math.round(vv.width), height: Math.round(vv.height) }
+    return readKeyboardViewport({ width: Math.round(vv.width), height: Math.round(vv.height) }, usesKioskFluidViewport(window.innerWidth, window.innerHeight))
   }
-  return { width: window.innerWidth, height: window.innerHeight }
+  return readKeyboardViewport({ width: window.innerWidth, height: window.innerHeight }, usesKioskFluidViewport(window.innerWidth, window.innerHeight))
 }
 
 /**
@@ -77,12 +78,14 @@ export function useKioskStageFit(): KioskStageFit {
 
     update()
     window.addEventListener('resize', update)
+    window.addEventListener(KEYBOARD_VIEWPORT_EVENT, update)
     const vv = window.visualViewport
     vv?.addEventListener('resize', update)
     vv?.addEventListener('scroll', update)
 
     return () => {
       window.removeEventListener('resize', update)
+      window.removeEventListener(KEYBOARD_VIEWPORT_EVENT, update)
       vv?.removeEventListener('resize', update)
       vv?.removeEventListener('scroll', update)
     }

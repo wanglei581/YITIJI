@@ -274,8 +274,11 @@ test('pickup accepts 8-digit codes without truncating a legacy 10-char code @w2'
   await page.goto('/print/pickup-claim')
   const input = page.getByLabel('到机码输入框')
   await expect(input).toBeVisible()
-  // 纯数字码必须唤起数字键盘，而不是全键盘。
-  await expect(input).toHaveAttribute('inputmode', 'numeric')
+  // 一体机上这一格由页面自己的数字键盘和扫码器输入（2026-10-10 起文字输入走系统触摸键盘，
+  // 配着页面键盘的格子要压住系统键盘，免得两个键盘叠在一起）；源码里仍声明 numeric 给手机浏览器用。
+  await expect(input).toHaveAttribute('data-kiosk-keyboard', 'page')
+  await expect(input).toHaveAttribute('virtualkeyboardpolicy', 'manual')
+  await expect(input).toHaveAttribute('inputmode', 'none')
 
   // 前 8 位全为数字的存量码：逐字符输入，不得在第 8 位被提交。
   await input.pressSequentially('23456789', { delay: 5 })

@@ -711,15 +711,6 @@
 /* 舞台模式里输入坞与边界说明紧贴导航，不留行间距。 */
 [data-kiosk-stage-fit='on'] .kassist.kassist-lightflow .assistant-truth { margin-top: -16px; }
 
-/* ── 软键盘打开：只收起「看状态」的仪表带与边界说明，把输入坞抬到键盘上沿。
- * 键盘固定在舞台底部、先盖住 132px 的主导航，所以输入坞只需再让出「键盘高 − 导航高」。 ── */
-.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-cockpit .assistant-ai-tools,
-.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-cockpit-disclosure,
-.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-truth { display: none; }
-.kassist.kassist-lightflow .assistant-workbench[data-kb-open] .assistant-composer {
-  margin-bottom: max(0px, calc(var(--kassist-kb-h, 0px) - 132px));
-}
-
 /* ══ 流式模式（手机 / 窄屏）：主体、输入坞与边界说明 ═══════════════ */
 @media (max-width: 760px) {
   .kassist.kassist-lightflow { --ck-gutter: 14px; padding-top: 10px; }

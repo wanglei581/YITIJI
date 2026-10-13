@@ -78,8 +78,6 @@
 .kassist .assistant-cockpit-body > * { flex-shrink: 0; }
 .kassist .assistant-truth { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; font-size: var(--qx-fs-aux); color: var(--qx-ink-2); }
 .kassist .assistant-complaint-link { flex: none; min-height: 48px; padding: 0 4px; border: 0; background: none; color: var(--qx-teal-d); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-/* 键盘覆盖的高度只留在页面末尾；头卡、正文和输入区仍按阅读顺序滚动。 */
-.kassist .assistant-workbench[data-kb-open] { padding-bottom: calc(var(--kassist-kb-h) + 20px); }
 @media (max-width: 600px) {
   .kassist.kassist-qingxu { overflow-y: auto; }
   .kassist.kassist-qingxu .assistant-workbench { height: auto; min-height: 100%; padding: 16px 0 24px; gap: 16px; }
@@ -98,7 +96,6 @@
   .kassist .assistant-ai-tools-header { flex-wrap: wrap; }
   .kassist .assistant-ai-tools-group { grid-template-columns: 1fr; }
   .kassist .assistant-cockpit-body { flex: none; overflow: visible; padding: 2px 4px; }
-  .kassist .assistant-workbench[data-kb-open] { padding-bottom: var(--kassist-kb-h); }
 }
 @media (prefers-reduced-motion: reduce) {
   .kassist *, .kassist *::before, .kassist *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -124,3 +121,8 @@
 @media (max-width: 600px) {
   .kassist .assistant-ai-tools-group { grid-template-columns: 1fr; gap: 8px; }
 }
+
+/* 触控涟漪节点（useInkRipple 在按下时塞进按钮里的 span）：它的定位样式只写在旧的 .kassist-lightflow 作用域下，
+ * 本页现在是 .kassist-qingxu，没有那条样式时这个 span 会变成按钮里的一个 275px 方块，把按钮瞬间撑大、
+ * 整排挪位，手指抬起时已不在按钮上，这一下就点空了。青序稿没有涟漪效果，这里直接不显示它。 */
+.kassist.kassist-qingxu .k-ripple { display: none; }
