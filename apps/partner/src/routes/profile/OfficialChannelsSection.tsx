@@ -178,7 +178,7 @@ export function OfficialChannelsSection({ publishable, archived }: { publishable
       </div>
 
       <p className="mt-4 text-sm leading-relaxed text-neutral-600">
-        {'这里维护的二维码只出现在本机构自己的一体机终端上，用户扫码后打开本机构的官方网站或官方账号。'
+        {'这里维护的二维码只出现在本机构自己的一体机终端上，并且要本机构通过平台内容可信核验后才会显示；用户扫码后打开本机构的官方网站或官方账号。'
           + '渠道由本机构自行维护；平台只在违法违规、权利人投诉等紧急情况下紧急下架，下架后不能恢复。'}
       </p>
 
@@ -214,7 +214,7 @@ export function OfficialChannelsSection({ publishable, archived }: { publishable
             icon={QrCodeIcon}
             title="还没有添加官方渠道"
             description={canAdd
-              ? '点右上角「添加渠道」，二维码会出现在本机构自己的一体机上。'
+              ? '点右上角「添加渠道」；本机构通过平台内容可信核验后，二维码会出现在本机构自己的一体机上。'
               : '平台登记本机构的官方域名之后，才能在这里添加渠道。'}
           />
         )}
