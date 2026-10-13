@@ -35,6 +35,7 @@ import {
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { runWithAiQuota } from '../src/ai/quota/run-with-ai-quota'
 import { ResumeDraftSourceService } from '../src/ai/resume/resume-draft-source.service'
+import { FilesService } from '../src/files/files.service'
 import { LlmCareerPlanService } from '../src/ai/resume/llm-career-plan.service'
 import { LlmFairVisitPlanService } from '../src/ai/resume/llm-fair-visit-plan.service'
 import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
@@ -534,6 +535,8 @@ async function main(): Promise<void> {
       { provide: MemberPrivacyService, useValue: {} },
       { provide: AssistantSummaryService, useValue: {} },
       { provide: ResumeDraftSourceService, useValue: {} },
+      // 简历诊断旧路径扣次数前要先确认文件可用，AiController 因此依赖 FilesService；本门禁不走简历诊断，给空桩。
+      { provide: FilesService, useValue: {} },
       { provide: AiPublicQuotaService, useValue: publicQuota },
       { provide: AiService, useValue: {
         async chatWithAssistant(input: { message: string; sessionId?: string; channel?: 'kiosk' | 'miniapp' }, ownerKey = 'anon') {
