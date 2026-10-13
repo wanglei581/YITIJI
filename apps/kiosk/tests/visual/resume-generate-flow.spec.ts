@@ -218,6 +218,7 @@ test('带着已填内容从预览回来，跳过第 0 屏 @kiosk', async ({ page
   await expect(page.getByTestId('resume-generate-entry')).toHaveCount(0)
   await expect(page.locator('[data-generate-state="input-basic"]')).toBeVisible()
   await expect(page.getByRole('textbox', { name: '姓名' })).toHaveValue('孙晓雯')
+  await expect(page.getByTestId('resume-generate-carried-note')).toHaveCount(0)
 })
 
 test('核对页点一行修改，落到对应的步和页签 @kiosk', async ({ page, api }) => {

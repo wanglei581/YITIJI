@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 716,
+      "reachableFileCount": 718,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16505,7 +16505,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 814
+      "sourceFileCount": 816
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21381,6 +21381,9 @@
     "apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx": [
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
+    "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeEmptyState.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
+    ],
     "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
@@ -21462,6 +21465,9 @@
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/components/resumeGenerateModel.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx": [
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs"
@@ -21573,6 +21579,9 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resumeBlocksToGenerateForm.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -25547,9 +25556,11 @@
       "services/api/scripts/verify-package-order-idempotency.ts"
     ],
     "services/api/src/common/pii/llm-input-mask.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/common/pii/pii-masker.ts": [
+      "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "services/api/scripts/verify-llm-input-pii-mask.ts"
     ],
     "services/api/src/common/prisma/postgres-busy.ts": [
@@ -31097,6 +31108,8 @@
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx",
+          "apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeEmptyState.tsx",
+          "apps/kiosk/src/pages/resume/components/resumeGenerateModel.ts",
           "apps/kiosk/src/pages/resume/resume-authoring-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-diagnosis-lightflow.css",
           "apps/kiosk/src/pages/resume/resume-generate-qx.css",
@@ -31105,7 +31118,10 @@
           "apps/kiosk/src/pages/resume/resume-optimize-qx.css",
           "apps/kiosk/src/pages/resume/resume-triage-panels-qx.css",
           "apps/kiosk/src/pages/resume/resume-triage-qx.css",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/pages/resume/resumeBlocksToGenerateForm.ts",
+          "apps/kiosk/src/routes/index.tsx",
+          "services/api/src/common/pii/llm-input-mask.ts",
+          "services/api/src/common/pii/pii-masker.ts"
         ],
         "missing": []
       },

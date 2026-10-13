@@ -44,6 +44,7 @@ import {
   type GenerateFormSnapshot,
   type HistorySeg,
 } from './components/resumeGenerateModel'
+import { CARRIED_NOTE } from './resumeBlocksToGenerateForm'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-flow-qx.css'
@@ -375,6 +376,9 @@ export function ResumeGeneratePage() {
         />
         {phase === 'entry' ? <ResumeGenerateEntry onOpen={openStep} /> : (
           <>
+            {boot.carried ? (
+              <p className="qx-rg-note" role="status" data-testid="resume-generate-carried-note"><span>{CARRIED_NOTE}</span></p>
+            ) : null}
             {!reviewing && <GenerateProgress step={step} />}
             {reviewing ? (
               <ResumeGenerateReview

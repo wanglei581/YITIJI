@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1951 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -433,7 +433,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 577 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 580 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -820,6 +820,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-compare/ResumeCompareState.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-compare/resumeCompareModel.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/CompareDecisionsApplyDialog.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeEmptyState.tsx` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeAigcBadge.tsx` | `verify-kiosk-ai-label-copy.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx` | `verify-resume-diagnosis-flow-ui.mjs` |
@@ -844,6 +845,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx` | `verify-resume-diagnosis-flow-ui.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportStates.tsx` | `verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx` | `verify-resume-report-qx.mjs` |
+| `apps/kiosk/src/pages/resume/components/resumeGenerateModel.ts` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts` | `verify-fusion-w3.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/resume/job-fit-qx.css` | `verify-job-fit-m1-5-ui.mjs` |
@@ -875,6 +877,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/resume/resume-report-qx.css` | `verify-ai-down-fallbacks.mjs`<br/>`verify-resume-report-qx.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-panels-qx.css` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/resume-triage-qx.css` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-resume-diagnosis-flow-ui.mjs` |
+| `apps/kiosk/src/pages/resume/resumeBlocksToGenerateForm.ts` | `verify-lightflow-k2b-ai-resume.mjs` |
 | `apps/kiosk/src/pages/resume/self-assessment-lightflow.css` | `verify-compliance.ts` |
 | `apps/kiosk/src/pages/resume/self-assessment-qx.css` | `verify-self-assessment-consent-source.mjs` |
 | `apps/kiosk/src/pages/resume/selfAssessmentConsent.ts` | `verify-self-assessment-consent-source.mjs` |
@@ -2534,8 +2537,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/pdf/cjk-font.ts` | `verify-cjk-font.ts` |
 | `services/api/src/common/pdf/pdfjs-document.ts` | `verify-advisor-work.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-mock-interview.ts`<br/>`verify-pdf-cmap.ts`<br/>`verify-pdfjs-engine.ts`<br/>`verify-pii-redaction.ts`<br/>`verify-resume-export-label.ts`<br/>`verify-resume-layout-adjust.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-self-assessment-ai-gate.ts` |
 | `services/api/src/common/pickup-code.ts` | `verify-backend-p0-contracts.mjs`<br/>`verify-free-print-quota.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-idempotency.ts` |
-| `services/api/src/common/pii/llm-input-mask.ts` | `verify-llm-input-pii-mask.ts` |
-| `services/api/src/common/pii/pii-masker.ts` | `verify-llm-input-pii-mask.ts` |
+| `services/api/src/common/pii/llm-input-mask.ts` | `verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-llm-input-pii-mask.ts` |
+| `services/api/src/common/pii/pii-masker.ts` | `verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-llm-input-pii-mask.ts` |
 | `services/api/src/common/prisma/postgres-busy.ts` | `verify-pg-lock-timeout-postgres.ts` |
 | `services/api/src/common/prisma/serialization-conflict.ts` | `verify-pg-serialization-conflict.ts` |
 | `services/api/src/common/privacy/client-declaration.ts` | `verify-kiosk-ai-declaration.mjs`<br/>`verify-miniapp-review-backend.ts` |
