@@ -654,7 +654,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               }}
             >
               <KeyboardIcon aria-hidden />
-              拼音键盘
+              键盘
             </button>
             {voiceAvailable && (
               <button

@@ -256,10 +256,10 @@ test('小青页：答过一问后再打字，新草稿那一节叫「这条还�
   await expect(page.getByText('这条还没发出', { exact: true })).toHaveCount(1)
 })
 
-test('小青页：键盘盖住输入框时整页上推，发送按钮仍点得中；「拼音键盘」按钮让输入框得焦 @kiosk', async ({ page, api }) => {
+test('小青页：键盘盖住输入框时整页上推，发送按钮仍点得中；「键盘」按钮让输入框得焦 @kiosk', async ({ page, api }) => {
   await openAssistant(page, api, 'push')
   const input = page.getByLabel('输入咨询问题')
-  await page.getByRole('button', { name: '拼音键盘', exact: true }).click()
+  await page.getByRole('button', { name: '键盘', exact: true }).click()
   await expect(input).toBeFocused()
 
   const before = await fieldRect(page, '输入咨询问题')

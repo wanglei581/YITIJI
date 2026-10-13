@@ -63,4 +63,6 @@ const keydown = assistant.slice(assistant.indexOf('const handleKeyDown'), assist
 assert.ok(/isComposing/.test(keydown) && /compositionEndedAtRef/.test(keydown), '拼音选字时的回车必须先被放过（选字中、以及刚结束选字的那一下），不能当成发送')
 assert.match(read('src/pages/print/PrintPickupClaimPage.tsx'), /id="pickup-code-input"[\s\S]{0,900}data-kiosk-keyboard="page"/, '取件码格配着页面数字键盘，须打标记压住系统键盘')
 assert.doesNotMatch(read('src/pages/profile/me/components/PhoneRebindPanel.tsx'), /data-kiosk-keyboard="page"/, '换绑三格没有页面数字键盘，靠系统键盘输入，不得打标记（否则无法输入）')
+// 回话单第 18 条（产品负责人 10/12 按推荐定）：小青页这颗按钮叫「键盘」——打字走的是系统触摸键盘，不是页面自己的拼音键盘。
+assert.ok(/<KeyboardIcon aria-hidden \/>\s*键盘\s*<\/button>/.test(assistant) && !/拼音键盘/.test(assistant), '小青页唤起系统键盘的按钮须叫「键盘」')
 console.log('PASS Kiosk 系统键盘共享层静态契约')
