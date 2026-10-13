@@ -331,6 +331,14 @@ async function main(): Promise<void> {
     const memberResult = await controller.export(memberTask, { kind: 'diagnosis_report' }, {
       headers: { authorization: 'Bearer member-a' },
     })
+    const takeawayNow = Date.now()
+    const takeawayExpiry = Date.parse(memberResult.expiresAt)
+    const signedExpiry = Number(new URL(memberResult.signedUrl, 'http://local.test').searchParams.get('expires'))
+    const printExpiry = Number(new URL(memberResult.printFileUrl, 'http://local.test').searchParams.get('expires'))
+    assert(takeawayExpiry > takeawayNow && takeawayExpiry - takeawayNow <= 605_000 && signedExpiry === takeawayExpiry,
+      '诊断报告扫码地址 ≤10 分钟且响应到期时间与地址一致')
+    assert(printExpiry - takeawayNow > 29 * 60_000 && printExpiry - takeawayNow <= 30 * 60_000,
+      '诊断报告 printFileUrl 仍约 30 分钟')
     fileIds.push(memberResult.fileId)
     const memberFile = await prisma.fileObject.findUnique({ where: { id: memberResult.fileId } })
     const memberBuffer = await readFile(join(storageDir, memberFile!.storageKey))
@@ -359,6 +367,14 @@ async function main(): Promise<void> {
     const changeResult = await controller.export(memberTask, { kind: 'change_list' }, {
       headers: { authorization: 'Bearer member-a' },
     })
+    const changeNow = Date.now()
+    const changeExpiry = Date.parse(changeResult.expiresAt)
+    const changeSignedExpiry = Number(new URL(changeResult.signedUrl, 'http://local.test').searchParams.get('expires'))
+    const changePrintExpiry = Number(new URL(changeResult.printFileUrl, 'http://local.test').searchParams.get('expires'))
+    assert(changeExpiry > changeNow && changeExpiry - changeNow <= 605_000 && changeSignedExpiry === changeExpiry,
+      '修改清单扫码地址 ≤10 分钟且响应到期时间与地址一致')
+    assert(changePrintExpiry - changeNow > 29 * 60_000 && changePrintExpiry - changeNow <= 30 * 60_000,
+      '修改清单 printFileUrl 仍约 30 分钟')
     fileIds.push(changeResult.fileId)
     const changeFile = await prisma.fileObject.findUnique({ where: { id: changeResult.fileId } })
     const changeBuffer = await readFile(join(storageDir, changeFile!.storageKey))

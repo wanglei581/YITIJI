@@ -76,10 +76,12 @@ test('API-04 EndUser audit stores actorId null and endUserId in payload', async 
 test('API-05 admin anonymous file access writes required audit before returning URL', async () => {
   const calls: string[] = []
   const files = {
-    getAccessUrl: async () => {
+    getAccessUrl: async (_id: string, _requester: unknown, _disposition: string, maxTtlSeconds?: number) => {
       calls.push('url')
+      const now = Date.now()
+      const expiresAt = new Date(now + (maxTtlSeconds ?? 1800) * 1000).toISOString()
       return {
-        response: { fileId: 'file-1', url: '/signed', printFileUrl: '/print', expiresAt: new Date().toISOString(), disposition: 'inline' },
+        response: { fileId: 'file-1', url: `/signed?expires=${Date.parse(expiresAt)}`, printFileUrl: `/print?expires=${now + 30 * 60_000}`, expiresAt, disposition: 'inline' },
         record: { purpose: 'id_scan', ownerType: 'system' },
         needsAdminAudit: false,
       }
@@ -99,6 +101,14 @@ test('API-05 admin anonymous file access writes required audit before returning 
   })
   const response = await controller.previewUrl('file-1', { headers: {}, ip: '127.0.0.1' } as Request & { requestId?: string })
   assert.equal(response.success, true)
+  const now = Date.now()
+  const data = response.data
+  assert.ok(data && Date.parse(data.expiresAt) - now > 0 && Date.parse(data.expiresAt) - now <= 605_000,
+    'preview-url 扫码地址应不超过 600 秒 + 5 秒容差')
+  assert.equal(Number(new URL(data!.url, 'http://local.test').searchParams.get('expires')), Date.parse(data!.expiresAt))
+  const printExpiry = Number(new URL(data!.printFileUrl!, 'http://local.test').searchParams.get('expires'))
+  assert.ok(printExpiry - now > 29 * 60_000 && printExpiry - now <= 30 * 60_000,
+    'preview-url printFileUrl 保持约 30 分钟')
   assert.deepEqual(calls, ['url', 'audit'])
 })
 

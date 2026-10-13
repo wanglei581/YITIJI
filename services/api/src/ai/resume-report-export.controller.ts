@@ -17,7 +17,7 @@ import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from '../files/files.service'
-import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, TAKEAWAY_URL_MAX_TTL_SECONDS, signFileUrl } from '../files/signing'
 import { formatBeijingDate } from '../common/beijing-display-time'
 import { resumeExportStagingExpiresAt } from '../benefit-redemption/resume-export-gate.service'
 import { PrismaService } from '../prisma/prisma.service'
@@ -125,12 +125,13 @@ export class ResumeReportExportController {
       derivationKind: 'ai_generated',
       sourceFileId,
       createdBy: 'ai_resume_diagnosis_export',
+      downloadUrlMaxTtlSeconds: TAKEAWAY_URL_MAX_TTL_SECONDS,
       ...(stage ? { paidExportStaging: stage } : {}),
     })
 
     if (stage) await this.ai.commitExportRedemption(decision, [uploaded.fileId])
     else await this.ai.commitExportRedemption(decision)
-    const access = stage ? await this.files.signActiveDownload(uploaded.fileId) : uploaded
+    const access = stage ? await this.files.signActiveDownload(uploaded.fileId, TAKEAWAY_URL_MAX_TTL_SECONDS) : uploaded
 
     await this.audit.write({
       actorId: null,

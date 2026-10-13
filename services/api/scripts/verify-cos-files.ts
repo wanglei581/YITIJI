@@ -141,6 +141,15 @@ async function main() {
     await expectThrow(() => files.getAccessUrl(up.fileId, memberEu2, 'inline'), '会员越权获取预览 URL 被拒')
     const selfPreview = await files.getAccessUrl(up.fileId, memberEu1, 'inline')
     ok(selfPreview.response.disposition === 'inline' && selfPreview.needsAdminAudit === false, '本人预览成功且不触发管理员审计')
+    const cappedPreview = await files.getAccessUrl(up.fileId, memberEu1, 'inline', 600)
+    const previewNow = Date.now()
+    const cappedExpires = Date.parse(cappedPreview.response.expiresAt)
+    const signedExpires = Number(new URL(cappedPreview.response.url, 'http://local.test').searchParams.get('expires'))
+    const printExpires = Number(new URL(cappedPreview.response.printFileUrl, 'http://local.test').searchParams.get('expires'))
+    ok(cappedExpires > previewNow && cappedExpires - previewNow <= 605_000 && signedExpires === cappedExpires,
+      '预览下载上限生效且响应到期时间与地址一致')
+    ok(printExpires - previewNow > 29 * 60_000 && printExpires - previewNow <= 30 * 60_000,
+      '预览 printFileUrl 仍约 30 分钟')
     const adminDl = await files.getAccessUrl(up.fileId, adminReq, 'attachment')
     ok(adminDl.needsAdminAudit === true, '管理员访问用户文件 → needsAdminAudit=true(应落审计)')
     ok(adminDl.response.url.includes('disposition=attachment'), '下载 URL 带 attachment')

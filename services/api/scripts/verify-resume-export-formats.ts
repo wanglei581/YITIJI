@@ -70,6 +70,20 @@ import { RESUME_EXPORT_SERVICE_KEY } from '../src/payment/price-config.seed'
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
 
+function assertTakeawayTtl(label: string, result: { signedUrl: string; expiresAt: string; printFileUrl: string }): void {
+  const now = Date.now()
+  const expires = Date.parse(result.expiresAt)
+  const signedExpires = Number(new URL(result.signedUrl, 'http://local.test').searchParams.get('expires'))
+  const printExpires = Number(new URL(result.printFileUrl, 'http://local.test').searchParams.get('expires'))
+  if (!(expires > now && expires - now <= 605_000 && signedExpires === expires)) {
+    fail(`${label}：扫码下载地址到期时间应与 URL 一致且不超过 600 秒 + 5 秒容差`)
+  }
+  if (!(printExpires - now > 29 * 60_000 && printExpires - now <= 30 * 60_000)) {
+    fail(`${label}：printFileUrl 应保持约 30 分钟`)
+  }
+  pass(`${label}：扫码下载 ≤10 分钟、printFileUrl 约 30 分钟`)
+}
+
 function errorCodeOf(err: unknown): string | undefined {
   if (err instanceof BadRequestException) {
     const response = err.getResponse()
@@ -347,6 +361,7 @@ async function main(): Promise<void> {
 
       if (!exported.fileId) fail(`2. [${format}] 未返回 fileId`)
       if (!exported.signedUrl) fail(`2. [${format}] 未返回 signedUrl(400 或空)`)
+      assertTakeawayTtl(`2. [${format}]`, exported)
 
       const fileRow = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
       if (!fileRow) fail(`2. [${format}] FileObject 未落库`)
@@ -848,7 +863,7 @@ async function main(): Promise<void> {
         { requireActiveConsent: async () => undefined } as never,
       )
       const exportReport = (taskId: string) => (reportController as unknown as {
-        exportAuthorized: (taskId: string, kind: 'diagnosis_report', requester: { endUserId: string; accessToken: null }, benefitGrantId: string) => Promise<{ fileId: string; signedUrl: string; printFileUrl: string }>
+        exportAuthorized: (taskId: string, kind: 'diagnosis_report', requester: { endUserId: string; accessToken: null }, benefitGrantId: string) => Promise<{ fileId: string; signedUrl: string; expiresAt: string; printFileUrl: string }>
       }).exportAuthorized(taskId, 'diagnosis_report', { endUserId: reportUser.id, accessToken: null }, reportGrant.id)
 
       const reportRace = await withCommitBarrier(2, async () => {
@@ -871,6 +886,7 @@ async function main(): Promise<void> {
       const reportWinner = reportOk[0].status === 'fulfilled' ? reportOk[0].value : null
       const reportLoserError = reportBad[0].status === 'rejected' ? reportBad[0].reason : null
       if (!reportWinner?.signedUrl || !reportWinner.printFileUrl) fail('6h. 成功的诊断导出没有可用 URL')
+      assertTakeawayTtl('6h. 收费诊断报告', reportWinner)
       if (!reportLoserError || !benefitLose(reportLoserError)) {
         fail(`6h. 失败的诊断导出应是权益拒绝，实际 ${httpErrorCode(reportLoserError) ?? (reportLoserError as Error).message}`)
       }

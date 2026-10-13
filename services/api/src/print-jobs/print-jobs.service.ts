@@ -3,7 +3,7 @@ import { Injectable, NotFoundException, BadRequestException, Optional, ServiceUn
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
-import { parseHistoricalSignedContentFileId, signFileUrl, verifyFileSignature } from '../files/signing'
+import { TAKEAWAY_URL_MAX_TTL_SECONDS, parseHistoricalSignedContentFileId, signFileUrl, verifyFileSignature } from '../files/signing'
 import { assertTerminalPrinterAvailable } from '../terminals/printer-availability'
 import { OrderStatusService } from '../payment/order-status.service'
 import {
@@ -686,7 +686,7 @@ export class PrintJobsService {
         },
       })
     }
-    const signed = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    const signed = signFileUrl(fileId, TAKEAWAY_URL_MAX_TTL_SECONDS * 1000)
     await this.audit.write({
       actorId: null, // AuditLog.actorId FK 指向运营 User：会员 ID 写进去会违反外键、被静默吞掉，改记 payload.endUserId
       actorRole: 'kiosk',

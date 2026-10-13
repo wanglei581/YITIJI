@@ -956,9 +956,9 @@ async function main() {
     if (
       takeaway.orderId === created.orderId &&
       takeaway.signedUrl.includes(`/files/`) &&
-      takeawayMs > 20 * 60 * 1000
+      takeawayMs > 8 * 60 * 1000 && takeawayMs <= 10 * 60 * 1000
     ) {
-      pass('8c. takeaway-url 本单归属可签发约 30 分钟签名 URL')
+      pass('8c. takeaway-url 本单归属可签发约 10 分钟签名 URL')
     } else {
       fail(`8c. takeaway 异常: ${JSON.stringify({ orderId: takeaway.orderId, expiresAt: takeaway.expiresAt, signedUrl: takeaway.signedUrl })}`)
     }

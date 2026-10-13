@@ -123,18 +123,19 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number; llm?: '
   const audit = { write: async (e: AuditEvent) => { audits.push(e) } }
 
   const files = {
-    upload: async (args: { buffer: Buffer; filename: string }) => {
+    upload: async (args: { buffer: Buffer; filename: string; downloadUrlMaxTtlSeconds?: number }) => {
       // 真实实现里 objectKey 由 randomUUID() 派生（files.service.ts:139），
       // 每次上传都是一行新 FileObject —— 这里如实建模「不按文件名覆盖」。
       uploadSeq += 1
       const fileId = `file-${uploadSeq}`
       uploads.push({ fileId, filename: args.filename, buffer: args.buffer })
+      const signedUrlExpiresAt = new Date(Date.now() + (args.downloadUrlMaxTtlSeconds ?? 1800) * 1000).toISOString()
       return {
         fileId,
         filename: args.filename,
         sizeBytes: args.buffer.length,
-        signedUrl: `https://obj.example/${fileId}?sig=storage`,
-        signedUrlExpiresAt: new Date(Date.now() + 300_000).toISOString(),
+        signedUrl: `https://obj.example/${fileId}?sig=storage&expires=${Date.parse(signedUrlExpiresAt)}`,
+        signedUrlExpiresAt,
       }
     },
     readContent: async () => ({ buffer: await makePdf(resumePages) }),
@@ -429,6 +430,14 @@ test('A4c 会员名下的旧版本记录仍可查看、打印、撤回', async (
 
   const printed = await h.service.printReport(row.taskId, member)
   assert.match(printed.printFileUrl, /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]{64}$/)
+  const now = Date.now()
+  assert.ok(Date.parse(printed.expiresAt) - now > 0 && Date.parse(printed.expiresAt) - now <= 605_000,
+    '自我探索扫码地址应不超过 600 秒 + 5 秒容差')
+  assert.equal(Number(new URL(printed.signedUrl).searchParams.get('expires')), Date.parse(printed.expiresAt),
+    '自我探索响应到期时间与扫码地址一致')
+  const printExpiry = Number(new URL(printed.printFileUrl, 'http://local.test').searchParams.get('expires'))
+  assert.ok(printExpiry - now > 29 * 60_000 && printExpiry - now <= 30 * 60_000,
+    '自我探索 printFileUrl 保持约 30 分钟')
 
   const withdrawn = await h.service.withdraw(row.taskId, member)
   assert.deepEqual(withdrawn, { deleted: true })

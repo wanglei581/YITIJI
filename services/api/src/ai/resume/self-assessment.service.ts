@@ -17,7 +17,7 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
-import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, TAKEAWAY_URL_MAX_TTL_SECONDS, signFileUrl } from '../../files/signing'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './self-assessment-questions'
 import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './self-assessment.types'
 import { isAcceptedSelfAssessmentConsentVersion, SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
@@ -481,6 +481,7 @@ export class SelfAssessmentService {
       uploaderId: null,
       endUserId: requester.endUserId,
       createdBy: 'self_assessment',
+      downloadUrlMaxTtlSeconds: TAKEAWAY_URL_MAX_TTL_SECONDS,
     })
     await this.audit.write({
       actorId: null,
