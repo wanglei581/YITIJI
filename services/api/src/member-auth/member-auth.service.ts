@@ -5,8 +5,11 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common'
+import { AdvisorQaMemory } from '../advisor/advisor-qa-memory'
+import { ConversationMemoryBridge } from '../common/conversation-memory-bridge'
 import { JwtService } from '@nestjs/jwt'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import { LEGAL_DRAFT_FALLBACK_VERSION } from '../legal/legal-constants'
@@ -65,6 +68,8 @@ export class MemberAuthService {
     private readonly redis: RedisService,
     private readonly jwtService: JwtService,
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
+    @Optional() @Inject(AdvisorQaMemory) private readonly qaMemory?: AdvisorQaMemory,
+    @Optional() @Inject(ConversationMemoryBridge) private readonly memoryBridge?: ConversationMemoryBridge,
   ) {}
 
   /** 发送短信验证码:冷却 + 多维频控 + 写 Redis(TTL 5min)+ 下发。 */
@@ -329,6 +334,9 @@ export class MemberAuthService {
   /** 登出:删除 Redis 会话即失效(JWT 即使未过期也作废)。 */
   async logout(endUserId: string, sessionId: string): Promise<void> {
     await this.redis.unregisterMemberSession(endUserId, sessionId)
+    const ownerKey = `u:${endUserId}`
+    this.memoryBridge?.forgetChatOwner(ownerKey)
+    this.qaMemory?.forgetOwner(ownerKey)
   }
 
   /** 当前登录用户信息(phoneMasked 由 phoneEnc 解密派生,绝不回明文)。 */

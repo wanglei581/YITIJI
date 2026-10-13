@@ -187,4 +187,12 @@ export class AdvisorController {
   ) {
     return this.service.printArtifact(sessionId, artifactId, await this.requesterOf(req))
   }
+
+  /** 一体机清场：丢掉这一次作业的问答内存。不删库里的作业。找不到或不是本人都当已经清掉。 */
+  @Post('sessions/:sessionId/forget')
+  @AiUseExempt('清场时丢掉这一次作业的问答内存，不调模型；AI 暂停期间也必须能删')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async forget(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
+    return this.service.forgetSession(sessionId, await this.requesterOf(req))
+  }
 }

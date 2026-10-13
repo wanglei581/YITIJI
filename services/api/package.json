@@ -251,6 +251,7 @@
     "verify:resume-template-fill": "node -r @swc-node/register scripts/verify-resume-template-fill.ts",
     "verify:resume-voice-generate": "node -r @swc-node/register scripts/verify-resume-voice-generate.ts && pnpm run verify:assistant-voice",
     "verify:assistant-voice": "node -r @swc-node/register scripts/verify-assistant-voice.ts",
+    "verify:conversation-memory-forget": "node -r @swc-node/register scripts/verify-conversation-memory-forget.ts",
     "verify:resume-optimize": "pnpm run verify:resume-optimize-live-gate && node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:resume-optimize-live-gate": "node -r @swc-node/register scripts/verify-resume-optimize-live-gate.ts",
     "probe:resume-optimize-live": "node -r @swc-node/register scripts/check-resume-optimize-live.ts",
