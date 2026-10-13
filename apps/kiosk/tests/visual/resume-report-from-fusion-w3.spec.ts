@@ -6,6 +6,8 @@ import { diagnosis, uploadedResume } from './fixtures/fusion-w3-states'
 import { chooseGenericResumeDirection } from './fixtures/direction-selection'
 
 const CAREER_PLAN_RETURN = '继续做职业规划'
+const REPORT_PRIMARY = '继续优化这份简历'
+const REPORT_SECONDARY = '重新诊断'
 const EXPORT_PREVIEW_FAILURE = '预览没能生成，打印仍按原文件。报告已生成，可扫码带走或直接打印。'
 const PREVIEW_FAILURE_HEAD = '预览没能生成，打印仍按原文件。'
 const PREVIEW_FAILURE_TAIL = '报告已生成，可扫码带走或直接打印'
@@ -41,17 +43,43 @@ function registerDiagnosis(api: ApiRouter): void {
   api.respond('POST', '/api/v1/resume/parse', { status: 200, json: diagnosis })
 }
 
-async function uploadAndOpenReport(page: Page): Promise<void> {
+async function uploadAndOpenReport(page: Page, startLabel = 'AI 诊断，看改进建议'): Promise<void> {
   await chooseGenericResumeDirection(page)
   await page.getByLabel('选择本机简历文件').setInputFiles({
     name: '求职简历.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-w3'),
   })
-  await page.getByRole('button', { name: 'AI 诊断，看改进建议' }).click()
+  await page.getByRole('button', { name: startLabel }).click()
   await page.waitForURL('/resume/report')
   await expect(page.locator('[data-kiosk-screen="resume-report"]')).toBeVisible()
 }
+
+test('report normal actions keep the draft labels from diagnose and from optimize @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  registerDiagnosis(api)
+  api.respond('GET', '/api/v1/resume/records/resume-w3-public-fixture/optimize', {
+    status: 404,
+    json: { error: { code: 'AI_TASK_NOT_FOUND', message: '尚未生成' } },
+  })
+
+  for (const entry of [
+    { intent: 'diagnose', start: 'AI 诊断，看改进建议' },
+    { intent: 'optimize', start: 'AI 优化，看改进建议' },
+  ]) {
+    await page.goto(`/resume/source?intent=${entry.intent}`)
+    await uploadAndOpenReport(page, entry.start)
+    await expect(page.locator('[data-kiosk-screen="resume-report"]')).toHaveAttribute('data-state', /^report(?:-minimal)?$/)
+    const primary = page.getByTestId('resume-report-primary')
+    await expect(primary).toHaveText(REPORT_PRIMARY)
+    await expect(page.getByRole('button', { name: REPORT_SECONDARY, exact: true })).toHaveText(REPORT_SECONDARY)
+    await expect(page.getByRole('button', { name: '查看优化建议', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '继续生成优化版简历', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '重新上传', exact: true })).toHaveCount(0)
+    await primary.click()
+    await page.waitForURL((url) => url.pathname === '/resume/optimize')
+  }
+})
 
 test('career plan diagnosis keeps a return and the export preview names the finished report @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)

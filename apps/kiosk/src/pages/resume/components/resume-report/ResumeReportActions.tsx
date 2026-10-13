@@ -67,7 +67,7 @@ export function ResumeReportCta({ viewState, canOptimize, intent, reportFrom, wh
     <>
       <p className="why" id="resume-report-why">{why}</p>
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/resume/source?intent=${intent}${reportFrom ? `&from=${reportFrom}` : ''}`)} data-route="/resume/source">
-        {intent === 'optimize' ? '重新上传' : '重新诊断'}
+        重新诊断
       </button>
       {reportFrom ? (
         <button
@@ -83,7 +83,7 @@ export function ResumeReportCta({ viewState, canOptimize, intent, reportFrom, wh
       ) : null}
       {canOptimize ? (
         <button type="button" className="qx-btn" data-variant="primary" onClick={onOptimize} data-route="/resume/optimize" data-testid="resume-report-primary">
-          {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
+          继续优化这份简历
         </button>
       ) : (
         <button type="button" className="qx-btn" data-variant="primary" aria-disabled="true" aria-describedby="resume-report-why" data-testid="resume-report-primary">

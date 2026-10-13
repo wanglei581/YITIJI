@@ -148,7 +148,7 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
       { name: /生成二维码带走/, skip: false },
       { name: /打印这份报告/, skip: false },
       { name: /重新诊断/, skip: true },
-      { name: /查看优化建议|继续生成优化版简历/, skip: true },
+      { name: /继续优化这份简历/, skip: true },
       { name: /目标岗位匹配参考/, skip: true },
       { name: /做一次自我探索/, skip: true },
       { name: /首页/, skip: true },
@@ -186,12 +186,12 @@ test('J1 匿名 · 首页→诊断→报告页按钮 @interaction', async ({ bro
     }
 
     await recordStep({
-      page, journey, step: 'report-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
+      page, journey, step: 'report-optimize', control: '继续优化这份简历', selectorHint: '[data-testid=resume-report-primary]',
       kind: 'click', collectors,
       act: async () => {
         const cta = page.getByTestId('resume-report-primary')
         if (await cta.count()) await cta.click()
-        else await page.getByRole('button', { name: /查看优化建议|继续生成优化版简历/ }).click()
+        else await page.getByRole('button', { name: '继续优化这份简历', exact: true }).click()
       },
     })
     await confirmAiConsent(page, journey, collectors)
@@ -212,12 +212,12 @@ test('J2 匿名 · 诊断→对照→应用弹层两分支→四种导出 @inter
     await enterDiagnoseSource(page, journey, collectors)
     await startDiagnosis(page, journey, collectors)
     await recordStep({
-      page, journey, step: 'to-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
+      page, journey, step: 'to-optimize', control: '继续优化这份简历', selectorHint: '[data-testid=resume-report-primary]',
       kind: 'click', collectors,
       act: async () => {
         const cta = page.getByTestId('resume-report-primary')
         if (await cta.count()) await cta.click()
-        else await page.getByRole('button', { name: /查看优化建议|继续生成优化版简历/ }).click()
+        else await page.getByRole('button', { name: '继续优化这份简历', exact: true }).click()
         await page.waitForURL((url) => url.pathname === '/resume/optimize', { timeout: 30_000 })
       },
     })
@@ -531,7 +531,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     expect(page.url(), '会员诊断未走到报告页：多半是简历来源页在登录态下走了另一条上传路径').toContain('/resume/report')
     {
       await recordStep({
-        page, journey, step: 'member-optimize', control: '查看优化建议', selectorHint: '[data-testid=resume-report-primary]',
+        page, journey, step: 'member-optimize', control: '继续优化这份简历', selectorHint: '[data-testid=resume-report-primary]',
         kind: 'click', collectors,
         act: async () => {
           const cta = page.getByTestId('resume-report-primary')

@@ -126,6 +126,17 @@ assert(
   has(files.actions, '`/resume/source?intent=${intent}${reportFrom ? `&from=${reportFrom}` : \'\'}`'),
   'rediagnose keeps the whitelist from marker and does not read raw route state',
 )
+{
+  // 22 号稿正常态只有一种写法：次要「重新诊断」、主按钮「继续优化这份简历」。
+  // 两种 intent 的去处仍按原样，只钉字。不能优化时那颗置灰的主按钮本来就是这句。
+  const normal = files.actions.slice(files.actions.lastIndexOf('return ('))
+  assert(normal.includes('重新诊断'), 'normal report secondary button says 重新诊断')
+  assert(normal.includes('继续优化这份简历'), 'normal report primary button says 继续优化这份简历')
+  assert(!normal.includes('重新上传'), 'normal report secondary button does not switch to 重新上传')
+  assert(!normal.includes("intent === 'optimize' ?"), 'normal report button labels do not branch on intent')
+  assert(!has(files.actions, '查看优化建议'), 'report actions file no longer says 查看优化建议')
+  assert(!has(files.actions, '继续生成优化版简历'), 'report actions file no longer says 继续生成优化版简历')
+}
 assert(!has(files.actions, 'state.from'), 'rediagnose does not splice the raw route-state string')
 const reportFrom = read('src/pages/resume/resumeReportFrom.ts')
 assert(has(reportFrom, "'career-plan'") && has(reportFrom, '继续做职业规划') && has(reportFrom, 'hasOwnProperty'), 'report source whitelist only accepts career-plan')
