@@ -27,9 +27,10 @@ const POLICY = 'apps/partner/src/routes/policy/index.tsx'
 
 const PARTNER_COPY = '本机构还没有通过平台的内容可信核验，暂时不能发布。请联系平台运营完成核验后再发布。'
 const ADMIN_COPY = '该机构还没有被标记为内容可信，不能发布。请先在「合作机构」里完成内容可信核验。'
-const CHANNEL_HINT = '本机构还没有通过平台的内容可信核验，下面的渠道暂时不会在一体机上显示。核验通过后自动恢复显示。'
+const CHANNEL_HINT = '本机构还没有通过平台的内容可信核验，下面的渠道暂时不会在一体机上显示。'
+const CHANNEL_HINT_ARCHIVED = '本机构已归档，下面的渠道暂时不会在一体机上显示。'
 const POLICY_SENTENCE = '一体机现场没有工作人员,正文里请不要写"找现场工作人员""叫工作人员看机器"这类话;需要到线下办理的,请写清本机构的办理地址、时间或电话。'
-const POLICY_OLD = '此类内容本机构审核时请不予通过。'
+const POLICY_FIRST_HALF = '此类内容本机构审核时请不予通过。'
 const BACKEND_RAW = '来源机构「演示机构」(org-demo) 未通过内容信任核验：当前 contentTrustStatus=pending，发布要求 active 且未归档。请先完成来源授权核验，再由管理员 PATCH /api/v1/admin/orgs/:id/content-trust 把该机构标成内容可信，然后重试发布。'
 const UNLISTED_RAW = '这个错误码没有登记，这句中文应原样返回。'
 
@@ -97,10 +98,13 @@ const channels = read(CHANNELS)
 const call = profile.match(/<OfficialChannelsSection\b[^>]*>/)
 assert.ok(call, '资料页要渲染官方渠道区块')
 assert.match(call[0], /publishable=\{publishable\}/, '资料页要把已算好的 publishable 传给渠道区块')
+assert.match(call[0], /archived=\{archived\}/, '资料页要把归档状态传给渠道区块（归档和没核验是两种原因，分开说）')
 assert.equal(channels.split(CHANNEL_HINT).length - 1, 1, '渠道提示句应只出现一次')
+assert.equal(channels.split(CHANNEL_HINT_ARCHIVED).length - 1, 1, '归档提示句应只出现一次')
+assert.ok(!channels.includes('自动恢复显示'), '不承诺「核验通过后自动恢复显示」：渠道自己的启用、域名、紧急下架也会让它不显示')
 const gated = channels.match(/\{!publishable && \([\s\S]*?\)\}/)
 assert.ok(gated, '渠道提示必须包在 !publishable 条件里')
-assert.ok(gated[0].includes(CHANNEL_HINT), '不可发布时渠道区块含那句提示')
+assert.ok(/archived \? CHANNEL_HINT_ARCHIVED : CHANNEL_HINT_UNTRUSTED/.test(gated[0]), '不可发布时按是否归档分开说原因')
 const expr = gated[0].match(/^\{(!publishable) && \(/)
 assert.ok(expr, '渠道提示的条件必须是 !publishable')
 const show = new Function('publishable', `return (${expr[1]})`)
@@ -111,7 +115,7 @@ console.log('PASS 2 渠道区块只在不可发布时显示提示，且接了 pu
 const policy = read(POLICY)
 assert.ok(policy.includes(POLICY_SENTENCE), '政策页合规提示末尾缺少「现场没有工作人员」那句')
 assert.ok(!policy.includes('此类内容审核将不予通过'), '旧说法「此类内容审核将不予通过」读着像平台在审，应已改掉')
-assert.ok(policy.includes(`${POLICY_OLD}${POLICY_SENTENCE}`), '「此类内容本机构审核时请不予通过」（产品负责人 10/13 17:05 点头，合规十原文）必须在新句前面')
+assert.ok(policy.includes(`${POLICY_FIRST_HALF}${POLICY_SENTENCE}`), '「此类内容本机构审核时请不予通过」（产品负责人 10/13 17:05 点头，合规十原文）必须在新句前面')
 console.log('PASS 3 政策页合规提示含新句，前半句已改成「本机构审核时请不予通过」')
 
 console.log('verify:partner-content-trust-hints passed')

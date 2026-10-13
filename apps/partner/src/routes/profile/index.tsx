@@ -205,7 +205,7 @@ export default function ProfilePage() {
       </div>
 
       {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；一体机只在机构内容可信时显示这些渠道 */}
-      <OfficialChannelsSection publishable={publishable} />
+      <OfficialChannelsSection publishable={publishable} archived={archived} />
 
       {/* 内容信任与发布权限（发布闸门依据） */}
       <Card className="mt-6 p-6">
