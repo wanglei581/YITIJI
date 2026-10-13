@@ -38,12 +38,14 @@ import { SELF_ASSESSMENT_CONSENT_VERSION } from '../self-assessment.types'
 const repoRoot = resolve(__dirname, '../../../../../..')
 const CURRENT = SELF_ASSESSMENT_CONSENT_VERSION
 /** 冻结的当前版本。测试不得改用导入常量，否则把常量改回旧值时请求会跟着变绿。 */
-const NEW_VERSION = 'sa-consent-v2.2026-09-29'
+const NEW_VERSION = 'sa-consent-v3.2026-10-13'
+/** C16 升版前下发过的版本。用它提交必须 400，证明升版本之后旧同意不再被接受。 */
+const SUPERSEDED_V2 = 'sa-consent-v2.2026-09-29'
 /** #1119 下发过的版本。取消过渡期后，用它提交必须 400。 */
 const PREVIOUS_VERSION = 'sa-consent-v1.2026-09-29'
 /** 更早的一体机版本。同样必须 400，不能再进白名单。 */
 const LEGACY_VERSION = 'sa-consent-v1.2026-08-16'
-const AGE_ITEM = '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。'
+const AGE_ITEM = '本工具面向年满 14 周岁的用户；未满 14 周岁的，须在监护人同意并陪同下使用，不提供 AI 解读。'
 const CHECKBOX_LABEL =
   '我已阅读上述说明和《隐私政策》中的未成年人个人信息处理规则，确认本人已满 14 周岁；未满 14 周岁的，已取得监护人同意并由监护人陪同。'
 const CONSENT_LINK = {
@@ -318,8 +320,8 @@ test('A2 新版本提交通过，并按新版本落库', async () => {
   assertAnonymousShortRetention(rows[0]!, '新版本匿名')
 })
 
-test('A2b #1119 版本与更早版本一律 400，不落库、不写创建审计', async () => {
-  for (const version of [PREVIOUS_VERSION, LEGACY_VERSION]) {
+test('A2b 升版前的 v2、#1119 版本与更早版本一律 400，不落库、不写创建审计', async () => {
+  for (const version of [SUPERSEDED_V2, PREVIOUS_VERSION, LEGACY_VERSION]) {
     const { service, rows, audits } = makeHarness()
     await assert.rejects(
       () => service.submit(anon, {
@@ -495,8 +497,9 @@ test('A6b shared 与服务端的版本、条款、链接、勾选框文字逐字
   const sharedItems = readConstStrings(sharedSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
   const apiItems = readConstStrings(apiSrc, 'SELF_ASSESSMENT_CONSENT_ITEMS')
   assert.deepEqual(apiItems, sharedItems, '服务端条款必须与 shared 逐字相同')
-  assert.equal(sharedItems.at(-1), AGE_ITEM)
   assert.equal(sharedItems.length, 6)
+  assert.equal(sharedItems[5], AGE_ITEM, '第 6 条必须逐字等于 C16 定字')
+  assert.equal(apiItems[5], AGE_ITEM, '服务端第 6 条必须逐字等于同一句定字')
   assert.equal(readStringConst(sharedSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
   assert.equal(readStringConst(apiSrc, 'SELF_ASSESSMENT_CONSENT_CHECKBOX_LABEL'), CHECKBOX_LABEL)
   assert.deepEqual(readConsentLinks(sharedSrc), [CONSENT_LINK])

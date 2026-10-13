@@ -52,7 +52,7 @@ export interface SelfAssessmentAnswerV1 {
  * 版本号、条款、链接、勾选框文字必须与真源逐字相等，由 `verify:self-assessment-consent` 锁死。
  * 改其中任意一项必须同时升版本号。服务端只接受这一版，不再保留旧版本清单。
  */
-export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v2.2026-09-29'
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v3.2026-10-13'
 
 /** 与当前版本配套的条款原文。改任一条必须同时升 `SELF_ASSESSMENT_CONSENT_VERSION`。 */
 export const SELF_ASSESSMENT_CONSENT_ITEMS = [
@@ -61,7 +61,7 @@ export const SELF_ASSESSMENT_CONSENT_ITEMS = [
   '作答后可在结果页一键撤回 / 物理删除；不留存本人答案原文。',
   '本工具不评估「适合 / 不适合」任何岗位或职业，亦不构成能力证明。',
   '5 段解读由 AI 生成（E3 · 仅供参考）；维度强度由固定权重算出，不经过 AI。',
-  '本工具面向年满 14 周岁的用户；未满 14 周岁的，请在监护人同意并陪同下使用。',
+  '本工具面向年满 14 周岁的用户；未满 14 周岁的，须在监护人同意并陪同下使用，不提供 AI 解读。',
 ] as const
 
 /**
