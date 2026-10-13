@@ -184,7 +184,7 @@ function libraryDetail (id, aiMode) {
 function manualSrc () {
   return link(url('policy', 'manual-view-source', ''), '/renshi?tab=policy', 'manual-src', 'exit',
     '<span class="eic">' + svg('eye', 24) + '</span><span class="etx"><b>自己看原文与来源</b>' +
-    '<span>不经过模型的人工核对</span></span>')
+    '<span>不经过 AI，自己对照</span></span>')
 }
 /** 一行原因 + 一个置灰控件 + 一条人工退路，就是这一页 AI 的全部体积。 */
 function aiOff (title, desc, reason) {
@@ -325,7 +325,7 @@ function policyView (st) {
         : st === 'ai-unavailable'
           ? '小青这次连不上；看原文、筛选、扫码与条件核对都照常可用'
           : st === 'manual-view-source'
-            ? '人工核对：不经过模型，直接看这条政策的原文与来源'
+            ? '自己核对：不经过 AI，直接看这条政策的原文与来源'
             : st === 'source-missing'
               ? '这条政策没有来源地址；本机不生成二维码，也不补写链接'
               : st === 'source-invalid'
@@ -396,7 +396,7 @@ function eligView (st) {
   }
   if (st === 'eligibility-backend-required') {
     return eligNotice('warn', 'alert', 'backend-required', '本机现在做不了条件核对',
-      ['本机暂时连不上政策服务。问项与判定口径都要由系统下发，<b>本机不会自己编一套问项或结论</b>。请联系现场工作人员后再试。'],
+      ['本机暂时连不上政策服务。问项与判定口径都要由系统下发，<b>本机不会自己编一套问项或结论</b>。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],
       noteline('warn', '本机没有向你收集任何信息，也没有给出任何结论。'))
   }
   if (st === 'eligibility-no-policies') {
@@ -565,7 +565,7 @@ var PAGES = {
       ['source-invalid', '来源地址不是有效的网址；本机不生成二维码。', 'bad', '来源地址无效'],
       ['context-missing', '本机整理的指引没有政策原文可引用，因此不提供解释入口。', 'warn', '无政策原文可引用'],
       ['ai-unavailable', '小青这次连不上；这一屏其余能力照常，条件核对本来也不经过模型。', 'bad', '小青不可用'],
-      ['manual-view-source', '不经过模型的人工核对：直接看这条政策的原文与来源。', 'ok', '人工核对路径']
+      ['manual-view-source', '自己核对，不经过 AI：直接看这条政策的原文与来源。', 'ok', '自己核对']
     ]
   },
   eligibility: {

@@ -36,7 +36,7 @@
     ② 收款码是**明确不可扫描的占位块**，不画二维码图样；真实收款码由 qrCodeContent 实时渲染。
     ③ paid 只是版式示例，不代表任何真实支付结果，也不构成支付凭证。
     ④ 不声称「未扣款 / 不会重复扣款 / 加密传输 / 付完自动出纸」；是否扣款、是否出纸都以支付平台账单与实际结果为准。
-    ⑤ 六个状态全部有可点的返回路径与「联系工作人员」实体出口，不留死按钮。
+    ⑤ 六个状态全部有可点的返回路径与「问小青」实体出口，不留死按钮。
   原型演示控制：仅用 ?state= 切换；?debug=1 才显示演示面板；?fallback=1 演示 pending 的通道降级块。
   验收范围：静态版式；不证明支付通道、金额、订单、出纸或退款可用。
 -->
@@ -442,7 +442,7 @@ function actsCard(title, hint, items){
 function fallbackCard(){
   return '<aside class="fallback" data-testid="'+SCREEN+'-fallback">'+svg('warn')
     + '<div><b>支付通道暂不可用</b>'
-    + '<p>当前拿不到可用的收款通道，屏幕上不会出现任何收款码。订单是否保留、金额是否变化，都以实际结果为准；请联系现场工作人员协助处理。</p>'
+    + '<p>当前拿不到可用的收款通道，屏幕上不会出现任何收款码。订单是否保留、金额是否变化，都以实际结果为准；这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。</p>'
     + slot(dev('等实际结果','订单号结果回来后再显示'))+'</div></aside>';
 }
 var GUIDE = {
@@ -453,7 +453,7 @@ var GUIDE = {
   paid:[['这一屏是什么','界面示例','这是已支付时的样子，不是支付凭证'],['真实结果','以系统为准','系统确认到账后才允许释放出纸'],['取件码','有了才展示','没有返回就不显示，也不本地生成']],
   /* 第三条原来和「已经付过了？先查单」那张出口卡逐字相同，改写成本屏没讲过的边界。 */
   expired:[['旧码','已经不可用','是否作废以支付平台与实际结果为准'],['金额','重新核价','换码后的金额同样以实际结果为准'],['续期','本页做不到','失效的码不能就地续期，只能回收银台重新出码']],
-  reconciling:[['查什么','支付平台账单','以账单为准，本页不判定成败'],['要多久','以实际结果为准','页面不预告时间，也不自动改状态'],['查不到','保留订单','订单保持原样，可联系工作人员协助']],
+  reconciling:[['查什么','支付平台账单','以账单为准，本页不判定成败'],['要多久','以实际结果为准','页面不预告时间，也不自动改状态'],['查不到','保留订单','订单保持原样，需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）']],
   closed:[['订单','已关闭','关闭原因与关闭时间以实际结果为准'],['扣款','按账单核对','本页不下「未扣款」结论'],['旧订单','不会自动恢复','关闭后的订单不再接受支付，也不会自己重开']]
 };
 function guide(key){
@@ -500,7 +500,7 @@ function bodyFor(state, fallback){
         + '</div>'
         + (fallback
             ? actsCard('付不了怎么办','',[
-                ['06-help.html','/help','help',['找现场工作人员','报订单号，由工作人员协助处理'],'help','clay'],
+                ['06-help.html','/help','help',['问小青','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','clay'],
                 ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道恢复后可以重新出码'],'refresh','slate'],
                 ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
                 ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以实际结果为准'],'print','slate']
@@ -508,13 +508,13 @@ function bodyFor(state, fallback){
             : actsCard('付款时可以做什么','',[
                 ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','通道选择与重新出码都在收银台完成'],'refresh',''],
                 ['14-print-confirm.html','/print/confirm','confirm',['返回修改份数或参数','改动后会重新核价'],'order','slate'],
-                ['06-help.html','/help','help',['扫不出来找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
+                ['06-help.html','/help','help',['扫不出来','不要重复扫码。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','clay'],
                 ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以实际结果为准'],'print','slate']
               ]))
         + '</div>',
       guide:'pending',
       cta:[
-        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('问小青','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
         link('我付好了，查看结果', href('confirming'), '/print/cashier', SCREEN+'-primary', {primary:true, icon:'arrow'})
       ]
     };
@@ -533,13 +533,13 @@ function bodyFor(state, fallback){
         + actsCard('等待时可以做什么','',[
             ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['主动查单','按支付平台账单核对，结果以系统为准'],'refresh','slate'],
             ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','收银台会继续等实际给出的支付结果'],'order',''],
-            ['06-help.html','/help','help',['等太久找工作人员','报订单号即可，不要重复扫码'],'help','clay'],
+            ['06-help.html','/help','help',['等太久','不要重复扫码。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','clay'],
             ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'ticket','slate']
           ])
         + '</div>',
       guide:'confirming',
       cta:[
-        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('问小青','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
         link('主动查单', href('reconciling'), '/print/cashier', SCREEN+'-primary', {primary:true, icon:'refresh'})
       ]
     };
@@ -581,12 +581,12 @@ function bodyFor(state, fallback){
             ['32-cashier.html','/print/cashier','cashier',['返回收银台重新获取收款码','新的收款码与有效期以实际结果为准'],'refresh',''],
             ['14-print-confirm.html','/print/confirm','confirm',['先改份数或参数','改动后会重新核价'],'order','slate'],
             ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['已经付过了？先查单','不要直接重付，先核对支付平台账单'],'ticket','clay'],
-            ['06-help.html','/help','help',['联系现场工作人员','报订单号即可，由工作人员协助处理'],'help','slate']
+            ['06-help.html','/help','help',['问小青','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','slate']
           ])
         + '</div>',
       guide:'expired',
       cta:[
-        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('问小青','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
         link('回收银台重新出码','32-cashier.html','/print/cashier',SCREEN+'-primary',{primary:true, icon:'refresh'})
       ]
     };
@@ -605,14 +605,14 @@ function bodyFor(state, fallback){
         + '</div>'
         + actsCard('查单之后','',[
             ['32-cashier.html','/print/cashier','cashier',['返回收银台查看最新结果','查单结果与是否重新出码都在收银台确认'],'refresh',''],
-            ['06-help.html','/help','help',['有争议找工作人员','报订单号，由工作人员协助核对'],'help','clay'],
+            ['06-help.html','/help','help',['有争议','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','clay'],
             ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'order','slate'],
             ['10-print-hub.html','/print-scan','hub',['先回打印扫描','订单是否保留以实际结果为准'],'print','slate']
           ])
         + '</div>',
       guide:'reconciling',
       cta:[
-        link('联系工作人员','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
+        link('问小青','06-help.html','/help',SCREEN+'-help',{icon:'help'}),
         link('返回收银台','32-cashier.html','/print/cashier',SCREEN+'-primary',{primary:true, icon:'back'})
       ]
     };
@@ -624,13 +624,13 @@ function bodyFor(state, fallback){
           [['订单号',''],['关闭原因',''],['关闭时间',''],['是否扣款','以账单与系统核对为准']])
       + '<aside class="fallback" data-testid="'+SCREEN+'-fallback">'+svg('warn')
       + '<div><b>手机显示已扣款？先别重复付</b>'
-      + '<p>先去查单，按支付平台账单核对；核对结果以实际结果为准。有争议请联系现场工作人员，报订单号即可。</p>'
+      + '<p>先去查单，按支付平台账单核对；核对结果以实际结果为准。如需退款，请拨打服务电话 18369161921（工作日 9:00–18:00），我们核实后原路退回。</p>'
       + slot(dev('等实际结果','订单号结果回来后再显示'))+'</div></aside>'
       + '</div>'
       + actsCard('还能怎么办','',[
           ['37-pay-states.html?state=reconciling','/print/cashier','reconcile',['我已扣款，去查单','按支付平台账单核对，不要重复支付'],'refresh','clay'],
           ['10-print-hub.html','/print-scan','hub',['重新下单打印','重新选文件并重新核价，会建立新订单'],'print',''],
-          ['06-help.html','/help','help',['联系现场工作人员','报订单号即可，由工作人员协助处理'],'help','slate'],
+          ['06-help.html','/help','help',['问小青','需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）'],'help','slate'],
           ['38-member-assets.html?state=orders-ready','/me/print-orders','orders',['我的打印订单','登录后查看本人订单与处理进度'],'ticket','slate']
         ])
       + '</div>',
