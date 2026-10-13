@@ -11591,6 +11591,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "StorageDeletion",
           "User",
           "UserAiConsent"
         ],
@@ -11599,11 +11600,13 @@
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
           "AuditService",
+          "FilesService",
           "MemberPrivacyService"
         ]
       },
@@ -17549,6 +17552,7 @@
           "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/files/closure-file-deletion.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
+          "services/api/src/files/file-access-proof.ts",
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/member-data-export-file.service.ts",
@@ -20146,7 +20150,8 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
-      "scripts/verify-no-raw-error-render.mjs"
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts"
     ],
     "apps/kiosk/src/pages/interview/InterviewShell.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -20525,6 +20530,7 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-wave3-print-aftercare.ts"
     ],
     "apps/kiosk/src/pages/print/PrintDeskPage.tsx": [
@@ -20547,7 +20553,8 @@
       "apps/kiosk/scripts/verify-pii-redaction-contract.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
-      "scripts/verify-no-raw-error-render.mjs"
+      "scripts/verify-no-raw-error-render.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts"
     ],
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
@@ -21263,7 +21270,8 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts"
     ],
     "apps/kiosk/src/pages/resume/ResumeReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
@@ -21860,7 +21868,8 @@
     ],
     "apps/kiosk/src/services/api/ai.ts": [
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
-      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts"
     ],
     "apps/kiosk/src/services/api/aiHttpAdapter.ts": [
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
@@ -21931,7 +21940,8 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
-      "apps/kiosk/scripts/verify-member-session-closure.mjs"
+      "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts"
     ],
     "apps/kiosk/src/services/api/jobAi.ts": [
       "apps/kiosk/scripts/verify-job-ai-history-privacy-ui.mjs",
@@ -21973,6 +21983,7 @@
     ],
     "apps/kiosk/src/services/api/materials.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-material-task-token-transport.ts"
     ],
     "apps/kiosk/src/services/api/memberAssets.ts": [
@@ -22034,7 +22045,8 @@
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
-      "services/api/scripts/verify-compliance.ts"
+      "services/api/scripts/verify-compliance.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts"
     ],
     "apps/kiosk/src/services/api/terminalConfig.ts": [
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
@@ -23829,6 +23841,7 @@
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-file-cleanup-cas-ledger.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts",
@@ -23867,6 +23880,7 @@
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
@@ -24387,6 +24401,7 @@
       "services/api/scripts/verify-assistant-provider-label.ts",
       "services/api/scripts/verify-assistant-voice.ts",
       "services/api/scripts/verify-file-assets-trial-acceptance.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-job-ai-ops-dashboard.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts",
@@ -24450,6 +24465,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/dto/resume-parse.dto.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts"
     ],
     "services/api/src/ai/dto/resume-voice.dto.ts": [
@@ -24610,12 +24626,14 @@
       "services/api/scripts/verify-resume-optimize.ts"
     ],
     "services/api/src/ai/resume-parse-intent-runner.service.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-llm-account-unavailable.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts"
     ],
     "services/api/src/ai/resume-parse-intent.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -24623,6 +24641,7 @@
       "services/api/scripts/verify-resume-parse-submission.ts"
     ],
     "services/api/src/ai/resume-parse-submission.service.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -24644,7 +24663,8 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts"
     ],
     "services/api/src/ai/resume/career-plan-degraded-pdf.service.ts": [
       "services/api/scripts/verify-ai-safety-aigc.ts",
@@ -24846,6 +24866,7 @@
     "services/api/src/ai/resume/resume-extraction.service.ts": [
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-fair-visit-review.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-ocr-baidu-live.ts",
       "services/api/scripts/verify-ocr-baidu.ts",
       "services/api/scripts/verify-pdfjs-engine.ts",
@@ -24947,7 +24968,8 @@
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-assess-isolation.ts",
       "services/api/scripts/verify-compliance.ts",
-      "services/api/scripts/verify-self-assessment-ai-gate.ts"
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts"
     ],
     "services/api/src/ai/usage/admin-ai-usage.controller.ts": [
       "apps/admin/scripts/verify-admin-ai-usage-contract.mjs",
@@ -25075,6 +25097,7 @@
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -25148,6 +25171,7 @@
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -25840,6 +25864,9 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-print-sign.ts"
     ],
+    "services/api/src/files/file-access-proof.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts"
+    ],
     "services/api/src/files/file-content-integrity.ts": [
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
     ],
@@ -25861,6 +25888,7 @@
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-file-retention-ui.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-data-export-files.ts",
       "services/api/scripts/verify-member-data-retention.ts"
@@ -25885,6 +25913,8 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-admin-fairs.ts",
       "services/api/scripts/verify-ai-safety-aigc.ts",
+      "services/api/scripts/verify-ai-safety-lexicon.ts",
+      "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-career-plan-degraded.ts",
       "services/api/scripts/verify-cos-files.ts",
       "services/api/scripts/verify-derivation-kind.ts",
@@ -25898,6 +25928,7 @@
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-file-lifecycle-summary.ts",
       "services/api/scripts/verify-file-retention.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
@@ -25923,6 +25954,7 @@
       "services/api/scripts/verify-resume-report-export.ts",
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts"
     ],
@@ -25948,13 +25980,16 @@
       "services/api/scripts/verify-derivation-kind.ts",
       "services/api/scripts/verify-document-conversion.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -25963,6 +25998,9 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts",
       "services/api/scripts/verify-resume-export-label.ts",
+      "services/api/scripts/verify-resume-parse-intent-http.ts",
+      "services/api/scripts/verify-self-assessment-ai-gate.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
     ],
@@ -26428,6 +26466,9 @@
     "services/api/src/main.ts": [
       "services/api/scripts/verify-sms-egress-limits.ts"
     ],
+    "services/api/src/materials/dto/create-material-task.dto.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts"
+    ],
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -26446,6 +26487,7 @@
     ],
     "services/api/src/materials/materials.service.ts": [
       "services/api/scripts/verify-derivation-kind.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-pdf-cmap.ts",
@@ -26847,6 +26889,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
@@ -26860,6 +26903,7 @@
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-beijing-display-time.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-llm-input-pii-mask.ts",
       "services/api/scripts/verify-member-data-retention.ts",
       "services/api/scripts/verify-mock-interview.ts"
@@ -27526,6 +27570,7 @@
       "services/api/scripts/verify-first-admin-bootstrap-postgres.ts",
       "services/api/scripts/verify-first-admin-bootstrap.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -27627,6 +27672,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-deletion-audit-reporting.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-support-contact.ts",
       "services/api/scripts/verify-terminal-credentials.ts",
       "services/api/scripts/verify-terminal-device-config.ts",
@@ -27795,6 +27841,7 @@
       "services/api/scripts/verify-fair-company-positions.ts",
       "services/api/scripts/verify-fair-info-fields.ts",
       "services/api/scripts/verify-free-print-quota.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-job-materials.ts",
       "services/api/scripts/verify-jobfair-venue-guide.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -27832,6 +27879,7 @@
       "services/api/scripts/verify-resume-template-fill.ts",
       "services/api/scripts/verify-scan-tasks.ts",
       "services/api/scripts/verify-screensaver-content.ts",
+      "services/api/scripts/verify-self-assessment-append-file-scope.ts",
       "services/api/scripts/verify-upload-sessions-faults.ts",
       "services/api/scripts/verify-upload-sessions.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
@@ -36115,6 +36163,7 @@
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/contract-review/contract-review-failure-reason.ts",
           "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/job-ai/job-ai-llm.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/mock-interview/mock-interview-llm.service.ts",
@@ -36234,6 +36283,7 @@
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/contract-review/contract-review-orchestrator.service.ts",
           "services/api/src/contract-review/contract-review-provider.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/terminals/terminal-session.service.ts"
@@ -38145,6 +38195,47 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
+          "apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
+          "apps/kiosk/src/services/api/ai.ts",
+          "apps/kiosk/src/services/api/interview.ts",
+          "apps/kiosk/src/services/api/materials.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/dto/resume-parse.dto.ts",
+          "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume-parse-intent.ts",
+          "services/api/src/ai/resume-parse-submission.service.ts",
+          "services/api/src/ai/resume/resume-extraction.service.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/file-access-proof.ts",
+          "services/api/src/files/file.types.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/materials/dto/create-material-task.dto.ts",
+          "services/api/src/materials/materials.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
+          "services/api/src/mock-interview/mock-interview.service.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-guest-file-proof.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:guest-file-proof"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/prisma/postgres/migrations/20261003090000_member_closure_storage_deletion/migration.sql",
           "services/api/src/common/filters/http-exception.filter.ts"
         ],
@@ -39427,6 +39518,7 @@
           "services/api/src/ai/resume/ocr/ocr.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/materials/pii-redaction.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -41349,6 +41441,7 @@
         "files": [
           "services/api/scripts/support/internal-auth-verify-harness.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/materials/materials-manual-confirmation.service.ts",
           "services/api/src/materials/materials.access.ts",
           "services/api/src/materials/materials.service.ts",
@@ -42849,6 +42942,7 @@
           "services/api/src/common/guards/end-user-auth.guard.ts",
           "services/api/src/common/redis/redis.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/member-privacy/member-privacy.service.ts",
           "services/api/src/prisma/prisma.module.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -43147,7 +43241,8 @@
           "services/api/src/ai/resume/self-assessment.types.ts",
           "services/api/src/ai/self-assessment.controller.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/common/pdf/pdfjs-document.ts"
+          "services/api/src/common/pdf/pdfjs-document.ts",
+          "services/api/src/files/signing.ts"
         ],
         "missing": []
       },
@@ -43157,6 +43252,33 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:self-assessment-ai-gate"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai/resume/appended-self-assessment.service.ts",
+          "services/api/src/ai/self-assessment.controller.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
+          "services/api/src/prisma/prisma.service.ts",
+          "services/api/src/storage/storage.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-self-assessment-append-file-scope.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:self-assessment-append-file-scope"
       ],
       "wired": true
     },

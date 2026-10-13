@@ -213,7 +213,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         difficulty,
         durationMin: duration,
         interactionMode: mode,
-        ...(resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
+        ...(resumeFile ? { resumeFileId: resumeFile.fileId, fileAccessUrl: resumeFile.fileUrl } : {}),
       }
       const token = getToken()
       const created = await createInterview(input, { token })

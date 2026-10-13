@@ -793,6 +793,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:self-assessment-consent
           # 自我探索：AI 被闸门拦下时打分照常、解读如实缺席、只有打分的文件不带 AIGC 标识（纯桩，不连库）
           pnpm --filter @ai-job-print/api verify:self-assessment-ai-gate
+          # 自我探索附录只取本人或本次会话持有的简历文件
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:self-assessment-append-file-scope
+          # 没有会员主人的文件，简历诊断、模拟面试、材料检查只认持有本次签名地址的调用方
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:guest-file-proof
           pnpm --filter @ai-job-print/api verify:launch-audit-p5
           # LLM 超时 + 全局并发闸门：派生式扫描所有 LLM 调用点都带 signal，
           # 并真跑证明「模型端卡住会超时」「闸门满了立刻拒绝」。

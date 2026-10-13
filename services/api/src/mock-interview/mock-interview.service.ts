@@ -25,6 +25,7 @@ import { RedisInflightLock } from '../ai/redis-inflight-lock'
 import { RedisService } from '../common/redis/redis.service'
 import { formatBeijingDate } from '../common/beijing-display-time'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
+import { assertGuestFileProof, fileNeedsHolderProof } from '../files/file-access-proof'
 
 /** 练习报告和通用题单印在纸上的日期。北京时间自然日。 */
 export function interviewReportDisplayDate(at: Date): string {
@@ -114,6 +115,7 @@ export class MockInterviewService {
       difficulty: string
       durationMin: number
       resumeFileId?: string
+      fileAccessUrl?: string
       interactionMode?: string
     },
     requester: InterviewRequester,
@@ -121,6 +123,16 @@ export class MockInterviewService {
     // 可选简历：服务端真实提取（复用提取层，失败 → 明确报错，不静默忽略）
     let resumeDigest: string | null = null
     if (dto.resumeFileId) {
+      // 没查到会员主人的简历只认持有本次签名地址的调用方。对不上时与文件读不到同一回应，
+      // 并且发生在提取、建会话和调用模型之前。
+      if (
+        await fileNeedsHolderProof(this.prisma, dto.resumeFileId)
+        && !assertGuestFileProof(dto.resumeFileId, dto.fileAccessUrl)
+      ) {
+        throw new BadRequestException({
+          error: { code: 'INTERVIEW_RESUME_EXTRACT_FAILED', message: '文件已失效或无法读取，请重新上传' },
+        })
+      }
       const extraction = await this.extraction.extractResumeText({ fileId: dto.resumeFileId, endUserId: requester.endUserId })
       if (!extraction.ok) {
         throw new BadRequestException({

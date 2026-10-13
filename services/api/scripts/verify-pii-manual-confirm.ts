@@ -42,6 +42,7 @@ async function main(): Promise<void> {
   const { MaterialsManualConfirmationService, PII_MANUAL_CONFIRMABLE_MODES } = await import('../src/materials/materials-manual-confirmation.service')
   const { assertPiiScanned, PII_SCAN_INCOMPLETE_MODES } = await import('../src/print-jobs/pii-scan-gate')
   const { hashAccessToken } = await import('../src/materials/materials.access')
+  const { signFileUrl } = await import('../src/files/signing')
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -228,7 +229,7 @@ async function main(): Promise<void> {
     const { PII_SCAN_DEDUPE_MS } = await import('../src/materials/materials.service')
     const dedupe = new MaterialsService(prisma, { getObject: async () => Buffer.from('不是 PDF 的内容') } as never, {} as never, {} as never)
     const dedupeFile = await makeFile(28)
-    const dto = { kind: 'pii_scan', sourceFileId: dedupeFile.id } as never
+    const dto = { kind: 'pii_scan', sourceFileId: dedupeFile.id, fileAccessUrl: signFileUrl(dedupeFile.id).url } as never
     const anon = { kind: 'anonymous' as const }
     const [d1, d2] = await Promise.all([dedupe.createTask(dto, anon), dedupe.createTask(dto, anon)])
     const created = () => prisma.documentProcessTask.count({ where: { sourceFileId: dedupeFile.id, kind: 'pii_scan' } })
@@ -244,7 +245,7 @@ async function main(): Promise<void> {
     } finally { Date.now = realNow }
     // 已经裁决 / 确认过的任务不再复用：之后再提交是重扫，要一条新的、待处理的检查。
     const touchedFile = await makeFile(32)
-    const touchedDto = { kind: 'pii_scan', sourceFileId: touchedFile.id } as never
+    const touchedDto = { kind: 'pii_scan', sourceFileId: touchedFile.id, fileAccessUrl: signFileUrl(touchedFile.id).url } as never
     const firstScan = await dedupe.createTask(touchedDto, anon)
     await confirm.confirm(firstScan.id, { kind: 'anonymous', accessToken: firstScan.accessToken })
     const secondScan = await dedupe.createTask(touchedDto, anon)
@@ -256,7 +257,7 @@ async function main(): Promise<void> {
     const missing = { kind: 'pii_scan', sourceFileId: `no-such-file-${suffix}` } as never
     const m1 = await outcome(() => dedupe.createTask(missing, anon)); const m2 = await outcome(() => dedupe.createTask(missing, anon))
     check('建任务失败不留在去重表里（两次都如实报错）', !m1.ok && !m2.ok && ![...(dedupe as unknown as { recentPiiScans: Map<string, unknown> }).recentPiiScans.keys()].some((key) => key.includes('no-such-file')))
-    const otherKind = await Promise.all([1, 2].map(() => outcome(() => dedupe.createTask({ kind: 'inspection', sourceFileId: dedupeFile.id } as never, anon))))
+    const otherKind = await Promise.all([1, 2].map(() => outcome(() => dedupe.createTask({ kind: 'inspection', sourceFileId: dedupeFile.id, fileAccessUrl: signFileUrl(dedupeFile.id).url } as never, anon))))
     check('别的任务种类不走去重', otherKind.every((r) => !r.ok) || (otherKind[0].ok && otherKind[1].ok && (otherKind[0].value as { id: string }).id !== (otherKind[1].value as { id: string }).id))
 
     console.log('\n[C] 口径一致')
