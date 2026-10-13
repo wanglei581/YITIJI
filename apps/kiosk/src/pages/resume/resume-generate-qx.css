@@ -22,14 +22,19 @@
   gap: 16px;
   min-width: 0;
 }
+/* 稿 24 核对底栏：两颗次要按钮按字宽，主按钮那层占满剩下的宽度。 */
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-btn {
-  flex: 1 1 auto;
-  min-width: auto;
+  flex: 0 0 auto;
   min-height: 56px;
   white-space: nowrap;
 }
 .qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-ai-declaration-slot {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+.qx-stage:has(.qx-resume-generate) > .qx-ctabar > .qx-rg-review-bar > .qx-ai-declaration-slot > .qx-btn {
+  width: 100%;
+  white-space: nowrap;
 }
 
 .qx-resume-generate .rg-xq {

@@ -470,6 +470,11 @@ async function expectSameRow(page: Page, locators: Locator[]) {
     const left = boxes[i - 1]
     const right = boxes[i]
     expect(left.y < right.y + right.height && right.y < left.y + left.height).toBe(true)
+    expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1)
+  }
+  const primary = boxes[boxes.length - 1]
+  for (let i = 0; i < boxes.length - 1; i += 1) {
+    expect(primary.width).toBeGreaterThan(boxes[i].width)
   }
 }
 
@@ -504,6 +509,104 @@ test('核对步可以不用 AI 导出原样草稿 @kiosk', async ({ page, api })
   expect(body.draft).toBe(true)
   expect(body.basic?.name).toBe('孙晓雯')
   await expect(page).toHaveURL(/\/print\//)
+})
+
+test('核对步原样导出失败不算 AI 失败 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 500,
+    json: { error: { code: 'INTERNAL', message: 'boom' } },
+  })
+  await page.goto('/resume/generate')
+  await fillRequired(page)
+  const draft = page.getByTestId('resume-generate-draft-export')
+  await draft.click()
+  await expect(page.locator('.qx-pill')).toHaveText('原样草稿 · 导出失败')
+  await expect(page.locator('.qx-pill')).toHaveAttribute('data-tone', 'bad')
+  const alert = page.getByTestId('resume-generate-draft-error')
+  await expect(alert).toBeVisible()
+  await expect(alert).toBeInViewport()
+  await expect(alert).toHaveAttribute('role', 'alert')
+  await expect(alert).toContainText('服务暂时不可用，请稍后重试')
+  await expect(page.getByText('AI 服务本身是通的')).toHaveCount(0)
+  await expect(page.getByText('这次没整理出来')).toHaveCount(0)
+  await expect(page.locator('.kiosk-ai-fallback')).toHaveCount(0)
+  await expect(draft).toBeVisible()
+  await expect(draft).toBeEnabled()
+  await expect(page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' })).toHaveCount(0)
+  expect(api.requestCount('POST', '/api/v1/resume/generate')).toBe(0)
+})
+
+test('核对步导出原样草稿没完成时，另两颗按钮也不能点 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  allowDraftPrint(api)
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/resume/generate/export', async () => {
+    await gate
+    return {
+      status: 200,
+      json: {
+        fileId: 'draft-held-1',
+        filename: '简历草稿_孙晓雯.pdf',
+        sizeBytes: 2048,
+        pageCount: 1,
+        signedUrl: '/e2e-fixtures/draft-resume.pdf',
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        printFileUrl: '/api/v1/files/draft-held-1/content?expires=1&sig=test',
+      },
+    }
+  })
+  await page.goto('/resume/generate')
+  await fillRequired(page)
+  const draft = page.getByTestId('resume-generate-draft-export')
+  const primary = page.getByRole('button', { name: '让 AI 整理成新简历' })
+  const back = page.locator('.qx-rg-review-bar').getByRole('button', { name: '上一步' })
+  await draft.click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/resume/generate/export')).toBe(1)
+  await expect(draft).toBeDisabled()
+  await expect(primary).toBeDisabled()
+  await expect(back).toBeDisabled()
+  release()
+  await expect(page).toHaveURL(/\/print\//)
+})
+
+test('AI 已经失败后再导出原样草稿失败，失败区不收起 @kiosk', async ({ page, api }) => {
+  registerW4Api(api)
+  api.respond('POST', '/api/v1/resume/generate', {
+    status: 200,
+    json: {
+      taskId: 'gen-fail-draft',
+      status: 'failed',
+      failReason: 'AI 简历生成失败，请稍后重试',
+    },
+  })
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  api.respondWith('POST', '/api/v1/resume/generate/export', async () => {
+    await gate
+    return { status: 500, json: { error: { code: 'INTERNAL', message: 'boom' } } }
+  })
+  await page.goto('/resume/generate')
+  await fillRequired(page)
+  await page.getByRole('button', { name: '让 AI 整理成新简历' }).click()
+  const fallback = page.locator('.kiosk-ai-fallback')
+  await expect(fallback).toBeVisible()
+  await expect(page.getByText('AI 简历生成失败，请稍后重试').first()).toBeVisible()
+  await expect(page.getByTestId('resume-generate-draft-export')).toHaveCount(0)
+  await page.getByRole('button', { name: '导出并打印我填的内容（未经 AI 润色）' }).click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/resume/generate/export')).toBe(1)
+  await expect(fallback).toBeVisible()
+  await expect(page.getByText('AI 简历生成失败，请稍后重试').first()).toBeVisible()
+  await expect(page.getByTestId('resume-generate-draft-export')).toHaveCount(0)
+  release()
+  const alert = page.getByTestId('resume-generate-draft-error')
+  await expect(alert).toBeVisible()
+  await expect(alert).toBeInViewport()
+  await expect(alert).toContainText('服务暂时不可用，请稍后重试')
+  await expect(fallback).toBeVisible()
+  await expect(page.getByText('AI 简历生成失败，请稍后重试').first()).toBeVisible()
+  await expect(page.getByTestId('resume-generate-draft-export')).toHaveCount(0)
 })
 
 test('生成页返回简历服务去简历中心 @kiosk', async ({ page, api }) => {

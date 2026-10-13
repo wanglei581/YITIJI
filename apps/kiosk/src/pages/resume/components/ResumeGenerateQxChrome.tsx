@@ -35,6 +35,16 @@ export function ResumeGenerateAiRow() {
   )
 }
 
+/** 原样导出失败的一行说明。字是调用方给的现成出错句，不另写。 */
+export function ResumeGenerateDraftError({ message }: { message: string | null }) {
+  if (!message) return null
+  return (
+    <p className="qx-rg-note" role="alert" data-testid="resume-generate-draft-error">
+      <span>{message}</span>
+    </p>
+  )
+}
+
 /**
  * 核对步底栏。AI 失败、不可用、本人不同意那几态不渲染这一条，
  * 那些态仍用原来的「导出并打印我填的内容（未经 AI 润色）」。
@@ -48,7 +58,7 @@ export function ResumeGenerateReviewBar(props: {
 }) {
   return (
     <div className="qx-rg-review-bar">
-      <button type="button" className="qx-btn" data-variant="ghost" disabled={props.generating} onClick={props.onBack}>
+      <button type="button" className="qx-btn" data-variant="ghost" disabled={props.generating || props.exportingDraft} onClick={props.onBack}>
         上一步
       </button>
       <button

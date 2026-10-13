@@ -23,7 +23,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow, ResumeGenerateReviewBar } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateAdvisor, ResumeGenerateAiRow, ResumeGenerateDraftError, ResumeGenerateReviewBar } from './components/ResumeGenerateQxChrome'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { ResumeGenerateEntry } from './components/ResumeGenerateEntry'
@@ -81,6 +81,8 @@ export function ResumeGeneratePage() {
   const [probed, setProbed] = useState(false)
   /** 原样草稿导出中（不经过 AI，只是服务端排版 + 上传）。 */
   const [exportingDraft, setExportingDraft] = useState(false)
+  /** 原样导出自己的出错。不写进 error，免得没走过 AI 也被说成 AI 失败。 */
+  const [draftError, setDraftError] = useState<string | null>(null)
   const [basic, setBasic] = useState(boot.basic)
   const [intention, setIntention] = useState(boot.intention)
   const [education, setEducation] = useState(boot.education)
@@ -135,13 +137,17 @@ export function ResumeGeneratePage() {
     selfIntro: clampText(selfIntro.trim(), TEXT_LIMITS.selfIntro) || undefined,
   })
 
+  const leaveReview = () => {
+    setDraftError(null)
+    setReviewing(false)
+  }
   const openStep = (next: number) => {
     setPhase('form')
-    setReviewing(false)
+    leaveReview()
     setStep(next)
   }
   const editFromReview = (next: number, nextSeg?: HistorySeg) => {
-    setReviewing(false)
+    leaveReview()
     setPhase('form')
     setStep(next)
     if (nextSeg) setSeg(nextSeg)
@@ -150,6 +156,7 @@ export function ResumeGeneratePage() {
   const runGenerate = async () => {
     setGenerating(true)
     setError(null)
+    setDraftError(null)
     setAiOutage(null)
     const input = buildInput()
     try {
@@ -183,6 +190,7 @@ export function ResumeGeneratePage() {
 
   const handleGenerate = async () => {
     if (consent.checking) return
+    setDraftError(null)
     if (!consent.ready) {
       setShowConsent(true)
       return
@@ -197,7 +205,7 @@ export function ResumeGeneratePage() {
   const handleExportDraft = async () => {
     if (exportingDraft) return
     setExportingDraft(true)
-    setError(null)
+    setDraftError(null)
     const input = buildInput()
     const draft: GeneratedResume = {
       basic: input.basic,
@@ -227,7 +235,7 @@ export function ResumeGeneratePage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '草稿导出失败，请稍后重试'))
+      setDraftError(userMessageOf(err, '草稿导出失败，请稍后重试'))
     } finally {
       setExportingDraft(false)
     }
@@ -284,15 +292,24 @@ export function ResumeGeneratePage() {
     ? '正在整理你的资料'
     : exportingDraft
       ? '正在把你填的内容排成 PDF'
-      : aiOutage
-        ? '整理暂时不可用'
-        : error
-          ? '这次没整理出来'
-          : phase === 'entry'
-            ? '从零生成 · 先看要问什么'
-            : reviewing
-              ? '核对 · 准备提交一次'
-              : `第 ${step + 1} 步 / 共 4 步 · ${STEPS[step].title}`
+      : draftError
+        ? '原样草稿 · 导出失败'
+        : aiOutage
+          ? '整理暂时不可用'
+          : error
+            ? '这次没整理出来'
+            : phase === 'entry'
+              ? '从零生成 · 先看要问什么'
+              : reviewing
+                ? '核对 · 准备提交一次'
+                : `第 ${step + 1} 步 / 共 4 步 · ${STEPS[step].title}`
+  const statusTone: 'ok' | 'warn' | 'bad' | 'unknown' = generating || exportingDraft
+    ? 'warn'
+    : draftError || aiOutage || error
+      ? 'bad'
+      : reviewing
+        ? 'ok'
+        : 'unknown'
 
   const reviewPrimary = (
     <span className="qx-ai-declaration-slot">
@@ -304,7 +321,7 @@ export function ResumeGeneratePage() {
         // 这里刻意**不看** aiOutage：能力级失败一旦把这颗钮禁掉，AI 恢复了也亮不回来
         // （清掉 aiOutage 的只有 runGenerate，而它只能从这颗钮进）。和职业规划页同一做法：
         // 不轮询、不自动重探，用户再按一次才再发一次真实请求，由结果重新决定。
-        disabled={generating}
+        disabled={generating || exportingDraft}
         onClick={() => void handleGenerate()}
       >
         <SparklesIcon className="h-5 w-5" aria-hidden="true" />
@@ -321,7 +338,7 @@ export function ResumeGeneratePage() {
           开始填写（第 1 步）
         </button>
       ) : showPlainDraft ? (
-        <ResumeGenerateReviewBar generating={generating} exportingDraft={exportingDraft} onBack={() => setReviewing(false)} onExportDraft={() => void handleExportDraft()}>
+        <ResumeGenerateReviewBar generating={generating} exportingDraft={exportingDraft} onBack={leaveReview} onExportDraft={() => void handleExportDraft()}>
           {reviewPrimary}
         </ResumeGenerateReviewBar>
       ) : (
@@ -329,9 +346,9 @@ export function ResumeGeneratePage() {
           type="button"
           className="qx-btn"
           data-variant="ghost"
-          disabled={generating}
+          disabled={generating || exportingDraft}
           onClick={() => {
-            if (reviewing) { setReviewing(false); return }
+            if (reviewing) { leaveReview(); return }
             if (step === 0) navigate('/resume-service')
             else setStep((current) => current - 1)
           }}
@@ -365,7 +382,7 @@ export function ResumeGeneratePage() {
       title="从零生成简历"
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
       status={{
-        tone: aiOutage || error ? 'bad' : generating || exportingDraft ? 'warn' : reviewing ? 'ok' : 'unknown',
+        tone: statusTone,
         label: statusLabel,
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume-service') }}
@@ -474,8 +491,10 @@ export function ResumeGeneratePage() {
           </p>
         )}
         {error && <p className="qx-rd-error" role="alert">{error}</p>}
+        {reviewing && !showPlainDraft ? <ResumeGenerateDraftError message={draftError} /> : null}
         <AiTaskRegion className="resume-generate-fallback" task={aiTask} label="AI 简历润色成文" fallback={fallback} />
         <p className="rg-truth">AI 只整理你提供的描述；学校、公司和时间请本人核对。</p>
+        {showPlainDraft ? <ResumeGenerateDraftError message={draftError} /> : null}
       </section>
       {showConsent && (
         <ResumeAiConsentDialog
