@@ -210,22 +210,28 @@ async function verifyPartnerQualitySummaryHosting(): Promise<void> {
     },
   }
 
-  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
-  const closed = await partnerJobQualitySummary(jobQuality, 'org-a')
-  if (closed.length === 0 && queries === 0) {
-    pass('运行时:托管关时机构端质量汇总为空且不查快照')
-  } else {
-    fail(`运行时:托管关时机构端质量汇总应为空且不查库 length=${closed.length} queries=${queries}`)
-  }
+  const previousHosting = process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+  try {
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const closed = await partnerJobQualitySummary(jobQuality, 'org-a')
+    if (closed.length === 0 && queries === 0) {
+      pass('运行时:托管关时机构端质量汇总为空且不查快照')
+    } else {
+      fail(`运行时:托管关时机构端质量汇总应为空且不查库 length=${closed.length} queries=${queries}`)
+    }
 
-  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
-  const open = await partnerJobQualitySummary(jobQuality, 'org-a')
-  const item = open[0]
-  const missing = PARTNER_QUALITY_FIELDS.filter((field) => !item || !(field in item))
-  if (open.length === 1 && item?.totalJobs === 2 && missing.length === 0 && queries === 1) {
-    pass('运行时:托管开时机构端质量汇总有数，字段与 SourceQualitySummaryItem 一致')
-  } else {
-    fail(`运行时:托管开时机构端质量汇总异常 length=${open.length} queries=${queries} missing=${missing.join(',')}`)
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+    const open = await partnerJobQualitySummary(jobQuality, 'org-a')
+    const item = open[0]
+    const missing = PARTNER_QUALITY_FIELDS.filter((field) => !item || !(field in item))
+    if (open.length === 1 && item?.totalJobs === 2 && missing.length === 0 && queries === 1) {
+      pass('运行时:托管开时机构端质量汇总有数，字段与 SourceQualitySummaryItem 一致')
+    } else {
+      fail(`运行时:托管开时机构端质量汇总异常 length=${open.length} queries=${queries} missing=${missing.join(',')}`)
+    }
+  } finally {
+    if (previousHosting === undefined) delete process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+    else process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = previousHosting
   }
 }
 
