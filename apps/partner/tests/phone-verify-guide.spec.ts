@@ -5,10 +5,11 @@ const body = '这个账号是平台代为开通的，暂时不能在这里自己
 const nextStep = '平台登记了你的手机号之后，回到登录页点「忘记密码」，用这个手机号收验证码、设置你自己的密码，验证就完成了。还没有登记，或者收不到验证码的，请联系平台运营，提交盖章的《账号联系人确认函》（写明联系人姓名和手机号）。'
 const before = '在这之前，仍可用账号和密码登录、正常使用后台；手机号登录和自助找回密码暂时用不了。'
 
-async function loginFixture(page: Page, ready: boolean | undefined, rejected = false) {
+async function loginFixture(page: Page, ready: boolean | undefined, rejected = false, phoneMasked: string | undefined = '138****0000') {
   const user = {
     id: 'phone-guide-partner', name: '测试机构', role: 'partner', orgId: 'guide-org',
-    phoneMasked: '138****0000', phoneVerifiedAt: null,
+    phoneVerifiedAt: null,
+    ...(phoneMasked ? { phoneMasked } : {}),
     ...(ready === undefined ? {} : { phoneSelfVerifyReady: ready }),
   }
   const requests: string[] = []
@@ -52,6 +53,43 @@ for (const close of ['知道了，进入工作台', '稍后验证']) {
     await expect(dialog).toHaveCount(0)
   })
 }
+
+test('没登记手机号且 false 显示指路版', async ({ page }) => {
+  const { dialog, requests } = await loginFixture(page, false, false, '')
+  for (const copy of [body, nextStep, before]) await expect(dialog).toContainText(copy)
+  await expect(dialog.locator('input')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '获取验证码' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '确认验证' })).toHaveCount(0)
+  await expect(dialog).not.toContainText('已绑定')
+  await expect(dialog).not.toContainText('undefined')
+  expect(requests).not.toContain('/api/v1/auth/phone/code')
+  await dialog.getByRole('button', { name: '知道了，进入工作台' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByRole('heading', { level: 1, name: '工作台' })).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+})
+
+test('找回密码填验证码那一步说明收不到找谁', async ({ page }) => {
+  const hint = '收不到验证码？这个账号可能还没有登记手机号，请联系平台运营。'
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/auth/password/reset/start') {
+      await route.fulfill({ json: { success: true, data: { sent: true, cooldownSeconds: 60 } } })
+      return
+    }
+    await route.fulfill({ status: 503, json: { error: { code: 'FIXTURE_UNAVAILABLE', message: '测试数据暂不可用' } } })
+  })
+  await page.goto('/login')
+  await page.getByRole('button', { name: '忘记密码？找回 / 重置' }).click()
+  const dialog = page.getByRole('dialog', { name: '找回密码' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).not.toContainText(hint)
+  await dialog.locator('#partner-reset-identity').fill('任意机构账号')
+  await checkAgreement(dialog)
+  await dialog.getByRole('button', { name: '发送验证码' }).click()
+  await expect(dialog.locator('#partner-reset-code')).toBeVisible()
+  await expect(dialog.getByText(hint, { exact: true })).toBeVisible()
+})
 
 for (const ready of [true, undefined]) {
   test(`${ready} 保留正常验证弹窗和成功发码`, async ({ page }) => {

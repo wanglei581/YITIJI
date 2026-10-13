@@ -141,13 +141,85 @@ for (const code of ['ACCOUNT_PASSWORD_PROOF_NOT_READY', 'SMS_TOO_FREQUENT']) {
   }
   pass(`${code} 仅持有人证明错误切换指路，其他错误保留正常版`)
 }
-for (const [phone, verifiedAt] of [[undefined, null], ['138****0000', '2026-10-10T00:00:00Z']]) {
-  const h = harness(false, phone ?? '', verifiedAt)
+const noCodeHint = '收不到验证码？这个账号可能还没有登记手机号，请联系平台运营。'
+
+{
+  const h = harness(false, '', null)
+  const tree = await h.login()
+  assertGuide(h, tree)
+  const dialog = h.find(tree, (n) => n.props.role === 'dialog')
+  assert.equal(h.user.phoneMasked, '')
+  assert.equal(h.requests.length, 1)
+  assert.equal(h.requests[0].url, '/api/v1/auth/login')
+  assert.ok(!h.text([dialog]).includes('已绑定'))
+  assert.ok(!h.text([dialog]).includes('undefined'))
+  assert.equal(h.navigations.length, 0)
+  h.find(tree, (n) => n.type === 'button' && h.text([n]) === '知道了，进入工作台').props.onClick()
+  assert.equal(h.navigations[0][0], '/')
+  pass('没登记手机号 + false + 未验证：指路版三段字一致，无验证码框、无发码请求，知道了进入工作台')
+}
+for (const ready of [true, undefined]) {
+  const h = harness(ready, '', null)
   const tree = await h.login()
   assert.ok(!h.find(tree, (n) => n.props.role === 'dialog'))
   assert.equal(h.navigations[0][0], '/')
-  pass('无手机号或已经验证时保持直接进入工作台')
+  pass(`没登记手机号 + ${ready === undefined ? '回包没有 phoneSelfVerifyReady' : 'true'}：不弹，直接进工作台`)
 }
+{
+  const h = harness(false, '138****0000', '2026-10-10T00:00:00Z')
+  const tree = await h.login()
+  assert.ok(!h.find(tree, (n) => n.props.role === 'dialog'))
+  assert.equal(h.navigations[0][0], '/')
+  pass('已验证手机 + false：不弹，直接进工作台')
+}
+{
+  const h = harness(true)
+  let tree = h.render()
+  assert.ok(!h.text(tree).includes(noCodeHint))
+  h.find(tree, (n) => n.props.className?.startsWith('c-agree')).props.onClick()
+  tree = h.render()
+  h.find(tree, (n) => n.type === 'button' && h.text([n]).includes('忘记密码')).props.onClick()
+  tree = h.render()
+  const identityDialog = h.find(tree, (n) => n.props['aria-label'] === '找回密码')
+  assert.ok(identityDialog)
+  assert.ok(!h.text([identityDialog]).includes(noCodeHint))
+  h.find([identityDialog], (n) => n.props.id === 'partner-reset-identity').props.onChange({ target: { value: 'guide-org' } })
+  tree = h.render()
+  const sent = { sent: true, cooldownSeconds: 60 }
+  h.replies.push({ status: 200, body: { data: sent } })
+  const dialog = h.find(tree, (n) => n.props['aria-label'] === '找回密码')
+  await h.find([dialog], (n) => n.type === 'form').props.onSubmit({ preventDefault() {} })
+  tree = h.render()
+  assert.deepEqual(Object.keys(sent).sort(), ['cooldownSeconds', 'sent'])
+  assert.equal(h.requests.at(-1).url, '/api/v1/auth/password/reset/start')
+  const codeForm = h.find(tree, (n) => n.type === 'form' && h.find([n], (c) => c.props?.id === 'partner-reset-code'))
+  assert.ok(codeForm)
+  const hint = h.find([codeForm], (n) => n.props.className === 'c-hint' && h.text([n]).includes(noCodeHint))
+  assert.ok(hint)
+  assert.equal(h.text([hint]).replace(/\s+/g, ''), noCodeHint)
+  const ordered = []
+  const walk = (nodes) => {
+    for (const node of nodes) {
+      if (node == null || typeof node !== 'object') continue
+      ordered.push(node)
+      if (Array.isArray(node.children)) walk(node.children)
+    }
+  }
+  walk(codeForm.children)
+  const resendAt = ordered.findIndex((n) => n.type === 'button' && /重新发送验证码|后可重新发送/.test(h.text([n])))
+  const hintAt = ordered.findIndex((n) => n === hint)
+  assert.ok(resendAt >= 0 && hintAt > resendAt)
+  pass('找回密码填码步逐字显示收不到验证码的说明；回包只有已发送，不带账号字段')
+}
+const loginSource = readFileSync(resolve(root, 'src/routes/login/index.tsx'), 'utf8')
+assert.equal(loginSource.split(noCodeHint).length - 1, 1)
+{
+  const codeAt = loginSource.indexOf("resetStep === 'code'")
+  const passwordAt = loginSource.indexOf("resetStep === 'password'")
+  const hintAt = loginSource.indexOf(noCodeHint)
+  assert.ok(codeAt >= 0 && passwordAt > codeAt && hintAt > codeAt && hintAt < passwordAt)
+}
+pass('这句话只写在找回密码填码那一步，全文只有一处')
 const h = harness(true)
 await h.login()
 for (const ready of [false, true, undefined]) {
