@@ -244,10 +244,15 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   makeShims(bin)
 
   mkdirSync(join(checkout, 'services/api/src/config'), { recursive: true })
+  mkdirSync(join(checkout, 'services/api/src/recruitment-hosting'), { recursive: true })
   mkdirSync(join(checkout, 'services/api/scripts'), { recursive: true })
   // 新旧内容长度不同：rsync 按「大小 + 修改时间」快速比对，同秒创建的同长文件会被当成没变
   writeFileSync(join(checkout, 'VERSION'), 'new-release\n')
   writeFileSync(join(checkout, 'services/api/src/config/production-runtime-gates.ts'), 'PRINT_REQUIRE_PII_SCAN\nPRINT_REQUIRE_PRINTER_ONLINE\n')
+  writeFileSync(
+    join(checkout, 'services/api/src/recruitment-hosting/deployment-ownership.ts'),
+    "export const DEPLOYMENT_OWNERSHIP_ENV = 'DEPLOYMENT_OWNERSHIP'\n",
+  )
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
   // 3d 法务文档预检的替身：记下调用参数；DRILL_LEGAL_PREFLIGHT=missing 时按「缺隐私政策」失败
   writeFileSync(join(checkout, 'services/api/scripts/preflight-legal-docs.mjs'), [

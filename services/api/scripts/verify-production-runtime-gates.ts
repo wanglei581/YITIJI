@@ -1,8 +1,20 @@
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { AIGC_DEFAULT_PRODUCER } from '../src/common/pdf/aigc-label'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
+import {
+  evaluateRecruitmentLock,
+  operatorSelfReportNoticeText,
+  recruitmentLockProductionError,
+  recruitmentLockStartupLine,
+} from '../src/recruitment-hosting/deployment-ownership'
+
+if (process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED === undefined) {
+  process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+}
 
 type Env = Parameters<typeof assertProductionRuntimeGates>[0]
 type FontProbe = Parameters<typeof assertProductionRuntimeGates>[1]
@@ -497,7 +509,158 @@ function main(): void {
   }
   console.log('  PASS .env.example 未写入真实 COS 桶名')
 
+  assertRecruitmentLockCases()
+  assertRecruitmentLockCopy()
+  assertPreflightForceValue()
+
   console.log('\n=== ALL PASS ===')
+}
+
+function assertRecruitmentLockCases(): void {
+  console.log('\n=== 招聘锁（只在生产拒绝启动）===')
+  const hostingOn = { ...PROD_OK, RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }
+  const privateReady = {
+    ...hostingOn,
+    DEPLOYMENT_OWNERSHIP: 'customer_private',
+    RECRUITMENT_OPERATOR_NAME: '示例职业介绍所',
+    RECRUITMENT_OPERATOR_LICENSE_NO: '鲁人社证字〔2026〕第001号',
+  }
+  expectRejected(hostingOn, 'PRODUCTION_RECRUITMENT_HOSTING_LOCKED', '生产 + 托管开 + 归属不写 → 拒')
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: 'cloud' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属写错 cloud → 拒',
+  )
+  expectRejected(
+    { ...hostingOn, DEPLOYMENT_OWNERSHIP: 'vendor_cloud' },
+    'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+    '生产 + 托管开 + 归属 vendor_cloud → 拒',
+  )
+  for (const value of ['yes', 'on', '1', ' TRUE ']) {
+    expectRejected(
+      { ...PROD_OK, RECRUITMENT_CONTENT_HOSTING_ENABLED: value },
+      'PRODUCTION_RECRUITMENT_HOSTING_LOCKED',
+      `生产 + 托管写成 ${JSON.stringify(value)} + 归属不写 → 拒`,
+    )
+  }
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_NAME: undefined },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 缺名称 → 拒',
+  )
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_LICENSE_NO: undefined },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 缺编号 → 拒',
+  )
+  expectRejected(
+    { ...privateReady, RECRUITMENT_OPERATOR_NAME: '   ', RECRUITMENT_OPERATOR_LICENSE_NO: ' \t ' },
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '生产 + 私有化 + 托管开 + 两项只有空格 → 拒',
+  )
+  expectAllowed(privateReady, '生产 + 私有化 + 托管开 + 两项齐全 → 通过')
+  expectAllowed(
+    { ...privateReady, DEPLOYMENT_OWNERSHIP: ' Customer_Private ' },
+    '生产 + 归属写成 Customer_Private（带空格）+ 两项齐全 → 按私有化通过',
+  )
+  expectAllowed(PROD_OK, '生产 + 托管关 + 归属不写 → 通过')
+  expectAllowed(
+    { NODE_ENV: 'development', RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' },
+    '非生产 + 托管开 + 归属不写 → 不拒',
+  )
+}
+
+function assertRecruitmentLockCopy(): void {
+  const fullLicense = '鲁人社证字〔2026〕第001号'
+  const reported = evaluateRecruitmentLock({
+    DEPLOYMENT_OWNERSHIP: 'customer_private',
+    RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
+    RECRUITMENT_OPERATOR_NAME: ' 示例职业介绍所 ',
+    RECRUITMENT_OPERATOR_LICENSE_NO: `  ${fullLicense}  `,
+  })
+  const selfReport = reported.selfReport
+  if (!selfReport || selfReport.name !== '示例职业介绍所' || selfReport.licenseNumber !== fullLicense) {
+    throw new Error(`selfReport 必须是去首尾空格后的全文，实际 ${JSON.stringify(reported.selfReport)}`)
+  }
+  const notice = operatorSelfReportNoticeText(selfReport)
+  const startupOn = recruitmentLockStartupLine(reported)
+  const startupOff = recruitmentLockStartupLine(evaluateRecruitmentLock({}))
+  const startupPrivateOff = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({ DEPLOYMENT_OWNERSHIP: 'customer_private' }),
+  )
+  const locked = recruitmentLockProductionError('locked_vendor_cloud')
+  const missing = recruitmentLockProductionError('operator_self_report_missing')
+  const texts = [notice, startupOn, locked?.message ?? '', missing?.message ?? '']
+  for (const text of texts) {
+    if (text.includes('已核验') || text.includes('已认证') || text.includes('持证') || text.includes('认证')) {
+      throw new Error(`文案含禁用词：${text}`)
+    }
+  }
+  if (!notice.includes('本软件未核验') || !startupOn.includes('本软件未核验') || !notice.includes(fullLicense)) {
+    throw new Error('自报文案必须含「本软件未核验」和编号全文')
+  }
+  if (startupOff !== '[INFO] RECRUITMENT_LOCK: 部署归属=我方云；招聘内容托管=关') {
+    throw new Error(`我方云启动日志不符：${startupOff}`)
+  }
+  if (startupPrivateOff !== '[INFO] RECRUITMENT_LOCK: 部署归属=客户私有化部署；招聘内容托管=关') {
+    throw new Error(`私有化托管关启动日志不符：${startupPrivateOff}`)
+  }
+  const vendorOn = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({ RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true' }),
+  )
+  if (vendorOn !== '[INFO] RECRUITMENT_LOCK: 部署归属=我方云；招聘内容托管=开') {
+    throw new Error(`我方云托管开的启动日志必须照实写开：${vendorOn}`)
+  }
+  const privateOnMissing = recruitmentLockStartupLine(
+    evaluateRecruitmentLock({
+      DEPLOYMENT_OWNERSHIP: 'customer_private',
+      RECRUITMENT_CONTENT_HOSTING_ENABLED: 'true',
+    }),
+  )
+  if (privateOnMissing !== '[INFO] RECRUITMENT_LOCK: 部署归属=客户私有化部署；招聘内容托管=开') {
+    throw new Error(`缺自报时不得写成已自报：${privateOnMissing}`)
+  }
+  if (
+    startupOn !==
+    `[INFO] RECRUITMENT_OPERATOR_SELF_REPORTED: 部署归属=客户私有化部署；招聘内容托管=开；${notice}`
+  ) {
+    throw new Error(`私有化托管开启动日志不符：${startupOn}`)
+  }
+  console.log('  PASS 自报文案含「本软件未核验」、不含禁用词，编号为全文')
+}
+
+function assertPreflightForceValue(): void {
+  console.log('\n=== 预检 --force-value ===')
+  const script = join(__dirname, 'preflight-production-gates.mjs')
+  const run = (extraArgs: string[]) => {
+    const dir = mkdtempSync(join(tmpdir(), 'recruitlock-preflight-'))
+    const envFile = join(dir, '.env')
+    writeFileSync(envFile, 'RECRUITMENT_CONTENT_HOSTING_ENABLED=true\n', 'utf8')
+    try {
+      const result = spawnSync(process.execPath, [script, '--env-file', envFile, ...extraArgs], { encoding: 'utf8' })
+      return { status: result.status, output: `${result.stdout ?? ''}\n${result.stderr ?? ''}` }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  const expectFail = (extraArgs: string[], needle: string, label: string) => {
+    const result = run(extraArgs)
+    if (result.status === 0 || !result.output.includes(needle)) {
+      throw new Error(`${label}: 期望失败且含 ${needle}，status=${result.status} output=${result.output.slice(0, 500)}`)
+    }
+    console.log(`  PASS ${label}`)
+  }
+  expectFail([], 'PRODUCTION_RECRUITMENT_HOSTING_LOCKED', '.env 没写归属 + 托管开 → 预检失败')
+  expectFail(
+    ['--force-value', 'DEPLOYMENT_OWNERSHIP=customer_private'],
+    'PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING',
+    '--force-value 私有化但缺自报 → 预检失败',
+  )
+  expectFail(
+    ['--force-value', 'deployment_ownership=vendor_cloud'],
+    'PREFLIGHT_USAGE',
+    '键名小写 → PREFLIGHT_USAGE',
+  )
 }
 
 main()
