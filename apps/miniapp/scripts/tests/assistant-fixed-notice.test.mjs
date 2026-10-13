@@ -195,8 +195,14 @@ test('f. 模板只在非加载中的固定提示上方标「安全提示」，�
   const wxIf = openTag && openTag.match(/\bwx:if="([^"]*)"/)
   const cls = openTag && openTag.match(/\bclass="([^"]*)"/)
   assert.ok(openTag && wxIf && cls && cls[1] === 'msg-notice-tag', '「安全提示」应写在 class 为 msg-notice-tag 的 view 上')
-  assert.equal(wxIf[1].includes('item.fixedNotice'), true, '小标的 wx:if 里要有 item.fixedNotice')
-  assert.equal(wxIf[1].includes('!item.loading'), true, '小标的 wx:if 里要有 !item.loading')
+  // 条件要逐字对上，不能只看「含有 item.fixedNotice」：写成 !item.fixedNotice 也含这几个字，
+  // 那样小标会挂到每条普通回答上，只查包含关系测不出来。
+  const cond = wxIf[1].replace(/\s+/g, '')
+  assert.equal(
+    ['{{!item.loading&&item.fixedNotice}}', '{{item.fixedNotice&&!item.loading}}'].includes(cond),
+    true,
+    `小标的条件应正好是「不是加载中、且 fixedNotice 为真」，现在是 ${wxIf[1]}`,
+  )
 
   const aiAt = wxml.indexOf("item.role === 'ai'")
   const userAt = wxml.indexOf("item.role === 'user'")
