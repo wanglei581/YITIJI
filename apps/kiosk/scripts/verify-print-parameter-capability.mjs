@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const kioskRoot = resolve(import.meta.dirname, '..')
@@ -204,5 +204,38 @@ expect(/new AbortController\(/.test(pdfCanvas) && /\.destroy\(/.test(pdfCanvas) 
 expect(/devicePixelRatio/.test(pdfCanvas), '按 devicePixelRatio 取缩放，避免字迹发糊')
 expect(/正在准备预览/.test(pdfCanvas) && /预览没能生成，打印仍按原文件/.test(pdfCanvas) && /第 /.test(pdfCanvas) && /共 /.test(pdfCanvas), '加载、失败和页码都如实显示')
 expect(/net::ERR_ABORTED/.test(pdfFrame) && /blob URL/.test(pdfFrame), 'PdfPreviewFrame 说明并避免卸载时的 PDF document abort')
+
+const PREVIEW_FAILURE_TAIL = '报告已生成，可扫码带走或直接打印'
+const PREVIEW_FAILURE_TAIL_FILES = new Set([
+  'src/pages/resume/resume-report-model.ts',
+  'src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx',
+])
+function walkSrcFiles(dir, acc = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = resolve(dir, entry.name)
+    if (entry.isDirectory()) walkSrcFiles(full, acc)
+    else if (/\.(tsx?|jsx?|css)$/.test(entry.name)) acc.push(full)
+  }
+  return acc
+}
+const srcRoot = resolve(kioskRoot, 'src')
+const tailHits = walkSrcFiles(srcRoot)
+  .filter((file) => readFileSync(file, 'utf8').includes(PREVIEW_FAILURE_TAIL))
+  .map((file) => file.slice(srcRoot.length + 1).replaceAll('\\', '/'))
+  .map((rel) => `src/${rel}`)
+expect(tailHits.length > 0, '诊断报告导出成功后的预览失败句带后半句')
+expect(
+  tailHits.every((rel) => PREVIEW_FAILURE_TAIL_FILES.has(rel)),
+  `后半句只出现在诊断报告常量和带走区，实际：${tailHits.join(', ') || '（没有）'}`,
+)
+const takeaway = read(kioskRoot, 'src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx')
+expect(
+  takeaway.includes("failureMessage={exportKind === 'diagnosis_report' ? REPORT_EXPORT_PREVIEW_FAILURE_COPY : undefined}"),
+  '诊断报告导出成功后的预览把后半句传进预览层，修改清单仍用默认句',
+)
+expect(
+  !takeaway.includes(PREVIEW_FAILURE_TAIL) || takeaway.includes('REPORT_EXPORT_PREVIEW_FAILURE_COPY'),
+  '带走区引用常量，不另写一句',
+)
 
 console.log('\nALL PASS')

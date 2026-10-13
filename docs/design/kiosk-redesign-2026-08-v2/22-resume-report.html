@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：9/28 用词：写稿人用语（原型、内部键名、「字段」）换成用户的话。结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。9/28 留白：内容结构每块的「命中几条问题」标签挪到标题行右端；非报告态的出口行按内容定高（不再拉成空盒），剩余高度分到卡片之间，解析中断与空报告两屏出口行、自查清单放宽一档；早期报告的「报告结论」建议条均匀排开。只改样式，无新增内容。另有一版重排结构的提案见 STATUS.md，不是默认。
+<!-- 青序流光 2.0 · 诊断报告（有报告态，轻优化）：9/28 用词：写稿人用语（原型、内部键名、「字段」）换成用户的话。结构一处不动，只改字阶（规则 2）、隐藏原型出处标记「合成演示 / 夹具 / 合同 / 本页算」与演示面板（规则 4）、标题旁加「AI 生成」（规则 7）。2026-09-28 用词：画面上的「服务端 / 会话」改成「这次结果 / 这次办理」。9/28 去掉内部英文键名。9/28 留白：内容结构每块的「命中几条问题」标签挪到标题行右端；非报告态的出口行按内容定高（不再拉成空盒），剩余高度分到卡片之间，解析中断与空报告两屏出口行、自查清单放宽一档；早期报告的「报告结论」建议条均匀排开。只改样式，无新增内容。另有一版重排结构的提案见 STATUS.md，不是默认。2026-10-13：报告正常态在 from=career-plan 时多一颗次要按钮「继续做职业规划」，别的 from 当没有。
      原稿：../kiosk-redesign-2026-08/22-resume-report.html（只读）。改法：原稿复制 + 覆盖样式 + 最小改动。2026-09-27 -->
 <html lang="zh-CN">
 <head>
@@ -700,6 +700,7 @@ html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after
     <a href="22-resume-report.html?debug=1&amp;state=no-context">no-context 没有编号</a>
     <a href="22-resume-report.html?debug=1&amp;state=loading&amp;taskId=RPT-2026-0830-A">loading 读取中</a>
     <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A">report 内容结构</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;from=career-plan">report 从职业规划来</a>
     <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=issues">report 问题与证据</a>
     <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=scores">report 六维分数</a>
     <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=conclusions">report 报告结论</a>
@@ -777,6 +778,11 @@ else if (blk && seg !== 'structure') { blk = null; fallback = true; }
 
 var rawView = q.get('view');
 var view = rawView === null ? null : (rawView === 'overview' ? 'overview' : (fallback = true, null));
+
+/* 只认职业规划这一处来源。别的 from 当没有，不把这一页打成非法。 */
+var FROM_KEYS = ['career-plan'];
+var rawFrom = q.get('from');
+var fromKey = rawFrom !== null && FROM_KEYS.indexOf(rawFrom) >= 0 ? rawFrom : null;
 
 /* ── 上传原件预览层的参数 ────────────────────────────────────────── */
 var SRC_MODES  = ['pdf','image','docx','no-file','expired','render-failed'];
@@ -905,6 +911,7 @@ function selfURL(over){
   }
   v = pick('view', view);    if (v && !s) out.push('view=' + v);
   if (RID) out.push('taskId=' + encodeURIComponent(RID));
+  if (fromKey) out.push('from=' + fromKey);
   if (DEBUG) out.push('debug=1');
   if (CAPTURE) out.push('capture=1');
   if (q.get('flat') === '1') out.push('flat=1');
@@ -1801,8 +1808,12 @@ function reportState(kind){
     overlay.classList.add('on');
   }
 
+  var backPlan = fromKey === 'career-plan'
+    ? btn('46-resume-decision-workspace.html?screen=career-plan', '继续做职业规划', false, SCREEN+'-career-plan', '/resume/career-plan')
+    : '';
   if (RID) {
     cta.innerHTML = btn('21-resume-triage.html', '重新诊断', false, SCREEN+'-secondary', '/resume/source')
+      + backPlan
       /* 只带 taskId 会落在 23 的「没有上下文」那一屏：那等于把用户送进一个空页面。
          这里显式请求 23 的**读取入口**（state=loading），由那一页凭编号去读优化结果。
          编号只是「读哪一条」的键，**不是授权** —— 真实链路仍按登录态或一次性令牌判本人，
@@ -1813,6 +1824,7 @@ function reportState(kind){
       + ' <span data-testid="'+SCREEN+'-session">'+SESSION_LINE+'</span>';
   } else {
     cta.innerHTML = btn('21-resume-triage.html','重新诊断',false,SCREEN+'-secondary','/resume/source')
+      + backPlan
       + btnDead('继续优化这份简历', SCREEN+'-primary');
     why.innerHTML = '<span id="'+SCREEN+'-why">这份报告没有对应的简历编号：优化那一步取不到原文，原件也没有可用的文件凭证，所以两个入口都先关着。重新走一次上传与解析就会带上编号。</span>'
       + ' <span data-testid="'+SCREEN+'-session">'+SESSION_LINE+'</span>';

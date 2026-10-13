@@ -305,7 +305,7 @@ const blankText = (b) => [['整行', b.full], ['左半', b.left], ['右半', b.r
 // 所以用 U 盘）；22 报告主内容的另外三个分区（?seg=）；06 的其余几个帮助主题。
 const DRAFT_VARIANTS = [
   { file: '21-resume-triage.html', when: (state) => !/^(usb|local|phone|scan)-/.test(state), queries: [{ source: 'usb' }] },
-  { file: '22-resume-report.html', when: (state) => state === 'report' || state === 'report-minimal', queries: ['issues', 'scores', 'conclusions'].map((seg) => ({ seg })) },
+  { file: '22-resume-report.html', when: (state) => state === 'report' || state === 'report-minimal', queries: [...['issues', 'scores', 'conclusions'].map((seg) => ({ seg })), { from: 'career-plan' }] },
   { file: '06-help.html', when: (state) => state === 'topic', queries: ['account', 'resume', 'policy', 'jobs', 'privacy'].map((topic) => ({ topic })) },
 ]
 function withVariants(targets) {

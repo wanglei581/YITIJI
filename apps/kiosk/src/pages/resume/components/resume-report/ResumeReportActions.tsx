@@ -1,16 +1,18 @@
 import { useNavigate } from 'react-router-dom'
+import { REPORT_FROM_WHITELIST, type ReportFromKey } from '../../resumeReportFrom'
 
 interface Props {
   viewState: string
   canOptimize: boolean
   intent: 'diagnose' | 'optimize'
+  reportFrom: ReportFromKey | null
   why: string
   onRetry: () => void
   onOptimize: () => void
   onJobFit: () => void
 }
 
-export function ResumeReportCta({ viewState, canOptimize, intent, why, onRetry, onOptimize }: Omit<Props, 'onJobFit'>) {
+export function ResumeReportCta({ viewState, canOptimize, intent, reportFrom, why, onRetry, onOptimize }: Omit<Props, 'onJobFit'>) {
   const navigate = useNavigate()
   if (viewState === 'loading') {
     return (
@@ -67,6 +69,18 @@ export function ResumeReportCta({ viewState, canOptimize, intent, why, onRetry, 
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/resume/source?intent=${intent}`)} data-route="/resume/source">
         {intent === 'optimize' ? '重新上传' : '重新诊断'}
       </button>
+      {reportFrom ? (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="ghost"
+          onClick={() => navigate(REPORT_FROM_WHITELIST[reportFrom].path)}
+          data-route={REPORT_FROM_WHITELIST[reportFrom].path}
+          data-testid="resume-report-career-plan"
+        >
+          {REPORT_FROM_WHITELIST[reportFrom].label}
+        </button>
+      ) : null}
       {canOptimize ? (
         <button type="button" className="qx-btn" data-variant="primary" onClick={onOptimize} data-route="/resume/optimize" data-testid="resume-report-primary">
           {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}

@@ -189,7 +189,7 @@ export function CareerPlanPage() {
 
   const goSelfAssessment = () => navigate(SELF_ASSESSMENT_ROUTE)
   const goResumeHub = () => navigate('/resume-service')
-  const goUpload = () => navigate('/resume/source?intent=diagnose')
+  const goUpload = () => navigate('/resume/source?intent=diagnose&from=career-plan')
   const goJobFit = () => navigate('/resume/job-fit', { state: { taskId, accessToken } })
   const goOptimize = () => navigate('/resume/optimize', { state: { taskId, accessToken } })
   const goPrintHub = () => navigate('/print-scan')

@@ -14,6 +14,8 @@ interface FilePreviewDialogProps {
   regenerating?: boolean
   /** 可选主按钮（B-14）：导出后自动弹出的预览层会盖住页面上的「去打印」，所以在层里直接给一个。 */
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean }
+  /** 预览画不出来时的整句。不传则仍是「预览没能生成，打印仍按原文件。」 */
+  failureMessage?: string
   onClose: () => void
 }
 
@@ -27,6 +29,7 @@ export function FilePreviewDialog({
   onRegenerate,
   regenerating = false,
   primaryAction,
+  failureMessage,
   onClose,
 }: FilePreviewDialogProps) {
   const remaining = useRemainingSeconds(expiresAt)
@@ -73,6 +76,7 @@ export function FilePreviewDialog({
             fileName={fileName}
             mimeType={mimeType}
             format={format}
+            failureMessage={failureMessage}
           />
           {phoneDownloadUrl && (
             <aside className="flex items-center justify-center border-t border-neutral-200 bg-neutral-50 p-5 sm:border-l sm:border-t-0">
