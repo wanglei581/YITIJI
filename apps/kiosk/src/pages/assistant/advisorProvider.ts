@@ -36,6 +36,19 @@ export function isAiGeneratedReply(
   return response.aiGenerated === true && (response.providerLabel?.startsWith(LLM_PROVIDER_PREFIX) ?? false)
 }
 
+/**
+ * 设备故障时的固定安全提示。只认布尔 true。
+ *
+ * 这段正文不是模型写的。模型就绪时服务端仍会盖上 aiGenerated，
+ * 所以不能并进 isAiGeneratedReply：并进去会让页面走「不是 AI 就把正文藏起来」。
+ * 页面必须先看这个，再看是不是模型回答。
+ */
+export function isFixedNoticeReply(
+  response: Pick<AssistantChatResponse, 'fixedNotice'>,
+): boolean {
+  return response.fixedNotice === true
+}
+
 /** 服务标识的用户可读形式。缺字段时如实说「未标注」，不猜。 */
 export function describeProviderLabel(providerLabel?: string): string {
   return providerLabel?.trim() ? providerLabel : '未标注'

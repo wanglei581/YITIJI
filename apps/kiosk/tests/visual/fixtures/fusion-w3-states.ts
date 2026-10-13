@@ -58,6 +58,26 @@ export const assistantReply = {
 export const ASSISTANT_MOCK_FALLBACK_REPLY_TEXT =
   '根据你的情况，我建议你先梳理三段核心经历，再按岗位要求逐条对齐关键词。'
 
+/**
+ * 设备故障固定安全提示。模型就绪时后端仍盖 `aiGenerated: true`
+ *（`ai.service.ts` 按整条对话路径盖，不按这一句是不是模型写的）。
+ * 正文与 `device-fault.ts` 的一体机固定话逐字相同。
+ */
+export const ASSISTANT_FIXED_NOTICE_REPLY =
+  '机器卡纸、缺纸、打不出来或有其它故障时，请不要自己打开机器、拉扯纸张、按机身上的按键或拔插电源。'
+  + '机器暂时用不了的话，请稍后再来；需要帮助请看「帮助中心」里的联系方式。'
+  + '如果看到冒烟、闻到焦味或听到异常响声，请立刻离开机器；有明火或人身危险请拨打 119。'
+
+export const assistantFixedNoticeReply = {
+  sessionId: 'assistant-w3-fixed-notice',
+  reply: ASSISTANT_FIXED_NOTICE_REPLY,
+  intent: 'general',
+  actions: [],
+  providerLabel: 'llm:deepseek',
+  aiGenerated: true,
+  fixedNotice: true,
+} satisfies AssistantChatResponse
+
 export const assistantMockFallbackReply = {
   sessionId: 'assistant-w3-mock-fallback-session',
   reply: ASSISTANT_MOCK_FALLBACK_REPLY_TEXT,

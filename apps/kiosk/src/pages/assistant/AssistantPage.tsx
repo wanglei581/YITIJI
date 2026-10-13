@@ -26,7 +26,7 @@ import {
   type Message,
 } from './AdvisorConversation'
 import { AiToolSection } from './AdvisorTools'
-import { buildNonAiNotice, isAiGeneratedReply } from './advisorProvider'
+import { buildNonAiNotice, isAiGeneratedReply, isFixedNoticeReply } from './advisorProvider'
 import {
   COCKPIT_COPY,
   CONSULTATION_TASKS,
@@ -35,6 +35,7 @@ import {
   deriveCockpitState,
   newSessionId,
   normalizeToolboxSkill,
+  type AdvisorResultTurn,
   type CockpitVoiceState,
   type ConsultationTask,
 } from './advisorScenes'
@@ -269,6 +270,21 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
       setProviderLabel(response.providerLabel)
+      // 固定提示先于「是不是模型回答」。模型就绪时服务端仍盖 aiGenerated，
+      // 若先走下面两支，要么标成 AI，要么把正文换成「没有 AI 回答」。
+      if (isFixedNoticeReply(response)) {
+        if (isAiGeneratedReply(response)) setAiAvailability('available')
+        setMessages((current) => [
+          ...current,
+          {
+            id: `fn-${Date.now()}`,
+            role: 'assistant',
+            kind: 'fixed-notice',
+            text: response.reply,
+          },
+        ])
+        return
+      }
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
         // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
@@ -351,8 +367,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   })
 
   const lastMessage = messages[messages.length - 1]
-  const lastTurn = lastMessage?.role === 'assistant'
-    && (lastMessage.kind === 'ai' || lastMessage.kind === 'not-ai' || lastMessage.kind === 'error')
+  const lastTurn: AdvisorResultTurn | null = lastMessage?.role === 'assistant'
+    && (lastMessage.kind === 'ai' || lastMessage.kind === 'not-ai' || lastMessage.kind === 'error' || lastMessage.kind === 'fixed-notice')
     ? lastMessage.kind
     : null
   const lastUserText = [...messages].reverse().find((message) => message.role === 'user')?.text

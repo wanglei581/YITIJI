@@ -8,7 +8,7 @@
 
 import type { ReactNode } from 'react'
 import { AigcMark } from '../../ai'
-import { COCKPIT_COPY, type CockpitState } from './advisorScenes'
+import { COCKPIT_COPY, type AdvisorResultTurn, type CockpitState } from './advisorScenes'
 
 export type CockpitReadingTone = 'plain' | 'hi' | 'amber' | 'bad'
 
@@ -20,7 +20,7 @@ export interface CockpitReading {
 
 interface CockpitReadingSignals {
   loading: boolean
-  lastTurn: 'ai' | 'not-ai' | 'error' | null
+  lastTurn: AdvisorResultTurn | null
   providerLabel: string | undefined
   aiLocked: boolean
   voiceAvailable: boolean
@@ -36,11 +36,13 @@ function buildCockpitReadings(args: CockpitReadingSignals): CockpitReading[] {
         ? { value: '等待返回' }
         : lastTurn === 'ai'
           ? { value: '模型已回答', tone: 'hi' as const }
-          : lastTurn === 'error'
-            ? { value: '本轮失败', tone: 'bad' as const }
-            : aiLocked
-              ? { value: '未取得 AI 回答', tone: 'amber' as const }
-              : { value: '未请求' }),
+          : lastTurn === 'fixed-notice'
+            ? { value: '未取得 AI 回答', tone: 'amber' as const }
+            : lastTurn === 'error'
+              ? { value: '本轮失败', tone: 'bad' as const }
+              : aiLocked
+                ? { value: '未取得 AI 回答', tone: 'amber' as const }
+                : { value: '未请求' }),
     },
     {
       label: '语音通道',

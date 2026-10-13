@@ -212,13 +212,16 @@ export type CockpitState =
   | 'reply-real' | 'reply-not-ai' | 'reply-error' | 'ai-unavailable'
   | CockpitVoiceState
 
+/** 一轮返回在舱面上的归类。fixed-notice 不改舱面文案。 */
+export type AdvisorResultTurn = 'ai' | 'not-ai' | 'error' | 'fixed-notice'
+
 export interface CockpitSignals {
   /** 语音面板打开时的真实相位（由 useAiAdvisorCallSession 上报），未打开为 null。 */
   voice: CockpitVoiceState | null
   /** `/assistant/chat` 请求是否真的在飞。 */
   loading: boolean
   /** 本次会话最后一轮的结果 kind；还没问过为 null。 */
-  lastTurn: 'ai' | 'not-ai' | 'error' | null
+  lastTurn: AdvisorResultTurn | null
   /** 只来自 `/assistant/chat` 的实测 providerLabel，未问过为 unknown。 */
   availability: 'available' | 'unavailable' | 'unknown'
   /** 输入框里有没有还没发出的字。 */
@@ -238,6 +241,7 @@ export function deriveCockpitState(signals: CockpitSignals): CockpitState {
   if (signals.hasDraft) return 'composer'
   if (signals.lastTurn === 'error') return 'reply-error'
   if (signals.lastTurn === 'ai') return 'reply-real'
+  // fixed-notice 用默认态：现有文案里没有这一态，不能借用「真实模型已应答」或「正文不展示」。
   return 'default'
 }
 

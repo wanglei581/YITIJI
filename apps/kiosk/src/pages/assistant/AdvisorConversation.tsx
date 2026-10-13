@@ -8,6 +8,7 @@
 //   **只有 `kind === 'ai'` 的气泡才带 E3「AI 判断 · 仅供参考」并显示模型正文。**
 // mock 回落的预置话术不会走到这里 —— 它在 AssistantPage 就被拦下，
 // 连 state 都不进（见 advisorProvider.ts）。这里渲染的是那一轮的**诚实说明**。
+// `fixed-notice` 是设备故障固定提示：正文照后端原文，小标是「安全提示」，不挂 E3。
 // ============================================================
 
 import type { AssistantAction } from '@ai-job-print/shared'
@@ -29,6 +30,8 @@ export type AdvisorMessageKind =
   | 'system'
   /** 真实大模型回答（providerLabel 带 `llm:` 前缀），唯一允许标 E3 的一类 */
   | 'ai'
+  /** 设备故障固定安全提示。不是模型回答，正文照后端原文，小标不是 E3 */
+  | 'fixed-notice'
   /** 后端回落到 mock provider：这一轮没有 AI 回答，正文不予展示 */
   | 'not-ai'
   /** 请求失败 */
@@ -113,6 +116,12 @@ export function ChatBubble({ msg }: { msg: Message }) {
       ) : (
         <div className="assistant-message-bubble">
           {msg.role === 'user' && <span className="assistant-message-who">你的问题</span>}
+          {/* 固定提示与 E3 同一行、同一套警示小标尺寸；字只有「安全提示」，不挂证据等级。 */}
+          {msg.kind === 'fixed-notice' && (
+            <span className="assistant-message-evrow">
+              <span className="kiosk-ev kiosk-ev--e3" data-fixed-notice="true">安全提示</span>
+            </span>
+          )}
           {/* E3 只挂在真实模型回答上。产品文案（system）与用户消息都不挂。 */}
           {msg.kind === 'ai' && (
             <span className="assistant-message-evrow">

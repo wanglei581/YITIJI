@@ -68,6 +68,65 @@ must(
 )
 must('conversation', /kind === 'ai' &&[\s\S]{0,120}EvidenceBadge level="E3"/, 'E3「AI 判断」徽章只允许挂在真实模型回答上')
 
+// ── ②b 设备故障固定提示：正文照后端原文，小标是「安全提示」，不挂 E3 ──
+// 模型就绪时服务端仍盖 aiGenerated。若把 fixedNotice 并进「不是 AI」那一支，
+// 正文会被藏掉；若仍走 kind === 'ai'，就会挂上 E3。两条都不许。
+must('provider', /function isFixedNoticeReply/, '固定提示必须有单独判定，不得并进 isAiGeneratedReply')
+must('provider', /fixedNotice === true/, 'fixedNotice 只认布尔 true，缺失与 false 都不是固定提示')
+must('page', /isFixedNoticeReply\(response\)/, '页面必须用统一判定决定这轮是不是固定提示')
+const noticeAt = files.page.indexOf('if (isFixedNoticeReply(response))')
+const nonAiAt = files.page.indexOf('if (!isAiGeneratedReply(response))')
+assert(noticeAt !== -1 && nonAiAt !== -1 && noticeAt < nonAiAt, 'page: 固定提示判定必须在非 AI 拦截之前')
+
+function braceBlockAfter(source, marker) {
+  const start = source.indexOf(marker)
+  if (start < 0) return ''
+  const open = source.indexOf('{', start)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1
+    else if (source[i] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(start, i + 1)
+    }
+  }
+  return ''
+}
+
+function parenBlockAfter(source, marker) {
+  const start = source.indexOf(marker)
+  if (start < 0) return ''
+  const open = source.indexOf('(', start)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '(') depth += 1
+    else if (source[i] === ')') {
+      depth -= 1
+      if (depth === 0) return source.slice(start, i + 1)
+    }
+  }
+  return ''
+}
+
+const noticeBranch = braceBlockAfter(files.page, 'if (isFixedNoticeReply(response))')
+assert(noticeBranch.includes("kind: 'fixed-notice'"), 'page: fixedNotice 为真时消息种类是 fixed-notice')
+assert(noticeBranch.includes('text: response.reply'), 'page: 固定提示正文必须是后端原文')
+assert(/\breturn\b/.test(noticeBranch), 'page: 固定提示分支必须提前 return，不得再走 AI 或非 AI 气泡')
+assert(!noticeBranch.includes("kind: 'ai'"), 'page: 固定提示不得标成 AI 回答')
+assert(!noticeBranch.includes("kind: 'not-ai'"), 'page: 固定提示不得走「这一轮没有 AI 回答」')
+assert(!noticeBranch.includes('buildNonAiNotice'), 'page: 固定提示不得换成非 AI 说明')
+
+const fixedBubble = parenBlockAfter(files.conversation, "msg.kind === 'fixed-notice'")
+assert(fixedBubble.includes('安全提示'), 'conversation: fixedNotice 气泡挂「安全提示」')
+assert(fixedBubble.includes('kiosk-ev--e3'), 'conversation: 「安全提示」复用 E3 小标的警示样式')
+assert(fixedBubble.includes('data-fixed-notice="true"'), 'conversation: 固定提示小标带 data-fixed-notice，不靠证据等级')
+assert(!fixedBubble.includes('EvidenceBadge'), 'conversation: 固定提示气泡不挂 E3')
+assert(!fixedBubble.includes('data-evidence'), 'conversation: 固定提示气泡不写证据等级')
+assert(!fixedBubble.includes('AI 生成 · 供参考'), 'conversation: 固定提示气泡不写「AI 生成 · 供参考」')
+assert(!fixedBubble.includes('AI 判断'), 'conversation: 固定提示气泡不写「AI 判断」')
+
 // ── ③ 可用性是实测值，不得写死 ────────────────────────────────────────────
 must('page', /useState<AiAvailability>\('unknown'\)/, '首次进入的可用性必须是诚实的 unknown')
 mustNot('page', /availability: 'available'/, '不得把 availability 直接写死为 available')
@@ -133,6 +192,13 @@ for (const [response, expected] of [
 ]) {
   assert(provider.isAiGeneratedReply(response) === expected, `provider: double gate ${JSON.stringify(response)}`)
 }
+assert(provider.isFixedNoticeReply({ fixedNotice: true }) === true, 'provider: fixedNotice true')
+assert(provider.isFixedNoticeReply({ fixedNotice: false }) === false, 'provider: fixedNotice false')
+assert(provider.isFixedNoticeReply({}) === false, 'provider: fixedNotice 缺失')
+assert(
+  provider.isAiGeneratedReply({ providerLabel: 'llm:test', aiGenerated: true, fixedNotice: true }) === true,
+  'provider: fixedNotice 不改模型来源判定，避免被收成非 AI 后藏正文',
+)
 const copy = loadPureModule('src/pages/assistant/advisorUserCopy.ts', {
   '../../utils/maskPii': loadPureModule('src/utils/maskPii.ts'),
 })

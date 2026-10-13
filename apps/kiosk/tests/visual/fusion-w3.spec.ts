@@ -5,8 +5,8 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoLargeBlankBands, assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow, assertQxPillReadable, assertTapTargetPointerHit, readEnabledStageScale } from './assert-layout'
 import {
-  ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
-  assistantReply, diagnosis, interviewAnswered, interviewCreated,
+  ASSISTANT_FIXED_NOTICE_REPLY, ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantFixedNoticeReply,
+  assistantMockFallbackReply, assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
@@ -1771,6 +1771,77 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
 
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('assistant device-fault fixed notice wears 安全提示 and a later model reply stays E3 @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respondWith('POST', '/api/v1/assistant/chat', (requestNumber) => ({
+    status: 200,
+    json: requestNumber === 1
+      ? assistantFixedNoticeReply
+      : { ...assistantReply, fixedNotice: false, sessionId: assistantFixedNoticeReply.sessionId },
+  }))
+  await page.goto('/assistant')
+  const input = page.getByLabel('输入咨询问题')
+  const send = page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true })
+  await input.fill('打印机卡纸怎么办')
+  await send.click()
+
+  const notice = page.locator('[data-message-kind="fixed-notice"]')
+  await expect(notice).toHaveCount(1)
+  await expect(notice.locator('[data-fixed-notice="true"]')).toHaveText('安全提示')
+  await expect(notice.locator('p')).toHaveText(ASSISTANT_FIXED_NOTICE_REPLY)
+  await expect(notice.locator('[data-evidence="E3"]')).toHaveCount(0)
+  await expect(page.getByText('AI 判断 · 仅供参考')).toHaveCount(0)
+  await expect(page.getByText('AI 生成 · 供参考', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('这一轮没有 AI 回答')).toHaveCount(0)
+  await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
+  await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
+
+  await input.fill('如何整理项目经历？')
+  await send.click()
+  const model = page.locator('[data-message-kind="ai"]')
+  await expect(model).toHaveCount(1)
+  await expect(model.locator('[data-evidence="E3"]')).toBeVisible()
+  await expect(model).toContainText('AI 判断 · 仅供参考')
+  await expect(model).toContainText('AI 生成 · 供参考')
+  await expect(model).toContainText(assistantReply.reply)
+  await expect(notice).toHaveCount(1)
+  await expect(notice.locator('[data-fixed-notice="true"]')).toHaveText('安全提示')
+  await expect(notice.locator('p')).toHaveText(ASSISTANT_FIXED_NOTICE_REPLY)
+  await expect(notice.locator('[data-evidence="E3"]')).toHaveCount(0)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('assistant shows a fixed notice even when the reply is not marked as AI @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/assistant/chat', {
+    status: 200,
+    json: {
+      sessionId: 'assistant-w3-fixed-notice-plain',
+      reply: ASSISTANT_FIXED_NOTICE_REPLY,
+      actions: [],
+      fixedNotice: true,
+    },
+  })
+  await page.goto('/assistant')
+  await page.getByLabel('输入咨询问题').fill('打印机卡纸怎么办')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+
+  const notice = page.locator('[data-message-kind="fixed-notice"]')
+  await expect(notice).toHaveCount(1)
+  await expect(notice.locator('[data-fixed-notice="true"]')).toHaveText('安全提示')
+  await expect(notice.locator('p')).toHaveText(ASSISTANT_FIXED_NOTICE_REPLY)
+  await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
+  await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(0)
+  await expect(page.getByText('这一轮没有 AI 回答')).toHaveCount(0)
+  await expect(page.getByText('AI 判断 · 仅供参考')).toHaveCount(0)
+  await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
   expect(runtimeErrors).toEqual([])
 })
 
