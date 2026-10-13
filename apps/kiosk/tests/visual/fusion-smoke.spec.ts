@@ -127,6 +127,9 @@ async function expectSentenceFullyVisible(locator: Locator) {
         right = Math.min(right, box.right)
       }
     }
+    // 底栏不是祖先，压在上面时祖先裁剪框量不出来：另按底栏顶边收一次。
+    const bar = document.querySelector('.qx-ctabar')?.getBoundingClientRect()
+    if (bar) bottom = Math.min(bottom, bar.top)
     return {
       top: rect.top,
       bottom: rect.bottom,
@@ -215,6 +218,16 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
     await expect(categories.getByRole('button', { name: /打印与扫描.*5 问/ })).toBeVisible()
     await expect(categories.getByRole('button', { name: /怎么打印、卡纸和没出纸、U 盘读不出、扫描件保存在哪/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /一定要登录才能使用吗/ })).toHaveCount(0)
+    // 概要变长后分类卡各多一行，首页第一屏放不下「需要帮助」卡最后一句；滑到底两张求助卡要整张露在底栏之上。
+    await scrollHelpToEnd(page)
+    const deskCards = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('.k1-help-people .k1-help-contact')]
+      const bar = document.querySelector('.qx-ctabar')
+      if (cards.length !== 2 || !bar) return null
+      const barTop = bar.getBoundingClientRect().top
+      return cards.map((card) => card.getBoundingClientRect().bottom <= barTop + 0.5)
+    })
+    expect(deskCards, '首页滑到底，「需要帮助」「网络断开」两张卡整张露在底栏之上').toEqual([true, true])
     await categories.getByRole('button', { name: /打印与扫描.*5 问/ }).click()
     await expect(page.locator('.k1-help-question strong')).toHaveText([
       '怎么打印文件？',
