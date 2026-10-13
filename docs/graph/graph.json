@@ -23819,6 +23819,7 @@
       "services/api/scripts/verify-admin-login-hardening.ts",
       "services/api/scripts/verify-admin-order-filters.ts",
       "services/api/scripts/verify-admin-session-revocation.ts",
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
@@ -24334,6 +24335,7 @@
     ],
     "services/api/src/ai-access/ai-access.service.ts": [
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
       "services/api/scripts/verify-self-assessment-ai-gate.ts"
@@ -26751,6 +26753,7 @@
     ],
     "services/api/src/member-privacy/member-data-export.mapper.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-member-data-export.ts",
@@ -26767,6 +26770,7 @@
       "services/api/scripts/verify-member-data-request-truth.ts"
     ],
     "services/api/src/member-privacy/member-privacy.controller.ts": [
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-job-ai-privacy.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
       "services/api/scripts/verify-member-closure.ts"
@@ -26787,6 +26791,7 @@
     "services/api/src/member-privacy/member-privacy.service.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-ai-safety-lexicon.ts",
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-job-ai-backend.ts",
@@ -26801,6 +26806,7 @@
       "services/api/scripts/verify-resume-report-export.ts"
     ],
     "services/api/src/member-privacy/member-privacy.types.ts": [
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-job-ai-privacy.ts"
     ],
     "services/api/src/mock-interview/asr/asr.service.ts": [
@@ -27485,6 +27491,7 @@
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-advisor-work.ts",
+      "services/api/scripts/verify-age-login-declaration.ts",
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-quota.ts",
       "services/api/scripts/verify-ai-result-ownership.ts",
@@ -35641,6 +35648,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:advisor-work"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/ai-access/ai-access.service.ts",
+          "services/api/src/member-privacy/member-data-export.mapper.ts",
+          "services/api/src/member-privacy/member-privacy.controller.ts",
+          "services/api/src/member-privacy/member-privacy.service.ts",
+          "services/api/src/member-privacy/member-privacy.types.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-age-login-declaration.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:age-login-declaration"
       ],
       "wired": true
     },

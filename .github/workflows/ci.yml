@@ -766,6 +766,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:miniapp-review-backend
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:age-login-declaration
           pnpm --filter @ai-job-print/api verify:job-fit-governance
           pnpm --filter @ai-job-print/api verify:governed-job-fit
           pnpm --filter @ai-job-print/api verify:job-fit-print

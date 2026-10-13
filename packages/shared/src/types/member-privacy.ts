@@ -9,6 +9,9 @@ export interface MemberAiConsentStatus {
   granted: boolean
   grantedAt: string | null
   revokedAt: string | null
+  /** 可选：一体机旧调用方不读这两项，缺了也能编译。 */
+  grantedVersion?: string | null
+  grantedSource?: 'login_checkbox' | 'prompt' | null
 }
 
 export const MEMBER_STEP_UP_ACTIONS = [

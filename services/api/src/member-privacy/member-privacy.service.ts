@@ -16,6 +16,15 @@ export const CURRENT_AGE_14_PLUS_CONSENT_VERSION = 'age-14-plus-v1'
 export const CURRENT_VOICE_RECORDING_CONSENT_VERSION = 'voice-recording-v1'
 /** 年满 14 周岁声明正文。服务端只存版本号，不收出生日期。 */
 export const AGE_14_PLUS_CONSENT_COPY = '我确认本人已年满14周岁。本声明不收集出生日期。'
+/** 屏上句子以后变了，另起 age-14-plus-login-v2，不许改 v1 的原文（旧记录是证据）。 */
+export const AGE_14_PLUS_LOGIN_CONSENT_VERSION = 'age-14-plus-login-v1'
+export const AGE_14_PLUS_LOGIN_CONSENT_COPY =
+  '我已阅读并同意《用户服务协议》和《隐私政策》，并确认已年满 14 周岁'
+/** 年满 14 周岁声明认可的版本：弹框当前版和登录勾选版都算已声明。 */
+export const AGE_14_PLUS_RECOGNIZED_VERSIONS: ReadonlySet<string> = new Set([
+  CURRENT_AGE_14_PLUS_CONSENT_VERSION,
+  AGE_14_PLUS_LOGIN_CONSENT_VERSION,
+])
 /**
  * 录音单独同意正文。五件事：用途、交给哪家做语音识别、保存多久、不做声纹、怎么撤回。
  * 服务商以生产实际启用的一家为准，文案不把未启用的厂商写成已经在用。
@@ -25,6 +34,15 @@ export const VOICE_RECORDING_CONSENT_COPY =
   '音频会交给当前启用的语音识别服务处理（腾讯云或百度智能云，以实际配置的一家为准）。' +
   '转写完成后不保留音频。不做声纹识别。' +
   '你可以在隐私页撤回这项同意；撤回后新的录音不会再开始。'
+
+/** 导出按版本还原当时屏上的原文。表里只存版本号，对不上的版本给 null，不编一句。 */
+export function consentDeclarationText(consentVersion: string): string | null {
+  if (consentVersion === CURRENT_AGE_14_PLUS_CONSENT_VERSION) return AGE_14_PLUS_CONSENT_COPY
+  if (consentVersion === AGE_14_PLUS_LOGIN_CONSENT_VERSION) return AGE_14_PLUS_LOGIN_CONSENT_COPY
+  if (consentVersion === CURRENT_VOICE_RECORDING_CONSENT_VERSION) return VOICE_RECORDING_CONSENT_COPY
+  return null
+}
+
 export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, string>> = {
   job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
   contract_review: 'contract-review-consent-v1',
@@ -126,9 +144,18 @@ export class MemberPrivacyService {
   async grantConsent(
     endUserId: string,
     scope: MemberAiConsentScope,
-    terminalId: string | null
+    terminalId: string | null,
+    source?: 'login_checkbox',
   ): Promise<MemberAiConsentStatus> {
     this.assertScope(scope)
+    if (source === 'login_checkbox') {
+      if (scope !== 'age_14_plus') {
+        throw new BadRequestException({
+          error: { code: 'VALIDATION_FAILED', message: 'source 只适用于年满 14 周岁声明' },
+        })
+      }
+      return this.grantLoginAgeDeclaration(endUserId, terminalId)
+    }
     const consentVersion = consentVersionForScope(scope)
     // Grant is an append-only authorization event; previous grant rows remain as history.
     const row = await this.prisma.userAiConsent.create({
@@ -223,6 +250,28 @@ export class MemberPrivacyService {
     return latest as ConsentTruthEvent
   }
 
+  private async grantLoginAgeDeclaration(
+    endUserId: string,
+    terminalId: string | null,
+  ): Promise<MemberAiConsentStatus> {
+    const scope: MemberAiConsentScope = 'age_14_plus'
+    return runSerializableTransaction(this.prisma, async (tx) => {
+      const latest = await this.latestConsentEventFrom(tx, endUserId, scope)
+      if (latest && !latest.revokedAt && AGE_14_PLUS_RECOGNIZED_VERSIONS.has(latest.consentVersion)) {
+        return this.consentStatus(scope, latest)
+      }
+      const row = await tx.userAiConsent.create({
+        data: {
+          endUserId,
+          scope,
+          consentVersion: AGE_14_PLUS_LOGIN_CONSENT_VERSION,
+          terminalId,
+        },
+      })
+      return this.consentStatus(scope, row)
+    })
+  }
+
   private assertScope(scope: string): asserts scope is MemberAiConsentScope {
     consentVersionForScope(scope as MemberAiConsentScope)
   }
@@ -278,13 +327,23 @@ export class MemberPrivacyService {
     row: ConsentTruthEvent | null
   ): MemberAiConsentStatus {
     const consentVersion = consentVersionForScope(scope)
-    const granted = Boolean(row && row.consentVersion === consentVersion && !row.revokedAt)
+    const versionOk = scope === 'age_14_plus'
+      ? Boolean(row && AGE_14_PLUS_RECOGNIZED_VERSIONS.has(row.consentVersion))
+      : Boolean(row && row.consentVersion === consentVersion)
+    const granted = Boolean(row && versionOk && !row.revokedAt)
+    const grantedVersion = granted && row ? row.consentVersion : null
     return {
       scope,
       consentVersion,
       granted,
       grantedAt: row ? row.grantedAt.toISOString() : null,
       revokedAt: row?.revokedAt ? row.revokedAt.toISOString() : null,
+      grantedVersion,
+      grantedSource: grantedVersion === null
+        ? null
+        : grantedVersion === AGE_14_PLUS_LOGIN_CONSENT_VERSION
+          ? 'login_checkbox'
+          : 'prompt',
     }
   }
 }
