@@ -733,6 +733,16 @@ async function main(): Promise<void> {
       parseBody(guestResume, signFileUrl(otherResume).url),
       req({}),
     ))
+    // 有会员主人的文件不要求签名地址，靠旧路径扣次数之前的文件可用性检查兜住：
+    // 别的会员、未登录拿会员文件，回应同样与旧路径文件不存在一致，且不扣次数。
+    await expectLegacyReject('旧路径别的会员拿会员文件', () => controller.submitResumeParse(
+      parseBody(memberResume),
+      req({ authorization: `Bearer ${memberB}` }),
+    ))
+    await expectLegacyReject('旧路径未登录拿会员文件', () => controller.submitResumeParse(
+      parseBody(memberResume),
+      req({}),
+    ))
     const legacyOwner = await controller.submitResumeParse(parseBody(memberResume), req({ authorization: `Bearer ${memberA}` }))
     if (legacyOwner.status !== 'completed' || quota.consume < 1) fail('旧路径会员本人应当成功')
     pass('旧路径会员本人成功')
