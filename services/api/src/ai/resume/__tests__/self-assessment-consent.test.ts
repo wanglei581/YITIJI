@@ -115,6 +115,7 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number; llm?: '
         id: 'resume-file-1',
         filename: 'resume.pdf',
         mimeType: 'application/pdf',
+        purpose: 'resume_upload',
         endUserId: null,
         deletedAt: null,
       }),

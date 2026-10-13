@@ -121,7 +121,7 @@ function makeWorld(opts: { config?: AiAccessConfig; simulate?: Simulated; realLl
         rows.find((r) => r.taskId === where.taskId_kind.taskId && r.kind === where.taskId_kind.kind) ?? null,
       update: async ({ where, data }: { where: { id: string }; data: Partial<Row> }) => { const row = rows.find((r) => r.id === where.id); if (row) Object.assign(row, data); return row },
     },
-    fileObject: { findUnique: async () => ({ id: 'resume-1', filename: 'resume.pdf', mimeType: 'application/pdf', endUserId: null, deletedAt: null }) },
+    fileObject: { findUnique: async () => ({ id: 'resume-1', filename: 'resume.pdf', mimeType: 'application/pdf', purpose: 'resume_upload', endUserId: null, deletedAt: null }) },
     endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
     userAiConsent: { findFirst: async () => null },
   }
