@@ -246,6 +246,9 @@ test('查询超时屏和 06、15 号稿不把未确认的状态说成已经收�
   assert.ok(timeoutStart >= 0 && timeoutEnd > timeoutStart, '15 号稿须有 rTimeout')
   const timeout = fulfill.slice(timeoutStart, timeoutEnd)
   assert.match(timeout, /可以先重新查询。需要帮助？拨打服务电话/)
-  assert.match(timeout, /moneyBar\('请先看出纸口。需要帮助？拨打服务电话/)
+  // 稿的费用条画的是已付那一单（moneyBar 写死「支付状态 已支付」并自动接退款句），
+  // 对的是运行页已付那支「请先看出纸口。{refundApplyLine()}」，实参只留「请先看出纸口。」；
+  // 再加求助句会和后面的退款句各报一遍电话，两支都对不上。
+  assert.match(timeout, /moneyBar\('请先看出纸口。'\)/)
   assert.doesNotMatch(timeout, /已经收到提醒|暂时打不了/)
 })
