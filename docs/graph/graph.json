@@ -11591,6 +11591,7 @@
           "PriceConfig",
           "PrintTask",
           "RedemptionRecord",
+          "StorageDeletion",
           "User",
           "UserAiConsent"
         ],
@@ -11599,11 +11600,13 @@
         "serviceFiles": [
           "services/api/src/ai/ai.service.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/files/files.service.ts",
           "services/api/src/member-privacy/member-privacy.service.ts"
         ],
         "services": [
           "AiService",
           "AuditService",
+          "FilesService",
           "MemberPrivacyService"
         ]
       },
@@ -17549,6 +17552,7 @@
           "services/api/src/document-conversion/document-conversion.service.ts",
           "services/api/src/files/closure-file-deletion.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
+          "services/api/src/files/file-access-proof.ts",
           "services/api/src/files/file-content-integrity.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/member-data-export-file.service.ts",
@@ -23809,11 +23813,6 @@
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts"
     ],
-    "services/api/scripts/support/hold-ownerless-material-file-url.ts": [
-      "services/api/scripts/verify-materials-processing.ts",
-      "services/api/scripts/verify-pii-manual-confirm.ts",
-      "services/api/scripts/verify-pii-redaction.ts"
-    ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
       "services/api/scripts/verify-upload-scene.ts"
     ],
@@ -24466,6 +24465,7 @@
       "services/api/scripts/verify-resume-template-fill.ts"
     ],
     "services/api/src/ai/dto/resume-parse.dto.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-resume-diagnosis-context.ts"
     ],
     "services/api/src/ai/dto/resume-voice.dto.ts": [
@@ -24633,6 +24633,7 @@
       "services/api/scripts/verify-resume-parse-intent-runner.ts"
     ],
     "services/api/src/ai/resume-parse-intent.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-parse-intent-runner.ts",
@@ -25980,11 +25981,13 @@
       "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
+      "services/api/scripts/verify-materials-processing.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-payment-flow.ts",
       "services/api/scripts/verify-payment-real-channels.ts",
+      "services/api/scripts/verify-pii-manual-confirm.ts",
       "services/api/scripts/verify-pii-redaction.ts",
       "services/api/scripts/verify-print-conversion.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -26461,6 +26464,9 @@
     "services/api/src/main.ts": [
       "services/api/scripts/verify-sms-egress-limits.ts"
     ],
+    "services/api/src/materials/dto/create-material-task.dto.ts": [
+      "services/api/scripts/verify-guest-file-proof.ts"
+    ],
     "services/api/src/materials/image-print-quality.util.ts": [
       "services/api/scripts/verify-file-display-truth.ts"
     ],
@@ -26881,6 +26887,7 @@
       "services/api/scripts/verify-ai-cost-coverage.ts",
       "services/api/scripts/verify-ai-cost-ui-coverage.ts",
       "services/api/scripts/verify-ai-usage-budget.ts",
+      "services/api/scripts/verify-guest-file-proof.ts",
       "services/api/scripts/verify-mock-interview.ts",
       "services/api/scripts/verify-multipart-field-nesting.ts"
     ],
@@ -38192,7 +38199,9 @@
           "apps/kiosk/src/services/api/materials.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/ai.controller.ts",
+          "services/api/src/ai/dto/resume-parse.dto.ts",
           "services/api/src/ai/resume-parse-intent-runner.service.ts",
+          "services/api/src/ai/resume-parse-intent.ts",
           "services/api/src/ai/resume-parse-submission.service.ts",
           "services/api/src/ai/resume/resume-extraction.service.ts",
           "services/api/src/audit/audit.service.ts",
@@ -38200,7 +38209,9 @@
           "services/api/src/files/file.types.ts",
           "services/api/src/files/files.service.ts",
           "services/api/src/files/signing.ts",
+          "services/api/src/materials/dto/create-material-task.dto.ts",
           "services/api/src/materials/materials.service.ts",
+          "services/api/src/mock-interview/mock-interview.controller.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.service.ts"
@@ -39500,10 +39511,10 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/scripts/support/hold-ownerless-material-file-url.ts",
           "services/api/src/ai/resume/ocr/ocr.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/materials/materials.service.ts",
           "services/api/src/materials/pii-redaction.service.ts",
           "services/api/src/prisma/prisma.service.ts",
@@ -41424,9 +41435,9 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/scripts/support/hold-ownerless-material-file-url.ts",
           "services/api/scripts/support/internal-auth-verify-harness.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
+          "services/api/src/files/signing.ts",
           "services/api/src/materials/materials-manual-confirmation.service.ts",
           "services/api/src/materials/materials.access.ts",
           "services/api/src/materials/materials.service.ts",
@@ -41449,7 +41460,6 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "services/api/scripts/support/hold-ownerless-material-file-url.ts",
           "services/api/src/ai/resume/ocr/ocr.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pdf/pdfjs-document.ts",

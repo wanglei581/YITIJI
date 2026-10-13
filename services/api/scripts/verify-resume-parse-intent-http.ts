@@ -102,7 +102,10 @@ function makeController() {
     prisma: {
       endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
       terminal: { findUnique: async ({ where }: { where: { id: string } }) => (where.id === 'terminal-1' ? { orgId: null } : null) },
+      // 夹具把这份文件当成会员本人的，证明检查不拦。
+      fileObject: { findUnique: async () => ({ endUserId: 'member-1' }) },
     },
+    files: { assertContentAccessibleForEndUser: async () => undefined },
     // 公共额度只认验签的终端：只有 terminal-1 带对的会话令牌才算本终端池。
     terminalSessions: {
       validate: async (terminalId: string, sessionToken: string) => {

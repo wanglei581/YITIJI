@@ -284,6 +284,8 @@ async function verifyTrustedTerminal(): Promise<void> {
       prisma: {
         endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) },
         terminal: { findUnique: async () => ticket === 'gone' ? null : { orgId: 'org-1' } },
+        // 夹具把这份文件当成会员本人的，证明检查不拦。
+        fileObject: { findUnique: async () => ({ endUserId: 'member-1' }) },
       },
       terminalSessions: { validate: async () => { validations++; if (ticket === 'wrong') throw new Error('invalid') } },
     } as unknown as AiCallerResolverDeps
@@ -291,6 +293,7 @@ async function verifyTrustedTerminal(): Promise<void> {
     const controller = new AiController(...(Array.from({ length: AiController.length }, () => ({})) as never[]))
     Object.assign(controller, deps, {
       publicQuota: quota, audit: { write: async () => undefined }, privacy: { requireActiveConsent: async () => undefined },
+      files: { assertContentAccessibleForEndUser: async () => undefined },
       aiService: {
         chatWithAssistant: async () => ({ sessionId: 's' }),
         submitResumeParse: async () => ({ taskId: 'p', status: 'queued' }), getProviderName: () => 'stub',

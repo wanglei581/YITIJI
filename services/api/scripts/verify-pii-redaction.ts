@@ -21,7 +21,7 @@ import { FilesService } from '../src/files/files.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
-import { verifyFileSignature } from '../src/files/signing'
+import { signFileUrl, verifyFileSignature } from '../src/files/signing'
 import { buildRedactedPdf } from '../src/materials/pii-redaction.util'
 import type { OcrService } from '../src/ai/resume/ocr/ocr.service'
 import { openUnpdfDocument } from '../src/common/pdf/pdfjs-document'
@@ -157,8 +157,6 @@ function verifyForbiddenClaimCopy(): void {
 }
 
 async function main() {
-  const { holdOwnerlessMaterialFileUrl } = await import('./support/hold-ownerless-material-file-url')
-  holdOwnerlessMaterialFileUrl()
   console.log('\n=== 隐私遮挡（一级 · 文字层 PDF）验证 ===')
   verifyForbiddenClaimCopy()
   const prisma = new PrismaService()
@@ -592,7 +590,10 @@ async function main() {
         ownerId: null,
       },
     })
-    const anonScan = await materials.createTask({ kind: 'pii_scan', sourceFileId: anonFileId, params: {} }, { kind: 'anonymous' })
+    const anonScan = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: anonFileId, params: {}, fileAccessUrl: signFileUrl(anonFileId).url },
+      { kind: 'anonymous' },
+    )
     const anonToken = anonScan.accessToken
     if (!anonToken) fail('9b. 匿名 pii_scan 未返回 access token')
     const anonSettled = await materials.decidePiiFindings(
@@ -606,7 +607,7 @@ async function main() {
       { kind: 'anonymous', accessToken: anonToken },
     )
     const anonRedact = await materials.createTask(
-      { kind: 'pii_redact', sourceFileId: anonFileId, params: { decisionTaskId: anonSettled.id } },
+      { kind: 'pii_redact', sourceFileId: anonFileId, params: { decisionTaskId: anonSettled.id }, fileAccessUrl: signFileUrl(anonFileId).url },
       { kind: 'anonymous', accessToken: anonToken },
     )
     const anonChecks = checksOf(anonRedact)
