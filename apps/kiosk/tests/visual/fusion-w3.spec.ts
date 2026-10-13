@@ -3543,6 +3543,7 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   await expect(root).toHaveAttribute('data-screen', 'source')
   await expect(root).toHaveAttribute('data-state', 'source')
   await expect(page.locator('.qx-pill')).toHaveText('第 1 步 · 取简历文件')
+  await expectNoStrayReportNote(page)
   await expect(page.getByText('简历这趟，先')).toBeVisible()
   await expect(page.getByText('原件只读不改', { exact: true })).toBeVisible()
   const order = ['resume-intent', 'resume-source-cards', 'resume-format-line', 'resume-direction-table', 'resume-extra-exits']
@@ -3594,6 +3595,7 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   await expect(root).toHaveAttribute('data-screen', 'target')
   await expect(root).toHaveAttribute('data-state', 'target')
   await expect(page.locator('.qx-pill')).toHaveText('第 1 步 · 诊断方向')
+  await expect(root.getByText('系统不会编造「超过多少人」「排名超过多少份简历」这类无法验证的结论，也不承诺提分幅度、不做录用预测、不做企业匹配。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /^通用诊断/ }).click()
   await expect(page.getByRole('button', { name: '通用诊断，直接回来源选择' })).toBeVisible()
   await expect(page.locator('.qx-rt-dimchip[data-off="true"]')).toHaveCount(6)
@@ -3604,9 +3606,11 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   await expect(root).toHaveAttribute('data-screen', 'target-context')
   await expect(page.locator('.qx-pill')).toHaveText('第 1 步 · 目标设置')
   await expect(page.getByRole('textbox', { name: '其他岗位' })).toHaveCount(0)
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '整屏门类表 →' }).click()
   await expect(root).toHaveAttribute('data-screen', 'target-industry')
   await expect(page.getByRole('button', { name: '用「暂不指定」继续' })).toBeVisible()
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '用「暂不指定」继续' }).click()
   await expect(root).toHaveAttribute('data-screen', 'target-context')
   await page.getByRole('button', { name: '技术研发', exact: true }).click()
@@ -3659,6 +3663,7 @@ test('T21a source screen follows the 2.0 order and the target workbench stays on
   await expect(page.locator('.qx-pill')).toHaveText('第 2 步 · 确认这次办理')
   await expect(page.getByText('王建国-简历-2026.pdf', { exact: true })).toBeVisible()
   await expect(page.getByText('页数未返回')).toBeVisible()
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '换一份文件' }).click()
   expect(openedChooser).toBe(false)
   await expect(root).toHaveAttribute('data-screen', 'source')
@@ -3786,6 +3791,14 @@ async function expectChannelHasNoStaff(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: '找现场工作人员' })).toHaveCount(0)
 }
 
+// 稿 21 的来源、渠道、目标设置、确认各屏都没有「报告按六个维度…」那句；10/6 拆出诊断方向屏时它没跟走，挂到了这些屏上。
+// 不编造结论的说明照稿只在诊断方向屏（target）出现，那一屏不调这个检查。
+async function expectNoStrayReportNote(page: Page): Promise<void> {
+  const root = page.locator('[data-kiosk-screen="resume-source"]')
+  await expect(root).not.toContainText('报告按六个维度')
+  await expect(root).not.toContainText('无法验证的结论')
+}
+
 test('T21c channel screens enter and return, and dead ends have an exit @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await routeT21cUsb(page, 'list')
@@ -3795,6 +3808,7 @@ test('T21c channel screens enter and return, and dead ends have an exit @w3-kios
   await expect(root).toHaveAttribute('data-state', 'usb-list')
   await expect(page.getByRole('button', { name: /孙晓雯-仓储主管简历\.pdf/ })).toBeVisible()
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '回到来源选择' }).click()
   await expect(root).toHaveAttribute('data-state', 'source')
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
@@ -3805,6 +3819,7 @@ test('T21c channel screens enter and return, and dead ends have an exit @w3-kios
   await expect(root).toHaveAttribute('data-state', 'usb-read-failed')
   await expect(page.getByRole('button', { name: '重新读一次 U 盘' })).toBeVisible()
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '回到来源选择' }).click()
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
 
@@ -3812,6 +3827,7 @@ test('T21c channel screens enter and return, and dead ends have an exit @w3-kios
   await expect(root).toHaveAttribute('data-state', 'local-guide')
   await expect(page.getByRole('button', { name: '打开文件选择' })).toBeVisible()
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '回到来源选择' }).click()
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
 
@@ -3827,6 +3843,7 @@ test('T21c channel screens enter and return, and dead ends have an exit @w3-kios
   await expect(page.getByText('二维码已过期', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '刷新二维码' })).toBeVisible()
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await page.getByRole('button', { name: '回到来源选择' }).click()
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
 
@@ -3841,6 +3858,7 @@ test('T21c channel screens enter and return, and dead ends have an exit @w3-kios
   await expect(scan.getByText('扫描原件 · 由扫描工作台交接')).toBeVisible()
   await expect(scan.getByText('孙晓雯-仓储主管简历.pdf', { exact: true })).toBeVisible()
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await scan.getByRole('button', { name: '回到来源选择' }).click()
   await expect(root).toHaveAttribute('data-state', 'source')
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
@@ -3859,6 +3877,7 @@ test('T21c usb offline screen keeps a way back to source choice @w3-kiosk', asyn
   const back = page.getByRole('button', { name: '回到来源选择' })
   await expect(back).toHaveCount(1)
   await expectChannelHasNoStaff(page)
+  await expectNoStrayReportNote(page)
   await back.click()
   await expect(root).toHaveAttribute('data-state', 'source')
   await expect(page.getByTestId('resume-source-cards')).toBeVisible()
