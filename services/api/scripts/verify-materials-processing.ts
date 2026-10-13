@@ -22,6 +22,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
 import { AuditService } from '../src/audit/audit.service'
 import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
+import { signFileUrl } from '../src/files/signing'
 
 /** 与 pii-scan.util.ts 内部同名常量保持一致的解析公式，避免测试假设与实际生效配置脱节。 */
 const EXPECTED_PII_SCAN_MAX_OCR_PAGES = (() => {
@@ -78,8 +79,6 @@ async function expectBadRequest(label: string, fn: () => Promise<unknown>) {
 }
 
 async function main() {
-  const { holdOwnerlessMaterialFileUrl } = await import('./support/hold-ownerless-material-file-url')
-  holdOwnerlessMaterialFileUrl()
   console.log('\n=== Phase A-2 materials document-processing verification ===')
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -409,7 +408,7 @@ async function main() {
     else fail('Deleting material task did not cascade PII findings')
 
     const anonymousTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: anonymousFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: anonymousFileId, fileAccessUrl: signFileUrl(anonymousFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     if (anonymousTask.endUserId === null) pass('Anonymous material task can be created')
@@ -443,7 +442,7 @@ async function main() {
     // 不能再借它做真实 PII 抽取。改用同样匿名归属、但已有真实落盘字节的 imageFileId，
     // 经 materialsRealOcr（fake OCR 返回 textSample）驱动真实抽取管线，同时保留匿名 token 授权语义验证。
     const anonymousPiiTask = await materialsRealOcr.createTask(
-      { kind: 'pii_scan', sourceFileId: imageFileId, params: {} },
+      { kind: 'pii_scan', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: {} },
       { kind: 'anonymous' },
     )
     if (!anonymousPiiTask.accessToken) fail('Anonymous PII scan should return access token')
@@ -463,18 +462,18 @@ async function main() {
     )
     await expectForbidden('Anonymous PII redact without decision task token is rejected', () =>
       materials.createTask(
-        { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'pii_redact', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { decisionTaskId: anonymousPiiSettled.id } },
         { kind: 'anonymous' },
       ),
     )
     await expectForbidden('Anonymous PII redact with wrong decision task token is rejected', () =>
       materials.createTask(
-        { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'pii_redact', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { decisionTaskId: anonymousPiiSettled.id } },
         { kind: 'anonymous', accessToken: 'wrong-token' },
       ),
     )
     const anonymousRedactionTask = await materials.createTask(
-      { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+      { kind: 'pii_redact', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { decisionTaskId: anonymousPiiSettled.id } },
       { kind: 'anonymous', accessToken: anonymousPiiTask.accessToken },
     )
     const anonymousRedactionChecks = (anonymousRedactionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -489,7 +488,7 @@ async function main() {
     }
 
     const unavailableNormalizeTask = await materials.createTask(
-      { kind: 'normalize_a4', sourceFileId: anonymousFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'normalize_a4', sourceFileId: anonymousFileId, fileAccessUrl: signFileUrl(anonymousFileId).url, params: { targetPaperSize: 'A4' } },
       { kind: 'anonymous' },
     )
     const unavailableNormalizeChecks = (unavailableNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -506,7 +505,7 @@ async function main() {
     }
 
     const imageInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: imageFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const imageChecks = (imageInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -538,7 +537,7 @@ async function main() {
     }
 
     const imageNormalizeTask = await materials.createTask(
-      { kind: 'normalize_a4', sourceFileId: imageFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'normalize_a4', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { targetPaperSize: 'A4' } },
       { kind: 'anonymous' },
     )
     const imageNormalizeChecks = (imageNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -555,13 +554,13 @@ async function main() {
     }
     await expectBadRequest('Non-A4 normalize_a4 target is rejected', () =>
       materials.createTask(
-        { kind: 'normalize_a4', sourceFileId: imageFileId, params: { targetPaperSize: 'A3' } },
+        { kind: 'normalize_a4', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { targetPaperSize: 'A3' } },
         { kind: 'anonymous' },
       ),
     )
 
     const pdfInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: pdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: pdfFileId, fileAccessUrl: signFileUrl(pdfFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const pdfChecks = (pdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -576,7 +575,7 @@ async function main() {
     }
 
     const pdfNormalizeTask = await materials.createTask(
-      { kind: 'normalize_a4', sourceFileId: pdfFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'normalize_a4', sourceFileId: pdfFileId, fileAccessUrl: signFileUrl(pdfFileId).url, params: { targetPaperSize: 'A4' } },
       { kind: 'anonymous' },
     )
     const pdfNormalizeChecks = (pdfNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -593,7 +592,7 @@ async function main() {
     }
 
     const unknownPdfNormalizeTask = await materials.createTask(
-      { kind: 'normalize_a4', sourceFileId: unknownPdfFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'normalize_a4', sourceFileId: unknownPdfFileId, fileAccessUrl: signFileUrl(unknownPdfFileId).url, params: { targetPaperSize: 'A4' } },
       { kind: 'anonymous' },
     )
     const unknownPdfNormalizeChecks = (unknownPdfNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -622,7 +621,7 @@ async function main() {
     const contentCategoryOcr = makeFakeOcr(async () => ({ ok: true, text: textSample, confidence: 'high' as const }))
     const materialsContentCategoryOcr = new MaterialsService(prisma, storage, contentCategoryOcr.ocr, new PiiRedactionService(prisma, storage, contentCategoryOcr.ocr, files))
     const photoClaimTask = await materialsContentCategoryOcr.createTask(
-      { kind: 'pii_scan', sourceFileId: imageFileId, params: { contentCategory: 'photo' } },
+      { kind: 'pii_scan', sourceFileId: imageFileId, fileAccessUrl: signFileUrl(imageFileId).url, params: { contentCategory: 'photo' } },
       { kind: 'anonymous' },
     )
     if (photoClaimTask.result?.['mode'] === 'real' && contentCategoryOcr.calls() >= 1) {
@@ -650,7 +649,7 @@ async function main() {
     //     特例收窄）。复用已有 pdfFileId（purpose=print_doc, mimeType=application/pdf），
     //     走 materialsRealOcr 覆盖该文件走 OCR 兜底渲染路径的情况。
     const pdfPhotoBypassTask = await materialsRealOcr.createTask(
-      { kind: 'pii_scan', sourceFileId: pdfFileId, params: { contentCategory: 'photo' } },
+      { kind: 'pii_scan', sourceFileId: pdfFileId, fileAccessUrl: signFileUrl(pdfFileId).url, params: { contentCategory: 'photo' } },
       { kind: 'anonymous' },
     )
     if (pdfPhotoBypassTask.result?.['mode'] !== 'skipped_non_document') {
@@ -683,7 +682,7 @@ async function main() {
     const failingOcr = makeFakeOcr(async () => ({ ok: false, errorCode: 'OCR_FAILED', errorMessage: 'mock OCR provider failure' }))
     const materialsFailingOcr = new MaterialsService(prisma, storage, failingOcr.ocr, new PiiRedactionService(prisma, storage, failingOcr.ocr, files))
     const degradedTask = await materialsFailingOcr.createTask(
-      { kind: 'pii_scan', sourceFileId: degradedOcrImageFileId, params: {} },
+      { kind: 'pii_scan', sourceFileId: degradedOcrImageFileId, fileAccessUrl: signFileUrl(degradedOcrImageFileId).url, params: {} },
       { kind: 'anonymous' },
     )
     const degradedFindings = await prisma.piiFinding.findMany({ where: { taskId: degradedTask.id } })
@@ -719,7 +718,7 @@ async function main() {
       },
     })
     const unsupportedTask = await materials.createTask(
-      { kind: 'pii_scan', sourceFileId: unsupportedFormatFileId, params: {} },
+      { kind: 'pii_scan', sourceFileId: unsupportedFormatFileId, fileAccessUrl: signFileUrl(unsupportedFormatFileId).url, params: {} },
       { kind: 'anonymous' },
     )
     const unsupportedFindings = await prisma.piiFinding.findMany({ where: { taskId: unsupportedTask.id } })
@@ -766,7 +765,7 @@ async function main() {
       },
     })
     const docxTask = await materials.createTask(
-      { kind: 'pii_scan', sourceFileId: docxFileId, params: {} },
+      { kind: 'pii_scan', sourceFileId: docxFileId, fileAccessUrl: signFileUrl(docxFileId).url, params: {} },
       { kind: 'anonymous' },
     )
     const docxFindingTypes = new Set((docxTask.piiFindings ?? []).map((finding) => finding.type))
@@ -824,7 +823,7 @@ async function main() {
     })
 
     const blankInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: blankImageFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: blankImageFileId, fileAccessUrl: signFileUrl(blankImageFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const blankChecks = (blankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -836,7 +835,7 @@ async function main() {
     }
 
     const nonBlankInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: nonBlankImageFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: nonBlankImageFileId, fileAccessUrl: signFileUrl(nonBlankImageFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const nonBlankChecks = (nonBlankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -892,7 +891,7 @@ async function main() {
     })
 
     const blankPdfInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: blankPdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: blankPdfFileId, fileAccessUrl: signFileUrl(blankPdfFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const blankPdfChecks = (blankPdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -904,7 +903,7 @@ async function main() {
     }
 
     const nonBlankPdfInspectionTask = await materials.createTask(
-      { kind: 'inspection', sourceFileId: nonBlankPdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'inspection', sourceFileId: nonBlankPdfFileId, fileAccessUrl: signFileUrl(nonBlankPdfFileId).url, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
     )
     const nonBlankPdfChecks = (nonBlankPdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -965,7 +964,7 @@ async function main() {
       const bigPageOcr = makeFakeOcr(async () => ({ ok: true, text: 'ocr-fallback-text', confidence: 'high' as const }))
       const materialsBigPageOcr = new MaterialsService(prisma, storage, bigPageOcr.ocr, new PiiRedactionService(prisma, storage, bigPageOcr.ocr, files))
       const bigPageTask = await materialsBigPageOcr.createTask(
-        { kind: 'pii_scan', sourceFileId: bigPageCountFileId, params: {} },
+        { kind: 'pii_scan', sourceFileId: bigPageCountFileId, fileAccessUrl: signFileUrl(bigPageCountFileId).url, params: {} },
         { kind: 'anonymous' },
       )
       if (unpdfExtractTextCalls === 0) {

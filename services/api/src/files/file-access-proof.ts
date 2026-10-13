@@ -1,3 +1,4 @@
+import type { PrismaService } from '../prisma/prisma.service'
 import { verifyFileSignature } from './signing'
 
 const CONTENT_PATH = /^\/api\/v1\/files\/([^/]+)\/content$/
@@ -51,32 +52,22 @@ export function assertGuestFileProof(fileId: string, url: string | null | undefi
   return verifyFileSignature(grant.fileId, grant.expires, grant.sig)
 }
 
-type OwnerlessFileRow = {
-  endUserId: string | null
-  deletedAt: Date | null
-  status: string
-  expiresAt: Date | null
-}
-
 /**
- * 仍可使用、且没有会员主人的文件，调用方必须另持本次签名地址。
- * 不存在、已删除、未就绪、已过期或已有会员主人的文件交给原有校验。
- * 测试桩没有 fileObject 时同样交给原有校验。
+ * 没查到带会员主人的文件行时，调用方必须另持本次签名地址。
+ * 没有这一行、已删除、未就绪、已过期，或这一行没有会员主人，都要证明。
+ * 只有查到 endUserId 不为空的行才不要证明。
+ * 拿不到 fileObject.findUnique 时直接报错。
  */
-export async function ownerlessActiveFileNeedsProof(
-  prisma: object | null | undefined,
+export async function fileNeedsHolderProof(
+  prisma: Pick<PrismaService, 'fileObject'>,
   fileId: string,
 ): Promise<boolean> {
-  const findUnique = (prisma as {
-    fileObject?: { findUnique?: (args: unknown) => Promise<OwnerlessFileRow | null> }
-  } | null | undefined)?.fileObject?.findUnique
-  if (typeof findUnique !== 'function' || !fileId) return false
-  const row = await findUnique({
+  if (typeof prisma?.fileObject?.findUnique !== 'function') {
+    throw new Error('文件记录读取不可用')
+  }
+  const row = await prisma.fileObject.findUnique({
     where: { id: fileId },
-    select: { id: true, endUserId: true, deletedAt: true, status: true, expiresAt: true },
+    select: { endUserId: true },
   })
-  if (!row || row.deletedAt || row.status !== 'active') return false
-  if (row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now()) return false
-  if (row.endUserId) return false
-  return true
+  return !row?.endUserId
 }

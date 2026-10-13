@@ -25,7 +25,8 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AdminAiUsage, AdminAiLogsResult, AiLogStatus, AiOperation } from './ai-log.service'
-import { assertGuestFileProof, ownerlessActiveFileNeedsProof } from '../files/file-access-proof'
+import { FilesService } from '../files/files.service'
+import { assertGuestFileProof, fileNeedsHolderProof } from '../files/file-access-proof'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
@@ -151,6 +152,7 @@ export class AiController {
     private readonly privacy: MemberPrivacyService,
     private readonly assistantSummary: AssistantSummaryService,
     private readonly draftSource: ResumeDraftSourceService,
+    private readonly files: FilesService,
     @Optional() private readonly resumeParseIntent?: ResumeParseIntentRunner,
     @Optional() private readonly terminalSessions?: TerminalSessionService,
   ) {}
@@ -210,7 +212,7 @@ export class AiController {
         error: { code: 'RESUME_PARSE_INTENT_MALFORMED', message: '简历解析意图标识无效' },
       })
     }
-    // 没有会员主人的文件只认持有本次签名地址的调用方。对不上时与文件不存在同一回应，
+    // 没查到会员主人的文件只认持有本次签名地址的调用方。对不上时与文件不存在同一回应，
     // 并且发生在扣次数、建立解析记录和调用模型之前。
     await this.assertOwnerlessResumeFileHeld(dto.fileId, dto.fileAccessUrl)
     const quotaContext = {
@@ -222,6 +224,7 @@ export class AiController {
     const result = intentHeaders.status === 'present'
       ? await this.submitKeyedResumeParse(dto, quotaContext.member, quotaContext, intentHeaders.intentKey, intentHeaders.proof)
       : await (async () => {
+        await this.files.assertContentAccessibleForEndUser(dto.fileId, quotaContext.member)
         const quotaTicket = await this.publicQuota.consume('resume_parse', quotaContext)
         return runWithPublicQuota(this.publicQuota, quotaTicket, req, () =>
           this.aiService.submitResumeParse(dto, quotaContext.member),
@@ -253,9 +256,9 @@ export class AiController {
     return result
   }
 
-  /** 仍可使用且没有会员主人时，签名地址必须对上；其余情况交给后面的读取校验。 */
+  /** 没查到会员主人时，签名地址必须对上。对不上时与文件不存在同一回应。 */
   private async assertOwnerlessResumeFileHeld(fileId: string, fileAccessUrl: string | undefined): Promise<void> {
-    if (!await ownerlessActiveFileNeedsProof(this.prisma, fileId)) return
+    if (!await fileNeedsHolderProof(this.prisma, fileId)) return
     if (assertGuestFileProof(fileId, fileAccessUrl)) return
     throw new NotFoundException({
       error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },

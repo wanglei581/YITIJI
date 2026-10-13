@@ -4,6 +4,8 @@
  * 没有会员主人的文件，简历诊断、模拟面试、材料检查只认持有本次签名地址的调用方。
  * 有会员主人的文件只认本人。对不上时与「文件不存在」同一回应。
  * 材料检查不再接受已过期的文件。
+ * 材料检查对别人的会员文件仍回原有的 403；只有没有会员主人的文件才和「源文件不存在」同一回应。
+ * 结束时只清掉本次写入的记录，并确认这些文件编号已经不在。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:guest-file-proof
  */
@@ -12,10 +14,11 @@ require('dotenv').config()
 process.env['FILE_STORAGE_DRIVER'] = 'local'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-guest-file-proof-secret-32chars-min'
 
+import 'reflect-metadata'
 import { createHmac, randomBytes } from 'crypto'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-import { Logger } from '@nestjs/common'
+import { BadRequestException, Logger, ValidationPipe, type ValidationError } from '@nestjs/common'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -27,8 +30,12 @@ import { ResumeParseSubmissionService } from '../src/ai/resume-parse-submission.
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { MaterialsService } from '../src/materials/materials.service'
 import { ResumeExtractionService } from '../src/ai/resume/resume-extraction.service'
-import { assertGuestFileProof, parseSignedContentUrl } from '../src/files/file-access-proof'
+import { assertGuestFileProof, fileNeedsHolderProof, parseSignedContentUrl } from '../src/files/file-access-proof'
 import { signFileUrl } from '../src/files/signing'
+import { resumeParseIntentId } from '../src/ai/resume-parse-intent'
+import { ResumeParseRequestDto } from '../src/ai/dto/resume-parse.dto'
+import { CreateMaterialTaskDto } from '../src/materials/dto/create-material-task.dto'
+import { CreateInterviewDto } from '../src/mock-interview/mock-interview.controller'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 import type { FilePurpose } from '../src/files/file.types'
 
@@ -133,6 +140,64 @@ function assertParser(): void {
   }
 }
 
+function flattenValidationErrors(errors: ValidationError[], parent = ''): string[] {
+  const out: string[] = []
+  for (const item of errors) {
+    const path = parent ? `${parent}.${item.property}` : item.property
+    if (item.constraints) {
+      for (const msg of Object.values(item.constraints)) out.push(`${path}: ${msg}`)
+    }
+    if (item.children && item.children.length) {
+      const childPath = Array.isArray(item.target) ? `${parent}[${item.property}]` : path
+      out.push(...flattenValidationErrors(item.children, childPath))
+    }
+  }
+  return out
+}
+
+async function assertDto(label: string, metatype: new () => object, body: object, ok: boolean): Promise<void> {
+  const pipe = new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: (errors) => {
+      const details = flattenValidationErrors(errors)
+      const message = details.length > 0 ? details[0]! : '请求参数校验失败'
+      return new BadRequestException({ error: { code: 'VALIDATION_FAILED', message, details } })
+    },
+  })
+  try {
+    await pipe.transform(body, { type: 'body', metatype })
+    if (!ok) fail(`${label}：应当拒绝`)
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+    if (ok) fail(`${label}：不应当拒绝 ${rejectionShape(error)}`)
+    const status = (error as { getStatus?: () => number }).getStatus?.() ?? 0
+    if (status !== 400) fail(`${label}：应当拒绝，实际 ${status}`)
+  }
+  pass(label)
+}
+
+async function assertValidation(): Promise<void> {
+  const url = 'u'.repeat(1024)
+  const tooLong = 'u'.repeat(1025)
+  const resumeOk = { fileId: 'f', fileName: 'a.pdf', fileFormat: 'pdf', source: 'upload', fileAccessUrl: url }
+  const materialOk = { kind: 'inspection', sourceFileId: 'f', fileAccessUrl: url }
+  const interviewOk = {
+    interviewerType: 'hr', industry: '软件', position: '后端', experience: 'y1_3',
+    difficulty: 'standard', durationMin: 5, fileAccessUrl: url,
+  }
+  await assertDto('简历诊断入参签名地址不超过 1024', ResumeParseRequestDto, resumeOk, true)
+  await assertDto('简历诊断入参签名地址超过 1024', ResumeParseRequestDto, { ...resumeOk, fileAccessUrl: tooLong }, false)
+  await assertDto('简历诊断入参多一个未声明字段', ResumeParseRequestDto, { ...resumeOk, unlisted: 1 }, false)
+  await assertDto('材料检查入参签名地址不超过 1024', CreateMaterialTaskDto, materialOk, true)
+  await assertDto('材料检查入参签名地址超过 1024', CreateMaterialTaskDto, { ...materialOk, fileAccessUrl: tooLong }, false)
+  await assertDto('材料检查入参多一个未声明字段', CreateMaterialTaskDto, { ...materialOk, unlisted: 1 }, false)
+  await assertDto('模拟面试入参签名地址不超过 1024', CreateInterviewDto, interviewOk, true)
+  await assertDto('模拟面试入参签名地址超过 1024', CreateInterviewDto, { ...interviewOk, fileAccessUrl: tooLong }, false)
+  await assertDto('模拟面试入参多一个未声明字段', CreateInterviewDto, { ...interviewOk, unlisted: 1 }, false)
+}
+
 async function resumePdf(): Promise<Buffer> {
   const doc = await PDFDocument.create()
   const page = doc.addPage([612, 792])
@@ -147,6 +212,7 @@ async function resumePdf(): Promise<Buffer> {
 async function main(): Promise<void> {
   assertKioskSources()
   assertParser()
+  await assertValidation()
   assertIsolatedVerificationDatabase()
 
   const prisma = new PrismaService()
@@ -205,6 +271,7 @@ async function main(): Promise<void> {
     { requireActiveConsent: async () => undefined } as never,
     {} as never,
     {} as never,
+    files,
     runner,
   )
 
@@ -244,6 +311,12 @@ async function main(): Promise<void> {
     durationMin: 5,
   }
 
+  const uploadedIds: string[] = []
+  const intentIds: string[] = []
+  let uploaderUserId: string | null = null
+  const createdBy = 'verify_guest_file_proof'
+  const memberIds = [memberA, memberB]
+
   async function upload(purpose: FilePurpose, endUserId: string | null): Promise<string> {
     const uploaded = await files.upload({
       buffer: await resumePdf(),
@@ -252,16 +325,175 @@ async function main(): Promise<void> {
       purpose,
       uploaderId: null,
       endUserId,
-      createdBy: 'verify_guest_file_proof',
+      createdBy,
       expiresAtOverride: new Date(Date.now() + 24 * 60 * 60 * 1000),
     })
+    uploadedIds.push(uploaded.fileId)
     return uploaded.fileId
   }
 
   function intentHeaders(): Record<string, string> {
+    const intentKey = randomBytes(32).toString('base64url')
+    intentIds.push(resumeParseIntentId(intentKey))
     return {
-      'x-resume-parse-intent': randomBytes(32).toString('base64url'),
+      'x-resume-parse-intent': intentKey,
       'x-resume-parse-proof': randomBytes(32).toString('base64url'),
+    }
+  }
+
+  function fileIdFilter(): string[] {
+    return uploadedIds.length ? [...uploadedIds] : ['__none__']
+  }
+
+  const countIntents = () => prisma.aiResumeResult.count({
+    where: {
+      kind: 'parse_intent',
+      OR: [
+        ...(intentIds.length ? [{ taskId: { in: [...intentIds] } }] : []),
+        { endUserId: { in: memberIds } },
+      ],
+    },
+  })
+  const countSessions = () => prisma.mockInterviewSession.count({
+    where: {
+      OR: [
+        { endUserId: { in: memberIds } },
+        { resumeFileId: { in: fileIdFilter() } },
+      ],
+    },
+  })
+  const countTasks = () => prisma.documentProcessTask.count({
+    where: {
+      OR: [
+        { endUserId: { in: memberIds } },
+        { sourceFileId: { in: fileIdFilter() } },
+      ],
+    },
+  })
+
+  async function collectFileIds(): Promise<string[]> {
+    const seen = new Set<string>(uploadedIds)
+    let grew = true
+    while (grew) {
+      grew = false
+      const ids = [...seen]
+      const or: Array<Record<string, unknown>> = [
+        { endUserId: { in: memberIds } },
+        { createdBy },
+      ]
+      if (ids.length) {
+        or.push({ id: { in: ids } })
+        or.push({ sourceFileId: { in: ids } })
+      }
+      const rows = await prisma.fileObject.findMany({ where: { OR: or }, select: { id: true } })
+      const taskOr: Array<Record<string, unknown>> = [{ endUserId: { in: memberIds } }]
+      if (ids.length) taskOr.push({ sourceFileId: { in: ids } })
+      const tasks = await prisma.documentProcessTask.findMany({
+        where: { OR: taskOr },
+        select: { sourceFileId: true, resultFileId: true },
+      })
+      for (const row of rows) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id)
+          grew = true
+        }
+      }
+      for (const task of tasks) {
+        for (const id of [task.sourceFileId, task.resultFileId]) {
+          if (id && !seen.has(id)) {
+            seen.add(id)
+            grew = true
+          }
+        }
+      }
+    }
+    return [...seen]
+  }
+
+  async function cleanup(): Promise<void> {
+    const fileIds = await collectFileIds()
+    const pendingBefore = new Set(
+      (await prisma.fileObject.findMany({
+        where: { storageDeletePendingAt: { not: null } },
+        select: { id: true },
+      })).map((row) => row.id),
+    )
+    const stored = fileIds.length
+      ? await prisma.fileObject.findMany({
+        where: { id: { in: fileIds } },
+        select: { id: true, storageKey: true, bucket: true },
+      })
+      : []
+    for (const row of stored) {
+      try {
+        await storage.deleteObject(row.storageKey, row.bucket)
+      } catch (error) {
+        const code = (error as { code?: string }).code
+        if (code !== 'ENOENT') throw error
+      }
+    }
+    const taskOr: Array<Record<string, unknown>> = [{ endUserId: { in: memberIds } }]
+    if (fileIds.length) taskOr.push({ sourceFileId: { in: fileIds } })
+    const taskRows = await prisma.documentProcessTask.findMany({
+      where: { OR: taskOr },
+      select: { id: true },
+    })
+    const taskIds = taskRows.map((row) => row.id)
+    if (taskIds.length) {
+      await prisma.piiFinding.deleteMany({ where: { taskId: { in: taskIds } } })
+      await prisma.documentProcessTask.updateMany({
+        where: { id: { in: taskIds } },
+        data: { resultFileId: null },
+      })
+      await prisma.documentProcessTask.deleteMany({ where: { id: { in: taskIds } } })
+    }
+    if (fileIds.length) {
+      await prisma.fileObject.updateMany({ where: { id: { in: fileIds } }, data: { sourceFileId: null } })
+      await prisma.fileObject.deleteMany({ where: { id: { in: fileIds } } })
+    }
+    const sessionRows = await prisma.mockInterviewSession.findMany({
+      where: {
+        OR: [
+          { endUserId: { in: memberIds } },
+          { resumeFileId: { in: fileIds.length ? fileIds : ['__none__'] } },
+        ],
+      },
+      select: { id: true },
+    })
+    const sessionIds = sessionRows.map((row) => row.id)
+    if (sessionIds.length) {
+      await prisma.mockInterviewTurn.deleteMany({ where: { sessionId: { in: sessionIds } } })
+      await prisma.mockInterviewReport.deleteMany({ where: { sessionId: { in: sessionIds } } })
+      await prisma.mockInterviewSession.deleteMany({ where: { id: { in: sessionIds } } })
+    }
+    await prisma.aiResumeResult.deleteMany({
+      where: {
+        OR: [
+          { endUserId: { in: memberIds } },
+          ...(intentIds.length ? [{ taskId: { in: [...intentIds] } }] : []),
+        ],
+      },
+    })
+    await prisma.aiUsageRecord.deleteMany({ where: { endUserId: { in: memberIds } } })
+    await prisma.aiServiceLog.deleteMany({ where: { endUserId: { in: memberIds } } })
+    const auditTargets = [...fileIds, ...taskIds, ...sessionIds, ...intentIds]
+    if (auditTargets.length) {
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: auditTargets } } })
+    }
+    await prisma.auditLog.deleteMany({ where: { requestId: 'verify-guest-file-proof' } })
+    if (uploaderUserId) await prisma.user.delete({ where: { id: uploaderUserId } })
+    await prisma.endUser.deleteMany({ where: { id: { in: memberIds } } })
+
+    if (fileIds.length) {
+      const left = await prisma.fileObject.count({ where: { id: { in: fileIds } } })
+      if (left !== 0) throw new Error('本次文件编号清理后仍在')
+    }
+    const pendingAfter = await prisma.fileObject.findMany({
+      where: { storageDeletePendingAt: { not: null } },
+      select: { id: true },
+    })
+    if (pendingAfter.some((row) => !pendingBefore.has(row.id))) {
+      throw new Error('清理后多出待删除记录')
     }
   }
   function req(headers: Record<string, string>) {
@@ -282,6 +514,7 @@ async function main(): Promise<void> {
     }
   }
 
+  let scenarioError: unknown
   try {
     await prisma.endUser.create({ data: { id: memberA, phoneHash: `hash_${memberA}`, phoneEnc: 'enc-a' } })
     await prisma.endUser.create({ data: { id: memberB, phoneHash: `hash_${memberB}`, phoneEnc: 'enc-b' } })
@@ -297,8 +530,60 @@ async function main(): Promise<void> {
       where: { id: expiredMaterial },
       data: { expiresAt: new Date(Date.now() - 60_000) },
     })
+    const deletedMaterial = await upload('print_doc', null)
+    await prisma.fileObject.update({
+      where: { id: deletedMaterial },
+      data: { deletedAt: new Date(), status: 'deleted' },
+    })
+    const uploader = await prisma.user.create({
+      data: {
+        username: `gfp_uploader_${suffix}`,
+        passwordHash: 'verify-only',
+        name: '验证上传账号',
+        role: 'admin',
+      },
+    })
+    uploaderUserId = uploader.id
+    const platformFile = await prisma.fileObject.create({
+      data: {
+        storageKey: `verify/guest-file-proof/${suffix}/platform`,
+        filename: 'platform.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 32,
+        sha256: 'b'.repeat(64),
+        purpose: 'resume_upload',
+        uploaderId: uploader.id,
+        endUserId: null,
+        ownerType: 'admin',
+        ownerId: uploader.id,
+        createdBy,
+        status: 'active',
+      },
+    })
+    uploadedIds.push(platformFile.id)
 
-    const countIntents = () => prisma.aiResumeResult.count({ where: { kind: 'parse_intent' } })
+    if (await fileNeedsHolderProof(prisma, `missing-${suffix}`) !== true) fail('编号不存在仍要证明')
+    if (await fileNeedsHolderProof(prisma, deletedMaterial) !== true) fail('已删除仍要证明')
+    if (await fileNeedsHolderProof(prisma, expiredMaterial) !== true) fail('已过期仍要证明')
+    if (await fileNeedsHolderProof(prisma, guestResume) !== true) fail('没有会员主人仍要证明')
+    if (await fileNeedsHolderProof(prisma, memberResume) !== false) fail('有会员主人不要证明')
+    pass('判定只看有没有会员主人')
+    let missingReader = false
+    try {
+      await fileNeedsHolderProof({} as never, guestResume)
+    } catch (error) {
+      missingReader = error instanceof Error && error.message === '文件记录读取不可用'
+    }
+    if (!missingReader) fail('拿不到文件记录读取时应报错')
+    missingReader = false
+    try {
+      await fileNeedsHolderProof({ fileObject: {} } as never, guestResume)
+    } catch (error) {
+      missingReader = error instanceof Error && error.message === '文件记录读取不可用'
+    }
+    if (!missingReader) fail('文件记录上没有读取方法时应报错')
+    pass('拿不到文件记录读取时报错')
+
     let resumeMissingShape = ''
     {
       try {
@@ -379,10 +664,85 @@ async function main(): Promise<void> {
       parseBody(guestResume, flippedGrant(guestResume)),
       req(intentHeaders()),
     ), { task: false })
-    await expectResumeReject('简历诊断拒时不扣次数', () => controller.submitResumeParse(
+    await expectResumeReject('简历诊断已登录会员用不带签名地址的无主文件', () => controller.submitResumeParse(
       parseBody(guestResume),
-      req({}),
+      req({ authorization: `Bearer ${memberA}`, ...intentHeaders() }),
     ), { task: false })
+    await expectResumeReject('简历诊断平台上传的文件不带签名地址', () => controller.submitResumeParse(
+      parseBody(platformFile.id),
+      req({ authorization: `Bearer ${memberA}`, ...intentHeaders() }),
+    ), { task: false })
+    {
+      const beforeIntent = await countIntents()
+      const beforeOnce = quota.once
+      const beforeConsume = quota.consume
+      const beforeModel = models.n
+      let caught: unknown
+      try {
+        await controller.submitResumeParse(
+          parseBody(expiredMaterial, signFileUrl(expiredMaterial).url),
+          req(intentHeaders()),
+        )
+        fail('简历诊断已过期但签名地址仍有效应当拒绝')
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+        caught = error
+      }
+      if (rejectionShape(caught) !== resumeMissingShape) fail(`简历诊断已过期但签名地址仍有效：回应不一致 ${rejectionShape(caught)}`)
+      if (quota.once !== beforeOnce || quota.consume !== beforeConsume) fail('简历诊断已过期但签名地址仍有效：拒时扣了次数')
+      if (models.n !== beforeModel) fail('简历诊断已过期但签名地址仍有效：拒时调了模型')
+      if (await countIntents() === beforeIntent) fail('简历诊断已过期但签名地址仍有效：证明未通过就没有后续校验')
+      pass('简历诊断已过期但签名地址仍有效，后面的校验仍拒绝')
+    }
+
+    let legacyMissingShape = ''
+    {
+      try {
+        await controller.submitResumeParse(parseBody(`missing-${suffix}`), req({}))
+        fail('旧路径文件不存在应当拒绝')
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+        legacyMissingShape = rejectionShape(error)
+      }
+      if (!legacyMissingShape.includes('FILE_NOT_FOUND') || !legacyMissingShape.includes('文件不存在或已被清理')) {
+        fail(`旧路径文件不存在的回应不可用 ${legacyMissingShape}`)
+      }
+      pass('旧路径文件不存在的回应已记录')
+    }
+    async function expectLegacyReject(label: string, run: () => Promise<unknown>): Promise<void> {
+      const beforeIntent = await countIntents()
+      const beforeOnce = quota.once
+      const beforeConsume = quota.consume
+      const beforeModel = models.n
+      let caught: unknown
+      try {
+        const result = await run()
+        fail(`${label}：应当拒绝，实际 ${JSON.stringify(result).slice(0, 160)}`)
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+        caught = error
+      }
+      if (rejectionShape(caught) !== legacyMissingShape) fail(`${label}：回应与旧路径文件不存在不一致 ${rejectionShape(caught)}`)
+      if (quota.once !== beforeOnce || quota.consume !== beforeConsume) fail(`${label}：拒时扣了次数`)
+      if (models.n !== beforeModel) fail(`${label}：拒时调了模型`)
+      if (await countIntents() !== beforeIntent) fail(`${label}：拒时建了任务`)
+      pass(label)
+    }
+    await expectLegacyReject('旧路径不带签名地址', () => controller.submitResumeParse(parseBody(guestResume), req({})))
+    await expectLegacyReject('旧路径带错签名地址', () => controller.submitResumeParse(
+      parseBody(guestResume, signFileUrl(otherResume).url),
+      req({}),
+    ))
+    const legacyOwner = await controller.submitResumeParse(parseBody(memberResume), req({ authorization: `Bearer ${memberA}` }))
+    if (legacyOwner.status !== 'completed' || quota.consume < 1) fail('旧路径会员本人应当成功')
+    pass('旧路径会员本人成功')
+    const consumeAfterOwner = quota.consume
+    const legacyGuest = await controller.submitResumeParse(
+      parseBody(guestResume, signFileUrl(guestResume).url),
+      req({}),
+    )
+    if (legacyGuest.status !== 'completed' || quota.consume !== consumeAfterOwner + 1) fail('旧路径持有签名地址应当成功')
+    pass('旧路径持有签名地址成功')
 
     let interviewMissingShape = ''
     {
@@ -403,7 +763,7 @@ async function main(): Promise<void> {
     }
 
     async function expectInterviewReject(label: string, run: () => Promise<unknown>, readFile: boolean): Promise<void> {
-      const sessions = await prisma.mockInterviewSession.count()
+      const sessions = await countSessions()
       const beforeExtract = extracts.n
       const beforeLlm = llm.n
       let caught: unknown
@@ -417,7 +777,7 @@ async function main(): Promise<void> {
       if (rejectionShape(caught) !== interviewMissingShape) {
         fail(`${label}：回应与文件不存在不一致 ${rejectionShape(caught)}`)
       }
-      if (await prisma.mockInterviewSession.count() !== sessions) fail(`${label}：拒时建了任务`)
+      if (await countSessions() !== sessions) fail(`${label}：拒时建了任务`)
       if (llm.n !== beforeLlm) fail(`${label}：拒时调了模型`)
       if (!readFile && extracts.n !== beforeExtract) fail(`${label}：拒时读取了文件`)
       pass(label)
@@ -461,6 +821,18 @@ async function main(): Promise<void> {
       { ...interviewBase, resumeFileId: guestResume, fileAccessUrl: flippedGrant(guestResume) },
       { endUserId: null, accessToken: null },
     ), false)
+    await expectInterviewReject('模拟面试已登录会员用不带签名地址的无主文件', () => interview.createSession(
+      { ...interviewBase, resumeFileId: guestResume },
+      { endUserId: memberA, accessToken: null },
+    ), false)
+    await expectInterviewReject('模拟面试平台上传的文件不带签名地址', () => interview.createSession(
+      { ...interviewBase, resumeFileId: platformFile.id },
+      { endUserId: memberA, accessToken: null },
+    ), false)
+    await expectInterviewReject('模拟面试已过期但签名地址仍有效', () => interview.createSession(
+      { ...interviewBase, resumeFileId: expiredMaterial, fileAccessUrl: signFileUrl(expiredMaterial).url },
+      { endUserId: null, accessToken: null },
+    ), true)
 
     let materialMissingShape = ''
     {
@@ -481,7 +853,7 @@ async function main(): Promise<void> {
     }
 
     async function expectMaterialReject(label: string, run: () => Promise<unknown>): Promise<void> {
-      const tasks = await prisma.documentProcessTask.count()
+      const tasks = await countTasks()
       const beforeOcr = ocrCalls.n
       let caught: unknown
       try {
@@ -494,7 +866,7 @@ async function main(): Promise<void> {
       if (rejectionShape(caught) !== materialMissingShape) {
         fail(`${label}：回应与文件不存在不一致 ${rejectionShape(caught)}`)
       }
-      if (await prisma.documentProcessTask.count() !== tasks) fail(`${label}：拒时建了任务`)
+      if (await countTasks() !== tasks) fail(`${label}：拒时建了任务`)
       if (ocrCalls.n !== beforeOcr) fail(`${label}：拒时调了识别`)
       pass(label)
     }
@@ -505,11 +877,12 @@ async function main(): Promise<void> {
     )
     if (!ownerMaterial.id) fail('材料检查会员本人应当成功')
     pass('材料检查会员本人成功')
+    // 别人的会员文件仍回原有的 403。这是改动前就有的行为，这里只钉住它。
     for (const [label, requester] of [
       ['材料检查别的会员', { kind: 'member' as const, endUserId: memberB }],
       ['材料检查未登录访问会员文件', { kind: 'anonymous' as const }],
     ]) {
-      const tasks = await prisma.documentProcessTask.count()
+      const tasks = await countTasks()
       const beforeOcr = ocrCalls.n
       let caught: unknown
       try {
@@ -523,7 +896,7 @@ async function main(): Promise<void> {
       if (!shape.includes('"status":403') || !shape.includes('SOURCE_FILE_ACCESS_DENIED')) {
         fail(`${label}：应当拒绝 ${shape}`)
       }
-      if (await prisma.documentProcessTask.count() !== tasks) fail(`${label}：拒时建了任务`)
+      if (await countTasks() !== tasks) fail(`${label}：拒时建了任务`)
       if (ocrCalls.n !== beforeOcr) fail(`${label}：拒时调了识别`)
       pass(label)
     }
@@ -554,11 +927,63 @@ async function main(): Promise<void> {
       { kind: 'inspection', sourceFileId: expiredMaterial, fileAccessUrl: signFileUrl(expiredMaterial).url },
       { kind: 'anonymous' },
     ))
-
-    console.log(`PASS verify:guest-file-proof ${passCount}`)
+    await expectMaterialReject('材料检查已删除但签名地址仍有效', () => materials.createTask(
+      { kind: 'inspection', sourceFileId: deletedMaterial, fileAccessUrl: signFileUrl(deletedMaterial).url },
+      { kind: 'anonymous' },
+    ))
+    await expectMaterialReject('材料检查已登录会员用不带签名地址的无主文件', () => materials.createTask(
+      { kind: 'inspection', sourceFileId: guestMaterial },
+      { kind: 'member', endUserId: memberA },
+    ))
+    await expectMaterialReject('材料检查平台上传的文件不带签名地址', () => materials.createTask(
+      { kind: 'inspection', sourceFileId: platformFile.id },
+      { kind: 'member', endUserId: memberA },
+    ))
+    const scanParams = {}
+    const firstScan = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: guestMaterial, params: scanParams, fileAccessUrl: signFileUrl(guestMaterial).url },
+      { kind: 'anonymous' },
+    )
+    if (!firstScan.id || !firstScan.accessToken) fail('去重顺序的第一次隐私检查应当成功')
+    const tasksAfterScan = await countTasks()
+    const ocrAfterScan = ocrCalls.n
+    let dedupeCaught: unknown
+    try {
+      const second = await materials.createTask(
+        { kind: 'pii_scan', sourceFileId: guestMaterial, params: scanParams },
+        { kind: 'anonymous' },
+      )
+      fail(`去重窗口内不带签名地址应当拒绝，实际 ${JSON.stringify(second).slice(0, 160)}`)
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('VERIFY_FAILED')) throw error
+      dedupeCaught = error
+    }
+    const dedupeShape = rejectionShape(dedupeCaught)
+    if (dedupeShape !== materialMissingShape) fail(`去重窗口内不带签名地址：回应与源文件不存在不一致 ${dedupeShape}`)
+    if (dedupeShape.includes(firstScan.id) || dedupeShape.includes(firstScan.accessToken)) {
+      fail('去重窗口内不带签名地址拿到了已有任务')
+    }
+    if (await countTasks() !== tasksAfterScan) fail('去重窗口内不带签名地址多建了任务')
+    if (ocrCalls.n !== ocrAfterScan) fail('去重窗口内不带签名地址调了识别')
+    pass('去重窗口内不带签名地址与源文件不存在一致')
+  } catch (error) {
+    scenarioError = error
   } finally {
-    await prisma.onModuleDestroy()
+    try {
+      await cleanup()
+    } catch (cleanupError) {
+      if (scenarioError) console.error(cleanupError instanceof Error ? cleanupError.stack ?? cleanupError.message : cleanupError)
+      else scenarioError = cleanupError
+    }
+    try {
+      await prisma.onModuleDestroy()
+    } catch (disconnectError) {
+      if (scenarioError) console.error(disconnectError instanceof Error ? disconnectError.stack ?? disconnectError.message : disconnectError)
+      else scenarioError = disconnectError
+    }
   }
+  if (scenarioError) throw scenarioError
+  console.log(`PASS verify:guest-file-proof ${passCount}`)
 }
 
 main().catch((error: unknown) => {
