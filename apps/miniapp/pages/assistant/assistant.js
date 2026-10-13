@@ -155,7 +155,8 @@ Page({
       // 此前这里只取 res.reply，把降级话术原样当成小青的回答展示——
       // 那是在用户看不见的地方伪造能力。
       const aiGenerated = res.aiGenerated === true
-      // 卡纸、缺纸、机器坏了时，后端不经过模型，直接回一段固定的安全话，并用 fixedNotice:true 标明。
+      // 问到眼前这台机器卡纸、缺纸、坏了，或者模型的回答在教人动手弄机器时，后端整段换成
+      // 一段固定的安全话（不是模型写的），并用 fixedNotice:true 标明。
       // 只有严格等于 true 才在气泡上方标「安全提示」；字符串 'true'、数字 1 都不算，免得把普通回答标错。
       // 这段不是「AI 服务当前不可用」的预置话术，为真时不挂那句说明，正文也不另加字。
       const fixedNotice = res.fixedNotice === true
