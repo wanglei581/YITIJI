@@ -40,6 +40,7 @@
             <image src="/assets/xiaoqing-card.jpg" mode="aspectFill" />
           </view>
           <view class="b-ai">
+            <view wx:if="{{!item.loading && item.fixedNotice}}" class="msg-notice-tag">安全提示</view>
             <view wx:if="{{item.loading}}" class="bt msg-loading">
               <view class="dot"></view><view class="dot"></view><view class="dot"></view>
             </view>

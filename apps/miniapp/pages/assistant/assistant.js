@@ -155,15 +155,22 @@ Page({
       // 此前这里只取 res.reply，把降级话术原样当成小青的回答展示——
       // 那是在用户看不见的地方伪造能力。
       const aiGenerated = res.aiGenerated === true
+      // 问到眼前这台机器卡纸、缺纸、坏了，或者模型的回答在教人动手弄机器时，后端整段换成
+      // 一段固定的安全话（不是模型写的），并用 fixedNotice:true 标明。
+      // 只有严格等于 true 才在气泡上方标「安全提示」；字符串 'true'、数字 1 都不算，免得把普通回答标错。
+      // 这段不是「AI 服务当前不可用」的预置话术，为真时不挂那句说明，正文也不另加字，
+      // 引导卡也清空（后端两种情况都回 actions: []，这里兜底：整段换掉，下面不能再挂跳转卡）。
+      const fixedNotice = res.fixedNotice === true
       const aiMsg = {
         id: loadingMsg.id,
         role: 'ai',
         text: res.reply || '',
-        cards,
+        cards: fixedNotice ? [] : cards,
         aiGenerated,
-        // 只在**没走真实模型**时出标记。走了就什么都不显示——
-        // 给每条真实回答都挂个「AI 生成」徽章是噪音，不是诚实。
-        fallbackNote: aiGenerated ? '' : '本条不是模型生成的回答，是系统预置话术（AI 服务当前不可用）。',
+        fixedNotice,
+        // 只在没走真实模型、又不是固定安全提示时出这句说明。真实回答什么都不挂；
+        // 固定安全提示挂的是上面的「安全提示」小标。给每条真实回答都挂徽章是噪音，不是诚实。
+        fallbackNote: fixedNotice ? '' : (aiGenerated ? '' : '本条不是模型生成的回答，是系统预置话术（AI 服务当前不可用）。'),
       }
       const msgs  = this.data.messages.slice(0, -1).concat(aiMsg)
       this.setData({
