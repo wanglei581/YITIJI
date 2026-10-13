@@ -130,8 +130,8 @@ assert(
   // 22 号稿正常态只有一种写法：次要「重新诊断」、主按钮「继续优化这份简历」。
   // 两种 intent 的去处仍按原样，只钉字。不能优化时那颗置灰的主按钮本来就是这句。
   const normal = files.actions.slice(files.actions.lastIndexOf('return ('))
-  assert(normal.includes('重新诊断'), 'normal report secondary button says 重新诊断')
-  assert(normal.includes('继续优化这份简历'), 'normal report primary button says 继续优化这份简历')
+  assert(/data-route="\/resume\/source">\s*重新诊断\s*<\/button>/.test(normal), 'normal report secondary button is the literal 重新诊断')
+  assert(/onClick=\{onOptimize\}[^>]*>\s*继续优化这份简历\s*<\/button>/.test(normal), 'canOptimize primary button is the literal 继续优化这份简历')
   assert(!normal.includes('重新上传'), 'normal report secondary button does not switch to 重新上传')
   assert(!normal.includes("intent === 'optimize' ?"), 'normal report button labels do not branch on intent')
   assert(!has(files.actions, '查看优化建议'), 'report actions file no longer says 查看优化建议')

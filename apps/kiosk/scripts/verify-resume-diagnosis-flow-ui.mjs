@@ -348,8 +348,9 @@ assertNotIncludes(filePreview, '请重新上传文件', 'preview failure no long
 {
   const actions = read('src/pages/resume/components/resume-report/ResumeReportActions.tsx')
   const normal = actions.slice(actions.lastIndexOf('return ('))
-  assertIncludes(normal, '重新诊断', 'normal report secondary button says 重新诊断')
-  assertIncludes(normal, '继续优化这份简历', 'normal report primary button says 继续优化这份简历')
+  assert.match(normal, /data-route="\/resume\/source">\s*重新诊断\s*<\/button>/, 'normal report secondary button is the literal 重新诊断')
+  assert.match(normal, /onClick=\{onOptimize\}[^>]*>\s*继续优化这份简历\s*<\/button>/, 'canOptimize primary button is the literal 继续优化这份简历')
+  console.log('PASS normal report buttons are the literal draft labels')
   assertNotIncludes(normal, '重新上传', 'normal report secondary button does not switch to 重新上传')
   assertNotIncludes(normal, "intent === 'optimize' ?", 'normal report button labels do not branch on intent')
   assertNotIncludes(actions, '查看优化建议', 'report actions file no longer says 查看优化建议')
