@@ -228,6 +228,7 @@
 
 - 我方生产 `DEPLOYMENT_OWNERSHIP` 由发布脚本固定写成 `vendor_cloud`（认不出也按我方云）。
 - 生产不许打开招聘内容托管（`RECRUITMENT_CONTENT_HOSTING_ENABLED` 为 1/true/yes/on 即拒绝启动，发布预检同样失败）。
+- 招聘锁上线后，发布脚本只接受带锁的提交；要回到更早的版本，先在主干做 revert 提交再走发布，不能直接部署旧提交号。
 
 以 `.env.example` 为清单逐项核对生产 `.env`：
 
