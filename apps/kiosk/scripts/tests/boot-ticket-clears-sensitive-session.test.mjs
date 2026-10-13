@@ -156,6 +156,7 @@ export function isScanType(value) {
     .replaceAll("from '../pages/scan/scanCleanupGate'", `from '${cleanupStub}'`)
     .replaceAll("from '../favorites/localFavorites'", `from '${leaf('src/favorites/localFavorites.ts')}'`)
     .replaceAll("from '../pages/contract-review/contractReviewSession'", `from '${leaf('src/pages/contract-review/contractReviewSession.ts')}'`)
+    .replaceAll("from '../services/api/aiSessionForget'", `from '${toDataUrl('export function forgetAiSessions() {}\n')}'`)
   const authCode = `${transpile('src/services/terminalAuth.ts')}\n// ${seed}\n`
     .replaceAll('import.meta.env', `globalThis[${JSON.stringify(envName)}]`)
     .replaceAll("from './api/client'", `from '${clientStub}'`)

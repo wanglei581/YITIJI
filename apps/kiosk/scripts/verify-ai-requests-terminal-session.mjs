@@ -192,6 +192,16 @@ const EXEMPT = [
     path: '/trtc/session/stop',
     reason: '结束语音会话止损：服务端 @AiUseExempt 且不挂终端守卫，凭停止能力令牌；页面卸载时要能用 keepalive 发出，不能等换票',
   },
+  {
+    file: 'src/services/api/aiSessionForget.ts',
+    path: '/assistant/sessions/forget',
+    reason: '清场 keepalive，不经终端封装：封装会先等续期，可能晚于整页重载；接口本身不要求终端会话票',
+  },
+  {
+    file: 'src/services/api/aiSessionForget.ts',
+    path: '/advisor/sessions/${encodeURIComponent(advisor.id)}/forget',
+    reason: '清场 keepalive，不经终端封装：封装会先等续期，可能晚于整页重载；接口本身不要求终端会话票',
+  },
 ]
 
 /** 这些文件里必须找到合格请求点：防止解析失效、改名后本门禁空转成全绿。 */

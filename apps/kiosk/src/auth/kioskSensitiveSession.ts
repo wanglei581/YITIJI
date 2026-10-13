@@ -26,6 +26,7 @@ import {
 } from '../pages/contract-review/contractReviewSession'
 import { clearAiDeclarationSession } from '../ai/aiDeclarationSession'
 import { AI_DECLARATION_SESSION_KEY } from '../ai/aiDeclarationVersions'
+import { forgetAiSessions } from '../services/api/aiSessionForget'
 
 /**
  * 清场会真正清掉的 sessionStorage 键。
@@ -78,6 +79,8 @@ export function clearKioskSensitiveSession(outgoingMemberToken?: string | null):
   // clearScanWorkbenchSession() 一旦先跑，就再也找不到要撤谁。
   beginScanSessionCleanup(outgoingMemberToken ?? null)
   clearScanWorkbenchSession()
+  // 放在最后：上面两行必须相邻。失败不抛错，不拦清场。
+  forgetAiSessions(outgoingMemberToken ?? null)
 }
 
 /**

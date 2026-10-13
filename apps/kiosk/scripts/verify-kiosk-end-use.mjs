@@ -183,7 +183,7 @@ else {
 // ── 接线 ────────────────────────────────────────────────────
 const pkg = JSON.parse(read('package.json'))
 check(
-  pkg.scripts['verify:kiosk-end-use'] === 'node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs',
+  pkg.scripts['verify:kiosk-end-use'] === 'node scripts/verify-kiosk-end-use.mjs && node --test scripts/tests/kiosk-end-use.test.mjs && node --test scripts/tests/ai-session-forget.test.mjs',
   'package.json 注册 verify:kiosk-end-use（含单测）',
 )
 check(/pnpm --filter @ai-job-print\/kiosk verify:kiosk-end-use/.test(readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')), 'CI 一体机静态门禁步跑 verify:kiosk-end-use')

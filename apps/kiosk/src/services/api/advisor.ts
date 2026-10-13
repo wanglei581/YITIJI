@@ -1,6 +1,7 @@
 // 顾问作业面：只封装已经存在的端点，不发明「列出全部产物」。
 
 import { terminalAttributedFetch } from '../terminalAuth'
+import { rememberAdvisorSession } from './aiSessionForget'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 import { networkError, throwHttpError } from './throwHttpError'
@@ -58,7 +59,9 @@ async function request(path: string, init: RequestInit, access?: AdvisorAccess):
 export async function getAdvisorSession(sessionId: string, access?: AdvisorAccess): Promise<unknown> {
   const res = await request(`/advisor/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET' }, access)
   if (!res.ok) await throwHttpError(res, access?.token)
-  return res.json()
+  const body: unknown = await res.json()
+  rememberAdvisorSession(sessionId, access)
+  return body
 }
 
 export async function printAdvisorArtifact(
