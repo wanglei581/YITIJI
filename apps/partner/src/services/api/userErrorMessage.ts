@@ -18,6 +18,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   RECRUITMENT_HOSTING_DISABLED: '本平台已关闭招聘内容托管，这项操作不可用',
   EMERGENCY_TAKEDOWN_IRREVERSIBLE: '该内容已被紧急下架，或所属机构已熔断，不能再发布',
   CONTENT_TRUST_INACTIVE: '来源机构内容信任未生效，无法发布',
+  ORG_CONTENT_TRUST_REQUIRED: '本机构还没有通过平台的内容可信核验，暂时不能发布。请联系平台运营完成核验后再发布。',
   CONTENT_NOT_FOUND: '内容不存在或已被删除，请刷新列表',
   WEBHOOK_SECRET_LOW_ENTROPY: '自定义密钥强度不足，请改用更长的随机密钥或留空由系统生成',
   WEBHOOK_SECRET_TOO_SHORT: '自定义密钥太短，请改用更长的随机密钥或留空由系统生成',

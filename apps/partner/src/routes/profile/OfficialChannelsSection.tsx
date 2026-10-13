@@ -71,7 +71,7 @@ function VerifiedDomains({ domains }: { domains: string[] | null }) {
  * 每个写操作都以服务端返回为准：成功后才改列表、才说「已保存 / 已启用 / 已归档」；
  * 失败时写出服务端的中文原因，列表保持原样。
  */
-export function OfficialChannelsSection() {
+export function OfficialChannelsSection({ publishable }: { publishable: boolean }) {
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [loadError, setLoadError] = useState('')
   const [items, setItems] = useState<OfficialChannelPartnerItem[]>([])
@@ -146,6 +146,11 @@ export function OfficialChannelsSection() {
 
   return (
     <Card className="mt-6 p-6" role="region" aria-labelledby="official-channels-title">
+      {!publishable && (
+        <p role="status" className="mb-4 rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
+          本机构还没有通过平台的内容可信核验，下面的渠道暂时不会在一体机上显示。核验通过后自动恢复显示。
+        </p>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50">
