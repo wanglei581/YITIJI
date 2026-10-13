@@ -23608,6 +23608,9 @@
     "services/api/scripts/backfill-terminal-credentials.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
+    "services/api/scripts/backup-postgres.sh": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "services/api/scripts/change-password-verify-target.ts": [
       "services/api/scripts/verify-change-password-target-guard.ts",
       "services/api/scripts/verify-change-password.ts"
@@ -36655,6 +36658,7 @@
         "files": [
           ".github/scripts/prune-prerelease-dumps.mjs",
           "docs/device/postgres-operations.md",
+          "services/api/scripts/backup-postgres.sh",
           "services/api/scripts/rclone-offsite.conf.example",
           "services/api/scripts/restore-offsite-drill.sh"
         ],

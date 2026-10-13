@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, readdirSync, utimesSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, chmodSync, readdirSync, utimesSync, rmSync, statSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawnSync, spawn } from 'node:child_process'
@@ -46,7 +46,7 @@ const baseEnv = {
   POSTGRES_URL: '',
   ALERT_WEBHOOK_URL: '',
 }
-const run = (script, args = [], extra = {}) => spawnSync('bash', [path.join(root, 'scripts', script), ...args], { env: { ...baseEnv, ...extra }, encoding: 'utf8' })
+const run = (script, args = [], extra = {}) => spawnSync('bash', [path.isAbsolute(script) ? script : path.join(root, 'scripts', script), ...args], { env: { ...baseEnv, ...extra }, encoding: 'utf8' })
 const day = new Date().toISOString().slice(0, 10)
 
 let result = run('backup-postgres.sh')
@@ -293,9 +293,12 @@ assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${thirty}\\.dum
 assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${orphan}\\.dump`))
 assert.match(dryPrune.stdout, new RegExp(`PRERELEASE_DRY_DELETE: ${legacy}\\.dump source=dump-mtime`))
 assert.match(dryPrune.stdout, new RegExp(`${old} storage_has_files=true`))
+assert.doesNotMatch(dryPrune.stderr, /runtime\/services\/api\/storage/, '干跑只列 storage，不以告警形式报出')
 assert.ok(!existsSync(path.join(prereleaseRoot, '.prune-last-success')) && existsSync(path.join(prereleaseRoot, `${old}.dump`)), '干跑只列不删，也不写状态')
 const cleaned = runPrune(prereleaseRoot)
 assert.equal(cleaned.status, 0, cleaned.stderr)
+assert.doesNotMatch(cleaned.stderr, /runtime\/services\/api\/storage/, '日常清理不告警历史组 storage')
+assert.doesNotMatch(readFileSync(log, 'utf8'), /storage/, '日常清理不推 storage 告警')
 for (const stem of [old, thirty, legacy, orphan]) {
   assert.ok(!existsSync(path.join(prereleaseRoot, `${stem}.dump`)) && existsSync(path.join(prereleaseRoot, `${stem}.dump.expired`)), `${stem} 到期删除并留标记`)
 }
@@ -305,6 +308,57 @@ assert.ok(existsSync(path.join(prereleaseRoot, 'legacy-group.dump')), '共用到
 assert.match(cleaned.stderr, /组名无法解析 UTC.*pre-legacy-no-utc/, '旧组按 dump 本身修改时间删时告警')
 assert.match(readFileSync(log, 'utf8'), /curl:/, '无法解析 UTC 的告警送到现有 webhook')
 assert.match(readFileSync(path.join(prereleaseRoot, '.prune-last-success'), 'utf8'), /last_success=\d{4}-\d{2}-\d{2}/)
+assert.equal(statSync(path.join(prereleaseRoot, '.prune-last-success')).mode & 0o777, 0o644, '清理状态文件权限为 0644')
+
+const partialRoot = path.join(dir, 'prerelease-partials')
+mkdirSync(partialRoot)
+const oldPartial = `pre-half-old-${stamp(40)}`
+const freshPartial = `pre-half-new-${stamp(2)}`
+for (const stem of [oldPartial, freshPartial]) {
+  writeFileSync(path.join(partialRoot, `${stem}.dump.partial`), 'unfinished dump')
+  writeFileSync(path.join(partialRoot, `${stem}.runtime.partial`), 'unfinished runtime')
+}
+for (const stem of [oldPartial, freshPartial]) {
+  const age = stem === oldPartial ? 40 : 2
+  const time = new Date(Date.now() - age * 86400000)
+  utimesSync(path.join(partialRoot, `${stem}.dump.partial`), time, time)
+  utimesSync(path.join(partialRoot, `${stem}.runtime.partial`), oldTime, oldTime)
+}
+writeFileSync(log, '')
+const partialCleaned = runPrune(partialRoot)
+assert.equal(partialCleaned.status, 0, partialCleaned.stderr)
+assert.ok(!existsSync(path.join(partialRoot, `${oldPartial}.dump.partial`)) && existsSync(path.join(partialRoot, `${oldPartial}.dump.expired`)), '满 30 天半截导出删除并留标记')
+assert.ok(existsSync(path.join(partialRoot, `${freshPartial}.dump.partial`)), '未满 30 天半截导出不动')
+assert.ok(existsSync(path.join(partialRoot, `${oldPartial}.runtime.partial`)) && existsSync(path.join(partialRoot, `${freshPartial}.runtime.partial`)), '不论年龄均不碰运行目录半截文件')
+assert.match(partialCleaned.stderr, new RegExp(`半截导出满 30 天已删除：${oldPartial}`), '半截导出删除告警一行')
+assert.equal((readFileSync(log, 'utf8').match(/curl:/g) ?? []).length, 1, '半截导出只推一次告警')
+
+const nodeRoot = path.join(dir, 'prerelease-node')
+mkdirSync(nodeRoot)
+putGroup(nodeRoot, old)
+// 在脚本夹具里屏蔽两个系统绝对路径，避免 CI 主机碰巧在 /usr/bin 安装 node。
+const sourceBackupScript = readFileSync(path.join(root, 'scripts/backup-postgres.sh'), 'utf8')
+const noFallbackScript = path.join(dir, 'backup-no-fallback-node.sh')
+assert.match(sourceBackupScript, /\/usr\/local\/bin\/node \/usr\/bin\/node/)
+writeFileSync(noFallbackScript, sourceBackupScript.replace('/usr/local/bin/node /usr/bin/node', '/nonexistent-node-1 /nonexistent-node-2'))
+const noNodeBin = path.join(dir, 'bin-no-node')
+mkdirSync(noNodeBin)
+for (const name of ['bash', 'cat', 'date', 'dirname', 'basename', 'sed', 'head', 'hostname', 'mkdir', 'rm', 'mv', 'find', 'touch', 'pg_dump', 'pg_restore', 'curl', 'flock', 'python3']) {
+  const fixture = path.join(bin, name)
+  const found = spawnSync('sh', ['-c', `command -v ${name}`], { encoding: 'utf8' }).stdout.trim()
+  const source = existsSync(fixture) ? fixture : found
+  assert.ok(source, `缺少夹具命令 ${name}`)
+  symlinkSync(source, path.join(noNodeBin, name))
+}
+writeFileSync(log, '')
+result = run(noFallbackScript, [], { DEPLOY_BACKUP_ROOT: nodeRoot, PRERELEASE_PRUNE_HELPER: helper, PATH: noNodeBin, NODE_BIN: '' })
+assert.equal(result.status, 0, result.stderr)
+assert.match(result.stderr, /定时任务里找不到 node，今天没清发布前备份里的过期导出/)
+assert.ok(existsSync(path.join(nodeRoot, `${old}.dump`)), '找不到 node 时当天备份成功且不清导出')
+assert.equal((readFileSync(log, 'utf8').match(/curl:/g) ?? []).length, 1, '找不到 node 当天立即推一次告警')
+result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: nodeRoot, PRERELEASE_PRUNE_HELPER: helper, PATH: noNodeBin, NODE_BIN: process.execPath })
+assert.equal(result.status, 0, result.stderr)
+assert.ok(existsSync(path.join(nodeRoot, `${old}.dump.expired`)), '显式 NODE_BIN 可正常清理')
 
 const lockRoot = path.join(dir, 'prerelease-lock')
 mkdirSync(lockRoot)
@@ -351,6 +405,15 @@ assert.match(result.stderr, /PRERELEASE_WARN: 发布前导出清理失败/)
 assert.match(result.stdout, /BACKUP_OK/)
 assert.ok(existsSync(path.join(errorRoot, `${old}.dump`)), '清理错误前未删 dump')
 assert.match(readFileSync(log, 'utf8'), /curl:/, '清理错误告警')
+assert.equal((readFileSync(log, 'utf8').match(/curl:/g) ?? []).length, 1, '共用脚本已告警的退出码 20 不重复推送')
+
+const abnormalHelper = path.join(dir, 'abnormal-prune.mjs')
+writeFileSync(abnormalHelper, 'process.exit(7)\n')
+writeFileSync(log, '')
+result = run('backup-postgres.sh', [], { DEPLOY_BACKUP_ROOT: errorRoot, PRERELEASE_PRUNE_HELPER: abnormalHelper })
+assert.equal(result.status, 0, '共用清理异常退出不改变当天备份结果')
+assert.match(result.stderr, /发布前导出清理异常退出（退出码 7）/, 'shell 兜底告警')
+assert.equal((readFileSync(log, 'utf8').match(/curl:/g) ?? []).length, 1, '异常退出只推一次兜底告警')
 
 const sameRoot = path.join(dir, 'prerelease-same')
 mkdirSync(sameRoot)

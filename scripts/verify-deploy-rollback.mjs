@@ -39,6 +39,7 @@ check(/\nconcurrency:\n  group: production-deploy\n  cancel-in-progress: false\n
 check(workflow.indexOf('✅ API-only 部署完成') >= 0 && workflow.indexOf('✅ API-only 部署完成') < workflow.indexOf('STATIC_BACKUP_ROOT'),
   'API-only 在静态目录备份之前退出')
 check(deployPrecheck.includes('command -v flock') && deployPrecheck.includes('FLOCK_INSTALLED='), '只读预检查服务器是否安装 flock')
+check(deployPrecheck.includes('command -v rsync') && deployPrecheck.includes('RSYNC_INSTALLED='), '只读预检查服务器是否安装 rsync')
 // 变量名后面紧跟中文标点（如 "$HEALTH_URL）"）：非 UTF-8 语言环境下 bash 会把那个字节当成变量名的一部分，
 // set -u 之下直接「unbound variable」退出。服务器经 SSH 执行时的语言环境不由我们保证，一律写成 ${VAR}。
 for (const [label, text] of [['deploy-api-release.sh', readFileSync(deployScript, 'utf8')], ['deploy.yml', workflow]]) {
@@ -795,6 +796,14 @@ const cleanupWorkflow = readFileSync(join(root, '.github/workflows/server-cleanu
 const precheckScript = readFileSync(join(root, '.github/scripts/deploy-precheck.sh'), 'utf8')
 const fragmentDirs = []
 try {
+  const rsyncBin = mkdtempSync(join(tmpdir(), 'precheck-no-rsync-'))
+  fragmentDirs.push(rsyncBin)
+  writeExec(join(rsyncBin, 'bash'), '#!/bin/sh\nexec /bin/bash "$@"\n')
+  const rsyncCheck = extractBetween(precheckScript, 'if command -v rsync', 'BK_PARENT=')
+  const rsyncMissing = runFragment(rsyncCheck, { PATH: rsyncBin })
+  fragmentDirs.push(rsyncMissing.dir)
+  check(rsyncMissing.code !== 0 && rsyncMissing.out.includes('RSYNC_INSTALLED=no'),
+    '预检：缺少 rsync 时失败并报告原因', `退出码 ${rsyncMissing.code}\n${rsyncMissing.out}`)
   const fullBuildAt = workflow.indexOf('=== full 发布构建前磁盘检查 ===')
   const pnpmInstallAt = workflow.indexOf('pnpm install --frozen-lockfile')
   const kioskBuildAt = workflow.indexOf('pnpm build:kiosk:production')

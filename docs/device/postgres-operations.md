@@ -101,7 +101,7 @@ cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
 
 ## 8. 每日备份、恢复演练与日志留存（E2）
 
-生产服务器由产品负责人安装依赖并执行，仓库脚本不会连接真实环境。先把 `backup-postgres.sh`、`restore-postgres-drill.sh` 和共用的 `.github/scripts/prune-prerelease-dumps.mjs` 按仓库相对路径复制到服务器并赋予执行权限；脚本优先使用环境里的连接串，没有时读取 `${API_ENV_FILE:-/srv/ai-job-print/services/api/.env}`。每日任务可选 `cron-backup.example` 或 systemd 的 `.service` / `.timer`；systemd 的 `EnvironmentFile=-...` 只是可选覆盖，脚本仍会自行读 `.env`。脚本先写 `.partial`，以 `pg_restore -l` 校验后原子改名，本机默认保留 30 天；失败会推送企业微信（若有 `ALERT_WEBHOOK_URL`）并返回非零，成功写 `LAST_SUCCESS`。异地副本默认关闭；开通、上传后校验、本机与异地分开的保留天数，以及在另一台机器上的恢复演练，见第 10 节。
+生产服务器由产品负责人安装依赖并执行，仓库脚本不会连接真实环境。先把 `backup-postgres.sh`、`restore-postgres-drill.sh` 和共用的 `.github/scripts/prune-prerelease-dumps.mjs` 按仓库相对路径复制到服务器并赋予执行权限；脚本优先使用环境里的连接串，没有时读取 `${API_ENV_FILE:-/srv/ai-job-print/services/api/.env}`。每日任务可选 `cron-backup.example` 或 systemd 的 `.service` / `.timer`；systemd 的 `EnvironmentFile=-...` 只是可选覆盖，脚本仍会自行读 `.env`。**定时任务环境必须能从 PATH 找到 node，或设置指向可执行文件的 `NODE_BIN`**，用于清理发布前导出；找不到时当天备份仍成功，但会立即告警。脚本先写 `.partial`，以 `pg_restore -l` 校验后原子改名，本机默认保留 30 天；失败会推送企业微信（若有 `ALERT_WEBHOOK_URL`）并返回非零，成功写 `LAST_SUCCESS`。异地副本默认关闭；开通、上传后校验、本机与异地分开的保留天数，以及在另一台机器上的恢复演练，见第 10 节。
 
 恢复演练必须指向临时 PostgreSQL 库，库名必须含 `drill` 或 `verify`，例如：
 

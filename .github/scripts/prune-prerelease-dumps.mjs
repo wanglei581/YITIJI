@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 发布与每日备份共用。调用方负责 flock；本文件只处理发布前导出与清理状态。
-import { readdirSync, statSync, existsSync, writeFileSync, renameSync, unlinkSync, readFileSync } from 'node:fs'
+import { readdirSync, statSync, existsSync, writeFileSync, renameSync, unlinkSync, readFileSync, chmodSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -41,7 +41,8 @@ function readState() {
 }
 function writeState(state) {
   const temp = `${statePath}.${process.pid}.partial`
-  writeFileSync(temp, `first_seen=${state.first_seen}\n${state.last_success ? `last_success=${state.last_success}\n` : ''}`, { mode: 0o600 })
+  writeFileSync(temp, `first_seen=${state.first_seen}\n${state.last_success ? `last_success=${state.last_success}\n` : ''}`, { mode: 0o644 })
+  chmodSync(temp, 0o644)
   renameSync(temp, statePath)
 }
 function missedTwoDays(state) {
@@ -54,7 +55,7 @@ function failure(reason) {
   const prior = readState()
   if (!prior) {
     // 跳过事件没有锁；排他创建避免覆盖刚刚由发布写入的成功日期。
-    try { writeFileSync(statePath, `first_seen=${today}\n`, { flag: 'wx', mode: 0o600 }) }
+    try { writeFileSync(statePath, `first_seen=${today}\n`, { flag: 'wx', mode: 0o644 }); chmodSync(statePath, 0o644) }
     catch (error) { if (error?.code !== 'EEXIST') throw error }
   }
   console.log(`PRERELEASE_SKIP: ${reason}`)
@@ -94,12 +95,16 @@ function run() {
   for (const stem of stems) {
     if (!stem.startsWith('pre-')) continue
     const dump = join(root, `${stem}.dump`)
+    const dumpPartial = join(root, `${stem}.dump.partial`)
     const partial = names.some((name) => name === `${stem}.dump.partial` || name === `${stem}.runtime.partial`)
-    const storage = containsStorageFiles(stem)
-    if (dryRun) console.log(`PRERELEASE_DRY_STORAGE: ${stem} storage_has_files=${storage}`)
-    if (storage) {
-      if (dryRun) console.error(`PRERELEASE_WARN: ${stem}.runtime/services/api/storage 含文件`)
-      else alert(`${stem}.runtime/services/api/storage 含文件`)
+    if (dryRun) console.log(`PRERELEASE_DRY_STORAGE: ${stem} storage_has_files=${containsStorageFiles(stem)}`)
+    if (existsSync(dumpPartial) && statSync(dumpPartial).mtimeMs <= cutoff) {
+      if (dryRun) console.log(`PRERELEASE_DRY_DELETE: ${stem}.dump.partial source=partial-mtime`)
+      else {
+        writeFileSync(join(root, `${stem}.dump.expired`), `${new Date().toISOString()}\n`, { mode: 0o600 })
+        unlinkSync(dumpPartial)
+        alert(`发布前半截导出满 30 天已删除：${stem}.dump.partial`)
+      }
     }
     if (partial || !existsSync(dump)) continue
     const namedTime = stampOf(stem)
@@ -127,5 +132,5 @@ try { run() } catch (error) {
     alert(`发布前导出清理失败：${reason}`)
     try { failure('清理本身失败') } catch (stateError) { console.error(`PRERELEASE_WARN: 状态记录失败：${stateError}`) }
   }
-  process.exitCode = 1
+  process.exitCode = 20 // 已由共用脚本告警；shell 只为其他异常退出兜底。
 }
