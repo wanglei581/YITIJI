@@ -23,6 +23,7 @@
 
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 import { requirePartnerOrgId, type PartnerOrgId } from '../console-screen/console-screen.org'
 import { countKioskVisitsByTerminal, hasKioskVisitsForOrg } from '../kiosk-session/kiosk-session.queries'
 import {
@@ -106,20 +107,11 @@ export class PartnerStatsService {
 
     // 1. 并发拉取：当期同步日志 + 上期同步日志 + 快照
     //    全部 where 都以 orgId / sourceOrgId 收口，跨机构不可达。
+    //    招聘内容托管只在这里判一次。关着时不查岗位、招聘会、企业、数据源和同步日志；
+    //    政策不属于招聘信息，在架数和待审数照常查。后面的聚合不改，空日志自然得出 0。
+    const hostingOpen = isRecruitmentContentHostingEnabled()
     const PENDING = { in: ['pending', 'reviewing'] }
-    const [
-      curLogs,
-      prevLogs,
-      publishedJobs,
-      publishedFairs,
-      publishedCompanies,
-      publishedPolicies,
-      activeSources,
-      pendingJobs,
-      pendingFairs,
-      pendingCompanies,
-      pendingPolicies,
-    ] = await Promise.all([
+    const openStats = () => Promise.all([
       this.prisma.syncLog.findMany({
         where:  { orgId, createdAt: { gte: from, lt: to } },
         select: { result: true, addedCount: true, updatedCount: true, errorCount: true, createdAt: true },
@@ -138,6 +130,31 @@ export class PartnerStatsService {
       this.prisma.companyProfile.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
       this.prisma.policyPost.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
     ])
+    type OpenStats = Awaited<ReturnType<typeof openStats>>
+    const closedStats = async (): Promise<OpenStats> => {
+      const [publishedPoliciesOnly, pendingPoliciesOnly] = await Promise.all([
+        this.prisma.policyPost.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+        this.prisma.policyPost.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
+      ])
+      const curLogs: OpenStats[0] = []
+      const prevLogs: OpenStats[1] = []
+      return [
+        curLogs, prevLogs, 0, 0, 0, publishedPoliciesOnly, 0, 0, 0, 0, pendingPoliciesOnly,
+      ]
+    }
+    const [
+      curLogs,
+      prevLogs,
+      publishedJobs,
+      publishedFairs,
+      publishedCompanies,
+      publishedPolicies,
+      activeSources,
+      pendingJobs,
+      pendingFairs,
+      pendingCompanies,
+      pendingPolicies,
+    ] = hostingOpen ? await openStats() : await closedStats()
 
     const pendingReview =
       pendingJobs + pendingFairs + pendingCompanies + pendingPolicies

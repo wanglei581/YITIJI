@@ -228,21 +228,15 @@ test('hosting on: home keeps the job and fair entries exactly as today @w1-kiosk
   await page.screenshot({ path: test.info().outputPath('home-hosting-on-1080x1920.png') })
 })
 
-// ── 旧服务端：没有 recruitmentHosting 字段 ─────────────────────────────────────
+// ── 缺 recruitmentHosting 这一项：一律按关，不退回 jobBoard ─────────────────────
+// 「有这一项且 enabled === true → 开」的对照是上面 hosting on 那条。
 
-test('an older server without recruitmentHosting falls back to jobBoard, and to closed without either @w1-kiosk', async ({ page, api }) => {
+test('missing recruitmentHosting stays closed even when jobBoard.enabled is true @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   const { recruitmentHosting: _dropped, ...jobBoardOnly } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
   api.respond('GET', CONFIG, { status: 200, json: jobBoardOnly })
   api.respond('GET', '/api/v1/jobs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 1, total: 3, totalPages: 3 } } })
   api.respond('GET', '/api/v1/job-fairs', { status: 200, json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
-  await expect(page.getByTestId('qx-home')).toHaveAttribute('data-recruitment', 'open')
-  await expect(page.locator('[data-action="jobs-hub"]')).toContainText('3 个在招')
-
-  // 两个字段都没有（比 3.13 更早的服务端）：按关闭处理，不因为「没说关」就放行。
-  const { recruitmentHosting: _hosting, jobBoard: _board, ...neither } = terminalConfigWithHosting(RECRUITMENT_HOSTING_ON)
-  api.respond('GET', CONFIG, { status: 200, json: neither })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   // 「关闭」也是没读到配置时的样子：先等这份配置真的读完（百宝箱判定落到 off，不再是 loading），
@@ -250,8 +244,9 @@ test('an older server without recruitmentHosting falls back to jobBoard, and to 
   await expect(home).toHaveAttribute('data-toolbox', 'off')
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await expect(home).toHaveAttribute('data-recruitment', 'closed')
-  await expect(page.locator('[data-action="jobs-hub"]')).toHaveCount(0)
-  expect(api.requestCount('GET', '/api/v1/jobs'), '按关闭处理时不再请求岗位').toBe(1)
+  await expect(page.locator('[data-action="jobs-hub"]'), '缺这一项时招聘类入口不出现').toHaveCount(0)
+  await expect(page.getByRole('button', { name: '岗位信息', exact: true })).toHaveCount(0)
+  expect(api.requestCount('GET', '/api/v1/jobs'), '缺这一项时不请求岗位').toBe(0)
 })
 
 // 请求在途时本机被重新绑定到另一台终端（Agent 换了身份）。今天整棵树会因为换身份重挂，
