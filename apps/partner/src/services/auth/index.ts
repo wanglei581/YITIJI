@@ -18,6 +18,7 @@ export interface AuthedUser {
   orgId:        string | null
   phoneMasked?: string
   phoneVerifiedAt?: string | null
+  phoneSelfVerifyReady?: boolean
 }
 
 interface AuthState {
@@ -233,7 +234,7 @@ export async function verifyToken(): Promise<AuthedUser | null> {
   }
   const r = await getJson<AuthedUser>('/auth/me')
   if (r.ok) {
-    const u = r.data as unknown as { userId: string; role: AuthedUser['role']; orgId: string | null; phoneMasked?: string; phoneVerifiedAt?: string | null }
+    const u = r.data as unknown as AuthedUser & { userId: string }
     const cur = getUser()
     const normalized: AuthedUser = {
       id:    u.userId,
@@ -242,6 +243,7 @@ export async function verifyToken(): Promise<AuthedUser | null> {
       orgId: u.orgId,
       phoneMasked: u.phoneMasked ?? cur?.phoneMasked,
       phoneVerifiedAt: u.phoneVerifiedAt ?? cur?.phoneVerifiedAt ?? null,
+      phoneSelfVerifyReady: u.phoneSelfVerifyReady,
     }
     if (normalized.role !== 'partner') {
       clearAuth()

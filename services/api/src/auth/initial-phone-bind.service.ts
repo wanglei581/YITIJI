@@ -14,7 +14,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuthService } from './auth.service'
 import { InternalOtpService } from './internal-otp.service'
-import { PASSWORD_PROOF_STATE } from './password-proof-state'
+import { PASSWORD_PROOF_STATE, PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE, partnerPhoneSelfVerifyReady } from './password-proof-state'
 
 const INITIAL_PHONE_BIND_TICKET_TTL = 600
 const CURRENT_PASSWORD_FAILURE_TTL = 300
@@ -129,11 +129,11 @@ export class InitialPhoneBindService {
   }
 
   private assertPartnerPasswordProofReady(user: { role: string; passwordProofState: string }): void {
-    if (user.role !== 'partner' || user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED) return
+    if (partnerPhoneSelfVerifyReady(user.role, user.passwordProofState)) return
     throw new HttpException({
       error: {
         code: 'ACCOUNT_PASSWORD_PROOF_NOT_READY',
-        message: '该机构账号尚无独立持有人证明，请先完成线下核验恢复',
+        message: PARTNER_PASSWORD_PROOF_NOT_READY_MESSAGE,
       },
     }, HttpStatus.CONFLICT)
   }

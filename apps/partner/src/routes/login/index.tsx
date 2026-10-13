@@ -33,6 +33,7 @@ import {
   verifyPasswordReset,
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
+import { PhoneVerificationGuide } from './PhoneVerificationGuide'
 import './login.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 type LoginMode = 'password' | 'sms'
@@ -154,10 +155,12 @@ export default function LoginPage() {
     return false
   }
 
-  /** 登录成功统一收口：记住账号 → 手机号未验证先弹本人验证，否则播过场进工作台 */
+  /** 登录成功统一收口：记住账号；未验证且（已登记手机号，或明确不能自己验证）时先弹本人验证，否则进工作台 */
   function completeLogin(user: AuthedUser, usedLoginId: string) {
     persistRememberedLoginId(remember, usedLoginId)
-    if (user.phoneMasked && !user.phoneVerifiedAt) {
+    // 必须写成「未验证 &&（有手机号 || 明确 false）」。&& 比 || 紧，少了括号会把已验证也弹出来。
+    // 老回包没有 phoneSelfVerifyReady 时只能是 undefined，必须严格 === false，不能用 !ready。
+    if (!user.phoneVerifiedAt && (user.phoneMasked || user.phoneSelfVerifyReady === false)) {
       setPhoneVerifyUser(user)
       setPhoneVerifyCode('')
       setPhoneVerifyError(null)
@@ -258,6 +261,9 @@ export default function LoginPage() {
     const r = await sendOwnPhoneCode()
     setPhoneVerifyBusy(false)
     if (r.ok) phoneVerifyCountdown.start(r.cooldownSeconds || 60)
+    else if (r.code === 'ACCOUNT_PASSWORD_PROOF_NOT_READY') {
+      setPhoneVerifyUser({ ...phoneVerifyUser, phoneSelfVerifyReady: false })
+    }
     else setPhoneVerifyError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
@@ -569,6 +575,10 @@ export default function LoginPage() {
                 >
                   {resetCountdown.seconds > 0 ? `${resetCountdown.seconds}s 后可重新发送` : '重新发送验证码'}
                 </button>
+                <div className="c-hint">
+                  <ShieldCheckIcon size={14} aria-hidden="true" />
+                  收不到验证码？这个账号可能还没有登记手机号，请联系平台运营。
+                </div>
               </form>
             )}
 
@@ -612,7 +622,9 @@ export default function LoginPage() {
         </div>
       )}
 
-      {phoneVerifyUser && (
+      {phoneVerifyUser && (phoneVerifyUser.phoneSelfVerifyReady === false ? (
+        <PhoneVerificationGuide onClose={() => nav('/', { replace: true })} />
+      ) : (
         <div className="c-modal" role="dialog" aria-modal="true" aria-label="手机号本人验证">
           <form className="c-modal-card" onSubmit={confirmPhoneVerification}>
             <div className="c-modal-head">
@@ -666,7 +678,7 @@ export default function LoginPage() {
             </div>
           </form>
         </div>
-      )}
+      ))}
 
       {legalDoc && <LegalDocsModal initialDoc={legalDoc} onClose={() => setLegalDoc(null)} />}
 
