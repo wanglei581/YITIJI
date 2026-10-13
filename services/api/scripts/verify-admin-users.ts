@@ -25,7 +25,8 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createClient } from '@libsql/client'
 import { GUARDS_METADATA, HEADERS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
-import { RequestMethod } from '@nestjs/common'
+import { Module, RequestMethod, UnauthorizedException, ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -250,6 +251,79 @@ async function main(): Promise<void> {
     assert.equal(controllerAudit?.action, 'admin.user.phone_search')
     assert.equal(controllerAudit?.payloadJson.includes(phone), false)
     pass('POST 查人审计照写，元数据忽略伪造转发头并限制长度')
+
+    // 经过真实 Nest 路由、DTO 和类级角色守卫；只替换 JWT 解析以隔离登录依赖。
+    const originalAuth = JwtAuthGuard.prototype.canActivate
+    JwtAuthGuard.prototype.canActivate = async function (executionContext) {
+      const httpRequest = executionContext.switchToHttp().getRequest<{
+        headers: { authorization?: string }
+        user?: AuthedUser
+      }>()
+      const authorization = httpRequest.headers.authorization
+      if (!authorization) throw new UnauthorizedException()
+      httpRequest.user = { userId: adminId, role: authorization === 'Bearer partner-test' ? 'partner' : 'admin', orgId: null }
+      return true
+    }
+    const closureToken = (Reflect.getMetadata('design:paramtypes', AdminUsersController) as Function[])[1]
+    const [jwtToken, , redisToken] = Reflect.getMetadata('design:paramtypes', JwtAuthGuard) as Function[]
+    assert.ok(closureToken && jwtToken && redisToken, 'HTTP 夹具依赖元数据缺失')
+    @Module({
+      controllers: [AdminUsersController],
+      providers: [
+        { provide: AdminUsersService, useValue: service },
+        { provide: closureToken, useValue: {} },
+        { provide: jwtToken, useValue: {} },
+        { provide: PrismaService, useValue: prisma },
+        { provide: redisToken, useValue: {} },
+        JwtAuthGuard,
+        RolesGuard,
+      ],
+    })
+    class SearchHttpModule {}
+    let app: Awaited<ReturnType<typeof NestFactory.create>> | undefined
+    try {
+      app = await NestFactory.create(SearchHttpModule, { logger: false, abortOnError: false })
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
+      await app.listen(0, '127.0.0.1')
+      const port = (app.getHttpServer().address() as { port: number }).port
+      const url = `http://127.0.0.1:${port}/admin/users/search`
+      const post = (authorization?: string) => fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(authorization ? { authorization } : {}),
+        },
+        body: JSON.stringify({ page: 1, pageSize: 20, phone }),
+      })
+      const auditsBefore = await prisma.auditLog.count({ where: { actorId: adminId, action: 'admin.user.phone_search' } })
+      const hit = await post('Bearer admin-test')
+      const hitBody = await hit.json() as { total: number; items: Array<{ id: string }> }
+      assert.equal(hit.status, 200)
+      assert.equal(hit.headers.get('cache-control'), 'no-store')
+      assert.equal(hitBody.total, 1)
+      assert.equal(hitBody.items[0]?.id, endUserId)
+      assert.equal(JSON.stringify(hitBody).includes(phone), false)
+      pass('HTTP POST 管理员手机号命中、响应脱敏且 Cache-Control: no-store')
+
+      const denied = await post('Bearer partner-test')
+      assert.equal(denied.status, 403)
+      pass('HTTP POST 非管理员被类级 RolesGuard 拒绝 403')
+      const anonymous = await post()
+      assert.equal(anonymous.status, 401)
+      pass('HTTP POST 未登录被 JwtAuthGuard 拒绝 401')
+
+      const httpAudits = await prisma.auditLog.findMany({
+        where: { actorId: adminId, action: 'admin.user.phone_search' },
+        orderBy: { createdAt: 'desc' },
+      })
+      assert.equal(httpAudits.length, auditsBefore + 1)
+      assert.equal(httpAudits.some((row) => row.targetId === endUserId), true)
+      assert.equal(httpAudits.every((row) => !row.payloadJson.includes(phone)), true)
+      pass('HTTP POST 审计照写且 payload 不含明文手机号')
+    } finally {
+      await app?.close()
+      JwtAuthGuard.prototype.canActivate = originalAuth
+    }
 
     const disabled = await service.list({ page: 1, pageSize: 20, enabled: false }, context)
     // 夹具里 enabled=false 的三位：历史停用、注销中、已匿名化。
