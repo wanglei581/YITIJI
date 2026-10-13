@@ -34,6 +34,7 @@ import {
 import { AppendedSelfAssessmentService } from '../appended-self-assessment.service'
 import { SelfAssessmentController } from '../../self-assessment.controller'
 import { SELF_ASSESSMENT_CONSENT_VERSION } from '../self-assessment.types'
+import { signFileUrl } from '../../../files/signing'
 
 const repoRoot = resolve(__dirname, '../../../../../..')
 const CURRENT = SELF_ASSESSMENT_CONSENT_VERSION
@@ -114,6 +115,7 @@ function makeHarness(opts: { resumePages?: number; reportPages?: number; llm?: '
         id: 'resume-file-1',
         filename: 'resume.pdf',
         mimeType: 'application/pdf',
+        purpose: 'resume_upload',
         endUserId: null,
         deletedAt: null,
       }),
@@ -616,14 +618,19 @@ async function seedAssessment(h: ReturnType<typeof makeHarness>) {
   return { taskId: res.taskId, accessToken: res.accessToken! }
 }
 
+/** 夹具里的简历没有会员主人，合并时带上这份文件的签名地址。 */
+function ownerlessResumeGrant(): string {
+  return signFileUrl('resume-file-1').url
+}
+
 test('B1 并发 append 互不覆盖，两次产出各自独立留存', async () => {
   const h = makeHarness()
   const { taskId, accessToken } = await seedAssessment(h)
   const requester = { endUserId: null, accessToken }
 
   const [a, b] = await Promise.all([
-    h.appendService.appendToResume({ taskId, requester, resumeFileId: 'resume-file-1' }),
-    h.appendService.appendToResume({ taskId, requester, resumeFileId: 'resume-file-1' }),
+    h.appendService.appendToResume({ taskId, requester, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant() }),
+    h.appendService.appendToResume({ taskId, requester, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant() }),
   ])
 
   assert.notEqual(a.fileId, b.fileId, '并发追加必须各自得到独立 fileId，不能互相覆盖')
@@ -639,7 +646,7 @@ test('B2 append 不修改自我探索原记录（追加不是覆盖）', async (
   const before = h.rows[0]!.payloadJson
 
   await h.appendService.appendToResume({
-    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
+    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant(),
   })
 
   assert.equal(h.rows.length, 1, 'append 不得新增/替换自我探索结果行')
@@ -650,7 +657,7 @@ test('B3 append 产出带内部 HMAC printFileUrl，且不与预览 signedUrl �
   const h = makeHarness()
   const { taskId, accessToken } = await seedAssessment(h)
   const out = await h.appendService.appendToResume({
-    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
+    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant(),
   })
 
   assert.ok(out.printFileUrl, '缺 printFileUrl ⇒ 打印工作台链路必然失败')
@@ -664,7 +671,7 @@ test('B4 合并页数 = 简历页数 + 报告页数（内容真的被追加了�
   const h = makeHarness()
   const { taskId, accessToken } = await seedAssessment(h)
   const out = await h.appendService.appendToResume({
-    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
+    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant(),
   })
   const merged = await PDFDocument.load(h.uploads.at(-1)!.buffer)
   // mock 简历 1 页 + mock 报告 2 页；页数变少即说明发生了替换而非追加。
@@ -678,7 +685,7 @@ test('B5 简历 2 页 + 附录 1 页时 pageCount 为 3，而不是附录的 1',
   const h = makeHarness({ resumePages: 2, reportPages: 1 })
   const { taskId, accessToken } = await seedAssessment(h)
   const out = await h.appendService.appendToResume({
-    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1',
+    taskId, requester: { endUserId: null, accessToken }, resumeFileId: 'resume-file-1', resumeFileUrl: ownerlessResumeGrant(),
   })
   const merged = await PDFDocument.load(h.uploads.at(-1)!.buffer)
   assert.equal(out.pageCount, 3, '2 页简历 + 1 页附录必须回报 3，回报 1 会按 1 页报价')

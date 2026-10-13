@@ -361,6 +361,7 @@
     "verify:self-assessment": "node -r @swc-node/register scripts/verify-self-assessment.ts",
     "verify:self-assessment-consent": "node -r @swc-node/register --test src/ai/resume/__tests__/self-assessment-consent.test.ts src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts",
     "verify:self-assessment-ai-gate": "node -r @swc-node/register scripts/verify-self-assessment-ai-gate.ts",
+    "verify:self-assessment-append-file-scope": "node -r @swc-node/register scripts/verify-self-assessment-append-file-scope.ts",
     "verify:launch-audit-p5": "node -r @swc-node/register --test src/common/__tests__/launch-audit-p5.test.ts",
     "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts",
     "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",

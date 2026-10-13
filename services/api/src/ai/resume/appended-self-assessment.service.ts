@@ -15,7 +15,7 @@ import { PDFDocument } from 'pdf-lib'
 import { appendAigcPages } from '../../common/pdf/aigc-label'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
-import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl, verifyFileSignature } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
   SelfAssessmentService,
@@ -46,12 +46,15 @@ export class AppendedSelfAssessmentService {
 
   /**
    * 把自我探索报告追加到主简历 PDF 之后，生成新的可打印 PDF。
-   * 仅本人持有 taskId + accessToken（或 endUserId）时可调用。
+   * 自我探索记录仍按本人或本次访问令牌读取。
+   * 有会员主人的简历只认本人；没有会员主人的，只认持有这份文件有效签名地址的调用方。
    */
   async appendToResume(opts: {
     taskId: string
     requester: { endUserId: string | null; accessToken: string | null }
     resumeFileId: string
+    /** 这份简历的签名地址。没有会员主人的文件，只认持有有效签名地址的调用方。 */
+    resumeFileUrl?: string
     auditCtx?: AuditContext
     /** 含 AI 解读时才过 AI 闸门（拦下原样抛）；只有打分时不含 AI 内容，照常合并。 */
     gates?: SelfAssessmentAiGates
@@ -71,29 +74,39 @@ export class AppendedSelfAssessmentService {
     const withAi = hasAiInterpretation(stored.dimensions, stored.summary)
     if (withAi) await opts.gates?.aiContentExport?.()
 
-    // 2) 读取主简历 PDF（由 PrintConfirmPage 提前验签后传入 fileId）
+    // 2) 读取主简历 PDF。有会员主人的只认本人；没有会员主人的，只认持有这份文件有效签名地址的调用方。
+    //    先确认能不能用，再看删没删、是不是简历类文件：确认之前任何一项不对，都回同一个「简历文件不存在」。
     const resumeRow = await this.prisma.fileObject.findUnique({
       where: { id: opts.resumeFileId },
-      select: { id: true, filename: true, mimeType: true, endUserId: true, deletedAt: true },
+      select: { id: true, mimeType: true, purpose: true, endUserId: true, deletedAt: true },
     })
-    if (!resumeRow || resumeRow.deletedAt) {
-      throw new NotFoundException({
-        error: { code: 'RESUME_FILE_NOT_FOUND', message: '简历文件不存在或已删除' },
+    const resumeMissing = () =>
+      new NotFoundException({
+        error: { code: 'RESUME_FILE_NOT_FOUND', message: '简历文件不存在' },
       })
+    if (!resumeRow) throw resumeMissing()
+    const resumeAccess = resumeRow.endUserId ? 'owner' : 'signed_url'
+    if (resumeRow.endUserId) {
+      if (opts.requester.endUserId !== resumeRow.endUserId) throw resumeMissing()
+    } else {
+      const grant = parseResumeContentGrant(opts.resumeFileUrl)
+      if (
+        !grant
+        || grant.fileId !== opts.resumeFileId
+        || !verifyFileSignature(grant.fileId, grant.expires, grant.sig)
+      ) {
+        throw resumeMissing()
+      }
     }
+    if (resumeRow.deletedAt || !APPENDABLE_RESUME_PURPOSES.has(resumeRow.purpose)) throw resumeMissing()
     if (resumeRow.mimeType !== 'application/pdf') {
       throw new BadRequestException({
         error: { code: 'RESUME_FILE_NOT_PDF', message: '简历文件必须是 PDF 格式' },
       })
     }
-    if (resumeRow.endUserId && opts.requester.endUserId !== resumeRow.endUserId) {
-      throw new NotFoundException({
-        error: { code: 'RESUME_FILE_NOT_FOUND', message: '简历文件不存在' },
-      })
-    }
-
-    // 3) 加载主简历 PDF buffer（通过 FilesService 走对象存储下载通道）
-    const resumeBundle = await this.files.readContent(opts.resumeFileId)
+    const resumeBundle = resumeRow.endUserId
+      ? await this.files.readContentForEndUser(opts.resumeFileId, resumeRow.endUserId)
+      : await this.files.readContent(opts.resumeFileId)
 
     // 4) 渲染自我探索报告 PDF → buffer
     const { buffer: saBuffer, pageCount: saPageCount } = await this.selfAssessment.renderReportForAppend({
@@ -135,6 +148,7 @@ export class AppendedSelfAssessmentService {
       payload: {
         mode: 'append',
         resumeFileId: opts.resumeFileId,
+        resumeAccess,
         mergedFileId: uploaded.fileId,
         saPageCount,
       },
@@ -208,6 +222,38 @@ export class AppendedSelfAssessmentService {
       completedAt: parsed.completedAt ?? new Date().toISOString(),
     }
   }
+}
+
+/**
+ * 能附加自我探索摘要的文件用途：简历类和普通打印文档（本机上传、手机传来、U 盘、扫描、AI 导出都落在这三类）。
+ * 合同原件、签约风险报告、证件扫描、招聘会资料等不在其中，它们各有自己的打印和留存规则。
+ */
+const APPENDABLE_RESUME_PURPOSES: ReadonlySet<string> = new Set(['resume_upload', 'resume_scan', 'print_doc'])
+
+const RESUME_CONTENT_PATH = /^\/api\/v1\/files\/([^/]+)\/content$/
+
+/** 从签名地址取出编号、到期时间与签名。路径或查询串对不上则返回空。 */
+function parseResumeContentGrant(resumeFileUrl: string | undefined): { fileId: string; expires: string; sig: string } | null {
+  if (!resumeFileUrl) return null
+  let parsed: URL
+  try {
+    parsed = new URL(resumeFileUrl, 'http://local')
+  } catch {
+    return null
+  }
+  const matched = RESUME_CONTENT_PATH.exec(parsed.pathname)
+  if (!matched?.[1]) return null
+  let fileId: string
+  try {
+    fileId = decodeURIComponent(matched[1])
+  } catch {
+    return null
+  }
+  if (parsed.pathname !== `/api/v1/files/${fileId}/content`) return null
+  const expires = parsed.searchParams.get('expires')
+  const sig = parsed.searchParams.get('sig')
+  if (!expires || !sig) return null
+  return { fileId, expires, sig }
 }
 
 /** 只拷页、不动 Info：用于不含 AI 内容的追加页（与 appendAigcPages 同一套 pdf-lib 拷页写法）。 */
