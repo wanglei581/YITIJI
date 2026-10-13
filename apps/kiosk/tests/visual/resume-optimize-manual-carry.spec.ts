@@ -6,7 +6,7 @@ import { registerW6Api } from './fixtures/fusion-w6-api'
 
 /** 本机看图才存截图：设了 F25_SHOTS_DIR 才存，CI 和别的机器上不存。 */
 const SHOTS = process.env.F25_SHOTS_DIR ?? ''
-const NOTE = '已带入你简历里的内容，请逐项核对'
+const NOTE = '已带入从你简历里读到的部分内容，请逐项核对、补全'
 
 const EDU_LINES = ['青岛职业技术学院物流管理', '在校做过仓库理货实训']
 const EXP_LINES = ['在成品仓理货和拣货', '一天大约处理 80 单', '按货位把货配齐再交给复核']

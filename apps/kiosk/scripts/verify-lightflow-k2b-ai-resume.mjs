@@ -236,7 +236,7 @@ const carryProgram = [
 ].join('\n')
 const carryApi = new Function(executable(carryProgram))()
 const toForm = carryApi.resumeBlocksToGenerateForm
-const NOTE = '已带入你简历里的内容，请逐项核对'
+const NOTE = '已带入从你简历里读到的部分内容，请逐项核对、补全'
 
 function block(key, label, lines) {
   return { key, label, lines }
@@ -302,7 +302,7 @@ const eduOnly = toForm([block('education', '教育经历', ['只剩教育'])])
 expect(eduOnly !== null && eduOnly.seg === 'edu' && eduOnly.form.experience[0].description === '', '只带了教育时落在 edu，工作描述留空')
 const projOnly = toForm([block('project', '项目经历', ['只剩项目'])])
 expect(projOnly !== null && projOnly.seg === 'proj' && projOnly.form.projects.length === 1, '只带了项目时落在 proj')
-expect(carryApi.CARRIED_NOTE === NOTE, '提示句逐字等于任务包给的原句（不在定稿上，等产品负责人定字）')
+expect(carryApi.CARRIED_NOTE === NOTE, '提示句逐字等于定下来的新句（这句不在定稿上）')
 
 // 技能：提交时只取前 LIMITS.skills 条（splitList）。带进来的要先按条截到同样条数，屏上看到的就是会提交的。
 const skillTotal = carryApi.LIMITS.skills + 5

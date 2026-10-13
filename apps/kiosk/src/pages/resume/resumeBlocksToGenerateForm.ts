@@ -24,7 +24,7 @@ export const DIAGNOSIS_MASK_PLACEHOLDER =
   /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/u
 
 /** 优化失败后带入表单时顶上的那一句。全仓库只写在这里。 */
-export const CARRIED_NOTE = '已带入你简历里的内容，请逐项核对'
+export const CARRIED_NOTE = '已带入从你简历里读到的部分内容，请逐项核对、补全'
 
 export interface ResumeBlocksCarry {
   form: GenerateFormSnapshot
