@@ -6,6 +6,7 @@ import { KioskRootStageScope, KioskStageFit } from '../components/kiosk-shell/Ki
 import { getTerminalCode } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
+import { SessionRecoveryHomeBridge } from './SessionRecoveryHomeBridge'
 import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
 import '../styles/v6-runtime-shell.css'
@@ -326,6 +327,7 @@ function KioskShell() {
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
       <KioskRootStageScope>
+        <SessionRecoveryHomeBridge />
         <FavoritesProvider>
           <Outlet context={deviceStatus} />
         </FavoritesProvider>

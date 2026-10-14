@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { KioskScreensaverItem, KioskScreensaverPlaylist } from '@ai-job-print/shared'
 import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
+import { dismissSessionRecoveryNotice } from '../../hooks/useSessionRecoveryNotice'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
@@ -31,6 +32,8 @@ export function ScreensaverPage() {
     // 扫描任务；否则下一位在面板上按下扫描，文件会投给刚离开的这一位。
     clearKioskSensitiveSession(getToken())
     logout()
+    // 进待机屏就是交给下一位。第 4、第 6 句只说一次，这里收起，醒回首页不再出现。
+    dismissSessionRecoveryNotice()
   }, [getToken, logout])
 
   const [items, setItems] = useState<KioskScreensaverItem[]>(statePlaylist?.items ?? [])

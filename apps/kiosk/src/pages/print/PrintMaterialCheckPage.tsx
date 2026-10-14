@@ -39,6 +39,7 @@ import {
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
 import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
+import { PrintFlowRecoveryStrip } from './PrintFlowRecoveryStrip'
 import { manualOriginalPrintCheck, shareMaterialChecks } from './printDeskModel'
 import './styles/print-desk-qx.css'
 
@@ -582,6 +583,8 @@ export function PrintMaterialCheckPage({
         )}
       >
         <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选好要打印的材料，再检查文件与个人信息。" />
+        {/* 参数页清场后文件没了，打印台会把这一步拉回来。第 4 句留在这里，不跟着预览页一起卸掉。 */}
+        <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" belowGuide />
         <div className="qpd-context-empty" data-w2-page="print-material-check" data-qx-state="missing-context">
           <div className="qx-state" data-tone="empty">
             <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
@@ -711,6 +714,7 @@ export function PrintMaterialCheckPage({
         title={encryptedPdf ? <>这份 PDF <em>打不开</em>。</> : stage === 'error' ? <>检查<em>没做成</em>。</> : isWorking ? <>正在<em>读这份文件</em>。</> : piiScanIncomplete ? <>检查没有<em>覆盖完整</em>。</> : findings.length > 0 && allFindingsDecided ? <>每一处都<em>决定完了</em>。</> : findings.length > 0 && presentationFindings.some((finding) => finding.selected !== 'pending') ? <>还剩 {presentationFindings.filter((finding) => finding.selected === 'pending').length} 处<em>没决定</em>。</> : findings.length > 0 ? <>有 {findings.length} 处<em>要你拿主意</em>。</> : <>没有<em>待决定的片段</em>。</>}
         detail={encryptedPdf ? ENCRYPTED_PDF_BLOCK_COPY : stage === 'error' ? '请重试检查，或返回选择其他文件。' : '检查格式、页数和个人信息，逐项确认后再设打印参数。'}
       />
+      <PrintFlowRecoveryStrip noticeTestId="print-preview-recovery-notice" holdTestId="print-preview-session-hold" belowGuide />
       <div className="qpd-check-page">
         <div className="qpd-check-intro" data-feature="文件预检">
           <strong>文件预检</strong>

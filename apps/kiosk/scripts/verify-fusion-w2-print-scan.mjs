@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -683,6 +683,133 @@ assert.equal(
   1,
   'print upload uses one QR upload session hook'
 )
+assert.match(printUploadPage, /usePrintSessionBlocked\(/, '选文件页用上一次定下来的本机会话')
+assert.match(
+  read('src/hooks/useTerminalSessionState.ts'),
+  /if \(next === 'ready' \|\| next === 'failed'\) settledPrintSession = next/,
+  'checking 不改写已定下来的打印拦截',
+)
+assert.match(
+  printUploadPage,
+  /const phoneEnabled = !printSessionBlocked && tab === 'qr' && channelActive && !file/,
+  '本机会话拦住打印时不签发手机上传会话',
+)
+assert.match(
+  printUploadPage,
+  /if \(printSessionBlocked\) return undefined/,
+  '本机会话拦住打印时不轮询 U 盘',
+)
+assert.match(printUploadView, /FileSourceSessionHold/, '选文件页 failed 时留着来源选择、来源卡置灰')
+assert.equal(
+  existsSync(join(kioskRoot, 'src/pages/print/file-source/FileSourceSessionBlocked.tsx')),
+  false,
+  '整屏阻断组件已删',
+)
+const sessionHold = read('src/pages/print/file-source/FileSourceSessionHold.tsx')
+assert.match(sessionHold, /这台机器现在下不了打印单/, '选文件说明块使用标题定句')
+// 第三轮：没压着仍是第 2 句；压着时同一块换成第 5 句。字面挪到 printSessionHoldCopy，说明块按 deferred 选用。
+assert.match(sessionHold, /PRINT_SESSION_RETRY_LINE/, '选文件说明块没压着时仍用第 2 句')
+assert.match(sessionHold, /PRINT_SESSION_DEFERRED_LINE/, '选文件说明块压着时换成第 5 句')
+assert.match(
+  read('src/pages/print/printSessionHoldCopy.ts'),
+  /机器会自己再试，恢复后这里会自动变回可用。你可以等一会儿，或稍后再来。/,
+  '第 2 句原文保留',
+)
+assert.match(sessionHold, /locked/, '来源卡在这一态置灰')
+assert.doesNotMatch(sessionHold, /返回首页/, '这一态不再单独放返回首页')
+assert.doesNotMatch(sessionHold, /ExistingSourceLinks/, '这一态不显示扫描原件和我的文档')
+assert.doesNotMatch(sessionHold, /还没有文件。选择一种方式上传/, '这一态不催人现在上传')
+assert.doesNotMatch(sessionHold, /useUploadSession\(/, '说明块不得再开一条上传会话')
+assert.match(printUploadPage, /这台机器现在下不了打印单/, '选文件页顶栏在拦住时使用同一句')
+assert.match(printUploadView, /recoveryNotice/, '选文件页能挂上换票清场那一句')
+assert.match(printUploadView, /file-source-recovery-notice/, '选文件页清场提示有稳定锚点')
+const recoveryNoticeHook = read('src/hooks/useSessionRecoveryNotice.ts')
+// 第三轮：print-only 的当页句改成完整第 4 句（合规六建议、前端二七拟、合规九定）。旧的短句不再单独出现。
+assert.match(recoveryNoticeHook, /机器刚恢复，刚才选的材料已经清掉，要重新传/, '换票清场提示使用第 4 句')
+assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示有稳定锚点（上下文区 10/12 拆到 HomeContextRegion）')
+// 第四轮：第 4、第 6 句只说一次。下一次触屏收起且不吞掉这次触摸；进页前先读清场范围再订阅。
+// 收货改：不在按下时收。句子一没整页上挪，抬手时手指底下换了东西，这一下会点空或点错；
+// 改成句子亮起后才按下的那一下点完（click）、滑走（pointercancel）或抬手后稍等（置灰按钮不发 click）再收。
+for (const type of ['pointerdown', 'pointerup', 'click', 'pointercancel']) {
+  assert.match(recoveryNoticeHook, new RegExp(`addEventListener\\(\\s*'${type}'`), `清场提示亮起时在 document 上听 ${type}`)
+  assert.match(recoveryNoticeHook, new RegExp(`removeEventListener\\(\\s*'${type}'`), `提示收起时摘掉 ${type} 监听`)
+}
+assert.match(recoveryNoticeHook, /addEventListener\(\s*'pointerdown',\s*onPressStart,/, '按下交给 onPressStart')
+assert.match(recoveryNoticeHook, /function onPressStart\(\): void \{\s*pressedSinceArm = true\s*\}/, '按下时只记一笔、不收起清场提示')
+assert.doesNotMatch(recoveryNoticeHook, /stopPropagation\(\)/, '触屏收起不吞掉这次触摸')
+assert.doesNotMatch(recoveryNoticeHook, /preventDefault\(\)/, '触屏收起不取消这次触摸')
+assert.match(
+  recoveryNoticeHook,
+  /function ensureWatch\(\)[^{]*\{[\s\S]*?consume\(\)[\s\S]*?subscribeTerminalSession\(/,
+  '进页前先读一次清场范围，再订阅',
+)
+assert.match(
+  read('src/pages/screensaver/ScreensaverPage.tsx'),
+  /dismissSessionRecoveryNotice\(\)/,
+  '进待机屏时收起清场提示',
+)
+const takeOriginal = "别忘了取走玻璃上或进纸口里的原件（身份证等）"
+assert.match(
+  read('src/copy/unattendedCopy.ts'),
+  new RegExp(`export const TAKE_ORIGINAL_REMINDER = '${takeOriginal}'`),
+  '取走原件那句提成一个常量，字面不变',
+)
+const featureInfo = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
+const scanStatus = read('src/pages/scan/ScanSettingsStatusView.tsx')
+assert.match(featureInfo, /TAKE_ORIGINAL_REMINDER/, '打印大厅说明页引用取走原件常量')
+assert.doesNotMatch(featureInfo, new RegExp(takeOriginal), '打印大厅说明页不再内嵌这句字面')
+assert.match(scanStatus, /TAKE_ORIGINAL_REMINDER/, '扫描结束使用屏引用同一个取走原件常量')
+assert.match(scanStatus, /failure\?\.kind === 'terminal-session'/, '扫描压着按失败类型认，不按中文标题')
+assert.doesNotMatch(scanStatus, /failure\?\.title === '这台机器的安全校验没通过'/, '扫描压着不再比较中文标题')
+assert.match(scanStatus, /subtitle=\{sessionHold \? null : shownDescription\}/, '压着时第 5 句不进页头副标题，屏上和读屏只留一处')
+assert.match(read('src/pages/scan/ScanSettingsPage.tsx'), /kind: 'terminal-session'/, '扫描页本地失败带上类型')
+assert.match(read('src/pages/scan/scanRescanRecovery.ts'), /kind: 'terminal-session'/, '扫描创建失败带上类型')
+assert.match(
+  sessionHold,
+  /<FileSourceStatus[\s\S]*<div className="fs-status-act">[\s\S]*<EndThisUseButton \/>[\s\S]*<\/FileSourceStatus>/,
+  '选文件页结束使用按钮放进状态卡',
+)
+assert.equal(
+  (read('src/pages/print/PrintMaterialCheckPage.tsx').match(/<PrintFlowRecoveryStrip\b/g) ?? []).length,
+  2,
+  '材料检查没文件和有文件两支都挂提示条',
+)
+// 收货改：打印台两页的提示条一律在页头大卡下面（和确认页、选文件页同一层），不再压在大卡上面。
+{
+  const materialCheck = read('src/pages/print/PrintMaterialCheckPage.tsx')
+  const preview = read('src/pages/print/PrintPreviewPage.tsx')
+  assert.doesNotMatch(materialCheck, /<PrintFlowRecoveryStrip[^>]*\/>\s*<PrintDeskGuide\b/, '材料检查的提示条不在页头大卡上面')
+  assert.equal((materialCheck.match(/<PrintFlowRecoveryStrip[^>]*\bbelowGuide\b/g) ?? []).length, 2, '材料检查两支提示条都按大卡下面留白')
+  assert.doesNotMatch(preview, /\{recoveryStrip\}\s*<PrintDeskGuide\b/, '预览页的提示条不在页头大卡上面')
+  assert.equal((preview.match(/<PrintDeskGuide\b[\s\S]*?\/>\s*\{recoveryStrip\}/g) ?? []).length, 3, '预览页三支都在页头大卡后面挂提示条')
+  assert.match(preview, /<PrintFlowRecoveryStrip[^>]*\bbelowGuide\b/, '预览页提示条按大卡下面留白')
+}
+assert.match(
+  read('src/pages/print/PrintConfirmPage.tsx'),
+  /recoveryNotice=\{<PrintRecoveryNotice/,
+  '确认页清场句交给视图，不再压在页头大卡上面',
+)
+assert.match(
+  read('src/pages/print/components/PrintConfirmView.tsx'),
+  /<Steps idle=\{idle\} step=\{props\.step\} freePricing=\{freePricing\} \/>\s*\{recoveryNotice\}/,
+  '确认页清场句在四步条下面',
+)
+function sourceFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(ts|tsx)$/.test(entry.name) ? [path] : []
+  })
+}
+const recoveryCalls = sourceFiles(join(kioskRoot, 'src')).flatMap((path) => {
+  const text = readFileSync(path, 'utf8')
+  // 第三轮：只读值从布尔改成 clearScope。仍只许恢复提示模块读一次。
+  const count = (text.match(/(?<!function )takeTerminalSessionRecoveryClearScope\s*\(/g) ?? []).length
+  return count > 0 ? [{ path, count }] : []
+})
+assert.equal(recoveryCalls.length, 1, 'takeTerminalSessionRecoveryClearScope 在 src 下只有一个调用文件')
+assert.equal(recoveryCalls[0]?.count, 1, 'takeTerminalSessionRecoveryClearScope 在 src 下只有一个调用点')
+assert.match(recoveryCalls[0]?.path ?? '', /useSessionRecoveryNotice\.ts$/, '唯一调用点在恢复提示模块')
 assert.doesNotMatch(
   printUpload,
   /<UploadSessionQrPanel\b/,

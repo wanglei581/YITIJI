@@ -37,6 +37,9 @@ import {
   isLegacyPickupCode,
 } from '@ai-job-print/shared'
 import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { usePrintSessionBlocked } from '../../hooks/useTerminalSessionState'
+import { PrintFlowRecoveryStrip } from './PrintFlowRecoveryStrip'
+import { PRINT_SESSION_HOLD_TITLE } from './printSessionHoldCopy'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
@@ -149,6 +152,7 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
 // ── 组件 ──────────────────────────────────────────────────────
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
+  const printSessionBlocked = usePrintSessionBlocked()
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -193,6 +197,7 @@ export function PrintPickupClaimPage() {
   }, [guide, state, legacyMode])
 
   const handleClaim = async (inputCode = code) => {
+    if (printSessionBlocked) return
     cancelSettle()
     const submittedCode = normalizeInput(inputCode)
     if (!PICKUP_CODE_ACCEPTED_PATTERN.test(submittedCode) || claimLockRef.current) return
@@ -280,7 +285,7 @@ export function PrintPickupClaimPage() {
       title="输入你的到机码"
       subtitle={screen === 'hid' ? <>不用手输：<strong>把手机上的码，对准机身扫码区</strong>。</> : <PickupSubtitle screen={screen} />}
       // 胶囊只标页面用途，不表示任何设备状态，所以 tone 保持 unknown。
-      status={{ tone: 'unknown', label: '到机码验证' }}
+      status={printSessionBlocked ? { tone: 'warn', label: PRINT_SESSION_HOLD_TITLE } : { tone: 'unknown', label: '到机码验证' }}
       terminalLabel="就业服务大厅"
       ctabar={
         <QxStepActions onPrev={() => navigate('/print-scan')}>
@@ -298,6 +303,7 @@ export function PrintPickupClaimPage() {
         />
       }
     >
+      <PrintFlowRecoveryStrip noticeTestId="print-pickup-recovery-notice" holdTestId="print-pickup-session-hold" />
       {body}
     </QxPageFrame>
   )
@@ -515,7 +521,7 @@ export function PrintPickupClaimPage() {
               type="button"
               className="qx-btn pcp-submit"
               data-variant="primary"
-              disabled={!isValid || loading}
+              disabled={!isValid || loading || printSessionBlocked}
               // 不夺输入框焦点：扫码器随时可能接着输入。
               onPointerDown={e => e.preventDefault()}
               onClick={() => void handleClaim()}

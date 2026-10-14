@@ -1,4 +1,4 @@
-import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue } from '../auth/kioskSensitiveSession'
+import { clearKioskSensitiveSession, clearKioskSharedDeviceResidue, kioskSensitiveSessionScope, type KioskClearScope } from '../auth/kioskSensitiveSession'
 import { API_BASE_URL, API_MODE } from './api/client'
 import { ApiHttpError } from './api/httpAdapter'
 import { getTerminalId } from './api/screensaver'
@@ -8,6 +8,10 @@ const STORAGE_KEY = 'terminal_session_token_v1'
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000]
 const RETRY_WINDOW_MS = 60_000
 const REQUEST_TIMEOUT_MS = 4_000
+// 判 failed 之后后台每隔这么久再试一次。本机 Agent 的取票口每分钟限 6 次（看门狗与页面共用），一分钟一次不会挤占。
+// 另加一段随机量：服务器重启时同一批机器会同时掉进 failed，不错开就会在同一秒一起回来敲门。
+const RECOVERY_INTERVAL_MS = 60_000
+const RECOVERY_JITTER_MS = 15_000
 // 本地 Agent 桥接：会话票失效后由页面自行重新引导用（与看门狗取票同一来源、同一端点）。
 const LOCAL_AGENT_BASE_URL = ((import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim() || 'http://127.0.0.1:9527').replace(/\/+$/, '')
 const LOCAL_BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
@@ -21,11 +25,82 @@ export type TerminalSessionState = 'checking' | 'ready' | 'failed'
 
 let state: TerminalSessionState = API_MODE === 'http' && !HAS_E2E_MOCK_TOKEN ? 'checking' : 'ready'
 let refreshTimer: number | null = null
+let recoveryTimer: number | null = null
+// 这一页是带着引导票打开的，而那张票没换成：此后只许走「向本机 Agent 要新票」那条路恢复
+// （那条路换票即清场），任何一条路都不拿标签页里可能留着的旧会话票续期（见 retryRefreshOnce、recoverOnce）。
+// 置真之后能回到 ready 的只剩 reBootstrapFromLocalAgent，它成功时归零。
+let bootExchangeUnsettled = false
+// 被服务端明确判作废的那张会话票（十分钟续期或业务请求的 401，以及后台恢复里再确认到作废）。
+// 票本身不删（终端停用期间读配置还要带它），只是不再拿同一张票去续。重建成功时清空。
+let rejectedSessionToken: string | null = null
+// 状态是否已经离开过最初那次 checking。用来区分「页面刚打开时的第一次换票」和「之后的重建」：
+// 只有后者才可能清掉正在机器前的人留下的材料，也才推迟「要新票」的那一步。
+let hadSettledState = false
+// 压着没恢复：要换新票才能恢复，但这台机器上还有这一位的别的内容。只在 failed 时对外为真。
+let recoveryDeferred = false
+// 上一次恢复清掉了什么。只能读一次，见 takeTerminalSessionRecoveryClearScope。页面刚打开时的第一次换票不记。
+let recoveryClearScope: KioskClearScope = 'none'
+// 视图变化的通知代次。同一轮里多次变化只通知一次；setState 会把还没发出的那次作废。
+let recoveryViewEpoch = 0
 const listeners = new Set<(next: TerminalSessionState) => void>()
 
+// failed 不再是终点：每次落到 failed 都排一次后台恢复，离开 failed 就撤掉。
+// 放在这里而不是各个判死的分支里，是为了以后新增的判死分支不会漏排。
 function setState(next: TerminalSessionState): void {
+  recoveryViewEpoch += 1
   state = next
+  if (next === 'ready') recoveryDeferred = false
+  if (next === 'failed') {
+    // 十分钟续期交给后台恢复接手：留着它会在恢复中途把状态翻回 checking，再跑一遍 60 秒重试窗口。
+    if (refreshTimer !== null) { window.clearTimeout(refreshTimer); refreshTimer = null }
+    scheduleRecovery()
+  } else {
+    cancelRecovery()
+  }
+  if (next !== 'checking') hadSettledState = true
   listeners.forEach((listener) => listener(next))
+}
+
+/** 恢复是不是只能换新票（不看状态）：带引导票没换成、标签页里没有票，或当前票已被服务端判作废。 */
+function newTicketRequired(): boolean {
+  const current = token()
+  return bootExchangeUnsettled || !current || current === rejectedSessionToken
+}
+
+/** 下一次恢复是不是只能换新票。只在 failed 时可能为真。 */
+function needsNewTicketNow(): boolean {
+  return state === 'failed' && newTicketRequired()
+}
+
+/**
+ * 只读视图变了、状态没变时，用现在的状态再通知一遍。
+ * 同一轮同步改动合并成一次；紧接着的 setState 会作废这次，避免重复通知。
+ */
+function touchRecoveryView(mutate: () => void): void {
+  const beforeDeferred = state === 'failed' && recoveryDeferred
+  const beforeNeeds = needsNewTicketNow()
+  const beforeScope = recoveryClearScope
+  mutate()
+  if (
+    (state === 'failed' && recoveryDeferred) === beforeDeferred
+    && needsNewTicketNow() === beforeNeeds
+    && recoveryClearScope === beforeScope
+  ) return
+  const epoch = ++recoveryViewEpoch
+  queueMicrotask(() => {
+    if (epoch !== recoveryViewEpoch) return
+    listeners.forEach((listener) => listener(state))
+  })
+}
+
+// 「压着」= 要换新票才能恢复。原票只是暂时续不上（503、超时）时停住但不标：下一轮先拿原票续，续上不清场。
+function holdRecoveryForOtherContent(): void {
+  if (!newTicketRequired()) return
+  touchRecoveryView(() => { recoveryDeferred = true })
+}
+
+function dropRecoveryHold(): void {
+  touchRecoveryView(() => { recoveryDeferred = false })
 }
 
 /**
@@ -82,6 +157,7 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, tim
 /**
  * 引导票已经换成新的终端会话。同一标签页里上一位的打印材料、简历、问卷、
  * 材料草稿、面试、扫描和收藏还在。清场只调用 kioskSensitiveSession 那一份清单。
+ * 换引导票即清场：哪怕当时判出来什么都没有，清场函数照样调用。
  * 新令牌在清完之后写入：清单不含终端会话键；引导票在服务端已被一次性核销，
  * 清场若抛错也要把新令牌留下，否则这台机器既没有旧会话也换不回这张票。
  */
@@ -90,7 +166,8 @@ function clearSensitiveStateForNewTerminalSession(): void {
   clearKioskSharedDeviceResidue()
 }
 
-async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promise<void> {
+/** 换票成功才返回。返回值是清场之前判出来的范围，调用方决定记不记。 */
+async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promise<KioskClearScope> {
   const response = await fetchWithTimeout(url('/terminals/session-token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -100,11 +177,13 @@ async function exchangeBootTicket(bootTicket: string, timeoutMs: number): Promis
   const payload = (await response.json()) as { sessionToken?: string }
   if (!payload.sessionToken) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
   const sessionToken = payload.sessionToken
+  const clearScope = kioskSensitiveSessionScope()
   try {
     clearSensitiveStateForNewTerminalSession()
   } finally {
     saveToken(sessionToken)
   }
+  return clearScope
 }
 
 /**
@@ -151,11 +230,15 @@ async function asHttpError(response: Response): Promise<ApiHttpError> {
   return new ApiHttpError(error.code, error.message, response.status)
 }
 
-// 只有网络抖动 / 超时 / 服务端明确的 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动）才自动重试；
-// 401 TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 网络抖动 / 超时自动重试；502 / 503 / 504 不看错误码一律重试 —— 既包括服务端明确的
+// 503 TERMINAL_SESSION_RETRYABLE（Redis 抖动），也包括后端重启那几十秒里网关回的错误页（没有业务错误码）。
+// 2026-10-10 走查实测：开机换票那一下撞上一次不带错误码的 503，此前一次就判死，4 分半不恢复。
+// TERMINAL_SESSION_INVALID 表示票已用过、令牌过期或终端被吊销，重试不会变好，立即 fail-closed。
+// 引导票是读出即删的：网关超时而后端其实已经用掉它时，重发会得到「作废」，由调用方改向本机 Agent 要新票。
 function transient(error: unknown): boolean {
   if (error instanceof TypeError || (error instanceof DOMException && error.name === 'AbortError')) return true
-  return error instanceof ApiHttpError && error.status === 503 && error.code === 'TERMINAL_SESSION_RETRYABLE'
+  if (!(error instanceof ApiHttpError)) return false
+  return error.status === 502 || error.status === 503 || error.status === 504
 }
 
 function sessionInvalid(error: unknown): boolean {
@@ -175,11 +258,15 @@ async function retryRefreshOnce(): Promise<void> {
   setState('checking')
   const startedAt = Date.now()
   let lastError: unknown = new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
-  for (const delay of [0, ...RETRY_DELAYS_MS]) {
+  let invalidToken: string | null = null
+  // 带引导票打开而没换成的页不拿旧会话票续期，直接走下面「要新引导票」那条路（换票即清场）。
+  for (const delay of bootExchangeUnsettled ? [] : [0, ...RETRY_DELAYS_MS]) {
     if (delay > 0) {
       if (Date.now() + delay - startedAt > RETRY_WINDOW_MS) break
       await new Promise<void>((resolve) => window.setTimeout(resolve, delay))
     }
+    // 这一次续期带的就是这张票（refreshOnce 同步读当前票，中间没有 await）。
+    const attemptToken = token()
     try {
       const remainingMs = startedAt + RETRY_WINDOW_MS - Date.now()
       if (remainingMs <= 0) break
@@ -189,11 +276,20 @@ async function retryRefreshOnce(): Promise<void> {
       return
     } catch (error) {
       lastError = error
+      if (sessionInvalid(error)) invalidToken = attemptToken
       if (!transient(error)) break
     }
   }
-  // 刷新走不通了（票被吊销 / 过期，重试无益）。在放弃之前，向本机 Agent 要一张新引导票
+  // 服务端明确作废的那一张票记下来：「要换新票」立刻为真，后台也不再拿它续一次。
+  // 只记收到作废的那一张，而且它还是当前票才记——续期在途时初始化可能已换上新票，不能把新票记成作废。
+  // 空转的那条初始错误（带引导票没换成、循环一次都没跑）不算，那种页本来就不续旧票。
+  if (invalidToken && token() === invalidToken) {
+    const rejected = invalidToken
+    touchRecoveryView(() => { rejectedSessionToken = rejected })
+  }
+  // 刷新走不通了（票被吊销 / 过期，或暂时连不上）。在放弃之前，向本机 Agent 要一张新引导票
   // 重新建会话 —— 这是看门狗重启浏览器时走的同一条路，页面自己走一遍就不必等浏览器重启。
+  // 上面还有这一位的别的内容时，reBootstrapFromLocalAgent 自己会停住，不取票。
   // 桥接令牌未配置（普通浏览器打开）时 requestLocalBootTicket 返回 null，此处仍然 fail-closed。
   if (await reBootstrapFromLocalAgent()) return
 
@@ -201,15 +297,38 @@ async function retryRefreshOnce(): Promise<void> {
   throw lastError
 }
 
-/** 用本机 Agent 的新引导票重建会话。成功返回 true 并已置为 ready。 */
+/**
+ * 用本机 Agent 的新引导票重建会话。成功返回 true 并已置为 ready。
+ *
+ * 推迟只发生在这里，四个调用点都经过这个函数，不在调用点上各判一次。
+ * 页面刚打开（hadSettledState 为假）不判。已经 settled 且还有别的内容：取票前停一次，
+ * 取到票、换票前再停一次（取票最长 4 秒，这期间人可能开始填东西）。停住时不换票。
+ * 停住时只有确实要换新票才标「压着」；原票只是暂时续不上（503、超时）不标，下一轮先拿原票续。
+ * 拿原票续期的 refreshOnce 不经过这里。
+ */
 async function reBootstrapFromLocalAgent(): Promise<boolean> {
+  if (hadSettledState && kioskSensitiveSessionScope() === 'with-other') {
+    holdRecoveryForOtherContent()
+    return false
+  }
+  // 重建真的往下走：不再是「压着等他结束」。取票期间人又填了别的，下面还会再停一次。
+  dropRecoveryHold()
   const ticket = await requestLocalBootTicket()
   if (!ticket) return false
+  if (hadSettledState && kioskSensitiveSessionScope() === 'with-other') {
+    holdRecoveryForOtherContent()
+    return false
+  }
+  let clearedScope: KioskClearScope = 'none'
   try {
-    await exchangeBootTicket(ticket, REQUEST_TIMEOUT_MS)
+    clearedScope = await exchangeBootTicket(ticket, REQUEST_TIMEOUT_MS)
   } catch {
     return false
   }
+  bootExchangeUnsettled = false
+  rejectedSessionToken = null
+  // 清掉了什么以换票那一刻、清场之前的判断为准。页面刚打开那一次不算。
+  if (hadSettledState) recoveryClearScope = clearedScope
   setState('ready')
   scheduleRefresh()
   return true
@@ -219,6 +338,81 @@ function scheduleRefresh(): void {
   if (API_MODE !== 'http') return
   if (refreshTimer !== null) window.clearTimeout(refreshTimer)
   refreshTimer = window.setTimeout(() => { void retryRefresh().catch(() => undefined) }, 10 * 60_000)
+}
+
+/**
+ * failed 之后的后台恢复。
+ *
+ * 存在的理由：此前判 failed 就是终点 —— 开机换票与十分钟续期两条路失败后都不再排下一次，
+ * 状态是 failed 时打印放行类请求又在发出之前就被闸门拦下（见 awaitReadySessionOrFailClosed），
+ * 于是没有任何东西会再去换票。服务器每重启一次（例如每次发布），只要正好撞上某台机器的
+ * 开机换票或续期，这台机器就一直打不了，直到有人重开浏览器；而现场没有人。
+ *
+ * 不放宽的三条：
+ *   · 后台恢复自己不改状态：它在飞时 state 仍是 failed，闸门照旧立即拦，
+ *     也不把屏幕在「校验中 / 没通过」之间每分钟来回翻一次。
+ *     只有一种交叉会让状态在恢复在飞时离开 failed：标签页里没有会话票，终端身份恢复回调此刻又来
+ *     初始化一次（initializeTerminalSessionOnce 的无票分支置 checking，并且自己也去要一张引导票）。
+ *     那时闸门等的是在飞的这一次，等出 ready 才放行、等不出照旧拦 —— 没有会话就不能下单这条不变。
+ *   · 恢复只走已有的两条路：拿当前会话票续期，或向本机 Agent 要新引导票再换（换票即清场）。
+ *     没有新的凭据来源，普通浏览器里（没有桥接令牌、没有会话票）什么都换不到，仍然 failed。
+ *   · 每轮只试一次，不在轮内重试；服务器没回来就等下一轮。
+ *
+ * 一直试下去、不设上限，是有意的：终端被后台停用后又恢复、服务器停了半天又回来，
+ * 现场都没有人去重开浏览器。每台机器每轮至多一次续期加一次取票。续期被 401 判作废时记下那张票，
+ * 后台不再拿同一张续；还没记过的那一轮仍是先续一次、作废了才去要新票。
+ * 要新票时如果这台机器上还有这一位的别的内容，这一轮不取票、不换票，等他结束使用。
+ */
+function scheduleRecovery(): void {
+  if (API_MODE !== 'http') return
+  if (recoveryTimer !== null) window.clearTimeout(recoveryTimer)
+  recoveryTimer = window.setTimeout(() => {
+    recoveryTimer = null
+    void recoverInBackground()
+  }, RECOVERY_INTERVAL_MS + Math.floor(Math.random() * RECOVERY_JITTER_MS))
+}
+
+function cancelRecovery(): void {
+  if (recoveryTimer === null) return
+  window.clearTimeout(recoveryTimer)
+  recoveryTimer = null
+}
+
+async function recoverInBackground(): Promise<void> {
+  if (state !== 'failed') return
+  // 别的换票正在飞（身份恢复回调重新初始化、按台计请求触发的续期）：让它先出结果，本轮只往后排。
+  if (refreshInflight || initInflight) { scheduleRecovery(); return }
+  // 与 retryRefresh 共用同一把锁：恢复在飞时别处再要续期，等的是这一次，不会并发出第二个续期请求。
+  // 状态此刻是 failed 而不是 checking，所以下单类请求的闸门不等它（见 awaitReadySessionOrFailClosed）；
+  // 例外只有 scheduleRecovery 上方写的那一种交叉。
+  const attempt = recoverOnce().then((recovered) => {
+    if (!recovered) throw new ApiHttpError('TERMINAL_SESSION_INVALID', '这台机器的安全校验没通过', 401)
+  })
+  refreshInflight = attempt.finally(() => { refreshInflight = null })
+  try {
+    await refreshInflight
+  } catch {
+    if (state === 'failed') scheduleRecovery()
+  }
+}
+
+/** 试一次。成功返回 true 并已置为 ready、重排续期。 */
+async function recoverOnce(): Promise<boolean> {
+  const current = token()
+  if (!bootExchangeUnsettled && current && current !== rejectedSessionToken) {
+    try {
+      await refreshOnce(REQUEST_TIMEOUT_MS)
+      setState('ready')
+      scheduleRefresh()
+      return true
+    } catch (error) {
+      // 会话票多半还有效，只是服务器还没回来或暂时答不了：等下一轮，别急着换新会话把这一位的材料清掉。
+      // 只有服务端明确说这张票作废了，才往下走「要新引导票」那条路。
+      if (!sessionInvalid(error)) return false
+      touchRecoveryView(() => { rejectedSessionToken = current })
+    }
+  }
+  return reBootstrapFromLocalAgent()
 }
 
 let initInflight: Promise<void> | null = null
@@ -268,10 +462,31 @@ async function retryBootTicketExchange(bootTicket: string): Promise<void> {
       if (!transient(error)) break
     }
   }
+  // URL 上那张票只有 60 秒、只能用一次，到这里已经指望不上。与续期那条路一样，判死之前
+  // 先向本机 Agent 要一张新票；还不行才 failed，之后由后台恢复每分钟再要一次。
+  bootExchangeUnsettled = true
+  if (await reBootstrapFromLocalAgent()) return
   setState('failed')
 }
 
 export function terminalSessionState(): TerminalSessionState { return state }
+
+/** 压着没恢复：上一轮要换新票、但还有这一位的别的内容，停住等他结束使用。只在 failed 时为真；不实时读清单，内容变了下一轮（60–75 秒）才跟着变。 */
+export function terminalSessionRecoveryDeferred(): boolean {
+  return state === 'failed' && recoveryDeferred
+}
+
+/** 下一次恢复是不是只能换新票（换的时候会清场）。只在 failed 时可能为真；为假表示「下一轮先拿原票续」。 */
+export function terminalSessionRecoveryNeedsNewTicket(): boolean {
+  return needsNewTicketNow()
+}
+
+/** 上一次恢复清掉了什么。只能读一次：读完自己复位成 'none'。页面刚打开时的第一次换票不算。不参与任何放行判断。 */
+export function takeTerminalSessionRecoveryClearScope(): KioskClearScope {
+  const scope = recoveryClearScope
+  recoveryClearScope = 'none'
+  return scope
+}
 
 export function subscribeTerminalSession(listener: (next: TerminalSessionState) => void): () => void {
   listeners.add(listener)
@@ -289,7 +504,8 @@ export function subscribeTerminalSession(listener: (next: TerminalSessionState) 
  *
  * 边界三条，一条都不放宽：
  *   · 只等「checking 且确有在飞续期」。启动引导（checking 但没有 refreshInflight）
- *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死。
+ *     与 failed 仍然立即失败：前者没有可等的结果，后者已经判过死
+ *     （failed 之后的后台恢复成功会把状态改回 ready，但 state 还是 failed 时本函数不等它）。
  *   · 自己绝不发起续期。等的永远是别人已经在飞的那个 Promise，因此并发业务请求
  *     仍然只对应一次 /session-token/refresh。
  *   · 等失败不降级：统一抛 TERMINAL_SESSION_INVALID，不把续期的原始错误（可能是
@@ -394,7 +610,7 @@ export async function terminalProtectedFetch(
   if (replay) return replay
   if (response.ok) return response
   const error = await asHttpError(response.clone())
-  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动 / 503 重试）；其它错误原样交给调用方。
+  // 业务请求 401 只触发一次会话刷新（刷新本身只对网络抖动与 502 / 503 / 504 重试）；其它错误原样交给调用方。
   if (!sessionInvalid(error)) return response
   await retryRefresh()
   // 刷新最长可达 60 秒。人已离页或本机已清场时不重放：原 401 的 body 还没被读过
@@ -471,14 +687,16 @@ export async function terminalAttributedFetch(
 //
 // 存在的理由：E2E 构建里会话恒为 ready，而真实的「续期在飞」只由十分钟定时器触发 ——
 // 浏览器用例既等不到它，也没有别的入口进到 checking 窗口，于是上面那段等待逻辑在浏览器里
-// 从来没被跑过（缺陷正是长在这段里）。这里只暴露两个动作：发起一次**真实**续期（与定时器
-// 调的是同一个 retryRefresh），和读一眼当前状态。它不放宽任何判定 —— 状态仍由真实代码写、
-// 票仍由真实代码读发，用例能控制的只是续期应答回来的时机。
+// 从来没被跑过（缺陷正是长在这段里）。这里暴露三个动作：发起一次**真实**续期（与定时器
+// 调的是同一个 retryRefresh）、读一眼当前状态，以及把三样只读恢复视图置成给定值。
+// 它不放宽任何判定 —— 状态仍由真实代码写、票仍由真实代码读发；setRecoveryView 不改会话状态、不发请求。
 export interface TerminalSessionE2EHooks {
   /** 发起一次真实续期，等价于十分钟定时器那一次。 */
   startRefresh: () => void
   /** 只读当前会话状态。 */
   state: () => TerminalSessionState
+  /** 把三样只读值置成给定值并通知订阅者。不改会话状态、不发请求；状态仍由 startRefresh 加路由应答驱动。 */
+  setRecoveryView: (view: { deferred?: boolean; needsNewTicket?: boolean; clearScope?: KioskClearScope }) => void
 }
 
 if (HAS_E2E_MOCK_TOKEN) {
@@ -487,5 +705,15 @@ if (HAS_E2E_MOCK_TOKEN) {
   host.__terminalSessionE2E = {
     startRefresh: () => { void retryRefresh().catch(() => undefined) },
     state: () => state,
+    setRecoveryView: (view) => {
+      if (view.deferred !== undefined) recoveryDeferred = view.deferred
+      if (view.needsNewTicket !== undefined) {
+        // 为真：把当前票记进作废票。为假：移出。没有票或带引导票没换成时，读值仍由那两条决定。
+        rejectedSessionToken = view.needsNewTicket ? token() : null
+      }
+      if (view.clearScope !== undefined) recoveryClearScope = view.clearScope
+      recoveryViewEpoch += 1
+      listeners.forEach((listener) => listener(state))
+    },
   }
 }

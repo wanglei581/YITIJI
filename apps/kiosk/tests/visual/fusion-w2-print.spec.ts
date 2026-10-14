@@ -624,6 +624,56 @@ async function terminalSessionStateOf(page: Page): Promise<string> {
   })
 }
 
+async function setRecoveryView(page: Page, view: {
+  deferred?: boolean
+  needsNewTicket?: boolean
+  clearScope?: 'none' | 'print-only' | 'with-other'
+}): Promise<void> {
+  await page.evaluate((payload) => {
+    const hooks = (window as unknown as {
+      __terminalSessionE2E?: { setRecoveryView: (next: typeof payload) => void }
+    }).__terminalSessionE2E
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法设置恢复视图')
+    hooks.setRecoveryView(payload)
+  }, view)
+}
+
+const CLEARING_SEEN_KEY = 'r8-saw-clearing-overlay'
+
+/** 清场遮罩只留一帧就整页重开。提交进 DOM 时写进 sessionStorage，整页重开后还读得到。 */
+async function armClearingOverlayWatch(page: Page): Promise<void> {
+  await page.evaluate((key) => {
+    const mark = (): void => {
+      if (document.querySelector('[data-testid="session-guard-state-clearing"]')) {
+        sessionStorage.setItem(key, '1')
+      }
+    }
+    new MutationObserver(mark).observe(document.documentElement, { childList: true, subtree: true })
+    mark()
+  }, CLEARING_SEEN_KEY)
+}
+
+async function expectClearingOverlayWasSeen(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate((key) => sessionStorage.getItem(key), CLEARING_SEEN_KEY)
+    } catch {
+      // 整页重开的那一下执行环境会先拆掉，等新页面起来再读。
+      return null
+    }
+  }).toBe('1')
+}
+
+async function failThisMachineSession(page: Page, api: ApiRouter): Promise<void> {
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
+    status: 401,
+    json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+}
+
 test('pickup claim during a normal session refresh waits for the new ticket @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -2852,4 +2902,750 @@ test('expired phone upload offers the usb switch when usb import is available @w
   await expect(page.getByRole('button', { name: '重新出一张码' })).toBeVisible()
   await expect(page.getByRole('button', { name: '改用 U 盘导入' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
+})
+
+const LOCAL_BOOT_TICKET_URL = 'http://127.0.0.1:9527/local/terminal-boot-ticket'
+const SESSION_FAILED_LINE = '这台机器现在下不了打印单'
+const SESSION_RECOVERY_LINE = '机器会自己再试，恢复后这里会自动变回可用。你可以等一会儿，或稍后再来。'
+const CONFIRM_RECOVERY_LINE = '机器会自己再试。恢复后这里的按钮会重新亮起；要是恢复时这里的材料被清掉了，就要重新传一次。'
+
+test('print upload stays closed until this machine session is ready again @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  const sessionId = 'r8-upload'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'pending',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file: null,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        uploadUrl: '/upload/phone',
+        uploadToken: 'r8-upload-token',
+        controlToken: 'r8-control',
+        expiresAt,
+      },
+    },
+  })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
+    requestNumber === 1
+      ? {
+          status: 401,
+          json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+        }
+      : { status: 200, json: { sessionToken: 'w2-recovered-terminal-session' } }
+  ))
+
+  await page.goto('/print/upload?source=document')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(page.getByTestId('file-source-channels')).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  const blocked = page.getByTestId('file-source-state-session-failed')
+  await expect(blocked).toBeVisible()
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  await expect(blocked.getByText(SESSION_FAILED_LINE, { exact: true })).toBeVisible()
+  await expect(blocked.getByText(SESSION_RECOVERY_LINE, { exact: true })).toBeVisible()
+  await expect(page.getByText('文件从哪来', { exact: true })).toBeVisible()
+  await expect(page.getByText('第三方网盘尚未接入', { exact: true })).toBeVisible()
+  await expect(page.getByText('两个上限不一样', { exact: true })).toBeVisible()
+  await expect(page.getByText('还没有文件。选择一种方式上传', { exact: false })).toHaveCount(0)
+  await expect(page.getByTestId('file-source-scan-source')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-member-source')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-qr')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '返回首页', exact: true })).toHaveCount(0)
+  const qrCard = page.getByTestId('file-source-ch-qr')
+  await expect(qrCard).toBeVisible()
+  await expect(qrCard).toBeDisabled()
+  const exit = page.getByTestId('file-source-exit')
+  await expect(exit).toBeEnabled()
+  const exitBox = await exit.boundingBox()
+  expect(exitBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  await qrCard.click({ force: true })
+  await page.waitForTimeout(400)
+  expect(api.requestCount('POST', '/api/v1/upload-sessions')).toBe(0)
+  await expect(blocked).toBeVisible()
+  await expect(page.getByTestId('file-source-qr')).toHaveCount(0)
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  await expect(blocked).toHaveCount(0)
+  await expect(pill).toHaveText('打印机在线')
+  await expect(qrCard).toBeEnabled()
+  await qrCard.click()
+  await expect.poll(() => api.requestCount('POST', '/api/v1/upload-sessions')).toBeGreaterThan(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('print confirm button lights up again after this machine session recovers @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', (requestNumber) => (
+    requestNumber === 1
+      ? {
+          status: 401,
+          json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+        }
+      : { status: 200, json: { sessionToken: 'w2-recovered-terminal-session' } }
+  ))
+
+  await seedMaterialSession(page)
+  await page.goto('/print/confirm')
+  const payButton = page.getByRole('button', { name: '确认并去付款', exact: true })
+  await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
+  await expect(payButton).toBeEnabled()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  const alert = page.locator('.pcf-alert[role="alert"]')
+  await expect(alert).toContainText(CONFIRM_RECOVERY_LINE)
+  await expect(alert).toContainText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。')
+  const blockedButton = page.getByRole('button', { name: '这台机器的安全校验没通过', exact: true })
+  await expect(blockedButton).toBeDisabled()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('ready')
+  await expect(payButton).toBeEnabled()
+  await expect(page.locator('.pcf-alert[role="alert"]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('print upload keeps the failed line while this machine session is checking again @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  let releaseChecking: () => void = () => undefined
+  const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async (requestNumber) => {
+    if (requestNumber > 1) await checkingGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/print/upload?source=document')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  await expect(pill).toHaveText('打印机在线')
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('checking')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  await expect(page.getByTestId('file-source-state-session-failed')).toBeVisible()
+  releaseChecking()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+const RECOVERY_NOTICE = '机器刚恢复，刚才选的材料已经清掉，要重新传'
+const PRINT_DEFERRED_LINE = '要在这台机器上打印，得先结束这次使用。结束后，这台机器上这次使用的内容都会清掉；已经保存到账号里的不受影响。'
+const SCAN_DEFERRED_LINE = '要在这台机器上扫描，得先结束这次使用。结束后，这台机器上这次使用的内容都会清掉；已经保存到账号里的不受影响。'
+const END_THIS_USE = '结束这次使用'
+
+test('home says previous materials were cleared after a new ticket rebuild @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+
+  // 页面刚打开的第一次换票不记清场范围。这一句改由只读视图 clearScope 驱动。
+  await page.goto('/')
+  await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+
+  await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  await softNavigate(page, '/', null)
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+
+  await page.locator('[data-action="print-hub"]').click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await expectHealthy(page, errors)
+})
+
+function registerHomeLists(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+}
+
+function installReadyPhoneUpload(api: ApiRouter): void {
+  const sessionId = 'r8-phone-file'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  const file = {
+    fileId: 'r8-phone-file',
+    filename: '求职信_本次.pdf',
+    sizeBytes: 96 * 1024,
+    mimeType: 'application/pdf',
+    sha256: 'b'.repeat(64),
+    fileExpiresAt: expiresAt,
+    fileUrl: '/w2-fixtures/sample-visible.pdf',
+  }
+  api.respond('POST', '/api/v1/upload-sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: { sessionId, uploadUrl: '/upload/phone', uploadToken: 'r8-upload-token', controlToken: 'r8-control', expiresAt },
+    },
+  })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        sessionId,
+        status: 'uploaded',
+        purpose: 'print_doc',
+        mode: 'temporary',
+        file,
+        requiresKioskConfirmation: true,
+        expiresAt,
+      },
+    },
+  })
+  api.respond('POST', `/api/v1/upload-sessions/${sessionId}/confirm`, {
+    status: 200,
+    json: { success: true, data: { sessionId, status: 'confirmed', file } },
+  })
+}
+
+function registerScanAvailable(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: {
+      terminalCode: 'KSK-001',
+      capabilities: [{
+        capabilityKey: 'scan',
+        status: 'available',
+        note: null,
+        configured: true,
+        updatedAt: NOW,
+      }],
+    },
+  })
+}
+
+test('print-only says sentence 4 on home and the four print pages, and confirm puts the pay button away @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerHomeLists(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await seedMaterialSession(page)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+
+  await page.goto('/print/upload?source=document')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+
+  await page.goto('/print/desk?step=preview')
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const previewNotice = page.getByTestId('print-preview-recovery-notice')
+  await expect(previewNotice).toHaveText(RECOVERY_NOTICE)
+  // 收货改：打印台的提示条在页头大卡下面，和确认页、选文件页同一层。
+  const deskGuide = await page.locator('.qpd-guide').boundingBox()
+  const previewNoticeBox = await previewNotice.boundingBox()
+  expect(previewNoticeBox?.y ?? 0).toBeGreaterThan((deskGuide?.y ?? 0) + (deskGuide?.height ?? 0) - 1)
+  await expect(page.getByText(W2_FILE.name, { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toHaveCount(0)
+
+  await page.goto('/print/confirm')
+  const pay = page.getByRole('button', { name: '确认并去付款', exact: true })
+  await expect(pay).toBeEnabled()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const confirmNotice = page.getByTestId('print-confirm-recovery-notice')
+  await expect(confirmNotice).toHaveText(RECOVERY_NOTICE)
+  const confirmCard = await page.locator('section.pcf-xq').boundingBox()
+  const confirmNoticeBox = await confirmNotice.boundingBox()
+  expect(confirmNoticeBox?.y ?? 0).toBeGreaterThan((confirmCard?.y ?? 0) + (confirmCard?.height ?? 0) - 1)
+  await expect(pay).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新选文件', exact: true })).toBeEnabled()
+  await expect(page.getByTestId('print-confirm-state-missing-context')).toBeVisible()
+
+  await page.goto('/print/pickup-claim')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('print-pickup-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only clears the file already chosen on the upload page @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  installReadyPhoneUpload(api)
+
+  await page.goto('/print/upload?source=document&tab=qr')
+  await expect(page.getByRole('button', { name: '确认使用这份文件', exact: true })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: '确认使用这份文件', exact: true }).click()
+  const card = page.getByTestId('file-source-file-card')
+  await expect(card).toBeVisible()
+  await expect(card).toContainText('求职信_本次.pdf')
+
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  await expect(page.getByTestId('file-source-file-card')).toHaveCount(0)
+  await expect(page.getByText('求职信_本次.pdf', { exact: true })).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-upload')
+})
+
+test('deferred session replaces the retry line and offers end-this-use on print and scan @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerHomeLists(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await seedMaterialSession(page)
+
+  await page.goto('/')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true, needsNewTicket: false })
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(printTile).toContainText(SESSION_FAILED_LINE)
+  await expect(page.getByText(PRINT_DEFERRED_LINE, { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+
+  await page.goto('/print/upload?source=document')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  const held = page.getByTestId('file-source-state-session-failed')
+  await expect(held).toContainText(PRINT_DEFERRED_LINE)
+  await expect(held).not.toContainText(SESSION_RECOVERY_LINE)
+  const endUse = page.getByTestId('print-session-end-use')
+  await expect(endUse).toBeVisible()
+  const endBox = await endUse.boundingBox()
+  const statusBox = await page.getByTestId('file-source-status').boundingBox()
+  expect(endBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(endBox?.width ?? 0).toBeLessThan((statusBox?.width ?? 0) - 40)
+  const endFonts = await page.evaluate(() => {
+    const end = document.querySelector('[data-testid="print-session-end-use"]')
+    const footer = document.querySelector('.print-upload-footer .qx-btn')
+    return {
+      inside: Boolean(end?.closest('[data-testid="file-source-status"]')),
+      end: end ? getComputedStyle(end).fontSize : '',
+      footer: footer ? getComputedStyle(footer).fontSize : '',
+    }
+  })
+  expect(endFonts.inside).toBe(true)
+  expect(endFonts.end).toBe(endFonts.footer)
+
+  let releaseChecking: () => void = () => undefined
+  const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    await checkingGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('checking')
+  await expect(held).toContainText(PRINT_DEFERRED_LINE)
+  await expect(endUse).toBeVisible()
+  releaseChecking()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+
+  await page.goto('/print/desk?step=preview')
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeVisible()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  await expect(page.getByTestId('print-preview-session-hold')).toContainText(PRINT_DEFERRED_LINE)
+  await expect(page.getByTestId('print-session-end-use')).toBeVisible()
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeDisabled()
+
+  await page.goto('/print/confirm')
+  await expect(page.getByRole('button', { name: '确认并去付款', exact: true })).toBeEnabled()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  const alert = page.locator('.pcf-alert[role="alert"]')
+  await expect(alert).toContainText(PRINT_DEFERRED_LINE)
+  await expect(alert).not.toContainText('机器会自己再试。恢复后这里的按钮会重新亮起')
+  await expect(page.getByTestId('print-session-end-use')).toBeVisible()
+
+  await page.goto('/print/pickup-claim')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  await expect(page.getByTestId('print-pickup-session-hold')).toContainText(PRINT_DEFERRED_LINE)
+  await expect(page.getByTestId('print-session-end-use')).toBeVisible()
+
+  registerScanAvailable(api)
+  await page.goto('/scan')
+  await page.getByRole('radio', { name: '选择扫描类型：普通文档' }).click()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
+  await expect(page).toHaveURL(/\/scan\?stage=settings/)
+  // 压着时第 5 句只留在状态卡。spread 下页头副标题被裁成给读屏的 1px，所以不再传入。
+  const scanDeferred = page.getByText(SCAN_DEFERRED_LINE, { exact: true })
+  await expect(scanDeferred).toHaveCount(1)
+  await expect(scanDeferred).toBeVisible()
+  await expect(page.getByTestId('scan-take-original')).toHaveText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
+  const scanEnd = page.getByTestId('scan-session-end-use')
+  await expect(scanEnd).toBeVisible()
+  expect((await scanEnd.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('end this use from a deferred print page really clears back home @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+  await page.goto('/print/upload?source=document')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: true })
+  const endUse = page.getByTestId('print-session-end-use')
+  await expect(endUse).toBeVisible()
+  await armClearingOverlayWatch(page)
+  await endUse.click()
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expectClearingOverlayWasSeen(page)
+  await expect(page.getByTestId('session-guard-state-clearing')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('failed without defer or a new ticket has no end-this-use button, and confirm uses the new sentence 3 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await seedMaterialSession(page)
+
+  await page.goto('/print/upload?source=document')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  await expect(page.getByTestId('file-source-state-session-failed')).toContainText(SESSION_RECOVERY_LINE)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+
+  await page.goto('/print/desk?step=preview')
+  await expect(page.getByRole('button', { name: '下一步：核对价格' })).toBeVisible()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  await expect(page.getByTestId('print-preview-session-hold')).toContainText(SESSION_RECOVERY_LINE)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+
+  await page.goto('/print/confirm')
+  await expect(page.getByRole('button', { name: '确认并去付款', exact: true })).toBeEnabled()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  const alert = page.locator('.pcf-alert[role="alert"]')
+  await expect(alert).toContainText(CONFIRM_RECOVERY_LINE)
+  await expect(alert).toContainText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。')
+  await expect(alert).not.toContainText(PRINT_DEFERRED_LINE)
+  await expect(page.getByRole('button', { name: '这台机器的安全校验没通过', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+
+  await page.goto('/print/pickup-claim')
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  await expect(page.getByTestId('print-pickup-session-hold')).toContainText(SESSION_RECOVERY_LINE)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+
+  registerScanAvailable(api)
+  await page.goto('/scan')
+  await page.getByRole('radio', { name: '选择扫描类型：普通文档' }).click()
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  await page.getByRole('button', { name: '开始这次扫描', exact: true }).click()
+  await expect(page.getByText('这台机器暂时不能用，请稍后再来，或拨打服务电话 18369161921（工作日 9:00–18:00）。').first()).toBeVisible()
+  await expect(page.getByText(SCAN_DEFERRED_LINE, { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only notice folds itself after 120 seconds @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  // install 把钟拨到给定时刻；pauseAt 只能往前拨，拨到「今天更早」会报 Cannot fast-forward to the past。
+  const start = new Date('2026-12-01T04:00:00.000Z')
+  await page.clock.install({ time: start })
+  await page.clock.pauseAt(new Date(start.getTime() + 60_000))
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  await page.clock.runFor(119_000)
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  await page.clock.runFor(1_000)
+  await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only notice on home dismisses on the next touch and stays gone on the print line @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 顶栏占位是空的 flex 项，首页还把它 display:none，Playwright 判定不可点。
+  // 点页头里这句说明（不是按钮），捕获阶段的触屏照样收起提示。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
+  await page.locator('[data-action="print-hub"]').click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await softNavigate(page, '/print/upload?source=document', null)
+  // 先等选文件页画出来再数：没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only notice on the upload page dismisses on the next touch without swallowing it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/upload?source=document')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('file-source-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 顶栏占位高度为 0（align-items:center 的空 flex 项），点页头大卡右侧空白。
+  await page.getByTestId('file-source-hero').click({ position: { x: 860, y: 36 } })
+  await expect(notice).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/upload/)
+  // 这次触屏没有把按钮吃掉：退出键仍会离开本页。source=document 的出口是首页。
+  await page.getByTestId('file-source-exit').click()
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  // 先等页面画出来再数：没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveCount(0)
+  await softNavigate(page, '/print/upload?source=document', null)
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('entering the screensaver dismisses the print-only notice without a reload @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+  let releasePlaylist: () => void = () => undefined
+  const playlistGate = new Promise<void>((resolve) => { releasePlaylist = resolve })
+  api.respondWith('GET', '/api/v1/terminals/KSK-001/screensaver', async () => {
+    await playlistGate
+    return {
+      status: 200,
+      json: {
+        enabled: true,
+        idleTimeoutSec: 4,
+        items: [{
+          id: 'r8-screensaver',
+          type: 'image',
+          url: 'https://warning.invalid/screensaver.png',
+          mimeType: 'image/png',
+          durationSec: 30,
+          sha256: 'r8-screen-fixture',
+        }],
+      },
+    }
+  })
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  await page.evaluate(() => { (window as unknown as { __r8Stay?: number }).__r8Stay = 1 })
+  releasePlaylist()
+  await expect(page).toHaveURL(/\/screensaver$/, { timeout: 8_000 })
+  await expect(page.locator('[data-kiosk-screen="screensaver"]')).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __r8Stay?: number }).__r8Stay)).toBe(1)
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  // 地址先变、首页后画。等首页真画出来再数提示，避免数到「还没画」的 0。
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  // 句子和首页同一帧画出来。toHaveCount(0) 会在「还没画」时立刻算过，所以这里读已经画上的字。
+  expect(await page.evaluate(() => document.body.innerText.includes('机器刚恢复，刚才选的材料已经清掉'))).toBe(false)
+  expect(await page.evaluate(() => (window as unknown as { __r8Stay?: number }).__r8Stay)).toBe(1)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('print-only already stored before mount shows sentence 4 on the first screen @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+  await page.addInitScript(() => {
+    let hooks: { setRecoveryView?: (view: { clearScope?: string }) => void } | undefined
+    Object.defineProperty(window, '__terminalSessionE2E', {
+      configurable: true,
+      enumerable: true,
+      get: () => hooks,
+      set: (value: { setRecoveryView?: (view: { clearScope?: string }) => void }) => {
+        hooks = value
+        value?.setRecoveryView?.({ clearScope: 'print-only' })
+      },
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByTestId('home-session-recovery-notice')).toHaveText(RECOVERY_NOTICE)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('material check with a file shows sentence 2 when failed and sentence 5 when deferred @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
+  registerShell(api)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
+  await routeExactJson(page, 'POST', '/api/v1/materials/tasks', async (route) => {
+    const body = route.request().postDataJSON() as { kind?: string }
+    await route.fulfill({
+      status: 201,
+      json: { success: true, data: { ...materialTask('inspection'), id: `w2-${body.kind ?? 'inspection'}`, status: 'processing', result: null } },
+    })
+  })
+  api.respond('GET', '/api/v1/materials/tasks/w2-inspection', {
+    status: 200,
+    json: { success: true, data: { ...materialTask('inspection'), status: 'processing', result: null } },
+  })
+  await seedPrintHandoff(page, { materialCheck: null })
+  await page.goto('/print/desk?step=check')
+  await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
+  await expect(page.getByText('这一页没有文件')).toHaveCount(0)
+
+  await failThisMachineSession(page, api)
+  await setRecoveryView(page, { deferred: false, needsNewTicket: false })
+  const hold = page.getByTestId('print-preview-session-hold')
+  await expect(hold).toContainText(SESSION_RECOVERY_LINE)
+  await expect(page.getByRole('button', { name: END_THIS_USE, exact: true })).toHaveCount(0)
+  const guide = await page.locator('.qpd-guide').boundingBox()
+  const failedBox = await hold.boundingBox()
+  expect(failedBox?.y ?? 0).toBeGreaterThan((guide?.y ?? 0) + (guide?.height ?? 0) - 1)
+
+  await setRecoveryView(page, { deferred: true })
+  await expect(hold).toContainText(PRINT_DEFERRED_LINE)
+  await expect(page.getByTestId('print-session-end-use')).toBeVisible()
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('the tap that folds sentence 4 still lands on the button under it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/confirm')
+  await expect(page.getByTestId('print-confirm-state-missing-context')).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('print-confirm-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 第一下就点句子下面的按钮。句子一收整页上挪；要是按下就收，抬手时手指底下已经换了东西，这一下会点空。
+  await page.getByRole('button', { name: '重新选文件', exact: true }).click()
+  await expect(page).toHaveURL(/\/print\/upload\?source=document$/)
+  // 这一下也把句子收了：先等选文件页画出来再数，没画出来时数到的 0 不算数。
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
+  await expect(page.getByTestId('file-source-recovery-notice')).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('a touch that turns into a scroll also folds sentence 4 @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 手指按下后滑动，浏览器接管滚动时只发 pointercancel、不发 click。这也算一次触屏，句子要收。
+  await page.evaluate(() => {
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
+    document.body.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch' }))
+  })
+  await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('a press that began before sentence 4 appeared does not fold it @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  const law = await page.locator('.qx-home-hero-law').boundingBox()
+  await page.mouse.move((law?.x ?? 0) + 24, (law?.y ?? 0) + (law?.height ?? 0) / 2)
+  // 手指先按着，这时句子才亮：抬手那一下不算「下一次触屏」，本人还没看清不能就收了。
+  await page.mouse.down()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  await page.mouse.up()
+  await page.waitForTimeout(900)
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  // 句子亮起之后才按下的这一下才收。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
+})
+
+test('a press on a greyed-out button still folds sentence 4 after release @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerHomeLists(api)
+
+  await page.goto('/print/upload?source=document')
+  await expect(page.getByTestId('file-source-hero')).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('file-source-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  const next = page.getByTestId('file-source-primary')
+  await expect(next).toBeDisabled()
+  // 置灰按钮不发 click。这一下也是触屏，抬手后稍等就收。
+  await next.click({ force: true })
+  await expect(notice).toHaveCount(0)
+  await expect(page).toHaveURL(/\/print\/upload/)
+  expect(errors.filter((line) => line.startsWith('pageerror:'))).toEqual([])
 })

@@ -114,9 +114,9 @@ export function UsbImportHoldNotice({ hold }: { hold: UsbImportHold }) {
   )
 }
 
-export function FileSourceNote({ children }: { children: ReactNode }) {
+export function FileSourceNote({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <div className="fs-note">
+    <div className="fs-note" data-testid={testId}>
       <span className="sq" aria-hidden="true" />
       <span>{children}</span>
     </div>
@@ -282,17 +282,20 @@ export function ChannelGrid({
   active,
   usbMode,
   onSelect,
+  locked = false,
 }: {
   keys: UploadTab[]
   active: UploadTab | null
   usbMode: 'ok' | 'unavailable' | 'offline'
   onSelect: (key: UploadTab) => void
+  locked?: boolean
 }) {
   return (
     <div className="w2-print-upload-source-grid fs-chs" data-count={keys.length} data-testid="file-source-channels">
       {keys.map((key) => {
         const copy = CHANNEL_COPY[key]
-        const disabled = key === 'usb' && usbMode !== 'ok'
+        const usbClosed = key === 'usb' && usbMode !== 'ok'
+        const disabled = locked || usbClosed
         const desc =
           key === 'usb' && usbMode === 'unavailable'
             ? '本机暂未开通 U 盘导入，请改用手机上传。'
@@ -327,7 +330,7 @@ export function ChannelGrid({
               <span>{copy.name}</span>
               {key === 'qr' ? <span className="fs-tag">一体机首选</span> : null}
               {key === 'file' ? <span className="fs-tag mut">备用通道</span> : null}
-              {disabled && note ? <span className="fs-tag mut">{note}</span> : null}
+              {usbClosed && note ? <span className="fs-tag mut">{note}</span> : null}
             </span>
             <span className="fs-ch-d">{desc}</span>
             <span className="fs-ch-f">{limit}</span>
@@ -424,6 +427,22 @@ export function FileSourceTruth() {
   return (
     <div className="fs-truth" data-testid="file-source-truth">
       <p>结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。</p>
+    </div>
+  )
+}
+
+/** 来源选择下面那两张说明小卡：正常的「还没选来源」和本机会话没好时共用，字只在这里写一次。 */
+export function SourceChooserNotes() {
+  return (
+    <div className="fs-split">
+      <div className="fs-mini" data-static="true">
+        <h4>第三方网盘尚未接入</h4>
+        <p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。</p>
+      </div>
+      <div className="fs-mini" data-static="true">
+        <h4>两个上限不一样</h4>
+        <p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。Word 是否可收由本机转换能力决定，能力关闭时请另存为 PDF。</p>
+      </div>
     </div>
   )
 }

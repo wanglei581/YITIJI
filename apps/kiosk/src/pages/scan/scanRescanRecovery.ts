@@ -47,6 +47,8 @@ export function isRescanRefusedByServer(code: string | undefined): boolean {
 export interface SessionFailure {
   title: string
   description: string
+  /** 本机会话没通过时才有。压着那一屏按这个字段认，不按中文标题。 */
+  kind?: 'terminal-session'
 }
 
 /**
@@ -232,6 +234,7 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
       return {
         title: '这台机器的安全校验没通过',
         description: userMessageOf(error, machineUnusableLine()),
+        kind: 'terminal-session',
       }
     }
     if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {

@@ -157,6 +157,26 @@ for (const [path, expected] of FROZEN) {
 }
 assert.doesNotMatch(read('src/pages/home/components/ContinuePanel.tsx'), /fileName/, '首页续办条不得读取文件名：公共屏上的文件名常带真名，明细应进入「我的 → 打印订单」由本人查看')
 
+const homePage = read('src/pages/home/HomePage.tsx')
+const homeView = read('src/pages/home/components/QxHomeView.tsx')
+assert.match(homePage, /usePrintSessionBlocked\(/, '首页用上一次定下来的本机会话')
+assert.match(
+  read('src/hooks/useTerminalSessionState.ts'),
+  /if \(next === 'ready' \|\| next === 'failed'\) settledPrintSession = next/,
+  'checking 不改写已定下来的打印拦截，首页不再把 checking 当成没失败',
+)
+assert.doesNotMatch(homePage, /terminalSession === 'failed'/, '首页不再直接把 checking 当成没失败')
+assert.match(homePage, /这台机器现在下不了打印单/, '首页顶栏在本机会话 failed 时使用定句')
+assert.match(homeView, /printSessionFailed \? '这台机器现在下不了打印单'/, '首页打印入口在本机会话 failed 时使用同一句')
+assert.match(read('src/pages/home/components/HomeContextRegion.tsx'), /home-session-recovery-notice/, '首页清场提示挂在现成提示条里（上下文区 10/12 拆到 HomeContextRegion）')
+// 第三轮：首页 print-only 用完整第 4 句。旧短句会和「要重新传」对上，但漏了「机器刚恢复」。
+assert.match(read('src/hooks/useSessionRecoveryNotice.ts'), /机器刚恢复，刚才选的材料已经清掉，要重新传/, '首页清场提示使用第 4 句')
+assert.match(
+  read('src/pages/home/components/HomeContextRegion.tsx'),
+  /qx-home-recovery-notice/,
+  '清场句移出空态：有待继续卡时空态被藏，句子必须单独看得见',
+)
+
 const notifications = read('src/pages/placeholders/NotificationsPage.tsx')
 const activityDetail = read('src/pages/placeholders/MeActivityDetailPage.tsx')
 const meShell = read('src/pages/profile/me/MeListShell.tsx')

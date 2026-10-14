@@ -2267,3 +2267,294 @@ test('settings stays operable at 390x844 without overlap @w5-mobile', async ({ p
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(dialog).toHaveCount(0)
 })
+
+const LOCAL_BOOT_TICKET_URL = 'http://127.0.0.1:9527/local/terminal-boot-ticket'
+const SESSION_FAILED_LINE = '这台机器现在下不了打印单'
+
+async function startTerminalSessionRefresh(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { startRefresh: () => void } }).__terminalSessionE2E
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法驱动终端会话状态')
+    hooks.startRefresh()
+  })
+}
+
+async function setRecoveryView(page: Page, view: {
+  deferred?: boolean
+  needsNewTicket?: boolean
+  clearScope?: 'none' | 'print-only' | 'with-other'
+}): Promise<void> {
+  await page.evaluate((payload) => {
+    const hooks = (window as unknown as {
+      __terminalSessionE2E?: { setRecoveryView: (next: typeof payload) => void }
+    }).__terminalSessionE2E
+    if (!hooks) throw new Error('terminalAuth 的 E2E 测试缝缺失，无法设置恢复视图')
+    hooks.setRecoveryView(payload)
+  }, view)
+}
+
+const CLEARING_SEEN_KEY = 'r8-saw-clearing-overlay'
+
+/** 清场遮罩只留一帧就整页重开。提交进 DOM 时写进 sessionStorage，整页重开后还读得到。 */
+async function armClearingOverlayWatch(page: Page): Promise<void> {
+  await page.evaluate((key) => {
+    const mark = (): void => {
+      if (document.querySelector('[data-testid="session-guard-state-clearing"]')) {
+        sessionStorage.setItem(key, '1')
+      }
+    }
+    new MutationObserver(mark).observe(document.documentElement, { childList: true, subtree: true })
+    mark()
+  }, CLEARING_SEEN_KEY)
+}
+
+async function expectClearingOverlayWasSeen(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    try {
+      return await page.evaluate((key) => sessionStorage.getItem(key), CLEARING_SEEN_KEY)
+    } catch {
+      // 整页重开的那一下执行环境会先拆掉，等新页面起来再读。
+      return null
+    }
+  }).toBe('1')
+}
+
+async function terminalSessionStateOf(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const hooks = (window as unknown as { __terminalSessionE2E?: { state: () => string } }).__terminalSessionE2E
+    return hooks ? hooks.state() : 'missing'
+  })
+}
+
+test('home print status tells the truth when this machine cannot place a print order @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+
+  let openRefresh: () => void = () => undefined
+  const refreshGate = new Promise<void>((resolve) => { openRefresh = resolve })
+  let markRefreshArrived: () => void = () => undefined
+  const refreshArrived = new Promise<void>((resolve) => { markRefreshArrived = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async () => {
+    markRefreshArrived()
+    await refreshGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(printTile.getByText('先看价格再出纸 · 带走：打印件')).toBeVisible()
+  await expect(page.getByText('改简历', { exact: true })).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await refreshArrived
+  expect(await terminalSessionStateOf(page), '续期在飞时必须是 checking').toBe('checking')
+  await expect(pill).toHaveText('打印机在线')
+  await expect(page.getByText(SESSION_FAILED_LINE)).toHaveCount(0)
+
+  openRefresh()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  await expect(page.getByText('先看价格再出纸 · 带走：打印件')).toHaveCount(0)
+  await expect(page.getByText('改简历', { exact: true })).toBeVisible()
+  await expect(page.getByText('练面试', { exact: true })).toBeVisible()
+
+  await printTile.click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  await expect(page.getByText('打印扫描', { exact: true }).first()).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('home print status stays on the failed line while this machine session is checking again @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  let releaseChecking: () => void = () => undefined
+  const checkingGate = new Promise<void>((resolve) => { releaseChecking = resolve })
+  api.respondWith('POST', '/api/v1/terminals/session-token/refresh', async (requestNumber) => {
+    if (requestNumber > 1) await checkingGate
+    return {
+      status: 401,
+      json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+    }
+  })
+
+  await page.goto('/')
+  const pill = page.locator('.qx-topbar .qx-pill')
+  const printTile = page.locator('[data-action="print-hub"]')
+  await expect(pill).toHaveText('打印机在线')
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('checking')
+  await expect(pill).toHaveText(SESSION_FAILED_LINE)
+  await expect(printTile.getByText(SESSION_FAILED_LINE)).toBeVisible()
+  await expect(page.getByText('打印机在线')).toHaveCount(0)
+  releaseChecking()
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  expect(errors).toEqual([])
+})
+
+const RECOVERY_NOTICE = '机器刚恢复，刚才选的材料已经清掉，要重新传'
+const RECOVERY_NOTICE_OTHER = '机器刚恢复，这台机器上刚才的内容已经清掉，要重新开始。'
+
+test('with-other sends the person home from interview and says sentence 6 @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+
+  await page.goto('/interview')
+  await expect(page.locator('[data-interview-workbench]')).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'with-other' })
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await expect(notice).toHaveText(RECOVERY_NOTICE_OTHER)
+  // 顶栏占位在首页是 display:none。点页头说明句，下一次触屏收起第 6 句。
+  await page.locator('.qx-home-hero-law').click()
+  await expect(notice).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('home recovery sentence stays visible when a continue card is showing @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api)
+  registerAuthenticatedShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/me/print-orders', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{
+          id: 'r8-continue-print',
+          orderNo: 'ORD-20261012-0008',
+          fileName: '不该出现在公共屏上的姓名.pdf',
+          status: 'pending',
+          createdAt: '2026-10-12T00:00:00.000Z',
+          completedAt: null,
+          copies: 1,
+          colorMode: 'bw',
+          duplex: 'simplex',
+          paperSize: 'A4',
+          pageRange: 'all',
+          amountCents: 0,
+          payStatus: 'paid',
+          paymentSource: 'free',
+          billablePages: 1,
+        }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+
+  await loginThroughVisibleUi(page, '/')
+  await expect(page.locator('section.continue')).toBeVisible()
+  await expect(page.getByText('打印任务进行中', { exact: true })).toBeVisible()
+  await setRecoveryView(page, { clearScope: 'print-only' })
+  const notice = page.getByTestId('home-session-recovery-notice')
+  await notice.scrollIntoViewIfNeeded()
+  await expect(notice).toBeVisible()
+  await expect(notice).toHaveText(RECOVERY_NOTICE)
+  await expect(notice).toBeInViewport()
+  const display = await notice.evaluate((node) => getComputedStyle(node).display)
+  expect(display).not.toBe('none')
+  expect((await notice.boundingBox())?.height ?? 0).toBeGreaterThan(8)
+  await expect(page.locator('section.continue')).toBeVisible()
+  await expect(page.getByText('不该出现在公共屏上的姓名.pdf')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('ending this use brings the AI age declaration back on the next question @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      ...terminalConfig({ enabled: false, items: [] }),
+      ai: { loginGate: 'off', declarationEnforced: true, paused: false },
+    },
+  })
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+  api.respond('POST', '/api/v1/assistant/chat', {
+    status: 200,
+    json: {
+      sessionId: 'r8-assistant',
+      reply: '可以按做过什么、怎么做的、结果如何来写。',
+      intent: 'general',
+      actions: [],
+      providerLabel: 'llm:deepseek',
+      aiGenerated: true,
+    },
+  })
+  api.respond('POST', '/api/v1/trtc/session', {
+    status: 503,
+    json: { error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: '语音通话这会儿接不上' } },
+  })
+
+  await page.goto('/assistant')
+  await expect(page.getByLabel('输入咨询问题')).toBeVisible()
+  await page.getByLabel('输入咨询问题').fill('我想把仓库管理员这段经历写成三段。')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '你已年满 14 周岁吗？' })).toBeVisible()
+  await page.getByRole('button', { name: '已满', exact: true }).click()
+  await expect(page.getByText('可以按做过什么、怎么做的、结果如何来写。')).toBeVisible()
+  const afterYes = api.requestCount('POST', '/api/v1/assistant/chat')
+  expect(afterYes).toBeGreaterThan(0)
+
+  await page.goto('/print/upload?source=document')
+  await page.route(LOCAL_BOOT_TICKET_URL, (route) => route.abort('connectionrefused'))
+  api.respond('POST', '/api/v1/terminals/session-token/refresh', {
+    status: 401,
+    json: { success: false, error: { code: 'TERMINAL_SESSION_INVALID', message: '终端安全会话无效' } },
+  })
+  await startTerminalSessionRefresh(page)
+  await expect.poll(() => terminalSessionStateOf(page)).toBe('failed')
+  await setRecoveryView(page, { deferred: true })
+  const endUse = page.getByTestId('print-session-end-use')
+  await expect(endUse).toBeVisible()
+  await armClearingOverlayWatch(page)
+  await endUse.click()
+  await expect(page).toHaveURL((url) => url.pathname === '/')
+  await expectClearingOverlayWasSeen(page)
+
+  // 清场后整页重开会记下隐私边界。再 page.goto 算一次后退式载入，会被送回首页。
+  // 人在首页点「AI 顾问」是新的一跳，声明键已经清掉，下一问要重新出现。
+  await page.getByRole('button', { name: 'AI 顾问', exact: true }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.getByLabel('输入咨询问题')).toBeVisible()
+  await page.getByLabel('输入咨询问题').fill('那三段里，盘点准确率该怎么写？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '你已年满 14 周岁吗？' })).toBeVisible()
+  expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(afterYes)
+  expect(errors).toEqual([])
+})

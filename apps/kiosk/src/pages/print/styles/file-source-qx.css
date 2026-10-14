@@ -211,6 +211,14 @@
   font-size: var(--qx-fs-sec); font-weight: 700; line-height: 1.25;
 }
 .fs-status-p { margin-top: 14px; font-size: var(--qx-fs-body-lg); line-height: 1.6; color: var(--qx-ink-2); }
+.fs-status-act { margin-top: 16px; }
+/* 比窄屏 `.fs-page .qx-btn` 更具体：按钮随内容宽，字号跟页内按钮，不拉成整行细字。 */
+.fs-status .fs-status-act .qx-btn {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 56px;
+  font-size: var(--qx-fs-btn);
+}
 .fs-chips { margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
 .fs-chip {
   min-height: 52px; padding: 0 20px; border-radius: 14px;
@@ -605,4 +613,32 @@
   .fs-page .fs-qr-live { min-height: 220px; }
   .fs-page .fs-qr-live svg { width: min(300px, 100%); }
   .fs-page .fs-sec.qx-grow > .qx-card { min-height: 0; }
+}
+
+/* 本机会话 failed：来源选择原样留着。说明块保持自然高度。
+   多出来的高度分给来源卡和下面两张说明小卡，避免中间留出大片空白。 */
+.fs-page[data-state='session-failed'] .fs-hero { min-height: 308px; }
+.fs-page[data-state='session-failed'] .fs-truth { margin-top: 0; }
+.fs-page[data-state='session-failed'] .fs-hold-sources,
+.fs-page[data-state='session-failed'] .fs-hold-notes {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-chs,
+.fs-page[data-state='session-failed'] .fs-hold-notes .fs-split {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-chs {
+  grid-template-rows: minmax(220px, 1fr);
+}
+.fs-page[data-state='session-failed'] .fs-hold-sources .fs-ch,
+.fs-page[data-state='session-failed'] .fs-hold-notes .fs-mini {
+  flex: 1 1 auto;
+  min-height: 220px;
+}
+@media (max-width: 760px) {
+  .fs-page[data-state='session-failed'] .fs-hero { min-height: 0; }
+  .fs-page[data-state='session-failed'] .fs-hold-sources .fs-ch,
+  .fs-page[data-state='session-failed'] .fs-hold-notes .fs-mini { min-height: 0; }
 }

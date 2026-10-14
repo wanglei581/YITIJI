@@ -10,7 +10,7 @@
 // ============================================================
 
 import type { CSSProperties } from 'react'
-import { helpNeededLine } from '../../copy/unattendedCopy'
+import { helpNeededLine, TAKE_ORIGINAL_REMINDER } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { useNavigate, useParams } from 'react-router-dom'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -270,7 +270,7 @@ export function PrintScanFeatureInfoPage() {
             <PrintHubState
               kind="warn"
               icon={<PackageCheckIcon size={28} />}
-              heading="别忘了取走玻璃上或进纸口里的原件（身份证等）"
+              heading={TAKE_ORIGINAL_REMINDER}
               testId="print-hub-copy-take-original"
             >
               <p className="ph-state-p">

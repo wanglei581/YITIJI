@@ -65,6 +65,10 @@
 
 .qx-home-continue { flex: none; min-height: 0; }
 .qx-home-continue:has(.continue) > .qx-home-empty-context { display: none; }
+.qx-home-recovery-notice {
+  margin: 0 0 8px; padding: 12px 16px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);
+  color: var(--qx-ink); background: var(--qx-surface); font-size: var(--qx-fs-body); line-height: var(--qx-lh-body);
+}
 .qx-home-empty-context, .qx-home .continue {
   display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; width: 100%;
   min-height: 64px; margin-bottom: 4px; padding: 8px 16px; border: 1px solid var(--qx-line); border-radius: var(--qx-home-r);

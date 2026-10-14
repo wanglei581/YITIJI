@@ -27,7 +27,9 @@ import {
   HelpMini,
   NowFileCard,
   PhoneQrSlot,
+  SourceChooserNotes,
 } from './FileSourceBits'
+import { FileSourceSessionHold } from './FileSourceSessionHold'
 import '../styles/file-source-qx.css'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 
@@ -39,6 +41,10 @@ export interface FileSourceViewProps {
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   /** 打印闸门合上时的可见说明。页头说明在本页只留给读屏，这句要出现在画面上。 */
   orderPausedNotice?: string
+  /** 本机会话拦住打印。来源选择留着，来源卡置灰，不出码、不读盘。 */
+  sessionBlocked?: boolean
+  /** 换票清场后的一句提示。没有就不出。 */
+  recoveryNotice?: string | null
   isResumePrint: boolean
   showFileChannel: boolean
   showScan: boolean
@@ -166,7 +172,7 @@ function disabledReason(screen: FileSourceScreen): string | null {
 
 export function FileSourceView(props: FileSourceViewProps) {
   const {
-    screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, isResumePrint,
+    screen, pageTitle, pageSubtitle, terminalLabel, status, orderPausedNotice, sessionBlocked = false, recoveryNotice = null, isResumePrint,
     showFileChannel, showScan, tab, usbMode, usbHold = null, usbSwitchAllowed = true, currentFile, blockedName, blockedMeta,
     wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
@@ -271,12 +277,13 @@ export function FileSourceView(props: FileSourceViewProps) {
 
   const usbHoldActive = tab === 'usb' ? usbHold : null
   if (usbHoldActive) secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
+  if (sessionBlocked) secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
 
-  const enabled = usbHoldActive ? usbHoldActive.state !== 'loading' : primaryEnabled(screen)
-  const reason = usbHoldActive
+  const enabled = sessionBlocked ? false : usbHoldActive ? usbHoldActive.state !== 'loading' : primaryEnabled(screen)
+  const reason = sessionBlocked ? disabledReason('source-chooser') : usbHoldActive
     ? (usbHoldActive.state === 'loading' ? '确认完成前先不读 U 盘' : null)
     : disabledReason(screen)
-  const primaryText = usbHoldActive
+  const primaryText = sessionBlocked ? primaryLabel('source-chooser', isResumePrint) : usbHoldActive
     ? (usbHoldActive.state === 'loading' ? '确认后再选文件' : '改用手机扫码上传')
     : primaryLabel(screen, isResumePrint)
   const ctabar = previewOpen ? undefined : (
@@ -289,6 +296,7 @@ export function FileSourceView(props: FileSourceViewProps) {
         disabled={!enabled}
         aria-disabled={!enabled || undefined}
         onClick={() => {
+          if (sessionBlocked) return
           if (usbHoldActive) {
             if (usbHoldActive.state !== 'loading') onSelectChannel('qr')
             return
@@ -332,7 +340,8 @@ export function FileSourceView(props: FileSourceViewProps) {
   )
 
   let body: ReactNode
-  switch (screen) {
+  if (sessionBlocked) body = <FileSourceSessionHold keys={channelKeys} usbMode={usbMode} />
+  else switch (screen) {
     case 'source-chooser':
     case 'missing-file':
     case 'unknown':
@@ -349,16 +358,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           <ExistingSourceLinks showScan={showScan} onScan={onScan} onDocuments={onDocuments} />
           {screen === 'source-chooser' ? (
             <section className="fs-sec">
-              <div className="fs-split">
-                <div className="fs-mini" data-static="true">
-                  <h4>第三方网盘尚未接入</h4>
-                  <p>本机不做百度网盘 / 微信文件的授权登录 —— 公共终端上登录你的网盘账号不安全。<b>但你自己存过的材料一直在</b>：登录后从「我的文档」直接选，不用重传。</p>
-                </div>
-                <div className="fs-mini" data-static="true">
-                  <h4>两个上限不一样</h4>
-                  <p>手机上传单份 <b>≤ 10MB</b>；本机选和 U 盘导入单份 <b>≤ 15MB</b>。Word 是否可收由本机转换能力决定，能力关闭时请另存为 PDF。</p>
-                </div>
-              </div>
+              <SourceChooserNotes />
             </section>
           ) : null}
           <section className="fs-sec qx-grow">
@@ -720,27 +720,28 @@ export function FileSourceView(props: FileSourceViewProps) {
         data-qx-screen="file-source"
         data-takeaway="检查后带走打印件"
         data-print-flow-step={1}
-        data-state={usbHoldActive ? 'usb-hold' : screen}
-        data-usb-gate={usbHoldActive?.state}
-        data-testid={usbHoldActive ? 'file-source-state-usb-hold' : `file-source-state-${screen}`}
+        data-state={sessionBlocked ? 'session-failed' : usbHoldActive ? 'usb-hold' : screen}
+        data-usb-gate={sessionBlocked ? undefined : usbHoldActive?.state}
+        data-testid={sessionBlocked ? 'file-source-state-session-failed' : usbHoldActive ? 'file-source-state-usb-hold' : `file-source-state-${screen}`}
       >
-        <FileSourceHero screen={screen} isResume={isResumePrint} hold={usbHoldActive?.state ?? null} />
+        <FileSourceHero screen={sessionBlocked ? 'source-chooser' : screen} isResume={isResumePrint} hold={sessionBlocked ? null : usbHoldActive?.state ?? null} />
         <div className="fs-flow" aria-label="打印流程">
           <span aria-current="step">1 选文件</span><span>2 材料检查</span><span>3 预览与参数</span><span>4 核对价格</span>
         </div>
-        {orderPausedNotice ? (
+        {orderPausedNotice && !sessionBlocked ? (
           <FileSourceStatus kind="warn" title={status.label}>
             {orderPausedNotice}
           </FileSourceStatus>
         ) : null}
-        {isResumePrint ? (
+        {isResumePrint && !sessionBlocked ? (
           <button type="button" className="fs-mini" onClick={onResumes} aria-label="查看我的简历记录">
             <h4><SparklesIcon size={22} aria-hidden="true" /><span>查看我的简历记录</span></h4>
             <p>已生成的简历可继续查看并打印；已有电子简历也可以在本页上传后直接打印。这里不做 AI 诊断。</p>
           </button>
         ) : null}
-        {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
-        {reason && !previewOpen ? <FileSourceReason>{reason}</FileSourceReason> : null}
+        {recoveryNotice ? <FileSourceNote testId="file-source-recovery-notice">{recoveryNotice}</FileSourceNote> : null}
+        {sessionBlocked ? body : usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
+        {reason && !previewOpen && !sessionBlocked ? <FileSourceReason>{reason}</FileSourceReason> : null}
         <FileSourceTruth />
         {previewOpen && currentFile ? (
           <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
