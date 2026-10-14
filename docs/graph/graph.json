@@ -22911,6 +22911,9 @@
     "docs/design/kiosk-redesign-2026-08-v2/10-print-hub.html": [
       "apps/kiosk/scripts/verify-p39-print-hub-fidelity.mjs"
     ],
+    "docs/design/kiosk-redesign-2026-08-v2/15-print-fulfill.html": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
     "docs/design/kiosk-redesign-2026-08-v2/16-service-hubs.html": [
       "apps/kiosk/scripts/extract-service-hub-specs.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
@@ -31566,7 +31569,8 @@
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "apps/kiosk/src/pages/scan/ScanResultPage.tsx",
           "apps/kiosk/tests/visual/fixtures/fusion-w6-route-cases.ts",
-          "apps/kiosk/tests/visual/print-done-truth.spec.ts"
+          "apps/kiosk/tests/visual/print-done-truth.spec.ts",
+          "docs/design/kiosk-redesign-2026-08-v2/15-print-fulfill.html"
         ],
         "missing": []
       },

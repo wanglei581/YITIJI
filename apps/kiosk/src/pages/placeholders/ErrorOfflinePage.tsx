@@ -377,7 +377,7 @@ export default function ErrorOfflinePage() {
                 </div>
                 <div className="k9s-card">
                   <h3><span className="k9s-ic" data-tone="cinnabar"><Glyph name="clockoff" size={26} /></span>不预告什么时候好</h3>
-                  <p>屏幕上<b>不写「预计几点恢复」</b>。{networkDisconnectLine()}，写个时间只会让你白等。</p>
+                  <p>屏幕上<b>不写「预计几点恢复」</b>，写个时间只会让你白等。{networkDisconnectLine()}。</p>
                 </div>
               </div>
             </section>

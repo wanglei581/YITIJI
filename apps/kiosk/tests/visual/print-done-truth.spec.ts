@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import type { PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { assertNoHorizontalOverflow } from './assert-layout'
 import { setReactRouterState, W2_FILE, W2_PRINT_PARAMS } from './fixtures/fusion-w2-state'
 
 const TASK_ID = 'truth-task-001'
@@ -228,6 +229,7 @@ test('a real pickup-code order without a flow amount reads the amount from the s
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
 
   // 卡纸屏、收过钱：说已付金额保留，就得同时有退款说明；不说同码接着打。
+  // 胶囊是「金额 · 打印中断」，不把新标题拼进顶栏。
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
     status: 200,
     json: { taskId: TASK_ID, status: 'failed', errorCode: 'PRINTER_ERROR', failureReasonForUser: '打印机可能卡纸或发生设备故障' },
@@ -237,14 +239,58 @@ test('a real pickup-code order without a flow amount reads the amount from the s
   await expect(jam).toContainText('你的订单和已付金额都保留着')
   await expect(jam).toContainText('如需退款')
   await expect(page.getByTestId('print-fulfill-resume-line')).toHaveCount(0)
+  await expect(page.getByText('已付 ¥2.00 · 打印中断')).toBeVisible()
 
   // 卡纸屏：0 元、服务端说还能重打，出现同码接着打那一句；不提钱。
+  // 页头和故障卡用新标题，大卡用现成那句；屏上不再写「打印机卡纸」「卡住了」。
   api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(0))
   await openAndAwaitReceipt()
   await expect(jam).toContainText('你的订单还在')
   await expect(page.getByTestId('print-fulfill-resume-line')).toContainText('回来再输一次同一个到机码就能接着打')
-  await expect(page.getByText('免费试运营，本单 0 元 · 打印机卡纸')).toBeVisible()
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印中断')).toBeVisible()
+  await expect(page.locator('.qx-pagehead h1')).toHaveText('打印机出了点问题，这次可能没打完')
+  await expect(jam.locator('.pff-issue-t')).toHaveText('打印机出了点问题，这次可能没打完')
+  await expect(jam.locator('.pff-xq-ask')).toHaveText('卡纸、缺纸、没出全？别硬拉纸。')
+  // 整页查：读屏标题、故障卡、大卡和下面各行都不再出现旧说法（「打印机卡纸故障」这类残留也拦得住）。
+  await expect(page.locator('body')).not.toContainText('打印机卡纸')
+  await expect(page.locator('body')).not.toContainText('卡住了')
   await expect(jam).not.toContainText('退款')
+  await assertNoHorizontalOverflow(page)
+  const pillClockGap = await page.evaluate(() => {
+    const pill = document.querySelector('.qx-pill')?.getBoundingClientRect()
+    const clock = document.querySelector('.qx-topbar-clock')?.getBoundingClientRect()
+    if (!pill || !clock) return -1
+    return clock.left - pill.right
+  })
+  expect(pillClockGap, '顶栏胶囊右边界不得越过时间').toBeGreaterThanOrEqual(0)
+  // 这一屏页头被 clip-path 收成读屏专用（print-fulfill-qx.css），看得见的标题是故障卡里那一行，量它。
+  const titleFit = await jam.locator('.pff-issue-t').evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    const card = el.closest('.pff-issue')?.getBoundingClientRect()
+    return {
+      full: (el.textContent ?? '').trim(),
+      clipped: !card || rect.width < 1 || rect.height < 1 || el.scrollWidth > el.clientWidth + 1
+        || rect.right > card.right + 0.5 || rect.right > window.innerWidth + 0.5,
+    }
+  })
+  expect(titleFit).toEqual({ full: '打印机出了点问题，这次可能没打完', clipped: false })
+
+  // 打印失败屏：胶囊仍是金额 · 标题，不用「打印中断」。
+  // 上面结果未确认三支已经钉过「订单保留 / 免费试运营，本单 0 元 / 已付 · 打印结果未确认」。
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: { taskId: TASK_ID, status: 'failed', failureReasonForUser: '打印机暂时离线' },
+  })
+  await openAndAwaitReceipt()
+  const failed = page.getByTestId('print-fulfill-state-failed')
+  await expect(failed).toBeVisible()
+  await expect(page.getByText('免费试运营，本单 0 元 · 打印失败')).toBeVisible()
+  await expect(page.locator('.qx-pagehead h1')).toHaveText('打印失败')
+  await expect(failed.locator('.pff-issue-t')).toHaveText('打印失败')
+  await expect(page.getByText('打印中断')).toHaveCount(0)
+  api.respond('POST', `/api/v1/print/jobs/${TASK_ID}/takeaway-url`, receipt(200))
+  await openAndAwaitReceipt()
+  await expect(page.getByText('已付 ¥2.00 · 打印失败')).toBeVisible()
 })
 
 test('paid or on-site unconfirmed prints never mention the same-code resume @kiosk', async ({ page, api }) => {

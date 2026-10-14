@@ -202,13 +202,13 @@ function HumanDesk({ no }: { no: string }) {
   const contact = useSupportContact()
   return (
     <>
-      <SectionHead no={no} title="遇到问题怎么办" hint="机器故障我们会收到提醒" />
+      <SectionHead no={no} title="遇到问题怎么办" hint="打不了请稍后再来" />
       <div className="k1-help-people">
         <div className="k1-help-contact">
           <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
           <div>
             <h3>需要帮助</h3>
-            <p>{helpNeededLine(contact)}。机器故障我们已经收到提醒，会尽快处理。</p>
+            <p>{helpNeededLine(contact)}。机器暂时打不了时，请稍后再来。</p>
             <p>也可以在「我的 → 意见反馈」里留言，登录后在那里看处理状态（处理中、已回复）。</p>
             <p className="k1-help-note">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p>
           </div>
@@ -322,7 +322,7 @@ export function HelpCenterPage() {
             </div>
             <div className="k1-help-truth" data-disclaimer="true" data-testid="help-truth">
               <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。</div>
-              <div><b>求助怎么算数</b>机器故障我们已经收到提醒。{networkDisconnectLine()}。{helpNeededLine(contact)}。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
+              <div><b>求助怎么算数</b>{networkDisconnectLine()}。{helpNeededLine(contact)}。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
             </div>
           </>
         )}
@@ -381,7 +381,7 @@ export function HelpCenterPage() {
               ) : null}
               <div className="k1-help-miss">
                 <h3><InfoIcon aria-hidden="true" />这里没答上你的问题</h3>
-                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。机器故障我们已经收到提醒。{helpNeededLine(contact)}。本页不会替你转达。</p>
+                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。{helpNeededLine(contact)}。本页不会替你转达。</p>
               </div>
             </>
           ) : null}
@@ -392,7 +392,7 @@ export function HelpCenterPage() {
               <ol className="k1-help-steps" data-testid="help-fallback">
                 <li><span className="k1-help-step-no" aria-hidden="true">1</span><strong>重新打开帮助</strong><p>点下面的重新打开帮助，这一页会再加载一次。</p></li>
                 <li><span className="k1-help-step-no" aria-hidden="true">2</span><strong>回首页再进来</strong><p>回首页重新进入要办的服务。正在办的打印不会因此取消。</p></li>
-                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>需要帮助</strong><p>连着两次都打不开。{helpNeededLine(contact)}。机器故障我们已经收到提醒。</p></li>
+                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>需要帮助</strong><p>连着两次都打不开。{helpNeededLine(contact)}。</p></li>
               </ol>
               <SectionHead no="02" title="这不影响你办事" hint="帮助页只是补充" />
               <div className="k1-help-people">
