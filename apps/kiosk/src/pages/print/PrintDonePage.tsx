@@ -533,7 +533,7 @@ export function PrintDonePage() {
           ? `系统已经登记。没出纸的话，回到打印重新选文件再打一次。${printProblemLine(contact)}`
           : `系统已经正式登记，核实后给出结论。${printProblemLine(contact)}`
       : jam
-        ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
+        ? '硬拉可能撕坏纸、伤到机器，机器里的纸留给维护人员处理。'
         : failureStaffDoing(payment, contact)
     const issueSub = isUnconfirmed
       ? unconfirmedSameCode || unconfirmedOnsiteFree ? '系统已登记，这次结果没能确认' : '系统已明确登记，等待人工核查'
