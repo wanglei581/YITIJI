@@ -30,6 +30,7 @@ import { ResumeReportHead } from './components/resume-report/ResumeReportChrome'
 import { ResumeReportStates } from './components/resume-report/ResumeReportStates'
 import { EmptyReportBody, ResumeReportBody } from './components/resume-report/ResumeReportBody'
 import { ResumeReportCta } from './components/resume-report/ResumeReportActions'
+import { readReportFrom } from './resumeReportFrom'
 import { ResumeReportTakeaway } from './components/resume-report/ResumeReportTakeaway'
 import './resume-report-qx.css'
 import './resume-r1-qx2.css'
@@ -51,6 +52,8 @@ interface ReportState {
   report?: ResumeReport
   extractionNotice?: { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] }
   targetContext?: ResumeTargetContext
+  /** 只由简历来源页按白名单写入。报告页再滤一次，不认地址栏里的 from。 */
+  from?: string
 }
 
 const CONTROL_FIELDS = new Set(['success', 'reason', 'failureCode', 'aiDown', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
@@ -107,6 +110,7 @@ export function ResumeReportPage() {
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
   const intent = state.intent === 'optimize' ? 'optimize' : 'diagnose'
+  const reportFrom = readReportFrom(typeof state.from === 'string' ? state.from : null)
   const { success = true, reason } = state
   const parsed = useMemo(() => parseReportSearch(location.search), [location.search])
   const session = useMemo(() => readAiResumeSession(), [])
@@ -294,6 +298,7 @@ export function ResumeReportPage() {
           viewState={viewState}
           canOptimize={canOptimize}
           intent={intent}
+          reportFrom={reportFrom}
           why={why}
           onRetry={() => {
             setLoadError(false)

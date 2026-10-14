@@ -343,6 +343,20 @@ assertNotIncludes(filePreview, '请重新上传文件', 'preview failure no long
   console.log('PASS report page exposes a single job-fit entry (no same-screen duplicate)')
 }
 
+// 22 号稿：报告正常态两颗按钮不按 intent 分字。上面那句是挤版事故的旧记录，
+// 当时主按钮叫「查看优化建议」；现在这个文件里不许再出现那句和「继续生成优化版简历」。
+{
+  const actions = read('src/pages/resume/components/resume-report/ResumeReportActions.tsx')
+  const normal = actions.slice(actions.lastIndexOf('return ('))
+  assert.match(normal, /data-route="\/resume\/source">\s*重新诊断\s*<\/button>/, 'normal report secondary button is the literal 重新诊断')
+  assert.match(normal, /onClick=\{onOptimize\}[^>]*>\s*继续优化这份简历\s*<\/button>/, 'canOptimize primary button is the literal 继续优化这份简历')
+  console.log('PASS normal report buttons are the literal draft labels')
+  assertNotIncludes(normal, '重新上传', 'normal report secondary button does not switch to 重新上传')
+  assertNotIncludes(normal, "intent === 'optimize' ?", 'normal report button labels do not branch on intent')
+  assertNotIncludes(actions, '查看优化建议', 'report actions file no longer says 查看优化建议')
+  assertNotIncludes(actions, '继续生成优化版简历', 'report actions file no longer says 继续生成优化版简历')
+}
+
 // ── R9 文案写支持 DOC，accept 里没有 DOC ──────────────────────────────────
 // 后端对旧版 .doc 固定返回 UNSUPPORTED_FILE_TYPE，前端 accept 已按此移除 .doc，
 // 只剩这句文案还在承诺 DOC —— 用户照它准备文件，到了机器前才发现选不中。

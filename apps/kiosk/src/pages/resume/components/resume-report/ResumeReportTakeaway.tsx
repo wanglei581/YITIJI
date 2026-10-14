@@ -13,6 +13,7 @@ import {
   EXPORT_BEFORE_PRINT_COPY,
   EXPORT_ERROR_COPY,
   GUEST_TAKEAWAY_COPY,
+  REPORT_EXPORT_PREVIEW_FAILURE_COPY,
   SAVED_TO_DOCUMENTS_COPY,
   type ExportCaptureState,
 } from '../../resume-report-model'
@@ -232,6 +233,7 @@ export function ResumeReportTakeaway(props: {
           format="pdf"
           phoneDownloadUrl={exported.signedUrl}
           expiresAt={exported.expiresAt}
+          failureMessage={exportKind === 'diagnosis_report' ? REPORT_EXPORT_PREVIEW_FAILURE_COPY : undefined}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}

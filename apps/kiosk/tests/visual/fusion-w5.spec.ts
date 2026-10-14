@@ -1671,6 +1671,36 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   expect(errors).toEqual([])
 })
 
+test('documents: a normal PDF preview failure keeps only the first sentence @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-plain', filename: '普通简历.pdf', mimeType: 'application/pdf' }),
+  ]))
+  api.respond('GET', '/api/v1/files/doc-plain/preview-url', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: 'doc-plain',
+        url: '/w5-fixtures/plain-resume.pdf',
+        expiresAt: FUTURE,
+        disposition: 'inline',
+      },
+    },
+  })
+  await page.route('**/w5-fixtures/plain-resume.pdf', (route) => route.fulfill({ status: 404, body: 'missing' }))
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectQxAssetsShell(page, 'documents-ready', 'documents')
+  await page.getByRole('button', { name: '预览', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '普通简历.pdf' })
+  await expect(dialog.getByText('预览没能生成，打印仍按原文件。', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('报告已生成，可扫码带走或直接打印')).toHaveCount(0)
+  await expectFusionAcceptance(page, errors)
+})
+
 test('documents: derived AI output skips the material check and goes straight to price confirm @w5-kiosk', async ({ page, api }) => {
   // 反向守卫：隐私闸门只管用户本人原件。AI 报告等派生产物（assetCategory=derived / optimized）
   // 服务端本就放行，不许为了「保险」也送去材料检查 —— 那会让用户对着 AI 生成的纸逐条选遮挡。

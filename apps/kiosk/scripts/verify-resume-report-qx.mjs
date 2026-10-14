@@ -107,6 +107,41 @@ assert(taskIdRe.test(sixtyFour) && !/^[A-Za-z0-9_-]{1,24}$/.test(sixtyFour), 'a 
 assert(!taskIdRe.test('a'.repeat(65)) && !taskIdRe.test('bad id') && !taskIdRe.test(''), 'task id still rejects overlong, spaced, and empty values')
 assert(has(files.model, 'evidenceCountOfBlock'), 'block tags count evidence lines separately from issues')
 assert(has(files.issues, '条证据'), 'structure blocks show how many evidence lines they hit')
+assert(has(files.actions, 'data-testid="resume-report-career-plan"'), 'normal report actions can show the career-plan return')
+assert(has(files.actions, 'reportFrom ?'), 'the career-plan return stays off unless the whitelist marker arrived')
+{
+  const marker = 'data-testid="resume-report-career-plan"'
+  const hits = files.actions.split(marker).length - 1
+  assert(hits === 1, 'resume-report-career-plan appears once')
+  const lastIf = files.actions.lastIndexOf('if (viewState ===')
+  const returns = lastIf >= 0 ? [...files.actions.slice(lastIf).matchAll(/\breturn\b/g)] : []
+  const normalReturnAt = lastIf + (returns[1]?.index ?? -1)
+  const markerAt = files.actions.indexOf(marker)
+  assert(
+    lastIf >= 0 && returns.length >= 2 && markerAt > normalReturnAt,
+    'resume-report-career-plan sits in the normal report branch, after the last viewState return',
+  )
+}
+assert(
+  has(files.actions, '`/resume/source?intent=${intent}${reportFrom ? `&from=${reportFrom}` : \'\'}`'),
+  'rediagnose keeps the whitelist from marker and does not read raw route state',
+)
+{
+  // 22 号稿正常态只有一种写法：次要「重新诊断」、主按钮「继续优化这份简历」。
+  // 两种 intent 的去处仍按原样，只钉字。不能优化时那颗置灰的主按钮本来就是这句。
+  const normal = files.actions.slice(files.actions.lastIndexOf('return ('))
+  assert(/data-route="\/resume\/source">\s*重新诊断\s*<\/button>/.test(normal), 'normal report secondary button is the literal 重新诊断')
+  assert(/onClick=\{onOptimize\}[^>]*>\s*继续优化这份简历\s*<\/button>/.test(normal), 'canOptimize primary button is the literal 继续优化这份简历')
+  assert(!normal.includes('重新上传'), 'normal report secondary button does not switch to 重新上传')
+  assert(!normal.includes("intent === 'optimize' ?"), 'normal report button labels do not branch on intent')
+  assert(!has(files.actions, '查看优化建议'), 'report actions file no longer says 查看优化建议')
+  assert(!has(files.actions, '继续生成优化版简历'), 'report actions file no longer says 继续生成优化版简历')
+}
+assert(!has(files.actions, 'state.from'), 'rediagnose does not splice the raw route-state string')
+const reportFrom = read('src/pages/resume/resumeReportFrom.ts')
+assert(has(reportFrom, "'career-plan'") && has(reportFrom, '继续做职业规划') && has(reportFrom, 'hasOwnProperty'), 'report source whitelist only accepts career-plan')
+assert(has(read('src/pages/resume/CareerPlanPage.tsx'), 'from=career-plan'), 'career plan is the entry that stamps the marker')
+assert(has(read('src/pages/resume/ResumeSourcePage.tsx'), 'readReportFrom'), 'source page drops any from value outside the whitelist')
 assert(has(files.takeaway, '带走这份报告'), 'takeaway section is titled 带走这份报告')
 assert(has(files.takeaway, 'data-testid="resume-report-takeaway-title"'), 'takeaway title has a stable test id')
 assert(has(files.css, '#resume-report-why'), 'bottom actions fill the row after the why line')

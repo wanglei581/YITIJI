@@ -13455,7 +13455,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 716,
+      "reachableFileCount": 717,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -16505,7 +16505,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 814
+      "sourceFileCount": 815
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21200,6 +21200,7 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs",
       "apps/kiosk/scripts/verify-w3a-ai-records.mjs"
     ],
     "apps/kiosk/src/pages/resume/GeneratePreviewChrome.tsx": [
@@ -21282,6 +21283,7 @@
       "apps/kiosk/scripts/verify-public-screen-mask.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs",
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
@@ -21441,6 +21443,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx": [
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx": [
@@ -21461,6 +21464,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/self-assessment/SelfAssessmentQxKit.tsx": [
@@ -21560,6 +21564,7 @@
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-model.ts": [
+      "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/resume-report-qx.css": [
@@ -21573,6 +21578,9 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/resumeReportFrom.ts": [
+      "apps/kiosk/scripts/verify-resume-report-qx.mjs"
     ],
     "apps/kiosk/src/pages/resume/self-assessment-lightflow.css": [
       "services/api/scripts/verify-compliance.ts"
@@ -31630,6 +31638,8 @@
           "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
           "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
           "apps/kiosk/src/pages/print/usePrintConfirmHandoff.ts",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx",
+          "apps/kiosk/src/pages/resume/resume-report-model.ts",
           "apps/kiosk/src/routes/index.tsx",
           "packages/shared/src/types/print.ts"
         ],
@@ -32400,6 +32410,7 @@
           "apps/kiosk/src/pages/resume/components/resume-deliver/useCompareDecisionsReturn.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useOptimizeLoad.ts",
           "apps/kiosk/src/pages/resume/components/resume-deliver/useResumeExportPricing.ts",
+          "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportScores.tsx",
           "apps/kiosk/src/pages/resume/hooks/useResumeLayout.ts",
@@ -32478,7 +32489,9 @@
         "dirs": [],
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
+          "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/components/resume-deliver/constants.ts",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportActions.tsx",
           "apps/kiosk/src/pages/resume/components/resume-report/ResumeReportBody.tsx",
@@ -32490,7 +32503,8 @@
           "apps/kiosk/src/pages/resume/resume-r1-qx2.css",
           "apps/kiosk/src/pages/resume/resume-report-fixture.ts",
           "apps/kiosk/src/pages/resume/resume-report-model.ts",
-          "apps/kiosk/src/pages/resume/resume-report-qx.css"
+          "apps/kiosk/src/pages/resume/resume-report-qx.css",
+          "apps/kiosk/src/pages/resume/resumeReportFrom.ts"
         ],
         "missing": []
       },
