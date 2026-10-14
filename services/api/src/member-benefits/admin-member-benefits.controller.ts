@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -13,9 +13,18 @@ import { GrantBenefitDto, RevokeBenefitDto, SearchEndUserByPhoneDto } from './dt
 export class AdminMemberBenefitsController {
   constructor(private readonly service: AdminMemberBenefitsService) {}
 
+  // 兼容旧后台前端；带手机号的查询改走 POST /admin/member-benefits/users/search，网址不放手机号。
   @Get('users')
+  @Header('Cache-Control', 'no-store')
   async searchUsers(@Query() query: SearchEndUserByPhoneDto, @CurrentUser() user: AuthedUser) {
     return ApiResponse.ok(await this.service.searchEndUsersByPhone(user, query.phone))
+  }
+
+  @Post('users/search')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async searchUsersPost(@Body() dto: SearchEndUserByPhoneDto, @CurrentUser() user: AuthedUser) {
+    return this.searchUsers(dto, user)
   }
 
   @Get()

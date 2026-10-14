@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`588` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`591` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -42,6 +42,7 @@
 | PATCH | `/api/v1/admin/internal-accounts/:id/status` | AdminInternalAccountsController.setStatus | admin | AdminInternalAccountsService | AuditLog<br/>User |
 | POST | `/api/v1/admin/internal-accounts/backup-admin/start` | AdminInternalAccountsController.startBackupAdmin | admin | BackupAdminCreateService | AuditLog<br/>User |
 | POST | `/api/v1/admin/internal-accounts/backup-admin/verify` | AdminInternalAccountsController.verifyBackupAdmin | admin | BackupAdminCreateService | AuditLog<br/>User |
+| POST | `/api/v1/admin/internal-accounts/search` | AdminInternalAccountsController.search | admin | — | — |
 
 ## `services/api/src/admin-ops/admin-ops.controller.ts`
 
@@ -76,6 +77,7 @@
 | POST | `/api/v1/admin/users/:endUserId/closure` | AdminUsersController.closure | admin | MemberClosureService | AdvisorArtifact<br/>AdvisorPin<br/>AiQuotaDaily<br/>AiQuotaReservation<br/>AiServiceLog<br/>AuditLog<br/>BenefitClaim<br/>BenefitGrant<br/>ContractReviewTask<br/>DocumentProcessTask<br/>EndUser<br/>FairMaterialPrintBridge<br/>FeedbackReply<br/>FeedbackTicket<br/>FileObject<br/>JobAiRecommendation<br/>KioskSession<br/>MemberLegalConsent<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>Order<br/>OrderItem<br/>OrderSubmissionLedger<br/>PaymentAttempt<br/>PiiFinding<br/>PrintTask<br/>PrintTaskStatusLog<br/>RedemptionRecord<br/>Refund<br/>ScanTask<br/>StorageDeletion<br/>User<br/>UserAiConsent<br/>UserDataRequest<br/>UserNotification |
 | POST | `/api/v1/admin/users/:endUserId/disable` | AdminUsersController.disable | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>User<br/>UserDataRequest |
 | POST | `/api/v1/admin/users/:endUserId/restore` | AdminUsersController.restore | admin | AdminUsersService | AiResumeResult<br/>AuditLog<br/>BrowseLog<br/>EndUser<br/>ExternalJumpLog<br/>FileObject<br/>PrintTask<br/>User<br/>UserDataRequest |
+| POST | `/api/v1/admin/users/search` | AdminUsersController.search | admin | — | — |
 
 ## `services/api/src/advisor/advisor.controller.ts`
 
@@ -625,6 +627,7 @@
 | POST | `/api/v1/admin/member-benefits` | AdminMemberBenefitsController.grant | admin | AdminMemberBenefitsService | AuditLog<br/>BenefitGrant<br/>EndUser<br/>User |
 | PATCH | `/api/v1/admin/member-benefits/:id/revoke` | AdminMemberBenefitsController.revoke | admin | AdminMemberBenefitsService | AuditLog<br/>BenefitGrant<br/>EndUser<br/>User |
 | GET | `/api/v1/admin/member-benefits/users` | AdminMemberBenefitsController.searchUsers | admin | AdminMemberBenefitsService | AuditLog<br/>BenefitGrant<br/>EndUser<br/>User |
+| POST | `/api/v1/admin/member-benefits/users/search` | AdminMemberBenefitsController.searchUsersPost | admin | — | — |
 
 ## `services/api/src/member-benefits/member-benefits.controller.ts`
 

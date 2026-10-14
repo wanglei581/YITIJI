@@ -24,8 +24,9 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { createClient } from '@libsql/client'
-import { GUARDS_METADATA, HEADERS_METADATA, METHOD_METADATA } from '@nestjs/common/constants'
-import { RequestMethod } from '@nestjs/common'
+import { GUARDS_METADATA, HEADERS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
+import { Module, RequestMethod, UnauthorizedException, ValidationPipe } from '@nestjs/common'
+import { NestFactory } from '@nestjs/core'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -233,13 +234,96 @@ async function main(): Promise<void> {
       requestId: controllerContext.requestId,
     } as unknown as Parameters<AdminUsersController['list']>[2]
     await controller.list(Object.assign(new ListAdminUsersDto(), { phone }), admin, request)
+    const postResult = await controller.search(Object.assign(new ListAdminUsersDto(), { phone }), admin, request)
+    assert.equal(postResult.total, 1)
+    assert.equal(postResult.items[0]?.id, endUserId)
+    assert.equal(JSON.stringify(postResult).includes(phone), false)
+    pass('POST /admin/users/search 请求体手机号命中且响应脱敏')
+    await expectCode('ADMIN_USER_SEARCH_CONFLICT', 'POST 手机号与昵称互斥', () =>
+      controller.search(Object.assign(new ListAdminUsersDto(), { phone, keyword: '会员' }), admin, request),
+    )
     const controllerAudit = await prisma.auditLog.findFirst({
       where: { requestId: controllerContext.requestId.slice(0, 128) },
     })
     assert.equal(controllerAudit?.ipAddress, '127.0.0.2')
     assert.equal(controllerAudit?.userAgent?.length, 512)
     assert.equal(controllerAudit?.requestId?.length, 128)
-    pass('审计元数据忽略伪造转发头并限制长度')
+    assert.equal(controllerAudit?.action, 'admin.user.phone_search')
+    assert.equal(controllerAudit?.payloadJson.includes(phone), false)
+    pass('POST 查人审计照写，元数据忽略伪造转发头并限制长度')
+
+    // 经过真实 Nest 路由、DTO 和类级角色守卫；只替换 JWT 解析以隔离登录依赖。
+    const originalAuth = JwtAuthGuard.prototype.canActivate
+    JwtAuthGuard.prototype.canActivate = async function (executionContext) {
+      const httpRequest = executionContext.switchToHttp().getRequest<{
+        headers: { authorization?: string }
+        user?: AuthedUser
+      }>()
+      const authorization = httpRequest.headers.authorization
+      if (!authorization) throw new UnauthorizedException()
+      httpRequest.user = { userId: adminId, role: authorization === 'Bearer partner-test' ? 'partner' : 'admin', orgId: null }
+      return true
+    }
+    const closureToken = (Reflect.getMetadata('design:paramtypes', AdminUsersController) as Function[])[1]
+    const [jwtToken, , redisToken] = Reflect.getMetadata('design:paramtypes', JwtAuthGuard) as Function[]
+    assert.ok(closureToken && jwtToken && redisToken, 'HTTP 夹具依赖元数据缺失')
+    @Module({
+      controllers: [AdminUsersController],
+      providers: [
+        { provide: AdminUsersService, useValue: service },
+        { provide: closureToken, useValue: {} },
+        { provide: jwtToken, useValue: {} },
+        { provide: PrismaService, useValue: prisma },
+        { provide: redisToken, useValue: {} },
+        JwtAuthGuard,
+        RolesGuard,
+      ],
+    })
+    class SearchHttpModule {}
+    let app: Awaited<ReturnType<typeof NestFactory.create>> | undefined
+    try {
+      app = await NestFactory.create(SearchHttpModule, { logger: false, abortOnError: false })
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))
+      await app.listen(0, '127.0.0.1')
+      const port = (app.getHttpServer().address() as { port: number }).port
+      const url = `http://127.0.0.1:${port}/admin/users/search`
+      const post = (authorization?: string) => fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(authorization ? { authorization } : {}),
+        },
+        body: JSON.stringify({ page: 1, pageSize: 20, phone }),
+      })
+      const auditsBefore = await prisma.auditLog.count({ where: { actorId: adminId, action: 'admin.user.phone_search' } })
+      const hit = await post('Bearer admin-test')
+      const hitBody = await hit.json() as { total: number; items: Array<{ id: string }> }
+      assert.equal(hit.status, 200)
+      assert.equal(hit.headers.get('cache-control'), 'no-store')
+      assert.equal(hitBody.total, 1)
+      assert.equal(hitBody.items[0]?.id, endUserId)
+      assert.equal(JSON.stringify(hitBody).includes(phone), false)
+      pass('HTTP POST 管理员手机号命中、响应脱敏且 Cache-Control: no-store')
+
+      const denied = await post('Bearer partner-test')
+      assert.equal(denied.status, 403)
+      pass('HTTP POST 非管理员被类级 RolesGuard 拒绝 403')
+      const anonymous = await post()
+      assert.equal(anonymous.status, 401)
+      pass('HTTP POST 未登录被 JwtAuthGuard 拒绝 401')
+
+      const httpAudits = await prisma.auditLog.findMany({
+        where: { actorId: adminId, action: 'admin.user.phone_search' },
+        orderBy: { createdAt: 'desc' },
+      })
+      assert.equal(httpAudits.length, auditsBefore + 1)
+      assert.equal(httpAudits.some((row) => row.targetId === endUserId), true)
+      assert.equal(httpAudits.every((row) => !row.payloadJson.includes(phone)), true)
+      pass('HTTP POST 审计照写且 payload 不含明文手机号')
+    } finally {
+      await app?.close()
+      JwtAuthGuard.prototype.canActivate = originalAuth
+    }
 
     const disabled = await service.list({ page: 1, pageSize: 20, enabled: false }, context)
     // 夹具里 enabled=false 的三位：历史停用、注销中、已匿名化。
@@ -536,6 +620,7 @@ async function createActivityCapFixtures(
 const EXPECTED_ROUTE_VERBS: Record<string, number> = {
   closure: RequestMethod.POST,
   list: RequestMethod.GET,
+  search: RequestMethod.POST,
   getDetail: RequestMethod.GET,
   disable: RequestMethod.POST,
   restore: RequestMethod.POST,
@@ -550,7 +635,7 @@ function verifyControllerMetadata(): void {
 
   const prototype = AdminUsersController.prototype as unknown as Record<string, unknown>
   const methods = Object.getOwnPropertyNames(prototype).filter((name) => name !== 'constructor')
-  assert.deepEqual(methods.sort(), ['closure', 'disable', 'getDetail', 'list', 'restore'])
+  assert.deepEqual(methods.sort(), ['closure', 'disable', 'getDetail', 'list', 'restore', 'search'])
   for (const name of methods) {
     assert.equal(
       Reflect.getMetadata(METHOD_METADATA, prototype[name] as object),
@@ -560,12 +645,13 @@ function verifyControllerMetadata(): void {
     const headers = (Reflect.getMetadata(HEADERS_METADATA, prototype[name] as object) ?? []) as Array<{ name: string; value: string }>
     assert.ok(headers.some((header) => header.name.toLowerCase() === 'cache-control' && header.value === 'no-store'))
   }
+  assert.equal(Reflect.getMetadata(PATH_METADATA, prototype.search as object), 'search')
 
   // 写边界：允许 closure / disable / restore 三条。想加第三条写路径必须先改这里，
   // 顺带被迫回答「它写不写审计、要不要 reason」——这就是这条断言存在的意义。
-  const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET)
+  const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET && name !== 'search')
   assert.deepEqual(writeMethods.sort(), ['closure', 'disable', 'restore'])
-  pass('Controller 暴露 2 个 GET + closure/disable/restore 三条写路径，动词与禁缓存头均正确')
+  pass('Controller 暴露 2 个 GET + POST search + 三条写路径，动词与禁缓存头均正确')
 }
 
 function verifyContractParity(): void {

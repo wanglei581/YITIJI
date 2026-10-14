@@ -47,6 +47,7 @@ export class AdminInternalAccountsController {
     private readonly backupAdmin: BackupAdminCreateService,
   ) {}
 
+  // 兼容旧后台前端；带手机号的查询改走 POST /admin/internal-accounts/search，网址不放手机号。
   @Get()
   @Header('Cache-Control', 'no-store')
   list(@Query() query: ListInternalAccountsDto) {
@@ -58,6 +59,13 @@ export class AdminInternalAccountsController {
       page: query.page,
       pageSize: query.pageSize,
     })
+  }
+
+  @Post('search')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  search(@Body() dto: ListInternalAccountsDto) {
+    return this.list(dto)
   }
 
   @Post('backup-admin/start')

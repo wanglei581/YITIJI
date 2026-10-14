@@ -23,7 +23,7 @@ async function setup(page: Page, options: { code?: string; pending?: boolean; cl
         return json({ endUserId: user.id, status: 'anonymized', changed: options.changed !== false })
       }
       if (url.pathname.endsWith('/closure-user')) return json({ user: { ...user, updatedAt: '2026-10-04T02:00:00Z' }, stats: { fileCount: 0, printTaskCount: 0, aiResultCount: 0, browseCount: 0, externalJumpCount: 0 }, recentActivities: [], retentionNotice: '展示当前留存记录' })
-      return json({ items: [user], total: 60, page: Number(url.searchParams.get('page') ?? 1), pageSize: 20 })
+      return json({ items: [user], total: 60, page: Number(request.postDataJSON()?.page ?? 1), pageSize: 20 })
     }
     if (url.pathname.endsWith('/auth/me')) return json({ success: true, data: { userId: MOCK_ADMIN_AUTH.user.id, role: 'admin', orgId: null } })
     if (url.pathname.endsWith('/admin/alerts')) return json({ success: true, data: [] })
@@ -67,7 +67,7 @@ test('注销筛选三个取值发送参数、写 URL、回首页；1280 无横�
     await page.getByRole('button', { name: '下一页' }).click()
     await expect(page).toHaveURL(/page=2/)
     await page.getByLabel('注销', { exact: true }).selectOption(closure)
-    await expect.poll(() => calls.at(-1)?.url.searchParams.get('closure')).toBe(closure)
+    await expect.poll(() => calls.at(-1)?.body?.closure).toBe(closure)
     await expect(page).toHaveURL(new RegExp(`closure=${closure}`))
     await expect(page).toHaveURL(/page=1/)
   }
@@ -88,7 +88,7 @@ test('无本人申请禁选，线下凭据必填，尾号只收四位数字', as
   await dialog.getByRole('button', { name: '下一步' }).click()
   await expect(dialog.getByText('请填写四位数字手机尾号。')).toBeVisible()
   await expect(dialog.getByText('请填写 1–64 字线下凭据编号。')).toBeVisible()
-  expect(calls.filter((call) => call.method === 'POST')).toHaveLength(0)
+  expect(calls.filter((call) => call.method === 'POST' && call.url.pathname.endsWith('/closure'))).toHaveLength(0)
   await dialog.getByLabel('手机尾号四位').fill('12345')
   await expect(dialog.getByLabel('手机尾号四位')).toHaveValue('1234')
   await dialog.getByLabel('线下凭据编号').fill('OFF-1')
@@ -119,7 +119,10 @@ for (const changed of [true, false]) test(`成功 changed=${changed} 刷新列�
   await confirm(page)
   await expect(page.getByRole('dialog', { name: '注销账号', exact: true })).toHaveCount(0)
   await expect(page.getByRole('status').getByText(changed ? '已注销' : '该账号此前已注销', { exact: true })).toBeVisible()
-  await expect.poll(() => calls.slice(before).filter((call) => call.method === 'GET').length).toBe(2)
+  await expect.poll(() => calls.slice(before).filter((call) =>
+    (call.method === 'POST' && call.url.pathname.endsWith('/admin/users/search'))
+    || (call.method === 'GET' && call.url.pathname.endsWith('/admin/users/closure-user')),
+  ).length).toBe(2)
   const detail = page.getByRole('dialog', { name: '用户详情' })
   await expect(detail.getByText('已注销', { exact: true })).toBeVisible()
   await expect(detail.getByText('***', { exact: true })).toBeVisible()
@@ -139,8 +142,8 @@ test('503 保留来源、事由、尾号、凭据，重试请求逐字段相同�
   await expect(dialog.getByLabel('手机尾号四位')).toHaveValue('1234')
   await expect(dialog.getByLabel('线下凭据编号')).toHaveValue('OFF-20261004-01')
   await confirm(page)
-  await expect.poll(() => calls.filter((call) => call.method === 'POST').length).toBe(2)
-  const posts = calls.filter((call) => call.method === 'POST')
+  await expect.poll(() => calls.filter((call) => call.method === 'POST' && call.url.pathname.endsWith('/closure')).length).toBe(2)
+  const posts = calls.filter((call) => call.method === 'POST' && call.url.pathname.endsWith('/closure'))
   expect(posts[0].body).toEqual(posts[1].body)
   const stored = await page.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]))
   expect(stored).not.toContain('本人到场核对身份申请注销')

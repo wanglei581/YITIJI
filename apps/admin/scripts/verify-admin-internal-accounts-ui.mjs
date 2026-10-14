@@ -1,7 +1,7 @@
 // Admin 内部账号名册（权限管理页）UI 门禁：真跑适配器 + 页面接线静态检查。
 //
 //   [A] VM 沙箱转译真跑 src/services/api/internalAccounts.ts（stub fetch / localStorage /
-//       sessionStorage / redirectToLogin）：GET 路径与查询参数（pageSize 只发 10/20/50/100）、
+//       sessionStorage / redirectToLogin）：POST 路径与请求体筛选（pageSize 只发 10/20/50/100）、
 //       PATCH 与两个 POST 的请求体键恰好是约定字段、不写任何浏览器存储、错误码与中文
 //       message 原样带回、401 统一 redirectToLogin、响应形状不对按 INVALID_RESPONSE 拒绝、
 //       { success: true, data } 包装也能解、mock 模式不发请求也不造假数据。
@@ -123,21 +123,18 @@ function callOf(harness, index = 0) {
   return harness.calls[index] ?? fail(`expected fetch call #${index}, got ${harness.calls.length}`)
 }
 
-function paramsOf(call) {
-  return new URL(call.url).searchParams
-}
-
 async function verifyAdapter() {
-  // GET：路径、查询参数、pageSize 收敛、keyword trim、无请求体
+  // POST：路径、请求体、pageSize 收敛、keyword trim，网址无筛选
   const listHarness = createAdapterHarness([{ status: 200, body: { items: [ITEM], total: 1, page: 2, pageSize: 20 } }])
   const list = await listHarness.api.listInternalAccounts({ role: 'admin', enabled: false, keyword: '  张三  ', page: 2, pageSize: 7 })
   const call = callOf(listHarness)
-  expect(call.method === 'GET', 'list must use GET')
-  expect(new URL(call.url).pathname === '/api/v1/admin/internal-accounts', `list path wrong: ${call.url}`)
-  expect(paramsOf(call).get('page') === '2' && paramsOf(call).get('pageSize') === '20', 'pageSize=7 must collapse to 20 and never be sent')
-  expect(paramsOf(call).get('role') === 'admin' && paramsOf(call).get('enabled') === 'false', 'role/enabled params')
-  expect(paramsOf(call).get('keyword') === '张三', 'keyword must be trimmed')
-  expect(call.body === undefined, 'GET must not send a body')
+  expect(call.method === 'POST', 'list must use POST')
+  expect(new URL(call.url).pathname === '/api/v1/admin/internal-accounts/search', `list path wrong: ${call.url}`)
+  expect(!/[?&](phone|keyword)=/.test(call.url) && new URL(call.url).search === '', 'list URL must not contain filters')
+  const listBody = JSON.parse(call.body)
+  expect(listBody.page === 2 && listBody.pageSize === 20, 'pageSize=7 must collapse to 20 in body')
+  expect(listBody.role === 'admin' && listBody.enabled === 'false', 'role/enabled body fields')
+  expect(listBody.keyword === '张三', 'keyword must be trimmed in body')
   expect(call.headers.Authorization === 'Bearer adapter-test-token', 'auth header must be attached')
   expect(list.items[0].id === 'a1' && list.total === 1, 'list result parsed from bare object')
   expect(listHarness.storageWrites.local === 0 && listHarness.storageWrites.session === 0, 'list must not write browser storage')

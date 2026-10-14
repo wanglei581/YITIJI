@@ -13,7 +13,7 @@
  * 允许 disable / restore / closure 三条写路径；注销须核对尾号、事由与来源，
  * 二次确认并写审计，相关正向行为由 verify-user-closure-ui.mjs 运行验证。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import ts from 'typescript'
 import vm from 'node:vm'
@@ -54,12 +54,16 @@ const shared = readFileSync(paths.shared, 'utf8')
 const drawerPrimitive = readFileSync(paths.drawerPrimitive, 'utf8')
 const runtime = `${page}\n${drawer}\n${statusDialog}\n${presentation}\n${service}\n${shared}`
 
-// 适配器写边界：GET 列表/详情，POST 停用/恢复/注销，此外不许扩写。
+// 适配器写边界：POST 请求体查列表、GET 查详情，另有停用/恢复/注销。
 const exportedFns = [...service.matchAll(/export function (\w+)\(/g)].map((match) => match[1]).sort()
 const httpVerbs = [...service.matchAll(/method:\s*'([A-Z]+)'/g)].map((match) => match[1])
 const writeVerbs = httpVerbs.filter((verb) => verb !== 'GET')
+const listAdapter = service.split('export function list(')[1]?.split('export function getDetail(')[0] ?? ''
 if (
-  service.includes("'/admin/users'") &&
+  listAdapter.includes("post<AdminUserListResult>('/admin/users/search', {") &&
+  listAdapter.includes('...query') &&
+  listAdapter.includes('enabled: query.enabled === undefined ? undefined : String(query.enabled)') &&
+  !/URLSearchParams|params\.set|\?phone=|\?keyword=/.test(listAdapter) &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/disable`') &&
   service.includes('`/admin/users/${encodeURIComponent(endUserId)}/restore`') &&
@@ -68,10 +72,23 @@ if (
   writeVerbs.length === 1 && writeVerbs[0] === 'POST' &&
   !/\b(PATCH|PUT|DELETE)\b|mockAdapter|MOCK_/.test(service)
 ) {
-  pass('API 适配器：真实 GET 列表/详情 + disable/restore/closure 三条写路径，无 mock、无其它写方法')
+  pass('API 适配器：POST 请求体查列表、GET 查详情，保留三条写路径')
 } else {
-  fail('API 适配器只允许 GET 列表/详情与 disable/restore/closure 三条写路径（单一 POST 通道，禁 PATCH/PUT/DELETE）')
+  fail('列表必须 POST /admin/users/search 且筛选只在请求体；详情仍走 GET')
 }
+
+const apiDir = join(root, 'src/services/api')
+const benefitsAdapter = readFileSync(join(apiDir, 'memberBenefitsAdmin.ts'), 'utf8')
+if (!benefitsAdapter.includes("request('/admin/member-benefits/users/search', { method: 'POST', body: { phone } })")) {
+  fail('会员权益查人必须 POST /users/search，手机号只在请求体')
+}
+for (const file of readdirSync(apiDir).filter((name) => /\.[cm]?[jt]sx?$/.test(name))) {
+  const source = readFileSync(join(apiDir, file), 'utf8')
+  if (/\?phone=|(?:searchParams|params)\.set\(\s*['"]phone['"]|encodeURIComponent\(\s*phone\s*\)/.test(source)) {
+    fail(`手机号不得拼进请求网址：${file}`)
+  }
+}
+pass('会员权益 POST 请求体查人，后台 API 服务目录无手机号拼入查询串')
 
 const pageTokens = [
   '用户管理',

@@ -41,7 +41,9 @@ export async function verifyUserClosure({ root, pass, fail, presentationModule }
     const query = presentationModule.buildAdminUserQuery({ search: '', enabled: 'all', registeredFrom: '', registeredTo: '', closure }, 1, 20)
     check(query.closure === closure && presentationModule.hasUserFilters({ ...query, search: '', enabled: 'all' }), `closure=${closure} 正向查询映射`)
     await adapter.list(query)
-    check(new URL(calls.at(-1).url, 'https://test.invalid').searchParams.get('closure') === closure, `HTTP 发送 closure=${closure}`)
+    const sent = calls.at(-1)
+    check(sent.url === '/api/v1/admin/users/search' && sent.options.method === 'POST'
+      && JSON.parse(sent.options.body).closure === closure, `HTTP 请求体发送 closure=${closure}`)
     check(page.includes(`value="${closure}"`), `页面提供 ${closure} 选项`)
   }
   check(/next\.set\('page', '1'\)/.test(page) && page.includes("next.set('closure', value)") && page.includes('useTableState'), '注销筛选写 URL 并回第一页')

@@ -235,16 +235,29 @@ async function main(): Promise<void> {
     const byPhone = await http('GET', `/admin/internal-accounts?keyword=${phones.partner}`, tokA)
     check('A12 关键字是手机号时按手机号精确匹配', byPhone.status === 200 && byPhone.body.total === 1
       && (byPhone.body.items as Array<{ id: string }>)[0]?.id === partner.id)
+    const postPhone = await http('POST', '/admin/internal-accounts/search', tokA, { keyword: phones.partner })
+    check('A12a POST 请求体手机号精确匹配且只返回脱敏值', postPhone.status === 200 && postPhone.body.total === 1
+      && (postPhone.body.items as Array<{ id: string }>)[0]?.id === partner.id && !JSON.stringify(postPhone.body).includes(phones.partner))
+    const postKeyword = await http('POST', '/admin/internal-accounts/search', tokA, { keyword: `va-admin-b-${suffix}` })
+    check('A12b POST 普通关键词按用户名筛选', postKeyword.status === 200 && postKeyword.body.total === 1
+      && (postKeyword.body.items as Array<{ id: string }>)[0]?.id === adminB.id)
     const page1 = await http('GET', '/admin/internal-accounts?role=admin&pageSize=10&page=1', tokA)
     const page2 = await http('GET', '/admin/internal-accounts?role=admin&pageSize=10&page=2', tokA)
     const adminCount = await prisma.user.count({ where: { role: 'admin', deletedAt: null } })
     check('A13 分页：total 为真实条数、page/pageSize 回显、第二页不与第一页重复',
       page1.body.total === adminCount && page1.body.page === 1 && page1.body.pageSize === 10
       && (page2.body.items as Array<{ id: string }>).every((item) => !(page1.body.items as Array<{ id: string }>).some((p) => p.id === item.id)))
+    const postPage1 = await http('POST', '/admin/internal-accounts/search', tokA, { role: 'admin', pageSize: 10, page: 1 })
+    const postPage2 = await http('POST', '/admin/internal-accounts/search', tokA, { role: 'admin', pageSize: 10, page: 2 })
+    check('A13a POST 分页与 GET 一致', postPage1.status === 200 && postPage2.status === 200
+      && postPage1.body.total === adminCount && postPage2.body.page === 2
+      && (postPage2.body.items as Array<{ id: string }>).every((item) => !(postPage1.body.items as Array<{ id: string }>).some((p) => p.id === item.id)))
     check('A14 pageSize 不在 10/20/50/100 → 400', codeOf(await http('GET', '/admin/internal-accounts?pageSize=7', tokA)) === 'VALIDATION_FAILED')
     check('A15 role 不是内部角色 → 400', codeOf(await http('GET', '/admin/internal-accounts?role=enduser', tokA)) === 'VALIDATION_FAILED')
     const asPartner = await http('GET', '/admin/internal-accounts', tokP)
     check('A16 合作机构账号读名册 → 403', asPartner.status === 403 && codeOf(asPartner) === 'AUTH_ROLE_FORBIDDEN', `${asPartner.status}`)
+    const postAsPartner = await http('POST', '/admin/internal-accounts/search', tokP, { keyword: phones.partner })
+    check('A16a 合作机构账号 POST 查名册 → 403', postAsPartner.status === 403 && codeOf(postAsPartner) === 'AUTH_ROLE_FORBIDDEN')
     check('A17 合作机构账号调启停 / 建备用 → 403',
       (await http('PATCH', `/admin/internal-accounts/${adminB.id}/status`, tokP, { action: 'disable', reason: '越权测试', adminCurrentPassword: pw.p })).status === 403
       && (await http('POST', '/admin/internal-accounts/backup-admin/start', tokP, { phone: phones.backup, adminCurrentPassword: pw.p })).status === 403)

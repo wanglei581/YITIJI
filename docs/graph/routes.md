@@ -304,7 +304,7 @@ flowchart LR
   app --> job_sources["/job-sources<br/>1 页 · 19 端点"]
   app --> legal_docs["/legal-docs<br/>1 页 · 0 端点"]
   app --> login["/login<br/>1 页 · 0 端点"]
-  app --> member_benefits["/member-benefits<br/>1 页 · 2 端点"]
+  app --> member_benefits["/member-benefits<br/>1 页 · 3 端点"]
   app --> member_feedback["/member-feedback<br/>1 页 · 3 端点"]
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
   app --> offline_agencies["/offline-agencies<br/>1 页 · 0 端点"]
@@ -345,7 +345,7 @@ flowchart LR
 | `/job-sources` | JobSourcesPage | `apps/admin/src/routes/job-sources/index.tsx` | 19 | — |
 | `/legal-docs` | LegalDocsPage | `apps/admin/src/routes/legal-docs/index.tsx` | 0 | — |
 | `/login` | LoginPage | `apps/admin/src/routes/login/index.tsx` | 0 | 1 |
-| `/member-benefits` | MemberBenefitsPage | `apps/admin/src/routes/member-benefits/index.tsx` | 2 | — |
+| `/member-benefits` | MemberBenefitsPage | `apps/admin/src/routes/member-benefits/index.tsx` | 3 | — |
 | `/member-feedback` | MemberFeedbackPage | `apps/admin/src/routes/member-feedback/index.tsx` | 3 | — |
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
 | `/offline-agencies` | Navigate | — _(重定向)_ | 0 | — |
@@ -399,7 +399,7 @@ flowchart LR
 
 **`/job-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
-**`/member-benefits`** → `PATCH /admin/member-benefits/:param/revoke`、`POST /admin/member-benefits`
+**`/member-benefits`** → `PATCH /admin/member-benefits/:param/revoke`、`POST /admin/member-benefits`、`POST /admin/member-benefits/users/search`
 
 **`/member-feedback`** → `PATCH /admin/feedback/:param/status`、`POST /admin/feedback/:param/contact-phone`、`POST /admin/feedback/:param/replies`
 
@@ -409,7 +409,7 @@ flowchart LR
 
 **`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/import-batches`、`GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/system/recruitment-hosting`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`PUT /admin/orgs/:param/accounts/:param/email`、`PUT /admin/orgs/:param/verified-official-domains`
 
-**`/permissions`** → `GET /admin/internal-accounts`、`PATCH /admin/internal-accounts/:param/status`、`POST /admin/internal-accounts/backup-admin/start`、`POST /admin/internal-accounts/backup-admin/verify`
+**`/permissions`** → `PATCH /admin/internal-accounts/:param/status`、`POST /admin/internal-accounts/backup-admin/start`、`POST /admin/internal-accounts/backup-admin/verify`、`POST /admin/internal-accounts/search`
 
 **`/policy-sources`** → `DELETE /files/:param`、`GET /admin/ai/logs`、`GET /admin/ai/usage`、`GET /admin/import-batches`、`GET /admin/jobs/quality-summary`、`GET /admin/orgs/:param/official-channels`、`GET /admin/orgs/:param/verified-official-domains`、`GET /admin/policy-sources/:param/eligibility-rules`、`GET /admin/system/recruitment-hosting`、`GET /files`、`GET /files/:param/url`、`GET /files/lifecycle-summary`、`GET /policies/eligibility-questions`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/recruitment-emergency/circuit-break`、`POST /admin/recruitment-emergency/takedown`、`POST /files/cleanup-expired`、`PUT /admin/orgs/:param/verified-official-domains`
 
@@ -423,7 +423,7 @@ flowchart LR
 
 **`/toolbox`** → `GET /admin/toolbox/allowed-hosts`、`GET /admin/toolbox/apps`、`GET /admin/toolbox/apps/:param/versions`、`GET /admin/toolbox/launch-summary`、`GET /admin/toolbox/terminals`、`POST /admin/toolbox/allowed-hosts`、`POST /admin/toolbox/allowed-hosts/:param/review`、`POST /admin/toolbox/apps`、`POST /admin/toolbox/apps/:param/suspend`、`POST /admin/toolbox/apps/:param/versions`、`POST /admin/toolbox/apps/:param/versions/:param/approve`、`POST /admin/toolbox/apps/:param/versions/:param/publish`、`POST /admin/toolbox/apps/:param/versions/:param/reject`、`POST /admin/toolbox/apps/:param/versions/:param/submit`、`PUT /admin/terminals/:param/toolbox-config`
 
-**`/users`** → `GET /admin/import-batches`、`GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/users`、`GET /admin/users/:param`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/users/:param/closure`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`
+**`/users`** → `GET /admin/import-batches`、`GET /admin/orders`、`GET /admin/orders/:param`、`GET /admin/users/:param`、`PATCH /admin/fair-sources/:param/publish`、`PATCH /admin/fair-sources/:param/review`、`PATCH /admin/job-sources/:param/publish`、`PATCH /admin/job-sources/:param/review`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`、`POST /admin/users/:param/closure`、`POST /admin/users/:param/disable`、`POST /admin/users/:param/restore`、`POST /admin/users/search`
 
 </details>
 

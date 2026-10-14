@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 588,
+    "endpointCount": 591,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1998,6 +1998,18 @@
         ]
       },
       {
+        "controller": "services/api/src/admin-internal-accounts/admin-internal-accounts.controller.ts",
+        "handler": "AdminInternalAccountsController.search",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/internal-accounts/search",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getJobSources",
         "method": "GET",
@@ -2440,6 +2452,18 @@
         "services": [
           "AdminMemberBenefitsService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-benefits/admin-member-benefits.controller.ts",
+        "handler": "AdminMemberBenefitsController.searchUsersPost",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/member-benefits/users/search",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-privacy/admin-member-privacy.controller.ts",
@@ -5160,6 +5184,18 @@
         "services": [
           "AdminUsersService"
         ]
+      },
+      {
+        "controller": "services/api/src/admin-users/admin-users.controller.ts",
+        "handler": "AdminUsersController.search",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/users/search",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
@@ -13081,7 +13117,8 @@
           "component": "MemberBenefitsPage",
           "endpoints": [
             "PATCH /admin/member-benefits/:param/revoke",
-            "POST /admin/member-benefits"
+            "POST /admin/member-benefits",
+            "POST /admin/member-benefits/users/search"
           ],
           "file": "apps/admin/src/routes/member-benefits/index.tsx",
           "layout": [
@@ -13208,10 +13245,10 @@
         {
           "component": "PermissionsPage",
           "endpoints": [
-            "GET /admin/internal-accounts",
             "PATCH /admin/internal-accounts/:param/status",
             "POST /admin/internal-accounts/backup-admin/start",
-            "POST /admin/internal-accounts/backup-admin/verify"
+            "POST /admin/internal-accounts/backup-admin/verify",
+            "POST /admin/internal-accounts/search"
           ],
           "file": "apps/admin/src/routes/permissions/index.tsx",
           "layout": [
@@ -13430,7 +13467,6 @@
             "GET /admin/import-batches",
             "GET /admin/orders",
             "GET /admin/orders/:param",
-            "GET /admin/users",
             "GET /admin/users/:param",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
@@ -13440,7 +13476,8 @@
             "POST /admin/orders/:param/refund",
             "POST /admin/users/:param/closure",
             "POST /admin/users/:param/disable",
-            "POST /admin/users/:param/restore"
+            "POST /admin/users/:param/restore",
+            "POST /admin/users/search"
           ],
           "file": "apps/admin/src/routes/users/index.tsx",
           "layout": [
@@ -25614,6 +25651,7 @@
       "services/api/scripts/verify-kiosk-upload-print-contract.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts",
+      "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
@@ -28713,7 +28751,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/admin/src/services/api"
+        ],
         "files": [
           "apps/admin/scripts/verify-user-closure-ui.mjs",
           "apps/admin/src/routes/users/UserDetailDrawer.tsx",
@@ -39579,6 +39619,7 @@
           "services/api/src/common/decorators/roles.decorator.ts",
           "services/api/src/common/guards/jwt-auth.guard.ts",
           "services/api/src/common/guards/roles.guard.ts",
+          "services/api/src/common/redis/redis.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.controller.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-benefits/member-benefits.service.ts",

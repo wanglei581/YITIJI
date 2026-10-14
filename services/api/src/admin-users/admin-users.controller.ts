@@ -46,6 +46,7 @@ function auditContextOf(admin: AuthedUser, request: AuditRequest): AdminUserAudi
 export class AdminUsersController {
   constructor(private readonly service: AdminUsersService, private readonly closures: MemberClosureService) {}
 
+  // 兼容旧后台前端；带手机号的查询改走 POST /admin/users/search，网址不放手机号。
   @Get()
   @Header('Cache-Control', 'no-store')
   async list(
@@ -64,6 +65,17 @@ export class AdminUsersController {
       registeredTo: query.registeredTo,
     }
     return this.service.list(serviceQuery, auditContextOf(admin, request))
+  }
+
+  @Post('search')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async search(
+    @Body() dto: ListAdminUsersDto,
+    @CurrentUser() admin: AuthedUser,
+    @Req() request: AuditRequest,
+  ) {
+    return this.list(dto, admin, request)
   }
 
   @Post(':endUserId/closure')
