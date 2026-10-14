@@ -173,7 +173,7 @@ const releasePiiGateOffset = releaseScript.indexOf(
   'if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then'
 )
 const dumpMvOffset = releaseScript.indexOf('mv -f -- "$DUMP_PARTIAL" "$BACKUP_PREFIX.dump"')
-const runtimeCopyOffset = releaseScript.indexOf('cp -a "$RUNTIME_ROOT" "$RUNTIME_PARTIAL"')
+const runtimeCopyOffset = releaseScript.indexOf('rsync -a --exclude \'services/api/storage\' "$RUNTIME_ROOT/" "$RUNTIME_PARTIAL/"')
 const runtimeMvOffset = releaseScript.indexOf('mv -f -- "$RUNTIME_PARTIAL" "$BACKUP_PREFIX.runtime"')
 const restoreTrapOffset = releaseScript.indexOf("trap 'restore_runtime_and_exit")
 const persistPiiGateOffset = releaseScript.indexOf('ENV_FILE="$API_DIR/.env"')
@@ -187,7 +187,7 @@ assert.ok(
     runtimeCopyOffset > dumpMvOffset &&
     runtimeMvOffset > runtimeCopyOffset &&
     restoreTrapOffset > runtimeMvOffset,
-  'partial dump and runtime copies must be renamed before the rollback trap is armed'
+  'partial dump and storage-excluding runtime copies must be renamed before the rollback trap is armed'
 )
 assert.ok(
   runtimeMvOffset < persistPiiGateOffset && persistPiiGateOffset < migrationOffset,

@@ -18647,6 +18647,10 @@
     ".ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    ".github/scripts/prune-prerelease-dumps.mjs": [
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     ".github/workflows/ci.yml": [
       "apps/kiosk/scripts/verify-browser-spec-coverage.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
@@ -23604,6 +23608,9 @@
     "services/api/scripts/backfill-terminal-credentials.ts": [
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
+    "services/api/scripts/backup-postgres.sh": [
+      "services/api/scripts/verify-backup-ops.mjs"
+    ],
     "services/api/scripts/change-password-verify-target.ts": [
       "services/api/scripts/verify-change-password-target-guard.ts",
       "services/api/scripts/verify-change-password.ts"
@@ -27668,6 +27675,11 @@
     "services/api/src/recruitment-content/recruitment-wave2-target.ts": [
       "services/api/scripts/verify-recruitment-wave2-full-inventory.ts",
       "services/api/scripts/verify-recruitment-wave2-readonly.ts"
+    ],
+    "services/api/src/recruitment-hosting/deployment-ownership.ts": [
+      "scripts/verify-deploy-gates-in-sync.mjs",
+      "scripts/verify-deploy-rollback.mjs",
+      "services/api/scripts/verify-production-runtime-gates.ts"
     ],
     "services/api/src/recruitment-hosting/recruitment-emergency.controller.ts": [
       "services/api/scripts/verify-official-channels.ts",
@@ -34327,7 +34339,8 @@
           "apps/partner/src/services/api/client.ts",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -34345,11 +34358,13 @@
         "absent": [],
         "dirs": [],
         "files": [
+          ".github/scripts/prune-prerelease-dumps.mjs",
           ".github/workflows/deploy.yml",
           ".github/workflows/server-cleanup.yml",
           "services/api/scripts/preflight-legal-docs.mjs",
           "services/api/scripts/preflight-production-gates.mjs",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },
@@ -36641,7 +36656,9 @@
           "services/api/prisma/postgres/migrations"
         ],
         "files": [
+          ".github/scripts/prune-prerelease-dumps.mjs",
           "docs/device/postgres-operations.md",
+          "services/api/scripts/backup-postgres.sh",
           "services/api/scripts/rclone-offsite.conf.example",
           "services/api/scripts/restore-offsite-drill.sh"
         ],
@@ -41840,7 +41857,8 @@
         "files": [
           "services/api/src/common/jwt-verifier.module.ts",
           "services/api/src/common/pdf/aigc-label.ts",
-          "services/api/src/config/production-runtime-gates.ts"
+          "services/api/src/config/production-runtime-gates.ts",
+          "services/api/src/recruitment-hosting/deployment-ownership.ts"
         ],
         "missing": []
       },

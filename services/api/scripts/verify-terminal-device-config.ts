@@ -1080,6 +1080,27 @@ async function runServiceChecks(): Promise<void> {
       fail(`7. 停用终端 Kiosk config 未关闭: ${JSON.stringify(kioskConfig)}`)
     }
 
+    const hostingBefore = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+    try {
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+      const hostingOffConfig = await terminals.getKioskTerminalConfig(codeA)
+      if (hostingOffConfig.recruitmentHosting && typeof hostingOffConfig.recruitmentHosting.enabled === 'boolean') {
+        pass('7b. 托管关时下发给终端的配置含 recruitmentHosting')
+      } else {
+        fail('7b. 托管关时下发给终端的配置缺少 recruitmentHosting')
+      }
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+      const hostingOnConfig = await terminals.getKioskTerminalConfig(codeA)
+      if (hostingOnConfig.recruitmentHosting && typeof hostingOnConfig.recruitmentHosting.enabled === 'boolean') {
+        pass('7c. 托管开时下发给终端的配置含 recruitmentHosting')
+      } else {
+        fail('7c. 托管开时下发给终端的配置缺少 recruitmentHosting')
+      }
+    } finally {
+      if (hostingBefore === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = hostingBefore
+    }
+
     const publicBody = JSON.stringify(kioskConfig)
     const forbiddenPublicKeys = [
       '"terminal":',

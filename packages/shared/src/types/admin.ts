@@ -38,15 +38,28 @@ export interface PublishActionPayload {
 }
 
 /**
+ * 私有化部署且招聘内容托管打开时，运营单位自己填写的名称和许可证编号。
+ * 编号是全文（只去首尾空格）。本软件不核验。
+ */
+export interface RecruitmentOperatorSelfReport {
+  name: string
+  licenseNumber: string
+}
+
+/**
  * `GET /api/v1/admin/system/recruitment-hosting` 的 `data`。
  *
  * 信封是 `{ success: true, data }`。`enabled` 与 `deploymentEnabled` 都等于
  * 部署开关，不看请求参数。管理员招聘类页面用它决定只留查看与紧急下架。
+ * `deploymentOwnership` 认不出按 `vendor_cloud`。`operatorSelfReport` 只在
+ * 客户私有化部署且托管打开、两项都填了时有值。
  */
 export interface AdminRecruitmentHostingStatus {
   recruitmentHosting: {
     enabled: boolean
     deploymentEnabled: boolean
+    deploymentOwnership: 'vendor_cloud' | 'customer_private'
+    operatorSelfReport: RecruitmentOperatorSelfReport | null
   }
 }
 

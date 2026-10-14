@@ -25,6 +25,11 @@
  *   - TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式声明 true|false；滚动部署第一阶段保持
  *     false，所有 API 实例升级且旧 binary 退出后再切 true
  *   - 中文 PDF 字体必须可由 PDFKit 实际注册；生产缺失即拒绝启动
+ *   - 招聘锁（只在生产生效）：部署归属认不出按我方云；我方云打开
+ *     RECRUITMENT_CONTENT_HOSTING_ENABLED 即拒绝启动
+ *     （PRODUCTION_RECRUITMENT_HOSTING_LOCKED）；客户私有化部署打开时必须同时填写
+ *     RECRUITMENT_OPERATOR_NAME 与 RECRUITMENT_OPERATOR_LICENSE_NO
+ *     （PRODUCTION_RECRUITMENT_OPERATOR_SELF_REPORT_MISSING）
  *
  * AI 类配置**不在此列**（2026-09-29 F-11）：OCR_PROVIDER / 百度 OCR 密钥、AI_PROVIDER / 大模型密钥、
  * AIGC_CONTENT_PRODUCER 缺失或不合法时不再拒启动 —— 那会让打印、扫描、支付、两个后台跟着停。
@@ -36,6 +41,11 @@
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
 import { probeCjkFont, type CjkFontProbeResult } from '../common/pdf/cjk-font'
+import {
+  evaluateRecruitmentLock,
+  recruitmentLockProductionError,
+  type RecruitmentLockEnv,
+} from '../recruitment-hosting/deployment-ownership'
 import { evaluateAiPlatform, type AiPlatformState } from './ai-platform-config'
 import { assertProductionTrustProxyHops } from './trust-proxy'
 
@@ -70,6 +80,10 @@ export interface ProductionRuntimeEnv {
   TRUST_PROXY_HOPS?: string
   TERMINAL_LEGACY_REGISTER_ENABLED?: string
   TERMINAL_PLANNED_PROVISIONING_ENABLED?: string
+  DEPLOYMENT_OWNERSHIP?: string
+  RECRUITMENT_CONTENT_HOSTING_ENABLED?: string
+  RECRUITMENT_OPERATOR_NAME?: string
+  RECRUITMENT_OPERATOR_LICENSE_NO?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -121,6 +135,13 @@ export function assertProductionRuntimeGates(
     )
   }
   if (nodeEnv !== 'production') return { aiPlatform: evaluateAiPlatform(env) }
+
+  // 招聘锁只在生产拒绝启动。判断托管开没开走 evaluateRecruitmentLock，
+  // 不在这里写 env 与 'true' 的比较（同步门禁用那种形态抽「必须为 true」的键）。
+  const recruitmentLockError = recruitmentLockProductionError(
+    evaluateRecruitmentLock(env as RecruitmentLockEnv).verdict,
+  )
+  if (recruitmentLockError) throw recruitmentLockError
 
   if (!cjkFontProbe.ok) {
     throw new Error(

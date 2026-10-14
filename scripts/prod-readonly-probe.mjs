@@ -45,6 +45,7 @@ const PATH_HEALTH = '/api/v1/health'
 const PATH_READY = '/api/v1/health/ready'
 const PATH_JOBS = '/api/v1/jobs?pageSize=50'
 const PATH_FAIRS = '/api/v1/job-fairs?pageSize=50'
+const PATH_FAIR_HOSTING_PROBE = '/api/v1/job-fairs/00000000000000000000000000000000'
 const PATH_POLICIES = '/api/v1/policies?pageSize=50'
 const PATH_COMPANIES = '/api/v1/companies?pageSize=50'
 const PATH_OFFLINE_AGENCIES = '/api/v1/kiosk/offline-agencies?pageSize=50'
@@ -530,6 +531,29 @@ async function runChecks(cli) {
       if (res.error) return row(item, 'FAIL', res.error)
       if (res.status === 401) return row(item, 'PASS', '401（#841 端点存在且受保护）')
       return row(item, 'FAIL', `期望 401，实际 HTTP ${res.status} ${snippet(res.body)}`)
+    })(),
+  )
+
+  // 匿名只读：不存在的招聘会 id。托管关 → 403；托管开 → 200 且 data 为 null，不写库。
+  tasks.push(
+    (async () => {
+      const item = `GET ${PATH_FAIR_HOSTING_PROBE}`
+      const res = await get(PATH_FAIR_HOSTING_PROBE)
+      if (res.error) return row(item, 'FAIL', res.error)
+      if (res.status === 403) {
+        const json = parseJson(res.body)
+        const code = json && typeof json === 'object' && json.error && typeof json.error === 'object'
+          ? json.error.code
+          : undefined
+        if (code === 'RECRUITMENT_HOSTING_DISABLED') {
+          return row(item, 'PASS', '403 RECRUITMENT_HOSTING_DISABLED（招聘内容托管关）')
+        }
+        return row(item, 'FAIL', `HTTP 403 但 error.code 不是 RECRUITMENT_HOSTING_DISABLED ${snippet(res.body)}`)
+      }
+      if (res.status === 200) {
+        return row(item, 'FAIL', '招聘内容托管在生产上是开的（招聘锁没生效）')
+      }
+      return row(item, 'FAIL', `HTTP ${res.status} ${snippet(res.body)}`)
     })(),
   )
 

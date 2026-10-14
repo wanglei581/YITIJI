@@ -23,8 +23,10 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const deployScript = join(root, '.github/scripts/deploy-api-release.sh')
+const deployScript = process.env.VERIFY_DEPLOY_SCRIPT || join(root, '.github/scripts/deploy-api-release.sh')
+const prereleaseHelper = process.env.VERIFY_PRERELEASE_HELPER || join(root, '.github/scripts/prune-prerelease-dumps.mjs')
 const workflow = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8')
+const deployPrecheck = readFileSync(join(root, '.github/scripts/deploy-precheck.sh'), 'utf8')
 let failures = 0
 const pass = (message) => console.log(`  PASS ${message}`)
 const fail = (message) => { failures += 1; console.error(`  FAIL ${message}`) }
@@ -36,6 +38,8 @@ check(workflow.includes('if [ -z "${DEPLOY_ADMIN_WEB_ROOT:-}" ] || [ -z "${DEPLO
 check(/\nconcurrency:\n  group: production-deploy\n  cancel-in-progress: false\n/.test(workflow), '生产发布串行：concurrency 组、不取消进行中的发布')
 check(workflow.indexOf('✅ API-only 部署完成') >= 0 && workflow.indexOf('✅ API-only 部署完成') < workflow.indexOf('STATIC_BACKUP_ROOT'),
   'API-only 在静态目录备份之前退出')
+check(deployPrecheck.includes('command -v flock') && deployPrecheck.includes('FLOCK_INSTALLED='), '只读预检查服务器是否安装 flock')
+check(deployPrecheck.includes('command -v rsync') && deployPrecheck.includes('RSYNC_INSTALLED='), '只读预检查服务器是否安装 rsync')
 // 变量名后面紧跟中文标点（如 "$HEALTH_URL）"）：非 UTF-8 语言环境下 bash 会把那个字节当成变量名的一部分，
 // set -u 之下直接「unbound variable」退出。服务器经 SSH 执行时的语言环境不由我们保证，一律写成 ${VAR}。
 for (const [label, text] of [['deploy-api-release.sh', readFileSync(deployScript, 'utf8')], ['deploy.yml', workflow]]) {
@@ -82,6 +86,30 @@ for name in os.listdir(base):
 }
 
 function makeShims(bin) {
+  if (isDarwin) writeExec(join(bin, 'flock'), `#!/usr/bin/env python3
+import fcntl, os, sys, time
+args=sys.argv[1:]
+nonblock='-n' in args
+timeout=float(args[args.index('-w')+1]) if '-w' in args else 0
+fd=int(args[-1])
+deadline=time.monotonic()+timeout
+while True:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        break
+    except BlockingIOError:
+        if nonblock or time.monotonic()>=deadline: sys.exit(1)
+        time.sleep(0.05)
+`)
+  writeExec(join(bin, 'rsync'), `#!/usr/bin/env bash
+case "$*" in
+  *"--server"*) exec /usr/bin/rsync "$@" ;;
+esac
+if [ "\${DRILL_CP_FAIL:-}" = 1 ] && [[ "\${!#}" == *.runtime.partial/ ]]; then
+  exit 1
+fi
+exec /usr/bin/rsync "$@"
+`)
   writeExec(join(bin, 'pnpm'), `#!/usr/bin/env bash
 echo "pnpm $* @ $PWD" >> "$DRILL_CALLS"
 case "$*" in
@@ -111,7 +139,16 @@ exit 0
 `)
   writeExec(join(bin, 'pg_dump'), `#!/usr/bin/env bash
 echo "pg_dump $*" >> "$DRILL_CALLS"
-out=""; while [ $# -gt 0 ]; do [ "$1" = -f ] && out="$2"; shift; done
+if [ "\${DRILL_CHECK_LOCK:-}" = 1 ]; then
+  ( exec 8>"$DEPLOY_BACKUP_ROOT/.prune.lock"; if flock -n 8; then echo release-lock-missing; else echo release-lock-held; fi ) >> "$DRILL_CALLS"
+fi
+out=""; while [ $# -gt 0 ]; do
+  case "$1" in
+    -f) out="$2" ;;
+    --file=*) out="\${1#--file=}" ;;
+  esac
+  shift
+done
 if [ "\${DRILL_PG_DUMP_FAIL:-}" = 1 ]; then
   [ -n "$out" ] && printf 'partial\\n' > "$out"
   exit 1
@@ -137,6 +174,10 @@ exit 0
 `)
   writeExec(join(bin, 'pm2'), `#!/usr/bin/env bash
 echo "pm2 $* COMMIT=\${COMMIT:-}" >> "$DRILL_CALLS"
+if [ "$1" = restart ] && [ -e /dev/fd/9 ]; then echo 'pm2-inherited-prune-lock' >> "$DRILL_CALLS"; fi
+if [ "$1" = restart ] && [ "\${DRILL_CHECK_LOCK:-}" = 1 ]; then
+  ( exec 8>"$DEPLOY_BACKUP_ROOT/.prune.lock"; if flock -n 8; then echo restart-lock-missing; else echo restart-lock-held; fi ) >> "$DRILL_CALLS"
+fi
 if [ "\${DRILL_PM2_LOGROTATE:-}" = installed ]; then
   case "$1" in
     ls) printf '%s\\n' "\${DRILL_PM2_LS_OUT:-pm2-logrotate online}" ;;
@@ -203,6 +244,7 @@ printf '%s\\n' "drill 100000000 1000 \${avail} 1% /"
 `)
   // 「哪个版本在跑」用运行目录里的 VERSION 表示：PM2 是桩，重启后读到的就是运行目录当前内容。
   writeExec(join(bin, 'curl'), `#!/usr/bin/env bash
+if [[ " $* " == *" -X POST "* ]]; then echo 'alert-post' >> "$DRILL_CALLS"; exit 0; fi
 version="$(cat "$DRILL_RUNTIME/VERSION" 2>/dev/null)"
 case "$DRILL_HEALTH" in
   always) ;;
@@ -234,7 +276,12 @@ exec "${dateBin}" "$@"
 `)
 }
 
-function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
+const fixtureNow = Date.now()
+const oldStem = (i) => {
+  const d = new Date(fixtureNow - (6 - i) * 86400000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  return `pre-old${i}-${d}`
+}
+function makeSandbox({ oldGroups = 0, pointerUnwritable = false, omitOwnershipFile = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'deploy-drill-'))
   const bin = join(dir, 'bin')
   const checkout = join(dir, 'checkout')
@@ -244,10 +291,17 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   makeShims(bin)
 
   mkdirSync(join(checkout, 'services/api/src/config'), { recursive: true })
+  mkdirSync(join(checkout, 'services/api/src/recruitment-hosting'), { recursive: true })
   mkdirSync(join(checkout, 'services/api/scripts'), { recursive: true })
   // 新旧内容长度不同：rsync 按「大小 + 修改时间」快速比对，同秒创建的同长文件会被当成没变
   writeFileSync(join(checkout, 'VERSION'), 'new-release\n')
   writeFileSync(join(checkout, 'services/api/src/config/production-runtime-gates.ts'), 'PRINT_REQUIRE_PII_SCAN\nPRINT_REQUIRE_PRINTER_ONLINE\n')
+  if (!omitOwnershipFile) {
+    writeFileSync(
+      join(checkout, 'services/api/src/recruitment-hosting/deployment-ownership.ts'),
+      "export const DEPLOYMENT_OWNERSHIP_ENV = 'DEPLOYMENT_OWNERSHIP'\n",
+    )
+  }
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
   // 3d 法务文档预检的替身：记下调用参数；DRILL_LEGAL_PREFLIGHT=missing 时按「缺隐私政策」失败
   writeFileSync(join(checkout, 'services/api/scripts/preflight-legal-docs.mjs'), [
@@ -277,7 +331,7 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   writeFileSync(join(dir, 'marker-ref'), 'ref\n')
   utimesSync(join(dir, 'marker-ref'), markerTime, markerTime)
   writeFileSync(join(runtime, 'DEPLOY_SOURCE.txt'), 'source=origin/main@previous-release\n')
-  writeFileSync(join(runtime, 'services/api/.env'), 'DATABASE_URL="postgres://drill@127.0.0.1/drill"\n')
+  writeFileSync(join(runtime, 'services/api/.env'), 'DATABASE_URL="postgres://drill@127.0.0.1/drill"\nALERT_WEBHOOK_URL="https://wecom.invalid/hook"\n')
   writeFileSync(join(runtime, 'services/api/storage/uploaded-before.txt'), 'before\n')
   // 旧运行目录的依赖标记与新装的同为 4 字节：若恢复还按「大小 + 修改时间」快速比对，
   // 同一秒内写出的两份会被当成没变而跳过（CI 机器快时必然撞上）。恢复必须逐个覆盖。
@@ -285,7 +339,7 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   mkdirSync(backups)
   const now = Date.now() / 1000
   for (let i = 0; i < oldGroups; i += 1) {
-    const stem = join(backups, `pre-old${i}-2026090${i}T000000Z`)
+    const stem = join(backups, oldStem(i))
     writeFileSync(`${stem}.dump`, 'old dump\n')
     mkdirSync(`${stem}.runtime`)
     writeFileSync(`${stem}.migrations.log`, 'old migrations\n')
@@ -312,6 +366,7 @@ function runDeploy(box, extraEnv, options = {}) {
     DEPLOY_API_DIR: box.runtime,
     DEPLOY_PM2_NAME: 'drill-api',
     DEPLOY_BACKUP_ROOT: box.backups,
+    PRERELEASE_PRUNE_HELPER: prereleaseHelper,
     DEPLOY_HEALTH_URL: 'http://drill.invalid/api/v1/health/ready',
     DEPLOY_HEALTH_ATTEMPTS: '2',
     DEPLOY_HEALTH_DELAY_SECONDS: '0',
@@ -354,10 +409,10 @@ function readSignalLogs(backups) {
 
 const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8').trim() : '(缺失)')
 const groupsOf = (backups) => {
-  const stems = new Set(readdirSync(backups).map((name) => name.replace(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, '')))
+  const stems = new Set(readdirSync(backups).filter((name) => name.startsWith('pre-')).map((name) => name.replace(/\.(dump\.partial|runtime\.partial|migrations\.log|dump\.expired|dump|runtime|ok)$/, '')))
   return [...stems].map((stem) => ({
     stem,
-    complete: ['dump', 'runtime', 'migrations.log'].every((ext) => existsSync(join(backups, `${stem}.${ext}`))),
+    complete: existsSync(join(backups, `${stem}.runtime`)) && (existsSync(join(backups, `${stem}.dump`)) || existsSync(join(backups, `${stem}.dump.expired`))),
   }))
 }
 
@@ -367,7 +422,7 @@ try {
   {
     const box = makeSandbox(); boxes.push(box)
     // 跳过变量写成 first-install 以外的值不算跳过：预检照常执行
-    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'true' })
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_SKIP_LEGAL_DOCS_PREFLIGHT: 'true', DRILL_CHECK_LOCK: '1' })
     check(r.code === 0, '场景 1：就绪检查通过时发布成功', `退出码 ${r.code}\n${r.out.slice(-800)}`)
     check(r.calls.includes('legal-preflight --base-url http://drill.invalid/api/v1\n'),
       '场景 1：3d 法务文档预检照常执行，地址由就绪检查地址推出（跳过变量不是 first-install 不算跳过）', r.calls)
@@ -375,6 +430,14 @@ try {
       '场景 1：运行目录换成新版本（代码与依赖）')
     check(read(join(box.runtime, 'DEPLOY_SOURCE.txt')).includes(`source=origin/main@${box.sha}`), '场景 1：发布指针指向目标提交')
     check(r.pm2Restarts === 1, '场景 1：PM2 只重启一次', `实际 ${r.pm2Restarts} 次`)
+    check(!r.calls.includes('pm2-inherited-prune-lock'), '清理锁：PM2 重启及其常驻子进程不继承发布锁')
+    check(r.calls.includes('release-lock-held') && r.calls.includes('restart-lock-held') && !r.calls.includes('release-lock-missing') && !r.calls.includes('restart-lock-missing'),
+      '清理锁：建备份时和 PM2 重启时发布仍持锁', r.calls)
+    const unlocked = spawnSync('bash', ['-c', 'exec 9>"$DEPLOY_BACKUP_ROOT/.prune.lock"; flock -n 9'], {
+      env: { ...process.env, PATH: `${box.bin}:${process.env.PATH}`, DEPLOY_BACKUP_ROOT: box.backups }, encoding: 'utf8',
+    })
+    check(unlocked.status === 0, '清理锁：发布退出后可以重新取得锁', unlocked.stderr)
+    check(read(join(box.backups, '.prune-last-success')).includes('last_success='), '清理状态：发布清理成功会更新状态文件')
     const names = readdirSync(box.backups)
     const dumps = names.filter((name) => name.includes(box.sha) && name.endsWith('.dump'))
     check(dumps.length === 1 && read(join(box.backups, dumps[0])) === 'drill-dump' && !names.some((name) => name.includes('.partial')),
@@ -384,6 +447,19 @@ try {
     check(r.out.includes('FLOOR_MB=10240'), '场景 1：空间下限默认 10240MB', r.out.match(/FLOOR_MB=\d+/)?.[0] ?? '')
     check(r.out.includes('::warning::pm2-logrotate 未安装') && r.out.includes('services/api/scripts/pm2-logrotate-setup.sh') && !r.calls.includes('pm2 install'),
       '场景 1：没装 pm2-logrotate 时只告警并指出安装脚本，不安装', r.out.slice(-400))
+  }
+  // 0a. 没有部署归属文件的旧提交不能当发布目标：在备份和迁移之前失败
+  {
+    const box = makeSandbox({ omitOwnershipFile: true }); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    const backupNames = readdirSync(box.backups)
+    check(r.code !== 0 && r.out.includes('=== 0a.') && r.out.includes('目标提交缺少部署归属文件 services/api/src/recruitment-hosting/deployment-ownership.ts'),
+      '场景 0a：没有 deployment-ownership.ts 的提交在 0a 失败', `退出码 ${r.code}\n${r.out.slice(-800)}`)
+    check(!r.out.includes('=== 2. PostgreSQL') && !r.calls.includes('pg_dump') && backupNames.length === 0,
+      '场景 0a：备份没有发生', `backups=${backupNames.join(',')} calls=${r.calls.slice(0, 300)}`)
+    check(!r.out.includes('=== 6. 收敛运行目录') && !r.calls.includes('db:pg:deploy') && !r.out.includes('Applying migration'),
+      '场景 0a：迁移没有发生', r.calls.slice(0, 300))
+    check(read(join(box.runtime, 'VERSION')) === 'old', '场景 0a：运行目录仍是发布前')
   }
   // 2. 就绪检查一直失败 → 恢复并重启回旧版
   {
@@ -399,6 +475,9 @@ try {
     check(r.pm2Restarts === 2, '场景 2：PM2 重启新版一次、回退后再重启旧版一次', `实际 ${r.pm2Restarts} 次`)
     check(r.out.includes('回退后的就绪检查通过'), '场景 2：回退后再做就绪检查并报告结果')
     check(groupsOf(box.backups).every((group) => group.complete), '场景 2：失败时本次备份完整保留（.dump / .runtime / .migrations.log）')
+    const runtimeBackup = readdirSync(box.backups).find((name) => name.includes(box.sha) && name.endsWith('.runtime'))
+    check(Boolean(runtimeBackup) && !existsSync(join(box.backups, runtimeBackup, 'services/api/storage')) && r.out.includes('回退后的就绪检查通过'),
+      '运行目录备份排除 storage，回退后仍能启动并通过就绪检查')
   }
   // 3. 迁移失败（PM2 还没重启）→ 恢复运行目录，不重启
   {
@@ -423,7 +502,7 @@ try {
     const box = makeSandbox(); boxes.push(box)
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_LEGAL_PREFLIGHT: 'missing' })
     check(r.code !== 0 && r.out.includes('法务文档预检失败'), '场景 6：缺法务文档时发布以失败结束并说明原因', `退出码 ${r.code}\n${r.out.slice(-600)}`)
-    check(!existsSync(box.backups) || readdirSync(box.backups).length === 0, '场景 6：没有做任何备份（中止在 pg_dump 之前）', readdirSync(box.backups).join(', '))
+    check(!groupsOf(box.backups).length, '场景 6：没有做任何备份（中止在 pg_dump 之前）', readdirSync(box.backups).join(', '))
     check(!r.calls.includes('db:pg:deploy') && r.pm2Restarts === 0, '场景 6：没有迁移、没有重启 PM2')
     check(read(join(box.runtime, 'VERSION')) === 'old' && read(join(box.runtime, 'DEPLOY_SOURCE.txt')) === 'source=origin/main@previous-release',
       '场景 6：运行目录与发布指针都保持发布前')
@@ -445,6 +524,53 @@ try {
       '场景 4：按组保留最近 3 组，每组三件齐全', `剩下 ${JSON.stringify(groups)}`)
     check(kept.some((stem) => stem.includes(box.sha)) && kept.some((stem) => stem.includes('old3')) && kept.some((stem) => stem.includes('old2')),
       '场景 4：保留的是本次与最近两次，迁移日志没有单算一组挤掉上一次的备份', `保留 ${kept.join(', ')}`)
+  }
+  {
+    const box = makeSandbox({ oldGroups: 2 }); boxes.push(box)
+    const oldStamp = new Date(Date.now() - 40 * 86400000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+    const anchor = `pre-anchor-${oldStamp}`
+    writeFileSync(join(box.backups, `${anchor}.dump`), 'expired full database')
+    mkdirSync(join(box.backups, `${anchor}.runtime`))
+    writeFileSync(join(box.backups, `${anchor}.ok`), 'ok\n')
+    // 当前名次以 UTC 名字为准，即使旧组的文件修改时间比新组晚。
+    const futureMtime = new Date(Date.now() + 5 * 86400000)
+    utimesSync(join(box.backups, `${anchor}.dump`), futureMtime, futureMtime)
+    for (let n = 0; n < 2; n += 1) utimesSync(join(box.backups, `${oldStem(n)}.dump`), futureMtime, futureMtime)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_BACKUP_KEEP: '1' })
+    check(r.code !== 0 && !existsSync(join(box.backups, `${anchor}.dump`)) && existsSync(join(box.backups, `${anchor}.dump.expired`)),
+      '过期 .dump 含带 .ok 锚点仍删除并留标记', r.out.slice(-500))
+    check(groupsOf(box.backups).length === 2 && existsSync(join(box.backups, `${anchor}.ok`)) && existsSync(join(box.backups, `${anchor}.runtime`)) && existsSync(join(box.backups, `${oldStem(1)}.dump`)),
+      '带过期标记的组仍完整、仍是 .ok 锚点；UTC 名字较新的组占 keep 名额', readdirSync(box.backups).join(','))
+    const again = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100', DEPLOY_BACKUP_KEEP: '1' })
+    check(again.code !== 0 && existsSync(join(box.backups, `${anchor}.ok`)) && existsSync(join(box.backups, `${anchor}.runtime`)) && groupsOf(box.backups).length === 2,
+      '下次发布清理不会把过期导出组的 .runtime 和 .ok 整组删掉', readdirSync(box.backups).join(','))
+  }
+  {
+    const box = makeSandbox(); boxes.push(box)
+    const stamp = new Date(Date.now() - 40 * 86400000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+    const aged = `pre-shared-${stamp}`
+    writeFileSync(join(box.backups, `${aged}.dump`), 'old database')
+    mkdirSync(join(box.backups, `${aged}.runtime`))
+    writeFileSync(join(box.backups, `${aged}.ok`), 'ok\n')
+    const release = runDeploy(box, { DRILL_HEALTH: 'always' })
+    const afterRelease = readdirSync(box.backups).filter((name) => name.startsWith(aged)).sort()
+    const daily = spawnSync('bash', [join(root, 'services/api/scripts/backup-postgres.sh')], {
+      env: {
+        ...process.env, PATH: `${box.bin}:${process.env.PATH}`, API_ENV_FILE: join(box.runtime, 'services/api/.env'),
+        BACKUP_DIR: join(box.dir, 'postgres'), DEPLOY_BACKUP_ROOT: box.backups, PRERELEASE_PRUNE_HELPER: prereleaseHelper,
+        DATABASE_URL: '', POSTGRES_URL: '', BACKUP_UPLOAD_ENABLED: '0', DRILL_CALLS: box.calls,
+      }, encoding: 'utf8',
+    })
+    const afterDaily = readdirSync(box.backups).filter((name) => name.startsWith(aged)).sort()
+    check(release.code === 0 && daily.status === 0 && afterRelease.join() === afterDaily.join() && afterDaily.includes(`${aged}.dump.expired`) && !afterDaily.includes(`${aged}.dump`),
+      '发布与每日备份在同一夹具上的过期导出结论一致', `release=${release.code} daily=${daily.status} ${afterRelease.join()} -> ${afterDaily.join()}\n${daily.stderr}`)
+  }
+  {
+    const box = makeSandbox(); boxes.push(box)
+    writeFileSync(join(box.backups, '.prune-last-success'), 'broken\n')
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    check(r.code === 0 && r.out.includes('PRERELEASE_WARN: 发布前导出清理失败') && r.calls.includes('alert-post') && read(join(box.runtime, 'VERSION')) === 'new-release',
+      '清理出错有告警，但发布仍成功', `退出码 ${r.code}\n${r.out.slice(-500)}`)
   }
   // 磁盘 a：空间不够 → 先清理 → 够了继续
   {
@@ -469,7 +595,7 @@ try {
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_DF_AVAIL_MB: '100' })
     check(r.code !== 0 && !r.calls.includes('pg_dump') && !r.calls.includes('install --frozen-lockfile'),
       '磁盘 b：清理后仍不够就中止，且没有构建、没有 pg_dump', `退出码 ${r.code}\n${r.calls}`)
-    check(readdirSync(box.backups).length === 0 && !r.out.includes('.partial'),
+    check(!groupsOf(box.backups).length && !r.out.includes('.partial'),
       '磁盘 b：未写任何备份', readdirSync(box.backups).join(', '))
     check(r.out.includes('Server Cleanup (backups / pnpm store / journal)') && r.out.includes('dry_run=true') && r.out.includes('REQUIRED_MB=') && r.out.includes('FLOOR_MB=10240'),
       '磁盘 b：报错同时打出公式门槛、10GB 下限，并指向 Server Cleanup 的 dry-run', r.out.slice(-700))
@@ -496,8 +622,8 @@ try {
     })
     check(r.code !== 0 && r.out.includes('DEPLOY_PRE_GATE_SAFE_CLEANUP=false') && !r.calls.includes('pnpm store prune') && !r.calls.includes('pg_dump'),
       '磁盘 d：DEPLOY_PRE_GATE_SAFE_CLEANUP=false 时不清理、直接中止', `退出码 ${r.code}\n${r.calls}`)
-    check(readdirSync(box.backups).sort().join() === before.join(),
-      '磁盘 d：旧备份一组都没删', readdirSync(box.backups).join(', '))
+    check(before.filter((name) => name.startsWith('pre-')).every((name) => existsSync(join(box.backups, name))) && groupsOf(box.backups).length === 4,
+      '磁盘 d：旧备份组一组都没删', readdirSync(box.backups).join(', '))
   }
   // 磁盘 f：pg_dump / pg_restore 失败不留 .partial；cp 失败不留 .runtime.partial
   {
@@ -670,6 +796,14 @@ const cleanupWorkflow = readFileSync(join(root, '.github/workflows/server-cleanu
 const precheckScript = readFileSync(join(root, '.github/scripts/deploy-precheck.sh'), 'utf8')
 const fragmentDirs = []
 try {
+  const rsyncBin = mkdtempSync(join(tmpdir(), 'precheck-no-rsync-'))
+  fragmentDirs.push(rsyncBin)
+  writeExec(join(rsyncBin, 'bash'), '#!/bin/sh\nexec /bin/bash "$@"\n')
+  const rsyncCheck = extractBetween(precheckScript, 'if command -v rsync', 'BK_PARENT=')
+  const rsyncMissing = runFragment(rsyncCheck, { PATH: rsyncBin })
+  fragmentDirs.push(rsyncMissing.dir)
+  check(rsyncMissing.code !== 0 && rsyncMissing.out.includes('RSYNC_INSTALLED=no'),
+    '预检：缺少 rsync 时失败并报告原因', `退出码 ${rsyncMissing.code}\n${rsyncMissing.out}`)
   const fullBuildAt = workflow.indexOf('=== full 发布构建前磁盘检查 ===')
   const pnpmInstallAt = workflow.indexOf('pnpm install --frozen-lockfile')
   const kioskBuildAt = workflow.indexOf('pnpm build:kiosk:production')
@@ -838,7 +972,7 @@ try {
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DRILL_RUNTIME_INSTALL_SIGNAL: 'TERM' }, { timeout: 20000, killSignal: 'SIGKILL' })
     const names = readdirSync(box.backups)
     const log = readSignalLogs(box.backups)
-    check(r.code === 143, '信号 1：回退陷阱生效后收到 TERM，退出码 143', `退出码 ${r.code} signal=${r.signal}\n${log.slice(-700)}`)
+    check(r.code === 143, '信号 1：回退陷阱生效后收到 TERM，退出码 143', `退出码 ${r.code} signal=${r.signal}\n${log.slice(-700)}\n${r.out.slice(-700)}\n${r.calls.slice(-400)}`)
     check(read(join(box.runtime, 'VERSION')) === 'old' && read(join(box.runtime, 'node_modules/marker')) === 'old',
       '信号 1：运行目录回到发布前', `VERSION=${read(join(box.runtime, 'VERSION'))} marker=${read(join(box.runtime, 'node_modules/marker'))}`)
     check(log.includes('开始把运行目录恢复') && log.includes('线上进程尚未重启'),
@@ -896,7 +1030,7 @@ try {
     const r = runDeploy(box, { DRILL_HEALTH: 'always', DEPLOY_BACKUP_KEEP: keep })
     const groups = groupsOf(box.backups)
     check(r.code === 0 && groups.length === 3 && r.out.includes('DEPLOY_BACKUP_KEEP=3') && r.out.includes(warning),
-      `数字 5：DEPLOY_BACKUP_KEEP=${keep} 回到 3，成功后仍留 3 组`, `退出码 ${r.code} 组数 ${groups.length}\n${r.out.match(/DEPLOY_BACKUP_KEEP=\d+/)?.[0] ?? ''} warning=${r.out.includes(warning)}`)
+      `数字 5：DEPLOY_BACKUP_KEEP=${keep} 回到 3，成功后仍留 3 组`, `退出码 ${r.code} 组数 ${groups.length}\n${r.out.match(/DEPLOY_BACKUP_KEEP=\d+/)?.[0] ?? ''} warning=${r.out.includes(warning)}\n${r.out.slice(-700)}`)
   }
   {
     const box = makeSandbox({ oldGroups: 1 }); reviewBoxes.push(box)
@@ -906,7 +1040,7 @@ try {
     const names = readdirSync(box.backups)
     check(r.code !== 0 && !r.calls.includes('pg_dump'),
       '锚点 1：只有 partial 时发布仍因空间不足停在备份前', `退出码 ${r.code}`)
-    check(!names.some((name) => name.includes('.partial')) && names.some((name) => name === 'pre-old0-20260900T000000Z.dump') && existsSync(join(box.backups, 'pre-old0-20260900T000000Z.runtime')),
+    check(!names.some((name) => name.includes('.partial')) && names.some((name) => name === `${oldStem(0)}.dump`) && existsSync(join(box.backups, `${oldStem(0)}.runtime`)),
       '锚点 1：partial 组被删，不占保留名额，完整组还在', names.join(','))
   }
   {
@@ -919,7 +1053,7 @@ try {
   }
   {
     const box = makeSandbox({ oldGroups: 3 }); reviewBoxes.push(box)
-    const oldest = join(box.backups, 'pre-old0-20260900T000000Z')
+    const oldest = join(box.backups, oldStem(0))
     writeFileSync(`${oldest}.ok`, 'ok\n')
     const dumpStat = statSync(`${oldest}.dump`)
     utimesSync(`${oldest}.ok`, dumpStat.atime, dumpStat.mtime)
@@ -1178,7 +1312,7 @@ exit 1
   const runBundle = (tail) => {
     writeFileSync(bundlePath, 'drill bundle\n')
     writeFileSync(helperPath, 'helper\n')
-    const result = runFragment(`${helperFn}\n${tail}\n`, { CONTROL_PLANE_HELPER: helperPath })
+    const result = runFragment(`${helperFn}\n${tail}\n`, { CONTROL_PLANE_HELPER: helperPath, CONTROL_PLANE_PRUNE_HELPER: helperPath })
     reviewDirs.push(result.dir)
     return result
   }

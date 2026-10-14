@@ -93,7 +93,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          sparse-checkout: .github/scripts/deploy-api-release.sh
+          sparse-checkout: |
+            .github/scripts/deploy-api-release.sh
+            .github/scripts/prune-prerelease-dumps.mjs
           sparse-checkout-cone-mode: false
 
       - name: Package deploy helper
@@ -104,6 +106,10 @@ jobs:
           test -f "$HELPER"
           echo "sha256=$(sha256sum "$HELPER" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "payload=$(gzip -c "$HELPER" | base64 -w 0)" >> "$GITHUB_OUTPUT"
+          PRUNE_HELPER=.github/scripts/prune-prerelease-dumps.mjs
+          test -f "$PRUNE_HELPER"
+          echo "prune_sha256=$(sha256sum "$PRUNE_HELPER" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "prune_payload=$(gzip -c "$PRUNE_HELPER" | base64 -w 0)" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -115,7 +121,7 @@ jobs:
           # fetch 单次预算 600s × 2 次 = 最坏 20m，其后仍需 pnpm install、
           # 三端前端构建、prisma migrate、pm2 重启，30m 不够，提到 45m。
           command_timeout: 45m
-          envs: TARGET_SHA,CI_RUN,DEPLOY_SCOPE,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN,CONTROL_PLANE_DEPLOY_HELPER_B64,CONTROL_PLANE_DEPLOY_HELPER_SHA256
+          envs: TARGET_SHA,CI_RUN,DEPLOY_SCOPE,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN,CONTROL_PLANE_DEPLOY_HELPER_B64,CONTROL_PLANE_DEPLOY_HELPER_SHA256,CONTROL_PLANE_PRUNE_HELPER_B64,CONTROL_PLANE_PRUNE_HELPER_SHA256
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
@@ -143,9 +149,11 @@ jobs:
             PREVIOUS_UMASK="$(umask)"
             umask 077
             CONTROL_PLANE_HELPER="$(mktemp /tmp/deploy-api-release-XXXXXXXX.sh)"
+            CONTROL_PLANE_PRUNE_HELPER="$(mktemp /tmp/prune-prerelease-dumps-XXXXXXXX.mjs)"
             umask "$PREVIOUS_UMASK"
             cleanup_control_plane_helper() {
               rm -f -- "$CONTROL_PLANE_HELPER"
+              rm -f -- "$CONTROL_PLANE_PRUNE_HELPER"
               rm -f -- /tmp/release.bundle
             }
             on_control_plane_signal() {
@@ -165,6 +173,13 @@ jobs:
             printf '%s' "$CONTROL_PLANE_DEPLOY_HELPER_B64" | base64 --decode | gzip -d > "$CONTROL_PLANE_HELPER"
             printf '%s  %s\n' "$CONTROL_PLANE_DEPLOY_HELPER_SHA256" "$CONTROL_PLANE_HELPER" | sha256sum -c -
             chmod 700 "$CONTROL_PLANE_HELPER"
+            if [ -z "${CONTROL_PLANE_PRUNE_HELPER_B64:-}" ] || [ -z "${CONTROL_PLANE_PRUNE_HELPER_SHA256:-}" ]; then
+              echo "::error::当前工作流未携带受审核的发布前导出清理 helper" >&2
+              exit 1
+            fi
+            printf '%s' "$CONTROL_PLANE_PRUNE_HELPER_B64" | base64 --decode | gzip -d > "$CONTROL_PLANE_PRUNE_HELPER"
+            printf '%s  %s\n' "$CONTROL_PLANE_PRUNE_HELPER_SHA256" "$CONTROL_PLANE_PRUNE_HELPER" | sha256sum -c -
+            chmod 700 "$CONTROL_PLANE_PRUNE_HELPER"
 
             echo "=== 拉取并检出 CI 已验证提交 ==="
             EXPECTED_SHA='${{ steps.target.outputs.sha }}'
@@ -350,6 +365,7 @@ jobs:
               API_RELEASE_ENABLED="$API_RELEASE_ENABLED" \
               DEPLOY_API_DIR="${DEPLOY_API_DIR:-/srv/ai-job-print}" \
               DEPLOY_PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}" \
+              PRERELEASE_PRUNE_HELPER="$CONTROL_PLANE_PRUNE_HELPER" \
               bash "$CONTROL_PLANE_HELPER"
             else
               echo "=== API 发布未启用：校验运行版本与目标一致，防止继续错位 ==="
@@ -485,3 +501,5 @@ jobs:
           PRINT_REQUIRE_PII_SCAN: ${{ vars.PRINT_REQUIRE_PII_SCAN }}
           CONTROL_PLANE_DEPLOY_HELPER_B64: ${{ steps.deploy_helper.outputs.payload }}
           CONTROL_PLANE_DEPLOY_HELPER_SHA256: ${{ steps.deploy_helper.outputs.sha256 }}
+          CONTROL_PLANE_PRUNE_HELPER_B64: ${{ steps.deploy_helper.outputs.prune_payload }}
+          CONTROL_PLANE_PRUNE_HELPER_SHA256: ${{ steps.deploy_helper.outputs.prune_sha256 }}

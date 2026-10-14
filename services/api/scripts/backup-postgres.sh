@@ -138,3 +138,56 @@ fi
 find "$BACKUP_DIR" -type f -name 'postgres_*.dump' -mtime "+$((RETENTION_DAYS - 1))" -delete
 printf '%s %s\n' "$stamp" "$(basename "$target")" > "$BACKUP_DIR/LAST_SUCCESS"
 echo "BACKUP_OK: $target"
+# 每日备份成功以后，用与发布相同的实现清理发布前全库导出。
+# 拿不到发布锁只记一次跳过；失败告警，但当天每日备份仍算成功。
+prerelease_root="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
+prerelease_helper="${PRERELEASE_PRUNE_HELPER:-$(dirname "${BASH_SOURCE[0]}")/../../../.github/scripts/prune-prerelease-dumps.mjs}"
+prerelease_alert_unhandled() {
+  local code="$1"
+  [[ "$code" == 20 ]] && return 0 # 共用脚本已经告警。
+  send_failure_alert "【职易达告警】发布前导出清理异常退出（退出码 ${code}），请检查定时任务日志"
+  echo "PRERELEASE_WARN: 发布前导出清理异常退出（退出码 ${code}）" >&2
+}
+prerelease_node=""
+if [[ -n "${NODE_BIN:-}" && -x "$NODE_BIN" ]]; then
+  prerelease_node="$NODE_BIN"
+elif command -v node >/dev/null 2>&1; then
+  prerelease_node="$(command -v node)"
+else
+  for candidate in /usr/local/bin/node /usr/bin/node; do
+    if [[ -x "$candidate" ]]; then prerelease_node="$candidate"; break; fi
+  done
+fi
+if [[ ! -d "$prerelease_root" ]]; then
+  echo "PRERELEASE_SKIP: 发布前备份目录不存在" >&2
+elif [[ ! -f "$prerelease_helper" ]] || ! command -v flock >/dev/null 2>&1; then
+  send_failure_alert "【职易达告警】发布前导出清理脚本或 flock 缺失"
+  echo "PRERELEASE_WARN: 发布前导出清理脚本或 flock 缺失" >&2
+elif [[ -z "$prerelease_node" ]]; then
+  send_failure_alert "【职易达告警】定时任务里找不到 node，今天没清发布前备份里的过期导出；在定时任务环境配 NODE_BIN 或 PATH"
+  echo "PRERELEASE_WARN: 定时任务里找不到 node，今天没清发布前备份里的过期导出；在定时任务环境配 NODE_BIN 或 PATH" >&2
+else
+  if ! exec 9>"$prerelease_root/.prune.lock"; then
+    send_failure_alert "【职易达告警】发布前导出清理锁无法打开"
+    echo "PRERELEASE_WARN: 发布前导出清理锁无法打开" >&2
+  else
+    if flock -n 9; then
+      if PRERELEASE_ALERT_WEBHOOK_URL="$alert_webhook" "$prerelease_node" "$prerelease_helper" --root "$prerelease_root"; then
+        :
+      else
+        prerelease_status=$?
+        prerelease_alert_unhandled "$prerelease_status"
+        echo "PRERELEASE_WARN: 发布前导出清理失败，当天备份仍成功" >&2
+      fi
+    else
+      if PRERELEASE_ALERT_WEBHOOK_URL="$alert_webhook" "$prerelease_node" "$prerelease_helper" --root "$prerelease_root" --event skipped; then
+        :
+      else
+        prerelease_status=$?
+        prerelease_alert_unhandled "$prerelease_status"
+        echo "PRERELEASE_WARN: 发布锁跳过状态记录失败" >&2
+      fi
+    fi
+    exec 9>&-
+  fi
+fi

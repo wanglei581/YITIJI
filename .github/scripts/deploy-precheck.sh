@@ -54,6 +54,17 @@ else
 fi
 
 echo "=== 4. 备份盘可用空间（仅输出 GiB 数量级）==="
+if command -v flock >/dev/null 2>&1; then
+  echo "FLOCK_INSTALLED=yes"
+else
+  echo "FLOCK_INSTALLED=no  （发布前导出清理需要 flock，发布会中止）"
+fi
+if command -v rsync >/dev/null 2>&1; then
+  echo "RSYNC_INSTALLED=yes"
+else
+  echo "RSYNC_INSTALLED=no  （运行目录备份需要 rsync，发布会中止）"
+  exit 1
+fi
 BK_PARENT="$(dirname "$EXPECT_BACKUP")"
 AVAIL_GB="$(df -BG --output=avail "$BK_PARENT" 2>/dev/null | tail -n1 | tr -dc '0-9')"
 if [ -n "$AVAIL_GB" ]; then

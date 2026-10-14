@@ -101,7 +101,7 @@ cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
 
 ## 8. 每日备份、恢复演练与日志留存（E2）
 
-生产服务器由产品负责人安装依赖并执行，仓库脚本不会连接真实环境。先把 `backup-postgres.sh`、`restore-postgres-drill.sh` 复制到服务器并赋予执行权限；脚本优先使用环境里的连接串，没有时读取 `${API_ENV_FILE:-/srv/ai-job-print/services/api/.env}`。每日任务可选 `cron-backup.example` 或 systemd 的 `.service` / `.timer`；systemd 的 `EnvironmentFile=-...` 只是可选覆盖，脚本仍会自行读 `.env`。脚本先写 `.partial`，以 `pg_restore -l` 校验后原子改名，本机默认保留 30 天；失败会推送企业微信（若有 `ALERT_WEBHOOK_URL`）并返回非零，成功写 `LAST_SUCCESS`。异地副本默认关闭；开通、上传后校验、本机与异地分开的保留天数，以及在另一台机器上的恢复演练，见第 10 节。
+生产服务器由产品负责人安装依赖并执行，仓库脚本不会连接真实环境。先把 `backup-postgres.sh`、`restore-postgres-drill.sh` 和共用的 `.github/scripts/prune-prerelease-dumps.mjs` 按仓库相对路径复制到服务器并赋予执行权限；脚本优先使用环境里的连接串，没有时读取 `${API_ENV_FILE:-/srv/ai-job-print/services/api/.env}`。每日任务可选 `cron-backup.example` 或 systemd 的 `.service` / `.timer`；systemd 的 `EnvironmentFile=-...` 只是可选覆盖，脚本仍会自行读 `.env`。**定时任务环境必须能从 PATH 找到 node，或设置指向可执行文件的 `NODE_BIN`**，用于清理发布前导出；找不到时当天备份仍成功，但会立即告警。脚本先写 `.partial`，以 `pg_restore -l` 校验后原子改名，本机默认保留 30 天；失败会推送企业微信（若有 `ALERT_WEBHOOK_URL`）并返回非零，成功写 `LAST_SUCCESS`。异地副本默认关闭；开通、上传后校验、本机与异地分开的保留天数，以及在另一台机器上的恢复演练，见第 10 节。
 
 恢复演练必须指向临时 PostgreSQL 库，库名必须含 `drill` 或 `verify`，例如：
 
@@ -122,10 +122,12 @@ POSTGRES_URL='postgresql://.../backup-drill-20260928' \
 |---|---|---|---|
 | 每日备份 | 本机 `BACKUP_DIR`（默认 `/var/backups/ai-job-print/postgres`） | `backup-postgres.sh` 按 `RETENTION_DAYS`（默认 30）删旧 dump | 30 天 |
 | 每日备份的异地副本 | `BACKUP_OBJECT_URI`（`BACKUP_UPLOAD_ENABLED=1` 时）；没有 rclone 的验证环境可以用 `BACKUP_MIRROR_DIR` | 同一脚本上传并校验后，按 `BACKUP_REMOTE_RETENTION_DAYS`（默认 30，不跟随本机 `RETENTION_DAYS`）清理。rclone 用 `delete --min-age`；本地目录用 `find -mtime`。2026-10-06 起与本机分开配置；2026-10-04 之前只传不删 | `BACKUP_REMOTE_RETENTION_DAYS`（默认 30 天）。对象存储若开了版本控制或回收站，还要加上它的生命周期 |
-| 发布前备份 | `/srv/ai-job-print-backups`（`DEPLOY_BACKUP_ROOT`） | `deploy-api-release.sh` 按组数保留：`DEPLOY_BACKUP_KEEP` 默认 3 组，另外最近一次成功发布前的那组永远保留 | **没有时间上限**：删除之后再成功发布 3 次，删除前做的备份才会全部被轮换掉；长期不发布就一直在 |
+| 发布前备份 | `/srv/ai-job-print-backups`（`DEPLOY_BACKUP_ROOT`） | `.runtime` 按组数保留：`DEPLOY_BACKUP_KEEP` 默认 3 组，最近一次成功发布前的锚点另留；全库 `.dump` 由发布和每日备份共用清理脚本按 UTC 名字时间满 30 天删除，留 `.dump.expired` 标记；无法解析名字时按该 dump 自身修改时间并告警 | 正常清理时全库导出最长约 31 天（每日任务有执行延迟）；清理失败会告警；运行目录备份排除 `services/api/storage` |
 | 应用日志 | PM2 日志 | `pm2-logrotate-setup.sh` 按日轮转、保留 180 天 | 180 天（日志里的手机号都是打码形式） |
 
-**对外说「已经清干净」之前**：等满本机 `RETENTION_DAYS` 与异地 `BACKUP_REMOTE_RETENTION_DAYS` 中较长的天数（默认都是 30），对象存储若开了版本控制或回收站，再等生命周期把旧版本删掉，并且确认删除之后已经有 3 次成功发布（或由运维人工删除删除时间之前的发布前备份组，删除要按「生产写操作逐次请示」办）。机构退出、存量清理的完成时间都按这个口径算，不按「数据库里删掉的那一刻」算。
+发布一开始（建新备份之前）就会删除过期的旧导出；即使发布失败并回退，也不会恢复这些导出。上线前先将本次控制面的 `.github/scripts/prune-prerelease-dumps.mjs` 校验后放到服务器，再用 `node <脚本实际路径> --root /srv/ai-job-print-backups --dry-run` 只列待删 dump 与各组运行目录中的 storage 是否有文件；核对清单、取得生产清理授权后再发布。清理失败或连续两天未清成功会告警，发布和每日备份不会因此算失败。
+
+**对外说「已经清干净」之前**：等满本机 `RETENTION_DAYS` 与异地 `BACKUP_REMOTE_RETENTION_DAYS` 中较长的天数（默认都是 30），对象存储若开了版本控制或回收站，再等生命周期把旧版本删掉，并核对发布前导出清理成功状态。机构退出、存量清理的完成时间都按这个口径算，不按「数据库里删掉的那一刻」算。
 
 ## 9. 1.6 发布回退演练记录（2026-09-29，本机临时库，不碰生产）
 
@@ -233,4 +235,3 @@ POSTGRES_URL='postgresql://.../backup-drill-20260928' \
 ### 10.5 每季度演练
 
 每季度做一次，下一次不晚于上一次之后的三个月。机器不能是生产服务器。步骤用第 10.4 节，记录留在运维档案里。演练完删除临时库和拉下来的 dump。不在生产库上执行 `restore-offsite-drill.sh`。
-

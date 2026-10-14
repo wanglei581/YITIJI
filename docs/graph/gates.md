@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1951 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -92,6 +92,15 @@ node scripts/project-graph-query.mjs file <路径>
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/requirements.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/review.md` | `verify-profile-commercial-first-batch.mjs` |
 | `.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json` | `verify-profile-commercial-first-batch.mjs` |
+
+</details>
+
+<details>
+<summary><code>.github/scripts/prune-prerelease-dumps.mjs/</code> — 1 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `.github/scripts/prune-prerelease-dumps.mjs` | `verify-deploy-rollback.mjs`<br/>`verify-backup-ops.mjs` |
 
 </details>
 
@@ -2183,11 +2192,12 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 136 个文件</summary>
+<summary><code>services/api/scripts/</code> — 137 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `services/api/scripts/backfill-terminal-credentials.ts` | `verify-terminal-bind-code.ts` |
+| `services/api/scripts/backup-postgres.sh` | `verify-backup-ops.mjs` |
 | `services/api/scripts/change-password-verify-target.ts` | `verify-change-password-target-guard.ts`<br/>`verify-change-password.ts` |
 | `services/api/scripts/check-resume-optimize-live.ts` | `verify-resume-optimize-live-gate.ts` |
 | `services/api/scripts/console-screen-printed-visits-cases-04.ts` | `verify-console-screen-printed-visits.ts` |
@@ -2327,7 +2337,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 621 个文件</summary>
+<summary><code>services/api/src/</code> — 622 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2875,6 +2885,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance-rules.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-proposed-governance.types.ts` | `verify-recruitment-wave2-proposed-governance.ts` |
 | `services/api/src/recruitment-content/recruitment-wave2-target.ts` | `verify-recruitment-wave2-full-inventory.ts`<br/>`verify-recruitment-wave2-readonly.ts` |
+| `services/api/src/recruitment-hosting/deployment-ownership.ts` | `verify-deploy-gates-in-sync.mjs`<br/>`verify-deploy-rollback.mjs`<br/>`verify-production-runtime-gates.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.controller.ts` | `verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-emergency.service.ts` | `verify-compliance-copy.mjs`<br/>`verify-companies.ts`<br/>`verify-job-review.ts`<br/>`verify-official-channels.ts`<br/>`verify-recruitment-emergency-scope.ts` |
 | `services/api/src/recruitment-hosting/recruitment-hosting.ts` | `verify-recruitment-hosting-default-off.ts` |

@@ -5,8 +5,10 @@
  * 期望：
  * - GET /api/v1/admin/system/recruitment-hosting
  *   只给 admin：无 token 401，partner token 403 AUTH_ROLE_FORBIDDEN。
- *   信封恰好是 { success: true, data: { recruitmentHosting: { enabled, deploymentEnabled } } }，
+ *   信封恰好是 { success: true, data: { recruitmentHosting: { enabled, deploymentEnabled,
+ *   deploymentOwnership: 'vendor_cloud', operatorSelfReport: null } } }，
  *   两个布尔都等于 isRecruitmentContentHostingEnabled()；查询参数改不了它。
+ *   本门禁不设部署归属，认不出按我方云，自报为 null。
  * - GET /api/v1/partner/data-sources/capabilities
  *   recruitmentHosting 同部署开关。关闭时 canImportJobs / canImportFairs / canManageCompanies
  *   一律为 false，其余字段（含 canManagePolicies）与机构类型矩阵逐字段相同；
@@ -178,9 +180,31 @@ export async function assertConsoleHostingFlag(input: {
       `${base}/partner/data-sources/capabilities?recruitmentHosting=${String(hint)}&canImportJobs=${String(hint)}`
 
     const assertAdminFlag = async (expected: boolean, label: string) => {
+      const savedOwnership = process.env.DEPLOYMENT_OWNERSHIP
+      const savedOperatorName = process.env.RECRUITMENT_OPERATOR_NAME
+      const savedOperatorLicense = process.env.RECRUITMENT_OPERATOR_LICENSE_NO
+      delete process.env.DEPLOYMENT_OWNERSHIP
+      delete process.env.RECRUITMENT_OPERATOR_NAME
+      delete process.env.RECRUITMENT_OPERATOR_LICENSE_NO
       const res = await fetch(adminUrl(!expected), { headers: adminAuth })
+      if (savedOwnership === undefined) delete process.env.DEPLOYMENT_OWNERSHIP
+      else process.env.DEPLOYMENT_OWNERSHIP = savedOwnership
+      if (savedOperatorName === undefined) delete process.env.RECRUITMENT_OPERATOR_NAME
+      else process.env.RECRUITMENT_OPERATOR_NAME = savedOperatorName
+      if (savedOperatorLicense === undefined) delete process.env.RECRUITMENT_OPERATOR_LICENSE_NO
+      else process.env.RECRUITMENT_OPERATOR_LICENSE_NO = savedOperatorLicense
       const body = await res.json() as Record<string, unknown>
-      const want = { success: true, data: { recruitmentHosting: { enabled: expected, deploymentEnabled: expected } } }
+      const want = {
+        success: true,
+        data: {
+          recruitmentHosting: {
+            enabled: expected,
+            deploymentEnabled: expected,
+            deploymentOwnership: 'vendor_cloud',
+            operatorSelfReport: null,
+          },
+        },
+      }
       if (res.status !== 200 || canonical(body) !== canonical(want)) {
         fail(`${label}：管理员接口应恰好返回 ${canonical(want)}，得到 ${res.status} ${canonical(body)}`)
       }

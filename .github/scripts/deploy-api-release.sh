@@ -35,12 +35,12 @@ fi
 RUNTIME_ROOT="${DEPLOY_API_DIR:-/srv/ai-job-print}"
 PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}"
 BACKUP_ROOT="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
+PRERELEASE_PRUNE_HELPER="${PRERELEASE_PRUNE_HELPER:-$(dirname "${BASH_SOURCE[0]}")/prune-prerelease-dumps.mjs}"
 HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health/ready}"
 HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-30}"
 HEALTH_DELAY_SECONDS="${DEPLOY_HEALTH_DELAY_SECONDS:-2}"
 
 API_DIR="$RUNTIME_ROOT/services/api"
-
 # 信号从这里就生效，不等到 pg_dump。Actions 取消后 SSH 断开，远端收不到 INT/TERM，
 # 下一次往 stdout 写才会被 SIGPIPE（13）杀掉；所以 PIPE 和 HUP/INT/TERM 走同一个函数。
 # pre：备份还没开始，只退出。backup：删 partial。restore：回退运行目录。
@@ -99,20 +99,20 @@ REQUIRED_PRODUCTION_GATES=(
   PRINT_REQUIRE_PRINTER_ONLINE
 )
 
+# 我方发布流程把部署归属固定写成我方云（招聘锁，合规边界 §1.1 2026-10-12）。
+FIXED_PRODUCTION_VALUES=( DEPLOYMENT_OWNERSHIP=vendor_cloud )
+
 # 备份保留策略：按发布分组保留最近 N 组，其余删除。
 #
-# 背景（2026-08-09 真实事故）：根分区 40GB 被备份撑到 100%，可用仅剩 1GiB，
-# 无法发布 —— 本脚本步骤 2/3 先做 PG 全库备份、再整目录备份（约 1.1GB），
-# 空间不足会在备份阶段写满盘，波及正在运行的 API 与 PostgreSQL。
-# 当天手工清理：29 组保留最新 3 组、删 26 组（最旧的 37 天没清），
-# 备份目录 8656MB → 4320MB。但每次发布仍新增约 1.1GB，不自动清理必然重演。
+# 2026-08-09 曾因备份撑满 40GB 根分区而无法发布；当时将 29 组清到 3 组。
+# 自动按组保留并预留全库导出和运行目录备份空间，防止重演。
 #
 # 安全设计：
 # · 两处调用：0b 空间不够且允许发布前清理时，先把旧组收到保留数再复判；
 #   步骤 9 在健康检查通过后再收一次。发布失败不会跑步骤 9。
-# · 一组包含 <stem>.dump、<stem>.runtime、<stem>.migrations.log，以及
+# · 一组包含 <stem>.dump 或 <stem>.dump.expired、<stem>.runtime、<stem>.migrations.log，以及
 #   <stem>.dump.partial、<stem>.runtime.partial、<stem>.ok。partial 与 .ok 都归进 stem，
-#   不单占名额。只有 partial、没有同时具备 .dump 和 .runtime 的组，清理时删掉。
+#   不单占名额。只有 partial、没有同时具备 .dump/.dump.expired 和 .runtime 的组，清理时删掉。
 # · 目录里只要存在 .ok，最新一组完整且带 .ok 的备份（最近一次成功发布前的快照（回退锚点））无论 keep 多少都留。
 #   一个 .ok 都没有时（旧版本留下的备份），仍按时间留最新 keep 组。
 # · 0b 与步骤 9 都不许删到 0 组完整备份。本次 current_stem 不删。.ok 随组一起删。
@@ -175,20 +175,11 @@ prune_old_backups() {
 
   current_stem="$(basename "$BACKUP_PREFIX")"
 
-  # 按 mtime 新→旧列出，去掉后缀后按 stem 归组去重。
-  # 只认这六种后缀；目录里的其他文件不计组、不删除。
-  # 去重保留首次出现，即取每组最新的 mtime（.dump 由 pg_dump 新写入，时间可靠；
-  # .runtime 由 cp -a 保留源目录时间，可能偏旧，因此不能单独作为排序依据）。
-  # 较长的后缀必须写在前面，否则 foo.dump.partial 会被先剪成 foo.partial。
-  stems="$(find "$BACKUP_ROOT" -maxdepth 1 -mindepth 1 -printf '%T@\t%f\n' 2>/dev/null \
-    | sort -rn \
-    | cut -f2- \
-    | awk '
-        /\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/ {
-          sub(/\.(dump\.partial|runtime\.partial|migrations\.log|dump|runtime|ok)$/, "")
-          if ($0 != "" && !seen[$0]++) print
-        }
-      ')"
+  # 与导出年龄共用 UTC 名字解析；旧组无法解析时才按组的 mtime 排序。
+  if ! stems="$(node "$PRERELEASE_PRUNE_HELPER" --root "$BACKUP_ROOT" --list-stems)"; then
+    echo "::warning::无法读取备份组清单" >&2
+    return 1
+  fi
 
   any_ok=0
   for ok_file in "$BACKUP_ROOT"/*.ok; do
@@ -205,7 +196,7 @@ prune_old_backups() {
   while IFS= read -r stem; do
     [ -n "$stem" ] || continue
     idx=$((idx + 1))
-    if [ -f "$BACKUP_ROOT/$stem.dump" ] && [ -d "$BACKUP_ROOT/$stem.runtime" ]; then
+    if { [ -f "$BACKUP_ROOT/$stem.dump" ] || [ -f "$BACKUP_ROOT/$stem.dump.expired" ]; } && [ -d "$BACKUP_ROOT/$stem.runtime" ]; then
       complete_list="$complete_list $stem"
       if [ -z "$ok_anchor" ] && [ -f "$BACKUP_ROOT/$stem.ok" ]; then
         ok_anchor="$stem"
@@ -278,8 +269,8 @@ prune_old_backups() {
     if [ "$stem" = "$current_stem" ]; then
       continue
     fi
-    rm -rf -- "$BACKUP_ROOT/$stem.dump" "$BACKUP_ROOT/$stem.runtime" "$BACKUP_ROOT/$stem.migrations.log" "$BACKUP_ROOT/$stem.dump.partial" "$BACKUP_ROOT/$stem.runtime.partial" "$BACKUP_ROOT/$stem.ok" 2>/dev/null || true
-    if [ -e "$BACKUP_ROOT/$stem.dump" ] || [ -e "$BACKUP_ROOT/$stem.runtime" ] || [ -e "$BACKUP_ROOT/$stem.migrations.log" ] || [ -e "$BACKUP_ROOT/$stem.dump.partial" ] || [ -e "$BACKUP_ROOT/$stem.runtime.partial" ] || [ -e "$BACKUP_ROOT/$stem.ok" ]; then
+    rm -rf -- "$BACKUP_ROOT/$stem.dump" "$BACKUP_ROOT/$stem.dump.expired" "$BACKUP_ROOT/$stem.runtime" "$BACKUP_ROOT/$stem.migrations.log" "$BACKUP_ROOT/$stem.dump.partial" "$BACKUP_ROOT/$stem.runtime.partial" "$BACKUP_ROOT/$stem.ok" 2>/dev/null || true
+    if [ -e "$BACKUP_ROOT/$stem.dump" ] || [ -e "$BACKUP_ROOT/$stem.dump.expired" ] || [ -e "$BACKUP_ROOT/$stem.runtime" ] || [ -e "$BACKUP_ROOT/$stem.migrations.log" ] || [ -e "$BACKUP_ROOT/$stem.dump.partial" ] || [ -e "$BACKUP_ROOT/$stem.runtime.partial" ] || [ -e "$BACKUP_ROOT/$stem.ok" ]; then
       failed_stems="${failed_stems} ${stem}"
     fi
   done
@@ -338,8 +329,8 @@ report_pm2_logrotate() {
     echo "::warning::pm2-logrotate 未安装。日志可能把磁盘写满。请运行 services/api/scripts/pm2-logrotate-setup.sh"
     return 0
   fi
-  pm2_ls_out="$(pm2 ls 2>/dev/null || true)"
-  pm2_conf_out="$(pm2 conf pm2-logrotate 2>/dev/null || true)"
+  pm2_ls_out="$(pm2 ls 9>&- 2>/dev/null || true)"
+  pm2_conf_out="$(pm2 conf pm2-logrotate 9>&- 2>/dev/null || true)"
   ok=0
   while IFS= read -r line; do
     case "$line" in
@@ -400,9 +391,38 @@ if [ -n "$MISSING_TARGET_GATES" ]; then
   exit 1
 fi
 
+TARGET_OWNERSHIP_SOURCE="$DEPLOY_PATH/services/api/src/recruitment-hosting/deployment-ownership.ts"
+if [ ! -f "$TARGET_OWNERSHIP_SOURCE" ]; then
+  echo "::error::目标提交缺少部署归属文件 services/api/src/recruitment-hosting/deployment-ownership.ts" >&2
+  exit 1
+fi
+for FIXED_PAIR in "${FIXED_PRODUCTION_VALUES[@]}"; do
+  FIXED_KEY="${FIXED_PAIR%%=*}"
+  if ! grep -Eq "(^|[^A-Z_])${FIXED_KEY}([^A-Z_]|$)" "$TARGET_OWNERSHIP_SOURCE"; then
+    echo "::error::目标提交的部署归属文件不认识固定键：$FIXED_KEY" >&2
+    exit 1
+  fi
+done
+
 # 0b 之前先记一次盘，成功或中止的摘要都用这个数当 DISK_AVAIL_MB_BEFORE。
 # mkdir 只为了 du 有目录可量；真正的备份文件还没写。
 mkdir -p "$BACKUP_ROOT"
+if ! command -v flock >/dev/null 2>&1; then
+  echo "::error::服务器缺少 flock，不能安全执行发布前导出清理" >&2
+  exit 1
+fi
+if [ ! -f "$PRERELEASE_PRUNE_HELPER" ]; then
+  echo "::error::缺少共用发布前导出清理脚本" >&2
+  exit 1
+fi
+# 固定 9 号描述符只由本次发布持有；PM2 两处重启显式关掉，常驻进程不继承。
+exec 9>"$BACKUP_ROOT/.prune.lock"
+if ! flock -w 60 9; then
+  echo "::error::等待发布前备份清理锁超时，尚未建立备份" >&2
+  exit 1
+fi
+# 一开始就清掉满 30 天的全库导出；失败告警而不影响发布。
+node "$PRERELEASE_PRUNE_HELPER" --root "$BACKUP_ROOT" --alert-env-file "$API_DIR/.env" || echo "::warning::发布前导出清理失败，继续发布" >&2
 print_disk_snapshot "DISK_SNAPSHOT_BEFORE"
 DISK_AVAIL_MB_BEFORE="$(disk_avail_mb "$BACKUP_ROOT")"
 
@@ -424,7 +444,7 @@ case "$API_DIR_MB" in
     API_DIR_MB=3072
     ;;
 esac
-# 需要的空间 = 整目录备份 + PG dump（压缩后远小于目录，按目录量级留冗余）+ 安全边界
+# 需要的空间 = 运行目录备份（排除 storage）+ PG dump（按目录量级留冗余）+ 安全边界
 NEED_MB=$(( API_DIR_MB + 1024 ))
 MARGIN_MB="$(normalize_decimal_setting DEPLOY_MIN_FREE_MARGIN_MB "${DEPLOY_MIN_FREE_MARGIN_MB:-1024}" 1024)"
 REQUIRED_MB=$(( NEED_MB + MARGIN_MB ))
@@ -488,7 +508,8 @@ echo "=== 3c. 生产运行闸门预检（目标提交代码 × 服务器真实 .
 # 做启动闸门预检，并叠加 3b 将写入的 KEY=true。失败必须在 pg_dump 之前中止。
 if ! node services/api/scripts/preflight-production-gates.mjs \
   --env-file "$API_DIR/.env" \
-  --force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")"; then
+  --force-true "$(IFS=,; echo "${REQUIRED_PRODUCTION_GATES[*]}")" \
+  --force-value "$(IFS=,; echo "${FIXED_PRODUCTION_VALUES[*]}")"; then
   echo "::error::生产闸门预检失败，发布在备份前中止（线上未动）"
   exit 1
 fi
@@ -547,7 +568,8 @@ fi
 echo "=== 3. 备份当前运行目录（回滚锚点）==="
 RUNTIME_PARTIAL="$BACKUP_PREFIX.runtime.partial"
 rm -rf -- "$RUNTIME_PARTIAL"
-if ! cp -a "$RUNTIME_ROOT" "$RUNTIME_PARTIAL"; then
+mkdir -p "$RUNTIME_PARTIAL"
+if ! rsync -a --exclude 'services/api/storage' "$RUNTIME_ROOT/" "$RUNTIME_PARTIAL/"; then
   cleanup_backup_partials
   echo "::error::运行目录备份失败，已删除不完整备份" >&2
   exit 1
@@ -598,7 +620,7 @@ restore_runtime_and_exit() {
   fi
   if [ "$PM2_RESTARTED" = true ]; then
     export COMMIT="$rollback_version"
-    pm2 restart "$PM2_NAME" --update-env
+    pm2 restart "$PM2_NAME" --update-env 9>&-
     for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
       if check_ready; then ok=true; break; fi
       sleep "$HEALTH_DELAY_SECONDS"
@@ -645,6 +667,34 @@ for GATE_KEY in "${REQUIRED_PRODUCTION_GATES[@]}"; do
   mv -f -- "$ENV_TMP" "$ENV_FILE"
   trap - EXIT
   echo "  已持久化 $GATE_KEY=true"
+done
+for FIXED_PAIR in "${FIXED_PRODUCTION_VALUES[@]}"; do
+  FIXED_KEY="${FIXED_PAIR%%=*}"
+  FIXED_VALUE="${FIXED_PAIR#*=}"
+  ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
+  cleanup_env_tmp() {
+    rm -f -- "$ENV_TMP"
+  }
+  trap cleanup_env_tmp EXIT
+  awk -v key="$FIXED_KEY" -v value="$FIXED_VALUE" '
+    BEGIN { written = 0 }
+    $0 ~ ("^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=") {
+      if (!written) {
+        print key "=" value
+        written = 1
+      }
+      next
+    }
+    { print }
+    END {
+      if (!written) print key "=" value
+    }
+  ' "$ENV_FILE" > "$ENV_TMP"
+  chmod --reference="$ENV_FILE" "$ENV_TMP"
+  chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
+  mv -f -- "$ENV_TMP" "$ENV_FILE"
+  trap - EXIT
+  echo "  已持久化 $FIXED_KEY"
 done
 
 echo "=== 4. 在目标提交内构建 API ==="
@@ -706,8 +756,9 @@ echo "=== 7. 重启 PM2 并就绪检查（${HEALTH_URL}） ==="
 PM2_RESTARTED=true
 export COMMIT="$TARGET_SHA"
 export PRINT_REQUIRE_PRINTER_ONLINE=true
+export "${FIXED_PRODUCTION_VALUES[@]}"
 export PRINT_REQUIRE_PII_SCAN=true
-pm2 restart "$PM2_NAME" --update-env
+pm2 restart "$PM2_NAME" --update-env 9>&-
 for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
   if check_ready; then
     echo "API readiness OK: $HEALTH_URL"
@@ -734,6 +785,7 @@ EOF
       echo "::warning::本次备份的成功标记没有写上，清理时不会把它当成最近一次成功发布前的快照（回退锚点）。" >&2
     fi
     # 清理失败不影响本次发布结果（发布已经成功），只记 warning。
+    node "$PRERELEASE_PRUNE_HELPER" --root "$BACKUP_ROOT" --alert-env-file "$API_DIR/.env" || echo "::warning::发布前导出清理失败（不影响本次发布）" >&2
     prune_old_backups || echo "::warning::备份清理失败，已跳过（不影响本次发布）"
     echo "=== 10. 发布摘要（磁盘与 pm2 日志轮转，只读）==="
     print_disk_snapshot "DISK_SNAPSHOT_AFTER"
