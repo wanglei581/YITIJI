@@ -12,7 +12,7 @@
 
 import type { ReactNode } from 'react'
 import { AlertCircleIcon, AlertTriangleIcon, FileTextIcon, WalletIcon } from 'lucide-react'
-import { helpNeededLine, machineCannotPrintLine, refundApplyLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, refundApplyLine } from '../../../copy/unattendedCopy'
 import { formatCents } from '../cashierStatus'
 import type { PaymentFact } from '../printProgressModel'
 import {
@@ -103,7 +103,6 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
 }) {
   const isFreeOrder = payment === 'free'
   const paid = payment === 'paid' && typeof amountCents === 'number' && amountCents > 0
-  const fault = machineCannotPrintLine(undefined, { orderKept: true })
   return (
     <>
       <section className="pff-sec" aria-label="这一单现在的状态">
@@ -123,7 +122,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             </div>
             <p className="pff-inbar-b">
               这只是<b>查询超时</b>：系统的打印任务状态<b>没有被改变</b>，我们不会猜它成功或失败。
-              可以先重新查询。{fault}
+              可以先重新查询。{helpNeededLine()}。
             </p>
           </div>
           <div className="pff-inbar">
@@ -143,7 +142,7 @@ export function PrintStatusTimeoutPanel({ jobRow, payment, amountCents, orderNo 
             <p className="pff-inbar-b">
               {paid
                 ? <>请先看出纸口。{refundApplyLine()}</>
-                : <>请先看出纸口。{fault}</>}
+                : <>请先看出纸口。{helpNeededLine()}。</>}
             </p>
             <div className="pff-inbar-kv">
               {orderNo ? <span>订单 <b>{orderNo}</b></span> : null}

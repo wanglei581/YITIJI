@@ -33,9 +33,9 @@ const SELF_HELP_STEPS = [
 ] as const
 
 const CATEGORIES: { key: string; label: string; summary: string; icon: LucideIcon; tone: Tone }[] = [
-  { key: 'account', label: '登录与账号', summary: '要不要登录、为什么变回游客、怎么换账号', icon: UserIcon, tone: 'teal' },
+  { key: 'account', label: '登录与账号', summary: '要不要登录、收不到验证码、为什么变回游客、怎么换账号', icon: UserIcon, tone: 'teal' },
   { key: 'resume', label: 'AI简历服务', summary: '能做什么、会不会保证面试或录用', icon: SparklesIcon, tone: 'plum' },
-  { key: 'print', label: '打印与扫描', summary: '怎么打印、扫描件保存在哪', icon: PrinterIcon, tone: 'slate' },
+  { key: 'print', label: '打印与扫描', summary: '怎么打印、卡纸和没出纸、U 盘读不出、扫描件保存在哪', icon: PrinterIcon, tone: 'slate' },
   { key: 'policy', label: '政策服务', summary: '能不能代申请补贴', icon: LandmarkIcon, tone: 'wheat' },
   { key: 'channels', label: '机构官方渠道', summary: '本机构的官方渠道在哪看、内容谁负责', icon: QrCodeIcon, tone: 'slate' },
   { key: 'jobs', label: '岗位与招聘会', summary: '能不能在这里办理岗位申请', icon: BriefcaseBusinessIcon, tone: 'slate' },
@@ -88,6 +88,11 @@ function buildFaq(hostingOpen: boolean): QA[] {
     },
     {
       categoryKey: 'account', category: '登录与账号',
+      q: '收不到短信验证码怎么办？',
+      a: '先核对手机号有没有输错。验证码 6 位、5 分钟内有效，60 秒后可以重新获取；也看看手机有没有把短信拦进了骚扰短信。还是收不到，可以先不登录继续用——打印、扫描、复印、机构官方渠道和政策查询都不需要账号；也可以改用扫码登录，在手机上确认。',
+    },
+    {
+      categoryKey: 'account', category: '登录与账号',
       q: '为什么离开或刷新后又变回游客了？',
       a: '本终端是公共设备，登录只留在当前这一次。页面刷新、离开或闲置超时会自动退出登录并清掉这次留下的内容，这是公共终端的正常保护行为。',
     },
@@ -113,6 +118,21 @@ function buildFaq(hostingOpen: boolean): QA[] {
       q: '怎么打印文件？',
       a: '在「文档打印」上传文件，核对打印参数与现场公示价目后确认输出。打印任务一经确认开始输出，纸张耗材即发生消耗，请在确认前核对参数。',
       link: { label: '文档打印', route: '/print/upload' },
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: '打印时卡纸了怎么办？',
+      a: '别自己打开机器，也别拽纸——撕在里面更难取，也可能弄坏机器。先把出纸口里已经出来的纸取走收好，记下屏幕上的订单号。用到机码打印、屏上提示可以接着打的，回到这台机器再输一次同一个到机码就能接着打，每单最多 2 次。需要帮助请看本页「遇到问题怎么办」里的服务电话。',
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: '确认打印以后没出纸怎么办？',
+      a: '先看屏幕上这一单的状态：还在打印的，请在出纸口旁等一会儿。屏上写「打印结果未确认」时，照屏上的提示办：用到机码打印的，过 5 分钟回这台机器再输一次同一个到机码；在这台机器上打的 0 元单，可以回到打印重新选文件再打一次。登录过的，可以在「我的 → 打印订单」按订单号查。付过钱的单子先别重新下单，照屏上提示办，或打服务电话问。需要帮助请看本页「遇到问题怎么办」里的服务电话。',
+    },
+    {
+      categoryKey: 'print', category: '打印与扫描',
+      q: 'U 盘插上了读不出来怎么办？',
+      a: '这台机器开通了 U 盘导入的，U 盘插在机器右侧的 USB 口。屏上只列最外层和下一层文件夹里能打印的文件（PDF、JPG、PNG，单份不超过 15MB）。读不出来先点「重新读一次 U 盘」，或换个 U 盘再读一次；还不行就改用手机扫码上传。',
     },
     {
       categoryKey: 'print', category: '打印与扫描',
@@ -202,13 +222,13 @@ function HumanDesk({ no }: { no: string }) {
   const contact = useSupportContact()
   return (
     <>
-      <SectionHead no={no} title="遇到问题怎么办" hint="机器故障我们会收到提醒" />
+      <SectionHead no={no} title="遇到问题怎么办" hint="打不了请稍后再来" />
       <div className="k1-help-people">
         <div className="k1-help-contact">
           <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
           <div>
             <h3>需要帮助</h3>
-            <p>{helpNeededLine(contact)}。机器故障我们已经收到提醒，会尽快处理。</p>
+            <p>{helpNeededLine(contact)}。机器暂时打不了时，请稍后再来。</p>
             <p>也可以在「我的 → 意见反馈」里留言，登录后在那里看处理状态（处理中、已回复）。</p>
             <p className="k1-help-note">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p>
           </div>
@@ -322,7 +342,7 @@ export function HelpCenterPage() {
             </div>
             <div className="k1-help-truth" data-disclaimer="true" data-testid="help-truth">
               <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。</div>
-              <div><b>求助怎么算数</b>机器故障我们已经收到提醒。{networkDisconnectLine()}。{helpNeededLine(contact)}。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
+              <div><b>求助怎么算数</b>{networkDisconnectLine()}。{helpNeededLine(contact)}。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
             </div>
           </>
         )}
@@ -381,7 +401,7 @@ export function HelpCenterPage() {
               ) : null}
               <div className="k1-help-miss">
                 <h3><InfoIcon aria-hidden="true" />这里没答上你的问题</h3>
-                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。机器故障我们已经收到提醒。{helpNeededLine(contact)}。本页不会替你转达。</p>
+                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。{helpNeededLine(contact)}。本页不会替你转达。</p>
               </div>
             </>
           ) : null}
@@ -392,7 +412,7 @@ export function HelpCenterPage() {
               <ol className="k1-help-steps" data-testid="help-fallback">
                 <li><span className="k1-help-step-no" aria-hidden="true">1</span><strong>重新打开帮助</strong><p>点下面的重新打开帮助，这一页会再加载一次。</p></li>
                 <li><span className="k1-help-step-no" aria-hidden="true">2</span><strong>回首页再进来</strong><p>回首页重新进入要办的服务。正在办的打印不会因此取消。</p></li>
-                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>需要帮助</strong><p>连着两次都打不开。{helpNeededLine(contact)}。机器故障我们已经收到提醒。</p></li>
+                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>需要帮助</strong><p>连着两次都打不开。{helpNeededLine(contact)}。</p></li>
               </ol>
               <SectionHead no="02" title="这不影响你办事" hint="帮助页只是补充" />
               <div className="k1-help-people">

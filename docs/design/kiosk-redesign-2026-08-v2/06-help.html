@@ -220,7 +220,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 
   <div class="truth" data-disclaimer="true" data-testid="help-truth">
     <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态，机器能不能用请看设备状态页。</div>
-    <div><b>求助怎么算数</b>机器故障我们已经收到提醒。网络断开时，我们会收到提醒并远程处理。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
+    <div><b>求助怎么算数</b>网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
   </div>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -251,9 +251,10 @@ var q=new URLSearchParams(location.search);
 /* 六个分类＝真实 HelpCenterPage 的 FILTER_KEYS；问答文字取自该页已上线的诚实口径，不新增承诺。 */
 var TOPICS=[
  {key:'account',name:'登录与账号',icon:'user',tone:['var(--teal-soft)','var(--teal-d)'],
-  brief:'要不要登录、为什么会退出、怎么换账号',
+  brief:'要不要登录、收不到验证码、为什么会退出、怎么换账号',
   items:[
    ['一定要登录才能用吗？','不用。大部分服务可以直接办。用手机验证码登录之后，这一趟的简历记录、文档、打印订单和收藏才会归到你的账号，<b>只有本人能看到</b>。'],
+   ['收不到短信验证码怎么办？','先核对手机号有没有输错。验证码 6 位、5 分钟内有效，60 秒后可以重新获取；也看看手机有没有把短信拦进了骚扰短信。还是收不到，可以<b>先不登录继续用</b>——打印、扫描、复印、机构官方渠道和政策查询都不需要账号；也可以改用扫码登录，在手机上确认。'],
    ['为什么离开一下就变回未登录了？','这台机器是公共设备，登录只留在<b>当前这一次</b>。刷新、离开或放着不管，都会退出并清掉这次留下的内容。这是保护，不是故障。'],
    ['怎么换成另一个账号？','到「我的 · 账号设置」退出当前账号，再用另一个手机号登录。一次只能登一个号。']
   ],
@@ -267,9 +268,12 @@ var TOPICS=[
   ],
   links:[['开始简历服务','21-resume-triage.html','file'],['问 AI 顾问','05-ai-cockpit.html','spark']]},
  {key:'print',name:'打印与扫描',icon:'printer',tone:['var(--slate-soft)','var(--slate-d)'],
-  brief:'怎么打印、到机码在哪用、扫描件去哪了',
+  brief:'怎么打印、卡纸和没出纸、U 盘读不出、到机码在哪用、扫描件去哪了',
   items:[
    ['怎么打印文件？','在打印扫描里上传文件，核对打印参数和<b>现场公示价目</b>后确认输出。确认后开始出纸，纸张耗材就会消耗，所以请先核对参数。'],
+   ['打印时卡纸了怎么办？','<b>别自己打开机器，也别拽纸</b>——撕在里面更难取，也可能弄坏机器。先把出纸口里已经出来的纸取走收好，记下屏幕上的订单号。用到机码打印、屏上提示可以接着打的，回到这台机器再输一次同一个到机码就能接着打，每单最多 2 次。需要帮助请看本页「遇到问题怎么办」里的服务电话。'],
+   ['确认打印以后没出纸怎么办？','先看屏幕上这一单的状态：还在打印的，请在出纸口旁等一会儿。屏上写「打印结果未确认」时，照屏上的提示办：用到机码打印的，过 5 分钟回这台机器再输一次同一个到机码；在这台机器上打的 0 元单，可以回到打印重新选文件再打一次。登录过的，可以在「我的 → 打印订单」按订单号查。<b>付过钱的单子先别重新下单</b>，照屏上提示办，或打服务电话问。需要帮助请看本页「遇到问题怎么办」里的服务电话。'],
+   ['U 盘插上了读不出来怎么办？','这台机器开通了 U 盘导入的，U 盘插在机器右侧的 USB 口。屏上只列最外层和下一层文件夹里能打印的文件（PDF、JPG、PNG，单份不超过 15MB）。读不出来先点「<b>重新读一次 U 盘</b>」，或换个 U 盘再读一次；还不行就改用手机扫码上传。'],
    ['手机上建的单，到机器上怎么用？','用到机码。到「打印扫描 · 到机码」输入或扫码核销，核销之后这台机器才会去领这单。'],
    ['扫描出来的文件去哪了？','用于本次打印或存进本次记录。证件照、身份证复印件这类高敏文件有<b>短期有效期</b>，到期删除。']
   ],
@@ -319,13 +323,13 @@ function selfHelp(no){
   '</div></section>';
 }
 function humanDesk(no){
- return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">遇到问题怎么办</span><span class="hint">机器故障我们会收到提醒</span></div>'+
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">遇到问题怎么办</span><span class="hint">打不了请稍后再来</span></div>'+
   '<div class="grid2">'+
   '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('phone',26)+'</span>需要帮助</h3>'+
-  '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒，会尽快处理。</p>'+
+  '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器暂时打不了时，请稍后再来。</p>'+
   '<p class="warnline">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p></div>'+
   '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>网络断开</h3>'+
-  '<p>网络断开时，我们会收到提醒并远程处理。</p>'+
+  '<p>网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。</p>'+
   '<p>打之前先记下屏幕上的<b>订单号或到机码</b>，对方靠这个才查得到你这一单。</p></div>'+
   '</div></section>';
 }
@@ -372,7 +376,7 @@ V['topic']=function(t){
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">直接去办</span><span class="hint">看完就能动手</span></div>'+
     '<div class="linkrow">'+lk+'</div></section>'+
    '<section class="sec"><div class="state" data-kind="warn"><div class="state-h">'+svg('warn','28')+'这里没答上你的问题</div>'+
-    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。机器故障我们已经收到提醒。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你转达。</div></div></section>'+
+    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你转达。</div></div></section>'+
    selfHelp('03'),
   cta:'<a class="btn ghost" href="06-help.html" data-route="/help">返回分类</a>'+
    '<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
@@ -408,7 +412,7 @@ V['unavailable']=function(){
     '<div class="grid3">'+
     '<div class="card"><h3><span class="step-no serif">1</span>重新打开帮助</h3><p>点下面的<b>重新打开帮助</b>，页面会重新加载一次内容。</p></div>'+
     '<div class="card"><h3><span class="step-no serif">2</span>回首页再进来</h3><p>回首页重新进入要办的服务；<b>正在办的打印任务不会因此取消</b>。</p></div>'+
-    '<div class="card"><h3><span class="step-no serif">3</span>需要帮助</h3><p>连着两次都打不开。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒。</p></div>'+
+    '<div class="card"><h3><span class="step-no serif">3</span>需要帮助</h3><p>连着两次都打不开。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。</p></div>'+
     '</div></section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">这不影响你办事</span><span class="hint">帮助页只是补充</span></div>'+
     '<div class="grid2">'+

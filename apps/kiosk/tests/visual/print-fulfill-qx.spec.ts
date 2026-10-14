@@ -653,6 +653,76 @@ test('out-of-paper still renders when support contact is missing @w2', async ({ 
   await expect(outOfPaper).not.toContainText('这单还在，手机上能看到')
 })
 
+async function openClientStatusTimeout(page: Page, api: ApiRouter, amountCents: number | null): Promise<void> {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 200,
+    json: { taskId: W2_ORDER.taskId, status: 'pending' },
+  })
+  await page.clock.install()
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', { ...flowState, amountCents })
+  await expect(page.getByTestId('print-fulfill-state-printing')).toBeVisible()
+  // 查询超时要本机连续读到非终态满 10 分钟。忙锁在那一刻放开；隐私清场的空闲截止
+  // 默认 5 分钟，若一直不拨，放开忙锁时这一屏会被立刻清掉。先走到 9 分钟（忙锁还在），
+  // 用一次指针活动把空闲截止拨到超时之后，再跨过第 10 分钟。
+  await page.clock.runFor(9 * 60 * 1000)
+  await page.mouse.move(120, 120)
+  await page.clock.runFor(70 * 1000)
+}
+
+test('query timeout does not claim the machine already failed when nothing was paid @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await openClientStatusTimeout(page, api, null)
+  const screen = page.getByTestId('print-fulfill-state-client-status-timeout')
+  await expect(screen).toBeVisible()
+  await expect(screen).toContainText('本机连续查询 10 分钟没有拿到最终结果')
+  const status = screen.getByTestId('print-fulfill-fallback')
+  await expect(status).toContainText('可以先重新查询')
+  await expect(status).toContainText('需要帮助？')
+  await expect(status).not.toContainText('暂时打不了')
+  await expect(status).not.toContainText('已经收到提醒')
+  const money = screen.locator('.pff-inbar').filter({ hasText: '费用与订单边界' })
+  await expect(money.locator('.pff-inbar-b')).toContainText('请先看出纸口')
+  await expect(money.locator('.pff-inbar-b')).toContainText('需要帮助？')
+  await expect(money).not.toContainText('如需退款')
+  await expect(money).not.toContainText('暂时打不了')
+  await expect(money).not.toContainText('已经收到提醒')
+  await expect(screen).toContainText('需要帮助？')
+  await expect(screen).not.toContainText('暂时打不了')
+  await expect(screen).not.toContainText('已经收到提醒')
+  await expectTouchAndBounds(page)
+  await page.screenshot({ path: test.info().outputPath('timeout-unpaid.png') })
+  expect(errors).toEqual([])
+})
+
+test('query timeout keeps the refund line on a paid order and still does not claim a fault @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await openClientStatusTimeout(page, api, W2_ORDER.amountCents)
+  const screen = page.getByTestId('print-fulfill-state-client-status-timeout')
+  await expect(screen).toBeVisible()
+  const status = screen.getByTestId('print-fulfill-fallback')
+  await expect(status).toContainText('可以先重新查询')
+  await expect(status).toContainText('需要帮助？')
+  await expect(status).not.toContainText('暂时打不了')
+  await expect(status).not.toContainText('已经收到提醒')
+  const money = screen.locator('.pff-inbar').filter({ hasText: '费用与订单边界' })
+  // 已付支仍是退款句，不改成求助句。假时钟跨过 10 分钟后，联系方式缓存 5 分钟过期，
+  // peek 可能回到「隐私政策」；号码在或不在，都得是这句退款，不能是故障句。
+  const moneyBody = money.locator('.pff-inbar-b')
+  await expect(moneyBody).toContainText('请先看出纸口。')
+  await expect(moneyBody).toContainText('如需退款，请')
+  await expect(moneyBody).toContainText('我们核实后原路退回。')
+  await expect(moneyBody).not.toContainText('需要帮助？')
+  await expect(money).not.toContainText('暂时打不了')
+  await expect(money).not.toContainText('已经收到提醒')
+  await expect(screen).toContainText('需要帮助？')
+  await expect(screen).not.toContainText('暂时打不了')
+  await expect(screen).not.toContainText('已经收到提醒')
+  await expectTouchAndBounds(page)
+  expect(errors).toEqual([])
+})
+
 test('zero-yuan confirmed failure does not mention a refund @w2', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
