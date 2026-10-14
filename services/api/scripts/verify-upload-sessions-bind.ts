@@ -428,7 +428,7 @@ async function main(): Promise<void> {
       assert.equal(status.status, 'confirmed')
       assert.equal(stored?.deletedAt ?? null, null)
     } else {
-      assert.notEqual(status.status, 'confirmed')
+      assert.ok(status.status !== 'confirmed' || (!cancelOk && liveMember), 'successor may confirm only when cancel was rejected')
     }
     assert.equal(cancelOk && liveMember && status.status === 'cancelled', false)
   }
@@ -720,7 +720,7 @@ async function main(): Promise<void> {
     const confirmed = await confirming
     const finalStatus = await service.getStatus(session.sessionId, session.controlToken)
     assert.equal(finalStatus.status, 'confirmed')
-    assert.equal(confirmed.ok, true)
+    assert.equal(confirmed.ok, false, 'stale holder must fail after lock loss')
     assert.equal(objects.has(previousKey), false, 'lock expiry recovery must delete the anonymous key')
     assert.equal(prisma.files.get(fileId)?.deletedAt ?? null, null)
     assert.match(prisma.files.get(fileId)?.storageKey ?? '', /^users\/member_1\//)

@@ -32,6 +32,7 @@ import {
 } from './upload-session-member-bind'
 import { deleteAnonymousObjectThenTombstone } from './upload-session-object-delete'
 import { isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
+import { SESSION_UPLOAD_TIMEOUT_MS, startUploadSessionLease, type UploadSessionLease } from './upload-session-lock-lease'
 import { clientDeclarationJson, type ClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   UploadSessionChannel,
@@ -242,7 +243,9 @@ export class UploadSessionsService {
     if (!(await this.redis.setNxEx(lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS))) {
       throw sceneUnusableException()
     }
+    const lease = startUploadSessionLease(this.redis, lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS)
     try {
+      await lease.assertOwned()
       const consumed = await this.redis.getDel(indexKey)
       if (consumed !== sessionId) throw sceneUnusableException()
       let record: StoredUploadSession
@@ -262,6 +265,7 @@ export class UploadSessionsService {
     // 轮换上传令牌：服务端只留哈希，换不回创建时那把明文（见 upload-scene.ts ①②）。
     // 轮换的副作用正是我们想要的 —— 同一个会话的旧网页二维码当场作废。
     const uploadToken = randomBytes(32).toString('base64url')
+      lease.assertActive()
       const committed = await this.commitSession(
         { ...record, uploadTokenHash: hashToken(uploadToken) },
         lockKey,
@@ -278,7 +282,7 @@ export class UploadSessionsService {
         uploadToken,
       }
     } finally {
-      await this.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
+      await lease.release()
     }
   }
 
@@ -307,6 +311,7 @@ export class UploadSessionsService {
     if (!(await this.redis.setNxEx(lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS))) {
       throw uploadInProgressException()
     }
+    const lease = startUploadSessionLease(this.redis, lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS)
 
     try {
       const loaded = this.markExpired(await this.load(args.sessionId))
@@ -324,6 +329,7 @@ export class UploadSessionsService {
         })
       }
       const latest: StoredUploadSession = { ...loaded, status: 'uploading', file: null }
+      lease.assertActive()
       const started = await this.commitSession(
         latest,
         lockKey,
@@ -341,8 +347,10 @@ export class UploadSessionsService {
       }
 
       let file: FileUploadResponse
+      let uploadWork: Promise<FileUploadResponse> | undefined
       try {
-        file = await this.files.upload({
+        await lease.assertOwned()
+        file = await lease.runBounded(() => (uploadWork = this.files.upload({
           buffer: args.file.buffer,
           filename: restoreMultipartUtf8Filename(
             args.file.originalname || defaultUploadFilename(latest.purpose),
@@ -352,9 +360,12 @@ export class UploadSessionsService {
           uploaderId: null,
           endUserId: null,
           createdBy: null,
-        })
+        })), SESSION_UPLOAD_TIMEOUT_MS)
       } catch (error) {
-        await this.commitSession(
+        if (lease.signal.aborted && uploadWork) void uploadWork.then((late) =>
+          deleteAnonymousObjectThenTombstone(this.memberBind, late.fileId, 'upload lock lost before commit').catch(() => undefined),
+        ).catch(() => undefined)
+        if (!lease.signal.aborted) await this.commitSession(
           { ...latest, status: 'pending', file: null },
           lockKey,
           lockToken,
@@ -370,6 +381,7 @@ export class UploadSessionsService {
         uploadedAt: new Date().toISOString(),
       }
       if (this.markExpired(uploaded).status === 'expired') {
+        lease.assertActive()
         const marked = await this.commitSession(
           { ...latest, status: 'expired', file: null },
           lockKey,
@@ -384,6 +396,7 @@ export class UploadSessionsService {
         if (marked === 'updated') await this.removeFromExpiryIndex(args.sessionId)
         throw expiredSessionException()
       }
+      lease.assertActive()
       const committed = await this.commitSession(uploaded, lockKey, lockToken, 'uploading')
       if (committed !== 'updated') {
         await deleteAnonymousObjectThenTombstone(
@@ -417,7 +430,7 @@ export class UploadSessionsService {
       }
       return this.toStatusResponse(uploaded)
     } finally {
-      await this.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
+      await lease.release()
     }
   }
 
@@ -627,7 +640,7 @@ export class UploadSessionsService {
 
   private async withSessionLock<T>(
     sessionId: string,
-    action: (lock: { lockKey: string; lockToken: string }) => Promise<T>,
+    action: (lock: UploadSessionLease) => Promise<T>,
   ): Promise<T> {
     const lockKey = uploadLockKey(sessionId)
     const lockToken = randomUUID()
@@ -639,10 +652,11 @@ export class UploadSessionsService {
         error: { code: 'UPLOAD_SESSION_ACTION_IN_PROGRESS', message: '上传会话正在处理中，请稍候' },
       })
     }
+    const lease = startUploadSessionLease(this.redis, lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS)
     try {
-      return await action({ lockKey, lockToken })
+      return await action(lease)
     } finally {
-      await this.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
+      await lease.release()
     }
   }
 
