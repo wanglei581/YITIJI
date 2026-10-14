@@ -234,7 +234,7 @@ exec "${dateBin}" "$@"
 `)
 }
 
-function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
+function makeSandbox({ oldGroups = 0, pointerUnwritable = false, omitOwnershipFile = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'deploy-drill-'))
   const bin = join(dir, 'bin')
   const checkout = join(dir, 'checkout')
@@ -244,10 +244,17 @@ function makeSandbox({ oldGroups = 0, pointerUnwritable = false } = {}) {
   makeShims(bin)
 
   mkdirSync(join(checkout, 'services/api/src/config'), { recursive: true })
+  mkdirSync(join(checkout, 'services/api/src/recruitment-hosting'), { recursive: true })
   mkdirSync(join(checkout, 'services/api/scripts'), { recursive: true })
   // 新旧内容长度不同：rsync 按「大小 + 修改时间」快速比对，同秒创建的同长文件会被当成没变
   writeFileSync(join(checkout, 'VERSION'), 'new-release\n')
   writeFileSync(join(checkout, 'services/api/src/config/production-runtime-gates.ts'), 'PRINT_REQUIRE_PII_SCAN\nPRINT_REQUIRE_PRINTER_ONLINE\n')
+  if (!omitOwnershipFile) {
+    writeFileSync(
+      join(checkout, 'services/api/src/recruitment-hosting/deployment-ownership.ts'),
+      "export const DEPLOYMENT_OWNERSHIP_ENV = 'DEPLOYMENT_OWNERSHIP'\n",
+    )
+  }
   writeFileSync(join(checkout, 'services/api/scripts/preflight-production-gates.mjs'), 'process.exit(0)\n')
   // 3d 法务文档预检的替身：记下调用参数；DRILL_LEGAL_PREFLIGHT=missing 时按「缺隐私政策」失败
   writeFileSync(join(checkout, 'services/api/scripts/preflight-legal-docs.mjs'), [
@@ -384,6 +391,19 @@ try {
     check(r.out.includes('FLOOR_MB=10240'), '场景 1：空间下限默认 10240MB', r.out.match(/FLOOR_MB=\d+/)?.[0] ?? '')
     check(r.out.includes('::warning::pm2-logrotate 未安装') && r.out.includes('services/api/scripts/pm2-logrotate-setup.sh') && !r.calls.includes('pm2 install'),
       '场景 1：没装 pm2-logrotate 时只告警并指出安装脚本，不安装', r.out.slice(-400))
+  }
+  // 0a. 没有部署归属文件的旧提交不能当发布目标：在备份和迁移之前失败
+  {
+    const box = makeSandbox({ omitOwnershipFile: true }); boxes.push(box)
+    const r = runDeploy(box, { DRILL_HEALTH: 'always' })
+    const backupNames = readdirSync(box.backups)
+    check(r.code !== 0 && r.out.includes('=== 0a.') && r.out.includes('目标提交缺少部署归属文件 services/api/src/recruitment-hosting/deployment-ownership.ts'),
+      '场景 0a：没有 deployment-ownership.ts 的提交在 0a 失败', `退出码 ${r.code}\n${r.out.slice(-800)}`)
+    check(!r.out.includes('=== 2. PostgreSQL') && !r.calls.includes('pg_dump') && backupNames.length === 0,
+      '场景 0a：备份没有发生', `backups=${backupNames.join(',')} calls=${r.calls.slice(0, 300)}`)
+    check(!r.out.includes('=== 6. 收敛运行目录') && !r.calls.includes('db:pg:deploy') && !r.out.includes('Applying migration'),
+      '场景 0a：迁移没有发生', r.calls.slice(0, 300))
+    check(read(join(box.runtime, 'VERSION')) === 'old', '场景 0a：运行目录仍是发布前')
   }
   // 2. 就绪检查一直失败 → 恢复并重启回旧版
   {
