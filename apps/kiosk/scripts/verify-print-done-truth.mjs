@@ -175,11 +175,14 @@ const checks = [
   // 2026-10-13（回话单第 13 条，第八次）：终端报的「卡纸」不一定是卡纸。
   // 卡纸屏三处改用现成的字：标题、顶栏「打印中断」、大卡「别硬拉纸」。
   // 打印结果未确认、打印失败两支标题不动，胶囊仍拼 issueTitle。15 号稿 paper-jam 同一三处；rTimeout 不动。
+  // 10/14 大卡下面那句后半句改成「机器里的纸留给维护人员处理。」（产品负责人 22:18 点头，合规十四定字）。
   ['卡纸屏不咬定卡纸：标题、胶囊、大卡，另外两屏仍拼标题', () => {
     assert.match(doneRuntime, /isUnconfirmed \? '打印结果未确认' : jam \? '打印机出了点问题，这次可能没打完' : '打印失败'/)
     assert.doesNotMatch(doneRuntime, /'打印机卡纸'/)
     assert.match(doneRuntime, /jam\s*\?\s*<>卡纸、缺纸、没出全？<em>别硬拉纸<\/em>。<\/>/)
     assert.doesNotMatch(doneRuntime, /纸<em>卡住了<\/em>/)
+    assert.match(doneRuntime, /jam\s*\?\s*'硬拉可能撕坏纸、伤到机器，机器里的纸留给维护人员处理。'/)
+    assert.doesNotMatch(doneRuntime, /交给我们来处理/)
     assert.match(doneRuntime, /\$\{paidLabel\} · \$\{jam \? '打印中断' : issueTitle\}/)
     assert.match(browserSpecSource, /免费试运营，本单 0 元 · 打印中断/)
     assert.match(browserSpecSource, /已付 ¥2\.00 · 打印中断/)
@@ -201,6 +204,8 @@ const checks = [
     assert.match(jamBlock, /title:'打印机出了点问题，这次可能没打完'/)
     assert.match(jamBlock, /pill:'打印中断'/)
     assert.match(jamBlock, /ask:'卡纸、缺纸、没出全？<em>别硬拉纸<\/em>。'/)
+    assert.match(jamBlock, /doing:'硬拉可能撕坏纸、伤到机器，机器里的纸留给维护人员处理。'/)
+    assert.doesNotMatch(jamBlock, /交给我们来处理/)
     assert.doesNotMatch(jamBlock, /title:'打印机卡纸'|pill:'卡纸'|纸<em>卡住了<\/em>/)
     const timeoutStart = fulfill.indexOf('function rTimeout()')
     const timeoutEnd = fulfill.indexOf('function rUnconfirmed()')
