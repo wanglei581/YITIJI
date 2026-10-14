@@ -25,6 +25,8 @@ const DEFAULT_TTL_MS = 5 * 60 * 1000 // 5 分钟
  * 链接仍是一次签名、到点失效的内部 HMAC 地址，只给本人会话；下载链接仍走默认 5 分钟。
  */
 export const PRINT_ARTIFACT_URL_TTL_MS = 30 * 60 * 1000
+/** 扫码带走的地址最长 10 分钟；屏上最长约 5 分钟就清场；一次性取件票据之前的短期措施。 */
+export const TAKEAWAY_URL_MAX_TTL_SECONDS = 600
 const REPORT_ABANDON_NAMESPACE = 'contract-report-abandon'
 
 function getSecret(): string {

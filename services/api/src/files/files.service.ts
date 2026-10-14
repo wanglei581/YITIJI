@@ -134,6 +134,8 @@ export class FilesService {
      * 避免会员数据导出按 endUserId 把未付款文件列出来。
      */
     paidExportStaging?: { endUserId: string; expiresAt: Date }
+    /** 仅收紧本次上传回包的下载签名；不改变文件或上传有效期。 */
+    downloadUrlMaxTtlSeconds?: number
     /**
      * 渲染前已经写进 AIGC.ProduceID 的编号。传入则作为 FileObject.id，
      * 缺省时在这里生成。只接受 32 位十六进制，和对象键里的文件段一致。
@@ -302,7 +304,7 @@ export class FilesService {
     // 先于对象删除、以及物理删除失败时的可重试账本（§11）。补偿失败不得替换
     // 调用方看到的原始错误。
     try {
-      return await this.signedUploadResponse(record)
+      return await this.signedUploadResponse(record, args.downloadUrlMaxTtlSeconds)
     } catch (responseError) {
       try {
         await this.systemDelete(record.id, 'upload response failed, compensating orphaned file')
@@ -321,9 +323,9 @@ export class FilesService {
    * 只为已经 active 的文件签发下载 URL。收费导出在核销事务提交后调用。
    * 签名失败不得删除文件：此时权益可能已经扣过。
    */
-  async signActiveDownload(fileId: string): Promise<FileUploadResponse> {
+  async signActiveDownload(fileId: string, maxTtlSeconds?: number): Promise<FileUploadResponse> {
     const record = await this.requireActive(fileId)
-    return this.signedUploadResponse(record)
+    return this.signedUploadResponse(record, maxTtlSeconds)
   }
 
   private async signedUploadResponse(record: {
@@ -336,8 +338,8 @@ export class FilesService {
     bucket: string
     expiresAt: Date | null
     purpose: string
-  }): Promise<FileUploadResponse> {
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
+  }, maxTtlSeconds?: number): Promise<FileUploadResponse> {
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose, maxTtlSeconds)
     const signed = this.storage.getDownloadUrl(
       {
         objectKey: record.storageKey,
@@ -666,7 +668,8 @@ export class FilesService {
   async getAccessUrl(
     fileId: string,
     requester: FileRequester,
-    disposition: 'inline' | 'attachment'
+    disposition: 'inline' | 'attachment',
+    maxTtlSeconds?: number
   ): Promise<{
     response: FileAccessUrlResponse
     record: { purpose: string; ownerType: string | null }
@@ -681,7 +684,7 @@ export class FilesService {
     await this.assertJobFitFileReadable(record)
     await this.assertContentIntegrity(record.id)
 
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose, maxTtlSeconds)
 
     const signed = this.storage.getDownloadUrl(
       {
@@ -1392,17 +1395,21 @@ export class FilesService {
     return tasks.some((task) => task.fileId === fileId || parseContentFileId(task.fileUrl) === fileId)
   }
 
-  private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
+  private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string, maxTtlSeconds?: number): number {
     if (purpose === 'contract_upload' && !expiresAt) {
       this.throwFileNotFound()
     }
-    if (!expiresAt) return this.storage.signTtlSeconds
+    if (!expiresAt) return maxTtlSeconds === undefined
+      ? this.storage.signTtlSeconds
+      : Math.min(this.storage.signTtlSeconds, maxTtlSeconds)
     const remainingSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
     // 对象存储签名的最小安全粒度为 1 秒；不足时禁止调用存储签名。
     if (remainingSeconds < 1) {
       this.throwFileNotFound()
     }
-    return Math.min(this.storage.signTtlSeconds, remainingSeconds)
+    return maxTtlSeconds === undefined
+      ? Math.min(this.storage.signTtlSeconds, remainingSeconds)
+      : Math.min(this.storage.signTtlSeconds, remainingSeconds, maxTtlSeconds)
   }
 
   private ensureSignedExpiryWithinFileLifetime(

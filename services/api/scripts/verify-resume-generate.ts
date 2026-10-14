@@ -322,6 +322,17 @@ async function main(): Promise<void> {
     if (!exported.signedUrl.includes('expires=') && !exported.signedUrl.includes('sig=') && !exported.signedUrl.includes('Signature')) {
       fail(`7. signedUrl 非签名 URL: ${exported.signedUrl.slice(0, 80)}`)
     }
+    const exportedNow = Date.now()
+    const exportedExpiry = Date.parse(exported.expiresAt)
+    const signedExpiry = Number(new URL(exported.signedUrl, 'http://local.test').searchParams.get('expires'))
+    const printExpiry = Number(new URL(exported.printFileUrl, 'http://local.test').searchParams.get('expires'))
+    if (!(exportedExpiry > exportedNow && exportedExpiry - exportedNow <= 605_000 && signedExpiry === exportedExpiry)) {
+      fail('7. 生成简历导出扫码地址应不超过 600 秒 + 5 秒容差，且响应到期时间与地址一致')
+    }
+    if (!(printExpiry - exportedNow > 29 * 60_000 && printExpiry - exportedNow <= 30 * 60_000)) {
+      fail('7. 生成简历导出 printFileUrl 应保持约 30 分钟')
+    }
+    pass('7. 生成简历导出扫码地址 ≤10 分钟，printFileUrl 约 30 分钟')
     const fileRow = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
     if (!fileRow) fail('7. FileObject 未落库')
     // 匿名导出无会员归属,仍走 system_short 短期保存;会员导出在 7b 覆盖账号资产策略。

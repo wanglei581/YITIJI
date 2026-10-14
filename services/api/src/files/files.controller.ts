@@ -41,7 +41,7 @@ import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
 import { UpdateRetentionDto } from './dto/update-retention.dto'
-import { signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
+import { TAKEAWAY_URL_MAX_TTL_SECONDS, signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
 import { readClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   FilePurpose,
@@ -250,19 +250,20 @@ export class FilesController {
 
   @Get(':id/preview-url')
   async previewUrl(@Param('id') id: string, @Req() req: ReqLike): Promise<ApiResponse<FileAccessUrlResponse>> {
-    return this.accessUrl(id, req, 'inline')
+    return this.accessUrl(id, req, 'inline', TAKEAWAY_URL_MAX_TTL_SECONDS)
   }
 
   private async accessUrl(
     id: string,
     req: ReqLike,
     disposition: 'inline' | 'attachment',
+    maxTtlSeconds?: number,
   ): Promise<ApiResponse<FileAccessUrlResponse>> {
     const requester = await this.resolveRequester(req)
     if (!requester) {
       throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后访问文件' } })
     }
-    const { response, record } = await this.files.getAccessUrl(id, requester, disposition)
+    const { response, record } = await this.files.getAccessUrl(id, requester, disposition, maxTtlSeconds)
     // 合规(CLAUDE.md §11):管理员访问用户文件必须记录审计日志。
     if (requester.kind === 'user' && requester.role === 'admin') {
       await this.audit.writeRequired(this.prisma, {

@@ -9,7 +9,7 @@ export function kioskSessionRetentionCutoff(now = new Date()): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
 }
 
-/** 会话记录只为统计服务人次，按开始时间保留 180 天（可配），与日志保留期一致。 */
+/** 会话记录只为统计服务人次，按开始时间保留 180 天（可配）。这是业务统计记录，不是网络日志，留存期不跟网络日志走。 */
 @Injectable()
 export class KioskSessionRetentionTask {
   private readonly logger = new Logger(KioskSessionRetentionTask.name)
