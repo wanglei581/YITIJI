@@ -10169,20 +10169,13 @@
         "controller": "services/api/src/jobs/jobs.controller.ts",
         "handler": "JobsController.getPartnerJobQualitySummary",
         "method": "GET",
-        "models": [
-          "Job",
-          "JobDataQualitySnapshot"
-        ],
+        "models": [],
         "path": "/api/v1/partner/jobs/quality-summary",
         "roles": [
           "partner"
         ],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-quality.service.ts"
-        ],
-        "services": [
-          "JobQualityService"
-        ]
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/official-channels/official-channels.controller.ts",
@@ -26030,6 +26023,9 @@
       "services/api/scripts/verify-public-fair-demo-guard.ts",
       "services/api/scripts/verify-recruitment-hosting-default-off.ts"
     ],
+    "services/api/src/job-ai/partner-quality-summary.ts": [
+      "services/api/scripts/verify-job-ai-ops-dashboard.ts"
+    ],
     "services/api/src/job-applications/dto/create-job-application.dto.ts": [
       "services/api/scripts/verify-job-application-track.ts"
     ],
@@ -38370,6 +38366,7 @@
           "services/api/src/ai/resume/llm-job-fit.service.ts",
           "services/api/src/job-ai/job-ai.service.ts",
           "services/api/src/job-ai/job-quality.service.ts",
+          "services/api/src/job-ai/partner-quality-summary.ts",
           "services/api/src/jobs/jobs.controller.ts"
         ],
         "missing": []

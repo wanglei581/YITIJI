@@ -520,7 +520,7 @@
 | PATCH | `/api/v1/partner/jobs/:id` | JobsController.updatePartnerJob | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | PATCH | `/api/v1/partner/jobs/:id/publish` | JobsController.unpublishPartnerJob | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | POST | `/api/v1/partner/jobs/import` | JobsController.importJobs | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
-| GET | `/api/v1/partner/jobs/quality-summary` | JobsController.getPartnerJobQualitySummary | partner | JobQualityService | Job<br/>JobDataQualitySnapshot |
+| GET | `/api/v1/partner/jobs/quality-summary` | JobsController.getPartnerJobQualitySummary | partner | — | — |
 | GET | `/api/v1/partner/sync-logs` | JobsController.getPartnerSyncLogs | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 
 ## `services/api/src/jobs/kiosk-campus-recruitment-stats.controller.ts`

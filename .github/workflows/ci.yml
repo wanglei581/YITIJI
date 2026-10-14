@@ -197,6 +197,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-end-use
           # 无人值守标准句与公开服务联系方式（10/6）：读不到接口时按最保守的一套，号码 / 服务时间 / 附近终端 / 小程序发布从接口读，单测真跑源码。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-support-contact
+          # 招聘锁：终端配置缺 recruitmentHosting 按关，不退回 jobBoard。转译真实源码真跑，不连库。
+          pnpm --filter @ai-job-print/kiosk verify:recruitment-hosting-open
           pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
           pnpm --filter @ai-job-print/kiosk verify:kiosk-field-safety
           pnpm --filter @ai-job-print/kiosk verify:terminal-session-self-heal
