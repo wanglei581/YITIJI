@@ -21,7 +21,7 @@ import {
   quotePrintOrder,
   type PrintPriceChangedQuote,
 } from '../../services/print/printJobsApi'
-import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { errorCodeOf, PRINT_MEMBER_DAILY_QUOTA_COPY, PRINT_TERMINAL_DAILY_QUOTA_COPY, userMessageOf } from '../../services/api/userErrorMessage'
 import { helpNeededLine, machineCannotPrintLine, machineUnusableLine, printProblemLine } from '../../copy/unattendedCopy'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
@@ -104,6 +104,34 @@ function quoteKeyOf(fileUrl: string | null | undefined, params: PrintJobParams):
   return `${fileUrl ?? ''}|${JSON.stringify(params)}`
 }
 
+/** 现场建单只认这两个当天额度码。别的出错不置灰。 */
+const QUOTA_ORDER_CODES = new Set(['PRINT_TERMINAL_DAILY_QUOTA_REACHED', 'PRINT_MEMBER_DAILY_QUOTA_REACHED'])
+
+/**
+ * 现场建单撞上当天额度后，主按钮按「这一份交接 + 报价键」置灰，红条原文跟键记在一起。
+ * 记在模块内存，不进 sessionStorage / localStorage：返回修改会卸载本页，组件 state 留不住红条；
+ * 同一组参数再进来键还在，所以仍灰、红条也还在。参数一变 quoteKey 对不上，按钮亮、红条收起。
+ * 刷新或关页即忘。只存这两句已有红条，不加新字。
+ * 进待机屏不整页重载，表会留到下一位，所以：键里带交接编号（每次选文件、每位用户都不同），
+ * 同一份公共文件、同一组参数，下一位来打不会被上一位的额度挡住；键只存摘要，不留文件签名链接。
+ */
+const quotaHolds = new Map<string, string>()
+
+function quotaHoldId(quoteKey: string): string {
+  let a = 0x811c9dc5
+  let b = 0x5bd1e995
+  for (let i = 0; i < quoteKey.length; i += 1) {
+    const c = quoteKey.charCodeAt(i)
+    a = Math.imul(a ^ c, 0x01000193)
+    b = Math.imul(b ^ c, 0x27d4eb2d)
+  }
+  return `${(a >>> 0).toString(36)}.${(b >>> 0).toString(36)}.${quoteKey.length}`
+}
+
+function isDailyQuotaCopy(text: string | null): boolean {
+  return text === PRINT_TERMINAL_DAILY_QUOTA_COPY || text === PRINT_MEMBER_DAILY_QUOTA_COPY
+}
+
 export function PrintConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -163,6 +191,9 @@ export function PrintConfirmPage() {
   const mergedFileUrl = appendEligible ? mergedMaterial?.printFileUrl ?? null : null
   // 报价只对「最终出纸文件 + 这组参数」有效：键一变，旧报价与迟到的响应都不算数。
   const quoteKey = quoteKeyOf(mergedFileUrl ?? file.fileUrl, params)
+  // 同一组参数的额度红条。键对不上就是 null：按钮亮，下面也不再拿旧的额度句当红条。
+  const quotaHoldKey = quotaHoldId(`${handoff?.contextId ?? ''}|${quoteKey}`)
+  const quotaHold = quotaHolds.get(quotaHoldKey) ?? null
   const [quoteState, setQuoteState] = useState<{ key: string; view: QuoteView } | null>(null)
   const quote = useMemo<QuoteView>(
     () => (API_MODE !== 'http' ? { status: 'demo' } : quoteState?.key === quoteKey ? quoteState.view : { status: 'loading' }),
@@ -196,6 +227,7 @@ export function PrintConfirmPage() {
       return
     }
     let cancelled = false
+    // 报价重取只换这一组参数的报价，不清当天额度的红条（红条按 quoteKey 记在模块内存里）。
     setQuoteState({ key: quoteKey, view: { status: 'loading' } })
     // 合并版才是最终出纸文件：已生成时报的是合并后那一份的价。
     const request = mergedFileUrl
@@ -319,6 +351,7 @@ export function PrintConfirmPage() {
   })
 
   const confirmBlocked =
+    quotaHold !== null ||
     sidesOverLimit ||
     submitting ||
     abandoning ||
@@ -345,6 +378,8 @@ export function PrintConfirmPage() {
   }
 
   const handleConfirm = async () => {
+    // 这一组参数已经撞上当天额度：点不到，也不许先把红条清掉再发请求。
+    if (quotaHolds.has(quotaHoldKey)) return
     if (terminalSession === 'checking') return
     if (terminalSession === 'failed') {
       setSubmitError(userMessageOf(
@@ -461,7 +496,10 @@ export function PrintConfirmPage() {
           setPiiCheckRequired(true)
           setSubmitError('这份文件的隐私检查还没有确认完，需要回到材料检查再确认一次。你的文件还在，不用重新上传。')
         } else {
-          setSubmitError(userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`))
+          const message = userMessageOf(err, `提交失败，请稍后重试。${helpNeededLine()}。`)
+          const code = errorCodeOf(err)
+          if (code && QUOTA_ORDER_CODES.has(code)) quotaHolds.set(quotaHoldKey, message)
+          setSubmitError(message)
         }
       } finally {
         if (!leaving) {
@@ -689,7 +727,14 @@ export function PrintConfirmPage() {
         selfAssessment={selfAssessment}
         printNotes={printNotes}
         actions={actions}
-        submitError={submitError ?? activeNotice ?? (sidesOverLimit ? sidesNotice : null)}
+        submitError={
+          // 置灰期间红条只认这条记录：重新报价、权益刷新、别的提示都不能清掉或盖住它。
+          // 报价键已经变了、组件里还留着上一句额度文案时，把那句收起来。
+          quotaHold
+          ?? (isDailyQuotaCopy(submitError) ? null : submitError)
+          ?? activeNotice
+          ?? (sidesOverLimit ? sidesNotice : null)
+        }
         // 回跳地址只放路由路径：不带文件编号、打印链接、交接编号，也不带当前查询串。
         onLogin={() => navigate(loginPathForPrintStep('confirm'))}
       />

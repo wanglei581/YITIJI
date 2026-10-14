@@ -339,17 +339,39 @@ pass('可恢复的码分类不变；未登记 401 不说「登录」')
     else pass(`${code}：${kind}，是合规定的那句`)
   }
   // 额度用完的码明天还能用：不许进「这个到机码不能再用来取件」那一屏，但按钮要和 closed 同一组。
-  if (model.failureScreen('quota') !== 'failed') fail('quota 不该映射到 closed 屏（码明天还能用）')
+  // 2026-10-12 第八次：旧断言钉死 failureScreen('quota') === 'failed'，屏头就只能是「没能完成校验」。
+  // 合规十一定额度单独一屏，屏头改成「这个到机码今天打不了。」（待产品负责人点头），所以这里改成必须等于 quota。
+  if (model.failureScreen('quota') === 'closed') fail('quota 不该映射到 closed 屏（码明天还能用）')
+  else if (model.failureScreen('quota') !== 'quota') fail(`quota 应映射到独立屏，实际 ${model.failureScreen('quota')}`)
+  else pass('quota 单独一屏，屏头不再用 failed 的「没能完成校验」')
   {
     const rel = 'apps/kiosk/src/pages/print/components/PickupHidGuide.tsx'
-    if (!/failure === 'closed' \|\| failure === 'quota'/.test(read(rel))) fail(`${rel}：quota 没有和 closed 共用「回到首页 / 输另一个到机码」那组按钮`)
+    const guide = read(rel)
+    if (!/failure === 'closed' \|\| failure === 'quota'/.test(guide)) fail(`${rel}：quota 没有和 closed 共用「回到首页」那组出口（次要出口额度是「求助」，closed 是「输另一个到机码」）`)
     else pass('quota 与 closed 共用「回到首页」那组按钮，屏头不同')
+    if (!/这个到机码<b>今天打不了<\/b>。/.test(guide)) fail(`${rel}：额度屏头不是「这个到机码今天打不了。」`)
+    else pass('额度屏头是「这个到机码今天打不了。」')
+    if (!/case 'failed':[\s\S]{0,160}没能完成校验/.test(guide)) fail(`${rel}：failed 屏头不再是「没能完成校验」`)
+    else pass('failed 屏头仍是「没能完成校验」')
   }
   // 全站共用码表：现场建单撞额度时不许落到「429 一律说人较多」。
   for (const [code, sentence] of [['PRINT_TERMINAL_DAILY_QUOTA_REACHED', terminalQuota], ['PRINT_MEMBER_DAILY_QUOTA_REACHED', memberQuota]]) {
     const shared = userError.userMessageOf(new ApiHttpError(code, '后端原话', 429), '兜底')
     if (shared !== sentence) fail(`共用码表 ${code} 应是「${sentence}」，实际「${shared}」`)
     else pass(`共用码表 ${code}：照实说量用完、明天恢复`)
+  }
+  // 确认页额度置灰的内存表：进待机屏不整页重载，表会留到下一位。所以键要带这一份交接的编号
+  // （同一份公共文件、同参数，下一位不被上一位的额度挡住），只存摘要（不留文件签名链接），
+  // 值只许是码表给的那句红条。读、写、判三处都走同一个键。
+  {
+    const rel = 'apps/kiosk/src/pages/print/PrintConfirmPage.tsx'
+    const page = read(rel)
+    const uses = page.match(/quotaHolds\.(get|set|has)\([^)]*\)/g) ?? []
+    if (!/const quotaHoldKey = quotaHoldId\(`\$\{handoff\?\.contextId \?\? ''\}\|\$\{quoteKey\}`\)/.test(page)) fail(`${rel}：置灰键没按「交接编号 + 报价键」取摘要`)
+    else if (uses.length < 3) fail(`${rel}：额度置灰表的读、写、判不足三处（实际 ${uses.length}）`)
+    else if (uses.some((use) => !/^quotaHolds\.(get|has)\(quotaHoldKey\)$|^quotaHolds\.set\(quotaHoldKey, message\)$/.test(use))) fail(`${rel}：额度置灰表有一处没走 quotaHoldKey 或存了别的值：${uses.join('；')}`)
+    else if (!/const message = userMessageOf\(err, /.test(page)) fail(`${rel}：写进置灰表的值不是码表那句红条`)
+    else pass('额度置灰表按交接编号加报价键存摘要，值只是那句红条')
   }
   // 无效、过期、不属于这台机器三种仍是同一句（防试探），句尾有回手机的路。
   for (const code of ['PICKUP_CODE_INVALID', 'PICKUP_CODE_EXPIRED', 'PICKUP_TERMINAL_MISMATCH']) {

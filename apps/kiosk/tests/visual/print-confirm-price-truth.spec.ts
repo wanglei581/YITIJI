@@ -26,7 +26,7 @@ import type { Page, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
-import { W2_FILE, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fixtures/fusion-w2-state'
+import { PRINT_HANDOFF_KEY, W2_FILE, W2_ORDER, W2_PRINT_PARAMS, writePrintHandoff } from './fixtures/fusion-w2-state'
 
 /** 打印交接统一（P0-5）后确认页只认打印交接上下文：写一份 v2 上下文再重载（跳转临时状态里的文件一律不看）。 */
 async function openConfirmWith(page: Page, printParams: Record<string, unknown>): Promise<void> {
@@ -518,3 +518,219 @@ for (const state of ['loading', 'failed'] as const) {
     }
   })
 }
+
+// 2026-10-12 第八次：现场建单撞上当天额度后，主按钮只置灰、不加新字。
+// 红条按报价键记在模块内存里：置灰期间报价重取和权益刷新都不能把它清掉；别的出错不置灰；参数一变就解开。
+const TERMINAL_QUOTA_COPY = '这台机器今天剩下的打印量不够打这一单，明天恢复。'
+const MEMBER_QUOTA_COPY = '你今天剩下的打印量不够打这一单，明天恢复。'
+const payButton = (page: Page) => page.getByRole('button', { name: '确认并去付款', exact: true })
+const confirmAlert = (page: Page) => page.locator('.pcf-cfm-alert span')
+
+function registerHomeLists(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { items: [], pagination: { total: 0, page: 1, pageSize: 1, totalPages: 0 } },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { total: 0, page: 1, pageSize: 20, totalPages: 0 } },
+  })
+}
+
+/**
+ * 点底部「首页」再后退：客户端跳转，不重载文档，模块内存里的额度记录还在。
+ * 首页按需加载：没画出来就后退，路由过渡会被放弃，确认页根本没卸载，测不到「回来」。
+ * 所以等首页真画出来、确认页真卸载了再后退；回来后用页面上的标记证明文档没重载。
+ */
+async function leaveConfirmAndReturn(page: Page): Promise<void> {
+  await page.evaluate(() => { (window as unknown as { __quotaStay?: number }).__quotaStay = 1 })
+  await page.locator('nav.qx-navbar').getByRole('button', { name: '首页', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toHaveCount(0)
+  await page.goBack()
+  await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { __quotaStay?: number }).__quotaStay)).toBe(1)
+}
+
+async function setHandoffCopies(page: Page, copies: number): Promise<void> {
+  await page.evaluate(({ key, copies: nextCopies }) => {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) throw new Error('missing print handoff')
+    const value = JSON.parse(raw) as { printParams?: { copies?: number } }
+    if (!value.printParams) throw new Error('missing print params')
+    value.printParams.copies = nextCopies
+    window.sessionStorage.setItem(key, JSON.stringify(value))
+  }, { key: PRINT_HANDOFF_KEY, copies })
+}
+
+const PRICE_CONFIG_JSON = {
+  billingEnabled: true,
+  items: [
+    { serviceKey: BW_LINE, unitCents: 20, unit: 'page', description: '黑白打印' },
+    { serviceKey: SERVICE_KEY.color, unitCents: UNIT_CENTS.color, unit: 'page', description: '彩色打印' },
+  ],
+}
+
+test('daily quota blocks the same quote and keeps the alert through a re-quote and a return @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerHomeLists(api)
+  let releasePrice = () => undefined
+  const priceHeld = new Promise<void>((resolve) => { releasePrice = resolve })
+  let priceCalls = 0
+  await page.route('**/api/v1/print/price-config', async (route) => {
+    priceCalls += 1
+    if (priceCalls === 1) await priceHeld
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(PRICE_CONFIG_JSON),
+    })
+  })
+  let releaseSecondQuote = () => undefined
+  const secondQuoteHeld = new Promise<void>((resolve) => { releaseSecondQuote = resolve })
+  await routeQuote(page, async (_url, n) => {
+    if (n === 2) await secondQuoteHeld
+    return { unitCents: 20, pages: W2_FILE.pages }
+  })
+  let jobs = 0
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    jobs += 1
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'PRINT_TERMINAL_DAILY_QUOTA_REACHED', message: '今天这台机器的免费打印量已用完' },
+      }),
+    })
+  })
+
+  try {
+    await openConfirm(page)
+    await expect(payButton(page)).toBeEnabled()
+    await expect(page.locator('[data-benefit-state="loading"]')).toBeVisible()
+    await payButton(page).click()
+
+    await expect(payButton(page)).toBeDisabled()
+    await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
+    await expect(page.locator('[data-benefit-state="loading"]')).toBeVisible()
+
+    releasePrice()
+    await expect(page.locator('[data-benefit-state="guest"]')).toBeVisible()
+    await expect(payButton(page)).toBeDisabled()
+    await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
+
+    await leaveConfirmAndReturn(page)
+    // 报价还在重取：红条一直在（条件①）；主按钮照旧是本来就灰的「获取报价后可继续」，不提前换成付款字样。
+    // 等待按钮本来就灰，这里只钉「不换字」；额度置灰的证据在报价回来之后那几行。
+    await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
+    await expect(page.getByRole('button', { name: '获取报价后可继续', exact: true })).toBeDisabled()
+    await expect(payButton(page)).toHaveCount(0)
+
+    releaseSecondQuote()
+    await expect(page.getByTestId('print-confirm-state-quoted')).toBeVisible()
+    await expect(payButton(page)).toBeDisabled()
+    await expect(confirmAlert(page)).toHaveText(TERMINAL_QUOTA_COPY)
+    expect(jobs).toBe(1)
+
+    await setHandoffCopies(page, 2)
+    await leaveConfirmAndReturn(page)
+    await expect(payButton(page)).toBeEnabled()
+    await expect(page.getByText(TERMINAL_QUOTA_COPY)).toHaveCount(0)
+    await expect(summaryValue(page, '打印份数')).toHaveText('2 份')
+  } finally {
+    releasePrice()
+    releaseSecondQuote()
+  }
+})
+
+test('member daily quota grays the same confirm button without new copy @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 1 面' },
+      }),
+    })
+  })
+
+  await openConfirm(page)
+  await expect(payButton(page)).toBeEnabled()
+  await payButton(page).click()
+  await expect(payButton(page)).toBeDisabled()
+  await expect(confirmAlert(page)).toHaveText(MEMBER_QUOTA_COPY)
+  await expect(page.getByText(TERMINAL_QUOTA_COPY)).toHaveCount(0)
+})
+
+test('a non-quota create failure keeps the confirm button enabled @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  let jobs = 0
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    jobs += 1
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'INTERNAL', message: 'boom' } }),
+    })
+  })
+
+  await openConfirm(page)
+  await expect(payButton(page)).toBeEnabled()
+  await payButton(page).click()
+  await expect(confirmAlert(page)).toContainText('服务暂时不可用')
+  await expect(confirmAlert(page)).not.toContainText('打印量不够')
+  await expect(payButton(page)).toBeEnabled()
+  await payButton(page).click()
+  await expect.poll(() => jobs).toBe(2)
+  await expect(payButton(page)).toBeEnabled()
+})
+
+test('the next handoff with the same file and params is not blocked by the previous quota @kiosk', async ({ page, api }) => {
+  registerShell(api, [])
+  registerHomeLists(api)
+  await routeQuote(page, () => ({ unitCents: 20, pages: W2_FILE.pages }))
+  let jobs = 0
+  await page.route('**/api/v1/print/jobs', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    jobs += 1
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: false, error: { code: 'PRINT_MEMBER_DAILY_QUOTA_REACHED', message: '你今天已免费打印 1 面' } }),
+    })
+  })
+
+  await openConfirm(page)
+  await payButton(page).click()
+  await expect(payButton(page)).toBeDisabled()
+  await expect(confirmAlert(page)).toHaveText(MEMBER_QUOTA_COPY)
+
+  // 下一位：同一份文件、同一组参数，但是新的一份交接（换了编号）。页面没重载，模块内存里上一位的记录还在。
+  await writePrintHandoff(page, { printParams: W2_PRINT_PARAMS, materialCheck: null, contextId: 'w2ctx-000000000002' })
+  await leaveConfirmAndReturn(page)
+  await expect(payButton(page)).toBeEnabled()
+  await expect(page.getByText(MEMBER_QUOTA_COPY)).toHaveCount(0)
+  await payButton(page).click()
+  await expect.poll(() => jobs).toBe(2)
+})

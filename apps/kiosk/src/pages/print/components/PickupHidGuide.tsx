@@ -42,6 +42,9 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
       return <>暂时没有拿到<b>可信的校验结果</b>。</>
     case 'closed':
       return <>这个到机码<b>不能再用来取件</b>。</>
+    case 'quota':
+      // 合规十一 10/12 定，待产品负责人点头。两种额度码同一句；红条与两颗按钮不改。
+      return <>这个到机码<b>今天打不了</b>。</>
     case 'failed':
       return <>这次<b>没能完成校验</b>。</>
     case 'success':
