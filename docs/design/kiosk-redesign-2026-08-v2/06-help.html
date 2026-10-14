@@ -220,7 +220,7 @@ html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
 
   <div class="truth" data-disclaimer="true" data-testid="help-truth">
     <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态，机器能不能用请看设备状态页。</div>
-    <div><b>求助怎么算数</b>机器故障我们已经收到提醒。网络断开时，我们会收到提醒并远程处理。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
+    <div><b>求助怎么算数</b>网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你拨出电话，点按钮也不等于已经有人受理。</div>
   </div>
 
   <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
@@ -319,13 +319,13 @@ function selfHelp(no){
   '</div></section>';
 }
 function humanDesk(no){
- return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">遇到问题怎么办</span><span class="hint">机器故障我们会收到提醒</span></div>'+
+ return '<section class="sec"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">遇到问题怎么办</span><span class="hint">打不了请稍后再来</span></div>'+
   '<div class="grid2">'+
   '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('phone',26)+'</span>需要帮助</h3>'+
-  '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒，会尽快处理。</p>'+
+  '<p>需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器暂时打不了时，请稍后再来。</p>'+
   '<p class="warnline">本页不会替你拨出电话，点按钮也不等于已经有人受理。</p></div>'+
   '<div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('info',26)+'</span>网络断开</h3>'+
-  '<p>网络断开时，我们会收到提醒并远程处理。</p>'+
+  '<p>网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。</p>'+
   '<p>打之前先记下屏幕上的<b>订单号或到机码</b>，对方靠这个才查得到你这一单。</p></div>'+
   '</div></section>';
 }
@@ -372,7 +372,7 @@ V['topic']=function(t){
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">直接去办</span><span class="hint">看完就能动手</span></div>'+
     '<div class="linkrow">'+lk+'</div></section>'+
    '<section class="sec"><div class="state" data-kind="warn"><div class="state-h">'+svg('warn','28')+'这里没答上你的问题</div>'+
-    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。机器故障我们已经收到提醒。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你转达。</div></div></section>'+
+    '<div class="state-p">换一个分类再看看，或者用下面的 AI 顾问把问题说一遍。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。本页不会替你转达。</div></div></section>'+
    selfHelp('03'),
   cta:'<a class="btn ghost" href="06-help.html" data-route="/help">返回分类</a>'+
    '<a class="btn ghost" href="01-home.html" data-route="/">返回首页</a>'+
@@ -408,7 +408,7 @@ V['unavailable']=function(){
     '<div class="grid3">'+
     '<div class="card"><h3><span class="step-no serif">1</span>重新打开帮助</h3><p>点下面的<b>重新打开帮助</b>，页面会重新加载一次内容。</p></div>'+
     '<div class="card"><h3><span class="step-no serif">2</span>回首页再进来</h3><p>回首页重新进入要办的服务；<b>正在办的打印任务不会因此取消</b>。</p></div>'+
-    '<div class="card"><h3><span class="step-no serif">3</span>需要帮助</h3><p>连着两次都打不开。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。机器故障我们已经收到提醒。</p></div>'+
+    '<div class="card"><h3><span class="step-no serif">3</span>需要帮助</h3><p>连着两次都打不开。需要帮助？拨打服务电话 18369161921（工作日 9:00–18:00）。</p></div>'+
     '</div></section>'+
    '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">这不影响你办事</span><span class="hint">帮助页只是补充</span></div>'+
     '<div class="grid2">'+
