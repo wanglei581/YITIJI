@@ -193,6 +193,47 @@ function assertRefreshButtonLockedWhileUploaded(src, label) {
   console.log(`PASS ${label}（disabled 由 ${source} 参与判定）`)
 }
 
+// 2026-10-15（第八次）：取消失败仍留着二维码和文件，只有服务端明确已作废才按过期处理（照打印上传页 useUploadSession 的做法）。
+function assertCancelFailureKeepsSession(src, label) {
+  const sourceFile = parsePanel(src)
+  const body = collectNamedBodies(sourceFile).get('handleCancel')?.body
+  if (!body || !ts.isBlock(body)) throw new Error(`${label}: 找不到 handleCancel 函数体`)
+  const statement = body.statements.find(ts.isTryStatement)
+  if (!statement?.catchClause || !statement.finallyBlock) throw new Error(`${label}: 取消必须区分成功、失败和收尾`)
+
+  const calls = (node) => collectCallNames(node)
+  const success = calls(statement.tryBlock)
+  if (!success.has('setQr') || !success.has('setStatus')) throw new Error(`${label}: 成功后必须清空二维码和状态`)
+  const catchBody = statement.catchClause.block.statements
+  if (catchBody.length !== 3 || !ts.isIfStatement(catchBody[1])) throw new Error(`${label}: 失败分支只能让已作废码走过期分支`)
+  const revoked = catchBody[1]
+  const revokedCalls = calls(revoked.thenStatement)
+  if (!revoked.expression.getText(sourceFile).includes('ALREADY_REVOKED_CODES.has(code)') ||
+      !revokedCalls.has('setQr') || !revokedCalls.has('expiredStatus') ||
+      !revoked.thenStatement.getText(sourceFile).includes('return')) {
+    throw new Error(`${label}: 已作废码必须清二维码并显示过期`)
+  }
+  const ordinaryFailure = catchBody[2].getText(sourceFile)
+  if (!/^setError\(uploadSessionUserMessage\(err, '这次上传没能取消，文件还留着。'\)\);?$/.test(ordinaryFailure)) {
+    throw new Error(`${label}: 普通取消失败必须保留二维码和状态并显示规定兜底句`)
+  }
+  if (calls(statement.finallyBlock).has('setQr') || calls(statement.finallyBlock).has('setStatus') ||
+      !calls(statement.finallyBlock).has('setCancelling')) {
+    throw new Error(`${label}: finally 只能结束取消中，不能清屏`)
+  }
+  const beforeRequest = body.statements.slice(0, body.statements.indexOf(statement)).map((item) => item.getText(sourceFile)).join('\n')
+  if (!beforeRequest.includes('!qr || cancelling') || !beforeRequest.includes('setCancelling(true)')) {
+    throw new Error(`${label}: 取消中重复点击必须无效`)
+  }
+  for (const [action, handler] of [['刷新', 'refresh'], ['取消', 'handleCancel'], ['确认', 'handleConfirm']]) {
+    const button = src.match(new RegExp(`<Button[^>]*disabled=\\{([^}]*)\\}[^>]*onClick=\\{${handler}\\}`))
+    if (!button?.[1].split('||').map((part) => part.trim()).includes('cancelling')) {
+      throw new Error(`${label}: ${action}按钮取消中必须禁用`)
+    }
+  }
+  console.log(`PASS ${label}`)
+}
+
 const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
@@ -260,6 +301,7 @@ assertIncludes(panel, 'created.controlToken', 'Kiosk keeps control token outside
 assertIncludes(panel, 'UPLOAD_SESSION_NOT_FOUND', 'polling stops when session disappears')
 assertRefreshRevokesOldQrBeforeMinting(panel, 'refresh revokes the previous QR before minting a replacement')
 assertRefreshButtonLockedWhileUploaded(panel, 'an uploaded file cannot be discarded by refreshing the QR')
+assertCancelFailureKeepsSession(panel, 'cancel failure keeps QR, file and retry/confirm actions (方案 A)')
 assertIncludes(panel, 'window.setInterval(() => setNow(Date.now()), 1_000)', 'QR countdown is driven by the server expiry timestamp')
 assertIncludes(panel, 'uploadSessionUserMessage', 'Kiosk QR errors use public-safe copy')
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')
