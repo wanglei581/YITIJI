@@ -112,7 +112,7 @@ POSTGRES_URL='postgresql://.../backup-drill-20260928' \
 
 脚本会拒绝其他库名，运行 `pg_restore` 后执行 Prisma migration status；验收输出以 `RESTORE_OK: restored ...; migration status checked` 开头，并且迁移状态命令成功。不得把生产库作为目标。
 
-日志留存：产品负责人在服务器执行 `pm2-logrotate-setup.sh`（它通过 `pm2 set` 配置按日轮转、压缩、保留 180 天），PM2 日志不再交给 logrotate。将 `logrotate/nginx` **替换** `/etc/logrotate.d/nginx`，不要与系统自带那份并存；它只管理 `/var/log/nginx/*.log`，按日压缩保留 180 天。安装后由产品负责人用 `logrotate -d /etc/logrotate.d/nginx` 预演。企业微信群机器人告警由 API 复用后台派生告警的每分钟节奏；服务器可设置 `ALERT_WEBHOOK_URL`，未设置时不发送。告警消息只含标题、级别、终端编号和发生 / 恢复状态，不含详情；发送失败只记录 `ALERT_PUSH_FAILED`，不影响业务请求。
+日志留存：产品负责人在服务器执行 `pm2-logrotate-setup.sh`（它通过 `pm2 set` 配置按日轮转、压缩、保留 200 天），PM2 日志不再交给 logrotate。将 `logrotate/nginx` **替换** `/etc/logrotate.d/nginx`，不要与系统自带那份并存；它只管理 `/var/log/nginx/*.log`，按日压缩保留 200 天。为什么是 200：网络日志法定不少于六个月，按日历月算最长的半年是 184 天，180 留不够，所以留了余量；2026-10-13 线上已按 200 天配置（线上 nginx 只改了留存那一行，没有整份替换）。安装后由产品负责人用 `logrotate -d /etc/logrotate.d/nginx` 预演。企业微信群机器人告警由 API 复用后台派生告警的每分钟节奏；服务器可设置 `ALERT_WEBHOOK_URL`，未设置时不发送。告警消息只含标题、级别、终端编号和发生 / 恢复状态，不含详情；发送失败只记录 `ALERT_PUSH_FAILED`，不影响业务请求。
 
 ### 8.1 删掉的数据多久才从备份里彻底消失（等待期）
 
@@ -123,7 +123,8 @@ POSTGRES_URL='postgresql://.../backup-drill-20260928' \
 | 每日备份 | 本机 `BACKUP_DIR`（默认 `/var/backups/ai-job-print/postgres`） | `backup-postgres.sh` 按 `RETENTION_DAYS`（默认 30）删旧 dump | 30 天 |
 | 每日备份的异地副本 | `BACKUP_OBJECT_URI`（`BACKUP_UPLOAD_ENABLED=1` 时）；没有 rclone 的验证环境可以用 `BACKUP_MIRROR_DIR` | 同一脚本上传并校验后，按 `BACKUP_REMOTE_RETENTION_DAYS`（默认 30，不跟随本机 `RETENTION_DAYS`）清理。rclone 用 `delete --min-age`；本地目录用 `find -mtime`。2026-10-06 起与本机分开配置；2026-10-04 之前只传不删 | `BACKUP_REMOTE_RETENTION_DAYS`（默认 30 天）。对象存储若开了版本控制或回收站，还要加上它的生命周期 |
 | 发布前备份 | `/srv/ai-job-print-backups`（`DEPLOY_BACKUP_ROOT`） | `deploy-api-release.sh` 按组数保留：`DEPLOY_BACKUP_KEEP` 默认 3 组，另外最近一次成功发布前的那组永远保留 | **没有时间上限**：删除之后再成功发布 3 次，删除前做的备份才会全部被轮换掉；长期不发布就一直在 |
-| 应用日志 | PM2 日志 | `pm2-logrotate-setup.sh` 按日轮转、保留 180 天 | 180 天（日志里的手机号都是打码形式） |
+| 应用日志 | PM2 日志 | `pm2-logrotate-setup.sh` 按日轮转、保留 200 天 | 200 天（日志里的手机号都是打码形式） |
+| 访问日志 | nginx 访问日志（`/var/log/nginx/`） | `logrotate/nginx` 按日轮转、压缩、保留 200 天 | 200 天。后台按手机号查人时，完整手机号会随查询串记进访问日志；「访问日志不记查询串」做完之前记下的行，要等轮转删掉。网络日志依法留存，不为清数据去改写或删除 |
 
 **对外说「已经清干净」之前**：等满本机 `RETENTION_DAYS` 与异地 `BACKUP_REMOTE_RETENTION_DAYS` 中较长的天数（默认都是 30），对象存储若开了版本控制或回收站，再等生命周期把旧版本删掉，并且确认删除之后已经有 3 次成功发布（或由运维人工删除删除时间之前的发布前备份组，删除要按「生产写操作逐次请示」办）。机构退出、存量清理的完成时间都按这个口径算，不按「数据库里删掉的那一刻」算。
 
