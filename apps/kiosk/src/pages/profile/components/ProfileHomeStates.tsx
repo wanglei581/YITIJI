@@ -191,6 +191,21 @@ export function SignedOutBody() {
           ))}
         </div>
       </section>
+      <div className="qx-rows">
+        <button
+          type="button"
+          className="qx-row"
+          data-testid="profile-help"
+          onClick={() => navigate('/help')}
+        >
+          <span className="qx-row-ic" aria-hidden="true"><HelpCircleIcon size={24} /></span>
+          <span className="qx-row-tx">
+            <span className="qx-row-t">帮助中心</span>
+            <span className="qx-row-d">常见问题与操作说明。</span>
+          </span>
+          <span className="qx-row-go" aria-hidden="true">›</span>
+        </button>
+      </div>
       <ProfileFactGrid title="登录与不登录的分界" hint="按功能划线，不按页面划线" rows={bounds} ariaLabel="登录与不登录的分界" />
     </>
   )
