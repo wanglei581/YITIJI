@@ -3401,6 +3401,59 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   expect(creates).toBe(1)
 })
 
+test('扫码上传取消撞锁保留二维码和文件，重试成功才清空 @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  const sessionId = 'w118-cancel-retry'
+  const expiresAt = '2099-01-01T00:00:00.000Z'
+  const file = { fileId: 'w118-resume-file', filename: '待确认简历.pdf', sizeBytes: 2048, mimeType: 'application/pdf', sha256: 'w118-sha' }
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: {
+    sessionId, uploadUrl: '/upload/phone', uploadToken: 'w118-upload', controlToken: 'w118-control', expiresAt,
+  } } })
+  api.respond('GET', `/api/v1/upload-sessions/${sessionId}`, { status: 200, json: { success: true, data: {
+    sessionId, status: 'uploaded', purpose: 'resume_upload', mode: 'temporary', file,
+    requiresKioskConfirmation: false, expiresAt,
+  } } })
+  let cancels = 0
+  let releaseFirst!: () => void
+  const firstReply = new Promise<void>((resolve) => { releaseFirst = resolve })
+  api.respondWith('DELETE', `/api/v1/upload-sessions/${sessionId}`, async () => {
+    cancels += 1
+    if (cancels === 1) {
+      await firstReply
+      return { status: 400, json: { success: false, error: { code: 'UPLOAD_SESSION_ACTION_IN_PROGRESS', message: '上传会话正在处理中，请稍候' } } }
+    }
+    return { status: 200, json: { success: true, data: { sessionId, status: 'cancelled' } } }
+  })
+
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /手机扫码/ }).click()
+  const panel = page.locator('.resume-source-phone-session')
+  const qr = panel.locator('svg[width="150"]')
+  const refresh = panel.getByRole('button', { name: '刷新二维码' })
+  const cancel = panel.getByRole('button', { name: '取消', exact: true })
+  const confirm = panel.getByRole('button', { name: '确认使用这份简历' })
+  await expect(qr).toBeVisible()
+  await expect(panel.getByText('待确认简历.pdf', { exact: false })).toBeVisible()
+
+  await cancel.click()
+  await expect.poll(() => cancels).toBe(1)
+  await expect(refresh).toBeDisabled()
+  await expect(cancel).toBeDisabled()
+  await expect(confirm).toBeDisabled()
+  releaseFirst()
+
+  await expect(panel.getByText('这次上传没能取消，文件还留着。')).toBeVisible()
+  await expect(qr).toBeVisible()
+  await expect(panel.getByText('待确认简历.pdf', { exact: false })).toBeVisible()
+  await expect(cancel).toBeEnabled()
+  await expect(confirm).toBeEnabled()
+  await cancel.click()
+  await expect.poll(() => cancels).toBe(2)
+  await expect(qr).toHaveCount(0)
+  await expect(panel.getByText('待确认简历.pdf', { exact: false })).toHaveCount(0)
+  await expect(panel.getByText('这次上传没能取消，文件还留着。')).toHaveCount(0)
+})
+
 const PAGE_AIGC_NOTE = '导出的简历每页底部有一行小字：含人工智能辅助生成内容'
 const FILE_AIGC_NOTE = '导出的文件末尾有一行：含人工智能辅助生成内容'
 

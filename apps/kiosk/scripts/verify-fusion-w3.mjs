@@ -137,7 +137,10 @@ const frozen = {
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+  // 2026-10-15 重新冻结（第八次）：取消失败不再清屏——二维码和已收到的文件留着，屏上沿用打印上传页那句兜底，
+  // 可以重试取消或去确认；取消中三个按钮都禁用。新行为由 verify:resume-phone-upload-ui 的断言钉住。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '0dc12b8be9f3c2d4fd1b39e1f575ad5d1fa0e4a9cff380fd2f94d3e131c9a320',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

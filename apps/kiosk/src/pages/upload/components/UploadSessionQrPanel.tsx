@@ -127,6 +127,7 @@ export function UploadSessionQrPanel({
   const [status, setStatus] = useState<UploadSessionStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
@@ -293,15 +294,24 @@ export function UploadSessionQrPanel({
   }
 
   const handleCancel = async () => {
-    if (!qr) return
+    if (!qr || cancelling) return
+    setCancelling(true)
+    setError(null)
     try {
       await cancelUploadSession(qr.sessionId, qr.controlToken)
-    } catch {
-      // best-effort only
-    } finally {
       setQr(null)
       setStatus(null)
       setError(null)
+    } catch (err) {
+      const code = apiErrorCode(err)
+      if (code && ALREADY_REVOKED_CODES.has(code)) {
+        setQr(null)
+        setStatus((current) => expiredStatus(qr, current, purpose))
+        return
+      }
+      setError(uploadSessionUserMessage(err, '这次上传没能取消，文件还留着。'))
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -362,16 +372,16 @@ export function UploadSessionQrPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={loading || confirming || uploaded} onClick={refresh}>
+            <Button size="sm" variant="secondary" disabled={loading || confirming || cancelling || uploaded} onClick={refresh}>
               <RefreshCwIcon className="mr-1 h-4 w-4" aria-hidden="true" />
               刷新二维码
             </Button>
             {qr && (
-              <Button size="sm" variant="secondary" disabled={confirming} onClick={handleCancel}>
+              <Button size="sm" variant="secondary" disabled={confirming || cancelling} onClick={handleCancel}>
                 取消
               </Button>
             )}
-            <Button size="sm" disabled={!uploaded || confirming} onClick={handleConfirm}>
+            <Button size="sm" disabled={!uploaded || confirming || cancelling} onClick={handleConfirm}>
               {confirming ? '确认中...' : confirmLabel}
             </Button>
           </div>
