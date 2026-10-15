@@ -97,6 +97,7 @@
     "verify:internal-accounts": "node -r @swc-node/register scripts/verify-internal-accounts.ts",
     "verify:internal-accounts:postgres": "node -r @swc-node/register scripts/verify-internal-accounts-postgres.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts && pnpm run verify:pickup-code-share && pnpm run verify:pickup-code-resume",
+    "verify:free-print-quota": "node -r @swc-node/register scripts/verify-free-print-quota.ts",
     "verify:print-retry-lock:postgres": "node -r @swc-node/register scripts/verify-print-retry-lock-postgres.ts",
     "verify:pickup-code-share": "node -r @swc-node/register scripts/verify-pickup-code-share.ts",
     "verify:pickup-code-resume": "node -r @swc-node/register scripts/verify-pickup-code-resume.ts",
