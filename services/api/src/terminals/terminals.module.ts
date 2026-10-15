@@ -18,6 +18,10 @@ import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit
 import { ReleaseObservationService } from './release-observation.service'
 import { AdminReleaseObservationController } from './admin-release-observation.controller'
 import { TerminalHeartbeatRetentionTask } from './terminal-heartbeat-retention.task'
+import { AdminTerminalCommandsController } from './admin-terminal-commands.controller'
+import { TerminalCommandsController } from './terminal-commands.controller'
+import { TerminalCommandService } from './terminal-commands.service'
+import { TerminalCommandSweepTask } from './terminal-command-sweep.task'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from './terminal-session.service'
 import { TerminalIdentityGuard } from './terminal-identity.guard'
 import { AiAccessModule } from '../ai-access/ai-access.module'
@@ -31,6 +35,8 @@ import { AiAccessModule } from '../ai-access/ai-access.module'
     AdminPrintersController,
     AdminToolboxController,
     AdminKioskJobBoardController,
+    AdminTerminalCommandsController,
+    TerminalCommandsController,
   ],
   providers: [
     TerminalAgentService,
@@ -45,6 +51,8 @@ import { AiAccessModule } from '../ai-access/ai-access.module'
     ToolboxGovernanceService,
     TerminalCapabilitiesService,
     TerminalHeartbeatRetentionTask,
+    TerminalCommandService,
+    TerminalCommandSweepTask,
     TerminalSessionService,
     TerminalIdentityGuard,
   ],

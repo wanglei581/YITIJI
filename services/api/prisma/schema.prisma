@@ -55,10 +55,37 @@ model Terminal {
   capabilities TerminalCapability[]
   releaseTargets AgentReleaseTarget[]
   activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
+  commands     TerminalCommand[]
 
   @@index([orgId])
   @@index([enabled])
   @@index([lifecycleStatus])
+}
+
+// 远程重启终端程序。同一终端同时只能有一条未结束命令（pending / accepted）。
+// 条件唯一索引 TerminalCommand_terminalId_open_unique 只写在两份迁移里：
+// Prisma @@unique 表达不了 WHERE status IN ('pending','accepted')
+// （先例：ScanTask_terminalId_active_unique、User_single_backup_admin）。
+// 本表没有会员、订单、文件字段，不进注销清单。
+model TerminalCommand {
+  id                String    @id
+  terminalId        String
+  terminal          Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  type              String
+  status            String
+  requestedById     String
+  requestedBy       User      @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt       DateTime
+  expiresAt         DateTime
+  acceptedAt        DateTime?
+  finishedAt        DateTime?
+  completedVerified Boolean?
+  resultCode        String?
+
+  @@index([terminalId, requestedAt])
+  @@index([status, expiresAt])
+  @@index([status, acceptedAt])
+  @@index([requestedById])
 }
 
 // ── TerminalCredential ───────────────────────────────────────────────────────
@@ -859,6 +886,7 @@ model User {
   createdBenefitActivities BenefitActivity[]
   feedbackReplies FeedbackReply[]
   recruitmentReviewDecisions ReviewDecision[]
+  requestedTerminalCommands TerminalCommand[]
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
