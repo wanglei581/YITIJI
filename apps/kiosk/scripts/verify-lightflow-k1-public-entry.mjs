@@ -485,9 +485,14 @@ expectPattern(
   /<KioskPageHeader\b[\s\S]{0,800}?onBack=\{\(\)\s*=>\s*navigate\(-1\)\}/,
   'LegalDocPage 共享页头必须返回上一页',
 )
-expectPattern(loginPage, /isSafeInternalPath\s*\(\s*(?:queryFrom|fromState)\s*\)/, 'LoginPage returnTo 安全校验必须实际调用 isSafeInternalPath')
+expectPattern(
+  loginPage,
+  /resolveLoginReturnTo\(\s*fromState,\s*queryFrom,\s*isSafeInternalPath\s*\)/,
+  'LoginPage returnTo 安全校验必须把 isSafeInternalPath 交给统一 resolver',
+)
 expectIncludes(loginPage, 'useMemberPhoneLogin({', 'LoginPage 必须消费共享手机号控制器')
-expectIncludes(loginPage, '<MemberPhoneLoginPane {...phoneLogin.paneProps} />', 'LoginPage 必须挂载共享手机号面板')
+expectIncludes(loginPage, 'phoneLogin.paneProps', 'LoginPage 必须消费共享手机号控制器的 paneProps')
+expectIncludes(loginPage, '<LoginGatePhoneFields', 'LoginPage 必须挂载青序手机号字段')
 expectIncludes(loginPage, '<MemberAgreement agreed={agreed}', 'LoginPage 必须挂载共享协议组件')
 expectPattern(
   phoneUploadPage,
@@ -648,7 +653,8 @@ expect(
   'login.css 必须只按固定顺序聚合五个职责 CSS 文件',
 )
 expect(lineCount(loginAggregate) < 300, `login.css 必须少于 300 行（当前 ${lineCount(loginAggregate)}）`)
-expectIncludes(loginPage, "import './login.css'", 'LoginPage 必须导入 login.css 聚合样式')
+expectIncludes(loginPage, "import './styles/login-gate-qx.css'", 'LoginPage 必须导入青序登录门样式')
+expectIncludes(read('src/pages/auth/components/MemberLoginDialog.tsx'), "import '../login.css'", 'MemberLoginDialog 仍聚合旧登录对话框样式')
 
 const loginStyleSources = new Map(
   loginStylePaths.map((path) => [path, expectCssContract(path, 'k1-login', { reducedMotion: path.endsWith('login-responsive.css') })]),

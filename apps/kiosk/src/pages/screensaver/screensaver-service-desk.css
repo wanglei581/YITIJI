@@ -1,34 +1,130 @@
-.k1-screensaver { color: var(--k-paper, var(--color-canvas)); background: var(--color-dark, var(--k-ink)); font-family: var(--font-sans); }
-.k1-screensaver > img,
-.k1-screensaver > video { position: absolute; inset: 0; }
-.k1-screensaver .screensaver-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(16,48,43,.4) 0%, transparent 24%, transparent 66%, rgba(16,48,43,.66) 100%); }
-.k1-screensaver .screensaver-corner { position: absolute; z-index: 2; top: 36px; display: flex; align-items: center; gap: 12px; color: rgba(244,241,232,.88); font-size: 22px; letter-spacing: .04em; text-shadow: 0 2px 8px rgba(9,26,23,.45); }
-.k1-screensaver .screensaver-corner--left { left: 44px; }
-.k1-screensaver .screensaver-corner--right { right: 44px; font-variant-numeric: tabular-nums; }
-.k1-screensaver .screensaver-corner--left > span { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary-500); box-shadow: 0 0 0 4px rgba(53,171,142,.18); }
-.k1-screensaver .screensaver-media-tag { position: absolute; z-index: 2; right: 44px; bottom: 296px; padding: 8px 18px; border: 1px solid rgba(244,241,232,.25); border-radius: 999px; color: rgba(244,241,232,.82); background: rgba(16,48,43,.26); font-size: 17px; letter-spacing: .03em; }
-.k1-screensaver .screensaver-dots { position: absolute; z-index: 2; right: 0; bottom: 240px; left: 0; display: flex; justify-content: center; gap: 18px; }
-.k1-screensaver .screensaver-dots i { width: 16px; height: 16px; border-radius: 999px; background: rgba(244,241,232,.35); transition: width .2s ease, background .2s ease; }
-.k1-screensaver .screensaver-dots i.is-active { width: 52px; background: var(--k-paper, var(--color-canvas)); }
-.k1-screensaver .screensaver-privacy { position: absolute; z-index: 2; right: 30px; bottom: 194px; left: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; color: rgba(244,241,232,.84); font-size: 19px; letter-spacing: .03em; text-shadow: 0 2px 8px rgba(9,26,23,.45); }
-.k1-screensaver .screensaver-privacy svg { width: 22px; height: 22px; }
-.k1-screensaver .screensaver-wake-prompt { position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; height: 172px; display: flex; align-items: center; justify-content: center; gap: 26px; padding: 0 34px; border-top: 1px solid rgba(244,241,232,.2); color: var(--k-paper, var(--color-canvas)); background: rgba(16,48,43,.58); backdrop-filter: blur(4px); pointer-events: none; animation: screensaver-breath 2.6s ease-in-out infinite; }
-.k1-screensaver .screensaver-wake-prompt > svg { width: 52px; height: 52px; }
-.k1-screensaver .screensaver-wake-prompt strong { font-family: var(--font-serif); font-size: 44px; font-weight: 700; letter-spacing: .12em; }
-.k1-screensaver .screensaver-wake-prompt span { color: rgba(244,241,232,.82); font-size: 23px; letter-spacing: .06em; }
-@keyframes screensaver-breath { 0%, 100% { opacity: 1; } 50% { opacity: .64; } }
-@media (max-width: 600px) {
-  .k1-screensaver .screensaver-corner { top: 20px; font-size: 14px; }
-  .k1-screensaver .screensaver-corner--left { left: 18px; }
-  .k1-screensaver .screensaver-corner--right { right: 18px; }
-  .k1-screensaver .screensaver-media-tag { right: 18px; bottom: 190px; font-size: 12px; }
-  .k1-screensaver .screensaver-dots { bottom: 150px; gap: 10px; }
-  .k1-screensaver .screensaver-dots i { width: 10px; height: 10px; }
-  .k1-screensaver .screensaver-dots i.is-active { width: 30px; }
-  .k1-screensaver .screensaver-privacy { bottom: 112px; font-size: 12px; text-align: center; }
-  .k1-screensaver .screensaver-wake-prompt { height: 94px; gap: 12px; }
-  .k1-screensaver .screensaver-wake-prompt > svg { width: 30px; height: 30px; }
-  .k1-screensaver .screensaver-wake-prompt strong { font-size: 24px; }
-  .k1-screensaver .screensaver-wake-prompt span { display: none; }
+/* 青序流光 00-standby。根选择器保持 .k1-screensaver，供既有门禁识别。 */
+.k1-screensaver {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--qx-paper);
+  background: var(--qx-deep);
+  font-family: var(--qx-sans);
 }
-@media (prefers-reduced-motion: reduce) { .k1-screensaver .screensaver-wake-prompt { animation: none; } }
+.k1-screensaver .sb-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--qx-deep) 72%, transparent), var(--qx-deep)),
+    radial-gradient(1200px 640px at 70% 18%, color-mix(in srgb, var(--qx-emerald) 16%, transparent), transparent 62%),
+    var(--qx-deep);
+}
+.k1-screensaver .sb-topbar {
+  position: absolute;
+  z-index: 3;
+  top: 0; left: 0; right: 0;
+  height: 132px;
+  padding: 0 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.k1-screensaver .sb-brand { display: flex; align-items: center; gap: 20px; }
+.k1-screensaver .sb-seal {
+  width: 74px; height: 74px; border-radius: 22px;
+  display: grid; place-items: center;
+  background: var(--qx-emerald);
+  color: var(--qx-deep);
+  font-family: var(--qx-serif);
+  font-size: 39px; font-weight: 900;
+}
+.k1-screensaver .sb-name { font-family: var(--qx-serif); font-size: 34px; font-weight: 900; letter-spacing: 3px; }
+.k1-screensaver .sb-sub { margin-top: 6px; color: color-mix(in srgb, var(--qx-paper) 68%, transparent); font-size: 19px; letter-spacing: 2px; }
+.k1-screensaver .sb-ready {
+  height: 58px; padding: 0 24px;
+  border: 1px solid color-mix(in srgb, var(--qx-emerald) 42%, transparent); border-radius: 999px;
+  display: flex; align-items: center; gap: 11px;
+  background: color-mix(in srgb, var(--qx-deep) 56%, transparent); font-size: 21px;
+}
+.k1-screensaver .sb-ready i { width: 10px; height: 10px; border-radius: 50%; background: var(--qx-emerald); }
+.k1-screensaver .sb-clock { position: absolute; z-index: 3; top: 208px; left: 0; right: 0; text-align: center; }
+.k1-screensaver .sb-date { font-size: 28px; letter-spacing: 5px; color: color-mix(in srgb, var(--qx-paper) 68%, transparent); }
+.k1-screensaver .sb-time {
+  margin-top: 18px;
+  font-family: var(--qx-serif);
+  font-size: 206px; line-height: 1; font-weight: 900;
+  font-variant-numeric: tabular-nums; letter-spacing: 5px;
+  text-shadow: 0 0 70px color-mix(in srgb, var(--qx-emerald) 18%, transparent);
+}
+.k1-screensaver .sb-media {
+  position: absolute; z-index: 3; top: 560px; left: 96px; right: 96px; height: 500px;
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 22%, transparent); border-radius: 28px; overflow: hidden;
+  background: var(--qx-deep-2);
+}
+.k1-screensaver .sb-media img,
+.k1-screensaver .sb-media video { width: 100%; height: 100%; object-fit: cover; }
+.k1-screensaver .sb-media-label {
+  position: absolute; left: 32px; top: 28px; z-index: 2;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 18px; letter-spacing: 2px; color: color-mix(in srgb, var(--qx-paper) 64%, transparent);
+}
+.k1-screensaver .sb-media-label i { width: 9px; height: 9px; border-radius: 50%; background: var(--qx-on-deep-warn); }
+.k1-screensaver .sb-fallback {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 72px;
+}
+.k1-screensaver .sb-fallback b { margin-top: 28px; font-family: var(--qx-serif); font-size: 40px; }
+.k1-screensaver .sb-fallback span { margin-top: 14px; font-size: 23px; line-height: 1.7; color: color-mix(in srgb, var(--qx-paper) 68%, transparent); }
+.k1-screensaver .sb-chips {
+  position: absolute; z-index: 3; top: 1096px; left: 96px; right: 96px;
+  display: flex; justify-content: center; gap: 18px;
+}
+.k1-screensaver .sb-chip {
+  height: 58px; padding: 0 22px;
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 18%, transparent); border-radius: 999px;
+  display: flex; align-items: center; font-size: 20px; color: color-mix(in srgb, var(--qx-paper) 84%, transparent);
+}
+.k1-screensaver .sb-cta-zone {
+  position: absolute; z-index: 3; top: 1210px; left: 0; right: 0; height: 330px;
+  display: grid; place-items: center; pointer-events: none;
+}
+.k1-screensaver .screensaver-wake-prompt,
+.k1-screensaver .sb-cta {
+  width: 700px; height: 166px; border-radius: 84px;
+  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 64%, transparent);
+  background: color-mix(in srgb, var(--qx-deep) 68%, transparent);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px;
+}
+.k1-screensaver .sb-cta strong,
+.k1-screensaver .screensaver-wake-prompt strong {
+  font-family: var(--qx-serif);
+  font-size: 47px; letter-spacing: 5px;
+}
+.k1-screensaver .sb-cta span,
+.k1-screensaver .screensaver-wake-prompt span { font-size: 22px; color: color-mix(in srgb, var(--qx-paper) 68%, transparent); letter-spacing: 2px; }
+.k1-screensaver .sb-bottom {
+  position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 310px;
+  padding: 44px 72px 46px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--qx-deep) 86%, transparent) 32%);
+  pointer-events: none;
+}
+.k1-screensaver .sb-truth { display: flex; justify-content: center; gap: 18px; }
+.k1-screensaver .sb-truth span {
+  min-height: 54px; padding: 0 22px;
+  border: 1px solid color-mix(in srgb, var(--qx-paper) 18%, transparent); border-radius: 999px;
+  display: flex; align-items: center; color: color-mix(in srgb, var(--qx-paper) 82%, transparent); font-size: 19px;
+}
+.k1-screensaver .sb-boundary {
+  margin-top: 28px; text-align: center;
+  color: color-mix(in srgb, var(--qx-paper) 66%, transparent); font-size: 19px; line-height: 1.8;
+}
+.k1-screensaver .sb-boundary strong { color: var(--qx-on-solid); font-weight: 600; }
+.k1-screensaver .wake-target {
+  position: absolute; z-index: 9; inset: 0;
+  border: 0; background: transparent; cursor: pointer; color: transparent;
+}
+.k1-screensaver .wake-target:focus-visible { outline: 6px solid var(--qx-on-deep-warn); outline-offset: -12px; }
+@media (prefers-reduced-motion: reduce) {
+  .k1-screensaver, .k1-screensaver * { animation: none !important; transition: none !important; }
+}

@@ -449,7 +449,8 @@ for (const [source, label] of [
 }
 
 expectMatches(loginPage, /useMemberPhoneLogin\s*\(/, 'LoginPage 使用共享手机号登录 hook')
-expectMatches(loginPage, /<MemberPhoneLoginPane\s+\{\.\.\.phoneLogin\.paneProps\}/, 'LoginPage 使用共享手机号登录面板')
+expectMatches(loginPage, /phoneLogin\.paneProps/, 'LoginPage 消费共享手机号控制器 paneProps')
+expectMatches(loginPage, /<LoginGatePhoneFields/, 'LoginPage 挂载青序手机号字段')
 expectMatches(loginPage, /<MemberAgreement/, 'LoginPage 使用共享协议组件')
 expectMatches(loginDialog, /useMemberPhoneLogin\s*\(/, 'MemberLoginDialog 使用共享手机号登录 hook')
 expectMatches(loginDialog, /<MemberPhoneLoginPane\s+\{\.\.\.phoneLogin\.paneProps\}/, 'MemberLoginDialog 使用共享手机号登录面板')

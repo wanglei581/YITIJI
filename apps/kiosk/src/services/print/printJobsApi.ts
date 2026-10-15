@@ -57,6 +57,8 @@ export interface PrintJobCreated {
   billingPageSource: BillingPageSource
   /** 短期支付会话 token：只用于本次订单出码 / 支付状态查询。 */
   paymentSessionToken: string
+  /** 建单时后端是否认了会员会话；不能用本机 token 自行判断。 */
+  hasEndUser: boolean
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */

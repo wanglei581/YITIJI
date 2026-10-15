@@ -1,144 +1,63 @@
-// LoginPage — Kiosk 顶级全屏会员登录
-//
-// 路由：/login（顶级路由，不嵌套在 KioskRoot 内）
-// 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
-// 已接入：手机号 + 短信验证码（未注册手机号验证后自动创建账号）
-// 已接入：手机扫描二维码确认一体机登录（claimToken 只保存在 Terminal Agent 本机代理）
-//
-// 公共一体机无系统软键盘：手机号 / 验证码全部由页面内嵌虚拟数字键盘驱动。
-// 视觉对齐 .workbuddy/prototypes/login-trio-v1.html ①（样式见 ./login.css）。
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  HomeIcon,
-  ScanLineIcon,
-  ShieldCheckIcon,
-  SmartphoneIcon,
-  UserRoundIcon,
-} from 'lucide-react'
+import { ScanLineIcon, SmartphoneIcon } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { MemberAgreement } from './components/MemberAgreement'
-import { MemberPhoneLoginPane } from './components/MemberPhoneLoginPane'
+import { LoginGatePhoneFields } from './components/LoginGatePhoneFields'
 import {
   type LoginResult,
   useMemberPhoneLogin,
 } from './hooks/useMemberPhoneLogin'
 import { ScanQrLoginPanel } from './ScanQrLoginPanel'
-import './login.css'
-import './login-batch8.css'
-
-const DEFAULT_LOGIN_IDLE_SEC = 180
-const SUCCESS_OVERLAY_MS = 950
+import {
+  derivePhoneGateState,
+  LOGIN_ANON_ENTRIES,
+  LOGIN_GATE_COPY,
+  LOGIN_GATE_PILL,
+  loginReturnLabel,
+  resolveLoginReturnTo,
+  type LoginGateMode,
+  type LoginQrState,
+} from './loginGateModel'
+import './styles/login-gate-qx.css'
 
 type LoginTab = 'phone' | 'scan'
-
-const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-
-function resolveLoginIdleMs(): number {
-  const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
-  const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LOGIN_IDLE_SEC
-  return sec * 1000
-}
-
-/** 触控涟漪：命中 .ripple-host 的元素按压时扩散水纹（纯视觉，事件委托） */
-function useRipple(rootRef: React.RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    const root = rootRef.current
-    if (!root) return undefined
-    const onDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null
-      const host = target?.closest?.('.ripple-host') as HTMLElement | null
-      if (!host || (host as HTMLButtonElement).disabled) return
-      const rect = host.getBoundingClientRect()
-      const rip = document.createElement('span')
-      rip.className = 'ripple'
-      const size = Math.max(rect.width, rect.height) * 1.6
-      rip.style.width = `${size}px`
-      rip.style.height = `${size}px`
-      rip.style.left = `${e.clientX - rect.left - size / 2}px`
-      rip.style.top = `${e.clientY - rect.top - size / 2}px`
-      host.appendChild(rip)
-      window.setTimeout(() => rip.remove(), 540)
-    }
-    root.addEventListener('pointerdown', onDown)
-    return () => root.removeEventListener('pointerdown', onDown)
-  }, [rootRef])
-}
-
-function useClock() {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 15000)
-    return () => window.clearInterval(timer)
-  }, [])
-  const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  const date = `${now.getMonth() + 1}月${now.getDate()}日 · ${WEEKDAYS[now.getDay()]}`
-  return { time, date }
-}
-
-interface MemberLoginPayload {
-  id: string
-  phoneMasked: string
-  nickname: string | null
-  token: string
-  method: 'phone'
-}
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login, isLoggedIn } = useAuth()
-  const rootRef = useRef<HTMLDivElement>(null)
-  useRipple(rootRef)
 
   const fromState = (location.state as { from?: unknown } | null)?.from
-  // 换绑手机号后旧会话被踢出，跳回登录页时带着这句提示（`MySettingsPage` 的
-  // `handleRebindDone`）。以前没人读它，用户被登出却看不到任何解释。
-  // 只认本站自己写进 state 的字符串，不从 query 取：query 可被外部构造，
-  // 会变成一个能在登录页显示任意文案的注入点。
   const hintState = (location.state as { hint?: unknown } | null)?.hint
   const hint = typeof hintState === 'string' && hintState.trim() !== '' ? hintState.trim() : null
   const queryFrom = new URLSearchParams(location.search).get('from')
-  const safeQueryFrom = typeof queryFrom === 'string' && isSafeInternalPath(queryFrom) ? queryFrom : null
-  const returnTo =
-    typeof fromState === 'string' && isSafeInternalPath(fromState)
-      ? fromState
-      : safeQueryFrom ?? '/'
+  const { returnTo, fromRejected } = resolveLoginReturnTo(fromState, queryFrom, isSafeInternalPath)
 
   const [tab, setTab] = useState<LoginTab>('phone')
   const [agreed, setAgreed] = useState(false)
-  const [successVisible, setSuccessVisible] = useState(false)
-  const pendingLoginRef = useRef<MemberLoginPayload | null>(null)
+  const [qrPhase, setQrPhase] = useState<LoginQrState>('qr-loading')
+  const qrRefreshRef = useRef<() => void>(() => undefined)
 
-  const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
+  const goHome = useCallback(() => navigate('/'), [navigate])
 
   useEffect(() => {
     if (isLoggedIn) navigate(returnTo, { replace: true })
   }, [isLoggedIn, navigate, returnTo])
 
-  /** 登录成功统一收口：先播 ≤1s 成功过场，再写入会话（isLoggedIn 生效后自动跳转） */
-  const finishWithSuccess = useCallback(
-    (res: LoginResult) => {
-      pendingLoginRef.current = {
-        id: res.user.id,
-        phoneMasked: res.user.phoneMasked,
-        nickname: res.user.nickname,
-        token: res.token,
-        method: 'phone',
-      }
-      setSuccessVisible(true)
-      window.setTimeout(() => {
-        if (pendingLoginRef.current) {
-          login(pendingLoginRef.current)
-          pendingLoginRef.current = null
-        }
-      }, SUCCESS_OVERLAY_MS)
-    },
-    [login],
-  )
+  const finishWithSuccess = useCallback((res: LoginResult) => {
+    login({
+      id: res.user.id,
+      phoneMasked: res.user.phoneMasked,
+      nickname: res.user.nickname,
+      token: res.token,
+      method: 'phone',
+    })
+  }, [login])
 
   const handleAgreementRequired = useCallback(() => setAgreed(false), [])
   const phoneLogin = useMemberPhoneLogin({
@@ -152,7 +71,7 @@ export function LoginPage() {
     requireAgreement: requireMemberAgreement,
   } = phoneLogin
 
-  useBusyLock(phoneLogin.loading || successVisible)
+  useBusyLock(phoneLogin.loading)
 
   const switchTab = useCallback((next: LoginTab) => {
     setTab(next)
@@ -172,139 +91,178 @@ export function LoginPage() {
     [agreed, clearPhoneLoginFeedback, finishWithSuccess, requireMemberAgreement],
   )
 
-  const clock = useClock()
-  const idleSeconds = Math.round(resolveLoginIdleMs() / 1000)
-  const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
+  const phoneState = derivePhoneGateState({
+    sendingCode: phoneLogin.sendingCode,
+    submitting: phoneLogin.submitting,
+    countdown: phoneLogin.countdown,
+    notice: phoneLogin.notice,
+    error: phoneLogin.error,
+  })
+  const mode: LoginGateMode = tab === 'scan' ? 'qr' : 'phone'
+  const state = mode === 'qr' ? qrPhase : phoneState
+  const copy = LOGIN_GATE_COPY[state]
+  const pill = LOGIN_GATE_PILL[state]
+  const canConfirm = agreed
+    && phoneLogin.phone.length === 11
+    && phoneLogin.code.length === 6
+    && !phoneLogin.loading
 
   return (
-    <div className="fusion-w5 fusion-w5--auth service-desk k1-login" data-kiosk-screen="login" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
-      <header className="topbar">
-        <span className="brand-mark">AI</span>
-        <div className="brand-copy">
-          <strong>AI求职打印一体机</strong>
-          <span>登录 · 保存你的服务记录</span>
-        </div>
-        <button type="button" className="back-home ripple-host" onClick={goToReturn}>
-          <HomeIcon size={17} aria-hidden="true" />
-          {returnTo === '/' ? '返回首页' : '返 回'}
-        </button>
-      </header>
-
-      <section className="login-screen">
-        <div className="login-inner">
-          {terminalName && (
-            <div className="mast">
-              <span>就业服务自助终端</span>
-              <i />
-              <span>{terminalName}</span>
-            </div>
-          )}
-
-          <section className="hero">
-            <div className="hero-copy">
-              <div className="hero-eyebrow">
-                <ShieldCheckIcon size={17} aria-hidden="true" />
-                就业服务 · 一体机自助办理
+    <div
+      className="fusion-w5 fusion-w5--auth service-desk k1-login"
+      data-kiosk-screen="login"
+      data-kiosk-presentation="fusion-youth"
+      data-visual-theme="service-desk"
+      data-ux-density="touch"
+    >
+      <KioskStageFit>
+        <QxPageFrame
+          title={copy.title}
+          subtitle={<>{copy.sub} 回来后会到 <b>{loginReturnLabel(returnTo)}</b>。</>}
+          status={pill}
+          back={{ label: '返回首页', onBack: goHome }}
+          ctabar={
+            <>
+              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying') ? (
+                <button type="button" className="qx-btn" data-variant="ghost" data-testid="login-gate-anonymous" onClick={goHome}>
+                  {state === 'phone-idle' ? '不登录，继续使用' : '返回首页'}
+                </button>
+              ) : (
+                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
+                  {mode === 'phone' ? '改用扫码登录' : '改用手机号登录'}
+                </button>
+              )}
+              {mode === 'phone' && (state === 'phone-idle' || state === 'phone-code-sent' || state === 'phone-code-invalid') ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="login-gate-primary"
+                  aria-disabled={!canConfirm}
+                  disabled={!canConfirm}
+                  onClick={phoneLogin.onLogin}
+                >
+                  验证并登录
+                </button>
+              ) : null}
+              {mode === 'phone' && (state === 'phone-send-limited' || state === 'phone-send-failed' || state === 'phone-code-expired') ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="login-gate-primary"
+                  aria-disabled={!agreed}
+                  disabled={!agreed}
+                  onClick={phoneLogin.onSendCode}
+                >
+                  {state === 'phone-send-failed' ? '立刻重新获取' : '重新获取验证码'}
+                </button>
+              ) : null}
+              {mode === 'qr' && (state === 'qr-ready' || state === 'qr-expired') ? (
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="login-gate-primary"
+                  aria-disabled={!agreed}
+                  disabled={!agreed}
+                  onClick={() => qrRefreshRef.current()}
+                >
+                  重新生成二维码
+                </button>
+              ) : null}
+              {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying') ? (
+                <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
+                  {state === 'phone-sending' ? '等待服务端返回' : '等待核验结果'}
+                </span>
+              ) : null}
+              {mode === 'qr' && (state === 'qr-loading' || state === 'qr-confirmed') ? (
+                <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
+                  {state === 'qr-confirmed' ? '正在换取登录态' : '等待服务端返回票据'}
+                </span>
+              ) : null}
+              {mode === 'qr' && state === 'qr-error' ? (
+                <button type="button" className="qx-btn" data-variant="primary" data-testid="login-gate-primary" onClick={() => switchTab('phone')}>
+                  改用手机号登录
+                </button>
+              ) : null}
+              {state === 'phone-send-failed' || state === 'qr-error' ? (
+                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
+                  联系工作人员
+                </button>
+              ) : null}
+            </>
+          }
+        >
+          <div className="qx-scroll qx-grow" data-screen="login-gate" data-mode={mode} data-state={state} data-testid={`login-gate-state-${state}`}>
+            {fromRejected ? (
+              <div className="lg-from" data-testid="login-gate-from-note">
+                来源参数不合法，已按回首页处理：只接受本站内部路径。这里不回显你传进来的原值。
               </div>
-              <h1>
-                登录后，简历和记录
-                <br />
-                都替你存好
-              </h1>
-              <p>AI 简历报告、打印订单、岗位与招聘会浏览记录自动保存到「我的」，下次来直接继续。</p>
-            </div>
-            <div className="hero-clock">
-              <div className="time">{clock.time}</div>
-              <div className="date">{clock.date}</div>
-            </div>
-          </section>
-
-          <section className={`login-card${phoneLogin.shaking ? ' shake' : ''}`}>
-            <div className="folio">
-              <span>
-                <b>会员登录</b>
-              </span>
-              <span>凭证仅存本机 · 离开请退出</span>
-            </div>
-            <div className="card-head">
-              <span className="chi">
-                <UserRoundIcon size={28} aria-hidden="true" />
-              </span>
-              <div>
-                <h3>选择登录方式</h3>
-                <p>手机号验证码或手机扫码，全程不超过 3 步</p>
-              </div>
-            </div>
-
-            {hint ? (
-              <p className="k-login-hint" role="status">
-                {hint}
-              </p>
             ) : null}
+            {hint ? <p className="lg-hint" role="status">{hint}</p> : null}
 
-            <div className="k-tabs">
-              <button
-                type="button"
-                className={`k-tab ripple-host${tab === 'phone' ? ' on' : ''}`}
-                onClick={() => switchTab('phone')}
-              >
-                <SmartphoneIcon size={22} aria-hidden="true" />
-                手机号登录
+            <div className="lg-tabs">
+              <button type="button" className="lg-tab" data-testid="login-gate-tab-phone" aria-label="手机号登录" aria-current={mode === 'phone' ? 'page' : undefined} onClick={() => switchTab('phone')}>
+                <span className="ti"><SmartphoneIcon size={26} aria-hidden /></span>
+                <span><span className="tn">手机号</span><span className="td">短信验证码</span></span>
               </button>
-              <button
-                type="button"
-                className={`k-tab ripple-host${tab === 'scan' ? ' on' : ''}`}
-                onClick={() => switchTab('scan')}
-              >
-                <ScanLineIcon size={22} aria-hidden="true" />
-                手机扫码登录
+              <button type="button" className="lg-tab" data-testid="login-gate-tab-qr" aria-label="手机扫码登录" aria-current={mode === 'qr' ? 'page' : undefined} onClick={() => switchTab('scan')}>
+                <span className="ti"><ScanLineIcon size={26} aria-hidden /></span>
+                <span><span className="tn">扫码</span><span className="td">手机确认后换登录态</span></span>
               </button>
             </div>
 
-            <MemberAgreement agreed={agreed} onAgreedChange={setAgreed} />
-
-            {tab === 'phone' && (
-              <MemberPhoneLoginPane {...phoneLogin.paneProps} />
-            )}
-
-            {tab === 'scan' && (
+            {mode === 'phone' ? (
+              <LoginGatePhoneFields {...phoneLogin.paneProps} state={phoneState} />
+            ) : (
               <ScanQrLoginPanel
                 returnTo={returnTo}
                 agreed={agreed}
                 onAgreementRequired={requireMemberAgreement}
                 onUsePhoneLogin={() => switchTab('phone')}
                 onLoginSuccess={handleQrLoginSuccess}
+                onPhaseChange={setQrPhase}
+                onRegisterRefresh={(fn) => { qrRefreshRef.current = fn }}
               />
             )}
-          </section>
 
-          <div className="push-bottom" />
+            <section className="qx-card" style={{ marginTop: 18 }}>
+              <h3>登录之后多出什么</h3>
+              <p>我的文档、打印订单、AI 服务记录、岗位与招聘会浏览记录归到你名下，只有本人可见。手机上下单拿到的到机码能和这台机器对上号。</p>
+            </section>
 
-          <div className="k-helpline">
-            <span>
-              无操作 <b>{idleSeconds}</b> 秒后自动返回首页
-            </span>
-          </div>
-          <div className="compliance">
-            <ShieldCheckIcon size={15} aria-hidden="true" />
-            登录仅用于保存你的简历、订单与浏览记录；敏感文件设有效期并自动清理，本终端不向任何企业提供简历。
-          </div>
-        </div>
-      </section>
+            <section style={{ marginTop: 18 }}>
+              <div className="qx-sec-h"><span className="t">不登录也能办</span></div>
+              <div className="lg-entries">
+                {LOGIN_ANON_ENTRIES.map((entry, index) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className="lg-entry"
+                    data-testid={`login-gate-anon-${index}`}
+                    onClick={() => navigate(entry.route)}
+                  >
+                    <span className="eb">
+                      <span className="en">{entry.title}</span>
+                      <span className="ed">{entry.desc}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
 
-      {successVisible && (
-        <div className="k-success" role="status">
-          <span className="inkdot" />
-          <div className="check-wrap">
-            <div className="check-circle">
-              <svg className="check" viewBox="0 0 100 100" aria-hidden="true">
-                <path d="M24 52 44 72 78 30" />
-              </svg>
+            <MemberAgreement agreed={agreed} onAgreedChange={setAgreed} />
+            {!agreed ? <p className="lg-gate">请先勾选用户服务协议和隐私政策，发码、创建二维码和换登录态才会开始。</p> : null}
+
+            <div className="lg-truth" data-disclaimer="true">
+              <div><b>登录结果</b>以服务端返回为准，本页不显示「已登录」。</div>
+              <div><b>手机确认</b>只等于 confirmed，一体机还要 claim 成功才登录。</div>
+              <div><b>不登录</b>仍可使用打印扫描、到机码和岗位招聘会信息入口。</div>
             </div>
           </div>
-          <div className="msg">登录成功，正在进入…</div>
-        </div>
-      )}
+        </QxPageFrame>
+      </KioskStageFit>
     </div>
   )
 }

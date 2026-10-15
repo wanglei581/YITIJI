@@ -8,6 +8,7 @@ import {
   FileTextIcon,
   PrinterIcon,
   ShieldIcon,
+  SmartphoneIcon,
 } from 'lucide-react'
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
@@ -49,6 +50,8 @@ interface PrintJobState {
   amountCents?:         number
   paymentSessionToken?: string
   source?:              PrintMaterialSource
+  /** 建单响应的真信号；缺省（刷新 / 旧 state / 从别处进来）时整条提示不渲染。 */
+  hasEndUser?:          boolean
 }
 
 type PrintResultState = 'loading' | 'completed' | 'failed' | 'unknown'
@@ -602,6 +605,10 @@ export function PrintDonePage() {
     )
   }
 
+  // 成功态才到这里：loading / unknown / failed / wiped / feeInfo 均已 return。
+  // 以建单响应 hasEndUser 为准；本地 token 不能证明后端认了会话。事后登录也不会把这单追认回去。
+  const hasEndUser = state.hasEndUser
+
   return (
     <QxPageFrame
       title="打印完成"
@@ -694,6 +701,19 @@ export function PrintDonePage() {
             </div>
           )}
         </div>
+
+        {typeof hasEndUser === 'boolean' && (
+          <div className="pff-inbar" role="status">
+            <div className="pff-inbar-h">
+              <span className="pff-inbar-ic"><SmartphoneIcon aria-hidden="true" /></span>
+              <span>
+                {hasEndUser
+                  ? <>这单已经在你的小程序里<small>打开「我的 → 打印订单」就能看到</small></>
+                  : <>本次打印未关联账号<small>如需在小程序留存订单记录，下次打印前可先登录</small></>}
+              </span>
+            </div>
+          </div>
+        )}
 
         {(state.taskId || state.orderId) && (
           <div className="pff-meta">
