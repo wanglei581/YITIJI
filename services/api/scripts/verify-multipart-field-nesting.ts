@@ -14,7 +14,7 @@
  *     { limits: { ... } as { fieldNestingDepth: number; fileSize?: number } }
  *
  * `fileSize?: number` 出现在**类型断言**里，看起来像已经配了，实际可以一次都没赋值
- * —— files.controller.ts 的两处上传入口就是这样（其中 /files/kiosk-upload 还是免认证的）。
+ * —— files.controller.ts 的三处上传入口就是这样（/files/kiosk-upload 与 /files/kiosk-usb-upload 免登录，后者另验 Agent 令牌）。
  * multer 默认 memory storage：不设 fileSize 时整个 body 先进内存，而体积校验发生在
  * file-validation.ts，那时内存已经占掉了，单个请求即可 OOM。
  *
@@ -39,7 +39,7 @@ const EXPECTED_FILE_INTERCEPTORS = [
   { file: 'src/content/content.controller.ts', count: 1 },
   { file: 'src/mock-interview/mock-interview.controller.ts', count: 1 },
   { file: 'src/scan-tasks/scan-tasks.controller.ts', count: 1 },
-  { file: 'src/files/files.controller.ts', count: 2 },
+  { file: 'src/files/files.controller.ts', count: 3 },
   { file: 'src/upload-sessions/upload-sessions.controller.ts', count: 1 },
   { file: 'src/jobs/admin-fairs.controller.ts', count: 1 },
   { file: 'src/jobs/partner-fairs.controller.ts', count: 1 },
@@ -193,11 +193,11 @@ async function verifyStaticGuards(): Promise<void> {
     }
   }
 
-  if (calls.length !== 12) {
-    failures.push(`全局 FileInterceptor: 预期 12 处，实际 ${calls.length} 处`)
+  if (calls.length !== 13) {
+    failures.push(`全局 FileInterceptor: 预期 13 处，实际 ${calls.length} 处`)
   }
 
-  // 代理上传（整 buffer 进内存）的两处入口必须对齐既有的 PROXY_MAX_BYTES，
+  // 代理上传（整 buffer 进内存）的三处入口必须对齐既有的 PROXY_MAX_BYTES，
   // 而不是另发明一个数字 —— 后续 file-validation.ts 用的就是这个常量。
   for (const call of calls.filter((item) => item.file === 'src/files/files.controller.ts')) {
     const optionsObject = objectLiteral(call.call.arguments[1]!)
@@ -213,9 +213,9 @@ async function verifyStaticGuards(): Promise<void> {
   }
 
   assert.deepEqual(failures, [], `静态 multipart 防护契约失败:\n${failures.join('\n')}`)
-  console.log('  PASS 静态核验：12 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
-  console.log('  PASS 静态核验：12 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）')
-  console.log('  PASS 静态核验：files.controller.ts 两处代理上传入口对齐 PROXY_MAX_BYTES')
+  console.log('  PASS 静态核验：13 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
+  console.log('  PASS 静态核验：13 处 FileInterceptor 均真正赋值 limits.fileSize（非类型断言）')
+  console.log('  PASS 静态核验：files.controller.ts 三处代理上传入口对齐 PROXY_MAX_BYTES')
 }
 
 function multipartBody(fieldName: string, filePayload = 'sample'): { body: Buffer; contentType: string } {

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { FilesModule } from '../files/files.module'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { TerminalsController } from './terminals.controller'
@@ -23,7 +23,7 @@ import { TerminalIdentityGuard } from './terminal-identity.guard'
 import { AiAccessModule } from '../ai-access/ai-access.module'
 
 @Module({
-  imports: [JwtVerifierModule, FilesModule, AiAccessModule],
+  imports: [JwtVerifierModule, forwardRef(() => FilesModule), AiAccessModule],
   controllers: [
     TerminalsController,
     AdminTerminalsController,

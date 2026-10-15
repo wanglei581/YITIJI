@@ -36,8 +36,12 @@ interface RecordedRequest {
   url: string
   authorization?: string
   terminalId?: string
+  agentToken?: string
   body: string
 }
+
+const USB_UPLOAD_PATH = '/api/v1/files/kiosk-usb-upload'
+const USB_IMPORT_UNAVAILABLE_MESSAGE = '这台终端暂不支持从 U 盘导入，请改用手机扫码上传'
 
 function readBody(req: http.IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -57,18 +61,32 @@ async function startBackendStub(): Promise<{
   const server = http.createServer((req, res) => {
     void (async () => {
       const body = await readBody(req)
+      const textBody = body.toString('utf-8')
       records.push({
         method: req.method ?? '',
         url: req.url ?? '',
         authorization: req.headers.authorization,
         terminalId: req.headers['x-terminal-id'] as string | undefined,
-        body: body.toString('utf-8'),
+        agentToken: req.headers['x-terminal-agent-token'] as string | undefined,
+        body: textBody,
       })
 
-      if (req.method === 'POST' && req.url === '/api/v1/files/kiosk-upload') {
+      if (req.method === 'POST' && req.url === USB_UPLOAD_PATH && textBody.includes('filename="denied-original-name.pdf"')) {
+        res.writeHead(403, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({
+          success: false,
+          error: {
+            code: 'USB_IMPORT_UNAVAILABLE',
+            message: '上游误把文件名 denied-original-name.pdf 放进了提示',
+          },
+        }))
+        return
+      }
+
+      if (req.method === 'POST' && req.url === USB_UPLOAD_PATH) {
         const contentType = req.headers['content-type'] ?? ''
         assert.match(String(contentType), /^multipart\/form-data; boundary=/, 'forwarded upload must be multipart with a boundary')
-        const text = body.toString('utf-8')
+        const text = textBody
         assert.ok(text.includes('name="file"'), 'multipart body must carry the file field under name="file"')
         assert.ok(text.includes('filename="usb-sample.pdf"'), 'multipart body must carry the original filename')
         assert.ok(text.includes('Content-Type: application/pdf'), 'multipart file part must declare the guessed mime type')
@@ -406,9 +424,11 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       assert.equal(uploaded.json.data.fileId, 'file_usb_1')
       assert.ok(uploaded.json.data.fileUrl, 'upload response must carry a signed content URL for the print flow to reuse')
 
-      const forwarded = backend.records.find((r) => r.url === '/api/v1/files/kiosk-upload')
-      assert.ok(forwarded, 'agent must forward the file to /files/kiosk-upload')
-      assert.equal(forwarded!.authorization, 'Bearer agent-token-secret')
+      const forwarded = backend.records.find((r) => r.url === USB_UPLOAD_PATH)
+      assert.ok(forwarded, 'agent must forward the file to /files/kiosk-usb-upload')
+      assert.equal(backend.records.some((r) => r.url === '/api/v1/files/kiosk-upload'), false, 'USB upload must not keep using /files/kiosk-upload')
+      assert.equal(forwarded!.authorization, undefined, 'print_doc upload must not put the agent token on Authorization')
+      assert.equal(forwarded!.agentToken, 'agent-token-secret')
       assert.equal(forwarded!.terminalId, 'terminal-usb-1')
       assert.ok(forwarded!.body.includes('print_doc'), 'default USB upload must remain purpose=print_doc')
 
@@ -427,9 +447,10 @@ async function verifyLocalHttpRoutes(): Promise<void> {
         },
       )
       assert.equal(resumeUploaded.status, 200)
-      const resumeForwarded = backend.records.filter((r) => r.url === '/api/v1/files/kiosk-upload').at(-1)
-      assert.ok(resumeForwarded, 'resume USB upload must reach /files/kiosk-upload')
-      assert.equal(resumeForwarded!.authorization, memberAuthorization, 'member token must replace Agent auth only for the resume upload')
+      const resumeForwarded = backend.records.filter((r) => r.url === USB_UPLOAD_PATH).at(-1)
+      assert.ok(resumeForwarded, 'resume USB upload must reach /files/kiosk-usb-upload')
+      assert.equal(resumeForwarded!.authorization, memberAuthorization, 'member token stays on Authorization for the resume upload')
+      assert.equal(resumeForwarded!.agentToken, 'agent-token-secret', 'resume upload still carries the agent token on its own header')
       assert.equal(resumeForwarded!.terminalId, 'terminal-usb-1')
       assert.ok(resumeForwarded!.body.includes('resume_upload'), 'resume USB upload must carry purpose=resume_upload')
 
@@ -458,6 +479,40 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       assert.equal(unreadable.json.error.code, 'LOCAL_USB_FILE_UNREADABLE')
       assert.equal(unreadable.json.error.message, '这个文件读不了，请换一个文件')
       assert.equal(backend.records.length, forwardedBefore, 'an unreadable file must not be forwarded to the backend')
+
+      writeFileSync(join(dir, 'denied-original-name.pdf'), '%PDF-1.4 denied')
+      const deniedList = await refreshUsbFileList(() => ({ rootPath: dir, label: 'UPLOAD-TEST' }), () => new Set())
+      const denied = deniedList.files.find((f) => f.filename === 'denied-original-name.pdf')
+      assert.ok(denied, 'capability-denied fixture must be listed')
+      const captured: string[] = []
+      const stdoutWrite = process.stdout.write.bind(process.stdout)
+      const stderrWrite = process.stderr.write.bind(process.stderr)
+      const remember = (chunk: unknown) => {
+        captured.push(typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk))
+      }
+      process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => {
+        remember(chunk)
+        return stdoutWrite(chunk as never, ...(rest as []))
+      }) as typeof process.stdout.write
+      process.stderr.write = ((chunk: unknown, ...rest: unknown[]) => {
+        remember(chunk)
+        return stderrWrite(chunk as never, ...(rest as []))
+      }) as typeof process.stderr.write
+      try {
+        const deniedUpload = await callJson<{ success: false; error: { code: string; message: string } }>(
+          `${localBase}/local/usb/upload`,
+          'POST',
+          { origin: ALLOWED_ORIGIN, bridgeToken: BRIDGE_TOKEN, body: { safeId: denied!.safeId } },
+        )
+        assert.equal(deniedUpload.status, 403)
+        assert.equal(deniedUpload.json.error.code, 'USB_IMPORT_UNAVAILABLE')
+        assert.equal(deniedUpload.json.error.message, USB_IMPORT_UNAVAILABLE_MESSAGE)
+        assert.equal(deniedUpload.json.error.message.includes('denied-original-name.pdf'), false)
+      } finally {
+        process.stdout.write = stdoutWrite
+        process.stderr.write = stderrWrite
+      }
+      assert.equal(captured.join('').includes('agent-token-secret'), false, 'agent token must not appear in logs')
     } finally {
       resetUsbRegistryForTest()
       rmSync(dir, { recursive: true, force: true })

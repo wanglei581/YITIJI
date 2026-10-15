@@ -93,7 +93,7 @@ test('API-05 admin anonymous file access writes required audit before returning 
       return 'audit-1'
     },
   }
-  const controller = new FilesController(files as never, audit as never, {} as never, {} as never, {} as never)
+  const controller = new FilesController(files as never, audit as never, {} as never, {} as never, {} as never, {} as never, {} as never)
   ;(controller as unknown as { resolveRequester: () => Promise<unknown> }).resolveRequester = async () => ({
     kind: 'user', userId: 'admin-1', role: 'admin', orgId: null,
   })
@@ -118,7 +118,7 @@ test('API-05 legacy admin signed URL also requires audit success', async () => {
     },
     write: async () => { throw new Error('soft audit must not be used for admin') },
   }
-  const controller = new FilesController(files as never, audit as never, {} as never, {} as never, {} as never)
+  const controller = new FilesController(files as never, audit as never, {} as never, {} as never, {} as never, {} as never, {} as never)
   const response = await controller.signedUrl(
     'file-1',
     { userId: 'admin-1', role: 'admin', orgId: null, sessionId: 'session-1' },

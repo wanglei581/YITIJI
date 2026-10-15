@@ -42,6 +42,9 @@ import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
 import { UpdateRetentionDto } from './dto/update-retention.dto'
 import { signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
+import { assertUsbImportAgent, rethrowUsbImportUnavailable } from './kiosk-usb-upload'
+import { TerminalsService } from '../terminals/terminals.service'
+import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { readClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   FilePurpose,
@@ -74,6 +77,7 @@ function parseDeletedQuery(deleted?: string): boolean | 'all' | undefined {
  *
  *   POST   /files                       multipart 服务端代理上传(已登录 User)
  *   POST   /files/kiosk-upload          Kiosk 匿名 / 会员 multipart 上传
+ *   POST   /files/kiosk-usb-upload      终端 Agent 代传的 U 盘导入（须校验 Agent 令牌与 usb_import）
  *   POST   /files/upload-intent         创建直传意图(User / 会员)→ 预签名 PUT
  *   PUT    /files/:id/raw?expires&sig   本地后端直传写入(签名授权,无 JWT)
  *   POST   /files/:id/complete          直传完成确认(User / 会员)
@@ -95,6 +99,8 @@ export class FilesController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly terminals: TerminalsService,
+    private readonly capabilities: TerminalCapabilitiesService,
   ) {}
 
   // ── 服务端代理上传 ─────────────────────────────────────────────────────────
@@ -162,6 +168,64 @@ export class FilesController {
         filename: res.filename,
         sizeBytes: res.sizeBytes,
         source: endUser ? 'kiosk_member' : 'kiosk_anonymous',
+        hasEndUser: Boolean(endUser),
+        ...(endUser ? {} : { clientDeclaration: readClientDeclaration(req.headers) }),
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({
+      ...res,
+      signedUrl: printSigned.url,
+      signedUrlExpiresAt: printSigned.expiresAt.toISOString(),
+    })
+  }
+
+  /**
+   * 终端 Agent 代传的 U 盘文件。与 kiosk-upload 同一套体积、校验、用途白名单和签名 URL。
+   * Agent 令牌在 X-Terminal-Agent-Token；会员令牌（简历要绑会员时）仍在 Authorization。
+   * 能力不可用时 403 USB_IMPORT_UNAVAILABLE，不落文件、不写带文件名的审计。
+   */
+  @Post('kiosk-usb-upload')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: PROXY_MAX_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  async kioskUsbUpload(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() options: KioskUploadOptionsDto,
+    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+  ): Promise<ApiResponse<FileUploadResponse>> {
+    if (!file) {
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' } })
+    }
+    const terminalId = await assertUsbImportAgent(this.terminals, req.headers)
+    try {
+      await this.capabilities.assertUserTaskAllowed(terminalId, 'usb_import')
+    } catch (error) {
+      rethrowUsbImportUnavailable(error)
+    }
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
+    const res = await this.files.upload({
+      buffer: file.buffer,
+      filename: restoreMultipartUtf8Filename(file.originalname),
+      mimeType: file.mimetype,
+      purpose: options.purpose as FilePurpose,
+      uploaderId: null,
+      endUserId: endUser?.endUserId ?? null,
+    })
+    const printSigned = signFileUrl(res.fileId, KIOSK_UPLOAD_SIGNED_URL_TTL_MS)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'file.upload',
+      targetType: 'file',
+      targetId: res.fileId,
+      payload: {
+        purpose: options.purpose,
+        filename: res.filename,
+        sizeBytes: res.sizeBytes,
+        source: 'kiosk_usb',
+        terminalId,
         hasEndUser: Boolean(endUser),
         ...(endUser ? {} : { clientDeclaration: readClientDeclaration(req.headers) }),
       },

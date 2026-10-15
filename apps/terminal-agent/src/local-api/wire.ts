@@ -36,7 +36,7 @@ export interface BackendQrClaimResult {
   user: MemberUser
 }
 
-/** POST /files/kiosk-upload 响应（Agent 转发打印材料或简历 U 盘文件时复用）。 */
+/** POST /files/kiosk-usb-upload 响应（与 kiosk-upload 同形；Agent 转发 U 盘文件时复用）。 */
 export interface BackendKioskUploadResult {
   fileId: string
   filename: string

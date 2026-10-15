@@ -81,6 +81,8 @@ export interface FileSourceViewProps {
   onUsbSelect: (safeId: string) => void
   onUsbImport: () => void
   onUsbRescan: () => void
+  /** 能力拒绝时的那句提示。只在 usb-unavailable 上替换「没接通」文案。 */
+  usbDeniedMessage?: string | null
   onPhoneRefresh: () => void
   onPhoneConfirm: () => void
   onPhoneCancel: () => void
@@ -164,7 +166,7 @@ export function FileSourceView(props: FileSourceViewProps) {
     wordHint, usbFiles, usbSelected, usbDriveLabel, formatBytes, phone, qrUrl, expiresLabel,
     previewOpen, previewToken, onSelectChannel, onOpenPicker, onRetryLocal, onNext, onExit, onBack,
     onHelp, onScan, onDocuments, onResumes, onPreview, onClosePreview, onReplace, onDelete,
-    onUsbSelect, onUsbImport, onUsbRescan, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
+    onUsbSelect, onUsbImport, onUsbRescan, usbDeniedMessage, onPhoneRefresh, onPhoneConfirm, onPhoneCancel,
     onPhoneRetryStatus, onFileInputChange, inputRef, printAccept, photoOnly,
   } = props
 
@@ -554,7 +556,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           <FileSourceStatus
             kind={screen === 'usb-unavailable' ? 'lock' : screen === 'usb-agent-offline' || screen === 'usb-read-failed' ? 'error' : screen === 'usb-empty' ? 'warn' : 'plain'}
             title={
-              screen === 'usb-unavailable' ? '这台机器没接通 U 盘导入'
+              screen === 'usb-unavailable' ? (usbDeniedMessage ? '这台终端暂不支持从 U 盘导入' : '这台机器没接通 U 盘导入')
                 : screen === 'usb-agent-offline' ? '暂时无法读取 U 盘'
                   : screen === 'usb-wait' ? '把 U 盘插进右侧 USB 口'
                     : screen === 'usb-detecting' ? '正在读 U 盘'
@@ -565,7 +567,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           >
             <div className="fs-status-p">
               {screen === 'usb-unavailable'
-                ? '本机暂未开通 U 盘导入，请改用手机上传或联系工作人员。'
+                ? (usbDeniedMessage ?? '本机暂未开通 U 盘导入，请改用手机上传或联系工作人员。')
                 : screen === 'usb-agent-offline'
                   ? '暂时无法读取 U 盘。可以重新连接，或改用手机上传。'
                   : screen === 'usb-wait'
@@ -577,7 +579,9 @@ export function FileSourceView(props: FileSourceViewProps) {
                         : '本地服务连上了，但这次没能列出文件。本机不显示上一次的列表。'}
             </div>
           </FileSourceStatus>
-          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
+          {screen === 'usb-unavailable' && usbDeniedMessage ? (
+            <div className="qx-card"><FileSourceSteps title="改用手机扫码上传" items={['点下面的「改用手机扫码上传」。', '用手机打开相机或微信扫这台机器上的码。', '手机传完后，回到这台机器确认这一份。']} /></div>
+          ) : screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
             <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '不进入子文件夹，请把文件移到最外层。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层文件，不改动盘上内容。', '仍没有结果时，换手机上传或联系工作人员。']} /></div>
           ) : null}
           {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (

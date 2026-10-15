@@ -89,6 +89,8 @@ const SHARED_USER_MESSAGES: Readonly<Record<string, string>> = {
   LOCAL_USB_FILE_UNREADABLE: '这个文件读不了，请换一个文件',
   // 列表过期（一次性编号已用过或超时）：同一个编号再点只会再失败，要重新读取 U 盘列表。
   LOCAL_USB_FILE_EXPIRED: '文件列表已过期，请重新读取 U 盘后再选',
+  // 服务端按这台终端的 usb_import 能力拒绝。固定这句，不透传上游（上游可能夹了原始文件名）。
+  USB_IMPORT_UNAVAILABLE: '这台终端暂不支持从 U 盘导入，请改用手机扫码上传',
   CONVERT_TOO_MANY_IMAGES: '一次转换的图片过多，请减少张数后重试',
   SIGN_SOURCE_NOT_FOUND: '文件访问凭证已过期或文件已清理，请重新选择文件',
   NO_TERMINAL_IDENTITY: '这台机器还没完成登记，请联系现场工作人员',

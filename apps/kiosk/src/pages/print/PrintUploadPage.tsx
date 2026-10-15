@@ -24,7 +24,7 @@ import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensave
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -189,6 +189,7 @@ export function PrintUploadPage() {
   const [usbSelected, setUsbSelected] = useState<UsbFileListItem | null>(null)
   const [usbSafeIdExpired, setUsbSafeIdExpired] = useState(false)
   const [usbImportFailed, setUsbImportFailed] = useState(false)
+  const [usbCapabilityDenied, setUsbCapabilityDenied] = useState(false)
   const [usbAgentOffline, setUsbAgentOffline] = useState(false)
   const [usbReadFailed, setUsbReadFailed] = useState(false)
   const [usbPollKey, setUsbPollKey] = useState(0)
@@ -345,6 +346,7 @@ export function PrintUploadPage() {
     setUsbUploading(true)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbCapabilityDenied(false)
     setUsbSafeIdExpired(false)
     try {
       const result = await uploadUsbFile(usbSelected.safeId)
@@ -360,13 +362,18 @@ export function PrintUploadPage() {
       persistFile(nextFile, 'usb')
       setUsbSelected(null)
     } catch (err) {
-      if (isUsbSafeIdExpired(err)) {
+      if (errorCodeOf(err) === 'USB_IMPORT_UNAVAILABLE') {
+        setUsbCapabilityDenied(true)
+        setUsbImportFailed(false)
+        setUsbError(userMessageOf(err, '这台终端暂不支持从 U 盘导入，请改用手机扫码上传'))
+      } else if (isUsbSafeIdExpired(err)) {
         setUsbSafeIdExpired(true)
         setUsbImportFailed(false)
+        setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
       } else {
         setUsbImportFailed(true)
+        setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
       }
-      setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
     } finally {
       setUsbUploading(false)
     }
@@ -401,6 +408,7 @@ export function PrintUploadPage() {
     setLocalRejectKind(null)
     setUsbSelected(null)
     setUsbImportFailed(false)
+    setUsbCapabilityDenied(false)
     setUsbSafeIdExpired(false)
   }
 
@@ -410,6 +418,7 @@ export function PrintUploadPage() {
     setUsbStatus(null)
     setUsbError(null)
     setUsbImportFailed(false)
+    setUsbCapabilityDenied(false)
     setUsbSafeIdExpired(false)
     setUsbReadFailed(false)
     setUsbAgentOffline(false)
@@ -437,6 +446,7 @@ export function PrintUploadPage() {
     usbSafeIdExpired,
     usbImportFailed,
     usbReadFailed: Boolean(usbReadFailed && usbError),
+    usbCapabilityDenied,
   })
 
   const fromQuery = `${location.pathname}${location.search}`
@@ -525,6 +535,7 @@ export function PrintUploadPage() {
       onDelete={clearCurrentFile}
       onUsbSelect={(safeId) => void handleUsbFileSelect(safeId)}
       onUsbImport={() => void handleUsbImport()}
+      usbDeniedMessage={usbCapabilityDenied ? usbError : null}
       onUsbRescan={handleUsbRescan}
       onPhoneRefresh={() => void phoneSession.refresh()}
       onPhoneConfirm={() => void phoneSession.confirm()}

@@ -286,6 +286,12 @@ assert.deepEqual(
   const usbExpired = userMessageOf({ code: 'LOCAL_USB_FILE_EXPIRED', message: 'x' }, 'U 盘文件导入失败，请重试')
   assert.match(usbExpired, /重新读取 U 盘/, 'LOCAL_USB_FILE_EXPIRED 必须提示重新读取 U 盘')
   assert.doesNotMatch(usbExpired, /请重试/, 'LOCAL_USB_FILE_EXPIRED 不能说成「请重试」')
+  const usbCapability = userMessageOf(
+    { code: 'USB_IMPORT_UNAVAILABLE', message: '上游误带了周若涵-市南材料.pdf' },
+    'U 盘文件导入失败，请重试',
+  )
+  assert.equal(usbCapability, '这台终端暂不支持从 U 盘导入，请改用手机扫码上传', 'USB_IMPORT_UNAVAILABLE 必须是固定提示')
+  assert.doesNotMatch(usbCapability, /周若涵|\.pdf/, '能力拒绝不得回显原始文件名')
   // PRINT_TERMINAL_QUEUE_HALTED（#1150 方案 A，只此一个新码）：
   // 合格中文原话原样显示。兜底句与拍板原话相同，只断言那一句时拿掉白名单仍会绿，
   // 所以再钉一条不同的合格中文（#1150 现文「本机…」），证明不是固定覆盖。

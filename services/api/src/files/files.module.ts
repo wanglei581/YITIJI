@@ -7,6 +7,7 @@ import { FilesCleanupTask } from './files.cleanup.task'
 import { MemberDataExportFileService } from './member-data-export-file.service'
 import { ContractReportPrintLifecycleService } from './contract-report-print-lifecycle.service'
 import { UploadSessionsModule } from '../upload-sessions/upload-sessions.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 /**
  * BE-1 文件模块。
@@ -30,6 +31,7 @@ import { UploadSessionsModule } from '../upload-sessions/upload-sessions.module'
     PrismaModule,
     JwtVerifierModule,
     forwardRef(() => UploadSessionsModule),
+    forwardRef(() => TerminalsModule),
   ],
   controllers: [FilesController],
   providers: [

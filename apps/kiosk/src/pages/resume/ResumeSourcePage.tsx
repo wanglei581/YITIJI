@@ -550,7 +550,14 @@ export function ResumeSourcePage() {
               </div>
             ) : selected === 'usb' ? (
               <div className="qx-rt-usb">
-                <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
+                <ResumeUsbImportPanel
+                  onUploaded={handleUsbUploaded}
+                  onBusyChange={setUsbBusy}
+                  onUsePhoneUpload={() => {
+                    setError(null)
+                    setSelected('phone')
+                  }}
+                />
               </div>
             ) : (
               <button

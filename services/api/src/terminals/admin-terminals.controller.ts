@@ -6,11 +6,12 @@
 //   GET   /admin/terminals/org-options       — 可绑定机构下拉（仅 enabled）
 //   PATCH /admin/terminals/:terminalId/org     — 绑定/解绑终端机构归属（写审计）
 //   PATCH /admin/terminals/:terminalId/profile — 设备档案/MAC/启停（写审计）
+//   DELETE /admin/terminals/:terminalId/capabilities/:capabilityKey — 清除能力行，回到未配置（写审计）
 //
 // 消费方：Agent3 admin 设备页。响应字段/类型必须严格匹配契约 C1。
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common'
 import type { TerminalCapabilityView } from './terminal-capabilities.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -183,6 +184,41 @@ export class AdminTerminalsController {
       requestId: req.requestId ?? null,
     })
     return ApiResponse.ok({ terminalCode: result.terminalCode, capability: result.capability })
+  }
+
+  // DELETE /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey
+  // 删掉该行，回到「未配置」。行本来就没有时 200 且不写审计。
+  @Delete(':terminalId/capabilities/:capabilityKey')
+  async clearCapability(
+    @Param('terminalId') terminalId: string,
+    @Param('capabilityKey') capabilityKey: string,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<{ terminalCode: string; capabilityKey: string; cleared: boolean }>> {
+    const result = await this.capabilities.clear(terminalId, capabilityKey)
+    if (result.cleared) {
+      await this.audit.write({
+        actorId: user.userId,
+        actorRole: user.role,
+        action: 'terminal.capability.cleared',
+        targetType: 'terminal',
+        targetId: result.terminalCode,
+        payload: {
+          terminalCode: result.terminalCode,
+          capabilityKey: result.capabilityKey,
+          previousStatus: result.previousStatus,
+          hadNote: result.hadNote,
+        },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+    }
+    return ApiResponse.ok({
+      terminalCode: result.terminalCode,
+      capabilityKey: result.capabilityKey,
+      cleared: result.cleared,
+    })
   }
 
   // PATCH /api/v1/admin/terminals/:terminalId/profile

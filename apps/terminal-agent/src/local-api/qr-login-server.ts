@@ -38,6 +38,8 @@ const MAX_BODY_BYTES = 8 * 1024
 const TICKET_ID_RE = /^[A-Za-z0-9_-]{32,96}$/
 const BOOT_TICKET_RATE_WINDOW_MS = 60_000
 const BOOT_TICKET_RATE_LIMIT = 6
+const USB_CLOUD_UPLOAD_PATH = '/files/kiosk-upload'
+const USB_IMPORT_UNAVAILABLE_MESSAGE = '这台终端暂不支持从 U 盘导入，请改用手机扫码上传'
 
 interface StoredClaim {
   claimToken: string
@@ -243,7 +245,7 @@ async function handleRequest(input: {
   }
 
   if (isUsbRoute) {
-    await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions)
+    await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions, config)
     return
   }
 
@@ -316,6 +318,7 @@ async function handleUsbRoute(
   client: ReturnType<typeof createApiClient>,
   bridgeToken: string | undefined,
   bridgeSessions: LocalBridgeSessionStore,
+  config: AgentConfig,
 ): Promise<void> {
   if (
     !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken) &&
@@ -340,7 +343,7 @@ async function handleUsbRoute(
   }
 
   if (req.method === 'POST' && url.pathname === '/local/usb/upload') {
-    await handleUsbUpload(req, res, origin, client)
+    await handleUsbUpload(req, res, origin, client, config)
     return
   }
 
@@ -352,6 +355,7 @@ async function handleUsbUpload(
   res: ServerResponse,
   origin: string,
   client: ReturnType<typeof createApiClient>,
+  config: AgentConfig,
 ): Promise<void> {
   const body = await readJsonBody<LocalUsbUploadRequest>(req, 'usb')
   const safeId = typeof body.safeId === 'string' ? body.safeId : ''
@@ -367,6 +371,11 @@ async function handleUsbUpload(
   const authorization = normalizeEndUserAuthorization(req.headers.authorization)
   if (req.headers.authorization && !authorization) {
     sendJson(res, 400, { code: 'LOCAL_USB_AUTHORIZATION_INVALID', message: '会员身份格式无效，请重新登录后再试' }, origin)
+    return
+  }
+
+  if (!config.terminalId || !config.agentToken) {
+    sendJson(res, 503, { code: 'LOCAL_TERMINAL_BOOT_NOT_READY', message: '终端云端注册尚未就绪，请稍后重试' }, origin)
     return
   }
 
@@ -393,10 +402,14 @@ async function handleUsbUpload(
   try {
     // form-data 流一次发送后即被消费,自动重试会提交空体;上传也非幂等
     // (响应丢失时重试会重复落文件),所以这里显式禁用 api-client 的自动重试。
-    const response = await client.post<ApiEnvelope<BackendKioskUploadResult>>('/files/kiosk-upload', form, {
+    // Agent 令牌只放 X-Terminal-Agent-Token。Authorization 留给会员令牌；
+    // 打印材料不带会员身份时用 false 删掉 api-client 默认的 Agent Bearer，避免占住这个头。
+    const response = await client.post<ApiEnvelope<BackendKioskUploadResult>>(USB_CLOUD_UPLOAD_PATH, form, {
       headers: {
         ...form.getHeaders(),
-        ...(purpose === 'resume_upload' && authorization ? { Authorization: authorization } : {}),
+        'X-Terminal-Id': config.terminalId,
+        'X-Terminal-Agent-Token': config.agentToken,
+        Authorization: (purpose === 'resume_upload' && authorization ? authorization : false) as unknown as string,
       },
       ...NO_RETRY_CONFIG,
     })
@@ -556,6 +569,10 @@ function backendError(error: unknown, context: 'qr' | 'usb' = 'qr', retryable = 
   if (axios.isAxiosError<ApiErrorEnvelope>(error)) {
     const status = error.response?.status ?? 502
     const code = error.response?.data?.error?.code ?? fallbackCode
+    // 能力拒绝用固定中文句。上游 message 可能夹了原始文件名，这里不往一体机传。
+    if (context === 'usb' && code === 'USB_IMPORT_UNAVAILABLE') {
+      return { status: 403, error: { code: 'USB_IMPORT_UNAVAILABLE', message: USB_IMPORT_UNAVAILABLE_MESSAGE } }
+    }
     const message = error.response?.data?.error?.message ?? fallbackMessage
     return { status: retryable ? 503 : status, error: { code: retryable ? 'LOCAL_TERMINAL_BOOT_RETRYABLE' : code, message } }
   }

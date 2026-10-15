@@ -145,6 +145,8 @@ export interface FileSourceDeriveInput {
   usbSafeIdExpired: boolean
   usbImportFailed: boolean
   usbReadFailed: boolean
+  /** 服务端 usb_import 能力拒绝。复用 usb-unavailable，不新增屏幕。 */
+  usbCapabilityDenied: boolean
 }
 
 export function deriveFileSourceScreen(input: FileSourceDeriveInput): FileSourceScreen {
@@ -182,7 +184,7 @@ export function deriveFileSourceScreen(input: FileSourceDeriveInput): FileSource
     return 'phone-generating'
   }
 
-  if (!input.usbConfigured) return 'usb-unavailable'
+  if (!input.usbConfigured || input.usbCapabilityDenied) return 'usb-unavailable'
   if (input.usbUploading) return 'usb-importing'
   if (input.usbSafeIdExpired) return 'usb-safeid-expired'
   if (input.usbImportFailed) return 'usb-import-failed'

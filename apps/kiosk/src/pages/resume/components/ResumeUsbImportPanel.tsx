@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { userMessageOf } from '../../../services/api/userErrorMessage'
+import { errorCodeOf, userMessageOf } from '../../../services/api/userErrorMessage'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { useAuth } from '../../../auth/useAuth'
@@ -25,6 +25,8 @@ export interface ResumeUsbImportedFile {
 interface ResumeUsbImportPanelProps {
   onUploaded: (file: ResumeUsbImportedFile) => void
   onBusyChange?: (busy: boolean) => void
+  /** 能力拒绝时切到本页已有的手机扫码上传，不新开页面。 */
+  onUsePhoneUpload?: () => void
 }
 
 const MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -47,7 +49,7 @@ function inferFormat(mimeType: string, filename: string): string {
   return 'unknown'
 }
 
-export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
+export function ResumeUsbImportPanel({ onUploaded, onBusyChange, onUsePhoneUpload }: ResumeUsbImportPanelProps) {
   const { getToken } = useAuth()
   const mountedRef = useRef(true)
   const [status, setStatus] = useState<UsbStatus | null>(null)
@@ -55,6 +57,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   const [loading, setLoading] = useState(false)
   const [importingId, setImportingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [capabilityDenied, setCapabilityDenied] = useState<string | null>(null)
   const configured = isUsbImportConfigured()
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   }, [onBusyChange])
 
   useEffect(() => {
-    if (!configured || importingId) return undefined
+    if (!configured || importingId || capabilityDenied) return undefined
     let cancelled = false
     let timer: number | undefined
 
@@ -100,7 +103,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [configured, importingId])
+  }, [configured, importingId, capabilityDenied])
 
   const importFile = async (item: UsbFileListItem) => {
     setImportingId(item.safeId)
@@ -120,6 +123,11 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
       })
     } catch (err) {
       if (!mountedRef.current) return
+      if (errorCodeOf(err) === 'USB_IMPORT_UNAVAILABLE') {
+        setCapabilityDenied(userMessageOf(err, '这台终端暂不支持从 U 盘导入，请改用手机扫码上传'))
+        setError(null)
+        return
+      }
       setError(userMessageOf(err, 'U盘文件导入失败，请重试'))
       setFiles(null)
       setStatus(null)
@@ -128,14 +136,19 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
     }
   }
 
-  if (!configured) {
+  if (!configured || capabilityDenied) {
     return (
-      <KioskStatePanel
-        compact
-        tone="empty"
-        title="这台机器暂未开通 U 盘导入"
-        description="请改用手机扫码上传，或联系现场工作人员。"
-      />
+      <section className="resume-usb-panel flex min-h-[214px] flex-1 flex-col gap-4" aria-label="U盘简历文件" data-usb-state={capabilityDenied ? 'capability-denied' : 'unconfigured'}>
+        <KioskStatePanel
+          compact
+          tone="empty"
+          title={capabilityDenied ? '这台终端暂不支持从 U 盘导入' : '这台机器暂未开通 U 盘导入'}
+          description={capabilityDenied ?? '请改用手机扫码上传，或联系现场工作人员。'}
+        />
+        {onUsePhoneUpload ? (
+          <Button size="lg" onClick={onUsePhoneUpload}>改用手机扫码上传</Button>
+        ) : null}
+      </section>
     )
   }
 
