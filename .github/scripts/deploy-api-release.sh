@@ -34,7 +34,9 @@ fi
 RUNTIME_ROOT="${DEPLOY_API_DIR:-/srv/ai-job-print}"
 PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}"
 BACKUP_ROOT="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
-HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health}"
+HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health/ready}"
+HEALTH_ATTEMPTS="${DEPLOY_HEALTH_ATTEMPTS:-30}"
+HEALTH_DELAY_SECONDS="${DEPLOY_HEALTH_DELAY_SECONDS:-2}"
 
 API_DIR="$RUNTIME_ROOT/services/api"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -295,35 +297,62 @@ echo "=== 6. 收敛运行目录依赖并执行 additive 迁移 ==="
 cd "$RUNTIME_ROOT"
 pnpm install --frozen-lockfile
 cd "$RUNTIME_ROOT/services/api"
-pnpm db:pg:deploy
+MIGRATION_LOG="$BACKUP_PREFIX.migrations.log"
+echo "本次执行的 PostgreSQL 迁移（数据库不回退，供人工判断）：" | tee "$MIGRATION_LOG"
+pnpm db:pg:deploy 2>&1 | tee -a "$MIGRATION_LOG"
 
-echo "=== 7. 写 DEPLOY_SOURCE（不含秘密）==="
-cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF
+check_ready() {
+  curl -fsS "$HEALTH_URL" 2>/dev/null \
+    | grep -Eq '"status"[[:space:]]*:[[:space:]]*"ready"'
+}
+
+rollback_after_health_failure() {
+  local rollback_version
+  echo "::error::API 就绪检查失败，开始自动回退运行目录；数据库迁移不回退。" >&2
+  if [ ! -d "$BACKUP_PREFIX.runtime" ]; then
+    echo "::error::找不到回退运行目录：$BACKUP_PREFIX.runtime" >&2
+    return 1
+  fi
+  rm -rf -- "$RUNTIME_ROOT"
+  cp -a "$BACKUP_PREFIX.runtime" "$RUNTIME_ROOT"
+  rollback_version="$(sed -n 's/^source=origin\/main@//p' "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" 2>/dev/null | head -n1)"
+  rollback_version="${rollback_version:-上一版备份 $BACKUP_PREFIX.runtime}"
+  export COMMIT="${rollback_version#origin/main@}"
+  echo "本次迁移记录保留在 $MIGRATION_LOG；数据库不回退，请人工判断迁移影响。" >&2
+  pm2 restart "$PM2_NAME" --update-env
+  if check_ready; then
+    echo "已回退到 $rollback_version；回退后的就绪检查通过。"
+  else
+    echo "::error::已回退到 $rollback_version，但回退后的就绪检查仍失败。" >&2
+  fi
+  return 1
+}
+
+echo "=== 7. 重启 PM2 并健康检查（$HEALTH_URL） ==="
+export COMMIT="$TARGET_SHA"
+export PRINT_REQUIRE_PRINTER_ONLINE=true
+export PRINT_REQUIRE_PII_SCAN=true
+pm2 restart "$PM2_NAME" --update-env
+for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
+  if check_ready; then
+    echo "API readiness OK: $HEALTH_URL"
+    echo "=== 8. 写 DEPLOY_SOURCE（健康检查通过后，不含秘密） ==="
+    cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF
 source=origin/main@$TARGET_SHA
 deployed_at=$(date -Is)
 ci_run=$CI_RUN
 control_plane_helper_sha256=$CONTROL_PLANE_DEPLOY_HELPER_SHA256
 backup=$BACKUP_PREFIX.dump
 runtime_backup=$BACKUP_PREFIX.runtime
-rollback=restore $BACKUP_PREFIX.runtime then if migration rollback required restore $BACKUP_PREFIX.dump
+migrations=$MIGRATION_LOG
+rollback=restore $BACKUP_PREFIX.runtime; database migrations are not rolled back
 api_database=postgresql
 EOF
-
-echo "=== 8. 重启 PM2 并健康检查 ==="
-export COMMIT="$TARGET_SHA"
-export PRINT_REQUIRE_PRINTER_ONLINE=true
-export PRINT_REQUIRE_PII_SCAN=true
-pm2 restart "$PM2_NAME" --update-env
-for _ in $(seq 1 30); do
-  if curl -fsS "$HEALTH_URL" 2>/dev/null | grep -q '"status":"ok"'; then
-    echo "API health OK: $HEALTH_URL"
     echo "=== 9. 发布成功，清理历史备份 ==="
     # 清理失败不影响本次发布结果（发布已经成功），只记 warning。
-    # 放在 || 右侧同时确保函数体内的错误不会被 set -e 带崩整个脚本。
     prune_old_backups || echo "::warning::备份清理失败，已跳过（不影响本次发布）"
     exit 0
   fi
-  sleep 2
+  sleep "$HEALTH_DELAY_SECONDS"
 done
-echo "::error::API health check failed after restart: $HEALTH_URL" >&2
-exit 1
+rollback_after_health_failure
