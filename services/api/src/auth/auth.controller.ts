@@ -1,5 +1,8 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Ip, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Ip, Post, UseGuards } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
+import { AuditService } from '../audit/audit.service'
+import { revokeIssuedInternalSession } from '../common/auth/internal-session-revocation'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -27,6 +30,7 @@ import {
 } from './dto/internal-auth.dto'
 import { LoginDto } from './dto/login.dto'
 import { PartnerAccountActionRedisService } from '../common/redis/partner-account-action-redis.service'
+import { RedisService } from '../common/redis/redis.service'
 
 @Controller('auth')
 export class AuthController {
@@ -36,6 +40,9 @@ export class AuthController {
     private readonly adminInitialPhoneBindService: AdminInitialPhoneBindService,
     private readonly adminPhoneTransferService: AdminPhoneTransferService,
     private readonly partnerAccountActionRedis: PartnerAccountActionRedisService,
+    private readonly redis: RedisService,
+    private readonly jwtService: JwtService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -282,18 +289,29 @@ export class AuthController {
   }
 
   /**
-   * 显式退出只撤销当前 jti 对应会话的 Admin 近期高风险验证。
-   * 本端点不声称在服务端撤销已签发 JWT；客户端仍需立即清除本地 token。
+   * 撤销当前 jti。名单写入失败时不返回成功。
+   * 管理员再清掉这份凭证上的近期高风险验证。客户端仍须清掉本地 token。
+   * 没有 jti 的旧凭证撤不了名单，只受 tokenVersion 与过期时间约束。
    */
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
-  async logout(@CurrentUser() user: AuthedUser): Promise<ApiResponse<{ loggedOut: true }>> {
-    if (user.role === 'admin') {
-      if (user.sessionId) {
-        await this.partnerAccountActionRedis.clearAdminRecentVerification(user.userId, user.sessionId)
-      }
+  async logout(
+    @CurrentUser() user: AuthedUser,
+    @Headers('authorization') authorization?: string,
+  ): Promise<ApiResponse<{ loggedOut: true }>> {
+    await revokeIssuedInternalSession(authorization, this.jwtService, this.redis)
+    if (user.role === 'admin' && user.sessionId) {
+      await this.partnerAccountActionRedis.clearAdminRecentVerification(user.userId, user.sessionId)
     }
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'auth.logout',
+      targetType: 'auth',
+      targetId: user.userId,
+      payload: { scope: 'current_session' },
+    })
     return ApiResponse.ok({ loggedOut: true })
   }
 

@@ -44,6 +44,7 @@ export type AuditAction =
   | 'resume.self_assessment_withdraw'
   | 'assistant.chat_message'
   | 'auth.password_change_self'
+  | 'auth.logout'
   | 'auth.phone_initial_bind_start'
   | 'auth.phone_initial_bind_complete'
   | 'auth.phone_initial_bind_cancel'

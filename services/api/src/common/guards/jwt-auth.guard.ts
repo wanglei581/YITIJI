@@ -19,8 +19,8 @@ export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-sessio
  *
  * 不主动检查角色 — 单独使用时表示"任意已登录用户"。
  *
- * 身份判定本体在 `../auth/optional-internal-user`:每次回源数据库。
- * Redis 只做更高 tokenVersion 的写入屏障，不作为命中身份；`tryRedis` 有界降级。
+ * 身份判定本体在 `../auth/optional-internal-user`:每次回源数据库，
+ * 并核对退出名单里的 jti。Redis 另做更高 tokenVersion 的写入屏障，不作为命中身份。
  * **Redis 挂掉时为什么回源数据库不等于放松鉴权，口径写在该文件的头注释里**，
  * 不要只改一处。抽出来是为了让混合鉴权路由(FilesController 同时接受会员与内部
  * 账号 token)复用同一份判定,而不是各写一套 —— 两份副本必然漂移。
@@ -54,7 +54,7 @@ export class JwtAuthGuard implements CanActivate {
     )
     if (!user) {
       throw new UnauthorizedException({
-        error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' },
+        error: { code: 'AUTH_TOKEN_INVALID', message: '登录已失效，请重新登录' },
       })
     }
 
