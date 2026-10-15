@@ -39,6 +39,7 @@ import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.s
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
 import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { offlineEpisodeToken } from '../src/admin-ops/derived-alert-identity'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
@@ -137,6 +138,51 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
 }
 
+/**
+ * 3a2. Agent 真会上报的 low_paper / unknown（apps/terminal-agent/src/agent/wmi.ts）必须有人话标题，
+ * 不能落到「打印机状态异常(low_paper)」兜底；low_paper 还能出纸 → warning，unknown 一体机打不了 → error。
+ * 同时钉住：告警文案时间按上海时间写，而 occurredAt / episodeToken 仍是原来的 UTC 口径。
+ */
+async function verifyPrinterStatusLabelsAndShanghaiTime(): Promise<void> {
+  const now = new Date()
+  const cases: Array<{ status: string; title: string; severity: 'warning' | 'error' }> = [
+    { status: 'low_paper', title: '纸张或墨粉不足', severity: 'warning' },
+    { status: 'unknown', title: '打印机状态读取不到', severity: 'error' },
+    { status: 'paper_empty', title: '打印机缺纸', severity: 'warning' },
+    { status: 'offline', title: '打印机离线', severity: 'error' },
+  ]
+  for (const { status, title, severity } of cases) {
+    const service = new AdminOpsService(mockOpsPrisma([{
+      id: `term_vop_label_${status}`,
+      terminalCode: `VOP-LABEL-${status}`,
+      registeredAt: now,
+      heartbeats: [{ createdAt: now, printerStatus: status }],
+    }]))
+    const alert = (await service.listDerivedAlerts()).data.find((item) => item.type === 'printer_issue')
+    if (!alert) fail(`3a2. 打印机状态 ${status} 没有产生 printer_issue 告警`)
+    if (!alert.title.includes(title) || alert.title.includes('状态异常(')) {
+      fail(`3a2. 打印机状态 ${status} 的标题应含「${title}」且不落兜底，实际「${alert.title}」`)
+    }
+    if (alert.severity !== severity) fail(`3a2. 打印机状态 ${status} 的级别应为 ${severity}，实际 ${alert.severity}`)
+  }
+
+  const lastSeen = new Date('2026-09-28T08:00:00.000Z')
+  const offlineService = new AdminOpsService(mockOpsPrisma([{
+    id: 'term_vop_shanghai_time',
+    terminalCode: 'VOP-SHANGHAI-TIME',
+    registeredAt: lastSeen,
+    heartbeats: [{ createdAt: lastSeen, printerStatus: 'ready' }],
+  }]))
+  const offline = (await offlineService.listDerivedAlerts()).data.find((item) => item.type === 'terminal_offline')
+  if (!offline || !offline.detail.includes('(2026-09-28 16:00)')) {
+    fail(`3a2. 离线告警里的心跳时间应按上海时间写 2026-09-28 16:00，实际「${offline?.detail}」`)
+  }
+  if (offline.occurredAt !== lastSeen.toISOString() || offline.episodeToken !== offlineEpisodeToken(lastSeen)) {
+    fail('3a2. 改时区只许动文案：occurredAt / episodeToken 必须仍按原 UTC 时刻算')
+  }
+  pass('3a2. low_paper（warning）/ unknown（error）有人话标题不落兜底；告警文案时间按上海时间，身份与 episode 不变')
+}
+
 async function verifyPendingFeedbackAlert(): Promise<void> {
   const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string }> = [
     { createdAt: new Date('2026-09-28T08:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: 'secret-phone', content: 'secret-content' },
@@ -149,6 +195,8 @@ async function verifyPendingFeedbackAlert(): Promise<void> {
   const alert = first.data.find((item) => item.type === 'feedback_pending')
   if (!alert || !alert.detail.includes('共 2 条')) fail('3c. 待处理 AI 内容投诉告警缺失，或把打印问题、已关闭工单也算进去了')
   if (alert && alert.occurredAt !== '2026-09-28T08:00:00.000Z') fail('3c. 告警时间不是最早一条待处理 AI 内容投诉的提交时间')
+  // 文案时间按上海时间（UTC 08:00 → 16:00），与意见反馈页显示的提交时间一致，不再差 8 小时。
+  if (alert && !alert.detail.includes('最早提交于 2026-09-28 16:00')) fail(`3c. 告警文案里的最早提交时间应按上海时间写，实际「${alert.detail}」`)
   const encoded = JSON.stringify(alert)
   if (encoded.includes('secret-phone') || encoded.includes('secret-content')) fail('3c. 告警泄露手机号或投诉正文')
   // 提醒时机：答复较早的一条不换 episode（不打扰已确认的告警）；有新投诉进来才换（重新提醒）。
@@ -258,6 +306,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPrinterStatusLabelsAndShanghaiTime()
   await verifyPendingFeedbackAlert()
   await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return

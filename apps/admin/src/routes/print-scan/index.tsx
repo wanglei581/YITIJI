@@ -4,29 +4,25 @@
 //   任务中心   — print/scan/document_process 真实聚合；photo/copy/材料包/格式转换/
 //               签章无数据模型，如实显示"未上线"，不伪造行数据。
 //   设备能力   — 终端 × 能力键开关（fail-closed：仅 available 对普通用户开放），
-//               终端 Agent 版本/降级/打印机状态为心跳真实值。
+//               终端 Agent 版本/降级/打印机状态为心跳真实值。实现在 ./CapabilityCenter.tsx。
 //   商业化控制 — 定价/权益复用既有 billing、benefit 页面入口；补贴标签与退款
 //               异常工作流当前未建设，如实标注。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
+import { CapabilityCenter } from './CapabilityCenter'
 import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
-import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 import {
   adminPrintScanService,
-  DEPRECATED_CAPABILITY_ALIAS,
   type AdminPrintScanTaskDetail,
   type AdminPrintScanTaskItem,
   type AdminPrintScanTaskPage,
-  type PrintScanCapabilityKey,
-  type PrintScanCapabilityStatus,
   type PrintScanTaskType,
-  type TerminalCapabilityView,
 } from '../../services/api/printScan'
 
 // ─── 展示映射 ─────────────────────────────────────────────────────────────────
@@ -39,7 +35,7 @@ const TASK_TYPE_TABS: { value: PrintScanTaskType; label: string; implemented: bo
   { value: 'copy', label: '复印', implemented: false },
   { value: 'material_pack', label: '材料包', implemented: false },
   { value: 'format_conversion', label: '格式转换', implemented: false },
-  { value: 'signature_stamp', label: '签名盖章', implemented: false },
+  { value: 'signature_stamp', label: '签名', implemented: false },
 ]
 
 const TASK_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'info' | 'default'; label: string }> = {
@@ -93,40 +89,6 @@ const CLOSE_UNPAID_BLOCK_REASON_LABELS: Record<NonNullable<Extract<AdminPrintSca
   order_not_unpaid: '关联订单已不是未支付状态',
   order_task_not_pending: '关联订单任务状态已变化',
   payment_attempt_exists: '订单已存在支付尝试，请先完成对账或退款处理',
-}
-
-const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
-  document_print: '文档打印',
-  phone_upload: '手机扫码上传',
-  cloud_upload: '云上传',
-  usb_import: 'U盘导入',
-  material_pack: '材料包',
-  scan: '材料扫描',
-  copy: '复印',
-  id_photo: '证件照',
-  format_convert: '格式转换',
-  // 未配置 = 关闭（2026-09-28 D3）：签名与印章共用一个图片位，试点先关，要开须逐台配成「可用」。
-  signature_stamp: '签名盖章（默认关闭）',
-  // 这两项未配置 = 拒绝（fail-closed）：必须在该终端真机验过彩色/双面出纸，
-  // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
-  color_print: '彩色打印（需真机验证）',
-  duplex_print: '自动双面（需真机验证）',
-}
-
-const CAPABILITY_STATUS_OPTIONS: { value: PrintScanCapabilityStatus; label: string }[] = [
-  { value: 'available', label: '可用（对用户开放）' },
-  { value: 'testing', label: '测试中（仅运维可见）' },
-  { value: 'maintenance', label: '维护中' },
-  { value: 'unsupported', label: '不支持' },
-  { value: 'not_verified', label: '未验收' },
-]
-
-const CAPABILITY_STATUS_BADGE: Record<PrintScanCapabilityStatus, { badge: 'success' | 'error' | 'warning' | 'info' | 'default'; label: string }> = {
-  available: { badge: 'success', label: '可用' },
-  testing: { badge: 'info', label: '测试中' },
-  maintenance: { badge: 'warning', label: '维护中' },
-  unsupported: { badge: 'default', label: '不支持' },
-  not_verified: { badge: 'warning', label: '未验收' },
 }
 
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
@@ -507,228 +469,6 @@ function TaskDetailBody({
         </p>
       )}
     </div>
-  )
-}
-
-// ─── 设备能力 ─────────────────────────────────────────────────────────────────
-
-function CapabilityCenter() {
-  const [terminals, setTerminals] = useState<AdminTerminalRecord[]>([])
-  const [terminalId, setTerminalId] = useState('')
-  const [capabilities, setCapabilities] = useState<TerminalCapabilityView[] | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [savingKey, setSavingKey] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const terminalIdRef = useRef(terminalId)
-  const saveSeq = useRef(0)
-  terminalIdRef.current = terminalId
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const res = await getTerminals()
-        setTerminals(res.terminals)
-        if (res.terminals.length > 0) setTerminalId(res.terminals[0]!.id)
-        else setLoading(false)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : '终端列表加载失败')
-        setLoading(false)
-      }
-    })()
-  }, [])
-
-  // 请求序号防竞态：快速切换终端时，A 终端的慢响应不得覆盖 B 终端的列表
-  // （否则后续保存会把 A 的状态误写到 B）。
-  const capSeq = useRef(0)
-  const loadCapabilities = useCallback(async (tid: string) => {
-    const seq = ++capSeq.current
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await adminPrintScanService.listCapabilities(tid)
-      if (seq !== capSeq.current) return
-      setCapabilities(res.capabilities)
-    } catch (e) {
-      if (seq !== capSeq.current) return
-      setError(e instanceof Error ? e.message : '能力配置加载失败')
-    } finally {
-      if (seq === capSeq.current) setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // 终端切换使 A 的所有保存回包失效，并清掉 A 的保存中/错误 UI。
-    saveSeq.current += 1
-    setSavingKey(null)
-    setSaveError(null)
-    if (terminalId) void loadCapabilities(terminalId)
-  }, [terminalId, loadCapabilities])
-
-  const selected = useMemo(() => terminals.find((t) => t.id === terminalId) ?? null, [terminals, terminalId])
-
-  const switchTerminal = (nextTerminalId: string) => {
-    if (nextTerminalId === terminalId) return
-    // 同一事件帧内先清掉 A 的 UI；effect 仍作为异步回包的二道防线。
-    saveSeq.current += 1
-    capSeq.current += 1
-    terminalIdRef.current = nextTerminalId
-    setSavingKey(null)
-    setSaveError(null)
-    setCapabilities(null)
-    setLoading(true)
-    setTerminalId(nextTerminalId)
-  }
-
-  const save = async (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => {
-    if (!terminalId || savingKey) return
-    const requestedTerminalId = terminalId
-    const requestSeq = ++saveSeq.current
-    const isCurrentSaveRequest = () =>
-      saveSeq.current === requestSeq && terminalIdRef.current === requestedTerminalId
-    setSavingKey(key)
-    setSaveError(null)
-    try {
-      const res = await adminPrintScanService.updateCapability(requestedTerminalId, key, { status, note: note || undefined })
-      if (!isCurrentSaveRequest()) return
-      setCapabilities((prev) => prev?.map((c) => (c.capabilityKey === key ? res.capability : c)) ?? null)
-    } catch (e) {
-      if (isCurrentSaveRequest()) {
-        setSaveError(e instanceof Error ? e.message : '保存失败')
-      }
-    } finally {
-      if (isCurrentSaveRequest()) {
-        setSavingKey(null)
-      }
-    }
-  }
-
-  if (error) return <ErrorState title="加载失败" message={error} onRetry={() => { if (terminalId) void loadCapabilities(terminalId) }} />
-  if (terminals.length === 0 && !loading) {
-    return <EmptyState title="暂无终端" description="尚无已注册终端，注册后可在此配置能力开关。" />
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={terminalId}
-          onChange={(e) => switchTerminal(e.target.value)}
-          className="h-9 rounded-lg border border-neutral-900/15 bg-surface px-3 text-[13px] font-bold text-neutral-800"
-        >
-          {terminals.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.displayName ?? t.terminalCode}（{t.terminalCode}）
-            </option>
-          ))}
-        </select>
-        {selected && (
-          <span className="text-[12px] text-neutral-500">
-            Agent {selected.agentVersion ?? '版本未知'} ·{' '}
-            {selected.online ? (selected.agentStatus === 'agent_degraded' ? 'Agent 降级' : '在线') : '离线'} · 打印机{' '}
-            {selected.printerStatus ?? '状态未知'}
-            {selected.localTaskDatabaseAvailable === false ? ' · 本地任务库不可用' : ''}
-          </span>
-        )}
-      </div>
-
-      <p className="text-[12px] leading-relaxed text-neutral-500">
-        fail-closed 口径：只有「可用」状态对普通用户开放正式任务；「测试中」仅运维语境可见；其余状态一律在
-        Kiosk 上不可用。彩色、自动双面、签名盖章未配置即关闭；其余未配置的能力由 Kiosk 按各自保守默认处理。配置后以此处为准。
-      </p>
-
-      {saveError && <div className="rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{saveError}</div>}
-
-      {loading ? (
-        <LoadingState text="正在加载能力配置" />
-      ) : capabilities ? (
-        <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
-          <table className="w-full min-w-[720px] text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-neutral-900/10 bg-neutral-50/90 text-[12px] text-neutral-500">
-                <th className="px-4 py-2.5 font-bold">能力</th>
-                <th className="px-4 py-2.5 font-bold">当前状态</th>
-                <th className="px-4 py-2.5 font-bold">调整为</th>
-                <th className="px-4 py-2.5 font-bold">备注（用户可见）</th>
-                <th className="px-4 py-2.5 font-bold">更新时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {capabilities.map((cap) => (
-                <CapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={save} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function CapabilityRow({
-  cap,
-  saving,
-  onSave,
-}: {
-  cap: TerminalCapabilityView
-  saving: boolean
-  onSave: (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => void
-}) {
-  const [status, setStatus] = useState<PrintScanCapabilityStatus>(cap.status)
-  const [note, setNote] = useState(cap.note ?? '')
-  useEffect(() => {
-    setStatus(cap.status)
-    setNote(cap.note ?? '')
-  }, [cap])
-
-  const meta = CAPABILITY_STATUS_BADGE[cap.status]
-  const dirty = status !== cap.status || (note.trim() || '') !== (cap.note ?? '')
-
-  return (
-    <tr className="border-b border-neutral-900/5 last:border-b-0">
-      <td className="px-4 py-2.5 font-bold text-neutral-800">
-        {CAPABILITY_LABELS[cap.capabilityKey]}
-        {DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey] && (
-          <span className="ml-1.5 rounded bg-neutral-900/5 px-1.5 py-0.5 text-[11px] font-normal text-neutral-500">
-            已弃用，等同「{CAPABILITY_LABELS[DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey]!]}」
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-2.5">
-        <StatusBadge status={meta.badge} label={cap.configured ? meta.label : `${meta.label}（未配置）`} />
-      </td>
-      <td className="px-4 py-2.5">
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value as PrintScanCapabilityStatus)}
-          className="h-8 rounded-lg border border-neutral-900/15 bg-surface px-2 text-[12.5px] text-neutral-800"
-        >
-          {CAPABILITY_STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </td>
-      <td className="px-4 py-2.5">
-        <input
-          value={note}
-          maxLength={200}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="将展示给一体机用户，如：送修中"
-          className="h-8 w-44 rounded-lg border border-neutral-900/15 bg-surface px-2 text-[12.5px] text-neutral-800"
-        />
-      </td>
-      <td className="px-4 py-2.5 text-[12px] text-neutral-500">
-        <span className="mr-2">{fmt(cap.updatedAt)}</span>
-        <button
-          type="button"
-          disabled={!dirty || saving}
-          onClick={() => onSave(cap.capabilityKey, status, note.trim())}
-          className="rounded-lg bg-primary-700 px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-40"
-        >
-          {saving ? '保存中…' : '保存'}
-        </button>
-      </td>
-    </tr>
   )
 }
 

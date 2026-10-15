@@ -1,8 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MessageSquareIcon, RefreshCwIcon, SendIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from './feedbackSla'
+import { DetailSla, FeedbackListChips } from './FeedbackSlaBadges'
 import {
   memberFeedbackAdminApi,
   type AdminFeedbackTicketDetail,
@@ -64,6 +67,14 @@ const CATEGORY_LABEL: Record<FeedbackCategory, string> = {
   ai_content: 'AI 内容投诉',
 }
 
+function isCategory(value: string | null): value is FeedbackCategory {
+  return CATEGORIES.some((item) => item.value !== 'all' && item.value === value)
+}
+
+function isStatus(value: string | null): value is FeedbackStatus {
+  return STATUSES.some((item) => item.value !== 'all' && item.value === value)
+}
+
 const REPLY_SENDER_LABEL: Record<AdminFeedbackTicketDetail['replies'][number]['senderType'], string> = {
   user: '用户',
   admin: '管理员',
@@ -78,7 +89,8 @@ function fmt(iso: string): string {
  * 提交方标识。一体机匿名工单（PR #612）没有账号归属，`phoneMasked` / `nickname`
  * 服务端一律返回 null 且不编造占位值；此前这里直接渲染 `{item.phoneMasked}`，
  * 匿名工单会渲染成空白并留下一个孤立的分隔点。
- * 匿名工单改为标注来源终端，让运营知道该去哪台机器现场处置——它无法回复也无法推通知。
+ * 匿名工单改为标注来源终端，让运营知道该去哪台机器现场处置——它没有账号可通知，
+ * 后台只能记录处理结果（用户看不到）。
  */
 function submitterLabel(item: Pick<AdminFeedbackTicketItem, 'submitterType' | 'phoneMasked' | 'nickname' | 'terminalId'>): string {
   if (item.submitterType === 'anonymous_kiosk') {
@@ -92,8 +104,21 @@ function brief(text: string): string {
 }
 
 export default function MemberFeedbackPage() {
-  const [status, setStatus] = useState<FeedbackStatus | 'all'>('all')
-  const [category, setCategory] = useState<FeedbackCategory | 'all'>('all')
+  // 状态与分类以地址栏为准：告警中心「去处理」带 ?category=ai_content 进来即是筛好的列表，
+  // 刷新或转发链接也不丢筛选。改筛选用 replace，不在浏览器历史里堆一串中间态。
+  const [searchParams, setSearchParams] = useSearchParams()
+  const statusParam = searchParams.get('status')
+  const categoryParam = searchParams.get('category')
+  const status: FeedbackStatus | 'all' = isStatus(statusParam) ? statusParam : 'all'
+  const category: FeedbackCategory | 'all' = isCategory(categoryParam) ? categoryParam : 'all'
+  const setFilter = (key: 'status' | 'category', value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value === 'all') next.delete(key)
+      else next.set(key, value)
+      return next
+    }, { replace: true })
+  }
   const [submitterType, setSubmitterType] = useState<FeedbackSubmitterType | 'all'>('all')
   const [items, setItems] = useState<AdminFeedbackTicketItem[]>([])
   const [total, setTotal] = useState(0)
@@ -163,8 +188,9 @@ export default function MemberFeedbackPage() {
     event.preventDefault()
     if (!detail) return
     const content = reply.trim()
+    const anonymous = detail.submitterType === 'anonymous_kiosk'
     if (!content) {
-      setMessage('请填写回复内容')
+      setMessage(anonymous ? '请填写处理结果' : '请填写回复内容')
       return
     }
     setSubmitting(true)
@@ -173,10 +199,10 @@ export default function MemberFeedbackPage() {
       const next = await memberFeedbackAdminApi.reply(detail.id, content)
       setDetail(next)
       setReply('')
-      setMessage('回复已发送')
+      setMessage(anonymous ? '处理记录已保存' : '回复已发送')
       await loadList()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '回复发送失败')
+      setMessage(error instanceof Error ? error.message : anonymous ? '处理记录保存失败' : '回复发送失败')
     } finally {
       setSubmitting(false)
     }
@@ -198,10 +224,12 @@ export default function MemberFeedbackPage() {
     }
   }
 
+  const anonymousDetail = detail?.submitterType === 'anonymous_kiosk'
+
   return (
     <Page
       title="意见反馈"
-      subtitle="查看用户对系统维护、设备服务、文件与打印处理的反馈，并记录回复"
+      subtitle="处理一体机「意见反馈」弹层（匿名提交）与会员在「我的 → 意见反馈」（一体机、小程序）提交的反馈：看详情、改状态、回复会员或记录处理结果"
       actions={
         <button
           type="button"
@@ -214,21 +242,24 @@ export default function MemberFeedbackPage() {
       }
     >
       <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-        页面只展示脱敏号码。回复内容请围绕设备状态、文件处理、打印服务和系统维护说明。
+        联系号码默认只显示脱敏号码；只有 AI 内容投诉可以查看完整号码，每次查看都会留痕。
+        AI 内容投诉须在 {AI_CONTENT_COMPLAINT_SLA_WORKDAYS} 个工作日内答复（提交当天不算，已扣除法定节假日）；还没答复的会同时出现在告警中心。
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
         <select
           value={status}
-          onChange={(event) => setStatus(event.target.value as FeedbackStatus | 'all')}
+          onChange={(event) => setFilter('status', event.target.value)}
           className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
+          aria-label="按状态筛选"
         >
           {STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
         <select
           value={category}
-          onChange={(event) => setCategory(event.target.value as FeedbackCategory | 'all')}
+          onChange={(event) => setFilter('category', event.target.value)}
           className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
+          aria-label="按分类筛选"
         >
           {CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
@@ -281,6 +312,7 @@ export default function MemberFeedbackPage() {
                       {STATUS_LABEL[item.status]}
                     </span>
                   </div>
+                  <FeedbackListChips item={item} categoryLabel={CATEGORY_LABEL[item.category]} />
                   <p className="mt-2 text-xs leading-relaxed text-neutral-500">{brief(item.content)}</p>
                 </button>
               ))}
@@ -315,8 +347,8 @@ export default function MemberFeedbackPage() {
                   {detail.submitterType === 'anonymous_kiosk' && (
                     <p className="mt-1 text-sm text-amber-700">
                       {detail.contactPhoneMasked
-                        ? '匿名工单没有账号归属：这里的回复不会送达。提交人留了手机号，请电话告知处理结果，再在回复里记下处理结果（不要写手机号）。'
-                        : '匿名工单没有账号归属：回复不会送达、也不会推通知，只能在该终端现场处置。'}
+                        ? '匿名工单没有账号归属，后台写的内容用户看不到。提交人留了手机号：请电话告知处理结果，再在下方「记录处理结果」里记下（不要写手机号）。'
+                        : '匿名工单没有账号归属，也没有留手机号，无法通知提交人：请到该终端现场处置，再在下方「记录处理结果」里记下。'}
                     </p>
                   )}
                 </div>
@@ -331,6 +363,8 @@ export default function MemberFeedbackPage() {
                   ))}
                 </select>
               </div>
+
+              <DetailSla detail={detail} />
 
               <div className="mt-4 rounded-lg border border-neutral-100 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-700">
                 {detail.content}
@@ -394,34 +428,40 @@ export default function MemberFeedbackPage() {
                 )}
               </div>
 
-              {/* 匿名一体机工单没有 endUser 关联行，回复无处送达。不渲染输入框，
-                  而不是渲染一个点了没结果的按钮——按 CLAUDE.md §9「不伪造能力」。 */}
-              {detail.submitterType === 'anonymous_kiosk' ? (
-                <div className="mt-5 rounded-lg border border-dashed border-neutral-200 px-4 py-6 text-sm text-neutral-500">
-                  本工单为一体机匿名提交，没有可送达的账号，因此不提供回复入口。
-                  请在上方更新状态以记录处置结果。
-                </div>
-              ) : (
-                <form onSubmit={(event) => void submitReply(event)} className="mt-5">
-                  <label className="text-sm font-semibold text-neutral-900">回复用户</label>
-                  <textarea
-                    value={reply}
-                    onChange={(event) => setReply(event.target.value)}
-                    disabled={detail.status === 'closed' || submitting}
-                    className="mt-2 min-h-[120px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-neutral-50"
-                    maxLength={500}
-                    placeholder="填写设备状态、文件处理、打印服务或系统维护说明"
-                  />
-                  <button
-                    type="submit"
-                    disabled={detail.status === 'closed' || submitting}
-                    className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
-                  >
-                    <SendIcon className="h-4 w-4" />
-                    {submitting ? '发送中…' : '发送回复'}
-                  </button>
-                </form>
-              )}
+              {/* 匿名一体机工单没有 endUser 关联行：写进来的内容不会送达、也不推通知（服务端
+                  addAdminReply 只对有账号的工单发通知）。所以匿名工单的表单不叫「回复用户」，
+                  而是「记录处理结果」，并把「用户看不到」写在表单上 —— CLAUDE.md §9「不伪造能力」。 */}
+              <form onSubmit={(event) => void submitReply(event)} className="mt-5">
+                <label htmlFor="feedback-reply" className="text-sm font-semibold text-neutral-900">
+                  {anonymousDetail ? '记录处理结果' : '回复用户'}
+                </label>
+                <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                  {anonymousDetail
+                    ? '匿名工单没有账号，这条记录用户看不到；电话告知后在这里记下处理结果，不要写手机号。'
+                    : '会员会在「我的 → 意见反馈」看到这条回复，并收到一条消息通知。'}
+                </p>
+                <textarea
+                  id="feedback-reply"
+                  value={reply}
+                  onChange={(event) => setReply(event.target.value)}
+                  disabled={detail.status === 'closed' || submitting}
+                  className="mt-2 min-h-[120px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-neutral-50"
+                  maxLength={500}
+                  placeholder={anonymousDetail
+                    ? '例如：已电话告知提交人问题原因和处理方式；或到现场处置后的结果'
+                    : '写给用户的处理说明：问题原因、已经做了什么、接下来怎么办'}
+                />
+                <button
+                  type="submit"
+                  disabled={detail.status === 'closed' || submitting}
+                  className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
+                >
+                  <SendIcon className="h-4 w-4" />
+                  {anonymousDetail
+                    ? (submitting ? '保存中…' : '保存处理记录')
+                    : (submitting ? '发送中…' : '发送回复')}
+                </button>
+              </form>
             </div>
           )}
         </Card>
