@@ -62,7 +62,7 @@ export function MaterialsTabEditor({
       setUploadOpen(false)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '活动资料没有上传，请检查文件后重试'))
     } finally {
       setSaving(false)
     }
@@ -95,7 +95,7 @@ export function MaterialsTabEditor({
       setEditing(null)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '活动资料没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }
@@ -108,7 +108,7 @@ export function MaterialsTabEditor({
       await fairsAdminService.publishMaterial(fairId, m.id, m.publishStatus === 'published' ? 'unpublish' : 'publish')
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '活动资料发布状态没有更新，请稍后重试'))
     } finally {
       setBusyId(null)
     }
@@ -121,7 +121,7 @@ export function MaterialsTabEditor({
       await fairsAdminService.deleteMaterial(fairId, materialId)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '活动资料没有删除，请稍后重试'))
     } finally {
       setBusyId(null)
     }

@@ -145,6 +145,40 @@ export async function verifyUserClosure({ root, pass, fail, presentationModule }
     if (code === 'CLOSURE_BLOCKED_BY_OPEN_ORDERS') check(text(tree).includes('ORD-1') && text(tree).includes('退款中'), '阻塞提示实际列出订单号与中文状态')
   }
   const sharedNow = read('../../packages/shared/src/types/memberPrivacy.ts')
-  check(read('src/routes/privacy-requests/index.tsx').includes('ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM as ADMIN_MEMBER_DATA_REQUEST_SCOPE') && sharedNow.includes('账号注销由管理员在用户管理页执行'), '隐私工单采用管理员专用新事实文案')
+  const privacyPage = read('src/routes/privacy-requests/index.tsx')
+  const privacyCopy = load(sharedNow, {})
+  check(privacyPage.includes('ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM as ADMIN_MEMBER_DATA_REQUEST_SCOPE') && sharedNow.includes('账号注销由管理员在用户管理页执行'), '隐私工单采用管理员专用新事实文案')
+  for (const stale of ['暂不开放在线处理', '法务矩阵尚未签字', '没有处理这类请求的入口', '请联系法务团队']) {
+    check(!privacyPage.includes(stale), `隐私请求页不得保留过时口径：${stale}`)
+  }
+  const privacySource = ts.createSourceFile('privacy-requests/index.tsx', privacyPage, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let deleteHint
+  const findHint = (node) => {
+    if (ts.isVariableDeclaration(node) && node.name.getText(privacySource) === 'ADMIN_DELETE_REQUEST_HINT' && node.initializer && ts.isStringLiteral(node.initializer)) deleteHint = node.initializer.text
+    ts.forEachChild(node, findHint)
+  }
+  findHint(privacySource)
+  const sharedConfirm = privacyCopy.ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM
+  check(typeof deleteHint === 'string' && deleteHint === sharedConfirm.slice(0, sharedConfirm.indexOf('。') + 1) && sharedConfirm.startsWith(deleteHint), '注销详情局部常量逐字采用 shared 确认文案第一句')
+  const renderPrivacy = (requestType) => {
+    const detail = requestType ? { id: 'privacy-fixture', requestType, status: 'pending', phoneMasked: '138****1234', retryCount: 0 } : null
+    const states = ['', '', undefined, [], [], null, 'ready', detail, null, false, null]
+    let index = 0
+    const component = load(privacyPage, {
+      'react/jsx-runtime': { jsx, jsxs: jsx }, react: { useState: () => [states[index++], () => {}] },
+      '@ai-job-print/shared': { ...privacyCopy, formatDateTime: (value) => value ?? '—' },
+      '@ai-job-print/ui': { Drawer: 'Drawer', ConsoleTable: 'ConsoleTable', StatusBadge: 'StatusBadge' },
+      'lucide-react': { RefreshCwIcon: 'RefreshCwIcon', RotateCcwIcon: 'RotateCcwIcon', XCircleIcon: 'XCircleIcon' },
+      '../Page': { Page: 'Page' }, '../components/FilterChip': { FilterChip: 'FilterChip' },
+      '../../services/api/userErrorMessage': {}, '../../services/api/adminPrivacyRequests': {},
+    }).default
+    return component()
+  }
+  for (const requestType of ['delete', 'export', 'revoke_consent', null]) {
+    const hint = walk(renderPrivacy(requestType), (node) => node.props?.children === deleteHint)
+    check(Boolean(hint) === (requestType === 'delete'), `注销说明只在 delete 详情渲染（${requestType ?? '无详情'}）`)
+    if (hint) check(hint.props.className.includes('border-info/20 bg-info-bg') && hint.props.className.includes('text-info-fg') && !hint.props.className.includes('warning'), '注销说明沿用本页普通说明色')
+  }
+  pass('隐私注销详情无旧口径、与 shared 第一句同文，仅 delete 渲染普通说明')
   pass('注销筛选、隐私、字段校验、页内二次确认、错误/订单、真实 POST、mock 拒绝与失败保留内容行为')
 }

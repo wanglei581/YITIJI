@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyRoundIcon, MailIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   orgsAdminService,
   type AdminOrgAccount,
@@ -69,10 +70,7 @@ function messageForAccountError(error: unknown): string {
   if (error instanceof ApiHttpError && error.code === 'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED') {
     return '该操作会使机构没有有效登录账号。请先新增并启用接替账号后再移除。'
   }
-  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-    return error.message
-  }
-  return '移除账号失败，请重试。'
+  return userMessageOf(error, '移除账号失败，请稍后重试。')
 }
 
 export function PartnerAccountManager({

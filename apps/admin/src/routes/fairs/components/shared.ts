@@ -84,6 +84,6 @@ export function localInputToIso(value: string): string {
 export const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
-export function errMsg(e: unknown): string {
-  return userMessageOf(e, '操作失败，请重试')
+export function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }

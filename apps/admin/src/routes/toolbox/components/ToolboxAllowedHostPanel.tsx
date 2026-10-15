@@ -3,6 +3,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { Button, Card, StatusBadge } from '@ai-job-print/ui'
 import { toolboxService, type ToolboxAllowedHostRecord } from '../../../services/api/toolbox'
 import { HOST_PURPOSE_OPTIONS, HOST_REVIEW_OPTIONS, STATUS_LABELS } from '../constants'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 function badgeStatus(status: string): 'success' | 'warning' | 'error' | 'default' {
   if (status === 'active') return 'success'
@@ -35,7 +36,7 @@ export function ToolboxAllowedHostPanel({
       setMessage(success)
       onRefresh()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '操作失败')
+      setMessage(userMessageOf(error, '域名白名单没有保存，请检查后重试'))
     }
   }
 

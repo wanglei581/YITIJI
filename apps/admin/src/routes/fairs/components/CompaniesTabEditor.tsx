@@ -92,7 +92,7 @@ export function CompaniesTabEditor({
       setEditing(null)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '参会企业没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }
@@ -105,7 +105,7 @@ export function CompaniesTabEditor({
       await fairsAdminService.deleteCompany(fairId, companyId)
       onChanged()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '参会企业没有删除，请稍后重试'))
     } finally {
       setBusyId(null)
     }

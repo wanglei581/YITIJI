@@ -11,7 +11,7 @@ import {
 import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule, downloadExcelTemplate } from '../../services/api'
 import type { ExcelPreviewResult, PartnerImportDataType } from '../../services/api'
 import { useCapability } from '../../services/capabilities'
-
+import { userMessageOf } from '../../services/api/userErrorMessage'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -142,7 +142,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     try {
       await downloadExcelTemplate(dataType)
     } catch (e) {
-      setError((e as Error).message || '模板下载失败，请稍后重试')
+      setError(userMessageOf(e, '模板下载失败，请稍后重试'))
     } finally {
       setDownloadingTemplate(false)
     }
@@ -182,7 +182,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
       setMapping(auto)
       setStep('mapping')
     } catch (e) {
-      setError((e as Error).message || '文件解析失败，请确认是有效的 Excel (.xlsx) 或 CSV (.csv) 文件')
+      setError(userMessageOf(e, '文件解析失败，请确认是有效的 Excel (.xlsx) 或 CSV (.csv) 文件'))
     } finally {
       setLoading(false)
     }
@@ -211,7 +211,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
       setPreview(result)
       setStep('preview')
     } catch (e) {
-      setError((e as Error).message || '预览生成失败，请检查字段映射后重试')
+      setError(userMessageOf(e, '预览生成失败，请检查字段映射后重试'))
     } finally {
       setLoading(false)
     }
@@ -226,7 +226,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
       setImportedCount(result.imported)
       setStep('done')
     } catch (e) {
-      setError((e as Error).message || '确认导入失败，请稍后重试')
+      setError(userMessageOf(e, '确认导入失败，请稍后重试'))
     } finally {
       setLoading(false)
     }

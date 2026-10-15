@@ -26,6 +26,7 @@ import {
   BriefcaseBusinessIcon,
 } from 'lucide-react'
 import { getAiUsage, getAiLogs, getAdminJobQualitySummary } from '../../services/api'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import type { AdminAiUsage, AdminAiLogEntry, AiOperation, JobSourceQualitySummary } from '../../services/api'
 import { AiAccessSwitchesPanel } from './AiAccessSwitchesPanel'
 import { AiUsagePanel } from './AiUsagePanel'
@@ -69,6 +70,7 @@ export default function AiServicesPage() {
   const [logs,         setLogs]         = useState<AdminAiLogEntry[]>([])
   const [logsTotal,    setLogsTotal]    = useState(0)
   const [logsOffset,   setLogsOffset]   = useState(0)
+  const [logsPageSize, setLogsPageSize] = useState(LOGS_PAGE_SIZE)
   const [logsLoading,  setLogsLoading]  = useState(true)
   const [logsError,    setLogsError]    = useState<string | null>(null)
   const [qualitySummary, setQualitySummary] = useState<JobSourceQualitySummary[]>([])
@@ -112,29 +114,30 @@ export default function AiServicesPage() {
         const result = await getAiLogs({
           operation: opFilter === 'all' ? undefined : opFilter,
           status: statusFilter === 'all' ? undefined : statusFilter,
-          limit: LOGS_PAGE_SIZE,
+          limit: logsPageSize,
           offset: logsOffset,
         })
         if (cancelled) return
         setLogs(result.entries)
         setLogsTotal(result.total)
         setLogsError(null)
-      } catch {
+      } catch (error: unknown) {
         if (cancelled) return
         // 失败时清空并明说加载失败，绝不留着上一次筛选的结果冒充本次结果。
         setLogs([])
         setLogsTotal(0)
-        setLogsError('调用日志加载失败，请重试')
+        setLogsError(userMessageOf(error, '调用日志加载失败，请重试'))
       } finally {
         if (!cancelled) setLogsLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [opFilter, statusFilter, logsOffset])
+  }, [opFilter, statusFilter, logsOffset, logsPageSize])
 
   // 换筛选条件必须回到第一页，否则会停在旧偏移量上、看起来像「筛不出东西」。
   const applyOpFilter = (next: OpFilter) => { setOpFilter(next); setLogsOffset(0) }
   const applyStatusFilter = (next: StatusFilter) => { setStatusFilter(next); setLogsOffset(0) }
+  const applyLogsPageSize = (size: number) => { setLogsPageSize(size); setLogsOffset(0) }
 
   if (loading) {
     return (
@@ -418,8 +421,8 @@ export default function AiServicesPage() {
         </section>
       )}
 
-      <AiLogsTable logs={logs} logsTotal={logsTotal} logsOffset={logsOffset} logsLoading={logsLoading} logsError={logsError}
-        opFilter={opFilter} statusFilter={statusFilter} applyOpFilter={applyOpFilter} applyStatusFilter={applyStatusFilter} setLogsOffset={setLogsOffset} />
+      <AiLogsTable logs={logs} logsTotal={logsTotal} logsOffset={logsOffset} logsPageSize={logsPageSize} logsLoading={logsLoading} logsError={logsError}
+        opFilter={opFilter} statusFilter={statusFilter} applyOpFilter={applyOpFilter} applyStatusFilter={applyStatusFilter} setLogsOffset={setLogsOffset} onPageSizeChange={applyLogsPageSize} />
 
       {/* ── 合规说明 ──────────────────────────────────── */}
       <section aria-label="合规说明" className="mt-8">

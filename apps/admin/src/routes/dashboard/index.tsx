@@ -41,6 +41,7 @@ import { RecentPrintTasks } from './RecentPrintTasks'
 import { RecentActivity } from './RecentActivity'
 import { DashboardDeviceStatus } from './DashboardDeviceStatus'
 import { fileAttention, buildTodoRows, buildAlertRows } from './dashboardRows'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ export default function DashboardPage() {
         if (result.status === 'fulfilled') {
           patchBlock(key, { value: result.value as never, error: null, loading: false })
         } else {
-          const message = result.reason instanceof Error ? result.reason.message : '加载失败'
+          const message = userMessageOf(result.reason, '这一块数据没有加载出来，请稍后重试')
           patchBlock(key, { value: null, error: message, loading: false })
         }
       })

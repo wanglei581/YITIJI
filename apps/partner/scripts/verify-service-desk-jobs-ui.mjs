@@ -370,7 +370,7 @@ const expectedUnpublishBlock = `const handleUnpublish = async (job: PartnerJobRe
     showNotice('岗位已下架，终端将不再展示。')
     void refresh()
   } catch (e) {
-    showNotice(errMsg(e), true)
+    showNotice(errMsg(e, '岗位下架失败，请稍后重试'), true)
   } finally {
     setBusyId(null)
   }
@@ -411,7 +411,7 @@ check(
   saveBlock.includes("setNotice('岗位已录入,进入待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。')") &&
     saveBlock.includes("setNotice('修改已保存。该岗位已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')") &&
     count(saveBlock, 'setEditing(null)') === 1 &&
-    /setEditing\(null\)\s*void refresh\(\)\s*\} catch \(e\) \{\s*setFormError\(errMsg\(e\)\)\s*\} finally \{\s*setSaving\(false\)\s*\}\s*\}/.test(
+    /setEditing\(null\)\s*void refresh\(\)\s*\} catch \(e\) \{\s*setFormError\(errMsg\(e, '岗位没有保存，请检查后重试'\)\)\s*\} finally \{\s*setSaving\(false\)\s*\}\s*\}/.test(
       compact(saveBlock),
     ),
   'save closes and notifies only on success; failure only exposes formError and keeps the drawer open',

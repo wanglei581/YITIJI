@@ -109,9 +109,19 @@ expect(!existsSync(resolve(root, 'src/routes/partners/PartnerAccountDeletionDial
 for (const forbidden of ['localStorage', 'sessionStorage', 'console.log', 'console.error', 'data-ticket']) {
   expect(!`${hook}\n${dialog}\n${steps}`.includes(forbidden), `敏感操作 UI 不得使用 ${forbidden}`)
 }
-expectContains(auth, "fetch(`${API_BASE_URL}/auth/logout`", '登出必须 best-effort 调用服务端撤销近期验证')
+expectContains(auth, "fetch(`${API_BASE_URL}/auth/logout`", '登出必须 best-effort 调用服务端撤销当前会话')
 expectContains(auth, 'const token = getToken()', '登出必须先捕获当前 bearer token')
-expectContains(auth, 'clearAuth()', '登出必须立即清理本地会话')
+expectContains(auth, 'keepalive: true', '登出请求必须 keepalive，页面跳转后仍能发出')
+expectContains(auth, 'Promise.race', '登出最多等待服务端回应，超时后继续本地退出')
+expectContains(auth, 'clearAuth()', '登出必须清理本地会话')
+const logoutSource = auth.slice(auth.indexOf('export function logout'))
+const logoutTokenAt = logoutSource.indexOf('const token = getToken()')
+const logoutFetchAt = logoutSource.indexOf('fetch(`${API_BASE_URL}/auth/logout`')
+const logoutClearAt = logoutSource.indexOf('clearAuth()')
+expect(
+  logoutTokenAt !== -1 && logoutTokenAt < logoutFetchAt && logoutFetchAt < logoutClearAt,
+  '登出必须先取 token、发出请求，再清本地会话',
+)
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`  FAIL ${failure}`)

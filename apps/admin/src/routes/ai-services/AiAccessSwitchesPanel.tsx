@@ -44,7 +44,7 @@ type Change =
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'forbidden' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; text: string }
   | { kind: 'ready'; config: AiAccessConfig }
 
 type BadgeTone = 'success' | 'warning' | 'error' | 'info' | 'default'
@@ -152,7 +152,7 @@ function consequenceOf(change: Change): string {
 
 function failureState(error: unknown): LoadState {
   if (error instanceof ApiHttpError && error.status === 403) return { kind: 'forbidden' }
-  return { kind: 'error', message: userMessageOf(error, '请稍后重试') }
+  return { kind: 'error', text: userMessageOf(error, '开关状态没有读到，请稍后重试') }
 }
 
 export function AiAccessSwitchesPanel() {
@@ -353,7 +353,7 @@ export function AiAccessSwitchesPanel() {
       )}
       {load.kind === 'error' && (
         <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg" role="alert">
-          AI 服务开关读取失败：{load.message}
+          AI 服务开关读取失败：{load.text}
         </p>
       )}
       {load.kind === 'ready' && (

@@ -91,7 +91,7 @@ const MOCK_PROFILE: PartnerOrgProfile = {
   contact: '演示联系人',
   contactPhone: '0532-00000000',
   sceneTemplate: 'campus',
-  enabledModules: ['jobs', 'fairs', 'policies'],
+  enabledModules: ['print_scan', 'resume_service', 'policy_service', 'job_info', 'job_fair', 'external_apply_redirect'],
   enabled: true,
   contentTrustStatus: 'pending',
   contentTrustReason: null,

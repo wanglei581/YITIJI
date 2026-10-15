@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CircleAlertIcon, LockKeyholeIcon, ShieldCheckIcon, XIcon } from 'lucide-react'
 import { completeFirstAdminPasswordChange } from '../../services/auth'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface FirstAdminPasswordChangeModalProps {
   changeTicket: string
@@ -38,7 +39,7 @@ export function FirstAdminPasswordChangeModal({
     const result = await completeFirstAdminPasswordChange(changeTicket, newPassword)
     setBusy(false)
     if (!result.ok) {
-      setError(result.message || '首次改密失败，请返回登录后重试')
+      setError(userMessageOf(result, '首次改密失败，请返回登录后重试'))
       return
     }
     setNewPassword('')

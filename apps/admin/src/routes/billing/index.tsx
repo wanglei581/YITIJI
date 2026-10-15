@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { CheckIcon, RefreshCwIcon, XIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   adminBillingService,
   type AdminPriceConfigItem,
@@ -53,7 +54,7 @@ function PriceConfigSection() {
       const res = await adminBillingService.listPriceConfig()
       setItems(res.items)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载价目失败')
+      setError(userMessageOf(e, '价目加载失败，请稍后重试'))
     }
   }, [])
 
@@ -91,7 +92,7 @@ function PriceConfigSection() {
         })
         await load()
       } catch (e) {
-        setError(e instanceof Error ? e.message : '改价失败')
+        setError(userMessageOf(e, '改价失败，请检查后重试'))
       } finally {
         setSaving(null)
       }
@@ -124,7 +125,7 @@ function PriceConfigSection() {
           return next
         })
       } catch (e) {
-        setError(e instanceof Error ? e.message : '说明更新失败')
+        setError(userMessageOf(e, '价目说明没有更新，请稍后重试'))
       } finally {
         setSaving(null)
       }
@@ -147,7 +148,7 @@ function PriceConfigSection() {
         await adminBillingService.updatePriceConfig(item.serviceKey, { active: nextActive })
         await load()
       } catch (e) {
-        setError(e instanceof Error ? e.message : '启停失败')
+        setError(userMessageOf(e, '价目启停失败，请稍后重试'))
       } finally {
         setSaving(null)
       }
@@ -263,7 +264,7 @@ function ReconciliationSection() {
     try {
       setReport(await adminBillingService.reconciliation())
     } catch (e) {
-      setError(e instanceof Error ? e.message : '对账失败')
+      setError(userMessageOf(e, '对账失败，请稍后重试'))
     } finally {
       setLoading(false)
     }

@@ -4,6 +4,7 @@ import { toolboxService, type ToolboxAdminAppView, type ToolboxAppVersion, type 
 import { formatCount } from '@ai-job-print/shared'
 import { ENTRY_TYPE_LABELS, BLOCK_REASON_LABELS, CATEGORY_OPTIONS, PRIORITY_OPTIONS, RISK_OPTIONS, STATUS_LABELS } from '../constants'
 import { runToolboxAction } from '../toolboxActionState'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 type EntryType = 'internal_route' | 'web_app' | 'qr_code' | 'mini_program_qr' | 'ai_skill'
 
@@ -67,7 +68,7 @@ export function ToolboxGovernancePanel({
     setVersionLoading(true)
     toolboxService.listVersions(selectedApp.appKey)
       .then(setVersions)
-      .catch((error) => setMessage(error instanceof Error ? error.message : '加载版本失败'))
+      .catch((error) => setMessage(userMessageOf(error, '版本列表加载失败，请稍后重试')))
       .finally(() => setVersionLoading(false))
   }
 
@@ -76,7 +77,7 @@ export function ToolboxGovernancePanel({
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setMessage('')
     const result = await runToolboxAction(action, success)
-    setMessage(result.message)
+    setMessage(userMessageOf(result, '百宝箱操作没有完成，请稍后重试'))
     if (!result.ok) return
     onRefresh()
     loadVersions()

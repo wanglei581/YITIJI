@@ -64,7 +64,7 @@ export function CreateOrgDrawer({ open, onClose, onCreated, showRecruitment }: {
       onCreated()
       onClose()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '机构没有创建成功，请检查后重试'))
     } finally {
       setSaving(false)
     }

@@ -11,6 +11,7 @@ import {
   type AdminBenefitType,
   type AdminEndUserSearchItem,
 } from '../../services/api/memberBenefitsAdmin'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   AI_QUOTA_GRANT_NOTE,
   AI_QUOTA_SERVICES,
@@ -103,7 +104,7 @@ export default function MemberBenefitsPage() {
       }
       await loadItems(user.endUserId)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '搜索会员失败，请重试')
+      setMessage(userMessageOf(error, '搜索会员失败，请稍后重试'))
       setState('error')
     }
   }
@@ -173,7 +174,7 @@ export default function MemberBenefitsPage() {
       setMessage('权益已撤销')
       await loadItems(selectedUser.endUserId)
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '撤销失败')
+      setMessage(userMessageOf(error, '权益撤销失败，请稍后重试'))
     }
   }
 

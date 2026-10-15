@@ -1,6 +1,7 @@
 import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { useRefreshable } from '@ai-job-print/refresh'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   createReleaseObservationPlan,
   getReleaseObservationPlans,
@@ -72,7 +73,7 @@ export function ReleaseObservationPanel({
       onNotice({ type: 'success', text: '观察计划已创建为草稿。它不会向终端下载、安装或控制服务。' })
       await refresh()
     } catch (error) {
-      onNotice({ type: 'error', text: error instanceof Error ? error.message : '创建观察计划失败' })
+      onNotice({ type: 'error', text: userMessageOf(error, '观察计划没有创建，请稍后重试') })
     } finally {
       setSaving(false)
     }
@@ -86,7 +87,7 @@ export function ReleaseObservationPanel({
       onNotice({ type: 'success', text: '观察计划状态已更新；终端不会执行安装动作。' })
       await refresh()
     } catch (error) {
-      onNotice({ type: 'error', text: error instanceof Error ? error.message : '更新观察计划失败' })
+      onNotice({ type: 'error', text: userMessageOf(error, '观察计划没有更新，请稍后重试') })
     }
   }
 

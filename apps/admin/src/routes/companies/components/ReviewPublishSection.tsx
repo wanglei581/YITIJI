@@ -26,7 +26,7 @@ export function ReviewPublishSection({ detail, onMutated, readOnly = false }: { 
       setRejectReason('')
       onMutated()
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '审核或发布没有完成，请稍后重试'))
     } finally {
       setBusy(false)
     }

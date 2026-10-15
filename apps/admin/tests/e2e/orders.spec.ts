@@ -159,4 +159,18 @@ test.describe('订单管理（mock 口径：有页数单与未记录页数单）
     await expect(page.getByText('页范围', { exact: true }).locator('..')).toContainText('未记录')
   })
 
+  test('待到机订单详情用中文状态，0 元单不提供退款', async ({ page }) => {
+    const guards = await openAuthed(page, '/orders')
+    await settleAdminPage(page, guards)
+    await page.getByRole('button', { name: '查看订单 ORD-20261006-RELEASE', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: '订单详情 · ORD-20261006-RELEASE' })).toBeVisible()
+    await expect(dialog.getByText('待到机').first()).toBeVisible()
+    await expect(dialog.getByText('已支付').first()).toBeVisible()
+    await expect(dialog.getByText('0 元订单无需退款')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '退款', exact: true })).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: '发起退款' })).toHaveCount(0)
+    expect(await dialog.innerText()).not.toContain('pending_release')
+  })
+
 })

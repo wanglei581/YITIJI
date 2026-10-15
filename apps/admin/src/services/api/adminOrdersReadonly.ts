@@ -278,6 +278,29 @@ const MOCK_UNRECORDED_DETAIL: AdminOrderReadonlyDetail = {
   payStatus: 'closed',
 }
 
+/** 小程序云打印已支付、尚未到机。实收为 0，详情应说明无需退款。 */
+const MOCK_RELEASE_DETAIL: AdminOrderReadonlyDetail = {
+  ...MOCK_DETAIL,
+  id: 'ord_mock_release',
+  orderNo: 'ORD-20261006-RELEASE',
+  payStatus: 'paid',
+  taskStatus: 'pending_release',
+  amountCents: 0,
+  billablePages: null,
+  copies: 1,
+  refundEligible: true,
+  refundRequired: false,
+  print: {
+    ...MOCK_DETAIL.print!,
+    status: 'pending_release',
+    copies: 1,
+    completedAt: null,
+  },
+  statusLogs: [
+    { fromStatus: 'pending_release', toStatus: 'printing', errorCode: null, createdAt: now() },
+  ],
+}
+
 /**
  * mock 模式下的可变订单态。
  *
@@ -292,12 +315,14 @@ let mockPaymentSource: AdminOrderMarkPaidSource | null = null
 const mockAdapter: AdminOrdersReadonlyService = {
   async list(params) {
     return {
-      items: [mockDetailState, MOCK_UNRECORDED_DETAIL],
-      pagination: { page: params.page, pageSize: params.pageSize, total: 2, totalPages: 1 },
+      items: [mockDetailState, MOCK_UNRECORDED_DETAIL, MOCK_RELEASE_DETAIL],
+      pagination: { page: params.page, pageSize: params.pageSize, total: 3, totalPages: 1 },
     }
   },
   async getById(id) {
-    return id === MOCK_UNRECORDED_DETAIL.id ? MOCK_UNRECORDED_DETAIL : mockDetailState
+    if (id === MOCK_UNRECORDED_DETAIL.id) return MOCK_UNRECORDED_DETAIL
+    if (id === MOCK_RELEASE_DETAIL.id) return MOCK_RELEASE_DETAIL
+    return mockDetailState
   },
   async markPaidOrder(_id, paymentSource) {
     // 复刻后端状态机：仅 unpaid 可入账；已 paid 同来源幂等回放，异来源冲突。

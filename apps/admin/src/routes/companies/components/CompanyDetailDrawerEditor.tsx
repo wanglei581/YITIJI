@@ -75,7 +75,7 @@ export function CompanyDetailDrawerEditor({
       setSaveSuccess('保存成功')
       onChanged()
     } catch (e) {
-      setSaveError(errMsg(e))
+      setSaveError(errMsg(e, '企业信息没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }

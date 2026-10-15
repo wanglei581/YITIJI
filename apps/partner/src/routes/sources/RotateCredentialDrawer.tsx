@@ -4,6 +4,7 @@ import { AlertTriangleIcon, CopyIcon } from 'lucide-react'
 import { formatDateTime, ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import type { PartnerDataSource, PartnerDataSourceCredentialRotationResult } from '../../services/api'
 import { rotateDataSourceCredential } from '../../services/api'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /**
  * 凭证轮换抽屉。
@@ -89,13 +90,13 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
             : code === 'DATA_SOURCE_ARCHIVED'
               ? '数据源已归档，无法轮换。请先取消归档'
               : code === 'CREDENTIAL_ROTATION_COOLDOWN'
-                ? (err as Error).message || '该数据源刚刚完成轮换，请稍后再试'
+                ? userMessageOf(err, '该数据源刚刚完成轮换，请稍后再试')
                 : code === 'CREDENTIAL_ROTATION_RATE_LIMITED'
-                  ? (err as Error).message || '轮换次数过多。紧急停止接收请归档该数据源'
+                  ? userMessageOf(err, '轮换次数过多。紧急停止接收请归档该数据源')
                   : code === 'CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED' || code === 'VALIDATION_FAILED'
                     ? '轮换未确认，已取消'
                     : code === 'WEBHOOK_SECRET_TOO_SHORT' || code === 'WEBHOOK_SECRET_LOW_ENTROPY'
-                      ? (err as Error).message || '自定义密钥强度不足'
+                      ? userMessageOf(err, '自定义密钥强度不足')
                       : code === 'CREDENTIAL_ROTATION_CONFLICT'
                         ? '该数据源刚刚已被轮换，请刷新后再试'
                         : '轮换失败，请检查登录状态或稍后重试',

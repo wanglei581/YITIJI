@@ -3,13 +3,14 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { XIcon } from 'lucide-react'
 import { API_MODE } from '../../services/api/client'
 import { legalDocsService, type LegalDocVersionDetail } from '../../services/api/legalDocs'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import { LegalDocPreview } from './LegalDocPreview'
 import { docTypeLabel } from './legalDocMeta'
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; doc: LegalDocVersionDetail }
-  | { status: 'error'; message: string }
+  | { status: 'error'; text: string }
 
 /** 「查看正文」：按一体机排版预览某一版本，可切原文。每次打开服务端都会记一条查看审计。 */
 export function LegalDocViewDrawer({ id, onClose }: { id: string; onClose: () => void }) {
@@ -21,7 +22,7 @@ export function LegalDocViewDrawer({ id, onClose }: { id: string; onClose: () =>
     legalDocsService
       .get(id)
       .then((doc) => { if (!cancelled) setState({ status: 'ready', doc }) })
-      .catch((e: Error) => { if (!cancelled) setState({ status: 'error', message: e.message || '正文加载失败' }) })
+      .catch((e: unknown) => { if (!cancelled) setState({ status: 'error', text: userMessageOf(e, '正文加载失败，请稍后重试') }) })
     return () => { cancelled = true }
   }, [id])
 
@@ -44,7 +45,7 @@ export function LegalDocViewDrawer({ id, onClose }: { id: string; onClose: () =>
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {state.status === 'loading' && <p className="py-16 text-center text-sm text-neutral-500">正文加载中…</p>}
           {state.status === 'error' && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">正文加载失败：{state.message}</div>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">正文加载失败：{state.text}</div>
           )}
           {state.status === 'ready' && (
             <>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { adminPrintScanService } from '../../services/api/printScan'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const MIN_REASON_LENGTH = 10
 const MAX_REASON_LENGTH = 500
@@ -43,7 +44,7 @@ export function CloseUnpaidPrintTaskForm({
       setOpen(false)
       await onClosed()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '取消失败，请重试')
+      setError(userMessageOf(e, '取消未支付任务失败，请检查原因后重试'))
     } finally {
       setBusy(false)
     }

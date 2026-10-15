@@ -12,6 +12,7 @@ import {
 } from '../../services/api/jobMaterials'
 import { JOB_MATERIAL_TYPE_LABELS } from './constants'
 import { TemplateDrawer } from './TemplateDrawer'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 export default function JobMaterialsPage() {
   const [page, setPage] = useState(1)
@@ -37,7 +38,7 @@ export default function JobMaterialsPage() {
         setError(null)
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '加载失败')
+        if (!cancelled) setError(userMessageOf(err, '模板列表加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -74,7 +75,7 @@ export default function JobMaterialsPage() {
       await setJobMaterialTemplatePublish(template.id, action)
       setReloadKey((key) => key + 1)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '发布状态更新失败')
+      setError(userMessageOf(err, '发布状态没有更新，请稍后重试'))
     } finally {
       setPublishBusyId(null)
     }

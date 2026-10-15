@@ -66,6 +66,19 @@ test('六列中文列表、尾号与悬停原值；长字段与递归脱敏在�
   await expect(page.getByText('起始时间（年/月/日 时:分）')).toBeVisible()
 })
 
+test('操作人有显示名时显示姓名，悬停仍是完整编号；没有显示名退回角色和尾号', async ({ page }) => {
+  await setup(page, [
+    { ...record, id: 'audit_named', actorDisplayName: '青岛职业技术学院 · 李老师', actorRole: 'partner' },
+    { ...record, id: 'audit_unnamed', actorDisplayName: null },
+  ])
+  const rows = page.locator('tbody tr')
+  await expect(rows.nth(0)).toContainText('青岛职业技术学院 · 李老师')
+  await expect(rows.nth(0).getByRole('button', { name: '查看审计详情：青岛职业技术学院 · 李老师' })).toHaveAttribute('title', actorId)
+  await expect(rows.nth(1)).toContainText('管理员 · 尾号 6p0ssy')
+  await rows.nth(0).getByRole('button', { name: '查看审计详情：青岛职业技术学院 · 李老师' }).click()
+  await expect(page.getByRole('dialog', { name: '审计日志详情' })).toContainText('青岛职业技术学院 · 李老师')
+})
+
 for (const payloadJson of ['{"password":"bad-secret"', '{"unknown":"unrecognized-secret"', '["private-raw"']) {
   test(`坏 JSON 不显示原文：${payloadJson}`, async ({ page }) => {
     await setup(page, [{ ...record, payloadJson }])

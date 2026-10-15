@@ -15,7 +15,9 @@ import { StatusBadge } from '@ai-job-print/ui'
 import { GlobeIcon, PlusIcon, XIcon } from 'lucide-react'
 import { getUser } from '../../services/auth'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import type { AuditLogRecord } from '../../services/api/audit'
 import { orgOfficialChannelsService, type VerifiedOfficialDomain } from '../../services/api/orgOfficialChannels'
+import { auditActorText } from '../audit/auditPresentation'
 import {
   OFFICIAL_DOMAIN_MAX,
   diffDomains,
@@ -152,7 +154,7 @@ export function OrgVerifiedDomainsPanel({
                 <li key={item.domain} className="px-3 py-2">
                   <span className="block font-mono text-sm text-neutral-800">{item.domain}</span>
                   <span className="mt-0.5 block text-[11px] text-neutral-500">
-                    登记于 {formatDateTime(item.verifiedAt)} · 登记人 <span className="font-mono">{item.verifiedBy}</span>（管理员账号 ID）
+                    登记于 {formatDateTime(item.verifiedAt)} · 登记人 <span title={item.verifiedBy}>{auditActorText({ actorRole: 'admin', actorId: item.verifiedBy } as AuditLogRecord)}</span>
                   </span>
                 </li>
               ))}

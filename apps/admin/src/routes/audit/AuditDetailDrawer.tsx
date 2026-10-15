@@ -11,7 +11,7 @@ function PayloadTerminalValue({ value, payload }: { value: unknown; payload: Rec
   return <span title={typeof value === 'string' ? value : undefined}>{auditTerminalText(value, payload)}</span>
 }
 
-function PayloadValue({ value }: { value: unknown }) {
+function PayloadValue({ value, fieldKey }: { value: unknown; fieldKey?: string }) {
   if (value === null) return <span>—</span>
   if (typeof value === 'boolean') return <span>{value ? '是' : '否'}</span>
   if (Array.isArray(value)) return <ul className="space-y-2">{value.map((item, i) => <li key={i}><PayloadValue value={item} /></li>)}</ul>
@@ -20,11 +20,14 @@ function PayloadValue({ value }: { value: unknown }) {
       {Object.entries(value).map(([key, item]) => (
         <div key={key} className="rounded-lg bg-neutral-50 p-3">
           <dt title={key} className="mb-1 text-xs text-neutral-500">{PAYLOAD_LABELS[key] ?? <>未登记字段 · <code className="text-[10px] text-neutral-400">{key}</code></>}</dt>
-          <dd className="break-words text-sm text-neutral-800">{['terminalId', 'terminalIds'].includes(key) ? <PayloadTerminalValue value={item} payload={value as Record<string, unknown>} /> : <PayloadValue value={item} />}</dd>
+          <dd className="break-words text-sm text-neutral-800">{['terminalId', 'terminalIds'].includes(key) ? <PayloadTerminalValue value={item} payload={value as Record<string, unknown>} /> : <PayloadValue value={item} fieldKey={key} />}</dd>
         </div>
       ))}
     </dl>
   )
+  if (fieldKey === 'operatorId' && typeof value === 'string' && value && !value.startsWith('尾号')) {
+    return <span title={value}>{`尾号 ${value.slice(-6)}`}</span>
+  }
   return <span>{String(value)}</span>
 }
 

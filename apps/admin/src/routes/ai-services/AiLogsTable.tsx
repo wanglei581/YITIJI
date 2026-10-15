@@ -69,6 +69,7 @@ interface Props {
   logs: AdminAiLogEntry[]
   logsTotal: number
   logsOffset: number
+  logsPageSize: number
   logsLoading: boolean
   logsError: string | null
   opFilter: OpFilter
@@ -76,12 +77,14 @@ interface Props {
   applyOpFilter: (filter: OpFilter) => void
   applyStatusFilter: (filter: StatusFilter) => void
   setLogsOffset: (offset: number) => void
+  onPageSizeChange: (size: number) => void
 }
 
 export function AiLogsTable({
   logs,
   logsTotal,
   logsOffset,
+  logsPageSize,
   logsLoading,
   logsError,
   opFilter,
@@ -89,6 +92,7 @@ export function AiLogsTable({
   applyOpFilter,
   applyStatusFilter,
   setLogsOffset,
+  onPageSizeChange,
 }: Props) {
   const columns: ConsoleColumn<AdminAiLogEntry>[] = [
     {
@@ -203,10 +207,11 @@ export function AiLogsTable({
             title: '该筛选条件下没有调用记录（已按条件查全库，不是只翻了最近 100 条）',
             description: '请调整筛选条件。',
           }}
-          page={Math.floor(logsOffset / LOGS_PAGE_SIZE) + 1}
-          pageSize={LOGS_PAGE_SIZE}
+          page={Math.floor(logsOffset / logsPageSize) + 1}
+          pageSize={logsPageSize}
           total={logsTotal}
-          onPageChange={(page) => setLogsOffset((page - 1) * LOGS_PAGE_SIZE)}
+          onPageChange={(page) => setLogsOffset((page - 1) * logsPageSize)}
+          onPageSizeChange={onPageSizeChange}
         />
       </Card>
     </section>

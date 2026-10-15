@@ -4,8 +4,9 @@
 //   GET  /admin/print-scan/tasks                          按类型分页任务列表
 //   GET  /admin/print-scan/tasks/:type/:taskId            类型感知详情
 //   POST /admin/print-scan/tasks/:type/:taskId/actions    print.retry / scan.cancel（写审计）
-//   GET  /admin/terminals/:terminalId/capabilities        终端能力开关列表
-//   PUT  /admin/terminals/:terminalId/capabilities/:key   upsert 单个能力开关（写审计）
+//   GET    /admin/terminals/:terminalId/capabilities        终端能力开关列表
+//   PUT    /admin/terminals/:terminalId/capabilities/:key   upsert 单个能力开关（写审计）
+//   DELETE /admin/terminals/:terminalId/capabilities/:key   删掉该行，回到未配置（写审计）
 //
 // 诚实约束：photo/copy/material_pack/format_conversion/signature_stamp 未上线，
 // 后端返回 implemented=false + 空 items；本客户端与页面不得伪造这些类型的数据。
@@ -162,6 +163,10 @@ interface AdminPrintScanServiceInterface {
     capabilityKey: PrintScanCapabilityKey,
     patch: { status: PrintScanCapabilityStatus; note?: string },
   ): Promise<{ terminalCode: string; capability: TerminalCapabilityView }>
+  clearCapability(
+    terminalId: string,
+    capabilityKey: PrintScanCapabilityKey,
+  ): Promise<{ terminalCode: string; capabilityKey: string; cleared: boolean }>
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -219,6 +224,10 @@ const httpAdapter: AdminPrintScanServiceInterface = {
     request(`/admin/terminals/${encodeURIComponent(terminalId)}/capabilities/${encodeURIComponent(capabilityKey)}`, {
       method: 'PUT',
       body: JSON.stringify(patch),
+    }),
+  clearCapability: (terminalId, capabilityKey) =>
+    request(`/admin/terminals/${encodeURIComponent(terminalId)}/capabilities/${encodeURIComponent(capabilityKey)}`, {
+      method: 'DELETE',
     }),
 }
 
@@ -317,6 +326,16 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     row.configured = true
     row.updatedAt = new Date().toISOString()
     return { terminalCode: 'KSK-001', capability: { ...row } }
+  },
+  clearCapability: async (_terminalId, capabilityKey) => {
+    const row = MOCK_CAPABILITIES.find((c) => c.capabilityKey === capabilityKey)
+    if (!row) throw new ApiHttpError('CAPABILITY_KEY_INVALID', '未知的能力键', 400)
+    if (!row.configured) return { terminalCode: 'KSK-001', capabilityKey, cleared: false }
+    row.configured = false
+    row.status = 'not_verified'
+    row.note = null
+    row.updatedAt = null
+    return { terminalCode: 'KSK-001', capabilityKey, cleared: true }
   },
 }
 

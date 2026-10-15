@@ -62,7 +62,7 @@ export function CreateCompanyDrawer({
       })
       onCreated(created.id)
     } catch (e) {
-      setError(errMsg(e))
+      setError(errMsg(e, '企业没有创建成功，请检查后重试'))
     } finally {
       setSaving(false)
     }

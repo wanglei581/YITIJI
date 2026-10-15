@@ -76,7 +76,10 @@ mustContain('src/routes/sources/ExcelImportModal.tsx', [
   '对应文件列',
   '单个文件不超过 10MB',
   'CSV 请使用 UTF-8 编码',
-  "setError((e as Error).message",
+  "setError(userMessageOf(e, '模板下载失败，请稍后重试'))",
+  "setError(userMessageOf(e, '文件解析失败，请确认是有效的 Excel (.xlsx) 或 CSV (.csv) 文件'))",
+  "setError(userMessageOf(e, '预览生成失败，请检查字段映射后重试'))",
+  "setError(userMessageOf(e, '确认导入失败，请稍后重试'))",
   'preview.sampleValid',
   '有效行示例',
 ], 'Excel 导入弹窗提供模板下载按钮并覆盖 AI-ready/签到字段')

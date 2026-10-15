@@ -6,6 +6,7 @@ import { MessageSquareIcon, RefreshCwIcon, SendIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { AI_CONTENT_COMPLAINT_SLA_WORKDAYS } from './feedbackSla'
 import { DetailSla, FeedbackListChips } from './FeedbackSlaBadges'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   memberFeedbackAdminApi,
   type AdminFeedbackTicketDetail,
@@ -142,7 +143,7 @@ export default function MemberFeedbackPage() {
       setListState('ready')
     } catch (error) {
       setListState('error')
-      setMessage(error instanceof Error ? error.message : '反馈列表加载失败')
+      setMessage(userMessageOf(error, '反馈列表加载失败，请稍后重试'))
     }
   }, [category, status, submitterType])
 
@@ -169,7 +170,7 @@ export default function MemberFeedbackPage() {
       setDetailState('ready')
     } catch (error) {
       setDetailState('error')
-      setMessage(error instanceof Error ? error.message : '反馈详情加载失败')
+      setMessage(userMessageOf(error, '反馈详情加载失败，请稍后重试'))
     }
   }
 
@@ -180,7 +181,7 @@ export default function MemberFeedbackPage() {
       const res = await memberFeedbackAdminApi.revealContactPhone(detail.id)
       setRevealedPhone({ id: detail.id, phone: res.phone })
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '联系电话查看失败')
+      setMessage(userMessageOf(error, '联系电话查看失败，请稍后重试'))
     }
   }
 
@@ -202,7 +203,7 @@ export default function MemberFeedbackPage() {
       setMessage(anonymous ? '处理记录已保存' : '回复已发送')
       await loadList()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : anonymous ? '处理记录保存失败' : '回复发送失败')
+      setMessage(userMessageOf(error, anonymous ? '处理记录保存失败，请稍后重试' : '回复发送失败，请稍后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -218,7 +219,7 @@ export default function MemberFeedbackPage() {
       setMessage('状态已更新')
       await loadList()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '状态更新失败')
+      setMessage(userMessageOf(error, '状态没有更新，请稍后重试'))
     } finally {
       setSubmitting(false)
     }

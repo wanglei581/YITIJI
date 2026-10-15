@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, Card } from '@ai-job-print/ui'
 import { CircleAlertIcon, CircleCheckIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   cancelAdminInitialPhoneBind,
   redirectToLogin,
@@ -80,7 +81,7 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
           setCurrentPassword('')
           setPhone('')
           if (requiresKnownSmsCooldown(result.code)) setCooldownSeconds(60)
-          setMessage({ kind: 'error', text: result.message || '短信服务暂不可用，请稍后重试' })
+          setMessage({ kind: 'error', text: userMessageOf(result, '短信服务暂不可用，请稍后重试') })
           return
         }
         if (result.code === 'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE') {
@@ -88,11 +89,11 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
           setPhone('')
           setMessage({
             kind: 'error',
-            text: `${result.message || '当前账号暂不可进行首次手机号绑定'}。若刚才操作中断，请 5 分钟后再试。`,
+            text: `${userMessageOf(result, '当前账号暂不可进行首次手机号绑定')}。若刚才操作中断，请 5 分钟后再试。`,
           })
           return
         }
-        setMessage({ kind: 'error', text: result.message || '验证码发送失败，请稍后重试' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '验证码发送失败，请稍后重试') })
         return
       }
 
@@ -143,10 +144,10 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
         }
         if (requiresRestartAfterVerificationFailure(result.code)) {
           clearVerificationState()
-          setMessage({ kind: 'error', text: `${result.message || '本次绑定验证已失效'}，请重新填写当前密码和手机号获取验证码。` })
+          setMessage({ kind: 'error', text: `${userMessageOf(result, '本次绑定验证已失效')}，请重新填写当前密码和手机号获取验证码。` })
           return
         }
-        setMessage({ kind: 'error', text: result.message || '验证失败，请稍后重试' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '验证失败，请稍后重试') })
         return
       }
 
@@ -176,7 +177,7 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
           redirectToLogin()
           return
         }
-        setMessage({ kind: 'error', text: result.message || '取消当前验证失败，请稍后重试。' })
+        setMessage({ kind: 'error', text: userMessageOf(result, '取消当前验证失败，请稍后重试。') })
         return
       }
       setCurrentPassword('')

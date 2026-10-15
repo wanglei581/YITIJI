@@ -323,4 +323,22 @@ mustContain(
   'D8. 侧栏「数据与账号」组有「终端数据」入口',
 )
 
+const statsCode = readCode(PAGE)
+const visitsAt = statsCode.indexOf('<ServiceVisitsCard')
+const statsErrorAt = statsCode.indexOf('统计数据加载失败')
+if (visitsAt < 0 || statsErrorAt < 0 || visitsAt > statsErrorAt) {
+  fail('数据统计页顶部必须先渲染服务人次卡，且不挂在统计数据自己的失败分支里')
+}
+const visitsCode = readCode('src/routes/stats/ServiceVisitsCard.tsx')
+for (const token of ["getPartnerTerminalOperations('week')", 'visitText(data, data.totals.visitCount)', '近 7 天（截至昨天）', 'to="/terminals"', '查看各终端明细', 'userMessageOf(', 'aria-label="服务人次"']) {
+  if (!visitsCode.includes(token)) fail(`服务人次卡缺少 ${token}`)
+}
+const errorAt = visitsCode.indexOf("state === 'error'")
+const readyAt = visitsCode.indexOf("state === 'ready'")
+if (errorAt < 0 || readyAt < errorAt) fail('服务人次卡必须区分失败和成功')
+const errorSlice = visitsCode.slice(errorAt, readyAt)
+if (!errorSlice.includes('<ErrorState')) fail('服务人次取数失败必须用本页出错态')
+if (/visitCount\s*\?\?\s*0|visitCount\s*\|\|\s*0|>\s*0\s*</.test(errorSlice)) fail('服务人次取数失败不得显示 0')
+pass('D9. 数据统计页服务人次卡取终端数据接口，失败不显示 0')
+
 console.log('\nALL PASS')

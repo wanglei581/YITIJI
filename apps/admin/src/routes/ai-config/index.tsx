@@ -91,7 +91,7 @@ export default function AiConfigPage() {
       setConfigs(data.configs)
       applyConfig(data.configs[selectedFeature] ?? data.config)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(userMessageOf(e, '模型配置加载失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
@@ -155,7 +155,7 @@ export default function AiConfigPage() {
       setSavedTip(true)
       setTimeout(() => setSavedTip(false), 2500)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存失败')
+      setError(userMessageOf(e, '模型配置没有保存，请检查后重试'))
     } finally {
       setSaving(false)
     }

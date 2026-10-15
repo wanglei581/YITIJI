@@ -1,5 +1,6 @@
 import { COMPANY_INDUSTRIES, COMPANY_TYPES, formatDate, formatDateTime, isMunicipality, resolveRegionSelection } from '@ai-job-print/shared'
 import { type AdminCompanyDetail, type CompanyFieldsInput } from '../../../services/api/companiesAdmin'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 // companies 路由内多个子组件与主页共享的展示常量、标签工具与表单逻辑。
 // 由 routes/companies/index.tsx 抽出,取值与行为零变化。
@@ -61,11 +62,8 @@ export function fmtDateTime(iso: string): string {
   return formatDateTime(iso)
 }
 
-export function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') {
-    return (e as Error).message
-  }
-  return '操作失败，请重试'
+export function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 export const inputCls =

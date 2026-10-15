@@ -1,5 +1,5 @@
 import type { OrderDetailControls } from './useOrderDetail'
-import { PAY_STATUS_MAP, MARK_PAID_SOURCES, markPaidSourceLabel, amountText, fmt } from './orderDisplay'
+import { MARK_PAID_SOURCES, markPaidSourceLabel, amountText, fmt, payStatusText } from './orderDisplay'
 
 export function OrderPaymentActions({ controls }: { controls: OrderDetailControls }) {
   const { detail, markPaidResult, setMarkPaidResult, markPaidOpen, setMarkPaidOpen, markPaidSource, setMarkPaidSource, markPaidError, setMarkPaidError, markPaidSubmitting, handleMarkPaid, refundOpen, setRefundOpen, refundReason, setRefundReason, refundError, setRefundError, refundSubmitting, handleRefund } = controls
@@ -13,7 +13,7 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               <div className="mt-6 rounded-[9px] border border-success/30 bg-success-bg px-4 py-3 text-[12.5px] leading-relaxed text-success-fg">
                 <p className="font-extrabold">收款已入账（服务端确认）</p>
                 <p className="mt-1">
-                  支付状态 {PAY_STATUS_MAP[markPaidResult.payStatus]?.label ?? markPaidResult.payStatus}
+                  <span title={payStatusText(markPaidResult.payStatus).title}>支付状态 {payStatusText(markPaidResult.payStatus).label}</span>
                   {' · '}来源 {markPaidSourceLabel(markPaidResult.paymentSource)}
                   {' · '}入账时间 {fmt(markPaidResult.paidAt)}
                 </p>
@@ -124,7 +124,12 @@ export function OrderPaymentActions({ controls }: { controls: OrderDetailControl
               canonical RefundService（POST /admin/orders/:id/refund）。
               待退款信号单走同一入口，文案改成「发起退款」并二次确认；不点确认不会发。
             */}
-            {detail.refundEligible && (
+            {detail.refundEligible && detail.amountCents === 0 && (
+              <div className="mt-6 rounded-[9px] border border-neutral-900/10 bg-neutral-50 px-4 py-3.5">
+                <p className="text-[13px] font-bold text-neutral-800">0 元订单无需退款</p>
+              </div>
+            )}
+            {detail.refundEligible && detail.amountCents !== 0 && (
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 {!refundOpen ? (
                   <div className="flex items-center justify-between">

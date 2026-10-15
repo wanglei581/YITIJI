@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { XIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   legalDocsService,
   type CreateLegalDocVersionInput,
@@ -53,7 +54,7 @@ export function LegalDocDrawer({ existing, onCreated, onClose }: Props) {
       await legalDocsService.create({ ...form, version: form.version.trim() })
       onCreated()
     } catch (err) {
-      setError((err as Error).message)
+      setError(userMessageOf(err, '法务文档没有保存，请检查后重试'))
     } finally {
       setSubmitting(false)
     }

@@ -13,6 +13,7 @@ import {
   secondFactorFallbackMessage,
 } from '../../services/auth/secondFactor'
 import { ErrorBar, LoadingDots } from './LoginBits'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface Props {
   challenge: AdminSecondFactorChallenge
@@ -53,7 +54,7 @@ export function SecondFactorPanel({ challenge, onSuccess, onRestart }: Props) {
   }, [expiresIn, onRestart])
 
   function handleFailure(failure: { code: string; message: string }) {
-    const message = failure.message || secondFactorFallbackMessage(failure.code)
+    const message = userMessageOf(failure, secondFactorFallbackMessage(failure.code))
     if (secondFactorFailureAction(failure.code) === 'retry') {
       setError(message)
       return

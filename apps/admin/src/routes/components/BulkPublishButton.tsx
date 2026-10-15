@@ -28,6 +28,7 @@ import {
 // 而 apps/admin/src/routes/partners/ 下当时根本没有任何 trust 控件 ——
 // 运营照着这句话找不到东西,只能去连数据库或跑维护脚本,绕过审计留痕。
 import { CONTENT_TRUST_UI_PATH_TEXT } from '../partners/contentTrustRules'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // OrgOption / toOrgOptions 放在 services/api/bulkPublish.ts:
 // 组件文件只导出组件,避免 react-refresh 失效。
@@ -112,7 +113,7 @@ export function BulkPublishButton({ kind, orgOptions, onDone }: Props) {
       setResult(null)
       setStep('preview')
     } catch (e) {
-      setError(e instanceof Error ? e.message : '预览失败,请重试')
+      setError(userMessageOf(e, '预览失败，请重试'))
     } finally {
       setBusy(false)
     }
@@ -132,7 +133,7 @@ export function BulkPublishButton({ kind, orgOptions, onDone }: Props) {
       // 有成功条目就刷新列表(即便同时有失败),让页面状态与库一致
       if (res.publishedCount > 0) onDone()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '发布失败,请重试')
+      setError(userMessageOf(e, '发布失败，请重试'))
     } finally {
       setBusy(false)
     }

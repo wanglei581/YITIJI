@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Drawer, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { AlertTriangleIcon, ClipboardListIcon } from 'lucide-react'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   policiesAdminService,
   type AdminPolicyRecord,
@@ -35,11 +36,8 @@ import {
   type PolicyEligibilityRuleRecord,
 } from '../../services/api/policiesAdmin'
 
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') {
-    return (e as Error).message
-  }
-  return '未知错误'
+function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 /** 取值 → 中文名称。问项字典没下发到、或取值已漂移时如实回退到服务端标识。 */
@@ -209,13 +207,13 @@ export default function EligibilityRulesDrawer({ policy, onClose }: Props) {
       setRules(rulesRes.value)
     } else {
       setRules(null)
-      setRulesError(errMsg(rulesRes.reason))
+      setRulesError(errMsg(rulesRes.reason, '资格条件加载失败，请稍后重试'))
     }
     if (questionsRes.status === 'fulfilled') {
       setQuestionSet(questionsRes.value)
     } else {
       setQuestionSet(null)
-      setQuestionsError(errMsg(questionsRes.reason))
+      setQuestionsError(errMsg(questionsRes.reason, '资格问项加载失败，请稍后重试'))
     }
     setLoading(false)
   }, [policy.id])

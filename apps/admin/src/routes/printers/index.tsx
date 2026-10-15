@@ -7,6 +7,7 @@ import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
 import { printerStatusView } from '../terminals/terminalStatusViews'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const PRINTERS_REFRESH_KEY = 'admin:printers'
 const STATUS_MAP: Record<AdminPrinterRecord['status'], { badge: 'success' | 'error'; label: string }> = {
@@ -64,7 +65,7 @@ export default function PrintersPage() {
   })
   const printers = data?.printers ?? []
   const loading = status === 'loading' && printers.length === 0
-  const errorMessage = status === 'error' ? (error instanceof Error ? error.message : '打印机数据加载失败') : null
+  const errorMessage = status === 'error' ? (userMessageOf(error, '打印机数据加载失败，请稍后重试')) : null
   const filtered = printers.filter((printer) => (FILTER_STATUS[filter] ? printer.status === FILTER_STATUS[filter] : true) && matchesSearch(printer, search))
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
   const counts = { 全部: printers.length, 在线: printers.filter((p) => p.status === 'online').length, 离线: printers.filter((p) => p.status === 'offline').length, 故障: printers.filter((p) => p.status === 'error').length }

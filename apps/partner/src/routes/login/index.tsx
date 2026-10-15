@@ -34,7 +34,7 @@ import {
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
 import './login.css'
-
+import { userMessageOf } from '../../services/api/userErrorMessage'
 type LoginMode = 'password' | 'sms'
 type ResetStep = 'identity' | 'code' | 'password'
 
@@ -176,7 +176,7 @@ export default function LoginPage() {
     const r = await login(loginId.trim(), password)
     setLoading(false)
     if (r.ok) completeLogin(r.user, loginId.trim())
-    else raiseError(r.message || '登录失败')
+    else raiseError(userMessageOf(r, '登录失败，请检查账号后重试'))
   }
 
   async function submitSms(e: FormEvent) {
@@ -188,7 +188,7 @@ export default function LoginPage() {
     const r = await loginWithSms(phone.trim(), code.trim())
     setLoading(false)
     if (r.ok) completeLogin(r.user, phone.trim())
-    else raiseError(r.message || '登录失败')
+    else raiseError(userMessageOf(r, '登录失败，请检查账号后重试'))
   }
 
   async function sendCode() {
@@ -197,7 +197,7 @@ export default function LoginPage() {
     setError(null)
     const r = await sendLoginSmsCode(phone.trim())
     if (r.ok) smsCountdown.start(r.cooldownSeconds || 60)
-    else raiseError(r.message || '验证码发送失败')
+    else raiseError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
   async function startReset(e: FormEvent) {
@@ -206,7 +206,7 @@ export default function LoginPage() {
     if (!requireAgreement(setResetError)) return
     const r = await startPasswordReset(resetIdentity.trim())
     if (!r.ok) {
-      setResetError(r.message || '验证码发送失败')
+      setResetError(userMessageOf(r, '验证码没有发出，请稍后重试'))
       return
     }
     resetCountdown.start(r.cooldownSeconds || 60)
@@ -218,7 +218,7 @@ export default function LoginPage() {
     setResetError(null)
     const r = await verifyPasswordReset(resetIdentity.trim(), resetCode.trim())
     if (!r.ok) {
-      setResetError(r.message || '验证码校验失败')
+      setResetError(userMessageOf(r, '验证码没有通过，请重新输入后再试'))
       return
     }
     setResetTicket(r.resetTicket)
@@ -242,7 +242,7 @@ export default function LoginPage() {
     }
     const r = await completePasswordReset(resetTicket, newPassword)
     if (!r.ok) {
-      setResetError(r.message || '密码重置失败')
+      setResetError(userMessageOf(r, '密码重置失败，请稍后重试'))
       return
     }
     setResetOpen(false)
@@ -258,7 +258,7 @@ export default function LoginPage() {
     const r = await sendOwnPhoneCode()
     setPhoneVerifyBusy(false)
     if (r.ok) phoneVerifyCountdown.start(r.cooldownSeconds || 60)
-    else setPhoneVerifyError(r.message || '验证码发送失败')
+    else setPhoneVerifyError(userMessageOf(r, '验证码没有发出，请稍后重试'))
   }
 
   async function confirmPhoneVerification(e: FormEvent) {
@@ -272,7 +272,7 @@ export default function LoginPage() {
       setPhoneVerifyUser(null)
       setSuccessVisible(true)
       window.setTimeout(() => nav('/', { replace: true }), SUCCESS_OVERLAY_MS)
-    } else setPhoneVerifyError(r.message || '手机号验证失败')
+    } else setPhoneVerifyError(userMessageOf(r, '手机号验证失败，请稍后重试'))
   }
 
   function openReset() {

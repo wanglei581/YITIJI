@@ -1,5 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import ts from 'typescript'
+import vm from 'node:vm'
 
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/orders/index.tsx')
@@ -334,5 +336,118 @@ if (
 } else {
   fail('API-20 admin manual refund button/confirm/no-auto-trigger contract is incomplete')
 }
+
+// 订单 / 打印任务状态必须覆盖服务端源码里的取值，列表和详情走同一套映射函数。
+function walkServerTs(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    if (name === '__tests__' || name === 'node_modules') continue
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) walkServerTs(path, out)
+    else if (path.endsWith('.ts') && !path.endsWith('.test.ts') && !path.endsWith('.spec.ts')) out.push(path)
+  }
+  return out
+}
+
+function stripCode(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
+function quotedStatuses(block) {
+  return [...block.matchAll(/'([a-z][a-z0-9_]*)'/g)].map((match) => match[1])
+}
+
+const serverRoot = join(root, '../..', 'services/api/src')
+const taskStatuses = new Set()
+const payStatuses = new Set()
+const pickupStatuses = new Set()
+for (const file of walkServerTs(serverRoot)) {
+  const src = stripCode(readFileSync(file, 'utf8'))
+  for (const match of src.matchAll(/(?<![A-Za-z])taskStatus\s*(?::|===|!==|==)\s*'([a-z][a-z0-9_]*)'/g)) taskStatuses.add(match[1])
+  const taskType = src.match(/\btype TaskStatus\s*=\s*([\s\S]*?);/)
+  if (taskType && taskType[1].length < 500) for (const status of quotedStatuses(taskType[1])) taskStatuses.add(status)
+  for (const match of src.matchAll(/\b(?:const|let)\s+(VALID_TASK_STATUS|TERMINAL_PRINT_STATUSES|TERMINAL_ORDER_TASK_STATUSES|ACTIVE_PRINT_TASK_STATES)\s*=\s*(?:new Set\()?(\[[^\]]*\])/g)) {
+    for (const status of quotedStatuses(match[2])) taskStatuses.add(status)
+  }
+  const payTable = src.match(/export const ORDER_PAY_STATUSES\s*=\s*\[([\s\S]*?)\]/)
+  if (payTable) for (const status of quotedStatuses(payTable[1])) payStatuses.add(status)
+  const pickupTable = src.match(/const VALID_PICKUP_STATUS\s*=\s*\[([^\]]+)\]/)
+  if (pickupTable) for (const status of quotedStatuses(pickupTable[1])) pickupStatuses.add(status)
+}
+if (taskStatuses.size < 10) fail(`服务端任务状态只解析出 ${taskStatuses.size} 个，抽取规则可能失效`)
+if (payStatuses.size < 8) fail(`服务端支付状态只解析出 ${payStatuses.size} 个，抽取规则可能失效`)
+if (pickupStatuses.size < 6) fail(`服务端取件状态只解析出 ${pickupStatuses.size} 个，抽取规则可能失效`)
+
+function loadDisplay(file) {
+  const cache = new Map()
+  const stubs = { '@ai-job-print/shared': { formatDateTime: (value) => String(value ?? ''), formatYuan: (value) => String(value) } }
+  const load = (current) => {
+    if (cache.has(current)) return cache.get(current)
+    const js = ts.transpileModule(readFileSync(current, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+      fileName: current,
+    }).outputText
+    const exportsBox = {}
+    const mod = { exports: exportsBox }
+    const req = (id) => {
+      if (Object.prototype.hasOwnProperty.call(stubs, id)) return stubs[id]
+      if (!id.startsWith('.')) throw new Error(`订单展示模块出现未登记依赖 ${id}`)
+      const base = join(dirname(current), id)
+      return load(base.endsWith('.ts') || base.endsWith('.tsx') ? base : `${base}.ts`)
+    }
+    vm.runInNewContext(js, { module: mod, exports: exportsBox, require: req }, { filename: current })
+    cache.set(current, mod.exports)
+    return mod.exports
+  }
+  return load(file)
+}
+
+const display = loadDisplay(join(root, 'src/routes/orders/orderDisplay.ts'))
+for (const status of taskStatuses) {
+  const view = display.taskStatusText(status)
+  if (!view?.label || view.label === status || view.label.startsWith('未归类') || /[A-Za-z]/.test(view.label)) {
+    fail(`任务状态 ${status} 没有经过 taskStatusText 映成中文，实际是 ${view?.label}`)
+  }
+}
+for (const status of payStatuses) {
+  const view = display.payStatusText(status)
+  if (!view?.label || view.label === status || view.label.startsWith('未归类') || /[A-Za-z]/.test(view.label)) {
+    fail(`支付状态 ${status} 没有经过 payStatusText 映成中文，实际是 ${view?.label}`)
+  }
+}
+for (const status of pickupStatuses) {
+  const text = display.pickupText({ pickupStatus: status, channel: null })
+  if (status === 'none') {
+    if (text !== '—' || !displaySrcIncludesNone()) fail('取件 none 必须显示「—」，不得显示原值')
+    continue
+  }
+  if (text === status || text.includes(status) || /[A-Za-z]/.test(text)) fail(`取件状态 ${status} 没有中文，实际是 ${text}`)
+}
+pass(`任务 ${taskStatuses.size}、支付 ${payStatuses.size}、取件 ${pickupStatuses.size} 个服务端状态都有中文`)
+
+function displaySrcIncludesNone() {
+  return stripCode(readFileSync(join(root, 'src/routes/orders/orderDisplay.ts'), 'utf8')).includes("pickupStatus === 'none'")
+}
+
+const columns = stripCode(readFileSync(join(root, 'src/routes/orders/orderColumns.tsx'), 'utf8'))
+const drawerCode = stripCode(readFileSync(join(root, 'src/routes/orders/OrderDetailDrawer.tsx'), 'utf8'))
+for (const [src, label] of [[columns, '列表'], [drawerCode, '详情']]) {
+  if (!src.includes('taskStatusText(') || !src.includes('payStatusText(')) fail(`${label}必须调用共用的任务 / 支付状态函数`)
+}
+if (!drawerCode.includes('pickupText(')) fail('详情取件状态必须走 pickupText')
+for (const raw of ['?? detail.taskStatus', '?? log.fromStatus', '?? log.toStatus', '?? detail.payStatus', '?? order.taskStatus', '?? order.payStatus', '>{detail.taskStatus}', '>{detail.payStatus}', '>{log.fromStatus}', '>{log.toStatus}']) {
+  if (`${columns}\n${drawerCode}`.includes(raw)) fail(`状态字段仍直接渲染原值：${raw}`)
+}
+pass('列表与详情的状态都走共用映射，不直接渲染原值')
+
+const payment = stripCode(readFileSync(join(root, 'src/routes/orders/OrderPaymentActions.tsx'), 'utf8'))
+const zeroAt = payment.indexOf('detail.refundEligible && detail.amountCents === 0')
+const nonzeroAt = payment.indexOf('detail.refundEligible && detail.amountCents !== 0')
+if (zeroAt < 0 || nonzeroAt < 0 || zeroAt > nonzeroAt) fail('0 元可退订单必须单独分支，且排在有实收退款按钮之前')
+const zeroBranch = payment.slice(zeroAt, nonzeroAt)
+if (!zeroBranch.includes('0 元订单无需退款') || /<button/.test(zeroBranch)) fail('实收为 0 时只说明无需退款，不得渲染退款按钮')
+const paidBranch = payment.slice(nonzeroAt)
+if (!paidBranch.includes('发起退款') || !paidBranch.includes("'退款'") || !/<button/.test(paidBranch)) fail('实收不为 0 时仍保留退款按钮')
+if (!payment.includes("detail.payStatus === 'unpaid'")) fail('登记收款入口仍只能在未支付时出现')
+pass('实收为 0 的可退订单不显示退款按钮')
 
 console.log('\nALL PASS')

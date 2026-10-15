@@ -21,6 +21,7 @@ import { changePassword, getUser, logout, type AuthedUser } from '../../services
 import { getAuditLogs, type AuditLogRecord } from '../../services/api/audit'
 import { AdminInitialPhoneBindingCard } from './AdminInitialPhoneBindingCard'
 import { AdminPhoneTransferCard } from './AdminPhoneTransferCard'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '超级管理员',
@@ -135,7 +136,7 @@ export default function AccountSettingsPage() {
       .catch((error: unknown) => {
         if (cancelled) return
         setLoginLogs([])
-        setLoginLogsError(error instanceof Error && error.message ? error.message : '登录记录加载失败')
+        setLoginLogsError(userMessageOf(error, '登录记录加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoginLogsLoading(false)
@@ -163,7 +164,7 @@ export default function AccountSettingsPage() {
     setSubmitting(true)
     try {
       const r = await changePassword(currentPassword, newPassword)
-      if (!r.ok) { setPwError(r.message || '修改失败，请重试'); return }
+      if (!r.ok) { setPwError(userMessageOf(r, '密码没有修改，请检查当前密码后重试')); return }
       setSuccessVisible(true)
       window.setTimeout(() => logout(), 1200)
     } finally {

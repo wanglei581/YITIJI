@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { StatusBadge } from '@ai-job-print/ui'
 import { Field, GhostButton, PrimaryButton } from '../../components/form'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 样式常量 ─────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ export function ReviewDialog({
       await op()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '操作失败，请重试')
+      setError(userMessageOf(e, '操作失败，请重试'))
     } finally {
       setBusy(false)
     }

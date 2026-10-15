@@ -2,6 +2,7 @@ import { screenAiProvider } from './aiScreenDisplay'
 import type { ScreenUsageSnapshot } from '@ai-job-print/shared'
 import { SCREEN_HOSTING_OFF_NOTE, TwinBarList, TwinMetricPanel, TwinTiles, twinSmall } from '@ai-job-print/ui'
 import { aiOperationRows } from './metricLabels'
+import { measureUnit } from './measureUnit'
 
 /**
  * 服务调用在招聘内容托管关闭（托管 a）时的右栏三块。
@@ -71,8 +72,8 @@ export function UsageAiQualityPanel({ metric, rangeText }: { metric: UsageMetric
               value.avgLatencyMs === null
                 ? { value: '样本不足', label: '平均耗时' }
                 : { value: (value.avgLatencyMs / 1000).toFixed(2), unit: '秒', label: '平均耗时' },
-              { value: twinSmall(value.fallbackCalls), unit: '次', label: '降级兜底' },
-              { value: twinSmall(value.failed), unit: '次', label: '调用失败' },
+              { value: twinSmall(value.fallbackCalls), unit: measureUnit(twinSmall(value.fallbackCalls), '次'), label: '降级兜底' },
+              { value: twinSmall(value.failed), unit: measureUnit(twinSmall(value.failed), '次'), label: '调用失败' },
             ]}
           />
           <p className="twin-cap twin-push">平均耗时只算成功调用；失败含超时与上游拒绝</p>
@@ -94,7 +95,7 @@ export function UsagePolicyPanel({ metric, rangeText, membersNote }: { metric: U
         <>
           <div className="twin-hero is-center">
             <span className="twin-big">{twinSmall(value.policy)}</span>
-            <span className="twin-unit">次</span>
+            <span className="twin-unit">{measureUnit(twinSmall(value.policy), '次')}</span>
             <span className="twin-muted">{rangeText}政策浏览 · 只含登录会员</span>
           </div>
           <p className="twin-cap">{SCREEN_HOSTING_OFF_NOTE}</p>

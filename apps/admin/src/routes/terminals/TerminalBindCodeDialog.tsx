@@ -2,6 +2,7 @@ import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
 import { CopyIcon, KeyRoundIcon, RefreshCwIcon, XIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   createTerminalBindCode,
   type AdminTerminalRecord,
@@ -106,7 +107,7 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
         text: `已为终端 ${created.terminalCode} 生成绑定码；明文仅在本对话框显示，请立即复制。`,
       })
     } catch (e) {
-      setBindCodeError(e instanceof Error ? e.message : '生成绑定码失败，请稍后重试')
+      setBindCodeError(userMessageOf(e, '生成绑定码失败，请稍后重试'))
     } finally {
       setBindCodeSaving(false)
     }

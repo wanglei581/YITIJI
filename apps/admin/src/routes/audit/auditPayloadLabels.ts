@@ -1,3 +1,5 @@
+import { PARTNER_TYPE_LABELS, RECRUITMENT_EMERGENCY_REASON_LABELS } from '@ai-job-print/shared'
+
 export const PAYLOAD_LABELS: Record<string, string> = {
   billablePages: '计费页数',
   terminalCode: '终端编号',
@@ -131,5 +133,79 @@ export const PAYLOAD_LABELS: Record<string, string> = {
   password: '密码', token: '令牌', accessToken: '访问令牌', refreshToken: '刷新令牌',
   apiKey: '接口密钥', secret: '密钥', authorization: '身份验证信息', cookie: '登录凭据',
   action: '操作', rows: '行数', cleaned: '清理数量', enabled: '是否启用', field: '变更字段',
+  type: '类型',
+  paymentSource: '收款来源',
+  reasonText: '事由说明',
+  operatorId: '操作人',
+  alreadyHeld: '是否已经下架',
+  autoRequeued: '是否已重新排队',
+  displayName: '显示名称',
+  macAddress: '网卡地址',
+  locationLabel: '点位',
+  areaLabel: '所在区',
+  geoLat: '纬度',
+  geoLng: '经度',
+  agentVersion: '代理版本',
+  deviceFingerprintPrefix: '设备指纹前缀',
+  serviceKey: '价目项',
+  zeroPriceCashierBypass: '零价跳过收银',
+  zeroPriceConfirmed: '已确认零价',
+  unit: '计价单位',
+}
+
+/** 收款来源。与 payment.types.ts 的 PaymentSource 注释一致，沙箱和权益不是真实资金。 */
+const PAYMENT_SOURCE_LABELS: Record<string, string> = {
+  offline: '线下收款',
+  manual_confirmed: '人工确认',
+  free: '免费',
+  sandbox: '沙箱测试（非真实资金）',
+  voucher: '权益核销（非资金）',
+  wechat: '微信支付',
+  alipay: '支付宝',
+}
+
+/** 价目项。与计费页 SERVICE_LABELS 同一套中文，不另起名字。 */
+const SERVICE_KEY_LABELS: Record<string, string> = {
+  print_bw_page: '黑白打印（每页）',
+  print_color_page: '彩色打印（每页）',
+  resume_export: '简历导出（每次）',
+}
+
+/** PriceConfig.unit：page / copy / item。 */
+const PRICE_UNIT_LABELS: Record<string, string> = {
+  page: '按页',
+  copy: '按份',
+  item: '按项',
+}
+
+/** recruitment-emergency.service.ts 的 mode。 */
+const MODE_LABELS: Record<string, string> = {
+  single: '单条',
+  circuit_break: '熔断',
+}
+
+/** 订单渠道与支付渠道取值不重叠，同一张表按命中翻译，未命中保持原值。 */
+const CHANNEL_LABELS: Record<string, string> = {
+  kiosk: '一体机现场',
+  miniapp_cloud: '小程序云打印',
+  ...PAYMENT_SOURCE_LABELS,
+}
+
+const SCOPED_LABELS: Record<string, Readonly<Record<string, string>>> = {
+  type: PARTNER_TYPE_LABELS as Readonly<Record<string, string>>,
+  paymentSource: PAYMENT_SOURCE_LABELS,
+  reasonCode: RECRUITMENT_EMERGENCY_REASON_LABELS as Readonly<Record<string, string>>,
+  mode: MODE_LABELS,
+  serviceKey: SERVICE_KEY_LABELS,
+  unit: PRICE_UNIT_LABELS,
+  channel: CHANNEL_LABELS,
+}
+
+/** 只翻译指定字段上的已知枚举。自由文本（名称、事由说明）原样返回 undefined。 */
+export function auditScopedValue(key: string, value: string): string | undefined {
+  if (key === 'zeroPriceCashierBypass' && value === 'paid/free') return '已确认跳过收银'
+  const table = SCOPED_LABELS[key]
+  if (!table || !Object.prototype.hasOwnProperty.call(table, value)) return undefined
+  return table[value]
 }
 

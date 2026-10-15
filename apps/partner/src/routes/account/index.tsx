@@ -3,6 +3,7 @@ import { Card, Button, EmptyState } from '@ai-job-print/ui'
 import { LockKeyholeIcon, UserCogIcon } from 'lucide-react'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
 import { changePassword, logout } from '../../services/auth'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 bg-surface px-3 py-2.5 text-sm text-neutral-900 ' +
@@ -48,7 +49,7 @@ export default function AccountPage() {
     setSubmitting(true)
     try {
       const r = await changePassword(currentPassword, newPassword)
-      if (!r.ok) { setPwError(r.message || '修改失败，请重试'); return }
+      if (!r.ok) { setPwError(userMessageOf(r, '密码没有修改，请检查后重试')); return }
       setSuccessVisible(true)
       window.setTimeout(() => logout(), 1200)
     } finally {

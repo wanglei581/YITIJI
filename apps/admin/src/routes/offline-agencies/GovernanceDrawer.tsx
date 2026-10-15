@@ -44,6 +44,7 @@ import {
   type QualificationAdminView,
 } from '../../services/api/offlineAgencyGovernance'
 import { API_BASE_URL, ApiHttpError } from '../../services/api/client'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 状态机 ───────────────────────────────────────────────────────────────────
 // 「没有」和「没拿到」必须是两个不同的分支，绝不能都落到空数组上。
@@ -60,8 +61,8 @@ type EvidenceState =
   | { kind: 'error'; code: string; message: string }
 
 function toError(e: unknown): { code: string; message: string } {
-  if (e instanceof ApiHttpError) return { code: e.code, message: e.message }
-  return { code: 'UNKNOWN', message: e instanceof Error ? e.message : '未知错误' }
+  const code = e instanceof ApiHttpError ? e.code : 'UNKNOWN'
+  return { code, message: userMessageOf(e, '证明材料没有打开，请稍后重试') }
 }
 
 // 本地存储后端签出来的是相对路径（/api/v1/files/:id/content?...），
@@ -251,7 +252,7 @@ function QualificationCard({ item, onViewEvidence, evidence }: {
         )}
         {evidence?.kind === 'error' && (
           <p className="mt-1.5 text-[11px] text-red-600">
-            {evidence.message}（{evidence.code}）
+            {userMessageOf(evidence, '证明材料没有打开，请稍后重试')}
           </p>
         )}
       </div>

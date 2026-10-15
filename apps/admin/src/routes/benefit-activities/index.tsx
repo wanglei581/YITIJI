@@ -3,6 +3,7 @@ import { formatDateTime, fromDatetimeLocalValue, toDatetimeLocalValue } from '@a
 import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { GiftIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 import {
   benefitActivitiesAdminApi,
   type AdminBenefitActivityClaimItem,
@@ -159,7 +160,7 @@ export default function BenefitActivitiesPage() {
       await loadClaims(saved.id)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '保存失败')
+      setMessage(userMessageOf(error, '权益活动没有保存，请检查后重试'))
     }
   }
 
@@ -171,7 +172,7 @@ export default function BenefitActivitiesPage() {
       setSelected(saved)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '发布失败')
+      setMessage(userMessageOf(error, '权益活动没有发布，请稍后重试'))
     }
   }
 
@@ -183,7 +184,7 @@ export default function BenefitActivitiesPage() {
       setSelected(saved)
       load()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '下架失败')
+      setMessage(userMessageOf(error, '权益活动没有下架，请稍后重试'))
     }
   }
 

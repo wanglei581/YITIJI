@@ -329,7 +329,7 @@ test.describe('partner screen · 托管关闭', () => {
     await expect(trend.locator('svg, .twin-tile, .twin-stat')).toHaveCount(0)
     await expect(trend.locator('.twin-cap')).toHaveText(display ? '今日只有一天，画不出趋势' : '今日只有一天，画不出趋势 · 选近 7 天看趋势')
     await expect(page.getByText(/选「近 7 天」或「近 30 天」/)).toHaveCount(0)
-    await expect(panel(page, /^使用概况$/).locator('.twin-stat b')).toHaveText(['21次', '少于 5次', '8次'])
+    await expect(panel(page, /^使用概况$/).locator('.twin-stat b')).toHaveText(['21次', '少于 5 次', '8次'])
     // 今日达到 5 次的只有 3 条：说一句为什么短
     await expect(panel(page, /^热门政策$/).locator('.twin-cap').first()).toHaveText('浏览少于 5 次的政策不列出')
     if (display) {

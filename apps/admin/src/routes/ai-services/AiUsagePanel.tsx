@@ -29,7 +29,7 @@ import type { AiUsageDimension } from './aiUsageDisplay'
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; text: string }
   | { kind: 'ready'; summary: AiUsageDailySummary }
 
 type TabState = AiUsageDimension
@@ -78,7 +78,7 @@ export function AiUsagePanel() {
   useEffect(() => {
     if (AI_USAGE_DAILY_DEMO) return
     if (!isAiUsageDayKey(day)) {
-      setLoad({ kind: 'error', message: '日期格式应为 YYYY-MM-DD' })
+      setLoad({ kind: 'error', text: '日期格式应为 YYYY-MM-DD' })
       return
     }
     let cancelled = false
@@ -88,10 +88,10 @@ export function AiUsagePanel() {
       (error: unknown) => {
         if (cancelled) return
         if (error instanceof ApiHttpError && error.status === 403) {
-          setLoad({ kind: 'error', message: '只有管理员可以查看 AI 用量与额度' })
+          setLoad({ kind: 'error', text: '只有管理员可以查看 AI 用量与额度' })
           return
         }
-        setLoad({ kind: 'error', message: userMessageOf(error, '请稍后重试') })
+        setLoad({ kind: 'error', text: userMessageOf(error, '用量没有读到，请稍后重试') })
       },
     )
     return () => { cancelled = true }
@@ -163,7 +163,7 @@ export function AiUsagePanel() {
       {!AI_USAGE_DAILY_DEMO && load.kind === 'error' && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="min-w-0 flex-1 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg" role="alert">
-            AI 用量读取失败：{load.message}
+            AI 用量读取失败：{load.text}
           </p>
           <button type="button" onClick={() => setReloadSeq((n) => n + 1)} className={CONTROL_BTN}>
             重试

@@ -27,6 +27,7 @@ import {
 } from '../../services/api/partnerCompanies'
 import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
 import { getOrgProfile } from '../../services/api/orgSelf'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -112,9 +113,8 @@ function buildFields(form: CompanyFormState, initial: CompanyFormState | null): 
   return out
 }
 
-function errMsg(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') return (e as Error).message
-  return '操作失败,请重试'
+function errMsg(e: unknown, fallback: string): string {
+  return userMessageOf(e, fallback)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ export default function CompaniesPage() {
       setEditing(null)
       load()
     } catch (e) {
-      setFormError(errMsg(e))
+      setFormError(errMsg(e, '企业资料没有保存，请检查后重试'))
       setNoticeIsError(true)
     } finally {
       setSaving(false)
@@ -273,7 +273,7 @@ export default function CompaniesPage() {
       setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交；审核发布入口尚未开放（平台不代审、不代发），开放前不能重新上架。')
     } catch (e) {
       setNoticeIsError(true)
-      setNotice(errMsg(e))
+      setNotice(errMsg(e, '企业资料下架失败，请稍后重试'))
       load()
     } finally {
       setUnpublishing(false)

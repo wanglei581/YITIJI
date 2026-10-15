@@ -590,21 +590,51 @@ export async function verifyToken(): Promise<AuthedUser | null> {
   return null
 }
 
+const LOGOUT_WAIT_MS = 2_000
+let logoutInFlight = false
+
 /**
- * 主动登出：best-effort 撤销 Admin 近期高风险验证，然后立即清理本地会话。
- * 服务端端点不声称撤销当前无 jti 的 JWT；网络失败也绝不阻止本地退出。
+ * 主动登出。http 且本地还有 token 时，先通知服务端撤销当前 jti（管理员还会清掉这份凭证上的近期高风险验证）。
+ * 最多等 2 秒：超时只停止等待，不取消请求；keepalive 让页面跳走之后请求仍能发出。
+ * 成功、失败、超时都继续清本地并跳登录页。网络失败绝不阻止本地退出。
+ * mock 模式不发请求。退出进行中再次调用直接返回。
  */
 export function logout(): void {
-  const token = getToken()
-  if (token && API_MODE === 'http') {
-    void fetch(`${API_BASE_URL}/auth/logout`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-      credentials: 'include',
-    }).catch(() => undefined)
-  }
-  clearAuth()
-  if (typeof window !== 'undefined') {
-    window.location.href = '/login'
+  if (logoutInFlight) return
+  logoutInFlight = true
+  void runLogout()
+}
+
+async function runLogout(): Promise<void> {
+  try {
+    const token = getToken()
+    if (token && API_MODE === 'http') {
+      const request = fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+        keepalive: true,
+      }).then(
+        () => undefined,
+        () => undefined,
+      )
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          request,
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, LOGOUT_WAIT_MS)
+          }),
+        ])
+      } finally {
+        if (timer !== undefined) clearTimeout(timer)
+      }
+    }
+  } catch {
+    // 请求在发出前就失败时也继续本地退出，避免未处理的拒绝挡住跳转。
+  } finally {
+    clearAuth()
+    if (typeof window !== 'undefined') window.location.href = '/login'
+    logoutInFlight = false
   }
 }

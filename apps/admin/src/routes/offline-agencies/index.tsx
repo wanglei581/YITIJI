@@ -23,6 +23,7 @@ import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentH
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export default function OfflineAgenciesPage() {
   // 表单 Drawer
   const [formOpen,     setFormOpen]     = useState(false)
   const [editingDetail,setEditingDetail]= useState<AdminOfflineAgencyDetail | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // 岗位管理 Drawer
   const [jobsOpen,     setJobsOpen]     = useState(false)
@@ -136,8 +138,8 @@ export default function OfflineAgenciesPage() {
       const detail = await offlineAgenciesAdminService.getAgency(id)
       setEditingDetail(detail)
       setFormOpen(true)
-    } catch {
-      alert('获取机构详情失败，请重试')
+    } catch (e) {
+      setActionError(userMessageOf(e, '获取机构详情失败，请稍后重试'))
     }
   }
 
@@ -161,7 +163,7 @@ export default function OfflineAgenciesPage() {
       await offlineAgenciesAdminService.publishAgency(id, true)
       void loadList()
     } catch (e) {
-      alert(e instanceof Error ? e.message : '发布失败')
+      setActionError(userMessageOf(e, '机构发布失败，请稍后重试'))
     }
   }
 
@@ -171,7 +173,7 @@ export default function OfflineAgenciesPage() {
       await offlineAgenciesAdminService.publishAgency(id, false)
       void loadList()
     } catch (e) {
-      alert(e instanceof Error ? e.message : '下架失败')
+      setActionError(userMessageOf(e, '机构下架失败，请稍后重试'))
     }
   }
 
@@ -182,7 +184,7 @@ export default function OfflineAgenciesPage() {
       await offlineAgenciesAdminService.deleteAgency(row.id)
       void loadList()
     } catch (e) {
-      alert(e instanceof Error ? e.message : '删除失败')
+      setActionError(userMessageOf(e, '机构删除失败，请稍后重试'))
     } finally {
       setDeletingId(null)
     }
@@ -221,6 +223,9 @@ export default function OfflineAgenciesPage() {
       )}
     >
       <RecruitmentHostingNotice hosting={hosting} subject="线下机构及其岗位" />
+      {actionError && (
+        <p role="alert" className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">{actionError}</p>
+      )}
       {/* 筛选条 */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select className={selectCls} value={orgType} onChange={(e) => { setOrgType(e.target.value); setPage(1) }}>
