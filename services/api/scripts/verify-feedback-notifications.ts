@@ -179,8 +179,23 @@ async function main() {
       feedback.addAdminReply(admin, ticket.id, { content: '已收到企业面试邀约，请查看投递结果。' }),
     )
 
+    await expectReject('PRIVACY_CONTACT_PHONE_REQUIRED', '8a. 会员个人信息请求缺手机号被拒', () =>
+      feedback.create(userA, { category: 'privacy', content: '会员个人信息请求描述不少于十字' }),
+    )
+    const privacyFeedback = await feedback.create(userA, {
+      category: 'privacy', contactPhone: phoneA, content: '会员个人信息请求描述不少于十字',
+    })
+    const privacyStored = await prisma.feedbackTicket.findUnique({ where: { id: privacyFeedback.id } })
+    if (!privacyStored?.contactPhoneEnc || privacyStored.contactPhoneEnc.includes(phoneA)) fail('8a. 会员 privacy 联系电话未加密保存')
+    pass('8a. 会员 privacy 必须留手机号，且只保存加密值')
+    const aiFeedback = await feedback.create(userA, {
+      category: 'ai_content', content: '会员 AI 内容投诉描述不少于十字',
+    })
+    if (aiFeedback.category === 'ai_content' && aiFeedback.contactPhoneMasked === null) pass('8a. 会员 ai_content 可提交且电话选填')
+    else fail('8a. 会员 ai_content 类别或选填电话行为错误')
+
     const extraFeedbacks = await Promise.all(Array.from({ length: 101 }, (_, index) => feedback.create(userA, {
-      category: 'general',  // FEEDBACK_CATEGORIES 只有 device/print/file_process/general，'other' 会被 DTO 400
+      category: 'general',
       title: `分页反馈 ${index}`,
       content: '用于验证后台反馈列表总数不因展示上限失真。',
     })))

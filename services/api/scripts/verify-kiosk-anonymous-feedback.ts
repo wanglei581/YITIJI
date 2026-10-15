@@ -108,7 +108,7 @@ async function main() {
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   // 每组用独立终端：限流按终端收敛，共用终端会让前一组的建单吃掉后一组的额度。
   const T = (k: string) => `term_kfb_${k}_${suffix}`
-  const terminalIds = ['main', 'other', 'rate', 'ratehour', 'dedup', 'dedup2', 'concurrent'].map(T)
+  const terminalIds = ['main', 'other', 'ai', 'rate', 'ratehour', 'dedup', 'dedup2', 'concurrent'].map(T)
   const printTaskId = `ptask_kfb_${suffix}`
   const scanTaskId = `stask_kfb_${suffix}`
   const memberId = `eu_kfb_${suffix}`
@@ -189,11 +189,21 @@ async function main() {
       through({ terminalId: T('main'), issueCode: 'refund_now' }))
     await expectCode('2c. 任意字符串 issueCode 被拒', 'VALIDATION_FAILED', () =>
       through({ terminalId: T('main'), issueCode: '<script>alert(1)</script>' }))
-    await expectCode('2d. 私带 category 想绕过映射被拒（forbidNonWhitelisted）', 'VALIDATION_FAILED', () =>
+    await expectCode('2d. 越界 category 被拒（forbidNonWhitelisted）', 'VALIDATION_FAILED', () =>
       through({ terminalId: T('main'), issueCode: 'other', category: 'recruiting' }))
-    await expectCode('2e. 越界满意度被拒', 'VALIDATION_FAILED', () =>
+    const aiTicket = await kiosk.submit(await through({ terminalId: T('ai'), category: 'ai_content', content: 'AI 内容投诉描述不少于十字' }))
+    const aiRow = await prisma.feedbackTicket.findUnique({ where: { id: aiTicket.ticketId } })
+    if (aiRow?.category !== 'ai_content' || aiRow?.contactPhoneEnc !== null) fail('2d. ai_content 匿名投诉提交或选填电话存储错误')
+    pass('2d. ai_content 匿名投诉可提交，电话可选且未伪造联系方式')
+    await expectCode('2e. privacy 无手机号被拒', 'PRIVACY_CONTACT_PHONE_REQUIRED', async () =>
+      kiosk.submit(await through({ terminalId: T('ai'), category: 'privacy', content: '个人信息请求描述不少于十字' })))
+    const privacyTicket = await kiosk.submit(await through({ terminalId: T('ai'), category: 'privacy', contactPhone: '13812345678', content: '个人信息请求描述不少于十字' }))
+    const privacyRow = await prisma.feedbackTicket.findUnique({ where: { id: privacyTicket.ticketId } })
+    if (privacyRow?.category !== 'privacy' || !privacyRow.contactPhoneEnc || privacyRow.contactPhoneEnc.includes('13812345678')) fail('2f. privacy 电话未加密存储')
+    pass('2f. privacy 必须留手机号且只保存加密值')
+    await expectCode('2g. 越界满意度被拒', 'VALIDATION_FAILED', () =>
       through({ terminalId: T('main'), satisfaction: 'excellent' }))
-    await expectCode('2f. 既无 issueCode 也无满意度的空提交被拒', 'KIOSK_FEEDBACK_EMPTY', async () =>
+    await expectCode('2h. 既无 issueCode 也无满意度的空提交被拒', 'KIOSK_FEEDBACK_EMPTY', async () =>
       kiosk.submit(await through({ terminalId: T('main') })))
 
     const strayCategory = KIOSK_FEEDBACK_ISSUE_CODES

@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 import type { FeedbackCategory } from '../member-feedback.types'
 
 /**
@@ -22,6 +22,8 @@ export const KIOSK_FEEDBACK_ISSUE_CODES = [
   'upload_issue',
   'billing_issue',
   'other',
+  'ai_content_complaint',
+  'privacy_request',
 ] as const
 
 export type KioskFeedbackIssueCode = typeof KIOSK_FEEDBACK_ISSUE_CODES[number]
@@ -40,6 +42,8 @@ export const KIOSK_FEEDBACK_ISSUE_MAP: Record<
   upload_issue: { category: 'file_process', label: '上传问题' },
   billing_issue: { category: 'general', label: '费用问题' },
   other: { category: 'general', label: '其他问题' },
+  ai_content_complaint: { category: 'ai_content', label: 'AI 内容投诉' },
+  privacy_request: { category: 'privacy', label: '个人信息请求' },
 }
 
 /** 打印完成页满意度三档。 */
@@ -63,6 +67,10 @@ export class CreateKioskFeedbackDto {
   terminalId!: string
 
   @IsOptional()
+  @IsIn(['ai_content', 'privacy'])
+  category?: 'ai_content' | 'privacy'
+
+  @IsOptional()
   @IsIn(KIOSK_FEEDBACK_ISSUE_CODES)
   issueCode?: KioskFeedbackIssueCode
 
@@ -75,6 +83,10 @@ export class CreateKioskFeedbackDto {
   @IsString()
   @MaxLength(KIOSK_FEEDBACK_CONTENT_MAX)
   content?: string
+
+  @IsOptional()
+  @Matches(/^1[3-9]\d{9}$/)
+  contactPhone?: string
 
   @IsOptional()
   @IsString()

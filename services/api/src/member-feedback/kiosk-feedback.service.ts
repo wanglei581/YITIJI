@@ -11,6 +11,7 @@ import {
   type KioskFeedbackSatisfaction,
 } from './dto/kiosk-feedback.dto'
 import { detectKioskFeedbackPii, sanitizeKioskFeedbackText } from './kiosk-feedback-text'
+import { encryptPhone } from '../common/crypto/phone-identity'
 
 /** 匿名工单的 submitterType 取值，后台据此与会员工单分开处置。 */
 export const ANONYMOUS_KIOSK_SUBMITTER = 'anonymous_kiosk'
@@ -74,7 +75,7 @@ export class KioskFeedbackService {
     if (!terminalId) badRequest('KIOSK_FEEDBACK_TERMINAL_REQUIRED', '缺少终端标识')
 
     // 1) 至少要说明一件事：报障或评分。两者都缺 = 空提交，不建单。
-    if (!dto.issueCode && !dto.satisfaction) {
+    if (!dto.issueCode && !dto.category && !dto.satisfaction) {
       badRequest('KIOSK_FEEDBACK_EMPTY', '请选择问题类型或满意度')
     }
 
@@ -89,9 +90,12 @@ export class KioskFeedbackService {
     //    也不得据此改 status —— 工单处置权始终在 Admin 侧。
     //    本批次不预留该字段：其形状（建议值/置信度/模型与提示词版本/聚类 id）现在无法确定，
     //    且日后新增可空列同样是纯 additive 迁移，现在猜一个反而要改。
-    const category = dto.issueCode ? KIOSK_FEEDBACK_ISSUE_MAP[dto.issueCode].category : 'general'
+    const category = dto.category ?? (dto.issueCode ? KIOSK_FEEDBACK_ISSUE_MAP[dto.issueCode].category : 'general')
     if (!(FEEDBACK_CATEGORIES as readonly string[]).includes(category)) {
       badRequest('FEEDBACK_CATEGORY_INVALID', '反馈分类不支持')
+    }
+    if (category === 'privacy' && !dto.contactPhone) {
+      badRequest('PRIVACY_CONTACT_PHONE_REQUIRED', '个人信息请求需要留一个手机号，方便我们核实和回复')
     }
 
     // 4) 终端必须真实存在。否则攻击者可以每次换一个 terminalId 绕开按终端限流。
@@ -126,7 +130,7 @@ export class KioskFeedbackService {
           content,
           satisfaction: dto.satisfaction ?? null,
           dedupKey: dedup.writeKey,
-          contactPhoneEnc: null,
+          contactPhoneEnc: dto.contactPhone ? encryptPhone(dto.contactPhone) : null,
         },
       })
       return this.toReceipt(row, dto.issueCode ?? null, false)

@@ -1,6 +1,6 @@
 import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
 
-export const FEEDBACK_CATEGORIES = ['device', 'print', 'file_process', 'general'] as const
+export const FEEDBACK_CATEGORIES = ['device', 'print', 'file_process', 'general', 'ai_content', 'privacy'] as const
 export const FEEDBACK_STATUSES = ['pending', 'processing', 'replied', 'closed'] as const
 /** 后台按提交方筛选用的白名单。member 与 anonymous_kiosk 的处置方式不同，需要分开成队列。 */
 export const FEEDBACK_SUBMITTER_TYPES = ['member', 'anonymous_kiosk'] as const

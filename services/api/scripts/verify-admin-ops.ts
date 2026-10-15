@@ -62,6 +62,7 @@ function mockOpsPrisma(
   printRows: unknown[] = [],
   dispositionRows: unknown[] = [],
   unavailableRows: unknown[] = [],
+  feedbackRows: unknown[] = [],
 ): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
@@ -71,6 +72,7 @@ function mockOpsPrisma(
       findFirst: async () => unavailableRows[0] ?? null,
     },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
+    feedbackTicket: { findMany: async () => feedbackRows },
     alertDisposition: {
       findMany: async () => dispositionRows,
       updateMany: async () => {
@@ -115,6 +117,23 @@ async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
     }
   }
   pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
+}
+
+async function verifyPendingFeedbackAlert(): Promise<void> {
+  const feedbackRows: Array<{ createdAt: Date; category: string; status: string; contactPhoneEnc: string; content: string }> = [
+    { createdAt: new Date('2026-09-28T08:00:00.000Z'), category: 'ai_content', status: 'pending', contactPhoneEnc: 'secret-phone', content: 'secret-content' },
+    { createdAt: new Date('2026-09-28T08:01:00.000Z'), category: 'privacy', status: 'processing', contactPhoneEnc: 'secret-phone-2', content: 'secret-content-2' },
+  ]
+  const service = new AdminOpsService(mockOpsPrisma([], [], [], [], feedbackRows))
+  const first = await service.listDerivedAlerts()
+  const alert = first.data.find((item) => item.type === 'feedback_pending')
+  if (!alert || !alert.detail.includes('共 2 条')) fail('3c. 待处理 AI 内容投诉/个人信息请求告警缺失或条数错误')
+  const encoded = JSON.stringify(alert)
+  if (encoded.includes('secret-phone') || encoded.includes('secret-content')) fail('3c. 告警泄露手机号或投诉正文')
+  feedbackRows.splice(0)
+  const after = await service.listDerivedAlerts()
+  if (after.data.some((item) => item.type === 'feedback_pending')) fail('3c. 工单处理完后派生告警未消失')
+  pass('3c. AI 内容投诉/个人信息请求告警按条数与最早时间派生，且不含个人信息，处理后消失')
 }
 
 async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
@@ -211,6 +230,7 @@ async function main() {
   pass('SES-07 终端在线窗口统一为五分钟心跳常量')
 
   await verifyHealthyPrinterStatusesDoNotAlert()
+  await verifyPendingFeedbackAlert()
   await verifyPaidPendingFileUnavailableAlert()
   if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return
 
@@ -320,7 +340,6 @@ async function main() {
       discountCents: 0,
     },
   })
-
   const cleanup = async () => {
     await prisma.alertDisposition.deleteMany({ where: { subjectKey: { in: subjectKeys } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: subjectKeys } } })

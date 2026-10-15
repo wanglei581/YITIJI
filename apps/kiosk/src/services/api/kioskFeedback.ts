@@ -8,9 +8,8 @@
 // 与 memberFeedback.ts（/me/feedback）的区别，三条都是硬约束：
 //   1. 不带 Authorization，且 credentials: 'omit' —— 不捎带会话 Cookie。
 //      匿名就要是真的匿名，不能因为用户碰巧登录过就把工单挂到他账号上。
-//   2. 不收联系方式。后端 CreateKioskFeedbackDto 根本没有 contactPhone 字段，
-//      前端也不提供输入框 —— 匿名工单没有账号归属，一旦落进手机号就是无主敏感数据
-//      （CLAUDE.md §11）。自由文本里的 PII 由服务端拒绝（不是脱敏）。
+//   2. 只有 privacy 个人信息请求可以提交手机号；后端加密保存，ai_content 不要求手机号。
+//      自由文本里的 PII 由服务端拒绝（不是脱敏）。
 //   3. 只有「提交」一个动作。没有列表 / 详情 / 追加回复 / 关单 ——
 //      匿名调用方不应拿到任何可枚举的工单读能力，处置只能走 Admin 侧。
 //
@@ -23,7 +22,7 @@ import { getTerminalId } from './screensaver'
 
 /**
  * 封闭词表，与后端 dto/kiosk-feedback.dto.ts 的 KIOSK_FEEDBACK_ISSUE_CODES 一一对应。
- * 客户端只能从这张表里选，category 由服务端映射得出 —— 前端不传也传不了 category。
+ * 客户端只能从这张表里选既有现场问题；ai_content / privacy 通过受限 category 传入。
  * 两份清单的一致性由 verify:kiosk-feedback-entry 静态门禁守护。
  */
 export const KIOSK_FEEDBACK_ISSUE_CODES = [
@@ -36,6 +35,8 @@ export const KIOSK_FEEDBACK_ISSUE_CODES = [
   'upload_issue',
   'billing_issue',
   'other',
+  'ai_content_complaint',
+  'privacy_request',
 ] as const
 
 export type KioskFeedbackIssueCode = typeof KIOSK_FEEDBACK_ISSUE_CODES[number]
@@ -85,9 +86,11 @@ export interface KioskFeedbackReceipt {
 }
 
 export interface SubmitKioskFeedbackInput {
+  category?: 'ai_content' | 'privacy'
   issueCode?: KioskFeedbackIssueCode
   satisfaction?: KioskFeedbackSatisfaction
   content?: string
+  contactPhone?: string
   relatedPrintTaskId?: string
   relatedScanTaskId?: string
 }
@@ -138,8 +141,10 @@ export async function submitKioskFeedback(
   const body = {
     terminalId,
     ...(input.issueCode ? { issueCode: input.issueCode } : {}),
+    ...(input.category ? { category: input.category } : {}),
     ...(input.satisfaction ? { satisfaction: input.satisfaction } : {}),
     ...(content ? { content } : {}),
+    ...(input.contactPhone ? { contactPhone: input.contactPhone } : {}),
     ...(input.relatedPrintTaskId ? { relatedPrintTaskId: input.relatedPrintTaskId } : {}),
     ...(input.relatedScanTaskId ? { relatedScanTaskId: input.relatedScanTaskId } : {}),
   }

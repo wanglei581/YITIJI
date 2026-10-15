@@ -82,6 +82,20 @@ async function main() {
     pass('shared / legal.service.ts 包含 operator_info，且新文档保持未激活')
   }
 
+  // 生产登录必须在缺版本或草稿哨兵时 fail-closed；开发/E2E 仍保留回落。
+  {
+    const auth = readFile('services/api/src/member-auth/member-auth.service.ts')
+    if (!auth.includes("code: 'LEGAL_DOCS_NOT_PUBLISHED'") || !auth.includes("process.env['NODE_ENV'] === 'production'")) {
+      fail('member-auth.service 缺少生产环境缺版本/草稿版本拒绝闸门')
+    }
+    if (!auth.includes('LEGAL_DRAFT_FALLBACK_VERSION')) fail('开发环境协议版本回落常量被移除')
+    const kioskVersions = readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts')
+    if (!kioskVersions.includes('import.meta.env.DEV') || !kioskVersions.includes(': null')) {
+      fail('kiosk legalConsentVersions 未实现生产返回 null、开发保留回落')
+    }
+    pass('生产拒绝缺失/草稿协议版本，开发与 E2E 保留回落')
+  }
+
   // ── 3. admin 控制器使用鉴权守卫 ──────────────────────────────────────────
   {
     const adminCtrl = readFile('services/api/src/legal/admin-legal-docs.controller.ts')

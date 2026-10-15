@@ -168,23 +168,41 @@ export class MemberAuthService {
     privacyVersion: string
     termsDocVersionId: string | null
     privacyDocVersionId: string | null
+    termsPublishedAt: Date | null
+    privacyPublishedAt: Date | null
   }> {
     const [terms, privacy] = await Promise.all([
       this.prisma.legalDocVersion.findFirst({
         where: { docType: 'terms_of_service', isActive: true },
-        select: { id: true, version: true },
+        select: { id: true, version: true, publishedAt: true },
       }),
       this.prisma.legalDocVersion.findFirst({
         where: { docType: 'privacy_policy', isActive: true },
-        select: { id: true, version: true },
+        select: { id: true, version: true, publishedAt: true },
       }),
     ])
-    return {
+    const resolved = {
       termsVersion: terms?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
       privacyVersion: privacy?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
       termsDocVersionId: terms?.id ?? null,
       privacyDocVersionId: privacy?.id ?? null,
+      termsPublishedAt: terms?.publishedAt ?? null,
+      privacyPublishedAt: privacy?.publishedAt ?? null,
     }
+    if (
+      process.env['NODE_ENV'] === 'production' &&
+      (resolved.termsVersion === LEGAL_DRAFT_FALLBACK_VERSION ||
+        resolved.privacyVersion === LEGAL_DRAFT_FALLBACK_VERSION ||
+        !resolved.termsDocVersionId ||
+        !resolved.privacyDocVersionId ||
+        !resolved.termsPublishedAt ||
+        !resolved.privacyPublishedAt)
+    ) {
+      throw new ForbiddenException({
+        error: { code: 'LEGAL_DOCS_NOT_PUBLISHED', message: '服务协议暂未发布，暂时不能登录' },
+      })
+    }
+    return resolved
   }
 
   private assertConsentMatches(

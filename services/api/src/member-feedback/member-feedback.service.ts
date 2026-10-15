@@ -30,6 +30,7 @@ export class MemberFeedbackService {
 
   async create(endUserId: string, dto: CreateFeedbackDto): Promise<MemberFeedbackTicketDetail> {
     this.validateCategory(dto.category)
+    this.assertContactPhone(dto.category, dto.contactPhone)
     this.assertSafeCopy(`${dto.title ?? ''} ${dto.content}`)
     if (dto.relatedPrintTaskId) await this.assertPrintTaskOwner(endUserId, dto.relatedPrintTaskId)
 
@@ -226,6 +227,14 @@ export class MemberFeedbackService {
       throw new BadRequestException({ error: { code: 'FEEDBACK_CATEGORY_INVALID', message: '反馈分类不支持' } })
     }
     return value as FeedbackCategory
+  }
+
+  private assertContactPhone(category: FeedbackCategory, phone: string | undefined): void {
+    if (category === 'privacy' && !phone) {
+      throw new BadRequestException({
+        error: { code: 'PRIVACY_CONTACT_PHONE_REQUIRED', message: '个人信息请求需要留一个手机号，方便我们核实和回复' },
+      })
+    }
   }
 
   private validateStatus(value: string): FeedbackStatus {
