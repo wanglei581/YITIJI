@@ -4,6 +4,9 @@
  * Windows owns a named pipe for the lifetime of the process. POSIX development
  * hosts use a Unix domain socket; a socket left by a crashed process is probed
  * before it is removed. agent.pid is diagnostic data only and never gates startup.
+ * Machine identity is published as a hard link to a complete, fsynced file:
+ * direct wx writes expose an empty file between exclusive creation and writing.
+ * Filesystems without hard links fall back to wx; readers briefly retry empties.
  *
  * Only the Windows path is the production guarantee: libuv creates the pipe with
  * FILE_FLAG_FIRST_PIPE_INSTANCE, so a second server fails atomically (EADDRINUSE).
@@ -35,19 +38,33 @@ export function getLockPath(): string { return path.join(stateDir(), PID_FILE) }
 export function getInstanceIdentityPath(): string { return path.join(stateDir(), INSTANCE_ID_FILE) }
 
 // 首次启动时由服务（LocalSystem）在只有 SYSTEM 与管理员可写的状态目录里生成随机标识。
-// 缺文件就生成；两个进程同时生成时独占创建只有一个成功，另一个读取它写好的那份；
+// 不能直接 wx 写：独占创建与写入之间会暴露空文件。先写同目录临时文件并 fsync，再硬链接发布；
+// 两个进程发布时只有一个成功，另一个读已发布的完整内容；不支持硬链接时回退 wx，空内容短暂重读。
 // 读得到但格式不对（被改过）仍然拒绝启动，绝不退回固定管道名。
 function createMachineIdentity(file: string): string {
   const value = crypto.randomBytes(16).toString('hex')
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, `${value}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+    const fd = fs.openSync(tmp, 'wx', 0o600)
+    try {
+      fs.writeFileSync(fd, `${value}\n`, { encoding: 'utf8' })
+      fs.fsyncSync(fd)
+    } finally { fs.closeSync(fd) }
+    try { fs.linkSync(tmp, file) }
+    catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (!['EPERM', 'ENOSYS', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV'].includes(code || '')) throw error
+      fs.writeFileSync(file, `${value}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+    }
     return value
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
       try { return fs.readFileSync(file, 'utf8').trim() } catch { /* fall through to fail-closed */ }
     }
     throw new Error(`machine_identity_unavailable: cannot create ${file}`)
+  } finally {
+    try { fs.unlinkSync(tmp) } catch { /* absent or already cleaned */ }
   }
 }
 
@@ -58,6 +75,14 @@ function readMachineIdentity(): string {
   catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`machine_identity_unavailable: cannot read ${file}`)
     value = createMachineIdentity(file)
+  }
+  // 只容忍正在写入的空文件；非空坏内容必须立刻拒绝，不能覆盖或放行。
+  const deadline = Date.now() + 250
+  const sleeper = new Int32Array(new SharedArrayBuffer(4))
+  while (value === '' && Date.now() < deadline) {
+    Atomics.wait(sleeper, 0, 0, Math.min(10, deadline - Date.now()))
+    try { value = fs.readFileSync(file, 'utf8').trim() }
+    catch { throw new Error(`machine_identity_unavailable: cannot read ${file}`) }
   }
   if (!MACHINE_ID_RE.test(value)) throw new Error(`machine_identity_invalid: ${file}`)
   return value

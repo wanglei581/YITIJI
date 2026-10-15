@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -14,20 +14,67 @@ mkdirSync(state, { recursive: true })
 const lockSource = (hold) => hold
   ? `require('./src/agent/instance-lock').acquireLock().then(() => { console.log('HELD'); setTimeout(() => {}, 600000) }).catch(e => { console.error(e.message); process.exit(2) })`
   : `require('./src/agent/instance-lock').acquireLock().then(() => process.exit(0)).catch(e => { console.error(e.message); process.exit(2) })`
-const identitySource = `try { console.log(require('./src/agent/instance-lock').__readMachineIdentityForTests()) } catch (e) { console.error(e.message); process.exit(3) }`
+// 在模块加载后用 IPC 同时放行，避免 ts-node 启动快慢把首启竞争错开。
+// 对直接 wx 写 instance-id 的路径拆出真实 open/write 两步并暂停 20ms，确定性放大空文件窗口；
+// 修复版写的是临时文件，不会进入此注入。类型检查由独立 typecheck 门禁承担。
+const identitySource = (linkError = '') => `
+  const fs = require('node:fs')
+  const { basename } = require('node:path')
+  const originalRead = fs.readFileSync
+  let readStarted = false
+  fs.readFileSync = function(file, ...args) {
+    const firstIdentityRead = typeof file === 'string' && basename(file) === 'instance-id' && !readStarted
+    try { return originalRead.call(this, file, ...args) }
+    finally {
+      if (firstIdentityRead) { readStarted = true; process.send('READING') }
+    }
+  }
+  const originalWrite = fs.writeFileSync
+  fs.writeFileSync = function(file, data, options) {
+    if (typeof file === 'string' && basename(file) === 'instance-id' && options?.flag === 'wx') {
+      const fd = fs.openSync(file, 'wx', options.mode)
+      try {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
+        return originalWrite.call(this, fd, data, options)
+      } finally { fs.closeSync(fd) }
+    }
+    return originalWrite.call(this, file, data, options)
+  }
+  if (${JSON.stringify(linkError)}) fs.linkSync = () => { throw Object.assign(new Error('unsupported link'), { code: ${JSON.stringify(linkError)} }) }
+  const readIdentity = require('./src/agent/instance-lock').__readMachineIdentityForTests
+  process.once('message', () => {
+    try { console.log(readIdentity()); process.exit(0) }
+    catch (e) { console.error(e.message); process.exit(3) }
+  })
+  process.send('READY')
+`
 
 // 持有者一直活到被测试显式结束（CI 慢时 60 秒不够，自己到时退出会被误判成锁丢了）；收尾统一强杀。
 const spawned = []
 function run(source, programData) {
-  const proc = spawn(process.execPath, ['-r', 'ts-node/register', '-e', source], {
+  const proc = spawn(process.execPath, ['-r', 'ts-node/register/transpile-only', '-e', source], {
     cwd: process.cwd(),
     env: { ...process.env, PROGRAMDATA: programData },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   })
   const out = { stdout: '', stderr: '', code: undefined }
   proc.stdout.on('data', (chunk) => { out.stdout += String(chunk) })
   proc.stderr.on('data', (chunk) => { out.stderr += String(chunk) })
-  out.exited = new Promise((resolve) => proc.once('exit', (code) => { out.code = code; resolve(code) }))
+  out.exited = new Promise((resolve) => proc.once('close', (code) => { out.code = code; resolve(code) }))
+  const messageOrExit = (expected) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => finish(new Error(`child did not report ${expected}`)), 15_000)
+    const onMessage = (message) => { if (message === expected) finish() }
+    const onClose = () => finish(new Error(`child exited before ${expected}: ${out.stderr}`))
+    function finish(error) {
+      clearTimeout(timer); proc.off('message', onMessage); proc.off('close', onClose)
+      if (error) reject(error); else resolve()
+    }
+    proc.on('message', onMessage); proc.once('close', onClose)
+  })
+  if (source.includes("process.send('READY')")) {
+    out.ready = messageOrExit('READY')
+    out.reading = messageOrExit('READING')
+  }
   out.proc = proc
   spawned.push(proc)
   return out
@@ -59,32 +106,95 @@ async function hammerEarlyDisconnect(endpoint, owner) {
   await wait(300)
 }
 const endpointOf = (child) => child.stdout.match(/instance-lock: acquired \((.+)\)/)?.[1]
+async function startReaders(readers) {
+  await Promise.all(readers.map((r) => r.ready))
+  for (const reader of readers) reader.proc.send('READ')
+  await Promise.all(readers.map((r) => r.reading))
+}
+const assertIdentityFiles = (root) => assert.deepEqual(
+  readdirSync(join(root, 'AIJobPrintAgent')).sort(), ['instance-id'], 'identity temporary files must be cleaned up',
+)
 
 try {
   // ── 机器标识：缺文件就生成、再次读取不变、并发生成结果一致、被改坏则拒绝 ──
   const idRoot = mkdtempSync(join(tmpdir(), 'terminal-agent-identity-'))
   try {
     const idFile = join(idRoot, 'AIJobPrintAgent', 'instance-id')
-    const first = run(identitySource, idRoot)
+    const first = run(identitySource(), idRoot)
+    await startReaders([first])
     assert.equal(await first.exited, 0, `missing instance-id must be created, not fail\n${first.stderr}`)
     const created = first.stdout.trim()
     assert.match(created, /^[0-9a-f]{32}$/, 'created identity is 128-bit random hex')
     assert.equal(readFileSync(idFile, 'utf8').trim(), created, 'identity is persisted to the state directory')
-    const again = run(identitySource, idRoot)
+    assertIdentityFiles(idRoot)
+    const again = run(identitySource(), idRoot)
+    await startReaders([again])
     assert.equal(await again.exited, 0)
     assert.equal(again.stdout.trim(), created, 'identity is stable across starts')
 
-    const raceRoot = mkdtempSync(join(tmpdir(), 'terminal-agent-identity-race-'))
-    const racers = [run(identitySource, raceRoot), run(identitySource, raceRoot)]
-    await Promise.all(racers.map((r) => r.exited))
-    assert.deepEqual(racers.map((r) => r.code), [0, 0], `concurrent first starts must both succeed\n${racers.map((r) => r.stderr).join('\n')}`)
-    assert.equal(racers[0].stdout.trim(), racers[1].stdout.trim(), 'concurrent first starts must agree on one identity')
-    rmSync(raceRoot, { recursive: true, force: true })
+    const raceStarted = Date.now()
+    for (let round = 0; round < 30; round += 1) {
+      const raceRoot = mkdtempSync(join(tmpdir(), 'terminal-agent-identity-race-'))
+      const racers = Array.from({ length: 4 }, () => run(identitySource(), raceRoot))
+      try {
+        await startReaders(racers)
+        await Promise.all(racers.map((r) => r.exited))
+        assert.deepEqual(racers.map((r) => r.code), [0, 0, 0, 0], `concurrent first starts must all succeed (round ${round + 1})\n${racers.map((r) => r.stderr).join('\n')}`)
+        assert.equal(racers[0].stdout.trim(), racers[1].stdout.trim(), 'concurrent first starts must agree on one identity')
+        for (const racer of racers) assert.equal(racer.stdout.trim(), racers[0].stdout.trim(), 'all four starts must agree on one identity')
+        assert.equal(readFileSync(join(raceRoot, 'AIJobPrintAgent', 'instance-id'), 'utf8').trim(), racers[0].stdout.trim())
+        assertIdentityFiles(raceRoot)
+      } finally {
+        for (const racer of racers) if (racer.code === undefined) await kill(racer)
+        rmSync(raceRoot, { recursive: true, force: true })
+      }
+    }
+    console.log(`identity race: 30 rounds x 4 processes in ${Date.now() - raceStarted}ms`)
+
+    // 不支持硬链接的文件系统仍能首次启动，竞争者通过空内容重读看到同一份标识。
+    for (const code of ['EPERM', 'ENOSYS', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV']) {
+      rmSync(idFile)
+      const readers = Array.from({ length: 4 }, () => run(identitySource(code), idRoot))
+      await startReaders(readers)
+      await Promise.all(readers.map((r) => r.exited))
+      assert.deepEqual(readers.map((r) => r.code), [0, 0, 0, 0], `wx fallback must succeed for ${code}`)
+      for (const reader of readers) assert.equal(reader.stdout.trim(), readers[0].stdout.trim())
+      assertIdentityFiles(idRoot)
+    }
+
+    writeFileSync(idFile, '')
+    const delayed = run(identitySource(), idRoot)
+    await startReaders([delayed])
+    await wait(80)
+    writeFileSync(idFile, `${created}\n`)
+    assert.equal(await delayed.exited, 0, `empty identity completed after 80ms must succeed\n${delayed.stderr}`)
+    assert.equal(delayed.stdout.trim(), created)
+    assertIdentityFiles(idRoot)
+
+    writeFileSync(idFile, '')
+    const empty = run(identitySource(), idRoot)
+    await startReaders([empty])
+    const emptyStarted = Date.now()
+    assert.equal(await empty.exited, 3, 'persistently empty identity must fail closed')
+    assert.match(empty.stderr, /machine_identity_invalid/)
+    assert.ok(Date.now() - emptyStarted >= 200, 'empty identity must wait for the bounded retry window')
+    assertIdentityFiles(idRoot)
 
     writeFileSync(idFile, 'bad id with spaces\n')
-    const tampered = run(identitySource, idRoot)
+    const tampered = run(identitySource(), idRoot)
+    await startReaders([tampered])
     assert.notEqual(await tampered.exited, 0, 'tampered identity must fail closed')
     assert.match(tampered.stderr, /machine_identity_invalid/, 'tampered identity must be reported as invalid, not silently replaced')
+    assertIdentityFiles(idRoot)
+
+    // 非空坏内容不能等到它被改成合法值再放行；仍须立即报 invalid。
+    const tamperedThenValid = run(identitySource(), idRoot)
+    await startReaders([tamperedThenValid])
+    await wait(80)
+    writeFileSync(idFile, `${created}\n`)
+    assert.equal(await tamperedThenValid.exited, 3, 'tampered identity must fail closed even if replaced after 80ms')
+    assert.match(tamperedThenValid.stderr, /machine_identity_invalid/)
+    assertIdentityFiles(idRoot)
   } finally {
     rmSync(idRoot, { recursive: true, force: true })
   }
