@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { ResumeExportFormat, ResumeExportPricing, ResumeGenerateExportResponse, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
+import type { ResumeExportFormat, ResumeExportPricing, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
+import type { OptimizeStoredExport } from './useOptimizeSession'
 import { ResumeLayoutControls } from '../ResumeLayoutControls'
 import { COMPRESS_ONE_PAGE, type GeneratePreviewViewState } from './constants'
 import { ResumeExportResult } from './ResumeExportResult'
@@ -40,7 +41,7 @@ export function ResumeFormatChooser(props: {
   selectedTemplateId: string
   onTemplateChange: (id: string) => void
   exporting: boolean
-  exported: ResumeGenerateExportResponse | null
+  exported: OptimizeStoredExport | null
   exportError: string | null
   exportVersion: number
   pricing: ResumeExportPricing | null
@@ -268,7 +269,7 @@ export function ResumeFormatChooser(props: {
 }
 
 function SyntheticFileCard(props: {
-  exported: ResumeGenerateExportResponse
+  exported: OptimizeStoredExport
   screen: GeneratePreviewViewState
   printReady: boolean
 }) {

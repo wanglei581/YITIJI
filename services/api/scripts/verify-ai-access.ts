@@ -394,6 +394,7 @@ async function draftExportManualPath(): Promise<void> {
   let exported = 0
   const self = {
     resolveAiResultRequester: async () => ({ endUserId: 'member-without-consent' }),
+    verifiedQuotaTerminal: async () => null,
     privacy: { requireActiveConsent: async () => { consentCalls += 1; throw new ForbiddenException({ error: { code: 'CONSENT_REQUIRED', message: '需要先同意' } }) } },
     aiService: {
       resolveExportSourceFileId: async () => null,

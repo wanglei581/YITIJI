@@ -123,6 +123,8 @@ export function ResumeGeneratePreviewPage() {
           signedUrl: '',
           expiresAt: new Date(Date.now() + (expired ? -60_000 : 30 * 60 * 1000)).toISOString(),
           printFileUrl: noPrint ? undefined : '/api/v1/files/capture-export/content?expires=1&sig=capture',
+          visibleLabelApplied: true,
+          unlabeledDeniedReason: null,
         })
       } else {
         setExported(null)

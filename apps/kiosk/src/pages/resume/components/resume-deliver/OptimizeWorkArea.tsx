@@ -2,7 +2,6 @@ import type { CSSProperties } from 'react'
 import type {
   GeneratedResume,
   ResumeExportFormat,
-  ResumeGenerateExportResponse,
   ResumeLayoutSettings,
   ResumeOptimizeModule,
   ResumeTemplate,
@@ -13,6 +12,7 @@ import { OptimizeReadyBody } from './OptimizeReadyBody'
 import { ResumeDeliverPanel } from './ResumeDeliverPanel'
 import { ResumeVersionsPanel } from './ResumeVersionsPanel'
 import type { ResumeDecisionMap, ResumeModuleDecision } from './resumeDecisions'
+import type { OptimizeStoredExport } from './useOptimizeSession'
 
 export function OptimizeWorkArea(props: {
   resume: GeneratedResume
@@ -33,7 +33,7 @@ export function OptimizeWorkArea(props: {
   selectedTemplateId: string
   exportFormat: ResumeExportFormat
   printNavigating: boolean
-  exported: ResumeGenerateExportResponse | null
+  exported: OptimizeStoredExport | null
   exportKind: 'resume' | 'change_list'
   exportError: string | null
   exportVersion: number

@@ -18,7 +18,8 @@ import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
-import { resumeExportShowsVisibleLabel } from '../common/pdf/aigc-label'
+import { resumeExportShowsVisibleLabel, resumeUnlabeledOptionEnabled } from '../common/pdf/aigc-label'
+import type { UnlabeledExportPublicDeniedReason } from './resume/resume-unlabeled-export'
 import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
 import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
@@ -699,10 +700,17 @@ export class AiService {
     return file.id
   }
 
-  /** GET /resume/export/pricing：三态价目 + 登录会员可用权益次数。 */
-  async getResumeExportPricing(endUserId: string | null): Promise<ResumeExportPricingView> {
-    if (this.exportGate) return this.exportGate.getPricing(endUserId)
-    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' }
+  /**
+   * GET /resume/export/pricing：三态价目 + 登录会员可用权益次数。
+   * unlabeledOptionAvailable 只看两个开关是否都开，不在这里判登录或协议。
+   */
+  async getResumeExportPricing(endUserId: string | null): Promise<ResumeExportPricingView & { unlabeledOptionAvailable: boolean }> {
+    const unlabeledOptionAvailable = resumeUnlabeledOptionEnabled()
+    if (this.exportGate) {
+      const pricing = await this.exportGate.getPricing(endUserId)
+      return { ...pricing, unlabeledOptionAvailable }
+    }
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营', unlabeledOptionAvailable }
   }
 
   /**
@@ -777,7 +785,14 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
-    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string; unlabeled?: boolean },
+    charge?: {
+      taskId?: string | null
+      benefitGrantId?: string | null
+      factsConfirmedAt?: string
+      unlabeled?: boolean
+      /** 准入没放行的原因；没申请或已放行不传，响应里是 null。 */
+      unlabeledDeniedReason?: UnlabeledExportPublicDeniedReason | null
+    },
   ): Promise<{
     fileId: string
     filename: string
@@ -788,6 +803,10 @@ export class AiService {
     /** 系统 HMAC content URL(signFileUrl 生成),供 /print/jobs 打印使用。pdf 直接签发本文件;
      *  docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),不是原文件本身。 */
     printFileUrl?: string
+    /** 这一份是否印了显式标识。与渲染判定相同，不单独改口径。 */
+    visibleLabelApplied: boolean
+    /** 申请了不印但没放行的原因；没申请或已放行为 null。 */
+    unlabeledDeniedReason: UnlabeledExportPublicDeniedReason | null
   }> {
     await this.drafts.assertFactsConfirmed({
       endUserId,
@@ -935,6 +954,8 @@ export class AiService {
       signedUrl: access.signedUrl,
       expiresAt: access.signedUrlExpiresAt,
       printFileUrl,
+      visibleLabelApplied: visibleLabel,
+      unlabeledDeniedReason: charge?.unlabeledDeniedReason ?? null,
     }
   }
 

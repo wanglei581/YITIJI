@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import type { GeneratedResume, ResumeExportFormat, ResumeGenerateExportResponse, ResumeOptimizeModule, ResumeTemplate } from '@ai-job-print/shared'
+import type { GeneratedResume, ResumeExportFormat, ResumeGenerateExportResponse, ResumeOptimizeModule, ResumeReportExportResponse, ResumeTemplate } from '@ai-job-print/shared'
 import type { ResumeLayoutAdjustAction } from '../../../../services/api/ai'
 import type { ResumeDecisionMap } from './resumeDecisions'
+
+/** 优化页同一槽位既放简历导出，也放修改清单。清单没有「印没印」字段，不能收成简历导出类型。 */
+export type OptimizeStoredExport = ResumeGenerateExportResponse | ResumeReportExportResponse
 
 type LeaveAction = () => void
 type FailKind = 'retry' | 'reparse' | 'expired' | 'consent' | 'outage'
@@ -16,7 +19,7 @@ export function useOptimizeSession(format: ResumeExportFormat, loggedIn: boolean
   const [exporting, setExporting] = useState(false)
   const [printNavigating, setPrintNavigating] = useState(false)
   const [exportFormat, setExportFormat] = useState<ResumeExportFormat>(format)
-  const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
+  const [exported, setExported] = useState<OptimizeStoredExport | null>(null)
   const [exportKind, setExportKind] = useState<'resume' | 'change_list'>('resume')
   const [exportVersion, setExportVersion] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)

@@ -152,6 +152,7 @@ export const FIXTURE_PRICING_CHARGED: ResumeExportPricing = {
   unit: 'item',
   benefit: { available: 0, serviceType: 'resume_export' },
   label: '每次导出 5.00 元',
+  unlabeledOptionAvailable: false,
 }
 
 export const FIXTURE_PRICING_UNAVAILABLE: ResumeExportPricing = {
@@ -160,6 +161,7 @@ export const FIXTURE_PRICING_UNAVAILABLE: ResumeExportPricing = {
   unit: 'item',
   benefit: null,
   label: '简历导出当前不可用（价目已停用，不是免费）',
+  unlabeledOptionAvailable: false,
 }
 
 export const FIXTURE_EXPORT_ERROR = EXPORT_ERROR_COPY.AI_RESULT_NOT_READY

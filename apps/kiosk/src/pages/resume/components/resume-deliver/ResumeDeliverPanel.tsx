@@ -1,4 +1,5 @@
-import type { ResumeExportFormat, ResumeGenerateExportResponse, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
+import type { ResumeExportFormat, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
+import type { OptimizeStoredExport } from './useOptimizeSession'
 import { ResumeLayoutControls } from '../ResumeLayoutControls'
 import { COMPRESS_ONE_PAGE, EXPORT_FORMAT_OPTIONS } from './constants'
 import { ResumeExportResult } from './ResumeExportResult'
@@ -16,7 +17,7 @@ export function ResumeDeliverPanel(props: {
   onExportFormatChange: (format: ResumeExportFormat) => void
   exporting: boolean
   printNavigating: boolean
-  exported: ResumeGenerateExportResponse | null
+  exported: OptimizeStoredExport | null
   exportKind: 'resume' | 'change_list'
   exportError: string | null
   exportVersion: number

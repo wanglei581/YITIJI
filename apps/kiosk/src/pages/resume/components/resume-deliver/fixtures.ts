@@ -48,6 +48,8 @@ export function syntheticExport(kind: 'ready' | 'no-print' | 'failed' | 'expired
     signedUrl: '',
     expiresAt: new Date(Date.now() + (expired ? -60_000 : 30 * 60 * 1000)).toISOString(),
     printFileUrl: kind === 'ready' ? undefined : undefined,
+    visibleLabelApplied: true,
+    unlabeledDeniedReason: null,
   }
 }
 

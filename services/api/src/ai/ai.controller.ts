@@ -46,7 +46,7 @@ import { assistantOwnerKey } from './llm/llm-chat.service'
 import { AssistantSummaryService } from '../advisor/assistant-summary.service'
 
 import { resolveClientIp } from '../common/client-ip'
-import { prepareUnlabeledExport } from './resume/resume-unlabeled-export'
+import { lookupExportTerminalCode, prepareUnlabeledExport } from './resume/resume-unlabeled-export'
 import { parseContentFileId } from '../files/signing'
 interface ReqLike {
   requestId?: string
@@ -568,13 +568,21 @@ export class AiController {
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const body = draft === true ? await this.draftSource.resolveDraftResume(resume, taskId, requester, req) : resume // 按原样导出不信客户端正文（A：取留存原话；B：拒照抄 AI）
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    // C8：不带显式标识只对「开关已开 + 登录会员 + 已同意正式协议」放行，放行前先写必须成功的留痕。
+    // C8：不带显式标识只对「开关已开 + PDF/Word + 登录会员 + 已同意正式协议」放行，放行前先写必须成功的留痕。
+    // 终端编号只从已验签的一体机身份取；没有身份时为 null。不把其它终端字段写进审计。
+    const terminalCode = await lookupExportTerminalCode(this.prisma, await this.verifiedQuotaTerminal(req))
     const unlabeledPlan = await prepareUnlabeledExport(
       { prisma: this.prisma, audit: this.audit },
-      { requested: unlabeled === true, draft: draft === true, endUserId: requester.endUserId, taskId: taskId ?? null, format: format ?? 'pdf' },
+      { requested: unlabeled === true, draft: draft === true, endUserId: requester.endUserId, taskId: taskId ?? null, format: format ?? 'pdf', terminalCode },
       { ipAddress: ipOf(req), userAgent: uaOf(req), requestId: req.requestId ?? null },
     )
-    const result = await this.aiService.exportGeneratedResume(body, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledPlan.applied })
+    const result = await this.aiService.exportGeneratedResume(body, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, {
+      taskId,
+      benefitGrantId: dto.benefitGrantId,
+      factsConfirmedAt: dto.factsConfirmedAt,
+      unlabeled: unlabeledPlan.applied,
+      unlabeledDeniedReason: unlabeledPlan.unlabeledDeniedReason,
+    })
     const exportAudit = {
       actorId: null,
       actorRole: 'kiosk',
@@ -592,6 +600,7 @@ export class AiController {
         // docx/txt/md 另渲染的打印用 PDF 副本也记下编号（pdf 时与 fileId 相同）
         printFileId: result.printFileUrl ? parseContentFileId(result.printFileUrl) : null,
         ...unlabeledPlan.auditPayload,
+        terminalCode: unlabeledPlan.terminalCode,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
@@ -600,7 +609,11 @@ export class AiController {
     // 去标识的导出，文件编号这条留痕也必须写成功，写不进去就不把文件交出去
     if (unlabeledPlan.applied) await this.audit.writeRequired(this.prisma, exportAudit)
     else await this.audit.write(exportAudit)
-    return result
+    return {
+      ...result,
+      visibleLabelApplied: unlabeledPlan.visibleLabelApplied,
+      unlabeledDeniedReason: unlabeledPlan.unlabeledDeniedReason,
+    }
   }
 
   @Post('assistant/chat')

@@ -315,13 +315,16 @@ export const aiMockAdapter = {
       pageCount: ext === 'pdf' ? 1 : 0,
       signedUrl: '',
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      // 演示模式不生成文件。字段只对齐导出响应类型，页面尚未展示。
+      visibleLabelApplied: true,
+      unlabeledDeniedReason: null,
     }
   },
 
   async getResumeExportPricing(_access?: ResumeReadAccess): Promise<ResumeExportPricing> {
     void _access
     await delay(40)
-    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营' }
+    return { mode: 'free', unitCents: 0, unit: 'item', benefit: null, label: '免费试运营', unlabeledOptionAvailable: false }
   },
 
   getResumeDraft(taskId: string, _token: string): Promise<ResumeDraftResponse> {
