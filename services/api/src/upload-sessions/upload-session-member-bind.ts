@@ -17,6 +17,8 @@ import {
 } from './upload-session-object-delete'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
+import { assertLease, copyForBind, MEMBER_COPY_BACKGROUND_TIMEOUT_MS, startUploadSessionLease, type BindLock } from './upload-session-lock-lease'
+import { recoverStorageKeys } from './upload-session-storage-recovery'
 import type {
   UploadSessionChannel,
   UploadSessionMode,
@@ -106,6 +108,8 @@ export interface MemberBindHost {
   redisClient: Pick<Redis, 'zadd' | 'zrangebyscore' | 'zrem'>
   cleanupBatchLimit: number
   lockTtlSeconds: number
+  copyTimeoutMs?: number
+  backgroundCopyTimeoutMs?: number
   expiryIndexKey: string
   confirmedFileUrlTtlMs: number
   signedUrlPurposes: ReadonlySet<FilePurpose>
@@ -130,9 +134,10 @@ export interface MemberBindHost {
 export async function driveMemberBind(
   host: MemberBindHost,
   stored: StoredUploadSession,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
   endUserId: string,
 ): Promise<UploadSessionConfirmResponse> {
+  await assertLease(lock)
   if (!stored.file) {
     throw new BadRequestException({
       error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' },
@@ -145,7 +150,7 @@ export async function driveMemberBind(
     })
   }
   let session = stored
-  let file = await reloadOrCompensate(host, stored.file.fileId, session, stored.bind?.userKey ?? null, stored.bind?.bucket ?? null)
+  let file = await reloadOrCompensate(host, stored.file.fileId, session, stored.bind?.userKey ?? null, stored.bind?.bucket ?? null, lock)
   if (file.purpose === 'contract_upload' && !file.expiresAt) {
     throw new BadRequestException({
       error: { code: 'CONTRACT_FILE_EXPIRY_MISSING', message: '上传文件状态异常，请重新上传' },
@@ -180,25 +185,27 @@ export async function driveMemberBind(
       session = await casBind(host, session, lock, intent(), session.bind?.phase === 'intent' ? 'intent' : '')
       let published = finishIfPublished()
       if (published) return published
+      await assertLease(lock)
       await claimPendingKey(host, file, userKey)
       if (file.storageKey !== userKey) {
-        await host.files.copyObjectToKey(file.storageKey, userKey, file.mimeType, bucket)
+        await copyForBind(host, lock, file.storageKey, userKey, file.mimeType, bucket)
       }
-      file = await reloadOrCompensate(host, file.id, session, userKey, bucket)
+      file = await reloadOrCompensate(host, file.id, session, userKey, bucket, lock)
       phase = 'copied'
       previousKey = file.storageKey === userKey ? previousKey : file.storageKey
       session = await casBind(host, session, lock, intent(), 'intent')
       published = finishIfPublished()
       if (published) return published
     } else if (file.storageKey !== userKey) {
-      await host.files.copyObjectToKey(file.storageKey, userKey, file.mimeType, bucket)
-      file = await reloadOrCompensate(host, file.id, session, userKey, bucket)
+      await copyForBind(host, lock, file.storageKey, userKey, file.mimeType, bucket)
+      file = await reloadOrCompensate(host, file.id, session, userKey, bucket, lock)
     }
     if (!bound()) {
       previousKey = file.storageKey === userKey ? previousKey : file.storageKey
       phase = 'copied'
+      await assertLease(lock)
       await applyOwnership(host, file, intent())
-      file = await reloadOrCompensate(host, file.id, session, userKey, bucket)
+      file = await reloadOrCompensate(host, file.id, session, userKey, bucket, lock)
       if (!bound()) {
         throw new BadRequestException({
           error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端上传已失效，请重新上传' },
@@ -207,7 +214,7 @@ export async function driveMemberBind(
     }
   }
 
-  file = await reloadOrCompensate(host, file.id, session, userKey, bucket)
+  file = await reloadOrCompensate(host, file.id, session, userKey, bucket, lock)
   if (file.replacedStorageKey && file.replacedStorageKey !== file.storageKey) {
     previousKey = file.replacedStorageKey
     phase = 'db-applied'
@@ -215,12 +222,14 @@ export async function driveMemberBind(
     session = await casBind(host, session, lock, intent(), expected)
     const published = finishIfPublished()
     if (published) return published
+    await assertLease(lock)
     await host.files.deleteObjectAtKey(file.replacedStorageKey, bucket)
+    await assertLease(lock)
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, storageKey: file.storageKey, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
     })
-    file = await reloadOrCompensate(host, file.id, session, userKey, bucket)
+    file = await reloadOrCompensate(host, file.id, session, userKey, bucket, lock)
     if (file.replacedStorageKey) {
       throw new BadRequestException({
         error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端上传已失效，请重新上传' },
@@ -232,15 +241,17 @@ export async function driveMemberBind(
     const published = finishIfPublished()
     if (published) return published
   }
+  await assertLease(lock)
   return publishConfirmed(host, session, lock, file)
 }
 
 export async function publishConfirmed(
   host: MemberBindHost,
   session: StoredUploadSession,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
   file: BindFileRow,
 ): Promise<UploadSessionConfirmResponse> {
+  await assertLease(lock)
   if (session.status !== 'confirmed' && new Date(session.expiresAt).getTime() <= Date.now()) {
     throw expiredBindException(memberRowRetained(file, session))
   }
@@ -269,6 +280,7 @@ export async function publishConfirmed(
     confirmedAt: new Date().toISOString(),
     bind: session.bind ? { ...session.bind, phase: 'done' } : null,
   }
+  await assertLease(lock)
   const committed = await host.commitSession(
     next,
     lock.lockKey,
@@ -295,10 +307,11 @@ export async function publishConfirmed(
 export async function casBind(
   host: MemberBindHost,
   session: StoredUploadSession,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
   bind: MemberBindIntent,
   expectedPhase: string,
 ): Promise<StoredUploadSession> {
+  await assertLease(lock)
   const next: StoredUploadSession = { ...session, status: 'uploaded', bind, confirmedAt: null }
   const committed = await host.commitSession(
     next,
@@ -390,23 +403,25 @@ export async function applyOwnership(
 export async function finishConfirmed(
   host: MemberBindHost,
   record: StoredUploadSession,
-  _lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
 ): Promise<void> {
   const file = record.file ? await loadBindFile(host, record.file.fileId) : null
   if (file?.replacedStorageKey && file.replacedStorageKey !== file.storageKey) {
+    await assertLease(lock)
     await host.files.deleteObjectAtKey(file.replacedStorageKey, file.bucket)
+    await assertLease(lock)
     await host.prisma.fileObject.updateMany({
       where: { id: file.id, replacedStorageKey: file.replacedStorageKey },
       data: { replacedStorageKey: null },
     })
   }
-  await releaseCleanup(host, record.sessionId)
+  await releaseCleanup(host, record.sessionId, lock)
 }
 
 export async function abandonBoundAttempt(
   host: MemberBindHost,
   record: StoredUploadSession,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
   reason: string,
 ): Promise<void> {
   const file = record.file ? await loadBindFile(host, record.file.fileId) : null
@@ -417,93 +432,9 @@ export async function abandonBoundAttempt(
     await driveMemberBind(host, record, lock, record.bind?.endUserId ?? file.endUserId ?? '')
     return
   }
-  if (file && isLiveMember(file)) await releaseReplacedObject(host, file)
+  if (file && isLiveMember(file)) { await assertLease(lock); await releaseReplacedObject(host, file) }
   const nextStatus = record.status === 'cancelled' ? 'cancelled' : 'expired'
   await abandonAfterCommit(host, record, nextStatus, reason, lock)
-}
-
-export async function recoverStorageKeys(
-  host: MemberBindHost,
-  now: number,
-): Promise<number> {
-  const where = {
-    OR: [
-      { pendingStorageKey: { not: null } },
-      { replacedStorageKey: { not: null } },
-    ],
-  }
-  const total = await host.prisma.fileObject.count({ where })
-  const pageCount = Math.ceil(total / host.cleanupBatchLimit)
-  const page = pageCount > 0 ? Math.floor(now / 60_000) % pageCount : 0
-  const rows = await host.prisma.fileObject.findMany({
-    where,
-    orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-    skip: page * host.cleanupBatchLimit,
-    take: host.cleanupBatchLimit,
-  })
-  let failed = 0
-  const staleBefore = now - host.sessionRedisTtlSeconds() * 1000
-  for (const row of rows) {
-    try {
-      await recoverOneStorageKey(host, row as BindFileRow, staleBefore)
-    } catch {
-      failed += 1
-    }
-  }
-  return failed
-}
-
-export async function recoverOneStorageKey(
-  host: MemberBindHost,
-  row: BindFileRow,
-  staleBefore: number,
-): Promise<void> {
-  if (row.replacedStorageKey && row.replacedStorageKey !== row.storageKey) {
-    await host.files.deleteObjectAtKey(row.replacedStorageKey, row.bucket)
-    await host.prisma.fileObject.updateMany({
-      where: { id: row.id, replacedStorageKey: row.replacedStorageKey },
-      data: { replacedStorageKey: null },
-    })
-    return
-  }
-  // 行已墓碑时，pendingStorageKey 是还没切成 storageKey 的复制件。
-  // 删除失败必须留下指针；不得删除行当前指向的对象。
-  if (row.deletedAt && row.pendingStorageKey && row.pendingStorageKey !== row.storageKey) {
-    await host.files.deleteObjectAtKey(row.pendingStorageKey, row.bucket)
-    await host.prisma.fileObject.updateMany({
-      where: {
-        id: row.id,
-        pendingStorageKey: row.pendingStorageKey,
-        storageKey: row.storageKey,
-      },
-      data: { pendingStorageKey: null },
-    })
-    return
-  }
-  if (
-    row.pendingStorageKey
-    && row.pendingStorageKey !== row.storageKey
-    && row.ownerType !== 'user'
-    && !row.deletedAt
-    && row.updatedAt
-    && row.updatedAt.getTime() < staleBefore
-  ) {
-    const claimed = await host.prisma.fileObject.updateMany({
-      where: {
-        id: row.id,
-        pendingStorageKey: row.pendingStorageKey,
-        storageKey: row.storageKey,
-        deletedAt: null,
-      },
-      data: { pendingStorageKey: null, replacedStorageKey: row.pendingStorageKey },
-    })
-    if (claimed.count !== 1) return
-    await host.files.deleteObjectAtKey(row.pendingStorageKey, row.bucket)
-    await host.prisma.fileObject.updateMany({
-      where: { id: row.id, replacedStorageKey: row.pendingStorageKey },
-      data: { replacedStorageKey: null },
-    })
-  }
 }
 
 export function memberObjectKey(file: BindFileRow, endUserId: string): string {
@@ -579,10 +510,12 @@ export async function reloadOrCompensate(
   _session: StoredUploadSession,
   userKey: string | null,
   bucket: string | null,
+  lock?: BindLock,
 ): Promise<BindFileRow> {
   const current = await loadBindFile(host, fileId)
   if (!current || current.deletedAt) {
     if (userKey && current && current.storageKey !== userKey) {
+      if (lock) await assertLease(lock)
       try {
         await host.files.deleteObjectAtKey(userKey, bucket)
       } catch (error) {
@@ -620,7 +553,9 @@ export async function cleanupExpiredSessions(
       skipped += 1
       continue
     }
-    const lock = { lockKey, lockToken }
+    const lock = startUploadSessionLease(host.redis, lockKey, lockToken, host.lockTtlSeconds, {
+      copyTimeoutMs: host.backgroundCopyTimeoutMs ?? MEMBER_COPY_BACKGROUND_TIMEOUT_MS,
+    })
     try {
       const outcome = await cleanupOne(host, sessionId, now, lock)
       if (outcome === 'cleaned') cleaned += 1
@@ -628,7 +563,7 @@ export async function cleanupExpiredSessions(
       failed += 1
       await host.redisClient.zadd(host.expiryIndexKey, now + 60_000, sessionId).catch(() => undefined)
     } finally {
-      await host.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
+      await lock.release()
     }
   }
   try {
@@ -643,8 +578,9 @@ async function cleanupOne(
   host: MemberBindHost,
   sessionId: string,
   now: number,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
 ): Promise<'cleaned' | 'idle'> {
+  await assertLease(lock)
   let record = await host.loadOptional(sessionId)
   const persisted = await host.loadCleanupRecord(sessionId)
   if (
@@ -654,6 +590,7 @@ async function cleanupOne(
     && persisted.bind.phase !== 'done'
     && new Date(persisted.expiresAt).getTime() > now
   ) {
+    await assertLease(lock)
     const restored = await host.redis.setNxEx(
       host.sessionKey(sessionId),
       JSON.stringify(persisted.snapshot),
@@ -689,15 +626,15 @@ async function cleanupOne(
   }
   if (record && (record.status === 'cancelled' || record.status === 'expired')) {
     if (record.file) await deleteRetainedFile(host, record, 'upload session expired', lock)
-    await releaseCleanup(host, sessionId)
+    await releaseCleanup(host, sessionId, lock)
     return 'cleaned'
   }
   const cleanup = record ?? persisted
   if (!cleanup || new Date(cleanup.expiresAt).getTime() > now) return 'idle'
   if (record && host.markExpired(record, now).status !== 'expired') return 'idle'
   if (!record) {
-    if (cleanup.file) await cleanupAbandonedFile(host, cleanup, 'upload session expired')
-    await releaseCleanup(host, sessionId)
+    if (cleanup.file) await cleanupAbandonedFile(host, cleanup, 'upload session expired', lock)
+    await releaseCleanup(host, sessionId, lock)
     return 'cleaned'
   }
   const committed = await abandonAfterCommit(host, record, 'expired', 'upload session expired', lock)
@@ -713,6 +650,7 @@ async function cleanupAbandonedFile(
   host: MemberBindHost,
   record: Pick<StoredUploadSession, 'file' | 'status'>,
   reason: string,
+  lock?: BindLock,
 ): Promise<void> {
   if (!record.file || record.status === 'confirmed') return
   const file = await host.prisma.fileObject.findUnique({
@@ -720,6 +658,7 @@ async function cleanupAbandonedFile(
     select: { endUserId: true, ownerType: true },
   })
   if (file?.endUserId || file?.ownerType === 'user') return
+  if (lock) await assertLease(lock)
   await deleteAnonymousObjectThenTombstone(host, record.file.fileId, reason)
 }
 
@@ -727,7 +666,7 @@ export async function finishExpired(
   host: MemberBindHost,
   stored: StoredUploadSession,
   reason: string,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
 ): Promise<void> {
   if (stored.bind && stored.bind.phase !== 'done') {
     await abandonBoundAttempt(host, stored, lock, reason)
@@ -741,8 +680,9 @@ export async function abandonAfterCommit(
   stored: StoredUploadSession,
   nextStatus: 'cancelled' | 'expired',
   reason: string,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
 ): Promise<'updated' | 'lost-lock' | 'expired' | 'conflict'> {
+  await assertLease(lock)
   const fileId = stored.file?.fileId ?? null
   const next: StoredUploadSession = { ...stored, status: nextStatus }
   const committed = await host.commitSession(
@@ -755,7 +695,7 @@ export async function abandonAfterCommit(
   if (committed !== 'updated') return committed
   await deleteRetainedFile(host, next, reason, lock)
   try {
-    await releaseCleanup(host, stored.sessionId)
+    await releaseCleanup(host, stored.sessionId, lock)
   } catch {
     // 失败的是多余对象或过期索引，不是这一行的 storageKey。不写 storageDeletePendingAt。
   }
@@ -770,15 +710,17 @@ function extraObjectKey(cleanup: StoredUploadSessionCleanup | null): string | nu
   return cleanup.stagedObjectKey ?? null
 }
 
-export async function releaseCleanup(host: MemberBindHost, sessionId: string): Promise<void> {
+export async function releaseCleanup(host: MemberBindHost, sessionId: string, lock?: BindLock): Promise<void> {
   const cleanup = await host.loadCleanupRecord(sessionId)
   const extra = extraObjectKey(cleanup)
   if (extra) {
     const file = cleanup?.file ? await loadBindFile(host, cleanup.file.fileId) : null
     if (!file || file.storageKey !== extra) {
+      if (lock) await assertLease(lock)
       await host.files.deleteObjectAtKey(extra, cleanup?.bind?.bucket ?? cleanup?.stagedBucket ?? null)
     }
   }
+  if (lock) await assertLease(lock)
   await host.removeFromExpiryIndex(sessionId)
 }
 
@@ -786,10 +728,12 @@ async function deleteRetainedFile(
   host: MemberBindHost,
   record: StoredUploadSession,
   reason: string,
-  lock: { lockKey: string; lockToken: string },
+  lock: BindLock,
 ): Promise<void> {
+  await assertLease(lock)
   if (!record.file) return
-  await cleanupAbandonedFile(host, record, reason)
+  await cleanupAbandonedFile(host, record, reason, lock)
+  await assertLease(lock)
   await host.commitSession(
     { ...record, file: null },
     lock.lockKey,

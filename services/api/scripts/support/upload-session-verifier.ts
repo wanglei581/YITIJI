@@ -66,6 +66,13 @@ export class FakeRedis {
     return entry.value
   }
 
+  async eval(script: string, _keys: number, key: string, token: string, ttlMs: string): Promise<number> {
+    const entry = this.values.get(key)
+    if (!entry || entry.expiresAt <= Date.now() || (script.includes("redis.call('GET'") && entry.value !== token)) return 0
+    this.values.set(key, { value: entry.value, expiresAt: Date.now() + Number(ttlMs) })
+    return 1
+  }
+
   async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
     this.values.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 })
   }

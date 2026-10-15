@@ -71,7 +71,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1948 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1951 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -2183,7 +2183,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/scripts/</code> — 136 个文件</summary>
+<summary><code>services/api/scripts/</code> — 137 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2253,7 +2253,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/scripts/support/scan-panel-wording.ts` | `verify-scan-tasks.ts` |
 | `services/api/scripts/support/serializable-race-barrier.ts` | `verify-first-admin-bootstrap-postgres.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-print-retry-lock-postgres.ts` |
 | `services/api/scripts/support/sqlite-cli.ts` | `verify-scan-tasks.ts` |
-| `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/scripts/support/upload-session-lease-race.ts` | `verify-upload-sessions-http.ts` |
+| `services/api/scripts/support/upload-session-verifier.ts` | `verify-upload-session-lock-lease.ts`<br/>`verify-upload-sessions-bind.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
 | `services/api/scripts/unpublish-demo-companies.ts` | `verify-demo-company-unpublish.ts` |
 | `services/api/scripts/verify-admin-fairs.ts` | `verify-profile-commercial-first-batch.mjs` |
 | `services/api/scripts/verify-ai-access.ts` | `verify-recruitment-hosting-gate-declares.ts` |
@@ -2327,7 +2328,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 621 个文件</summary>
+<summary><code>services/api/src/</code> — 623 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2949,8 +2950,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/trtc/trtc.module.ts` | `verify-trtc-terminal-http.ts` |
 | `services/api/src/trtc/trtc.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-safety-aigc.ts`<br/>`verify-ai-safety-lexicon.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-llm-thinking-off.ts`<br/>`verify-trtc-session-deadline.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/upload-sessions/upload-scene.ts` | `verify-upload-scene.ts` |
+| `services/api/src/upload-sessions/upload-session-lock-lease.ts` | `verify-upload-session-lock-lease.ts` |
+| `services/api/src/upload-sessions/upload-session-member-bind.ts` | `verify-upload-session-lock-lease.ts` |
 | `services/api/src/upload-sessions/upload-session-object-delete.ts` | `verify-upload-sessions.ts` |
 | `services/api/src/upload-sessions/upload-sessions.controller.ts` | `verify-ai-access.ts`<br/>`verify-multipart-field-nesting.ts`<br/>`verify-upload-sessions.ts` |
-| `services/api/src/upload-sessions/upload-sessions.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions.ts` |
+| `services/api/src/upload-sessions/upload-sessions.service.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts`<br/>`verify-upload-sessions-http.ts`<br/>`verify-upload-sessions.ts` |
 
 </details>
