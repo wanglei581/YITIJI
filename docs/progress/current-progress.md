@@ -1,3 +1,17 @@
+## 2026-10-15：109 个剩余旧 worktree 逐项核验与存储收口（第四阶段）
+
+- **范围与授权：** 产品负责人要求继续核查剩余109目录，独有代码先上传Git、未提交内容先归档，确认闲置冗余后清理；活动项目和全部聊天原位保留。本次仅新增本文清理记录，不改产品功能、根工作区源码、生产配置、数据库或硬件链路。
+- **实际结果：** 109项全量盘点，确认完成保全并移除34项，项目`.claude/worktrees`剩75项；全仓登记190项。66项因活动、PR、工具、共享依赖或Git操作等原因保护，9项归属/后续任务仍不清而保留。34项已归档候选全部通过最终动态门禁后移除。6个已交班旧检出仍对应开放PR头，因没有可靠的其它本地完整副本，未删除。
+- **引用保护：** `qingxu-51-page-migration-a4d688`是89个开放PR的目标分支，继续保护；`cranky-borg-6b101d`是共享依赖提供方，继续保护。当前直接运行服务的目录和原8个明确owner保留目录均未动。Git清理没有prune、gc、reset、开发分支删除、合并或部署。
+- **代码上Git：** 5个`codex/archive-phase4-20261015/*`备份分支已推送并逐个核对远端SHA，共148项源码/测试变更。4目录的12项未提交文件变更完整保留；两套小程序五文件原稿彼此一致，接任提交已吸收并补充，但不把原稿与后续PR版本误称为完全相同。`recursing-ramanujan-f06a43`完整未公开历史仅入私密bundle，公开备份从已公开的最近第一父提交构造。6个敏感字面量疑点文件和私密资料只在本地保全，未上传。备份不是已验收修复，不得整支合回main。
+- **完整私密恢复：** 归档`Documents/项目归档/一体机旧工作目录-20261015-第三批`保存34目录原HEAD、完整零前置依赖bundle、index、暂存与未暂存补丁、未跟踪和非重复忽略文件、配置、数据库及伴随文件、文件权限/时间。34项实际隔离恢复通过；另一个含五文件未提交改动的样本使用归档自带脚本恢复成独立Git仓库，通过原HEAD/index/status/patch核验，未依赖原仓库对象。
+- **依赖保全：** 135个依赖目录按完整路径、类型、权限、SHA和软链文本比对保留锚点；2978个差异文件合计5,989,100字节及21个差异目录已归档。10个无法证明可重建的构建/存储目录整体归档，4条外部依赖软链按原链接保存，未跟随删除共享目标。原位JSON/JSONL/数据库聊天疑点均作为停止条件；所有聊天记录未清理。
+- **最终删除门禁：** 对每项复核源哈希、归档真实恢复、远端SHA、PR head/base及exact HEAD、owner会话元数据、Git锁/操作、活跃进程与入站引用；重复依赖在临删前完整重hash，再核inode/ctime等元数据。入站扫描前后以及临删前核对输入稳定性。仅正常停止待删闲置目录已有且PID/启动时间匹配的Git fsmonitor。
+- **协作事实：** 本轮真实Claude CLI使用用户选择的`opus`别名和`max`，返回模型`claude-opus-5-5`；agy完成策略和34初单条件复核，CLI未提供具体模型ID；Grok首次返回402，按用户要求重试成功，实际模型`grok-4.7-build-fast`，51.367秒、0次工具调用。三方基于给定元数据作条件审查，没有替代本地逐项检查；Grok快照中4项待恢复随后已补齐为34/34通过。实际执行由上述逐项门禁和Codex独立核验决定。
+- **存储实测：** 结束时整个项目58.31GiB，项目`.claude`从69.39GiB降至49.75GiB；本批私密归档0.632GB。整轮磁盘可用净变化+3.847GB，最终可用173.124GB，测量时间2026-10-15T19:39:50.238587+08:00。APFS共享块使du目录统计不能等同物理释放量，后台写入也影响可用空间；不叠加上一批MySQL处理结果。
+- **保护核对：** 根HEAD、index、工作区状态、43个stash、原有refs及保留登记核对通过；另一个清理聊天在本轮期间独立移除范围外的`.worktrees/AI求职打印服务终端-windows-scan-mutation-boundary-20260810`并记录为`f362bd5f3b27ef157a0edc10f63199318b668377`，该1项及其本地文档分支已单独对账，不计入本任务移除数量或独占空间收益。本轮文档从干净`origin/main@cfbe567840d2`用独立index提交，不修改脏根目录文档。历史第三阶段记录继续保留于`194259ca1af2c7e5396d170270b1b6c55324bad4`。没有新的线上或真机验收，产品阻塞状态不因清理关闭。
+- **本轮已移除：** `adoring-vaughan-0e884b`, `awesome-roentgen-22f941`, `blissful-cori-1e43e8`, `blissful-napier-a026b5`, `codex-noai-1012`, `compassionate-volhard-b532ed`, `cool-mccarthy-e49357`, `cool-zhukovsky-8cd480`, `cranky-almeida-35f69e`, `determined-einstein-521d0c`, `distracted-swirles-e8b058`, `epic-satoshi-2918de`, `fervent-hypatia-bb4226`, `festive-swanson-e5c74d`, `funny-feynman-603b1c`, `gifted-jemison-3faaca`, `great-yalow-ad15c4`, `kind-snyder-491eda`, `laughing-carson-9665bc`, `loving-gauss-7cf52a`, `magical-hertz-b4e57e`, `mp5-noai-1012`, `musing-chebyshev-38f044`, `nostalgic-poitras-1f5c48`, `nostalgic-torvalds-49de9b`, `recursing-ramanujan-f06a43`, `reverent-goldwasser-56e14d`, `sad-dubinsky-9fad9c`, `silly-meninsky-dfa3bb`, `stoic-ishizaka-181b8a`, `sweet-euler-810be8`, `upbeat-borg-0644b9`, `zealous-jemison-ce4a01`, `zen-proskuriakova-33a255`。
+
 # 当前开发进度
 
 ## 2026-10-06：取件码方案②一体机配套（分支 `claude/kiosk-pickup-arrival-code-only-1006`，叠在 #1261 上）
