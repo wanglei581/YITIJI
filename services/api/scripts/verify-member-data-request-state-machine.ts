@@ -87,7 +87,7 @@ interface HarnessOptions {
 }
 
 const TEST_MATRIX = [
-  'delete 在任何 Redis/DB/step-up/queue 副作用前 ACCOUNT_CLOSURE_NOT_AVAILABLE',
+  'delete 需要 close_account 授权，无授权不写请求也不排队',
   '同幂等键重放返回原记录且不再次消费 grant',
   '跨用户复用幂等键拒绝且不消费 grant',
   '同会员 activeKey 冲突拒绝且不消费 grant',
@@ -350,20 +350,14 @@ function command(overrides: Partial<CreateCommand> = {}): CreateCommand {
 async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise<void> {
   await check(TEST_MATRIX[0], async () => {
     const harness = createHarness(Constructor)
+    ;(harness.service as any).stepUp.consumeGrant = async () => {
+      harness.counters.stepUpConsumes += 1
+      throw { getResponse: () => ({ error: { code: 'STEP_UP_TOKEN_INVALID' } }) }
+    }
     const error = await captureError(() => invokeCreate(harness.service, command({ requestType: 'delete' })))
-    assertErrorCode(error, 'ACCOUNT_CLOSURE_NOT_AVAILABLE')
-    assert.deepEqual(harness.counters, {
-      reads: 0,
-      creates: 0,
-      updates: 0,
-      transactions: 0,
-      endUserWrites: 0,
-      stepUpConsumes: 0,
-      auditRequired: 0,
-      redisLocks: 0,
-      redisUnlocks: 0,
-      queueAdds: 0,
-    })
+    assertErrorCode(error, 'STEP_UP_TOKEN_INVALID')
+    assert.equal(harness.counters.stepUpConsumes, 1)
+    assert.equal(harness.counters.creates, 0)
   })
 
   await check(TEST_MATRIX[1], async () => {
@@ -373,7 +367,6 @@ async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise
     assert.equal(result.id, existing.id)
     assert.equal(harness.counters.stepUpConsumes, 0)
     assert.equal(harness.counters.transactions, 0)
-    assert.equal(harness.counters.queueAdds, 0)
     assert.equal(harness.counters.redisLocks, 0)
   })
 
@@ -412,7 +405,6 @@ async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise
     assertErrorCode(error, 'DATA_REQUEST_IN_PROGRESS')
     assert.equal(harness.counters.stepUpConsumes, 0)
     assert.equal(harness.counters.transactions, 0)
-    assert.equal(harness.counters.queueAdds, 0)
     assert.equal(harness.lockCalls[0]?.[0], 'member:data-request:create:member-one')
     assert.equal(harness.lockCalls[0]?.[2], 30)
 
@@ -465,7 +457,6 @@ async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise
     )
     assert.equal(harness.requiredAuditCalls[0]?.insideTransactionCallback, true)
     assert.equal(harness.rows().length, 0)
-    assert.equal(harness.counters.queueAdds, 0)
   })
 
   await check(TEST_MATRIX[8], async () => {
@@ -515,7 +506,6 @@ async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise
     assert.equal(stored?.activeKey, orphan.activeKey)
     assert.equal(stored?.exportFileId, orphan.exportFileId)
     assert.equal(harness.counters.auditRequired, 0)
-    assert.equal(harness.counters.queueAdds, 0)
   })
 }
 

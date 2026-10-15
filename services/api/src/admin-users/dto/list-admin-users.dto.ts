@@ -33,6 +33,9 @@ export class ListAdminUsersDto {
   @MaxLength(64)
   registeredFrom?: string
 
+  @IsOptional() @IsIn(['requested', 'offline_executed', 'executed'])
+  closure?: 'requested' | 'offline_executed' | 'executed'
+
   @IsOptional()
   @IsString()
   @MaxLength(64)

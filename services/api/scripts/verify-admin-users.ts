@@ -534,6 +534,7 @@ async function createActivityCapFixtures(
 
 /** 每个 handler 期望的 HTTP 动词。GET 之外的一律视为写路径，见下方写边界断言。 */
 const EXPECTED_ROUTE_VERBS: Record<string, number> = {
+  closure: RequestMethod.POST,
   list: RequestMethod.GET,
   getDetail: RequestMethod.GET,
   disable: RequestMethod.POST,
@@ -549,7 +550,7 @@ function verifyControllerMetadata(): void {
 
   const prototype = AdminUsersController.prototype as unknown as Record<string, unknown>
   const methods = Object.getOwnPropertyNames(prototype).filter((name) => name !== 'constructor')
-  assert.deepEqual(methods.sort(), ['disable', 'getDetail', 'list', 'restore'])
+  assert.deepEqual(methods.sort(), ['closure', 'disable', 'getDetail', 'list', 'restore'])
   for (const name of methods) {
     assert.equal(
       Reflect.getMetadata(METHOD_METADATA, prototype[name] as object),
@@ -560,11 +561,11 @@ function verifyControllerMetadata(): void {
     assert.ok(headers.some((header) => header.name.toLowerCase() === 'cache-control' && header.value === 'no-store'))
   }
 
-  // 写边界：只允许 disable / restore 两条。想加第三条写路径必须先改这里，
+  // 写边界：允许 closure / disable / restore 三条。想加第三条写路径必须先改这里，
   // 顺带被迫回答「它写不写审计、要不要 reason」——这就是这条断言存在的意义。
   const writeMethods = methods.filter((name) => EXPECTED_ROUTE_VERBS[name] !== RequestMethod.GET)
-  assert.deepEqual(writeMethods.sort(), ['disable', 'restore'])
-  pass('Controller 暴露 2 个 GET + disable/restore 两条写路径，动词与禁缓存头均正确')
+  assert.deepEqual(writeMethods.sort(), ['closure', 'disable', 'restore'])
+  pass('Controller 暴露 2 个 GET + closure/disable/restore 三条写路径，动词与禁缓存头均正确')
 }
 
 function verifyContractParity(): void {
@@ -659,6 +660,14 @@ async function initFallbackDb(): Promise<void> {
         "id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT NOT NULL,
         "action" TEXT NOT NULL, "targetTitle" TEXT, "sourceName" TEXT, "sourceUrl" TEXT, "externalId" TEXT,
         "terminalId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "expiresAt" DATETIME NOT NULL
+      )`,
+      `CREATE TABLE "UserDataRequest" (
+        "id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "requestType" TEXT NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'pending', "requestedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "handledAt" DATETIME, "handledBy" TEXT, "auditRef" TEXT, "idempotencyKey" TEXT, "activeKey" TEXT,
+        "executionVersion" INTEGER NOT NULL DEFAULT 0, "executionStep" TEXT, "progressJson" TEXT,
+        "workerJobId" TEXT, "exportFileId" TEXT, "exportExpiresAt" DATETIME, "downloadConsumedAt" DATETIME,
+        "failureCode" TEXT, "failureMessage" TEXT, "retryCount" INTEGER NOT NULL DEFAULT 0, "lastAttemptAt" DATETIME
       )`,
       `CREATE TABLE "AuditLog" (
         "id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL,

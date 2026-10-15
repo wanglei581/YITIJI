@@ -99,6 +99,11 @@ export class MemberDataRequestController {
     return ApiResponse.ok(await this.requests.list(user.endUserId, query.cursor, query.limit))
   }
 
+  @Post(':id/cancel')
+  async cancel(@CurrentEndUser() user: AuthedEndUser, @Param('id') id: string) {
+    return ApiResponse.ok(await this.requests.cancel(user.endUserId, id))
+  }
+
   @Post()
   async create(
     @CurrentEndUser() user: AuthedEndUser,

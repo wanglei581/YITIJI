@@ -22,6 +22,8 @@ export interface ErrorResponseBody {
     message: string
     /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"] */
     details?: string[]
+    /** 管理员注销阻塞清单，只含订单号与状态。 */
+    orders?: Array<{ orderNo: string; status: string }>
     /** 手机上传二维码已过期，但文件已经记在会员名下。只有 true，不带文件名。 */
     memberFileRetained?: true
     /** 仅 PICKUP_TERMINAL_MISMATCH（会员本机领取走错机器）：该单绑定的网点，给本人看。 */

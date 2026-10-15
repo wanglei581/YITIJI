@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service'
 import { RedisService } from '../common/redis/redis.service'
 import { MemberStepUpService } from '../member-auth/member-step-up.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { MemberClosureRequests } from './member-closure-requests'
 import { MemberDataRequestAdminOperations } from './member-data-request.admin'
 import {
   badRequest,
@@ -60,7 +61,7 @@ export class MemberDataRequestService {
   ): Promise<MemberDataRequestItem> {
     this.assertCreateInput(endUserId, requestType, idempotencyKey)
     if (requestType === 'delete') {
-      throw badRequest('ACCOUNT_CLOSURE_NOT_AVAILABLE', '账号注销暂未开放')
+      return this.closures().create(endUserId, idempotencyKey, stepUpToken, deviceId)
     }
 
     const replay = await this.findIdempotent(endUserId, requestType, idempotencyKey)
@@ -146,8 +147,16 @@ export class MemberDataRequestService {
     return {
       items: items.map(toMemberDataRequestItem),
       nextCursor: hasMore && items.length > 0 ? encodeRequestCursor(items[items.length - 1]!) : null,
-      capabilities: { accountClosureAvailable: false },
+      capabilities: { accountClosureAvailable: true },
     }
+  }
+
+  cancel(endUserId: string, id: string): Promise<MemberDataRequestItem> {
+    return this.closures().cancel(endUserId, id)
+  }
+
+  private closures(): MemberClosureRequests {
+    return new MemberClosureRequests(this.prisma, this.stepUp, this.audit)
   }
 
   listForAdmin(query: AdminMemberDataRequestQuery = {}): Promise<AdminMemberDataRequestPage> {

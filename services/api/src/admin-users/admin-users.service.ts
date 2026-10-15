@@ -1,3 +1,4 @@
+import { closureFilter, closureRequestOf } from './admin-user-closure-read'
 import {
   BadRequestException,
   ConflictException,
@@ -169,6 +170,7 @@ export class AdminUsersService {
     const createdAt = registrationRange(query)
     const exactPhoneHash = normalizedPhone ? hashPhone(normalizedPhone) : undefined
     const where: Prisma.EndUserWhereInput = {
+      ...await closureFilter(this.prisma, query.closure),
       ...(exactPhoneHash ? { phoneHash: exactPhoneHash } : {}),
       ...(keyword ? { nickname: { contains: keyword } } : {}),
       ...(query.enabled === undefined ? {} : { enabled: query.enabled }),
@@ -188,7 +190,7 @@ export class AdminUsersService {
         ? this.prisma.endUser.findUnique({ where: { phoneHash: exactPhoneHash }, select: { id: true } })
         : Promise.resolve(null),
     ])
-    const items = rows.map(toListItem)
+    const items = await Promise.all(rows.map(async (row) => ({ ...toListItem(row), closureRequest: await closureRequestOf(this.prisma, row.id) })))
 
     if (normalizedPhone !== undefined) {
       await this.writeRequiredAudit({
@@ -214,7 +216,7 @@ export class AdminUsersService {
       })
     }
 
-    const user = { ...toListItem(row), updatedAt: row.updatedAt.toISOString() }
+    const user = { ...toListItem(row), closureRequest: await closureRequestOf(this.prisma, row.id), updatedAt: row.updatedAt.toISOString() }
     const now = new Date()
     const fileWhere = currentFileWhere(endUserId, now)
     const [stats, recentActivities] = await Promise.all([

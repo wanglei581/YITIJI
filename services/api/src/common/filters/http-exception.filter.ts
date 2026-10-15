@@ -104,6 +104,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let details: string[] | undefined
     let memberFileRetained = false
     let mismatchTerminal: MismatchTerminal | null | undefined
+    let closureOrders: Array<{ orderNo: string; status: string }> | undefined
     let nextAction: string | undefined
 
     if (exception instanceof HttpException) {
@@ -132,6 +133,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
           // 会员本机领取走错机器：给本人看该去哪台（网点名）。只认这一个错误码、只取三个字符串列。
           if (err['code'] === 'PICKUP_TERMINAL_MISMATCH') mismatchTerminal = pickMismatchTerminal(err['terminal'])
           // 页面不能是死胡同：拒绝时附一个下一步标识，前端据此挂按钮。
+          if (err['code'] === 'CLOSURE_BLOCKED_BY_OPEN_ORDERS' && Array.isArray(err['orders'])) {
+            closureOrders = err['orders'].filter((row): row is { orderNo: string; status: string } =>
+              Boolean(row && typeof row === 'object' && typeof row.orderNo === 'string' && row.orderNo.length <= 128
+                && typeof row.status === 'string' && /^[a-z_]{1,64}$/.test(row.status)))
+              .map((row) => ({ orderNo: row.orderNo, status: row.status }))
+          }
           if (isNextActionId(err['nextAction'])) nextAction = err['nextAction']
         } else if (typeof errField === 'string') {
           const bodyMessage = b['message']
@@ -209,6 +216,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(details ? { details } : {}),
         ...(memberFileRetained ? { memberFileRetained: true as const } : {}),
         ...(mismatchTerminal !== undefined ? { terminal: mismatchTerminal } : {}),
+        ...(closureOrders ? { orders: closureOrders } : {}),
         ...(nextAction ? { nextAction } : {}),
       },
       requestId: request.requestId,

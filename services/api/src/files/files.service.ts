@@ -1,3 +1,5 @@
+import { deleteClosureFile, reconcileDetachedStorageDeletions } from './closure-file-deletion'
+import type { PrismaTransactionClient } from '../prisma/prisma.service'
 import {
   Injectable,
   Logger,
@@ -977,6 +979,12 @@ export class FilesService {
     return this._delete(fileId, 'system', reason, true, true)
   }
 
+  /** 仅供注销执行器，硬删元数据与删除对账同一条链路。 */
+  async deleteForMemberClosure(fileId: string, onDeleted: (tx: PrismaTransactionClient, failures: number) => Promise<void>): Promise<void> {
+    await deleteClosureFile(this.prisma, this.storage, fileId,
+      (id) => this.systemDeleteSensitive(id, 'member_account_closure'), onDeleted)
+  }
+
   /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
   async updateRetention(
     fileId: string,
@@ -1316,7 +1324,9 @@ export class FilesService {
       })
     }
 
-    return { reconciledCount: reconciledIds.length, stillPendingCount, triggeredBy }
+    const detached = await reconcileDetachedStorageDeletions(this.prisma, this.storage, limit)
+    return { reconciledCount: reconciledIds.length + detached.reconciledCount,
+      stillPendingCount: stillPendingCount + detached.stillPendingCount, triggeredBy }
   }
 
   // ── 内部 ────────────────────────────────────────────────────────────────────
