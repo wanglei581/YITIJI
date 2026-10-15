@@ -1,6 +1,8 @@
 import 'dotenv/config'
-import { ForbiddenException } from '@nestjs/common'
+import { createHmac } from 'crypto'
+import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { decryptSecret, generateWebhookSecret } from '../src/common/crypto/secret-cipher'
 import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
 import { JobSyncService } from '../src/job-sync/job-sync.service'
 import type { AuditService } from '../src/audit/audit.service'
@@ -17,17 +19,30 @@ function pass(message: string): void {
   console.log(`  PASS ${message}`)
 }
 
-async function expectForbidden(run: () => Promise<unknown>, message: string): Promise<void> {
+async function expectException(
+  matches: (error: unknown) => boolean,
+  expected: string,
+  run: () => Promise<unknown>,
+  message: string,
+): Promise<void> {
   try {
     await run()
   } catch (error) {
-    if (error instanceof ForbiddenException) {
+    if (matches(error)) {
       pass(message)
       return
     }
     throw error
   }
-  throw new Error(`${message}: expected ForbiddenException`)
+  throw new Error(`${message}: expected ${expected}`)
+}
+
+function expectForbidden(run: () => Promise<unknown>, message: string): Promise<void> {
+  return expectException((error) => error instanceof ForbiddenException, 'ForbiddenException', run, message)
+}
+
+function expectNotFound(run: () => Promise<unknown>, message: string): Promise<void> {
+  return expectException((error) => error instanceof NotFoundException, 'NotFoundException', run, message)
 }
 
 async function main(): Promise<void> {
@@ -153,11 +168,98 @@ async function main(): Promise<void> {
       () => partner.importFairs({ items: [] }, partnerUser(orgIds.hr)),
       'Licensed HR agency cannot import job fairs',
     )
+
+    // ── 凭证与密钥处理契约 ────────────────────────────────────
+    // 覆盖 W3 BE-8 的安全性质:密钥只在创建响应回显一次、落库必须是密文、
+    // 一次性回显的那把密钥正是 Webhook 验签实际使用的密钥。
+    // 签名构造与 services/api/src/sync/sync.service.ts 的 HMAC 校验保持同构。
+
+    // 空串兜底:后续断言都不再需要非空断言,断言失败即直接暴露"没回显密钥"。
+    const webhookSecretOnce = webhookSource.webhookSecretOnce ?? ''
+    expect(webhookSecretOnce.length >= 32, 'create must return webhookSecretOnce for a webhook source')
+
+    const apiCredential = `verify-partner-api-credential-${suffix}`
+    const apiSource = await partner.createPartnerDataSource(
+      {
+        name: 'School API',
+        accessMode: 'api',
+        sourceKind: 'school',
+        endpoint: 'https://example.edu/api/jobs',
+        authType: 'bearer',
+        credential: apiCredential,
+      },
+      partnerUser(orgIds.school),
+    )
+    expect(apiSource.credentialConfigured, 'API source must record credentialConfigured')
+    expect(apiSource.webhookSecretOnce === undefined, 'API source must not return webhookSecretOnce')
+
+    // 整串 JSON 扫描,而不是只看字段:字段改名或多挂一层嵌套都不能让密钥漏出去。
+    // credentialConfigured 断言是反空转保险 —— 证明这个源确实有密钥,扫不到不是因为没配。
+    const hrList = await partner.getPartnerDataSources(partnerUser(orgIds.hr))
+    const hrListJson = JSON.stringify(hrList)
+    const listedWebhook = hrList.find((row) => row.id === webhookSource.id)
+    expect(listedWebhook?.credentialConfigured, 'listed webhook source must report credentialConfigured')
+    expect(!hrListJson.includes(webhookSecretOnce), 'webhook secret leaked into the data source list JSON')
+    expect(!hrListJson.includes('webhookSecret'), 'list JSON must not carry any webhookSecret field')
+
+    const schoolList = await partner.getPartnerDataSources(partnerUser(orgIds.school))
+    const schoolListJson = JSON.stringify(schoolList)
+    const listedApi = schoolList.find((row) => row.id === apiSource.id)
+    expect(listedApi?.credentialConfigured, 'listed API source must report credentialConfigured')
+    expect(!schoolListJson.includes(apiCredential), 'API credential leaked into the data source list JSON')
+    pass('Secrets are echoed once on create and never appear anywhere in the list response JSON')
+
+    // secret-cipher 的容器格式:base64(iv):base64(ciphertext):base64(authTag)
+    const CIPHER_CONTAINER = /^[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/
+    const storedWebhookRow = await prisma.jobSource.findUniqueOrThrow({ where: { id: webhookSource.id } })
+    const storedWebhookSecret = storedWebhookRow.webhookSecret ?? ''
+    expect(storedWebhookSecret.length > 0, 'webhook source must persist a secret column')
+    expect(!storedWebhookSecret.includes(webhookSecretOnce), 'webhook secret persisted in plaintext')
+    expect(CIPHER_CONTAINER.test(storedWebhookSecret), 'webhook secret is not an AES-256-GCM container')
+    expect(decryptSecret(storedWebhookSecret) === webhookSecretOnce, 'stored webhook secret does not decrypt to the echoed one')
+
+    const storedApiRow = await prisma.jobSource.findUniqueOrThrow({ where: { id: apiSource.id } })
+    const storedApiCredential = storedApiRow.encryptedCredential ?? ''
+    expect(storedApiCredential.length > 0, 'API source must persist a credential column')
+    expect(!storedApiCredential.includes(apiCredential), 'partner-supplied credential persisted in plaintext')
+    expect(CIPHER_CONTAINER.test(storedApiCredential), 'partner credential is not an AES-256-GCM container')
+    expect(decryptSecret(storedApiCredential) === apiCredential, 'stored credential does not decrypt to the submitted value')
+    pass('Partner-supplied credential and webhook secret are both stored as ciphertext, not plaintext')
+
+    // 与 sync.service.ts 的验签同构:HMAC-SHA256 over `${ts}.${rawBody}`。
+    // 这条锁死"发给合作机构的那把密钥 == 真正能通过验签的密钥",
+    // 并证明任何其他密钥都算不出同一个签名。
+    const signedTs = '1756900000000'
+    const signedBody = JSON.stringify({ items: [{ externalId: `verify-hmac-${suffix}`, title: 'Verify' }] })
+    const signWith = (secret: string): string =>
+      createHmac('sha256', secret).update(`${signedTs}.${signedBody}`).digest('hex')
+    const expectedSignature = signWith(webhookSecretOnce)
+    expect(signWith(decryptSecret(storedWebhookSecret)) === expectedSignature, 'stored secret does not reproduce the webhook signature')
+    expect(signWith(generateWebhookSecret()) !== expectedSignature, 'an unrelated secret produced a matching signature')
+    pass('The once-echoed secret is exactly the key that validates webhook signatures; any other key fails')
+
+    const createEvents = auditEvents.filter((event) => event.action === 'data_source.create')
+    expect(createEvents.length >= 2, 'data_source.create audit events missing')
+    const createEventsJson = JSON.stringify(createEvents)
+    expect(!createEventsJson.includes(webhookSecretOnce), 'creation audit event carries the webhook secret')
+    expect(!createEventsJson.includes(apiCredential), 'creation audit event carries the API credential')
+    expect(
+      createEvents.some((event) => event.payload?.['credentialConfigured'] === true),
+      'creation audit must record credentialConfigured',
+    )
+    pass('Data source audit records credentialConfigured only, with no secret material in the payload')
+
+    // 跨机构只能是 404:不能用 403 把"这个 id 存在"泄漏出去。
+    await expectNotFound(
+      () => partner.togglePartnerDataSource(fileSource.id, partnerUser(orgIds.school)),
+      'Cross-org access to another org data source is a 404, not an existence leak',
+    )
   } finally {
     await prisma.job.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: Object.values(orgIds) } } })
     await prisma.syncLog.deleteMany({ where: { orgId: { in: Object.values(orgIds) } } })
     await prisma.importBatch.deleteMany({ where: { orgId: { in: Object.values(orgIds) } } })
+    await prisma.fieldMappingRule.deleteMany({ where: { orgId: { in: Object.values(orgIds) } } })
     await prisma.jobSource.deleteMany({ where: { orgId: { in: Object.values(orgIds) } } })
     await prisma.organization.deleteMany({ where: { id: { in: Object.values(orgIds) } } })
     await prisma.onModuleDestroy()
