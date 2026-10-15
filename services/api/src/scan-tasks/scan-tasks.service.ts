@@ -95,6 +95,20 @@ export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
  */
 export const SCAN_RETRY_AUTHORITY_TTL_MS = 15 * 60 * 1000
 
+/** 取消/过期后的终端级隐私静默期；可由环境变量覆盖，默认 90 秒。 */
+export const SCAN_TERMINAL_QUIET_PERIOD_SECONDS = Math.max(
+  0,
+  Number.isFinite(Number(process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS']))
+    ? Math.floor(Number(process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS']))
+    : 90,
+)
+export const SCAN_TERMINAL_QUIET_PERIOD_MS = SCAN_TERMINAL_QUIET_PERIOD_SECONDS * 1000
+export function scanTerminalQuietPeriodMs(): number {
+  const raw = Number(process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'])
+  const seconds = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : SCAN_TERMINAL_QUIET_PERIOD_SECONDS
+  return seconds * 1000
+}
+
 const SCAN_RETRY_ELIGIBLE_STATUSES = ['failed', 'cancelled', 'expired'] as const
 const SCAN_RETRY_RECOVERABLE_CHILD_STATUSES = ['waiting', 'matched'] as const
 
@@ -287,6 +301,8 @@ export class ScanTasksService {
         error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端当前不可创建新扫描任务' },
       })
     }
+
+    await this.assertTerminalQuietPeriod(terminal.id)
 
     // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
@@ -606,6 +622,7 @@ export class ScanTasksService {
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权确认该扫描任务' },
       })
     }
+    await this.assertTerminalQuietPeriod(task.terminalId)
     if (task.deliveryAckedAt) {
       return { scanTaskId: task.id, deliveryAckedAt: task.deliveryAckedAt.toISOString() }
     }
@@ -1127,6 +1144,40 @@ export class ScanTasksService {
       return 'expired'
     }
     return status
+  }
+
+  /**
+   * 取消或过期后先让打印机把自动进纸器里的余页吐完。该判断在服务端执行，
+   * 因而前端绕过页面也不能把下一位的会话开到同一台终端上。
+   */
+  private async assertTerminalQuietPeriod(terminalId: string): Promise<void> {
+    const quietPeriodMs = scanTerminalQuietPeriodMs()
+    if (quietPeriodMs <= 0) return
+    const now = Date.now()
+    const recent = await this.prisma.scanTask.findFirst({
+      where: {
+        terminalId,
+        status: { in: ['cancelled', 'expired'] },
+        updatedAt: { gt: new Date(now - quietPeriodMs) },
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: { status: true, updatedAt: true, expiresAt: true },
+    })
+    if (!recent) return
+    if (recent.status !== 'cancelled' && recent.status !== 'expired') return
+    // 静默期从服务端真正把任务收敛为 cancelled/expired 的时刻开始；
+    // expiresAt 只是用户会话的截止时间，不能把尚未被 reaper 处理的尾页提前放行。
+    const endedAt = recent.updatedAt.getTime()
+    const remainingMs = endedAt + quietPeriodMs - now
+    if (remainingMs <= 0) return
+    const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000))
+    throw new ConflictException({
+      error: {
+        code: 'SCAN_TERMINAL_QUIET_PERIOD',
+        message: `上一位的扫描可能还在出纸，请等约 ${remainingSeconds} 秒再开始`,
+        details: { remainingSeconds },
+      },
+    })
   }
 
   /**

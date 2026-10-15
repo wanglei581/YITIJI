@@ -2,6 +2,10 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-scan-tasks-admin-secret'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-scan-tasks-action-secret'
+// The legacy lifecycle fixtures intentionally create cancelled rows and immediately
+// open another task. The dedicated quiet-period verification below runs with the
+// production default; keep this broad regression suite focused on its existing cases.
+process.env['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'] ||= '0'
 
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -544,6 +548,26 @@ function assertDeliverScanFileRequiresBidirectionalLineage(apiRoot: string): voi
       `deliverScanFile() must keep bidirectional lineage check: ${snippet}`
     )
   }
+}
+
+function assertTerminalQuietPeriodContracts(apiRoot: string): void {
+  const source = readFileSync(path.join(apiRoot, 'src/scan-tasks/scan-tasks.service.ts'), 'utf8')
+  assert.match(source, /SCAN_TERMINAL_QUIET_PERIOD_SECONDS[\s\S]*process\.env\['SCAN_TERMINAL_QUIET_PERIOD_SECONDS'\]/,
+    'scan quiet period must be configurable with SCAN_TERMINAL_QUIET_PERIOD_SECONDS')
+  assert.match(source, /code:\s*'SCAN_TERMINAL_QUIET_PERIOD'/,
+    'quiet period must return the stable SCAN_TERMINAL_QUIET_PERIOD error code')
+  assert.match(source, /remainingSeconds[\s\S]*details:\s*\{\s*remainingSeconds\s*\}/,
+    'quiet period error must expose remaining seconds')
+  const createStart = source.indexOf('async create(')
+  const ackStart = source.indexOf('async ack(')
+  const quietStart = source.indexOf('assertTerminalQuietPeriod(')
+  assert.ok(createStart >= 0 && quietStart > createStart, 'create must enforce terminal quiet period')
+  assert.ok(ackStart >= 0 && source.indexOf('assertTerminalQuietPeriod(task.terminalId)', ackStart) > ackStart,
+    'ACK must enforce terminal quiet period')
+  assert.match(source, /status:\s*\{\s*in:\s*\['cancelled',\s*'expired'\]/,
+    'quiet period must only follow cancelled or expired tasks')
+  assert.match(source, /const endedAt = recent\.updatedAt\.getTime\(\)/,
+    'quiet period must start at server convergence time')
 }
 
 function sqliteQuery(databasePath: string, sql: string): string {
@@ -2453,6 +2477,7 @@ async function main(): Promise<void> {
   assertRetryHardeningMigrationContracts(apiRootForContracts)
   assertRetryCreateRecoversLostResponse(apiRootForContracts)
   assertDeliverScanFileRequiresBidirectionalLineage(apiRootForContracts)
+  assertTerminalQuietPeriodContracts(apiRootForContracts)
   assertDeliveryAckMigrationContracts(apiRootForContracts)
   assertLeaseRequiresDeliveryAck(apiRootForContracts)
   assertDeliverCasRepinsAckAndExpiry(apiRootForContracts)

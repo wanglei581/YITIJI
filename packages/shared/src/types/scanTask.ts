@@ -80,6 +80,9 @@ export interface ScanRescanAuthorization {
  */
 export const SCAN_RETRY_CONTROL_HEADER = 'X-Scan-Retry-Control'
 
+/** 服务端拒绝终端在取消/过期后的隐私静默期内重新建会话。 */
+export const SCAN_TERMINAL_QUIET_PERIOD = 'SCAN_TERMINAL_QUIET_PERIOD' as const
+
 /** 409：配对重扫的 child 已不在 waiting/matched，不能恢复，也不能再开第二条。 */
 export const SCAN_RETRY_CHILD_NOT_RECOVERABLE = 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'
 

@@ -67,10 +67,13 @@ export interface ScanSettingsStatusViewProps {
   liveNotDurable: boolean
   /** 上一位的扫描还没收完尾：本页一个创建请求都没发，所以不许说成「会话创建失败」。 */
   cleanupHolding: boolean
+  quietPeriodRemaining: number
+  quietPeriodBlocked: boolean
   handleSafeReturn: () => void
   handlePlainRestart: () => void
   handleRescanRetry: () => void
   handleAckRetry: () => void
+  handleQuietPeriodRetry: () => void
 }
 
 export function ScanSettingsStatusView({
@@ -86,10 +89,13 @@ export function ScanSettingsStatusView({
   ackRefused,
   liveNotDurable,
   cleanupHolding,
+  quietPeriodRemaining,
+  quietPeriodBlocked,
   handleSafeReturn,
   handlePlainRestart,
   handleRescanRetry,
   handleAckRetry,
+  handleQuietPeriodRetry,
 }: ScanSettingsStatusViewProps) {
   /* 会话建成了，投递授权还没到手。它压在其它分支**之上**：phase 已经是 success，
    * 按旧判据这一屏会直接画出面板操作指引 —— 而那正是这次要挡掉的动作。 */
@@ -194,6 +200,17 @@ export function ScanSettingsStatusView({
                 等系统确认投递授权
               </button>
             )
+          ) : quietPeriodBlocked ? (
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="primary"
+              disabled={quietPeriodRemaining > 0}
+              aria-disabled={quietPeriodRemaining > 0}
+              onClick={handleQuietPeriodRetry}
+            >
+              {quietPeriodRemaining > 0 ? `请等约 ${quietPeriodRemaining} 秒` : '重新开始一次扫描'}
+            </button>
           ) : rescanRetryable ? (
             <button type="button" className="qx-btn" data-variant="primary" onClick={handleRescanRetry}>
               再试一次安全重扫
