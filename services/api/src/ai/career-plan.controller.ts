@@ -1,4 +1,5 @@
 import { Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
@@ -52,12 +53,16 @@ export class CareerPlanController {
 
   @Post(':taskId')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async generate(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const open = await this.jobBoardOpen(req)
     return this.service.generate(taskId, await this.requesterOf(req), { includeJobFitTitle: open })
   }
 
   @Get(':taskId')
+  @AiUse('read')
+
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const open = await this.jobBoardOpen(req)
     return this.service.getLatest(taskId, await this.requesterOf(req), { jobBoardOpen: open })
@@ -65,6 +70,8 @@ export class CareerPlanController {
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     const open = await this.jobBoardOpen(req)
     return this.service.printPlan(taskId, await this.requesterOf(req), { jobBoardOpen: open })

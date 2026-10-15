@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
@@ -96,12 +97,16 @@ export class AdvisorController {
 
   @Post('sessions')
   @PaidAiThrottle(10)
+  @AiUse('generate')
+
   async create(@Body() dto: CreateAdvisorSessionDto, @Req() req: ReqLike) {
     return this.service.createSession(dto.topic, await this.requesterOf(req))
   }
 
   /** 只读：刷新恢复 / 换设备继续。刻意不限流 —— AI 挂了也要能看到已有进度。 */
   @Get('sessions/:sessionId')
+  @AiUse('read')
+
   async get(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
     return this.service.getSession(sessionId, await this.requesterOf(req))
   }
@@ -109,6 +114,8 @@ export class AdvisorController {
   /** 判错了一键换型；已填输入槽不丢。 */
   @Patch('sessions/:sessionId/skill')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @AiUse('generate')
+
   async switchSkill(
     @Param('sessionId') sessionId: string,
     @Body() dto: SwitchSkillDto,

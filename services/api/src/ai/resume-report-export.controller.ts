@@ -1,3 +1,4 @@
+import { AiUse } from '../ai-access/ai-access.decorator'
 import {
   BadRequestException,
   Body,
@@ -51,6 +52,8 @@ export class ResumeReportExportController {
 
   @Post(':taskId/export')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('export')
+
   async export(
     @Param('taskId') taskId: string,
     @Body() body: { kind?: string; benefitGrantId?: string | null } | undefined,

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { AiUse } from '../ai-access/ai-access.decorator'
 import { JwtService } from '@nestjs/jwt'
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
@@ -143,6 +144,8 @@ export class JobAiController {
 
   @Post(':id/ai/match')
   @PaidAiThrottle(6)
+  @AiUse('generate')
+
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
     if (!isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     await this.assertJobBoard(req)
@@ -173,6 +176,8 @@ export class MemberJobAiSessionsController {
   ) {}
 
   @Get()
+  @AiUse('read')
+
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('cursor') cursor?: string,

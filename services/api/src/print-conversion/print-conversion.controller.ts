@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Post, Req } from '@nestjs/common'
+import { MaintenanceBlocked } from '../ai-access/ai-access.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
@@ -19,6 +20,7 @@ export class PrintConversionController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @MaintenanceBlocked()
   @Post('images-to-pdf')
   @Throttle({ default: { ttl: 60_000, limit: 3 } })
   async imagesToPdf(

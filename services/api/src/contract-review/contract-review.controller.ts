@@ -1,3 +1,4 @@
+import { AiUse } from '../ai-access/ai-access.decorator'
 import {
   Body,
   Controller,
@@ -58,6 +59,8 @@ export class ContractReviewController {
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @AiUse('generate')
+
   async create(@Body() dto: CreateContractReviewDto, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.createAndEnqueue(
       dto,
@@ -71,6 +74,7 @@ export class ContractReviewController {
     return ApiResponse.ok(await this.consent.getConsentScope())
   }
 
+  @AiUse('read')
   @Get(':id')
   async get(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.get(id, await this.requesterOf(req)))
@@ -79,6 +83,8 @@ export class ContractReviewController {
   @Post(':id/confirm')
   @HttpCode(HttpStatus.ACCEPTED)
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
+  @AiUse('generate')
+
   async confirm(
     @Param('id') id: string,
     @Body() dto: ConfirmContractReviewDto,
@@ -91,12 +97,14 @@ export class ContractReviewController {
     ))
   }
 
+  @AiUse('generate')
   @Post(':id/report')
   @Throttle({ default: { ttl: 60_000, limit: 4 } })
   async report(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.createReport(id, await this.requesterOf(req)))
   }
 
+  @AiUse('export')
   @Post(':id/report/keep')
   @Throttle({ default: { ttl: 60_000, limit: 4 } })
   async keepReport(@Param('id') id: string, @Req() req: RequestLike) {
