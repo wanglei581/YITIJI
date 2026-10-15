@@ -1,3 +1,15 @@
+## 2026-10-15：剩余 169 个旧工作目录复核与归档清理（第三阶段）
+
+- **范围与约束：** 产品负责人授权继续检查剩余 169 个旧 worktree，独有代码先推送、未提交内容先归档，再移除确认闲置目录；活动项目和所有聊天记录原位保留。本次只改本文档记录，不改产品代码、根工作区或任何生产/硬件链路。
+- **结果：** 盘点 169 项，本轮完成移除 60 项，项目内 `.claude/worktrees` 剩 109 项；全仓 Git worktree 登记 225 项。未删除任何原开发分支、stash 或保留目录。正在运行服务、开放 PR、Git 操作残留、明确 owner 保留、开发工具引用及未确认闲置目录保持原状。
+- **代码与私密内容：** 新增 29 个 `codex/archive-phase3-20261015/*` 备份分支，430 项代码/测试变更已原子推送并逐个核对远端 SHA。它们是历史工作快照，不是已验收修复，不得整体合回 main。5 个仍有敏感字面量疑点的源码/测试文件与其它私密配置、数据库、文档完整保留在本机归档，未上传到公开仓库。
+- **完整恢复：** 本批私密归档位于 `Documents/项目归档/一体机旧工作目录-20261015-第二批`，保留原 HEAD、完整历史 bundle、index、暂存/未暂存二进制补丁、未跟踪及非再生的忽略文件、数据库/WAL/SHM、权限/时间和证据；另为 3 个后来明确保留的责任窗口完成额外备份。60 项实际隔离恢复通过文件与 Git 状态核对；恢复对象仅来自私密 bundle 导入的空仓库。再生依赖和构建目录按保存的锁文件重建。
+- **协作与删除门禁：** 实际 agy 与 Grok CLI 审查条件名单，Codex 依照 owner 证据收缩范围；删除前再次核对源文件、远端 SHA、实时 PR、进程、Git 操作状态、入站源码和依赖引用。仅正常停止待删闲置目录的 Git fsmonitor。根工作区、保留目录登记、原有 refs 和 43 个 stash 前后核对一致。没有执行 prune、gc、reset、分支删除、合并或部署。
+- **存储实测：** 本轮结束整个项目 78.02 GiB，项目 `.claude` 69.39 GiB；私密归档 0.841 GB。包含另行授权结束异常临时 MySQL 的清理窗口，磁盘可用空间变化 +38.152 GB；最终可用 157.121 GB（2026-10-15T17:24:40+08:00）。du 块合计可能重复计算 APFS 共享块，不等于独占可回收空间；后台写入影响整轮磁盘变化。
+- **额外授权的异常进程处理：** 另一行业政策任务的临时 mysqld PID 5484 持有已删除但持续增长的日志（约0.7 GB/分钟）。用户明确批准正常停止；SIGTERM超过1分钟无效后，再次明确批准强制结束同一进程。启动时间/路径/端口核验后发送SIGKILL，日志句柄全部关闭，观测窗口磁盘可用空间回升约 38.68 GB。该窗口与worktree清理重叠，不能累加；全程开始至结束可用空间净变化 +9.50 GB。没有删除该项目文件或聊天。
+- **发布边界：** 本记录在既有独立文档分支提交和推送，没有修改脏根目录文档。本轮无业务功能改动，不重复业务测试，未进行新的线上或真机验收；原有产品交付阻塞不因存储清理关闭。
+- **已移除目录：** `admiring-knuth-78b261`, `agent-ae8eeaf67149e3c89`, `agitated-blackburn-5107d6`, `bh-c-noraw3`, `bh-c-policy`, `bh-c-takeaway`, `bh-flow`, `bh-g-bos`, `bh-g-clearq`, `bh-g-q2a2`, `bh-g-q2b1`, `bh-g-q2b2`, `bh-g-quota`, `ch41-account-assets`, `ch44-jobs-fairs`, `cmp-d-content`, `confident-goldstine-1bd3ab`, `consoles-ui14`, `cranky-fermat-c90c91`, `dazzling-gagarin-f5d946`, `dazzling-hodgkin-24cdea`, `dazzling-morse-740f5a`, `dreamy-chaum-0101b6`, `eager-volhard-4abd78`, `ecstatic-euler-8c38ad`, `elastic-blackwell-3908e3`, `elastic-hellman-1e7d34`, `elated-burnell-3f79bd`, `eloquent-nightingale-e9b6f3`, `epic-panini-1580b8`, `field-fix-lock-0928`, `focused-hopper-dcd83b`, `friendly-hermann-6d25d1`, `gallant-leavitt-e120a8`, `gracious-cohen-c265c3`, `grok-dataset-d4`, `grok-pantum-api-0929`, `hopeful-feistel-d7336e`, `immutable-mapping-orbit`, `jolly-shirley-2fe130`, `kind-murdock-abb4b5`, `laughing-goodall-f5809e`, `laughing-nobel-58158f`, `local-partner-backend-startup-d43faa`, `loving-wu-698f80`, `nervous-haslett-410376`, `peaceful-margulis-a59ecf`, `project-progress-assessment-b1620e`, `purring-purring-dragon`, `qx-contractgate`, `qx-homedead`, `recursing-hellman-9d4fdd`, `rl-p1-checklist-evidence`, `rosy-gathering-pearl`, `sleepy-mclean-b188f8`, `sweep-harness-guards`, `swirling-honking-pike`, `wonderful-cerf-98b05e`, `wonderful-jackson-e8585c`, `zen-chandrasekhar-e76c18`。
+
 ## 2026-10-15：旧 worktree 代码远端备份后移除（同日第二阶段）
 
 - 用户追加授权：已修文件上传 Git，确认闲置、已保全的 worktree 可以删除；活动项目和全部聊天仍不动。前一条“源码留在原处”是第一阶段快照，现以下列实际结果为准。
