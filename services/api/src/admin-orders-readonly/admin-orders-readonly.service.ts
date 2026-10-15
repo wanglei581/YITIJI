@@ -25,6 +25,9 @@ interface OrderRow {
   orderNo: string
   type: string
   printTaskId: string | null
+  sourceFileId: string | null
+  sourceFileName: string | null
+  printParamsJson: string | null
   endUserId: string | null
   terminalId: string | null
   amountCents: number
@@ -350,7 +353,13 @@ export class AdminOrdersReadonlyService {
   }
 
   private toItem(row: OrderRow, labels: LabelMaps, channelAcceptedUnconfirmed = false): AdminOrderReadonlyItem {
-    const printSummary = parseSafePrintSummary(row.printTask?.paramsJson)
+    // 手机单在到机放行前只有 Order：展示已确认的打印快照，不伪造 PrintTask。
+    // 有真实任务时只认任务参数；材料包/历史现场单不套用单文件快照。
+    const pendingSingle = !row.printTask && row.type === 'print' && row.sourceFileId !== null
+    const printSummary = parseSafePrintSummary(row.printTask?.paramsJson ?? (pendingSingle ? row.printParamsJson : null))
+    if (pendingSingle && !printSummary.fileName) {
+      printSummary.fileName = row.sourceFileName?.trim() || null
+    }
     const effectiveTerminalId = row.terminalId ?? row.printTask?.terminalId ?? null
     const ownerType = row.endUserId ? 'member' : 'anonymous'
     const nickname = row.endUserId ? labels.userLabels.get(row.endUserId) : null
@@ -388,6 +397,9 @@ function orderSelect() {
     orderNo: true,
     type: true,
     printTaskId: true,
+    sourceFileId: true,
+    sourceFileName: true,
+    printParamsJson: true,
     endUserId: true,
     terminalId: true,
     amountCents: true,

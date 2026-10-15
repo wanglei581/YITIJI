@@ -32,6 +32,8 @@ const STATUS_MAP = {
   completed: '已完成',
   failed:    '打印失败',
   cancelled: '已取消',
+  expired: '已过期',
+  abandoned: '已结束',
 }
 
 const STATUS_TONE = {
@@ -39,6 +41,10 @@ const STATUS_TONE = {
   pending: 'wheat', claimed: 'wheat', printing: 'teal',
   completed: 'ok', failed: 'danger', cancelled: 'neutral',
 }
+
+const POLL_INTERVAL_MS = 3000
+const MAX_AUTO_POLLS = 200
+const MAX_POLL_ERRORS = 3
 
 const ERROR_TITLE_DEFAULT = '加载失败，点此重试'
 const ERROR_TITLE_SWITCHED = '账号已切换'
@@ -84,9 +90,15 @@ function canCancelCloudOrder(raw) {
     && raw.pickupStatus === 'pending'
 }
 
+function visiblePickupRaw(raw) {
+  if (!raw || !raw.pickupCode) return ''
+  const pending = !raw.status && raw.pickupStatus === 'pending'
+  return (pending || raw.reprintAllowed === true) ? String(raw.pickupCode) : ''
+}
+
 function toDetail(raw) {
   const status = raw.status || raw.taskStatus || ''
-  const pickupRaw = (!raw.status && raw.pickupStatus === 'pending') ? (raw.pickupCode || '') : ''
+  const pickupRaw = visiblePickupRaw(raw)
   return {
     fileName:     raw.fileName || '打印文件',
     store:        raw.terminalDisplayName || raw.terminalName || raw.storeName || '打印服务终端',
@@ -112,6 +124,7 @@ Page({
     errorTitle: ERROR_TITLE_DEFAULT,
     detail: null,
     cancelling: false,
+    refreshNotice: '',
   },
 
   onLoad(options) {
@@ -132,6 +145,10 @@ Page({
     // 取消链的去重锁。必须显式初始化：留成 undefined 不影响判断，但显式写出来才能
     // 和 _clearSensitive 里的释放对上。
     this._cancelLock = false
+    this._pollCount = 0
+    this._pollErrors = 0
+    this._pollEpoch = 0
+    this._pollTimer = null
     this._guard = createLifecycleGuard()
     this._guard.activate()
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
@@ -292,7 +309,8 @@ Page({
    * 留着它 B 的按钮会永远按不动。
    */
   _clearSensitive(patch) {
-    const next = { detail: null, cancelling: false }
+    this._stopPolling()
+    const next = { detail: null, cancelling: false, refreshNotice: '' }
     if (patch) {
       for (const key of Object.keys(patch)) next[key] = patch[key]
     }
@@ -340,6 +358,7 @@ Page({
 
   _commitCancelSuccess(token, raw) {
     if (!this._sameOwnerCancel(token)) return false
+    this._stopPolling()
     this._cancelCommitted = {
       orderId: this._orderId,
       account: token.identity,
@@ -354,6 +373,7 @@ Page({
       error: '',
       errorTitle: ERROR_TITLE_DEFAULT,
       detail: toDetail(raw),
+      refreshNotice: '',
     })
     return true
   },
@@ -364,8 +384,7 @@ Page({
     if (committed.orderId !== this._orderId) return raw
     if (committed.account !== this._account) return raw
     if (canCancelCloudOrder(raw)) return committed.raw
-    const pickupRaw = (!raw.status && raw.pickupStatus === 'pending') ? (raw.pickupCode || '') : ''
-    if (pickupRaw) return committed.raw
+    if (visiblePickupRaw(raw)) return committed.raw
     return raw
   },
 
@@ -389,6 +408,7 @@ Page({
   },
 
   onUnload() {
+    this._stopPolling()
     this._guard.deactivate()
     // **这里不走 setData。** 页面正在销毁：视图不会再渲染一帧，而真机上对已卸载的
     // 页面调 setData 会被框架告警（也确实没有意义）。这一步要的只是"别让这个页面
@@ -397,9 +417,43 @@ Page({
     // 不依赖这里清没清。
     this.data.detail = null
     this.data.cancelling = false
+    this.data.refreshNotice = ''
   },
 
-  _load() {
+  _stopPolling() {
+    this._pollEpoch += 1
+    if (this._pollTimer !== null) clearTimeout(this._pollTimer)
+    this._pollTimer = null
+  },
+
+  _schedulePoll(raw) {
+    this._stopPolling()
+    const status = raw.status || raw.taskStatus || ''
+    if (!this._guard.isActive() || this._cancelLock) return
+    // 未知态不猜成进行中；续打资格和冷却仍由服务端决定。
+    const retryable = status === 'failed' && (raw.reprintAllowed === true || raw.reprintNotice === 'may_have_printed')
+    if (!retryable && !['pending_release', 'awaiting_payment', 'pending', 'claimed', 'printing'].includes(status)) return
+    this._queuePoll(POLL_INTERVAL_MS)
+  },
+
+  _queuePoll(delay) {
+    this._stopPolling()
+    if (!this._guard.isActive() || this._cancelLock) return
+    if (this._pollCount >= MAX_AUTO_POLLS) {
+      this.setData({ refreshNotice: '自动刷新已暂停，当前为上次查询结果。点此刷新。' })
+      return
+    }
+    const epoch = this._pollEpoch
+    this._pollTimer = setTimeout(() => {
+      if (epoch !== this._pollEpoch || !this._guard.isActive() || this._cancelLock) return
+      this._pollCount += 1
+      this._load(true)
+    }, delay)
+  },
+
+  _load(silent) {
+    this._stopPolling()
+    if (!this._guard.isActive()) return
     const state = this._resolveAccount()
     if (state === 'changed') return
     if (state === 'unusable') { this._failClosed(); return }
@@ -415,7 +469,9 @@ Page({
       return
     }
     const token = this._guard.issue('detail', { orderId: this._orderId, confirming })
-    this.setData({ loading: true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
+    const quiet = silent === true && this.data.detail !== null
+    if (silent !== true) { this._pollCount = 0; this._pollErrors = 0 }
+    this.setData({ loading: !quiet, error: '', errorTitle: ERROR_TITLE_DEFAULT, refreshNotice: quiet ? this.data.refreshNotice : '' })
     api.getCloudPrintOrder(this._orderId)
       .then((raw) => {
         // _verify 内部会**先执行**账号判定：换人 / 前台静默登出时，光丢弃这条响应
@@ -425,11 +481,15 @@ Page({
         // 确认请求，由服务端来回答归属；在那之前一个字节都不写屏。
         if (verdict === 'confirm') { this._requestOwnerConfirmation(); return }
         if (verdict !== 'accept') return
+        const current = this._detailAfterCancelCommit(raw)
+        this._pollErrors = 0
         this.setData({
           loading: false,
-          cancelling: false,
-          detail: toDetail(this._detailAfterCancelCommit(raw)),
+          cancelling: this._cancelLock,
+          detail: toDetail(current),
+          refreshNotice: '',
         })
+        this._schedulePoll(current)
       })
       .catch((err) => {
         // 失败**不追确认请求、也不建立归属**：确认请求是为"归属未定那一发成功了、
@@ -444,8 +504,19 @@ Page({
           this._denyOwner(token.identity)
           return
         }
+        const httpStatus = Number(err && err.statusCode) || 0
+        const transient = httpStatus <= 0 || httpStatus === 408 || httpStatus === 429 || httpStatus >= 500
+        if (quiet && transient && this.data.detail) {
+          this._pollErrors += 1
+          const retrying = this._pollErrors <= MAX_POLL_ERRORS
+          this.setData({ loading: false, cancelling: this._cancelLock,
+            refreshNotice: retrying ? '暂时无法更新，正在重试；当前为上次查询结果。' : '更新暂时中断，当前为上次查询结果。点此刷新。' })
+          if (retrying) this._queuePoll(POLL_INTERVAL_MS * 2 ** this._pollErrors)
+          return
+        }
         this.setData({
           loading: false,
+          cancelling: this._cancelLock,
           errorTitle: ERROR_TITLE_DEFAULT,
           error: (err && err.message) || '加载失败，请稍后重试',
         })
@@ -453,6 +524,12 @@ Page({
   },
 
   retry() { this._load() },
+
+  refreshDetail() {
+    this._pollCount = 0
+    this._pollErrors = 0
+    this._load(true)
+  },
 
   back() {
     wx.navigateBack({ delta: 1, fail() { wx.navigateTo({ url: '/pages/orders/orders' }) } })
@@ -489,6 +566,7 @@ Page({
     const state = this._resolveAccount()
     if (state === 'changed' || state === 'unusable') return
     this._cancelLock = true
+    this._stopPolling()
     // 取消**独占一个通道**：详情刷新（onShow 每次都会发）不该让在途的取消失效，
     // 反过来也一样 —— 两者写的是同一批字段，但有各自的因果。
     const token = this._guard.issue('cancel', { orderId: this._orderId })
@@ -508,6 +586,9 @@ Page({
       })
       // 去重锁**无条件**交还：被守卫丢弃的那一发也必须放锁，否则"再取消一次"会是一个
       // 按不动的按钮。屏幕上的 cancelling 遮罩由清场那一步收起（_clearSensitive）。
-      .then(() => { this._cancelLock = false })
+      .then(() => {
+        this._cancelLock = false
+        if (!this._cancelCommitted && this._guard.isActive()) this._load(true)
+      })
   },
 })
