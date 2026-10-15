@@ -135,7 +135,12 @@ export class PickupOrderService {
     if (order.pickupStatus === 'used' || order.printTaskId) {
       const resumed = await resumeReleasedFailure(this.prisma, order, terminal.id)
       if (resumed.action === 'resumed') {
-        return { ...this.releasedView(resumed.order), resumed: true as const }
+        return {
+          ...this.releasedView(resumed.order),
+          resumed: true as const,
+          ...(resumed.mayHavePrinted ? { mayHavePrinted: true as const } : {}),
+          ...(resumed.partialOutput ? { partialOutput: true as const } : {}),
+        }
       }
       return this.replayReleasedClaim(order, terminal.id)
     }

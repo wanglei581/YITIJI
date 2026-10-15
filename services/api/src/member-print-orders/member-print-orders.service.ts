@@ -179,6 +179,7 @@ export function memberOrderPaymentFields(
       : null,
     reprintAllowed: view.reprintAllowed,
     reprintRemaining: view.reprintRemaining,
+    reprintNotice: view.reprintNotice,
   }
 }
 

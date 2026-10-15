@@ -45,11 +45,20 @@ import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { isPaidUnfulfilledRefundRequired } from '../src/payment/pending-refund-signal'
+import { PickupExpiryRefundService } from '../src/payment/pickup-expiry-refund.service'
 import { RefundService } from '../src/payment/refund.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PickupOrderService } from '../src/print-jobs/pickup-order.service'
-import { PICKUP_CODE_RESUME, selfServiceReprintCount } from '../src/print-jobs/self-service-reprint'
+import { REPRINT_BLOCKED_MESSAGE } from '../src/print-jobs/paid-reprint-eligibility'
+import {
+  PICKUP_CODE_RESUME,
+  PICKUP_RESUME_REFUND_PENDING_MESSAGE,
+  UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS,
+  selfServiceAnomalyDecision,
+  selfServiceReprintCount,
+} from '../src/print-jobs/self-service-reprint'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
@@ -71,6 +80,14 @@ type ClaimBody = {
   orderId?: string
   paymentSessionToken?: string
   resumed?: boolean
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
+}
+
+type RetryBody = {
+  status?: string
+  mayHavePrinted?: boolean
+  partialOutput?: boolean
 }
 
 async function capture(action: () => Promise<unknown>): Promise<{ thrown: boolean; status: number | null; code: string | null; message: string | null }> {
@@ -294,9 +311,11 @@ async function main(): Promise<void> {
       beforeResume.pickupCode !== code
       || beforeResume.reprintAllowed !== true
       || beforeResume.reprintRemaining !== 2
+      || beforeResume.reprintNotice !== null
       || memberBefore?.pickupCode !== code
       || memberBefore.reprintAllowed !== true
       || memberBefore.reprintRemaining !== 2
+      || memberBefore.reprintNotice !== null
     ) {
       fail(`可续打时应下发到机码且剩余 2 次，实际 detail=${JSON.stringify({ pickupCode: beforeResume.pickupCode, reprintAllowed: beforeResume.reprintAllowed, reprintRemaining: beforeResume.reprintRemaining })} list=${JSON.stringify(memberBefore)}`)
     }
@@ -338,6 +357,8 @@ async function main(): Promise<void> {
       || (await prisma.printTask.count({ where: { endUserId: userId } })) !== tasksBefore
       || (await prisma.order.count({ where: { endUserId: userId } })) !== ordersBefore
       || resumeLogs !== 1
+      || 'mayHavePrinted' in resumed
+      || 'partialOutput' in resumed
     ) {
       fail(`第一次续打应把同一任务拉回 pending 并带 resumed，实际 ${JSON.stringify(resumed)} status=${afterFirst.status}`)
     }
@@ -424,20 +445,302 @@ async function main(): Promise<void> {
     }
     pass('别的终端输同码被拒；任务终端不一致也不续打')
 
-    async function blockedRelease(label: string, errorCode: string, expectCode: string, expectMessage: string): Promise<void> {
+    if (
+      REPRINT_BLOCKED_MESSAGE.unconfirmed !== '这单的出纸结果还没确认，请 5 分钟后再试'
+      || REPRINT_BLOCKED_MESSAGE.partial_output !== '这单只出了一部分纸'
+      || REPRINT_BLOCKED_MESSAGE.unconfirmed.includes('工作人员')
+      || REPRINT_BLOCKED_MESSAGE.partial_output.includes('工作人员')
+      || PICKUP_RESUME_REFUND_PENDING_MESSAGE !== '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话'
+    ) {
+      fail(`两条阻断文案必须去掉工作人员，实际 ${JSON.stringify(REPRINT_BLOCKED_MESSAGE)}`)
+    }
+    const boundarySince = new Date('2026-10-06T08:00:00.000Z')
+    const boundaryCooled = selfServiceAnomalyDecision({
+      errorCode: 'PRINT_JOB_UNCONFIRMED',
+      amountCents: 0,
+      discountCents: 0,
+      unconfirmedSince: boundarySince,
+      now: new Date(boundarySince.getTime() + UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS),
+    })
+    const boundaryEarly = selfServiceAnomalyDecision({
+      errorCode: 'PRINT_JOB_UNCONFIRMED',
+      amountCents: 0,
+      discountCents: 0,
+      unconfirmedSince: boundarySince,
+      now: new Date(boundarySince.getTime() + UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS - 1),
+    })
+    const boundaryMissing = selfServiceAnomalyDecision({
+      errorCode: 'PRINT_JOB_UNCONFIRMED',
+      amountCents: 0,
+      discountCents: 0,
+      unconfirmedSince: null,
+      now: boundarySince,
+    })
+    if (
+      boundaryCooled.action !== 'reprint'
+      || (boundaryCooled.action === 'reprint' && boundaryCooled.notice !== 'may_have_printed')
+      || boundaryEarly.action !== 'cooldown'
+      || boundaryMissing.action !== 'cooldown'
+    ) {
+      fail(`未确认冷却期边界不对：满 ${JSON.stringify(boundaryCooled)} 差 1 毫秒 ${JSON.stringify(boundaryEarly)} 无完成时间 ${JSON.stringify(boundaryMissing)}`)
+    }
+    pass('未确认 / 部分出纸文案不含工作人员；免费未确认满 5 分钟才可续打')
+
+    const expiryRefunds = new PickupExpiryRefundService(
+      prisma,
+      new RefundService(prisma, audit, new PaymentProviderRegistry([])),
+      audit,
+    )
+
+    async function releaseFailed(
+      errorCode: string,
+      opts?: { free?: 'zero' | 'discount'; completedAt?: Date | null },
+    ): Promise<{ orderId: string; code: string; taskId: string }> {
       redis.reset()
       const order = await createCloud(resumeFile, terminalId)
       const released = await payAndRelease(order.id, order.pickupCode!)
-      await failTask(released.taskId, order.id, errorCode)
-      const denied = await capture(() => pickup.claim(order.pickupCode!, terminalId, source()))
-      const row = await prisma.printTask.findUniqueOrThrow({ where: { id: released.taskId } })
-      if (denied.status !== 409 || denied.code !== expectCode || denied.message !== expectMessage || row.status !== 'failed') {
-        fail(`${label} 应 409 ${expectCode}，实际 ${JSON.stringify(denied)} status=${row.status}`)
+      if (opts?.free === 'zero') {
+        await prisma.order.update({ where: { id: order.id }, data: { amountCents: 0, discountCents: 0 } })
+      } else if (opts?.free === 'discount') {
+        const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+        await prisma.order.update({ where: { id: order.id }, data: { discountCents: row.amountCents } })
       }
+      await failTask(released.taskId, order.id, errorCode)
+      if (opts && 'completedAt' in opts) {
+        await prisma.printTask.update({ where: { id: released.taskId }, data: { completedAt: opts.completedAt ?? null } })
+      }
+      return { orderId: order.id, code: order.pickupCode!, taskId: released.taskId }
     }
-    await blockedRelease('结果未确认', 'PRINT_JOB_UNCONFIRMED', 'PICKUP_RESUME_UNCONFIRMED', '这单的出纸结果还没确认，暂时不能接着打，请稍后再试')
-    await blockedRelease('已出部分纸', 'PARTIAL_OUTPUT', 'PICKUP_RESUME_PARTIAL_OUTPUT', '这单已经出了一部分纸，不能整单重打')
-    pass('未确认与已出部分纸各自用续打自己的 409 文案')
+
+    const cooledAt = new Date(Date.now() - UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS)
+
+    async function assertRefundPending(label: string, errorCode: 'PRINT_JOB_UNCONFIRMED' | 'PARTIAL_OUTPUT'): Promise<string> {
+      const released = await releaseFailed(errorCode)
+      const denied = await capture(() => pickup.claim(released.code, terminalId, source()))
+      const row = await prisma.printTask.findUniqueOrThrow({ where: { id: released.taskId } })
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: released.orderId } })
+      const refunds = await prisma.refund.count({ where: { orderId: released.orderId } })
+      const view = await cloudOrders.detail(userId, released.orderId)
+      if (
+        denied.status !== 409
+        || denied.code !== 'PICKUP_RESUME_REFUND_PENDING'
+        || denied.message !== PICKUP_RESUME_REFUND_PENDING_MESSAGE
+        || row.status !== 'failed'
+        || !isPaidUnfulfilledRefundRequired(order)
+        || order.payStatus !== 'paid'
+        || refunds !== 0
+        || view.reprintAllowed !== false
+        || view.reprintNotice !== null
+        || view.reprintRemaining !== 2
+      ) {
+        fail(`${label} 应付 409 且进入需退款判定，实际 ${JSON.stringify({ denied, status: row.status, refundReason: order.refundReason, refunds, view: { allowed: view.reprintAllowed, notice: view.reprintNotice, remaining: view.reprintRemaining } })}`)
+      }
+      return released.orderId
+    }
+
+    const paidUnconfirmedId = await assertRefundPending('付费未确认', 'PRINT_JOB_UNCONFIRMED')
+    await assertRefundPending('付费部分出纸', 'PARTIAL_OUTPUT')
+    const retryPaid = await releaseFailed('PRINT_JOB_UNCONFIRMED')
+    const retryPaidDenied = await capture(() => printJobs.retryPaidFailedJob(retryPaid.taskId, { endUserId: userId }))
+    const retryPaidOrder = await prisma.order.findUniqueOrThrow({ where: { id: retryPaid.orderId } })
+    if (
+      retryPaidDenied.status !== 409
+      || retryPaidDenied.code !== 'PICKUP_RESUME_REFUND_PENDING'
+      || retryPaidDenied.message !== PICKUP_RESUME_REFUND_PENDING_MESSAGE
+      || !isPaidUnfulfilledRefundRequired(retryPaidOrder)
+    ) {
+      fail(`付费单 /retry 未确认应同样 409，实际 ${JSON.stringify(retryPaidDenied)} reason=${retryPaidOrder.refundReason}`)
+    }
+    const retryPaidPartial = await releaseFailed('PARTIAL_OUTPUT')
+    const retryPaidPartialDenied = await capture(() => printJobs.retryPaidFailedJob(retryPaidPartial.taskId, { endUserId: userId }))
+    const retryPaidPartialOrder = await prisma.order.findUniqueOrThrow({ where: { id: retryPaidPartial.orderId } })
+    if (retryPaidPartialDenied.code !== 'PICKUP_RESUME_REFUND_PENDING' || !isPaidUnfulfilledRefundRequired(retryPaidPartialOrder)) {
+      fail(`付费单 /retry 部分出纸应 409，实际 ${JSON.stringify(retryPaidPartialDenied)}`)
+    }
+    pass('付费单未确认与部分出纸：到机码和 /retry 都是 409 PICKUP_RESUME_REFUND_PENDING，订单进入需退款判定')
+
+    await prisma.order.update({
+      where: { id: paidUnconfirmedId },
+      data: { paidAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+    })
+    await expiryRefunds.sweep()
+    const swept = await prisma.order.findUniqueOrThrow({ where: { id: paidUnconfirmedId } })
+    const sweptRefunds = await prisma.refund.count({ where: { orderId: paidUnconfirmedId, reason: 'paid_output_anomaly' } })
+    if (swept.payStatus !== 'refunded' || sweptRefunds !== 1) {
+      fail(`满 7 天的付费未确认应走到期退款，实际 pay=${swept.payStatus} refunds=${sweptRefunds} reason=${swept.refundReason}`)
+    }
+    pass('付费未确认标记后，付款满 7 天由原到期清扫退款')
+
+    const unmarkedPartial = await releaseFailed('PARTIAL_OUTPUT')
+    await prisma.order.update({
+      where: { id: unmarkedPartial.orderId },
+      data: { paidAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+    })
+    await expiryRefunds.sweep()
+    const unmarkedAfter = await prisma.order.findUniqueOrThrow({ where: { id: unmarkedPartial.orderId } })
+    const unmarkedRefunds = await prisma.refund.count({ where: { orderId: unmarkedPartial.orderId, reason: 'paid_output_anomaly' } })
+    if (unmarkedAfter.payStatus !== 'refunded' || unmarkedRefunds !== 1) {
+      fail(`没来续打的付费部分出纸，满 7 天也应退，实际 pay=${unmarkedAfter.payStatus} refunds=${unmarkedRefunds}`)
+    }
+    const verifiedPrinted = await releaseFailed('PRINT_JOB_UNCONFIRMED')
+    await prisma.printTask.update({ where: { id: verifiedPrinted.taskId }, data: { printOutcome: 'printed' } })
+    await prisma.order.update({
+      where: { id: verifiedPrinted.orderId },
+      data: { paidAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+    })
+    await expiryRefunds.sweep()
+    const verifiedAfter = await prisma.order.findUniqueOrThrow({ where: { id: verifiedPrinted.orderId } })
+    if (verifiedAfter.payStatus !== 'paid' || verifiedAfter.refundReason != null) {
+      fail('已核查出纸的付费未确认不得被清扫退掉')
+    }
+    const recentPaid = await releaseFailed('PRINT_JOB_UNCONFIRMED')
+    await expiryRefunds.sweep()
+    const recentAfter = await prisma.order.findUniqueOrThrow({ where: { id: recentPaid.orderId } })
+    if (recentAfter.payStatus !== 'paid' || recentAfter.refundReason != null) {
+      fail('未满 7 天且没来续打的付费未确认不得提前标退款')
+    }
+    pass('没来续打的付费异常满 7 天也退；已核查出纸、未满 7 天不退')
+
+    const cooling = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero' })
+    const coolingDenied = await capture(() => pickup.claim(cooling.code, terminalId, source()))
+    const coolingView = await cloudOrders.detail(userId, cooling.orderId)
+    const coolingList = (await legacy.list(userId, { cursor: null, pageSize: 50 })).items.find((item) => item.id === cooling.taskId)
+    const coolingTimeline = (await timeline.list(userId, parseTimelineQuery({ pageSize: '50' }), null)).items.find((item) => item.id === cooling.taskId)
+    const coolingOrder = await prisma.order.findUniqueOrThrow({ where: { id: cooling.orderId } })
+    if (
+      coolingDenied.status !== 409
+      || coolingDenied.code !== 'PICKUP_RESUME_UNCONFIRMED'
+      || coolingDenied.message !== '这单的出纸结果还没确认，请 5 分钟后再试'
+      || coolingView.reprintAllowed !== false
+      || coolingView.reprintRemaining !== 2
+      || coolingView.reprintNotice !== 'may_have_printed'
+      || coolingList?.reprintNotice !== 'may_have_printed'
+      || coolingList.reprintAllowed !== false
+      || coolingTimeline?.reprintNotice !== 'may_have_printed'
+      || coolingOrder.refundReason != null
+    ) {
+      fail(`免费未确认 5 分钟内应 409 且视图提示可能出过纸，实际 ${JSON.stringify({ coolingDenied, notice: coolingView.reprintNotice, allowed: coolingView.reprintAllowed })}`)
+    }
+    const coolingRetry = await capture(() => printJobs.retryPaidFailedJob(cooling.taskId, { endUserId: userId }))
+    if (coolingRetry.status !== 409 || coolingRetry.code !== 'PICKUP_RESUME_UNCONFIRMED' || await selfServiceReprintCount(prisma, cooling.taskId) !== 0) {
+      fail(`冷却期内 /retry 也应 409 且不计数，实际 ${JSON.stringify(coolingRetry)}`)
+    }
+    await prisma.order.update({
+      where: { id: cooling.orderId },
+      data: { paidAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+    })
+    await expiryRefunds.sweep()
+    const coolingAfterSweep = await prisma.order.findUniqueOrThrow({ where: { id: cooling.orderId } })
+    if (coolingAfterSweep.payStatus !== 'paid' || coolingAfterSweep.refundReason != null) {
+      fail('免费单不得进入需退款判定，也不得被清扫退掉')
+    }
+    const missingClock = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero', completedAt: null })
+    const missingDenied = await capture(() => pickup.claim(missingClock.code, terminalId, source()))
+    if (missingDenied.code !== 'PICKUP_RESUME_UNCONFIRMED') {
+      fail(`没有完成时间的未确认单应按未满冷却期拒绝，实际 ${JSON.stringify(missingDenied)}`)
+    }
+    pass('免费未确认 5 分钟内 409，视图 reprintNotice=may_have_printed；没有完成时间不放行')
+
+    const freeUnconfirmed = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero', completedAt: cooledAt })
+    const freeView = await cloudOrders.detail(userId, freeUnconfirmed.orderId)
+    if (freeView.reprintAllowed !== true || freeView.reprintRemaining !== 2 || freeView.reprintNotice !== 'may_have_printed') {
+      fail(`冷却期后免费未确认应允许续打，实际 ${JSON.stringify({ allowed: freeView.reprintAllowed, remaining: freeView.reprintRemaining, notice: freeView.reprintNotice })}`)
+    }
+    const freeResumed = await pickup.claim(freeUnconfirmed.code, terminalId, source()) as ClaimBody
+    const freeCount = await selfServiceReprintCount(prisma, freeUnconfirmed.taskId)
+    const freeRemaining = (await cloudOrders.detail(userId, freeUnconfirmed.orderId)).reprintRemaining
+    if (
+      freeResumed.resumed !== true
+      || freeResumed.mayHavePrinted !== true
+      || 'partialOutput' in freeResumed
+      || freeCount !== 1
+      || freeRemaining !== 1
+    ) {
+      fail(`免费未确认续打应带 mayHavePrinted 并计入上限，实际 ${JSON.stringify(freeResumed)} count=${freeCount} remaining=${freeRemaining}`)
+    }
+    await failTask(freeUnconfirmed.taskId, freeUnconfirmed.orderId, 'PRINT_JOB_UNCONFIRMED')
+    await prisma.printTask.update({ where: { id: freeUnconfirmed.taskId }, data: { completedAt: cooledAt } })
+    const freeSecond = await pickup.claim(freeUnconfirmed.code, terminalId, source()) as ClaimBody
+    if (freeSecond.mayHavePrinted !== true || await selfServiceReprintCount(prisma, freeUnconfirmed.taskId) !== 2) {
+      fail('第二次免费未确认续打也应计入上限')
+    }
+    await failTask(freeUnconfirmed.taskId, freeUnconfirmed.orderId, 'PRINT_JOB_UNCONFIRMED')
+    await prisma.printTask.update({ where: { id: freeUnconfirmed.taskId }, data: { completedAt: cooledAt } })
+    const freeThird = await capture(() => pickup.claim(freeUnconfirmed.code, terminalId, source()))
+    if (freeThird.code !== 'PICKUP_RESUME_LIMIT_REACHED') {
+      fail(`未确认续打满 2 次后应被上限拦住，实际 ${JSON.stringify(freeThird)}`)
+    }
+    const discountFree = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'discount', completedAt: cooledAt })
+    const discountResumed = await pickup.claim(discountFree.code, terminalId, source()) as ClaimBody
+    if (discountResumed.mayHavePrinted !== true || discountResumed.resumed !== true) {
+      fail(`全额抵扣的未确认单应按免费单续打，实际 ${JSON.stringify(discountResumed)}`)
+    }
+    pass('免费未确认满 5 分钟后续打成功，带 mayHavePrinted，计入每单 2 次；全额抵扣同样')
+
+    const freePartial = await releaseFailed('PARTIAL_OUTPUT', { free: 'zero' })
+    const partialView = await cloudOrders.detail(userId, freePartial.orderId)
+    if (partialView.reprintAllowed !== true || partialView.reprintNotice !== 'partial_output' || partialView.reprintRemaining !== 2) {
+      fail(`免费部分出纸应允许整单重打，实际 ${JSON.stringify({ allowed: partialView.reprintAllowed, notice: partialView.reprintNotice })}`)
+    }
+    const partialResumed = await pickup.claim(freePartial.code, terminalId, source()) as ClaimBody
+    if (
+      partialResumed.resumed !== true
+      || partialResumed.partialOutput !== true
+      || 'mayHavePrinted' in partialResumed
+      || await selfServiceReprintCount(prisma, freePartial.taskId) !== 1
+    ) {
+      fail(`免费部分出纸续打应带 partialOutput 并计数，实际 ${JSON.stringify(partialResumed)}`)
+    }
+    const retryPartial = await releaseFailed('PARTIAL_OUTPUT', { free: 'zero' })
+    const retryPartialResult = await printJobs.retryPaidFailedJob(retryPartial.taskId, { endUserId: userId }) as RetryBody
+    if (retryPartialResult.status !== 'pending' || retryPartialResult.partialOutput !== true || retryPartialResult.mayHavePrinted === true) {
+      fail(`/retry 免费部分出纸应带 partialOutput，实际 ${JSON.stringify(retryPartialResult)}`)
+    }
+    const retryCooled = await releaseFailed('PRINT_JOB_UNCONFIRMED', { free: 'zero', completedAt: cooledAt })
+    const retryCooledResult = await printJobs.retryPaidFailedJob(retryCooled.taskId, { endUserId: userId }) as RetryBody
+    if (
+      retryCooledResult.mayHavePrinted !== true
+      || retryCooledResult.partialOutput === true
+      || await selfServiceReprintCount(prisma, retryCooled.taskId) !== 1
+    ) {
+      fail(`/retry 免费未确认应带 mayHavePrinted 并计数，实际 ${JSON.stringify(retryCooledResult)} count=${await selfServiceReprintCount(prisma, retryCooled.taskId)}`)
+    }
+    pass('免费部分出纸可整单续打并带 partialOutput；/retry 与到机码同一规则')
+
+    const adminPaid = await releaseFailed('PRINT_JOB_UNCONFIRMED')
+    const adminDenied = await capture(() => adminScan.applyAction('print', adminPaid.taskId, 'retry'))
+    const adminOrder = await prisma.order.findUniqueOrThrow({ where: { id: adminPaid.orderId } })
+    const adminTask = await prisma.printTask.findUniqueOrThrow({ where: { id: adminPaid.taskId } })
+    if (
+      adminDenied.status !== 409
+      || adminDenied.code !== 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN'
+      || adminDenied.message !== REPRINT_BLOCKED_MESSAGE.unconfirmed
+      || adminOrder.refundReason != null
+      || adminTask.status !== 'failed'
+      || await selfServiceReprintCount(prisma, adminPaid.taskId) !== 0
+    ) {
+      fail(`管理员重试付费未确认不得改单，实际 ${JSON.stringify(adminDenied)} reason=${adminOrder.refundReason}`)
+    }
+    const adminPartial = await releaseFailed('PARTIAL_OUTPUT', { free: 'zero' })
+    const adminPartialDenied = await capture(() => adminScan.applyAction('print', adminPartial.taskId, 'retry'))
+    const adminPartialTask = await prisma.printTask.findUniqueOrThrow({ where: { id: adminPartial.taskId } })
+    if (
+      adminPartialDenied.code !== 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN'
+      || adminPartialDenied.message !== REPRINT_BLOCKED_MESSAGE.partial_output
+      || adminPartialTask.status !== 'failed'
+    ) {
+      fail(`管理员重试部分出纸仍应拒绝，实际 ${JSON.stringify(adminPartialDenied)} status=${adminPartialTask.status}`)
+    }
+    pass('管理员重试未确认与部分出纸仍拒绝，不占次数，也不标退款')
+
+    const expiredAnomaly = await releaseFailed('PRINT_JOB_UNCONFIRMED')
+    await prisma.order.update({ where: { id: expiredAnomaly.orderId }, data: { pickupCodeExpiresAt: new Date(Date.now() - 60_000) } })
+    const expiredAnomalyClaim = await capture(() => pickup.claim(expiredAnomaly.code, terminalId, source()))
+    const expiredAnomalyOrder = await prisma.order.findUniqueOrThrow({ where: { id: expiredAnomaly.orderId } })
+    if (expiredAnomalyClaim.code !== 'PICKUP_CODE_EXPIRED' || expiredAnomalyOrder.refundReason != null) {
+      fail(`取件窗口已关应先于退款标记，实际 ${JSON.stringify(expiredAnomalyClaim)} reason=${expiredAnomalyOrder.refundReason}`)
+    }
+    pass('取件窗口已关的付费未确认仍是 PICKUP_CODE_EXPIRED，不标退款')
 
     redis.reset()
     const expiredOrder = await createCloud(resumeFile, terminalId)

@@ -393,7 +393,7 @@ async function main() {
       409,
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       'PRINT_JOB_UNCONFIRMED retry → 409 + 精确业务错误码',
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
     )
     const [unconfirmedTaskAfter, unconfirmedOrderAfter, unconfirmedLogCountAfter, unconfirmedTaskCountAfter] = await Promise.all([
       prisma.printTask.findUniqueOrThrow({ where: { id: unconfirmedTaskId } }),
@@ -410,7 +410,7 @@ async function main() {
     ) {
       fail('PRINT_JOB_UNCONFIRMED retry 拒绝后 PrintTask、Order、状态日志和任务总数必须完全不变')
     }
-    await expectRetryReason(unconfirmedTaskId, '打印结果未确认，不能重新提交，请联系工作人员核查', '未确认')
+    await expectRetryReason(unconfirmedTaskId, '这单的出纸结果还没确认，请 5 分钟后再试', '未确认')
     pass('PRINT_JOB_UNCONFIRMED retry 拒绝路径零副作用（任务/订单/日志/任务总数不变）')
     const unconfirmedDetail = await printScan.getTaskDetail('print', unconfirmedTaskId)
     if (unconfirmedDetail.type !== 'print' || unconfirmedDetail.printOutcome !== null) {
@@ -429,7 +429,7 @@ async function main() {
       409,
       'PRINT_RETRY_UNCONFIRMED_FORBIDDEN',
       '核查后仍禁止 retry',
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
     )
     pass('print-scan 展示 printOutcome，核查后仍禁止重试且不改 errorCode')
 
@@ -469,7 +469,7 @@ async function main() {
       409,
       'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN',
       'PARTIAL_OUTPUT retry → 409 + 精确业务错误码',
-      '这单已经出了一部分纸，不能整单重打；需要补打请另下新单',
+      '这单只出了一部分纸',
     )
     const [partialAfter, partialOrderAfter, partialLogsAfter] = await Promise.all([
       prisma.printTask.findUniqueOrThrow({ where: { id: partialTaskId } }),
@@ -486,7 +486,7 @@ async function main() {
     ) {
       fail('PARTIAL_OUTPUT retry 拒绝后任务、订单和状态日志必须保持不变')
     }
-    await expectRetryReason(partialTaskId, '这单已经出了一部分纸，不能整单重打；需要补打请另下新单', '只出一部分')
+    await expectRetryReason(partialTaskId, '这单只出了一部分纸', '只出一部分')
     pass('管理员重试 PARTIAL_OUTPUT 被拒，任务状态不变')
 
     const unpaidRetryTaskId = `pt_vps_unpaid_retry_${suffix}`
@@ -643,7 +643,7 @@ async function main() {
     })
     await expectRetryReason(
       retiredUnconfirmedTaskId,
-      '打印结果未确认，不能重新提交，请联系工作人员核查',
+      '这单的出纸结果还没确认，请 5 分钟后再试',
       '退役终端上的未确认仍先报未确认',
     )
 

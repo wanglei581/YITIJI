@@ -2157,21 +2157,24 @@ async function main(): Promise<void> {
         await printJobs.retryPaidFailedJob(unconfirmed.taskId, { endUserId })
         fail('F-04 unconfirmed retry should be rejected')
       } catch (error) {
-        if (errorCode(error) !== 'PRINT_RETRY_UNCONFIRMED_FORBIDDEN') {
+        if (errorCode(error) !== 'PICKUP_RESUME_REFUND_PENDING') {
           fail(`F-04 unconfirmed retry code ${errorCode(error)}`)
         }
       }
       const unconfirmedOrder = await prisma.order.findUnique({ where: { id: unconfirmed.orderId } })
       const unconfirmedTask = await prisma.printTask.findUnique({ where: { id: unconfirmed.taskId } })
+      const unconfirmedRefunds = await prisma.refund.count({ where: { orderId: unconfirmed.orderId } })
       if (
         unconfirmedTask?.status === 'failed' &&
         unconfirmedTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
         unconfirmedOrder?.payStatus === 'paid' &&
-        unconfirmedOrder.refundReason == null
+        unconfirmedOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        unconfirmedOrder.refundedAmountCents === 0 &&
+        unconfirmedRefunds === 0
       ) {
-        pass('F-04 unconfirmed: stays failed and paid, no automatic refund')
+        pass('F-04 unconfirmed: stays failed and paid, marks refund required, no Refund row')
       } else {
-        fail(`F-04 unconfirmed mismatch ${JSON.stringify({ unconfirmedTask, unconfirmedOrder })}`)
+        fail(`F-04 unconfirmed mismatch ${JSON.stringify({ unconfirmedTask, unconfirmedOrder, unconfirmedRefunds })}`)
       }
 
       const partialFile = await seedFile('partial', {})
@@ -2186,15 +2189,22 @@ async function main(): Promise<void> {
         await printJobs.retryPaidFailedJob(partial.taskId, { endUserId })
         fail('F-04 partial retry should be rejected')
       } catch (error) {
-        if (errorCode(error) !== 'PRINT_RETRY_PARTIAL_OUTPUT_FORBIDDEN') {
+        if (errorCode(error) !== 'PICKUP_RESUME_REFUND_PENDING') {
           fail(`F-04 partial retry code ${errorCode(error)}`)
         }
       }
       const partialOrder = await prisma.order.findUnique({ where: { id: partial.orderId } })
-      if (partialOrder?.payStatus === 'paid' && partialOrder.refundReason == null && partialOrder.taskStatus === 'failed') {
-        pass('F-04 partial output: manual only, no automatic full refund')
+      const partialRefunds = await prisma.refund.count({ where: { orderId: partial.orderId } })
+      if (
+        partialOrder?.payStatus === 'paid' &&
+        partialOrder.refundReason === PAID_UNFULFILLED_PENDING_REFUND_REASON &&
+        partialOrder.taskStatus === 'failed' &&
+        partialOrder.refundedAmountCents === 0 &&
+        partialRefunds === 0
+      ) {
+        pass('F-04 partial output: marks refund required, no Refund row yet')
       } else {
-        fail(`F-04 partial mismatch ${JSON.stringify(partialOrder)}`)
+        fail(`F-04 partial mismatch ${JSON.stringify({ partialOrder, partialRefunds })}`)
       }
 
       const powerFile = await seedFile('power', {})

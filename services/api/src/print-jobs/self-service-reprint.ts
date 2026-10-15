@@ -1,8 +1,14 @@
 import { ConflictException } from '@nestjs/common'
 import { decryptSecret } from '../common/crypto/secret-cipher'
+import { payableCents } from '../payment/pending-refund-signal'
 import type { PrismaService } from '../prisma/prisma.service'
+import {
+  PARTIAL_OUTPUT_ERROR_CODE,
+  PRINT_JOB_UNCONFIRMED_ERROR_CODE,
+} from './paid-anomaly-disposition'
 import { isPickupClaimWindowClosed } from './pickup-claim-window'
 import {
+  REPRINT_BLOCKED_MESSAGE,
   latestHeartbeatAgentVersions,
   paidReprintBlockReason,
 } from './paid-reprint-eligibility'
@@ -23,11 +29,70 @@ export const SELF_SERVICE_REPRINT_LIMIT_MESSAGE = '这单已经接着打过 2 �
 export const PRINT_RETRY_LIMIT_REACHED = 'PRINT_RETRY_LIMIT_REACHED'
 export const PICKUP_RESUME_LIMIT_REACHED = 'PICKUP_RESUME_LIMIT_REACHED'
 
+/** 免费单停在「出纸未确认」满这段时间后，才允许自助续打。 */
+export const UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS = 5 * 60 * 1000
+
 export const PICKUP_RESUME_UNCONFIRMED = 'PICKUP_RESUME_UNCONFIRMED'
-export const PICKUP_RESUME_UNCONFIRMED_MESSAGE = '这单的出纸结果还没确认，暂时不能接着打，请稍后再试'
+export const PICKUP_RESUME_UNCONFIRMED_MESSAGE = REPRINT_BLOCKED_MESSAGE.unconfirmed
 
 export const PICKUP_RESUME_PARTIAL_OUTPUT = 'PICKUP_RESUME_PARTIAL_OUTPUT'
-export const PICKUP_RESUME_PARTIAL_OUTPUT_MESSAGE = '这单已经出了一部分纸，不能整单重打'
+export const PICKUP_RESUME_PARTIAL_OUTPUT_MESSAGE = REPRINT_BLOCKED_MESSAGE.partial_output
+
+export const PICKUP_RESUME_REFUND_PENDING = 'PICKUP_RESUME_REFUND_PENDING'
+export const PICKUP_RESUME_REFUND_PENDING_MESSAGE = '这单没有打完，费用会按原路退回，需要帮助请拨打服务电话'
+
+/** 订单视图给前端的提示。付费单这两种状态不提示续打。 */
+export type ReprintNotice = 'may_have_printed' | 'partial_output' | null
+
+export type SelfServiceAnomalyDecision =
+  | { action: 'none' }
+  | { action: 'cooldown' }
+  | { action: 'refund' }
+  | { action: 'reprint'; notice: Exclude<ReprintNotice, null> }
+
+/**
+ * 实付 = 应付 − 抵扣。实付 0 的未确认单要等冷却期；部分出纸可立刻整单重打。
+ * 实付大于 0 的这两种状态不自助重打，调用方改走已付未履约标记。
+ * 没有 completedAt 的未确认单视为还没满冷却期。
+ */
+export function selfServiceAnomalyDecision(input: {
+  errorCode?: string | null
+  amountCents: number
+  discountCents: number
+  unconfirmedSince?: Date | null
+  now?: Date
+}): SelfServiceAnomalyDecision {
+  const unconfirmed = input.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE
+  const partial = input.errorCode === PARTIAL_OUTPUT_ERROR_CODE
+  if (!unconfirmed && !partial) return { action: 'none' }
+  if (payableCents({ amountCents: input.amountCents, discountCents: input.discountCents }) > 0) {
+    return { action: 'refund' }
+  }
+  if (partial) return { action: 'reprint', notice: 'partial_output' }
+  const now = input.now ?? new Date()
+  const since = input.unconfirmedSince
+  if (!since || now.getTime() - since.getTime() < UNCONFIRMED_SELF_SERVICE_COOLDOWN_MS) {
+    return { action: 'cooldown' }
+  }
+  return { action: 'reprint', notice: 'may_have_printed' }
+}
+
+export function throwSelfServiceAnomalyHalt(halt: 'refund' | 'cooldown'): never {
+  if (halt === 'refund') {
+    throw new ConflictException({
+      error: { code: PICKUP_RESUME_REFUND_PENDING, message: PICKUP_RESUME_REFUND_PENDING_MESSAGE },
+    })
+  }
+  throw new ConflictException({
+    error: { code: PICKUP_RESUME_UNCONFIRMED, message: PICKUP_RESUME_UNCONFIRMED_MESSAGE },
+  })
+}
+
+export function selfServiceReprintFlags(notice: ReprintNotice): { mayHavePrinted?: true; partialOutput?: true } {
+  if (notice === 'may_have_printed') return { mayHavePrinted: true }
+  if (notice === 'partial_output') return { partialOutput: true }
+  return {}
+}
 
 const LIVE_PAY_FOR_CODE = new Set(['unpaid', 'paying', 'paid'])
 
@@ -35,12 +100,14 @@ export type ArrivalReprintFields = {
   pickupCode: string | null
   reprintAllowed: boolean
   reprintRemaining: number | null
+  reprintNotice: ReprintNotice
 }
 
 export const EMPTY_ARRIVAL_REPRINT: ArrivalReprintFields = {
   pickupCode: null,
   reprintAllowed: false,
   reprintRemaining: null,
+  reprintNotice: null,
 }
 
 export type ArrivalOrderRow = {
@@ -54,6 +121,8 @@ export type ArrivalOrderRow = {
   paidAt: Date | null
   printTaskId: string | null
   terminalId: string | null
+  amountCents: number
+  discountCents: number
 }
 
 type ReprintLogDb = Pick<PrismaService, 'printTaskStatusLog'>
@@ -129,7 +198,7 @@ export async function arrivalViewsForOrders(
   const tasks = taskIds.length
     ? await prisma.printTask.findMany({
         where: { id: { in: taskIds } },
-        select: { id: true, status: true, errorCode: true, terminalId: true, fileId: true },
+        select: { id: true, status: true, errorCode: true, terminalId: true, fileId: true, completedAt: true },
       })
     : []
   const taskById = new Map(tasks.map((task) => [task.id, task]))
@@ -152,6 +221,7 @@ export async function arrivalViewsForOrders(
     const hasHash = Boolean(order.pickupCodeHash && order.pickupCodeEnc)
     let reprintAllowed = false
     let reprintRemaining: number | null = null
+    let reprintNotice: ReprintNotice = null
     if (hasHash && task) {
       const used = counts.get(task.id) ?? 0
       reprintRemaining = reprintRemainingFromCount(used)
@@ -165,6 +235,15 @@ export async function arrivalViewsForOrders(
         paidAt: order.paidAt,
         pickupCodeHash: order.pickupCodeHash,
       }, now)
+      const anomaly = selfServiceAnomalyDecision({
+        errorCode: task.errorCode,
+        amountCents: order.amountCents,
+        discountCents: order.discountCents,
+        unconfirmedSince: task.completedAt,
+        now,
+      })
+      if (anomaly.action === 'cooldown') reprintNotice = 'may_have_printed'
+      else if (anomaly.action === 'reprint') reprintNotice = anomaly.notice
       const block = paidReprintBlockReason({
         status: task.status,
         errorCode: task.errorCode,
@@ -173,6 +252,7 @@ export async function arrivalViewsForOrders(
         file: task.fileId ? fileById.get(task.fileId) ?? null : null,
         terminalId: task.terminalId,
         agentVersion: task.terminalId ? versions.get(task.terminalId) ?? null : null,
+        selfServiceAnomalyCleared: anomaly.action === 'reprint',
       })
       reprintAllowed = sameTerminal && windowOpen && block === null && used < SELF_SERVICE_REPRINT_LIMIT
     }
@@ -181,6 +261,7 @@ export async function arrivalViewsForOrders(
       pickupCode: showCode ? decryptArrival(order.pickupCodeEnc) : null,
       reprintAllowed,
       reprintRemaining,
+      reprintNotice,
     })
   }
   return views
