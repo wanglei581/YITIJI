@@ -1,7 +1,11 @@
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, Logger } from '@nestjs/common'
 import type { Redis } from 'ioredis'
+import { describeBackgroundError, runBackground, scheduleBackground } from '../common/process/background-task'
 import { RedisService } from '../common/redis/redis.service'
 import type { MemberBindHost } from './upload-session-member-bind'
+
+const leaseLogger = new Logger('UploadSessionLease')
+const onBackgroundError = (error: unknown) => leaseLogger.warn(`UPLOAD_LEASE_BACKGROUND_FAILED ${describeBackgroundError(error)}`)
 
 // 两分钟覆盖正常上传和重试窗口，同时避免卡死进程无限占用会话。
 export const UPLOAD_LOCK_MAX_HOLD_MS = 120_000
@@ -96,7 +100,7 @@ export function startUploadSessionLease(
     leaseLost = true
     if (!controller.signal.aborted) controller.abort()
     stop()
-    if (releasing) void finish()
+    if (releasing) runBackground(finish, onBackgroundError)
   }
   const renew = async () => {
     if (closed || leaseLost || inFlight) return
@@ -112,15 +116,14 @@ export function startUploadSessionLease(
       inFlight = false
     }
   }
-  const renewal = setInterval(() => void renew(), intervalMs)
-  renewal.unref()
+  const renewal = scheduleBackground(renew, intervalMs, onBackgroundError)
   const watchdog = setInterval(() => {
     if (Date.now() - lastSuccess >= ttlMs - marginMs) lose()
   }, Math.max(1, Math.floor(intervalMs / 2)))
   watchdog.unref()
   const maximum = setTimeout(() => {
     lose()
-    void finish()
+    runBackground(finish, onBackgroundError)
   }, options.maxHoldMs ?? UPLOAD_LOCK_MAX_HOLD_MS)
   maximum.unref()
 
@@ -151,10 +154,10 @@ export function startUploadSessionLease(
       const work = Promise.resolve().then(operation)
       void work.then(() => {
         pending -= 1
-        if (releasing && pending === 0) void finish()
+        if (releasing && pending === 0) runBackground(finish, onBackgroundError)
       }, () => {
         pending -= 1
-        if (releasing && pending === 0) void finish()
+        if (releasing && pending === 0) runBackground(finish, onBackgroundError)
       })
       let timer: NodeJS.Timeout | undefined
       let onAbort: (() => void) | undefined
