@@ -189,8 +189,13 @@ function assertImportOrder(css) {
 const packageJson = JSON.parse(await read('package.json'))
 assert.equal(
   packageJson.scripts?.['verify:fusion-shell'],
-  'node scripts/verify-fusion-shell.mjs',
-  'package.json must expose the exact verify:fusion-shell command',
+  'node scripts/verify-fusion-shell.mjs && pnpm run verify:migration-contract-retired',
+  'package.json must expose verify:fusion-shell and chain the migration-contract retirement gate',
+)
+assert.equal(
+  packageJson.scripts?.['verify:migration-contract-retired'],
+  'node scripts/verify-migration-contract-retired.mjs',
+  'package.json must expose the exact verify:migration-contract-retired command',
 )
 
 const layout = await read('../../packages/ui/src/layouts/KioskLayout.tsx')
