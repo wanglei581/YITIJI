@@ -28,6 +28,16 @@ test('白名单与真违规同时出现时只报违规项', () => {
   assert.deepEqual(scanForbiddenCopy('去来源平台投递 一键投递'), ['一键投递'])
 })
 
+test('合规文案「去来源平台预约 / 扫码预约」判为通过', () => {
+  assert.deepEqual(scanForbiddenCopy('去来源平台预约 扫码预约 扫码前往来源平台预约'), [])
+})
+
+test('真违规文案「一键预约 / 立即预约」判为不通过', () => {
+  assert.deepEqual(scanForbiddenCopy('一键预约'), ['一键预约'])
+  assert.deepEqual(scanForbiddenCopy('立即预约'), ['立即预约'])
+  assert.deepEqual(scanForbiddenCopy('扫码预约 一键预约 立即预约'), ['一键预约', '立即预约'])
+})
+
 test('四要素缺一项时报出缺哪一项', () => {
   const missing = missingSourceFourElements('来源机构 同步时间 外部ID')
   assert.deepEqual(missing, ['外部投递链接'])

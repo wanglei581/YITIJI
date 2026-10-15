@@ -18,12 +18,15 @@ export const COMPLIANCE_ALLOWED_PHRASES = Object.freeze([
   '来源平台投递页',
   '扫码前往来源平台投递',
   '来源平台投递',
+  '扫码前往来源平台预约',
 ])
 
 export const COMPLIANCE_FORBIDDEN_PHRASES = Object.freeze([
   '一键投递',
   '立即投递',
   '平台投递',
+  '一键预约',
+  '立即预约',
 ])
 
 /**
