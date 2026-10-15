@@ -1,6 +1,7 @@
 import { Controller, Delete, Get, Optional, Param, Query, Req, UseGuards } from '@nestjs/common'
 import {
   isRecruitmentContentHostingEnabled,
+  RECRUITMENT_ACTIVITY_TARGET_TYPES,
   recruitmentHostingDisabledException,
 } from '../recruitment-hosting/recruitment-hosting'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -64,9 +65,9 @@ export class MeActivityController {
     const hosting = isRecruitmentContentHostingEnabled()
     const open = hosting && await this.jobBoardOpen(req)
     const type = targetType || undefined
-    if (!hosting && (type === 'job' || type === 'job_fair')) throw recruitmentHostingDisabledException()
+    if (!hosting && RECRUITMENT_ACTIVITY_TARGET_TYPES.includes(type ?? '')) throw recruitmentHostingDisabledException()
     if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
-    const exclude = !hosting ? ['job', 'job_fair'] : (!open && !type ? ['job'] : undefined)
+    const exclude = !hosting ? [...RECRUITMENT_ACTIVITY_TARGET_TYPES] : (!open && !type ? ['job'] : undefined)
     return ApiResponse.ok(
       await this.activity.listBrowse(
         user.endUserId,
@@ -88,9 +89,9 @@ export class MeActivityController {
     const hosting = isRecruitmentContentHostingEnabled()
     const open = hosting && await this.jobBoardOpen(req)
     const type = targetType || undefined
-    if (!hosting && (type === 'job' || type === 'job_fair')) throw recruitmentHostingDisabledException()
+    if (!hosting && RECRUITMENT_ACTIVITY_TARGET_TYPES.includes(type ?? '')) throw recruitmentHostingDisabledException()
     if (!open && type === 'job') await this.jobBoard!.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
-    const exclude = !hosting ? ['job', 'job_fair'] : (!open && !type ? ['job'] : undefined)
+    const exclude = !hosting ? [...RECRUITMENT_ACTIVITY_TARGET_TYPES] : (!open && !type ? ['job'] : undefined)
     return ApiResponse.ok(
       await this.activity.listJumps(
         user.endUserId,

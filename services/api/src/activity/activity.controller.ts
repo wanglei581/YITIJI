@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Optional, Post, Req } from '@nestjs/common'
 import {
   isRecruitmentContentHostingEnabled,
+  RECRUITMENT_ACTIVITY_TARGET_TYPES,
   recruitmentHostingDisabledException,
 } from '../recruitment-hosting/recruitment-hosting'
 import { Throttle } from '@nestjs/throttler'
@@ -67,7 +68,7 @@ export class ActivityController {
   }
 
   private async assertJobWrite(req: ReqLike, body: { terminalId?: string }, targetType: string): Promise<void> {
-    if (!isRecruitmentContentHostingEnabled() && (targetType === 'job' || targetType === 'job_fair')) {
+    if (!isRecruitmentContentHostingEnabled() && RECRUITMENT_ACTIVITY_TARGET_TYPES.includes(targetType)) {
       throw recruitmentHostingDisabledException()
     }
     if (targetType !== 'job') return

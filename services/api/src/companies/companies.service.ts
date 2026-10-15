@@ -563,6 +563,7 @@ export class CompaniesService {
   // ── Partner（来源机构维护本机构数据；不是企业 HR 后台）─────────────────────
 
   async partnerList(orgId: string) {
+    if (!isRecruitmentContentHostingEnabled()) return []
     const rows = await this.prisma.companyProfile.findMany({
       where: { sourceOrgId: orgId },
       include: { _count: { select: { jobs: true } } },

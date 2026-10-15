@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards, BadRequestException } from '@nestjs/common'
+import { isRecruitmentContentHostingEnabled, recruitmentHostingDisabledException } from '../recruitment-hosting/recruitment-hosting'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -39,6 +40,7 @@ export class JobApplicationsController {
 
   /** 关联本站岗位的进度会带回岗位标题。手填且不关联岗位的记录仍可读写。 */
   private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
+    if (!isRecruitmentContentHostingEnabled()) return false
     return (await this.jobBoard.resolve(kioskJobBoardTerminalRef(req ?? {}))).enabled
   }
 
@@ -69,6 +71,7 @@ export class JobApplicationsController {
     @Body() dto: CreateJobApplicationDto,
     @Req() req?: KioskJobBoardRequest,
   ): Promise<ApiResponse<JobApplicationItem>> {
+    if (dto.jobId && !isRecruitmentContentHostingEnabled()) throw recruitmentHostingDisabledException()
     if (dto.jobId) await this.jobBoard.assertOpen(kioskJobBoardTerminalRef(req ?? {}))
     return ApiResponse.ok(await this.applications.create(user.endUserId, dto))
   }
