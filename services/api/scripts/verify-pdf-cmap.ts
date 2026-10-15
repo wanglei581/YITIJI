@@ -54,13 +54,13 @@ function assertOpenSitesUseFactory(): void {
       fail(`${rel} 仍直接调用 unpdf.getDocumentProxy，没有走 openUnpdfDocument`)
     }
     if (source.includes("from 'pdfjs-dist'") || source.includes('require("pdfjs-dist")') || source.includes("require('pdfjs-dist')")) {
-      fail(`${rel} 引入了 pdfjs-dist 的 PDF.js 构建`)
+      fail(`${rel} 绕过预置工厂自己引入了 pdfjs-dist 的 PDF.js 构建`)
     }
     if (/getDocument\s*\(\s*\{/.test(source) && !source.includes('pdfjsPresetDataOptions()')) {
       fail(`${rel} 的 getDocument 没有传入 pdfjsPresetDataOptions()`)
     }
   }
-  pass('服务端 PDF.js 打开点都经过预置 CMap 工厂，且没有加载 pdfjs-dist 构建')
+  pass('服务端 PDF.js 打开点都经过预置 CMap 工厂，除工厂外没有文件自己加载 pdfjs-dist 构建')
 }
 
 async function darkBands(png: Buffer): Promise<{ zh: number; ascii: number }> {

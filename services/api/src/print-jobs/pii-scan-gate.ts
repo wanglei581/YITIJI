@@ -4,6 +4,19 @@ import type { PrismaService } from '../prisma/prisma.service'
 
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
+/** 与 materials-manual-confirmation.service.ts 的 PII_MANUAL_CONFIRMABLE_MODES 同一份口径（门禁比对两处一致）。 */
+export const PII_SCAN_INCOMPLETE_MODES = new Set(['partial', 'degraded', 'unsupported_format'])
+
+/**
+ * A-04：隐私检查没有完整覆盖的原件，建单前要求本人确认（任务 result.manualConfirmedAt）。
+ * 默认关——小程序会员订单、材料包、到机码建单也走这道闸，而目前只有一体机会做确认步骤；
+ * 一体机材料检查页接好「我已确认，继续打印」后与 AI_DECLARATION_ENFORCEMENT 同批打开。
+ */
+export function piiManualConfirmEnforced(): boolean {
+  const raw = process.env['PRINT_PII_MANUAL_CONFIRM_ENFORCED']?.trim().toLowerCase()
+  return raw === 'true' || raw === '1' || raw === 'on'
+}
+
 export const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
 
 type PiiGateArgs = {
@@ -35,7 +48,7 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
   const scan = await args.prisma.documentProcessTask.findFirst({
     where: { sourceFileId: args.fileId, kind: 'pii_scan', status: 'completed' },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, paramsJson: true },
+    select: { id: true, paramsJson: true, resultJson: true },
   })
   const pendingFindings = scan
     ? await args.prisma.piiFinding.count({ where: { taskId: scan.id, action: 'pending' } })
@@ -50,6 +63,17 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
           message: '文件在隐私检查后又被改过，请重新检查后再打印',
         },
       })
+    }
+    if (args.requireCompleted && piiManualConfirmEnforced()) {
+      const result = readJsonObject(scan.resultJson)
+      if (PII_SCAN_INCOMPLETE_MODES.has(String(result['mode'] ?? '')) && typeof result['manualConfirmedAt'] !== 'string') {
+        throw new BadRequestException({
+          error: {
+            code: 'PRINT_PII_MANUAL_CONFIRM_REQUIRED',
+            message: '隐私检查没有完整覆盖这份文件，请先确认文件里没有不想打印的个人信息',
+          },
+        })
+      }
     }
     return
   }
@@ -77,6 +101,15 @@ export async function assertPiiScanned(args: PiiGateArgs): Promise<void> {
       message: scan && pendingFindings > 0 ? args.pendingMessage : args.missingMessage,
     },
   })
+}
+
+function readJsonObject(json: string | null): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(json || '{}') as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
 }
 
 function readPiiScanSourceSha256(paramsJson: string | null): string {

@@ -29,6 +29,7 @@ import { PickupOrderService } from './pickup-order.service'
   ],
   controllers: [PrintJobsController, AdminPrintJobsController, OrderQuoteController],
   providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, AdminPrintJobsVerifyOutcomeService, OrderQuoteService, PickupOrderService],
-  exports:     [PrintPageCountService, OrderQuoteService],
+  // PickupOrderService 导出给会员「本机领取」（member-print-orders）复用核销判定，不另写一份。
+  exports:     [PrintPageCountService, OrderQuoteService, PickupOrderService],
 })
 export class PrintJobsModule {}

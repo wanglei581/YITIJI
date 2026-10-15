@@ -23,7 +23,7 @@ import PDFDocument from 'pdfkit'
 import { CJK_FONT_MISSING_USER_MESSAGE, registerCjkFont } from '../common/pdf/cjk-font'
 import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { signFileUrl } from '../files/signing'
+import { PRINT_ARTIFACT_URL_TTL_MS, signFileUrl } from '../files/signing'
 import { withPublicFairDemoExclusion } from './jobs-shared'
 import { assertRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
 
@@ -138,7 +138,7 @@ export class FairCompanyPrintService {
       sizeBytes: uploaded.sizeBytes,
       mimeType: 'application/pdf',
       pageCount: rendered.pageCount,
-      printFileUrl: signFileUrl(uploaded.fileId).url,
+      printFileUrl: signFileUrl(uploaded.fileId, PRINT_ARTIFACT_URL_TTL_MS).url,
       variant,
     }
   }

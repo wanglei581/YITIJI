@@ -70,3 +70,70 @@ export interface MemberPendingTaskItem {
   updatedAt: string
   resume: MemberPendingTaskResume
 }
+
+// ── 跨端订单时间线（GET /me/print-orders/timeline）──────────────────────────
+// 契约源：packages/shared/src/types/memberPrintOrders.ts（MemberOrderTimeline*）。改一处必须同改两处；
+// verify:member-order-timeline 会比对两边的展示状态取值。
+
+export type MemberOrderTimelineKind = 'kiosk_task' | 'cloud_single' | 'package'
+
+export const MEMBER_ORDER_TIMELINE_DISPLAY_STATUSES = [
+  'awaiting_arrival',
+  'awaiting_payment',
+  'queued',
+  'printing',
+  'completed',
+  'failed',
+  'cancelled',
+  'expired',
+] as const
+export type MemberOrderTimelineDisplayStatus = (typeof MEMBER_ORDER_TIMELINE_DISPLAY_STATUSES)[number]
+
+export const MEMBER_ORDER_TIMELINE_STATUS_FILTERS = ['all', 'waiting', 'printing', 'done'] as const
+export type MemberOrderTimelineStatusFilter = (typeof MEMBER_ORDER_TIMELINE_STATUS_FILTERS)[number]
+export const MEMBER_ORDER_TIMELINE_KIND_FILTERS = ['all', 'kiosk_task', 'cloud_single', 'package'] as const
+export type MemberOrderTimelineKindFilter = (typeof MEMBER_ORDER_TIMELINE_KIND_FILTERS)[number]
+
+export interface MemberOrderTimelineTerminal {
+  id: string
+  displayName: string | null
+  locationLabel: string | null
+}
+
+export interface MemberOrderTimelineItem {
+  kind: MemberOrderTimelineKind
+  id: string
+  orderId: string | null
+  orderNo: string | null
+  printTaskId: string | null
+  title: string | null
+  itemCount: number
+  createdAt: string
+  completedAt: string | null
+  copies: number | null
+  colorMode: 'black_white' | 'color' | null
+  duplex: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge' | null
+  paperSize: string | null
+  pageRange: string | null
+  amountCents: number | null
+  billablePages: number | null
+  payStatus: OrderPayStatus | null
+  paymentSource: PaymentSource | null
+  refundedAmountCents: number | null
+  discountCents: number | null
+  refundRequired: boolean | null
+  taskStatus: string
+  pickupStatus: string | null
+  displayStatus: MemberOrderTimelineDisplayStatus
+  arrivalCodeExpiresAt: string | null
+  hasArrivalCode: boolean
+  pickupCode: string | null
+  terminal: MemberOrderTimelineTerminal | null
+  claimableHere: boolean
+}
+
+export interface MemberOrderTimelinePage {
+  items: MemberOrderTimelineItem[]
+  nextCursor: string | null
+  total: number
+}

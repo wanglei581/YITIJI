@@ -1,4 +1,4 @@
-import { pdfjsPresetDataOptions } from '../common/pdf/pdfjs-document'
+import { openPdfjsDocument } from '../common/pdf/pdfjs-document'
 
 // 文件页数识别（materials 体检 + print-jobs 计费页数共用）。
 //
@@ -73,37 +73,18 @@ const DOCUMENT_LEVEL_PDFJS_ERRORS = new Set([
 ])
 
 /**
- * 用 unpdf 内置的 pdf.js 只读页数，不渲染、不注入 CanvasFactory
+ * 经服务端唯一的 PDF 打开入口只读页数，不渲染、不注入 CanvasFactory
  * （拿 numPages 不需要 canvas，避免把原生画布依赖引进计费链路）。
  *
- * isEvalSupported:false —— 禁止 pdfjs 对不可信 PDF 内嵌函数走 eval 路径。
+ * 打开选项（isEvalSupported:false、enableScripting:false 等）由共用入口统一强制。
+ * 共用入口自身出错（引擎模块缺失等）抛的不是 pdf.js 文档级异常，落到下面的 parser_unavailable。
  */
 async function countPdfPagesByParser(buffer: Buffer): Promise<ParserOutcome> {
-  let getDocument: (params: Record<string, unknown>) => {
-    promise: Promise<{ numPages: number; destroy(): Promise<void> }>
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getResolvedPDFJS } = require('unpdf') as {
-      getResolvedPDFJS(): Promise<{
-        getDocument(params: Record<string, unknown>): {
-          promise: Promise<{ numPages: number; destroy(): Promise<void> }>
-        }
-      }>
-    }
-    const pdfjs = await getResolvedPDFJS()
-    getDocument = pdfjs.getDocument.bind(pdfjs)
-  } catch {
-    return { kind: 'parser_unavailable' }
-  }
-
   let doc: { numPages: number; destroy(): Promise<void> } | undefined
   try {
-    doc = await getDocument({
-      ...pdfjsPresetDataOptions(),
-      data: new Uint8Array(buffer),
-      isEvalSupported: false,
-    }).promise
+    doc = await openPdfjsDocument<{ numPages: number; destroy(): Promise<void> }>(
+      new Uint8Array(buffer),
+    )
     const pages = doc.numPages
     if (!Number.isInteger(pages) || pages <= 0 || pages > MAX_PLAUSIBLE_PAGES) {
       return { kind: 'invalid_document' }

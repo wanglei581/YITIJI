@@ -51,14 +51,20 @@ const NON_RESUMABLE_PAYMENT_STATUSES: OrderPayStatus[] = [
 /**
  * 从 PrintTask.paramsJson（写入时由强校验 DTO 产生，但读时仍按不可信处理）安全提取
  * 白名单元数据。任何缺失 / 类型不符 / JSON 损坏 → 该字段返回 null，绝不抛错、绝不透传未知字段。
+ * 跨端订单时间线（member-order-timeline.service.ts）也用这一份，口径不另起。
  */
-function parseSafeParams(paramsJson: string): ParsedParams {
+export function parseSafeParams(paramsJson: string): ParsedParams {
   let raw: unknown
   try {
     raw = JSON.parse(paramsJson)
   } catch {
     return EMPTY_PARAMS
   }
+  return sanitizePrintParams(raw)
+}
+
+/** {@link parseSafeParams} 的白名单本体；材料包行（OrderItem 列）不经 JSON 也走这里。 */
+export function sanitizePrintParams(raw: unknown): ParsedParams {
   if (typeof raw !== 'object' || raw === null) return EMPTY_PARAMS
   const p = raw as Record<string, unknown>
 
@@ -110,6 +116,52 @@ function parseSafePriceLines(itemsJson: string): PrintPriceLine[] {
   })
 }
 
+/** 映射支付/退款/取件凭证字段所需的 Order 列（select 必须包含这些）。 */
+export type MemberOrderPaymentSource = {
+  amountCents: number
+  payStatus: string
+  paymentSource: string | null
+  billablePages: number | null
+  billingPageSource: string | null
+  pickupCode: string | null
+  taskStatus: string
+  refundedAt: Date | null
+  refundedAmountCents: number
+  discountCents: number
+  refundReason: string | null
+}
+
+/**
+ * 「我的打印订单」支付字段的唯一口径：历史无 Order 一律 null，不编造。
+ * 取件凭证码走 pickupCodeVisibleFor 门控（仅 paid 且未退款、任务未进入完成/取消/失败终态）。
+ * `/me/print-orders` 与跨端时间线共用，不许在别处另写一套。
+ */
+export function memberOrderPaymentFields(order: MemberOrderPaymentSource | null) {
+  // 取件码门控：仅 paid 且未退款、任务未进入完成/取消/失败终态时返回；其余（unpaid/refunded/终态）一律 null。
+  const pickupCode =
+    order && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
+      ? order.pickupCode
+      : null
+  return {
+    // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
+    amountCents: order ? order.amountCents : null,
+    payStatus: order ? (order.payStatus as OrderPayStatus) : null,
+    paymentSource: order ? (order.paymentSource as PaymentSource | null) : null,
+    billablePages: order ? order.billablePages : null,
+    billingPageSource: order ? (order.billingPageSource as BillingPageSource | null) : null,
+    pickupCode,
+    // C5-4 只读：已退金额 / 券抵扣额（历史无 Order 为 null）。券=平台 credit 非资金。
+    refundedAmountCents: order ? order.refundedAmountCents : null,
+    discountCents: order ? order.discountCents : null,
+    refundRequired: order
+      ? isPaidUnfulfilledRefundRequired({
+          payStatus: order.payStatus,
+          refundReason: order.refundReason,
+        })
+      : null,
+  }
+}
+
 @Injectable()
 export class MemberPrintOrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -153,12 +205,6 @@ export class MemberPrintOrdersService {
     })
     return buildMemberPage(rows, page, total, (r) => {
       const params = parseSafeParams(r.paramsJson)
-      const order = r.order
-      // 取件码门控：仅 paid 且未退款、任务未进入完成/取消/失败终态时返回；其余（unpaid/refunded/终态）一律 null。
-      const pickupCode =
-        order && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
-          ? order.pickupCode
-          : null
       return {
         id: r.id,
         status: r.status,
@@ -170,22 +216,7 @@ export class MemberPrintOrdersService {
         duplex: params.duplex,
         paperSize: params.paperSize,
         pageRange: params.pageRange,
-        // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
-        amountCents: order ? order.amountCents : null,
-        payStatus: order ? (order.payStatus as OrderPayStatus) : null,
-        paymentSource: order ? (order.paymentSource as PaymentSource | null) : null,
-        billablePages: order ? order.billablePages : null,
-        billingPageSource: order ? (order.billingPageSource as BillingPageSource | null) : null,
-        pickupCode,
-        // C5-4 只读：已退金额 / 券抵扣额（历史无 Order 为 null）。券=平台 credit 非资金。
-        refundedAmountCents: order ? order.refundedAmountCents : null,
-        discountCents: order ? order.discountCents : null,
-        refundRequired: order
-          ? isPaidUnfulfilledRefundRequired({
-              payStatus: order.payStatus,
-              refundReason: order.refundReason,
-            })
-          : null,
+        ...memberOrderPaymentFields(r.order),
       }
     })
   }
