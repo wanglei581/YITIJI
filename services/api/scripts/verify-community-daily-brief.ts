@@ -44,6 +44,23 @@ function assert(condition: unknown, label: string): void {
   else { failures += 1; console.error(`  FAIL ${label}`) }
 }
 
+/**
+ * 固定「当日」锚点：取真实时刻所在 Asia/Shanghai 日期的当天中午。
+ *
+ * 门禁此前用 `new Date()` 写夹具、再让服务各自读一次系统时钟聚合，两次读钟之间跨过
+ * 上海午夜就会查不到刚写的当日数据；夹具还额外回拨 1 小时，因此每天 00:00–01:00
+ * （UTC 16:00–17:00）整整一小时都是必红窗口 —— 2026-09-06 16:00:10 UTC 的
+ * CI run 34043230675 正落在窗口第 10 秒。锚在中午后，回拨 1 小时不可能跨日，
+ * 且该时刻会一并注入服务，写入与查询用同一个 now。
+ */
+function shanghaiNoon(reference: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(reference)
+  const value = (type: string) => parts.find((part) => part.type === type)?.value
+  return new Date(`${value('year')}-${value('month')}-${value('day')}T12:00:00.000+08:00`)
+}
+
 function inMemoryPublicCache(): Cache {
   const values = new Map<string, string>()
   return {
@@ -58,7 +75,8 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const cache = inMemoryPublicCache()
   const community = new CommunityController(new CommunityService(prisma, cache as never))
-  const daily = new DailyBriefController(new DailyBriefService(prisma, cache as never))
+  const dailyBrief = new DailyBriefService(prisma, cache as never)
+  const daily = new DailyBriefController(dailyBrief)
   const guards = (Reflect.getMetadata(GUARDS_METADATA, DailyBriefController) ?? []) as Function[]
   assert(guards.includes(EndUserAuthGuard), '0. POST /assistant/daily-report 声明 EndUserAuthGuard 会员鉴权')
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
@@ -73,7 +91,7 @@ async function main(): Promise<void> {
   const unpublishedPolicyId = `policy_cdb_unpublished_${suffix}`
   const broadcastId = `broadcast_cdb_${suffix}`
   const city = `验证城市${suffix}`
-  const now = new Date()
+  const now = shanghaiNoon(new Date())
   const today = new Date(now.getTime() - 60 * 60 * 1000)
 
   async function cleanup(): Promise<void> {
@@ -155,7 +173,10 @@ async function main(): Promise<void> {
     )
     console.log(`  FEED_SAMPLE ${JSON.stringify(policy)}`)
 
-    const report: DailyReport = await daily.create({ endUserId: userA, sessionId: 'verify' }, { city })
+    // 5/6/7 依赖「当日」「未来 24h / 48h」窗口，必须与夹具用同一个 now，
+    // 否则日界翻转时 city_new 会查不到刚写的当日岗位与政策。控制器只做透传，
+    // 其转发行为仍由断言 0（守卫元数据）与断言 8/9（真实系统时钟路径）覆盖。
+    const report: DailyReport = await dailyBrief.create(userA, city, now)
     const pickup = report.modules.find((module) => module.type === 'pickup_expiring')
     const fair = report.modules.find((module) => module.type === 'fair_countdown')
     const cityNew = report.modules.find((module) => module.type === 'city_new')

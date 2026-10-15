@@ -22,8 +22,12 @@ export class DailyBriefService {
     private readonly redis: RedisService,
   ) {}
 
-  async create(endUserId: string, requestedCity?: string): Promise<DailyReport> {
-    const now = new Date()
+  /**
+   * `now` 默认取系统时钟，生产路径（DailyBriefController）不传该参数，语义不变。
+   * 只有验证脚本会显式注入固定时刻：本服务的「当日」按 Asia/Shanghai 日界切分，
+   * 写入夹具与聚合查询若分别读两次系统时钟，跨过本地午夜就会查不到刚写的当日数据。
+   */
+  async create(endUserId: string, requestedCity?: string, now: Date = new Date()): Promise<DailyReport> {
     const date = shanghaiDate(now)
     const city = requestedCity?.trim() || null
     const modules: DailyReportModule[] = []
