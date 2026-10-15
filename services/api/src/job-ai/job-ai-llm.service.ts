@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../ai/llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import { LLM_BUSY_MESSAGE, LlmBusyError, LlmTimeoutError, llmFetchJson } from '../ai/llm/llm-http'
 import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
@@ -181,7 +182,7 @@ export class JobAiLlmService {
             stream: false,
           }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: featureKey, forbiddenWords: cfg.forbiddenWords } },
       )
       if (!res.ok) {
         this.logger.warn(`${operation}.upstream_non_2xx status=${res.status}`)
@@ -206,6 +207,7 @@ export class JobAiLlmService {
         tokenUsage: normalizeTokenUsage(data?.usage),
       }
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof ServiceUnavailableException) throw error
       if (error instanceof LlmBusyError) {
         this.logger.warn(`${operation}.busy limit=${error.limit}`)

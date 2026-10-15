@@ -10,6 +10,12 @@ import {
  */
 export const RECRUITMENT_POLICY_CATEGORY = 'recruitment'
 
+export type PolicyPublicScope = { mode: 'all' } | { mode: 'org'; orgId: string | null; state: 'bound' | 'unbound' | 'missing' }
+
+export function policyScopeMode(): 'all' | 'org' {
+  return process.env['POLICY_SCOPE']?.trim().toLowerCase() === 'org' ? 'org' : 'all'
+}
+
 type HoldReader = {
   recruitmentEmergencyHold?: {
     findMany?: (args: {
@@ -67,8 +73,12 @@ function recruitmentCategoryExclusion(): Prisma.PolicyPostWhereInput {
 export function publicPolicyWhere(
   extra: Prisma.PolicyPostWhereInput,
   heldIds: string[],
+  scope: PolicyPublicScope = { mode: 'all' },
 ): Prisma.PolicyPostWhereInput {
   const parts: Prisma.PolicyPostWhereInput[] = [extra, recruitmentCategoryExclusion()]
+  if (scope.mode === 'org') {
+    parts.push(scope.orgId ? { sourceOrgId: scope.orgId } : { sourceOrgId: '__no_public_terminal__' })
+  }
   if (heldIds.length > 0) parts.push({ id: { notIn: heldIds } })
   const present = parts.filter((part) => Object.keys(part).length > 0)
   if (present.length === 1) return present[0]!
@@ -78,6 +88,7 @@ export function publicPolicyWhere(
 export async function publicPolicyLookupWhere(
   prisma: HoldReader,
   extra: Prisma.PolicyPostWhereInput,
+  scope: PolicyPublicScope = { mode: 'all' },
 ): Promise<Prisma.PolicyPostWhereInput> {
-  return publicPolicyWhere(extra, await listPolicyHoldIds(prisma))
+  return publicPolicyWhere(extra, await listPolicyHoldIds(prisma), scope)
 }

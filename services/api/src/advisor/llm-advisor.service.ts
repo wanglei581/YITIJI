@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../ai/llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import {
   LLM_BUSY_MESSAGE,
@@ -473,9 +474,10 @@ export class LlmAdvisorService {
             ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
           }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: 'advisor_work', forbiddenWords: cfg.forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       if (error instanceof LlmBusyError) {
         this.logger.warn(`advisor.llm busy limit=${error.limit}`)
         throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })

@@ -32,6 +32,7 @@
 // ============================================================================
 
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { AiContentBlockedError, assertContentAllowed, configuredForbiddenWords } from './llm-guard'
 
 /** 当前 HTTP 请求的 abort signal。客户端断开时取消上游 LLM，从而走配额回滚。 */
 export const llmRequestAbort = new AsyncLocalStorage<AbortSignal>()
@@ -178,6 +179,9 @@ export interface LlmFetchOptions {
   gate?: LlmConcurrencyGate
   /** 仅供门禁注入假 fetch，避免门禁真打模型。 */
   fetchImpl?: typeof fetch
+  /** 双向本地内容检查；未传时仍使用 env/default 词表。 */
+  contentModeration?: { feature?: string; forbiddenWords?: readonly string[]; terminalId?: string | null; memberId?: string | null }
+  onContentBlocked?: (error: AiContentBlockedError) => void | Promise<void>
 }
 
 /**
@@ -202,6 +206,27 @@ export async function llmFetchJson(
   const gate = options.gate ?? llmConcurrencyGate
   const doFetch = options.fetchImpl ?? fetch
   const { timeoutMs } = options
+
+  const moderation = options.contentModeration
+  const words = configuredForbiddenWords(moderation?.forbiddenWords)
+  const block = async (error: unknown): Promise<never> => {
+    if (error instanceof AiContentBlockedError) {
+      await options.onContentBlocked?.(error)
+      throw error
+    }
+    throw error
+  }
+  try {
+    const payload = JSON.parse(init.body) as { messages?: Array<{ role?: string; content?: unknown }> }
+    for (const message of payload.messages ?? []) {
+      if (message.role === 'user' && typeof message.content === 'string') {
+        assertContentAllowed(message.content, 'input', words, moderation)
+      }
+    }
+  } catch (error) {
+    if (error instanceof AiContentBlockedError) return block(error)
+    // A malformed body is left to the upstream/caller's existing handling.
+  }
 
   // 先过闸门：满了直接抛，不建 controller、不发请求。
   gate.acquire()
@@ -235,12 +260,17 @@ export async function llmFetchJson(
       if (timedOut) throw error
       data = null
     }
+    if (res.ok) {
+      const reply = (data as { choices?: Array<{ message?: { content?: unknown } }> } | null)?.choices?.[0]?.message?.content
+      if (typeof reply === 'string') assertContentAllowed(reply, 'output', words, moderation)
+    }
     return { ok: res.ok, status: res.status, statusText: res.statusText, data }
   } catch (error) {
     // 分类只看自己设的 timedOut 标记，不看 error.name：
     // AbortError / TimeoutError 的 name 在不同 runtime 上并不稳定
     // （合同审查那边已经踩过，见 contract-review-provider.service.ts）。
     if (timedOut) throw new LlmTimeoutError(timeoutMs)
+    if (error instanceof AiContentBlockedError) return block(error)
     // 原始 error 原样外抛给调用方的既有 catch —— 它们一律不记正文。
     throw error
   } finally {

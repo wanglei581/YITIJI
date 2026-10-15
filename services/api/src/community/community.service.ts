@@ -2,10 +2,15 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import { isRecruitmentContentHostingEnabled } from '../recruitment-hosting/recruitment-hosting'
-import { listPolicyHoldIds, publicPolicyWhere } from '../policies/policy-public-visibility'
+import { listPolicyHoldIds, publicPolicyWhere, type PolicyPublicScope } from '../policies/policy-public-visibility'
 import type { CommunityFeedItem, CommunityFeedKind, CommunityFeedPage } from './community.types'
 
 const CACHE_TTL_SECONDS = 15 * 60
+
+export function communityFeedCacheKey(hostingKey: string, scope: PolicyPublicScope, cursorValue: string | undefined, limit: number): string {
+  const scopeKey = scope.mode === 'org' ? `${scope.state}:${scope.orgId ?? 'none'}` : 'all'
+  return `community:feeds:v2:${hostingKey}:${scopeKey}:${cursorValue ?? 'first'}:${limit}`
+}
 const MAX_SUMMARY_LENGTH = 120
 
 type FeedCursor = { publishedAt: Date; id: string }
@@ -17,11 +22,11 @@ export class CommunityService {
     private readonly redis: RedisService,
   ) {}
 
-  async list(cursorValue?: string, requestedLimit?: number): Promise<CommunityFeedPage> {
+  async list(cursorValue?: string, requestedLimit?: number, scope: PolicyPublicScope = { mode: 'all' }): Promise<CommunityFeedPage> {
     const cursor = cursorValue ? this.parseCursor(cursorValue) : null
     const limit = requestedLimit ?? 20
     const hostingKey = isRecruitmentContentHostingEnabled() ? 'hosting' : 'closed'
-    const cacheKey = `community:feeds:v2:${hostingKey}:${cursorValue ?? 'first'}:${limit}`
+    const cacheKey = communityFeedCacheKey(hostingKey, scope, cursorValue, limit)
     const heldIds = await listPolicyHoldIds(this.prisma)
     const held = new Set(heldIds)
 
@@ -30,6 +35,7 @@ export class CommunityService {
       const policyWhere = publicPolicyWhere(
         { reviewStatus: 'approved', publishStatus: 'published' },
         heldIds,
+        scope,
       )
       const [policies, benefits, broadcasts] = await Promise.all([
         this.prisma.policyPost.findMany({

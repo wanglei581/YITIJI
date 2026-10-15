@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { Equals, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
@@ -17,6 +17,7 @@ import {
 import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
 import { PartnerUnpublishActionDto } from '../jobs/dto/publish.dto'
+import { PolicyScopeService } from './policy-scope.service'
 
 /**
  * 政策服务(阶段1D)。
@@ -99,7 +100,9 @@ export class PoliciesController {
   constructor(
     private readonly policies: PoliciesService,
     private readonly eligibility: PolicyEligibilityService,
+    private readonly policyScope: PolicyScopeService,
   ) {}
+
 
   // ── Kiosk(公开)──────────────────────────────────────────────────────────
 
@@ -110,8 +113,10 @@ export class PoliciesController {
     @Query('category') category?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Headers('x-terminal-id') terminalId?: string,
+    @Headers('x-terminal-session-token') sessionToken?: string,
   ) {
-    return this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize })
+    return this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }).then((scope) => this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize, scope }))
   }
 
   /**
@@ -134,16 +139,25 @@ export class PoliciesController {
    */
   @Post('policies/eligibility-check')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  checkEligibility(@Body() dto: PolicyEligibilityCheckDto) {
-    return this.eligibility.checkEligibility({ answers: dto.answers, policyIds: dto.policyIds })
+  async checkEligibility(
+    @Body() dto: PolicyEligibilityCheckDto,
+    @Headers('x-terminal-id') terminalId?: string,
+    @Headers('x-terminal-session-token') sessionToken?: string,
+  ) {
+    const scope = await this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } })
+    return this.eligibility.checkEligibility({ answers: dto.answers, policyIds: dto.policyIds, scope })
   }
 
   /**
    * 公开政策详情。只返回 approved+published；其余一律 404，不泄露草稿/驳回。
    */
   @Get('policies/:id')
-  getPublishedPolicy(@Param('id') id: string) {
-    return this.policies.getPublishedPolicyById(id)
+  async getPublishedPolicy(
+    @Param('id') id: string,
+    @Headers('x-terminal-id') terminalId?: string,
+    @Headers('x-terminal-session-token') sessionToken?: string,
+  ) {
+    return this.policies.getPublishedPolicyById(id, await this.policyScope.resolve({ headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': sessionToken } }))
   }
 
   // ── Partner ─────────────────────────────────────────────────────────────────

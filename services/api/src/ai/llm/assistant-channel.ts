@@ -5,6 +5,7 @@
  * 对账逻辑在 verify 里读 app.json；清单继续堆进 llm-chat.service 会把那个文件顶过行数线。
  */
 import { containsForbiddenWord } from './llm-guard'
+import { isRecruitmentContentHostingEnabled } from '../../recruitment-hosting/recruitment-hosting'
 
 export type AssistantChannel = 'kiosk' | 'miniapp'
 
@@ -78,6 +79,7 @@ const KIOSK_ROUTE_TO_MINIAPP_PAGE: Record<string, string> = {
 }
 
 const LABEL_BLOCK = /招聘会|查看岗位|浏览岗位|岗位信息|岗位列表|找企业|查看企业|企业资料|人社|政策/
+const KIOSK_RECRUITMENT_BLOCK = /招聘会|岗位|企业|job-fairs|^\/jobs(?:\/|$)|^\/companies(?:\/|$)/i
 
 const REPLY_FORBIDDEN_BASE = [
   '招聘会',
@@ -125,6 +127,11 @@ export function miniappChannelConstraint(pages: readonly string[] = MINIAPP_REGI
   ].join('\n')
 }
 
+export function kioskChannelConstraint(): string {
+  if (isRecruitmentContentHostingEnabled()) return ''
+  return '当前为公共一体机。不要引导用户查看岗位、招聘会或企业，也不要给出这些内容的入口；用户自己贴来的岗位要求可以帮他对照简历。'
+}
+
 export function scrubMiniappReply(reply: string, pages: readonly string[] = MINIAPP_REGISTERED_PAGES): string {
   const words = miniappReplyForbiddenWords(pages)
   if (!containsForbiddenWord(reply, words)) return reply
@@ -136,14 +143,19 @@ export function filterAssistantActions(
   actions: ChannelAction[] | undefined,
   channel: AssistantChannel,
 ): ChannelAction[] | undefined {
-  if (channel !== 'miniapp') return actions
+  if (channel === 'kiosk' && isRecruitmentContentHostingEnabled()) return actions
   if (!actions?.length) return undefined
   const kept: ChannelAction[] = []
   for (const action of actions) {
     const path = action.route.split('?')[0]
+    if (channel === 'kiosk') {
+      if (KIOSK_RECRUITMENT_BLOCK.test(`${action.label} ${path}`)) continue
+      kept.push(action)
+      continue
+    }
     const page = KIOSK_ROUTE_TO_MINIAPP_PAGE[path]
     if (!page || !MINIAPP_PAGE_SET.has(page)) continue
-    if (LABEL_BLOCK.test(action.label)) continue
+    if (channel === 'miniapp' && LABEL_BLOCK.test(action.label)) continue
     kept.push({ label: action.label, route: `/${page}` })
   }
   return kept.length ? kept : undefined
@@ -154,7 +166,10 @@ export function applyAssistantChannel<T extends { reply: string; actions?: Chann
   channel: string | undefined,
 ): T {
   const resolved = resolveAssistantChannel(channel)
-  if (resolved === 'kiosk') return output
+  if (resolved === 'kiosk') {
+    if (isRecruitmentContentHostingEnabled()) return output
+    return { ...output, actions: filterAssistantActions(output.actions, 'kiosk') } as T
+  }
   return {
     ...output,
     reply: scrubMiniappReply(output.reply),

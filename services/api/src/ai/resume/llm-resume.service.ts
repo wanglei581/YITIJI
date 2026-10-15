@@ -1,4 +1,5 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { AiContentBlockedError } from '../llm/llm-guard'
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { RESUME_SCORING_DIMENSIONS } from '../interfaces/ai-provider.interface'
 import type {
   ResumePriority,
@@ -231,7 +232,7 @@ export class LlmResumeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: DIAGNOSIS_RETRY_HINT }]
       const raw = await this.callLlm(
         cfg.baseURL, apiKey, cfg.model, DIAGNOSIS_TEMPERATURE, messages,
-        `llm:${cfg.vendor}:${cfg.model}`, context?.onLlmCall,
+        `llm:${cfg.vendor}:${cfg.model}`, cfg.forbiddenWords, context?.onLlmCall,
       )
       // 防编造校验基准是 text（**送出去的那一份**，已截断已遮盖），不是 extractedText。
       // 与 llm-job-fit / llm-resume-optimize 同一条不变量：引文必须能在模型看得到的
@@ -262,6 +263,7 @@ export class LlmResumeService {
      * 由调用方传入，因为 cfg 只在 diagnose 作用域内。**不含任何凭证**。
      */
     providerLabel: string,
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
@@ -279,9 +281,10 @@ export class LlmResumeService {
           // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空 / JSON 诊断失败。
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS, contentModeration: { feature: 'resume_diagnosis', forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
       // 不记请求/响应正文（可能回显简历文本），只抛明确错误。
       // 「忙」「超时」「连不上」三态各自独立成码，不合并 —— 合并等于放弃根因。
       if (error instanceof LlmBusyError) {

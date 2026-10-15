@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
-import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
+import { publicPolicyLookupWhere, type PolicyPublicScope } from '../policies/policy-public-visibility'
 
 // ============================================================
 // 会员收藏服务（Phase C-2C）。
@@ -48,7 +48,7 @@ export class MemberFavoritesService {
     endUserId: string,
     page: MemberPageQuery,
     targetType?: FavoriteTargetType,
-    options?: { excludeTargetTypes?: FavoriteTargetType[] },
+    options?: { excludeTargetTypes?: FavoriteTargetType[]; policyScope?: PolicyPublicScope },
   ): Promise<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }> {
     const excluded = options?.excludeTargetTypes
     const where = {
@@ -59,9 +59,16 @@ export class MemberFavoritesService {
           ? { targetType: { notIn: excluded } }
           : {}),
     }
-    const total = await this.prisma.favorite.count({ where })
+    const policyScope = options?.policyScope
+    const visiblePolicyIds = policyScope?.mode === 'org'
+      ? (await this.prisma.policyPost.findMany({ where: await publicPolicyLookupWhere(this.prisma, { reviewStatus: 'approved', publishStatus: 'published' }, policyScope), select: { id: true } })).map((row) => row.id)
+      : undefined
+    const scopedWhere = policyScope?.mode === 'org'
+      ? { ...where, ...(targetType === 'policy' ? { targetId: { in: visiblePolicyIds } } : targetType ? {} : { OR: [{ targetType: { not: 'policy' } }, { targetType: 'policy', targetId: { in: visiblePolicyIds } }] }) }
+      : where
+    const total = await this.prisma.favorite.count({ where: scopedWhere })
     const rows = await this.prisma.favorite.findMany({
-      where,
+      where: scopedWhere,
       select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
       ...memberPageArgs(page),
     })

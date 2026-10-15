@@ -27,10 +27,10 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from './llm-http'
+import { AiContentBlockedError, buildGuardedSystemPrompt, configuredForbiddenWords, enforceForbiddenWords } from './llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
-import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 import { withAiSafety } from './ai-prompt-safety'
-import { applyAssistantChannel, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
+import { applyAssistantChannel, kioskChannelConstraint, miniappChannelConstraint, resolveAssistantChannel } from './assistant-channel'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -319,13 +319,26 @@ export class LlmChatService {
 
     const channel = resolveAssistantChannel(input.channel)
     const guarded = buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill)
-    const systemPrompt = channel === 'miniapp' ? `${guarded}\n\n${miniappChannelConstraint()}` : guarded
+    const channelConstraint = channel === 'miniapp' ? miniappChannelConstraint() : kioskChannelConstraint()
+    const systemPrompt = channelConstraint ? `${guarded}\n\n${channelConstraint}` : guarded
     const payloadMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
-    const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, onLlmCall)
+    let rawReply: string
+    try {
+      rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, cfg.forbiddenWords, onLlmCall)
+    } catch (error) {
+      if (error instanceof AiContentBlockedError) {
+        const words = configuredForbiddenWords(cfg.forbiddenWords)
+        const reply = words.length > 0
+          ? enforceForbiddenWords(words[0]!, words)
+          : '这个问题超出当前助手的服务范围，请换一个合规问题。'
+        return { sessionId, reply, intent: classifyIntent(input.message), actions: [] }
+      }
+      throw error
+    }
     const guardedReply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
     const reply = channel === 'miniapp' ? applyAssistantChannel({ reply: guardedReply }, 'miniapp').reply : guardedReply
     if (reply !== rawReply) {
@@ -361,6 +374,7 @@ export class LlmChatService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    forbiddenWords: readonly string[],
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     // AI-COST-TRUTH：落账标签必须含厂商名，否则定价表匹配不到 → 永远算不出成本。
@@ -379,9 +393,10 @@ export class LlmChatService {
           },
           body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        { timeoutMs: LLM_TIMEOUT_MS },
+        { timeoutMs: LLM_TIMEOUT_MS, contentModeration: { feature: featureKey, forbiddenWords } },
       )
     } catch (error) {
+      if (error instanceof AiContentBlockedError) throw error
       // 「AI 正忙」和「超时」都必须能和下面的 network_error 分开报：三者的处置完全不同
       // （加容量 / 查模型端 / 查网络）。糊成一个码就等于把根因抹掉。
       if (error instanceof LlmBusyError) {
@@ -436,7 +451,7 @@ export class LlmChatService {
         { role: 'system', content: buildGuardedSystemPrompt(cfg) },
         { role: 'user', content: '你好，请用一句话自我介绍。' },
       ]
-      const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages)
+      const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages, cfg.forbiddenWords)
       return { ok: true, reply: enforceForbiddenWords(rawReply, cfg.forbiddenWords) }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }

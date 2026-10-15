@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
-import { publicPolicyLookupWhere } from '../policies/policy-public-visibility'
+import { publicPolicyLookupWhere, type PolicyPublicScope } from '../policies/policy-public-visibility'
 import {
   ACTIVITY_TARGET_TYPES,
   JUMP_ACTIONS_BY_TARGET,
@@ -194,7 +194,7 @@ export class ActivityService {
     endUserId: string,
     page: MemberPageQuery,
     targetType?: string,
-    options?: { excludeTargetTypes?: string[] },
+    options?: { excludeTargetTypes?: string[]; policyScope?: PolicyPublicScope },
   ) {
     if (targetType !== undefined) assertTargetType(targetType)
     const excluded = options?.excludeTargetTypes
@@ -207,9 +207,15 @@ export class ActivityService {
           ? { targetType: { notIn: excluded } }
           : {}),
     }
-    const total = await this.prisma.browseLog.count({ where })
+    const visiblePolicyIds = options?.policyScope?.mode === 'org'
+      ? (await this.prisma.policyPost.findMany({ where: await publicPolicyLookupWhere(this.prisma, { reviewStatus: 'approved', publishStatus: 'published' }, options.policyScope), select: { id: true } })).map((row) => row.id)
+      : undefined
+    const scopedWhere = options?.policyScope?.mode === 'org'
+      ? { ...where, ...(targetType === 'policy' ? { targetId: { in: visiblePolicyIds } } : targetType ? {} : { OR: [{ targetType: { not: 'policy' } }, { targetType: 'policy', targetId: { in: visiblePolicyIds } }] }) }
+      : where
+    const total = await this.prisma.browseLog.count({ where: scopedWhere })
     const rows = await this.prisma.browseLog.findMany({
-      where,
+      where: scopedWhere,
       select: {
         id: true, targetType: true, targetId: true, targetTitle: true,
         sourceName: true, sourceUrl: true, externalId: true, createdAt: true,
@@ -233,7 +239,7 @@ export class ActivityService {
     endUserId: string,
     page: MemberPageQuery,
     targetType?: string,
-    options?: { excludeTargetTypes?: string[] },
+    options?: { excludeTargetTypes?: string[]; policyScope?: PolicyPublicScope },
   ) {
     if (targetType !== undefined) assertTargetType(targetType)
     const excluded = options?.excludeTargetTypes
@@ -246,9 +252,15 @@ export class ActivityService {
           ? { targetType: { notIn: excluded } }
           : {}),
     }
-    const total = await this.prisma.externalJumpLog.count({ where })
+    const visiblePolicyIds = options?.policyScope?.mode === 'org'
+      ? (await this.prisma.policyPost.findMany({ where: await publicPolicyLookupWhere(this.prisma, { reviewStatus: 'approved', publishStatus: 'published' }, options.policyScope), select: { id: true } })).map((row) => row.id)
+      : undefined
+    const scopedWhere = options?.policyScope?.mode === 'org'
+      ? { ...where, ...(targetType === 'policy' ? { targetId: { in: visiblePolicyIds } } : targetType ? {} : { OR: [{ targetType: { not: 'policy' } }, { targetType: 'policy', targetId: { in: visiblePolicyIds } }] }) }
+      : where
+    const total = await this.prisma.externalJumpLog.count({ where: scopedWhere })
     const rows = await this.prisma.externalJumpLog.findMany({
-      where,
+      where: scopedWhere,
       select: {
         id: true, targetType: true, targetId: true, action: true, targetTitle: true,
         sourceName: true, sourceUrl: true, externalId: true, createdAt: true,

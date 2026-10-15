@@ -7,6 +7,7 @@ import {
 import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 import { withAiSafety } from '../ai/llm/ai-prompt-safety'
+import { assertContentAllowed } from '../ai/llm/llm-guard'
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
@@ -290,6 +291,8 @@ export class ContractReviewProviderService {
     }
     const body = transportResponse['body']
     if (typeof body !== 'string') throw new Error('CONTRACT_PROVIDER_RESPONSE_INVALID')
+    // 合同原文只作为待审材料，不按聊天用户输入检查；模型报告仍需检查输出。
+    assertContentAllowed(body, 'output', undefined, { feature: 'contract_review' })
     if (Buffer.byteLength(body, 'utf8') > MAX_RESPONSE_BYTES) {
       throw new Error('CONTRACT_PROVIDER_RESPONSE_TOO_LARGE')
     }

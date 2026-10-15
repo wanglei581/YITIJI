@@ -9,6 +9,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { AuditService } from '../audit/audit.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { ActivityService } from './activity.service'
+import { PolicyScopeService } from '../policies/policy-scope.service'
 
 import { resolveClientIp } from '../common/client-ip'
 import {
@@ -44,8 +45,10 @@ export class MeActivityController {
   constructor(
     private readonly activity: ActivityService,
     private readonly audit: AuditService,
+    private readonly policyScopeService: PolicyScopeService,
     @Optional() private readonly jobBoard?: KioskJobBoardService,
   ) {}
+
 
   /** 未注入开关时保持原列表（既有验证直接构造控制器）。生产模块会注入。 */
   private async jobBoardOpen(req?: KioskJobBoardRequest): Promise<boolean> {
@@ -72,7 +75,7 @@ export class MeActivityController {
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        exclude ? { excludeTargetTypes: exclude } : undefined,
+        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await this.policyScopeService.resolve(req) },
       ),
     )
   }
@@ -96,7 +99,7 @@ export class MeActivityController {
         user.endUserId,
         parseMemberPageQuery(cursor, pageSize),
         type,
-        exclude ? { excludeTargetTypes: exclude } : undefined,
+        { ...(exclude ? { excludeTargetTypes: exclude } : {}), policyScope: await this.policyScopeService.resolve(req) },
       ),
     )
   }
