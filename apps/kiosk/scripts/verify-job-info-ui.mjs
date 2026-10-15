@@ -8,9 +8,14 @@ function read(relativePath) {
   return readFileSync(join(root, relativePath), 'utf8')
 }
 
+// Visible copy also lives in plain .ts helpers next to the components, so the
+// compliance scan reads both extensions. Ambient declarations and test files
+// render nothing and stay out.
+const NON_RENDERED_SOURCE = /\.(?:test|spec)\.tsx?$|\.d\.ts$/
+
 function readDirectory(relativePath) {
   return readdirSync(join(root, relativePath), { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.tsx'))
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name) && !NON_RENDERED_SOURCE.test(entry.name))
     .map((entry) => read(join(relativePath, entry.name)))
     .join('\n')
 }

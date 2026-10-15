@@ -36,6 +36,9 @@ const FORBIDDEN_PATHS = [
 const PLANNED_TEST_FILES = new Set([
   'docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md',
   'apps/kiosk/scripts/verify-fusion-w4.mjs',
+  // Reads only W4-owned src/pages/jobs/** surfaces, so its copy scan has to be
+  // widened in lockstep with this file's.
+  'apps/kiosk/scripts/verify-job-info-ui.mjs',
   'apps/kiosk/playwright.w4.config.ts',
   'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
@@ -216,11 +219,18 @@ function changedFiles() {
   return [...new Set(`${tracked}\n${untracked}`.split('\n').map((item) => item.trim()).filter(Boolean))]
 }
 
-function collectTsx(dir) {
+// User-visible copy is not confined to .tsx: label tables and reason-sentence
+// templates live in plain .ts helpers under the same page directories and still
+// render to screen, so the copy scan must reach both extensions. Ambient
+// declarations and test fixtures render nothing and stay out.
+const NON_RENDERED_SOURCE = /(?:^|[\\/])(?:__tests__|__fixtures__|__mocks__)[\\/]|\.(?:test|spec)\.tsx?$|\.d\.ts$/
+
+function collectSource(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) return collectTsx(path)
-    if (!entry.isFile() || !entry.name.endsWith('.tsx')) return []
+    if (entry.isDirectory()) return collectSource(path)
+    if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) return []
+    if (NON_RENDERED_SOURCE.test(path)) return []
     return [path]
   })
 }
@@ -478,13 +488,12 @@ check('legacy CSS entry remains a compatibility aggregator', () => {
 })
 
 const w4Dirs = ['jobs', 'companies', 'offline-agencies', 'job-fairs', 'campus', 'smart-campus', 'renshi']
-const w4Files = w4Dirs.flatMap((dir) => collectTsx(join(KIOSK_ROOT, 'src/pages', dir)))
+const w4Files = w4Dirs.flatMap((dir) => collectSource(join(KIOSK_ROOT, 'src/pages', dir)))
   .concat([
     join(KIOSK_ROOT, 'src/pages/placeholders/CampusWelcomePage.tsx'),
     join(KIOSK_ROOT, 'src/pages/placeholders/FreshmanInsightsPage.tsx'),
   ])
 const w4Source = w4Files
-  .filter((path) => !path.endsWith('jobs/utils/jobDisplay.ts'))
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n')
 
@@ -494,7 +503,7 @@ check('W4 pages no longer depend on legacy presentation helpers', () => {
 })
 
 check('ComingSoonNotice remains zero-consumer', () => {
-  const consumers = collectTsx(join(KIOSK_ROOT, 'src'))
+  const consumers = collectSource(join(KIOSK_ROOT, 'src'))
     .filter((path) => !path.endsWith('components/ComingSoonNotice.tsx'))
     .filter((path) => readFileSync(path, 'utf8').includes('ComingSoonNotice'))
     .map((path) => relative(KIOSK_ROOT, path))
