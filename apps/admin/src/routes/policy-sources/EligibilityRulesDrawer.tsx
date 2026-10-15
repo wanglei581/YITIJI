@@ -156,7 +156,7 @@ function RuleCard({
           {rule.clauses.length === 0 ? (
             <p className="mt-1 rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs leading-relaxed text-warning-fg">
               本条标为「能比对」却没有任何比对项，一体机上不会产出任何相符 / 不符结论。
-              请退回机构补齐比对项，或让机构改标为「只能人工核对」。
+              请联系机构补齐比对项，或让机构改标为「只能人工核对」。
             </p>
           ) : (
             <div className="mt-1 space-y-2">
@@ -263,7 +263,7 @@ export default function EligibilityRulesDrawer({ policy, onClose }: Props) {
             <p className="mt-1.5 text-xs leading-relaxed text-error-fg">失败原因：{rulesError}</p>
             <p className="mt-2 border-t border-error/20 pt-2 text-xs leading-relaxed text-error-fg">
               这<span className="font-semibold">不等于</span>「这条政策没有申领限制」——
-              只是本次没读到。请先重试；仍失败请联系技术排查，不要据此认定这条政策无门槛就放行。
+              只是本次没读到。请先重试；仍失败请联系技术排查，不要据此认定这条政策没有申领门槛。
             </p>
           </div>
           <button
@@ -276,8 +276,8 @@ export default function EligibilityRulesDrawer({ policy, onClose }: Props) {
       ) : (
         <div className="space-y-4">
           <div className="rounded-lg border border-info/30 bg-info-bg px-3 py-2.5 text-xs leading-relaxed text-info-fg">
-            本页只读。申领条件由来源机构在合作机构后台录入；机构改条件后，这条政策会自动回到「待审核 + 待发布」重审。
-            审核前请对照政策原文核对：条件是否与原文一致、有没有漏录。
+            本页只读。申领条件由来源机构在合作机构后台录入并自行审核发布；机构改条件后，这条政策会自动回到「待审核 + 待发布」，由机构重新审核发布。
+            核对时请对照政策原文：条件是否与原文一致、有没有漏录；发现问题请联系机构更正，违法违规内容用紧急下架。
           </div>
 
           {questionsError !== null && (
@@ -295,7 +295,7 @@ export default function EligibilityRulesDrawer({ policy, onClose }: Props) {
               description={
                 '已成功读取，机构确实一条都没录（不是加载失败）。一体机上这条政策会如实显示' +
                 '「该政策尚未录入可机械比对的条件，本次未做条件核对，需人工核对」。' +
-                '审核前请对照政策原文确认：是确实没有申领门槛，还是机构漏录了。'
+                '核对时请对照政策原文确认：是确实没有申领门槛，还是机构漏录了；漏录请联系机构补录。'
               }
               className="py-10"
             />

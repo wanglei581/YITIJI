@@ -32,7 +32,6 @@ import ToolboxPage from './toolbox'
 import SmartCampusPage from './smart-campus'
 import JobMaterialsPage from './job-materials'
 import AccountSettingsPage from './account-settings'
-import OfflineAgenciesPage from './offline-agencies'
 import LegalDocsPage from './legal-docs'
 import PrivacyRequestsPage from './privacy-requests'
 
@@ -79,7 +78,9 @@ export const adminRouter = createBrowserRouter([
       { path: 'toolbox',         element: <ToolboxPage /> },
       { path: 'smart-campus',    element: <SmartCampusPage /> },
       { path: 'account-settings', element: <AccountSettingsPage /> },
-      { path: 'offline-agencies', element: <OfflineAgenciesPage /> },
+      // 3.15：线下机构整页停放（源码在 routes/offline-agencies/，不再 import），资质核验迁到合作机构详情；
+      // 旧地址照历史路径的做法重定向到能继续干活的页面，而不是落到空白 / 404。
+      { path: 'offline-agencies', element: <Navigate to="/partners" replace /> },
       { path: 'legal-docs',       element: <LegalDocsPage /> },
       { path: 'privacy-requests', element: <PrivacyRequestsPage /> },
     ],

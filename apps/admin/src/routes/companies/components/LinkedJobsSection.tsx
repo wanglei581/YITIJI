@@ -1,3 +1,6 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不打包：只被停放的 CompanyDetailDrawerEditor.tsx 引用，
+// 页面挂载的只读 CompanyDetailDrawer 不再用它。本节是管理员对企业资料的「关联岗位 / 移除关联」，
+// 托管 a 下本平台不代审、不代发、不代改；b 版本随 CompanyDetailDrawerEditor 一起恢复。
 import { useCallback, useEffect, useState } from 'react'
 import { Card, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { LinkIcon, SearchIcon } from 'lucide-react'
@@ -5,7 +8,10 @@ import { DangerDeleteButton, InlineError, InlineSuccess } from '../../../compone
 import { JOB_CATEGORY_LABELS, PUBLISH_BADGE, errMsg, inputCls } from './shared'
 import { companiesAdminService, type AdminCompanyDetail, type CompanyLinkableJob } from '../../../services/api/companiesAdmin'
 
-/** readOnly：托管关闭（我们云上默认）时只列已关联岗位，不搜索、不关联、不移除（点了也只会 403）。 */
+/**
+ * readOnly：只列已关联岗位，不搜索、不关联、不移除。
+ * 服务端对关联与移除关联都在托管关闭时回 403（移除关联的闸 3.15 才补上，此前这里写「点了也只会 403」并不属实）。
+ */
 export function LinkedJobsSection({ detail, onMutated, readOnly = false }: { detail: AdminCompanyDetail; onMutated: () => void; readOnly?: boolean }) {
   const [keyword, setKeyword] = useState('')
   const [linkable, setLinkable] = useState<CompanyLinkableJob[]>([])

@@ -120,7 +120,7 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
       setPreview(null)
       setSavedNotice(
         `已保存 ${persisted.length} 条条件。该政策已回到「待审核 + 待发布」,` +
-          '管理员审核通过并重新发布后,一体机上的条件核对才会用上这组条件。',
+          '本机构审核通过并确认发布后,一体机上的条件核对才会用上这组条件。',
       )
       onSaved()
     } catch (e) {

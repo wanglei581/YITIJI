@@ -263,25 +263,33 @@ async function main() {
     const orgEnt = `orgEnt-${tag}`
     await prisma.organization.create({ data: { id: orgFair, name: `招聘会主办方${tag}`, type: 'fair_organizer', contentTrustStatus: 'active' } })
     await prisma.organization.create({ data: { id: orgEnt, name: `本企业${tag}`, type: 'enterprise_source', contentTrustStatus: 'active' } })
+    // 3.15 停放：这两类机构不再能维护企业资料（partner-capabilities.ts canManageCompanies=false），
+    // 托管打开时也一样。原 9c 断言 fair_organizer 无参展企业 400、enterprise_source 非本企业 400、
+    // enterprise_source 维护本企业成功；停放后三条一律 403，且本企业那条不再落库。
     await expectStatus(
       companies.partnerImport(orgFair, {
         items: [{ externalId: `ff-${tag}`, name: '无关企业', fairParticipant: true }],
       }, partner),
-      400,
-      '9c. fair_organizer 无本机构参展企业不得录入',
+      403,
+      '9c. fair_organizer 已停放，不得录入企业资料',
     )
     await expectStatus(
       companies.partnerImport(orgEnt, {
         items: [{ externalId: `ee-${tag}`, name: '别的公司' }],
       }, partner),
-      400,
-      '9c. enterprise_source 不得录入非本企业',
+      403,
+      '9c. enterprise_source 已停放，不得录入非本企业',
     )
-    const own = await companies.partnerImport(orgEnt, {
-      items: [{ externalId: `own-${tag}`, name: `本企业${tag}` }],
-    }, partner)
-    if (own.created !== 1) fail('9c. enterprise_source 维护本企业应成功')
-    pass('9c. fair_organizer / enterprise_source 企业资料范围限制生效')
+    await expectStatus(
+      companies.partnerImport(orgEnt, {
+        items: [{ externalId: `own-${tag}`, name: `本企业${tag}` }],
+      }, partner),
+      403,
+      '9c. enterprise_source 已停放，连本企业也不得录入',
+    )
+    const parkedRows = await prisma.companyProfile.count({ where: { sourceOrgId: { in: [orgFair, orgEnt] } } })
+    if (parkedRows !== 0) fail(`9c. 停放机构的企业资料不应落库，实际 ${parkedRows} 条`)
+    pass('9c. fair_organizer / enterprise_source 已停放：企业资料写入一律 403 且不落库')
 
     // ── 10. 浏览/跳转闭环（company_profile）──────────────────
     const b = await activity.recordBrowse(userA, 'company_profile', companyId, null)
@@ -463,9 +471,30 @@ async function main() {
         sourceOrgId: orgA, externalId: `closed-${tag}`, sourceName: 'x', name: '关闭后不得建',
       } as never, admin), 403, '托管关闭时管理员代建企业被拒')
       pass('托管关闭时管理员代建企业被拒')
+      // 3.15：移除关联与关联同一道闸。先确保岗位确实挂在本企业上，否则 404「未关联」会冒充 403 通过。
+      await prisma.job.update({ where: { id: jobPub.id }, data: { companyProfileId: companyId } })
+      await expectStatus(companies.adminUnlinkJob(companyId, jobPub.id, admin), 403, '托管关闭时管理员移除岗位关联被拒')
+      const stillLinked = await prisma.job.findUnique({ where: { id: jobPub.id }, select: { companyProfileId: true } })
+      if (stillLinked?.companyProfileId !== companyId) fail('托管关闭时移除关联被拒后，岗位应仍关联本企业')
+      pass('托管关闭时管理员移除岗位关联被拒（403），关联保持不变')
     } finally {
       if (previousHosting === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
       else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previousHosting
+    }
+    // 对照：托管打开时同一次移除照常生效（证明上面的 403 来自托管闸，而不是别的前置条件）
+    {
+      const previous = process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+      process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+      try {
+        const unlinked = await companies.adminUnlinkJob(companyId, jobPub.id, admin)
+        if (!unlinked.unlinked) fail('托管打开时移除岗位关联应成功')
+        const after = await prisma.job.findUnique({ where: { id: jobPub.id }, select: { companyProfileId: true } })
+        if (after?.companyProfileId !== null) fail('托管打开时移除关联后岗位不应再挂本企业')
+        pass('对照：托管打开时移除岗位关联照常生效')
+      } finally {
+        if (previous === undefined) delete process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED
+        else process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = previous
+      }
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)

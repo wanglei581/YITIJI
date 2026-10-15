@@ -3,7 +3,7 @@
 //
 // 合规定位：本页是来源机构维护「企业展示资料」的数据后台，不是企业 HR 后台。
 // 只维护展示信息与本机构岗位的展示性关联；不涉及任何求职者数据。
-// 新增/编辑一律回 pending+draft，须管理员重新审核发布后终端才展示。
+// 新增/编辑一律回 pending+draft；3.15 起管理员侧审核发布停放，审核发布入口尚未开放，开放前终端不展示。
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
@@ -328,8 +328,8 @@ export default function CompaniesPage() {
         setNoticeIsError(false)
         setNotice(
           result.updated > 0
-            ? '该外部编号已存在,本次提交已更新原企业资料并回到待审核+草稿状态,须管理员重新审核发布。'
-            : '企业资料已录入,进入待审核+草稿状态;管理员审核通过并发布后,终端才会展示。',
+            ? '该外部编号已存在,本次提交已更新原企业资料并回到待审核+草稿状态;审核发布入口尚未开放（平台不代审、不代发）。'
+            : '企业资料已录入,进入待审核+草稿状态;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。',
         )
       } else if (editing) {
         const payload: UpdatePartnerCompanyInput = buildFields(form, initialForm)
@@ -337,7 +337,7 @@ export default function CompaniesPage() {
         if (jobIds.length > 0) payload.jobExternalIds = jobIds
         await partnerCompaniesService.updatePartnerCompany(editing.id, payload)
         setNoticeIsError(false)
-        setNotice('修改已保存。该企业资料已回到待审核+草稿状态,管理员重新审核发布前,终端不展示该企业。')
+        setNotice('修改已保存。该企业资料已回到待审核+草稿状态;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示该企业。')
       }
       setEditing(null)
       load()
@@ -358,7 +358,7 @@ export default function CompaniesPage() {
       if (updated) setCompanies((prev) => prev.map((c) => (c.id === company.id ? updated : c)))
       else load()
       setNoticeIsError(false)
-      setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交并由管理员审核发布。')
+      setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交；审核发布入口尚未开放（平台不代审、不代发），开放前不能重新上架。')
     } catch (e) {
       setNoticeIsError(true)
       setNotice(errMsg(e))
@@ -422,7 +422,7 @@ export default function CompaniesPage() {
       )}
 
       <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
-        企业资料新增/编辑后将回到待审核+草稿状态，须管理员重新审核发布后，终端才会展示。
+        企业资料新增/编辑后将回到待审核+草稿状态；审核发布入口尚未开放（平台不代审、不代发），开放并发布前终端不展示。
       </div>
 
       {/* 审核状态筛选 */}
@@ -539,8 +539,8 @@ export default function CompaniesPage() {
           {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
           <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
             {editing === 'new'
-              ? '提交后该企业资料进入待审核+草稿状态;管理员审核通过并发布后,终端才会展示。'
-              : '保存后该企业资料将回到待审核+草稿状态;管理员重新审核发布前,终端不展示该企业。外部编号与来源机构不可修改。'}
+              ? '提交后该企业资料进入待审核+草稿状态;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。'
+              : '保存后该企业资料将回到待审核+草稿状态;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示该企业。外部编号与来源机构不可修改。'}
           </p>
           {companyScope === 'fair_associated' && (
             <p className="rounded-lg border border-info/20 bg-info-bg px-3 py-2 text-xs text-info-fg">

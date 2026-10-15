@@ -48,6 +48,8 @@ function buildSingleEntryZip(content: Buffer, declaredExpandedSize: number): Buf
 }
 
 async function verifyConcurrentConfirm(): Promise<void> {
+  // 机构类型只是前置条件，本用例测的是并发确认。3.15 起 enterprise_source 已停放、不能导入，
+  // 这里改用仍可导入岗位且允许 excel + manual 的持证人力资源机构；停放类型被拒见 verifyParkedOrgConfirmRejected。
   let batchStatus = 'pending'
   let findCount = 0
   let releaseFinds = () => undefined
@@ -101,7 +103,7 @@ async function verifyConcurrentConfirm(): Promise<void> {
       findUnique: async () => ({
         id: 'org-1',
         name: '测试机构',
-        type: 'enterprise_source',
+        type: 'licensed_hr_agency',
         enabled: true,
       }),
     },
@@ -130,6 +132,35 @@ async function verifyConcurrentConfirm(): Promise<void> {
   assert(results.filter((result) => result.status === 'fulfilled').length === 1, '并发重复确认仅一次成功')
   assert(results.filter((result) => result.status === 'rejected').length === 1, '并发重复确认返回一次明确拒绝')
   assert(batchStatus === 'confirmed' && syncLogWrites === 1, '岗位、同步日志与批次状态在单事务中只写一次')
+}
+
+/** 3.15 停放：企业来源方的 Excel 岗位批次在确认时被能力矩阵拒绝，批次不动。停放前这条会导入成功。 */
+async function verifyParkedOrgConfirmRejected(): Promise<void> {
+  let batchWrites = 0
+  const service = new JobsExcelService({
+    importBatch: {
+      findUnique: async () => ({
+        id: 'parked-batch', sourceId: 'source-1', orgId: 'org-1', dataType: 'job', status: 'pending',
+        invalidRows: 0, dupRows: 0, mappingJson: '{}',
+        records: [{ mappedJson: JSON.stringify({ externalId: 'job-1', title: '测试', company: '示例', city: '青岛' }) }],
+      }),
+      updateMany: async () => { batchWrites += 1; return { count: 1 } },
+    },
+    organization: { findUnique: async () => ({ id: 'org-1', name: '停放企业', type: 'enterprise_source', enabled: true }) },
+    jobSource: {
+      findUnique: async () => ({ id: 'source-1', orgId: 'org-1', enabled: true, accessMode: 'excel', sourceKind: 'manual' }),
+    },
+    $transaction: async () => { batchWrites += 1 },
+  } as never, {} as never, {} as never)
+  let rejection: unknown
+  try {
+    await service.confirmExcelImport('parked-batch', { userId: 'partner-1', role: 'partner', orgId: 'org-1' } as never)
+  } catch (error) {
+    rejection = error
+  }
+  const response = (rejection as { getResponse?: () => unknown })?.getResponse?.() as { error?: { code?: string } } | undefined
+  assert(response?.error?.code === 'PARTNER_CAPABILITY_DENIED', '停放的企业来源方确认 Excel 岗位批次被拒（PARTNER_CAPABILITY_DENIED）')
+  assert(batchWrites === 0, '停放类型被拒时不写批次、不开事务')
 }
 
 async function verifyEmptyBatchRejected(): Promise<void> {
@@ -215,6 +246,7 @@ async function main(): Promise<void> {
   assert(sourceView.lastSyncTime !== '从未同步', '数据源最近同步时间来自事务维护的来源状态')
   await verifyEmptyBatchRejected()
   await verifyConcurrentConfirm()
+  await verifyParkedOrgConfirmRejected()
   await verifyExcelPreviewRules()
   verifyExcelModalCopy()
 

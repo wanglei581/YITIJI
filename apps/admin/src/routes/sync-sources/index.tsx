@@ -1,84 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
-import { API_BASE_URL, API_MODE, ApiHttpError } from '../../services/api/client'
-import { authHeader, redirectToLogin } from '../../services/auth'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { RefreshCwIcon } from 'lucide-react'
+import { API_MODE } from '../../services/api/client'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { CircuitBreakDialog, type CircuitBreakTarget } from '../components/recruitment/CircuitBreakDialog'
+import { fetchApiSources, type ApiSyncSourceItem } from './syncSourcesApi'
 
-/**
- * 统一鉴权 fetch:带 Bearer(authHeader)+ credentials,401 走全局 redirectToLogin。
- * 与其余 adapter 的鉴权机制保持一致(MEDIUM:此前仅 credentials:'include' 不带 Bearer,
- * 后端校验 Bearer 时会 401)。
- */
-async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: { Accept: 'application/json', ...authHeader(), ...(init.headers ?? {}) },
-  })
-  if (res.status === 401) {
-    redirectToLogin()
-    throw new ApiHttpError('AUTH_REQUIRED', '登录已过期', 401)
-  }
-  return res
-}
-
-async function throwIfNotOk(res: Response): Promise<void> {
-  if (res.ok) return
-  let code = `HTTP_${res.status}`
-  let message = `请求失败（${res.status}）`
-  try {
-    const body = (await res.json()) as { error?: { code?: string; message?: string } }
-    if (body.error?.code) code = body.error.code
-    if (body.error?.message) message = body.error.message
-  } catch {
-    /* 非 JSON */
-  }
-  throw new ApiHttpError(code, message, res.status)
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ApiSyncSourceItem {
-  id: string
-  name: string
-  orgId: string
-  orgName: string
-  sourceKind: string
-  accessMode: string
-  syncFreq: string
-  enabled: boolean
-  archived: boolean
-  lastSyncAt: string | null
-  lastSyncStatus: string | null
-  hasEndpoint: boolean
-  hasCredential: boolean
-  hasResponseConfig: boolean
-}
-
-interface SourceImpact {
-  content: {
-    jobs: { total: number; published: number }
-    fairs: { total: number; published: number }
-  }
-}
-
-type TriggerState = 'idle' | 'loading' | 'ok' | 'error'
-
-interface FieldMapping {
-  std: string
-  src: string
-}
-
-interface ConfigDraft {
-  dataType: 'job' | 'fair'
-  rootPath: string
-  fields: FieldMapping[]
-}
+// 3.15：本平台不代为同步、启停或配置机构的数据来源。字段映射、立即同步、停用 / 审批启用、
+// 批量下架内容四个写操作不论托管开关一律停放在 SyncSourceWriteActions.tsx（不被 import），
+// 本页只留查看与「按来源熔断」。
 
 const FREQ_LABELS: Record<string, string> = {
   manual:  '手动',
@@ -93,75 +25,7 @@ const STATUS_BADGE: Record<string, 'success' | 'error' | 'warning' | 'default'> 
   failed:  'error',
 }
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
-
-const MOCK_SOURCES: ApiSyncSourceItem[] = [
-  {
-    id: 'mock-src-1',
-    name: '示例岗位 API 数据源',
-    orgId: 'org-1',
-    orgName: '演示机构',
-    sourceKind: 'aggregator',
-    accessMode: 'api',
-    syncFreq: 'hourly',
-    enabled: true,
-    archived: false,
-    lastSyncAt: null,
-    lastSyncStatus: null,
-    hasEndpoint: true,
-    hasCredential: true,
-    hasResponseConfig: false,
-  },
-]
-
-async function fetchApiSources(): Promise<ApiSyncSourceItem[]> {
-  if (API_MODE !== 'http') return MOCK_SOURCES
-  const res = await authFetch('/admin/job-sync/sources')
-  await throwIfNotOk(res)
-  const body = (await res.json()) as { data: ApiSyncSourceItem[] }
-  return body.data ?? []
-}
-
-async function triggerApiSync(sourceId: string): Promise<void> {
-  if (API_MODE !== 'http') {
-    await new Promise((r) => setTimeout(r, 800))
-    return
-  }
-  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/trigger`, {
-    method: 'POST',
-  })
-  await throwIfNotOk(res)
-}
-
-async function setSourceEnabled(sourceId: string, enabled: boolean): Promise<void> {
-  if (API_MODE !== 'http') return
-  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/enabled`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled }),
-  })
-  await throwIfNotOk(res)
-}
-
-async function fetchSourceImpact(sourceId: string): Promise<SourceImpact> {
-  if (API_MODE !== 'http') {
-    return { content: { jobs: { total: 3, published: 2 }, fairs: { total: 1, published: 1 } } }
-  }
-  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/impact`)
-  await throwIfNotOk(res)
-  const body = await res.json() as { data: SourceImpact }
-  return body.data
-}
-
-async function unpublishSourceContent(sourceId: string): Promise<void> {
-  if (API_MODE !== 'http') return
-  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/unpublish-content`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirmation: 'UNPUBLISH_SOURCE_CONTENT' }),
-  })
-  await throwIfNotOk(res)
-}
+const SUBTITLE = '查看各机构的数据来源通道；本平台不代为同步、启停或配置，应急时按来源熔断'
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -169,15 +33,8 @@ export default function SyncSourcesPage() {
   const [sources,      setSources]      = useState<ApiSyncSourceItem[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
-  const [triggers,     setTriggers]     = useState<Record<string, TriggerState>>({})
-  const [configSrc,    setConfigSrc]    = useState<ApiSyncSourceItem | null>(null)
-  const [configDraft,  setConfigDraft]  = useState<ConfigDraft | null>(null)
-  const [configSaving, setConfigSaving] = useState(false)
-  const [configErr,    setConfigErr]    = useState<string | null>(null)
-  const [sourceActionId, setSourceActionId] = useState<string | null>(null)
-  const [sourceActionError, setSourceActionError] = useState<{ id: string; message: string } | null>(null)
   const [circuitTarget, setCircuitTarget] = useState<CircuitBreakTarget | null>(null)
-  // 托管关闭（我们云上默认）时同步、启停、映射、批量下架都会 403，只留查看与按来源熔断。
+  // 开关只用于顶部说明；写操作不论开关一律停放（见文件头）。
   const hosting = useRecruitmentHosting()
 
   const load = useCallback(() => {
@@ -191,119 +48,9 @@ export default function SyncSourcesPage() {
 
   useEffect(() => { load() }, [load])
 
-  const openConfig = async (src: ApiSyncSourceItem) => {
-    // Bug 1 fix: reset stale draft and error BEFORE opening the drawer,
-    // so the drawer never briefly shows the previous source's data.
-    setConfigDraft(null)
-    setConfigErr(null)
-    setConfigSrc(src)
-    if (API_MODE !== 'http') {
-      setConfigDraft({ dataType: 'job', rootPath: '', fields: [] })
-      return
-    }
-    try {
-      const res = await authFetch('/admin/job-sync/sources/' + src.id)
-      await throwIfNotOk(res)
-      const body = (await res.json()) as { data?: { responseConfig?: { dataType?: string; rootPath?: string; fields?: Record<string, string> } } }
-      const rc = body.data?.responseConfig
-      setConfigDraft({
-        dataType: (rc?.dataType === 'fair' ? 'fair' : 'job') as 'job' | 'fair',
-        rootPath: rc?.rootPath ?? '',
-        fields: rc?.fields ? Object.entries(rc.fields).map(([std, src]) => ({ std, src })) : [],
-      })
-    } catch {
-      // Bug 2 fix: do NOT silently fall back to an empty draft (that risks
-      // overwriting real mappings on save). Surface the error instead.
-      setConfigErr('配置加载失败，请关闭后重试')
-    }
-  }
-
-  const saveConfig = async () => {
-    if (!configSrc || !configDraft) return
-    setConfigSaving(true)
-    setConfigErr(null)
-    const dto = {
-      dataType: configDraft.dataType,
-      rootPath: configDraft.rootPath || undefined,
-      fields: configDraft.fields.length
-        ? Object.fromEntries(configDraft.fields.filter((f) => f.std && f.src).map((f) => [f.std, f.src]))
-        : undefined,
-    }
-    try {
-      if (API_MODE !== 'http') {
-        await new Promise((r) => setTimeout(r, 600))
-      } else {
-        const res = await authFetch('/admin/job-sync/sources/' + configSrc.id + '/response-config', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dto),
-        })
-        await throwIfNotOk(res)
-      }
-      setConfigSrc(null)
-      load()
-    } catch (e) {
-      setConfigErr(userMessageOf(e, '保存失败，请稍后重试'))
-    } finally {
-      setConfigSaving(false)
-    }
-  }
-
-  const handleTrigger = async (sourceId: string) => {
-    setTriggers((prev) => ({ ...prev, [sourceId]: 'loading' }))
-    setSourceActionError(null)
-    try {
-      await triggerApiSync(sourceId)
-      setTriggers((prev) => ({ ...prev, [sourceId]: 'ok' }))
-      setTimeout(() => setTriggers((prev) => ({ ...prev, [sourceId]: 'idle' })), 3000)
-    } catch (e) {
-      setTriggers((prev) => ({ ...prev, [sourceId]: 'error' }))
-      setSourceActionError({ id: sourceId, message: userMessageOf(e, '触发同步失败，请查看原因后重试') })
-      setTimeout(() => setTriggers((prev) => ({ ...prev, [sourceId]: 'idle' })), 4000)
-    }
-  }
-
-  const handleEnabled = async (source: ApiSyncSourceItem) => {
-    if (source.archived) return
-    setSourceActionId(source.id)
-    setSourceActionError(null)
-    try {
-      await setSourceEnabled(source.id, !source.enabled)
-      load()
-    } catch (e) {
-      setSourceActionError({ id: source.id, message: userMessageOf(e, '启停失败，请查看原因后重试') })
-    } finally {
-      setSourceActionId(null)
-    }
-  }
-
-  const handleBulkUnpublish = async (source: ApiSyncSourceItem) => {
-    setSourceActionId(source.id)
-    setSourceActionError(null)
-    try {
-      const impact = await fetchSourceImpact(source.id)
-      const published = impact.content.jobs.published + impact.content.fairs.published
-      if (published === 0) {
-        window.alert('该来源当前没有已发布岗位或招聘会。')
-        return
-      }
-      const confirmed = window.confirm(
-        `将下架 ${impact.content.jobs.published} 个岗位和 ${impact.content.fairs.published} 场招聘会。` +
-        '数据与审计记录会保留；此操作与“停用来源”相互独立。确认继续？',
-      )
-      if (!confirmed) return
-      await unpublishSourceContent(source.id)
-      load()
-    } catch (e) {
-      setSourceActionError({ id: source.id, message: userMessageOf(e, '批量下架失败，请稍后重试') })
-    } finally {
-      setSourceActionId(null)
-    }
-  }
-
   if (loading) {
     return (
-      <Page title="数据接入通道" subtitle="统一管理来源启停、同步配置和已发布内容影响">
+      <Page title="数据接入通道" subtitle={SUBTITLE}>
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -313,7 +60,7 @@ export default function SyncSourcesPage() {
 
   if (error) {
     return (
-      <Page title="数据接入通道" subtitle="统一管理来源启停、同步配置和已发布内容影响">
+      <Page title="数据接入通道" subtitle={SUBTITLE}>
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <RefreshCwIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -328,7 +75,7 @@ export default function SyncSourcesPage() {
   return (
     <Page
       title="数据接入通道"
-      subtitle="API/Webhook 由管理员审批启用；停用通道不会自动下架既有内容"
+      subtitle={SUBTITLE}
       actions={
         <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
@@ -337,14 +84,10 @@ export default function SyncSourcesPage() {
     >
       <RecruitmentHostingNotice
         hosting={hosting}
-        detail="数据源不再同步、启停或配置字段映射，本页只保留查看与按来源熔断。熔断是单向操作，提交后不能撤销，并会自动通知受影响的机构。"
+        detail="一体机与小程序不展示机构导入的岗位与招聘会。本平台不代为同步、启停或配置数据来源，本页只保留查看与按来源熔断。熔断是单向操作，提交后不能撤销，并会自动通知受影响的机构。"
       />
-      {/* 说明 */}
-      {hosting.writable && (
-        <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-          停用通道只停止后续 API 拉取、Webhook 接收或文件使用，既有已发布内容保持不变；如需下架，请使用独立的“批量下架内容”操作。
-          {API_MODE !== 'http' && <span className="ml-2 font-medium text-info">（当前为 mock 模式，触发操作仅模拟）</span>}
-        </div>
+      {API_MODE !== 'http' && (
+        <p className="mb-4 text-xs text-neutral-400">当前为 mock 模式，列表为演示数据。</p>
       )}
 
       <Card className="overflow-hidden p-0">
@@ -371,7 +114,6 @@ export default function SyncSourcesPage() {
                 </tr>
               ) : (
                 sources.map((s) => {
-                  const trigState = triggers[s.id] ?? 'idle'
                   return (
                     <tr key={s.id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
@@ -416,47 +158,6 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          {hosting.writable && (
-                            <>
-                              {s.accessMode === 'api' && <button
-                                onClick={() => openConfig(s)}
-                                className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                              >
-                                <SettingsIcon className="h-3 w-3" />
-                                mappings
-                              </button>}
-                              {s.accessMode === 'api' && <button
-                                disabled={trigState === 'loading' || s.archived || !s.enabled || !s.hasEndpoint}
-                                onClick={() => handleTrigger(s.id)}
-                                className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                                  trigState === 'ok'    ? 'bg-success-bg text-success-fg' :
-                                  trigState === 'error' ? 'bg-error-bg text-error-fg' :
-                                  'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                                }`}
-                                title={s.archived ? '数据源已归档' : !s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
-                              >
-                                <PlayIcon className="h-3 w-3" />
-                                {trigState === 'loading' ? '触发中…' :
-                                 trigState === 'ok'      ? '已入队' :
-                                 trigState === 'error'   ? '触发失败' :
-                                 '立即同步'}
-                              </button>}
-                              <button
-                                disabled={s.archived || sourceActionId === s.id}
-                                onClick={() => void handleEnabled(s)}
-                                className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
-                              >
-                                {s.archived ? '已归档' : s.enabled ? '停用通道' : '审批并启用'}
-                              </button>
-                              <button
-                                disabled={sourceActionId === s.id}
-                                onClick={() => void handleBulkUnpublish(s)}
-                                className="rounded px-2.5 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
-                              >
-                                批量下架内容
-                              </button>
-                            </>
-                          )}
                           <button
                             type="button"
                             onClick={() => setCircuitTarget({ scope: 'source', id: s.id, name: s.name, orgName: s.orgName })}
@@ -464,9 +165,6 @@ export default function SyncSourcesPage() {
                           >
                             按来源熔断
                           </button>
-                          {sourceActionError?.id === s.id && (
-                            <span className="max-w-[16rem] text-xs text-error-fg">{sourceActionError.message}。请修正后重试。</span>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -478,110 +176,8 @@ export default function SyncSourcesPage() {
         </div>
       </Card>
 
-      {configSrc && (
-        <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setConfigSrc(null)} />
-      )}
-      {configSrc && (
-        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
-            <p className="text-sm font-semibold text-neutral-800">Configure response mapping</p>
-            <button onClick={() => setConfigSrc(null)} className="rounded p-1 hover:bg-neutral-100 text-neutral-400">x</button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            {/* Bug 1: configDraft === null means load is in-flight — show spinner */}
-            {configDraft === null && !configErr && (
-              <LoadingState text="加载配置中…" className="py-8" />
-            )}
-            {/* Bug 2: load failed — show error, never render the editable form */}
-            {configDraft === null && configErr && (
-              <div className="rounded-lg border border-error/20 bg-error-bg px-4 py-3 text-sm text-error-fg">
-                {configErr}
-              </div>
-            )}
-            {configDraft !== null && (
-              <>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-600">Data type</label>
-                  <select
-                    value={configDraft.dataType}
-                    onChange={(e) => setConfigDraft((d) => d ? { ...d, dataType: e.target.value as 'job' | 'fair' } : d)}
-                    className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
-                  >
-                    <option value="job">Job (岗位)</option>
-                    <option value="fair">Job fair (招聘会)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-600">Root path (e.g. data.items)</label>
-                  <input
-                    value={configDraft.rootPath}
-                    onChange={(e) => setConfigDraft((d) => d ? { ...d, rootPath: e.target.value } : d)}
-                    placeholder="Leave empty for auto-detect"
-                    className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
-                  />
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-neutral-600">Field mappings (standard -&gt; source field)</span>
-                    <button
-                      onClick={() => setConfigDraft((d) => d ? { ...d, fields: [...d.fields, { std: '', src: '' }] } : d)}
-                      className="rounded px-2 py-1 text-xs text-primary-600 hover:bg-primary-50"
-                    >
-                      + Add
-                    </button>
-                  </div>
-                  {configDraft.fields.map((f, i) => (
-                    <div key={i} className="mb-2 flex items-center gap-2">
-                      <input
-                        value={f.std}
-                        placeholder="standard field"
-                        onChange={(e) => setConfigDraft((d) => d ? { ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, std: e.target.value } : ff) } : d)}
-                        className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
-                      />
-                      <span className="text-neutral-400">-&gt;</span>
-                      <input
-                        value={f.src}
-                        placeholder="source field"
-                        onChange={(e) => setConfigDraft((d) => d ? { ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, src: e.target.value } : ff) } : d)}
-                        className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
-                      />
-                      <button
-                        onClick={() => setConfigDraft((d) => d ? { ...d, fields: d.fields.filter((_, ii) => ii !== i) } : d)}
-                        className="text-xs text-error-fg hover:text-error-fg"
-                      >
-                        Del
-                      </button>
-                    </div>
-                  ))}
-                  {configDraft.fields.length === 0 && (
-                    <p className="text-xs text-neutral-400">No mappings - auto-detect mode</p>
-                  )}
-                </div>
-                {configErr && <p className="text-xs text-error-fg">{configErr}</p>}
-              </>
-            )}
-          </div>
-          <div className="border-t border-neutral-100 px-5 py-3 flex justify-end gap-2">
-            <button onClick={() => setConfigSrc(null)} className="rounded px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100">
-              Cancel
-            </button>
-            {/* Hide Save when draft is null (loading in-flight or load failed) to prevent accidental overwrites */}
-            {configDraft !== null && (
-              <button
-                onClick={saveConfig}
-                disabled={configSaving}
-                className="rounded bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50"
-              >
-                {configSaving ? 'Saving...' : 'Save'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       <p className="mt-3 text-xs text-neutral-400">
-        所有操作写入审计。批量下架只改变岗位/招聘会发布状态，不删除来源、内容或历史记录。
-        「按来源熔断」是应急处置：停用该来源，并把它导入的内容全部下架锁定，不可撤销，会通知所属机构。
+        「按来源熔断」是应急处置：停用该来源，并把它导入的内容全部下架锁定，不可撤销，写入审计，并会通知所属机构。
       </p>
 
       <CircuitBreakDialog target={circuitTarget} onClose={() => setCircuitTarget(null)} onDone={load} />

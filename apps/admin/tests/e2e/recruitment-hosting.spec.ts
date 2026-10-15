@@ -6,6 +6,10 @@ import { openAuthed, settleAdminPage } from './helpers/open'
 /**
  * 3.13 招聘内容托管开关 × 管理员招聘类页面（mock 口径）。
  *
+ * 3.15 起管理员侧的审核、发布、代建、代改、同步控件**不论托管开关一律停放**（源码在各页的停放文件里，
+ * 不再挂载）。所以「托管打开」一组不再断言「原有控件保留」，而是断言它们同样不存在、只留查看与紧急下架；
+ * 线下机构整页停放，旧地址重定向到合作机构管理。
+ *
  * 托管状态由 mock 适配器读 localStorage['mock:recruitment-hosting']：'off' 我们云上默认关闭，
  * 'on' 私有化部署（b）打开，'error' 模拟读取失败（页面应按关闭处理）。
  * localStorage['mock:recruitment-emergency'] = 'fail' 让下架 / 熔断按服务端「已被紧急下架」拒绝。
@@ -154,7 +158,7 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
     await expect(page.getByRole('dialog', { name: '紧急下架招聘会资料' })).toBeVisible()
   })
 
-  test('企业展示与线下机构：不新增、不编辑，空态如实说明只读', async ({ page }) => {
+  test('企业展示不新增、不编辑；线下机构整页停放，旧地址转到合作机构', async ({ page }) => {
     await openAs(page, '/companies', 'off')
     await expect(page.getByText(HOSTING_OFF_NOTICE)).toBeVisible()
     await expect(page.getByText('当前只读：只能查看与紧急下架。')).toBeVisible()
@@ -162,10 +166,9 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
     await shot(page, 'companies-hosting-off')
 
     await openAs(page, '/offline-agencies', 'off')
-    await expect(page.getByText(HOSTING_OFF_NOTICE)).toBeVisible()
-    await expect(page.getByText('当前只读：只能查看与紧急下架')).toBeVisible()
+    await expect(page).toHaveURL(/\/partners$/)
+    await expect(page.getByRole('heading', { name: '合作机构管理' })).toBeVisible()
     await expectAbsent(page, ['新建机构'])
-    await shot(page, 'offline-agencies-hosting-off')
   })
 
   test('Excel 导入记录：导入已停止的说明与处置去向', async ({ page }) => {
@@ -240,25 +243,20 @@ test.describe('托管状态读不到：按关闭处理并说明', () => {
   })
 })
 
-test.describe('托管打开（私有化部署 b）：原有控件保留，另加紧急下架', () => {
-  test('岗位信息源：审核 / 发布 / 下架 / 批量发布都在，每行另有紧急下架', async ({ page }) => {
+test.describe('托管打开（私有化部署 b）：管理员同样不代审代发，只留查看、紧急下架与熔断', () => {
+  test('岗位 / 招聘会 / 政策信息源：没有审核发布与批量发布，每行有紧急下架', async ({ page }) => {
     await openAs(page, '/job-sources', 'on')
-    await expect(page.getByRole('row', { name: /UI 设计师/ }).getByRole('button', { name: '审核通过', exact: true })).toBeVisible()
-    await expect(page.getByRole('row', { name: /行政专员/ }).getByRole('button', { name: '发布', exact: true })).toBeVisible()
     const published = page.getByRole('row', { name: /前端开发工程师/ })
-    await expect(published.getByRole('button', { name: '下架', exact: true })).toBeVisible()
     await expect(published.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '批量发布', exact: true })).toBeVisible()
+    await expectAbsent(page, REVIEW_PUBLISH)
+    await expect(page.getByText('本平台不代审、不代发招聘内容').first()).toBeVisible()
     await expect(page.getByText(HOSTING_OFF_NOTICE)).toHaveCount(0)
     await shot(page, 'job-sources-hosting-on')
-  })
 
-  test('招聘会信息源与政策信息源', async ({ page }) => {
     await openAs(page, '/fair-sources', 'on')
     const fair = page.getByRole('row', { name: /2026年春季大型招聘会/ })
-    await expect(fair.getByRole('button', { name: '下架', exact: true })).toBeVisible()
     await expect(fair.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '批量发布', exact: true })).toBeVisible()
+    await expectAbsent(page, REVIEW_PUBLISH)
     await shot(page, 'fair-sources-hosting-on')
 
     await openAs(page, '/policy-sources', 'on')
@@ -267,65 +265,46 @@ test.describe('托管打开（私有化部署 b）：原有控件保留，另加
     await shot(page, 'policy-sources-hosting-on')
   })
 
-  test('招聘会管理：编辑与各页签写入照旧，另有紧急下架', async ({ page }) => {
+  test('招聘会管理：同样只读，基本信息与资料可紧急下架', async ({ page }) => {
     await openAs(page, '/fairs', 'on')
-    await expect(page.getByRole('button', { name: '编辑基本信息' })).toBeVisible()
     await expect(page.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: '新增企业' })).toBeVisible()
+    await expectAbsent(page, ['编辑基本信息', '新增企业'])
     await shot(page, 'fairs-hosting-on')
     await page.getByRole('button', { name: '活动资料' }).click()
     const material = page.getByRole('row', { name: /活动日程/ })
-    await expect(page.getByRole('button', { name: '上传资料' })).toBeVisible()
     await expect(material.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
+    await expectAbsent(page, ['上传资料', '发布', '下架'])
     await shot(page, 'fairs-materials-hosting-on')
   })
 
-  test('企业展示：新增照旧，新建的企业行上有管理与紧急下架', async ({ page }) => {
+  test('企业展示：没有新增企业；线下机构旧地址转到合作机构', async ({ page }) => {
     await openAs(page, '/companies', 'on')
-    await page.getByRole('button', { name: '新增企业' }).click()
-    const orgSelect = page.getByRole('combobox', { name: /来源机构/ }).first()
-    await expect(orgSelect).toBeEnabled({ timeout: 10_000 })
-    await orgSelect.selectOption({ index: 1 })
-    await page.getByRole('textbox', { name: /外部编号/ }).fill('EXT-E2E-HOSTING-001')
-    await page.getByRole('textbox', { name: '企业名称*' }).fill('青岛演示科技有限公司')
-    await page.getByRole('button', { name: '创建（待审核）' }).click()
-    const row = page.getByRole('row', { name: /青岛演示科技有限公司/ })
-    await expect(row.getByRole('button', { name: '管理', exact: true })).toBeVisible()
-    await expect(row.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
-    await page.keyboard.press('Escape')
+    await expect(page.getByText('当前只读：只能查看与紧急下架。')).toBeVisible()
+    await expectAbsent(page, ['新增企业'])
     await shot(page, 'companies-hosting-on')
-    await row.getByRole('button', { name: '紧急下架', exact: true }).click()
-    await expect(page.getByRole('dialog', { name: '紧急下架企业资料' })).toBeVisible()
-  })
 
-  test('线下机构：新建照旧，行上有编辑 / 审核 / 删除与紧急下架', async ({ page }) => {
     await openAs(page, '/offline-agencies', 'on')
-    await page.getByRole('button', { name: '新建机构' }).click()
-    await page.getByRole('textbox', { name: '机构名称*', exact: true }).fill('市南区就业服务站（演示）')
-    await page.getByRole('textbox', { name: '地址*', exact: true }).fill('青岛市市南区演示路 1 号')
-    await page.getByRole('button', { name: '创建' }).click()
-    const row = page.getByRole('row', { name: /市南区就业服务站/ })
-    await expect(row.getByRole('button', { name: '编辑', exact: true })).toBeVisible()
-    await expect(row.getByRole('button', { name: '审核', exact: true })).toBeVisible()
-    await expect(row.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
-    await shot(page, 'offline-agencies-hosting-on')
+    await expect(page).toHaveURL(/\/partners$/)
+    await expectAbsent(page, ['新建机构'])
   })
 
   test('数据接入通道与导入记录', async ({ page }) => {
     await openAs(page, '/sync-sources', 'on')
-    await expect(page.getByRole('button', { name: '批量下架内容' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /立即同步/ })).toBeVisible()
     await expect(page.getByRole('button', { name: '按来源熔断', exact: true })).toBeVisible()
+    await expectAbsent(page, ['mappings', '审批并启用', '停用通道', '批量下架内容'])
+    await expect(page.getByRole('button', { name: /立即同步/ })).toHaveCount(0)
     await shot(page, 'sync-sources-hosting-on')
 
     await openAs(page, '/import-batches', 'on')
-    await expect(page.getByText(/确认后进入审核队列/)).toBeVisible()
+    await expect(page.getByText(/本平台不代审、不代发/).first()).toBeVisible()
+    await expect(page.getByText(/确认后进入审核队列/)).toHaveCount(0)
     await expect(page.getByText(HOSTING_OFF_NOTICE)).toHaveCount(0)
     await shot(page, 'import-batches-hosting-on')
 
     await openAs(page, '/partners', 'on')
     await page.getByRole('button', { name: '详情/账号' }).first().click()
     await expect(page.getByRole('region', { name: '按机构熔断' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '资质核验' })).toBeVisible()
     await shot(page, 'partners-drawer-hosting-on')
   })
 })

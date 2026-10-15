@@ -2,14 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { recruitmentEmergencyService } from '../../../services/api/recruitmentEmergency'
 
 /**
- * 招聘内容托管开关（3.13），管理员招聘类页面共用。
+ * 招聘内容托管开关（3.13），管理员后台读它来决定说法与少数只读展示。
  *
- * - ready + enabled=false：我们云上的默认。审核 / 发布 / 新建 / 编辑 / 导入 / 同步
- *   一律不显示（点了也只会 403 RECRUITMENT_HOSTING_DISABLED），只留查看与紧急下架。
- * - ready + enabled=true：私有化部署（b）。既有控件照旧，另加紧急下架。
- * - loading / error：按关闭处理（fail-closed）。管理员侧的写按钮本身就是要收掉的风险面，
- *   开关没读到时宁可少给按钮，也不能给出一排点了就 403 的「审核通过 / 发布」。
- *   紧急下架不受影响。
+ * 3.15 起管理员对岗位 / 招聘会 / 企业 / 线下机构的审核、发布、新建、编辑、导入、同步控件
+ * **不论开关一律停放**（源码保留在各页的停放文件里，不再挂载），`writable` 因此不再用来显示写按钮，
+ * 只留给停放文件在私有化部署（b）恢复时使用。
+ *
+ * - ready + enabled=false：我们云上的默认。一体机与小程序不展示招聘类内容。
+ * - ready + enabled=true：私有化部署（b）。
+ * - loading / error：按关闭处理（fail-closed）。
  *
  * 开关是部署级环境变量，运行期不会变，所以一次页面生命周期里只请求一次；失败后下次挂载重试。
  */
