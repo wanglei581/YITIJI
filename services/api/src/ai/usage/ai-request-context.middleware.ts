@@ -24,6 +24,14 @@ export class AiRequestContextMiddleware implements NestMiddleware {
   use(req: Request, _res: Response, next: NextFunction): void {
     const headers = req.headers
     const deps = { jwt: this.jwt, redis: this.redis, prisma: this.prisma, terminalSessions: this.terminalSessions }
-    runWithAiRequestContext(lazyAiRequestContext(() => resolveAiCaller(headers, deps)), () => next())
+    const context = lazyAiRequestContext(() => resolveAiCaller(headers, deps))
+    const raw = headers['x-terminal-id']
+    const value = Array.isArray(raw) ? raw[0] : raw
+    if (typeof value === 'string') {
+      // eslint-disable-next-line no-control-regex -- 刻意匹配控制字符以剔除
+      const cleaned = value.replace(new RegExp('[\\u0000-\\u001f\\u007f]', 'g'), '').trim().slice(0, 64)
+      if (cleaned) context.terminalCode = cleaned
+    }
+    runWithAiRequestContext(context, () => next())
   }
 }

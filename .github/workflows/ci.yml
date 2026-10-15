@@ -738,6 +738,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
           pnpm --filter @ai-job-print/api verify:ai-content-moderation
+          pnpm --filter @ai-job-print/api verify:ai-safety-lexicon
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:legal-doc-version

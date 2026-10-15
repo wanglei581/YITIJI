@@ -1,3 +1,5 @@
+import { REFUSAL_BASE, REFUSAL_C2, REFUSAL_DANGER } from '../ai/safety/refusal'
+
 /**
  * 失败原因的**对外白名单**：内部机器码 → 用户看得懂的一句话。
  *
@@ -83,6 +85,9 @@ const FAILURE_REASONS: Readonly<Record<string, string>> = Object.freeze({
     '上一次分析被中断且无法继续，请重新发起。',
   CONTRACT_REVIEW_SAFETY_REJECTED:
     'AI 给出的结果未通过安全检查，已丢弃，请重试。',
+  CONTRACT_REVIEW_CONTENT_BLOCKED: REFUSAL_BASE,
+  CONTRACT_REVIEW_CONTENT_BLOCKED_DANGER: `${REFUSAL_BASE}${REFUSAL_DANGER}`,
+  CONTRACT_REVIEW_CONTENT_BLOCKED_C2: `${REFUSAL_BASE}${REFUSAL_C2}`,
 
   // ── 任务一致性 ────────────────────────────────────────────────────────────
   CONTRACT_REVIEW_SOURCE_CHANGED:

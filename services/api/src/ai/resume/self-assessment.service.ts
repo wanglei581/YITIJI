@@ -222,7 +222,7 @@ export class SelfAssessmentService {
         })
         if (llmResult.status === 'rejected') {
           dimensions = scored.dimensions.map((d) => ({ ...d, note: null }))
-          summary = null
+          summary = llmResult.summary
           providerName = LLM_UNAVAILABLE_PROVIDER
           aiUnavailableReason = 'COMPLIANCE_REJECT'
           llmErrorCode = 'COMPLIANCE_REJECT'

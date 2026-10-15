@@ -1,4 +1,7 @@
 import { appendAiSafetySentences } from './ai-prompt-safety'
+import { recordSafetyBlock } from '../safety/block-log'
+import { matchLexicon } from '../safety/matcher'
+import { REFUSAL_BASE } from '../safety/refusal'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 
 export const DEFAULT_ROLE_SCOPE =
@@ -38,7 +41,7 @@ export interface ContentModerationProvider {
   inspectOutput(text: string, forbiddenWords?: readonly string[]): ModerationMatch | null
 }
 
-export interface ModerationMatch { category: string; word: string }
+export interface ModerationMatch { category: string }
 
 /** 本地内容检查命中；故意不携带命中词或原文。 */
 export class AiContentBlockedError extends Error {
@@ -102,21 +105,27 @@ export function containsForbiddenWord(text: string, forbiddenWords: readonly str
 function firstMatch(text: string, words: readonly string[] | undefined): ModerationMatch | null {
   const normalized = normalizeForMatch(text)
   const word = normalizeForbiddenWords(words).find((candidate) => normalized.includes(normalizeForMatch(candidate)))
-  return word ? { category: 'forbidden_word', word: word.slice(0, 32) } : null
+  return word ? { category: 'forbidden_word' } : null
+}
+
+function inspect(text: string, forbiddenWords?: readonly string[]): ModerationMatch | null {
+  const lexicon = matchLexicon(text)
+  if (lexicon) return { category: lexicon.category }
+  return firstMatch(text, configuredForbiddenWords(forbiddenWords))
 }
 
 export class LocalContentModerationProvider implements ContentModerationProvider {
   inspectInput(text: string, forbiddenWords?: readonly string[]): ModerationMatch | null {
-    return firstMatch(text, configuredForbiddenWords(forbiddenWords))
+    return inspect(text, forbiddenWords)
   }
   inspectOutput(text: string, forbiddenWords?: readonly string[]): ModerationMatch | null {
-    return firstMatch(text, configuredForbiddenWords(forbiddenWords))
+    return inspect(text, forbiddenWords)
   }
 }
 
 export const contentModerationProvider: ContentModerationProvider = new LocalContentModerationProvider()
 
-export const AI_CONTENT_BLOCKED_MESSAGE = '这个问题我不能回答'
+export const AI_CONTENT_BLOCKED_MESSAGE = REFUSAL_BASE
 
 export function assertContentAllowed(
   text: string,
@@ -128,16 +137,11 @@ export function assertContentAllowed(
     ? contentModerationProvider.inspectInput(text, forbiddenWords)
     : contentModerationProvider.inspectOutput(text, forbiddenWords)
   if (!match) return
-  // Deliberately metadata only: never include the matched text or source text.
-  console.warn(JSON.stringify({
-    action: 'ai.content_blocked',
-    direction,
+  recordSafetyBlock({
     feature: meta.feature ?? 'unknown',
     category: match.category,
-    terminal: meta.terminalId ? 'bound' : 'none',
-    member: meta.memberId ? 'bound' : 'none',
-    at: new Date().toISOString(),
-  }))
+    position: direction,
+  })
   throw new AiContentBlockedError(direction, meta.feature ?? 'unknown', match.category)
 }
 

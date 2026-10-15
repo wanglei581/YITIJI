@@ -1,5 +1,6 @@
 import { AiContentBlockedError } from '../ai/llm/llm-guard'
-import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
+import { contentBlockedException } from '../ai/safety/content-blocked'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import { LLM_BUSY_MESSAGE, LlmBusyError, LlmTimeoutError, llmFetchJson } from '../ai/llm/llm-http'
 import { deepseekThinkingOff } from '../ai/llm/deepseek-thinking'
@@ -212,7 +213,7 @@ export class JobAiLlmService {
         tokenUsage: normalizeTokenUsage(data?.usage),
       }
     } catch (error) {
-      if (error instanceof AiContentBlockedError) throw new BadRequestException({ error: { code: 'AI_CONTENT_BLOCKED', message: '这个问题我不能回答' } })
+      if (error instanceof AiContentBlockedError) throw contentBlockedException(error)
       if (error instanceof ServiceUnavailableException) throw error
       // 地址不在出站白名单：请求没发出 → 不落账，也不能报成「连不上」。
       if (error instanceof AiEndpointNotAllowedError) throw llmEndpointNotAllowedError()
