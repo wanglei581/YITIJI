@@ -30,7 +30,7 @@
     </view>
 
     <block wx:else>
-      <view class="card" wx:if="{{refreshNotice}}" bindtap="retry">
+      <view class="card" wx:if="{{refreshNotice}}" bindtap="refreshDetail">
         <view class="empty-slot"><view class="es-d">{{refreshNotice}}</view></view>
       </view>
       <view class="card od-card">

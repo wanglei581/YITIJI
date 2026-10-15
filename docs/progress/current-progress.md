@@ -12,6 +12,8 @@
 - 本地验证：小程序完整 `verify:static` PASS，随后补充真实 `taskStatus` 和 8 位到机码夹具、跨 hide/show 迟到响应及冷却恢复用例，随后根据 Claude 复核补弱网退避、轮询上限与取消跨前后台状态复位，完整 static 和生命周期 386/386 PASS；专用刷新 25/25 PASS；API typecheck PASS；完整 `verify:miniapp-cloud-print-m2`（含 service/HTTP 两个幂等子门禁）三段 ALL PASS。新增集成断言经过真实上传、建单、领取、Agent claim/patch 和手机/后台查询服务，隐私结果与设备回传为夹具、Redis 为替身，不是真机。
 - 回归有效性：临时运行时禁用后台快照 fallback 后，新断言如预期失败；后台 UI 门禁 PASS，真实 TSX 元素树检查到机前展示/任务优先/任务缺值不回旧快照 PASS（外围控件替身）；`VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 后台生产构建 PASS。首次未传 http 模式被防 mock 门禁拒绝，按规定配置重跑，未修改门禁。
 - 多模型：Codex 独立前后端审查已完成；实际 agy、Grok 首轮通过。Claude `opus` + `max` 实际返回模型 `claude-opus-5-5`，指出弱网停刷/无界轮询/取消跨代次收尾，已逐项修复并新增回归；已发三方定点复验，未返回的结论不算通过。Windows 专窗用户另行授权升级旧 Agent，目前不把其现网设备检查作为本候选验收。
+- 继续复验：Claude 第二轮指出手动点击提示卡仍走非静默错误路径；已新增 `refreshDetail` 专用处理，重置预算后保留现有详情刷新，错误卡保留原 retry；完整静态及389项生命周期、28项专用刷新回归通过，Codex定点复核通过，三方第三轮定点复验中。另一条“在途丢提示”已于22faa9280修复，本轮核实并保留用例。新增手动断网恢复、切账号及模板绑定回归，仅涉及原预算9文件。Monika已明确仍在验收，继续等明确释放。UU现场用户已确认标准测试页“出了一张，清晰完整”，心跳已核；只计硬件基线，不计业务同单验收。
+
 - Git：功能提交 `8405a07de8165c676e747e4159fad1554481ad0e` 已推送同名独立分支，未合并或部署；本提交的分支推送未触发 GitHub Actions（查询返回空），不能写 CI PASS。
 - 微信入口实查：用户指出小程序在开发者工具。UI 与本地 Git 确认为 `.claude/worktrees/zhiyida-miniapp-main/apps/miniapp`，`claude/miniapp-main@cfbe567840d2bd2d62accce4bcea1797bcf59976`、工作区干净、真实 API `https://zyidai.cn`、测试地址为空。它不是本次修复版本，未修改该项目。
 - 共享设备边界：Monika 活跃验收任务要求独占本机微信开发者工具，主控已暂停所有该工具的 UI/CLI/MCP 项目打开、编译、模拟器及缓存操作，待释放后恢复；UU Windows 专窗继续。当前仍缺候选可访问 API / 对应手机调试版本，不能用现网检查顶替同候选验收。

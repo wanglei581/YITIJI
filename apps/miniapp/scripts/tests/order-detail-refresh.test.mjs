@@ -237,3 +237,39 @@ test('silent cancellation recovery without detail still renders loading', async 
   assert.equal(page.data.cancelling, false)
   assert.equal(page.data.loading, false)
 })
+
+
+test('manual refresh from a stale-data notice keeps the arrival code even while offline', async () => {
+  const { page, requests, timers } = setup()
+  requests[0].resolve(pendingOrder); await flush()
+  for (let i = 0; i < 4; i += 1) {
+    timers[i](); requests[i + 1].reject({ statusCode: 503 }); await flush()
+  }
+  const notice = page.data.refreshNotice
+  page.refreshDetail()
+  assert.equal(page.data.loading, false)
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+  assert.equal(page.data.refreshNotice, notice)
+  assert.equal(page._pollCount, 0)
+  assert.equal(page._pollErrors, 0)
+  requests[5].reject({ statusCode: -1, message: 'offline' }); await flush()
+  assert.equal(page.data.error, '')
+  assert.equal(page.data.detail.pickup, '12-34-56-78')
+  assert.match(page.data.refreshNotice, /上次查询结果/)
+  assert.equal(timers.length, 5)
+})
+
+test('manual stale-data refresh still fails closed after an account switch', async () => {
+  const { page, requests, setUser } = setup()
+  requests[0].resolve(pendingOrder); await flush()
+  setUser({ id: 'B' }); page.refreshDetail()
+  assert.equal(requests.length, 1)
+  assert.equal(page.data.detail, null)
+})
+
+test('notice template uses quiet refresh while the error card retains full retry', async () => {
+  const { readFileSync } = await import('node:fs')
+  const template = readFileSync(new URL('../../pages/order-detail/order-detail.wxml', import.meta.url), 'utf8')
+  assert.match(template, /wx:if="\{\{refreshNotice\}\}" bindtap="refreshDetail"/)
+  assert.match(template, /wx:elif="\{\{error\}\}" bindtap="retry"/)
+})

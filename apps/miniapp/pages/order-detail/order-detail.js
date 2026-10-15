@@ -529,6 +529,12 @@ Page({
 
   retry() { this._load() },
 
+  refreshDetail() {
+    this._pollCount = 0
+    this._pollErrors = 0
+    this._load(true)
+  },
+
   back() {
     wx.navigateBack({ delta: 1, fail() { wx.navigateTo({ url: '/pages/orders/orders' }) } })
   },
