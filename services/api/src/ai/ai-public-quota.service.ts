@@ -94,8 +94,8 @@ export class AiPublicQuotaService {
   constructor(private readonly redis: RedisService) {}
 
   async consume(operation: AiPublicOperation, input: AiPublicQuotaContext): Promise<AiPublicQuotaTicket> {
-    // 简历解析的会员次数改由 AiQuota 账本计算，避免和按人次数双重计数。终端与 IP 仍在这里。
-    const countMember = operation !== 'resume_parse'
+    // 简历解析与小青对话的会员次数改由 AiQuota 账本计算，避免和按人次数双重计数。终端与 IP 仍在这里。
+    const countMember = !ledgerOwnsMember(operation)
     const limits: DimensionLimit[] = [
       countMember && input.member
         ? { key: this.key(operation, 'member', input.member), limit: memberLimit(operation) }
@@ -198,6 +198,11 @@ function envLimit(name: string, fallback: number): number {
 
 // 默认值按「一次正常求职服务用不到这么多次」定，同时给大厅留出多台机器的余量。
 // 对话比解析便宜且天然更频繁，故 chat 的额度高于 parse。
+
+/** 返回类型写成 boolean，避免这两个字面量被收成恒真后，会员维分支被当成死代码。 */
+function ledgerOwnsMember(operation: AiPublicOperation): boolean {
+  return operation === 'resume_parse' || operation === 'assistant_chat'
+}
 
 function memberLimit(operation: AiPublicOperation): number {
   return operation === 'assistant_chat'

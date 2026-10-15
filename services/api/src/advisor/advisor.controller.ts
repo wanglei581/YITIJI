@@ -151,7 +151,7 @@ export class AdvisorController {
   @AiUse('generate')
   @PaidAiThrottle(12)
   async ask(@Param('sessionId') sessionId: string, @Body() dto: AskDto, @Req() req: ReqLike) {
-    return this.service.ask(sessionId, dto.question, await this.requesterOf(req))
+    return this.service.ask(sessionId, dto.question, await this.requesterOf(req), req)
   }
 
   /** 钉住一条。这是问答型唯一会跨请求留下的动作。 */
