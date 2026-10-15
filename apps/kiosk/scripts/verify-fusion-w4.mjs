@@ -252,14 +252,24 @@ check('fair source, mock-stat and print contracts remain intact', () => {
   assert.match(fairCompanyDetailSections, /min-h-12 min-w-12 rounded-lg p-2 transition-colors/, 'fair company view toggles keep 48px touch targets')
   assert.match(fairDetail, /external_appointment/)
   assert.match(fairDetail, /external_checkin_open/)
-  assert.match(fairDetail, /!stats\.isMockData/)
+  // 详情页必须**否定** isMockData 才能算「有真统计」。2026-09-20 起 stats 是子请求
+  // 结果对象的一个字段（statsResult.stats），所以放开变量名，但保留「取反 .isMockData」
+  // 这个核心判据——把 `!` 去掉、或改成 `stats.isMockData ? 真 : 假` 仍然会红。
+  assert.match(fairDetail, /![A-Za-z_$][\w$]*(?:\.[\w$]+)*\.isMockData/)
   assert.match(fairMaterials, /printable\.printFileUrl/)
   assert.doesNotMatch(fairMaterials, /fileUrl:\s*material\.fileUrl/)
-  assert.match(fairStats, /stats\.isMockData/)
+  // 页面写的是 `stats?.isMockData`（stats 可为 null），所以允许可选链。
+  assert.match(fairStats, /stats\??\.isMockData/)
 })
 
 // Phase 0 S0-A A1b：招聘会统计 Kiosk 消费面诚实化（nullable metrics）
-const fairDataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')
+//
+// 2026-09-20 招聘会八屏迁入青序流光后，「详情页内嵌数据大屏」组件
+// （components/FairDataScreen.tsx）随四 Tab 壳一起退休，统计只剩
+// /job-fairs/:id/stats 一个页面消费。原先把两个文件名钉死的写法会在
+// 文件消失时直接 ENOENT 崩掉，而且第三个消费面长出来时它也发现不了。
+// 改成扫描 src/pages 下**所有**引用 FairLiveStatsDTO 的页面：谁渲染了可空字段，
+// 谁就必须自带显式 null 分支。这是收严不是放宽 —— 新消费面无需改门禁即被覆盖。
 const FAIR_STATS_NULLABLE_FIELDS = [
   'checkedInCompanies',
   'browseCount',
@@ -268,40 +278,46 @@ const FAIR_STATS_NULLABLE_FIELDS = [
   'checkinCount',
 ]
 
+/** src/pages 下引用 FairLiveStatsDTO 的页面与组件，[相对路径, 源码]。 */
+function fairStatsConsumers() {
+  return collectTsx(join(KIOSK_ROOT, 'src/pages'))
+    .map((path) => [relative(KIOSK_ROOT, path), readFileSync(path, 'utf8')])
+    .filter(([, source]) => source.includes('FairLiveStatsDTO'))
+}
+
+check('fair stats consumer scan actually sees the stats page', () => {
+  // 阳性对照：读数为 0 既可能是「真的没有消费面」，也可能是扫描根本没扫到。
+  // 没有这一条，下面两项会在扫描失效时静默全绿。
+  const paths = fairStatsConsumers().map(([rel]) => rel)
+  assert.ok(paths.length > 0, 'no FairLiveStatsDTO consumer found under src/pages')
+  assert.ok(
+    paths.includes('src/pages/job-fairs/FairStatsPage.tsx'),
+    `FairStatsPage must be among the stats consumers, got: ${paths.join(', ')}`,
+  )
+})
+
 check('fair stats kiosk surfaces reject misleading live/system-truth copy', () => {
-  assert.doesNotMatch(fairStats, /准实时数据|系统真实服务数据/)
-  assert.doesNotMatch(fairDataScreen, /准实时数据|系统真实服务数据/)
+  for (const [rel, source] of fairStatsConsumers()) {
+    assert.doesNotMatch(source, /准实时数据|系统真实服务数据/, `${rel} must not claim live/system-truth stats`)
+  }
 })
 
 check('fair stats nullable metrics have explicit null branches and are not rendered unconditionally', () => {
-  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
-    assert.match(
-      fairStats,
-      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
-      `FairStatsPage must guard ${field} with explicit != null / !== null`,
-    )
-  }
-  for (const field of ['browseCount', 'scanCount', 'printCount']) {
-    assert.match(
-      fairDataScreen,
-      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
-      `FairDataScreen must guard ${field} with explicit != null / !== null`,
-    )
-  }
-  // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
-  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
-    assert.doesNotMatch(
-      fairStats,
-      new RegExp(`\\{stats\\.${field}\\}`),
-      `FairStatsPage must not unconditionally render {stats.${field}}`,
-    )
-  }
-  for (const field of ['browseCount', 'scanCount', 'printCount']) {
-    assert.doesNotMatch(
-      fairDataScreen,
-      new RegExp(`\\{stats\\.${field}\\}`),
-      `FairDataScreen must not unconditionally render {stats.${field}}`,
-    )
+  for (const [rel, source] of fairStatsConsumers()) {
+    for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+      if (!source.includes(`stats.${field}`)) continue
+      assert.match(
+        source,
+        new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+        `${rel} must guard ${field} with explicit != null / !== null`,
+      )
+      // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
+      assert.doesNotMatch(
+        source,
+        new RegExp(`\\{stats\\.${field}\\}`),
+        `${rel} must not unconditionally render {stats.${field}}`,
+      )
+    }
   }
 })
 

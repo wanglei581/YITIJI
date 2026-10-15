@@ -38,10 +38,11 @@ const SCAN_DIRS = [
   { dir: 'apps/miniapp/pages', exts: ['.js', '.wxml'] },
   { dir: 'apps/miniapp/utils', exts: ['.js'] },
   // 待补：docs/design/kiosk-redesign-2026-08（.html）——51 页新稿是上线一体机前端的
-  // 全部来源，文案在那里定稿。实测加进来会报 7 处**误报**：原型是带批注的说明体，
-  // 「本机不代收简历，也不在平台内投递」这类边界声明句，现有否定式豁免（按前 N 字符
-  // 回看）接不住；27-browse-detail 还会被规则 4 误判成目录页。原型本身合规，是豁免
-  // 逻辑不适配。要接这个目录得先扩豁免判定，不能靠放宽禁词表——那会同时削弱 apps/。
+  // 全部来源，文案在那里定稿。原实测的 7 处误报里，「本机不代收简历，也不在平台内投递」
+  // 这一类已由 2026-09-20 新增的 NEGATED_ADJACENT（紧贴式否定）接住；剩下的仍未解决：
+  // 27-browse-detail 会被规则 4 误判成目录页，稿里的批注体还有其它说明句式没逐条过过。
+  // 所以本目录**仍未接入**——接之前要把剩余误报逐条核过，不能靠放宽禁词表，
+  // 那会同时削弱 apps/。
 ]
 
 let failures = 0
@@ -111,8 +112,45 @@ if (piiPatterns.length !== piiTerms.length) {
 patterns.push(...piiPatterns)
 
 const markerBody = sliceBlock(ssotSource, 'COMPLIANCE_EXEMPTION_MARKERS', '{', '\n}')
-const markers = [...markerBody.matchAll(/'([^']+)'/g)].map((m) => m[1])
+
+/**
+ * 取出 `{ KEY: [...], ... }` 体里某一个分组的字符串数组。
+ *
+ * 为什么不再把整块拍平成一个数组:2026-09-20 起豁免判定有两种语义 ——
+ * NEGATED / OUTBOUND 走**回看窗口**,NEGATED_ADJACENT 必须**紧贴**命中词。
+ * 拍平后两者无法区分,新加的紧贴组会被当成窗口标记使用,等于悄悄放宽。
+ */
+function markerGroup(key) {
+  const at = markerBody.indexOf(`${key}:`)
+  if (at === -1) hardFail(`COMPLIANCE_EXEMPTION_MARKERS 缺少 ${key} 分组`)
+  const open = markerBody.indexOf('[', at)
+  const close = markerBody.indexOf(']', open)
+  if (open === -1 || close === -1) hardFail(`COMPLIANCE_EXEMPTION_MARKERS.${key} 不是数组字面量`)
+  const items = [...markerBody.slice(open, close).matchAll(/'([^']+)'/g)].map((m) => m[1])
+  if (items.length === 0) hardFail(`COMPLIANCE_EXEMPTION_MARKERS.${key} 解析出 0 项`)
+  return items
+}
+
+/** 命中位置**前 LOOKBEHIND 字符内出现**即豁免。 */
+const windowMarkers = [...markerGroup('NEGATED'), ...markerGroup('OUTBOUND')]
+/** 否定词必须**紧贴**命中词(before 以它结尾)才豁免,中间插一个字都不算。 */
+const adjacentMarkers = markerGroup('NEGATED_ADJACENT')
+const markers = [...windowMarkers, ...adjacentMarkers]
 if (markers.length === 0) hardFail('COMPLIANCE_EXEMPTION_MARKERS 解析出 0 项')
+
+// fail-closed:SSOT 里出现本门禁不认识的第四个分组时必须报错。
+// 否则那一组会既不按窗口、也不按紧贴参与判定 —— 添加者会以为自己登记了豁免,
+// 实际上一条都没生效(或更糟:被下一个维护者顺手拍平成窗口标记)。
+{
+  const allStrings = [...markerBody.matchAll(/'([^']+)'/g)].map((m) => m[1])
+  if (allStrings.length !== markers.length) {
+    hardFail(
+      `COMPLIANCE_EXEMPTION_MARKERS 共 ${allStrings.length} 项,但只有 `
+      + `NEGATED / NEGATED_ADJACENT / OUTBOUND 三组共 ${markers.length} 项参与判定 —— `
+      + '新增分组必须同步本脚本的判定逻辑,不得静默当成回看窗口标记',
+    )
+  }
+}
 
 const banBody = sliceBlock(ssotSource, 'COMPLIANCE_BAN_DECLARATION_MARKERS', '[', ']')
 const banMarkers = [...banBody.matchAll(/'([^']+)'/g)].map((m) => m[1])
@@ -133,7 +171,7 @@ if (!preferred.includes('复制来源链接')) {
 console.log(`\n📋 合规文案禁词门禁`)
 console.log(`   SSOT: ${path.relative(root, SSOT)}`)
 console.log(
-  `   禁词 ${terms.length} 项 / 隐私遮挡禁词 ${piiTerms.length} 项 / 扫描正则 ${patterns.length} 项 / 豁免标记 ${markers.length} 项 / 禁用声明标记 ${banMarkers.length} 项`
+  `   禁词 ${terms.length} 项 / 隐私遮挡禁词 ${piiTerms.length} 项 / 扫描正则 ${patterns.length} 项 / 豁免标记 ${windowMarkers.length} 项(回看)+ ${adjacentMarkers.length} 项(紧贴) / 禁用声明标记 ${banMarkers.length} 项`
 )
 console.log(`   扫描: ${SCAN_DIRS.map((d) => `${d.dir}(${d.exts.join(',')})`).join(' ')}\n`)
 
@@ -171,12 +209,23 @@ if (files.length === 0) hardFail('全部扫描目录合计 0 个文件,范围配
 /**
  * 合规判定:
  * - 整行是禁用声明(在禁止这些词) → 合规;
- * - 命中位置前 LOOKBEHIND 字符内出现否定式 / 站外标记 → 合规。
+ * - 命中位置前 LOOKBEHIND 字符内出现否定式 / 站外标记 → 合规;
+ * - 命中位置**紧贴**着一个 NEGATED_ADJACENT 否定前缀 → 合规。
+ *
+ * 第三条刻意不放宽成窗口:「不在平台内投递」合规,「不在校学生也能平台内投递」不合规,
+ * 两者的差别只有一个 —— 否定词是不是直接管住那个短语。
  */
+let adjacentExemptHits = 0
+
 function isExempt(line, index) {
   if (banMarkers.some((marker) => line.includes(marker))) return true
   const before = line.slice(Math.max(0, index - LOOKBEHIND), index)
-  return markers.some((marker) => before.includes(marker))
+  if (windowMarkers.some((marker) => before.includes(marker))) return true
+  if (adjacentMarkers.some((marker) => before.endsWith(marker))) {
+    adjacentExemptHits += 1
+    return true
+  }
+  return false
 }
 
 const violations = []
@@ -223,7 +272,9 @@ if (violations.length === 0) {
 // ---------- 4. 自检:豁免机制不能形同虚设,也不能过宽 ----------
 
 if (exempted > 0) {
-  pass(`2. 豁免机制生效(${exempted} 处合规用法未误报)`)
+  // 紧贴式命中数只报不判:它可能合法地归零(引用那句稿面文案的页面被改写),
+  // 那时不该红 —— 机制本身是否有效由下面第 3 项的 probe 阳性/阴性对照保证。
+  pass(`2. 豁免机制生效(${exempted} 处合规用法未误报,其中紧贴式 ${adjacentExemptHits} 处)`)
 } else {
   fail(`2. 豁免命中 0 处 —— 实测应有约 30 处合规用法,豁免标记可能已失效`)
 }
@@ -231,6 +282,13 @@ if (exempted > 0) {
 const probe = [
   { text: '去来源平台投递', shouldPass: true },
   { text: '不提供平台内投递,不接收简历', shouldPass: true },
+  // 紧贴式否定(NEGATED_ADJACENT)。上面那句「不提供」靠回看窗口,下面这句靠紧贴 ——
+  // 稿 28-jobfair-enhanced.html 参展企业屏的边界原话,生产页逐字使用。
+  { text: '名单由主办方提供;本机不代收简历,也不在平台内投递。', shouldPass: true },
+  // 紧贴式**不是**回看窗口:否定词与禁词之间插了字就不再豁免。
+  // 这两条是「不在」被收进 NEGATED(窗口式)时会漏放的真实句式,故意长期钉在这里。
+  { text: '不在乎学历门槛,一键投递到企业', shouldPass: false },
+  { text: '不在校学生也能平台内投递', shouldPass: false },
   { text: '本后台不涉及简历接收与候选人管理', shouldPass: true },
   { text: '一键投递到企业', shouldPass: false },
   { text: '立即投递,无需注册', shouldPass: false },
@@ -274,7 +332,7 @@ for (const item of probe) {
 }
 
 if (probeFailures === 0) {
-  pass(`3. 判定逻辑自检通过(${probe.length} 条用例,含否定式豁免与"不用注册+一键投递"反例)`)
+  pass(`3. 判定逻辑自检通过(${probe.length} 条用例,含紧贴式否定豁免与"不在乎…一键投递"反例)`)
 } else {
   fail(`3. 判定逻辑自检失败 ${probeFailures}/${probe.length} 条`)
 }

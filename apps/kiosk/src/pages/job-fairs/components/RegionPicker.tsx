@@ -4,6 +4,11 @@
 // 用户需求：地区筛选要覆盖中国所有省市区，都可选。
 // 数据来自 china-division（全国行政区划）。chip 行无法承载 2800+ 区县，
 // 故做成「按钮 → 弹层下钻」：省 → 市 → 区，每级可「整个省/整个市」提前停。
+//
+// 2026-09-20 随 /job-fairs 迁入青序流光：配色与触控尺寸改用 qx / dw 令牌
+// （原来的 primary-*/neutral-* 是暖褐旧壳的颜色，落在青序页上两套色系会打架）。
+// 顺带把选项格的 min-h-[44px] 提到 --qx-tap-min（48px），补上 CLAUDE.md §9 的下限。
+// 下钻逻辑一字未改。
 // ============================================================
 
 import { useState } from 'react'
@@ -21,13 +26,9 @@ type Stage = 'province' | 'city' | 'district'
 
 function OptionGrid({ options, onPick }: { options: string[]; onPick: (v: string) => void }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="qxfw-optgrid">
       {options.map((o) => (
-        <button
-          key={o}
-          onClick={() => onPick(o)}
-          className="flex min-h-[44px] items-center justify-center rounded-lg bg-neutral-50 px-2 text-center text-sm text-neutral-700 transition-colors hover:bg-primary-50 hover:text-primary-700 active:bg-primary-100"
-        >
+        <button key={o} type="button" className="qxfw-opt" onClick={() => onPick(o)}>
           {o}
         </button>
       ))}
@@ -75,51 +76,57 @@ export function RegionPicker({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openPicker}
-        className={[
-          'flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
-          hasSelection ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-        ].join(' ')}
-      >
-        <MapPinIcon className="h-4 w-4" />
-        <span className="max-w-[7rem] truncate">{regionLabel(value)}</span>
+      {/*
+        清除是独立动作，不能和「打开选择器」共用一个点击区 —— 触屏上误触代价太大。
+        2026-09-20 修正实现方式：原来把清除做成 <button> **内部**的 role="button" span。
+        嵌套可交互元素在 HTML 里是非法的，读屏软件只看得见外层那一个控件，
+        而 stopPropagation 只挡冒泡、挡不住「两个控件叠在一起」这件事本身。
+        改成兄弟按钮：两个真 <button>，各自 ≥48px 触控区，读屏也能分别念出来。
+      */}
+      <span className="qxfw-chipgrp">
+        <button
+          type="button"
+          onClick={openPicker}
+          aria-pressed={hasSelection}
+          className={`dw-chip${hasSelection ? ' on' : ''}`}
+        >
+          <MapPinIcon size={20} aria-hidden />
+          <span>{regionLabel(value)}</span>
+          {hasSelection ? null : <ChevronRightIcon size={20} aria-hidden />}
+        </button>
         {hasSelection ? (
-          <XIcon
-            className="h-4 w-4 opacity-80"
-            onClick={(e) => { e.stopPropagation(); onChange({}) }}
-          />
-        ) : (
-          <ChevronRightIcon className="h-4 w-4 opacity-70" />
-        )}
-      </button>
+          <button
+            type="button"
+            className="qxfw-chip-clear"
+            aria-label="清除地区筛选"
+            onClick={() => onChange({})}
+          >
+            <XIcon size={20} aria-hidden />
+          </button>
+        ) : null}
+      </span>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setOpen(false)}>
-          <div
-            className="flex max-h-[78vh] w-full flex-col rounded-t-2xl bg-white p-5 shadow-xl sm:w-[28rem] sm:rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 头部 */}
-            <div className="flex items-center justify-between">
-              <p className="text-base font-semibold text-neutral-800">选择地区</p>
-              <button onClick={() => setOpen(false)} className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label="关闭">
-                <XIcon className="h-5 w-5" />
+        <div className="qxfw-sheet" role="dialog" aria-modal="true" aria-label="选择地区" onClick={() => setOpen(false)}>
+          <div className="qxfw-sheet-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="qxfw-sheet-head">
+              <p>选择地区</p>
+              <button type="button" className="qxfw-overlay-close" onClick={() => setOpen(false)} aria-label="关闭">
+                <XIcon size={26} aria-hidden />
               </button>
             </div>
 
-            {/* 面包屑 */}
-            <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
-              <button onClick={() => setStage('province')} className={stage === 'province' ? 'font-semibold text-primary-600' : 'text-neutral-500'}>
+            <div className="qxfw-sheet-crumbs">
+              <button type="button" aria-current={stage === 'province'} onClick={() => setStage('province')}>
                 省/直辖市
               </button>
               {(stage === 'city' || stage === 'district') && draftProvince && (
                 <>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-neutral-300" />
+                  <ChevronRightIcon size={18} aria-hidden />
                   <button
+                    type="button"
+                    aria-current={stage === 'city'}
                     onClick={() => !isMunicipality(draftProvince) && setStage('city')}
-                    className={stage === 'city' ? 'font-semibold text-primary-600' : 'text-neutral-500'}
                   >
                     {draftProvince}
                   </button>
@@ -127,44 +134,44 @@ export function RegionPicker({
               )}
               {stage === 'district' && draftCity && draftCity !== '市辖区' && (
                 <>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-neutral-300" />
-                  <span className="font-semibold text-primary-600">{draftCity}</span>
+                  <ChevronRightIcon size={18} aria-hidden />
+                  <span>{draftCity}</span>
                 </>
               )}
             </div>
 
-            {/* 顶部快捷：清除 / 整个省 / 整个市 + 返回 */}
-            <div className="mt-3 flex items-center gap-2">
-              {stage !== 'province' && (
-                <button
-                  onClick={() => setStage(stage === 'district' && !isMunicipality(draftProvince) ? 'city' : 'province')}
-                  className="flex items-center gap-0.5 rounded-lg bg-neutral-100 px-2.5 py-1.5 text-sm text-neutral-600"
-                >
-                  <ChevronLeftIcon className="h-4 w-4" />返回
-                </button>
-              )}
-              {stage === 'province' && (
-                <button onClick={() => apply({})} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600">
-                  全部地区
-                </button>
-              )}
-              {stage === 'city' && (
-                <button onClick={() => apply({ province: draftProvince })} className="rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">
-                  整个{draftProvince}
-                </button>
-              )}
-              {stage === 'district' && (
-                <button
-                  onClick={() => apply({ province: draftProvince, city: isMunicipality(draftProvince) ? undefined : draftCity })}
-                  className="rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700"
-                >
-                  {isMunicipality(draftProvince) ? `整个${draftProvince}` : `整个${draftCity}`}
-                </button>
-              )}
+            <div className="dw-fgrp">
+              <div className="fc">
+                {stage !== 'province' && (
+                  <button
+                    type="button"
+                    className="dw-chip"
+                    onClick={() => setStage(stage === 'district' && !isMunicipality(draftProvince) ? 'city' : 'province')}
+                  >
+                    <ChevronLeftIcon size={20} aria-hidden />返回
+                  </button>
+                )}
+                {stage === 'province' && (
+                  <button type="button" className="dw-chip" onClick={() => apply({})}>全部地区</button>
+                )}
+                {stage === 'city' && (
+                  <button type="button" className="dw-chip ok" onClick={() => apply({ province: draftProvince })}>
+                    整个{draftProvince}
+                  </button>
+                )}
+                {stage === 'district' && (
+                  <button
+                    type="button"
+                    className="dw-chip ok"
+                    onClick={() => apply({ province: draftProvince, city: isMunicipality(draftProvince) ? undefined : draftCity })}
+                  >
+                    {isMunicipality(draftProvince) ? `整个${draftProvince}` : `整个${draftCity}`}
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* 选项区 */}
-            <div className="mt-3 flex-1 overflow-y-auto pb-2">
+            <div className="qxfw-sheet-opts">
               {stage === 'province' && <OptionGrid options={PROVINCES} onPick={pickProvince} />}
               {stage === 'city' && <OptionGrid options={citiesOf(draftProvince)} onPick={pickCity} />}
               {stage === 'district' && (

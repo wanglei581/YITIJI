@@ -137,6 +137,11 @@ const QX_MIGRATED_ROUTES = new Set<string>([
   '/scan/progress',
   '/scan/result',
   '/jobs',
+  /* 招聘会共享工作台（稿 28-jobfair-enhanced.html）。无参的两条放精确集合，
+   * 带 :id 的六条见下方 QX_MIGRATED_EXACT_PATTERNS —— 不能写 '/job-fairs/' 宽前缀：
+   * 那会顺手放行未来新增、还没迁的兄弟路由，verify:fusion-w4 也明令禁止该前缀。 */
+  '/job-fairs',
+  '/job-fairs/checkin',
   // 批 3「我的」：逐条精确列出。不用 `/me/` 宽前缀 —— 尚未迁移的
   // `/me/documents` `/me/settings` 等兄弟路由会被误命中掉进空壳。
   '/profile',
@@ -167,14 +172,25 @@ const QX_MIGRATED_PREFIXES = [
 /**
  * 带参路由但父段还有未迁兄弟页：不能写宽前缀。
  * - /jobs/:id/offline 不能用 /jobs/（会误伤 /jobs/:id、/jobs/online-platforms）
- * - /job-fairs/:id/companies/:companyId 不能用 /job-fairs/（会误伤列表、详情、地图、资料）
+ * - 招聘会那六条也逐条精确写。**不要**因为「现在六条都迁完了」就合并成
+ *   '/job-fairs/' 前缀：以后这棵子树再长出一条新路由（比如展位预约详情），
+ *   宽前缀会在它还没迁的时候就把它染成青序壳，页面当场掉进空壳。
+ *   verify:fusion-w4 也直接断言 QX_MIGRATED_PREFIXES 里不得出现 '/job-fairs/'。
  */
 const QX_MIGRATED_EXACT_PATTERNS: readonly RegExp[] = [
   // 26 号稿岗位详情：只放行单段 ID。不能写成 '/jobs/' 前缀——那会连
   // /jobs/:id/offline 一起放行（它有自己的稿和自己的模式，见下一行）。
   /^\/jobs\/[^/]+$/,
   /^\/jobs\/[^/]+\/offline$/,
+  // 28 号稿招聘会工作台的六条带参屏（086 / 087 / 090 / 091 / 092 / 093）。
+  // 第一条只放行单段 ID，不会越过 '/' 吃掉后面五条。
+  /^\/job-fairs\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/companies$/,
   /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/map$/,
+  /^\/job-fairs\/[^/]+\/materials$/,
+  /^\/job-fairs\/[^/]+\/visit-plan$/,
+  /^\/job-fairs\/[^/]+\/stats$/,
 ]
 
 function isQxMigratedPath(pathname: string): boolean {
