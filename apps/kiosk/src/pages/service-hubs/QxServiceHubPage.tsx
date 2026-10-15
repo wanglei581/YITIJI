@@ -270,8 +270,9 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
 
   return (
     <QxPageFrame
+      // 页头 h1 只作可及标题保留（service-hub-hero-qx.css 以 clip-path 视觉隐藏）；
+      // 看得见的标题在下面的小青横幅里，与稿 16 的 hero 同位。副标题只在横幅里渲染一次。
       title={spec.title}
-      subtitle={spec.subtitle}
       status={statusPill(availability)}
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       navbar={
@@ -291,14 +292,21 @@ export function QxServiceHubPage({ hub }: { hub: ServiceHubKey }) {
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
       >
-        {/* 域标识（稿的 eyebrow）。稿把它放在主标题上方；这里放在标题行下方独立一行，
-            用小字 + 字距做成标签，不与 h1 竞争视线，也不混进 h1 的可及名称。 */}
-        <p className="qx-hub-eyebrow">{spec.eyebrow}</p>
-        {/* 稿里的 hero-note：原件/结果归属的一句话，紧跟在标题说明之后。 */}
-        <p className="qx-hub-hero-note">
-          <b>{spec.noteTitle}</b>
-          <span>{spec.note}</span>
-        </p>
+        {/* 稿 16 的 hero：深底小青横幅，域标识 → 标题 → 一句话说明 → 原件/结果归属。
+            标题在这里只是视觉副本（aria-hidden）：可及的 h1 仍是 QxPageFrame 页头那一个，
+            避免读屏把同一句标题读两遍。域标识、说明与归属声明都照常可读。 */}
+        <section className="qx-hub-hero" aria-label={`${spec.eyebrow}说明`}>
+          <span className="qx-hub-hero-face" aria-hidden="true">青</span>
+          <div className="qx-hub-hero-main">
+            <p className="qx-hub-hero-eyebrow">{spec.eyebrow}</p>
+            <p className="qx-hub-hero-title" aria-hidden="true">{spec.title}</p>
+            <p className="qx-hub-hero-sub">{spec.subtitle}</p>
+            <p className="qx-hub-hero-note">
+              <b>{spec.noteTitle}</b>
+              <span>{spec.note}</span>
+            </p>
+          </div>
+        </section>
 
         <section className="qx-hub-goals" aria-label="先告诉我你现在最想完成什么">
           <div className="qx-hub-goals-copy">
