@@ -46,6 +46,31 @@
       "gate": "@ai-job-print/api::verify:member-login-data-closure",
       "category": "redundant-alias",
       "reason": "纯 shell 别名：body 是 17 个 `pnpm run verify:*` 用 && 串起来，没有任何自己的断言、夹具或环境要求。2026-08-16 GATE-WIRE 复核：17 个子门禁**全部 17 条**都已在 CI 执行闭包内（#647 当时记的是 15/17，另 2 条已随本批接线补齐），因此把别名本身再挂一遍只是让同一批断言在同一个 job 里跑第二遍，徒增 CI 时长而不增加任何覆盖。本条不是欠账，故不占 pending-ci-wiring 名额；「子门禁全覆盖」这个前提由 verify-ci-gate-coverage.mjs 对 redundant-alias 类别做机器复核，一旦有子门禁被移出 CI 会立刻转红。"
+    },
+    {
+      "gate": "@ai-job-print/kiosk::verify:probe-member-session-41",
+      "category": "running-server",
+      "reason": "上线前清单 §4.1 会话闭环取证：登录 / 登出后旧 token 立即失效 / 验证码不可重放 / 未登录不返回数量。必须打真实 API（含 Redis 会话与短信频控）并从服务端日志读开发验证码，CI 内没有这套后端。CI 里已有等价保护的是 kiosk-privacy-timeout 套件（浏览器侧），本脚本是它够不到的服务端侧补充。"
+    },
+    {
+      "gate": "@ai-job-print/kiosk::verify:probe-ai-resume-closure-42",
+      "category": "running-server",
+      "reason": "上线前清单 §4.2 AI 简历闭环取证：诊断进 AI 服务记录、生成稿导出进我的文档、删除后不残留幽灵记录（列表少一条 + 直连读取 404 两处同验）。需要真实后端 + 种子数据 + AI_PROVIDER=mock，CI 内无此前置。"
+    },
+    {
+      "gate": "@ai-job-print/kiosk::verify:probe-file-closure-43",
+      "category": "running-server",
+      "reason": "上线前清单 §4.3 打印/文件闭环取证：上传 / 我的文档可见 / 预览短期签名 URL / 下载 / 删除后 DB 与磁盘一致 / 删除前铸的签名链接失效。需要真实后端 + 本地对象存储目录，CI 内无此前置。"
+    },
+    {
+      "gate": "@ai-job-print/kiosk::verify:probe-activity-favorites-44",
+      "category": "running-server",
+      "reason": "上线前清单 §4.4 收藏与浏览跳转记录取证，并钉住 CLAUDE.md §10 合规红线（日志表不得有结果类字段、跳转 action 只能是 external_* 打开语义）。需要真实后端 + 岗位/招聘会种子数据，CI 内无此前置。合规红线的静态部分未来可拆成纯源码门禁进 CI，届时应把这条豁免缩小到只剩运行期部分。"
+    },
+    {
+      "gate": "@ai-job-print/kiosk::verify:probe-ai-failure-honesty-45",
+      "category": "running-server",
+      "reason": "上线前清单 §4.5 外部服务失败诚实性取证。必须在两种后端配置下各跑一次才有意义（provider 失败时三条断言必须 PASS，provider 可用时必须 FAIL），CI 单一配置下跑它只会得到一半结论，反而制造「已覆盖」的错觉。"
     }
   ],
   "$unwiredScriptsReadme": [
