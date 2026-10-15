@@ -776,7 +776,7 @@ export class AiService {
      * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
      */
     draft = false,
-    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string },
+    charge?: { taskId?: string | null; benefitGrantId?: string | null; factsConfirmedAt?: string; unlabeled?: boolean },
   ): Promise<{
     fileId: string
     filename: string
@@ -827,7 +827,7 @@ export class AiService {
     let ext: string
     switch (format) {
       case 'docx': {
-        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId })
+        const rendered = await this.resumeDocx.render(resume, { draft, contentId: draft ? null : produceId, unlabeled: charge?.unlabeled === true })
         buffer = rendered.buffer
         pageCount = 0
         mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -855,6 +855,7 @@ export class AiService {
           templatePreset: template?.resumeLayoutPreset,
           draft,
           contentId: draft ? null : produceId,
+          unlabeled: charge?.unlabeled === true,
         })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
@@ -888,7 +889,7 @@ export class AiService {
     // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
     let printFileId = uploaded.fileId
     if (format !== 'pdf') {
-      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft, contentId: draft ? null : printProduceId, unlabeled: charge?.unlabeled === true })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
         filename: `${namePrefix}_${safeName}.pdf`,

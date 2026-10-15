@@ -108,8 +108,8 @@ function assertStaticContracts(): void {
   if (!aiSrc.includes('templatePreset: template?.resumeLayoutPreset') || !aiSrc.includes('contentId: draft ? null : produceId')) fail('4a. AiService 未把 layout / draft / contentId 透传给 ResumePdfService')
   // draft 与 layout 一样必须从 dto 剥离并透传：漏了它，ai-down 时导出的原样草稿
   // 会被当成 AI 产物打上 AIGenerated=true。
-  if (!controllerSrc.includes('const { taskId, format, layout, templateId, draft, ...resume } = dto')) {
-    fail('4b. AiController 导出接口未从 dto 中剥离 layout / draft')
+  if (!controllerSrc.includes('const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto')) {
+    fail('4b. AiController 导出接口未从 dto 中剥离 layout / draft / unlabeled')
   }
   if (!controllerSrc.includes("format ?? 'pdf', layout, templateId, draft === true")) fail('4b. AiController 未把 layout / draft 透传给 AiService')
   pass('4. 导出 controller/service 已透传 layout')

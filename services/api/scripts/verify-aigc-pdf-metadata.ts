@@ -7,9 +7,8 @@
  *   自我探索 / 面试报告 5 个 PDF 只有首页一行免责声明，metadata 里没有任何 AIGC 字段，
  *   简历 PDF 更是只有一个 Title。打印出去的纸质件事后无从判定是否 AI 生成。
  *
- * 本批次范围：**只加隐式 metadata，不加可见水印**。
- *   简历 PDF 是否加可见标识需产品裁决（用户要拿去投递），本脚本因此
- *   **不断言可见水印**，只断言元数据 —— 未来产品裁决后另加断言。
+ * 本批次范围：AI 简历导出默认加每页页脚显式标识；其余 AI 产物沿用各自页眉/声明。
+ *   简历的 unlabeled 申请受环境开关控制，隐式 metadata 始终保留。
  *
  * 覆盖：
  *   1. applyAigcPdfMetadata 写入的键与合同审查那套一致
@@ -34,6 +33,7 @@ import { FairVisitPlanPdfService } from '../src/ai/resume/fair-visit-plan-pdf.se
 import { SelfAssessmentPdfService } from '../src/ai/resume/self-assessment-pdf.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { ResumePdfService } from '../src/ai/resume/resume-pdf.service'
+import { AIGC_VISIBLE_FOOTER } from '../src/common/pdf/aigc-label'
 
 const ROOT = join(__dirname, '..')
 
@@ -253,15 +253,35 @@ for (const [rel, label] of services) {
   }
 }
 
-// 本批次刻意不加可见水印：如果哪天要加，应先有产品裁决再改本断言。
 const resumePdfSrc = read('src/ai/resume/resume-pdf.service.ts')
-assertContains(resumePdfSrc, '不加任何可见水印', '边界: 简历 PDF 明确记录「可见标识待产品裁决」')
+assertContains(resumePdfSrc, 'stampAigcPageFooter', '简历 PDF 每页调用显式页脚标识')
+
+async function resumeLabelChecks(): Promise<void> {
+  // 简历 AI 导出默认带页脚；开关关闭时即使请求 unlabeled 也不能去掉。
+  const previous = process.env['RESUME_EXPORT_UNLABELED_OPTION']
+  process.env['RESUME_EXPORT_UNLABELED_OPTION'] = 'false'
+  const fixture = {
+    basic: { name: '示例', phone: '', email: '', city: '' },
+    intention: { position: '后端开发' }, summary: '简历内容', education: [], experience: [], projects: [], skills: [], certificates: [],
+  }
+  const resumeForVisible = await new ResumePdfService().render(fixture as never, { contentId: 'task-resume-visible', unlabeled: true })
+  const visibleRaw = resumeForVisible.buffer.toString('latin1')
+  if (visibleRaw.includes(AIGC_VISIBLE_FOOTER)) pass('简历 PDF 开关关闭时 unlabeled 无效（显式页脚仍存在）')
+  else fail('简历 PDF 开关关闭时 unlabeled 不应生效')
+  process.env['RESUME_EXPORT_UNLABELED_OPTION'] = 'true'
+  const resumeForUnlabeled = await new ResumePdfService().render(fixture as never, { contentId: 'task-resume-unlabeled', unlabeled: true })
+  if (!resumeForUnlabeled.buffer.toString('latin1').includes(AIGC_VISIBLE_FOOTER)) pass('简历 PDF 开关开启时 unlabeled 去掉显式页脚')
+  else fail('简历 PDF 开关开启时 unlabeled 仍带显式页脚')
+  if (previous === undefined) delete process.env['RESUME_EXPORT_UNLABELED_OPTION']
+  else process.env['RESUME_EXPORT_UNLABELED_OPTION'] = previous
+}
 
 // ─── 结果 ────────────────────────────────────────────────────────────────────
 
 void (async () => {
   try {
     await runtimeChecks()
+    await resumeLabelChecks()
   } catch (error) {
     fail(`运行时检查异常: ${error instanceof Error ? error.message : String(error)}`)
   }

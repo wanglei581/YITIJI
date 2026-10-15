@@ -5,6 +5,7 @@
 import { PDFDocument, PDFDict, PDFHexString, PDFName, PDFString } from 'pdf-lib'
 
 export const AIGC_VISIBLE_HEADER = 'AI 生成，仅供参考'
+export const AIGC_VISIBLE_FOOTER = '含人工智能辅助生成内容'
 
 export const AIGC_DEFAULT_PRODUCER = '职易达'
 
@@ -91,6 +92,34 @@ export function stampAigcPageHeader(
       lineBreak: false,
     })
     doc.page.margins.top = previousTop
+    doc.restore()
+    doc.x = savedX
+    doc.y = savedY
+  }
+}
+
+/** 每页页脚显式标识。只在 AI 简历导出且用户未申请去标识时调用。 */
+export function stampAigcPageFooter(
+  doc: PDFKit.PDFDocument,
+  text: string = AIGC_VISIBLE_FOOTER,
+): void {
+  const range = doc.bufferedPageRange()
+  for (let index = 0; index < range.count; index += 1) {
+    doc.switchToPage(range.start + index)
+    const savedX = doc.x
+    const savedY = doc.y
+    doc.save()
+    const left = doc.page.margins.left
+    const right = doc.page.margins.right
+    const previousBottom = doc.page.margins.bottom
+    doc.page.margins.bottom = 0
+    doc.font('cjk').fontSize(8).fillColor('#64748b')
+    doc.text(text, left, doc.page.height - 30, {
+      width: doc.page.width - left - right,
+      align: 'center',
+      lineBreak: false,
+    })
+    doc.page.margins.bottom = previousBottom
     doc.restore()
     doc.x = savedX
     doc.y = savedY

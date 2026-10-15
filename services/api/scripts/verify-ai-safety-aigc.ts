@@ -481,7 +481,7 @@ async function main(): Promise<void> {
       {
         overall: { level: 'pass', summary: sample },
         expression: ['说清楚了'],
-        positionFit: ['提到了项目'],
+        positionFit: ['岗位匹配度 80%'],
         credibility: ['有具体事'],
         professional: ['讲了职责'],
         adaptability: ['能接着说'],
@@ -553,6 +553,12 @@ async function main(): Promise<void> {
     const text = squash(await visibleText(item.buffer))
     const info = await readPdfInfo(item.buffer)
     const aigc = parseAigcLabelJson(info['AIGC'] ?? '')
+    if (item.id === 'interview') {
+      const banned = ['练习表现等级', '匹配度', '岗位匹配']
+      const hit = banned.find((phrase) => text.includes(phrase))
+      if (hit) fail('pdf:interview:neutral-copy', `模拟面试报告仍出现禁词「${hit}」`)
+      else pass('pdf:interview:neutral-copy')
+    }
     if (item.wantVisible) {
       // 审计表第 11–36、103 行：每一页都要同时有「AI 生成」和「仅供参考」。合并全文会让第二页丢页眉也通过。
       const pages = await visiblePages(item.buffer)
@@ -622,11 +628,12 @@ async function main(): Promise<void> {
   const docx = await new ResumeDocxService().render(resume as never, { contentId: 'task-resume-docx' })
   const docxRequire = createRequire(require.resolve('docx'))
   const JSZip = docxRequire('jszip') as {
-    loadAsync: (buf: Buffer) => Promise<{ file: (name: string) => { async: (type: 'string') => Promise<string> } | null }>
+    loadAsync: (buf: Buffer) => Promise<{ files: Record<string, unknown>; file: (name: string) => { async: (type: 'string') => Promise<string> } | null }>
   }
   const zip = await JSZip.loadAsync(docx.buffer)
   const customXml = await zip.file('docProps/custom.xml')?.async('string') ?? ''
   const body = await zip.file('word/document.xml')?.async('string') ?? ''
+  const footerXml = (await Promise.all(Object.keys(zip.files).filter((name) => /^word\/footer\d+\.xml$/u.test(name)).map(async (name) => await zip.file(name)?.async('string') ?? ''))).join('\n')
   const customMatch = customXml.match(/name="AIGC"[\s\S]*?<vt:lpwstr>([\s\S]*?)<\/vt:lpwstr>/)
   const decoded = (customMatch?.[1] ?? '')
     .replace(/&quot;/g, '"')
@@ -637,9 +644,9 @@ async function main(): Promise<void> {
   if (!docxAigc || docxAigc.ProduceID !== 'task-resume-docx') {
     fail('docx:aigc', 'customProperties 没有合法 AIGC（next-tasks 第 4 条）')
   } else pass('docx:aigc')
-  if (body.includes('AI 生成') || body.includes('仅供参考')) {
-    fail('docx:body', '简历 DOCX 正文印了可见标识，这一项还没拍板（审计表第 16 行）')
-  } else pass('docx:body')
+  if (body.includes('AI 生成') || body.includes('仅供参考')) fail('docx:body', '简历 DOCX 正文不应出现旧式 AI 提示')
+  else if (!footerXml.includes('含人工智能辅助生成内容')) fail('docx:footer', '简历 DOCX 缺少每页显式页脚标识')
+  else pass('docx:footer')
 
   // 追加页保持原简历 Title，并把 AIGC.Label 置为 1。草稿原来 AIGenerated=false，追加后必须改成 true。
   const original = await PDFDocument.create()

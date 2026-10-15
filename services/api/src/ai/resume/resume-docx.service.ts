@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import {
   Document,
+  Footer,
   HeadingLevel,
   Packer,
   Paragraph,
@@ -32,10 +33,11 @@ export interface RenderedResumeDocx {
 @Injectable()
 export class ResumeDocxService {
   /**
-   * 渲染简历 docx。正文不加可见标识（是否印在投递件上待产品负责人拍板）。
+   * 渲染简历 docx。AI 导出默认在每页页脚加入显式标识，草稿不加；
+   * 开关开启且用户申请时可去掉页脚，隐式标识始终保留。
    * 非草稿写入 AIGC 自定义属性；草稿不是模型文字，不写 AIGC。
    */
-  async render(resume: GeneratedResume, options?: { contentId?: string | null; draft?: boolean }): Promise<RenderedResumeDocx> {
+  async render(resume: GeneratedResume, options?: { contentId?: string | null; draft?: boolean; unlabeled?: boolean }): Promise<RenderedResumeDocx> {
     const children: Paragraph[] = []
 
     // ── 头部:姓名 + 求职意向 + 联系方式 ─────────────────────────────
@@ -141,6 +143,8 @@ export class ResumeDocxService {
     const generatedAt = new Date()
     const draft = options?.draft === true
     const produceId = draft ? '' : requireAigcProduceId(options?.contentId ?? '')
+    const unlabeledEnabled = process.env['RESUME_EXPORT_UNLABELED_OPTION'] === 'true'
+    const showVisibleFooter = !draft && !(unlabeledEnabled && options?.unlabeled === true)
     const doc = new Document({
       title: `${resume.basic.name} 的简历`,
       creator: '青序 AI 求职服务',
@@ -163,6 +167,13 @@ export class ResumeDocxService {
         {
           properties: {},
           children,
+          ...(showVisibleFooter ? {
+            footers: {
+              default: new Footer({
+                children: [new Paragraph({ alignment: 'center', children: [new TextRun({ text: '含人工智能辅助生成内容', color: '64748B', size: 16 })] })],
+              }),
+            },
+          } : {}),
         },
       ],
     })

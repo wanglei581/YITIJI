@@ -192,6 +192,10 @@ export class ResumeGenerateExportDto {
   @IsOptional() @IsBoolean()
   draft?: boolean
 
+  /** 开关开启时可申请不带页脚显式标识的版本；隐式标识仍保留。 */
+  @IsOptional() @IsBoolean()
+  unlabeled?: boolean
+
   /** 导出格式,缺省 pdf。docx/txt/md 页数恒为 0。 */
   @IsOptional() @IsIn(['pdf', 'docx', 'txt', 'md'])
   format?: ResumeExportFormat

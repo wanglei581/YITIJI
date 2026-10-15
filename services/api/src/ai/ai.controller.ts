@@ -520,15 +520,16 @@ export class AiController {
   ) {
     const requester = await this.resolveAiResultRequester(req)
     await this.privacy.requireActiveConsent(requester.endUserId, 'resume_ai')
-    const { taskId, format, layout, templateId, draft, ...resume } = dto
+    const { taskId, format, layout, templateId, draft, unlabeled, ...resume } = dto
     delete (resume as { benefitGrantId?: string }).benefitGrantId
     delete (resume as { factsConfirmedAt?: string }).factsConfirmedAt
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt })
+    const unlabeledApplied = process.env['RESUME_EXPORT_UNLABELED_OPTION'] === 'true' && unlabeled === true && draft !== true
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId, draft === true, { taskId, benefitGrantId: dto.benefitGrantId, factsConfirmedAt: dto.factsConfirmedAt, unlabeled: unlabeledApplied })
     await this.audit.write({
-      actorId: null,
+      actorId: unlabeledApplied ? requester.endUserId : null,
       actorRole: 'kiosk',
-      action: 'resume.generate_exported',
+      action: unlabeledApplied ? 'resume.generate_export_unlabeled' : 'resume.generate_exported',
       targetType: 'file',
       targetId: result.fileId,
       payload: {
@@ -539,6 +540,9 @@ export class AiController {
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),
+        unlabeledRequested: unlabeled === true,
+        unlabeledApplied,
+        unlabeledProtocolVersion: unlabeledApplied ? '2026-09-28' : null,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
