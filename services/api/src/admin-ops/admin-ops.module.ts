@@ -4,10 +4,11 @@ import { AdminOpsService } from './admin-ops.service'
 import { AdminOpsController } from './admin-ops.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
+import { AdminAlertPushService } from './admin-alert-push.service'
 
 @Module({
   imports:     [PrismaModule, AuthModule],
-  providers:   [AdminOpsService, AdminAlertActionsService],
+  providers:   [AdminOpsService, AdminAlertActionsService, AdminAlertPushService],
   controllers: [AdminOpsController],
   exports:     [AdminOpsService],
 })

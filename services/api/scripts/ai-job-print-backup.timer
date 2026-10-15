@@ -1,0 +1,7 @@
+[Unit]
+Description=Run AI job print PostgreSQL backup daily
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+[Install]
+WantedBy=timers.target

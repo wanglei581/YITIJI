@@ -30,6 +30,16 @@ export class RedisService implements OnModuleDestroy {
     return this.client.get(key)
   }
 
+  /** 原子地写入一次性标记；false 表示已有实例先完成了这次动作。 */
+  async setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX')
+    return result === 'OK'
+  }
+
+  set(key: string, value: string, ttlSeconds: number): Promise<void> {
+    return this.setEx(key, ttlSeconds, value)
+  }
+
   async getDel(key: string): Promise<string | null> {
     const value = await this.client.call('GETDEL', key)
     return typeof value === 'string' ? value : null

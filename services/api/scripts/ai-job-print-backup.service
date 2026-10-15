@@ -1,0 +1,7 @@
+[Unit]
+Description=AI job print PostgreSQL daily backup
+[Service]
+Type=oneshot
+# The script reads this file itself; EnvironmentFile is optional convenience for overrides.
+EnvironmentFile=-/srv/ai-job-print/services/api/.env
+ExecStart=/srv/ai-job-print/services/api/scripts/backup-postgres.sh
