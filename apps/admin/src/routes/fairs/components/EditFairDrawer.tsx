@@ -1,3 +1,6 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不注册、不打包：本文件不再被任何页面 import。
+// 管理员代改招聘会基本信息的抽屉，原由 fairs/index.tsx 的「编辑基本信息」按钮打开。托管 a 下本平台不代改
+// 招聘会内容，前端不论托管开关一律不给；b 版本恢复时由 fairs/index.tsx 引入并挂回（按钮一并恢复）。
 import { useEffect, useState } from 'react'
 import { Drawer } from '@ai-job-print/ui'
 import { Field, GhostButton, InlineError, PrimaryButton } from '../../../components/form'

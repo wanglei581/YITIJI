@@ -32,6 +32,17 @@
  *     evidence-access 不允许出现在 useEffect 里（预取会给没真看过的材料留审计），
  *     且开窗必须发生在请求之前（窗口开不出来就不发请求 = 不留假审计）。
  *
+ * ── 3.15（2026-09-29）起 ──────────────────────────────────────────────────
+ *
+ * 线下机构整页停放：不注册路由、不进侧栏，旧地址 /offline-agencies 重定向到合作机构管理；
+ * 页面源码原样保留给私有化部署（b）。资质核验这一只读能力迁到合作机构详情抽屉的「资质核验」
+ * 小节（routes/partners/OrgQualificationSection.tsx），按机构 id 直接读，不再经 sourceOrgId。
+ * 因此本门禁：
+ *   - 1–5 节照旧核对停放的表单（b 版本恢复时这条链路不能是空转的）；
+ *   - 6–7 节的「状态可分辨 + 取证只走 evidence-access」对**停放抽屉与新小节各跑一遍**，
+ *     新小节没有「没有来源机构」这一态（它总有机构 id），另加「还没有登记资质记录 / 登记入口尚未开放」的如实说法；
+ *   - 第 8 节核对停放本身：路由与侧栏里没有这一页、旧地址重定向、合作机构抽屉真的挂了资质核验小节。
+ *
  * ── 运行 ────────────────────────────────────────────────────────────────────
  *   pnpm --filter @ai-job-print/admin verify:admin-offline-agencies-ui
  *
@@ -54,6 +65,10 @@ const FORM = join(PAGE_DIR, 'AgencyForm.tsx')
 const DRAWER = join(PAGE_DIR, 'GovernanceDrawer.tsx')
 const REVIEW = join(PAGE_DIR, 'ReviewDialog.tsx')
 const INDEX = join(PAGE_DIR, 'index.tsx')
+const QUAL_SECTION = join(adminRoot, 'src/routes/partners/OrgQualificationSection.tsx')
+const PARTNERS_PAGE = join(adminRoot, 'src/routes/partners/index.tsx')
+const ROUTES = join(adminRoot, 'src/routes/index.tsx')
+const NAV = join(adminRoot, 'src/layouts/AdminLayoutWrapper.tsx')
 const SERVICE = join(adminRoot, 'src/services/api/offlineAgenciesAdmin.ts')
 const GOV_SERVICE = join(adminRoot, 'src/services/api/offlineAgencyGovernance.ts')
 const SERVER_DTO = join(repoRoot, 'services/api/src/offline-agencies/dto/create-offline-agency.dto.ts')
@@ -392,8 +407,9 @@ if (!selectGuard.includes("orgs.kind === 'ready'")) {
 pass(`${rel(FORM)} 的机构列表「拉取失败 / 确认为空 / 有候选」三态互斥，失败态不渲染空下拉`)
 
 // ---------------------------------------------------------------------------
-// 6. 资质抽屉五态：都存在，且「失败」绝不渲染成「空」
+// 6. 资质界面各态：都存在，且「失败」绝不渲染成「空」
 // ---------------------------------------------------------------------------
+function checkQualificationSurface(DRAWER, drawerAst, { withoutSourceOrgState }) {
 const confirmedEmpty = jsxNamed(drawerAst, 'ConfirmedEmpty')
 const loadFailed = jsxNamed(drawerAst, 'LoadFailed')
 if (confirmedEmpty.length === 0 || loadFailed.length === 0) {
@@ -424,10 +440,10 @@ const drawerGuards = collect(drawerAst, (n) => isJsxEl(n)).map((el) => ({
   guard: guardOfElement(el) ?? '',
 }))
 const REQUIRED_STATES = [
-  {
+  ...(withoutSourceOrgState ? [{
     label: '① 没有来源机构（不发请求，也不算无资质）',
     match: (g) => g.name === 'ConfirmedEmpty' && /^!\(\s*organizationId\s*\)$/.test(g.guard.trim()),
-  },
+  }] : []),
   {
     label: '② 来源机构在机构表中不存在（404，≠ 没有资质）',
     match: (g) =>
@@ -458,10 +474,10 @@ const REQUIRED_STATES = [
 ]
 for (const state of REQUIRED_STATES) {
   if (!drawerGuards.some((g) => state.match(g))) {
-    fail(`${rel(DRAWER)} 找不到状态「${state.label}」的渲染分支 —— 五态不再可分辨`)
+    fail(`${rel(DRAWER)} 找不到状态「${state.label}」的渲染分支 —— 各态不再可分辨`)
   }
 }
-pass(`${rel(DRAWER)} 五态齐备且守卫互不重叠：${REQUIRED_STATES.map((s) => s.label.slice(0, 2)).join(' ')}`)
+pass(`${rel(DRAWER)} ${REQUIRED_STATES.length} 态齐备且守卫互不重叠：${REQUIRED_STATES.map((s) => s.label.slice(0, 2)).join(' ')}`)
 
 // ---------------------------------------------------------------------------
 // 7. 取证只走 evidence-access 这一条留痕路径
@@ -514,5 +530,63 @@ if (earlyReturn === 0) {
   fail(`${rel(DRAWER)} 的 viewEvidence 没有在开窗失败时 early return，仍会发出取证请求`)
 }
 pass(`${rel(DRAWER)} 取证只走 evidence-access：无 /files/ 拼接、无 evidenceFileId、无 useEffect 预取，且开窗失败即 early return`)
+}
+
+checkQualificationSurface(DRAWER, drawerAst, { withoutSourceOrgState: true })
+
+// 新小节：总有机构 id，没有「没有来源机构」这一态；其余各态与取证规则与停放抽屉相同
+const qualText = readOrFail(QUAL_SECTION)
+const qualAst = sourceFile(QUAL_SECTION, qualText)
+checkQualificationSurface(QUAL_SECTION, qualAst, { withoutSourceOrgState: false })
+
+// 零资质要如实说「还没有登记」，并写明登记入口尚未开放（生产上没有写入 QualificationRecord 的入口）
+{
+  const emptyNodes = jsxNamed(qualAst, 'ConfirmedEmpty').filter((el) => /quals\.data\.length\s*===\s*0/.test(guardOfElement(el) ?? ''))
+  const attrs = emptyNodes.map((el) => el.getText())
+  if (!attrs.some((t) => t.includes('还没有登记资质记录') && t.includes('资质登记入口尚未开放'))) {
+    fail(`${rel(QUAL_SECTION)} 的零资质空态没有写「还没有登记资质记录」与「资质登记入口尚未开放」—— 会被读成「该机构没有资质」`)
+  }
+  if (!qualText.includes('审计日志')) fail(`${rel(QUAL_SECTION)} 没有提示「查看资质材料会写入审计日志」`)
+  // 按机构 id 直接读：取数调用的第一个参数必须是 organizationId，不再经 sourceOrgId 桥
+  if (qualText.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1').includes('sourceOrgId')) fail(`${rel(QUAL_SECTION)} 仍经 sourceOrgId 找机构 —— 迁到合作机构后应按机构 id 直接读`)
+  for (const method of ['listProfilesByOrganization', 'listQualifications', 'getQualificationEvidence']) {
+    const calls = callsMethod(qualAst, method)
+    if (calls.length === 0) fail(`${rel(QUAL_SECTION)} 没有调用 ${method}`)
+    for (const call of calls) {
+      const first = call.arguments[0]?.getText() ?? ''
+      if (!/^(organizationId|orgId)$/.test(first)) fail(`${rel(QUAL_SECTION)} 的 ${method} 第一个参数是 \`${first}\`，不是机构 id`)
+    }
+  }
+  pass(`${rel(QUAL_SECTION)} 按机构 id 直接读；零资质如实说「还没有登记 / 登记入口尚未开放」，取证提示留痕`)
+}
+
+// ---------------------------------------------------------------------------
+// 8. 停放本身：路由、侧栏、旧地址、合作机构抽屉
+// ---------------------------------------------------------------------------
+{
+  const routes = readOrFail(ROUTES)
+  const nav = readOrFail(NAV)
+  const partners = readOrFail(PARTNERS_PAGE)
+  const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  if (/import\s+\w+\s+from\s+'\.\/offline-agencies'/.test(code(routes))) {
+    fail(`${rel(ROUTES)} 仍 import 线下机构页 —— 3.15 停放后不得打包`)
+  }
+  if (!/\{\s*path:\s*'offline-agencies',\s*element:\s*<Navigate to="\/partners" replace \/>\s*\}/.test(routes)) {
+    fail(`${rel(ROUTES)} 的旧地址 /offline-agencies 没有按历史路径做法重定向到 /partners`)
+  }
+  if (/key:\s*'offline-agencies'/.test(code(nav)) || code(nav).includes("label: '线下机构'")) {
+    fail(`${rel(NAV)} 侧栏仍有「线下机构」`)
+  }
+  if (!/'\/offline-agencies':\s*'partners'/.test(nav)) {
+    fail(`${rel(NAV)} 旧地址 /offline-agencies 没有映射到合作机构菜单高亮`)
+  }
+  if (!/<OrgQualificationSection\s+organizationId=\{/.test(partners)) {
+    fail(`${rel(PARTNERS_PAGE)} 的机构详情没有挂「资质核验」小节 —— 迁移没有落地，入驻核验就丢了`)
+  }
+  for (const file of [INDEX, FORM, DRAWER, REVIEW, join(PAGE_DIR, 'JobsDrawer.tsx')]) {
+    if (!readOrFail(file).startsWith('// 【停放，')) fail(`${rel(file)} 缺少停放文件头注释`)
+  }
+  pass('线下机构页已停放：路由不 import、侧栏无入口、旧地址重定向到合作机构；合作机构详情挂了资质核验小节；页面文件都带停放头')
+}
 
 console.log('\nALL PASS')

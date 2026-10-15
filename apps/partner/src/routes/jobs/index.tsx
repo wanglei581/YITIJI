@@ -259,7 +259,7 @@ export default function JobsPage() {
         // 手动录入岗位:走导入端点,externalId 由前端生成 MANUAL- 前缀(本机构手工来源)
         const externalId = `MANUAL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         await importPartnerJobs([{ ...payload, externalId, title: payload.title!, company: payload.company!, city: payload.city!, sourceUrl: payload.sourceUrl! }])
-        setNotice('岗位已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
+        setNotice('岗位已录入,进入待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。')
       } else if (editing) {
         await updatePartnerJob(editing.id, payload)
         setNotice('修改已保存。该岗位已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
@@ -447,7 +447,7 @@ export default function JobsPage() {
       <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
       <p className="mt-3 text-xs text-neutral-400">
-        本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的岗位需经管理员重新审核后才会在终端展示。
+        本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的岗位回到待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。
       </p>
 
       {/* 编辑/新增抽屉 */}

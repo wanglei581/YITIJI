@@ -236,7 +236,7 @@ export default function FairsPage() {
           sourceUrl: payload.sourceUrl!,
           checkinUrl: payload.checkinUrl || undefined,
         }])
-        setNotice('招聘会已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
+        setNotice('招聘会已录入,进入待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。')
       } else if (editing) {
         await updatePartnerFair(editing.id, payload)
         setNoticeIsError(false)
@@ -409,7 +409,7 @@ export default function FairsPage() {
       <ListPagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
       <p className="mt-3 text-xs text-neutral-400">
-        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示；活动资料由合作机构上传，发布仍由管理员控制。
+        本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会回到待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示；活动资料由合作机构上传，发布入口同样尚未开放。
       </p>
 
       {/* 编辑/新增抽屉 */}

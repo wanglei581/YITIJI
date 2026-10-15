@@ -19,10 +19,15 @@
  *   「下架」渲染 ⟺ publishStatus === 'published'
  *
  * 3.13（2026-09-26）起：
- *   - job-sources / fair-sources 的审核 / 发布 / 下架整组包在托管开关守卫里：托管关闭（我们云上默认）
- *     时不渲染，只留查看与紧急下架；托管打开（私有化部署 b）时按上面的矩阵渲染，另加紧急下架。
  *   - policy-sources 不再有任何管理员审核 / 发布 / 批量发布：政策由机构自己审核发布，
  *     服务端对管理员一律回 403 ADMIN_POLICY_PUBLISH_DISABLED。页面只留查看与紧急下架。
+ *
+ * 3.15（2026-09-29）起：
+ *   - job-sources / fair-sources 的审核 / 发布 / 下架与批量发布**不论托管开关一律停放**：
+ *     逐行按钮抽到同目录停放文件 JobSourceReviewActions.tsx / FairSourceReviewActions.tsx，
+ *     批量发布是 components/BulkPublishButton.tsx，三者都不得被任何文件 import。
+ *     页面只留查看与紧急下架（原 3.13 的「托管开关守卫」断言随之改为「页面上根本没有」）。
+ *   - 上面的 4×4 矩阵断言改在停放文件上求值：b 版本恢复时原样挂回，2026-08-16 的事故回归不能丢。
  *
  * Run: pnpm --filter @ai-job-print/admin verify:source-publish-actions
  *
@@ -33,7 +38,7 @@
  *   .github/workflows/ci.yml，否则 verify:ci-gate-coverage 会判它「未被任何 CI job
  *   执行」而转红。拆名字时请连同 ci.yml 一起改。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -50,13 +55,20 @@ const ORACLES = {
   下架: (row) => row.publishStatus === 'published',
 }
 
+/** 停放的逐行审核 / 发布 / 下架按钮（3.15）。矩阵断言在这里求值。 */
 const targets = [
-  join(adminRoot, 'src/routes/job-sources/index.tsx'),
-  join(adminRoot, 'src/routes/fair-sources/index.tsx'),
+  join(adminRoot, 'src/routes/job-sources/JobSourceReviewActions.tsx'),
+  join(adminRoot, 'src/routes/fair-sources/FairSourceReviewActions.tsx'),
 ]
 
-/** 托管开关守卫：管理员对招聘内容的审核 / 发布 / 下架只在它为真时渲染。 */
-const HOSTING_GUARD_LINE = '{hosting.writable && ('
+/** 挂在路由上的两个信息源页：只许查看与紧急下架。 */
+const pages = [
+  { path: join(adminRoot, 'src/routes/job-sources/index.tsx'), kind: 'job', api: ['approveJobSource', 'rejectJobSource', 'publishJobSource', 'unpublishJobSource'] },
+  { path: join(adminRoot, 'src/routes/fair-sources/index.tsx'), kind: 'job_fair', api: ['approveFairSource', 'rejectFairSource', 'publishFairSource', 'unpublishFairSource'] },
+]
+
+/** 停放文件的导出名：整个 admin src 里不许出现对它们的 import。 */
+const PARKED_EXPORTS = ['JobSourceReviewActions', 'FairSourceReviewActions', 'BulkPublishButton']
 
 /** 形如 `{<expr> && (` 的 JSX 守卫行 */
 const GUARD_RE = /^\s*\{(.+?)\s*&&\s*\($/
@@ -154,56 +166,58 @@ for (const target of targets) {
   pass(`${rel(target)} approved + unpublished 可渲染「发布」按钮`)
 }
 
-/**
- * 找到 `{hosting.writable && (` 这一守卫包住的行号区间（按括号配对，JSX 里的中文与 className 不含括号）。
- * 返回 [开始行, 结束行]（1 起算，含两端）。
- */
-function hostingGuardRange(source, file) {
-  const lines = source.split('\n')
-  const starts = lines.flatMap((line, index) => (line.trim() === HOSTING_GUARD_LINE ? [index] : []))
-  if (starts.length !== 1) fail(`${rel(file)} 应恰好有 1 处 \`${HOSTING_GUARD_LINE}\` 守卫包住审核 / 发布 / 下架，实际 ${starts.length} 处`)
-  let depth = 0
-  for (let i = starts[0]; i < lines.length; i += 1) {
-    for (const ch of lines[i]) {
-      if (ch === '(') depth += 1
-      if (ch === ')') depth -= 1
-    }
-    if (depth === 0) return [starts[0] + 1, i + 1]
-  }
-  fail(`${rel(file)} 的托管守卫没有闭合`)
-}
-
-for (const target of targets) {
-  const source = readFileSync(target, 'utf8')
-  const [from, to] = hostingGuardRange(source, target)
-  const lines = source.split('\n')
-  for (const label of ['审核通过', '拒绝', '发布', '下架']) {
-    const at = lines.flatMap((line, index) => (line.trim() === label ? [index + 1] : []))
-    if (at.length === 0) fail(`${rel(target)} 找不到「${label}」按钮，页面结构已失配`)
-    const outside = at.filter((line) => line < from || line > to)
-    if (outside.length > 0) {
-      fail(`${rel(target)}:${outside.join(',')} 的「${label}」不在托管开关守卫（第 ${from}-${to} 行）里 —— 托管关闭时会渲染出点了就 403 的按钮`)
-    }
-  }
-  if (!/hosting\.writable \? <BulkPublishButton/.test(source)) {
-    fail(`${rel(target)} 的批量发布没有按托管开关收起（期望 \`hosting.writable ? <BulkPublishButton\`）`)
-  }
-  const kind = target.includes('job-sources') ? 'job' : 'job_fair'
-  if (!source.includes(`setTakedown({ targetType: '${kind}'`) || !source.includes('<EmergencyTakedownDialog')) {
-    fail(`${rel(target)} 没有逐条的紧急下架入口（targetType=${kind}）`)
-  }
-  const takedownLine = lines.findIndex((line) => line.includes(`setTakedown({ targetType: '${kind}'`)) + 1
-  if (takedownLine >= from && takedownLine <= to) {
-    fail(`${rel(target)}:${takedownLine} 紧急下架被包进了托管开关守卫 —— 托管关闭时管理员反而无法下架`)
-  }
-  pass(`${rel(target)} 审核 / 发布 / 下架只在托管打开时渲染（第 ${from}-${to} 行），紧急下架两种状态都在`)
-}
-
-// ── 3.13 政策：管理员只读 + 紧急下架 ─────────────────────────────────────────
 /** 去掉块注释与行注释，只看会执行的代码（注释里解释「为什么不再调用」不应打挂断言）。 */
 function codeOnly(text) {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
+
+// ── 3.15：两个信息源页只留查看与紧急下架（不论托管开关） ─────────────────────
+for (const { path, kind, api } of pages) {
+  const raw = readFileSync(path, 'utf8')
+  const code = codeOnly(raw)
+  const lines = code.split('\n').map((line) => line.trim())
+  for (const label of ['审核通过', '拒绝', '发布', '下架', '批量发布']) {
+    if (lines.includes(label)) fail(`${rel(path)} 仍渲染管理员「${label}」按钮 —— 3.15 起不论托管开关一律停放`)
+  }
+  for (const token of [...api, 'BulkPublishButton', 'hosting.writable', 'window.confirm(']) {
+    if (code.includes(token)) fail(`${rel(path)} 仍含 ${token} —— 审核 / 发布 / 批量发布应只在停放文件里`)
+  }
+  if (!code.includes(`setTakedown({ targetType: '${kind}'`) || !code.includes('<EmergencyTakedownDialog')) {
+    fail(`${rel(path)} 没有逐条的紧急下架入口（targetType=${kind}）`)
+  }
+  if (!code.includes('本平台不代审、不代发招聘内容')) {
+    fail(`${rel(path)} 原审核 / 发布按钮的位置缺少如实说明（「本平台不代审、不代发招聘内容…」）`)
+  }
+  pass(`${rel(path)} 不渲染审核 / 发布 / 下架 / 批量发布，逐条紧急下架仍在`)
+}
+
+// 停放文件不被任何文件 import（否则就是「停放」之名、挂载之实）
+{
+  const srcRoot = join(adminRoot, 'src')
+  const offenders = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      if (statSync(full).isDirectory()) { walk(full); continue }
+      if (!/\.(tsx?|jsx?)$/.test(name)) continue
+      // 只看代码（停放文件头注释里会写「不被 import」「由 xxx 引入」），且只认一条 import 语句之内的命名
+      const text = codeOnly(readFileSync(full, 'utf8'))
+      for (const exported of PARKED_EXPORTS) {
+        const named = new RegExp(`import\\s+(?:type\\s+)?\\{[^}]*\\b${exported}\\b[^}]*\\}\\s*from`)
+        const lazy = new RegExp(`import\\([^)]*${exported}`)
+        if (named.test(text) || lazy.test(text)) offenders.push(`${rel(full)} → ${exported}`)
+      }
+    }
+  }
+  walk(srcRoot)
+  if (offenders.length > 0) fail(`停放文件被 import：${offenders.join(' , ')}`)
+  for (const target of targets) {
+    if (!readFileSync(target, 'utf8').startsWith('// 【停放，')) fail(`${rel(target)} 缺少停放文件头注释`)
+  }
+  pass(`停放文件（${PARKED_EXPORTS.join(' / ')}）不被 admin src 里任何文件 import，且带停放文件头`)
+}
+
+// ── 3.13 政策：管理员只读 + 紧急下架 ─────────────────────────────────────────
 
 {
   const policyPath = join(adminRoot, 'src/routes/policy-sources/index.tsx')

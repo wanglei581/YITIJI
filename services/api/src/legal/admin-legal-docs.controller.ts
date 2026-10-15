@@ -19,6 +19,16 @@ export class AdminLegalDocsController {
     return { success: true, data: await this.service.list(docType) }
   }
 
+  /**
+   * GET /api/v1/admin/legal-doc-versions/:id — 读取单个版本（含正文）。
+   * 只给管理员（方法上再声明一次，不只靠类级装饰器）；每次读取写 legal_doc.view 访问审计。
+   */
+  @Get(':id')
+  @Roles('admin')
+  async getOne(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return { success: true, data: await this.service.getById(id, { userId: user.userId, role: user.role }) }
+  }
+
   /** POST /api/v1/admin/legal-doc-versions — 新建草稿 */
   @Post()
   async create(

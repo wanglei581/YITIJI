@@ -1,41 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Card, Drawer, ErrorState, LoadingState } from '@ai-job-print/ui'
-import { GhostButton, InlineError, InlineSuccess, PrimaryButton } from '../../../components/form'
-import { EMPTY_FORM, detailToForm, errMsg, fmtDateTime, formToFields, validateForm, type CompanyFormState } from './shared'
+import { Card, Drawer, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { GhostButton } from '../../../components/form'
+import { JOB_CATEGORY_LABELS, PUBLISH_BADGE, REVIEW_BADGE, detailToForm, fmtDateTime } from './shared'
 import { companiesAdminService, type AdminCompanyDetail } from '../../../services/api/companiesAdmin'
 import { CompanyFormFields } from './CompanyFormFields'
-import { LinkedJobsSection } from './LinkedJobsSection'
-import { ReviewPublishSection } from './ReviewPublishSection'
 
+/**
+ * 企业详情抽屉（只读）。
+ *
+ * 3.15 起本平台不代审、不代发、不代改企业资料：保存展示信息、审核发布、关联 / 移除岗位
+ * 不论托管开关一律停放，完整可写版本在同目录 CompanyDetailDrawerEditor.tsx（不被 import）。
+ * 处置入口只有列表行上的「紧急下架」。
+ */
 export function CompanyDetailDrawer({
   companyId,
   onClose,
-  onChanged,
-  readOnly = false,
 }: {
   companyId: string | null
   onClose: () => void
-  onChanged: () => void
-  /** 托管关闭（我们云上默认）时只读：展示资料照常，编辑 / 审核 / 发布 / 关联岗位一律不给。 */
-  readOnly?: boolean
 }) {
   const [detail, setDetail] = useState<AdminCompanyDetail | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
-  const [form, setForm] = useState<CompanyFormState>(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
-  const load = useCallback(async (id: string, resetForm: boolean) => {
-    if (resetForm) setState('loading')
+  const load = useCallback(async (id: string) => {
+    setState('loading')
     try {
-      const d = await companiesAdminService.getCompany(id)
-      setDetail(d)
-      if (resetForm) {
-        setForm(detailToForm(d))
-        setSaveError(null)
-        setSaveSuccess(null)
-      }
+      setDetail(await companiesAdminService.getCompany(id))
       setState('ready')
     } catch {
       setState('error')
@@ -43,38 +33,8 @@ export function CompanyDetailDrawer({
   }, [])
 
   useEffect(() => {
-    if (companyId) void load(companyId, true)
+    if (companyId) void load(companyId)
   }, [companyId, load])
-
-  /** 审核/发布/岗位关联变更后：刷新详情（保留正在编辑的表单内容）+ 通知列表刷新。 */
-  const mutated = useCallback(() => {
-    if (companyId) void load(companyId, false)
-    onChanged()
-  }, [companyId, load, onChanged])
-
-  const save = async () => {
-    if (!detail) return
-    const invalid = validateForm(form)
-    if (invalid) {
-      setSaveError(invalid)
-      setSaveSuccess(null)
-      return
-    }
-    setSaving(true)
-    setSaveError(null)
-    setSaveSuccess(null)
-    try {
-      const updated = await companiesAdminService.updateCompany(detail.id, formToFields(form))
-      setDetail(updated)
-      setForm(detailToForm(updated))
-      setSaveSuccess('保存成功')
-      onChanged()
-    } catch (e) {
-      setSaveError(errMsg(e))
-    } finally {
-      setSaving(false)
-    }
-  }
 
   return (
     <Drawer
@@ -84,19 +44,14 @@ export function CompanyDetailDrawer({
       size="lg"
       footer={
         state === 'ready' ? (
-          <div className="flex justify-end gap-2">
-            <GhostButton onClick={onClose} disabled={saving}>关闭</GhostButton>
-            {!readOnly && (
-              <PrimaryButton onClick={() => void save()} disabled={saving || !form.name.trim()}>
-                {saving ? '保存中…' : '保存展示信息'}
-              </PrimaryButton>
-            )}
+          <div className="flex justify-end">
+            <GhostButton onClick={onClose}>关闭</GhostButton>
           </div>
         ) : undefined
       }
     >
       {state === 'loading' && <LoadingState className="py-24" />}
-      {state === 'error' && companyId && <ErrorState className="py-24" onRetry={() => void load(companyId, true)} />}
+      {state === 'error' && companyId && <ErrorState className="py-24" onRetry={() => void load(companyId)} />}
       {state === 'ready' && detail && (
         <div className="space-y-4">
           {/* 来源信息（合规：可溯源，不可修改） */}
@@ -110,23 +65,56 @@ export function CompanyDetailDrawer({
             </div>
           </Card>
 
-          <ReviewPublishSection detail={detail} onMutated={mutated} readOnly={readOnly} />
+          {/* 审核与发布状态（只读） */}
+          <Card className="space-y-3 p-4">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-neutral-700">审核与发布状态</p>
+              <StatusBadge dot status={REVIEW_BADGE[detail.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[detail.reviewStatus]?.label ?? detail.reviewStatus} />
+              <StatusBadge dot status={PUBLISH_BADGE[detail.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[detail.publishStatus]?.label ?? detail.publishStatus} />
+            </div>
+            {detail.reviewStatus === 'rejected' && detail.rejectReason && (
+              <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">拒绝原因：{detail.rejectReason}</p>
+            )}
+            <p className="text-xs text-neutral-500">本平台不代审、不代发企业资料；如有违法违规内容，请用列表中的「紧急下架」。</p>
+          </Card>
 
-          {/* 展示信息编辑 */}
+          {/* 展示信息：fieldset 统一禁用，内容照常可读，但不能改 */}
           <Card className="space-y-4 p-4">
             <p className="text-sm font-medium text-neutral-700">展示信息</p>
-            <InlineError message={saveError} />
-            <InlineSuccess message={saveSuccess} />
-            {/* 只读时用 fieldset 统一禁用：内容照常可读，但不能改。 */}
-            <fieldset disabled={readOnly} className="min-w-0">
-              <CompanyFormFields form={form} onChange={setForm} />
+            <fieldset disabled className="min-w-0">
+              <CompanyFormFields form={detailToForm(detail)} onChange={() => undefined} />
             </fieldset>
           </Card>
 
-          <LinkedJobsSection detail={detail} onMutated={mutated} readOnly={readOnly} />
+          {/* 关联岗位（只读） */}
+          <Card className="space-y-3 p-4">
+            <p className="text-sm font-medium text-neutral-700">关联岗位（{detail.linkedJobsTotal}）</p>
+            {detail.linkedJobs.length === 0 ? (
+              <p className="rounded-lg bg-neutral-50 px-3 py-3 text-center text-xs text-neutral-400">暂无关联岗位</p>
+            ) : (
+              <>
+                {detail.linkedJobsTotal > detail.linkedJobs.length && (
+                  <p className="text-xs text-warning-fg">仅显示最近 {detail.linkedJobs.length} 条</p>
+                )}
+                <ul className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
+                  {detail.linkedJobs.map((j) => (
+                    <li key={j.id} className="flex items-center gap-2 px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-neutral-800">{j.title}</p>
+                        <p className="text-xs text-neutral-400">
+                          {j.city || '—'} · {j.category ? JOB_CATEGORY_LABELS[j.category] ?? j.category : '—'}
+                        </p>
+                      </div>
+                      <StatusBadge dot status={PUBLISH_BADGE[j.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[j.publishStatus]?.label ?? j.publishStatus} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Card>
 
           <p className="text-xs text-neutral-400">
-            企业展示仅作为来源企业与岗位的导览信息；系统不接收求职者简历，求职者通过既有「去来源平台投递 / 扫码投递」入口跳转外部来源平台。所有修改操作均记录审计日志。
+            企业展示仅作为来源企业与岗位的导览信息；系统不接收求职者简历，求职者通过既有「去来源平台投递 / 扫码投递」入口跳转外部来源平台。紧急下架记录审计日志。
           </p>
         </div>
       )}

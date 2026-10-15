@@ -22,6 +22,9 @@ import { Type } from 'class-transformer'
  * 启用模块白名单由 service 层再校验一次(招聘闭环模块硬拒绝)。
  */
 
+// 清单保留全部五类：存量的企业来源方 / 招聘会主办方编辑时会原样回传自己的类型，这里拒掉会误伤存量。
+// 「不能新建、不能改成」这两类（3.15 停放）由 AdminOrgsService 按 parked-org-types.ts 拒绝，错误码 ORG_TYPE_PARKED；
+// 放在 DTO 里只能得到笼统的 VALIDATION_FAILED，前端说不清原因。
 export const PARTNER_TYPES = [
   'school_employment_center',
   'public_employment_service',

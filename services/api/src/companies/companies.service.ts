@@ -545,6 +545,8 @@ export class CompaniesService {
   }
 
   async adminUnlinkJob(id: string, jobId: string, actor: { userId: string }) {
+    // 与关联同一道闸（3.15）：移除关联同样改写对外展示的企业岗位列表，托管关闭时管理员不得改。
+    assertRecruitmentContentHostingEnabled()
     const res = await this.prisma.job.updateMany({
       where: { id: jobId, companyProfileId: id },
       data: { companyProfileId: null },

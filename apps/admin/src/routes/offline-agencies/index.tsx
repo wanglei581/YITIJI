@@ -1,3 +1,8 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不注册、不打包：线下机构整页已从 routes/index.tsx 与侧栏移除，
+// 旧地址 /offline-agencies 重定向到合作机构管理。托管 a 下线下机构目录及其岗位不在我们云上运营，
+// 管理员也不代建、不代审、不代发；入驻时的资质核验已迁到合作机构详情的「资质核验」小节
+// （routes/partners/OrgQualificationSection.tsx，按机构 id 直接读）。
+// b 版本恢复时：routes/index.tsx 把那条 Navigate 换回本页，并在 layouts/AdminLayoutWrapper.tsx 侧栏加回「线下机构」。是否删除等产品负责人确认。
 import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { BuildingIcon, PlusIcon, SearchIcon, ShieldCheckIcon, Trash2Icon } from 'lucide-react'

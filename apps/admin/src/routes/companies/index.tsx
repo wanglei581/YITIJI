@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { Building2Icon, PlusIcon, SearchIcon } from 'lucide-react'
+import { Building2Icon, SearchIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 import { CompanyDetailDrawer } from './components/CompanyDetailDrawer'
-import { CreateCompanyDrawer } from './components/CreateCompanyDrawer'
 import {
   PUBLISH_BADGE,
   PUBLISH_FILTER_OPTIONS,
@@ -40,11 +39,11 @@ export default function CompaniesPage() {
   const [rows, setRows] = useState<AdminCompanyListItem[]>([])
   const [listState, setListState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [createOpen, setCreateOpen] = useState(false)
   const [takedown, setTakedown] = useState<EmergencyTakedownTarget | null>(null)
-  // 托管关闭（我们云上默认）时只读：不新增、不编辑、不审核发布、不关联岗位，只留查看与紧急下架。
+  // 3.15：本平台不代建、不代审、不代发企业资料，不论托管开关整页只读（不新增、不编辑、不审核发布、
+  // 不关联岗位），只留查看与紧急下架。可写版本停放在 CreateCompanyDrawer.tsx 与 CompanyDetailDrawerEditor.tsx；
+  // 开关只用于顶部说明。
   const hosting = useRecruitmentHosting()
-  const readOnly = !hosting.writable
 
   const loadList = useCallback(async () => {
     setListState('loading')
@@ -64,7 +63,7 @@ export default function CompaniesPage() {
 
   useEffect(() => { void loadList() }, [loadList])
 
-  /** 抽屉内操作成功后刷新列表（不打断抽屉）。 */
+  /** 紧急下架成功后刷新列表。 */
   const refreshList = useCallback(() => { void loadList() }, [loadList])
 
   const hasFilter = Boolean(reviewStatus || publishStatus || keyword)
@@ -72,18 +71,8 @@ export default function CompaniesPage() {
   return (
     <Page
       title="企业展示管理"
-      subtitle={readOnly
-        ? '来源企业展示信息查看 — 展示资料 · 岗位关联（只读，保留紧急下架；不参与招聘闭环）'
-        : '来源企业展示信息运营 — 审核 · 发布 · 展示资料 · 岗位关联（仅信息展示，不参与招聘闭环）'}
-      actions={readOnly ? undefined : (
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
-        >
-          <PlusIcon className="h-4 w-4" />
-          新增企业
-        </button>
-      )}
+      subtitle="来源企业展示信息查看 — 展示资料 · 岗位关联（只读，保留紧急下架；不参与招聘闭环）"
+      actions={<p className="max-w-sm text-right text-xs text-neutral-500">本平台不代建、不代审、不代发企业资料；如有违法违规内容，请用紧急下架。</p>}
     >
       <RecruitmentHostingNotice hosting={hosting} subject="企业资料" />
       {/* 筛选条 */}
@@ -121,9 +110,7 @@ export default function CompaniesPage() {
           description={
             hasFilter
               ? '调整筛选条件或关键词后重试。'
-              : readOnly
-                ? '当前只读：只能查看与紧急下架。'
-                : '企业由合作机构导入或管理员手工新增，审核通过并发布后在一体机「找企业」展示。'
+              : '当前只读：只能查看与紧急下架。'
           }
         />
       )}
@@ -171,7 +158,7 @@ export default function CompaniesPage() {
                           }}
                           className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
                         >
-                          {readOnly ? '查看' : '管理'}
+                          查看
                         </button>
                         <button
                           type="button"
@@ -195,27 +182,10 @@ export default function CompaniesPage() {
       )}
 
       <p className="mt-6 text-xs text-neutral-400">
-        企业展示模块仅提供来源企业信息与岗位导览：展示来源机构提供并经审核的企业资料；系统不接收求职者简历，不参与招聘闭环。
+        企业展示模块仅提供来源企业信息与岗位导览：资料由来源机构提供，本平台不代审、不代发；系统不接收求职者简历，不参与招聘闭环。
       </p>
 
-      <CompanyDetailDrawer
-        companyId={selectedId}
-        onClose={() => setSelectedId(null)}
-        onChanged={refreshList}
-        readOnly={readOnly}
-      />
-
-      {!readOnly && (
-        <CreateCompanyDrawer
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
-          onCreated={(id) => {
-            setCreateOpen(false)
-            refreshList()
-            setSelectedId(id)
-          }}
-        />
-      )}
+      <CompanyDetailDrawer companyId={selectedId} onClose={() => setSelectedId(null)} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refreshList} />
     </Page>

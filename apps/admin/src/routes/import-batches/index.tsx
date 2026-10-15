@@ -59,11 +59,12 @@ export default function ImportBatchesPage() {
   const hosting = useRecruitmentHosting()
   const hostingOff = hosting.status === 'ready' && !hosting.enabled
   const hostingOn = hosting.status === 'ready' && hosting.enabled
-  // 开关没读到时两种说法都不下：既不说「导入已停止」，也不说「确认后进入审核队列」
+  // 开关没读到时两种说法都不下：既不说「导入已停止」，也不说导入后怎样。
+  // 3.15：托管打开时管理员同样不再审核发布导入内容（信息源页只留查看与紧急下架），这里不能再说「在信息源中审核发布」。
   const footnote = hostingOff
     ? '机构的 Excel 导入已停止，这里只保留历史批次。要处置某条内容，点「查看岗位 / 查看招聘会」到对应信息源页做紧急下架；要整体停用一个来源，到「数据接入通道」按来源熔断。'
     : hostingOn
-      ? '导入后数据默认"待审核 + 草稿"，需在岗位信息源或招聘会信息源中审核发布后才会在 Kiosk 展示'
+      ? '导入后数据默认"待审核 + 草稿"。本平台不代审、不代发导入的岗位与招聘会；要处置某条内容，点「查看岗位 / 查看招聘会」到对应信息源页做紧急下架。'
       : null
 
   useEffect(() => {
@@ -136,12 +137,12 @@ export default function ImportBatchesPage() {
       subtitle={hostingOff
         ? '合作机构 Excel 批量导入的历史批次（导入已停止，只读）'
         : hostingOn
-          ? '合作机构 Excel 批量导入的历史批次，确认后进入审核队列'
+          ? '合作机构 Excel 批量导入的历史批次（本平台不代审、不代发）'
           : '合作机构 Excel 批量导入的历史批次'}
     >
       <RecruitmentHostingNotice
         hosting={hosting}
-        detail="机构的 Excel 导入已停止，管理员也不再审核发布导入的岗位与招聘会。本页只保留历史批次，供查看与追溯。"
+        detail="机构的 Excel 导入已停止，本平台也不代审、不代发导入的岗位与招聘会。本页只保留历史批次，供查看与追溯。"
       />
 
       {/* 搜索 + 状态筛选 */}

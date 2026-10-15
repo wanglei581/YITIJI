@@ -200,7 +200,7 @@ export function OrgContentTrustPanel({ orgId, onChanged }: { orgId: string; onCh
             <p className="rounded bg-error-bg px-3 py-2 text-xs text-error-fg">
               该机构已归档。<strong>归档状态下即使标记为「{ORG_CONTENT_TRUST_STATUS_LABELS.active}」,其内容仍然发布不出去</strong>
               ,服务端会直接拒绝这次标记(ORG_ARCHIVED)。
-              取消归档目前<strong>没有后台入口</strong>(后端未提供该接口),需联系平台工程处理后再回来核验。
+              本后台<strong>没有取消归档的功能</strong>;如确需恢复这家机构的内容,请联系平台技术支持处理,完成后再回来核验。
             </p>
           )}
 

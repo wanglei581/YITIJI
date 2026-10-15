@@ -33,7 +33,7 @@ function firstPendingPath(snapshot: PartnerStatsResponse['snapshot']): string {
 //
 // 招聘内容托管关闭（3.13，我们云上默认）时：岗位 / 招聘会 / 数据源的卡片与同步记录不展示，
 // 待审核只算政策（snapshot.pendingReviewPolicies）——岗位类存量没有人能审，算进来只会误导。
-// 政策由本机构自己审核发布；岗位 / 招聘会 / 企业（托管打开时）仍由平台管理员审核。
+// 政策由本机构自己审核发布；岗位 / 招聘会 / 企业（托管打开时）的审核发布入口 3.15 起尚未开放（管理员侧停放）。
 
 const RESULT_CONFIG: Record<string, { label: string; badge: 'success' | 'error' | 'warning' }> = {
   success: { label: '成功', badge: 'success' },
@@ -53,7 +53,7 @@ function PendingReviewCallout({ count, recruitmentHosting, onView }: { count: nu
           <p className="text-sm font-semibold text-warning-fg">有 {count} 条内容待审核</p>
           <p className="mt-0.5 text-xs text-warning-fg">
             {recruitmentHosting
-              ? '岗位、招聘会、企业资料由平台管理员审核；政策由本机构自行审核并确认发布。通过并发布后才会在终端展示'
+              ? '政策由本机构自行审核并确认发布；岗位、招聘会、企业资料的审核发布入口尚未开放（平台不代审、不代发）。通过并发布后才会在终端展示'
               : '政策由本机构自行审核：审核通过并确认发布责任后，才会在终端展示'}
           </p>
         </div>

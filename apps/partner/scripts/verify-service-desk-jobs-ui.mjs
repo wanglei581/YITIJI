@@ -400,7 +400,8 @@ const saveBlock = extractBetween(
   'save workflow',
 )
 check(
-  saveBlock.includes("setNotice('岗位已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')") &&
+  // 3.15：管理员侧审核发布停放，托管打开时文案按真实能力写「审核发布入口尚未开放」（原钉「管理员审核通过并发布后」）
+  saveBlock.includes("setNotice('岗位已录入,进入待审核;审核发布入口尚未开放（平台不代审、不代发）,开放并发布前终端不展示。')") &&
     saveBlock.includes("setNotice('修改已保存。该岗位已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')") &&
     count(saveBlock, 'setEditing(null)') === 1 &&
     /setEditing\(null\)\s*void refresh\(\)\s*\} catch \(e\) \{\s*setFormError\(errMsg\(e\)\)\s*\} finally \{\s*setSaving\(false\)\s*\}\s*\}/.test(

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { ActivityIcon, BuildingIcon, FileTextIcon, LayoutGridIcon, MapPinIcon, PencilIcon } from 'lucide-react'
+import { ActivityIcon, BuildingIcon, FileTextIcon, LayoutGridIcon, MapPinIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
@@ -8,7 +8,6 @@ import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTake
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
 import { VenueGuideTab } from './VenueGuideTab'
 import { CompaniesTab } from './components/CompaniesTab'
-import { EditFairDrawer } from './components/EditFairDrawer'
 import { MaterialsTab } from './components/MaterialsTab'
 import { StatsTab } from './components/StatsTab'
 import { ZonesTab } from './components/ZonesTab'
@@ -48,11 +47,10 @@ export default function FairsPage() {
   const [detailState, setDetailState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [stats, setStats] = useState<AdminFairStats | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('companies')
-  const [editOpen, setEditOpen] = useState(false)
   const [takedown, setTakedown] = useState<EmergencyTakedownTarget | null>(null)
-  // 托管关闭（我们云上默认）时整页只读：不编辑基本信息、企业、展区、导览与资料，只留查看与紧急下架。
+  // 3.15：管理员不代改招聘会内容，不论托管开关整页只读（基本信息、企业、展区、导览、资料），只留查看与紧急下架。
+  // 可写版本停放在 components/EditFairDrawer.tsx 与各 *Editor.tsx；开关只用于顶部说明。
   const hosting = useRecruitmentHosting()
-  const readOnly = !hosting.writable
 
   const loadList = useCallback(async () => {
     setListState('loading')
@@ -96,9 +94,7 @@ export default function FairsPage() {
   return (
     <Page
       title="招聘会管理"
-      subtitle={readOnly
-        ? '招聘会内容查看 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(只读,保留紧急下架)'
-        : '招聘会内容运营 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(审核/发布请到「招聘会信息源」)'}
+      subtitle="招聘会内容查看 — 基本信息 · 参展企业 · 展区 · 活动资料 · 统计(只读,保留紧急下架)"
     >
       <RecruitmentHostingNotice hosting={hosting} subject="招聘会及其企业、展区、导览与资料" />
       {listState === 'loading' && <LoadingState className="py-24" />}
@@ -107,9 +103,7 @@ export default function FairsPage() {
         <EmptyState
           className="py-24"
           title="暂无招聘会数据"
-          description={readOnly
-            ? '当前只读：只能查看与紧急下架。'
-            : '招聘会由合作机构在机构后台导入,经「招聘会信息源」审核后在此进行内容运营。'}
+          description="当前只读：只能查看与紧急下架。"
         />
       )}
 
@@ -169,15 +163,7 @@ export default function FairsPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {!readOnly && (
-                    <button
-                      onClick={() => setEditOpen(true)}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
-                    >
-                      <PencilIcon className="h-3.5 w-3.5" />
-                      编辑基本信息
-                    </button>
-                  )}
+                  <span className="text-xs text-neutral-400">本平台不代改招聘会内容</span>
                   <button
                     type="button"
                     onClick={() => setTakedown({ targetType: 'job_fair', targetId: selectedFair.id, title: selectedFair.title, orgName: selectedFair.sourceName })}
@@ -206,35 +192,23 @@ export default function FairsPage() {
                 ))}
               </div>
 
-              {activeTab === 'companies' && <CompaniesTab fairId={selectedFair.id} companies={detail?.companies ?? []} onChanged={refresh} readOnly={readOnly} />}
-              {activeTab === 'zones'     && <ZonesTab fairId={selectedFair.id} zones={detail?.zones ?? []} onChanged={refresh} readOnly={readOnly} />}
-              {activeTab === 'venue'     && <VenueGuideTab fairId={selectedFair.id} venueDefault={selectedFair.venue} companies={detail?.companies ?? []} readOnly={readOnly} />}
+              {activeTab === 'companies' && <CompaniesTab companies={detail?.companies ?? []} />}
+              {activeTab === 'zones'     && <ZonesTab zones={detail?.zones ?? []} />}
+              {activeTab === 'venue'     && <VenueGuideTab fairId={selectedFair.id} />}
               {activeTab === 'materials' && (
                 <MaterialsTab
-                  fairId={selectedFair.id}
                   materials={detail?.materials ?? []}
-                  onChanged={refresh}
-                  readOnly={readOnly}
                   onTakedown={(m) => setTakedown({ targetType: 'fair_material', targetId: m.id, title: m.name, orgName: selectedFair.sourceName })}
                 />
               )}
               {activeTab === 'stats'     && <StatsTab stats={stats} />}
-
-              {!readOnly && (
-                <EditFairDrawer
-                  fair={selectedFair}
-                  open={editOpen}
-                  onClose={() => setEditOpen(false)}
-                  onSaved={refresh}
-                />
-              )}
             </>
           )}
         </>
       )}
 
       <p className="mt-6 text-xs text-neutral-400">
-        招聘会数字化模块:仅提供信息展示和现场服务,不接收简历,不参与招聘闭环。所有修改操作均记录审计日志。紧急下架只能下架、不能恢复,须写明事由,并会通知所属机构。
+        招聘会数字化模块:仅提供信息展示和现场服务,不接收简历,不参与招聘闭环。本平台不代改、不代发招聘会内容;紧急下架只能下架、不能恢复,须写明事由,记录审计日志,并会通知所属机构。
       </p>
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refresh} />

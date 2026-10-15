@@ -184,6 +184,42 @@ async function main(): Promise<void> {
       'Licensed HR agency cannot import job fairs',
     )
 
+    // ── 3.15 停放：企业来源方 / 招聘会主办方不能导入、不能维护企业资料，托管打开也一样 ──
+    // 停放前 enterprise_source 能导入岗位、fair_organizer 能导入招聘会，两者都能维护企业资料。
+    {
+      const previousHosting = process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+      process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
+      try {
+        for (const [key, orgType] of [['enterprise', 'enterprise_source'], ['fair', 'fair_organizer']] as const) {
+          const caps = await partner.getPartnerDataSourceCapabilities(partnerUser(orgIds[key]))
+          expect(caps.recruitmentHosting === true, `${orgType}: hosting override did not take effect`)
+          expect(
+            caps.canImportJobs === false && caps.canImportFairs === false && caps.canManageCompanies === false,
+            `${orgType} is parked (3.15) but still reports import/company capability with hosting on: ${JSON.stringify(caps)}`,
+          )
+        }
+        await expectCode(
+          () => partner.importJobs([], partnerUser(orgIds.enterprise)),
+          'PARTNER_CAPABILITY_DENIED',
+          'Parked enterprise_source cannot import jobs even with hosting on (was allowed before 3.15)',
+        )
+        await expectCode(
+          () => partner.importFairs({ items: [] }, partnerUser(orgIds.fair)),
+          'PARTNER_CAPABILITY_DENIED',
+          'Parked fair_organizer cannot import job fairs even with hosting on (was allowed before 3.15)',
+        )
+        const stillOpen = await partner.getPartnerDataSourceCapabilities(partnerUser(orgIds.publicService))
+        expect(
+          stillOpen.canImportJobs && stillOpen.canImportFairs && stillOpen.canManageCompanies,
+          'public_employment_service must keep import/company capability with hosting on (parking must not spill over)',
+        )
+        pass('3.15 parked org types: no import / company capability with hosting on; other types unaffected')
+      } finally {
+        if (previousHosting === undefined) delete process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED']
+        else process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = previousHosting
+      }
+    }
+
     expect(webhookSecretStrengthIssue('12345678') === 'too_short', '8-char webhook secret is too_short')
     expect(webhookSecretStrengthIssue('a'.repeat(32)) === 'low_entropy', '32 identical chars are low_entropy')
     expect(webhookSecretStrengthIssue('0123456789abcdef0123456789abcdef') === null, '32-char hex meets the write-path bar')

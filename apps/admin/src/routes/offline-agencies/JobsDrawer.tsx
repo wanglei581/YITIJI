@@ -1,3 +1,8 @@
+// 【停放，2026-09-29，next-tasks 3.15】源码保留，不注册、不打包：线下机构整页已从 routes/index.tsx 与侧栏移除，
+// 旧地址 /offline-agencies 重定向到合作机构管理。托管 a 下线下机构目录及其岗位不在我们云上运营，
+// 管理员也不代建、不代审、不代发；入驻时的资质核验已迁到合作机构详情的「资质核验」小节
+// （routes/partners/OrgQualificationSection.tsx，按机构 id 直接读）。
+// 本文件是该页的机构岗位抽屉，只被停放的 offline-agencies/index.tsx 引用；随整页一起恢复。
 import { useCallback, useEffect, useState } from 'react'
 import { Drawer, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { BriefcaseIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
