@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 // verify-bulk-publish.ts
 // 信息源批量发布门禁(岗位 / 招聘会 / 政策)。
 //

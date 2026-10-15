@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * 校园/招聘会公开接口生产数据防线验证。
  *

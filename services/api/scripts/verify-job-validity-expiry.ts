@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * 岗位有效期门禁 —— 过期岗位不得出现在求职者可见的任何读取路径。
  *

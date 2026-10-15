@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * Kiosk /campus 本校招聘会优先验证。
  *

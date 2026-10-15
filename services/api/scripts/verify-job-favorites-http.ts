@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * Phase C-2C follow-up — 登录会员收藏 HTTP 端到端验证（真实会员 JWT + 真实 HTTP + Guard + Redis）。
  *

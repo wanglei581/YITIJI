@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 /**
  * 招聘会审核 / 发布状态机 service 级验证（2026-06-17 P0 补门禁）。
  *

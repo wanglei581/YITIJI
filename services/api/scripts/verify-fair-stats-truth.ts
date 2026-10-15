@@ -1,3 +1,6 @@
+// 本门禁验证托管打开（私有化版）下的行为。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
+
 // verify-fair-stats-truth.ts
 // TDD verify: FairLiveStatsDTO + FairStatsDto truthfulness
 // RED → five fields must be number | null; getFairStats must return null for unprovenFields
