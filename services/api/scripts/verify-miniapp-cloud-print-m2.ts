@@ -1,8 +1,9 @@
 /**
- * 小程序云打印 M2 第一片：Order-only → 到机认领 → 现场支付 → 唯一 PrintTask。
- * 使用一次性 SQLite 数据库与真实服务类，绝不连接生产。
+ * 小程序云打印 M2：Order-only → 到机认领 → 现场支付 → 唯一 PrintTask → 手机与后台结果。
+ * 使用一次性 SQLite 与真实服务类；设备回传由夹具模拟，不连接生产、不证明真机出纸。
  */
 import 'dotenv/config'
+import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync, rmSync } from 'node:fs'
@@ -15,6 +16,8 @@ import type { RedisService } from '../src/common/redis/redis.service'
 import { ClaimPickupDto } from '../src/print-jobs/dto/claim-pickup.dto'
 import { PICKUP_LOCKOUT_FAILURE_THRESHOLD } from '../src/print-jobs/pickup-claim-lockout'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
+import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
+import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -377,6 +380,7 @@ async function main(): Promise<void> {
   const userId = `eu_m2_${suffix}`
   const terminalId = `terminal_m2_${suffix}`
   const otherTerminalId = `terminal_m2_other_${suffix}`
+  const chainTerminalId = `terminal_m2_chain_${suffix}`
   const fileId = `file_m2_${suffix}`
   const pendingPiiFileId = `file_m2_pii_${suffix}`
   const storageKeys: string[] = []
@@ -434,6 +438,117 @@ async function main(): Promise<void> {
     await prisma.piiFinding.create({ data: { taskId: directScan.id, type: 'phone', label: '手机号', action: 'keep' } })
     await storage.putObject(directRecord.storageKey, buildRealPdf(2), 'application/pdf', directRecord.bucket)
     return directIntent.fileId
+  }
+
+  async function verifyCrossDeviceOrder(): Promise<void> {
+    // 真服务/隔离库集成；隐私检查结论和设备状态由夹具提供，不代表微信或奔图真机验收。
+    const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+    const agent = new TerminalAgentService(prisma, audit)
+    const history = new MemberPrintOrdersService(prisma)
+    const admin = new AdminOrdersReadonlyService(prisma)
+    await seedTerminal(chainTerminalId, `M2-C-${suffix}`)
+    const pdf = buildRealPdf(2)
+    const uploaded = await files.upload({
+      buffer: pdf, filename: '跨端打印验证.pdf', mimeType: 'application/pdf',
+      purpose: 'print_doc', uploaderId: null, endUserId: userId,
+    })
+    const file = await prisma.fileObject.findUniqueOrThrow({ where: { id: uploaded.fileId } })
+    storageKeys.push(file.storageKey)
+    assert.equal(file.sha256, createHash('sha256').update(pdf).digest('hex'))
+    await prisma.documentProcessTask.create({ data: {
+      kind: 'pii_scan', status: 'completed', requesterMode: 'member', sourceFileId: file.id,
+      endUserId: userId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      paramsJson: JSON.stringify({ sourceSha256: file.sha256 }),
+    } })
+    const dto = { fileId: file.id, terminalId: chainTerminalId, copies: 2, colorMode: 'black_white' as const, duplex: 'simplex' as const }
+    const key = randomUUID()
+    const order = await memberOrders.create(userId, dto, key)
+    assert.equal((await memberOrders.create(userId, dto, key)).id, order.id, '重试必须回同一订单')
+    const snapshot = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    const listAdmin = async () => {
+      const page = await admin.list({ search: order.orderNo, page: 1, pageSize: 10 })
+      assert.equal(page.items.length, 1)
+      assert.equal(page.items[0].id, order.id)
+      return page.items[0]
+    }
+    const before = await admin.getById(order.id)
+    assert.equal(before.print, null, '待到机只有快照，没有真实打印任务')
+    assert.equal(before.printTaskId, null)
+    assert.deepEqual([before.printFileName, before.copies, before.colorMode, before.paperSize], [file.filename, 2, 'black_white', 'A4'])
+    const beforeList = await listAdmin()
+    assert.deepEqual([beforeList.printFileName, beforeList.copies, beforeList.colorMode], [file.filename, 2, 'black_white'])
+    assert.equal(before.statusLogs.length, 0)
+    // 白名单、损坏 JSON、缺失文件名及非单件对照；只改本次隔离夹具，随后恢复。
+    const poisoned = JSON.stringify({ fileName: '快照.pdf', copies: 99, colorMode: 'color', paperSize: 'A4', secret: 'must-not-leak' })
+    await prisma.order.update({ where: { id: order.id }, data: { printParamsJson: poisoned } })
+    const safe = await admin.getById(order.id)
+    assert.deepEqual([safe.printFileName, safe.copies, safe.colorMode], ['快照.pdf', 99, 'color'])
+    assert.ok(!JSON.stringify(safe).includes('must-not-leak'))
+    for (const params of ['{', '[]', JSON.stringify({ copies: -1, colorMode: 'invented', fileName: 4 })]) {
+      await prisma.order.update({ where: { id: order.id }, data: { printParamsJson: params } })
+      const view = await admin.getById(order.id)
+      assert.deepEqual([view.printFileName, view.copies, view.colorMode], [file.filename, null, null])
+    }
+    await prisma.order.update({ where: { id: order.id }, data: { sourceFileName: null, printParamsJson: '{}' } })
+    assert.equal((await admin.getById(order.id)).printFileName, null)
+    await prisma.order.update({ where: { id: order.id }, data: { sourceFileId: null, sourceFileName: file.filename, printParamsJson: poisoned } })
+    const nonSingle = await admin.getById(order.id)
+    assert.deepEqual([nonSingle.printFileName, nonSingle.copies], [null, null], '多文件/历史订单不冒充单件')
+    await prisma.order.update({ where: { id: order.id }, data: {
+      sourceFileId: snapshot.sourceFileId, sourceFileName: snapshot.sourceFileName, printParamsJson: snapshot.printParamsJson,
+    } })
+    await expectCode(() => memberOrders.detail(`${userId}-other`, order.id), 'PRINT_ORDER_NOT_FOUND', '跨端订单详情拒绝非本人')
+    const memberClaim = new MemberOrderClaimHereService(prisma, redis as unknown as RedisService, pickup)
+    await expectCode(() => memberClaim.claimHere(userId, order.id, otherTerminalId, 'chain'), 'PICKUP_TERMINAL_MISMATCH', '本人也不能在错误终端领取')
+    const claimed = await memberClaim.claimHere(userId, order.id, chainTerminalId, 'chain')
+    assert.equal(claimed.released, false)
+    assert.equal((await agent.claimTasks(chainTerminalId, { maxTasks: 1 }, `Bearer token-${chainTerminalId}`)).length, 0)
+    await orderStatus.markPaid(order.id, { paymentSource: 'offline', operatorId: 'verify-cross-device' })
+    const released = await pickup.release(order.id, chainTerminalId, claimed.paymentSessionToken)
+    assert.ok(released.taskId)
+    assert.equal((await pickup.release(order.id, chainTerminalId, claimed.paymentSessionToken)).taskId, released.taskId)
+    assert.equal(await prisma.printTask.count({ where: { order: { is: { id: order.id } } } }), 1)
+    const tasks = await agent.claimTasks(chainTerminalId, { maxTasks: 1 }, `Bearer token-${chainTerminalId}`)
+    assert.equal(tasks.length, 1)
+    assert.equal(tasks[0].taskId, released.taskId)
+    assert.equal(tasks[0].fileMd5, file.sha256)
+    assert.equal((await agent.claimTasks(chainTerminalId, { maxTasks: 1 }, `Bearer token-${chainTerminalId}`)).length, 0)
+    const assertViews = async (status: string) => {
+      const phone = await memberOrders.detail(userId, order.id)
+      const mobile = (await history.list(userId, { cursor: null, pageSize: 50 })).items.find(row => row.id === released.taskId)
+      const consoleView = await admin.getById(order.id)
+      const consoleList = await listAdmin()
+      assert.deepEqual([phone.id, phone.orderNo, phone.printTaskId, phone.taskStatus], [order.id, order.orderNo, released.taskId, status])
+      assert.deepEqual([mobile?.orderId, mobile?.orderNo, mobile?.status, mobile?.fileName], [order.id, order.orderNo, status, file.filename])
+      assert.deepEqual([consoleView.id, consoleView.orderNo, consoleView.printTaskId, consoleView.taskStatus, consoleView.print?.status], [order.id, order.orderNo, released.taskId, status, status])
+      assert.equal(consoleList.taskStatus, status)
+      assert.equal(consoleList.printFileName, file.filename)
+      assert.equal((await memberOrders.listCloud(userId)).some(row => row.id === order.id), false, '释放后转历史任务，不重复出现在待到机列表')
+      for (const field of ['sourceFileId', 'sourceFileSha256', 'printParamsJson', 'fileUrl', 'fileMd5', 'endUserId', 'pickupCode', 'pickupCodeHash', 'pickupCodeEnc']) {
+        assert.ok(!Object.prototype.hasOwnProperty.call(consoleView, field), `后台不得泄露 ${field}`)
+      }
+      return consoleView
+    }
+    await assertViews('claimed')
+    for (const status of ['printing', 'completed'] as const) {
+      await agent.patchTaskStatus(released.taskId, { status, attempt: tasks[0].attempt }, `Bearer token-${chainTerminalId}`, chainTerminalId)
+      await assertViews(status)
+    }
+    const finished = await admin.getById(order.id)
+    assert.ok(finished.print?.completedAt)
+    const statusCount = finished.statusLogs.length
+    await agent.patchTaskStatus(released.taskId, { status: 'completed', attempt: tasks[0].attempt }, `Bearer token-${chainTerminalId}`, chainTerminalId)
+    const replayed = await assertViews('completed')
+    assert.equal(replayed.print?.completedAt, finished.print?.completedAt)
+    assert.equal(replayed.statusLogs.length, statusCount, '重复完成不重复写状态日志')
+    await expectCode(() => agent.patchTaskStatus(released.taskId, { status: 'failed', attempt: tasks[0].attempt }, `Bearer token-${chainTerminalId}`, chainTerminalId), 'PRINT_TASK_TERMINAL_STATUS_CONFLICT', '已完成不能被迟到失败覆盖')
+    // 有任务以后必须以实际任务为准；不能被后来损坏或过时的订单快照覆盖。
+    await prisma.order.update({ where: { id: order.id }, data: { printParamsJson: poisoned, sourceFileName: '过时.pdf' } })
+    assert.equal((await admin.getById(order.id)).printFileName, file.filename)
+    await prisma.printTask.update({ where: { id: released.taskId }, data: { paramsJson: '{' } })
+    assert.equal((await admin.getById(order.id)).printFileName, null, '损坏任务参数不能退回订单快照冒充实际输出')
+    await prisma.printTask.update({ where: { id: released.taskId }, data: { paramsJson: snapshot.printParamsJson } })
+    pass('跨端同单：真实上传/建单/领取/Agent回传/手机与后台投影一致；快照安全、终态幂等与归属反证通过（非真机出纸）')
   }
 
   try {
@@ -1034,6 +1149,7 @@ async function main(): Promise<void> {
       redis.reset()
     }
 
+    await verifyCrossDeviceOrder()
   } finally {
     setPrintScanCapabilityModeForTest(null)
     await prisma.auditLog.deleteMany({ where: { targetId: { in: (await prisma.order.findMany({ where: { endUserId: userId }, select: { id: true } })).map((row) => row.id) } } })
@@ -1048,8 +1164,8 @@ async function main(): Promise<void> {
     await prisma.documentProcessTask.deleteMany({ where: { endUserId: userId } })
     await prisma.fileObject.deleteMany({ where: { endUserId: userId } })
     await prisma.endUser.deleteMany({ where: { id: userId } })
-    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, otherTerminalId] } } })
-    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, otherTerminalId, chainTerminalId] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId, chainTerminalId] } } })
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
     for (const key of storageKeys) await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()

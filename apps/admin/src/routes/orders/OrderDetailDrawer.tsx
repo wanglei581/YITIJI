@@ -32,13 +32,13 @@ export function OrderDetailDrawer({ controls }: { controls: OrderDetailControls 
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
               <Info label="用户" value={orderUserText(detail)} />
               <Info label="终端" value={detail.terminalCode ?? '—'} />
-              <Info label="文件名" value={detail.print?.fileName ?? '未记录'} />
+              <Info label="文件名" value={(detail.print ? detail.print.fileName : detail.printFileName) ?? '未记录'} />
               <Info label="单双面" value={duplexText(detail.print?.duplex)} />
-              <Info label="彩色/黑白" value={colorModeText(detail.print?.colorMode)} />
-              <Info label="份数" value={copiesText(detail.print?.copies)} />
+              <Info label="彩色/黑白" value={colorModeText(detail.print ? detail.print.colorMode : detail.colorMode)} />
+              <Info label="份数" value={copiesText(detail.print ? detail.print.copies : detail.copies)} />
               <Info label="计费页数" value={billablePagesText(detail.billablePages) ?? '—'} />
               <Info label="页范围" value={pageRangeText(detail.print?.pageRange, detail.billablePages)} />
-              <Info label="幅面" value={detail.print?.paperSize?.trim() ? detail.print.paperSize : '未记录'} />
+              <Info label="幅面" value={(detail.print ? detail.print.paperSize : detail.paperSize)?.trim() || '未记录'} />
               {detail.refundedAt && (
                 <Info label="退款时间" value={fmt(detail.refundedAt)} />
               )}
