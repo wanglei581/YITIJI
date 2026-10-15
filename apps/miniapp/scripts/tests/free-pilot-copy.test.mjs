@@ -54,6 +54,20 @@ const PAGE_JS = registeredPages().flatMap((pg) => {
   return fs.readdirSync(path.join(MINIAPP, dir)).filter((f) => f.endsWith('.js')).map((f) => `${dir}/${f}`)
 })
 
+// 停放的 aiPages，源码还在、只是不注册，登记它不算过期。
+// variantName 不传时仍读目录当前版本；传了就按那个版本算，完整版目录也能测到不含 AI 的判定。
+// 不传版本名、目录又是完整版时，这些页都在包里，走不到「算停放页」。钱字眼仍只扫上面的注册页。
+function parkedWithSource(rel, variantName) {
+  const matched = rel.match(/^pages\/([^/]+)\//)
+  if (!matched) return false
+  const variant = variantName || (read('utils/build-variant.js').match(/VARIANT:\s*'([^']+)'/) || [])[1]
+  if (variant !== 'no-ai') return false
+  const spec = JSON.parse(read('review-variants/variants.json'))[variant]
+  const aiPages = (spec && spec.aiPages) || []
+  if (!aiPages.includes(matched[1])) return false
+  return fs.existsSync(path.join(MINIAPP, rel))
+}
+
 // 模板正文里允许的钱字眼：只有服务端 409 PRICE_CHANGED（价目真的变了）才会渲染。
 const WXML_TEXT_ALLOW = {
   'pages/print-pay/print-pay.wxml': ['价格已更新'],
@@ -207,7 +221,7 @@ function jsViolations(rel) {
 }
 
 test('WXML：钱字眼只出现在「已报出大于 0 的金额」的分支里', () => {
-  for (const rel of Object.keys(PAID_GUARD)) assert.ok(PAGE_WXML.includes(rel), `${rel} 不是注册页面，PAID_GUARD 登记过期`)
+  for (const rel of Object.keys(PAID_GUARD)) assert.ok(PAGE_WXML.includes(rel) || parkedWithSource(rel), `${rel} 不是注册页面，PAID_GUARD 登记过期`)
   const v = PAGE_WXML.flatMap(wxmlViolations)
   assert.deepEqual(v, [])
 })
@@ -228,9 +242,23 @@ test('含钱的常量只进登记过的字段名（否则模板检查看不见�
 })
 
 test('JS：含钱字眼的字面量都已登记为只在收费时出现', () => {
-  for (const rel of Object.keys(JS_ALLOW)) assert.ok(PAGE_JS.includes(rel), `${rel} 不在注册页面目录下，JS_ALLOW 登记过期`)
+  for (const rel of Object.keys(JS_ALLOW)) assert.ok(PAGE_JS.includes(rel) || parkedWithSource(rel), `${rel} 不在注册页面目录下，JS_ALLOW 登记过期`)
   const v = PAGE_JS.flatMap(jsViolations)
   assert.deepEqual(v, [])
+})
+
+test('停放页判定可按版本名计算，不靠目录当前停在哪个版本', () => {
+  // 停放页、在包里的页都用仓库里真实存在的页面。缺目录的那条先确认目录不在，不用假路径冒充存在。
+  const parked = 'pages/resume-diagnose/resume-diagnose.wxml'
+  const packed = 'pages/orders/orders.wxml'
+  const missing = 'pages/no-such-miniapp-page/no-such-miniapp-page.wxml'
+  assert.equal(fs.existsSync(path.join(MINIAPP, parked)), true)
+  assert.equal(fs.existsSync(path.join(MINIAPP, packed)), true)
+  assert.equal(fs.existsSync(path.join(MINIAPP, 'pages/no-such-miniapp-page')), false)
+  assert.equal(parkedWithSource(parked, 'no-ai'), true)
+  assert.equal(parkedWithSource(packed, 'no-ai'), false)
+  assert.equal(parkedWithSource(missing, 'no-ai'), false)
+  assert.equal(parkedWithSource(parked, 'full'), false)
 })
 
 test('材料包免费时的两句说明不含钱字眼', () => {

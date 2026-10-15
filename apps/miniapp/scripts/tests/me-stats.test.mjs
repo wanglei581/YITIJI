@@ -1,6 +1,10 @@
 /**
  * 「我的」概览计数（pages/me/me.js）：真跑页面，api 是替身。
  *
+ * 两个版本的期望都在这个文件里。setup 接收版本名（默认 full），把开关和路由表成套注入，
+ * 不靠目录当前停在哪个版本。测的就是真实发布的组合。
+ * 不含 AI 版里「我的简历」页已停放，概览不显示简历这一项，也不发简历请求。
+ *
  * 钉住的是第 12 件（9/04 评审遗留）要修的事：
  *   - 读取失败时不写成 0，仍显示「—」，并且 statsFailed 打开（页面据此出现「没读到 + 重试」）；
  *   - 一项失败不连坐，读到的照常显示；
@@ -10,9 +14,9 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deferred, flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
+import { deferred, flush, instantiate, loadPageDefinition, variantModules } from './page-sandbox.mjs'
 
-function setup({ loggedIn = true, loaders }) {
+function setup({ loggedIn = true, loaders, variantName = 'full' }) {
   const calls = { resume: 0, docs: 0, order: 0, cloud: 0 }
   const auth = { isLoggedIn: () => loggedIn, getUser: () => ({ nickname: '测试' }) }
   const api = {
@@ -22,7 +26,7 @@ function setup({ loggedIn = true, loaders }) {
     // 手机单（还没到机）：默认没有，个别用例覆盖
     getMyCloudPrintOrders: () => { calls.cloud += 1; return (loaders.cloud || (() => Promise.resolve([])))(calls.cloud) },
   }
-  const def = loadPageDefinition('pages/me/me.js', { wx: {}, modules: { auth, api } })
+  const def = loadPageDefinition('pages/me/me.js', { wx: {}, modules: { ...variantModules(variantName), auth, api } })
   const page = instantiate(def)
   return { page, calls, auth }
 }
@@ -163,4 +167,57 @@ test('手机单那段没读到：打印单整项「—」并提示可重试，�
   await flush()
   assert.equal(values(page), 'resume=0,docs=0,order=—')
   assert.equal(page.data.statsFailed, true)
+})
+
+// 不含 AI 的期望也在这里跑：成套注入 no-ai，不读目录里的 utils/build-variant.js。
+test('不含 AI：全部读到只有文档和打印单，简历请求次数为 0', async () => {
+  const { page, calls } = setup({ variantName: 'no-ai', loaders: {
+    resume: () => Promise.resolve({ total: 2 }),
+    docs: () => Promise.resolve({ items: [1, 2, 3] }),
+    order: () => Promise.resolve({ total: 0 }),
+  } })
+  page.onShow()
+  await flush()
+  assert.equal(values(page), 'docs=3,order=0')
+  assert.equal(calls.resume, 0)
+  assert.equal(page.data.statsFailed, false)
+})
+
+test('不含 AI：一项失败不连坐，失败项仍是「—」', async () => {
+  const { page, calls } = setup({ variantName: 'no-ai', loaders: {
+    resume: () => Promise.resolve({ total: 2 }),
+    docs: () => Promise.reject(new Error('网络错误')),
+    order: () => Promise.resolve({ total: 5 }),
+  } })
+  page.onShow()
+  await flush()
+  assert.equal(values(page), 'docs=—,order=5')
+  assert.equal(calls.resume, 0)
+  assert.equal(page.data.statsFailed, true)
+})
+
+test('不含 AI：未登录是两个「—」，不发请求', async () => {
+  const { page, calls } = setup({ variantName: 'no-ai', loggedIn: false, loaders: {
+    resume: () => Promise.resolve({ total: 1 }),
+    docs: () => Promise.resolve({ total: 1 }),
+    order: () => Promise.resolve({ total: 1 }),
+  } })
+  page.onShow()
+  await flush()
+  assert.equal(values(page), 'docs=—,order=—')
+  assert.equal(calls.resume + calls.docs + calls.order + calls.cloud, 0)
+  assert.equal(page.data.statsFailed, false)
+})
+
+test('不含 AI：打印单合计仍把手机单算上', async () => {
+  const { page, calls } = setup({ variantName: 'no-ai', loaders: {
+    resume: () => Promise.resolve({ total: 0 }),
+    docs: () => Promise.resolve({ total: 0 }),
+    order: () => Promise.resolve({ total: 3, items: [] }),
+    cloud: () => Promise.resolve([{ id: 'o1' }, { id: 'o2' }]),
+  } })
+  page.onShow()
+  await flush()
+  assert.equal(values(page), 'docs=0,order=5')
+  assert.equal(calls.resume, 0)
 })
