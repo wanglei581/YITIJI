@@ -69,13 +69,17 @@ export class TerminalSessionService {
     return this.issue(payload)
   }
 
-  async validate(terminalId: string | undefined, sessionToken: string | undefined): Promise<void> {
+  async validate(
+    terminalId: string | undefined,
+    sessionToken: string | undefined,
+    options?: { allowDisabled?: boolean },
+  ): Promise<void> {
     if (!terminalId?.trim() || !sessionToken?.trim()) throw this.invalid()
     const raw = await this.read(this.sessionKey(sessionToken))
     if (!raw) throw this.invalid()
     const payload = this.parse(raw)
     if (payload.terminalId !== terminalId) throw this.invalid()
-    await this.assertCurrent(payload)
+    await this.assertCurrent(payload, options)
   }
 
   private async issue(payload: TerminalSessionPayload) {
@@ -87,12 +91,17 @@ export class TerminalSessionService {
     return { sessionToken, expiresInSeconds: SESSION_TTL_SECONDS }
   }
 
-  private async assertCurrent(payload: TerminalSessionPayload): Promise<void> {
+  private async assertCurrent(
+    payload: TerminalSessionPayload,
+    options?: { allowDisabled?: boolean },
+  ): Promise<void> {
     const terminal = await this.prisma.terminal.findUnique({
       where: { id: payload.terminalId },
       select: { enabled: true, credentialGeneration: true },
     })
-    if (!terminal?.enabled || terminal.credentialGeneration !== payload.generation) throw this.invalid()
+    if (!terminal || terminal.credentialGeneration !== payload.generation) throw this.invalid()
+    // 默认：停用立即作废会话。配置读取可单独放行，好让一体机读到暂停文案。换代仍然作废。
+    if (!terminal.enabled && !options?.allowDisabled) throw this.invalid()
   }
 
   private async read(key: string): Promise<string | null> {

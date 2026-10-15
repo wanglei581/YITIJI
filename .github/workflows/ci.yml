@@ -641,6 +641,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config
+          pnpm --filter @ai-job-print/api verify:kiosk-terminal-maintenance
           pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:scan-quiet-period
