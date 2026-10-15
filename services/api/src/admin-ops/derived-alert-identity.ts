@@ -14,7 +14,7 @@
  *   3. 退款消警必须读 Order.payStatus；禁止为了让红条消失去写 printOutcome。
  */
 
-export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending'] as const
+export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed', 'paid_pending_file_unavailable', 'feedback_pending', 'ai_provider_unavailable', 'ai_consecutive_failures', 'ai_budget_exhausted'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
 export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const
@@ -124,6 +124,37 @@ export function paidPendingFileUnavailableEpisodeToken(args: {
  */
 export function feedbackPendingEpisodeToken(latest: Date): string {
   return latest.toISOString()
+}
+
+/**
+ * 三种 AI 告警各全站一条，不按终端、会员拆。
+ * subjectKey 形如 `ai_provider_unavailable:global`。
+ */
+export const AI_ALERT_SUBJECT_ID = 'global'
+
+/** 账户不可用的回看窗口，也是回合分桶的宽度。 */
+export const AI_PROVIDER_UNAVAILABLE_WINDOW_MS = 15 * 60 * 1000
+
+/**
+ * 回合 = 这一轮还没恢复的第一次账户级失败所在的 15 分钟窗口（按 Unix 纪元对齐）。
+ * 同一轮里后面的失败不换回合；出现成功后再失败，第一次失败的时刻变了，回合就换。
+ */
+export function aiProviderUnavailableEpisodeToken(firstFailureAt: Date): string {
+  const bucket = Math.floor(firstFailureAt.getTime() / AI_PROVIDER_UNAVAILABLE_WINDOW_MS) * AI_PROVIDER_UNAVAILABLE_WINDOW_MS
+  return new Date(bucket).toISOString()
+}
+
+/**
+ * 连续失败的回合 = 当前这一段连续失败的第一次失败时刻。
+ * 中间出现成功后再失败会换成新时刻；同一段里次数增加不换回合。
+ */
+export function aiConsecutiveFailuresEpisodeToken(firstFailureAt: Date): string {
+  return firstFailureAt.toISOString()
+}
+
+/** 当天费用上限的回合 = 北京时间日期。过了 0 点是新的一天，也是新回合。 */
+export function aiBudgetExhaustedEpisodeToken(dayKey: string): string {
+  return dayKey
 }
 
 /**

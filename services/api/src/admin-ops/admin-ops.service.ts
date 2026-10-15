@@ -194,6 +194,8 @@ export class AdminOpsService {
    *
    *   删掉之后「恢复后再发作」仍然是对的:那由 episodeToken 负责——离线用 lastSeen、
    *   打印机异常用 printerStatus+lastHealthyAt、打印失败用 PrintTask.id,
+   *   AI 账户不可用用第一次未恢复失败所在的 15 分钟窗口、连续失败用该段第一次失败时刻、
+   *   费用上限用北京时间日期,
    *   任何一次真实恢复都会让下一轮故障拿到新 token,旧处置自然失效。
    *   也就是说恢复判定是从正面数据算出来的,不是从「没看见」推断出来的。
    */

@@ -38,7 +38,10 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
-import { ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { collectDerivedAlerts, ONLINE_WINDOW_MS, PRINT_FAILED_LIST_CAP, resolveDerivedAlert } from '../src/admin-ops/derived-alerts'
+import { AI_PROVIDER_UNAVAILABLE_WINDOW_MS, aiProviderUnavailableEpisodeToken } from '../src/admin-ops/derived-alert-identity'
+import { AiBudgetService } from '../src/ai/usage/ai-budget.service'
+import { beijingDayKey } from '../src/ai/usage/ai-usage-meter'
 import { offlineEpisodeToken } from '../src/admin-ops/derived-alert-identity'
 import { TERMINAL_ONLINE_WINDOW_MS } from '../src/terminals/printer-availability'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -91,6 +94,13 @@ function mockOpsPrisma(
     },
     terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
     // 按真实 where 过滤、按真实 orderBy 排序（不自带排序），否则「只算 AI 内容投诉」「取最早 / 最新」都测不出来。
+    // AI 告警在这些夹具里没有计量行：空结果，不能因为没桩而把整份列表打崩，也不能凭空报费用用完。
+    aiUsageRecord: {
+      findMany: async () => [],
+      findFirst: async () => null,
+      count: async () => 0,
+      groupBy: async () => [],
+    },
     feedbackTicket: {
       count: async (args?: FeedbackQuery) => matchFeedback(feedbackRows, args).length,
       findFirst: async (args?: FeedbackQuery) => {
@@ -306,6 +316,275 @@ async function verifyPaidPendingFileUnavailableAlert(): Promise<void> {
   )
   if (!resolved || resolved.subjectKey !== alert.subjectKey) fail('3b. 单条正向查证必须复用同一告警条件')
   pass('3b. 已支付 pending 文件不可用告警、误报排除、稳定身份和单条查证')
+}
+
+/**
+ * N-6：三种 AI 派生告警。计量行的功能名、时间像真的；人名不需要。
+ * 告警文本不得带用户输入（这里把哨兵写进 model，查询不取这一列）。
+ */
+async function verifyAiDerivedAlerts(prisma: PrismaService): Promise<void> {
+  const vendor = 'verify-ai-alert'
+  const sentinel = 'SENTINEL_USER_TEXT_不要出现'
+  const clear = () => prisma.aiUsageRecord.deleteMany({ where: { vendor } })
+  await clear()
+  const budget = new AiBudgetService(prisma)
+  if (!(budget.limits.terminalCny < budget.limits.globalCny)) {
+    fail(`单终端上限必须低于全站上限，否则分不清「只到单终端」。实际 terminal=${budget.limits.terminalCny} global=${budget.limits.globalCny}`)
+  }
+  let problem: string | null = null
+  const stop = (message: string) => { if (!problem) problem = message }
+
+  const insert = async (rows: Array<{
+    createdAt: Date
+    status: string
+    httpStatus: number | null
+    featureKey: string
+    costCny?: number
+    terminalId?: string
+    terminalVerified?: boolean
+  }>) => {
+    for (const row of rows) {
+      await prisma.aiUsageRecord.create({
+        data: {
+          vendor,
+          model: sentinel,
+          featureKey: row.featureKey,
+          status: row.status,
+          httpStatus: row.httpStatus,
+          dayKey: beijingDayKey(row.createdAt),
+          createdAt: row.createdAt,
+          costCny: row.costCny ?? 0,
+          costMeasured: true,
+          terminalId: row.terminalId ?? null,
+          terminalVerified: row.terminalVerified ?? false,
+        },
+      })
+    }
+  }
+
+  const collect = () => collectDerivedAlerts(prisma, new Date())
+  const consistent = (collected: Awaited<ReturnType<typeof collectDerivedAlerts>>, label: string) => {
+    if (collected.firingTotal !== collected.alerts.length + collected.omitted) {
+      stop(`${label} firingTotal=${collected.firingTotal} 与列表 ${collected.alerts.length} + 省略 ${collected.omitted} 不一致`)
+    }
+  }
+  const ofType = (collected: Awaited<ReturnType<typeof collectDerivedAlerts>>, type: string) => collected.alerts.filter((alert) => alert.type === type)
+  const noLeak = (collected: Awaited<ReturnType<typeof collectDerivedAlerts>>, label: string) => {
+    const text = JSON.stringify(collected.alerts.filter((alert) => alert.type.startsWith('ai_')))
+    if (text.includes(sentinel) || text.includes('工作人员') || text.includes('resume_diagnosis') || text.includes('mock_interview')) {
+      stop(`${label} 告警文本带了不该出现的内容：${text}`)
+    }
+  }
+
+  // return 写在 try 里会跳过 try 后面的失败上报，变异时门禁会假绿。用 break 离开这一段。
+  aiCases: {
+  try {
+    const anchor = new Date()
+    const ago = (minutes: number) => new Date(anchor.getTime() - minutes * 60 * 1000)
+
+    await insert([{ createdAt: ago(1), status: 'upstream_error', httpStatus: 402, featureKey: 'resume_diagnosis' }])
+    let collected = await collect()
+    consistent(collected, '402')
+    noLeak(collected, '402')
+    const provider = ofType(collected, 'ai_provider_unavailable')
+    if (provider.length !== 1) stop(`402 一次应出 ai_provider_unavailable，实际 ${provider.length} 条`)
+    else {
+      if (provider[0].severity !== 'error') stop('账户不可用应为 error')
+      if (provider[0].title !== 'AI 服务账户不可用（余额或密钥问题），用户只能用手动方式') stop(`账户不可用标题不对：${provider[0].title}`)
+      if (!provider[0].detail.includes('余额不足') || !provider[0].detail.includes('1 次')) stop(`账户不可用明细不对：${provider[0].detail}`)
+      if (provider[0].subjectId !== 'global' || provider[0].terminalCode !== null) stop('账户不可用必须是全站一条，不挂终端')
+      const firstAt = new Date(provider[0].occurredAt)
+      if (provider[0].episodeToken !== aiProviderUnavailableEpisodeToken(firstAt)) stop('账户不可用回合不是第一次失败所在的 15 分钟窗口')
+      const resolved = await resolveDerivedAlert(prisma, 'ai_provider_unavailable', 'global', new Date())
+      if (!resolved || resolved.episodeToken !== provider[0].episodeToken) stop('单条查证应复用同一条账户不可用告警')
+    }
+    if (problem) break aiCases
+
+    await insert([{ createdAt: new Date(), status: 'ok', httpStatus: 200, featureKey: 'mock_interview' }])
+    collected = await collect()
+    consistent(collected, '402 之后 ok')
+    if (ofType(collected, 'ai_provider_unavailable').length !== 0) stop('账户失败之后有成功，告警应消失')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([{ createdAt: ago(16), status: 'upstream_error', httpStatus: 402, featureKey: 'resume_diagnosis' }])
+    collected = await collect()
+    if (ofType(collected, 'ai_provider_unavailable').length !== 0) stop('15 分钟窗口之外的 402 不得告警')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      { createdAt: ago(3), status: 'ok', httpStatus: 200, featureKey: 'assistant_chat' },
+      { createdAt: ago(1), status: 'upstream_error', httpStatus: 401, featureKey: 'career_plan' },
+    ])
+    collected = await collect()
+    if (ofType(collected, 'ai_provider_unavailable').length !== 1) stop('成功出现在失败之前，账户不可用仍应告警')
+    noLeak(collected, '401')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([1, 2, 3, 4].map((minute) => ({
+      createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: minute % 2 ? 'resume_diagnosis' : 'resume_optimize',
+    })))
+    collected = await collect()
+    consistent(collected, '连续 4 次')
+    if (ofType(collected, 'ai_consecutive_failures').length !== 0) stop('连续 4 次超时不得告警')
+    if (problem) break aiCases
+
+    await insert([{ createdAt: ago(0.2), status: 'timeout', httpStatus: null, featureKey: 'mock_interview' }])
+    collected = await collect()
+    consistent(collected, '连续 5 次')
+    noLeak(collected, '连续 5 次')
+    const streak = ofType(collected, 'ai_consecutive_failures')
+    if (streak.length !== 1) stop(`连续 5 次超时应出 ai_consecutive_failures，实际 ${streak.length} 条`)
+    else {
+      if (streak[0].severity !== 'error') stop('这段时间没有成功，连续失败应为 error')
+      if (!/^AI 连续失败 5 次，最近一次是超时$/.test(streak[0].title)) stop(`连续失败标题不对：${streak[0].title}`)
+      if (!streak[0].detail.includes('没有成功的调用')) stop(`连续失败明细应说明没有成功：${streak[0].detail}`)
+    }
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      { createdAt: ago(8), status: 'ok', httpStatus: 200, featureKey: 'assistant_chat' },
+      ...[1, 2, 3, 4, 5].map((minute) => ({
+        createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: 'mock_interview',
+      })),
+    ])
+    collected = await collect()
+    const warned = ofType(collected, 'ai_consecutive_failures')
+    if (warned.length !== 1 || warned[0].severity !== 'warning') stop('前面有成功、末尾连续 5 次失败，应为 warning')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      { createdAt: ago(7), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' },
+      { createdAt: ago(6), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' },
+      { createdAt: ago(5), status: 'ok', httpStatus: 200, featureKey: 'resume_optimize' },
+      { createdAt: ago(4), status: 'timeout', httpStatus: null, featureKey: 'mock_interview' },
+      { createdAt: ago(3), status: 'timeout', httpStatus: null, featureKey: 'mock_interview' },
+      { createdAt: ago(2), status: 'timeout', httpStatus: null, featureKey: 'career_plan' },
+    ])
+    collected = await collect()
+    if (ofType(collected, 'ai_consecutive_failures').length !== 0) stop('中间夹成功，末尾不够 5 次，不得告警')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      ...[1, 2, 3, 4].map((minute) => ({ createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' })),
+      { createdAt: ago(0.5), status: 'aborted', httpStatus: null, featureKey: 'resume_diagnosis' },
+    ])
+    collected = await collect()
+    if (ofType(collected, 'ai_consecutive_failures').length !== 0) stop('aborted 不计，4 次超时加 1 次中止不得告警')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      ...[2, 3, 4, 5].map((minute) => ({ createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' })),
+      { createdAt: ago(1), status: 'blocked', httpStatus: 200, featureKey: 'resume_diagnosis' },
+    ])
+    collected = await collect()
+    if (ofType(collected, 'ai_consecutive_failures').length !== 0) stop('blocked 不计，4 次超时加 1 次拦截不得告警')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      { createdAt: ago(6), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' },
+      { createdAt: ago(5), status: 'timeout', httpStatus: null, featureKey: 'mock_interview' },
+      { createdAt: ago(4), status: 'aborted', httpStatus: null, featureKey: 'assistant_chat' },
+      { createdAt: ago(3), status: 'timeout', httpStatus: null, featureKey: 'resume_optimize' },
+      { createdAt: ago(2), status: 'blocked', httpStatus: 200, featureKey: 'career_plan' },
+      { createdAt: ago(1), status: 'network_error', httpStatus: null, featureKey: 'assistant_chat' },
+      { createdAt: ago(0.4), status: 'busy', httpStatus: 429, featureKey: 'mock_interview' },
+    ])
+    collected = await collect()
+    noLeak(collected, '中止夹在中间')
+    const skipped = ofType(collected, 'ai_consecutive_failures')
+    if (skipped.length !== 1) stop('aborted / blocked 夹在中间应跳过，前后失败仍连续')
+    else if (!skipped[0].title.includes('5 次') || !skipped[0].title.includes('繁忙')) stop(`跳过中止后的标题不对：${skipped[0].title}`)
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      ...[1, 2, 3, 4].map((minute) => ({ createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: 'resume_diagnosis' })),
+      { createdAt: ago(0.3), status: 'upstream_error', httpStatus: 403, featureKey: 'mock_interview' },
+    ])
+    collected = await collect()
+    consistent(collected, '两种同时')
+    if (ofType(collected, 'ai_provider_unavailable').length !== 1) stop('账户失败与连续失败同时成立时应出第一种')
+    if (ofType(collected, 'ai_consecutive_failures').length !== 0) stop('账户失败与连续失败同时成立时不得再出第二种')
+    if (problem) break aiCases
+
+    await clear()
+    await insert([
+      ...[12, 11].map((minute) => ({ createdAt: ago(minute), status: 'upstream_error', httpStatus: 402, featureKey: 'resume_diagnosis' })),
+      { createdAt: ago(9), status: 'ok', httpStatus: 200, featureKey: 'assistant_chat' },
+      ...[1, 2, 3, 4, 5].map((minute) => ({ createdAt: ago(minute), status: 'timeout', httpStatus: null, featureKey: 'career_plan' })),
+    ])
+    collected = await collect()
+    if (ofType(collected, 'ai_provider_unavailable').length !== 0) stop('账户失败之后已有成功，不得再报账户不可用')
+    if (ofType(collected, 'ai_consecutive_failures').length !== 1) stop('账户失败恢复后，末尾连续超时仍应报连续失败')
+    if (problem) break aiCases
+
+    await clear()
+    const dayKey = beijingDayKey(new Date())
+    budget.resetForTests()
+    const baseline = await budget.spent(dayKey, { kind: 'global', id: null })
+    const terminalCost = budget.limits.terminalCny + 1
+    if (baseline + terminalCost >= budget.limits.globalCny) {
+      stop(`当天已有花费 ${baseline}，加上单终端探针会碰到全站上限，这条断言分不清`)
+      break aiCases
+    }
+    await insert([{
+      createdAt: new Date(),
+      status: 'ok',
+      httpStatus: 200,
+      featureKey: 'resume_generate',
+      costCny: terminalCost,
+      costMeasured: true,
+      terminalId: `verify-ai-alert-term`,
+      terminalVerified: true,
+    }])
+    collected = await collect()
+    consistent(collected, '单终端上限')
+    noLeak(collected, '单终端上限')
+    if (ofType(collected, 'ai_budget_exhausted').length !== 0) stop('单终端达上限不得出 ai_budget_exhausted')
+    if (problem) break aiCases
+
+    const topUp = budget.limits.globalCny - baseline - terminalCost
+    await insert([{
+      createdAt: new Date(),
+      status: 'ok',
+      httpStatus: 200,
+      featureKey: 'resume_generate',
+      costCny: topUp,
+      costMeasured: true,
+    }])
+    collected = await collect()
+    consistent(collected, '全站上限')
+    noLeak(collected, '全站上限')
+    const exhausted = ofType(collected, 'ai_budget_exhausted')
+    if (exhausted.length !== 1) stop(`全局花费达上限应出 ai_budget_exhausted，实际 ${exhausted.length} 条`)
+    else {
+      if (exhausted[0].severity !== 'error') stop('费用上限应为 error')
+      if (exhausted[0].title !== '今天的 AI 费用上限已用完，AI 功能暂停到明天 0 点') stop(`费用上限标题不对：${exhausted[0].title}`)
+      if (exhausted[0].episodeToken !== dayKey) stop(`费用上限回合应为当天日期，实际 ${exhausted[0].episodeToken}`)
+      if (!exhausted[0].detail.includes(dayKey) || exhausted[0].detail.includes('元') || /\d+\.\d+/.test(exhausted[0].detail)) {
+        stop(`费用上限明细只留日期，不写金额：${exhausted[0].detail}`)
+      }
+    }
+    if (ago(20).getTime() > anchor.getTime() - AI_PROVIDER_UNAVAILABLE_WINDOW_MS) stop('窗口常量未按 15 分钟使用')
+  } finally {
+    await clear()
+  }
+  }
+  // 抛错而不是 process.exit，好让 main 的 finally 清掉本轮终端和打印任务。
+  // 断言仍会打出 FAIL，并由 main 的 catch 以退出码 1 结束。
+  if (problem) {
+    console.error(`  FAIL ${problem}`)
+    throw new Error(problem)
+  }
+  pass('12. AI 账户不可用 / 连续失败 / 全站费用上限：判定、恢复、不计 aborted 与 blocked、单终端不报、firingTotal 与列表一致、文本不含用户输入')
 }
 
 async function main() {
@@ -1266,6 +1545,8 @@ async function main() {
         fail(`11. 去向串线 ${JSON.stringify({ paperRow, unconfirmedRow, powerRow, powerTask, mixed: mixed.map((item) => item.id) })}`)
       }
     }
+
+    await verifyAiDerivedAlerts(prisma)
 
     console.log('\n=== ALL PASS ===')
   } finally {
