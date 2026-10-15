@@ -33,6 +33,20 @@ for (const copy of ['正在确认在线服务', '在线服务已连接', '在线
 }
 check(!/AI.*已连接/.test(readinessStrip), '健康检查不扩大声明为 AI 能力已连接')
 
+// 2026-09-23：五个服务中心迁入青序流光 16 号稿，共用 QxServiceHub 一个宿主。
+// 探测与 fail-closed 只在宿主里写一次；每个页面必须经由宿主渲染、且不得自己绕开门禁跳转。
+// 断言按结构改写，不变量一条不少：探测 → 展示 → 检查中与不可用都 fail-closed → disabled 门禁。
+const sharedHubPath = 'src/components/qingxu/service-hub/QxServiceHub.tsx'
+const sharedHub = read(sharedHubPath)
+check(sharedHub.includes('useApiReadiness()'), `${sharedHubPath} 使用入口级在线服务探测`)
+check(sharedHub.includes('<ServiceReadinessStrip status={apiStatus}'), `${sharedHubPath} 展示真实检查状态`)
+check(sharedHub.includes("apiStatus !== 'ready'"), `${sharedHubPath} 检查中和不可用均 fail-closed`)
+check(
+  /const blocked = apiBlocked && card\.requiresApi !== false[\s\S]*?disabled=\{blocked\}/.test(sharedHub) &&
+    /disabled=\{apiBlocked\}/.test(sharedHub),
+  `${sharedHubPath} 能力卡与常用入口都有 disabled 门禁`,
+)
+
 const hubs = [
   'src/pages/resume/ResumeServiceHubPage.tsx',
   'src/pages/jobs/JobsServiceHubPage.tsx',
@@ -42,10 +56,10 @@ const hubs = [
 ]
 for (const hub of hubs) {
   const source = read(hub)
-  check(source.includes('useApiReadiness'), `${hub} 使用入口级在线服务探测`)
-  check(source.includes('ServiceReadinessStrip'), `${hub} 展示真实检查状态`)
-  check(source.includes("apiStatus !== 'ready'"), `${hub} 检查中和不可用均 fail-closed`)
-  check(/disabled=\{(?:apiBlocked|blocked)\}/.test(source), `${hub} 在线工作流有 disabled 门禁`)
+  check(/<QxServiceHub\b/.test(source), `${hub} 经 QxServiceHub 渲染（继承在线服务探测）`)
+  check(!/@ai-job-print\/ui|KioskPageFrame|KioskPageHeader/.test(source), `${hub} 不再挂旧页壳`)
+  check(!/useNavigate|navigate\(|<button\b|onClick=/.test(source), `${hub} 不自带跳转，不能绕开 disabled 门禁`)
+  check(!/useApiReadiness|apiStatus/.test(source), `${hub} 不另起一份在线服务探测`)
 }
 
 const jobsHub = read('src/pages/jobs/JobsServiceHubPage.tsx')

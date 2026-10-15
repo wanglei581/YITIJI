@@ -72,8 +72,15 @@ assert.match(contractApi, /_mockConfirmed = true/)
 assert.doesNotMatch(contractApi, /call\(`\/contract-reviews\/\$\{id\}`,[\s\S]{0,100}?\.catch\(\(\) => undefined\)/)
 
 assert.match(resumeHub, /VITE_ENABLE_CONTRACT_REVIEW === 'true'/)
-assert.match(resumeHub, /签约与权益/)
+assert.match(resumeHub, /badge: '签约与权益/)
 assert.match(resumeHub, /AI签约风险提示/)
-assert.match(resumeHub, /navigate\('\/contract-review'\)/)
+// 2026-09-23 服务中心迁入 QxServiceHub：页面只声明入口表，跳转由共享宿主按 `card.to` 执行。
+// 断言随结构改写，不变量不变：开关打开时这张卡真的指向 /contract-review，且只在开关打开时出现。
+assert.match(resumeHub, /key: 'contract-review'[\s\S]*?to: '\/contract-review'/)
+assert.match(resumeHub, /contractReviewEnabled \? \[\.\.\.CAPABILITIES, CONTRACT_REVIEW_CARD\] : CAPABILITIES/)
+assert.match(
+  read('src/components/qingxu/service-hub/QxServiceHub.tsx'),
+  /if \(!blocked\) navigate\(card\.to/,
+)
 
 console.log('PASS kiosk visible actions truth contract')

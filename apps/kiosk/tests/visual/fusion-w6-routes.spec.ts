@@ -261,3 +261,106 @@ test('/campus/freshman-insights mobile breakpoint @w6-mobile', async ({ page, ap
   registerW6Api(api)
   await acceptRoute(page, route, errors)
 })
+
+/**
+ * 16 号稿五个服务中心（2026-09-23 迁入 QxServiceHub）。
+ * 锁三件事，任何一件丢了都要红：
+ *   ① 活路径只有青序流光一套壳（旧深藏青顶栏 / V6 暖纸壳 / 旧页头都不得出现）；
+ *   ② 入口表逐条保真，含 query 参数，点击后落到带参的真实路由；
+ *   ③ 在线服务探测 fail-closed：失败时只有声明为离线可用的入口还能点，且可重新检测恢复。
+ */
+const SERVICE_HUBS = [
+  {
+    hub: 'resume', route: '/resume-service',
+    cards: ['/resume/source?intent=diagnose', '/resume/source?intent=optimize', '/resume/generate', '/resume/templates', '/resume/career-plan', '/resume/materials', '/print/upload?source=resume', '/resume/job-fit'],
+    quick: ['/me/resumes', '/me/ai-records', '/resume/self-assessment/intro'],
+    offline: [] as string[],
+    boundary: '简历最终投递由本人负责确认',
+  },
+  {
+    hub: 'jobs', route: '/jobs-service',
+    cards: ['/jobs?category=fulltime', '/jobs?category=intern', '/jobs?category=parttime', '/jobs', '/companies', '/resume/job-fit', '/jobs/online-platforms', '/offline-agencies'],
+    quick: ['/me/activity', '/me/activity?tab=jump'],
+    offline: ['/jobs/online-platforms'],
+    boundary: '投递、预约请前往来源平台完成',
+  },
+  {
+    hub: 'fairs', route: '/fairs-service',
+    cards: ['/job-fairs', '/campus', '/job-fairs/checkin', '/assistant', '/resume-service', '/print-scan'],
+    quick: ['/me/activity', '/me/activity?tab=jump'],
+    offline: [] as string[],
+    boundary: '预约、报名请前往来源平台完成',
+  },
+  {
+    hub: 'interview', route: '/interview-service',
+    cards: ['/interview/setup', '/resume/self-assessment/intro', '/resume/career-plan', '/interview/tips', '/resume/self-assessment/history', '/assistant'],
+    quick: ['/me/ai-records', '/interview/reports'],
+    offline: ['/interview/tips'],
+    boundary: '评测结果不构成招聘意见，不对外共享',
+  },
+  {
+    hub: 'policy', route: '/policy-service',
+    cards: ['/renshi?tab=policy', '/renshi?tab=social', '/renshi?tab=register', '/renshi', '/assistant', '/me/favorites?tab=policy'],
+    quick: ['/me/activity', '/me/ai-records'],
+    offline: ['/renshi?tab=social', '/renshi?tab=register'],
+    boundary: '不承诺到账，不代办申请',
+  },
+] as const
+
+const HUB_ALLOWED_APPLY_COPY = /去来源平台投递|扫码前往来源平台投递|来源平台投递/g
+const HUB_FORBIDDEN_COPY = /一键投递|立即投递|平台投递|投递简历|企业收简历|候选人管理|面试邀约/
+
+for (const spec of SERVICE_HUBS) {
+  test(`${spec.route} 服务中心只挂青序流光壳、入口与合规边界保真 @w6-kiosk`, async ({ page, api }) => {
+    registerW6Api(api)
+    await page.goto(spec.route, { waitUntil: 'domcontentloaded' })
+    const hub = page.locator(`[data-qx-frame="true"] [data-testid="${spec.hub}-hub"]`)
+    await expect(hub, `${spec.route} 必须由青序流光页壳承载 QxServiceHub`).toBeVisible()
+    await expect(page.locator('.ui-kiosk-topbar:visible'), `${spec.route} 不得再露出旧壳顶栏`).toHaveCount(0)
+    await expect(page.locator('.v6-runtime-shell'), `${spec.route} 不得再挂 V6 暖纸壳`).toHaveCount(0)
+    await expect(page.locator('.ui-kiosk-page-header, .service-hub'), `${spec.route} 不得混用旧页头 / 旧服务中心`).toHaveCount(0)
+    await expect(page.locator('.qx-topbar-back[aria-label="返回首页"]')).toBeVisible()
+    await expect(page.locator('.qx-navbar')).toBeVisible()
+
+    await expect(hub).toHaveAttribute('data-readiness', 'ready')
+    const cards = hub.locator('.qx-hub-card')
+    expect(await cards.evaluateAll((els) => els.map((el) => el.getAttribute('data-route'))), `${spec.route} 能力入口表（含 query）`).toEqual([...spec.cards])
+    expect(await hub.locator('.qx-hub-quick-item').evaluateAll((els) => els.map((el) => el.getAttribute('data-route'))), `${spec.route} 常用入口表`).toEqual([...spec.quick])
+    for (let index = 0; index < spec.cards.length; index += 1) await expect(cards.nth(index)).toBeEnabled()
+
+    const boundary = page.getByTestId(`${spec.hub}-hub-boundary`)
+    await expect(boundary).toContainText(spec.boundary)
+    await expect(boundary).toContainText('结束会话或闲置超时清除本机登录态与临时会话信息')
+    const hubText = (await hub.innerText()).replace(/\s+/g, '').replace(HUB_ALLOWED_APPLY_COPY, '')
+    expect(hubText, `${spec.route} 出现招聘闭环禁用文案`).not.toMatch(HUB_FORBIDDEN_COPY)
+
+    const withQuery = spec.cards.findIndex((to) => to.includes('?'))
+    if (withQuery >= 0) {
+      await cards.nth(withQuery).click()
+      await expect(page, `${spec.route} 入口必须带着 query 落地`).toHaveURL((url) => `${url.pathname}${url.search}` === spec.cards[withQuery])
+    }
+  })
+
+  test(`${spec.route} 在线服务不可用时 fail-closed 并可重新检测 @w6-kiosk`, async ({ page, api }) => {
+    registerW6Api(api)
+    api.respond('GET', '/api/v1/health', { status: 503, json: { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'down' } } })
+    await page.goto(spec.route, { waitUntil: 'domcontentloaded' })
+    const hub = page.locator(`[data-qx-frame="true"] [data-testid="${spec.hub}-hub"]`)
+    await expect(hub).toHaveAttribute('data-readiness', 'unavailable')
+    await expect(hub.locator('.service-readiness')).toContainText('在线服务暂不可用')
+    await expect(page.locator('.qx-pill')).toContainText('在线服务暂不可用')
+    const cards = hub.locator('.qx-hub-card')
+    for (let index = 0; index < spec.cards.length; index += 1) {
+      const offline = (spec.offline as readonly string[]).includes(spec.cards[index])
+      if (offline) await expect(cards.nth(index), `${spec.cards[index]} 声明为离线可用`).toBeEnabled()
+      else await expect(cards.nth(index), `${spec.cards[index]} 需要在线服务，必须 fail-closed`).toBeDisabled()
+    }
+    const quick = hub.locator('.qx-hub-quick-item')
+    for (let index = 0; index < spec.quick.length; index += 1) await expect(quick.nth(index)).toBeDisabled()
+
+    api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
+    await hub.getByRole('button', { name: '重新检测' }).click()
+    await expect(hub).toHaveAttribute('data-readiness', 'ready')
+    await expect(cards.first()).toBeEnabled()
+  })
+}

@@ -79,14 +79,10 @@ interface V6ShellRoute {
 /* 只列**仍在用 V6 壳**的路由。迁到青序流光的路由必须从这里移出去——
  * `isV6Route` 虽然已经用 `!isQxRoute` 挡住了它们，但这张表本身也是运行时真值，
  * fusion-w6-routes.spec.ts:32 会拿它和实际壳归属对账，留着就是自相矛盾。
- * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。 */
-const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-])
+ * 2026-09-08 移出：'/'（首页迁入青序流光）、'/print-scan'（早已迁入，本次一并清理）。
+ * 2026-09-23 移出：五个服务中心（/resume-service 等，迁入 16 号稿 QxServiceHub）。
+ * 表已清空：运行时再没有路由挂 V6 暖纸壳。 */
+const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([])
 
 /**
  * 青序流光已迁移路由。
@@ -105,6 +101,12 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
  */
 const QX_MIGRATED_ROUTES = new Set<string>([
   '/',
+  // 16 号稿五个服务中心：共用 QxServiceHub 一个宿主。
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
   '/print/pickup-claim',
   '/print/cashier',
   '/print/upload',

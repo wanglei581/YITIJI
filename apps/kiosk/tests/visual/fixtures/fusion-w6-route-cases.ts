@@ -44,6 +44,8 @@ const w2 = (name: string) => `[data-w2-page="${name}"]`
 const w4 = '.w4-page-frame'
 const qx = '[data-qx-frame="true"]'
 const member = screen('member-list')
+/** 16 号稿服务中心：必须同时在青序流光页壳内、且是本域的 QxServiceHub。 */
+const qxHub = (hub: string) => `${qx} [data-testid="${hub}-hub"]`
 
 async function seedScreensaver(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -156,7 +158,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/export', url: '/resume/export', expectedPath: compatibilityRedirects['/resume/export'], marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
-  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("AI简历服务")', featureText: 'AI简历服务' },
+  { pattern: '/resume-service', url: '/resume-service', marker: qxHub('resume'), featureText: 'AI简历服务' },
   { pattern: '/scan', url: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/start', url: '/scan/start', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/settings', url: '/scan/settings', expectedPath: '/scan', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
@@ -164,7 +166,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/scan/result', url: '/scan/result', expectedPath: '/scan', marker: w2('scan-start'), featureText: '扫描服务' },
 
   { pattern: '/jobs', url: '/jobs', marker: qx, featureText: '岗位信息' },
-  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: qxHub('jobs'), featureText: '岗位信息' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: qx, featureText: '前端工程师' },
   { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: qx, featureText: '线下机构岗位' },
   { pattern: '/offline-agencies', url: '/offline-agencies', marker: qx, featureText: '线下招聘机构' },
@@ -173,7 +175,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/companies', url: '/companies', marker: qx, featureText: '找企业' },
   { pattern: '/companies/:id', url: '/companies/company-001', marker: qx, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs', url: '/job-fairs', marker: w4, featureText: '招聘会' },
-  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("招聘会信息")', featureText: '招聘会信息' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: qxHub('fairs'), featureText: '招聘会信息' },
   { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: w4, featureText: '来源平台入场入口' },
   { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: w4, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: w4, featureText: '参展企业' },
@@ -186,12 +188,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("AI面试训练")', featureText: 'AI面试训练' },
+  { pattern: '/interview-service', url: '/interview-service', marker: qxHub('interview'), featureText: 'AI面试训练' },
   // 合同审查 production_default=false；默认构建直接访问也必须安全回首页。
   { pattern: '/contract-review', url: '/contract-review', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '也可以直接选：' },
-  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
+  { pattern: '/policy-service', url: '/policy-service', marker: qxHub('policy'), featureText: '政策服务' },
 ] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
@@ -215,12 +217,11 @@ export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
    *
    * 2026-09-09 再移出 '/profile'：同样口径。#931 把它加进 QX_MIGRATED_ROUTES
    * 却漏了这两张表，main 的 kiosk-browser-smoke 因此连红两次合并
-   * （run 34263887180：「同时出现在两张表里：/profile」）。 */
-  '/resume-service',
-  '/jobs-service',
-  '/fairs-service',
-  '/interview-service',
-  '/policy-service',
+   * （run 34263887180：「同时出现在两张表里：/profile」）。
+   *
+   * 2026-09-23 移出五个服务中心（/resume-service /jobs-service /fairs-service
+   * /interview-service /policy-service）：迁入 16 号稿 QxServiceHub。表至此为空——
+   * 契约仍在，含义变成「所有路由都不得挂 V6 暖纸壳」。 */
 ])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)

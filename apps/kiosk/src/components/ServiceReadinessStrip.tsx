@@ -21,6 +21,10 @@ const STATUS_COPY: Record<ApiReadinessStatus, { title: string; detail: string }>
   },
 }
 
+/**
+ * 服务中心的在线服务条（青序流光 16-service-hubs 的 .notice 行）。
+ * 样式在 components/qingxu/service-hub/service-hub-qx.css。
+ */
 export function ServiceReadinessStrip({ status, onRetry }: ServiceReadinessStripProps) {
   const copy = STATUS_COPY[status]
   const Icon =
@@ -32,19 +36,19 @@ export function ServiceReadinessStrip({ status, onRetry }: ServiceReadinessStrip
 
   return (
     <div
-      className="service-hub__rail service-readiness"
+      className="qx-hub-notice service-readiness"
       data-readiness={status}
       role="status"
       aria-live="polite"
     >
-      <Icon className="service-readiness__icon" aria-hidden="true" />
-      <span className="service-readiness__copy">
+      <Icon className="qx-hub-notice-ic" aria-hidden="true" />
+      <span className="qx-hub-notice-copy">
         <b>{copy.title}</b>
         <span>{copy.detail}</span>
       </span>
       {status === 'unavailable' && (
-        <button type="button" onClick={onRetry} className="service-readiness__retry">
-          <RefreshCwIcon aria-hidden="true" />
+        <button type="button" onClick={onRetry} className="qx-hub-notice-retry">
+          <RefreshCwIcon size={20} aria-hidden="true" />
           重新检测
         </button>
       )}
