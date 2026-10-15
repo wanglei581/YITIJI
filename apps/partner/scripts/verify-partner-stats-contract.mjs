@@ -10,6 +10,9 @@
  *        曝光/跳转不得写成投递/预约/意向/简历；
  *        空态必须给出原因与下一步，不是一句「暂无数据」。
  *
+ *  D. 终端数据页（2026-09-29）：/terminals 只读 GET /partner/terminal-operations，
+ *     http 模式不出演示数据；服务人次、AI 可用率照实「暂不能统计」；导出 CSV 共用转义。
+ *
  * 后端侧（DTO 白名单 / 信封 / 跨租户 / 运行时形状）由
  * `pnpm --filter @ai-job-print/api verify:partner-stats-contract` 覆盖。
  *
@@ -233,8 +236,91 @@ mustContain(
     "join(repoRoot, 'apps/partner/src/routes/terminals/index.tsx')",
     "join(repoRoot, 'apps/partner/src/routes/account/index.tsx')",
   ],
-  'C2. honest-placeholders 仍钉住其余四页空壳',
+  'C2. honest-placeholders 仍钉住其余四页',
   repoRoot,
+)
+// 2026-09-29：/terminals 接真后改钉「读真实接口、http 模式不出演示数据」，不再钉空壳文案
+mustContain(
+  HONEST,
+  [
+    "'getPartnerTerminalOperations'",
+    "join(repoRoot, 'apps/partner/src/services/api/terminalOps.ts')",
+    `"if (API_MODE !== 'http') return buildDemoTerminalOps(period)"`,
+    "exactCount: { 'buildDemoTerminalOps(': 2 }",
+  ],
+  'C3. honest-placeholders 对 /terminals 改钉真实接口与「http 不出演示数据」',
+  repoRoot,
+)
+mustNotContain(
+  HONEST,
+  ['终端明细暂由平台统一运营'],
+  'C3b. honest-placeholders 不再要求 /terminals 保留空壳文案',
+  repoRoot,
+)
+
+// ── D. 终端数据页（/terminals ↔ GET /partner/terminal-operations）───────────
+
+const OPS_ADAPTER = 'src/services/api/terminalOps.ts'
+const OPS_PAGE = 'src/routes/terminals/index.tsx'
+const OPS_CARDS = 'src/routes/terminals/TerminalOpsCards.tsx'
+const OPS_FORMAT = 'src/routes/terminals/terminalOpsFormat.ts'
+
+mustContain(
+  OPS_ADAPTER,
+  ['/partner/terminal-operations?period=${period}`', 'await res.json()) as PartnerTerminalOpsResponse'],
+  'D1. adapter 请求串只带 period，直接取裸对象',
+)
+codeMustNotContain(
+  OPS_ADAPTER,
+  ['orgId', 'terminalId', 'timezone=', 'body.data', 'consoleScreen'],
+  'D1b. adapter 不发送机构 / 终端 / 时区参数，不借用数据大屏服务',
+)
+mustContain(
+  OPS_ADAPTER,
+  ["if (API_MODE !== 'http') return buildDemoTerminalOps(period)", 'return fetchTerminalOps(period)', "dataMode: 'demo'"],
+  'D2. http 模式只走真实接口；演示数据只在 mock 模式出现且带 demo 标记',
+)
+mustContain(
+  OPS_PAGE,
+  ['getPartnerTerminalOperations', 'FRONTEND_HINT.terminals', "data.dataMode === 'demo'", '本机构还没有绑定终端', '终端由平台绑定后这里会显示运营数据', 'downloadCsv', 'buildTerminalOpsCsv'],
+  'D3. 页面消费真实接口、演示数据有标注、空态说明由平台绑定、导出走共用 CSV',
+)
+mustContain(
+  OPS_CARDS,
+  ['暂不能统计', '打印扫描服务次数', '不等于人次', '暂不能按本机构终端统计', '出纸成功率', '故障与恢复'],
+  'D4. 四张指标卡：服务人次与 AI 可用率照实「暂不能统计」，服务次数写明不等于人次',
+)
+mustContain(
+  OPS_FORMAT,
+  ['统计窗口', '服务人次', 'AI 可用率', 'METRIC_NOTES.sample', "value === null ? '少于 5'"],
+  'D5. 导出 CSV 表头前写统计窗口与两项「暂不能统计」原因；1–4 不显示具体数字',
+)
+mustContain(
+  'src/lib/csv.ts',
+  ['\\uFEFF', "split('\"').join('\"\"')", 'FORMULA_LEAD'],
+  'D6. 共用 CSV：UTF-8 BOM、双引号转义、公式注入防护',
+)
+mustContain(
+  'src/services/api/partnerMockAdapter.ts',
+  ["import { escapeCsvCell } from '../../lib/csv'"],
+  'D6b. 模板下载与终端数据导出共用同一个单元格转义',
+)
+codeMustNotContain(
+  'src/services/api/partnerMockAdapter.ts',
+  ['function escapeCsvCell'],
+  'D6c. mock adapter 不再保留私有转义',
+)
+for (const file of [OPS_PAGE, OPS_CARDS, OPS_FORMAT, 'src/routes/terminals/TerminalOpsDrawer.tsx']) {
+  mustNotContain(
+    file,
+    ['一键投递', '立即投递', '平台投递', '投递数', '简历数', '候选人', '手机号', 'endUserId'],
+    `D7. ${file} 不出现投递 / 简历 / 个人口径`,
+  )
+}
+mustContain(
+  'src/layouts/PartnerLayoutWrapper.tsx',
+  ["'/terminals':  'terminals'", "label: '终端数据'"],
+  'D8. 侧栏「数据与账号」组有「终端数据」入口',
 )
 
 console.log('\nALL PASS')

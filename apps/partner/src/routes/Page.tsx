@@ -19,6 +19,7 @@ export const FRONTEND_HINT = {
   profileHosted: '对应一体机「本机构官方渠道」「找企业」与岗位、政策的来源机构',
   companies: '对应一体机「找企业」与岗位详情来源机构',
   screen: '汇总本机构在一体机与小程序上的可见内容与终端状态',
+  terminals: '对应本机构一体机的打印扫描服务与设备运行',
   none: '不直接对应前端页面',
 } as const
 

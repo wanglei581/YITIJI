@@ -80,6 +80,9 @@ const SCHOOL_A = 'test-sc-org-school-a'
 const SCHOOL_B = 'test-sc-org-school-b'
 const NONSCHOOL = 'test-sc-org-nonschool'
 const DISABLED_ORG = 'test-sc-org-disabled'
+// 托管 a（3.15）停放的两类机构：不能再被选为终端归属
+const PARKED_ENTERPRISE = 'test-sc-org-parked-enterprise'
+const PARKED_FAIR = 'test-sc-org-parked-fair'
 const T_A = 'TEST-SC-KSK-A'
 const T_B = 'TEST-SC-KSK-B'
 const T_ADMIN = 'TEST-SC-KSK-ADMIN' // 归属可变终端，admin 归属用例专用
@@ -135,7 +138,7 @@ async function cleanup(prisma: PrismaService): Promise<void> {
   await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN, T_UNRELATED] } } })
   await prisma.auditLog.deleteMany({ where: { actorId: ADMIN_USER_ID } })
   await prisma.user.deleteMany({ where: { id: ADMIN_USER_ID } })
-  await prisma.organization.deleteMany({ where: { id: { in: [SCHOOL_A, SCHOOL_B, NONSCHOOL, DISABLED_ORG] } } })
+  await prisma.organization.deleteMany({ where: { id: { in: [SCHOOL_A, SCHOOL_B, NONSCHOOL, DISABLED_ORG, PARKED_ENTERPRISE, PARKED_FAIR] } } })
 }
 
 async function main(): Promise<void> {
@@ -158,6 +161,8 @@ async function main(): Promise<void> {
     await prisma.organization.create({ data: { id: SCHOOL_B, name: '测试学校B就业中心', type: 'school_employment_center', sceneTemplate: 'school' } })
     await prisma.organization.create({ data: { id: NONSCHOOL, name: '测试市人才中心', type: 'public_employment_service', sceneTemplate: 'public_employment' } })
     await prisma.organization.create({ data: { id: DISABLED_ORG, name: '测试停用机构', type: 'school_employment_center', sceneTemplate: 'school', enabled: false } })
+    await prisma.organization.create({ data: { id: PARKED_ENTERPRISE, name: '测试停放企业来源', type: 'enterprise_source' } })
+    await prisma.organization.create({ data: { id: PARKED_FAIR, name: '测试停放招聘会主办方', type: 'fair_organizer' } })
     await prisma.terminal.create({ data: { id: T_A, terminalCode: T_A, agentToken: 'test-sc-token-a', deviceFingerprint: 'test-sc-fp-a', orgId: SCHOOL_A } })
     await prisma.terminal.create({ data: { id: T_B, terminalCode: T_B, agentToken: 'test-sc-token-b', deviceFingerprint: 'test-sc-fp-b', orgId: SCHOOL_B } })
     await prisma.terminal.create({ data: { id: T_ADMIN, terminalCode: T_ADMIN, agentToken: 'test-sc-token-admin', deviceFingerprint: 'test-sc-fp-admin', orgId: null } })
@@ -257,6 +262,23 @@ async function main(): Promise<void> {
     await expectCode(() => terminals.assignTerminalOrg('TEST-SC-KSK-NOPE', SCHOOL_A), 'TERMINAL_NOT_FOUND', 'Case11 终端不存在')
     await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, 'test-sc-org-nope'), 'ORG_NOT_FOUND', 'Case11 机构不存在')
     await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, DISABLED_ORG), 'ORG_DISABLED', 'Case11 机构已停用')
+
+    // Case 11b: 托管 a 停放类型（企业来源 / 招聘会主办方）不在可选列表里，新绑定一律 ORG_TYPE_PARKED
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_ENTERPRISE), 'ORG_TYPE_PARKED', 'Case11b 绑定企业来源类机构')
+    await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, PARKED_FAIR), 'ORG_TYPE_PARKED', 'Case11b 绑定招聘会主办方类机构')
+    const afterParked = await prisma.terminal.findUnique({ where: { id: T_ADMIN }, select: { orgId: true } })
+    if (afterParked?.orgId === null) pass('Case11b 被拒后终端归属保持不变（仍未绑定）')
+    else fail(`Case11b 被拒后终端归属却变成 ${afterParked?.orgId}`)
+    const orgOptions = (await terminals.listOrganizationOptions()).organizations.map((o) => o.id)
+    if (!orgOptions.includes(PARKED_ENTERPRISE) && !orgOptions.includes(PARKED_FAIR) && orgOptions.includes(SCHOOL_A) && orgOptions.includes(NONSCHOOL)) {
+      pass('Case11b 终端可选机构列表去掉停放类型，其余启用机构照常可选')
+    } else fail(`Case11b 可选机构列表异常: ${JSON.stringify(orgOptions)}`)
+    // 存量绑定不动：直接写库模拟 3.15 前已绑定的停放类型，管理员列表如实带出机构类型供页面提示改绑
+    await prisma.terminal.update({ where: { id: T_UNRELATED }, data: { orgId: PARKED_FAIR } })
+    const legacyRow = (await terminals.listTerminalsForAdmin()).terminals.find((t) => t.id === T_UNRELATED)
+    if (legacyRow?.orgId === PARKED_FAIR && legacyRow.orgType === 'fair_organizer') pass('Case11b 存量停放类型绑定保留，并带出 orgType 供页面提示改绑')
+    else fail(`Case11b 存量绑定视图异常: ${JSON.stringify({ orgId: legacyRow?.orgId, orgType: legacyRow?.orgType })}`)
+    await prisma.terminal.update({ where: { id: T_UNRELATED }, data: { orgId: null } })
 
     // ── 高校版模板联动（codex/smart-campus-template-link）─────────────────────
     // Case 12: 共享契约——学校场景默认含 smart_campus、且有中文标签「智慧校园」。

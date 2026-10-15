@@ -103,13 +103,21 @@ export interface DeviceFleetOverview {
 // ─── Terminals (设备管理 — 终端心跳上报) ─────────────────────────────────────
 // 严格对齐跨 agent 契约 C1 (GET /admin/terminals)。字段名/类型不得臆造。
 
-/** 打印机状态枚举(取自最近一条 heartbeat 上报)。 */
+/**
+ * 打印机状态(取自最近一条 heartbeat 上报)。
+ * Agent 当前真实上报 ready / offline / error / low_paper / unknown；
+ * ok / idle 为历史正常值，paper_empty / not_found 为早期约定、仅兼容存量心跳。
+ */
 export type TerminalPrinterStatus =
+  | 'ready'
   | 'ok'
+  | 'idle'
+  | 'low_paper'
   | 'offline'
   | 'paper_empty'
   | 'error'
   | 'not_found'
+  | 'unknown'
 
 export type TerminalLifecycleStatus =
   | 'planned'
@@ -132,6 +140,8 @@ export interface AdminTerminalRecord {
   hasActiveCredential: boolean
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
+  /** 所属机构类型；enterprise_source / fair_organizer 已停放，页面提示改绑 */
+  orgType?: string | null
   registeredAt: string            // ISO
   lastSeenAt: string              // ISO
   online: boolean                 // lastSeenAt 距今 < 3 分钟 = true

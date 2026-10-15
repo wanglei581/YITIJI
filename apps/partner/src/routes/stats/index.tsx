@@ -27,7 +27,7 @@
 // 同步概况整段不展示（导入与同步已停止）；待审核只算政策，且写明政策由本机构自行审核发布。
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Button,
   Card,
@@ -432,6 +432,8 @@ export default function StatsPage() {
           <p className="text-xs text-neutral-400">
             本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。
             统计只覆盖浏览、外部跳转、打印与 AI 调用，且只提供机构级聚合。
+            本机构终端的打印扫描服务次数、出纸成功率与故障恢复见
+            <Link to="/terminals" className="mx-0.5 font-semibold text-primary-600 hover:underline">终端数据</Link>。
           </p>
         </div>
       )}
