@@ -45,7 +45,7 @@ export interface RedeemBenefitResult {
   idempotent: boolean
 }
 
-/** C5-4 订单核销入参（券/免费次数/权益**全额抵扣一个订单**，联动免费单）。 */
+/** C5-4 订单核销入参（按券面值抵扣一个订单，支持全额与部分抵扣）。 */
 export interface RedeemForOrderParams {
   endUserId: string
   orderId: string
@@ -56,10 +56,16 @@ export interface RedeemForOrderParams {
 export interface RedeemForOrderResult {
   orderId: string
   redemptionRecordId: string
-  /** 核销后订单支付状态（全额核销 → paid）。 */
+  /** 核销后订单支付状态：全额抵扣 → 'paid'；**部分抵扣 → 仍为 'unpaid'**（余额未收）。 */
   payStatus: string
-  /** 抵扣金额（分）。 */
+  /** 本次实际抵扣金额（分）= min(券面值, 抵扣上限, 订单应付)。平台 credit，非资金。 */
   discountCents: number
+  /**
+   * 抵扣后仍需通过支付通道收取的金额（分）。全额抵扣为 0。
+   *
+   * 调用方必须据此决定是否继续走支付：核销成功 ≠ 订单已结清。
+   */
+  netPayableCents: number
   /** true = 幂等回放（该订单已用该权益核销过）。 */
   idempotent: boolean
 }

@@ -47,6 +47,9 @@ export class MemberBenefitsService {
         description: true,
         quantityTotal: true,
         quantityRemaining: true,
+        amountCents: true,
+        maxDiscountCents: true,
+        serviceScope: true,
         status: true,
         sourceType: true,
         validFrom: true,
@@ -62,6 +65,11 @@ export class MemberBenefitsService {
       description: r.description,
       quantityTotal: r.quantityTotal,
       quantityRemaining: r.quantityRemaining,
+      // 面值 / 上限 / 范围只读回显：前端据此显示"可抵 X 元"，
+      // amountCents=null 表示这张权益没有面值、不能用于订单抵扣（不得显示成 0 元券）。
+      amountCents: r.amountCents,
+      maxDiscountCents: r.maxDiscountCents,
+      serviceScope: r.serviceScope,
       status: r.status as BenefitStatus,
       sourceType: r.sourceType as BenefitSourceType,
       validFrom: r.validFrom ? r.validFrom.toISOString() : null,

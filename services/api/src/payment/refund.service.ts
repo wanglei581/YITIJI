@@ -29,6 +29,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException, Unauthorize
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
+import { netPayableCents } from './order-status.service'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 
@@ -269,8 +270,9 @@ export class RefundService {
     const paymentSource = order.paymentSource ?? ''
     if (!REFUNDABLE_SOURCES.has(paymentSource)) throw new BadRequestException('REFUND_CHANNEL_UNSUPPORTED')
     const channel = paymentSource
-    // 退款额 = 实付资金 = 应付 − 抵扣（免费/全额券单为 0，不动资金）。
-    const amountCents = Math.max(0, order.amountCents - order.discountCents)
+    // 退款额 = 实付资金 = 净应付 = 应付 − 抵扣（免费/全额券单为 0，不动资金；
+    // 部分抵扣单只退渠道实收的那部分，券不折现）。
+    const amountCents = netPayableCents(order)
 
     // ③ 阶段一：CAS paid→refunding + 建 Refund(pending)。refundNo 唯一兜底并发幂等。
     let refund: RefundRecord
@@ -349,12 +351,15 @@ export class RefundService {
         return this.blockRefund(refund, 'REFUND_SOURCE_AMBIGUOUS', operatorId)
       }
       const src = successAttempts[0] as NonNullable<(typeof successAttempts)[0]>
-      // 金额口径（审查 M2）：真实渠道退款额必须 = 渠道实收 = 尝试快照 = 订单应付；
-      // 线上入账单当前不可能有抵扣（voucher 全额核销不经渠道），discount 非 0 即异常。
-      if (order.discountCents !== 0 || refund.amountCents !== order.amountCents || src.amountCents !== refund.amountCents) {
+      // 金额口径（审查 M2）：真实渠道退款额必须 = 渠道实收 = 尝试快照 = 订单**净应付**。
+      // 为什么不再要求 discountCents === 0：权益支持部分抵扣后，线上入账单**可以**带抵扣
+      //（券抵一部分、余额走渠道），此时渠道实收就是净应付，出码快照也是净应付（online-payment
+      // 同一口径）。仍然只退渠道实收部分 —— 券是平台 credit，不参与资金流，绝不折现退款。
+      const netPayable = netPayableCents(order)
+      if (refund.amountCents !== netPayable || src.amountCents !== refund.amountCents) {
         return this.blockRefund(refund, 'REFUND_AMOUNT_BASIS_UNSUPPORTED', operatorId)
       }
-      providerInput.orderAmountCents = order.amountCents
+      providerInput.orderAmountCents = netPayable
       providerInput.outTradeNo = src.id
       providerInput.channelTxnNo = src.channelTxnNo
     }

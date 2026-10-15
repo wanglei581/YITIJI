@@ -16,6 +16,9 @@ type Order = {
   orderNo: string
   terminalId: string
   amountCents: number
+  /** 券/权益抵扣额。测试替身必须带上：生产 Order 行恒有此列（@default(0)），
+   *  少了它会让净应付算成 NaN，掩盖真实的金额比对语义。 */
+  discountCents: number
   printTaskId: string | null
   payStatus: string
   paymentSource: string | null
@@ -184,6 +187,7 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
       orderNo: `ORD-CODEPAY-${randomUUID().replace(/-/g, '').slice(0, 8)}`,
       terminalId: 'terminal-codepay-verify',
       amountCents,
+      discountCents: 0,
       printTaskId: null,
       payStatus: 'unpaid',
       paymentSource: null,

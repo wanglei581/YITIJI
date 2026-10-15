@@ -19,7 +19,7 @@ import { randomBytes } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
-import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
+import { OrderStatusService, netPayableCents, pickupCodeVisibleFor } from './order-status.service'
 import { verifyPaymentSessionToken } from './payment-session-token'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import {
@@ -104,7 +104,12 @@ export interface PayStatusView {
   payStatus: string
   paymentSource: string | null
   payChannel: string | null
+  /** 订单应付原价（分）。**不是本次该收的钱** —— 用券后实收见 netPayableCents。 */
   amountCents: number
+  /** 已由权益/券抵扣的金额（分，平台 credit，非资金）。未用券为 0。 */
+  discountCents: number
+  /** 净应付（分）= amountCents − discountCents，**支付通道实际收取的金额**。 */
+  netPayableCents: number
   paidAt: string | null
   /** 仅 paid 且按 pickupCodeVisibleFor 可见时返回。 */
   pickupCode: string | null
@@ -182,7 +187,8 @@ export class OnlinePaymentService {
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     this.requirePaymentSession(order, paymentSessionToken)
     // 免费单不出码：0 元单走 markPaid(free) 路径，绝不为其生成支付码。
-    if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
+    // 口径按**净应付**（应付 − 券抵扣）判定：全额券已在核销时结清订单，不该再出码收钱。
+    if (netPayableCents(order) <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
 
     order = await this.applyLazyExpiry(order)
     const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
@@ -233,7 +239,8 @@ export class OnlinePaymentService {
         data: {
           orderId: order.id,
           channel: provider.channel,
-          amountCents: order.amountCents, // 金额快照自服务端订单，绝不信任前端
+          // 金额快照自服务端订单的**净应付**，绝不信任前端。按原价快照会让用了券的订单被全价收款。
+          amountCents: netPayableCents(order),
           status: 'created',
           expiresAt: attemptExpiresAt,
         },
@@ -243,7 +250,7 @@ export class OnlinePaymentService {
       orderId: order.id,
       orderNo: order.orderNo,
       attemptId: attempt.id,
-      amountCents: order.amountCents,
+      amountCents: netPayableCents(order),
       expiresAt: attemptExpiresAt,
     })
     const pendingAttempt = await this.prisma.paymentAttempt.update({
@@ -259,7 +266,15 @@ export class OnlinePaymentService {
       action: 'payment.attempt_created',
       targetType: 'payment_attempt',
       targetId: attempt.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, channel: provider.channel, amountCents: order.amountCents },
+      // amountCents 记本次实际出码金额（净应付）；同时留原价与抵扣额，便于对账时还原口径。
+      payload: {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        channel: provider.channel,
+        amountCents: netPayableCents(order),
+        orderAmountCents: order.amountCents,
+        discountCents: order.discountCents,
+      },
     })
 
     return this.toAttemptView(pendingAttempt, freshOrder)
@@ -283,7 +298,8 @@ export class OnlinePaymentService {
     let order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     this.requirePaymentSession(order, paymentSessionToken)
-    if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
+    // 同 QR 路径：按净应付判定，全额券已结清的订单不再收款。
+    if (netPayableCents(order) <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
 
     order = await this.applyLazyExpiry(order)
     const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
@@ -323,7 +339,7 @@ export class OnlinePaymentService {
         data: {
           orderId: order.id,
           channel: provider.channel,
-          amountCents: order.amountCents,
+          amountCents: netPayableCents(order), // 净应付快照（同 QR 路径）
           status: 'created',
           expiresAt: new Date(now + this.qrTtlSeconds * 1000),
         },
@@ -336,7 +352,14 @@ export class OnlinePaymentService {
       action: 'payment.code_attempt_created',
       targetType: 'payment_attempt',
       targetId: attempt.id,
-      payload: { orderId: order.id, orderNo: order.orderNo, channel: provider.channel, amountCents: order.amountCents },
+      payload: {
+        orderId: order.id,
+        orderNo: order.orderNo,
+        channel: provider.channel,
+        amountCents: netPayableCents(order),
+        orderAmountCents: order.amountCents,
+        discountCents: order.discountCents,
+      },
     })
 
     let result: Awaited<ReturnType<NonNullable<PaymentProvider['createCodePayment']>>>
@@ -346,7 +369,7 @@ export class OnlinePaymentService {
         orderNo: order.orderNo,
         attemptId: attempt.id,
         terminalId: order.terminalId,
-        amountCents: order.amountCents,
+        amountCents: netPayableCents(order),
         authCode,
       })
     } catch {
@@ -354,7 +377,7 @@ export class OnlinePaymentService {
       result = { status: 'paying', channelTxnNo: null, prepayId: attempt.id, amountCents: null, failReason: '支付结果待核实，请稍候' }
     }
 
-    if (result.status === 'success' && result.channelTxnNo && result.amountCents === order.amountCents) {
+    if (result.status === 'success' && result.channelTxnNo && result.amountCents === netPayableCents(order)) {
       await this.prisma.paymentAttempt.update({
         where: { id: attempt.id },
         data: { status: 'pending', prepayId: result.prepayId ?? attempt.id, failReason: null },
@@ -369,7 +392,7 @@ export class OnlinePaymentService {
     }
 
     const successIncomplete =
-      result.status === 'success' && (result.channelTxnNo === null || result.amountCents !== order.amountCents)
+      result.status === 'success' && (result.channelTxnNo === null || result.amountCents !== netPayableCents(order))
     if (result.status === 'paying' || successIncomplete) {
       await this.prisma.paymentAttempt.update({
         where: { id: attempt.id },
@@ -433,6 +456,8 @@ export class OnlinePaymentService {
       paymentSource: order.paymentSource,
       payChannel: order.payChannel,
       amountCents: order.amountCents,
+      discountCents: order.discountCents,
+      netPayableCents: netPayableCents(order),
       paidAt: order.paidAt?.toISOString() ?? null,
       pickupCode: visible ? order.pickupCode : null,
       attempt: latest
@@ -600,10 +625,11 @@ export class OnlinePaymentService {
     if (attempt.channel !== channel) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (!attempt.prepayId || attempt.prepayId !== event.prepayId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
     if (attempt.orderId !== event.orderId) throw new BadRequestException('CALLBACK_FIELD_MISMATCH')
-    // 金额一致性双重比对：回调金额 = 尝试快照 = 订单应付，防篡改。
+    // 金额一致性双重比对：回调金额 = 尝试快照 = 订单**净应付**，防篡改。
+    // 用净应付而非原价：出码时快照的就是净应付，按原价比对会让所有用券订单的合法回调被判为篡改。
     if (attempt.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
     const order = attempt.order
-    if (order.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
+    if (netPayableCents(order) !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
 
     if (event.result === 'success') {
       const res = await this.handleSuccess(channel as PaymentChannel, attempt, order, {
@@ -815,7 +841,7 @@ export class OnlinePaymentService {
         channelResult.channelTxnNo &&
         channelResult.amountCents !== null &&
         channelResult.amountCents === attempt.amountCents &&
-        channelResult.amountCents === freshOrder.amountCents
+        channelResult.amountCents === netPayableCents(freshOrder) // 净应付，非原价
       ) {
         await this.handleSuccess(attempt.channel as PaymentChannel, attempt, freshOrder, {
           channelTxnNo: channelResult.channelTxnNo,
@@ -840,7 +866,7 @@ export class OnlinePaymentService {
           orderId: order.id,
           channel: attempt.channel,
           queriedAmountCents: channelResult.amountCents,
-          expectedAmountCents: order.amountCents,
+          expectedAmountCents: netPayableCents(order),
         },
       })
       return { order: freshOrder, outcome: 'pending' }
@@ -912,7 +938,7 @@ export class OnlinePaymentService {
         queried.channelTxnNo &&
         queried.amountCents !== null &&
         queried.amountCents === attempt.amountCents &&
-        queried.amountCents === order.amountCents
+        queried.amountCents === netPayableCents(order) // 净应付，非原价
       ) {
         const late =
           order.payStatus === 'closed' ||
@@ -939,7 +965,7 @@ export class OnlinePaymentService {
           orderId: order.id,
           channel: attempt.channel,
           queriedAmountCents: queried.amountCents,
-          expectedAmountCents: order.amountCents,
+          expectedAmountCents: netPayableCents(order),
         },
       })
       if (opts.rejectAmountMismatch !== false) throw new BadRequestException('RECONCILE_AMOUNT_MISMATCH')

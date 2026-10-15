@@ -5,19 +5,19 @@
 //   复用 memberFavorites.getMyBenefits（同一端点已有实现），本模块**不另起第二个 fetch**，
 //   避免 CLAUDE.md §8 禁止的重复入口。本模块只负责「打印域怎么解读这份权益列表」。
 //
-// ⚠️ 本模块刻意**不提供** POST /orders/:id/redeem 的调用函数。
+// ⚠️ 本模块仍然刻意**不提供** POST /orders/:id/redeem 的调用函数。
 //
-//   服务端现状（origin/main，已逐行核对）：
-//     benefit-redemption.service.ts:153  discountCents: order.amountCents
-//     order-status.service.ts:298/312    要求 discountCents >= 应付；落库 discountCents = 应付
-//   即**核销 = 整单免**：抵扣额恒等于订单应付金额，不看券面值、不看品类、不看色彩、
-//   不看计费页上限、不看退款后是否恢复。在这些规则落地前把「使用权益」CTA 接上，
-//   一张小额券可以免掉任意金额的整单 —— 直接资损。
+//   服务端的资损根因已修复：BenefitGrant 现有 amountCents / maxDiscountCents / serviceScope，
+//   抵扣额 = min(面值, 上限, 订单应付)（benefit-valuation.ts 为计价 SSOT），
+//   并支持部分抵扣（订单保持 unpaid，余额按净应付走支付通道）。
+//   「一张小额券免掉整单」这条路径已经关死，**不再**是拦住前端接线的理由。
 //
-//   这与服务端自己的口径一致：order-redeem.controller.ts 头注释写明
-//   「**仅后端能力 + 端点**：Kiosk / 会员前端本波不加『使用券抵扣 / 核销』用户可操作入口」。
+//   但结账用券是一条独立的前端交付：需要选券 UI、净应付与原价的双行展示、
+//   部分抵扣后继续支付的衔接、以及 payStatus='unpaid' + netPayableCents>0 这个
+//   「核销成功但订单未结清」状态的正确呈现。这些没做之前接 CTA，会让用户以为已付清。
+//   服务端口径同样如此：order-redeem.controller.ts 头注释保留「仅后端能力 + 端点」。
 //
-//   因此本轮只做「读」：查权益、按真实数据渲染六态、说明适用性由谁裁定。
+//   因此本轮仍只做「读」：查权益、按真实数据渲染六态、说明适用性由谁裁定。
 //   页面上的核销 CTA 保持**可聚焦的 aria-disabled**，并明文写出原因，绝不静默、
 //   绝不显示「已抵扣 / 已减免」这类假成功。
 //
@@ -41,13 +41,20 @@ export const REDEEMABLE_BENEFIT_TYPES = ['coupon', 'free_quota', 'package_entitl
 /**
  * 这条权益是否满足服务端核销的**前置条件**。
  *
- * 每一条都对应服务端 benefit-redemption.service.ts 里一个真实的拒绝分支，不是前端自拟规则：
- *   - 类型不在白名单        :133 BENEFIT_NOT_REDEEMABLE
- *   - status !== 'active'   :137 BENEFIT_NOT_ACTIVE
- *   - validFrom 未到        :141 BENEFIT_NOT_STARTED
- *   - validUntil 已过       :144 BENEFIT_EXPIRED
- *   - quantityRemaining 为空:147 BENEFIT_NOT_QUANTIFIED
- *   - 余额 <= 0             :161 BENEFIT_USED_UP（CAS where quantityRemaining > 0）
+ * 每一条都对应服务端 benefit-redemption.service.ts `redeemForOrder` 里一个真实的拒绝分支，
+ * 不是前端自拟规则：
+ *   - 类型不在白名单        :149 BENEFIT_NOT_REDEEMABLE
+ *   - status !== 'active'   :152 BENEFIT_NOT_ACTIVE
+ *   - validFrom 未到        :156 BENEFIT_NOT_STARTED
+ *   - validUntil 已过       :159 BENEFIT_EXPIRED
+ *   - quantityRemaining 为空:162 BENEFIT_NOT_QUANTIFIED
+ *   - 面值未定义            :173 BENEFIT_NOT_VALUED（computeOrderDiscountCents）
+ *   - 适用范围不含 'print'  :173 BENEFIT_SCOPE_MISMATCH（同上）
+ *   - 余额 <= 0             :190 BENEFIT_USED_UP（CAS where quantityRemaining > 0）
+ *
+ * 面值 / 范围两条是计价三要素补齐后新增的拒绝分支。**必须在这里镜像**：
+ * 存量权益的 amountCents 全是 null，不判这一条就会把一批服务端必拒的券显示成「可用」
+ * （CLAUDE.md §9「不伪造能力」）。
  *
  * ⚠️ 这是**展示用过滤**，不是资格裁定。最终能不能核销永远由服务端说了算；
  *    本函数只保证本机不会把服务端明确会拒的权益摆出来当「可用」。
@@ -58,7 +65,21 @@ export function isRedeemableForPrint(item: MemberBenefitItem, now: number): bool
   if (item.validFrom && Date.parse(item.validFrom) > now) return false
   if (item.validUntil && Date.parse(item.validUntil) < now) return false
   if (item.quantityRemaining === null) return false
-  return item.quantityRemaining > 0
+  if (item.quantityRemaining <= 0) return false
+  // 未定义面值 → 服务端 BENEFIT_NOT_VALUED；金额为 0 的券同样抵不了钱。
+  if (item.amountCents === null || item.amountCents <= 0) return false
+  // 适用范围为 null = 不限；非空则必须包含打印订单类型（Order.type === 'print'）。
+  return isScopeApplicableToPrint(item.serviceScope)
+}
+
+/** 镜像服务端 benefit-valuation.ts 的 serviceScope 解析：null/空 = 不限，逗号分隔、忽略大小写与空白。 */
+function isScopeApplicableToPrint(scope: string | null): boolean {
+  if (!scope) return true
+  return scope
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0)
+    .includes('print')
 }
 
 /** 拉取本人权益列表（只读）。未登录 / mock 模式由 getMyBenefits 直接返回空页，不发无效请求。 */

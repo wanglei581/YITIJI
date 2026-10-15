@@ -1785,6 +1785,25 @@ model BenefitGrant {
   updatedAt         DateTime  @updatedAt
   benefitClaim      BenefitClaim?
 
+  // ── 计价三要素：面值 / 抵扣上限 / 适用范围（订单金额抵扣的前提）──────────────
+  // 为什么必须有：在此之前 BenefitGrant 只有 quantityTotal / quantityRemaining（次数），
+  // 系统没有「这张券值多少钱」的概念，redeemForOrder 只能按 discountCents = order.amountCents
+  // 整单免单 —— 抵扣额与券本身的价值无关，任意券命中未付单都会把应付打到 0（P0 资损，
+  // 曾以 REDEEM_PRINT_ORDER_UNSUPPORTED 止血闸临时关死）。本三列补齐后止血闸才可撤除。
+  //
+  // amountCents      面值（分，>= 0）。**null = 未定义面值 → 不可用于订单金额抵扣**（fail-closed）。
+  //                  存量行一律 null，不会因为本迁移凭空获得抵扣能力。
+  // maxDiscountCents 单次抵扣上限（分，>= 0）；null = 不额外设限。实际抵扣恒取
+  //                  min(面值, 上限, 订单应付)，三重约束，绝不超过订单应付（不找零、不转结余）。
+  // serviceScope     适用服务范围：逗号分隔的 Order.type 白名单（当前唯一取值 "print"）；
+  //                  null = 不限服务类型。范围不匹配一律拒绝核销，绝不跨服务乱抵。
+  //
+  // 合规：券 = 平台 credit，非资金、非真实收款；面值只表示「可抵扣的平台服务额度」，
+  // 不是可提现金额，不得表述为补贴发放。
+  amountCents      Int?
+  maxDiscountCents Int?
+  serviceScope     String?
+
   @@index([endUserId])
   @@index([endUserId, status])
 }
@@ -1814,6 +1833,12 @@ model BenefitActivity {
   createdById       String?
   createdBy         User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
   claims            BenefitClaim[]
+
+  // 计价三要素模板：claim 时逐字复制到 BenefitGrant（口径与 BenefitGrant 同名列一致）。
+  // 活动未填面值 → 领到的券同样 amountCents=null → 不可用于订单抵扣（fail-closed 一路贯穿）。
+  amountCents       Int?
+  maxDiscountCents  Int?
+  serviceScope      String?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 

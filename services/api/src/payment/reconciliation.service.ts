@@ -18,6 +18,7 @@
  */
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { netPayableCents } from './order-status.service'
 
 /** 线上资金通道（有 PaymentAttempt 台账的入账来源）。 */
 const ONLINE_CHANNELS = new Set(['sandbox', 'wechat', 'alipay'])
@@ -119,7 +120,7 @@ export class ReconciliationService {
     }
 
     for (const o of orders) {
-      const netCaptured = Math.max(0, o.amountCents - o.discountCents) // 实收资金（抵扣不入资金流）
+      const netCaptured = netPayableCents(o) // 实收资金 = 净应付（券抵扣不入资金流）
       const refundSum = successRefundSumByOrder.get(o.id) ?? 0
 
       if (o.payStatus === 'paid') {

@@ -52,6 +52,10 @@ export class BenefitActivitiesService {
         benefitType: dto.benefitType,
         sourceType: dto.sourceType,
         quantityTotal: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.quantityTotal),
+        // 计价三要素模板：info-only 资格提示不是券，一律不带面值（校验侧已拒，此处再兜一层）。
+        amountCents: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.amountCents),
+        maxDiscountCents: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.maxDiscountCents),
+        serviceScope: dto.benefitType === 'subsidy_eligibility_hint' ? null : cleanNullable(dto.serviceScope),
         stockTotal,
         stockRemaining: stockTotal,
         claimLimitPerUser: 1,
@@ -82,6 +86,10 @@ export class BenefitActivitiesService {
         benefitType: dto.benefitType,
         sourceType: dto.sourceType,
         quantityTotal: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.quantityTotal),
+        // 计价三要素模板：info-only 资格提示不是券，一律不带面值（校验侧已拒，此处再兜一层）。
+        amountCents: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.amountCents),
+        maxDiscountCents: dto.benefitType === 'subsidy_eligibility_hint' ? null : normalizeOptionalInt(dto.maxDiscountCents),
+        serviceScope: dto.benefitType === 'subsidy_eligibility_hint' ? null : cleanNullable(dto.serviceScope),
         stockTotal,
         stockRemaining: stockTotal,
         claimLimitPerUser: 1,
@@ -186,6 +194,9 @@ export class BenefitActivitiesService {
         ? new Date(now.getTime() + activity.grantValidDays * 24 * 60 * 60 * 1000)
         : activity.validUntil
       const quantityTotal = activity.benefitType === 'subsidy_eligibility_hint' ? null : activity.quantityTotal
+      // 计价三要素从活动模板逐字继承。info-only 资格提示不是券，一律不带面值。
+      // 活动未填面值 → 领到的券 amountCents=null → 不可用于订单抵扣（fail-closed 贯穿到底）。
+      const valued = activity.benefitType !== 'subsidy_eligibility_hint'
       const grant = await tx.benefitGrant.create({
         data: {
           endUserId,
@@ -194,6 +205,9 @@ export class BenefitActivitiesService {
           description: activity.description,
           quantityTotal,
           quantityRemaining: quantityTotal,
+          amountCents: valued ? activity.amountCents : null,
+          maxDiscountCents: valued ? activity.maxDiscountCents : null,
+          serviceScope: valued ? activity.serviceScope : null,
           status: 'active',
           sourceType: activity.sourceType,
           sourceRef: activity.id,
@@ -255,6 +269,21 @@ export class BenefitActivitiesService {
     if (dto.benefitType === 'subsidy_eligibility_hint' && dto.quantityTotal !== null && dto.quantityTotal !== undefined) {
       throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_QUANTITY_FORBIDDEN', message: '政策资格提示不允许设置额度' } })
     }
+    // 计价三要素校验，与 AdminMemberBenefitsService.validateGrant 同口径（两条发放路径不能有松紧差）。
+    const face = normalizeOptionalInt(dto.amountCents)
+    const cap = normalizeOptionalInt(dto.maxDiscountCents)
+    // info-only 资格提示是政策说明，不是券：给它填面值等于承诺一笔可抵扣金额。
+    if (dto.benefitType === 'subsidy_eligibility_hint' && face !== null) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_AMOUNT_FORBIDDEN', message: '政策资格提示不允许设置面值' } })
+    }
+    // 上限低于面值等价于把面值改小，属于自相矛盾的录入。
+    if (face !== null && cap !== null && cap < face) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_DISCOUNT_CAP_INVALID', message: '抵扣上限不能低于面值' } })
+    }
+    // 没有面值时上限没有可封顶的对象，多半是漏填面值。
+    if (face === null && cap !== null) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_ACTIVITY_AMOUNT_REQUIRED', message: '设置抵扣上限前必须先设置面值' } })
+    }
     const validFrom = parseOptionalDate(dto.validFrom)
     const validUntil = parseOptionalDate(dto.validUntil)
     if (validFrom && validUntil && validFrom.getTime() > validUntil.getTime()) {
@@ -270,6 +299,10 @@ export class BenefitActivitiesService {
       benefitType: row.benefitType,
       sourceType: row.sourceType,
       quantityTotal: row.quantityTotal,
+      // 发布前重新校验计价三要素：草稿期改过的面值/上限组合必须在发布这一刻仍然自洽。
+      amountCents: row.amountCents,
+      maxDiscountCents: row.maxDiscountCents,
+      serviceScope: row.serviceScope,
       stockTotal: row.stockTotal,
       validFrom: row.validFrom?.toISOString() ?? null,
       validUntil: row.validUntil?.toISOString() ?? null,
@@ -348,6 +381,9 @@ export class BenefitActivitiesService {
       description: row.description,
       quantityTotal: row.quantityTotal,
       quantityRemaining: row.quantityRemaining,
+      amountCents: row.amountCents,
+      maxDiscountCents: row.maxDiscountCents,
+      serviceScope: row.serviceScope,
       status: row.status as MemberBenefitItem['status'],
       sourceType: row.sourceType as MemberBenefitItem['sourceType'],
       validFrom: row.validFrom ? row.validFrom.toISOString() : null,
@@ -381,6 +417,9 @@ type ActivityRow = {
   benefitType: string
   sourceType: string
   quantityTotal: number | null
+  amountCents: number | null
+  maxDiscountCents: number | null
+  serviceScope: string | null
   stockTotal: number | null
   stockRemaining: number | null
   claimLimitPerUser: number
@@ -399,6 +438,9 @@ type GrantRow = {
   description: string | null
   quantityTotal: number | null
   quantityRemaining: number | null
+  amountCents: number | null
+  maxDiscountCents: number | null
+  serviceScope: string | null
   status: string
   sourceType: string
   validFrom: Date | null

@@ -57,6 +57,31 @@ export class UpsertBenefitActivityDto {
   @Max(999999)
   stockTotal?: number | null
 
+  /**
+   * 券面值模板（分）—— 领取时逐字写入 BenefitGrant.amountCents。
+   * 缺省 / null = 不定义面值，领到的券**不可用于订单金额抵扣**（fail-closed）。
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  amountCents?: number | null
+
+  /** 单次抵扣上限模板（分）；缺省 / null = 不额外设限。 */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  maxDiscountCents?: number | null
+
+  /** 适用服务范围模板：逗号分隔的订单类型白名单（当前唯一取值 "print"）；缺省 = 不限。 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  serviceScope?: string | null
+
   @IsOptional()
   @IsString()
   validFrom?: string | null

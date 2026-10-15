@@ -23,6 +23,15 @@ export interface MemberBenefitItem {
   description: string | null
   quantityTotal: number | null
   quantityRemaining: number | null
+  /**
+   * 面值（分，>= 0）—— 单次可抵扣的平台服务额度。
+   * **null = 未定义面值 → 不可用于订单金额抵扣**（fail-closed，BENEFIT_NOT_VALUED）。
+   */
+  amountCents: number | null
+  /** 单次抵扣上限（分，>= 0）；null = 不额外设限。实际抵扣 = min(面值, 上限, 订单应付)。 */
+  maxDiscountCents: number | null
+  /** 适用服务范围：逗号分隔的订单类型白名单（当前唯一取值 "print"）；null = 不限服务类型。 */
+  serviceScope: string | null
   status: BenefitStatus
   sourceType: BenefitSourceType
   validFrom: string | null

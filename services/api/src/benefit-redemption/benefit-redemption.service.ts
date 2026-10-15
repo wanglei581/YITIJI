@@ -8,7 +8,7 @@ import {
 import { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
-import { OrderStatusService } from '../payment/order-status.service'
+import { OrderStatusService, netPayableCents } from '../payment/order-status.service'
 import {
   REDEEMABLE_BENEFIT_TYPES,
   type RedeemBenefitParams,
@@ -16,6 +16,7 @@ import {
   type RedeemForOrderParams,
   type RedeemForOrderResult,
 } from './benefit-redemption.types'
+import { computeOrderDiscountCents } from './benefit-valuation'
 
 type OrderRedemptionOutcome = {
   record: { id: string; amountCents: number; kind: string }
@@ -82,14 +83,27 @@ export class BenefitRedemptionService {
   }
 
   /**
-   * C5-4 订单核销：券/免费次数/权益**全额抵扣一个未支付订单**，联动免费单。
+   * C5-4 订单核销：按**券的面值**抵扣一个未支付订单，支持全额与部分抵扣。
    *
    * 复用同一核销账本（RedemptionRecord，serviceType='order_redeem' / serviceRefId=orderId）
-   * 与同一幂等/一产物一核销/CAS/审计机制（**不重建第二套账本**）；订单置 paid(voucher)、
-   * 权益扣减与账本记录必须在同一个事务内提交。全额抵扣（本波不接部分抵扣）。
+   * 与同一幂等/一产物一核销/CAS/审计机制（**不重建第二套账本**）；订单结算、
+   * 权益扣减与账本记录必须在同一个事务内提交。
    *
-   * 幂等：同订单同权益重复调用 → RedemptionRecord 回放 + markPaidByRedemption 幂等，不二次扣。
-   * 一单一核销：`@@unique([serviceType,serviceRefId])` 保证同一订单只被核销一次（换权益也拒）。
+   * 抵扣额口径（SSOT 在 benefit-valuation.ts，本方法不自行算钱）：
+   *   discountCents = min(面值 amountCents, 抵扣上限 maxDiscountCents ?? ∞, 订单应付)
+   * - 全额（>= 应付）：订单 → paid(voucher)，净应付 0。
+   * - 部分（< 应付）：订单**保持 unpaid**，只落抵扣额，余额照常走支付通道收 netPayableCents。
+   *
+   * fail-closed：面值未定义（amountCents=null，**所有存量权益的状态**）→ BENEFIT_NOT_VALUED；
+   * 适用范围不含本订单类型 → BENEFIT_SCOPE_MISMATCH。二者都在任何写入之前拒绝。
+   *
+   * 幂等：同订单同权益重复调用 → RedemptionRecord 回放，不二次扣。
+   * 一单一核销：`@@unique([serviceType,serviceRefId])` 保证同一订单只被核销一次（换权益也拒），
+   * 订单侧 CAS 另锁 discountCents=0 作为防御纵深（部分抵扣不改 payStatus，光锁状态拦不住覆盖写）。
+   *
+   * 历史：本方法曾以 `REDEEM_PRINT_ORDER_UNSUPPORTED` 对打印订单整体 fail-closed 止血 ——
+   * 因为当时 BenefitGrant 没有面值 / 上限 / 范围任何字段，抵扣额只能取 order.amountCents，
+   * 任意券命中未付单都整单免单。三列补齐、抵扣改按面值计算后，该止血闸已撤除。
    */
   async redeemForOrder(params: RedeemForOrderParams): Promise<RedeemForOrderResult> {
     const { endUserId, orderId, benefitGrantId } = params
@@ -148,9 +162,23 @@ export class BenefitRedemptionService {
           throw new BadRequestException({ error: { code: 'BENEFIT_NOT_QUANTIFIED', message: '该权益无可核销额度' } })
         }
 
+        // ── 抵扣额计算（按券面值，不按订单金额）────────────────────────────
+        // 计算口径的 SSOT 在 benefit-valuation.ts：min(面值, 抵扣上限, 订单应付)。
+        // 这里只负责把失败原因翻成 HTTP 错误码，绝不在本文件里重算一遍金额。
+        //
+        // fail-closed：面值未定义（amountCents=null）一律拒。存量权益全部是 null，
+        // 因此「补齐字段」这件事本身不会让任何历史券凭空获得抵扣能力 —— 必须由运营
+        // 显式为新券填面值，才可能产生抵扣。拒绝发生在任何写入之前（结算 / 扣额度 /
+        // 落账本全在其后且同事务），不会留下半个核销。
+        const valuation = computeOrderDiscountCents(grant, order.amountCents, order.type)
+        if (!valuation.ok) {
+          throw new BadRequestException({ error: { code: valuation.code, message: valuation.message } })
+        }
+
         // 先获取订单唯一结算锁；后续任何 grant / 账本写入都在同一事务内，失败会完整回滚。
+        // 全额 → paid(voucher)；部分 → 订单仍 unpaid，只落抵扣额（余额走支付通道）。
         const settledOrder = await this.orderStatus.settleRedemptionInTransaction(tx, orderId, {
-          discountCents: order.amountCents,
+          discountCents: valuation.discountCents,
           benefitRef: benefitGrantId,
           operatorId: endUserId,
         })
@@ -180,7 +208,9 @@ export class BenefitRedemptionService {
             serviceType: 'order_redeem',
             serviceRefId: orderId,
             quantity: 1,
-            amountCents: order.amountCents,
+            // 账本记**落库后**的实际抵扣额，不是订单原价、也不是入参 —— 抵扣被订单应付封顶时
+            // 二者会不一致，以落库结果为准才对得上账（平台 credit，非资金）。
+            amountCents: settledOrder.discountCents,
             idempotencyKey,
           },
         })
@@ -231,6 +261,8 @@ export class BenefitRedemptionService {
       redemptionRecordId: outcome.record.id,
       payStatus: outcome.order.payStatus,
       discountCents: outcome.record.amountCents,
+      // 部分抵扣后订单仍欠款；调用方必须凭此判断是否继续走支付，不能只看有没有报错。
+      netPayableCents: netPayableCents(outcome.order),
       idempotent: outcome.idempotent,
     }
   }
@@ -254,6 +286,7 @@ export class BenefitRedemptionService {
       redemptionRecordId: record.id,
       payStatus: order.payStatus,
       discountCents: record.amountCents,
+      netPayableCents: netPayableCents(order),
       idempotent: true,
     }
   }

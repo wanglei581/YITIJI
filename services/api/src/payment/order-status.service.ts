@@ -35,6 +35,27 @@ function isPickupCodeUniqueConflict(e: unknown): boolean {
 }
 
 /**
+ * 净应付（分）= 应付 − 已抵扣，下限 0。**订单实际需要走资金通道收取的金额**。
+ *
+ * 为什么必须只有这一处口径：自权益支持**部分抵扣**起，`amountCents`（应付原价）不再等于
+ * 该向用户收的钱。任何仍按 `amountCents` 出码 / 校验回调金额的路径，都会让「用了券的订单」
+ * 被全价收款——用户既付了全款又白扣一次权益额度，比整单免单更糟。
+ *
+ * 已按同一口径计算的既有代码（refund.service 退款额、reconciliation.service 实收）
+ * 一并改为调用本函数，避免同一公式散落多处各自演化。
+ */
+export function netPayableCents(o: { amountCents: number; discountCents: number }): number {
+  const net = Math.max(0, o.amountCents - o.discountCents)
+  // 绝不返回 NaN：缺字段（如 select 漏列、测试替身少字段）会让 `100 - undefined` 变成 NaN，
+  // 一路写进 PaymentAttempt.amountCents（落库成 null）再让金额比对必然不等 —— 表现为
+  // 「支付结果校验失败」这种看不出根因的症状。宁可在此显式炸掉，也不把 NaN 当金额用。
+  if (!Number.isInteger(net)) {
+    throw new BadRequestException('ORDER_AMOUNT_INVALID')
+  }
+  return net
+}
+
+/**
  * 取件码可见性门（P0a）：仅 `paid`、未退款、且任务未进入 completed/cancelled/failed 终态时，
  * 后端才可向会员返回可用取件码。其它状态一律不返回（unpaid / refunded / 终态）。
  */
@@ -225,12 +246,14 @@ export class OrderStatusService {
   }
 
   /**
-   * C5-4 核销入账（全额券/免费次数/权益抵扣，**唯一允许写 paymentSource='voucher' 的路径**）。
+   * C5-4 核销入账（**全额**券/免费次数/权益抵扣，**唯一允许写 paymentSource='voucher' 的路径**）。
    *
    * 只能由 BenefitRedemptionService.redeemForOrder 在核销账本（RedemptionRecord）落库后调用；
    * Admin / markPaid / markPaidOnline 绝不写 voucher。
    *
-   * - 合法起点：unpaid（付费单）；要求 discountCents >= order.amountCents（**全额核销**，本波不接部分抵扣）。
+   * - 合法起点：unpaid（付费单）；本方法**只做全额核销**，要求 discountCents >= order.amountCents。
+   *   部分抵扣不置 paid，与本方法名（markPaid…）的契约冲突，必须直接走
+   *   settleRedemptionInTransaction —— 否则调用方会拿到一个仍是 unpaid 的「已支付」订单。
    * - 落库：payStatus=paid + paymentSource='voucher' + payChannel='voucher' + discountCents(=应付) + paidAt +
    *   paidBy='redemption' + 唯一 pickupCode；CAS + 取件码撞码有界重试（同 markPaid）。
    * - 幂等：已 paid 且 paymentSource='voucher' → 原样返回；已 paid 但来源不同 → 冲突拒绝。
@@ -247,6 +270,10 @@ export class OrderStatusService {
         if (order.paymentSource === 'voucher') return { order, settled: false }
         throw new BadRequestException('ORDER_ALREADY_PAID')
       }
+      // 全额闸：本方法承诺「返回的订单已 paid」，部分抵扣做不到，宁可拒绝也不返回半成品状态。
+      if (!Number.isInteger(opts.discountCents) || opts.discountCents < order.amountCents) {
+        throw new BadRequestException('REDEEM_REQUIRES_FULL_COVERAGE')
+      }
       return { order: await this.settleRedemptionInTransaction(tx, orderId, opts), settled: true }
     })
 
@@ -260,12 +287,16 @@ export class OrderStatusService {
   /**
    * 将订单核销审计放在外层事务提交后写入；订单核销需要借此复用同一审计格式，
    * 同时避免审计 I/O 位于 Prisma 事务中而拉长结算锁持有时间。
+   *
+   * 传入的 `order` 必须是**结算后**读回的行：抵扣额与是否入账都以落库结果为准，
+   * 绝不按入参重算 —— 部分抵扣被订单应付封顶时，入参与落库值可能不同。
    */
   async writeRedemptionSettlementAudit(
     orderId: string,
     order: OrderRecord,
     opts: RedemptionSettlementOptions,
   ): Promise<void> {
+    const netPayable = netPayableCents(order)
     await this.audit.write({
       actorId: null,
       actorRole: 'system',
@@ -273,9 +304,13 @@ export class OrderStatusService {
       targetType: 'order',
       targetId: orderId,
       // voucher = 平台券/权益抵扣，非真实资金；benefitRef 记录来源权益，便于对账与追溯。
+      // coverage 诚实标注本次是否把订单结清：部分抵扣**没有**入账，订单仍需走资金通道收 netPayableCents，
+      // 审计里必须能一眼分清，不能让「写了抵扣额」被读成「已收款」。
       payload: {
-        paymentSource: 'voucher',
-        discountCents: order.amountCents,
+        paymentSource: order.paymentSource,
+        coverage: netPayable === 0 ? 'full' : 'partial',
+        discountCents: order.discountCents,
+        netPayableCents: netPayable,
         benefitRef: opts.benefitRef,
         operatorId: opts.operatorId ?? null,
       },
@@ -283,8 +318,20 @@ export class OrderStatusService {
   }
 
   /**
-   * 在调用方事务内完成全额权益核销入账。此方法不写审计，避免账本、权益扣减与订单结算跨事务分裂。
+   * 在调用方事务内完成权益核销抵扣。此方法不写审计，避免账本、权益扣减与订单结算跨事务分裂。
    * 已支付订单（包括 voucher）不做幂等回放：调用方必须整体回滚或按既有核销账本回放。
+   *
+   * 两种结算形态（由抵扣额与订单应付的关系决定，调用方不需要分支）：
+   *
+   * - **全额**（discountCents >= 应付）：订单结清 → payStatus=paid + paymentSource/payChannel='voucher'
+   *   + discountCents=应付 + paidAt + paidBy='redemption' + 唯一 pickupCode。净应付 0，不走资金通道。
+   * - **部分**（0 < discountCents < 应付）：订单**保持 unpaid**，只落 discountCents。
+   *   绝不置 paid、绝不写 paymentSource、绝不发取件码 —— 钱还没收，出码等于白送货。
+   *   余额由既有支付通道按 netPayableCents(order) 收取（见 online-payment.service 出码与回调校验）。
+   *
+   * 幂等 / 并发：CAS 同时锁 `payStatus='unpaid'` 与 `discountCents=0`。后者是部分抵扣专属防线 ——
+   * 部分抵扣不改 payStatus，只靠 payStatus 的 CAS 无法阻止第二张券把抵扣额覆盖掉。
+   * （账本侧 `@@unique([serviceType, serviceRefId])` 已保证一单一核销，此处是防御纵深。）
    */
   async settleRedemptionInTransaction(
     tx: PrismaTransactionClient,
@@ -294,22 +341,42 @@ export class OrderStatusService {
     const order = await this.requireOrder(tx, orderId)
     if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
     if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
-    // 全额核销：抵扣额必须 >= 应付；部分抵扣（<应付）本波不接（留结账用券 UI 波）。
-    if (!Number.isInteger(opts.discountCents) || opts.discountCents < order.amountCents) {
-      throw new BadRequestException('REDEEM_REQUIRES_FULL_COVERAGE')
+    // 抵扣额必须是正整数：0 / 负数 / 小数一律拒。0 元抵扣会白扣一次权益额度却不省钱。
+    if (!Number.isInteger(opts.discountCents) || opts.discountCents <= 0) {
+      throw new BadRequestException('REDEEM_DISCOUNT_INVALID')
+    }
+    // 已有抵扣的订单不再叠加第二张券（一单一核销），也避免抵扣额被覆盖写。
+    if (order.discountCents !== 0) throw new BadRequestException('ORDER_ALREADY_DISCOUNTED')
+    // 封顶于订单应付：券面值高于订单金额时按应付截断，不找零、不转结余、不产生负应付。
+    const applied = Math.min(opts.discountCents, order.amountCents)
+
+    // ── 部分抵扣：只落抵扣额，订单仍 unpaid，余额照常走资金通道 ──────────────
+    if (applied < order.amountCents) {
+      const res = await tx.order.updateMany({
+        where: { id: orderId, payStatus: 'unpaid', discountCents: 0 }, // compare-and-set
+        data: { discountCents: applied },
+      })
+      if (res.count === 0) {
+        const fresh = await this.requireOrder(tx, orderId)
+        if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh.discountCents !== 0) throw new BadRequestException('ORDER_ALREADY_DISCOUNTED')
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      }
+      return this.requireOrder(tx, orderId)
     }
 
+    // ── 全额抵扣：净应付 0，直接结清并发取件码 ────────────────────────────
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
       const pickupCode = await this.generateUniquePickupCode(tx)
       let res: { count: number }
       try {
         res = await tx.order.updateMany({
-          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set
+          where: { id: orderId, payStatus: 'unpaid', discountCents: 0 }, // compare-and-set
           data: {
             payStatus: 'paid',
             paymentSource: 'voucher',
             payChannel: 'voucher',
-            discountCents: order.amountCents, // 全额抵扣（净应付 0）
+            discountCents: applied, // = 应付（净应付 0）
             paidAt: new Date(),
             paidBy: 'redemption',
             pickupCode,
@@ -322,6 +389,7 @@ export class OrderStatusService {
       if (res.count === 0) {
         const fresh = await this.requireOrder(tx, orderId)
         if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        if (fresh.discountCents !== 0) throw new BadRequestException('ORDER_ALREADY_DISCOUNTED')
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       return this.requireOrder(tx, orderId)

@@ -82,6 +82,8 @@ export class AdminMemberBenefitsService {
 
     const phoneMasked = maskPhoneFromEnc(user.phoneEnc)
     const quantityTotal = dto.benefitType === 'subsidy_eligibility_hint' ? null : (dto.quantityTotal ?? null)
+    // info-only 政策资格提示既无额度也无面值：它不是券，绝不能被赋予任何抵扣能力。
+    const valued = dto.benefitType !== 'subsidy_eligibility_hint'
     const created = await this.prisma.benefitGrant.create({
       data: {
         endUserId: dto.endUserId,
@@ -90,6 +92,9 @@ export class AdminMemberBenefitsService {
         description: cleanNullable(dto.description),
         quantityTotal,
         quantityRemaining: quantityTotal,
+        amountCents: valued ? (dto.amountCents ?? null) : null,
+        maxDiscountCents: valued ? (dto.maxDiscountCents ?? null) : null,
+        serviceScope: valued ? cleanNullable(dto.serviceScope) : null,
         status: 'active',
         sourceType: dto.sourceType,
         validFrom: parseOptionalDate(dto.validFrom),
@@ -109,6 +114,10 @@ export class AdminMemberBenefitsService {
         benefitType: created.benefitType,
         sourceType: created.sourceType,
         quantityTotal: created.quantityTotal,
+        // 面值 / 上限 / 范围进审计：这三项决定这张券能抵多少钱，发放时的取值必须可追溯。
+        amountCents: created.amountCents,
+        maxDiscountCents: created.maxDiscountCents,
+        serviceScope: created.serviceScope,
       },
     })
 
@@ -165,6 +174,28 @@ export class AdminMemberBenefitsService {
     if (dto.benefitType === 'subsidy_eligibility_hint' && dto.quantityTotal !== null && dto.quantityTotal !== undefined) {
       throw new BadRequestException({ error: { code: 'BENEFIT_QUANTITY_FORBIDDEN', message: '政策资格提示不允许设置额度' } })
     }
+    // info-only 资格提示是政策说明，不是券：给它填面值等于承诺一笔可抵扣金额，直接拒绝而不是静默丢弃。
+    if (
+      dto.benefitType === 'subsidy_eligibility_hint' &&
+      (dto.amountCents !== null && dto.amountCents !== undefined)
+    ) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_AMOUNT_FORBIDDEN', message: '政策资格提示不允许设置面值' } })
+    }
+    // 上限低于面值即等价于把面值改小，属于自相矛盾的录入 —— 明确拒绝，避免运营以为按面值抵扣。
+    if (
+      dto.amountCents !== null && dto.amountCents !== undefined &&
+      dto.maxDiscountCents !== null && dto.maxDiscountCents !== undefined &&
+      dto.maxDiscountCents < dto.amountCents
+    ) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_DISCOUNT_CAP_INVALID', message: '抵扣上限不能低于面值' } })
+    }
+    // 只有面值缺席时上限才没有意义（没有可封顶的对象），这种组合多半是漏填面值。
+    if (
+      (dto.amountCents === null || dto.amountCents === undefined) &&
+      dto.maxDiscountCents !== null && dto.maxDiscountCents !== undefined
+    ) {
+      throw new BadRequestException({ error: { code: 'BENEFIT_AMOUNT_REQUIRED', message: '设置抵扣上限前必须先设置面值' } })
+    }
     const validFrom = parseOptionalDate(dto.validFrom)
     const validUntil = parseOptionalDate(dto.validUntil)
     if (validFrom && validUntil && validFrom.getTime() > validUntil.getTime()) {
@@ -192,6 +223,9 @@ export class AdminMemberBenefitsService {
       description: string | null
       quantityTotal: number | null
       quantityRemaining: number | null
+      amountCents: number | null
+      maxDiscountCents: number | null
+      serviceScope: string | null
       status: string
       sourceType: string
       validFrom: Date | null
@@ -211,6 +245,9 @@ export class AdminMemberBenefitsService {
       description: row.description,
       quantityTotal: row.quantityTotal,
       quantityRemaining: row.quantityRemaining,
+      amountCents: row.amountCents,
+      maxDiscountCents: row.maxDiscountCents,
+      serviceScope: row.serviceScope,
       status: STATUS_TYPES.includes(row.status as BenefitStatus) ? (row.status as BenefitStatus) : 'revoked',
       sourceType: row.sourceType as BenefitSourceType,
       validFrom: row.validFrom ? row.validFrom.toISOString() : null,

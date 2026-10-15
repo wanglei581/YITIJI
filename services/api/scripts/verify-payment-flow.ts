@@ -389,6 +389,10 @@ async function main(): Promise<void> {
         quantityTotal: 1,
         quantityRemaining: 1,
         status: 'active',
+        // 刻意给足面值且范围匹配：这张券本身完全可用，被拒的唯一原因必须是订单已被出码预留
+        // （ORDER_NOT_REDEEMABLE）。若不给面值，断言可能因 BENEFIT_NOT_VALUED 而失去本用例的意义。
+        amountCents: 100,
+        serviceScope: 'print',
       },
     })
     grantIds.push(qrRaceGrant.id)

@@ -14,6 +14,13 @@ import { RedeemOrderDto } from './dto/redeem-order.dto'
  *
  * 合规：券 = 平台 credit / 权益，**非资金、非真实收款**；全额核销单联动 paid(voucher)，
  * 不承诺补贴到账；核销账本沿用既有 RedemptionRecord（禁重建第二套账本）。
+ *
+ * 抵扣额按**券面值**计算：min(amountCents, maxDiscountCents ?? ∞, 订单应付)。
+ * 响应里 `payStatus` 与 `netPayableCents` 必须一起读 —— 部分抵扣时 payStatus 仍是 'unpaid'、
+ * netPayableCents > 0，表示订单尚未结清，余额仍需走支付通道。核销成功 ≠ 订单已支付。
+ *
+ * fail-closed：未定义面值的权益（amountCents=null，所有存量权益）返回 400 `BENEFIT_NOT_VALUED`；
+ * 适用范围不含本订单类型返回 400 `BENEFIT_SCOPE_MISMATCH`。
  */
 @Controller()
 @UseGuards(EndUserAuthGuard)
