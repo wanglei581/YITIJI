@@ -1,6 +1,6 @@
 # 本机走查用假服务
 
-**只用于本机全链路走查。** 不得部署，不得指向生产或共用数据目录，也不得把假服务的输出当成真实 AI 能力的证据。内容全部是测试数据（虚构人物「测试·张建国」、测试号段手机号）。
+**只用于本机全链路走查。** 不得部署，不得指向生产或共用数据目录，也不得把假服务的输出当成真实 AI 能力的证据。内容全部是虚构走查数据，人物与单位来自 `scripts/walkthrough/dataset/personas.json`（例如张建国、青岛海湾某机械有限公司），不再使用「测试·」前缀。手机号只用 13800000000–13800000999。
 
 | 文件 | 作用 |
 |------|------|
@@ -50,7 +50,7 @@ FILE_STORAGE_DIR=<走查 API 的数据目录> SECRET_ENCRYPTION_KEY=<与走查 A
 
 如果只想让某一次请求出故障，可以在任意自由文本框里输入 `【走查故障:timeout】`（冒号全角、半角都认）。这个标记只对那一次请求生效，优先级高于状态文件。
 
-**假 OCR**。状态文件是 `${FAKE_OCR_STATE_DIR:-~/.cache/walk0929/fake-ocr}/mode`，可选值：`ok`、`lowconf`（平均置信度约 0.4）、`empty`（识别出 0 行）、`error`（等同于 `error17`，日配额用尽）、`error18`（QPS 超限）、`timeout`。在同一目录放一个 `text.txt`，可以替换默认的识别文本，每行一条。
+**假 OCR**。状态文件是 `${FAKE_OCR_STATE_DIR:-~/.cache/walk0929/fake-ocr}/mode`，可选值：`ok`、`lowconf`（平均置信度约 0.4）、`empty`（识别出 0 行）、`error`（等同于 `error17`，日配额用尽）、`error18`（QPS 超限）、`timeout`。在同一目录放一个 `text.txt`，可以在没有按文件命中时替换默认识别文本，每行一条。按文件名或人设切换见 `dataset/ocr-persona-lines.mjs`（对照 `~/.cache/walk0929/dataset/files/manifest.json`）。也可以在同一目录写 `active-file.txt`，内容是人设编号或素材相对路径。
 
 ## 日志
 

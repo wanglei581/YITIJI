@@ -13,7 +13,7 @@
 //   1. 状态文件 ${FAKE_LLM_STATE_DIR:-~/.cache/walk0929/fake-llm}/mode，内容为下列之一：
 //      ok | timeout | http500 | badjson | blocked | slow
 //   2. 请求任意消息里带标记【走查故障:timeout】（冒号全角半角都认），只影响这一次请求，
-//      优先级高于状态文件 —— 方便测试者直接在自由文本框里输入。
+//      优先级高于状态文件 —— 走查时可以直接写在自由文本框里。
 //   timeout = 挂住连接 200 秒不回；http500 = 500 + OpenAI 错误体；
 //   badjson = 200 但内容不是合法 JSON（纯文本功能则回空内容）；
 //   blocked = 400 + 内容安全拦截错误体（DashScope / DeepSeek 风格）；slow = 25 秒后正常回。

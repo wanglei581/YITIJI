@@ -138,10 +138,10 @@ async function main() {
 
   const gen = new LlmResumeGenerateService(config)
   await expectOk('resume_generate', () => gen.generate({
-    basic: { name: '测试·李梅', phone: '13800000002' },
+    basic: { name: '诸葛小雨', phone: '13800000616' },
     intention: { position: '行政文员' },
-    education: [{ school: '测试职业学院', major: '文秘', degree: '大专', description: '学习办公软件与公文写作' }],
-    experience: [{ company: '测试商贸有限公司', role: '前台', description: '接待来访客户，整理快递和文件' }],
+    education: [{ school: '示例·黄岛某高校', major: '文秘', degree: '大专', description: '学习办公软件与公文写作' }],
+    experience: [{ company: '青岛金沙滩某商贸有限公司', role: '前台', description: '接待来访客户，整理快递和文件' }],
     projects: [],
     skills: ['word', 'Excel'],
     certificates: [],
@@ -149,7 +149,7 @@ async function main() {
 
   // ── 岗位对照 / 规划 / 自我探索 / 招聘会 / 岗位 AI ─────────
   const jobCtx = {
-    title: '仓库管理员', company: '测试物流有限公司',
+    title: '仓库管理员', company: '青岛海湾某物流有限公司',
     description: '负责仓库货物出入库登记\n定期盘点库存并整理报表',
     requirements: '1. 中专及以上学历\n2. 熟悉ERP系统出入库操作\n3. 会用Excel制作报表\n4. 持叉车操作证者优先\n5. 能接受倒班',
   }
@@ -163,10 +163,10 @@ async function main() {
     (r) => (r.status === 'completed' && r.summary && (r.dimensions as Array<{ note: string | null }>).every((d) => d.note) ? null : JSON.stringify(r).slice(0, 200)))
   const fairCtx = (mode: 'preparation' | 'review') => ({
     resumeText, mode,
-    fair: { id: 'walk-fair', title: '走查测试招聘会', sourceName: '测试人社局', sourceUrl: 'https://example.com/fair', startAt: '', endAt: '', venue: '测试会展中心', city: '青岛' },
+    fair: { id: 'walk-fair', title: '示例·黄岛高校秋季宣讲', sourceName: '示例·某高校就业指导中心（黄岛）', sourceUrl: 'https://example.com/fair', startAt: '', endAt: '', venue: '示例·黄岛某高校礼堂', city: '青岛' },
     fairCompanies: [
-      { companyName: '测试物流有限公司', industry: '物流', sourceUrl: 'https://example.com/c1', positions: [{ title: '仓库管理员', requirements: '熟悉出入库', education: '中专', location: '青岛' }] },
-      { companyName: '测试装备制造有限公司', industry: '制造', sourceUrl: null, positions: [{ title: '装配班组长', requirements: null, education: null, location: null }] },
+      { companyName: '青岛海湾某物流有限公司', industry: '物流', sourceUrl: 'https://example.com/c1', positions: [{ title: '仓库管理员', requirements: '熟悉出入库', education: '中专', location: '青岛' }] },
+      { companyName: '青岛海湾某机械有限公司', industry: '制造', sourceUrl: null, positions: [{ title: '装配工', requirements: null, education: null, location: null }] },
     ],
   })
   await expectOk('fair_visit_plan.preparation', () => new LlmFairVisitPlanService(config).build(fairCtx('preparation')), (r) =>
@@ -174,7 +174,7 @@ async function main() {
   await expectOk('fair_visit_plan.review', () => new LlmFairVisitPlanService(config).build(fairCtx('review')), (r) =>
     r.mode === 'review' && r.followUpActions.length >= 1 ? null : JSON.stringify(r).slice(0, 200))
   const jobs = ['walk-job-1', 'walk-job-2'].map((jobId, i) => ({
-    jobId, title: i ? '装配工' : '仓库管理员', company: '测试物流有限公司', sourceName: '测试来源', sourceUrl: 'https://example.com',
+    jobId, title: i ? '装配工' : '仓库管理员', company: '青岛海湾某物流有限公司', sourceName: '示例·来源', sourceUrl: 'https://example.com',
     externalId: `ext-${i}`, description: jobCtx.description, requirements: jobCtx.requirements, skills: ['Excel'], city: '青岛',
   }))
   const jobAi = new JobAiLlmService(config)

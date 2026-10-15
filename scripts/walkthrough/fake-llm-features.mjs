@@ -17,7 +17,8 @@
 //   contract_review         contract-review/contract-review-provider.service.ts
 //   assistant_chat          ai/llm/llm-chat.service.ts（纯文本）
 //
-// 内容一律是「走查测试数据」：不出现真实人名，回引的原文都来自请求本身。
+// 回引的原文都来自请求本身，不另编人名。识别稿里的样例人物是张建国
+// （47 岁，青岛海湾某机械有限公司装配工，青岛市某机电中等专业学校），见 ocr-persona-lines.mjs。
 // ============================================================
 
 import {

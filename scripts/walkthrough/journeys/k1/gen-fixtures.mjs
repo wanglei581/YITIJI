@@ -1,4 +1,4 @@
-// 生成 K1 走查测试文件到 ~/.cache/walk0929/fixtures/（全部是测试数据，不含真实个人信息）
+// 生成 K1 走查夹具到 ~/.cache/walk0929/fixtures/（虚构人物，不含真实个人信息，姓名不加「测试·」）
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -32,21 +32,21 @@ function writePdf(file, pages) {
 
 // 1. 两页中文文字 PDF（游客打印）
 await writePdf(path.join(lib.FIX, 'k1-两页中文材料.pdf'), [
-  ['测试·求职材料说明（第一页）', '这是 K1 走查用的测试文件，内容全部虚构。', '一、个人情况：测试·王五，从事仓储物流工作八年。', '二、求职意向：仓库管理、物流调度。', '三、证书：叉车操作证（测试）。'],
-  ['测试·求职材料说明（第二页）', '四、工作经历：2018—2026 某测试物流公司 仓管员。', '五、自我评价：做事踏实，能吃苦，服从安排。', '六、说明：本页用于核对页数与份数。'],
+  ['孙伟 求职材料说明（第一页）', '这是走查用的虚构材料。', '一、个人情况：孙伟，在青岛海湾某物流有限公司做仓储八年。', '二、求职意向：仓库管理、物流调度。', '三、证书：叉车操作证（示例）。'],
+  ['孙伟 求职材料说明（第二页）', '四、工作经历：2018—2026 青岛海湾某物流有限公司 仓管员。', '五、自我评价：做事踏实，能吃苦，服从安排。', '六、说明：本页用于核对页数与份数。'],
 ]);
 // 2. 一页简历 PDF（零工之家工友）
 await writePdf(path.join(lib.FIX, 'k1-一页简历.pdf'), [
-  ['测试·李四 简历', '求职意向：普工、装卸', '工作经历：2020—2026 测试建筑工地 杂工', '技能：会开电动三轮车、能上夜班', '联系方式：请到现场询问（测试样张）'],
+  ['马犇 简历', '求职意向：普工、装卸', '工作经历：2020—2026 青岛浮山某装修工程有限公司 杂工', '技能：会开电动三轮车、能上夜班', '联系方式：13800000608（虚构号段）'],
 ]);
 // 3. U 盘用 PDF
 await writePdf(path.join(lib.FIX, 'k1-U盘材料.pdf'), [
-  ['测试·U 盘导入材料', '这份文件放在模拟 U 盘里，用来测 U 盘导入打印。', '内容虚构，仅供走查。'],
+  ['韩冰 U 盘材料', '这份文件放在模拟 U 盘里，用来走查 U 盘导入打印。', '内容虚构。单位：青岛小麦岛某物业服务有限公司。'],
 ]);
 // 4. 扫描投递用 PDF（两页）
 await writePdf(path.join(lib.FIX, 'k1-扫描件.pdf'), [
-  ['测试·扫描原件第一页', '这份文件模拟打印机面板扫描回传。'],
-  ['测试·扫描原件第二页', '用于核对扫描件页数。'],
+  ['李秀兰 扫描原件第一页', '这份文件模拟打印机面板扫描回传。'],
+  ['李秀兰 扫描原件第二页', '用于核对扫描件页数。青岛麦岛某家政服务有限公司。'],
 ]);
 
 // 5. 最小 .docx（用 python zipfile 打包）
@@ -56,11 +56,11 @@ import zipfile,sys
 z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED)
 z.writestr('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
 z.writestr('_rels/.rels','<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
-z.writestr('word/document.xml','<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>测试·Word 简历（走查用）</w:t></w:r></w:p></w:body></w:document>')
+z.writestr('word/document.xml','<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>韩冰 Word 简历（走查用，青岛小麦岛某物业服务有限公司）</w:t></w:r></w:p></w:body></w:document>')
 z.close()
 `, docx]);
 
-// 6. 身份证测试样张图片（正、反面），用浏览器 canvas 画
+// 6. 身份证示例样张（正、反面）。证件号用郑大山的虚构号，末位为 X。
 const browser = await lib.chromium.launch();
 const page = await browser.newPage({ viewport: { width: 856, height: 540 } });
 async function card(file, side) {
@@ -68,15 +68,15 @@ async function card(file, side) {
     const c=document.getElementById('c').getContext('2d');
     c.fillStyle='#dfe9f3';c.fillRect(0,0,856,540);
     c.strokeStyle='#8aa';c.lineWidth=6;c.strokeRect(10,10,836,520);
-    c.fillStyle='#c00';c.font='bold 64px "Hiragino Sans GB"';c.fillText('测试样张 非真实证件',120,110);
+    c.fillStyle='#c00';c.font='bold 64px "Hiragino Sans GB"';c.fillText('示例 非真实证件',180,110);
     c.fillStyle='#123';c.font='36px "Hiragino Sans GB"';
     ${side === 'front'
-      ? `c.fillText('姓名  测试·李四',60,210);c.fillText('性别 男   民族 汉',60,270);c.fillText('出生 1990 年 1 月 1 日',60,330);c.fillText('住址 测试省测试市测试路 1 号',60,390);c.fillText('公民身份号码 110101199001011234',60,470);c.fillStyle='#aab';c.fillRect(640,170,170,220);`
-      : `c.fillText('中华人民共和国（测试样张）',160,220);c.fillText('居民身份证（背面·测试）',180,290);c.fillText('签发机关 测试市公安局（虚构）',60,390);c.fillText('有效期限 2020.01.01-2040.01.01',60,450);`}
+      ? `c.fillText('姓名  郑大山',60,210);c.fillText('性别 男   民族 汉',60,270);c.fillText('出生 1967 年 5 月 19 日',60,330);c.fillText('住址 青岛市示例路605号（虚构）',60,390);c.fillText('公民身份号码 37020019670519029X',60,470);c.fillStyle='#aab';c.fillRect(640,170,170,220);`
+      : `c.fillText('中华人民共和国（示例样张）',160,220);c.fillText('居民身份证（背面·示例）',180,290);c.fillText('签发机关 示例市公安局（虚构）',60,390);c.fillText('有效期限 2020.01.01-2040.01.01',60,450);`}
   </script></body></html>`);
   await page.locator('#c').screenshot({ path: file });
 }
-await card(path.join(lib.FIX, 'k1-身份证测试样张-正面.png'), 'front');
-await card(path.join(lib.FIX, 'k1-身份证测试样张-反面.png'), 'back');
+await card(path.join(lib.FIX, 'k1-身份证示例样张-正面.png'), 'front');
+await card(path.join(lib.FIX, 'k1-身份证示例样张-反面.png'), 'back');
 await browser.close();
 console.log(fs.readdirSync(lib.FIX).join('\n'));

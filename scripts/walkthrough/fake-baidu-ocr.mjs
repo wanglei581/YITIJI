@@ -15,8 +15,10 @@
 // 模式：${FAKE_OCR_STATE_DIR:-~/.cache/walk0929/fake-ocr}/mode，逐请求读取：
 //   ok | lowconf（average 0.4）| empty（0 行）| error（=error17）| error17（日配额用尽）
 //   | error18（QPS 超限）| timeout（挂住 200 秒）
-// 同目录放 text.txt 可替换默认识别文本（每行一条）。
-// 请求逐行记到 requests.jsonl（不记图片内容，只记字节数）。
+// 识别文本按上传文件切换（见 dataset/ocr-persona-lines.mjs）：
+//   表单 filename / persona、图片 sha256、刚写入存储目录的素材、active-file.txt。
+// 都对不上时用张建国的默认识别稿。text.txt 只在上述都没有命中时整份替换。
+// 请求逐行记到 requests.jsonl（不记图片内容，只记字节数和命中方式）。
 // ============================================================
 
 import { createServer } from 'node:http'
@@ -24,6 +26,7 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import { selectOcrLines } from './dataset/ocr-persona-lines.mjs'
 
 const PORT = Number(process.env.FAKE_OCR_PORT || 4341)
 const STATE_DIR = process.env.FAKE_OCR_STATE_DIR || join(homedir(), '.cache', 'walk0929', 'fake-ocr')
@@ -33,51 +36,12 @@ const HANG_MS = 200_000
 mkdirSync(STATE_DIR, { recursive: true })
 const LOG_FILE = join(STATE_DIR, 'requests.jsonl')
 
-/** 走查测试简历：虚构人物、测试号段，不对应任何真实个人。 */
-const DEFAULT_LINES = [
-  '个人简历',
-  '姓名：测试·张建国',
-  '性别：男    年龄：45岁',
-  '联系电话：13800000001',
-  '电子邮箱：walk.test.zhang@example.com',
-  '现居城市：山东省青岛市',
-  '求职意向',
-  '意向岗位：仓库管理员',
-  '期望城市：青岛',
-  '教育经历',
-  '1996.09-1999.07  青岛市测试职业中等专业学校  机电技术应用  中专',
-  '工作经历',
-  '2016.03-2025.12  青岛测试机械制造有限公司  装配车间班组长',
-  '负责装配车间12人班组的日常排班和生产进度跟踪',
-  '带领班组完成新产线的设备调试与试生产',
-  '推行工位5S现场管理，车间物料摆放更加规范',
-  '2002.07-2016.02  青岛测试五金厂  装配工',
-  '从事五金配件装配和成品检验工作',
-  '熟悉来料检验、首件检验和巡检流程',
-  '技能与证书',
-  '叉车操作证、低压电工作业证',
-  '会用Excel整理生产日报表',
-  '熟悉ERP系统的出入库操作',
-  '自我评价',
-  '工作踏实肯干，有多年一线生产和班组管理经验',
-  '愿意学习新设备和新系统，能接受倒班',
-]
-
 function readMode() {
   try {
     const raw = readFileSync(join(STATE_DIR, 'mode'), 'utf8').trim()
     return MODES.has(raw) ? raw : 'ok'
   } catch {
     return 'ok'
-  }
-}
-
-function readLines() {
-  try {
-    const lines = readFileSync(join(STATE_DIR, 'text.txt'), 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-    return lines.length > 0 ? lines : DEFAULT_LINES
-  } catch {
-    return DEFAULT_LINES
   }
 }
 
@@ -182,9 +146,10 @@ async function handleOcr(url, req, res) {
     return sendJson(res, 200, { words_result: [], words_result_num: 0, log_id: logId() })
   }
   const low = mode === 'lowconf'
-  const lines = readLines()
+  const picked = selectOcrLines({ image: image ? Buffer.from(image, 'base64') : Buffer.alloc(0), form, stateDir: STATE_DIR })
+  const lines = picked.lines
   const words = lines.map((words, i) => ({ words, ...(entry.probability ? { probability: probabilityFor(i, low) } : {}) }))
-  log({ ...entry, outcome: low ? 'lowconf' : 'ok', lines: words.length })
+  log({ ...entry, outcome: low ? 'lowconf' : 'ok', lines: words.length, via: picked.via })
   return sendJson(res, 200, { words_result: words, words_result_num: words.length, direction: 0, log_id: logId() })
 }
 
