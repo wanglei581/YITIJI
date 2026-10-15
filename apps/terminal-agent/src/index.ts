@@ -67,7 +67,7 @@ program
     process.on('exit', releaseLock)
 
     // ── Step 1: Single-instance lock ──────────────────────────────────────
-    acquireLock()
+    await acquireLock()
 
     // ── Step 1b: Crash leftovers of Agent-owned print downloads ───────────
     // Only after the exclusive lock: a live instance's in-flight task_* file
