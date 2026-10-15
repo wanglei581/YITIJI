@@ -1,9 +1,7 @@
-import { Button } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
   ArrowRightIcon,
   BuildingIcon,
-  ExternalLinkIcon,
   FileSearchIcon,
   InfoIcon,
   Link2Icon,
@@ -291,56 +289,6 @@ function ActionButton({
       <span className="jf-tile-icon"><Icon aria-hidden="true" /></span>
       <span><b>{label}</b><span>{hint}</span></span>
     </button>
-  )
-}
-
-export function StickyActionBar({
-  sourceCanApply,
-  onOpenSource,
-  onOpenQr,
-}: {
-  sourceCanApply: boolean
-  onOpenSource: () => void
-  onOpenQr: () => void
-}) {
-  return (
-    <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
-      {/* 能力门禁用 aria-disabled + 常显原因，不用原生 disabled（触屏无 hover，
-          原生 disabled 还会让读屏跳过按钮、读不到原因）。真正的放行由上层
-          onOpenSource / onOpenQr 内部的 `if (!sourceCanApply) return` 兜底。 */}
-      {sourceCanApply ? null : (
-        <p id="job-sticky-apply-blocked" className="mb-2 text-center text-sm text-neutral-500">
-          {SOURCE_APPLY_UNAVAILABLE_REASON}
-        </p>
-      )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button
-          size="lg"
-          className={`flex items-center gap-2${sourceCanApply ? '' : ' cursor-not-allowed opacity-50'}`}
-          aria-disabled={!sourceCanApply || undefined}
-          aria-describedby={sourceCanApply ? undefined : 'job-sticky-apply-blocked'}
-          onClick={onOpenSource}
-        >
-          <ExternalLinkIcon className="h-4 w-4" />
-          去来源平台投递
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          className={`flex items-center gap-2${sourceCanApply ? '' : ' cursor-not-allowed opacity-50'}`}
-          aria-disabled={!sourceCanApply || undefined}
-          aria-describedby={sourceCanApply ? undefined : 'job-sticky-apply-blocked'}
-          onClick={onOpenQr}
-        >
-          <QrCodeIcon className="h-4 w-4" />
-          扫码投递
-        </Button>
-      </div>
-      <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
-        <InfoIcon className="h-3 w-3" />
-        {sourceCanApply ? '扫码将跳转至来源平台办理，本系统不收取简历' : '来源平台未提供有效投递链接，请前往来源机构咨询'}
-      </div>
-    </div>
   )
 }
 
