@@ -57,10 +57,25 @@ function assert(label: string, condition: boolean, detail?: string): void {
   }
 }
 
-// 服务端用真实 new Date() 判有效期,所以固定夹具取「远早于/远晚于今天」的两端,
-// 不受运行日期影响。
-const PAST = new Date('2026-07-01T00:00:00Z')
-const FUTURE = new Date('2026-12-31T00:00:00Z')
+// 服务端用真实 new Date() 判有效期,所以夹具日期一律**从运行时刻派生**,
+// 不写日历常量。
+//
+// 这里踩过坑:endAt 曾写死 '2026-09-01T09:00:00Z' 表示「未结束的招聘会」,
+// 到了 2026-09-02 这一刻就变成了过去,f-ok 被判为已结束 —— 门禁在业务代码
+// 毫无改动的情况下恒红(38 passed / 5 failed),并同时挡住 ci.yml 的
+// build-and-verify 与 postgres-readiness 两个 job。
+// 把日期往后推一个新的固定值只是把引信调长,仍然会再次到期;唯一稳的做法
+// 是让「过去 / 未来」相对此刻定义。
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+/** 整个运行只取一次「此刻」,同一次运行内所有夹具同源,不受跨秒/跨天影响。 */
+const NOW_MS = Date.now()
+/** 远早于此刻:已过有效期 / 已结束。 */
+const PAST = new Date(NOW_MS - 60 * DAY_MS)
+/** 远晚于此刻:仍在有效期内 / 尚未结束。 */
+const FUTURE = new Date(NOW_MS + 60 * DAY_MS)
+/** 同步时间:过去某个合理时刻。只需「非空且是合法 Date」,不参与过期判定。 */
+const SYNCED_AT = new Date(NOW_MS - 90 * DAY_MS)
 
 // ── 内存假 Prisma ─────────────────────────────────────────────────────────────
 
@@ -203,7 +218,7 @@ function jobRow(id: string, opts: Partial<Row> = {}): Row {
     reviewedAt: null,
     rejectReason: null,
     validThrough: null,
-    syncTime: new Date('2026-06-01T00:00:00Z'),
+    syncTime: SYNCED_AT,
     ...opts,
   }
 }
@@ -234,9 +249,10 @@ function fairRow(id: string, opts: Partial<Row> = {}): Row {
     reviewedBy: null,
     reviewedAt: null,
     rejectReason: null,
-    startAt: new Date('2026-09-01T01:00:00Z'),
-    endAt: new Date('2026-09-01T09:00:00Z'),
-    syncTime: new Date('2026-06-01T00:00:00Z'),
+    // 尚未结束的单日招聘会(此刻之后 30 天开场,开 8 小时)。
+    startAt: new Date(NOW_MS + 30 * DAY_MS),
+    endAt: new Date(NOW_MS + 30 * DAY_MS + 8 * HOUR_MS),
+    syncTime: SYNCED_AT,
     ...opts,
   }
 }
@@ -268,7 +284,7 @@ function buildFixture() {
   ])
   const jobFair = makeTable([
     fairRow('f-ok'),                                                    // 未结束
-    fairRow('f-ended', { endAt: new Date('2026-07-02T09:00:00Z'), startAt: PAST }), // 已结束
+    fairRow('f-ended', { startAt: PAST, endAt: new Date(PAST.getTime() + 8 * HOUR_MS) }), // 已结束
     fairRow('f-nourl', { sourceUrl: '' }),
   ])
   const policyPost = makeTable([])
