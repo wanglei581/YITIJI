@@ -9,7 +9,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -17,6 +16,7 @@ import {
   ArrowRightIcon,
   BriefcaseIcon,
   CheckCircle2Icon,
+  InfoIcon,
   Loader2Icon,
   PencilLineIcon,
   PrinterIcon,
@@ -35,7 +35,7 @@ import {
 } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { ResumeDecisionFrame } from './decision/ResumeDecisionFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
 import { FitSkillMap } from './jobFit/FitSkillMap'
@@ -46,7 +46,6 @@ import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
 import './jobFit-inkpaper.css'
 import './jobFit-inkpaper-ext.css'
-import './resume-fusion-youth.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface PageState {
@@ -62,11 +61,20 @@ interface PageState {
  */
 type PreconditionGate = 'missing' | 'rejected'
 
-function JobFitFullscreenFrame({ children }: { children: ReactNode }) {
+/**
+ * 合规披露条。
+ *
+ * 迁移前用的是 ui 包的 `ComplianceBanner`（暖褐主题），换到青序流光壳之后两套色系
+ * 不能落在同一页上，所以这里按稿 46 的 guardline 自绘。
+ * **语义一个不少**：`role="note"` 与可访问名称原样保留 —— 丢了它读屏用户就听不到
+ * 这是一条合规声明而不是普通段落。
+ */
+function JobFitCompliance({ children }: { children: ReactNode }) {
   return (
-    <KioskFullscreenShell>
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume">{children}</KioskPageFrame>
-    </KioskFullscreenShell>
+    <p className="job-fit-compliance" role="note" aria-label="合规提示">
+      <InfoIcon aria-hidden="true" />
+      <span>{children}</span>
+    </p>
   )
 }
 
@@ -189,19 +197,22 @@ export function JobFitPage() {
 
   if (gate) {
     return (
-      <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <ResumeDecisionFrame
+        title="岗位匹配参考"
+        subtitle={gate === 'missing' ? '先补上简历任务，再谈岗位匹配' : '这份简历任务现在读不出来'}
+      ><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="alert">
-          <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
-          <p className="text-base text-neutral-500">
+          <AlertCircleIcon aria-hidden="true" />
+          <p>
             {gate === 'missing'
               ? '请先完成简历上传与诊断，再做岗位匹配参考'
               : '这台机器上读不到你那份简历解析结果了。解析有保存期限，也只对本人开放 —— 重新上传并跑完诊断后再来。'}
           </p>
-          <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>
+          <button type="button" className="qx-btn job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>
             {gate === 'missing' ? '去上传简历' : '重新上传简历'}
-          </Button>
+          </button>
         </div>
-      </main></JobFitFullscreenFrame>
+      </main></ResumeDecisionFrame>
     )
   }
 
@@ -211,12 +222,12 @@ export function JobFitPage() {
 
   if (loadingLatest) {
     return (
-      <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <ResumeDecisionFrame title="岗位匹配参考" subtitle="正在读取，还没有结果"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="status" aria-live="polite">
-          <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
-          <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
+          <Loader2Icon className="animate-spin" aria-hidden="true" />
+          <p>正在恢复岗位匹配报告…</p>
         </div>
-      </main></JobFitFullscreenFrame>
+      </main></ResumeDecisionFrame>
     )
   }
 
@@ -417,19 +428,14 @@ export function JobFitPage() {
     const gapActionCount =
       (result.gapPoints ?? []).length + (result.targetedSuggestions ?? []).length
     return (
-      <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
-        <div className="job-fit-header">
-          <KioskPageHeader
-            title="岗位匹配参考"
-            description={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
-            onBack={() => navigate('/')}
-            backLabel="返回首页"
-          />
-        </div>
-        <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
-          <ComplianceBanner tone="info">
+      <ResumeDecisionFrame
+        title="岗位匹配参考"
+        subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
+      ><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-content">
+          <JobFitCompliance>
             以下内容仅为帮助你修改简历与准备投递的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。
-          </ComplianceBanner>
+          </JobFitCompliance>
 
           <DecisionSummaryBar
             jobTitle={result.job?.title ?? '目标岗位'}
@@ -448,86 +454,88 @@ export function JobFitPage() {
             原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
           */}
           {gapActionCount > 0 && (
-            <Card className="job-fit-card job-fit-gap-entry p-5">
-              <p className="text-sm leading-relaxed text-neutral-600">
+            <div className="job-fit-card job-fit-gap-entry">
+              <p className="job-fit-card-copy">
                 这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，
                 单独放在一屏里。
               </p>
-              <Button
-                size="lg"
-                className="job-fit-primary-action mt-3 h-14 w-full"
+              <button
+                type="button"
+                className="qx-btn job-fit-primary-action job-fit-block-action"
                 onClick={() =>
                   navigate('/resume/job-fit/actions', { state: { taskId, accessToken } })
                 }
               >
                 我要补这些差距
-              </Button>
-            </Card>
+              </button>
+            </div>
           )}
 
           {result.job?.sourceName && (
-            <Card className="job-fit-card job-fit-source p-5">
-              <p className="text-xs text-neutral-400">
+            <div className="job-fit-card job-fit-source">
+              <p className="job-fit-card-meta">
                 岗位来源：{result.job.sourceName}{result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
               </p>
-              <p className="mt-1 text-sm text-neutral-600">准备好之后，请前往来源平台完成投递。</p>
-            </Card>
+              <p className="job-fit-card-copy">准备好之后，请前往来源平台完成投递。</p>
+            </div>
           )}
 
           {isAnonymous && anonymousConsentActive && (
             <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
           )}
-          {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
-          {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
+          {notice && <p className="job-fit-notice" aria-live="polite">{notice}</p>}
+          {error && <p className="job-fit-alert" role="alert">{error}</p>}
         </div>
 
-        <KioskActionBar className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-          <div className="job-fit-action-grid grid grid-cols-3 gap-2">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="h-14 text-sm"
+        <div className="job-fit-action-bar">
+          <div className="job-fit-action-grid">
+            <button
+              type="button"
+              className="qx-btn"
               disabled={printing}
               onClick={() => void handlePrint()}
             >
-              {printing ? <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" /> : <PrinterIcon className="mr-1 h-5 w-5" aria-hidden="true" />}
+              {printing ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : <PrinterIcon aria-hidden="true" />}
               {printing ? '生成中' : '打印报告'}
-            </Button>
-            <Button
-              size="lg"
-              className="h-14 text-sm"
+            </button>
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="teal"
               onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}
             >
-              <PencilLineIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+              <PencilLineIcon aria-hidden="true" />
               优化简历
-            </Button>
+            </button>
             {result.job?.id ? (
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-14 text-sm"
+              <button
+                type="button"
+                className="qx-btn"
                 onClick={() => {
                   if (result.job?.id) navigate(`/jobs/${result.job.id}`)
                 }}
               >
-                <BriefcaseIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+                <BriefcaseIcon aria-hidden="true" />
                 查看岗位
-              </Button>
+              </button>
             ) : (
-              <Button size="lg" variant="secondary" className="h-14 text-sm" onClick={() => setResult(null)}>
+              <button type="button" className="qx-btn" onClick={() => setResult(null)}>
                 换个岗位分析
-              </Button>
+              </button>
             )}
           </div>
-        </KioskActionBar>
-      </main></JobFitFullscreenFrame>
+        </div>
+      </main></ResumeDecisionFrame>
     )
   }
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <JobFitFullscreenFrame>
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+    <ResumeDecisionFrame
+      title="岗位匹配参考"
+      subtitle="选择目标岗位，基于本人简历生成定向参考与优化建议"
+    >
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--form" data-visual-theme="service-desk" data-ux-density="touch">
       {showAnonymousConsent && (
         <AnonymousJobFitConsentDialog
           busy={analyzing}
@@ -547,64 +555,55 @@ export function JobFitPage() {
         onCancel={handleCancelMemberConsent}
         onConfirm={() => void handleConfirmMemberConsent()}
       />
-      <div className="job-fit-header">
-        <KioskPageHeader
-          title="岗位匹配参考"
-          description="选择目标岗位，基于本人简历生成定向参考与优化建议"
-          onBack={() => navigate(-1)}
-          backLabel="返回"
-        />
-      </div>
-      <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
-        <ComplianceBanner tone="info">
+      <div className="job-fit-content">
+        <JobFitCompliance>
           分析结果仅供本人参考，不代表录用结果；本平台不提供投递功能，投递请前往岗位来源平台。
-        </ComplianceBanner>
+        </JobFitCompliance>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="job-fit-tabs">
           <button
             type="button"
             onClick={() => setTab('pick')}
             aria-pressed={tab === 'pick'}
-            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'pick' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
+            className="qx-btn job-fit-tab"
           >
-            <BriefcaseIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
+            <BriefcaseIcon aria-hidden="true" />
             从岗位信息选择
           </button>
           <button
             type="button"
             onClick={() => setTab('manual')}
             aria-pressed={tab === 'manual'}
-            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'manual' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
+            className="qx-btn job-fit-tab"
           >
-            <TargetIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
+            <TargetIcon aria-hidden="true" />
             手填目标岗位
           </button>
         </div>
 
         {tab === 'pick' ? (
-          <Card className="job-fit-card p-4">
-            <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-300" aria-hidden="true" />
+          <div className="job-fit-card job-fit-picker">
+            <div className="job-fit-search">
+              <SearchIcon aria-hidden="true" />
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="搜索岗位名称 / 公司"
                 aria-label="搜索岗位名称或公司"
-                className="min-h-[48px] w-full rounded-xl border border-neutral-200 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
               />
             </div>
-            <div className="mt-3 flex flex-col gap-2" aria-busy={jobsLoading} aria-live="polite">
+            <div className="job-fit-joblist" aria-busy={jobsLoading} aria-live="polite">
               {jobsLoading ? (
-                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400" role="status">
-                  <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />正在加载岗位…
+                <p className="job-fit-list-hint" role="status">
+                  <Loader2Icon className="animate-spin" aria-hidden="true" />正在加载岗位…
                 </p>
               ) : jobsError ? (
-                <p className="py-6 text-center text-sm text-error-fg" role="alert">
+                <p className="job-fit-alert" role="alert">
                   岗位列表这次没取回来（不是没有岗位）。可以稍后重试，或直接切到「手填目标岗位」——
                   手填不依赖岗位库，照常能做匹配参考。
                 </p>
               ) : jobs.length === 0 ? (
-                <p className="py-6 text-center text-sm text-neutral-400">没有找到岗位，可切换「手填目标岗位」</p>
+                <p className="job-fit-list-hint">没有找到岗位，可切换「手填目标岗位」</p>
               ) : (
                 jobs.map((j) => {
                   const active = selectedJob?.id === j.id
@@ -615,28 +614,27 @@ export function JobFitPage() {
                       onClick={() => setSelectedJob(j)}
                       aria-pressed={active}
                       aria-label={`${j.title}，${j.company}，${active ? '已选择' : '未选择'}`}
-                      className={['flex min-h-[56px] items-center justify-between rounded-xl border px-4 py-3 text-left', active ? 'border-primary-500 bg-primary-50' : 'border-neutral-100 bg-white hover:border-neutral-200'].join(' ')}
+                      className="job-fit-joblist-row"
                     >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-neutral-900">{j.title}</span>
-                        <span className="mt-0.5 block truncate text-xs text-neutral-500">{j.company} · 来源：{j.sourceName}</span>
+                      <span className="job-fit-joblist-tx">
+                        <span className="job-fit-joblist-t">{j.title}</span>
+                        <span className="job-fit-joblist-d">{j.company} · 来源：{j.sourceName}</span>
                       </span>
-                      {active && <CheckCircle2Icon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />}
+                      {active && <CheckCircle2Icon aria-hidden="true" />}
                     </button>
                   )
                 })
               )}
             </div>
-          </Card>
+          </div>
         ) : (
-          <Card className="job-fit-card p-4">
+          <div className="job-fit-card job-fit-manual">
             <input
               value={manualTitle}
               onChange={(e) => setManualTitle(e.target.value)}
               maxLength={50}
               placeholder="目标岗位名称，如：行政专员"
               aria-label="目标岗位名称"
-              className="min-h-[52px] w-full rounded-xl border border-neutral-200 px-4 text-base focus:border-primary-500 focus:outline-none"
             />
             <textarea
               value={manualReq}
@@ -645,13 +643,12 @@ export function JobFitPage() {
               rows={5}
               placeholder="可粘贴岗位 JD / 任职要求（选填，提供后参考更有针对性）"
               aria-label="岗位 JD 或任职要求"
-              className="mt-2 w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-sm leading-relaxed focus:border-primary-500 focus:outline-none"
             />
-          </Card>
+          </div>
         )}
 
-        {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
-        {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
+        {error && <p className="job-fit-alert" role="alert">{error}</p>}
+        {notice && <p className="job-fit-notice" aria-live="polite">{notice}</p>}
         {memberConsentRequired && (
           <MemberJobFitConsentCard
             busy={memberConsentBusy}
@@ -663,22 +660,22 @@ export function JobFitPage() {
         )}
       </div>
 
-      <KioskActionBar className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <Button size="lg" className="job-fit-primary-action h-14 w-full text-base" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
+      <div className="job-fit-action-bar">
+        <button type="button" className="qx-btn job-fit-primary-action job-fit-block-action" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>
-              <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
+              <Loader2Icon className="animate-spin" aria-hidden="true" />
               正在分析（约 10-20 秒）…
             </>
           ) : (
             <>
               开始匹配参考分析
-              <ArrowRightIcon className="ml-1.5 h-5 w-5" aria-hidden="true" />
+              <ArrowRightIcon aria-hidden="true" />
             </>
           )}
-        </Button>
-      </KioskActionBar>
+        </button>
+      </div>
     </main>
-    </JobFitFullscreenFrame>
+    </ResumeDecisionFrame>
   )
 }

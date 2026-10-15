@@ -1,294 +1,196 @@
+/* 岗位匹配参考 · 青序流光（稿 46-resume-decision-workspace?screen=job-fit / actions）
+ *
+ * 壳层（顶栏 / 页头 / 底部导航 / 返回键）在 decision/ResumeDecisionFrame.tsx 的
+ * QxPageFrame 里，这里只写本页分区；地基按钮、卡片、状态块见 styles/qingxu/primitives.css。
+ *
+ * 保留 `.job-fit-inkpaper` 作用域与原有类名 —— 它们是子组件（DecisionSummaryBar /
+ * FitSkillMap / GapActionCards / ResumeRewriteCard）的稳定地标，改名只会把样式悄悄改丢
+ * （类名写错 CSS 不报错，本仓为此栽过 92 处边框不渲染）。变的是**取色与排版**：
+ * 下面那张表把本页自定义的 --sd-* 一次性改接到青序流光令牌，不再经 --k-*（暖褐）那条链，
+ * 两套色系因此不会落在同一页上。
+ *
+ * 舞台：1080×1920 固定舞台由外层 KioskStageFit 等比缩放，本页**不得**再用 100dvh ——
+ * 那量的是真实可视区，在被缩放的舞台里会短一截。高度一律靠 flex 撑满 .qx-body。
+ */
 .job-fit-inkpaper {
-  --sd-color-canvas-outer: var(--k-paper, var(--color-canvas));
-  --sd-color-canvas: var(--k-paper, var(--color-canvas));
-  --sd-color-surface: var(--k-surface, var(--color-surface));
-  --sd-color-primary: var(--color-warning);
-  --sd-color-primary-strong: var(--color-warning-fg);
-  --sd-color-primary-soft: var(--color-warning-bg);
-  --sd-color-teal: var(--k-teal);
-  --sd-color-teal-deep: var(--k-teal-deep);
-  --sd-color-teal-soft: var(--k-teal-soft);
-  --sd-color-wheat: var(--color-wheat);
-  --sd-color-wheat-deep: var(--color-wheat-deep);
-  --sd-color-wheat-soft: var(--color-wheat-soft);
-  --sd-color-text-strong: var(--k-ink);
-  --sd-color-text: var(--k-ink);
-  --sd-color-text-muted: var(--k-muted);
-  --sd-color-line: var(--k-line);
-  --sd-color-success-soft: var(--k-teal-soft);
-  --sd-color-warning-soft: var(--color-wheat-soft);
-  --sd-control-min: 56px;
-  --sd-primary-control-min: 72px;
-  --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
-  position: relative;
-  min-height: 100dvh;
-  background: var(--sd-color-canvas-outer);
-  color: var(--sd-color-text);
+  --sd-color-canvas-outer: var(--qx-paper);
+  --sd-color-canvas: var(--qx-paper);
+  --sd-color-surface: var(--qx-surface);
+  --sd-color-primary: var(--qx-teal);
+  --sd-color-primary-strong: var(--qx-teal-d);
+  --sd-color-primary-soft: var(--qx-teal-soft);
+  --sd-color-teal: var(--qx-teal);
+  --sd-color-teal-deep: var(--qx-teal-d);
+  --sd-color-teal-soft: var(--qx-teal-soft);
+  --sd-color-wheat: var(--qx-wheat);
+  --sd-color-wheat-deep: var(--qx-wheat-d);
+  --sd-color-wheat-soft: var(--qx-wheat-soft);
+  --sd-color-text-strong: var(--qx-ink);
+  --sd-color-text: var(--qx-ink-2);
+  --sd-color-text-muted: var(--qx-ink-3);
+  --sd-color-line: var(--qx-line);
+  --sd-color-line-strong: var(--qx-line-2);
+  --sd-color-success-soft: var(--qx-teal-soft);
+  --sd-color-warning-soft: var(--qx-wheat-soft);
+  --sd-color-error: var(--qx-cinnabar);
+  --sd-color-error-deep: var(--qx-cinnabar-d);
+  --sd-color-error-soft: var(--qx-cinnabar-soft);
+  /* 触控底线：可点区 ≥48px、主操作 ≥56px（CLAUDE.md §9）。这里绑的是青序流光令牌
+     （--qx-tap-min 48px / --qx-btn-h 76px），不再本地重写一份数值。
+     舞台缩放后屏幕上量到的是 CSS px × scale，门禁断言必须除以 scale。 */
+  --sd-control-min: var(--qx-tap-min);
+  --sd-primary-control-min: var(--qx-btn-h);
+  --sd-serif: var(--qx-serif);
+  --sd-sans: var(--qx-sans);
+  --sd-card-radius: var(--qx-r);
+  position: relative; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  background: transparent; color: var(--sd-color-text); font-family: var(--sd-sans);
 }
-.job-fit-inkpaper .job-fit-header {
-  flex: 0 0 auto;
-  padding: 2px 2px 0;
-}
+/* 前置缺失 / 读取中：这两态只有一张卡，让它把 .qx-body 的余量吃掉并居中，
+   否则 1920 高的舞台上卡片底下会留一大片空白（青序「余量吸收」口径）。 */
+.job-fit-inkpaper--gate,
+.job-fit-inkpaper--loading { align-items: center; justify-content: center; }
 .job-fit-inkpaper .job-fit-content {
-  width: min(100%, 984px);
-  margin-inline: auto;
-  scrollbar-color: var(--k-line) transparent;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 18px; padding: 16px 0 28px; scrollbar-width: none;
 }
+.job-fit-inkpaper .job-fit-content::-webkit-scrollbar { display: none; }
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary,
 .job-fit-inkpaper .job-fit-state-card {
-  border: 1px solid var(--sd-color-line);
+  border: 1px solid var(--sd-color-line); border-radius: var(--sd-card-radius);
   background: var(--sd-color-surface);
-  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
-}
-.job-fit-inkpaper .job-fit-card,
-.job-fit-inkpaper .job-fit-summary {
-  border-radius: 18px;
 }
 .job-fit-inkpaper .job-fit-state-card {
-  display: grid;
-  width: min(100%, 420px);
-  justify-items: center;
-  gap: 16px;
-  border-radius: 18px;
-  padding: 32px 28px;
-  text-align: center;
+  display: grid; width: min(100%, 720px); justify-items: center; gap: 20px;
+  padding: 44px 40px; text-align: center;
 }
-.job-fit-inkpaper .job-fit-state-card > svg {
-  color: var(--sd-color-primary);
-}
-.job-fit-inkpaper .job-fit-summary {
-  border-color: var(--k-line);
-  border-top: 4px solid var(--sd-color-primary);
-  background: var(--sd-color-surface);
-  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
-}
-.job-fit-inkpaper .job-fit-summary > div > div > p:first-child,
+.job-fit-inkpaper .job-fit-state-card > svg { width: 56px; height: 56px; color: var(--sd-color-primary); }
+.job-fit-inkpaper .job-fit-state-card p { font-size: 22px; line-height: 1.55; color: var(--sd-color-text); }
+.job-fit-inkpaper .job-fit-summary { border-top: 4px solid var(--sd-color-primary); }
 .job-fit-inkpaper .job-fit-card h2,
-.job-fit-inkpaper .job-fit-card h3 {
-  color: var(--sd-color-text-strong);
-}
-.job-fit-inkpaper .job-fit-header h1,
-.job-fit-inkpaper .job-fit-summary h2,
-.job-fit-inkpaper .job-fit-card h2,
-.job-fit-inkpaper .job-fit-card h3 {
-  font-family: var(--sd-font-sans, system-ui, sans-serif);
-  letter-spacing: .02em;
+.job-fit-inkpaper .job-fit-card h3,
+.job-fit-inkpaper .job-fit-summary h2 {
+  color: var(--sd-color-text-strong); font-family: var(--sd-sans); letter-spacing: .02em;
 }
 .job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
-  border-left: 3px solid var(--k-teal);
-  background: var(--sd-color-success-soft);
+  border-left: 3px solid var(--sd-color-teal); background: var(--sd-color-success-soft);
 }
 .job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
-  border-left: 3px solid var(--color-wheat);
-  background: var(--sd-color-warning-soft);
+  border-left: 3px solid var(--sd-color-wheat); background: var(--sd-color-warning-soft);
 }
-.job-fit-inkpaper .job-fit-source {
-  border-style: dashed;
-}
+.job-fit-inkpaper .job-fit-source { border-style: dashed; border-color: var(--sd-color-line-strong); }
 .job-fit-inkpaper .job-fit-notice {
-  border: 1px solid var(--color-warning);
-  background: var(--sd-color-primary-soft);
-  color: var(--sd-color-text-strong);
+  border: 1px solid var(--sd-color-teal); background: var(--sd-color-primary-soft);
+  color: var(--sd-color-primary-strong); font-size: 19px; line-height: 1.5;
 }
 .job-fit-inkpaper .job-fit-alert {
-  border: 1px solid var(--color-error-bg);
-  background: var(--k-surface, var(--color-surface));
+  border: 1px solid var(--sd-color-error); background: var(--sd-color-error-soft);
+  color: var(--sd-color-error-deep); font-size: 19px; line-height: 1.5;
 }
+/* 合规披露条。迁移前用的是 ui 包 ComplianceBanner（暖褐主题），换壳后不再混用；
+   role="note" 与 aria-label 的语义在 JSX 里原样保留，丢的只是旧主题的外观。 */
+.job-fit-inkpaper .job-fit-compliance {
+  display: flex; gap: 14px; padding: 16px 20px;
+  border: 1px solid var(--sd-color-line-strong); border-radius: var(--sd-card-radius);
+  background: var(--sd-color-wheat-soft); color: var(--sd-color-wheat-deep);
+  font-size: 19px; line-height: 1.5;
+}
+.job-fit-inkpaper .job-fit-compliance > svg { flex: none; width: 24px; height: 24px; margin-top: 2px; }
+/* 底部动作条：flex:none 的兄弟节点，不随正文滚动。 */
 .job-fit-inkpaper .job-fit-action-bar {
-  border-color: var(--sd-color-line);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -8px 20px rgba(16, 48, 43, .06);
+  position: sticky; bottom: 0; z-index: 1; flex: 0 0 auto;
+  padding: 18px 0 max(18px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--sd-color-line); background: var(--sd-color-canvas-outer);
 }
-.job-fit-inkpaper .job-fit-action-bar > * {
-  width: min(100%, 984px);
-  margin-inline: auto;
-}
-.job-fit-inkpaper .job-fit-action-grid > button:first-child,
+.job-fit-inkpaper .job-fit-action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .job-fit-inkpaper button[aria-pressed='false'] {
-  border-color: var(--sd-color-line);
-  color: var(--sd-color-text);
+  border-color: var(--sd-color-line-strong); background: var(--sd-color-surface); color: var(--sd-color-text);
 }
 .job-fit-inkpaper button[aria-pressed='true'] {
-  border-color: var(--sd-color-primary);
-  background: var(--sd-color-primary-soft);
-  color: var(--sd-color-primary-strong);
-  box-shadow: inset 0 0 0 1px var(--sd-color-primary);
+  border-color: var(--sd-color-primary); background: var(--sd-color-primary-soft);
+  color: var(--sd-color-primary-strong); box-shadow: inset 0 0 0 1px var(--sd-color-primary);
 }
 .job-fit-inkpaper button,
 .job-fit-inkpaper input,
-.job-fit-inkpaper textarea {
-  min-height: var(--sd-control-min);
-}
+.job-fit-inkpaper textarea { min-height: var(--sd-control-min); }
 .job-fit-inkpaper .job-fit-primary-action {
-  min-height: var(--sd-primary-control-min);
-  background: var(--sd-color-primary);
-  box-shadow: 0 6px 18px rgba(184, 104, 60, .22);
+  min-height: var(--sd-primary-control-min); border-color: var(--qx-deep);
+  background: var(--qx-deep); color: var(--qx-paper); font-size: 24px; font-weight: 700;
 }
-.job-fit-inkpaper .job-fit-primary-action:hover:not(:disabled) {
-  background: var(--sd-color-primary-strong);
-}
+.job-fit-inkpaper .job-fit-primary-action:hover:not(:disabled) { background: var(--qx-deep-2); }
 .job-fit-inkpaper input,
 .job-fit-inkpaper textarea {
-  border-color: var(--sd-color-line);
-  background: var(--sd-color-surface);
-  color: var(--sd-color-text-strong);
+  border-color: var(--sd-color-line-strong); background: var(--sd-color-surface);
+  color: var(--sd-color-text-strong); font-size: 20px;
 }
-.job-fit-inkpaper textarea {
-  min-height: 128px;
-}
+.job-fit-inkpaper textarea { min-height: 160px; }
 .job-fit-inkpaper button:focus-visible,
 .job-fit-inkpaper input:focus-visible,
-.job-fit-inkpaper textarea:focus-visible {
-  outline: 3px solid rgba(184, 104, 60, .35);
-  outline-offset: 2px;
-}
+.job-fit-inkpaper textarea:focus-visible { outline: 3px solid var(--sd-color-teal); outline-offset: 3px; }
 @media (max-width: 1080px) {
-  .job-fit-inkpaper .job-fit-content,
-  .job-fit-inkpaper .job-fit-action-bar > * {
-    width: 100%;
-  }
-  .job-fit-inkpaper .job-fit-header {
-    padding-inline: 2px;
-  }
+  .job-fit-inkpaper .job-fit-content { gap: 14px; }
 }
 @media (max-width: 390px) {
-  .job-fit-inkpaper .job-fit-action-grid {
-    grid-template-columns: 1fr;
+  .job-fit-inkpaper .job-fit-action-grid { grid-template-columns: 1fr; }
+  .job-fit-inkpaper .job-fit-state-card { padding: 28px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .job-fit-inkpaper *,
+  .job-fit-inkpaper *::before,
+  .job-fit-inkpaper *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
-  .job-fit-inkpaper .job-fit-action-bar {
-    padding-inline: 16px;
-  }
-  .job-fit-inkpaper .job-fit-state-card {
-    padding: 28px 20px;
-  }
 }
-/* LightFlow touch target contracts */
-.job-fit-inkpaper {
-  --sd-control-min: 48px;
-  --sd-primary-control-min: 56px;
-}
-/* ── 屏55 视觉对齐：原型 fusion-youth 风格子组件 ─────────────────── */
-/* 决策摘要卡（clay accent） */
-.job-fit-inkpaper .jf-decision-summary {
-  border-top: 4px solid var(--sd-color-primary);
-}
-.job-fit-inkpaper .jf-decision-summary__head {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-.job-fit-inkpaper .jf-decision-summary__titles {
-  flex: 1;
-  min-width: 0;
-}
+/* ── 稿 46 子组件：决策摘要 / 匹配依据 / 差距 / 改写 ───────────────── */
+.job-fit-inkpaper .jf-decision-summary { border-top: 4px solid var(--sd-color-primary); }
+.job-fit-inkpaper .jf-decision-summary__head { display: flex; align-items: flex-start; gap: 20px; }
+.job-fit-inkpaper .jf-decision-summary__titles { flex: 1; min-width: 0; }
 .job-fit-inkpaper .jf-decision-summary__eyebrow {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--sd-color-primary);
+  font-size: 19px; font-weight: 700; letter-spacing: .06em; color: var(--sd-color-primary-strong);
 }
 .job-fit-inkpaper .jf-decision-summary__title {
-  font-family: var(--sd-serif);
-  font-size: clamp(22px, 3vw, 32px);
-  font-weight: 900;
-  letter-spacing: 1px;
-  margin-top: 6px;
-  color: var(--sd-color-text-strong);
+  margin-top: 8px; font-family: var(--sd-serif); font-size: 34px; font-weight: 700;
+  letter-spacing: 1px; color: var(--sd-color-text-strong);
 }
 .job-fit-inkpaper .jf-decision-summary__body {
-  margin-top: 14px;
-  font-size: 18px;
-  line-height: 1.65;
-  color: var(--sd-color-text);
+  margin-top: 16px; font-size: 20px; line-height: 1.6; color: var(--sd-color-text);
 }
 .job-fit-inkpaper .jf-decision-summary__disclaimer {
-  margin-top: 10px;
-  font-size: 15px;
-  color: var(--sd-color-text-muted);
-  line-height: 1.5;
+  margin-top: 12px; font-size: 17px; line-height: 1.5; color: var(--sd-color-text-muted);
 }
-/* 匹配等级徽章 */
+/* 三档参考徽章。合规红线：只有较高 / 中等 / 偏低三档，永远不出现百分比。 */
 .job-fit-inkpaper .jf-fit-badge {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 0 22px;
-  border-radius: 999px;
-  font-size: 18px;
-  font-weight: 700;
+  display: inline-flex; flex: none; align-items: center; gap: 10px;
+  min-height: var(--sd-control-min); padding: 0 24px; border-radius: 999px;
+  font-size: 20px; font-weight: 700;
 }
-.job-fit-inkpaper .jf-fit-badge svg { width: 22px; height: 22px; }
+.job-fit-inkpaper .jf-fit-badge svg { width: 24px; height: 24px; }
 .job-fit-inkpaper .jf-fit-badge--high {
-  background: var(--sd-color-teal-soft);
-  border: 1px solid rgba(31, 158, 134, .4);
-  color: var(--sd-color-teal-deep);
+  border: 1px solid var(--qx-teal-line); background: var(--sd-color-teal-soft); color: var(--sd-color-teal-deep);
 }
 .job-fit-inkpaper .jf-fit-badge--medium {
-  background: var(--sd-color-wheat-soft);
-  border: 1px solid rgba(169, 120, 31, .4);
-  color: var(--sd-color-wheat-deep);
+  border: 1px solid var(--sd-color-wheat); background: var(--sd-color-wheat-soft); color: var(--sd-color-wheat-deep);
 }
 .job-fit-inkpaper .jf-fit-badge--low {
-  background: var(--sd-color-primary-soft);
-  border: 1px solid rgba(184, 104, 60, .4);
-  color: var(--sd-color-primary-strong);
+  border: 1px solid var(--qx-cinnabar-line); background: var(--sd-color-error-soft); color: var(--sd-color-error-deep);
 }
-/* 通用卡片 section — card-head + icon 布局 */
 .job-fit-inkpaper .jf-section {
-  border: 1px solid var(--sd-color-line);
-  border-radius: 18px;
-  background: var(--sd-color-surface);
-  padding: 22px 24px 24px;
-  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
+  border: 1px solid var(--sd-color-line); border-radius: var(--sd-card-radius);
+  background: var(--sd-color-surface); padding: 24px 26px 26px;
 }
-.job-fit-inkpaper .jf-card-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 18px;
-}
+.job-fit-inkpaper .jf-card-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
 .job-fit-inkpaper .jf-card-icon {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: none;
-  place-items: center;
-  border-radius: 14px;
+  display: grid; width: 52px; height: 52px; flex: none; place-items: center; border-radius: var(--sd-card-radius);
 }
-.job-fit-inkpaper .jf-card-icon svg { width: 26px; height: 26px; }
-.job-fit-inkpaper .jf-card-head h2 {
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--sd-color-text-strong);
-}
-.job-fit-inkpaper .jf-card-sub {
-  font-size: 16px;
-  color: var(--sd-color-text-muted);
-  margin-top: 3px;
-}
-/* teal section accent */
-.job-fit-inkpaper .jf-section--teal {
-  border-top: 3px solid var(--sd-color-teal);
-}
-.job-fit-inkpaper .jf-section--teal .jf-card-icon {
-  background: var(--sd-color-teal-soft);
-  color: var(--sd-color-teal-deep);
-}
-/* wheat section accent */
-.job-fit-inkpaper .jf-section--wheat {
-  border-top: 3px solid var(--sd-color-wheat);
-}
-.job-fit-inkpaper .jf-section--wheat .jf-card-icon {
-  background: var(--sd-color-wheat-soft);
-  color: var(--sd-color-wheat-deep);
-}
-/* clay section accent */
-.job-fit-inkpaper .jf-section--clay {
-  border-top: 3px solid var(--sd-color-primary);
-}
-.job-fit-inkpaper .jf-section--clay .jf-card-icon {
-  background: var(--sd-color-primary-soft);
-  color: var(--sd-color-primary-strong);
-}
+.job-fit-inkpaper .jf-card-icon svg { width: 28px; height: 28px; }
+.job-fit-inkpaper .jf-card-head h2 { font-size: 25px; font-weight: 700; color: var(--sd-color-text-strong); }
+.job-fit-inkpaper .jf-card-sub { margin-top: 4px; font-size: 18px; color: var(--sd-color-text-muted); }
+.job-fit-inkpaper .jf-section--teal { border-top: 3px solid var(--sd-color-teal); }
+.job-fit-inkpaper .jf-section--teal .jf-card-icon { background: var(--sd-color-teal-soft); color: var(--sd-color-teal-deep); }
+.job-fit-inkpaper .jf-section--wheat { border-top: 3px solid var(--sd-color-wheat); }
+.job-fit-inkpaper .jf-section--wheat .jf-card-icon { background: var(--sd-color-wheat-soft); color: var(--sd-color-wheat-deep); }
+.job-fit-inkpaper .jf-section--clay { border-top: 3px solid var(--qx-plum); }
+.job-fit-inkpaper .jf-section--clay .jf-card-icon { background: var(--qx-plum-soft); color: var(--qx-plum-d); }

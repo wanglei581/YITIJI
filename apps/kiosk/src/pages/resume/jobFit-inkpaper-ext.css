@@ -1,88 +1,43 @@
-/* 证据条目堆叠 */
-.job-fit-inkpaper .jf-ev-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.job-fit-inkpaper .jf-ev-item {
-  border-radius: 14px;
-  padding: 14px 18px;
-}
+/* 岗位匹配 · 证据条目 / 关键词覆盖 / 定向改写建议（稿 46 的结果区细部）
+ *
+ * 取色全部走 styles/resume-fusion-job-fit.css 里那张 --sd-* → 青序流光令牌的映射表，
+ * 本文件不再出现裸 rgba —— 描边改用 --qx-*-line，否则改一次主色要在两处同步。
+ * 字号按 1080×1920 站立操作上调，与该文件的 .jf-section 同一档。
+ */
+.job-fit-inkpaper .jf-ev-stack { display: flex; flex-direction: column; gap: 12px; }
+.job-fit-inkpaper .jf-ev-item { border-radius: var(--sd-card-radius); padding: 16px 20px; }
 .job-fit-inkpaper .jf-ev-item p {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.45;
-  color: var(--sd-color-text-strong);
+  font-size: 20px; font-weight: 600; line-height: 1.45; color: var(--sd-color-text-strong);
 }
 .job-fit-inkpaper .jf-ev-item span {
-  display: block;
-  font-size: 16px;
-  color: var(--sd-color-text-muted);
-  margin-top: 5px;
-  line-height: 1.5;
+  display: block; margin-top: 6px; font-size: 18px; line-height: 1.5; color: var(--sd-color-text-muted);
 }
-.job-fit-inkpaper .jf-ev-item--match {
-  background: var(--sd-color-teal-soft);
-}
-.job-fit-inkpaper .jf-ev-item--gap {
-  background: var(--sd-color-wheat-soft);
-}
-/* 关键词覆盖行 */
+.job-fit-inkpaper .jf-ev-item--match { background: var(--sd-color-teal-soft); }
+.job-fit-inkpaper .jf-ev-item--gap { background: var(--sd-color-wheat-soft); }
+
 .job-fit-inkpaper .jf-kw-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--sd-color-line);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sd-color-line);
 }
-.job-fit-inkpaper .jf-kw-label {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--sd-color-text-muted);
-}
+.job-fit-inkpaper .jf-kw-label { font-size: 18px; font-weight: 600; color: var(--sd-color-text-muted); }
 .job-fit-inkpaper .jf-chip {
-  display: inline-flex;
-  align-items: center;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 999px;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 999px;
+  font-size: 17px; font-weight: 600; white-space: nowrap;
 }
 .job-fit-inkpaper .jf-chip--ok {
-  background: var(--sd-color-teal-soft);
-  border: 1px solid rgba(31, 158, 134, .3);
-  color: var(--sd-color-teal-deep);
+  border: 1px solid var(--qx-teal-line); background: var(--sd-color-teal-soft); color: var(--sd-color-teal-deep);
 }
 .job-fit-inkpaper .jf-chip--warn {
-  background: var(--sd-color-wheat-soft);
-  border: 1px solid rgba(169, 120, 31, .3);
-  color: var(--sd-color-wheat-deep);
+  border: 1px solid var(--sd-color-wheat); background: var(--sd-color-wheat-soft); color: var(--sd-color-wheat-deep);
 }
-/* 简历定向优化建议列表 */
+
 .job-fit-inkpaper .jf-sug-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
+  list-style: none; display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0;
 }
 .job-fit-inkpaper .jf-sug-list li {
-  display: flex;
-  gap: 10px;
-  font-size: 18px;
-  line-height: 1.55;
-  color: var(--sd-color-text);
+  display: flex; gap: 12px; font-size: 20px; line-height: 1.55; color: var(--sd-color-text);
 }
 .job-fit-inkpaper .jf-sug-list li::before {
-  content: '';
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sd-color-primary);
-  margin-top: 9px;
+  content: ''; flex: none; width: 9px; height: 9px; margin-top: 11px;
+  border-radius: 50%; background: var(--sd-color-primary);
 }
