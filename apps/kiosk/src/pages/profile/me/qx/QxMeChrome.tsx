@@ -12,7 +12,7 @@ import { useTerminalDeviceStatus } from '../../../../hooks/useTerminalDeviceStat
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../styles/qx-me-shared.css'
 
-export type QxMeView = 'notifications' | 'resumes' | 'favorites' | 'ai-records' | 'activity' | 'activity-detail'
+export type QxMeView = 'notifications' | 'resumes' | 'favorites' | 'ai-records' | 'activity' | 'activity-detail' | 'settings'
 
 export type QxMeStatusTone = 'ok' | 'warn' | 'bad' | 'unknown'
 
@@ -26,7 +26,7 @@ function qxStatusFromDevice(device: ReturnType<typeof useTerminalDeviceStatus>):
   return { tone: 'bad', label: device.printerLabel }
 }
 
-const RECORD_VIEWS: { key: Exclude<QxMeView, 'notifications' | 'activity-detail'>; label: string; hint: string; to: string }[] = [
+const RECORD_VIEWS: { key: Exclude<QxMeView, 'notifications' | 'activity-detail' | 'settings'>; label: string; hint: string; to: string }[] = [
   { key: 'resumes', label: '简历', hint: '诊断与生成', to: '/me/resumes' },
   { key: 'favorites', label: '收藏', hint: '岗位·招聘会·政策', to: '/me/favorites' },
   { key: 'ai-records', label: 'AI记录', hint: '服务元数据', to: '/me/ai-records' },
@@ -48,7 +48,7 @@ export function QxMePage({
 }: {
   title: string
   view: QxMeView
-  screen: 'member-list' | 'activity-detail'
+  screen: 'member-list' | 'activity-detail' | 'member-settings'
   screenState: string
   eyebrow: string
   ask: ReactNode
@@ -62,7 +62,9 @@ export function QxMePage({
   const device = useTerminalDeviceStatus()
   const status = qxStatusFromDevice(device)
   const terminalLabel = getTerminalCode() || '设备未绑定'
-  const showViewTabs = view !== 'notifications'
+  // 通知与账号设置不属于四类记录台账：不挂记录分类 Tab，状态/提示的 testid 各用自己的前缀。
+  const testScope = view === 'notifications' ? 'notifications' : view === 'settings' ? 'member-settings' : 'member-records'
+  const showViewTabs = testScope === 'member-records'
 
   return (
     <QxPageFrame
@@ -84,7 +86,7 @@ export function QxMePage({
         data-kiosk-domain="profile"
         data-kiosk-screen={screen}
         data-state={screenState}
-        data-testid={`${view === 'notifications' ? 'notifications' : 'member-records'}-state-${screenState}`}
+        data-testid={`${testScope}-state-${screenState}`}
         aria-live="polite"
       >
         <section className="qx-me-xq">
@@ -121,7 +123,7 @@ export function QxMePage({
         ) : null}
 
         {toast ? (
-          <div className="qx-me-toast" role="status" data-tone={toast.tone} data-testid={view === 'notifications' ? 'notifications-toast' : 'member-records-toast'}>
+          <div className="qx-me-toast" role="status" data-tone={toast.tone} data-testid={`${testScope}-toast`}>
             {toast.text}
           </div>
         ) : null}

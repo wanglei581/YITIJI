@@ -312,7 +312,8 @@ button.qx-me-row { cursor: pointer; }
 }
 .qx-me-small[data-variant='primary'] { background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); }
 .qx-me-small[data-variant='danger'] { background: var(--qx-cinnabar); border-color: var(--qx-cinnabar); color: var(--qx-on-solid); }
-.qx-me-small[aria-disabled='true'] {
+.qx-me-small[aria-disabled='true'],
+.qx-me-small:disabled {
   background: var(--qx-muted-bg);
   border-color: var(--qx-muted-line);
   color: var(--qx-muted-ink);
@@ -432,3 +433,61 @@ button.qx-me-row { cursor: pointer; }
 .qx-me-fav-next span { display: block; margin-top: 7px; font-size: 16px; line-height: 1.45; color: var(--qx-ink-3); }
 
 .qx-me-grow { flex: 1 1 auto; min-height: 0; }
+
+/* ── 账号设置（/me/settings，稿 30-my-profile screen=settings）─────────────
+   分区标题与行之间留 12px（稿 .rows margin-top:12px）；行本身用 primitives 的 .qx-rows/.qx-row。 */
+.qx-me-sec { flex: none; display: flex; flex-direction: column; gap: 12px; }
+
+/* 会员页确认弹层。弹层渲染在 .qx-stage 之外（不进 aria-live 区），所以字体与墨色在这里自带。
+   fixed 的包含块是外层舞台（KioskStageFit 有 transform），窄屏关缩放时就是视口。
+   尺寸口径与 privacy-qx.css 的 .pr-dlg 一致，便于隐私页后续直接复用。 */
+.qx-me-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  background: color-mix(in srgb, var(--qx-deep) 58%, transparent);
+}
+.qx-me-dlg {
+  width: 100%;
+  max-width: 780px;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 34px 36px;
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  font-family: var(--qx-sans);
+}
+.qx-me-dlg h2 { margin: 0; font-size: 31px; font-weight: 700; }
+.qx-me-dlg p { margin: 14px 0 0; font-size: 21px; line-height: 1.6; color: var(--qx-ink-2); overflow-wrap: anywhere; }
+.qx-me-dlg p b { color: var(--qx-ink); }
+.qx-me-dlg .qx-me-dlg-step { margin-top: 8px; font-size: 18px; font-weight: 700; color: var(--qx-teal-d); }
+.qx-me-dlg .qx-me-dlg-err { color: var(--qx-cinnabar-d); font-weight: 700; }
+.qx-me-dlg-acts { display: flex; gap: 14px; margin-top: 26px; }
+.qx-me-dlg-acts .qx-btn { flex: 1 1 0; min-width: 0; }
+
+.qx-me-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 18px;
+  min-height: var(--qx-btn-h);
+  padding: 0 20px;
+  border: 1px solid var(--qx-line-2);
+  border-radius: var(--qx-r);
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-family: var(--qx-mono);
+  font-size: 30px;
+  letter-spacing: 4px;
+  text-align: center;
+}
+.qx-me-input:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
+/* 大厅屏上的 6 位验证码：type=password 之外再盖一层圆点，防止被改回明文输入。 */
+.qx-me-otp { -webkit-text-security: disc; letter-spacing: 10px; }
