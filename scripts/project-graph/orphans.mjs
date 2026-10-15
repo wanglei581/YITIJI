@@ -88,6 +88,18 @@ const TEXT_EXT =
 // 改用 Unicode 属性类 + u 标志，中日韩文件名同样能整段取出。
 const PATH_TOKEN_PATTERN = /[\p{L}\p{N}@_][\p{L}\p{N}@._-]*(?:\/[\p{L}\p{N}@._-]+)+/gu
 
+// 2026-09-06 修（同一个 bug 的另一半）：原来是
+// /\b([\w-]+\.(?:tsx?|mjs|css|md|prisma))\b/g —— 同样只认 ASCII，中文文件名一个都取不到。
+// 这一半单独致命：PATH_TOKEN_PATTERN 至少要有一个 `/` 才成立，而文档里的同目录相对链接
+// 压根没有斜杠 —— docs/patent/README.md 写的是 `[对接清单.md](对接清单.md)`，
+// 只有文件名兜底这条路能认出来。路径那半修好之后它仍留在「全仓零提及」，就是这个原因。
+//
+// 注意不能只加 u 标志了事：JS 的 `\b` 永远按 ASCII \w 定义，即使开了 u。
+// 「空格 + 中文」两侧都是非 ASCII 词字符，`\b` 判不出边界，加了 u 照样匹配不上。
+// 所以边界必须手写成前后否定环视，用与字符类同源的集合。
+const BASENAME_TOKEN_PATTERN =
+  /(?<![\p{L}\p{N}_])([\p{L}\p{N}_][\p{L}\p{N}_-]*\.(?:tsx?|mjs|css|md|prisma))(?![\p{L}\p{N}_])/gu
+
 /**
  * 返回 { paths, basenames, ambiguousBasenames }
  *
@@ -125,7 +137,7 @@ export function buildMentionIndex(maxBytes = 2 * 1024 * 1024) {
       paths.get(token).add(file)
     }
     // 文档里常只写文件名（如「见 CareerPlanPage.tsx」），也算一次提及
-    for (const [, base] of text.matchAll(/\b([\w-]+\.(?:tsx?|mjs|css|md|prisma))\b/g)) {
+    for (const [, base] of text.matchAll(BASENAME_TOKEN_PATTERN)) {
       if (!basenames.has(base)) basenames.set(base, new Set())
       basenames.get(base).add(file)
     }
