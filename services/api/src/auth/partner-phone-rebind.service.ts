@@ -20,6 +20,7 @@ import { PartnerAccountActionRedisService } from '../common/redis/partner-accoun
 import { RedisService } from '../common/redis/redis.service'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { Prisma } from '../generated/prisma/client'
+import { isPostgresBusyError } from '../common/prisma/postgres-busy'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
 import { PrismaService } from '../prisma/prisma.service'
 import { InternalOtpService } from './internal-otp.service'
@@ -402,6 +403,7 @@ export class PartnerPhoneRebindService {
       try {
         return await operation()
       } catch (error) {
+        if (isPostgresBusyError(error)) throw error
         const retryable = isSerializationConflict(error)
         if (!retryable || attempt === 2) throw error
         await waitBeforeSerializationRetry(attempt + 1)

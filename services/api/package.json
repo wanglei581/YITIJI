@@ -130,6 +130,7 @@
     "verify:first-admin-bootstrap:postgres": "node -r @swc-node/register scripts/verify-first-admin-bootstrap-postgres.ts",
     "verify:pg-serialization-conflict": "node -r @swc-node/register scripts/verify-pg-serialization-conflict.ts",
     "verify:pg-serialization-conflict:postgres": "node -r @swc-node/register scripts/verify-pg-serialization-conflict-postgres.ts",
+    "verify:pg-lock-timeout:postgres": "node -r @swc-node/register scripts/verify-pg-lock-timeout-postgres.ts",
     "verify:job-headcount": "node -r @swc-node/register scripts/verify-job-headcount.ts",
     "verify:job-content-screening": "node -r @swc-node/register scripts/verify-job-content-screening.ts",
     "verify:job-validity-expiry": "node -r @swc-node/register scripts/verify-job-validity-expiry.ts",
