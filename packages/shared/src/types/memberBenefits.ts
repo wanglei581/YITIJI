@@ -16,7 +16,11 @@ export type BenefitType =
   | 'coupon' // 优惠券
   | 'free_quota' // 免费次数额度
   | 'package_entitlement' // 套餐服务额度
+  | 'ai_quota' // 按用途发放的 AI 次数
   | 'subsidy_eligibility_hint' // 补贴资格提示（info-only）
+
+/** AI 次数用途。 */
+export type AiQuotaBucket = 'ai_resume' | 'ai_assistant' | 'ai_interview'
 
 /** 权益状态。 */
 export type BenefitStatus = 'active' | 'used_up' | 'expired' | 'revoked'
@@ -29,6 +33,7 @@ export interface MemberBenefitItem {
   /** BenefitGrant 行 id */
   id: string
   benefitType: BenefitType
+  serviceKey?: AiQuotaBucket | null
   title: string
   description: string | null
   /** 额度类（free_quota / 多次券）总量；不适用时为 null */

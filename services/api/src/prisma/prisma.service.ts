@@ -331,6 +331,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiServiceLog
   }
 
+  get aiQuotaDaily() { return this.client.aiQuotaDaily }
+
+  get aiQuotaReservation() { return this.client.aiQuotaReservation }
+
   get aiUsageRecord() {
     return this.client.aiUsageRecord
   }

@@ -1,7 +1,7 @@
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator'
 import { Type } from 'class-transformer'
 
-export const ADMIN_BENEFIT_TYPES = ['coupon', 'free_quota', 'package_entitlement', 'subsidy_eligibility_hint'] as const
+export const ADMIN_BENEFIT_TYPES = ['coupon', 'free_quota', 'package_entitlement', 'ai_quota', 'subsidy_eligibility_hint'] as const
 export const ADMIN_BENEFIT_SOURCE_TYPES = ['platform', 'campus', 'gov', 'fair', 'partner'] as const
 
 export class SearchEndUserByPhoneDto {
@@ -18,6 +18,10 @@ export class GrantBenefitDto {
   @IsIn([...ADMIN_BENEFIT_TYPES])
   benefitType!: typeof ADMIN_BENEFIT_TYPES[number]
 
+  @ValidateIf((o: GrantBenefitDto) => o.benefitType === 'ai_quota' || o.serviceKey !== undefined)
+  @IsIn(['ai_resume', 'ai_assistant', 'ai_interview'])
+  serviceKey?: 'ai_resume' | 'ai_assistant' | 'ai_interview'
+
   @IsIn([...ADMIN_BENEFIT_SOURCE_TYPES])
   sourceType!: typeof ADMIN_BENEFIT_SOURCE_TYPES[number]
 
@@ -30,7 +34,7 @@ export class GrantBenefitDto {
   @MaxLength(500)
   description?: string | null
 
-  @ValidateIf((o: GrantBenefitDto) => o.quantityTotal !== null && o.quantityTotal !== undefined)
+  @ValidateIf((o: GrantBenefitDto) => o.benefitType === 'ai_quota' || (o.quantityTotal !== null && o.quantityTotal !== undefined))
   @Type(() => Number)
   @IsInt()
   @Min(1)
