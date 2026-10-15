@@ -44,6 +44,8 @@ const STATUS_TONE = {
 }
 
 const POLL_INTERVAL_MS = 3000
+const MAX_AUTO_POLLS = 200
+const MAX_POLL_ERRORS = 3
 
 const ERROR_TITLE_DEFAULT = '加载失败，点此重试'
 const ERROR_TITLE_SWITCHED = '账号已切换'
@@ -125,6 +127,7 @@ Page({
     errorTitle: ERROR_TITLE_DEFAULT,
     detail: null,
     cancelling: false,
+    refreshNotice: '',
   },
 
   onLoad(options) {
@@ -145,6 +148,8 @@ Page({
     // 取消链的去重锁。必须显式初始化：留成 undefined 不影响判断，但显式写出来才能
     // 和 _clearSensitive 里的释放对上。
     this._cancelLock = false
+    this._pollCount = 0
+    this._pollErrors = 0
     this._pollEpoch = 0
     this._pollTimer = null
     this._guard = createLifecycleGuard()
@@ -308,7 +313,7 @@ Page({
    */
   _clearSensitive(patch) {
     this._stopPolling()
-    const next = { detail: null, cancelling: false }
+    const next = { detail: null, cancelling: false, refreshNotice: '' }
     if (patch) {
       for (const key of Object.keys(patch)) next[key] = patch[key]
     }
@@ -371,6 +376,7 @@ Page({
       error: '',
       errorTitle: ERROR_TITLE_DEFAULT,
       detail: toDetail(raw),
+      refreshNotice: '',
     })
     return true
   },
@@ -415,6 +421,7 @@ Page({
     // 不依赖这里清没清。
     this.data.detail = null
     this.data.cancelling = false
+    this.data.refreshNotice = ''
   },
 
   _stopPolling() {
@@ -427,14 +434,25 @@ Page({
     this._stopPolling()
     const status = raw.status || raw.taskStatus || ''
     if (!this._guard.isActive() || this._cancelLock) return
-    if (['completed', 'cancelled', 'expired', 'abandoned'].includes(status)) return
-    // 续打复用同一订单；可能出纸的冷却期结束后，服务端还会改变续打资格。
-    if (status === 'failed' && raw.reprintAllowed !== true && raw.reprintNotice !== 'may_have_printed') return
+    // 未知态不猜成进行中；续打资格和冷却仍由服务端决定。
+    const retryable = status === 'failed' && (raw.reprintAllowed === true || raw.reprintNotice === 'may_have_printed')
+    if (!retryable && !['pending_release', 'awaiting_payment', 'pending', 'claimed', 'printing'].includes(status)) return
+    this._queuePoll(POLL_INTERVAL_MS)
+  },
+
+  _queuePoll(delay) {
+    this._stopPolling()
+    if (!this._guard.isActive() || this._cancelLock) return
+    if (this._pollCount >= MAX_AUTO_POLLS) {
+      this.setData({ refreshNotice: '自动刷新已暂停，当前为上次查询结果。点此刷新。' })
+      return
+    }
     const epoch = this._pollEpoch
     this._pollTimer = setTimeout(() => {
       if (epoch !== this._pollEpoch || !this._guard.isActive() || this._cancelLock) return
+      this._pollCount += 1
       this._load(true)
-    }, POLL_INTERVAL_MS)
+    }, delay)
   },
 
   _load(silent) {
@@ -455,7 +473,9 @@ Page({
       return
     }
     const token = this._guard.issue('detail', { orderId: this._orderId, confirming })
-    this.setData({ loading: silent !== true, error: '', errorTitle: ERROR_TITLE_DEFAULT })
+    const quiet = silent === true && this.data.detail !== null
+    if (silent !== true) { this._pollCount = 0; this._pollErrors = 0 }
+    this.setData({ loading: !quiet, error: '', errorTitle: ERROR_TITLE_DEFAULT, refreshNotice: quiet ? this.data.refreshNotice : '' })
     api.getCloudPrintOrder(this._orderId)
       .then((raw) => {
         // _verify 内部会**先执行**账号判定：换人 / 前台静默登出时，光丢弃这条响应
@@ -466,10 +486,12 @@ Page({
         if (verdict === 'confirm') { this._requestOwnerConfirmation(); return }
         if (verdict !== 'accept') return
         const current = this._detailAfterCancelCommit(raw)
+        this._pollErrors = 0
         this.setData({
           loading: false,
           cancelling: this._cancelLock,
           detail: toDetail(current),
+          refreshNotice: '',
         })
         this._schedulePoll(current)
       })
@@ -486,8 +508,19 @@ Page({
           this._denyOwner(token.identity)
           return
         }
+        const httpStatus = Number(err && err.statusCode) || 0
+        const transient = httpStatus <= 0 || httpStatus === 408 || httpStatus === 429 || httpStatus >= 500
+        if (quiet && transient && this.data.detail) {
+          this._pollErrors += 1
+          const retrying = this._pollErrors <= MAX_POLL_ERRORS
+          this.setData({ loading: false, cancelling: this._cancelLock,
+            refreshNotice: retrying ? '暂时无法更新，正在重试；当前为上次查询结果。' : '更新暂时中断，当前为上次查询结果。点此刷新。' })
+          if (retrying) this._queuePoll(POLL_INTERVAL_MS * 2 ** this._pollErrors)
+          return
+        }
         this.setData({
           loading: false,
+          cancelling: this._cancelLock,
           errorTitle: ERROR_TITLE_DEFAULT,
           error: (err && err.message) || '加载失败，请稍后重试',
         })
