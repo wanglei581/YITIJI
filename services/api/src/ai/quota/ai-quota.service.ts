@@ -23,6 +23,13 @@ export interface QuotaReceipt {
   day: string
 }
 
+/**
+ * 未结算预占的清扫窗口。
+ * 合同审查 analyze 整段预算上限是 900 秒（15 分钟）。窗口若同样是 15 分钟，
+ * 长合同还在跑就会被提前归还，所以放到 20 分钟，并且必须长于那段预算。
+ */
+export const AI_QUOTA_STALE_RESERVATION_MS = 20 * 60_000
+
 @Injectable()
 export class AiQuotaService {
   private readonly logger = new Logger(AiQuotaService.name)
@@ -138,7 +145,7 @@ export class AiQuotaService {
   async sweepStale(now = new Date()): Promise<{ releasedCount: number; truncated: boolean }> {
     let releasedCount = 0
     for (let batch = 0; batch < 10; batch++) {
-      const rows = await this.prisma.aiQuotaReservation.findMany({ where: { status: 'reserved', reservedAt: { lt: new Date(now.getTime() - 15 * 60_000) } }, take: 500, orderBy: { reservedAt: 'asc' } })
+      const rows = await this.prisma.aiQuotaReservation.findMany({ where: { status: 'reserved', reservedAt: { lt: new Date(now.getTime() - AI_QUOTA_STALE_RESERVATION_MS) } }, take: 500, orderBy: { reservedAt: 'asc' } })
       for (const row of rows) {
         try { await this.release(row.id, 'stale', now); releasedCount++ } catch (error) {
           if (!(error instanceof ConflictException)) throw error
