@@ -179,6 +179,12 @@ jobs:
                 echo "当前检出尚无 BOS 客户端，首次发布走 GitHub 拉取"
               else
                 echo "尝试从 BOS 拉取增量 bundle"
+                (
+                  set -a
+                  . /srv/ai-job-print-secrets/bos-release.env
+                  set +a
+                  node scripts/release-bundle/bos-object.mjs diagnose
+                ) || echo "BOS diagnose 未通过（不影响本次发布）"
                 if (
                   set -a
                   . /srv/ai-job-print-secrets/bos-release.env
@@ -449,13 +455,20 @@ jobs:
               | xargs -r rm -rf --
 
             if test -f scripts/release-bundle/bos-object.mjs; then
-              (
+              WRITEBACK_LOG="$(mktemp)"
+              if (
                 set -a
                 . /srv/ai-job-print-secrets/bos-release.env 2>/dev/null || exit 1
                 set +a
                 printf '%s' "$EXPECTED_SHA" > /tmp/latest.txt
                 node scripts/release-bundle/bos-object.mjs put latest-deployed.txt /tmp/latest.txt
-              ) || echo "latest-deployed.txt 回写失败（不影响本次发布）"
+              ) 2>"$WRITEBACK_LOG"; then
+                rm -f "$WRITEBACK_LOG"
+              else
+                echo "latest-deployed.txt 回写失败（不影响本次发布）"
+                cat "$WRITEBACK_LOG" >&2
+                rm -f "$WRITEBACK_LOG"
+              fi
             fi
 
             echo "✅ 部署完成"
