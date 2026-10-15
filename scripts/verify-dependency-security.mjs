@@ -33,6 +33,16 @@ const REQUIRED_BRACE_OVERRIDES = {
 const REQUIRED_PNPM_VERSION = '11.2.2'
 const REQUIRED_JS_YAML_VERSION = '4.3.1'
 const REQUIRED_NANOID_OVERRIDE = '3.3.18'
+// GHSA-c83g-rgw3-j3cx (unbounded cache growth -> OOM) + GHSA-73wf-gq98-2v4g
+// (normalizeStats crash / prototype write on untrusted browserslist-stats.json):
+// both affect <=4.28.6; 4.28.7 is the first fixed release. Transitive via
+// @vitejs/plugin-react > @babel/core > @babel/helper-compilation-targets (build-time only).
+const REQUIRED_BROWSERSLIST_OVERRIDE = '4.28.7'
+// GHSA-3f6p-5ww8-9rcr (auth-plugin downgrade to mysql_clear_password leaks plaintext
+// credentials): affects <3.22.0. prisma@7.8.0 pins mysql2 at exactly 3.15.3, so the only
+// remediation is a targeted override. This project runs PostgreSQL + SQLite and never
+// loads mysql2; the bump removes the advisory rather than fixing a live path.
+const REQUIRED_MYSQL2_OVERRIDE = { selector: 'mysql2@3.15.3', version: '3.22.0' }
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -135,6 +145,16 @@ function assertSecurityOverrides() {
     workspaceMap['nanoid@3.3.12'],
     REQUIRED_NANOID_OVERRIDE,
     `missing required nanoid override: nanoid@3.3.12 -> ${REQUIRED_NANOID_OVERRIDE}`
+  )
+  assert.equal(
+    workspaceMap['browserslist'],
+    REQUIRED_BROWSERSLIST_OVERRIDE,
+    `missing required browserslist override: browserslist -> ${REQUIRED_BROWSERSLIST_OVERRIDE}`
+  )
+  assert.equal(
+    workspaceMap[REQUIRED_MYSQL2_OVERRIDE.selector],
+    REQUIRED_MYSQL2_OVERRIDE.version,
+    `missing required mysql2 override: ${REQUIRED_MYSQL2_OVERRIDE.selector} -> ${REQUIRED_MYSQL2_OVERRIDE.version}`
   )
 }
 
