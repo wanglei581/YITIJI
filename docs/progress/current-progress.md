@@ -1,6 +1,18 @@
 # 当前开发进度
 
-## 2026-10-16：彩色、双面及异常恢复收口（开发中，未发布、未验收）
+## 2026-10-16 12:20 活动快照：候选 CI 全绿，设备升级尚未开始
+
+- 用户因 Codex 额度不足转由 Claude 继续；本任务已通知 UU 操作线程停止，不再发送按键或执行安装/打印。继续前须确认旧远程操作任务已停，避免多人同时控制。当前工作区为 `/Users/wanglei/.codex/worktrees/print-chain-main-closeout/AI求职打印服务终端`，分支 `codex/print-capabilities-20261016`；共享根目录有其他工作，不作为修改源。
+- Agent PR #1465 精确候选 `0e9e0a5fdd184f53af90dcea36a78aadc00fac0b` 的主 CI `38844282214`、Windows CI `38844282216` 全部成功；PR 条件下 release-bundle 跳过，不代表发布。小程序 PR #1466 精确代码 `03439f5cab096fef99cd8442f2718cde3ed9cff6` 的 CI `38844452929` 全部成功。两 PR 均未合并，本节文档更新不是新的已验收功能版本。
+- Windows KSK-001 / DESKTOP-DDD6FCO 仍为 Agent `0.4.15@7d2c0c250c0eaa16a13670b0ff541816ba9493e8`。未停服务、未执行备份或安装，未提交新的业务单。UU 鼠标可用，键盘输入间歇丢失且 Enter/Esc 无响应；用户确认本机键盘可正常输入 TEST。最后待执行行是只读 `sc.exe qfailure aijobprintagent.exe`，不要盲目接着输入其它命令；必须先刷新屏幕确认。qfailure/qfailureflag 尚未取得。
+- 精确候选包已在 Windows `D:/Downloads/Agent-0.4.17-0e9e0a5/AIJobPrintTerminalSetup.exe`，45521245 字节，SHA256 `D8628ED0CDB8CDC38CC8CB0F7681640CCD9636D8A864A40209F09B838D250AB4`，未运行。不得用旧 7acc9d4b8 包。升级仅为受控 KSK 测试，不是 API/web 生产发布授权。
+- Windows 现状必须保留：Agent Running/Automatic、Spooler Running/Automatic；仅 Kiosk watchdog 任务存在，boot-spool-guard/daily-reboot 未注册；注册表 Bound 属性不存在，不补写为 1。config 与 last-known-good 不同，分别保留；token、instance、数据库与历史任务不可重建。受审备份脚本 `/tmp/kiosk-print-capabilities-20261016/grok/upgrade-backup-REVIEW-ONLY.ps1`，SHA256 `703822a1b4ebbc2db04729de333dc29714ffa0f8559111993ef1bd7b65f2018a`，尚未执行。
+- 手机已打开与 03439f5 源码一致的新预览并登录，停首页。四份 `ZYD-20261016-BIZ-{COLOR,DUPLEX,OFFLINE,PAPER}-D93A.pdf` 已按授权分别发送一次到本人文件传输助手，Windows 哈希验证通过；不重复发送，尚未创建新业务单/打印。微信开发者工具已归还 Monika 任务，本任务不得抢占。
+- 生产 API/web 仍为 `1024b2b78d780d7243833ecceb2444659d260736`；终端 color_print / duplex_print 仍未开通。此前 COLOR-B71E、DUPLEX-B71E、SHORTEDGE-C82F 仅为旧 Agent 独立驱动实纸通过，旧手机订单 `ORD-20261016-6227481A3E` 为黑白单面业务通过；均封存，不重复出纸。
+- C3 最后 3 条于 12:18 只读查询：均 failed、attempt 0、正式订单关联；DOWNLOAD_HASH_MISMATCH 为 unpaid，另外 PRINTER_OFFLINE / UNSUPPORTED_FILE_TYPE 为 paid、管理员 URL 对应文件已删除过期，但 memberStoredId 缺失。管理员文件守卫和未付款守卫已有证据；会员历史 HMAC 回退分支须结合实际代码核对，不能仅由缺少 stored ID 推断安全或可重试。没有改写生产或历史任务，也不能由旧错误码推断从未出纸。
+- 原始设备证据：`/tmp/kiosk-cross-device-print-20261015/windows-acceptance.txt`。本轮候选、各模型审查、只读生产快照及制品在 `/tmp/kiosk-print-capabilities-20261016/`；这些是辅助证据，正式状态以本节、精确 Git 与当前现场为准。
+
+## 2026-10-16：彩色、双面及异常恢复收口（驱动实纸通过，新业务链待验）
 
 - 用户已授权继续逐项修复及 UU 真机验收，现场可配合。实际 Grok 主力实现，Claude opus/max 审查异常和安装边界，agy 核查小程序方案及发布缺口，Codex 控制范围与验收。代码基线 `origin/main@1024b2b78d780d7243833ecceb2444659d260736`；复用干净验收工作区，在 `codex/print-capabilities-20261016` 继续，已有通过的订单不再操作。
 - 第一批方案已审：保留已装 Agent `0.4.15@7d2c0c2` 的开机队列防护和安装资产，选择性提取其相对 main 的 26 个 Agent 路径；CI 仅接入对应防护门禁、安装工作流保留现装验证，不带入其它候选功能。独立迁移提交 `778ff6efb`，未安装。随后最小修正队列清理状态、严格完成证据与派发后不确定结果：队列消失不等于完成，派发后缺纸/故障不得直接允许整单重打；复用已有结果核验和幂等机制，不整合冲突的旧 PR #1387。
@@ -15,6 +27,10 @@
 - 小程序 13 路径已冻结：实际 Grok 产出主体实现，协调者修正规范枚举/参数、能力严格 `configured===true`、竞态及字阶，并独立补 10 组真实页面 VM 回归；完整 static 118 项、scope 8 项、layout 7 项及 613 项行为测试通过，API 契约 140 端点零缺口。实际 agy 前两次审查失败未计通过，最终短审及补齐成功，未发现阻塞。DevTools Stable 2.02.2608060 对冻结源码编译预览成功，AppID 正确、生产 API、无 mock；主包 374335 字节、总包 1093039 字节。预览时源码尚未提交，记录为 base `7acc9d4b8` 加精确 13 文件哈希，不能写成已提交版本发布；工具短窗口已归还 Monika。尚未正式上传/审核/发布，也未完成新小程序真机打印链。
 - C1 两文件补修已冻结待 CI：实际 Grok 修复 failed 缺码回放；父级与 Claude 追加核实本地异常状态同类分支，先持久化 `PRINT_JOB_UNCONFIRMED` 再记 failed，防止崩溃后沿用旧码。协调者独立测试用真实 SQLite 关闭重开、HTTP 断连/outbox 补报、异常状态带旧码并在写状态时中断，验证零次打印、错误码及 attempt 不丢失；旧源码隔离加载红测复现风险，新源码 typecheck/retry 验证通过，最终 reliability 仍运行。原 `7acc9d4b8` 的 Windows 三组 CI 已绿且制品哈希核实，但只存 review-only，不安装；补修后的精确 CI 与包须重新验证。
 - 后续冻结：C1/异常状态补修已提交并推送 `0e9e0a5fdd184f53af90dcea36a78aadc00fac0b` 至 Agent PR #1465，最终 reliability 已通过，typecheck/retry/diff-check 同为通过；独立补修复核与新 SHA CI 继续。小程序 13 文件在本次独立提交收录，提交前逐项核对其 SHA256 与已通过测试及预览的冻结清单相同，不把 Agent 旧包混入验收。
+- 三项独立驱动实纸均已通过并封存：COLOR-B71E 为一张且六色清晰；DUPLEX-B71E 为一张、正反页正确、左右翻转方向正确；SHORTEDGE-C82F 为一张、正反页正确、上下翻转方向正确。均由 UU 单次发送、现场用户明确确认清晰完整，不再重打。这只证明现装 0.4.15 驱动参数与物理输出，尚未开通生产能力，也不代表 0.4.17 或小程序高级参数业务链通过。
+- 小程序已提交 `03439f5cab096fef99cd8442f2718cde3ed9cff6`，堆叠 PR [#1466](https://github.com/wanglei581/YITIJI/pull/1466) 以 Agent 分支为基线。预览全部 346 个源码文件与该提交逐一比对，346 一致、零缺失/额外文件；此前预览可对应此提交的小程序源码，仍非微信正式上传或发布。两 PR 精确 SHA CI 进行中。
+- 升级前 C3 只读盘点发现本地 103 个任务中有 26 个最新 attempt 为 failed 且错误码为空，无 dispatching/spooled，outbox 为空。旧失败记录不能因此当成已安全恢复；正在提取限定任务身份，与生产同任务/attempt/订单只读对账，确认是否存在可重试旧订单。未删除或改写记录、未补造任务、未升级服务。新补修保护同 attempt 回放，但不能把它当作旧服务端可重试订单跨 attempt 风险已消除。
+- C3 后续只读对账完成（11:34 上海时间）：26 条中 13 条现网无对应任务，其余 13 条均 failed、attempt 0 与本地相同，无在途或新 attempt；其中 6 条已为 UNCONFIRMED，4 条旧模糊错误另核付款和文件。4 条均有正式 Order.printTaskId 关联，1 条未付款、1 条已退款，2 条已付款的管理员与会员文件引用均命中已删除、已过期文件。现网 1024 与候选的正常重试资格代码一致，分别按付款/退款/文件守卫拒绝，因此可撤除这 4 条当前误重试的升级阻塞；不证明历史实际出纸、也不改写或删除历史。实际 Claude 的 C1 聚焦复核已通过，完整可靠性门槛已补齐；新精确 0e9e0a5 的 Windows 三组 CI 全部通过，候选包 source/version/hash 已核对，等待主 CI 和 UU 升级实测。
 
 
 ## 2026-10-16：主线打印链已部署，单笔手机到机打印验收通过
