@@ -1599,7 +1599,9 @@ const PACKAGE_CHAIN_PAGES = [
   const createIdx = flow.indexOf('api.createCloudPrintOrder(')
   const chain = createIdx >= 0 ? flow.slice(createIdx) : ''
   const lockIdx = chain.indexOf('this._createdOrderId = orderId')
-  const redirectIdx = chain.indexOf('wx.redirectTo(')
+  // 进取件页的跳转 2026-10-16 起是 wx.reLaunch（下单后清掉下单流程页，见 print-pay.js 注释）。
+  // 下面三条要求不变：先锁 orderId 再跳；跳转失败有兜底；地址只带 orderId。
+  const redirectIdx = chain.indexOf('wx.reLaunch(')
   // R5：判据不再是"回调时再读一次身份"。同一个人的 30 分钟 JWT 在 POST 在途期间到点，
   // getToken() 会先 clearSession()，回调读到的身份是 `''` —— 逐字比对会把它判成换人，
   // 于是订单已经在服务端建出来了，页面却不锁 orderId、还把按钮解开。再点一次就是
@@ -1617,8 +1619,8 @@ const PACKAGE_CHAIN_PAGES = [
   }
   const guardIdx = chain.indexOf('this._createAttempt !== attempt')
   if (!(guardIdx > 0 && lockIdx > guardIdx)) misses.push('建单成功回调没有先判这次尝试还属不属于当前账号，再锁 orderId')
-  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在 redirectTo 之前锁住（跳转失败时页面还留在这里）')
-  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('redirectTo 没有失败兜底')
+  if (!(lockIdx > 0 && redirectIdx > lockIdx)) misses.push('orderId 必须在进取件页的跳转（reLaunch）之前锁住（跳转失败时页面还留在这里）')
+  if (!/fail: \(\) => this\._lockAfterCreated\(orderId\)/.test(printPayJs)) misses.push('进取件页的跳转没有失败兜底')
   if (!/if \(this\._createdOrderId\) \{ this\._lockAfterCreated\(this\._createdOrderId\); return \}/.test(printPayJs)) {
     misses.push('已建过单仍可能再 POST 一次（服务端虽会按幂等键回放，页面也不该让用户白点）')
   }
@@ -1663,11 +1665,11 @@ const PACKAGE_CHAIN_PAGES = [
   if (!printPayJs.includes("wx.navigateTo({ url: '/pages/orders/orders'")) misses.push('锁定后没有给出找回订单的出口')
   // print-pay → print-pickup 只带 orderId。
   //
-  // 取的是 `wx.redirectTo(...)` 的**整个实参段**，不是 `/print-pickup\?[^`'"]*/`。
+  // 取的是 `wx.reLaunch(...)` 的**整个实参段**，不是 `/print-pickup\?[^`'"]*/`。
   // 那条正则在第一个引号处就停 —— 本页的地址是 `'…?orderId=' + encodeURIComponent(id)`
   // 拼出来的，它只看得到 `orderId=`，后面再 `+ '&pickupCode=' + code` 一个字都抓不到。
   // 也就是说这条「凭证不进 URL」的断言，对本页真正的写法从来没有约束力。
-  const navArgs = callArgs(payBare, 'wx.redirectTo(')
+  const navArgs = callArgs(payBare, 'wx.reLaunch(')
   if (!navArgs.includes('print-pickup')) misses.push('找不到 print-pay 进取件页的跳转')
   else {
     for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {

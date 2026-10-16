@@ -56,7 +56,7 @@
           <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
         </view>
         <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点下面的「作废换新码」，旧码马上失效。</text>
-        <view class="btn-retry-sub tap" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+        <view class="btn-retry-sub tap" style="{{reissuing ? 'opacity: .5;' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
       </block>
 
       <view class="status-visual" wx:else>
@@ -94,17 +94,18 @@
 
     <!-- 去一体机之前先核一眼：文件、终端、规格都取自服务端订单，缺哪项就不显示哪项。 -->
     <view class="info-card" wx:if="{{orderNo || taskStatus || pickupStatus}}">
+      <!-- 文件名常是一长串没有空格的字母数字：标签不许被挤扁，值允许任意处断行（不改样式文件，只在这三行加行内样式）。 -->
       <view class="info-row" wx:if="{{fileName}}">
-        <text class="info-key">文件</text>
-        <text class="info-val">{{fileName}}</text>
+        <text class="info-key" style="flex-shrink: 0;">文件</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{fileName}}</text>
       </view>
       <view class="info-row" wx:if="{{store}}">
-        <text class="info-key">终端</text>
-        <text class="info-val">{{store}}</text>
+        <text class="info-key" style="flex-shrink: 0;">终端</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{store}}</text>
       </view>
       <view class="info-row" wx:if="{{spec}}">
-        <text class="info-key">规格</text>
-        <text class="info-val">{{spec}}</text>
+        <text class="info-key" style="flex-shrink: 0;">规格</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{spec}}</text>
       </view>
       <view class="info-row" wx:if="{{orderNo}}">
         <text class="info-key">订单号</text>

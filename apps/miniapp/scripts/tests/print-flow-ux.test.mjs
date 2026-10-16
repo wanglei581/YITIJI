@@ -108,7 +108,7 @@ test('模板：复制、分享并排；「作废换新码」降为说明下面�
 test('模板：信息卡有文件、终端、规格三行；底部按钮文字由状态决定', () => {
   const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/print-pickup/print-pickup.wxml'), 'utf8')
   for (const [field, key] of [['fileName', '文件'], ['store', '终端'], ['spec', '规格']]) {
-    assert.match(wxml, new RegExp(`wx:if="\\{\\{${field}\\}\\}">\\s*<text class="info-key">${key}</text>\\s*<text class="info-val">\\{\\{${field}\\}\\}</text>`))
+    assert.match(wxml, new RegExp(`wx:if="\\{\\{${field}\\}\\}">\\s*<text class="info-key"[^>]*>${key}</text>\\s*<text class="info-val"[^>]*>\\{\\{${field}\\}\\}</text>`))
   }
   assert.match(wxml, /bindtap="home">\{\{doneLabel\}\}<\/view>/)
   assert.doesNotMatch(wxml, /bindtap="home">完成<\/view>/, '不能再写死「完成」')
@@ -122,4 +122,13 @@ test('B2 模板：订单详情按钮写实际去处；确认页第 3 步与上�
     const wxml = fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
     assert.match(wxml, /<text class="n">3<\/text><text class="nl">到机核验<\/text>/, rel)
   }
+})
+
+test('B2 模板：信息卡三行的标签不被挤扁、值可断行；换码进行中置灰', () => {
+  const wxml = fs.readFileSync(path.join(MINIAPP, 'pages/print-pickup/print-pickup.wxml'), 'utf8')
+  for (const [field, key] of [['fileName', '文件'], ['store', '终端'], ['spec', '规格']]) {
+    const row = new RegExp(`wx:if="\\{\\{${field}\\}\\}">\\s*<text class="info-key" style="flex-shrink: 0;">${key}</text>\\s*<text class="info-val" style="min-width: 0; word-break: break-all;">`)
+    assert.match(wxml, row, `${key}这一行要有换行保护：连续长串文件名不能把标签挤扁或撑出卡片`)
+  }
+  assert.match(wxml, /class="btn-retry-sub tap" style="\{\{reissuing \? 'opacity: \.5;' : ''\}\}"[^>]*bindtap="reissueCode"/)
 })

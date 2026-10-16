@@ -794,14 +794,14 @@ Page({
       wx.navigateBack({ fail() { wx.redirectTo({ url: '/pages/orders/orders' }) } })
       return
     }
-    // 刚下完单去订单列表：列表不能叠在「选终端」上面，否则从列表一返回又回到下单流程。
-    // 先退出下单流程那几页再打开列表；栈里只剩流程页时重开列表；上一页本来就不是流程页时照旧替换。
+    // 上一页本来就不是下单流程（例如从首页卡片进来）：照旧把本页换成订单列表。
+    // 其余情况（栈里只剩本页，或下面还压着下单流程的页）一律重开订单列表：
+    // 列表不能叠在「选终端」上面，也不分「先退再进」两步跳（会闪屏、会停在半路）。
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
     const delta = backDeltaPastOrderFlow(pages.map((page) => page && page.route))
     const url = '/pages/orders/orders'
-    if (!delta) { wx.reLaunch({ url }); return }
     if (delta === 1) { wx.redirectTo({ url }); return }
-    wx.navigateBack({ delta, success() { wx.navigateTo({ url }) }, fail() { wx.reLaunch({ url }) } })
+    wx.reLaunch({ url })
   },
 
   home() {
