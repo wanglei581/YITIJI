@@ -255,6 +255,11 @@ Page({
     this._fetch()
   },
 
+  /** 无任务态与失败态：去「我的简历」另选一份（列表由服务端按本人返回，每份有带 taskId 的「继续优化」）。 */
+  toResumes() {
+    wx.navigateTo({ url: '/pages/resumes/resumes', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
+  },
+
   tapReupload() {
     wx.navigateTo({
       url: '/pages/resume-parse/resume-parse',

@@ -7,11 +7,17 @@
     <view class="nav-right"></view>
   </view>
 
+  <!-- 没带任务进来（AI 工具 / 首页 / 助手）：只给两条已鉴权的现有路线，不读本机缓存的任务、不显示其文件名
+       （缓存没有账号归属）。原先只有「返回」，是死路（10/16 开发者工具实际模拟器截图）。 -->
   <view wx:if="{{phase === 'no-task'}}" class="no-task-state">
     <text class="ficon i-file-text nt-ic"></text>
-    <view class="nt-title">未指定优化任务</view>
-    <view class="nt-sub">请从简历诊断页发起 AI 优化</view>
-    <view class="btn ghost tap nt-btn" bindtap="goBack">返回</view>
+    <view class="nt-title">选择要优化的简历</view>
+    <view class="nt-sub">AI 优化要基于一份已经解析过的简历。</view>
+    <view class="nt-actions">
+      <view class="btn primary block tap" hover-class="tap-press" bindtap="toResumes">从我的简历选择</view>
+      <view class="btn ghost block tap" hover-class="tap-press" bindtap="tapReupload">上传新简历</view>
+      <view class="nt-back tap" hover-class="tap-press" bindtap="goBack">返回</view>
+    </view>
   </view>
 
   <view wx:if="{{phase === 'loading'}}" class="running-state">
@@ -26,14 +32,16 @@
   <view wx:if="{{phase === 'failed'}}" class="failed-state">
     <text class="ficon i-info fail-ic"></text>
     <view class="fail-msg">{{failMsg || '优化生成失败'}}</view>
+    <!-- 原因已在上一行（服务端或接口给的原话）；这里只说还能做什么，不替所有失败套「真实性校验」一个原因。 -->
     <view wx:if="{{needReupload}}" class="fail-hint">
-      AI 已按隐私策略清理简历原文，无法重新生成。请重新上传简历后再试。
+      这份简历不能再生成优化稿。请重新上传，或从我的简历里另选一份。
     </view>
     <view wx:if="{{!needReupload}}" class="fail-hint">
-      AI 生成内容未通过真实性校验。你可以手动重试，再次生成仍可能失败。
+      可以手动重试，再次生成仍可能失败；也可以从我的简历里另选一份。
     </view>
     <view wx:if="{{needReupload}}" class="btn primary tap fail-btn" bindtap="tapReupload">重新上传简历</view>
     <view wx:if="{{!needReupload}}" class="btn ghost tap fail-btn" bindtap="tapRetry">重试</view>
+    <view class="btn ghost tap fail-btn" hover-class="tap-press" bindtap="toResumes">选择其他简历</view>
     <view class="btn ghost tap fail-btn-sm" bindtap="goBack">返回</view>
   </view>
 
