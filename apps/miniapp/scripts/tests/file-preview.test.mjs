@@ -119,6 +119,7 @@ test('其余失败各自归类，都不重取', async () => {
     { download: { status: 404 }, kind: 'denied' },
     { download: { status: 410 }, kind: 'denied' },
     { download: { errMsg: 'downloadFile:fail timeout' }, kind: 'timeout' },
+    { download: { errMsg: 'downloadFile:fail timed out' }, kind: 'timeout' },
     { download: { errMsg: 'downloadFile:fail ssl hand shake error' }, kind: 'network' },
     { download: { status: 500 }, kind: 'network' },
   ]
@@ -222,6 +223,16 @@ test('预览页「打开原文」现取链接；域名没配时弹窗说明原�
   assert.equal(calls.open.length, 0)
 })
 
+test('预览页「打开原文」途中返回：收起加载遮罩，但不在上一页弹窗', async () => {
+  const { page, calls, fetches } = loadPreviewPage({ downloads: [{ errMsg: DOMAIN_ERR }] })
+  fetches[0].d.resolve({ url: COS_URL }); await flush()
+  page.openDoc(); await flush()
+  page.onUnload()
+  fetches[1].d.resolve({ url: COS_URL }); await flush()
+  assert.equal(calls.hide, 1, '全局加载遮罩必须收起')
+  assert.equal(calls.modal.length, 0, '页面已退出，不能把弹窗留给上一页')
+})
+
 test('预览页「打开原文」成功：交给阅读器，页面不进错误态', async () => {
   const { page, calls, fetches } = loadPreviewPage({ downloads: [{ status: 200 }] })
   fetches[0].d.resolve({ url: COS_URL }); await flush()
@@ -296,6 +307,15 @@ test('我的文档预览 PDF：走同一套打开流程，失败用弹窗说清�
   assert.equal(calls.modal.length, 1)
   assert.equal(calls.modal[0].content, TEXT.domain)
   assert.equal(calls.toast.length, 0, '不再用一句笼统的「下载失败」')
+})
+
+test('我的文档预览途中返回：收起加载遮罩，但不弹窗', async () => {
+  const { page, calls, fetches } = loadDocumentsPage({ downloads: [{ errMsg: DOMAIN_ERR }] })
+  page.previewDoc('doc-1'); await flush()
+  page.onUnload()
+  fetches[0].d.resolve({ url: COS_URL }); await flush()
+  assert.equal(calls.hide, 1)
+  assert.equal(calls.modal.length, 0)
 })
 
 test('我的文档预览 PDF 成功：按服务端 mime 传 fileType', async () => {

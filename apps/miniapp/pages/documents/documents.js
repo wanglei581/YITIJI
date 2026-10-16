@@ -48,6 +48,7 @@ Page({
   },
 
   onUnload() {
+    this._unloaded = true
     this._stopConvertCountdown()
     shareFriend.abandon(this)
   },
@@ -247,9 +248,10 @@ Page({
     if (this.data.previewing) return
     this.setData({ previewing: true })
     wx.showLoading({ title: '加载预览…', mask: true })
+    // 用户中途返回：加载遮罩是全局的，照样收起；不再弹窗或打开全屏预览，免得落到上一页。
     const done = () => {
       wx.hideLoading()
-      this.setData({ previewing: false })
+      if (!this._unloaded) this.setData({ previewing: false })
     }
     if (!item.isImage) {
       fileUrls.openSignedDocument({
@@ -259,7 +261,7 @@ Page({
         mimeType: item.mimeType,
       }).then((result) => {
         done()
-        if (!result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
+        if (!this._unloaded && !result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
       })
       return
     }
@@ -273,11 +275,11 @@ Page({
         const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回预览链接')
         done()
-        wx.previewImage({ urls: [url], current: url })
+        if (!this._unloaded) wx.previewImage({ urls: [url], current: url })
       })
       .catch((err) => {
         done()
-        wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
+        if (!this._unloaded) wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
       })
   },
 
