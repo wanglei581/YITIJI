@@ -1,5 +1,19 @@
 # 当前开发进度
 
+## 2026-10-16 17:40：离线前置拦截与恢复核销通过；缺纸待执行
+
+- **本次范围**：只在 `docs/progress/current-progress.md`、`docs/progress/next-tasks.md` 记录已发生的验收和下一步。没有代码、入口、依赖、数据库或生产配置变更；没有更改设备能力。验证为同订单服务端只读对账、UU Windows 只读检查、用户实纸与手机状态确认。
+- **OFFLINE 订单 `ORD-20261016-61E53D83BC` 通过本项验收**：文件 `ZYD-20261016-BIZ-OFFLINE-D93A.pdf`，黑白、单面、A4、1 份、1 页、免费。
+  - 关机后，Windows `WorkOffline=true`、服务器心跳 `offline`。用户在正常一体机页面核销一次，被提示「这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员」。09:28:14Z 服务端订单仍 `pending_release`、到机码 `pending`、无打印任务，更新时间未变；用户确认未出纸。本机任务仍 105 条，队列/在途/待补报都是 0。
+  - 正常开机后，09:31:40Z 与 09:32:10Z 心跳连续 `ready`；UU 本机 17:32:56 确认 `WorkOffline=false`、队列/在途/待补报为 0，才通知用户用原码正常核销一次。
+  - 09:37:57Z 服务端对账：原订单 `completed`、到机码 `used`，唯一任务 `ptask_pickup_f381464c6e3d8def`，09:37:15.330Z 领取、09:37:23.204Z 完成，无错误，失败转待打印日志为 0。`printOutcome=null` 不作出纸证明。
+  - UU 本机 17:38:44：任务 105 → 106，完成 79 → 80，历史失败仍 26；所有打印队列为 0，无 Win32 作业，在途/待补报为 0，数据库检查正常。Windows 证据 `D:/Downloads/zyd-upgrade-0417/evidence/biz-offline-postclaim-173845.json`。
+  - 用户明确确认：恰好一张、编号正确、黑白单面内容完整，手机同一订单显示打印完成。
+- **范围界限**：这是 KSK-001 测试电脑 Agent 0.4.17 的「服务端离线前置拦截 → 就绪后原订单首次成功生成任务并出纸」。没有制造 Agent 内部 `PRINTER_OFFLINE` 失败任务，因此不证明失败任务续打、打印中断网/重启、缺纸自动恢复、new01 或最终整机商用通过。没有与心跳抢跑或绕过门禁。
+- **证据**：本轮既有验收目录 `commercial-closeout-20261016/claude-exec/evidence/` 下 `offline-rejected-server-20261016T092814Z.json`、`offline-restored-server-20261016T093210Z.json`、`offline-postclaim-20261016T093758Z.json` 及 `codex-uu-preflight-20261016.json`；不把到机码、完整聊天或凭证写入仓库。
+- **下一项缺纸**：复用尚未核销的 PAPER 订单 `ORD-20261016-9075723483`，它的参数是彩色、单面、A4、1 份、1 页、免费。由 Grok 复核当前订单/心跳/监控条件，Codex 经 UU 与用户执行。不得抢补纸；若进入 `PRINT_JOB_UNCONFIRMED`，停止重试，单独记防重印表现，不能算缺纸自动恢复通过。没有当前作业的时序证据时，不以最终 `failed` 或无 307 事件推断从未派发。
+- **并行小程序事项未关单**：downloadFile 合法域名与手机原文预览、页面操作逻辑仍待修复验收。17:11 截图新增反复 `writeFile:fail the maximum size of the file storage limit is exceeded`，仅证明该微信运行环境写文件超限，尚未确定来源；不得据此断言 Mac 磁盘满或删除用户文档/聊天。Claude 当前 CLI 明确提示会话额度到 20:00 恢复，保留其独立工作区改动；本次由 Codex补录已验证事实，Grok/agy继续各自有授权的工作。
+
 ## 2026-10-16 17:10：长边双面业务单通过（只限 KSK-001 测试电脑）；生产 COS 桶归属取证；异常恢复方案修订中
 
 - **双面单 `ORD-20261016-A5DCD86EC7` 通过**，四方证据一致：
