@@ -147,7 +147,8 @@ function toUiItem(item) {
     // 已完成可再打一份；到机码可见时显示"查看到机码"
     action,
     actionLabel: action === 'pickup' ? '查看到机码'
-               : action === 'reprint' ? '再打印一份'
+               // 这个按钮实际是去「我的文档」重新选文件，不是按原单原样再打一份，名字要说实话。
+               : action === 'reprint' ? '去我的文档打印'
                : '',
     orderId: item.id,
     amountCents,

@@ -47,7 +47,7 @@ function fakeCanvasNode() {
 
 /** 最小 wx 替身：只实现被测页面真正用到的那几个。storage 是一个普通 Map。 */
 function createWx(storage = new Map()) {
-  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [], getRandomValues: [] }
+  const calls = { navigateTo: [], redirectTo: [], reLaunch: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [], getRandomValues: [] }
   // wx.showLoading / hideLoading 不是栈：hideLoading 无条件掀掉当前那一张遮罩，
   // 不管它是谁挂上去的。所以替身用一个布尔记"现在屏幕上有没有遮罩"——
   // 这正是 A 的迟到回调能掀掉 B 的遮罩那个缺陷的形状。
@@ -75,6 +75,7 @@ function createWx(storage = new Map()) {
       if (opts.success) opts.success()
     },
     switchTab: (opts) => { calls.switchTab.push(opts.url) },
+    reLaunch: (opts) => { calls.reLaunch.push(opts.url) },
     navigateBack: (opts) => { if (opts && opts.fail) opts.fail({ errMsg: 'no page' }) },
     showToast: (opts) => { calls.showToast.push(opts.title) },
     showModal: (opts) => { calls.showModal.push(opts); if (opts && opts.success) opts.success({ confirm: false }) },
@@ -1334,6 +1335,50 @@ test('B1 订单详情：排队中写「排队中」；规格带单双面；没�
     assert.equal(page.data.detail.statusLabel, label)
     assert.equal(page.data.detail.spec, spec)
   }
+})
+
+test('B2 取件页「查看全部订单」：刚下完单不把列表叠在下单流程上；从列表进来照旧返回', async () => {
+  for (const [source, expectRelaunch] of [['', true], ['orders', false]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad(source ? { orderId: 'ord-B1', source } : { orderId: 'ord-B1' })
+    detail.resolve(B1_PENDING)
+    await flush()
+    page.toOrders()
+    if (expectRelaunch) {
+      // 沙箱没有页面栈，等同于「栈里只剩下单流程」：重开订单列表，不叠在选终端上面
+      assert.deepEqual([...wx.calls.reLaunch], ['/pages/orders/orders'])
+      assert.equal(wx.calls.redirectTo.length, 0)
+    } else {
+      assert.equal(wx.calls.reLaunch.length, 0)
+      // 从订单列表进来的照旧退回列表（替身的 navigateBack 走 fail，于是兜底 redirectTo）
+      assert.deepEqual([...wx.calls.redirectTo], ['/pages/orders/orders'])
+    }
+  }
+})
+
+test('B2 订单列表：已完成的单，按钮写实际去处「去我的文档打印」，点了去我的文档', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const done = {
+    id: 'pt-B2', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'a.pdf',
+  }
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: () => Promise.resolve([done]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  const row = page.data.orders.find((item) => item.id === 'pt-B2')
+  assert.equal(row.action, 'reprint')
+  assert.equal(row.actionLabel, '去我的文档打印', '不能写「再打印一份」：它不会按原单原样再打')
+  page.primary({ currentTarget: { dataset: { id: 'pt-B2' } } })
+  assert.ok(wx.calls.navigateTo.includes('/pages/documents/documents'))
 })
 
 // ══════════════════════════════════════════════════════════════════════
