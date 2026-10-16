@@ -83,7 +83,7 @@ function claim(taskId: string, fileUrl: string, attempt?: number): ClaimTask {
   return task
 }
 
-function printResult(success: boolean, file: string, printer: string, errorCode?: 'PAPER_EMPTY'): PrintResult {
+function printResult(success: boolean, file: string, printer: string, errorCode?: 'PAPER_EMPTY' | 'FILE_NOT_FOUND' | 'PRINT_COMMAND_FAILED'): PrintResult {
   const now = new Date().toISOString()
   return {
     success,
@@ -93,7 +93,7 @@ function printResult(success: boolean, file: string, printer: string, errorCode?
     startedAt: now,
     finishedAt: now,
     durationMs: 1,
-    ...(errorCode ? { errorCode, errorMessage: '打印机缺纸' } : {}),
+    ...(errorCode ? { errorCode, errorMessage: errorCode === 'FILE_NOT_FOUND' ? '文件不存在' : errorCode === 'PRINT_COMMAND_FAILED' ? '打印命令执行失败' : '打印机缺纸' } : {}),
   }
 }
 
@@ -233,7 +233,7 @@ async function verifyRetryAttempt(): Promise<void> {
       const fileName = basename(file)
       prints.push({ taskId, file: fileName, correlationId })
       const next = prints.filter((item) => item.taskId === taskId).length
-      if (next === 1) return printResult(false, file, printer, 'PAPER_EMPTY')
+      if (next === 1) return printResult(false, file, printer, 'FILE_NOT_FOUND')
       if (next === 2) return printResult(true, file, printer)
       throw new Error(`打印桩被多调了一次: ${taskId} #${next}`)
     },
@@ -253,22 +253,22 @@ async function verifyRetryAttempt(): Promise<void> {
 
   async function assertReprint(label: string, taskId: string): Promise<void> {
     await executeTask(claim(taskId, fileUrl, 0), agent, db, dependencies)
-    assert.equal(printCount(taskId), 1, `${label} attempt 0 缺纸必须真的调用一次打印桩`)
+    assert.equal(printCount(taskId), 1, `${label} attempt 0 文件缺失必须真的调用一次打印桩`)
     assert.equal(prints.at(-1)?.file, `task_${taskId}.pdf`)
     assert.equal(prints.at(-1)?.correlationId, taskId)
     assert.match(prints.at(-1)?.file ?? '', BOOT_QUEUE_CLEANUP_TASK_FILE_RE)
     assert.equal(getTaskLocalStatus(db, taskId, 0), 'failed')
-    assert.equal(getTaskLocalErrorCode(db, taskId, 0), 'PAPER_EMPTY')
+    assert.equal(getTaskLocalErrorCode(db, taskId, 0), 'FILE_NOT_FOUND')
     assert.equal(isTaskDone(db, taskId, 1), false)
     const firstFail = patchesFor(server.patches, taskId).filter((item) => item.body['status'] === 'failed')
-    assert.equal(firstFail.at(-1)?.body['errorCode'], 'PAPER_EMPTY')
+    assert.equal(firstFail.at(-1)?.body['errorCode'], 'FILE_NOT_FOUND')
     assert.equal(firstFail.at(-1)?.body['attempt'], 0)
-    assert.equal(monitorKeys.includes(`${taskId}_a1`), false, `${label} 缺纸发生在监控之前`)
+    assert.equal(monitorKeys.includes(`${taskId}_a1`), false, `${label} 文件缺失发生在派发前校验`)
 
     await executeTask(claim(taskId, fileUrl), agent, db, dependencies)
     assert.equal(printCount(taskId), 1, `${label} 老服务端不带 attempt 时不得再次打印`)
     const replay = patchesFor(server.patches, taskId).filter((item) => item.body['status'] === 'failed')
-    assert.equal(replay.at(-1)?.body['errorCode'], 'PAPER_EMPTY', `${label} 重报 failed 必须带回原来的 errorCode`)
+    assert.equal(replay.at(-1)?.body['errorCode'], 'FILE_NOT_FOUND', `${label} 重报 failed 必须带回原来的 errorCode`)
     assert.equal(replay.at(-1)?.body['attempt'], 0)
 
     await executeTask(claim(taskId, fileUrl, 1), agent, db, dependencies)
@@ -279,7 +279,7 @@ async function verifyRetryAttempt(): Promise<void> {
     assert.equal(monitorKeys.filter((key) => key === `${taskId}_a1`).length, 1)
     assert.equal(getTaskLocalStatus(db, taskId, 1), 'completed')
     assert.equal(getTaskLocalStatus(db, taskId, 0), 'failed')
-    assert.equal(getTaskLocalErrorCode(db, taskId, 0), 'PAPER_EMPTY')
+    assert.equal(getTaskLocalErrorCode(db, taskId, 0), 'FILE_NOT_FOUND')
 
     await executeTask(claim(taskId, fileUrl, 1), agent, db, dependencies)
     assert.equal(printCount(taskId), 2, `${label} 同一 attempt 再领不得再调打印桩`)
@@ -292,6 +292,35 @@ async function verifyRetryAttempt(): Promise<void> {
   try {
     await assertReprint('一体机重试', KIOSK_TASK)
     await assertReprint('管理员重试', ADMIN_TASK)
+
+    // A dispatched command can fail after some pages reached the device.
+    // Exercise the real reporting and local persistence path, not only a mapper.
+    for (const fault of ['command', 'paper_empty', 'error'] as const) {
+      const taskId = `post-dispatch-${fault}`
+      let sends = 0
+      const faultDependencies: ExecuteTaskDependencies = {
+        printCommand: async (file, printer) => {
+          sends += 1
+          return printResult(fault !== 'command', file, printer,
+            fault === 'command' ? 'PRINT_COMMAND_FAILED' : undefined)
+        },
+        monitorDependencies: {
+          platform: 'win32',
+          sleep: async () => undefined,
+          queryStatus: async () => ({ status: fault === 'paper_empty' ? 'paper_empty' : 'error', rawStatus: fault === 'paper_empty' ? 'PaperOut' : 'Jammed' }),
+          queryCompletionEvent: async () => false,
+        },
+      }
+      await executeTask(claim(taskId, fileUrl, 0), agent, db, faultDependencies)
+      assert.equal(sends, 1, `${fault}: dispatch invoked once`)
+      assert.equal(getTaskLocalErrorCode(db, taskId, 0), 'PRINT_JOB_UNCONFIRMED')
+      const failed = patchesFor(server.patches, taskId).filter((item) => item.body['status'] === 'failed')
+      assert.equal(failed.at(-1)?.body['errorCode'], 'PRINT_JOB_UNCONFIRMED')
+      assert.match(String(failed.at(-1)?.body['errorMessage']), /不会自动重印/)
+      await executeTask(claim(taskId, fileUrl, 0), agent, db, faultDependencies)
+      assert.equal(sends, 1, `${fault}: repeated claim must only replay status`)
+      assert.equal(patchesFor(server.patches, taskId).at(-1)?.body['errorCode'], 'PRINT_JOB_UNCONFIRMED')
+    }
 
     const dispatchId = 'dispatch-unconfirmed'
     markTaskDone(db, dispatchId, 'dispatching', 0)
