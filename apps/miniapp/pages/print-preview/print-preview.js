@@ -159,7 +159,8 @@ Page({
     }).then((result) => {
       wx.hideLoading()
       this.setData({ opening: false })
-      if (!result.ok) this.setData({ state: 'error', errorText: result.text })
+      // 失败用弹窗说明原因，页面留在原处：文件信息还在，用户可以再点一次。
+      if (!result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
     })
   },
 

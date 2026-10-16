@@ -256,7 +256,7 @@ Page({
         mimeType: item.mimeType,
       }).then((result) => {
         done()
-        if (!result.ok) wx.showModal({ title: '没有打开原文', content: result.text, showCancel: false })
+        if (!result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
       })
       return
     }
