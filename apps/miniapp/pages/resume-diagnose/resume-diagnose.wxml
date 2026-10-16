@@ -22,6 +22,8 @@
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有诊断报告</view>
     <view class="rs-sub">上传或拍摄一份简历,AI 解析完成后会在这里生成报告</view>
+    <!-- 主操作紧跟在说明下面（10/16 开发者工具实际模拟器截图：放在底部固定栏时，中间是一大片空白，像两件事）。 -->
+    <view class="btn primary block tap state-cta" hover-class="tap-press" bindtap="toUpload">上传简历开始诊断</view>
     <view wx:if="{{hasSavedTask}}" class="saved-tip tap" bindtap="viewSaved">
       <text>查看上一次的诊断{{savedFileName ? '(' + savedFileName + ')' : ''}}</text>
       <text class="ficon i-right saved-tip-arrow"></text>
@@ -33,18 +35,14 @@
     <view class="st-ic warn"><text class="ficon i-info"></text></view>
     <view class="rs-title">未能获取诊断报告</view>
     <view class="rs-sub">{{failMsg}}</view>
+    <!-- 失败时先给能做的事：换一份重新上传；「重试诊断」与打印入口在底部固定栏。 -->
+    <view class="btn ghost block tap state-cta" hover-class="tap-press" bindtap="toUpload">重新上传简历</view>
   </view>
 
-  <view wx:if="{{status !== 'done'}}" class="state-export-disabled">
-    <view class="state-export-reason">诊断失败或尚未完成，暂时不能导出。完成诊断后可生成真实 PDF。</view>
-    <view class="report-export-actions">
-      <button class="btn ghost" disabled="{{true}}" aria-disabled="{{true}}">导出诊断报告 PDF</button>
-      <button class="btn ghost" disabled="{{true}}" aria-disabled="{{true}}">导出修改清单</button>
-    </view>
-  </view>
-
-  <!-- 真实诊断结果 -->
-  <view wx:else class="content has-bar">
+  <!-- 导出只在真实完成的报告里出现（下方完成态的「带走这份结果」）。读取中、空态、失败态都没有报告，
+       不放任何导出控件；失败态先给原因和「重新上传 / 重试诊断」。 -->
+  <!-- 真实诊断结果（显式按 done 判断；不再挂在上面那块的 wx:else 上） -->
+  <view wx:if="{{status === 'done'}}" class="content has-bar">
 
     <!-- 占位 provider 必须明示,否则用户会把演示结论当成真实分析 -->
     <view wx:if="{{report.isMockProvider}}" class="notice warn">
@@ -223,9 +221,6 @@
   <!-- 操作栏 -->
   <view wx:if="{{status === 'done'}}" class="actionbar">
     <view class="btn primary block tap" bindtap="tapOptimize">去 AI 优化</view>
-  </view>
-  <view wx:elif="{{status === 'empty'}}" class="actionbar">
-    <view class="btn primary block tap" bindtap="toUpload">上传简历开始诊断</view>
   </view>
   <view wx:elif="{{status === 'failed'}}" class="actionbar">
     <view class="fail-actions">

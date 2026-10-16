@@ -418,6 +418,12 @@ Page({
     }
   },
 
+  // 单件区末尾的「加载更多 / 重试」：与触底同一条路径，只推进单件自己的 nextCursor，
+  // 与材料包的 pkgCursor 互不相干（VIS1：单件区挪到材料包前面后，不能只靠触底翻页）。
+  loadMoreOrders() {
+    this.onReachBottom()
+  },
+
   loadMorePackages() {
     if (this.data.pkgCursor && !this.data.pkgLoadingMore) this._loadPackages(true)
   },

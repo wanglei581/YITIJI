@@ -598,14 +598,21 @@ const diagnoseSaveState = resumeDiagnoseWxml.match(
   /wx:if="\{\{exportResult\.savedToDocuments\}\}"[^>]*>([^<]*)<\/view>\s*<view wx:else[^>]*>([^<]*)<\/view>/,
 )
 const anonymousSaveCopy = diagnoseSaveState ? diagnoseSaveState[2] : ''
+// 2026-10-16 VIS1：没有结果就不能导出。导出控件（两个 data-kind、exportReport）只许出现在完成态
+// 内容块里（status === 'done' 那一块到「操作栏」之间）；读取中、空态、失败态一个导出控件都不放，
+// 也不再用两个禁用按钮占位。
+const diagnoseDoneAt = resumeDiagnoseWxml.indexOf(`wx:if="{{status === 'done'}}" class="content has-bar"`)
+const diagnoseBarsAt = resumeDiagnoseWxml.indexOf('<!-- 操作栏 -->')
+const diagnoseExportAts = [...resumeDiagnoseWxml.matchAll(/data-kind="(?:diagnosis_report|change_list)"|bindtap="exportReport"/g)].map((m) => m.index)
+const diagnoseExportOnlyInDone = diagnoseDoneAt > 0 && diagnoseBarsAt > diagnoseDoneAt &&
+  diagnoseExportAts.length >= 2 && diagnoseExportAts.every((i) => i > diagnoseDoneAt && i < diagnoseBarsAt)
 if (
   apiJs.includes('exportResumeReport(taskId, kind, accessToken, benefitGrantId)') &&
   apiJs.includes('getResumeExportPricing()') &&
   resumeDiagnoseWxml.includes('data-kind="diagnosis_report"') &&
   resumeDiagnoseWxml.includes('data-kind="change_list"') &&
-  resumeDiagnoseWxml.includes("status !== 'done'") &&
-  resumeDiagnoseWxml.includes('诊断失败或尚未完成，暂时不能导出') &&
-  (resumeDiagnoseWxml.match(/aria-disabled="\{\{true\}\}"/g) || []).length >= 2 &&
+  diagnoseExportOnlyInDone &&
+  !resumeDiagnoseWxml.includes('state-export-disabled') &&
   resumeDiagnoseJs.includes('api.exportResumeReport(this.data.taskId, kind, accessToken, this.data.benefitGrantId)') &&
   resumeDiagnoseJs.includes('wx.downloadFile') &&
   resumeDiagnoseJs.includes('wx.openDocument') &&
@@ -621,7 +628,7 @@ if (
   anonymousSaveCopy.includes('本次仅可打开，登录后可存我的文档') &&
   !anonymousSaveCopy.includes('已存')
 ) ok('诊断报告与修改清单可真实导出、打开、打印，并按登录态和有效期诚实展示')
-else bad('诊断报告导出结果层', '必须有两种导出动作、真实 PDF 打开/打印、页数/大小/有效期倒计时，且 savedToDocuments=false 分支不得出现「已存」')
+else bad('诊断报告导出结果层', '必须有两种导出动作且只在完成态出现（没有结果就不能导出）、真实 PDF 打开/打印、页数/大小/有效期倒计时，且 savedToDocuments=false 分支不得出现「已存」')
 
 const normalizeJs = read('utils/normalize.js')
 const pricingCopyOk =

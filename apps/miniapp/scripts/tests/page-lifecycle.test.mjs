@@ -1436,6 +1436,37 @@ test('B2 订单列表：已完成的单，按钮写实际去处「去我的文�
   assert.ok(wx.calls.navigateTo.includes('/pages/documents/documents'))
 })
 
+test('VIS1 订单列表单件区「加载更多」：与触底同一条路径，只推进单件游标，不重拉材料包', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const singleCalls = []
+  let pkgCalls = 0
+  const firstPage = Object.assign([{ id: 'pt-1', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'a.pdf' }], { nextCursor: 'c-2' })
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: (params) => {
+      singleCalls.push(params)
+      return Promise.resolve(params && params.cursor
+        ? [{ id: 'pt-2', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'b.pdf' }]
+        : firstPage)
+    },
+    getPackageOrders: () => { pkgCalls += 1; return Promise.resolve({ items: [], total: 0 }) },
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  assert.equal(page.data.nextCursor, 'c-2')
+  const pkgBefore = pkgCalls
+  page.loadMoreOrders()
+  page.loadMoreOrders()
+  await flush()
+  assert.equal(singleCalls.length, 2, '连点只翻一页')
+  assert.equal(singleCalls[1].cursor, 'c-2', '带的是单件自己的游标')
+  assert.equal(pkgCalls, pkgBefore, '不重拉材料包')
+  assert.deepEqual([...page.data.orders.map((o) => o.id)], ['pt-1', 'pt-2'], '第二页接在后面')
+})
+
 // ══════════════════════════════════════════════════════════════════════
 // M. P1-8 守卫不得制造解不开的锁
 // ══════════════════════════════════════════════════════════════════════
