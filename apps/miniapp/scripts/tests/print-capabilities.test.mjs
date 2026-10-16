@@ -14,7 +14,8 @@ const select = (page, id) => page.pick({ currentTarget: { dataset: { id } } })
 const serial = value => JSON.parse(JSON.stringify(value))
 function ui() {
   const calls = { nav: [], redirect: [], toast: [] }
-  return { calls, wx: { navigateTo: x => calls.nav.push(x.url), redirectTo: x => { calls.redirect.push(x.url); x.success?.() }, showToast: x => calls.toast.push(x), showModal() {}, showLoading() {}, hideLoading() {}, navigateBack() {}, switchTab() {} } }
+  // redirect：建单后的跳转。print-pay 2026-10-16 起用 reLaunch 进取件页（清掉下单流程页），两种都记在这里。
+  return { calls, wx: { navigateTo: x => calls.nav.push(x.url), redirectTo: x => { calls.redirect.push(x.url); x.success?.() }, reLaunch: x => { calls.redirect.push(x.url); x.success?.() }, showToast: x => calls.toast.push(x), showModal() {}, showLoading() {}, hideLoading() {}, navigateBack() {}, switchTab() {} } }
 }
 function store(api, opts = {}) {
   const u = ui()

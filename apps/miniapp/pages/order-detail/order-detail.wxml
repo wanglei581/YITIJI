@@ -74,7 +74,8 @@
           bindtap="cancelOrder"
           disabled="{{cancelling}}"
         >{{cancelling ? '正在取消…' : '取消订单'}}</button>
-        <button class="btn primary block tap" hover-class="tap-press" bindtap="toPrint">再打印一份</button>
+        <!-- toPrint 去「我的文档」重新选文件，不是按原单原样再打一份，文字照实写。 -->
+        <button class="btn primary block tap" hover-class="tap-press" bindtap="toPrint">去我的文档打印</button>
       </view>
     </block>
 
