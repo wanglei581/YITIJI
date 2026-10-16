@@ -30,3 +30,30 @@
 .store-list .empty { margin: 0; border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: var(--surface); }
 .store-list .empty .e-ic { color: var(--teal); }
 .store-list .empty .e-ic .ficon { width: 58rpx; height: 58rpx; }
+
+/* 打印参数：选项触控区不小于 96rpx，选中态沿用终端卡片的青色 */
+.param-box { margin-top: 8rpx; }
+.param-label { margin-top: 20rpx; font-size: var(--fs-base); color: var(--muted); }
+.param-options { display: flex; gap: 16rpx; margin-top: 12rpx; }
+.param-opt {
+  box-sizing: border-box;
+  min-width: 96rpx;
+  min-height: 96rpx;
+  flex: 1;
+  padding: 16rpx 20rpx;
+  border-radius: var(--r-lg);
+  border: 2rpx solid var(--line-soft);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--fs-base);
+  line-height: 1.35;
+  color: var(--ink);
+}
+.param-opt.on { border-color: var(--teal); background: var(--teal-wash); color: var(--ink); font-weight: 600; }
+.param-opt.disabled { opacity: 0.45; }
+.param-opt.on.disabled { opacity: 1; border-color: var(--clay-deep); background: var(--surface); color: var(--clay-deep); }
+.param-hint { margin-top: 16rpx; font-size: var(--fs-base); line-height: 1.5; color: var(--clay-deep); }
+.actionbar .btn.lg { min-height: 96rpx; }

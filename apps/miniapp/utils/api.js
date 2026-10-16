@@ -1008,11 +1008,12 @@ const api = {
    * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
    * 前端不构造、不缓存、不复用。
    */
-  quoteMyPrintOrder(fileId, params, presetFileUrl) {
+  quoteMyPrintOrder(fileId, params, presetFileUrl, options) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    const terminalId = options && String(options.terminalId || '').trim();
     const quoteWith = (fileUrl) => request('/orders/quote', {
       method: 'POST',
-      data: { fileUrl, params },
+      data: terminalId ? { fileUrl, params, terminalId } : { fileUrl, params },
       needAuth: false,
     });
 
@@ -1028,6 +1029,16 @@ const api = {
       const fileUrl = access && access.printFileUrl;
       if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
       return quoteWith(fileUrl);
+    });
+  },
+
+  getTerminalCapabilities(terminalId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('终端能力'));
+    const id = String(terminalId || '').trim();
+    if (!id) return Promise.reject(new Error('缺少终端'));
+    return request(`/terminals/${encodeURIComponent(id)}/capabilities`, {
+      method: 'GET',
+      needAuth: false,
     });
   },
 

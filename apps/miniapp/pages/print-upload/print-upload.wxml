@@ -44,8 +44,8 @@
       </view>
       <view class="opt off tap" hover-class="tap-press" data-v="color" bindtap="pickColor">
         <view class="o-radio"></view>
-        <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">驱动侧彩色参数未完成真机验收</view></view>
-        <view class="o-locked">暂不可选</view>
+        <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">选择终端后按该终端开放的能力设置</view></view>
+        <view class="o-locked">选终端后设置</view>
       </view>
     </view>
 
@@ -67,10 +67,10 @@
       </view>
       <view class="duplex-opt off tap" hover-class="tap-press" data-v="double" bindtap="pickDuplex">
         <view class="d-t">双面</view>
-        <view class="d-s">暂不可选</view>
+        <view class="d-s">选终端后设置</view>
       </view>
     </view>
-    <view class="set-why">彩色与双面本期不可选，点一下会说明原因{{priceStatus === 'ready' && amountCents > 0 ? '；开放前不会按这两项计价' : ''}}。</view>
+    <view class="set-why">选择终端后，可根据该终端开放的能力设置彩色或双面。</view>
 
     <view class="set-sep"></view>
 
