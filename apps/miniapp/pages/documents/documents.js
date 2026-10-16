@@ -48,6 +48,8 @@ Page({
 
   onUnload() {
     this._unloaded = true
+    // 预览进行中用户返回：全局遮罩当场收起，不等网络回来，免得挡住上一页。
+    if (this.data.previewing) wx.hideLoading()
     this._stopConvertCountdown()
   },
 

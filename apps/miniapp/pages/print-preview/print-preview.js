@@ -91,6 +91,9 @@ Page({
   // 否则会落到上一页；加载遮罩是全局的，照样收起。
   onUnload() {
     this._unloaded = true
+    // 正在打开原文时用户返回：遮罩是全局的，当场收起，不等网络回来，免得挡住上一页。
+    // 只有「打开原文」挂了遮罩（放大图片不挂），所以单独记一面旗子。
+    if (this._maskShown) { this._maskShown = false; wx.hideLoading() }
   },
 
   _loadPreview() {
@@ -160,12 +163,13 @@ Page({
     if (this.data.opening || !this.data.fileId) return
     this.setData({ opening: true })
     wx.showLoading({ title: '正在打开原文…', mask: true })
+    this._maskShown = true
     fileUrls.openSignedDocument({
       wx,
       fetchUrl: () => api.getFilePreviewUrl(this.data.fileId),
       name: this.data.docName,
     }).then((result) => {
-      wx.hideLoading()
+      if (this._maskShown) { this._maskShown = false; wx.hideLoading() }
       if (this._unloaded) return
       this.setData({ opening: false })
       // 失败用弹窗说明原因，页面留在原处：文件信息还在，用户可以再点一次。
