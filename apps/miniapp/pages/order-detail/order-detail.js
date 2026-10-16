@@ -19,6 +19,7 @@
 // 后者要当场清场。那一层由 page-guard 的 RESIGNIN_ELIGIBLE 判据负责。
 const app = getApp()
 const api = require('../../utils/api')
+const printParams = require('../../utils/print-params')
 const auth = require('../../utils/auth')
 const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 
@@ -26,8 +27,9 @@ const STATUS_MAP = {
   // 云打印单到机前的两个任务态（服务端 Order.taskStatus），与「我的打印订单」列表同一说法
   pending_release: '待到机',
   awaiting_payment: '待现场支付',
-  pending:   '待取件',
-  claimed:   '待取件',
+  // 任务已建、在终端排队（取件页写「已进入打印队列」）。不是「待取件」：人已经在机器前核销过了。
+  pending:   '排队中',
+  claimed:   '排队中',
   printing:  '打印中',
   completed: '已完成',
   failed:    '打印失败',
@@ -75,13 +77,10 @@ function fmtTime(iso) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
+// 规格与取件页、订单列表同一份实现（utils/print-params.js displaySpec）：含单双面；
+// 服务端没记录的项不写，不再把未记录的颜色当成「黑白」。
 function buildSpec(item) {
-  const parts = []
-  if (item.paperSize)     parts.push(String(item.paperSize).toUpperCase())
-  if (item.colorMode)     parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
-  if (item.copies)        parts.push(`${item.copies} 份`)
-  if (item.billablePages) parts.push(`共 ${item.billablePages} 页`)
-  return parts.join(' · ') || '—'
+  return printParams.displaySpec(item) || '—'
 }
 
 function canCancelCloudOrder(raw) {

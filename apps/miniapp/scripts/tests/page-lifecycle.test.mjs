@@ -1237,6 +1237,105 @@ test('P1-7 print-pickup 前台登出：屏幕上那张码必须当场清掉', as
   assert.equal(page.data.state, 'error')
 })
 
+// ── B1（10/16）取件页：去机器前能核对文件、终端、规格；底部按钮不误称「完成」；返回不回到下单流程 ──
+
+const B1_PENDING = {
+  orderNo: 'NO-B1', pickupStatus: 'pending', taskStatus: 'pending_release', pickupCode: '12345678', amountCents: 0,
+  fileName: 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf', terminalName: '大厅一体机', locationLabel: '一楼服务区',
+  paperSize: 'A4', colorMode: 'black_white', duplex: 'duplex_long_edge', copies: 1, billablePages: 2,
+}
+
+test('B1 取件页：信息卡显示文件、终端、规格（含长边双面）；码还没用时底部写「返回首页」', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+  page.onLoad({ orderId: 'ord-B1' })
+  detail.resolve(B1_PENDING)
+  await flush()
+  assert.equal(page.data.state, 'ready')
+  assert.equal(page.data.fileName, 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf')
+  assert.equal(page.data.store, '大厅一体机 · 一楼服务区')
+  assert.equal(page.data.spec, 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页')
+  assert.equal(page.data.doneLabel, '返回首页', '码还没用就写「完成」，会让人以为这一单已经结束')
+})
+
+test('B1 取件页：打印完成后底部才写「完成」；服务端没给的项不显示', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+  page.onLoad({ orderId: 'ord-B1' })
+  detail.resolve({ orderNo: 'NO-B1', pickupStatus: 'used', taskStatus: 'completed', amountCents: 0, fileName: '简历.pdf' })
+  await flush()
+  assert.equal(page.data.doneLabel, '完成')
+  assert.equal(page.data.fileName, '简历.pdf')
+  assert.equal(page.data.store, '', '没有终端名就不显示这一行，不编一个')
+  assert.equal(page.data.spec, '', '没有参数就不显示这一行，不回落成「单面」「黑白」')
+})
+
+test('B1 取件页返回：从订单列表进来退一页；刚下完单则不退回下单流程', async () => {
+  for (const [source, expectBackDelta, expectHome] of [['orders', 1, false], ['', null, true]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const backs = []
+    wx.navigateBack = (opts) => { backs.push(opts.delta) }
+    const detail = deferred()
+    const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad(source ? { orderId: 'ord-B1', source } : { orderId: 'ord-B1' })
+    detail.resolve(B1_PENDING)
+    await flush()
+    page.back()
+    if (expectBackDelta === null) assert.equal(backs.length, 0, '沙箱没有页面栈：不能盲退一页回到选终端')
+    else assert.equal(backs[0], expectBackDelta)
+    assert.equal(wx.calls.switchTab.includes('/pages/home/home'), expectHome)
+  }
+})
+
+test('B1 订单列表：终端里排队的任务写「排队中」不写「待取件」；规格带上长边双面', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const queued = {
+    id: 'pt-B1', status: 'pending', payStatus: 'paid', pickupStatus: 'used', amountCents: 0,
+    fileName: 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf', paperSize: 'A4', colorMode: 'black_white',
+    duplex: 'duplex_long_edge', copies: 1, billablePages: 2,
+  }
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: () => Promise.resolve([queued]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  const row = page.data.orders.find((item) => item.id === 'pt-B1')
+  assert.ok(row, '列表里要有这一单')
+  assert.equal(row.statusLabel, '排队中')
+  assert.equal(row.status, 'waiting', '仍归在「待取件」这一栏')
+  assert.equal(row.spec, 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页')
+})
+
+test('B1 订单详情：排队中写「排队中」；规格带单双面；没记录的颜色不再写成「黑白」', async () => {
+  for (const [raw, label, spec] of [
+    [{ taskStatus: 'claimed', duplex: 'duplex_long_edge', colorMode: 'black_white', paperSize: 'A4', copies: 1, billablePages: 2 },
+      '排队中', 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页'],
+    [{ taskStatus: 'completed', duplex: null, colorMode: null, paperSize: 'A4', copies: 2 }, '已完成', 'A4 · 2 份'],
+  ]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const page = makePage('pages/order-detail/order-detail.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad({ orderId: 'ord-B1' })
+    page.onShow()
+    detail.resolve({ id: 'ord-B1', orderNo: 'NO-B1', pickupStatus: 'used', payStatus: 'paid', amountCents: 0, fileName: 'a.pdf', ...raw })
+    await flush()
+    assert.ok(page.data.detail, '详情要渲染出来')
+    assert.equal(page.data.detail.statusLabel, label)
+    assert.equal(page.data.detail.spec, spec)
+  }
+})
+
 // ══════════════════════════════════════════════════════════════════════
 // M. P1-8 守卫不得制造解不开的锁
 // ══════════════════════════════════════════════════════════════════════

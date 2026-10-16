@@ -15,7 +15,10 @@ const auth = require('../../utils/auth')
 const { isMemberIdentity, resolveAccountState, sameAccount } = require('../../utils/page-guard')
 const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('../../utils/pickup-qrcode')
 const pickupActions = require('../../utils/pickup-actions')
-const { parseAmountCents, formatCode, formatCountdown, resolveOrderState } = require('./pickup-state')
+const {
+  parseAmountCents, formatCode, formatCountdown, resolveOrderState,
+  bottomActionLabel, orderSummary, backDeltaPastOrderFlow,
+} = require('./pickup-state')
 
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
@@ -71,6 +74,12 @@ Page({
     orderId: '',
     fromOrders: false,
     orderNo: '',
+    // 信息卡：文件、终端、规格，全部取自服务端订单详情（pickup-state.js orderSummary）。
+    fileName: '',
+    store: '',
+    spec: '',
+    // 底部主按钮：只有打印完成才写「完成」（pickup-state.js bottomActionLabel）。
+    doneLabel: '返回首页',
     taskStatus: '',
     pickupStatus: '',
     statusKey: 'pending',
@@ -564,6 +573,8 @@ Page({
           statusKey: status.key,
           statusTitle: status.title,
           statusDetail: status.detail,
+          doneLabel: bottomActionLabel(status.key),
+          ...orderSummary(order),
           showQr: status.showQr && hasCode,
           codeRaw: status.showQr && hasCode ? pickupCode : '',
           code: status.showQr && hasCode ? formatCode(pickupCode) : '',
@@ -790,7 +801,12 @@ Page({
     wx.switchTab({ url: '/pages/home/home' })
   },
 
+  // 下单后返回：跳过「上传参数 → 选终端 → 确认」这些页，不把人送回选终端再下一单。
+  // 从订单列表进来的照旧退一页。
   back() {
-    wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const delta = this.data.fromOrders ? 1 : backDeltaPastOrderFlow(pages.map((page) => page && page.route))
+    if (!delta) { wx.switchTab({ url: '/pages/home/home' }); return }
+    wx.navigateBack({ delta, fail() { wx.switchTab({ url: '/pages/home/home' }) } })
   },
 })
