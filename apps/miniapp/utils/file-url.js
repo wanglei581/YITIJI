@@ -87,7 +87,7 @@ function classifyDownload(result) {
   if (result.failed) {
     const text = String(result.errMsg || '');
     if (/domain list|合法域名|not in domain/i.test(text)) return 'domain';
-    if (/timeout/i.test(text)) return 'timeout';
+    if (/timeout|timed out/i.test(text)) return 'timeout';
     return 'network';
   }
   if (result.statusCode === 401 || result.statusCode === 403) return 'expired';

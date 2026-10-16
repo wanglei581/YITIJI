@@ -87,6 +87,12 @@ Page({
     this._loadPreview()
   },
 
+  // 打开原文、放大图片都是异步的。用户中途返回时，回调里不再弹窗、不再打开全屏预览，
+  // 否则会落到上一页；加载遮罩是全局的，照样收起。
+  onUnload() {
+    this._unloaded = true
+  },
+
   _loadPreview() {
     if (!this.data.fileId) {
       this.setData({ state: 'error', errorText: '缺少文件参数，请返回重新选择文档' })
@@ -137,12 +143,14 @@ Page({
     this.setData({ opening: true })
     api.getFilePreviewUrl(this.data.fileId)
       .then((res) => {
+        if (this._unloaded) return
         this.setData({ opening: false })
         const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回可用的预览链接')
         wx.previewImage({ urls: [url], current: url })
       })
       .catch((err) => {
+        if (this._unloaded) return
         this.setData({ opening: false })
         wx.showToast({ title: (err && err.message) || '放大失败，请重试', icon: 'none' })
       })
@@ -158,6 +166,7 @@ Page({
       name: this.data.docName,
     }).then((result) => {
       wx.hideLoading()
+      if (this._unloaded) return
       this.setData({ opening: false })
       // 失败用弹窗说明原因，页面留在原处：文件信息还在，用户可以再点一次。
       if (!result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
