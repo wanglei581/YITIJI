@@ -1,3 +1,23 @@
+# 2026-10-16 20:00 后软件续办（Claude）
+
+- **额度**：会话 20:00 恢复。本会话没有 get_usage 工具，读不到周额度和 5 小时额度的百分比。请求正常受理，没有切换账号，没有开付费追加。
+- **小程序打开原文**：
+  - 分支 `claude/miniapp-print-ux-20261016`，草稿 PR #1469，叠在 #1466 上。提交 `6026e535a` → `c0cca1e8a` → `e1af0aeac` → `689047e9f`。
+  - 改了 6 个文件：`utils/file-url.js`、`pages/print-preview/print-preview.js`、`pages/documents/documents.js`，新测试 `scripts/tests/file-preview.test.mjs`，`package.json` 的一行，`page-lifecycle.test.mjs` 的一条。
+  - 验证：
+    - 20 条新用例；
+    - 页面生命周期 237 条；
+    - 小程序全量静态门禁 exit 0；
+    - 反向检查 16 处，逐一变红后复原；
+    - agy 两轮复核。
+  - 手机：两个 PDF 入口和正常返回都 PASS。下载中途返回、图片两项待真机复验。
+- **手机预览的来源**：一次性冻结副本 `/Users/wanglei/.codex/worktrees/miniapp-candidate-689047e9f`，是 Claude 建的，Codex 说用完后由 Claude 删除，不加 `--force`。主项目 `zhiyida-miniapp-main` 保持 `cfbe567` 正式版不动。
+- **存储超限日志**：只记证据，不改代码。
+- **G09 CI**：已接手收货。Grok 的诊断已读，方案交 agy 复核，等结论再派实现。
+- **B1**：新分支 `claude/miniapp-print-flow-ux-20261016` 从 `689047e9f` 起，预算 6 个源文件，做完单独开草稿 PR。
+
+---
+
 # 2026-10-16 商用收口统筹接任（Claude）
 
 - 接收完整交接报告：正文已读完，附录按模块分段读；工作分支 `claude/closeout-commander-20261016`，叠在 #1466 分支 `03439f5` 加两笔文档提交上，#1466 的头提交不动。
