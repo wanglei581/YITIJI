@@ -47,6 +47,9 @@ Page({
   },
 
   onUnload() {
+    this._unloaded = true
+    // 预览进行中用户返回：全局遮罩当场收起，不等网络回来，免得挡住上一页。
+    if (this.data.previewing) wx.hideLoading()
     this._stopConvertCountdown()
   },
 
@@ -235,13 +238,32 @@ Page({
     this.reprintDoc({ currentTarget: { dataset: { id: result.fileId } } })
   },
 
-  // 预览文件内容
+  // 预览文件内容。PDF / Office 走 utils/file-url.js 的 openSignedDocument：
+  // 每次现取短期签名链接，过期重取一次；失败原因（下载域名未配置、过期、
+  // 无权限、超时、格式不支持）用一句中文说清，不再统一写「下载失败」。
   previewDoc(id) {
     const item = this.data.all.find((entry) => entry.id === id) || this._convertedPdfItem(id)
     if (!item) return
     if (this.data.previewing) return
     this.setData({ previewing: true })
     wx.showLoading({ title: '加载预览…', mask: true })
+    // 用户中途返回：加载遮罩是全局的，照样收起；不再弹窗或打开全屏预览，免得落到上一页。
+    const done = () => {
+      wx.hideLoading()
+      if (!this._unloaded) this.setData({ previewing: false })
+    }
+    if (!item.isImage) {
+      fileUrls.openSignedDocument({
+        wx,
+        fetchUrl: () => api.getFilePreviewUrl(item.id),
+        name: item.name,
+        mimeType: item.mimeType,
+      }).then((result) => {
+        done()
+        if (!this._unloaded && !result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
+      })
+      return
+    }
     api.getFilePreviewUrl(item.id)
       .then((res) => {
         // 服务端返回的是相对路径，wx API 只接受绝对地址（见 utils/file-url.js）
@@ -251,38 +273,12 @@ Page({
         // 会被 verifyFileSignature 判为无效签名 → 401 → 图片加载失败。
         const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回预览链接')
-        if (item.isImage) {
-          wx.hideLoading()
-          this.setData({ previewing: false })
-          wx.previewImage({ urls: [url], current: url })
-        } else {
-          wx.downloadFile({
-            url,
-            success: (dl) => {
-              wx.hideLoading()
-              this.setData({ previewing: false })
-              if (dl.statusCode === 200) {
-                wx.openDocument({
-                  filePath: dl.tempFilePath,
-                  showMenu: true,
-                  fail: () => wx.showToast({ title: '无法打开此文件', icon: 'none' }),
-                })
-              } else {
-                wx.showToast({ title: '下载失败，请重试', icon: 'none' })
-              }
-            },
-            fail: () => {
-              wx.hideLoading()
-              this.setData({ previewing: false })
-              wx.showToast({ title: '下载失败，请重试', icon: 'none' })
-            },
-          })
-        }
+        done()
+        if (!this._unloaded) wx.previewImage({ urls: [url], current: url })
       })
       .catch((err) => {
-        wx.hideLoading()
-        this.setData({ previewing: false })
-        wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
+        done()
+        if (!this._unloaded) wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
       })
   },
 

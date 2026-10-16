@@ -6688,16 +6688,19 @@ test('微信接口失败的英文 errMsg 不直接当成给用户看的句子', 
   assert.deepEqual(hits, [])
 })
 
-test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', () => {
+test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', async () => {
+  // 10/16 起「打开原文」每次现取签名链接（utils/file-url.js openSignedDocument），403 先重取一次再报过期。
   for (const [dl, expected] of [
     [(opts) => opts.fail({ errMsg: 'downloadFile:fail unknown reason' }), '打开原文失败，请检查网络后重试。'],
-    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '服务端返回 403，预览链接可能已过期'],
+    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '预览链接已过期，重新获取后仍没有打开。请返回后重新进入再试。'],
   ]) {
     const wx = createWx()
     wx.downloadFile = dl
-    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api: {}, wx })
-    page.setData({ fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
+    const api = { getFilePreviewUrl: () => Promise.resolve({ url: 'https://zyidai.cn/f/a.pdf' }) }
+    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api, wx })
+    page.setData({ fileId: 'file-a', fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
     page.openDoc()
+    await flush()
     assert.equal(wx.calls.showModal.length, 1)
     assert.equal(wx.calls.showModal[0].content, expected)
   }
