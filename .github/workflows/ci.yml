@@ -394,6 +394,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # Preserve the installed boot spool protection verification.
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
