@@ -202,7 +202,7 @@ function loadPreviewPage({ downloads, fileName = 'ZYD-BIZ-COLOR.pdf' } = {}) {
   return { page, calls, fetches }
 }
 
-test('预览页「打开原文」现取链接；域名没配时停在错误态并说明原因', async () => {
+test('预览页「打开原文」现取链接；域名没配时弹窗说明原因，页面留在原处', async () => {
   const { page, calls, fetches } = loadPreviewPage({ downloads: [{ errMsg: DOMAIN_ERR }] })
   fetches[0].d.resolve({ url: COS_URL }); await flush()
   assert.equal(page.data.state, 'doc')
@@ -214,8 +214,9 @@ test('预览页「打开原文」现取链接；域名没配时停在错误态�
   assert.equal(page.data.opening, true)
   fetches[1].d.resolve({ url: COS_URL }); await flush()
   assert.equal(page.data.opening, false)
-  assert.equal(page.data.state, 'error')
-  assert.equal(page.data.errorText, TEXT.domain)
+  assert.equal(page.data.state, 'doc', '文件信息还在，可以再点一次')
+  assert.equal(calls.modal.length, 1)
+  assert.equal(calls.modal[0].content, TEXT.domain)
   assert.equal(calls.loading, 1)
   assert.equal(calls.hide, 1, '加载提示必须收起')
   assert.equal(calls.open.length, 0)
@@ -230,6 +231,7 @@ test('预览页「打开原文」成功：交给阅读器，页面不进错误�
   assert.equal(page.data.opening, false)
   assert.equal(calls.open.length, 1)
   assert.equal(calls.open[0].fileType, 'pdf')
+  assert.equal(calls.modal.length, 0)
 })
 
 test('预览页图片渲染失败先自动重取一次，再失败才报错；用户点重新加载会重置', async () => {
