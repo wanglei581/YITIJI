@@ -369,7 +369,7 @@ export async function executeTask(
   //
   // 只有 attempt 变大才重新下载、打印。同一 (任务号, attempt)：
   // dispatching/spooled → 报 PRINT_JOB_UNCONFIRMED，不重打；
-  // completed → 重报 completed；failed → 重报 failed，本地有错误码就带回。
+  // completed → 重报 completed；failed → 重报 failed，有错误码原样带回，没有则报 PRINT_JOB_UNCONFIRMED。
   // attempt 由服务端按 failed→pending 的状态日志计数，一体机重试和管理员重试都会加。
   // 重报时带上的 errorCode 以服务端规则为准：空则保留原值，非空则覆盖。
   bindPrintAttempt(db, task.attempt)
@@ -422,21 +422,29 @@ export async function executeTask(
       if (!ok) queue( { status: 'completed' })
     } else if (localStatus === 'failed') {
       log(`task ${task.taskId}: locally failed task was re-claimed; replaying terminal status`)
-      // 本地有 errorCode 就带回，避免重报把「打印机缺纸」冲成笼统失败。没有则不带。
+      // 两次写入：markTaskDone('failed') 先落状态，rememberTaskErrorCode 再落错误码。
+      // 中间崩溃会留下空 errorCode。空码按未确认上报，避免服务端整单重试；已有错误码原样带回。
       const localError = getTaskLocalErrorCode(db, task.taskId)
-      const ok = await patch('failed', localError)
+      const replayCode = localError ?? 'PRINT_JOB_UNCONFIRMED'
+      const replayMessage = localError
+        ? undefined
+        : '本地失败记录缺少错误码，出纸结果未确认，系统不会自动重印'
+      const ok = await patch('failed', replayCode, replayMessage)
       if (!ok) {
         queue( {
           status: 'failed',
-          ...(localError ? { errorCode: localError } : {}),
+          errorCode: replayCode,
+          ...(replayMessage ? { errorMessage: replayMessage } : {}),
         })
       }
     } else {
-      const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），为避免重复出纸已停止自动重试，请工作人员核查`
-      warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting failed`)
+      const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），出纸结果需要核查，请勿再次提交打印`
+      warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting unconfirmed failure`)
+      // Tighten any stale retryable code before changing status; either crash point stays blocked.
+      rememberTaskErrorCode(db, task.taskId, 'PRINT_JOB_UNCONFIRMED')
       markTaskDone(db, task.taskId, 'failed')
-      const ok = await patch('failed', 'LOCAL_TASK_STATE_UNKNOWN', msg)
-      if (!ok) queue( { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
+      const ok = await patch('failed', 'PRINT_JOB_UNCONFIRMED', msg)
+      if (!ok) queue( { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
     }
     await settlePrinterAfterTerminal({
       outcome: terminalOutcome,

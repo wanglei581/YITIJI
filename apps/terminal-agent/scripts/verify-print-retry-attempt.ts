@@ -105,9 +105,11 @@ interface PatchRecord {
 function startServer(): Promise<{
   origin: string
   patches: PatchRecord[]
+  failTaskIds: Set<string>
   close: () => Promise<void>
 }> {
   const patches: PatchRecord[] = []
+  const failTaskIds = new Set<string>()
   const server = http.createServer((req, res) => {
     const url = req.url ?? ''
     if (req.method === 'GET' && url.startsWith('/files/')) {
@@ -121,6 +123,12 @@ function startServer(): Promise<{
       req.on('end', () => {
         const raw = Buffer.concat(chunks).toString('utf8')
         patches.push({ url, body: raw ? JSON.parse(raw) as Record<string, unknown> : {} })
+        const matched = url.match(/\/print-tasks\/([^/?]+)\/status/)
+        const taskId = matched?.[1] ? decodeURIComponent(matched[1]) : ''
+        if (failTaskIds.has(taskId)) {
+          res.destroy()
+          return
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end('{"acknowledged":true}')
       })
@@ -139,6 +147,7 @@ function startServer(): Promise<{
       resolve({
         origin: `http://127.0.0.1:${addr.port}`,
         patches,
+        failTaskIds,
         close: () => new Promise((done) => server.close(() => done())),
       })
     })
@@ -497,10 +506,124 @@ function verifySpoolMatch(): void {
   pass('队列匹配键带 attempt，文件名仍符合开机清理正则，测试缝不再是全局 setter')
 }
 
+/** Exercise crash-gap recovery through reopened SQLite and real loopback HTTP. */
+async function verifyFailedErrorCodeSurvivesRestart(): Promise<void> {
+  const root = mkdtempSync(join(tmpdir(), 'agent-retry-restart-'))
+  const previous = process.env['PROGRAMDATA']
+  process.env['PROGRAMDATA'] = root
+  __setUnauthorizedMarkerPathForTests(join(root, 'missing-unauthorized'))
+  __resetClaimRateLimitForTests()
+  let db = openDatabase()
+  assert.ok(db)
+  const server = await startServer()
+  const agent = config(`${server.origin}/api/v1`)
+  const fileUrl = `${server.origin}/files/sample.pdf`
+  let printCalls = 0
+  const dependencies: ExecuteTaskDependencies = {
+    printCommand: async () => { printCalls += 1; throw new Error('Restart must never dispatch') },
+  }
+  const cases = [
+    ['gap-null', 0, 'failed', null, 'PRINT_JOB_UNCONFIRMED'],
+    ['gap-empty', 0, 'failed', '', 'PRINT_JOB_UNCONFIRMED'],
+    ['unknown-state', 0, 'unknown', null, 'PRINT_JOB_UNCONFIRMED'],
+    ['unknown-with-code', 0, 'unknown', 'FILE_NOT_FOUND', 'PRINT_JOB_UNCONFIRMED'],
+    ['unknown-interrupted', 0, 'unknown', 'PRINT_JOB_UNCONFIRMED', 'PRINT_JOB_UNCONFIRMED'],
+    ['isolated', 0, 'failed', 'FILE_NOT_FOUND', 'FILE_NOT_FOUND'],
+    ['isolated', 1, 'failed', null, 'PRINT_JOB_UNCONFIRMED'],
+    ['known-paper', 0, 'failed', 'PAPER_EMPTY', 'PAPER_EMPTY'],
+    ['done', 0, 'completed', null, undefined],
+    ['dispatch', 0, 'dispatching', null, 'PRINT_JOB_UNCONFIRMED'],
+    ['spooled', 0, 'spooled', null, 'PRINT_JOB_UNCONFIRMED'],
+  ] as const
+  try {
+    for (const [id, attempt, status, code] of cases) {
+      markTaskDone(db, id, status, attempt)
+      db.prepare('UPDATE print_tasks SET errorCode = ? WHERE taskId = ? AND attempt = ?').run(code, id, attempt)
+    }
+    for (const [id, code, status] of [
+      ['offline-null', null, 'failed'], ['offline-empty', '', 'failed'], ['offline-unknown', null, 'unknown'],
+    ] as const) {
+      markTaskDone(db, id, status, 3)
+      db.prepare('UPDATE print_tasks SET errorCode = ? WHERE taskId = ? AND attempt = ?').run(code, id, 3)
+      server.failTaskIds.add(id)
+    }
+    // Inject a crash between the real error-code UPDATE and status INSERT.
+    db.prepare('UPDATE print_tasks SET errorCode = ? WHERE taskId = ?').run('FILE_NOT_FOUND', 'unknown-interrupted')
+    const prepare = db.prepare.bind(db)
+    db.prepare = ((sql: string) => {
+      if (sql.includes('INSERT INTO print_tasks')) throw new Error('simulated crash before status write')
+      return prepare(sql)
+    }) as typeof db.prepare
+    try {
+      await assert.rejects(executeTask(claim('unknown-interrupted', fileUrl, 0), agent, db, dependencies), /simulated crash/)
+    } finally {
+      db.prepare = prepare
+    }
+    assert.equal(getTaskLocalStatus(db, 'unknown-interrupted', 0), 'unknown')
+    assert.equal(getTaskLocalErrorCode(db, 'unknown-interrupted', 0), 'PRINT_JOB_UNCONFIRMED')
+    db.close()
+    db = openDatabase()
+    assert.ok(db, 'SQLite must reopen after the simulated crash')
+    for (const [id, attempt, status, initial, expected] of cases) {
+      const row = db.prepare('SELECT errorCode FROM print_tasks WHERE taskId = ? AND attempt = ?').get(id, attempt)
+      assert.equal(row?.['errorCode'], initial, 'Crash fixture must survive reopening unchanged')
+      for (let replay = 0; replay < 2; replay += 1) {
+        await executeTask(claim(id, fileUrl, attempt), agent, db, dependencies)
+        const body = patchesFor(server.patches, id).at(-1)?.body
+        assert.equal(body?.['status'], status === 'completed' ? 'completed' : 'failed')
+        assert.equal(body?.['errorCode'], expected, `${id}: restarted failed row must retain a blocking code`)
+        assert.equal(body?.['attempt'], attempt)
+        assert.equal(getTaskLocalErrorCode(db, id, attempt), expected)
+        assert.equal(printCalls, 0)
+      }
+    }
+    assert.equal(getTaskLocalErrorCode(db, 'isolated', 0), 'FILE_NOT_FOUND', 'Other attempt must remain unchanged')
+    for (const id of server.failTaskIds) {
+      await executeTask(claim(id, fileUrl, 3), agent, db, dependencies)
+      const body = patchesFor(server.patches, id).at(-1)?.body
+      assert.equal(body?.['errorCode'], 'PRINT_JOB_UNCONFIRMED')
+      assert.equal(body?.['attempt'], 3)
+    }
+    db.close()
+    db = openDatabase()
+    assert.ok(db)
+    const queuedCount = db.prepare('SELECT COUNT(*) AS count FROM pending_patches').get()
+    assert.equal(queuedCount?.['count'], 3, 'All disconnected HTTP reports must persist to the outbox')
+    // Advance only the fixture retry deadline; production backoff remains unchanged.
+    db.prepare('UPDATE pending_patches SET nextRetryAt = ?').run('2000-01-01T00:00:00.000Z')
+    const pending = getPendingPatches(db)
+    assert.equal(pending.length, 3)
+    server.failTaskIds.clear()
+    for (const queued of pending) {
+      assert.equal(queued.errorCode, 'PRINT_JOB_UNCONFIRMED')
+      assert.equal(queued.printAttempt, 3)
+      assert.equal(getTaskLocalErrorCode(db, queued.taskId, 3), 'PRINT_JOB_UNCONFIRMED')
+      assert.equal(await processPatch(queued, agent, db), 'processed')
+      const body = patchesFor(server.patches, queued.taskId).at(-1)?.body
+      assert.equal(body?.['errorCode'], 'PRINT_JOB_UNCONFIRMED')
+      assert.equal(body?.['attempt'], 3)
+      await executeTask(claim(queued.taskId, fileUrl, 3), agent, db, dependencies)
+      assert.equal(patchesFor(server.patches, queued.taskId).at(-1)?.body['errorCode'], 'PRINT_JOB_UNCONFIRMED')
+    }
+    assert.equal(getPendingPatches(db).length, 0)
+    assert.equal(getDeadLetterPatches(db).length, 0)
+    assert.equal(printCalls, 0)
+    pass('SQLite重开：NULL/空码失败安全补报；明确码/跨attempt不变；断网outbox重开补报清空且零打印')
+  } finally {
+    await server.close()
+    db?.close()
+    if (previous === undefined) delete process.env['PROGRAMDATA']
+    else process.env['PROGRAMDATA'] = previous
+    __setUnauthorizedMarkerPathForTests(undefined)
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   verifySpoolMatch()
   verifyLegacyRowsSurvive()
   await verifyRetryAttempt()
+  await verifyFailedErrorCodeSurvivesRestart()
   pass('verify:print-retry-attempt 全部通过')
 }
 
