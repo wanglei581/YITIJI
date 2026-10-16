@@ -28,11 +28,15 @@ const TERMINALS = [
   },
 ]
 
-function capabilityRows(note: string): CapabilityRow[] {
-  return [
+function capabilityRows(note: string, withSignature = false): CapabilityRow[] {
+  const rows: CapabilityRow[] = [
     { capabilityKey: 'document_print', status: 'available', note, configured: true, updatedAt: '2026-10-01T00:00:00.000Z' },
     { capabilityKey: 'material_pack', status: 'not_verified', note: null, configured: false, updatedAt: null },
   ]
+  if (withSignature) {
+    rows.push({ capabilityKey: 'signature_stamp', status: 'not_verified', note: null, configured: false, updatedAt: null })
+  }
+  return rows
 }
 
 function capabilityCalls(calls: CapabilityCall[]): CapabilityCall[] {
@@ -43,6 +47,9 @@ async function setup(page: Page, options: {
   holdGet?: (terminalId: string) => Promise<void> | undefined
   holdPut?: Promise<void>
   putResult?: (terminalId: string, key: string) => { terminalCode: string; capability: CapabilityRow }
+  putStatus?: number
+  putErrorMessage?: string
+  withSignature?: boolean
 } = {}) {
   const calls: CapabilityCall[] = []
   const json = (route: Route, body: unknown) =>
@@ -67,7 +74,7 @@ async function setup(page: Page, options: {
       if (hold) await hold
       const note = terminalId === 'term-new01' ? 'A-TABLE' : 'B-TABLE'
       const terminalCode = terminalId === 'term-new01' ? 'new01' : 'KSK-001'
-      return json(route, { data: { terminalCode, capabilities: capabilityRows(note) } })
+      return json(route, { data: { terminalCode, capabilities: capabilityRows(note, options.withSignature) } })
     }
     const saved = url.pathname.match(/\/admin\/terminals\/([^/]+)\/capabilities\/([^/]+)$/)
     if (method === 'PUT' && saved) {
@@ -75,6 +82,13 @@ async function setup(page: Page, options: {
       const key = saved[2] ?? ''
       calls.push({ method, pathname: url.pathname })
       if (options.holdPut) await options.holdPut
+      if ((options.putStatus ?? 200) >= 400) {
+        return route.fulfill({
+          status: options.putStatus,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'CAPABILITY_SAVE_FAILED', message: options.putErrorMessage ?? '能力保存失败' } }),
+        })
+      }
       const result = options.putResult?.(terminalId, key) ?? {
         terminalCode: terminalId === 'term-ksk' ? 'PUT-CODE-KSK' : 'PUT-CODE-NEW',
         capability: { capabilityKey: key, status: 'available', note: null, configured: true, updatedAt: '2026-10-16T00:30:00.000Z' },
@@ -91,6 +105,10 @@ async function setup(page: Page, options: {
 
 function terminalSelect(page: Page) {
   return page.getByRole('combobox', { name: '终端' })
+}
+
+function dataRow(page: Page, label: string) {
+  return page.locator('tr').filter({ hasText: label }).filter({ has: page.locator('select') })
 }
 
 test('初始未选终端时没有能力表，也不发能力请求', async ({ page }) => {
@@ -143,9 +161,8 @@ test('登记确认前切换终端后，确认不会对任何一台发保存', as
   await expect(page.getByText('将把『新一号（new01）』的『材料包』登记为『可用（对用户开放）』')).toBeVisible()
   expect(calls.filter((call) => call.method === 'PUT')).toEqual([])
   await terminalSelect(page).selectOption('term-ksk')
+  await expect(page.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
   await expect(page.getByText(/将把『/)).toHaveCount(0)
-  const confirm = page.getByRole('button', { name: '确认', exact: true })
-  if (await confirm.count()) await confirm.click()
   await page.waitForTimeout(400)
   expect(calls.filter((call) => call.method === 'PUT')).toEqual([])
 })
@@ -199,4 +216,86 @@ test('确认后切走，晚回的保存结果不写进新终端的表和提示',
   await expect(page.getByText(/已登记到/)).toHaveCount(0)
   await expect(terminalSelect(page)).toHaveValue('term-ksk')
   expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1)
+})
+
+test('取消登记不发保存，提示消失且按钮恢复可点', async ({ page }) => {
+  const calls = await setup(page)
+  await terminalSelect(page).selectOption('term-new01')
+  const material = dataRow(page, '材料包')
+  await material.locator('select').selectOption('available')
+  await material.getByRole('button', { name: '登记' }).click()
+  await expect(page.getByText('将把『新一号（new01）』的『材料包』登记为『可用（对用户开放）』')).toBeVisible()
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByText(/将把『/)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
+  await expect(material.getByRole('button', { name: '登记' })).toBeEnabled()
+  await page.waitForTimeout(400)
+  expect(calls.filter((call) => call.method === 'PUT')).toEqual([])
+})
+
+test('保存失败时显示错误，不出现已登记回执，且没有第二次保存', async ({ page }) => {
+  const calls = await setup(page, { putStatus: 500, putErrorMessage: '能力保存失败' })
+  await terminalSelect(page).selectOption('term-ksk')
+  const material = dataRow(page, '材料包')
+  await material.locator('select').selectOption('available')
+  await material.getByRole('button', { name: '登记' }).click()
+  await page.getByRole('button', { name: '确认', exact: true }).click()
+  await expect.poll(() => calls.filter((call) => call.method === 'PUT').length).toBe(1)
+  await expect(page.getByText('能力保存失败')).toBeVisible()
+  await expect(page.getByText(/已登记到/)).toHaveCount(0)
+  await expect(material.getByRole('button', { name: '登记' })).toBeEnabled()
+  await page.waitForTimeout(400)
+  expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1)
+})
+
+test('待确认期间别的行按钮禁用，点不出第二个提示', async ({ page }) => {
+  await setup(page)
+  await terminalSelect(page).selectOption('term-ksk')
+  const doc = dataRow(page, '文档打印')
+  const material = dataRow(page, '材料包')
+  await doc.locator('input').fill('DIRTY-NOTE')
+  await expect(doc.getByRole('button', { name: '保存' })).toBeEnabled()
+  await material.locator('select').selectOption('available')
+  await material.getByRole('button', { name: '登记' }).click()
+  await expect(material.getByRole('button', { name: '待确认' })).toBeDisabled()
+  await expect(doc.getByRole('button', { name: '保存' })).toBeDisabled()
+  await doc.getByRole('button', { name: '保存' }).click({ force: true })
+  await expect(page.getByText(/将把『/)).toHaveCount(1)
+  await expect(page.getByText(/『文档打印』/)).toHaveCount(0)
+  await expect(page.getByText('将把『大厅终端（KSK-001）』的『材料包』登记为『可用（对用户开放）』')).toBeVisible()
+})
+
+test('确认提示出现在被点行的下一行，不在表格上方的目标行', async ({ page }) => {
+  await setup(page)
+  await terminalSelect(page).selectOption('term-ksk')
+  const identity = page.getByText('大厅终端 · KSK-001 · Agent 0.4.11 · 离线')
+  await expect(identity).toBeVisible()
+  const material = dataRow(page, '材料包')
+  await material.locator('select').selectOption('available')
+  await material.getByRole('button', { name: '登记' }).click()
+  const prompt = '将把『大厅终端（KSK-001）』的『材料包』登记为『可用（对用户开放）』'
+  const next = material.locator('xpath=following-sibling::tr[1]')
+  await expect(next).toContainText(prompt)
+  await expect(next.getByRole('button', { name: '确认', exact: true })).toBeVisible()
+  await expect(next.getByRole('button', { name: '取消', exact: true })).toBeVisible()
+  await expect(identity).not.toContainText('将把')
+  await expect(identity.getByRole('button', { name: '确认', exact: true })).toHaveCount(0)
+})
+
+test('签名确认打到页面选中的终端，回执在签名行正下方', async ({ page }) => {
+  const calls = await setup(page, { withSignature: true })
+  await terminalSelect(page).selectOption('term-ksk')
+  await expect(page.getByText('大厅终端 · KSK-001 · Agent 0.4.11 · 离线')).toBeVisible()
+  const signature = page.locator('tr').filter({ hasText: '签名（本人手写，默认关闭）' })
+  await expect(signature).toBeVisible()
+  await signature.getByRole('button', { name: '开通' }).click()
+  const panel = signature.locator('xpath=following-sibling::tr[1]')
+  await expect(panel).toContainText('确认为『大厅终端（KSK-001）』开通签名？')
+  await panel.getByRole('button', { name: '确认开通' }).click()
+  await expect.poll(() => calls.filter((call) => call.method === 'PUT').length).toBe(1)
+  const shown = await terminalSelect(page).inputValue()
+  expect(calls.find((call) => call.method === 'PUT')?.pathname).toBe(`/api/v1/admin/terminals/${shown}/capabilities/signature_stamp`)
+  const receiptRow = signature.locator('xpath=following-sibling::tr[1]')
+  await expect(receiptRow).toContainText('已登记到 PUT-CODE-KSK · 2026-10-16 08:30')
+  await expect(page.getByText('大厅终端 · KSK-001 · Agent 0.4.11 · 离线')).not.toContainText('已登记到')
 })

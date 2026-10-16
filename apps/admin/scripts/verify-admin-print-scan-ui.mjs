@@ -15,6 +15,9 @@ const pagePath = join(root, 'src/routes/print-scan/index.tsx')
 const retryButtonPath = join(root, 'src/routes/print-scan/PrintRetryButton.tsx')
 // 「设备能力」板块 2026-09-29 从 index.tsx 原样拆到独立文件；能力开关相关断言改读这里，强度不变。
 const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
+// 2026-10-16 能力行再拆到 CapabilityRows.tsx，避免 CapabilityCenter 超过 580 行。
+// 未登记行的断言跟着函数走，口径不变。
+const capabilityRowsPath = join(root, 'src/routes/print-scan/CapabilityRows.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
 const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
@@ -35,10 +38,12 @@ if (!existsSync(pagePath)) fail('print-scan page is missing')
 if (!existsSync(servicePath)) fail('printScan service is missing')
 if (!existsSync(closeFormPath)) fail('controlled unpaid-print close form is missing')
 if (!existsSync(capabilityPath)) fail('print-scan capability center is missing')
+if (!existsSync(capabilityRowsPath)) fail('print-scan capability rows file is missing')
 if (!existsSync(retryButtonPath)) fail('print retry button is missing')
 const page = readFileSync(pagePath, 'utf8')
 const retryUi = readFileSync(retryButtonPath, 'utf8')
 const cap = readFileSync(capabilityPath, 'utf8')
+const capabilityRows = readFileSync(capabilityRowsPath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
 const closeForm = readFileSync(closeFormPath, 'utf8')
 const routes = readFileSync(routesPath, 'utf8')
@@ -272,7 +277,7 @@ if (page.includes("setActionError(e instanceof Error ? e.message : '操作失败
 
 // 10. 未登记行的「调整为」不预选 cap.status。列表对缺行固定回 not_verified，
 // 直接登记会把仍跟随部署设置（managed 下放行）的能力写成关闭。
-const capabilityRow = cap.slice(cap.indexOf('function CapabilityRow('), cap.indexOf('function SignatureCapabilityRow('))
+const capabilityRow = capabilityRows.slice(capabilityRows.indexOf('function CapabilityRow('), capabilityRows.indexOf('function SignatureCapabilityRow('))
 if (!capabilityRow.includes('function CapabilityRow(')) fail('CapabilityRow source block is missing')
 const blankInitial = "useState<PrintScanCapabilityStatus | ''>(cap.configured ? cap.status : '')"
 const blankReset = "setStatus(cap.configured ? cap.status : '')"
@@ -281,25 +286,27 @@ if (
   capabilityRow.includes(blankReset) &&
   !/useState<[^>\n]+>\(\s*cap\.status\s*\)/.test(capabilityRow) &&
   !/setStatus\(\s*cap\.status\s*\)/.test(capabilityRow) &&
-  !cap.includes('未登记的行允许不改任何内容、原样登记')
+  !cap.includes('未登记的行允许不改任何内容、原样登记') &&
+  !capabilityRows.includes('未登记的行允许不改任何内容、原样登记')
 ) {
   pass('unconfigured rows start blank; configured rows still start from the saved status')
 } else {
   fail('unconfigured rows must initialize and reset to empty string; configured rows must keep cap.status; the old “原样登记” note must be gone')
 }
 const placeholder = `{!cap.configured && (
-            <option value="" disabled>
-              请选择
-            </option>
-          )}`
+              <option value="" disabled>
+                请选择
+              </option>
+            )}`
 if (capabilityRow.includes(placeholder)) {
   pass('unconfigured rows show a disabled 请选择 placeholder and configured rows do not')
 } else {
   fail('unconfigured rows must render a disabled placeholder option 请选择, gated by !cap.configured')
 }
+// 待确认或保存在途时，其它行的登记/保存也必须带 disabled（controlsLocked），不能只靠点击处理函数吞掉。
 if (
   capabilityRow.includes("const savable = cap.configured ? dirty : status !== ''") &&
-  capabilityRow.includes('disabled={!savable || saving}') &&
+  capabilityRow.includes('disabled={!savable || saving || controlsLocked}') &&
   capabilityRow.includes("if (status === '') return") &&
   capabilityRow.includes("{!cap.configured && status === '' && <span className=\"whitespace-nowrap\">请先选择要登记的状态</span>}") &&
   !capabilityRow.includes('dirty || !cap.configured')

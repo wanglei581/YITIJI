@@ -1,4 +1,5 @@
-// 设备能力页的目标行：选中终端后展示这台机器是谁，并承接登记前的确认。
+// 设备能力页的目标行：只展示当前选中的是哪台机器。
+// 登记前的确认、取消和成功回执贴在被点的那一行正下方，不放在这里。
 import { printerStatusView } from '../terminals/terminalStatusViews'
 
 interface CapabilityTargetIdentity {
@@ -18,19 +19,7 @@ function PrinterHeartbeatText({ status }: { status: string | null }) {
   return <span className={tone}>{view.label}</span>
 }
 
-export function CapabilityTargetBar({
-  identity,
-  prompt,
-  receipt,
-  onConfirm,
-  onCancel,
-}: {
-  identity: CapabilityTargetIdentity | null
-  prompt: string | null
-  receipt: string | null
-  onConfirm: () => void
-  onCancel: () => void
-}) {
+export function CapabilityTargetBar({ identity }: { identity: CapabilityTargetIdentity | null }) {
   if (!identity) return null
   const name = identity.displayName?.trim() || identity.terminalCode
   const online = identity.online ? (identity.agentStatus === 'agent_degraded' ? 'Agent 降级' : '在线') : '离线'
@@ -42,27 +31,6 @@ export function CapabilityTargetBar({
         <PrinterHeartbeatText status={identity.printerStatus} />
         {identity.localTaskDatabaseAvailable === false ? ' · 本地任务库不可用' : ''}
       </span>
-      {prompt ? (
-        <span className="inline-flex flex-wrap items-center gap-2 font-bold text-neutral-800">
-          <span>{prompt}</span>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-lg bg-primary-700 px-3 py-1.5 text-[12px] font-bold text-white"
-          >
-            确认
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-neutral-900/15 bg-surface px-3 py-1.5 text-[12px] font-bold text-neutral-700"
-          >
-            取消
-          </button>
-        </span>
-      ) : receipt ? (
-        <span className="font-bold text-neutral-800">{receipt}</span>
-      ) : null}
     </div>
   )
 }
