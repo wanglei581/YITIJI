@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDateTime } from '@ai-job-print/shared'
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
-import { printerStatusView } from '../terminals/terminalStatusViews'
+import { CapabilityTargetBar } from './CapabilityTargetBar'
 import {
   adminPrintScanService,
   DEFAULT_DENY_CAPABILITY_KEYS,
@@ -36,13 +36,6 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   duplex_print: '自动双面（需真机验证）',
 }
 
-function PrinterHeartbeatText({ status }: { status: string | null }) {
-  if (!status) return <>状态未知</>
-  const view = printerStatusView(status)
-  const tone = view.badge === 'error' ? 'font-semibold text-error-fg' : view.badge === 'warning' ? 'font-semibold text-warning-fg' : undefined
-  return <span className={tone}>{view.label}</span>
-}
-
 const CAPABILITY_STATUS_OPTIONS: { value: PrintScanCapabilityStatus; label: string }[] = [
   { value: 'available', label: '可用（对用户开放）' },
   { value: 'testing', label: '测试中（仅运维可见）' },
@@ -61,6 +54,26 @@ const CAPABILITY_STATUS_BADGE: Record<PrintScanCapabilityStatus, { badge: 'succe
 
 function fmt(iso: string | null): string {
   return formatDateTime(iso)
+}
+
+function terminalDisplayLabel(terminal: { displayName: string | null; terminalCode: string }): string {
+  const name = terminal.displayName?.trim() || terminal.terminalCode
+  return `${name}（${terminal.terminalCode}）`
+}
+
+interface PendingCapabilitySave {
+  terminalId: string
+  key: PrintScanCapabilityKey
+  status: PrintScanCapabilityStatus
+  note: string
+  capabilityLabel: string
+  statusLabel: string
+  displayLabel: string
+}
+
+interface CapabilitySaveReceipt {
+  terminalCode: string
+  at: string
 }
 
 const DEFAULT_DENY_KEYS: readonly PrintScanCapabilityKey[] = DEFAULT_DENY_CAPABILITY_KEYS
@@ -111,7 +124,10 @@ export function CapabilityCenter() {
   const [error, setError] = useState<string | null>(null)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingCapabilitySave | null>(null)
+  const [receipt, setReceipt] = useState<CapabilitySaveReceipt | null>(null)
   const terminalIdRef = useRef(terminalId)
+  const pendingRef = useRef<PendingCapabilitySave | null>(null)
   const saveSeq = useRef(0)
   terminalIdRef.current = terminalId
 
@@ -120,10 +136,9 @@ export function CapabilityCenter() {
       try {
         const res = await getTerminals()
         setTerminals(res.terminals)
-        if (res.terminals.length > 0) setTerminalId(res.terminals[0]!.id)
-        else setLoading(false)
       } catch (e) {
         setError(e instanceof Error ? e.message : '终端列表加载失败')
+      } finally {
         setLoading(false)
       }
     })()
@@ -164,16 +179,24 @@ export function CapabilityCenter() {
     saveSeq.current += 1
     capSeq.current += 1
     terminalIdRef.current = nextTerminalId
+    pendingRef.current = null
+    setPending(null)
+    setReceipt(null)
     setSavingKey(null)
     setSaveError(null)
     setCapabilities(null)
     setLoading(true)
+    if (!nextTerminalId) setLoading(false)
     setTerminalId(nextTerminalId)
   }
 
-  const save = async (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => {
-    if (!terminalId || savingKey) return
-    const requestedTerminalId = terminalId
+  const save = async (
+    key: PrintScanCapabilityKey,
+    status: PrintScanCapabilityStatus,
+    note: string,
+    requestedTerminalId: string,
+  ) => {
+    if (!requestedTerminalId || savingKey) return
     const requestSeq = ++saveSeq.current
     const isCurrentSaveRequest = () =>
       saveSeq.current === requestSeq && terminalIdRef.current === requestedTerminalId
@@ -183,6 +206,7 @@ export function CapabilityCenter() {
       const res = await adminPrintScanService.updateCapability(requestedTerminalId, key, { status, note: note || undefined })
       if (!isCurrentSaveRequest()) return
       setCapabilities((prev) => prev?.map((c) => (c.capabilityKey === key ? res.capability : c)) ?? null)
+      setReceipt({ terminalCode: res.terminalCode, at: formatDateTime(res.capability.updatedAt) })
     } catch (e) {
       if (isCurrentSaveRequest()) {
         setSaveError(e instanceof Error ? e.message : '保存失败')
@@ -194,34 +218,83 @@ export function CapabilityCenter() {
     }
   }
 
+  // 登记/保存先记下当时的终端，确认时只用这个 id。切换后待确认作废，不再发请求。
+  const requestSave = (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => {
+    if (!terminalId || savingKey) return
+    const requestedTerminalId = terminalId
+    const next: PendingCapabilitySave = {
+      terminalId: requestedTerminalId,
+      key,
+      status,
+      note,
+      capabilityLabel: CAPABILITY_LABELS[key],
+      statusLabel: CAPABILITY_STATUS_OPTIONS.find((item) => item.value === status)?.label ?? status,
+      displayLabel: selected ? terminalDisplayLabel(selected) : requestedTerminalId,
+    }
+    pendingRef.current = next
+    setReceipt(null)
+    setPending(next)
+  }
+
+  const confirmSave = () => {
+    const current = pendingRef.current
+    if (!current || savingKey) return
+    if (current.terminalId !== terminalIdRef.current) {
+      pendingRef.current = null
+      setPending(null)
+      return
+    }
+    pendingRef.current = null
+    setPending(null)
+    void save(current.key, current.status, current.note, current.terminalId)
+  }
+
+  const cancelSave = () => {
+    pendingRef.current = null
+    setPending(null)
+  }
+
+  const saveSignature = (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => {
+    if (!terminalId || savingKey) return
+    pendingRef.current = null
+    setPending(null)
+    void save(key, status, note, terminalId)
+  }
+
   if (error) return <ErrorState title="加载失败" message={error} onRetry={() => { if (terminalId) void loadCapabilities(terminalId) }} />
   if (terminals.length === 0 && !loading) {
     return <EmptyState title="暂无终端" description="尚无已注册终端，注册后可在此配置能力开关。" />
   }
 
+  const prompt = pending && pending.terminalId === terminalId
+    ? `将把『${pending.displayLabel}』的『${pending.capabilityLabel}』登记为『${pending.statusLabel}』`
+    : null
+  const receiptText = receipt ? `已登记到 ${receipt.terminalCode} · ${receipt.at}` : null
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <select
+          aria-label="终端"
           value={terminalId}
           onChange={(e) => switchTerminal(e.target.value)}
           className="h-9 rounded-lg border border-neutral-900/15 bg-surface px-3 text-[13px] font-bold text-neutral-800"
         >
+          <option value="">请先选择终端</option>
           {terminals.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.displayName ?? t.terminalCode}（{t.terminalCode}）
+              {terminalDisplayLabel(t)}
             </option>
           ))}
         </select>
-        {selected && (
-          <span className="text-[12px] text-neutral-500">
-            Agent {selected.agentVersion ?? '版本未知'} ·{' '}
-            {selected.online ? (selected.agentStatus === 'agent_degraded' ? 'Agent 降级' : '在线') : '离线'} · 打印机{' '}
-            <PrinterHeartbeatText status={selected.printerStatus} />
-            {selected.localTaskDatabaseAvailable === false ? ' · 本地任务库不可用' : ''}
-          </span>
-        )}
       </div>
+      <CapabilityTargetBar
+        identity={selected}
+        prompt={prompt}
+        receipt={receiptText}
+        onConfirm={confirmSave}
+        onCancel={cancelSave}
+      />
 
       <p className="text-[12px] leading-relaxed text-neutral-500">
         只有标为「可用」的能力对用户开放；「测试中」只给运维使用；没有登记的能力一律不开放。彩色、自动双面、签名三项未登记即关闭，一体机显示「暂未开通」；其余能力未登记时按服务器部署设置处理
@@ -230,9 +303,9 @@ export function CapabilityCenter() {
 
       {saveError && <div className="rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{saveError}</div>}
 
-      {loading ? (
+      {selected && loading ? (
         <LoadingState text="正在加载能力配置" />
-      ) : capabilities ? (
+      ) : selected && capabilities ? (
         <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
           <table className="w-full min-w-[720px] text-left text-[13px]">
             <thead>
@@ -247,9 +320,15 @@ export function CapabilityCenter() {
             <tbody>
               {capabilities.filter((cap) => cap.capabilityKey !== 'cloud_upload').map((cap) =>
                 cap.capabilityKey === 'signature_stamp' ? (
-                  <SignatureCapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={save} />
+                  <SignatureCapabilityRow
+                    key={cap.capabilityKey}
+                    cap={cap}
+                    targetLabel={terminalDisplayLabel(selected)}
+                    saving={savingKey === cap.capabilityKey}
+                    onSave={saveSignature}
+                  />
                 ) : (
-                  <CapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={save} />
+                  <CapabilityRow key={cap.capabilityKey} cap={cap} saving={savingKey === cap.capabilityKey} onSave={requestSave} />
                 ),
               )}
             </tbody>
@@ -350,10 +429,12 @@ function CapabilityRow({
  */
 function SignatureCapabilityRow({
   cap,
+  targetLabel,
   saving,
   onSave,
 }: {
   cap: TerminalCapabilityView
+  targetLabel: string
   saving: boolean
   onSave: (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => void
 }) {
@@ -415,7 +496,7 @@ function SignatureCapabilityRow({
           <td colSpan={5} className="px-4 pb-3">
             {panel === 'open' ? (
               <div className="rounded-lg border border-primary-200 bg-primary-50/60 p-3 text-[12.5px] leading-relaxed text-neutral-700">
-                <p className="font-bold text-neutral-800">确认为这台终端开通签名？</p>
+                <p className="font-bold text-neutral-800">确认为『{targetLabel}』开通签名？</p>
                 <ul className="mt-1 list-disc pl-5">
                   <li>只收用户本人的手写签名图片，叠到用户自己的 PDF 上；</li>
                   <li>不做公章、圆形章或任何单位印章；</li>
@@ -445,7 +526,7 @@ function SignatureCapabilityRow({
                 <label htmlFor={`sign-close-note-${cap.capabilityKey}`} className="font-bold text-neutral-800">
                   用户可见说明（必填，最多 200 字）
                 </label>
-                <p className="text-[12px] text-neutral-500">关闭后一体机「打印扫描」页的签名卡片停用，标「本机暂未开通」并显示这句说明。</p>
+                <p className="text-[12px] text-neutral-500">关闭『{targetLabel}』后，一体机「打印扫描」页的签名卡片停用，标「本机暂未开通」并显示这句说明。</p>
                 <input
                   id={`sign-close-note-${cap.capabilityKey}`}
                   value={note}

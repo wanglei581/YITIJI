@@ -39,6 +39,10 @@ test.describe('打印扫描运维（mock 口径）', () => {
     const guards = await openAuthed(page, '/print-scan')
     await settleAdminPage(page, guards)
     await page.getByRole('button', { name: '设备能力' }).click()
+    // 进入设备能力时不预选终端，先选中演示终端后才有能力表。
+    const terminalSelect = page.getByRole('combobox', { name: '终端' })
+    await expect(terminalSelect.locator('option[value="t1"]')).toHaveCount(1)
+    await terminalSelect.selectOption('t1')
 
     const materialRow = page.locator('tr').filter({ hasText: '材料包' })
     await expect(materialRow).toBeVisible()
@@ -67,6 +71,7 @@ test.describe('打印扫描运维（mock 口径）', () => {
     await expect(materialRow.getByText('请先选择要登记的状态')).toHaveCount(0)
     await expect(materialRow.getByRole('button', { name: '登记' })).toBeEnabled()
     await materialRow.getByRole('button', { name: '登记' }).click()
+    await page.getByRole('button', { name: '确认', exact: true }).click()
     await expect(materialRow.getByText('已开通')).toBeVisible()
     await expect(materialRow.getByRole('button', { name: '保存' })).toBeDisabled()
     await settleAdminPage(page, guards)
