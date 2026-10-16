@@ -255,9 +255,18 @@ Page({
     this._fetch()
   },
 
+  /** 无任务态与失败态：去「我的简历」另选一份（列表由服务端按本人返回，每份有带 taskId 的「继续优化」）。 */
+  toResumes() {
+    wx.navigateTo({ url: '/pages/resumes/resumes', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
+  },
+
+  /**
+   * 无任务态「上传新简历」与失败态「重新上传简历」：去选文件的上传页（诊断、我的简历、职业规划、岗位匹配同一入口）。
+   * 不能直接去解析页：解析页没有 fileId 就停在「缺少待解析的简历文件」。
+   */
   tapReupload() {
     wx.navigateTo({
-      url: '/pages/resume-parse/resume-parse',
+      url: '/pages/resume-upload/resume-upload',
       fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
     })
   },
