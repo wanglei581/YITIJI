@@ -28,7 +28,7 @@ const MONEY = /报价|单价|金额|核价|计价|计费|价格|价目|应付|�
 const PAID_GUARD = {
   'pages/print-upload/print-upload.wxml': "priceStatus === 'ready' && amountCents > 0",
   'pages/print-preview/print-preview.wxml': 'hasQuote && !isFree',
-  'pages/print-store/print-store.wxml': 'q.total && !isFreeOrder',
+  'pages/print-store/print-store.wxml': "quoteState === 'ready' && !isFreeOrder",
   'pages/print-pay/print-pay.wxml': "quoteState === 'ready' && !isFreeOrder",
   'pages/package-create/package-create.wxml': null,
   'pages/package-confirm/package-confirm.wxml': "quoteState === 'ready' && !quoteFree",

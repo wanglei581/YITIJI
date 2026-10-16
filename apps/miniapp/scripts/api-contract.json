@@ -72,6 +72,7 @@
     "GET /resume/records/:p/versions",
     "GET /resume/self-assessment/:p",
     "GET /resume/self-assessment/questions",
+    "GET /terminals/:p/capabilities",
     "GET /terminals/public",
     "PATCH /files/:p/retention",
     "PATCH /me/feedback/:p/close",

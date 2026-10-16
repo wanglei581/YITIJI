@@ -2,7 +2,7 @@
 //
 // 单件云打印的最后一步：确认参数 → 建 Order-only 订单 → 去到机码页。
 //
-// 本页收到的 URL **只有 fileId / storeId / store（终端公开显示名）/ copies** 四项。
+// 本页 URL 只收文件/终端标识、公开终端名、份数与打印枚举；不收金额、文件名或取件凭证。
 // 文件名与金额此前是从上一页拼在 URL 里传过来的，现在一律向服务端取：
 //   - 金额与页数走 `POST /orders/quote`（与 print-upload 同一条报价链，服务端识别真实
 //     页数并按 PriceConfig 计价）。前端不做任何单价乘法，也不把调用方给的数字当事实。
@@ -16,42 +16,11 @@ const { createLifecycleGuard, isMemberIdentity, resolveAccountState, sameAccount
 const idem = require('../../utils/print-order-idempotency')
 const reconcileEngine = require('../../utils/order-submission-reconcile')
 const priceConfirm = require('../../utils/price-confirmation')
-
-// MP-07 改法 (a)：标签只显示即将建单的真实参数，不从 query 猜彩色/双面。
-// 与 print-upload.verifiedPrintParams 锁死同一组（verify-miniapp-static 抽取字面量）。
-// 彩色/双面尚未通过真机验收，不能做 (b) 把 query 透传到报价/建单——那会按彩色收费或 400。
-const ORDER_COLOR_MODE = 'black_white'
-const ORDER_DUPLEX = 'simplex'
-
-/**
- * 报价参数。**与下面 createCloudPrintOrder 用的是同两个常量**，
- * 两条链共用一个出口，就不可能出现「按一种参数报价、按另一种参数计价」。
- * 其余固定值与 print-upload 的 verifiedPrintParams 逐字一致。
- */
-function quoteParams(copies) {
-  return {
-    copies,
-    colorMode: ORDER_COLOR_MODE,
-    duplex: ORDER_DUPLEX,
-    paperSize: 'A4',
-    orientation: 'auto',
-    quality: 'standard',
-    scale: 'fit',
-    pagesPerSheet: 1,
-  }
-}
+const printParams = require('../../utils/print-params')
 
 function decodeParam(value) {
   if (typeof value !== 'string' || !value) return ''
   try { return decodeURIComponent(value) } catch (e) { return value }
-}
-
-function colorLabelOf(colorMode) {
-  return colorMode === 'color' ? '彩色' : '黑白'
-}
-
-function duplexLabelOf(duplex) {
-  return duplex === 'simplex' ? '单面' : '双面'
 }
 
 /** 分 → 元字符串。0 分是真的免费（试运营价目），不是「未知」，两者必须分开。 */
@@ -97,8 +66,8 @@ Page({
     fee: { total: '—' },
     isFreeOrder: false,
     submitting: false,
-    colorMode: ORDER_COLOR_MODE,
-    duplex: ORDER_DUPLEX,
+    colorMode: 'black_white',
+    duplex: 'simplex',
     colorLabel: '黑白',
     duplexLabel: '单面',
     pageCountLabel: '待服务端核定',
@@ -131,7 +100,6 @@ Page({
 
   onLoad(opts) {
     const q = opts || {}
-    const copies = Number(q.copies) > 0 ? Number(q.copies) : 1
     // 稳定账号快照。**只放内存**，并且必须在任何一次破坏性 token 读取之前就存在：
     // auth.getToken() 在 JWT 过期时会连 user 一起清掉，事后再去读就没有账号 id 了。
     this._account = ''
@@ -144,16 +112,33 @@ Page({
     this._verifiedOrderId = ''
     // 屏幕上那个金额的快照（price-confirmation.bindQuote）。**只放内存**：退出重进一律重新核价。
     this._quote = null
+    this._paramsError = ''
+    let normalized
+    try {
+      normalized = printParams.normalize({ copies: q.copies, colorMode: q.colorMode, duplex: q.duplex })
+    } catch (err) {
+      this._paramsError = (err && err.message) || '打印参数不正确'
+      this.setData({
+        statusBarHeight: getApp().globalData.statusBarHeight || 20,
+        q,
+        storeName: decodeParam(q.store),
+        quoteState: 'error',
+        quoteError: this._paramsError,
+        quoteRecover: '',
+      })
+      return
+    }
+    const labels = printParams.labels(normalized)
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
       // 终端名由上一页 encodeURIComponent 传来，微信不替我们解码；只解这个显示用字段。
       storeName: decodeParam(q.store),
-      colorMode: ORDER_COLOR_MODE,
-      duplex: ORDER_DUPLEX,
-      colorLabel: colorLabelOf(ORDER_COLOR_MODE),
-      duplexLabel: duplexLabelOf(ORDER_DUPLEX),
-      copiesLabel: copies,
+      colorMode: normalized.colorMode,
+      duplex: normalized.duplex,
+      colorLabel: labels.colorLabel,
+      duplexLabel: labels.duplexLabel,
+      copiesLabel: normalized.copies,
     })
     // 进页面就先看一眼：这一组参数在本机有没有一张**已经建成**的订单。
     // 有就直接进恢复态，连第一次提交都不该发生。**必须排在核价之前**：锁住之后 _loadQuote
@@ -170,10 +155,9 @@ Page({
     return {
       fileId: q.fileId,
       terminalId: q.storeId,
-      copies: Math.max(1, Number(q.copies) || 1),
-      // 与上面 quoteParams 逐字同源（同两个常量）：报价与计价不会分叉。
-      colorMode: ORDER_COLOR_MODE,
-      duplex: ORDER_DUPLEX,
+      copies: this.data.copiesLabel,
+      colorMode: this.data.colorMode,
+      duplex: this.data.duplex,
     }
   },
 
@@ -490,6 +474,7 @@ Page({
    */
   onShow() {
     this._guard.activate()
+    if (this._paramsError) return
     // 先判一次：换人 / 登出时 _resolveAccount 会把上一位的建单锁、提交锁、文件名与金额
     // 全部清干净。
     if (this._resolveAccount() === 'changed') {
@@ -519,6 +504,7 @@ Page({
    * 没有这个数就没有「用户确认过的价格」可言。重新核价按钮一直在，所以这不是死路。
    */
   _loadQuote() {
+    if (this._paramsError) return
     // 已经锁在一张建成的订单上：屏幕只认那张订单自己的金额（_verifyCreatedOrder 取回），不再核价。
     if (this._createdOrderId) return
     // 一开始重新核价，屏幕上那个金额就不再算数了（它会被「正在核定」替换掉）。
@@ -552,8 +538,18 @@ Page({
     // 发起这一刻是谁、按哪一组参数问的：回来时对不上就不许变成可提交的金额。
     const quoteCtx = priceConfirm.beginQuote(this._account, idem.fingerprintOf(this._orderPayload()))
     this.setData({ quoteState: 'loading', quoteError: '', quoteRecover: '', priceChangeText: '', priceConfirmLabel: '' })
-    api.quoteMyPrintOrder(fileId, quoteParams(this.data.copiesLabel))
-      .then((quote) => {
+    const payload = this._orderPayload()
+    const advanced = payload.colorMode !== 'black_white' || payload.duplex !== 'simplex'
+    const quoteOrder = () => api.quoteMyPrintOrder(fileId, printParams.quoteParams(payload), undefined, { terminalId: payload.terminalId })
+    const pending = advanced
+      ? api.getTerminalCapabilities(payload.terminalId).then((raw) => {
+          if (!this._accepts(token)) return
+          const denied = printParams.capabilityError(raw, payload)
+          if (denied) throw new Error(denied)
+          return quoteOrder()
+        })
+      : quoteOrder()
+    pending.then((quote) => {
         if (!this._accepts(token)) return
         if (this._createdOrderId) { this._settleLateQuote(); return }
         const amountCents = Number(quote && quote.amountCents)
@@ -778,6 +774,7 @@ Page({
   },
 
   continueFlow() {
+    if (this._paramsError) return
     const q = this.data.q
     if (this.data.submitting) return
     // 已经建过单：不再发第二次 POST，直接把人送去找那张订单。

@@ -14,6 +14,7 @@
 - Claude 行为审完成并确认阻塞 C1：本地先写 failed、再写错误码之间崩溃，重启会补报 failed 但无码，服务端可能保留可重试状态。`7acc9d4b8` 即使 CI 全绿也暂停安装；已批准 Grok 在现有 task-runner 与 retry 验证两文件内最小修复：failed 缺码保守补报 `PRINT_JOB_UNCONFIRMED`，明确零派发失败保持原码，并以真实 SQLite 重开、HTTP 和离线 outbox 验证。无 schema/API 变更。
 - 小程序 13 路径已冻结：实际 Grok 产出主体实现，协调者修正规范枚举/参数、能力严格 `configured===true`、竞态及字阶，并独立补 10 组真实页面 VM 回归；完整 static 118 项、scope 8 项、layout 7 项及 613 项行为测试通过，API 契约 140 端点零缺口。实际 agy 前两次审查失败未计通过，最终短审及补齐成功，未发现阻塞。DevTools Stable 2.02.2608060 对冻结源码编译预览成功，AppID 正确、生产 API、无 mock；主包 374335 字节、总包 1093039 字节。预览时源码尚未提交，记录为 base `7acc9d4b8` 加精确 13 文件哈希，不能写成已提交版本发布；工具短窗口已归还 Monika。尚未正式上传/审核/发布，也未完成新小程序真机打印链。
 - C1 两文件补修已冻结待 CI：实际 Grok 修复 failed 缺码回放；父级与 Claude 追加核实本地异常状态同类分支，先持久化 `PRINT_JOB_UNCONFIRMED` 再记 failed，防止崩溃后沿用旧码。协调者独立测试用真实 SQLite 关闭重开、HTTP 断连/outbox 补报、异常状态带旧码并在写状态时中断，验证零次打印、错误码及 attempt 不丢失；旧源码隔离加载红测复现风险，新源码 typecheck/retry 验证通过，最终 reliability 仍运行。原 `7acc9d4b8` 的 Windows 三组 CI 已绿且制品哈希核实，但只存 review-only，不安装；补修后的精确 CI 与包须重新验证。
+- 后续冻结：C1/异常状态补修已提交并推送 `0e9e0a5fdd184f53af90dcea36a78aadc00fac0b` 至 Agent PR #1465，最终 reliability 已通过，typecheck/retry/diff-check 同为通过；独立补修复核与新 SHA CI 继续。小程序 13 文件在本次独立提交收录，提交前逐项核对其 SHA256 与已通过测试及预览的冻结清单相同，不把 Agent 旧包混入验收。
 
 
 ## 2026-10-16：主线打印链已部署，单笔手机到机打印验收通过
