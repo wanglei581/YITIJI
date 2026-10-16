@@ -12217,7 +12217,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 240,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12985,7 +12985,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 264
+      "sourceFileCount": 266
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -18524,6 +18524,9 @@
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
     ],
+    "apps/admin/src/routes/print-scan/CapabilityRows.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
+    ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
@@ -23448,6 +23451,7 @@
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
@@ -25803,6 +25807,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
     ],
@@ -27093,6 +27098,7 @@
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
@@ -27662,6 +27668,7 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
+          "apps/admin/src/routes/print-scan/CapabilityRows.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
           "apps/admin/src/routes/print-scan/PrintRetryButton.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
@@ -38829,6 +38836,7 @@
           "packages/shared/src/types/print.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -38838,6 +38846,7 @@
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
@@ -38852,7 +38861,8 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
-          "services/api/src/terminals/terminal-capabilities.service.ts"
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },
