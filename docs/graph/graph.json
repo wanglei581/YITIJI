@@ -12217,7 +12217,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 240,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12985,7 +12985,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 264
+      "sourceFileCount": 266
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -18523,6 +18523,9 @@
     "apps/admin/src/routes/print-scan/CapabilityCenter.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "services/api/scripts/verify-print-color-duplex-capability.ts"
+    ],
+    "apps/admin/src/routes/print-scan/CapabilityRows.tsx": [
+      "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
     ],
     "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx": [
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs"
@@ -27665,6 +27668,7 @@
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
+          "apps/admin/src/routes/print-scan/CapabilityRows.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
           "apps/admin/src/routes/print-scan/PrintRetryButton.tsx",
           "apps/admin/src/routes/print-scan/index.tsx",
