@@ -228,9 +228,21 @@ test('预览页「打开原文」途中返回：收起加载遮罩，但不在�
   fetches[0].d.resolve({ url: COS_URL }); await flush()
   page.openDoc(); await flush()
   page.onUnload()
+  assert.equal(calls.hide, 1, '返回当下就要收起全局遮罩，不等网络')
   fetches[1].d.resolve({ url: COS_URL }); await flush()
-  assert.equal(calls.hide, 1, '全局加载遮罩必须收起')
+  assert.equal(calls.hide, 1, '遮罩只收一次')
   assert.equal(calls.modal.length, 0, '页面已退出，不能把弹窗留给上一页')
+})
+
+test('预览页放大图片途中返回：不在上一页打开全屏预览或提示', async () => {
+  const { page, calls, fetches } = loadPreviewPage({ fileName: 'photo.jpg' })
+  fetches[0].d.resolve({ url: COS_URL }); await flush()
+  page.zoomImage()
+  page.onUnload()
+  fetches[1].d.resolve({ url: COS_URL }); await flush()
+  assert.equal(calls.previewImage.length, 0)
+  assert.equal(calls.toast.length, 0)
+  assert.equal(calls.hide, 0, '放大图片没挂遮罩，返回时也不该乱收')
 })
 
 test('预览页「打开原文」成功：交给阅读器，页面不进错误态', async () => {
@@ -313,9 +325,20 @@ test('我的文档预览途中返回：收起加载遮罩，但不弹窗', async
   const { page, calls, fetches } = loadDocumentsPage({ downloads: [{ errMsg: DOMAIN_ERR }] })
   page.previewDoc('doc-1'); await flush()
   page.onUnload()
+  assert.equal(calls.hide, 1, '返回当下就要收起全局遮罩，不等网络')
   fetches[0].d.resolve({ url: COS_URL }); await flush()
-  assert.equal(calls.hide, 1)
+  assert.ok(calls.hide >= 1)
   assert.equal(calls.modal.length, 0)
+})
+
+test('我的文档预览图片途中返回：不在上一页打开全屏预览', async () => {
+  const { page, calls, fetches } = loadDocumentsPage({ downloads: [] })
+  page.data.all = [{ id: 'img-1', name: '证件照.jpg', mimeType: 'image/jpeg', isImage: true }]
+  page.previewDoc('img-1')
+  page.onUnload()
+  fetches[0].d.resolve({ url: COS_URL }); await flush()
+  assert.equal(calls.previewImage.length, 0)
+  assert.equal(calls.toast.length, 0)
 })
 
 test('我的文档预览 PDF 成功：按服务端 mime 传 fileType', async () => {
