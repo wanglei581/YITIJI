@@ -66,12 +66,12 @@ test('简历优化：不带任务进入停在「选择要优化的简历」，�
   assert.equal(shown.includes('t-other'), false, '页面数据里不能出现缓存的 taskId')
 })
 
-test('简历优化：「从我的简历选择」去我的简历，「上传新简历」去简历解析页；跳转失败给提示', () => {
+test('简历优化：「从我的简历选择」去我的简历，「上传新简历」去选文件的上传页；跳转失败给提示', () => {
   const { page, calls } = loadOptimize()
   page.onLoad({})
   page.toResumes()
   page.tapReupload()
-  assert.deepEqual([...calls.navigateTo], ['/pages/resumes/resumes', '/pages/resume-parse/resume-parse'])
+  assert.deepEqual([...calls.navigateTo], ['/pages/resumes/resumes', '/pages/resume-upload/resume-upload'])
 
   const failing = loadOptimize({ navFail: true })
   failing.page.onLoad({})
@@ -133,6 +133,67 @@ test('简历优化失败态：非终态「优化任务未完成」保留手动�
   page.tapRetry()
   await flush()
   assert.equal(calls.optimize.length, 2)
+})
+
+/** 把 navigateTo 的 url 当成真实落点：必须是 app.json 注册过的页，再用 url 里的参数跑它的 onLoad。 */
+function landOn(url, { modules = {}, loggedIn = true } = {}) {
+  const [route, query = ''] = url.replace(/^\//, '').split('?')
+  const app = JSON.parse(read('app.json'))
+  const registered = [...app.pages, ...(app.subpackages || app.subPackages || []).flatMap((p) => p.pages.map((name) => `${p.root}/${name}`))]
+  assert.ok(registered.includes(route), `${route} 没有在 app.json 注册`)
+  const calls = { chooseMessageFile: 0, chooseMedia: 0, getMyResumes: 0 }
+  const wx = {
+    navigateTo() {}, redirectTo() {}, navigateBack() {}, switchTab() {}, showToast() {}, showModal() {},
+    showLoading() {}, hideLoading() {},
+    chooseMessageFile() { calls.chooseMessageFile += 1 },
+    chooseMedia() { calls.chooseMedia += 1 },
+  }
+  const api = {
+    getDocumentConversionCapabilities: () => new Promise(() => {}),
+    getMyResumes: () => { calls.getMyResumes += 1; return new Promise(() => {}) },
+  }
+  const auth = { isLoggedIn: () => loggedIn, getUser: () => (loggedIn ? { id: 'member-1' } : null) }
+  const def = loadPageDefinition(`${route}.js`, { wx, modules: { api, auth, ...modules } })
+  const page = instantiate(def)
+  const options = Object.fromEntries(new URLSearchParams(query))
+  page.onLoad(options)
+  if (typeof page.onShow === 'function') page.onShow()
+  return { page, calls, route, wxml: read(`${route}.wxml`) }
+}
+
+test('落点：「上传新简历」和失败态「重新上传简历」都落在能选文件的上传页，不是报错页', async () => {
+  for (const enter of ['no-task', 'failed']) {
+    const { page, calls } = loadOptimize({
+      optimize: () => Promise.resolve({ taskId: 't-1', status: 'failed', failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再生成优化版' }),
+    })
+    page.onLoad(enter === 'no-task' ? {} : { taskId: 't-1' })
+    await flush()
+    if (enter === 'failed') assert.equal(page.data.needReupload, true, '失败态显示的是「重新上传简历」')
+    page.tapReupload()
+    const url = calls.navigateTo.at(-1)
+    const landed = landOn(url)
+    assert.equal(landed.route, 'pages/resume-upload/resume-upload', enter)
+    assert.match(landed.wxml, /bindtap="tapUploadFile"/, '落点页上有选文件的入口')
+    landed.page.tapUploadFile()
+    assert.equal(landed.calls.chooseMessageFile, 1, `${enter}：点了真的打开选文件`)
+  }
+})
+
+test('落点反例：不带 fileId 直接进解析页会停在「缺少待解析的简历文件」——所以不能跳那里', () => {
+  const sessionStub = { ownerId: () => null, sameIdentity: () => true, nonemptyToken: (v) => v || '', persistResumeTask: () => true }
+  const landed = landOn('/pages/resume-parse/resume-parse', { modules: { 'resume-parse-session': sessionStub } })
+  assert.equal(landed.page.data.phase, 'missing')
+  assert.equal(landed.page.data.atext, '缺少待解析的简历文件')
+})
+
+test('落点：「从我的简历选择」未登录先给登录，已登录才按本人取列表', () => {
+  const guest = landOn('/pages/resumes/resumes', { loggedIn: false })
+  assert.equal(guest.page.data.loginRequired, true)
+  assert.equal(guest.calls.getMyResumes, 0, '未登录不取列表')
+  assert.match(guest.wxml, /wx:if="\{\{loginRequired\}\}"[\s\S]*?bindtap="goLogin">微信一键登录<\/view>/)
+  const member = landOn('/pages/resumes/resumes', { loggedIn: true })
+  assert.equal(member.page.data.loginRequired, false)
+  assert.equal(member.calls.getMyResumes, 1)
 })
 
 test('简历优化模板：无任务态只有三条去路，不绑定任何缓存字段', () => {
