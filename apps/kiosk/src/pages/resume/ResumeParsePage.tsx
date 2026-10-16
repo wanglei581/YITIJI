@@ -93,7 +93,7 @@ export function ResumeParsePage() {
   const consent = useResumeAiConsent()
   const state = location.state as Record<string, unknown> | null
 
-  const file = state?.file as { name?: string; format?: string; size?: number | string } | undefined
+  const file = state?.file as { name?: string; format?: string; size?: number | string; fileUrl?: string } | undefined
   const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
   const watchedOwner = user?.id ?? null
 
@@ -313,7 +313,11 @@ export function ResumeParsePage() {
       }
       intentRef.current = prepared.headers.intent
       payloadRef.current = prepared.payload
-      const result = await submitResumeParse(resumeParseWireBody(prepared.payload), getToken(), prepared.headers)
+      const result = await submitResumeParse(
+        { ...resumeParseWireBody(prepared.payload), fileAccessUrl: file?.fileUrl },
+        getToken(),
+        prepared.headers,
+      )
       await acceptResult(result, ownerId, knownTaskId)
     } catch (err) {
       if (!samePerson(ownerId)) return
@@ -389,7 +393,7 @@ export function ResumeParsePage() {
     } finally {
       inFlightRef.current = false
     }
-  }, [acceptResult, dropHeldIntent, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
+  }, [acceptResult, dropHeldIntent, file?.fileUrl, file?.format, file?.name, fileId, getToken, navigateFail, samePerson, state])
 
   const replaySame = () => {
     if (terminal || inFlightRef.current || confirmFresh !== 0 || identityStoppedRef.current) return

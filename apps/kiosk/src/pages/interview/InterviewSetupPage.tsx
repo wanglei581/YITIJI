@@ -124,7 +124,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [experience, setExperience] = useState<InterviewExperience | ''>(setupDraft?.experience ?? '')
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(setupDraft?.difficulty ?? 'standard')
   const [duration, setDuration] = useState<InterviewDuration>(setupDraft?.duration ?? 5)
-  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(setupDraft?.resumeFile ?? null)
+  const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string; fileUrl?: string } | null>(setupDraft?.resumeFile ?? null)
   const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
   const [qrBusy, setQrBusy] = useState(false)
@@ -181,7 +181,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setError(null)
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
-      setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename })
+      setResumeFile({ fileId: uploaded.fileId, name: uploaded.filename, fileUrl: uploaded.signedUrl })
     } catch (err) {
       setError(userMessageOf(err, '简历上传失败，请重试'))
     } finally {
@@ -215,7 +215,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         experience,
         difficulty,
         durationMin: duration,
-        ...(resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
+        ...(resumeFile ? { resumeFileId: resumeFile.fileId, fileAccessUrl: resumeFile.fileUrl } : {}),
       }
       const token = getToken()
       const created = await createInterview(input, { token })
@@ -532,12 +532,12 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                     title="手机扫码上传简历"
                     description="手机只负责上传；这台机器确认后才会带进本次练习。不上传也可以开始。"
                     confirmLabel="确认使用这份简历"
-                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name, fileUrl: file.fileUrl })}
                     onBusyChange={setQrBusy}
                   />
                 ) : resumeChannel === 'usb' ? (
                   <ResumeUsbImportPanel
-                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name, fileUrl: file.fileUrl })}
                     onBusyChange={setUsbBusy}
                   />
                 ) : resumeChannel === 'desktop' && !kiosk ? (
