@@ -6,14 +6,14 @@
 ## 证据口径（三类，不混算）
 
 - **已见实际**：有人真看到过。注明是开发者工具实际模拟器截图还是用户手机，并写清源版本。
-  - 正式版：`cfbe56784`。
+  - 开发者工具当前源码基线：`cfbe56784`（主项目 `claude/miniapp-main` 的 HEAD；不是「已发布正式版」）。
   - 候选：`689047e9f`、`8242781fa`，以及 VIS1 的 `0205742fc`。
   - 后台 webview 的 AX 树不算可见截图。CUA 点击偶发 noWindowsAvailable，不记成产品按钮坏。
 - **仅代码检查**：只从源码推断入口、状态分支和测试覆盖。没人看过实际效果，不能当作通过。
 - **待真机**：必须在手机上看。例如下单后的系统返回、图片预览、下载中途返回。
 
 截图证据清单：`commercial-closeout-20261016/claude-exec/evidence/ui-audit-2106/capture-manifest.json`。
-- 8 个路由，全部是 `cfbe56784` 正式版在开发者工具 iPhone 12/13 (Pro) 下的截图。
+- 8 个路由，全部是开发者工具在当前源码基线 `cfbe56784` 上的运行效果，在开发者工具 iPhone 12/13 (Pro) 下的截图。
 - `01-orders-before.png` 实际拍到的是首页，作废。
 
 ## 概况（截至 21:30）
@@ -26,7 +26,7 @@
     - 简历优化入口是死路。
   - P2 六条：首页、AI 工具、简历搭建、语音简历、面试入口，以及 AI 工具滚动后内容进入状态栏下方。
 - 代码层面：
-  - 5 页没有任何测试：简历搭建、语音简历、求职材料、关于、今日提醒。
+  - 5 页未检出直接的页级测试覆盖（只按文件名和引用检索，可能有关联测试间接覆盖，待核实）：简历搭建、语音简历、求职材料、关于、今日提醒。
   - 10 页 js 超过 500 行，其中材料包确认 1112 行、打印确认 970 行、取件页 819 行，这三页超过 800 行。按 CLAUDE.md §8 不再往里堆功能，取件页列入拆分。
 
 ## 批次
@@ -56,8 +56,8 @@
 | 打印·选终端<br>`pages/print-store/print-store` | print-upload | 加载、失败、完成、空 | 已见实际｜手机 03439f5（旧源）：COLOR / DUPLEX / OFFLINE 下单时走过 | 待截图 | 待走查 | — | — | free-pilot-copy、page-lifecycle、print-capabilities 等；js 289 行 |
 | 打印·确认<br>`pages/print-pay/print-pay` | print-store | 加载、失败、未登录、锁定 | 已见实际｜手机 03439f5（旧源）：同上 | 待截图 | 待走查 | — | — | free-pilot-copy、page-lifecycle、price-confirmation 等；js 970 行 ⚠ 超 800 |
 | 打印·到机码/取件<br>`pages/print-pickup/print-pickup` | home, orders, print-pay | 加载、失败、完成、未登录 | 已见实际｜手机 03439f5（旧源）：同上；8242781fa 查看路径（用户未逐页记录） | 待截图 | 待走查 | — | — | free-pilot-copy、home-pickup-summary、page-lifecycle 等；js 819 行 ⚠ 超 800 |
-| 简历搭建<br>`pages/resume-build/resume-build` | ai, ai-records, resume-voice | 加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：05-resume-build-before（空表单） | 语音替代入口和大段说明先占首屏，基本字段靠下 | — | P2 | 待排批（下一批） | **无测试覆盖**；js 555 行 ⚠ 超 500 |
-| 语音简历<br>`pages/resume-voice/resume-voice` | ai, home, resume-build | 失败、完成 | 已见实际｜模拟器 cfbe567：07、07b（未勾选录音 → 用手打进入第一题） | 文字模式题面仍写「请说出你的姓名」「转成文字后」 | 文字兜底入口本身可用（已观察） | P2 | 待排批（下一批） | **无测试覆盖**；js 387 行 |
+| 简历搭建<br>`pages/resume-build/resume-build` | ai, ai-records, resume-voice | 加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：05-resume-build-before（空表单） | 语音替代入口和大段说明先占首屏，基本字段靠下 | — | P2 | 待排批（下一批） | 未检出直接页级覆盖（待核实关联测试）；js 555 行 ⚠ 超 500 |
+| 语音简历<br>`pages/resume-voice/resume-voice` | ai, home, resume-build | 失败、完成 | 已见实际｜模拟器 cfbe567：07、07b（未勾选录音 → 用手打进入第一题） | 文字模式题面仍写「请说出你的姓名」「转成文字后」 | 文字兜底入口本身可用（已观察） | P2 | 待排批（下一批） | 未检出直接页级覆盖（待核实关联测试）；js 387 行 |
 | 简历上传<br>`pages/resume-upload/resume-upload` | assistant, career-plan, job-fit, resume-diagnose, resume-parse, resumes 等 | （模板无状态分支） | 仅代码检查 | 待截图 | 待走查 | — | — | verify-miniapp-static；js 128 行 |
 | AI 诊断报告<br>`pages/resume-diagnose/resume-diagnose` | ai, ai-records, assistant, home, resume-parse, resumes | 加载、失败、完成、禁用、空 | 已见实际｜模拟器 cfbe567：02-diagnose-before（空态） | 无报告却有整块禁用导出卡；并排按钮右侧越屏；空态与主按钮之间大片空白 | 空态主操作离说明太远 | P1 | VIS1 #1472 `0205742fc`（agy：可以出候选；候选截图待 Codex） | ai-records-qa、free-pilot-copy、page-lifecycle 等；js 343 行 |
 | 简历优化<br>`pages/resume-optimize/resume-optimize` | ai, ai-records, assistant, home, job-fit, resume-diagnose 等 | 加载、失败、完成、禁用 | 已见实际｜模拟器 cfbe567：06-resume-optimize-before（从 AI 工具正常进入） | — | 无 taskId 时只显示「未指定优化任务／请从简历诊断页发起」，只能返回：入口死路（首页有同名入口） | P1 | 下一批：复用上传 / 诊断 / 已有任务入口 | free-pilot-copy、verify-miniapp-static；js 498 行 |
@@ -72,17 +72,17 @@
 | 简历解析<br>`pages/resume-parse/resume-parse` | resume-diagnose, resume-optimize, resume-upload | 失败、完成、锁定 | 仅代码检查 | 待截图 | 待走查 | — | — | page-lifecycle、verify-miniapp-static；js 756 行 ⚠ 超 500 |
 | 我的简历<br>`pages/resumes/resumes` | me | 分页、加载、失败、未登录 | 仅代码检查 | 待截图 | 待走查 | — | — | list-load-more、verify-miniapp-static；js 183 行 |
 | 我的文档<br>`pages/documents/documents` | ai, home, launch, me, order-detail, orders 等 | 分页、加载、失败、锁定 | 已见实际｜手机 689047e9f / 8242781fa：预览 PDF 完整、返回正常 | 待截图 | 待走查 | — | — | file-preview、page-lifecycle、print-flow-ux 等；js 468 行 |
-| 求职材料<br>`pages/job-materials/job-materials` | ai | 加载、失败、空 | 仅代码检查 | 待截图 | 待走查 | — | — | **无测试覆盖**；js 145 行 |
+| 求职材料<br>`pages/job-materials/job-materials` | ai | 加载、失败、空 | 仅代码检查 | 待截图 | 待走查 | — | — | 未检出直接页级覆盖（待核实关联测试）；js 145 行 |
 | 打印订单<br>`pages/orders/orders` | home, me, notifications, order-detail, package-code, package-confirm 等 | 分页、加载、失败、完成、未登录、空 | 已见实际｜模拟器 cfbe567：01-orders-actual-before<br>已见实际｜手机 8242781fa：查看已完成 COLOR / DUPLEX 与待到机 PAPER 单，文件/终端/单双面清楚、返回正常（只看不下单） | 材料包 0 笔大空卡占首屏；到机码和标签折行；字小、卡里套卡 | 真实订单被挤到下面 | P1 | VIS1 #1472 `0205742fc`（agy：可以出候选；候选截图待 Codex） | free-pilot-copy、page-lifecycle、print-flow-ux 等；js 539 行 ⚠ 超 500 |
 | 订单详情<br>`pages/order-detail/order-detail` | orders | 加载、失败 | 仅代码检查 | 待截图 | 待走查 | — | — | free-pilot-copy、order-detail-refresh、page-lifecycle 等；js 593 行 ⚠ 超 500 |
 | AI 服务记录<br>`pages/ai-records/ai-records` | ai, assistant, me, notifications, resume-parse | 加载、失败、未登录 | 仅代码检查 | 待截图 | 待走查 | — | — | ai-records-qa、page-lifecycle、verify-miniapp-static；js 384 行 |
 | 设置<br>`pages/settings/settings` | me | 未登录 | 仅代码检查 | 待截图 | 待走查 | — | — | verify-miniapp-static；js 61 行 |
 | 隐私与数据<br>`pages/privacy/privacy` | feedback, settings | 加载、失败、未登录、空 | 仅代码检查 | 待截图 | 待走查 | — | — | free-pilot-copy、page-lifecycle、verify-miniapp-static；js 579 行 ⚠ 超 500 |
 | 帮助<br>`pages/help/help` | settings | （模板无状态分支） | 仅代码检查 | 待截图 | 待走查 | — | — | page-lifecycle、verify-miniapp-static；js 71 行 |
-| 关于<br>`pages/about/about` | settings | （模板无状态分支） | 仅代码检查 | 待截图 | 待走查 | — | — | **无测试覆盖**；js 42 行 |
+| 关于<br>`pages/about/about` | settings | （模板无状态分支） | 仅代码检查 | 待截图 | 待走查 | — | — | 未检出直接页级覆盖（待核实关联测试）；js 42 行 |
 | 法务文档<br>`pages/legal/legal` | about, ai, assistant, feedback, home, launch 等 | 加载、失败 | 仅代码检查 | 待截图 | 待走查 | — | — | self-explore-consent-items、verify-miniapp-static；js 119 行 |
 | 消息通知<br>`pages/notifications/notifications` | home, launch, me, settings | 加载、失败 | 仅代码检查 | 待截图 | 待走查 | — | — | verify-miniapp-static；js 139 行 |
 | 扫码登录一体机<br>`pages/kiosk-login/kiosk-login` | home, print | 失败、完成、未登录 | 仅代码检查 | 待截图 | 待走查 | — | — | kiosk-login-confirm；js 348 行 |
 | 发送到一体机<br>`pages/kiosk-send/kiosk-send` | kiosk-login | 加载、失败、完成 | 仅代码检查 | 待截图 | 待走查 | — | — | kiosk-send-receipt；js 253 行 |
-| 今日提醒<br>`pages/daily-report/daily-report` | home, print | 加载、失败、空 | 仅代码检查 | 待截图 | 待走查 | — | — | **无测试覆盖**；js 129 行 |
+| 今日提醒<br>`pages/daily-report/daily-report` | home, print | 加载、失败、空 | 仅代码检查 | 待截图 | 待走查 | — | — | 未检出直接页级覆盖（待核实关联测试）；js 129 行 |
 | 意见反馈<br>`pages/feedback/feedback` | ai, assistant, help, me, privacy | 分页、加载、失败、完成 | 仅代码检查 | 待截图 | 待走查 | — | — | list-load-more；js 315 行 |
