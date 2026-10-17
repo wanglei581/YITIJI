@@ -112,6 +112,8 @@ Page({
     this._verifiedOrderId = ''
     // 屏幕上那个金额的快照（price-confirmation.bindQuote）。**只放内存**：退出重进一律重新核价。
     this._quote = null
+    // 这次核价是不是因为「没登录」才停下的（FLOW1b-2 L5）：只有这种，从登录页回来才替用户重新核价一次。
+    this._quoteNeedsLogin = false
     this._paramsError = ''
     let normalized
     try {
@@ -449,6 +451,7 @@ Page({
   _failClosedQuote(token) {
     if (!token || token.channel !== 'quote') return
     if (!this._guard.accepts(token)) return
+    this._quoteNeedsLogin = true
     this.setData({
       quoteState: 'error',
       quoteError: auth.isLoggedIn()
@@ -486,6 +489,9 @@ Page({
       this._resolveAccount()
     }
     this._restoreCreatedOrder()
+    // 从登录页回来（L5）：上次因为没登录停在「去登录」，现在登录了，就重新核价一次。
+    // 仍未登录不核价；换了账号走上面的复位、不在这里核价；_loadQuote 一开始就收起旗子，不会循环。
+    if (this._quoteNeedsLogin && auth.isLoggedIn()) this._loadQuote()
   },
 
   // 只在真正离开本页时作废在途的报价。**不在 onHide 作废**：建单成功后本页会
@@ -504,6 +510,7 @@ Page({
    * 没有这个数就没有「用户确认过的价格」可言。重新核价按钮一直在，所以这不是死路。
    */
   _loadQuote() {
+    this._quoteNeedsLogin = false
     if (this._paramsError) return
     // 已经锁在一张建成的订单上：屏幕只认那张订单自己的金额（_verifyCreatedOrder 取回），不再核价。
     if (this._createdOrderId) return
@@ -518,6 +525,7 @@ Page({
     // 'changed' 时 _resolveAccount 已经复位并写好说明，不要再覆盖它。
     if (state === 'changed') return
     if (state === 'unusable') {
+      this._quoteNeedsLogin = true
       this.setData({
         quoteState: 'error',
         quoteError: auth.isLoggedIn()

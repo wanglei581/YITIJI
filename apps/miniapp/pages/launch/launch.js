@@ -12,6 +12,19 @@ const LOGIN_RETURN_ROUTES = new Set([
   '/pages/notifications/notifications',
 ])
 
+// 登录失败时屏上那句话（FLOW1b-2 L3）：本地和网络失败（没有状态码或 -1）不露原文——
+// 「wx.login 调用失败」这类话对用户没有意义；服务端给的可读原因（如验证码不对）照常显示。
+function failureText(err, kind) {
+  const status = err && err.statusCode
+  if (!Number.isFinite(status) || status <= 0) {
+    return kind === 'sms-code' ? '网络不太稳定，验证码没有发出去，请稍后重试' : '网络不太稳定，暂时没能登录，请稍后重试'
+  }
+  if (status >= 500) return kind === 'sms-code' ? '短信服务暂时不可用，请稍后重试' : '登录服务暂时不可用，请稍后重试'
+  return (err && err.message) || (kind === 'sms-code' ? '发送失败，请稍后重试' : '登录没有成功，请重试')
+}
+
+const AGREE_FIRST = '请先阅读并勾选上方的服务协议和隐私政策'
+
 function safeReturnTo(raw) {
   if (!raw) return ''
   let value = String(raw)
@@ -41,6 +54,11 @@ Page({
     // 临时失败（断网、限流、服务故障）restoreFailed，给「重试恢复」，也允许手动登录。
     restoring: false,
     restoreFailed: false,
+    // 登录过程的状态条（FLOW1b-2 L2）：不只靠两秒的提示。statusTone 'warn' 用醒目的那一种；
+    // statusAction 'sms' 时状态条上给「改用短信验证码」。
+    status: '',
+    statusTone: '',
+    statusAction: '',
   },
 
   onLoad(options) {
@@ -117,22 +135,44 @@ Page({
     this._clearCountDown()
   },
 
+  _say(status, tone, action) {
+    this.setData({ status: status || '', statusTone: tone || '', statusAction: action || '' })
+  },
+
+  /** 没勾协议时点了登录：说清楚先勾哪里（L1）。微信授权按钮在勾选之前根本不出现。 */
+  needAgree() {
+    if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
+    wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
+    this._say(AGREE_FIRST, 'warn')
+  },
+
+  /** 状态条上的「改用短信验证码」。 */
+  useSms() {
+    this.tapSmsLogin()
+  },
+
   // ── 微信一键登录 ──────────────────────────────────────────────────
 
   onGetPhoneNumber(e) {
     if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
-    if (!this.data.agreed) {
-      wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
-      return
-    }
+    if (!this.data.agreed) { this.needAgree(); return }
     const d = e.detail || {}
     if (!d.code) {
-      // 拿不到手机号（用户拒绝，或微信要求先在客户端完成短信验证——那句「获取手机号失败 / Error: …」
+      // 只在没拿到 code 时判原因（L2）。errMsg 先转小写：含 deny 或 cancel 算用户自己取消了授权——
+      // 尊重这个选择，不替他打开别的表单，只在状态条上给「改用短信验证码」。
+      const reason = String(d.errMsg || '').toLowerCase()
+      if (reason.includes('deny') || reason.includes('cancel')) {
+        this._say('你取消了微信授权，可以改用短信验证码登录', 'warn', 'sms')
+        return
+      }
+      // 其余算没拿到手机号（没绑手机，或微信要求先在客户端完成短信验证——那句「获取手机号失败 / Error: …」
       // 是微信自己弹的，页面改不了也不绕过）：直接打开现有的短信验证码表单，不只弹一个两秒的提示。
       wx.showToast({ title: '未获取到手机号，可用短信验证码登录', icon: 'none' })
       this.setData({ showSms: true })
+      this._say('没有拿到微信绑定的手机号，已为你打开短信验证码登录', 'warn')
       return
     }
+    this._say('正在登录…')
     wx.showLoading({ title: '登录中', mask: true })
     api.loginByPhone(d.code)
       .then(res => {
@@ -141,17 +181,20 @@ Page({
         // 存不下的会话等于没有会话:这时跳走,用户以为登录了,下一页当场 401。
         if (!saved) {
           wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          this._say('登录状态没能保存，请重试', 'warn')
           return
         }
+        this._say('')
         this._syncDeclarations()
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
       })
       .catch(err => {
         wx.hideLoading()
-        if (this._handleLoginError(err)) return
-        wx.showToast({ title: (err && err.message) || '微信登录失败，请用短信验证码', icon: 'none' })
-        setTimeout(() => this.setData({ showSms: true }), 1200)
+        if (this._handleLoginError(err)) { this._say(''); return }
+        const text = failureText(err, 'login')
+        wx.showToast({ title: text, icon: 'none' })
+        this._say(`${text.replace(/[。.!！]+$/, '')}，也可以改用短信验证码`, 'warn', 'sms')
       })
   },
 
@@ -159,16 +202,15 @@ Page({
 
   tapSmsLogin() {
     if (this.data.legalBlocked) { this._explainLegalBlocked(); return }
-    if (!this.data.agreed) {
-      wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
-      return
-    }
+    if (!this.data.agreed) { this.needAgree(); return }
     this.setData({ showSms: true })
+    this._say('')
   },
 
   tapBackToWx() {
     this._clearCountDown()
     this.setData({ showSms: false, phone: '', code: '', otp: ['','','','','',''], codeHint: '', counting: false, countDown: 0 })
+    this._say('')
   },
 
   onPhoneInput(e) {
@@ -183,10 +225,7 @@ Page({
 
   sendCode() {
     if (this.data.counting || this.data.sending) return
-    if (!this.data.agreed) {
-      wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
-      return
-    }
+    if (!this.data.agreed) { this.needAgree(); return }
     const phone = this.data.phone.replace(/\s/g, '')
     if (!/^1[3-9]\d{9}$/.test(phone)) {
       wx.showToast({ title: '请输入正确的手机号', icon: 'none' })
@@ -205,7 +244,7 @@ Page({
       })
       .catch(err => {
         wx.hideLoading()
-        const reason = (err && err.message) || '发送失败，请稍后重试'
+        const reason = failureText(err, 'sms-code')
         // 原因留在输入框下方：toast 一闪就没，被限流的人不知道要等多久（走查 9/29）。
         this.setData({ sending: false, codeHint: reason })
         wx.showToast({ title: reason, icon: 'none' })
@@ -213,10 +252,7 @@ Page({
   },
 
   confirmSms() {
-    if (!this.data.agreed) {
-      wx.showToast({ title: '请先阅读并同意服务协议和隐私政策', icon: 'none' })
-      return
-    }
+    if (!this.data.agreed) { this.needAgree(); return }
     if (this.data.code.length < 6) {
       wx.showToast({ title: '请输入完整的验证码', icon: 'none' })
       return
@@ -228,6 +264,7 @@ Page({
     }
     if (this.data.submitting) return
     this.setData({ submitting: true })
+    this._say('正在登录…')
     wx.showLoading({ title: '登录中', mask: true })
     api.loginBySms(phone, this.data.code)
       .then(res => {
@@ -238,8 +275,10 @@ Page({
         if (!saved) {
           this.setData({ code: '', otp: ['','','','','',''] })
           wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })
+          this._say('登录状态没能保存，请重试', 'warn')
           return
         }
+        this._say('')
         this._syncDeclarations()
         wx.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => this._afterLogin(), 600)
@@ -247,8 +286,10 @@ Page({
       .catch(err => {
         wx.hideLoading()
         this.setData({ submitting: false, code: '', otp: ['','','','','',''] })
-        if (this._handleLoginError(err)) return
-        wx.showToast({ title: (err && err.message) || '登录失败，请重试', icon: 'none' })
+        if (this._handleLoginError(err)) { this._say(''); return }
+        const text = failureText(err, 'login')
+        wx.showToast({ title: text, icon: 'none' })
+        this._say(text, 'warn')
       })
   },
 
@@ -297,7 +338,12 @@ Page({
     if (this._timer) { clearInterval(this._timer); this._timer = null }
   },
 
-  toggleAgree() { this.setData({ agreed: !this.data.agreed }) },
+  toggleAgree() {
+    const agreed = !this.data.agreed
+    this.setData({ agreed })
+    // 勾上之后，「请先勾选」那句就不再成立。
+    if (agreed && this.data.status === AGREE_FIRST) this._say('')
+  },
   tapTerms()   { wx.navigateTo({ url: '/pages/legal/legal?type=terms_of_service' }) },
   tapPrivacy() { wx.navigateTo({ url: '/pages/legal/legal?type=privacy_policy' }) },
 })
