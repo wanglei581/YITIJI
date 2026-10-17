@@ -496,7 +496,7 @@ Page({
       .catch((err) => {
         if (this._gone || seq !== this._seq) return
         if (err && err.code === 'SELF_ASSESSMENT_WITHDRAWN') {
-          this._fail('这次结果已撤回，服务端已删除，无法再查看。', true)
+          this._fail('这次结果已撤回并删除，无法再查看。', true)
           return
         }
         if (err && err.statusCode === 404) {
@@ -523,7 +523,7 @@ Page({
     let blocked = ''
     if (!canManage) {
       blocked = view.status === 'rejected'
-        ? '本次 AI 解读整体未通过，服务端没有返回可用于打印或撤回的凭证；下面的五维强度仍是本次真实算出的结果，记录会在到期后自动清理。'
+        ? '本次 AI 解读整体没有通过，没有拿到可用于打印或撤回的凭证；下面的五维强度仍是本次真实算出的结果，记录会在到期后自动清理。'
         : '本次没有拿到结果访问凭证，无法生成打印件或撤回。'
     }
 
@@ -692,7 +692,7 @@ Page({
     if (this.data.withdrawing || !this.data.canManage || !this.data.taskId) return
     wx.showModal({
       title: '撤回本次结果',
-      content: '撤回后服务端会删除这次的五维强度与解读，并留下一条删除审计记录。删除不可恢复。',
+      content: '撤回后会删除这次的五维强度与解读，并留下一条删除审计记录。删除不可恢复。',
       confirmText: '确认撤回',
       cancelText: '取消',
       success: (r) => { if (r.confirm) this._doWithdraw() },
@@ -708,7 +708,7 @@ Page({
         if (this._gone) return
         this._token = ''
         this.setData({ withdrawing: false, result: null, taskId: '', canManage: false, historyMode: false })
-        this._resetToConsent('上次结果已撤回，服务端已删除该次的五维强度与解读，并留有删除审计记录。')
+        this._resetToConsent('上次结果已撤回，该次的五维强度与解读已删除，并留有删除审计记录。')
       })
       .catch((err) => {
         wx.hideLoading()
