@@ -126,6 +126,9 @@ let eligibilityRevoked = false;
  */
 const ELIGIBILITY_VOID = '!';
 
+/** 恢复凭证的明文格式（与服务端 RESTORE_TOKEN_PATTERN 一致）：组号.密钥，base64url。 */
+const RESTORE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
+
 /** 当前会话代际。 */
 function sessionGeneration() {
   return generation;
@@ -184,7 +187,48 @@ function saveSession(data = {}, options = {}) {
     && identityProven(data.token);
   if (!usable) return false;
   if (!isResignin) sessionRevoked = false;
+  recordRestoreCredential(data.user, data.restoreToken, isResignin);
   return true;
+}
+
+/**
+ * 同设备恢复凭证（FLOW1c）跟着这次会话写下。写不进也不影响这次登录：只是访问令牌过期后
+ * 这台手机要再登录一次（补签时旧凭证在宽限期内还能用，过了宽限期会被服务端判重放）。
+ * 显式登录没带凭证（旧版 API、或请求没被认成小程序）：删掉旧的那一格，不留上一位的；
+ * 删不掉也用不上——只认 memberId 等于上次明确登录的那一位。
+ */
+function recordRestoreCredential(user, token, isResignin) {
+  const memberId = user && user.id != null && user.id !== '' ? String(user.id) : '';
+  if (memberId && typeof token === 'string' && RESTORE_TOKEN_PATTERN.test(token)) {
+    storage.set(storage.KEYS.RESTORE, { memberId, token });
+    return;
+  }
+  if (!isResignin) storage.remove(storage.KEYS.RESTORE);
+}
+
+/**
+ * 上次明确登录的那一位在这台手机上的恢复凭证（FLOW1c）。严格读：读失败与「确实没有」分开。
+ * @param {string} expected restorableMember().id
+ * @returns {{ ok: boolean, token: string | null }}
+ *   ok=false —— 这一次读不出来，调用方按临时失败处理（不要改走微信补签：没绑微信的账号会被判确定失败而登出）；
+ *   token=null —— 没有，或记的不是这一位（不用，也不删）。
+ */
+function restoreCredential(expected) {
+  const read = storage.read(storage.KEYS.RESTORE);
+  if (!read.ok) return { ok: false, token: null };
+  const value = read.found ? read.value : null;
+  if (!expected || !value || typeof value !== 'object' || String(value.memberId) !== String(expected)) {
+    return { ok: true, token: null };
+  }
+  return { ok: true, token: typeof value.token === 'string' && RESTORE_TOKEN_PATTERN.test(value.token) ? value.token : null };
+}
+
+/** 这台手机上存着的恢复凭证（不论是哪一位）。主动退出时交服务端作废用。 */
+function storedRestoreToken() {
+  const value = storage.get(storage.KEYS.RESTORE, null);
+  return value && typeof value === 'object' && typeof value.token === 'string' && RESTORE_TOKEN_PATTERN.test(value.token)
+    ? value.token
+    : null;
 }
 
 /**
@@ -356,6 +400,9 @@ function logout() {
   const left = storage.get(storage.KEYS.TOKEN);
   if (left && !isTokenExpired(left) && identityProven(left)) storage.set(storage.KEYS.TOKEN, ELIGIBILITY_VOID);
   removeUserUnlessLastEvidence();
+  // 恢复凭证（FLOW1c）：删掉；删不掉写作废标。留下也换不出会话——上面已经作废了恢复资格。
+  storage.remove(storage.KEYS.RESTORE);
+  if (storage.get(storage.KEYS.RESTORE)) storage.set(storage.KEYS.RESTORE, ELIGIBILITY_VOID);
   return logoutPersisted();
 }
 
@@ -401,6 +448,8 @@ module.exports = {
   canSilentResignin,
   restorableMember,
   restorableMemberId,
+  restoreCredential,
+  storedRestoreToken,
   logout,
   logoutIfSameSession,
   sessionGeneration,

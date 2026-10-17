@@ -69,7 +69,10 @@ Page({
         // 服务端退出尽力而为，而且要**先发**：请求在发出的这一刻带走退出前的令牌；随后本机作废，
         // 撤销位与代际让它即使回 401 也补签不了，不会凭补签把人登回来。
         const server = auth.isLoggedIn() ? api.logout() : null
+        // 同设备恢复凭证（FLOW1c）：本机作废之前取出来，作废之后交服务端也作废；网络不通也不影响本机已退出。
+        const restoreToken = auth.storedRestoreToken()
         const saved = auth.logout()
+        if (restoreToken) api.revokeRestore(restoreToken).catch(() => {})
         this.setData({ loggingOut: true })
         let finished = false
         const finish = (message) => {

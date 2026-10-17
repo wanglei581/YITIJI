@@ -72,6 +72,8 @@ const RESIGNIN_DEFINITIVE_CODES = [
   'MEMBER_NOT_BOUND', 'ACCOUNT_UNAVAILABLE', 'MEMBER_NOT_FOUND',
   'MEMBER_LEGAL_VERSION_STALE', 'LEGAL_VERSION_STALE',
   'RESIGNIN_MEMBER_MISMATCH', 'RESIGNIN_MEMBER_UNKNOWN',
+  // 同设备恢复凭证（FLOW1c）被拒：无效、过期、被撤销、旧凭证再现。都必须重新认证，不再回退到微信补签。
+  'MEMBER_RESTORE_INVALID', 'MEMBER_RESTORE_REUSED',
 ];
 function isDefinitiveResigninFailure(err) {
   return !!err && RESIGNIN_DEFINITIVE_CODES.indexOf(err.code) !== -1;
@@ -122,22 +124,41 @@ function silentResignin(generation) {
   // 本机存储这一次读不出来（认不清）是临时失败：不登出、不删资格，稍后再试（Codex 冷审）。
   const member = auth.restorableMember();
   const expected = member.id;
+  // 同设备恢复凭证（FLOW1c）优先：纯短信登录、没绑微信的账号靠它续上，不用再收验证码。
+  // 只认上次明确登录的那一位的凭证；这一格读不出来是临时失败——不能改走微信补签，没绑微信会被判确定失败而登出。
+  const restore = expected ? auth.restoreCredential(expected) : { ok: true, token: null };
   flight.promise = new Promise((resolve, reject) => {
     if (!expected) {
       reject(member.unreadable ? recoverableSessionError() : makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_UNKNOWN'));
       return;
     }
+    if (!restore.ok) {
+      reject(recoverableSessionError());
+      return;
+    }
+    if (restore.token) {
+      resolve({ restoreToken: restore.token });
+      return;
+    }
     wx.login({
-      success: (r) => (r && r.code ? resolve(r.code) : reject(makeError('wx.login 未返回 code', -1))),
+      success: (r) => (r && r.code ? resolve({ code: r.code }) : reject(makeError('wx.login 未返回 code', -1))),
       fail: () => reject(makeError('wx.login 调用失败', -1)),
     });
   })
-    .then((code) => {
+    .then((start) => {
       // wx.login 本身可能很慢:已经换人了就别再拿这个 code 去换旧账号的 token。
       if (!auth.isSameSession(generation)) throw staleSessionError();
+      // 恢复凭证被拒（无效、过期、撤销、重放）按确定失败处理，不在这里回退到微信补签：那样会绕过「必须重新认证」。
+      if (start.restoreToken) {
+        return rawRequest('/member/auth/restore', {
+          method: 'POST',
+          data: { restoreToken: start.restoreToken },
+          needAuth: false,
+        });
+      }
       return rawRequest('/member/auth/wx-resignin', {
         method: 'POST',
-        data: { code },
+        data: { code: start.code },
         needAuth: false,
       });
     })
@@ -150,7 +171,7 @@ function silentResignin(generation) {
       if (memberId !== expected) throw makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_MISMATCH');
       // 代际校验在 saveSession 内部与写入一起完成(先查后写会留下一个窗口)。
       // 返回 false = 换人了,或没能写进去再读回来,两种都按补签失败处理。
-      if (!auth.saveSession({ token, user: res.user }, { expectGeneration: generation })) {
+      if (!auth.saveSession({ token, user: res.user, restoreToken: res.restoreToken }, { expectGeneration: generation })) {
         throw staleSessionError();
       }
       done();

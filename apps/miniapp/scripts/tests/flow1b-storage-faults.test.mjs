@@ -656,7 +656,8 @@ const MUTATIONS = [
   {
     name: '服务端退出在本机作废之后才发',
     build: () => mutator('pages/settings/settings.js', [
-      ['        const server = auth.isLoggedIn() ? api.logout() : null\n        const saved = auth.logout()\n', '        const saved = auth.logout()\n        const server = auth.isLoggedIn() ? api.logout() : null\n'],
+      ['        const server = auth.isLoggedIn() ? api.logout() : null\n', ''],
+      ['        const saved = auth.logout()\n', '        const saved = auth.logout()\n        const server = auth.isLoggedIn() ? api.logout() : null\n'],
     ]),
     scenario: (opts) => settingsLogout({ reply: 'ok' }, opts),
   },

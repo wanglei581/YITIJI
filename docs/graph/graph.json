@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 580,
+    "endpointCount": 582,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -8111,6 +8111,34 @@
         "services": [
           "MemberQrLoginService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-auth/member-auth.controller.ts",
+        "handler": "MemberAuthController.restoreSession",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "LegalDocVersion",
+          "MemberLegalConsent"
+        ],
+        "path": "/api/v1/member/auth/restore",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-auth/member-restore.service.ts"
+        ],
+        "services": [
+          "MemberRestoreService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-auth/member-auth.controller.ts",
+        "handler": "MemberAuthController.revokeRestore",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/member/auth/restore/revoke",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-auth/member-auth.controller.ts",
@@ -16783,6 +16811,7 @@
           "services/api/src/common/guards/optional-end-user-auth.guard.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
           "services/api/src/member-auth/member-step-up.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-privacy/member-closure-requests.ts",
@@ -24166,6 +24195,7 @@
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -24480,6 +24510,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
@@ -24559,6 +24590,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -24750,6 +24782,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -25676,12 +25709,17 @@
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-member-auth-races.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-qr-login.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts"
+    ],
+    "services/api/src/member-auth/member-restore.service.ts": [
+      "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-auth/member-step-up.service.ts": [
       "services/api/scripts/verify-member-closure.ts",
@@ -25855,7 +25893,8 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts"
     ],
     "services/api/src/member-privacy/member-closure-redis.service.ts": [
-      "services/api/scripts/verify-member-closure.ts"
+      "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-privacy/member-closure-retention.ts": [
       "services/api/scripts/verify-member-closure.ts"
@@ -26655,6 +26694,7 @@
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
@@ -38530,6 +38570,7 @@
           "services/api/src/files/retention-policy.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/storage/storage.service.ts"
@@ -38775,6 +38816,31 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:member-qr-login"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/app.module.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
+          "services/api/src/member-privacy/member-closure-redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-restore.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-restore"
       ],
       "wired": true
     },
