@@ -8,7 +8,7 @@
       <view class="me-page-title">我的</view>
       <view class="me-page-sub">管理本人资料、记录与服务</view>
     </view>
-    <view class="notify-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
+    <view class="notify-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" aria-role="button" aria-label="查看消息通知">
       <text class="ficon i-bell" aria-hidden="true"></text>
     </view>
   </view>
@@ -25,7 +25,7 @@
                  补一句真实状态与登录后能得到什么，与登录按钮同属一个 wx:else 分支。 -->
             <view wx:else class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
           </view>
-          <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" role="button" aria-label="打开账号设置">
+          <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" aria-role="button" aria-label="打开账号设置">
             <text class="ficon i-right"></text>
           </view>
         </view>
@@ -33,7 +33,7 @@
         <!-- 未登录态原本把「微信一键登录」写成头像行里的第三行蓝字，
              与姓名、说明堆成三行，右侧箭头因而失去对齐参照、显得孤立。
              改为整行主按钮：登录是这张卡片唯一的主操作，应当有按钮的分量。 -->
-        <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
+        <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" aria-role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
         <!-- 「我的权益」条随 pages/membership 一起停放（首发不对 AI 收费）。
              停放后这里曾留下一个点了没反应的按钮：me.js 的 routes 表已删掉 membership。 -->
       </view>
@@ -45,10 +45,10 @@
         </view>
       </view>
       <!-- 计数没读到：说清楚，并给重试（只用全局 .list-state / .state-retry，不加样式） -->
-      <view class="list-state" wx:if="{{isLoggedIn && statsFailed}}" role="alert">
+      <view class="list-state" wx:if="{{isLoggedIn && statsFailed}}" aria-role="alert">
         <view>部分数量没读到，显示「—」的项目请稍后重试。</view>
         <view class="state-retry tap" hover-class="tap-press" bindtap="retryStats"
-              role="button" aria-label="重新读取数量">重试</view>
+              aria-role="button" aria-label="重新读取数量">重试</view>
       </view>
 
       <view class="section-row">
@@ -63,7 +63,7 @@
           hover-class="tap-press"
           data-id="{{item.id}}"
           bindtap="tapEntry"
-          role="button"
+          aria-role="button"
           aria-label="{{item.title}}，{{item.sub}}"
         >
           <view class="asset-icon tone-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
@@ -84,7 +84,7 @@
           hover-class="tap-press"
           data-id="{{item.id}}"
           bindtap="tapEntry"
-          role="button"
+          aria-role="button"
           aria-label="{{item.title}}，{{item.sub}}"
         >
           <view class="menu-icon soft-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>

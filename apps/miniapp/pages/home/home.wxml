@@ -10,7 +10,7 @@
     <view class="brand-row">
       <text class="brand-name">职易达</text>
     </view>
-    <view class="head-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
+    <view class="head-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" aria-role="button" aria-label="查看消息通知">
       <text class="ficon i-bell" aria-hidden="true"></text>
     </view>
   </view>
@@ -24,7 +24,7 @@
 
       <!-- 待取件（两端打通）：手机上下的单，到一体机前凭到机码取。首页不显示码本身，码在取件页里现取。 -->
       <view wx:if="{{pickupCount > 0}}" class="pickup-card">
-        <view class="pickup-main tap" hover-class="tap-press" bindtap="tapPickup" role="button" aria-label="待取件 {{pickupCount}} 单，查看到机码">
+        <view class="pickup-main tap" hover-class="tap-press" bindtap="tapPickup" aria-role="button" aria-label="待取件 {{pickupCount}} 单，查看到机码">
           <view class="pickup-icon"><text class="ficon i-printer" aria-hidden="true"></text></view>
           <view class="pickup-copy">
             <text class="pickup-title">待取件 {{pickupCount}} 单</text>
@@ -32,9 +32,9 @@
           </view>
           <view class="pickup-go">查看到机码</view>
         </view>
-        <view class="pickup-more tap" hover-class="tap-press" bindtap="tapOrders" role="button" aria-label="全部打印订单">全部打印订单 ›</view>
+        <view class="pickup-more tap" hover-class="tap-press" bindtap="tapOrders" aria-role="button" aria-label="全部打印订单">全部打印订单 ›</view>
       </view>
-      <view wx:elif="{{latestOrderAt}}" class="pickup-latest tap" hover-class="tap-press" bindtap="tapOrders" role="button" aria-label="最近订单，查看出纸状态">
+      <view wx:elif="{{latestOrderAt}}" class="pickup-latest tap" hover-class="tap-press" bindtap="tapOrders" aria-role="button" aria-label="最近订单，查看出纸状态">
         <text>最近订单 {{latestOrderAt}} · 查看出纸状态</text>
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
@@ -45,7 +45,7 @@
            改为对话入口条：圆头像 + 她「说」的一句话 + 箭头，像微信里一个真人在讲话。
            真人形象保留（对低数字素养用户，"有个人在帮我"比抽象图标更可信），
            但裁成 220px 头像后仅 7KB，远低于图片预算。 -->
-      <view class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" role="button" aria-label="打开小青 AI 职业助手">
+      <view class="qing-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" aria-role="button" aria-label="打开小青 AI 职业助手">
         <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" aria-hidden="true" />
         <view class="qing-copy">
           <view class="qing-name">小青 · AI 职业助手</view>
@@ -54,22 +54,9 @@
         <view class="qing-go"><text class="ficon i-right"></text></view>
       </view>
 
-      <view class="info-card" style="margin-top:22rpx">
-        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
-              data-url="/pages/resume-voice/resume-voice"
-              role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
-          <view class="info-icon soft-indigo"><text class="ficon i-comment"></text></view>
-          <view class="info-copy">
-            <text class="info-title">语音说简历</text>
-            <text class="info-desc">一题一问，看字确认后再生成</text>
-          </view>
-          <view class="info-arrow"><text class="ficon i-right"></text></view>
-        </view>
-      </view>
-
       <view class="section-head">
         <text class="section-title">常用服务</text>
-        <text class="section-more text-action" bindtap="tapLifeCircle" role="button" aria-label="查看全部 AI 工具">全部 AI 工具</text>
+        <text class="section-more text-action" bindtap="tapLifeCircle" aria-role="button" aria-label="查看全部 AI 工具">全部 AI 工具</text>
       </view>
       <view class="service-grid">
         <view
@@ -79,7 +66,7 @@
           hover-class="tap-press"
           bindtap="tapService"
           data-url="{{item.url}}"
-          role="button"
+          aria-role="button"
           aria-label="{{item.title}}"
         >
           <view class="service-icon tone-{{item.tone}}"><text class="ficon i-{{item.icon}}"></text></view>
@@ -87,7 +74,21 @@
         </view>
       </view>
 
-      <view class="print-banner tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/documents/documents" role="button" aria-label="从我的文档发起打印">
+      <!-- 语音说简历挪到常用服务下面，和其他 AI 工具挨着（10/17：原先小青、语音、四宫格三块连着，首屏挤）。 -->
+      <view class="info-card" style="margin-top:22rpx">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapService"
+              data-url="/pages/resume-voice/resume-voice"
+              aria-role="button" aria-label="语音说简历，一题一问，看字确认后再生成">
+          <view class="info-icon soft-indigo"><text class="ficon i-comment"></text></view>
+          <view class="info-copy">
+            <text class="info-title">语音说简历</text>
+            <text class="info-desc">一题一问，看字确认后再生成</text>
+          </view>
+          <view class="info-arrow"><text class="ficon i-right"></text></view>
+        </view>
+      </view>
+
+      <view class="print-banner tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/documents/documents" aria-role="button" aria-label="从我的文档发起打印">
         <view class="print-icon"><text class="ficon i-printer"></text></view>
         <view class="print-copy">
           <text class="print-title">手机准备文件，到终端直接打印</text>
@@ -98,7 +99,7 @@
 
       <!-- 到一体机前用得上的两件事（两端打通）：扫屏幕上的码登录或传文件；看快到期的到机码与平台通知。 -->
       <view class="info-card" style="margin-top:22rpx">
-        <view class="info-row tap" hover-class="tap-press" bindtap="tapScanKiosk" role="button" aria-label="扫码连接一体机，扫屏幕上的码登录或把文件传过去">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapScanKiosk" aria-role="button" aria-label="扫码连接一体机，扫屏幕上的码登录或把文件传过去">
           <view class="info-icon soft-indigo"><text class="ficon i-scan"></text></view>
           <view class="info-copy">
             <text class="info-title">扫码连接一体机</text>
@@ -106,7 +107,7 @@
           </view>
           <view class="info-arrow"><text class="ficon i-right"></text></view>
         </view>
-        <view class="info-row tap" hover-class="tap-press" bindtap="tapDaily" role="button" aria-label="今日提醒，快到期的到机码和平台通知">
+        <view class="info-row tap" hover-class="tap-press" bindtap="tapDaily" aria-role="button" aria-label="今日提醒，快到期的到机码和平台通知">
           <view class="info-icon soft-amber"><text class="ficon i-bell"></text></view>
           <view class="info-copy">
             <text class="info-title">今日提醒</text>
@@ -119,9 +120,9 @@
       <view class="home-note">AI 生成，仅供参考，请核对后再使用。</view>
       <!-- 电子商务法第十五条：首页持续公示经营者信息（或指向它的链接）；AI 服务说明里公示模型名称与备案号（C1）。 -->
       <view class="home-legal">
-        <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" role="link" aria-label="经营者信息">经营者信息</text>
+        <text class="home-legal-link" bindtap="tapLegal" data-type="operator_info" aria-role="link" aria-label="经营者信息">经营者信息</text>
         <text class="home-legal-sep" aria-hidden="true">·</text>
-        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" role="link" aria-label="AI 服务说明，所用模型与备案号">AI 服务说明</text>
+        <text class="home-legal-link" bindtap="tapLegal" data-type="ai_disclaimer" aria-role="link" aria-label="AI 服务说明，所用模型与备案号">AI 服务说明</text>
       </view>
       <view class="tab-spacer"></view>
     </view>

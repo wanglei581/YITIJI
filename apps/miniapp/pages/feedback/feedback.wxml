@@ -16,8 +16,8 @@
         <text class="ficon i-comment es-ic"></text>
         <view class="es-t">请先登录</view>
         <view class="es-d">登录后可提交意见反馈，并查看处理进度</view>
-        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
-        <view class="fb-alt tap" hover-class="tap-press" bindtap="goOperatorInfo" role="button" aria-label="不登录，按经营者信息里的联系方式联系我们">不登录，按「经营者信息」里的联系方式联系我们</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" aria-role="button" aria-label="去登录">去登录</view>
+        <view class="fb-alt tap" hover-class="tap-press" bindtap="goOperatorInfo" aria-role="button" aria-label="不登录，按经营者信息里的联系方式联系我们">不登录，按「经营者信息」里的联系方式联系我们</view>
       </view>
     </view>
 
@@ -27,7 +27,7 @@
         <view class="field-label">分类</view>
         <view class="cat-row">
           <view class="cat tap {{category === item.value ? 'on' : ''}}" wx:for="{{categories}}" wx:key="value"
-            hover-class="tap-press" data-value="{{item.value}}" bindtap="setCategory" role="button" aria-label="{{item.label}}">{{item.label}}</view>
+            hover-class="tap-press" data-value="{{item.value}}" bindtap="setCategory" aria-role="button" aria-label="{{item.label}}">{{item.label}}</view>
         </view>
         <view class="fb-note" wx:if="{{category === 'ai_content'}}">对 AI 生成的内容有异议，写清是哪个功能、大概什么时间、哪段内容有问题。我们在 {{aiReplyDays}} 个工作日内答复，答复在下方「我的反馈」里查看。</view>
         <view class="field-label">标题（选填）</view>
@@ -38,7 +38,7 @@
         <view class="field-label">联系电话（选填）</view>
         <input class="fb-input" type="number" value="{{contactPhone}}" maxlength="11" placeholder="便于必要时联系确认" bindinput="onPhone" />
         <view class="btn lg primary block tap {{canSubmit && !submitting ? '' : 'disabled'}}" hover-class="tap-press"
-          bindtap="submit" role="button" aria-label="提交反馈">{{submitting ? '正在提交…' : '提交反馈'}}</view>
+          bindtap="submit" aria-role="button" aria-label="提交反馈">{{submitting ? '正在提交…' : '提交反馈'}}</view>
       </view>
 
       <view class="section-t">我的反馈</view>
@@ -49,7 +49,7 @@
         <view class="empty-slot compact">
           <view class="es-t">加载失败</view>
           <view class="es-d">{{loadError}}</view>
-          <view class="btn ghost tap" hover-class="tap-press" bindtap="retryLoad" role="button" aria-label="重新加载">重新加载</view>
+          <view class="btn ghost tap" hover-class="tap-press" bindtap="retryLoad" aria-role="button" aria-label="重新加载">重新加载</view>
         </view>
       </view>
       <view class="card" wx:elif="{{list.length}}">
@@ -71,7 +71,7 @@
             </view>
             <view class="fb-replies" wx:elif="{{item.replies}}">暂无回复</view>
             <view wx:if="{{item.canClose}}" class="btn ghost tap close-btn {{item.closing ? 'disabled' : ''}}"
-              hover-class="tap-press" catchtap="closeItem" data-id="{{item.id}}" role="button" aria-label="关闭这条反馈">{{item.closing ? '正在关闭…' : '关闭'}}</view>
+              hover-class="tap-press" catchtap="closeItem" data-id="{{item.id}}" aria-role="button" aria-label="关闭这条反馈">{{item.closing ? '正在关闭…' : '关闭'}}</view>
           </view>
         </view>
       </view>
@@ -84,12 +84,12 @@
 
       <view class="list-state" wx:if="{{listState === 'ready' && list.length && loadingMore}}">正在加载更多…</view>
       <view class="list-state" wx:elif="{{listState === 'ready' && list.length && loadMoreError}}">
-        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" role="button" aria-label="重新加载更多反馈">加载更多失败，点此重试</view>
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" aria-role="button" aria-label="重新加载更多反馈">加载更多失败，点此重试</view>
       </view>
       <view class="list-state" wx:elif="{{listState === 'ready' && list.length && nextCursor}}">上拉加载更多</view>
 
       <!-- 个人信息请求不在反馈里开类别（C3），指到「隐私与数据」，时限写在那一页。 -->
-      <view class="fb-alt tap" hover-class="tap-press" bindtap="goPrivacy" role="button" aria-label="查阅、导出、删除个人信息，去隐私与数据">查阅、导出、删除个人信息，去「隐私与数据」</view>
+      <view class="fb-alt tap" hover-class="tap-press" bindtap="goPrivacy" aria-role="button" aria-label="查阅、导出、删除个人信息，去隐私与数据">查阅、导出、删除个人信息，去「隐私与数据」</view>
     </block>
   </view>
 </view>

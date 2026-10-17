@@ -19,10 +19,10 @@
     <text class="state-label">{{errorMsg}}</text>
     <!-- 按钮文案必须和 errorAction 指的动作一致：登录已失效时写「重新加载」，
          用户会一直按一个不可能成功的按钮。 -->
-    <view class="btn-retry tap" hover-class="tap-press" bindtap="recover" role="button">
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="recover" aria-role="button">
       {{errorAction === 'login' ? '去登录' : errorAction === 'orders' ? '去我的打印订单' : '重新加载'}}
     </view>
-    <view class="btn-retry-sub tap" hover-class="tap-press" wx:if="{{errorAction === 'login'}}" bindtap="toOrders" role="button">先去我的打印订单</view>
+    <view class="btn-retry-sub tap" hover-class="tap-press" wx:if="{{errorAction === 'login'}}" bindtap="toOrders" aria-role="button">先去我的打印订单</view>
   </view>
 
   <block wx:elif="{{state === 'ready'}}">
@@ -53,11 +53,11 @@
         <!-- 到机码三个动作（9/25 拍板第 5 条：可以给别人代取，一次性，可作废重发）。
              复制、分享是常用动作，并排放；作废换新码会让旧码立刻失效，降为说明下面的次级按钮，免得误点。 -->
         <view class="ph-acts">
-          <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">复制</view>
-          <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
+          <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" aria-role="button" aria-label="复制到机码">复制</view>
+          <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" aria-role="button" aria-label="分享给代取人">分享给代取人</view>
         </view>
         <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点下面的「作废换新码」，旧码马上失效。</text>
-        <view class="btn-retry-sub tap" style="{{reissuing ? 'opacity: .5;' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+        <view class="btn-retry-sub tap" style="{{reissuing ? 'opacity: .5;' : ''}}" hover-class="tap-press" bindtap="reissueCode" aria-role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
       </block>
 
       <view class="status-visual" wx:else>

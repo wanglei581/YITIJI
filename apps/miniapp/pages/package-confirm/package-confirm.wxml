@@ -15,14 +15,14 @@
       <view class="section-card" wx:if="{{!isLoggedIn}}">
         <view class="state-t">请先登录小程序</view>
         <view class="state-d">材料包的文件、核定结果与到机码都绑定本人账号，登录后才能下单。</view>
-        <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
+        <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" aria-role="button">去登录</view>
       </view>
 
       <!-- 草稿缺失：深链直进或草稿已清，说清原因并给回到第一步的出口 -->
       <view class="section-card" wx:elif="{{draftState === 'missing'}}">
         <view class="state-t">没有可确认的材料包</view>
         <view class="state-d">这一步要用前两步选好的文件与服务点，而当前没有草稿（可能是直接打开了本页，或草稿已被清理）。</view>
-        <view class="btn primary block tap" hover-class="tap-press" bindtap="backToFiles" role="button">回到选择文件</view>
+        <view class="btn primary block tap" hover-class="tap-press" bindtap="backToFiles" aria-role="button">回到选择文件</view>
       </view>
 
       <block wx:else>
@@ -76,7 +76,7 @@
           <view wx:elif="{{quoteState === 'error'}}" class="state-block">
             <view class="state-t">{{quoteErrorTitle}}</view>
             <view class="state-d">{{quoteErrorText}}</view>
-            <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{quoteRecover}}" role="button">
+            <view class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{quoteRecover}}" aria-role="button">
               {{quoteRecover === 'login' ? '去登录' : quoteRecover === 'reorder' ? '重新下单' : quoteRecover === 'store' ? '换一个服务点' : quoteRecover === 'files' || quoteRecover === 'privacy' ? '回到选择文件' : quoteRecover === 'orders' ? '去我的打印订单' : '重新核定'}}
             </view>
             <!-- 这里此前还画了一句「原来那张订单仍可在「我的 · 打印订单」的材料包分区里
@@ -122,7 +122,7 @@
           <view class="state-d">{{submitErrorText}}</view>
           <!-- submitRecover 为空 = 这一刻没有可执行的下一步（核对正在进行中）。
                画一个按钮出来只会是一个按下去什么都不做的主动作。 -->
-          <view wx:if="{{submitRecover}}" class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{submitRecover}}" role="button">
+          <view wx:if="{{submitRecover}}" class="btn ghost block tap" hover-class="tap-press" bindtap="recover" data-recover="{{submitRecover}}" aria-role="button">
             {{submitRecover === 'login' ? '去登录' : submitRecover === 'reconcile' ? '重新核对下单记录' : submitRecover === 'resubmit' ? '确认下单' : submitRecover === 'store' ? '换一个服务点' : submitRecover === 'files' || submitRecover === 'privacy' ? '回到选择文件' : submitRecover === 'orders' ? '去我的打印订单' : '重新核定'}}
           </view>
         </view>

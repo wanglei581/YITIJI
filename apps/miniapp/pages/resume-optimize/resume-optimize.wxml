@@ -149,7 +149,7 @@
         bindtap="openVersion"
         data-file-id="{{item.fileId}}"
         data-open-hint="{{item.openHint}}"
-        role="button"
+        aria-role="button"
         aria-label="打开 {{item.versionLabel}}"
       >{{item.canOpen ? '打开文件' : '无法打开'}}</view>
     </view>
@@ -162,7 +162,7 @@
         wx:key="key"
         bindtap="pickFormat"
         data-format="{{item.key}}"
-        role="button"
+        aria-role="button"
         aria-label="导出为 {{item.label}}"
       >{{item.label}}</view>
     </view>
@@ -205,7 +205,7 @@
         class="fact-row tap {{item.needsConfirm ? '' : 'found'}} {{item.confirmed ? 'on' : ''}} {{item.removed ? 'removed' : ''}}"
         bindtap="toggleFact"
         data-fact-key="{{item.key}}"
-        role="checkbox"
+        aria-role="checkbox"
         aria-label="{{item.label}} {{item.value}}"
       >
         <view class="fact-box {{item.confirmed ? 'on' : ''}}"></view>
@@ -220,7 +220,7 @@
         class="btn ghost tap block fact-remove"
         bindtap="removeFact"
         data-fact-key="{{item.key}}"
-        role="button"
+        aria-role="button"
         aria-label="删掉这条，回到原文"
       >删掉这条，回到原文</view>
       </block>
