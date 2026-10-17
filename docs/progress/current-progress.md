@@ -19,7 +19,7 @@
     - 服务端 `verify-member-restore` 39 项全过，10 条反向变异全部判红；
     - 小程序 `flow1c-restore.test.mjs` 27 例（含 10 条反向变异）通过；verify:static 全过，854 个 node 测试；
     - 服务端 member-auth、auth-races、account-status、step-up、data-retention 都通过。auth-races 因为换绑服务多了一个依赖，补了替身，并新增三条断言；
-    - `verify-member-closure --http` 本机 HTTP 段有一处 503≠401。在 FLOW1c 之前的 `da41cd061` 上同样失败，不是本批引入，以 CI 为准。
+    - `verify-member-closure --http`：按 CI 同样的开关（`MEMBER_CLOSURE_REAL_REDIS=1`、`VERIFICATION_REDIS_TARGET=isolated`）本机全部通过，17 组，HTTP 段通过。**19:2x 更正**：先前记的「503≠401」是我本机少带这两个开关，走了替身 Redis；在 `da41cd061` 上按同样方式跑也一样，不是回归。最终候选 SHA 的 CI 仍交 Grok 核对，不拿旧候选的绿替代。
   - CI：SQLite 和 PG 两个作业都加了 `verify:member-restore`；workflow 语法已用 repository-integrity 校验。
   - 部署需求（不自行部署，交负责人）：
     - 先上 API，再发小程序。旧 API 会忽略新请求头，不会 400；
