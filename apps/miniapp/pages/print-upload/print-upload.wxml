@@ -3,28 +3,29 @@
   <view style="height:{{statusBarHeight}}px"></view>
   <view class="nav-inner">
     <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-title">打印参数</view>
+    <view class="nav-title">确认文件</view>
     <view class="nav-right"></view>
   </view>
 </view>
 
 <view class="content has-bar">
-  <!-- 步骤条文案与 print-store / print-pay 保持同一套，避免同一笔订单在相邻两页读到不同流程 -->
+  <!-- 步骤条文案与 print-store / print-pay 保持同一套，避免同一笔订单在相邻两页读到不同流程。
+       第 2 步在终端选定后统一设置颜色、单双面、份数；第 3 步还在手机上确认提交，到机核验是第 4 步的事（FLOW1a）。 -->
   <view class="steps rise-d1">
     <view class="st on"><text class="n">1</text><text class="nl">选择文件</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">2</text><text class="nl">选终端</text></view>
+    <view class="st"><text class="n">2</text><text class="nl">终端和参数</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
+    <view class="st"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' && amountCents > 0 ? '机端支付' : (priceStatus === 'ready' ? '现场打印' : '到机完成')}}</text></view>
   </view>
 
-  <!-- 文件 -->
+  <!-- 文件：标题只放主名，扩展名在 fc-tag 里，「.pdf」不会被拆到下一行。点整卡或「查看原文」直接打开原文。 -->
   <view class="card file-card rise-d2 tap" hover-class="tap-press" bindtap="tapFile">
     <view class="fc-ic a-teal"><text class="ficon i-file-text"></text></view>
     <view class="fc-main">
-      <view class="fc-name">{{file.name}}</view>
+      <view class="fc-name">{{fileBase}}</view>
       <view class="fc-meta">
         <text wx:if="{{hasFile}}" class="fc-tag">{{fileExt}}</text>
         <text class="fc-sub">{{hasFile ? (hasPageCount ? '服务端核定 ' + file.pages + ' 页' : (priceStatus === 'loading' ? '正在由服务端识别页数…' : '页数待服务端核定')) : '从本人文档或真实 AI 成果选择'}}</text>
@@ -33,92 +34,10 @@
     <view class="fc-go"><text>{{hasFile ? '查看原文' : '选择文件'}}</text><text class="ficon i-right"></text></view>
   </view>
 
-  <!-- 打印设置 -->
-  <view class="section-t rise-d3">打印设置</view>
-  <view class="card flat setting rise-d3">
-
-    <view class="set-k">打印颜色</view>
-    <view class="opt-list">
-      <view class="opt {{color==='bw'?'on':''}} tap" hover-class="tap-press" data-v="bw" bindtap="pickColor">
-        <view class="o-radio"><text wx:if="{{color==='bw'}}" class="ficon i-check"></text></view>
-        <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济，适合文字文档</view></view>
-        <view class="o-price">{{priceLabels.bw}}</view>
-      </view>
-      <view class="opt off tap" hover-class="tap-press" data-v="color" bindtap="pickColor">
-        <view class="o-radio"></view>
-        <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">选择终端后按该终端开放的能力设置</view></view>
-        <view class="o-locked">选终端后设置</view>
-      </view>
-    </view>
-
-    <view class="set-sep"></view>
-
-    <view class="set-row">
-      <view class="set-k tight">纸张规格</view>
-      <view class="set-v">A4 · 210 × 297mm</view>
-      <view class="set-badge">仅支持 A4</view>
-    </view>
-
-    <view class="set-sep"></view>
-
-    <view class="set-k">打印方式</view>
-    <view class="duplex-row">
-      <view class="duplex-opt {{duplex==='single'?'on':''}} tap" hover-class="tap-press" data-v="single" bindtap="pickDuplex">
-        <view class="d-t">单面</view>
-        <view class="d-s">每页一张纸</view>
-      </view>
-      <view class="duplex-opt off tap" hover-class="tap-press" data-v="double" bindtap="pickDuplex">
-        <view class="d-t">双面</view>
-        <view class="d-s">选终端后设置</view>
-      </view>
-    </view>
-    <view class="set-why">选择终端后，可根据该终端开放的能力设置彩色或双面。</view>
-
-    <view class="set-sep"></view>
-
-    <view class="set-row">
-      <view class="set-k tight">打印份数</view>
-      <view class="stepper">
-        <view class="s-btn tap {{copies<=1?'off':''}}" hover-class="tap-press" bindtap="minus">−</view>
-        <view class="s-val">{{copies}}</view>
-        <view class="s-btn tap {{copies>=99?'off':''}}" hover-class="tap-press" bindtap="plus">+</view>
-      </view>
-    </view>
-
-  </view>
-
-  <!-- 页数与金额：明确写出这笔钱是怎么来的，页数、份数、单价、合计逐项对得上 -->
-  <view class="section-t rise-d4">{{priceStatus === 'ready' && amountCents > 0 ? '页数与金额' : '页数核定'}}</view>
-  <view class="card flat bill rise-d4">
-    <block wx:if="{{priceStatus === 'ready'}}">
-      <view class="bl-row">
-        <text class="bl-k">{{priceStatus === 'ready' && amountCents > 0 ? '计费页数' : '核定页数'}}</text>
-        <text class="bl-v">{{file.pages}} 页 / 份</text>
-      </view>
-      <view class="bl-note">{{billingPageSource === 'image_single_page' ? '图片文件按 1 页核定' : (billingPageSource === 'pdf_lightweight_scan' ? '由服务端读取 PDF 实际页数核定' : '由服务端核定，不由手机端推算')}}</view>
-      <view class="bl-row">
-        <text class="bl-k">打印份数</text>
-        <text class="bl-v">× {{copies}} 份</text>
-      </view>
-      <view class="bl-row">
-        <text class="bl-k">合计纸张</text>
-        <text class="bl-v">{{file.pages * copies}} 页</text>
-      </view>
-      <view class="bl-row">
-        <text class="bl-k">{{priceStatus === 'ready' && amountCents > 0 ? '黑白单价' : '黑白打印'}}</text>
-        <text class="bl-v">{{priceLabels.bw}}</text>
-      </view>
-      <view class="bl-row total">
-        <text class="bl-k strong">{{priceStatus === 'ready' && amountCents > 0 ? '服务端报价' : '本次打印'}}</text>
-        <text class="bl-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
-      </view>
-    </block>
-
-    <view wx:elif="{{!hasFile}}" class="bl-idle">选择文件后，由服务端核定真实页数。</view>
-
-    <view wx:elif="{{priceStatus === 'loading'}}" class="bl-idle">服务端正在读取文件真实页数…</view>
-
-    <view wx:else class="bl-fail">
+  <!-- 颜色、单双面、份数都挪到第 2 步，选定终端、知道它开放什么之后统一设置（FLOW1a）。
+       这里只留页数核定失败时的说明和重试；核定中、已核定都写在上面文件卡里，不再另起一块明细。 -->
+  <view wx:if="{{hasFile && priceStatus === 'unavailable'}}" class="card flat bill rise-d3">
+    <view class="bl-fail">
       <view class="bl-fail-t"><text class="ficon i-warning"></text><text>暂时无法核定页数</text></view>
       <view class="bl-fail-s">{{priceError || '服务端暂时无法核定页数'}}</view>
       <view class="btn ghost bl-retry" bindtap="retryQuote">重新核定</view>
@@ -142,19 +61,19 @@
       <view class="pc-note">继续表示你确认这些内容属于本次打印文件，并选择原样保留。</view>
       <view class="btn primary pc-btn" bindtap="confirmPrivacy">{{privacySubmitting ? '确认中…' : '确认保留并继续'}}</view>
     </view>
-    <view wx:elif="{{privacyStatus === 'ready'}}" class="pc-ready"><text class="ficon i-check"></text><text>隐私检查已完成，可以提交打印订单</text></view>
+    <!-- 提交在第 3 步，这里不说「可以提交打印订单」 -->
+    <view wx:elif="{{privacyStatus === 'ready'}}" class="pc-ready"><text class="ficon i-check"></text><text>隐私检查已完成</text></view>
     <view wx:else class="pc-state">选择文件后开始检查</view>
   </view>
-
-  <view class="compliance-note rise-d6">{{amountCents === 0 ? '当前为免费试运营：到机核验后直接进入打印队列；在终端核验之前不会开始打印。' : '在终端扫码或输入到机码核验之前，不会开始打印。'}}</view>
 </view>
 
 <view class="actionbar">
   <view class="ab-price">
-    <text class="ab-label">{{priceStatus === 'ready' && amountCents > 0 ? '精确报价' : (priceStatus === 'ready' ? '免费试运营' : (priceStatus === 'loading' ? '正在核定页数' : (hasFile ? '页数待核定' : '')))}}</text>
+    <!-- 第 1 步只按 1 份黑白单面核定，付费时不能叫这一单的「精确报价」；最终金额在第 2、3 步按所选参数核定 -->
+    <text class="ab-label">{{priceStatus === 'ready' && amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '免费试运营' : (priceStatus === 'loading' ? '正在核定页数' : (hasFile ? '页数待核定' : '')))}}</text>
     <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{priceStatus === 'ready' && amountCents > 0 ? '¥' + total : '免费'}}</text>
     <text wx:elif="{{hasFile}}" class="ab-amt pending">—</text>
   </view>
-  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端')}}</view>
+  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选终端和参数')}}</view>
 </view>
 </view>

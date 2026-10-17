@@ -12,18 +12,19 @@
   <view class="steps rise-d1">
     <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选择文件</text></view>
     <view class="line done"></view>
-    <view class="st on"><text class="n">2</text><text class="nl">选终端</text></view>
+    <view class="st on"><text class="n">2</text><text class="nl">终端和参数</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
+    <view class="st"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl" wx:if="{{quoteState === 'ready' && !isFreeOrder}}">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : ''}}</text><text class="nl" wx:elif="{{quoteState === 'ready' && isFreeOrder}}">现场打印</text><text class="nl" wx:else>到机完成</text></view>
   </view>
 
+  <!-- 三档照旧按实时核价分支（没核价时不说免费），每档缩成一行（FLOW1a，agy 1131 Q4 + 用户裁定） -->
   <view class="notice info rise-d2">
     <text class="ficon i-location n-ic"></text>
-    <text wx:if="{{quoteState === 'ready' && !isFreeOrder}}">{{quoteState === 'ready' && !isFreeOrder ? '请选择真实在线终端。到机核验后再现场支付与打印，终端状态以实时心跳为准。' : ''}}</text>
-    <text wx:elif="{{quoteState === 'ready' && isFreeOrder}}">当前为免费试运营。请选择真实在线终端，到机核验后直接进入打印队列。</text>
-    <text wx:else>请选择真实在线终端，到机核验后打印，终端状态以实时心跳为准。</text>
+    <text wx:if="{{quoteState === 'ready' && !isFreeOrder}}">{{quoteState === 'ready' && !isFreeOrder ? '到机核验后现场支付并打印' : ''}}</text>
+    <text wx:elif="{{quoteState === 'ready' && isFreeOrder}}">本单免费：到机核验后直接进入打印队列</text>
+    <text wx:else>请选择在线终端，到机核验后打印</text>
   </view>
 
   <view class="store-list rise-d3">
@@ -52,26 +53,36 @@
     </view>
   </view>
 
-  <view wx:if="{{picked}}" class="param-box rise-d4">
-    <view class="section-t">打印参数</view>
-    <view class="param-label">颜色</view>
-    <view class="param-options">
-      <view class="param-opt tap {{colorMode==='black_white'?'on':''}}" data-key="colorMode" data-mode="black_white" bindtap="setParam">黑白</view>
-      <view class="param-opt tap {{colorMode==='color'?'on':''}} {{capColor?'':'disabled'}}" data-key="colorMode" data-mode="color" bindtap="setParam">彩色</view>
+  <!-- 选定终端后，在这里统一设置颜色、单双面、份数（FLOW1a：此前份数在上一页、颜色和单双面在这一页）。
+       卡片沿用全局左右边距，不再贴屏幕边。 -->
+  <block wx:if="{{picked}}">
+    <view class="section-t rise-d4">打印参数</view>
+    <view class="card flat card-inner param-box rise-d4">
+      <view class="param-label">颜色</view>
+      <view class="param-options">
+        <view class="param-opt tap {{colorMode==='black_white'?'on':''}}" data-key="colorMode" data-mode="black_white" bindtap="setParam">黑白</view>
+        <view class="param-opt tap {{colorMode==='color'?'on':''}} {{capColor?'':'disabled'}}" data-key="colorMode" data-mode="color" bindtap="setParam">彩色</view>
+      </view>
+      <view class="param-label">单双面</view>
+      <view class="param-options">
+        <view class="param-opt tap {{duplex==='simplex'?'on':''}}" data-key="duplex" data-mode="simplex" bindtap="setParam">单面</view>
+        <view class="param-opt tap {{duplex==='duplex_long_edge'?'on':''}} {{capDuplex?'':'disabled'}}" data-key="duplex" data-mode="duplex_long_edge" bindtap="setParam">双面（长边翻页）</view>
+      </view>
+      <view class="param-label">份数</view>
+      <view class="param-stepper">
+        <view class="s-btn tap {{copies<=1?'off':''}}" hover-class="tap-press" bindtap="minusCopies" aria-role="button" aria-label="减少一份">−</view>
+        <view class="s-val">{{copies}}</view>
+        <view class="s-btn tap {{copies>=99?'off':''}}" hover-class="tap-press" bindtap="plusCopies" aria-role="button" aria-label="增加一份">+</view>
+      </view>
+      <view wx:if="{{capError}}" class="param-hint">{{capError}}</view>
+      <view wx:elif="{{capState==='loading'}}" class="param-hint">正在读取可选参数</view>
+      <view wx:elif="{{capState==='fail'}}" class="param-hint">高级参数暂不可选；黑白单面仍需核定</view>
+      <view wx:elif="{{capState==='ready' && (!capColor || !capDuplex)}}" class="param-hint">{{!capColor && !capDuplex ? '本终端暂未开放彩色和双面' : (!capColor ? '本终端暂未开放彩色' : '本终端暂未开放双面')}}</view>
     </view>
-    <view class="param-label">翻页</view>
-    <view class="param-options">
-      <view class="param-opt tap {{duplex==='simplex'?'on':''}}" data-key="duplex" data-mode="simplex" bindtap="setParam">单面</view>
-      <view class="param-opt tap {{duplex==='duplex_long_edge'?'on':''}} {{capDuplex?'':'disabled'}}" data-key="duplex" data-mode="duplex_long_edge" bindtap="setParam">双面（长边翻页）</view>
-    </view>
-    <view wx:if="{{capError}}" class="param-hint">{{capError}}</view>
-    <view wx:elif="{{capState==='loading'}}" class="param-hint">正在读取可选参数</view>
-    <view wx:elif="{{capState==='fail'}}" class="param-hint">高级参数暂不可选；黑白单面仍需核定</view>
-    <view wx:elif="{{capState==='ready' && (!capColor || !capDuplex)}}" class="param-hint">{{!capColor && !capDuplex ? '本终端暂未开放彩色和双面' : (!capColor ? '本终端暂未开放彩色' : '本终端暂未开放双面')}}</view>
-  </view>
+  </block>
 
   <view class="section-t rise-d4">订单摘要</view>
-  <view class="card flat summary rise-d4">
+  <view class="card flat card-inner summary rise-d4">
     <view class="summary-row"><text>文件</text><text>{{fileName || '未提供文件'}}</text></view>
     <view class="summary-row"><text>参数</text><text>{{colorLabel}} · A4 · {{duplexLabel}} · ×{{copies}}份</text></view>
     <view class="summary-row total">
@@ -89,6 +100,6 @@
     <block wx:elif="{{quoteState === 'ready' && isFreeOrder}}"><text class="ab-label">免费试运营</text><text class="ab-amt">免费</text></block>
     <block wx:else><text class="ab-label">{{quoteState === 'pending' ? '正在核定' : '待核定'}}</text><text class="ab-amt">待核定</text></block>
   </view>
-  <view class="btn primary lg {{canConfirm ? '' : 'disabled'}}" bindtap="toPay">确认终端</view>
+  <view class="btn primary lg {{canConfirm ? '' : 'disabled'}}" bindtap="toPay">下一步：确认订单</view>
 </view>
 </view>

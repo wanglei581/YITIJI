@@ -955,7 +955,9 @@ else bad('打印参数页服务端精确报价', '必须先取本人 printFileUr
   else bad('打印 printFileUrl 旁路受控', offenders.join('；'))
 }
 
-const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n  pickColor/)
+// 2026-10-17 FLOW1a：打印参数页不再有 pickColor（颜色、单双面、份数挪到选终端页），
+// 截取到 _refreshQuote 之后的下一个方法为止；下面三项先后顺序与旧回包保护的断言不变。
+const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n(?:  \/\/[^\n]*\n)*  [A-Za-z_$][\w$]*\(/)
 const quoteRefreshBody = quoteRefreshMatch ? quoteRefreshMatch[1] : ''
 const quoteSeqIndex = quoteRefreshBody.indexOf('const seq = ++this._quoteSeq')
 const quoteLoadingIndex = quoteRefreshBody.indexOf("priceStatus: 'loading'")
@@ -971,7 +973,8 @@ else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须
 if (
   !/print-store\?[^`]*\b(?:amountCents|total)=/.test(printUploadJs) &&
   // 2026-09-30：价目为 0 时不出现钱的字眼，付费分支改挂在「已报出大于 0 的金额」下（free-pilot-copy.test.mjs）
-  printUploadWxml.includes("amountCents > 0 ? '精确报价' : (priceStatus === 'ready' ? '免费试运营'") &&
+  // 2026-10-17 FLOW1a：第 1 步只按 1 份黑白单面核定，付费分支改叫「1 份黑白参考价」；免费分支不变
+  printUploadWxml.includes("amountCents > 0 ? '1 份黑白参考价' : (priceStatus === 'ready' ? '免费试运营'") &&
   printStoreJs.includes('const isFreeOrder = amountCents === 0') &&
   printStoreWxml.includes("quoteState === 'ready' && !isFreeOrder") &&
   printStoreWxml.includes('机端支付') && printStoreWxml.includes('现场打印') &&

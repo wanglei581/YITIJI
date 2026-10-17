@@ -74,19 +74,27 @@ Page({
       })
   },
 
-  loadDocuments(append = false) {
+  // 「刷新」「重试」走这里。模板曾直接 bindtap="loadDocuments"：点击事件对象被当成 append，
+  // 没有下一页时直接返回、有下一页时把下一页追加进来，刷新和重试都不灵（FLOW1a，沙箱复现）。
+  reloadDocuments() {
+    this.loadDocuments(false)
+  },
+
+  loadDocuments(append) {
     // 2026-09-03 修复「不显示文件」：此前只取第一页 50 条即止——unwrapList 早就把
     // nextCursor 挂在返回数组上（utils/api.js），这里拿到就丢。第 51 份文件起
     // 永远不出现，页面还写着「最近 · 50 个文件」让人以为只有这么多。
     // 打印场景（证件正反、简历多版本、证书、合同）极易超过 50 份。
     // 分页写法对照 orders.js 的 _load（同一套 cursor 约定）。
-    if (append && (!this.data.nextCursor || this.data.loadingMore)) return
-    const cursor = append ? this.data.nextCursor : null
-    this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
+    // 只有 append === true 才翻页：别的真值（例如误绑进来的事件对象）一律按刷新处理。
+    const paging = append === true
+    if (paging && (!this.data.nextCursor || this.data.loadingMore)) return
+    const cursor = paging ? this.data.nextCursor : null
+    this.setData(paging ? { loadingMore: true } : { loading: true, loadError: '' })
     api.getMyDocuments({ pageSize: 50, ...(cursor ? { cursor } : {}) })
       .then((items) => {
         const page = (items || []).map(conversion.toView)
-        const all = append ? [...this.data.all, ...page] : page
+        const all = paging ? [...this.data.all, ...page] : page
         this.setData({ all, loading: false, loadingMore: false, nextCursor: (items && items.nextCursor) || null })
         this.applyFilter(this.data.activeFilter, all)
       })
@@ -112,23 +120,12 @@ Page({
     this.applyFilter(key)
   },
 
-  // 点击行 → 可打印文件进打印流程；高敏报告只预览，避免点进打印吃 400
+  // 点整行 = 打开原文（点文件就是看文件）。此前点整行进的是打印，预览藏在「⋯」里（FLOW1a 实图 02）；
+  // 打印改由行内「打印」按钮发起（reprintDoc），不可打印的报告照样能点开看。
   openDoc(e) {
-    const item = this.data.all.find((entry) => entry.id === String(e.currentTarget.dataset.id || ''))
-    if (!item) return
-    if (!item.reprintable) {
-      wx.showModal({
-        title: '不可打印',
-        content: conversion.DOCUMENT_NOT_REPRINTABLE_COPY,
-        showCancel: false,
-        confirmText: '查看文件',
-        success: (modal) => { if (modal.confirm) this.previewDoc(item.id) },
-      })
-      return
-    }
-    wx.navigateTo({
-      url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.name)}&pages=${item.pages}`,
-    })
+    const id = String(e.currentTarget.dataset.id || '')
+    if (!this.data.all.some((entry) => entry.id === id)) return
+    this.previewDoc(id)
   },
 
   reprintDoc(e) {
@@ -346,7 +343,7 @@ Page({
     const canChangeRetention = !item.retentionLocked
     const itemList = ['预览文件']
     if (item.isWord) itemList.push('转 PDF')
-    itemList.push(item.reprintable ? '发起打印' : conversion.DOCUMENT_NOT_REPRINTABLE_COPY)
+    itemList.push(item.reprintable ? '打印' : conversion.DOCUMENT_NOT_REPRINTABLE_COPY)
     if (canChangeRetention) itemList.push('修改保存期限')
     itemList.push('删除文件')
     const CONVERT_IDX = item.isWord ? 1 : -1
@@ -355,6 +352,8 @@ Page({
     const DELETE_IDX = canChangeRetention ? PRINT_IDX + 2 : PRINT_IDX + 1
 
     wx.showActionSheet({
+      // 列表标题只放主名、最多两行；完整原名在这里读得到（FLOW1a）。
+      alertText: item.name,
       itemList,
       success: (res) => {
         if (res.tapIndex === 0) {
