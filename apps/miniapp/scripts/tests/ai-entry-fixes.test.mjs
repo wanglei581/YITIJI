@@ -190,7 +190,8 @@ test('落点：「从我的简历选择」未登录先给登录，已登录才�
   const guest = landOn('/pages/resumes/resumes', { loggedIn: false })
   assert.equal(guest.page.data.loginRequired, true)
   assert.equal(guest.calls.getMyResumes, 0, '未登录不取列表')
-  assert.match(guest.wxml, /wx:if="\{\{loginRequired\}\}"[\s\S]*?bindtap="goLogin">微信一键登录<\/view>/)
+  // FLOW1b：登录卡片前面多了「恢复中 / 可重试」两支，登录卡片改成同一条链上的 wx:elif。
+  assert.match(guest.wxml, /wx:elif="\{\{loginRequired\}\}"[\s\S]*?bindtap="goLogin">微信一键登录<\/view>/)
   const member = landOn('/pages/resumes/resumes', { loggedIn: true })
   assert.equal(member.page.data.loginRequired, false)
   assert.equal(member.calls.getMyResumes, 1)

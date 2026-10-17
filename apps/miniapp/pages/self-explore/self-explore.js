@@ -7,6 +7,7 @@ const RADAR_COLORS = radar.RADAR_COLORS
 const DIM_COUNT_EXPECTED = radar.DIM_COUNT_EXPECTED
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { startAfterMemberGate, markPageUnloaded } = require('../../utils/page-guard')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const session = require('../../utils/resume-parse-session')
@@ -145,12 +146,6 @@ Page({
 
   onLoad(options) {
     const opts = options || {}
-    // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
-    // 取不到就留空，走会员登录态。
-    // 只用属于当前身份的本机任务当种子（10/17）：换号以后不带上一位的匿名令牌。
-    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth) || {}
-    this._token = saved.accessToken || ''
-
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     // 画布宽度必须减掉**整条容器链**的横向占用，不是拍一个 48。
     // 链路（canvas 在 .radar-wrap > .card.card-inner 里，三层都是 border-box）：
@@ -181,6 +176,16 @@ Page({
       radarCanvasHeightPx: Math.round(radarPx * 0.82 * 0.78),
     })
 
+    // 过期但可恢复（FLOW1b）：先等恢复结果，再按「现在这一位」取种子凭证、读题或读历史——否则会员会被当成游客提交。
+    this._startOptions = opts
+    startAfterMemberGate(this, auth, api, () => this._start(opts))
+  },
+
+  _start(opts) {
+    // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
+    // 取不到就留空，走会员登录态。只用属于当前身份的本机任务当种子（10/17）：换号以后不带上一位的匿名令牌。
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth) || {}
+    this._token = saved.accessToken || ''
     const taskId = trimmed(opts.taskId)
     if (taskId) {
       this.setData({ historyMode: true, taskId, phase: 'loading' })
@@ -196,6 +201,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._gone = true
     this._seq += 1
     this._stopElapsed()

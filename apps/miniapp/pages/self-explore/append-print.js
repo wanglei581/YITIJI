@@ -2,6 +2,9 @@
 // 选择器留在本页，不跳「我的文档」，也不走 opener 事件通道。
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden,
+} = require('../../utils/page-guard')
 
 const SELECTABLE_PURPOSES = ['resume_upload', 'resume_scan']
 const RESUME_PAGE_SIZE = 50
@@ -36,12 +39,27 @@ function mapResumeOption(item) {
 
 const methods = {
   onShow() {
+    markPageShown(this)
+    // 会员闸门（FLOW1b）：恢复结束时页面在后台，回到前台才启动（启动过就什么都不做）。
+    if (this._startOptions) startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
     if (this.data.appendConfirmed && this.data.canManage && !this.data.appending) {
       this._loadResumeOptions()
     }
   },
 
+  onHide() { markPageHidden(this) },
+
   toggleAppendConfirmed() {
+    if (!this.data.canManage || this.data.appending) return
+    // 过期但可恢复（FLOW1b）：勾选「附到本人简历」前先等恢复，成功后照常勾选一次；恢复中再点不重复。
+    gateMemberAction(this, auth, api, 'append', () => this._toggleAppendConfirmed(), {
+      needLogin: () => this._toggleAppendConfirmed(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
+
+  _toggleAppendConfirmed() {
     if (!this.data.canManage || this.data.appending) return
     const next = !this.data.appendConfirmed
     if (next && !auth.isLoggedIn()) {

@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
+const { startAfterMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 const session = require('../../utils/resume-parse-session')
 const fileUrls = require('../../utils/file-url')
 
@@ -37,6 +38,20 @@ Page({
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——导出价格按会员显示，本机任务也要按「现在这一位」认领。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
+
+  onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
+  },
+
+  onHide() { markPageHidden(this) },
+
+  _start(options) {
     this._loadPricing()
 
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
@@ -63,6 +78,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._stopped = true
     if (this._pollTimer) clearTimeout(this._pollTimer)
     this._stopExportCountdown()

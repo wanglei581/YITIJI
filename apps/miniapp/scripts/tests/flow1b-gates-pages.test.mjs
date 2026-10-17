@@ -14,6 +14,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import vm from 'node:vm'
+import { createRequire } from 'node:module'
 import { flush, instantiate, loadPageDefinition } from './page-sandbox.mjs'
 
 const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -62,7 +64,7 @@ function createEnv(initial = 'restorable') {
     getStorageSync: (k) => (store.has(k) ? store.get(k) : ''), setStorageSync: (k, v) => store.set(k, v),
     removeStorageSync: (k) => store.delete(k), getWindowInfo: () => ({ statusBarHeight: 20, windowWidth: 390 }),
     getSystemInfoSync: () => ({ statusBarHeight: 20 }), getAccountInfoSync: () => ({ miniProgram: { envVersion: 'release' } }),
-    chooseMessageFile() {}, scanCode() {},
+    chooseMessageFile() {}, scanCode() {}, pageScrollTo() {}, vibrateShort() {},
   }
   return {
     auth, api, wx, calls, nav, toasts, store,
@@ -268,4 +270,189 @@ test('材料包「选文件」：恢复中切到后台，结果回来不打开�
   page.onShow()
   await settle()
   assert.equal(opened, 0)
+})
+
+// ── β 批：不登录也能用的 AI 工具页——过期但可恢复时先等恢复结果再启动 ─────────────
+// 启动只做一次：恢复成功按会员启动，临时失败照游客启动；恢复中不发任何业务请求；
+// 恢复结束时在后台不启动，回到前台的 onShow 才启动。点击类（导出、生成、重试、附到简历）另验只执行一次。
+
+/** started：这一页「启动过」的可观测痕迹（各页启动时做的第一件事不同）。 */
+const BETA = [
+  { rel: 'pages/job-fit/job-fit', options: { taskId: 'T-1' }, started: (page) => page.data.historyMode === true, history: true },
+  { rel: 'pages/career-plan/career-plan', options: { taskId: 'T-1' }, started: (page) => page.data.historyMode === true, history: true },
+  { rel: 'pages/resume-diagnose/resume-diagnose', options: {}, started: (page, env) => env.called('getResumeExportPricing') > 0 },
+  { rel: 'pages/resume-parse/resume-parse', options: { fileId: 'F-1', fileName: 'a.pdf' }, started: (page) => page.data.fileId === 'F-1' },
+  { rel: 'pages/resume-optimize/resume-optimize', options: {}, started: (page, env) => env.called('getResumeExportPricing') > 0 },
+  { rel: 'pages/self-explore/self-explore', options: {}, started: (page, env) => businessCalls(env) > 0 },
+  { rel: 'pages/resume-build/resume-build', options: { taskId: 'T-1' }, started: (page, env) => businessCalls(env) > 0 },
+]
+function businessCalls(env) { return env.calls.filter((c) => c !== 'restoreSession').length }
+
+async function betaStartsOnceAfterRestore(p, outcome, source) {
+  const env = createEnv('restorable')
+  const page = mount(`${p.rel}.js`, env, source)
+  page.onLoad(p.options)
+  page.onShow && page.onShow()
+  await settle()
+  assert.equal(businessCalls(env), 0, '恢复中不发业务请求（不会把会员当成游客先提交或先报价）')
+  assert.equal(p.started(page, env), false, '恢复中不启动')
+  env.resolve(outcome)
+  await settle()
+  const afterStart = businessCalls(env)
+  assert.equal(p.started(page, env), true, '恢复结束后启动')
+  if (p.history && outcome === 'recoverable') {
+    assert.match(String(page.data.failMsg || ''), /暂时没能恢复登录/, '临时失败不说「登录已失效」')
+  }
+  page.onHide && page.onHide()
+  page.onShow && page.onShow()
+  await settle()
+  assert.equal(businessCalls(env), afterStart, '只启动一次：再回到前台不重复启动')
+  assert.equal(env.loginNavs(), 0, '不跳登录页')
+}
+
+async function betaBackgroundThenShow(p, source) {
+  const env = createEnv('restorable')
+  const page = mount(`${p.rel}.js`, env, source)
+  page.onLoad(p.options)
+  await settle()
+  page.onHide && page.onHide()
+  env.resolve('ok')
+  await settle()
+  assert.equal(p.started(page, env), false, '恢复结束时在后台：不启动')
+  page.onShow && page.onShow()
+  await settle()
+  assert.equal(p.started(page, env), true, '回到前台才启动')
+}
+
+for (const p of BETA) {
+  const name = p.rel.split('/').pop()
+  test(`${name}：过期但可恢复时先等恢复，成功后只启动一次`, () => betaStartsOnceAfterRestore(p, 'ok'))
+  test(`${name}：恢复临时失败也只启动一次（照游客），不自动再恢复`, async () => {
+    await betaStartsOnceAfterRestore(p, 'recoverable')
+  })
+  test(`${name}：恢复结束时在后台不启动，回到前台才启动`, () => betaBackgroundThenShow(p))
+  test(`${name}：已登录时直接启动，不进恢复`, async () => {
+    const env = createEnv('logged_in')
+    const page = mount(`${p.rel}.js`, env)
+    page.onLoad(p.options)
+    await settle()
+    assert.equal(p.started(page, env), true)
+    assert.equal(env.restoreCalls(), 0)
+  })
+  test(`变异[${name}·不等恢复直接启动]必须判红`, async () => {
+    const original = read(`${p.rel}.js`)
+    const anchor = 'startAfterMemberGate(this, auth, api, '
+    assert.ok(original.includes(anchor), `${name} 没有接入 startAfterMemberGate`)
+    const mutated = original.split(anchor).join(';((p, a, b, start) => start())(this, auth, api, ')
+    await assert.rejects(async () => betaStartsOnceAfterRestore(p, 'ok', mutated), (e) => e && e.code === 'ERR_ASSERTION')
+  })
+}
+
+const BETA_ACTIONS = [
+  { rel: 'pages/job-fit/job-fit', options: { taskId: 'T-1' }, tap: 'retry', run: '_retry' },
+  { rel: 'pages/career-plan/career-plan', options: { taskId: 'T-1' }, tap: 'tapGenerate', run: '_tapGenerate' },
+  { rel: 'pages/resume-build/resume-build', options: {}, tap: 'tapExport', run: '_export' },
+  { rel: 'pages/resume-optimize/resume-optimize', options: {}, tap: 'exportResume', run: '_exportResume' },
+]
+for (const a of BETA_ACTIONS) {
+  const name = a.rel.split('/').pop()
+  test(`${name}「${a.tap}」：令牌过期但可恢复时先等恢复，恢复中再点不重复，成功只执行一次；后台期间成功不执行`, async () => {
+    for (const background of [false, true]) {
+      const env = createEnv('restorable')
+      const page = mount(`${a.rel}.js`, env)
+      page._memberStarted = true // 只验点击：页面启动另有用例
+      let ran = 0
+      page[a.run] = () => { ran += 1 }
+      page[a.tap]()
+      page[a.tap]()
+      await settle()
+      if (background) page.onHide()
+      env.resolve('ok')
+      await settle()
+      if (background) { page.onShow(); await settle() }
+      assert.equal(ran, background ? 0 : 1)
+      assert.equal(env.restoreCalls(), 1)
+    }
+  })
+}
+
+// 自我探索「附到本人简历」在页面目录下的 append-print.js 里：页面沙箱给页面换的 auth / api 替身到不了它
+// （它用 Node 的 require 直接拿真实模块）。所以这里单独把 append-print.js 装进沙箱、把它的 auth / api
+// 换成同一套替身，真跑它的勾选逻辑——不是只钉写法。
+function loadAppendPrint(env, mutate) {
+  const file = path.join(MINIAPP, 'pages/self-explore/append-print.js')
+  let source = fs.readFileSync(file, 'utf8')
+  if (mutate) source = mutate(source)
+  const realRequire = createRequire(file)
+  const mod = { exports: {} }
+  const sandbox = { console, wx: env.wx, module: mod, exports: mod.exports }
+  sandbox.require = (id) => {
+    if (id === '../../utils/api') return env.api
+    if (id === '../../utils/auth') return env.auth
+    return realRequire(id)
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox, { filename: file })
+  return mod.exports
+}
+
+function appendPage(env, mutate) {
+  const { methods } = loadAppendPrint(env, mutate)
+  const page = Object.assign({
+    data: { canManage: true, appending: false, appendConfirmed: false, selectedResumeId: '', taskId: 'T-1' },
+    setData(patch) { Object.assign(this.data, patch) },
+  }, methods)
+  return page
+}
+
+async function appendOnceAfterRestore(mutate) {
+  const env = createEnv('restorable')
+  const page = appendPage(env, mutate)
+  page.toggleAppendConfirmed()
+  page.toggleAppendConfirmed()
+  await settle()
+  assert.equal(page.data.appendConfirmed, false, '恢复中不勾选')
+  assert.equal(env.restoreCalls(), 1, '恢复中再点同一个动作：忽略，不再发恢复')
+  env.resolve('ok')
+  await settle()
+  assert.equal(page.data.appendConfirmed, true, '恢复成功：勾选')
+  assert.equal(env.called('getMyDocuments'), 1, '只读一次本人简历列表')
+  assert.equal(env.restoreCalls(), 1)
+}
+test('自我探索「附到本人简历」：恢复中再点同一动作忽略，恢复成功只勾选一次、只读一次简历列表', () => appendOnceAfterRestore())
+
+test('自我探索「附到本人简历」：恢复临时失败提示可重试、不勾选；要登录走原来的登录弹窗', async () => {
+  for (const outcome of ['recoverable', 'need_login']) {
+    const env = createEnv('restorable')
+    const page = appendPage(env)
+    page.toggleAppendConfirmed()
+    await settle()
+    env.resolve(outcome)
+    await settle()
+    assert.equal(page.data.appendConfirmed, false)
+    if (outcome === 'recoverable') assert.ok(env.toasts.some((t) => String(t).includes('暂时没能恢复登录')))
+    else assert.ok(env.toasts.some((t) => String(t) === 'modal:请先登录'), '要登录：原来的「请先登录」弹窗')
+  }
+})
+
+test('自我探索「附到本人简历」：恢复中页面切到后台，结果回来不勾选，回到前台也不补执行', async () => {
+  const env = createEnv('restorable')
+  const page = appendPage(env)
+  page.toggleAppendConfirmed()
+  await settle()
+  page.onHide()
+  env.resolve('ok')
+  await settle()
+  page.onShow()
+  await settle()
+  assert.equal(page.data.appendConfirmed, false)
+})
+
+test('变异[自我探索·附到简历不走会员闸门]必须判红', async () => {
+  const anchor = "    gateMemberAction(this, auth, api, 'append', () => this._toggleAppendConfirmed(), {"
+  const mutate = (src) => {
+    assert.ok(src.includes(anchor), '变异锚点已失效')
+    return src.split(anchor).join("    ;((p, a, b, k, run, h) => (auth.isLoggedIn() ? run() : h.needLogin()))(this, auth, api, 'append', () => this._toggleAppendConfirmed(), {")
+  }
+  await assert.rejects(async () => appendOnceAfterRestore(mutate), (e) => e && e.code === 'ERR_ASSERTION')
 })
