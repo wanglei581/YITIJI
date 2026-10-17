@@ -32,7 +32,27 @@
 
   <view class="content has-bar ord-content">
 
-    <block wx:if="{{!isLoggedIn}}">
+    <block wx:if="{{restoring}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">正在恢复上次的登录…</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{restoreFailed}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">暂时没能恢复登录</view>
+          <view class="es-d">请稍后再试一次。</view>
+          <button class="btn primary block" hover-class="tap-press" bindtap="retryRestore">重试</button>
+        </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{!isLoggedIn}}">
       <view class="card">
         <view class="empty-slot">
           <text class="ficon i-user es-ic"></text>
@@ -247,7 +267,7 @@
 
   <view class="actionbar">
     <view wx:if="{{isLoggedIn}}" class="btn primary block" hover-class="tap-press" bindtap="toPrint">去打印文件</view>
-    <view wx:else class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
+    <view wx:elif="{{!restoring && !restoreFailed}}" class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
   </view>
 
 </view>

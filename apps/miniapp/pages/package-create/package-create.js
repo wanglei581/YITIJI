@@ -23,7 +23,10 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const {
+  createLifecycleGuard, memberIdentityKey, isMemberIdentity,
+  gateMember, retryMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 
 const DOC_PAGE_SIZE = 20
 
@@ -67,6 +70,9 @@ Page({
   data: {
     statusBarHeight: 20,
     isLoggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
 
     docState: 'idle',     // idle | loading | ready | error
     docErrorTitle: '',
@@ -121,6 +127,17 @@ Page({
 
   onShow() {
     this._guard.activate()
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => this._showForCurrentIdentity(),
+      needLogin: () => this._showForCurrentIdentity(),
+    })
+  },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
+
+  /** 按「现在」这一位刷新本页：身份、草稿归属、文件列表。会员闸门三个出口都走这里（恢复失败除外）。 */
+  _showForCurrentIdentity() {
     const previous = this._guard.identity()
     const identity = this._identityKey()
     const usable = isMemberIdentity(identity)
@@ -178,10 +195,12 @@ Page({
 
   onHide() {
     this._guard.deactivate()
+    markPageHidden(this)
   },
 
   onUnload() {
     this._guard.deactivate()
+    markPageUnloaded(this)
   },
 
   /**
@@ -346,6 +365,20 @@ Page({
    */
   addFile() {
     if (this.data.uploading) return
+    // 访问令牌过期但可恢复（FLOW1b）：先等恢复，成功后照常选文件；等待中再点不重复。
+    gateMemberAction(this, auth, api, 'add-file', () => this._addFile(), this._memberActionHandlers())
+  },
+
+  _memberActionHandlers() {
+    return {
+      needLogin: () => this.toLogin(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    }
+  },
+
+  _addFile() {
+    if (this.data.uploading) return
     if (!this._identityUsable()) { this.toLogin(); return }
     wx.chooseMessageFile({
       count: 9,
@@ -500,6 +533,10 @@ Page({
    * 进入服务点选择。只把**服务端 fileId** 和打印参数交给下一步，不带任何金额或页数。
    */
   createPackage() {
+    gateMemberAction(this, auth, api, 'create-package', () => this._createPackage(), this._memberActionHandlers())
+  },
+
+  _createPackage() {
     if (!this._identityUsable()) { this.toLogin(); return }
     const selected = this.data.docs.filter((row) => row.selected)
     if (!selected.length) {
