@@ -18,178 +18,23 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import path from 'node:path'
-import vm from 'node:vm'
-import { fileURLToPath } from 'node:url'
 
-const MINIAPP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const UTILS = path.join(MINIAPP, 'utils')
-
-/** 跑完所有已排队的微任务（回调都挂在 Promise 上）。 */
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
-
-/**
- * 不用 try/catch 包断言：拿到结果再判，避免把断言失败当成业务 reject。
- * 带看门狗：防护被变异摘掉后请求可能永远不落地（比如被拿去补签却没人喂 wx.login），
- * 没有它，变异用例会挂在事件循环上而不是判红。
- */
-async function settle(promise, timeoutMs = 300) {
-  let timer = null
-  const watchdog = new Promise((resolve) => {
-    timer = setTimeout(() => resolve({ ok: false, error: { statusCode: 'TIMEOUT' } }), timeoutMs)
-  })
-  const settled = promise.then((value) => ({ ok: true, value }), (error) => ({ ok: false, error }))
-  const result = await Promise.race([settled, watchdog])
-  clearTimeout(timer)
-  return result
-}
-
-function fakeToken(sub, ttlSeconds = 3600) {
-  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
-  const exp = Math.floor(Date.now() / 1000) + ttlSeconds
-  return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ sub, exp })}.sig`
-}
-
-/** 没有 sub 的 JWT：证明不了持有者是谁。 */
-function tokenWithoutSubject(ttlSeconds = 3600) {
-  const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
-  return `${enc({ alg: 'HS256', typ: 'JWT' })}.${enc({ exp: Math.floor(Date.now() / 1000) + ttlSeconds })}.sig`
-}
-
-// sub 必须等于 user.id —— 后端 member-auth.service.ts 按 user.id 签 sub。
-// 补签拿到的是同一个人的新 token，所以只换 exp 不换 sub。
-const TOKEN_A = fakeToken('A')
-const TOKEN_A2 = fakeToken('A', 7200)
-const TOKEN_B = fakeToken('B')
-const TOKEN_B2 = fakeToken('B', 7200)
-const USER_A = { id: 'A', maskedPhone: '183****0001' }
-const USER_B = { id: 'B', maskedPhone: '183****0002' }
-
-// ── wx 替身 ────────────────────────────────────────────────────────────────
-// faults.set / faults.remove:
-//   'throw'  → 接口抛异常（storage.js 会捕获）
-//   'silent' → 不抛，但什么也没写/没删（**返回值盖不住的那一种**）
-
-function createWx(seed) {
-  // seed = 冷启动：换一个进程，但盘上的内容原样还在。
-  const store = seed instanceof Map ? seed : new Map()
-  // faults.key/keyMode 只让**某一格**写失败 —— 换号时的 torn write 就是这个形状。
-  const faults = { set: null, remove: null, key: null, keyMode: null }
-  const calls = { login: [], request: [], upload: [], toast: [], nav: [], loading: [] }
-  const clone = (v) => {
-    try {
-      return JSON.parse(JSON.stringify(v))
-    } catch (_) {
-      return v
-    }
-  }
-  return {
-    store,
-    faults,
-    calls,
-    getStorageSync(key) {
-      return store.has(key) ? store.get(key) : ''
-    },
-    setStorageSync(key, value) {
-      const mode = faults.key === key ? faults.keyMode : faults.set
-      if (mode === 'throw') throw new Error('setStorageSync failed')
-      if (mode === 'silent') return
-      store.set(key, clone(value))
-    },
-    removeStorageSync(key) {
-      if (faults.remove === 'throw') throw new Error('removeStorageSync failed')
-      if (faults.remove === 'silent') return
-      store.delete(key)
-    },
-    login(opts) { calls.login.push(opts) },
-    request(opts) { calls.request.push(opts) },
-    uploadFile(opts) { calls.upload.push(opts) },
-    getAccountInfoSync() { return { miniProgram: { envVersion: 'release' } } },
-    // 页面用到的那几个：跳转一律只记录，不真的走。
-    showToast(opts) { calls.toast.push((opts && opts.title) || '') },
-    showLoading(opts) { calls.loading.push(['show', (opts && opts.title) || '']) },
-    hideLoading() { calls.loading.push(['hide', '']) },
-    switchTab(opts) { calls.nav.push(['switchTab', opts && opts.url]) },
-    redirectTo(opts) { calls.nav.push(['redirectTo', opts && opts.url]) },
-    navigateTo(opts) { calls.nav.push(['navigateTo', opts && opts.url]) },
-    navigateBack() { calls.nav.push(['navigateBack', '']) },
-    getWindowInfo() { return { statusBarHeight: 20 } },
-  }
-}
-
-/**
- * 真实模块装进一个只有 wx 替身的沙箱。
- * mutate(name, source) 可在**内存里**改写源码（磁盘上的生产源不动）。
- */
-function createRuntime({ mutate, store } = {}) {
-  const wx = createWx(store)
-  // 计时器由测试自己推进：launch.js 的「登录成功 → 600ms 后跳转」不能真等。
-  // （vm 的新 realm 本来就没有 setTimeout，必须注入。）
-  const timers = []
-  const sandbox = {
-    wx,
-    console,
-    setTimeout: (fn) => timers.push(fn),
-    clearTimeout: () => {},
-    setInterval: (fn) => timers.push(fn),
-    clearInterval: () => {},
-    getApp: () => ({ globalData: { statusBarHeight: 20 } }),
-    getCurrentPages: () => [{ route: 'pages/launch/launch' }],
-  }
-  sandbox.globalThis = sandbox
-  vm.createContext(sandbox)
-
-  const cache = new Map()
-  const load = (name) => {
-    if (cache.has(name)) return cache.get(name).exports
-    const file = path.join(UTILS, `${name}.js`)
-    let source = fs.readFileSync(file, 'utf8')
-    if (mutate) source = mutate(name, source)
-    const mod = { exports: {} }
-    cache.set(name, mod)
-    const compiled = vm.compileFunction(source, ['module', 'exports', 'require'], {
-      parsingContext: sandbox,
-      filename: file,
-    })
-    compiled(mod, mod.exports, (spec) => load(String(spec).replace(/^\.\//, '').replace(/\.js$/, '')))
-    return mod.exports
-  }
-
-  const ctx = { wx, storage: load('storage'), auth: load('auth'), net: load('request') }
-  ctx.resigninCalls = () => wx.calls.request.filter((c) => c.url.includes('/wx-resignin'))
-  ctx.runTimers = () => { timers.splice(0).forEach((fn) => fn()) }
-
-  /**
-   * 真跑一个页面：Page 配置由沙箱捕获后实例化成带 setData 的对象。
-   * utils/auth 用的是上面那一份**真实**实例（页面与请求层共享同一个会话），
-   * 只有 utils/api 是替身 —— 它是网络边界，和 wx 同类。
-   */
-  ctx.loadPage = (relPath, apiStub) => {
-    const file = path.join(MINIAPP, relPath)
-    let source = fs.readFileSync(file, 'utf8')
-    if (mutate) source = mutate(relPath, source)
-    let config = null
-    sandbox.Page = (cfg) => { config = cfg }
-    const compiled = vm.compileFunction(source, ['module', 'exports', 'require'], {
-      parsingContext: sandbox,
-      filename: file,
-    })
-    compiled({ exports: {} }, {}, (spec) => {
-      const name = String(spec).replace(/^(\.\.\/)+utils\//, '').replace(/\.js$/, '')
-      return name === 'api' ? apiStub : load(name)
-    })
-    assert.ok(config, `页面没有调用 Page()：${relPath}`)
-    const page = Object.assign({}, config)
-    page.data = JSON.parse(JSON.stringify(config.data))
-    page.setData = function setData(patch) { Object.assign(this.data, patch) }
-    return page
-  }
-
-  return ctx
-}
-
-const authHeader = (call) => (call && call.header && call.header.Authorization) || null
+import {
+  flush,
+  settle,
+  fakeToken,
+  tokenWithoutSubject,
+  TOKEN_A,
+  TOKEN_A2,
+  TOKEN_B,
+  TOKEN_B2,
+  USER_A,
+  USER_B,
+  createRuntime,
+  authHeader,
+  mutator,
+  assertionFailed,
+} from './session-runtime.mjs'
 
 function loginAs(ctx, token, user) {
   return ctx.auth.saveSession({ token, user })
@@ -834,22 +679,6 @@ for (const entry of ['wx', 'sms']) {
 // ── 反向变异：摘掉核心防护，上面的断言必须判红 ────────────────────────────
 
 /** 在内存里改写某个 util 的源码；锚点失效会在这里当场报错（而不是静默不变异）。 */
-function mutator(target, pairs) {
-  const file = target.includes('/') ? path.join(MINIAPP, target) : path.join(UTILS, `${target}.js`)
-  const source = fs.readFileSync(file, 'utf8')
-  for (const [from] of pairs) {
-    assert.ok(source.includes(from), `变异锚点已失效（${target}）：${from.slice(0, 60)}`)
-  }
-  return (name, src) => {
-    if (name !== target) return src
-    let out = src
-    for (const [from, to] of pairs) out = out.split(from).join(to)
-    return out
-  }
-}
-
-/** 变异必须让**断言**失败（ERR_ASSERTION），而不是把代码改崩。 */
-const assertionFailed = (err) => err && err.code === 'ERR_ASSERTION'
 
 const MUTATIONS = [
   {
@@ -859,7 +688,7 @@ const MUTATIONS = [
   },
   {
     name: '登出不推进代际',
-    build: () => mutator('auth', [['  bumpSessionGeneration();\n  sessionRevoked = true;\n  clearSession();', '  sessionRevoked = true;\n  clearSession();']]),
+    build: () => mutator('auth', [['  bumpSessionGeneration();\n  sessionRevoked = true;\n  // 先作废资格', '  sessionRevoked = true;\n  // 先作废资格']]),
     scenario: (opts) => logoutInvalidatesInflightWhenWritesAreLost(TRANSPORTS[0], opts),
   },
   {
@@ -1293,7 +1122,7 @@ async function inconsistentEligibilityStaysDead({ removeFault = null, setFault =
   ctx.wx.faults.remove = null
   ctx.wx.faults.key = null
   ctx.wx.faults.keyMode = null
-  // 冷启动：删不掉时要么写了作废标记，要么本机资料也还在（同样删不掉），都能再认出不一致。
+  // 冷启动：删不掉时要么写了作废标记，要么本机资料还在（删除被 removeUserUnlessLastEvidence 拦下），都能再认出不一致。
   const cold = createRuntime({ store: new Map(ctx.wx.store) })
   assert.equal(cold.auth.restorableMemberId(), null, '冷启动后也不能恢复成 A')
   assert.equal((await cold.net.restoreSession()).state, 'need_login')
@@ -1311,7 +1140,7 @@ async function tokenFirstOrderCannotRevive(opts) {
 
 test('FLOW1b 不一致资格：先认人 → 查令牌 → 再认人，前后都认不出 A（Codex 给的调用顺序）', () => inconsistentEligibilityStaysDead())
 test('FLOW1b 不一致资格：删不掉时写作废标记，本次运行和冷启动都复活不了', () => inconsistentEligibilityStaysDead({ removeFault: 'silent' }))
-test('FLOW1b 不一致资格：删不掉也写不进作废标记时，本次运行靠作废位、冷启动靠还删不掉的本机资料，都复活不了', () => inconsistentEligibilityStaysDead({ removeFault: 'silent', setFault: 'silent' }))
+test('FLOW1b 不一致资格：所有格都删不掉、资格也写不进作废标记时，本次运行和冷启动都复活不了（只坏资格一格的情形见 flow1b-storage-faults）', () => inconsistentEligibilityStaysDead({ removeFault: 'silent', setFault: 'silent' }))
 test('FLOW1b 不一致资格：先查令牌再认人，清资料前已对账', () => tokenFirstOrderCannotRevive())
 
 const FLOW1B_MUTATIONS = [
@@ -1321,25 +1150,17 @@ const FLOW1B_MUTATIONS = [
     scenario: staleEligibilityCannotSurvive,
   },
   {
-    name: '记不下资格时不删旧资格',
-    build: () => mutator('auth', [['  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);\n  return !storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);\n}', '  return true;\n}']]),
+    name: '记不下资格时不作废旧资格',
+    build: () => mutator('auth', [['    }\n  }\n  return revokeEligibility();\n}', '    }\n  }\n  return true;\n}']]),
     scenario: eligibilityRemovedWhenNotWritable,
   },
   {
     name: '恢复资格不核对本机资料',
-    build: () => mutator('auth', [['  if (userId && userId !== String(raw)) revokeEligibility();\n', '']]),
+    build: () => mutator('auth', [['  if (userId && userId !== member) return { id: null, mismatch: true, legacy };\n', '']]),
     scenario: mismatchedEligibilityIsNotRestorable,
   },
-  {
-    name: '作废位不挡第二次读取',
-    build: () => mutator('auth', [['  if (sessionRevoked || eligibilityRevoked) return null;\n  reconcileEligibility();\n  if (eligibilityRevoked) return null;\n', '  if (sessionRevoked) return null;\n  reconcileEligibility();\n']]),
-    scenario: (opts) => inconsistentEligibilityStaysDead({ removeFault: 'silent', setFault: 'silent' }, opts),
-  },
-  {
-    name: '清资料前不对账',
-    build: () => mutator('auth', [['  reconcileEligibility();\n  storage.remove(storage.KEYS.TOKEN);', '  storage.remove(storage.KEYS.TOKEN);']]),
-    scenario: (opts) => tokenFirstOrderCannotRevive(opts),
-  },
+  // 「作废位不挡第二次读取」「清资料前不对账」两条移到 flow1b-storage-faults.test.mjs：
+  // 本机资料的删除改由 removeUserUnlessLastEvidence 把关后，这里原来的场景测不出它们（等价变异），换成能测出的场景。
   {
     name: '补签不核对回来的是不是同一位会员',
     build: () => mutator('request', [["      if (memberId !== expected) throw makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_MISMATCH');\n", '']]),

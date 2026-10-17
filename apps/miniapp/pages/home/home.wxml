@@ -22,7 +22,7 @@
         <text class="greet-sub">{{todayStr}} · 今天也向理想工作靠近一点</text>
         <!-- 上次登录过期、正在自动恢复（FLOW1b）：不当成未登录；临时失败给「重试」，不送去登录页 -->
         <text wx:if="{{restoring}}" class="greet-sub" aria-role="status">正在恢复上次的登录…</text>
-        <text wx:elif="{{restoreFailed}}" class="greet-sub greet-retry tap" bindtap="retryRestore" aria-role="button">网络不稳定，没能恢复登录 · 点此重试</text>
+        <text wx:elif="{{restoreFailed}}" class="greet-sub greet-retry tap" bindtap="retryRestore" aria-role="button">暂时没能恢复登录 · 点此重试</text>
       </view>
 
       <!-- 待取件（两端打通）：手机上下的单，到一体机前凭到机码取。首页不显示码本身，码在取件页里现取。 -->

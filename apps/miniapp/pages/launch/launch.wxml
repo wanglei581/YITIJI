@@ -19,7 +19,7 @@
     <!-- 上次登录还认得、只是过期了：先替用户恢复，成功就回到原处，不收短信（FLOW1b） -->
     <view wx:if="{{restoring}}" class="launch-restore" aria-role="status">正在恢复上次的登录…</view>
     <view wx:elif="{{restoreFailed}}" class="launch-restore warn" aria-role="alert">
-      <text>网络不稳定，暂时没能恢复上次的登录。</text>
+      <text>暂时没能恢复上次的登录。</text>
       <text class="launch-restore-retry tap" bindtap="retryRestore">重试恢复</text>
     </view>
 

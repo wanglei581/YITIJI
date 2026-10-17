@@ -38,10 +38,13 @@ Page({
     if (restorable && afterRestore !== true && !this._restoreWait) {
       this._restoreWait = ensureMember(auth, api).then(() => {
         this._restoreWait = null
-        this.refreshSessionState(true)
+        // 等恢复期间页面已关（例如退出后回到首页）：不再往已卸载的页面写状态。
+        if (!this._unloaded) this.refreshSessionState(true)
       })
     }
   },
+
+  onUnload() { this._unloaded = true },
 
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
   toPrivacy() { wx.navigateTo({ url: '/pages/privacy/privacy' }) },
@@ -61,17 +64,39 @@ Page({
       confirmText: '退出',
       confirmColor: '#b5643c',
       success: (r) => {
-        if (!r.confirm) return
+        if (!r.confirm || this.data.loggingOut) return
+        // 确认即退出（FLOW1b）：本机作废并落盘，不等网络——请求挂起时用户关掉小程序，重开也不会被恢复。
+        // 服务端退出尽力而为，而且要**先发**：请求在发出的这一刻带走退出前的令牌；随后本机作废，
+        // 撤销位与代际让它即使回 401 也补签不了，不会凭补签把人登回来。
+        const server = auth.isLoggedIn() ? api.logout() : null
+        const saved = auth.logout()
         this.setData({ loggingOut: true })
-        api.logout()
-          .then(() => this.finishLogout('已退出登录'))
-          .catch(() => this.finishLogout('已退出本机登录'))
+        let finished = false
+        const finish = (message) => {
+          if (finished) return
+          finished = true
+          this.finishLogout(message, saved)
+        }
+        if (!server) { finish('已退出登录'); return }
+        server.then(() => finish('已退出登录'), () => finish('已退出本机登录'))
+        // 服务端迟迟不回：本机已经退出，不让人干等。
+        setTimeout(() => finish('已退出本机登录'), 1500)
       },
     })
   },
 
-  finishLogout(message) {
-    auth.logout()
+  /** @param {boolean} saved auth.logout() 的返回值：退出是否已在本机落盘。 */
+  finishLogout(message, saved) {
+    if (saved === false) {
+      // 本机存储写不进、或读不出来确认不了：本次已经退出，但重开可能仍是登录状态——如实说，不报「已退出」了事。
+      wx.showModal({
+        title: '退出没有完全保存',
+        content: '本次已退出，但手机存储暂时出了问题，没能确认退出已保存。下次打开小程序可能仍是登录状态，可以重新打开后再退出一次。',
+        showCancel: false,
+        complete: () => wx.reLaunch({ url: '/pages/home/home' }),
+      })
+      return
+    }
     wx.showToast({ title: message, icon: 'none', duration: 1000 })
     setTimeout(() => wx.reLaunch({ url: '/pages/home/home' }), 250)
   },

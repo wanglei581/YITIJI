@@ -65,7 +65,7 @@ for (const page of [
     const p = instantiate(loadPageDefinition(page.rel, { wx, modules: { api, auth } }))
     p.onLoad({}); await flush()
     assert.equal(calls.redirect.length, 0, '不送去登录页重收短信')
-    assert.match(p.data.loadError, /网络不稳定/)
+    assert.match(p.data.loadError, /暂时没能恢复登录/)
   })
 
   test(`${page.rel}：确定需要登录才跳登录页，并带回跳地址`, async () => {

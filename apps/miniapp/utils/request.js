@@ -79,7 +79,7 @@ function isDefinitiveResigninFailure(err) {
 
 /** 临时失败给页面的错误：不是 401（页面不会当成「要重新登录」），说清楚稍后会恢复。 */
 function recoverableSessionError() {
-  const e = makeError('网络不稳定，暂时没能恢复登录，请稍后重试', -1, 'SESSION_RESTORE_PENDING');
+  const e = makeError('暂时没能恢复登录，请稍后重试', -1, 'SESSION_RESTORE_PENDING');
   e.recoverable = true;
   return e;
 }
@@ -119,10 +119,12 @@ function silentResignin(generation) {
   // 只清自己那一次:旧飞行晚到时若无条件清空,会把之后新建的飞行一起抹掉。
   const done = () => { if (resigninInflight === flight) resigninInflight = null; };
   // 补签只认上次明确登录的那一位（FLOW1b）：出发时就定下来；认不出是谁就不去换 token。
-  const expected = auth.restorableMemberId();
+  // 本机存储这一次读不出来（认不清）是临时失败：不登出、不删资格，稍后再试（Codex 冷审）。
+  const member = auth.restorableMember();
+  const expected = member.id;
   flight.promise = new Promise((resolve, reject) => {
     if (!expected) {
-      reject(makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_UNKNOWN'));
+      reject(member.unreadable ? recoverableSessionError() : makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_UNKNOWN'));
       return;
     }
     wx.login({
@@ -454,8 +456,11 @@ function extractError(body, statusCode) {
  */
 function restoreSession() {
   // 先认人：旧版本的「1」要趁本机资料还在时迁移成会员 id（getToken 遇到过期会清掉资料）。
-  const expected = auth.restorableMemberId();
+  const member = auth.restorableMember();
+  const expected = member.id;
   if (auth.getToken()) return Promise.resolve({ state: 'ok' });
+  // 本机存储读不出来、认不清是谁：临时失败，给重试，不送去登录页（Codex 冷审）。
+  if (!expected && member.unreadable) return Promise.resolve({ state: 'recoverable' });
   if (!expected || !auth.canSilentResignin()) return Promise.resolve({ state: 'need_login' });
   const generation = auth.sessionGeneration();
   // 途中换了人（显式登录 / 登出）：结果按「现在」算，不按出发时那个人算。

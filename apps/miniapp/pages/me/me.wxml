@@ -25,7 +25,7 @@
                  补一句真实状态与登录后能得到什么，与登录按钮同属一个 wx:else 分支。 -->
             <!-- 上次登录过期、正在自动恢复（FLOW1b）：不当成未登录 -->
             <view wx:elif="{{restoring}}" class="profile-meta" aria-role="status">正在恢复上次的登录…</view>
-            <view wx:elif="{{restoreFailed}}" class="profile-meta">网络不稳定，暂时没能恢复登录</view>
+            <view wx:elif="{{restoreFailed}}" class="profile-meta">暂时没能恢复登录</view>
             <view wx:else class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
           </view>
           <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" aria-role="button" aria-label="打开账号设置">

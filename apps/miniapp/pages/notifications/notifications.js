@@ -64,7 +64,7 @@ Page({
         return
       }
       if (r.state === 'recoverable') {
-        this.setData({ loading: false, loadError: '网络不稳定，暂时没能恢复登录，请稍后重试' })
+        this.setData({ loading: false, loadError: '暂时没能恢复登录，请稍后重试' })
         return
       }
       this.loadNotifications()

@@ -262,7 +262,11 @@ function sameAccount(tokenAccount, currentAccount) {
  */
 function isRestorable(auth) {
   if (!auth || typeof auth.restorableMemberId !== 'function') return false
-  if (!auth.restorableMemberId()) return false
+  // 本机存储这一次读不出来（认不清是谁）也按「可恢复」走：去等恢复结果（临时失败、可重试），不当成未登录。
+  const member = typeof auth.restorableMember === 'function'
+    ? auth.restorableMember()
+    : { id: auth.restorableMemberId(), unreadable: false }
+  if (!member.id && !member.unreadable) return false
   if (auth.isLoggedIn()) return false
   return !!(auth.canSilentResignin && auth.canSilentResignin())
 }
