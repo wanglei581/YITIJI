@@ -17,10 +17,11 @@
 - `ui-audit-vis1-0205742fc/manifest.json`：VIS1 候选 `0205742fc` 的运行效果，6 张，含主项目切换前后的 SHA。
 - `ui-audit-ops1-696437f28/manifest.json`：OPS1+VIS2 候选 `696437f28` 的运行效果，5 张；面试设置是用临时只读启动模式看的，不算首页跳转验收。
 
-## 概况（截至 10/17 10:33，取自下面几份清单）
+## 概况（截至 10/17 10:44，取自下面几份清单）
 
 **收口状态**（分开写，不混算）：
-- **已修复且已实屏**：候选 `ed73304`，开发者工具模拟器，范围见各行。
+- **已修复且已实屏**：候选 `ed73304`（VIS3a）和 `ec69af9`（VIS3b），开发者工具模拟器，390 宽，范围见各行。
+  - VIS3b：首页副标题两行、打印 Tab 去重且已登录不再写「登录后查看」、组包没选文件时置灰、AI 工具标题对齐、简历搭建首屏、语音简历手打题面、助手初态置灰、U 盘指引内边距（`ui-audit-vis3b-ec69af9f8/manifest.json`，9 张）；
   - AI 工具、打印 Tab、意见反馈：滚动后不再穿进状态栏和胶囊，页头钉在顶部；
   - 诊断、简历上传：返回箭头可见、单次返回正确；
   - 今日提醒：日期在内容区、不压胶囊；
@@ -28,11 +29,10 @@
   - 订单页：VIS1 的单件优先、码一行，候选 `0205742fc` 和 `ed73304` 都看过；
   - 简历优化无任务页、上传落点、面试选项：候选 `696437f28`。
 - **已修复、待实屏**：
-  - VIS3b `ec69af9` 的 12 项，加登录页追加一项；
+  - VIS3b 里还没截图的：帮助 FAQ 内边距、AI 服务记录空态跳转、订单详情按钮边距、登录拿不到手机号后打开短信表单（只有代码和 agy 证据）；
+  - VIS3c #1476 `214411a`：订单详情「查看到机码」、自我探索其余提示去掉「服务端」；
   - 返回箭头的其余页面（订单详情、消息通知、我的简历、关于等）：已改画法，候选还没截图。
 - **未修（已登记）**：
-  - 订单详情没有「查看到机码」主操作；
-  - 自我探索其余「服务端」文案；
   - RESUME_TASK 账号归属；
   - 优化额度用完时没有模板出口；
   - 约 230 处 `role=` 改成 `aria-role`；
@@ -59,8 +59,9 @@
 | OPS1 + VIS2 | 简历优化、面试入口 | 入口死路改走「我的简历 / 上传新简历」；失败态加「选择其他简历」；上传落点改为选文件页；时长选项写清、选项块居中 | #1473 `696437f28`。第一版方案 agy 判需修改已撤；冷审阻断（上传落到解析页报错）已修；agy 重核：可以出候选。CI 全绿。实屏局部通过：无任务页两个入口、上传落点、面试选项居中与时长题数、点选高亮。不算通过：上传页返回图标看不见、首页到面试的跳转、空态开始提示 |
 | VIS3（已拆成 3a / 3b，下面两行） | 优先（用户 10/16 晚指定，已有实图证实）：滚动进状态栏和胶囊（AI 工具、意见反馈、打印 Tab）；部分页返回箭头稳定看不见并补无障碍返回名称；今日提醒日期被胶囊盖住；帮助卡片内边距；首页和 AI 工具入口层级；语音简历文字模式。其次：订单详情主按钮贴边、组包「下一步」、AI 服务记录空态、助手初态、职业规划孤字、打印 Tab 文案、U盘指引标签、扫码登录配色、自我探索用语 | 按现有组件和全局样式找共享根因，不逐页打补丁；不删已验证功能 | 未开工；先报文件预算，交 agy 审方案，再实现 |
 | VIS3a | 38 个有返回键的页、21 页页头、今日提醒、扫码登录 | 页头钉顶；返回键无障碍并换画法；日期移出胶囊区；扫码登录回到现有配色 | #1474 `ed73304`。agy 方案两轮、实现复核：可以出候选。实屏 14 张（开发者工具；320 宽未验；手机未验） |
-| VIS3b | 打印 Tab、AI 工具、首页、帮助、U 盘、订单详情、组包、AI 服务记录、助手、语音简历、自我探索、简历搭建、登录 | 页面层级、对齐、内边距、空态出口、置灰、手打题面、首屏顺序；登录拿不到手机号后打开短信表单 | `ec69af9`（本机 469/469，13 条反向检查转红）；agy 实现复核中；待推送、待实屏 |
-| 下一批（小批，各自报预算再交 agy） | 订单详情、自我探索、首页；诊断、职业规划、岗位匹配；简历优化 | 待到机详情给「查看到机码」主操作（复用取件页路由）；其余「服务端」文案；首页层级轻调；RESUME_TASK 账号归属；额度用完的模板出口 | 未开工 |
+| VIS3b | 打印 Tab、AI 工具、首页、帮助、U 盘、订单详情、组包、AI 服务记录、助手、语音简历、自我探索、简历搭建、登录 | 页面层级、对齐、内边距、空态出口、置灰、手打题面、首屏顺序；登录拿不到手机号后打开短信表单 | #1475 `ec69af9`（本机 469/469）；agy 实现通过；实屏 9 张（390 宽；帮助、空态跳转、订单详情边距、登录兜底没截图） |
+| VIS3c | 订单详情、自我探索 | 待到机详情给「查看到机码」主操作（复用取件页路由，码不进 URL）；其余「服务端」提示 | #1476 `214411a`。agy 方案、实现都通过；待实屏 |
+| VIS3d（冻结前最后一批） | 诊断、职业规划、岗位匹配、自我探索、解析；简历优化 | RESUME_TASK 账号归属（复用 ownerId）；额度用完或 AI 不可用时给「按模板手动填写」（现有 resume-build） | 方案交 agy 中 |
 | 另起一批 | 诊断、职业规划、岗位匹配 | RESUME_TASK 没有账号归属 | 未开工 |
 
 ## 跨页待核
@@ -90,13 +91,13 @@
 
 | 页面 | 入口（代码） | 模板状态分支（代码） | 证据 | 视觉问题 | 操作问题 | 严重度 | 修复 | 测试；规模 |
 |---|---|---|---|---|---|---|---|---|
-| 首页<br>`pages/home/home` | 底部 Tab；TabBar, about, ai-records, assistant, career-plan, daily-report 等 | （模板无状态分支） | 已见实际｜模拟器 cfbe567：03-home-top-before（已登录、有一笔待到机） | 入口层级密集；待取件副标题被截断 | — | P2 | 副标题两行：VIS3b 已修复，待实屏。入口层级：常规层级和对齐调整属于现有授权（用户 10/17），不大改首页结构，下一批轻调 | page-lifecycle、print-flow-ux、verify-miniapp-static 等；js 170 行 |
-| 启动/登录<br>`pages/launch/launch` | ai-records, career-plan, daily-report, documents, feedback, job-fit 等 | 锁定 | 已见实际｜模拟器 cfbe567：32-launch-before（从扫码登录一体机「去登录」进入） | 版面完整 | 没勾协议前登录按钮不可用；没勾协议、没提交登录。<br>10/17 用户实测：微信一键登录拿不到手机号时，开发者工具弹出微信自己的「获取手机号失败 / Error: 用户绑定的手机需要进行验证，请在客户端完成短信验证步骤」（小程序代码里没有这两句），之后页面只弹两秒提示，不打开短信表单 | P2 | 拿不到手机号后直接打开现有短信验证码表单：VIS3b `ec69af9` 已修复，待实屏。微信自己的报错框页面改不了，也不绕过 | ai-access、page-lifecycle、session-generation 等；js 270 行 |
-| AI 工具（Tab）<br>`pages/ai/ai` | 底部 Tab；TabBar, assistant, daily-report, help, home | （模板无状态分支） | 已见实际｜模拟器 cfbe567：04-ai-before、04b-ai-lower-before<br>已见实际｜模拟器 候选 ed73304：01-ai-top、02-ai-scrolled（往下翻页后页头钉住，状态栏和胶囊不再被内容盖住） | 分组标题与说明贴左、没和卡片对齐；顶部说明和入口密集；滚动后内容跑到状态栏和微信胶囊下面（截图所见，根因待核） | — | P2 | 滚穿顶：VIS3a #1474 `ed73304` 已修复、已实屏（02）。分组标题对齐：VIS3b `ec69af9` 已修复，待实屏 | verify-miniapp-static、verify-package-layout；js 140 行 |
-| 打印（Tab）<br>`pages/print/print` | 底部 Tab；TabBar, assistant, daily-report, home, resume-diagnose | （模板无状态分支） | 已见实际｜模拟器 cfbe567：16-print-before（Codex 当时记为已登录）、16b-print-lower-before（下半屏；**运行时已是未登录态，不能算已登录截图**）<br>已见实际｜模拟器 候选 ed73304：07-print-top、08-print-scrolled（页头钉住） | 初屏引导、步骤、大入口卡层级重复；下滚后内容穿进状态栏和微信胶囊下面 | 「今日提醒」的「登录后查看」在 `print.js:25` 写死（代码），已登录时也这么写，待已登录运行复测；底栏坐标点击几次不响应，改用文本节点能进入（工具限制） | P2 | 滚穿顶：VIS3a 已修复、已实屏（08）。层级重复与写死的「登录后查看」：VIS3b `ec69af9` 已修复，待实屏 | free-pilot-copy、verify-miniapp-static、verify-package-layout；js 60 行 |
+| 首页<br>`pages/home/home` | 底部 Tab；TabBar, about, ai-records, assistant, career-plan, daily-report 等 | （模板无状态分支） | 已见实际｜模拟器 cfbe567：03-home-top-before（已登录、有一笔待到机）<br>已见实际｜模拟器 候选 ec69af9：01-home-pickup（用户本人登录：待取件终端名和到期时间完整，副标题换行不再截断） | 入口层级密集；待取件副标题被截断 | — | P2 | 副标题两行：VIS3b #1475 `ec69af9` 已修复、已实屏（01）。入口层级：不大改结构 | page-lifecycle、print-flow-ux、verify-miniapp-static 等；js 170 行 |
+| 启动/登录<br>`pages/launch/launch` | ai-records, career-plan, daily-report, documents, feedback, job-fit 等 | 锁定 | 已见实际｜模拟器 cfbe567：32-launch-before（从扫码登录一体机「去登录」进入） | 版面完整 | 没勾协议前登录按钮不可用；没勾协议、没提交登录。<br>10/17 用户实测：微信一键登录拿不到手机号时，开发者工具弹出微信自己的「获取手机号失败 / Error: 用户绑定的手机需要进行验证，请在客户端完成短信验证步骤」（小程序代码里没有这两句），之后页面只弹两秒提示，不打开短信表单 | P2 | 拿不到手机号后直接打开现有短信验证码表单：VIS3b 已修复；没截图，只有代码和 agy 证据。微信自己的报错框页面改不了，也不绕过 | ai-access、page-lifecycle、session-generation 等；js 270 行 |
+| AI 工具（Tab）<br>`pages/ai/ai` | 底部 Tab；TabBar, assistant, daily-report, help, home | （模板无状态分支） | 已见实际｜模拟器 cfbe567：04-ai-before、04b-ai-lower-before<br>已见实际｜模拟器 候选 ed73304：01-ai-top、02-ai-scrolled（往下翻页后页头钉住，状态栏和胶囊不再被内容盖住）<br>已见实际｜模拟器 候选 ec69af9：04-ai-alignment（分组标题和卡片左边对齐） | 分组标题与说明贴左、没和卡片对齐；顶部说明和入口密集；滚动后内容跑到状态栏和微信胶囊下面（截图所见，根因待核） | — | P2 | 滚穿顶：VIS3a 已修复、已实屏（02）。分组标题对齐：VIS3b 已修复、已实屏（04） | verify-miniapp-static、verify-package-layout；js 140 行 |
+| 打印（Tab）<br>`pages/print/print` | 底部 Tab；TabBar, assistant, daily-report, home, resume-diagnose | （模板无状态分支） | 已见实际｜模拟器 cfbe567：16-print-before（Codex 当时记为已登录）、16b-print-lower-before（下半屏；**运行时已是未登录态，不能算已登录截图**）<br>已见实际｜模拟器 候选 ed73304：07-print-top、08-print-scrolled（页头钉住）<br>已见实际｜模拟器 候选 ec69af9：02-print-tab（卡片流程小字已去掉；已登录时不再写「登录后查看」） | 初屏引导、步骤、大入口卡层级重复；下滚后内容穿进状态栏和微信胶囊下面 | 「今日提醒」的「登录后查看」在 `print.js:25` 写死（代码），已登录时也这么写，待已登录运行复测；底栏坐标点击几次不响应，改用文本节点能进入（工具限制） | P2 | 滚穿顶：VIS3a 已修复、已实屏（08）。层级重复与写死的「登录后查看」：VIS3b 已修复、已实屏（02） | free-pilot-copy、verify-miniapp-static、verify-package-layout；js 60 行 |
 | 我的（Tab）<br>`pages/me/me` | 底部 Tab；TabBar, assistant, daily-report, feedback, home | 失败、未登录 | 已见实际｜模拟器 候选 0205742fc：09-me-current（未登录态）<br>已见实际｜模拟器 cfbe567：15-me-auth-before（已登录：0 简历、17 文档、9 订单） | — | — | — | — | me-stats、print-flow-ux、verify-miniapp-static 等；js 171 行 |
-| AI 助手<br>`pages/assistant/assistant` | ai, home | 加载、锁定 | 已见实际｜模拟器 cfbe567：11-assistant-before（问候态） | 只有问候就显著显示「保存本次要点」大按钮 | 待核：只有问候时该不该显示、能不能点（未点，未发 AI 请求） | P2 | 无对话时置灰：VIS3b 已修复，待实屏 | page-lifecycle；js 330 行 |
-| 材料包·组包<br>`pages/package-create/package-create` | orders, package-confirm, print, store-select | 分页、加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：17-package-create-before、17b-package-empty-next-before（一份没选） | 一份没选时「下一步」是蓝色可点的样子 | 点了提示「请先选择文件」、留在本页、没建单：可用性待优化，不是漏校验 | P2 | 没选文件时置灰：VIS3b 已修复，待实屏 | free-pilot-copy、package-order-idempotency、page-lifecycle 等；js 553 行 ⚠ 超 500 |
+| AI 助手<br>`pages/assistant/assistant` | ai, home | 加载、锁定 | 已见实际｜模拟器 cfbe567：11-assistant-before（问候态）<br>已见实际｜模拟器 候选 ec69af9：07-assistant-initial（初态「保存本次要点」外观和无障碍都是不可用；没发问题；返回箭头可见） | 只有问候就显著显示「保存本次要点」大按钮 | 待核：只有问候时该不该显示、能不能点（未点，未发 AI 请求） | P2 | 无对话时置灰：VIS3b 已修复、已实屏（07） | page-lifecycle；js 330 行 |
+| 材料包·组包<br>`pages/package-create/package-create` | orders, package-confirm, print, store-select | 分页、加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：17-package-create-before、17b-package-empty-next-before（一份没选）<br>已见实际｜模拟器 候选 ec69af9：03-package-empty-selection（一份没选时「选择服务点」外观和无障碍都是不可用；没选文件、没建单） | 一份没选时「下一步」是蓝色可点的样子 | 点了提示「请先选择文件」、留在本页、没建单：可用性待优化，不是漏校验 | P2 | 没选文件时置灰：VIS3b 已修复、已实屏（03） | free-pilot-copy、package-order-idempotency、page-lifecycle 等；js 553 行 ⚠ 超 500 |
 | 材料包·选服务点<br>`pages/store-select/store-select` | package-confirm, package-create | 加载、失败、空 | 仅代码检查 | 待截图 | 待走查 | — | — | package-order-idempotency、page-lifecycle、verify-miniapp-static 等；js 186 行 |
 | 材料包·确认<br>`pages/package-confirm/package-confirm` | store-select | 加载、失败、完成、未登录 | 仅代码检查 | 待截图 | 待走查 | — | — | free-pilot-copy、package-order-idempotency、page-lifecycle 等；js 1112 行 ⚠ 超 800 |
 | 材料包·到机码<br>`pages/package-code/package-code` | home, orders, package-confirm | 加载、失败、完成 | 仅代码检查 | 待截图 | 待走查 | — | — | free-pilot-copy、home-pickup-summary、package-order-idempotency 等；js 457 行 |
@@ -104,8 +105,8 @@
 | 打印·选终端<br>`pages/print-store/print-store` | print-upload | 加载、失败、完成、空 | 已见实际｜手机 03439f5（旧源）：COLOR / DUPLEX / OFFLINE 下单时走过 | 待截图 | 待走查 | — | — | free-pilot-copy、page-lifecycle、print-capabilities 等；js 289 行 |
 | 打印·确认<br>`pages/print-pay/print-pay` | print-store | 加载、失败、未登录、锁定 | 已见实际｜手机 03439f5（旧源）：同上 | 待截图 | 待走查 | — | — | free-pilot-copy、page-lifecycle、price-confirmation 等；js 970 行 ⚠ 超 800 |
 | 打印·到机码/取件<br>`pages/print-pickup/print-pickup` | home, orders, print-pay | 加载、失败、完成、未登录 | 已见实际｜手机 03439f5（旧源）：同上；8242781fa 查看路径（用户未逐页记录） | 待截图 | 待走查 | — | — | free-pilot-copy、home-pickup-summary、page-lifecycle 等；js 819 行 ⚠ 超 800 |
-| 简历搭建<br>`pages/resume-build/resume-build` | ai, ai-records, resume-voice | 加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：05-resume-build-before（空表单） | 语音替代入口和大段说明先占首屏，基本字段靠下 | — | P2 | 首屏顺序：VIS3b 已修复，待实屏 | 未检出直接页级覆盖（待核实关联测试）；js 555 行 ⚠ 超 500 |
-| 语音简历<br>`pages/resume-voice/resume-voice` | ai, home, resume-build | 失败、完成 | 已见实际｜模拟器 cfbe567：07、07b（未勾选录音 → 用手打进入第一题） | 文字模式题面仍写「请说出你的姓名」「转成文字后」 | 文字兜底入口本身可用（已观察） | P2 | 手打题面：VIS3b 已修复，待实屏 | 未检出直接页级覆盖（待核实关联测试）；js 387 行 |
+| 简历搭建<br>`pages/resume-build/resume-build` | ai, ai-records, resume-voice | 加载、失败、完成、未登录 | 已见实际｜模拟器 cfbe567：05-resume-build-before（空表单）<br>已见实际｜模拟器 候选 ec69af9：05-resume-build-first（基本信息在语音入口之前；空表单，没填） | 语音替代入口和大段说明先占首屏，基本字段靠下 | — | P2 | 首屏顺序：VIS3b 已修复、已实屏（05） | 未检出直接页级覆盖（待核实关联测试）；js 555 行 ⚠ 超 500 |
+| 语音简历<br>`pages/resume-voice/resume-voice` | ai, home, resume-build | 失败、完成 | 已见实际｜模拟器 cfbe567：07、07b（未勾选录音 → 用手打进入第一题）<br>已见实际｜模拟器 候选 ec69af9：06-voice-text-mode（不同意录音、选手打：题面写「请填写你的姓名」，不再写「说出」；没填内容） | 文字模式题面仍写「请说出你的姓名」「转成文字后」 | 文字兜底入口本身可用（已观察） | P2 | 手打题面：VIS3b 已修复、已实屏（06） | 未检出直接页级覆盖（待核实关联测试）；js 387 行 |
 | 简历上传<br>`pages/resume-upload/resume-upload` | assistant, career-plan, job-fit, resume-diagnose, resume-parse, resumes 等 | （模板无状态分支） | 已见实际｜模拟器 cfbe567：13-resume-upload-before<br>已见实际｜模拟器 候选 696437f28：03-upload-landing（选文件页）<br>已见实际｜模拟器 候选 ed73304：05-upload-back-arrow（返回箭头可见，单次返回到简历优化；Codex 初看缩略图误判，放大原图后已更正） | 基线返回箭头看不见；候选里可见 | 返回可用（候选，AX 单次返回） | — | VIS3a #1474 `ed73304` 已修复、已实屏（05） | verify-miniapp-static；#1473 起 ai-entry-fixes 也测这一页的落点；js 128 行 |
 | AI 诊断报告<br>`pages/resume-diagnose/resume-diagnose` | ai, ai-records, assistant, home, resume-parse, resumes | 加载、失败、完成、禁用、空 | 已见实际｜模拟器 cfbe567：02-diagnose-before（空态）<br>已见实际｜模拟器 候选 0205742fc：02-diagnose-after（空态）<br>已见实际｜模拟器 候选 ed73304：03-diagnose-back-arrow（返回箭头可见，单次返回到首页） | 改前：无报告却有整块禁用导出卡、并排按钮越屏、空态与主按钮之间大片空白。候选：已消失；返回箭头在这张里看不明显（根因与候选关系未确认） | 改前：空态主操作离说明太远。候选：主按钮贴近说明 | P1 | VIS1 #1472 `0205742fc`：候选实屏局部通过。返回箭头：VIS3a `ed73304` 已修复、已实屏（03） | ai-records-qa、free-pilot-copy、page-lifecycle 等，#1472 加 vis-layout；js 343 行 |
 | 简历优化<br>`pages/resume-optimize/resume-optimize` | ai, ai-records, assistant, home, job-fit, resume-diagnose 等 | 加载、失败、完成、禁用 | 已见实际｜模拟器 cfbe567：06-resume-optimize-before（从 AI 工具正常进入）<br>已见实际｜模拟器 候选 ed73304：04-optimize-empty（无任务页两个入口，返回箭头可见） | — | 改前：无 taskId 时只有「未指定优化任务／请从简历诊断页发起」和「返回」，入口是死路；失败态「重新上传简历」跳解析页落到报错 | P1 | OPS1 #1473 `696437f`：只给「从我的简历选择 / 上传新简历」，不读缓存；失败态加「选择其他简历」；上传落点改为选文件页。agy 重核可以出候选；候选截图待 Codex | free-pilot-copy、verify-miniapp-static；#1473 加 ai-entry-fixes（13 条）；js 498 行（#1473 后 503 行，已评估拆分） |
@@ -116,17 +117,17 @@
 | 自我探索<br>`pages/self-explore/self-explore` | ai, ai-records, career-plan | 加载、失败、完成、锁定 | 已见实际｜模拟器 cfbe567：29-self-explore-before（只看介绍和同意说明） | 说明很长；露出「E3」「服务端拒绝」等实现用语；返回箭头可见 | 没同意、没作答、没发 AI 请求；AX 返回回到 AI 工具。以后精简必须保留同意内容 | P2 | 同意区和底部说明两句：VIS3b 已修复，待实屏。模板另有 5 处、脚本提示另有 4 处写「服务端」：下一批文案项，同意内容一字不动 | self-explore-consent-items、verify-miniapp-static；js 780 行 ⚠ 超 500 |
 | 岗位匹配参考<br>`pages/job-fit/job-fit` | ai, ai-records, assistant | 加载、失败、完成 | 已见实际｜模拟器 cfbe567：28-job-fit-before（无简历空态） | 返回箭头可见 | 上传入口可见；返回 AI 工具可用；无任务时读没有归属的 RESUME_TASK（代码，另起一批） | — | — | verify-miniapp-static、verify-review-scope；js 354 行 |
 | 打印预览<br>`pages/print-preview/print-preview` | print-upload | 加载 | 已见实际｜手机 689047e9f：「打开原文查看」PDF 完整、返回无残留遮罩 | 待截图 | 待走查 | — | — | file-preview、free-pilot-copy、page-lifecycle 等；js 181 行 |
-| U盘打印指引<br>`pages/usb-import/usb-import` | print | （模板无状态分支） | 已见实际｜模拟器 cfbe567：30-usb-import-before | 格式标签贴在卡片左边；返回箭头可见 | 没打印、没导入 | P3 | 格式标签内边距：VIS3b 已修复，待实屏 | page-lifecycle；js 28 行 |
+| U盘打印指引<br>`pages/usb-import/usb-import` | print | （模板无状态分支） | 已见实际｜模拟器 cfbe567：30-usb-import-before<br>已见实际｜模拟器 候选 ec69af9：08-usb-guide、09-usb-guide-bottom（格式卡片有内边距；底部说明可读，标题钉住；单次返回到打印 Tab） | 格式标签贴在卡片左边；返回箭头可见 | 没打印、没导入 | P3 | 格式标签内边距：VIS3b 已修复、已实屏（09） | page-lifecycle；js 28 行 |
 | 简历解析<br>`pages/resume-parse/resume-parse` | resume-diagnose, resume-optimize, resume-upload | 失败、完成、锁定 | 仅代码检查 | 待截图 | 不带 fileId 进入停在「缺少待解析的简历文件」（代码；#1473 起优化页不再直接跳这里） | — | — | page-lifecycle、verify-miniapp-static；#1473 起 ai-entry-fixes 用它做反例；js 756 行 ⚠ 超 500 |
 | 我的简历<br>`pages/resumes/resumes` | me | 分页、加载、失败、未登录 | 已见实际｜模拟器 cfbe567：24-resumes-before、24b-resumes-settled-before（0 份空态） | 稳定后返回箭头仍看不见 | 点左上区域能回「我的」；空态主按钮合理 | P2 | 返回箭头：VIS3a `ed73304` 已改画法（代码），候选还没截图，不记通过 | list-load-more、verify-miniapp-static；#1473 起 ai-entry-fixes 也测这一页的落点；js 183 行 |
 | 我的文档<br>`pages/documents/documents` | ai, home, launch, me, order-detail, orders 等 | 分页、加载、失败、锁定 | 已见实际｜手机 689047e9f / 8242781fa：预览 PDF 完整、返回正常 | 待截图 | 待走查 | — | — | file-preview、page-lifecycle、print-flow-ux 等；js 468 行 |
 | 求职材料<br>`pages/job-materials/job-materials` | ai | 加载、失败、空 | 已见实际｜模拟器 cfbe567：27-job-materials-before（模板目录）、27b-job-materials-form-before（校园求职信空表单） | 表单每个字段一张独立大卡片 | 空表单时「生成」不可用；没填、没生成；坐标返回没确认（工具限制） | P3 | VIS3 待定 | 未检出直接页级覆盖（待核实关联测试）；js 145 行 |
 | 打印订单<br>`pages/orders/orders` | home, me, notifications, order-detail, package-code, package-confirm 等 | 分页、加载、失败、完成、未登录、空 | 已见实际｜模拟器 cfbe567：01-orders-actual-before<br>已见实际｜手机 8242781fa：查看已完成 COLOR / DUPLEX 与待到机 PAPER 单（只看不下单）<br>已见实际｜模拟器 候选 0205742fc：01-orders-after、01b-orders-pending-after、01c-orders-empty-filter-after（用户本人登录）<br>已见实际｜模拟器 候选 ed73304：13-orders-auth-top（用户本人登录：待到机 PAPER 加已过期单；单件在前，到机码一行，提示在下，长文件名在卡片内换行）。320 宽没有验收 | 改前：材料包 0 笔大空卡占首屏；到机码和标签折行；字小、卡里套卡。候选：单件在前、码一行、材料包空态一行 | 改前：真实订单被挤到下面。候选：「待取件」筛选一笔 PAPER 加紧凑空行；「打印中」筛选零单件、提示切到全部 | P1 | VIS1 #1472 `0205742fc`：候选实屏局部通过 | free-pilot-copy、page-lifecycle、print-flow-ux 等，#1472 加 vis-layout；js 539 行 ⚠ 超 500 |
-| 订单详情<br>`pages/order-detail/order-detail` | orders | 加载、失败 | 已见实际｜模拟器 候选 0205742fc：10-order-detail-current（只读打开）<br>已见实际｜模拟器 候选 ed73304：14-order-detail-auth（用户本人登录的真实待到机 PAPER 单，字段和码都在） | 主按钮贴到屏幕左右边缘（候选 10、14） | 点左上返回区能回到订单列表。待到机的详情只有「去我的文档打印」一个主按钮，没有直接看到机码或二维码的主操作（实图 14） | P2 | 按钮贴边：VIS3b `ec69af9` 已修复，待实屏。查看到机码：下一批（复用现有取件页路由，按待到机状态给主操作，不新建能力） | free-pilot-copy、order-detail-refresh、page-lifecycle 等；js 593 行 ⚠ 超 500 |
-| AI 服务记录<br>`pages/ai-records/ai-records` | ai, assistant, me, notifications, resume-parse | 加载、失败、未登录 | 已见实际｜模拟器 cfbe567：25-ai-records-before（空态） | 返回箭头可见 | 空态没有直接去使用的入口；返回可用 | P2 | 空态出口：VIS3b 已修复，待实屏 | ai-records-qa、page-lifecycle、verify-miniapp-static；js 384 行 |
+| 订单详情<br>`pages/order-detail/order-detail` | orders | 加载、失败 | 已见实际｜模拟器 候选 0205742fc：10-order-detail-current（只读打开）<br>已见实际｜模拟器 候选 ed73304：14-order-detail-auth（用户本人登录的真实待到机 PAPER 单，字段和码都在） | 主按钮贴到屏幕左右边缘（候选 10、14） | 点左上返回区能回到订单列表。待到机的详情只有「去我的文档打印」一个主按钮，没有直接看到机码或二维码的主操作（实图 14） | P2 | 按钮贴边：VIS3b 已修复（没截图，只有代码和 agy 证据）。查看到机码：VIS3c #1476 `214411a` 已修复，待实屏 | free-pilot-copy、order-detail-refresh、page-lifecycle 等；js 593 行 ⚠ 超 500 |
+| AI 服务记录<br>`pages/ai-records/ai-records` | ai, assistant, me, notifications, resume-parse | 加载、失败、未登录 | 已见实际｜模拟器 cfbe567：25-ai-records-before（空态） | 返回箭头可见 | 空态没有直接去使用的入口；返回可用 | P2 | 空态出口：VIS3b 已修复；空态跳转没截图，只有代码和 agy 证据 | ai-records-qa、page-lifecycle、verify-miniapp-static；js 384 行 |
 | 设置<br>`pages/settings/settings` | me | 未登录 | 已见实际｜模拟器 cfbe567：18-settings-before | 稳定渲染后返回箭头可见 | — | — | — | verify-miniapp-static；js 61 行 |
 | 隐私与数据<br>`pages/privacy/privacy` | feedback, settings | 加载、失败、未登录、空 | 已见实际｜模拟器 cfbe567：21-privacy-before | 返回箭头可见 | 反馈→隐私→法务可达；坐标返回 noWindowsAvailable（工具限制），返回没确认 | — | — | free-pilot-copy、page-lifecycle、verify-miniapp-static；js 579 行 ⚠ 超 500 |
-| 帮助<br>`pages/help/help` | settings | （模板无状态分支） | 已见实际｜模拟器 cfbe567：19-help-before | FAQ 卡片文字贴左边、没有内边距；返回箭头可见 | FAQ 展开正常；帮助→反馈可达 | P2 | FAQ 内边距：VIS3b `ec69af9` 已修复，待实屏 | page-lifecycle、verify-miniapp-static；js 71 行 |
+| 帮助<br>`pages/help/help` | settings | （模板无状态分支） | 已见实际｜模拟器 cfbe567：19-help-before | FAQ 卡片文字贴左边、没有内边距；返回箭头可见 | FAQ 展开正常；帮助→反馈可达 | P2 | FAQ 内边距：VIS3b 已修复；这批没截图，只有代码和 agy 证据 | page-lifecycle、verify-miniapp-static；js 71 行 |
 | 关于<br>`pages/about/about` | settings | （模板无状态分支） | 已见实际｜模拟器 cfbe567：26-about-before | 版面可读；返回箭头看不见 | AX 连点两次返回经设置回到「我的」，不能证明单步返回落点 | P2 | 返回箭头：VIS3a `ed73304` 已改画法（代码），候选还没截图，不记通过 | 未检出直接页级覆盖（待核实关联测试）；js 42 行 |
 | 法务文档<br>`pages/legal/legal` | about, ai, assistant, feedback, home, launch 等 | 加载、失败 | 已见实际｜模拟器 cfbe567：22-legal-before（政策只读打开） | — | AX 返回回到隐私页 | — | — | self-explore-consent-items、verify-miniapp-static；js 119 行 |
 | 消息通知<br>`pages/notifications/notifications` | home, launch, me, settings | 加载、失败 | 已见实际｜模拟器 cfbe567：14-notifications-before | 返回箭头看不见 | 列表是真实账号数据，含历史测试广播（没点全部已读、没删、没点条目）；是否属于存量清理范围待判 | P2 | 返回箭头：VIS3a `ed73304` 已改画法（代码），候选还没截图，不记通过 | verify-miniapp-static；js 139 行 |
