@@ -111,6 +111,7 @@
     "POST /member/auth/login",
     "POST /member/auth/logout",
     "POST /member/auth/qr/:p/confirm-by-token",
+    "POST /member/auth/restore/revoke",
     "POST /member/auth/sms-code",
     "POST /member/auth/step-up/sms-code",
     "POST /member/auth/step-up/verify",

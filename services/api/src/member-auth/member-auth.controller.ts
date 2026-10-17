@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Header, Headers, Param, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, Headers, Param, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import type { Request } from 'express'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { MemberLoginDto } from './dto/member-login.dto'
+import { MemberRestoreDto } from './dto/member-restore.dto'
 import { PhoneRebindDto } from './dto/phone-rebind.dto'
 import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-step-up.dto'
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
@@ -18,6 +19,7 @@ import {
   type SendCodeResult,
 } from './member-auth.service'
 import { MemberPhoneRebindService, type PhoneRebindResult } from './member-phone-rebind.service'
+import { MemberRestoreService, type MemberRestoreResult } from './member-restore.service'
 import {
   MemberQrLoginService,
   type ConfirmQrLoginResult,
@@ -43,6 +45,18 @@ function clientIp(req: Request): string {
 }
 
 /**
+ * 请求是不是来自本小程序（FLOW1c 签发恢复凭证的前提之一）。微信官方文档：小程序网络请求的 referer
+ * 不可设置，格式固定为 https://servicewechat.com/{appid}/{version}/page-frame.html。浏览器里的页面脚本
+ * 也不能把 Referer 设成别的站点，所以一体机拿不到。没配 WECHAT_MINIAPP_APPID 时一律不认。
+ */
+function isOwnMiniappReferer(referer: string | undefined): boolean {
+  const appid = process.env['WECHAT_MINIAPP_APPID']?.trim()
+  if (!appid || !referer) return false
+  const escaped = appid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^https://servicewechat\\.com/${escaped}/[^/]+/page-frame\\.html$`).test(referer)
+}
+
+/**
  * C 端求职者账号接口(阶段 A)。路由前缀 /api/v1/member/*。
  * 与内部 /api/v1/auth/* 完全隔离;受 EndUserAuthGuard 保护的接口拒绝内部 token。
  */
@@ -54,7 +68,29 @@ export class MemberAuthController {
     private readonly stepUp: MemberStepUpService,
     private readonly phoneRebind: MemberPhoneRebindService,
     private readonly terminalSessions: TerminalSessionService,
+    private readonly restore: MemberRestoreService,
   ) {}
+
+  /**
+   * 显式登录时是否同时签发同设备恢复凭证（FLOW1c）。三条同时成立才签：
+   * 客户端要（x-member-keep-signed-in: 1）、不是一体机终端请求（不带 x-terminal-id）、Referer 是本小程序。
+   * 意愿用请求头而不是请求体字段：旧版 API 会忽略不认识的请求头，不会因为白名单校验回 400。
+   */
+  private wantsRestore(req: Request): boolean {
+    if (req.header('x-member-keep-signed-in') !== '1') return false
+    if (req.header('x-terminal-id')) return false
+    return isOwnMiniappReferer(req.header('referer'))
+  }
+
+  /** 登录成功后按需附上恢复凭证。签发失败不影响这次登录：只是这台手机 30 分钟后要再登录一次。 */
+  private async withRestore(req: Request, result: MemberLoginResult): Promise<MemberLoginResult & { restoreToken?: string }> {
+    if (!this.wantsRestore(req)) return result
+    try {
+      return { ...result, restoreToken: await this.restore.issue(result.user.id) }
+    } catch {
+      return result
+    }
+  }
 
   /**
    * 发送验证码。细粒度多维频控在 service 内走 Redis。
@@ -80,32 +116,51 @@ export class MemberAuthController {
   @Post('auth/login')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async login(@Body() dto: MemberLoginDto, @Req() req: Request): Promise<ApiResponse<MemberLoginResult>> {
-    return ApiResponse.ok(
-      await this.service.login(dto.phone, dto.code, dto.deviceId, clientIp(req), {
-        termsVersion: dto.termsVersion,
-        privacyVersion: dto.privacyVersion,
-      }),
-    )
+    const result = await this.service.login(dto.phone, dto.code, dto.deviceId, clientIp(req), {
+      termsVersion: dto.termsVersion,
+      privacyVersion: dto.privacyVersion,
+    })
+    return ApiResponse.ok(await this.withRestore(req, result))
   }
 
   /** 微信小程序一键登录（getPhoneNumber 授权）。appSecret 全程服务端持有，不经前端。 */
   @Post('auth/wx-login')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async wxLogin(@Body() dto: WxMiniappLoginDto, @Req() req: Request): Promise<ApiResponse<MemberLoginResult>> {
-    return ApiResponse.ok(
-      await this.service.wxLogin(
-        dto.code,
-        dto.phoneCode,
-        { termsVersion: dto.termsVersion, privacyVersion: dto.privacyVersion },
-        clientIp(req),
-      ),
+    const result = await this.service.wxLogin(
+      dto.code,
+      dto.phoneCode,
+      { termsVersion: dto.termsVersion, privacyVersion: dto.privacyVersion },
+      clientIp(req),
     )
+    return ApiResponse.ok(await this.withRestore(req, result))
   }
 
   /**
    * 已绑定微信的会员凭 wx.login code 静默续签。
    * 不建号、不绑手机；未绑定走 401 MEMBER_NOT_BOUND，让小程序进正常登录。
    */
+  /**
+   * 同设备恢复（FLOW1c）：访问令牌失效后，凭恢复凭证换一枚新的（同一位会员），并换新恢复凭证。
+   * 只认本小程序发来的请求；无效、过期、重放、账号不可用都要重新登录。
+   */
+  @Post('auth/restore')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async restoreSession(@Body() dto: MemberRestoreDto, @Req() req: Request): Promise<ApiResponse<MemberRestoreResult>> {
+    if (!isOwnMiniappReferer(req.header('referer'))) {
+      throw new UnauthorizedException({ error: { code: 'MEMBER_RESTORE_INVALID', message: '登录已过期，请重新登录' } })
+    }
+    return ApiResponse.ok(await this.restore.restore(dto.restoreToken))
+  }
+
+  /** 主动退出时作废这台手机的恢复凭证。不要求访问令牌：退出时它可能已经过期。凭证不存在也回成功。 */
+  @Post('auth/restore/revoke')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async revokeRestore(@Body() dto: MemberRestoreDto): Promise<ApiResponse<{ revoked: true }>> {
+    await this.restore.revokeByToken(dto.restoreToken)
+    return ApiResponse.ok({ revoked: true })
+  }
+
   @Post('auth/wx-resignin')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async wxResignin(@Body() dto: WxMiniappResigninDto): Promise<ApiResponse<MemberLoginResult>> {

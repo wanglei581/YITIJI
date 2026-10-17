@@ -22,6 +22,12 @@ const { withQuotedAmount } = require('./price-confirmation');
 const legalConsent = require('./api-legal-consent');
 
 /**
+ * 登录时请服务端同时签发同设备恢复凭证（FLOW1c）。用请求头而不是请求体字段：旧版 API 会忽略不认识的请求头，
+ * 不会因白名单校验回 400。服务端还要核对微信固定的 Referer 是本小程序，一体机拿不到。
+ */
+const KEEP_SIGNED_IN = { 'x-member-keep-signed-in': '1' };
+
+/**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
  * 直接 list.map() 会丢掉 .pagination / .nextCursor / .total。
  */
@@ -387,7 +393,7 @@ const api = {
         privacyVersion: v.privacyVersion,
       };
       if (deviceId) data.deviceId = deviceId;
-      return request('/member/auth/login', { method: 'POST', data, needAuth: false });
+      return request('/member/auth/login', { method: 'POST', data, needAuth: false, header: KEEP_SIGNED_IN });
     });
   },
 
@@ -413,6 +419,15 @@ const api = {
   logout() {
     if (config.USE_MOCK) return Promise.resolve({ loggedOut: true });
     return request('/member/auth/logout', { method: 'POST', needAuth: true });
+  },
+
+  /**
+   * 主动退出时作废这台手机的恢复凭证（FLOW1c），尽力而为。不带访问令牌：退出时它可能已经过期。
+   * 本机在调用之前已经作废并落盘（auth.logout），这一次成没成都不影响「退出后不恢复」。
+   */
+  revokeRestore(restoreToken) {
+    if (config.USE_MOCK || !restoreToken) return Promise.resolve({ revoked: false });
+    return request('/member/auth/restore/revoke', { method: 'POST', data: { restoreToken }, needAuth: false });
   },
 
   /**
@@ -490,6 +505,7 @@ const api = {
           privacyVersion: v.privacyVersion,
         },
         needAuth: false,
+        header: KEEP_SIGNED_IN,
       });
     });
   },

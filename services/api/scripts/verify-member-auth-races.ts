@@ -197,7 +197,7 @@ async function main(): Promise<void> {
   }
   console.log('\n[C-4] 换绑手机号：先踢会话再改库')
   const newPhone = '13700000003'
-  const setupRebind = async (revokeFails: boolean) => {
+  const setupRebind = async (revokeFails: boolean, restoreRevokeFails = false) => {
     const redis = new TtlRedis()
     redis.revokeFails = revokeFails
     await redis.setEx(`member:sms:code:${hashPhone(newPhone)}`, 300, '123456')
@@ -211,8 +211,17 @@ async function main(): Promise<void> {
     }
     const stepUp = { consumeGrant: async () => undefined }
     const audit = { write: async () => 'audit' }
-    const service = new MemberPhoneRebindService(prisma as never, redis as never, stepUp as never, audit as never)
-    return { service, redis, updates }
+    // 同设备恢复凭证（FLOW1c）：换绑要与踢会话一起整户作废，作废不了同样整单不改。
+    const restore = {
+      revoked: [] as string[],
+      async revokeAll(endUserId: string) {
+        if (restoreRevokeFails) throw new Error('restore store down')
+        this.revoked.push(endUserId)
+        return 1
+      },
+    }
+    const service = new MemberPhoneRebindService(prisma as never, redis as never, stepUp as never, audit as never, restore as never)
+    return { service, redis, updates, restore }
   }
   {
     const { service, updates } = await setupRebind(true)
@@ -221,9 +230,16 @@ async function main(): Promise<void> {
     check('踢会话失败：数据库里的手机号一次都没改', updates.length === 0, `update 次数 ${updates.length}`)
   }
   {
-    const { service, redis, updates } = await setupRebind(false)
+    const { service, redis, updates, restore } = await setupRebind(false)
     const r = await outcome(() => service.rebind('member-A', 'step-up', newPhone, '123456'))
     check('踢会话成功后才改手机号', r.ok && redis.revoked.includes('member-A') && updates.length === 1, JSON.stringify(r))
+    check('换绑同时整户作废同设备恢复凭证', restore.revoked.includes('member-A'), JSON.stringify(restore.revoked))
+  }
+  {
+    const { service, updates } = await setupRebind(false, true)
+    const r = await outcome(() => service.rebind('member-A', 'step-up', newPhone, '123456'))
+    check('恢复凭证作废失败：整单不改、如实 503 REBIND_UNAVAILABLE', !r.ok && r.status === 503 && r.code === 'REBIND_UNAVAILABLE', JSON.stringify(r))
+    check('恢复凭证作废失败：数据库里的手机号一次都没改', updates.length === 0, `update 次数 ${updates.length}`)
   }
 
   console.log('\n[C-3] 真 Redis：replaceExactWithCurrentTtl 的 Lua')

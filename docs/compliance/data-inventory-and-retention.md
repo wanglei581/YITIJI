@@ -20,6 +20,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | 短信验证码 | 登录验证码 | 与手机号哈希绑在同一键上，按个人信息对待。是否敏感：待律师确认 | 一般 | 手机号登录发码 | 5 分钟（`CODE_TTL = 300`，`member-auth.service.ts:29`） | Redis 到期。验证成功或超限会删键。键名 `member:sms:code:`（同文件 `:332`）。同号频控、冷却、设备频控键在 `:333`–`:336`，各自时长未逐个摘录 | Redis，不落用户表 | 服务端校验。代码注释要求不把验证码返回前端。生产日志是否按配置不记录，未读生产配置 |
 | 2 | 会员登录会话 | 登录后的会话标识 | 能对应到会员，属个人信息。是否敏感：工作判断为否 | 一般 | 登录成功后 | 30 分钟（`SESSION_TTL = 1800`，`member-auth.service.ts:30`；`MEMBER_SESSION_TTL_SECONDS`，`end-user-auth.guard.ts:28`） | 到期失效；登出删除。键 `member:session:{会话标识}`（`end-user-auth.guard.ts:24`） | Redis。一体机 token 按留存矩阵放在页面内存 | 本人持有凭证。服务端按会话标识核验 |
+| 2A | 同设备恢复凭证（FLOW1c） | 小程序显式登录时签发，访问令牌失效后在同一台手机上换新的 | 能对应到会员，属个人信息。是否敏感：工作判断为否 | 一般 | 小程序显式登录（短信或微信一键），且服务端按微信固定 Referer 确认来自本小程序；一体机不签 | 未使用 7 天失效，从显式登录算起最长 30 天（`MEMBER_RESTORE_IDLE_DAYS`、`MEMBER_RESTORE_MAX_DAYS`，`member-restore.service.ts`）；换新宽限期 30 秒（`MEMBER_RESTORE_GRACE_SECONDS`） | Redis 到期。主动退出、换绑手机、注销作废；旧凭证再现、账号停用或签发后状态变过时整组作废 | Redis `member:restore:family:{组号}`（服务端只存摘要；宽限期内暂存加密的后继）、`member:restore:user-families:{会员}`；小程序本机 `zyd_restore` | 持有那台手机的本人。服务端按摘要核验 |
 | 3 | 手机号 | 登录身份 | 个人信息。单独的手机号通常不按敏感个人信息列举；本场景是否有其他敏感性由律师判断 | 一般（项目标签） | 注册 / 登录 | 账号存在期间。未发现按天删除的任务 | 未发现定时删除。账号注销接口当前直接拒绝（`ACCOUNT_CLOSURE_NOT_AVAILABLE`，`member-data-request.service.ts:62`–`:63`） | `EndUser.phoneHash`、`phoneEnc`（`schema.prisma:877`–`:878`）。无明文字段 | 页面按矩阵展示脱敏号。谁持有解密密钥、哪些后台能解出号码，未核实 |
 | 4 | 微信标识 | 小程序一键登录后的 openid | 个人信息。是否敏感：工作判断为否 | 一般 | 微信登录绑定 | 账号存在期间。两份期限文件未列此行 | 未发现定时删除。字段注释写不存 sessionKey（`schema.prisma:879`–`:880`） | `EndUser.wxOpenId` | 本人账号关联。后台谁能查看，未核实 |
 | 5 | 昵称 | 会员显示名 | 若能指向个人，属个人信息。是否敏感：工作判断为否 | 一般 | 账号资料。写入入口本次未逐页打开 | 账号存在期间。两份期限文件未列 | 未发现定时删除 | `EndUser.nickname`（`schema.prisma:881`） | 本人；后台范围未核实 |
@@ -75,6 +76,7 @@
 | 90 天 | `TERMINAL_HEARTBEAT_RETENTION_DAYS` | 终端心跳 |
 | 10 分钟 / 15 分钟 | `MEMBER_EXPORT_TICKET_TTL_SECONDS` / `MEMBER_EXPORT_CLAIM_TTL_SECONDS` | 导出下载票据 / 领取票据 |
 | 30 分钟 / 1800 秒 | `MEMBER_SESSION_TTL_SECONDS` | 会员会话（服务层有 `SESSION_TTL = 1800`；实际以调用路径为准） |
+| 7 天 / 30 天 / 30 秒 | `MEMBER_RESTORE_IDLE_DAYS` / `MEMBER_RESTORE_MAX_DAYS` / `MEMBER_RESTORE_GRACE_SECONDS` | 同设备恢复凭证：未使用期限 / 绝对期限 / 换新宽限期 |
 
 文件的 24/6/1 小时、合同 2 小时、未领取扫描件 24 小时和长期保存 `expiresAt = null` 是代码策略常量或产品策略，不得写成生产已核实值。环境变量可以改变的边界、优先级和后台覆盖关系应在上线前形成配置快照。
 

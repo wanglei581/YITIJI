@@ -12,6 +12,7 @@
 | --- | --- | --- | --- | --- |
 | 短信验证码 | Redis `member:sms:code:*` | 5 分钟 | 验证成功、超限或 TTL 到期删除 | 不返回前端；生产环境禁止日志短信通道 |
 | 会员会话 | Redis `member:session:*` + JWT `jti` | 30 分钟 | 登出、账号禁用、Redis TTL 到期删除 | token 只存 Kiosk React 内存，不写浏览器存储 |
+| 同设备恢复凭证（FLOW1c） | Redis `member:restore:family:*`、`member:restore:user-families:*`；小程序本机 `zyd_restore` | 未使用 7 天失效；从显式登录算起最长 30 天（宽限期 30 秒） | 到期删除；主动退出、换绑手机、注销作废；旧凭证再现、账号停用或签发后状态变过时整组作废 | 只发给小程序（服务端按微信固定 Referer 确认），一体机拿不到；服务端只存摘要；访问令牌仍是 30 分钟 |
 | 手机号身份 | PostgreSQL / SQLite `EndUser.phoneHash`、`phoneEnc` | 账号存在期间 | 账号治理流程处理；页面只展示脱敏手机号 | 不保存手机号明文字段 |
 | 未登录 / 匿名 / 系统短期文件 | 私有对象存储 + `FileObject(retentionPolicy=system_short)` | normal 24 小时、sensitive 6 小时、高敏文件 1 小时 | 到期按 `expiresAt` 物理删除；本人或管理员可触发删除；删除动作留审计 | 仅用于本次服务、证件/临时/系统处理等短期场景，不进入会员长期资产 |
 | 登录会员原始简历 / 原始求职材料 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6)` | 默认 90 天 | 本人可延长至 180 天或主动删除；到期按 `expiresAt` 物理删除；删除动作留审计 | 原始文件首批不开放长期保存；签名 URL 访问，不暴露对象存储真实地址 |

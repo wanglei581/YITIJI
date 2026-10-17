@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { Redis } from 'ioredis'
 import { MemberDataExportRedisService } from '../common/redis/member-data-export-redis.service'
 import { REDIS_CLIENT, RedisService } from '../common/redis/redis.service'
+import { revokeAllMemberRestoreFamilies } from '../member-auth/member-restore.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { conflict, unavailable } from './member-data-request.helpers'
 
@@ -40,6 +41,8 @@ export class MemberClosureRedisService {
   async revoke(endUserId: string, phoneHash: string, persistFiles?: (ids: string[]) => Promise<void>): Promise<string[]> {
     const files: string[] = []
     await this.redis.revokeMemberSessions(endUserId)
+    // 同设备恢复凭证（FLOW1c）：注销后不得再换出会话，组记录里的会员号也一并删掉。
+    await revokeAllMemberRestoreFamilies(this.client, endUserId)
     await this.redis.revokeMemberStepUpGrants(endUserId)
     await this.exports.revokeCapabilitiesByUser(createHash('sha256').update(endUserId).digest('hex'))
     const digest = createHmac('sha256', process.env['SECRET_ENCRYPTION_KEY']!)
