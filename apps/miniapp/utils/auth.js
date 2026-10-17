@@ -161,8 +161,13 @@ function saveSession(data = {}, options = {}) {
 
   if (data.token) {
     storage.set(storage.KEYS.TOKEN, data.token);
-    // 登录成功即取得补签资格，直到用户主动登出为止
-    storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, 1);
+    // 登录成功即取得补签资格，直到用户主动登出为止。资格里记下「是哪位会员」（FLOW1b）：
+    // 过期后补签只认这一位，绝不把短信登录的 B 静默换成这个微信绑定的 A。
+    // 补签成功是同一个人续签，不改它。
+    if (!isResignin) {
+      const memberId = data.user && data.user.id != null && data.user.id !== '' ? String(data.user.id) : '';
+      storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, memberId || 1);
+    }
   }
   if (data.user) storage.set(storage.KEYS.USER, data.user);
 
@@ -188,6 +193,30 @@ function saveSession(data = {}, options = {}) {
 function canSilentResignin() {
   if (sessionRevoked) return false;
   return !!storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+}
+
+/**
+ * 上次**明确登录**的会员 id（补签只认这一位）；没有、或认不出是谁时返回 null。
+ *
+ * 只读存储，不调 getToken：令牌过期时 getToken 会顺手清掉 zyd_user，而旧版本的资格只记了「1」，
+ * 认人要靠 zyd_user。所以调用方要**先**调它，再碰 getToken / isLoggedIn。
+ * 旧值 1：本机资料还在就以它的 id 为准、就地改写成 id；不在就认不出人，删掉旧值、不自动恢复。
+ */
+function restorableMemberId() {
+  if (sessionRevoked) return null;
+  const raw = storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (raw === null || raw === undefined || raw === '' || raw === 0 || raw === false) return null;
+  if (raw === 1 || raw === '1' || raw === true) {
+    const user = storage.get(storage.KEYS.USER, null);
+    const id = user && user.id != null && user.id !== '' ? String(user.id) : '';
+    if (id) {
+      storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, id);
+      return id;
+    }
+    storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+    return null;
+  }
+  return String(raw);
 }
 
 /** 用户主动登出：撤销会话与补签资格，并推进代际作废所有在途请求。 */
@@ -237,6 +266,7 @@ function wxLogin() {
 
 module.exports = {
   canSilentResignin,
+  restorableMemberId,
   logout,
   logoutIfSameSession,
   sessionGeneration,
