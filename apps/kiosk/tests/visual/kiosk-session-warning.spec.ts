@@ -791,6 +791,10 @@ test('scan busy stays released when the scan control token is missing @scan-busy
   )
   await page.goto('/scan?stage=progress')
 
+  // 控制令牌为空时，工作台同样把 ?stage=progress 纠偏回 start。
+  // 纠偏回 start 并且 start 区块可见后再计 3 秒，不放宽 helper。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/, { timeout: 5_000 })
+  await expect(page.locator('[data-scan-stage="start"]')).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
 })
 
