@@ -2,7 +2,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <!-- 顶栏固定用四类文档的短名：后台发布的标题可能很长，会压到微信胶囊下面（走查 W-13）。

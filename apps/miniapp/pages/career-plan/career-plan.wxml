@@ -5,10 +5,12 @@
   以及"学历/年限/城市/期望"输入框(后端不收 body,填了也会被丢掉)。
 -->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-  <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-center nav-title">职业规划参考</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" bindtap="goBack" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-center nav-title">职业规划参考</view>
+    </view>
   </view>
 
   <!-- 无已解析简历:不伪造规划,给真实入口 -->

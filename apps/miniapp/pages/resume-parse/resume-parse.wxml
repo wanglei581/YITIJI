@@ -1,7 +1,7 @@
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
   <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
       <text class="ficon i-right nav-back-ic"></text>
     </view>
     <view class="nav-title">{{fileChanged || fileChangedBlocked ? '请重新上传' : terminalCharge || terminalBlocked ? '原标识已结束' : conflict === 'blocked' ? '不能开始这次解析' : conflict ? '另一次标识还在' : phase === 'unknown' ? '解析结果未知' : 'AI 解析中'}}</view>

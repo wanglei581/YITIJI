@@ -218,7 +218,10 @@ function runRemove(page, helpers, key) {
     page._factsConfirmedAt = ''
     page._factsNeedRecheck = true
     page.setData({ factPanel: closedPanel() }, () => {
-      wx.pageScrollTo({ selector: out.selector, duration: 300 })
+      // 页头钉在顶部（app.wxss .navbar.col），落点让出状态栏 + 52px 页头，免得那一项压在页头底下。
+      // offsetTop：落点 = selector 位置 + 偏移（基础库 2.23.1 起；更低的版本忽略，退回原来的落点）。
+      const headerHeight = ((page.data && page.data.statusBarHeight) || 20) + 52
+      wx.pageScrollTo({ selector: out.selector, offsetTop: -headerHeight, duration: 300 })
     })
     wx.showToast({ title: `请在编辑区修改：${out.label}`, icon: 'none', duration: 2500 })
   }
