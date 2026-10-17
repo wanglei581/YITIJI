@@ -41,7 +41,7 @@ const exemptions: Record<string, string> = {
   "scripts/verify-resume-report-export.ts": "验证本人简历诊断报告及导出文件入列，不生成系统岗位匹配报告。",
   "scripts/verify-scan-input-lockout-telemetry.ts": "只验证扫码锁定遥测 DTO、脱敏与接收路径，不调用招聘内容配置。",
   "scripts/verify-terminal-credentials.ts": "验证设备令牌签发、迁移和撤销，不调用招聘内容配置路径。",
-  "scripts/verify-terminal-device-config.ts": "只断言终端凭证、停用后的学校与工具箱配置及敏感字段，不断言 recruitmentHosting 返回值。",
+  "scripts/verify-terminal-device-config.ts": "断言终端配置在托管开、关时都含 recruitmentHosting，并在脚本内显式赋值 RECRUITMENT_CONTENT_HOSTING_ENABLED。",
   "scripts/verify-terminal-provisioning.ts": "验证设备预配、激活与生命周期守卫，不调用招聘托管内容路径。",
   "scripts/verify-terminal-test-print-seed-guard.ts": "只验证测试打印种子创建守卫，不读取招聘配置。",
   "src/ai/resume/__tests__/self-assessment-consent-reconfirm.test.ts": "验证自我探索授权撤回后职业规划重新确认；夹具无系统岗位匹配上下文。",

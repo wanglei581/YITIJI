@@ -276,6 +276,8 @@ async function main(): Promise<void> {
       ],
     })
 
+    // 托管开：下面 3a–3p 是原来的全部断言，岗位、同步、企业和招聘会都有数。
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'true'
     const a = await stats.getStats(orgA, 'week')
     const e = await stats.getStats(orgEmpty, 'week')
 
@@ -386,6 +388,61 @@ async function main(): Promise<void> {
       '3p. 数据模式标记为 live（真实库数据）',
       a.dataMode === 'live',
     )
+
+    // 托管关：同一份种子。岗位、招聘会、企业、数据源、同步日志清零；政策照常；字段名与开时一致。
+    process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+    const closed = await stats.getStats(orgA, 'week')
+    const openKeys = [...collectKeys(a)].sort()
+    const closedKeys = [...collectKeys(closed)].sort()
+    assert(
+      '3q. 托管关与托管开的响应字段名一致',
+      openKeys.join('\n') === closedKeys.join('\n'),
+      `开 ${openKeys.filter((key) => !closedKeys.includes(key)).join(',')} / 关 ${closedKeys.filter((key) => !openKeys.includes(key)).join(',')}`,
+    )
+    assert(
+      '3r. 托管关：在架岗位、招聘会、企业与启用数据源为 0',
+      closed.snapshot.publishedJobs === 0
+        && closed.snapshot.publishedFairs === 0
+        && closed.snapshot.publishedCompanies === 0
+        && closed.snapshot.activeSources === 0,
+      `jobs=${closed.snapshot.publishedJobs} fairs=${closed.snapshot.publishedFairs} companies=${closed.snapshot.publishedCompanies} sources=${closed.snapshot.activeSources}`,
+    )
+    assert(
+      '3s. 托管关：待审岗位、招聘会、企业为 0',
+      closed.snapshot.pendingReviewJobs === 0
+        && closed.snapshot.pendingReviewFairs === 0
+        && closed.snapshot.pendingReviewCompanies === 0,
+      `jobs=${closed.snapshot.pendingReviewJobs} fairs=${closed.snapshot.pendingReviewFairs} companies=${closed.snapshot.pendingReviewCompanies}`,
+    )
+    assert(
+      '3t. 托管关：同步批次、新增、失败、成功率的当期为 0，上期与环比为 null',
+      closed.sync.totalBatches.current === 0
+        && closed.sync.totalAdded.current === 0
+        && closed.sync.totalFailed.current === 0
+        && closed.sync.successRate.current === 0
+        && closed.sync.totalBatches.previous === null
+        && closed.sync.totalAdded.previous === null
+        && closed.sync.totalFailed.previous === null
+        && closed.sync.successRate.previous === null
+        && closed.sync.totalBatches.deltaPercent === null
+        && closed.statusDist.success === 0
+        && closed.statusDist.partial === 0
+        && closed.statusDist.failed === 0,
+      `batches=${closed.sync.totalBatches.current} added=${closed.sync.totalAdded.current}`,
+    )
+    assert(
+      '3u. 托管关：趋势仍是 7 个全 0 的桶，不是空数组',
+      closed.trend.length === 7 && closed.trend.every((bucket) => bucket.added === 0 && bucket.updated === 0 && bucket.failed === 0),
+      `长度 ${closed.trend.length}`,
+    )
+    assert(
+      '3v. 托管关：政策照常（在架与待审和托管开相同，待审政策为 1，待审总数只剩政策）',
+      closed.snapshot.publishedPolicies === a.snapshot.publishedPolicies
+        && closed.snapshot.pendingReviewPolicies === a.snapshot.pendingReviewPolicies
+        && a.snapshot.pendingReviewPolicies === 1
+        && closed.snapshot.pendingReview === 1,
+      `openPolicies=${a.snapshot.publishedPolicies}/${a.snapshot.pendingReviewPolicies} closedPolicies=${closed.snapshot.publishedPolicies}/${closed.snapshot.pendingReviewPolicies} pending=${closed.snapshot.pendingReview}`,
+    )
     // 3j/3k 的禁用键同样约束终端数据端点，另加机构、终端内部与单据字段
     await verifyTerminalOperations(assert, prisma, [
       ...fabricated, ...personal, 'orgId', 'terminalId', 'taskId', 'orderId', 'errorCode', 'printOutcome', 'id',
@@ -405,8 +462,7 @@ async function main(): Promise<void> {
   console.log('\n✅ verify:partner-stats-contract PASSED')
 }
 
-// 本机构统计与终端数据门禁固定验证托管 a；不启用招聘内容。
-process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
+// 开、关两段都在 main 里显式赋值 RECRUITMENT_CONTENT_HOSTING_ENABLED。
 main().catch((error) => {
   console.error('\n❌ verify:partner-stats-contract 执行异常')
   console.error(error)
