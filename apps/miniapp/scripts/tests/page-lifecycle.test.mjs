@@ -6683,7 +6683,7 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="toAiRecords"/.test(l)), 'not-found 给核对身份的出口')
   for (const l of links) {
     assert.match(l, /hover-class="tap-press"/)
-    assert.match(l, /role="button"/)
+    assert.match(l, /aria-role="button"/)
     assert.match(l, /aria-label="/)
   }
   const linkCss = wxss.match(/\.unknown-link\s*\{([^}]*)\}/)

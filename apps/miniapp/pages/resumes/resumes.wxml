@@ -33,7 +33,7 @@
           <view class="section-sub">点击简历可查看诊断报告</view>
         </view>
         <view class="upload-button tap" hover-class="tap-press" bindtap="upload"
-              role="button" aria-label="上传新简历">
+              aria-role="button" aria-label="上传新简历">
           <text class="ficon i-upload"></text>
           <text>上传新简历</text>
         </view>
@@ -72,7 +72,7 @@
 
       <view class="list-state" wx:if="{{loadingMore}}">正在加载更多…</view>
       <view class="list-state" wx:elif="{{loadMoreError}}">
-        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" role="button" aria-label="重新加载更多简历">加载更多失败，点此重试</view>
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" aria-role="button" aria-label="重新加载更多简历">加载更多失败，点此重试</view>
       </view>
       <view class="list-state" wx:elif="{{nextCursor}}">上拉加载更多</view>
     </block>

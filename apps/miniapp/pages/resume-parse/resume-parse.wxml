@@ -59,9 +59,9 @@
       <view wx:if="{{recheck === 'not-ready' && !intentReplay}}" class="unknown-next">本次任务仍在处理中，稍后可按同一编号再查。</view>
       <view wx:elif="{{recheck === 'error'}}" class="unknown-next">查询暂时失败，稍后可按同一编号再查。</view>
       <view wx:elif="{{recheck === 'malformed'}}" class="unknown-next">查询答复不完整，仍无法确认结果；稍后可按同一编号再查。</view>
-      <view wx:if="{{canCheckRecords || recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="toAiRecords" role="button" aria-label="到我的 AI 服务记录核对">到我的 AI 服务记录核对</view>
-      <view wx:if="{{pendingTaskId && recheck === 'not-found' && !intentReplay && !settleBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
-      <view wx:if="{{!pendingTaskId && !conflict && !intentReplay && !settleBlocked && !terminalCharge && !terminalBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
+      <view wx:if="{{canCheckRecords || recheck === 'not-found'}}" class="unknown-link tap" hover-class="tap-press" bindtap="toAiRecords" aria-role="button" aria-label="到我的 AI 服务记录核对">到我的 AI 服务记录核对</view>
+      <view wx:if="{{pendingTaskId && recheck === 'not-found' && !intentReplay && !settleBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" aria-role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
+      <view wx:if="{{!pendingTaskId && !conflict && !intentReplay && !settleBlocked && !terminalCharge && !terminalBlocked}}" class="unknown-link tap" hover-class="tap-press" bindtap="confirmResubmit" aria-role="button" aria-label="改为重新提交（新的一次），提交前会再确认">改为重新提交（新的一次）</view>
     </view>
 
     <!-- 无待解析文件 -->

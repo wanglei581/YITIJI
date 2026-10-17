@@ -31,7 +31,7 @@
         data-id="{{item.id}}"
         hover-class="tap-press"
         bindtap="tapLink"
-        role="button"
+        aria-role="button"
         aria-label="{{item.title}}"
       >
         <view class="ab-t">{{item.title}}</view>
@@ -48,7 +48,7 @@
         data-id="{{item.id}}"
         hover-class="tap-press"
         bindtap="tapLink"
-        role="button"
+        aria-role="button"
         aria-label="{{item.title}}，{{item.sub}}"
       >
         <view class="ab-t">{{item.title}}</view>

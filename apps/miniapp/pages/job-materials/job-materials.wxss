@@ -28,6 +28,8 @@
   font-size: var(--fs-base); color: var(--ink); line-height: 1.6;
 }
 .jm-area { min-height: 180rpx; }
+/* 同一张卡里的字段之间：和全仓列表分隔线同一个变量。 */
+.jm-field + .jm-field { margin-top: 32rpx; padding-top: 32rpx; border-top: 1rpx solid var(--line-faint); }
 .jm-ph { color: var(--ghost); }
 
 /* 底栏两个按钮的分配比例。对应 self-explore 的 .ab-side / .ab-main 写法：

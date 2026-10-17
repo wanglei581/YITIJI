@@ -20,7 +20,7 @@
       <view class="state-card" wx:if="{{!hasPackageData}}">
         <view class="state-t">还没有可下单的材料包</view>
         <view class="state-d">这一步要用上一步选好的文件，而当前没有草稿（可能是直接打开了本页，或草稿已被清理）。请回到第一步重新选择文件。</view>
-        <view class="btn primary block tap" hover-class="tap-press" bindtap="backToFiles" role="button">回到选择文件</view>
+        <view class="btn primary block tap" hover-class="tap-press" bindtap="backToFiles" aria-role="button">回到选择文件</view>
       </view>
 
       <view class="state-card" wx:elif="{{state === 'loading'}}">
@@ -30,7 +30,7 @@
       <view class="state-card" wx:elif="{{state === 'error'}}">
         <view class="state-t">{{errorTitle}}</view>
         <view class="state-d">{{errorText}}</view>
-        <view class="btn ghost block tap" hover-class="tap-press" bindtap="retryStores" role="button">重新加载</view>
+        <view class="btn ghost block tap" hover-class="tap-press" bindtap="retryStores" aria-role="button">重新加载</view>
       </view>
 
       <view class="state-card" wx:elif="{{!stores.length}}">
@@ -50,7 +50,7 @@
             hover-class="tap-press"
             bindtap="selectStore"
             data-id="{{item.id}}"
-            role="button"
+            aria-role="button"
             aria-label="服务点：{{item.name}}"
             aria-disabled="{{!item.isOnline}}"
           >

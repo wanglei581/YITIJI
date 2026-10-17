@@ -17,7 +17,9 @@
   <view wx:if="{{phase === 'no-task'}}" class="running-state">
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有可用的简历</view>
-    <view class="rs-sub">职业规划完全基于你的简历原文生成,需要先上传并解析一份简历</view>
+    <!-- 拆成两句两行：原先一整句折行后剩一个孤字（10/17 实图 12）。 -->
+    <view class="rs-sub">职业规划完全基于你的简历原文生成。</view>
+    <view class="rs-sub">请先上传并解析一份简历。</view>
     <view class="cp-cta tap" bindtap="tapUpload">
       <text>去上传简历</text><text class="ficon i-right cp-cta-arrow"></text>
     </view>
@@ -106,7 +108,7 @@
       <block wx:if="{{plan.selfAssessmentOutdated}}">
         <view class="cb-hint">你之前的自我探索结果因说明已更新，这次没有纳入；重新确认说明后可以纳入。</view>
         <view class="text-action tap cb-link" hover-class="tap-press" bindtap="goSelfExplore"
-              role="button" aria-label="去自我探索重新确认说明">去自我探索重新确认</view>
+              aria-role="button" aria-label="去自我探索重新确认说明">去自我探索重新确认</view>
       </block>
     </view>
 

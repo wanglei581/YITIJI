@@ -31,10 +31,10 @@
            就是把「不显示文件」包装成「只有这么多」。 -->
       <text class="section-t lt-title">最近{{nextCursor ? '' : ' · ' + filtered.length + ' 个文件'}}</text>
       <view class="lt-action tap" hover-class="tap-press" bindtap="loadDocuments"
-            role="button" aria-label="重新加载文档列表">刷新</view>
+            aria-role="button" aria-label="重新加载文档列表">刷新</view>
     </view>
 
-    <view wx:if="{{convertResult}}" class="convert-result" role="status">
+    <view wx:if="{{convertResult}}" class="convert-result" aria-role="status">
       <view class="convert-result-title">{{convertResult.filename}}</view>
       <view class="convert-result-meta">{{convertResult.pageLabel}} · {{convertResult.sizeLabel}}</view>
       <view class="convert-result-meta">{{convertCountdown}}</view>
