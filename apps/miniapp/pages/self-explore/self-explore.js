@@ -9,6 +9,7 @@ const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
+const session = require('../../utils/resume-parse-session')
 
 // 没有 AI 解读时说清为什么、要不要再试（后端 #1112 的 aiUnavailableReason）。
 // 闸门类重试没用，不提示重试；声明 / 登录缺失要先补再重新作答。
@@ -146,7 +147,8 @@ Page({
     const opts = options || {}
     // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
     // 取不到就留空，走会员登录态。
-    const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
+    // 只用属于当前身份的本机任务当种子（10/17）：换号以后不带上一位的匿名令牌。
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth) || {}
     this._token = saved.accessToken || ''
 
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }

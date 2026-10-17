@@ -22,6 +22,7 @@ Page({
     phase: 'no-task',
     taskId: '',
     needReupload: false,
+    canManual: false, // 额度用完或 AI 不可用：失败态给「按模板手动填写」
     failMsg: '',
     opt: null,
     isMock: false,
@@ -88,7 +89,8 @@ Page({
       if (opt.isFailed) {
         const msg = opt.failReason || '优化生成失败'
         const needReupload = /简历原文|清理|重新上传/.test(msg)
-        this._fail(msg, needReupload)
+        // 模型层额度或账号问题时服务端原话是「可以先按模板手动填写」：给这条路（10/17）。
+        this._fail(msg, needReupload, /手动填写/.test(msg))
         return
       }
       if (!opt.isCompleted) {
@@ -117,13 +119,15 @@ Page({
       } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT' || code === 'AI_OPTIMIZE_UNAVAILABLE') {
         this._fail('AI 优化服务暂时不可用，请稍后重试', false)
       } else {
-        this._fail((err && err.message) || '加载失败，请返回重试', false)
+        // 额度用完或 AI 暂时不可用：提示语本身说「可以先（用模板）手动填写」，失败态给这条路（10/17）。
+        const manual = code === 'AI_BUDGET_EXHAUSTED' || code === 'AI_BUDGET_UNAVAILABLE'
+        this._fail((err && err.message) || '加载失败，请返回重试', false, manual)
       }
     }
   },
 
-  _fail(failMsg, needReupload) {
-    this.setData({ phase: 'failed', failMsg, needReupload }, () => this._syncExportAvailability())
+  _fail(failMsg, needReupload, canManual) {
+    this.setData({ phase: 'failed', failMsg, needReupload, canManual: !!canManual }, () => this._syncExportAvailability())
   },
 
   _bootDraft() {
@@ -253,6 +257,11 @@ Page({
     if (this.data.phase !== 'failed' || this.data.needReupload) return
     this.setData({ phase: 'loading', failMsg: '' })
     this._fetch()
+  },
+
+  /** 额度用完或 AI 不可用时的出路：现有的「从零建一份简历」，表单填写，AI 挂了也能按填写内容导出。 */
+  toManualBuild() {
+    wx.navigateTo({ url: '/pages/resume-build/resume-build', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
   },
 
   /** 无任务态与失败态：去「我的简历」另选一份（列表由服务端按本人返回，每份有带 taskId 的「继续优化」）。 */

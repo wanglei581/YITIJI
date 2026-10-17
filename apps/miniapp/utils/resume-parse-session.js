@@ -325,8 +325,25 @@ async function releaseConflict(page, auth, identity) {
   markConflict(page, released && released.code === 'IDENTITY_CHANGED' ? 'login' : 'blocked')
 }
 
+/**
+ * 本机存的上一次解析任务（RESUME_TASK），只在属于当前身份时返回（10/17）。
+ * 原先没有归属：同一部手机换号以后，诊断、职业规划、岗位匹配会拿上一位的任务和文件名。
+ * - 新记录带 ownerId（会员 id，匿名为 null，与解析意图里的 ownerId 同一口径），必须和当前身份严格相等；
+ * - 旧记录没有 ownerId：带匿名令牌的是匿名时存的，只在当前也是匿名时可用；
+ *   不带令牌的是会员存的、不知道是哪位会员，一律不用。
+ * 只管「没指定任务就自动拿来用」的地方；「指定任务才用」的地方照旧按 taskId 相等判断，服务端再校验归属。
+ * 纯函数：存储由调用方读好传进来。
+ */
+function ownedResumeTask(saved, auth) {
+  if (!saved || typeof saved !== 'object' || !saved.taskId) return null
+  const me = ownerId(auth)
+  if (Object.prototype.hasOwnProperty.call(saved, 'ownerId')) return saved.ownerId === me ? saved : null
+  return me === null && nonemptyToken(saved.accessToken) ? saved : null
+}
+
 module.exports = {
   nonemptyToken,
+  ownedResumeTask,
   persistResumeTask,
   isTaskNotFound,
   isExactPublicQuotaExceeded,
