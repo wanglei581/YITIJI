@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const session = require('../../utils/resume-parse-session')
 
 /**
  * 职业规划参考。
@@ -50,7 +51,8 @@ Page({
       this._loadHistory()
       return
     }
-    const saved = storage.get(storage.KEYS.RESUME_TASK)
+    // 只认属于当前身份的本机任务（10/17）：换号以后不拿上一位的任务和文件名。
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth)
     if (!saved || !saved.taskId) {
       this.setData({ phase: 'no-task' })
       return

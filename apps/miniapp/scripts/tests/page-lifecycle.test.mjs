@@ -7244,3 +7244,35 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
   assert.match(usbFaq.a, /U盘打印指引/)
 })
+
+// VIS3d（10/17）：本机任务带归属。读的地方只认自己的任务，所以写的时候必须带上提交时的身份。
+test('RP-OWN resume-parse：落库的本机任务带提交时的 ownerId（会员是 id，匿名是 null）', async () => {
+  const key = realStorage.KEYS.RESUME_TASK
+
+  const wxMember = createWx()
+  const gateMember = deferred()
+  const pageMember = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('A'), wx: wxMember, api: { parseResume: () => gateMember.promise },
+  })
+  pageMember.onLoad({ fileId: 'F-A', fileName: 'A的简历.pdf', fileFormat: 'pdf' })
+  await flush()
+  gateMember.resolve({ taskId: 'T-A', status: 'completed' })
+  await flush()
+  const savedMember = wxMember.storage.get(key)
+  assert.equal(savedMember.taskId, 'T-A')
+  assert.equal(savedMember.ownerId, 'A')
+
+  const wxAnon = createWx()
+  const gateAnon = deferred()
+  const pageAnon = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxAnon, api: { parseResume: () => gateAnon.promise },
+  })
+  pageAnon.onLoad({ fileId: 'F-N', fileName: '匿名的简历.pdf', fileFormat: 'pdf' })
+  await flush()
+  gateAnon.resolve({ taskId: 'T-N', status: 'completed', accessToken: 'tok-N' })
+  await flush()
+  const savedAnon = wxAnon.storage.get(key)
+  assert.equal(savedAnon.taskId, 'T-N')
+  assert.ok(Object.prototype.hasOwnProperty.call(savedAnon, 'ownerId'), '匿名也要写上 ownerId 这个键')
+  assert.equal(savedAnon.ownerId, null)
+})

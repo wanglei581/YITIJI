@@ -3,6 +3,7 @@ const api = require('../../utils/api')
 const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
+const session = require('../../utils/resume-parse-session')
 const fileUrls = require('../../utils/file-url')
 
 // 结果未就绪时的轮询节奏(与解析页一致口径)
@@ -53,8 +54,10 @@ Page({
       return
     }
 
-    if (saved.taskId) {
-      this.setData({ hasSavedTask: true, savedFileName: saved.fileName || '' })
+    // 只认属于当前身份的本机任务：换号以后不显示上一位的文件名（10/17）。
+    const owned = session.ownedResumeTask(saved, auth)
+    if (owned) {
+      this.setData({ hasSavedTask: true, savedFileName: owned.fileName || '' })
     }
     this.setData({ status: 'empty' })
   },
@@ -268,8 +271,8 @@ Page({
 
   /** 查看本机存的上一次任务 */
   viewSaved() {
-    const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
-    if (!saved.taskId) return
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth)
+    if (!saved) return
     this.setData({
       status: 'loading',
       taskId: saved.taskId,

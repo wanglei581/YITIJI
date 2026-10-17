@@ -41,6 +41,7 @@
     <view wx:if="{{!needReupload}}" class="fail-hint">
       可以手动重试，再次生成仍可能失败；也可以从我的简历里另选一份。
     </view>
+    <view wx:if="{{canManual}}" class="btn primary tap fail-btn" hover-class="tap-press" bindtap="toManualBuild" aria-role="button" aria-label="按模板手动填写">按模板手动填写</view>
     <view wx:if="{{needReupload}}" class="btn primary tap fail-btn" bindtap="tapReupload">重新上传简历</view>
     <view wx:if="{{!needReupload}}" class="btn ghost tap fail-btn" bindtap="tapRetry">重试</view>
     <view class="btn ghost tap fail-btn" hover-class="tap-press" bindtap="toResumes">选择其他简历</view>

@@ -279,6 +279,8 @@ Page({
         fileId: res.fileId || this.data.fileId,
         fileName: this.data.fileName,
         ts: Date.now(),
+        // 归属：提交时的身份（会员 id，匿名为 null）。读的地方据此只认自己的任务（10/17）。
+        ownerId: this._submitIdentity ? this._submitIdentity.ownerId : session.ownerId(auth),
       }
       if (terminal && this._intent && session.sameIdentity(auth, this._submitIdentity) && (!anonymous || token)) task.settledIntent = this._intent
       if (!session.persistResumeTask(task)) {
@@ -416,6 +418,7 @@ Page({
           fileName: saved.fileName || this.data.fileName,
           ts: Date.now(),
           settledIntent: this._intent,
+          ownerId: this._submitIdentity ? this._submitIdentity.ownerId : session.ownerId(auth),
         }
         if (!session.persistResumeTask(next)) {
           this._unsavedTask = next
