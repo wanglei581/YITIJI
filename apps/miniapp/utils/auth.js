@@ -281,6 +281,8 @@ function revokeEligibility() {
 function removeUserUnlessLastEvidence() {
   const found = readEligibility();
   if (found.unreadable) return;
+  // 旧版本的「1」只能靠本机资料认人：没能迁成会员 id（资格那一格写失败）时，它是唯一的认人依据，留着（Codex 冷审）。
+  if (found.legacy && found.id) return;
   if (found.id === null && judgeEligibility(found.raw, null).id !== null) return;
   storage.remove(storage.KEYS.USER);
 }

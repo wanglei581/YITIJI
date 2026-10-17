@@ -236,6 +236,8 @@ async function legacyGetTokenFirst({ legacyValue = 1 } = {}, opts = {}) {
   const store = new Map([['zyd_token', EXPIRED_B], ['zyd_user', USER_B], [ELIGIBLE, legacyValue]])
   const ctx = createRuntime({ store, ...opts })
   assert.equal(ctx.auth.getToken(), null, '先查令牌（过期，清会话）')
+  assert.equal(ctx.wx.store.get(ELIGIBLE), 'B', '清资料前已把旧值迁成会员 id')
+  assert.equal(ctx.wx.store.has('zyd_user'), false, '迁好之后本机资料照常清掉，不多留个人资料')
   const cold = coldStart(ctx, { keepFaults: false, mutate: opts.mutate })
   assert.equal(cold.auth.restorableMemberId(), 'B', '升级上来的老用户冷启动照样恢复同一位')
   const pending = cold.net.restoreSession()
@@ -250,15 +252,23 @@ async function legacyGetTokenFirst({ legacyValue = 1 } = {}, opts = {}) {
 for (const legacyValue of [1, '1', true]) {
   test(`旧版本资格「${legacyValue}」：页面先调 getToken 也先迁成会员 id，冷启动恢复同一位，不逼再收短信`, () => legacyGetTokenFirst({ legacyValue }))
 }
-test('旧版本资格「1」迁不进去（资格那一格写失败）：先查令牌后认不出人——不恢复，也不认错人', () => {
+/** 旧值「1」迁不进会员 id（资格那一格写失败）：本机资料是唯一的认人依据，先查令牌也不能删掉它。 */
+async function legacyMigrationWriteFails(opts = {}) {
   const store = new Map([['zyd_token', EXPIRED_B], ['zyd_user', USER_B], [ELIGIBLE, 1]])
-  const ctx = createRuntime({ store })
+  const ctx = createRuntime({ store, ...opts })
   breakKey(ctx, ELIGIBLE, { set: 'silent' })
   assert.equal(ctx.auth.getToken(), null)
-  assert.equal(ctx.auth.restorableMemberId(), null)
-  const cold = coldStart(ctx, { keepFaults: false })
-  assert.equal(cold.auth.restorableMemberId(), null)
-})
+  assert.equal(ctx.auth.getUser(), null, '资料留着也不当成已登录')
+  assert.equal(ctx.wx.store.get(ELIGIBLE), 1, '前提成立：没能迁成 id')
+  assert.equal(ctx.auth.restorableMemberId(), 'B', '本次运行仍认得出同一位')
+  for (const keepFaults of [true, false]) {
+    const cold = coldStart(ctx, { keepFaults, mutate: opts.mutate })
+    cold.auth.getToken()
+    cold.auth.getUser()
+    assert.equal(cold.auth.restorableMemberId(), 'B', `冷启动（${keepFaults ? '存储仍坏' : '存储已恢复'}）照样恢复同一位，不逼再收短信`)
+  }
+}
+test('旧版本资格「1」迁不进去（资格那一格写失败）：本机资料留作认人依据，先查令牌后冷启动照样恢复同一位', () => legacyMigrationWriteFails())
 
 /** 本次运行里证据被别处删掉（不经过 auth）：靠作废位挡住第二次读取。冷启动后就没有依据了，这一层只管本次运行。 */
 async function revokedFlagHoldsWhenEvidenceLost(opts = {}) {
@@ -614,6 +624,11 @@ const MUTATIONS = [
     name: '清资料前不对账（旧值来不及迁）',
     build: () => mutator('auth', [['  reconcileEligibility();\n  storage.remove(storage.KEYS.TOKEN);\n  removeUserUnlessLastEvidence();', '  storage.remove(storage.KEYS.TOKEN);\n  removeUserUnlessLastEvidence();']]),
     scenario: (opts) => legacyGetTokenFirst({ legacyValue: 1 }, opts),
+  },
+  {
+    name: '旧值迁不进 id 时也删掉本机资料',
+    build: () => mutator('auth', [['  if (found.legacy && found.id) return;\n', '']]),
+    scenario: (opts) => legacyMigrationWriteFails(opts),
   },
   {
     name: '补签出发时读不清当成认不出人',
