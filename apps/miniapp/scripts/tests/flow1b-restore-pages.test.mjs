@@ -52,6 +52,7 @@ function expiredRuntime(mutate) {
   return createRuntime({ store: disk, mutate })
 }
 
+const calls = (ctx, part) => ctx.wx.calls.request.filter((c) => c.url.includes(part))
 const restoreCalls = (ctx) => ctx.wx.calls.request.filter((c) => c.url.includes('/member/auth/restore') && !c.url.includes('/revoke'))
 const navTargets = (ctx) => ctx.wx.calls.nav.map(([, url]) => String(url || ''))
 const pathOf = (call) => call.url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/api\/v1/, '').split('?')[0]
@@ -295,4 +296,51 @@ test('反向变异：材料包错误映射把「恢复暂时失败」算成登�
     "if (statusCode === 401 || (err && err.recoverable) || code === 'MEMBER_SESSION_EXPIRED'",
   ]])
   await assert.rejects(packageScenario(mutate), assertionFailed)
+})
+
+// ── 求职材料页（β 批里唯一不用改的一页：它没有同步登录判断，靠请求层恢复）─────────────
+
+async function materialsScenario(mutate) {
+  const ctx = expiredRuntime(mutate)
+  const generated = { fileId: 'f-9d41', filename: '王敏-求职信.pdf', pageCount: 1 }
+  const server = createServer(ctx, {
+    restore: ['fail', 'ok'],
+    routes: [
+      ['GET', '/job-materials/templates', { items: [] }, false],
+      ['POST', '/job-materials/generate', generated, true],
+    ],
+  })
+  const page = ctx.loadPage('pages/job-materials/job-materials.js', ctx.load('api'))
+  page.onLoad({})
+  await server.drain()
+  const values = { name: '王敏', target: '行政专员' }
+  page.setData({ phase: 'form', picked: { id: 'cover-letter', title: '求职信' }, values, canSubmit: true })
+
+  page.submit()
+  await server.drain()
+  assert.equal(restoreCalls(ctx).length, 1)
+  assert.equal(page.data.generating, false, '恢复暂时失败：解开按钮，用户可以再点一次')
+  assert.deepEqual(ctx.wx.calls.modal.map((m) => m.title), ['未能生成材料'], '不弹「需要登录」')
+  assert.equal(ctx.wx.calls.modal[0].content, PENDING_COPY)
+  assert.equal(calls(ctx, '/job-materials/generate').filter((c) => authHeader(c) === `Bearer ${TOKEN_A}`).length, 0, '没恢复成功就没有真的生成')
+  await noAutomaticRetry(ctx, server)
+  common(ctx, server)
+
+  page.submit()
+  await server.drain()
+  assert.equal(restoreCalls(ctx).length, 2, '再点一次才再恢复一次')
+  assert.equal(calls(ctx, '/job-materials/generate').filter((c) => authHeader(c) === `Bearer ${TOKEN_A}`).length, 1, '恢复成功后只真的生成一次')
+  assert.deepEqual(page.data.values, values, '已填内容不丢')
+  assert.ok(navTargets(ctx).some((url) => url.startsWith('/pages/print-upload/print-upload?') && url.includes('fileId=f-9d41')), navTargets(ctx).join(', '))
+  common(ctx, server)
+}
+
+test('求职材料页：生成时恢复暂时失败 → 提示可重试、不弹登录、不自己循环；再点一次恢复成功只生成一次，已填内容不丢', () => materialsScenario())
+
+test('反向变异：求职材料页把「恢复暂时失败」当成要登录 → 上一条必须判红', async () => {
+  const mutate = mutator('pages/job-materials/job-materials.js', [[
+    'if (err && err.statusCode === 401) {',
+    'if (err && (err.statusCode === 401 || err.recoverable)) {',
+  ]])
+  await assert.rejects(materialsScenario(mutate), assertionFailed)
 })
