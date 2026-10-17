@@ -381,4 +381,20 @@ Page({
   back() {
     wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } })
   },
+
+  /** 空态按钮：问答要点为空时去问小青，其余去「AI 工具」Tab。 */
+  emptyAction() {
+    if (this.data.activeFilter === 'qa') this.toAssistant()
+    else this.toAiTools()
+  },
+
+  /** 空态出口：去「AI 工具」Tab。 */
+  toAiTools() {
+    wx.switchTab({ url: '/pages/ai/ai' })
+  },
+
+  /** 问答要点为空时的出口：去问小青。 */
+  toAssistant() {
+    wx.navigateTo({ url: '/pages/assistant/assistant', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
+  },
 })

@@ -29,7 +29,7 @@
 
     <view class="section-t rise-d3">U 盘里能打印的文件</view>
     <view class="card flat rise-d3">
-      <view class="fmt-chips">
+      <view class="fmt-chips card-inner sm">
         <view class="chip" wx:for="{{formats}}" wx:key="*this">{{item}}</view>
       </view>
     </view>

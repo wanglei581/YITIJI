@@ -48,7 +48,6 @@
           <view wx:if="{{item.badge}}" class="pc-badge">{{item.badge}}</view>
         </view>
         <view class="pc-desc">{{item.desc}}</view>
-        <view class="pc-flow">{{item.flow}}</view>
       </view>
       <view class="pc-arrow"><text class="ficon i-right"></text></view>
     </view>

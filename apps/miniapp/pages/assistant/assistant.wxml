@@ -86,7 +86,8 @@
       </view>
 
       <view class="as-summary">
-        <view class="as-sum-btn tap {{savingSummary ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="saveSummary">
+        <view class="as-sum-btn tap {{savingSummary || !sessionId ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="saveSummary"
+              aria-role="button" aria-disabled="{{savingSummary || !sessionId}}">
           {{savingSummary ? '正在保存…' : '保存本次要点'}}
         </view>
         <view wx:if="{{summaryHint}}" class="as-sum-hint">{{summaryHint}}</view>

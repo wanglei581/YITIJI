@@ -16,7 +16,7 @@
 
     <!-- FAQ 折叠列表 -->
     <view class="section-t">热门问答</view>
-    <view class="card">
+    <view class="card"><view class="card-inner">
       <view
         class="faq-item tap"
         wx:for="{{faqs}}"
@@ -30,7 +30,7 @@
         </view>
         <view class="faq-a" wx:if="{{openId === item.id}}">{{item.a}}</view>
       </view>
-    </view>
+    </view></view>
 
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
