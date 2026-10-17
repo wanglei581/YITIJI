@@ -114,13 +114,14 @@ test('模板：信息卡有文件、终端、规格三行；底部按钮文字�
   assert.doesNotMatch(wxml, /bindtap="home">完成<\/view>/, '不能再写死「完成」')
 })
 
-test('B2 模板：订单详情按钮写实际去处；确认页第 3 步与上传页、选终端页同叫「到机核验」', () => {
+test('B2 模板：订单详情按钮写实际去处；确认页第 3 步与上传页、选终端页同叫「确认提交」（FLOW1a：到机核验在第 4 步）', () => {
   const detail = fs.readFileSync(path.join(MINIAPP, 'pages/order-detail/order-detail.wxml'), 'utf8')
   assert.match(detail, /bindtap="toPrint">去我的文档打印<\/button>/)
   assert.doesNotMatch(detail, /再打印一份/)
   for (const rel of ['pages/print-upload/print-upload.wxml', 'pages/print-store/print-store.wxml', 'pages/print-pay/print-pay.wxml']) {
     const wxml = fs.readFileSync(path.join(MINIAPP, rel), 'utf8')
-    assert.match(wxml, /<text class="n">3<\/text><text class="nl">到机核验<\/text>/, rel)
+    assert.match(wxml, /<text class="n">3<\/text><text class="nl">确认提交<\/text>/, rel)
+    assert.doesNotMatch(wxml, /<text class="nl">到机核验<\/text>/, `${rel}：步骤条不能再把「到机核验」放在手机上的步骤里`)
   }
 })
 

@@ -12,9 +12,10 @@
   <view class="steps rise-d1">
     <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选择文件</text></view>
     <view class="line done"></view>
-    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选终端</text></view>
+    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">终端和参数</text></view>
     <view class="line done"></view>
-    <view class="st on"><text class="n">3</text><text class="nl">到机核验</text></view>
+    <!-- 这一步还在手机上确认提交，到机码要提交后才生成；到机核验属于第 4 步（FLOW1a 实图 06） -->
+    <view class="st on"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印' : '到机完成')}}</text></view>
   </view>
@@ -37,8 +38,10 @@
     </view>
   </view>
 
-  <view class="section-t rise-d4">{{quoteState === 'ready' && !isFreeOrder ? '费用（服务端核定）' : '页数核定'}}</view>
-  <view class="card flat fee rise-d4">
+  <!-- 免费时这一块只剩「免费试运营 免费」一行，与上面文件行的「免费」和底栏重复（FLOW1a 实图 06），不再显示；
+       付费、核定中、核定失败照旧显示。 -->
+  <view wx:if="{{quoteState !== 'ready' || !isFreeOrder}}" class="section-t rise-d4">{{quoteState === 'ready' && !isFreeOrder ? '费用（服务端核定）' : '页数核定'}}</view>
+  <view wx:if="{{quoteState !== 'ready' || !isFreeOrder}}" class="card flat fee rise-d4">
     <view class="fee-row total"><text>{{quoteState === 'ready' && !isFreeOrder ? '服务端核定金额' : (isFreeOrder ? '免费试运营' : '页数待服务端核定')}}</text><text class="amt">{{quoteState === 'ready' && !isFreeOrder ? '¥' + fee.total : (isFreeOrder ? '免费' : '—')}}</text></view>
     <!-- 报价拿不到时**不本地补一个数字**：只说清楚，并给一条可执行的重试。
          提交要等到服务端核定出金额之后才放行（建单会带上这个用户确认过的金额）。 -->
@@ -93,6 +96,7 @@
   <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
        再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
        「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->
-  <view class="btn wx lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
+  <!-- 这里没有微信支付（付费也是到机再付），主按钮与整条链一样用蓝色 primary，不用微信绿（FLOW1a 实图 06） -->
+  <view class="btn primary lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
 </view>
 </view>

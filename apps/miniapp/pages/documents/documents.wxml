@@ -30,7 +30,7 @@
       <!-- 不写「N 个文件」当总数：filtered.length 只是已载入数，还有下一页时说成总数
            就是把「不显示文件」包装成「只有这么多」。 -->
       <text class="section-t lt-title">最近{{nextCursor ? '' : ' · ' + filtered.length + ' 个文件'}}</text>
-      <view class="lt-action tap" hover-class="tap-press" bindtap="loadDocuments"
+      <view class="lt-action tap" hover-class="tap-press" bindtap="reloadDocuments"
             aria-role="button" aria-label="重新加载文档列表">刷新</view>
     </view>
 
@@ -52,7 +52,7 @@
           hover-class="tap-press"
           aria-disabled="{{convertExpired || convertingId || previewing || !convertResult.reprintable}}"
           catchtap="reprintConvertedPdf"
-        >重新打印</view>
+        >打印</view>
       </view>
       <view wx:if="{{convertExpired}}" class="doc-hint">链接已过期，请在列表里重新打开</view>
       <view wx:if="{{!convertResult.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
@@ -66,7 +66,7 @@
       <view class="empty-slot">
         <view class="es-t">加载失败</view>
         <view class="es-d">{{loadError}}</view>
-        <view class="btn ghost" bindtap="loadDocuments">重试</view>
+        <view class="btn ghost" bindtap="reloadDocuments">重试</view>
       </view>
     </view>
 
@@ -79,42 +79,45 @@
         data-id="{{item.id}}"
         bindtap="openDoc"
       >
-        <view class="doc-ic ic-{{item.kind}}">{{item.ext}}</view>
-        <view class="doc-body">
-          <view class="doc-name">{{item.name}}</view>
-          <view class="doc-meta">
-            <text>{{item.size}}</text>
-            <text class="doc-dot">·</text>
-            <text>{{item.time}}</text>
-            <text class="doc-exp" wx:if="{{item.expire}}">{{item.expire}}</text>
+        <!-- 一行：格式块 + 主名（最多两行，占满剩余宽度）+ ⋯。操作放在下面独立的紧凑底行，
+             不在右侧常驻一列挤压文件名（FLOW1a，Codex 意见）。扩展名只在格式块里出现，
+             「.pdf」不会被拆到下一行；完整原名在「⋯」菜单顶部。 -->
+        <view class="doc-row">
+          <view class="doc-ic ic-{{item.kind}}">{{item.ext}}</view>
+          <view class="doc-body">
+            <view class="doc-name">{{item.baseName}}</view>
+            <view class="doc-meta">
+              <text>{{item.size}}</text>
+              <text class="doc-dot">·</text>
+              <text>{{item.time}}</text>
+              <text class="doc-exp" wx:if="{{item.expire}}">{{item.expire}}</text>
+            </view>
+            <!-- 保存期限：档位与是否可改都由服务端给（allowedRetentionPolicies），前端不推算。
+                 原来是档位 chip 一行、「不可延长」提示再一行，合成一行小字。 -->
+            <view class="doc-retention" wx:if="{{item.retentionPolicy}}">{{item.retentionLabel}}{{item.retentionLocked ? '，不可延长' : ''}}</view>
+            <view wx:if="{{item.isWord}}" class="doc-hint">{{wordConversionCopy}}</view>
+            <view wx:if="{{!item.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
           </view>
-          <!-- 保存期限：此前只显示到期日期，用户看不出自己处在哪一档、也不知道能不能改。
-               档位与是否可改都由服务端给（allowedRetentionPolicies），前端不推算。 -->
-          <view class="doc-retention" wx:if="{{item.retentionPolicy}}">
-            <text class="chip">{{item.retentionLabel}}</text>
-            <text class="doc-retention-hint" wx:if="{{item.retentionLocked}}">此类文件按系统策略保存，不可延长</text>
-          </view>
-          <view class="doc-actions">
-            <view
-              wx:if="{{item.isWord}}"
-              class="doc-action {{(!wordConversionAvailable || convertingId) ? 'is-disabled' : ''}}"
-              hover-class="tap-press"
-              aria-disabled="{{!wordConversionAvailable || convertingId}}"
-              catchtap="convertDoc"
-              data-id="{{item.id}}"
-            >{{convertingId === item.id ? '转换中' : '转 PDF'}}</view>
-            <view
-              class="doc-action {{item.reprintable ? '' : 'is-disabled'}}"
-              hover-class="tap-press"
-              aria-disabled="{{!item.reprintable}}"
-              catchtap="reprintDoc"
-              data-id="{{item.id}}"
-            >重新打印</view>
-          </view>
-          <view wx:if="{{item.isWord}}" class="doc-hint">{{wordConversionCopy}}</view>
-          <view wx:if="{{!item.reprintable}}" class="doc-hint">该报告仅可查看，不可打印</view>
+          <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}"
+                aria-role="button" aria-label="更多操作">⋯</view>
         </view>
-        <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}">⋯</view>
+        <view class="doc-actions" wx:if="{{item.isWord || item.reprintable}}">
+          <view
+            wx:if="{{item.isWord}}"
+            class="doc-action {{(!wordConversionAvailable || convertingId) ? 'is-disabled' : ''}}"
+            hover-class="tap-press"
+            aria-disabled="{{!wordConversionAvailable || convertingId}}"
+            catchtap="convertDoc"
+            data-id="{{item.id}}"
+          >{{convertingId === item.id ? '转换中' : '转 PDF'}}</view>
+          <view
+            wx:if="{{item.reprintable}}"
+            class="doc-action primary"
+            hover-class="tap-press"
+            catchtap="reprintDoc"
+            data-id="{{item.id}}"
+          >打印</view>
+        </view>
       </view>
     </view>
 
