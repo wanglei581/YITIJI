@@ -682,7 +682,17 @@ for (const failingKey of ['zyd_user', 'zyd_token']) {
       cold.wx.calls.request[0].success({ statusCode: 401, data: {} })
       await flush()
 
-      // 补签资格还在，所以能自己修好：补签写回成对的一份会话。
+      if (failingKey === 'zyd_user') {
+        // FLOW1b（Codex 冷审）：资格认的是 B、本机资料还是 A —— 两边对不上，资格按不可恢复作废，
+        // 不靠微信补签「自己修好」，用户再登录一次。宁可多一次登录，不可错认一个人。
+        assert.equal(cold.wx.calls.login.length, 0, '对不上就不去 wx.login')
+        assert.equal(cold.auth.canSilentResignin(), false)
+        assert.equal(cold.auth.restorableMemberId(), null)
+        assert.equal((await pending).ok, false)
+        return
+      }
+
+      // 资格与本机资料都是 B（令牌那一格是旧的）：补签资格可信，能自己修好，补签写回成对的一份会话。
       assert.equal(cold.wx.calls.login.length, 1)
       cold.wx.calls.login[0].success({ code: 'CODE-COLD' })
       await flush()
@@ -1269,6 +1279,41 @@ test('FLOW1b 资格写不进也删不掉：登录 B 不成立，冷启动后能�
 test('FLOW1b 资格写不进但能删掉：登录 B 成立，旧的 A 资格删掉，过期后不自动恢复', () => eligibilityRemovedWhenNotWritable())
 test('FLOW1b 一致性核对：本机资料是 B、资格是 A 时不恢复', () => mismatchedEligibilityIsNotRestorable())
 
+/** Codex 给的实际调用顺序：资格 A、本机资料 B、令牌是过期的 B。先认人、再查令牌、再认人，前后都不能认出 A。 */
+async function inconsistentEligibilityStaysDead({ removeFault = null, setFault = null } = {}, opts) {
+  const store = new Map([['zyd_token', fakeToken('B', -60)], ['zyd_user', USER_B], ['resignin_eligible', 'A']])
+  const ctx = createRuntime({ store, ...opts })
+  ctx.wx.faults.remove = removeFault
+  if (setFault) { ctx.wx.faults.key = 'resignin_eligible'; ctx.wx.faults.keyMode = setFault }
+  const before = ctx.auth.restorableMemberId()
+  const token = ctx.auth.getToken()
+  const after = ctx.auth.restorableMemberId()
+  assert.deepEqual({ before, token, after }, { before: null, token: null, after: null }, '同一次运行里第二次读也复活不了 A')
+  assert.equal(ctx.auth.canSilentResignin(), false)
+  ctx.wx.faults.remove = null
+  ctx.wx.faults.key = null
+  ctx.wx.faults.keyMode = null
+  // 冷启动：删不掉时要么写了作废标记，要么本机资料也还在（同样删不掉），都能再认出不一致。
+  const cold = createRuntime({ store: new Map(ctx.wx.store) })
+  assert.equal(cold.auth.restorableMemberId(), null, '冷启动后也不能恢复成 A')
+  assert.equal((await cold.net.restoreSession()).state, 'need_login')
+  assert.equal(cold.wx.calls.login.length, 0)
+}
+
+/** 反过来的顺序：先查令牌（会清掉本机资料），再认人——清资料前必须先对账。 */
+async function tokenFirstOrderCannotRevive(opts) {
+  const store = new Map([['zyd_token', fakeToken('B', -60)], ['zyd_user', USER_B], ['resignin_eligible', 'A']])
+  const ctx = createRuntime({ store, ...opts })
+  assert.equal(ctx.auth.getToken(), null)
+  assert.equal(ctx.auth.restorableMemberId(), null, '清掉资料后再认人也不能认出 A')
+  assert.equal(ctx.wx.store.has('resignin_eligible'), false, '不一致的资格要删掉')
+}
+
+test('FLOW1b 不一致资格：先认人 → 查令牌 → 再认人，前后都认不出 A（Codex 给的调用顺序）', () => inconsistentEligibilityStaysDead())
+test('FLOW1b 不一致资格：删不掉时写作废标记，本次运行和冷启动都复活不了', () => inconsistentEligibilityStaysDead({ removeFault: 'silent' }))
+test('FLOW1b 不一致资格：删不掉也写不进作废标记时，本次运行靠作废位、冷启动靠还删不掉的本机资料，都复活不了', () => inconsistentEligibilityStaysDead({ removeFault: 'silent', setFault: 'silent' }))
+test('FLOW1b 不一致资格：先查令牌再认人，清资料前已对账', () => tokenFirstOrderCannotRevive())
+
 const FLOW1B_MUTATIONS = [
   {
     name: '显式登录不先确认恢复资格就写新会话',
@@ -1282,8 +1327,18 @@ const FLOW1B_MUTATIONS = [
   },
   {
     name: '恢复资格不核对本机资料',
-    build: () => mutator('auth', [["  if (user && user.id != null && user.id !== '' && String(user.id) !== memberId) return null;\n", '']]),
+    build: () => mutator('auth', [['  if (userId && userId !== String(raw)) revokeEligibility();\n', '']]),
     scenario: mismatchedEligibilityIsNotRestorable,
+  },
+  {
+    name: '作废位不挡第二次读取',
+    build: () => mutator('auth', [['  if (sessionRevoked || eligibilityRevoked) return null;\n  reconcileEligibility();\n  if (eligibilityRevoked) return null;\n', '  if (sessionRevoked) return null;\n  reconcileEligibility();\n']]),
+    scenario: (opts) => inconsistentEligibilityStaysDead({ removeFault: 'silent', setFault: 'silent' }, opts),
+  },
+  {
+    name: '清资料前不对账',
+    build: () => mutator('auth', [['  reconcileEligibility();\n  storage.remove(storage.KEYS.TOKEN);', '  storage.remove(storage.KEYS.TOKEN);']]),
+    scenario: (opts) => tokenFirstOrderCannotRevive(opts),
   },
   {
     name: '补签不核对回来的是不是同一位会员',

@@ -114,6 +114,15 @@ let generation = 1;
  */
 let sessionRevoked = false;
 
+/**
+ * 恢复资格作废位（本次运行内，FLOW1b）。资格与本机资料认的不是同一位时置起：
+ * 存储的删除可能抛、也可能安静没删，只靠删存储挡不住「清掉资料后再读一次又认出上一位」。
+ * 下一次显式登录、资格确认写成新的那一位时才放下。
+ */
+let eligibilityRevoked = false;
+/** 删不掉旧资格时写进去的作废标记：冷启动后也不会被当成可恢复。 */
+const ELIGIBILITY_VOID = '!';
+
 /** 当前会话代际。 */
 function sessionGeneration() {
   return generation;
@@ -186,7 +195,9 @@ function saveSession(data = {}, options = {}) {
  */
 function canSilentResignin() {
   if (sessionRevoked) return false;
-  return !!storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (eligibilityRevoked) return false;
+  const raw = storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+  return !!raw && raw !== ELIGIBILITY_VOID;
 }
 
 /**
@@ -202,10 +213,36 @@ function recordRestorableMember(user) {
   const memberId = user && user.id != null && user.id !== '' ? String(user.id) : '';
   if (memberId) {
     storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, memberId);
-    if (storage.get(storage.KEYS.RESIGNIN_ELIGIBLE) === memberId) return true;
+    if (storage.get(storage.KEYS.RESIGNIN_ELIGIBLE) === memberId) {
+      eligibilityRevoked = false;
+      return true;
+    }
   }
   storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
   return !storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+}
+
+/**
+ * 作废恢复资格：本次运行内立即失效（内存旗子），存储里删掉；删不掉就写作废标记。
+ * 两样都失败时存储整体坏了，本机资料也删不掉，冷启动时 reconcileEligibility 会再认出不一致。
+ */
+function revokeEligibility() {
+  eligibilityRevoked = true;
+  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (storage.get(storage.KEYS.RESIGNIN_ELIGIBLE)) storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, ELIGIBILITY_VOID);
+}
+
+/**
+ * 对账（FLOW1b，Codex 冷审）：恢复资格认的会员必须就是本机资料这一位；对不上（撕裂写、旧版本残留）
+ * 就按不可恢复处理并作废，不能只返回 null——清掉本机资料之后就再也认不出来了，第二次读会又认出上一位。
+ * 所以 restorableMemberId 和 clearSession（销毁本机资料的地方）都先对账，调用顺序怎么排都一样。
+ */
+function reconcileEligibility() {
+  const raw = storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (!raw || raw === 1 || raw === '1' || raw === true || raw === ELIGIBILITY_VOID) return;
+  const user = storage.get(storage.KEYS.USER, null);
+  const userId = user && user.id != null && user.id !== '' ? String(user.id) : '';
+  if (userId && userId !== String(raw)) revokeEligibility();
 }
 
 /**
@@ -216,9 +253,11 @@ function recordRestorableMember(user) {
  * 旧值 1：本机资料还在就以它的 id 为准、就地改写成 id；不在就认不出人，删掉旧值、不自动恢复。
  */
 function restorableMemberId() {
-  if (sessionRevoked) return null;
+  if (sessionRevoked || eligibilityRevoked) return null;
+  reconcileEligibility();
+  if (eligibilityRevoked) return null;
   const raw = storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
-  if (raw === null || raw === undefined || raw === '' || raw === 0 || raw === false) return null;
+  if (raw === null || raw === undefined || raw === '' || raw === 0 || raw === false || raw === ELIGIBILITY_VOID) return null;
   if (raw === 1 || raw === '1' || raw === true) {
     const user = storage.get(storage.KEYS.USER, null);
     const id = user && user.id != null && user.id !== '' ? String(user.id) : '';
@@ -229,12 +268,9 @@ function restorableMemberId() {
     storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
     return null;
   }
-  const memberId = String(raw);
-  // 一致性可验证：本机资料还在时，资格必须就是这一位；对不上（撕裂写、旧版本残留）就不恢复。
-  // 资料不在时（令牌过期已被清掉）靠 saveSession 的写入顺序保证：新会话落盘前资格已确认是这一位或已删除。
-  const user = storage.get(storage.KEYS.USER, null);
-  if (user && user.id != null && user.id !== '' && String(user.id) !== memberId) return null;
-  return memberId;
+  // 一致性：本机资料还在时上面的对账已经核过；资料不在时（令牌过期已被清掉）靠两点保证——
+  // saveSession 在新会话落盘前已确认资格是这一位或已删除；clearSession 清资料前先对账。
+  return String(raw);
 }
 
 /** 用户主动登出：撤销会话与补签资格，并推进代际作废所有在途请求。 */
@@ -259,6 +295,8 @@ function logoutIfSameSession(expected) {
 }
 
 function clearSession() {
+  // 清资料前先对账（FLOW1b）：这里是销毁「本机是哪一位」的地方，清掉之后不一致就再也认不出来了。
+  reconcileEligibility();
   storage.remove(storage.KEYS.TOKEN);
   storage.remove(storage.KEYS.USER);
 }
