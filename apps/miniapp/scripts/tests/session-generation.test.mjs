@@ -774,7 +774,7 @@ const MUTATIONS = [
   {
     name: '登录页忽略 saveSession 的返回值',
     build: () => mutator('pages/launch/launch.js', [[
-      "        if (!saved) {\n          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })\n          return\n        }\n",
+      "        if (!saved) {\n          wx.showToast({ title: '登录状态未能保存，请重试', icon: 'none' })\n          this._say('登录状态没能保存，请重试', 'warn')\n          return\n        }\n",
       '',
     ]]),
     scenario: async (opts) => {

@@ -166,14 +166,30 @@ export function createRuntime({ mutate, store } = {}) {
     if (mutate) source = mutate(relPath, source)
     let config = null
     sandbox.Page = (cfg) => { config = cfg }
+    // 页面目录里的同级模块（如 print-pickup/pickup-state.js）也装进同一个沙箱，它们引用的 utils 走同一份实例。
+    const local = new Map()
+    const requireFrom = (dir) => (spec) => {
+      const s = String(spec)
+      if (s.startsWith('./')) {
+        const target = path.join(dir, `${s.slice(2).replace(/\.js$/, '')}.js`)
+        if (!local.has(target)) {
+          const mod = { exports: {} }
+          local.set(target, mod)
+          vm.compileFunction(fs.readFileSync(target, 'utf8'), ['module', 'exports', 'require'], {
+            parsingContext: sandbox,
+            filename: target,
+          })(mod, mod.exports, requireFrom(path.dirname(target)))
+        }
+        return local.get(target).exports
+      }
+      const name = s.replace(/^(\.\.\/)+utils\//, '').replace(/\.js$/, '')
+      return name === 'api' ? apiStub : load(name)
+    }
     const compiled = vm.compileFunction(source, ['module', 'exports', 'require'], {
       parsingContext: sandbox,
       filename: file,
     })
-    compiled({ exports: {} }, {}, (spec) => {
-      const name = String(spec).replace(/^(\.\.\/)+utils\//, '').replace(/\.js$/, '')
-      return name === 'api' ? apiStub : load(name)
-    })
+    compiled({ exports: {} }, {}, requireFrom(path.dirname(file)))
     assert.ok(config, `页面没有调用 Page()：${relPath}`)
     const page = Object.assign({}, config)
     page.data = JSON.parse(JSON.stringify(config.data))
