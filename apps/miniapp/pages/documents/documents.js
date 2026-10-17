@@ -3,6 +3,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const fileUrls = require('../../utils/file-url')
 const auth = require('../../utils/auth')
+const pageGuard = require('../../utils/page-guard')
 const uploadNames = require('../../utils/upload-name')
 const conversion = require('./documents-helpers')
 
@@ -34,16 +35,25 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
-    if (!auth.isLoggedIn()) {
-      wx.redirectTo({
-        url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/documents/documents')}`,
-        // redirectTo 失败（如 launch 已在栈顶）时不能静默留在本页，与 contract-review._toLogin 同款兜底。
-        fail: () => wx.switchTab({ url: '/pages/home/home' }),
-      })
-      return
-    }
-    this._loadConversionCapabilities()
-    this.loadDocuments()
+    // 登录闸门（FLOW1b）：过期但可恢复时先等恢复结果；只有确定需要登录才去登录页。
+    // 网络、限流、服务端故障时留在本页给重试，不把人送去重收短信。
+    pageGuard.ensureMember(auth, api).then((r) => {
+      if (this._unloaded) return
+      if (r.state === 'need_login') {
+        wx.redirectTo({
+          url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/documents/documents')}`,
+          // redirectTo 失败（如 launch 已在栈顶）时不能静默留在本页，与 contract-review._toLogin 同款兜底。
+          fail: () => wx.switchTab({ url: '/pages/home/home' }),
+        })
+        return
+      }
+      if (r.state === 'recoverable') {
+        this.setData({ loading: false, loadError: '网络不稳定，暂时没能恢复登录，请稍后重试' })
+        return
+      }
+      this._loadConversionCapabilities()
+      this.loadDocuments()
+    })
   },
 
   onUnload() {
@@ -54,6 +64,7 @@ Page({
   },
 
   _loadConversionCapabilities() {
+    this._capsRequested = true
     api.getDocumentConversionCapabilities()
       .then((capabilities) => {
         const available = capabilities && capabilities.wordToPdf === true
@@ -77,6 +88,8 @@ Page({
   // 「刷新」「重试」走这里。模板曾直接 bindtap="loadDocuments"：点击事件对象被当成 append，
   // 没有下一页时直接返回、有下一页时把下一页追加进来，刷新和重试都不灵（FLOW1a，沙箱复现）。
   reloadDocuments() {
+    // 进页时登录没能恢复（临时失败）就没取过转换能力：重试时一并补上。
+    if (!this._capsRequested) this._loadConversionCapabilities()
     this.loadDocuments(false)
   },
 

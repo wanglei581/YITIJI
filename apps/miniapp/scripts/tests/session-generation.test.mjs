@@ -370,7 +370,8 @@ async function resigninFailureLateAfterSwitch(tr, opts) {
   await flush()
 
   switchToB(ctx)
-  ctx.resigninCalls()[0].success({ statusCode: 401, data: {} })
+  // 确定失败（FLOW1b 起只有确定失败才会去登出），晚到时只能登出自己那一代，不能把 B 踢下线。
+  ctx.resigninCalls()[0].success({ statusCode: 401, data: { error: { code: 'MEMBER_NOT_BOUND', message: '该微信尚未绑定账号' } } })
   await flush()
 
   assert.equal(tr.calls(ctx).length, 1)
@@ -540,7 +541,10 @@ async function logoutInvalidatesInflightWhenWritesAreLost(tr, opts) {
   assertLoggedOut(ctx)
 }
 
-/** 补签回来了但落不了盘：存不下的会话等于没有会话，按补签失败处理。 */
+/**
+ * 补签回来了但落不了盘：存不下的会话等于没有会话，这次不重放。
+ * FLOW1b 起按**临时失败**处理：不登出、不删恢复资格（存储问题不该让人重收短信），给页面可恢复的错误。
+ */
 async function resigninSaveFailureIsFailure(tr, mode, opts) {
   const ctx = createRuntime(opts)
   loginAs(ctx, TOKEN_A, USER_A)
@@ -558,9 +562,11 @@ async function resigninSaveFailureIsFailure(tr, mode, opts) {
 
   const result = await pending
   assert.equal(result.ok, false)
-  assert.equal(result.error.statusCode, 401)
+  assert.equal(result.error.code, 'SESSION_RESTORE_PENDING')
+  assert.equal(result.error.recoverable, true)
   assert.equal(tr.calls(ctx).length, 1, '没存下新 token 就不该拿旧 token 去重放')
-  assertLoggedOut(ctx)
+  assert.equal(ctx.auth.canSilentResignin(), true, '存储问题不撤销恢复资格')
+  assert.equal(ctx.auth.restorableMemberId(), 'A')
 }
 
 // ── 用例 ────────────────────────────────────────────────────────────────────
@@ -578,7 +584,7 @@ for (const tr of TRANSPORTS) {
   test(`[${tr.name}] 补签带 MEMBER_LEGAL_VERSION_STALE：业务码不被 401 盖掉`, () => legalVersionStaleSurfaces(tr))
   test(`[${tr.name}] 登出时写入全丢：在途补签仍然失效`, () => logoutInvalidatesInflightWhenWritesAreLost(tr))
   for (const mode of ['throw', 'silent']) {
-    test(`[${tr.name}] 补签保存失败(${mode})：按补签失败处理`, () => resigninSaveFailureIsFailure(tr, mode))
+    test(`[${tr.name}] 补签保存失败(${mode})：不重放、不登出、保留恢复资格`, () => resigninSaveFailureIsFailure(tr, mode))
   }
 }
 
@@ -651,7 +657,8 @@ function tornStore(failingKey, mode) {
   const user = store.get('zyd_user')
   assert.ok(token && user, '前提：两格都还有值')
   assert.notEqual(subjectOf(token), String(user.id), '前提：盘上两格分属两个人')
-  assert.equal(store.get('resignin_eligible'), 1, '前提：补签资格仍在')
+  // FLOW1b：补签资格记的是最近一次**显式登录**的会员 id（这里是 B），过期后只恢复这一位。
+  assert.equal(store.get('resignin_eligible'), 'B', '前提：补签资格仍在，且认的是最近一次显式登录的 B')
   return store
 }
 
@@ -942,6 +949,361 @@ const MUTATIONS = [
 
 for (const mutation of MUTATIONS) {
   test(`变异[${mutation.name}]必须判红`, async () => {
+    const mutate = mutation.build()
+    await assert.rejects(() => mutation.scenario({ mutate }), assertionFailed)
+  })
+}
+
+// ── FLOW1b：过期后只恢复同一位会员、网络问题不登出、只有主动退出才算退出 ─────────────
+// 真跑 auth / request / storage；wx 是替身。令牌用负的有效期造「已过期」。
+
+const EXPIRED_A = fakeToken('A', -60)
+const RESIGN = (code, status = 401) => ({ statusCode: status, data: { error: { code, message: '服务端原话' } } })
+
+/** 冷启动：盘上是一份过期的 A 会话（资格记着 A），就像用户 38 分钟后重新打开小程序。 */
+function coldExpiredA(extra = {}) {
+  const warm = createRuntime()
+  assert.equal(loginAs(warm, TOKEN_A, USER_A), true)
+  const store = new Map(warm.wx.store)
+  store.set('zyd_token', EXPIRED_A)
+  for (const [k, v] of Object.entries(extra)) {
+    if (v === undefined) store.delete(k)
+    else store.set(k, v)
+  }
+  return createRuntime({ store })
+}
+
+test('FLOW1b 登录即记下会员 id；同一位续签不改它', async () => {
+  const ctx = createRuntime()
+  assert.equal(loginAs(ctx, TOKEN_A, USER_A), true)
+  assert.equal(ctx.wx.store.get('resignin_eligible'), 'A')
+  assert.equal(ctx.auth.restorableMemberId(), 'A')
+})
+
+test('FLOW1b 补签只认同一会员：短信登录的 B 不会被换成这个微信绑定的 A', async () => {
+  const ctx = createRuntime()
+  assert.equal(loginAs(ctx, TOKEN_B, USER_B), true)
+  const pending = settle(ctx.net.request('/member/print-orders'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+  await flush()
+  ctx.wx.calls.login[0].success({ code: 'CODE-1' })
+  await flush()
+  ctx.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+  await flush()
+  const result = await pending
+  assert.equal(result.ok, false)
+  assert.equal(result.error.code, 'RESIGNIN_MEMBER_MISMATCH')
+  assert.equal(TRANSPORTS[0].calls(ctx).length, 1, '不是同一位就不重放')
+  assert.notEqual(ctx.wx.store.get('zyd_token'), TOKEN_A2, 'A 的令牌不得写入')
+  assertLoggedOut(ctx)
+})
+
+for (const [label, fail] of [
+  ['补签接口 503', (ctx) => ctx.resigninCalls()[0].success({ statusCode: 503, data: { error: { code: 'MEMBER_SESSION_STORE_UNAVAILABLE' } } })],
+  ['补签接口限流 429', (ctx) => ctx.resigninCalls()[0].success({ statusCode: 429, data: { error: { code: 'RATE_LIMITED' } } })],
+  ['补签请求断网', (ctx) => ctx.resigninCalls()[0].fail({ errMsg: 'request:fail timeout' })],
+]) {
+  test(`FLOW1b 临时失败不登出（${label}）：保留恢复资格，下一次请求就能恢复`, async () => {
+    const ctx = createRuntime()
+    loginAs(ctx, TOKEN_A, USER_A)
+    const first = settle(ctx.net.request('/member/print-orders'))
+    await flush()
+    TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+    await flush()
+    ctx.wx.calls.login[0].success({ code: 'CODE-1' })
+    await flush()
+    fail(ctx)
+    await flush()
+    const r1 = await first
+    assert.equal(r1.ok, false)
+    assert.equal(r1.error.code, 'SESSION_RESTORE_PENDING')
+    assert.equal(r1.error.recoverable, true)
+    assert.notEqual(r1.error.statusCode, 401, '不让页面当成「要重新登录」')
+    assert.equal(ctx.auth.canSilentResignin(), true, '恢复资格保留')
+    assert.equal(ctx.auth.restorableMemberId(), 'A')
+
+    const second = settle(ctx.net.request('/member/print-orders'))
+    await flush()
+    TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[1], 401, {})
+    await flush()
+    ctx.wx.calls.login[1].success({ code: 'CODE-2' })
+    await flush()
+    ctx.resigninCalls()[1].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+    await flush()
+    TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[2], 200, { data: { ok: 1 } })
+    assert.equal((await second).ok, true, '网络恢复后同一位会员接着用')
+    assert.equal(ctx.auth.getToken(), TOKEN_A2)
+  })
+}
+
+test('FLOW1b 临时失败不登出（wx.login 失败）', async () => {
+  const ctx = createRuntime()
+  loginAs(ctx, TOKEN_A, USER_A)
+  const pending = settle(ctx.net.request('/member/print-orders'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+  await flush()
+  ctx.wx.calls.login[0].fail({ errMsg: 'login:fail' })
+  await flush()
+  const result = await pending
+  assert.equal(result.error.code, 'SESSION_RESTORE_PENDING')
+  assert.equal(ctx.auth.canSilentResignin(), true)
+})
+
+for (const code of ['MEMBER_NOT_BOUND', 'ACCOUNT_UNAVAILABLE']) {
+  test(`FLOW1b 确定失败（补签回 ${code}）：本机登出并撤销恢复资格`, async () => {
+    const ctx = createRuntime()
+    loginAs(ctx, TOKEN_A, USER_A)
+    const pending = settle(ctx.net.request('/member/print-orders'))
+    await flush()
+    TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+    await flush()
+    ctx.wx.calls.login[0].success({ code: 'CODE-1' })
+    await flush()
+    ctx.resigninCalls()[0].success(RESIGN(code, code === 'ACCOUNT_UNAVAILABLE' ? 403 : 401))
+    await flush()
+    const result = await pending
+    assert.equal(result.error.code, code)
+    assertLoggedOut(ctx)
+  })
+}
+
+test('FLOW1b 业务 401（二次验证码错）不补签、不登出', async () => {
+  const ctx = createRuntime()
+  loginAs(ctx, TOKEN_A, USER_A)
+  const pending = settle(ctx.net.request('/member/step-up/verify'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, { error: { code: 'STEP_UP_CODE_INVALID', message: '验证码不正确' } })
+  await flush()
+  const result = await pending
+  assert.equal(result.error.code, 'STEP_UP_CODE_INVALID')
+  assert.equal(ctx.wx.calls.login.length, 0, '不去 wx.login')
+  assert.equal(ctx.auth.isLoggedIn(), true)
+  assert.equal(ctx.auth.canSilentResignin(), true)
+})
+
+test('FLOW1b 守卫说账号不可用（401 ACCOUNT_UNAVAILABLE）：不补签，直接本机登出', async () => {
+  const ctx = createRuntime()
+  loginAs(ctx, TOKEN_A, USER_A)
+  const pending = settle(ctx.net.request('/member/print-orders'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, { error: { code: 'ACCOUNT_UNAVAILABLE', message: '账号不可用' } })
+  await flush()
+  await pending
+  assert.equal(ctx.wx.calls.login.length, 0)
+  assertLoggedOut(ctx)
+})
+
+test('FLOW1b 冷启动恢复：过期的 A → 只换 A 的新令牌，不发短信；恢复中不伪装成已登录', async () => {
+  const ctx = coldExpiredA()
+  const pending = ctx.net.restoreSession()
+  await flush()
+  assert.equal(ctx.auth.isLoggedIn(), false, '恢复进行中照旧是未登录')
+  ctx.wx.calls.login[0].success({ code: 'CODE-COLD' })
+  await flush()
+  ctx.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+  assert.deepEqual({ ...(await pending) }, { state: 'ok' })
+  assert.equal(ctx.auth.getToken(), TOKEN_A2)
+  assert.equal(ctx.auth.getUser().id, 'A')
+  assert.equal(ctx.wx.calls.request.filter((c) => /sms|login\b/.test(c.url) && !c.url.includes('wx-resignin')).length, 0, '没有短信或登录请求')
+})
+
+test('FLOW1b 冷启动恢复：临时失败 → recoverable，资格保留；确定失败 → need_login，资格撤销', async () => {
+  const flaky = coldExpiredA()
+  const p1 = flaky.net.restoreSession()
+  await flush()
+  flaky.wx.calls.login[0].success({ code: 'C1' })
+  await flush()
+  flaky.resigninCalls()[0].success({ statusCode: 502, data: { error: { code: 'WX_CODE2SESSION_FAILED' } } })
+  assert.equal((await p1).state, 'recoverable')
+  assert.equal(flaky.auth.canSilentResignin(), true)
+
+  const unbound = coldExpiredA()
+  const p2 = unbound.net.restoreSession()
+  await flush()
+  unbound.wx.calls.login[0].success({ code: 'C2' })
+  await flush()
+  unbound.resigninCalls()[0].success(RESIGN('MEMBER_NOT_BOUND'))
+  assert.equal((await p2).state, 'need_login')
+  assert.equal(unbound.auth.canSilentResignin(), false)
+  assert.equal(unbound.wx.store.has('resignin_eligible'), false)
+})
+
+test('FLOW1b 主动退出后重开：不恢复、不去 wx.login', async () => {
+  const warm = createRuntime()
+  loginAs(warm, TOKEN_A, USER_A)
+  warm.auth.logout()
+  const cold = createRuntime({ store: new Map(warm.wx.store) })
+  assert.deepEqual({ ...(await cold.net.restoreSession()) }, { state: 'need_login' })
+  assert.equal(cold.wx.calls.login.length, 0)
+})
+
+test('FLOW1b 旧版本资格「1」：本机资料还在就迁成会员 id 并恢复；资料不在就不恢复并删掉旧值', async () => {
+  const legacy = coldExpiredA({ resignin_eligible: 1 })
+  const p = legacy.net.restoreSession()
+  assert.equal(legacy.wx.store.get('resignin_eligible'), 'A', '迁成会员 id')
+  await flush()
+  legacy.wx.calls.login[0].success({ code: 'C' })
+  await flush()
+  legacy.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+  assert.equal((await p).state, 'ok')
+
+  const orphan = coldExpiredA({ resignin_eligible: 1, zyd_user: undefined })
+  assert.equal((await orphan.net.restoreSession()).state, 'need_login')
+  assert.equal(orphan.wx.calls.login.length, 0)
+  assert.equal(orphan.wx.store.has('resignin_eligible'), false)
+})
+
+test('FLOW1b 并发 401：三个请求只补签一次，全部用新令牌重放', async () => {
+  const ctx = createRuntime()
+  loginAs(ctx, TOKEN_A, USER_A)
+  const all = [1, 2, 3].map(() => settle(ctx.net.request('/member/print-orders')))
+  await flush()
+  TRANSPORTS[0].calls(ctx).slice(0, 3).forEach((c) => TRANSPORTS[0].reply(c, 401, {}))
+  await flush()
+  assert.equal(ctx.wx.calls.login.length, 1)
+  ctx.wx.calls.login[0].success({ code: 'C' })
+  await flush()
+  ctx.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+  await flush()
+  const replays = TRANSPORTS[0].calls(ctx).slice(3)
+  assert.equal(replays.length, 3)
+  replays.forEach((c) => { assert.equal(authHeader(c), `Bearer ${TOKEN_A2}`); TRANSPORTS[0].reply(c, 200, { data: { ok: 1 } }) })
+  for (const r of await Promise.all(all)) assert.equal(r.ok, true)
+})
+
+// ── FLOW1b 负向：恢复资格与最后一次显式登录必须一致（Codex 冷审 P1），以及各防护的反向变异 ────────
+
+/** 资格既写不进也删不掉：登录 B 不成立，盘上不会出现「会话是 B、资格还是 A」。 */
+async function staleEligibilityCannotSurvive(opts) {
+  const ctx = createRuntime(opts)
+  assert.equal(loginAs(ctx, TOKEN_A, USER_A), true)
+  ctx.wx.faults.key = 'resignin_eligible'
+  ctx.wx.faults.keyMode = 'silent'
+  ctx.wx.faults.remove = 'silent'
+  const savedB = ctx.auth.saveSession({ token: TOKEN_B, user: USER_B })
+  ctx.wx.faults.key = null
+  ctx.wx.faults.keyMode = null
+  ctx.wx.faults.remove = null
+  assert.equal(savedB, false, '资格确认不了就不能报登录成功')
+  const disk = ctx.wx.store
+  const diskUser = disk.get('zyd_user')
+  const diskEligible = disk.get('resignin_eligible')
+  assert.ok(!(diskUser && String(diskUser.id) === 'B' && diskEligible === 'A'), '盘上不得出现会话 B + 资格 A')
+  const cold = createRuntime({ store: new Map(disk) })
+  const coldUser = cold.auth.getUser()
+  const coldMember = cold.auth.restorableMemberId()
+  assert.ok(!coldMember || (coldUser && String(coldUser.id) === coldMember), '冷启动后能恢复的只能是本机当前那一位')
+}
+
+/** 资格写不进、但能删掉：登录 B 照常成立，过期后不自动恢复（宁可再登录一次也不认错人）。 */
+async function eligibilityRemovedWhenNotWritable(opts) {
+  const ctx = createRuntime(opts)
+  assert.equal(loginAs(ctx, TOKEN_A, USER_A), true)
+  ctx.wx.faults.key = 'resignin_eligible'
+  ctx.wx.faults.keyMode = 'silent'
+  assert.equal(ctx.auth.saveSession({ token: TOKEN_B, user: USER_B }), true)
+  ctx.wx.faults.key = null
+  ctx.wx.faults.keyMode = null
+  assert.equal(ctx.auth.getUser().id, 'B')
+  assert.equal(ctx.wx.store.has('resignin_eligible'), false, '旧的 A 资格必须删掉')
+  assert.equal(ctx.auth.restorableMemberId(), null)
+}
+
+/** 一致性核对：本机资料是 B、资格却是 A（撕裂或旧版本残留）→ 不恢复，也不去 wx.login。 */
+async function mismatchedEligibilityIsNotRestorable(opts) {
+  const store = new Map([['zyd_token', fakeToken('B', -60)], ['zyd_user', USER_B], ['resignin_eligible', 'A']])
+  const ctx = createRuntime({ store, ...opts })
+  assert.equal(ctx.auth.restorableMemberId(), null)
+  assert.equal((await ctx.net.restoreSession()).state, 'need_login')
+  assert.equal(ctx.wx.calls.login.length, 0)
+}
+
+/** 补签回来的不是上次那一位：不写入、不重放。 */
+async function resigninMustMatchMember(opts) {
+  const ctx = createRuntime(opts)
+  assert.equal(loginAs(ctx, TOKEN_B, USER_B), true)
+  const pending = settle(ctx.net.request('/member/print-orders'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+  await flush()
+  ctx.wx.calls.login[0].success({ code: 'CODE-1' })
+  await flush()
+  ctx.resigninCalls()[0].success({ statusCode: 200, data: { token: TOKEN_A2, user: USER_A } })
+  await flush()
+  await pending
+  assert.notEqual(ctx.wx.store.get('zyd_token'), TOKEN_A2, 'A 的令牌不得写入')
+  assert.equal(TRANSPORTS[0].calls(ctx).length, 1, '不得重放')
+}
+
+/** 补签临时失败（503）：不登出、资格保留。 */
+async function transientFailureKeepsSession(opts) {
+  const ctx = createRuntime(opts)
+  loginAs(ctx, TOKEN_A, USER_A)
+  const pending = settle(ctx.net.request('/member/print-orders'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, {})
+  await flush()
+  ctx.wx.calls.login[0].success({ code: 'CODE-1' })
+  await flush()
+  ctx.resigninCalls()[0].success({ statusCode: 503, data: { error: { code: 'MEMBER_SESSION_STORE_UNAVAILABLE' } } })
+  await flush()
+  await pending
+  assert.equal(ctx.auth.canSilentResignin(), true, '临时失败不撤销恢复资格')
+}
+
+/** 业务 401（二次验证码错）：不补签、不登出。 */
+async function business401DoesNotResign(opts) {
+  const ctx = createRuntime(opts)
+  loginAs(ctx, TOKEN_A, USER_A)
+  const pending = settle(ctx.net.request('/member/step-up/verify'))
+  await flush()
+  TRANSPORTS[0].reply(TRANSPORTS[0].calls(ctx)[0], 401, { error: { code: 'STEP_UP_CODE_INVALID', message: '验证码不正确' } })
+  await flush()
+  await pending
+  assert.equal(ctx.wx.calls.login.length, 0, '业务 401 不去 wx.login')
+}
+
+test('FLOW1b 资格写不进也删不掉：登录 B 不成立，冷启动后能恢复的只能是本机当前那一位', () => staleEligibilityCannotSurvive())
+test('FLOW1b 资格写不进但能删掉：登录 B 成立，旧的 A 资格删掉，过期后不自动恢复', () => eligibilityRemovedWhenNotWritable())
+test('FLOW1b 一致性核对：本机资料是 B、资格是 A 时不恢复', () => mismatchedEligibilityIsNotRestorable())
+
+const FLOW1B_MUTATIONS = [
+  {
+    name: '显式登录不先确认恢复资格就写新会话',
+    build: () => mutator('auth', [['    if (!recordRestorableMember(data.user)) return false;\n', '    recordRestorableMember(data.user);\n']]),
+    scenario: staleEligibilityCannotSurvive,
+  },
+  {
+    name: '记不下资格时不删旧资格',
+    build: () => mutator('auth', [['  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);\n  return !storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);\n}', '  return true;\n}']]),
+    scenario: eligibilityRemovedWhenNotWritable,
+  },
+  {
+    name: '恢复资格不核对本机资料',
+    build: () => mutator('auth', [["  if (user && user.id != null && user.id !== '' && String(user.id) !== memberId) return null;\n", '']]),
+    scenario: mismatchedEligibilityIsNotRestorable,
+  },
+  {
+    name: '补签不核对回来的是不是同一位会员',
+    build: () => mutator('request', [["      if (memberId !== expected) throw makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_MISMATCH');\n", '']]),
+    scenario: resigninMustMatchMember,
+  },
+  {
+    name: '临时失败也登出',
+    build: () => mutator('request', [['  if (!auth.isSameSession(generation)) return err;\n  return recoverableSessionError();', '  auth.logoutIfSameSession(generation);\n  return recoverableSessionError();']]),
+    scenario: transientFailureKeepsSession,
+  },
+  {
+    name: '业务 401 也去补签',
+    build: () => mutator('request', [['      && isSession401(err)\n      && auth.canSilentResignin()\n      // 出发时', '      && auth.canSilentResignin()\n      // 出发时']]),
+    scenario: business401DoesNotResign,
+  },
+]
+
+for (const mutation of FLOW1B_MUTATIONS) {
+  test(`变异[FLOW1b·${mutation.name}]必须判红`, async () => {
     const mutate = mutation.build()
     await assert.rejects(() => mutation.scenario({ mutate }), assertionFailed)
   })

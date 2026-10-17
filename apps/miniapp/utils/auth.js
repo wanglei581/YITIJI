@@ -157,18 +157,12 @@ function saveSession(data = {}, options = {}) {
     // 这段时间里上一个账号也读不出来。
     bumpSessionGeneration();
     sessionRevoked = true;
+    // 恢复资格先于会话落盘（FLOW1b）：必须确认已改成这一位，或确认已删掉；两样都做不到就不写新会话。
+    // 否则盘上会出现「会话是 B、恢复资格还是 A」，令牌过期后被恢复成 A（Codex 冷审 P1）。
+    if (!recordRestorableMember(data.user)) return false;
   }
 
-  if (data.token) {
-    storage.set(storage.KEYS.TOKEN, data.token);
-    // 登录成功即取得补签资格，直到用户主动登出为止。资格里记下「是哪位会员」（FLOW1b）：
-    // 过期后补签只认这一位，绝不把短信登录的 B 静默换成这个微信绑定的 A。
-    // 补签成功是同一个人续签，不改它。
-    if (!isResignin) {
-      const memberId = data.user && data.user.id != null && data.user.id !== '' ? String(data.user.id) : '';
-      storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, memberId || 1);
-    }
-  }
+  if (data.token) storage.set(storage.KEYS.TOKEN, data.token);
   if (data.user) storage.set(storage.KEYS.USER, data.user);
 
   // 写完读回：存不下的会话等于没有会话，对不上就维持 fail-closed
@@ -196,6 +190,25 @@ function canSilentResignin() {
 }
 
 /**
+ * 显式登录时记下恢复资格（FLOW1b）：登录成功即取得补签资格，直到用户主动登出为止；
+ * 资格里记的是「哪位会员」，过期后补签只认这一位，绝不把短信登录的 B 静默换成这个微信绑定的 A。
+ * 补签成功是同一个人续签，不改它。
+ *
+ * 写完读回：确认已是这一位才算记下；记不下就删掉旧资格并**读回确认已删**（宁可不自动恢复，
+ * 也不留下上一位的资格）。两样都确认不了返回 false，调用方不得再写新会话。
+ * 存储的 set / remove 可能抛、也可能安静丢操作，返回值盖不住后者，只认读回。
+ */
+function recordRestorableMember(user) {
+  const memberId = user && user.id != null && user.id !== '' ? String(user.id) : '';
+  if (memberId) {
+    storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, memberId);
+    if (storage.get(storage.KEYS.RESIGNIN_ELIGIBLE) === memberId) return true;
+  }
+  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  return !storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+}
+
+/**
  * 上次**明确登录**的会员 id（补签只认这一位）；没有、或认不出是谁时返回 null。
  *
  * 只读存储，不调 getToken：令牌过期时 getToken 会顺手清掉 zyd_user，而旧版本的资格只记了「1」，
@@ -216,7 +229,12 @@ function restorableMemberId() {
     storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
     return null;
   }
-  return String(raw);
+  const memberId = String(raw);
+  // 一致性可验证：本机资料还在时，资格必须就是这一位；对不上（撕裂写、旧版本残留）就不恢复。
+  // 资料不在时（令牌过期已被清掉）靠 saveSession 的写入顺序保证：新会话落盘前资格已确认是这一位或已删除。
+  const user = storage.get(storage.KEYS.USER, null);
+  if (user && user.id != null && user.id !== '' && String(user.id) !== memberId) return null;
+  return memberId;
 }
 
 /** 用户主动登出：撤销会话与补签资格，并推进代际作废所有在途请求。 */

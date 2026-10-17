@@ -255,8 +255,45 @@ function sameAccount(tokenAccount, currentAccount) {
   return from === '' && isMemberIdentity(to)
 }
 
+/**
+ * 「过期但可恢复」（FLOW1b）：本地令牌已不可用，但上次明确登录的会员还认得、也没有主动退出。
+ * 先认人（auth.restorableMemberId 会把旧版本的「1」趁本机资料还在时迁移成 id），再看令牌。
+ * 这一态**不是**已登录：页面应显示「正在恢复登录」，不显示「未登录 / 去登录」，也不伪装成已登录。
+ */
+function isRestorable(auth) {
+  if (!auth || typeof auth.restorableMemberId !== 'function') return false
+  if (!auth.restorableMemberId()) return false
+  if (auth.isLoggedIn()) return false
+  return !!(auth.canSilentResignin && auth.canSilentResignin())
+}
+
+/**
+ * 统一的会员闸门（FLOW1b）：页面在 onLoad / onShow / 点按时用它代替同步的 isLoggedIn() 判定。
+ *   已登录 → ok；过期但可恢复 → 等 api.restoreSession() 的结果；都不是 → need_login。
+ * 恢复进行中 auth.isLoggedIn() 照旧返回 false；调用方在等待期间自己显示「正在恢复登录」。
+ * 恢复本身是单飞的（utils/request.js），几处同时等也只换一次 token。
+ * @returns {Promise<{ state: 'ok' | 'need_login' | 'recoverable' }>}
+ */
+function ensureMember(auth, api) {
+  if (!auth) return Promise.resolve({ state: 'need_login' })
+  if (typeof auth.restorableMemberId === 'function') auth.restorableMemberId()
+  if (auth.isLoggedIn()) return Promise.resolve({ state: 'ok' })
+  if (!isRestorable(auth) || !api || typeof api.restoreSession !== 'function') {
+    return Promise.resolve({ state: 'need_login' })
+  }
+  return Promise.resolve()
+    .then(() => api.restoreSession())
+    .then((r) => {
+      const state = r && r.state
+      return state === 'ok' || state === 'need_login' || state === 'recoverable' ? { state } : { state: 'recoverable' }
+    })
+    .catch(() => ({ state: 'recoverable' }))
+}
+
 module.exports = {
   createLifecycleGuard,
+  isRestorable,
+  ensureMember,
   memberIdentityKey,
   isMemberIdentity,
   IDENTITY_UNUSABLE,

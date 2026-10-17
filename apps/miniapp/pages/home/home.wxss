@@ -102,3 +102,5 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .home-legal-sep { color: var(--faint); font-size: var(--fs-sm); }
 .tab-spacer { height: calc(130rpx + env(safe-area-inset-bottom)); }
 @media (max-height: 720px) { .section-head { height: 78rpx; padding-top: 20rpx; } }
+/* 恢复登录失败时的重试行：可点区域不小于 48px（FLOW1b） */
+.greet-retry { display: flex; align-items: center; min-height: 96rpx; color: var(--teal); }

@@ -93,6 +93,8 @@ function afterResigninFailure(resignErr, err, generation) {
     // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
     return (resignErr && resignErr.code) ? resignErr : err;
   }
+  // 途中已经换了人（显式登录 / 登出）：这次请求属于已被顶掉的会话，原样抛 401，不说「稍后恢复」。
+  if (!auth.isSameSession(generation)) return err;
   return recoverableSessionError();
 }
 
