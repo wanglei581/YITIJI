@@ -230,17 +230,6 @@
         <view class="ph-sub">第 {{step + 1}} / {{steps.length}} 段 · {{steps[step].sub}}</view>
       </view>
 
-      <view wx:if="{{step === 0}}" class="card rise-d1"><view class="card-inner">
-        <view class="rb-row-title">也可以一题一题说</view>
-        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
-        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" role="button" aria-label="用语音说一份">用语音说一份</view>
-      </view></view>
-
-      <view wx:if="{{step === 0}}" class="notice info">
-        <text class="ficon i-info n-ic"></text>
-        <text>这是一份表单，不是对话。简历内容全部以你填写的为准；AI 只对你写下的句子做表达润色，不会替你编造经历，也不会替你补写空着的段落。</text>
-      </view>
-
       <!-- 第 1 段：基本信息 -->
       <view wx:if="{{step === 0}}" class="card rise-d2"><view class="card-inner">
         <view class="rb-field">
@@ -454,6 +443,19 @@
         </view>
         <view class="rb-fine">{{selfIntro.length}} / {{LEN.selfIntro}} 字</view>
       </view></view>
+
+      <!-- 第 1 段的语音入口与说明放在基本信息卡后面（10/17 实图 05：原先先占了首屏，姓名等字段被挤到下面）。
+           放在 if/elif 链之后，链本身不动；第 1 段时链上其余分支都不渲染，所以紧跟在基本信息卡后面。 -->
+      <view wx:if="{{step === 0}}" class="card rise-d3"><view class="card-inner">
+        <view class="rb-row-title">也可以一题一题说</view>
+        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
+        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" role="button" aria-label="用语音说一份">用语音说一份</view>
+      </view></view>
+
+      <view wx:if="{{step === 0}}" class="notice info">
+        <text class="ficon i-info n-ic"></text>
+        <text>这是一份表单，不是对话。简历内容全部以你填写的为准；AI 只对你写下的句子做表达润色，不会替你编造经历，也不会替你补写空着的段落。</text>
+      </view>
 
       <view wx:if="{{step === 5}}" class="notice plum">
         <text class="ficon i-robot n-ic"></text>

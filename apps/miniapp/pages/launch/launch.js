@@ -97,7 +97,10 @@ Page({
     }
     const d = e.detail || {}
     if (!d.code) {
+      // 拿不到手机号（用户拒绝，或微信要求先在客户端完成短信验证——那句「获取手机号失败 / Error: …」
+      // 是微信自己弹的，页面改不了也不绕过）：直接打开现有的短信验证码表单，不只弹一个两秒的提示。
       wx.showToast({ title: '未获取到手机号，可用短信验证码登录', icon: 'none' })
+      this.setData({ showSms: true })
       return
     }
     wx.showLoading({ title: '登录中', mask: true })

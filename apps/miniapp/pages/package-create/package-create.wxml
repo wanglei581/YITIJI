@@ -191,6 +191,6 @@
       <view class="label">已选</view>
       <view class="val">{{selectedCount}} 个文件</view>
     </view>
-    <view class="btn primary tap" hover-class="tap-press" bindtap="createPackage" role="button" aria-label="选择服务点">选择服务点</view>
+    <view class="btn primary tap {{selectedCount ? '' : 'disabled'}}" hover-class="tap-press" bindtap="createPackage" aria-role="button" aria-label="选择服务点" aria-disabled="{{!selectedCount}}">选择服务点</view>
   </view>
 </view>

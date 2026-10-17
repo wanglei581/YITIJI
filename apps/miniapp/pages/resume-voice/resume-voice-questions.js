@@ -58,7 +58,9 @@ const QUESTIONS = [
   {
     id: 'name', slot: 'basic.name', title: '姓名',
     prompt: '请说出你的姓名。',
+    textPrompt: '请填写你的姓名。',
     hint: '转成文字后必须你自己看一眼，确认后才写进简历。',
+    textHint: '填好后自己看一眼，确认后才写进简历。',
     example: '例如：张三',
     input: 'voice', required: true, skippable: false, maxLen: LEN.name,
   },
@@ -153,6 +155,7 @@ const QUESTIONS = [
   {
     id: 'expDesc', slot: 'expRows.0.description', title: '做过什么',
     prompt: '用你自己的话说，在那里具体做过什么。',
+    textPrompt: '用你自己的话写，在那里具体做过什么。',
     hint: 'AI 只润色你这句话，不会替你编。',
     input: 'voice', required: true, skippable: false, maxLen: LEN.description,
     need: 'expRows.0.company',
@@ -177,6 +180,7 @@ const QUESTIONS = [
   {
     id: 'skills', slot: 'skillsText', title: '技能',
     prompt: '你会哪些本事？一项项说就行。',
+    textPrompt: '你会哪些本事？一项项写就行。',
     example: '例如：电焊、叉车、收银',
     hint: '多项用顿号或逗号隔开。',
     input: 'voice', required: false, skippable: true, maxLen: 1000,
@@ -190,6 +194,7 @@ const QUESTIONS = [
   {
     id: 'selfIntro', slot: 'selfIntro', title: '自我介绍',
     prompt: '再用几句话介绍一下自己。不想说可以跳过，简历上这一栏会空着。',
+    textPrompt: '再用几句话介绍一下自己。不想写可以跳过，简历上这一栏会空着。',
     input: 'voice', required: false, skippable: true, maxLen: LEN.selfIntro,
   },
 ]
@@ -241,8 +246,22 @@ function transcribeFail(err) {
   return { degrade: false, msg: msg || '语音转写失败，请改用文字输入' }
 }
 
+/**
+ * 这一题此刻该显示的题面。语音题的 prompt / hint 是照口述写的（「请说出」「转成文字后」）；
+ * 不走语音（整页转手打，或这题改用手打）时用 textPrompt / textHint，没有就沿用原句。
+ */
+function promptFor(q, useVoice) {
+  if (!q) return { prompt: '', hint: '' }
+  if (useVoice) return { prompt: q.prompt, hint: q.hint || '' }
+  return {
+    prompt: q.textPrompt || q.prompt,
+    hint: q.textHint !== undefined ? q.textHint : (q.hint || ''),
+  }
+}
+
 module.exports = {
   QUESTIONS,
+  promptFor,
   emptyForm,
   getPath,
   questionAt,
