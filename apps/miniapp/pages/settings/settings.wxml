@@ -20,7 +20,7 @@
       <view class="set-item">
         <view class="set-ic a-clay"><text class="ficon i-form"></text></view>
         <view class="set-t">登录手机号</view>
-        <view class="set-v">{{isLoggedIn ? phoneMasked : '未登录'}}</view>
+        <view class="set-v">{{isLoggedIn ? phoneMasked : (restorable ? '正在恢复登录…' : '未登录')}}</view>
       </view>
     </view>
 
@@ -65,7 +65,7 @@
       </view>
     </view>
 
-    <view wx:if="{{isLoggedIn}}" class="logout tap" hover-class="tap-press" bindtap="logout">{{loggingOut ? '正在退出…' : '退出登录'}}</view>
+    <view wx:if="{{isLoggedIn || restorable}}" class="logout tap" hover-class="tap-press" bindtap="logout">{{loggingOut ? '正在退出…' : '退出登录'}}</view>
     <view wx:else class="logout login-cta tap" hover-class="tap-press" bindtap="toLogin">登录职易达</view>
 
   </view>

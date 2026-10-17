@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const pageGuard = require('../../utils/page-guard')
 
 // 只允许回到已经明确需要登录的现有页面，禁止把任意 query 当成跳转地址。
 // 「我的权益」「合同审查」两页已停放（首发按非招聘类目提审，compliance-boundary.md §1.1），
@@ -36,6 +37,10 @@ Page({
     returnTo: '',
     // 正式版取不到已发布的协议（C4）：先说清楚，不让人交出手机号之后才失败。
     legalBlocked: false,
+    // 上次登录还认得、只是过期了（FLOW1b）：先替用户恢复，restoring 期间不展示登录按钮；
+    // 临时失败（断网、限流、服务故障）restoreFailed，给「重试恢复」，也允许手动登录。
+    restoring: false,
+    restoreFailed: false,
   },
 
   onLoad(options) {
@@ -45,6 +50,30 @@ Page({
       returnTo: safeReturnTo(options && options.returnTo),
     })
     this._checkLegal()
+    this._tryRestore()
+  },
+
+  /**
+   * 兜底（FLOW1b）：所有「去登录」最后都落到这一页。上次明确登录的会员还认得、只是令牌过期时，
+   * 先替用户恢复——成功就按原路回去（不收短信）；临时失败给「重试恢复」并保留手动登录；
+   * 确定失败（没绑微信、不是同一位、已主动退出……）才显示正常登录。恢复只认同一位会员。
+   */
+  _tryRestore() {
+    if (!pageGuard.isRestorable(auth)) return
+    this.setData({ restoring: true, restoreFailed: false })
+    pageGuard.ensureMember(auth, api).then((r) => {
+      if (this._unloaded) return
+      if (r.state === 'ok') {
+        this.setData({ restoring: false })
+        this._afterLogin()
+        return
+      }
+      this.setData({ restoring: false, restoreFailed: r.state === 'recoverable' })
+    })
+  },
+
+  retryRestore() {
+    if (!this.data.restoring) this._tryRestore()
   },
 
   /**
@@ -84,6 +113,7 @@ Page({
   },
 
   onUnload() {
+    this._unloaded = true
     this._clearCountDown()
   },
 

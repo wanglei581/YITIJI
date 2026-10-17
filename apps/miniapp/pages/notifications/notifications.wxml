@@ -36,7 +36,7 @@
       <view class="es-t">正在加载本人通知…</view>
     </view>
 
-    <view class="empty-slot card" wx:elif="{{loadError}}" bindtap="loadNotifications">
+    <view class="empty-slot card" wx:elif="{{loadError}}" bindtap="reloadNotifications">
       <view class="es-t">加载失败，点此重试</view>
       <view class="es-d">{{loadError}}</view>
     </view>

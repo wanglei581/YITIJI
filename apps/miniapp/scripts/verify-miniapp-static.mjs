@@ -501,6 +501,12 @@ function loadAuthForVerify(token) {
   const mockStorage = {
     KEYS: { TOKEN: 'zyd_token', USER: 'zyd_user' },
     get(key, fallback = null) { return Object.prototype.hasOwnProperty.call(state, key) ? state[key] : fallback },
+    // 与 utils/storage.js 的 read 同形：auth 用它区分「读失败」与「确实没有」（FLOW1b 按格故障）。
+    read(key) {
+      return Object.prototype.hasOwnProperty.call(state, key)
+        ? { ok: true, found: true, value: state[key] }
+        : { ok: true, found: false, value: null }
+    },
     set(key, value) { state[key] = value; return true },
     remove(key) { delete state[key]; return true },
   }

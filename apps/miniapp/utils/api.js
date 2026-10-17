@@ -4,7 +4,7 @@
 // 切换后端时:只改 utils/config.js 的 baseUrl / USE_MOCK,页面代码零改动。
 
 const config = require('./config');
-const { request, uploadFile } = require('./request');
+const { request, uploadFile, restoreSession } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
@@ -399,6 +399,15 @@ const api = {
       return Promise.reject(e);
     }
     return request('/member/me', { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 把「过期但可恢复」的会话恢复回来（FLOW1b，见 utils/request.js restoreSession）。
+   * 返回 { state: 'ok' | 'need_login' | 'recoverable' }；页面经 utils/page-guard.ensureMember 调用。
+   */
+  restoreSession() {
+    if (config.USE_MOCK) return Promise.resolve({ state: 'need_login' });
+    return restoreSession();
   },
 
   logout() {

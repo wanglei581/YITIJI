@@ -114,6 +114,18 @@ let generation = 1;
  */
 let sessionRevoked = false;
 
+/**
+ * 恢复资格作废位（本次运行内，FLOW1b）。资格与本机资料认的不是同一位时置起：
+ * 存储的删除可能抛、也可能安静没删，只靠删存储挡不住「清掉资料后再读一次又认出上一位」。
+ * 下一次显式登录、资格确认写成新的那一位时才放下。
+ */
+let eligibilityRevoked = false;
+/**
+ * 作废标记：资格删不掉时写进资格那一格；资格那一格连它也写不进时，写进本机资料那一格（zyd_user）。
+ * 冷启动后两处任何一处是它，都不会被当成可恢复。
+ */
+const ELIGIBILITY_VOID = '!';
+
 /** 当前会话代际。 */
 function sessionGeneration() {
   return generation;
@@ -157,13 +169,12 @@ function saveSession(data = {}, options = {}) {
     // 这段时间里上一个账号也读不出来。
     bumpSessionGeneration();
     sessionRevoked = true;
+    // 恢复资格先于会话落盘（FLOW1b）：必须确认已改成这一位，或确认已删掉；两样都做不到就不写新会话。
+    // 否则盘上会出现「会话是 B、恢复资格还是 A」，令牌过期后被恢复成 A（Codex 冷审 P1）。
+    if (!recordRestorableMember(data.user)) return false;
   }
 
-  if (data.token) {
-    storage.set(storage.KEYS.TOKEN, data.token);
-    // 登录成功即取得补签资格，直到用户主动登出为止
-    storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, 1);
-  }
+  if (data.token) storage.set(storage.KEYS.TOKEN, data.token);
   if (data.user) storage.set(storage.KEYS.USER, data.user);
 
   // 写完读回：存不下的会话等于没有会话，对不上就维持 fail-closed
@@ -187,17 +198,165 @@ function saveSession(data = {}, options = {}) {
  */
 function canSilentResignin() {
   if (sessionRevoked) return false;
-  return !!storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (eligibilityRevoked) return false;
+  const raw = storage.read(storage.KEYS.RESIGNIN_ELIGIBLE);
+  // 这一格读不出来：说不清有没有资格，放行到补签——补签出发时认不清是谁，按临时失败处理（不登出、不删资格）。
+  if (!raw.ok) return true;
+  return raw.found && !!raw.value && raw.value !== ELIGIBILITY_VOID;
 }
 
-/** 用户主动登出：撤销会话与补签资格，并推进代际作废所有在途请求。 */
+/**
+ * 显式登录时记下恢复资格（FLOW1b）：登录成功即取得补签资格，直到用户主动登出为止；
+ * 资格里记的是「哪位会员」，过期后补签只认这一位，绝不把短信登录的 B 静默换成这个微信绑定的 A。
+ * 补签成功是同一个人续签，不改它。
+ *
+ * 写完读回：确认已是这一位才算记下；记不下就作废旧资格并**读回确认已作废**（删掉或写成作废标，
+ * 宁可不自动恢复，也不留下上一位的资格）。两样都确认不了返回 false，调用方不得再写新会话。
+ * 存储的 set / remove 可能抛、也可能安静丢操作，返回值盖不住后者，只认读回。
+ */
+function recordRestorableMember(user) {
+  const memberId = user && user.id != null && user.id !== '' ? String(user.id) : '';
+  if (memberId) {
+    storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, memberId);
+    if (storage.get(storage.KEYS.RESIGNIN_ELIGIBLE) === memberId) {
+      eligibilityRevoked = false;
+      return true;
+    }
+  }
+  return revokeEligibility();
+}
+
+/**
+ * 只读盘上判断资格（纯函数：不写存储、不看内存旗子）——冷启动后看到的就是这个结论。
+ *   id       可恢复的会员 id（旧值「1」时取本机资料的 id），否则 null；
+ *   mismatch 资格认的是一位确定的会员，但本机资料（或它的作废标）证明不是这一位。
+ * 证据只会让结论更保守：本机资料对不上就不恢复。令牌不当证据——换号时令牌那一格写失败，
+ * 剩下的旧令牌对不上是常态，而资格与本机资料两格一致才是这次登录的结果。
+ */
+function judgeEligibility(raw, user) {
+  if (!raw || raw === ELIGIBILITY_VOID) return { id: null, mismatch: false, legacy: false };
+  const legacy = raw === 1 || raw === '1' || raw === true;
+  if (user === ELIGIBILITY_VOID) return { id: null, mismatch: true, legacy };
+  const userId = user && user.id != null && user.id !== '' ? String(user.id) : '';
+  const member = legacy ? userId : String(raw);
+  if (!member) return { id: null, mismatch: false, legacy };
+  if (userId && userId !== member) return { id: null, mismatch: true, legacy };
+  return { id: member, mismatch: false, legacy };
+}
+
+/**
+ * 资格或本机资料这一格读不出来（读接口抛了，storage.get 会退回默认值、看起来像「没有」）：
+ * 认不清是不是同一位，这一次按临时失败——不恢复、不作废、不删任何东西（Codex 冷审：读失败不能当成已清理）。
+ */
+function readEligibility() {
+  const user = storage.read(storage.KEYS.USER);
+  const eligible = storage.read(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (!user.ok || !eligible.ok) return { id: null, mismatch: false, legacy: false, unreadable: true, raw: null };
+  const raw = eligible.found ? eligible.value : null;
+  return Object.assign(judgeEligibility(raw, user.found ? user.value : null), { unreadable: false, raw });
+}
+
+/** 资格那一格**读得出来**，且为空或作废标。读不出来不算已作废。 */
+function eligibilityCleared() {
+  const raw = storage.read(storage.KEYS.RESIGNIN_ELIGIBLE);
+  return raw.ok && (!raw.found || !raw.value || raw.value === ELIGIBILITY_VOID);
+}
+
+/**
+ * 作废恢复资格：本次运行内立即失效（内存旗子），存储里删掉；删不掉就写作废标记。
+ * @returns {boolean} 盘上是否已确认作废。存储可以**只坏这一格**（Codex 冷审反例：资格写删都失败，
+ *   令牌与本机资料照常删得掉），返回 false 时冷启动还认不认得出来，全看另外两格——调用方不得销毁它们。
+ */
+function revokeEligibility() {
+  eligibilityRevoked = true;
+  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  if (!eligibilityCleared()) storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, ELIGIBILITY_VOID);
+  return eligibilityCleared();
+}
+
+/**
+ * 删本机资料之前先问：删掉之后，冷启动的结论会不会变宽（本来不可恢复，删完成了可恢复）。会就不删——
+ * 它就是冷启动唯一还能认出不一致的证据（Codex 冷审反例：资格那一格写删都失败，本机资料却照常删得掉）。
+ */
+function removeUserUnlessLastEvidence() {
+  const found = readEligibility();
+  if (found.unreadable) return;
+  // 旧版本的「1」只能靠本机资料认人：没能迁成会员 id（资格那一格写失败）时，它是唯一的认人依据，留着（Codex 冷审）。
+  if (found.legacy && found.id) return;
+  if (found.id === null && judgeEligibility(found.raw, null).id !== null) return;
+  storage.remove(storage.KEYS.USER);
+}
+
+/**
+ * 对账（FLOW1b，Codex 冷审）：恢复资格认的会员必须就是本机资料那一位；对不上（撕裂写、旧版本残留）
+ * 就按不可恢复处理并作废，不能只返回 null。作废没能在盘上确认时，证据就是本机资料：
+ * 删它一律经 removeUserUnlessLastEvidence，冷启动照样认得出来。
+ *
+ * 旧版本的资格只记了「1」、认人要靠本机资料：对得上就趁资料还在迁成会员 id。clearSession 也先走这里，
+ * 所以哪个页面先调 getToken 都不会把升级上来的老用户清成「认不出人」、逼他再收一次短信（Codex 冷审）。
+ */
+function reconcileEligibility() {
+  const found = readEligibility();
+  if (found.mismatch) revokeEligibility();
+  else if (found.legacy && found.id) storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, found.id);
+}
+
+/**
+ * 上次**明确登录**的会员（补签只认这一位）。{ id, unreadable }：
+ *   id         会员 id；没有、或认不出是谁时为 null；
+ *   unreadable 资格或本机资料这一次读不出来——认不清，调用方按临时失败处理（可重试），不当成「没有资格」去登录页。
+ *
+ * 只读存储，不调 getToken。旧值 1：本机资料还在就以它的 id 为准（对账时已就地迁成 id，迁不进去也照样认这一位）；
+ * 不在就认不出人，删掉旧值、不自动恢复。
+ */
+function restorableMember() {
+  if (sessionRevoked || eligibilityRevoked) return { id: null, unreadable: false };
+  reconcileEligibility();
+  if (eligibilityRevoked) return { id: null, unreadable: false };
+  const found = readEligibility();
+  if (found.unreadable) return { id: null, unreadable: true };
+  if (found.legacy && !found.id) storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  return { id: found.id, unreadable: false };
+}
+
+/** 上次明确登录的会员 id；读不清时也是 null（要区分用 restorableMember）。 */
+function restorableMemberId() {
+  return restorableMember().id;
+}
+
+/**
+ * 只看盘上（不看内存旗子）：能不能**确认**冷启动后既读不回令牌、也恢复不了。读不清的一律算不能确认。
+ */
+function logoutPersisted() {
+  const token = storage.read(storage.KEYS.TOKEN);
+  if (!token.ok) return false;
+  if (token.found && !isTokenExpired(token.value) && identityProven(token.value)) return false;
+  const found = readEligibility();
+  if (!found.unreadable) return found.id === null;
+  // 资格那一格读不出来：本机资料是作废标时，资格是什么都恢复不了；否则说不清。
+  const user = storage.read(storage.KEYS.USER);
+  return user.ok && user.found && user.value === ELIGIBILITY_VOID;
+}
+
+/**
+ * 用户主动登出：撤销会话与补签资格，并推进代际作废所有在途请求。
+ * @returns {boolean} 退出是否已落盘——冷启动后既读不回令牌、也恢复不了。false 时本次运行照样是退出状态
+ *   （内存撤销位），只是存储坏得连作废标都写不进，调用方要如实告诉用户。
+ */
 function logout() {
   // 先在内存里推进代际、置撤销位，再动存储：前两步不可能失败，
   // 即便下面的清理全军覆没，本次运行也读不回旧身份、也不会再补签。
   bumpSessionGeneration();
   sessionRevoked = true;
-  clearSession();
-  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
+  // 先作废资格。资格删不掉也写不进作废标时，本机资料换成作废标——冷启动靠它认出「已退出」；
+  // 换不进去，删除也会被 removeUserUnlessLastEvidence 拦下，不销毁冷启动唯一还认得出的证据。
+  if (!revokeEligibility()) storage.set(storage.KEYS.USER, ELIGIBILITY_VOID);
+  storage.remove(storage.KEYS.TOKEN);
+  // 令牌删不掉、而且还是一枚有效的会话：写成作废标，冷启动读不回来。
+  const left = storage.get(storage.KEYS.TOKEN);
+  if (left && !isTokenExpired(left) && identityProven(left)) storage.set(storage.KEYS.TOKEN, ELIGIBILITY_VOID);
+  removeUserUnlessLastEvidence();
+  return logoutPersisted();
 }
 
 /**
@@ -212,8 +371,11 @@ function logoutIfSameSession(expected) {
 }
 
 function clearSession() {
+  // 清资料前先对账（FLOW1b）：这里是销毁「本机是哪一位」的地方，清掉之后不一致就再也认不出来了。
+  // 资格作废没确认时，本机资料的删除会被拦下：它就是冷启动的拒绝依据。
+  reconcileEligibility();
   storage.remove(storage.KEYS.TOKEN);
-  storage.remove(storage.KEYS.USER);
+  removeUserUnlessLastEvidence();
 }
 
 /**
@@ -237,6 +399,8 @@ function wxLogin() {
 
 module.exports = {
   canSilentResignin,
+  restorableMember,
+  restorableMemberId,
   logout,
   logoutIfSameSession,
   sessionGeneration,

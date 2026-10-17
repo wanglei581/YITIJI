@@ -2,6 +2,7 @@
 const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
+const { isRestorable, ensureMember } = require('../../utils/page-guard')
 
 function countFromResult(res) {
   if (!res) return '—'
@@ -58,6 +59,9 @@ Page({
     // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
     capsuleInsetRight: 94,
     isLoggedIn: false,
+    // 上次登录过期、正在自动恢复 / 恢复遇到临时失败（FLOW1b）：都不显示「未登录 · 去登录」
+    restoring: false,
+    restoreFailed: false,
     user: null,
     // 概览计数：「—」= 还不知道（读取中或没读到），不写成 0。
     stats: blankStats(),
@@ -86,8 +90,13 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
+    // 先判「可恢复」：它要在 isLoggedIn 清掉过期令牌之前认出上次的会员（见 page-guard.isRestorable）。
+    const restoring = isRestorable(auth)
     const loggedIn = auth.isLoggedIn()
-    this.setData({ isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null })
+    const patch = { isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null, restoring }
+    if (loggedIn || restoring) patch.restoreFailed = false
+    this.setData(patch)
+    if (restoring) this._awaitRestore()
     if (loggedIn) {
       this.loadStats(STAT_DEFS.map(function(d) { return d.key }))
     } else {
@@ -147,6 +156,22 @@ Page({
       settings:   '/pages/settings/settings',
     }
     if (routes[id]) wx.navigateTo({ url: routes[id] })
+  },
+
+  // 过期但可恢复（FLOW1b）：等恢复结果再刷新；临时失败给「重试」，不把人送去登录页重收短信。
+  _awaitRestore() {
+    if (this._restoreWait) return
+    this._restoreWait = ensureMember(auth, api).then((r) => {
+      this._restoreWait = null
+      this.setData({ restoring: false, restoreFailed: r.state === 'recoverable' })
+      // 只在本地确实已登录时重刷：否则 onShow 会再次判成「可恢复」并再发起恢复，形成循环。
+      if (r.state === 'ok' && auth.isLoggedIn()) this.onShow()
+    })
+  },
+
+  retryRestore() {
+    this.setData({ restoring: true, restoreFailed: false })
+    this._awaitRestore()
   },
 
   tapLogin() {

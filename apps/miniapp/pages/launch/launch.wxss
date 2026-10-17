@@ -112,3 +112,9 @@ page { height: 100%; background: #eef4ff; }
   .launch-brand { margin-top: 24rpx; font-size: 45rpx; }
   .launch-slogan { margin-top: 24rpx; }
 }
+
+/* 恢复上次登录（FLOW1b）：一行状态条；失败时给「重试恢复」，可点区域不小于 48px */
+.launch-restore { margin: 0 0 24rpx; padding: 20rpx 24rpx; border-radius: var(--r-sm);
+  background: var(--teal-wash); color: var(--ink-soft); font-size: var(--fs-sm); line-height: 1.5; }
+.launch-restore.warn { background: var(--clay-wash); color: var(--clay-deep); display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.launch-restore-retry { flex-shrink: 0; min-height: 96rpx; display: inline-flex; align-items: center; padding: 0 8rpx; color: var(--teal); font-weight: 600; }

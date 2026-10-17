@@ -16,12 +16,21 @@
     <view class="sheet-title">登录后继续</view>
     <view class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
 
+    <!-- 上次登录还认得、只是过期了：先替用户恢复，成功就回到原处，不收短信（FLOW1b） -->
+    <view wx:if="{{restoring}}" class="launch-restore" aria-role="status">正在恢复上次的登录…</view>
+    <view wx:elif="{{restoreFailed}}" class="launch-restore warn" aria-role="alert">
+      <text>暂时没能恢复上次的登录。</text>
+      <text class="launch-restore-retry tap" bindtap="retryRestore">重试恢复</text>
+    </view>
+
     <!-- 正式版协议没发布（C4）：先说清楚为什么不能登录、不登录还能做什么。 -->
     <view wx:if="{{legalBlocked}}" class="launch-blocked" aria-role="alert">
       <view class="lb-t">服务协议还没有正式发布，暂时不能登录</view>
       <view class="lb-d">不登录也可以看使用帮助和打印指引，也可以扫一体机屏幕上的码，把文件传到一体机打印。</view>
     </view>
 
+    <!-- 恢复进行中不展示登录按钮与协议：用户此时不是在登录 -->
+    <block wx:if="{{!restoring}}">
     <!-- ① 微信一键登录（默认） -->
     <block wx:if="{{!showSms}}">
       <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
@@ -89,6 +98,7 @@
         <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>，并确认已年满 14 周岁
       </view>
     </view>
+    </block>
 
   </view>
 </view>
