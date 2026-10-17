@@ -151,7 +151,7 @@ const methods = {
         if (this._gone) return
         this.setData({ appending: false })
         const fileId = trimmed(res && res.fileId)
-        if (!fileId) throw new Error('服务端未返回合并后的文件')
+        if (!fileId) throw new Error('没有拿到合并后的文件')
         const name = encodeURIComponent(trimmed(res && res.filename) || '简历-自我探索附录.pdf')
         const pages = (res && res.pageCount) || ''
         wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${encodeURIComponent(fileId)}&pages=${pages}` })

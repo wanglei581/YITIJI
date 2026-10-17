@@ -538,6 +538,17 @@ Page({
     wx.navigateTo({ url: '/pages/documents/documents' })
   },
 
+  /**
+   * 去取件页看这一单的到机码。只带 orderId（与订单列表同一口径），码不进 URL。
+   * source 不写 orders：取件页的 fromOrders 只认 'orders'；不是 orders 时它按页面栈返回，
+   * 上一页是本页，不在下单流程里，所以退一页正好回到这里。
+   */
+  toPickup() {
+    if (!this._orderId) return
+    const query = `orderId=${encodeURIComponent(this._orderId)}&source=order-detail`
+    wx.navigateTo({ url: `/pages/print-pickup/print-pickup?${query}` })
+  },
+
   cancelOrder() {
     const detail = this.data.detail
     if (!this._orderId || !detail || !detail.canCancel || this.data.cancelling) return

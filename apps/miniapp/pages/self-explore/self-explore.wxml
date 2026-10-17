@@ -143,7 +143,7 @@
     <view wx:elif="{{phase === 'submitting'}}" class="empty">
       <view class="e-ic"><text class="ficon i-compass"></text></view>
       <view class="e-title">正在生成倾向参考</view>
-      <view class="e-desc">已用时 {{elapsed}} 秒。五维强度由服务端固定权重算出，五段解读由 AI 生成，这一步会稍慢一些。</view>
+      <view class="e-desc">已用时 {{elapsed}} 秒。五维强度按固定权重算出，五段解读由 AI 生成，这一步会稍慢一些。</view>
     </view>
 
     <!-- ══ 结果 ══ -->
@@ -162,7 +162,7 @@
       <view wx:if="{{result.status === 'rejected' || result.providerUnavailable}}" class="notice warn rise-d1">
         <text class="ficon i-warning n-ic"></text>
         <text wx:if="{{result.providerUnavailable}}">{{result.aiReasonText}}五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
-        <text wx:else>本次 AI 解读未通过服务端校验{{result.failReason ? '（' + result.failReason + '）' : ''}}，文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
+        <text wx:else>本次 AI 解读没有通过系统校验{{result.failReason ? '（' + result.failReason + '）' : ''}}，文字解读没有生成。五维强度由固定权重算出，不经过 AI，因此照常有效。</text>
       </view>
 
       <view wx:if="{{result.consentStale}}" class="notice warn rise-d1">
@@ -192,7 +192,7 @@
                 style="left:{{item.leftPct}}%;top:{{item.topPct}}%">{{item.label}}</view>
         </view>
         <view class="radar-cap" wx:if="{{radarDrawable && radarStatus !== 'error'}}">外圈淡线是五维的均衡位置，形状偏向哪边就是这次作答更投入的方向。</view>
-        <view wx:elif="{{!radarDrawable}}" class="radar-note">服务端返回的五维强度不完整，本次不绘制图形；下面的列表按服务端实际返回逐项显示。</view>
+        <view wx:elif="{{!radarDrawable}}" class="radar-note">这次返回的五维强度不完整，不画图形；下面按实际返回的数值逐项列出。</view>
         <view wx:else class="radar-note">图形未能渲染，五个数值见下面的列表。</view>
 
         <view class="dim-bars">
@@ -236,7 +236,7 @@
       <!-- ── 本次记录：只回显服务端存下来的事实，缺什么就说缺什么 ── -->
       <view class="card card-inner rise-d5">
         <view class="sec-t">本次记录</view>
-        <view class="mrow"><text class="mk">同意说明版本</text><text class="mv">{{result.consentVersion || '未版本化（服务端未存版本号）'}}</text></view>
+        <view class="mrow"><text class="mk">同意说明版本</text><text class="mv">{{result.consentVersion || '未记录版本号'}}</text></view>
         <view class="mrow"><text class="mk">勾选时间</text><text class="mv">{{result.consentedAt || '未记录'}}</text></view>
         <view class="mrow"><text class="mk">保留至</text><text class="mv">{{result.expiresAt || '未返回到期时间'}}</text></view>
         <view class="mrow"><text class="mk">已生成解读</text><text class="mv">{{result.noteCount}} / {{result.dims.length}} 段</text></view>
@@ -251,7 +251,7 @@
           <text class="ficon i-close wd-ic"></text>
           <text>{{withdrawing ? '正在撤回…' : '撤回本次结果'}}</text>
         </view>
-        <view wx:if="{{canManage}}" class="wd-desc">撤回后服务端会删除这次的五维强度与解读，并留下一条删除审计记录。</view>
+        <view wx:if="{{canManage}}" class="wd-desc">撤回后会删除这次的五维强度与解读，并留下一条删除审计记录。</view>
       </view>
 
       <view wx:if="{{canManage}}" class="card card-inner rise-d5 append-card">
