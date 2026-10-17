@@ -67,8 +67,11 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
 }
 
 async function expectWarningWithinThreeSeconds(page: Page): Promise<void> {
-  await expect(page).toHaveURL(/\/session-timeout$/, { timeout: 3_000 })
-  await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible()
+  // 3 秒只守「计时器触发导航」，等到地址变成 /session-timeout（commit）即可。
+  // 渲染另由下面的标题断言兜，上界 5 秒。
+  await page.waitForURL(/\/session-timeout$/, { timeout: 3_000, waitUntil: 'commit' })
+  // 标题可见兜白屏和懒加载失败。5 秒是渲染上界，不计入上面的 3 秒导航契约。
+  await expect(page.getByRole('heading', { name: /还在用吗/ })).toBeVisible({ timeout: 5_000 })
 }
 
 async function readSensitiveSession(page: Page): Promise<string | null | undefined> {
@@ -148,6 +151,9 @@ test('image-to-pdf editing warns that unsaved work is lost, not the generic clea
   // 「登录状态和这台机器上的这次使用记录将清除」——那句话没提用户会丢掉刚挑的图。
   registerKioskShell(api, { screensaverEnabled: false })
   await page.goto('/print-scan/convert')
+  // 就绪锚点：h1「图片转 PDF」（QxPageFrame，apps/kiosk/src/components/qingxu/QxPageFrame.tsx）。
+  // 标题出现说明这条路由已经挂载、空闲计时已开始；在这之前开始计 3 秒，会把挂载耗时算进去。
+  await expect(page.getByRole('heading', { name: '图片转 PDF', level: 1 })).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('未保存的填写、编辑或练习内容会清除', { exact: true })).toBeVisible()
   await expect(page.getByText('登录状态和这台机器上的这次使用记录将清除', { exact: true })).toHaveCount(0)
@@ -759,11 +765,11 @@ test('scan busy stays released when the scan task id is missing @scan-busy @warn
   registerKioskShell(api)
   await page.goto('/scan?stage=progress')
 
-  // 缺少扫描会话时，工作台把 ?stage=progress 按回 start；busy 的作用是
-  // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。E2E 这一组测试
-  // 要锁住的是用户可见的承诺:身份不完整时,idle 计时器继续工作,提示用户在
-  // 3s 内弹出 /session-timeout。不去对内部 active===false 这种实现细节
-  // 做断言——它属于 hook 单测的职责范围。
+  // 缺少扫描会话时，工作台把 ?stage=progress 纠偏回 ?stage=start。busy 抑制空闲警告，但不会拦截这次跳转。
+  // 要锁住的是可见承诺：身份不完整时空闲计时继续走，3 秒内弹出 /session-timeout。不对内部 active===false 做断言。
+  // 纠偏回 ?stage=start 并且 start 区块可见后再计 3 秒，不放宽 helper。
+  await expect(page).toHaveURL(/\/scan\?stage=start$/, { timeout: 5_000 })
+  await expect(page.locator('[data-scan-stage="start"]')).toBeVisible({ timeout: 5_000 })
   await expectWarningWithinThreeSeconds(page)
 })
 
