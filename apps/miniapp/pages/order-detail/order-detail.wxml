@@ -4,7 +4,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">订单详情</view>

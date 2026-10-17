@@ -1,9 +1,10 @@
 <!--pages/ai/ai.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-title left serif">AI 工具</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-title left serif">AI 工具</view>
+    </view>
   </view>
 
   <view class="content has-tabbar">

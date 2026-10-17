@@ -1,5 +1,6 @@
 /* pages/daily-report/daily-report.wxss */
-.nav-date { font-size: var(--fs-sm); color: var(--muted); }
+/* 日期在内容区第一行：字号颜色沿用原页头日期，左右是页面标准的 16px 边距。 */
+.dr-date { padding: 12px 16px 0; font-size: var(--fs-sm); color: var(--muted); }
 .empty-slot {
   padding: 60rpx 20rpx;
   display: flex;
