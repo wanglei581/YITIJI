@@ -1,5 +1,19 @@
 # 当前开发进度
 
+## 2026-10-18 21:5x：合并提交 `b2c49d3f8` 的 main CI 39128612384 全绿，Grok 已核、我已复核；等 Windows 队列新读数后发布（新签发开关一直关）
+
+- **main CI**：13:49:43Z success。四个作业全过：build-and-verify、postgres-readiness、kiosk-browser-smoke（用时 63 分 56 秒）、release-bundle。
+- **关键数字**：member-restore 57/0；W5 63/63，0 flaky、0 retry；小程序 node 测试 603/603。
+- **自动发布**：这次 CI 自动触发的发布被跳过，因为发布开关是 false。
+- **复核**：Grok 报告加原始材料加 SHA256SUMS，我独立抽查过运行和作业 JSON、自动发布记录、两段日志，结论一致。
+- **另记一条**：release-bundle 读增量基线返回 403，这次发布会改走 GitHub 拉取，服务器直连 GitHub 慢，所以发布可能要 30–40 分钟。为此把发布脚本改成：「Deploy via SSH」一开始执行就关回发布开关，跟踪上限 50 分钟。
+- **下一步**：
+  1. Codex 安排用户现读 Windows 队列；
+  2. 当场再核一次服务器在途；
+  3. api-only 发布；
+  4. 观察至少 10 分钟后回报。
+- 开开关和短信，用户都还没批准。
+
 ## 2026-10-18 21:3x：用户明确收尾目标（六步，见 next-tasks 顶部 21:3x 节）；main CI 39128612384 两项已 success，一体机冒烟在跑
 
 - **六步**：
