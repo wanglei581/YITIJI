@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 const qa = require('./qa-records')
 
 /** 后端真实 kind → 展示与现有结果页。没有结果页的类型保持诚实状态展示。 */
@@ -120,6 +121,9 @@ Page({
     ],
     groups: [],
     loginRequired: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
     loading: false,
     loadError: '',
   },
@@ -139,8 +143,18 @@ Page({
   },
 
   onShow() {
-    this._load()
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => this._load(),
+      needLogin: () => this._load(),
+    })
   },
+
+  onHide() { markPageHidden(this) },
+
+  onUnload() { markPageUnloaded(this) },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   onReachBottom() {
     this._load(true)
@@ -380,5 +394,21 @@ Page({
 
   back() {
     wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } })
+  },
+
+  /** 空态按钮：问答要点为空时去问小青，其余去「AI 工具」Tab。 */
+  emptyAction() {
+    if (this.data.activeFilter === 'qa') this.toAssistant()
+    else this.toAiTools()
+  },
+
+  /** 空态出口：去「AI 工具」Tab。 */
+  toAiTools() {
+    wx.switchTab({ url: '/pages/ai/ai' })
+  },
+
+  /** 问答要点为空时的出口：去问小青。 */
+  toAssistant() {
+    wx.navigateTo({ url: '/pages/assistant/assistant', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
   },
 })

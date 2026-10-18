@@ -1,7 +1,8 @@
 /**
  * 打印送出之后的队列监控。
- * 从 task-runner.ts 拆出：该文件加上空闲暂停后超过 1000 行。
- * 行为与原先相同，task-runner 再导出，现有门禁的 import 不用改。
+ * 成功只来自明确的 Printed/Completed，或本次派发之后符合队列关联规则的 307（含已验证的通用文档名回退）。
+ * 见过随后消失、Retained、Deleting/Deleted，没有 307 都是未确认。
+ * 派发后的缺纸、卡纸、取消也报未确认，并保留故障人话。
  */
 
 import { getPrintJobStatus, hasPrintServiceCompletionEvent, type PrintJobMonitorStatus } from './wmi'
@@ -37,13 +38,14 @@ interface MonitorDependencies {
  * Poll Get-PrintJob until the job completes, errors, or the timeout expires.
  *
  * Design invariants:
- *   - PaperOut must appear on 2 consecutive polls before returning 'paper_empty'
- *     (guards against transient driver state flicker).
- *   - Only an explicit spooler completion, or an observed active job followed by
- *     queue removal, confirms completed. This confirms the Windows spooler
- *     lifecycle only; it does not prove that paper physically reached the user.
- *   - If the job never appears (taskId not in DocumentName), the query remains
- *     unknown, or monitoring times out, return failed+PRINT_JOB_UNCONFIRMED.
+ *   - PaperOut must appear on 2 consecutive polls before the fault is reported.
+ *   - Success is only an explicit Printed/Completed status, or a boolean 307
+ *     matching the queue after this dispatch, including the verified generic-name
+ *     fallback. This is limited correlation, not unique task identity. Queue removal is not success.
+ *   - A job seen active or removing may wait COMPLETION_GRACE_POLLS for that 307.
+ *   - Retained or Deleting/Deleted without that 307 is PRINT_JOB_UNCONFIRMED.
+ *   - Post-dispatch paper, jam, error, and cancel keep their fault text and
+ *     use PRINT_JOB_UNCONFIRMED, because some pages may already have emerged.
  *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
  *
  * @param printerName     Windows printer name (from config)
@@ -75,6 +77,8 @@ export async function monitorPrintJob(
   // we fail closed. A fast job may leave the queue before the first poll, but that
   // is indistinguishable from DocumentName mismatch or query/driver failure.
   const NOT_FOUND_LIMIT = 5
+  // Bounded wait for one boolean 307 after a seen printing job leaves the queue.
+  const COMPLETION_GRACE_POLLS = 4
 
   const dispatchedAtMs = Number.isFinite(dependencies.dispatchedAtMs)
     ? Math.max(0, dependencies.dispatchedAtMs as number)
@@ -88,50 +92,72 @@ export async function monitorPrintJob(
   let paperEmptySeen = false
   let notFoundCount = 0
   let activeJobSeenOnce = false
-  let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
+  let seenRetainedOnce = false
+  let removalSeen = false
+  let removalRawStatus: string | undefined
+  let goneWithoutEventPolls = 0
+  let lastStatus: PrintJobMonitorStatus | undefined
 
   while (now() < deadline) {
     await wait(pollIntervalMs)
 
     const { status, rawStatus } = await queryStatus(printerName, spoolKey)
+    lastStatus = status
 
     switch (status) {
       case 'paper_empty':
         paperEmptySeen = true
         paperEmptyCount++
         notFoundCount = 0
-        // Require 2 consecutive PaperOut confirmations before declaring failure.
+        goneWithoutEventPolls = 0
+        // Require 2 consecutive PaperOut confirmations before declaring the fault.
         if (paperEmptyCount >= 2) {
-          return {
-            failed: true,
-            errorCode: 'PAPER_EMPTY',
-            errorMessage: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
+          return postDispatchFault(
+            '打印机缺纸。作业已经送去打印，可能已出一部分纸，系统不会自动重印，出纸结果需要核查，请勿再次提交打印',
             rawStatus,
-          }
+          )
         }
         break
 
       case 'error': {
-        // Covers Jammed / Error / UserIntervention / Deleting — explicit driver error flags.
-        const isJammed = rawStatus?.toLowerCase().includes('jammed') ?? false
-        return {
-          failed: true,
-          errorCode: 'PRINTER_ERROR',
-          errorMessage: isJammed
-            ? `打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理（队列状态: ${rawStatus ?? '?'}）`
-            : `打印机发生设备异常，当前暂时无法继续使用，请联系工作人员处理（队列状态: ${rawStatus ?? '?'}）`,
+        // Jammed / Error / UserIntervention / Cancelled. Not a retryable device code:
+        // the command was already dispatched, so some pages may have emerged.
+        const flags = rawStatus?.toLowerCase() ?? ''
+        const isJammed = flags.includes('jammed')
+        const isCancelled = flags.includes('cancel')
+        const detail = rawStatus ?? '?'
+        const reason = isJammed
+          ? `打印机可能卡纸或发生设备故障（队列状态: ${detail}）`
+          : isCancelled
+            ? `打印队列报告作业已取消（队列状态: ${detail}）`
+            : `打印机发生设备异常（队列状态: ${detail}）`
+        return postDispatchFault(
+          `${reason}。作业已经送去打印，可能已出一部分纸，系统不会自动重印，出纸结果需要核查，请勿再次提交打印`,
           rawStatus,
-        }
+        )
       }
 
       case 'retained':
         // Pantum CM2800ADN: job submitted to printer + spooler retained copy.
-        // Indeterminate: cannot distinguish "printed and kept" from "waiting for paper".
-        // Keep polling — in case the driver eventually reports an explicit PaperOut or Error.
+        // Indeterminate until an explicit 307. Absence of the job later is not success.
         activeJobSeenOnce = true
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
+        goneWithoutEventPolls = 0
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
+        break
+
+      case 'removing':
+        // Deleting/Deleted without a fault flag and without an explicit Printed status.
+        // Neutral queue clearance. A 307 can still confirm; disappearance cannot.
+        removalSeen = true
+        removalRawStatus = rawStatus
+        notFoundCount = 0
+        paperEmptyCount = 0
+        goneWithoutEventPolls = 0
         if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
@@ -147,12 +173,12 @@ export async function monitorPrintJob(
         activeJobSeenOnce = true
         paperEmptyCount = 0
         notFoundCount = 0
+        goneWithoutEventPolls = 0
         break
 
       case 'not_found':
         // A small job can finish and leave a non-retained queue before the
-        // first Get-PrintJob sample. Event 307 is stronger evidence than queue
-        // visibility when it carries this exact taskId after dispatch.
+        // first Get-PrintJob sample. Event 307 is the completion evidence.
         if (paperEmptySeen) {
           return unconfirmedOutcome(
             'the job disappeared after a paper-empty signal; completion cannot be confirmed',
@@ -161,15 +187,25 @@ export async function monitorPrintJob(
         if (await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
-        if (activeJobSeenOnce) {
-          // 已知边界，保持既有语义：作业曾经出现在队列里，随后查不到，并且没有完成事件，就判为完成。
-          // 这只说明 Windows 假脱机不再留着这份作业，不证明纸已经出来。
-          // 打印过程中被人从队列删掉，或 Spooler 把作业弄丢，也会走到这里，被误判为完成。
-          return { failed: false, errorCode: '' }
+        if (activeJobSeenOnce || removalSeen) {
+          goneWithoutEventPolls += 1
+          if (goneWithoutEventPolls >= COMPLETION_GRACE_POLLS) {
+            return unconfirmedOutcome(
+              'the job left the queue without a matching PrintService 307 during the bounded grace period',
+              removalSeen ? removalRawStatus : undefined,
+            )
+          }
+          break
         }
         notFoundCount++
         paperEmptyCount = 0
         if (notFoundCount >= NOT_FOUND_LIMIT) {
+          if (removalSeen) {
+            return unconfirmedOutcome(
+              'the job was only ever seen while Windows was removing it and no completion event followed',
+              removalRawStatus,
+            )
+          }
           return unconfirmedOutcome(
             `job not found in queue after ${NOT_FOUND_LIMIT} polls ` +
               `(${(NOT_FOUND_LIMIT * pollIntervalMs / 1000).toFixed(1)}s); ` +
@@ -180,7 +216,7 @@ export async function monitorPrintJob(
 
       case 'unknown':
         // Get-PrintJob can fail independently of the Operational event log.
-        // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
+        // Preserve fail-closed behaviour but accept a post-dispatch 307 satisfying the same bounded queue correlation.
         if (!paperEmptySeen && await queryCompletionEvent(printerName, spoolKey, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
@@ -190,6 +226,21 @@ export async function monitorPrintJob(
   }
 
   // Hard timeout reached. Every remaining state is indeterminate, so fail closed.
+  if (goneWithoutEventPolls > 0) {
+    return unconfirmedOutcome(
+      `monitoring window ended after ${timeoutMs}ms: the job had left the queue and no completion event was observed`,
+      removalSeen ? removalRawStatus : undefined,
+    )
+  }
+
+  if (lastStatus === 'removing') {
+    return unconfirmedOutcome(
+      `print queue monitoring timed out after ${timeoutMs}ms ` +
+        '(the job was still being removed from the queue; completion cannot be confirmed)',
+      removalRawStatus,
+    )
+  }
+
   if (seenRetainedOnce) {
     // Pantum driver limitation: job was visible as 'Printing, Retained' throughout
     // the monitoring window. Cannot distinguish normal completion from waiting-for-paper.
@@ -210,11 +261,21 @@ export async function monitorPrintJob(
   return unconfirmedOutcome(warnMsg)
 }
 
+function postDispatchFault(errorMessage: string, rawStatus?: string): MonitorOutcome {
+  return {
+    failed: true,
+    errorCode: 'PRINT_JOB_UNCONFIRMED',
+    errorMessage,
+    ...(rawStatus ? { rawStatus } : {}),
+    warn: `post-dispatch queue fault kept as PRINT_JOB_UNCONFIRMED (${rawStatus ?? 'n/a'})`,
+  }
+}
+
 function unconfirmedOutcome(warnMessage: string, rawStatus?: string): MonitorOutcome {
   return {
     failed: true,
     errorCode: 'PRINT_JOB_UNCONFIRMED',
-    errorMessage: '打印作业已提交，但未确认打印队列完成，请工作人员现场检查纸张、卡纸和出纸状态；系统不会自动重印',
+    errorMessage: '打印作业已提交，但未确认打印队列完成，出纸结果需要核查，请勿再次提交打印；系统不会自动重印',
     ...(rawStatus ? { rawStatus } : {}),
     warn: warnMessage,
   }

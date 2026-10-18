@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 
 function relDate(iso) {
   try {
@@ -60,6 +61,9 @@ Page({
     statusBarHeight: 20,
     resumes: [],
     loginRequired: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「去登录」
+    restoring: false,
+    restoreFailed: false,
     nextCursor: null,
     loadingMore: false,
     loadMoreError: '',
@@ -70,8 +74,18 @@ Page({
   },
 
   onShow() {
-    this._load()
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => this._load(),
+      needLogin: () => this._clearForLoggedOut(),
+    })
   },
+
+  onHide() { markPageHidden(this) },
+
+  onUnload() { markPageUnloaded(this) },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   onReachBottom() {
     this._load(true)

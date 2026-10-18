@@ -7,8 +7,10 @@ const RADAR_COLORS = radar.RADAR_COLORS
 const DIM_COUNT_EXPECTED = radar.DIM_COUNT_EXPECTED
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { startAfterMemberGate, markPageUnloaded } = require('../../utils/page-guard')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
+const session = require('../../utils/resume-parse-session')
 
 // 没有 AI 解读时说清为什么、要不要再试（后端 #1112 的 aiUnavailableReason）。
 // 闸门类重试没用，不提示重试；声明 / 登录缺失要先补再重新作答。
@@ -144,11 +146,6 @@ Page({
 
   onLoad(options) {
     const opts = options || {}
-    // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
-    // 取不到就留空，走会员登录态。
-    const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
-    this._token = saved.accessToken || ''
-
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     // 画布宽度必须减掉**整条容器链**的横向占用，不是拍一个 48。
     // 链路（canvas 在 .radar-wrap > .card.card-inner 里，三层都是 border-box）：
@@ -179,6 +176,16 @@ Page({
       radarCanvasHeightPx: Math.round(radarPx * 0.82 * 0.78),
     })
 
+    // 过期但可恢复（FLOW1b）：先等恢复结果，再按「现在这一位」取种子凭证、读题或读历史——否则会员会被当成游客提交。
+    this._startOptions = opts
+    startAfterMemberGate(this, auth, api, () => this._start(opts))
+  },
+
+  _start(opts) {
+    // 简历会话凭证只是个种子：自我探索不依赖简历，本次结果的真凭证由提交响应下发。
+    // 取不到就留空，走会员登录态。只用属于当前身份的本机任务当种子（10/17）：换号以后不带上一位的匿名令牌。
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth) || {}
+    this._token = saved.accessToken || ''
     const taskId = trimmed(opts.taskId)
     if (taskId) {
       this.setData({ historyMode: true, taskId, phase: 'loading' })
@@ -194,6 +201,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._gone = true
     this._seq += 1
     this._stopElapsed()
@@ -496,7 +504,7 @@ Page({
       .catch((err) => {
         if (this._gone || seq !== this._seq) return
         if (err && err.code === 'SELF_ASSESSMENT_WITHDRAWN') {
-          this._fail('这次结果已撤回，服务端已删除，无法再查看。', true)
+          this._fail('这次结果已撤回并删除，无法再查看。', true)
           return
         }
         if (err && err.statusCode === 404) {
@@ -523,7 +531,7 @@ Page({
     let blocked = ''
     if (!canManage) {
       blocked = view.status === 'rejected'
-        ? '本次 AI 解读整体未通过，服务端没有返回可用于打印或撤回的凭证；下面的五维强度仍是本次真实算出的结果，记录会在到期后自动清理。'
+        ? '本次 AI 解读整体没有通过，没有拿到可用于打印或撤回的凭证；下面的五维强度仍是本次真实算出的结果，记录会在到期后自动清理。'
         : '本次没有拿到结果访问凭证，无法生成打印件或撤回。'
     }
 
@@ -692,7 +700,7 @@ Page({
     if (this.data.withdrawing || !this.data.canManage || !this.data.taskId) return
     wx.showModal({
       title: '撤回本次结果',
-      content: '撤回后服务端会删除这次的五维强度与解读，并留下一条删除审计记录。删除不可恢复。',
+      content: '撤回后会删除这次的五维强度与解读，并留下一条删除审计记录。删除不可恢复。',
       confirmText: '确认撤回',
       cancelText: '取消',
       success: (r) => { if (r.confirm) this._doWithdraw() },
@@ -708,7 +716,7 @@ Page({
         if (this._gone) return
         this._token = ''
         this.setData({ withdrawing: false, result: null, taskId: '', canManage: false, historyMode: false })
-        this._resetToConsent('上次结果已撤回，服务端已删除该次的五维强度与解读，并留有删除审计记录。')
+        this._resetToConsent('上次结果已撤回，该次的五维强度与解读已删除，并留有删除审计记录。')
       })
       .catch((err) => {
         wx.hideLoading()

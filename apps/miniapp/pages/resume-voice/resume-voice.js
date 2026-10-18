@@ -276,8 +276,12 @@ Page({
   },
 
   typeThisQuestion() {
+    // 这题改用手打：题面跟着换成文字版，不再写「请说出」「转成文字后」。
+    const shown = Q.promptFor(Q.questionAt(this.data.qIndex), false)
     this.setData({
       qVoice: false,
+      qPrompt: shown.prompt,
+      qHint: shown.hint,
       recStatus: 'idle',
       transcript: '',
       recError: '',
@@ -320,8 +324,8 @@ Page({
     this.setData({
       qIndex: index,
       qTitle: q.title,
-      qPrompt: q.prompt,
-      qHint: q.hint || '',
+      qPrompt: Q.promptFor(q, useVoice).prompt,
+      qHint: Q.promptFor(q, useVoice).hint,
       qExample: q.example || '',
       qSensitive: Boolean(q.sensitive),
       qSkippable: Boolean(q.skippable),

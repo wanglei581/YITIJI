@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 580,
+    "endpointCount": 582,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -8111,6 +8111,34 @@
         "services": [
           "MemberQrLoginService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-auth/member-auth.controller.ts",
+        "handler": "MemberAuthController.restoreSession",
+        "method": "POST",
+        "models": [
+          "EndUser",
+          "LegalDocVersion",
+          "MemberLegalConsent"
+        ],
+        "path": "/api/v1/member/auth/restore",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/member-auth/member-restore.service.ts"
+        ],
+        "services": [
+          "MemberRestoreService"
+        ]
+      },
+      {
+        "controller": "services/api/src/member-auth/member-auth.controller.ts",
+        "handler": "MemberAuthController.revokeRestore",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/member/auth/restore/revoke",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-auth/member-auth.controller.ts",
@@ -16783,6 +16811,7 @@
           "services/api/src/common/guards/optional-end-user-auth.guard.ts",
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
           "services/api/src/member-auth/member-step-up.service.ts",
           "services/api/src/member-benefits/admin-member-benefits.service.ts",
           "services/api/src/member-privacy/member-closure-requests.ts",
@@ -18092,6 +18121,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
@@ -18129,6 +18159,7 @@
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/windows-agent-installer.yml": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -21838,14 +21869,27 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/daily-reboot.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/scripts/collect-field-evidence.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs"
     ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
     "apps/terminal-agent/scripts/install-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
@@ -21914,6 +21958,9 @@
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-job-monitor.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
@@ -23448,6 +23495,7 @@
       "services/api/scripts/verify-admin-pending-dispose.ts",
       "services/api/scripts/verify-admin-print-outcome.ts",
       "services/api/scripts/verify-api20-manual-refund.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-payment-flow.ts"
     ],
     "services/api/src/admin-print-scan/admin-print-scan.service.ts": [
@@ -24147,6 +24195,7 @@
       "services/api/scripts/verify-member-assets-c2d.ts",
       "services/api/scripts/verify-member-auth.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-resume-export-draft-source.ts",
       "services/api/scripts/verify-trtc-ownership.ts",
@@ -24461,6 +24510,7 @@
       "services/api/scripts/verify-member-benefits-admin.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-partner-account-action-postgres.ts",
       "services/api/scripts/verify-partner-account-action.ts",
@@ -24540,6 +24590,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -24731,6 +24782,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
@@ -25657,12 +25709,17 @@
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "services/api/scripts/verify-member-auth-races.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-wave2-account-rebind.ts"
     ],
     "services/api/src/member-auth/member-qr-login.service.ts": [
       "services/api/scripts/verify-legal-doc-version.ts",
       "services/api/scripts/verify-member-auth-races.ts",
       "services/api/scripts/verify-member-auth.ts"
+    ],
+    "services/api/src/member-auth/member-restore.service.ts": [
+      "services/api/scripts/verify-member-data-retention.ts",
+      "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-auth/member-step-up.service.ts": [
       "services/api/scripts/verify-member-closure.ts",
@@ -25803,6 +25860,7 @@
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-pickup-code-resume.ts"
     ],
@@ -25835,7 +25893,8 @@
       "services/api/scripts/verify-member-data-request-state-machine.ts"
     ],
     "services/api/src/member-privacy/member-closure-redis.service.ts": [
-      "services/api/scripts/verify-member-closure.ts"
+      "services/api/scripts/verify-member-closure.ts",
+      "services/api/scripts/verify-member-restore.ts"
     ],
     "services/api/src/member-privacy/member-closure-retention.ts": [
       "services/api/scripts/verify-member-closure.ts"
@@ -26635,6 +26694,7 @@
       "services/api/scripts/verify-member-print-orders.ts",
       "services/api/scripts/verify-member-qa-records.ts",
       "services/api/scripts/verify-member-qr-login.ts",
+      "services/api/scripts/verify-member-restore.ts",
       "services/api/scripts/verify-member-step-up.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-miniapp-review-backend.ts",
@@ -27093,6 +27153,7 @@
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
       "services/api/scripts/verify-kiosk-job-board-switch.ts",
       "services/api/scripts/verify-legacy-pending-print-task-disposition.ts",
+      "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
       "services/api/scripts/verify-order.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-partner-smart-campus.ts",
@@ -32286,6 +32347,49 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1",
+          "apps/terminal-agent/installer/provision/boot-spool-guard.ps1",
+          "apps/terminal-agent/installer/provision/daily-reboot.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/collect-field-evidence.ps1",
+          "apps/terminal-agent/scripts/install-production-agent.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/api-client.ts"
         ],
         "missing": []
@@ -32731,6 +32835,7 @@
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
           "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
+          "apps/terminal-agent/src/agent/print-job-monitor.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/index.ts"
@@ -38465,6 +38570,7 @@
           "services/api/src/files/retention-policy.ts",
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-auth/member-auth.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
           "services/api/src/mock-interview/mock-interview.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/storage/storage.service.ts"
@@ -38718,6 +38824,31 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/src/app.module.ts",
+          "services/api/src/common/crypto/phone-identity.ts",
+          "services/api/src/common/filters/http-exception.filter.ts",
+          "services/api/src/common/redis/redis.service.ts",
+          "services/api/src/member-auth/member-phone-rebind.service.ts",
+          "services/api/src/member-auth/member-restore.service.ts",
+          "services/api/src/member-privacy/member-closure-redis.service.ts",
+          "services/api/src/prisma/prisma.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-member-restore.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:member-restore"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/src/member-auth/member-auth.service.ts",
           "services/api/src/member-auth/sms/sms-sender.ts"
         ],
@@ -38829,6 +38960,7 @@
           "packages/shared/src/types/print.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/scripts/support/minimal-pdf.ts",
+          "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/pickup-code.ts",
           "services/api/src/common/redis/redis.service.ts",
@@ -38838,6 +38970,7 @@
           "services/api/src/member-print-orders/member-order-claim-here.service.ts",
           "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/member-print-orders/member-print-orders.controller.ts",
+          "services/api/src/member-print-orders/member-print-orders.service.ts",
           "services/api/src/payment/order-quote.service.ts",
           "services/api/src/payment/order-status.service.ts",
           "services/api/src/payment/price-config.seed.ts",
@@ -38852,7 +38985,8 @@
           "services/api/src/prisma/prisma.service.ts",
           "services/api/src/storage/storage.interface.ts",
           "services/api/src/storage/storage.service.ts",
-          "services/api/src/terminals/terminal-capabilities.service.ts"
+          "services/api/src/terminals/terminal-capabilities.service.ts",
+          "services/api/src/terminals/terminals-agent.service.ts"
         ],
         "missing": []
       },

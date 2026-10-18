@@ -3,6 +3,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const fileUrls = require('../../utils/file-url')
 const auth = require('../../utils/auth')
+const pageGuard = require('../../utils/page-guard')
 const uploadNames = require('../../utils/upload-name')
 const conversion = require('./documents-helpers')
 
@@ -34,23 +35,36 @@ Page({
 
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
-    if (!auth.isLoggedIn()) {
-      wx.redirectTo({
-        url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/documents/documents')}`,
-        // redirectTo 失败（如 launch 已在栈顶）时不能静默留在本页，与 contract-review._toLogin 同款兜底。
-        fail: () => wx.switchTab({ url: '/pages/home/home' }),
-      })
-      return
-    }
-    this._loadConversionCapabilities()
-    this.loadDocuments()
+    // 登录闸门（FLOW1b）：过期但可恢复时先等恢复结果；只有确定需要登录才去登录页。
+    // 网络、限流、服务端故障时留在本页给重试，不把人送去重收短信。
+    pageGuard.ensureMember(auth, api).then((r) => {
+      if (this._unloaded) return
+      if (r.state === 'need_login') {
+        wx.redirectTo({
+          url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/documents/documents')}`,
+          // redirectTo 失败（如 launch 已在栈顶）时不能静默留在本页，与 contract-review._toLogin 同款兜底。
+          fail: () => wx.switchTab({ url: '/pages/home/home' }),
+        })
+        return
+      }
+      if (r.state === 'recoverable') {
+        this.setData({ loading: false, loadError: '暂时没能恢复登录，请稍后重试' })
+        return
+      }
+      this._loadConversionCapabilities()
+      this.loadDocuments()
+    })
   },
 
   onUnload() {
+    this._unloaded = true
+    // 预览进行中用户返回：全局遮罩当场收起，不等网络回来，免得挡住上一页。
+    if (this.data.previewing) wx.hideLoading()
     this._stopConvertCountdown()
   },
 
   _loadConversionCapabilities() {
+    this._capsRequested = true
     api.getDocumentConversionCapabilities()
       .then((capabilities) => {
         const available = capabilities && capabilities.wordToPdf === true
@@ -71,19 +85,29 @@ Page({
       })
   },
 
-  loadDocuments(append = false) {
+  // 「刷新」「重试」走这里。模板曾直接 bindtap="loadDocuments"：点击事件对象被当成 append，
+  // 没有下一页时直接返回、有下一页时把下一页追加进来，刷新和重试都不灵（FLOW1a，沙箱复现）。
+  reloadDocuments() {
+    // 进页时登录没能恢复（临时失败）就没取过转换能力：重试时一并补上。
+    if (!this._capsRequested) this._loadConversionCapabilities()
+    this.loadDocuments(false)
+  },
+
+  loadDocuments(append) {
     // 2026-09-03 修复「不显示文件」：此前只取第一页 50 条即止——unwrapList 早就把
     // nextCursor 挂在返回数组上（utils/api.js），这里拿到就丢。第 51 份文件起
     // 永远不出现，页面还写着「最近 · 50 个文件」让人以为只有这么多。
     // 打印场景（证件正反、简历多版本、证书、合同）极易超过 50 份。
     // 分页写法对照 orders.js 的 _load（同一套 cursor 约定）。
-    if (append && (!this.data.nextCursor || this.data.loadingMore)) return
-    const cursor = append ? this.data.nextCursor : null
-    this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
+    // 只有 append === true 才翻页：别的真值（例如误绑进来的事件对象）一律按刷新处理。
+    const paging = append === true
+    if (paging && (!this.data.nextCursor || this.data.loadingMore)) return
+    const cursor = paging ? this.data.nextCursor : null
+    this.setData(paging ? { loadingMore: true } : { loading: true, loadError: '' })
     api.getMyDocuments({ pageSize: 50, ...(cursor ? { cursor } : {}) })
       .then((items) => {
         const page = (items || []).map(conversion.toView)
-        const all = append ? [...this.data.all, ...page] : page
+        const all = paging ? [...this.data.all, ...page] : page
         this.setData({ all, loading: false, loadingMore: false, nextCursor: (items && items.nextCursor) || null })
         this.applyFilter(this.data.activeFilter, all)
       })
@@ -109,23 +133,12 @@ Page({
     this.applyFilter(key)
   },
 
-  // 点击行 → 可打印文件进打印流程；高敏报告只预览，避免点进打印吃 400
+  // 点整行 = 打开原文（点文件就是看文件）。此前点整行进的是打印，预览藏在「⋯」里（FLOW1a 实图 02）；
+  // 打印改由行内「打印」按钮发起（reprintDoc），不可打印的报告照样能点开看。
   openDoc(e) {
-    const item = this.data.all.find((entry) => entry.id === String(e.currentTarget.dataset.id || ''))
-    if (!item) return
-    if (!item.reprintable) {
-      wx.showModal({
-        title: '不可打印',
-        content: conversion.DOCUMENT_NOT_REPRINTABLE_COPY,
-        showCancel: false,
-        confirmText: '查看文件',
-        success: (modal) => { if (modal.confirm) this.previewDoc(item.id) },
-      })
-      return
-    }
-    wx.navigateTo({
-      url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.name)}&pages=${item.pages}`,
-    })
+    const id = String(e.currentTarget.dataset.id || '')
+    if (!this.data.all.some((entry) => entry.id === id)) return
+    this.previewDoc(id)
   },
 
   reprintDoc(e) {
@@ -235,13 +248,32 @@ Page({
     this.reprintDoc({ currentTarget: { dataset: { id: result.fileId } } })
   },
 
-  // 预览文件内容
+  // 预览文件内容。PDF / Office 走 utils/file-url.js 的 openSignedDocument：
+  // 每次现取短期签名链接，过期重取一次；失败原因（下载域名未配置、过期、
+  // 无权限、超时、格式不支持）用一句中文说清，不再统一写「下载失败」。
   previewDoc(id) {
     const item = this.data.all.find((entry) => entry.id === id) || this._convertedPdfItem(id)
     if (!item) return
     if (this.data.previewing) return
     this.setData({ previewing: true })
     wx.showLoading({ title: '加载预览…', mask: true })
+    // 用户中途返回：加载遮罩是全局的，照样收起；不再弹窗或打开全屏预览，免得落到上一页。
+    const done = () => {
+      wx.hideLoading()
+      if (!this._unloaded) this.setData({ previewing: false })
+    }
+    if (!item.isImage) {
+      fileUrls.openSignedDocument({
+        wx,
+        fetchUrl: () => api.getFilePreviewUrl(item.id),
+        name: item.name,
+        mimeType: item.mimeType,
+      }).then((result) => {
+        done()
+        if (!this._unloaded && !result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
+      })
+      return
+    }
     api.getFilePreviewUrl(item.id)
       .then((res) => {
         // 服务端返回的是相对路径，wx API 只接受绝对地址（见 utils/file-url.js）
@@ -251,38 +283,12 @@ Page({
         // 会被 verifyFileSignature 判为无效签名 → 401 → 图片加载失败。
         const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回预览链接')
-        if (item.isImage) {
-          wx.hideLoading()
-          this.setData({ previewing: false })
-          wx.previewImage({ urls: [url], current: url })
-        } else {
-          wx.downloadFile({
-            url,
-            success: (dl) => {
-              wx.hideLoading()
-              this.setData({ previewing: false })
-              if (dl.statusCode === 200) {
-                wx.openDocument({
-                  filePath: dl.tempFilePath,
-                  showMenu: true,
-                  fail: () => wx.showToast({ title: '无法打开此文件', icon: 'none' }),
-                })
-              } else {
-                wx.showToast({ title: '下载失败，请重试', icon: 'none' })
-              }
-            },
-            fail: () => {
-              wx.hideLoading()
-              this.setData({ previewing: false })
-              wx.showToast({ title: '下载失败，请重试', icon: 'none' })
-            },
-          })
-        }
+        done()
+        if (!this._unloaded) wx.previewImage({ urls: [url], current: url })
       })
       .catch((err) => {
-        wx.hideLoading()
-        this.setData({ previewing: false })
-        wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
+        done()
+        if (!this._unloaded) wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
       })
   },
 
@@ -350,7 +356,7 @@ Page({
     const canChangeRetention = !item.retentionLocked
     const itemList = ['预览文件']
     if (item.isWord) itemList.push('转 PDF')
-    itemList.push(item.reprintable ? '发起打印' : conversion.DOCUMENT_NOT_REPRINTABLE_COPY)
+    itemList.push(item.reprintable ? '打印' : conversion.DOCUMENT_NOT_REPRINTABLE_COPY)
     if (canChangeRetention) itemList.push('修改保存期限')
     itemList.push('删除文件')
     const CONVERT_IDX = item.isWord ? 1 : -1
@@ -359,6 +365,8 @@ Page({
     const DELETE_IDX = canChangeRetention ? PRINT_IDX + 2 : PRINT_IDX + 1
 
     wx.showActionSheet({
+      // 列表标题只放主名、最多两行；完整原名在这里读得到（FLOW1a）。
+      alertText: item.name,
       itemList,
       success: (res) => {
         if (res.tapIndex === 0) {

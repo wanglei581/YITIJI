@@ -21,7 +21,7 @@ $scripts = @(Get-ChildItem -LiteralPath $provisionRoot -Filter "*.ps1" -File | S
 if ($scripts.Count -eq 0) {
   throw "No staged Windows PowerShell scripts were found"
 }
-foreach ($required in @("collect-field-evidence.ps1", "install-production-agent.ps1")) {
+foreach ($required in @("collect-field-evidence.ps1", "diagnose-production-agent.ps1", "install-production-agent.ps1")) {
   if (-not (Test-Path -LiteralPath (Join-Path $provisionRoot $required) -PathType Leaf)) {
     throw "Staged provision script is missing: $required"
   }

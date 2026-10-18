@@ -1,6 +1,9 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 const storage = require('../../utils/storage')
 const model = require('../../utils/resume-build-model')
 const view = require('./resume-build-view')
@@ -99,7 +102,8 @@ Page({
       const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
       this._token = saved.taskId === historyTaskId ? (saved.accessToken || '') : ''
       this.setData({ historyMode: true, phase: 'loading' })
-      this._loadHistory()
+      // 过期但可恢复（FLOW1b）：历史回看要会员身份，先等恢复结果再读。
+      startAfterMemberGate(this, auth, api, () => this._loadHistory())
       return
     }
 
@@ -111,12 +115,18 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._gone = true
     this._stopElapsed()
   },
 
+  onHide() { markPageHidden(this) },
+
   /** 登录页是 navigateTo 压栈的，登录完 navigateBack 回来，表单内容原样还在 */
   onShow() {
+    markPageShown(this)
+    // 历史回看：恢复结束时页面在后台，回到前台才读（读过就什么都不做）。
+    if (this.data.historyMode) startAfterMemberGate(this, auth, api, () => this._loadHistory())
     if (!this._waitingForLogin || !auth.isLoggedIn()) return
     this._waitingForLogin = false
     const pending = this._pendingExport
@@ -371,14 +381,26 @@ Page({
     this.setData({ optionGroups: model.syncOptionGroups(model.optionGroups(), this.data.format, this.data.layout) })
   },
 
-  tapExport() { this._export(false) },
+  tapExport() { this._gateExport(false) },
+
+  /**
+   * 导出要挂在本人账号下（FLOW1b）：访问令牌过期但可恢复时先等恢复，成功后照常导出一次；
+   * 恢复中再点不重复；要登录时走原来的「去登录」弹窗。
+   */
+  _gateExport(draft) {
+    gateMemberAction(this, auth, api, draft ? 'export-draft' : 'export', () => this._export(draft), {
+      needLogin: () => this._export(draft),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
 
   /**
    * 原样草稿导出：内容逐字来自用户填写，未经模型润色。
    * 这是 AI 不可用时的退路——功能退化成「按你填的排版」，不是转圈假装成功，
    * 也不是干脆不给导出。
    */
-  tapExportDraft() { this._export(true) },
+  tapExportDraft() { this._gateExport(true) },
 
   _export(draft) {
     if (this.data.exporting) return

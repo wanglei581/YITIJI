@@ -4,7 +4,7 @@
 // 切换后端时:只改 utils/config.js 的 baseUrl / USE_MOCK,页面代码零改动。
 
 const config = require('./config');
-const { request, uploadFile } = require('./request');
+const { request, uploadFile, restoreSession } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
 const uploadNames = require('./upload-name');
@@ -20,6 +20,12 @@ const { withQuotedAmount } = require('./price-confirmation');
 // 这一段拆到 api-legal-consent.js，方法在文件末尾并进同一个 api 对象。
 // 加载它的同时也向 request.js 注册了 ai 标记请求的前后置。
 const legalConsent = require('./api-legal-consent');
+
+/**
+ * 登录时请服务端同时签发同设备恢复凭证（FLOW1c）。用请求头而不是请求体字段：旧版 API 会忽略不认识的请求头，
+ * 不会因白名单校验回 400。服务端还要核对微信固定的 Referer 是本小程序，一体机拿不到。
+ */
+const KEEP_SIGNED_IN = { 'x-member-keep-signed-in': '1' };
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -387,7 +393,7 @@ const api = {
         privacyVersion: v.privacyVersion,
       };
       if (deviceId) data.deviceId = deviceId;
-      return request('/member/auth/login', { method: 'POST', data, needAuth: false });
+      return request('/member/auth/login', { method: 'POST', data, needAuth: false, header: KEEP_SIGNED_IN });
     });
   },
 
@@ -401,9 +407,27 @@ const api = {
     return request('/member/me', { method: 'GET', needAuth: true });
   },
 
+  /**
+   * 把「过期但可恢复」的会话恢复回来（FLOW1b，见 utils/request.js restoreSession）。
+   * 返回 { state: 'ok' | 'need_login' | 'recoverable' }；页面经 utils/page-guard.ensureMember 调用。
+   */
+  restoreSession() {
+    if (config.USE_MOCK) return Promise.resolve({ state: 'need_login' });
+    return restoreSession();
+  },
+
   logout() {
     if (config.USE_MOCK) return Promise.resolve({ loggedOut: true });
     return request('/member/auth/logout', { method: 'POST', needAuth: true });
+  },
+
+  /**
+   * 主动退出时作废这台手机的恢复凭证（FLOW1c），尽力而为。不带访问令牌：退出时它可能已经过期。
+   * 本机在调用之前已经作废并落盘（auth.logout），这一次成没成都不影响「退出后不恢复」。
+   */
+  revokeRestore(restoreToken) {
+    if (config.USE_MOCK || !restoreToken) return Promise.resolve({ revoked: false });
+    return request('/member/auth/restore/revoke', { method: 'POST', data: { restoreToken }, needAuth: false });
   },
 
   /**
@@ -481,6 +505,7 @@ const api = {
           privacyVersion: v.privacyVersion,
         },
         needAuth: false,
+        header: KEEP_SIGNED_IN,
       });
     });
   },
@@ -1008,11 +1033,12 @@ const api = {
    * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
    * 前端不构造、不缓存、不复用。
    */
-  quoteMyPrintOrder(fileId, params, presetFileUrl) {
+  quoteMyPrintOrder(fileId, params, presetFileUrl, options) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    const terminalId = options && String(options.terminalId || '').trim();
     const quoteWith = (fileUrl) => request('/orders/quote', {
       method: 'POST',
-      data: { fileUrl, params },
+      data: terminalId ? { fileUrl, params, terminalId } : { fileUrl, params },
       needAuth: false,
     });
 
@@ -1028,6 +1054,16 @@ const api = {
       const fileUrl = access && access.printFileUrl;
       if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
       return quoteWith(fileUrl);
+    });
+  },
+
+  getTerminalCapabilities(terminalId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('终端能力'));
+    const id = String(terminalId || '').trim();
+    if (!id) return Promise.reject(new Error('缺少终端'));
+    return request(`/terminals/${encodeURIComponent(id)}/capabilities`, {
+      method: 'GET',
+      needAuth: false,
     });
   },
 

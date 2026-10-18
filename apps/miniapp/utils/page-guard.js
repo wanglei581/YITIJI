@@ -255,8 +255,204 @@ function sameAccount(tokenAccount, currentAccount) {
   return from === '' && isMemberIdentity(to)
 }
 
+/**
+ * 「过期但可恢复」（FLOW1b）：本地令牌已不可用，但上次明确登录的会员还认得、也没有主动退出。
+ * 先认人（auth.restorableMemberId 会把旧版本的「1」趁本机资料还在时迁移成 id），再看令牌。
+ * 这一态**不是**已登录：页面应显示「正在恢复登录」，不显示「未登录 / 去登录」，也不伪装成已登录。
+ */
+function isRestorable(auth) {
+  if (!auth || typeof auth.restorableMemberId !== 'function') return false
+  // 本机存储这一次读不出来（认不清是谁）也按「可恢复」走：去等恢复结果（临时失败、可重试），不当成未登录。
+  const member = typeof auth.restorableMember === 'function'
+    ? auth.restorableMember()
+    : { id: auth.restorableMemberId(), unreadable: false }
+  if (!member.id && !member.unreadable) return false
+  if (auth.isLoggedIn()) return false
+  return !!(auth.canSilentResignin && auth.canSilentResignin())
+}
+
+/**
+ * 统一的会员闸门（FLOW1b）：页面在 onLoad / onShow / 点按时用它代替同步的 isLoggedIn() 判定。
+ *   已登录 → ok；过期但可恢复 → 等 api.restoreSession() 的结果；都不是 → need_login。
+ * 恢复进行中 auth.isLoggedIn() 照旧返回 false；调用方在等待期间自己显示「正在恢复登录」。
+ * 恢复本身是单飞的（utils/request.js），几处同时等也只换一次 token。
+ * @returns {Promise<{ state: 'ok' | 'need_login' | 'recoverable' }>}
+ */
+function ensureMember(auth, api) {
+  if (!auth) return Promise.resolve({ state: 'need_login' })
+  if (typeof auth.restorableMemberId === 'function') auth.restorableMemberId()
+  if (auth.isLoggedIn()) return Promise.resolve({ state: 'ok' })
+  if (!isRestorable(auth) || !api || typeof api.restoreSession !== 'function') {
+    return Promise.resolve({ state: 'need_login' })
+  }
+  return Promise.resolve()
+    .then(() => api.restoreSession())
+    .then((r) => {
+      const state = r && r.state
+      return state === 'ok' || state === 'need_login' || state === 'recoverable' ? { state } : { state: 'recoverable' }
+    })
+    .catch(() => ({ state: 'recoverable' }))
+}
+
+/** 只在值不同时 setData：闸门每个出口都收口状态，避免多余渲染。 */
+function patchIfChanged(page, patch) {
+  const data = page.data || {}
+  const changed = {}
+  let dirty = false
+  for (const key of Object.keys(patch)) {
+    if (data[key] !== patch[key]) { changed[key] = patch[key]; dirty = true }
+  }
+  if (dirty) page.setData(changed)
+}
+
+/**
+ * 页面级会员闸门（FLOW1b-1b，v3）。页面在 onLoad / onShow 里用它代替同步的 isLoggedIn() 判定。
+ *   handlers = { ready, needLogin, recoverable? }
+ *
+ * 三个确定出口，每个出口都先把 restoring / restoreFailed 收口（包括同步分支：后台恢复成功、切回来时走的是
+ * 「本地已登录」这一支，不收口就会一直停在「恢复中」）：
+ *   已登录 → ready()；要登录 → needLogin()；临时失败 → 显示可重试（recoverable()）。
+ *
+ * 等待中的规则：
+ *   - 同一页同时只等一次；等待中再调用（例如 onShow 又来了）只把 handlers 换成最新的，不再发恢复；
+ *   - 等待结束**不认出发时的状态**，只记下结果，再按「现在」重新判断一次：页面已卸载就结束，
+ *     在后台就结束（回到前台的 onShow 会再走一遍闸门），在前台就用最新的 handlers 同步判断——
+ *     所以前台回调不会被吞，换了号也是按现在这一位判断；
+ *   - 临时失败之后这一页只认用户点「重试」（retryMemberGate），等待结束、切前后台、onShow 都不自动再发起。
+ *
+ * 页面需要在 onHide / onShow / onUnload 里维护 _hidden、_unloaded（见 markPageShown / markPageHidden / markPageUnloaded）。
+ */
+function gateMember(page, auth, api, handlers, options) {
+  if (!page || !auth || !handlers) return
+  page._memberGateHandlers = handlers
+  const afterRestore = !!(options && options.afterRestore)
+  // 每做出一次决定就记一笔：等待期间若已经按「现在」判断过（例如换了号回到前台），恢复结束时不再重复判断。
+  const decide = (fn) => {
+    page._memberGateDecisions = (page._memberGateDecisions || 0) + 1
+    if (fn) fn()
+  }
+  // 先认人再看令牌（isRestorable 里的顺序）：旧版本的资格要趁本机资料还在时迁成会员 id。
+  const restorable = isRestorable(auth)
+  if (auth.isLoggedIn()) {
+    page._memberGateOutcome = null
+    patchIfChanged(page, { restoring: false, restoreFailed: false })
+    decide(handlers.ready)
+    return
+  }
+  if (!restorable) {
+    page._memberGateOutcome = null
+    patchIfChanged(page, { restoring: false, restoreFailed: false })
+    decide(handlers.needLogin)
+    return
+  }
+  // 可恢复：上一次恢复是临时失败、或这一次判断就是恢复刚结束时的复核——都只显示可重试，不自动再发起。
+  if (page._memberGateOutcome === 'recoverable' || afterRestore) {
+    page._memberGateOutcome = 'recoverable'
+    patchIfChanged(page, { restoring: false, restoreFailed: true })
+    decide(handlers.recoverable)
+    return
+  }
+  if (page._memberGate) return
+  patchIfChanged(page, { restoring: true, restoreFailed: false })
+  const decisionsAtStart = page._memberGateDecisions || 0
+  page._memberGate = ensureMember(auth, api)
+    .then((r) => (r && r.state) || 'recoverable', () => 'recoverable')
+    .then((state) => {
+      page._memberGate = null
+      if ((page._memberGateDecisions || 0) !== decisionsAtStart) return
+      page._memberGateOutcome = state === 'recoverable' ? 'recoverable' : null
+      if (page._unloaded || page._hidden) return
+      gateMember(page, auth, api, page._memberGateHandlers, { afterRestore: true })
+    })
+}
+
+/** 用户点「重试」：清掉上一次的临时失败，再走一遍闸门（会发起一次恢复）。不会自己循环。 */
+function retryMemberGate(page, auth, api, handlers) {
+  if (!page) return
+  page._memberGateOutcome = null
+  gateMember(page, auth, api, handlers || page._memberGateHandlers)
+}
+
+/**
+ * 点击类会员闸门（FLOW1b-1b，v3）：导出、保存、生成、确认这类动作。
+ *   run() 是原来的动作，页面原有的防重复提交、当前文件和账号校验都留在 run 里，执行那一刻才判断。
+ *   handlers = { needLogin, recoverable, busy }
+ *
+ * - 已登录：直接 run()；要登录：needLogin()。
+ * - 可恢复：等恢复。等待中同一个动作再点：忽略；点别的动作：busy()（提示「正在恢复登录」），都不执行。
+ * - 恢复结束那一刻，页面已卸载、在后台、或会话代际变了（显式退出或换号；补签与恢复不推进代际）：什么都不做。
+ *   动作不补执行——是用户在那一刻点的，回来后由用户再点一次。
+ * - 成功：run() 恰好一次；临时失败：recoverable()，不自动重试。
+ * @returns {Promise<'ran'|'need_login'|'recoverable'|'busy'|'dropped'>}
+ */
+function gateMemberAction(page, auth, api, key, run, handlers) {
+  const h = handlers || {}
+  if (!page || !auth) return Promise.resolve('dropped')
+  if (page._memberAction) {
+    if (page._memberAction !== key && h.busy) h.busy()
+    return Promise.resolve('busy')
+  }
+  const restorable = isRestorable(auth)
+  if (auth.isLoggedIn()) {
+    run()
+    return Promise.resolve('ran')
+  }
+  if (!restorable) {
+    if (h.needLogin) h.needLogin()
+    return Promise.resolve('need_login')
+  }
+  const generation = typeof auth.sessionGeneration === 'function' ? auth.sessionGeneration() : null
+  page._memberAction = key
+  return ensureMember(auth, api)
+    .then((r) => (r && r.state) || 'recoverable', () => 'recoverable')
+    .then((state) => {
+      page._memberAction = null
+      const sameSession = generation === null || typeof auth.isSameSession !== 'function' || auth.isSameSession(generation)
+      if (page._unloaded || page._hidden || !sameSession) return 'dropped'
+      if (state === 'ok' && auth.isLoggedIn()) {
+        run()
+        return 'ran'
+      }
+      if (state === 'need_login') {
+        if (h.needLogin) h.needLogin()
+        return 'need_login'
+      }
+      if (h.recoverable) h.recoverable()
+      return 'recoverable'
+    })
+}
+
+/**
+ * 不登录也能用的页面（AI 工具类）启动一次（FLOW1b-1b，v3）：过期但可恢复时，先等恢复结果再启动——
+ * 不论结果是会员、要登录还是临时失败，都只启动一次；恢复不了就照游客启动。页面在后台时恢复结束不启动，
+ * 回到前台的 onShow 再调一次本函数才启动。onLoad 与 onShow 都调它，启动过之后再调是空操作。
+ */
+function startAfterMemberGate(page, auth, api, start) {
+  if (!page || page._memberStarted) return
+  const run = () => {
+    if (page._memberStarted) return
+    page._memberStarted = true
+    start()
+  }
+  gateMember(page, auth, api, { ready: run, needLogin: run, recoverable: run })
+}
+
+/** 页面生命周期标记（gateMember / gateMemberAction 读它们）。 */
+function markPageShown(page) { if (page) page._hidden = false }
+function markPageHidden(page) { if (page) page._hidden = true }
+function markPageUnloaded(page) { if (page) page._unloaded = true }
+
 module.exports = {
   createLifecycleGuard,
+  isRestorable,
+  ensureMember,
+  gateMember,
+  retryMemberGate,
+  gateMemberAction,
+  startAfterMemberGate,
+  markPageShown,
+  markPageHidden,
+  markPageUnloaded,
   memberIdentityKey,
   isMemberIdentity,
   IDENTITY_UNUSABLE,

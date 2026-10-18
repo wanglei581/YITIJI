@@ -33,6 +33,13 @@ App({
     } catch (e) {
       // 兜底：使用默认值
     }
+    // 打开小程序就把「过期但可恢复」的会话恢复回来（FLOW1b）：只认上次明确登录的同一位会员，
+    // 不阻塞界面；要登录的页面另经 utils/page-guard.ensureMember 等结果（恢复是单飞的，不会重复换 token）。
+    try {
+      require('./utils/request').restoreSession().catch(() => {})
+    } catch (e) {
+      // 恢复失败不影响启动；页面闸门会再试
+    }
     // 启动时的「招聘会提醒」弹窗已随招聘会页一起停放（首发按非招聘类目提审，
     // 见 docs/compliance/compliance-boundary.md §1.1）。取得人力资源服务许可证、
     // 通过求职/招聘类目后，与 pages/fair-reminders 一起恢复。

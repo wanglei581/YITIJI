@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { MemberRestoreService } from './member-restore.service'
 import { MemberStepUpService } from './member-step-up.service'
 
 /**
@@ -44,6 +45,7 @@ export class MemberPhoneRebindService {
     private readonly redis: RedisService,
     private readonly stepUp: MemberStepUpService,
     private readonly audit: AuditService,
+    private readonly restore: MemberRestoreService,
   ) {}
 
   async rebind(
@@ -105,6 +107,8 @@ export class MemberPhoneRebindService {
     let sessionsRevoked: number
     try {
       sessionsRevoked = await this.redis.revokeMemberSessions(endUserId)
+      // 同设备恢复凭证（FLOW1c）一并作废：否则旧手机号登录时签的凭证换绑后还能换出新会话。
+      await this.restore.revokeAll(endUserId)
     } catch {
       throw new ServiceUnavailableException({
         error: { code: 'REBIND_UNAVAILABLE', message: '暂时无法换绑手机号（登录状态没能安全清除），手机号没有改动，请稍后再试' },

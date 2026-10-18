@@ -16,8 +16,10 @@
 .option-group { margin: 16rpx 16px 0; }
 .og-label { font-size: 26rpx; color: var(--muted); margin-bottom: 12rpx; }
 .og-chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.opt-chip { min-height: 96rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
-  font-size: 26rpx; color: var(--ink); background: var(--surface); }
+/* 文字纵向居中（10/16 实际模拟器截图：文字贴在块的上沿，下面空一截）；触控高度不变。 */
+.opt-chip { display: inline-flex; align-items: center; justify-content: center;
+  min-height: 96rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
+  font-size: var(--fs-base); color: var(--ink); background: var(--surface); }
 .opt-chip.active { border-color: var(--teal); color: var(--teal);
   background: var(--teal-soft); }
 
