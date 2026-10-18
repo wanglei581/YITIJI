@@ -231,3 +231,51 @@ test('确认文件页：跳转后换了会话，晚到的草稿在收到时就�
   navs[0].events.printDraft({ fileId: 'f-1', copies: 2, colorMode: 'color', duplex: 'simplex', terminalId: 'T' })
   assert.equal(p._draft, undefined, '会员变了，收到时就不收')
 })
+
+// ── 首页问候和日期：Tab 页会一直驻留，回到前台按当时的时间重算（实屏 10/18 13:20 仍显示「10/17 晚上好」）──
+
+function homeAt(clock, source) {
+  const RealDate = Date
+  // 只替换「现在」，其余照真的 Date；用本地时间构造，CI 跑在 UTC 也一样。
+  class FakeDate extends RealDate {
+    constructor(...args) { if (args.length) super(...args); else super(clock.now.getTime()) }
+    static now() { return clock.now.getTime() }
+  }
+  const { auth, state } = restorableAuth()
+  state.revoked = true
+  const { api } = restoringApi(state, 'need_login')
+  const { wx } = wxStub()
+  const p = instantiate(loadPageDefinition('pages/home/home.js', {
+    wx,
+    source,
+    globals: { Date: FakeDate },
+    modules: { api, auth, 'pickup-summary': { load: () => new Promise(() => {}), pickupUrl: () => '' } },
+  }))
+  p.getTabBar = () => null
+  return p
+}
+
+async function staleGreetingScenario(source) {
+  const clock = { now: new Date(2026, 9, 17, 21, 30) }
+  const p = homeAt(clock, source)
+  p.onLoad({})
+  p.onShow()
+  assert.equal(p.data.greetWord, '晚上好')
+  assert.equal(p.data.todayStr, '10月17日 · 周六')
+  // 第二天下午切回来：页面实例还是同一个（Tab 页不销毁）。
+  clock.now = new Date(2026, 9, 18, 13, 20)
+  if (p.onHide) p.onHide()
+  p.onShow()
+  assert.equal(p.data.greetWord, '下午好', '回到前台按现在的时段问候')
+  assert.equal(p.data.todayStr, '10月18日 · 周日', '日期换成今天')
+}
+
+test('首页：驻留到第二天再回到前台，问候和日期按当时的时间重算', () => staleGreetingScenario())
+
+test('反向变异：首页只在 onLoad 算一次问候 → 上一条必须判红', async () => {
+  let src = read('pages/home/home.js')
+  const anchor = "    if (greet !== this.data.greetWord || today !== this.data.todayStr) this.setData({ greetWord: greet, todayStr: today })\n"
+  assert.ok(src.includes(anchor))
+  src = src.split(anchor).join('')
+  await assert.rejects(staleGreetingScenario(src), (e) => e && e.code === 'ERR_ASSERTION')
+})

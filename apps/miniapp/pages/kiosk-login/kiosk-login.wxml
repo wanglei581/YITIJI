@@ -51,6 +51,8 @@
         <view class="sc-desc">请稍后再试一次。</view>
         <view class="actions">
           <button class="btn primary tap" hover-class="tap-press" bindtap="retryRestore">重试</button>
+          <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+          <button class="btn ghost tap" hover-class="tap-press" bindtap="goLogin">去登录</button>
         </view>
       </view>
     </block>

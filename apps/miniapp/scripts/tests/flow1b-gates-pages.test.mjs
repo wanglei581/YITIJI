@@ -187,11 +187,13 @@ for (const rel of TEMPLATES) {
     const restoring = wxml.indexOf('wx:if="{{restoring}}"')
     const failed = wxml.indexOf('wx:elif="{{restoreFailed}}"')
     assert.ok(restoring >= 0 && failed > restoring, '先「恢复中」，再「可重试」')
-    const loginIdx = Math.max(wxml.indexOf('bindtap="goLogin"'), wxml.indexOf('bindtap="toLogin"'))
-    assert.ok(loginIdx > failed, '「去登录」在后面')
-    const between = wxml.slice(failed, loginIdx)
-    assert.match(between, /bindtap="retryRestore"/)
-    assert.match(between, /wx:elif="\{\{[^}]*(!isLoggedIn|!loggedIn|loginRequired)[^}]*\}\}"/, '去登录那一支是 wx:elif，不会和恢复中同时出现')
+    // 先找「未登录」那一支：它必须是恢复失败之后、同一条链上的 wx:elif。
+    // 10/18 起恢复失败卡片里也有一个主动「去登录」（flow1b-restore-pages 另测），所以不能再拿第一个 goLogin 当登录卡片。
+    const offset = wxml.slice(failed + 1).search(/wx:elif="\{\{[^}]*(!isLoggedIn|!loggedIn|loginRequired)[^}]*\}\}"/)
+    assert.ok(offset >= 0, '去登录那一支是 wx:elif，不会和恢复中同时出现')
+    const branch = failed + 1 + offset
+    assert.match(wxml.slice(failed, branch), /bindtap="retryRestore"/)
+    assert.match(wxml.slice(branch), /bindtap="(goLogin|toLogin)"/, '「去登录」在那一支里，排在后面')
   })
 }
 

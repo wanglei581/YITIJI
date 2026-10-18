@@ -344,3 +344,127 @@ test('反向变异：求职材料页把「恢复暂时失败」当成要登录 �
   ]])
   await assert.rejects(materialsScenario(mutate), assertionFailed)
 })
+
+// ── 恢复一直不成时的主动出口：失败卡片上的「去登录」（agy 13:18 指出的缺口，10/18 补）───────────
+//
+// 要求：复用各页已有的登录入口（都去 /pages/launch/launch）；点它只跳转，不登出、不删凭证、不发请求；
+// 进了登录页，登录页照常先替用户再试一次恢复——再失败也停在登录页、登录方式能操作，不把人送回失败卡片；
+// 用户主动登录后回到原页就是已登录，不再出现失败卡片，也不再恢复。
+
+import fs from 'node:fs'
+import path from 'node:path'
+import { MINIAPP } from './session-runtime.mjs'
+
+const LOGIN_ENTRIES = [
+  ['ai-records', 'goLogin'], ['daily-report', 'goLogin'], ['feedback', 'goLogin'], ['resumes', 'goLogin'],
+  ['kiosk-login', 'goLogin'], ['orders', 'toLogin'], ['package-confirm', 'toLogin'], ['package-create', 'toLogin'],
+  ['privacy', 'toLogin'], ['me', 'tapLogin'], ['home', 'tapLogin'],
+]
+const wxmlOf = (name) => fs.readFileSync(path.join(MINIAPP, `pages/${name}/${name}.wxml`), 'utf8').replace(/<!--[\s\S]*?-->/g, '')
+
+/** 失败状态下能看到一个「去登录」，绑的是这一页已有的登录入口。 */
+function checkLoginEntry(name, handler, wxml) {
+  const src = wxml || wxmlOf(name)
+  if (name === 'me' || name === 'home') {
+    // 这两页的失败提示在 wx:if/wx:elif 链里，入口单独挂在链后面，条件同样是 restoreFailed。
+    const re = new RegExp(`<(view|text) wx:if="\\{\\{restoreFailed[^"]*\\}\\}"[^>]*bindtap="${handler}"[^>]*>去登录</(view|text)>`)
+    assert.match(src, re, `${name}：失败时有「去登录」`)
+    return
+  }
+  const start = src.indexOf('wx:elif="{{restoreFailed}}"')
+  assert.ok(start > 0, `${name}：有恢复失败的卡片`)
+  const next = src.indexOf('wx:elif=', start + 10)
+  const block = src.slice(start, next > 0 ? next : undefined)
+  assert.ok(block.includes('bindtap="retryRestore"'), `${name}：仍有「重试」`)
+  const at = block.indexOf(`bindtap="${handler}"`)
+  assert.ok(at > 0, `${name}：失败卡片上有绑定 ${handler} 的入口`)
+  assert.ok(block.slice(at, at + 300).includes('去登录'), `${name}：入口写着「去登录」`)
+}
+
+test('恢复失败卡片：11 页都有「去登录」，复用该页已有的登录入口，「重试」仍在', () => {
+  for (const [name, handler] of LOGIN_ENTRIES) checkLoginEntry(name, handler)
+})
+
+test('反向变异：简历页去掉失败卡片上的「去登录」→ 上一条必须判红', () => {
+  const wxml = wxmlOf('resumes')
+  const entry = '<view class="btn ghost block tap mt12" hover-class="tap-press" bindtap="goLogin">去登录</view>'
+  assert.ok(wxml.includes(entry))
+  assert.throws(() => checkLoginEntry('resumes', 'goLogin', wxml.replace(entry, '')), assertionFailed)
+})
+
+test('「去登录」只跳到登录页：不发请求、不登出、本机凭证与资格原样留着', () => {
+  for (const [name, handler] of LOGIN_ENTRIES) {
+    const ctx = expiredRuntime()
+    const before = JSON.stringify([...ctx.wx.store.entries()])
+    const page = ctx.loadPage(`pages/${name}/${name}.js`, ctx.load('api'))
+    page[handler]()
+    assert.deepEqual(ctx.wx.calls.nav, [['navigateTo', LAUNCH]], `${name}：只跳登录页`)
+    assert.equal(ctx.wx.calls.request.length, 0, `${name}：不发请求`)
+    assert.equal(JSON.stringify([...ctx.wx.store.entries()]), before, `${name}：本机存储一个字节都不变`)
+  }
+})
+
+/** 闭环：恢复失败 → 去登录 → 登录页再试恢复仍失败、停在登录页可操作 → 主动短信登录 → 回原页已登录。 */
+async function manualLoginAfterRestoreFailed(mutate) {
+  const ctx = expiredRuntime(mutate)
+  ctx.setPages([{ route: 'pages/resumes/resumes' }, { route: 'pages/launch/launch' }])
+  const legalDoc = (type) => ({ docType: type, version: 'v2026.09', content: '职易达服务协议（测试正文）' })
+  const server = createServer(ctx, {
+    restore: ['fail', 'fail'],
+    routes: [
+      ['GET', '/me/resumes', { items: [] }, true],
+      ['GET', '/kiosk/legal/terms_of_service', legalDoc('terms_of_service'), false],
+      ['GET', '/kiosk/legal/privacy_policy', legalDoc('privacy_policy'), false],
+      ['POST', '/member/auth/login', { token: TOKEN_A, user: USER_A, restoreToken: R_A2 }, false],
+      // 登录成功后登录页会对一次账：读 AI 授权状态，再把「登录即声明」补写到账号（失败不影响登录）。
+      ['GET', '/me/ai-consents/status', { consents: [] }, true],
+      ['POST', '/me/ai-consents', { ok: true }, true],
+    ],
+  })
+  const page = ctx.loadPage('pages/resumes/resumes.js', ctx.load('api'))
+  page.onLoad({})
+  page.onShow()
+  await server.drain()
+  assert.equal(page.data.restoreFailed, true, '前提：简历页恢复失败')
+  assert.equal(restoreCalls(ctx).length, 1)
+
+  page.goLogin()
+  assert.deepEqual(ctx.wx.calls.nav, [['navigateTo', LAUNCH]])
+  const launch = ctx.loadPage('pages/launch/launch.js', ctx.load('api'))
+  launch.onLoad({})
+  await server.drain()
+  assert.equal(restoreCalls(ctx).length, 2, '登录页照常替用户再试一次恢复')
+  assert.equal(launch.data.restoring, false, '再失败：不停在「正在恢复」')
+  assert.equal(launch.data.restoreFailed, true, '说清楚没恢复成，同时给登录方式')
+  assert.deepEqual(ctx.wx.calls.nav, [['navigateTo', LAUNCH]], '不把人送回失败卡片')
+
+  launch.toggleAgree()
+  launch.tapSmsLogin()
+  assert.equal(launch.data.showSms, true, '登录方式能操作：打开短信表单')
+  launch.setData({ phone: '18369160193', code: '482913', otp: ['4', '8', '2', '9', '1', '3'] })
+  launch.confirmSms()
+  await server.drain()
+  ctx.runTimers()
+  assert.ok(ctx.wx.calls.nav.some(([kind]) => kind === 'navigateBack'), '登录成功后回到原来那一页')
+  assert.equal(ctx.auth.isLoggedIn(), true)
+
+  page.onShow()
+  await server.drain()
+  assert.equal(page.data.restoreFailed, false, '回到原页：不再是失败卡片')
+  assert.equal(page.data.loginRequired, false)
+  assert.equal(restoreCalls(ctx).length, 2, '登录之后不再恢复，没有循环')
+  assert.equal(ctx.wx.calls.login.length, 0, '没有走微信登录')
+  assert.equal(calls(ctx, '/auth/logout').length, 0, '全程没有登出')
+  assert.deepEqual(server.unexpected, [])
+}
+
+test('闭环：恢复失败 → 去登录 → 登录页再失败仍可操作 → 主动短信登录 → 回原页已登录、不再恢复', () => manualLoginAfterRestoreFailed())
+
+test('反向变异：登录页恢复失败后把人送回去（困回失败卡片）→ 上一条必须判红', async () => {
+  const anchor = "      this.setData({ restoring: false, restoreFailed: r.state === 'recoverable' })\n    })"
+  const mutate = mutator('pages/launch/launch.js', [[
+    anchor,
+    "      this.setData({ restoring: false, restoreFailed: r.state === 'recoverable' })\n      wx.navigateBack()\n    })",
+  ]])
+  await assert.rejects(manualLoginAfterRestoreFailed(mutate), assertionFailed)
+})

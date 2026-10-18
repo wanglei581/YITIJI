@@ -97,6 +97,14 @@
         </view>
         <text class="ficon i-right pv-go"></text>
       </view>
+      <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
+        <view class="pv-main">
+          <view class="pv-t">去登录</view>
+          <view class="pv-s">换一种方式登录本人账号</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
     </view>
 
     <view wx:elif="{{!isLoggedIn}}" class="pv-group">

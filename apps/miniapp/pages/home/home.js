@@ -75,6 +75,10 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    // 首页是 Tab 页，会一直驻留：问候和日期在每次回到前台时重算，不停在第一次打开那一刻（实屏 10/18 仍显示「10/17 晚上好」）。
+    const greet = greetWord()
+    const today = todayStr()
+    if (greet !== this.data.greetWord || today !== this.data.todayStr) this.setData({ greetWord: greet, todayStr: today })
     this._guard.activate()
     this._refresh()
     this._loadPickup()
@@ -93,6 +97,11 @@ Page({
         this._loadPickup()
       }
     })
+  },
+
+  // 恢复一直不成时的主动出口：进同一个登录页（不登出、不清本机凭证；登录页先替用户再试一次恢复）。
+  tapLogin() {
+    wx.navigateTo({ url: '/pages/launch/launch' })
   },
 
   retryRestore() {

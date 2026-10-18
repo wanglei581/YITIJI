@@ -122,6 +122,7 @@ export function createRuntime({ mutate, store } = {}) {
   // 计时器由测试自己推进：launch.js 的「登录成功 → 600ms 后跳转」不能真等。
   // （vm 的新 realm 本来就没有 setTimeout，必须注入。）
   const timers = []
+  let pagesStack = [{ route: 'pages/launch/launch' }]
   const sandbox = {
     wx,
     console,
@@ -130,7 +131,8 @@ export function createRuntime({ mutate, store } = {}) {
     setInterval: (fn) => timers.push(fn),
     clearInterval: () => {},
     getApp: () => ({ globalData: { statusBarHeight: 20 } }),
-    getCurrentPages: () => [{ route: 'pages/launch/launch' }],
+    // 页面栈：默认只有登录页（老用例不变）；要模拟「从某页进登录页」时用 ctx.setPages 换掉。
+    getCurrentPages: () => pagesStack,
   }
   sandbox.globalThis = sandbox
   vm.createContext(sandbox)
@@ -154,6 +156,7 @@ export function createRuntime({ mutate, store } = {}) {
   const ctx = { wx, storage: load('storage'), auth: load('auth'), net: load('request'), load }
   ctx.resigninCalls = () => wx.calls.request.filter((c) => c.url.includes('/wx-resignin'))
   ctx.runTimers = () => { timers.splice(0).forEach((fn) => fn()) }
+  ctx.setPages = (pages) => { pagesStack = pages }
 
   /**
    * 真跑一个页面：Page 配置由沙箱捕获后实例化成带 setData 的对象。
