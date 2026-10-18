@@ -57,6 +57,17 @@ function isOwnMiniappReferer(referer: string | undefined): boolean {
 }
 
 /**
+ * FLOW1c 新签发开关，默认关：只认 true / 1 / on，其余一律当关；每次请求现读，不缓存。
+ * 只管显式登录时要不要新签一枚。已签出的凭证照常恢复、换新、作废，所以它不能拿来紧急停止恢复。
+ * 默认关的原因：首次发布时，发布脚本就绪没过或收到信号，会自动还原成没有恢复接口的旧版，
+ * 窗口里签出的凭证就会一直 404。等发布确认 committed、在途为 0、另有生产授权，才在运行目录的 .env 里打开。
+ */
+function restoreIssuanceEnabled(): boolean {
+  const raw = process.env['MEMBER_RESTORE_ISSUANCE_ENABLED']?.trim().toLowerCase()
+  return raw === 'true' || raw === '1' || raw === 'on'
+}
+
+/**
  * C 端求职者账号接口(阶段 A)。路由前缀 /api/v1/member/*。
  * 与内部 /api/v1/auth/* 完全隔离;受 EndUserAuthGuard 保护的接口拒绝内部 token。
  */
@@ -72,11 +83,12 @@ export class MemberAuthController {
   ) {}
 
   /**
-   * 显式登录时是否同时签发同设备恢复凭证（FLOW1c）。三条同时成立才签：
+   * 显式登录时是否同时签发同设备恢复凭证（FLOW1c）。新签发开关打开，并且下面三条同时成立才签：
    * 客户端要（x-member-keep-signed-in: 1）、不是一体机终端请求（不带 x-terminal-id）、Referer 是本小程序。
    * 意愿用请求头而不是请求体字段：旧版 API 会忽略不认识的请求头，不会因为白名单校验回 400。
    */
   private wantsRestore(req: Request): boolean {
+    if (!restoreIssuanceEnabled()) return false
     if (req.header('x-member-keep-signed-in') !== '1') return false
     if (req.header('x-terminal-id')) return false
     return isOwnMiniappReferer(req.header('referer'))
