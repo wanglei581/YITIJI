@@ -1,5 +1,37 @@
 # 当前开发进度
 
+## 2026-10-18 18:2x：新一轮 CI 结果暂时取不到——GitHub API 限流（不是 CI 失败）；已停止一切查询，不取消、不重跑
+
+**发生了什么**：
+- 10:23:53 UTC（Codex）、10:24:04 UTC（Grok），GitHub API 都回 403 rate limit exceeded。这是 GitHub 接口的额度，不是 Claude 的额度。
+- Codex 的 watch 句柄已经以 exit 1 结束，不再轮询。
+- Grok 当时正准备 `sleep 180` 之后再查，我按 PID 停了它。它是只跑一次的设置，不会自动重跑。我自己也不再查 GitHub。
+- 实际在跑的 CI 不取消，也不重跑。
+
+**额度什么时候恢复（推断）**：
+- core 额度按 Grok 早先一次只读读数推算，重置在 **10:47:55 UTC，即北京时间 18:47:55**；graphql 在 11:07:46 UTC。
+- 这个时间来自更早的读数，**不是 403 响应头给的**，所以只是最早可能恢复的时间。
+- 恢复之后只由 Grok 统一查一次，收最终证据。不再用每 3 秒刷新一次的 watch，那种方式两条运行跑满 50 多分钟，就是两千多次请求。
+
+**已经落盘的最后状态**：本机只读，约 10:23Z 的 `gh run watch` 快照，存在 `claude-exec/evidence/ci-b2-w5fix-partial-20261018/`。
+- **H-B（39115373464）**：
+  - postgres-readiness ✓（8 分 49 秒）；
+  - build-and-verify ✓（30 分 2 秒）；
+  - kiosk-browser-smoke 还在跑：「Run Kiosk browser smoke」✓（W5 和它后面各套浏览器测试都在这一步里），Admin browser、data-screen、member-closure 三步 ✓，Partner data-screen 正在跑，Partner mock 和路径巡检还没跑。
+- **W-B（39115376471）**：
+  - postgres-readiness ✓（6 分 47 秒）；
+  - build-and-verify ✓（33 分 30 秒）；
+  - kiosk-browser-smoke 还在跑：「Run Kiosk browser smoke」✓，Admin browser、data-screen ✓，member-closure 正在跑，Partner 和路径巡检还没跑。
+- **W-B 的 windows-agent-installer（39115376515）**：三个作业都 ✓。
+
+**现在还不能说的**：
+- W5 是否 63/63，`:861` 是否不靠重试就过了；
+- 各套测试的 passed、flaky、skipped 计数；
+- `verify:member-restore` 和小程序的计数；
+- 两条运行的最终结论。
+
+这些都要等额度恢复后由 Grok 取作业日志确认。在那之前，不写「全绿」，也不写「失败」。
+
 ## 2026-10-18 17:3x：B 候选的 CI 只红在 W5，原因是测试夹具日期到期（main 同样会红）；已修测试，新头 H-B `3ae4d4c27`、W-B `c757e9c09` 的 CI 在跑；不合并、不部署
 
 **上一轮 CI**：`bd6787f81` 是运行 39111663127，`94cdf557c` 是运行 39111678874。Grok 报告和我的核对一致：
