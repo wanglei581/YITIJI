@@ -11,8 +11,21 @@
   <scroll-view class="confirm-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="confirm-body">
 
+      <!-- 过期但可恢复（FLOW1b）：先等恢复结果，恢复中、恢复失败都不显示「请先登录」 -->
+      <view class="section-card" wx:if="{{restoring}}">
+        <view class="state-t">正在恢复上次的登录…</view>
+      </view>
+
+      <view class="section-card" wx:elif="{{restoreFailed}}">
+        <view class="state-t">暂时没能恢复登录</view>
+        <view class="state-d">请稍后再试一次。</view>
+        <view class="btn primary block tap" hover-class="tap-press" bindtap="retryRestore" aria-role="button">重试</view>
+        <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+        <view class="btn ghost block tap mt12" hover-class="tap-press" bindtap="toLogin" aria-role="button">去登录</view>
+      </view>
+
       <!-- 未登录：材料包订单绑在会员账号上，不登录连文件都读不到 -->
-      <view class="section-card" wx:if="{{!isLoggedIn}}">
+      <view class="section-card" wx:elif="{{!isLoggedIn}}">
         <view class="state-t">请先登录小程序</view>
         <view class="state-d">材料包的文件、核定结果与到机码都绑定本人账号，登录后才能下单。</view>
         <view class="btn primary block tap" hover-class="tap-press" bindtap="toLogin" aria-role="button">去登录</view>

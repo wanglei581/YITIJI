@@ -3,6 +3,9 @@ const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard.js')
 const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
 const draft = require('./draft')
@@ -54,7 +57,22 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20, loggedIn: auth.isLoggedIn() })
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——导出价格、已确认版本、草稿存哪儿都按会员身份判断。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
+
+  onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
+  },
+
+  onHide() { markPageHidden(this) },
+
+  _start(options) {
+    this.setData({ loggedIn: auth.isLoggedIn() })
     this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
@@ -71,6 +89,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._gone = true
     this._stopExportCountdown()
     if (this._saver) this._saver.flush()
@@ -288,6 +307,16 @@ Page({
   },
 
   exportResume() {
+    if (this.data.exporting) return
+    // 导出要挂在本人账号下（FLOW1b）：访问令牌过期但可恢复时先等恢复，成功后照常导出一次；恢复中再点不重复。
+    gateMemberAction(this, auth, api, 'export', () => this._exportResume(), {
+      needLogin: () => this._exportResume(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
+
+  _exportResume() {
     if (this.data.exporting) return
     if (this.data.exportDisabled) {
       wx.showModal({ title: '暂时不能导出', content: this.data.exportDisabledReason, showCancel: false })

@@ -31,10 +31,35 @@
 
     <!-- 恢复进行中不展示登录按钮与协议：用户此时不是在登录 -->
     <block wx:if="{{!restoring}}">
+    <!-- 法律条款放在按钮上方（两种模式共用）：先看到、先勾选，再点登录（FLOW1b-2 L1） -->
+    <view class="launch-legal">
+      <view class="launch-agree tap" hover-class="tap-press" bindtap="toggleAgree">
+        <view class="launch-check {{agreed ? 'checked' : ''}}">
+          <view wx:if="{{agreed}}" class="check-dot"></view>
+        </view>
+        <text>我已阅读并同意</text>
+      </view>
+      <view>
+        <text class="launch-link tap" catchtap="tapTerms">《用户服务协议》</text>和
+        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>，并确认已年满 14 周岁
+      </view>
+    </view>
+
+    <!-- 登录过程的状态条（L2）：登录中、取消了授权、没拿到手机号、服务暂时不可用、没能保存，不只靠两秒的提示 -->
+    <view wx:if="{{status && statusTone === 'warn'}}" class="launch-restore warn" aria-role="alert">
+      <text>{{status}}</text>
+      <text wx:if="{{statusAction === 'sms'}}" class="launch-restore-retry tap" bindtap="useSms">改用短信验证码</text>
+    </view>
+    <view wx:elif="{{status}}" class="launch-restore" aria-role="status">{{status}}</view>
+
     <!-- ① 微信一键登录（默认） -->
     <block wx:if="{{!showSms}}">
-      <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
-        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed || legalBlocked}}">
+      <!-- 勾选协议之后才放出微信授权按钮；之前是一个样子相同的普通按钮，点了说清楚先勾哪里（L1） -->
+      <button wx:if="{{agreed && !legalBlocked}}" class="btn wx block launch-btn-wx tap" hover-class="tap-press"
+        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber">
+        <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
+      </button>
+      <button wx:else class="btn wx block launch-btn-wx pending tap" hover-class="tap-press" bindtap="needAgree">
         <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
       </button>
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
@@ -85,19 +110,6 @@
       </view>
     </block>
 
-    <!-- 法律条款（两种模式共用） -->
-    <view class="launch-legal">
-      <view class="launch-agree tap" hover-class="tap-press" bindtap="toggleAgree">
-        <view class="launch-check {{agreed ? 'checked' : ''}}">
-          <view wx:if="{{agreed}}" class="check-dot"></view>
-        </view>
-        <text>我已阅读并同意</text>
-      </view>
-      <view>
-        <text class="launch-link tap" catchtap="tapTerms">《用户服务协议》</text>和
-        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>，并确认已年满 14 周岁
-      </view>
-    </view>
     </block>
 
   </view>

@@ -38,6 +38,8 @@
              改为整行主按钮：登录是这张卡片唯一的主操作，应当有按钮的分量。 -->
         <view wx:if="{{restoreFailed && !isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="retryRestore" aria-role="button" aria-label="重试恢复登录">重试恢复登录</view>
         <view wx:elif="{{!isLoggedIn && !restoring}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" aria-role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
+        <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证）。放在 if/elif 链之后，不打断那条链 -->
+        <view wx:if="{{restoreFailed && !isLoggedIn}}" class="btn ghost block tap mt8" hover-class="tap-press" bindtap="tapLogin" aria-role="button" aria-label="去登录">去登录</view>
         <!-- 「我的权益」条随 pages/membership 一起停放（首发不对 AI 收费）。
              停放后这里曾留下一个点了没反应的按钮：me.js 的 routes 表已删掉 membership。 -->
       </view>

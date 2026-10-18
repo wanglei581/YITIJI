@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 const qa = require('./qa-records')
 
 /** 后端真实 kind → 展示与现有结果页。没有结果页的类型保持诚实状态展示。 */
@@ -120,6 +121,9 @@ Page({
     ],
     groups: [],
     loginRequired: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
     loading: false,
     loadError: '',
   },
@@ -139,8 +143,18 @@ Page({
   },
 
   onShow() {
-    this._load()
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => this._load(),
+      needLogin: () => this._load(),
+    })
   },
+
+  onHide() { markPageHidden(this) },
+
+  onUnload() { markPageUnloaded(this) },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   onReachBottom() {
     this._load(true)

@@ -81,7 +81,33 @@
 
     <view class="grp-label">我的数据权利</view>
 
-    <view wx:if="{{!isLoggedIn}}" class="pv-group">
+    <view wx:if="{{restoring}}" class="pv-group">
+      <view class="pv-item">
+        <view class="pv-main">
+          <view class="pv-t">正在恢复上次的登录…</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:elif="{{restoreFailed}}" class="pv-group">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="retryRestore">
+        <view class="pv-main">
+          <view class="pv-t">暂时没能恢复登录</view>
+          <view class="pv-s">点此重试</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
+      <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
+        <view class="pv-main">
+          <view class="pv-t">去登录</view>
+          <view class="pv-s">换一种方式登录本人账号</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
+    </view>
+
+    <view wx:elif="{{!isLoggedIn}}" class="pv-group">
       <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
         <view class="pv-main">
           <view class="pv-t">登录后可导出数据或提交注销</view>

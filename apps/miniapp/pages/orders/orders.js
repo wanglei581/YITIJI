@@ -18,7 +18,10 @@ const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
 const printParams = require('../../utils/print-params')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const {
+  createLifecycleGuard, memberIdentityKey, isMemberIdentity,
+  gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
 
@@ -172,6 +175,9 @@ Page({
     nextCursor: null,
     loadingMore: false,
     isLoggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
 
     // ── 材料包分区（独立来源、独立游标、独立失败态）──────────────────
     pkgRows: [],
@@ -256,9 +262,20 @@ Page({
 
   onShow() {
     this._guard.activate()
-    // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
-    // 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
-    // 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+    markPageShown(this)
+    // 过期但可恢复（FLOW1b）：先等恢复结果；恢复中、恢复失败都不显示「请先登录」。
+    gateMember(this, auth, api, {
+      ready: () => this._showForCurrentIdentity(),
+      needLogin: () => this._showForCurrentIdentity(),
+    })
+  },
+
+  /**
+   * A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
+   * 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
+   * 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+   */
+  _showForCurrentIdentity() {
     const usable = this._enforceIdentity()
     this.setData({ isLoggedIn: usable })
     if (usable) {
@@ -267,14 +284,18 @@ Page({
     }
   },
 
+  retryRestore() { retryMemberGate(this, auth, api) },
+
   // 切后台 / 离开本页：在途请求全部作废。
   // 只靠 loading 布尔锁挡不住这件事 —— 锁在请求发出时是开的，回调执行时早被清掉了。
   onHide() {
     this._guard.deactivate()
+    markPageHidden(this)
   },
 
   onUnload() {
     this._guard.deactivate()
+    markPageUnloaded(this)
   },
 
   /** 清空两个分区的全部数据与游标。跨用户、登出、下拉刷新前都必须走这里。 */

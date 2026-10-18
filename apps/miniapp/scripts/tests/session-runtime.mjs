@@ -122,6 +122,7 @@ export function createRuntime({ mutate, store } = {}) {
   // 计时器由测试自己推进：launch.js 的「登录成功 → 600ms 后跳转」不能真等。
   // （vm 的新 realm 本来就没有 setTimeout，必须注入。）
   const timers = []
+  let pagesStack = [{ route: 'pages/launch/launch' }]
   const sandbox = {
     wx,
     console,
@@ -130,7 +131,8 @@ export function createRuntime({ mutate, store } = {}) {
     setInterval: (fn) => timers.push(fn),
     clearInterval: () => {},
     getApp: () => ({ globalData: { statusBarHeight: 20 } }),
-    getCurrentPages: () => [{ route: 'pages/launch/launch' }],
+    // 页面栈：默认只有登录页（老用例不变）；要模拟「从某页进登录页」时用 ctx.setPages 换掉。
+    getCurrentPages: () => pagesStack,
   }
   sandbox.globalThis = sandbox
   vm.createContext(sandbox)
@@ -154,6 +156,7 @@ export function createRuntime({ mutate, store } = {}) {
   const ctx = { wx, storage: load('storage'), auth: load('auth'), net: load('request'), load }
   ctx.resigninCalls = () => wx.calls.request.filter((c) => c.url.includes('/wx-resignin'))
   ctx.runTimers = () => { timers.splice(0).forEach((fn) => fn()) }
+  ctx.setPages = (pages) => { pagesStack = pages }
 
   /**
    * 真跑一个页面：Page 配置由沙箱捕获后实例化成带 setData 的对象。
@@ -166,14 +169,30 @@ export function createRuntime({ mutate, store } = {}) {
     if (mutate) source = mutate(relPath, source)
     let config = null
     sandbox.Page = (cfg) => { config = cfg }
+    // 页面目录里的同级模块（如 print-pickup/pickup-state.js）也装进同一个沙箱，它们引用的 utils 走同一份实例。
+    const local = new Map()
+    const requireFrom = (dir) => (spec) => {
+      const s = String(spec)
+      if (s.startsWith('./')) {
+        const target = path.join(dir, `${s.slice(2).replace(/\.js$/, '')}.js`)
+        if (!local.has(target)) {
+          const mod = { exports: {} }
+          local.set(target, mod)
+          vm.compileFunction(fs.readFileSync(target, 'utf8'), ['module', 'exports', 'require'], {
+            parsingContext: sandbox,
+            filename: target,
+          })(mod, mod.exports, requireFrom(path.dirname(target)))
+        }
+        return local.get(target).exports
+      }
+      const name = s.replace(/^(\.\.\/)+utils\//, '').replace(/\.js$/, '')
+      return name === 'api' ? apiStub : load(name)
+    }
     const compiled = vm.compileFunction(source, ['module', 'exports', 'require'], {
       parsingContext: sandbox,
       filename: file,
     })
-    compiled({ exports: {} }, {}, (spec) => {
-      const name = String(spec).replace(/^(\.\.\/)+utils\//, '').replace(/\.js$/, '')
-      return name === 'api' ? apiStub : load(name)
-    })
+    compiled({ exports: {} }, {}, requireFrom(path.dirname(file)))
     assert.ok(config, `页面没有调用 Page()：${relPath}`)
     const page = Object.assign({}, config)
     page.data = JSON.parse(JSON.stringify(config.data))

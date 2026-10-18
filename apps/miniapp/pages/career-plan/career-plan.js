@@ -3,6 +3,9 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 const session = require('../../utils/resume-parse-session')
 
 /**
@@ -39,11 +42,18 @@ Page({
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——历史回看要会员身份，本机任务也要按「现在这一位」认领。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
+
+  _start(options) {
     const historyTaskId = options && options.taskId ? options.taskId : ''
     if (historyTaskId) {
       this.setData({ taskId: historyTaskId, historyMode: true })
       if (!auth.isLoggedIn()) {
-        this._fail('登录已失效，请重新登录后查看历史结果')
+        // 恢复只是临时失败（断网等）时不说「登录已失效」：点「重新生成」会再恢复一次。
+        this._fail(this._memberGateOutcome === 'recoverable' ? '暂时没能恢复登录，请稍后重试' : '登录已失效，请重新登录后查看历史结果')
         return
       }
       this._token = ''
@@ -63,11 +73,17 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._stopped = true
     this._stopElapsed()
   },
 
+  onHide() { markPageHidden(this) },
+
   onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
     if (!this.data.historyMode || !this._waitingForHistoryLogin || !auth.isLoggedIn()) return
     this._waitingForHistoryLogin = false
     this._stopped = false
@@ -129,6 +145,15 @@ Page({
   },
 
   tapGenerate() {
+    // 过期但可恢复（FLOW1b）：先等恢复，成功后照常执行一次；要登录时走原来的登录出口。
+    gateMemberAction(this, auth, api, 'generate', () => this._tapGenerate(), {
+      needLogin: () => this._tapGenerate(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
+
+  _tapGenerate() {
     if (this.data.historyMode) {
       if (!auth.isLoggedIn()) {
         this._openHistoryLogin()
