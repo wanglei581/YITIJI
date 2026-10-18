@@ -211,6 +211,12 @@ test('home restores real fair and device panels with balanced 1080x1920 geometry
     homeFair(),
   ])
 
+  // 两场招聘会的起止都是写死的绝对时间，首页用浏览器的 Date.now() 筛掉已结束的场次
+  // （useHomeJobFairHighlight 的 eligibleFair）。不固定时钟，过了秋季场的 endTime（2026-10-18T08:00Z）
+  // 它就被筛掉、面板改显示冬季场，本用例按日历到点变红（10/18 下午 CI 就是这样红的）。
+  // 把页面时钟定在两场都还没结束的时刻，验的仍是「同为 upcoming 时取 startTime 更近的一场」，与真实日期无关。
+  // 不能用上面的 freezeClock()：它停在真实的现在，到点之后照样会筛掉秋季场。
+  await page.clock.install({ time: new Date('2026-10-18T02:00:00.000Z') })
   await page.goto('/')
   const tiles = page.locator('.qx-home-tiles')
   const fairPanel = page.locator('[data-home-job-fair-panel]')

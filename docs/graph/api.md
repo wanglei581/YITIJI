@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`580` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`582` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -602,6 +602,8 @@
 | POST | `/api/v1/member/auth/qr/:ticketId/confirm-by-token` | MemberAuthController.confirmQrLoginByToken | — | MemberQrLoginService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
 | GET | `/api/v1/member/auth/qr/:ticketId/status` | MemberAuthController.qrLoginStatus | — | MemberQrLoginService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
 | POST | `/api/v1/member/auth/qr/create` | MemberAuthController.createQrLogin | — | MemberQrLoginService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
+| POST | `/api/v1/member/auth/restore` | MemberAuthController.restoreSession | — | MemberRestoreService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
+| POST | `/api/v1/member/auth/restore/revoke` | MemberAuthController.revokeRestore | — | — | — |
 | POST | `/api/v1/member/auth/sms-code` | MemberAuthController.sendSmsCode | — | MemberAuthService | EndUser<br/>LegalDocVersion<br/>MemberLegalConsent |
 | POST | `/api/v1/member/auth/step-up/sms-code` | MemberAuthController.sendStepUpCode | — | MemberStepUpService | AuditLog<br/>EndUser |
 | POST | `/api/v1/member/auth/step-up/verify` | MemberAuthController.verifyStepUp | — | MemberStepUpService | AuditLog<br/>EndUser |
