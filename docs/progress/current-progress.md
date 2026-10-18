@@ -1,5 +1,21 @@
 # 当前开发进度
 
+## 2026-10-18 11:52：恢复只读预检；候选未变，发布与手机验收仍未完成
+
+- **候选/CI**：#1482 仍为 open、未合并，精确 SHA `83955a6d713a2d3d913fb1a5b0908c36708ae255`，工作区干净；运行 `39038593248` 重新查询为 completed/success。短信恢复、全站闸门、文档布局与打印参数 UX 仍在同一候选，没有另起版本。
+- **Claude 实际状态**：重新接入原会话 `fb5c195f` 后仍回「weekly limit，Oct 20 at 9am (Asia/Shanghai)」。本轮没有由其他模型接手产品开发；Codex 只读核对与维护本节、next-tasks。
+- **今天的生产读数（北京时间 11:50–11:52）**：
+  - DEPLOY_SOURCE、服务器 checkout、API PM2 COMMIT 与远端 main 均为 `1024b2b78d780d7243833ecceb2444659d260736`；API online，累计重启 40 与昨晚相同；health 为 ok、PostgreSQL、degraded 为空。
+  - `DEPLOY_API_ENABLED=false`；未切换。完整 nginx 配置读取成功，未发现关闭请求头透传或覆盖 Referer、x-member-keep-signed-in、x-terminal-id 的指令。这是配置证据，不是新接口端到端证据。
+  - 数据库只读事务：迁移成功 95、已回退 1、未完成 0；运行目录 95 条均有成功记录。PrintTask 的 pending/claimed/printing、ScanTask 的 waiting/matched/processing、DocumentProcessTask 与 AiResumeResult 的 pending/processing 均无记录，ContractReviewTask 无记录。没有运行 migrate deploy；不把账本比对写成运行过 prisma migrate status。
+  - Redis 7.0.15、standalone、noeviction、maxmemory=0；三条 Bull 队列 active/wait 均为 0，member-privacy 仍有 1 条 delayed。上传会话、上传锁和恢复凭据键计数均为 0。**Windows 队列未实时读取，仍未知**，数据库零不能替代它。
+  - 环境文件 AppID 匹配、加密 key 长度满足要求，三个恢复期限未显式设置。dist 加载 dotenv、cwd 正确且文件早于进程启动，只支持加载推断；PM2 jlist 中缺少这些变量不代表应用未加载，也没有读取应用内存确认有效值。
+  - AOF=0，RDB 规则 `3600 1 / 300 100 / 60 10000`；11:52:01 成功快照，11:52:08 有 2 次未落盘变化。此计数会变，不代表两枚恢复凭据（恢复键为 0）。Redis/主机故障可能丢失最后快照后的状态；AOF=0 本身不自动判硬阻塞，也不擅自开启 AOF。
+- **复核**：Grok、agy 均基于内联的昨晚证据和明确边界给出暂不能发布（NO-GO）。本轮没有独立重新读源码或生产；今天的补读由 Codex 完成。两者共同要求：后端 H 的可追溯提交/CI、签发后的兼容回退或明确向前修复方案、有效配置确认、Redis 丢失窗口处置、API 内 worker 重启恢复评估、Windows 队列实读和手机验收。
+  - 冷审校准：agy 的「无漂移风险」「安全静默期」超出抽样证据，不能作为发布结论；Grok 的 RDB 时长只是按 save 阈值的估算，不是最大丢失时间保证。完整 schema 未由数据库 introspection 比对，进程内配置也未直接读到。
+- **证据**：`claude-exec/evidence/flow1c-live-preflight-20261018/`；两份复核 `outputs/agy-preflight-inline-20261018.txt`、`outputs/grok-preflight-inline-20261018.txt`（位于当前对话 commercial-closeout 证据目录，仓库外）。
+- **仍未做**：构建后端 H、合并、部署、短信、下单/核销/打印、登录态实屏及手机 31 分钟恢复验收。缺纸继续不测；不出半成品新预览码。
+
 ## 2026-10-17 23:03：#1482 精确 SHA 的 CI 全绿；FLOW1c 后端计划 v3.1 与本地回退演练证据（未部署）
 
 - **CI**：`83955a6d713a2d3d913fb1a5b0908c36708ae255` 上只有一条运行 39038593248（pull_request），结论 success。Grok 只读核对，headSha 一致。
