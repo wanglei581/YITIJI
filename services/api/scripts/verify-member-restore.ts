@@ -139,7 +139,7 @@ async function main() {
     delete process.env['MEMBER_RESTORE_ISSUANCE_ENABLED']
     const unset = await smsLogin(KEEP)
     check(unset.status < 300 && typeof data(unset.json)['token'] === 'string', '开关不设：登录照常，拿到访问令牌')
-    check(!('restoreToken' in data(unset.json)), '开关不设：回包里没有 restoreToken 这个键（与旧版回包逐字相同）')
+    check(!('restoreToken' in data(unset.json)), '开关不设：不附带恢复凭证，回包里没有 restoreToken 这个键（结构与没有恢复功能的旧版兼容）')
     for (const value of ['off', 'false', '0', 'yes', 'enabled', '', ' ']) {
       process.env['MEMBER_RESTORE_ISSUANCE_ENABLED'] = value
       const res = await smsLogin(KEEP)
