@@ -8,7 +8,8 @@
  * 运行（services/api/）：pnpm verify:member-restore
  *
  * 验证（真实 HTTP + 直调服务）：
- *   1. 签发条件：要的请求头 + 不带终端头 + 本小程序 Referer 才签；缺任何一条不签；开发者工具的 Referer 也签
+ *   0. 新签发开关 MEMBER_RESTORE_ISSUANCE_ENABLED：不设即关，只认 true / 1 / on；关着时登录回包没有 restoreToken 这个键
+ *   1. 签发条件（开关打开时）：要的请求头 + 不带终端头 + 本小程序 Referer 才签；缺任何一条不签；开发者工具的 Referer 也签
  *   2. 访问令牌仍是 30 分钟；恢复后新令牌能访问 /me，仍是同一位会员
  *   3. 换新：首次使用换出新凭证；宽限期内再用上一枚返回同一个后继（幂等，并发两次也一样）
  *   4. 旧凭证再现（后继已用过、或宽限期已过、或隔了几轮）：整组作废，之后当前那一枚也无效
@@ -16,6 +17,7 @@
  *   6. 撤销：主动退出作废这一组；整户作废（换绑手机）；注销流程作废
  *   7. 账号停用：回 ACCOUNT_UNAVAILABLE 并作废；停用后又启用：签发在前的凭证无效，必须重新认证
  *   8. 接口：恢复只认本小程序 Referer；格式不对 400；作废接口幂等
+ *   9. 关掉开关只停新签发：已签出的凭证照常恢复、换新、作废；关掉后新的显式登录不签
  */
 import 'dotenv/config'
 import { readFileSync } from 'node:fs'
@@ -131,6 +133,25 @@ async function main() {
   try {
     await prisma.endUser.deleteMany({ where: { phoneHash } })
     const KEEP = { 'x-member-keep-signed-in': '1', Referer: MINIAPP_REFERER }
+
+    console.log('── 0. 新签发开关：不设即关，只认 true / 1 / on ─────────────')
+    // 外面带进来的值不算数，先清掉，验证「不设」就是关。控制器每次请求现读这个变量。
+    delete process.env['MEMBER_RESTORE_ISSUANCE_ENABLED']
+    const unset = await smsLogin(KEEP)
+    check(unset.status < 300 && typeof data(unset.json)['token'] === 'string', '开关不设：登录照常，拿到访问令牌')
+    check(!('restoreToken' in data(unset.json)), '开关不设：回包里没有 restoreToken 这个键（与旧版回包逐字相同）')
+    for (const value of ['off', 'false', '0', 'yes', 'enabled', '', ' ']) {
+      process.env['MEMBER_RESTORE_ISSUANCE_ENABLED'] = value
+      const res = await smsLogin(KEEP)
+      check(res.status < 300 && !('restoreToken' in data(res.json)), `开关为 ${JSON.stringify(value)}：登录照常，不签发`)
+    }
+    for (const value of ['true', '1', ' ON ']) {
+      process.env['MEMBER_RESTORE_ISSUANCE_ENABLED'] = value
+      const res = await smsLogin(KEEP)
+      check(typeof data(res.json)['restoreToken'] === 'string', `开关为 ${JSON.stringify(value)}：签发`)
+    }
+    // 下面第 1–8 节都在开关打开时跑；第 9 节再把它关掉。
+    process.env['MEMBER_RESTORE_ISSUANCE_ENABLED'] = 'on'
 
     console.log('── 1. 签发条件 ───────────────────────────────────────')
     const first = await smsLogin(KEEP)
@@ -255,8 +276,26 @@ async function main() {
     check(extra.status === 400, '多带字段（例如指定会员）：400，不能指定换成谁')
     const stillLive = await call('/auth/restore', { restoreToken: live }, { Referer: MINIAPP_REFERER })
     check(stillLive.status < 300, '上面几次被拒的请求没有作废这一组')
+
+    console.log('── 9. 关掉开关：只停新签发，已签出的凭证不受影响 ─────────')
+    const kept = String(data((await smsLogin(KEEP)).json)['restoreToken'] ?? '')
+    check(kept.length > 0, '开关开着时签出一枚')
+    process.env['MEMBER_RESTORE_ISSUANCE_ENABLED'] = 'off'
+    const k1 = await call('/auth/restore', { restoreToken: kept }, { Referer: MINIAPP_REFERER })
+    const k1Next = String(data(k1.json)['restoreToken'] ?? '')
+    check(k1.status < 300 && typeof data(k1.json)['token'] === 'string' && k1Next.length > 0 && k1Next !== kept, '开关关掉后：已签出的凭证照常恢复，并换出后继')
+    const k2 = await call('/auth/restore', { restoreToken: k1Next }, { Referer: MINIAPP_REFERER })
+    const k2Next = String(data(k2.json)['restoreToken'] ?? '')
+    check(k2.status < 300 && k2Next.length > 0, '开关关掉后：后继照常再恢复')
+    const fresh = await smsLogin(KEEP)
+    check(fresh.status < 300 && !('restoreToken' in data(fresh.json)), '开关关掉后：新的显式登录不签发')
+    const k2Revoked = await call('/auth/restore/revoke', { restoreToken: k2Next })
+    check(k2Revoked.status < 300, '开关关掉后：作废接口照常')
+    const k2Dead = await call('/auth/restore', { restoreToken: k2Next }, { Referer: MINIAPP_REFERER })
+    check(k2Dead.status === 401, '作废之后这一枚不能再恢复（401）')
   } finally {
     delete process.env['MEMBER_RESTORE_GRACE_SECONDS']
+    delete process.env['MEMBER_RESTORE_ISSUANCE_ENABLED']
     await prisma.endUser.deleteMany({ where: { phoneHash } }).catch(() => undefined)
     await app.close()
   }
