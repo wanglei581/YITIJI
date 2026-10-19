@@ -91,6 +91,7 @@
       <block wx:else><text>本次打印</text><text class="amt">待核定</text></block>
     </view>
     <view wx:if="{{quoteError}}" class="param-hint">{{quoteError}}</view>
+    <view wx:if="{{quoteError && quoteRetryable}}" class="btn ghost sm" bindtap="retryQuote">重新核定</view>
   </view>
 </view>
 

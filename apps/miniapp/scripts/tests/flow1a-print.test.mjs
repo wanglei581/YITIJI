@@ -257,12 +257,15 @@ function storeUi(query, { capsFor = () => storeCaps(), terminals } = {}) {
     quoteMyPrintOrder: (...args) => { calls.quotes.push(args); return Promise.resolve({ amountCents: 0, billablePages: 1 }) },
   }
   const wx = { navigateTo: (o) => calls.nav.push(o.url), showToast: (o) => calls.toast.push(o), showModal() {}, showLoading() {}, hideLoading() {}, navigateBack() {}, switchTab() {} }
-  const page = instantiate(loadPageDefinition('pages/print-store/print-store.js', { wx, modules: { api } }))
+  const timers = []
+  const page = instantiate(loadPageDefinition('pages/print-store/print-store.js', { wx, modules: { api }, timers }))
   page.getOpenerEventChannel = () => ({ emit: (name, payload) => calls.emitted.push([name, JSON.parse(JSON.stringify(payload))]) })
   page.onLoad({ fileId: 'f-color', name: encodeURIComponent('ZYD-20261016-BIZ-COLOR-D93A.pdf'), ...query })
   page.onShow()
-  return { page, calls }
+  return { page, calls, timers }
 }
+// 改参数后的报价要等停手再发（防抖）；沙箱定时器不自己跑，这里跑掉排上的。
+const settleStore = (timers) => { while (timers.length) timers.shift()() }
 const pickEv = (id) => ({ currentTarget: { dataset: { id } } })
 const paramEv = (key, mode) => ({ currentTarget: { dataset: { key, mode } } })
 
@@ -309,7 +312,7 @@ test('份数步进（T9）：1 时减不动、99 时加不动，改了就重新�
   low.page.minusCopies()
   assert.equal(low.page.data.copies, 1)
   const before = low.calls.quotes.length
-  low.page.plusCopies(); await flush()
+  low.page.plusCopies(); settleStore(low.timers); await flush()
   assert.equal(low.page.data.copies, 2)
   assert.ok(low.calls.quotes.length > before, '改份数要重新核价')
   const high = storeUi({ copies: '99', terminalId: 'KSK-001' })

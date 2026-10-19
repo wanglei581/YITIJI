@@ -19,10 +19,13 @@ function ui() {
 }
 function store(api, opts = {}) {
   const u = ui()
-  const page = instantiate(loadPageDefinition('pages/print-store/print-store.js', { wx: u.wx, modules: { api } }))
+  const timers = []
+  const page = instantiate(loadPageDefinition('pages/print-store/print-store.js', { wx: u.wx, modules: { api }, timers }))
   page.onLoad({ fileId: 'owned-file', copies: '2', ...opts }); page.onShow()
-  return { page, ...u }
+  return { page, timers, ...u }
 }
+// 改参数后的报价要等停手再发（防抖）。沙箱里的定时器不会自己跑：这里把排上的全跑掉，只有最后排上的那个真的报价。
+const settle = timers => { while (timers.length) timers.shift()() }
 function storeApi(overrides = {}) {
   return { getPublicTerminals: () => Promise.resolve([{ id: 'A', displayName: 'A', isOnline: true }, { id: 'B', displayName: 'B', isOnline: true }]), getTerminalCapabilities: () => Promise.resolve(caps()), quoteMyPrintOrder: () => Promise.resolve(quote(120)), ...overrides }
 }
@@ -72,13 +75,15 @@ test('slow terminal A capability cannot overwrite selected B', async () => {
 
 test('slow terminal A quote cannot overwrite B, and parameter changes withdraw amount', async () => {
   const pending = []
-  const { page } = store(storeApi({ quoteMyPrintOrder: (...args) => { const d = deferred(); pending.push({ d, args }); return d.promise } }))
+  const { page, timers } = store(storeApi({ quoteMyPrintOrder: (...args) => { const d = deferred(); pending.push({ d, args }); return d.promise } }))
   await flush(); select(page, 'A'); await flush(); select(page, 'B'); await flush()
   pending[1].d.resolve(quote(80)); await flush(); pending[0].d.resolve(quote(999)); await flush()
   assert.equal(page.data.amountCents, 80)
   page.setParam(event('colorMode', 'color'))
   assert.equal(page.data.quoteReady, false); assert.equal(page.data.amountCents, null)
+  settle(timers)
   page.setParam(event('duplex', 'duplex_long_edge'))
+  settle(timers)
   pending[2].d.resolve(quote(999)); await flush(); assert.equal(page.data.quoteReady, false)
   pending[3].d.resolve(quote(130)); await flush()
   assert.equal(page.data.amountCents, 130); assert.equal(page.data.duplex, 'duplex_long_edge')
@@ -98,12 +103,12 @@ test('hide discards outstanding capabilities and quotes; show refetches', async 
 
 test('switching to a terminal without capability preserves advanced intent and blocks navigation', async () => {
   const seen = []
-  const { page, calls } = store(storeApi({ getTerminalCapabilities: id => Promise.resolve(caps(id === 'A')), quoteMyPrintOrder: (...args) => { seen.push(args); return Promise.resolve(quote(150)) } }))
-  await flush(); select(page, 'A'); await flush(); page.setParam(event('colorMode', 'color')); page.setParam(event('duplex', 'duplex_long_edge')); await flush()
+  const { page, calls, timers } = store(storeApi({ getTerminalCapabilities: id => Promise.resolve(caps(id === 'A')), quoteMyPrintOrder: (...args) => { seen.push(args); return Promise.resolve(quote(150)) } }))
+  await flush(); select(page, 'A'); await flush(); page.setParam(event('colorMode', 'color')); page.setParam(event('duplex', 'duplex_long_edge')); settle(timers); await flush()
   const before = seen.length; select(page, 'B'); await flush(); page.toPay()
   assert.equal(page.data.colorMode, 'color'); assert.equal(page.data.duplex, 'duplex_long_edge')
   assert.equal(page.data.quoteReady, false); assert.equal(seen.length, before); assert.equal(calls.nav.length, 0)
-  page.setParam(event('colorMode', 'black_white')); page.setParam(event('duplex', 'simplex')); await flush(); page.toPay()
+  page.setParam(event('colorMode', 'black_white')); page.setParam(event('duplex', 'simplex')); settle(timers); await flush(); page.toPay()
   assert.equal(calls.nav.length, 1); assert.match(calls.nav[0], /colorMode=black_white&duplex=simplex/)
 })
 
@@ -127,8 +132,8 @@ test('offline terminal and invalid URL parameters never quote or navigate', asyn
 })
 
 test('store URL to pay quote to create uses the same canonical intent and double click submits once', async () => {
-  const { page, calls } = store(storeApi())
-  await flush(); select(page, 'A'); await flush(); page.setParam(event('colorMode', 'color')); page.setParam(event('duplex', 'duplex_long_edge')); await flush(); page.toPay(); page.toPay()
+  const { page, calls, timers } = store(storeApi())
+  await flush(); select(page, 'A'); await flush(); page.setParam(event('colorMode', 'color')); page.setParam(event('duplex', 'duplex_long_edge')); settle(timers); await flush(); page.toPay(); page.toPay()
   assert.equal(calls.nav.length, 1)
   const url = new URL(calls.nav[0], 'https://test.invalid'); const opts = Object.fromEntries(url.searchParams)
   const quotes = []; const creates = []; const created = deferred()
@@ -140,6 +145,57 @@ test('store URL to pay quote to create uses the same canonical intent and double
   assert.deepEqual(serial(quotes[0][1]), params.quoteParams(advanced)); assert.equal(quotes[0][3].terminalId, 'A')
   assert.equal(creates[0][1].quotedAmountCents, 140); assert.equal(creates[0][1].idempotencyKey, 'one-stable-key')
   created.resolve({ id: 'new-order', amountCents: 140 }); await flush(); p.page.continueFlow(); await flush(); assert.equal(creates.length, 1)
+})
+
+test('改参数连点只按停手时的参数报一次价（防抖），不把服务端每分钟 10 次的报价额度用光', async () => {
+  const seen = []
+  const { page, timers } = store(storeApi({ quoteMyPrintOrder: (...args) => { seen.push(args); return Promise.resolve(quote(0)) } }))
+  await flush(); select(page, 'A'); await flush()
+  const before = seen.length
+  for (let i = 0; i < 9; i++) page.plusCopies()
+  page.setParam(event('colorMode', 'color'))
+  assert.equal(seen.length, before, '停手之前不报价')
+  assert.equal(page.data.quoteReady, false, '改了参数就撤掉旧金额')
+  settle(timers); await flush()
+  assert.equal(seen.length, before + 1, '连点只报一次')
+  assert.deepEqual(serial(seen[seen.length - 1][1]), params.quoteParams({ copies: 11, colorMode: 'color', duplex: 'simplex' }))
+  assert.equal(page.data.quoteReady, true)
+})
+
+test('排上的报价在换终端后不再按旧终端发出', async () => {
+  const seen = []
+  const { page, timers } = store(storeApi({ quoteMyPrintOrder: (...args) => { seen.push(args); return Promise.resolve(quote(0)) } }))
+  await flush(); select(page, 'A'); await flush()
+  page.plusCopies(); select(page, 'B'); settle(timers); await flush()
+  assert.ok(seen.length >= 2)
+  assert.ok(seen.slice(1).every(args => args[3].terminalId === 'B'), '换终端之后只按新终端报价')
+})
+
+test('排上的报价在离开页面后不再发出', async () => {
+  const seen = []
+  const { page, timers } = store(storeApi({ quoteMyPrintOrder: (...args) => { seen.push(args); return Promise.resolve(quote(0)) } }))
+  await flush(); select(page, 'A'); await flush()
+  const before = seen.length
+  page.plusCopies(); page.onHide(); settle(timers); await flush()
+  assert.equal(seen.length, before)
+})
+
+test('报价被限流（429）：说清原因、参数不丢，点「重新核定」立即重报，核定中再点不重复发', async () => {
+  const seen = []
+  const limited = Object.assign(new Error('尝试过于频繁，请稍后再试'), { statusCode: 429, code: 'RATE_LIMITED' })
+  const { page, timers } = store(storeApi({ quoteMyPrintOrder: (...args) => { seen.push(args); return seen.length === 2 ? Promise.reject(limited) : Promise.resolve(quote(0)) } }))
+  await flush(); select(page, 'A'); await flush()
+  page.plusCopies(); settle(timers); await flush()
+  assert.equal(seen.length, 2)
+  assert.equal(page.data.quoteState, 'fail'); assert.equal(page.data.quoteRetryable, true)
+  assert.match(page.data.quoteError, /约一分钟/, '服务端超限后约封 60 秒，提示要说清要等多久')
+  assert.equal(page.data.copies, 3, '参数不丢')
+  page.toPay(); assert.equal(page.data.quoteReady, false, '没核定成功不能去下一步')
+  page.retryQuote(); page.retryQuote()
+  assert.equal(seen.length, 3, '立即重报一次，核定中再点不重复发')
+  assert.equal(timers.length, 0, '重新核定不走防抖')
+  await flush()
+  assert.equal(page.data.quoteReady, true); assert.equal(page.data.quoteError, ''); assert.equal(page.data.quoteRetryable, false)
 })
 
 test('pay rechecks revoked capability and invalid deep links cannot submit', async () => {

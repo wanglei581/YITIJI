@@ -15,9 +15,14 @@ function quoteKey(fileId, terminalId, params) {
 function clearedQuote(state) {
   return {
     quoteState: state || 'idle', quoteReady: false, isFreeOrder: false,
-    amountCents: null, amountYuan: '', quoteError: '', canConfirm: false,
+    amountCents: null, amountYuan: '', quoteError: '', quoteRetryable: false, canConfirm: false,
   }
 }
+
+// 改份数、颜色、单双面后，等用户停手再报价：连点只按停下时的参数报一次。
+// 服务端报价接口每 60 秒按 IP 只放 10 次（POST /orders/quote），逐次报价时份数从 1 加到 11 就会撞上 429
+// （2026-10-19 手机验收实测 16:24 连续 4 次）。进页面、选终端仍立即报价，不受这里影响。
+const QUOTE_DEBOUNCE_MS = 600
 
 function yuanText(cents) {
   const frac = cents % 100
@@ -31,13 +36,15 @@ Page({
     stores: [], picked: '', loading: true, loadError: '',
     capState: 'idle', capColor: false, capDuplex: false, capError: '',
     quoteState: 'idle', quoteReady: false, isFreeOrder: false,
-    amountCents: null, amountYuan: '', quoteError: '', canConfirm: false,
+    amountCents: null, amountYuan: '', quoteError: '', quoteRetryable: false, canConfirm: false,
   },
 
   onLoad(opts) {
     const q = opts || {}
     this._active = true
     this._seq = this._quoteSeq = this._listSeq = 0
+    this._quoteTimer = null
+    this._quoteTimerSeq = 0
     this._capRaw = null
     this._quotedKey = ''
     this._navigating = false
@@ -74,6 +81,7 @@ Page({
   reload() { this._refresh(false) },
 
   _dropInflight() {
+    this._cancelScheduledQuote()
     this._seq += 1
     this._quoteSeq += 1
     this._listSeq += 1
@@ -117,6 +125,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.picked || this._paramsError || !this._active) return
     if (!(this.data.stores || []).some(item => item && item.id === id)) return
+    this._cancelScheduledQuote()
     this.setData(Object.assign({ picked: id }, clearedQuote('pending'), {
       capState: 'loading', capColor: false, capDuplex: false, capError: '',
     }))
@@ -186,10 +195,43 @@ Page({
       colorLabel: text.colorLabel, duplexLabel: text.duplexLabel, capError,
     }))
     this._reportDraft()
-    if (!capError && this.data.picked && this.data.capState !== 'loading') this._requestQuote(this.data.picked, normalized)
+    if (!capError && this.data.picked && this.data.capState !== 'loading') this._scheduleQuote()
+    else this._cancelScheduledQuote()
+  },
+
+  // 只认最后一次排上的那一个（序号），不依赖 clearTimeout 一定生效。到点时按当时的终端和参数报价。
+  _scheduleQuote() {
+    this._cancelScheduledQuote()
+    const ticket = this._quoteTimerSeq
+    this._quoteTimer = setTimeout(() => {
+      if (ticket !== this._quoteTimerSeq) return
+      this._quoteTimer = null
+      if (!this._active || this._paramsError || !this.data.picked || this.data.capState === 'loading') return
+      let normalized
+      try { normalized = printParams.normalize(this._intent()) } catch (e) { return }
+      if (printParams.capabilityError(this._capRaw, normalized)) return
+      this._requestQuote(this.data.picked, normalized)
+    }, QUOTE_DEBOUNCE_MS)
+  },
+
+  _cancelScheduledQuote() {
+    this._quoteTimerSeq = (this._quoteTimerSeq || 0) + 1
+    if (this._quoteTimer) clearTimeout(this._quoteTimer)
+    this._quoteTimer = null
+  },
+
+  // 报价失败后的「重新核定」：按当前终端和参数立即再报一次，不走防抖；核定中再点不重复发。
+  retryQuote() {
+    if (!this._active || this._paramsError || this.data.quoteState === 'pending') return
+    if (!this.data.picked || this.data.capState === 'loading') return
+    let normalized
+    try { normalized = printParams.normalize(this._intent()) } catch (e) { return }
+    if (printParams.capabilityError(this._capRaw, normalized)) return
+    this._requestQuote(this.data.picked, normalized)
   },
 
   _loadCapabilities(terminalId) {
+    this._cancelScheduledQuote()
     const seq = ++this._seq
     this._capRaw = null
     this._quoteSeq += 1
@@ -237,6 +279,7 @@ Page({
   },
 
   _requestQuote(terminalId, normalized) {
+    this._cancelScheduledQuote()
     const store = this.data.stores.find(item => item && item.id === terminalId)
     if (!this._active || this._paramsError || !store || !store.isOnline) { this.setData(Object.assign(clearedQuote('fail'), { quoteError: '所选终端暂时离线，请选择其他终端' })); return }
     const quoteSeq = ++this._quoteSeq
@@ -277,10 +320,14 @@ Page({
         amountYuan: isFreeOrder ? '' : yuanText(amountCents), quoteError: '',
         canConfirm: !!(store && store.isOnline),
       })
-    }).catch(() => {
+    }).catch((err) => {
       if (!this._active || quoteSeq !== this._quoteSeq) return
       this._quotedKey = ''
-      this.setData(Object.assign(clearedQuote('fail'), { quoteError: '核定没有完成，请重试' }))
+      const limited = !!err && (err.code === 'RATE_LIMITED' || err.statusCode === 429)
+      this.setData(Object.assign(clearedQuote('fail'), {
+        quoteError: limited ? '核定太频繁，请约一分钟后再点「重新核定」' : '核定没有完成，请重试',
+        quoteRetryable: true,
+      }))
     })
   },
 
