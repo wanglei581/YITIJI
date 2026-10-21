@@ -1,5 +1,11 @@
 # 2026-10-21（Claude）
 
+- **15:5x**：百宝箱、智慧校园默认隐藏，改动在隔离分支 `claude/hide-toolbox-campus-20261021` 完成。
+  - 本地提交 `dfd0679f9`，未推送、未部署。
+  - 服务端部署开关不设就是关；一体机、小程序代码不动。
+  - 22 条关联门禁本机全过；反向验证时新断言会变红。
+  - 等用户定是否推送、开 PR。
+
 - **15:3x**：全产品商业收口评估报告定稿，见 `docs/reviews/commercial-closeout-assessment-2026-10-21.md`。
   - 定稿 SHA256 `8c58fafe794fc088eb8aea64d8dbebc8ee2d5e2a46469b1e35fe17ee33eb0972`；评审版 v3 `b6bac7a75e2c…d9f5`。
   - 两方各轮结论：
