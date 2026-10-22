@@ -5,6 +5,7 @@
 - [x] 在 `codex/kiosk-idle-content-update-20261022` 完成 8 文件候选：构建版本标记、5 分钟检测、干净首页连续空闲 60 秒后重新验证静态入口再刷新；复用现有会话、忙碌和扫描收尾保护，无新增业务入口或 Agent 升级。
 - [x] 本地 typecheck、lint（0 error / 主干已有 27 warning）、生产构建、会员会话闭环、11 个更新行为/请求测试、CI 门禁覆盖检查通过；Edge 真实生产构建在竖屏与手机视口完成自动换版及弹窗/会话残留/业务路由延后验证。浏览器测试可在启动生产预览后，用 `CONTENT_UPDATE_BROWSER_URL=http://127.0.0.1:4199` 运行 `pnpm --filter @ai-job-print/kiosk verify:content-update`（PowerShell 用 `$env:CONTENT_UPDATE_BROWSER_URL=...`；默认使用本机 Edge）。
 - [ ] 候选审查及精确 SHA CI 全绿后，按现行受控发布流程部署 Kiosk；首次部署后重新打开现场 Edge 套壳客户端一次，再以第二次发布验证空闲自动换版、业务不中断和断网保留旧页。当前不得写成已上线、已更新本机客户端或完成真机出纸验收。
+- [ ] PR #1488 首轮 CI `39733842947` 依赖门禁失败：按最小补丁锁定 `follow-redirects@1.16.1` / `vite@6.4.4` 并重新验证。产品负责人已明确批准本次评审流程例外；仍须分支与 main 精确 SHA 三项 CI 全绿、生产备份、发布后版本与健康核验，发布结束恢复 `DEPLOY_API_ENABLED=false`。
 
 ## 2026-10-15：主线打印链最小修复候选（未合并、未部署、未完成业务出纸）
 
