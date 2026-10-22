@@ -1039,7 +1039,8 @@ const api = {
     const quoteWith = (fileUrl) => request('/orders/quote', {
       method: 'POST',
       data: terminalId ? { fileUrl, params, terminalId } : { fileUrl, params },
-      needAuth: false,
+      // 本地有未过期令牌才附 Bearer；没有或已过期则不带头照发，不在这里跳登录。
+      needAuth: true,
     });
 
     const preset = String(presetFileUrl || '').trim();
@@ -1670,7 +1671,8 @@ const api = {
     )).then((lines) => request('/orders/quote', {
       method: 'POST',
       data: { terminalId, lines, params },
-      needAuth: false,
+      // 与 quoteMyPrintOrder 相同：有令牌就带上，没有也照发。
+      needAuth: true,
     }));
   },
 
