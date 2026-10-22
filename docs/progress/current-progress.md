@@ -1,14 +1,18 @@
 # 当前开发进度
 
-## 2026-10-22：Edge 套壳客户端内容自动更新候选（本地验证，未发布）
+## 2026-10-22：Edge 套壳客户端内容自动更新已发布（现场首次载入待确认）
 
 - 用户确认客户端是 Edge 网站套壳，要求随功能更新同步页面内容。本轮从 `main@b2c49d3f8ab80bdac09f21ccd245bc0bf09f96c0` 建立独立分支 `codex/kiosk-idle-content-update-20261022`，没有修改共享根目录的现场脏改动或本机已安装 Agent。
 - 范围/预算 8 文件：Kiosk `vite.config.ts`、`src/services/contentUpdate.ts`、`src/hooks/useContentUpdate.ts`、`src/layouts/KioskRuntimeRoot.tsx`、`scripts/tests/content-update.test.mjs`、`package.json` 及两份正式进度文档。复用既有忙碌锁、隐私会话空操作判据和扫描收尾闸；不新增页面/入口/依赖/API/数据模型，不改简历/文件/打印/扫描业务协议、生产配置、密钥、数据库或硬件代码。
 - 正式构建向首页 HTML 写入独立版本标记；运行中每 5 分钟以 `no-store`、不带凭据、拒绝重定向的同源请求检查新版。只有可见、在线、无查询串/片段的干净首页，未登录、非 guestMode、无忙碌锁/警告/敏感会话/扫描收尾/弹窗/输入焦点，且连续安全空闲 60 秒，才重新验证首页及入口 JS/CSS 后整页刷新。网络/文件不可用保留旧页并退避，回滚到当前版本取消更新，卸载取消请求。刷新前不主动清除用户会话。
 - 本地验证：Kiosk typecheck、`build:kiosk:production`（含 `verify:prod-build-config`，使用本地测试网桥值）通过；完整 lint 0 error（主干已有 27 warning）；会员会话闭环静态守卫与 28 个行为用例通过；新增 11 个更新行为/请求用例通过，并接入现有 `verify:member-session-closure` 的 CI 执行闭包，`verify:ci-gate-coverage` 通过。Edge 对真实生产构建在 1080×1920、390×844 两种视口验证新版检测、弹窗/敏感残留/业务路由阻止刷新、回到干净首页后延迟刷新并加载新版本标记；所有 API/本机 Agent 请求均在浏览器测试中隔离，不代表真服务或真机出纸验收。
-- 发布边界：候选未合并、未部署，当前安装的 Agent 0.4.17 不变。首次发布本候选后需人工重新打开一次 Edge 客户端，旧页面没有检测器，不能自行获得本次新增能力；后续网站版本可自动跟随。只验证入口 JS/CSS 的可达性，发布仍须保持 HTML 与完整静态目录一致、遵循既有发布门禁；不以本地验证替代生产发布授权与现场验收。
+- 发布边界：已随 PR #1488 合入并发布，当前安装的 Agent 0.4.17 不变。首次发布后需人工重新打开一次 Edge 客户端，旧页面没有检测器，不能自行获得本次新增能力；后续网站版本可自动跟随。只验证入口 JS/CSS 的可达性，发布仍须保持 HTML 与完整静态目录一致、遵循既有发布门禁；本次未刷新用户现存 InPrivate 独立窗口，尚不代表该窗口已载入新版或完成真机出纸验收。
 - 发布推进：PR #1488；产品负责人本人明确允许本次以代码审查、浏览器验证和三项 CI 通过代替五家联合评审。生产只读核对 API 为上述基线 SHA、ready=200、PostgreSQL/Redis 正常。首轮 CI `39733842947` 的依赖安全门禁被现有依赖的 3 条 high 公告拦截，文件预算由 8 增至 10，仅增加 `pnpm-workspace.yaml` 与锁文件：`follow-redirects` 1.16.0 → 1.16.1（两条跨域凭据泄露公告），Vite 6.4.3 → 6.4.4（Windows 编辑器检查绕过）。保留原安全门禁及例外范围；补丁属于发布阻塞修复，涉及 API 传递依赖，须重新跑完整 CI 后才能受控整体发布。
 - 补丁验证：锁文件仅更新上述两包及 Vite peer 键，保留其余主线依赖；frozen-lockfile 安装、Kiosk typecheck、11 项内容更新测试、CI 覆盖和 Vite 6.4.4 生产构建通过。官方 npm audit 为 high=0 / critical=0（7 项 moderate）；本机默认 npmmirror 无 audit 端点，既有完整安全脚本另因 Windows `spawnSync('pnpm')` 无法执行而未通过，Linux CI 仍须实际运行该脚本，未添加豁免。
+- 已上线证据：候选 `c65e2e61fa10fdcd306e995c7dadb9aab68cf8d6` 的三项 CI `39735197927` 全绿；合并后 `main@d185d01efef1cc66b1287082dc3c87b38cedc198` 与候选文件树一致，三项主线 CI `39741191256` 全绿（含真实执行的依赖安全门禁）。按用户本人授权运行 full 发布 `39749729980` 成功，`DEPLOY_SOURCE.txt` 记录目标 SHA 和 CI 号，`deployed_at=2026-10-22T16:54:41+08:00`。PostgreSQL 备份可读、运行目录及三端静态备份均已生成；95 个迁移无待执行项；SSH 发布开始后已将 `DEPLOY_API_ENABLED` 恢复 `false` 并再次确认。
+- 发布后验证：公网首页版本 `aff73c2b-15ac-408a-973c-007dd05ca358`，入口 `/assets/index-BQ_Vb3mh.js`，HTML 保持 `no-store, must-revalidate, no-cache`；严格生产巡检 PASS 14 / WARN 0 / FAIL 0，API ready=200、PostgreSQL/Redis 正常。Edge 隔离会话在 1080×1920 与 390×844 读取真实已发布构建，入口 JS/CSS HEAD=200、无未捕获页面异常、无横向溢出，截图在本工作区忽略目录 `test-results/content-update-production/`；阻断 Agent 与业务写请求，不算现场硬件或真人验收。
+- 生产构建自动换版实测：隔离 Edge 只把首次导航的版本标记模拟为旧值，随后首页与 JS/CSS 均读取真实公网；全部 API/Agent 请求在此单项中隔离，以真实 60 秒空闲时间验证整页加载次数由 1 变 2，最终为上述线上版本。前两次使用加速时钟的公网探针未完成刷新（快进同时触发 10 秒网络截止，不能作为生产失败结论），改为真实时钟后通过。没有进行第二次生产发布或刷新用户现存窗口。
+- 发布工具残留：BOS 缺少增量基线，本次经既有 GitHub fallback 拉取成功；发布成功后的 `latest-deployed.txt` 回写仍为 HTTP 404。该辅助通道失败不影响已部署站点，但下次发布仍可能直拉 GitHub，列为后续运维项，不在本轮改密钥或发布脚本。
 
 ## 2026-10-15：主线打印链最小修复候选（未合并、未部署、未完成业务出纸）
 
