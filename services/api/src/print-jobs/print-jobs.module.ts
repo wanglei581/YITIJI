@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { OrderQuoteController } from '../payment/order-quote.controller'
 import { OrderQuoteService } from '../payment/order-quote.service'
+import { OrderQuoteThrottleBinder } from '../payment/order-quote-throttle'
 import { PaymentModule } from '../payment/payment.module'
 import { StorageModule } from '../storage/storage.module'
 import { TerminalsModule } from '../terminals/terminals.module'
@@ -28,7 +29,8 @@ import { PickupOrderService } from './pickup-order.service'
     AuditModule,
   ],
   controllers: [PrintJobsController, AdminPrintJobsController, OrderQuoteController],
-  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, AdminPrintJobsVerifyOutcomeService, OrderQuoteService, PickupOrderService],
+  // OrderQuoteThrottleBinder 启动时把同步验签绑进报价的限流 tracker（JwtService 来自 JwtVerifierModule）。
+  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, AdminPrintJobsVerifyOutcomeService, OrderQuoteService, PickupOrderService, OrderQuoteThrottleBinder],
   // PickupOrderService 导出给会员「本机领取」（member-print-orders）复用核销判定，不另写一份。
   exports:     [PrintPageCountService, OrderQuoteService, PickupOrderService],
 })

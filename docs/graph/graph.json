@@ -21398,6 +21398,7 @@
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
@@ -24735,6 +24736,7 @@
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -24796,6 +24798,7 @@
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-kiosk-session.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -26137,8 +26140,12 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
+    "services/api/src/payment/order-quote-throttle.ts": [
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
+    ],
     "services/api/src/payment/order-quote.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
     ],
     "services/api/src/payment/order-quote.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -26146,6 +26153,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -26477,6 +26485,9 @@
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
+    ],
+    "services/api/src/print-jobs/print-jobs.module.ts": [
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
     ],
     "services/api/src/print-jobs/print-jobs.service.ts": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
@@ -27082,6 +27093,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -30512,7 +30524,8 @@
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
-          "apps/kiosk/src/services/print/printJobsApi.ts"
+          "apps/kiosk/src/services/print/printJobsApi.ts",
+          "apps/kiosk/src/services/terminalAuth.ts"
         ],
         "missing": []
       },
@@ -39148,6 +39161,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:offline-agencies-page"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/throttler/terminal-throttle.ts",
+          "services/api/src/payment/order-quote-throttle.ts",
+          "services/api/src/payment/order-quote.controller.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/print-jobs/print-jobs.module.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-order-quote-throttle-identity.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:order-quote-throttle-identity"
       ],
       "wired": true
     },

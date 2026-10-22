@@ -75,7 +75,7 @@ overrides:
   fast-uri: 3.1.7
   # postcss: GHSA-fxqj-rqcc-2cmp (sourceMappingURL reads arbitrary .map files
   # when `from` is unset) affects <=8.5.22. First fix is 8.5.23.
-  # The previous pin 8.5.18 is inside that range. vite@6.4.3 asks for
+  # The previous pin 8.5.18 is inside that range. vite@6.4.4 asks for
   # postcss@^8.5.3, so 8.5.23 stays inside the direct dependency's range.
   postcss: 8.5.23
   # valibot: GHSA-5qjj-4xww-7phc (record() issue paths make flatten() throw)
@@ -95,7 +95,7 @@ overrides:
   '@babel/core': 7.29.6
   # esbuild: GHSA-g7r4-m6w7-qqqr affects >=0.27.3 <0.28.1. First fix is 0.28.1.
   # Only tsx@4.22.3 (services/api devDependency) requests esbuild@~0.28.0,
-  # which already allows 0.28.1. vite@6.4.3 requests ^0.25.0 and resolves
+  # which already allows 0.28.1. vite@6.4.4 requests ^0.25.0 and resolves
   # 0.25.12, outside the advisory. A global esbuild override would pull vite
   # off 0.25, so the selector matches only the ~0.28.0 request.
   'esbuild@~0.28.0': 0.28.1
@@ -142,6 +142,18 @@ overrides:
   # 同 major 升级，且比已有的 deepmerge-ts 7.1.5 → 8.0.0（同样来自 prisma@7.8.0，跨 major）更保守。
   # 3.22 的行为变化就是漏洞修复本身：默认关掉 mysql_clear_password。
   mysql2: 3.24.0
+  # follow-redirects: GHSA-q3jh-wrc6-jgq8 + GHSA-8r9p-f939-6h3c
+  # affect >=1.16.0 <1.16.1. First fix is 1.16.1 (2026-10-01).
+  # Carrier: apps/terminal-agent axios@1.20.0 asks for follow-redirects@^1.16.0,
+  # so 1.16.1 stays inside that range. 1.x has no 1.16.2 and there is no 2.x.
+  # Pin the first fix so a later resolve cannot float.
+  follow-redirects: 1.16.1
+  # vite: GHSA-587h-7wmj-h5pm affects 6.4.3. First fix on the 6.x line is 6.4.4
+  # (2026-10-06). apps/admin, apps/kiosk and apps/partner declare ^6.4.3, which
+  # already allows 6.4.4 and does not allow 7.x/8.x. Do not take 6.4.5
+  # (2026-10-21): that release is inside the yesterday-pin rule.
+  # Override so the next resolve cannot float from ^6.4.3 to 6.4.5.
+  vite: 6.4.4
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true

@@ -69,6 +69,11 @@ function headers(input?: HeadersInit): Headers {
   return result
 }
 
+/** 报价只读当前票。不刷新、不写存储、不改 10 分钟定时器。 */
+export function terminalSessionHeaders(input?: HeadersInit): Headers {
+  return headers(input)
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs)

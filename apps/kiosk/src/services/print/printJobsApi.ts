@@ -14,7 +14,7 @@ import { API_BASE_URL } from '../api/client'
 import { ApiHttpError } from '../api/httpAdapter'
 import { getTerminalId } from '../api/screensaver'
 import { networkError, throwHttpError } from '../api/throwHttpError'
-import { terminalProtectedFetch } from '../terminalAuth'
+import { terminalProtectedFetch, terminalSessionHeaders } from '../terminalAuth'
 import type {
   BillingPageSource,
   OrderPayStatus,
@@ -129,7 +129,7 @@ export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<Prin
   try {
     res = await fetch(`${API_BASE_URL}/orders/quote`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: terminalSessionHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         fileUrl: input.fileUrl,
         params: normalizePrintParams(input.params),
