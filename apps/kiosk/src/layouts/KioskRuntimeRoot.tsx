@@ -3,6 +3,12 @@ import { AiDeclarationHost } from '../ai/AiDeclarationHost'
 import { KioskPrivacyGuard } from '../auth/KioskPrivacyGuard'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { KioskHidScanGuard } from '../components/hid-guard/KioskHidScanGuard'
+import { useContentUpdate } from '../hooks/useContentUpdate'
+
+function ContentUpdateGuard() {
+  useContentUpdate()
+  return null
+}
 
 /**
  * Kiosk 终端业务路由的非视觉运行时根。
@@ -17,6 +23,7 @@ export function KioskRuntimeRoot() {
     <KioskBusyProvider>
       <AiDeclarationHost />
       <KioskPrivacyGuard>
+        <ContentUpdateGuard />
         <KioskHidScanGuard />
         <Outlet />
       </KioskPrivacyGuard>
