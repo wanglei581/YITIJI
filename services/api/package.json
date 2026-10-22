@@ -361,6 +361,7 @@
     "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts",
     "verify:throttle-dimension": "node -r @swc-node/register scripts/verify-throttle-dimension.ts",
+    "verify:order-quote-throttle-identity": "node -r @swc-node/register scripts/verify-order-quote-throttle-identity.ts",
     "verify:ai-public-quota": "node -r @swc-node/register scripts/verify-ai-public-quota.ts",
     "verify:ai-throttle-dimension": "node -r @swc-node/register scripts/verify-ai-throttle-dimension.ts",
     "verify:kiosk-ai-capabilities": "node -r @swc-node/register scripts/verify-kiosk-ai-capabilities.ts",
