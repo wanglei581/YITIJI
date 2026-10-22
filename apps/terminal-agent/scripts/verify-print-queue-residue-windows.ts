@@ -130,9 +130,14 @@ function isCleanUnreadableSid(replay: { status: number | null; stderr: string })
 }
 
 async function resolveSid(label: string, user: string): Promise<string> {
+  const started = process.hrtime.bigint()
   try {
-    return (await resolvePrintJobUserSid(user)).trim()
+    const sid = (await resolvePrintJobUserSid(user)).trim()
+    console.info(`sid-step ${label} elapsedMs=${Number(process.hrtime.bigint() - started) / 1e6} isTimeout=false`)
+    return sid
   } catch (error) {
+    const isTimeout = error instanceof Error && error.message === 'print queue command timed out'
+    console.info(`sid-step ${label} elapsedMs=${Number(process.hrtime.bigint() - started) / 1e6} isTimeout=${isTimeout}`)
     replaySidStep(label, user)
     throw error
   }
