@@ -153,7 +153,8 @@ function assertNoSqliteDrift(db: string, label: string): void {
 // 112（本次，服务联系方式，+1）：
 //   PlatformSetting —— 平台级公开键值（服务电话、服务时间、小程序是否已发布）。
 //   没有可复用的平台键值表。没有 endUserId，不是会员数据，不进注销删除或置空清单。
-const EXPECTED_MODEL_COUNT = 112
+// 117: first-order service project/deployment/incident/event/report; no old model removed.
+const EXPECTED_MODEL_COUNT = 117
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
@@ -170,6 +171,7 @@ function verifyStaticContract(): void {
   )
 
   for (const schema of [sqliteSchema, pgSchema]) {
+    for (const name of ['ServiceProject', 'ServiceDeployment', 'ServiceIncident', 'ServiceIncidentEvent', 'ServiceReport']) modelBlock(schema, name)
     requireTokens(modelBlock(schema, 'TerminalScanDeletionAudit'), 'TerminalScanDeletionAudit', [
       'terminalId',
       'eventId',

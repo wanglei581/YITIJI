@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { FirstOrderAccessService, firstOrderMissing, firstOrderOrg } from './first-order-access.service'
 import type { ServiceIncident, ServiceIncidentEvent } from '../generated/prisma/client'
 
+const INCIDENT_ACTIONS = { start: 'first_order.incident_start', resolve: 'first_order.incident_resolve', confirm: 'first_order.incident_confirm', reopen: 'first_order.incident_reopen' } as const
 const eventsInclude = { events: { orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }], take: 51 } }
 type IncidentRow = ServiceIncident & { events: ServiceIncidentEvent[] }
 
@@ -118,7 +119,7 @@ export class FirstOrderIncidentsService {
       if (changed.count !== 1) return conflict('工单已被其他人更新，请刷新后重试')
       await tx.serviceIncidentEvent.create({ data: { incidentId: id, action: input.action, note, actorRole: user.role } })
       await this.audit.writeRequired(tx, { actorId: user.userId, actorRole: user.role,
-        action: `first_order.incident_${input.action}`, targetType: 'service_incident', targetId: id,
+        action: INCIDENT_ACTIONS[input.action], targetType: 'service_incident', targetId: id,
         payload: { version: input.version, status: data.status } })
     })
     return this.get(user, id)
