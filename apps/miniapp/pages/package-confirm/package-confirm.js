@@ -34,7 +34,7 @@ const pkg = require('../../utils/package-order')
 const idem = require('../../utils/package-order-idempotency')
 const reconcileEngine = require('../../utils/order-submission-reconcile')
 const priceConfirm = require('../../utils/price-confirmation')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity, gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 
 /**
  * 报价用的打印参数。
@@ -66,6 +66,7 @@ Page({
   data: {
     statusBarHeight: 44,
     isLoggedIn: false,
+    restoring: false, restoreFailed: false, // 过期但可恢复（FLOW1b）：先等恢复结果
     submitting: false,
 
     // draft | missing —— 深链直进、草稿被清都属 missing，必须能说清并可恢复
@@ -151,6 +152,13 @@ Page({
 
   onShow() {
     this._guard.activate()
+    markPageShown(this)
+    gateMember(this, auth, api, { ready: () => this._showForCurrentIdentity(), needLogin: () => this._showForCurrentIdentity() })
+  },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
+
+  _showForCurrentIdentity() {
     const loggedIn = auth.isLoggedIn()
     // 身份变了（刚登录 / 刚登出 / 换了账号）：草稿必须按**新**身份重新核一遍归属，
     // 不能沿用上一次解析出来的文件列表。setIdentity 同时 +1 代次，
@@ -193,10 +201,12 @@ Page({
 
   onHide() {
     this._guard.deactivate()
+    markPageHidden(this)
   },
 
   onUnload() {
     this._guard.deactivate()
+    markPageUnloaded(this)
   },
 
   /**

@@ -18,6 +18,9 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const {
+  gateMember, retryMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 const exportFile = require('./export-file')
 const dr = require('./data-rights')
 const consents = require('./consents')
@@ -26,6 +29,9 @@ Page({
   data: {
     statusBarHeight: 20,
     isLoggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「登录后可导出」
+    restoring: false,
+    restoreFailed: false,
 
     loading: false,
     loadError: '',
@@ -71,16 +77,43 @@ Page({
   },
 
   onShow() {
-    const isLoggedIn = auth.isLoggedIn()
+    markPageShown(this)
     this._pollCount = 0
-    this.setData({ isLoggedIn, savedFiles: exportFile.listSavedExports() })
-    this.loadConsents()
-    if (isLoggedIn) this.loadRequests()
-    else this.setData({ requests: [], latestExport: null, capabilityLoaded: false, hasActiveRequest: false, hasActiveExport: false, activeClosure: null })
+    this.setData({ savedFiles: exportFile.listSavedExports() })
+    gateMember(this, auth, api, {
+      ready: () => {
+        this.setData({ isLoggedIn: true })
+        this.loadConsents()
+        this.loadRequests()
+      },
+      needLogin: () => {
+        this.setData({ isLoggedIn: false, requests: [], latestExport: null, capabilityLoaded: false, hasActiveRequest: false, hasActiveExport: false, activeClosure: null })
+        this.loadConsents()
+      },
+      // 恢复临时失败：本机能显示的同意记录照常显示，数据权利那一栏给重试。
+      recoverable: () => this.loadConsents(),
+    })
   },
 
-  onHide() { this.stopTimers() },
-  onUnload() { this.stopTimers() },
+  onHide() {
+    markPageHidden(this)
+    this.stopTimers()
+  },
+  onUnload() {
+    markPageUnloaded(this)
+    this.stopTimers()
+  },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
+
+  /** 导出、下载、撤回授权、注销这几个点击动作的会员闸门（FLOW1b）：过期但可恢复时先等恢复，成功后只执行一次。 */
+  _memberActionHandlers() {
+    return {
+      needLogin: () => this.requireLogin(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    }
+  },
   onPullDownRefresh() {
     this.loadConsents()
     if (this.data.isLoggedIn) this.loadRequests(() => wx.stopPullDownRefresh())
@@ -236,6 +269,10 @@ Page({
   // ---------- 数据导出 ----------
 
   startExport() {
+    gateMemberAction(this, auth, api, 'export', () => this._startExport(), this._memberActionHandlers())
+  },
+
+  _startExport() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
     if (this.data.hasActiveRequest) {
@@ -287,6 +324,10 @@ Page({
   },
 
   startDownload() {
+    gateMemberAction(this, auth, api, 'download', () => this._startDownload(), this._memberActionHandlers())
+  },
+
+  _startDownload() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
     const item = this.data.latestExport
@@ -400,6 +441,10 @@ Page({
   // ---------- 撤回 AI 分析授权 ----------
 
   revokeConsent() {
+    gateMemberAction(this, auth, api, 'revoke', () => this._revokeConsent(), this._memberActionHandlers())
+  },
+
+  _revokeConsent() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
     wx.showModal({
@@ -441,6 +486,10 @@ Page({
   // ---------- 账号注销 ----------
 
   requestAccountClosure() {
+    gateMemberAction(this, auth, api, 'closure', () => this._requestAccountClosure(), this._memberActionHandlers())
+  },
+
+  _requestAccountClosure() {
     if (!this.requireLogin()) return
     if (this.data.busy) return
     // 服务端说没说「开放注销」还没读到：不猜，等读到再办

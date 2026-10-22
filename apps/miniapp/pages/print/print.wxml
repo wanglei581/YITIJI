@@ -1,12 +1,13 @@
 <!--pages/print/print.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
   <!-- 底部 Tab 页：没有返回键。原右上角「连接终端」和微信胶囊在同一行
        （home / me / assistant 三页实测过这一行的按钮会落进胶囊、点不到），
        而它和下面「扫码登录一体机」是同一个入口，所以不再单独放。 -->
-  <view class="navbar">
-    <view class="nav-title left serif">打印</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-title left serif">打印</view>
+    </view>
   </view>
 
   <view class="content has-tabbar">
@@ -47,7 +48,6 @@
           <view wx:if="{{item.badge}}" class="pc-badge">{{item.badge}}</view>
         </view>
         <view class="pc-desc">{{item.desc}}</view>
-        <view class="pc-flow">{{item.flow}}</view>
       </view>
       <view class="pc-arrow"><text class="ficon i-right"></text></view>
     </view>

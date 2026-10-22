@@ -4,7 +4,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">打印订单</view>
@@ -32,7 +32,29 @@
 
   <view class="content has-bar ord-content">
 
-    <block wx:if="{{!isLoggedIn}}">
+    <block wx:if="{{restoring}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">正在恢复上次的登录…</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{restoreFailed}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">暂时没能恢复登录</view>
+          <view class="es-d">请稍后再试一次。</view>
+          <button class="btn primary block" hover-class="tap-press" bindtap="retryRestore">重试</button>
+          <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+          <button class="btn ghost block mt12" hover-class="tap-press" bindtap="toLogin">去登录</button>
+        </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{!isLoggedIn}}">
       <view class="card">
         <view class="empty-slot">
           <text class="ficon i-user es-ic"></text>
@@ -44,6 +66,95 @@
     </block>
 
     <block wx:else>
+
+      <!-- 分区顺序（10/16 开发者工具实际模拟器截图后调整）：单件打印订单在前，多数订单在这里；材料包订单在后。
+           两个分区仍各自独立加载、独立失败、独立重试、独立分页，互不顶掉。 -->
+      <!-- ── 单件打印订单：云打印 Order + 一体机历史任务，走触底分页 ─────────── -->
+      <view class="sec-head">
+        <view class="sh-t">单件打印订单</view>
+      </view>
+
+      <view class="card" wx:if="{{loading && !filtered.length}}">
+        <view class="empty-slot">
+          <view class="es-t">正在加载打印订单…</view>
+        </view>
+      </view>
+
+      <block wx:elif="{{filtered.length}}">
+        <view class="ord-card" wx:for="{{filtered}}" wx:key="id">
+          <view class="oc-top">
+            <view class="oc-store">
+              <text class="ficon i-location oc-store-ic"></text>
+              <text>{{item.store}}</text>
+            </view>
+            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="oc-body">
+            <view class="oc-thumb"><text class="ficon i-file-text"></text></view>
+            <view class="oc-info">
+              <view class="oc-title">{{item.title}}</view>
+              <view class="oc-spec">{{item.spec}}</view>
+              <!-- 失败原因（服务端白名单码）与过期说明：复用规格行的样式，不另起样式 -->
+              <view class="oc-spec" wx:if="{{item.reasonNote}}">{{item.reasonNote}}</view>
+            </view>
+          </view>
+          <view class="pk-strip" wx:if="{{item.pickup}}">
+            <view class="pk-row">
+              <text class="pk-label">到机码</text>
+              <text class="pk-code">{{item.pickup}}</text>
+            </view>
+            <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
+          </view>
+          <view class="oc-foot">
+            <view class="oc-price">{{item.price}}</view>
+            <view class="oc-btns">
+              <view wx:if="{{item.detailId}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+              <!-- 打印历史行（PrintTask）没有线上详情端点，不放会 404 的按钮。手机下单、到机核销后的单
+                   也落在这里（服务端这一行不带 orderId），所以不能说它是「一体机任务」、把人指去一体机（W-走查）。 -->
+              <text wx:else class="oc-note">终端打印记录，状态以上方为准</text>
+              <view wx:if="{{item.canCancel}}" class="oc-btn cancel tap {{item.cancelling ? 'disabled' : ''}}" hover-class="tap-press" data-id="{{item.id}}" bindtap="cancelOrder">{{item.cancelling ? '正在取消…' : '取消订单'}}</view>
+              <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
+            </view>
+          </view>
+        </view>
+        <!-- 单件区排在材料包前面以后，翻页不能只靠触底（材料包很长时要先滚过整个材料包区）：
+             这里给明确的「加载更多」，走的是与触底同一条路径，只推进单件自己的游标。 -->
+        <view
+          wx:if="{{nextCursor && !error}}"
+          class="btn ghost block tap load-more"
+          hover-class="tap-press"
+          bindtap="loadMoreOrders"
+        >{{loadingMore ? '正在加载…' : '加载更多单件打印订单'}}</view>
+        <view class="list-foot warn" wx:if="{{error}}">
+          {{error}}
+          <text wx:if="{{nextCursor}}" class="lf-retry tap" hover-class="tap-press" bindtap="loadMoreOrders">重试</text>
+        </view>
+      </block>
+
+      <view class="card" wx:elif="{{error}}">
+        <view class="empty-slot">
+          <text class="ficon i-warning es-ic"></text>
+          <view class="es-t">打印订单加载失败</view>
+          <view class="es-d">{{error}}</view>
+        </view>
+      </view>
+
+      <view class="card" wx:elif="{{orders.length}}">
+        <view class="empty-slot">
+          <view class="es-t">当前筛选下没有单件打印订单</view>
+          <view class="es-d">切到「全部」可以看到这 {{orders.length}} 笔单件打印订单</view>
+        </view>
+      </view>
+
+      <!-- 从来没有单件订单：压成一行。去打印的入口在底部固定栏「去打印文件」，这里不再放第二个。 -->
+      <view class="empty-row" wx:else>
+        <text class="ficon i-printer er-ic"></text>
+        <view class="er-body">
+          <view class="er-t">暂无单件打印订单</view>
+          <view class="er-d">发起打印后可在此查看到机码与出纸状态</view>
+        </view>
+      </view>
+
 
       <!-- ── 材料包订单：独立来源 GET /orders/package，独立游标与失败态 ───────── -->
       <view class="sec-head">
@@ -95,8 +206,10 @@
             </view>
           </view>
           <view class="pk-strip" wx:if="{{item.hasPickupCode}}">
-            <view class="pk-label">到机码</view>
-            <view class="pk-code">{{item.pickupCode}}</view>
+            <view class="pk-row">
+              <text class="pk-label">到机码</text>
+              <text class="pk-code">{{item.pickupCode}}</text>
+            </view>
             <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
           </view>
           <view class="oc-foot">
@@ -139,86 +252,11 @@
         </view>
       </view>
 
-      <view class="card" wx:else>
-        <view class="empty-slot">
-          <text class="ficon i-folder es-ic"></text>
-          <view class="es-t">还没有材料包订单</view>
-          <view class="es-d">{{pkgOnsiteNotice}}</view>
-          <view class="btn ghost block tap" hover-class="tap-press" bindtap="toPackageCreate">创建材料包</view>
-        </view>
-      </view>
-
-      <!-- ── 单件打印订单：云打印 Order + 一体机历史任务，走触底分页 ─────────── -->
-      <view class="sec-head">
-        <view class="sh-t">单件打印订单</view>
-      </view>
-
-      <view class="card" wx:if="{{loading && !filtered.length}}">
-        <view class="empty-slot">
-          <view class="es-t">正在加载打印订单…</view>
-        </view>
-      </view>
-
-      <block wx:elif="{{filtered.length}}">
-        <view class="ord-card" wx:for="{{filtered}}" wx:key="id">
-          <view class="oc-top">
-            <view class="oc-store">
-              <text class="ficon i-location oc-store-ic"></text>
-              <text>{{item.store}}</text>
-            </view>
-            <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
-          </view>
-          <view class="oc-body">
-            <view class="oc-thumb"><text class="ficon i-file-text"></text></view>
-            <view class="oc-info">
-              <view class="oc-title">{{item.title}}</view>
-              <view class="oc-spec">{{item.spec}}</view>
-              <!-- 失败原因（服务端白名单码）与过期说明：复用规格行的样式，不另起样式 -->
-              <view class="oc-spec" wx:if="{{item.reasonNote}}">{{item.reasonNote}}</view>
-            </view>
-          </view>
-          <view class="pk-strip" wx:if="{{item.pickup}}">
-            <view class="pk-label">到机码</view>
-            <view class="pk-code">{{item.pickup}}</view>
-            <view class="pk-hint">到一体机前，在「到机码核销」扫码或手输</view>
-          </view>
-          <view class="oc-foot">
-            <view class="oc-price">{{item.price}}</view>
-            <view class="oc-btns">
-              <view wx:if="{{item.detailId}}" class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
-              <!-- 打印历史行（PrintTask）没有线上详情端点，不放会 404 的按钮。手机下单、到机核销后的单
-                   也落在这里（服务端这一行不带 orderId），所以不能说它是「一体机任务」、把人指去一体机（W-走查）。 -->
-              <text wx:else class="oc-note">终端打印记录，状态以上方为准</text>
-              <view wx:if="{{item.canCancel}}" class="oc-btn cancel tap {{item.cancelling ? 'disabled' : ''}}" hover-class="tap-press" data-id="{{item.id}}" bindtap="cancelOrder">{{item.cancelling ? '正在取消…' : '取消订单'}}</view>
-              <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
-            </view>
-          </view>
-        </view>
-        <view class="list-foot" wx:if="{{loadingMore}}">正在加载更多…</view>
-        <view class="list-foot warn" wx:elif="{{error}}">{{error}}</view>
-      </block>
-
-      <view class="card" wx:elif="{{error}}">
-        <view class="empty-slot">
-          <text class="ficon i-warning es-ic"></text>
-          <view class="es-t">打印订单加载失败</view>
-          <view class="es-d">{{error}}</view>
-        </view>
-      </view>
-
-      <view class="card" wx:elif="{{orders.length}}">
-        <view class="empty-slot">
-          <view class="es-t">当前筛选下没有单件打印订单</view>
-          <view class="es-d">切到「全部」可以看到这 {{orders.length}} 笔单件打印订单</view>
-        </view>
-      </view>
-
-      <view class="card" wx:else>
-        <view class="empty-slot">
-          <text class="ficon i-printer es-ic"></text>
-          <view class="es-t">暂无单件打印订单</view>
-          <view class="es-d">发起打印后可在此查看到机码与出纸状态</view>
-        </view>
+      <!-- 从来没有材料包订单：压成一行，不再用整张空卡把真实订单挤下去；创建入口仍在这一行里。 -->
+      <view class="empty-row" wx:else>
+        <text class="ficon i-folder er-ic"></text>
+        <view class="er-t">还没有材料包订单</view>
+        <view class="er-act tap" hover-class="tap-press" bindtap="toPackageCreate">创建材料包</view>
       </view>
 
     </block>
@@ -231,7 +269,7 @@
 
   <view class="actionbar">
     <view wx:if="{{isLoggedIn}}" class="btn primary block" hover-class="tap-press" bindtap="toPrint">去打印文件</view>
-    <view wx:else class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
+    <view wx:elif="{{!restoring && !restoreFailed}}" class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
   </view>
 
 </view>

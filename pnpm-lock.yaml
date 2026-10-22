@@ -5,8 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  follow-redirects: 1.16.1
-  vite: 6.4.4
   qs: 6.16.0
   source-map-js: 1.2.2
   proxy-addr: 2.0.8

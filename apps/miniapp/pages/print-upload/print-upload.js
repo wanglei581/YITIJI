@@ -1,5 +1,10 @@
 const api = require('../../utils/api')
+const auth = require('../../utils/auth')
+const fileUrls = require('../../utils/file-url')
 const pricing = require('../../utils/print-pricing')
+const printParams = require('../../utils/print-params')
+const storage = require('../../utils/storage')
+const uploadNames = require('../../utils/upload-name')
 
 // 后端 print_doc 只收 PDF/JPG/PNG，扩展名足以判型，不必为一个徽章多打一次网络请求。
 function extLabelOf(name) {
@@ -7,6 +12,16 @@ function extLabelOf(name) {
   const dot = clean.lastIndexOf('.')
   if (dot < 0 || dot === clean.length - 1) return 'FILE'
   return clean.slice(dot + 1).toUpperCase().slice(0, 5)
+}
+
+const IMAGE_EXTS = ['JPG', 'JPEG', 'PNG']
+const DEFAULT_DRAFT = { copies: 1, colorMode: 'black_white', duplex: 'simplex', terminalId: '' }
+
+// 草稿归属用的会员 id：只读存储，不调 getToken / isLoggedIn / getUser——令牌过期或两格对不上时
+// 它们会顺手清掉会话，影响别的页面。真正的「换没换人」由会话代际（auth.sessionGeneration）判定。
+function storedOwner() {
+  const user = storage.get(storage.KEYS.USER, null)
+  return user && user.id != null && user.id !== '' ? String(user.id) : null
 }
 
 function verifiedPrintParams(copies) {
@@ -30,17 +45,17 @@ Page({
     statusBarHeight: 20,
     // 文件内容始终留在服务端；页面只持有本人文件 id 和安全元数据。
     file: { name: '未选择文件', pages: 0, size: '—' },
+    // 文件卡标题只放主名，扩展名在 fileExt 标签里（「.pdf」不再被拆到下一行，FLOW1a）。
+    fileBase: '未选择文件',
     fileExt: 'FILE',
     fileId: '',
     hasFile: false,
     hasPageCount: false,
-    color: 'bw',
-    duplex: 'single',
+    // 第 1 步只按 1 份黑白单面向服务端核定页数（门禁基线）；份数、颜色、单双面都在第 2 步按终端能力设置。
     copies: 1,
     // idle | loading | ready | unavailable；ready 仅代表 /orders/quote 已返回。
     priceStatus: 'idle',
     priceError: '',
-    priceLabels: { bw: '读取中…', color: '读取中…' },
     total: '—',
     amountCents: null,
     billingPageSource: '',
@@ -56,7 +71,7 @@ Page({
     const o = opts || {}
     if (o.name) {
       const name = decodeURIComponent(o.name)
-      this.setData({ 'file.name': name, fileExt: extLabelOf(name) })
+      this.setData({ 'file.name': name, fileBase: uploadNames.displayNameParts(name).base, fileExt: extLabelOf(name) })
     }
 
     // 上游页数只作瞬时参考，不作为计价依据；服务端报价会覆盖为真实计费页数。
@@ -73,25 +88,15 @@ Page({
       this._runPrivacyScan(o.fileId)
       this._refreshQuote()
     }
-    this._loadPriceLabels()
   },
 
   onUnload() {
+    this._unloaded = true
     if (this._quoteTimer) clearTimeout(this._quoteTimer)
     this._quoteTimer = null
     this._quoteSeq += 1
-  },
-
-  _loadPriceLabels() {
-    api.getPrintPriceConfig()
-      .then((raw) => {
-        const view = pricing.normalizePriceConfig(raw)
-        this.setData({ priceLabels: view.labels })
-      })
-      .catch(() => {
-        // 单价展示失败不冒充正式价格；精确报价仍独立走 /orders/quote。
-        this.setData({ priceLabels: { bw: '以核定结果为准', color: '暂未开放' } })
-      })
+    // 正在打开原文时返回：全局遮罩当场收起，不等网络，免得挡住上一页。
+    if (this._opening) { this._opening = false; wx.hideLoading() }
   },
 
   _refreshQuote(delay = 0) {
@@ -151,45 +156,66 @@ Page({
     else run()
   },
 
-  pickColor(e) {
-    // 不可选项要说清楚「为什么」。一个没有解释的 toast 会让用户以为是自己点错了、
-    // 反复去点；讲明原因之后，暂不开放才是一条能被接受的产品结论。
-    // 注意：本函数必须紧跟 _refreshQuote 之后（verify-miniapp-static 的报价竞态门禁按此定位）。
-    if (e.currentTarget.dataset.v !== 'bw') {
-      wx.showModal({
-        title: '彩色打印暂不可选',
-        content: '门店一体机硬件支持彩色，但驱动侧的彩色参数尚未完成 Windows 真机出纸验收。在验收通过前放开，可能出现选了彩色、实际却出黑白的情况，所以本期只开放黑白。',
-        showCancel: false,
-        confirmText: '知道了',
-      })
+  // 「查看原文」直接用微信阅读器打开本人原文件：PDF/Office 走 openSignedDocument（与「我的文档」同一实现，
+  // 手机上已验过），图片走 previewImage。此前先进打印预览中间页、还要再点一次「打开原文查看」，
+  // 那页还把第 1 步默认的黑白单面写成「本次打印参数」（FLOW1a 实图 08）。
+  openOriginal() {
+    const { fileId, file, fileExt } = this.data
+    if (!fileId) { this.chooseSource(); return }
+    if (this._opening) return
+    this._opening = true
+    wx.showLoading({ title: '正在打开原文…', mask: true })
+    const done = () => {
+      if (!this._opening) return
+      this._opening = false
+      wx.hideLoading()
+    }
+    if (IMAGE_EXTS.indexOf(fileExt) === -1) {
+      fileUrls.openSignedDocument({ wx, fetchUrl: () => api.getFilePreviewUrl(fileId), name: file.name })
+        .then((result) => {
+          done()
+          if (!this._unloaded && !result.ok) wx.showModal({ title: '无法打开原文', content: result.text, showCancel: false })
+        })
       return
     }
-    this.setData({ color: 'bw' })
-  },
-
-  pickDuplex(e) {
-    if (e.currentTarget.dataset.v !== 'single') {
-      wx.showModal({
-        title: '双面打印暂不可选',
-        content: '一体机支持自动双面，但双面参数要经打印驱动 DEVMODE 下发，尚未完成真机验收。在验收通过前放开，可能出现选了双面却打成单面的情况，所以本期只开放单面。',
-        showCancel: false,
-        confirmText: '知道了',
+    api.getFilePreviewUrl(fileId)
+      .then((res) => {
+        const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
+        if (!url) throw new Error('没有拿到原文链接，请稍后重试')
+        done()
+        if (!this._unloaded) wx.previewImage({ urls: [url], current: url })
       })
-      return
+      .catch((err) => {
+        done()
+        if (!this._unloaded) wx.showToast({ title: (err && err.message) || '原文打开失败，请重试', icon: 'none' })
+      })
+  },
+
+  // 第 2 步（终端和参数）每次改动都经 EventChannel 报回来。草稿只存在本页实例里（不写 storage / globalData）。
+  // 归属绑定在**发起跳转那一刻**（gen、owner 由 toStore 传进来），不是事件到达时现取：
+  // 晚到的事件若已跨了账号，代际或会员对不上就不收；未登录（owner 为 null）不收；别的文件、校验不过的也不收。
+  _keepDraft(d, gen, owner) {
+    if (!owner || !auth.isSameSession(gen) || storedOwner() !== owner) return
+    if (!d || typeof d !== 'object' || d.fileId !== this.data.fileId) return
+    let normalized
+    try { normalized = printParams.normalize({ copies: d.copies, colorMode: d.colorMode, duplex: d.duplex }) } catch (e) { return }
+    const terminalId = typeof d.terminalId === 'string' && d.terminalId.length <= 64 ? d.terminalId : ''
+    this._draft = {
+      fileId: d.fileId,
+      gen,
+      owner,
+      copies: normalized.copies,
+      colorMode: normalized.colorMode,
+      duplex: normalized.duplex,
+      terminalId,
     }
-    this.setData({ duplex: 'single' })
   },
 
-  minus() {
-    if (this.data.copies <= 1) return
-    this.setData({ copies: this.data.copies - 1 })
-    this._refreshQuote(500)
-  },
-
-  plus() {
-    if (this.data.copies >= 99) return
-    this.setData({ copies: this.data.copies + 1 })
-    this._refreshQuote(500)
+  // 带回第 2 步的只有本文件、同一会话代际、同一会员的草稿；中途登出、换号就作废，回到默认值。
+  _usableDraft() {
+    const d = this._draft
+    if (d && d.fileId === this.data.fileId && auth.isSameSession(d.gen) && storedOwner() === d.owner) return d
+    return DEFAULT_DRAFT
   },
 
   // 「预览排版」和「去选门店」是同一条打印链路上的两个入口，必须走同一道闸门：
@@ -224,26 +250,11 @@ Page({
     return true
   },
 
-  // 预览页已不再是流程节点：它只让用户看「自己这份文件是什么」，本身没有任何
-  // 通往选门店的出口（print-preview.js 里不存在 confirm/print-store 跳转），
-  // 所以 #610 要堵的「预览 → 建单绕过隐私确认」那条旁路是结构性关掉的，
-  // 预览不必再被报价卡住。下单闸门仍然只有 _passPrintGate() 这一处实现，
-  // 且只有 toStore() 这一个入口会用到它——任何入口都不得再内联重复校验。
-  // 报价未就绪时不本地补 0、不伪造免费结论，金额与页数一律传空由预览页显示「待核定」。
-  preview() {
-    const { color, duplex, copies, total, amountCents, file, fileId, hasPageCount } = this.data
-    if (!fileId) {
-      wx.showToast({ title: '请先从“我的文档”选择真实文件', icon: 'none' })
-      return
-    }
-    const quoted = this.data.priceStatus === 'ready' && hasPageCount
-    wx.navigateTo({
-      url: `/pages/print-preview/print-preview?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${encodeURIComponent(quoted ? total : '')}&amountCents=${encodeURIComponent(quoted ? amountCents : '')}&pages=${quoted ? file.pages : 0}&name=${encodeURIComponent(file.name)}`,
-    })
-  },
-
+  // 看原文不是流程节点：openOriginal() 只打开文件本身，没有通往选终端的出口，
+  // #610 要堵的「预览 → 建单绕过隐私确认」那条旁路结构上不存在。下单闸门仍然只有
+  // _passPrintGate() 这一处实现，且只有 toStore() 这一个入口会用到它——任何入口都不得再内联重复校验。
   tapFile() {
-    if (this.data.hasFile) this.preview()
+    if (this.data.hasFile) this.openOriginal()
     else this.chooseSource()
   },
 
@@ -251,11 +262,25 @@ Page({
     wx.navigateTo({ url: '/pages/documents/documents' })
   },
 
+  // 颜色、单双面、份数、终端都在第 2 步按终端实时能力设置；这里把上次在第 2 步选好的
+  // 带回去（FLOW1a P1：此前只带份数，返回再进时彩色、双面被重置成黑白单面）。
+  // 带回去的只是用户意图：第 2 步照样按终端能力重算、重新核价，quoteKey 对得上才放行。
   toStore() {
     if (!this._passPrintGate()) return
-    const { color, duplex, copies, total, amountCents, file, fileId } = this.data
+    const { file, fileId } = this.data
+    const d = this._usableDraft()
+    const enc = encodeURIComponent
+    let url = '/pages/print-store/print-store?fileId=' + enc(fileId)
+      + '&copies=' + d.copies
+      + '&colorMode=' + d.colorMode
+      + '&duplex=' + d.duplex
+      + '&name=' + enc(file.name)
+    if (d.terminalId) url += '&terminalId=' + enc(d.terminalId)
+    const gen = auth.sessionGeneration()
+    const owner = storedOwner()
     wx.navigateTo({
-      url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
+      url,
+      events: { printDraft: (draft) => this._keepDraft(draft, gen, owner) },
     })
   },
 

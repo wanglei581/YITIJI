@@ -1,5 +1,6 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
-.store-list { display: flex; flex-direction: column; gap: 16rpx; }
+/* 终端列表沿用全局卡片的左右 16px，不再贴屏幕边（FLOW1a 实图 05） */
+.store-list { display: flex; flex-direction: column; gap: 16rpx; margin: 0 16px; }
 .store-card { padding: 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid var(--line-soft); }
 .store-card.selected { border-color: var(--teal); background: var(--teal-wash); }
 .sc-top { display: flex; align-items: center; justify-content: space-between; }
@@ -30,3 +31,39 @@
 .store-list .empty { margin: 0; border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: var(--surface); }
 .store-list .empty .e-ic { color: var(--teal); }
 .store-list .empty .e-ic .ficon { width: 58rpx; height: 58rpx; }
+
+/* 打印参数：放进 card flat card-inner（全局左右边距和内边距）；选项触控区不小于 96rpx，选中态沿用终端卡片的青色 */
+.param-label { margin-top: 20rpx; font-size: var(--fs-base); color: var(--muted); }
+.param-box .param-label:first-child { margin-top: 0; }
+.param-options { display: flex; gap: 16rpx; margin-top: 12rpx; }
+.param-opt {
+  box-sizing: border-box;
+  min-width: 96rpx;
+  min-height: 96rpx;
+  flex: 1;
+  padding: 16rpx 20rpx;
+  border-radius: var(--r-lg);
+  border: 2rpx solid var(--line-soft);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--fs-base);
+  line-height: 1.35;
+  color: var(--ink);
+}
+.param-opt.on { border-color: var(--teal); background: var(--teal-wash); color: var(--ink); font-weight: 600; }
+.param-opt.disabled { opacity: 0.45; }
+.param-opt.on.disabled { opacity: 1; border-color: var(--clay-deep); background: var(--surface); color: var(--clay-deep); }
+.param-hint { margin-top: 16rpx; font-size: var(--fs-base); line-height: 1.5; color: var(--clay-deep); }
+
+/* 份数步进器（原在打印参数页，随参数一起挪到这里）；加减按钮 96rpx（48px），达到最小可点击尺寸 */
+.param-stepper { display: flex; align-items: center; gap: 10rpx; margin-top: 12rpx; }
+.s-btn { width: 96rpx; height: 96rpx; border-radius: var(--r-sm); background: var(--surface-2);
+  border: 1rpx solid var(--line-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 40rpx; color: var(--ink); }
+.s-btn.off { color: var(--ghost); background: var(--surface-3); }
+.s-val { min-width: 88rpx; text-align: center; font-size: 32rpx; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums; }
+.actionbar .btn.lg { min-height: 96rpx; }

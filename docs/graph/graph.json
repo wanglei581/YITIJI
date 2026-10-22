@@ -13017,7 +13017,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 641,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15993,7 +15993,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 738
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18121,6 +18121,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
@@ -18158,6 +18159,7 @@
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/windows-agent-installer.yml": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -21868,14 +21870,27 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/daily-reboot.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/scripts/collect-field-evidence.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs"
     ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
     "apps/terminal-agent/scripts/install-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
@@ -21944,6 +21959,9 @@
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-job-monitor.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
@@ -32342,6 +32360,49 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1",
+          "apps/terminal-agent/installer/provision/boot-spool-guard.ps1",
+          "apps/terminal-agent/installer/provision/daily-reboot.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/collect-field-evidence.ps1",
+          "apps/terminal-agent/scripts/install-production-agent.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/api-client.ts"
         ],
         "missing": []
@@ -32787,6 +32848,7 @@
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
           "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
+          "apps/terminal-agent/src/agent/print-job-monitor.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/index.ts"

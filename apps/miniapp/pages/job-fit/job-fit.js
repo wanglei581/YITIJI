@@ -3,6 +3,10 @@ const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
 const auth = require('../../utils/auth')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
+const session = require('../../utils/resume-parse-session')
 
 /**
  * 简历对照（原「岗位匹配参考」，后端能力名仍是 job_fit）。
@@ -50,6 +54,12 @@ Page({
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     const opts = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——历史回看要会员身份，本机任务也要按「现在这一位」认领。
+    this._startOptions = opts
+    startAfterMemberGate(this, auth, api, () => this._start(opts))
+  },
+
+  _start(opts) {
     // 只做「简历 ↔ 用户自己填写 / 粘贴的职位要求」对照：不再接收 jobId / jobTitle，
     // 平台岗位入口（岗位详情页）已停放，首发按非招聘类目提审（compliance-boundary.md §1.1）。
     const historyTaskId = opts.taskId || ''
@@ -61,7 +71,8 @@ Page({
     // 「我的 AI 记录」只包含会员本人结果；按 taskId 直接只读回看，不要求本机还保存最近任务。
     if (historyTaskId) {
       if (!auth.isLoggedIn()) {
-        this._fail('登录已失效，请重新登录后查看历史结果')
+        // 恢复只是临时失败（断网等）时不说「登录已失效」：点「重试」会再恢复一次。
+        this._fail(this._memberGateOutcome === 'recoverable' ? '暂时没能恢复登录，请稍后重试' : '登录已失效，请重新登录后查看历史结果')
         return
       }
       this._token = ''
@@ -71,7 +82,8 @@ Page({
       return
     }
 
-    const saved = storage.get(storage.KEYS.RESUME_TASK)
+    // 只认属于当前身份的本机任务（10/17）：换号以后不拿上一位的任务和文件名。
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth)
     if (!saved || !saved.taskId) {
       this.setData({ phase: 'no-task' })
       return
@@ -83,11 +95,17 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._stopped = true
     this._stopElapsed()
   },
 
+  onHide() { markPageHidden(this) },
+
   onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
     if (!this.data.historyMode || !this._waitingForHistoryLogin || !auth.isLoggedIn()) return
     this._waitingForHistoryLogin = false
     this._stopped = false
@@ -331,6 +349,19 @@ Page({
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
   toUpload() { wx.navigateTo({ url: '/pages/resume-upload/resume-upload' }) },
   retry() {
+    // 过期但可恢复（FLOW1b）：先等恢复，成功后照常重试一次；要登录时走原来的登录出口。
+    gateMemberAction(this, auth, api, 'retry', () => this._retry(), { needLogin: () => this._retry(), ...this._memberActionHints() })
+  },
+
+  /** 点击类会员闸门的提示（FLOW1b）：恢复临时失败、恢复中再点。 */
+  _memberActionHints() {
+    return {
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    }
+  },
+
+  _retry() {
     if (this.data.historyMode) {
       if (!auth.isLoggedIn()) {
         this._openHistoryLogin()

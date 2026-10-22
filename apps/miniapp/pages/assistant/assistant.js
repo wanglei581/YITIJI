@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMemberAction, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 const voice = require('../../utils/voice-recorder')
 const aiAccess = require('../../utils/ai-access')
 const { userMessageOf, plainAiMessageOf } = require('../../utils/user-error')
@@ -103,7 +104,12 @@ Page({
     })
   },
 
+  onShow() { markPageShown(this) },
+
+  onHide() { markPageHidden(this) },
+
   onUnload() {
+    markPageUnloaded(this)
     voice.cancel()
   },
 
@@ -268,6 +274,16 @@ Page({
   },
 
   saveSummary() {
+    if (this.data.savingSummary) return
+    // 过期但可恢复（FLOW1b）：先等恢复，成功后照常保存一次；恢复中再点不重复发。
+    gateMemberAction(this, auth, api, 'summary', () => this._saveSummary(), {
+      needLogin: () => this.setData({ summaryHint: '登录后可将本次要点保存到我的文档并打印。' }),
+      recoverable: () => this.setData({ summaryHint: '暂时没能恢复登录，请稍后再试一次。' }),
+      busy: () => this.setData({ summaryHint: '正在恢复登录，请稍候。' }),
+    })
+  },
+
+  _saveSummary() {
     if (this.data.savingSummary) return
     if (!auth.isLoggedIn()) {
       this.setData({ summaryHint: '登录后可将本次要点保存到我的文档并打印。' })

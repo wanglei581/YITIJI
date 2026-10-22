@@ -1,27 +1,28 @@
 /* pages/kiosk-login/kiosk-login.wxss
    按 docs/design/kiosk-redesign-2026-08/phone-relay.css 的 qr-login 分屏移植：
-   纸色底、深绿接力条与机器卡、青绿主操作。配色只在本页 .relay 内生效，不改全局令牌。
+   版式照稿；配色 10/17 起统一回小程序现有变量（--paper / --teal / --teal-deep 等），
+   不再用一体机稿的深绿奶油，也不新增颜色。.relay 里的局部变量只是给全局变量起的别名。
    字号 / 圆角一律走 app.wxss 的 --fs-* / --r-*（视觉刻度棘轮）。
    触控：可点区域 ≥48px，主操作 ≥56px（CLAUDE.md §9）。 */
 .relay {
-  --q-paper: #f5f2e9;
-  --q-surface: #fffdf8;
-  --q-ink: #10302b;
-  --q-ink2: #3d5a52;
-  --q-muted: #65746d;
-  --q-line: #e3ddcb;
-  --q-line2: #d4cdb6;
-  --q-deep: #0b241e;
-  --q-deep2: #123a30;
-  --q-emerald: #2ee6a8;
-  --q-emerald2: #78edc5;
-  --q-teal: #1f9e86;
-  --q-teal-d: #157a67;
-  --q-teal-soft: #e0f1ea;
-  --q-wheat-d: #8a6219;
-  --q-wheat-soft: #f3ecda;
-  --q-cinnabar-d: #963227;
-  --q-cinnabar-soft: #f6e4e1;
+  --q-paper: var(--paper);
+  --q-surface: var(--surface);
+  --q-ink: var(--ink);
+  --q-ink2: var(--ink-soft);
+  --q-muted: var(--muted);
+  --q-line: var(--line-soft);
+  --q-line2: var(--line);
+  --q-deep: var(--teal-deep);
+  --q-deep2: var(--teal);
+  --q-emerald: var(--teal-soft);
+  --q-emerald2: var(--teal-wash);
+  --q-teal: var(--teal);
+  --q-teal-d: var(--teal-deep);
+  --q-teal-soft: var(--teal-soft);
+  --q-wheat-d: var(--wheat-deep);
+  --q-wheat-soft: var(--wheat-soft);
+  --q-cinnabar-d: var(--clay-deep);
+  --q-cinnabar-soft: var(--clay-soft);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -31,21 +32,23 @@
 
 /* ── 接力条：常驻提示「这一页只为一体机服务」 ── */
 .relaybar {
+  /* 钉在顶部：状态栏下面始终是深色接力条，白色状态栏字才读得清（kiosk-login.json）。 */
+  position: sticky; top: 0; z-index: 50;
   background: linear-gradient(152deg, var(--q-deep2), var(--q-deep) 72%);
-  color: #f2efe4;
+  color: var(--surface);
   padding-bottom: 28rpx;
   border-radius: 0 0 var(--r-xl) var(--r-xl);
 }
 .rb-row { display: flex; align-items: center; gap: 16rpx; padding: 12rpx 24rpx 0 8rpx; }
-.nav-back { width: 96rpx; height: 96rpx; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #f2efe4; font-size: var(--fs-lg); }
+.nav-back { width: 96rpx; height: 96rpx; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--surface); font-size: var(--fs-lg); }
 .nav-back .i-right { transform: rotate(180deg); }
 .rb-copy { flex: 1; min-width: 0; }
 .rb-title { font-size: var(--fs-md); font-weight: 800; letter-spacing: 2rpx; }
-.rb-sub { margin-top: 4rpx; color: rgba(242,239,228,.66); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rb-sub { margin-top: 4rpx; color: rgba(255,255,255,.66); font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rb-tag {
   flex-shrink: 0;
   padding: 6rpx 20rpx;
-  border: 1rpx solid rgba(46,230,168,.34);
+  border: 1rpx solid rgba(255,255,255,.34);
   border-radius: var(--r-full);
   color: var(--q-emerald2);
   font-size: var(--fs-sm);
@@ -63,28 +66,28 @@
   padding: 40rpx 36rpx 36rpx;
   border-radius: var(--r-xl);
   background: linear-gradient(158deg, var(--q-deep2), var(--q-deep) 74%);
-  color: #f2efe4;
+  color: var(--surface);
   text-align: center;
 }
 .dev-glyph {
   width: 120rpx; height: 120rpx;
   display: flex; align-items: center; justify-content: center;
-  border: 2rpx solid rgba(46,230,168,.4);
+  border: 2rpx solid rgba(255,255,255,.4);
   border-radius: var(--r-lg);
-  background: rgba(46,230,168,.11);
+  background: rgba(255,255,255,.11);
   color: var(--q-emerald);
   font-size: var(--fs-2xl);
 }
 .dev-copy { display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .dev-name { margin-top: 24rpx; font-size: var(--fs-xl); font-weight: 800; line-height: 1.3; word-break: break-all; }
-.devcard.unknown .dev-name { font-size: var(--fs-lg); color: rgba(242,239,228,.9); }
-.dev-desc { margin-top: 12rpx; color: rgba(242,239,228,.74); font-size: var(--fs-base); line-height: 1.6; }
+.devcard.unknown .dev-name { font-size: var(--fs-lg); color: rgba(255,255,255,.9); }
+.dev-desc { margin-top: 12rpx; color: rgba(255,255,255,.74); font-size: var(--fs-base); line-height: 1.6; }
 .dev-chip {
   margin-top: 24rpx;
   padding: 8rpx 24rpx;
-  border: 1rpx solid rgba(46,230,168,.3);
+  border: 1rpx solid rgba(255,255,255,.3);
   border-radius: var(--r-full);
-  background: rgba(46,230,168,.09);
+  background: rgba(255,255,255,.09);
   color: var(--q-emerald2);
   font-size: var(--fs-sm);
   line-height: 1.5;
@@ -93,10 +96,10 @@
   display: flex; align-items: flex-start; gap: 14rpx;
   margin-top: 24rpx;
   padding: 18rpx 22rpx;
-  border: 1rpx solid rgba(242,239,228,.16);
+  border: 1rpx solid rgba(255,255,255,.16);
   border-radius: var(--r-md);
-  background: rgba(255,253,248,.07);
-  color: rgba(242,239,228,.86);
+  background: rgba(255,255,255,.07);
+  color: rgba(255,255,255,.86);
   font-size: var(--fs-sm);
   line-height: 1.6;
   text-align: left;
@@ -129,7 +132,7 @@
 }
 .statecard.warn .glyph { background: var(--q-wheat-soft); color: var(--q-wheat-d); }
 .statecard.error .glyph { background: var(--q-cinnabar-soft); color: var(--q-cinnabar-d); }
-.statecard.done { border-color: #9ed2c4; background: var(--q-teal-soft); }
+.statecard.done { border-color: var(--teal-soft); background: var(--q-teal-soft); }
 .statecard.done .glyph { background: var(--q-surface); color: var(--q-teal-d); }
 .sc-title { margin-top: 28rpx; color: var(--q-ink); font-size: var(--fs-lg); font-weight: 800; line-height: 1.4; }
 .sc-desc { margin-top: 16rpx; color: var(--q-muted); font-size: var(--fs-base); line-height: 1.65; }
@@ -167,8 +170,8 @@
 }
 .notice .ficon { margin-top: 6rpx; }
 .notice-text { flex: 1; }
-.notice.calm { background: var(--q-teal-soft); color: #0b4c40; }
-.notice.warn { background: var(--q-wheat-soft); color: #5e4210; }
+.notice.calm { background: var(--q-teal-soft); color: var(--teal-deep); }
+.notice.warn { background: var(--q-wheat-soft); color: var(--wheat-deep); }
 
 /* ── 事实表：时限、下一步这类必须写清楚的话 ── */
 .facts { border: 1rpx solid var(--q-line); border-radius: var(--r-lg); background: var(--q-surface); overflow: hidden; }
@@ -192,8 +195,8 @@
   line-height: 1.3;
 }
 .btn::after { border: none; }
-.btn.primary { background: var(--q-teal); color: #fffdf8; box-shadow: 0 12rpx 32rpx rgba(31,158,134,.26); }
-.btn.ghost { min-height: 104rpx; border: 2rpx solid var(--q-line2); background: var(--q-surface); color: var(--q-ink); }
+.btn.primary { background: var(--q-teal); color: #fff; box-shadow: 0 8px 18px rgba(35, 84, 230, .22); }
+.btn.ghost { min-height: 104rpx; border: 1.5px solid var(--q-line2); background: var(--q-surface); color: var(--q-ink); }
 .btn .ficon { font-size: var(--fs-lg); }
 .reason { color: var(--q-muted); font-size: var(--fs-sm); line-height: 1.6; text-align: center; }
 

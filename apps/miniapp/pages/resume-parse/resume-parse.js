@@ -1,6 +1,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { startAfterMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 const storage = require('../../utils/storage')
 const intentStore = require('../../utils/resume-parse-intent')
 const session = require('../../utils/resume-parse-session')
@@ -95,7 +96,21 @@ Page({
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再提交解析——否则会员的这份简历会被当成游客任务提交，
+    // 进不了「我的简历」。恢复不了就照游客提交（与原来一样）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
 
+  onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
+  },
+
+  onHide() { markPageHidden(this) },
+
+  _start(options) {
     const fileId = options.fileId || ''
     const fileName = options.fileName ? decodeURIComponent(options.fileName) : ''
     const fileFormat = options.fileFormat ? decodeURIComponent(options.fileFormat) : ''
@@ -123,6 +138,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._stopped = true
     this._unsavedTask = null
     if (this._elapsedTimer) clearInterval(this._elapsedTimer)
@@ -279,6 +295,8 @@ Page({
         fileId: res.fileId || this.data.fileId,
         fileName: this.data.fileName,
         ts: Date.now(),
+        // 归属：提交时的身份（会员 id，匿名为 null）。读的地方据此只认自己的任务（10/17）。
+        ownerId: this._submitIdentity ? this._submitIdentity.ownerId : session.ownerId(auth),
       }
       if (terminal && this._intent && session.sameIdentity(auth, this._submitIdentity) && (!anonymous || token)) task.settledIntent = this._intent
       if (!session.persistResumeTask(task)) {
@@ -416,6 +434,7 @@ Page({
           fileName: saved.fileName || this.data.fileName,
           ts: Date.now(),
           settledIntent: this._intent,
+          ownerId: this._submitIdentity ? this._submitIdentity.ownerId : session.ownerId(auth),
         }
         if (!session.persistResumeTask(next)) {
           this._unsavedTask = next

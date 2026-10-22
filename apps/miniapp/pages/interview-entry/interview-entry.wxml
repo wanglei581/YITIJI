@@ -1,9 +1,11 @@
 <!--pages/interview-entry/interview-entry.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-  <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-center nav-title">模拟面试</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" bindtap="goBack" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-center nav-title">模拟面试</view>
+    </view>
   </view>
   <view class="content has-bar">
 

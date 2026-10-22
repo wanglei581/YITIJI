@@ -52,7 +52,7 @@
 }
 
 .od-actions {
-  padding: 24rpx 0 8rpx;
+  padding: 24rpx 16px 8rpx;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
