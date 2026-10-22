@@ -72,6 +72,7 @@ import { CommunityModule } from './community/community.module'
 import { AssistantModule } from './assistant/assistant.module'
 import { DocumentConversionModule } from './document-conversion/document-conversion.module'
 import { AiAccessModule } from './ai-access/ai-access.module'
+import { FirstOrderModule } from './first-order/first-order.module'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
   const u = new URL(url)
@@ -87,6 +88,7 @@ const redisUrl = process.env['REDIS_URL']
 
 @Module({
   imports: [
+    FirstOrderModule,
     // Throttler:防字典爆破。默认全局每 IP 每分钟 60 次,
     // /auth/login 单独用更严格的 5 次/60 秒(见 auth.controller)。
     //

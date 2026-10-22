@@ -54,6 +54,7 @@ model Terminal {
   scanDeletionAudits TerminalScanDeletionAudit[]
   capabilities TerminalCapability[]
   releaseTargets AgentReleaseTarget[]
+  serviceDeployments ServiceDeployment[]
   activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
 
   @@index([orgId])
@@ -692,6 +693,7 @@ model Organization {
   updatedAt  DateTime @updatedAt
 
   users      User[]
+  serviceProjects ServiceProject[]
   terminals  Terminal[]
   jobs       Job[]      @relation("JobOrg")
   jobSources JobSource[]
@@ -3363,4 +3365,100 @@ model PlatformSetting {
   value     String?
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+
+// First-order institutional assets, maintenance and frozen aggregate reports.
+// Deployment is append-only history; activeTerminalId enforces one active project per terminal.
+model ServiceProject {
+  id             String @id @default(cuid())
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  name           String
+  reference      String
+  serviceStartAt DateTime
+  serviceEndAt   DateTime
+  serviceScope   String
+  supportContact String
+  version        Int @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deployments    ServiceDeployment[]
+  incidents      ServiceIncident[]
+  reports        ServiceReport[]
+
+  @@unique([orgId, reference])
+  @@index([orgId, createdAt])
+}
+
+model ServiceDeployment {
+  id               String @id @default(cuid())
+  projectId        String
+  project          ServiceProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  orgId            String
+  terminalId       String
+  terminal         Terminal @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  activeTerminalId String? @unique
+  terminalCode     String
+  locationLabel    String
+  startedAt        DateTime @default(now())
+  endedAt          DateTime?
+  incidents        ServiceIncident[]
+
+  @@index([projectId, startedAt])
+  @@index([terminalId, startedAt, endedAt])
+  @@index([orgId, startedAt])
+}
+
+model ServiceIncident {
+  id           String @id @default(cuid())
+  orgId        String
+  projectId    String
+  project      ServiceProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  deploymentId String
+  deployment   ServiceDeployment @relation(fields: [deploymentId], references: [id], onDelete: Restrict)
+  terminalCode String
+  issueCode    String
+  note         String
+  requestKey   String
+  status       String @default("open")
+  assignee     String?
+  resolution   String?
+  version      Int @default(1)
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  events       ServiceIncidentEvent[]
+
+  @@unique([orgId, requestKey])
+  @@index([orgId, createdAt])
+  @@index([projectId, status])
+}
+
+model ServiceIncidentEvent {
+  id         String @id @default(cuid())
+  incidentId String
+  incident   ServiceIncident @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+  action     String
+  note       String
+  actorRole  String
+  createdAt  DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+}
+
+model ServiceReport {
+  id             String @id @default(cuid())
+  projectId      String
+  project        ServiceProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  orgId          String
+  month          String
+  snapshotJson   String
+  checksum       String
+  acknowledgedAt DateTime?
+  createdAt      DateTime @default(now())
+
+  @@unique([projectId, month])
+  @@index([orgId, month])
 }

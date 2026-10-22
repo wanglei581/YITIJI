@@ -24,6 +24,7 @@ import { getOrgProfile } from '../../services/api/orgSelf'
 import { downloadCsv, safeFileName } from '../../lib/csv'
 import { TerminalOpsCards } from './TerminalOpsCards'
 import { TerminalOpsDrawer } from './TerminalOpsDrawer'
+import { FirstOrderPanel } from '../../components/first-order/FirstOrderPanel'
 import {
   METRIC_NOTES,
   RUN_STATE_VIEW,
@@ -221,6 +222,8 @@ export default function TerminalsPage() {
           </p>
         </div>
       )}
+
+      <FirstOrderPanel />
 
       <TerminalOpsDrawer
         row={selected}
