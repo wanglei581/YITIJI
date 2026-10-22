@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-22：Edge 套壳客户端内容自动更新候选（本地验证，未发布）
+
+- 用户确认客户端是 Edge 网站套壳，要求随功能更新同步页面内容。本轮从 `main@b2c49d3f8ab80bdac09f21ccd245bc0bf09f96c0` 建立独立分支 `codex/kiosk-idle-content-update-20261022`，没有修改共享根目录的现场脏改动或本机已安装 Agent。
+- 范围/预算 8 文件：Kiosk `vite.config.ts`、`src/services/contentUpdate.ts`、`src/hooks/useContentUpdate.ts`、`src/layouts/KioskRuntimeRoot.tsx`、`scripts/tests/content-update.test.mjs`、`package.json` 及两份正式进度文档。复用既有忙碌锁、隐私会话空操作判据和扫描收尾闸；不新增页面/入口/依赖/API/数据模型，不改简历/文件/打印/扫描业务协议、生产配置、密钥、数据库或硬件代码。
+- 正式构建向首页 HTML 写入独立版本标记；运行中每 5 分钟以 `no-store`、不带凭据、拒绝重定向的同源请求检查新版。只有可见、在线、无查询串/片段的干净首页，未登录、非 guestMode、无忙碌锁/警告/敏感会话/扫描收尾/弹窗/输入焦点，且连续安全空闲 60 秒，才重新验证首页及入口 JS/CSS 后整页刷新。网络/文件不可用保留旧页并退避，回滚到当前版本取消更新，卸载取消请求。刷新前不主动清除用户会话。
+- 本地验证：Kiosk typecheck、`build:kiosk:production`（含 `verify:prod-build-config`，使用本地测试网桥值）通过；完整 lint 0 error（主干已有 27 warning）；会员会话闭环静态守卫与 28 个行为用例通过；新增 11 个更新行为/请求用例通过，并接入现有 `verify:member-session-closure` 的 CI 执行闭包，`verify:ci-gate-coverage` 通过。Edge 对真实生产构建在 1080×1920、390×844 两种视口验证新版检测、弹窗/敏感残留/业务路由阻止刷新、回到干净首页后延迟刷新并加载新版本标记；所有 API/本机 Agent 请求均在浏览器测试中隔离，不代表真服务或真机出纸验收。
+- 发布边界：候选未合并、未部署，当前安装的 Agent 0.4.17 不变。首次发布本候选后需人工重新打开一次 Edge 客户端，旧页面没有检测器，不能自行获得本次新增能力；后续网站版本可自动跟随。只验证入口 JS/CSS 的可达性，发布仍须保持 HTML 与完整静态目录一致、遵循既有发布门禁；不以本地验证替代生产发布授权与现场验收。
+- 发布推进：PR #1488；产品负责人本人明确允许本次以代码审查、浏览器验证和三项 CI 通过代替五家联合评审。生产只读核对 API 为上述基线 SHA、ready=200、PostgreSQL/Redis 正常。首轮 CI `39733842947` 的依赖安全门禁被现有依赖的 3 条 high 公告拦截，文件预算由 8 增至 10，仅增加 `pnpm-workspace.yaml` 与锁文件：`follow-redirects` 1.16.0 → 1.16.1（两条跨域凭据泄露公告），Vite 6.4.3 → 6.4.4（Windows 编辑器检查绕过）。保留原安全门禁及例外范围；补丁属于发布阻塞修复，涉及 API 传递依赖，须重新跑完整 CI 后才能受控整体发布。
+- 补丁验证：锁文件仅更新上述两包及 Vite peer 键，保留其余主线依赖；frozen-lockfile 安装、Kiosk typecheck、11 项内容更新测试、CI 覆盖和 Vite 6.4.4 生产构建通过。官方 npm audit 为 high=0 / critical=0（7 项 moderate）；本机默认 npmmirror 无 audit 端点，既有完整安全脚本另因 Windows `spawnSync('pnpm')` 无法执行而未通过，Linux CI 仍须实际运行该脚本，未添加豁免。
+
 ## 2026-10-15：主线打印链最小修复候选（未合并、未部署、未完成业务出纸）
 
 - 基线 `main@cfbe567840d2bd2d62accce4bcea1797bcf59976`；分支 `codex/print-chain-main-closeout-20261015`。从主线独立提取本轮修复，不带入旧候选的五百多个提交。
