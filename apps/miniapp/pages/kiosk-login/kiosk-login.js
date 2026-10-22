@@ -8,6 +8,9 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const {
+  gateMember, retryMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 
 // 从扫码结果 URL 里提取 ticketId（容错：带或不带 domain 前缀）
 const TICKET_RE = /[?&]ticketId=([A-Za-z0-9_%-]{20,200})/
@@ -114,6 +117,9 @@ Page({
     ttlSeconds: QR_TICKET_TTL_SECONDS,
     errorMsg: '',
     note: '',
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
   },
 
   onLoad(options) {
@@ -133,19 +139,27 @@ Page({
   },
 
   onShow() {
+    markPageShown(this)
     // 从登录页返回、或在别处换了账号
     if (!auth.isSameSession(this._gen)) {
       this._reset()
       return
     }
-    const loggedIn = auth.isLoggedIn()
-    if (loggedIn !== this.data.isLoggedIn) this.setData({ isLoggedIn: loggedIn })
+    gateMember(this, auth, api, {
+      ready: () => { if (!this.data.isLoggedIn) this.setData({ isLoggedIn: true }) },
+      needLogin: () => { if (this.data.isLoggedIn) this.setData({ isLoggedIn: false }) },
+    })
   },
 
+  onHide() { markPageHidden(this) },
+
   onUnload() {
+    markPageUnloaded(this)
     this._flow += 1
     this._ticketId = ''
   },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   goLogin() {
     // 统一进入包含「微信一键登录 + 短信兜底」的登录页。
@@ -299,6 +313,16 @@ Page({
 
   /** 本人在页面上核对过机器之后确认。只在 ready 屏可用，一张票据一次只发一发。 */
   confirmLogin() {
+    if (this.data.phase !== 'ready' || !this._ticketId) return
+    // 访问令牌刚好过期但可恢复（FLOW1b）：先等恢复，成功后照常确认一次；等待中再点不会重复发，
+    // 恢复临时失败提示可重试，不让人去收短信。
+    gateMemberAction(this, auth, api, 'confirm', () => this._confirmLogin(), {
+      needLogin: () => this._reset(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+    })
+  },
+
+  _confirmLogin() {
     if (this.data.phase !== 'ready' || !this._ticketId) return
     if (!auth.isLoggedIn() || !auth.isSameSession(this._gen)) {
       this._reset()

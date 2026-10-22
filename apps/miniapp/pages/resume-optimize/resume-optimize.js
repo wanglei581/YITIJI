@@ -3,6 +3,9 @@ const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 const normalize = require('../../utils/normalize.js')
 const auth = require('../../utils/auth.js')
+const {
+  startAfterMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard.js')
 const buildModel = require('../../utils/resume-build-model.js')
 const fileUrls = require('../../utils/file-url.js')
 const draft = require('./draft')
@@ -22,6 +25,7 @@ Page({
     phase: 'no-task',
     taskId: '',
     needReupload: false,
+    canManual: false, // 额度用完或 AI 不可用：失败态给「按模板手动填写」
     failMsg: '',
     opt: null,
     isMock: false,
@@ -53,7 +57,22 @@ Page({
   },
 
   onLoad(options) {
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20, loggedIn: auth.isLoggedIn() })
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——导出价格、已确认版本、草稿存哪儿都按会员身份判断。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
+
+  onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
+  },
+
+  onHide() { markPageHidden(this) },
+
+  _start(options) {
+    this.setData({ loggedIn: auth.isLoggedIn() })
     this._loadPricing()
     const taskId = options.taskId || ''
     if (!taskId) {
@@ -70,6 +89,7 @@ Page({
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._gone = true
     this._stopExportCountdown()
     if (this._saver) this._saver.flush()
@@ -88,7 +108,8 @@ Page({
       if (opt.isFailed) {
         const msg = opt.failReason || '优化生成失败'
         const needReupload = /简历原文|清理|重新上传/.test(msg)
-        this._fail(msg, needReupload)
+        // 模型层额度或账号问题时服务端原话是「可以先按模板手动填写」：给这条路（10/17）。
+        this._fail(msg, needReupload, /手动填写/.test(msg))
         return
       }
       if (!opt.isCompleted) {
@@ -117,13 +138,15 @@ Page({
       } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT' || code === 'AI_OPTIMIZE_UNAVAILABLE') {
         this._fail('AI 优化服务暂时不可用，请稍后重试', false)
       } else {
-        this._fail((err && err.message) || '加载失败，请返回重试', false)
+        // 额度用完或 AI 暂时不可用：提示语本身说「可以先（用模板）手动填写」，失败态给这条路（10/17）。
+        const manual = code === 'AI_BUDGET_EXHAUSTED' || code === 'AI_BUDGET_UNAVAILABLE'
+        this._fail((err && err.message) || '加载失败，请返回重试', false, manual)
       }
     }
   },
 
-  _fail(failMsg, needReupload) {
-    this.setData({ phase: 'failed', failMsg, needReupload }, () => this._syncExportAvailability())
+  _fail(failMsg, needReupload, canManual) {
+    this.setData({ phase: 'failed', failMsg, needReupload, canManual: !!canManual }, () => this._syncExportAvailability())
   },
 
   _bootDraft() {
@@ -255,9 +278,23 @@ Page({
     this._fetch()
   },
 
+  /** 额度用完或 AI 不可用时的出路：现有的「从零建一份简历」，表单填写，AI 挂了也能按填写内容导出。 */
+  toManualBuild() {
+    wx.navigateTo({ url: '/pages/resume-build/resume-build', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
+  },
+
+  /** 无任务态与失败态：去「我的简历」另选一份（列表由服务端按本人返回，每份有带 taskId 的「继续优化」）。 */
+  toResumes() {
+    wx.navigateTo({ url: '/pages/resumes/resumes', fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }) })
+  },
+
+  /**
+   * 无任务态「上传新简历」与失败态「重新上传简历」：去选文件的上传页（诊断、我的简历、职业规划、岗位匹配同一入口）。
+   * 不能直接去解析页：解析页没有 fileId 就停在「缺少待解析的简历文件」。
+   */
   tapReupload() {
     wx.navigateTo({
-      url: '/pages/resume-parse/resume-parse',
+      url: '/pages/resume-upload/resume-upload',
       fail: () => wx.showToast({ title: '页面跳转失败', icon: 'none' }),
     })
   },
@@ -270,6 +307,16 @@ Page({
   },
 
   exportResume() {
+    if (this.data.exporting) return
+    // 导出要挂在本人账号下（FLOW1b）：访问令牌过期但可恢复时先等恢复，成功后照常导出一次；恢复中再点不重复。
+    gateMemberAction(this, auth, api, 'export', () => this._exportResume(), {
+      needLogin: () => this._exportResume(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
+
+  _exportResume() {
     if (this.data.exporting) return
     if (this.data.exportDisabled) {
       wx.showModal({ title: '暂时不能导出', content: this.data.exportDisabledReason, showCancel: false })

@@ -2,7 +2,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">我的简历</view>
@@ -10,7 +10,7 @@
   </view>
 
   <view class="content resume-content">
-    <view class="resume-hero" wx:if="{{!loginRequired}}">
+    <view class="resume-hero" wx:if="{{!loginRequired && !restoring && !restoreFailed}}">
       <view class="rh-copy">
         <view class="rh-kicker">简历资产</view>
         <view class="rh-title"><text class="rh-num">{{resumes.length}}</text> 份简历</view>
@@ -19,7 +19,21 @@
       <view class="rh-icon"><text class="ficon i-folder"></text></view>
     </view>
 
-    <view class="empty-card" wx:if="{{loginRequired}}">
+    <view class="empty-card" wx:if="{{restoring}}">
+      <view class="empty-icon"><text class="ficon i-user"></text></view>
+      <view class="empty-title">正在恢复上次的登录…</view>
+    </view>
+
+    <view class="empty-card" wx:elif="{{restoreFailed}}">
+      <view class="empty-icon"><text class="ficon i-user"></text></view>
+      <view class="empty-title">暂时没能恢复登录</view>
+      <view class="empty-desc">请稍后再试一次。</view>
+      <view class="btn primary block tap" hover-class="tap-press" bindtap="retryRestore">重试</view>
+      <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+      <view class="btn ghost block tap mt12" hover-class="tap-press" bindtap="goLogin">去登录</view>
+    </view>
+
+    <view class="empty-card" wx:elif="{{loginRequired}}">
       <view class="empty-icon"><text class="ficon i-user"></text></view>
       <view class="empty-title">登录后管理简历</view>
       <view class="empty-desc">查看本人全部简历版本，并继续使用 AI 诊断、优化与打印服务。</view>
@@ -33,7 +47,7 @@
           <view class="section-sub">点击简历可查看诊断报告</view>
         </view>
         <view class="upload-button tap" hover-class="tap-press" bindtap="upload"
-              role="button" aria-label="上传新简历">
+              aria-role="button" aria-label="上传新简历">
           <text class="ficon i-upload"></text>
           <text>上传新简历</text>
         </view>
@@ -72,7 +86,7 @@
 
       <view class="list-state" wx:if="{{loadingMore}}">正在加载更多…</view>
       <view class="list-state" wx:elif="{{loadMoreError}}">
-        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" role="button" aria-label="重新加载更多简历">加载更多失败，点此重试</view>
+        <view class="state-retry tap" hover-class="tap-press" bindtap="retryLoadMore" aria-role="button" aria-label="重新加载更多简历">加载更多失败，点此重试</view>
       </view>
       <view class="list-state" wx:elif="{{nextCursor}}">上拉加载更多</view>
     </block>

@@ -1,20 +1,39 @@
 <!--pages/daily-report/daily-report.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-  <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
-      <text class="nav-back-ic ficon i-right"></text>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" aria-role="button" aria-label="返回">
+        <text class="nav-back-ic ficon i-right"></text>
+      </view>
+      <view class="nav-title">今日提醒</view>
     </view>
-    <view class="nav-title">今日提醒</view>
-    <view class="nav-date" wx:if="{{dateStr}}">{{dateStr}}</view>
   </view>
 
   <view class="content">
-    <view class="card" wx:if="{{!loggedIn}}">
+    <!-- 日期放在内容区第一行：页头标题绝对居中，日期留在页头右侧会被胶囊盖住，往左推又会压到标题。 -->
+    <view class="dr-date" wx:if="{{dateStr}}">{{dateStr}}</view>
+    <view class="card" wx:if="{{restoring}}">
+      <view class="empty-slot">
+        <view class="es-t">正在恢复上次的登录…</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{restoreFailed}}">
+      <view class="empty-slot">
+        <view class="es-t">暂时没能恢复登录</view>
+        <view class="es-d">请稍后再试一次。</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="retryRestore" aria-role="button" aria-label="重试">重试</view>
+        <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+        <view class="btn lg ghost block tap mt12" hover-class="tap-press" bindtap="goLogin" aria-role="button" aria-label="去登录">去登录</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{!loggedIn}}">
       <view class="empty-slot">
         <view class="es-t">请先登录</view>
         <view class="es-d">今日提醒按你的打印订单和平台通知生成，登录后可查看。</view>
-        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goLogin" aria-role="button" aria-label="去登录">去登录</view>
       </view>
     </view>
 
@@ -25,14 +44,14 @@
     <view class="empty-slot" wx:elif="{{error}}">
       <view class="es-t">加载失败</view>
       <view class="es-d">{{error}}</view>
-      <view class="btn ghost block tap" hover-class="tap-press" bindtap="retry" role="button" aria-label="重试">重试</view>
+      <view class="btn ghost block tap" hover-class="tap-press" bindtap="retry" aria-role="button" aria-label="重试">重试</view>
     </view>
 
     <view class="card" wx:elif="{{empty}}">
       <view class="empty-slot">
         <view class="es-t">今日无紧急待办</view>
         <view class="es-d">没有即将过期的到机码，也没有新的平台通知</view>
-        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goPrint" role="button" aria-label="去打印">去打印</view>
+        <view class="btn lg primary block tap" hover-class="tap-press" bindtap="goPrint" aria-role="button" aria-label="去打印">去打印</view>
       </view>
     </view>
 
@@ -52,7 +71,7 @@
               hover-class="tap-press"
               bindtap="openRoute"
               data-route="{{row.route}}"
-              role="button"
+              aria-role="button"
               aria-label="{{row.actionLabel}}"
             >{{row.actionLabel}}</view>
           </view>
@@ -62,7 +81,7 @@
             hover-class="tap-press"
             bindtap="openRoute"
             data-route="{{item.route}}"
-            role="button"
+            aria-role="button"
             aria-label="{{item.actionLabel}}"
           >{{item.actionLabel}}</view>
         </view>

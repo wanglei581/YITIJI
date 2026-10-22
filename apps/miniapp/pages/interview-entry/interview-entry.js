@@ -18,11 +18,12 @@ Page({
       { val: 'gt5',   label: '5年以上' },
       { val: 'switch', label: '转岗' },
     ],
-    // durationMin 对应后端 DURATION_TARGET: { 3:4, 5:6, 8:8 }
+    // durationMin 对应后端 DURATION_TARGET: { 3:4, 5:6, 8:8 }。标签叫「练习时长」，
+    // 选项同时写时长和对应题数，免得标签写时长、选项只写题数，两头对不上。
     durations: [
-      { val: 3, label: '约4题' },
-      { val: 5, label: '约6题' },
-      { val: 8, label: '约8题' },
+      { val: 3, label: '约3分钟 · 4题' },
+      { val: 5, label: '约5分钟 · 6题' },
+      { val: 8, label: '约8分钟 · 8题' },
     ],
     qtypes: [
       { val: 'hr',   label: '行为面试' },

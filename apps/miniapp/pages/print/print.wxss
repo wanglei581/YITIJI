@@ -45,13 +45,6 @@
 .pc-body { flex: 1; min-width: 0; }
 .pc-title { font-size: 29rpx; font-weight: 700; color: var(--ink); }
 .pc-desc  { font-size: 23rpx; line-height: 1.45; color: var(--muted); margin-top: 7rpx; }
-.pc-flow  {
-  font-size: 21rpx; color: var(--teal-deep);
-  background: var(--teal-wash);
-  display: inline-block;
-  padding: 6rpx 14rpx; border-radius: var(--r-full);
-  margin-top: 12rpx;
-}
 .pc-arrow { color: var(--ghost); flex-shrink: 0; }
 .pc-arrow .ficon { width: 22rpx; height: 22rpx; }
 

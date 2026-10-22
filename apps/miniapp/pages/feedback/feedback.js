@@ -3,6 +3,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 
 // ai_content（C3）：AI 内容投诉，服务端 member-feedback.dto.ts 的 FEEDBACK_CATEGORIES 里有这一类。
 // 个人信息请求不在这里开类别：在「隐私与数据」自助办，办不了的按那里写的方式联系（9/28 C3 口径）。
@@ -66,6 +67,9 @@ Page({
   data: {
     statusBarHeight: 20,
     loggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
     categories: CATEGORIES,
     category: 'general',
     title: '',
@@ -93,13 +97,21 @@ Page({
   },
 
   onShow() {
-    if (!auth.isLoggedIn()) {
-      this._abandonList()
-      return
-    }
-    this.setData({ loggedIn: true })
-    this.loadList()
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => {
+        this.setData({ loggedIn: true })
+        this.loadList()
+      },
+      needLogin: () => this._abandonList(),
+    })
   },
+
+  onHide() { markPageHidden(this) },
+
+  onUnload() { markPageUnloaded(this) },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   onReachBottom() {
     this.loadList(true)

@@ -3,7 +3,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
       <view class="nav-title">AI 服务记录</view>
       <view class="nav-right"></view>
     </view>
@@ -20,7 +20,25 @@
       >{{item.label}}</view>
     </view>
 
-    <view class="card" wx:if="{{loginRequired}}">
+    <view class="card" wx:if="{{restoring}}">
+      <view class="empty-slot">
+        <text class="ficon i-robot es-ic"></text>
+        <view class="es-t">正在恢复上次的登录…</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{restoreFailed}}">
+      <view class="empty-slot">
+        <text class="ficon i-robot es-ic"></text>
+        <view class="es-t">暂时没能恢复登录</view>
+        <view class="es-d">请稍后再试一次。</view>
+        <view class="btn teal" style="margin-top:32rpx" bindtap="retryRestore">重试</view>
+        <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+        <view class="btn ghost" style="margin-top:20rpx" bindtap="goLogin">去登录</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{loginRequired}}">
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
         <view class="es-t">请先登录</view>
@@ -69,6 +87,10 @@
         <text class="ficon i-robot es-ic"></text>
         <view class="es-t">{{activeFilter === 'qa' ? '暂无问答要点' : '暂无 AI 服务记录'}}</view>
         <view class="es-d">{{activeFilter === 'qa' ? '在小青对话里保存本次要点后，可以在这里回看条目' : '使用简历诊断、优化、模拟面试、简历对照、职业规划，或保存小青问答要点后可在此回看'}}</view>
+        <!-- 空态出口（10/17 实图 25：只有一句「暂无」，没有去用的入口）。落到现有页面，不是新入口。 -->
+        <view class="btn primary sm tap" style="margin-top: 24rpx;" hover-class="tap-press"
+              bindtap="emptyAction" aria-role="button"
+              aria-label="{{activeFilter === 'qa' ? '去问小青' : '去用 AI 工具'}}">{{activeFilter === 'qa' ? '去问小青' : '去用 AI 工具'}}</view>
       </view>
     </view>
 

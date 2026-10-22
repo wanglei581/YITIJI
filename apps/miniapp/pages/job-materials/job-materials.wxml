@@ -1,9 +1,10 @@
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-title">材料模板</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" bindtap="goBack" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-title">材料模板</view>
+    </view>
   </view>
 
   <view class="content has-bar">
@@ -14,7 +15,7 @@
       <view class="state-icon error"><text class="ficon i-warning"></text></view>
       <view class="state-title">加载失败</view>
       <view class="state-desc">{{loadError}}</view>
-      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载">重新加载</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" aria-role="button" aria-label="重新加载">重新加载</view>
     </view>
 
     <!-- ── 选模板 ── -->
@@ -33,7 +34,7 @@
       <view wx:for="{{templates}}" wx:key="id"
             class="card tap {{item.unsupported ? 'jm-off' : ''}}" hover-class="tap-press"
             bindtap="tapTemplate" data-id="{{item.id}}"
-            role="button" aria-label="{{item.title}}，{{item.description}}">
+            aria-role="button" aria-label="{{item.title}}，{{item.description}}">
         <view class="jm-head">
           <view class="jm-title">{{item.title}}</view>
           <text class="chip">{{item.typeLabel}}</text>
@@ -55,16 +56,19 @@
         <view class="ph-sub">{{picked.description}}</view>
       </view>
 
-      <view class="card rise-d2" wx:for="{{picked.fields}}" wx:key="key">
-        <view class="jm-flabel">
-          {{item.label}}<text wx:if="{{item.required}}" class="jm-req">必填</text>
+      <!-- 所有字段放进同一张卡，字段之间用分隔线（10/17 实图 27b：原先每个字段一张大卡）。 -->
+      <view class="card rise-d2" wx:if="{{picked.fields && picked.fields.length}}">
+        <view class="jm-field" wx:for="{{picked.fields}}" wx:key="key">
+          <view class="jm-flabel">
+            {{item.label}}<text wx:if="{{item.required}}" class="jm-req">必填</text>
+          </view>
+          <textarea wx:if="{{item.multiline}}" class="jm-input jm-area" value="{{values[item.key]}}"
+            placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
+            data-key="{{item.key}}" bindinput="onInput" auto-height />
+          <input wx:else class="jm-input" value="{{values[item.key]}}"
+            placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
+            data-key="{{item.key}}" bindinput="onInput" />
         </view>
-        <textarea wx:if="{{item.multiline}}" class="jm-input jm-area" value="{{values[item.key]}}"
-          placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
-          data-key="{{item.key}}" bindinput="onInput" auto-height />
-        <input wx:else class="jm-input" value="{{values[item.key]}}"
-          placeholder="{{item.placeholder}}" placeholder-class="jm-ph" maxlength="{{item.maxLength}}"
-          data-key="{{item.key}}" bindinput="onInput" />
       </view>
 
       <view class="notice info rise-d3">
@@ -87,9 +91,9 @@
            自己没有 flex:1，于是它按 max-content 收缩（1×93 + 2×93 + 8 = 287px），
            在 343px 的可用宽里靠左贴着，右边空 56px。子元素的 flex:1 / flex:2 只能
            在这个已经缩过的父容器里分配，救不回来。 -->
-      <view class="btn lg ghost tap jm-side" hover-class="tap-press" bindtap="backToList" role="button" aria-label="换一个模板">换模板</view>
+      <view class="btn lg ghost tap jm-side" hover-class="tap-press" bindtap="backToList" aria-role="button" aria-label="换一个模板">换模板</view>
       <view class="btn lg primary tap jm-main {{!canSubmit || generating ? 'disabled' : ''}}" hover-class="tap-press"
-            bindtap="submit" role="button" aria-label="生成并去打印">{{generating ? '正在生成…' : '生成并去打印'}}</view>
+            bindtap="submit" aria-role="button" aria-label="生成并去打印">{{generating ? '正在生成…' : '生成并去打印'}}</view>
     </block>
   </view>
 </view>

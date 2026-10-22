@@ -2,7 +2,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">隐私与数据</view>
@@ -20,7 +20,7 @@
         </view>
         <text class="ficon i-right pv-go"></text>
       </view>
-      <view class="pv-item tap" hover-class="tap-press" bindtap="openPrivacyGuide" role="button" aria-label="小程序用户隐私保护指引">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="openPrivacyGuide" aria-role="button" aria-label="小程序用户隐私保护指引">
         <view class="pv-main">
           <view class="pv-t">小程序用户隐私保护指引</view>
           <view class="pv-s">微信里登记的那一份，与首次使用时弹出的一致</view>
@@ -49,14 +49,14 @@
             <view class="pv-s">{{consents.age.text}}</view>
           </view>
         </view>
-        <view class="pv-item tap" hover-class="tap-press" bindtap="tapVoiceConsent" role="button" aria-label="录音单独同意，{{consents.voice.text}}">
+        <view class="pv-item tap" hover-class="tap-press" bindtap="tapVoiceConsent" aria-role="button" aria-label="录音单独同意，{{consents.voice.text}}">
           <view class="pv-main">
             <view class="pv-t">录音单独同意</view>
             <view class="pv-s">{{consents.voice.text}}</view>
           </view>
           <text class="pv-act">{{consents.voice.on ? '撤回' : '查看'}}</text>
         </view>
-        <view wx:if="{{consents.resume}}" class="pv-item tap" hover-class="tap-press" bindtap="tapResumeConsent" role="button" aria-label="简历 AI 授权，{{consents.resume.text}}">
+        <view wx:if="{{consents.resume}}" class="pv-item tap" hover-class="tap-press" bindtap="tapResumeConsent" aria-role="button" aria-label="简历 AI 授权，{{consents.resume.text}}">
           <view class="pv-main">
             <view class="pv-t">简历 AI 授权</view>
             <view class="pv-s">{{consents.resume.text}}</view>
@@ -74,14 +74,40 @@
       <view class="pr-line"><text class="pr-k">办不了的</text><text class="pr-v">{{accountClosureAvailable ? '例如更正：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。注销账号在本页下方申请；手机号用不了或由监护人代办的，也按联系方式找我们。' : '例如更正、注销账号：在「意见反馈」里写清楚，或按「经营者信息」里的联系方式联系我们。'}}</text></view>
       <view class="pr-line"><text class="pr-k">多久答复</text><text class="pr-v">核实是你本人后，{{privacyRequestDays}} 个工作日内处理；办不了的会告诉你理由。</text></view>
       <view class="pr-acts">
-        <view class="pr-btn tap" hover-class="tap-press" bindtap="toFeedback" role="button" aria-label="去意见反馈">去意见反馈</view>
-        <view class="pr-btn tap" hover-class="tap-press" bindtap="toOperatorInfo" role="button" aria-label="查看经营者信息里的联系方式">经营者信息</view>
+        <view class="pr-btn tap" hover-class="tap-press" bindtap="toFeedback" aria-role="button" aria-label="去意见反馈">去意见反馈</view>
+        <view class="pr-btn tap" hover-class="tap-press" bindtap="toOperatorInfo" aria-role="button" aria-label="查看经营者信息里的联系方式">经营者信息</view>
       </view>
     </view>
 
     <view class="grp-label">我的数据权利</view>
 
-    <view wx:if="{{!isLoggedIn}}" class="pv-group">
+    <view wx:if="{{restoring}}" class="pv-group">
+      <view class="pv-item">
+        <view class="pv-main">
+          <view class="pv-t">正在恢复上次的登录…</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:elif="{{restoreFailed}}" class="pv-group">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="retryRestore">
+        <view class="pv-main">
+          <view class="pv-t">暂时没能恢复登录</view>
+          <view class="pv-s">点此重试</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
+      <!-- 恢复一直不成时，也能主动去登录页换一种方式登录（不登出、不清本机凭证） -->
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
+        <view class="pv-main">
+          <view class="pv-t">去登录</view>
+          <view class="pv-s">换一种方式登录本人账号</view>
+        </view>
+        <text class="ficon i-right pv-go"></text>
+      </view>
+    </view>
+
+    <view wx:elif="{{!isLoggedIn}}" class="pv-group">
       <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
         <view class="pv-main">
           <view class="pv-t">登录后可导出数据或提交注销</view>
@@ -190,7 +216,7 @@
           </view>
           <view class="rq-sub">{{item.requestedAtText}}</view>
           <view wx:if="{{item.failureText}}" class="rq-sub warn">{{item.failureText}}</view>
-          <view wx:if="{{item.canCancel}}" class="ef-btn tap" hover-class="tap-press" bindtap="cancelClosure" data-id="{{item.id}}" role="button" aria-label="撤回注销申请">撤回申请</view>
+          <view wx:if="{{item.canCancel}}" class="ef-btn tap" hover-class="tap-press" bindtap="cancelClosure" data-id="{{item.id}}" aria-role="button" aria-label="撤回注销申请">撤回申请</view>
         </view>
       </view>
     </block>

@@ -12,13 +12,14 @@
   4. 全页不出现录用或面试结果类表述。这是求职材料工具，不是招聘平台。
 -->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
-      <text class="ficon i-right nav-back-ic"></text>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" aria-role="button" aria-label="返回">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">从零建一份简历</view>
     </view>
-    <view class="nav-title">从零建一份简历</view>
   </view>
 
   <!-- ── 读取历史结果 ── -->
@@ -39,13 +40,13 @@
 
     <view class="rb-acts">
       <view wx:if="{{failKind === 'login'}}" class="btn lg primary block tap" hover-class="tap-press"
-            bindtap="goLogin" role="button" aria-label="去登录">去登录</view>
+            bindtap="goLogin" aria-role="button" aria-label="去登录">去登录</view>
       <view wx:if="{{failKind !== 'refill'}}" class="btn lg {{failKind === 'login' ? 'ghost' : 'primary'}} block tap" hover-class="tap-press"
-            bindtap="retry" role="button" aria-label="重试一次">重试一次</view>
+            bindtap="retry" aria-role="button" aria-label="重试一次">重试一次</view>
       <view class="btn lg ghost block tap" hover-class="tap-press"
-            bindtap="backToForm" role="button" aria-label="回去检查填写内容">回去检查填写内容</view>
+            bindtap="backToForm" aria-role="button" aria-label="回去检查填写内容">回去检查填写内容</view>
       <view wx:if="{{!historyMode}}" class="btn lg ghost-ink block tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
-            bindtap="tapExportDraft" role="button" aria-label="{{fromVoice ? '按你说的原话出稿' : '按填写内容导出未润色版本'}}">
+            bindtap="tapExportDraft" aria-role="button" aria-label="{{fromVoice ? '按你说的原话出稿' : '按填写内容导出未润色版本'}}">
         {{exporting ? '正在排版…' : (fromVoice ? '按你说的原话出稿' : '按填写内容导出（未润色）')}}
       </view>
     </view>
@@ -182,7 +183,7 @@
             <view wx:for="{{item.items}}" wx:for-item="opt" wx:key="label"
                   class="s {{opt.on ? 'on' : ''}} tap" hover-class="tap-press"
                   bindtap="pickOption" data-opt="{{item.key}}" data-val="{{opt.val}}"
-                  role="button" aria-label="{{item.label}}选择{{opt.label}}">{{opt.label}}</view>
+                  aria-role="button" aria-label="{{item.label}}选择{{opt.label}}">{{opt.label}}</view>
           </view>
         </view>
         <view class="rb-fine">排版设置只对 PDF 生效。Word / 纯文本 / Markdown 由服务端按各自格式渲染，不套用这里的选择，页面也不假装它生效了。</view>
@@ -193,7 +194,7 @@
         <text>导出只代表文件已经做好并存进你的「我的文档」，不等于已经打印。出纸要到终端核销后才发生。</text>
       </view>
 
-      <view class="rb-textline tap" hover-class="tap-press" bindtap="tapRegenerate" role="button" aria-label="重新生成一次">
+      <view class="rb-textline tap" hover-class="tap-press" bindtap="tapRegenerate" aria-role="button" aria-label="重新生成一次">
         对润色结果不满意？重新生成一次
       </view>
 
@@ -202,9 +203,9 @@
     </view>
 
     <view class="actionbar">
-      <view class="btn lg ghost tap" hover-class="tap-press" bindtap="backToForm" role="button" aria-label="返回修改填写内容">返回修改</view>
+      <view class="btn lg ghost tap" hover-class="tap-press" bindtap="backToForm" aria-role="button" aria-label="返回修改填写内容">返回修改</view>
       <view class="btn lg primary rb-grow tap {{exporting ? 'disabled' : ''}}" hover-class="tap-press"
-            bindtap="tapExport" role="button" aria-label="导出文件">
+            bindtap="tapExport" aria-role="button" aria-label="导出文件">
         {{exporting ? '正在生成…' : (format === 'pdf' ? '导出并去打印' : '导出文件')}}
       </view>
     </view>
@@ -217,7 +218,7 @@
         <block wx:for="{{steps}}" wx:key="label">
           <view wx:if="{{index > 0}}" class="line {{index <= step ? 'done' : ''}}"></view>
           <view class="st {{index === step ? 'on' : (item.filled ? 'done' : '')}} tap" hover-class="tap-press"
-                bindtap="goStep" data-step="{{index}}" role="button" aria-label="第{{index + 1}}段 {{item.label}}">
+                bindtap="goStep" data-step="{{index}}" aria-role="button" aria-label="第{{index + 1}}段 {{item.label}}">
             <view class="n">{{index + 1}}</view>
             <view class="nl">{{item.label}}</view>
           </view>
@@ -227,17 +228,6 @@
       <view class="pagehead rise-d1">
         <view class="ph-title">{{steps[step].title}}</view>
         <view class="ph-sub">第 {{step + 1}} / {{steps.length}} 段 · {{steps[step].sub}}</view>
-      </view>
-
-      <view wx:if="{{step === 0}}" class="card rise-d1"><view class="card-inner">
-        <view class="rb-row-title">也可以一题一题说</view>
-        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
-        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" role="button" aria-label="用语音说一份">用语音说一份</view>
-      </view></view>
-
-      <view wx:if="{{step === 0}}" class="notice info">
-        <text class="ficon i-info n-ic"></text>
-        <text>这是一份表单，不是对话。简历内容全部以你填写的为准；AI 只对你写下的句子做表达润色，不会替你编造经历，也不会替你补写空着的段落。</text>
       </view>
 
       <!-- 第 1 段：基本信息 -->
@@ -295,7 +285,7 @@
           <view class="rb-row-head">
             <view class="rb-row-title">教育经历 {{index + 1}}</view>
             <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="eduRows" data-index="{{index}}"
-                  role="button" aria-label="删除第{{index + 1}}条教育经历">
+                  aria-role="button" aria-label="删除第{{index + 1}}条教育经历">
               <text class="ficon i-close"></text>
             </view>
           </view>
@@ -326,7 +316,7 @@
                       data-group="eduRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
           </view>
         </view></view>
-        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="eduRows" role="button" aria-label="添加一条教育经历">
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="eduRows" aria-role="button" aria-label="添加一条教育经历">
           <text class="ficon i-plus rb-add-ic"></text>
           <text>添加一条（最多 {{maxEdu}} 条）</text>
         </view>
@@ -342,7 +332,7 @@
           <view class="rb-row-head">
             <view class="rb-row-title">经历 {{index + 1}}</view>
             <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="expRows" data-index="{{index}}"
-                  role="button" aria-label="删除第{{index + 1}}条经历">
+                  aria-role="button" aria-label="删除第{{index + 1}}条经历">
               <text class="ficon i-close"></text>
             </view>
           </view>
@@ -369,7 +359,7 @@
                       data-group="expRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
           </view>
         </view></view>
-        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="expRows" role="button" aria-label="添加一条经历">
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="expRows" aria-role="button" aria-label="添加一条经历">
           <text class="ficon i-plus rb-add-ic"></text>
           <text>添加一条（最多 {{maxExp}} 条）</text>
         </view>
@@ -381,7 +371,7 @@
           <view class="rb-row-head">
             <view class="rb-row-title">项目 {{index + 1}}</view>
             <view class="rb-row-del tap" hover-class="tap-press" catchtap="removeRow" data-group="projRows" data-index="{{index}}"
-                  role="button" aria-label="删除第{{index + 1}}个项目">
+                  aria-role="button" aria-label="删除第{{index + 1}}个项目">
               <text class="ficon i-close"></text>
             </view>
           </view>
@@ -403,7 +393,7 @@
                       data-group="projRows" data-index="{{index}}" data-key="description" bindinput="onRow"></textarea>
           </view>
         </view></view>
-        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="projRows" role="button" aria-label="添加一个项目">
+        <view class="rb-add tap" hover-class="tap-press" bindtap="addRow" data-group="projRows" aria-role="button" aria-label="添加一个项目">
           <text class="ficon i-plus rb-add-ic"></text>
           <text>添加一个项目（最多 {{maxProj}} 个）</text>
         </view>
@@ -454,6 +444,19 @@
         <view class="rb-fine">{{selfIntro.length}} / {{LEN.selfIntro}} 字</view>
       </view></view>
 
+      <!-- 第 1 段的语音入口与说明放在基本信息卡后面（10/17 实图 05：原先先占了首屏，姓名等字段被挤到下面）。
+           放在 if/elif 链之后，链本身不动；第 1 段时链上其余分支都不渲染，所以紧跟在基本信息卡后面。 -->
+      <view wx:if="{{step === 0}}" class="card rise-d3"><view class="card-inner">
+        <view class="rb-row-title">也可以一题一题说</view>
+        <view class="rb-fine">每句转成文字后你自己确认，确认前不会写进简历。电话请手打。文字填写入口一直留在这一页。</view>
+        <view class="btn lg ghost block tap rb-voice-go" hover-class="tap-press" bindtap="goVoice" aria-role="button" aria-label="用语音说一份">用语音说一份</view>
+      </view></view>
+
+      <view wx:if="{{step === 0}}" class="notice info">
+        <text class="ficon i-info n-ic"></text>
+        <text>这是一份表单，不是对话。简历内容全部以你填写的为准；AI 只对你写下的句子做表达润色，不会替你编造经历，也不会替你补写空着的段落。</text>
+      </view>
+
       <view wx:if="{{step === 5}}" class="notice plum">
         <text class="ficon i-robot n-ic"></text>
         <text>提交后 AI 会对你填的描述文字做表达润色，通常需要几十秒。学校、单位、职务、时间、证书等事实字段由服务端逐字保留，不会被改动。</text>
@@ -465,11 +468,11 @@
 
     <view class="actionbar">
       <view wx:if="{{step > 0}}" class="btn lg ghost tap" hover-class="tap-press"
-            bindtap="prevStep" role="button" aria-label="上一段">上一段</view>
+            bindtap="prevStep" aria-role="button" aria-label="上一段">上一段</view>
       <view wx:if="{{step < 5}}" class="btn lg primary rb-grow tap" hover-class="tap-press"
-            bindtap="nextStep" role="button" aria-label="下一段">下一段</view>
+            bindtap="nextStep" aria-role="button" aria-label="下一段">下一段</view>
       <view wx:else class="btn lg primary rb-grow tap" hover-class="tap-press"
-            bindtap="submit" role="button" aria-label="提交并生成简历">提交生成</view>
+            bindtap="submit" aria-role="button" aria-label="提交并生成简历">提交生成</view>
     </view>
   </block>
 </view>
