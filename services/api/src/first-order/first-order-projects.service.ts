@@ -34,7 +34,7 @@ export class FirstOrderProjectsService {
 
   async overview(user: AuthedUser, requestedOrg?: string): Promise<FirstOrderOverview> {
     const orgId = firstOrderOrg(user, requestedOrg)
-    const [projects, terminals, incidents, reports] = await Promise.all([
+    const [projects, terminals, incidentList, reports] = await Promise.all([
       this.prisma.serviceProject.findMany({ where: { orgId }, include: { deployments: true }, orderBy: { createdAt: 'desc' }, take: 201 }),
       this.prisma.terminal.findMany({ where: { orgId }, select: {
         id: true, terminalCode: true, displayName: true, locationLabel: true, lastHeartbeatAt: true, enabled: true, lifecycleStatus: true,
@@ -47,7 +47,7 @@ export class FirstOrderProjectsService {
       throw new BadRequestException({ error: { code: 'FIRST_ORDER_LIMIT', message: '资料数量超出首单视图范围，请联系平台分批核对，不显示不完整结果' } })
     }
     return {
-      projects: projects.map(projectView), incidents, reports: reports.map(reportView),
+      projects: projects.map(projectView), incidents: incidentList.items, reports: reports.map(reportView), truncated: false,
       terminals: terminals.map((t) => ({
         id: t.id, terminalCode: t.terminalCode, displayName: t.displayName, locationLabel: t.locationLabel,
         lastHeartbeatAt: t.lastHeartbeatAt?.toISOString() ?? null,

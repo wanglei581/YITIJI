@@ -113,7 +113,9 @@ export interface FirstOrderReportSummary {
 export interface FirstOrderReport extends FirstOrderReportSummary {
   snapshot: FirstOrderReportSnapshot
 }
+/** Lists are complete or the request rejects the hard limit; never silent truncation. */
 export interface FirstOrderOverview {
+  truncated: false
   projects: FirstOrderProject[]
   terminals: FirstOrderTerminal[]
   incidents: FirstOrderIncident[]

@@ -210,6 +210,13 @@ async function main() {
     }
     await request('admin', `${A}/deployments/${deployment.id}/end`, 201, {})
     await request('partner', `${P}/incidents`, 409, { ...incidentInput, requestKey: randomUUID() })
+    const fullOverview = await request<FirstOrderOverview>('partner', `${P}/overview`)
+    check('首单总览明确返回未截断，完整或超限拒绝', fullOverview.truncated === false)
+    await f.prisma.serviceIncident.createMany({ data: Array.from({ length: 201 }, () => ({ orgId: f.orgs.own, projectId: project.id, deploymentId: deployment.id, terminalCode: f.terminals.spare, issueCode: 'offline', note: 'Fixture cap only', requestKey: randomUUID() })) })
+    await request('partner', `${P}/overview`, 400)
+    await f.prisma.serviceIncident.deleteMany({ where: { note: 'Fixture cap only' } })
+    await f.prisma.serviceProject.createMany({ data: Array.from({ length: 201 }, () => ({ orgId: f.orgs.own, name: 'Fixture cap only', reference: randomUUID(), serviceStartAt: new Date(), serviceEndAt: new Date(Date.now() + 86400000), serviceScope: 'Fixture', supportContact: 'Fixture' })) })
+    await request('partner', `${P}/overview`, 400)
     console.log(`\nPASS: ${checks} real HTTP/database assertions. No production, live AI, SMS login or physical output acceptance is claimed.`)
   } finally { await f.close() }
 }

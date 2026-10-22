@@ -34,11 +34,11 @@ function required(text: string | undefined): string {
 export class FirstOrderIncidentsService {
   constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly access: FirstOrderAccessService) {}
 
-  async list(user: AuthedUser, requestedOrg: string): Promise<FirstOrderIncident[]> {
+  async list(user: AuthedUser, requestedOrg: string): Promise<{ items: FirstOrderIncident[]; truncated: false }> {
     const orgId = firstOrderOrg(user, requestedOrg)
     const rows = await this.prisma.serviceIncident.findMany({ where: { orgId }, include: eventsInclude, orderBy: { createdAt: 'desc' }, take: 201 })
     if (rows.length > 200) throw new BadRequestException({ error: { code: 'FIRST_ORDER_LIMIT', message: '工单数量超出首单视图范围，请联系平台分批核对' } })
-    return rows.map(incidentView)
+    return { items: rows.map(incidentView), truncated: false }
   }
 
   async create(user: AuthedUser, input: FirstOrderIncidentInput): Promise<FirstOrderIncident> {

@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { formatDateTime, type FirstOrderProject, type FirstOrderProjectInput, type FirstOrderTerminal } from '@ai-job-print/shared'
+import { formatDate, formatDateTime, type FirstOrderProject, type FirstOrderProjectInput, type FirstOrderTerminal } from '@ai-job-print/shared'
 import { Button } from '@ai-job-print/ui'
 import { firstOrderApi } from '../../services/api/firstOrder'
 
 const input = 'mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm'
-const day = (value: string) => value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 10) : ''
+const day = (value: string) => formatDate(value, '')
 const initial = (project: FirstOrderProject | null): FirstOrderProjectInput => project ? { ...project } : {
   name: '', reference: '', serviceStartAt: '', serviceEndAt: '', serviceScope: '', supportContact: '',
 }
