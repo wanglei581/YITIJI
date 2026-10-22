@@ -1133,6 +1133,240 @@ if (!/aria-label=\{label\}/.test(confirmCopy)) {
   pass('主按钮读屏与可见文字一致')
 }
 
+// 重构债：本文件已超过 1000 行。S5 报价头四条必须留在这支已批准门禁里，
+// 不另开文件、不删旧断言。后续再把这段运行时探针拆出去。
+function loadCompiledQuoteModule(source, filename, requireMap, bridge) {
+  const rewritten = source.replaceAll('import.meta.env', '__quoteHeaderTestEnv')
+  const output = ts.transpileModule(rewritten, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: false,
+      importHelpers: false,
+    },
+    fileName: filename,
+  }).outputText
+  const module = { exports: {} }
+  const compiled = new Function(
+    'exports',
+    'require',
+    'module',
+    'window',
+    'fetch',
+    '__quoteHeaderTestEnv',
+    `${output}\nreturn module.exports;\n`,
+  )
+  return compiled(
+    module.exports,
+    (id) => {
+      if (Object.prototype.hasOwnProperty.call(requireMap, id)) return requireMap[id]
+      throw new Error(`报价头测试适配器未提供依赖: ${id}`)
+    },
+    module,
+    bridge.window,
+    bridge.fetch,
+    bridge.env,
+  )
+}
+
+async function verifyQuotePrintOrderSessionHeaders() {
+  // 测试适配器：只顶替 Node 装不起来的 import.meta.env、api/client、httpAdapter、
+  // screensaver.getTerminalId、throwHttpError / networkError、会话清场函数。
+  // headers()、token()、terminalSessionHeaders()、quotePrintOrder 的 fetch 仍是当前源码。
+  const terminalSource = read('src/services/terminalAuth.ts')
+  const quoteSource = read('src/services/print/printJobsApi.ts')
+  const quoteBody = {
+    fileUrl: 'https://files.example.invalid/quote.pdf',
+    params: { copies: 1, colorMode: 'black_white', duplex: 'simplex' },
+    terminalId: 'BODY-TERMINAL',
+  }
+
+  async function runCase(options) {
+    const records = new Map()
+    const writes = []
+    const timers = []
+    const calls = []
+    const sensitiveCalls = []
+    if (options.storedToken) records.set('terminal_session_token_v1', options.storedToken)
+    const storage = {
+      getItem(key) {
+        return records.has(key) ? records.get(key) : null
+      },
+      setItem(key, value) {
+        writes.push(String(key))
+        records.set(String(key), String(value))
+      },
+      removeItem(key) {
+        records.delete(String(key))
+      },
+      clear() {
+        records.clear()
+      },
+    }
+    const window = {
+      sessionStorage: storage,
+      setTimeout(fn, delay) {
+        timers.push(delay)
+        return timers.length
+      },
+      clearTimeout() {},
+      location: {
+        href: 'http://kiosk.local/print',
+        origin: 'http://kiosk.local',
+        pathname: '/print',
+        search: '',
+        hash: '',
+      },
+      history: {
+        state: null,
+        replaceState() {
+          writes.push('history')
+        },
+      },
+    }
+    const bridge = {
+      window,
+      env: {},
+      fetch: async (url, init) => {
+        calls.push({
+          url: String(url),
+          method: init && init.method,
+          headers: new Headers(init && init.headers),
+          body: init && init.body,
+        })
+        return {
+          ok: options.status >= 200 && options.status < 300,
+          status: options.status,
+          json: async () => ({ amountCents: 0, billablePages: 1, billingPageSource: 'server', lines: [] }),
+          clone() {
+            return this
+          },
+        }
+      },
+    }
+    class QuoteHeaderTestApiHttpError extends Error {
+      constructor(code, message, status) {
+        super(message)
+        this.name = 'ApiHttpError'
+        this.code = code
+        this.status = status
+      }
+    }
+    const client = { API_BASE_URL: 'http://quote-header.test/api/v1', API_MODE: options.mode }
+    const errors = {
+      async throwHttpError(res) {
+        const error = new QuoteHeaderTestApiHttpError('QUOTE_HEADER_TEST_HTTP', `http ${res.status}`, res.status)
+        throw error
+      },
+      networkError(err) {
+        return err instanceof Error ? err : new Error('quote-header-test-network')
+      },
+      async readHttpError() {
+        return { code: 'QUOTE_HEADER_TEST_UNUSED', message: '测试适配器不解析真实响应体' }
+      },
+    }
+    const screensaver = { getTerminalId: () => 'HEADER-TERMINAL' }
+    const privacy = {
+      clearKioskSensitiveSession() {
+        sensitiveCalls.push('clearKioskSensitiveSession')
+      },
+      clearKioskSharedDeviceResidue() {
+        sensitiveCalls.push('clearKioskSharedDeviceResidue')
+      },
+    }
+    const terminalAuth = loadCompiledQuoteModule(terminalSource, 'terminalAuth.ts', {
+      '../auth/kioskSensitiveSession': privacy,
+      './api/client': client,
+      './api/httpAdapter': { ApiHttpError: QuoteHeaderTestApiHttpError },
+      './api/screensaver': screensaver,
+      './api/throwHttpError': errors,
+    }, bridge)
+    const printJobs = loadCompiledQuoteModule(quoteSource, 'printJobsApi.ts', {
+      '../api/client': client,
+      '../api/httpAdapter': { ApiHttpError: QuoteHeaderTestApiHttpError },
+      '../api/screensaver': screensaver,
+      '../api/throwHttpError': errors,
+      '../terminalAuth': terminalAuth,
+    }, bridge)
+    return { calls, writes, timers, sensitiveCalls, terminalAuth, printJobs }
+  }
+
+  function assertQuoteFetch(scene, started, result, expectations) {
+    const quoteCalls = result.calls.filter((call) => String(call.url).endsWith('/orders/quote') && call.method === 'POST')
+    const refreshCalls = result.calls.filter((call) => /session-token|\/refresh|boot-ticket|\/issue/.test(call.url))
+    if (result.calls.length !== 1 || quoteCalls.length !== 1) {
+      fail(`${scene} 应恰好 1 次 POST /orders/quote，实际 ${result.calls.length} 次: ${result.calls.map((call) => `${call.method} ${call.url}`).join(', ')}`)
+    } else if (refreshCalls.length !== 0) {
+      fail(`${scene} 不得请求续期或发新票`)
+    } else if (result.writes.length !== 0 || result.timers.length !== 0 || result.sensitiveCalls.length !== 0) {
+      fail(`${scene} 不得写存储、起定时器或清会话`)
+    } else {
+      const headers = quoteCalls[0].headers
+      const session = headers.get('x-terminal-session-token')
+      const terminal = headers.get('x-terminal-id')
+      const body = JSON.parse(String(quoteCalls[0].body))
+      if (terminal !== 'HEADER-TERMINAL') fail(`${scene} 的 x-terminal-id 应来自 getTerminalId`)
+      else if (body.terminalId !== 'BODY-TERMINAL') fail(`${scene} 的 body terminalId 只用于计价`)
+      else if (expectations.session === null && session !== null) fail(`${scene} 不应带 x-terminal-session-token，实际 ${session}`)
+      else if (expectations.session !== null && session !== expectations.session) fail(`${scene} 的会话票应为 ${expectations.session}，实际 ${session}`)
+      else if (headers.get('content-type') !== 'application/json') fail(`${scene} 应保留 Content-Type`)
+      else if (failures === started) pass(scene)
+    }
+  }
+
+  {
+    const started = failures
+    const result = await runCase({ mode: 'http', storedToken: 'ticket-current-1', status: 200 })
+    const built = result.terminalAuth.terminalSessionHeaders({
+      Authorization: 'Bearer member-kept',
+      'Content-Type': 'application/json',
+    })
+    if (result.calls.length !== 0 || result.writes.length !== 0 || result.timers.length !== 0) {
+      fail('读取当前票组头时不得发请求、写存储或起定时器')
+    } else if (built.get('authorization') !== 'Bearer member-kept') {
+      fail('调用方带入的 Bearer 必须原样保留')
+    } else if (built.get('x-terminal-session-token') !== 'ticket-current-1' || built.get('x-terminal-id') !== 'HEADER-TERMINAL') {
+      fail('保留 Bearer 时仍要带上当前终端号和当前会话票')
+    } else {
+      await result.printJobs.quotePrintOrder(quoteBody)
+      assertQuoteFetch('http 且存有 terminal_session_token_v1：1 次 POST /orders/quote，带终端号和当前票', started, result, { session: 'ticket-current-1' })
+    }
+  }
+
+  {
+    const started = failures
+    const result = await runCase({ mode: 'http', storedToken: '', status: 200 })
+    await result.printJobs.quotePrintOrder(quoteBody)
+    assertQuoteFetch('http 且会话存储为空：1 次 POST /orders/quote，没有会话票头', started, result, { session: null })
+  }
+
+  {
+    const started = failures
+    const result = await runCase({ mode: 'mock', storedToken: '', status: 200 })
+    await result.printJobs.quotePrintOrder(quoteBody)
+    assertQuoteFetch('非 http：会话票是现有 mock 回退值，且不请求 refresh', started, result, { session: 'mock-terminal-session-fixture' })
+  }
+
+  {
+    const started = failures
+    const result = await runCase({ mode: 'http', storedToken: 'ticket-current-1', status: 401 })
+    let rejected = false
+    try {
+      await result.printJobs.quotePrintOrder(quoteBody)
+    } catch {
+      rejected = true
+    }
+    if (!rejected) fail('http 401 必须拒绝本次报价调用')
+    else assertQuoteFetch('http 401：恰好 1 次 fetch，报价被拒绝，没有 refresh', started, result, { session: 'ticket-current-1' })
+  }
+}
+
+try {
+  await verifyQuotePrintOrderSessionHeaders()
+} catch (error) {
+  fail(`报价头运行时未捕获异常: ${error instanceof Error ? error.stack ?? error.message : error}`)
+}
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
   process.exit(1)
