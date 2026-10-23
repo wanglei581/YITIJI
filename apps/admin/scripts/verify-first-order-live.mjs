@@ -404,6 +404,39 @@ try {
     await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(another.id)
     await expect(a.getByLabel('服务项目', { exact: true }).locator(`option[value="${created.id}"]`)).toHaveText(savedName)
     mark('Late committed save refreshes the project list without switching back to the unmounted form')
+
+    const cancelledName = `${newProjectName}-提交后取消新建`
+    await a.getByRole('button', { name: '新建服务项目', exact: true }).click()
+    await expect(a.getByText('离开表单不会撤回已提交的创建请求；创建成功后会在上方提示，未出现请刷新核对。', { exact: true })).toBeVisible()
+    await a.getByLabel('项目名称', { exact: true }).fill(cancelledName)
+    await a.getByLabel('合同或采购编号', { exact: true }).fill(`CANCEL-${nonce}`)
+    await a.getByLabel('服务开始日', { exact: true }).fill(date)
+    await a.getByLabel('服务截止日', { exact: true }).fill(endDate)
+    await a.getByLabel('免费服务与维保范围', { exact: true }).fill('仅隔离浏览器验证：提交后离开表单的真实持久化。')
+    await a.getByLabel('服务联系渠道', { exact: true }).fill('首单验证服务窗口')
+    await admin.evaluate(({ base }) => {
+      const original = window.fetch.bind(window)
+      window.fetch = async (input, init) => {
+        const response = await original(input, init)
+        if (String(input) === `${base}/admin/first-order/projects` && init?.method === 'POST' && response.ok) {
+          window.fetch = original; await response.clone().arrayBuffer()
+          await new Promise((release) => { window.firstOrderReleaseCreate = release })
+        }
+        return response
+      }
+    }, { base: fixture.base })
+    const cancelledCreate = await responseAfter(admin, 'POST', '/admin/first-order/projects', () => a.getByRole('button', { name: '创建服务项目', exact: true }).click())
+    await admin.waitForFunction(() => typeof window.firstOrderReleaseCreate === 'function')
+    await a.getByRole('button', { name: '取消新建', exact: true }).click()
+    await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(another.id)
+    const createReloaded = admin.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/admin/first-order/overview' && response.request().method() === 'GET')
+    await admin.evaluate(() => window.firstOrderReleaseCreate())
+    assert.equal((await createReloaded).status(), 200)
+    await expect(a.getByRole('status').filter({ hasText: `项目「${cancelledName}」资料已保存。` })).toBeVisible()
+    await expect(a.getByLabel('服务项目', { exact: true }).locator(`option[value="${cancelledCreate.id}"]`)).toHaveText(cancelledName)
+    await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(another.id)
+    assert.equal((await api('admin', `/admin/first-order/overview?orgId=${fixture.orgs.own}`)).projects.find((item) => item.id === cancelledCreate.id)?.name, cancelledName)
+    mark('Cancelling a submitted create keeps the selected project and shows the committed project in notice, list, and database')
   }
 
   await partner.goto(`${partnerOrigin}/terminals`)

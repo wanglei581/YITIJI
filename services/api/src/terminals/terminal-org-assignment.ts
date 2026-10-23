@@ -1,11 +1,15 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import type { AssignTerminalOrgResult } from './terminals-admin.service'
 import { isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingWrite } from './terminal-org-binding'
 
-/** Same transaction as rebinding; closes the immutable first-order ownership interval. */
-export async function assignTerminalOrganization(prisma: PrismaService, terminalId: string, orgId: string | null, now?: Date): Promise<AssignTerminalOrgResult> {
+export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
+  deploymentIds: string[]; effectiveAt: string
+}) => Promise<unknown>
+
+/** Rebinding, ownership interval closure and required audit commit or roll back together. */
+export async function assignTerminalOrganization(prisma: PrismaService, terminalId: string, orgId: string | null, now: Date | undefined, writeAudit: TerminalOrgAssignmentAudit): Promise<AssignTerminalOrgResult> {
   const terminal = await prisma.terminal.findFirst({
     where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
     select: { id: true, terminalCode: true, orgId: true },
@@ -31,6 +35,7 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
   }
 
   const oldOrgId = terminal.orgId
+  const result = { terminalId: terminal.terminalCode, terminalCode: terminal.terminalCode, oldOrgId, newOrgId: orgId, orgName }
   await prisma.$transaction(async (tx) => {
     const changed = await tx.terminal.updateMany({
       where: { id: terminal.id, orgId: oldOrgId },
@@ -39,8 +44,11 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     if (changed.count !== 1) {
       throw new ConflictException({ error: { code: 'TERMINAL_ORG_CHANGED', message: '终端归属已变更，请刷新后重试' } })
     }
-    const active = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: null }, select: { startedAt: true } })
-    const effectiveAt = new Date(Math.max((now ?? new Date()).getTime(), active?.startedAt.getTime() ?? 0))
+    const current = await tx.terminal.findUniqueOrThrow({ where: { id: terminal.id }, select: { orgBoundAt: true } })
+    const active = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: null }, select: { id: true, startedAt: true } })
+    const latest = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: { not: null } }, orderBy: { endedAt: 'desc' }, select: { endedAt: true } })
+    const effectiveAt = new Date(Math.max((now ?? new Date()).getTime(), active?.startedAt.getTime() ?? 0,
+      current.orgBoundAt?.getTime() ?? 0, latest?.endedAt?.getTime() ?? 0))
     await tx.terminal.update({ where: { id: terminal.id }, data: terminalOrgBindingWrite(oldOrgId, orgId, effectiveAt) })
     if (oldOrgId !== orgId) {
       await tx.serviceDeployment.updateMany({
@@ -48,13 +56,8 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
         data: { endedAt: effectiveAt, activeTerminalId: null },
       })
     }
+    await writeAudit(tx, { ...result, deploymentIds: oldOrgId !== orgId && active ? [active.id] : [], effectiveAt: effectiveAt.toISOString() })
   })
 
-  return {
-    terminalId: terminal.terminalCode,
-    terminalCode: terminal.terminalCode,
-    oldOrgId,
-    newOrgId: orgId,
-    orgName,
-  }
+  return result
 }

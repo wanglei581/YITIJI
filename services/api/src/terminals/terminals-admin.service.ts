@@ -24,7 +24,7 @@ import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingOnCreate } from './terminal-org-binding'
-import { assignTerminalOrganization } from './terminal-org-assignment'
+import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
@@ -358,8 +358,8 @@ export class TerminalAdminService {
     return { organizations }
   }
 
-  async assignTerminalOrg(terminalId: string, orgId: string | null, now?: Date): Promise<AssignTerminalOrgResult> {
-    return assignTerminalOrganization(this.prisma, terminalId, orgId, now)
+  async assignTerminalOrg(terminalId: string, orgId: string | null, now: Date | undefined, writeAudit: TerminalOrgAssignmentAudit): Promise<AssignTerminalOrgResult> {
+    return assignTerminalOrganization(this.prisma, terminalId, orgId, now, writeAudit)
   }
 
   async updateTerminalProfile(

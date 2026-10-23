@@ -44,9 +44,10 @@ export function FirstOrderPanel({ orgId }: { orgId: string }) {
     if (!creating && data && !data.projects.some((project) => project.id === selectedId)) setSelectedId(data.projects[0]?.id ?? '')
   }, [creating, data, selectedId])
 
-  function projectSaved(saved: FirstOrderProject) {
+  function projectSaved(saved: FirstOrderProject, select: boolean) {
     setData((current) => current ? { ...current, projects: [saved, ...current.projects.filter((item) => item.id !== saved.id)] } : current)
-    setCreating(false); setSelectedId(saved.id); setNotice(`项目「${saved.name}」资料已保存。`)
+    setNotice(`项目「${saved.name}」资料已保存。`)
+    if (select) { setCreating(false); setSelectedId(saved.id) }
   }
   function deploymentChanged(saved: FirstOrderDeployment) {
     setData((current) => current ? { ...current, projects: current.projects.map((item) => item.id === saved.projectId

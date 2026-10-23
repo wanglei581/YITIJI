@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import type { FirstOrderIncident, FirstOrderOverview, FirstOrderProject, FirstOrderReport, FirstOrderReportSnapshot } from '@ai-job-print/shared'
 import { createFirstOrderFixture, seedFirstOrderMonth } from './support/first-order-fixture'
 import { assignTerminalOrganization } from '../src/terminals/terminal-org-assignment'
+import { AuditService } from '../src/audit/audit.service'
+import { verifyFirstOrderReviewBoundaries } from './support/first-order-review-boundaries'
 
 const A = '/admin/first-order', P = '/partner/first-order'
 let checks = 0
@@ -14,7 +16,8 @@ function check(name: string, value: unknown): void {
 }
 
 async function main() {
-  const f = await createFirstOrderFixture({ mode: process.argv.includes('--postgres') ? 'postgres' : 'sqlite' })
+  const mode = process.argv.includes('--postgres') ? 'postgres' : 'sqlite'
+  const f = await createFirstOrderFixture({ mode })
   try {
     async function request<T = Record<string, unknown>>(
       actor: keyof typeof f.tokens | null, path: string, expected = 200, body?: unknown, method = body === undefined ? 'GET' : 'POST',
@@ -86,18 +89,34 @@ async function main() {
       return result.status
     }))
     check('同版本并发处理只有一次成功，另一方收到冲突', casResults.sort().join(',') === '200,409')
+    check('同版本并发冲突不会多写负责人审计', await f.prisma.auditLog.count({ where: { targetId: concurrent[0].id, action: 'first_order.incident_start' } }) === 1)
     await request('partner', `${P}/incidents/${incident.id}`, 403, { action: 'start', version: incident.version, note: '机构不能派单', assignee: '维修员' }, 'PATCH')
     await request('admin', `${A}/incidents/${incident.id}`, 409, { action: 'resolve', version: incident.version, note: '未受理就修复' }, 'PATCH')
     const started = await request<FirstOrderIncident>('admin', `${A}/incidents/${incident.id}`, 200, { action: 'start', version: incident.version, note: '已受理', assignee: '验证维修员' }, 'PATCH')
     check('管理员受理并分配负责人', started.status === 'processing' && started.assignee === '验证维修员')
+    const reassigned = await request<FirstOrderIncident>('admin', `${A}/incidents/${incident.id}`, 200, { action: 'start', version: started.version, note: '处理中改派', assignee: '验证维修员乙' }, 'PATCH')
+    check('处理中改派负责人真实持久化', reassigned.status === 'processing' && reassigned.assignee === '验证维修员乙' && (await f.prisma.serviceIncident.findUnique({ where: { id: incident.id } }))?.assignee === '验证维修员乙')
+    const auditsBeforeConflict = await f.prisma.auditLog.count({ where: { targetId: incident.id } })
     await request('admin', `${A}/incidents/${incident.id}`, 409, { action: 'resolve', version: incident.version, note: '旧版本写入' }, 'PATCH')
-    const resolved = await request<FirstOrderIncident>('admin', `${A}/incidents/${incident.id}`, 200, { action: 'resolve', version: started.version, note: '已补纸并检查，等待机构核对' }, 'PATCH')
+    check('陈旧版本冲突不追加审计或覆盖改派负责人', await f.prisma.auditLog.count({ where: { targetId: incident.id } }) === auditsBeforeConflict && (await f.prisma.serviceIncident.findUnique({ where: { id: incident.id } }))?.assignee === '验证维修员乙')
+    const resolved = await request<FirstOrderIncident>('admin', `${A}/incidents/${incident.id}`, 200, { action: 'resolve', version: reassigned.version, note: '已补纸并检查，等待机构核对' }, 'PATCH')
     check('修复与机构确认分开记录', resolved.status === 'resolved' && !!resolved.resolvedAt && !resolved.closedAt)
     await request('admin', `${A}/incidents/${incident.id}`, 403, { action: 'confirm', version: resolved.version, note: '不可代机构确认' }, 'PATCH')
     const confirmed = await request<FirstOrderIncident>('partner', `${P}/incidents/${incident.id}`, 200, { action: 'confirm', version: resolved.version, note: '现场核对已恢复' }, 'PATCH')
     check('机构确认后才关闭', confirmed.status === 'closed' && !!confirmed.closedAt)
     const reopened = await request<FirstOrderIncident>('partner', `${P}/incidents/${incident.id}`, 200, { action: 'reopen', version: confirmed.version, note: '复用时再次缺纸' }, 'PATCH')
-    check('机构可复开，状态与时间清理正确', reopened.status === 'open' && !reopened.resolvedAt && !reopened.closedAt && reopened.events.length >= 5)
+    check('机构可复开，状态与负责人时间清理正确', reopened.status === 'open' && reopened.assignee === null && !reopened.resolvedAt && !reopened.closedAt && reopened.events.length >= 6)
+    const assigneeHistory = (await f.prisma.auditLog.findMany({ where: { targetId: incident.id } })).map((row) => ({ action: row.action, payload: JSON.parse(row.payloadJson) as Record<string, unknown> }))
+    for (const [action, version, previousAssignee, assignee, status] of [
+      ['start', incident.version, null, '验证维修员', 'processing'],
+      ['start', started.version, '验证维修员', '验证维修员乙', 'processing'],
+      ['resolve', reassigned.version, '验证维修员乙', '验证维修员乙', 'resolved'],
+      ['confirm', resolved.version, '验证维修员乙', '验证维修员乙', 'closed'],
+      ['reopen', confirmed.version, '验证维修员乙', null, 'open'],
+    ] as const) {
+      const history = assigneeHistory.filter((row) => row.action === `first_order.incident_${action}` && row.payload.version === version)
+      check(`复开后仍保留${action}版本${version}负责人前后值审计`, history.length === 1 && history[0].payload.previousAssignee === previousAssignee && history[0].payload.assignee === assignee && history[0].payload.status === status)
+    }
     await request('other', `${P}/incidents/${incident.id}`, 404, { action: 'reopen', version: reopened.version, note: '越权' }, 'PATCH')
 
     await f.prisma.$transaction(async (tx) => {
@@ -172,7 +191,9 @@ async function main() {
     check('月报核对幂等且不改写数据快照', !!ack.acknowledgedAt && ack.acknowledgedAt === ackAgain.acknowledgedAt && ack.checksum === report.checksum)
     check('报告导出与核对保留审计', await f.prisma.auditLog.count({ where: { targetId: report.id, action: 'first_order.report_exported' } }) === 1 && await f.prisma.auditLog.count({ where: { targetId: report.id, action: 'first_order.report_acknowledged' } }) === 1)
 
-    await assignTerminalOrganization(f.prisma, f.terminals.monthly, f.orgs.other)
+    await assignTerminalOrganization(f.prisma, f.terminals.monthly, f.orgs.other, undefined, (tx, result) => new AuditService(f.prisma).writeRequired(tx, {
+      actorId: f.users.admin, actorRole: 'admin', action: 'terminal.org.update', targetType: 'terminal', targetId: result.terminalCode, payload: { ...result },
+    }))
     const endedByTransfer = await f.prisma.serviceDeployment.findUniqueOrThrow({ where: { id: monthly.deployment.id } })
     check('真实调拨服务在同一事务关闭旧项目登记', !!endedByTransfer.endedAt && endedByTransfer.activeTerminalId === null)
     const afterTransfer = await request<FirstOrderReportSnapshot>('partner', `${P}/projects/${monthly.project.id}/report-preview?month=${monthly.month}`)
@@ -217,8 +238,10 @@ async function main() {
     await f.prisma.serviceIncident.deleteMany({ where: { note: 'Fixture cap only' } })
     await f.prisma.serviceProject.createMany({ data: Array.from({ length: 201 }, () => ({ orgId: f.orgs.own, name: 'Fixture cap only', reference: randomUUID(), serviceStartAt: new Date(), serviceEndAt: new Date(Date.now() + 86400000), serviceScope: 'Fixture', supportContact: 'Fixture' })) })
     await request('partner', `${P}/overview`, 400)
-    console.log(`\nPASS: ${checks} real HTTP/database assertions. No production, live AI, SMS login or physical output acceptance is claimed.`)
   } finally { await f.close() }
+  // Full AppModule gets a fresh owned database/environment after the focused fixture closes.
+  checks += await verifyFirstOrderReviewBoundaries(mode)
+  console.log(`\nPASS: ${checks} real HTTP/database assertions. No production, live AI, SMS login or physical output acceptance is claimed.`)
 }
 
 void main().catch((error: unknown) => { console.error(error); process.exitCode = 1 })

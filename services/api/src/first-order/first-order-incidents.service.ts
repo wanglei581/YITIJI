@@ -120,7 +120,8 @@ export class FirstOrderIncidentsService {
       await tx.serviceIncidentEvent.create({ data: { incidentId: id, action: input.action, note, actorRole: user.role } })
       await this.audit.writeRequired(tx, { actorId: user.userId, actorRole: user.role,
         action: INCIDENT_ACTIONS[input.action], targetType: 'service_incident', targetId: id,
-        payload: { version: input.version, status: data.status } })
+        payload: { version: input.version, status: data.status, previousAssignee: old.assignee,
+          assignee: data.assignee === undefined ? old.assignee : data.assignee } })
     })
     return this.get(user, id)
   }

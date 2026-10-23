@@ -20,6 +20,7 @@ export async function buildFirstOrderReport(tx: PrismaTransactionClient, project
     '出纸结果来自软件完成或管理员核查，不能替代实物抽验；印面数不含面板复印，也不等于耗纸张数。',
     '本报告暂不包含AI可用率；扫描缺少可核对的完成时间，暂不能统计自然月完成量。',
     '工单分布为本月新建工单在生成时的处理状态，不是月末状态或故障恢复率。',
+    '快照仅包含生成时已入库的记录；后续补报或修正不会回写已留存报告，留存前请核对。',
   ])
   let complete = true, sessions = 0, printed = 0, faces = 0, failed = 0, unconfirmed = 0
   let observed = false, heartbeatCount = 0, offlineMinutes = 0, printCount = 0, missingPages = false
@@ -98,7 +99,7 @@ export async function buildFirstOrderReport(tx: PrismaTransactionClient, project
     limitations.add('没有本范围内会话记录，无法区分无人使用和未接入会话采集，不填零服务人数。')
   }
   if (missingPages) { complete = false; limitations.add('有已出纸任务缺可信页数来源，整项印面数不展示，不输出少算的合计。') }
-  const printMetrics = suppressPrintFamily([printed, faces, unconfirmed, failed], [
+  const printMetrics = suppressPrintFamily([printed, missingPages ? 0 : faces, unconfirmed, failed], [
     '软件完成且未被核查为未出纸，或人工核查已出纸；按完成时间落月。',
     '与大屏同口径：订单计费页×任务份数，双面仍计印面，不含复印。',
     '已结束但尚无法确认出纸，单列，不冒充成功。', '本月已结束且不属于已出纸/未确认的任务。',

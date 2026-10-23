@@ -11,7 +11,7 @@ const initial = (project: FirstOrderProject | null): FirstOrderProjectInput => p
 
 export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, onChanged, onSaved, onDeploymentChanged }: {
   orgId: string; project: FirstOrderProject | null; terminals: FirstOrderTerminal[]; assignedTerminalIds: string[]
-  onChanged: () => Promise<void>; onSaved: (project: FirstOrderProject) => void; onDeploymentChanged: (deployment: FirstOrderDeployment) => void
+  onChanged: () => Promise<void>; onSaved: (project: FirstOrderProject, select: boolean) => void; onDeploymentChanged: (deployment: FirstOrderDeployment) => void
 }) {
   const [editing, setEditing] = useState(!project)
   const [form, setForm] = useState(() => initial(project))
@@ -51,11 +51,12 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
       }
       const result = project ? await firstOrderApi.updateProject(project.id, payload, baseVersion) : await firstOrderApi.createProject(orgId, payload)
       // A completed save must not select an old project after the user leaves its form.
+      onSaved(result, mounted.current)
       if (!mounted.current) {
         try { await onChanged() } catch { /* Parent reload displays its error. */ }
         return
       }
-      setEditing(false); onSaved(result)
+      setEditing(false)
       await refreshAfterWrite('项目资料已保存。')
     })
   }
@@ -78,6 +79,7 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
           <label className="text-sm sm:col-span-2">免费服务与维保范围<textarea disabled={busy} required maxLength={1000} rows={3} className={input} value={form.serviceScope} onChange={(e) => setForm({ ...form, serviceScope: e.target.value })} placeholder="如实填写免费服务、耗材和上门维保覆盖范围。" /></label>
           <label className="text-sm sm:col-span-2">服务联系渠道<input disabled={busy} required maxLength={200} className={input} value={form.supportContact} onChange={(e) => setForm({ ...form, supportContact: e.target.value })} placeholder="填写机构可以联系到的服务电话或服务方式。" /></label>
           <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? '正在保存…' : project ? '保存项目资料' : '创建服务项目'}</Button></div>
+          {!project && <p className="text-xs text-neutral-500 sm:col-span-2">离开表单不会撤回已提交的创建请求；创建成功后会在上方提示，未出现请刷新核对。</p>}
           {project && <p className="text-xs text-neutral-500 sm:col-span-2">若提示记录已发生变化，请先刷新项目服务，再收起编辑后重新打开，核对最新资料再保存。</p>}
         </form>
       ) : project && (

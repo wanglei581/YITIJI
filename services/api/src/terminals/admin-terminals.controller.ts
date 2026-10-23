@@ -127,22 +127,23 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<AssignTerminalOrgResult>> {
-    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId)
-    await this.audit.write({
+    const result = await this.terminalsService.assignTerminalOrg(terminalId, dto.orgId, undefined, (tx, assignment) => this.audit.writeRequired(tx, {
       actorId: user.userId,
       actorRole: user.role,
       action: 'terminal.org.update',
       targetType: 'terminal',
-      targetId: result.terminalCode,
+      targetId: assignment.terminalCode,
       payload: {
-        terminalCode: result.terminalCode,
-        oldOrgId: result.oldOrgId,
-        newOrgId: result.newOrgId,
+        terminalCode: assignment.terminalCode,
+        oldOrgId: assignment.oldOrgId,
+        newOrgId: assignment.newOrgId,
+        deploymentIds: assignment.deploymentIds,
+        effectiveAt: assignment.effectiveAt,
       },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
-    })
+    }))
     return ApiResponse.ok(result)
   }
 
