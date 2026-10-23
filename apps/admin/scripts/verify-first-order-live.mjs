@@ -363,13 +363,18 @@ try {
     const remoteName = `${newProjectName}-另一客户端更新`
     const remote = await fetch(`${fixture.base}/admin/first-order/projects/${created.id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${fixture.tokens.admin}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, name: remoteName }), signal: AbortSignal.timeout(10000) })
     assert.equal(remote.status, 200)
+    expectedProjectConflictPath = `/api/v1/admin/first-order/projects/${created.id}`
+    async function expectConflict() {
+      const conflict = admin.waitForResponse((response) => new URL(response.url()).pathname === expectedProjectConflictPath && response.request().method() === 'PATCH')
+      await a.getByRole('button', { name: '保存项目资料', exact: true }).click()
+      assert.equal((await conflict).status(), 409)
+      await expect(a.getByRole('alert')).toContainText('记录已发生变化')
+    }
+    await expectConflict()
+    await expect(a.getByText('若提示记录已发生变化，请先刷新项目服务，再收起编辑后重新打开，核对最新资料再保存。', { exact: true })).toBeVisible()
     await refresh(a)
     await expect(a.getByLabel('项目名称', { exact: true })).toHaveValue('不可覆盖另一客户端的最新资料')
-    expectedProjectConflictPath = `/api/v1/admin/first-order/projects/${created.id}`
-    const conflict = admin.waitForResponse((response) => new URL(response.url()).pathname === expectedProjectConflictPath && response.request().method() === 'PATCH')
-    await a.getByRole('button', { name: '保存项目资料', exact: true }).click()
-    assert.equal((await conflict).status(), 409)
-    await expect(a.getByRole('alert')).toContainText('记录已发生变化')
+    await expectConflict()
     assert.equal((await api('admin', `/admin/first-order/overview?orgId=${fixture.orgs.own}`)).projects.find((item) => item.id === created.id).name, remoteName)
     mark('Editing retains its original version after refresh; real concurrent update rejects stale form with 409')
     await a.getByRole('button', { name: '收起项目编辑', exact: true }).click()
@@ -500,7 +505,7 @@ try {
   mark('Desktop and 390px views keep first-order panel and controls within viewport')
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
   const expectedConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedProjectConflictPath && item.status === 409)
-  assert.equal(expectedConflicts.length, fullApp ? 1 : 0, 'Exactly one intentional stale-form conflict is expected')
+  assert.equal(expectedConflicts.length, fullApp ? 2 : 0, 'Exactly two intentional stale-form conflicts are expected')
   results.expectedRequestFailures = expectedConflicts
   const unexpectedRequests = results.externalRequests.filter((item) => !expectedConflicts.includes(item))
   assert(!unexpectedRequests.some((item) => item.path.includes('/first-order/')), 'Unexpected first-order requests failed')

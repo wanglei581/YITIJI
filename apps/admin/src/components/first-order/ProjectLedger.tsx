@@ -78,7 +78,7 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
           <label className="text-sm sm:col-span-2">免费服务与维保范围<textarea disabled={busy} required maxLength={1000} rows={3} className={input} value={form.serviceScope} onChange={(e) => setForm({ ...form, serviceScope: e.target.value })} placeholder="如实填写免费服务、耗材和上门维保覆盖范围。" /></label>
           <label className="text-sm sm:col-span-2">服务联系渠道<input disabled={busy} required maxLength={200} className={input} value={form.supportContact} onChange={(e) => setForm({ ...form, supportContact: e.target.value })} placeholder="填写机构可以联系到的服务电话或服务方式。" /></label>
           <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? '正在保存…' : project ? '保存项目资料' : '创建服务项目'}</Button></div>
-          {project && <p className="text-xs text-neutral-500 sm:col-span-2">若提示记录已发生变化，请收起编辑后重新打开，核对最新资料再保存。</p>}
+          {project && <p className="text-xs text-neutral-500 sm:col-span-2">若提示记录已发生变化，请先刷新项目服务，再收起编辑后重新打开，核对最新资料再保存。</p>}
         </form>
       ) : project && (
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
