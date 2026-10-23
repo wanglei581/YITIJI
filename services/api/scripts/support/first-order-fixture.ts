@@ -117,8 +117,11 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
     const { OrgsModule } = await import('../../src/orgs/orgs.module')
     @Module({ imports: [FirstOrderModule, OrgsModule] })
     class FirstOrderVerificationModule {}
+    let fullAppBase: string | undefined
     if (options.fullApp) {
-      app = (await startFirstOrderFullApplication()).app
+      const server = await startFirstOrderFullApplication()
+      app = server.app
+      fullAppBase = server.base
     } else {
       app = await NestFactory.create(FirstOrderVerificationModule, { logger: ['error'], abortOnError: false })
       app.setGlobalPrefix('api/v1')
@@ -150,7 +153,7 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
       } })
     }
     const credentials = options.fullApp ? await seedFirstOrderLogin(prisma, { admin: users.admin, partner: users.partner }) : undefined
-    return { app, prisma, directory, mode, base: `${await app.getUrl()}/api/v1`, users, tokens, orgs, terminals, credentials, close }
+    return { app, prisma, directory, mode, base: fullAppBase ?? `${await app.getUrl()}/api/v1`, users, tokens, orgs, terminals, credentials, close }
   } catch (error) { await close(); throw error }
 }
 

@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { formatDate, formatDateTime, type FirstOrderProject, type FirstOrderProjectInput, type FirstOrderTerminal } from '@ai-job-print/shared'
+import { useRef, useState, type FormEvent } from 'react'
+import { formatDate, formatDateTime, type FirstOrderDeployment, type FirstOrderProject, type FirstOrderProjectInput, type FirstOrderTerminal } from '@ai-job-print/shared'
 import { Button } from '@ai-job-print/ui'
 import { firstOrderApi } from '../../services/api/firstOrder'
 
@@ -9,9 +9,9 @@ const initial = (project: FirstOrderProject | null): FirstOrderProjectInput => p
   name: '', reference: '', serviceStartAt: '', serviceEndAt: '', serviceScope: '', supportContact: '',
 }
 
-export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, onChanged, onCreated }: {
+export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, onChanged, onSaved, onDeploymentChanged }: {
   orgId: string; project: FirstOrderProject | null; terminals: FirstOrderTerminal[]; assignedTerminalIds: string[]
-  onChanged: () => Promise<void>; onCreated: (id: string) => void
+  onChanged: () => Promise<void>; onSaved: (project: FirstOrderProject) => void; onDeploymentChanged: (deployment: FirstOrderDeployment) => void
 }) {
   const [editing, setEditing] = useState(!project)
   const [form, setForm] = useState(() => initial(project))
@@ -21,12 +21,20 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [endingId, setEndingId] = useState<string | null>(null)
+  const writing = useRef(false)
   const available = terminals.filter((terminal) => !assignedTerminalIds.includes(terminal.id))
 
   async function perform(work: () => Promise<void>) {
+    if (writing.current) return
+    writing.current = true
     setBusy(true); setError(''); setNotice('')
     try { await work() } catch (failure) { setError(failure instanceof Error ? failure.message : '操作未完成，请刷新核对后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
+  }
+
+  async function refreshAfterWrite(message: string) {
+    try { await onChanged(); setNotice(message) }
+    catch { setNotice(`${message} 列表暂未刷新，请联网后刷新核对。`) }
   }
 
   async function save(event: FormEvent) {
@@ -38,7 +46,8 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
         serviceEndAt: project?.deployments.length ? project.serviceEndAt : new Date(`${day(form.serviceEndAt)}T23:59:59+08:00`).toISOString(),
       }
       const result = project ? await firstOrderApi.updateProject(project.id, payload, project.version) : await firstOrderApi.createProject(orgId, payload)
-      await onChanged(); onCreated(result.id); setEditing(false); setNotice('项目资料已保存。')
+      setEditing(false); onSaved(result)
+      await refreshAfterWrite('项目资料已保存。')
     })
   }
 
@@ -76,10 +85,10 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
           <p className="font-semibold">{deployment.terminalCode} · {deployment.locationLabel}</p>
           <p className="mt-1 text-xs text-neutral-500">登记于 {formatDateTime(deployment.startedAt)}{deployment.endedAt ? `，结束于 ${formatDateTime(deployment.endedAt)}` : '，当前在此项目服务'}</p>
           {!deployment.endedAt && <div className="mt-2">
-            {endingId === deployment.id ? <div className="space-y-2"><p>确认结束这台设备在本项目的部署？历史记录保留，之后的使用不再计入本次部署。</p><div className="flex gap-2"><Button size="sm" variant="danger" disabled={busy} onClick={() => void perform(async () => { await firstOrderApi.endDeployment(deployment.id); setEndingId(null); await onChanged(); setNotice('本次部署已结束，历史记录已保留。') })}>确认结束部署</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => setEndingId(null)}>取消</Button></div></div> : <Button size="sm" variant="outline" disabled={busy} onClick={() => setEndingId(deployment.id)}>结束本次部署</Button>}
+            {endingId === deployment.id ? <div className="space-y-2"><p>确认结束这台设备在本项目的部署？历史记录保留，之后的使用不再计入本次部署。</p><div className="flex gap-2"><Button size="sm" variant="danger" disabled={busy} onClick={() => void perform(async () => { const saved = await firstOrderApi.endDeployment(deployment.id); onDeploymentChanged(saved); setEndingId(null); await refreshAfterWrite('本次部署已结束，历史记录已保留。') })}>确认结束部署</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => setEndingId(null)}>取消</Button></div></div> : <Button size="sm" variant="outline" disabled={busy} onClick={() => setEndingId(deployment.id)}>结束本次部署</Button>}
           </div>}
         </div>)}
-        <form aria-label="登记项目设备" className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void perform(async () => { await firstOrderApi.createDeployment(project.id, terminalId, location.trim()); setTerminalId(''); setLocation(''); await onChanged(); setNotice('项目设备已登记。统计从本次登记时刻开始，不补造历史。') }) }}>
+        <form aria-label="登记项目设备" className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void perform(async () => { const saved = await firstOrderApi.createDeployment(project.id, terminalId, location.trim()); onDeploymentChanged(saved); setTerminalId(''); setLocation(''); await refreshAfterWrite('项目设备已登记。统计从本次登记时刻开始，不补造历史。') }) }}>
           <label className="text-sm">待登记终端<select aria-label="待登记终端" disabled={busy} required className={input} value={terminalId} onChange={(e) => { setTerminalId(e.target.value); setLocation(terminals.find((item) => item.id === e.target.value)?.locationLabel ?? '') }}><option value="">选择本机构尚未部署的终端</option>{available.map((terminal) => <option key={terminal.id} value={terminal.id}>{terminal.terminalCode} · {terminal.displayName ?? '未命名终端'}</option>)}</select></label>
           <label className="text-sm">安装位置<input disabled={busy} required maxLength={200} className={input} value={location} onChange={(e) => setLocation(e.target.value)} /></label>
           <div className="sm:col-span-2"><Button type="submit" disabled={busy || !available.length || !terminalId || !location.trim()}>登记项目设备</Button></div>

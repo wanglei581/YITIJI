@@ -86,7 +86,7 @@ export async function startVerificationApi(port: number, redisUrl?: string, opti
   options.configure?.(app)
   await app.listen(port, '127.0.0.1')
   return {
-    base: `http://127.0.0.1:${port}/api/v1`,
+    base: `${await app.getUrl()}/api/v1`,
     app,
     async close() {
       await app.close()

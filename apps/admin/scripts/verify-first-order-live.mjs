@@ -92,6 +92,7 @@ async function readDescriptor(path, ownedPid) {
   assert.equal(metadata.mode & 0o077, 0, 'Fixture descriptor must not be group/world readable')
   const value = JSON.parse(await readFile(path, 'utf8'))
   assert.match(value.base, /^http:\/\/127\.0\.0\.1:\d+\/api\/v1$/)
+  assert.notEqual(new URL(value.base).port, '0', 'API helper must return the actual listening port')
   assert.match(value.orgs.own, /^fo-own-/)
   assert.match(value.terminals.spare, /^fo-spare-/)
   if (ownedPid) assert.equal(value.pid, ownedPid, 'Descriptor belongs to another API process')
@@ -169,6 +170,7 @@ async function context(role, origin) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true })
   if (!fullApp) await ctx.addInitScript(({ key, stored }) => { localStorage.setItem(key, JSON.stringify(stored)) }, { key: `${role}_auth_v1`, stored: value })
   const page = await ctx.newPage()
+  if (fullApp) await page.exposeBinding('firstOrderDisconnectAfterWrite', () => ctx.setOffline(true))
   page.setDefaultTimeout(30000)
   page.on('pageerror', (error) => results.pageErrors.push(`${role}: ${error.message}`))
   page.on('response', (response) => {
@@ -205,6 +207,26 @@ async function responseAfter(page, method, suffix, action) {
   ])
   assert.equal(response.ok(), true, `${method} ${suffix} returned ${response.status()}`)
   return response.json()
+}
+
+/** Receive the real committed HTTP response, then disconnect before the UI refresh.
+ * No fake response is returned; reconnect and reread the database through the real API.
+ */
+async function disconnectAfterWrite(page, suffix) {
+  if (!fullApp) return
+  await page.evaluate(({ base, suffix }) => {
+    const original = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const response = await original(input, init)
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.startsWith(base) && new URL(url).pathname.endsWith(suffix) && init?.method === 'POST' && response.ok) {
+        window.fetch = original
+        await response.clone().arrayBuffer()
+        await window.firstOrderDisconnectAfterWrite()
+      }
+      return response
+    }
+  }, { base: fixture.base, suffix })
 }
 
 const adminPanel = (page) => page.locator('section[aria-label="首单交付与服务"]')
@@ -279,11 +301,32 @@ try {
   await a.getByLabel('服务截止日', { exact: true }).fill(endDate)
   await a.getByLabel('免费服务与维保范围', { exact: true }).fill('免费打印、年度技术维保；仅隔离浏览器验证资料。')
   await a.getByLabel('服务联系渠道', { exact: true }).fill('首单验证服务窗口')
-  const created = await responseAfter(admin, 'POST', '/admin/first-order/projects', () => a.getByRole('button', { name: '创建服务项目', exact: true }).click())
+  let projectWrites = 0
+  admin.on('request', (request) => { if (request.method() === 'POST' && request.url() === `${fixture.base}/admin/first-order/projects`) projectWrites++ })
+  await disconnectAfterWrite(admin, '/admin/first-order/projects')
+  const created = await responseAfter(admin, 'POST', '/admin/first-order/projects', () => fullApp
+    ? a.getByRole('form', { name: '新建服务项目', exact: true }).evaluate((form) => { form.requestSubmit(); form.requestSubmit() })
+    : a.getByRole('button', { name: '创建服务项目', exact: true }).click())
   await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(created.id)
+  if (fullApp) {
+    await expect(a.getByRole('alert')).toContainText('现有内容尚未刷新')
+    await expect(a.getByRole('status')).toContainText('资料已保存')
+    assert.equal(projectWrites, 1, 'Rapid duplicate submit must issue only one create request')
+    await admin.context().setOffline(false); await refresh(a)
+    mark('Committed project remains selected after failed refresh; duplicate submit is locked; reconnect persists')
+  }
   await a.getByLabel('待登记终端', { exact: true }).selectOption(fixture.terminals.spare)
   await a.getByLabel('安装位置', { exact: true }).fill('浏览器验证大厅')
+  await disconnectAfterWrite(admin, `/projects/${created.id}/deployments`)
   const deployed = await responseAfter(admin, 'POST', `/projects/${created.id}/deployments`, () => a.getByRole('button', { name: '登记项目设备', exact: true }).click())
+  if (fullApp) {
+    await expect(a.getByRole('alert')).toContainText('现有内容尚未刷新')
+    await expect(a.getByTestId(`first-order-deployment-${deployed.id}`)).toContainText('浏览器验证大厅')
+    await expect(a.getByLabel('待登记终端', { exact: true }).locator(`option[value="${fixture.terminals.spare}"]`)).toHaveCount(0)
+    await expect(a.getByRole('status').filter({ hasText: '项目设备已登记' })).toContainText('列表暂未刷新')
+    await admin.context().setOffline(false); await refresh(a)
+    mark('Committed deployment remains visible after failed refresh and is unavailable for duplicate registration')
+  }
   await openAdmin(admin, adminOrigin, orgName); a = adminPanel(admin)
   await chooseProject(a, created.id, '项目台账')
   await expect(a.getByTestId(`first-order-deployment-${deployed.id}`)).toContainText('浏览器验证大厅')
