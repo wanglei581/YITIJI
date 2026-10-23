@@ -15,6 +15,7 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
 }) {
   const [editing, setEditing] = useState(!project)
   const [form, setForm] = useState(() => initial(project))
+  const [baseVersion, setBaseVersion] = useState(project?.version ?? 0)
   const [terminalId, setTerminalId] = useState('')
   const [location, setLocation] = useState('')
   const [busy, setBusy] = useState(false)
@@ -48,9 +49,12 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
         serviceStartAt: project?.deployments.length ? project.serviceStartAt : new Date(`${day(form.serviceStartAt)}T00:00:00+08:00`).toISOString(),
         serviceEndAt: project?.deployments.length ? project.serviceEndAt : new Date(`${day(form.serviceEndAt)}T23:59:59+08:00`).toISOString(),
       }
-      const result = project ? await firstOrderApi.updateProject(project.id, payload, project.version) : await firstOrderApi.createProject(orgId, payload)
+      const result = project ? await firstOrderApi.updateProject(project.id, payload, baseVersion) : await firstOrderApi.createProject(orgId, payload)
       // A completed save must not select an old project after the user leaves its form.
-      if (!mounted.current) return
+      if (!mounted.current) {
+        try { await onChanged() } catch { /* Parent reload displays its error. */ }
+        return
+      }
       setEditing(false); onSaved(result)
       await refreshAfterWrite('项目资料已保存。')
     })
@@ -60,7 +64,7 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
     <section aria-label="项目与点位台账" className="space-y-4 rounded-xl border border-neutral-200 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="font-semibold text-neutral-900">项目与点位台账</h4>
-        {project && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setForm(initial(project)); setEditing(!editing) }}>{editing ? '收起项目编辑' : '编辑项目资料'}</Button>}
+        {project && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setForm(initial(project)); setBaseVersion(project.version); setEditing(!editing) }}>{editing ? '收起项目编辑' : '编辑项目资料'}</Button>}
       </div>
       {error && <p role="alert" className="text-sm text-error-fg">{error}</p>}
       {notice && <p role="status" className="text-sm text-success-fg">{notice}</p>}
@@ -74,6 +78,7 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
           <label className="text-sm sm:col-span-2">免费服务与维保范围<textarea disabled={busy} required maxLength={1000} rows={3} className={input} value={form.serviceScope} onChange={(e) => setForm({ ...form, serviceScope: e.target.value })} placeholder="如实填写免费服务、耗材和上门维保覆盖范围。" /></label>
           <label className="text-sm sm:col-span-2">服务联系渠道<input disabled={busy} required maxLength={200} className={input} value={form.supportContact} onChange={(e) => setForm({ ...form, supportContact: e.target.value })} placeholder="填写机构可以联系到的服务电话或服务方式。" /></label>
           <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? '正在保存…' : project ? '保存项目资料' : '创建服务项目'}</Button></div>
+          {project && <p className="text-xs text-neutral-500 sm:col-span-2">若提示记录已发生变化，请收起编辑后重新打开，核对最新资料再保存。</p>}
         </form>
       ) : project && (
         <dl className="grid gap-3 text-sm sm:grid-cols-2">

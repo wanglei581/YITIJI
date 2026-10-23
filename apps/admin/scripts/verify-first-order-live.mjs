@@ -24,6 +24,7 @@ if (!isolated && !descriptor) throw new Error('Use --isolated or provide a priva
 let fixture
 let launchDirectory
 let ownedApiDirectory
+let expectedProjectConflictPath
 const outputArgument = process.argv[3] || process.env.FIRST_ORDER_BROWSER_OUTPUT
 const output = outputArgument ? resolve(outputArgument) : await mkdtemp(join(tmpdir(), 'first-order-browser-'))
 await mkdir(output, { recursive: true })
@@ -354,6 +355,52 @@ try {
   mark('Admin creates project and deployment, refresh persists; registered dates are locked')
   await shot(admin, 'admin-project-desktop', a)
 
+  if (fullApp) {
+    await a.getByRole('button', { name: '编辑项目资料', exact: true }).click()
+    await a.getByLabel('项目名称', { exact: true }).fill('不可覆盖另一客户端的最新资料')
+    const current = (await api('admin', `/admin/first-order/overview?orgId=${fixture.orgs.own}`)).projects.find((item) => item.id === created.id)
+    const payload = Object.fromEntries(['name', 'reference', 'serviceScope', 'supportContact', 'serviceStartAt', 'serviceEndAt', 'version'].map((key) => [key, current[key]]))
+    const remoteName = `${newProjectName}-另一客户端更新`
+    const remote = await fetch(`${fixture.base}/admin/first-order/projects/${created.id}`, { method: 'PATCH', headers: { Authorization: `Bearer ${fixture.tokens.admin}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, name: remoteName }), signal: AbortSignal.timeout(10000) })
+    assert.equal(remote.status, 200)
+    await refresh(a)
+    await expect(a.getByLabel('项目名称', { exact: true })).toHaveValue('不可覆盖另一客户端的最新资料')
+    expectedProjectConflictPath = `/api/v1/admin/first-order/projects/${created.id}`
+    const conflict = admin.waitForResponse((response) => new URL(response.url()).pathname === expectedProjectConflictPath && response.request().method() === 'PATCH')
+    await a.getByRole('button', { name: '保存项目资料', exact: true }).click()
+    assert.equal((await conflict).status(), 409)
+    await expect(a.getByRole('alert')).toContainText('记录已发生变化')
+    assert.equal((await api('admin', `/admin/first-order/overview?orgId=${fixture.orgs.own}`)).projects.find((item) => item.id === created.id).name, remoteName)
+    mark('Editing retains its original version after refresh; real concurrent update rejects stale form with 409')
+    await a.getByRole('button', { name: '收起项目编辑', exact: true }).click()
+    await a.getByRole('button', { name: '编辑项目资料', exact: true }).click()
+    await expect(a.getByLabel('项目名称', { exact: true })).toHaveValue(remoteName)
+    const savedName = `${newProjectName}-保存时切换项目`
+    await a.getByLabel('项目名称', { exact: true }).fill(savedName)
+    await admin.evaluate(({ base, id }) => {
+      const original = window.fetch.bind(window)
+      window.fetch = async (input, init) => {
+        const response = await original(input, init)
+        if (String(input) === `${base}/admin/first-order/projects/${id}` && init?.method === 'PATCH' && response.ok) {
+          window.fetch = original; await response.clone().arrayBuffer()
+          await new Promise((release) => { window.firstOrderReleaseSave = release })
+        }
+        return response
+      }
+    }, { base: fixture.base, id: created.id })
+    await responseAfter(admin, 'PATCH', `/projects/${created.id}`, () => a.getByRole('button', { name: '保存项目资料', exact: true }).click())
+    await admin.waitForFunction(() => typeof window.firstOrderReleaseSave === 'function')
+    const another = (await api('admin', `/admin/first-order/overview?orgId=${fixture.orgs.own}`)).projects.find((item) => item.id !== created.id)
+    assert(another)
+    await a.getByLabel('服务项目', { exact: true }).selectOption(another.id)
+    const reloaded = admin.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/admin/first-order/overview' && response.request().method() === 'GET')
+    await admin.evaluate(() => window.firstOrderReleaseSave())
+    assert.equal((await reloaded).status(), 200)
+    await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(another.id)
+    await expect(a.getByLabel('服务项目', { exact: true }).locator(`option[value="${created.id}"]`)).toHaveText(savedName)
+    mark('Late committed save refreshes the project list without switching back to the unmounted form')
+  }
+
   await partner.goto(`${partnerOrigin}/terminals`)
   let p = partnerPanel(partner)
   await expect(p.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
@@ -452,9 +499,13 @@ try {
   await shot(partner, 'partner-report-narrow', p, true)
   mark('Desktop and 390px views keep first-order panel and controls within viewport')
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
-  assert(!results.externalRequests.some((item) => item.path.includes('/first-order/')), 'First-order requests failed')
+  const expectedConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedProjectConflictPath && item.status === 409)
+  assert.equal(expectedConflicts.length, fullApp ? 1 : 0, 'Exactly one intentional stale-form conflict is expected')
+  results.expectedRequestFailures = expectedConflicts
+  const unexpectedRequests = results.externalRequests.filter((item) => !expectedConflicts.includes(item))
+  assert(!unexpectedRequests.some((item) => item.path.includes('/first-order/')), 'Unexpected first-order requests failed')
   if (fullApp) {
-    assert.deepEqual(results.externalRequests, [], 'Complete application browser requests failed')
+    assert.deepEqual(unexpectedRequests, [], 'Unexpected complete application browser requests failed')
     for (const role of ['admin', 'partner']) {
       const headers = { Authorization: `Bearer ${fixture.tokens[role]}` }
       const logout = await fetch(`${fixture.base}/auth/logout`, { method: 'POST', headers, signal: AbortSignal.timeout(10000) })
