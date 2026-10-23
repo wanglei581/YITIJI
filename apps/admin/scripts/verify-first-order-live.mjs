@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /** Real browser -> Vite/http adapters -> authenticated Nest -> isolated SQLite.
- * Fixture JWTs bypass SMS login only. No route interception, API stubs or hardware calls.
+ * Focused mode uses fixture JWTs; --isolated-full performs real password login.
+ * Neither mode verifies SMS/2FA, live AI or hardware. No route interception/API stubs.
  * Usage: node apps/admin/scripts/verify-first-order-live.mjs --isolated [output-dir]
+ *    or: node apps/admin/scripts/verify-first-order-live.mjs --isolated-full [output-dir]
  *    or: node apps/admin/scripts/verify-first-order-live.mjs /private/fixture.json [output-dir]
  * FIRST_ORDER_BROWSER_OUTPUT selects the artifacts directory in CI.
  */
@@ -15,7 +17,8 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const isolated = process.argv[2] === '--isolated'
+const fullApp = process.argv[2] === '--isolated-full'
+const isolated = fullApp || process.argv[2] === '--isolated'
 const descriptor = isolated ? null : process.argv[2]
 if (!isolated && !descriptor) throw new Error('Use --isolated or provide a private fixture descriptor')
 let fixture
@@ -30,7 +33,7 @@ const children = []
 let browser
 let interrupted = false
 let cleanupPromise
-const results = { startedAt: new Date().toISOString(), mode: isolated ? 'isolated' : 'external_descriptor', cleanup: [], checks: [], screenshots: [], externalRequests: [], pageErrors: [], limitations: ['Isolated synthetic SQLite task/result records; no Pantum/Windows device acceptance.', 'Real fixture-issued JWT + AuthGuard checks; SMS login is not exercised.', 'Fixture loads FirstOrderModule + OrgsModule, not the complete production application.'] }
+const results = { startedAt: new Date().toISOString(), mode: fullApp ? 'isolated_full_app' : isolated ? 'isolated' : 'external_descriptor', cleanup: [], checks: [], screenshots: [], externalRequests: [], pageErrors: [], limitations: ['Isolated synthetic SQLite task/result records; no Pantum/Windows device acceptance.', fullApp ? 'Real password login with preverified synthetic accounts; SMS/2FA and production runtime gates are not exercised.' : 'Real fixture-issued JWT + AuthGuard checks; SMS login is not exercised.', fullApp ? 'Complete AppModule with owned Redis queues and local storage; no live AI/provider or production deployment acceptance.' : 'Fixture loads FirstOrderModule + OrgsModule, not the complete production application.'] }
 const mark = (name) => { results.checks.push(name); console.log(`PASS ${name}`) }
 
 function alive(child) {
@@ -100,25 +103,29 @@ async function startIsolatedApi() {
   launchDirectory = await mkdtemp(join(tmpdir(), 'first-order-browser-launch-'))
   const env = { ...process.env, NODE_ENV: 'test', DOTENV_CONFIG_PATH: join(launchDirectory, 'no-dotenv') }
   for (const key of ['DATABASE_URL', 'POSTGRES_URL', 'REDIS_URL', 'JWT_SECRET', 'SECRET_ENCRYPTION_KEY']) delete env[key]
-  const child = spawn(process.execPath, ['-r', '@swc-node/register', 'scripts/support/first-order-fixture.ts'], {
+  const child = spawn(process.execPath, ['-r', '@swc-node/register', 'scripts/support/first-order-fixture.ts', ...(fullApp ? ['--full-app'] : [])], {
     cwd: join(root, 'services/api'), env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   })
   child.firstOrderKind = 'api'; children.push(child)
-  let path, spawnFailure, readyBuffer = ''
+  let path, spawnFailure, readyBuffer = '', errorBuffer = ''
   child.on('error', (error) => { spawnFailure = error.message })
   child.stdout.on('data', (chunk) => {
     readyBuffer = `${readyBuffer}${chunk}`.slice(-32000)
     const ready = readyBuffer.match(/private descriptor: ([^\r\n]+\/browser-fixture\.json)(?:\r?\n|$)/)
     if (ready) path = ready[1].trim()
   })
-  // Drain stderr without printing fixture process output or any credentials.
-  child.stderr.on('data', () => undefined)
+  // Keep bounded diagnostics private; do not print fixture credentials or process logs.
+  child.stderr.on('data', (chunk) => { errorBuffer = `${errorBuffer}${chunk}`.slice(-32000) })
   const deadline = Date.now() + 90000
   while (Date.now() < deadline) {
-    if (spawnFailure || child.exitCode !== null || child.signalCode !== null) throw new Error('Isolated API startup failed; verify redis-server and generated SQLite Prisma client')
+    if (spawnFailure || child.exitCode !== null || child.signalCode !== null) {
+      await writeFile(join(output, 'api-startup.log'), `${readyBuffer}\n${errorBuffer}`, { mode: 0o600 })
+      throw new Error('Isolated API startup failed; private diagnostics: api-startup.log')
+    }
     if (path) {
       ownedApiDirectory = resolve(dirname(path))
       const value = await readDescriptor(path, child.pid)
+      if (fullApp) assert.equal(value.application, 'AppModule')
       results.apiPid = child.pid
       return value
     }
@@ -156,11 +163,11 @@ async function api(role, path) {
   return response.json()
 }
 
-async function context(role) {
+async function context(role, origin) {
   const user = { id: fixture.users[role], name: role === 'admin' ? '首单管理员（验证）' : '首单机构（验证）', role, orgId: role === 'partner' ? fixture.orgs.own : null }
   const value = { token: fixture.tokens[role], user }
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true })
-  await ctx.addInitScript(({ key, stored }) => { localStorage.setItem(key, JSON.stringify(stored)) }, { key: `${role}_auth_v1`, stored: value })
+  if (!fullApp) await ctx.addInitScript(({ key, stored }) => { localStorage.setItem(key, JSON.stringify(stored)) }, { key: `${role}_auth_v1`, stored: value })
   const page = await ctx.newPage()
   page.setDefaultTimeout(30000)
   page.on('pageerror', (error) => results.pageErrors.push(`${role}: ${error.message}`))
@@ -169,13 +176,33 @@ async function context(role) {
       results.externalRequests.push({ role, path: new URL(response.url()).pathname, status: response.status() })
     }
   })
+  if (fullApp) {
+    await page.goto(`${origin}/login`)
+    await page.getByPlaceholder(role === 'admin' ? '请输入管理员账号或手机号' : '请输入机构账号、已验证手机号或已验证邮箱', { exact: true }).fill(fixture.credentials[role].loginId)
+    await page.getByPlaceholder('请输入密码', { exact: true }).fill(fixture.credentials[role].password)
+    const agreement = page.getByRole('checkbox', { name: /我已阅读并同意/ })
+    await agreement.locator('.box').click()
+    await expect(agreement).toHaveAttribute('aria-checked', 'true')
+    const response = await responseAfter(page, 'POST', '/auth/login', () => page.locator('form button[type="submit"]').click())
+    assert.equal(response.data.user.id, fixture.users[role])
+    await page.waitForURL((url) => url.pathname !== '/login')
+    const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), `${role}_auth_v1`)
+    assert.equal(stored.token, response.data.token)
+    fixture.tokens[role] = stored.token
+    const me = await api(role, '/auth/me')
+    assert.equal(me.data.userId, fixture.users[role])
+    assert.equal(me.data.role, role)
+    assert.equal(me.data.orgId, role === 'partner' ? fixture.orgs.own : null)
+    mark(`${role} password login uses real UI/API and current-account identity agrees`)
+  }
   return page
 }
 
 async function responseAfter(page, method, suffix, action) {
-  const pending = page.waitForResponse((response) => response.url().startsWith(fixture.base) && new URL(response.url()).pathname.endsWith(suffix) && response.request().method() === method)
-  await action()
-  const response = await pending
+  const [response] = await Promise.all([
+    page.waitForResponse((response) => response.url().startsWith(fixture.base) && new URL(response.url()).pathname.endsWith(suffix) && response.request().method() === method),
+    action(),
+  ])
   assert.equal(response.ok(), true, `${method} ${suffix} returned ${response.status()}`)
   return response.json()
 }
@@ -230,7 +257,12 @@ try {
   fixture = isolated ? await startIsolatedApi() : await readDescriptor(descriptor)
   const [adminOrigin, partnerOrigin] = await Promise.all([startVite('admin', Number(process.env.FIRST_ORDER_ADMIN_PORT || 4194)), startVite('partner', Number(process.env.FIRST_ORDER_PARTNER_PORT || 4195))])
   browser = await chromium.launch({ headless: true })
-  const admin = await context('admin'), partner = await context('partner')
+  const admin = await context('admin', adminOrigin), partner = await context('partner', partnerOrigin)
+  if (fullApp) {
+    const health = await fetch(`${fixture.base}/health/ready`, { signal: AbortSignal.timeout(10000) })
+    assert.equal(health.status, 200)
+    mark('Complete AppModule readiness succeeds with owned database and Redis')
+  }
   const org = await api('admin', `/admin/orgs/${encodeURIComponent(fixture.orgs.own)}`)
   const orgName = org.name ?? org.data?.name
   assert.equal(typeof orgName, 'string')
@@ -332,6 +364,17 @@ try {
   mark('Desktop and 390px views keep first-order panel and controls within viewport')
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
   assert(!results.externalRequests.some((item) => item.path.includes('/first-order/')), 'First-order requests failed')
+  if (fullApp) {
+    assert.deepEqual(results.externalRequests, [], 'Complete application browser requests failed')
+    for (const role of ['admin', 'partner']) {
+      const headers = { Authorization: `Bearer ${fixture.tokens[role]}` }
+      const logout = await fetch(`${fixture.base}/auth/logout`, { method: 'POST', headers, signal: AbortSignal.timeout(10000) })
+      assert.equal(logout.status, 200)
+      const replay = await fetch(`${fixture.base}/${role}/first-order/overview${role === 'admin' ? `?orgId=${fixture.orgs.own}` : ''}`, { headers, signal: AbortSignal.timeout(10000) })
+      assert.equal(replay.status, 401)
+    }
+    mark('Both real login sessions are revoked on logout; old tokens cannot read first-order data')
+  }
   results.status = 'PASS'
 } catch (error) {
   results.status = 'FAIL'; results.error = error instanceof Error ? error.message : 'Browser verification failed'

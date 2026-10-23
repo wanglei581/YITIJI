@@ -12,6 +12,7 @@ import { createServer } from 'node:net'
 import { PrismaService } from '../../src/prisma/prisma.service'
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter'
 import { registerProcessCleanup, startEphemeralRedis } from './ephemeral-redis-server'
+import { isolateFirstOrderEnvironment, seedFirstOrderLogin, startFirstOrderFullApplication } from './first-order-full-app'
 
 const API_ROOT = resolve(__dirname, '../..')
 const ENV_KEYS = ['NODE_ENV', 'DATABASE_URL', 'POSTGRES_URL', 'REDIS_URL', 'JWT_SECRET', 'SECRET_ENCRYPTION_KEY'] as const
@@ -63,11 +64,12 @@ export interface FirstOrderFixture {
   tokens: { admin: string; partner: string; other: string; kiosk: string }
   orgs: { own: string; other: string }
   terminals: { monthly: string; spare: string; other: string; small: string }
+  credentials?: Awaited<ReturnType<typeof seedFirstOrderLogin>>
   close(): Promise<void>
 }
 
 /** Real isolated SQLite + Redis + Nest/guards. Never reads .env or reuses caller databases. */
-export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'postgres' } = {}): Promise<FirstOrderFixture> {
+export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'postgres'; fullApp?: boolean } = {}): Promise<FirstOrderFixture> {
   if (process.env.NODE_ENV === 'production') throw new Error('Refusing first-order fixture in production')
   const saved = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]))
   const directory = mkdtempSync(join(tmpdir(), 'first-order-http-'))
@@ -80,6 +82,7 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
     try { postgres?.stop() } finally { rmSync(directory, { recursive: true, force: true }) }
     throw error
   })
+  const restoreEnvironment = options.fullApp ? isolateFirstOrderEnvironment(directory) : undefined
   process.env.NODE_ENV = 'test'
   process.env.DATABASE_URL = postgres?.url ?? `file:${database}`
   if (postgres) process.env.POSTGRES_URL = postgres.url
@@ -100,6 +103,7 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
             if (saved[key] === undefined) delete process.env[key]
             else process.env[key] = saved[key]
           }
+          restoreEnvironment?.()
         }
       }
     }
@@ -113,12 +117,16 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
     const { OrgsModule } = await import('../../src/orgs/orgs.module')
     @Module({ imports: [FirstOrderModule, OrgsModule] })
     class FirstOrderVerificationModule {}
-    app = await NestFactory.create(FirstOrderVerificationModule, { logger: ['error'], abortOnError: false })
-    app.setGlobalPrefix('api/v1')
-    app.enableCors({ origin: /^http:\/\/(127\.0\.0\.1|localhost):\d+$/, credentials: true })
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
-    app.useGlobalFilters(new HttpExceptionFilter())
-    await app.listen(0, '127.0.0.1')
+    if (options.fullApp) {
+      app = (await startFirstOrderFullApplication()).app
+    } else {
+      app = await NestFactory.create(FirstOrderVerificationModule, { logger: ['error'], abortOnError: false })
+      app.setGlobalPrefix('api/v1')
+      app.enableCors({ origin: /^http:\/\/(127\.0\.0\.1|localhost):\d+$/, credentials: true })
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+      app.useGlobalFilters(new HttpExceptionFilter())
+      await app.listen(0, '127.0.0.1')
+    }
     const prisma = app.get(PrismaService)
     const nonce = randomUUID().slice(0, 8)
     const orgs = { own: `fo-own-${nonce}`, other: `fo-other-${nonce}` }
@@ -141,7 +149,8 @@ export async function createFirstOrderFixture(options: { mode?: 'sqlite' | 'post
         enabled: true, lifecycleStatus: 'active', displayName: `${key}验证终端`, locationLabel: '验证大厅', lastHeartbeatAt: new Date(),
       } })
     }
-    return { app, prisma, directory, mode, base: `${await app.getUrl()}/api/v1`, users, tokens, orgs, terminals, close }
+    const credentials = options.fullApp ? await seedFirstOrderLogin(prisma, { admin: users.admin, partner: users.partner }) : undefined
+    return { app, prisma, directory, mode, base: `${await app.getUrl()}/api/v1`, users, tokens, orgs, terminals, credentials, close }
   } catch (error) { await close(); throw error }
 }
 
@@ -194,10 +203,11 @@ export async function seedFirstOrderMonth(f: FirstOrderFixture, small = false) {
 
 if (require.main === module) {
   void (async () => {
-    const fixture = await createFirstOrderFixture({ mode: process.argv.includes('--postgres') ? 'postgres' : 'sqlite' })
+    const fullApp = process.argv.includes('--full-app')
+    const fixture = await createFirstOrderFixture({ mode: process.argv.includes('--postgres') ? 'postgres' : 'sqlite', fullApp })
     const seeded = await seedFirstOrderMonth(fixture)
     const descriptor = join(fixture.directory, 'browser-fixture.json')
-    writeFileSync(descriptor, JSON.stringify({ pid: process.pid, base: fixture.base, tokens: fixture.tokens, users: fixture.users, orgs: fixture.orgs, terminals: fixture.terminals, month: seeded.month, projectId: seeded.project.id }), { mode: 0o600 })
+    writeFileSync(descriptor, JSON.stringify({ pid: process.pid, base: fixture.base, tokens: fixture.tokens, users: fixture.users, orgs: fixture.orgs, terminals: fixture.terminals, credentials: fixture.credentials, application: fullApp ? 'AppModule' : 'FirstOrderVerificationModule', month: seeded.month, projectId: seeded.project.id }), { mode: 0o600 })
     console.log(`First-order fixture ready; private descriptor: ${descriptor}`)
     const close = async () => { await fixture.close(); process.exit(0) }
     process.once('SIGINT', () => void close())

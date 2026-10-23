@@ -54,14 +54,19 @@ export interface VerificationApiServer {
  * 不这么做的话:队列会连上不实现 Lua 的内存桩,每几秒吐一整屏 BullMQ 脚本源码,
  * 真正的验证输出会被噪声淹没(实测第一版就是这样)。
  */
-export async function startVerificationApi(port: number, redisUrl?: string): Promise<VerificationApiServer> {
+export async function startVerificationApi(port: number, redisUrl?: string, options: {
+  queues?: boolean
+  configure?: (app: NestExpressApplication) => void
+} = {}): Promise<VerificationApiServer> {
   const savedRedisUrl = redisUrl ?? process.env['REDIS_URL']
-  delete process.env['REDIS_URL']
+  // Existing callers retain inline fallback; full-app checks use owned real Redis queues.
+  if (!options.queues) delete process.env['REDIS_URL']
   const { AppModule } = await import('../../src/app.module')
   if (savedRedisUrl) process.env['REDIS_URL'] = savedRedisUrl
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
     logger: ['error', 'warn'],
+    ...(options.queues ? { abortOnError: false } : {}),
   })
   installBodyParsers(app)
   app.setGlobalPrefix('api/v1')
@@ -78,6 +83,7 @@ export async function startVerificationApi(port: number, redisUrl?: string): Pro
     }),
   )
   app.useGlobalFilters(new HttpExceptionFilter())
+  options.configure?.(app)
   await app.listen(port, '127.0.0.1')
   return {
     base: `http://127.0.0.1:${port}/api/v1`,

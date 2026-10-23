@@ -1290,12 +1290,13 @@ jobs:
           pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
           sudo apt-get install -y -q redis-server
 
-      - name: First-order two-console real HTTP browser workflow
+      - name: First-order complete AppModule two-console password-login workflow
         env:
           FIRST_ORDER_BROWSER_OUTPUT: ${{ github.workspace }}/test-results/first-order
         run: |
           pnpm --filter @ai-job-print/api exec prisma generate
-          pnpm --filter @ai-job-print/admin verify:first-order-live
+          FIRST_ORDER_BROWSER_OUTPUT="${FIRST_ORDER_BROWSER_OUTPUT}/focused" pnpm --filter @ai-job-print/admin verify:first-order-live
+          pnpm --filter @ai-job-print/admin verify:first-order-full-app
 
       - name: Typecheck Kiosk workspace-source dependencies
         run: |
