@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { FIRST_ORDER_ISSUE_LABELS, formatDateTime, type FirstOrderIncident, type FirstOrderIncidentAction } from '@ai-job-print/shared'
 import { Button, StatusBadge } from '@ai-job-print/ui'
 import { firstOrderApi } from '../../services/api/firstOrder'
@@ -7,20 +7,24 @@ const labels = { open: '待受理', processing: '处理中', resolved: '技术�
 const eventLabels: Record<string, string> = { create: '提交报障', created: '提交报障', start: '开始处理', resolve: '记录技术恢复', confirm: '确认恢复', reopen: '重新报障' }
 const input = 'mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm'
 
-function Incident({ item, onChanged }: { item: FirstOrderIncident; onChanged: () => Promise<void> }) {
+function Incident({ item, onChanged, onSaved }: { item: FirstOrderIncident; onChanged: () => Promise<void>; onSaved: (saved: FirstOrderIncident) => void }) {
   const [assignee, setAssignee] = useState(item.assignee ?? '')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const writing = useRef(false)
 
   async function update(action: FirstOrderIncidentAction) {
+    if (writing.current) return
+    writing.current = true
     setBusy(true); setError(''); setNotice('')
     try {
-      await firstOrderApi.updateIncident(item.id, { action, version: item.version, note: note.trim(), ...(action === 'start' ? { assignee: assignee.trim() } : {}) })
-      setNote(''); setNotice('处理记录已保存。'); await onChanged()
+      const saved = await firstOrderApi.updateIncident(item.id, { action, version: item.version, note: note.trim(), ...(action === 'start' ? { assignee: assignee.trim() } : {}) })
+      onSaved(saved); setNote(''); setNotice('处理记录已保存。')
+      try { await onChanged() } catch { /* Parent reload displays its error; the write is already committed. */ }
     } catch (failure) { setError(failure instanceof Error ? failure.message : '操作未完成，请刷新核对后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
   }
 
   return <article className="space-y-3 rounded-lg border border-neutral-200 p-3" data-testid={`first-order-incident-${item.id}`}>
@@ -43,10 +47,10 @@ function Incident({ item, onChanged }: { item: FirstOrderIncident; onChanged: ()
   </article>
 }
 
-export function IncidentPanel({ incidents, onChanged }: { incidents: FirstOrderIncident[]; onChanged: () => Promise<void> }) {
+export function IncidentPanel({ incidents, onChanged, onSaved }: { incidents: FirstOrderIncident[]; onChanged: () => Promise<void>; onSaved: (saved: FirstOrderIncident) => void }) {
   return <section aria-label="设备报障与处理" className="space-y-3 rounded-xl border border-neutral-200 p-4">
     <h4 className="font-semibold text-neutral-900">设备报障与处理</h4>
     <p className="text-xs text-neutral-500">报障由机构提交，平台负责受理与修复。技术恢复与机构核对分开记录，不能用主机在线代替出纸验证。</p>
-    {incidents.length === 0 ? <p className="text-sm text-neutral-500">本项目暂无报障记录；这不代表设备已经通过现场验收。</p> : incidents.map((item) => <Incident key={item.id} item={item} onChanged={onChanged} />)}
+    {incidents.length === 0 ? <p className="text-sm text-neutral-500">本项目暂无报障记录；这不代表设备已经通过现场验收。</p> : incidents.map((item) => <Incident key={item.id} item={item} onChanged={onChanged} onSaved={onSaved} />)}
   </section>
 }

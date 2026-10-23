@@ -7,21 +7,23 @@ const metricLabels = { sessions: '服务会话数', printedTasks: '出纸记录�
 const stateLabels = { measured: '', sample_suppressed: '样本不足，不显示', not_recorded: '暂无可用记录', unverified: '暂不能核验' } as const
 const currentMonth = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).format(new Date())
 
-export function ReportPanel({ projectId, reports, onChanged }: { projectId: string; reports: FirstOrderReportSummary[]; onChanged: () => Promise<void> }) {
+export function ReportPanel({ projectId, reports, onChanged, onSaved }: { projectId: string; reports: FirstOrderReportSummary[]; onChanged: () => Promise<void>; onSaved: (saved: FirstOrderReportSummary) => void }) {
   const [month, setMonth] = useState(currentMonth)
   const [view, setView] = useState<{ snapshot: FirstOrderReportSnapshot; saved: FirstOrderReport | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const writing = useRef(false)
   const controller = useRef<AbortController | null>(null)
   const sequence = useRef(0)
   useEffect(() => () => { sequence.current++; controller.current?.abort() }, [])
 
-  function cancelView() { sequence.current++; controller.current?.abort(); setView(null); setError(''); setBusy(false) }
+  function cancelView() { sequence.current++; controller.current?.abort(); setView(null); setError(''); setNotice(''); setBusy(false) }
   async function showReport(id?: string) {
     controller.current?.abort()
     const control = new AbortController(); controller.current = control
     const task = ++sequence.current
-    setBusy(true); setError(''); setView(null)
+    setBusy(true); setError(''); setNotice(''); setView(null)
     try {
       if (id) {
         const report = await firstOrderApi.report(id, control.signal)
@@ -33,25 +35,36 @@ export function ReportPanel({ projectId, reports, onChanged }: { projectId: stri
     } catch (failure) { if (task === sequence.current && !control.signal.aborted) setError(failure instanceof Error ? failure.message : '报告暂时未能读取，请重试。') }
     finally { if (task === sequence.current) setBusy(false) }
   }
+  async function refreshAfterWrite(message: string) {
+    setNotice(message)
+    try { await onChanged() } catch { /* Parent reload displays its error; the write is already committed. */ }
+  }
   async function seal() {
-    setBusy(true); setError('')
+    if (writing.current) return
+    writing.current = true
+    sequence.current++; controller.current?.abort()
+    setBusy(true); setError(''); setNotice('')
     try {
       const report = await firstOrderApi.seal(projectId, month)
-      setView({ snapshot: report.snapshot, saved: report }); await onChanged()
+      setView({ snapshot: report.snapshot, saved: report }); onSaved(report)
+      await refreshAfterWrite('月报已留存。')
     } catch (failure) { setError(failure instanceof Error ? failure.message : '月报未能生成，请刷新核对后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
   }
   async function acknowledge() {
-    if (!view?.saved) return
-    setBusy(true); setError('')
+    if (!view?.saved || writing.current) return
+    writing.current = true
+    sequence.current++; controller.current?.abort()
+    setBusy(true); setError(''); setNotice('')
     try {
       const report = await firstOrderApi.acknowledge(view.saved.id)
-      setView({ snapshot: report.snapshot, saved: report }); await onChanged()
+      setView({ snapshot: report.snapshot, saved: report }); onSaved(report)
+      await refreshAfterWrite('月报核对已记录。')
     } catch (failure) { setError(failure instanceof Error ? failure.message : '核对记录未能保存，请刷新后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
   }
   async function download(report: FirstOrderReportSummary) {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setNotice('')
     try { await firstOrderApi.downloadReport(report.id, report.month) }
     catch (failure) { setError(failure instanceof Error ? failure.message : '导出未完成，请重试。') }
     finally { setBusy(false) }
@@ -63,6 +76,7 @@ export function ReportPanel({ projectId, reports, onChanged }: { projectId: stri
     <div className="flex flex-wrap items-end gap-2"><label className="text-sm">统计月份<input type="month" aria-label="统计月份" max={currentMonth()} className="mt-1 block min-h-12 rounded-lg border border-neutral-300 px-3" value={month} disabled={busy} onChange={(event) => { cancelView(); setMonth(event.target.value) }} /></label><Button size="sm" variant="outline" disabled={busy || !month} onClick={() => void showReport()}>{busy ? '正在读取…' : '预览自然月报'}</Button><Button size="sm" disabled={busy || !month || month >= currentMonth()} onClick={() => void seal()}>生成留存月报</Button></div>
     {month >= currentMonth() && <p className="text-xs text-neutral-500">本月尚未结束，暂不能生成留存月报。</p>}
     {error && <p role="alert" className="text-sm text-error-fg">{error}</p>}
+    {notice && <p role="status" className="text-sm text-success-fg">{notice}</p>}
     {view && <div className="space-y-3 rounded-lg bg-neutral-50 p-3" data-testid="first-order-report-view">
       <h5 className="font-semibold">{view.snapshot.month} · {view.saved ? '已留存月报' : '临时预览'}</h5>
       <p className="text-xs text-neutral-500">统计于 {formatDateTime(view.snapshot.generatedAt)} · {view.snapshot.complete ? '统计范围完整，仍需核对业务结果' : '存在统计边界或缺失，请查看说明'}</p>

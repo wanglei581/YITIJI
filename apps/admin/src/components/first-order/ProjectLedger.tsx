@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { formatDate, formatDateTime, type FirstOrderDeployment, type FirstOrderProject, type FirstOrderProjectInput, type FirstOrderTerminal } from '@ai-job-print/shared'
 import { Button } from '@ai-job-print/ui'
 import { firstOrderApi } from '../../services/api/firstOrder'
@@ -22,6 +22,8 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
   const [notice, setNotice] = useState('')
   const [endingId, setEndingId] = useState<string | null>(null)
   const writing = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const available = terminals.filter((terminal) => !assignedTerminalIds.includes(terminal.id))
 
   async function perform(work: () => Promise<void>) {
@@ -33,8 +35,9 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
   }
 
   async function refreshAfterWrite(message: string) {
-    try { await onChanged(); setNotice(message) }
-    catch { setNotice(`${message} 列表暂未刷新，请联网后刷新核对。`) }
+    setNotice(message)
+    try { await onChanged() }
+    catch { /* Parent reload displays its error; the write is already committed. */ }
   }
 
   async function save(event: FormEvent) {
@@ -46,6 +49,8 @@ export function ProjectLedger({ orgId, project, terminals, assignedTerminalIds, 
         serviceEndAt: project?.deployments.length ? project.serviceEndAt : new Date(`${day(form.serviceEndAt)}T23:59:59+08:00`).toISOString(),
       }
       const result = project ? await firstOrderApi.updateProject(project.id, payload, project.version) : await firstOrderApi.createProject(orgId, payload)
+      // A completed save must not select an old project after the user leaves its form.
+      if (!mounted.current) return
       setEditing(false); onSaved(result)
       await refreshAfterWrite('项目资料已保存。')
     })

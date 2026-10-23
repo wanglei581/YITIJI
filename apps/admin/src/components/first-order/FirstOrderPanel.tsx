@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FirstOrderDeployment, FirstOrderOverview, FirstOrderProject } from '@ai-job-print/shared'
+import type { FirstOrderDeployment, FirstOrderIncident, FirstOrderOverview, FirstOrderProject, FirstOrderReportSummary } from '@ai-job-print/shared'
 import { Button, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { FIRST_ORDER_HTTP, firstOrderApi } from '../../services/api/firstOrder'
 import { ProjectLedger } from './ProjectLedger'
@@ -52,6 +52,12 @@ export function FirstOrderPanel({ orgId }: { orgId: string }) {
     setData((current) => current ? { ...current, projects: current.projects.map((item) => item.id === saved.projectId
       ? { ...item, deployments: [...item.deployments.filter((row) => row.id !== saved.id), saved] } : item) } : current)
   }
+  function incidentSaved(saved: FirstOrderIncident) {
+    setData((current) => current ? { ...current, incidents: [saved, ...current.incidents.filter((item) => item.id !== saved.id)] } : current)
+  }
+  function reportSaved(saved: FirstOrderReportSummary) {
+    setData((current) => current ? { ...current, reports: [saved, ...current.reports.filter((item) => item.id !== saved.id)] } : current)
+  }
 
   const project = creating ? null : data?.projects.find((item) => item.id === selectedId) ?? null
   return <section aria-label="首单交付与服务" className="space-y-4 rounded-xl border border-primary-200 bg-white p-4">
@@ -68,8 +74,8 @@ export function FirstOrderPanel({ orgId }: { orgId: string }) {
       {(project || creating) && <>
         <div role="tablist" aria-label="项目服务分组" className="flex flex-wrap gap-2">{tabs.map((item) => <Button key={item.key} size="sm" role="tab" aria-selected={tab === item.key} variant={tab === item.key ? 'primary' : 'outline'} disabled={creating && item.key !== 'ledger'} onClick={() => setTab(item.key)}>{item.label}</Button>)}</div>
         {tab === 'ledger' && <ProjectLedger key={project?.id ?? 'new'} orgId={orgId} project={project} terminals={data.terminals} assignedTerminalIds={data.projects.flatMap((item) => item.deployments.filter((deployment) => !deployment.endedAt).map((deployment) => deployment.terminalId))} onChanged={reload} onSaved={projectSaved} onDeploymentChanged={deploymentChanged} />}
-        {tab === 'incidents' && project && <IncidentPanel key={project.id} incidents={data.incidents.filter((item) => item.projectId === project.id)} onChanged={reload} />}
-        {tab === 'reports' && project && <ReportPanel key={project.id} projectId={project.id} reports={data.reports.filter((item) => item.projectId === project.id)} onChanged={reload} />}
+        {tab === 'incidents' && project && <IncidentPanel key={project.id} incidents={data.incidents.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={incidentSaved} />}
+        {tab === 'reports' && project && <ReportPanel key={project.id} projectId={project.id} reports={data.reports.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={reportSaved} />}
       </>}
     </>}
   </section>

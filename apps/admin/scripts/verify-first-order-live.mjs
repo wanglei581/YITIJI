@@ -76,6 +76,7 @@ async function cleanupOwnedProcesses() {
         item.exited = await killed
       }
     }
+    item.exited = !alive(child)
     results.cleanup.push(item)
     if (!item.exited) { results.status = 'FAIL'; results.error = 'An owned verification child did not exit'; process.exitCode = 1 }
   }
@@ -132,7 +133,8 @@ async function startIsolatedApi() {
     }
     await delay(200)
   }
-  throw new Error('Isolated API readiness exceeded 90 seconds')
+  await writeFile(join(output, 'api-startup.log'), `${readyBuffer}\n${errorBuffer}`, { mode: 0o600 })
+  throw new Error('Isolated API readiness exceeded 90 seconds; private diagnostics: api-startup.log')
 }
 
 async function startVite(role, port) {
@@ -212,21 +214,21 @@ async function responseAfter(page, method, suffix, action) {
 /** Receive the real committed HTTP response, then disconnect before the UI refresh.
  * No fake response is returned; reconnect and reread the database through the real API.
  */
-async function disconnectAfterWrite(page, suffix) {
+async function disconnectAfterWrite(page, suffix, method = 'POST') {
   if (!fullApp) return
-  await page.evaluate(({ base, suffix }) => {
+  await page.evaluate(({ base, suffix, method }) => {
     const original = window.fetch.bind(window)
     window.fetch = async (input, init) => {
       const response = await original(input, init)
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-      if (url.startsWith(base) && new URL(url).pathname.endsWith(suffix) && init?.method === 'POST' && response.ok) {
+      if (url.startsWith(base) && new URL(url).pathname.endsWith(suffix) && init?.method === method && response.ok) {
         window.fetch = original
         await response.clone().arrayBuffer()
         await window.firstOrderDisconnectAfterWrite()
       }
       return response
     }
-  }, { base: fixture.base, suffix })
+  }, { base: fixture.base, suffix, method })
 }
 
 const adminPanel = (page) => page.locator('section[aria-label="首单交付与服务"]')
@@ -244,11 +246,25 @@ async function refresh(panel) {
   await panel.getByRole('button', { name: '刷新项目服务', exact: true }).click()
   await expect(panel.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
 }
+async function reconnectAfterWrite(page, panel, verifySaved) {
+  await expect(panel.getByRole('alert')).toContainText('现有内容尚未刷新')
+  await verifySaved()
+  await page.context().setOffline(false)
+  await refresh(panel)
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(panel.getByRole('status').filter({ hasText: '列表暂未刷新' })).toHaveCount(0)
+  await verifySaved()
+}
 async function shot(page, name, panel, narrow = false) {
   if (narrow) {
     await page.setViewportSize({ width: 390, height: 844 })
+    await delay(300)
     const collapse = page.getByRole('button', { name: '收起侧边栏', exact: true })
-    if (await collapse.isVisible()) await collapse.click()
+    if (await collapse.isVisible() && await collapse.evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
+      return hit !== null && element.contains(hit)
+    })) await collapse.click()
     await delay(300)
   }
   await panel.scrollIntoViewIfNeeded()
@@ -309,10 +325,11 @@ try {
     : a.getByRole('button', { name: '创建服务项目', exact: true }).click())
   await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(created.id)
   if (fullApp) {
-    await expect(a.getByRole('alert')).toContainText('现有内容尚未刷新')
-    await expect(a.getByRole('status')).toContainText('资料已保存')
     assert.equal(projectWrites, 1, 'Rapid duplicate submit must issue only one create request')
-    await admin.context().setOffline(false); await refresh(a)
+    await reconnectAfterWrite(admin, a, async () => {
+      await expect(a.getByLabel('服务项目', { exact: true })).toHaveValue(created.id)
+      await expect(a.getByRole('status')).toContainText('资料已保存')
+    })
     mark('Committed project remains selected after failed refresh; duplicate submit is locked; reconnect persists')
   }
   await a.getByLabel('待登记终端', { exact: true }).selectOption(fixture.terminals.spare)
@@ -320,11 +337,11 @@ try {
   await disconnectAfterWrite(admin, `/projects/${created.id}/deployments`)
   const deployed = await responseAfter(admin, 'POST', `/projects/${created.id}/deployments`, () => a.getByRole('button', { name: '登记项目设备', exact: true }).click())
   if (fullApp) {
-    await expect(a.getByRole('alert')).toContainText('现有内容尚未刷新')
-    await expect(a.getByTestId(`first-order-deployment-${deployed.id}`)).toContainText('浏览器验证大厅')
-    await expect(a.getByLabel('待登记终端', { exact: true }).locator(`option[value="${fixture.terminals.spare}"]`)).toHaveCount(0)
-    await expect(a.getByRole('status').filter({ hasText: '项目设备已登记' })).toContainText('列表暂未刷新')
-    await admin.context().setOffline(false); await refresh(a)
+    await reconnectAfterWrite(admin, a, async () => {
+      await expect(a.getByTestId(`first-order-deployment-${deployed.id}`)).toContainText('浏览器验证大厅')
+      await expect(a.getByLabel('待登记终端', { exact: true }).locator(`option[value="${fixture.terminals.spare}"]`)).toHaveCount(0)
+      await expect(a.getByRole('status').filter({ hasText: '项目设备已登记' })).toBeVisible()
+    })
     mark('Committed deployment remains visible after failed refresh and is unavailable for duplicate registration')
   }
   await openAdmin(admin, adminOrigin, orgName); a = adminPanel(admin)
@@ -344,7 +361,12 @@ try {
   await p.getByLabel('报障设备', { exact: true }).selectOption(deployed.id)
   await p.getByLabel('设备问题', { exact: true }).selectOption('paper')
   await p.getByLabel('故障情况', { exact: true }).fill('浏览器隔离验证：设备提示缺纸，请检查纸盒。')
+  await disconnectAfterWrite(partner, '/partner/first-order/incidents')
   const incident = await responseAfter(partner, 'POST', '/partner/first-order/incidents', () => p.getByRole('button', { name: '提交设备报障', exact: true }).click())
+  if (fullApp) {
+    await reconnectAfterWrite(partner, p, async () => { await expect(p.getByTestId(`first-order-incident-${incident.id}`)).toContainText('浏览器隔离验证'); await expect(p.getByRole('status').filter({ hasText: '报障已提交' })).toBeVisible() })
+    mark('Committed incident is visible after failed refresh; reconnect retains the same incident')
+  }
   await partner.reload(); p = partnerPanel(partner)
   await expect(p.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
   await chooseProject(p, created.id, '报障与恢复')
@@ -355,7 +377,12 @@ try {
   let incidentCard = a.getByTestId(`first-order-incident-${incident.id}`)
   await incidentCard.getByLabel('处理负责人', { exact: true }).fill('验证维修负责人')
   await incidentCard.getByLabel('处理说明', { exact: true }).fill('浏览器隔离验证：已受理并检查纸盒。')
+  await disconnectAfterWrite(admin, `/incidents/${incident.id}`, 'PATCH')
   await responseAfter(admin, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '开始处理', exact: true }).click())
+  if (fullApp) {
+    await reconnectAfterWrite(admin, a, () => expect(incidentCard.getByRole('status', { name: '处理中', exact: true })).toBeVisible())
+    mark('Committed Admin incident state and version survive failed refresh')
+  }
   await expect(incidentCard.getByRole('status', { name: '处理中', exact: true })).toBeVisible()
   await incidentCard.getByLabel('处理说明', { exact: true }).fill('浏览器隔离验证：已记录补纸处置，等待机构核对；不构成真机出纸证据。')
   await responseAfter(admin, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '记录技术恢复', exact: true }).click())
@@ -363,7 +390,12 @@ try {
   incidentCard = p.getByTestId(`first-order-incident-${incident.id}`)
   await expect(incidentCard.getByRole('status', { name: '技术恢复，待您核对', exact: true })).toBeVisible()
   await incidentCard.getByLabel('现场核对说明', { exact: true }).fill('浏览器隔离验证：核对处置记录。')
+  await disconnectAfterWrite(partner, `/incidents/${incident.id}`, 'PATCH')
   await responseAfter(partner, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '确认恢复', exact: true }).click())
+  if (fullApp) {
+    await reconnectAfterWrite(partner, p, () => expect(incidentCard.getByRole('status', { name: '已确认恢复', exact: true })).toBeVisible())
+    mark('Committed Partner recovery confirmation survives failed refresh')
+  }
   await expect(incidentCard.getByRole('status', { name: '已确认恢复', exact: true })).toBeVisible()
   await incidentCard.getByLabel('现场核对说明', { exact: true }).fill('浏览器隔离验证：仍有缺纸提示，需要复查。')
   await responseAfter(partner, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '故障仍在，重新报障', exact: true }).click())
@@ -380,7 +412,16 @@ try {
   const previewP = await responseAfter(partner, 'GET', `/projects/${fixture.projectId}/report-preview`, () => p.getByRole('button', { name: '预览自然月报', exact: true }).click())
   assert.deepEqual(previewA.metrics, previewP.metrics)
   assert.deepEqual(previewA.window, previewP.window)
+  await disconnectAfterWrite(admin, `/projects/${fixture.projectId}/reports`)
   const saved = await responseAfter(admin, 'POST', `/projects/${fixture.projectId}/reports`, () => a.getByRole('button', { name: '生成留存月报', exact: true }).click())
+  if (fullApp) {
+    await reconnectAfterWrite(admin, a, () => expect(a.getByRole('status').filter({ hasText: '月报已留存' })).toBeVisible())
+    await disconnectAfterWrite(partner, `/projects/${fixture.projectId}/reports`)
+    const same = await responseAfter(partner, 'POST', `/projects/${fixture.projectId}/reports`, () => p.getByRole('button', { name: '生成留存月报', exact: true }).click())
+    assert.equal(same.id, saved.id)
+    await reconnectAfterWrite(partner, p, () => expect(p.getByRole('status').filter({ hasText: '月报已留存' })).toBeVisible())
+    mark('Both consoles retain the same committed report after failed list refresh')
+  }
   await expect(a.getByTestId('first-order-report-view')).toContainText('已留存月报')
   await refresh(p)
   await p.getByRole('button', { name: `查看 ${fixture.month} 月报`, exact: true }).click()
@@ -395,7 +436,12 @@ try {
   assert.equal(csvA, csvP)
   assert(!csvA.includes('PRIVATE_RESUME_BODY'))
   assert(!csvA.includes(fixture.tokens.admin) && !csvA.includes(fixture.tokens.partner))
+  await disconnectAfterWrite(partner, `/reports/${saved.id}/acknowledge`)
   await responseAfter(partner, 'POST', `/reports/${saved.id}/acknowledge`, () => p.getByRole('button', { name: '记录已核对月报', exact: true }).click())
+  if (fullApp) {
+    await reconnectAfterWrite(partner, p, () => expect(p.getByRole('status').filter({ hasText: '月报核对已记录' })).toBeVisible())
+    mark('Committed report acknowledgement remains visible after failed refresh')
+  }
   await expect(p.getByTestId('first-order-report-view')).toContainText('机构核对于')
   const acknowledged = await api('admin', `/admin/first-order/reports/${saved.id}`)
   assert(acknowledged.acknowledgedAt)

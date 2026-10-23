@@ -7,18 +7,24 @@ const input = 'mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-whit
 const labels = { open: '待平台受理', processing: '平台处理中', resolved: '技术恢复，待您核对', closed: '已确认恢复' } as const
 const eventLabels: Record<string, string> = { create: '提交报障', created: '提交报障', start: '平台开始处理', resolve: '平台记录技术恢复', confirm: '机构确认恢复', reopen: '重新报障' }
 
-function Incident({ item, onChanged }: { item: FirstOrderIncident; onChanged: () => Promise<void> }) {
+function Incident({ item, onChanged, onSaved }: { item: FirstOrderIncident; onChanged: () => Promise<void>; onSaved: (saved: FirstOrderIncident) => void }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const writing = useRef(false)
   async function update(action: 'confirm' | 'reopen') {
+    if (writing.current) return
+    writing.current = true
     setBusy(true); setError(''); setNotice('')
     try {
-      await firstOrderApi.updateIncident(item.id, { action, version: item.version, note: note.trim() })
-      setNote(''); setNotice(action === 'confirm' ? '恢复核对已记录。' : '已重新报障，等待平台处理。'); await onChanged()
+      const saved = await firstOrderApi.updateIncident(item.id, { action, version: item.version, note: note.trim() })
+      onSaved(saved); setNote('')
+      const message = action === 'confirm' ? '恢复核对已记录。' : '已重新报障，等待平台处理。'
+      setNotice(message)
+      try { await onChanged() } catch { /* Parent reload displays its error; the write is already committed. */ }
     } catch (failure) { setError(failure instanceof Error ? failure.message : '操作未完成，请刷新核对后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
   }
   return <article className="space-y-3 rounded-lg border border-neutral-200 p-3" data-testid={`first-order-incident-${item.id}`}>
     <div className="flex flex-wrap items-center justify-between gap-2"><h5 className="text-sm font-semibold">{item.terminalCode} · {FIRST_ORDER_ISSUE_LABELS[item.issueCode]}</h5><StatusBadge label={labels[item.status]} status={item.status === 'closed' ? 'success' : item.status === 'open' ? 'error' : 'warning'} /></div>
@@ -37,7 +43,7 @@ function Incident({ item, onChanged }: { item: FirstOrderIncident; onChanged: ()
   </article>
 }
 
-export function IncidentPanel({ deployments, incidents, onChanged }: { deployments: FirstOrderDeployment[]; incidents: FirstOrderIncident[]; onChanged: () => Promise<void> }) {
+export function IncidentPanel({ deployments, incidents, onChanged, onSaved }: { deployments: FirstOrderDeployment[]; incidents: FirstOrderIncident[]; onChanged: () => Promise<void>; onSaved: (saved: FirstOrderIncident) => void }) {
   const active = deployments.filter((item) => !item.endedAt)
   const [deploymentId, setDeploymentId] = useState('')
   const [issueCode, setIssueCode] = useState<FirstOrderIssue>('offline')
@@ -46,14 +52,19 @@ export function IncidentPanel({ deployments, incidents, onChanged }: { deploymen
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const writing = useRef(false)
   const changed = () => { requestKey.current = crypto.randomUUID(); setNotice('') }
   async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('')
+    event.preventDefault()
+    if (writing.current) return
+    writing.current = true
+    setBusy(true); setError(''); setNotice('')
     try {
-      await firstOrderApi.createIncident({ deploymentId, issueCode, note: note.trim(), requestKey: requestKey.current })
-      setNote(''); requestKey.current = crypto.randomUUID(); setNotice('报障已提交，平台会按项目服务范围受理。'); await onChanged()
+      const saved = await firstOrderApi.createIncident({ deploymentId, issueCode, note: note.trim(), requestKey: requestKey.current })
+      onSaved(saved); setNote(''); requestKey.current = crypto.randomUUID(); setNotice('报障已提交，平台会按项目服务范围受理。')
+      try { await onChanged() } catch { /* Parent reload displays its error; the write is already committed. */ }
     } catch (failure) { setError(failure instanceof Error ? failure.message : '报障未完成，请刷新核对后重试。') }
-    finally { setBusy(false) }
+    finally { writing.current = false; setBusy(false) }
   }
   return <section aria-label="设备报障与处理" className="space-y-4 rounded-xl border border-neutral-200 p-4">
     <h4 className="font-semibold">设备报障与处理</h4>
@@ -66,6 +77,6 @@ export function IncidentPanel({ deployments, incidents, onChanged }: { deploymen
       <label className="text-sm sm:col-span-2">故障情况<textarea required disabled={busy} rows={2} maxLength={300} className={input} value={note} onChange={(event) => { changed(); setNote(event.target.value) }} /></label>
       <div className="sm:col-span-2"><Button type="submit" disabled={busy || !deploymentId || !note.trim()}>{busy ? '正在提交…' : '提交设备报障'}</Button></div>
     </form> : <p className="text-sm text-neutral-500">本项目暂无当前部署设备，请通过项目服务联系渠道核对；历史报障仍可查看。</p>}
-    {incidents.length ? incidents.map((item) => <Incident key={item.id} item={item} onChanged={onChanged} />) : <p className="text-sm text-neutral-500">本项目暂无报障记录。</p>}
+    {incidents.length ? incidents.map((item) => <Incident key={item.id} item={item} onChanged={onChanged} onSaved={onSaved} />) : <p className="text-sm text-neutral-500">本项目暂无报障记录。</p>}
   </section>
 }

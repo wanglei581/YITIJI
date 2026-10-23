@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FirstOrderOverview } from '@ai-job-print/shared'
+import type { FirstOrderIncident, FirstOrderOverview, FirstOrderReportSummary } from '@ai-job-print/shared'
 import { Button, Card, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { FIRST_ORDER_HTTP, firstOrderApi } from '../../services/api/firstOrder'
 import { ProjectDetails } from './ProjectDetails'
@@ -41,6 +41,12 @@ export function FirstOrderPanel() {
   useEffect(() => {
     if (data && !data.projects.some((project) => project.id === selectedId)) setSelectedId(data.projects[0]?.id ?? '')
   }, [data, selectedId])
+  function incidentSaved(saved: FirstOrderIncident) {
+    setData((current) => current ? { ...current, incidents: [saved, ...current.incidents.filter((item) => item.id !== saved.id)] } : current)
+  }
+  function reportSaved(saved: FirstOrderReportSummary) {
+    setData((current) => current ? { ...current, reports: [saved, ...current.reports.filter((item) => item.id !== saved.id)] } : current)
+  }
 
   const project = data?.projects.find((item) => item.id === selectedId) ?? null
   return <Card aria-label="首单交付与服务" className="mt-6 space-y-4" data-testid="first-order-panel">
@@ -51,8 +57,8 @@ export function FirstOrderPanel() {
       {project && <>
         <div role="tablist" aria-label="项目服务分组" className="flex flex-wrap gap-2">{tabs.map((item) => <Button key={item.key} size="sm" role="tab" aria-selected={tab === item.key} variant={tab === item.key ? 'primary' : 'outline'} onClick={() => setTab(item.key)}>{item.label}</Button>)}</div>
         {tab === 'details' && <ProjectDetails project={project} terminals={data.terminals} />}
-        {tab === 'incidents' && <IncidentPanel key={project.id} deployments={project.deployments} incidents={data.incidents.filter((item) => item.projectId === project.id)} onChanged={reload} />}
-        {tab === 'reports' && <ReportPanel key={project.id} projectId={project.id} reports={data.reports.filter((item) => item.projectId === project.id)} onChanged={reload} />}
+        {tab === 'incidents' && <IncidentPanel key={project.id} deployments={project.deployments} incidents={data.incidents.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={incidentSaved} />}
+        {tab === 'reports' && <ReportPanel key={project.id} projectId={project.id} reports={data.reports.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={reportSaved} />}
       </>}
     </>}
   </Card>
