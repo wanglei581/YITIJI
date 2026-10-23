@@ -77,6 +77,7 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
       deployment: await f.prisma.serviceDeployment.findUniqueOrThrow({ where: { id: active.id }, select: { endedAt: true, activeTerminalId: true } }),
     })
     const original = await bindingState()
+    const deploymentCount = await f.prisma.serviceDeployment.count({ where: { terminalId: device.id } })
     await f.prisma.$transaction(async (tx) => {
       if (mode === 'postgres') {
         await tx.$executeRawUnsafe(`CREATE FUNCTION review_rebind_reject_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'terminal.org.update' THEN RAISE EXCEPTION 'fixture required audit unavailable'; END IF; RETURN NEW; END $$`)
@@ -86,7 +87,8 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
     try {
       await request('admin', `/admin/terminals/${device.id}/org`, 500, { orgId: f.orgs.other })
       assert.deepEqual(await bindingState(), original, 'HTTP审计失败必须同时回滚归属、绑定时间、部署结束时间和有效设备槽')
-      checks++
+      assert.equal(await f.prisma.serviceDeployment.count({ where: { terminalId: device.id } }), deploymentCount, 'HTTP审计失败不得残留或删除部署')
+      checks += 2
       check('完整应用审计被拒绝后没有遗留改绑审计', await f.prisma.auditLog.count({ where: { action: 'terminal.org.update', targetId: device.terminalCode } }) === 0)
     } finally {
       await f.prisma.$transaction(async (tx) => {
@@ -103,23 +105,30 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
     assert.deepEqual(payload.deploymentIds, [active.id])
     check('审计包含旧新机构、关闭部署和真实有效时间', payload.oldOrgId === f.orgs.own && payload.newOrgId === f.orgs.other && payload.effectiveAt === committed.terminal.orgBoundAt?.toISOString() && payload.effectiveAt === committed.deployment.endedAt?.toISOString())
 
-    // Inject only the service's optional clock argument; never alter the machine clock.
-    const backwardsNow = new Date('2026-01-01T00:00:00Z')
-    const futureBound = new Date('2027-01-01T00:00:00Z')
-    const futureEnd = new Date('2027-02-01T00:00:00Z')
-    const futureStart = new Date('2027-03-01T00:00:00Z')
+    // Keep each lower bound after the injected clock but before the wall clock,
+    // so ignoring the optional clock cannot accidentally satisfy these assertions.
+    const day = 86_400_000, nowMs = Date.now(), earliest = beforeMonth.getTime()
+    const room = nowMs - earliest
+    const align = (ms: number) => Math.floor(ms / 1000) * 1000
+    const backwardsNow = new Date(align(earliest - 180 * day))
+    const midBound = new Date(align(earliest + room / 4))
+    const midEnd = new Date(align(earliest + room / 2))
+    const midStart = new Date(align(earliest + room * 3 / 4))
+    check('回拨夹具下界位于注入时钟与真实墙钟之间', room > 4 * day && backwardsNow < midBound && midBound < midEnd && midEnd < midStart && midStart.getTime() > earliest && midStart.getTime() < nowMs)
     for (const source of ['orgBoundAt', 'latestEndedAt', 'activeStartedAt'] as const) {
-      const t = await terminal(futureBound)
-      const d = source === 'latestEndedAt' ? await deployment(t.id, futureBound, futureEnd)
-        : source === 'activeStartedAt' ? await deployment(t.id, futureStart) : null
-      const expected = source === 'orgBoundAt' ? futureBound : source === 'latestEndedAt' ? futureEnd : futureStart
+      const t = await terminal(midBound)
+      const d = source === 'latestEndedAt' ? await deployment(t.id, midBound, midEnd)
+        : source === 'activeStartedAt' ? await deployment(t.id, midStart) : null
+      const expected = source === 'orgBoundAt' ? midBound : source === 'latestEndedAt' ? midEnd : midStart
+      const startedExpected = source === 'latestEndedAt' ? midBound : midStart
       await assignTerminalOrganization(f.prisma, t.id, f.orgs.other, backwardsNow, writeAudit)
       const after = await f.prisma.terminal.findUniqueOrThrow({ where: { id: t.id } })
-      check(`时钟回拨受锁后${source}下界保护`, after.orgBoundAt?.getTime() === expected.getTime())
+      check(`时钟回拨受锁后${source}下界保护`, after.orgId === f.orgs.other && after.orgBoundAt?.getTime() === expected.getTime())
       const history = d ? await f.prisma.serviceDeployment.findUniqueOrThrow({ where: { id: d.id } }) : null
-      if (history) check(`时钟回拨${source}不倒退或重写历史区间`, history.endedAt?.getTime() === expected.getTime() && history.endedAt >= history.startedAt && history.activeTerminalId === null)
+      if (history) check(`时钟回拨${source}不倒退或重写历史区间`, history.startedAt.getTime() === startedExpected.getTime() && history.endedAt?.getTime() === expected.getTime() && history.endedAt >= history.startedAt && history.activeTerminalId === null)
       const log = await f.prisma.auditLog.findMany({ where: { action: 'terminal.org.update', targetId: t.terminalCode } })
-      check(`时钟回拨${source}同事务审计记录有效时间`, log.length === 1 && JSON.parse(log[0].payloadJson).effectiveAt === expected.toISOString())
+      const entry = log.length === 1 ? JSON.parse(log[0].payloadJson) as Record<string, unknown> : null
+      check(`时钟回拨${source}同事务审计记录有效时间`, !!entry && entry.effectiveAt === after.orgBoundAt?.toISOString() && entry.oldOrgId === f.orgs.own && entry.newOrgId === f.orgs.other)
     }
 
     async function reportCase(printed: number, failed: number, unconfirmed: number, missingPages: boolean) {
@@ -134,7 +143,7 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
             status: kind === 'printed' ? 'completed' : 'failed', printOutcome: kind === 'printed' ? 'printed' : null,
             errorCode: kind === 'unconfirmed' ? 'PRINT_JOB_UNCONFIRMED' : null,
           } })
-          if (!missingPages || (kind === 'printed' && index === 0)) await f.prisma.order.create({ data: {
+          if (kind === 'printed' && (!missingPages || index === 0)) await f.prisma.order.create({ data: {
             orderNo: `REVIEW-${id}`, printTaskId: id, terminalId: t.id, billablePages: 2,
             amountCents: 0, paymentSource: 'free', payStatus: 'paid',
           } })
@@ -144,7 +153,7 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
     }
     const mixed = await reportCase(12, 0, 0, true)
     check('12条可信出纸仅一条有2印面不会误抑制充足任务计数', mixed.metrics.printedTasks.value === 12 && mixed.metrics.printedTasks.state === 'measured')
-    check('混合缺页整项印面仍未知而非输出少算合计', mixed.metrics.printedFaces.value === null && mixed.metrics.printedFaces.state === 'unverified' && !mixed.complete)
+    check('混合缺页整项印面仍未知而非输出少算合计', mixed.metrics.printedFaces.value === null && mixed.metrics.printedFaces.state === 'unverified' && mixed.complete === false)
     for (const kind of ['printed', 'failed', 'unconfirmed'] as const) for (const small of [1, 4]) {
       const report = await reportCase(kind === 'printed' ? small : 12, kind === 'failed' ? small : 0, kind === 'unconfirmed' ? small : 0, kind !== 'printed')
       check(`真实${kind}小样本${small}仍抑制整个可计数打印组`, ['printedTasks', 'failedPrints', 'unconfirmedPrints'].every((key) => {
@@ -152,6 +161,13 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
         return metric.value === null && metric.state === 'sample_suppressed'
       }))
       check(`真实${kind}小样本${small}不泄漏印面`, report.metrics.printedFaces.value === null && report.metrics.printedFaces.state === (kind === 'printed' ? 'sample_suppressed' : 'unverified'))
+    }
+    for (const kind of ['failed', 'unconfirmed'] as const) {
+      const report = await reportCase(12, kind === 'failed' ? 1 : 0, kind === 'unconfirmed' ? 1 : 0, false)
+      check(`页数齐全时${kind}小样本仍抑制整组且不泄漏印面`, (['printedTasks', 'failedPrints', 'unconfirmedPrints', 'printedFaces'] as const).every((key) => {
+        const metric = report.metrics[key]
+        return metric.value === null && metric.state === 'sample_suppressed'
+      }))
     }
     // Month boundary object is reused above; ensure reports cover the full closed month.
     check('新增报告回归仍使用同一完整北京时间自然月', mixed.window.from === from.toISOString() && mixed.window.to === to.toISOString())

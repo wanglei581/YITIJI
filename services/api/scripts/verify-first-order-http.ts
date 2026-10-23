@@ -105,7 +105,8 @@ async function main() {
     const confirmed = await request<FirstOrderIncident>('partner', `${P}/incidents/${incident.id}`, 200, { action: 'confirm', version: resolved.version, note: '现场核对已恢复' }, 'PATCH')
     check('机构确认后才关闭', confirmed.status === 'closed' && !!confirmed.closedAt)
     const reopened = await request<FirstOrderIncident>('partner', `${P}/incidents/${incident.id}`, 200, { action: 'reopen', version: confirmed.version, note: '复用时再次缺纸' }, 'PATCH')
-    check('机构可复开，状态与负责人时间清理正确', reopened.status === 'open' && reopened.assignee === null && !reopened.resolvedAt && !reopened.closedAt && reopened.events.length >= 6)
+    const reopenedRow = await f.prisma.serviceIncident.findUnique({ where: { id: incident.id } })
+    check('机构可复开，状态与负责人时间清理正确', reopened.status === 'open' && reopened.assignee === null && reopenedRow?.assignee === null && !reopened.resolvedAt && !reopened.closedAt && reopened.events.length >= 6)
     const assigneeHistory = (await f.prisma.auditLog.findMany({ where: { targetId: incident.id } })).map((row) => ({ action: row.action, payload: JSON.parse(row.payloadJson) as Record<string, unknown> }))
     for (const [action, version, previousAssignee, assignee, status] of [
       ['start', incident.version, null, '验证维修员', 'processing'],
