@@ -27,6 +27,7 @@ let fixture
 let launchDirectory
 let ownedApiDirectory
 let expectedProjectConflictPath
+let expectedIncidentConflictPath
 const outputArgument = process.argv[3] || process.env.FIRST_ORDER_BROWSER_OUTPUT
 const output = outputArgument ? resolve(outputArgument) : await mkdtemp(join(tmpdir(), 'first-order-browser-'))
 await mkdir(output, { recursive: true })
@@ -510,6 +511,62 @@ try {
     mark('Committed Admin incident state and version survive failed refresh')
   }
   await expect(incidentCard.getByRole('status', { name: '处理中', exact: true })).toBeVisible()
+  const changeAssignee = () => incidentCard.getByRole('button', { name: '变更处理负责人', exact: true })
+  await expect(incidentCard.getByLabel('处理负责人', { exact: true })).toHaveValue('验证维修负责人')
+  await expect(changeAssignee()).toBeDisabled()
+  await incidentCard.getByLabel('处理负责人', { exact: true }).fill('验证维修负责人乙')
+  await expect(changeAssignee()).toBeDisabled()
+  await incidentCard.getByLabel('处理说明', { exact: true }).fill('浏览器隔离验证：交接给负责人乙继续处理，不代表实际维修。')
+  await incidentCard.getByLabel('处理负责人', { exact: true }).fill('   ')
+  await expect(changeAssignee()).toBeDisabled()
+  await incidentCard.getByLabel('处理负责人', { exact: true }).fill('验证维修负责人乙')
+  await disconnectAfterWrite(admin, `/incidents/${incident.id}`, 'PATCH')
+  let reassigned = await responseAfter(admin, 'PATCH', `/incidents/${incident.id}`, () => changeAssignee().click())
+  if (fullApp) await reconnectAfterWrite(admin, a, async () => {
+    await expect(incidentCard).toContainText('处理负责人：验证维修负责人乙')
+    await expect(incidentCard.getByRole('status').filter({ hasText: '处理记录已保存' })).toBeVisible()
+  })
+  assert.equal(reassigned.status, 'processing')
+  assert.equal(reassigned.assignee, '验证维修负责人乙')
+  await expect(changeAssignee()).toBeDisabled()
+  await refresh(p)
+  await expect(p.getByTestId(`first-order-incident-${incident.id}`)).toContainText('平台处理负责人：验证维修负责人乙')
+  const audits = (await api('admin', `/admin/audit-logs?targetId=${incident.id}&action=first_order.incident_start`)).data.items
+  assert(audits.some((row) => {
+    const payload = JSON.parse(row.payloadJson)
+    return payload.previousAssignee === '验证维修负责人' && payload.assignee === '验证维修负责人乙'
+  }))
+  mark('Processing incident owner changes through UI, survives refresh failure, appears in Partner view and records old/new audit values')
+
+  // A real second client updates the same row; the stale browser must not overwrite it.
+  const remoteAssignee = await fetch(`${fixture.base}/admin/first-order/incidents/${incident.id}`, {
+    method: 'PATCH', signal: AbortSignal.timeout(20000),
+    headers: { Authorization: `Bearer ${fixture.tokens.admin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'start', version: reassigned.version, assignee: '验证外部负责人', note: '另一操作者已接手，旧表单不能覆盖。' }),
+  })
+  assert.equal(remoteAssignee.status, 200)
+  await incidentCard.getByLabel('处理负责人', { exact: true }).fill('不可覆盖新负责人')
+  await incidentCard.getByLabel('处理说明', { exact: true }).fill('旧版本并发验证。')
+  expectedIncidentConflictPath = `/api/v1/admin/first-order/incidents/${incident.id}`
+  const staleAssigneeResponse = admin.waitForResponse((response) => response.url().startsWith(fixture.base) && new URL(response.url()).pathname === expectedIncidentConflictPath && response.request().method() === 'PATCH')
+  await changeAssignee().click()
+  assert.equal((await staleAssigneeResponse).status(), 409)
+  await expect(incidentCard.getByRole('alert')).toContainText('记录已发生变化')
+  await refresh(a)
+  await expect(incidentCard.getByLabel('处理负责人', { exact: true })).toHaveValue('验证外部负责人')
+  await expect(changeAssignee()).toBeDisabled()
+  await incidentCard.getByLabel('处理负责人', { exact: true }).fill('验证维修负责人乙')
+  await incidentCard.getByLabel('处理说明').fill('核对最新版本后，交接回负责人乙。')
+  reassigned = await responseAfter(admin, 'PATCH', `/incidents/${incident.id}`, () => changeAssignee().click())
+  // openAdmin performs a full document navigation; avoid immediately cancelling a reload's auth bootstrap.
+  await openAdmin(admin, adminOrigin, orgName); a = adminPanel(admin)
+  await chooseProject(a, created.id, '报障处理')
+  incidentCard = a.getByTestId(`first-order-incident-${incident.id}`)
+  await expect(incidentCard).toContainText('处理负责人：验证维修负责人乙')
+  await partner.reload(); p = partnerPanel(partner)
+  await chooseProject(p, created.id, '报障与恢复')
+  await expect(p.getByTestId(`first-order-incident-${incident.id}`)).toContainText('平台处理负责人：验证维修负责人乙')
+  mark('Stale assignee UI receives 409; refresh discards old draft, same-owner submit stays disabled, both full reloads retain the final owner')
   await incidentCard.getByLabel('处理说明', { exact: true }).fill('浏览器隔离验证：已记录补纸处置，等待机构核对；不构成真机出纸证据。')
   await responseAfter(admin, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '记录技术恢复', exact: true }).click())
   await refresh(p)
@@ -589,8 +646,10 @@ try {
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
   const expectedConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedProjectConflictPath && item.status === 409)
   assert.equal(expectedConflicts.length, fullApp ? 2 : 0, 'Exactly two intentional stale-form conflicts are expected')
-  results.expectedRequestFailures = expectedConflicts
-  const unexpectedRequests = results.externalRequests.filter((item) => !expectedConflicts.includes(item))
+  const expectedIncidentConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedIncidentConflictPath && item.status === 409)
+  assert.equal(expectedIncidentConflicts.length, 1, 'Exactly one intentional stale-assignee conflict is expected')
+  results.expectedRequestFailures = [...expectedConflicts, ...expectedIncidentConflicts]
+  const unexpectedRequests = results.externalRequests.filter((item) => !results.expectedRequestFailures.includes(item))
   assert(!unexpectedRequests.some((item) => item.path.includes('/first-order/')), 'Unexpected first-order requests failed')
   if (fullApp) {
     assert.deepEqual(unexpectedRequests, [], 'Unexpected complete application browser requests failed')

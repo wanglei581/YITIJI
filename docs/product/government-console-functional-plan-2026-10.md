@@ -584,3 +584,17 @@ Hermes 事实复核 `20261024_154523_b5f444` 已明确撤回额外清单与本�
 同源码隔离软件闭环：Codex运行现有verify-first-order-live.mjs --isolated-full，完整AppModule、独立SQLite/Redis、真实Admin新建账号与双端正常登录，22项PASS/exit0、pageErrors空、三个所属子进程正常退出。9月合成记录下，两端预览一致→留存同一报告→刷新故障后保留成功结果→真实下载CSV→机构核对回读均完成。两CSV实际2576字节相同，文件SHA256 d73cd72f8067f108c112b67fa3fa8f1c2ebff561b59aa4b4195174a117f3e73e，UTF-8 BOM/CRLF、同报告编号及快照摘要（文件摘要与快照摘要分别使用）。会话10、任务5、印面20、未确认5、失败5；扫描空值且暂不能核验，公式编号加单引号防注入，无个人材料。既有verify:first-order-http实际215项PASS/exit0，覆盖真实异机构报告/CSV拒绝、并发留存唯一、源记录变化不改快照和核对幂等。另用完整AppModule两个正常密码登录，外机构项目预览/留存、报告详情/CSV/核对5请求均404；数据库报告仍1份、checksum及acknowledgedAt未变，无成功导出/核对审计。此处合成业务记录不代表生产履约、现场或采购方正式验收。
 
 补查首轮使用夹具JWT在完整应用得到401，保留report-denials.log；改用两个正常密码登录后通过，保留report-denials-normal-login.json/log，无运行时代码修改。Grok064c8838源码主查及594825dd最终窄证据复核均超时、de395e54执行任务取消，均不计完成，Codex接手实跑；不称新增独立源码审查通过。实际任务回执保留grok-attempt-receipts.json。结果、截图、CSV及acceptance-summary.json在仓库外monthly-isolation-20261024目录，两份私有验收JSON已同步。本地apps/services/packages相对生产源0b4b5770无差异，本轮无源码改动、CI重跑或部署、无新硬件动作。
+
+### 18.10 2026-10-24 补齐复审与处理中负责人变更
+
+用户授权继续剩余非现场验收，生产月报固定等11月1日、打印扫描等其到现场。本轮先补实际源码复审：Grok5f5570fe只审权限/留存/审计，Grok2e9326d7主审处理中变更负责人缺口，agy0254e45b独立审最小方案；均须有真实非空完成结论，不把派发当通过。
+
+已由Codex独立核实：既有API允许admin在processing用start变更负责人，CAS及前后负责人审计已有215项HTTP验证；但Admin IncidentPanel只在open提供负责人输入和开始按钮，processing无变更入口，清单的该项无法通过UI执行。最小方案复用现有卡片/start/version，不新增入口页、模型、服务或依赖：open/processing都显示负责人输入；仅processing提供“变更处理负责人”，要求非空且不同于当前负责人，并填写处理说明。负责人草稿与item.version绑定，外部刷新版本变化时回到最新负责人，避免旧草稿借新版本覆盖；保持组件稳定key及已提交成功提示，禁止为同步草稿而重挂载正在写入的组件。独立方案复核后才改源码。
+
+文件预算5份：apps/admin/src/components/first-order/IncidentPanel.tsx、apps/admin/scripts/verify-first-order-live.mjs、本规划、current-progress.md、next-tasks.md。禁止改API/Partner/共享层、生产数据库、设备归属、密钥及硬件链路。原浏览器验证扩写实际改派、双端刷新持久化和旧版本冲突；验证Admin typecheck/lint/build、focused/full-app真实浏览器、候选自身CI与复审。若合并发布则只使用精确main+自身CI和既有full工作流，关闭发布开关并核同版来源，再做正常生产UI验收，不用本地通过替代线上完成。远控UU稳定性另记，不因本地替代路径宣称根治。
+
+方案实际复核完成：Grok2e9326d7确认可证缺口，明确不得用id-version重挂载卡片；agy0254e45b认可按版本派生负责人草稿、同一trim值提交和严格禁用条件。Codex据此实现，保持key=item.id。Grok5f5570fe权限/留存两文件源码补审完成，无独立可复现P1/P2；其余聚合/CSV交Grok b353d6ca补核，不把审查未覆盖部分计入通过。
+
+验证记录：先扩写原浏览器流程，修前真实红例定位processing输入不存在。修后首轮已完成改派/前后负责人审计/旧UI409，错误后非空textarea使新增strict label定位超时，改该处为非精确label匹配；第二轮业务全部过，因新增预期409未进入请求失败精确清单而失败，再补唯一incident路径且必须恰好1次409，不放宽其他请求错误。第三轮focused 7项PASS/exit0，双端全重载保留负责人乙。原失败证据与每轮结果分别保留，不覆盖。Admin typecheck、lint 0error/4既有warning、显式VITE_API_MODE=http及/api/v1生产build通过；首次无env构建被既有保护正确拒绝，不降级保护。full-app及最终差异审查/自身CI继续，生产未变。
+
+完整AppModule复验最终24项PASS/exit0：正常双端密码登录、新开户、processing改派及真实前后负责人审计、旧UI409/刷新弃旧草稿、双端全document加载后负责人乙持久化、恢复确认、月报留存/CSV/核对和退出撤销全部通过，无pageErrors，所属3子进程正常退出。首轮新增检查把reload后立即goto叠加，取消鉴权启动而回登录；移除冗余reload，仅由既有openAdmin的page.goto完成完整document加载，再复验成功；未改鉴权或测试登录保护。Grok b353d6ca月报聚合/CSV两文件补审已成功，无确认P1/P2；其对外部心跳、页数、未来结束时刻和零宽字符表格行为的待核不升级为已复现缺陷，Codex按实际源和边界另核。下一关为冻结候选自身CI与最终差异复审，生产仍0b4b5770。
