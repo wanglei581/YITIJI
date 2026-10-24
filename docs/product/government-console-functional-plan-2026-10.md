@@ -571,3 +571,16 @@ Hermes 事实复核 `20261024_154523_b5f444` 已明确撤回额外清单与本�
 20:19机构端对原演练单提交一次复开，界面显示待平台受理，负责人和恢复信息清空，旧创建时间19:35保留；只读回查open/version5/5事件，已保存partner-same-incident-reopened.png。UU输入随后再次失效，转用用户本人正常登录的本机Chrome管理员及原机构账号，未提取或搬运远端凭据。Admin真实UI于20:38开始处理并指定UAT operator B，20:39记录技术恢复，页面明确仍待机构核对；Partner真实UI于20:43提交明确“不代表实体出纸、扫描、实际维修或采购方正式验收”的联合角色演练核对并确认。各操作只提交一次，无接口代写。
 
 最终双端各全页reload并重新打开原项目/工单，Partner“已确认恢复”、Admin“机构已确认恢复”，负责人B、恢复说明与完整8条处理过程均保存一致。正常鉴权只读GET最终证实原id closed/version8、historyTruncated=false，action依次create/start/resolve/confirm/reopen/start/resolve/confirm；仅1条工单、0份留存月报、部署仍19:40结束。证据same-incident-final-readback-20261024.json、partner-same-incident-full-reload.png及admin-same-incident-full-reload.png存仓库外，两份私有验收JSON同步最新v8。该子任务通过联合功能验收，未发现需修改源码的可复现缺陷；不将本机浏览器替代路径称为UU根治，不扩展为实体或整体交付通过。Grok34b13436中间证据复核超时，不计完成。实际Grok278ba302最终事实包复核成功，同意软件子任务收口、UU未根治及整体未交付的边界；它未操作UI、未核截图，不计独立E2E。实际回执grok-same-incident-final-278ba302.json已保存。
+
+
+### 18.9 2026-10-24 跨机构隔离及月报留存、CSV续验
+
+本轮用户授权继续不依赖现场的权限与月报闭环验收，Grok主查源码、可执行路径及证据边界，Codex执行真实UI与结果核对。文件预算仍为本规划及两份进度入口共3份；先不改运行时代码。复用既有双端项目/月报入口、first-order HTTP及真实全应用浏览器验证，不新增入口、模型、服务或依赖。涉及正常鉴权和非个人月报CSV，不读隐藏浏览器凭据/密钥，不改生产数据库日期或回填部署、不造历史履约数据，不发打印扫描任务。若发现可复现缺陷，先明确最小源码/现有verify预算并审查再修。验证包含生产真实异机构对象拒绝、已闭月覆盖条件核实及留存/下载/机构核对/刷新；无生产闭月覆盖时用既有隔离真实数据库/HTTP/浏览器验证软件流程并明确环境，不冒充生产通过。只改记录执行diff检查；修源码另跑对应typecheck/lint/build/verify及候选CI。
+
+生产实操：Admin逐一核对7家机构，除原机构10月UAT外，其余6家原无服务项目。随后在111只创建UAT-ISOLATION-111-20261024（cmvmefcrd0066q2a8idyku7kk），编号UAT-NO-CONTRACT-ISOLATION-20261024，范围明确无合同/无部署/仅隔离演练，未绑定设备。原KSK001UAT正常鉴权概览不含该项目，对其预览和9月留存均404/FIRST_ORDER_NOT_FOUND。用户本人正常登录111后，机构资料显示111；终端页只见自己的演练项目、明确无绑定终端，不含KSK-001或原项目，完整刷新保留。项目保留作验收追溯，不改变设备归属。生产真实外机构已留存报告不存在，不能把不存在ID的404当成详情/CSV/核对真实对象隔离已验。
+
+生产月份条件：原机构9月页面预览与留存均拒绝“这个月还没有经过核验的设备部署记录，不能生成报告”，无报告新增；10月仅预览。未改服务器时间、倒填部署或造空白履约数据。生产首份正式留存/CSV/机构核对仍待2026-11-01北京时间10月自然月结束后执行；此项不依赖现场但有真实月份前置条件，不是已定位产品缺陷。
+
+同源码隔离软件闭环：Codex运行现有verify-first-order-live.mjs --isolated-full，完整AppModule、独立SQLite/Redis、真实Admin新建账号与双端正常登录，22项PASS/exit0、pageErrors空、三个所属子进程正常退出。9月合成记录下，两端预览一致→留存同一报告→刷新故障后保留成功结果→真实下载CSV→机构核对回读均完成。两CSV实际2576字节相同，文件SHA256 d73cd72f8067f108c112b67fa3fa8f1c2ebff561b59aa4b4195174a117f3e73e，UTF-8 BOM/CRLF、同报告编号及快照摘要（文件摘要与快照摘要分别使用）。会话10、任务5、印面20、未确认5、失败5；扫描空值且暂不能核验，公式编号加单引号防注入，无个人材料。既有verify:first-order-http实际215项PASS/exit0，覆盖真实异机构报告/CSV拒绝、并发留存唯一、源记录变化不改快照和核对幂等。另用完整AppModule两个正常密码登录，外机构项目预览/留存、报告详情/CSV/核对5请求均404；数据库报告仍1份、checksum及acknowledgedAt未变，无成功导出/核对审计。此处合成业务记录不代表生产履约、现场或采购方正式验收。
+
+补查首轮使用夹具JWT在完整应用得到401，保留report-denials.log；改用两个正常密码登录后通过，保留report-denials-normal-login.json/log，无运行时代码修改。Grok064c8838源码主查及594825dd最终窄证据复核均超时、de395e54执行任务取消，均不计完成，Codex接手实跑；不称新增独立源码审查通过。实际任务回执保留grok-attempt-receipts.json。结果、截图、CSV及acceptance-summary.json在仓库外monthly-isolation-20261024目录，两份私有验收JSON已同步。本地apps/services/packages相对生产源0b4b5770无差异，本轮无源码改动、CI重跑或部署、无新硬件动作。
