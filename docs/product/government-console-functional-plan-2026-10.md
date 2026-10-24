@@ -508,3 +508,17 @@ Grok 现场源码核对 `82f55c23-cce6-454a-a07f-f8be60c02939` 已完成：首�
 本地最终验证：可信增量、缺失/非法/不可用/非祖先/相同/大写/标签基线共 8 类，每类同 SHA 重跑两次、校验和一致；8 个真实隔离 receiver 在 fetch 前均无目标，校验、精确 fetch 和 checkout 成功。坏 checksum、缺前提增量及 HEAD 缺对象 exit 3 均拒绝；原静态/变异/loopback、CI 覆盖、仓库/YAML完整性、main 并发、生产 gates 同步、发布授权和真实发布脚本回退门禁全部通过。本地执行不是真 BOS 上传，未据此关闭产物/生产/真机。
 
 agy 全差分冷审 `132184b4-24dd-4dfe-b08d-fb89bf162e02` 成功，所附范围未见问题。Hermes 首审 `20261024_145137_baf07d` 的广域 exit0 断言已移除，精确 pack 标记硬校验保留；既有 loopback 原本已执行 HEAD，另补缺对象负例与 HEAD→uploaded 顺序。事实复核 `20261024_145721_24abc9` 明确撤回错误质疑、确认无可证 P0/P1/P2；本机 /sbin/sha256sum 与 Ubuntu CI 工具先决条件已实际核，不新增未配置环境适配。Grok 整包冷审 `ed714551-0d12-4cac-9e28-4da7fc41a74b` 超时不计通过，关键段 `038686b4-670f-4732-8395-ba4709e2c9ff` 继续；Claude 额度恢复后补齐，尚不称五家齐。当前冻结草稿候选进入自身完整 CI；新主线精确 CI、真实上传可读证据、full 发布及机构/硬件验收仍待完成。
+
+后续状态：Grok 关键段 `038686b4-670f-4732-8395-ba4709e2c9ff` 已成功，所附 producer/receiver 未见可证问题。冻结草稿 PR #1492，候选 `47cc12fa35e9bc0e11402a1be74994bc3faae11e` 的 CI `40072761626` 进入完整验证，PG/build 已成功，浏览器待结束。Claude 在 15:20 恢复后复审 `eb70b67c-a2ec-437e-8338-8bc946d2d9c2` 实际成功：当前运行逻辑无可证 P0/P1，上传标记的子串/顺序静态守卫有 P2，可放过未来 `|| true` 或 `set +e`。另要求核完整 checkout 和真云包证明；已读到 `fetch-depth: 0`，并计划加防退化守卫。
+
+按该复审追加同五文件内的最小收口：producer 唯一边界提取、关键 put/put/head/head 逐行精确匹配与整个区域禁止错误屏蔽，新变异必须拒绝；full 上传后用既有 BOS client 下载原 bundle/单行 SHA256 receipt，cmp 本次本地 receipt、校验和、空 Git 库 verify/精确 fetch/checkout/HEAD 比对，适用检查全成功才输出 uploaded，记录字节量和 full-download-verified，EXIT 保留退出码清理本次临时目录。增量包不假称空库自含。复用既有 loopback 和合成源仓执行完整 producer 的真 Node client/HTTP/Git 正例，以及 checksum HEAD 404 退出 3 且零成功标记的负例；不调用真 BOS，真实私有云读回只在新 main CI 执行。验证器按必要完整 wire 证明扩展、目标不超 500 行，仍不新增文件/依赖、部署脚本或权限。
+
+Grok `905b4b78-5d62-4d64-9186-3e7c40fd4fee` 主产该增量补丁；agy 增量方案 `e6d3d3e8-4ec0-4e35-8877-50d77c45a3f2` 已成功支持，HEAD 状态保真、精确 SHA detach 和原 receipt 字节一致性均作为落地约束。Hermes `20261024_153931_3bdfda` 的“还有第三个 checksum 清单”“本地 bundle 不能按已宣告 SHA fetch”质疑与实际两对象协议/已有空库精确取回实测不符，继续事实复核，不引入额外对象/改生产 refspec；精确白名单和失败零成功标记建议采纳。新改动将以新 SHA 跑候选与 main CI，47 的既有结果只计该版本，原生产、云产物和机构真机验收仍未通过。
+
+新增资源事实：匿名访问源码默认北京发布端点的 `latest-deployed.txt`，得到 HTTP 404、错误码 `NoSuchBucket`（requestId `7a3a279e-24a3-4912-a176-6736e4494af0`）；[BOS 官方错误码](https://cloud.baidu.com/doc/BOS/s/Ajwvysfpl)将此码定义为该桶不存在，亦需核对地域端点，不能把它缩写成仅缺对象。上次成功 full `39749729980` 实际日志也有 2026-10-22 08:55 UTC 的基线 PUT 404（requestId `f7fc8c7a-6ab5-4aba-b90c-61e51d7067ca`），故代码打包修复之外，发布存储资源必须一并恢复。已请求用户提供桶名/地域或打开已登录 BOS 桶列表；不取 AK/SK、不假设实际服务器 secret 文件配置值、不更改用户文件 COS、不自行创建或扩大访问权限。云目标/认证可用及真实读回未核实，不放行 full 部署。
+
+Hermes 事实复核 `20261024_154523_b5f444` 已明确撤回额外清单与本地 bundle SHA fetch 必被拒的判断，认可两对象协议、精确取回实测及已纳入的白名单/动态失败验证，无确定方案阻断。私有对象上传缓存不当成客户业务发布，也不为修复新增 draft 云体系或删除权限。增量补丁及全 producer 实跑仍待完成，以上只关闭事实争议与方案项。
+
+加固落地快照：Grok `905b4b78-5d62-4d64-9186-3e7c40fd4fee` 已成功交付增量，Codex 仅修补丁导入/原文块适配，生产器边界兼容合法 job 名并统一拒绝 `||` 错误屏蔽。现有验证器 493 行；实际完整 producer 经既有真 BOS client 对回环 HTTP 完成 PUT/HEAD/GET、receipt 本次字节绑定、空 Git 库精确取回和成功标记顺序，checksum HEAD 404 真实 exit 3、日志及 summary 均无成功标记。8 类打包各两次、8 个先无目标的 receiver 及原损坏 checksum/缺前提负例仍通过；CI 覆盖、仓库/YAML完整性、main 并发、部署 gates 同步、发布授权检查通过，真实 deploy 回退已在本轮前版通过且 deploy 文件未改。以上是本地隔离执行，不是真云上传。
+
+旧候选 47 / CI `40072761626` 已实时确认三项全部 SUCCESS，只关闭该 SHA 的 CI。新加固源码已交实际 Claude `1215ceac-2228-4600-a04b-f53f8e0dbdeb`、Grok `dd4db012-cd15-4491-82d9-08544217b646`、agy `a4539da2-d419-46ba-a65f-6517259f2f12` 聚焦冷审，Hermes 同包复核进行中；结论以真实最终回执为准。待新 SHA 完整 CI、所需复审与真实发布桶恢复，仍未合并 #1492、重开发布开关或完成生产账号/机构/硬件验收。

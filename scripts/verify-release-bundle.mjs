@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +16,79 @@ const fail = (message) => { throw new Error(message) }
 
 function required(text, expression, message) {
   if (!expression.test(text)) fail(message)
+}
+
+function releaseJobText(ci) {
+  const start = ci.search(/^  release-bundle:\n/m)
+  if (start < 0) fail('CI must define release-bundle job')
+  const next = ci.slice(start + 1).search(/\n  [A-Za-z0-9_-]+:\n/)
+  return next < 0 ? ci.slice(start) : ci.slice(start, start + 1 + next)
+}
+
+function requireConsecutive(text, expected, message) {
+  const lines = text.split('\n').map((line) => line.trim())
+  if (!lines.some((_, index) => expected.every((want, offset) => lines[index + offset] === want))) fail(message)
+}
+
+function assertNoWeakening(producer) {
+  for (const raw of producer.split('\n')) {
+    const code = raw.replace(/#.*$/, '').trim()
+    if (!code) continue
+    if (/(?:^|&&|[;|])\s*set\s+\+/.test(code)) fail('producer must not disable fail-closed shell options')
+    if (code.includes('||')) fail('producer must not ignore a command failure')
+  }
+}
+
+const PUBLISH_TAIL = `
+# release-bundle-pack:end
+node scripts/release-bundle/bos-object.mjs put "$BUNDLE" "$BUNDLE"
+node scripts/release-bundle/bos-object.mjs put "$CHECKSUM" "$CHECKSUM"
+node scripts/release-bundle/bos-object.mjs head "$BUNDLE"
+node scripts/release-bundle/bos-object.mjs head "$CHECKSUM"
+if [ "$release_bundle_mode" = full ]; then
+verify_dir=$(mktemp -d "\${RUNNER_TEMP}/release-readback.XXXXXX")
+trap 'rm -rf "$verify_dir"' EXIT
+node scripts/release-bundle/bos-object.mjs get "$BUNDLE" "$verify_dir/release.bundle"
+node scripts/release-bundle/bos-object.mjs get "$CHECKSUM" "$verify_dir/release.sha256"
+cmp "$verify_dir/release.sha256" "$CHECKSUM"
+( cd "$verify_dir" && sha256sum -c release.sha256 )
+empty_repo="$verify_dir/empty"
+git init -q --initial-branch=main "$empty_repo"
+if git -C "$empty_repo" cat-file -e "\${RELEASE_SHA}^{commit}"; then
+exit 1
+fi
+git -C "$empty_repo" bundle verify "$verify_dir/release.bundle"
+git -C "$empty_repo" fetch --no-tags "$verify_dir/release.bundle" "$RELEASE_SHA"
+git -C "$empty_repo" checkout -q --detach "$RELEASE_SHA"
+actual=$(git -C "$empty_repo" rev-parse HEAD)
+if [ "$actual" != "$RELEASE_SHA" ]; then
+exit 1
+fi
+bytes=$(wc -c < "$verify_dir/release.bundle" | tr -d '[:space:]')
+echo "release-bundle full-download-verified=$RELEASE_SHA bytes=$bytes"
+printf 'release-bundle full-download-verified=%s bytes=%s\\n' "$RELEASE_SHA" "$bytes" >> "$GITHUB_STEP_SUMMARY"
+fi
+echo "release-bundle uploaded=$BUNDLE checksum=$CHECKSUM"
+printf 'release-bundle uploaded=%s checksum=%s\\n' "$BUNDLE" "$CHECKSUM" >> "$GITHUB_STEP_SUMMARY"
+# release-bundle-publish:end
+`.trim().split('\n')
+
+function producerSlice(job) {
+  const begin = '# release-bundle-pack:begin'
+  const end = '# release-bundle-publish:end'
+  const start = job.indexOf(begin)
+  const stop = job.indexOf(end)
+  if (start < 0 || stop <= start) fail('release-bundle publish markers missing or unordered')
+  if (job.indexOf(begin, start + begin.length) >= 0 || job.indexOf(end, stop + end.length) >= 0) fail('release-bundle producer markers must be unique')
+  return job.slice(start, stop + end.length)
+}
+
+function assertProducerShape(job) {
+  if (!/\n {6}- uses: actions\/checkout@v4\n {8}with:\n {10}fetch-depth: 0\n/.test(job)) fail('release-bundle checkout must use actions/checkout@v4 with fetch-depth 0')
+  const producer = producerSlice(job)
+  assertNoWeakening(producer)
+  requireConsecutive(producer, ['record_mode() {', 'release_bundle_mode=$1', 'echo "release-bundle mode=$1 reason=$2"'], 'record_mode must set release_bundle_mode and keep the mode log')
+  requireConsecutive(producer, PUBLISH_TAIL, 'producer upload, readback, and uploaded marker must be exact consecutive lines')
 }
 
 function verifyStaticContractsFromSources({ deploy, ci, client }) {
@@ -32,17 +105,12 @@ function verifyStaticContractsFromSources({ deploy, ci, client }) {
   required(ci, /^  release-bundle:\n/m, 'CI must define release-bundle job')
   required(ci, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/, 'release-bundle must be restricted to main pushes')
   required(ci, /needs: \[build-and-verify, postgres-readiness, kiosk-browser-smoke\]/, 'release-bundle must wait for all verified CI jobs')
-  const releaseJob = ci.slice(ci.indexOf('  release-bundle:'))
+  const releaseJob = releaseJobText(ci)
   assert.ok((releaseJob.match(/continue-on-error: true/g) ?? []).length >= 2, 'all BOS steps must be best-effort')
   required(releaseJob, /release-bundle mode=\$1 reason=\$2/, 'CI must log pack mode and reason')
   required(releaseJob, />> "\$GITHUB_STEP_SUMMARY"/, 'CI must write pack mode to the step summary')
   required(releaseJob, /git bundle create "\$BUNDLE" refs\/release\/target\s*$/m, 'invalid baseline must create a self-contained bundle')
-  required(releaseJob, /bos-object\.mjs head "\$BUNDLE"/, 'CI must confirm the uploaded bundle is readable')
-  required(releaseJob, /bos-object\.mjs head "\$CHECKSUM"/, 'CI must confirm the uploaded checksum is readable')
-  const bundleHead = releaseJob.indexOf('bos-object.mjs head "$BUNDLE"')
-  const checksumHead = releaseJob.indexOf('bos-object.mjs head "$CHECKSUM"')
-  const uploaded = releaseJob.indexOf('echo "release-bundle uploaded=')
-  assert.ok(bundleHead < checksumHead && checksumHead < uploaded, 'uploaded marker must follow both successful HEAD commands')
+  assertProducerShape(releaseJob)
   assert.ok(!/echo[^\n]*(BOS_RELEASE_ACCESS_KEY|BOS_RELEASE_SECRET_KEY)/.test(releaseJob), 'CI must not echo BOS credentials')
 
   assert.ok(!/^import\s+(?!assert from 'node:|.*from 'node:)/m.test(client), 'BOS client may import only node built-ins')
@@ -79,6 +147,31 @@ async function verifyMutations() {
       sources: { ...sources, deploy: sources.deploy.replace('PRINT_REQUIRE_PII_SCAN', 'PRINT_REQUIRE_PII_SCAN,BOS_RELEASE_SECRET_KEY') },
       message: /must not cross GitHub SSH/,
     },
+    {
+      name: 'ignore bundle HEAD failure',
+      sources: { ...sources, ci: sources.ci.replace('bos-object.mjs head "$BUNDLE"', 'bos-object.mjs head "$BUNDLE" || true') },
+      message: /ignore a command failure/,
+    },
+    {
+      name: 'ignore checksum HEAD with colon',
+      sources: { ...sources, ci: sources.ci.replace('bos-object.mjs head "$CHECKSUM"', 'bos-object.mjs head "$CHECKSUM" || :') },
+      message: /ignore a command failure/,
+    },
+    {
+      name: 'disable errexit after pack',
+      sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:end\n', '# release-bundle-pack:end\n          set +e\n') },
+      message: /fail-closed shell options/,
+    },
+    {
+      name: 'disable shell option after pack',
+      sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:end\n', '# release-bundle-pack:end\n          set +o pipefail\n') },
+      message: /fail-closed shell options/,
+    },
+    {
+      name: 'shallow release-bundle checkout',
+      sources: { ...sources, ci: sources.ci.replace(/(  release-bundle:[\s\S]*?fetch-depth:) 0(\n)/, '$1 1$2') },
+      message: /fetch-depth 0/,
+    },
   ]
   for (const mutation of mutations) {
     assert.throws(() => verifyStaticContractsFromSources(mutation.sources), mutation.message, `mutation must fail: ${mutation.name}`)
@@ -98,6 +191,7 @@ function runNode(args, env) {
 
 async function verifyLoopbackBos() {
   const objects = new Map()
+  let checksumHead404 = false
   const server = createServer((request, response) => {
     const authorization = request.headers.authorization || ''
     if (!/^bce-auth-v1\/fake-access\/.+\/host;x-bce-date\/[0-9a-f]{64}$/.test(authorization)) {
@@ -112,7 +206,8 @@ async function verifyLoopbackBos() {
       return
     }
     if (request.method === 'HEAD') {
-      response.writeHead(objects.has(key) ? 200 : 404).end()
+      const hidden = checksumHead404 && String(request.url).endsWith('.sha256')
+      response.writeHead(!hidden && objects.has(key) ? 200 : 404).end()
       return
     }
     if (request.method === 'GET' && objects.has(key)) {
@@ -152,6 +247,9 @@ async function verifyLoopbackBos() {
       assert.equal(result.code, 0, `local BOS ${args[1]} must pass: ${result.stderr}`)
     }
     assert.equal(await readFile(output, 'utf8'), await readFile(input, 'utf8'), 'GET output must equal PUT input')
+    await verifyRealBundleRoundTrip(async ({ src, releaseSha }) => {
+      await proveFullProducerRoundTrip(src, releaseSha, env, objects, () => { checksumHead404 = true })
+    })
   } finally {
     await new Promise((resolve) => server.close(resolve))
     await rm(directory, { recursive: true, force: true })
@@ -188,13 +286,14 @@ function runGit(args, cwd) {
 }
 
 function extractPackShell(ci) {
+  const job = releaseJobText(ci)
   const begin = '# release-bundle-pack:begin'
   const end = '# release-bundle-pack:end'
-  const start = ci.indexOf(begin)
-  const stop = ci.indexOf(end)
+  const start = job.indexOf(begin)
+  const stop = job.indexOf(end)
   if (start < 0 || stop <= start) fail('release-bundle pack markers missing or unordered')
-  if (ci.indexOf(begin, start + begin.length) >= 0 || ci.indexOf(end, stop + end.length) >= 0) fail('release-bundle pack markers must be unique')
-  const lines = ci.slice(start + begin.length, stop).split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n').trim()
+  if (job.indexOf(begin, start + begin.length) >= 0 || job.indexOf(end, stop + end.length) >= 0) fail('release-bundle pack markers must be unique')
+  const lines = job.slice(start + begin.length, stop).split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n').trim()
   if (!lines.startsWith('set -euo pipefail')) fail('pack shell indent boundary is wrong or fail-closed mode is missing')
   if (/\bexit 0\b/.test(lines)) fail('pack shell must not skip a missing baseline')
   if (/bos-object\.mjs/.test(lines)) fail('pack shell must not upload to BOS')
@@ -208,11 +307,48 @@ function extractPackShell(ci) {
   if (!lines.includes('git update-ref refs/release/target "$RELEASE_SHA"')) fail('pack shell must pin refs/release/target')
   if (!lines.includes('git bundle verify "$BUNDLE"')) fail('pack shell must verify the bundle')
   if (!lines.includes('sha256sum "$BUNDLE"')) fail('pack shell must checksum the bundle')
-  const after = ci.slice(stop + end.length)
+  const after = job.slice(stop + end.length)
   if (!after.includes('bos-object.mjs put "$BUNDLE" "$BUNDLE"') || !after.includes('bos-object.mjs put "$CHECKSUM" "$CHECKSUM"')) {
     fail('BOS upload must stay after the pack block')
   }
   return `${lines}\n`
+}
+
+function extractProducerShell(ci) {
+  const job = releaseJobText(ci)
+  assertProducerShape(job)
+  const producer = producerSlice(job)
+  const begin = '# release-bundle-pack:begin'
+  const end = '# release-bundle-publish:end'
+  const lines = producer.slice(producer.indexOf(begin) + begin.length, producer.indexOf(end)).split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n').trim()
+  if (!lines.startsWith('set -euo pipefail')) fail('producer shell indent boundary is wrong or fail-closed mode is missing')
+  return `${lines}\n`
+}
+
+async function proveFullProducerRoundTrip(src, releaseSha, env, objects, armChecksumHead404) {
+  const runnerTemp = join(src, 'runner-temp')
+  await mkdir(join(src, 'scripts/release-bundle'), { recursive: true })
+  await mkdir(runnerTemp)
+  await writeFile(join(src, 'producer.sh'), extractProducerShell(await read('.github/workflows/ci.yml')))
+  await writeFile(join(src, 'scripts/release-bundle/bos-object.mjs'), await read('scripts/release-bundle/bos-object.mjs'))
+  assert.notEqual((await runGit(['ls-files', '--error-unmatch', 'scripts/release-bundle/bos-object.mjs'], src)).code, 0, 'fixture BOS client must stay untracked')
+  const invoke = (name) => runCmd('bash', ['producer.sh'], src, { ...env, GITHUB_SHA: releaseSha, BASE_SHA: '', RUNNER_TEMP: runnerTemp, GITHUB_STEP_SUMMARY: join(runnerTemp, name) })
+  const ok = await invoke('summary.txt')
+  assert.equal(ok.code, 0, `full producer failed: ${ok.err.trim()}`)
+  const bundlePath = join(src, `release-${releaseSha}.bundle`)
+  const bytes = (await readFile(bundlePath)).length
+  const summaryText = await readFile(join(runnerTemp, 'summary.txt'), 'utf8')
+  for (const marker of ['release-bundle mode=full reason=baseline-missing', `release-bundle full-download-verified=${releaseSha} bytes=${bytes}`, `release-bundle uploaded=release-${releaseSha}.bundle checksum=release-${releaseSha}.sha256`]) {
+    assert.equal(ok.out.includes(marker), true, `log missing ${marker}`)
+    assert.equal(summaryText.includes(`${marker}\n`), true, `summary missing ${marker}`)
+  }
+  assert.ok(ok.out.indexOf(`full-download-verified=${releaseSha}`) < ok.out.indexOf('release-bundle uploaded='))
+  assert.ok(objects.get(`/release-${releaseSha}.bundle`)?.equals(await readFile(bundlePath)), 'stored bundle bytes differ')
+  assert.equal(objects.get(`/release-${releaseSha}.sha256`)?.toString('utf8'), await readFile(join(src, `release-${releaseSha}.sha256`), 'utf8'))
+  armChecksumHead404()
+  const again = await invoke('again.txt')
+  assert.equal(again.code, 3, `checksum HEAD 404 must exit 3, got ${again.code}: ${again.err}`)
+  assert.equal(/release-bundle uploaded=|full-download-verified=/.test(`${again.out}\n${await readFile(join(runnerTemp, 'again.txt'), 'utf8')}`), false, 'failed HEAD must not report success')
 }
 
 async function gitOk(args, cwd) {
@@ -296,7 +432,7 @@ async function provePrerequisiteRejects(dir, packed, releaseSha) {
   assert.notEqual(fetched.code, 0, 'exact fetch must be rejected without its prerequisite')
 }
 
-async function verifyRealBundleRoundTrip() {
+async function verifyRealBundleRoundTrip(onReady) {
   const packShell = extractPackShell(await read('.github/workflows/ci.yml'))
   const dir = await mkdtemp(join(tmpdir(), 'qx-bundle-'))
   const src = join(dir, 'src')
@@ -340,6 +476,7 @@ async function verifyRealBundleRoundTrip() {
     }
     await proveChecksumRejects(dir, incremental)
     await provePrerequisiteRejects(dir, incremental, releaseSha)
+    if (onReady) await onReady({ src, releaseSha })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -349,8 +486,7 @@ try {
   await verifyStaticContracts()
   await verifyMutations()
   await verifyLoopbackBos()
-  await verifyRealBundleRoundTrip()
-  console.log('ALL PASS: release bundle contracts, mutations, loopback BOS, and incremental/full bundle round-trips')
+  console.log('ALL PASS: release bundle contracts, mutations, loopback BOS, bundle round-trips, and full download readback')
 } catch (error) {
   console.error(`FAIL: ${error.message}`)
   process.exit(1)

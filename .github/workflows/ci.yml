@@ -1462,6 +1462,7 @@ jobs:
           # 裸 SHA 会让 git bundle 以 Refusing to create empty bundle 退出 128。
           git update-ref refs/release/target "$RELEASE_SHA"
           record_mode() {
+            release_bundle_mode=$1
             echo "release-bundle mode=$1 reason=$2"
             printf 'release-bundle mode=%s reason=%s\n' "$1" "$2" >> "$GITHUB_STEP_SUMMARY"
           }
@@ -1494,5 +1495,29 @@ jobs:
           node scripts/release-bundle/bos-object.mjs put "$CHECKSUM" "$CHECKSUM"
           node scripts/release-bundle/bos-object.mjs head "$BUNDLE"
           node scripts/release-bundle/bos-object.mjs head "$CHECKSUM"
+          if [ "$release_bundle_mode" = full ]; then
+            verify_dir=$(mktemp -d "${RUNNER_TEMP}/release-readback.XXXXXX")
+            trap 'rm -rf "$verify_dir"' EXIT
+            node scripts/release-bundle/bos-object.mjs get "$BUNDLE" "$verify_dir/release.bundle"
+            node scripts/release-bundle/bos-object.mjs get "$CHECKSUM" "$verify_dir/release.sha256"
+            cmp "$verify_dir/release.sha256" "$CHECKSUM"
+            ( cd "$verify_dir" && sha256sum -c release.sha256 )
+            empty_repo="$verify_dir/empty"
+            git init -q --initial-branch=main "$empty_repo"
+            if git -C "$empty_repo" cat-file -e "${RELEASE_SHA}^{commit}"; then
+              exit 1
+            fi
+            git -C "$empty_repo" bundle verify "$verify_dir/release.bundle"
+            git -C "$empty_repo" fetch --no-tags "$verify_dir/release.bundle" "$RELEASE_SHA"
+            git -C "$empty_repo" checkout -q --detach "$RELEASE_SHA"
+            actual=$(git -C "$empty_repo" rev-parse HEAD)
+            if [ "$actual" != "$RELEASE_SHA" ]; then
+              exit 1
+            fi
+            bytes=$(wc -c < "$verify_dir/release.bundle" | tr -d '[:space:]')
+            echo "release-bundle full-download-verified=$RELEASE_SHA bytes=$bytes"
+            printf 'release-bundle full-download-verified=%s bytes=%s\n' "$RELEASE_SHA" "$bytes" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "release-bundle uploaded=$BUNDLE checksum=$CHECKSUM"
           printf 'release-bundle uploaded=%s checksum=%s\n' "$BUNDLE" "$CHECKSUM" >> "$GITHUB_STEP_SUMMARY"
+          # release-bundle-publish:end
