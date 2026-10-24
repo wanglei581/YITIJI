@@ -2,6 +2,8 @@
 
 ## 2026-10-24：先收口机构账号真实开通（执行中）
 
+- 最新补修：Claude `1215ceac`、Grok `dd4db012`、agy `a4539da2`、Hermes `20261024_155840_aa2f11` 源码复审均实际成功，所附发布运行逻辑未见 P0/P1 阻断。Hermes 两种守卫绕过已实际复现，Grok `f0f08675` 再产补丁；Claude 建议的两种 GET 内容损坏负例亦落地。候选 `220fabf2f62d75d4a44f591573f57bf4bb837238` 的既有验证器 499 行，10 种变异、完整 producer 正例、bundle/receipt 损坏各自 exit1 且零成功标记、最后 HEAD404 exit3、原8类×2/8 receiver 均实跑通过。生产器与 a883 逐字相同。最终测试补修的 Grok/Hermes 窄审进行中，须以最终含记录提交自身 CI 为准；以下为加固过程快照，旧候选绿标不替代新提交。真实发布桶仍待核，开关false、未合并/部署或完成机构生产验收。
+
 - 新确认的实际资源阻塞：默认发布端点 `ai-job-print-release.bj.bcebos.com/latest-deployed.txt` 的匿名只读请求返回 HTTP 404 / `NoSuchBucket`，不只是缺某个 bundle。读取上次成功 full `39749729980` 也确认 10-22 基线 PUT 为 404（该次应用部署仍成功）。CI 以源码默认北京桶为目标，因此须核对发布桶名/地域或恢复原计划资源；已请求用户只提供非密钥配置或打开已登录 BOS 桶列表。未读取 AK/SK、未创建云资源/改权限/动用户文件 COS，Grok 的代码及复审继续，云资源未就绪前不重新打开发布闸门。
 
 - 当前执行：草稿 PR #1492 的旧候选 `47cc12fa35e9bc0e11402a1be74994bc3faae11e` / CI `40072761626` 已核三项全部成功。Claude 额度恢复后的实际复审发现上传成功标记守卫 P2；Grok 已主产并交付同五文件内加固，Codex 集成：精确 producer 白名单、禁止错误屏蔽、完整 checkout 守卫、full 上传后下载本次 receipt/bundle 并在空库校验/精确取回/HEAD 比对，最后输出成功。493 行既有验证器全 producer 真 Node/HTTP/Git 正例、HEAD 404 失败零成功标记、原 8 类×2/8 receiver 及有关 workflow/仓库/授权检查均通过。新加固交 Claude/Grok/agy/Hermes 实际复核，新 SHA 自身完整 CI 另核，47 绿标不能替代新改动；真实 BOS 资源仍阻塞，不提前合并或部署。
