@@ -32,10 +32,10 @@ function requireConsecutive(text, expected, message) {
 
 function assertNoWeakening(producer) {
   for (const raw of producer.split('\n')) {
-    const code = raw.replace(/#.*$/, '').trim()
-    if (!code) continue
-    if (/(?:^|&&|[;|])\s*set\s+\+/.test(code)) fail('producer must not disable fail-closed shell options')
-    if (code.includes('||')) fail('producer must not ignore a command failure')
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    if (/\bset\s+\+/.test(line)) fail('producer must not disable fail-closed shell options')
+    if (line.includes('||')) fail('producer must not ignore a command failure')
   }
 }
 
@@ -172,6 +172,8 @@ async function verifyMutations() {
       sources: { ...sources, ci: sources.ci.replace(/(  release-bundle:[\s\S]*?fetch-depth:) 0(\n)/, '$1 1$2') },
       message: /fetch-depth 0/,
     },
+    { name: 'if true disables errexit after set -euo', sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:begin\n          set -euo pipefail\n', '# release-bundle-pack:begin\n          set -euo pipefail\n          if true; then set +e; fi\n') }, message: /fail-closed shell options/ },
+    { name: 'quoted hash hides set +e', sources: { ...sources, ci: sources.ci.replace('# release-bundle-pack:begin\n          set -euo pipefail\n', "# release-bundle-pack:begin\n          set -euo pipefail\n          printf '%s\\n' \"a#b\"; set +e\n") }, message: /fail-closed shell options/ },
   ]
   for (const mutation of mutations) {
     assert.throws(() => verifyStaticContractsFromSources(mutation.sources), mutation.message, `mutation must fail: ${mutation.name}`)
@@ -192,6 +194,7 @@ function runNode(args, env) {
 async function verifyLoopbackBos() {
   const objects = new Map()
   let checksumHead404 = false
+  let corruptGetSuffix = ''
   const server = createServer((request, response) => {
     const authorization = request.headers.authorization || ''
     if (!/^bce-auth-v1\/fake-access\/.+\/host;x-bce-date\/[0-9a-f]{64}$/.test(authorization)) {
@@ -211,7 +214,9 @@ async function verifyLoopbackBos() {
       return
     }
     if (request.method === 'GET' && objects.has(key)) {
-      response.writeHead(200).end(objects.get(key))
+      const body = Buffer.from(objects.get(key))
+      if (corruptGetSuffix && key.endsWith(corruptGetSuffix)) body[0] ^= 1
+      response.writeHead(200).end(body)
       return
     }
     response.writeHead(404).end()
@@ -248,7 +253,7 @@ async function verifyLoopbackBos() {
     }
     assert.equal(await readFile(output, 'utf8'), await readFile(input, 'utf8'), 'GET output must equal PUT input')
     await verifyRealBundleRoundTrip(async ({ src, releaseSha }) => {
-      await proveFullProducerRoundTrip(src, releaseSha, env, objects, () => { checksumHead404 = true })
+      await proveFullProducerRoundTrip(src, releaseSha, env, objects, () => { checksumHead404 = true }, (suffix) => { corruptGetSuffix = suffix })
     })
   } finally {
     await new Promise((resolve) => server.close(resolve))
@@ -256,15 +261,8 @@ async function verifyLoopbackBos() {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 真跑一次 CI 的 bundle 生成命令。静态断言抓不到这一类：2026-09-07 之前
-// ci.yml 用 `git bundle create "$BUNDLE" "$RELEASE_SHA" ^"$BASE_SHA"` 传裸 SHA，
-// git 以 "Refusing to create empty bundle." 退出 128；该步骤 continue-on-error，
-// 于是 job 一直显示成功，而桶里从来没有过任何 bundle。
-// 这里从 ci.yml 里把命令抽出来，在临时仓库上真执行，再从 bundle 取回目标 SHA。
-// ─────────────────────────────────────────────────────────────────────────────
-// 从 CI 标记之间提取完整打包 shell（不含 BOS put），在临时仓库执行。
-// 接收端不得预先持有目标提交；存在性只看 git cat-file -e 的退出码。
+// Execute the literal CI shell; source and receivers are isolated Git fixtures.
+// A receiver must lack the target before exact-SHA fetch, avoiding clone/reset false positives.
 function runCmd(command, args, cwd, env = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -325,7 +323,7 @@ function extractProducerShell(ci) {
   return `${lines}\n`
 }
 
-async function proveFullProducerRoundTrip(src, releaseSha, env, objects, armChecksumHead404) {
+async function proveFullProducerRoundTrip(src, releaseSha, env, objects, armChecksumHead404, corruptGet) {
   const runnerTemp = join(src, 'runner-temp')
   await mkdir(join(src, 'scripts/release-bundle'), { recursive: true })
   await mkdir(runnerTemp)
@@ -345,6 +343,14 @@ async function proveFullProducerRoundTrip(src, releaseSha, env, objects, armChec
   assert.ok(ok.out.indexOf(`full-download-verified=${releaseSha}`) < ok.out.indexOf('release-bundle uploaded='))
   assert.ok(objects.get(`/release-${releaseSha}.bundle`)?.equals(await readFile(bundlePath)), 'stored bundle bytes differ')
   assert.equal(objects.get(`/release-${releaseSha}.sha256`)?.toString('utf8'), await readFile(join(src, `release-${releaseSha}.sha256`), 'utf8'))
+  for (const [suffix, gate] of [['.bundle', /release\.bundle: FAILED/], ['.sha256', / differ: /]]) {
+    corruptGet(suffix)
+    const bad = await invoke(`corrupt${suffix}.txt`)
+    corruptGet('')
+    assert.equal(bad.code, 1, `corrupt ${suffix} readback must exit 1, got ${bad.code}: ${bad.err}`)
+    assert.match(bad.out, gate, `corrupt ${suffix} must fail at its own readback gate`)
+    assert.equal(/release-bundle uploaded=|full-download-verified=/.test(`${bad.out}\n${await readFile(join(runnerTemp, `corrupt${suffix}.txt`), 'utf8')}`), false, `corrupt ${suffix} must not report success`)
+  }
   armChecksumHead404()
   const again = await invoke('again.txt')
   assert.equal(again.code, 3, `checksum HEAD 404 must exit 3, got ${again.code}: ${again.err}`)
