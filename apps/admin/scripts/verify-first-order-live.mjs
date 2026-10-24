@@ -9,6 +9,7 @@
  */
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { randomBytes, randomInt } from 'node:crypto'
 import { readFile, writeFile, mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -34,7 +35,7 @@ const children = []
 let browser
 let interrupted = false
 let cleanupPromise
-const results = { startedAt: new Date().toISOString(), mode: fullApp ? 'isolated_full_app' : isolated ? 'isolated' : 'external_descriptor', cleanup: [], checks: [], screenshots: [], externalRequests: [], pageErrors: [], limitations: ['Isolated synthetic SQLite task/result records; no Pantum/Windows device acceptance.', fullApp ? 'Real password login with preverified synthetic accounts; SMS/2FA and production runtime gates are not exercised.' : 'Real fixture-issued JWT + AuthGuard checks; SMS login is not exercised.', fullApp ? 'Complete AppModule with owned Redis queues and local storage; no live AI/provider or production deployment acceptance.' : 'Fixture loads FirstOrderModule + OrgsModule, not the complete production application.'] }
+const results = { startedAt: new Date().toISOString(), mode: fullApp ? 'isolated_full_app' : isolated ? 'isolated' : 'external_descriptor', cleanup: [], checks: [], screenshots: [], externalRequests: [], pageErrors: [], limitations: ['Isolated synthetic SQLite task/result records; no Pantum/Windows device acceptance.', fullApp ? 'Real Admin login creates an unverified Partner account through UI; first login and business use that account. SMS/2FA and production runtime gates are not exercised.' : 'Real fixture-issued JWT + AuthGuard checks; SMS login is not exercised.', fullApp ? 'Complete AppModule with owned Redis queues and local storage; no live AI/provider or production deployment acceptance.' : 'Fixture loads FirstOrderModule + OrgsModule, not the complete production application.'] }
 const mark = (name) => { results.checks.push(name); console.log(`PASS ${name}`) }
 
 function alive(child) {
@@ -155,6 +156,8 @@ async function startVite(role, port) {
   const origin = `http://127.0.0.1:${port}`
   for (let attempt = 0; attempt < 120; attempt++) {
     if (spawnFailure || child.exitCode !== null || child.signalCode !== null) throw new Error(`${role} Vite startup failed: ${logs}`)
+    // Wait for this owned Vite child, never accept an unrelated process already on the port.
+    if (!logs.includes(origin)) { await delay(250); continue }
     try { const response = await fetch(origin, { signal: AbortSignal.timeout(1000) }); if (response.ok) return origin } catch { /* not listening yet */ }
     await delay(250)
   }
@@ -182,6 +185,10 @@ async function context(role, origin) {
     }
   })
   if (fullApp) {
+    let phoneVerifyRequests = 0
+    if (role === 'partner') page.on('request', (request) => {
+      if (request.url().startsWith(fixture.base) && /\/auth\/phone\/(code|verify)$/.test(new URL(request.url()).pathname)) phoneVerifyRequests++
+    })
     await page.goto(`${origin}/login`)
     await page.getByPlaceholder(role === 'admin' ? '请输入管理员账号或手机号' : '请输入机构账号、已验证手机号或已验证邮箱', { exact: true }).fill(fixture.credentials[role].loginId)
     await page.getByPlaceholder('请输入密码', { exact: true }).fill(fixture.credentials[role].password)
@@ -190,6 +197,16 @@ async function context(role, origin) {
     await expect(agreement).toHaveAttribute('aria-checked', 'true')
     const response = await responseAfter(page, 'POST', '/auth/login', () => page.locator('form button[type="submit"]').click())
     assert.equal(response.data.user.id, fixture.users[role])
+    if (role === 'partner' && !response.data.user.phoneVerifiedAt) {
+      assert.equal(response.data.user.phoneVerificationAvailable, false)
+      const initialAccount = page.getByRole('dialog', { name: '账号已登录', exact: true })
+      await expect(initialAccount).toContainText('新账号初始密码由管理员交付')
+      await expect(initialAccount.getByRole('button', { name: '获取验证码', exact: true })).toHaveCount(0)
+      await page.screenshot({ path: join(output, 'partner-first-login-guidance.png'), fullPage: false, animations: 'disabled' })
+      await initialAccount.getByRole('button', { name: '进入工作台', exact: true }).click()
+      assert.equal(phoneVerifyRequests, 0, 'Initial credentials must not invoke unavailable phone verification')
+      mark('Newly created unverified account receives honest guidance and enters workbench without phone verification')
+    }
     await page.waitForURL((url) => url.pathname !== '/login')
     const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)), `${role}_auth_v1`)
     assert.equal(stored.token, response.data.token)
@@ -296,7 +313,7 @@ try {
   fixture = isolated ? await startIsolatedApi() : await readDescriptor(descriptor)
   const [adminOrigin, partnerOrigin] = await Promise.all([startVite('admin', Number(process.env.FIRST_ORDER_ADMIN_PORT || 4194)), startVite('partner', Number(process.env.FIRST_ORDER_PARTNER_PORT || 4195))])
   browser = await chromium.launch({ headless: true })
-  const admin = await context('admin', adminOrigin), partner = await context('partner', partnerOrigin)
+  const admin = await context('admin', adminOrigin)
   if (fullApp) {
     const health = await fetch(`${fixture.base}/health/ready`, { signal: AbortSignal.timeout(10000) })
     assert.equal(health.status, 200)
@@ -306,6 +323,27 @@ try {
   const orgName = org.name ?? org.data?.name
   assert.equal(typeof orgName, 'string')
   await openAdmin(admin, adminOrigin, orgName)
+  if (fullApp) {
+    const phoneUsername = `139${randomInt(10000000, 100000000)}`
+    const initialPassword = `Fo!${randomBytes(20).toString('base64url')}9a`
+    await admin.getByRole('button', { name: '新增账号', exact: true }).click()
+    await admin.getByLabel('登录用户名', { exact: false }).fill(phoneUsername)
+    await admin.getByLabel('账号姓名', { exact: false }).fill('首单新开户机构（验证）')
+    await admin.getByLabel('登录手机号', { exact: false }).fill(phoneUsername)
+    await admin.getByLabel('初始密码', { exact: false }).fill(initialPassword)
+    const accountResponse = await responseAfter(admin, 'POST', `/admin/orgs/${fixture.orgs.own}/accounts`, () => admin.getByRole('button', { name: '创建账号', exact: true }).click())
+    const account = accountResponse.data ?? accountResponse
+    assert.equal(account.username, phoneUsername)
+    assert.equal(account.enabled, true)
+    assert.equal(account.phoneVerifiedAt, null)
+    assert.equal(account.phoneRegisteredByAdminAt, null)
+    await expect(admin.getByText(phoneUsername, { exact: true })).toBeVisible()
+    await expect(admin.getByRole('status').filter({ hasText: '已创建，可使用该用户名' })).toBeVisible()
+    fixture.users.partner = account.id
+    fixture.credentials.partner = { loginId: phoneUsername, password: initialPassword }
+    mark('Admin creates a new unverified partner account through the real UI; all following business uses that account')
+  }
+  const partner = await context('partner', partnerOrigin)
   let a = adminPanel(admin)
   await a.getByRole('button', { name: '新建服务项目', exact: true }).click()
   const nonce = Date.now().toString(36)
@@ -484,6 +522,15 @@ try {
     mark('Committed Partner recovery confirmation survives failed refresh')
   }
   await expect(incidentCard.getByRole('status', { name: '已确认恢复', exact: true })).toBeVisible()
+  if (fullApp) {
+    await refresh(a)
+    await expect(a.getByTestId(`first-order-incident-${incident.id}`).getByRole('status', { name: '机构已确认恢复', exact: true })).toBeVisible()
+    await incidentCard.scrollIntoViewIfNeeded()
+    await partner.screenshot({ path: join(output, 'partner-confirmed-recovery.png'), fullPage: false, animations: 'disabled' })
+    await a.getByTestId(`first-order-incident-${incident.id}`).scrollIntoViewIfNeeded()
+    await admin.screenshot({ path: join(output, 'admin-confirmed-recovery.png'), fullPage: false, animations: 'disabled' })
+    mark('Newly onboarded partner confirms recovery; refreshed Admin sees the same confirmed incident')
+  }
   await incidentCard.getByLabel('现场核对说明', { exact: true }).fill('浏览器隔离验证：仍有缺纸提示，需要复查。')
   await responseAfter(partner, 'PATCH', `/incidents/${incident.id}`, () => incidentCard.getByRole('button', { name: '故障仍在，重新报障', exact: true }).click())
   await refresh(a)

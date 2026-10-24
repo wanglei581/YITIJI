@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
-import type { FirstOrderReportSnapshot } from '@ai-job-print/shared'
+import { randomBytes, randomUUID } from 'node:crypto'
+import * as bcrypt from 'bcryptjs'
+import type { FirstOrderOverview, FirstOrderReportSnapshot } from '@ai-job-print/shared'
 import { AuditService } from '../../src/audit/audit.service'
+import { encryptPhone, hashPhone } from '../../src/common/crypto/phone-identity'
 import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from '../../src/terminals/terminal-org-assignment'
 import { createFirstOrderFixture, previousMonth } from './first-order-fixture'
 
@@ -19,10 +21,11 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
     actorId: f.users.admin, actorRole: 'admin', action: 'terminal.org.update',
     targetType: 'terminal', targetId: result.terminalCode, payload: { ...result },
   })
-  async function request<T>(actor: 'admin' | 'partner', path: string, expected = 200, body?: unknown): Promise<T> {
+  async function request<T>(actor: 'admin' | 'partner', path: string, expected = 200, body?: unknown, method?: 'GET' | 'POST' | 'PATCH', token = f.tokens[actor]): Promise<T> {
+    const verb = method ?? (body === undefined ? 'GET' : 'PATCH')
     const response = await fetch(`${f.base}${path}`, {
-      method: body === undefined ? 'GET' : 'PATCH',
-      headers: { Authorization: `Bearer ${f.tokens[actor]}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      method: verb,
+      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     const text = await response.text()
@@ -56,15 +59,27 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
   try {
     console.log(`Full AppModule review boundaries: real ${mode}, isolated services.`)
     assert.ok(f.credentials, '完整应用夹具必须提供本次随机生成的登录凭据')
-    for (const role of ['admin', 'partner'] as const) {
-      const response = await fetch(`${f.base}/auth/login`, {
+    // 真实 /auth/login 为每 IP 60 秒 5 次。本夹具开头两次登录计入同一计数，满 4 次先等满 61 秒，不清键、不改 Guard、不送 XFF。
+    let passwordLoginPosts = 0
+    async function postPasswordLogin(body: { loginId: string; password: string; portal: 'admin' | 'partner' }): Promise<Response> {
+      if (passwordLoginPosts >= 4) {
+        await new Promise((resolve) => setTimeout(resolve, 61_000))
+        passwordLoginPosts = 0
+      }
+      passwordLoginPosts += 1
+      return fetch(`${f.base}/auth/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...f.credentials[role], portal: role }),
+        body: JSON.stringify(body),
       })
+    }
+    await f.prisma.user.update({ where: { id: f.users.partner }, data: { passwordProofState: 'owner_managed' } })
+    for (const role of ['admin', 'partner'] as const) {
+      const response = await postPasswordLogin({ ...f.credentials[role], portal: role })
       check(`完整应用${role}真实密码登录返回201`, response.status === 201)
-      const login = await response.json() as { data: { token: string; user: { id: string; role: string; orgId: string | null } } }
+      const login = await response.json() as { data: { token: string; user: { id: string; role: string; orgId: string | null; phoneVerificationAvailable?: boolean } } }
       const expectedOrg = role === 'admin' ? null : f.orgs.own
       check(`完整应用${role}登录身份与机构匹配`, typeof login.data?.token === 'string' && login.data.token.length > 0 && login.data.user.id === f.users[role] && login.data.user.role === role && login.data.user.orgId === expectedOrg)
+      if (role === 'partner') check('owner_managed机构账号登录响应phoneVerificationAvailable为true', login.data.user.phoneVerificationAvailable === true)
       // Use the actual AuthService-issued token, never a different module's JwtService.
       f.tokens[role] = login.data.token
       const me = await request<{ data: { userId: string; role: string; orgId: string | null } }>(role, '/auth/me')
@@ -171,6 +186,121 @@ export async function verifyFirstOrderReviewBoundaries(mode: 'sqlite' | 'postgre
     }
     // Month boundary object is reused above; ensure reports cover the full closed month.
     check('新增报告回归仍使用同一完整北京时间自然月', mixed.window.from === from.toISOString() && mixed.window.to === to.toISOString())
+
+    // §18.4 开户边界只复用本 fullApp 夹具。报障、受理、确认已在总套件，这里不重放。
+    // 手机号、用户名和密码只在本次进程内随机生成。
+    const reservedPhones = new Set(['13800000000', '13800000001'])
+    const mobile = () => {
+      let phone = ''
+      do phone = `139${String(randomBytes(4).readUInt32BE(0) % 100_000_000).padStart(8, '0')}`
+      while (reservedPhones.has(phone))
+      reservedPhones.add(phone)
+      return phone
+    }
+    const secret = () => `Aa1!${randomBytes(18).toString('base64url')}`
+    const letterUser = () => `p${randomBytes(6).toString('hex')}`
+    type NewAccount = { id: string; username: string; enabled: boolean; canRegisterContactPhone: boolean; phoneVerifiedAt: string | null; phoneRegisteredByAdminAt: string | null }
+    async function createdAccount(orgId: string, username: string, phone: string, password: string) {
+      const created = await request<NewAccount>('admin', `/admin/orgs/${orgId}/accounts`, 201, { username, password, name: '合成机构账号', phone }, 'POST')
+      const row = await f.prisma.user.findUniqueOrThrow({ where: { id: created.id }, select: { orgId: true, enabled: true, passwordProofState: true, phoneVerifiedAt: true, phoneRegisteredByAdminAt: true } })
+      check('新建账号HTTP为启用且未验证未登记', created.enabled === true && created.phoneVerifiedAt === null && created.phoneRegisteredByAdminAt === null && created.canRegisterContactPhone === true && created.username === username && !('password' in created) && !('passwordHash' in created))
+      check('新建账号库存仍是临时证明', row.orgId === orgId && row.enabled && row.passwordProofState === 'temporary' && row.phoneVerifiedAt === null && row.phoneRegisteredByAdminAt === null)
+      return created
+    }
+    async function partnerLogin(name: string, loginId: string, password: string, expected: number) {
+      const response = await postPasswordLogin({ loginId, password, portal: 'partner' })
+      const text = await response.text()
+      assert.equal(response.status, expected, `${name}: ${response.status}: ${text.slice(0, 180)}`)
+      checks++
+      console.log(`  ✓ ${name}`)
+      return (text ? JSON.parse(text) : {}) as { data?: { token?: string; user?: { id?: string; phoneVerificationAvailable?: boolean } } }
+    }
+    async function seeOwnTerminals(token: string, accountId: string) {
+      const me = await request<{ data: { userId: string; role: string; orgId: string | null } }>('partner', '/auth/me', 200, undefined, 'GET', token)
+      check('首次登录后auth/me是本机构身份', me.data.userId === accountId && me.data.role === 'partner' && me.data.orgId === f.orgs.own)
+      const overview = await request<FirstOrderOverview>('partner', '/partner/first-order/overview', 200, undefined, 'GET', token)
+      const ids = overview.terminals.map((item) => item.id)
+      check('首次登录总览可见本机构终端且不见另一机构', ids.includes(f.terminals.monthly) && ids.includes(f.terminals.spare) && !ids.includes(f.terminals.other))
+    }
+    async function rejectedCreate(status: 400 | 409, username: string, phone: string, name: string) {
+      const before = await f.prisma.user.count()
+      const existing = await f.prisma.user.findUnique({ where: { username }, select: { id: true } })
+      await request('admin', `/admin/orgs/${f.orgs.own}/accounts`, status, { username, password: secret(), name: '合成机构账号', phone }, 'POST')
+      const after = await f.prisma.user.findUnique({ where: { username }, select: { id: true } })
+      check(name, await f.prisma.user.count() === before && after?.id === existing?.id)
+    }
+    const phoneUser = mobile()
+    const phonePassword = secret()
+    const phoneAccount = await createdAccount(f.orgs.own, phoneUser, phoneUser, phonePassword)
+    const phoneSession = await partnerLogin('手机号用户名首次密码登录201', phoneUser, phonePassword, 201)
+    check('手机号用户名临时账号phoneVerificationAvailable为false', phoneSession.data?.user?.id === phoneAccount.id && phoneSession.data?.user?.phoneVerificationAvailable === false)
+    await seeOwnTerminals(phoneSession.data?.token ?? '', phoneAccount.id)
+    const letter = letterUser()
+    const letterPhone = mobile()
+    const letterPassword = secret()
+    const letterAccount = await createdAccount(f.orgs.own, letter, letterPhone, letterPassword)
+    const letterSession = await partnerLogin('字母用户名首次密码登录201', letter, letterPassword, 201)
+    check('字母用户名临时账号phoneVerificationAvailable为false', letterSession.data?.user?.id === letterAccount.id && letterSession.data?.user?.phoneVerificationAvailable === false)
+    await seeOwnTerminals(letterSession.data?.token ?? '', letterAccount.id)
+    const phoneCode = await request<{ error?: { code?: string } }>('partner', '/auth/phone/code', 409, {}, 'POST', letterSession.data?.token ?? '')
+    const afterCode = await f.prisma.user.findUniqueOrThrow({ where: { id: letterAccount.id }, select: { phoneVerifiedAt: true, passwordProofState: true } })
+    check('临时账号phone/code仍409且未写成已验证', phoneCode.error?.code === 'ACCOUNT_PASSWORD_PROOF_NOT_READY' && afterCode.phoneVerifiedAt === null && afterCode.passwordProofState === 'temporary')
+    await rejectedCreate(400, mobile(), mobile(), '手机号形态用户名与手机号不符返回400且无残留')
+    await rejectedCreate(409, letterPhone, letterPhone, '同一号码用户名交叉占用返回409且无残留')
+    const occupied = mobile()
+    const occupiedElsewhere = mobile()
+    const occupiedId = `fo-x-${randomUUID()}`
+    await f.prisma.user.create({ data: {
+      id: occupiedId, username: occupied, name: '合成用户名占号', role: 'partner', orgId: f.orgs.own, enabled: true,
+      passwordHash: await bcrypt.hash(secret(), 4), passwordProofState: 'temporary',
+      phoneHash: hashPhone(occupiedElsewhere), phoneEnc: encryptPhone(occupiedElsewhere),
+    } })
+    const occupiedBefore = await f.prisma.user.findUniqueOrThrow({ where: { id: occupiedId }, select: { phoneHash: true } })
+    const countBefore = await f.prisma.user.count()
+    await request('admin', `/admin/orgs/${f.orgs.own}/accounts`, 409, { username: letterUser(), password: secret(), name: '合成机构账号', phone: occupied }, 'POST')
+    const occupiedAfter = await f.prisma.user.findUniqueOrThrow({ where: { id: occupiedId }, select: { phoneHash: true } })
+    check('手机号撞上已有用户名返回409且无部分账号', await f.prisma.user.count() === countBefore && occupiedAfter.phoneHash === occupiedBefore.phoneHash && occupiedAfter.phoneHash === hashPhone(occupiedElsewhere))
+    const verifiedPhone = mobile()
+    const passwordA = secret()
+    const passwordB = secret()
+    const idA = `fo-a-${randomUUID()}`
+    const idB = `fo-b-${randomUUID()}`
+    await f.prisma.user.create({ data: {
+      id: idA, username: letterUser(), name: '合成已验证账号', role: 'partner', orgId: f.orgs.own, enabled: true,
+      passwordHash: await bcrypt.hash(passwordA, 4), passwordProofState: 'owner_managed',
+      phoneHash: hashPhone(verifiedPhone), phoneEnc: encryptPhone(verifiedPhone), phoneVerifiedAt: new Date(), lastLoginAt: null,
+    } })
+    await f.prisma.user.create({ data: {
+      id: idB, username: verifiedPhone, name: '合成冲突用户名', role: 'partner', orgId: f.orgs.own, enabled: true,
+      passwordHash: await bcrypt.hash(passwordB, 4), passwordProofState: 'temporary', lastLoginAt: null,
+    } })
+    await partnerLogin('冲突用户名密码不能登录已验证手机号', verifiedPhone, passwordB, 401)
+    const blockedB = await f.prisma.user.findUniqueOrThrow({ where: { id: idB }, select: { lastLoginAt: true } })
+    const loginA = await partnerLogin('已验证手机号使用账号A密码登录', verifiedPhone, passwordA, 201)
+    const afterB = await f.prisma.user.findUniqueOrThrow({ where: { id: idB }, select: { lastLoginAt: true } })
+    const afterA = await f.prisma.user.findUniqueOrThrow({ where: { id: idA }, select: { lastLoginAt: true } })
+    check('已验证手机号优先登录A，B的lastLoginAt始终不变', loginA.data?.user?.id === idA && loginA.data?.user?.phoneVerificationAvailable === true && blockedB.lastLoginAt === null && afterB.lastLoginAt === null && afterA.lastLoginAt !== null)
+    await partnerLogin('未验证字母账号的手机号不能作为登录别名', letterPhone, letterPassword, 401)
+    await partnerLogin('+86输入不能作为未验证手机号用户名的别名', `+86${phoneUser}`, phonePassword, 401)
+    await request('admin', `/admin/orgs/${f.orgs.own}/accounts/${phoneAccount.id}/status`, 200, { action: 'disable' })
+    const disabledRow = await f.prisma.user.findUniqueOrThrow({ where: { id: phoneAccount.id }, select: { enabled: true, deletedAt: true } })
+    check('停用账号仍保留且enabled为false', disabledRow.enabled === false && disabledRow.deletedAt === null)
+    const offOrg = `fo-off-${randomUUID().slice(0, 8)}`
+    await f.prisma.organization.create({ data: { id: offOrg, name: '合成停用机构', type: 'public_employment_service', enabled: true, contentTrustStatus: 'active' } })
+    const offUser = letterUser()
+    const offPassword = secret()
+    await createdAccount(offOrg, offUser, mobile(), offPassword)
+    await request('admin', `/admin/orgs/${offOrg}/status`, 200, { action: 'disable' })
+    check('停用机构已落库', (await f.prisma.organization.findUniqueOrThrow({ where: { id: offOrg }, select: { enabled: true } })).enabled === false)
+    const nextPassword = secret()
+    const changedBody = await request<{ data: { success: true } }>('partner', '/auth/password/change', 201, { currentPassword: letterPassword, newPassword: nextPassword }, 'POST', letterSession.data?.token ?? '')
+    const changed = await f.prisma.user.findUniqueOrThrow({ where: { id: letterAccount.id }, select: { passwordProofState: true, passwordHash: true, phoneVerifiedAt: true } })
+    check('自行改密不提升证明且旧密码哈希失效', changedBody.data.success === true && changed.passwordProofState === 'temporary' && changed.phoneVerifiedAt === null && !(await bcrypt.compare(letterPassword, changed.passwordHash)) && await bcrypt.compare(nextPassword, changed.passwordHash))
+    await partnerLogin('停用账号密码登录401', phoneUser, phonePassword, 401)
+    await partnerLogin('停用机构密码登录401', offUser, offPassword, 401)
+    await partnerLogin('自行改密后旧密码失效', letter, letterPassword, 401)
+    await f.prisma.user.update({ where: { id: idA }, data: { enabled: false } })
+    await partnerLogin('停用已验证手机号不回退到冲突用户名', verifiedPhone, passwordB, 401)
     return checks
   } finally { await f.close() }
 }

@@ -4,7 +4,6 @@ import * as bcrypt from 'bcryptjs'
 import { createHash, randomBytes, randomInt, randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import {
-  hashEmail,
   isValidEmail,
   maskEmail,
   maskEmailFromEnc,
@@ -37,6 +36,7 @@ import { AdminLoginSecondFactor, adminSecondFactorRequired, assertAdminSecondFac
 import { assertAdminSmsOnlyLoginAllowed, type AdminSecondFactorChallenge } from './admin-login-second-factor'
 import { clearPasswordLoginAttempts, passwordLoginAccountKey, passwordLoginIdentityKey } from './password-login-attempts'
 import { equalizePasswordCompareTiming, reservePasswordLoginAttempt, type PasswordLoginPortal } from './password-login-attempts'
+import { findPasswordLoginUser } from './password-login-identity'
 
 type LoginPortal = PasswordLoginPortal
 type SmsPortal = 'admin' | 'partner'
@@ -54,6 +54,7 @@ interface FullLoginResult {
     orgId:       string | null
     phoneMasked?: string
     phoneVerifiedAt?: string | null
+    phoneVerificationAvailable?: boolean
     emailMasked?: string
     emailVerifiedAt?: string | null
   }
@@ -507,19 +508,7 @@ export class AuthService {
   }
 
   private async findUserByLoginId(loginId: string): Promise<InternalUser | null> {
-    const phone = this.normalizedPhoneOrNull(loginId)
-    if (phone) {
-      const phoneHash = hashPhone(phone)
-      const user = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
-      return user?.phoneVerifiedAt ? user : null
-    }
-    const email = this.normalizedEmailOrNull(loginId)
-    if (email) {
-      const emailHash = hashEmail(email)
-      const user = await this.prisma.user.findFirst({ where: { emailHash, deletedAt: null } })
-      return user?.emailVerifiedAt ? user : null
-    }
-    return this.prisma.user.findFirst({ where: { username: loginId.trim(), deletedAt: null } })
+    return findPasswordLoginUser(this.prisma, loginId, this.normalizedPhoneOrNull(loginId), this.normalizedEmailOrNull(loginId))
   }
 
   private async findVerifiedUserByPhone(phone: string): Promise<InternalUser | null> {
@@ -598,6 +587,7 @@ export class AuthService {
         orgId: user.orgId,
         ...(user.phoneEnc ? { phoneMasked: maskPhoneFromEnc(user.phoneEnc) } : {}),
         phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
+        phoneVerificationAvailable: role === 'partner' && user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED,
         ...(user.emailEnc ? { emailMasked: maskEmailFromEnc(user.emailEnc) } : {}),
         emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       },

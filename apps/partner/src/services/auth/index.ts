@@ -18,6 +18,7 @@ export interface AuthedUser {
   orgId:        string | null
   phoneMasked?: string
   phoneVerifiedAt?: string | null
+  phoneVerificationAvailable?: boolean
 }
 
 interface AuthState {
