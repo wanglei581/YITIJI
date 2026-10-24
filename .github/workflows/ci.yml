@@ -613,6 +613,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:partner-stats-contract
+          pnpm --filter @ai-job-print/api verify:first-order-http
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
@@ -986,6 +987,8 @@ jobs:
       RECRUITMENT_CONTENT_HOSTING_ENABLED: 'false'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 11.2.2
@@ -1000,7 +1003,7 @@ jobs:
         run: |
           bash scripts/ci/drop-unused-apt-sources.sh
           sudo apt-get update -q
-          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
+          sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server postgresql
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
@@ -1018,6 +1021,12 @@ jobs:
         run: |
           npx prisma generate
           pnpm db:pg:generate
+      - name: First-order isolated PostgreSQL and dual migration gates
+        working-directory: services/api
+        run: |
+          export PATH="$(pg_config --bindir):$PATH"
+          pnpm verify:first-order-migrations
+          pnpm verify:first-order-http:postgres
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
@@ -1279,6 +1288,15 @@ jobs:
         run: |
           bash scripts/ci/drop-unused-apt-sources.sh
           pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
+          sudo apt-get install -y -q redis-server
+
+      - name: First-order complete AppModule two-console password-login workflow
+        env:
+          FIRST_ORDER_BROWSER_OUTPUT: ${{ github.workspace }}/test-results/first-order
+        run: |
+          pnpm --filter @ai-job-print/api exec prisma generate
+          FIRST_ORDER_BROWSER_OUTPUT="${FIRST_ORDER_BROWSER_OUTPUT}/focused" pnpm --filter @ai-job-print/admin verify:first-order-live
+          pnpm --filter @ai-job-print/admin verify:first-order-full-app
 
       - name: Typecheck Kiosk workspace-source dependencies
         run: |
@@ -1397,6 +1415,7 @@ jobs:
             test-results/kiosk-scan-safety/**
             test-results/kiosk-mic-capability/**
             test-results/kiosk-mic-capability-report/**
+            test-results/first-order/**
             test-results/admin-e2e/**
             test-results/admin-e2e-report/**
             test-results/partner-e2e/**

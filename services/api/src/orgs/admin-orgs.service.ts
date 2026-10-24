@@ -27,6 +27,7 @@ import { Prisma } from '../generated/prisma/client'
 import { isSerializationConflict, waitBeforeSerializationRetry } from '../common/prisma/serialization-conflict'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import { contactPhoneAssignment } from './contact-phone-change'
+import { assertPartnerAccountIdentifiers } from './partner-account-identifiers'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
 import {
@@ -306,11 +307,7 @@ export class AdminOrgsService {
     this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules, typeIsNew: true })
 
     if (dto.account) {
-      const exists = await this.prisma.user.findUnique({ where: { username: dto.account.username } })
-      if (exists) {
-        throw new ConflictException({ error: { code: 'USERNAME_TAKEN', message: `用户名 ${dto.account.username} 已存在` } })
-      }
-      await this.assertPhoneAvailable(dto.account.phone)
+      await assertPartnerAccountIdentifiers(this.prisma, dto.account)
     }
 
     const orgId = `org_${randomUUID().replace(/-/g, '').slice(0, 20)}`
@@ -322,6 +319,7 @@ export class AdminOrgsService {
         }
       : null
     await this.prisma.$transaction(async (tx) => {
+      if (dto.account) await assertPartnerAccountIdentifiers(tx, dto.account)
       await tx.organization.create({
         data: {
           id: orgId,
@@ -454,14 +452,11 @@ export class AdminOrgsService {
     admin: AuthedUser,
   ): Promise<AdminOrgAccount> {
     await this.assertOrgExists(orgId)
-    const exists = await this.prisma.user.findUnique({ where: { username: input.username } })
-    if (exists) {
-      throw new ConflictException({ error: { code: 'USERNAME_TAKEN', message: `用户名 ${input.username} 已存在` } })
-    }
-    await this.assertPhoneAvailable(input.phone)
+    await assertPartnerAccountIdentifiers(this.prisma, input)
     const passwordHash = await bcrypt.hash(input.password, 10)
     const normalizedPhone = normalizePhone(input.phone)
     const account = await this.prisma.$transaction(async (tx) => {
+      await assertPartnerAccountIdentifiers(tx, input)
       const created = await tx.user.create({
         data: {
           username: input.username,
@@ -783,13 +778,6 @@ export class AdminOrgsService {
     const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
     if (!org) this.throwOrgNotFound(orgId)
     return org
-  }
-
-  private async assertPhoneAvailable(phone: string): Promise<void> {
-    const exists = await this.prisma.user.findFirst({ where: { phoneHash: hashPhone(phone), deletedAt: null } })
-    if (exists) {
-      throw new ConflictException({ error: { code: 'PHONE_ALREADY_BOUND', message: '该手机号已绑定其他账号' } })
-    }
   }
 
   private async assertEmailAvailable(email: string, exceptUserId?: string): Promise<void> {

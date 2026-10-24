@@ -368,7 +368,10 @@
     "verify:miniapp-code": "node scripts/verify-miniapp-code.mjs",
     "verify:backup-ops": "node scripts/verify-backup-ops.mjs",
     "verify:background-task-safety": "node -r @swc-node/register scripts/verify-background-task-safety.ts",
-    "verify:alert-push": "node -r @swc-node/register scripts/verify-alert-push.cjs"
+    "verify:alert-push": "node -r @swc-node/register scripts/verify-alert-push.cjs",
+    "verify:first-order-http": "node -r @swc-node/register scripts/verify-first-order-http.ts",
+    "verify:first-order-http:postgres": "node -r @swc-node/register scripts/verify-first-order-http.ts --postgres",
+    "verify:first-order-migrations": "node -r @swc-node/register scripts/verify-first-order-migrations.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

@@ -23,7 +23,8 @@ import { TerminalToolboxService } from './terminal-toolbox.service'
 import { TerminalAgentService } from './terminals-agent.service'
 import { adminPaperStatus, describePrinterFault, normalizeDiskFreeGb, toAdminPrinterStatus } from './admin-printer-status'
 import { PARKED_TERMINAL_ORG_TYPES, isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
-import { terminalOrgBindingOnCreate, terminalOrgBindingWrite } from './terminal-org-binding'
+import { terminalOrgBindingOnCreate } from './terminal-org-binding'
+import { assignTerminalOrganization, type TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import { TERMINAL_ONLINE_WINDOW_MS } from './printer-availability'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import {
@@ -357,44 +358,8 @@ export class TerminalAdminService {
     return { organizations }
   }
 
-  async assignTerminalOrg(terminalId: string, orgId: string | null, now: Date = new Date()): Promise<AssignTerminalOrgResult> {
-    const terminal = await this.prisma.terminal.findFirst({
-      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
-      select: { id: true, terminalCode: true, orgId: true },
-    })
-    if (!terminal) {
-      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
-    }
-
-    let orgName: string | null = null
-    if (orgId !== null) {
-      const org = await this.prisma.organization.findUnique({
-        where: { id: orgId },
-        select: { id: true, name: true, enabled: true, type: true },
-      })
-      if (!org) {
-        throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
-      }
-      if (!org.enabled) {
-        throw new BadRequestException({ error: { code: 'ORG_DISABLED', message: '机构已停用，不能绑定' } })
-      }
-      if (isParkedTerminalOrgType(org.type)) throw orgTypeParkedError()
-      orgName = org.name
-    }
-
-    const oldOrgId = terminal.orgId
-    await this.prisma.terminal.update({
-      where: { id: terminal.id },
-      data: terminalOrgBindingWrite(oldOrgId, orgId, now),
-    })
-
-    return {
-      terminalId: terminal.terminalCode,
-      terminalCode: terminal.terminalCode,
-      oldOrgId,
-      newOrgId: orgId,
-      orgName,
-    }
+  async assignTerminalOrg(terminalId: string, orgId: string | null, now: Date | undefined, writeAudit: TerminalOrgAssignmentAudit): Promise<AssignTerminalOrgResult> {
+    return assignTerminalOrganization(this.prisma, terminalId, orgId, now, writeAudit)
   }
 
   async updateTerminalProfile(

@@ -11,6 +11,7 @@
 import { Injectable } from '@nestjs/common'
 import { TerminalAgentService } from './terminals-agent.service'
 import { TerminalAdminService } from './terminals-admin.service'
+import type { TerminalOrgAssignmentAudit } from './terminal-org-assignment'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
@@ -135,8 +136,8 @@ export class TerminalsService {
     return this.admin.listOrganizationOptions()
   }
 
-  assignTerminalOrg(terminalId: string, orgId: string | null, now?: Date) {
-    return this.admin.assignTerminalOrg(terminalId, orgId, now)
+  assignTerminalOrg(terminalId: string, orgId: string | null, now: Date | undefined, writeAudit: TerminalOrgAssignmentAudit) {
+    return this.admin.assignTerminalOrg(terminalId, orgId, now, writeAudit)
   }
 
   updateTerminalProfile(terminalId: string, dto: UpdateTerminalProfileDto) {

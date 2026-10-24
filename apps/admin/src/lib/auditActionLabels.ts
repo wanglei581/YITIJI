@@ -6,6 +6,19 @@
  */
 
 const ACTION_LABELS: Record<string, string> = {
+  'first_order.project_created': '新建服务项目',
+  'first_order.project_updated': '更新服务项目',
+  'first_order.deployment_created': '登记项目设备',
+  'first_order.deployment_ended': '结束设备部署',
+  'first_order.incident_created': '提交设备报障',
+  'first_order.incident_start': '指定维修负责人',
+  'first_order.incident_resolve': '记录设备修复',
+  'first_order.incident_confirm': '机构确认恢复',
+  'first_order.incident_reopen': '复开设备报障',
+  'first_order.report_created': '留存自然月报',
+  'first_order.report_exported': '导出自然月报',
+  'first_order.report_acknowledged': '机构核对月报',
+
   // 第六批补名清单：以下 217 项由服务端源码动作全集补齐。
   'ad_asset.create_external': '新增外链宣传素材',
   'ad_asset.delete': '删除宣传素材',
@@ -335,6 +348,10 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 const TARGET_LABELS: Record<string, string> = {
+  service_project: '服务项目',
+  service_deployment: '设备部署',
+  service_incident: '设备报障',
+  service_report: '自然月报',
   auth: '登录',
   EndUser: '用户',
   AiQuotaReservation: 'AI 额度预占记录',

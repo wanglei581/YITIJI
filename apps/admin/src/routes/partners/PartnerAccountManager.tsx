@@ -95,6 +95,8 @@ export function PartnerAccountManager({
   const [emailConfirmVerified, setEmailConfirmVerified] = useState(false)
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [createNotice, setCreateNotice] = useState<string | null>(null)
+  const createLock = useRef(false)
   const sectionRef = useRef<HTMLDivElement>(null)
 
   const reloadAccounts = useCallback(async () => {
@@ -106,10 +108,13 @@ export function PartnerAccountManager({
   const enabledAccountCount = accounts.filter((account) => account.enabled).length
 
   const addAccount = async () => {
+    if (createLock.current) return
+    createLock.current = true
+    setCreateNotice(null)
     setAccountBusy('create')
     setError(null)
     try {
-      await orgsAdminService.createAccount(orgId, {
+      const created = await orgsAdminService.createAccount(orgId, {
         username: newAccount.username.trim(),
         password: newAccount.password,
         name: newAccount.name.trim(),
@@ -117,10 +122,14 @@ export function PartnerAccountManager({
       })
       setShowNewAccount(false)
       setNewAccount({ username: '', password: '', name: '', phone: '' })
-      await reloadAccounts()
+      setCreateNotice(`账号 ${created.username} 已创建，可使用该用户名和交付的初始密码登录机构端。`)
+      try { await reloadAccounts() } catch {
+        setError('账号已创建，列表暂未刷新。请刷新核对，无需重复创建。')
+      }
     } catch (caught) {
       setError(messageForAccountError(caught))
     } finally {
+      createLock.current = false
       setAccountBusy(null)
     }
   }
@@ -209,10 +218,12 @@ export function PartnerAccountManager({
         </p>
       </div>
 
-      {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
+      {createNotice && <p role="status" className="rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">{createNotice}</p>}
+      {error && <p role="alert" className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
 
       {showNewAccount && (
         <div className="space-y-3 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+          <p className="text-xs leading-5 text-neutral-600">用户名和初始密码创建后即可登录机构端，请将初始密码交付给使用人。以手机号作为用户名时，须与下方登录手机号相同；本人验证另行完成。</p>
           <div className="grid grid-cols-2 gap-3">
             <AccountField label="登录用户名" required>
               <input className={inputCls} value={newAccount.username} onChange={(event) => setNewAccount((value) => ({ ...value, username: event.target.value }))} />

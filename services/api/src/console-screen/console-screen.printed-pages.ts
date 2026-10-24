@@ -90,7 +90,7 @@ type PageSourceRow = {
 }
 
 /** 每个出纸任务贡献的页数（计费页 × 份数）。没有可信页数的任务不在结果里。 */
-async function pagesByPrintedTask(
+export async function pagesByPrintedTask(
   prisma: Pick<PrismaService, 'orderItem'>,
   rows: PageSourceRow[],
 ): Promise<Map<string, number>> {

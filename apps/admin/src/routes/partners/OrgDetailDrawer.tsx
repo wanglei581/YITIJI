@@ -11,6 +11,7 @@ import { OrgCircuitBreakPanel } from './OrgCircuitBreakPanel'
 import { OrgOfficialChannelSections } from './OrgOfficialChannelSections'
 import { OrgQualificationSection } from './OrgQualificationSection'
 import { editOrgTypeOptions, isParkedOrgType } from './orgTypeOptions'
+import { FirstOrderPanel } from '../../components/first-order/FirstOrderPanel'
 
 export function OrgDetailDrawer({
   orgId,
@@ -158,6 +159,8 @@ export function OrgDetailDrawer({
 
           {/* 内容可信:发布闸门的人工入口。放在档案之后、账号之前 ——
               它决定这家机构的内容能不能对公众可见,比账号管理更靠前。 */}
+          <FirstOrderPanel key={orgId ?? detail.id} orgId={orgId ?? detail.id} />
+
           <OrgContentTrustPanel
             orgId={orgId ?? detail.id}
             onChanged={() => {
