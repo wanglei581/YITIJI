@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes, randomInt } from 'node:crypto'
+import { stripVTControlCharacters } from 'node:util'
 import { readFile, writeFile, mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -157,7 +158,7 @@ async function startVite(role, port) {
   for (let attempt = 0; attempt < 120; attempt++) {
     if (spawnFailure || child.exitCode !== null || child.signalCode !== null) throw new Error(`${role} Vite startup failed: ${logs}`)
     // Wait for this owned Vite child, never accept an unrelated process already on the port.
-    if (!logs.includes(origin)) { await delay(250); continue }
+    if (!stripVTControlCharacters(logs).includes(origin)) { await delay(250); continue }
     try { const response = await fetch(origin, { signal: AbortSignal.timeout(1000) }); if (response.ok) return origin } catch { /* not listening yet */ }
     await delay(250)
   }

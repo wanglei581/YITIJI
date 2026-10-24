@@ -452,3 +452,25 @@ API/Admin/Partner类型、定向lint与两后台HTTP生产构建通过；原内�
 最终agy可执行验证冷审`45f8666f-6664-4a41-bfdd-57c982bd171b`已成功，所附两脚本未见可证P0/P1/P2，确认真实新建起点、自有Vite就绪、双端确认回读、真实限流和第215项停用已验证账号不回退均成立。最终双库215/215、完整浏览器22项、focused及端口占用负例均通过，CI覆盖/仓库完整性和原文档边界门禁通过；关键Grok窄审继续，新候选尚待远程CI。
 
 Grok关键后端窄审`8544a397-1ede-4ddd-b98a-e9460515b49a`实际成功，所附最终解析/创建实现未见可证P0/P1/P2。最终模型意见已收口，Codex独立核查同意冻结本次12文件候选；下一步精确新提交CI→main合并CI→已授权full同版部署→原机构账号/KSK-001线上联合验收，保留未完成状态。
+
+### 18.5 2026-10-24 新候选CI两项阻塞的最小收口（先记录范围）
+
+候选`0453c6ddd37e3d3ddd1357d89ded8d0c9fe36b41`已推送PR#1489，CI`40055424376`实际失败两项：浏览器focused启动器在Ubuntu的彩色日志将`http://127.0.0.1:`与端口间插入ANSI，新增自有origin匹配误超时；依赖安全门禁拒绝现有body-parser2.3.0和multer2.4.0。失败日志已取得，不把本地22项作为远程通过。预检`40055436919`成功，来源仍d185d01e、PM2/Redis/health正常、备份空间18GiB、发布开关false，未合并发布。
+
+官方公告明确body-parser2.4.0修复[GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828)，multer2.5.0修复[GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m)。本次仅原有两处override升至同主版本的上游修复，不绕过audit或添加accepted风险。安装来源与版本另以npm注册表及锁文件/实际加载交叉核对。
+
+范围上限7文件：既有浏览器脚本、pnpm-workspace.yaml、pnpm-lock.yaml、必要时原verify-dependency-security脚本、本规划/current-progress/next-tasks；与§18.4并集最多15文件。本轮只读核实安全门禁没有body-parser/multer专用REQUIRED常量，故无需为它们新增重复常量或改脚本，实际预期6文件/并集14文件。不触碰业务页面、接口、Schema、打印/上传逻辑、生产/密钥或硬件；升级的是现有上传/JSON解析基础依赖，不新增依赖。
+
+方案：Node22内置stripVTControlCharacters仅清洗自有Vite日志再匹配origin，保留strictPort、自己进程就绪、HTTP及清理守卫，CI=true/FORCE_COLOR=1正例与占用端口零外来请求负例复验。pnpm11.2.2只重算受两override影响的锁闭包，检查无无关升级，frozen重装后跑原完整dependency-security、API类型/lint/真实multipart限制和上传session HTTP及新开户完整双端流程；双库首单回归、覆盖/完整性和新SHA全CI。五家最小方案独立审查进行，结论核实后实现；任何上游兼容变化先停下核对，不放宽门禁或最低发布年龄配置。
+
+§18.5方案已独立核实：实际Grok`b123fed0-4805-4e21-8b5f-f1ce7c24edd3`、agy`0e422cde-9c43-4107-9590-52fc4b72b0c1`、Claude`0fa64444-4c52-4c84-a0e4-339a3ba73544`及Hermes会话`20261024_104909_86f970`均成功同意最小方案，Codex独立同意。采纳清洗累积完整日志后仍精确匹配origin、仅两原有依赖和闭包、原阈值/frozen/CI全绿；模型所述“两常量”经完整脚本核实不存在，故不新增冗余常量或改安全脚本。Claude“高危为零”按原门禁解释为未接受的高危为零，保留原已批准且经SPA守卫证明不可达的RSC例外，不增新例外。npm元数据确认修复版均2026-10-22发布，pnpm本机11.2.2，未设置或降低发布年龄参数。
+
+修前证据：从实际失败CI日志提取同一Local行，原includes(origin)=false，Node22 stripVT后的精确匹配=true；本机CI/FORCE_COLOR输出方式与Ubuntu不同，修前本机focused仍通过，不虚构本机已复现超时。问题由真实CI日志确定，修后必须重新跑远程CI。
+
+§18.5差分与验证事实：pnpm锁仅升级body-parser2.4.0、multer2.5.0及body-parser所需content-type2.1.0闭包；生成时附带的两处既有Vite peer元数据改写已按范围还原，无其他包版本变化。pnpm11.2.2 frozen重装及963项供应链检查成功；实际API直接及Nest加载Multer均2.5.0、Express加载body-parser2.4.0。原dependency-security全量/生产审计high和critical均0，无新增豁免；API类型、真实multipart扁平/嵌套/大小上限通过。CI=true/GITHUB_ACTIONS=true/FORCE_COLOR=1完整新开户浏览器22项与focused通过，彩色占用端口负例仍零外来请求且清理全部完成；升级后双库215/216项通过（原有并发成功/冲突计数可差1）。
+
+Grok实际最终diff复审`9f8a04e7-db07-431d-86a1-698ae3a2189e`提出manifest没随lock specifier升级的P0。Codex以旧manifest一直为^2.2.0、旧lock因override已是2.4.0且旧CI frozen成功、本次2.5.0实际frozen/加载均成功核实为误判，不扩大修改API package.json。Grok事实复核`a2dba800-17dc-4728-8bd4-743af8541b53`已成功明确撤回P0，确认是既有override规则；其余差分复审无新增确定问题。完整新SHA CI仍需重跑，未合并/发布。
+
+补充上传验证保留首轮失败材料：Codex临时装配曾同时保留父/子两个完整AppModule并访问同一SQLite，在FIFO锁过期竞态中出现扫描定时清理干扰与P1008，不能算依赖回归已通过。改为建好本任务独占DB/Redis后先关闭父App，再仅运行原HTTP验证脚本的一个完整应用；不改产品、测试断言或锁时限，重新核两轮真实竞态及清理。该差异属于临时执行装配，未写新仓库脚本或加豁免。
+
+单完整应用上传复验已完成ALL PASS：成员/临时真实multipart上传、控制令牌与归属拒绝、确认/取消、真实锁过期confirm/cancel两轮均通过，finally关闭应用并清理本任务独占资源；取消已清理的对象在最终清理提示missing属于幂等清理，不是活文件残留。§18.5实际改动6文件，§18.4–18.5并集14文件，安全门禁源码未修改；最终同版候选重新固定并跑全CI，不复用0453失败结果。
