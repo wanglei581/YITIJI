@@ -7,6 +7,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
 
 const TAB_PATHS = {
   '/pages/home/home': true,
@@ -60,6 +61,9 @@ Page({
   data: {
     statusBarHeight: 20,
     loggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
     loading: false,
     error: '',
     empty: false,
@@ -75,11 +79,21 @@ Page({
   },
 
   onShow() {
-    const loggedIn = auth.isLoggedIn()
-    this.setData({ loggedIn })
-    if (loggedIn) this._loadReport()
-    else this.setData({ loading: false, error: '', empty: false, modules: [] })
+    markPageShown(this)
+    gateMember(this, auth, api, {
+      ready: () => {
+        this.setData({ loggedIn: true })
+        this._loadReport()
+      },
+      needLogin: () => this.setData({ loggedIn: false, loading: false, error: '', empty: false, modules: [] }),
+    })
   },
+
+  onHide() { markPageHidden(this) },
+
+  onUnload() { markPageUnloaded(this) },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   _loadReport() {
     this.setData({ loading: true, error: '', empty: false })

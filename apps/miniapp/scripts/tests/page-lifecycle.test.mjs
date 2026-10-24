@@ -18,6 +18,7 @@
  * 排除在"门禁脚本"之外，所以本文件不会被 verify-ci-gate-coverage 当成
  * "写完没接线的门禁"。它由 `verify:page-lifecycle` 拉起，并串在 verify:static 里进 CI。
  */
+import './print-capabilities.test.mjs'
 import test, { mock } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -46,7 +47,7 @@ function fakeCanvasNode() {
 
 /** 最小 wx 替身：只实现被测页面真正用到的那几个。storage 是一个普通 Map。 */
 function createWx(storage = new Map()) {
-  const calls = { navigateTo: [], redirectTo: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [], getRandomValues: [] }
+  const calls = { navigateTo: [], redirectTo: [], reLaunch: [], showToast: [], showModal: [], switchTab: [], clipboard: [], qrExec: [], showLoading: [], hideLoading: [], getRandomValues: [] }
   // wx.showLoading / hideLoading 不是栈：hideLoading 无条件掀掉当前那一张遮罩，
   // 不管它是谁挂上去的。所以替身用一个布尔记"现在屏幕上有没有遮罩"——
   // 这正是 A 的迟到回调能掀掉 B 的遮罩那个缺陷的形状。
@@ -74,6 +75,11 @@ function createWx(storage = new Map()) {
       if (opts.success) opts.success()
     },
     switchTab: (opts) => { calls.switchTab.push(opts.url) },
+    reLaunch: (opts) => {
+      calls.reLaunch.push(opts.url)
+      if (control.navFail) { if (opts.fail) opts.fail({ errMsg: 'reLaunch:fail' }); return }
+      if (opts.success) opts.success()
+    },
     navigateBack: (opts) => { if (opts && opts.fail) opts.fail({ errMsg: 'no page' }) },
     showToast: (opts) => { calls.showToast.push(opts.title) },
     showModal: (opts) => { calls.showModal.push(opts); if (opts && opts.success) opts.success({ confirm: false }) },
@@ -200,14 +206,14 @@ function switchAccount(id) {
 }
 
 
-function makePage(relPath, { auth, api, wx }) {
+function makePage(relPath, { auth, api, wx, globals }) {
   // 真机上只有**一个**全局 wx，页面和 utils 共用它。替身必须照做：
   // utils/storage.js、utils/print-order-idempotency.js 走的是 globalThis.wx，
   // 而页面走的是沙箱 wx —— 两者不是同一个对象的话，工具模块会读到一个空的
   // （或上一条测试遗留的）存储，随机数能力也会凭空消失。
   ACTIVE_WX = wx
   const timers = []
-  const def = loadPageDefinition(relPath, { wx, modules: { api, auth }, timers })
+  const def = loadPageDefinition(relPath, { wx, modules: { api, auth }, timers, globals })
   const page = instantiate(def)
   page._timers = timers
   return page
@@ -1236,6 +1242,231 @@ test('P1-7 print-pickup 前台登出：屏幕上那张码必须当场清掉', as
   assert.equal(page.data.state, 'error')
 })
 
+// ── B1（10/16）取件页：去机器前能核对文件、终端、规格；底部按钮不误称「完成」；返回不回到下单流程 ──
+
+const B1_PENDING = {
+  orderNo: 'NO-B1', pickupStatus: 'pending', taskStatus: 'pending_release', pickupCode: '12345678', amountCents: 0,
+  fileName: 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf', terminalName: '大厅一体机', locationLabel: '一楼服务区',
+  paperSize: 'A4', colorMode: 'black_white', duplex: 'duplex_long_edge', copies: 1, billablePages: 2,
+}
+
+test('B1 取件页：信息卡显示文件、终端、规格（含长边双面）；码还没用时底部写「返回首页」', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+  page.onLoad({ orderId: 'ord-B1' })
+  detail.resolve(B1_PENDING)
+  await flush()
+  assert.equal(page.data.state, 'ready')
+  assert.equal(page.data.fileName, 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf')
+  assert.equal(page.data.store, '大厅一体机 · 一楼服务区')
+  assert.equal(page.data.spec, 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页')
+  assert.equal(page.data.doneLabel, '返回首页', '码还没用就写「完成」，会让人以为这一单已经结束')
+})
+
+test('B1 取件页：打印完成后底部才写「完成」；服务端没给的项不显示', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const detail = deferred()
+  const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+  page.onLoad({ orderId: 'ord-B1' })
+  detail.resolve({ orderNo: 'NO-B1', pickupStatus: 'used', taskStatus: 'completed', amountCents: 0, fileName: '简历.pdf' })
+  await flush()
+  assert.equal(page.data.doneLabel, '完成')
+  assert.equal(page.data.fileName, '简历.pdf')
+  assert.equal(page.data.store, '', '没有终端名就不显示这一行，不编一个')
+  assert.equal(page.data.spec, '', '没有参数就不显示这一行，不回落成「单面」「黑白」')
+})
+
+test('B1 取件页返回：从订单列表进来退一页；刚下完单则不退回下单流程', async () => {
+  for (const [source, expectBackDelta, expectHome] of [['orders', 1, false], ['', null, true]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const backs = []
+    wx.navigateBack = (opts) => { backs.push(opts.delta) }
+    const detail = deferred()
+    const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad(source ? { orderId: 'ord-B1', source } : { orderId: 'ord-B1' })
+    detail.resolve(B1_PENDING)
+    await flush()
+    page.back()
+    if (expectBackDelta === null) assert.equal(backs.length, 0, '沙箱没有页面栈：不能盲退一页回到选终端')
+    else assert.equal(backs[0], expectBackDelta)
+    assert.equal(wx.calls.switchTab.includes('/pages/home/home'), expectHome)
+  }
+})
+
+test('B1 订单列表：终端里排队的任务写「排队中」不写「待取件」；规格带上长边双面', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const queued = {
+    id: 'pt-B1', status: 'pending', payStatus: 'paid', pickupStatus: 'used', amountCents: 0,
+    fileName: 'ZYD-20261016-BIZ-DUPLEX-D93A.pdf', paperSize: 'A4', colorMode: 'black_white',
+    duplex: 'duplex_long_edge', copies: 1, billablePages: 2,
+  }
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: () => Promise.resolve([queued]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  const row = page.data.orders.find((item) => item.id === 'pt-B1')
+  assert.ok(row, '列表里要有这一单')
+  assert.equal(row.statusLabel, '排队中')
+  assert.equal(row.status, 'waiting', '仍归在「待取件」这一栏')
+  assert.equal(row.spec, 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页')
+})
+
+test('B1 订单详情：排队中写「排队中」；规格带单双面；没记录的颜色不再写成「黑白」', async () => {
+  for (const [raw, label, spec] of [
+    [{ taskStatus: 'claimed', duplex: 'duplex_long_edge', colorMode: 'black_white', paperSize: 'A4', copies: 1, billablePages: 2 },
+      '排队中', 'A4 · 黑白 · 双面（长边翻页） · 1 份 · 共 2 页'],
+    [{ taskStatus: 'completed', duplex: null, colorMode: null, paperSize: 'A4', copies: 2 }, '已完成', 'A4 · 2 份'],
+  ]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const page = makePage('pages/order-detail/order-detail.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad({ orderId: 'ord-B1' })
+    page.onShow()
+    detail.resolve({ id: 'ord-B1', orderNo: 'NO-B1', pickupStatus: 'used', payStatus: 'paid', amountCents: 0, fileName: 'a.pdf', ...raw })
+    await flush()
+    assert.ok(page.data.detail, '详情要渲染出来')
+    assert.equal(page.data.detail.statusLabel, label)
+    assert.equal(page.data.detail.spec, spec)
+  }
+})
+
+test('B2 取件页「查看全部订单」：刚下完单不把列表叠在下单流程上；从列表进来照旧返回', async () => {
+  for (const [source, expectRelaunch] of [['', true], ['orders', false]]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const detail = deferred()
+    const page = makePage('pages/print-pickup/print-pickup.js', { auth, api: { getCloudPrintOrder: () => detail.promise }, wx })
+    page.onLoad(source ? { orderId: 'ord-B1', source } : { orderId: 'ord-B1' })
+    detail.resolve(B1_PENDING)
+    await flush()
+    page.toOrders()
+    if (expectRelaunch) {
+      // 沙箱没有页面栈，等同于「栈里只剩下单流程」：重开订单列表，不叠在选终端上面
+      assert.deepEqual([...wx.calls.reLaunch], ['/pages/orders/orders'])
+      assert.equal(wx.calls.redirectTo.length, 0)
+    } else {
+      assert.equal(wx.calls.reLaunch.length, 0)
+      // 从订单列表进来的照旧退回列表（替身的 navigateBack 走 fail，于是兜底 redirectTo）
+      assert.deepEqual([...wx.calls.redirectTo], ['/pages/orders/orders'])
+    }
+  }
+})
+
+// 真实页面栈：getCurrentPages 返回的 route 不带前导斜杠，最后一项是当前页。
+const stackOf = (...routes) => () => routes.map((route) => ({ route }))
+const FLOW_STACK = stackOf('pages/home/home', 'pages/documents/documents', 'pages/print-upload/print-upload',
+  'pages/print-store/print-store', 'pages/print-pickup/print-pickup')
+
+test('B2 取件页返回（真实页面栈）：下面压着下单流程时一次退到我的文档，不停在选终端', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const backs = []
+  wx.navigateBack = (opts) => { backs.push(opts.delta) }
+  const detail = deferred()
+  const page = makePage('pages/print-pickup/print-pickup.js', {
+    auth, api: { getCloudPrintOrder: () => detail.promise }, wx, globals: { getCurrentPages: FLOW_STACK },
+  })
+  page.onLoad({ orderId: 'ord-B1' })
+  detail.resolve(B1_PENDING)
+  await flush()
+  page.back()
+  assert.deepEqual(backs, [3], '一次 navigateBack 跳过上传参数、选终端，回到我的文档')
+  assert.equal(wx.calls.switchTab.length, 0)
+})
+
+test('B2 取件页「查看全部订单」（真实页面栈）：不先退再进；压着下单流程时重开列表，从首页进来时照旧替换', async () => {
+  for (const [stack, expectRedirect] of [
+    [FLOW_STACK, false],
+    [stackOf('pages/home/home', 'pages/print-pickup/print-pickup'), true],
+  ]) {
+    const auth = createAuth('A')
+    const wx = createWx()
+    const backs = []
+    wx.navigateBack = (opts) => { backs.push(opts.delta) }
+    const detail = deferred()
+    const page = makePage('pages/print-pickup/print-pickup.js', {
+      auth, api: { getCloudPrintOrder: () => detail.promise }, wx, globals: { getCurrentPages: stack },
+    })
+    page.onLoad({ orderId: 'ord-B1' })
+    detail.resolve(B1_PENDING)
+    await flush()
+    page.toOrders()
+    assert.deepEqual(backs, [], '不许先 navigateBack 再 navigateTo（两步跳会闪屏、会停在半路）')
+    assert.equal(wx.calls.navigateTo.length, 0)
+    if (expectRedirect) {
+      assert.deepEqual([...wx.calls.redirectTo], ['/pages/orders/orders'])
+      assert.equal(wx.calls.reLaunch.length, 0)
+    } else {
+      assert.deepEqual([...wx.calls.reLaunch], ['/pages/orders/orders'])
+      assert.equal(wx.calls.redirectTo.length, 0)
+    }
+  }
+})
+
+test('B2 订单列表：已完成的单，按钮写实际去处「去我的文档打印」，点了去我的文档', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const done = {
+    id: 'pt-B2', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'a.pdf',
+  }
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: () => Promise.resolve([done]),
+    getPackageOrders: () => Promise.resolve({ items: [], total: 0 }),
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  const row = page.data.orders.find((item) => item.id === 'pt-B2')
+  assert.equal(row.action, 'reprint')
+  assert.equal(row.actionLabel, '去我的文档打印', '不能写「再打印一份」：它不会按原单原样再打')
+  page.primary({ currentTarget: { dataset: { id: 'pt-B2' } } })
+  assert.ok(wx.calls.navigateTo.includes('/pages/documents/documents'))
+})
+
+test('VIS1 订单列表单件区「加载更多」：与触底同一条路径，只推进单件游标，不重拉材料包', async () => {
+  const auth = createAuth('A')
+  const wx = createWx()
+  const singleCalls = []
+  let pkgCalls = 0
+  const firstPage = Object.assign([{ id: 'pt-1', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'a.pdf' }], { nextCursor: 'c-2' })
+  const api = {
+    getMyCloudPrintOrders: () => Promise.resolve([]),
+    getMyPrintOrders: (params) => {
+      singleCalls.push(params)
+      return Promise.resolve(params && params.cursor
+        ? [{ id: 'pt-2', status: 'completed', payStatus: 'paid', pickupStatus: 'used', amountCents: 0, fileName: 'b.pdf' }]
+        : firstPage)
+    },
+    getPackageOrders: () => { pkgCalls += 1; return Promise.resolve({ items: [], total: 0 }) },
+  }
+  const page = makePage('pages/orders/orders.js', { auth, api, wx })
+  page.onLoad()
+  page.onShow()
+  await flush()
+  assert.equal(page.data.nextCursor, 'c-2')
+  const pkgBefore = pkgCalls
+  page.loadMoreOrders()
+  page.loadMoreOrders()
+  await flush()
+  assert.equal(singleCalls.length, 2, '连点只翻一页')
+  assert.equal(singleCalls[1].cursor, 'c-2', '带的是单件自己的游标')
+  assert.equal(pkgCalls, pkgBefore, '不重拉材料包')
+  assert.deepEqual([...page.data.orders.map((o) => o.id)], ['pt-1', 'pt-2'], '第二页接在后面')
+})
+
 // ══════════════════════════════════════════════════════════════════════
 // M. P1-8 守卫不得制造解不开的锁
 // ══════════════════════════════════════════════════════════════════════
@@ -1923,7 +2154,11 @@ test('R4-4 同一个人建单成功：锁照常生效，再点一次不得发第
 test('R4-7 print-store 进支付页只带 fileId/storeId/store/copies，敏感项一个都不带', async () => {
   const auth = createAuth('A')
   const wx = createWx()
-  const api = { getPublicTerminals: () => Promise.resolve([{ id: 'term-1', displayName: '一号店', isOnline: true }]) }
+  const api = {
+    getPublicTerminals: () => Promise.resolve([{ id: 'term-1', displayName: '一号店', isOnline: true }]),
+    getTerminalCapabilities: () => Promise.resolve({ capabilities: [] }),
+    quoteMyPrintOrder: () => Promise.resolve({ amountCents: 150, billablePages: 3 }),
+  }
   const page = makePage('pages/print-store/print-store.js', { auth, api, wx })
   page.onLoad({ fileId: 'f-1', copies: '2', name: '张三的简历.pdf', total: '1.50', amountCents: '150', pages: '3' })
   await flush()
@@ -1984,7 +2219,7 @@ test('R4-7 print-pay 报价失败：不本地补一个金额，也不把下单�
   page.continueFlow()
   await flush()
   await flush()
-  assert.equal(wx.calls.redirectTo.length, 1, '展示失败不该取消一次真实的下单能力')
+  assert.equal(wx.calls.reLaunch.length, 1, '展示失败不该取消一次真实的下单能力')
 })
 
 test('R4-7 print-pay 建单成功但跳转失败：锁住页面并指路，不得重复 POST', async () => {
@@ -2036,7 +2271,7 @@ test('R4-7 print-pay 跳转到取件页只带 orderId，凭证一个都不进 UR
   await flush()
   await flush()
 
-  const url = wx.calls.redirectTo[0]
+  const url = wx.calls.reLaunch[0]
   assert.equal(url, '/pages/print-pickup/print-pickup?orderId=ord-A')
   for (const field of ['pickupCode', 'expiresAt', 'amountCents', 'taskStatus', 'orderNo', 'name', 'store']) {
     assert.ok(!url.includes(`${field}=`), `取件页 URL 不得携带 ${field}`)
@@ -2066,7 +2301,7 @@ test('R4-7 print-pay 建单在途换了人：不锁当前这位的页面，也�
   assert.ok(!page._createdOrderId, 'A 的订单不得锁住 B 的页面')
   assert.equal(page.data.createdLocked, false)
   assert.equal(page.data.submitting, false, '按钮锁必须解开，否则 B 的页面永远按不动')
-  assert.equal(wx.calls.redirectTo.length, 0, '不得把 B 带去 A 的到机码页')
+  assert.equal(wx.calls.reLaunch.length, 0, '不得把 B 带去 A 的到机码页')
 })
 
 // ══════════════════════════════════════════════════════════════════════
@@ -2338,7 +2573,7 @@ test('R5-3 确认支付页：建单在途时 JWT 自然过期 —— 只 POST �
     '订单已经在服务端建出来了：必须锁住，否则用户以为没下成再点一次 = 第二张订单、第二笔钱')
   assert.equal(page.data.createdLocked, true)
   assert.equal(page.data.submitting, false, '不得卡在「正在提交…」')
-  assert.ok(wx.calls.redirectTo.some((u) => u === '/pages/print-pickup/print-pickup?orderId=ord-A'),
+  assert.ok(wx.calls.reLaunch.some((u) => u === '/pages/print-pickup/print-pickup?orderId=ord-A'),
     '同一位账号的自然过期不得挡住去取件页')
 
   page.continueFlow()
@@ -2381,14 +2616,14 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
   creates[0].resolve({ id: 'ord-A' })
   await flush()
 
-  assert.equal(wx.calls.redirectTo.length, 0, '不得把 B 带去 A 的到机码页')
+  assert.equal(wx.calls.reLaunch.length, 0, '不得把 B 带去 A 的到机码页')
   assert.ok(!page._createdOrderId, 'A 的订单不得锁住 B 的页面')
   assert.equal(page.data.createdLocked, false)
   assert.equal(page.data.submitting, false, '按钮锁必须解开，否则 B 的页面永远按不动')
   assert.ok(!JSON.stringify(page.data).includes('ord-A'), 'A 的订单号不得出现在 B 看到的任何字段里')
 
   // B 自己的那一次：必须是一次**新的** POST，并且跳的是 B 自己的订单。
-  const before = wx.calls.redirectTo.length
+  const before = wx.calls.reLaunch.length
   // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
   page.retryQuote()
   await flush()
@@ -2397,7 +2632,7 @@ test('R5-3 确认支付页：建单在途时真的换了人 —— 不跳 A 的�
   assert.equal(creates.length, 2, 'B 必须能安全地发起自己的建单')
   creates[1].resolve({ id: 'ord-B' })
   await flush()
-  assert.equal(wx.calls.redirectTo[before], '/pages/print-pickup/print-pickup?orderId=ord-B')
+  assert.equal(wx.calls.reLaunch[before], '/pages/print-pickup/print-pickup?orderId=ord-B')
 })
 
 test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 必须复位 A 的锁与 A 的文件名', async () => {
@@ -2427,7 +2662,7 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
 
   // 而且 B 点提交发的是 B 自己的那一次，不是被带去 A 的订单。
   wx.control.navFail = false
-  const before = wx.calls.redirectTo.length
+  const before = wx.calls.reLaunch.length
   // 价格再确认（2026-09-23）：提交前必须先有属于当前账号的服务端报价，所以先核一次价。
   page.retryQuote()
   await flush()
@@ -2436,7 +2671,7 @@ test('R5-3 确认支付页：建单锁定后换账号回到本页 —— onShow 
   assert.equal(creates.length, 2)
   creates[1].resolve({ id: 'ord-B' })
   await flush()
-  assert.equal(wx.calls.redirectTo[before], '/pages/print-pickup/print-pickup?orderId=ord-B')
+  assert.equal(wx.calls.reLaunch[before], '/pages/print-pickup/print-pickup?orderId=ord-B')
 })
 
 test('R5-3 确认支付页：建单在途时**主动登出** —— 不得跳 A 的订单，也不得靠缓存身份补签回去', async () => {
@@ -2457,7 +2692,7 @@ test('R5-3 确认支付页：建单在途时**主动登出** —— 不得跳 A 
   await flush()
 
   assert.equal(realAuth.canSilentResignin(), false)
-  assert.equal(wx.calls.redirectTo.length, 0, '登出之后不得把人带去这张订单的到机码页')
+  assert.equal(wx.calls.reLaunch.length, 0, '登出之后不得把人带去这张订单的到机码页')
   assert.ok(!page._createdOrderId, '登出之后不得用缓存身份把 A 的订单锁回来')
   assert.equal(page.data.createdLocked, false)
   assert.ok(!JSON.stringify(page.data).includes('ord-A'), 'A 的订单号不得留在屏幕上')
@@ -2695,14 +2930,14 @@ test('R5-6 确认支付页：A 的迟到建单回调不得掀掉 B 正在进行�
   await flush()
   assert.equal(wx.loading.visible, true,
     'A 的迟到回调不得掀掉 B 的遮罩 —— B 的按钮还锁着、请求还在飞，屏幕却什么都没有了')
-  assert.equal(wx.calls.redirectTo.length, 0, '更不得把 B 带去 A 的到机码页')
+  assert.equal(wx.calls.reLaunch.length, 0, '更不得把 B 带去 A 的到机码页')
   assert.ok(!page._createdOrderId)
 
   // B 的响应回来时才收起遮罩，并且跳的是 B 自己的订单。
   creates[1].resolve({ id: 'ord-B' })
   await flush()
   assert.equal(wx.loading.visible, false, 'B 自己的回调必须收起遮罩，不能永远挂着')
-  assert.equal(wx.calls.redirectTo[0], '/pages/print-pickup/print-pickup?orderId=ord-B')
+  assert.equal(wx.calls.reLaunch[0], '/pages/print-pickup/print-pickup?orderId=ord-B')
 })
 
 // ══════════════════════════════════════════════════════════════════════
@@ -2826,7 +3061,7 @@ test('R6-3 A 的 200 晚于换人：orderId 落进 A 的恢复记录，但一个
   // 但 B 的页面一个字都不许被写。
   assert.ok(!page._createdOrderId)
   assert.equal(page.data.createdLocked, false)
-  assert.equal(wx.calls.redirectTo.length, 0)
+  assert.equal(wx.calls.reLaunch.length, 0)
   assert.ok(!JSON.stringify(page.data).includes('ord-A'))
 
   // A 重新登录回到本页：看得见「订单已创建」，而且再点也不会发第二次 POST。
@@ -2904,7 +3139,7 @@ test('R6-5 跳转成功才清恢复记录；跳转失败要留着 orderId 并锁
   await flush()
   okPage.creates[0].resolve({ id: 'ord-A' })
   await flush()
-  assert.equal(wxOk.calls.redirectTo[0], '/pages/print-pickup/print-pickup?orderId=ord-A')
+  assert.equal(wxOk.calls.reLaunch[0], '/pages/print-pickup/print-pickup?orderId=ord-A')
   assert.equal(idem.findRecord('u:A', print), null, '确实跳走之后才清')
 })
 
@@ -6448,7 +6683,7 @@ test('RP-6 resume-parse：当前身份下查不到时仍可按同编号再查（
   assert.ok(links.some((l) => /recheck === 'not-found'/.test(l) && /bindtap="toAiRecords"/.test(l)), 'not-found 给核对身份的出口')
   for (const l of links) {
     assert.match(l, /hover-class="tap-press"/)
-    assert.match(l, /role="button"/)
+    assert.match(l, /aria-role="button"/)
     assert.match(l, /aria-label="/)
   }
   const linkCss = wxss.match(/\.unknown-link\s*\{([^}]*)\}/)
@@ -6683,16 +6918,19 @@ test('微信接口失败的英文 errMsg 不直接当成给用户看的句子', 
   assert.deepEqual(hits, [])
 })
 
-test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', () => {
+test('print-preview：打开原文失败时不显示微信的英文报错，页面自己的中文句子照用', async () => {
+  // 10/16 起「打开原文」每次现取签名链接（utils/file-url.js openSignedDocument），403 先重取一次再报过期。
   for (const [dl, expected] of [
     [(opts) => opts.fail({ errMsg: 'downloadFile:fail unknown reason' }), '打开原文失败，请检查网络后重试。'],
-    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '服务端返回 403，预览链接可能已过期'],
+    [(opts) => opts.success({ statusCode: 403, tempFilePath: '' }), '预览链接已过期，重新获取后仍没有打开。请返回后重新进入再试。'],
   ]) {
     const wx = createWx()
     wx.downloadFile = dl
-    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api: {}, wx })
-    page.setData({ fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
+    const api = { getFilePreviewUrl: () => Promise.resolve({ url: 'https://zyidai.cn/f/a.pdf' }) }
+    const page = makePage('pages/print-preview/print-preview.js', { auth: createAuth('A'), api, wx })
+    page.setData({ fileId: 'file-a', fileUrl: 'https://zyidai.cn/f/a.pdf', opening: false, ext: 'pdf' })
     page.openDoc()
+    await flush()
     assert.equal(wx.calls.showModal.length, 1)
     assert.equal(wx.calls.showModal[0].content, expected)
   }
@@ -7005,4 +7243,36 @@ test('U 盘指引：只列一体机真能读的格式，Word 说另存为 PDF，
   const usbFaq = help.data.faqs.find((f) => f.id === 'usb')
   assert.doesNotMatch(usbFaq.a, /OTG|读卡器|传输到终端/, '小程序读不了 U 盘，也没有手机直传终端')
   assert.match(usbFaq.a, /U盘打印指引/)
+})
+
+// VIS3d（10/17）：本机任务带归属。读的地方只认自己的任务，所以写的时候必须带上提交时的身份。
+test('RP-OWN resume-parse：落库的本机任务带提交时的 ownerId（会员是 id，匿名是 null）', async () => {
+  const key = realStorage.KEYS.RESUME_TASK
+
+  const wxMember = createWx()
+  const gateMember = deferred()
+  const pageMember = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth('A'), wx: wxMember, api: { parseResume: () => gateMember.promise },
+  })
+  pageMember.onLoad({ fileId: 'F-A', fileName: 'A的简历.pdf', fileFormat: 'pdf' })
+  await flush()
+  gateMember.resolve({ taskId: 'T-A', status: 'completed' })
+  await flush()
+  const savedMember = wxMember.storage.get(key)
+  assert.equal(savedMember.taskId, 'T-A')
+  assert.equal(savedMember.ownerId, 'A')
+
+  const wxAnon = createWx()
+  const gateAnon = deferred()
+  const pageAnon = makePage('pages/resume-parse/resume-parse.js', {
+    auth: createAuth(null), wx: wxAnon, api: { parseResume: () => gateAnon.promise },
+  })
+  pageAnon.onLoad({ fileId: 'F-N', fileName: '匿名的简历.pdf', fileFormat: 'pdf' })
+  await flush()
+  gateAnon.resolve({ taskId: 'T-N', status: 'completed', accessToken: 'tok-N' })
+  await flush()
+  const savedAnon = wxAnon.storage.get(key)
+  assert.equal(savedAnon.taskId, 'T-N')
+  assert.ok(Object.prototype.hasOwnProperty.call(savedAnon, 'ownerId'), '匿名也要写上 ownerId 这个键')
+  assert.equal(savedAnon.ownerId, null)
 })

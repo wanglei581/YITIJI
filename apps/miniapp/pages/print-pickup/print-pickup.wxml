@@ -1,11 +1,12 @@
 <!--pages/print-pickup/print-pickup.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-title">打印取件</view>
-    <view class="nav-right"></view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-title">打印取件</view>
+      <view class="nav-right"></view>
+    </view>
   </view>
 
   <view class="state-center" wx:if="{{state === 'loading'}}">
@@ -18,10 +19,10 @@
     <text class="state-label">{{errorMsg}}</text>
     <!-- 按钮文案必须和 errorAction 指的动作一致：登录已失效时写「重新加载」，
          用户会一直按一个不可能成功的按钮。 -->
-    <view class="btn-retry tap" hover-class="tap-press" bindtap="recover" role="button">
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="recover" aria-role="button">
       {{errorAction === 'login' ? '去登录' : errorAction === 'orders' ? '去我的打印订单' : '重新加载'}}
     </view>
-    <view class="btn-retry-sub tap" hover-class="tap-press" wx:if="{{errorAction === 'login'}}" bindtap="toOrders" role="button">先去我的打印订单</view>
+    <view class="btn-retry-sub tap" hover-class="tap-press" wx:if="{{errorAction === 'login'}}" bindtap="toOrders" aria-role="button">先去我的打印订单</view>
   </view>
 
   <block wx:elif="{{state === 'ready'}}">
@@ -49,13 +50,14 @@
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
         <text class="ph-hint">二维码与下方到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
-        <!-- 到机码三个动作（9/25 拍板第 5 条：可以给别人代取，一次性，可作废重发）。 -->
+        <!-- 到机码三个动作（9/25 拍板第 5 条：可以给别人代取，一次性，可作废重发）。
+             复制、分享是常用动作，并排放；作废换新码会让旧码立刻失效，降为说明下面的次级按钮，免得误点。 -->
         <view class="ph-acts">
-          <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">复制</view>
-          <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" role="button" aria-label="分享给代取人">分享给代取人</view>
-          <view class="ph-act tap {{reissuing ? 'off' : ''}}" hover-class="tap-press" bindtap="reissueCode" role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
+          <view class="ph-act tap" hover-class="tap-press" bindtap="copyCode" aria-role="button" aria-label="复制到机码">复制</view>
+          <view class="ph-act tap" hover-class="tap-press" bindtap="shareCode" aria-role="button" aria-label="分享给代取人">分享给代取人</view>
         </view>
-        <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点「作废换新码」，旧码马上失效。</text>
+        <text class="ph-share-note">码发给谁，谁就能取；不想让对方取了，点下面的「作废换新码」，旧码马上失效。</text>
+        <view class="btn-retry-sub tap" style="{{reissuing ? 'opacity: .5;' : ''}}" hover-class="tap-press" bindtap="reissueCode" aria-role="button" aria-label="作废这个码并换一个新码">{{reissuing ? '正在换码…' : '作废换新码'}}</view>
       </block>
 
       <view class="status-visual" wx:else>
@@ -91,7 +93,21 @@
       <view class="next-text">请不要离开设备。若长时间没有出纸，请先查看终端屏幕上的提示；{{supportHint}}</view>
     </view>
 
+    <!-- 去一体机之前先核一眼：文件、终端、规格都取自服务端订单，缺哪项就不显示哪项。 -->
     <view class="info-card" wx:if="{{orderNo || taskStatus || pickupStatus}}">
+      <!-- 文件名常是一长串没有空格的字母数字：标签不许被挤扁，值允许任意处断行（不改样式文件，只在这三行加行内样式）。 -->
+      <view class="info-row" wx:if="{{fileName}}">
+        <text class="info-key" style="flex-shrink: 0;">文件</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{fileName}}</text>
+      </view>
+      <view class="info-row" wx:if="{{store}}">
+        <text class="info-key" style="flex-shrink: 0;">终端</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{store}}</text>
+      </view>
+      <view class="info-row" wx:if="{{spec}}">
+        <text class="info-key" style="flex-shrink: 0;">规格</text>
+        <text class="info-val" style="min-width: 0; word-break: break-all;">{{spec}}</text>
+      </view>
       <view class="info-row" wx:if="{{orderNo}}">
         <text class="info-key">订单号</text>
         <text class="info-val">{{orderNo}}</text>
@@ -121,5 +137,5 @@
 <canvas type="2d" id="pickup-share-card" class="share-card-canvas" aria-hidden="true"></canvas>
 
 <view class="action-bar" wx:if="{{state === 'ready'}}">
-  <view class="ab-btn tap" hover-class="tap-press" bindtap="home">完成</view>
+  <view class="ab-btn tap" hover-class="tap-press" bindtap="home">{{doneLabel}}</view>
 </view>

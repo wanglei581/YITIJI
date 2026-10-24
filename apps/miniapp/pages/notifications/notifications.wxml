@@ -4,7 +4,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">消息通知</view>
@@ -29,14 +29,14 @@
          自定义导航栏右侧永远不可用。这是低频次级操作，移到消息列表上方的工具栏。 -->
     <view class="list-toolbar" wx:if="{{!loading && !loadError && list.length > 0}}">
       <view class="lt-action tap" hover-class="tap-press" bindtap="markAllRead"
-            role="button" aria-label="把全部通知标记为已读">全部已读</view>
+            aria-role="button" aria-label="把全部通知标记为已读">全部已读</view>
     </view>
 
     <view class="empty-slot card" wx:if="{{loading}}">
       <view class="es-t">正在加载本人通知…</view>
     </view>
 
-    <view class="empty-slot card" wx:elif="{{loadError}}" bindtap="loadNotifications">
+    <view class="empty-slot card" wx:elif="{{loadError}}" bindtap="reloadNotifications">
       <view class="es-t">加载失败，点此重试</view>
       <view class="es-d">{{loadError}}</view>
     </view>

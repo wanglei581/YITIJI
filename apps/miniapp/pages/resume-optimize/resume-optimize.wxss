@@ -48,7 +48,9 @@
 .nt-ic { font-size: 80rpx; color: var(--ghost); }
 .nt-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
 .nt-sub { font-size: var(--fs-base); color: var(--muted); text-align: center; }
-.nt-btn { margin-top: 20rpx; padding: 0 48rpx; }
+.nt-actions { width: 100%; margin-top: 20rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.nt-back { align-self: center; min-height: 48px; padding: 0 32rpx; display: flex; align-items: center;
+  font-size: var(--fs-base); color: var(--muted); }
 
 /* 失败 */
 .failed-state { display: flex; flex-direction: column; align-items: center;

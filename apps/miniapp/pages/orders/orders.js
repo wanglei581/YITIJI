@@ -17,14 +17,19 @@ const app = getApp()
 const auth = require('../../utils/auth')
 const api = require('../../utils/api')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const printParams = require('../../utils/print-params')
+const {
+  createLifecycleGuard, memberIdentityKey, isMemberIdentity,
+  gateMember, retryMemberGate, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 
 const PAGE_SIZE = 20
 
 // PrintTask.status (后端) → UI 展示状态映射
 const STATUS_MAP = {
-  pending:   { key: 'waiting',  label: '待取件', tone: 'wheat' },
-  claimed:   { key: 'waiting',  label: '待取件', tone: 'wheat' },
+  // 任务已建、在终端排队（取件页写「已进入打印队列」）。仍归「待取件」这一栏，但单子本身写「排队中」。
+  pending:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
+  claimed:   { key: 'waiting',  label: '排队中', tone: 'wheat' },
   printing:  { key: 'printing', label: '打印中',  tone: 'teal'  },
   completed: { key: 'done',     label: '已完成', tone: 'ok'    },
   failed:    { key: 'done',     label: '打印失败', tone: 'danger'},
@@ -54,14 +59,9 @@ function resolveDisplayStatus(item) {
   return STATUS_MAP[item.status] || { key: 'done', label: item.status, tone: 'neutral' }
 }
 
-// colorMode + paperSize + copies + pages → 规格摘要
+// 规格摘要：与取件页、订单详情同一份实现（utils/print-params.js displaySpec），含单双面。
 function buildSpec(item) {
-  const parts = []
-  if (item.paperSize) parts.push(item.paperSize.toUpperCase())
-  if (item.colorMode) parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
-  if (item.copies)    parts.push(`${item.copies} 份`)
-  if (item.billablePages) parts.push(`共 ${item.billablePages} 页`)
-  return parts.join(' · ') || '—'
+  return printParams.displaySpec(item) || '—'
 }
 
 // 金额：分 → 元字符串（0 分 = 免费）
@@ -150,7 +150,8 @@ function toUiItem(item) {
     // 已完成可再打一份；到机码可见时显示"查看到机码"
     action,
     actionLabel: action === 'pickup' ? '查看到机码'
-               : action === 'reprint' ? '再打印一份'
+               // 这个按钮实际是去「我的文档」重新选文件，不是按原单原样再打一份，名字要说实话。
+               : action === 'reprint' ? '去我的文档打印'
                : '',
     orderId: item.id,
     amountCents,
@@ -174,6 +175,9 @@ Page({
     nextCursor: null,
     loadingMore: false,
     isLoggedIn: false,
+    // 过期但可恢复（FLOW1b）：先等恢复结果，不显示「请先登录」
+    restoring: false,
+    restoreFailed: false,
 
     // ── 材料包分区（独立来源、独立游标、独立失败态）──────────────────
     pkgRows: [],
@@ -258,9 +262,20 @@ Page({
 
   onShow() {
     this._guard.activate()
-    // A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
-    // 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
-    // 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+    markPageShown(this)
+    // 过期但可恢复（FLOW1b）：先等恢复结果；恢复中、恢复失败都不显示「请先登录」。
+    gateMember(this, auth, api, {
+      ready: () => this._showForCurrentIdentity(),
+      needLogin: () => this._showForCurrentIdentity(),
+    })
+  },
+
+  /**
+   * A 用户登出、B 用户登录后回到本页时，上一位的订单和到机码绝不能还留在 data 里。
+   * 登录了却拿不到会员 id 时按未登录渲染：那种会话无法确认"我的"是谁的，
+   * 拉列表等于拿一个所有人共享的身份键去要本人数据。用户的补救动作恰好就是重新登录。
+   */
+  _showForCurrentIdentity() {
     const usable = this._enforceIdentity()
     this.setData({ isLoggedIn: usable })
     if (usable) {
@@ -269,14 +284,18 @@ Page({
     }
   },
 
+  retryRestore() { retryMemberGate(this, auth, api) },
+
   // 切后台 / 离开本页：在途请求全部作废。
   // 只靠 loading 布尔锁挡不住这件事 —— 锁在请求发出时是开的，回调执行时早被清掉了。
   onHide() {
     this._guard.deactivate()
+    markPageHidden(this)
   },
 
   onUnload() {
     this._guard.deactivate()
+    markPageUnloaded(this)
   },
 
   /** 清空两个分区的全部数据与游标。跨用户、登出、下拉刷新前都必须走这里。 */
@@ -418,6 +437,12 @@ Page({
     if (this.data.nextCursor && !this.data.loadingMore) {
       this._load(true)
     }
+  },
+
+  // 单件区末尾的「加载更多 / 重试」：与触底同一条路径，只推进单件自己的 nextCursor，
+  // 与材料包的 pkgCursor 互不相干（VIS1：单件区挪到材料包前面后，不能只靠触底翻页）。
+  loadMoreOrders() {
+    this.onReachBottom()
   },
 
   loadMorePackages() {

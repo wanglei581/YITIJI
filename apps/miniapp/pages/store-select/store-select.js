@@ -17,7 +17,10 @@
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 const pkg = require('../../utils/package-order')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const {
+  createLifecycleGuard, memberIdentityKey, isMemberIdentity,
+  isRestorable, gateMember, retryMemberGate, gateMemberAction, markPageShown, markPageHidden, markPageUnloaded,
+} = require('../../utils/page-guard')
 
 Page({
   data: {
@@ -29,6 +32,9 @@ Page({
     errorTitle: '',
     errorText: '',
     hasPackageData: true,
+    // 过期但可恢复（FLOW1b）：草稿归属等恢复结果再判断
+    restoring: false,
+    restoreFailed: false,
     // 这一页还没有报价，不知道金额：只用不提钱的那句
     onsiteNoticeFree: pkg.PACKAGE_ONSITE_NOTICE_FREE,
   },
@@ -40,15 +46,20 @@ Page({
     this._guard = createLifecycleGuard()
     this._guard.activate()
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 44 })
-    this._syncDraft()
+    // 过期但可恢复时，草稿归属等 onShow 里的会员闸门恢复完再判断，不先显示「没有材料包」。
+    if (!isRestorable(auth)) this._syncDraft()
     this._loadStores()
   },
 
   onShow() {
     this._guard.activate()
+    markPageShown(this)
     // 换了账号之后，上一位的草稿不再算数 —— 它里面的 fileId 属于别人，
     // 拿它继续选服务点只会在下一步被服务端拒（PRINT_FILE_NOT_FOUND）。
-    this._syncDraft()
+    gateMember(this, auth, api, {
+      ready: () => this._syncDraft(),
+      needLogin: () => this._syncDraft(),
+    })
     // 切后台会作废在途的列表请求。回来后若还停在 loading 且那次确实已作废，重发一次，
     // 否则页面会永远显示「正在读取服务点」而其实没有请求在跑。
     if (this.data.state === 'loading' && !this._guard.accepts(this._storesToken)) this._loadStores()
@@ -56,11 +67,15 @@ Page({
 
   onHide() {
     this._guard.deactivate()
+    markPageHidden(this)
   },
 
   onUnload() {
     this._guard.deactivate()
+    markPageUnloaded(this)
   },
+
+  retryRestore() { retryMemberGate(this, auth, api) },
 
   /**
    * 当前身份的稳定快照。三态：`''` 未登录 / `'!'` 登录但无 id（不可用）/ `'u:<id>'`。
@@ -151,6 +166,14 @@ Page({
   },
 
   confirmAndContinue() {
+    gateMemberAction(this, auth, api, 'confirm-store', () => this._confirmAndContinue(), {
+      needLogin: () => this._confirmAndContinue(),
+      recoverable: () => wx.showToast({ title: '暂时没能恢复登录，请稍后重试', icon: 'none' }),
+      busy: () => wx.showToast({ title: '正在恢复登录，请稍候', icon: 'none' }),
+    })
+  },
+
+  _confirmAndContinue() {
     const { selectedStore, stores, hasPackageData } = this.data
     if (!hasPackageData) {
       this.backToFiles()

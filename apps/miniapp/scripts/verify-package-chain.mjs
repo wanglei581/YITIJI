@@ -1392,8 +1392,10 @@ console.log('\n⑭ 幂等键的落盘 / 唯一性 / 留存，与陈旧恢复记�
     '没落住就保持锁定并指路「我的 · 打印订单」，**不跳转、不解锁、不重试**')
   {
     const flow = /continueFlow\(\) \{[\s\S]*?\n  \},/.exec(pay)
-    assert(!!flow && flow[0].indexOf('if (recoveryUnsaved)') < flow[0].indexOf('wx.redirectTo('),
-      '这一支必须排在 redirectTo 之前（排在后面就等于没有）')
+    // 单件链进取件页 2026-10-16 起是 wx.reLaunch（下单后清掉下单流程页，见 print-pay.js）。
+    // 判据不变：「没落住」那一支必须排在跳转之前；找不到跳转同样算不通过（indexOf 为 -1 时比较恒假）。
+    assert(!!flow && flow[0].indexOf('if (recoveryUnsaved)') < flow[0].indexOf('wx.reLaunch('),
+      '这一支必须排在进取件页的跳转（reLaunch）之前（排在后面就等于没有）')
     const markAt = flow[0].indexOf('idem.markSubmitted(attempt.account, fingerprint, record.key)')
     const postAt = flow[0].indexOf('api.createCloudPrintOrder(')
     assert(markAt > 0 && postAt > markAt,

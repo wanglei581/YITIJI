@@ -53,6 +53,62 @@ function staleSessionError() {
 }
 
 /**
+ * 会话类 401（FLOW1b）：只有它们说明「这张令牌不能用了」，才值得静默补签。
+ * 业务 401（短信码错、二次验证码错……）与会话无关：补签救不了，短信账号补签还会被判「没绑微信」而误登出。
+ * 没有 code 的 401 按会话类处理（老接口、网关）。
+ */
+const SESSION_401_CODES = ['MEMBER_MISSING_TOKEN', 'MEMBER_TOKEN_INVALID', 'MEMBER_SESSION_EXPIRED', 'AI_LOGIN_REQUIRED'];
+function isSession401(err) {
+  return !!err && err.statusCode === 401 && (!err.code || SESSION_401_CODES.indexOf(err.code) !== -1);
+}
+
+/**
+ * 补签「确定失败」：再试也不会好，只能本人重新登录——没绑微信、回来的不是上次那位会员、
+ * 认不出上次是谁、账号不可用、协议版本已更新。其余（断网、超时、限流、5xx、wx.login 失败、
+ * 补签结果写不进存储……）都是临时失败：不登出、不删恢复资格，下一次请求或下次打开时再恢复
+ * （用户验收：网络问题不让人退出）。
+ */
+const RESIGNIN_DEFINITIVE_CODES = [
+  'MEMBER_NOT_BOUND', 'ACCOUNT_UNAVAILABLE', 'MEMBER_NOT_FOUND',
+  'MEMBER_LEGAL_VERSION_STALE', 'LEGAL_VERSION_STALE',
+  'RESIGNIN_MEMBER_MISMATCH', 'RESIGNIN_MEMBER_UNKNOWN',
+  // 同设备恢复凭证（FLOW1c）被拒：无效、过期、被撤销、旧凭证再现。都必须重新认证，不再回退到微信补签。
+  'MEMBER_RESTORE_INVALID', 'MEMBER_RESTORE_REUSED',
+];
+function isDefinitiveResigninFailure(err) {
+  return !!err && RESIGNIN_DEFINITIVE_CODES.indexOf(err.code) !== -1;
+}
+
+/** 临时失败给页面的错误：不是 401（页面不会当成「要重新登录」），说清楚稍后会恢复。 */
+function recoverableSessionError() {
+  const e = makeError('暂时没能恢复登录，请稍后重试', -1, 'SESSION_RESTORE_PENDING');
+  e.recoverable = true;
+  return e;
+}
+
+/** 补签失败之后：确定失败只登出自己那一代；临时失败不登出。返回要抛给页面的错误。 */
+function afterResigninFailure(resignErr, err, generation) {
+  if (isDefinitiveResigninFailure(resignErr)) {
+    // 只登出自己那一代:晚到的失败不得把之后登录的新账号踢下线。
+    auth.logoutIfSameSession(generation);
+    // 补签自身若带业务码(如 MEMBER_LEGAL_VERSION_STALE),优先抛它:
+    // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
+    return (resignErr && resignErr.code) ? resignErr : err;
+  }
+  // 途中已经换了人（显式登录 / 登出）：这次请求属于已被顶掉的会话，原样抛 401，不说「稍后恢复」。
+  if (!auth.isSameSession(generation)) return err;
+  return recoverableSessionError();
+}
+
+/** 账号停用 / 注销中（守卫回 401 ACCOUNT_UNAVAILABLE）：补签也救不了，本机登出（只登出自己那一代）。 */
+function accountUnavailable(err, generation, options) {
+  if (err && err.statusCode === 401 && err.code === 'ACCOUNT_UNAVAILABLE' && options.needAuth !== false) {
+    auth.logoutIfSameSession(generation);
+  }
+  return err;
+}
+
+/**
  * @param {number} generation 发起这次补签的请求**出发时**的会话代际:
  *   带着它走完全程,才能在每个落点上认出「这还是同一个人吗」。
  */
@@ -64,27 +120,58 @@ function silentResignin(generation) {
   const flight = { generation, promise: null };
   // 只清自己那一次:旧飞行晚到时若无条件清空,会把之后新建的飞行一起抹掉。
   const done = () => { if (resigninInflight === flight) resigninInflight = null; };
+  // 补签只认上次明确登录的那一位（FLOW1b）：出发时就定下来；认不出是谁就不去换 token。
+  // 本机存储这一次读不出来（认不清）是临时失败：不登出、不删资格，稍后再试（Codex 冷审）。
+  const member = auth.restorableMember();
+  const expected = member.id;
+  // 同设备恢复凭证（FLOW1c）优先：纯短信登录、没绑微信的账号靠它续上，不用再收验证码。
+  // 只认上次明确登录的那一位的凭证；这一格读不出来是临时失败——不能改走微信补签，没绑微信会被判确定失败而登出。
+  const restore = expected ? auth.restoreCredential(expected) : { ok: true, token: null };
   flight.promise = new Promise((resolve, reject) => {
+    if (!expected) {
+      reject(member.unreadable ? recoverableSessionError() : makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_UNKNOWN'));
+      return;
+    }
+    if (!restore.ok) {
+      reject(recoverableSessionError());
+      return;
+    }
+    if (restore.token) {
+      resolve({ restoreToken: restore.token });
+      return;
+    }
     wx.login({
-      success: (r) => (r && r.code ? resolve(r.code) : reject(makeError('wx.login 未返回 code', -1))),
+      success: (r) => (r && r.code ? resolve({ code: r.code }) : reject(makeError('wx.login 未返回 code', -1))),
       fail: () => reject(makeError('wx.login 调用失败', -1)),
     });
   })
-    .then((code) => {
+    .then((start) => {
       // wx.login 本身可能很慢:已经换人了就别再拿这个 code 去换旧账号的 token。
       if (!auth.isSameSession(generation)) throw staleSessionError();
+      // 恢复凭证被拒（无效、过期、撤销、重放）按确定失败处理，不在这里回退到微信补签：那样会绕过「必须重新认证」。
+      if (start.restoreToken) {
+        return rawRequest('/member/auth/restore', {
+          method: 'POST',
+          data: { restoreToken: start.restoreToken },
+          needAuth: false,
+        });
+      }
       return rawRequest('/member/auth/wx-resignin', {
         method: 'POST',
-        data: { code },
+        data: { code: start.code },
         needAuth: false,
       });
     })
     .then((res) => {
       const token = res && res.token;
       if (!token) throw makeError('续签未返回 token', -1);
+      // 回来的必须是上次明确登录的那一位：短信登录的 B 不能被换成这个微信绑定的 A
+      // （补签不换代，页面看不出换了人）。不是同一位就不写入，按确定失败处理。
+      const memberId = res.user && res.user.id != null ? String(res.user.id) : '';
+      if (memberId !== expected) throw makeError('登录已过期，请重新登录', 401, 'RESIGNIN_MEMBER_MISMATCH');
       // 代际校验在 saveSession 内部与写入一起完成(先查后写会留下一个窗口)。
       // 返回 false = 换人了,或没能写进去再读回来,两种都按补签失败处理。
-      if (!auth.saveSession({ token, user: res.user }, { expectGeneration: generation })) {
+      if (!auth.saveSession({ token, user: res.user, restoreToken: res.restoreToken }, { expectGeneration: generation })) {
         throw staleSessionError();
       }
       done();
@@ -116,11 +203,13 @@ function request(path, options = {}) {
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
       && !options._retried
+      // 只有会话类 401 才补签（FLOW1b）；业务 401 原样抛给页面。
+      && isSession401(err)
       && auth.canSilentResignin()
       // 出发时那个会话还在吗:换号会让资格旗子重新点亮,只看 canSilentResignin
       // 认不出这次 401 属于上一个人。
       && auth.isSameSession(generation);
-    if (!retriable) throw err;
+    if (!retriable) throw accountUnavailable(err, generation, options);
 
     return silentResignin(generation).then(
       () => {
@@ -128,13 +217,8 @@ function request(path, options = {}) {
         if (!auth.isSameSession(generation)) throw err;
         return rawRequest(path, Object.assign({}, options, { _retried: true }));
       },
-      (resignErr) => {
-        // 只登出自己那一代:晚到的失败不得把之后登录的新账号踢下线。
-        auth.logoutIfSameSession(generation);
-        // 补签自身若带业务码(如 MEMBER_LEGAL_VERSION_STALE),优先抛它:
-        // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
-        throw (resignErr && resignErr.code) ? resignErr : err;
-      },
+      // 确定失败只登出自己那一代；临时失败不登出、不删恢复资格（FLOW1b）。
+      (resignErr) => { throw afterResigninFailure(resignErr, err, generation); },
     );
   });
 }
@@ -248,19 +332,17 @@ function uploadFile(path, filePath, options = {}) {
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
       && !options._retried
+      && isSession401(err)
       && auth.canSilentResignin()
       && auth.isSameSession(generation);
-    if (!retriable) throw err;
+    if (!retriable) throw accountUnavailable(err, generation, options);
 
     return silentResignin(generation).then(
       () => {
         if (!auth.isSameSession(generation)) throw err;
         return rawUploadFile(path, filePath, Object.assign({}, options, { _retried: true }));
       },
-      (resignErr) => {
-        auth.logoutIfSameSession(generation);
-        throw (resignErr && resignErr.code) ? resignErr : err;
-      },
+      (resignErr) => { throw afterResigninFailure(resignErr, err, generation); },
     );
   });
 }
@@ -385,4 +467,35 @@ function extractError(body, statusCode) {
   return makeError('', statusCode);
 }
 
-module.exports = { request, uploadFile, configureAiRunner };
+/**
+ * 进入要登录的页面、或打开小程序时，把「过期但可恢复」的会话先恢复回来（FLOW1b）。
+ * 只认上次明确登录的同一位会员；恢复进行中 auth.isLoggedIn() 照旧是 false，不伪装成已登录。
+ * @returns {Promise<{ state: 'ok' | 'need_login' | 'recoverable' }>}
+ *   ok：本地令牌有效，或已换到同一位会员的新令牌；
+ *   need_login：没有恢复资格，或补签确定失败（已按代际登出）；
+ *   recoverable：临时失败（断网、超时、限流、5xx……），恢复资格还在，稍后再试。
+ */
+function restoreSession() {
+  // 先认人：旧版本的「1」要趁本机资料还在时迁移成会员 id（getToken 遇到过期会清掉资料）。
+  const member = auth.restorableMember();
+  const expected = member.id;
+  if (auth.getToken()) return Promise.resolve({ state: 'ok' });
+  // 本机存储读不出来、认不清是谁：临时失败，给重试，不送去登录页（Codex 冷审）。
+  if (!expected && member.unreadable) return Promise.resolve({ state: 'recoverable' });
+  if (!expected || !auth.canSilentResignin()) return Promise.resolve({ state: 'need_login' });
+  const generation = auth.sessionGeneration();
+  // 途中换了人（显式登录 / 登出）：结果按「现在」算，不按出发时那个人算。
+  const settled = (state) => (auth.isSameSession(generation) ? { state } : { state: auth.getToken() ? 'ok' : 'need_login' });
+  return silentResignin(generation).then(
+    () => settled(auth.getToken() ? 'ok' : 'need_login'),
+    (err) => {
+      if (isDefinitiveResigninFailure(err)) {
+        auth.logoutIfSameSession(generation);
+        return settled('need_login');
+      }
+      return settled('recoverable');
+    },
+  );
+}
+
+module.exports = { request, uploadFile, configureAiRunner, restoreSession };

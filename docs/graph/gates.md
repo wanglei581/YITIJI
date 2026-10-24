@@ -26,7 +26,7 @@ _（空）_
 
 ──────────────────────────────────────────────────────────────────────
 
-## 有脚本名但不在 CI 执行闭包里（14）
+## 有脚本名但不在 CI 执行闭包里（15）
 
 这一栏是**尽力而为的推断**，权威是 `verify:ci-gate-coverage` 加
 `scripts/ci-gate-exemptions.json`。已在豁免清单里登记的（需要真实凭证 / 真机 /
@@ -41,6 +41,7 @@ _（空）_
 | `apps/kiosk/scripts/probe-ai-resume-closure-42.mjs` | `@ai-job-print/kiosk::verify:probe-ai-resume-closure-42` |
 | `apps/kiosk/scripts/probe-file-closure-43.mjs` | `@ai-job-print/kiosk::verify:probe-file-closure-43` |
 | `apps/kiosk/scripts/probe-member-session-41.mjs` | `@ai-job-print/kiosk::verify:probe-member-session-41` |
+| `apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts` | `terminal-agent::verify:boot-spool-guard-windows` |
 | `apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts` | `terminal-agent::verify:print-queue-residue-windows` |
 | `scripts/generate-project-graph.mjs` | `ai-job-print-terminal::graph`<br/>`ai-job-print-terminal::graph:check` |
 | `scripts/project-graph-query.mjs` | `ai-job-print-terminal::graph:query` |
@@ -69,7 +70,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1872 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1879 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -98,7 +99,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
+| `.github/workflows/ci.yml` | `verify-browser-spec-coverage.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-job-ai-history-privacy-ui.mjs`<br/>`verify-job-ai-ui.mjs`<br/>`verify-job-fit-m1-5-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-lightflow-k2b-ai-resume.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-mic-capability-truth.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-documents-inkpaper.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-profile-print-orders-inkpaper.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-boot-spool-guard.mjs`<br/>`verify-service-desk-foundation.mjs`<br/>`gates.mjs`<br/>`verify-ci-gate-coverage.mjs`<br/>`verify-ci-main-runs-complete.mjs`<br/>`verify-release-bundle.mjs`<br/>`verify-contract-review-preprod-readiness.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-ops-dashboard.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-customer-sample-readiness.ts`<br/>`verify-job-data-quality.ts`<br/>`verify-job-info-ai-real-acceptance.ts`<br/>`verify-partner-excel-template.ts`<br/>`verify-policy-eligibility-authoring.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-profile-commercial-first-batch-acceptance.ts` |
 
 </details>
 
@@ -143,7 +144,7 @@ node scripts/project-graph-query.mjs file <路径>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
-| `.github/workflows/windows-agent-installer.yml` | `verify-ci-gate-coverage.mjs` |
+| `.github/workflows/windows-agent-installer.yml` | `verify-boot-spool-guard.mjs`<br/>`verify-ci-gate-coverage.mjs` |
 
 </details>
 
@@ -955,7 +956,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/services/print/priceConfigApi.ts` | `verify-price-single-source.mjs` |
 | `apps/kiosk/src/services/print/printJobsApi.ts` | `verify-print-confirm-honest.mjs`<br/>`verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-no-raw-error-render.mjs`<br/>`verify-print-scan-first-release.ts` |
 | `apps/kiosk/src/services/resumeParseIntent.ts` | `verify-kiosk-ai-declaration.mjs` |
-| `apps/kiosk/src/services/terminalAuth.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
+| `apps/kiosk/src/services/terminalAuth.ts` | `verify-ai-requests-terminal-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-runtime-terminal-identity.mjs`<br/>`verify-terminal-session-self-heal.mjs` |
 | `apps/kiosk/src/styles/ai-primitives.css` | `verify-kiosk-ai-primitives.mjs` |
 | `apps/kiosk/src/styles/fonts/source-han.css` | `verify-kiosk-font-subset.mjs` |
 | `apps/kiosk/src/styles/kiosk-stage-fit.css` | `verify-kiosk-visual-unity.mjs` |
@@ -1188,20 +1189,32 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/scripts/</code> — 5 个文件</summary>
+<summary><code>apps/terminal-agent/installer/</code> — 3 个文件</summary>
+
+| 文件 | 被这些门禁断言 |
+| --- | --- |
+| `apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1` | `verify-boot-spool-guard-windows.ts` |
+| `apps/terminal-agent/installer/provision/boot-spool-guard.ps1` | `verify-boot-spool-guard-windows.ts` |
+| `apps/terminal-agent/installer/provision/daily-reboot.ps1` | `verify-boot-spool-guard-windows.ts` |
+
+</details>
+
+<details>
+<summary><code>apps/terminal-agent/scripts/</code> — 6 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
 | `apps/terminal-agent/scripts/agent-crash-privacy.helper.ts` | `verify-task-reliability.ts` |
+| `apps/terminal-agent/scripts/collect-field-evidence.ps1` | `verify-boot-spool-guard.mjs` |
 | `apps/terminal-agent/scripts/diagnose-production-agent.ps1` | `verify-agent-unauthorized.mjs` |
-| `apps/terminal-agent/scripts/install-production-agent.ps1` | `verify-agent-unauthorized.mjs`<br/>`verify-terminal-bind-code.ts` |
+| `apps/terminal-agent/scripts/install-production-agent.ps1` | `verify-agent-unauthorized.mjs`<br/>`verify-boot-spool-guard.mjs`<br/>`verify-terminal-bind-code.ts` |
 | `apps/terminal-agent/scripts/scan-lease-barrier.helper.ts` | `verify-scan-watcher.ts` |
 | `apps/terminal-agent/scripts/verify-windows-service-recovery.mjs` | `verify-agent-unauthorized.mjs` |
 
 </details>
 
 <details>
-<summary><code>apps/terminal-agent/src/</code> — 42 个文件</summary>
+<summary><code>apps/terminal-agent/src/</code> — 43 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1219,6 +1232,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/terminal-agent/src/agent/offline-queue.ts` | `verify-agent-unauthorized.mjs`<br/>`verify-print-retry-attempt.ts`<br/>`verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-correlation.ts` | `verify-print-retry-attempt.ts` |
 | `apps/terminal-agent/src/agent/print-dispatch-gate.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
+| `apps/terminal-agent/src/agent/print-job-monitor.ts` | `verify-task-reliability.ts` |
 | `apps/terminal-agent/src/agent/print-monitor-timeout.ts` | `verify-print-truth-hardening.ts` |
 | `apps/terminal-agent/src/agent/print-queue-hold.ts` | `verify-print-queue-residue-windows.ts`<br/>`verify-print-queue-residue.ts` |
 | `apps/terminal-agent/src/agent/print-task-temp-cleanup.ts` | `verify-print-scan-agent.mjs` |
@@ -2263,7 +2277,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 599 个文件</summary>
+<summary><code>services/api/src/</code> — 601 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2467,10 +2481,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/common/redis/member-data-export-redis.service.ts` | `verify-member-closure.ts`<br/>`verify-member-data-export-download.ts` |
 | `services/api/src/common/redis/partner-account-action-redis.service.ts` | `verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action-redis.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts` |
 | `services/api/src/common/redis/redis-client-options.ts` | `verify-redis-degradation-truth.ts` |
-| `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-sms-budget.ts` |
+| `services/api/src/common/redis/redis-degradation.ts` | `verify-admin-login-hardening.ts`<br/>`verify-admin-orgs.ts`<br/>`verify-file-internal-auth.ts`<br/>`verify-member-print-orders.ts`<br/>`verify-order-quote-throttle-identity.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-sms-budget.ts` |
 | `services/api/src/common/redis/redis.module.ts` | `verify-internal-accounts.ts` |
 | `services/api/src/common/redis/redis.service.ts` | `verify-activity-logs.ts`<br/>`verify-admin-ops.ts`<br/>`verify-admin-phone-transfer.ts`<br/>`verify-ai-public-quota.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-alert-push.cjs`<br/>`verify-backend-p0-http.ts`<br/>`verify-change-password.ts`<br/>`verify-internal-accounts-postgres.ts`<br/>`verify-internal-accounts.ts`<br/>`verify-internal-auth-phone.ts`<br/>`verify-kiosk-upload-print-contract.ts`<br/>`verify-member-auth-races.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-restore.ts`<br/>`verify-member-step-up.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-partner-account-action-postgres.ts`<br/>`verify-partner-account-action.ts`<br/>`verify-partner-contact-phone-registration.ts`<br/>`verify-partner-fair-subresources.ts`<br/>`verify-pg-serialization-conflict-postgres.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-recruitment-content-http.ts`<br/>`verify-recruitment-hosting-default-off.ts`<br/>`verify-redis-degradation-truth.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-parse-quota-once.ts`<br/>`verify-sms-budget.ts`<br/>`verify-support-contact.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-trtc-terminal-http.ts`<br/>`verify-upload-scene.ts`<br/>`verify-upload-sessions-faults.ts` |
-| `services/api/src/common/throttler/terminal-throttle.ts` | `verify-ai-throttle-dimension.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-kiosk-session.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/common/throttler/terminal-throttle.ts` | `verify-ai-throttle-dimension.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-kiosk-session.ts`<br/>`verify-order-quote-throttle-identity.ts`<br/>`verify-partner-source-capabilities.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-throttle-dimension.ts` |
 | `services/api/src/community/community.controller.ts` | `verify-community-daily-brief.ts` |
 | `services/api/src/community/community.module.ts` | `verify-policy-scope.ts` |
 | `services/api/src/community/community.service.ts` | `verify-community-daily-brief.ts`<br/>`verify-policies.ts`<br/>`verify-policy-scope.ts` |
@@ -2721,8 +2735,9 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/payment/dto/admin-billing.dto.ts` | `verify-admin-billing.ts` |
 | `services/api/src/payment/dto/order-action.dto.ts` | `verify-order.ts`<br/>`verify-payment-flow.ts`<br/>`verify-refund-idempotent.ts` |
 | `services/api/src/payment/online-payment.service.ts` | `verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-admin-print-scan.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts` |
-| `services/api/src/payment/order-quote.controller.ts` | `verify-ai-access.ts` |
-| `services/api/src/payment/order-quote.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-print-parameter-capability.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
+| `services/api/src/payment/order-quote-throttle.ts` | `verify-order-quote-throttle-identity.ts` |
+| `services/api/src/payment/order-quote.controller.ts` | `verify-ai-access.ts`<br/>`verify-order-quote-throttle-identity.ts` |
+| `services/api/src/payment/order-quote.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order-quote-throttle-identity.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-print-parameter-capability.ts`<br/>`verify-queue-dispatch-printer-status.ts` |
 | `services/api/src/payment/order-status.service.ts` | `verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-audit-postgres.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-redemption-audit.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/payment-provider.factory.ts` | `verify-admin-print-scan.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-order.ts`<br/>`verify-payment-codepay.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-refund-convergence.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/payment/payment-provider.types.ts` | `verify-admin-orders-refund.ts`<br/>`verify-admin-print-outcome.ts`<br/>`verify-api20-manual-refund.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts` |
@@ -2770,6 +2785,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/print-jobs/pickup-order.service.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-backend-p0-contracts.mjs`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts` |
 | `services/api/src/print-jobs/pii-scan-gate.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-derivation-kind.ts`<br/>`verify-pii-manual-confirm.ts` |
 | `services/api/src/print-jobs/print-jobs.controller.ts` | `verify-ai-access.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-throttle-dimension.ts` |
+| `services/api/src/print-jobs/print-jobs.module.ts` | `verify-order-quote-throttle-identity.ts` |
 | `services/api/src/print-jobs/print-jobs.service.ts` | `verify-contract-review-report-print.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-profile-resumes-notifications-inkpaper.mjs`<br/>`verify-admin-fairs.ts`<br/>`verify-admin-print-scan.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-closed-pending-print-task-disposition.ts`<br/>`verify-document-conversion.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-member-print-audit-postgres.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-color-duplex-capability.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-param-suggestion.ts`<br/>`verify-print-parameter-capability.ts`<br/>`verify-print-retry-lock-postgres.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/print-jobs/print-page-count.service.ts` | `verify-admin-fairs.ts`<br/>`verify-career-plan-degraded.ts`<br/>`verify-kiosk-cashier-ui.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-audit-postgres.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-member-print-order-idempotency.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-order.ts`<br/>`verify-package-order-fulfillment.ts`<br/>`verify-package-order-idempotency-http.ts`<br/>`verify-package-order-idempotency.ts`<br/>`verify-payment-flow.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-code-share.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-refund-real-channels.ts`<br/>`verify-resume-report-export.ts`<br/>`verify-wechat-refund-notify.ts`<br/>`verify-wechat-refund-regression.ts` |
 | `services/api/src/print-jobs/print-pricing.ts` | `verify-order.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-pricing.ts`<br/>`verify-print-color-duplex-capability.ts` |
@@ -2844,7 +2860,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/terminals/terminal-credential-security.service.ts` | `verify-terminal-bind-code.ts`<br/>`verify-terminal-device-config.ts` |
 | `services/api/src/terminals/terminal-heartbeat-retention.task.ts` | `verify-terminal-network-diagnostics.ts` |
 | `services/api/src/terminals/terminal-identity.guard.ts` | `verify-kiosk-session.ts`<br/>`verify-member-closure.ts`<br/>`verify-official-channels.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-scan-tasks.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-trtc-terminal-http.ts` |
-| `services/api/src/terminals/terminal-session.service.ts` | `verify-ai-usage-coverage.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-trtc-terminal-http.ts` |
+| `services/api/src/terminals/terminal-session.service.ts` | `verify-ai-usage-coverage.ts`<br/>`verify-member-closure.ts`<br/>`verify-member-order-timeline.ts`<br/>`verify-member-print-order-idempotency-http.ts`<br/>`verify-order-quote-throttle-identity.ts`<br/>`verify-pickup-code-resume.ts`<br/>`verify-pickup-terminal-http.ts`<br/>`verify-print-jobs.ts`<br/>`verify-terminal-identity.ts`<br/>`verify-trtc-terminal-http.ts` |
 | `services/api/src/terminals/terminal-toolbox.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts`<br/>`verify-toolbox-launch-events.ts`<br/>`verify-toolbox-micro-app-platform.ts`<br/>`verify-toolbox-review-workflow.ts` |
 | `services/api/src/terminals/terminal-utils.ts` | `verify-kiosk-job-board-switch.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-terminal-bind-code.ts` |
 | `services/api/src/terminals/terminals-admin.service.ts` | `verify-kiosk-cashier-ui.ts`<br/>`verify-kiosk-job-board-switch.ts`<br/>`verify-legacy-pending-print-task-disposition.ts`<br/>`verify-order.ts`<br/>`verify-partner-smart-campus.ts`<br/>`verify-payment-real-channels.ts`<br/>`verify-print-jobs.ts`<br/>`verify-print-rollout-config.ts`<br/>`verify-print-scan-first-release.ts`<br/>`verify-refund-idempotent.ts`<br/>`verify-scan-input-lockout-telemetry.ts`<br/>`verify-terminal-credentials.ts`<br/>`verify-terminal-device-config.ts`<br/>`verify-terminal-network-diagnostics.ts`<br/>`verify-terminal-provisioning.ts`<br/>`verify-terminal-test-print-seed-guard.ts` |

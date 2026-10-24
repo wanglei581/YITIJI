@@ -1,5 +1,6 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#f4f1e8",
-  "backgroundTextStyle": "dark"
+  "backgroundColor": "#f5f7fa",
+  "backgroundTextStyle": "dark",
+  "navigationBarTextStyle": "white"
 }

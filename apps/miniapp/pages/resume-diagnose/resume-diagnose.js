@@ -3,6 +3,8 @@ const api = require('../../utils/api')
 const storage = require('../../utils/storage')
 const N = require('../../utils/normalize')
 const auth = require('../../utils/auth')
+const { startAfterMemberGate, markPageShown, markPageHidden, markPageUnloaded } = require('../../utils/page-guard')
+const session = require('../../utils/resume-parse-session')
 const fileUrls = require('../../utils/file-url')
 
 // 结果未就绪时的轮询节奏(与解析页一致口径)
@@ -36,6 +38,20 @@ Page({
 
   onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this._startOptions = options || {}
+    // 过期但可恢复（FLOW1b）：先等恢复结果再启动——导出价格按会员显示，本机任务也要按「现在这一位」认领。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions))
+  },
+
+  onShow() {
+    markPageShown(this)
+    // 恢复结束时页面在后台：回到前台才启动（启动过就什么都不做）。
+    startAfterMemberGate(this, auth, api, () => this._start(this._startOptions || {}))
+  },
+
+  onHide() { markPageHidden(this) },
+
+  _start(options) {
     this._loadPricing()
 
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
@@ -53,13 +69,16 @@ Page({
       return
     }
 
-    if (saved.taskId) {
-      this.setData({ hasSavedTask: true, savedFileName: saved.fileName || '' })
+    // 只认属于当前身份的本机任务：换号以后不显示上一位的文件名（10/17）。
+    const owned = session.ownedResumeTask(saved, auth)
+    if (owned) {
+      this.setData({ hasSavedTask: true, savedFileName: owned.fileName || '' })
     }
     this.setData({ status: 'empty' })
   },
 
   onUnload() {
+    markPageUnloaded(this)
     this._stopped = true
     if (this._pollTimer) clearTimeout(this._pollTimer)
     this._stopExportCountdown()
@@ -268,8 +287,8 @@ Page({
 
   /** 查看本机存的上一次任务 */
   viewSaved() {
-    const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
-    if (!saved.taskId) return
+    const saved = session.ownedResumeTask(storage.get(storage.KEYS.RESUME_TASK), auth)
+    if (!saved) return
     this.setData({
       status: 'loading',
       taskId: saved.taskId,

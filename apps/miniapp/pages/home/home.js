@@ -1,7 +1,8 @@
 // pages/home/home.js
 const app = getApp()
 const auth = require('../../utils/auth')
-const { createLifecycleGuard, memberIdentityKey, isMemberIdentity } = require('../../utils/page-guard')
+const api = require('../../utils/api')
+const { createLifecycleGuard, memberIdentityKey, isMemberIdentity, isRestorable, ensureMember } = require('../../utils/page-guard')
 const pickup = require('./pickup-summary')
 
 // 首页是 Tab 页，每次切回来都会 onShow：同一个人 30 秒内不重复拉订单。
@@ -34,6 +35,9 @@ Page({
     // 不能在 wxss 里写死：胶囊位置随机型与系统版本变。
     capsuleInsetRight: 94,
     isLoggedIn: false,
+    // 上次登录过期、正在自动恢复 / 恢复遇到临时失败（FLOW1b）
+    restoring: false,
+    restoreFailed: false,
     userName: '同学',
     greetWord: '你好',
     todayStr: '',
@@ -71,9 +75,38 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    // 首页是 Tab 页，会一直驻留：问候和日期在每次回到前台时重算，不停在第一次打开那一刻（实屏 10/18 仍显示「10/17 晚上好」）。
+    const greet = greetWord()
+    const today = todayStr()
+    if (greet !== this.data.greetWord || today !== this.data.todayStr) this.setData({ greetWord: greet, todayStr: today })
     this._guard.activate()
     this._refresh()
     this._loadPickup()
+    if (this.data.restoring) this._awaitRestore()
+  },
+
+  // 过期但可恢复（FLOW1b）：先等恢复结果，再刷新问候和待取件。等待期间显示「正在恢复登录」，
+  // 不当成未登录；临时失败给一行「重试」，不把人送去登录页。
+  _awaitRestore() {
+    if (this._restoreWait) return
+    this._restoreWait = ensureMember(auth, api).then((r) => {
+      this._restoreWait = null
+      this.setData({ restoring: false, restoreFailed: r.state === 'recoverable' })
+      if (r.state === 'ok') {
+        this._refresh()
+        this._loadPickup()
+      }
+    })
+  },
+
+  // 恢复一直不成时的主动出口：进同一个登录页（不登出、不清本机凭证；登录页先替用户再试一次恢复）。
+  tapLogin() {
+    wx.navigateTo({ url: '/pages/launch/launch' })
+  },
+
+  retryRestore() {
+    this.setData({ restoring: true, restoreFailed: false })
+    this._awaitRestore()
   },
 
   onHide() {
@@ -122,10 +155,14 @@ Page({
   },
 
   _refresh() {
+    // 先判「可恢复」：它要在 isLoggedIn 清掉过期令牌之前认出上次的会员（见 page-guard.isRestorable）。
+    const restoring = isRestorable(auth)
     const loggedIn = auth.isLoggedIn()
     const user = loggedIn ? auth.getUser() : null
     const name = (user && (user.nickname || user.name)) || '同学'
-    this.setData({ isLoggedIn: loggedIn, userName: name })
+    const patch = { isLoggedIn: loggedIn, userName: name, restoring }
+    if (loggedIn || restoring) patch.restoreFailed = false
+    this.setData(patch)
   },
 
   // ── 事件处理 ──

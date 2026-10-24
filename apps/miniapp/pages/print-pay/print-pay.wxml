@@ -1,18 +1,21 @@
 <view class="page-wrap">
-<view style="height:{{statusBarHeight}}px"></view>
-<view class="navbar">
-  <view class="nav-back tap" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
-  <view class="nav-title">确认到机打印</view>
-  <view class="nav-right"></view>
+<view class="navbar col">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="nav-inner">
+    <view class="nav-back tap" bindtap="back" aria-role="button" aria-label="返回"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">确认到机打印</view>
+    <view class="nav-right"></view>
+  </view>
 </view>
 
 <view class="content has-bar">
   <view class="steps rise-d1">
     <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选择文件</text></view>
     <view class="line done"></view>
-    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选终端</text></view>
+    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">终端和参数</text></view>
     <view class="line done"></view>
-    <view class="st on"><text class="n">3</text><text class="nl">到机码</text></view>
+    <!-- 这一步还在手机上确认提交，到机码要提交后才生成；到机核验属于第 4 步（FLOW1a 实图 06） -->
+    <view class="st on"><text class="n">3</text><text class="nl">确认提交</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">4</text><text class="nl">{{quoteState === 'ready' && !isFreeOrder ? '机端支付' : (isFreeOrder ? '现场打印' : '到机完成')}}</text></view>
   </view>
@@ -35,8 +38,10 @@
     </view>
   </view>
 
-  <view class="section-t rise-d4">{{quoteState === 'ready' && !isFreeOrder ? '费用（服务端核定）' : '页数核定'}}</view>
-  <view class="card flat fee rise-d4">
+  <!-- 免费时这一块只剩「免费试运营 免费」一行，与上面文件行的「免费」和底栏重复（FLOW1a 实图 06），不再显示；
+       付费、核定中、核定失败照旧显示。 -->
+  <view wx:if="{{quoteState !== 'ready' || !isFreeOrder}}" class="section-t rise-d4">{{quoteState === 'ready' && !isFreeOrder ? '费用（服务端核定）' : '页数核定'}}</view>
+  <view wx:if="{{quoteState !== 'ready' || !isFreeOrder}}" class="card flat fee rise-d4">
     <view class="fee-row total"><text>{{quoteState === 'ready' && !isFreeOrder ? '服务端核定金额' : (isFreeOrder ? '免费试运营' : '页数待服务端核定')}}</text><text class="amt">{{quoteState === 'ready' && !isFreeOrder ? '¥' + fee.total : (isFreeOrder ? '免费' : '—')}}</text></view>
     <!-- 报价拿不到时**不本地补一个数字**：只说清楚，并给一条可执行的重试。
          提交要等到服务端核定出金额之后才放行（建单会带上这个用户确认过的金额）。 -->
@@ -45,8 +50,8 @@
       <!-- 按 quoteRecover 这个**状态字段**分流，不按文案里有没有「登录」两个字。
            认不出人时「重新核价」是个死循环：再点一次还是同一条 fail-closed，
            真正有效的下一步是重新登录。 -->
-      <view wx:if="{{quoteRecover === 'login'}}" class="qf-login tap" hover-class="tap-press" bindtap="toLogin" role="button">去登录</view>
-      <view wx:else class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" role="button">重新核定</view>
+      <view wx:if="{{quoteRecover === 'login'}}" class="qf-login tap" hover-class="tap-press" bindtap="toLogin" aria-role="button">去登录</view>
+      <view wx:else class="qf-retry tap" hover-class="tap-press" bindtap="retryQuote" aria-role="button">重新核定</view>
     </view>
     <view class="fee-row" wx:elif="{{quoteState === 'loading'}}"><text class="qf-text">正在向服务端核定页数…</text></view>
   </view>
@@ -74,9 +79,9 @@
     <view class="locked-main">
       <view class="locked-t">{{createdState === 'abandoned' ? '上一次提交没有建成订单' : createdState === 'terminal' ? '上一张订单已经结束' : (createdState === 'unknown' ? '暂时核对不上上一张订单' : '订单已创建，请不要重复提交')}}</view>
       <view class="locked-d">{{createdNotice || '到机码已经生成，只是这一步没能自动跳转。到「我的 · 打印订单」就能找回这张订单，点进去即是到机码。'}}</view>
-      <view wx:if="{{createdCanReorder}}" class="locked-btn tap" hover-class="tap-press" bindtap="startNewOrder" role="button">重新下单</view>
-      <view wx:elif="{{createdState === 'unknown'}}" class="locked-btn tap" hover-class="tap-press" bindtap="retryCreatedCheck" role="button">重新核对订单状态</view>
-      <view class="locked-btn tap {{createdCanReorder || createdState === 'unknown' ? 'ghost' : ''}}" hover-class="tap-press" bindtap="toOrders" role="button">去我的打印订单</view>
+      <view wx:if="{{createdCanReorder}}" class="locked-btn tap" hover-class="tap-press" bindtap="startNewOrder" aria-role="button">重新下单</view>
+      <view wx:elif="{{createdState === 'unknown'}}" class="locked-btn tap" hover-class="tap-press" bindtap="retryCreatedCheck" aria-role="button">重新核对订单状态</view>
+      <view class="locked-btn tap {{createdCanReorder || createdState === 'unknown' ? 'ghost' : ''}}" hover-class="tap-press" bindtap="toOrders" aria-role="button">去我的打印订单</view>
     </view>
   </view>
 
@@ -91,6 +96,7 @@
   <!-- 订单建成后按钮永久变灰。服务端现在按 (endUserId, idempotency-key) 回放，
        再点一次不会多出一张单；但页面仍必须变灰 —— 让一个已经下过单的人反复点
        「提交」本身就是在骗他，而且那次回放对他毫无意义。 -->
-  <view class="btn wx lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
+  <!-- 这里没有微信支付（付费也是到机再付），主按钮与整条链一样用蓝色 primary，不用微信绿（FLOW1a 实图 06） -->
+  <view class="btn primary lg {{submitting || createdLocked || quoteState !== 'ready' ? 'disabled' : ''}}" bindtap="continueFlow">{{createdLocked ? '订单已创建' : (submitting ? '正在提交…' : (priceConfirmLabel || '提交并生成到机码'))}}</view>
 </view>
 </view>

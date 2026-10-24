@@ -1,9 +1,10 @@
 <!--pages/ai/ai.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px"></view>
-
-  <view class="navbar">
-    <view class="nav-title left serif">AI 工具</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-title left serif">AI 工具</view>
+    </view>
   </view>
 
   <view class="content has-tabbar">
@@ -27,11 +28,11 @@
     </view>
     <!-- C1 模型名称与备案号在「AI 服务说明」里公示；C3 投诉入口。两处都放在 AI 功能的入口页上。 -->
     <view class="as-links">
-      <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" role="button" aria-label="AI 服务说明，所用模型与备案号">
+      <view class="as-link tap" hover-class="tap-press" bindtap="openAiDisclaimer" aria-role="button" aria-label="AI 服务说明，所用模型与备案号">
         <text>AI 服务说明与备案号</text>
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
-      <view class="as-link tap" hover-class="tap-press" bindtap="openAiComplaint" role="button" aria-label="投诉 AI 生成的内容">
+      <view class="as-link tap" hover-class="tap-press" bindtap="openAiComplaint" aria-role="button" aria-label="投诉 AI 生成的内容">
         <text>投诉 AI 内容</text>
         <text class="ficon i-right" aria-hidden="true"></text>
       </view>
@@ -55,7 +56,7 @@
           hover-class="tap-press"
           bindtap="tapEntry"
           data-id="{{item.id}}"
-          role="button"
+          aria-role="button"
           aria-label="{{item.title}}，{{item.desc}}"
         >
           <view class="t-ic a-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
@@ -83,7 +84,7 @@
         hover-class="tap-press"
         bindtap="tapPending"
         data-id="{{item.id}}"
-        role="button"
+        aria-role="button"
         aria-disabled="true"
         aria-label="{{item.title}}，当前未开放，{{item.why}}。{{item.desc}}。点击查看完整说明"
       >

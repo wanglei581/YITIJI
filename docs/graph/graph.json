@@ -13017,7 +13017,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 641,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15993,7 +15993,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 738
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -18121,6 +18121,7 @@
       "apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
       "scripts/verify-ci-gate-coverage.mjs",
@@ -18158,6 +18159,7 @@
       "scripts/verify-server-maintenance-workflows.mjs"
     ],
     ".github/workflows/windows-agent-installer.yml": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "scripts/verify-ci-gate-coverage.mjs"
     ],
     "apps/admin/index.html": [
@@ -21398,6 +21400,7 @@
       "apps/kiosk/scripts/verify-ai-requests-terminal-session.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs",
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs",
       "apps/kiosk/scripts/verify-terminal-session-self-heal.mjs"
     ],
@@ -21867,14 +21870,27 @@
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts",
       "apps/terminal-agent/scripts/verify-printer-config.mjs"
     ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/boot-spool-guard.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
+    "apps/terminal-agent/installer/provision/daily-reboot.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts"
+    ],
     "apps/terminal-agent/scripts/agent-crash-privacy.helper.ts": [
       "apps/terminal-agent/scripts/verify-task-reliability.ts"
+    ],
+    "apps/terminal-agent/scripts/collect-field-evidence.ps1": [
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs"
     ],
     "apps/terminal-agent/scripts/diagnose-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs"
     ],
     "apps/terminal-agent/scripts/install-production-agent.ps1": [
       "apps/terminal-agent/scripts/verify-agent-unauthorized.mjs",
+      "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
       "services/api/scripts/verify-terminal-bind-code.ts"
     ],
     "apps/terminal-agent/scripts/scan-lease-barrier.helper.ts": [
@@ -21943,6 +21959,9 @@
     "apps/terminal-agent/src/agent/print-dispatch-gate.ts": [
       "apps/terminal-agent/scripts/verify-print-queue-residue-windows.ts",
       "apps/terminal-agent/scripts/verify-print-queue-residue.ts"
+    ],
+    "apps/terminal-agent/src/agent/print-job-monitor.ts": [
+      "apps/terminal-agent/scripts/verify-task-reliability.ts"
     ],
     "apps/terminal-agent/src/agent/print-monitor-timeout.ts": [
       "apps/terminal-agent/scripts/verify-print-truth-hardening.ts"
@@ -24735,6 +24754,7 @@
       "services/api/scripts/verify-admin-orgs.ts",
       "services/api/scripts/verify-file-internal-auth.ts",
       "services/api/scripts/verify-member-print-orders.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-partner-contact-phone-registration.ts",
       "services/api/scripts/verify-pickup-code-share.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
@@ -24796,6 +24816,7 @@
       "services/api/scripts/verify-ai-throttle-dimension.ts",
       "services/api/scripts/verify-backend-p0-contracts.mjs",
       "services/api/scripts/verify-kiosk-session.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-partner-source-capabilities.ts",
       "services/api/scripts/verify-terminal-provisioning.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
@@ -26137,8 +26158,12 @@
       "services/api/scripts/verify-refund-idempotent.ts",
       "services/api/scripts/verify-refund-real-channels.ts"
     ],
+    "services/api/src/payment/order-quote-throttle.ts": [
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
+    ],
     "services/api/src/payment/order-quote.controller.ts": [
-      "services/api/scripts/verify-ai-access.ts"
+      "services/api/scripts/verify-ai-access.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
     ],
     "services/api/src/payment/order-quote.service.ts": [
       "services/api/scripts/verify-kiosk-cashier-ui.ts",
@@ -26146,6 +26171,7 @@
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
       "services/api/scripts/verify-member-print-order-idempotency.ts",
       "services/api/scripts/verify-miniapp-cloud-print-m2.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-package-order-fulfillment.ts",
       "services/api/scripts/verify-package-order-idempotency-http.ts",
       "services/api/scripts/verify-package-order-idempotency.ts",
@@ -26477,6 +26503,9 @@
       "services/api/scripts/verify-print-scan-first-release.ts",
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-throttle-dimension.ts"
+    ],
+    "services/api/src/print-jobs/print-jobs.module.ts": [
+      "services/api/scripts/verify-order-quote-throttle-identity.ts"
     ],
     "services/api/src/print-jobs/print-jobs.service.ts": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs",
@@ -27082,6 +27111,7 @@
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-member-order-timeline.ts",
       "services/api/scripts/verify-member-print-order-idempotency-http.ts",
+      "services/api/scripts/verify-order-quote-throttle-identity.ts",
       "services/api/scripts/verify-pickup-code-resume.ts",
       "services/api/scripts/verify-pickup-terminal-http.ts",
       "services/api/scripts/verify-print-jobs.ts",
@@ -30512,7 +30542,8 @@
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
-          "apps/kiosk/src/services/print/printJobsApi.ts"
+          "apps/kiosk/src/services/print/printJobsApi.ts",
+          "apps/kiosk/src/services/terminalAuth.ts"
         ],
         "missing": []
       },
@@ -32329,6 +32360,49 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/terminal-agent/installer/provision/boot-spool-guard-task.ps1",
+          "apps/terminal-agent/installer/provision/boot-spool-guard.ps1",
+          "apps/terminal-agent/installer/provision/daily-reboot.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard-windows.ts",
+      "helper": false,
+      "inCi": false,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard-windows"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "apps"
+        ],
+        "files": [
+          ".github/workflows/ci.yml",
+          ".github/workflows/windows-agent-installer.yml",
+          "apps/terminal-agent/scripts/collect-field-evidence.ps1",
+          "apps/terminal-agent/scripts/install-production-agent.ps1"
+        ],
+        "missing": []
+      },
+      "file": "apps/terminal-agent/scripts/verify-boot-spool-guard.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:boot-spool-guard"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "apps/terminal-agent/src/agent/api-client.ts"
         ],
         "missing": []
@@ -32774,6 +32848,7 @@
           "apps/terminal-agent/src/agent/dead-letter-operator.ts",
           "apps/terminal-agent/src/agent/legacy-residue-cleanup.ts",
           "apps/terminal-agent/src/agent/offline-queue.ts",
+          "apps/terminal-agent/src/agent/print-job-monitor.ts",
           "apps/terminal-agent/src/agent/task-runner.ts",
           "apps/terminal-agent/src/agent/types.ts",
           "apps/terminal-agent/src/index.ts"
@@ -39148,6 +39223,30 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:offline-agencies-page"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/src/common/redis/redis-degradation.ts",
+          "services/api/src/common/throttler/terminal-throttle.ts",
+          "services/api/src/payment/order-quote-throttle.ts",
+          "services/api/src/payment/order-quote.controller.ts",
+          "services/api/src/payment/order-quote.service.ts",
+          "services/api/src/print-jobs/print-jobs.module.ts",
+          "services/api/src/terminals/terminal-session.service.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-order-quote-throttle-identity.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:order-quote-throttle-identity"
       ],
       "wired": true
     },

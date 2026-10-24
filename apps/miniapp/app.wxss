@@ -164,8 +164,19 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: var(--ink);
 }
-/* 返回箭头：复用 i-right（右向 chevron）翻转为左向 */
-.navbar .nav-back .nav-back-ic { transform: rotate(180deg); }
+/* 返回箭头：只这一处改用边框画 chevron，不再翻转 i-right 的 mask 图（10/17）。
+   10/16–10/17 开发者工具实图：同一份标记，诊断、订单详情、简历上传、消息通知、我的简历、关于
+   稳定看不见，设置、帮助等页看得见；代码层面找不到差别，根因未定位。其余 ficon 不动。
+   .ficon 带 background-color: currentColor，去掉 mask 后必须清空背景，不然是个实心方块。 */
+.navbar .nav-back .nav-back-ic {
+  display: inline-block;
+  width: 10px; height: 10px;
+  background: transparent;
+  -webkit-mask-image: none; mask-image: none;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateX(2px) rotate(45deg);
+}
 .navbar .nav-title {
   position: absolute; left: 50%; transform: translateX(-50%);
   font-size: 16px; font-weight: 650; color: var(--ink);
@@ -185,8 +196,10 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .navbar.light .nav-title,
 .navbar.light .nav-back { color: #fff; }
 
-/* 列式 navbar：statusBar 占位条嵌在 navbar 内部时，需纵向堆叠 */
-.navbar.col { flex-direction: column; height: auto; padding: 0; }
+/* 列式 navbar：statusBar 占位条嵌在 navbar 内部时，需纵向堆叠。
+   钉在顶部（10/17）：整页滚动时页头和状态栏占位一起留住，内容不再滚进状态栏和胶囊下面。
+   z-index 50：高于页面内容层（1–30），低于全屏遮罩（90、120）；底部固定条（100）在下端，不重叠。 */
+.navbar.col { flex-direction: column; height: auto; padding: 0; position: sticky; top: 0; z-index: 50; }
 .nav-inner {
   height: 52px; width: 100%;
   padding: 0 16px;

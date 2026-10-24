@@ -394,6 +394,8 @@ jobs:
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          # Preserve the installed boot spool protection verification.
+          pnpm run verify:boot-spool-guard
           pnpm run verify:agent-unauthorized
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
@@ -822,6 +824,8 @@ jobs:
           # 限流计数维度：一个大厅的 N 台一体机走同一个 NAT 出口 IP，按 IP 计数时
           # 第 3 台机器就会把打印进度轮询打成 429（伪装成「后端挂了」）。
           pnpm --filter @ai-job-print/api verify:throttle-dimension
+          # 报价 POST /orders/quote：按验签后的会员计数，其余按 IP；伪造、自报身份开不出新桶（B-01）。
+          pnpm --filter @ai-job-print/api verify:order-quote-throttle-identity
           # 会花钱的 AI 路由：限流维度必须显式声明。派生式 —— 用 TypeChecker 建调用图，
           # 从「按次计费的厂商调用」反向可达推导出路由集合，新增路由漏声明即红。
           pnpm --filter @ai-job-print/api verify:ai-throttle-dimension

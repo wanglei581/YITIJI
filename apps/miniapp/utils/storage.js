@@ -8,6 +8,9 @@ const KEYS = {
   RESIGNIN_ELIGIBLE: 'resignin_eligible',
   TOKEN: 'zyd_token',
   USER: 'zyd_user',
+  // 同设备恢复凭证（FLOW1c）{ memberId, token }：访问令牌失效后在这台手机上换一枚新的，只认 memberId 这一位。
+  // 服务端只在小程序显式登录时发；主动退出删除。见 utils/auth.js restoreCredential。
+  RESTORE: 'zyd_restore',
   MAPPING_RULE: 'zyd_last_mapping', // 预留
   FAVORITES: 'zyd_favorites',       // 本机收藏(岗位/招聘会/企业),接后端后由服务端同步
   HISTORY: 'zyd_history',           // 本机浏览/外部跳转记录,接后端后由服务端埋点为准

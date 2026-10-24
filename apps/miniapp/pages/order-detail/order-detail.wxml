@@ -4,7 +4,7 @@
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back" aria-role="button" aria-label="返回">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">订单详情</view>
@@ -74,7 +74,12 @@
           bindtap="cancelOrder"
           disabled="{{cancelling}}"
         >{{cancelling ? '正在取消…' : '取消订单'}}</button>
-        <button class="btn primary block tap" hover-class="tap-press" bindtap="toPrint">再打印一份</button>
+        <!-- toPrint 去「我的文档」重新选文件，不是按原单原样再打一份，文字照实写。
+             有到机码时它降为次按钮：这一单要做的是到机取件，不是重新选文件。 -->
+        <button class="btn {{detail.pickup ? 'ghost-ink' : 'primary'}} block tap" hover-class="tap-press" bindtap="toPrint">去我的文档打印</button>
+        <!-- 待到机（或允许同码续打）时的主操作：去取件页看二维码、复制或分享到机码。
+             只带 orderId，和订单列表同一个口径；取件页自己带登录态查订单真值，码不进 URL。 -->
+        <button wx:if="{{detail.pickup}}" class="btn primary block tap" hover-class="tap-press" bindtap="toPickup">查看到机码</button>
       </view>
     </block>
 
