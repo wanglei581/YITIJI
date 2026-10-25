@@ -1,5 +1,10 @@
 # 青序流光 2.0 · 一体机前台优化稿（2026-09-27 起）
 
+> **2026-10-25 部分解冻（产品负责人）：** 原话「稿子可以，解冻 2.0，按对照表先改首页、打印、简历三条主路」。
+> - 首页、打印、简历三条主路（`/`；`/print-scan` 起的打印流程到 `/print/pickup-claim`；`/resume-service` 起的简历流程到 `/resume/optimize/compare`，逐条清单见 `docs/design/kiosk-touch-2026-10/README.md`）的运行页**改以触屏版 `docs/design/kiosk-touch-2026-10/` 为准**。
+> - 本目录对应的稿——01、10、11、12、13、14、15、21、22、23、32、33、37，以及 16 里的简历服务台——**原样保留、不改**，只作历史参照；这几条路由的并排截图、版式验收不再拿它们当真值。
+> - 其余页面照旧以本目录为准、照旧冻结；冻结门禁 `verify:qingxu-v2-frozen` 和下面的冻结规则不变（本目录的稿文件一个字节都不动）。16 的岗位、招聘会、面试、政策四个服务台仍按本目录。
+
 > **定稿（产品负责人，2026-09-29）：本目录是最终版，之后不再改稿。**原话：「这一遍就是最终版本，然后后续前端所有页面都按照这个最终版更新到线上的项目当中」。
 > - 运行页（`apps/kiosk`）和稿不一致时**改运行页，不改稿**；稿本身真有错，先报产品负责人，同意后再改。
 > - 冻结由门禁 `verify:qingxu-v2-frozen`（`apps/kiosk/scripts/verify-qingxu-v2-frozen.mjs`，进 CI）守着：本目录每个稿文件的 sha256 记在 `FROZEN.json`，改动、新增、删除都会让 CI 变红。产品负责人同意改稿后，改完在 `apps/kiosk` 下跑 `node scripts/verify-qingxu-v2-frozen.mjs --update` 重写清单，并在 `docs/progress/current-progress.md` 写明谁同意的、改了什么、为什么。`README.md`、`STATUS.md` 是说明文档，不在冻结范围。
