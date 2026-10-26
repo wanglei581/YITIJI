@@ -1,0 +1,16 @@
+{
+  "frozenAt": "2026-10-26",
+  "updatedAt": "2026-10-26",
+  "note": "青序流光 · 触屏版，补稿定稿（产品负责人 2026-10-26 看过）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。",
+  "files": {
+    "app.js": "1e7e91a5abeba01c83e0630898cc3402c2f235b73d75f4dd3fdc0b209d15d6f1",
+    "data.js": "a0a9e1dc5b3167bdae687c436eb02040471e1fee45bc4b1bde9e74ed1724a35c",
+    "index.html": "8e5ca80031e06e508a057fd1e206b2877ee4c3fc4dc916bb051f2b80995cc049",
+    "map.js": "f851102137996138f0f3f86fe051a52f6f08f8d264e0475e457bb494b95d0d2e",
+    "screens.js": "72d61d1040248eb2a3e69f4d425013d087c47ee35334c2bc467d86d1f4c79271",
+    "screens2.js": "9a92e5e8ca802d4848bddca79deb65f990dbc9290511b815173cc03428e88ac4",
+    "screens3.js": "5303c7e5609c911c94c424454d0051ec59fe2827e19b03db7195b09db595356e",
+    "screens4.js": "ddcccc3081861442b74cdc9aa4ca7550f7349dc937cc7aa51c8513cd8a46074d",
+    "ui.js": "da7603b3254fb1664bddb61902478cb442b20e94b238651de09ba27f862da8a5"
+  }
+}

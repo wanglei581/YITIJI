@@ -2,11 +2,10 @@
 (function () {
   const { icon, band, dock, nav, slab, tile } = UI;
   const S = () => window.S;
-  const F = (o) => (o.band ? band(o.band) : '') + (o.pre || '') + `<main class="body ${o.cls || ''}">${o.body}</main>` + (o.dock === false ? '' : (o.dockHtml || dock(o.dock || {}))) + (o.nav === false ? '' : nav(o.nav));
+  const F = (o) => (o.band ? band(o.band) : '') + (o.pre || '') + `<main class="body ${o.cls || ''}">${o.body}</main>` + (o.dock === false ? '' : (o.dockHtml || dock(o.dock || {}))) + (o.nav === false ? '' : (o.navAdvisor ? nav(o.nav).replace('<span>问小青</span>', '<span>AI 顾问</span>') : nav(o.nav)));
   const fine = (t) => `<p class="fine">${t}</p>`;
   const sec = (t, s) => `<div class="sec-t">${t}${s ? `<small>${s}</small>` : ''}</div>`;
   const add = (id, group, name, def) => window.SCREENS.push(Object.assign({ id, group, name }, def));
-  const RAIL2 = { print: ['选文件', '预览设置', '核对付款', '取件'] };
   const needLogin = (what) => `${slab({ i: 0, go: 'login', title: '登录后才能看' + what, desc: '用手机微信扫一扫，几秒钟；只有你本人能看到', take: '本人记录', vis: UI.qr(3, 180) })}
     <div class="lockprev"><div class="olist-t" style="padding:0">登录后，这里会列出你的${what}</div>${[1, 2, 3].map(k => `<div class="lp"><i></i><span><b></b><small></small></span>${icon('lock', 26, 2)}</div>`).join('')}</div>
     <div class="benefits">${[['printer', '不登录也能打印', '手机、U 盘、扫描'], ['file', '不登录也能改简历', '离开后自动清除'], ['landmark', '不登录也能查政策', '本机构发布']].map(b => `<div><span>${icon(b[0], 38, 2)}</span><b>${b[1]}</b><small>${b[2]}</small></div>`).join('')}</div>
@@ -462,17 +461,36 @@
   });
 
   add('cashier', '打印扫描', '订单支付（收费点位）', {
-    notes: { does: '只在收费点位出现：屏上收款码付款，付完自动开始打印。本机构免费的机器跳过这一屏。', motion: '等待付款时收款码外圈扩散；付款成功对勾画出。', keep: '金额来自已建订单；成功只认系统确认的付款结果；超时关闭、不扣钱；退款改为「拨打服务电话，核实后原路退回」（现有页面写的是找现场工作人员，要改）。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '打印文件 · 订单支付 · 示例：收费点位才有', title: '扫码付款，付完自动开始打印', rail: { labels: RAIL2.print, now: 2 }, seal: null },
-      body: `<div class="seg"><button aria-pressed="true">微信支付</button><button aria-pressed="false" data-act="seg">支付宝</button></div>
-        <div class="paygrid"><div class="waiting"><div class="qr-card" style="margin-top:0"><div class="qr-box"><i class="pulse"></i><i class="pulse p2"></i>${UI.qr(31, 340)}<span class="qr-tag">示例码</span></div><b style="font-size:24px">打开微信扫一扫</b></div></div>
-          <div class="sumcard"><div class="r"><span>订单</span><b>尾号 0927</b><span></span></div><div class="r"><span>内容</span><b>2 页 × 1 份 · 黑白 · 单面</b><span></span></div><div class="r"><span>应付</span><b style="font-size:40px;color:var(--clay-ink)">0.60 元</b><span></span></div></div></div>
-        <div class="livebox"><span class="spin"></span><div><b>请扫码支付</b><small>4:32 后没付会自动关闭订单，不会扣钱；请勿重复付款</small></div></div>
-        <div class="howto">${icon('shield', 34, 2)}<span>付款结果以系统确认为准。如需退款，请拨打服务电话 183-6916-1921，核实后原路退回。</span></div>
-        ${fine('示例金额 · 本机构免费的机器不会出现这一屏')}`,
-      dock: { backLabel: '取消', ask: false, pri: { label: '演示：已付款', go: 'printing', kind: 'pri wide' } }, nav: null
-    })
+    notes: { does: '运行页收银台 PrintCashierPage / CashierQxView 的等待支付态（cashierQxModel pending-qr）。金额大于 0 才到这一屏。', motion: '不演出付款成功。切换方式只改说明，出示付款码时屏幕不回显那串码。', keep: '胶囊「等待支付 · 未确认」。通道行「这台机器只启用了一个支付通道，已自动采用」加「测试支付通道 · 非真实收款」。这句只在沙箱通道出现（CashierPaymentPanel.tsx:327-331）。正式通道显示「{通道名} · 支付结果以实际到账为准」。多通道时由用户自己选，绝不默认第一项（PrintCashierPage.tsx:185-195）。扫码方式两选，「我用手机扫码付」默认选中。收款码下写「这张码属于本次订单，支付主体与金额以手机端展示为准」和「收款码 5 分钟内有效」。有效期从服务端读，默认 300 秒。订单摘要示例「订单号 ORD-20261026-0418」「内容 毕业生就业推荐表（已填写）.pdf · 2 张 · 黑白」「应付 2.00 元」。金额和订单号从订单读，示例不代表价目。底部返回位「返回确认页」；出过码后这一颗变「改参数需重新下单」（PrintCashierPage.tsx:471-475）。「退出支付」放弃这次支付回首页，和返回是两件事（545-569）。主按钮「刷新付款结果」。不预画微信或支付宝按钮。成功只认系统确认的付款结果。' },
+    render: () => {
+      const mode = S().payMode === 'code' ? 'code' : 'qr';
+      return F({
+        band: { kind: 'compact', eyebrow: '打印文件 · 订单支付', title: '请完成这笔支付', sub: '选择已开通的支付通道；确认到账后才会开始打印', seal: null, place: ' ', status: { text: '等待支付 · 未确认', warn: 1 } },
+        cls: 'd3-cashier',
+        body: `<p class="d3-chline"><b>这台机器只启用了一个支付通道，已自动采用</b>测试支付通道 · 非真实收款</p>
+          <div class="seg">
+            <button aria-pressed="${mode === 'qr' ? 'true' : 'false'}" data-d3="pay" data-v="qr">我用手机扫码付</button>
+            <button aria-pressed="${mode === 'code' ? 'true' : 'false'}" data-d3="pay" data-v="code">出示付款码给机器扫</button>
+          </div>
+          <div class="sumcard"><div class="r"><span>订单号</span><b>ORD-20261026-0418</b><span></span></div><div class="r"><span>内容</span><b>毕业生就业推荐表（已填写）<span class="d3-ext">.pdf</span> · 2 张 · 黑白</b><span></span></div><div class="r"><span>应付</span><b>2.00 元</b><span></span></div></div>
+          ${mode === 'qr'
+            ? `<div class="d3-qrframe waiting"><b class="d3-qrt">请扫码支付</b>${UI.qr(11, 400)}<b>这张码属于本次订单，支付主体与金额以手机端展示为准</b><p>支付尝试已经创建。请勿切换方式、重复付款或重新下单。收款码 5 分钟内有效。</p></div>`
+            : '<div class="d3-qrframe"><b>请把付款码对准扫码区</b><p>机器扫你的付款码。屏幕不回显这串码。</p></div>'}
+          <button class="btn sec" data-go="home" style="height:80px;align-self:flex-start;min-width:240px">退出支付</button>`,
+        dock: { back: false, left: `<button class="btn sec" data-go="confirm">${icon('chevL', 30, 2.4)}返回确认页</button>`, ask: '问小青：这笔账看不懂', pri: { label: '刷新付款结果', act: 'toast', arg: '正在向支付渠道核实这一次的结果' } }, nav: null, navAdvisor: 1
+      });
+    },
+    mount: (el) => {
+      const on = (e) => {
+        const b = e.target.closest('[data-d3="pay"]');
+        if (!b || !el.contains(b)) return;
+        e.stopPropagation();
+        window.S.payMode = b.dataset.v;
+        window.__proto.refresh();
+      };
+      el.addEventListener('click', on);
+      return () => el.removeEventListener('click', on);
+    }
   });
 
   add('sign', '打印扫描', '签名（默认关闭）', {

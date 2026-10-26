@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 仓库版：私有页发布时由平台补的文档头（doctype、字符集、视口）在这里写明，直接用浏览器打开也按标准模式、UTF-8 渲染。稿的内容与私有页第 3 版一致。 -->
+<!-- 仓库版：私有页发布时由平台补的文档头（doctype、字符集、视口）在这里写明，直接用浏览器打开也按标准模式、UTF-8 渲染。稿的内容与私有页 2026-10-26 那一版（补稿后）一致。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -933,6 +933,7 @@ button.gi:active{background:#f8f4e8}
     <div class="p-head">
       <h1>青序流光 · 触屏版</h1>
       <p>一体机前台减密度 + 动效设计稿。左边是 1080×1920 竖屏真尺寸，可以直接点；这里看每一屏为什么这样排。</p>
+      <p style="flex-basis:100%;margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(31,143,111,.08);color:var(--desk-ink)"><b>第 4 版（10/26）补稿：</b>首页、打印、简历三条主路各屏的字按运行页代码改过，运行页有、稿上原来没画的功能和状态补上了；新增「状态样式板」7 屏（加载、空、出错、不可用、设备停用、结果未确认、小青不可用），简历补「诊断方向、更多条件、编辑、导出与打印」。点「全部页面」能看到新分组。字和功能由 Codex 逐条对代码核过，agy 做了反方挑刺。<br><b>10/26 产品负责人定：</b>完成页「结束使用」按一下就结束；诊断方向的「招聘会现场」保留为参考标签；打印步骤统一成 4 步。</p>
     </div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="flows" aria-selected="true">本屏说明</button>
@@ -952,7 +953,7 @@ button.gi:active{background:#f8f4e8}
       </div>
       <div class="row">
         <button class="tg" id="tg-login" aria-pressed="false">已登录</button>
-        <button class="tg" id="tg-printer" aria-pressed="false">打印机连不上</button>
+        <button class="tg" id="tg-printer" aria-pressed="false">打印机离线</button>
         <button class="tg" id="tg-ai" aria-pressed="false">小青不可用</button>
         <button class="tg" id="tg-idle">演示：无操作提醒</button>
       </div>
@@ -965,5 +966,7 @@ button.gi:active{background:#f8f4e8}
 <script src="data.js"></script>
 <script src="screens.js"></script>
 <script src="screens2.js"></script>
+<script src="screens3.js"></script>
+<script src="screens4.js"></script>
 <script src="map.js"></script>
 <script src="app.js"></script>

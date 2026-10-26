@@ -48,7 +48,7 @@
     d.style.cssText = 'position:absolute;left:50%;bottom:300px;transform:translateX(-50%);z-index:50;max-width:900px;padding:22px 34px;border-radius:999px;background:rgba(11,36,30,.92);color:#f6f3ea;font:600 25px/1.4 var(--sans);text-align:center;animation:fadein 200ms ease both';
     stage.appendChild(d); setTimeout(() => d.remove(), 2400);
   }
-  window.doClear = () => { S.logged = false; S.opt = 0; S.code = ''; S.iv.q = 0; S.print = { copies: 1, color: 'bw', duplex: 'single' }; syncToggles(); hist.length = 0; render('cleared'); };
+  window.doClear = () => { S.logged = false; S.opt = 0; S.code = ''; S.iv.q = 0; S.print = { copies: 1, color: 'bw', duplex: 'single' }; ['more', 'pii', 'legacy', 'hid', 'payMode', 'pickupState', 'directed', 'intent', 'layoutMore', 'factSheet', 'expDone', 'expFmt', 'repExported', 'aiAdjusted'].forEach((k) => { delete S[k]; }); syncToggles(); hist.length = 0; render('cleared'); };
   function idle() {
     stage.querySelectorAll('.overlay').forEach(n => n.remove());
     const o = document.createElement('div'); o.className = 'overlay';

@@ -122,6 +122,7 @@
     "verify:contract-review-session": "node scripts/verify-contract-review-session.mjs",
     "verify:contract-review-report-print": "node scripts/verify-contract-review-report-print.mjs",
     "verify:qingxu-v2-frozen": "node scripts/verify-qingxu-v2-frozen.mjs",
+    "verify:kiosk-touch-frozen": "node scripts/verify-kiosk-touch-frozen.mjs",
     "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",
     "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs",
     "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
