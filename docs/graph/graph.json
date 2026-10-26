@@ -30516,6 +30516,24 @@
     {
       "asserts": {
         "absent": [],
+        "dirs": [
+          "docs/design/kiosk-touch-2026-10"
+        ],
+        "files": [],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-touch-frozen.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-touch-frozen"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
