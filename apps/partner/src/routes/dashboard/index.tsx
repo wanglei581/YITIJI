@@ -9,6 +9,7 @@ import { partnerPoliciesService, type PartnerPolicyPage } from '../../services/a
 import { getPartnerStats, type PartnerStatsResponse } from '../../services/api/stats'
 import { getPartnerTerminalOperations, type PartnerTerminalOpsView } from '../../services/api/terminalOps'
 import { OrgNoticesSection, type OrgNoticeOutcome } from './OrgNoticesSection'
+import { RecruitmentOverview } from './RecruitmentOverview'
 
 type Load<T> = { status: 'loading' | 'error' | 'ready'; data: T | null }
 type OverviewLoad =
@@ -133,6 +134,13 @@ export default function DashboardPage() {
             {showEmpty && <p className="text-sm text-neutral-600">{EMPTY_TODAY}</p>}
             <Link to={INCIDENTS} className="inline-flex h-14 min-h-14 items-center justify-center rounded-xl bg-primary-600 px-8 text-base font-bold text-white hover:bg-primary-700">报障</Link>
           </section>
+          <RecruitmentOverview
+            dashboard={dashboard}
+            snapshot={snapshot}
+            statsStatus={stats.status}
+            onRetryDashboard={() => setDashKey((k) => k + 1)}
+            onRetryStats={() => setStatsKey((k) => k + 1)}
+          />
           <OrgNoticesSection onOutcome={onNoticeOutcome} />
         </div>
         <div className="min-w-0 space-y-4">

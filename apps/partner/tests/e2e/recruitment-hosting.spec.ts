@@ -93,10 +93,11 @@ test.describe('托管关闭（我们云上默认）', () => {
     await expect(today).toBeVisible()
     await expect(policies.getByText('政策公告')).toBeVisible()
     await expect(policies.getByText(/待审核/)).toBeVisible()
-    for (const label of ['已上传岗位', '已上传招聘会', '已发布数据', '数据源']) {
+    for (const label of ['已上传岗位', '已上传招聘会', '已发布数据', '待审核数据', '数据源']) {
       await expect(page.getByText(label, { exact: true })).toHaveCount(0)
     }
     await expect(page.getByRole('heading', { name: '最近同步记录' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: '招聘内容概况' })).toHaveCount(0)
     const notices = page.getByRole('region', { name: '平台处置通知' })
     await expect(notices.getByText('政策已紧急下架')).toBeVisible()
     await expect(notices.getByText('岗位已紧急下架')).toBeVisible()
@@ -206,10 +207,23 @@ test.describe('托管打开（私有化部署 b）', () => {
     }
     await expect(page.getByRole('region', { name: '今天要处理' })).toBeVisible()
     await expect(page.getByRole('region', { name: '政策概况' })).toBeVisible()
-    await expect(page.getByText('已上传岗位')).toHaveCount(0)
-    await expect(page.getByRole('heading', { name: '最近同步记录' })).toHaveCount(0)
+    const overview = page.getByRole('region', { name: '招聘内容概况' })
+    await expect(overview.getByText('已上传岗位', { exact: true })).toBeVisible()
+    await expect(overview.getByText('待审核数据', { exact: true })).toBeVisible()
+    await expect(overview.getByText('含审核中与企业资料，与统计页相同')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '最近同步记录' })).toBeVisible()
     await expect(page.getByRole('region', { name: '平台处置通知' })).toBeVisible()
     await shot(page, 'dashboard-hosting-on')
+
+    await page.getByRole('region', { name: '最近同步记录' }).getByRole('button', { name: '查看全部' }).click()
+    await page.waitForURL(/\/sync-logs/)
+    await expect(page.getByRole('heading', { level: 1, name: '同步日志' })).toBeVisible()
+
+    await gotoPartner(page, '/', '工作台')
+    await waitForMockList(page)
+    await page.getByRole('region', { name: '招聘内容概况' }).locator('p').filter({ hasText: /^数据源$/ }).click()
+    await page.waitForURL(/\/sources/)
+    await expect(page.getByRole('heading', { level: 1, name: '数据源管理' })).toBeVisible()
 
     for (const route of HOSTED_ROUTES) {
       await gotoPartner(page, route.path, route.title)
@@ -234,6 +248,21 @@ test.describe('托管打开（私有化部署 b）', () => {
     await waitForMockList(page)
     await expect(page.getByRole('row', { name: /就业见习岗位补贴申领/ }).getByRole('button', { name: '审核通过' })).toBeVisible()
     await shot(page, 'policy-hosting-on')
+    await assertPageHonest(page, errors)
+  })
+
+  test('1280 宽同步表在自己的容器里横滑', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    const { errors } = collectPageFaults(page)
+    await gotoPartner(page, '/', '工作台')
+    await waitForMockList(page)
+    const section = page.getByRole('region', { name: '最近同步记录' })
+    await expect(section.getByText('市人才网 API（演示）')).toBeVisible()
+    const table = section.locator('table')
+    await expect(table.locator('thead th', { hasText: /^数据源$/ })).toBeVisible()
+    const scroller = table.locator('..')
+    await expect(scroller).toHaveCSS('overflow-x', 'auto')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await assertPageHonest(page, errors)
   })
 })
