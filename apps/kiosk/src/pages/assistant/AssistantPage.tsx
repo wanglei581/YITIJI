@@ -1,9 +1,9 @@
 // 稿 05 青序流光 2.0；状态只由真实请求、草稿与语音相位派生。
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { HomeIcon, KeyboardIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { KeyboardIcon } from 'lucide-react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
@@ -465,17 +465,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const draftLength = input.trim().length
 
   return (
-    <QxPageFrame
-      back={{ label: '返回首页', onBack: () => navigate('/') }}
-      title="AI 顾问"
+    <PublicTouchFrame
+      eyebrow="问小青"
+      title={cockpitCopy.title.join('')}
+      sub={cockpitCopy.lede}
       status={cockpitCopy.pill}
-      navbar={
-        <>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/')}><HomeIcon size={32} aria-hidden />首页</button>
-          <button type="button" className="qx-nav-item" aria-current="page"><SparklesIcon size={32} aria-hidden />AI 顾问</button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')}><UserIcon size={32} aria-hidden />我的</button>
-        </>
-      }
+      navCurrent="advisor"
+      back={{ label: '返回首页', onBack: () => navigate('/') }}
+      screen="assistant"
     >
     <section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">
       <div
@@ -748,6 +745,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         }}
       />
     </section>
-    </QxPageFrame>
+    </PublicTouchFrame>
   )
 }

@@ -16,8 +16,8 @@ import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
+import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import { accountDisplayMessage } from './accountUserMessage'
 import { MemberAgreement } from './components/MemberAgreement'
 import { LoginGatePhoneFields } from './components/LoginGatePhoneFields'
@@ -164,6 +164,7 @@ export function LoginPage() {
     && phoneLogin.phone.length === 11
     && phoneLogin.code.length === 6
     && !phoneLogin.loading
+  const helpLine = useVisibleHelpLine()
 
   return (
     <div
@@ -175,27 +176,30 @@ export function LoginPage() {
       data-takeaway="本人服务记录与继续办理"
     >
       <KioskStageFit>
-        <QxPageFrame
+        <PublicTouchFrame
           title={copy.title}
-          subtitle={<>{copy.sub} 回来后会到 <b>{loginReturnLabel(returnTo)}</b>。</>}
+          sub={`${copy.sub}回来后会到${loginReturnLabel(returnTo)}。`}
+          eyebrow="登录"
           status={pill}
           back={{ label: '返回首页', onBack: goHome }}
-          ctabar={
-            <>
+          nav={false}
+          screen="login"
+          dock={(
+            <footer className="qxt-dock">
+              <button type="button" className="qxt-btn qxt-btn-sec" data-testid="login-gate-back" onClick={goHome}>返回首页</button>
               {mode === 'phone' && (state === 'phone-idle' || state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable' || phoneDaily) ? (
-                <button type="button" className="qx-btn" data-variant="ghost" data-testid="login-gate-anonymous" onClick={goHome}>
+                <button type="button" className="qxt-btn qxt-btn-sec" data-testid="login-gate-anonymous" onClick={goHome}>
                   {state === 'phone-idle' || state === 'phone-legal-unpublished' || state === 'phone-sms-unavailable' || phoneDaily ? '不登录，继续使用' : '返回首页'}
                 </button>
               ) : (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
+                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => switchTab(mode === 'phone' ? 'scan' : 'phone')}>
                   {mode === 'phone' ? '改用扫码登录' : '改用手机号登录'}
                 </button>
               )}
               {mode === 'phone' && (state === 'phone-code-sent' || state === 'phone-code-invalid') ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-pri"
                   data-testid="login-gate-primary"
                   aria-disabled={!canConfirm}
                   disabled={!canConfirm}
@@ -207,8 +211,7 @@ export function LoginPage() {
               {mode === 'phone' && !phoneDaily && (state === 'phone-send-limited' || state === 'phone-send-failed' || state === 'phone-code-expired' || state === 'phone-code-locked') ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-pri"
                   data-testid="login-gate-primary"
                   aria-disabled={!agreed || phoneLogin.countdown > 0 || phoneLogin.loading}
                   disabled={!agreed || phoneLogin.countdown > 0 || phoneLogin.loading}
@@ -221,8 +224,7 @@ export function LoginPage() {
               {mode === 'phone' && (state === 'phone-sms-unavailable' || phoneDaily) ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-pri"
                   data-testid="login-gate-primary"
                   onClick={() => switchTab('scan')}
                 >
@@ -232,8 +234,7 @@ export function LoginPage() {
               {mode === 'qr' && (state === 'qr-ready' || state === 'qr-expired' || state === 'qr-error') ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-pri"
                   data-testid="login-gate-primary"
                   aria-disabled={!agreed}
                   disabled={!agreed}
@@ -243,22 +244,22 @@ export function LoginPage() {
                 </button>
               ) : null}
               {mode === 'phone' && (state === 'phone-sending' || state === 'phone-verifying' || state === 'phone-legal-unpublished') ? (
-                <span className="qx-btn" role="button" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
+                <span className="qxt-btn qxt-btn-pri" role="button" aria-disabled="true" data-testid="login-gate-primary">
                   {state === 'phone-sending' ? '正在等待结果' : state === 'phone-legal-unpublished' ? '暂时无法登录' : '等待核验结果'}
                 </span>
               ) : null}
               {mode === 'qr' && (state === 'qr-loading' || state === 'qr-confirmed') ? (
-                <span className="qx-btn" role="button" data-variant="primary" aria-disabled="true" data-testid="login-gate-primary">
+                <span className="qxt-btn qxt-btn-pri" role="button" aria-disabled="true" data-testid="login-gate-primary">
                   {state === 'qr-confirmed' ? '正在完成登录' : agreed ? '正在取二维码' : '请先勾选协议'}
                 </span>
               ) : null}
               {state === 'phone-send-failed' || state === 'qr-error' ? (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-                  联系工作人员
+                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/help')}>
+                  查看帮助
                 </button>
               ) : null}
-            </>
-          }
+            </footer>
+          )}
         >
           <p className="lg-identity-note">验证码由短信发到你的手机。这台机器不生成、也不代填。这一步不用 AI 核对是不是你。</p>
           <ol className="lg-rail" aria-label="登录步骤"><li><b>01</b>选择登录方式</li><li><b>02</b>核对本人身份</li><li><b>03</b>回到刚才的办理</li></ol>
@@ -347,11 +348,10 @@ export function LoginPage() {
               </div>
             </section>
           </div>
+          {helpLine ? <p className="qxp-note" role="note">{helpLine}</p> : null}
           <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>
-          <QxStepActions onPrev={goHome} prevLabel="返回首页">
-            <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
-          </QxStepActions>
-        </QxPageFrame>
+          <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
+        </PublicTouchFrame>
       </KioskStageFit>
     </div>
   )

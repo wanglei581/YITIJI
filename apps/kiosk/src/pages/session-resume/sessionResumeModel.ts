@@ -107,5 +107,5 @@ export const RESUME_EMPTY_EXITS = [
 export const RESUME_UNAVAILABLE_EXITS = [
   { id: 'code', title: '用到机码继续', sub: '到机码还在有效期内、且就在这台机器上核销时，可以绕开这一页。', route: '/print/pickup-claim' },
   { id: 'records', title: '去我的记录看看', sub: '打印订单和状态在我的记录里，同样能确认这一单还在不在。', route: '/me/activity' },
-  { id: 'help', title: '一直读不出来', sub: '按常见问题里的方式找现场工作人员，请他们帮你核对这一单的真实状态。', route: '/help' },
+  { id: 'help', title: '一直读不出来', sub: '到帮助页看常见问题。这一页不替你核对订单，服务电话读得到时写在帮助页上。', route: '/help' },
 ] as const

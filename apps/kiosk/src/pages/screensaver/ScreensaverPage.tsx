@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { StandbyView } from './StandbyView'
 import { deriveStandbyPhase, formatStandbyClock, nextPlayableIndex, standbyShouldExitHome } from './standbyModel'
 import '../../styles/qingxu/index.css'
@@ -180,6 +181,13 @@ export function ScreensaverPage() {
       role="presentation"
     >
       <KioskStageFit>
+        <PublicTouchFrame
+          title="待机"
+          band={false}
+          nav={false}
+          className="qxp-standby"
+          bodyClassName="qxt-body-tight"
+        >
         <StandbyView
           // 素材全部加载失败：显示「暂无宣传内容」（empty 态的说明），而不是一直「正在读取」。
           phase={allFailed ? 'empty' : phase === 'empty' ? 'loading' : phase}
@@ -193,6 +201,7 @@ export function ScreensaverPage() {
           onMediaError={() => { if (shown) markFailedRef.current(shown.id) }}
           onWake={exit}
         />
+        </PublicTouchFrame>
       </KioskStageFit>
     </div>
   )

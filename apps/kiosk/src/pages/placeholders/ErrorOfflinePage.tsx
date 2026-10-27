@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
 import { API_BASE_URL, getTerminalId } from '../../services/api'
 import './system-state-qx.css'
@@ -163,6 +163,8 @@ const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${Str
 
 export default function ErrorOfflinePage() {
   const navigate = useNavigate()
+  const faultLine = useVisibleHelpLine(true)
+  const helpLine = useVisibleHelpLine(false)
   const location = useLocation()
   const [attempts, setAttempts] = useState(0)
   const [checking, setChecking] = useState(false)
@@ -276,8 +278,8 @@ export default function ErrorOfflinePage() {
       glyph: 'wifioff', label: '本机连不上服务器',
       title: <>和服务器<em>连不上</em></>,
       copy: safeFrom
-        ? <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，一连上就把你送回刚才那一页。</>
-        : <>传文件、算价、AI 和岗位信息都要走服务器，所以这几项现在用不了。<b>机器会自己一直重试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
+        ? <>传文件、算价、AI 和机构官方渠道都要走服务器，所以这几项这次取不到。<b>机器会自己再试</b>，一连上就把你送回刚才那一页。</>
+        : <>传文件、算价、AI 和机构官方渠道都要走服务器，所以这几项这次取不到。<b>机器会自己再试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
       note: <>已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</>,
     },
   }
@@ -285,8 +287,8 @@ export default function ErrorOfflinePage() {
   const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
   const hint = view === 'unknown' ? '检测之后才有判定'
     : view === 'checking' ? '等这次结果'
-      : view === 'offline' ? `${lastCheck} · 已重试 ${attempts} 次，${nextAuto}`
-        : `${lastCheck} · ${nextAuto}`
+      : view === 'offline' ? `${lastCheck} · 已重试 ${attempts} 次`
+        : lastCheck || '等下一次检测'
   const pill = {
     unknown: { tone: 'unknown', label: '还没检测' },
     checking: { tone: 'unknown', label: '正在检测' },
@@ -295,7 +297,7 @@ export default function ErrorOfflinePage() {
   } as const
 
   return (
-    <main
+    <div
       className="fusion-w5 fusion-w5--system k9-system-state"
       data-kiosk-screen="error-offline"
       data-kiosk-presentation="fusion-youth"
@@ -303,23 +305,27 @@ export default function ErrorOfflinePage() {
       data-state={view}
     >
       <KioskStageFit>
-        <QxPageFrame
+        <PublicTouchFrame
           title="机器状态"
+          eyebrow="本机"
+          sub={current.label}
           status={pill[view]}
           back={{ label: '返回首页', onBack: () => navigate('/') }}
-          ctabar={(
+          nav={false}
+          screen="error-offline"
+          dock={(
             <>
-              <div className="k9s-cta">
-                <button type="button" className="k9s-btn" onClick={() => navigate('/')}>返回首页</button>
-                <button type="button" className="k9s-btn" onClick={() => navigate('/help', { replace: true })}>帮助与求助</button>
-                <button type="button" className="k9s-btn is-primary" data-testid="system-state-primary" disabled={checking}
+              <div className="k9s-cta qxt-dock">
+                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/')}>返回首页</button>
+                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/help', { replace: true })}>帮助与求助</button>
+                <button type="button" className="qxt-btn qxt-btn-pri" data-testid="system-state-primary" disabled={checking}
                         onClick={() => void retry()}>
                   <Glyph name="radar" size={26} />{checking ? '正在检测' : '重新检测'}
                 </button>
               </div>
               <div className="k9s-truth" data-disclaimer="true" data-testid="system-state-truth">
                 <p><b>怎么判断</b>八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，<b>不会默认写成正常</b>。</p>
-                <p><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况；拿不准就找工作人员。</p>
+                <p><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况。</p>
               </div>
             </>
           )}
@@ -343,6 +349,7 @@ export default function ErrorOfflinePage() {
                 <span className="no" aria-hidden="true">01</span>
                 <h2 className="t">这台机器的八项状态</h2>
                 <span className="hint">{hint}</span>
+                <span className="qxp-sr">{view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}</span>
               </div>
               <ul className="k9s-caps" data-testid="system-state-list">
                 {CAPS.map((cap, index) => (
@@ -378,9 +385,11 @@ export default function ErrorOfflinePage() {
                 </div>
               </div>
             </section>
+            {view === 'offline' && faultLine ? <p className="qxp-remind">{faultLine}</p> : null}
+            {view !== 'offline' && helpLine ? <p className="qxp-remind">{helpLine}</p> : null}
           </div>
-        </QxPageFrame>
+        </PublicTouchFrame>
       </KioskStageFit>
-    </main>
+    </div>
   )
 }

@@ -163,7 +163,7 @@ export function AssistantHoldToTalk({
       setError(
         failure === 'permission-denied'
           ? isTerminalKiosk()
-            ? '麦克风不可用，可以改用文字输入；如需语音请联系现场工作人员'
+            ? '麦克风不可用，可以改用文字输入；语音暂时用不了'
             : '麦克风权限未开启，请在地址栏允许麦克风后重试，或改用文字输入'
           : '麦克风不可用，请改用文字输入',
       )

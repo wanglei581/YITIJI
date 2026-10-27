@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useAuth } from '../../auth/useAuth'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { getPendingTasks, type PendingTask } from '../../services/api/pendingTasks'
 import { SessionResumeView } from './SessionResumeView'
 import {
@@ -18,10 +18,14 @@ export function SessionResumePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  const goLogin = () => {
+    navigate('/login', { replace: true, state: { from: '/session-resume' } })
+  }
+
   const reload = () => {
     const token = getToken()
     if (!isLoggedIn || !token) {
-      navigate('/login', { replace: true, state: { from: '/session-resume' } })
+      goLogin()
       return
     }
     setLoading(true)
@@ -36,7 +40,7 @@ export function SessionResumePage() {
     if (!ready) return
     const token = getToken()
     if (!isLoggedIn || !token) {
-      navigate('/login', { replace: true, state: { from: '/session-resume' } })
+      setLoading(false)
       return
     }
     let cancelled = false
@@ -75,42 +79,72 @@ export function SessionResumePage() {
     navigate('/print/progress', { state })
   }
 
-  const status = screen === 'loading'
+  const guest = ready && !isLoggedIn
+  const status = !ready || (loading && !guest)
     ? { tone: 'unknown' as const, label: '正在读取' }
-    : screen === 'unavailable'
-      ? { tone: 'bad' as const, label: '没读到未完成任务' }
-      : screen === 'empty'
-        ? { tone: 'ok' as const, label: '名下没有未完成任务' }
-        : { tone: 'warn' as const, label: '继续打印任务' }
+    : guest
+      ? { tone: 'unknown' as const, label: '登录后继续' }
+      : screen === 'unavailable'
+        ? { tone: 'warn' as const, label: '没读到未完成任务' }
+        : screen === 'empty'
+          ? { tone: 'ok' as const, label: '名下没有未完成任务' }
+          : { tone: 'warn' as const, label: '继续打印任务' }
 
   return (
-    <QxPageFrame
+    <PublicTouchFrame
       title="继续打印任务"
-      subtitle="只列你名下没办完的打印任务。继续回到这一单原来那一步，不重新建单。"
+      sub="只列你名下没办完的打印任务。继续回到这一单原来那一步，不重新建单。"
+      eyebrow="打印"
       status={status}
       back={{ label: '返回首页', onBack: () => navigate('/') }}
-      ctabar={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>去打印扫描</button>
-          {screen === 'unavailable' || screen === 'list' ? (
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="session-resume-primary" onClick={reload}>
+      navCurrent="profile"
+      screen="session-resume"
+      dock={(
+        <footer className="qxt-dock">
+          <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/')}>返回首页</button>
+          {guest ? (
+            <button type="button" className="qxt-btn qxt-btn-pri qxt-wide" data-testid="session-resume-primary" onClick={goLogin}>
+              去登录
+            </button>
+          ) : screen === 'unavailable' || screen === 'list' ? (
+            <button type="button" className="qxt-btn qxt-btn-pri qxt-wide" data-testid="session-resume-primary" onClick={reload}>
               重新读取列表
             </button>
           ) : (
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="session-resume-primary" onClick={() => navigate('/print-scan')}>
+            <button type="button" className="qxt-btn qxt-btn-pri qxt-wide" data-testid="session-resume-primary" onClick={() => navigate('/print-scan')}>
               去打印扫描
             </button>
           )}
-        </>
-      }
+        </footer>
+      )}
     >
-      <SessionResumeView
-        screen={screen}
-        tasks={tasks}
-        onContinue={continueTask}
-        onExit={(route) => navigate(route)}
-      />
-    </QxPageFrame>
+      {guest ? (
+        <div data-screen="session-resume" data-state="guest" data-testid="session-resume-state-guest">
+          <p className="qxp-note">登录后才能看你名下没办完的打印任务。登录成功会回到这一页，不重新建单。</p>
+          <section className="qxp-remind" aria-label="登录后在这一页能">
+            <strong>登录后在这一页能</strong>
+            <ul>
+              <li>看你名下没办完的打印。</li>
+              <li>接着去付款或取件。这一页不判定付成没有。</li>
+              <li>不能继续的会写原因，不写价钱。</li>
+            </ul>
+          </section>
+          <section aria-label="不登录也能办">
+            <strong>不登录也能办</strong>
+            <div className="qxp-actions">
+              <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/print-scan')}>去打印扫描</button>
+              <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/help')}>帮助</button>
+            </div>
+          </section>
+        </div>
+      ) : (
+        <SessionResumeView
+          screen={screen}
+          tasks={tasks}
+          onContinue={continueTask}
+          onExit={(route) => navigate(route)}
+        />
+      )}
+    </PublicTouchFrame>
   )
 }

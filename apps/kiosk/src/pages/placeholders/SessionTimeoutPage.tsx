@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { SessionGuardView } from '../session-guard/SessionGuardView'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import {
   deriveSessionGuardState,
   remainingSeconds,
@@ -80,35 +80,38 @@ export default function SessionTimeoutPage() {
       data-kiosk-viewport="kiosk"
     >
       <KioskStageFit>
-        <QxPageFrame
-          title="使用时限"
-          subtitle="这台机器闲置后会清掉这次使用。倒计时由本机时钟执行。"
-          status={pill}
-          ctabar={
-            <>
+        <PublicTouchFrame
+          title="还在用吗？"
+          sub="这台机器闲置后会清掉这次使用。倒计时由本机时钟执行。点「我还在」会回到原来那一页。"
+          eyebrow="闲置提醒"
+          status={{ label: pill.label, tone: pill.tone === 'bad' ? 'warn' : pill.tone }}
+          back={false}
+          nav={false}
+          screen="session-timeout"
+          dock={(
+            <footer className="qxt-dock">
               <button
                 type="button"
-                className="qx-btn"
-                data-variant="danger"
+                className="qxt-btn qxt-btn-danger"
                 data-testid="session-guard-clear"
                 onClick={hardClear}
+                aria-label="结束并清除这台机器上的这次使用记录"
               >
-                结束并清除这台机器上的这次使用记录
+                现在结束使用
               </button>
               {canContinue ? (
                 <button
                   type="button"
-                  className="qx-btn"
-                  data-variant="primary"
+                  className="qxt-btn qxt-btn-pri qxt-wide"
                   data-testid="session-guard-primary"
                   onClick={continueSession}
                   aria-label={sourceKnown ? `我还在，继续使用，回到${sessionGuardSourceName(sourcePath)}` : '我还在，继续使用；来源页不可用，只能回首页重新进入'}
                 >
-                  {sourceKnown ? '我还在，继续使用' : '我还在，继续使用（回首页）'}
+                  {sourceKnown ? '我还在' : '我还在，继续使用（回首页）'}
                 </button>
               ) : null}
-            </>
-          }
+            </footer>
+          )}
         >
           <SessionGuardView
             state={state}
@@ -119,7 +122,7 @@ export default function SessionTimeoutPage() {
             isAnonymous={isAnonymous}
             accountLabel={accountLabel}
           />
-        </QxPageFrame>
+        </PublicTouchFrame>
       </KioskStageFit>
     </div>
   )

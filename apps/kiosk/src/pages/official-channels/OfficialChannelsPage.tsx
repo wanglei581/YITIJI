@@ -19,8 +19,7 @@ import { useNavigate } from 'react-router-dom'
 import { BotIcon, ChevronRightIcon, LandmarkIcon, MessageCircleIcon, PrinterIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { DirSec, DirState, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
@@ -297,19 +296,20 @@ export function OfficialChannelsPage() {
   const assistNo = hasCards ? `0${cardSections + 1}` : null
   // 页上没有码时不说「扫下面的码」。
   const subtitle = hasCards
-    ? '岗位和招聘会在机构官网办理。扫下面的码，在自己的手机上打开。'
+    ? '扫下面的码，在自己的手机上打开本机构核验过的官方页面。'
     : view === 'empty'
-      ? '岗位和招聘会在机构官网办理。本终端还没有配置可扫的官方渠道。'
-      : '岗位和招聘会在机构官网办理。读到本终端的官方渠道后，这里给出二维码。'
+      ? '本终端暂未配置官方渠道。'
+      : '读到本终端的官方渠道后，这里给出二维码。'
 
   return (
-    <QxPageFrame
+    <PublicTouchFrame
       back={{ label: '返回首页', onBack: home }}
-      title="本机构官方渠道"
-      subtitle={subtitle}
+      title="扫码，在手机上看"
+      eyebrow="本机构官方渠道"
+      sub={subtitle}
       status={status}
-      navbar={<QxAppNavbar onHome={home} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
-      ctabar={<ChannelBar view={view} onHome={home} onRetry={channels.retry} />}
+      screen="official-channels"
+      dock={<ChannelBar view={view} onHome={home} onRetry={channels.retry} />}
     >
       <div className="dw-page qx-grow oc-page" data-kiosk-screen="official-channels" data-state={view} data-density={density}>
         {note ? <p className="oc-withdrawn" data-testid="official-channel-withdrawn" role="status">{note}</p> : null}
@@ -369,6 +369,6 @@ export function OfficialChannelsPage() {
           onExplore={() => navigate('/assistant?intent=career_explore')}
         />
       </div>
-    </QxPageFrame>
+    </PublicTouchFrame>
   )
 }

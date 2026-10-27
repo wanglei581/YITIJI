@@ -6,11 +6,11 @@ import { useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   BriefcaseBusinessIcon, ChevronRightIcon, FolderOpenIcon, InfoIcon, LandmarkIcon, LockIcon,
-  MapPinIcon, PhoneIcon, PrinterIcon, QrCodeIcon, SparklesIcon, UserIcon, type LucideIcon,
+  PhoneIcon, PrinterIcon, QrCodeIcon, SparklesIcon, UserIcon, type LucideIcon,
 } from 'lucide-react'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
+import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import './help-service-desk.css'
 
 interface QA {
@@ -196,25 +196,17 @@ function SelfHelp({ no }: { no: string }) {
   )
 }
 
-function HumanDesk({ no }: { no: string }) {
+function HumanDesk({ no, phoneLine }: { no: string; phoneLine: string | null }) {
   return (
     <>
-      <SectionHead no={no} title="自己解决不了，找人" hint="这两条才真的有人处理" />
+      <SectionHead no={no} title="自己解决不了时" hint="本页不会替你上报" />
       <div className="k1-help-people">
-        <div className="k1-help-contact">
-          <span className="k1-help-cat-icon" aria-hidden="true"><MapPinIcon /></span>
-          <div>
-            <h3>找现场工作人员</h3>
-            <p>机器故障、退费、开票都由现场处理。服务台位置和值守时间以现场公示为准，屏幕上不写死。</p>
-            <p className="k1-help-note">本页不会替你联系工作人员，也不会自动上报；点任何按钮都不等于已经有人受理。</p>
-          </div>
-        </div>
         <div className="k1-help-contact">
           <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
           <div>
-            <h3>拨机身上的服务电话</h3>
-            <p>号码贴在机身上，屏幕上不显示。</p>
-            <p>打之前先记下屏幕上的订单号或取件码。登录后也可在「我的」查看本人的打印订单。</p>
+            <h3>{phoneLine ? '服务电话' : '这一页不转达'}</h3>
+            <p>{phoneLine ?? '服务电话这次没有读到，这一页不显示号码。退费、开票和机器故障以现场公示为准，屏幕上不写死地点。'}</p>
+            <p className="k1-help-note">本页不会自动拨出，也不会自动上报。点任何按钮都不等于已经有人受理。</p>
           </div>
         </div>
       </div>
@@ -227,6 +219,7 @@ export function HelpCenterPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const hostingOpen = useRecruitmentHosting().enabled
+  const phoneLine = useVisibleHelpLine()
   const faq = useMemo(() => buildFaq(hostingOpen), [hostingOpen])
   const cards = CATEGORIES
     .map((card) => ({ ...card, count: faq.filter((item) => item.categoryKey === card.key).length }))
@@ -250,26 +243,20 @@ export function HelpCenterPage() {
   }
 
   const title = view === 'topic' && topic
-    ? <><span className="k1-help-eyebrow">{`帮助 · ${topic.label}`}</span><span>{topic.label}</span></>
+    ? topic.label
     : view === 'no-result'
       ? '没有这个分类'
       : view === 'unavailable'
         ? '帮助内容没显示出来'
-        : <><span className="k1-help-eyebrow">现场帮助</span><span>你想解决<em>什么问题</em>？</span></>
+        : '你想解决什么？'
+  const eyebrow = view === 'topic' && topic ? `帮助 · ${topic.label}` : '现场帮助'
   const subtitle = view === 'topic' && topic
     ? `${topic.summary}。下面 ${visibleFaq.length} 条是这一类里最常被问到的，答案就是本机现在的实际做法。`
     : view === 'no-result'
       ? '地址里的分类不在这台机器的帮助分类里，这里不猜你想看哪一类，也不拿别的内容顶上。'
       : view === 'unavailable'
         ? '帮助内容装在这台机器上，不用再去取一份。这里空白通常是这一页没打开完整，不是你操作错了。'
-        : (
-          <>
-            <span>先在下面点一个分类，<b>不用打字</b>。里面放的是这台机器上最常卡住的几件事，点开就能看到做法和对应入口。</span>
-            <span className="k1-help-hero-steps">
-              {SELF_HELP_STEPS.map((step, index) => <span key={step.title}><b>{index + 1}</b>{step.title}</span>)}
-            </span>
-          </>
-        )
+        : '先在下面点一个分类，不用打字。里面放的是这台机器上最常卡住的几件事，点开就能看到做法和对应入口。'
   const status = view === 'unavailable'
     ? { tone: 'warn' as const, label: '帮助内容没显示出来' }
     : view === 'no-result'
@@ -280,16 +267,18 @@ export function HelpCenterPage() {
 
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-help-center" data-help-view={view}>
-      <QxPageFrame
+      <PublicTouchFrame
         title={title}
-        subtitle={subtitle}
+        eyebrow={eyebrow}
+        sub={subtitle}
         status={status}
+        screen="help"
         back={view === 'topic' || view === 'no-result'
           ? { label: '返回帮助分类', onBack: clearTopic }
           : { label: '返回首页', onBack: home }}
-        ctabar={(
+        dock={(
           <>
-            <div className="k1-help-actions">
+            <div className="k1-help-actions qxt-dock">
               {view === 'unavailable' ? (
                 <>
                   <button type="button" onClick={home}>返回首页</button>
@@ -317,7 +306,7 @@ export function HelpCenterPage() {
             </div>
             <div className="k1-help-truth" data-disclaimer="true" data-testid="help-truth">
               <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。</div>
-              <div><b>求助怎么算数</b>本页不能替你联系工作人员，也不会自动上报故障；要人处理请直接找现场工作人员，或拨机身上的服务电话。</div>
+              <div><b>求助怎么算数</b>本页不会自动上报，也不会替你转达。{phoneLine ?? '服务电话这次没有读到，这一页不显示号码。'}</div>
             </div>
           </>
         )}
@@ -376,7 +365,7 @@ export function HelpCenterPage() {
               ) : null}
               <div className="k1-help-miss">
                 <h3><InfoIcon aria-hidden="true" />这里没答上你的问题</h3>
-                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。退费、开票和机器故障只能找现场工作人员，本页不会替你转达。</p>
+                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。退费、开票和机器故障本页不会替你转达。</p>
               </div>
             </>
           ) : null}
@@ -387,7 +376,7 @@ export function HelpCenterPage() {
               <ol className="k1-help-steps" data-testid="help-fallback">
                 <li><span className="k1-help-step-no" aria-hidden="true">1</span><strong>重新打开帮助</strong><p>点下面的重新打开帮助，这一页会再加载一次。</p></li>
                 <li><span className="k1-help-step-no" aria-hidden="true">2</span><strong>回首页再进来</strong><p>回首页重新进入要办的服务。正在办的打印不会因此取消。</p></li>
-                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>找现场工作人员</strong><p>连着两次都打不开，就直接找人。屏幕这边不会替你报修。</p></li>
+                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>回首页继续办</strong><p>连着两次都打不开，回首页接着办。这一页不会替你报修。{phoneLine ? phoneLine : ''}</p></li>
               </ol>
               <SectionHead no="02" title="这不影响你办事" hint="帮助页只是补充" />
               <div className="k1-help-people">
@@ -410,9 +399,9 @@ export function HelpCenterPage() {
           ) : null}
 
           {view === 'default' || view === 'topic' ? <SelfHelp no={view === 'topic' && topicLinks.length > 0 ? '03' : '02'} /> : null}
-          {view === 'default' ? <HumanDesk no="03" /> : null}
-          {view === 'no-result' ? <HumanDesk no="02" /> : null}
-          {view === 'unavailable' ? <HumanDesk no="03" /> : null}
+          {view === 'default' ? <HumanDesk no="03" phoneLine={phoneLine} /> : null}
+          {view === 'no-result' ? <HumanDesk no="02" phoneLine={phoneLine} /> : null}
+          {view === 'unavailable' ? <HumanDesk no="03" phoneLine={phoneLine} /> : null}
           {view === 'no-result' ? (
             <div className="k1-help-miss" data-testid="help-fallback">
               <h3><InfoIcon aria-hidden="true" />怎么会到这一页</h3>
@@ -431,7 +420,7 @@ export function HelpCenterPage() {
             {' · 职易达AI'}
           </p>
         </section>
-      </QxPageFrame>
+      </PublicTouchFrame>
     </div>
   )
 }
