@@ -235,7 +235,12 @@
   [data-qx-page='home'] .qxt-home-tiles .qxt-tile b { font-size: var(--qxt-fs-tile); line-height: 1.25; }
   [data-qx-page='home'] .qxt-home-tiles .qxt-tx small { font-size: var(--qxt-fs-sub); line-height: 1.35; margin-top: 4px; }
   [data-qx-page='home'] .qxt-home-tiles .qxt-tile-mark { margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.3; }
-  [data-qx-page='home'] .qxt-tile-cue { font-size: var(--qxt-fs-sub); }
+  /* 失败态的「点这里重新读取」和状态短句排同一行，磁贴和读取中一样高，状态切换时首页不跳（fusion-w5 守着） */
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: start; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx > b { grid-column: 1 / -1; grid-row: 1; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile-mark { grid-column: 1; grid-row: 2; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tile-cue { grid-column: 2; grid-row: 2; margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.3; }
+  [data-qx-page='home'] .qxt-home-tiles .qxt-tx > small { grid-column: 1 / -1; grid-row: 3; }
 }
 
 @media (prefers-reduced-motion: reduce) {
