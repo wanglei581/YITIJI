@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
-import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { PrintArt } from './art/PrintArt'
 import { QxTouchStateEmpty } from '../../components/qingxu/touch/QxTouchStates'
-import { PrintTouchFrame } from './PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
@@ -44,7 +44,7 @@ import './styles/print-desk-qx.css'
 import './styles/print-desk-touch.css'
 
 const CHECK_ASK = {
-  label: '问小青：保留和遮挡有什么区别 →',
+  label: '问小青：怎么遮挡',
   draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？',
 } as const
 
@@ -91,8 +91,8 @@ function EmptyPrintDesk({
         stepsTitle="办理顺序"
         steps={[...EMPTY_STEPS]}
         slabs={[
-          { title: '去选文件', desc: '手机、U 盘，把真实文件带进这次办理', onClick: onPickFile, visual: <QxTouchIcon name="phone" size={64} /> },
-          { title: '我的文档（登录后）', desc: '登录后才能看到你保存的文件', onClick: onDocuments, visual: <QxTouchIcon name="file" size={64} /> },
+          { title: '去选文件', desc: '手机、U 盘，把真实文件带进这次办理', onClick: onPickFile, visual: <PrintArt name="phone" size={86} /> },
+          { title: '我的文档（登录后）', desc: '登录后才能看到你保存的文件', onClick: onDocuments, visual: <PrintArt name="stack" size={100} count={2} /> },
         ]}
         fine="这一页本身不保存文件"
       />
@@ -639,8 +639,8 @@ export function PrintMaterialCheckPage({
         titleTag="h2"
         subtitle="先选好要打印的材料，再检查、再设参数。"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
-        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
-        ask={EMPTY_ASK}
+        back={{ label: '上一步', onBack: () => navigate(uploadPath) }}
+        ask={printAsk(EMPTY_ASK.label, EMPTY_ASK.draft)}
         primary={{ label: '去选文件', onClick: () => navigate(uploadPath) }}
       >
         <EmptyPrintDesk
@@ -717,24 +717,20 @@ export function PrintMaterialCheckPage({
       title={frameTitle}
       subtitle={frameSub}
       status={status}
-      back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
-      ask={CHECK_ASK}
+      back={{ label: '上一步', onBack: () => navigate(uploadPath) }}
+      ask={printAsk(CHECK_ASK.label, CHECK_ASK.draft)}
       primary={{
         label: primaryLabel,
         disabled: encryptedPdf ? isWorking : !(canContinue || canManualAck),
         onClick: () => { if (encryptedPdf) { navigate(uploadPath); return } void handleContinue() },
       }}
     >
-      <div className="qpd-check-page">
-        <div className="qpd-check-intro" data-feature="文件预检">
-          <strong>文件预检</strong>
-          <span>{precheckLine}</span>
-        </div>
-        <MaterialCheckPresentation
+      <MaterialCheckPresentation
           stage={stage}
           file={file}
           token={getToken()}
           error={error}
+          precheckLine={precheckLine}
           inspection={inspectionSummary ? {
             pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
             canPrint: inspectionSummary.canPrint,
@@ -759,7 +755,6 @@ export function PrintMaterialCheckPage({
           onKeepAll={keepAll}
           onDecision={setDecision}
         />
-      </div>
     </PrintTouchFrame>
   )
 }
