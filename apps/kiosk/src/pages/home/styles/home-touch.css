@@ -23,6 +23,9 @@
 }
 [data-qx-page='home'] .qxt-task-dark .qxt-task-note { color: var(--qxt-mint); }
 [data-qx-page='home'] [data-action='print-hub'] .qxt-task-note {
+  align-self: flex-start;
+  box-sizing: border-box;
+  width: calc(100% - 200px);
   max-width: calc(100% - 200px);
   padding-right: 0;
 }
@@ -128,12 +131,12 @@
   min-height: 64px;
 }
 [data-qx-page='home'] .qxt-home-id .qx-home-identity[data-kind='status'] {
-  flex: 1;
+  flex: 0 0 auto;
   justify-content: flex-start;
   background: transparent;
   border-color: transparent;
 }
-[data-qx-page='home'] [data-testid='home-end-previous'] {
+[data-qx-page='home'] .qxt-home-id button[data-testid='home-end-previous'] {
   background: transparent;
   color: var(--qx-cinnabar);
   border: 2px solid var(--qx-cinnabar);
@@ -151,12 +154,14 @@
   color: var(--qxt-ink-3);
   line-height: 1.35;
 }
-[data-qx-page='home'] .qxt-home-icp { font-size: 18px; }
+[data-qx-page='home'] .qxt-home-icp { font-size: 20px; }
 [data-qx-page='home'] .qxt-home-icp a {
   color: inherit;
   display: inline-flex;
   align-items: center;
-  min-height: 48px;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 64px;
   padding: 0 8px;
 }
 [data-qx-page='home'][data-qx-intro='done'] .qxt-rise { animation: none; }
@@ -179,10 +184,31 @@
   [data-qx-page='home'] .qxt-home-tasks .qxt-task { min-height: 0; padding: 14px 14px 12px; gap: 6px; }
   [data-qx-page='home'] .qxt-home-tasks .qxt-ic { width: 44px; height: 44px; border-radius: 14px; }
   [data-qx-page='home'] .qxt-home-tasks .qxt-task h3 { font-size: 26px; margin: 0; }
-  [data-qx-page='home'] .qxt-home-tasks .qxt-task p { font-size: 16px; line-height: 1.35; padding-right: 76px; }
-  [data-qx-page='home'] [data-action='print-hub'] .qxt-task-note { max-width: calc(100% - 96px); font-size: 16px; }
-  [data-qx-page='home'] .qxt-home-tasks .qxt-chip { max-width: 68%; font-size: 14px; min-height: 32px; }
-  [data-qx-page='home'] .qxt-home-tasks .qxt-take { font-size: 16px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-task p { font-size: 20px; line-height: 1.35; padding-right: 76px; }
+  [data-qx-page='home'] [data-action='print-hub'] .qxt-task-note {
+    width: calc(100% - 96px);
+    max-width: calc(100% - 96px);
+    font-size: 20px;
+  }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-chip { max-width: 68%; font-size: 20px; min-height: 40px; }
+  [data-qx-page='home'] .qxt-home-tasks .qxt-take { font-size: 20px; }
+  /* 共享窄屏把问小青条上提，字号提到 20 以后会盖住第一张卡的点按区。首页改回正常流。 */
+  [data-qx-page='home'] .qxt-band-hero,
+  [data-qx-page='home'] .qxt-band-hero.qxt-band-dense { padding-bottom: 12px; }
+  [data-qx-page='home'] .qxt-askbar {
+    height: auto;
+    min-height: 88px;
+    margin: 8px 0 0;
+    border-radius: 28px;
+  }
+  [data-qx-page='home'] .qxt-askbar b { font-size: 22px; }
+  [data-qx-page='home'] .qxt-askbar small { font-size: 20px; }
+  [data-qx-page='home'] .qxt-greet p,
+  [data-qx-page='home'] .qxt-band-hero .qxt-eyebrow,
+  [data-qx-page='home'] .qxt-brand b,
+  [data-qx-page='home'] .qxt-brand small,
+  [data-qx-page='home'] .qxt-clock small { font-size: 20px; }
+  [data-qx-page='home'] .qxt-status { height: auto; min-height: 44px; font-size: 20px; }
   [data-qx-page='home'] .qxt-home-tasks .qxt-mini { transform: scale(0.48); transform-origin: bottom right; }
   [data-qx-page='home'] .qxt-home-id {
     flex-direction: column;
