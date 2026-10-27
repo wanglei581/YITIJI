@@ -84,7 +84,12 @@ export default function PolicySourcesPage() {
   }, [listQuery, applyPage])
 
   const reload = useCallback(() => {
-    policiesAdminService.getPolicySources(listQuery).then(applyPage).catch(() => setError(true))
+    setError(false)
+    setLoading(true)
+    policiesAdminService.getPolicySources(listQuery)
+      .then(applyPage)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
   }, [listQuery, applyPage])
 
   if (loading) {
@@ -103,6 +108,13 @@ export default function PolicySourcesPage() {
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <ScrollTextIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
         </div>
       </Page>
     )

@@ -255,6 +255,7 @@ export default function DashboardPage() {
             sub={terminals !== null ? (totalTerminals === 0 ? '暂无终端' : offlineTerminals > 0 ? `${formatCount(offlineTerminals)} 台离线 · 点击设备管理查看` : '全部在线') : ''}
             warn={terminals !== null && offlineTerminals > 0}
             failed={terminals === null}
+            href={terminals !== null ? '/devices' : undefined}
             onRetry={retry(['terminals'])}
           />
           <KpiCard

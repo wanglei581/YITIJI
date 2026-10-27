@@ -48,9 +48,14 @@ test.describe('工作台（mock 口径）', () => {
   })
 
   test('退出登录回到登录页', async ({ page }) => {
+    const logoutCalls: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/auth/logout')) logoutCalls.push(request.url())
+    })
     await gotoPartner(page, '/', '工作台')
     await page.getByRole('button', { name: '退出登录' }).click()
     await page.waitForURL(/\/login/)
     await expect(page.getByRole('heading', { name: '合作机构登录' })).toBeVisible({ timeout: 15_000 })
+    expect(logoutCalls).toEqual([])
   })
 })

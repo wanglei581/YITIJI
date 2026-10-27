@@ -6,7 +6,7 @@ import type { ReviewStatus } from '../../services/api'
 import { RejectReason } from '../../components/RejectReason'
 import { PolicyEmergencyNote } from './PolicyEmergencyNote'
 
-import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
+import { KIND_LABELS, AUDIENCE_LABELS, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
 
 const REVIEW_MAP: Record<
   string,
@@ -33,6 +33,7 @@ interface Props {
   reviewFilter: string
   canCreate: boolean
   cannotCreateHint: string
+  recruitmentWriteBlocked: boolean
   busyId: string | null
   openEdit: (row: PartnerPolicyRecord) => void
   setRulesFor: (row: PartnerPolicyRecord) => void
@@ -50,6 +51,7 @@ export function PolicyTable({
   reviewFilter,
   canCreate,
   cannotCreateHint,
+  recruitmentWriteBlocked,
   busyId,
   openEdit,
   setRulesFor,
@@ -91,6 +93,7 @@ export function PolicyTable({
           const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
           const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
           const held = isPolicyEmergencyHeld(r)
+          const recruitmentBlocked = recruitmentWriteBlocked && r.category === 'recruitment' && !held
           return (
             <Fragment key={r.id}>
               <tr className={held ? 'border-b-0 hover:bg-neutral-50' : 'hover:bg-neutral-50'}>
@@ -171,7 +174,8 @@ export function PolicyTable({
                     {!held && (r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                       <button
                         type="button"
-                        disabled={busyId === r.id}
+                        disabled={busyId === r.id || recruitmentBlocked}
+                        title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
                         onClick={() => void handleApprove(r)}
                         className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
                       >
@@ -181,7 +185,8 @@ export function PolicyTable({
                     {!held && r.reviewStatus === 'approved' && r.publishStatus !== 'published' && (
                       <button
                         type="button"
-                        disabled={busyId === r.id}
+                        disabled={busyId === r.id || recruitmentBlocked}
+                        title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
                         onClick={() => setReleasing(r)}
                         className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-50"
                       >
@@ -209,6 +214,13 @@ export function PolicyTable({
                   </div>
                 </td>
               </tr>
+              {recruitmentBlocked && (
+                <tr>
+                  <td colSpan={7} className="px-4 pb-3 pt-0">
+                    <p className="text-xs leading-relaxed text-neutral-500">{RECRUITMENT_POLICY_BLOCKED_REASON}</p>
+                  </td>
+                </tr>
+              )}
               {held && (
                 <tr>
                   <td colSpan={7} className="px-4 pb-3 pt-0">

@@ -707,6 +707,14 @@ await check('D1 AI 服务管理页：加载中、加载失败、正常三个分�
   }
 })
 
+await check('D1b AI 服务管理概览加载失败有重新加载，且不挪走开关面板', () => {
+  const source = read('src/routes/ai-services/index.tsx')
+  assert.ok(source.includes('重新加载'), '概览失败态缺少重新加载')
+  assert.ok(source.includes('setOverviewTick'), '重新加载没有重跑概览加载')
+  const logs = read('src/routes/ai-services/AiLogsTable.tsx')
+  assert.ok(logs.includes('调用日志加载失败') && logs.includes('重新加载') && logs.includes('onReload'), '调用记录失败态缺少重新加载')
+})
+
 await check('D2 package.json 注册本门禁', () => {
   assert.match(read('package.json'), /"verify:admin-ai-access-ui": "node scripts\/verify-admin-ai-access-ui\.mjs"/)
 })

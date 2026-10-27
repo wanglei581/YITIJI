@@ -18,7 +18,8 @@ import {
  */
 const SHOT_DIR = process.env.CONSOLE_HOSTING_SCREENSHOT_DIR
 
-const RECRUITMENT_NAV = ['岗位信息管理', '企业资料管理', '招聘会信息管理', '数据源管理', '同步日志']
+const RECRUITMENT_TABS = ['岗位信息管理', '企业资料管理', '招聘会信息管理', '数据源管理', '同步日志']
+const RECRUITMENT_NAV = '招聘内容'
 
 const HOSTED_ROUTES: Array<{ path: string; title: string }> = [
   { path: '/jobs', title: '岗位信息管理' },
@@ -57,8 +58,9 @@ test.describe('托管关闭（我们云上默认）', () => {
     const nav = sideNav(page)
     await expect(nav.getByRole('link', { name: '政策公告管理' })).toBeVisible()
     await expect(nav.getByText('内容管理', { exact: true })).toBeVisible()
-    for (const label of RECRUITMENT_NAV) {
-      await expect(nav.getByRole('link', { name: label }), `托管关闭时侧栏不应有「${label}」`).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: RECRUITMENT_NAV, exact: true }), '托管关闭时侧栏不应有「招聘内容」').toHaveCount(0)
+    for (const label of RECRUITMENT_TABS) {
+      await expect(nav.getByRole('link', { name: label, exact: true }), `托管关闭时侧栏不应有「${label}」`).toHaveCount(0)
     }
     await assertPageHonest(page, errors)
   })
@@ -73,6 +75,7 @@ test.describe('托管关闭（我们云上默认）', () => {
       await expect(state).toContainText('这不是故障')
       await expect(page.getByRole('table')).toHaveCount(0)
       await expect(page.getByText('加载失败')).toHaveCount(0)
+      await expect(page.getByRole('navigation', { name: '招聘内容' })).toHaveCount(0)
       if (route.path === '/jobs') await shot(page, 'jobs-direct-url-hosting-off')
       await state.getByRole('button', { name: '去政策公告管理' }).click()
       await page.waitForURL(/\/policy$/)
@@ -195,18 +198,27 @@ test.describe('托管打开（私有化部署 b）', () => {
     await gotoPartner(page, '/', '工作台')
     await waitForMockList(page)
     const nav = sideNav(page)
-    for (const label of RECRUITMENT_NAV) {
-      await expect(nav.getByRole('link', { name: label })).toBeVisible()
+    await expect(nav.getByRole('link', { name: RECRUITMENT_NAV, exact: true })).toHaveCount(1)
+    for (const label of RECRUITMENT_TABS) {
+      await expect(nav.getByRole('link', { name: label, exact: true })).toHaveCount(0)
     }
     await expect(page.getByText('已上传岗位')).toBeVisible()
     await expect(page.getByRole('heading', { name: '最近同步记录' })).toBeVisible()
     await expect(page.getByRole('region', { name: '平台处置通知' })).toBeVisible()
     await shot(page, 'dashboard-hosting-on')
 
-    await gotoPartner(page, '/jobs', '岗位信息管理')
-    await waitForMockList(page)
-    await expect(page.getByRole('status', { name: '本平台未开放此功能' })).toHaveCount(0)
-    await shot(page, 'jobs-hosting-on')
+    for (const route of HOSTED_ROUTES) {
+      await gotoPartner(page, route.path, route.title)
+      await waitForMockList(page)
+      await expect(page.getByRole('status', { name: '本平台未开放此功能' })).toHaveCount(0)
+      const tabs = page.getByRole('navigation', { name: '招聘内容' })
+      await expect(tabs.getByRole('link')).toHaveCount(RECRUITMENT_TABS.length)
+      for (const label of RECRUITMENT_TABS) {
+        await expect(tabs.getByRole('link', { name: label, exact: true })).toBeVisible()
+      }
+      await expect(tabs.getByRole('link', { name: route.title, exact: true })).toHaveAttribute('aria-current', 'page')
+      if (route.path === '/jobs') await shot(page, 'jobs-hosting-on')
+    }
 
     await gotoPartner(page, '/stats', '数据统计')
     await waitForMockList(page)
@@ -238,8 +250,10 @@ test.describe('能力没读到（按关闭处理）', () => {
     await expect(page.getByRole('table')).toHaveCount(0)
     const nav = sideNav(page)
     await expect(nav.getByRole('link', { name: '政策公告管理' })).toBeVisible()
-    for (const label of RECRUITMENT_NAV) {
-      await expect(nav.getByRole('link', { name: label }), `能力没读到时侧栏不应有「${label}」`).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: RECRUITMENT_NAV, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: '招聘内容' })).toHaveCount(0)
+    for (const label of RECRUITMENT_TABS) {
+      await expect(nav.getByRole('link', { name: label, exact: true }), `能力没读到时侧栏不应有「${label}」`).toHaveCount(0)
     }
     await shot(page, 'jobs-direct-url-hosting-unknown')
 
@@ -247,7 +261,8 @@ test.describe('能力没读到（按关闭处理）', () => {
     await state.getByRole('button', { name: '重新读取' }).click()
     await expect(page.getByRole('status', { name: '暂时无法确认这一页是否开放' })).toHaveCount(0)
     await waitForMockList(page)
-    await expect(nav.getByRole('link', { name: '岗位信息管理' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: '招聘内容', exact: true })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: '招聘内容' }).getByRole('link')).toHaveCount(RECRUITMENT_TABS.length)
     await assertPageHonest(page, errors)
   })
 })

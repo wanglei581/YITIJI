@@ -288,6 +288,13 @@ const PARKED_ONLY_FROM = {
     fail(`${rel(path)} 没有在托管关闭时把这三项标成「托管关闭，不可用」`)
   }
   pass(`${rel(path)} 托管关闭时招聘会行程 / 岗位推荐 / 岗位解读标「托管关闭，不可用」`)
+  if (!code.includes("currentFeature?.status === 'planned'") || !code.includes('规划中，暂不生效') || !code.includes('保存后没有任何功能会读取这项配置')) {
+    fail(`${rel(path)} 规划中的功能必须标出暂不生效，并禁用保存`)
+  }
+  if (!code.includes("currentFeature?.key === 'print_param_prefill'") || !code.includes('本功能按规则预填，不调用大模型，只有启用开关生效')) {
+    fail(`${rel(path)} 打印参数预填必须说明只有启用开关生效`)
+  }
+  pass(`${rel(path)} 规划中的功能不能保存；打印参数预填只让启用开关生效`)
 }
 
 console.log('\nALL PASS')

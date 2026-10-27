@@ -5,7 +5,7 @@
 // 成功后后端旧 token 立即失效，前端主动 logout() 并跳登录页重新登录。
 
 import { formatDate, formatDateTime, formatRelativeTime } from '@ai-job-print/shared'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Card, Button } from '@ai-job-print/ui'
 import {
   CircleAlertIcon,
@@ -108,16 +108,16 @@ export default function AccountSettingsPage() {
   const [loginLogs, setLoginLogs] = useState<AuditLogRecord[]>([])
   const [loginLogsLoading, setLoginLogsLoading] = useState(true)
   const [loginLogsError, setLoginLogsError] = useState<string | null>(null)
+  const loginLogsGen = useRef(0)
 
-  useEffect(() => {
+  const loadLoginLogs = useCallback(() => {
+    const gen = ++loginLogsGen.current
     if (!user?.id) {
       setLoginLogs([])
       setLoginLogsLoading(false)
       setLoginLogsError('无法识别当前账号，登录记录暂不可用')
       return
     }
-
-    let cancelled = false
     setLoginLogsLoading(true)
     setLoginLogsError(null)
     Promise.all([
@@ -125,7 +125,7 @@ export default function AccountSettingsPage() {
       getAuditLogs({ limit: 5, action: 'auth.sms_login', actorId: user.id }),
     ])
       .then((responses) => {
-        if (cancelled) return
+        if (loginLogsGen.current !== gen) return
         const newest = responses
           .flatMap((response) => response.items)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -133,16 +133,20 @@ export default function AccountSettingsPage() {
         setLoginLogs(newest)
       })
       .catch((error: unknown) => {
-        if (cancelled) return
+        if (loginLogsGen.current !== gen) return
         setLoginLogs([])
         setLoginLogsError(error instanceof Error && error.message ? error.message : '登录记录加载失败')
       })
       .finally(() => {
-        if (!cancelled) setLoginLogsLoading(false)
+        if (loginLogsGen.current !== gen) return
+        setLoginLogsLoading(false)
       })
-
-    return () => { cancelled = true }
   }, [user?.id])
+
+  useEffect(() => {
+    loadLoginLogs()
+    return () => { loginLogsGen.current += 1 }
+  }, [loadLoginLogs])
 
   function handlePhoneBound(phone: Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'>): void {
     setUser((current) => current ? { ...current, ...phone } : current)
@@ -344,7 +348,16 @@ export default function AccountSettingsPage() {
             {loginLogsLoading ? (
               <p className="px-5 py-4 text-sm text-neutral-400">正在加载当前账号的登录记录…</p>
             ) : loginLogsError ? (
-              <p role="alert" className="px-5 py-4 text-sm text-error-fg">{loginLogsError}</p>
+              <div className="px-5 py-4">
+                <p role="alert" className="text-sm text-error-fg">{loginLogsError}</p>
+                <button
+                  type="button"
+                  onClick={loadLoginLogs}
+                  className="mt-3 inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+                >
+                  重新加载
+                </button>
+              </div>
             ) : loginLogs.length === 0 ? (
               <p className="px-5 py-4 text-sm text-neutral-500">当前账号暂无密码或短信登录记录。</p>
             ) : (

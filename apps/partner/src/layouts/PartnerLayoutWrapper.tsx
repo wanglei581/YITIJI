@@ -1,110 +1,29 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { ContentTrustBanner } from '../components/ContentTrustBanner'
-import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
+import { PartnerLayout } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
-import {
-  BarChart2Icon,
-  GaugeIcon,
-  BriefcaseIcon,
-  Building2Icon,
-  CalendarIcon,
-  DatabaseIcon,
-  FileTextIcon,
-  GraduationCapIcon,
-  LayoutDashboardIcon,
-  LogOutIcon,
-  MonitorIcon,
-  RefreshCwIcon,
-  UserCogIcon,
-} from 'lucide-react'
+import { LogOutIcon } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 import { PartnerCapabilitiesProvider } from '../services/CapabilitiesProvider'
 import { usePartnerCapabilities } from '../services/capabilities'
-import type { PartnerDataSourceCapabilities } from '../services/api'
-
-const PATH_TO_KEY: Record<string, string> = {
-  '/':           'dashboard',
-  '/profile':    'profile',
-  '/jobs':       'jobs',
-  '/companies':  'companies',
-  '/fairs':      'fairs',
-  '/smart-campus': 'smart-campus',
-  '/policy':     'policy',
-  '/screen':     'screen',
-  '/stats':      'stats',
-  '/terminals':  'terminals',
-  '/sources':    'sources',
-  '/sync-logs':  'sync-logs',
-  '/account':    'account',
-}
-
-const KEY_TO_PATH: Record<string, string> = Object.fromEntries(
-  Object.entries(PATH_TO_KEY).map(([path, key]) => [key, path])
-)
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',  label: '工作台',        icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
-  { key: 'profile',    label: '机构资料',       icon: Building2Icon,   group: '机构信息', href: KEY_TO_PATH.profile },
-  { key: 'jobs',       label: '岗位信息管理',   icon: BriefcaseIcon,   group: '数据管理', href: KEY_TO_PATH.jobs },
-  { key: 'companies',  label: '企业资料管理',   icon: Building2Icon, href: KEY_TO_PATH.companies },
-  { key: 'fairs',      label: '招聘会信息管理', icon: CalendarIcon, href: KEY_TO_PATH.fairs },
-  { key: 'smart-campus', label: '智慧校园',       icon: GraduationCapIcon, group: '校园服务', href: KEY_TO_PATH['smart-campus'] },
-  { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon,  group: '内容管理', href: KEY_TO_PATH.policy },
-  { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon, href: KEY_TO_PATH.sources },
-  { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon, href: KEY_TO_PATH['sync-logs'] },
-  { key: 'screen',     label: '数据大屏',       icon: GaugeIcon, group: '数据与账号', href: KEY_TO_PATH.screen },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, href: KEY_TO_PATH.stats },
-  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon, href: KEY_TO_PATH.terminals },
-  { key: 'account',    label: '账号',           icon: UserCogIcon, href: KEY_TO_PATH.account },
-]
-
-/**
- * 侧栏能力投影：只隐藏「这类机构连打开都会被服务端拒绝」的入口。
- *
- * 判定来源是服务端 `partner-capabilities.ts` 的同一份矩阵（经
- * `GET /partner/data-sources/capabilities` 下发），前端不另写机构类型规则。
- *
- * 只有智慧校园符合「整页不可用」：smart-campus.service.ts 的 assertSchoolOrg
- * 对**读取**也拒（PARTNER_NOT_SCHOOL），非学校机构点进去只会拿到 403。
- *
- * 岗位 / 招聘会 / 政策**不隐藏**，尽管服务端按类型拒绝新增：
- * 这三处的列表、编辑、下架都不校验机构类型（jobs-partner.service.ts 的
- * getPartnerJobs/getPartnerFairs、policies.service.ts 「更新/下架/删除不校验」），
- * 存量数据必须还能被机构自己下架——把整页藏掉反而会把违规内容锁死在已发布状态。
- * 这些页面改为**在真正会 403 的那颗「新增」按钮上禁用并说明原因**，
- * 比藏掉整个入口更准确，也正好消掉「填完整张表才 403」的死路。
- *
- * 招聘内容托管关闭（3.13，我们云上默认）是部署级的整块下线：岗位 / 企业 / 招聘会 /
- * 数据源 / 同步日志的列表恒为空、写入一律 403，整组入口隐藏；直接打开地址时由
- * routes/RecruitmentHostingGate 给出如实说明。只有服务端明确回 true 才显示；
- * 能力没读到时也不显示（fail-closed，见 services/capabilities.ts 的 useRecruitmentHosting）。
- */
-const RECRUITMENT_HOSTED_NAV_KEYS = new Set(['jobs', 'companies', 'fairs', 'sources', 'sync-logs'])
-
-function isNavItemVisible(key: string, caps: PartnerDataSourceCapabilities | null): boolean {
-  if (RECRUITMENT_HOSTED_NAV_KEYS.has(key)) return caps?.recruitmentHosting === true
-  if (!caps) return true // 其余能力未知一律放行，见 services/capabilities.ts 的 fail-open 说明
-  if (key === 'smart-campus') return caps.canManageSmartCampus
-  return true
-}
-
-/** 过滤后把被丢弃项的分组标题顺延给该组第一个幸存项，避免分组表头凭空消失。 */
-function projectNavItems(caps: PartnerDataSourceCapabilities | null): NavItem[] {
-  const out: NavItem[] = []
-  let pendingGroup: string | undefined
-  for (const item of NAV_ITEMS) {
-    if (item.group) pendingGroup = item.group
-    if (!isNavItemVisible(item.key, caps)) continue
-    out.push(pendingGroup ? { ...item, group: pendingGroup } : item)
-    pendingGroup = undefined
-  }
-  return out
-}
+import { ConsoleTabStrip } from './ConsoleTabStrip'
+import {
+  KEY_TO_PATH,
+  NAV_ITEMS,
+  PATH_TO_KEY,
+  consoleTabsFor,
+  projectNavItems,
+} from './partnerNav'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '管理员',
   partner: '机构管理员',
   kiosk:   '终端用户',
+}
+
+function narrowSidebar(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  return window.matchMedia('(max-width: 767px)').matches
 }
 
 export function PartnerLayoutWrapper() {
@@ -150,10 +69,19 @@ export function PartnerLayoutWrapper() {
 function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
+  // 390 一类窄屏默认收起侧栏，避免 240px 侧栏把内容区挤出横向滚动。
+  const [collapsed, setCollapsed] = useState(narrowSidebar)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = () => setCollapsed(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
   const { capabilities } = usePartnerCapabilities()
   const activeKey = PATH_TO_KEY[location.pathname] ?? (location.pathname.startsWith('/screen/') ? 'screen' : 'dashboard')
   const navItems = projectNavItems(capabilities)
+  const tabs = consoleTabsFor(activeKey, capabilities)
+  const tabLabel = NAV_ITEMS.find((item) => item.key === activeKey)?.label
 
   const orgName = user?.name ?? '合作机构后台'
 
@@ -185,11 +113,11 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
         </div>
       }
     >
-      {/* 上架受「内容可信」闸门约束：政策由机构自己发布（3.13），岗位 / 招聘会仍由管理员上架，
+      {/* 上架受「内容可信」闸门约束：政策由机构自己发布，岗位 / 招聘会仍由管理员上架，
           两条路都要求机构先通过核验。未核验时机构会看到「审核通过了但终端上没有」而
-          得不到原因 —— 这条横幅补的就是原因与该找谁。挂布局层：三个管理页各 500+ 行，
-          逐页塞会漂移、新增页会漏。 */}
+          得不到原因 —— 这条横幅补的就是原因与该找谁。挂布局层，避免逐页塞会漂移。 */}
       <ContentTrustBanner />
+      {tabs && tabLabel && <ConsoleTabStrip label={tabLabel} tabs={tabs} />}
       <Outlet />
     </PartnerLayout>
   )
