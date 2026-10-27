@@ -95,6 +95,7 @@ export function PublicTouchFrame({
           eyebrow={eyebrow}
           title={title}
           sub={sub}
+          seal={null}
           status={toStatus(status)}
           back={showBack}
           backLabel={showBack ? back?.label : undefined}
@@ -104,7 +105,7 @@ export function PublicTouchFrame({
       dock={dock}
       nav={nav ? <QxTouchNav current={navCurrent} {...navHandlers} /> : undefined}
     >
-      <main className="qxp-fill" data-qx-page={pageId} data-kiosk-screen={screen}>{children}</main>
+      <main className="qxp-fill" data-kiosk-screen={screen}>{children}</main>
     </QxTouchScreen>
   )
 }

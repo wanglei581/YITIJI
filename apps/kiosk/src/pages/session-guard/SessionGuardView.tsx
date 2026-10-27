@@ -45,7 +45,7 @@ export function SessionGuardView({
       <section className="sg-hero">
         <div className="sg-num" role="group" aria-label="本机剩余计时">
           <b>{seconds}</b>
-          <span>秒后按本机计时清场</span>
+          <span>秒后自动结束这次使用</span>
         </div>
         <div>
           {/* 必须是真 heading：这一屏是全屏接管，屏幕阅读器要靠它知道「现在在说什么」。

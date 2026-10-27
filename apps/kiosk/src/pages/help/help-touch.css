@@ -1,4 +1,6 @@
-.qxt-screen[data-qx-page='help'] .k1-help-filters {
+.qxt-screen[data-qx-page='help'] .k1-help-filters,
+.qxt-screen[data-qx-page='help'] .k1-help-center[data-help-view='default'] .k1-help-filters,
+.qxt-screen[data-qx-page='help'] .k1-help-center[data-help-view='no-result'] .k1-help-filters {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -76,6 +78,112 @@
   padding: 4px 40px 8px;
 }
 
+.qxt-screen[data-qx-page='help'] .k1-help-more {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  font-size: var(--qxt-fs-body);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-more small,
+.qxt-screen[data-qx-page='help'] .k1-help-phone,
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-filing {
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well {
+  margin-top: 12px;
+  padding: 8px 16px 16px;
+  border-radius: 24px;
+  background: var(--qxt-well);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well-k {
+  margin: 8px 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-truth {
+  display: block;
+  flex: none;
+  width: auto;
+  margin: 8px 0 0;
+  padding: 0;
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps li {
+  display: block;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-step-no {
+  display: inline;
+  width: auto;
+  height: auto;
+  margin-right: 4px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps strong,
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps p {
+  display: inline;
+  margin: 0;
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps strong::after {
+  content: '。';
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-actions .is-primary svg {
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock > button:not(.is-primary) {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 148px;
+  height: var(--qxt-btn-h);
+  min-height: var(--qxt-btn-h);
+}
+
+.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock > button.is-primary {
+  flex: 1 1 auto;
+  width: auto;
+  border-radius: 999px;
+}
+
 .qxt-screen[data-qx-page='help'] .k1-help-filters strong {
   font-size: 28px;
 }
@@ -135,15 +243,16 @@
     padding: 10px 14px;
   }
 
-  .qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock {
+  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock {
     flex-direction: column;
     flex-wrap: nowrap;
     padding: 12px 16px;
   }
 
-  .qxt-screen[data-qx-page='help'] .k1-help-actions button,
-  .qxt-screen[data-qx-page='help'] .k1-help-actions button.is-primary {
+  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock > button,
+  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock > button.is-primary {
     width: 100%;
+    flex: 1 1 auto;
     min-height: var(--qxt-btn-h);
     height: auto;
   }

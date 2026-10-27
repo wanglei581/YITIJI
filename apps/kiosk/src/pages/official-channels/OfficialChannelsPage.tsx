@@ -16,11 +16,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BotIcon, ChevronRightIcon, LandmarkIcon, MessageCircleIcon, PrinterIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
+import { MessageCircleIcon, QrCodeIcon, RouteIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
+import { PublicArt } from '../public-touch/PublicArt'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
-import { DirSec, DirState, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
+import { DirState, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import type { OfficialChannelItem } from '../../services/api/officialChannels'
@@ -31,12 +32,20 @@ import './official-touch.css'
 type View = 'loading' | 'items' | 'empty' | 'error'
 type ChannelKind = 'org' | 'legacy'
 
-/** 没有渠道或读取失败时给出的去处：都是本机照常能办、不依赖渠道的既有入口。 */
-const ALTERNATIVES = [
-  { key: 'policy', icon: LandmarkIcon, title: '就业政策', desc: '政策、社保与登记指引，以官方核验为准', to: '/policy-service' },
-  { key: 'ai', icon: BotIcon, title: 'AI 求职工具', desc: '简历、面试与求职方向，问小青', to: '/assistant' },
-  { key: 'print', icon: PrinterIcon, title: '打印 · 扫描', desc: '简历、证明材料与照片', to: '/print-scan' },
-] as const
+function PairCard({ title, desc, art, onClick }: {
+  title: string
+  desc: string
+  art: 'list' | 'resume'
+  onClick: () => void
+}) {
+  return (
+    <button type="button" className="oc-pair-card" onClick={onClick}>
+      <span className="oc-pair-k">{title}</span>
+      <span className="oc-pair-d">{desc}</span>
+      <span className="qxp-art" aria-hidden="true"><PublicArt kind={art} /></span>
+    </button>
+  )
+}
 
 function hostOf(url: string): string {
   try {
@@ -87,7 +96,9 @@ function ChannelCard({
         aria-label={`核对「${item.name}」还能不能扫`}
         aria-busy={busy}
         onClick={() => onRecheck(item)}
-      />
+      >
+        核对还能不能扫
+      </button>
     </li>
   )
 }
@@ -124,13 +135,6 @@ function withdrawnCopy(names: string[]): string {
 }
 
 const CHANNEL_ASK_DRAFT = '这个二维码怎么用？请只说明用手机打开的步骤，不要生成岗位。'
-
-/** 页上还没有码时，「这个码怎么用」这一问灰着，就地写原因（不可用的按钮灰色写原因，9/29 产品负责人）。 */
-const ASK_BLOCKED_WHY: Record<Exclude<View, 'items'>, string> = {
-  loading: '渠道还在读取，读到码之后再问',
-  error: '渠道这次没读到，先点下方「重新读取」',
-  empty: '本终端还没有可扫的码',
-}
 
 /**
  * 「也可以问小青」（稿 45 的最后一段）：整行可点的入口行，行尾「›」。
@@ -277,22 +281,17 @@ export function OfficialChannelsPage() {
         ? { tone: 'ok' as const, label: `${items.length} 个官方渠道` }
         : { tone: 'warn' as const, label: '暂未配置官方渠道' }
 
-  const alternatives = (
-    <DirSec title="可以先办这些" hint={view === 'loading' ? '不用等这次读取' : '都在这台终端上'}>
-      <div className="qx-rows oc-alt-rows" data-testid="official-channels-alternatives">
-        {ALTERNATIVES.map(({ key, icon: Icon, title, desc, to }) => (
-          <button key={key} type="button" className="qx-row" data-route={to} onClick={() => navigate(to)}>
-            <span className="qx-row-ic" aria-hidden="true"><Icon size={28} /></span>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">{title}</span>
-              <span className="qx-row-d">{desc}</span>
-            </span>
-            <ChevronRightIcon className="qx-row-go" size={26} aria-hidden="true" />
-          </button>
-        ))}
-      </div>
-    </DirSec>
-  )
+  const alternatives = view === 'error' ? (
+    <div className="oc-pair" data-testid="official-channels-alternatives">
+      <PairCard title="重新读取" desc="先进入读取中，读完再显示" art="list" onClick={() => channels.retry()} />
+      <PairCard title="帮助" desc="渠道没读到时，仍可以查常见问题" art="resume" onClick={() => navigate('/help')} />
+    </div>
+  ) : view === 'empty' ? (
+    <div className="oc-pair" data-testid="official-channels-alternatives">
+      <PairCard title="问小青" desc="渠道还没有码，仍可以问别的事" art="list" onClick={() => navigate('/assistant')} />
+      <PairCard title="帮助" desc="常见问题和这一页的用法" art="resume" onClick={() => navigate('/help')} />
+    </div>
+  ) : null
   const hasCards = cardCount > 0
   // 只有一张本机构渠道时照稿 45：码卡本身就是主角，不再压一行机构名分区头（机构名在卡底的来源说明里），
   // 问小青编 01。多张或另有其他来源平台时，分区头照旧：本机构 01、其他来源平台接着编，问小青排在最后。
@@ -305,13 +304,22 @@ export function OfficialChannelsPage() {
     ? '扫下面的码，在自己的手机上打开本机构核验过的官方页面。'
     : view === 'empty'
       ? '没有可扫的码。可以问小青，或先看帮助。'
-      : '读到本终端的官方渠道后，这里给出二维码。'
+      : view === 'error'
+        ? '渠道这次没读到。可以重新读取，或先看帮助。'
+        : '读取完成前这里不下结论。'
+  const title = view === 'empty'
+    ? '本终端暂未配置官方渠道'
+    : view === 'error'
+      ? '官方渠道这次没有读取成功'
+      : view === 'loading'
+        ? '正在读取本终端的官方渠道'
+        : '扫码，在手机上看'
 
   return (
     <PublicTouchFrame
       page="official"
       back={{ label: '返回首页', onBack: home }}
-      title="扫码，在手机上看"
+      title={title}
       eyebrow="本机构官方渠道"
       sub={subtitle}
       status={status}
@@ -368,12 +376,14 @@ export function OfficialChannelsPage() {
             <ChannelList items={legacy} kind="legacy" busyKey={busyKey} onRecheck={recheckCard} />
           </section>
         ) : null}
-        {view === 'items' ? null : <div className="oc-alt oc-push">{alternatives}</div>}
-        <ChannelAssist
-          no={assistNo}
-          blocked={hasCards || view === 'items' ? null : ASK_BLOCKED_WHY[view]}
-          onExplore={() => navigate('/assistant?intent=career_explore')}
-        />
+        {alternatives ? <div className="oc-alt oc-push">{alternatives}</div> : null}
+        {view === 'items' ? (
+          <ChannelAssist
+            no={assistNo}
+            blocked={null}
+            onExplore={() => navigate('/assistant?intent=career_explore')}
+          />
+        ) : null}
       </div>
     </PublicTouchFrame>
   )

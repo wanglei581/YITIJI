@@ -187,36 +187,32 @@ async function expectChannelCards(page: Page, section: 'org' | 'legacy', expecte
 }
 
 /**
- * 空态 / 失败态的三条去处是紧凑行（与招聘托管说明页同一套 qx-row）：舞台上 128px 一行，不许被拉成空卡。
- * 上界防的是 2026-09-27 协调窗口截图里的样子——三项平分余量、每张约 410px、字漂在正中间；
- * 下界是 128px 行高本身（手机档 88px，按 `minHeight` 传）。图标、标题、说明一律靠左。
+ * 空态 / 失败态是稿上的两张带插画去处卡，标题靠左。
+ * 上界防的是卡片被 flex 拉成整屏空卡；下界是可点高度，卡里还要有插画。
  */
-async function expectCompactAlternatives(page: Page, where: string, { minHeight, maxHeight }: { minHeight: number; maxHeight: number }): Promise<void> {
+async function expectDraftPairs(page: Page, where: string, labels: readonly string[], { minHeight, maxHeight }: { minHeight: number; maxHeight: number }): Promise<void> {
   const scale = await stageScale(page)
-  const rows = await page.getByTestId('official-channels-alternatives').locator('.qx-row').evaluateAll((elements) => elements.map((row) => {
-    const rect = (selector: string) => row.querySelector(selector)!.getBoundingClientRect()
-    const box = row.getBoundingClientRect()
+  const cards = await page.getByTestId('official-channels-alternatives').locator('.oc-pair-card').evaluateAll((elements) => elements.map((card) => {
+    const box = card.getBoundingClientRect()
+    const title = card.querySelector('.oc-pair-k')!.getBoundingClientRect()
     return {
-      label: row.querySelector('.qx-row-t')?.textContent ?? '',
+      label: card.querySelector('.oc-pair-k')?.textContent ?? '',
       height: box.height,
       left: box.left,
-      iconLeft: rect('.qx-row-ic').left,
-      iconRight: rect('.qx-row-ic').right,
-      titleLeft: rect('.qx-row-t').left,
-      descLeft: rect('.qx-row-d').left,
+      titleLeft: title.left,
+      art: card.querySelector('.qxp-art') ? 1 : 0,
     }
   }))
-  expect(rows.map((row) => row.label), `${where}：三条去处`).toEqual(['就业政策', 'AI 求职工具', '打印 · 扫描'])
-  for (const row of rows) {
-    expect(row.height / scale, `${where}「${row.label}」不被拉成空卡（≤${maxHeight}px）`).toBeLessThanOrEqual(maxHeight)
-    expect(row.height / scale, `${where}「${row.label}」保持紧凑行高（≥${minHeight}px）`).toBeGreaterThanOrEqual(minHeight)
-    expect((row.iconLeft - row.left) / scale, `${where}「${row.label}」图标靠左`).toBeLessThanOrEqual(32)
-    expect(row.titleLeft, `${where}「${row.label}」标题在图标右边`).toBeGreaterThanOrEqual(row.iconRight)
-    expect((row.titleLeft - row.iconRight) / scale, `${where}「${row.label}」标题紧跟图标，不居中`).toBeLessThanOrEqual(32)
-    expect(Math.abs(row.descLeft - row.titleLeft), `${where}「${row.label}」说明与标题左对齐`).toBeLessThanOrEqual(1)
+  expect(cards.map((card) => card.label), `${where}：去处`).toEqual([...labels])
+  for (const card of cards) {
+    expect(card.height / scale, `${where}「${card.label}」不被拉成空卡（≤${maxHeight}px）`).toBeLessThanOrEqual(maxHeight)
+    expect(card.height / scale, `${where}「${card.label}」保持可点高度（≥${minHeight}px）`).toBeGreaterThanOrEqual(minHeight)
+    expect((card.titleLeft - card.left) / scale, `${where}「${card.label}」标题靠左`).toBeLessThanOrEqual(40)
+    expect(card.art, `${where}「${card.label}」有插画`).toBe(1)
   }
 }
-const STAGE_ROWS = { minHeight: 127, maxHeight: 180 }
+const STAGE_PAIRS = { minHeight: 180, maxHeight: 320 }
+const PHONE_PAIRS = { minHeight: 140, maxHeight: 240 }
 
 // ── 渠道页：机构终端 ─────────────────────────────────────────────────────────
 
@@ -289,19 +285,20 @@ test('empty: says the terminal has no channel configured, not why, and offers wh
   await expect(page.locator('[data-kiosk-screen="official-channels"]')).not.toContainText('招聘')
   await expect(page.locator('.qxt-status')).toHaveText('暂未配置官方渠道')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
-  const alternatives = page.getByTestId('official-channels-alternatives').locator('.qx-row-t')
-  await expect(alternatives).toHaveText(['就业政策', 'AI 求职工具', '打印 · 扫描'])
-  await expectCompactAlternatives(page, '空态', STAGE_ROWS)
+  const alternatives = page.getByTestId('official-channels-alternatives').locator('.oc-pair-k')
+  await expect(alternatives).toHaveText(['问小青', '帮助'])
+  await expectDraftPairs(page, '空态', ['问小青', '帮助'], STAGE_PAIRS)
   await expectNoForbiddenCopy(page, '空态')
   await expectTouchTargets(page, '空态')
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('official-channels-empty-1080x1920.png') })
 
   registerLandingPages(api)
-  await page.getByRole('button', { name: /就业政策/ }).click()
-  await page.waitForURL((url) => url.pathname === '/policy-service')
-  await expect(page.locator('[data-qx-page="service-hub"]')).toBeVisible()
-  await expect.poll(() => api.requestCount('GET', '/api/v1/health'), '落地页的挂载请求在用例内发完').toBeGreaterThan(0)
+  api.respond('GET', '/api/v1/public/support-contact', { status: 200, json: { data: { servicePhone: null, serviceHours: null } } })
+  await page.getByTestId('official-channels-alternatives').getByRole('button', { name: /^帮助/ }).click()
+  await page.waitForURL((url) => url.pathname === '/help')
+  await expect(page.locator('[data-qx-page="help"]')).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', '/api/v1/public/support-contact'), '帮助页挂载时读取服务电话').toBeGreaterThan(0)
   expect(errors).toEqual([])
 })
 
@@ -336,7 +333,7 @@ test('error then retry: honest failure with a working retry, no raw error text @
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
   await expect(page.getByTestId('official-channels-empty'), '失败不冒充「没有渠道」').toHaveCount(0)
   await expect(page.getByTestId('official-channels-alternatives')).toBeVisible()
-  await expectCompactAlternatives(page, '失败态', STAGE_ROWS)
+  await expectDraftPairs(page, '失败态', ['重新读取', '帮助'], STAGE_PAIRS)
   const text = await page.locator('body').innerText()
   for (const raw of ['SERVICE_UNAVAILABLE', 'upstream timeout', '503']) expect(text, `不直出原始错误「${raw}」`).not.toContain(raw)
   await expectTouchTargets(page, '失败态')
@@ -610,7 +607,7 @@ test('phone 390x844: the empty state keeps the alternatives as compact 88px rows
   respondChannels(api, [])
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'empty')
-  await expectCompactAlternatives(page, '手机空态', { minHeight: 87, maxHeight: 120 })
+  await expectDraftPairs(page, '手机空态', ['问小青', '帮助'], PHONE_PAIRS)
   await expectTouchTargets(page, '手机空态')
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)

@@ -1459,30 +1459,33 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
 
   await page.setViewportSize({ width: 390, height: 844 })
   // 等窄屏重排真正落地（导航贴回 844 视口底部），并回到首屏顶部再量 —— 否则量到的是 1080 版式的残影。
+  // 触屏稿默认正文是「最近办理」示例行加四张主题卡，不再用座舱标题和披露条当首屏几何。
   await page.waitForFunction(() => Math.abs(document.querySelector('.qxt-nav')!.getBoundingClientRect().bottom - window.innerHeight) <= 1)
   await page.locator('.kassist').evaluate((el) => { el.scrollTop = 0 })
   const narrow = await page.evaluate(() => {
     const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect()
     return {
-      greeting: box('.assistant-prototype-head h2'),
-      disclosure: box('.assistant-advisor-disclosure'),
-      disclosureDisplay: getComputedStyle(document.querySelector('.assistant-advisor-disclosure')!).display,
-      firstTopic: box('.assistant-topic-choices summary'),
+      recent: box('.assistant-recent'),
+      firstTask: box('.assistant-task'),
       navTop: box('.qxt-nav').top,
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
     }
   })
-  console.log(`assistant-geometry-390 greetingW=${narrow.greeting.width} greetingH=${narrow.greeting.height} disclosureW=${narrow.disclosure.width} disclosureH=${narrow.disclosure.height} disclosureDisplay=${narrow.disclosureDisplay} topicTop=${narrow.firstTopic.top} navTop=${narrow.navTop} overflowX=${narrow.overflowX}`)
+  console.log(`assistant-geometry-390 recentW=${narrow.recent.width} recentH=${narrow.recent.height} taskTop=${narrow.firstTask.top} taskH=${narrow.firstTask.height} navTop=${narrow.navTop} overflowX=${narrow.overflowX}`)
   await page.screenshot({ path: 'test-results/assistant-qx-r4-390x844.png' })
   expect(narrow.overflowX).toBeLessThanOrEqual(0)
-  expect(narrow.greeting.width).toBeGreaterThan(200)
-  expect(narrow.greeting.height).toBeLessThan(80)
-  expect(narrow.disclosure.width).toBeGreaterThan(200)
-  expect(narrow.disclosureDisplay).toBe('block')
-  expect(narrow.disclosure.height).toBeLessThan(125)
-  expect(narrow.greeting.width).toBeLessThanOrEqual(390)
-  expect(narrow.firstTopic.top).toBeGreaterThanOrEqual(0)
-  expect(narrow.firstTopic.top).toBeLessThan(narrow.navTop)
+  expect(narrow.recent.width).toBeGreaterThan(200)
+  expect(narrow.recent.width).toBeLessThanOrEqual(390)
+  expect(narrow.recent.height).toBeGreaterThanOrEqual(64)
+  expect(narrow.recent.height).toBeLessThan(140)
+  await expect(page.locator('.assistant-recent .assistant-recent-chip')).toHaveText('示例')
+  await expect(page.locator('.assistant-recent strong')).toHaveText('最近办理')
+  await expect(page.locator('.assistant-recent small')).toHaveText('模拟面试 · HR 面试 5 分钟')
+  await expect(page.locator('.assistant-task strong')).toHaveText(['简历与求职材料', '面试与沟通', '岗位与选择', '入职与职场'])
+  expect(narrow.firstTask.top).toBeGreaterThanOrEqual(0)
+  expect(narrow.firstTask.top).toBeLessThan(narrow.navTop)
+  expect(narrow.firstTask.height).toBeGreaterThanOrEqual(64)
+  await expect(page.getByRole('button', { name: /不经过 AI，直接去办/ })).toBeVisible()
   await page.locator('.kassist').evaluate((el) => { el.scrollTop = el.scrollHeight })
   const sendButton = page.locator('.assistant-send')
   await expect(sendButton).toBeVisible()

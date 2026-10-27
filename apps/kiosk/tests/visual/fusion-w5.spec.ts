@@ -636,7 +636,9 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
 
   await page.goto('/help')
-  await page.getByRole('group', { name: '按分类筛选常见问题' }).getByRole('button', { name: /隐私与留存/ }).click()
+  // 触屏稿默认分类不含隐私；隐私与留存在「隐私、设备与备案」弹层里，仍要点进去再打开隐私政策。
+  await page.getByRole('button', { name: /^隐私、设备与备案/ }).click()
+  await page.getByRole('dialog', { name: '隐私、设备与备案' }).getByRole('button', { name: /隐私与留存/ }).click()
   await page.getByRole('button', { name: /文件会保存多久/ }).click()
   await page.getByRole('button', { name: '隐私政策', exact: true }).click()
   await expect(page).toHaveURL(/\/legal\/privacy$/)

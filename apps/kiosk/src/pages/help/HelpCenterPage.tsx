@@ -2,12 +2,13 @@ import { useTerminalKiosk } from '../../services/api/screensaver'
 // 帮助中心 /help。条目是页内常量，没有帮助内容接口，也没有工单通道。
 // 版式按青序流光 2.0 稿 06：分类首页 / 分类问答 / 分类不在清单 / 内容没显示出来。
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   BriefcaseBusinessIcon, ChevronRightIcon, FolderOpenIcon, InfoIcon, LandmarkIcon, LockIcon,
-  PhoneIcon, PrinterIcon, QrCodeIcon, SparklesIcon, UserIcon, type LucideIcon,
+  MicIcon, PhoneIcon, PrinterIcon, QrCodeIcon, SparklesIcon, UserIcon, type LucideIcon,
 } from 'lucide-react'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
@@ -26,9 +27,9 @@ type HelpView = 'default' | 'topic' | 'no-result' | 'unavailable'
 type Tone = 'teal' | 'plum' | 'slate' | 'wheat'
 
 const SELF_HELP_STEPS = [
-  { title: '照屏幕上的提示走', body: '出错时先看当前页面的提示与按钮，按提示重试或返回；设备故障请勿自行拆卸或拉扯纸张。' },
-  { title: '退回上一步重做', body: '用页面上的「返回」回到上一步重新选择。打印在你核对参数并确认之后才开始输出，确认前返回不会出纸。' },
-  { title: '换一种来源', body: '一种上传方式不成时，回到打印扫描页换本机已开通的其他来源；哪些可用以页面显示为准。' },
+  { title: '照屏幕上的提示走', body: '出错时先看当前页的提示和按钮，按提示重试或返回。设备故障不要自己拆，也不要拉扯纸张。' },
+  { title: '退回上一步重做', body: '用「返回」回到上一步重选。打印要等你核对参数并确认之后才输出，确认前返回不会出纸。' },
+  { title: '换一种来源', body: '一种上传方式不成，就回打印扫描换本机已经开通的其他来源。哪些能用，以那一页显示的为准。' },
 ] as const
 
 const CATEGORIES: { key: string; label: string; summary: string; icon: LucideIcon; tone: Tone }[] = [
@@ -180,10 +181,14 @@ function SectionHead({ no, title, hint }: { no: string; title: string; hint?: st
   )
 }
 
-function SelfHelp({ no }: { no: string }) {
+function SelfHelp({ no, plain = false }: { no: string; plain?: boolean }) {
   return (
     <>
-      <SectionHead no={no} title="卡住了，先自己试这三步" hint="多数情况到第二步就通了" />
+      {plain ? (
+        <p className="k1-help-well-k">卡住了，先自己试这三步</p>
+      ) : (
+        <SectionHead no={no} title="卡住了，先自己试这三步" hint="多数情况到第二步就通了" />
+      )}
       <ol className="k1-help-steps">
         {SELF_HELP_STEPS.map((step, index) => (
           <li key={step.title}>
@@ -226,6 +231,9 @@ export function HelpCenterPage() {
   const cards = CATEGORIES
     .map((card) => ({ ...card, count: faq.filter((item) => item.categoryKey === card.key).length }))
     .filter((card) => card.count > 0)
+  const listed = cards.filter((card) => card.key !== 'privacy')
+  const privacy = cards.find((card) => card.key === 'privacy')
+  const [moreOpen, setMoreOpen] = useState(false)
   const view = cards.length === 0 ? 'unavailable' : resolveView(params, cards.map((card) => card.key))
   const topicKey = params.get('topic') ?? ''
   const topic = cards.find((card) => card.key === topicKey)
@@ -251,21 +259,21 @@ export function HelpCenterPage() {
       : view === 'unavailable'
         ? '帮助内容没显示出来'
         : '你想解决什么？'
-  const eyebrow = view === 'topic' && topic ? `帮助 · ${topic.label}` : '现场帮助'
+  const eyebrow = '帮助'
   const subtitle = view === 'topic' && topic
-    ? `${topic.summary}。下面 ${visibleFaq.length} 条是这一类里最常被问到的，答案就是本机现在的实际做法。`
+    ? `${topic.summary}。下面 ${visibleFaq.length} 条是这一类里常被问到的。`
     : view === 'no-result'
-      ? '地址里的分类不在这台机器的帮助分类里，这里不猜你想看哪一类，也不拿别的内容顶上。'
+      ? '请回到帮助首页，再选一个分类。'
       : view === 'unavailable'
-        ? '帮助内容装在这台机器上，不用再去取一份。这里空白通常是这一页没打开完整，不是你操作错了。'
-        : '先在下面点一个分类，不用打字。里面放的是这台机器上最常卡住的几件事，点开就能看到做法和对应入口。'
+        ? '帮助内容装在这台机器上。这一页没有显示完整。'
+        : '先点一个分类，不用打字。'
   const status = view === 'unavailable'
     ? { tone: 'warn' as const, label: '帮助内容没显示出来' }
     : view === 'no-result'
       ? { tone: 'warn' as const, label: '不在帮助分类里' }
       : view === 'topic' && topic
         ? { tone: 'unknown' as const, label: `当前分类 · ${topic.label}` }
-        : { tone: 'unknown' as const, label: '帮助内容随应用发布' }
+        : { tone: 'ok' as const, label: '常见问题' }
 
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-help-center" data-help-view={view}>
@@ -296,30 +304,51 @@ export function HelpCenterPage() {
                 <>
                   <button type="button" onClick={clearTopic}>返回分类</button>
                   <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}>问小青：这里没看懂</button>
+                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}><MicIcon aria-hidden="true" />问小青：这里没看懂</button>
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" onClick={() => navigate('/error-offline')}>看设备状态</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}>问小青：这里没看懂</button>
+                  <button type="button" onClick={home}>返回</button>
+                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}><MicIcon aria-hidden="true" />问小青：这里没看懂</button>
                 </>
               )}
-            </div>
-            <div className="k1-help-truth" data-disclaimer="true" data-testid="help-truth">
-              <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。</div>
-              <div><b>求助怎么算数</b>本页不会自动上报，也不会替你转达。{phoneLine ?? ''}</div>
             </div>
           </>
         )}
       >
         <section data-kiosk-screen="help" data-state={view} data-testid={`help-state-${view}`} className="k1-help-scroll qx-scroll">
-          {view === 'default' || view === 'no-result' ? (
+          {view === 'default' ? (
+            <>
+              <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
+                {listed.map(({ key, label, summary, icon: Icon, tone, count }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    data-testid={`help-topic-${key}`}
+                    data-tone={tone}
+                    aria-pressed={false}
+                    onClick={() => setParams({ topic: key })}
+                  >
+                    <span className="k1-help-cat-top">
+                      <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
+                      <strong>{label}</strong>
+                    </span>
+                    <small>{summary} · {count} 问</small>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="k1-help-more" onClick={() => setMoreOpen(true)}>
+                <strong>隐私、设备与备案</strong>
+                <small>隐私与留存、看设备状态、备案号</small>
+              </button>
+            </>
+          ) : null}
+          {view === 'no-result' ? (
             <>
               <SectionHead
                 no="01"
-                title={view === 'no-result' ? '可选的分类' : '按你正要办的事找'}
-                hint={view === 'no-result' ? `共 ${cards.length} 个` : '只写本机已经能做的事'}
+                title="可选的分类"
+                hint={`共 ${cards.length} 个`}
               />
               <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
                 {cards.map(({ key, label, summary, icon: Icon, tone, count }) => (
@@ -334,9 +363,8 @@ export function HelpCenterPage() {
                     <span className="k1-help-cat-top">
                       <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
                       <strong>{label}</strong>
-                      <span className="k1-help-count">{count} 问</span>
                     </span>
-                    <small>{summary}</small>
+                    <small>{summary} · {count} 问</small>
                   </button>
                 ))}
               </div>
@@ -400,8 +428,7 @@ export function HelpCenterPage() {
             </>
           ) : null}
 
-          {view === 'default' || view === 'topic' ? <SelfHelp no={view === 'topic' && topicLinks.length > 0 ? '03' : '02'} /> : null}
-          {view === 'default' ? <HumanDesk no="03" phoneLine={phoneLine} /> : null}
+          {view === 'topic' ? <SelfHelp no={topicLinks.length > 0 ? '03' : '02'} /> : null}
           {view === 'no-result' ? <HumanDesk no="02" phoneLine={phoneLine} /> : null}
           {view === 'unavailable' ? <HumanDesk no="03" phoneLine={phoneLine} /> : null}
           {view === 'no-result' ? (
@@ -411,17 +438,51 @@ export function HelpCenterPage() {
             </div>
           ) : null}
 
-          <p className="k1-help-filing" aria-label="网站备案信息">
-            {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
-              鲁ICP备2026023517号-2
-            </a>)}
-            {' · '}
-            {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
-              鲁公网安备37021402007308号
-            </a>)}
-            {' · 职易达AI'}
-          </p>
+          {view === 'default' ? (
+            <div className="k1-help-well">
+              <SelfHelp no="01" plain />
+              {phoneLine ? <p className="k1-help-phone">{phoneLine}</p> : null}
+              <p className="k1-help-filing" aria-label="网站备案信息">
+                <span>鲁ICP备2026023517号-2</span>
+                {' · '}
+                <span>鲁公网安备37021402007308号</span>
+                {' · 职易达AI'}
+              </p>
+              <p className="k1-help-truth" data-testid="help-truth">只写本机已经上线的做法。本页不会自动上报，也不会替你转达。</p>
+            </div>
+          ) : (
+            <p className="k1-help-filing" aria-label="网站备案信息">
+              {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
+                鲁ICP备2026023517号-2
+              </a>)}
+              {' · '}
+              {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
+                鲁公网安备37021402007308号
+              </a>)}
+              {' · 职易达AI'}
+            </p>
+          )}
         </section>
+        {moreOpen ? (
+          <QxTouchOverlay kind="sheet" title="隐私、设备与备案" onClose={() => setMoreOpen(false)} dismissOnScrim>
+            {privacy ? (
+              <button
+                type="button"
+                className="k1-help-more"
+                data-testid={`help-topic-${privacy.key}`}
+                onClick={() => { setMoreOpen(false); setParams({ topic: privacy.key }) }}
+              >
+                <strong>{privacy.label}</strong>
+                <small>{privacy.summary}</small>
+              </button>
+            ) : null}
+            <button type="button" className="k1-help-more" onClick={() => navigate('/error-offline')}>
+              <strong>看设备状态</strong>
+              <small>联网和各项读没读到</small>
+            </button>
+            <p className="k1-help-filing">鲁ICP备2026023517号-2 · 鲁公网安备37021402007308号 · 职易达AI</p>
+          </QxTouchOverlay>
+        ) : null}
       </PublicTouchFrame>
     </div>
   )

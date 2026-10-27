@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyboardIcon } from 'lucide-react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
@@ -122,6 +123,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [hostingOpen, selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
@@ -513,7 +515,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             <AssistantTaskPicker no={nextNo()} composing={cockpitState === 'composer'} input={input}
               selectedTask={selectedTask} contextLabel={contextLabel} questions={quickQuestions}
               loading={loading} aiLocked={aiLocked} onSelect={setSelectedTaskId}
-              onClear={clearTask} onQuestion={chooseQuickQuestion} />
+              onClear={clearTask} onQuestion={chooseQuickQuestion}
+              onRecent={() => navigate('/interview')}
+              onOpenManual={() => setManualOpen(true)}
+              onComplaint={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)} />
           )}
 
           {showConversation && (
@@ -632,7 +637,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             aria-label="输入咨询问题"
             placeholder={aiLocked
               ? 'AI 顾问暂不可用，请先选择办事入口'
-              : toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '说说你想解决什么，例如：我想把简历压到一页')}
+              : toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '还没写问题。点「打字」用屏上键盘，或点上面的一句。')}
             rows={3}
             maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
             readOnly={aiLocked}
@@ -675,7 +680,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               }}
             >
               <KeyboardIcon aria-hidden />
-              拼音键盘
+              打字
             </button>
             {voiceAvailable && (
               <button
@@ -741,6 +746,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <LazyCallPanel onClose={closeVoiceDialog} onSwitchToText={switchVoiceToText} onStateChange={setVoiceState} />
         </Suspense>
       )}
+
+      {manualOpen ? (
+        <QxTouchOverlay kind="sheet" title="不经过 AI，直接去办" onClose={() => setManualOpen(false)} dismissOnScrim>
+          <AdvisorManualEntries />
+        </QxTouchOverlay>
+      ) : null}
 
       <KioskKeyboard
         open={keyboardOpen}

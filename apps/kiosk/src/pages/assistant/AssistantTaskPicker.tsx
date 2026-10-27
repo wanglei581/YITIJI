@@ -23,13 +23,24 @@ interface Props {
   onSelect: (id: ConsultationTask['id']) => void
   onClear: () => void
   onQuestion: (question: string) => void
+  onRecent: () => void
+  onOpenManual: () => void
+  onComplaint: () => void
 }
 
 /** 稿 05 默认态只铺快捷问题；旧页的主题功能收进可展开区域，不丢上下文。 */
-export function AssistantTaskPicker({ no, composing, input, selectedTask, contextLabel, questions, loading, aiLocked, onSelect, onClear, onQuestion }: Props) {
+export function AssistantTaskPicker({ no, composing, input, selectedTask, contextLabel, questions, loading, aiLocked, onSelect, onClear, onQuestion, onRecent, onOpenManual, onComplaint }: Props) {
   return (
     <section className="assistant-task-picker" aria-labelledby="assistant-task-title">
       <AdvisorSectionLabel no={no} id="assistant-task-title" title={composing ? '这条还没发出' : '点一下就能问'} hint={composing ? '改完按右下角发送' : '点完落进输入框，可以改'} />
+      <button type="button" className="assistant-recent" onClick={onRecent}>
+        <span className="assistant-task-icon" aria-hidden="true"><KIcon name="mic" /></span>
+        <span className="assistant-task-copy">
+          <strong>最近办理</strong>
+          <small>模拟面试 · HR 面试 5 分钟</small>
+        </span>
+        <span className="assistant-recent-chip">示例</span>
+      </button>
       <details className="assistant-topic-choices" open>
         <summary>{contextLabel ? `当前主题：${contextLabel}` : '选择咨询主题'}</summary>
         <div className="assistant-task-grid">
@@ -44,26 +55,33 @@ export function AssistantTaskPicker({ no, composing, input, selectedTask, contex
               <span className="assistant-task-art" aria-hidden="true"><PublicArt kind={TASK_ART[task.id]} /></span>
             </button>
           ))}
-          <button type="button" className="assistant-direct-question" aria-pressed={!contextLabel} onClick={onClear}>
-            <strong>直接提问</strong><small>不选主题</small>
-          </button>
         </div>
       </details>
+      <div className="assistant-task-actions">
+        <button type="button" className="assistant-direct-question" onClick={() => { onClear(); onOpenManual() }}>
+          <strong>不经过 AI，直接去办</strong><small>打印扫描、帮助、政策、简历</small>
+        </button>
+        <button type="button" className="assistant-complaint" onClick={onComplaint}>
+          <strong>投诉 AI 内容</strong><small>对回答有异议走这里</small>
+        </button>
+      </div>
       {composing && (
         <div className="assistant-draft-card" data-testid="cockpit-draft">
           <p className="assistant-draft-head"><KIcon name="chat" />将要发送的内容</p>
           <p className="assistant-draft-text">{advisorDisplayText(input.trim())}</p>
         </div>
       )}
-      <div className="assistant-quick-questions" aria-label="快捷问题">
-        {questions.map((question, index) => (
-          <button type="button" key={question} data-testid={`cockpit-quick-${index}`} disabled={!aiLocked && loading} aria-disabled={aiLocked || undefined} onClick={() => onQuestion(question)}>
-            <span className="assistant-quick-icon" aria-hidden="true"><KIcon name="help" /></span>
-            <span className="assistant-quick-text">{question}</span>
-            <span className="assistant-quick-go" aria-hidden="true">{composing ? '替换输入框' : '填入输入框'}<KIcon name="arrow" /></span>
-          </button>
-        ))}
-      </div>
+      {selectedTask ? (
+        <div className="assistant-quick-questions" aria-label="快捷问题">
+          {questions.map((question, index) => (
+            <button type="button" key={question} data-testid={`cockpit-quick-${index}`} disabled={!aiLocked && loading} aria-disabled={aiLocked || undefined} onClick={() => onQuestion(question)}>
+              <span className="assistant-quick-icon" aria-hidden="true"><KIcon name="help" /></span>
+              <span className="assistant-quick-text">{question}</span>
+              <span className="assistant-quick-go" aria-hidden="true">{composing ? '替换输入框' : '填入输入框'}<KIcon name="arrow" /></span>
+            </button>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }

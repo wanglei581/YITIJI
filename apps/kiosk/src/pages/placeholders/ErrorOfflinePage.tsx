@@ -309,7 +309,13 @@ export default function ErrorOfflinePage() {
       <KioskStageFit>
         <PublicTouchFrame
           page="offline"
-          title="机器状态"
+          title={view === 'unknown'
+            ? '这台机器还没检测'
+            : view === 'checking'
+              ? '正在检测'
+              : view === 'partial'
+                ? '连得上，但有几项取不到'
+                : '和服务器连不上'}
           eyebrow="本机"
           sub={current.label}
           status={pill[view]}

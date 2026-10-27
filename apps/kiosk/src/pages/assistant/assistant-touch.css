@@ -167,12 +167,49 @@
   height: 88px;
 }
 
-.qxt-screen[data-qx-page='assistant'] .assistant-direct-question {
-  grid-column: 1 / -1;
+.qxt-screen[data-qx-page='assistant'] .assistant-recent,
+.qxt-screen[data-qx-page='assistant'] .assistant-direct-question,
+.qxt-screen[data-qx-page='assistant'] .assistant-complaint {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
   min-height: 72px;
-  font-size: var(--qxt-fs-body);
+  padding: 12px 16px;
+  border-radius: 22px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  font-size: var(--qxt-fs-body);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-recent-chip {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-picker .assistant-sec-label,
+.qxt-screen[data-qx-page='assistant'] .assistant-topic-choices > summary {
+  display: none;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench[data-cockpit-state='default'] .assistant-cockpit,
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench[data-cockpit-state='composer'] .assistant-cockpit,
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench[data-cockpit-state='default'] .assistant-manual-section,
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench[data-cockpit-state='default'] .assistant-truth,
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench[data-cockpit-state='composer'] .assistant-truth {
+  display: none;
 }
 
 .qxt-screen[data-qx-page='assistant'] .assistant-quick-questions button,
@@ -278,7 +315,8 @@
     width: 100%;
   }
 
-  .qxt-screen[data-qx-page='assistant'] .assistant-task-grid {
-    grid-template-columns: 1fr 1fr;
+  .qxt-screen[data-qx-page='assistant'] .assistant-task-grid,
+  .qxt-screen[data-qx-page='assistant'] .assistant-task-actions {
+    grid-template-columns: 1fr;
   }
 }

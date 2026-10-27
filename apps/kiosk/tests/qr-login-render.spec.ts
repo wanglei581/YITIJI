@@ -527,7 +527,10 @@ for (const scenario of [
     await expect(page.getByTestId('login-gate-back')).toHaveText('返回首页')
     await expect(page.getByTestId('login-gate-keypad')).toHaveCount(0)
     if (scenario.code === 'SMS_SEND_FAILED') {
-      expect((await page.getByTestId('login-gate-tab-phone').boundingBox())!.y).toBeGreaterThanOrEqual(500)
+      const phoneTab = (await page.getByTestId('login-gate-tab-phone').boundingBox())!
+      const loginBand = (await page.locator('.qxt-band').boundingBox())!
+      expect(phoneTab.y, '手机号入口在意图带下面').toBeGreaterThan(loginBand.y + loginBand.height - 1)
+      expect(phoneTab.y, '手机号入口仍在首屏').toBeLessThan(720)
       expect(await page.locator('.k1-login .qx-scroll').evaluate((el) => el.scrollHeight - el.clientHeight), '登录默认态首屏放得下').toBeLessThanOrEqual(1)
       await expect(page.getByRole('checkbox', { name: /我已阅读并同意/ })).toBeInViewport()
     }
