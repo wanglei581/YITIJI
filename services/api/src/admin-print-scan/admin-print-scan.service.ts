@@ -31,6 +31,7 @@ import {
   throwIfAdminReprintBlocked,
 } from '../print-jobs/paid-reprint-eligibility'
 import { lockPrintTaskRow } from '../terminals/print-status-attempt'
+import { assertUnconfirmedOnlyForPrint, unconfirmedPrintWhere } from './print-scan-unconfirmed-filter'
 import {
   ADMIN_RETRY_STATE_CHANGED_MESSAGE,
   ADMIN_RETRY_TERMINAL_NOT_ACTIVE_MESSAGE,
@@ -89,7 +90,7 @@ export interface ListAdminPrintScanTasksParams {
   terminalId?: string
   page: number
   pageSize: number
-  /** true 时只统计出纸未确认：errorCode 为未确认且尚未核查。 */
+  /** 只看出纸未确认，口径见 print-scan-unconfirmed-filter.ts */
   unconfirmed?: boolean
 }
 
@@ -152,11 +153,7 @@ export class AdminPrintScanService {
 
   async listTasks(params: ListAdminPrintScanTasksParams): Promise<AdminPrintScanTaskPage> {
     const type = this.asTaskType(params.type)
-    if (params.unconfirmed && type !== 'print') {
-      throw new BadRequestException({
-        error: { code: 'PRINT_SCAN_UNCONFIRMED_PRINT_ONLY', message: '出纸未确认只适用于打印任务' },
-      })
-    }
+    assertUnconfirmedOnlyForPrint(type, params.unconfirmed)
     const implemented = (IMPLEMENTED_PRINT_SCAN_TASK_TYPES as readonly string[]).includes(type)
     const pagination = { page: params.page, pageSize: params.pageSize, total: 0, totalPages: 0 }
 
@@ -200,10 +197,7 @@ export class AdminPrintScanService {
     const where: Record<string, unknown> = {}
     if (params.status) where['status'] = params.status
     if (params.terminalId) where['terminalId'] = params.terminalId
-    if (params.unconfirmed) {
-      where['errorCode'] = PRINT_JOB_UNCONFIRMED_ERROR_CODE
-      where['OR'] = [{ printOutcome: null }, { printOutcome: '' }]
-    }
+    if (params.unconfirmed) Object.assign(where, unconfirmedPrintWhere())
 
     const [rows, total] = await Promise.all([
       this.prisma.printTask.findMany({
