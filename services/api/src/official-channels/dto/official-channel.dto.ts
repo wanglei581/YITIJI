@@ -43,27 +43,28 @@ export class CreateOfficialChannelDto {
 }
 
 export class UpdateOfficialChannelDto {
-  @IsOptional()
+  // 不传就不改；传了就不许是 null（null 会把渠道当成停用写进去，或让名称、链接报 500）
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @Transform(trim)
   @MinLength(1)
   @MaxLength(40)
   name?: string
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @Transform(trim)
   @MinLength(1)
   @MaxLength(500)
   url?: string
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(0)
   @Max(999)
   displayOrder?: number
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean()
   enabled?: boolean
 

@@ -156,6 +156,14 @@ async function main() {
     const nullCreate = await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: null })
     const nullUpdate = await audienceStatus(UpdateOfficialChannelDto, { audience: null })
     ok(nullCreate.status === 400 && nullUpdate.status === 400, 'null audience rejected with 400')
+    for (const field of ['name', 'url', 'displayOrder', 'enabled'] as const) {
+      const nulled = await audienceStatus(UpdateOfficialChannelDto, { [field]: null })
+      ok(nulled.status === 400, `update ${field}: null rejected with 400`)
+    }
+    const keepOff = await audienceStatus(UpdateOfficialChannelDto, { enabled: false }) as { status: number; body: { enabled?: unknown } | null }
+    const rename = await audienceStatus(UpdateOfficialChannelDto, { name: '机构服务号', displayOrder: 3 }) as { status: number; body: { name?: unknown; displayOrder?: unknown } | null }
+    ok(keepOff.status === 200 && keepOff.body?.enabled === false
+      && rename.status === 200 && rename.body?.name === '机构服务号' && rename.body?.displayOrder === 3, 'update with real values still passes')
     const graduateCreate = await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: 'graduate' })
     ok(graduateCreate.status === 200 && graduateCreate.body?.audience === 'graduate', 'create graduate passes and keeps audience')
     for (const audience of ['graduate', 'social', 'general'] as const) {
