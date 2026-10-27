@@ -48,6 +48,7 @@ import {
 } from './printConfirmModel'
 import { usePrintConfirmQueryGuard } from './printConfirmQuery'
 import './styles/print-confirm-qx.css'
+import { FilePageThumb } from './components/FileThumbCard'
 import './styles/print-confirm-touch.css'
 
 type PrintFile = PrintFileState
@@ -677,14 +678,7 @@ export function PrintConfirmPage() {
         : primaryLabel
   const dockDisabled = sidesOverLimit || screen === 'quoting' || (screen !== 'quote-failed' && confirmBlocked)
   const previewKind = hasFileContext ? previewKindForFile(file) : 'unavailable'
-  const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image')
-    ? (
-      <div className="pct-mark">
-        <b>{file.name}</b>
-        <span>第 1 页</span>
-      </div>
-    )
-    : null
+  const previewNode = hasFileContext && (previewKind === 'pdf' || previewKind === 'image') ? <FilePageThumb file={file} /> : null
   const sheetPages = quote.status === 'ready' ? quote.billablePages : rangedPages
   const sheetUsage = computePrintUsageEstimate({
     pages: sheetPages,

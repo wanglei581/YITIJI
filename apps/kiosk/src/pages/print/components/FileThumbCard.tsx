@@ -103,3 +103,30 @@ export function FileThumbCard({
     </>
   )
 }
+
+/** 只画一页缩略（核对价格用）：这一份文件自己的第一页，读不出来时退成文件图标。不弹窗、不翻页。 */
+export function FilePageThumb({ file }: { file: PrintFileState }) {
+  const kind = previewKindForFile(file)
+  return (
+    <>
+      <span className="pct-thumb-page">
+        {kind === 'pdf' && file.fileUrl ? (
+          <PdfCanvasPreview
+            className="pdk-doc-canvas"
+            title={`${file.name} 缩略`}
+            src={file.fileUrl}
+            fit="page"
+            showPager={false}
+            failureMessage="预览没生成"
+            passwordMessage={ENCRYPTED_PDF_BLOCK_COPY}
+          />
+        ) : null}
+        {kind === 'image' && file.fileUrl ? <img src={file.fileUrl} alt="" /> : null}
+        {kind === 'word' || kind === 'unsupported' || kind === 'unavailable' || !file.fileUrl ? (
+          <QxTouchIcon name="file" size={56} strokeWidth={1.8} />
+        ) : null}
+      </span>
+      <span>第 1 页</span>
+    </>
+  )
+}

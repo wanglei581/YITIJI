@@ -63,7 +63,7 @@ import { printUploadPathForSource, type PrintFileState, type PrintMaterialSource
 import { cashierQxPill, deriveCashierQxState, type ChannelLoadState } from './cashierQxModel'
 import { CashierQxView } from './components/CashierQxView'
 import './styles/cashier-qx.css'
-import './styles/print-confirm-touch.css'
+import './styles/print-cashier-touch.css'
 
 interface CashierLocationState {
   orderId?: string

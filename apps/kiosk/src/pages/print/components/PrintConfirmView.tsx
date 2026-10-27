@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { FileTextIcon, LockIcon } from 'lucide-react'
+import { PrintIcon } from '../art/PrintIcon'
 import type { PrintParamAdjustment } from '@ai-job-print/shared'
-import { machineCannotPrintLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, machineCannotPrintLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../../copy/unattendedCopy'
 import type { PrintBenefitView } from '../../../services/api/benefits'
 import type { PrintConfirmScreen, QuoteView } from '../printConfirmModel'
 import type { PrintFileState } from '../printMaterialSession'
@@ -211,9 +212,6 @@ export function PrintConfirmView(props: Props) {
             </section>
           </div>
 
-          <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
-          {selfAssessment}
-
           {adjustments.length > 0 ? (
             <div className="pct-alert">
               彩色或双面本机暂未开通，已改回目前能打的参数。
@@ -231,66 +229,71 @@ export function PrintConfirmView(props: Props) {
           ) : null}
 
           {freePricing ? (
-            <section className="pct-fee" aria-label="页数核定">
-              <b>页数核定</b>
+            <section className="pdk-fee pct-fee" aria-label="页数核定" data-tone={readyZero ? undefined : 'warn'}>
               {readyZero ? (
                 <>
-                  <span data-testid="print-confirm-amount">免费试运营</span>
-                  <strong className="pct-num">0 元</strong>
-                  <p>免费试运营，本单 0 元</p>
+                  <div>
+                    <b>费用</b>
+                    <small><span data-testid="print-confirm-amount">免费试运营</span>，本单 0 元</small>
+                  </div>
+                  <span className="pdk-num">0 元</span>
                 </>
               ) : screen === 'quoting' || quote.status === 'demo' ? (
-                <p>正在核定页数</p>
+                <div><b>页数核定</b><small>正在核定页数</small></div>
               ) : screen === 'quote-failed' ? (
-                <div className={halted ? 'pcf-grid2' : 'pct-note'} data-single={halted ? 'true' : undefined}>
-                  <p>{failText}</p>
+                <div className={halted ? 'pcf-grid2' : undefined} data-single={halted ? 'true' : undefined}>
+                  <b>页数核定未完成</b>
+                  <small>{failText}</small>
                 </div>
               ) : (
-                <p>页数核定未完成</p>
+                <div><b>页数核定</b><small>页数核定未完成</small></div>
               )}
             </section>
           ) : (
-            <section className="pct-fee" aria-label="应付金额">
+            <section className="pdk-fee pct-fee" aria-label="应付金额" data-tone={ready ? undefined : 'warn'}>
               {ready ? (
                 <>
-                  <p className="pct-fee-line">
-                    应付 <span data-testid="print-confirm-amount">{`¥${amountText}`}</span> 元
-                  </p>
-                  <p className="pct-note">金额以订单为准</p>
+                  <div>
+                    <b>应付 <span data-testid="print-confirm-amount">{`¥${amountText}`}</span> 元</b>
+                    <small>金额以订单为准</small>
+                    <small><span data-cost-calc="true">{costCalcLabel}</span></small>
+                  </div>
+                  <span className="pdk-num" aria-hidden="true">{amountText} 元</span>
                 </>
-              ) : quote.status === 'demo' ? (
-                <p>演示模式不显示金额</p>
-              ) : screen === 'quoting' ? (
-                <p>正在获取金额</p>
               ) : (
-                <p>这一次没有拿到报价</p>
+                <div>
+                  <b>{quote.status === 'demo' ? '演示模式不显示金额' : screen === 'quoting' ? '正在获取金额' : '这一次没有拿到报价'}</b>
+                  {quote.status !== 'unavailable' ? <small><span data-cost-calc="true">{costCalcLabel}</span></small> : null}
+                  {screen === 'quote-failed' ? (
+                    halted ? (
+                      <div className="pcf-grid2" data-single="true"><small>{failText}</small></div>
+                    ) : (
+                      <>
+                        <small>{failText}</small>
+                        <small>可能的原因：本机与系统之间网络中断；参数里有本机暂未开通的项，系统直接拒绝报价。</small>
+                      </>
+                    )
+                  ) : null}
+                </div>
               )}
-              {quote.status !== 'unavailable' ? (
-                <p className="pct-note"><span data-cost-calc="true">{costCalcLabel}</span></p>
-              ) : null}
-              {screen === 'quote-failed' ? (
-                halted ? (
-                  <div className="pcf-grid2" data-single="true"><p>{failText}</p></div>
-                ) : (
-                  <>
-                    <div className="pct-note"><p>{failText}</p></div>
-                    <div className="pcf-pgrp">
-                      <h4>可能的原因</h4>
-                      <Plan items={['本机与系统之间网络中断。', '参数里有本机暂未开通的项，系统直接拒绝报价。']} />
-                    </div>
-                  </>
-                )
-              ) : null}
-              {screen === 'benefit-unverified' ? (
-                <p className="pct-note">核销没通过，按实际原价继续。本机不会先按抵扣后的价格显示。</p>
-              ) : null}
-              {ready && (quotedLike || screen === 'capability-invalid-params') ? (
-                <CouponUnavailable free={quote.amountCents === 0} />
-              ) : null}
             </section>
           )}
+          {!freePricing && screen === 'benefit-unverified' ? (
+            <p className="pct-note">核销没通过，按实际原价继续。本机不会先按抵扣后的价格显示。</p>
+          ) : null}
 
-          {!freePricing && benefitView ? <BenefitCard view={benefitView} onLogin={onLogin} /> : null}
+          <div className="qxt-remind">
+            <PrintIcon name="shield" size={34} />
+            <span>{freePricing ? '提交后请留在机器旁，任务确认后自动开始打印。' : '提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。'}</span>
+          </div>
+          <p className="pdk-fine">隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</p>
+
+          <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
+          {selfAssessment}
+          {ready && (quotedLike || screen === 'capability-invalid-params') ? (
+            <CouponUnavailable free={quote.amountCents === 0} />
+          ) : null}
+          {!freePricing && benefitView ? <BenefitCard view={{ ...benefitView, detail: preferUnattended(benefitView.detail, `价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。请稍后重试。${helpNeededLine()}`) }} onLogin={onLogin} /> : null}
           {printNotes}
           {actions ? <div className="pct-acts">{actions}</div> : null}
         </>
