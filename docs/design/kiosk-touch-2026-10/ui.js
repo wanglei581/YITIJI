@@ -212,14 +212,14 @@
   function header(o = {}) {
     const st = o.status === false ? '' : status(o.status);
     return `<div class="hdr">${o.back ? `<button class="back" data-act="back" aria-label="返回上一步">${icon('chevL', 34, 2.4)}</button>` : ''}
-      <div class="brand"><div class="mark">职</div><div><b>职易达</b><small>${o.place || '就业服务大厅'}</small></div></div>
+      <div class="brand"><div class="mark">职</div><div><b>职易达</b>${o.place && o.place.trim() ? `<small>${o.place}</small>` : ''}</div></div>
       <div class="right">${st}${clock()}</div></div>`;
   }
   function status(s) {
     const st = window.S || {};
     if (s && s.text) return `<span class="status ${s.warn ? 'warn' : ''}"><i class="dot"></i>${s.text}</span>`;
-    if (st.printer === 'down') return `<span class="status warn"><i class="dot"></i>打印机暂时连不上</span>`;
-    return `<span class="status"><i class="dot"></i>打印机就绪</span>`;
+    /* 运行页 QxPageFrame：拿不到确定结论就写「状态未知」，不默认就绪，也不替不探测打印机的页面报打印机状态。 */
+    return `<span class="status unknown"><i class="dot"></i>状态未知</span>`;
   }
   function band(o) {
     const kind = o.kind || 'std';
@@ -248,7 +248,7 @@
     return s;
   }
   function nav(active) {
-    const it = [['home', '首页', 'home'], ['xq', '问小青', 'sparkle'], ['me', '我的', 'user']];
+    const it = [['home', '首页', 'home'], ['xq', 'AI 顾问', 'sparkle'], ['me', '我的', 'user']];
     return `<nav class="nav">${it.map(([k, l, ic]) => `<button class="${active === k ? 'on' : ''}" data-go="${k === 'me' ? 'me' : k}" ${active === k ? 'aria-current="page"' : ''}>${icon(ic, 36, 2)}<span>${l}</span></button>`).join('')}</nav>`;
   }
   function slab(o) {

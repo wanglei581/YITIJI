@@ -16,6 +16,10 @@
   };
 
   function stopMount() { if (cleanup) { try { cleanup(); } catch (e) { } cleanup = null; } }
+  /* 私有化部署（b）版的屏（bOnly）一律在最上面加标识条：只在说明栏打开「显示私有化版页面」后出现，
+     防止被当成我方云上的页面拿去演示或宣传。标识条由这里统一加，各屏自己不画。 */
+  const B_RIBBON = '<div class="b-ribbon" role="note">私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传</div>';
+  function screenHtml(def) { return (def.bOnly ? B_RIBBON : '') + def.render(); }
   function render(id, dir = 'fwd') {
     const def = byId[id]; if (!def) return;
     stopMount();
@@ -24,21 +28,35 @@
     const el = document.createElement('div');
     el.className = 'screen enter' + (dir === 'back' ? ' back' : '');
     el.dataset.id = id;
-    el.innerHTML = def.render();
+    el.innerHTML = screenHtml(def);
     stage.appendChild(el);
     if (old) { old.classList.remove('enter'); old.classList.add('leave'); setTimeout(() => old.remove(), 200); }
     setTimeout(() => el.classList.remove('enter', 'back'), 320);
     cur = id; tickClock(el);
     if (def.mount) cleanup = def.mount(el) || null;
-    renderPanel(); updateZones();
+    renderPanel(); updateZones(); renderDemo();
   }
   function refresh() {
     const el = stage.querySelector('.screen:not(.leave)'); if (!el) return;
-    stopMount(); el.classList.add('norise'); el.innerHTML = byId[cur].render(); tickClock(el);
+    stopMount(); el.classList.add('norise'); el.innerHTML = screenHtml(byId[cur]); tickClock(el);
     if (byId[cur].mount) cleanup = byId[cur].mount(el) || null;
-    renderPanel(); updateZones();
+    renderPanel(); updateZones(); renderDemo();
   }
-  window.go = (id, o = {}) => { if (cur && cur !== id && !o.noHist) hist.push(cur); render(id, o.dir || 'fwd'); };
+  /* 演示事件：屏定义里的 demo（数组，或按状态返回数组的函数）列出后台 / 硬件回报，例如手机传来文件、出纸完成。
+     点了在当前屏上派发 proto-demo 事件，由那一屏的 mount 接住。屏上不画这些按钮，不演成功。 */
+  function demoList(def) { const d = def && def.demo; return typeof d === 'function' ? (d() || []) : (d || []); }
+  function fireDemo(ev) { const el = stage.querySelector('.screen:not(.leave)'); if (el) el.dispatchEvent(new CustomEvent('proto-demo', { detail: ev })); }
+  window.protoDemo = fireDemo;
+  function renderDemo() {
+    const row = document.getElementById('demoRow'); if (!row) return;
+    const list = demoList(byId[cur]);
+    row.hidden = !list.length;
+    row.innerHTML = list.map((d) => `<button class="tg" data-demo="${d.ev}">${d.label}</button>`).join('');
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('#demoRow [data-demo]'); if (b) fireDemo(b.dataset.demo); });
+  /* 进登录前记住从哪来：登录成功回到那一页（运行页「登录后回到刚才那一步」）；从首页来的去「我的」。 */
+  window.go = (id, o = {}) => { if (id === 'login' && cur && cur !== 'login') S.loginBack = cur; if (cur && cur !== id && !o.noHist) hist.push(cur); render(id, o.dir || 'fwd'); };
+  window.afterLogin = () => { const b = S.fmLoginBack || S.loginBack; S.loginBack = null; S.fmLoginBack = null; return b && b !== 'home' && b !== 'login' ? b : 'me'; };
   function back() { const p = hist.pop(); render(p || 'home', 'back'); }
 
   /* 演示交互 */
@@ -48,18 +66,9 @@
     d.style.cssText = 'position:absolute;left:50%;bottom:300px;transform:translateX(-50%);z-index:50;max-width:900px;padding:22px 34px;border-radius:999px;background:rgba(11,36,30,.92);color:#f6f3ea;font:600 25px/1.4 var(--sans);text-align:center;animation:fadein 200ms ease both';
     stage.appendChild(d); setTimeout(() => d.remove(), 2400);
   }
-  window.doClear = () => { S.logged = false; S.opt = 0; S.code = ''; S.iv.q = 0; S.print = { copies: 1, color: 'bw', duplex: 'single' }; ['more', 'pii', 'legacy', 'hid', 'payMode', 'pickupState', 'directed', 'intent', 'layoutMore', 'factSheet', 'expDone', 'expFmt', 'repExported', 'aiAdjusted'].forEach((k) => { delete S[k]; }); syncToggles(); hist.length = 0; render('cleared'); };
-  function idle() {
-    stage.querySelectorAll('.overlay').forEach(n => n.remove());
-    const o = document.createElement('div'); o.className = 'overlay';
-    o.innerHTML = `<div class="dialog"><div class="ring-lg">${UI.ring(1, 220, 14)}<b id="idleN">20</b></div><h2>还在办理吗？</h2>
-      <p>20 秒后会清除这台机器上本次的文件和登录状态。<br>已经开始的打印会照常出纸。</p>
-      <div class="btns"><button class="btn pri" data-act="idle-keep" style="width:100%">继续办理</button><button class="btn sec" data-act="clear" style="width:100%;color:var(--cinnabar)">现在结束并清除</button></div></div>`;
-    stage.appendChild(o);
-    let n = 20; const arc = o.querySelector('.arc'), C = parseFloat(arc.getAttribute('stroke-dasharray'));
-    const t = setInterval(() => { n--; const b = o.querySelector('#idleN'); if (!b) return clearInterval(t); b.textContent = n; arc.setAttribute('stroke-dashoffset', C * (1 - n / 20)); if (n <= 0) { clearInterval(t); window.doClear(); } }, 1000);
-    o._t = t;
-  }
+  window.doClear = () => { S.logged = false; S.opt = 0; S.code = ''; S.iv.q = 0; S.print = { copies: 1, color: 'bw', duplex: 'single' }; ['more', 'pii', 'legacy', 'hid', 'payMode', 'pickupState', 'directed', 'intent', 'layoutMore', 'factSheet', 'expDone', 'expFmt', 'repExported', 'aiAdjusted'].forEach((k) => { delete S[k]; }); syncToggles(); hist.length = 0; render('home'); };  /* 运行页 endKioskUse：结束人次 → 清本机数据 → 退出登录 → 回首页 */
+  /* 运行页无操作到预警线时进 /session-timeout（稿屏 cleared）；那一屏自己倒计时、结束后清场回首页。 */
+  function idle() { if (cur && cur !== 'cleared') S.fpFrom = cur; window.go('cleared'); }
   function xqReply(q, answer, card) {
     const chat = $('#chat', stage); if (!chat) return;
     const me = document.createElement('div'); me.className = 'bub me rise'; me.textContent = q; chat.appendChild(me);
@@ -80,19 +89,21 @@
     const act = t.dataset.act, arg = t.dataset.arg, goId = t.dataset.go;
     if (goId) {
       if (goId === 'upload' || goId === 'usb') S.ctx = arg || (cur === 'print-src' ? 'print' : 'resume');
-      if (goId === 'print-src') S.ctx = 'print';
+      if (goId === 'print-src') { S.ctx = 'print'; S.printDoc = null; S.pvPage = 1; }
       if (goId === 'resume-src') S.ctx = 'resume';
       if (goId === 'confirm') S.ctx = arg || (cur === 'policy-detail' ? 'policy' : cur === 'reading' || cur === 'compare' ? 'resume' : cur === 'iv-report' ? 'report' : 'print');
       if (goId === 'optimize' && arg === 'reset') { S.opt = 0; S.decided = []; }
       if (goId === 'iv-run') S.iv.q = 0;
       if (goId === 'scan-guide' && cur === 'resume-src') S.ctx = 'resume';
+      /* data-set="键=值;键=值"：跳转前先改状态（例如进岗位列表前选好「校招」）。 */
+      if (t.dataset.set) t.dataset.set.split(';').forEach((kv) => { const [k, v] = kv.split('='); if (k) S[k.trim()] = v === 'true' ? true : v === 'false' ? false : v; });
       window.go(goId); return;
     }
     switch (act) {
       case 'back': back(); break;
       case 'toast': toast(arg); break;
       case 'type': toast('演示：弹出系统触摸键盘，输入框会留在键盘上方'); break;
-      case 'login': S.logged = true; syncToggles(); toast('已登录（示例账号）'); setTimeout(() => window.go('me'), 600); break;
+      case 'login': S.logged = true; syncToggles(); toast('已登录（示例账号）'); setTimeout(() => window.go(window.afterLogin()), 600); break;
       case 'clear': { const ov = stage.querySelector('.overlay'); if (ov && ov._t) clearInterval(ov._t); window.doClear(); break; }
       case 'idle-keep': { const ov = stage.querySelector('.overlay'); if (ov) { clearInterval(ov._t); ov.remove(); } break; }
       case 'ask': { const a = ANSWERS[arg]; xqReply(arg, a[0], card(a[1])); break; }
@@ -194,7 +205,7 @@
   function flowOf(id) { return (window.FLOWS || []).find(f => f.ids.includes(id) && f.ids[0] !== id) || (window.FLOWS || []).find(f => f.ids.includes(id)); }
   function stripHtml(flow) {
     const key = flow.n + '|' + S.logged + S.printer + S.ai;
-    if (!thumbCache[key]) thumbCache[key] = flow.ids.map(id => byId[id] ? `<div class="sitem" role="button" tabindex="0" data-open="${id}"><div class="th"><div class="stage static"><div class="screen">${byId[id].render()}</div></div></div><span>${byId[id].name}</span></div>` : '').join('<span class="arr">→</span>');
+    if (!thumbCache[key]) thumbCache[key] = flow.ids.map(id => byId[id] ? `<div class="sitem" role="button" tabindex="0" data-open="${id}"><div class="th"><div class="stage static"><div class="screen">${screenHtml(byId[id])}</div></div></div><span>${byId[id].name}</span></div>` : '').join('<span class="arr">→</span>');
     return thumbCache[key];
   }
   function renderPanel() {
@@ -209,7 +220,7 @@
       requestAnimationFrame(() => { const m = measure(), box = $('#meter'); if (m && box) { box.innerHTML = `<span>可点 ${m.taps}</span><span>小于 64px 的可点 ${m.small}</span><span>最小字 ${m.minFs}px</span><span>小于 22px 的字 ${m.pct}%</span>`; const nn = $('#nowNew'); if (nn) nn.textContent = `新版：可点 ${m.taps} · 小于 22px 的字占 ${m.pct}%`; } });
     } else if (tab === 'all') {
       let h = `<h2>全部页面（${SCREENS.length} 屏）</h2><p>按业务分组。点名字直接打开那一屏；要一次看全部，用下面的「全部页面总览」。</p>`; let k = 0;
-      SCREEN_GROUPS.forEach(g => { const list = SCREENS.filter(s => s.group === g); if (!list.length) return; h += `<div class="flow-group">${g}（${list.length}）</div><div class="flow-list">` + list.map(s => `<button data-open="${s.id}" ${s.id === cur ? 'aria-current="true"' : ''}><span class="n">${String(++k).padStart(2, '0')}</span>${s.name}</button>`).join('') + '</div>'; });
+      SCREEN_GROUPS.forEach(g => { const list = SCREENS.filter(s => s.group === g && (!s.bOnly || S.showB)); if (!list.length) return; h += `<div class="flow-group">${g}（${list.length}）</div><div class="flow-list">` + list.map(s => `<button data-open="${s.id}" ${s.id === cur ? 'aria-current="true"' : ''}><span class="n">${String(++k).padStart(2, '0')}</span>${s.name}</button>`).join('') + '</div>'; });
       pbody.innerHTML = h;
     } else if (tab === 'goals') {
       pbody.innerHTML = `<p>按「一个人走到机器前想办成的事」排，不按页面排。依据：Codex 读 main 代码梳理的办理路径，Claude 抽查属实。点页面名直接跳过去。</p><div class="gap-list">` + GOALS.map(g => `<div class="note-card"><h3 style="margin:0 0 6px">${g.t}</h3><dl class="kv"><dt>谁会来</dt><dd>${g.who}</dd><dt>带走</dt><dd>${g.take}</dd><dt>离不开机器</dt><dd>${g.kiosk}</dd><dt>手机上</dt><dd>${g.phone}</dd></dl><div class="goal"><div class="path">路径：${g.path.map(p => byId[p] ? `<button data-open="${p}">${byId[p].name}</button>` : p).join(' → ')}</div></div></div>`).join('') + '</div>';
@@ -251,9 +262,9 @@
   const ov = $('#overview'), grid = $('#ovGrid');
   function buildOverview() {
     grid.innerHTML = '';
-    SCREENS.forEach((s, i) => {
+    SCREENS.filter(s => !s.bOnly || S.showB).forEach((s, i) => {
       const item = document.createElement('div'); item.className = 'ov-item'; item.dataset.open = s.id; item.setAttribute('role', 'button'); item.tabIndex = 0;
-      item.innerHTML = `<div class="ov-thumb"><div class="stage static"><div class="screen">${s.render()}</div></div></div><span>${String(i + 1).padStart(2, '0')} · ${s.group} · ${s.name}</span>`;
+      item.innerHTML = `<div class="ov-thumb"><div class="stage static"><div class="screen">${screenHtml(s)}</div></div></div><span>${String(i + 1).padStart(2, '0')} · ${s.group} · ${s.name}</span>`;
       grid.appendChild(item);
     });
     tickClock(grid); sizeThumbs();
@@ -265,6 +276,9 @@
   /* 开关 */
   function syncToggles() {
     $('#tg-login').setAttribute('aria-pressed', S.logged); $('#tg-printer').setAttribute('aria-pressed', S.printer === 'down'); $('#tg-ai').setAttribute('aria-pressed', S.ai === 'down');
+    const f = $('#tg-fee'); if (f) f.setAttribute('aria-pressed', !!S.fee);
+    const c = $('#tg-ctrl'); if (c) c.setAttribute('aria-pressed', !!S.controlsOn);
+    const bb = $('#tg-showb'); if (bb) bb.setAttribute('aria-pressed', !!S.showB);
   }
   const tg = (id, fn) => $(id).addEventListener('click', fn);
   tg('#tg-overview', () => { const on = !ov.classList.contains('on'); closeOverview(); if (!on) return; ov.classList.add('on'); app.classList.add('mode-wide'); wrap.style.visibility = 'hidden'; $('#tg-overview').setAttribute('aria-pressed', 'true'); buildOverview(); fit(); });
@@ -275,6 +289,9 @@
   tg('#tg-login', () => { S.logged = !S.logged; syncToggles(); for (const k in thumbCache) delete thumbCache[k]; refresh(); });
   tg('#tg-printer', () => { S.printer = S.printer === 'down' ? 'ok' : 'down'; syncToggles(); refresh(); });
   tg('#tg-ai', () => { S.ai = S.ai === 'down' ? 'ok' : 'down'; syncToggles(); refresh(); });
+  tg('#tg-fee', () => { S.fee = !S.fee; syncToggles(); refresh(); });
+  tg('#tg-ctrl', () => { S.controlsOn = !S.controlsOn; syncToggles(); refresh(); });
+  tg('#tg-showb', () => { S.showB = !S.showB; syncToggles(); refresh(); });
   tg('#tg-idle', () => { closeOverview(); idle(); });
 
   /* 启动：地址里带页面编号（如 #optimize）就直接打开那一屏 */
@@ -285,10 +302,14 @@
   if (params.get('login') === '1') S.logged = true;
   if (params.get('printer') === 'down') S.printer = 'down';
   if (params.get('ai') === 'down') S.ai = 'down';
+  if (params.get('fee') === '1') S.fee = true;
+  if (params.get('ctrl') === '1') S.controlsOn = true;
+  if (params.get('b') === '1') S.showB = true;
   syncToggles();
   if (!window.renderMap) $('#tg-map').hidden = true;
   fit();
   render(byId[start] ? start : 'home');
+  if (params.get('demo')) setTimeout(() => fireDemo(params.get('demo')), 500);
   if (params.get('overview') === '1') $('#tg-overview').click();
   if (params.get('map') === '1' && window.renderMap) $('#tg-map').click();
   window.__proto = { render, S, measure, refresh, idle, byId };

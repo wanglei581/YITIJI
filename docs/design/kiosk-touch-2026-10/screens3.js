@@ -253,14 +253,14 @@
           <div class="r"><span>参数</span><b>2 张 · 黑白 · 单面</b><span></span></div>
         </div>
         <div class="st3-exits">
-          <button class="btn sec" data-act="toast" data-arg="订单 ORD-20261026-0418，毕业生就业推荐表（已填写）.pdf，2 张，黑白，单面。结果未确认，订单保留。">查看订单说明</button>
-          <button class="btn sec" data-act="toast" data-arg="不用登录也能反馈。写完留在这一页。">反馈问题</button>
+          <button class="btn sec" data-fl="order">查看订单说明</button>
+          <button class="btn sec" data-fl="fb">反馈问题</button>
         </div>
         <button class="rowlink" data-go="my-orders">${icon('receipt', 32, 2)}<span><b>查看打印订单</b></span><span class="chev">${icon('chevR', 28, 2.2)}</span></button>
         ${fine('这次结果已登记，等待人工核查；订单保留。')}`,
       dock: { back: false, left: `<button class="btn sec" data-go="home">${icon('chevL', 30, 2.4)}返回首页</button>`, ask: '问小青：取纸或异常怎么办', pri: { label: '使用帮助', go: 'help' } },
       nav: 'home'
-    })
+    }) + window.FM.layerFor(['st-unconfirmed', 'unconfirmed'])
   });
 
   const MANUAL = [

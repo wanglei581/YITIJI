@@ -1,16 +1,25 @@
 {
   "frozenAt": "2026-10-26",
-  "updatedAt": "2026-10-26",
-  "note": "青序流光 · 触屏版，补稿定稿（产品负责人 2026-10-26 看过）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。",
+  "updatedAt": "2026-10-27",
+  "note": "青序流光 · 触屏版，全页补稿第 5 版定稿（产品负责人 2026-10-27 看过并同意进仓库；第 4 版补稿 2026-10-26 定稿）。改稿须产品负责人同意，并在 current-progress.md 写明原因；README.md 不在冻结范围。",
   "files": {
-    "app.js": "1e7e91a5abeba01c83e0630898cc3402c2f235b73d75f4dd3fdc0b209d15d6f1",
+    "app.js": "34dd3a5fe3fb2311e9a23e5a120f1289cfd4360ec44b08da31a72e177bf5779e",
     "data.js": "a0a9e1dc5b3167bdae687c436eb02040471e1fee45bc4b1bde9e74ed1724a35c",
-    "index.html": "8e5ca80031e06e508a057fd1e206b2877ee4c3fc4dc916bb051f2b80995cc049",
-    "map.js": "f851102137996138f0f3f86fe051a52f6f08f8d264e0475e457bb494b95d0d2e",
-    "screens.js": "72d61d1040248eb2a3e69f4d425013d087c47ee35334c2bc467d86d1f4c79271",
-    "screens2.js": "9a92e5e8ca802d4848bddca79deb65f990dbc9290511b815173cc03428e88ac4",
-    "screens3.js": "5303c7e5609c911c94c424454d0051ec59fe2827e19b03db7195b09db595356e",
+    "fix-fairs.js": "00b78bd0455f8f01f050ef55aebb30a6b49b004d29fa22f40fb269f58ec26ba6",
+    "fix-interview.js": "59f9fd67a9e92cddcebc1ae1f7ee2e0a53fc2363d6e6f58d2aa31c21cbf61d34",
+    "fix-jobs.js": "817c17d27b2003e73bbd95f3588f1e7d9a2a853638fe0f568cc59275494b88f3",
+    "fix-main.js": "9459c950d6dece7fd7e72ff459c0eed8f17110ccd61bdf78d7e0559cdcbae9ca",
+    "fix-me.js": "45821fef9bf6ae81df22d6e13219c9bee105782544aafd6ac8d791ff588df976",
+    "fix-policy.js": "a62435697054e4c14191cbf76757a064b4ef61762dfc2a1fb00a64c9dbc3ff1f",
+    "fix-public.js": "565096d0285127f349cafd3f36a16b544c412a05f0b7eb8da4a18ccbbeb0ba65",
+    "fix-resume2.js": "5e847ba4de75a399f104f5eb1c51f435ee3753fe01e7c501609a26816920bebc",
+    "fix-scan.js": "5eb2c4fee81389dea5291e1b0061442208b98864c8efa1c384f21618461d3881",
+    "index.html": "1cf9b3248483c3d94d943d6b3d43a9ea17998eaaffa7a03e2a6cfc7871e906d1",
+    "map.js": "2a15f0cecd7c1cc70767797af98c4b6c56ad7188e8c2dca8083e1de3c4ff93da",
+    "screens.js": "750fa506dae476bc8cf4e90657ab3bee8db0d0fce57daafd634b644d3759675c",
+    "screens2.js": "f6c86e8fc0ae2f7c94c929c1de3d6ea832b8fd7381da85f5b0b8ded3af925fee",
+    "screens3.js": "23ad15bf1b21ffb33fb85ab93a822290ad64f117fa8763aa72162db1aa92795b",
     "screens4.js": "ddcccc3081861442b74cdc9aa4ca7550f7349dc937cc7aa51c8513cd8a46074d",
-    "ui.js": "da7603b3254fb1664bddb61902478cb442b20e94b238651de09ba27f862da8a5"
+    "ui.js": "dd32fc86bef7afc413cb0d9e1c8a0745130453678aa7f8b04be87f9aba062adf"
   }
 }

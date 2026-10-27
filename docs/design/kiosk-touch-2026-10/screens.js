@@ -220,42 +220,24 @@
 
   /* ═════════ 公共 ═════════ */
   add('standby', '公共', '待机屏', {
-    notes: { does: '没人用的时候放「在这里能办什么」，轻触任何地方开始。', motion: '光带慢速流动（22 秒一个来回）、四张卡 6 秒淡入淡出轮换；一被触摸立即停。只有这一屏有长循环动画。', keep: '不放商业广告（深圳地方标准）；不显示上一位的任何资料。' },
-    render: () => `<div class="standby" data-go="home" role="button" aria-label="轻触屏幕开始">
-      <div class="halo"></div>${UI.flowLines(1920).replace('class="flow"', 'class="flow" style="position:absolute;inset:0"')}
-      <div style="display:flex;justify-content:space-between;align-items:center"><div class="brand"><div class="mark">职</div><div><b>职易达</b><small>就业服务大厅</small></div></div><span class="status"><i class="dot"></i>可以使用</span></div>
-      <div class="sb-time" style="margin-top:80px"><b data-clock="t">14:30</b><small data-clock="d">10月25日 周日</small></div>
-      <div class="slides" id="slides">
-        ${[
-          ['带简历来', '小青帮你改好，<br>当场打印带走', '上传或扫描纸质简历，逐条看改法，每一处都由你决定。', UI.resume(250, 'fixed')],
-          ['练一场面试', '3 分钟到 8 分钟，<br>练完拿一份反馈', '选岗位、选面试官，用说的或打字回答。', UI.report(250)],
-          ['打印 · 扫描 · 复印', '手机和 U 盘的文件，<br>在这里打出来', '手机微信扫码就能传，不用装软件。', UI.stack(240, 3)],
-          ['查政策', '补贴和社保怎么办，<br>要带哪些材料', '内容由本机构发布，可以打印材料清单。', UI.checklist(250)]
-        ].map((s, i) => `<div class="slide ${i === 0 ? 'on' : ''}"><div class="k">${s[0]}</div><h2>${s[1]}</h2><p>${s[2]}</p><div class="art">${s[3]}</div></div>`).join('')}
-      </div>
-      <div class="sb-dots" id="sbDots"><i class="on"></i><i></i><i></i><i></i></div>
-      <div class="touch-cta"><span class="ring">${icon('hand', 46, 2)}</span><span><b>轻触屏幕开始</b><small>不用登录，办完自动清除你的资料</small></span></div>
-      <div class="sb-foot"><span>鲁ICP备2026023517号-2</span><span>需要帮助：服务电话 183-6916-1921</span></div>
-    </div>`,
-    mount: (el) => {
-      let k = 0; const sl = el.querySelectorAll('.slide'), dots = el.querySelectorAll('#sbDots i');
-      const t = setInterval(() => { sl[k].classList.remove('on'); dots[k].classList.remove('on'); k = (k + 1) % sl.length; sl[k].classList.add('on'); dots[k].classList.add('on'); }, 6000);
-      return () => clearInterval(t);
-    }
+    notes: { does: '运行页 /screensaver，在 KioskRoot 外。点位名和宣传素材从后台读；读不到点位名时用「就业服务大厅」，这句话只写在 notes，屏上不解释点位名从哪来。', motion: '有素材时 6 秒换一张，只动 opacity。轻触整屏回首页。', keep: '屏上示例只标小胶囊「示例」。读取中、暂无素材用本区状态留下，运行页空或失败会直接回首页。页脚只有边界句。本屏不报打印机。' },
+    demo: [{ label: '演示：暂无素材', ev: 'noads' }, { label: '演示：正在读取', ev: 'loading' }, { label: '演示：素材回来了', ev: 'ads' }],
+    render: () => window.FP.standby(),
+    mount: (el) => window.FP.mountStandby(el)
   });
 
   add('home', '公共', '首页', {
     before: 'home',
-    notes: { does: '运行页首页 QxHomeView（/）。只回答两件事：这里能办什么、从哪开始。问小青是纸面上的第一主操作。身份与状态在页脚边界句上方（下按区）。继续上次在问小青和四张大卡之间，对应 ContinuePanel。', motion: '光带缓慢流动；四张卡依次浮入（每张晚 45 毫秒）；按下缩小 2%。', keep: '四项主任务与第三行三块不变，底部导航中间一项是「AI 顾问」。AI 角标写能力词。岗位、招聘会入口不出现（托管 a）。清除时长用普通页 3 分钟，结果页 1 分 30 秒。打印机正常写「打印机在线」。不显示姓名和手机号，不写「进入我的」。官方渠道只在本机构渠道数大于 0 时出现，为 0 时这一行只剩两块。百宝箱、智慧校园只在机构开通时出现在这一行。语音没开（构建变量 VITE_USE_TRTC_CALL 不为 true）时文案是「问小青：打一句你想办的事」且不画麦克风；为 true 时才是说话入口并画麦克风。本屏按没开画。收费点位页脚多一句「收费以现场公示为准」（两边单价都读到、且有一边大于 0 才加；读不到不写，也不写免费）。继续上次只在已登录、并且有进行中的打印订单（pending / claimed / printing）或已诊断未优化的简历时出现，接口失败当没有。运行页打印标题是「打印任务进行中」，副行是「文件名 · 状态」，按钮「查看进度」去 /me/print-orders（本屏 my-orders）。示例文件名「毕业生就业推荐表（已填写）.pdf」，状态按进行中写成「正在打印」。简历那条是「上次诊断的简历，可继续优化」，按钮「去优化」。未登录不出现这条。已登录两行大卡最小高度约 300px，字号和小样与未登录相同。练面试说明只用「回答常见问题，当场看反馈，不做录用判断」。未登录左边原文「这台机器上没有待继续的办理 · 不会显示上一位的资料」；已登录左边「有人登录着」（不是按钮），「结束上一位的使用」走清除，「设备状态」去 offline 屏。' },
+    notes: { does: '运行页首页 QxHomeView（/）。只回答两件事：这里能办什么、从哪开始。问小青是纸面上的第一主操作。身份与状态在页脚边界句上方（下按区）。继续上次在问小青和四张大卡之间，对应 ContinuePanel。', motion: '光带缓慢流动；四张卡依次浮入（每张晚 45 毫秒）；按下缩小 2%。', keep: '四项主任务与第三行三块不变，底部导航中间一项是「AI 顾问」。AI 角标写能力词。岗位、招聘会入口不出现（托管 a）。清除时长用普通页 3 分钟，结果页 1 分 30 秒。打印机正常写「打印机在线」。不显示姓名和手机号，不写「进入我的」。官方渠道只在本机构渠道数大于 0 时出现，为 0 时这一行只剩两块。百宝箱、智慧校园只在机构开通时出现在这一行（S().controlsOn，地址 ?ctrl=1）。开通后第三行改成两行五块：百宝箱去 toolbox，说明「按本机已上架的扩展服务进入」，带走「进入已开通的服务」，徽标「受控开放」；智慧校园去 smart-campus，说明「按本机开通范围进入校园服务」，带走「进入校园服务」，徽标「受控开放」。五块的字号和卡片最小高度不缩，高度从四张大卡的最小高度里匀。未开通时仍是现在这三块。语音没开（构建变量 VITE_USE_TRTC_CALL 不为 true）时文案是「问小青：打一句你想办的事」且不画麦克风；为 true 时才是说话入口并画麦克风。本屏按没开画。收费点位页脚多一句「收费以现场公示为准」（两边单价都读到、且有一边大于 0 才加；读不到不写，也不写免费）。继续上次只在已登录、并且有进行中的打印订单（pending / claimed / printing）或已诊断未优化的简历时出现，接口失败当没有。运行页打印标题是「打印任务进行中」，副行是「文件名 · 状态」，按钮「查看进度」去 /me/print-orders（本屏 my-orders）。示例文件名「毕业生就业推荐表（已填写）.pdf」，状态按进行中写成「正在打印」。简历那条是「上次诊断的简历，可继续优化」，按钮「去优化」。未登录不出现这条。已登录两行大卡最小高度约 300px，字号和小样与未登录相同。练面试说明只用「回答常见问题，当场看反馈，不做录用判断」。未登录左边原文「这台机器上没有待继续的办理 · 不会显示上一位的资料」；已登录左边「有人登录着」（不是按钮），「结束上一位的使用」走清除，「设备状态」去 offline 屏。私有化版（说明栏「显示私有化版页面」）：第三行把「本机构官方渠道」换成「社会招聘」「校园招聘」两块，去 b-social、b-campus；运行页 QxHomeView 在 recruitmentOpen 时是「岗位信息」「招聘会」两块，改程序时按这次的分法改名重排；页脚那句换成运行页 recruitmentOpen 时的原句。我方云上（默认）不出现这两块。' },
     render: () => {
       const logged = !!S().logged;
       const T = (o) => `<button class="task ${o.dark ? 'dark' : ''} rise" style="--i:${o.i}" data-go="${o.go}">
         <div class="top"><span class="ic">${icon(o.ic, 40, 2)}</span><span class="chip ${o.ck || ''} ${o.ai ? 'ai' : ''}">${o.chip}</span></div>
         <h3>${o.t}</h3><p>${o.d}</p><div class="take">${icon('check', 24, 2.6)}${o.take}</div><div class="mini">${o.vis}</div></button>`;
-      return `<header class="band hero flowing">${UI.flowLines(700)}<div class="halo"></div>${UI.header({ back: false, status: printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' } })}
+      return `<header class="band hero flowing${S().controlsOn || S().showB ? ' fm-hero' : ''}">${UI.flowLines(700)}<div class="halo"></div>${UI.header({ back: false, place: '就业服务大厅', status: printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' } })}
         <div class="greet">${UI.seal('idle', 'xl')}<div><div class="eyebrow" data-greet>下午好</div><h1>我是小青</h1><p>今天想办哪件事？下面选一项，或者直接问我</p></div></div></header>`
         + `<button class="xq-bar rise" style="--i:0" data-go="xq"><span class="orb">${icon('message', 46, 2.2)}</span><span><b>问小青：打一句你想办的事</b><small></small></span><span class="chip ai">AI 数字人</span></button>`
-        + `<main class="body d3-home${logged ? ' d3-on' : ''}">
+        + `<main class="body d3-home${logged ? ' d3-on' : ''}${S().controlsOn || S().showB ? ' fm-x' : ''}">
           ${logged ? `<div class="d3-go rise" style="--i:0"><span class="ic">${icon('printer', 32, 2)}</span><span class="tx"><b>打印任务进行中</b><small>毕业生就业推荐表（已填写）.pdf · 打印中</small></span><button class="d3-mini" data-go="my-orders">查看进度</button></div>` : ''}
           <div class="grid2 tasks">
             ${T({ i: 1, go: 'resume', ic: 'file', chip: 'AI 诊断改写', ai: 1, t: '改简历', d: '上传或扫描，诊断、优化或生成新简历，<br>改不改你定', take: '带走：新简历', vis: UI.resume(150, 'annot') })}
@@ -263,10 +245,11 @@
             ${T({ i: 3, go: 'print', dark: 1, ic: 'printer', chip: printerOff() ? '打印机离线' : '先选材料再出纸 · 带走：打印件', ck: printerOff() ? 'clay' : 'ghost', t: '打印 · 扫描', d: '手机扫码传文件、插 U 盘，或扫描原件', take: '开始选择材料', vis: UI.stack(132, 3) })}
             ${T({ i: 4, go: 'policy', ic: 'landmark', chip: '官方发布', ck: 'slate', t: '查政策', d: '补贴、社保怎么办，要带哪些材料，以官方发布为准', take: '查看政策说明', vis: UI.checklist(150) })}
           </div>
-          <div class="tiles3">
+          <div class="tiles3${({ 4: ' fm-home4', 5: ' fm-home5', 6: ' fm-home6' })[3 + (S().showB ? 1 : 0) + (S().controlsOn ? 2 : 0)] || ''}">
             ${tile({ i: 5, go: 'pickup', icon: 'ticket', title: '到机取件', desc: '手机上下了单，来这里取' })}
-            ${tile({ i: 6, go: 'official', icon: 'qr', tone: 'slate', title: '本机构官方渠道', desc: '公众号、官网，扫码看' })}
+            ${S().showB ? tile({ i: 6, go: 'b-social', icon: 'clipboard', tone: 'slate', title: '社会招聘', desc: '全职、兼职岗位和社会招聘会' }) + tile({ i: 6, go: 'b-campus', icon: 'book', tone: 'slate', title: '校园招聘', desc: '校园招聘会、校招和实习岗位' }) : tile({ i: 6, go: 'official', icon: 'qr', tone: 'slate', title: '本机构官方渠道', desc: '公众号、官网，扫码看' })}
             ${tile({ i: 7, go: 'help', icon: 'help', tone: 'clay', title: '帮助', desc: '常见问题、服务电话' })}
+            ${S().controlsOn ? tile({ i: 8, go: 'toolbox', icon: 'layers', title: '百宝箱', desc: '按本机已上架的扩展服务进入' }) + tile({ i: 9, go: 'smart-campus', icon: 'landmark', tone: 'slate', title: '智慧校园', desc: '按本机开通范围进入校园服务' }) : ''}
           </div>
           <div class="d3-id">
             <p class="d3-note">${logged ? '有人登录着' : '这台机器上没有待继续的办理 · 不会显示上一位的资料'}</p>
@@ -275,119 +258,50 @@
               <button class="d3-mini" data-go="offline">设备状态</button>
             </div>
           </div>
-          <div class="footline rise" style="--i:8"><p class="fine">AI 生成的内容都会标明，仅供参考 · 本机不替你投递 · 离开 3 分钟无操作自动退出登录 · 打开本人文档、诊断报告或优化结果后 1 分 30 秒无操作自动退出</p><span class="icp">鲁ICP备2026023517号-2 · 鲁公网安备37021402007308号</span></div>
+          <div class="footline rise" style="--i:8"><p class="fine">AI 生成的内容都会标明，仅供参考 · ${S().showB ? '岗位与招聘会仅展示第三方或官方来源，本终端只展示与跳转、不代收简历' : '本机不替你投递'} · 离开 3 分钟无操作自动退出登录 · 打开本人文档、诊断报告或优化结果后 1 分 30 秒无操作自动退出</p><span class="icp">鲁ICP备2026023517号-2 · 鲁公网安备37021402007308号</span></div>
         </main>` + nav('home').replace('<span>问小青</span>', '<span>AI 顾问</span>');
     }
   });
 
   add('xq', '公共', '问小青', {
-    before: 'assistant',
-    notes: { does: '说一句想办的事，小青回一句话加一个去处。点选、说话优先，打字其次。', motion: '按住麦克风时外圈扩散、声波条跳动；小青回答前三个点闪烁；回答卡片浮入。静止时小青圆章不动。', keep: 'AI 标识、不用 AI 也能办的出口、投诉入口留在本屏；不保存录音，离开即清。' },
-    render: () => {
-      if (aiOff()) return F({
-        band: { eyebrow: '问小青 · AI 顾问', title: '小青暂时不可用', sub: '这一页其余功能照常，下面可以直接去办。', sealHtml: '' },
-        cls: 'big-tiles xl-tiles',
-        body: `<div class="remind rise" style="--i:1">${icon('alert', 34, 2.2)}<span>网络或服务出了问题，稍后可以再试。不影响打印、扫描和查政策。</span></div>
-            ${sec('不用 AI，直接去办')}
-            <div class="grid2">${tile({ i: 4, go: 'print', icon: 'printer', title: '打印 · 扫描', desc: '文件、纸质材料' })}${tile({ i: 5, go: 'resume', icon: 'file', title: '改简历', desc: '可以先打印原件' })}${tile({ i: 6, go: 'policy', icon: 'landmark', tone: 'slate', title: '查政策', desc: '本机构发布的内容' })}${tile({ i: 7, go: 'help', icon: 'help', tone: 'clay', title: '帮助', desc: '常见问题、服务电话' })}</div>
-            <div class="howto rise" style="--i:8">${icon('call', 34, 2)}<span>需要帮助：服务电话 183-6916-1921（工作日 9:00–18:00）</span></div>
-            ${fine('小青恢复后，这里会自动变回对话')}`,
-        dock: { ask: false, pri: { label: '回到首页', go: 'home' } }, nav: 'xq'
-      });
-      return F({
-        band: { eyebrow: '问小青 · AI 顾问', title: '我是小青，你想办什么？', sub: '可以说话，也可以打字。我会带你去对应的功能。', sealHtml: UI.seal('idle', 'lg') },
-        cls: 'tight',
-        body: `<div class="chat" id="chat">
-            <div class="bub xq rise" style="--i:0;max-width:100%"><span class="ai">小青 · AI 顾问</span>我能帮你做这几件事，直接说就行：
-              <div class="caps">${[['file', '改简历', '找问题、逐条改'], ['mic', '练面试', '3–8 分钟一场'], ['printer', '打印扫描', '手机、U 盘、纸质'], ['landmark', '查政策', '条件和材料']].map(c => `<div class="cap"><span>${icon(c[0], 36, 2)}</span><b>${c[1]}</b></div>`).join('')}</div></div>
-            <div class="bub me rise" style="--i:1">我想把简历改一下，再打出来</div>
-            <div class="bub xq rise" style="--i:2"><span class="ai">AI 生成 · 仅供参考</span>可以。先把简历传给我，我帮你看看哪里能改，每一处都由你决定改不改。
-              <button class="action" data-go="resume-src"><span class="ic">${icon('file', 34, 2)}</span><span><b>去改简历</b><small>手机传、U 盘，或者扫描纸质简历</small></span><span style="margin-left:auto;color:var(--teal-ink)">${icon('arrowR', 32, 2.4)}</span></button></div>
-          </div>
-          <div class="transcript" id="transcript" hidden></div>
-          ${sec('试试这样问')}
-          <div class="chips rise" style="--i:4"><button data-act="ask" data-arg="身份证怎么复印？">身份证怎么复印？</button><button data-act="ask" data-arg="我能领什么补贴？">我能领什么补贴？</button><button data-act="ask" data-arg="面试怎么做自我介绍？">面试怎么做自我介绍？</button></div>
-          <button class="rowlink rise" style="--i:5" data-go="home">${icon('layers', 32, 2)}<span><b>不用 AI 也能办</b> <small>· 打印扫描 · 改简历 · 查政策</small></span><span class="chev">${icon('chevR', 28, 2.2)}</span></button>
-          ${fine('不保存你的录音和对话 · 对回答有疑问可以在「帮助」里反馈')}`,
-        dockHtml: `<footer class="composer" id="composer">
-            <button class="btn sec" data-act="type">${icon('keyboard', 32, 2)}打字</button>
-            <div class="mic-wrap"><button class="mic-big" data-act="listen" aria-label="按住说话">${icon('mic', 64, 2.2)}</button><div class="wave" aria-hidden="true">${'<i></i>'.repeat(9)}</div><span id="micLabel">按住说话</span></div>
-            <button class="btn sec" data-act="toast" data-arg="数字人通话：试点按机构开通">${icon('video', 32, 2)}通话</button>
-          </footer>`,
-        nav: 'xq'
-      });
-    }
+    notes: { does: '运行页 /assistant。默认四主题，上面一行「最近办理 · 模拟面试 · HR 面试 5 分钟」标「示例」，可点去 iv-1。子入口在「这一主题还能去哪」。面试主题的动作去 iv-1。职场主题「政策服务」去 policy，「政策与材料说明」去 policy-list。手动入口去 print、help、policy、resume。投诉去 feedback。回答只在演示事件 done 之后出现一轮。', motion: '发送后停在等待。不倒计时演成功。语音开关关闭，不画麦克风和通话。', keep: 'AI 不可用时照 st-ai-down：四条手动入口仍在，重新检查和投诉在底栏，重新检查不把 AI 写成已恢复。岗位主题写「本终端未开放岗位与招聘会信息」。回复旁标「AI 生成，仅供参考」。未登录保存去 login。出错留在本屏重试。号码与服务时间从后台读，读不到不显示。' },
+    demo: [{ label: '演示：键盘已写入', ev: 'typed' }, { label: '演示：生成好了', ev: 'done' }, { label: '演示：这一轮没连上', ev: 'fail' }, { label: '演示：不是 AI 回复', ev: 'notai' }, { label: '演示：检查仍不可用', ev: 'still' }],
+    render: () => window.FP.xq(),
+    mount: (el) => window.FP.mountXq(el)
   });
   add('help', '公共', '帮助', {
-    notes: { does: '自己解决常见问题；解决不了就打服务电话或问小青。', motion: '无循环动画；条目依次浮入。', keep: '不出现「找现场工作人员」；电话号码和服务时间后台可改；机器故障说明「我们已收到提醒」。' },
-    render: () => F({
-      band: { eyebrow: '帮助', title: '遇到问题了？', sub: '先看看下面有没有你的情况。', seal: 'idle', path: ['看常见问题', '问小青', '打服务电话'], pathLabel: '自己就能办完' },
-      body: `<div class="grid2">${[['打印出来的纸在哪里拿？', '出纸口在屏幕下方打印机的正面，打完屏幕会提示张数。'], ['手机扫码没反应？', '用微信「扫一扫」；码过期了，点「换一个码」。'], ['身份证怎么复印？', '在打印机屏幕上点「身份证复印」，按打印机上的图示放。'], ['打印到一半停了？', '先别重复点打印，看看出纸口，再拨打下面的服务电话。'], ['U 盘读不出来？', '换一个 USB 口再插；还不行就用手机传。'], ['我的资料会留在这里吗？', '不会。办完或离开 60 秒没操作，就会清除。']].map((q, i) => `<div class="qa rise" style="--i:${i}"><b>${q[0]}</b><span>${q[1]}</span></div>`).join('')}</div>
-        <div class="me-card rise" style="--i:5;background:var(--teal-wash);border-color:transparent"><span class="ic" style="width:88px;height:88px;border-radius:26px;background:var(--teal);color:#fff;display:grid;place-items:center">${icon('call', 46, 2)}</span><div><div style="font-size:22px;color:var(--teal-ink);font-weight:700">服务电话（工作日 9:00–18:00）</div><div style="font:700 52px/1.2 var(--sans);font-variant-numeric:tabular-nums;color:var(--deep)">183-6916-1921</div><div style="font-size:21px;color:var(--ink-2)">打印机出问题时，我们会自动收到提醒</div></div></div>
-        ${fine('这台机器没有现场工作人员，所有事情都可以自己办完')}`,
-      dock: { ask: '问小青：我遇到的不在上面' }, nav: null
-    })
+    notes: { does: '运行页 /help。分类是页内常量。托管 a 下岗位类 0 条，不画。政策分类的入口去 policy-list（运行页 /renshi?tab=policy），不是政策枢纽 policy。其余入口去 login（带来源）、settings、resume-src、print-src、scan-type、official、my-docs、legal。设备状态去 offline。', motion: '无循环。重新打开只增加「已重新打开」的次数，不假装内容已经回来。', keep: '去掉离开秒数和出纸口位置。不可用、分类对不上留在本屏。问小青仍在。备案号是一体机上的文字。号码与服务时间从后台读，读不到不显示。' },
+    demo: [{ label: '演示：帮助没显示', ev: 'down' }, { label: '演示：没有这个分类', ev: 'miss' }, { label: '演示：帮助回来了', ev: 'ok' }],
+    render: () => window.FP.help(),
+    mount: (el) => window.FP.mountHelp(el)
   });
-
   add('official', '公共', '本机构官方渠道', {
-    notes: { does: '把本机构自己的公众号、官网放成二维码，在手机上看。', motion: '无。', keep: '托管 a：只放本机构返回的真实渠道；没有就写「本机构还没有添加」，不画假码。' },
-    render: () => F({
-      band: { eyebrow: '本机构官方渠道', title: '扫码，在手机上看', sub: '这些渠道由本机构维护和发布。', sealHtml: '', path: ['打开微信扫一扫', '对准下面的码', '在手机上看'], pathLabel: '怎么看' },
-      body: `<div class="grid2">${[['就业指导中心公众号', '通知公告 · 活动预告 · 办事指南'], ['就业服务官网', '办事指南 · 表格下载 · 政策原文']].map((c, i) => `<div class="qrc rise" style="--i:${i}">${UI.qr(11 + i, 380)}<b>${c[0]}</b><small>${c[1]}</small><span class="chip clay">示例码，不能扫</span></div>`).join('')}</div>
-        <div class="howto rise" style="--i:3">${icon('phone', 34, 2)}<span>打开微信「扫一扫」，对准上面的码，在你自己的手机上看完整内容。</span></div>
-        <div class="remind rise" style="--i:4;background:var(--slate-wash);color:var(--slate-ink)">${icon('landmark', 34, 2)}<span>岗位和招聘会信息请看本机构官方渠道。这台机器不收简历、不代投递。</span></div>
-        ${fine('二维码由本机构在后台添加；还没添加时，这里会写明「本机构还没有添加」')}`,
-      dock: { ask: '问小青：这些渠道能办什么？' }, nav: 'home'
-    })
+    notes: { does: '运行页 /official-channels。状态 loading、items、empty、error。渠道名、域名、二维码从本机构配置读。空态去问小青、帮助、回首页。默认不分组，只列通用渠道。S().fpGroup（地址 !fpGroup=1）才按面向对象分组。', motion: '核对只改本屏说明。重新读取进入读取中，结果等演示事件。', keep: '屏上示例只标小胶囊「示例」，不写岗位数、企业名，也不出现「校园招聘」「社会招聘」「招聘」。默认一张清单。改程序时：官方渠道加一个『面向对象』字段（面向高校毕业生 / 面向社会求职者 / 通用，默认通用），机构端添加渠道的弹窗加一个选择，一体机按它分组；都没选（全是通用）就不分组，跟现在一样。二维码直接编码机构已核验官方域名的链接，不经过我方域名中转。约 1–2 人日、约 10 个文件（对照 out-F-jobs.md 第 5 节）。核对成功不写成已经确认还在。方向探索去 xq 并带 career_explore。托管关闭时的招聘说明页不是这一屏。本屏不报打印机。号码与服务时间从后台读，读不到不显示。' },
+    demo: [{ label: '演示：正在读取', ev: 'load' }, { label: '演示：没有渠道', ev: 'empty' }, { label: '演示：读取失败', ev: 'error' }, { label: '演示：渠道回来了', ev: 'items' }, { label: '演示：核对没确认', ev: 'recheck' }, { label: '演示：核对通过', ev: 'recheck-ok' }, { label: '演示：撤下一条', ev: 'withdraw' }, { label: '演示：机构给渠道选了面向对象（按组显示 / 恢复不分组）', ev: 'group' }],
+    render: () => window.FP.official(),
+    mount: (el) => window.FP.mountOfficial(el)
   });
   add('login', '公共', '登录', {
-    notes: { does: '要保存、找回资料时才登录；扫码是第一选择，手机号是退路。', motion: '二维码外圈轻微扩散（等待扫码时）。', keep: '不登录也能打印、扫描、查政策；登录后回到刚才那一步；只管这一次，离开自动退出。' },
-    render: () => F({
-      band: { eyebrow: '登录', title: '用手机微信扫一扫', sub: '登录后，改好的简历和打印记录能在手机上找到。', sealHtml: '' },
-      pre: `<div class="waiting" style="display:flex;justify-content:center"><div class="qr-card"><div class="qr-box"><i class="pulse"></i><i class="pulse p2"></i>${UI.qr(5, 360)}<span class="qr-tag">示例码</span></div><b style="font-size:26px">打开微信 → 扫一扫</b></div></div>`,
-      body: `<button class="tile rise" style="--i:1" data-act="toast" data-arg="演示：弹出屏上数字键盘"><span class="ic slate">${icon('phone', 34, 2)}</span><span class="tx"><b>用手机号和验证码</b><small>屏幕上有数字键盘，不用系统键盘</small></span><span class="chev">${icon('chevR', 30, 2.2)}</span></button>
-        <div class="benefits rise" style="--i:2">${[['file', '改好的简历', '下次接着用'], ['receipt', '打印订单', '手机上看进度'], ['sparkle', 'AI 记录', '回看诊断和反馈']].map(b => `<div><span>${icon(b[0], 38, 2)}</span><b>${b[1]}</b><small>${b[2]}</small></div>`).join('')}</div>
-        <div class="remind rise" style="--i:3;background:var(--teal-wash);color:var(--teal-ink)">${icon('shield', 34, 2)}<span>不登录也能打印、扫描、查政策。离开 60 秒没操作会自动退出。</span></div>
-        ${fine('登录即表示同意《用户协议》《隐私政策》')}`,
-      dock: { ask: false, pri: { label: '演示：扫码成功', act: 'login' } }, nav: 'me'
-    })
+    notes: { does: '运行页 /login。默认手机号；短信不可用、码过期、扫码是另外的态。成功只由演示事件 code-ok 或 scan-ok 触发，回到 S().fpFrom，没有就去 me。', motion: '不走 60 秒和 180 秒的表，也不把秒数走完演成登录成功。', keep: '必须先勾选协议。重发 60 秒，票据 180 秒。不登录能去 print、pickup、policy。发送失败去 help。键盘是系统界面。扫码页可打开 phone-login，运行时那一页在手机上。号码与服务时间从后台读，读不到不显示。' },
+    demo: [{ label: '演示：键盘已写入', ev: 'typed' }, { label: '演示：验证码已发出', ev: 'sent' }, { label: '演示：验证码已填', ev: 'coded' }, { label: '演示：核验通过', ev: 'code-ok' }, { label: '演示：改用扫码', ev: 'scan' }, { label: '演示：扫码已确认', ev: 'scan-ok' }, { label: '演示：码过期', ev: 'expired' }, { label: '演示：短信不可用', ev: 'sms' }],
+    render: () => window.FP.login(),
+    mount: (el) => window.FP.mountLogin(el)
   });
   add('me', '公共', '我的', {
-    notes: { does: '看本人的简历、文档、订单和 AI 记录；结束时退出并清除本机资料。', motion: '数字依次浮入；退出时整屏淡出到「已清除」。', keep: '手机号打码；明细归到各业务页；注销等长期事务引到手机或服务电话，不画成在线一键完成。' },
-    render: () => {
-      const m = D.me;
-      if (!S().logged) return F({
-        band: { eyebrow: '我的', title: '登录后才能看本人记录', sub: '简历、文档、打印订单和 AI 记录都在这里。', seal: null },
-        body: `${slab({ i: 1, go: 'login', title: '扫码登录', desc: '用手机微信扫一扫，几秒钟', take: '本人记录', vis: UI.qr(3, 180) })}
-          ${sec('登录后能看到')}
-          <div class="grid2">${[['我的简历', '改好的简历和历史版本', 'file'], ['我的文档', '扫描件、合成的 PDF', 'folder'], ['打印订单', '进度和到机码', 'receipt'], ['AI 记录', '诊断、面试反馈', 'sparkle']].map((s, i) => `<div class="stat locked rise" style="--i:${i + 4}"><span style="color:var(--ink-3)">${icon(s[2], 34, 2)}</span><span>${s[0]}</span><small>${s[1]}</small><i class="lk">${icon('lock', 24, 2)}</i></div>`).join('')}</div>
-          <div class="grid2">${tile({ i: 9, go: 'help', icon: 'help', title: '帮助', desc: '常见问题' })}${tile({ i: 10, go: 'official', icon: 'qr', tone: 'slate', title: '官方渠道', desc: '扫码看' })}</div>${fine('不登录也能打印、扫描、查政策')}`,
-        dock: { ask: false, pri: { label: '去登录', go: 'login' } }, nav: 'me'
-      });
-      return F({
-        band: { eyebrow: '我的', title: `${m.name}，你好`, sub: `手机号 ${m.phone} · 这次登录只在这台机器上有效`, seal: null },
-        body: `<div class="grid2">${[['resumes', '我的简历', '份', 'file'], ['docs', '我的文档', '个', 'folder'], ['orders', '打印订单', '笔', 'receipt'], ['ai', 'AI 记录', '条', 'sparkle']].map((s, i) => `<button class="stat rise" style="--i:${i}" data-go="${{ resumes: 'my-resumes', docs: 'my-docs', orders: 'my-orders', ai: 'my-ai' }[s[0]]}"><span style="color:var(--teal-ink)">${icon(s[3], 36, 2)}</span><b>${m[s[0]]}<small style="font-size:22px;margin-left:4px">${s[2]}</small></b><span>${s[1]}</span></button>`).join('')}</div>
-          <div class="stack"><div class="olist-t" style="padding:0">最近办理</div><div class="qrow" style="background:var(--well)"><span class="no">${icon('printer', 20, 2.4)}</span><b>改简历 · 打印 1 张</b><small>今天 14:12</small></div><div class="qrow" style="background:var(--well)"><span class="no">${icon('mic', 20, 2.4)}</span><b>模拟面试 · HR 面试 5 分钟</b><small>10 月 22 日</small></div></div>
-          ${tile({ i: 5, go: 'privacy', icon: 'shield', title: '隐私与数据请求', desc: '撤回 AI 授权等' })}
-          <div class="grid2">${tile({ i: 6, go: 'notifications', icon: 'bell', title: '消息', desc: '2 条未读' })}${tile({ i: 7, go: 'settings', icon: 'user', tone: 'slate', title: '账号设置', desc: '协议、换绑、退出' })}</div>
-          ${fine('示例数据 · 记录保存期限按《隐私政策》')}`,
-        dock: { ask: false, back: false, left: `<button class="btn danger wide" data-act="clear" style="flex:1">${icon('logout', 32, 2.2)}退出并清除本机资料</button>` }, nav: 'me'
-      });
-    }
+    notes: {
+      get does() { return window.FE.notes['me'].does; },
+      get motion() { return window.FE.notes['me'].motion; },
+      get keep() { return window.FE.notes['me'].keep; },
+    },
+    demo() { return window.FE.demo('me'); },
+    render() { return window.FE.page('me'); },
+    mount(el) { return window.FE.mount(el, 'me'); },
   });
 
-  add('cleared', '公共', '已清除', {
-    notes: { does: '告诉下一个人和这个人：这台机器上已经没有你的东西了。', motion: '对勾一笔画出（0.7 秒）；3 秒后淡回待机屏。', keep: '明说「已经开始的打印照常出纸」，清场不等于取消。' },
-    render: () => `<div class="standby" style="justify-content:center;align-items:center;text-align:center;gap:34px">
-      <div class="halo"></div>
-      <svg class="big-check" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="68" fill="none" stroke="#2ee6a8" stroke-width="6"/><path d="M46 77l20 20 40-42" fill="none" stroke="#2ee6a8" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <h2 style="margin:0;font:700 68px var(--serif)">已清除本次资料</h2>
-      <div style="display:flex;flex-direction:column;gap:14px;font-size:28px;color:var(--mint);text-align:left">
-        ${['你传到这台机器的文件', '简历修改记录和草稿', '登录状态'].map(t => `<span style="display:flex;gap:14px;align-items:center">${icon('check', 30, 2.6)}${t}</span>`).join('')}
-      </div>
-      <p style="font-size:26px;color:rgba(191,233,216,.8);margin:20px 0 0">已经开始的打印会照常出纸 · 3 秒后回到待机画面</p>
-    </div>`,
-    mount: () => { const t = setTimeout(() => window.go && window.go('standby'), 3200); return () => clearTimeout(t); }
+  add('cleared', '公共', '闲置提醒', {
+    notes: { does: '运行页 /session-timeout，不是清完之后的结果页。说明栏「演示：无操作提醒」进入这一屏。倒计时 30 秒是没有预警时刻时的兜底，到 0 调 window.doClear() 回首页。截图参数 shot=1 时数字停在 30，不自动清场。', motion: '只改倒计时数字。不自动跳待机，也不在到 0 之前清场。', keep: '屏上写「30 秒后自动结束这次使用」。有 S().fpFrom 且不是本页时写「继续后回到刚才那一页」，否则写「继续后回到首页」。来源读不到的原因只写在 notes。「我还在，继续使用」回 fpFrom，没有就回首页；「现在结束使用」立即清场。匿名和已登录两套后果分开写。已经交出去的打印继续，账号文档和取件码不清。号码与服务时间从后台读，读不到不显示。' },
+    render: () => window.FP.cleared(),
+    mount: (el) => window.FP.mountCleared(el)
   });
 
   /* ═════════ 改简历 ═════════ */
@@ -405,7 +319,7 @@
 
   add('resume', '改简历', '简历入口', {
     before: 'resume',
-    notes: { does: '运行页 /resume-service，QxServiceHubPage hub=resume。正常态两张主卡：有简历去 /resume/source（本稿 resume-src，data-arg=diagnose），没有去 /resume/generate（本稿 scratch）。?ai=down 只停 kind===ai 的入口。', motion: '两张主卡依次浮入；按下缩小。停用的卡按下不动。', keep: '屏上问题用第 3 版「你手上有简历吗？」，副题「有就帮你诊断改写，没有就一步步写一份。」。运行页标题「把简历这件事，做得更清楚」、副题「从来源选择、诊断优化到生成、材料与打印，按你的目标进入对应步骤。」写在规格 serviceHubSpecs.ts，不画在意图带上。底栏中间一项是「AI 顾问」。页脚三句是规格原文 truthTitle / truth / note，排成一行到两行。顶栏胶囊是就绪句「能力与设备状态以办理时确认为准」，不报打印机。合同风险提示卡只在 VITE_ENABLE_CONTRACT_REVIEW==="true" 时出现，默认关，这一帧不画。要 AI 的项（kind ai）：两张主卡（AI简历诊断、从零生成简历）、职业规划、简历对照，以及展开里的 AI简历诊断、AI简历优化。不要 AI、?ai=down 仍可点：求职材料（info）、自我探索（info）、简历素材库（info）、简历打印（device）、我的简历（account）、AI服务记录（account，名字带 AI 但 kind 不是 ai）。两张主卡停用时的出路：有简历「可以先打印原件」去 print；没有简历「可以先看简历素材库」去 templates。后端整站不可用是 st-unavailable，不是这一变体。四张常用卡同一路由不在展开里再列。自我探索卡上写规格句「完成职业倾向参考」。' },
+    notes: { does: '运行页 /resume-service，QxServiceHubPage hub=resume。正常态两张主卡：有简历去 /resume/source（本稿 resume-src，data-arg=diagnose），没有去 /resume/generate（本稿 scratch）。?ai=down 只停 kind===ai 的入口。', motion: '两张主卡依次浮入；按下缩小。停用的卡按下不动。机构开通时「其余」从本屏底部滑出，不另开一页。', keep: '屏上问题用第 3 版「你手上有简历吗？」，副题「有就帮你诊断改写，没有就一步步写一份。」。运行页标题「把简历这件事，做得更清楚」、副题「从来源选择、诊断优化到生成、材料与打印，按你的目标进入对应步骤。」写在规格 serviceHubSpecs.ts，不画在意图带上。底栏中间一项是「AI 顾问」。页脚三句是规格原文 truthTitle / truth / note，排成一行到两行。顶栏胶囊是就绪句「能力与设备状态以办理时确认为准」，不报打印机。合同风险提示不在 serviceHubSpecs.ts：运行页 QxServiceHubPage 在开关 VITE_ENABLE_CONTRACT_REVIEW==="true" 时另加一张，默认关。本稿用 S().controlsOn（?ctrl=1）表示这个开关打开。未打开时「其余 6 项」仍去 resume-more，常用四卡不动。打开后按钮写成「其余 7 项」，在本屏展开原来的 6 项，再加「AI签约风险提示」：说明「上传劳动合同、实习协议或 Offer，核查试用期、薪酬、竞业等条款风险」，徽标「AI · 仅供参考」，去 contract。?ai=down 时这一项和其他 kind ai 一样停用，文案「AI能力当前不可用」，不消失。要 AI 的项（kind ai）：两张主卡（AI简历诊断、从零生成简历）、职业规划、简历对照，以及展开里的 AI简历诊断、AI简历优化、AI签约风险提示。不要 AI、?ai=down 仍可点：求职材料（info）、自我探索（info）、简历素材库（info）、简历打印（device）、我的简历（account）、AI服务记录（account，名字带 AI 但 kind 不是 ai）。两张主卡停用时的出路：有简历「可以先打印原件」去 print；没有简历「可以先看简历素材库」去 templates。后端整站不可用是 st-unavailable，不是这一变体。四张常用卡同一路由不在展开里再列。自我探索卡上写规格句「完成职业倾向参考」。' },
     render: () => {
       const down = aiOff();
       const mains = down
@@ -419,7 +333,7 @@
         band: { eyebrow: 'AI简历服务', title: '你手上有简历吗？', sub: '有就帮你诊断改写，没有就一步步写一份。', seal: 'idle', place: ' ', status: { text: '能力与设备状态以办理时确认为准' } },
         cls: 'tight d4-hub',
         body: `${mains}
-          <div class="fgroup"><div class="sec-t rise" style="--i:3">也可以直接用<small>不用先诊断</small><button class="more" data-go="resume-more">其余 6 项 ${icon('chevR', 24, 2.4)}</button></div>
+          <div class="fgroup"><div class="sec-t rise" style="--i:3">也可以直接用<small>不用先诊断</small>${S().controlsOn ? `<button class="more" data-fm="hubmore">其余 7 项 ${icon('chevR', 24, 2.4)}</button>` : `<button class="more" data-go="resume-more">其余 6 项 ${icon('chevR', 24, 2.4)}</button>`}</div>
           <div class="grid2">
             ${tile({ i: 4, go: 'materials', icon: 'clipboard', title: '求职材料', desc: '按模板套填，带走求职信和自我介绍' })}
             ${career}
@@ -430,7 +344,35 @@
         dock: { ask: '问小青：我该选哪一个？' }, nav: 'home', navAdvisor: 1
       });
     },
-    mount: bindResumeIntent
+    mount: (el) => {
+      const offIntent = bindResumeIntent(el);
+      const paint = () => {
+        el.querySelectorAll('.fm-hub').forEach((n) => n.remove());
+        if (!(S().controlsOn && S().fmHubMore)) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'fm-hub';
+        wrap.innerHTML = window.FM.hubSheet();
+        el.appendChild(wrap);
+      };
+      paint();
+      const on = (e) => {
+        const open = e.target.closest('[data-fm="hubmore"]');
+        if (open && el.contains(open)) {
+          e.stopPropagation();
+          S().fmHubMore = true;
+          paint();
+          return;
+        }
+        const close = e.target.closest('[data-fm="hubclose"]');
+        if (close && el.contains(close)) {
+          e.stopPropagation();
+          S().fmHubMore = false;
+          paint();
+        }
+      };
+      el.addEventListener('click', on);
+      return () => { offIntent(); el.removeEventListener('click', on); };
+    }
   });
 
   add('resume-more', '改简历', '全部简历服务（展开）', {
@@ -458,30 +400,37 @@
   });
 
   add('resume-src', '改简历', '简历在哪', {
-    notes: { does: '运行页 /resume/source，ResumeSourcePage。一体机默认打开手机扫码面板（同页的 UploadSessionQrPanel），U 盘是同页的 ResumeUsbImportPanel，不另开路由。', motion: '点「在手机里 / 在 U 盘里」只切换本页面板（opacity）。二维码外圈用已有脉冲，不表示上传进度。', keep: '纸质去扫描工作台：与诊断失败屏 ResumeReportStates.tsx「扫描纸质简历」同一去向 /scan（desc「在打印机面板上扫描，存成 PDF」）。本稿落到 scan-type。本页不能点选已存简历。未登录句是「当前未登录 · 这次按临时上传处理」加「去登录」。已登录只去 my-resumes。Word 默认 wordToPdf=false，句为「Word 转换暂未开放，请另存为 PDF 再上传」；能力打开才收 DOC/DOCX。文件确认前主按钮禁用，文案「请先上传简历文件」；确认后去 resume-direction，不直接解析。会话 600 秒，不写死剩余钟点，不写手机是否连上，也不写号码后四位。U 盘未开通、确认不了、读取失败是别的态，这一帧是「等待插入U盘」。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: 'AI 简历诊断', title: '你的简历在哪里？', rail: { labels: RAIL.resume, now: 0 }, seal: 'idle', place: ' ', status: { text: '等待简历文件' } },
+    notes: { does: '运行页 /resume/source，ResumeSourcePage。一体机默认打开手机扫码面板（同页的 UploadSessionQrPanel），U 盘是同页的 ResumeUsbImportPanel，不另开路由。', motion: '点「在手机里 / 在 U 盘里」只切换本页面板（opacity）。二维码外圈用已有脉冲，不表示上传进度。文件到了只换占位框里的文件卡，不自己跳到下一步。', keep: '纸质去扫描工作台：与诊断失败屏 ResumeReportStates.tsx「扫描纸质简历」同一去向 /scan（desc「在打印机面板上扫描，存成 PDF」）。本稿落到 scan-type。本页不能点选已存简历。未登录句是「当前未登录 · 这次按临时上传处理」加「去登录」。已登录只去 my-resumes。Word 默认 wordToPdf=false，句为「Word 转换暂未开放，请另存为 PDF 再上传」；能力打开才收 DOC/DOCX。文件确认前主按钮禁用，文案「请先上传简历文件」；确认后（S().fmFile，手机上传或 U 盘导入带回来，或本屏演示事件 file）主按钮「下一步：诊断方向」去 resume-direction，不直接解析。文件卡读 S().fmDoc，没有就用手机示例「李佳怡-产品运营-简历.pdf · 1 页 · 248 KB」。胶囊改为「系统已收到，等你确认」。刷新二维码只换这张码的种子，不报成功。取消后本屏写「这次扫码已取消」，再出一张码回到等待。U 盘面板「重新检测」读不到盘就写「刚刚重新检测过，还是没有插入 U 盘」，不假装插上了。会话 600 秒，不写死剩余钟点，不写手机是否连上，也不写号码后四位。U 盘未开通、确认不了、读取失败是别的态，这一帧是「等待插入U盘」。出错、小青不可用、未登录都不挡这一页：纸质去 scan-type，没有电子简历去 scratch，只打印去 print。' },
+    render: () => {
+      const got = !!S().fmFile;
+      const doc = S().fmDoc || window.FM.resumeDoc;
+      const scanOff = !!S().fmScanOff && !got;
+      const noUsb = S().fmNoUsb || 0;
+      const srcOn = S().fmSrc === 'usb' ? 'usb' : 'phone';
+      return F({
+      band: { kind: 'compact', eyebrow: 'AI 简历诊断', title: '你的简历在哪里？', rail: { labels: RAIL.resume, now: 0 }, seal: 'idle', place: ' ', status: got ? { text: '系统已收到，等你确认' } : { text: '等待简历文件' } },
       cls: 'tight d4-fill d4-srcpage',
       body: `<div class="d4-srcs" role="group" aria-label="简历从哪儿来">
-          <button class="d4-src" data-d4-src="phone" data-act="seg" aria-pressed="true"><span class="d4-ico">${icon('phone', 40, 2)}</span><b>在手机里</b><small>用手机扫码选择简历文件，再回到一体机确认</small></button>
-          <button class="d4-src" data-d4-src="usb" data-act="seg" aria-pressed="false"><span class="d4-ico">${icon('usb', 40, 2)}</span><b>在 U 盘里</b><small>从已插入的 U 盘里选一份。只读取你点的那份</small></button>
+          <button class="d4-src" data-d4-src="phone" data-act="seg" aria-pressed="${srcOn === 'phone' ? 'true' : 'false'}"><span class="d4-ico">${icon('phone', 40, 2)}</span><b>在手机里</b><small>用手机扫码选择简历文件，再回到一体机确认</small></button>
+          <button class="d4-src" data-d4-src="usb" data-act="seg" aria-pressed="${srcOn === 'usb' ? 'true' : 'false'}"><span class="d4-ico">${icon('usb', 40, 2)}</span><b>在 U 盘里</b><small>从已插入的 U 盘里选一份。只读取你点的那份</small></button>
           <button class="d4-src" data-d4-src="paper" data-go="scan-type" aria-pressed="false"><span class="d4-ico">${icon('scan', 40, 2)}</span><b>是纸质的</b><small>在打印机面板上扫描，存成 PDF</small></button>
         </div>
         <div class="d4-panel" data-d4-panel="phone">
-          <b>请用手机微信或浏览器扫码</b>
-          <div class="d4-qr">${UI.qr(6, 360)}</div>
+          ${scanOff ? `<div class="fm-cancel"><div>${UI.phone(200)}</div><div><b>这次扫码已取消</b><p>这张码已经作废。文件还没到这台机器，可以再出一张码。</p><button class="btn pri" data-fm="newscan">再出一张码</button></div></div>` : `<b>请用手机微信或浏览器扫码</b>
+          <div class="d4-qr">${UI.qr(S().fmQrSrc || 6, 360)}</div>
           <p>二维码有效期从生成时起算，10 分钟 · 文件最大 10MB</p>
           <div class="d4-ops">
-            <button data-act="toast" data-arg="刷新二维码">刷新二维码</button>
-            <button data-act="toast" data-arg="取消这次扫码">取消</button>
-          </div>
+            <button data-fm="qrsrc">刷新二维码</button>
+            <button data-fm="cancelscan">取消</button>
+          </div>`}
           <div class="steps3 d4-ministep" aria-label="怎么把文件传过来"><div class="s"><span class="n">1</span><b>扫码</b></div><div class="s"><span class="n">2</span><b>在手机上选文件、点上传</b></div><div class="s"><span class="n">3</span><b>回到这台机器点确认</b></div></div>
-          <div class="dropzone d4-drop">${icon('file', 36, 1.8)}<span>传过来的文件会出现在这里</span></div>
+          <div class="dropzone d4-drop${got ? ' fm-got' : ''}">${got ? window.FM.file(doc.name, doc.meta) : `${icon('file', 36, 1.8)}<span>传过来的文件会出现在这里</span>`}</div>
         </div>
         <div class="d4-panel" data-d4-panel="usb" hidden>
           <b>等待插入U盘</b>
           <p>插好后列出 10MB 以内的 PDF、JPG、PNG。只读取你主动选择的文件，上传完成后即可拔出 U 盘。</p>
-          <button class="btn sec" data-act="toast" data-arg="重新检测">重新检测</button>
+          ${noUsb ? `<p class="fm-note" data-fm-n="${noUsb}">刚刚重新检测过，还是没有插入 U 盘。</p>` : ''}
+          <button class="btn sec" data-fm="redetect">重新检测</button>
         </div>
         ${S().logged
           ? `<button class="d4-link" data-go="my-resumes">${icon('user', 28, 2)}<span>保存过的简历在『我的简历』里看</span>${icon('chevR', 28, 2.2)}</button>`
@@ -491,51 +440,165 @@
           <button data-go="print">只想打印原件</button>
         </div>
         ${fine('Word 转换暂未开放，请另存为 PDF 再上传。')}`,
-      dock: { backLabel: '上一步', ask: '问小青：帮我选诊断重点 →', pri: { label: '请先上传简历文件', disabled: true } }, nav: 'home', navAdvisor: 1
-    }),
+      dock: { backLabel: '上一步', ask: '问小青：帮我选诊断重点 →', pri: got ? { label: '下一步：诊断方向', go: 'resume-direction' } : { label: '请先上传简历文件', disabled: true } }, nav: 'home', navAdvisor: 1
+    });
+    },
+    demo: [{ label: '演示：手机传来一份文件', ev: 'file' }],
     mount: (el) => {
       const sync = () => {
         const on = el.querySelector('.d4-srcs [aria-pressed="true"]');
         const id = on && on.dataset.d4Src === 'usb' ? 'usb' : 'phone';
         el.querySelectorAll('[data-d4-panel]').forEach((p) => { p.hidden = p.dataset.d4Panel !== id; });
       };
-      const onClick = () => queueMicrotask(sync);
+      sync();
+      const onClick = (e) => {
+        const src = e.target.closest('.d4-src');
+        if (src && el.contains(src)) {
+          if (src.dataset.d4Src === 'usb' || src.dataset.d4Src === 'phone') S().fmSrc = src.dataset.d4Src;
+          if (src.getAttribute('aria-pressed') === 'true') src.setAttribute('data-fm-n', String((+src.getAttribute('data-fm-n') || 0) + 1));
+        }
+        const fm = e.target.closest('[data-fm]');
+        if (fm && el.contains(fm)) {
+          const k = fm.dataset.fm;
+          if (k === 'qrsrc') { e.stopPropagation(); S().fmQrSrc = (S().fmQrSrc || 6) + 1; window.__proto.refresh(); return; }
+          if (k === 'cancelscan') { e.stopPropagation(); S().fmScanOff = true; window.__proto.refresh(); return; }
+          if (k === 'newscan') { e.stopPropagation(); S().fmScanOff = false; S().fmQrSrc = (S().fmQrSrc || 6) + 1; window.__proto.refresh(); return; }
+          if (k === 'redetect') { e.stopPropagation(); S().fmSrc = 'usb'; S().fmNoUsb = (S().fmNoUsb || 0) + 1; window.__proto.refresh(); return; }
+        }
+        queueMicrotask(sync);
+      };
+      const onDemo = (e) => {
+        if (e.detail !== 'file') return;
+        S().fmFile = true;
+        S().fmDoc = window.FM.resumeDoc;
+        window.__proto.refresh();
+      };
       el.addEventListener('click', onClick);
-      return () => el.removeEventListener('click', onClick);
+      el.addEventListener('proto-demo', onDemo);
+      return () => { el.removeEventListener('click', onClick); el.removeEventListener('proto-demo', onDemo); };
     }
   });
   add('upload', '改简历', '手机扫码传文件', {
-    notes: { does: '手机扫码传文件。打印来路（S.ctx 为 print）和简历来路（resume）都走这一屏。大屏不感知扫没扫，只等系统收到文件。', motion: '等待时二维码外圈扩散。不自己演到下一步。', keep: '意图带不画步骤条，二维码放在意图带下方，边长 360。两路都画三步：扫码 → 在手机上选文件、点上传 → 回到这台机器点确认。等待句「等你在手机上传文件 · 传好后会显示在下面，再点确认」。占位「传好的文件会出现在这里」。有「取消这次上传」（打印回 print-src，简历回 resume-src）。不写手机连接状态，不自动进入下一步。有效期从生成时起算，10 分钟；能刷新二维码。确认按钮在文件出现前不可点。' },
+    notes: { does: '手机扫码传文件。打印来路（S.ctx 为 print）和简历来路（resume）都走这一屏。大屏不感知扫没扫，只等系统收到文件。演示事件 file（或 S().fmUp）表示系统已经收到。', motion: '等待时二维码外圈扩散。不自己演到下一步。收到文件后只换下面的文件卡和主按钮。', keep: '意图带不画步骤条，二维码放在意图带下方，边长 360。两路都画三步：扫码 → 在手机上选文件、点上传 → 回到这台机器点确认。等待句「等你在手机上传文件 · 传好后会显示在下面，再点确认」。占位「传好的文件会出现在这里」。收到后胶囊「系统已收到，等你确认」，框里画文件卡。打印来路示例「毕业生就业推荐表（已填写）.pdf · 2 页 · 186 KB」，主按钮「确认使用这份文件」去 pii。简历来路示例「李佳怡-产品运营-简历.pdf · 1 页 · 248 KB」，同一句按钮回 resume-src，并写上 S().fmFile 与 S().fmDoc。有「取消这次上传」（打印回 print-src，简历回 resume-src），取消清掉这次已收到的标记。不写手机连接状态，不自动进入下一步。有效期从生成时起算，10 分钟；刷新二维码只换种子。确认按钮在文件出现前不可点。文件名从这一次上传读，上面两个名字是示例。' },
     render: () => {
       const forPrint = S().ctx === 'print';
+      const got = !!S().fmUp;
+      const doc = forPrint ? window.FM.printDoc : window.FM.resumeDoc;
+      const waitStatus = forPrint ? (printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' }) : { text: '等待简历文件' };
       return F({
-        band: { eyebrow: forPrint ? '文档打印' : 'AI 简历诊断', title: forPrint ? '用手机扫描下方二维码' : '请用手机微信或浏览器扫码', seal: null, place: ' ', status: forPrint ? (printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' }) : { text: '等待简历文件' } },
+        band: { eyebrow: forPrint ? '文档打印' : 'AI 简历诊断', title: forPrint ? '用手机扫描下方二维码' : '请用手机微信或浏览器扫码', seal: null, place: ' ', status: got ? { text: '系统已收到，等你确认' } : waitStatus },
         cls: 'tight d3-up',
-        body: `<div class="qr-card waiting" id="qrWrap"><div class="qr-box d3-qrbox"><i class="pulse"></i><i class="pulse p2"></i>${UI.qr(9, 360)}</div><span style="font-size:21px;color:var(--ink-3)" id="qrExp">二维码有效期从生成时起算，10 分钟 · 文件最大 10MB · <u data-act="toast" data-arg="刷新二维码">刷新二维码</u></span></div>
+        body: `<div class="qr-card waiting" id="qrWrap"><div class="qr-box d3-qrbox"><i class="pulse"></i><i class="pulse p2"></i>${UI.qr(S().fmQrUp || 9, 360)}</div><span style="font-size:21px;color:var(--ink-3)" id="qrExp">二维码有效期从生成时起算，10 分钟 · 文件最大 10MB · <u data-fm="qrup">刷新二维码</u></span></div>
           <div class="steps3 rise" style="--i:1" id="steps"><div class="s"><span class="n">1</span><b>扫码</b><small>相机或微信</small></div><div class="s"><span class="n">2</span><b>在手机上选文件、<br>点上传</b><small>PDF、JPG、PNG</small></div><div class="s"><span class="n">3</span><b>回到这台机器点确认</b><small>传好后再点下面的确认</small></div></div>
-          <div class="livebox rise" style="--i:2" id="upLive"><span class="spin"></span><div><b>等你在手机上传文件 · 传好后会显示在下面，再点确认</b></div></div>
-          <div id="upFile"><div class="dropzone d3-drop">${icon('file', 40, 1.8)}<span>传好的文件会出现在这里</span></div></div>
+          <div class="livebox rise" style="--i:2" id="upLive">${got ? icon('check', 36, 2.4) : '<span class="spin"></span>'}<div><b>${got ? '系统已收到，等你确认' : '等你在手机上传文件 · 传好后会显示在下面，再点确认'}</b></div></div>
+          <div id="upFile"><div class="dropzone d3-drop${got ? ' fm-got' : ''}">${got ? window.FM.file(doc.name, doc.meta) : `${icon('file', 40, 1.8)}<span>传好的文件会出现在这里</span>`}</div></div>
           <button class="btn sec" data-go="${forPrint ? 'print-src' : 'resume-src'}">取消这次上传</button>
           ${fine(forPrint ? '结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。' : '未登录临时上传约 1 小时；登录后简历默认保存 90 天。')}`,
-        dock: { backLabel: '上一步', ask: forPrint ? '问小青：怎么检查' : '问小青：选诊断重点', pri: { label: forPrint ? '确认使用这份文件' : '确认', go: forPrint ? 'pii' : 'reading', disabled: true, id: 'upNext' } }, nav: 'home', navAdvisor: 1
+        dock: { backLabel: '上一步', ask: forPrint ? '问小青：怎么检查' : '问小青：选诊断重点', pri: got ? { label: '确认使用这份文件', go: forPrint ? 'pii' : 'resume-src', id: 'upNext' } : { label: forPrint ? '确认使用这份文件' : '确认', go: forPrint ? 'pii' : 'reading', disabled: true, id: 'upNext' } }, nav: 'home', navAdvisor: 1
       });
+    },
+    demo: [{ label: '演示：手机传来一份文件', ev: 'file' }],
+    mount: (el) => {
+      const on = (e) => {
+        const u = e.target.closest('[data-fm="qrup"]');
+        if (u && el.contains(u)) {
+          e.stopPropagation();
+          S().fmQrUp = (S().fmQrUp || 9) + 1;
+          window.__proto.refresh();
+          return;
+        }
+        const next = e.target.closest('#upNext');
+        if (next && el.contains(next) && !next.disabled && S().fmUp && S().ctx !== 'print') {
+          S().fmFile = true;
+          S().fmDoc = window.FM.resumeDoc;
+        }
+        const cancel = e.target.closest('button');
+        if (cancel && el.contains(cancel) && (cancel.textContent || '').indexOf('取消这次上传') >= 0) S().fmUp = false;
+      };
+      const onDemo = (e) => {
+        if (e.detail !== 'file') return;
+        S().fmUp = true;
+        window.__proto.refresh();
+      };
+      el.addEventListener('click', on);
+      el.addEventListener('proto-demo', onDemo);
+      return () => { el.removeEventListener('click', on); el.removeEventListener('proto-demo', onDemo); };
     }
   });
 
   add('usb', '改简历', 'U 盘选文件', {
-    notes: { does: '列出当次根目录里能用的文件。没插上时不能写已经读到。打印来路和简历来路都走这一屏。', motion: '文件列表依次浮入。', keep: '列表上方写「U 盘根目录里能用的文件（3 个）」和「重新检测」（运行页 U 盘面板有重新检测）。只显示文件名和大小，不显示页数，不列出 Word。拔盘句只写「导入完成后可以直接拔出 U 盘」。读不出来可以换 USB 口或改用手机。底部导航中间一项是「AI 顾问」。' },
-    render: () => F({
-      band: { eyebrow: S().ctx === 'print' ? '文档打印' : 'AI 简历诊断', title: '挑一份就行', sub: '只读根目录，不进子文件夹。', rail: { labels: S().ctx === 'print' ? RAIL.print : RAIL.resume, now: 0 }, seal: null, place: ' ', status: S().ctx === 'print' ? (printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' }) : { text: '等待简历文件' } },
-      cls: 'd3-usb',
-      body: `<div class="d3-usbhead rise" style="--i:0"><b>U 盘根目录里能用的文件（${D.usbFiles.length} 个）</b><button class="d3-mini" data-act="toast" data-arg="重新检测">重新检测</button></div>
-        <div class="stack">${D.usbFiles.map((f, i) => `<button class="filecard rise" style="--i:${i};text-align:left;width:100%" data-go="${S().ctx === 'print' ? 'pii' : 'reading'}"><span class="ft ${f.t === 'JPG' ? 'img' : ''}">${f.t}</span><div style="min-width:0"><b>${f.n}</b><small>${f.s}</small></div><span style="margin-left:auto;color:var(--ink-3)">${icon('chevR', 34, 2.2)}</span></button>`).join('')}</div>
-        <div class="remind rise" style="--i:5">${icon('usb', 34, 2)}<span>只读取你主动选择的文件。导入完成后可以直接拔出 U 盘。</span></div>
+    notes: { does: '列出当次根目录里能用的文件。没插上时不能写已经读到。打印来路和简历来路都走这一屏。点文件行只选中，主按钮出现后才导入。', motion: '文件列表依次浮入。选中只改这一行的底色。导入中不自己跳到下一步，等演示事件 imported。', keep: '列表上方写「U 盘根目录里能用的文件（3 个）」和「重新检测」（运行页 U 盘面板有重新检测）。重新检测清掉选中，写「刚刚重新读过这块 U 盘，根目录里还是这 3 个文件」，不假装读出新文件。只显示文件名和大小，不显示页数，不列出 Word。未选中时拔盘句只写「导入完成后可以直接拔出 U 盘」，底栏没有导入按钮。选中后主按钮「导入这份文件」（运行页按钮原文是「导入这一份」，本稿按这一轮任务用「导入这份文件」），说明用「只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。」导入中写「正在导入选中的文件，请暂时不要拔出 U 盘。」以及「系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。」导入完成：打印来路去 pii，简历来路回 resume-src 并带上 S().fmFile 与这份文件名、大小。读不出来可以换 USB 口或改用手机。底部导航中间一项是「AI 顾问」。' },
+    render: () => {
+      const forPrint = S().ctx === 'print';
+      const idx = window.FM.usbIndex();
+      const busy = !!S().fmUsbBusy;
+      const reads = S().fmUsbReads || 0;
+      const remind = busy
+        ? '正在导入选中的文件，请暂时不要拔出 U 盘。系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。'
+        : idx >= 0
+          ? '只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。'
+          : '只读取你主动选择的文件。导入完成后可以直接拔出 U 盘。';
+      return F({
+        band: { eyebrow: forPrint ? '文档打印' : 'AI 简历诊断', title: '挑一份就行', sub: '只读根目录，不进子文件夹。', rail: { labels: forPrint ? RAIL.print : RAIL.resume, now: 0 }, seal: null, place: ' ', status: forPrint ? (printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' }) : { text: '等待简历文件' } },
+        cls: 'd3-usb',
+        body: `<div class="d3-usbhead rise" style="--i:0"><b>U 盘根目录里能用的文件（${D.usbFiles.length} 个）</b><button class="d3-mini" data-fm="uread">重新检测</button></div>
+        ${reads ? `<p class="fm-note" data-fm-n="${reads}">刚刚重新读过这块 U 盘，根目录里还是这 ${D.usbFiles.length} 个文件。</p>` : ''}
+        <div class="stack">${D.usbFiles.map((f, i) => `<button class="filecard rise${idx === i ? ' fm-on' : ''}" style="--i:${i};text-align:left;width:100%" data-fm="usel" data-i="${i}"><span class="ft ${f.t === 'JPG' ? 'img' : ''}">${f.t}</span><div style="min-width:0"><b>${f.n}</b><small>${f.s}</small></div><span style="margin-left:auto;color:${idx === i ? 'var(--teal-ink)' : 'var(--ink-3)'}">${idx === i ? '已选中' : icon('chevR', 34, 2.2)}</span></button>`).join('')}</div>
+        <div class="remind rise" style="--i:5">${icon('usb', 34, 2)}<span>${remind}</span></div>
         ${fine('Word 转换暂未开放，请另存为 PDF 再上传。读不出来可以换一个 USB 口，或者改用手机传。')}`,
-      dock: { backLabel: '上一步', ask: S().ctx === 'print' ? '问小青：怎么检查' : '问小青：选诊断重点' }, nav: null, navAdvisor: 1
-    })
+        dock: Object.assign({ backLabel: '上一步', ask: forPrint ? '问小青：怎么检查' : '问小青：选诊断重点' }, idx >= 0 ? { pri: { label: busy ? '正在导入' : '导入这份文件', disabled: busy, id: 'fmUsbGo' } } : {}),
+        nav: null, navAdvisor: 1
+      });
+    },
+    demo: () => (S().fmUsbBusy ? [{ label: '演示：导入完成', ev: 'imported' }] : []),
+    mount: (el) => {
+      const on = (e) => {
+        const row = e.target.closest('[data-fm="usel"]');
+        if (row && el.contains(row)) {
+          e.stopPropagation();
+          if (S().fmUsbBusy) return;
+          const i = +row.dataset.i;
+          if (window.FM.usbIndex() === i) {
+            row.setAttribute('data-fm-hit', String((+row.dataset.fmHit || 0) + 1));
+            return;
+          }
+          S().fmUsbSel = i;
+          window.__proto.refresh();
+          return;
+        }
+        const again = e.target.closest('[data-fm="uread"]');
+        if (again && el.contains(again)) {
+          e.stopPropagation();
+          delete S().fmUsbSel;
+          S().fmUsbBusy = false;
+          S().fmUsbReads = (S().fmUsbReads || 0) + 1;
+          window.__proto.refresh();
+          return;
+        }
+        const go = e.target.closest('#fmUsbGo');
+        if (go && el.contains(go) && !go.disabled) {
+          e.stopPropagation();
+          S().fmUsbBusy = true;
+          window.__proto.refresh();
+        }
+      };
+      const onDemo = (e) => {
+        if (e.detail !== 'imported' || !S().fmUsbBusy) return;
+        const f = D.usbFiles[window.FM.usbIndex()];
+        S().fmUsbBusy = false;
+        delete S().fmUsbSel;
+        if (S().ctx === 'print') { S().printDoc = f ? { name: f.n, meta: f.s } : null; window.go('pii'); return; }
+        S().fmFile = true;
+        S().fmDoc = f ? { name: f.n, meta: f.s } : window.FM.resumeDoc;
+        window.go('resume-src');
+      };
+      el.addEventListener('click', on);
+      el.addEventListener('proto-demo', onDemo);
+      return () => { el.removeEventListener('click', on); el.removeEventListener('proto-demo', onDemo); };
+    }
   });
   add('reading', '改简历', '读简历', {
-    notes: { does: '运行页 /resume/parse 的等待态（ResumeParseOutcomeNote waiting）。标题和副标题用等待文案，不预报时长。?ai=down 不画等待：运行页小青停用时诊断失败直接到报告失败态，这一变体改画 st-ai-down 的内容（render 时取 window.SCREENS 里 st-ai-down 的 render）。地址仍是 reading。', motion: '圆章和转圈只表示在进行（transform / opacity），不表示百分比，也没有扫描线。四条说明不打勾、不播报阶段。', keep: '四条是处理内容说明：读取上传文件、识别可解析文字、提取简历结构、生成诊断报告。「处理内容」只在列头标一次。运行页解析页没有底部导航；本稿壳子仍留三格导航，中间一项是「AI 顾问」，这三格不计入本屏可点。底栏是返回上一步和问小青（问小青：解析没完成怎么办）。返回句用 ResumeParsePage.tsx 717：「返回仅停止本机等待，不会撤回已提交的服务请求」。简历原文不会发送给企业，也不进入平台候选人简历库。发给 AI 之前会先遮住手机号、身份证号、邮箱、住址等个人信息；代码里 mask 还包含银行卡号和姓名。等待中没有打印原件，也没有「读完了」。六维名称只读，来自 RESUME_SCORING_DIMENSIONS。' },
+    notes: { does: '运行页 /resume/parse 的等待态（ResumeParseOutcomeNote waiting）。标题和副标题用等待文案，不预报时长。?ai=down 不画等待：运行页小青停用时诊断失败直接到报告失败态，这一变体改画 st-ai-down 的内容（render 时取 window.SCREENS 里 st-ai-down 的 render）。地址仍是 reading。', motion: '圆章和转圈只表示在进行（transform / opacity），不表示百分比，也没有扫描线。四条说明不打勾、不播报阶段。不倒计时演完自动成功。', keep: '四条是处理内容说明：读取上传文件、识别可解析文字、提取简历结构、生成诊断报告。「处理内容」只在列头标一次。运行页解析页没有底部导航；本稿壳子仍留三格导航，中间一项是「AI 顾问」，这三格不计入本屏可点。底栏是返回上一步和问小青（问小青：解析没完成怎么办）。返回句用 ResumeParsePage.tsx 717：「返回仅停止本机等待，不会撤回已提交的服务请求」。简历原文不会发送给企业，也不进入平台候选人简历库。发给 AI 之前会先遮住手机号、身份证号、邮箱、住址等个人信息；代码里 mask 还包含银行卡号和姓名。等待中没有打印原件，也没有「读完了」。六维名称只读，来自 RESUME_SCORING_DIMENSIONS。演示事件 done（解析完成）去 diagnosis；fail（这次没解析出来）去 st-ai-down。小青已停用时 done 不前进，页面本身已经是失败态。返回上一步是不用 AI 的出口。' },
     render: () => {
       if (aiOff()) {
         const fail = (window.SCREENS || []).find((s) => s.id === 'st-ai-down');
@@ -560,6 +623,15 @@
           </div>`,
         dock: { backLabel: '返回上一步', ask: '问小青：解析没完成怎么办' }, nav: null, navAdvisor: 1
       });
+    },
+    demo: [{ label: '演示：解析完成', ev: 'done' }, { label: '演示：这次没解析出来', ev: 'fail' }],
+    mount: (el) => {
+      const on = (e) => {
+        if (e.detail === 'done') { if (S().ai !== 'down') window.go('diagnosis'); return; }
+        if (e.detail === 'fail') window.go('st-ai-down');
+      };
+      el.addEventListener('proto-demo', on);
+      return () => el.removeEventListener('proto-demo', on);
     }
   });
   add('diagnosis', '改简历', '诊断报告', {
@@ -696,17 +768,17 @@
   });
 
   add('compare', '改简历', '逐条选择', {
-    notes: { does: '运行页 /resume/optimize/compare 的最后一条。标题「第 n / N 条 · 模块名」。这一帧是第 4 / 4 条 · 工作经历，用来同时看见「去编辑」和未确认的新增事实。', motion: '无循环动画。勾上事实后，「用改写」才可点。未勾时框是白底描边，整行可点。', keep: '左右是原文和改写，图例是删掉、加上、换写法。五格统计来自 ResumeOptimizeComparePage.tsx 193–195：全部 / 已采纳 / 保留原文 / 自己写 / 待定。这一帧示例数字是 4 / 2 / 1 / 0 / 1，写死，不跟当前这一条的按钮连动（当前条画的是「自己写」按下，统计里自己写仍是 0）。三个决定：用改写、保留原文、自己写。自己写展开输入，点了走屏上键盘（data-act=type），不画数字键盘。改写里的「周更 2 篇」原文没有，勾「周更 2 篇是我的真实信息」之后才能用改写；运行页复选框是「{新增内容}是我的真实信息」。上一条留在本帧提示，不假装已经翻页。最后一条没有下一条，主按钮是「去编辑」。意图带用「选择还没写进简历，在『编辑』里生效」。正文另写运行页 UNSAVED_NOTICE：「选择是阅读决策，未保存、未生成文件；返回优化页时可以选择是否应用到编辑区。只有编辑区的内容会进入导出。」不画只看改后，不去打印。批量清空在改动清单，这一页不重复。改写栏标识「AI 生成，仅供参考，请自行核对」。' },
-    render: () => F({
+    notes: { does: '运行页 /resume/optimize/compare 的最后一条。标题「第 n / N 条 · 模块名」。这一帧是第 4 / 4 条 · 工作经历，用来同时看见「去编辑」和未确认的新增事实。', motion: '无循环动画。勾上事实后，「用改写」才可点。未勾时框是白底描边，整行可点。', keep: '左右是原文和改写，图例是删掉、加上、换写法。五格统计来自 ResumeOptimizeComparePage.tsx 193–195：全部 / 已采纳 / 保留原文 / 自己写 / 待定。这一帧示例数字是 4 / 2 / 1 / 0 / 1，写死，不跟当前这一条的按钮连动（当前条画的是「自己写」按下，统计里自己写仍是 0）。三个决定：用改写、保留原文、自己写。自己写展开输入，点了走屏上键盘（data-act=type），不画数字键盘。改写里的「周更 2 篇」原文没有，勾「周更 2 篇是我的真实信息」之后才能用改写；运行页复选框是「{新增内容}是我的真实信息」。上一条回到逐条确认的第 3 条（optimize）。批量处理、用这段、取消是本屏状态变化，统计跟着变。最后一条没有下一条，主按钮是「去编辑」。意图带用「选择还没写进简历，在『编辑』里生效」。正文另写运行页 UNSAVED_NOTICE：「选择是阅读决策，未保存、未生成文件；返回优化页时可以选择是否应用到编辑区。只有编辑区的内容会进入导出。」不画只看改后，不去打印。批量清空在改动清单，这一页不重复。改写栏标识「AI 生成，仅供参考，请自行核对」。' },
+    render: () => { const c = Object.assign({ all: 4, opt: 2, keep: 1, own: 0, pend: 1, choice: 'custom', used: false, msg: '' }, S().cmp || {}); return F({
       band: { kind: 'compact', eyebrow: '逐条选择', title: '第 4 / 4 条 · 工作经历', sub: '选择还没写进简历，在『编辑』里生效', rail: { labels: RAIL.resume, now: 3 }, seal: null, place: ' ', status: { text: '待本人选择' } },
       cls: 'tight d4-fill d4-cmp',
       body: `<div class="d4-top">
-          <button class="d4-prev" data-act="toast" data-arg="上一条">上一条</button>
+          <button class="d4-prev" data-go="optimize" data-set="opt=2">上一条</button>
           <div class="d4-legend" aria-label="对照图例"><span><del>删掉</del> 删除</span><span><ins>加上</ins> 新增</span><span class="d4-swap">换写法</span><span>普通文字 保留</span></div>
         </div>
-        <div class="d4-stats5" aria-label="改写选择统计"><span><u>全部</u><b>4</b></span><span><u>已采纳</u><b>2</b></span><span><u>保留原文</u><b>1</b></span><span><u>自己写</u><b>0</b></span><span><u>待定</u><b>1</b></span></div>
-        <div class="d4-batch" aria-label="批量处理"><button data-act="toast" data-arg="可采纳的已全部采纳"><b>可采纳的全部采纳</b><small>跳过有待确认事实的那几条</small></button><button data-act="toast" data-arg="其余已记为保留原文"><b>其余保留原文</b><small>把还没决定的都记为保留</small></button><button data-act="toast" data-arg="已全部回到待定"><b>清空全部选择</b><small>全部回到待定</small></button></div>
-        <p class="d4-draft">选择是阅读决策，未保存、未生成文件；返回优化页时可以选择是否应用到编辑区。只有编辑区的内容会进入导出。</p>
+        <div class="d4-stats5" aria-label="改写选择统计"><span><u>全部</u><b>${c.all}</b></span><span><u>已采纳</u><b>${c.opt}</b></span><span><u>保留原文</u><b>${c.keep}</b></span><span><u>自己写</u><b>${c.own}</b></span><span><u>待定</u><b>${c.pend}</b></span></div>
+        <div class="d4-batch" aria-label="批量处理"><button data-cmp="opt-all"><b>可采纳的全部采纳</b><small>跳过有待确认事实的那几条</small></button><button data-cmp="keep-rest"><b>其余保留原文</b><small>把还没决定的都记为保留</small></button><button data-cmp="clear"><b>清空全部选择</b><small>全部回到待定</small></button></div>
+        <p class="d4-draft">${c.msg || '选择是阅读决策，未保存、未生成文件；返回优化页时可以选择是否应用到编辑区。只有编辑区的内容会进入导出。'}</p>
         <div class="d4-cols">
           <section class="d4-col"><b>原文</b><p>负责学院公众号的选题、撰写和排版。</p><small>摘自本次简历原文</small></section>
           <section class="d4-col d4-diff"><b>改写</b><p><del>负责</del><span class="d4-swap">独立运营</span>学院公众号的选题、撰写和排版，<ins>周更 2 篇</ins>。</p><small>AI 生成，仅供参考，请自行核对</small></section>
@@ -715,13 +787,26 @@
         <label class="d4-fact"><input id="d4Fact" type="checkbox"><span>周更 2 篇是我的真实信息</span></label>
         <div class="d4-seg d4-dec" role="group" aria-label="这一条用哪一版">
           <button id="d4Use" data-act="seg" data-d4-choice="opt" aria-pressed="false" disabled>用改写</button>
-          <button data-act="seg" data-d4-choice="keep" aria-pressed="false">保留原文</button>
-          <button data-act="seg" data-d4-choice="custom" aria-pressed="true">自己写</button>
+          <button data-act="seg" data-d4-choice="keep" aria-pressed="${c.choice === 'keep'}">保留原文</button>
+          <button data-act="seg" data-d4-choice="custom" aria-pressed="${c.choice === 'custom'}">自己写</button>
         </div>
-        <div class="d4-custom" id="d4Custom"><b class="d4-cl">自己写这一条</b><button class="d4-ta" data-act="type">在这里写你自己的这一句</button><p class="d4-cn">这段只留在本页，刷新后不保留。要放进新简历，请回编辑区填写。</p><div class="d4-ca"><button class="btn sm mint" data-act="toast" data-arg="已用这段">用这段</button><button class="btn sm sec" data-act="toast" data-arg="已取消">取消</button></div></div>`,
+        <div class="d4-custom" id="d4Custom"><b class="d4-cl">自己写这一条</b><button class="d4-ta" data-act="type">在这里写你自己的这一句</button><p class="d4-cn">这段只留在本页，刷新后不保留。要放进新简历，请回编辑区填写。</p><div class="d4-ca">${c.used ? '<b class="d4-cl">已用你写的这段</b>' : '<button class="btn sm mint" data-cmp="use-own">用这段</button>'}<button class="btn sm sec" data-cmp="cancel-own">取消</button></div></div>`,
       dock: { backLabel: '返回', ask: '问小青：这句还能怎么改 →', pri: { label: '去编辑', go: 'resume-edit' } }, nav: null, navAdvisor: 1
-    }),
+    }); },
     mount: (el) => {
+      /* 批量处理、用这段、取消：本屏状态变化（统计跟着变），不弹提示条。 */
+      const onCmp = (e) => {
+        const t = e.target.closest('[data-cmp]'); if (!t || !el.contains(t)) return;
+        const c = Object.assign({ all: 4, opt: 2, keep: 1, own: 0, pend: 1, choice: 'custom', used: false, msg: '' }, S().cmp || {});
+        const k = t.dataset.cmp;
+        if (k === 'opt-all') c.msg = '可以采纳的都已采纳；这一条有待你确认的新增内容（周更 2 篇），先跳过，仍是待定。';
+        if (k === 'keep-rest') { c.keep += c.pend; c.pend = 0; c.choice = 'keep'; c.used = false; c.msg = '还没决定的都记为保留原文。'; }
+        if (k === 'clear') Object.assign(c, { opt: 0, keep: 0, own: 0, pend: c.all, choice: '', used: false, msg: '全部回到待定，可以重新逐条选。' });
+        if (k === 'use-own') { if (!c.used && c.pend > 0) { c.own += 1; c.pend -= 1; } c.used = true; c.msg = '这一条用你自己写的。要放进新简历，请回编辑区填写。'; }
+        if (k === 'cancel-own') { if (c.used) { c.own -= 1; c.pend += 1; } Object.assign(c, { choice: '', used: false, msg: '' }); }
+        S().cmp = c; window.__proto.refresh();
+      };
+      el.addEventListener('click', onCmp);
       const sync = () => {
         const box = el.querySelector('#d4Fact');
         const use = el.querySelector('#d4Use');
@@ -733,155 +818,84 @@
       const onClick = () => queueMicrotask(sync);
       el.addEventListener('click', onClick);
       el.addEventListener('change', onClick);
-      return () => { el.removeEventListener('click', onClick); el.removeEventListener('change', onClick); };
+      return () => { el.removeEventListener('click', onCmp); el.removeEventListener('click', onClick); el.removeEventListener('change', onClick); };
     }
   });
-  add('scratch', '改简历', '从零写：在哪写', {
-    notes: { does: '长任务默认引到手机（10/10 定），大屏完整流程留作退路。', motion: '无循环动画。', keep: '上线条件：「用手机写」这张卡是开关——带 AI 的小程序上架、手机上真能办之前不显示，那时屏上只有「就在这台机器上写」。' },
-    render: () => F({
-      band: { eyebrow: '从零写简历', title: '在哪写比较方便？', sub: '写一份简历要 10 到 15 分钟，坐下来用手机写更轻松。', seal: 'idle', path: ['想找的工作', '教育', '经历', '技能', '核对生成'], pathLabel: '要写的' },
-      body: `${slab({ i: 0, go: 'scratch-1', dark: 1, chip: '推荐', ck: 'ghost', title: '用手机写', desc: '扫码在手机上慢慢写，写好回到这台机器打印', take: '一份新简历', vis: UI.qr(4, 190) })}
-        ${slab({ i: 2, go: 'scratch-1', chip: 'AI 起草', ai: 1, title: '就在这台机器上写', desc: '6 步，每步几个问题；可以说话填写，少打字', take: '一份新简历', vis: UI.resume(150, 'blank') })}
-        <div class="manual rise" style="--i:3"><div class="olist-t" style="padding:0">写之前想一想这几样</div>${['学校、专业和在校时间', '实习或工作：在哪、做了什么、做成了什么', '校园活动、获奖和证书', '会用的工具和技能'].map(t => `<div><i></i>${t}</div>`).join('')}</div>
-        ${fine('写的内容都由你提供，AI 只帮你组织语言')}`,
-      dock: { ask: '问小青：写简历要准备什么？' }, nav: 'home'
-    })
+  add('scratch', '改简历', '从零生成：基本信息', {
+    notes: { does: '从零生成第 1 步，只问基本信息。姓名必填，城市和联系方式可空。', motion: '无循环动画。同意层淡入。', keep: '路由 /resume/generate 第 1 步。没有「在哪写」，也没有手机写。第一次用 AI 的同意层由演示事件 consent 打开，同意后进第 2 步。AI 不可用或暂不使用时，导出原话走演示事件 draft，好了才去 pii。未满 14 周岁由演示事件 age。号码与服务时间从后台读，读不到不显示。普通页 3 分钟清除。中间四步和复核页同一版式，这一轮不另画。第二轮起这些话只留在说明里，屏上不写：后面四步同一版式、教育 6 段、工作 8 段、项目 6 段、技能 20 项、证书 15 项、语音从教育描述开始。屏上是普通表单，姓名空着显示必填，城市、电话、邮箱写示例值。旁边是「简历顶部会这样显示」。' },
+    demo: () => window.FR.demo('scratch'),
+    render: () => window.FR.render('scratch'),
+    mount: (el) => window.FR.mount('scratch', el)
   });
-
-  add('scratch-1', '改简历', '从零写：第 1 步', {
-    notes: { does: '一步只问一类事；能点选的不让打字；可以说话填写；下面实时显示草稿。', motion: '说话时麦克风按钮外圈扩散；识别出的字逐字出现在输入框；草稿里新填的一行淡入。', keep: '姓名和目标岗位必填；语音转写要本人确认；AI 不可用时仍能把你填的原话导出打印。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '从零写简历 · 第 1 步 / 共 6 步', title: '你想找什么工作？', rail: { labels: ['想找的工作', '教育', '实习与工作', '校园经历', '技能证书', '核对生成'], now: 0 }, seal: null },
-      cls: 'tight',
-      body: `<div class="fgroup"><label class="sec-t" for="role">目标岗位 <small>必填，可以说话填</small></label>
-        <div class="field"><input id="role" placeholder="例如：新媒体运营" value="新媒体运营"><button class="mic" data-act="toast" data-arg="演示：说话填写">${icon('mic', 38, 2.2)}</button></div>
-        <div class="chips">${D.roles.slice(0, 5).map((r, i) => `<button aria-pressed="${i === 0}" data-act="chip">${r}</button>`).join('')}</div></div>
-        <div class="fgroup"><div class="sec-t">想在哪个城市 <small>可以多选</small></div>
-        <div class="chips">${['青岛', '济南', '烟台', '不限'].map((r, i) => `<button aria-pressed="${i === 0}" data-act="chip">${r}</button>`).join('')}</div></div>
-        <div class="fgroup"><div class="sec-t">什么时候能到岗</div>
-        <div class="seg"><button aria-pressed="true">毕业后</button><button aria-pressed="false" data-act="seg">一个月内</button><button aria-pressed="false" data-act="seg">随时</button></div></div>
-        <div class="draft rise" style="--i:6"><div class="dleft">${UI.resume(120, 'blank')}</div><div class="kvs"><div class="olist-t" style="padding:0">简历草稿 · 边填边生成</div><div><span>目标岗位</span><b>新媒体运营</b></div><div><span>城市</span><b>青岛</b></div><div><span>到岗</span><b>毕业后</b></div><div><span>还差</span><b>教育、经历、技能 · 5 步</b></div></div></div>
-        ${fine('需要打字时，输入框和「下一步」会留在键盘上方')}`,
-      dock: { ask: '问小青：帮我说清楚', pri: { label: '下一步', act: 'toast', arg: '演示到这里：后面 5 步结构相同' } }, nav: null
-    })
+  add('scratch-1', '改简历', '从零生成：求职意向', {
+    notes: { does: '第 2 步只问求职意向。目标岗位必填。下一步去核对页。', motion: '无循环动画。', keep: '运行页六步原名。工作类型不选即「不填写」。教育最多 6 段、工作 8、项目 6、技能 20、证书 15；语音从教育描述开始，先确认再写入。这两步不画语音。下一步按钮进 gen-preview，中间几步同一版式未另画。AI 不可用时可导出原话。号码与服务时间从后台读，读不到不显示。普通页 3 分钟清除。第二轮起这些话只留在说明里，屏上不写条数上限和语音。屏上是表单加意向预览，目标岗位空着显示必填，意向城市和期望薪资写示例值，工作类型空着显示不填写。' },
+    demo: () => window.FR.demo('scratch-1'),
+    render: () => window.FR.render('scratch-1'),
+    mount: (el) => window.FR.mount('scratch-1', el)
   });
-  add('interview', '练面试', '练面试入口', {
-    notes: { does: '一个主动作「马上练一场」，流程三步写清楚；技巧和记录放下面。', motion: '卡片浮入。', keep: '只供本人练习，不做录用判断；记录要登录；麦克风不行随时改打字。' },
-    render: () => F({
-      band: { eyebrow: '练面试 · AI 模拟面试', title: '想练一场面试吗？', sub: '选岗位和面试官，3 到 8 分钟，练完拿一份反馈。', seal: 'idle', path: ['三步设置', '回答问题', '拿到反馈'], pathLabel: '一场练习' },
-      body: `${slab({ i: 0, go: 'iv-1', dark: 1, chip: 'AI 模拟面试', ck: 'ghost', title: '马上练一场', desc: '三步设置好，用说的或打字回答', take: '练习反馈报告（可打印）', vis: UI.report(160) })}
-        <div class="process rise" style="--i:1">${[['clipboard', '三步设置', '岗位、面试官、时长'], ['mic', '回答问题', '说或者打字都行'], ['printer', '拿到反馈', '可以打印带走']].map((p, k) => `<div class="ps"><span class="n">${k + 1}</span><span class="pi">${icon(p[0], 36, 2)}</span><b>${p[1]}</b><small>${p[2]}</small></div>`).join(`<span class="pa">${icon('arrowR', 30, 2.4)}</span>`)}</div>
-        <div class="grid2">${tile({ i: 2, go: 'iv-tips', icon: 'book', title: '面试技巧', desc: '常见问题怎么答' })}${tile({ i: 3, go: 'iv-reports', icon: 'receipt', tone: 'slate', title: '我的练习记录', desc: S().logged ? '共 2 场' : '没登录约保留 2 小时' })}</div>
-        <div class="why rise" style="--i:4">${icon('mic', 32, 2)}<span>想用说的回答，开始前会先试一下麦克风；不行就打字，不影响练习。</span></div>
-        ${fine('练习只供你自己参考，不代表录用结果')}`,
-      dock: { ask: '问小青：第一次练选哪个？' }, nav: 'home'
-    })
+  add('interview', '练面试', '练面试服务台', {
+    notes: {
+      does: '运行页 /interview-service（serviceHubSpecs.interview + QxServiceHubPage）。主入口「马上练一场」去 iv-1，和运行页「开始模拟面试」都是 /interview/setup，不另画第二张卡。面试技巧去 iv-tips，训练报告去 iv-reports，职业自我探索去 sa-intro，职业规划建议去 career。其余四项去 interview-more。',
+      motion: '按下缩小。停用的卡是 div，不是按钮。',
+      keep: '顶栏胶囊只写在线服务：就绪「能力与设备状态以办理时确认为准」；S().fiHub=checking「正在确认在线服务」；fiHub=down「在线服务不可用」。不探测打印机，?printer=down 这页不变。kind ai 在 ?ai=down 或 fiHub=down 时写「AI能力当前不可用」，检查中写「正在确认AI能力状态」。训练报告要在线服务，不可达写「在线服务当前不可用」。面试技巧在离线白名单，仍可进。重新检测只在 fiHub=down，点了变成检查中，不在本屏演成已恢复（演示事件 hub-ready）。免责句用运行页：AI训练不是企业面试 / 不排名，不预测录用。普通页 3 分钟清除。问小青仍在，去 xq。'
+    },
+    render: () => window.FI.hub(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('interview')
   });
   add('iv-1', '练面试', '设置 1：岗位与经验', {
-    before: 'interview',
-    notes: { does: '第 1 步只定「练哪个岗位、你的经验」。岗位能点选也能说。', motion: '选中时卡片底色过渡（120 毫秒）；步骤条填充。', keep: '岗位预设和自由输入都保留；行业须本人确认；上一步回来选择不丢。' },
-    render: () => {
-      const iv = S().iv;
-      return F({
-        band: { kind: 'compact', eyebrow: '练面试 · 第 1 步 / 共 3 步', title: '这次练哪个岗位？', rail: { labels: RAIL.iv, now: 0 }, seal: null },
-        cls: 'tight',
-        body: `<div class="fgroup"><div class="field"><input id="ivRole" value="${iv.role}" placeholder="说或者点下面的岗位"><button class="mic" data-act="toast" data-arg="演示：说话填写">${icon('mic', 38, 2.2)}</button></div>
-          <div class="chips">${D.roles.map(r => `<button aria-pressed="${iv.role === r}" data-act="iv" data-arg="role:${r}">${r}</button>`).join('')}</div></div>
-          <div class="fgroup"><div class="sec-t">行业 <small>根据岗位推荐，点一下确认</small></div>
-          <div class="chips">${D.industries.map(r => `<button aria-pressed="${iv.industry === r}" data-act="iv" data-arg="industry:${r}">${r}</button>`).join('')}<button data-act="toast" data-arg="演示：完整行业清单（20 个）">更多行业 ›</button></div></div>
-          <div class="fgroup"><div class="sec-t">你的工作经验</div>
-          <div class="seg" style="flex-wrap:wrap">${D.exps.map(e => `<button style="flex:1 1 30%" aria-pressed="${iv.exp === e}" data-act="iv" data-arg="exp:${e}">${e}</button>`).join('')}</div></div>
-          <div class="topics"><div class="olist-t" style="padding:0">这个岗位常练的方向（示例）</div><div class="row"><span>自我介绍</span><span>作品和数据</span><span>选题与复盘</span><span>求职动机</span><span>反问环节</span></div></div>
-          <div class="sumline">${icon('check', 30, 2.6)}<span>后面两步不改的话：<b>HR 面试 · 标准难度 · 5 分钟 · 说出来</b></span></div>
-          ${fine('需要打字时，输入框和「下一步」会留在键盘上方')}`,
-        dock: { ask: '问小青：我不知道选哪个岗位', pri: { label: '下一步', go: 'iv-2' } }, nav: null
-      });
-    }
-  });
-
-  add('iv-2', '练面试', '设置 2：面试官与时长', {
-    notes: { does: '第 2 步选面试官；难度和时长有默认值，不改也能走。', motion: '选中面试官时出现对勾、边框变绿。', keep: '五类面试官、三档难度、3/5/8 分钟全部保留。' },
-    render: () => {
-      const iv = S().iv;
-      return F({
-        band: { kind: 'compact', eyebrow: '练面试 · 第 2 步 / 共 3 步', title: '选一位面试官', rail: { labels: RAIL.iv, now: 1 }, seal: null },
-        cls: 'tight',
-        body: `<div class="plist">${D.interviewers.map((p, i) => `<button class="persona" aria-pressed="${iv.who === p.k}" data-act="iv" data-arg="who:${p.k}"><span class="av" style="background:${p.c}">${p.a}</span><span><b>${p.l}</b><small>${p.d}</small><em>常问：${p.q}</em></span><span class="tick">${icon('check', 36, 2.8)}</span></button>`).join('')}</div>
-          <div class="sec-t">难度 <small>默认标准</small></div>
-          <div class="seg tall">${D.diffs.map(d => `<button aria-pressed="${iv.diff === d[0]}" data-act="iv" data-arg="diff:${d[0]}">${d[1]}<small>${d[2]}</small></button>`).join('')}</div>
-          <div class="sec-t">时长 <small>到点自动结束</small></div>
-          <div class="seg tall">${D.durs.map(d => `<button aria-pressed="${iv.dur === d[0]}" data-act="iv" data-arg="dur:${d[0]}">${d[1]}<small>${d[2]}</small></button>`).join('')}</div>`,
-        dock: { backLabel: '上一步', ask: false, pri: { label: '下一步', go: 'iv-3' }, mid: `<button class="askq" data-go="xq"><span class="mic">${icon('mic', 30, 2.2)}</span><span>问小青：选哪位？</span></button>` }, nav: null
-      });
-    }
-  });
-
-  add('iv-3', '练面试', '设置 3：核对开始', {
-    notes: { does: '集中核对一次；哪项不对点「改」回到那一步，已选的不丢。', motion: '无循环动画。', keep: '回答方式进入后检测麦克风；不上传简历也能练；年满 14 周岁提示。' },
-    render: () => {
-      const iv = S().iv, who = D.interviewers.find(p => p.k === iv.who), dif = D.diffs.find(d => d[0] === iv.diff), dur = D.durs.find(d => d[0] === iv.dur);
-      return F({
-        band: { kind: 'compact', eyebrow: '练面试 · 第 3 步 / 共 3 步', title: '核对一下，就开始', rail: { labels: RAIL.iv, now: 2 }, seal: null },
-        cls: 'tight',
-        body: `<div class="sumcard">
-            <div class="r"><span>岗位</span><b>${iv.role} · ${iv.industry} · ${iv.exp}</b><button class="edit" data-go="iv-1">改</button></div>
-            <div class="r"><span>面试官</span><b>${who.l} · ${dif[1]}</b><button class="edit" data-go="iv-2">改</button></div>
-            <div class="r"><span>时长</span><b>${dur[1]}（${dur[2]}）</b><button class="edit" data-go="iv-2">改</button></div></div>
-          <div class="fgroup"><div class="sec-t">怎么回答</div>
-          <div class="seg tall"><button aria-pressed="${iv.mode === 'voice'}" data-act="iv" data-arg="mode:voice">${icon('mic', 30, 2)} 说出来<small>开始前先试麦克风</small></button><button aria-pressed="${iv.mode === 'text'}" data-act="iv" data-arg="mode:text">${icon('keyboard', 30, 2)} 打字<small>任何时候都能用</small></button></div></div>
-          <div class="fgroup"><div class="sec-t">带上简历 <small>可选，题目会更贴近你的经历</small></div>
-          <div class="seg"><button aria-pressed="true">不用</button><button aria-pressed="false" data-act="toast" data-arg="演示：手机扫码传简历">手机传</button><button aria-pressed="false" data-act="toast" data-arg="演示：U 盘选简历">U 盘</button></div></div>
-          <div class="process">${[['mic', '面试官出题', '可以再听一遍'], ['message', '你来回答', '答完点「下一题」'], ['clock', '时间到就结束', '马上出反馈']].map((p, k) => `<div class="ps"><span class="n">${k + 1}</span><span class="pi">${icon(p[0], 34, 2)}</span><b>${p[1]}</b><small>${p[2]}</small></div>`).join(`<span class="pa">${icon('arrowR', 28, 2.4)}</span>`)}</div>
-          ${fine('练习只供你自己参考，不代表录用结果 · 使用 AI 即表示你已年满 14 周岁')}`,
-        dock: { backLabel: '上一步', ask: false, pri: { label: '开始练习', go: 'iv-run', kind: 'pri wide' } }, nav: null
-      });
-    }
-  });
-
-  add('iv-run', '练面试', '面试进行中', {
-    notes: { does: '题目放在最显眼处；回答区在手够得着的地方；倒计时一直可见。', motion: '面试官说话时圆章外圈扩散；回答时声波条跳动；倒计时圆环每秒走一格；时间到自动结束。', keep: '语音不可用随时切打字；到点硬结束；不录音保存。' },
-    render: () => {
-      const iv = S().iv, who = D.interviewers.find(p => p.k === iv.who), q = iv.q;
-      return `<header class="band compact">${UI.flowLines(560)}<div class="halo"></div>${UI.header({ back: false })}
-          <div class="ask" style="flex-direction:column;align-items:stretch;gap:22px;padding-bottom:44px">
-            <div style="display:flex;align-items:center;gap:20px"><span class="seal sm listen" style="background:${who.c};font:700 24px var(--sans)">${who.a}</span><div style="flex:1"><div class="eyebrow">${who.l} · 第 ${q + 1} 题 / 约 5 题</div><div style="font-size:21px;color:var(--mint)">AI 面试官 · 仅供练习</div></div>
-              <div class="timer" id="timer">${UI.ring(1, 132, 10, '#2ee6a8', 'rgba(255,255,255,.14)')}<b id="tleft">${iv.dur}:00</b><small>剩余</small></div></div>
-            <p class="qtext">${D.questions[q]}</p></div></header>
-        <main class="body ${iv.mode === 'voice' ? '' : ''}" id="ivBody">
-          ${iv.mode === 'voice' ? `<div class="transcript" id="ivTx" style="min-height:540px;font-size:30px;line-height:1.7">按住下面的按钮开始回答，松开就停。</div>
-            <div class="mic-wrap" style="margin-top:20px"><button class="mic-big" data-act="ivlisten" style="margin:0">${icon('mic', 64, 2.2)}</button><div class="wave">${'<i></i>'.repeat(11)}</div><span>按住回答</span></div>`
-          : `<div class="fgroup"><label class="sec-t" for="ivText">你的回答</label><textarea id="ivText" style="height:860px;border-radius:28px;border:2px solid rgba(31,158,134,.55);padding:26px;font:500 28px/1.6 var(--sans);background:var(--card);color:var(--ink);resize:none" placeholder="在这里输入回答"></textarea></div>`}
-          <div class="howto">${icon('book', 34, 2)}<span>可以按这四步说：当时的情况 → 你要做的事 → 你怎么做的 → 结果怎样</span></div>
-          <div class="chips" style="justify-content:center"><button data-act="toast" data-arg="演示：再念一遍题目">${icon('sound', 26, 2)} 再听一遍题目</button><button data-act="iv" data-arg="mode:${iv.mode === 'voice' ? 'text' : 'voice'}">${icon(iv.mode === 'voice' ? 'keyboard' : 'mic', 26, 2)} 改成${iv.mode === 'voice' ? '打字' : '说话'}</button></div>
-          ${fine('练习过程不录音保存 · 时间到会自动结束')}</main>
-        ${dock({ back: false, left: `<button class="btn sec" data-act="toast" data-arg="演示：确认后结束，已答部分生成报告">结束练习</button>`, ask: false, pri: { label: q < 4 ? '回答完了，下一题' : '回答完了，看反馈', act: 'ivnext', kind: 'pri wide' } })}`;
+    notes: {
+      does: '运行页 /interview/setup 的岗位、行业、经验。产品负责人要求一屏一问，设置拆成三屏；改程序时运行页按这三步拆。这一屏只问岗位、行业、经验。',
+      motion: '按下缩小。选中只改底色，不做循环动画。行业选择层淡入。',
+      keep: '岗位六条示例从运行页读，不预填：前端开发工程师、行政专员、市场运营、机械工程师、会计、销售代表。自由输入是屏上键盘（演示：弹出系统触摸键盘），最多 50 字。行业是 GB/T 4754-2017 二十个门类，不预选、不推荐；点「选择行业 (20)」打开本屏选择层，不是提示。经验六档，再点一次取消。校验句照运行页：请先填写目标岗位，例如：前端开发工程师、行政专员 / 请先选择本次练习的行业，不会替你预选 / 请先选择你的经验情况，不会替你预选。过了才去 iv-2。先看面试技巧去 iv-tips。设置页没有麦克风。?ai=down 胶囊「AI 暂时不能出题」，这一屏仍可填。默认不改的话后面是 HR 面试、标准面试、5 分钟 / 6 题、文字回答。普通页 3 分钟清除。'
     },
-    mount: (el) => {
-      const iv = S().iv; let left = iv.dur * 60 - 48 - iv.q * 40;
-      const tl = el.querySelector('#tleft'), arc = el.querySelector('#timer .arc');
-      const total = iv.dur * 60, C = parseFloat(arc.getAttribute('stroke-dasharray'));
-      const upd = () => { const m = Math.floor(left / 60), s = left % 60; tl.textContent = `${m}:${String(s).padStart(2, '0')}`; arc.setAttribute('stroke-dashoffset', C * (1 - left / total)); };
-      upd(); const t = setInterval(() => { left = Math.max(0, left - 1); upd(); if (!left) { clearInterval(t); window.go('iv-report'); } }, 1000);
-      return () => clearInterval(t);
-    }
+    render: () => window.FI.iv1(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('iv-1')
   });
-
-  add('iv-report', '练面试', '练习反馈', {
-    notes: { does: '一句总评 + 做得好的三条 + 可以更好的三条 + 每题一句；主动作是打印报告。', motion: '两栏依次浮入。', keep: '标「AI 生成 · 仅供参考」；AI 不可用时给通用题目单，不能装成点评；报告只给本人。' },
-    render: () => F({
-      band: { eyebrow: '练习反馈 · AI 生成，仅供参考', title: D.report.title, sub: `${D.interviewers.find(p => p.k === S().iv.who).l} · ${S().iv.role} · 答了 5 题`, sealHtml: `<div style="flex:none">${UI.report(116)}</div>` },
-      body: `<div class="grid2" style="align-items:stretch">
-          <div class="report-col rise" style="--i:0"><h4 style="color:var(--teal-ink)">${icon('check', 30, 2.6)}做得好的</h4><ul>${D.report.good.map(g => `<li>${g}</li>`).join('')}</ul></div>
-          <div class="report-col rise" style="--i:1"><h4 style="color:var(--clay-ink)">${icon('arrowR', 30, 2.4)}可以更好的</h4><ul>${D.report.better.map(g => `<li>${g}</li>`).join('')}</ul></div></div>
-        <div class="olist rise" style="--i:2"><div class="olist-t">每一题</div>${D.questions.map((q, k) => `<div class="qrow"><span class="no">${k + 1}</span><b>${q}</b><small>${['清楚', '缺少数字', '步骤不全', '动机清楚', '可以多问'][k]}</small></div>`).join('')}</div>
-        <div class="grid2">${tile({ i: 3, go: 'iv-1', icon: 'refresh', title: '再练一场', desc: '换个面试官' })}${tile({ i: 4, go: S().logged ? 'me' : 'login', icon: 'user', tone: 'slate', title: '存到我的', desc: S().logged ? '已登录' : '需要登录' })}</div>
-        ${fine('练习只供你自己参考，不代表录用结果 · 报告 2 页')}`,
-      dock: { backLabel: '回到入口', ask: '问小青：第 2 题怎么答更好？', pri: { label: '打印报告', go: 'confirm', arg: 'report' } }, nav: null
-    })
+  add('iv-2', '练面试', '设置 2：面试官与时长', {
+    notes: {
+      does: '运行页 /interview/setup 的面试官、难度、时长，拆成第 2 屏。运行页本身没有独立路由，改程序时从设置页拆出这一步。',
+      motion: '按下缩小。选中出对勾。',
+      keep: '面试官五类键是 hr / manager / tech / campus / final，说明句照运行页（HR 含薪资沟通），不写「常问」例句。难度：轻松练习、标准面试、压力面试，各带一句说明。时长写真值「3 分钟 / 4 题」「5 分钟 / 6 题」「8 分钟 / 8 题」。默认 HR、标准面试、5 分钟、文字回答；再点已选项也会改说明行，避免看起来没反应。到点不自动交卷。下一步去 iv-3。先看面试技巧去 iv-tips。?ai=down 只改胶囊「AI 暂时不能出题」。普通页 3 分钟清除。'
+    },
+    render: () => window.FI.iv2(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('iv-2')
+  });
+  add('iv-3', '练面试', '设置 3：核对开始', {
+    notes: {
+      does: '运行页 /interview/setup 的核对、简历来源、年龄确认和创建会话。创建会话是后台结果：本屏先进入「正在为你准备面试官…」，演示事件 started 才去 iv-run；start-fail 留在本页。',
+      motion: '按下缩小。确认层淡入。不倒计时演成功。',
+      keep: '三项没填齐时主按钮只写出缺哪一项，不去下一屏。年龄确认、录音同意是本屏变体（演示 consent / voice-consent；开始录音时若还没同意，也弹出录音层）。未满 14 周岁进 age-block，不创建练习。手机扫码上传去 upload，U 盘导入去 usb，app.js 把 S().ctx 设为 resume。隐藏本机文件。已选用简历的文件名从上传结果读，示例「李佳怡-行政专员-简历.pdf」；移除是本屏状态。?ai=down 主按钮换成「打印通用题目单」，三项校验通过后去 pii，不经模型、不看年龄。运行页只有已经有 pendingSession 才印通用题目单；本稿按本轮设计决定，校验通过即可去 pii，改程序时一起改。创建中按钮禁用，不自动跳作答。上传失败、无法提取两句照运行页。使用 AI 即表示你已年满 14 周岁。普通页 3 分钟清除。号码不在这页。'
+    },
+    render: () => window.FI.iv3(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('iv-3')
+  });
+  add('iv-run', '练面试', '作答', {
+    notes: {
+      does: '运行页 /interview/session/:sessionId（InterviewSessionPage、interviewWorkbenchModel、interviewAnswerRecovery）。直接打开这屏是一场进行中的示例；S().fiPhase=expired 是无会话或过期，回 iv-1 重新创建。',
+      motion: '按下缩小。时钟不自动走，演示事件 timeup 才把剩余时间改成 0，并只改文案，不跳报告。录音不自动跳秒；演示事件 rec-full 表示录满 58 秒，只进入转写。',
+      keep: '顶栏写「文字输入始终可用。题目、剩余时间和下一题，都按这场练习显示。」题目、题号、目标题数从本场会话读。目标题数按时长：3 分钟 4 题、5 分钟 6 题、8 分钟 8 题。题旁写「题目由 AI 生成，仅供参考」。默认文字作答。点按开始录音，不是按住；最长 58 秒，到点只停止录音。跳过此题不计入有效回答。不打印回答是开关。结束本场：没有非跳过回答就停在「这一场还没有记下的回答」，可继续答题或离开回服务台；有回答则本屏「正在生成练习报告…」，演示事件 report 才去 iv-report。演示 report 在没有回答时不跳。提交空稿写「请输入回答内容，或选择跳过此题」。提交失败留草稿。AI 停用：有已保存回答写「你的回答已保存，AI 恢复后可以接着生成报告」；没有则不说已保存。稍后再试只再问一次，不演成报告已生成。麦克风权限句改成「需要帮助？拨打服务电话 183-6916-1921」。号码与服务时间从后台读，读不到不显示。语音模式自动播一次当前题，不画「再听一遍」。不画「存到我的」。不报打印机。普通页 3 分钟清除。'
+    },
+    render: () => window.FI.run(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('iv-run')
+  });
+  add('iv-report', '练面试', '练习报告', {
+    notes: {
+      does: '运行页 /interview/report/:sessionId（InterviewReportPage）。这一屏放综合概览、五组能力、风险。预测题、STAR、准备清单、问答摘录去 iv-report-more。',
+      motion: '按下缩小。不自动跳打印。',
+      keep: '不显示等级。标识用运行页原句「AI 生成，仅供参考，只用于本人练习复盘」。岗位、行业、面试官、能力栏、风险从报告读；这一帧句子标「示例」，空数组不补。不写死页数。「生成打印版」先变成「正在生成打印版…」，演示事件 print-ready 才把 S().ctx 设为 report 并去 pii；print-fail 留本页，写「打印版生成失败，请稍后重试」。查看历史报告去 iv-reports。重新练习去 iv-1。S().fiRep=loading / gone 不展示示例句子。结果页 1 分 30 秒清除。下游 confirm 仍写死 2 页和「新媒体运营」，不在本区改。'
+    },
+    render: () => window.FI.report(),
+    mount: (el) => window.FI.bind(el),
+    demo: () => window.FI.demo('iv-report')
   });
   add('print', '打印扫描', '打印 · 扫描 · 复印入口', {
     before: 'print',
-    notes: { does: '运行页打印扫描服务台 PrintScanHomePage / QxPrintHubView（/print-scan）。问句用 HUB_ASK：在线「你的文件，现在在哪？」，打印机离线「这台机器出不了纸。」。', motion: '卡片依次浮入。状态只在顶部胶囊说一次。隐私长文默认折叠。', keep: '眉题「打印扫描服务」。正常胶囊「能力与设备状态以办理时确认」。离线胶囊「打印机离线 · 出纸类暂停」（printerLabel + 出纸类暂停）。意图带四步「选文件 → 材料检查 → 预览与参数 → 核对价格」，不标当前步。运行页服务台现在是三步轴，10/26 产品负责人定统一成这四步，改程序时一起改。复印卡名「复印」，说明：在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单。到机码右上胶囊「不是取件码」，说明一行「凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）」，带走「订单里的打印件」，右下 8 个空格，不写示例码。离线时打印文件、扫描纸质材料呈浅底虚线，徽标写原因；照片打印同样停。手机扫码上传、U 盘导入仍可进，细行「先传、稍后打印」。复印仍可点，说明「打印机离线时复印可能也用不了，以打印机屏幕为准」。到机码离线说明「这台机器现在出不了纸，核销完也拿不到纸；订单还在，请稍后再来。」底部故障句用标准句。服务电话 183-6916-1921。号码与服务时间从后台读，读不到不显示。不写换一台。彩色、双面写「本机暂未开通」。其他工具 3×2：照片打印去 print-src，照片合成 PDF，证件照去 feature-info，签名默认「本机暂未开通」，我的文档、打印订单登录后查看。反馈是当场提示，不进入要登录的意见反馈页。' },
+    notes: { does: '运行页打印扫描服务台 PrintScanHomePage / QxPrintHubView（/print-scan）。问句用 HUB_ASK：在线「你的文件，现在在哪？」，打印机离线「这台机器出不了纸。」。', motion: '卡片依次浮入。状态只在顶部胶囊说一次。隐私长文默认折叠。', keep: '眉题「打印扫描服务」。正常胶囊「能力与设备状态以办理时确认」。离线胶囊「打印机离线 · 出纸类暂停」（printerLabel + 出纸类暂停）。意图带四步「选文件 → 材料检查 → 预览与参数 → 核对价格」，不标当前步。运行页服务台现在是三步轴，10/26 产品负责人定统一成这四步，改程序时一起改。复印卡名「复印」，说明：在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单。到机码右上胶囊「不是取件码」，说明一行「凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）」，带走「订单里的打印件」，右下 8 个空格，不写示例码。离线时打印文件、扫描纸质材料呈浅底虚线，徽标写原因；照片打印同样停。手机扫码上传、U 盘导入仍可进，细行「先传、稍后打印」。复印仍可点，说明「打印机离线时复印可能也用不了，以打印机屏幕为准」。到机码离线说明「这台机器现在出不了纸，核销完也拿不到纸；订单还在，请稍后再来。」底部故障句用标准句。服务电话 183-6916-1921。号码与服务时间从后台读，读不到不显示。不写换一台。彩色、双面写「本机暂未开通」。其他工具 3×2：照片打印去 print-src，照片合成 PDF，证件照去 feature-info，签名默认「本机暂未开通」，我的文档、打印订单登录后查看。反馈留在本屏一层里写，不进入要登录的意见反馈页。S().controlsOn 为真时签名改成可点卡，说明用运行页能力卡「放入本人手写签名」，去 sign；带走句「生成的新 PDF」写在这里，不画上卡。打印机离线时签名仍可点。未开通时灰卡一字不变。' },
     render: () => {
       const off = printerOff();
       const mfp = `<span class="d3-mfpmini">${UI.mfp()}</span>`;
@@ -899,7 +913,7 @@
             ${off ? '<button class="tile off rise" style="--i:5" disabled><span class="ic">' + icon('image', 34, 2) + '</span><span class="tx"><b>照片打印</b><small>打印机离线</small></span></button>' : tile({ i: 5, go: 'print-src', icon: 'image', title: '照片打印', desc: '按照片出纸' })}
             ${tile({ i: 6, go: 'img2pdf', icon: 'layers', title: '照片合成 PDF', desc: '几张照片拼成一个文件' })}
             ${tile({ i: 7, go: 'feature-info', icon: 'idcard', tone: 'clay', title: '证件照', desc: '本机尚未开放 · 看说明' })}
-            <button class="tile off" style="--i:8" disabled><span class="ic">${icon('pen', 34, 2)}</span><span class="tx"><b>签名</b><small>本机暂未开通</small></span></button>
+            ${S().controlsOn ? tile({ i: 8, go: 'sign', icon: 'pen', tone: 'clay', title: '签名', desc: '放入本人手写签名' }) : `<button class="tile off" style="--i:8" disabled><span class="ic">${icon('pen', 34, 2)}</span><span class="tx"><b>签名</b><small>本机暂未开通</small></span></button>`}
             ${tile({ i: 9, go: 'my-docs', icon: 'folder', tone: 'slate', title: '我的文档', desc: '登录后查看' })}
             ${tile({ i: 10, go: 'my-orders', icon: 'receipt', tone: 'slate', title: '打印订单', desc: '登录后查看' })}
           </div>
@@ -911,11 +925,29 @@
               <p>证件照、身份证等敏感文件仅用于本次打印/扫描,完成后按隐私策略自动清理,不长期留存;打印前隐私检查时,扫描件/图片可能通过第三方 OCR 服务识别文字。</p>
               <p>签名仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。</p>
             </details>
-            <button class="d3-mini" data-act="toast" data-arg="不用登录也能反馈。写完留在这一页。">反馈问题</button>
+            <button class="d3-mini" data-fm="fb">反馈问题</button>
           </div>`,
         cls: off ? 'print-off d3-print' : 'd3-print',
         dock: { backLabel: '上一步', ask: '问小青：怎么选打印方式 →' }, nav: 'home', navAdvisor: 1
-      });
+      }) + (S().fmFeedback ? window.FM.feedback(S().fmFeedback) : '');
+    },
+    mount: (el) => {
+      const on = (e) => {
+        const b = e.target.closest('[data-fm]');
+        if (b && el.contains(b)) {
+          const k = b.getAttribute('data-fm');
+          if (k === 'fb') { e.stopPropagation(); S().fmFeedback = true; window.__proto.refresh(); return; }
+          if (k === 'fbsend') { e.stopPropagation(); S().fmFeedback = 'sent'; window.__proto.refresh(); return; }
+          if (k === 'fbclose') { e.stopPropagation(); S().fmFeedback = false; window.__proto.refresh(); return; }
+        }
+        if (e.target.classList && e.target.classList.contains('overlay')) {
+          e.stopPropagation();
+          S().fmFeedback = false;
+          window.__proto.refresh();
+        }
+      };
+      el.addEventListener('click', on);
+      return () => el.removeEventListener('click', on);
     }
   });
   function codeArt() { return `<div class="codeart" aria-hidden="true">${'<i></i>'.repeat(8)}</div>`; }
@@ -927,18 +959,29 @@
   }
 
   add('print-src', '打印扫描', '文件在哪', {
-    notes: { does: '运行页文档打印选文件 PrintUploadPage / FileSourceView（/print/upload）。一个问题：文件在哪。第三张大卡是纸质原件，去扫描工作台 scan-type（运行页 /scan）。我的文档收成下面的细行。', motion: '卡片依次浮入。', keep: '大小行写「手机上传不超过 10MB · U 盘不超过 15MB」。一体机隐藏本机选文件（PrintUploadPage.tsx:202-203），这一屏不写本机。能打印的文件三列：PDF、图片、Word（转换暂未开放），不留空的第 4 格。不写 HEIC。我的文档本页就能点，登录门在下一页。' },
+    notes: { does: '运行页文档打印选文件 PrintUploadPage / FileSourceView（/print/upload）。一个问题：文件在哪。第三张大卡是纸质原件，去扫描工作台 scan-type（运行页 /scan）。我的文档收成下面的细行。', motion: '卡片依次浮入。', keep: '大小行写「手机上传不超过 10MB · U 盘不超过 15MB」。一体机隐藏本机选文件（PrintUploadPage.tsx:202-203），这一屏不写本机。能打印的文件三列：PDF、图片、Word（转换暂未开放），不留空的第 4 格。不写 HEIC。细行说明是运行页事实「手机小程序里登录后传过的 PDF、图片，登录这台机器后在我的文档里选」。这句属「手机上能看到」，小程序发布前由开关 support.miniappPublished 收起，不显示。已登录去 my-docs，并写 S().ctx 为 print，让那一屏进「选一份来打印」。未登录去 login，并写 S().fmLoginBack 为 print-src，登录后回到这一页。本页不画多选文件盘。' },
     render: () => F({
       band: { eyebrow: '文档打印', title: '文件在哪里？', rail: { labels: RAIL.print, now: 0 }, seal: 'idle', place: ' ', status: printerOff() ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' } },
       body: `${slab({ i: 0, row: 1, go: 'upload', arg: 'print', title: '手机扫码上传', desc: '不用登录、不用装软件。单份不超过 10MB', vis: UI.phone(78) })}
         ${slab({ i: 1, row: 1, go: 'usb', arg: 'print', title: 'U 盘导入', desc: '只读根目录，只读取你主动选择的文件', vis: UI.usb(120) })}
         ${slab({ i: 2, row: 1, go: 'scan-type', title: '是纸质的 · 放到打印机上扫描', desc: '扫描纸质原件，扫成 PDF 后可以存、可以打', vis: UI.scanPaper(120) })}
-        <button class="rowlink rise" style="--i:3" data-go="my-docs">${icon('folder', 32, 2)}<span><b>我的文档</b> <small>· 最近打印。登录后查看</small></span><span class="chev">${icon('chevR', 28, 2.2)}</span></button>
+        <button class="rowlink rise fm-doc" style="--i:3" data-fm="docs" data-go="${S().logged ? 'my-docs' : 'login'}">${icon('folder', 32, 2)}<span><b>我的文档</b> <small>手机小程序里登录后传过的 PDF、图片，登录这台机器后在我的文档里选</small></span><span class="chev">${icon('chevR', 28, 2.2)}</span></button>
         <div class="fmt rise" style="--i:4"><div class="olist-t">能打印的文件</div><div class="fmtrow d3-fmt3"><span><b>PDF</b><small>.pdf</small></span><span><b>图片</b><small>.jpg  .png</small></span><span class="no"><b>Word</b><small>转换暂未开放，请另存为 PDF</small></span></div><small>手机上传不超过 10MB · U 盘不超过 15MB</small></div>
         ${fine('结束办理或闲置超时会清除本机临时信息；已上传文件按留存期限管理。')}`,
       cls: 'd3-src',
       dock: { backLabel: '上一步', ask: '问小青：这份文件怎么检查 →' }, nav: 'home', navAdvisor: 1
-    })
+    }),
+    mount: (el) => {
+      S().ctx = 'print';
+      const on = (e) => {
+        const row = e.target.closest('[data-fm="docs"]');
+        if (!row || !el.contains(row)) return;
+        if (S().logged) S().ctx = 'print';
+        else S().fmLoginBack = 'print-src';
+      };
+      el.addEventListener('click', on);
+      return () => el.removeEventListener('click', on);
+    }
   });
   add('pii', '打印扫描', '隐私确认', {
     notes: { does: '运行页材料检查 PrintMaterialCheckPage / MaterialCheckPresentation（打印流程第 2 步）。有命中时逐处选择遮挡或保留。示例 2 处：第 1 页身份证号（高风险）370202********2316、第 2 页手机号（中风险）138****5621。处数、页码、掩码都从检查结果读。', motion: '无循环动画。点遮挡或保留后按钮压下，没决定完主按钮保持禁用。', keep: '上方预检写「格式、大小、页数、图片清晰度已检查 · 不做 AI 判断」。未决定时写「还没决定 · 请选择保留或遮挡，下一步可以逐页核对」。计数「已决定 0 / 2 · 保留 0 处 · 遮挡 0 处」和「还有 2 处等你决定」随选择变。解释用运行页原句：「保留：这一处原样印在纸上。」「遮挡：另生成一份把这一处涂黑的文件，打印用这一份；你上传的原文件不变。」批量按钮「按风险建议处理」：高、中风险标遮挡，低风险标保留。示例两处都不是低风险，所以两处都遮挡。旁边是「全部保留」。主按钮「下一步：预览与参数」在没决定完时禁用。不印完整证件号。' },
@@ -959,7 +1002,7 @@
         band: { kind: 'compact', eyebrow: '材料检查', title: '有 2 处要你拿主意', sub: '第 2 步 / 共 4 步 · 逐处选择遮挡或保留', rail: { labels: RAIL.print, now: 1 }, seal: null, place: ' ', status: left ? { text: `还有 ${left} 处待确认`, warn: 1 } : { text: '每一处都已决定' } },
         cls: 'd3-pii',
         body: `<div class="howto">${icon('shield', 34, 2)}<span>格式、大小、页数、图片清晰度已检查 · 不做 AI 判断</span></div>
-          <div class="preview">${UI.resume(120, 'plain')}<div><b class="d3-fname">毕业生就业推荐表（已填写）<span class="d3-ext">.pdf</span></b><span>共 2 页 · 186 KB</span></div></div>
+          <div class="preview">${UI.resume(120, 'plain')}<div>${window.FM.printName()}<span>${window.FM.printMeta()}</span></div></div>
           <div class="d3-finds">${rows.map((r, i) => `<div class="d3-find"><div class="tx"><b>${r[0]}</b><small>${stateLine(i)}</small></div><div class="acts">${choice(i, 'keep', '保留')}${choice(i, 'redact', '遮挡')}</div></div>`).join('')}</div>
           <p class="d3-count">已决定 ${decided} / ${rows.length} · 保留 ${kept} 处 · 遮挡 ${redacted} 处</p>
           <p class="d3-opt">${left ? `还有 ${left} 处等你决定` : '每一处都已决定，可以去预览与参数'}</p>
@@ -1003,14 +1046,14 @@
       return F({
         band: { kind: 'compact', eyebrow: '预览与参数', title: '部分打印能力暂未开通', sub: '第 3 步 / 共 4 步 · 核对内容与参数，下一步看价格', rail: { labels: RAIL.print, now: 2 }, seal: null, place: ' ', status: off ? { text: '打印机离线', warn: 1 } : { text: '打印机在线' } },
         cls: 'tight d3-prev' + (more ? ' d3-more-on' : ''),
-        body: `<div class="preview"><div style="display:flex;gap:24px;align-items:center">${UI.resume(more ? 96 : 150, 'plain')}<div style="display:flex;flex-direction:column;gap:8px;font-size:22px;color:var(--ink-2)"><b class="d3-fname">毕业生就业推荐表（已填写）<span class="d3-ext">.pdf</span></b><span>共 2 页 · 186 KB</span></div></div></div>
+        body: `<div class="preview"><div style="display:flex;gap:24px;align-items:center">${UI.resume(more ? 96 : 150, 'plain')}<div style="display:flex;flex-direction:column;gap:8px;font-size:22px;color:var(--ink-2)">${window.FM.printName()}<span>${window.FM.printMeta()}</span></div></div></div>
           <div class="d3-sug">
             <div class="tx"><b>按文件事实给出的参数建议</b><p>按文件页数和纸张计算；采用后仍可修改。</p><div class="d3-sug-items"><span>颜色 · 黑白</span><span>单双面 · 单面</span><span>份数 · 1 份</span></div></div>
             <button class="d3-mini" data-d3="adopt">采用这些建议</button>
           </div>
           <div class="d3-facts"><b>总打印面 ${faces} 面</b><b>预计用纸 ${sheets} 张</b></div>
           ${p.duplex === 'double' ? `<p class="d3-opt">双面比单面预计少用 ${save} 张纸</p>` : ''}
-          <div class="pager"><button aria-label="上一页">${icon('chevL', 30, 2.4)}</button><span>第 1 页 / 共 2 页</span><button aria-label="下一页">${icon('chevR', 30, 2.4)}</button></div>
+          <div class="pager"><button aria-label="上一页" data-d3="page" data-arg="-1" ${(S().pvPage || 1) <= 1 ? 'disabled' : ''}>${icon('chevL', 30, 2.4)}</button><span>第 ${S().pvPage || 1} 页 / 共 2 页</span><button aria-label="下一页" data-d3="page" data-arg="1" ${(S().pvPage || 1) >= 2 ? 'disabled' : ''}>${icon('chevR', 30, 2.4)}</button></div>
           <div class="params">
             <div class="prow"><span>份数</span><div class="d3-stepx"><button data-d3="copies" data-arg="-10" aria-label="少十份" ${n <= 1 ? 'disabled' : ''}>−10</button><button data-d3="copies" data-arg="-1" aria-label="少一份" ${n <= 1 ? 'disabled' : ''}>${icon('minus', 34, 2.6)}</button><output id="copies">${n}</output><button data-d3="copies" data-arg="1" aria-label="多一份" ${n >= 99 ? 'disabled' : ''}>${icon('plus', 34, 2.6)}</button><button data-d3="copies" data-arg="10" aria-label="多十份" ${n >= 99 ? 'disabled' : ''}>+10</button><span class="d3-cap">可选 1–99 份</span></div></div>
             <div class="prow"><span>颜色</span><div class="seg"><button aria-pressed="${p.color !== 'color'}">黑白</button><button disabled>彩色</button></div></div>
@@ -1038,6 +1081,9 @@
           const n = Math.min(99, Math.max(1, (S().print.copies || 1) + (+b.dataset.arg)));
           S().print.copies = n;
           window.__proto.refresh();
+        } else if (b.dataset.d3 === 'page') {
+          S().pvPage = Math.min(2, Math.max(1, (S().pvPage || 1) + (+b.dataset.arg)));
+          window.__proto.refresh();
         } else if (b.dataset.d3 === 'more') {
           S().more = !S().more;
           window.__proto.refresh();
@@ -1056,10 +1102,10 @@
   });
 
   add('confirm', '打印扫描', '核对并打印', {
-    notes: { does: '运行页核对价格 PrintConfirmPage。直接打开这一屏时 S.ctx 默认是简历来路，示例走简历是正常的。本屏画的是 0 元单：核对打印内容，确认后直接打印。', motion: '无循环动画。', keep: '只有这一态写「免费试运营，本单 0 元」。不逐行改，退回用「返回修改」。问小青写「问小青：核对这单」，避免被截断。打印机离线时按钮写「打印机离线」。另外三种状态本屏不画，运行页有：非 0 元才有权益，核销失败时按钮是「去我的权益 / 按实际原价继续」（PrintConfirmPage.tsx:600-603）。本机没开通的彩色或双面会改成黑白或单面再报价，并逐项说明。同一份交接已经建过单时不再建第二单，已建单那一屏给「我的打印订单」和「回到这一单」。' },
+    notes: { does: '运行页核对价格 PrintConfirmPage。直接打开这一屏时 S.ctx 默认是简历来路，示例走简历是正常的。本屏默认画 0 元单：核对打印内容，确认后直接打印。S().fee 为真时画收费点位。', motion: '无循环动画。', keep: '0 元才写「免费试运营，本单 0 元」，主按钮「确认并打印」去 printing。S().fee 为真时费用行写「应付 2.00 元」，小字「金额以订单为准」，数字「2.00 元」，不写免费；金额从订单读，示例不代表价目。打印机在线且金额大于 0 时主按钮「去付款」去 cashier。打印机离线时按钮仍是「打印机离线」，不送去收银台。不逐行改，退回用「返回修改」。问小青写「问小青：核对这单」，避免被截断。另外三种状态本屏不画，运行页有：非 0 元才有权益，核销失败时按钮是「去我的权益 / 按实际原价继续」（PrintConfirmPage.tsx:600-603）。本机没开通的彩色或双面会改成黑白或单面再报价，并逐项说明。同一份交接已经建过单时不再建第二单，已建单那一屏给「我的打印订单」和「回到这一单」。' },
     render: () => {
-      const p = S().print, ctx = S().ctx, off = printerOff();
-      const name = ctx === 'report' ? '面试练习报告-新媒体运营.pdf' : ctx === 'resume' ? '李佳怡-简历（改后）.pdf' : ctx === 'policy' ? '材料清单-高校毕业生一次性求职创业补贴.pdf' : '毕业生就业推荐表（已填写）.pdf';
+      const p = S().print, ctx = S().ctx, off = printerOff(), charged = !!S().fee;
+      const name = ctx === 'report' ? '面试练习报告-新媒体运营.pdf' : ctx === 'resume' ? '李佳怡-简历（改后）.pdf' : ctx === 'policy' ? '材料清单-高校毕业生一次性求职创业补贴.pdf' : (S().printDoc && S().printDoc.name) || '毕业生就业推荐表（已填写）.pdf';
       const pages = ctx === 'report' ? 2 : ctx === 'resume' || ctx === 'policy' ? 1 : 2;
       const sheets = p.duplex === 'double' ? Math.ceil(pages / 2) * p.copies : pages * p.copies;
       const art = ctx === 'report' ? UI.report(300) : ctx === 'policy' ? UI.checklist(300) : UI.resume(300, ctx === 'resume' ? 'fixed' : 'plain');
@@ -1072,26 +1118,38 @@
             <div class="r"><span>页数</span><b>${pages} 页 × ${p.copies} 份</b><span></span></div>
             <div class="r"><span>设置</span><b>${p.color === 'bw' ? '黑白' : '彩色'} · ${p.duplex === 'double' ? '双面' : '单面'} · A4</b><span></span></div>
             <div class="r"><span>用纸</span><b>${sheets} 张</b><span></span></div></div></div>
-          <div class="fee rise" style="--i:1"><div><b>费用</b><div style="font-size:22px;color:var(--ink-2)">免费试运营，本单 0 元</div></div><span class="num">0 元</span></div>
+          ${charged ? '<div class="fee rise" style="--i:1"><div><b>应付 2.00 元</b><div style="font-size:22px;color:var(--ink-2)">金额以订单为准</div></div><span class="num">2.00 元</span></div>' : '<div class="fee rise" style="--i:1"><div><b>费用</b><div style="font-size:22px;color:var(--ink-2)">免费试运营，本单 0 元</div></div><span class="num">0 元</span></div>'}
           <div class="remind rise" style="--i:2;background:var(--teal-wash);color:var(--teal-ink)">${icon('printer', 34, 2)}<span>提交后请留在机器旁，任务确认后自动开始打印。</span></div>
           ${fine('隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。')}`,
-        dock: { backLabel: '返回修改', ask: '问小青：核对这单', pri: { label: off ? '打印机离线' : '确认并打印', go: 'printing', kind: 'pri wide', disabled: off } }, nav: null, navAdvisor: 1
+        dock: { backLabel: '返回修改', ask: '问小青：核对这单', pri: { label: off ? '打印机离线' : (charged ? '去付款' : '确认并打印'), go: off || !charged ? 'printing' : 'cashier', kind: 'pri wide', disabled: off } }, nav: null, navAdvisor: 1
       });
     }
   });
   add('printing', '打印扫描', '出纸中', {
-    notes: { does: '运行页打印进度。进页先说正在确认任务状态。只有服务端回报正在打印才写正在出纸。', motion: '插画只保留机身，不做出纸动画，不自己走到完成。', keep: '四段是提交任务、排队等待、打印中、完成取件。当前段是「提交任务」，完成段在进行中不点亮。说明「纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。」文件卡写「2 张 · 黑白 · 单面 · 1 份」和订单号 ORD-20261026-0418，都从这一单读。底部导航中间一项是「AI 顾问」。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '打印进度', title: '正在确认任务状态', sub: '任务已提交，正在读取终端状态，请留在机器旁', seal: null, place: ' ', status: { text: '正在确认任务状态' } },
-      cls: 'printing d3-printing',
-      body: `<div class="d3-psec"><b>打印进度</b><span>状态来自打印服务，每 3 秒更新</span></div>
+    notes: { does: '运行页打印进度。进页先说正在确认任务状态。只有服务端回报正在打印才写正在出纸。演示事件 done 去 done，unconfirmed 去 unconfirmed。45 秒没有新进度留在本屏。', motion: '插画只保留机身，不做出纸动画，不自己走到完成。', keep: '四段是提交任务、排队等待、打印中、完成取件。当前段是「提交任务」，完成段在进行中不点亮。默认说明「纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。」文件卡写「2 张 · 黑白 · 单面 · 1 份」和订单号 ORD-20261026-0418，都从这一单读。S().fmQuiet 为真时，进度条不改成失败，也不报成功。说明改成看出纸口，并给服务电话 183-6916-1921。号码与服务时间从后台读，读不到不显示。这一态不是失败，大约 10 分钟后由服务端收口。运行页原文在 printProgressModel.ts 第 235 到 236 行，其中的现场求助口径本稿不沿用。底部这一页没有导航。' },
+    render: () => {
+      const quiet = !!S().fmQuiet;
+      return F({
+        band: { kind: 'compact', eyebrow: '打印进度', title: '正在确认任务状态', sub: '任务已提交，正在读取终端状态，请留在机器旁', seal: null, place: ' ', status: { text: '正在确认任务状态' } },
+        cls: 'printing d3-printing' + (quiet ? ' fm-q' : ''),
+        body: `<div class="d3-psec"><b>打印进度</b><span>状态来自打印服务，每 3 秒更新</span></div>
         <div class="d3-psteps" id="pst"><div class="s on"><span class="n">1</span><b>提交任务</b><em>完成</em><small>已创建打印任务，本次无需支付</small></div><div class="s now"><span class="n">2</span><b>排队等待</b><em>确认中</em><small>正在确认这台机器有没有领到任务</small></div><div class="s"><span class="n">3</span><b>打印中</b><em>未开始</em><small>终端开始打印后才会出纸</small></div><div class="s"><span class="n">4</span><b>完成取件</b><em>未开始</em><small>确认完成后自动转到取件核对</small></div></div>
         <div class="printer-wrap"><div class="printer">${UI.mfp()}</div></div>
-        <p class="d3-pend">任务还没打完，完成后才能结束清空。这一页不会自己报成功。</p>
-        <p class="fine" id="pmsg">纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。</p>
-        <div class="filecard"><span class="ft">PDF</span><div><b class="d3-fname">毕业生就业推荐表（已填写）<span class="d3-ext">.pdf</span></b><small>2 张 · 黑白 · 单面 · 1 份 · 订单号 ORD-20261026-0418</small></div></div>`,
-      dock: { back: false, ask: '问小青：取纸或异常怎么办' }, nav: null, navAdvisor: 1
-    })
+        ${quiet ? '<p class="d3-pend">超过 45 秒没有新进度。这一页不会把它记成失败，也不会自己报成功。</p><p class="fm-quiet" id="pmsg">这台机器暂时没有回报打印进度，请看出纸口。需要帮助？拨打服务电话 183-6916-1921。</p>' : '<p class="d3-pend">任务还没打完，完成后才能结束清空。这一页不会自己报成功。</p><p class="fine" id="pmsg">纸从打印机出纸口出来。超过 45 秒没有新进度，这里会说明下一步怎么办。</p>'}
+        <div class="filecard"><span class="ft">PDF</span><div>${window.FM.printName()}<small>2 张 · 黑白 · 单面 · 1 份 · 订单号 ORD-20261026-0418</small></div></div>`,
+        dock: { back: false, ask: '问小青：取纸或异常怎么办' }, nav: null, navAdvisor: 1
+      });
+    },
+    demo: [{ label: '演示：出纸完成', ev: 'done' }, { label: '演示：打印机没有回报', ev: 'unconfirmed' }, { label: '演示：45 秒没有新进度', ev: 'quiet' }],
+    mount: (el) => {
+      const on = (e) => {
+        if (e.detail === 'done') window.go('done');
+        else if (e.detail === 'unconfirmed') window.go('unconfirmed');
+        else if (e.detail === 'quiet') { S().fmQuiet = true; window.__proto.refresh(); }
+      };
+      el.addEventListener('proto-demo', on);
+      return () => el.removeEventListener('proto-demo', on);
+    }
   });
 
   add('done', '打印扫描', '取件', {
@@ -1105,13 +1163,13 @@
         <div class="tiles3">
           ${tile({ go: 'my-orders', icon: 'receipt', title: '查看打印订单', desc: '这一单的记录' })}
           ${tile({ go: 'help', icon: 'help', title: '使用帮助', desc: '常见问题、服务电话' })}
-          ${tile({ act: 'toast', arg: '不用登录也能反馈。写完留在这一页。', icon: 'message', tone: 'slate', title: '反馈问题', desc: '不用登录也能写' })}
+          ${tile({ icon: 'message', tone: 'slate', title: '反馈问题', desc: '不用登录也能写' }).replace('<button ', '<button data-fl="fb" ')}
         </div>
         <button class="btn sec" data-go="print-src" style="height:80px">再印一份</button>
         <p class="fine" style="margin-top:-6px">重新选文件后再确认。免费试运营。</p>
         ${fine('需要帮助？拨打服务电话 183-6916-1921。不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时。')}`,
       dock: { back: false, ask: '问小青：怎么取纸', left: `<div class="cdring">${UI.ring(1, 96, 8)}<b id="cd">60</b></div>`, mid: `<button class="btn danger wide" id="endUse" style="flex:1">${icon('erase', 32, 2.2)}我拿走了，结束使用</button>` }, nav: null, navAdvisor: 1
-    }),
+    }) + window.FM.layerFor(['done']),
     mount: (el) => {
       let n = 60, stopped = false;
       const b = el.querySelector('#cd'), arc = el.querySelector('.cdring .arc'), end = el.querySelector('#endUse');
@@ -1139,7 +1197,7 @@
     }
   });
   add('pickup', '打印扫描', '输入到机码', {
-    notes: { does: '运行页到机码核销 PrintPickupClaimPage。屏上数字键盘输入到机码，输满后确认校验。键盘下方有「历史 10 位码」切换和「用扫码枪扫」说明。', motion: '每输一位格子亮起；码不对时格子左右轻晃两下（320 毫秒）。', keep: '胶囊「到机码验证」（PrintPickupClaimPage.tsx:283）。不写演示口令，不把说明卡上的数字画成可核销的码。不引导未发布的小程序路径。原句「这一步不收钱 · 输错可以改，不作废」放在键盘下方。历史码运行页是「输入历史码」，10 位，字母不含 0、O、1、I、L，按钮「← 回到 8 位新码键盘」。整副字母键盘会挤出这一屏，只做 10 格切换和一行说明，数字键仍可输入。app.js 的 key 动作把长度封在 8，历史码这一态在本屏截下按键，自己计到 10 位。扫码说明用运行页原句：不用手输，把手机上的码对准机身侧面的扫码区；手机亮度调高，再凑近扫码区（PrintPickupClaimPage.tsx:473-475）。点「用扫码枪扫」在说明卡里展开这句，不另加一块高度。' },
+    notes: { does: '运行页到机码核销 PrintPickupClaimPage。屏上数字键盘输入到机码，输满后确认校验。键盘下方有「历史 10 位码」切换和「用扫码枪扫」说明。', motion: '每输一位格子亮起；码不对时格子左右轻晃两下（320 毫秒）。', keep: '胶囊「到机码验证」（PrintPickupClaimPage.tsx:283）。不写演示口令，不把说明卡上的数字画成可核销的码。原句「这一步不收钱 · 输错可以改，不作废」放在键盘下方，后面加手机到店单：「在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付」。这句属「手机上能看到」，小程序发布前由开关 support.miniappPublished 收起，不显示。运行页 PickupHidGuide.tsx 第 81 行「打开小程序里的到机码页面」目前没走这个开关，改程序时补上；这一句本稿不画在屏上。历史码运行页是「输入历史码」，10 位，字母不含 0、O、1、I、L，按钮「← 回到 8 位新码键盘」。整副字母键盘会挤出这一屏，只做 10 格切换和一行说明，数字键仍可输入。app.js 的 key 动作把长度封在 8，历史码这一态在本屏截下按键，自己计到 10 位。扫码说明用运行页原句：不用手输，把手机上的码对准机身侧面的扫码区；手机亮度调高，再凑近扫码区（PrintPickupClaimPage.tsx:473-475）。点「用扫码枪扫」在说明卡里展开这句，不另加一块高度。' },
     render: () => {
       const legacy = !!S().legacy, hid = !!S().hid, n = legacy ? 10 : 8;
       return F({
@@ -1155,7 +1213,7 @@
             <button class="d3-mini" data-d3="hid" aria-pressed="${hid ? 'true' : 'false'}">用扫码枪扫</button>
           </div>
           ${legacy ? '<p class="d3-note2">历史码 10 位，字母不含 0、O、1、I、L。这一屏不铺整副字母键盘。</p>' : ''}
-          <p class="fine">这一步不收钱 · 输错可以改，不作废</p>`,
+          <p class="fine">这一步不收钱 · 输错可以改，不作废。在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付</p>`,
         dock: { ask: '问小青：到机码怎么找 →', pri: { label: '确认校验', act: 'code', id: 'codeGo', disabled: true } }, nav: null, navAdvisor: 1
       });
     },
@@ -1225,111 +1283,94 @@
     }
   });
   add('scan-type', '打印扫描', '扫描：选类型', {
-    notes: { does: '先问扫成什么：简历扫完可以直接诊断。', motion: '卡片浮入。', keep: '网页不能远程启动扫描，要在打印机面板上按；三种类型都保留。' },
-    render: () => F({
-      band: { eyebrow: '扫描纸质材料', title: '要扫的是什么？', rail: { labels: RAIL.scan, now: 0 }, seal: 'idle' },
-      cls: 'big-rows',
-      body: `${slab({ i: 0, row: 1, go: 'scan-guide', title: '简历', desc: '扫完可以直接让小青诊断', take: '扫描件 + 诊断', vis: UI.resume(96, 'plain') })}
-        ${slab({ i: 1, row: 1, go: 'scan-guide', title: '证件、证书', desc: '扫成 PDF，可以存、可以打', take: 'PDF 扫描件', vis: UI.idcard(130) })}
-        ${slab({ i: 2, row: 1, go: 'scan-guide', title: '其他材料', desc: '表格、证明、成绩单', take: 'PDF 扫描件', vis: UI.stack(96, 2) })}
-        ${fine('扫描件只用于这次办理 · 不登录不会存进「我的文档」')}`,
-      dock: { ask: '问小青：扫描和复印有什么不同？' }, nav: 'home'
-    })
+    notes: {
+      does: '对应 /scan 选类型。三张卡只改选中：简历扫描、证件扫描、普通文档。主按钮才建立这次扫描。',
+      motion: '无。',
+      keep: '顶栏「可创建扫描任务 · 需面板操作」。正在确认、暂未开放、读不到用 fsGate；扫描到 U 盘整页用 fsUsb，并写暂未开通。不预告生成 PDF。未登录不进我的文档。直接打开本屏是放行态。从这里点下一步会把指引设成先确认授权。顶栏返回、问小青、底部导航离开时先记下要撤销未完成任务。小青不可用时仍可手动选。出错停在暂未开放或读不到，主路改去上传文件。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除，屏上不演倒计时。'
+    },
+    demo: () => window.FS.scanTypeDemo(),
+    render: () => window.FS.scanType(),
+    mount: (el) => window.FS.mount(el)
   });
-
-  add('scan-guide', '打印扫描', '扫描：在打印机上操作', {
-    notes: { does: '把要在打印机面板上做的三步讲清楚，屏幕这边等着。', motion: '三步依次高亮循环，提示现在该做哪一步（4 秒换一步）。', keep: '本机扫描码有效期；扫描在面板上启动，屏幕不假装能远程启动；多页用自动输稿器（50 页）。' },
-    render: () => F({
-      band: { eyebrow: '扫描纸质材料', title: '在打印机上按三步', sub: '这台机器的扫描要在打印机面板上开始。', rail: { labels: RAIL.scan, now: 1 }, seal: null },
-      cls: 'even',
-      body: `<div class="sggrid"><div class="sgart">${UI.scanPaper(300)}</div>
-          <div class="steps3 big" id="sgSteps" style="grid-template-columns:1fr"><div class="s on"><span class="n">1</span><b>掀开上盖，纸面朝下放</b><small>对齐玻璃左上角的箭头</small></div><div class="s"><span class="n">2</span><b>在面板上点「扫描」</b><small>选「扫描到电脑」</small></div><div class="s"><span class="n">3</span><b>按绿色开始键</b><small>扫完屏幕这边会自动显示</small></div></div></div>
-        <div class="howto">${icon('layers', 34, 2)}<span>好几页？放进上方的自动输稿器，一次最多 50 页。</span></div>
-        <div class="livebox">${icon('clock', 36, 2)}<div><b>屏幕在等打印机传回扫描件</b><small>这次扫描 7 分钟内有效</small></div></div>
-        ${fine('扫完记得取回原件')}`,
-      dock: { ask: '问小青：面板上找不到扫描', pri: { label: '演示：扫完了', go: 'scan-wait' } }, nav: null
-    }),
-    mount: (el) => { let k = 0; const s = el.querySelectorAll('#sgSteps .s'); const t = setInterval(() => { s[k].classList.remove('on'); k = (k + 1) % 3; s[k].classList.add('on'); }, 4000); return () => clearInterval(t); }
+  add('scan-guide', '打印扫描', '扫描：扫描指引', {
+    notes: {
+      does: '对应 /scan?stage=settings。直接打开是已授权的面板步骤；从选类型进来先停在投递授权未确认。',
+      motion: '有效期数字每秒改一格，只改文字，不循环高亮。',
+      keep: '步骤用下发原文，菜单是「扫描到 SMB」。屏上「回到本屏幕」写成「回到这台机器」。屏上不放示意图，也不写改程序时统一；下发示意图的菜单名是「扫描到 网络文件夹」，和步骤不一致，改程序时统一。普通文档原文里的「自动生成 PDF」原样留在步骤里，屏上不再另写两句不一致；结果页不把 PDF 当保证。有效期 10 分钟。不写输稿器页数上限。创建中、创建失败、过期用 fsGuide。安全重扫只写带着凭据申请，不写已经放行。主按钮「我已操作，开始等待」。顶栏返回、问小青、底部导航离开会撤销未完成任务。小青不可用时仍按步骤手动操作。失败可重新建立或回选类型。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除。'
+    },
+    demo: () => window.FS.scanGuideDemo(),
+    render: () => window.FS.scanGuide(),
+    mount: (el) => window.FS.mount(el)
   });
   add('scan-wait', '打印扫描', '扫描：等回传', {
-    notes: { does: '告诉人打印机已经在扫、文件正在传回来。', motion: '扫描光从上到下扫过纸面。', keep: '超时没回传 → 重扫或另建任务，两者区分清楚。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '扫描纸质材料', title: '正在接收扫描件', rail: { labels: RAIL.scan, now: 2 }, seal: null },
-      cls: 'even',
-      body: `<div class="reader" style="width:560px;height:792px">${UI.resume(560, 'plain').replace('paper-shadow', '')}<div class="scanline"></div></div>
-        <div class="livebox"><span class="spin"></span><div><b>打印机正在把扫描件传过来</b><small>通常 10 秒左右</small></div></div>
-        ${fine('超过 1 分钟没收到？可以重扫一次')}`,
-      dock: { back: false, ask: false, pri: { label: '演示：收到了', go: 'scan-result', kind: 'pri wide' } }, nav: null
-    }),
-    mount: () => { const t = setTimeout(() => window.go && window.go('scan-result'), 3800); return () => clearTimeout(t); }
+    notes: {
+      does: '对应 /scan?stage=progress。已授权时等待回传；取消和立即检查是本屏动作。',
+      motion: '查询次数和已等待每 3 秒改数字，不跳结果，不循环高亮。',
+      keep: '每 3 秒查一次，最长等 10 分钟。屏上只写这一句，不写页级进度、不写百分比。不写通常几十秒内能好。取消要再点一次才发出；系统没回之前不说已经取消。立即检查只加一次查询。查状态失败留在本屏，不改判。演示事件 done 进结果成功，timeout 进结果失败。授权未确认时主按钮是「再确认一次」，不给立即检查。顶栏返回、问小青、底部导航离开会撤销未完成任务。小青不可用时仍可等、查、取消。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除。屏上不自己跳成功。'
+    },
+    demo: () => window.FS.scanWaitDemo(),
+    render: () => window.FS.scanWait(),
+    mount: (el) => window.FS.mount(el)
   });
-  add('scan-result', '打印扫描', '扫描：用扫描件', {
-    notes: { does: '先看扫得清不清楚，再选怎么用；不替人预先决定。', motion: '扫描件浮入；取回原件的提醒带一次轻微强调。', keep: '匿名扫描件不进「我的文档」；简历可直接诊断；取回原件提醒。' },
-    render: () => F({
-      band: { eyebrow: '扫描完成', title: '扫好了，要怎么用？', rail: { labels: RAIL.scan, now: 3 }, seal: null },
-      body: `<div style="display:grid;grid-template-columns:360px 1fr;gap:28px;align-items:start"><div style="display:flex;flex-direction:column;align-items:center;gap:10px" class="fly">${UI.resume(360, 'plain')}<span class="fine">扫描件 · 1 页 · 清晰</span></div>
-          <div style="display:flex;flex-direction:column;gap:14px">${tile({ go: 'reading', icon: 'sparkle', title: '让小青诊断', desc: '这是简历的话' })}${tile({ go: 'confirm', icon: 'printer', title: '打印出来', desc: '黑白或彩色' })}${tile({ go: S().logged ? 'me' : 'login', icon: 'folder', tone: 'slate', title: '存进我的文档', desc: '需要登录' })}${tile({ act: 'toast', arg: '演示：重扫一次', icon: 'refresh', title: '不清楚，重扫', desc: '换个位置再放' })}</div></div>
-        <div class="howto">${icon('file', 34, 2)}<span>扫描件：1 页 · A4 · PDF 格式</span></div>
-        <div class="remind">${icon('alert', 34, 2.2)}<span>原件还在打印机玻璃上，记得取回。</span></div>
-        ${fine('不登录的话，扫描件办完就清除')}`,
-      dock: { ask: '问小青：扫描件能发到手机吗？' }, nav: 'home'
-    })
+  add('scan-result', '打印扫描', '扫描：扫描完成', {
+    notes: {
+      does: '对应 /scan?stage=result。直接打开是简历扫描成功；fsResult=timeout、incomplete、nofile 是三张失败帧。',
+      motion: '无。',
+      keep: '文件名、格式、大小、页数从结果读。示例：王晓婷-产品运营简历.pdf、居民身份证-正反面.jpg、实习证明-青序文化-2026.pdf。拿去打印去 pii（运行页 /print/desk?step=check）。简历才可点 AI 简历识别，去 reading；其他类型按钮停用但还在。未登录不去登录，文档按钮停用。重新扫描是普通新会话。失败帧同时给「重新开始一次扫描」和「重试扫描（同一份材料）」。两小时重复件拒收只写在失败说明。整屏查看可翻页、适宽；打不开不改判。顶栏返回、问小青、底部导航离开会撤销未完成任务。小青不可用时打印和重扫仍在，识别仍去 reading 由那一屏退化。成功页无操作约 1 分 30 秒清除。号码与服务时间从后台读，读不到不显示。'
+    },
+    demo: () => window.FS.scanResultDemo(),
+    render: () => window.FS.scanResult(),
+    mount: (el) => window.FS.mount(el)
   });
   add('copy', '打印扫描', '复印（在打印机上）', {
-    notes: { does: '复印全在打印机面板上做；屏幕只把五步和按钮名字讲清楚。', motion: '当前一步高亮，4 秒换一步。', keep: '复印不在屏幕下单、不进「我的打印订单」；身份证怎么放写「请看打印机屏幕提示」，不编按键；不得复印伪造的证件、印章、票据；提醒取回原件。' },
-    render: () => F({
-      band: { eyebrow: '复印 · 在打印机面板上操作', title: '怎么在打印机上复印', sub: '这一项不用在屏幕上操作，也不进打印订单', seal: null },
-      body: `<div class="seg"><button aria-pressed="true">身份证</button><button aria-pressed="false" data-act="seg">发票收据</button><button aria-pressed="false" data-act="seg">正反两面</button></div>
-        <div class="sggrid"><div class="sgart" style="flex-direction:column;gap:16px">${UI.idcard(240)}<span class="chip clay">示意图，不是摆放位置</span></div>
-          <div class="steps3 big" id="cpSteps" style="grid-template-columns:1fr;gap:10px">${[['放原件', '身份证怎么放，请看打印机屏幕提示'], ['选功能', '在打印机屏幕上点「身份证复印」'], ['改设置', '份数、颜色；上一位可能改过'], ['开始复印', '按打印机上的开始键'], ['取走复印件和原件', '复印件从出纸口出来']].map((t, k) => `<div class="s ${k === 0 ? 'on' : ''}" style="min-height:118px"><span class="n">${k + 1}</span><b>${t[0]}</b><small>${t[1]}</small></div>`).join('')}</div></div>
-        <div class="remind">${icon('alert', 34, 2.2)}<span>只能复印本人的真实证件和票据。复印完记得取回原件。</span></div>
-        ${fine('复印不经过这台屏幕，也不保存证件图像')}`,
-      dock: { ask: '问小青：复印要注意什么？', pri: { label: '复印好了', go: 'home' } }, nav: null
-    }),
-    mount: (el) => { let k = 0; const st = el.querySelectorAll('#cpSteps .s'); const t = setInterval(() => { st[k].classList.remove('on'); k = (k + 1) % st.length; st[k].classList.add('on'); }, 4000); return () => clearInterval(t); }
+    notes: {
+      does: '对应 /print-scan/feature/copy。五步和三条原件同时摆出，没有成功页。',
+      motion: '无。',
+      keep: '面板按钮名是复印、身份证复印、票据复印。开始是屏幕上的「复印」。双面写放回进纸口、不翻面。身份证怎么放、怎么翻面，屏上只写请看打印机屏幕上的图示。法律两句都在。取回原件用服务电话，不写现场岗位。主按钮「去打印文件」去 print-src。底栏回 print。不读打印机缺纸。小青不可用时五步仍可照做。能力名不认识不画在这里，在证件照屏 fsFeat=unknown。号码与服务时间从后台读，读不到不显示。无操作约 3 分钟清除。'
+    },
+    render: () => window.FS.copy(),
+    mount: (el) => window.FS.mount(el)
   });
-
   add('img2pdf', '打印扫描', '照片合成 PDF', {
-    notes: { does: '几张照片排好顺序，合成一个 PDF。', motion: '调整顺序时照片平移到新位置。', keep: '最多 20 张、每张一页；只收 JPG、PNG；不显示假的进度百分比；不登录不进「我的文档」。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '照片合成 PDF', title: '排好顺序，合成一个文件', sub: '已收到 4 张照片 · 最多 20 张', seal: null },
-      body: `<div class="grid2">${['成绩单第 1 页', '成绩单第 2 页', '获奖证书', '实习证明'].map((t, i) => `<div class="phcard rise" style="--i:${i}"><div class="ph">${icon('image', 64, 1.6)}<span class="pn">${i + 1}</span></div><b>${t}</b><div class="phb"><button class="btn sec sm" data-act="toast" data-arg="演示：往前挪" aria-label="往前挪">${icon('chevL', 28, 2.4)}</button><button class="btn sec sm" data-act="toast" data-arg="演示：往后挪" aria-label="往后挪">${icon('chevR', 28, 2.4)}</button><button class="btn ghost sm" data-act="toast" data-arg="演示：删除" aria-label="删除">${icon('erase', 28, 2)}</button></div></div>`).join('')}</div>
-        <div class="howto">${icon('file', 34, 2)}<span>合成后：1 个 PDF · 4 页 · 每张照片一页 · A4</span></div>
-        ${fine('不登录的话，合成的 PDF 办完就清除')}`,
-      dock: { backLabel: '加照片', ask: false, pri: { label: '合成 PDF', go: 'confirm' } }, nav: null
-    })
+    notes: {
+      does: '对应 /print-scan/convert。直接打开是空列表。编辑、上传中、合成中、结果、结果未知、冲突、未开通、U 盘未接线用 fsPdf。',
+      motion: '无。',
+      keep: '空列表：一句说明，手机扫码传图片（打开二维码层），U 盘导入停用并写「暂未开通」，一行小字「最多 20 张，单张不超过 10MB，只收 JPG、PNG」。不预放照片。手机扫码打开二维码层，不设「我已上传」。排序、删除是本屏真动作，删除要再点一次。旋转按钮在，且停用。上限：20 张，JPG/PNG，单张 10MB，合计 40MB，成品 15MB，单张 2500 万像素，合计 2 亿像素。U 盘未接线；运行页写「改用本机上传」，一体机没有本机文件框，稿上写「回到手机扫码」。合成靠演示事件 done 进结果，不自己跳。结果未知用同一标记再查。完成态未登录才出现「先登录再转换」，合成本身不用先登录。拿这份 PDF 去打印去 pii。页数等于张数，不写纸型。文件名用运行页「格式转换-N张图片.pdf」。小青不可用时仍可加图、合成。空列表主按钮停用。能力未开整页说明后回 print。号码与服务时间从后台读，读不到不显示。编辑约 3 分钟、结果约 1 分 30 秒清除。'
+    },
+    demo: () => window.FS.img2pdfDemo(),
+    render: () => window.FS.img2pdf(),
+    mount: (el) => window.FS.mount(el)
   });
-  add('policy', '查政策', '政策分类', {
+  add('policy', '查政策', '政策服务台', {
     before: 'policy',
-    notes: { does: '先选类别；也可以直接问小青「我能领什么」。', motion: '类别卡依次浮入。', keep: '内容由本机构发布，以官方原文为准；不写「已申请」「可领取」。' },
-    render: () => F({
-      band: { eyebrow: '查政策 · 本机构发布', title: '想了解哪一类？', sub: '每条政策都写了条件、材料和官方来源。', seal: 'idle', path: ['选类别', '看条件和材料', '打印清单或扫码看原文'], pathLabel: '查一条政策' },
-      body: `<div class="grid2">${D.policyCats.map((c, i) => `<button class="cat rise" style="--i:${i}" data-go="policy-list"><span class="ic">${icon(c.ic, 38, 2)}</span><b>${c.k}</b><small>${c.d}</small></button>`).join('')}</div>
-        <button class="rowlink rise" style="--i:7" data-go="policy-detail">${icon('bell', 32, 2)}<span><b>最近更新</b> <small>· 高校毕业生一次性求职创业补贴 · 10 月 18 日</small></span><span class="chev">${icon('chevR', 28, 2.2)}</span></button>
-        ${fine('示例内容 · 政策以本机构发布和官方原文为准')}`,
-      dock: { ask: '问小青：我能领什么补贴？' }, nav: 'home'
-    })
+    notes: {
+      does: '运行页 /policy-service。主入口「查政策与公告」进 policy-list 的就业政策分区；四个目标进同一页的对应分区（核对申领条件进 policy-check）。常用入口是浏览记录、AI 服务记录、政策收藏、全部服务。',
+      motion: '在线检查中和不可用只改可点范围，不自动跳成可用。重新检测回到检查中，等演示事件 up 或 down。',
+      keep: '对应 serviceHubSpecs 的政策服务台。七张能力卡不重复铺：就业政策与四个目标同一路由；政策公告在列表分区，不在本页另放按钮；打开 AI 顾问是底栏问小青和导航「AI 顾问」，AI 停用仍进 xq，由问小青页退化。政策收藏放进常用入口，避免丢掉这一张。没有六个政策类别，没有最近更新。社保指南、档案与登记、全部服务在在线服务检查中或不可用时仍可进，其余停，原因「正在确认在线服务」或「在线服务当前不可用」。重新检测只在不可用时出现。本页不探测打印机，打印机离线也不改文案。胶囊「能力与设备状态以办理时确认为准」。首页「查政策」已能进这屏。帮助中心的入口是 policy-list，不是这屏。出错留在本屏；空列表在 policy-list。登记目标屏上写「失业登记、就业登记和档案转移」，不写「托管」。屏上不写开发用语。普通页闲置 3 分钟清除。号码与服务时间从后台读，读不到不显示。'
+    },
+    demo: () => window.FY.demo('policy'),
+    render: () => window.FY.render('policy'),
+    mount: (el) => window.FY.mount('policy', el)
   });
   add('policy-list', '查政策', '政策列表', {
-    notes: { does: '一类下面的政策列表，每条写发布机构、更新时间和一句话说明。', motion: '列表依次浮入。', keep: '来源（发布机构）和更新时间常驻每一条。' },
-    render: () => F({
-      band: { eyebrow: '查政策 · 高校毕业生', title: '4 条政策', sub: '按更新时间排列', seal: null },
-      body: `<div class="stack">${D.policies.map((p, i) => `<button class="pol rise" style="--i:${i}" data-go="policy-detail"><b>${p.t}</b><span class="sum">${p.sum}</span><div class="meta"><span>${icon('landmark', 22, 2)} ${p.org}</span><span>更新于 ${p.date}</span>${p.tags.map(t => `<span class="chip slate" style="height:36px;font-size:20px">${t}</span>`).join('')}</div></button>`).join('')}</div>
-        ${fine('示例内容 · 以本机构发布为准')}`,
-      dock: { ask: '问小青：这几条有什么区别？' }, nav: 'home'
-    })
+    notes: {
+      does: '运行页 /renshi 的五个分区：就业政策、条件核对、社保指南、就业登记、政策公告。身份六种在本屏筛选。政策库条目进 policy-detail；内置指引单独收在「通用办事指引」。',
+      motion: '分区和身份就地切换。读取、打开某一条、重新读取都停在本屏，等演示事件，不自己变成成功。',
+      keep: '字从发布数据读：标题、摘要、来源、同步时间。眉题只写「政策服务」，不写路由。已发布条目旁只用胶囊「示例」，不写「示例，运行时读…」。来源行写「合作机构发布 · 发布于日期 · 同步于日期」。列表默认 5 条，加载更多翻到下一页，类型、日期、状态各不相同。读取中用浅灰条「正在读取」。读取失败、政策库空、筛选无命中、公告空用说明加行动卡，不拉空卡。点名打开的三态（正在打开、这条打不开、这次没打开）都在这屏。重新读取回到读取中。筛选无命中不是库空。办事参考标「办事参考」，不能收藏。浏览和外链记录是运行页副作用，稿不弹「已记录」。条件核对入口去 policy-check，不使用 AI，AI 停用仍可进。未登录不影响阅读。主按钮「上传自备材料打印」去 print-src，对应运行页 /print/upload。底栏「仅信息指引，不代办」。普通页 3 分钟。号码与服务时间从后台读，读不到不显示。'
+    },
+    demo: () => window.FY.demo('policy-list'),
+    render: () => window.FY.render('policy-list'),
+    mount: (el) => window.FY.mount('policy-list', el)
   });
   add('policy-detail', '查政策', '政策详情', {
-    notes: { does: '条件、材料、去哪办、官方来源四块；主动作是打印材料清单。', motion: '四块依次浮入。', keep: '条件核对是按规则比对，不是资格认定，不调 AI；官方入口用二维码；补贴标准以官方为准。' },
-    render: () => F({
-      band: { kind: 'compact', eyebrow: '市人社局 · 更新于 10 月 18 日', title: '高校毕业生一次性求职创业补贴', seal: null },
-      cls: 'tight',
-      body: `<div class="dsec rise" style="--i:0"><h4>${icon('user', 30, 2)}谁可以申请</h4><ul><li>毕业年度内的高校毕业生，并且属于下面任意一类：</li><li>城乡低保家庭、脱贫家庭、残疾、获得国家助学贷款等（完整条件看官方原文）</li></ul></div>
-        <div class="dsec check rise" style="--i:1"><h4>${icon('clipboard', 30, 2)}要准备的材料</h4><ul><li>本人身份证</li><li>学生证或学校出具的在读证明</li><li>对应类别的证明材料</li><li>本人银行卡</li></ul></div>
-        <div class="dsec rise" style="--i:2;display:flex;gap:26px;align-items:center"><div style="flex:1"><h4>${icon('landmark', 30, 2)}去哪办、看原文</h4><ul><li>学校就业指导中心统一组织申报</li><li>补贴标准和申报时间以官方原文为准</li></ul></div><div style="display:flex;flex-direction:column;align-items:center;gap:6px">${UI.qr(21, 200)}<span class="chip clay" style="height:34px;font-size:20px">示例码</span></div></div>
-        <div class="grid2">${tile({ act: 'toast', arg: '演示：按规则逐条核对（不调 AI）', icon: 'check', title: '核对条件', desc: '逐条问你，按规则比对' })}${tile({ go: 'xq', icon: 'sparkle', title: '问小青这条', desc: 'AI 解释，仅供参考' })}</div>`,
-      dock: { ask: false, pri: { label: '打印材料清单（1 页）', go: 'confirm', kind: 'pri wide' } }, nav: null
-    })
+    notes: {
+      does: '运行页 /renshi 里展开的一条。先看是否符合、需要准备材料、建议办理路径。收藏、来源二维码、上传自备材料、核对条件都是真去处。',
+      motion: '收藏在本屏切换。来源二维码打开层。来源守卫三态停在本屏。',
+      keep: '没有「打印材料清单」。核对条件去 policy-check，不判断能不能办，不使用 AI。政策库条目可收藏，只记在这台机器本次办理，办事参考不能收藏。没有来源地址时按钮停用，文案「发布方没有提供来源地址」。撤下、未确认、正在确认来源时不打开二维码。二维码是示例，不能扫；层内写明来源入口由发布方提供、扫码前核对机构和域名。眉题「就业政策」（办事参考为「办事指引」）。来源一行写「合作机构发布 · 发布于日期 · 同步于日期」。屏上写「小青还不能解释这条政策」，不写「未接入」。条件、材料各 5 条左右，和路径合成一张按内容撑开的卡。问小青仍在底栏，预填「问小青别的问题，不判断能不能办」。AI 停用、未登录都不挡阅读和核对。返回列表。普通页 3 分钟。号码与服务时间从后台读，读不到不显示。'
+    },
+    demo: () => window.FY.demo('policy-detail'),
+    render: () => window.FY.render('policy-detail'),
+    mount: (el) => window.FY.mount('policy-detail', el)
   });
 
   window.SCREENS = screens;
