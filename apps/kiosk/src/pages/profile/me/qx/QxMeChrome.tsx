@@ -1,18 +1,11 @@
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  BellIcon,
-  ClockIcon,
-  LockIcon,
-  TriangleAlertIcon,
-} from 'lucide-react'
 import type { QxTouchAsk } from '../../../../components/qingxu/touch/QxTouchDock'
-import { helpNeededLine, whenMiniapp } from '../../../../copy/unattendedCopy'
-import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
+import { whenMiniapp } from '../../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../../hooks/useSupportContact'
-import { MeTouchShell } from '../../touch/MeTouchShell'
+import { MeSeg } from '../../touch/MeKit'
+import { MeTouchShell, type MeBandStatus } from '../../touch/MeTouchShell'
 import '../styles/qx-me-shared.css'
-import '../../touch/me-touch.css'
 
 export type QxMeView =
   | 'notifications'
@@ -39,20 +32,20 @@ const ME_ASK: Record<QxMeView, QxTouchAsk> = {
   settings: { label: '问小青：怎么注销账号？', draft: '怎么注销账号？' },
 }
 
-type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
+type QxMeTab = { key: QxMeView; label: string; to: string }
 
+/* 稿 REC：简历、收藏、AI 记录、足迹四个记录分类。 */
 const RECORD_VIEWS: QxMeTab[] = [
-  { key: 'resumes', label: '简历', hint: '诊断与生成', to: '/me/resumes' },
-  { key: 'favorites', label: '收藏', hint: '岗位·招聘会·政策', to: '/me/favorites' },
-  // 稿 39：页签副标题写「名称和状态」，不写「元数据」（v2 规则 4，2026-09-30 A 批）。
-  { key: 'ai-records', label: 'AI记录', hint: '名称和状态', to: '/me/ai-records' },
-  { key: 'activity', label: '足迹', hint: '浏览·跳转', to: '/me/activity' },
+  { key: 'resumes', label: '简历', to: '/me/resumes' },
+  { key: 'favorites', label: '收藏', to: '/me/favorites' },
+  { key: 'ai-records', label: 'AI 记录', to: '/me/ai-records' },
+  { key: 'activity', label: '足迹', to: '/me/activity' },
 ]
 
-/* 稿 38：文档与打印订单是同一块「本人资产」的两个分域，互相切换，不混进上面四个记录分类。 */
+/* 稿 ASSET：文档与订单是同一块「本人资产」的两个分域，互相切换，不混进上面四个记录分类。 */
 const ASSET_VIEWS: QxMeTab[] = [
-  { key: 'documents', label: '我的文档', hint: '预览·打印·留存', to: '/me/documents' },
-  { key: 'orders', label: '打印订单', hint: '进度·支付·取件', to: '/me/print-orders' },
+  { key: 'documents', label: '文档', to: '/me/documents' },
+  { key: 'orders', label: '订单', to: '/me/print-orders' },
 ]
 
 export function QxMePage({
@@ -62,13 +55,14 @@ export function QxMePage({
   screenState,
   eyebrow,
   sub,
-  truth,
+  fine,
   toast,
   ctabar,
   live = true,
-  ordersHint,
   onBack,
   backLabel,
+  hideTabs = false,
+  overlay,
   children,
 }: {
   title: string
@@ -78,28 +72,27 @@ export function QxMePage({
   eyebrow: string
   /** 意图带副题。不传时按页面给一句稿上的副题。 */
   sub?: string
-  ask: ReactNode
-  doing: ReactNode
-  truth: string
+  /** 列表下面的一行小字（保留期、自动退出时间等）。登录门、读取中、读不到时不画。 */
+  fine?: ReactNode
   toast?: { tone: 'ok' | 'bad'; text: string } | null
   ctabar: ReactNode
   /** 整页 aria-live。定时刷新的页（打印订单每 5 秒同步）传 false，否则读屏会反复播报整块列表。 */
   live?: boolean
-  /** 打印订单页在已加载订单全部为 0 元时，把「进度·支付·取件」换成不提钱的说法。 */
-  ordersHint?: string
   onBack?: () => void
   backLabel?: string
+  /** 活动详情这类从记录页点进来的页不挂分类分段。 */
+  hideTabs?: boolean
+  /** 弹层（例如确认保存期限）。盖在这一屏上，底下的内容变成不可点。 */
+  overlay?: ReactNode
   children: ReactNode
 }) {
   const navigate = useNavigate()
   // 未登录登录门不读服务电话：这条请求也是 /api/v1/，账号资产页未登录必须是 0 条。
   const contact = useSupportContact(!/(?:^|-)login$/.test(screenState))
-  // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
-  const hostingOpen = useRecruitmentHosting().enabled
   const isAssetView = view === 'documents' || view === 'orders'
   /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
   const isSettingsView = view === 'settings'
-  const tabs = isAssetView ? ASSET_VIEWS : view === 'notifications' || isSettingsView ? [] : RECORD_VIEWS
+  const tabs = isAssetView ? ASSET_VIEWS : hideTabs ? [] : view === 'notifications' || isSettingsView ? [] : RECORD_VIEWS
   const testScope = view === 'notifications'
     ? 'notifications'
     : isSettingsView
@@ -154,21 +147,25 @@ export function QxMePage({
     : view === 'documents'
       ? whenMiniapp(contact, '这些文档在手机小程序里也能看到。')
       : ''
+  const status: MeBandStatus | undefined = showPrinter
+    ? phase === 'error' ? { tone: 'warn', label: '这次没读到' } : undefined
+    : { tone: 'unknown', label: '以你账号里的实际记录为准' }
 
   return (
     <MeTouchShell
       eyebrow={eyebrow}
       title={bandTitle}
       sub={bandSub}
-      showPrinter={showPrinter}
-      status={showPrinter ? undefined : { tone: 'unknown', label: '以你账号里的实际记录为准' }}
+      showPrinter={showPrinter && phase !== 'error'}
+      status={status}
       backLabel={backLabel ?? (view === 'activity-detail' ? '返回记录' : '返回我的')}
       onBack={goBack}
       ask={ME_ASK[view]}
       primaryNode={ctabar}
+      overlay={overlay}
     >
       <div
-        className={pageClass}
+        className={`me-page ${pageClass}`}
         data-kiosk-domain="profile"
         data-kiosk-screen={screen}
         data-state={screenState}
@@ -176,120 +173,32 @@ export function QxMePage({
         aria-live={live ? 'polite' : undefined}
       >
         {tabs.length > 0 ? (
-          <nav
+          <MeSeg
             className="qx-me-viewtabs"
-            data-n={tabs.length}
-            aria-label={isAssetView ? '我的文档与打印订单' : '我的记录分类'}
-          >
-            {tabs.map((item) => {
-              const active = item.key === view || (view === 'activity-detail' && item.key === 'activity')
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  className="qx-me-vtab"
-                  data-route={item.to}
-                  data-testid={isAssetView ? `member-assets-tab-${item.key}` : `member-records-view-${item.key}`}
-                  aria-current={active ? 'true' : undefined}
-                  onClick={() => navigate(item.to)}
-                >
-                  {item.label}
-                  <span>{item.key === 'orders' && ordersHint ? ordersHint : item.key === 'favorites' && !hostingOpen ? '政策' : item.hint}</span>
-                </button>
-              )
-            })}
-          </nav>
+            label={isAssetView ? '我的文档与打印订单' : '我的记录分类'}
+            current={view === 'activity-detail' ? 'activity' : view}
+            items={tabs.map((item) => ({
+              id: item.key,
+              label: item.label,
+              testId: isAssetView ? `member-assets-tab-${item.key}` : `member-records-view-${item.key}`,
+            }))}
+            onPick={(id) => navigate(tabs.find((item) => item.key === id)?.to ?? '/profile')}
+          />
         ) : null}
 
         {toast ? (
-          <div className="qx-me-toast" role="status" data-tone={toast.tone} data-testid={`${testScope}-toast`}>
+          <div className="qx-me-toast me-toast" role="status" data-tone={toast.tone} data-testid={`${testScope}-toast`}>
             {toast.text}
           </div>
         ) : null}
 
+        {phase === 'ready' && miniLine ? <p className="me-sync">{miniLine}</p> : null}
+
         {children}
 
-        {phase === 'login' ? null : (
-          <>
-            {miniLine ? <p className="qxt-me-sync">{miniLine}</p> : null}
-            <p className="qxt-fine">{helpNeededLine(contact)}</p>
-            <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
-          </>
-        )}
+        {phase === 'ready' && fine ? <p className="me-fine">{fine}</p> : null}
       </div>
     </MeTouchShell>
-  )
-}
-
-export function QxMeBanner({
-  tone,
-  title,
-  desc,
-  minis,
-}: {
-  tone: 'lock' | 'warn' | 'calm' | 'empty'
-  title: string
-  desc: ReactNode
-  minis?: string[]
-}) {
-  const Icon = tone === 'lock' ? LockIcon : tone === 'warn' ? TriangleAlertIcon : tone === 'calm' ? ClockIcon : BellIcon
-  return (
-    <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind={tone}>
-      <span className="qx-me-banner-ico" data-tone={tone} aria-hidden="true"><Icon size={34} /></span>
-      <span className="qx-me-banner-main">
-        <h2 className="qx-me-banner-t">{title}</h2>
-        <span className="qx-me-banner-p">{desc}</span>
-      </span>
-      {minis && minis.length > 0 ? (
-        <span className="qx-me-banner-mini">
-          {minis.map((item) => <i key={item}>{item}</i>)}
-        </span>
-      ) : null}
-    </section>
-  )
-}
-
-export function QxMeSummary({
-  tone,
-  icon,
-  label,
-  big,
-  desc,
-  minis,
-}: {
-  tone?: 'plum' | 'clay' | 'slate'
-  icon: ReactNode
-  label: string
-  big: ReactNode
-  desc: ReactNode
-  minis: string[]
-}) {
-  return (
-    <section className="qx-me-summary" aria-label={`${label}概览`}>
-      <span className="qx-me-summary-ico" data-tone={tone} aria-hidden="true">{icon}</span>
-      <span className="qx-me-summary-main">
-        <b>{label}</b>
-        <strong>{big}</strong>
-        <span>{desc}</span>
-      </span>
-      <span className="qx-me-summary-mini">
-        {minis.map((item) => <i key={item}>{item}</i>)}
-      </span>
-    </section>
-  )
-}
-
-export function QxMeGuide({ items }: { items: [string, string, string][] }) {
-  return (
-    <section className="qx-me-guide" aria-label="说明">
-      {items.map(([k, t, p]) => (
-        <div className="qx-me-guide-item" key={k}>
-          <div className="qx-me-guide-k">{k}</div>
-          <div className="qx-me-guide-t">{t}</div>
-          <div className="qx-me-guide-p">{p}</div>
-        </div>
-      ))}
-    </section>
   )
 }
 
@@ -314,21 +223,3 @@ export function recordsCtabar(
   }
   return <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={onReady}>{readyLabel}</button>
 }
-
-export const QX_ME_GUIDE = {
-  login: [
-    ['隐私', '只对本人可见', '退出或超时后，本机不保留任何明细'],
-    ['登录方式', '手机号 + 验证码', '也可以在登录页用手机扫码登录'],
-    ['边界', '本机不代收简历', '岗位与招聘会只做来源信息入口'],
-  ],
-  loading: [
-    ['读取范围', '只读当前账号', '不会展示其他账号的数据'],
-    ['显示规则', '先显示「—」', '离开前请点结束使用，否则一段时间无操作后才会自动退出'],
-    ['失败怎么办', '保留重试入口', '读取失败不会改动任何已有数据'],
-  ],
-  error: [
-    ['数据', '已保存内容不受影响', '这次加载失败不会删除任何记录'],
-    ['先试这个', '检查网络后重试', '重试不会重复创建记录'],
-    ['仍不行', '先去办别的', '回到首页继续打印、扫描或查政策'],
-  ],
-} as const satisfies Record<string, [string, string, string][]>

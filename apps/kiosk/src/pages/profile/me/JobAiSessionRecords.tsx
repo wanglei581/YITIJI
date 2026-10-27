@@ -1,20 +1,19 @@
 import type { JobAiSessionListItem } from '@ai-job-print/shared'
-import { Trash2Icon } from 'lucide-react'
-import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
-import { MeAiChip } from '../touch/MeStatePacks'
 import { formatTime } from '../assets/format'
+import { MeActs, MeBtn, MeRow } from '../touch/MeKit'
+import { MeAiChip } from '../touch/MeStatePacks'
 
-const OPERATION_META: Record<JobAiSessionListItem['session']['operation'], { label: string; hint: string; icon: KioskIconName; tone?: 'slate' | 'wheat' }> = {
-  recommend: { label: '岗位 AI 推荐参考', hint: '基于本人简历与真实岗位生成', icon: 'sparkle' },
-  explain: { label: 'AI岗位解读', hint: '基于来源岗位上的内容生成', icon: 'briefcase', tone: 'slate' },
-  match: { label: '岗位匹配参考', hint: '用本人简历做求职准备', icon: 'doc-check', tone: 'wheat' },
+const OPERATION_META: Record<JobAiSessionListItem['session']['operation'], { label: string; hint: string }> = {
+  recommend: { label: '岗位 AI 推荐参考', hint: '基于本人简历与真实岗位生成' },
+  explain: { label: 'AI岗位解读', hint: '基于来源岗位上的内容生成' },
+  match: { label: '岗位匹配参考', hint: '用本人简历做求职准备' },
 }
 
-const STATUS_META: Record<JobAiSessionListItem['session']['status'], { label: string; tone?: 'wait' | 'run' | 'bad' }> = {
-  pending: { label: '待处理', tone: 'wait' },
-  processing: { label: '处理中', tone: 'run' },
-  completed: { label: '已完成' },
-  failed: { label: '失败', tone: 'bad' },
+const STATUS_LABEL: Record<JobAiSessionListItem['session']['status'], string> = {
+  pending: '待处理',
+  processing: '处理中',
+  completed: '已完成',
+  failed: '失败',
 }
 
 function metaLine(item: JobAiSessionListItem): string {
@@ -24,54 +23,54 @@ function metaLine(item: JobAiSessionListItem): string {
   return `${formatTime(item.session.createdAt)}${recommendation}${expires}`
 }
 
+/** 岗位 AI 参考记录（只在招聘内容托管打开的私有化版本里出现）。只展示记录，不展示简历原文、提示词或模型输出。 */
 export function JobAiSessionRecords({
   items,
   confirmId,
   busyId,
   onDelete,
+  openKey,
+  onToggle,
 }: {
   items: JobAiSessionListItem[]
   confirmId: string | null
   busyId: string | null
   onDelete: (sessionId: string) => void
+  openKey: string | null
+  onToggle: (key: string) => void
 }) {
   if (items.length === 0) return null
   return (
     <>
-      <div className="qx-me-legal">岗位 AI 参考记录 · 只展示这次岗位解读的记录（时间、岗位名等），不展示简历原文、提示词或模型原始输出。分析结果仅供参考</div>
+      <p className="me-fine">岗位 AI 参考记录 · 只展示这次岗位解读的记录（时间、岗位名等），不展示简历原文、提示词或模型原始输出。分析结果仅供参考。</p>
       {items.map((item) => {
         const meta = OPERATION_META[item.session.operation]
-        const status = STATUS_META[item.session.status]
         const confirming = confirmId === item.session.id
+        const key = `job-${item.session.id}`
         return (
-          <div key={item.session.id} className="qx-me-row" data-flag={confirming ? 'true' : undefined} data-record-kind="job-ai-session" data-record-status={item.session.status}>
-            <span className="qx-me-row-ico" data-tone={meta.tone} aria-hidden="true">
-              <KIcon name={meta.icon} />
-            </span>
-            <span className="qx-me-row-main">
-              <span className="qx-me-row-head">
-                <span className="qx-me-chip">{meta.label}</span>
-                <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
-              </span>
-              <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.job ? `${item.job.title} · ${item.job.company}` : meta.hint}</span>
-              <MeAiChip />
-              <span className="qx-me-row-sub">{metaLine(item)}</span>
-            </span>
-            <span className="qx-me-acts">
-              <button
-                type="button"
-                className={['qx-me-small me-delete-button', confirming ? 'is-confirm' : ''].join(' ')}
-                data-variant="danger"
-                disabled={busyId === item.session.id}
-                onClick={() => onDelete(item.session.id)}
-                title={confirming ? '再次点击确认删除' : '删除'}
-                aria-label={confirming ? '再次点击确认删除岗位 AI 参考记录' : '删除岗位 AI 参考记录'}
-              >
-                <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-                {confirming ? <span className="ml-1">确认删除</span> : '删除'}
-              </button>
-            </span>
-          </div>
+          <MeRow
+            key={item.session.id}
+            data-flag={confirming ? 'true' : undefined}
+            data-record-kind="job-ai-session"
+            data-record-status={item.session.status}
+            open={openKey === key}
+            onToggle={() => onToggle(key)}
+            title={item.job ? `${item.job.title} · ${item.job.company}` : meta.label}
+            lines={[`${STATUS_LABEL[item.session.status]} · ${meta.label} · ${metaLine(item)}`, meta.hint]}
+            chips={<MeAiChip />}
+            actions={(
+              <MeActs>
+                <MeBtn
+                  v={confirming ? 'danger' : 'sec'}
+                  disabled={busyId === item.session.id}
+                  onClick={() => onDelete(item.session.id)}
+                  aria-label={confirming ? '再次点击确认删除岗位 AI 参考记录' : '删除岗位 AI 参考记录'}
+                >
+                  {confirming ? '再点一次确认删除' : '删除'}
+                </MeBtn>
+              </MeActs>
+            )}
+          />
         )
       })}
     </>

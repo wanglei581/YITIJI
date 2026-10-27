@@ -156,10 +156,11 @@ expect(
     assetMountIndex,
     sessionRecordsMountIndex,
   ].every((index) => index !== -1)
-    && profileHeaderMountIndex < continueMountIndex
-    && continueMountIndex < assetMountIndex
-    && assetMountIndex < sessionRecordsMountIndex,
-  'ProfileHeader, continue card, asset grid, and session records mount in the required order',
+    && profileHeaderMountIndex < assetMountIndex
+    && assetMountIndex < continueMountIndex
+    && continueMountIndex < sessionRecordsMountIndex,
+  // 触屏稿 fix-me.js pageMe：账号卡 → 六个计数 → 待办卡 → 记录。顺序随稿换，四件仍都要在，仍按固定顺序。
+  'ProfileHeader, asset grid, continue card, and session records mount in the touch-draft order',
 )
 
 for (const marker of [
@@ -328,8 +329,10 @@ expectMatches(
   'Profile icon actions exceed the 48px secondary touch-target minimum',
 )
 expectIncludes(profile, 'data-testid="profile-login"', 'Profile 底部保留游客登录锚点')
-expectIncludes(profile, 'onClick={onLogin}', 'Profile 底部保留游客登录操作')
-expectIncludes(profile, 'data-testid="profile-account"', 'Profile 底部保留账号设置操作')
+// 触屏版第 6 包：证据锚点随稿换字，判据不变。游客登录键直接接 goLogin；账号设置是六条链接行之一。
+expectIncludes(profile, 'onClick={goLogin}', 'Profile 底部保留游客登录操作')
+expectIncludes(profile, "testid: 'profile-account'", 'Profile 保留账号设置操作')
+expectIncludes(profile, "to: '/me/settings'", 'Profile 账号设置行去 /me/settings')
 const profileQxCss = read('src/pages/profile/styles/profile-qx.css')
 expectIncludes(profileQxCss, 'var(--qx-ink)', 'profile-qx.css consumes Qingxu tokens')
 expectIncludes(profileQxCss, '--qx-tap-min', 'profile-qx.css keeps the 48px touch floor')

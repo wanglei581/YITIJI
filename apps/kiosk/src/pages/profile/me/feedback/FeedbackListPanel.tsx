@@ -1,8 +1,9 @@
-import { KIcon } from '../../../../components/kiosk-icon'
 import type { MemberFeedbackTicketDetail, MemberFeedbackTicketItem } from '../../../../services/api/memberFeedback'
 import { formatTime } from '../../assets/format'
+import { MeP, MeRows } from '../../touch/MeKit'
 import { CATEGORY_META, STATUS_META } from './types'
 
+/** 以前的处理进度：每条一行，点开读详情。还没有反馈时写一句话。 */
 export function FeedbackListPanel({
   items,
   selected,
@@ -18,35 +19,28 @@ export function FeedbackListPanel({
   totalLabel: string
   onOpen: (id: string) => void
 }) {
+  if (items.length === 0) {
+    return (
+      <section className="me-static" aria-label="我的反馈">
+        <b>还没有反馈记录</b>
+        <small>提交反馈后，这里会显示处理状态与回复</small>
+      </section>
+    )
+  }
   return (
-    <section className="qx-card" aria-label="我的反馈">
-      <div className="qx-sec-h">
-        <h2 className="t">我的反馈</h2>
-        <span className="hint">{totalLabel}</span>
-      </div>
-      <p className="qx-row-d" style={{ marginBottom: 12 }}>查看处理状态、服务回复和补充描述</p>
-
-      {items.length === 0 ? (
-        <div className="qx-state" data-tone="empty">
-          <span className="qx-state-ic" />
-          <span>
-            <div className="qx-state-t">还没有反馈记录</div>
-            <p className="qx-state-d">提交反馈后，这里会显示处理状态与回复</p>
-          </span>
-        </div>
-      ) : (
-        <div className="qx-rows">
-          {items.map((item) => (
-            <FeedbackRow
-              key={item.id}
-              item={item}
-              active={selected?.id === item.id || selectedId === item.id}
-              loading={loading}
-              onOpen={() => onOpen(item.id)}
-            />
-          ))}
-        </div>
-      )}
+    <section aria-label="我的反馈" className="me-hist">
+      <MeP>我的反馈 · {totalLabel}。查看处理状态、服务回复和补充描述。</MeP>
+      <MeRows few={items.length < 5}>
+        {items.map((item) => (
+          <FeedbackRow
+            key={item.id}
+            item={item}
+            active={selected?.id === item.id || selectedId === item.id}
+            loading={loading}
+            onOpen={() => onOpen(item.id)}
+          />
+        ))}
+      </MeRows>
     </section>
   )
 }
@@ -69,19 +63,13 @@ function FeedbackRow({
       type="button"
       disabled={loading}
       onClick={onOpen}
-      className="qx-row"
+      className="me-line"
       data-active={active ? 'true' : undefined}
     >
-      <span className="qx-row-ic" aria-hidden="true">
-        <KIcon name={category.icon} />
-      </span>
-      <span className="qx-row-tx">
-        <span className="qx-row-t">{item.title || item.content}</span>
-        <span className="qx-row-d">
-          {category.label} · {formatTime(item.updatedAt)}
-        </span>
-      </span>
-      <span className="fb-st">{status.label}</span>
+      <b>{item.title || item.content}</b>
+      <small>
+        {category.label} · {formatTime(item.updatedAt)} · {status.label}
+      </small>
     </button>
   )
 }

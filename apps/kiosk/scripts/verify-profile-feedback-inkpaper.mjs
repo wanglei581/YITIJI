@@ -74,7 +74,9 @@ expectIncludes(formPanel, 'maxLength={11}', '反馈表单保留联系电话长�
 expectIncludes(formPanel, 'maxLength={80}', '反馈表单保留标题长度限制')
 expectIncludes(formPanel, 'maxLength={500}', '反馈表单保留反馈内容长度限制')
 expectIncludes(formPanel, '提交反馈', '反馈表单保留提交按钮')
-expectIncludes(formPanel, 'KIcon name="send"', '反馈表单使用 KIcon 发送图标')
+// 触屏稿 pageFeedback：提交键在底栏，不在表单里。锚点随稿换到页面，判据不变（用 KIcon 发送图标、键名仍是「提交反馈」）。
+expectIncludes(page, 'KIcon name="send"', '反馈提交键使用 KIcon 发送图标')
+expectIncludes(page, '提交反馈', '反馈页底栏保留提交按钮')
 
 expectIncludes(listPanel, 'formatTime(item.updatedAt)', '反馈列表保留更新时间展示')
 expectIncludes(listPanel, 'selected?.id === item.id || selectedId === item.id', '反馈列表保留当前详情高亮逻辑')

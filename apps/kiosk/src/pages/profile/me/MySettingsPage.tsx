@@ -1,22 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  ChevronRightIcon,
-  FileTextIcon,
-  LogOutIcon,
-  PhoneIcon,
-  RepeatIcon,
-  ShieldCheckIcon,
-  ShieldQuestionIcon,
-  UserIcon,
-  type LucideIcon,
-} from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
 import { accountErrorMessage, accountPhoneDisplay } from '../../auth/accountUserMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
+import { MeActs, MeBtn, MeHero, MeP } from '../touch/MeKit'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import { SettingsConfirm } from './components/SettingsConfirm'
 import { PhoneRebindPanel } from './components/PhoneRebindPanel'
@@ -30,52 +20,40 @@ type JobAiConsent = 'idle' | 'loading' | 'granted' | 'not-granted' | 'error'
 // 电话、邮箱不写死，引用隐私政策。一体机上不直接提交注销，也没有自助导出。
 const ACCOUNT_CLOSURE_NOTE = '注销账号、复制个人信息，请按《隐私政策》里的电话、邮箱联系我们申请。我们核实是你本人后，15 个工作日内处理。'
 
-const CONSENT_BADGE: Record<JobAiConsent, { text: string; tone?: 'run' | 'bad' | 'off' }> = {
-  idle: { text: '—', tone: 'off' },
-  loading: { text: '查询中', tone: 'run' },
+const CONSENT_BADGE: Record<JobAiConsent, { text: string }> = {
+  idle: { text: '—' },
+  loading: { text: '查询中' },
   granted: { text: '已授权' },
-  'not-granted': { text: '未授权', tone: 'off' },
-  error: { text: '本次未取到', tone: 'bad' },
+  'not-granted': { text: '未授权' },
+  error: { text: '本次未取到' },
 }
 
+/** 账号操作行：登录后是整行可点；游客只说明登录后会出现什么，不可点、不发任何请求。 */
 function SettingsRow({
-  icon: Icon,
-  tone,
   title,
   desc,
   route,
   testid,
   onClick,
 }: {
-  icon: LucideIcon
-  tone?: 'slate' | 'plum' | 'wheat'
   title: string
   desc: string
   route?: string
   testid: string
-  /** 不传即游客态的锁定行：只说明登录后会出现什么，不可点、不发任何请求。 */
   onClick?: () => void
 }) {
   if (!onClick) {
     return (
-      <div className="qx-me-row" data-dead="true" aria-disabled="true" data-testid={testid}>
-        <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
-        <span className="qx-me-row-main">
-          <span className="qx-me-row-title">{title}</span>
-          <span className="qx-me-row-sub">{desc}</span>
-        </span>
-        <span className="qx-me-pending">登录后可用</span>
+      <div className="me-line" data-dead="true" aria-disabled="true" data-testid={testid}>
+        <b>{title}</b>
+        <small>{desc} · 登录后可用</small>
       </div>
     )
   }
   return (
-    <button type="button" className="qx-me-row" data-route={route} data-testid={testid} onClick={onClick}>
-      <span className="qx-me-row-ico" data-tone={tone} aria-hidden="true"><Icon size={28} /></span>
-      <span className="qx-me-row-main">
-        <span className="qx-me-row-title">{title}</span>
-        <span className="qx-me-row-sub">{desc}</span>
-      </span>
-      <span className="qx-me-row-go" aria-hidden="true"><ChevronRightIcon size={26} /></span>
+    <button type="button" className="me-line" data-route={route} data-testid={testid} onClick={onClick}>
+      <b>{title}</b>
+      <small>{desc}</small>
     </button>
   )
 }
@@ -184,104 +162,103 @@ export function MySettingsPage() {
       onCancel={() => setShowRebind(false)} />
   )
   const ctabar = isLoggedIn
-    ? <button type="button" className="qx-btn" data-variant="danger" data-testid="member-settings-primary" onClick={() => setConfirm('logout')}><LogOutIcon size={24} aria-hidden="true" />结束使用并退出登录</button>
+    ? <button type="button" className="qx-btn" data-variant="danger" data-testid="member-settings-primary" onClick={() => setConfirm('logout')}>结束使用</button>
     : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-settings-primary" onClick={() => navigate('/login', { state: { from: '/me/settings' } })}>去登录</button>
+
+  const bandStatus = !isLoggedIn
+    ? { tone: 'unknown' as const, label: '当前是游客' }
+    : jobAi === 'error'
+      ? { tone: 'warn' as const, label: '这次没读到' }
+      : jobAi === 'loading'
+        ? { tone: 'reading' as const, label: '正在读取' }
+        : { tone: 'ok' as const, label: badge.text }
 
   return (
     <div className="settings-page fusion-w5" data-kiosk-screen="member-settings" data-qx-view="settings" data-state={screenState} data-testid={`member-settings-state-${screenState}`} data-takeaway="本人账号设置与授权状态">
-    <MeTouchShell eyebrow="我的 · 账号设置" title="账号设置" sub="换号、管理授权或结束使用，都在这里。"
-      status={{ tone: jobAi === 'error' ? 'warn' : 'unknown', label: isLoggedIn ? '公共设备，请保护个人信息' : '当前是游客' }}
+    <MeTouchShell eyebrow="我的 · 账号设置" title="账号设置" sub={isLoggedIn ? `${phoneMasked || '手机号只显示前三后四'} · 只在这台机器上有效` : '当前是游客'}
+      status={bandStatus}
       backLabel="返回我的"
       onBack={() => navigate('/profile')}
       ask={{ label: '问小青：怎么注销账号？', draft: '怎么注销账号？' }}
       primaryNode={ctabar}>
-      <div className="qx-scroll qx-grow settings-body">
-        <section className="settings-identity" aria-label={isLoggedIn ? '会员账号概览' : '登录引导'}>
-          <span className="settings-avatar" aria-hidden="true"><UserIcon size={36} /></span>
-          <span className="settings-idtx">
-            <b>{isLoggedIn ? '本人账号' : '还没有登录'}</b>
-            <span className="settings-idsub">
-              {isLoggedIn
-                ? `手机号 ${phoneMasked || '只显示前三后四'} · 公共终端默认不显示完整个人信息`
-                : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
-            </span>
+      <div className="qx-scroll qx-grow settings-body me-page">
+        <section className="me-id" aria-label={isLoggedIn ? '会员账号概览' : '登录引导'}>
+          <b>{isLoggedIn ? '本人账号' : '还没有登录'}</b>
+          <span>
+            {isLoggedIn
+              ? `手机号 ${phoneMasked || '只显示前三后四'} · 公共终端不显示完整个人信息`
+              : '这台机器是公共终端，不登录就不会显示任何人的简历、订单和文件。'}
           </span>
-          <span className="settings-idstat">{isLoggedIn ? '账号设置在页面下方' : '登录后管理本人账号'}</span>
         </section>
-        {hint ? <p data-testid="member-settings-toast" role="status" className="settings-note">{hint.text}</p> : null}
+        {hint ? <p data-testid="member-settings-toast" role="status" className="me-toast" data-tone={hint.tone === 'bad' ? 'bad' : undefined}>{hint.text}</p> : null}
         {/* 账号操作（仅登录态）；游客只看到登录后会出现哪几项（稿 30 settings:anonymous），不可点、不读数据 */}
         {!isLoggedIn && (
-          <>
-            <h2 className="settings-section-title">账号</h2>
-            <section className="qx-me-list" aria-label="登录后才出现的账号操作">
-              <SettingsRow icon={PhoneIcon} title="换绑手机号" desc="旧号验证 + 新号验证，双重确认" testid="member-settings-locked-rebind" />
-              <SettingsRow icon={RepeatIcon} title="切换账号" desc="当前未登录，可以直接去登录" testid="member-settings-locked-switch" />
-              <SettingsRow icon={ShieldQuestionIcon} title="隐私与 AI 授权管理" desc={`登录后可以查看与撤回 AI 使用授权。${ACCOUNT_CLOSURE_NOTE}`} testid="member-settings-locked-consent" />
-            </section>
-          </>
+          <section className="me-block" aria-label="登录后才出现的账号操作">
+            <SettingsRow title="换绑手机号" desc="旧号验证 + 新号验证，双重确认" testid="member-settings-locked-rebind" />
+            <SettingsRow title="切换账号" desc="当前未登录，可以直接去登录" testid="member-settings-locked-switch" />
+            <SettingsRow title="隐私与 AI 授权管理" desc="可以查看与撤回 AI 使用授权" testid="member-settings-locked-consent" />
+          </section>
         )}
         {isLoggedIn && (
-          <>
-            <h2 className="settings-section-title">账号</h2>
-            <section className="qx-me-list" aria-label="账号操作">
-              <SettingsRow icon={PhoneIcon} tone="wheat" title="换绑手机号" desc="验证旧手机号后，再验证新手机号；成功后退出并重新登录。" testid="member-settings-rebind" onClick={() => setShowRebind(true)} />
-              <SettingsRow icon={RepeatIcon} tone="plum" title="换一个账号登录" desc="先二次确认，再退出并清除本机这一次的登录，然后才去登录页。" testid="member-settings-switch" onClick={() => setConfirm('switch')} />
-              <SettingsRow
-                icon={ShieldQuestionIcon}
-                tone="plum"
-                title="隐私与数据请求"
-                desc={`当前可提交 AI 使用授权的撤回。${ACCOUNT_CLOSURE_NOTE}`}
-                route="/me/privacy-requests"
-                testid="member-settings-privacy"
-                onClick={() => navigate('/me/privacy-requests')}
-              />
-            </section>
-          </>
-        )}
-
-        {isLoggedIn && (
-          <section className="qx-me-settings-consent" aria-label="隐私与 AI 授权管理" data-consent={jobAi} data-testid="member-settings-consent">
-            <span className="qx-me-row-ico" data-tone="plum" aria-hidden="true"><ShieldCheckIcon size={28} /></span>
-            <span className="qx-me-row-main">
-              <span className="qx-me-row-head">
-                <span className="qx-me-row-title">隐私与 AI 授权管理</span>
-                <span className="qx-me-st" data-tone={badge.tone} data-testid="member-settings-consent-status">{badge.text}</span>
-              </span>
-              <span className="qx-me-row-sub">
-                {jobAi === 'error'
-                  ? '授权状态这次没有取到，请重新读取，或到「隐私与数据请求」处理。'
-                  : 'AI 辅助只用于本人求职准备参考。撤回后，再次使用相关服务需要重新确认；已有记录可在 AI 服务记录中删除。'}
-              </span>
-            </span>
-            <span className="qx-me-acts">
-              {jobAi === 'error' && (
-                <button type="button" className="qx-me-small" onClick={() => setConsentReload((n) => n + 1)}>重新读取</button>
-              )}
-              <button type="button" className="qx-me-small" disabled={jobAi !== 'granted' || jobAiBusy} onClick={() => setConfirm('revokeJobAi')}>
-                撤回授权
-              </button>
-            </span>
+          <section className="me-block" aria-label="账号操作">
+            <SettingsRow title="换绑手机号" desc="先验证现在的号码，再验证新号码" testid="member-settings-rebind" onClick={() => setShowRebind(true)} />
+            <SettingsRow title="换一个账号登录" desc="会先结束当前这一位的使用" testid="member-settings-switch" onClick={() => setConfirm('switch')} />
+            <SettingsRow
+              title="隐私与数据请求"
+              desc="可以撤回 AI 使用授权"
+              route="/me/privacy-requests"
+              testid="member-settings-privacy"
+              onClick={() => navigate('/me/privacy-requests')}
+            />
           </section>
         )}
 
-        {/* 协议 / 隐私入口：不登录也能读 */}
-        <h2 className="settings-section-title">协议与帮助</h2>
-        <section className="qx-me-list" aria-label="协议与帮助">
-          <SettingsRow icon={FileTextIcon} title="用户服务协议" desc="服务范围、账号、收费与打印说明" route="/legal/terms" testid="member-settings-terms" onClick={() => navigate('/legal/terms')} />
-          <SettingsRow icon={ShieldCheckIcon} tone="slate" title="隐私政策" desc="信息收集、使用与文件留存说明" route="/legal/privacy" testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')} />
-        </section>
+        <div className="me-split">
+          {isLoggedIn && (
+            <MeHero
+              art="checklist"
+              artWidth={150}
+              title={<span data-testid="member-settings-consent-status">{badge.text}</span>}
+              testId="member-settings-consent"
+              className="me-consent"
+            >
+              <MeP>
+                {jobAi === 'error'
+                  ? '授权状态这次没有取到，请重新读取，或到「隐私与数据请求」处理。'
+                  : jobAi === 'granted'
+                    ? '你已经同意用 AI 辅助处理简历。AI 辅助只用于本人求职准备参考；撤回后，再次使用相关服务需要重新确认，已有记录可在 AI 服务记录中删除。'
+                    : jobAi === 'not-granted'
+                      ? '你还没有同意用 AI 辅助处理简历。'
+                      : '正在读取你的 AI 使用授权。'}
+              </MeP>
+              <MeActs>
+                <MeBtn v="sec" disabled={jobAi !== 'error'} onClick={() => setConsentReload((n) => n + 1)}>重新读取</MeBtn>
+                <MeBtn v="sec" aria-label="撤回授权" disabled={jobAi !== 'granted' || jobAiBusy} onClick={() => setConfirm('revokeJobAi')}>撤回</MeBtn>
+              </MeActs>
+            </MeHero>
+          )}
+          {/* 协议 / 隐私入口：不登录也能读 */}
+          <MeHero art="resume" artWidth={140} title="协议与注销" className="me-legal-card">
+            <MeP>用户服务协议和隐私政策不登录也能看。{ACCOUNT_CLOSURE_NOTE}一体机上不能直接注销。</MeP>
+            <section aria-label="协议与帮助">
+              <MeActs>
+                <MeBtn v="sec" data-testid="member-settings-terms" onClick={() => navigate('/legal/terms')}>用户服务协议</MeBtn>
+                <MeBtn v="sec" data-testid="member-settings-privacy-doc" onClick={() => navigate('/legal/privacy')}>隐私政策</MeBtn>
+              </MeActs>
+            </section>
+          </MeHero>
+        </div>
 
-        <section className="settings-note" aria-label="公共终端使用说明">
-          <h2>结束使用之后会发生什么</h2>
-          <p>结束使用或闲置超时，会退出本机登录并清除这一次的临时信息。已经提交的订单、文件和记录按各自的保存期限管理。</p>
+        <section className="me-fine" aria-label="公共终端使用说明">
+          结束使用或闲置超时，会退出本机登录并清除这一次的临时信息。已经提交的订单、文件和记录按各自的保存期限管理。
         </section>
       </div>
 
       {confirm === 'logout' && (
         <SettingsConfirm
-          title="退出登录"
-          description="退出后将清除本次登录状态，返回游客模式。本人记录已保存在账号下，下次登录仍可查看。"
-          confirmLabel="退出登录"
+          title="结束使用"
+          description="这会退出登录，并清掉这台机器上这一次的临时信息。已保存的简历和文档按保存期限保留。"
+          confirmLabel="确认结束使用"
           danger
           busy={clearing}
           error={clearError}
@@ -291,9 +268,9 @@ export function MySettingsPage() {
       )}
       {confirm === 'switch' && (
         <SettingsConfirm
-          title="切换账号"
-          description="将退出当前账号并前往登录页，使用另一手机号登录。本次临时信息会被清除，不会带入下一个账号。"
-          confirmLabel="退出并切换"
+          title="换一个账号登录"
+          description="会先结束这一位的使用，再去登录。本次临时信息会被清除，不会带入下一个账号。"
+          confirmLabel="结束并去登录"
           busy={clearing}
           error={clearError}
           onConfirm={handleSwitch}

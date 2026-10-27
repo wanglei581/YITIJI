@@ -163,7 +163,10 @@ expectIncludes(page, 'documentForConvertedPdf', '结果卡预览/打印复用本
 expectIncludes(page, 'reprintable={isDocumentReprintable(doc)}', '结果卡打印按转换前记录的 reprintable 判定')
 expectIncludes(page, 'disabled={deleteDisabled}', '删除按钮保留禁用态')
 
-expectIncludes(retentionOverlay, 'role="dialog"', '保存期限确认弹层保留 dialog 语义')
+// 触屏版第 6 包：确认层换成共享弹层 QxTouchOverlay（自带 role=dialog、aria-modal、焦点圈住），判据不变。
+expectIncludes(retentionOverlay, '<QxTouchOverlay', '保存期限确认弹层使用触屏共享弹层')
+expectIncludes(retentionOverlay, 'kind="dialog"', '保存期限确认弹层保留 dialog 语义')
+expectIncludes(read('src/components/qingxu/touch/QxTouchOverlay.tsx'), 'role="dialog"', '共享弹层带 role=dialog')
 expectIncludes(page, 'aria-modal="true"', '保存期限确认弹层保留 aria-modal')
 expectIncludes(page, '还没有文档', '我的文档保留空态标题')
 // 证据锚点随稿换字，判据不变：空态仍说明登录后上传才出现，游客文件不归入账号。
@@ -178,7 +181,9 @@ const meGuide = read('src/pages/profile/me/qx/QxMeChrome.tsx')
 expectIncludes(read('src/auth/KioskHandoverGate.tsx'), '确认之前不会显示上一位的文件和订单。', '确认之前不会显示上一位的文件和订单')
 expectIncludes(loadingBlock, '<MeLoadingPack', '文档加载态按稿使用骨架')
 expectAbsent(loadingBlock, /不会闪回上一位用户的内容/, '文档加载不再写「不会闪回上一位」')
-expectIncludes(meGuide, '离开前请点结束使用，否则一段时间无操作后才会自动退出', '共用加载说明改为离开前结束使用')
+// 证据锚点随稿换字，判据不变：触屏稿的读取中只有骨架，不再有说明卡；「离开前请点结束使用」这句留在登录后的文档页底部小字（kioskIdleTiming）。
+expectIncludes(read('src/auth/kioskIdleTiming.ts'), '离开前请点结束使用，否则', '离开前结束使用的说明仍有出处')
+expectIncludes(page, 'documentsLoggedInTruth', '我的文档底部小字用登录后的结束使用说明')
 expectAbsent(meGuide, /上一位用户的内容不会残留在屏幕上/, '共用加载说明不再写上一位的内容不会残留')
 
 for (const [label, source] of [

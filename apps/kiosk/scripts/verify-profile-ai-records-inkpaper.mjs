@@ -81,7 +81,8 @@ expectIncludes(jobAiRecords, '分析结果仅供参考', 'JobAiSessionRecords �
 
 expectIncludes(jobAiRecords, 'onDelete(item.session.id)', 'JobAiSessionRecords 保留删除回调接线')
 expectIncludes(jobAiRecords, '再次点击确认删除岗位 AI 参考记录', 'JobAiSessionRecords 保留岗位 AI 删除确认 aria 文案')
-expectIncludes(jobAiRecords, 'KIcon', 'JobAiSessionRecords 复用 KIcon 图标系统')
+// 触屏稿的记录行没有图标：判据换成「用触屏行卡，不另起一套」，不再钉 KIcon。
+expectIncludes(jobAiRecords, '<MeRow', 'JobAiSessionRecords 使用触屏行卡 MeRow')
 
 expectMatches(detailCss, /\.me-inkdetail \.me-delete-button\s*\{/, '明细页 CSS 在局部作用域提供删除按钮样式')
 expectMatches(detailCss, /\.me-inkdetail \.me-delete-button\.is-confirm/, '明细页 CSS 在局部作用域提供删除确认态样式')

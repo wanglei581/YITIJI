@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../auth/useAuth'
 import { API_MODE } from '../../../services/api/client'
+import { KIcon } from '../../../components/kiosk-icon'
+import { MeFine } from '../touch/MeKit'
 import { MeErrorPack, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import {
@@ -188,13 +190,17 @@ export function MyFeedbackPage() {
                 ? 'list-empty'
                 : 'form-list'
 
-  const status = uiState === 'error'
-    ? { tone: 'bad' as const, label: '反馈列表这次没取到' }
+  const status = uiState === 'error' || uiState === 'service-unavailable'
+    ? { tone: 'warn' as const, label: '这次没读到' }
     : uiState === 'loading' || uiState === 'detail-loading'
-      ? { tone: 'unknown' as const, label: '正在读取本人工单' }
-      : form.category === 'ai_content' && !relatedPrintTaskId
-        ? { tone: 'unknown' as const, label: `AI 内容投诉 ${AI_COMPLAINT_REPLY_DAYS} 个工作日内答复` }
-        : { tone: 'unknown' as const, label: '本人工单，不承诺回复时限' }
+      ? { tone: 'reading' as const, label: '正在读取' }
+      : uiState === 'login'
+        ? { tone: 'unknown' as const, label: '未登录' }
+        : form.category === 'ai_content' && !relatedPrintTaskId
+          ? { tone: 'ok' as const, label: `${AI_COMPLAINT_REPLY_DAYS} 个工作日内答复` }
+          : { tone: 'ok' as const, label: '不承诺回复时限' }
+
+  const showForm = canUseRemote && loadState === 'ready'
 
   return (
     <div
@@ -207,7 +213,7 @@ export function MyFeedbackPage() {
       <MeTouchShell
         eyebrow="我的 · 意见反馈"
         title={uiState === 'login' ? '登录后看你的反馈' : uiState === 'loading' || uiState === 'detail-loading' ? '正在读取' : uiState === 'error' || uiState === 'service-unavailable' ? '这次没读到' : '遇到什么问题了？'}
-        sub={form.category === 'ai_content' && !relatedPrintTaskId ? 'AI 内容投诉 5 个工作日内答复' : '其他反馈不承诺回复时限'}
+        sub={uiState === 'login' ? '只有你本人能看到' : form.category === 'ai_content' && !relatedPrintTaskId ? `AI 内容投诉 ${AI_COMPLAINT_REPLY_DAYS} 个工作日内答复` : '其他反馈不承诺回复时限'}
         status={status}
         backLabel="返回我的"
         onBack={() => navigate('/profile')}
@@ -215,12 +221,14 @@ export function MyFeedbackPage() {
         primaryNode={(
           <FeedbackCta
             uiState={uiState}
+            submitBusy={busy === 'submit'}
+            onSubmit={() => void submit()}
             onLogin={() => navigate('/login', { state: { from: loginReturnTo } })}
             onRetry={refresh}
           />
         )}
       >
-        <div className="qx-scroll qx-grow fb-page">
+        <div className="qx-scroll qx-grow fb-page me-page">
           {hint ? (
             <div role="status" className="fb-toast" data-tone={hint.includes('失败') ? 'bad' : undefined}>
               {hint}
@@ -228,45 +236,28 @@ export function MyFeedbackPage() {
           ) : null}
 
           {uiState === 'login' ? (
-            <div data-testid="member-feedback-fallback">
+            <div data-testid="member-feedback-fallback" className="me-state">
               <MeLoginGate page="feedback" />
             </div>
           ) : null}
           {uiState === 'service-unavailable' ? (
-            <div data-testid="member-feedback-fallback">
-              <p className="qxt-me-lead">反馈服务这次不可用。已填写的内容还在。这不是简历功能停用。</p>
-              <MeErrorPack onRetry={refresh} />
+            <div data-testid="member-feedback-fallback" className="me-state">
+              <MeErrorPack sentence="反馈服务这次不可用。已填写的内容还在。这不是简历功能停用。" onRetry={refresh} />
             </div>
           ) : null}
           {uiState === 'loading' ? <MeLoadingPack rows={6} /> : null}
           {uiState === 'error' ? (
-            <div data-testid="member-feedback-fallback">
+            <div data-testid="member-feedback-fallback" className="me-state">
               <MeErrorPack onRetry={refresh} />
             </div>
           ) : null}
 
-          {uiState !== 'login' && uiState !== 'loading' && uiState !== 'error' && uiState !== 'service-unavailable' ? (
-          <section className="fb-summary" aria-label="意见反馈概览">
-            <div className="fb-summary-main">
-              <b>服务反馈</b>
-              <strong>{items.length}</strong>
-              <span>本人设备、打印、文件处理、一般建议与 AI 内容投诉，不涉及招聘平台闭环承诺</span>
-            </div>
-            <div>
-              <span className="fb-st">{canUseRemote ? '可提交' : '待登录'}</span>
-              <p className="fb-legal" style={{ marginTop: 8 }}>{totalLabel}</p>
-            </div>
-          </section>
-          ) : null}
-
-          {canUseRemote && loadState === 'ready' ? (
+          {showForm ? (
             <>
               <FeedbackFormPanel
                 form={form}
                 relatedPrintTaskId={relatedPrintTaskId}
-                submitBusy={busy === 'submit'}
                 onFormChange={setForm}
-                onSubmit={() => void submit()}
               />
               <FeedbackListPanel
                 items={items}
@@ -286,13 +277,11 @@ export function MyFeedbackPage() {
                 replyBusy={busy === 'reply'}
                 closeBusy={busy === 'close'}
               />
+              <MeFine>
+                本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；AI 内容投诉 {AI_COMPLAINT_REPLY_DAYS} 个工作日内答复，其他反馈不承诺受理结论或回复时限。
+              </MeFine>
             </>
           ) : null}
-
-          <p className="fb-legal">
-            <b>诚实说明</b>
-            本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；AI 内容投诉 {AI_COMPLAINT_REPLY_DAYS} 个工作日内答复，其他反馈不承诺受理结论或回复时限。
-          </p>
           {isLoggedIn && loadState === 'ready' && !selected ? <MemberLoadMore {...pagination} /> : null}
         </div>
       </MeTouchShell>
@@ -302,10 +291,14 @@ export function MyFeedbackPage() {
 
 function FeedbackCta({
   uiState,
+  submitBusy,
+  onSubmit,
   onLogin,
   onRetry,
 }: {
   uiState: FeedbackUiState
+  submitBusy: boolean
+  onSubmit: () => void
   onLogin: () => void
   onRetry: () => void
 }) {
@@ -321,5 +314,11 @@ function FeedbackCta({
       <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新加载</button>
     )
   }
-  return null
+  if (uiState === 'loading' || uiState === 'detail-loading') return null
+  return (
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="member-feedback-submit" disabled={submitBusy} onClick={onSubmit}>
+      <KIcon name="send" />
+      提交反馈
+    </button>
+  )
 }

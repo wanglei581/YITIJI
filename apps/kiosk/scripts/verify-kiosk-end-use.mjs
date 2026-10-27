@@ -80,7 +80,7 @@ check(
 
 // 每个离场出口都经 endKioskUse。
 const exits = [
-  ['src/pages/profile/ProfilePage.tsx', /onEnd=\{\(\) => endKioskUse\('end_use'\)\}/, '「我的」结束使用'],
+  ['src/pages/profile/ProfilePage.tsx', /const onEnd = \(\) => endKioskUse\('end_use'\)/, '「我的」结束使用'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleLogout = [\s\S]{0,200}endKioskUse\('end_use'\)/, '账号设置「结束使用并退出登录」'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleSwitch = [\s\S]{0,200}endKioskUse\('switch_account'\)/, '换号登录（W-64：先完整清场再进登录）'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleRebindDone = [\s\S]{0,120}endKioskUse\('switch_account', \{ loginHint:/, '换绑成功重新登录'],

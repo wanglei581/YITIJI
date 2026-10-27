@@ -25,6 +25,7 @@ export type QxTouchPrimary = {
 export function QxTouchDock({
   onBack,
   back = true,
+  backDisabled = false,
   backLabel = '返回',
   left,
   ask,
@@ -34,6 +35,8 @@ export function QxTouchDock({
 }: {
   onBack?: () => void
   back?: boolean
+  /** 返回键还在、但此刻不能点（提交中、正在清场）。不传时和以前一样。 */
+  backDisabled?: boolean
   backLabel?: string
   left?: ReactNode
   ask?: QxTouchAsk
@@ -69,7 +72,7 @@ export function QxTouchDock({
   const middle = askNode ?? mid ?? null
   const wide = !middle && Boolean(primary)
   const leftNode = left ?? (back ? (
-    <button type="button" className="qxt-btn qxt-btn-sec" onClick={goBack}>
+    <button type="button" className="qxt-btn qxt-btn-sec" disabled={backDisabled} onClick={goBack}>
       <QxTouchIcon name="chevL" size={30} strokeWidth={2.4} />
       {backLabel}
     </button>

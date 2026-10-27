@@ -53,12 +53,14 @@ export function supportContactFromPayload(body: unknown): PublicSupportContact {
     serviceHours?: unknown
     otherOnlineTerminalNearby?: unknown
     miniappPublished?: unknown
+    selfNoteTab?: unknown
   }
   return {
     servicePhone: textOrNull(row.servicePhone),
     serviceHours: textOrNull(row.serviceHours),
     otherOnlineTerminalNearby: row.otherOnlineTerminalNearby === true,
     miniappPublished: row.miniappPublished === true,
+    selfNoteTab: row.selfNoteTab === true,
   }
 }
 

@@ -8,19 +8,13 @@ import { MemberLoadMore } from './MemberLoadMore'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MemberResumeItem } from '@ai-job-print/shared'
-import {
-  ClockIcon,
-  FileCheckIcon,
-  FileTextIcon,
-  ScanLineIcon,
-  SparklesIcon,
-  UploadIcon,
-} from 'lucide-react'
 import { deleteMyResume, getMyResumes } from '../../../services/api/memberAssets'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
-import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
-import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
+import { QxMePage, recordsCtabar } from './qx/QxMeChrome'
+import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock } from './qx/QxMeStateBits'
+import { MeActs, MeBtn, MeP, MeRow, MeRows } from '../touch/MeKit'
+import { MeEmptyPack, MeExitCard } from '../touch/MeStatePacks'
 import './styles/member-records-qx.css'
 
 const STATUS_META: Record<MemberResumeItem['status'], { label: string; tone?: 'wait' | 'run' | 'bad' }> = {
@@ -31,12 +25,13 @@ const STATUS_META: Record<MemberResumeItem['status'], { label: string; tone?: 'w
 }
 
 /**
- * 行内说明只写时间与留存期。2026-09-30 A 批：原来写「模型名 · 任务 编号 · 时间」，
- * 模型名（如 demo / llm）和任务编号都是工程信息，稿 39 只显示名称和状态（v2 规则 4）。
+ * 行内第一行：处理状态、有没有优化版、保留到哪天（稿 pageResumes）。
+ * 不写模型名和任务编号：那是工程信息（2026-09-30 A 批，稿 39 只显示名称和状态）。
  */
-function metaLine(item: MemberResumeItem): string {
-  const expires = item.expiresAt ? ` · 留存至 ${formatTime(item.expiresAt)}` : ''
-  return `${formatTime(item.createdAt)}${expires}`
+function metaLine(item: MemberResumeItem, status: string): string {
+  const opt = item.kind === 'parse' ? ` · ${item.optimized ? '已生成优化版' : '未优化'}` : ''
+  const expires = item.expiresAt ? ` · 保留至 ${formatTime(item.expiresAt)}` : ''
+  return `${status}${opt}${expires}`
 }
 
 function isActionable(item: MemberResumeItem): boolean {
@@ -83,85 +78,58 @@ export function MyResumesPage() {
   }
   const openGenerate = (taskId: string) => navigate(taskPath('/resume/generate/preview', taskId), { state: { taskId } })
 
-  const completedCount = items.filter((item) => item.status === 'completed').length
-  const parseCount = items.filter((item) => item.kind === 'parse').length
-  const generateCount = items.filter((item) => item.kind === 'generate').length
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
-
-  const struct = (
-    <>
-      <QxMeStructRow icon={FileCheckIcon} title="上传诊断简历" desc="诊断报告、优化版与打印出口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-resumes-0" />
-      <QxMeStructRow icon={SparklesIcon} title="AI 生成简历" desc="生成的版本与打印出口" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-resumes-1" />
-      <QxMeStructRow icon={ClockIcon} title="每条记录的处理状态" desc="待处理 / 处理中 / 已完成 / 失败" mode={!isLoggedIn ? 'lock' : 'error'} testid="member-records-struct-resumes-2" />
-    </>
-  )
+  const [openId, setOpenId] = useState<string | null>(null)
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看我的简历" desc="公共一体机不会在未登录时展示简历文件名、任务或诊断记录；游客上传不会自动绑定到账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看我的简历" />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的简历" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="简历记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的简历不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
+    body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
-      <>
-        <QxMeSummary
-          icon={<FileTextIcon size={32} />}
-          label="简历记录"
-          big={total}
-          desc="仅展示本人简历服务记录，不展示原文或诊断正文"
-          minis={[`诊断 ${parseCount}`, `生成 ${generateCount}`, `完成 ${completedCount}`]}
-        />
-        <QxMeBannerEmpty />
-        <section className="qx-me-list qx-me-grow" aria-label="从这里开始">
-          <QxMeStartRow icon={UploadIcon} title="上传一份现有简历" desc="上传后可以做诊断、优化，并生成可打印的版本" label="去上传" route="/resume/source" testid="member-records-start-upload" onClick={() => navigate('/resume/source')} />
-          <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质简历" desc="把纸质简历扫成 PDF，再走同一条诊断流程" label="去扫描" route="/scan/start" testid="member-records-start-scan" onClick={() => navigate('/scan/start')} />
-          <QxMeStartRow icon={SparklesIcon} tone="plum" title="让 AI 生成一份新简历" desc="按引导逐段生成，可直接打印" label="去生成" route="/resume/generate" testid="member-records-start-generate" onClick={() => navigate('/resume/generate')} />
-          <div className="qx-me-legal">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历会显示在这里。</div>
-        </section>
-        <QxMeGuide items={[['怎么产生', '登录后上传或生成', '游客上传不会自动绑定到账号'], ['这里显示什么', '记录名称与保存期限', '不展示简历原文或诊断正文'], ['留存', '原始简历短留存', '到期后无法恢复']]} />
-      </>
+      <div className="me-state" data-testid="qx-me-fallback">
+        <MeEmptyPack
+          sentence="这个账号还没有简历记录。"
+          note={<p className="me-p">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历会显示在这里。</p>}
+        >
+          <MeExitCard art="resume" artWidth={120} title="上传一份简历" desc="从手机或 U 盘选一份，接着做诊断" onClick={() => navigate('/resume/source')} />
+          <MeExitCard art="scan" artWidth={120} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} />
+          <MeExitCard art="checklist" artWidth={110} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} />
+        </MeEmptyPack>
+      </div>
     )
   } else {
     body = (
       <>
-        <QxMeSummary
-          icon={<FileTextIcon size={32} />}
-          label="简历记录"
-          big={total}
-          desc="仅展示本人简历服务记录，不展示原文或诊断正文"
-          minis={[`诊断 ${parseCount}`, `生成 ${generateCount}`, `完成 ${completedCount}`]}
-        />
-        <section className="qx-me-list qx-me-grow" data-testid="member-records-list" aria-label="我的简历">
-          {items.map((item) => {
-            const status = STATUS_META[item.status] ?? { label: '未知状态', tone: 'run' as const }
-            const actionable = isActionable(item)
-            const disabledReason = recordUnavailableReason(item) ?? ''
-            const isParse = item.kind === 'parse'
-            const taskLabel = formatTime(item.createdAt)
-            return (
-              <div key={item.id} className="qx-me-row" data-flag={item.status === 'failed' ? 'true' : undefined} data-record-status={item.status} data-record-kind={item.kind}>
-                <span className="qx-me-row-ico" data-tone={isParse ? undefined : 'plum'} aria-hidden="true">
-                  {isParse ? <FileCheckIcon size={28} /> : <SparklesIcon size={28} />}
-                </span>
-                <span className="qx-me-row-main">
-                  <span className="qx-me-row-head">
-                    <span className="qx-me-row-title">{resumeLabel(item)}</span>
-                    <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
-                    {isParse ? <span className="qx-me-chip">{item.optimized ? '已生成优化版' : '未优化'}</span> : null}
-                  </span>
-                  <span className="qx-me-row-sub">{isParse ? '上传简历后生成的诊断记录' : 'AI 引导生成的简历版本'}</span>
-                  <span className="qx-me-row-sub">{metaLine(item)}</span>
-                  {!isParse ? <span className="qx-me-reason">生成简历暂不能直接对照；请先导出，再上传诊断。</span> : null}
-                  {!actionable ? <span className="qx-me-reason">{isParse ? '报告与优化：' : ''}{disabledReason}</span> : null}
-                </span>
-                <span className="qx-me-acts">
+      <MeRows few={items.length < 5 && openId === null} testId="member-records-list" label="我的简历">
+        {items.map((item) => {
+          const status = STATUS_META[item.status] ?? { label: '未知状态', tone: 'run' as const }
+          const actionable = isActionable(item)
+          const disabledReason = recordUnavailableReason(item) ?? ''
+          const isParse = item.kind === 'parse'
+          const taskLabel = formatTime(item.createdAt)
+          const open = openId === item.id
+          const confirming = confirmDelete?.id === item.id && confirmDelete.ownerToken === token
+          return (
+            <MeRow
+              key={item.id}
+              open={open}
+              onToggle={() => { setOpenId(open ? null : item.id); if (confirmDelete?.id === item.id) setConfirmDelete(null) }}
+              data-record-status={item.status}
+              data-record-kind={item.kind}
+              data-flag={item.status === 'failed' ? 'true' : undefined}
+              title={resumeLabel(item)}
+              lines={[metaLine(item, status.label), isParse ? '上传简历后生成的诊断记录' : 'AI 引导生成的简历版本']}
+              actions={(
+                <MeActs>
                   {isParse ? (
                     <>
                       <SmallAct label="查看报告" disabled={!actionable} reason={disabledReason} aria={`查看 ${taskLabel} 这份简历的诊断报告`} onClick={() => openReport(item.taskId)} primary />
                       <SmallAct label={item.optimized ? '查看优化版' : '继续优化'} disabled={!actionable} reason={disabledReason} aria={`${item.optimized ? '查看' : '继续生成'} ${taskLabel} 这份简历的优化版`} onClick={() => openOptimize(item.taskId, item.optimized)} />
-                      <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria={`用这份简历做简历对照`} onClick={() => openJobFit(item)} />
+                      <SmallAct label="简历对照" disabled={!actionable} reason={disabledReason} aria="用这份简历做简历对照" onClick={() => openJobFit(item)} />
                     </>
                   ) : (
                     <>
@@ -169,17 +137,38 @@ export function MyResumesPage() {
                       <SmallAct label="简历对照" disabled reason="生成简历请先导出再上传诊断" aria="用这份简历做简历对照" onClick={() => {}} />
                     </>
                   )}
-                  <SmallAct label="删除" disabled={deleting} reason="正在删除" aria="删除这份简历" onClick={() => { setConfirmDelete({ ...item, ownerToken: token }); setDeleteError(null) }} />
-                </span>
-              </div>
-            )
-          })}
-          <div className="qx-me-legal">
-            仅展示本人简历记录；原始简历短留存，到期后无法恢复，<b>不向企业提供或投递</b>。
-            「简历对照」会使用你在这里选中的这份简历。
-            {total > items.length ? `当前显示最近 ${items.length} / ${total} 条` : ''}
+                  {confirming ? null : (
+                    <SmallAct label="删除" disabled={deleting} reason="正在删除" aria="删除这份简历" onClick={() => { setConfirmDelete({ ...item, ownerToken: token }); setDeleteError(null) }} />
+                  )}
+                </MeActs>
+              )}
+              extra={(
+                <>
+                  {!isParse ? <MeP tone="reason">生成简历暂不能直接对照；请先导出，再上传诊断。</MeP> : null}
+                  {!actionable ? <MeP tone="reason">{isParse ? '报告与优化：' : ''}{disabledReason}</MeP> : null}
+                  {confirming && confirmDelete ? (
+                    <div role="group" aria-labelledby="resume-delete-title" className="me-confirm">
+                      <b id="resume-delete-title">删除 {resumeLabel(confirmDelete)}？</b>
+                      <MeP>{confirmDelete.kind === 'parse' ? '会一并删除这份简历的诊断、优化稿、编辑草稿、确认版本、简历对照、职业规划及相关 AI 分析记录。' : '会删除这份 AI 生成简历记录。'}删除后不可恢复。已上传和导出的文件仍在「我的文档」，可在那里单独删除。</MeP>
+                      {deleteError ? <MeP tone="reason"><span role="alert">{deleteError}</span></MeP> : null}
+                      <MeActs>
+                        <MeBtn v="danger" disabled={deleting} onClick={() => void remove()}>{deleting ? '正在删除…' : '确认删除'}</MeBtn>
+                        <MeBtn v="sec" disabled={deleting} onClick={() => setConfirmDelete(null)}>取消</MeBtn>
+                      </MeActs>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            />
+          )
+        })}
+        </MeRows>
+        {items.length < 5 && openId === null ? (
+          <div className="me-stack">
+            <MeExitCard art="scan" artWidth={110} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} />
+            <MeExitCard art="checklist" artWidth={100} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} />
           </div>
-        </section>
+        ) : null}
       </>
     )
   }
@@ -193,37 +182,13 @@ export function MyResumesPage() {
       screen="member-list"
       screenState={`resumes-${uiState}`}
       eyebrow="我的 · 简历"
-      ask={<>你的简历，<em>都在这里</em>。</>}
-      doing={<>只显示<b>本人简历服务记录</b>，不展示简历原文或诊断正文。</>}
-      truth="只展示本人简历记录；原始简历短留存，到期后无法恢复，不向企业提供或投递。"
+      sub={items.length > 0 ? `共 ${total} 条 · 不显示简历原文` : uiState === 'empty' ? '这个账号还没有简历记录' : undefined}
+      fine={`到期日写在每一份上。原始简历短留存，到期后无法恢复，不向企业提供或投递。${total > items.length ? `当前显示最近 ${items.length} / ${total} 条。` : ''}离开 3 分钟没操作会自动退出。`}
       ctabar={ctabar}
     >
       {body}
-      {isLoggedIn && confirmDelete && confirmDelete.ownerToken === token ? <div role="alertdialog" aria-modal="true" aria-labelledby="resume-delete-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-8">
-        <div className="rounded-2xl bg-white p-8 max-w-2xl">
-          <h2 id="resume-delete-title">删除 {resumeLabel(confirmDelete)}？</h2>
-          <p>{confirmDelete.kind === 'parse' ? '会一并删除这份简历的诊断、优化稿、编辑草稿、确认版本、简历对照、职业规划及相关 AI 分析记录。' : '会删除这份 AI 生成简历记录。'}删除后不可恢复。</p>
-          <p>已上传和导出的文件仍在「我的文档」，可在那里单独删除。</p>
-          {deleteError ? <p role="alert">{deleteError}</p> : null}
-          <button type="button" className="qx-btn" style={{ minHeight: 56 }} disabled={deleting} onClick={() => setConfirmDelete(null)}>取消</button>
-          <button type="button" className="qx-btn" style={{ minHeight: 56 }} disabled={deleting} onClick={() => void remove()}>{deleting ? '正在删除…' : '确认删除'}</button>
-        </div>
-      </div> : null}
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...pagination} /> : null}
     </QxMePage>
-  )
-}
-
-function QxMeBannerEmpty() {
-  return (
-    <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
-      <span className="qx-me-banner-ico" aria-hidden="true"><FileTextIcon size={34} /></span>
-      <span className="qx-me-banner-main">
-        <h2 className="qx-me-banner-t">这个账号还没有简历记录</h2>
-        <span className="qx-me-banner-p">这个账号还没有简历记录。公共一体机上的游客上传不会自动绑定到账号。</span>
-      </span>
-      <span className="qx-me-banner-mini"><i>共 0</i></span>
-    </section>
   )
 }
 
@@ -238,16 +203,14 @@ function SmallAct({
   primary?: boolean
 }) {
   return (
-    <button
-      type="button"
-      className="qx-me-small"
-      data-variant={primary ? 'primary' : undefined}
+    <MeBtn
+      v={primary ? 'pri' : 'sec'}
       disabled={disabled}
       aria-disabled={disabled || undefined}
       onClick={disabled ? (event) => event.preventDefault() : onClick}
       aria-label={disabled ? `${aria}（${reason}）` : aria}
     >
       {label}
-    </button>
+    </MeBtn>
   )
 }

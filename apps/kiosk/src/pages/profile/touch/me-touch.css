@@ -1,5 +1,6 @@
-/* 我的与权益。全部挂在 [data-qx-page="me"] 下，不改 .qxt-* 的默认。
-   正文底色用意图带那张纸，不另铺一层扫不出来的底。 */
+/* 我的与权益：壳、版式件、状态屏。全部挂在 [data-qx-page="me"] 下，不改 .qxt-* 的默认。
+   正文不另铺底色：底就是 .qxt-screen 的纸色。类名 me-* 对应触屏稿 fix-me.js 的 fe-*。 */
+@import './me-tokens.css';
 
 .qxt-me-root {
   height: 100%;
@@ -9,105 +10,28 @@
 [data-qx-page="me"] .qxt-body.qxt-me-pad {
   justify-content: flex-start;
   overflow: auto;
-  padding: 16px 28px 12px;
-  gap: 16px;
+  padding: 12px 40px 12px;
+  gap: 10px;
 }
 
-[data-qx-page="me"] .qx-me-page,
+[data-qx-page="me"] .me-page {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* 旧页留下的内层滚动框在触屏壳里不再自己滚：由正文区一起滚。 */
 [data-qx-page="me"] .qx-scroll,
-[data-qx-page="me"] .pf-page,
-[data-qx-page="me"] .bf-page,
-[data-qx-page="me"] .fb-page,
-[data-qx-page="me"] .pr-page,
-[data-qx-page="me"] .settings-body,
-[data-qx-page="me"] .qx-grow,
-[data-qx-page="me"] .k8-act-scroll,
-[data-qx-page="me"] .k8-activities > section {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
+[data-qx-page="me"] .qx-grow {
+  flex: 1 0 auto;
   height: auto;
-  min-height: 100%;
-  max-height: none;
-  overflow: visible;
-  gap: 16px;
-}
-
-/* 登录门包在测试锚点里。锚点自己拉高，出口卡才能接到 dock，不留一整块纸。 */
-[data-qx-page="me"] .qx-me-page > div:has(> .qxt-me-state),
-[data-qx-page="me"] .fb-page > div:has(> .qxt-me-state),
-[data-qx-page="me"] .bf-page > div:has(> .qxt-me-state),
-[data-qx-page="me"] .pr-page > div:has(> .qxt-me-state) {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
-}
-
-/* 正文不小于 20px。这条压过页面自己的小号工具类；标题再单独放大。 */
-[data-qx-page="me"] .qxt-body.qxt-me-pad,
-[data-qx-page="me"] .qxt-body.qxt-me-pad * {
-  font-size: var(--qxt-fs-aux);
-  line-height: 1.45;
-}
-
-[data-qx-page="me"] .qxt-body.qxt-me-pad :is(h2, h3, .qx-me-row-title, .qx-row-t, .pf-idname, .qxt-me-exit b, .qxt-me-can b, .qxt-me-login b, .bf-item-t, .k8-activity-card h2) {
-  font-size: var(--qxt-fs-body);
-  line-height: 1.35;
-}
-
-[data-qx-page="me"] .qxt-body.qxt-me-pad .pf-asset-num,
-[data-qx-page="me"] .qxt-body.qxt-me-pad .qx-num {
-  font-size: 40px;
-  line-height: 1.1;
-}
-
-[data-qx-page="me"] .qx-me-vtab,
-[data-qx-page="me"] .qx-me-tab,
-[data-qx-page="me"] .qx-me-row,
-[data-qx-page="me"] .qx-row,
-[data-qx-page="me"] .pf-asset,
-[data-qx-page="me"] .pf-mlink,
-[data-qx-page="me"] .qx-me-small,
-[data-qx-page="me"] .qxt-me-exit,
-[data-qx-page="me"] .settings-pad button {
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-}
-
-[data-qx-page="me"] .qx-me-list,
-[data-qx-page="me"] .qx-me-grow {
-  flex: none;
-  height: auto;
-  overflow: visible;
-  max-height: none;
-}
-
-/* 列表行旧的 240px 上限只收边框，字会画到盒子外面，窄屏上点不中。
-   可点盒子跟着文字长，正文再负责把它整段放进视口。 */
-[data-qx-page="me"] .qx-me-list > .qx-me-row {
-  max-height: none;
-  height: auto;
   overflow: visible;
 }
 
-[data-qx-page="me"] .pf-grid3,
-[data-qx-page="me"] .pf-morelinks {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-[data-qx-page="me"] .pf-asset,
-[data-qx-page="me"] .pf-mlink,
-[data-qx-page="me"] .qx-me-row,
-[data-qx-page="me"] .qx-row {
-  background: var(--qxt-card);
-  border: 1px solid var(--qxt-line);
-  border-radius: 22px;
-  text-align: left;
-}
-
+/* ── 底栏里沿用旧按钮的页面，样子和触屏底栏按钮一致 ── */
 [data-qx-page="me"] .qxt-dock .qx-btn,
 [data-qx-page="me"] .qxt-dock .qxt-btn {
   min-height: var(--qxt-btn-h);
@@ -138,275 +62,495 @@
   color: var(--qx-on-solid);
 }
 
-[data-qx-page="me"] .qxt-handover-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
+[data-qx-page="me"] .qxt-dock .qx-btn[aria-disabled="true"],
+[data-qx-page="me"] .qxt-dock .qx-btn:disabled {
+  opacity: 0.42;
 }
 
-[data-qx-page="me"] .qxt-handover-cards button {
-  flex: 1 1 0;
-  min-height: 160px;
-  min-width: var(--qxt-tap);
-  border-radius: 28px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-line);
-  color: var(--qxt-ink);
-  font-size: var(--qxt-fs-body);
+/* ── 版式件 ── */
+[data-qx-page="me"] .me-p,
+[data-qx-page="me"] .me-reason,
+[data-qx-page="me"] .me-fine {
+  margin: 0;
+}
+
+[data-qx-page="me"] .me-p {
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="me"] .me-reason {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-clay-ink);
   font-weight: 700;
-  padding: 24px;
+}
+
+[data-qx-page="me"] .me-fine {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+  text-align: center;
+}
+
+[data-qx-page="me"] .me-k {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .me-seg {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page="me"] .me-seg-b {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--qxt-tap);
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-ink-2);
+  line-height: 1.2;
+}
+
+[data-qx-page="me"] .me-seg-b[aria-current="true"],
+[data-qx-page="me"] .me-seg-b[aria-pressed="true"] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="me"] .me-rows {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-qx-page="me"] .me-rows > .me-line,
+[data-qx-page="me"] .me-rows > .me-static,
+[data-qx-page="me"] .me-rows > .me-skel {
+  flex: 1 1 auto;
+  min-height: min-content;
+}
+
+[data-qx-page="me"] .me-rows.me-few > .me-line,
+[data-qx-page="me"] .me-rows.me-few > .me-static {
+  flex: 0 0 auto;
+}
+
+[data-qx-page="me"] .me-line,
+[data-qx-page="me"] .me-static {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page="me"] .me-static {
+  justify-content: center;
+  gap: 4px;
+}
+
+[data-qx-page="me"] .me-line[data-dim="true"] {
+  background: var(--qxt-well);
+}
+
+[data-qx-page="me"] .me-line > .me-jump,
+[data-qx-page="me"] .me-jump {
   flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
-  gap: 24px;
-  text-align: left;
+  gap: 14px;
+  min-height: 88px;
 }
 
-/* 稿上大卡左边是文件 / 手机插画，色板跟着卡片拉高。 */
-[data-qx-page="me"] .qxt-me-art {
-  flex: none;
-  width: 168px;
-  align-self: stretch;
-  min-height: 120px;
-  border-radius: 18px;
-  background: #f7f4ec;
-  color: #1f6b5a;
-  display: grid;
-  place-items: center;
-}
-
-[data-qx-page="me"] .qxt-me-art svg {
-  width: 72px;
-  height: 72px;
-}
-
-[data-qx-page="me"] .qxt-me-art-phone {
-  background: #e7f3ef;
-  color: #143d36;
-}
-
-[data-qx-page="me"] [role="alertdialog"] {
-  flex: 1 1 auto;
+[data-qx-page="me"] .me-open {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-}
-
-[data-qx-page="me"] .k8-activities-grid {
-  grid-template-columns: 1fr;
-}
-
-[data-qx-page="me"] .k8-activity-action {
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
   min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
-[data-qx-page="me"] .qx-state-ic:empty {
+[data-qx-page="me"] .me-line b,
+[data-qx-page="me"] .me-static b,
+[data-qx-page="me"] .me-open b {
+  display: block;
+  font-size: 26px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .me-line small,
+[data-qx-page="me"] .me-static small,
+[data-qx-page="me"] .me-open small {
+  display: block;
+  font-size: 21px;
+  line-height: 1.4;
+  color: var(--qxt-ink-3);
+  font-weight: 600;
+}
+
+[data-qx-page="me"] .me-line small b,
+[data-qx-page="me"] .me-static small b,
+[data-qx-page="me"] .me-open small b {
+  display: inline;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 700;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="me"] .me-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page="me"] .me-btn {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 0 24px;
+  border-radius: 20px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page="me"] .me-btn[data-v="pri"] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  border-color: transparent;
+}
+
+[data-qx-page="me"] .me-btn[data-v="danger"] {
+  background: var(--qx-cinnabar);
+  color: var(--qx-on-solid);
+  border-color: transparent;
+}
+
+[data-qx-page="me"] .me-btn[data-v="ghost"] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="me"] .me-btn:disabled,
+[data-qx-page="me"] .me-btn[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+[data-qx-page="me"] .me-btn.me-wide {
+  width: 100%;
+}
+
+[data-qx-page="me"] .me-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+[data-qx-page="me"] .me-ai,
+[data-qx-page="me"] .qxt-me-ai {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 2px 12px;
+  border-radius: 18px;
   background: var(--qxt-teal-wash);
-  color: #1f6b5a;
-}
-
-[data-qx-page="me"] .qx-state-ic:empty::before {
-  content: "";
-  width: 18px;
-  height: 24px;
-  border: 2.5px solid currentColor;
-  border-radius: 3px;
-}
-
-[data-qx-page="me"] .qx-me-row-ico,
-[data-qx-page="me"] .qx-row-ic,
-[data-qx-page="me"] .bf-item-ic {
-  align-self: stretch;
-  height: auto;
-  min-height: 64px;
-}
-
-[data-qx-page="me"] .qxt-handover-cards button small {
+  color: var(--qxt-teal-ink);
   font-size: var(--qxt-fs-aux);
-  font-weight: 500;
+  font-weight: 700;
+}
+
+[data-qx-page="me"] .me-unread {
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page="me"] .me-art {
+  flex: none;
+  max-width: 100%;
+  height: auto;
+}
+
+[data-qx-page="me"] .me-art-paper {
+  filter: var(--me-art-shadow);
+}
+
+/* 稿 fe-hero：左边插画、右边一段话，撑满剩下的高度。 */
+[data-qx-page="me"] .me-hero {
+  flex: 1 1 0;
+  min-height: min-content;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 16px 18px;
+}
+
+[data-qx-page="me"] .me-hero.me-pin {
+  flex: 0 0 auto;
+}
+
+[data-qx-page="me"] .me-hero-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-qx-page="me"] .me-hero-tx > b {
+  font: 700 32px/1.3 var(--qx-serif);
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .me-split {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-qx-page="me"] .me-pin {
+  flex: 0 0 auto;
+}
+
+[data-qx-page="me"] .me-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+[data-qx-page="me"] .me-rule {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 24px;
   line-height: 1.4;
 }
 
-[data-qx-page="me"] .qxt-handover-cards button[data-variant="primary"] {
-  background: var(--qxt-card);
-  color: var(--qxt-ink);
-  border-color: #1f6b5a;
-  border-width: 2px;
+[data-qx-page="me"] .me-rule i {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 22px;
 }
 
-[data-qx-page="me"] .qxt-me-sync {
+[data-qx-page="me"] .me-kinds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+[data-qx-page="me"] .me-kinds > div {
+  min-height: 84px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+[data-qx-page="me"] .me-kinds b {
+  font-size: 24px;
+}
+
+[data-qx-page="me"] .me-kinds span {
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-3);
+  font-weight: 700;
+}
+
+[data-qx-page="me"] .me-sync {
   margin: 0;
   padding: 12px 16px;
   border-radius: 18px;
   background: var(--qxt-teal-wash);
   color: var(--qxt-teal-ink);
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="me"] .qxt-me-k {
-  margin: 4px 0 0;
-  font-size: var(--qxt-fs-body);
+  font-size: 22px;
+  line-height: 1.45;
   font-weight: 700;
 }
 
-[data-qx-page="me"] .qxt-me-lead,
-[data-qx-page="me"] .qxt-me-idle {
-  margin: 0;
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="me"] .qxt-me-state {
-  flex: 1 0 auto;
-  min-height: 100%;
+[data-qx-page="me"] .me-jump-tx {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 2px;
 }
 
-[data-qx-page="me"] .qxt-me-stack {
-  flex: 1 1 auto;
+[data-qx-page="me"] .me-id {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-}
-
-[data-qx-page="me"] .qxt-me-login,
-[data-qx-page="me"] .qxt-me-can,
-[data-qx-page="me"] .qxt-me-exit {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
+  gap: 4px;
+  padding: 14px 18px;
   border-radius: 22px;
   background: var(--qxt-card);
-  border: 1px solid var(--qxt-line);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page="me"] .me-id b {
+  font: 700 36px/1.25 var(--qx-serif);
+}
+
+[data-qx-page="me"] .me-id span {
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="me"] .me-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+[data-qx-page="me"] .me-count {
+  min-height: 116px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
   text-align: left;
-  color: var(--qxt-ink);
-}
-
-[data-qx-page="me"] .qxt-me-exit {
-  flex: 1 1 auto;
-  min-height: 88px;
-  width: 100%;
-  align-items: stretch;
-}
-
-[data-qx-page="me"] .qxt-me-exit > span {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
-  min-width: 0;
+  gap: 2px;
 }
 
-[data-qx-page="me"] .qxt-me-exit .qxt-me-ic {
-  width: 120px;
-  height: auto;
-  min-height: 64px;
-  align-self: stretch;
+[data-qx-page="me"] .me-count b {
+  font: 700 40px/1 var(--qx-sans);
+  font-variant-numeric: tabular-nums;
 }
 
-[data-qx-page="me"] .qxt-me-can b,
-[data-qx-page="me"] .qxt-me-can small,
-[data-qx-page="me"] .qxt-me-exit b,
-[data-qx-page="me"] .qxt-me-exit small,
-[data-qx-page="me"] .qxt-me-login b,
-[data-qx-page="me"] .qxt-me-login p {
-  display: block;
+[data-qx-page="me"] .me-count b.me-ghost {
+  font: 700 28px/1.2 var(--qx-sans);
 }
 
-[data-qx-page="me"] .qxt-me-exit small,
-[data-qx-page="me"] .qxt-me-can small,
-[data-qx-page="me"] .qxt-me-login p {
-  margin: 4px 0 0;
-  font-weight: 500;
-  color: var(--qxt-ink-soft, var(--qxt-ink));
+[data-qx-page="me"] .me-count em {
+  font-style: normal;
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+  margin-left: 4px;
 }
 
-/* 小节标题只有两个字，落在取样区左边。加一条横线，避免标题上下被当成整行空白。 */
-[data-qx-page="me"] .settings-page .qx-me-row {
-  min-height: 88px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+[data-qx-page="me"] .me-count span {
+  font-size: 22px;
+  font-weight: 700;
 }
 
-[data-qx-page="me"] .settings-page .settings-note {
-  padding-top: 12px;
-  padding-bottom: 12px;
+[data-qx-page="me"] .me-count small {
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-3);
+  font-weight: 600;
 }
 
-[data-qx-page="me"] .settings-section-title {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 0;
+[data-qx-page="me"] .qxt-back:disabled {
+  opacity: 0.42;
 }
 
-[data-qx-page="me"] .settings-section-title::after {
-  content: "";
-  flex: 1 1 auto;
-  height: 2px;
-  background: var(--qxt-line);
-}
-
-/* 活动列表、详情内容短时，底下一句说明接高。左边色块随卡片拉高，不是铺底色。 */
-[data-qx-page="me"] .k8-activities-scroll {
+/* ── 登录门、错误、读取中、空态（稿 gate / err / loading / emptyPack） ── */
+[data-qx-page="me"] .me-state {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
-  min-height: 0;
-  overflow: visible;
-  gap: 16px;
-}
-
-[data-qx-page="me"] .k8-activities-grid {
-  align-items: start;
-}
-
-[data-qx-page="me"] .k8-activity-card,
-[data-qx-page="me"] .k8-activity-card > div {
-  height: auto;
-}
-
-[data-qx-page="me"] .k8-activities-notice,
-[data-qx-page="me"] .k8-act-notice {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: stretch;
-  gap: 16px;
-  min-height: 88px;
-  margin: 0;
-  padding: 18px 20px;
-  border-radius: 22px;
-  background: var(--qxt-card);
-  border: 1px solid var(--qxt-line);
-  color: var(--qxt-ink);
-}
-
-[data-qx-page="me"] .k8-activities-notice > svg,
-[data-qx-page="me"] .k8-act-notice > svg {
-  flex: none;
-  width: 72px;
-  height: auto;
-  min-height: 72px;
-  align-self: stretch;
-  padding: 18px;
-  box-sizing: border-box;
-  border-radius: 18px;
-  background: var(--qxt-teal-wash);
-  color: #1f6b5a;
-}
-
-[data-qx-page="me"] .k8-activities-notice > span,
-[data-qx-page="me"] .k8-act-notice > span {
-  display: flex;
-  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-[data-qx-page="me"] .qxt-me-ic {
+[data-qx-page="me"] .me-stack {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-qx-page="me"] .me-login {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 14px 18px;
+}
+
+[data-qx-page="me"] .me-login-vis {
+  display: grid;
+  place-items: center;
+  min-height: 168px;
+}
+
+[data-qx-page="me"] .me-login b {
+  display: block;
+  font: 700 32px/1.3 var(--qx-serif);
+}
+
+[data-qx-page="me"] .me-login p {
+  margin: 6px 0 0;
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="me"] .me-can {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  min-height: 84px;
+}
+
+[data-qx-page="me"] .me-ic {
   flex: none;
   width: 64px;
   height: 64px;
@@ -417,78 +561,152 @@
   place-items: center;
 }
 
-[data-qx-page="me"] .qxt-me-ic svg {
-  width: 36px;
-  height: 36px;
-}
-
-[data-qx-page="me"] .qxt-me-counts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-[data-qx-page="me"] .qxt-me-counts div {
-  min-height: 88px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--qxt-card);
-  border: 1px solid var(--qxt-line);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-}
-
-[data-qx-page="me"] .qxt-me-skel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-[data-qx-page="me"] .qxt-me-skel-row {
-  min-height: 72px;
-  border-radius: 18px;
-  background: var(--qxt-card);
-  border: 1px solid var(--qxt-line);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-  padding: 14px 18px;
-}
-
-[data-qx-page="me"] .qxt-me-skel-row span {
+[data-qx-page="me"] .me-can b {
   display: block;
-  height: 18px;
-  border-radius: 9px;
-  background: var(--qxt-line);
+  font-size: 26px;
+  line-height: 1.3;
 }
 
-[data-qx-page="me"] .qxt-me-skel-row span:first-child {
-  width: 46%;
+[data-qx-page="me"] .me-can span > span {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
 }
 
-[data-qx-page="me"] .qxt-me-skel-row span:last-child {
-  width: 72%;
-}
-
-[data-qx-page="me"] .qxt-me-ai {
-  display: inline-flex;
+[data-qx-page="me"] .me-exit {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 16px;
   align-items: center;
-  min-height: 36px;
-  margin-top: 8px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--qxt-teal-wash);
-  color: var(--qxt-teal-ink);
-  font-size: var(--qxt-fs-aux);
+  text-align: left;
+  width: 100%;
+  min-height: 88px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 14px 16px;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .me-exit > .me-art {
+  max-height: 100%;
+}
+
+[data-qx-page="me"] .me-exit-art {
+  flex: none;
+  width: 132px;
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page="me"] .me-exit.me-tall .me-exit-art {
+  width: 240px;
+}
+
+[data-qx-page="me"] .me-exit b {
+  display: block;
+  font: 700 32px/1.25 var(--qx-serif);
+}
+
+[data-qx-page="me"] .me-exit small {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
+}
+
+[data-qx-page="me"] .me-skel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page="me"] .me-skel b {
+  font-size: 22px;
+  color: var(--qxt-ink-3);
   font-weight: 700;
 }
 
-/* 共享流光和光晕的盒子画出视口，带上 overflow:hidden 只是看起来裁掉了。
-   测量仍算越界。只收本页的盒子，不改 .qxt-* 默认。光晕改成铺满意图带再画渐变，
-   可见的那一团还在右上角。流光左右各让出一截，路径坐标和漂移都落在屏内。 */
+[data-qx-page="me"] .me-skel i {
+  display: block;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page="me"] .me-skel i.me-short {
+  width: 58%;
+}
+
+[data-qx-page="me"] .me-ghost {
+  color: var(--qxt-ink-3);
+  font: 700 28px/1.2 var(--qx-sans);
+}
+
+/* ── 「还是你吗？」两张答案卡 ── */
+[data-qx-page="me"] .me-answers {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+[data-qx-page="me"] .me-answers > button {
+  flex: 1 1 0;
+  min-height: 160px;
+  min-width: var(--qxt-tap);
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 24px;
+  text-align: left;
+}
+
+[data-qx-page="me"] .me-answers > button .me-answer-art {
+  flex: none;
+  width: 240px;
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page="me"] .me-answers b {
+  display: block;
+  font: 700 32px/1.25 var(--qx-serif);
+}
+
+[data-qx-page="me"] .me-answers small {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
+}
+
+[data-qx-page="me"] [role="alertdialog"] {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 共享流光和光晕的盒子画出视口，带上 overflow:hidden 只是看起来裁掉了，测量仍算越界。
+   只收本页的盒子，不改 .qxt-* 默认；可见的那一团还在右上角。 */
 [data-qx-page="me"] .qxt-screen .qxt-flow svg {
   left: 7%;
   width: 84%;
@@ -602,12 +820,6 @@
     font-size: 20px;
   }
 
-  [data-qx-page="me"] .qxt-screen .qxt-seal {
-    width: 72px;
-    height: 72px;
-    font-size: 36px;
-  }
-
   [data-qx-page="me"] .qxt-screen .qxt-nav {
     height: 76px;
   }
@@ -621,17 +833,6 @@
   [data-qx-page="me"] .qxt-screen .qxt-nav svg {
     width: 28px;
     height: 28px;
-  }
-
-  [data-qx-page="me"] .settings-page .qx-me-row {
-    padding: 12px 14px;
-    gap: 10px;
-    align-items: flex-start;
-  }
-
-  [data-qx-page="me"] .settings-page .qx-me-row-ico {
-    width: 48px;
-    height: 48px;
   }
 
   [data-qx-page="me"] .qxt-screen .qxt-dock {
@@ -652,5 +853,37 @@
     white-space: normal;
     line-height: 1.15;
     font-size: 20px;
+  }
+
+  [data-qx-page="me"] .me-login {
+    grid-template-columns: 1fr;
+  }
+
+  [data-qx-page="me"] .me-login-vis {
+    min-height: 0;
+  }
+
+  [data-qx-page="me"] .me-counts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  [data-qx-page="me"] .me-kinds {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  [data-qx-page="me"] .me-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  [data-qx-page="me"] .me-exit-art,
+  [data-qx-page="me"] .me-exit.me-tall .me-exit-art,
+  [data-qx-page="me"] .me-answers > button .me-answer-art {
+    width: 72px;
+  }
+
+  [data-qx-page="me"] .me-answers > button {
+    padding: 14px;
+    gap: 12px;
   }
 }

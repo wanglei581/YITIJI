@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { BellIcon, ClockIcon, HelpCircleIcon, MessageSquareIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { whenMiniapp } from '../../copy/unattendedCopy'
@@ -120,113 +119,90 @@ function ProfileContent() {
 
   const status = statusFor(uiState)
 
-  const dock = uiState === 'member' || uiState === 'ready'
+  const onEnd = () => endKioskUse('end_use')
+  // 底栏右边的主按钮：未登录去登录；读不到重新读取；读取中不放主按钮；其余都是「结束使用」，
+  // 待办里的「继续付款 / 看出纸进度 / 去首页开始」在待办卡上。
+  const dock = uiState === 'signed-out'
     ? (
-      <button type="button" className="qx-btn" data-variant="danger" data-testid="profile-primary" onClick={() => endKioskUse('end_use')}>
-        结束使用
+      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={goLogin}>
+        <span data-testid="profile-login">去登录</span>
       </button>
     )
-    : (
-      <ProfileCta
-        uiState={uiState}
-        pendingTask={pendingTask}
-        onLogin={goLogin}
-        onHome={() => navigate('/')}
-        onRetry={() => setReloadKey((key) => key + 1)}
-        onHelp={() => navigate('/help')}
-        onProgress={() => {
-          if (!pendingTask) return
-          navigate('/print/progress', {
-            state: {
-              taskId: pendingTask.id,
-              orderId: pendingTask.resume.orderId,
-              orderNo: pendingTask.resume.orderNo,
-              amountCents: pendingTask.resume.amountCents,
-              paymentSessionToken: pendingTask.resume.paymentSessionToken,
-            },
-          })
-        }}
-      />
-    )
+    : uiState === 'error'
+      ? (
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={() => setReloadKey((key) => key + 1)}>
+          重新读取
+        </button>
+      )
+      : uiState === 'loading'
+        ? null
+        : (
+          <button type="button" className="qx-btn" data-variant="danger" data-testid="profile-primary" onClick={onEnd}>
+            结束使用
+          </button>
+        )
+
+  const signedIn = isLoggedIn
+  const bandTitle = uiState === 'error' ? '账号数据这次没取到' : '我的'
+  const bandSub = uiState === 'error'
+    ? '可以再试一次'
+    : uiState === 'loading' ? '正在读取数量与待办' : '简历、文档、订单、收藏与权益都在这里。'
 
   return (
     <div className="fusion-w5 h-full pf-root" data-kiosk-screen="profile" data-takeaway="本人资产、记录与待办" data-state={uiState} data-testid={`profile-state-${uiState}`}>
       <MeTouchShell
-        title="我的"
-        sub="简历、文档、订单、收藏与权益都在这里。"
+        title={bandTitle}
+        sub={bandSub}
         status={status}
         backLabel="返回首页"
         onBack={() => navigate('/')}
-        ask={isLoggedIn
+        ask={signedIn
           ? { label: '问小青：我的记录在哪里找？', draft: '我的简历、文档和打印订单在哪里找？离开前应该怎样结束使用？' }
           : { label: '问小青：不登录能办什么？', draft: '不登录能办什么？' }}
         primaryNode={dock}
       >
-        <div className="qx-scroll qx-grow pf-page">
-          {isLoggedIn ? (
-            <ProfileHeader
-              isLoggedIn={isLoggedIn}
-              displayName={headerDisplayName}
-              phoneMasked={headerPhoneMasked}
-              reserveBannerSpace={isLoggedIn && Boolean(pendingTask)}
-              onLogin={goLogin}
-              onOpenSettings={() => navigate('/me/settings')}
-            />
-          ) : null}
-          {isLoggedIn && miniappLine ? <p className="qxt-me-sync">{miniappLine}</p> : null}
-
+        <div className="qx-scroll qx-grow me-page">
           {uiState === 'signed-out' ? <MeProfileGuest contact={support} /> : null}
 
           {uiState === 'loading' ? <MeProfileLoading /> : null}
 
           {uiState === 'error' ? (
-            <div data-testid="profile-fallback">
-              <h2>账号数据这次没取到</h2>
+            <div data-testid="profile-fallback" className="me-state">
               <MeErrorPack reloadLabel="重新读取" onRetry={() => setReloadKey((key) => key + 1)} />
             </div>
           ) : null}
 
-          {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
-            <ProfileContinueCard task={pendingTask} tasksError={tasksError} />
+          {signedIn && uiState !== 'loading' && uiState !== 'error' ? (
+            <>
+              <ProfileHeader
+                isLoggedIn={isLoggedIn}
+                displayName={headerDisplayName}
+                phoneMasked={headerPhoneMasked}
+                reserveBannerSpace={Boolean(pendingTask)}
+                onLogin={goLogin}
+                onOpenSettings={() => navigate('/me/settings')}
+              />
+              {miniappLine ? <p className="me-sync">{miniappLine}</p> : null}
+              <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
+              <ProfileContinueCard task={pendingTask} tasksError={tasksError} empty={uiState === 'empty'} />
+              {uiState === 'empty' ? <EmptyStartRows /> : null}
+              {resumes.length + scans.length + aiRecords.length > 0 ? (
+                <ProfileSessionRecords
+                  resumes={resumes}
+                  scans={scans}
+                  aiRecords={aiRecords}
+                  onPrintFile={printFile}
+                  onDeleteResume={(id) => setResumes((prev) => prev.filter((item) => item.id !== id))}
+                  onDeleteScan={(id) => setScans((prev) => prev.filter((item) => item.id !== id))}
+                  onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((item) => item.id !== id))}
+                />
+              ) : null}
+              <AccountRows few={uiState === 'empty'} />
+              <p className="me-fine">
+                结束使用会退出本机并清除临时信息。已提交的订单与文件按保存期限管理。离开 3 分钟没操作会自动退出。
+              </p>
+            </>
           ) : null}
-
-          {isLoggedIn ? (
-            <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
-          ) : null}
-
-          {uiState === 'empty' ? (
-            <div className="qx-state" data-tone="info" data-testid="profile-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">这个账号下还没有任何记录</div>
-                <p className="qx-state-d">
-                  你还没有保存过简历、生成过文档或下过打印订单。办过之后，会列在上面几项里。
-                </p>
-              </span>
-            </div>
-          ) : null}
-          {uiState === 'empty' ? <EmptyStartRows /> : null}
-
-          {isLoggedIn && (resumes.length + scans.length + aiRecords.length > 0 || uiState === 'member' || uiState === 'ready' || uiState === 'printing') ? (
-            <ProfileSessionRecords
-              resumes={resumes}
-              scans={scans}
-              aiRecords={aiRecords}
-              onPrintFile={printFile}
-              onDeleteResume={(id) => setResumes((prev) => prev.filter((item) => item.id !== id))}
-              onDeleteScan={(id) => setScans((prev) => prev.filter((item) => item.id !== id))}
-              onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((item) => item.id !== id))}
-            />
-          ) : null}
-
-          {isLoggedIn ? <AccountRows onEnd={() => endKioskUse('end_use')} primaryEnd={uiState === 'member' || uiState === 'ready'} /> : null}
-
-          <p className="pf-truth">
-            <span><b>结束使用会退出本机并清除临时信息。</b>已提交的订单与文件按保存期限管理。离开 3 分钟没操作会自动退出。</span>
-            <button type="button" onClick={() => navigate('/legal/privacy')}>
-              隐私说明
-            </button>
-          </p>
         </div>
       </MeTouchShell>
     </div>
@@ -262,62 +238,24 @@ function statusFor(state: ProfileUiState): { tone: 'ok' | 'warn' | 'bad' | 'unkn
   return { tone: 'unknown', label: '已登录' }
 }
 
-function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boolean }) {
+function AccountRows({ few }: { few: boolean }) {
   const navigate = useNavigate()
   const rows = [
-    { icon: ClockIcon, title: '浏览与跳转记录', desc: '只记录你看过和打开过的来源，不记录投递结果。', to: '/me/activity', testid: 'profile-activity' },
-    { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: HelpCircleIcon, title: '帮助中心', desc: '常见问题与服务电话', to: '/help', testid: 'profile-help' },
-    { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
-    { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { title: '浏览与跳转记录', desc: '你看过的政策，和打开过的来源', to: '/me/activity', testid: 'profile-activity' },
+    { title: '消息通知', desc: '打印、反馈和公告', to: '/me/notifications', testid: 'profile-notifications' },
+    { title: '帮助中心', desc: '常见问题与服务电话', to: '/help', testid: 'profile-help' },
+    { title: '意见反馈', desc: '提交后能看到处理状态', to: '/me/feedback', testid: 'profile-feedback' },
+    { title: '隐私请求', desc: '可撤回 AI 使用授权', to: '/me/privacy-requests', testid: 'profile-privacy' },
+    { title: '账号设置', desc: '换绑、协议、结束使用', to: '/me/settings', testid: 'profile-account' },
   ]
   return (
-    <section>
-      <div className="qx-sec-h">
-        <span className="t">通知与支持</span>
-        <span className="hint">只列已经能用的</span>
-      </div>
-      <div className="qx-rows pf-support-rows">
-        {rows.map((row) => (
-          <button
-            type="button"
-            key={row.to}
-            className="qx-row"
-            data-testid={row.testid}
-            onClick={() => navigate(row.to)}
-          >
-            <span className="qx-row-ic">
-              <row.icon size={24} aria-hidden />
-            </span>
-            <span className="qx-row-tx">
-              <span className="qx-row-t">{row.title}</span>
-              <span className="qx-row-d">{row.desc}</span>
-            </span>
-            <span className="qx-row-go">›</span>
-          </button>
-        ))}
-        <button
-          type="button"
-          className="qx-row"
-          data-testid="profile-account"
-          onClick={() => navigate('/me/settings')}
-        >
-          <span className="qx-row-ic">
-            <SettingsIcon size={24} aria-hidden />
-          </span>
-          <span className="qx-row-tx">
-            <span className="qx-row-t">账号设置</span>
-            <span className="qx-row-d">换号、授权和结束使用。</span>
-          </span>
-          <span className="qx-row-go">›</span>
+    <section className={`me-rows${few ? ' me-few me-links' : ''}`} aria-label="通知与支持">
+      {rows.map((row) => (
+        <button type="button" key={row.to} className="me-line" data-testid={row.testid} onClick={() => navigate(row.to)}>
+          <b>{row.title}</b>
+          <small>{row.desc}</small>
         </button>
-      </div>
-      <div className="pf-support-actions">
-        <p>离开前请点「结束使用」；这会退出登录并清掉本机这一次的临时信息。</p>
-        {primaryEnd ? null : (
-          <button type="button" className="qx-btn" data-variant="danger" data-testid="profile-end-use" onClick={onEnd}>结束使用</button>
-        )}
-      </div>
+      ))}
     </section>
   )
 }
@@ -325,86 +263,19 @@ function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boo
 function EmptyStartRows() {
   const navigate = useNavigate()
   return (
-    <section>
-      <div className="qx-sec-h">
-        <span className="t">从这里开始</span>
-      </div>
-      <div className="qx-rows">
-        <button type="button" className="qx-row" onClick={() => navigate('/resume/source')}>
-          <span className="qx-row-tx">
-            <span className="qx-row-t">上传或扫描一份简历</span>
-            <span className="qx-row-d">解析完就能诊断、优化和生成材料。</span>
-          </span>
-        </button>
-        <button type="button" className="qx-row" onClick={() => navigate('/print/upload')}>
-          <span className="qx-row-tx">
-            <span className="qx-row-t">打印你带来的文件</span>
-            <span className="qx-row-d">U 盘、手机传输或本机扫描都可以。</span>
-          </span>
-        </button>
-        <button type="button" className="qx-row" onClick={() => navigate('/policy-service')}>
-          <span className="qx-row-tx"><span className="qx-row-t">看看就业政策并收藏</span><span className="qx-row-d">查看办事指引，资格与办理以官方核验为准。</span></span>
-        </button>
-      </div>
+    <section className="me-trio" aria-label="从这里开始">
+      <button type="button" className="me-line" onClick={() => navigate('/resume/source')}>
+        <b>上传或扫描简历</b>
+        <small>解析完可以诊断</small>
+      </button>
+      <button type="button" className="me-line" onClick={() => navigate('/print/upload')}>
+        <b>打印带来的文件</b>
+        <small>U 盘、手机或扫描</small>
+      </button>
+      <button type="button" className="me-line" onClick={() => navigate('/policy-service')}>
+        <b>看看就业政策</b>
+        <small>以官方原文为准</small>
+      </button>
     </section>
   )
-}
-
-function ProfileCta({
-  uiState,
-  pendingTask,
-  onLogin,
-  onHome,
-  onRetry,
-  onProgress,
-}: {
-  uiState: ProfileUiState
-  pendingTask: PendingTask | null
-  onLogin: () => void
-  onHome: () => void
-  onRetry: () => void
-  onHelp: () => void
-  onProgress: () => void
-}) {
-  if (uiState === 'signed-out') {
-    return (
-      <button type="button" className="qx-btn" data-variant="primary" data-grow="1" data-testid="profile-primary" onClick={onLogin}>
-        <span data-testid="profile-login">去登录</span>
-      </button>
-    )
-  }
-  if (uiState === 'loading') {
-    return (
-      <><button type="button" className="qx-btn" data-variant="ghost" data-testid="profile-primary" onClick={onHome}>回首页</button></>
-    )
-  }
-  if (uiState === 'error') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onRetry}>
-          重新读取
-        </button>
-      </>
-    )
-  }
-  if (uiState === 'empty') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onHome}>
-          回首页选服务
-        </button>
-      </>
-    )
-  }
-  if (uiState === 'printing' && pendingTask) {
-    return (
-      <>
-        <p className="why">出纸完成前不要离开取件口；离开这一页不会取消已经提交的打印。</p>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="profile-primary" onClick={onProgress}>
-          看出纸进度
-        </button>
-      </>
-    )
-  }
-  return null
 }

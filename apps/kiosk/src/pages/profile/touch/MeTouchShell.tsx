@@ -8,6 +8,7 @@ import { useTerminalDeviceStatus } from '../../../hooks/useTerminalDeviceStatus'
 import { getTerminalCode } from '../../../services/api/terminalConfig'
 import { printerTouchStatus, toTouchStatus, type MeBandStatus } from './meTouchStatus'
 import './me-touch.css'
+import './me-pages.css'
 
 export type { MeBandStatus }
 
@@ -23,15 +24,17 @@ export function MeTouchShell({
   status,
   showPrinter = false,
   back = true,
+  backDisabled = false,
   backLabel = '返回',
   onBack,
   ask,
   primaryNode,
   nav = true,
+  overlay,
   children,
   testId,
   stateId,
-  bodyClassName = 'qxt-body-scroll qxt-me-pad',
+  bodyClassName = 'qxt-me-pad',
 }: {
   title: string
   eyebrow?: string
@@ -40,11 +43,15 @@ export function MeTouchShell({
   status?: MeBandStatus | null
   showPrinter?: boolean
   back?: boolean
+  /** 返回键还在但此刻不能点（换绑提交中、正在清场）。 */
+  backDisabled?: boolean
   backLabel?: string
   onBack?: () => void
   ask?: QxTouchAsk
   primaryNode?: ReactNode
   nav?: boolean
+  /** 弹层。盖在这一屏上，底下的内容变成不可点（QxTouchScreen 负责）。 */
+  overlay?: ReactNode
   children: ReactNode
   testId?: string
   stateId?: string
@@ -62,6 +69,7 @@ export function MeTouchShell({
         testId={testId}
         stateId={stateId}
         bodyClassName={bodyClassName}
+        overlay={overlay}
         band={(
           <QxTouchBand
             kind="compact"
@@ -71,14 +79,16 @@ export function MeTouchShell({
             sub={sub}
             status={bandStatus}
             back={back}
+            backDisabled={backDisabled}
             onBack={onBack}
-            seal="idle"
+            seal={null}
             place={place}
           />
         )}
         dock={showDock ? (
           <QxTouchDock
             back={back}
+            backDisabled={backDisabled}
             backLabel={backLabel}
             onBack={onBack}
             ask={ask}

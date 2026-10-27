@@ -150,7 +150,8 @@ assertNotContains(
 )
 // 2026-09-23 稿 38 迁入青序流光后打印键用 lucide PrinterIcon，不再是墨青 KIcon name="printer"；
 // 改钉按钮本身：可见的「打印」键点击后真的走本页 print(doc)（换短期 printFileUrl → /print/confirm）。
-assertContains('src/pages/profile/me/MyDocumentsPage.tsx', /onClick=\{\(\) => \{ if \(reprintBlocked\) return; void print\(doc\) \}\}[\s\S]{0,200}?<PrinterIcon[\s\S]{0,160}?'打印'/, 'MyDocuments exposes print action')
+// 触屏版第 6 包：打印键是触屏按钮（MeBtn），不再带 PrinterIcon；仍钉按钮本身点击后走本页 print(doc)，键名仍是「打印」。
+assertContains('src/pages/profile/me/MyDocumentsPage.tsx', /onClick=\{\(\) => \{ if \(reprintBlocked\) return; void print\(doc\) \}\}[\s\S]{0,40}?>\s*\{reprintBlocked \? '重新打印' : printingThis \? '准备中' : '打印'\}/, 'MyDocuments exposes print action')
 assertContains('src/pages/profile/me/MyDocumentsPage.tsx', "origin: 'my_documents'", 'MyDocuments reuses the print chain through the print handoff context')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',

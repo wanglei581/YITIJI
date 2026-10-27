@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
+import { QxTouchChip } from '../../components/qingxu/touch/QxTouchChip'
 import { MeTouchShell } from '../profile/touch/MeTouchShell'
+import { MeBtn, MeRows } from '../profile/touch/MeKit'
 import { MeEmptyPack, MeErrorPack, MeExitCard, MeLoadingPack } from '../profile/touch/MeStatePacks'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
-import {
-  ChevronRightIcon,
-  GiftIcon,
-  InfoIcon,
-  LandmarkIcon,
-  PackageIcon,
-  TicketIcon,
-  type LucideIcon,
-} from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { listBenefitActivities } from '../../services/api/benefitActivities'
 import { formatTime } from '../profile/assets/format'
@@ -20,12 +12,12 @@ import './activities-batch8.css'
 
 type PageState = 'loading' | 'ready' | 'error'
 
-const TYPE_META: Record<BenefitActivityType, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-error-bg', color: 'text-error-fg' },
-  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
-  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
-  ai_quota: { label: 'AI 次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
-  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
+const TYPE_LABEL: Record<BenefitActivityType, string> = {
+  coupon: '优惠券',
+  free_quota: '免费次数',
+  package_entitlement: '服务额度',
+  ai_quota: 'AI 次数',
+  subsidy_eligibility_hint: '政策资格提示',
 }
 
 const SOURCE_LABEL: Record<BenefitActivitySourceType, string> = {
@@ -52,11 +44,17 @@ function stockLabel(item: BenefitActivityListItem): string {
 }
 
 function ctaLabel(item: BenefitActivityListItem, isLoggedIn: boolean): string {
-  if (!isLoggedIn) return '登录后领取'
-  if (item.claimed) return '查看我的权益'
-  if (item.soldOut) return '已领完'
   if (item.ended) return '已结束'
-  return '查看详情'
+  if (item.soldOut && !item.claimed) return '已领完'
+  if (item.claimed) return '查看我的权益'
+  if (!isLoggedIn) return '登录后领取'
+  return '查看活动'
+}
+
+function quantityText(item: BenefitActivityListItem): string {
+  if (item.benefitType === 'subsidy_eligibility_hint') return '仅提供政策资格和官方入口指引'
+  if (item.quantityTotal === null) return '一次性权益'
+  return `${item.quantityTotal} 次 / 份服务额度`
 }
 
 export function BenefitActivitiesPage() {
@@ -111,87 +109,56 @@ export function BenefitActivitiesPage() {
       sub={`${subtitle}${countSuffix}`}
       backLabel="返回我的"
       onBack={() => navigate('/profile')}
-      status={{ tone: state === 'error' ? 'warn' : 'unknown', label: state === 'error' ? '这次没读到' : (items.length === 0 && state === 'ready' ? '现在没有活动' : '可以先看再领') }}
+      status={{ tone: state === 'error' ? 'warn' : 'ok', label: state === 'error' ? '这次没读到' : (items.length === 0 && state === 'ready' ? '现在没有活动' : '可以先看再领') }}
       ask={{ label: '问小青：领取代表报名了吗？', draft: '领取代表报名了吗？' }}
     >
-      <section data-kiosk-domain="profile" data-kiosk-screen="activities" className="flex min-h-0 flex-1 flex-col gap-4">
+      <section data-kiosk-domain="profile" data-kiosk-screen="activities" className="me-page">
+        <MeBtn v="sec" onClick={() => navigate('/me/benefits')}>我的权益</MeBtn>
 
-      <button type="button" className="qx-btn" data-variant="secondary" onClick={() => navigate('/me/benefits')}>
-        我的权益
-      </button>
-
-      <div className="k8-activities-compliance rounded-xl border border-warning/30 bg-warning-bg px-[22px] py-3.5 leading-relaxed">
-        领取不代表报名、签到或投递。权益活动只用于本终端服务与打印辅助。政策资格提示只提供官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。
-      </div>
-
-      <div className="k8-activities-scroll min-h-0 pb-5">
         {state === 'loading' ? (
           <MeLoadingPack rows={6} />
         ) : state === 'error' ? (
           <MeErrorPack onRetry={() => setReloadKey((k) => k + 1)} />
         ) : items.length === 0 ? (
           <MeEmptyPack sentence="现在没有可参加的活动。">
-            <MeExitCard art="print" title="去打印" desc="没有活动也能打印、扫描" onClick={() => navigate('/print-scan')} />
-            <MeExitCard title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+            <MeExitCard art="phone" artWidth={150} tall title="去打印" desc="没有活动也能打印、扫描" onClick={() => navigate('/print-scan')} />
+            <MeExitCard art="checklist" artWidth={140} tall title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
           </MeEmptyPack>
         ) : (
-          <div className="k8-activities-grid grid grid-cols-2 gap-4">
+          <MeRows few={items.length < 5} label="可参加的活动">
             {items.map((item) => {
-              const meta = TYPE_META[item.benefitType]
-              const Icon = meta.icon
+              const off = item.ended || item.soldOut
               return (
-                <Card key={item.id} className="k8-activity-card p-0" data-benefit-type={item.benefitType} data-ended={item.ended || undefined}>
-                  <div className="flex flex-col gap-3 p-[22px_24px]">
-                    <div className="flex items-start gap-3.5">
-                      <div className="k8-activity-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px]">
-                        <Icon className="h-[30px] w-[30px]" aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="k8-activity-src-chip">{SOURCE_LABEL[item.sourceType]}</span>
-                          <span className="k8-activity-type-chip">{meta.label}</span>
-                          <span className={`k8-activity-stock ml-auto ${item.ended || item.soldOut ? 'is-off' : item.stockRemaining !== null && item.stockRemaining <= 5 ? 'is-low' : 'is-ok'}`}>
-                            {stockLabel(item)}
-                          </span>
-                        </div>
-                        <h2 className="mt-2 font-serif text-[25px] font-bold leading-snug text-neutral-900">{item.title}</h2>
-                      </div>
-                    </div>
-
-                    {item.description && <p className="line-clamp-2 text-[17px] leading-relaxed text-neutral-500">{item.description}</p>}
-
-                    <div className="mt-auto space-y-1 text-[16px] text-neutral-500">
-                      <p>{validity(item)}</p>
-                      <p>
-                        {item.claimed ? '已领取 · 可在我的权益查看' : stockLabel(item)}
-                      </p>
-                    </div>
-
-                    <Button
-                      className="k8-activity-action min-h-[60px] w-full text-[20px]"
-                      variant={item.claimed ? 'secondary' : 'primary'}
-                      disabled={isLoggedIn && !item.claimed && (item.soldOut || item.ended)}
-                      onClick={() => {
-                        if (!isLoggedIn) navigate('/login', { state: { from: `/activities/${item.id}` } })
-                        else if (item.claimed) navigate('/me/benefits')
-                        else navigate(`/activities/${item.id}`)
-                      }}
-                    >
-                      {ctaLabel(item, isLoggedIn)}
-                      <ChevronRightIcon className="ml-1 h-4 w-4" aria-hidden="true" />
-                    </Button>
+                <div key={item.id} className="me-line me-act" data-benefit-type={item.benefitType} data-ended={item.ended || undefined}>
+                  <div className="me-chips">
+                    <QxTouchChip>{SOURCE_LABEL[item.sourceType]}</QxTouchChip>
+                    <QxTouchChip tone="slate">{TYPE_LABEL[item.benefitType]}</QxTouchChip>
+                    <QxTouchChip tone={off ? 'clay' : 'teal'}>{stockLabel(item)}</QxTouchChip>
                   </div>
-                </Card>
+                  <h2 className="me-act-title">{item.title}</h2>
+                  {item.description ? <small>{item.description}</small> : null}
+                  <small>{validity(item)} · {quantityText(item)}</small>
+                  <MeBtn
+                    v={item.claimed ? 'sec' : 'pri'}
+                    className="k8-activity-action me-wide"
+                    disabled={off && !item.claimed ? true : undefined}
+                    onClick={() => {
+                      if (item.claimed) navigate('/me/benefits')
+                      else if (!isLoggedIn) navigate('/login', { state: { from: `/activities/${item.id}` } })
+                      else navigate(`/activities/${item.id}`)
+                    }}
+                  >
+                    {ctaLabel(item, isLoggedIn)}
+                  </MeBtn>
+                </div>
               )
             })}
-          </div>
+          </MeRows>
         )}
-      </div>
 
-      <p className="k8-activities-notice">
-        <InfoIcon aria-hidden="true" />
-        <span>领取不代表报名。活动发布后才会在这里展示；未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。</span>
-      </p>
+        <p className="me-fine k8-activities-notice">
+          领取不代表报名、签到或投递。权益活动只用于本终端服务与打印辅助；政策资格提示只给官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。没登录也可以先看。
+        </p>
       </section>
     </MeTouchShell>
     </div>

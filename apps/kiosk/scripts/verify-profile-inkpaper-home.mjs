@@ -451,6 +451,10 @@ const allowedLowRiskInkpaperChanged = new Set([
   // 2026-10-27 触屏版第 6 包：我的与权益共用页壳。只加白名单行，不改上面的行为断言。
   'apps/kiosk/src/pages/profile/touch/MeTouchShell.tsx',
   'apps/kiosk/src/pages/profile/touch/MeStatePacks.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeIllus.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeKit.tsx',
+  'apps/kiosk/src/pages/profile/touch/me-pages.css',
+  'apps/kiosk/src/pages/profile/touch/me-tokens.css',
   'apps/kiosk/src/pages/profile/touch/me-touch.css',
   'apps/kiosk/src/pages/profile/touch/meTouchStatus.ts',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',

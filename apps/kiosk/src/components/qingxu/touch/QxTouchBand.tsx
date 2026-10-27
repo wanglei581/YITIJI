@@ -50,6 +50,7 @@ export function QxTouchBand({
   pathLabel,
   onBack,
   back = true,
+  backDisabled = false,
   live = false,
   titleId,
 }: {
@@ -65,6 +66,8 @@ export function QxTouchBand({
   pathLabel?: string
   onBack?: () => void
   back?: boolean
+  /** 返回键还在、但此刻不能点（提交中、正在清场）。不传时和以前一样。 */
+  backDisabled?: boolean
   live?: boolean
   /** 不传时标题没有 id，和以前一样。交接屏用它把对话框说明连到这句标题上。 */
   titleId?: string
@@ -84,7 +87,7 @@ export function QxTouchBand({
       <div className="qxt-halo" />
       <div className="qxt-hdr">
         {back ? (
-          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={goBack}>
+          <button type="button" className="qxt-back" aria-label="返回上一步" disabled={backDisabled} onClick={goBack}>
             <QxTouchIcon name="chevL" size={34} strokeWidth={2.4} />
           </button>
         ) : null}

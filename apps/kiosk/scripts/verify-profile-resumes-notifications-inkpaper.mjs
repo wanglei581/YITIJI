@@ -64,7 +64,8 @@ expectIncludes(resumes, "taskPath('/resume/report', taskId)", '我的简历保�
 expectIncludes(resumes, "taskPath('/resume/optimize', taskId)", '我的简历保留优化页跳转')
 expectIncludes(resumes, 'taskId: item.taskId, resumeName: resumeLabel(item)', '我的简历保留岗位匹配参考跳转')
 expectIncludes(resumes, "taskPath('/resume/generate/preview', taskId)", '我的简历保留 AI 生成预览跳转')
-expectIncludes(resumes, "item.status === 'completed'", '我的简历保留完成态才可操作')
+// 触屏版第 6 包：只有完成态才可操作由 recordUnavailableReason 统一判定（aiRecordNavigation 里 status !== 'completed' 即不可开），本页不再另写一遍。
+expectIncludes(read('src/pages/profile/me/aiRecordNavigation.ts'), "item.status !== 'completed'", '我的简历保留完成态才可操作（统一判定）')
 expectIncludes(resumes, 'recordUnavailableReason(item)', '我的简历保留未完成/失败禁用原因')
 // 证据锚点随稿换字，判据不变：空态仍说明这个账号还没有简历，不造记录。
 expectIncludes(resumes, '这个账号还没有简历记录', '我的简历保留空态标题')
@@ -83,10 +84,11 @@ expectMatches(
   /loginFrom\s*=\s*['"]\/me\/notifications['"]/,
   '消息通知保留登录回跳来源',
 )
-expectIncludes(notifications, 'setUnreadOnly(tab.key)', '消息通知保留未读筛选')
+// 触屏稿的筛选是两段按钮，锚点随稿换字，判据不变。
+expectIncludes(notifications, "setUnreadOnly(id === 'unread')", '消息通知保留未读筛选')
 expectIncludes(notifications, '当前没有可读取的消息', '消息通知保留未连接/未登录空态')
 expectIncludes(notifications, '当前没有未读消息', '消息通知保留未读空态')
-expectIncludes(notifications, '当前没有消息通知', '消息通知保留全部空态')
+expectIncludes(notifications, "'还没有消息。'", '消息通知保留全部空态（稿上的说法）')
 expectIncludes(notifications, "item.relatedType === 'feedback_ticket' && item.relatedId", '消息通知保留反馈关联判断')
 expectIncludes(notifications, "navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)", '消息通知保留相关反馈跳转')
 expectIncludes(notifications, '已标记全部已读', '消息通知保留全部已读成功提示')

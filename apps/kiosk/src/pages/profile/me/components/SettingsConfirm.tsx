@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { MeArt } from '../../touch/MeIllus'
 
 export function SettingsConfirm({ title, description, confirmLabel, cancelLabel = '取消', confirmDetail, cancelDetail, labelledBy, describedBy, testId, danger, busy = false, error, onConfirm, onCancel, layout = 'dialog' }: {
   title: string
@@ -23,21 +24,30 @@ export function SettingsConfirm({ title, description, confirmLabel, cancelLabel 
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
+  // 卡片形态按 Esc 等于「不是我」。处理函数放进 ref，父组件每次重绘换新函数也不会重绑监听、重抢焦点。
+  const latestCancel = useRef(onCancel)
+  useEffect(() => { latestCancel.current = onCancel })
   useEffect(() => {
-    if (layout === 'cards') {
-      cancelRef.current?.focus()
-      const onKey = (event: KeyboardEvent) => {
-        if (event.key !== 'Escape' || busy) return
-        event.preventDefault()
-        onCancel()
-      }
-      window.addEventListener('keydown', onKey)
-      return () => window.removeEventListener('keydown', onKey)
+    if (layout !== 'cards') return
+    // 出现时焦点落在「不是我」那张卡上：误触回车只会结束使用，不会把上一位的资料亮出来。
+    cancelRef.current?.focus()
+  }, [layout])
+  useEffect(() => {
+    if (layout !== 'cards') return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || busy) return
+      event.preventDefault()
+      latestCancel.current()
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [layout, busy])
+  useEffect(() => {
+    if (layout === 'cards') return
     const previous = document.activeElement as HTMLElement | null
     dialog.current?.showModal()
     return () => { previous?.focus() }
-  }, [layout, busy, onCancel])
+  }, [layout])
   if (layout === 'cards') {
     const labelId = labelledBy ?? 'account-action-title'
     const descId = describedBy ?? 'account-action-desc'
@@ -46,26 +56,16 @@ export function SettingsConfirm({ title, description, confirmLabel, cancelLabel 
         {labelledBy ? null : <h2 id="account-action-title">{title}</h2>}
         {describedBy ? null : <p id="account-action-desc">{description}</p>}
         {error ? <p role="alert" className="settings-error">{error}</p> : null}
-        <div className="qxt-handover-cards">
+        <div className="me-answers">
           <button type="button" data-variant="primary" disabled={busy} onClick={onConfirm}>
-            <span className="qxt-me-art qxt-me-art-doc" aria-hidden="true">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <path d="M14 8h14l8 8v24H14z" />
-                <path d="M28 8v8h8M18 26h12M18 32h8" />
-              </svg>
-            </span>
+            <span className="me-answer-art"><MeArt name="resume" width={220} /></span>
             <span>
               <b>{busy ? '处理中…' : confirmLabel}</b>
               {confirmDetail ? <small>{confirmDetail}</small> : null}
             </span>
           </button>
           <button type="button" ref={cancelRef} autoFocus disabled={busy} onClick={onCancel}>
-            <span className="qxt-me-art qxt-me-art-phone" aria-hidden="true">
-              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <rect x="16" y="6" width="16" height="36" rx="3" />
-                <path d="M21 10h6M22 36h4" />
-              </svg>
-            </span>
+            <span className="me-answer-art"><MeArt name="phone" width={140} /></span>
             <span>
               <b>{cancelLabel}</b>
               {cancelDetail ? <small>{cancelDetail}</small> : null}
