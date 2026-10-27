@@ -88,11 +88,13 @@ test.describe('托管关闭（我们云上默认）', () => {
     const { errors } = collectPageFaults(page)
     await gotoPartner(page, '/', '工作台')
     await waitForMockList(page)
-    const overview = page.getByRole('region', { name: '数据概览' })
-    await expect(overview.getByText('政策公告', { exact: true })).toBeVisible()
-    await expect(overview.getByText('待审核政策', { exact: true })).toBeVisible()
+    const today = page.getByRole('region', { name: '今天要处理' })
+    const policies = page.getByRole('region', { name: '政策概况' })
+    await expect(today).toBeVisible()
+    await expect(policies.getByText('政策公告')).toBeVisible()
+    await expect(policies.getByText(/待审核/)).toBeVisible()
     for (const label of ['已上传岗位', '已上传招聘会', '已发布数据', '数据源']) {
-      await expect(overview.getByText(label, { exact: true })).toHaveCount(0)
+      await expect(page.getByText(label, { exact: true })).toHaveCount(0)
     }
     await expect(page.getByRole('heading', { name: '最近同步记录' })).toHaveCount(0)
     const notices = page.getByRole('region', { name: '平台处置通知' })
@@ -202,8 +204,10 @@ test.describe('托管打开（私有化部署 b）', () => {
     for (const label of RECRUITMENT_TABS) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toHaveCount(0)
     }
-    await expect(page.getByText('已上传岗位')).toBeVisible()
-    await expect(page.getByRole('heading', { name: '最近同步记录' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '今天要处理' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '政策概况' })).toBeVisible()
+    await expect(page.getByText('已上传岗位')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: '最近同步记录' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: '平台处置通知' })).toBeVisible()
     await shot(page, 'dashboard-hosting-on')
 

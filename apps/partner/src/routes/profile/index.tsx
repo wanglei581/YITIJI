@@ -145,6 +145,9 @@ export default function ProfilePage() {
         </Button>
       }
     >
+      {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
+      <OfficialChannelsSection />
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 基本信息（真实数据） */}
         <Card className="p-6">
@@ -198,9 +201,6 @@ export default function ProfilePage() {
           </p>
         </Card>
       </div>
-
-      {/* 本机构官方渠道（3.14）：二维码只在本机构终端显示；与内容信任无关，单独成块 */}
-      <OfficialChannelsSection />
 
       {/* 内容信任与发布权限（发布闸门依据） */}
       <Card className="mt-6 p-6">

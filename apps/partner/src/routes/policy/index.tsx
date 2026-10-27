@@ -290,14 +290,14 @@ export default function PolicyPage() {
         </div>
       )}
 
-      <div className="mb-4 flex items-center gap-2">
-        <span className="w-14 text-xs text-neutral-400">审核状态</span>
-        <div className="flex gap-2">
+      <div className="mb-4 flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-xs text-neutral-400">审核状态</span>
+        <div className="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto">
           {REVIEW_FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => { setReviewFilter(f); setPage(1) }}
-              className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-sm font-medium transition-colors ${
                 reviewFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
               }`}
             >
@@ -312,7 +312,7 @@ export default function PolicyPage() {
         busyId={busyId} openEdit={openEdit} setRulesFor={setRulesFor} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会在一体机「政策服务」页展示;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
+        政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。录入后由本机构审核通过、确认发布责任并发布,才会展示（对应一体机首页「查政策」）;平台管理员不审核、不代发,只在违法违规等紧急情况下单向下架。
         政策扶持条目可另行录入「申领条件」:条件按政策原文逐条录入,一体机据此给出「相符 / 不符 / 无法判定」的机械比对结果,不做资格认定;未录入条件的政策不会出现任何判定结论。
       </p>
 

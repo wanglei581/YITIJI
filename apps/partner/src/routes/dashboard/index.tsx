@@ -1,261 +1,308 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { formatCount, formatDateTime } from '@ai-job-print/shared'
-import { Button, Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { FIRST_ORDER_ISSUE_LABELS, formatCount, formatDate, type FirstOrderOverview } from '@ai-job-print/shared'
+import { Card } from '@ai-job-print/ui'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
-import {
-  AlertCircleIcon,
-  ArrowRightIcon,
-  BriefcaseIcon,
-  CalendarIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  DatabaseIcon,
-  RefreshCwIcon,
-  ScrollTextIcon,
-} from 'lucide-react'
+import { FIRST_ORDER_HTTP, firstOrderApi } from '../../services/api/firstOrder'
 import { getPartnerDashboard, type PartnerDashboardData } from '../../services/api/orgSelf'
+import { partnerPoliciesService, type PartnerPolicyPage } from '../../services/api/policies'
 import { getPartnerStats, type PartnerStatsResponse } from '../../services/api/stats'
-import { useRecruitmentHosting } from '../../services/capabilities'
-import { OrgNoticesSection } from './OrgNoticesSection'
+import { getPartnerTerminalOperations, type PartnerTerminalOpsView } from '../../services/api/terminalOps'
+import { OrgNoticesSection, type OrgNoticeOutcome } from './OrgNoticesSection'
 
-function firstPendingPath(snapshot: PartnerStatsResponse['snapshot']): string {
-  if (snapshot.pendingReviewJobs > 0) return '/jobs'
-  if (snapshot.pendingReviewFairs > 0) return '/fairs'
-  if (snapshot.pendingReviewPolicies > 0) return '/policy'
-  return '/companies'
+type Load<T> = { status: 'loading' | 'error' | 'ready'; data: T | null }
+type OverviewLoad =
+  | { kind: 'preview' }
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; data: FirstOrderOverview }
+
+const EMPTY_TODAY = '今天没有要核对的事'
+const MISS = '这类这次没读到'
+const MONTH_PREVIEW = '本月月报可以预览，北京时间下月 1 日起才能留存'
+const NO_PROJECT = '尚未登记服务项目，请联系平台核对'
+const PREVIEW_NOTE = '项目交付与服务需要连接真实后端。当前为预览模式，不提供演示数据或模拟操作。'
+const AI_LINE = '暂不能按本机构终端统计'
+const INCIDENTS = '/terminals?tab=delivery&section=incidents'
+const REPORTS = '/terminals?tab=delivery&section=reports'
+const PROJECT = '/terminals?tab=delivery&section=project'
+
+function shanghaiMonth(date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit' }).format(date).slice(0, 7)
 }
 
-// ─── 工作台 ────────────────────────────────────────────────────────────────
-// 内容计数来自 GET /partner/dashboard；待审核标题数与统计页统一为
-// GET /partner/stats snapshot.pendingReview（pending+reviewing，含企业）。
-// 无埋点支撑的「展示/跳转/打印次数」不展示假数字。
-//
-// 招聘内容托管关闭（3.13，我们云上默认）时：岗位 / 招聘会 / 数据源的卡片与同步记录不展示，
-// 待审核只算政策（snapshot.pendingReviewPolicies）——岗位类存量没有人能审，算进来只会误导。
-// 政策由本机构自己审核发布；岗位 / 招聘会 / 企业（托管打开时）的审核发布入口 3.15 起尚未开放（管理员侧停放）。
-
-const RESULT_CONFIG: Record<string, { label: string; badge: 'success' | 'error' | 'warning' }> = {
-  success: { label: '成功', badge: 'success' },
-  failed: { label: '失败', badge: 'error' },
-  partial: { label: '部分失败', badge: 'warning' },
+function shanghaiToday(date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
 }
 
-const DATA_TYPE_LABEL: Record<string, string> = { job: '岗位', fair: '招聘会', policy: '政策' }
-
-function PendingReviewCallout({ count, recruitmentHosting, onView }: { count: number; recruitmentHosting: boolean; onView: () => void }) {
-  if (count === 0) return null
+function BlockMiss({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-warning/30 bg-warning-bg px-5 py-4">
-      <div className="flex items-center gap-3">
-        <AlertCircleIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
-        <div>
-          <p className="text-sm font-semibold text-warning-fg">有 {formatCount(count)} 条内容待审核</p>
-          <p className="mt-0.5 text-xs text-warning-fg">
-            {recruitmentHosting
-              ? '政策由本机构自行审核并确认发布；岗位、招聘会、企业资料的审核发布入口尚未开放（平台不代审、不代发）。通过并发布后才会在终端展示'
-              : '政策由本机构自行审核：审核通过并确认发布责任后，才会在终端展示'}
-          </p>
-        </div>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        className="shrink-0 whitespace-nowrap border-warning/40 text-warning-fg hover:bg-warning-bg"
-        onClick={onView}
-      >
-        去查看
-        <ArrowRightIcon className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-      </Button>
+    <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-sm text-warning-fg">
+      <span>{MISS}</span>
+      <button type="button" onClick={onRetry} className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-warning/40 px-3 text-sm font-semibold">重试</button>
     </div>
   )
 }
 
-function MetricsGrid({
-  data,
-  snapshot,
-  recruitmentHosting,
-  onGo,
-}: {
-  data: PartnerDashboardData
-  snapshot: PartnerStatsResponse['snapshot']
-  recruitmentHosting: boolean
-  onGo: (path: string) => void
-}) {
-  const pendingReview = snapshot.pendingReview
-  const hostedMetrics = [
-    {
-      label: '已上传岗位', value: data.jobs.total,
-      note: `已发布 ${formatCount(data.jobs.published)} · 待初审 ${formatCount(data.jobs.pending)}`,
-      icon: BriefcaseIcon, iconClass: 'bg-info-bg text-info-fg', path: '/jobs',
-    },
-    {
-      label: '已上传招聘会', value: data.fairs.total,
-      note: `已发布 ${formatCount(data.fairs.published)} · 待初审 ${formatCount(data.fairs.pending)}`,
-      icon: CalendarIcon, iconClass: 'bg-purple-50 text-purple-600', path: '/fairs',
-    },
-    {
-      label: '政策公告', value: data.policies.total,
-      note: `已发布 ${formatCount(data.policies.published)} · 待初审 ${formatCount(data.policies.pending)}`,
-      icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
-    },
-    {
-      label: '已发布数据', value: data.jobs.published + data.fairs.published + data.policies.published,
-      note: `岗位 ${formatCount(data.jobs.published)} + 招聘会 ${formatCount(data.fairs.published)} + 政策 ${formatCount(data.policies.published)}`,
-      icon: CheckCircleIcon, iconClass: 'bg-success-bg text-success-fg', path: '/jobs',
-    },
-    {
-      label: '待审核数据', value: pendingReview,
-      note: pendingReview > 0 ? '含审核中与企业资料，与统计页相同' : '当前无待审核',
-      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: firstPendingPath(snapshot),
-    },
-    {
-      label: '数据源', value: data.sources.total,
-      note: `启用中 ${formatCount(data.sources.enabled)} 个`,
-      icon: DatabaseIcon, iconClass: 'bg-cyan-50 text-cyan-600', path: '/sources',
-    },
-  ]
-  // 托管关闭：只留政策。岗位 / 招聘会 / 数据源在本平台不开放，展示成 0 会被读成「还没上传」。
-  const policyOnlyMetrics = [
-    {
-      label: '政策公告', value: data.policies.total,
-      note: `已发布 ${formatCount(data.policies.published)}`,
-      icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
-    },
-    {
-      label: '待审核政策', value: snapshot.pendingReviewPolicies,
-      note: snapshot.pendingReviewPolicies > 0 ? '由本机构自行审核发布' : '当前无待审核',
-      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: '/policy',
-    },
-  ]
-  const metrics = recruitmentHosting ? hostedMetrics : policyOnlyMetrics
-  return (
-    <section role="region" aria-label="数据概览">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-        <h2 className="text-[13px] font-bold text-neutral-700">数据概览</h2>
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {metrics.map((m) => {
-          const Icon = m.icon
-          return (
-            <Card
-              key={m.label}
-              className="cursor-pointer p-4 transition-shadow hover:shadow-md"
-              onClick={() => onGo(m.path)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11.5px] font-medium text-neutral-500">{m.label}</p>
-                  <p className="mt-1.5 text-[1.5rem] font-bold tabular-nums leading-none text-neutral-900">{formatCount(m.value)}</p>
-                  <p className="mt-1.5 text-[10.5px] text-neutral-400">{m.note}</p>
-                </div>
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ${m.iconClass}`}>
-                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-    </section>
-  )
+function useLoad<T>(read: () => Promise<T>, reloadKey: number): Load<T> {
+  const [load, setLoad] = useState<Load<T>>({ status: 'loading', data: null })
+  useEffect(() => {
+    let alive = true
+    setLoad((prev) => ({ status: 'loading', data: prev.data }))
+    read()
+      .then((data) => { if (alive) setLoad({ status: 'ready', data }) })
+      .catch(() => { if (alive) setLoad((prev) => ({ status: 'error', data: prev.data })) })
+    return () => { alive = false }
+    // read 是每次渲染新建的函数，只跟 reloadKey 走，避免请求循环。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey])
+  return load
 }
-
-function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLogs: () => void }) {
-  return (
-    <section aria-label="最近同步记录">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-          <h2 className="text-[13px] font-bold text-neutral-700">最近同步记录</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onGoLogs}
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
-        >
-          查看全部
-          <ArrowRightIcon className="h-3 w-3" aria-hidden="true" />
-        </button>
-      </div>
-
-      <Card className="overflow-hidden p-0">
-        {data.recentSyncs.length === 0 ? (
-          <EmptyState
-            icon={RefreshCwIcon}
-            title="暂无同步记录"
-            description="通过 API / Webhook / Excel 导入数据后，这里会显示最近的同步结果"
-            className="py-10"
-          />
-        ) : (
-          <ConsoleTable
-            items={data.recentSyncs}
-            page={1} pageSize={Math.max(data.recentSyncs.length, 1)} total={data.recentSyncs.length} onPageChange={() => {}}
-            columns={[
-              { id: 'source', header: '数据源', truncate: true, cell: (s) => s.source },
-              { id: 'type', header: '类型', cell: (s) => DATA_TYPE_LABEL[s.dataType] ?? s.dataType },
-              { id: 'counts', header: '新增/更新/失败', cellClassName: 'whitespace-nowrap tabular-nums', cell: (s) => <>{formatCount(s.addedCount)} / {formatCount(s.updatedCount)} / <span className={s.errorCount > 0 ? 'text-error-fg' : ''}>{formatCount(s.errorCount)}</span></> },
-              { id: 'result', header: '结果', cell: (s) => {
-                const cfg = RESULT_CONFIG[s.status] ?? { label: s.status, badge: 'warning' as const }
-                return <StatusBadge dot status={cfg.badge} label={cfg.label} />
-              } },
-              { id: 'time', header: '同步时间', cellClassName: 'whitespace-nowrap tabular-nums', cell: (s) => formatDateTime(s.syncTime) },
-            ]}
-          />
-        )}
-      </Card>
-    </section>
-  )
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
-  // 只有服务端明确打开托管才展示岗位类卡片；能力没读到时与关闭同样只看政策（fail-closed）。
-  const recruitmentHosting = useRecruitmentHosting() === 'on'
-  const [data, setData] = useState<PartnerDashboardData | null>(null)
-  const [snapshot, setSnapshot] = useState<PartnerStatsResponse['snapshot'] | null>(null)
-  const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
-  const [reloadKey, setReloadKey] = useState(0)
+  const [overviewKey, setOverviewKey] = useState(0)
+  const [statsKey, setStatsKey] = useState(0)
+  const [policyKey, setPolicyKey] = useState(0)
+  const [dashKey, setDashKey] = useState(0)
+  const [opsKey, setOpsKey] = useState(0)
+  const [noticeOutcome, setNoticeOutcome] = useState<OrgNoticeOutcome>('loading')
+  const onNoticeOutcome = useCallback((next: OrgNoticeOutcome) => {
+    setNoticeOutcome((prev) => (prev === next ? prev : next))
+  }, [])
+
+  const [overview, setOverview] = useState<OverviewLoad>(FIRST_ORDER_HTTP ? { kind: 'loading' } : { kind: 'preview' })
+  const [statsLoad, setStatsLoad] = useState<Load<PartnerStatsResponse['snapshot']>>({ status: 'loading', data: null })
+  const policies = useLoad(() => partnerPoliciesService.getPolicies({ page: 1, pageSize: 100 }), policyKey)
+  const dashboard = useLoad(() => getPartnerDashboard(), dashKey)
+  const ops = useLoad(() => getPartnerTerminalOperations('week'), opsKey)
 
   useEffect(() => {
-    let cancelled = false
-    setState('loading')
-    Promise.all([getPartnerDashboard(), getPartnerStats('week')])
-      .then(([d, stats]) => {
-        if (cancelled) return
-        setData(d)
-        setSnapshot(stats.snapshot)
-        setState('ready')
+    let alive = true
+    setStatsLoad((prev) => ({ status: 'loading', data: prev.data }))
+    getPartnerStats('week')
+      .then((stats) => {
+        if (!alive) return
+        setStatsLoad({ status: 'ready', data: stats.snapshot })
       })
-      .catch(() => {
-        if (!cancelled) setState('error')
-      })
-    return () => {
-      cancelled = true
+      .catch(() => { if (alive) setStatsLoad((prev) => ({ status: 'error', data: prev.data })) })
+    return () => { alive = false }
+  }, [statsKey])
+
+  useEffect(() => {
+    if (!FIRST_ORDER_HTTP) {
+      setOverview({ kind: 'preview' })
+      return
     }
-  }, [reloadKey])
+    let alive = true
+    setOverview({ kind: 'loading' })
+    firstOrderApi.overview()
+      .then((data) => { if (alive) setOverview({ kind: 'ready', data }) })
+      .catch(() => { if (alive) setOverview({ kind: 'error' }) })
+    return () => { alive = false }
+  }, [overviewKey])
+
+  const stats = statsLoad
+  const snapshot = stats.status === 'ready' ? stats.data : null
+  const pendingCount = snapshot?.pendingReviewPolicies ?? null
+  const policyTitles = policyTitlesFrom(policies, pendingCount)
+  const month = shanghaiMonth()
+  const actionable = countActionable(overview, pendingCount)
+  const showEmpty = overview.kind === 'ready'
+    && stats.status === 'ready'
+    && policies.status === 'ready'
+    && noticeOutcome === 'empty'
+    && actionable === 0
 
   return (
-    <Page title="工作台" subtitle={withFrontendHint('本机构数据概览（实时统计）', FRONTEND_HINT.none)}>
-      {state === 'loading' ? (
-        <LoadingState className="py-20" />
-      ) : state === 'error' || !data || !snapshot ? (
-        <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
-      ) : (
-        <div className="flex flex-col gap-6">
-          <PendingReviewCallout
-            count={recruitmentHosting ? snapshot.pendingReview : snapshot.pendingReviewPolicies}
-            recruitmentHosting={recruitmentHosting}
-            onView={() => navigate(recruitmentHosting ? firstPendingPath(snapshot) : '/policy')}
-          />
-          <MetricsGrid data={data} snapshot={snapshot} recruitmentHosting={recruitmentHosting} onGo={(p) => navigate(p)} />
-          <OrgNoticesSection />
-          {recruitmentHosting && <SyncLogSection data={data} onGoLogs={() => navigate('/sync-logs')} />}
+    <Page title="工作台" subtitle={withFrontendHint(`${shanghaiToday()} 本机构今天要核对的事`, FRONTEND_HINT.none)}>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-6">
+          <section aria-label="今天要处理" className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+              <h2 className="text-[13px] font-bold text-neutral-700">今天要处理</h2>
+            </div>
+            <ProjectBar overview={overview} />
+            {overview.kind === 'error' && <BlockMiss onRetry={() => setOverviewKey((k) => k + 1)} />}
+            {overview.kind === 'ready' && <OverviewRows data={overview.data} month={month} />}
+            {stats.status === 'error' && <BlockMiss onRetry={() => setStatsKey((k) => k + 1)} />}
+            {pendingCount !== null && pendingCount > 0 && (
+              <PolicyTodo count={pendingCount} titles={policyTitles} listStatus={policies.status} onRetry={() => setPolicyKey((k) => k + 1)} />
+            )}
+            {policies.status === 'error' && !(pendingCount !== null && pendingCount > 0) && <BlockMiss onRetry={() => setPolicyKey((k) => k + 1)} />}
+            {showEmpty && <p className="text-sm text-neutral-600">{EMPTY_TODAY}</p>}
+            <Link to={INCIDENTS} className="inline-flex h-14 min-h-14 items-center justify-center rounded-xl bg-primary-600 px-8 text-base font-bold text-white hover:bg-primary-700">报障</Link>
+          </section>
+          <OrgNoticesSection onOutcome={onNoticeOutcome} />
         </div>
-      )}
+        <div className="min-w-0 space-y-4">
+          <TerminalWeek ops={ops} overview={overview} onRetryOps={() => setOpsKey((k) => k + 1)} onRetryOverview={() => setOverviewKey((k) => k + 1)} />
+          <PolicyGlance dashboard={dashboard} snapshot={snapshot} statsFailed={stats.status === 'error'} onRetryDash={() => setDashKey((k) => k + 1)} onRetryStats={() => setStatsKey((k) => k + 1)} />
+        </div>
+      </div>
     </Page>
+  )
+}
+
+function policyTitlesFrom(policies: Load<PartnerPolicyPage>, pendingCount: number | null): { titles: string[]; partial: boolean } {
+  if (policies.status !== 'ready' || !policies.data || pendingCount === null) return { titles: [], partial: false }
+  const titles = policies.data.data
+    .filter((row) => row.reviewStatus === 'pending' || row.reviewStatus === 'reviewing')
+    .map((row) => row.title)
+  const partial = pendingCount > titles.length || policies.data.pagination.total > policies.data.data.length
+  return { titles, partial }
+}
+
+function countActionable(overview: OverviewLoad, pendingCount: number | null): number {
+  let count = pendingCount ?? 0
+  if (overview.kind !== 'ready') return count
+  const month = shanghaiMonth()
+  count += overview.data.incidents.filter((item) => item.status === 'resolved' || item.status === 'processing').length
+  count += overview.data.reports.filter((item) => item.month < month && !item.acknowledgedAt).length
+  return count
+}
+
+function ProjectBar({ overview }: { overview: OverviewLoad }) {
+  if (overview.kind === 'preview') {
+    return <p className="rounded-xl border border-neutral-200 bg-surface px-4 py-3 text-sm text-neutral-600">{PREVIEW_NOTE}</p>
+  }
+  if (overview.kind === 'loading') return <p className="text-sm text-neutral-500">正在读取服务项目</p>
+  if (overview.kind === 'error') return null
+  const projects = overview.data.projects
+  if (projects.length === 0) {
+    return <p className="rounded-xl border border-neutral-200 bg-surface px-4 py-3 text-sm text-neutral-700">{NO_PROJECT}</p>
+  }
+  const first = projects[0]!
+  const extra = projects.length > 1 ? `，另有 ${projects.length - 1} 个服务项目` : ''
+  return (
+    <Link to={PROJECT} className="block rounded-xl border border-neutral-200 bg-surface px-4 py-3 hover:border-primary-300">
+      <p className="text-base font-semibold text-neutral-900">{first.name}{extra}</p>
+      <p className="mt-1 text-sm text-neutral-600">服务范围：{first.serviceScope}</p>
+      <p className="mt-0.5 text-sm text-neutral-600">服务至 {formatDate(first.serviceEndAt)}</p>
+      <p className="mt-0.5 text-sm text-neutral-600">服务联系：{first.supportContact}</p>
+    </Link>
+  )
+}
+
+function OverviewRows({ data, month }: { data: FirstOrderOverview; month: string }) {
+  const incidents = data.incidents.filter((item) => item.status === 'resolved' || item.status === 'processing')
+  const reports = data.reports.filter((item) => item.month < month && !item.acknowledgedAt)
+  return (
+    <ul className="space-y-2">
+      {incidents.map((item) => {
+        const issue = FIRST_ORDER_ISSUE_LABELS[item.issueCode] ?? '设备问题'
+        const waiting = item.status === 'resolved'
+        return (
+          <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
+            <p className="text-sm text-neutral-800">
+              <span className="font-semibold">{item.terminalCode}</span>
+              {' · '}{issue}{' · '}{waiting ? '技术恢复，待你核对' : '平台处理中'}
+            </p>
+            <Link to={INCIDENTS} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700">{waiting ? '去核对' : '看进度'}</Link>
+          </li>
+        )
+      })}
+      {reports.map((item) => (
+        <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
+          <p className="text-sm font-semibold text-neutral-800">{item.month} 月报已留存，待核对</p>
+          <Link to={REPORTS} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700">去核对</Link>
+        </li>
+      ))}
+      <li className="rounded-xl border border-neutral-200 bg-surface px-4 py-3 text-sm text-neutral-600">
+        {MONTH_PREVIEW}
+        <Link to={REPORTS} className="ml-3 inline-flex min-h-11 items-center font-semibold text-primary-700">去预览</Link>
+      </li>
+    </ul>
+  )
+}
+
+function PolicyTodo({ count, titles, listStatus, onRetry }: { count: number; titles: { titles: string[]; partial: boolean }; listStatus: Load<PartnerPolicyPage>['status']; onRetry: () => void }) {
+  return (
+    <div className="rounded-xl border border-warning/30 bg-warning-bg px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-warning-fg">{formatCount(count)} 条政策等你审核</p>
+        <Link to="/policy" className="inline-flex min-h-11 items-center text-sm font-semibold text-warning-fg">去审核</Link>
+      </div>
+      {listStatus === 'loading' && <p className="mt-2 text-sm text-neutral-600">正在读取政策标题</p>}
+      {listStatus === 'error' && <div className="mt-2"><BlockMiss onRetry={onRetry} /></div>}
+      {listStatus === 'ready' && (
+        <ul className="mt-2 space-y-1">
+          {titles.titles.map((title) => <li key={title} className="text-sm text-neutral-800">{title}</li>)}
+        </ul>
+      )}
+      {listStatus === 'ready' && titles.partial && <p className="mt-2 text-xs text-neutral-600">只列出这次读到的标题。</p>}
+    </div>
+  )
+}
+
+function TerminalWeek({
+  ops,
+  overview,
+  onRetryOps,
+  onRetryOverview,
+}: {
+  ops: Load<PartnerTerminalOpsView>
+  overview: OverviewLoad
+  onRetryOps: () => void
+  onRetryOverview: () => void
+}) {
+  const lowPaper = overview.kind === 'ready' ? overview.data.terminals.filter((item) => item.printerStatus === 'low_paper') : []
+  return (
+    <Card className="space-y-3 p-4">
+      <section aria-label="本周终端运营" className="space-y-2">
+        <h2 className="text-[13px] font-bold text-neutral-700">本周终端运营</h2>
+        {ops.status === 'loading' && <p className="text-sm text-neutral-500">正在读取终端运营</p>}
+        {ops.status === 'error' && <BlockMiss onRetry={onRetryOps} />}
+        {ops.status === 'ready' && ops.data && <OpsFigures data={ops.data} />}
+        {overview.kind === 'error' && <BlockMiss onRetry={onRetryOverview} />}
+        {lowPaper.map((item) => (
+          <p key={item.id} className="text-sm text-neutral-700">{item.displayName?.trim() || item.terminalCode}：纸张或墨粉不足，仍可打印</p>
+        ))}
+        <p className="text-sm text-neutral-700">{AI_LINE}</p>
+      </section>
+    </Card>
+  )
+}
+
+function OpsFigures({ data }: { data: PartnerTerminalOpsView }) {
+  const { totals } = data
+  if (totals.terminalCount === 0) return <p className="text-sm text-neutral-600">暂无终端</p>
+  return (
+    <div className="space-y-1 text-sm text-neutral-800">
+      <p>现在在线 <span className="font-semibold tabular-nums">{formatCount(totals.onlineTerminals)}</span> / <span className="tabular-nums">{formatCount(totals.terminalCount)}</span></p>
+      <p>本周服务次数 {totals.serviceCount === null ? '样本不足' : formatCount(totals.serviceCount)}</p>
+      <p className="text-xs text-neutral-500">在线是此刻，服务次数到昨天</p>
+    </div>
+  )
+}
+
+function PolicyGlance({
+  dashboard,
+  snapshot,
+  statsFailed,
+  onRetryDash,
+  onRetryStats,
+}: {
+  dashboard: Load<PartnerDashboardData>
+  snapshot: PartnerStatsResponse['snapshot'] | null
+  statsFailed: boolean
+  onRetryDash: () => void
+  onRetryStats: () => void
+}) {
+  const published = dashboard.status === 'ready' && dashboard.data ? dashboard.data.policies.published : null
+  const total = dashboard.status === 'ready' && dashboard.data ? dashboard.data.policies.total : null
+  return (
+    <Card className="space-y-2 p-4">
+      <section aria-label="政策概况" className="space-y-2">
+        <h2 className="text-[13px] font-bold text-neutral-700">政策概况</h2>
+        {dashboard.status === 'loading' && <p className="text-sm text-neutral-500">正在读取政策概况</p>}
+        {dashboard.status === 'error' && <BlockMiss onRetry={onRetryDash} />}
+        {total !== null && published !== null && (
+          <p className="text-sm text-neutral-800">政策公告 <span className="font-semibold tabular-nums">{formatCount(total)}</span> · 已发布 <span className="font-semibold tabular-nums">{formatCount(published)}</span></p>
+        )}
+        {statsFailed && <BlockMiss onRetry={onRetryStats} />}
+        {snapshot && <p className="text-sm text-neutral-800">待审核 <span className="font-semibold tabular-nums">{formatCount(snapshot.pendingReviewPolicies)}</span>（含审核中）</p>}
+      </section>
+    </Card>
   )
 }

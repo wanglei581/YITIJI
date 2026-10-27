@@ -218,6 +218,11 @@ function mockCanManageSmartCampus(): boolean {
   }
 }
 
+/** 演示机构类型与能力接口同一口径。智慧校园打开时按高校就业中心，否则按持证人力资源机构。 */
+export function demoPartnerOrgType(): 'school_employment_center' | 'licensed_hr_agency' {
+  return mockCanManageSmartCampus() ? 'school_employment_center' : 'licensed_hr_agency'
+}
+
 export const partnerMockAdapter = {
   // Smart Campus
   async getSmartCampusTerminals(): Promise<PartnerSmartCampusTerminal[]> {
@@ -247,7 +252,7 @@ export const partnerMockAdapter = {
     // 演示默认打开（保持既有演示口径）；localStorage['mock:recruitment-hosting']='off' 时按关闭演示。
     const recruitmentHosting = mockRecruitmentHostingEnabled()
     return {
-      orgType: 'licensed_hr_agency',
+      orgType: demoPartnerOrgType(),
       allowedAccessModes: ['api', 'excel', 'csv', 'json', 'webhook', 'manual'],
       allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],
       defaultSourceKind: 'hr_company',
