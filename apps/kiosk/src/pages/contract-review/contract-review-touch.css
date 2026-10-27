@@ -122,15 +122,15 @@
 }
 [data-qx-page='contract-review'] .cr-stage-list {
   flex: none;
-  gap: 12px;
+  gap: 16px;
 }
 [data-qx-page='contract-review'] .cr-stage-item,
 [data-qx-page='contract-review'] .cr-stage-item--active,
 [data-qx-page='contract-review'] .cr-stage-item--done {
   flex: none;
-  min-height: 162px;
+  min-height: 164px;
   align-items: center;
-  gap: 20px;
+  gap: 22px;
   padding: 20px 24px;
   background: var(--qxt-card, #fffdf7);
   border: 1.5px solid var(--qxt-edge, var(--qxt-line));
@@ -142,19 +142,39 @@
   border-color: var(--qx-emerald, var(--teal));
 }
 [data-qx-page='contract-review'] .cr-stage-item__icon {
-  width: 64px;
-  height: 64px;
-  min-height: 64px;
-  border-radius: 20px;
+  width: 72px;
+  height: 72px;
+  min-height: 72px;
+  border-radius: 22px;
+  color: var(--qxt-ink-3);
+  background: var(--qxt-well);
+}
+[data-qx-page='contract-review'] .cr-stage-item--done .cr-stage-item__icon {
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+}
+[data-qx-page='contract-review'] .cr-stage-item--active .cr-stage-item__icon {
+  color: var(--qxt-cream);
+  background: var(--qx-deep);
 }
 [data-qx-page='contract-review'] .cr-stage-item__name {
-  font-size: 26px;
+  font-size: 28px;
   line-height: 1.5;
 }
-[data-qx-page='contract-review'] .cr-stage-item__desc,
-[data-qx-page='contract-review'] .cr-stage-item__status {
+[data-qx-page='contract-review'] .cr-stage-item__desc {
   font-size: 22px;
   line-height: 1.5;
+}
+[data-qx-page='contract-review'] .cr-stage-item__status {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+}
+[data-qx-page='contract-review'] .cr-stage-item--done .cr-stage-item__status,
+[data-qx-page='contract-review'] .cr-stage-item--active .cr-stage-item__status {
+  color: var(--qxt-teal-ink);
 }
 
 /* ── 上传页：类型卡与展开头被共享重置抹掉的边框和底色补回，选中态一眼可见 ── */

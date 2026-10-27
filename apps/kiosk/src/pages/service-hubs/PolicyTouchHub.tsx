@@ -121,14 +121,16 @@ export function PolicyTouchHub() {
         data-hub-device-probe={deviceAware ? 'on' : 'off'}
       >
         <div className="p10-notice" data-hub-notice="" data-readiness={notice.readiness} role="status">
-          <b>{notice.title}</b>
-          <span>{notice.detail}</span>
+          <div className="p10-notice-copy">
+            <b>{notice.title}</b>
+            <span>{notice.detail}</span>
+          </div>
           {availability.apiDown ? (
             <button type="button" className="p10-retry" onClick={retryApi}>重新检测</button>
           ) : null}
         </div>
 
-        <div data-hub-entry="">
+        <div className="p10-entry" data-hub-entry="">
           <QxTouchTile
             icon="file"
             title="查政策与公告"
@@ -137,7 +139,6 @@ export function PolicyTouchHub() {
             onClick={() => go(mainRoute)}
             label={mainReason ? `查政策与公告：${mainReason}` : undefined}
           />
-          {mainReason ? <span className="p10-why" data-hub-reason="">{mainReason}</span> : null}
         </div>
 
         <section className="p10-sec" aria-label="四个目标">
@@ -156,7 +157,6 @@ export function PolicyTouchHub() {
                     index={index}
                     label={reason ? `${goal.label}：${reason}` : undefined}
                   />
-                  {reason ? <span className="p10-why" data-hub-reason="">{reason}</span> : null}
                 </div>
               )
             })}
@@ -173,23 +173,24 @@ export function PolicyTouchHub() {
                   <QxTouchTile
                     icon="file"
                     title={link.title}
-                    desc={link.description}
+                    desc={reason ?? link.description}
                     tone="slate"
                     off={Boolean(reason)}
                     onClick={() => go(link.route)}
                     index={index}
                     label={reason ? `${link.title}：${reason}` : undefined}
                   />
-                  {reason ? <span className="p10-why" data-hub-reason="">{reason}</span> : null}
                 </div>
               )
             })}
           </div>
         </section>
 
-        <p className="p10-note">政策内容以来源发布为准。这里不判断你能不能领。</p>
-        <p className="p10-note">AI顾问不替主管部门作资格判断。</p>
-        <p className="p10-note">结束这次办理或闲置超时，会清除本机登录和临时信息。</p>
+        <div className="p10-notes">
+          <p className="p10-note">政策内容以来源发布为准。这里不判断你能不能领。</p>
+          <p className="p10-note">AI顾问不替主管部门作资格判断。</p>
+          <p className="p10-note">结束这次办理或闲置超时，会清除本机登录和临时信息。</p>
+        </div>
       </div>
     </QxTouchScreen>
   )

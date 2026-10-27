@@ -5,7 +5,6 @@ import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
@@ -300,7 +299,7 @@ export function RenshiPage() {
               : notices.length === 0
                 ? '公告为空不影响打印你自己带来的材料。'
                 : '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。'
-  const askDraft = '问小青别的问题，不判断能不能办'
+  const askDraft = AI_DRAFT[activeTab]
 
   // 稿 48 的死路屏：政策与公告同一次读取，读取中 / 读取失败时两个分区给同一屏；三条出口都不等这次读取。
   const offReadExits = (hint: string): DeadEndExit[] => [
@@ -471,11 +470,6 @@ export function RenshiPage() {
           )}
           {activeTab === 'social' && <SocialPanel onOfficialEntry={setQrEntry} />}
           {activeTab === 'register' && <RegisterPanel />}
-          {activeTab === 'policy' && policyState === 'ready' ? null : (
-            <QxStepActions onPrev={goHub}>
-              <QxAiHelp label={AI_LABEL} draft={AI_DRAFT[activeTab]} testId="renshi-ask-ai" />
-            </QxStepActions>
-          )}
         </div>
       </div>
     </QxTouchScreen>

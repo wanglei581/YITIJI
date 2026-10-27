@@ -400,9 +400,8 @@ export function ContractReviewProcessingPage() {
                   <div className="cr-stage-item__text">
                     <div className="cr-stage-item__name">{stage.label}</div>
                     <div className="cr-stage-item__desc">{stage.desc}</div>
+                    <div className="cr-stage-item__status">{isDone ? '完成' : isActive2 ? '进行中' : '等待'}</div>
                   </div>
-                  {isDone && <span className="cr-stage-item__status">完成</span>}
-                  {isActive2 && <span className="cr-stage-item__status">进行中</span>}
                 </div>
               )
             })}

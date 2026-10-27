@@ -44,7 +44,7 @@
 }
 
 [data-qx-page="renshi"] .rq-cta-row {
-  flex: 1.15 1 0;
+  flex: 1.6 1 0;
   min-width: 0;
   display: flex;
 }
@@ -59,7 +59,6 @@
 [data-qx-page="renshi"] .rq-chip,
 [data-qx-page="renshi"] .rq-exit,
 [data-qx-page="renshi"] .rq-qr-close,
-[data-qx-page="renshi"] .qx-step-prev,
 [data-qx-page="renshi"] .qx-ai-help,
 [data-qx-page="renshi"] .k8-elig-opt,
 [data-qx-page="renshi"] .k8-elig-submit,
@@ -123,7 +122,6 @@
   justify-content: center;
 }
 
-[data-qx-page="renshi"] .qx-step-prev,
 [data-qx-page="renshi"] .qx-ai-help {
   background: var(--qx-paper);
   color: var(--qx-ink);
@@ -146,4 +144,34 @@
   color: var(--qx-wheat-d);
   font-weight: 650;
   line-height: 1.45;
+}
+
+/* 底栏主按钮：经 portal 放进 .rq-cta-host 的比对 / 重新填写 / 重新检查，
+   和同排「返回政策服务」、问小青一样高（88），字号、圆角、底色同 qxt-btn-pri。
+   字多时换行，不缩高。 */
+[data-qx-page="renshi"] .rq-cta-host > button {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--qxt-btn-h, 88px);
+  min-height: var(--qxt-btn-h, 88px);
+  padding: 0 22px;
+  border-radius: var(--qxt-r-btn, 26px);
+  font: 700 var(--qxt-fs-btn, 28px) / 1.2 var(--qx-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  white-space: normal;
+}
+
+[data-qx-page="renshi"] .rq-cta-host > .k8-elig-submit[aria-disabled="true"] {
+  opacity: 0.42;
+}
+
+/* 政策列表的收藏键原来是 56×56，本页里提到 64×64。 */
+[data-qx-page="renshi"] .rq-fav {
+  width: 64px;
+  min-width: 64px;
+  min-height: 64px;
 }
