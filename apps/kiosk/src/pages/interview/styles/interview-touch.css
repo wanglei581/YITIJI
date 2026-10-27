@@ -1,0 +1,275 @@
+/* 练面试触屏页。颜色只走 var(--qxt-*) / var(--qx-*)。 */
+
+.qxt-screen .qxt-body-iv {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+.qxt-screen .qxt-body-iv > .interview-flow,
+.qxt-screen .qxt-body-iv > .qxt-ivhub {
+  flex: 1;
+  min-height: 0;
+  background: var(--qxt-well);
+  overflow: auto;
+}
+
+.qxt-screen .qxt-iv-sub {
+  margin: 0;
+  padding: 18px 56px 0;
+  font-size: var(--qxt-fs-body);
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .qx-ctabar.qxt-iv-dock {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 40px 22px;
+  background: var(--qxt-paper-2);
+  border-top: 1px solid var(--qxt-line);
+}
+
+.qxt-screen .qx-ctabar .interview-qx-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+}
+
+.qxt-screen .qx-ctabar .iv-cta-row,
+.qxt-screen .qx-ctabar .iv-history-actions,
+.qxt-screen .qx-ctabar .qx-step-actions {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.qxt-screen .qx-ctabar .iv-alert {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.45;
+  color: var(--qx-cinnabar);
+}
+
+.qxt-screen .qx-btn {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 0 26px;
+  border-radius: var(--qxt-r-btn);
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-btn);
+  font-weight: 700;
+}
+
+.qxt-screen .qx-btn[data-variant='primary'] {
+  background: var(--qx-deep);
+  border-color: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qx-btn[data-variant='ghost'] {
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .interview-option,
+.qxt-screen .iv-mini-btn,
+.qxt-screen .iv-tabs button {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 12px 18px;
+  font-size: var(--qxt-fs-aux);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+}
+
+.qxt-screen .interview-option[aria-pressed='true'],
+.qxt-screen .iv-tabs button[aria-pressed='true'] {
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-teal-ink);
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen .qxt-ivhub {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 8px 18px;
+}
+
+.qxt-screen .qxt-ivhub > .qxt-grid2 {
+  flex: none;
+  align-items: start;
+  grid-auto-rows: max-content;
+}
+
+.qxt-screen .qxt-ivhub .qxt-task {
+  height: auto;
+  min-height: max-content;
+  overflow: visible;
+  padding: 16px 18px 14px;
+}
+
+.qxt-screen .qxt-ivhub .qxt-task:not(.qxt-span2) {
+  gap: 6px;
+  padding: 14px 16px 12px;
+}
+
+.qxt-screen .qxt-ivhub .qxt-task:not(.qxt-span2) .qxt-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+
+.qxt-screen .qxt-ivhub .qxt-task:not(.qxt-span2) h3 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.qxt-screen .qxt-iv-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qxt-screen .qxt-iv-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--qxt-cream) 10%, transparent);
+}
+
+.qxt-screen .qxt-iv-steps b {
+  color: var(--qxt-cream);
+  font-size: var(--qxt-fs-sub);
+}
+
+.qxt-screen .qxt-iv-steps span {
+  color: var(--qxt-mint);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+}
+
+.qxt-screen .qxt-task-dark .qx-hub-why {
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qxt-iv-fallback {
+  margin-top: 12px;
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 0 18px;
+  border-radius: 18px;
+  border: 1.5px solid var(--qxt-cream);
+  background: transparent;
+  color: var(--qxt-cream);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+}
+
+.qxt-screen .qxt-grid2 > .qxt-span2 {
+  grid-column: 1 / -1;
+}
+
+.qxt-screen .qx-hub-why {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+  color: var(--qxt-clay-ink);
+}
+
+.qxt-screen .qxt-iv-note {
+  margin: 0;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.5;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .qxt-iv-note b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+}
+
+.qxt-screen .qxt-iv-more {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-height: var(--qxt-tap);
+  padding: 16px 22px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  text-align: left;
+}
+
+.qxt-screen .qxt-iv-more small {
+  font-size: var(--qxt-fs-aux);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .qx-hub-notice {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen .qx-hub-notice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.qxt-screen .qx-hub-notice-copy b {
+  font-size: var(--qxt-fs-sub);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .qx-hub-retry {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 0 18px;
+  border-radius: 18px;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+}

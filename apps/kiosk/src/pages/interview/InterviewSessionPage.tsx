@@ -16,12 +16,14 @@ import {
 } from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
 import { InterviewSessionBar } from './session/InterviewSessionBar'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { speakInterview } from './session/speakInterview'
 import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
+import { interviewMicLine } from './interviewMicCopy'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
 import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
 import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
@@ -50,6 +52,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
+  const contact = useSupportContact()
   const storedLive = readInterviewWorkbenchSession()?.live
   const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
@@ -345,13 +348,17 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     : micCapability !== 'available' ? MIC_REASON[micCapability]
     : !asrEnabled ? '语音转写服务未启用，请用文字作答'
     : null
+  const shownVoiceHint = interviewMicLine(voiceHint, contact)
+  const shownError = interviewMicLine(error, contact)
+  const shownMicBlocked = interviewMicLine(micBlockedReason, contact)
 
   const copy = INTERVIEW_STAGE_COPY.session
   const titleParts = emphasizedTitle(copy)
 
   return (
     <InterviewShell
-      title={<>第 {questionIndex} 题，<em>{titleParts.em}</em>。</>}
+      eyebrow="练面试 · 作答"
+      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={copy.subtitle}
       status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
       live={voice.kind === 'recording'}
@@ -394,7 +401,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         micStatusTone={micStatusTone}
         speaking={speaking}
         lastInterviewerMsg={lastInterviewerMsg}
-        voiceHint={voiceHint}
+        voiceHint={shownVoiceHint}
         messages={messages}
         lastInterviewerMessageIndex={lastInterviewerMessageIndex}
         phase={phase}
@@ -402,7 +409,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       >
       <InterviewAnswerDock
         micError={micError}
-        error={error}
+        error={shownError}
         voiceLocked={voiceLocked}
         busyTurn={busyTurn}
         phase={phase}
@@ -412,7 +419,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         maxRecordSec={MAX_RECORD_SEC}
         draft={draft}
         voiceAvailable={voiceAvailable}
-        micBlockedReason={micBlockedReason}
+        micBlockedReason={shownMicBlocked}
         onRecheckMic={recheckMic}
         onDraftChange={setDraft}
         onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}

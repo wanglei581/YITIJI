@@ -99,6 +99,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   const [loadError, setLoadError] = useState(false)
   const [printing, setPrinting] = useState(false)
   const [printError, setPrintError] = useState<string | null>(null)
+  const [more, setMore] = useState(false)
 
   useBusyLock(printing)
 
@@ -152,6 +153,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   if (loading) {
     return (
       <InterviewShell
+        eyebrow="练面试 · 报告"
         title={<>正在核对<em>报告状态</em>。</>}
         subtitle="报告只按这场练习读取。读取完成前不展示上一次内容，也不提前放开打印。"
         status={{ tone: 'unknown', label: '正在读取' }}
@@ -175,6 +177,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
   if (loadError || !data) {
     return (
       <InterviewShell
+        eyebrow="练面试 · 报告"
         title={<>这份报告暂时<em>不能查看</em>。</>}
         subtitle="报告可能还没生成、已经过期，或当前账号不能查看；不能用固定内容替代实际结果。"
         status={{ tone: 'bad', label: '报告不可用' }}
@@ -206,8 +209,16 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
 
   return (
     <InterviewShell
+      eyebrow="练面试 · 报告"
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
-      subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
+      subtitle={more
+        ? '预测题、STAR、准备清单和问答摘录。'
+        : `${data.position} · ${data.industry} · ${data.interviewerLabel}。只用于本人复盘，不代表通过率或录用结果。`}
+      status={printing
+        ? { tone: 'warn', label: '正在生成打印版' }
+        : printError
+          ? { tone: 'bad', label: '打印版没有生成' }
+          : { tone: 'ok', label: '报告可以查看' }}
       ctabar={
         <div className="interview-qx-cta">
           <QxStepActions onPrev={goReports} prevLabel="查看历史报告">
@@ -252,79 +263,90 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
           <p className="mt-3 text-sm leading-relaxed text-neutral-700">{data.report.overall.summary}</p>
         </Card>
 
-        <div className="interview-report__abilities">
-          <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
-          <Section icon={TargetIcon} title="和目标岗位要求的对照"><Bullets items={data.report.positionFit} /></Section>
-          <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
-          <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
-          <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
-        </div>
-
-        <div className="interview-report__two-col">
-        <Section icon={AlertTriangleIcon} title="风险点与改进建议" className="interview-report__risk">
-          <ul className="flex flex-col gap-2">
-            {data.report.risks.map((t) => (
-              <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm leading-relaxed text-warning-fg">
-                <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {t}
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        <Section icon={HelpCircleIcon} title="高频问题预测" className="interview-report__questions">
-          <div className="flex flex-col gap-3">
-            {data.report.predictedQuestions.map((q, i) => (
-              <div key={q.question.slice(0, 24)} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                <p className="text-sm font-semibold text-neutral-900">{i + 1}. {q.question}</p>
-                <p className="mt-1.5 text-xs text-neutral-500">考察点：{q.why}</p>
-                <p className="mt-1 text-xs leading-relaxed text-neutral-600">回答思路:{q.approach}</p>
+        {more ? (
+          <>
+            <Section icon={HelpCircleIcon} title="高频问题预测" className="interview-report__questions">
+              <div className="flex flex-col gap-3">
+                {data.report.predictedQuestions.map((q, i) => (
+                  <div key={q.question.slice(0, 24)} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                    <p className="text-sm font-semibold text-neutral-900">{i + 1}. {q.question}</p>
+                    <p className="mt-1.5 text-xs text-neutral-500">考察点：{q.why}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-600">回答思路:{q.approach}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-        </div>
-
-        <Section icon={LightbulbIcon} title="STAR 回答建议">
-          <div className="flex flex-col gap-2 text-sm leading-relaxed text-neutral-700">
-            <p><span className="font-semibold text-primary-700">S 情境：</span>{data.report.starAdvice.s}</p>
-            <p><span className="font-semibold text-primary-700">T 任务：</span>{data.report.starAdvice.t}</p>
-            <p><span className="font-semibold text-primary-700">A 行动：</span>{data.report.starAdvice.a}</p>
-            <p><span className="font-semibold text-primary-700">R 结果：</span>{data.report.starAdvice.r}</p>
-            <p className="mt-1 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning-fg">{data.report.starAdvice.reminder}</p>
-          </div>
-        </Section>
-
-        {Array.isArray(data.qaExcerpts) && data.qaExcerpts.length > 0 && (
-          <Section icon={MessageSquareTextIcon} title="问答摘录">
-            <p className="mb-3 text-xs text-neutral-500">
-              {data.includeAnswersInPrint === false
-                ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。'
-                : '打印件会收录每题回答的前 200 字。'}
-            </p>
-            <div className="flex flex-col gap-3">
-              {data.qaExcerpts.map((item, i) => (
-                <div key={`${i}-${item.question.slice(0, 24)}`} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
-                  <p className="text-sm font-semibold text-neutral-900">{i + 1}. {item.question}</p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-neutral-700">
-                    {item.skipped ? '回答：（跳过）' : `回答：${item.answerExcerpt?.trim() || '（未作答）'}`}
-                  </p>
+            </Section>
+            <Section icon={LightbulbIcon} title="STAR 回答建议">
+              <div className="flex flex-col gap-2 text-sm leading-relaxed text-neutral-700">
+                <p><span className="font-semibold text-primary-700">S 情境：</span>{data.report.starAdvice.s}</p>
+                <p><span className="font-semibold text-primary-700">T 任务：</span>{data.report.starAdvice.t}</p>
+                <p><span className="font-semibold text-primary-700">A 行动：</span>{data.report.starAdvice.a}</p>
+                <p><span className="font-semibold text-primary-700">R 结果：</span>{data.report.starAdvice.r}</p>
+                <p className="mt-1 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning-fg">{data.report.starAdvice.reminder}</p>
+              </div>
+            </Section>
+            <Section icon={ClipboardListIcon} title="面试前准备清单">
+              <ul className="flex flex-col gap-2">
+                {data.report.checklist.map((c) => (
+                  <li key={c.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-700">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-neutral-300 text-[10px] text-transparent" aria-hidden="true">✓</span>
+                    {c}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+            {Array.isArray(data.qaExcerpts) && data.qaExcerpts.length > 0 && (
+              <Section icon={MessageSquareTextIcon} title="问答摘录">
+                <p className="mb-3 text-xs text-neutral-500">
+                  {data.includeAnswersInPrint === false
+                    ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。'
+                    : '打印件会收录每题回答的前 200 字。'}
+                </p>
+                <div className="flex flex-col gap-3">
+                  {data.qaExcerpts.map((item, i) => (
+                    <div key={`${i}-${item.question.slice(0, 24)}`} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                      <p className="text-sm font-semibold text-neutral-900">{i + 1}. {item.question}</p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-neutral-700">
+                        {item.skipped ? '回答：（跳过）' : `回答：${item.answerExcerpt?.trim() || '（未作答）'}`}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </Section>
+            )}
+            <button type="button" className="qxt-iv-more" onClick={() => setMore(false)}>
+              回到这份报告
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="interview-report__abilities">
+              <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
+              <Section icon={TargetIcon} title="和目标岗位要求的对照"><Bullets items={data.report.positionFit} /></Section>
+              <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
+              <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
+              <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
             </div>
-          </Section>
+            <Section icon={AlertTriangleIcon} title="风险点与改进建议" className="interview-report__risk">
+              <ul className="flex flex-col gap-2">
+                {data.report.risks.map((t) => (
+                  <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm leading-relaxed text-warning-fg">
+                    <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+            <button type="button" className="qxt-iv-more" onClick={() => setMore(true)}>
+              <b>预测题、STAR、清单、摘录</b>
+              <small>
+                {data.includeAnswersInPrint === false
+                  ? '你选择了不把回答印进打印件。下面仍可在屏幕上回看摘录。'
+                  : '打印件会收录每题回答的前 200 字。'}
+              </small>
+            </button>
+          </>
         )}
-
-        <Section icon={ClipboardListIcon} title="面试前准备清单">
-          <ul className="flex flex-col gap-2">
-            {data.report.checklist.map((c) => (
-              <li key={c.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-700">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-neutral-300 text-[10px] text-transparent" aria-hidden="true">✓</span>
-                {c}
-              </li>
-            ))}
-          </ul>
-        </Section>
 
         {printError && <p className="iv-alert" role="alert">{printError}</p>}
         <InterviewNotice>

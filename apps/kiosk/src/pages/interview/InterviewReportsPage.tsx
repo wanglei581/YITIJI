@@ -88,10 +88,12 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
 
   return (
     <InterviewShell
+      eyebrow="练面试 · 练习记录"
       title={isLoggedIn
         ? <>登录后，<em>只查看自己的报告</em>。</>
         : <>你的练习记录，<em>登录后才可长期查看</em>。</>}
       subtitle={copy.subtitle}
+      status={isLoggedIn ? undefined : { tone: 'warn', label: '未登录' }}
       ctabar={
         <div className="interview-qx-cta">
           <QxStepActions onPrev={() => onGoStage ? onGoStage('tips') : navigate('/interview/tips')} prevLabel="先看面试技巧">

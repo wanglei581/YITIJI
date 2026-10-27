@@ -161,9 +161,10 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
 
   return (
     <InterviewShell
+      eyebrow="练面试 · 面试技巧"
       title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
       subtitle={copy.subtitle}
-      // 顶栏胶囊跟着一起说。默认档是 InterviewShell 的「模拟练习」，
+      // 顶栏胶囊跟着一起说。默认档是「AI 模拟面试」，
       // 而此刻这台机器恰恰练不了 —— 不出声等于让胶囊替在线服务作保。
       status={
         apiStatus === 'unavailable'

@@ -47,7 +47,7 @@ import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
-import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import type { InterviewStage } from './interviewWorkbenchModel'
 import {
   patchInterviewWorkbenchSession,
   readInterviewWorkbenchSession,
@@ -85,9 +85,9 @@ const DIFFICULTIES: Array<{ key: InterviewDifficulty; label: string; desc: strin
 ]
 
 const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> = [
-  { key: 3, label: '3 分钟', desc: '快速练习 · 约 3-4 题' },
-  { key: 5, label: '5 分钟', desc: '标准练习 · 约 4-6 题' },
-  { key: 8, label: '8 分钟', desc: '深度练习 · 约 6-8 题' },
+  { key: 3, label: '3 分钟 / 4 题', desc: '到点不自动交卷，回答完当前题后再结束' },
+  { key: 5, label: '5 分钟 / 6 题', desc: '到点不自动交卷，回答完当前题后再结束' },
+  { key: 8, label: '8 分钟 / 8 题', desc: '到点不自动交卷，回答完当前题后再结束' },
 ]
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
@@ -150,6 +150,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    * 拿它去点亮 ai-down 降级区，等于把用户少填一个字说成 AI 挂了 —— 那是另一种伪造。
    */
   const [startFailed, setStartFailed] = useState(setupDraft?.startFailed ?? false)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
 
   useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
 
@@ -358,15 +359,40 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         ...sheetAction,
       }
 
-  const copy = INTERVIEW_STAGE_COPY.setup
-  const titleParts = emphasizedTitle(copy)
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
-  const interviewerDesc = INTERVIEWERS.find((it) => it.key === interviewerType)?.desc
+  const interviewer = INTERVIEWERS.find((it) => it.key === interviewerType)
+  const difficultyItem = DIFFICULTIES.find((item) => item.key === difficulty)
+  const durationItem = DURATIONS.find((item) => item.key === duration)
+  const validateBasics = (): string | null => {
+    if (!position.trim()) return '请先填写目标岗位，例如：前端开发工程师、行政专员'
+    if (!industry.trim()) return '请先选择本次练习的行业，不会替你预选'
+    if (!experience) return '请先选择你的经验情况，不会替你预选'
+    return null
+  }
+  const goNext = () => {
+    if (step === 1) {
+      const message = validateBasics()
+      if (message) {
+        setError(message)
+        return
+      }
+    }
+    setError(null)
+    setStep((current) => (current === 1 ? 2 : 3))
+  }
+  const stepCopy = step === 1
+    ? { eyebrow: '练面试 · 岗位与经验', title: '这次练哪个岗位？', sub: '选定岗位、面试官和时长后才开始这场练习；语音能否使用，进入后按麦克风实际情况确认。' }
+    : step === 2
+      ? { eyebrow: '练面试 · 面试官与时长', title: '选一位面试官', sub: '难度和时长有默认值。到点不自动交卷。' }
+      : { eyebrow: '练面试 · 核对开始', title: '核对一下，就开始', sub: '面试前，先设置一场练习。' }
 
   return (
     <InterviewShell
-      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
-      subtitle={copy.subtitle}
+      eyebrow={stepCopy.eyebrow}
+      title={stepCopy.title}
+      subtitle={stepCopy.sub}
+      onBack={step > 1 ? () => { setError(null); setStep((current) => (current === 3 ? 2 : 1)) } : undefined}
+      rail={{ labels: ['岗位与经验', '面试官与时长', '核对开始'], now: step - 1 }}
       status={{ tone: aiOutage ? 'bad' : 'ok', label: aiOutage ? 'AI 暂时不能出题' : 'AI 模拟面试' }}
       ctabar={
         <div className="interview-qx-cta">
@@ -376,19 +402,25 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
               先看面试技巧
             </button>
-            <span className="qx-ai-declaration-slot">
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="primary"
-                data-testid="interview-primary"
-                disabled={creating || uploading}
-                onClick={() => void handleStart()}
-              >
-                {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
+            {step < 3 ? (
+              <button type="button" className="qx-btn" data-variant="primary" onClick={goNext}>
+                下一步
               </button>
-              <AiDeclarationNote />
-            </span>
+            ) : (
+              <span className="qx-ai-declaration-slot">
+                <button
+                  type="button"
+                  className="qx-btn"
+                  data-variant="primary"
+                  data-testid="interview-primary"
+                  disabled={creating || uploading || printingSheet}
+                  onClick={() => void handleStart()}
+                >
+                  {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
+                </button>
+                <AiDeclarationNote />
+              </span>
+            )}
           </div>
         </div>
       }
@@ -420,56 +452,62 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           ]}
         />
 
-        <section className="iv-card interview-setup__stack">
-          <InterviewCardHead title="本场练习设置" hint="请本人填写目标岗位、选择行业和经验后再开始" />
-          <div className="iv-fields">
-            <label className="iv-field">
-              <small>目标岗位（必填，最多 50 字）</small>
-              <input
-                value={position}
-                onChange={(e) => {
-                  setPosition(e.target.value)
-                  if (error?.includes('目标岗位')) setError(null)
-                }}
-                maxLength={50}
-                placeholder="输入目标岗位，例：前端开发工程师"
-              />
-            </label>
-            <div className="iv-field">
-              <small>行业（必填，从就业行业清单选择）</small>
-              <b>{industry || '尚未选择'}</b>
-              <button type="button" className="iv-mini-btn" aria-haspopup="dialog" onClick={() => setShowIndustryPicker(true)}>
-                选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
-              </button>
+        {step === 1 && (
+          <section className="iv-card interview-setup__stack">
+            <InterviewCardHead title="本场练习设置" hint="请本人填写目标岗位、选择行业和经验后再开始" />
+            <div className="iv-fields">
+              <label className="iv-field">
+                <small>目标岗位（必填，最多 50 字）</small>
+                <input
+                  value={position}
+                  onChange={(e) => {
+                    setPosition(e.target.value)
+                    if (error?.includes('目标岗位')) setError(null)
+                  }}
+                  maxLength={50}
+                  placeholder="输入目标岗位，例：前端开发工程师"
+                />
+              </label>
+              <div className="iv-field">
+                <small>行业（必填，从就业行业清单选择）</small>
+                <b>{industry || '尚未选择'}</b>
+                <button type="button" className="iv-mini-btn" aria-haspopup="dialog" onClick={() => setShowIndustryPicker(true)}>
+                  选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="iv-choice">
-            <p>岗位快捷项</p>
-            <div className="iv-chips">
-              {POSITION_EXAMPLES.map((example) => (
-                <OptionButton key={example} active={position === example} onClick={() => { setPosition(example); setError(null) }}>{example}</OptionButton>
-              ))}
+            <div className="iv-choice">
+              <p>岗位快捷项</p>
+              <div className="iv-chips">
+                {POSITION_EXAMPLES.map((example) => (
+                  <OptionButton key={example} active={position === example} onClick={() => { setPosition(example); setError(null) }}>{example}</OptionButton>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="iv-choice interview-setup__interviewer">
-            <p>面试官类型</p>
-            <div className="iv-chips">
-              {INTERVIEWERS.map((it) => (
-                <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)}>{it.label}</OptionButton>
-              ))}
+            <div className="iv-choice">
+              <p>经验（必选）</p>
+              <div className="iv-chips">
+                {EXPERIENCES.map((item) => (
+                  <OptionButton key={item.key} active={experience === item.key} onClick={() => setExperience(experience === item.key ? '' : item.key)}>{item.label}</OptionButton>
+                ))}
+              </div>
+              {!experience && <p className="iv-hint">尚未选择，请按自己的实际情况选择。</p>}
             </div>
-            <p className="iv-hint">{interviewerDesc}</p>
-          </div>
-          <div className="iv-choice">
-            <p>经验（必选）</p>
-            <div className="iv-chips">
-              {EXPERIENCES.map((item) => (
-                <OptionButton key={item.key} active={experience === item.key} onClick={() => setExperience(experience === item.key ? '' : item.key)}>{item.label}</OptionButton>
-              ))}
+            <p className="iv-hint">后面不改的话：HR 面试 · 标准面试 · 5 分钟 / 6 题 · 文字回答。行业和经验都不预选。</p>
+          </section>
+        )}
+
+        {step === 2 && (
+          <section className="iv-card interview-setup__stack">
+            <div className="iv-choice interview-setup__interviewer">
+              <p>面试官类型</p>
+              <div className="iv-chips">
+                {INTERVIEWERS.map((it) => (
+                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)}>{it.label}</OptionButton>
+                ))}
+              </div>
+              <p className="iv-hint">{interviewer?.desc}</p>
             </div>
-            {!experience && <p className="iv-hint">尚未选择，请按自己的实际情况选择。</p>}
-          </div>
-          <div className="iv-choice-row">
             <div className="iv-choice">
               <p>难度</p>
               <div className="iv-chips">
@@ -477,6 +515,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   <OptionButton key={item.key} active={difficulty === item.key} onClick={() => setDifficulty(item.key)}>{item.label}</OptionButton>
                 ))}
               </div>
+              <p className="iv-hint">{difficultyItem?.desc}</p>
             </div>
             <div className="iv-choice">
               <p>时长</p>
@@ -485,10 +524,30 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   <OptionButton key={item.key} active={duration === item.key} onClick={() => setDuration(item.key)}>{item.label}</OptionButton>
                 ))}
               </div>
+              <p className="iv-hint">{durationItem?.desc}。练习时长到了，只提示你点结束，不自动出报告。</p>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
+        {step === 3 && (
+          <section className="iv-card interview-setup__stack">
+            <InterviewCardHead title="核对这场练习" hint="改完再创建。创建前不会出题。" />
+            <div className="iv-fields">
+              <div className="iv-field">
+                <small>岗位 · 行业 · 经验</small>
+                <b>{position.trim() || '尚未选择'} · {industry || '尚未选择'} · {EXPERIENCES.find((item) => item.key === experience)?.label || '尚未选择'}</b>
+                <button type="button" className="iv-mini-btn" onClick={() => setStep(1)}>改岗位与经验</button>
+              </div>
+              <div className="iv-field">
+                <small>面试官 · 难度 · 时长</small>
+                <b>{interviewer?.label} · {difficultyItem?.label} · {durationItem?.label}</b>
+                <button type="button" className="iv-mini-btn" onClick={() => setStep(2)}>改面试官与时长</button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {step === 3 && (<>
         <section className="iv-card">
           <InterviewCardHead title="简历（可选）" hint={resumeFile ? '已选用 1 份' : '不上传也能开始'} />
           {resumeFile ? (
@@ -594,6 +653,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
             查看面试准备要点（本机固定内容，不依赖 AI）
           </Button>
         )}
+        </>)}
         <InterviewRail />
       </div>
     </div>
