@@ -12,20 +12,8 @@ import {
   NAV_ITEMS,
   PATH_TO_KEY,
   consoleTabsFor,
-  navKeyForPath,
   projectNavItems,
 } from './partnerNav'
-
-/** 数据大屏入口与 /screen 子路径高亮必须和侧栏登记一致。 */
-const SCREEN_NAV = { '/screen': 'screen', key: 'screen' } as const
-if (
-  PATH_TO_KEY['/screen'] !== SCREEN_NAV['/screen']
-  || KEY_TO_PATH[SCREEN_NAV.key] !== '/screen'
-  || !NAV_ITEMS.some((item) => item.key === SCREEN_NAV.key)
-  || navKeyForPath('/screen/overview') !== SCREEN_NAV['/screen']
-) {
-  throw new Error('数据大屏侧栏登记与路径不一致')
-}
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '管理员',

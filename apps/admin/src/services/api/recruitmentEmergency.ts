@@ -8,8 +8,8 @@
 // API_MODE=mock → 演示数据。托管开关默认打开（保持既有演示与用例口径）；
 //   浏览器里 localStorage['mock:recruitment-hosting'] = 'off' 时按关闭演示，= 'error' 时模拟
 //   读取失败（页面应按关闭处理并说明读不到）；localStorage['mock:recruitment-emergency'] = 'fail'
-//   时下架 / 熔断按服务端「已被紧急下架」拒绝。默认演示不改数据、不回成功回执，
-//   界面显示「演示模式不执行」。只在 mock 下读。
+//   时下架 / 熔断按服务端「已被紧急下架」拒绝；= 'confirm' 时模拟服务端已确认（只给浏览器用例
+//   验证成功态与列表变化）。默认演示不改数据、不回成功回执，界面显示「演示模式不执行」。只在 mock 下读。
 //
 // 页面只能按服务端返回的结果说话：下架 / 熔断成功与否以响应为准，不自行假定。
 // ============================================================
@@ -23,6 +23,8 @@ import {
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import { publishFairSourceRecord, publishJobSourceRecord } from './sources'
+import { markMockOfficialChannelTakenDown } from './orgOfficialChannels'
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
 export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 
@@ -107,16 +109,25 @@ function mockHostingEnabled(): boolean {
   return value !== 'off'
 }
 
+function mockEmergencyMode(): string | null {
+  try {
+    return window.localStorage.getItem(MOCK_RECRUITMENT_EMERGENCY_KEY)
+  } catch {
+    return null /* 读不到按默认演示 */
+  }
+}
+
+/** 校验事由；'fail' 按服务端拒绝；除 'confirm'（用例专用的模拟确认）外一律「演示模式不执行」。 */
 function assertMockReason(reasonCode: string, reasonText: string): void {
   if (!reasonCode || !reasonText.trim()) {
     throw new ApiHttpError('TAKEDOWN_REASON_REQUIRED', '紧急下架必须选择事由并填写说明', 403)
   }
-  let mode: string | null = null
-  try {
-    mode = window.localStorage.getItem(MOCK_RECRUITMENT_EMERGENCY_KEY)
-  } catch { /* 读不到按默认演示 */ }
+  const mode = mockEmergencyMode()
   if (mode === 'fail') {
     throw new ApiHttpError('EMERGENCY_TAKEDOWN_IRREVERSIBLE', '该内容已紧急下架，不能恢复', 403)
+  }
+  if (mode !== 'confirm') {
+    throw new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
   }
 }
 
@@ -126,11 +137,18 @@ const mockAdapter: RecruitmentEmergencyServiceInterface = {
   },
   async takedown(input) {
     assertMockReason(input.reasonCode, input.reasonText)
-    throw new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
+    // 只有用例打开 'confirm' 才走到这里：演示数据里岗位 / 招聘会来源行、机构官方渠道改成已下架，其余类型只回执。
+    if (input.targetType === 'job') await publishJobSourceRecord(input.targetId, 'unpublish')
+    if (input.targetType === 'job_fair') await publishFairSourceRecord(input.targetId, 'unpublish')
+    if (input.targetType === 'official_channel') {
+      markMockOfficialChannelTakenDown(input.targetId, input.reasonCode, input.reasonText.trim())
+    }
+    return { targetType: input.targetType, targetId: input.targetId, publishStatus: 'unpublished', irreversible: true }
   },
   async circuitBreak(input) {
     assertMockReason(input.reasonCode, input.reasonText)
-    throw new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
+    // 同上，用例专用；演示数据没有真实内容可锁定，如实回 0 条。
+    return { scope: input.scope, id: input.id, unpublished: 0, irreversible: true }
   },
 }
 

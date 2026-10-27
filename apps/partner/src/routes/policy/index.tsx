@@ -358,7 +358,7 @@ export default function PolicyPage() {
           )}
           <Field label="内容类型" required>
             <select className={inputCls} value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as PolicyKind }))}>
-              <option value="notice">政策公告(公告/通知/招募,展示在公告列表)</option>
+              <option value="notice">{recruitmentOpen ? '政策公告(公告/通知/招募,展示在公告列表)' : '政策公告(公告/通知,展示在公告列表)'}</option>
               <option value="policy_guide">政策扶持条目(按人群分组展示)</option>
             </select>
           </Field>

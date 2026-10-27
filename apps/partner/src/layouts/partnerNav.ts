@@ -86,10 +86,6 @@ export const NAV_ITEMS: NavItem[] = [
  */
 export const RECRUITMENT_HOSTED_NAV_KEYS = new Set(['jobs'])
 
-export function navKeyForPath(pathname: string): string {
-  return PATH_TO_KEY[pathname] ?? (pathname.startsWith('/screen/') ? 'screen' : 'dashboard')
-}
-
 function isNavItemVisible(key: string, caps: PartnerDataSourceCapabilities | null): boolean {
   if (RECRUITMENT_HOSTED_NAV_KEYS.has(key)) return caps?.recruitmentHosting === true
   if (!caps) return true

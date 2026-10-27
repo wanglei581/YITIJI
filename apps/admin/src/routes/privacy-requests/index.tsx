@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Drawer, ConsoleTable, StatusBadge } from '@ai-job-print/ui'
 import {
@@ -417,12 +418,12 @@ export default function PrivacyRequestsPage() {
             {detail.requestType === 'delete' && (
               <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[12.5px] text-warning-fg">
                 <p>账号注销在「用户管理」处理：点下面的按钮会列出已申请注销的用户，打开详情执行注销。本页只显示申请记录，不在这里执行。</p>
-                <a
-                  href="/users?closure=requested"
+                <Link
+                  to="/users?closure=requested"
                   className="mt-2 inline-flex h-11 items-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700"
                 >
                   去用户管理处理
-                </a>
+                </Link>
               </div>
             )}
           </>

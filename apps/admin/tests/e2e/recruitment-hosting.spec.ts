@@ -57,7 +57,7 @@ const REVIEW_PUBLISH = ['审核通过', '拒绝', '发布', '下架', '批量发
 
 test.describe('托管关闭（我们云上默认）：只留查看与紧急下架', () => {
   test('岗位信息源：无审核发布；紧急下架要事由与说明，结果按服务端返回展示', async ({ page }) => {
-    await openAs(page, '/job-sources', 'off')
+    await openAs(page, '/job-sources', 'off', { 'mock:recruitment-emergency': 'confirm' })
     await expect(page.getByText(HOSTING_OFF_NOTICE)).toBeVisible()
     const row = page.getByRole('row', { name: /前端开发工程师/ })
     await expect(row.getByRole('button', { name: '紧急下架', exact: true })).toBeVisible()
@@ -88,10 +88,26 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
     await shot(page, 'takedown-dialog')
 
     await confirm.click()
+    await expect(dialog.getByText('服务端已确认处置')).toBeVisible()
+    await expect(dialog).toContainText('已下架')
+    await expect(dialog).toContainText('不能恢复（单向下架）')
+    await shot(page, 'takedown-result')
+    await dialog.getByRole('button', { name: '完成' }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(row.getByText('已下架')).toBeVisible()
+  })
+
+  test('演示模式默认不执行紧急下架：如实提示，不显示成功，这一行不变', async ({ page }) => {
+    await openAs(page, '/job-sources', 'off')
+    const row = page.getByRole('row', { name: /前端开发工程师/ })
+    await row.getByRole('button', { name: '紧急下架', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('combobox', { name: /事由/ }).selectOption('rights_complaint')
+    await dialog.getByRole('textbox', { name: /说明/ }).fill('权利人投诉：岗位页冒用企业标识，投诉编号 TS-2026-1027')
+    await dialog.getByRole('button', { name: '确认紧急下架（不可恢复）' }).click()
     await expect(dialog.getByRole('alert')).toContainText('演示模式不执行')
     await expect(dialog.getByText('服务端已确认处置')).toHaveCount(0)
     await expect(dialog.getByRole('button', { name: '确认紧急下架（不可恢复）' })).toBeEnabled()
-    await shot(page, 'takedown-result')
     await dialog.getByRole('button', { name: '取消' }).click()
     await expect(dialog).toHaveCount(0)
     await expect(row.getByText('已发布')).toBeVisible()
@@ -181,7 +197,7 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
   })
 
   test('数据接入通道：只有按来源熔断，必须勾选不可撤销', async ({ page }) => {
-    await openAs(page, '/sync-sources', 'off')
+    await openAs(page, '/sync-sources', 'off', { 'mock:recruitment-emergency': 'confirm' })
     await expect(page.getByText(HOSTING_OFF_NOTICE)).toBeVisible()
     const breaker = page.getByRole('button', { name: '按来源熔断', exact: true })
     await expect(breaker).toBeVisible()
@@ -201,13 +217,14 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
     await expect(confirm).toBeEnabled()
     await shot(page, 'circuit-break-source-dialog')
     await confirm.click()
-    await expect(dialog.getByRole('alert')).toContainText('演示模式不执行')
-    await expect(dialog.getByText('服务端已确认熔断')).toHaveCount(0)
+    await expect(dialog.getByText('服务端已确认熔断')).toBeVisible()
+    await expect(dialog).toContainText('0 条内容')
+    await expect(dialog).toContainText('不能撤销')
     await shot(page, 'circuit-break-source-result')
   })
 
   test('合作机构详情：按机构熔断；Escape 只关弹窗不关抽屉', async ({ page }) => {
-    await openAs(page, '/partners', 'off')
+    await openAs(page, '/partners', 'off', { 'mock:recruitment-emergency': 'confirm' })
     await page.getByRole('button', { name: '详情/账号' }).first().click()
     const panel = page.getByRole('region', { name: '按机构熔断' })
     await expect(panel).toBeVisible()
@@ -226,6 +243,17 @@ test.describe('托管关闭（我们云上默认）：只留查看与紧急下�
     await expect(dialog.getByRole('button', { name: '确认熔断（不可撤销）' })).toBeDisabled()
     await dialog.getByRole('checkbox').check()
     await shot(page, 'circuit-break-org-dialog')
+    await dialog.getByRole('button', { name: '确认熔断（不可撤销）' }).click()
+    await expect(dialog.getByText('服务端已确认熔断')).toBeVisible()
+  })
+
+  test('演示模式默认不执行熔断：如实提示，不显示成功', async ({ page }) => {
+    await openAs(page, '/sync-sources', 'off')
+    await page.getByRole('button', { name: '按来源熔断', exact: true }).first().click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('combobox', { name: /事由/ }).selectOption('authority_order')
+    await dialog.getByRole('textbox', { name: /说明/ }).fill('主管部门通知，文号 2026-10-27-01')
+    await dialog.getByRole('checkbox').check()
     await dialog.getByRole('button', { name: '确认熔断（不可撤销）' }).click()
     await expect(dialog.getByRole('alert')).toContainText('演示模式不执行')
     await expect(dialog.getByText('服务端已确认熔断')).toHaveCount(0)
