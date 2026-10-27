@@ -182,6 +182,7 @@ export function ScreensaverPage() {
     >
       <KioskStageFit>
         <PublicTouchFrame
+          page="standby"
           title="待机"
           band={false}
           nav={false}

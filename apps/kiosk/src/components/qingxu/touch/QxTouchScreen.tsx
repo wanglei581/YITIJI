@@ -21,6 +21,8 @@ export function QxTouchScreen({
   stateId,
   className,
   gallery = true,
+  page,
+  frameMarker = false,
 }: {
   band: ReactNode
   children: ReactNode
@@ -35,6 +37,10 @@ export function QxTouchScreen({
   className?: string
   /** 开发样板标记。业务页传 false，样板页保持默认 true。 */
   gallery?: boolean
+  /** 业务页标记。不传则不挂 data-qx-page，样板页行为不变。 */
+  page?: string
+  /** 为 true 时挂 data-qx-frame，供仍按青序页框查找的用例识别。默认不挂。 */
+  frameMarker?: boolean
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -49,6 +55,8 @@ export function QxTouchScreen({
     <div
       className={['qxt-screen', motionClass, className].filter(Boolean).join(' ')}
       data-qxt-screen=""
+      {...(page ? { 'data-qx-page': page } : {})}
+      {...(frameMarker ? { 'data-qx-frame': 'true' } : {})}
       {...(gallery ? { 'data-qxt-gallery': '' } : {})}
       data-qxt-state={stateId}
       data-testid={testId}

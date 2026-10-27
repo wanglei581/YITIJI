@@ -1,3 +1,4 @@
+import { PublicArt } from '../public-touch/PublicArt'
 import { SESSION_GUARD_ASKS, sessionGuardClears, sessionGuardSourceName, type SessionGuardState } from './sessionGuardModel'
 
 export function SessionGuardView({
@@ -28,7 +29,9 @@ export function SessionGuardView({
     ? <>这次<em>不能</em>就地继续</>
     : state === 'clearing'
       ? <>正在<em>清除</em>这台机器上的这次使用记录</>
-      : <>还在用吗？<em>没操作</em>有一会儿了</>
+      // 顶栏 h1 已经是「还在用吗？」（稿 cleared）。这里再写一遍会让
+      // getByRole('heading', { name: /还在用吗/ }) 同时命中两个标题。
+      : <><em>没操作</em>有一会儿了</>
   const copy = state === 'warning-no-continue'
     ? '这一次不允许再点「继续使用」。你可以立刻结束并清场，也可以等计时走完。'
     : state === 'clearing'
@@ -88,6 +91,7 @@ export function SessionGuardView({
               <ul>
                 {card.items.map((item) => <li key={item}>{item}</li>)}
               </ul>
+              <span className="qxp-art"><PublicArt kind={card.title === '本机会清除' ? 'stack' : 'list'} /></span>
             </div>
           ))}
         </div>

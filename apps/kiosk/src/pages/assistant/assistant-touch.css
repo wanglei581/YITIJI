@@ -1,0 +1,284 @@
+/* 问小青触屏正文。只挂在本页，不改 .qxt-* 默认。 */
+
+.qxt-screen[data-qx-page='assistant'] .qxt-body {
+  padding: 14px 28px 10px;
+  gap: 10px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .qxp-fill {
+  overflow: hidden;
+}
+
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-workbench {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  padding: 0;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit {
+  flex: none;
+  padding: 14px 16px;
+  border-radius: 24px;
+  color: var(--qxt-ink);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-row {
+  min-height: 0;
+  gap: 16px;
+  align-items: center;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-headline h2 {
+  margin: 0 0 4px;
+  font-size: 32px;
+  line-height: 1.2;
+  color: var(--qxt-ink);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-lede,
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-eyebrow,
+.qxt-screen[data-qx-page='assistant'] .assistant-advisor-disclosure {
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-advisor-disclosure {
+  display: block;
+  margin-top: 4px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .kiosk-aigc-mark {
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-edge);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-telemetry {
+  width: 220px;
+  border-left-color: var(--qxt-line);
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-telemetry dd {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top-color: var(--qxt-line);
+  max-height: 132px;
+  overflow: auto;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-header h2,
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-group-label,
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tools-count {
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-ai-tool-card {
+  min-height: 64px;
+  color: var(--qxt-ink);
+  background: var(--qxt-well);
+  border-color: var(--qxt-edge);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-cockpit-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: 12px;
+  padding: 0 2px 8px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-topic-choices summary {
+  min-height: 64px;
+  font-size: var(--qxt-fs-body);
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task {
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 180px;
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: var(--qxt-fs-body);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-copy strong {
+  font-size: 28px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-copy small,
+.qxt-screen[data-qx-page='assistant'] .assistant-direct-question small {
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72px;
+  margin-top: auto;
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-task-art svg {
+  width: 120px;
+  height: 88px;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-direct-question {
+  grid-column: 1 / -1;
+  min-height: 72px;
+  font-size: var(--qxt-fs-body);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-quick-questions button,
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entry {
+  min-height: 72px;
+  font-size: var(--qxt-fs-body);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-composer {
+  flex: none;
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-send {
+  min-width: 160px;
+  min-height: var(--qxt-btn-h);
+  height: var(--qxt-btn-h);
+  font-size: var(--qxt-fs-btn);
+}
+
+.qxt-screen[data-qx-page='assistant'] .assistant-tool-button,
+.qxt-screen[data-qx-page='assistant'] .assistant-dock-clear {
+  min-height: 64px;
+  min-width: 64px;
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen[data-qx-page='assistant'] textarea {
+  font-size: var(--qxt-fs-body);
+}
+
+@media (max-width: 600px) {
+  .qxt-screen[data-qx-page='assistant'] .qxt-band-compact {
+    min-height: 0;
+    padding-bottom: 8px;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .qxt-ask {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .qxt-body {
+    padding: 12px 16px 8px;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-workbench {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  /* 窄屏先看见咨询主题，座舱和输入区跟在后面，滚到底仍能看见发送。 */
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit-body {
+    order: 1;
+    overflow: visible;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit {
+    order: 2;
+    display: block;
+    padding: 12px;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-composer {
+    order: 3;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit-row,
+  .qxt-screen[data-qx-page='assistant'] .assistant-ai-tools {
+    display: block;
+    min-height: 0;
+    color: var(--qxt-ink);
+    background: transparent;
+    padding: 0;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit-mark {
+    display: none;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit-headline h2 {
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-cockpit-telemetry {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 8px 0 0;
+    border: 0;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-advisor-disclosure {
+    display: block;
+    width: 100%;
+  }
+
+  .qxt-screen[data-qx-page='assistant'] .assistant-task-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

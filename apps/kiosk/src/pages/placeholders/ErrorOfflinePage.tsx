@@ -21,10 +21,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
+import { PublicArt } from '../public-touch/PublicArt'
 import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
 import { API_BASE_URL, getTerminalId } from '../../services/api'
 import './system-state-qx.css'
+import './offline-touch.css'
 
 type View = 'unknown' | 'checking' | 'partial' | 'offline'
 type Tone = 'q' | 'ok' | 'warn' | 'bad'
@@ -306,6 +308,7 @@ export default function ErrorOfflinePage() {
     >
       <KioskStageFit>
         <PublicTouchFrame
+          page="offline"
           title="机器状态"
           eyebrow="本机"
           sub={current.label}
@@ -347,8 +350,10 @@ export default function ErrorOfflinePage() {
               <div className="k9s-label">
                 <span className="no" aria-hidden="true">01</span>
                 <h2 className="t">这台机器的八项状态</h2>
-                <span className="hint">{hint}</span>
-                <span className="qxp-sr">{view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}</span>
+                <span className="qxp-sr">
+                  {view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}
+                  <span className="hint">{hint}</span>
+                </span>
               </div>
               <ul className="k9s-caps" data-testid="system-state-list">
                 {CAPS.map((cap, index) => (
@@ -362,6 +367,9 @@ export default function ErrorOfflinePage() {
                   </li>
                 ))}
               </ul>
+              <div className="qxp-card k9s-machine" aria-hidden="true">
+                <span className="qxp-art"><PublicArt kind="machine" /></span>
+              </div>
             </section>
             <section className="k9s-sec">
               <div className="k9s-label">

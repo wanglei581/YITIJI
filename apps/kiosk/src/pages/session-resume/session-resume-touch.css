@@ -1,0 +1,44 @@
+/* 继续打印任务。只挂在本页。 */
+
+.qxt-screen[data-qx-page='session-resume'] .sr-recs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qxt-screen[data-qx-page='session-resume'] button.qxp-card {
+  width: 100%;
+  min-height: 220px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.qxt-screen[data-qx-page='session-resume'] .sr-exits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='session-resume'] .sr-exits .sr-link {
+  min-height: 220px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.qxt-screen[data-qx-page='session-resume'] .sr-exits .sr-fn {
+  white-space: normal;
+  font-size: 24px;
+}
+
+.qxt-screen[data-qx-page='session-resume'] .sr-sub,
+.qxt-screen[data-qx-page='session-resume'] .sr-truth,
+.qxt-screen[data-qx-page='session-resume'] .sr-chip,
+.qxt-screen[data-qx-page='session-resume'] .sr-why,
+.qxt-screen[data-qx-page='session-resume'] .sr-banner p,
+.qxt-screen[data-qx-page='session-resume'] .sr-head-p {
+  font-size: 20px;
+}
+
+.qxt-screen[data-qx-page='session-resume'] .qxt-btn {
+  min-height: var(--qxt-btn-h);
+}

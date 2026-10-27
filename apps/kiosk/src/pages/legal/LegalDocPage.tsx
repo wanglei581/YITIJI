@@ -33,6 +33,7 @@ import {
   ReaderSkeleton, StateBlock, type DocMeta,
 } from './LegalDocViews'
 import './legal-service-desk.css'
+import './legal-touch.css'
 
 const FALLBACK_UPDATED_AT = '2026 年 6 月 22 日'
 
@@ -288,7 +289,7 @@ export function LegalDocPage() {
               <p>左上角和下面的返回按钮，会回到<b>你进来的那一页</b>；来路不明时统一回首页，不会把你甩到别处。</p>
             </LegalCard>
             <LegalCard tone="teal" glyph="desk" title="要找别的文件">
-              <p>屏幕上只提供这两份。其他材料请按运营方公示的方式联系。</p>
+              <p>屏幕上只提供这两份。其他材料不在这一页。</p>
             </LegalCard>
           </div>
         </LegalSec>
@@ -342,7 +343,7 @@ export function LegalDocPage() {
               </button>
             </LegalCard>
             <LegalCard tone="teal" glyph="desk" title="现在就要看">
-              <p>请按运营方公示的方式索取现行版本。</p>
+              <p>可以重新读取，或改看另一份。</p>
               <p className="fine">屏幕这边不会替你转达，也不会自动记录这次读取失败。</p>
               <button type="button" className="legal-doc-inbtn is-ghost" data-testid="legal-local-text"
                       onClick={() => setLocalOptIn((prev) => ({ ...prev, [meta.key]: true }))}>
@@ -364,7 +365,7 @@ export function LegalDocPage() {
         </LegalSec>
         <LegalSec>
           <StateBlock kind="warn" glyph="clock" title="什么时候能读到">
-            <p className="legal-doc-state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。要现在就看到现行版本，请按运营方公示的方式索取。</p>
+            <p className="legal-doc-state-p">屏幕上<b>不预告恢复时间</b>，也不会替你上报这次失败。</p>
           </StateBlock>
         </LegalSec>
       </>
@@ -385,7 +386,7 @@ export function LegalDocPage() {
           <div className="legal-doc-state is-compact" data-kind="warn" role="status" data-testid="legal-doc-fallback-warning">
             <h2 className="legal-doc-state-h"><Glyph name="warn" size={28} />本机留存文本，不作为正式版本</h2>
             <p className="legal-doc-state-p">
-              当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。请稍后重试，或按运营方公示的方式索取正式文本。
+              当前无法读取正式版本，以下为本机留存的说明文本，<strong>不作为正式版本</strong>。可以稍后重新读取正式版本。
             </p>
           </div>
         </LegalSec>
@@ -396,7 +397,7 @@ export function LegalDocPage() {
         <LegalSec>
           <div className="legal-doc-grid2">
             <LegalCard tone="wheat" glyph="info" title="哪一版算数">
-              <p>本文本为本机留存的试运营文本，正式运营前以运营方法务审定发布的版本为准；如有疑问，按运营方公示的方式联系。</p>
+              <p>这是这台机器上留着的文本，不是最新正式版本，不作为正式版本。</p>
             </LegalCard>
             <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
               <p className="fine">AI 顾问只转述运营方发布的正文。<b>正文没取到时这个入口先关着</b>，不拿留存文本去讲。</p>
@@ -439,7 +440,7 @@ export function LegalDocPage() {
           <div className="legal-doc-grid2">
             <LegalCard tone="wheat" glyph="info" title="哪一版算数">
               <p>以<b>运营方正式发布</b>的版本为准。本机显示的更新日期来自发布记录，不由本页写死。</p>
-              <p className="fine">以上为运营方当前发布的有效版本；如有疑问，按运营方公示的方式联系。</p>
+              <p className="fine">以上为运营方当前发布的有效版本。</p>
             </LegalCard>
             <LegalCard tone="plum" glyph="spark" title="看不懂这一章">
               <p className="fine">AI 顾问只做<b>通俗转述</b>：不改条款效力，不构成法律结论，也不判定你符不符合某一条。本页不会把正文自动发过去，到那边说出想问的章节即可。</p>
@@ -469,6 +470,7 @@ export function LegalDocPage() {
     >
       <KioskStageFit enabled={!fluid}>
         <PublicTouchFrame
+          page="legal"
           title={meta?.title ?? '协议与隐私'}
           eyebrow="协议与政策"
           sub={meta?.summary}

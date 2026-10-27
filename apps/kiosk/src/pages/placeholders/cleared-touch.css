@@ -1,0 +1,64 @@
+/* 闲置提醒。只挂在本页。 */
+
+.qxt-screen[data-qx-page='cleared'] .sg-hero {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) 1.15fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-num {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 240px;
+  padding: 16px 18px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-num b {
+  font-size: 128px;
+  line-height: 0.9;
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-num span,
+.qxt-screen[data-qx-page='cleared'] .sg-copy,
+.qxt-screen[data-qx-page='cleared'] .sg-from,
+.qxt-screen[data-qx-page='cleared'] .sg-impact,
+.qxt-screen[data-qx-page='cleared'] .sg-card,
+.qxt-screen[data-qx-page='cleared'] .sg-card li,
+.qxt-screen[data-qx-page='cleared'] .sg-truth {
+  font-size: 20px;
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-card {
+  min-height: 0;
+  padding: 16px 18px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-grid3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='cleared'] .sg-card .qxp-art {
+  flex: none;
+  min-height: 72px;
+}
+
+.qxt-screen[data-qx-page='cleared'] .qxt-btn {
+  min-height: var(--qxt-btn-h);
+  height: var(--qxt-btn-h);
+}

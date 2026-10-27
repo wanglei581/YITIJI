@@ -12,6 +12,7 @@ import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import './help-service-desk.css'
+import './help-touch.css'
 
 interface QA {
   q: string
@@ -205,7 +206,8 @@ function HumanDesk({ no, phoneLine }: { no: string; phoneLine: string | null }) 
           <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
           <div>
             <h3>{phoneLine ? '服务电话' : '这一页不转达'}</h3>
-            <p>{phoneLine ?? '服务电话这次没有读到，这一页不显示号码。退费、开票和机器故障以现场公示为准，屏幕上不写死地点。'}</p>
+            {phoneLine ? <p>{phoneLine}</p> : null}
+            <p>退费、开票和机器故障以现场公示为准，屏幕上不写死地点。</p>
             <p className="k1-help-note">本页不会自动拨出，也不会自动上报。点任何按钮都不等于已经有人受理。</p>
           </div>
         </div>
@@ -268,6 +270,7 @@ export function HelpCenterPage() {
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-help-center" data-help-view={view}>
       <PublicTouchFrame
+        page="help"
         title={title}
         eyebrow={eyebrow}
         sub={subtitle}
@@ -305,7 +308,7 @@ export function HelpCenterPage() {
             </div>
             <div className="k1-help-truth" data-disclaimer="true" data-testid="help-truth">
               <div><b>这页写的是什么</b>只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。</div>
-              <div><b>求助怎么算数</b>本页不会自动上报，也不会替你转达。{phoneLine ?? '服务电话这次没有读到，这一页不显示号码。'}</div>
+              <div><b>求助怎么算数</b>本页不会自动上报，也不会替你转达。{phoneLine ?? ''}</div>
             </div>
           </>
         )}

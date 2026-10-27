@@ -1,0 +1,8 @@
+.qxt-screen[data-qx-page='route-error'] .qxp-card {
+  min-height: 280px;
+  font-size: var(--qxt-fs-body);
+}
+
+.qxt-screen[data-qx-page='route-error'] .qxp-note {
+  font-size: var(--qxt-fs-body);
+}

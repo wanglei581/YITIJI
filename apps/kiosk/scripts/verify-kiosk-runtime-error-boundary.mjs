@@ -90,7 +90,8 @@ for (const route of routerArray.elements) {
     + 'export const KioskTopbar = () => null; export const KioskStageFit = ({ children }) => children;'
     + 'export const HomeIcon = () => null; export const RefreshCwIcon = () => null; export const TriangleAlertIcon = () => null;'
     + 'export const useSupportContact = () => ({ servicePhone: null, serviceHours: null });'
-    + 'export const PublicTouchFrame = ({ title, children, dock }) => hs("div", { children: [h("h1", { children: title }), children, dock] });',
+    + 'export const PublicTouchFrame = ({ title, sub, children, dock }) => hs("div", { children: [h("h1", { children: title }), h("p", { children: sub }), children, dock] });'
+    + 'export const PublicArt = () => null;',
   )
   const compile = (code) => ts.transpileModule(code, {
     fileName: 'probe.tsx',
@@ -98,7 +99,8 @@ for (const route of routerArray.elements) {
   }).outputText.replace(/from ["']react\/jsx-runtime["']/g, `from '${import.meta.resolve('react/jsx-runtime')}'`)
   const pageUrl = dataUrl(compile(errorPage)
     .replaceAll("from 'react-router-dom'", `from '${import.meta.resolve('react-router-dom')}'`)
-    .replace(/from '(?:@ai-job-print\/ui|lucide-react|\.\.\/\.\.\/components\/kiosk-shell\/KioskStageFit|\.\.\/\.\.\/hooks\/useSupportContact|\.\.\/public-touch\/PublicTouchFrame)'/g, `from '${chromeUrl}'`))
+    .replace(/import\s+['"][^'"]+\.css['"];?/g, '')
+    .replace(/from '(?:@ai-job-print\/ui|lucide-react|\.\.\/\.\.\/components\/kiosk-shell\/KioskStageFit|\.\.\/\.\.\/hooks\/useSupportContact|\.\.\/public-touch\/PublicTouchFrame|\.\.\/public-touch\/PublicArt)'/g, `from '${chromeUrl}'`))
   const { KioskRouteErrorPage } = await import(pageUrl)
   const { fallback } = await import(dataUrl(compile(
     `import { KioskRouteErrorPage } from '${pageUrl}'; export const fallback = ${fallbackElement}`,

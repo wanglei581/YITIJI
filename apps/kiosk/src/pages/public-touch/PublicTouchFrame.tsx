@@ -52,6 +52,7 @@ export function PublicTouchFrame({
   testId,
   stateId,
   screen,
+  page,
   className,
   bodyClassName = 'qxt-body-tight',
   band = true,
@@ -68,6 +69,8 @@ export function PublicTouchFrame({
   testId?: string
   stateId?: string
   screen?: string
+  /** 挂到 `[data-qx-page]`，供本页样式使用。不传时用 screen。 */
+  page?: string
   className?: string
   bodyClassName?: string
   band?: boolean
@@ -75,9 +78,12 @@ export function PublicTouchFrame({
 }) {
   const navHandlers = usePublicNav()
   const showBack = back !== false
+  const pageId = page ?? screen
   return (
     <QxTouchScreen
       gallery={false}
+      page={pageId}
+      frameMarker
       className={['qxp-app', className].filter(Boolean).join(' ')}
       testId={testId}
       stateId={stateId}
@@ -91,13 +97,14 @@ export function PublicTouchFrame({
           sub={sub}
           status={toStatus(status)}
           back={showBack}
+          backLabel={showBack ? back?.label : undefined}
           onBack={showBack ? back?.onBack : undefined}
         />
       ) : null}
       dock={dock}
       nav={nav ? <QxTouchNav current={navCurrent} {...navHandlers} /> : undefined}
     >
-      <div className="qxp-fill" data-kiosk-screen={screen}>{children}</div>
+      <main className="qxp-fill" data-qx-page={pageId} data-kiosk-screen={screen}>{children}</main>
     </QxTouchScreen>
   )
 }

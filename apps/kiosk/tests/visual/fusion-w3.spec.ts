@@ -1459,7 +1459,7 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
 
   await page.setViewportSize({ width: 390, height: 844 })
   // 等窄屏重排真正落地（导航贴回 844 视口底部），并回到首屏顶部再量 —— 否则量到的是 1080 版式的残影。
-  await page.waitForFunction(() => Math.abs(document.querySelector('.qx-navbar')!.getBoundingClientRect().bottom - window.innerHeight) <= 1)
+  await page.waitForFunction(() => Math.abs(document.querySelector('.qxt-nav')!.getBoundingClientRect().bottom - window.innerHeight) <= 1)
   await page.locator('.kassist').evaluate((el) => { el.scrollTop = 0 })
   const narrow = await page.evaluate(() => {
     const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect()
@@ -1468,7 +1468,7 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
       disclosure: box('.assistant-advisor-disclosure'),
       disclosureDisplay: getComputedStyle(document.querySelector('.assistant-advisor-disclosure')!).display,
       firstTopic: box('.assistant-topic-choices summary'),
-      navTop: box('.qx-navbar').top,
+      navTop: box('.qxt-nav').top,
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
     }
   })
@@ -1486,7 +1486,7 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
   await page.locator('.kassist').evaluate((el) => { el.scrollTop = el.scrollHeight })
   const sendButton = page.locator('.assistant-send')
   await expect(sendButton).toBeVisible()
-  const narrowNavTop = await page.locator('.qx-navbar').evaluate((el) => el.getBoundingClientRect().top)
+  const narrowNavTop = await page.locator('.qxt-nav').evaluate((el) => el.getBoundingClientRect().top)
   const narrowSend = await sendButton.evaluate((el) => el.getBoundingClientRect().bottom)
   const narrowInput = await page.getByLabel('输入咨询问题').evaluate((el) => el.getBoundingClientRect().bottom)
   console.log(`assistant-geometry-390-scrolled sendBottom=${narrowSend} inputBottom=${narrowInput} navTop=${narrowNavTop}`)

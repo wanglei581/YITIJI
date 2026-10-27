@@ -44,6 +44,7 @@ import { AssistantTaskPicker } from './AssistantTaskPicker'
 import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
 import './assistant-qingxu.css'
+import './assistant-touch.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 
@@ -108,10 +109,17 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       return { id: `welcome-${toolboxSkill}`, role: 'assistant', kind: 'system', text: toolboxScene.welcome }
     }
     if (selectedTask) {
-      return { id: `welcome-${selectedTask.id}`, role: 'assistant', kind: 'system', text: selectedTask.welcome }
+      return {
+        id: `welcome-${selectedTask.id}`,
+        role: 'assistant',
+        kind: 'system',
+        text: selectedTask.id === 'jobs' && !hostingOpen
+          ? `${selectedTask.welcome} 本终端未开放岗位与招聘会信息。问题仍可以问。`
+          : selectedTask.welcome,
+      }
     }
     return WELCOME
-  }, [selectedTask, toolboxScene, toolboxSkill])
+  }, [hostingOpen, selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput] = useState('')
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
@@ -466,6 +474,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   return (
     <PublicTouchFrame
+      page="assistant"
       eyebrow="问小青"
       title={cockpitCopy.title.join('')}
       sub={cockpitCopy.lede}

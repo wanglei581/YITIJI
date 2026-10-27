@@ -1,4 +1,5 @@
 import type { PendingTask } from '../../services/api/pendingTasks'
+import { PublicArt } from '../public-touch/PublicArt'
 import {
   formatResumeAmount,
   formatResumeUpdatedAt,
@@ -9,6 +10,12 @@ import {
   resumeVerdict,
   type ResumeScreen,
 } from './sessionResumeModel'
+
+function exitArt(id: string): 'stack' | 'phone' | 'list' {
+  if (id === 'print') return 'stack'
+  if (id === 'code') return 'phone'
+  return 'list'
+}
 
 export function SessionResumeView({
   screen,
@@ -55,13 +62,14 @@ export function SessionResumeView({
             <p>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。</p>
           </div>
         </div>
-        <div className="sr-list" style={{ marginTop: 12 }}>
+        <div className="sr-list sr-exits">
           {RESUME_EMPTY_EXITS.map((item) => (
             <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
               <span>
                 <span className="sr-fn">{item.title}</span>
                 <span className="sr-sub">{item.sub}</span>
               </span>
+              <span className="qxp-art"><PublicArt kind={exitArt(item.id)} /></span>
             </button>
           ))}
         </div>
@@ -79,13 +87,14 @@ export function SessionResumeView({
             <p>读不出列表不等于任务没了；已经建好的单继续排队或出纸。先别重新下单。</p>
           </div>
         </div>
-        <div className="sr-list" style={{ marginTop: 12 }}>
+        <div className="sr-list sr-exits">
           {RESUME_UNAVAILABLE_EXITS.map((item) => (
             <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
               <span>
                 <span className="sr-fn">{item.title}</span>
                 <span className="sr-sub">{item.sub}</span>
               </span>
+              <span className="qxp-art"><PublicArt kind={exitArt(item.id)} /></span>
             </button>
           ))}
         </div>

@@ -3,9 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {
   CheckIcon,
   ChevronRightIcon,
-  FilesIcon,
   LandmarkIcon,
-  Link2Icon,
   PrinterIcon,
   ScanLineIcon,
   SmartphoneIcon,
@@ -17,6 +15,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
+import { PublicArt } from '../public-touch/PublicArt'
 import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
 import { accountDisplayMessage } from './accountUserMessage'
 import { MemberAgreement } from './components/MemberAgreement'
@@ -42,6 +41,7 @@ import {
   type LoginQrState,
 } from './loginGateModel'
 import './styles/login-gate-qx.css'
+import './login-touch.css'
 
 type LoginTab = 'phone' | 'scan'
 
@@ -177,6 +177,7 @@ export function LoginPage() {
     >
       <KioskStageFit>
         <PublicTouchFrame
+          page="login"
           title={copy.title}
           sub={`${copy.sub}回来后会到${loginReturnLabel(returnTo)}。`}
           eyebrow="登录"
@@ -307,17 +308,26 @@ export function LoginPage() {
             )}
 
             {state === 'phone-idle' ? (
-              <section className="lg-benefits">
-                <div className="qx-sec-h"><span className="t">登录之后多出什么</span></div>
-                <div className="lg-grid2">
-                  <div className="qx-card lg-benefit">
-                    <h3><span className="lg-benefit-ic" data-tone="teal"><FilesIcon size={26} aria-hidden /></span>本人资产按账号归集</h3>
-                    <p>我的文档、打印订单、AI 服务记录归到你名下，<b>只有本人可见</b>。要删、要留，按各自的保存期限。</p>
-                  </div>
-                  <div className="qx-card lg-benefit">
-                    <h3><span className="lg-benefit-ic" data-tone="slate"><Link2Icon size={26} aria-hidden /></span>手机与这台机器接得上</h3>
-                    <p>手机上下单拿到的到机码、手机传上来的文件，能和这台机器对上号，不用重新传一遍。</p>
-                  </div>
+              <section className="lg-facts" aria-label="登录之后记在哪">
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">简历</p>
+                  <p className="qxp-note">改好的简历，登录之后才记到账号。没登录时，这次改的先留在这台机器上。</p>
+                  <span className="qxp-art"><PublicArt kind="resume" /></span>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">打印订单</p>
+                  <p className="qxp-note">登录后才能对上你名下的订单。到机码不登录也能取手机上已经下过的单。</p>
+                  <span className="qxp-art"><PublicArt kind="stack" /></span>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">AI 记录</p>
+                  <p className="qxp-note">诊断和面试反馈记在这次登录里。要保存回答要点，没登录会先到这一页。</p>
+                  <span className="qxp-art"><PublicArt kind="list" /></span>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">只管这一次</p>
+                  <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>
+                  <span className="qxp-art"><PublicArt kind="phone" /></span>
                 </div>
               </section>
             ) : null}

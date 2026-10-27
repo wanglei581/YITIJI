@@ -11,6 +11,7 @@ import {
   sessionGuardSourceName,
 } from '../session-guard/sessionGuardModel'
 import '../session-guard/styles/session-guard-qx.css'
+import './cleared-touch.css'
 
 export default function SessionTimeoutPage() {
   const { warning, continueSession, hardClear, clearToScreensaver } = useKioskSessionControl()
@@ -81,8 +82,9 @@ export default function SessionTimeoutPage() {
     >
       <KioskStageFit>
         <PublicTouchFrame
+          page="cleared"
           title="还在用吗？"
-          sub="这台机器闲置后会清掉这次使用。倒计时由本机时钟执行。点「我还在」会回到原来那一页。"
+          sub="30 秒后自动结束这次使用。倒计时由本机时钟执行。"
           eyebrow="闲置提醒"
           status={{ label: pill.label, tone: pill.tone === 'bad' ? 'warn' : pill.tone }}
           back={false}
@@ -106,7 +108,7 @@ export default function SessionTimeoutPage() {
                   onClick={continueSession}
                   aria-label={sourceKnown ? `我还在，继续使用，回到${sessionGuardSourceName(sourcePath)}` : '我还在，继续使用；来源页不可用，只能回首页重新进入'}
                 >
-                  {sourceKnown ? '我还在' : '我还在，继续使用（回首页）'}
+                  我还在，继续使用
                 </button>
               ) : null}
             </footer>

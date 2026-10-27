@@ -1,0 +1,75 @@
+/* 登录页触屏正文。只挂在本页，不改 .qxt-* 默认。 */
+
+.qxt-screen[data-qx-page='login'] .qx-scroll {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-facts {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-fact {
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 12px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-fact .qxp-art {
+  min-height: 0;
+  flex: 1 1 0;
+}
+
+.qxt-screen[data-qx-page='login'] .qx-scroll {
+  gap: 8px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-field {
+  padding: 6px 14px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-field + .lg-field {
+  margin-top: 4px;
+}
+
+.qxt-screen[data-qx-page='login'] .k-agree {
+  margin: 4px 0;
+  padding: 6px 12px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-entries {
+  gap: 6px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-entry {
+  padding: 6px 14px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-fact .qxp-note,
+.qxt-screen[data-qx-page='login'] .lg-identity-note,
+.qxt-screen[data-qx-page='login'] .lg-truth,
+.qxt-screen[data-qx-page='login'] .lg-hint,
+.qxt-screen[data-qx-page='login'] .lg-rail {
+  font-size: 20px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-tab {
+  min-height: 88px;
+}
+
+.qxt-screen[data-qx-page='login'] .lg-entry {
+  min-height: 64px;
+}
+
+.qxt-screen[data-qx-page='login'] .qxt-btn {
+  min-height: var(--qxt-btn-h);
+}

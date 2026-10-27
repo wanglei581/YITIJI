@@ -64,7 +64,7 @@ async function freezeClock(page: Page): Promise<void> {
 /** 稿 08-legal 迁入青序流光后的页壳：QxPageFrame + 页内文档头标题（h1「协议与隐私」只留给读屏）。 */
 async function expectQingxuLegalShell(page: Page, title: string): Promise<void> {
   await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
-  await expect(page.locator('.qx-topbar .qx-topbar-back')).toBeVisible()
+  await expect(page.locator('.qxt-band .qxt-back')).toBeVisible()
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
 }
 
@@ -660,8 +660,8 @@ test('legal document back button says where it goes, with and without in-app his
     json: { success: true, data: { content: '一、服务说明\n\n本终端提供打印与 AI 简历服务。', publishedAt: '2026-07-24T00:00:00.000Z' } },
   })
   api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
-  const topbarBack = page.locator('.qx-topbar-back')
-  const ctaBack = page.locator('.legal-doc-cta .legal-doc-btn').first()
+  const topbarBack = page.locator('.qxt-back')
+  const ctaBack = page.locator('.legal-doc-cta .qxt-btn-sec').first()
 
   // 分支一：站内有上一页（/help），地址又带 ?from=login。现有入口不会这样拼地址，
   // 用 pushState + popstate 模拟一次站内前进（与 kiosk-privacy-timeout 的做法相同）。
@@ -709,9 +709,9 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   const root = page.locator('[data-kiosk-screen="legal-doc"]')
   // 2026-09-25 迁入稿 08-legal：页头由青序顶栏（返回槽）+ 页内文档头承担，字号控件落在「按章节读」一行。
   // 断言意图不变：窄屏下标题可读、返回键与字号控件互不遮挡、页头不吃掉整屏。
-  const topbar = root.locator('.qx-topbar')
+  const topbar = root.locator('.qxt-hdr')
   const title = root.locator('.legal-doc-title')
-  const back = topbar.locator('.qx-topbar-back')
+  const back = root.locator('.qxt-back')
   const tools = root.locator('.legal-doc-tools')
   await expectQingxuLegalShell(page, '隐私政策')
   await expect(root.locator('[data-kiosk-stage-fit="off"]')).toHaveCount(1)

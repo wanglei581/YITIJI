@@ -1,7 +1,15 @@
 import { KIcon } from '../../components/kiosk-icon'
+import { PublicArt } from '../public-touch/PublicArt'
 import { AdvisorSectionLabel } from './AdvisorConversation'
 import { CONSULTATION_TASKS, type ConsultationTask } from './advisorScenes'
 import { advisorDisplayText } from './advisorUserCopy'
+
+const TASK_ART = {
+  resume: 'resume',
+  interview: 'list',
+  jobs: 'list',
+  workplace: 'stack',
+} as const
 
 interface Props {
   no: number
@@ -22,13 +30,18 @@ export function AssistantTaskPicker({ no, composing, input, selectedTask, contex
   return (
     <section className="assistant-task-picker" aria-labelledby="assistant-task-title">
       <AdvisorSectionLabel no={no} id="assistant-task-title" title={composing ? '这条还没发出' : '点一下就能问'} hint={composing ? '改完按右下角发送' : '点完落进输入框，可以改'} />
-      <details className="assistant-topic-choices">
+      <details className="assistant-topic-choices" open>
         <summary>{contextLabel ? `当前主题：${contextLabel}` : '选择咨询主题'}</summary>
         <div className="assistant-task-grid">
           {CONSULTATION_TASKS.map((task) => (
             <button type="button" className="assistant-task" aria-pressed={selectedTask?.id === task.id} key={task.id} onClick={() => onSelect(task.id)}>
               <span className="assistant-task-icon" aria-hidden="true"><KIcon name={task.icon} /></span>
-              <span className="assistant-task-copy"><strong>{task.label}</strong><small>{task.description}</small></span>
+              <span className="assistant-task-copy">
+                <strong>{task.label}</strong>
+                <small>{task.description}</small>
+                <small>例如：{task.questions[0]}</small>
+              </span>
+              <span className="assistant-task-art" aria-hidden="true"><PublicArt kind={TASK_ART[task.id]} /></span>
             </button>
           ))}
           <button type="button" className="assistant-direct-question" aria-pressed={!contextLabel} onClick={onClear}>

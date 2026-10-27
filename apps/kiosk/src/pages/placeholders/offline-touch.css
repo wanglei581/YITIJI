@@ -1,0 +1,70 @@
+/* 机器状态。只挂在本页。 */
+
+.qxt-screen[data-qx-page='offline'] .k9s-caps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-cap {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-cap-name {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-cap-dep,
+.qxt-screen[data-qx-page='offline'] .k9s-verdict,
+.qxt-screen[data-qx-page='offline'] .k9s-copy,
+.qxt-screen[data-qx-page='offline'] .k9s-note,
+.qxt-screen[data-qx-page='offline'] .k9s-card p,
+.qxt-screen[data-qx-page='offline'] .k9s-truth {
+  font-size: 20px;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-label .qxp-sr {
+  margin-left: auto;
+  text-align: right;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-label .qxp-sr .hint {
+  visibility: visible;
+  margin-left: 0;
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--qx-ink-3);
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-machine {
+  min-height: 160px;
+  margin-top: 12px;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-grid3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.qxt-screen[data-qx-page='offline'] .k9s-card {
+  min-height: 120px;
+}
+
+.qxt-screen[data-qx-page='offline'] .qxt-btn {
+  min-height: var(--qxt-btn-h);
+  height: var(--qxt-btn-h);
+}

@@ -84,7 +84,7 @@ export function DocHead({ doc, meta }: { doc: DocMeta; meta: ReactNode }) {
       <span className="legal-doc-ic" data-tone={doc.tone}><Glyph name={doc.glyph} size={38} /></span>
       <div className="legal-doc-head-main">
         <div className="legal-doc-eyebrow" aria-hidden="true">{doc.eyebrow}</div>
-        <h2 className="legal-doc-title">{doc.title}</h2>
+        <p className="legal-doc-title">{doc.title}</p>
         <p className="legal-doc-sum">{doc.summary}</p>
         <div className="legal-doc-meta">{meta}</div>
       </div>

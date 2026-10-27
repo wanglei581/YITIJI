@@ -26,6 +26,7 @@ import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import type { OfficialChannelItem } from '../../services/api/officialChannels'
 import '../../components/qingxu/directory/directory-qx.css'
 import './official-channels-qx.css'
+import './official-touch.css'
 
 type View = 'loading' | 'items' | 'empty' | 'error'
 type ChannelKind = 'org' | 'legacy'
@@ -193,17 +194,22 @@ function ChannelBar({
   // 稿 45 底部两颗：「返回全部服务」（服务目录）与「回首页」。运行时的服务目录就是首页（稿 16 的「全部服务」
   // 同样回 /），两颗按稿并排；读取失败时主按钮让给「重新读取」，「回首页」退成次按钮。
   return (
-    <div className="oc-cta">
+    <div className="oc-cta qxt-dock">
       <div className="oc-cta-btns">
         {view === 'error' ? (
           <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>回首页</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新读取</button>
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={onHome}>回首页</button>
+            <button type="button" className="qxt-btn qxt-btn-pri" onClick={onRetry}>重新读取</button>
+          </>
+        ) : view === 'empty' ? (
+          <>
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={onHome}>返回全部服务</button>
+            <button type="button" className="qxt-btn qxt-btn-pri" onClick={onHome}>回首页</button>
           </>
         ) : (
           <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回全部服务</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={onHome}>回首页</button>
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={onHome}>返回</button>
+            <button type="button" className="qxt-btn qxt-btn-pri" onClick={onHome}>回首页</button>
           </>
         )}
       </div>
@@ -298,11 +304,12 @@ export function OfficialChannelsPage() {
   const subtitle = hasCards
     ? '扫下面的码，在自己的手机上打开本机构核验过的官方页面。'
     : view === 'empty'
-      ? '本终端暂未配置官方渠道。'
+      ? '没有可扫的码。可以问小青，或先看帮助。'
       : '读到本终端的官方渠道后，这里给出二维码。'
 
   return (
     <PublicTouchFrame
+      page="official"
       back={{ label: '返回首页', onBack: home }}
       title="扫码，在手机上看"
       eyebrow="本机构官方渠道"
@@ -316,7 +323,7 @@ export function OfficialChannelsPage() {
           <ol className="oc-steps" aria-label="怎么用这些二维码">
             <li><b>1</b>用手机对准下面的二维码。</li>
             <li><b>2</b>在你自己的手机上打开，<br />不用在这台机器上登录。</li>
-            <li><b>3</b>浏览和报名都在机构官网完成。</li>
+            <li><b>3</b>页面内容以该机构页面为准。</li>
           </ol>
         ) : null}
         {view === 'loading' ? (
