@@ -100,7 +100,12 @@ export default function FairSourcesPage() {
   }, [listQuery, applyPage])
 
   const reload = useCallback(() => {
-    getFairSources(listQuery).then(applyPage).catch(() => setError(true))
+    setError(false)
+    setLoading(true)
+    getFairSources(listQuery)
+      .then(applyPage)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
   }, [listQuery, applyPage])
 
   if (loading) {
@@ -115,6 +120,15 @@ export default function FairSourcesPage() {
     return (
       <Page title="招聘会信息源" subtitle="第三方来源招聘会查看 · 紧急下架">
         <ErrorState title="加载失败" message="请检查网络或稍后重试" className="py-24" />
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={reload}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
+        </div>
       </Page>
     )
   }

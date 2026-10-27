@@ -145,6 +145,10 @@ export async function verifyUserClosure({ root, pass, fail, presentationModule }
     if (code === 'CLOSURE_BLOCKED_BY_OPEN_ORDERS') check(text(tree).includes('ORD-1') && text(tree).includes('退款中'), '阻塞提示实际列出订单号与中文状态')
   }
   const sharedNow = read('../../packages/shared/src/types/memberPrivacy.ts')
-  check(read('src/routes/privacy-requests/index.tsx').includes('ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM as ADMIN_MEMBER_DATA_REQUEST_SCOPE') && sharedNow.includes('账号注销由管理员在用户管理页执行'), '隐私工单采用管理员专用新事实文案')
+  const privacyPage = read('src/routes/privacy-requests/index.tsx')
+  check(privacyPage.includes('ADMIN_DATA_REQUEST_DELETE_COMPLETE_CONFIRM as ADMIN_MEMBER_DATA_REQUEST_SCOPE') && sharedNow.includes('账号注销由管理员在用户管理页执行'), '隐私工单采用管理员专用新事实文案')
+  check(privacyPage.includes('账号注销在「用户管理」处理：点下面的按钮会列出已申请注销的用户，打开详情执行注销。本页只显示申请记录，不在这里执行。'), '注销类工单说明改为去用户管理处理')
+  check(privacyPage.includes('href="/users?closure=requested"') && privacyPage.includes('去用户管理处理'), '注销工单链到已申请注销的用户列表')
+  check(!privacyPage.includes('本后台目前没有处理这类请求的入口'), '过时的没有处理入口说明必须删掉')
   pass('注销筛选、隐私、字段校验、页内二次确认、错误/订单、真实 POST、mock 拒绝与失败保留内容行为')
 }

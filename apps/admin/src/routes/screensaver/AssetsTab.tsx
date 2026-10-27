@@ -28,6 +28,7 @@ export function AssetsTab() {
   const [title, setTitle] = useState('')
   const [duration, setDuration] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [techOpen, setTechOpen] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [previewAsset, setPreviewAsset] = useState<AdAssetView | null>(null)
@@ -205,10 +206,17 @@ export function AssetsTab() {
         </h3>
         <p className="mb-3 text-xs leading-5 text-neutral-500">
           {externalVideoHelp}
-          <button type="button" className="ml-1 cursor-help underline decoration-dotted" title={externalVideoTechNote}>
+          <button
+            type="button"
+            className="ml-1 underline decoration-dotted"
+            title={externalVideoTechNote}
+            aria-expanded={techOpen}
+            onClick={() => setTechOpen((open) => !open)}
+          >
             技术说明
           </button>
         </p>
+        {techOpen && <p className="mb-3 text-xs leading-5 text-neutral-600">{externalVideoTechNote}</p>}
         <div className="flex flex-wrap items-start gap-3">
           <div>
             <label className="mb-1 block text-xs text-neutral-500">视频文件网址</label>

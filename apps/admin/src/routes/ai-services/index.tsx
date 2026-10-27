@@ -76,10 +76,14 @@ export default function AiServicesPage() {
   const [error,        setError]        = useState<string | null>(null)
   const [opFilter,     setOpFilter]     = useState<OpFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [overviewTick, setOverviewTick] = useState(0)
+  const [logsTick, setLogsTick] = useState(0)
 
-  // 概览（统计 + 岗位质量）只在挂载时取一次，与日志筛选解耦。
+  // 概览（统计 + 岗位质量）与日志筛选解耦；重新加载只重跑这一段。
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError(null)
     void (async () => {
       try {
         const [usageData, qualityData] = await Promise.all([
@@ -96,7 +100,7 @@ export default function AiServicesPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [overviewTick])
 
   // 日志：**每次筛选 / 翻页都重新请求后端**。
   //
@@ -107,6 +111,7 @@ export default function AiServicesPage() {
   useEffect(() => {
     let cancelled = false
     setLogsLoading(true)
+    setLogsError(null)
     void (async () => {
       try {
         const result = await getAiLogs({
@@ -130,7 +135,7 @@ export default function AiServicesPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [opFilter, statusFilter, logsOffset])
+  }, [opFilter, statusFilter, logsOffset, logsTick])
 
   // 换筛选条件必须回到第一页，否则会停在旧偏移量上、看起来像「筛不出东西」。
   const applyOpFilter = (next: OpFilter) => { setOpFilter(next); setLogsOffset(0) }
@@ -152,6 +157,15 @@ export default function AiServicesPage() {
         <AiAccessSwitchesPanel />
         <AiUsagePanel />
         <ErrorState title="数据加载失败" message={error ?? '未知错误'} />
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setOverviewTick((tick) => tick + 1)}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
+        </div>
       </Page>
     )
   }
@@ -419,6 +433,7 @@ export default function AiServicesPage() {
       )}
 
       <AiLogsTable logs={logs} logsTotal={logsTotal} logsOffset={logsOffset} logsLoading={logsLoading} logsError={logsError}
+        onReload={() => setLogsTick((tick) => tick + 1)}
         opFilter={opFilter} statusFilter={statusFilter} applyOpFilter={applyOpFilter} applyStatusFilter={applyStatusFilter} setLogsOffset={setLogsOffset} />
 
       {/* ── 合规说明 ──────────────────────────────────── */}

@@ -416,7 +416,13 @@ export default function PrivacyRequestsPage() {
 
             {detail.requestType === 'delete' && (
               <div className="mt-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[12.5px] text-warning-fg">
-                账号注销请求暂不开放在线处理（法务矩阵尚未签字），本后台目前没有处理这类请求的入口。请联系法务团队确认处理方式。
+                <p>账号注销在「用户管理」处理：点下面的按钮会列出已申请注销的用户，打开详情执行注销。本页只显示申请记录，不在这里执行。</p>
+                <a
+                  href="/users?closure=requested"
+                  className="mt-2 inline-flex h-11 items-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700"
+                >
+                  去用户管理处理
+                </a>
               </div>
             )}
           </>

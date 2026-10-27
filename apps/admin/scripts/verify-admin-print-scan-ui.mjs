@@ -18,7 +18,7 @@ const capabilityPath = join(root, 'src/routes/print-scan/CapabilityCenter.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
 const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
-const layoutPath = join(root, 'src/layouts/AdminLayoutWrapper.tsx')
+const layoutPath = join(root, 'src/layouts/adminNav.ts')
 
 function pass(message) {
   console.log(`  PASS ${message}`)

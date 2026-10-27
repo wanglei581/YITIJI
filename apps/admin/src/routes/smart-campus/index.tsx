@@ -143,7 +143,16 @@ export default function SmartCampusPage() {
         {loading ? (
           <p className="text-sm text-neutral-400">加载中…</p>
         ) : error ? (
-          <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
+          <Card className="p-6 text-center text-sm text-neutral-500">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-3 inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              重新加载
+            </button>
+          </Card>
         ) : terminals.length === 0 ? (
           <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
         ) : (

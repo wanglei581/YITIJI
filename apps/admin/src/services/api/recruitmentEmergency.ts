@@ -8,7 +8,8 @@
 // API_MODE=mock → 演示数据。托管开关默认打开（保持既有演示与用例口径）；
 //   浏览器里 localStorage['mock:recruitment-hosting'] = 'off' 时按关闭演示，= 'error' 时模拟
 //   读取失败（页面应按关闭处理并说明读不到）；localStorage['mock:recruitment-emergency'] = 'fail'
-//   时下架 / 熔断按服务端「已被紧急下架」拒绝，用来验证弹窗不自行假定成功。只在 mock 下读。
+//   时下架 / 熔断按服务端「已被紧急下架」拒绝。默认演示不改数据、不回成功回执，
+//   界面显示「演示模式不执行」。只在 mock 下读。
 //
 // 页面只能按服务端返回的结果说话：下架 / 熔断成功与否以响应为准，不自行假定。
 // ============================================================
@@ -22,9 +23,6 @@ import {
 } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import { publishFairSourceRecord, publishJobSourceRecord } from './sources'
-import { markMockOfficialChannelTakenDown } from './orgOfficialChannels'
-
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
 export const MOCK_RECRUITMENT_EMERGENCY_KEY = 'mock:recruitment-emergency'
 
@@ -128,18 +126,11 @@ const mockAdapter: RecruitmentEmergencyServiceInterface = {
   },
   async takedown(input) {
     assertMockReason(input.reasonCode, input.reasonText)
-    // 演示数据里岗位 / 招聘会来源行、机构官方渠道真的改成已下架，其余类型只回执。
-    if (input.targetType === 'job') await publishJobSourceRecord(input.targetId, 'unpublish')
-    if (input.targetType === 'job_fair') await publishFairSourceRecord(input.targetId, 'unpublish')
-    if (input.targetType === 'official_channel') {
-      markMockOfficialChannelTakenDown(input.targetId, input.reasonCode, input.reasonText.trim())
-    }
-    return { targetType: input.targetType, targetId: input.targetId, publishStatus: 'unpublished', irreversible: true }
+    throw new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
   },
   async circuitBreak(input) {
     assertMockReason(input.reasonCode, input.reasonText)
-    // 演示模式没有真实内容可锁定，如实回 0 条。
-    return { scope: input.scope, id: input.id, unpublished: 0, irreversible: true }
+    throw new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
   },
 }
 
