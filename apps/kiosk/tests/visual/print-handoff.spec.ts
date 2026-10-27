@@ -43,6 +43,12 @@ function capabilities(available: string[] = []): unknown {
   }
 }
 
+/** 2026-10-28 稿 confirm：核对价格页的小样会取这一份文件自己的第一页。把来源文件的内容接到一份可见 PDF，不留未接的请求。 */
+async function routeFileContent(page: Page, fileId: string): Promise<void> {
+  await page.route((url) => url.pathname === `/api/v1/files/${fileId}/content`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+}
+
 function runtimeErrors(page: Page): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
@@ -293,6 +299,7 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   const errors = runtimeErrors(page)
   registerPrintShell(api) // 双面未登记 = 本机暂未开通
   registerMemberLogin(api)
+  await routeFileContent(page, 'jm-p05-001')
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [MATERIAL_TEMPLATE] } })
   api.respond('POST', '/api/v1/job-materials/generate', { status: 200, json: { success: true, data: MATERIAL_FILE } })
   await captureQuoteBodies(page)
@@ -351,6 +358,7 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
 test('H5 F09 advisor work print enters the print chain and a guest is never told it was saved @w2', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerPrintShell(api)
+  await routeFileContent(page, 'file-p05-art')
   api.respond('GET', '/api/v1/advisor/sessions/p05-art-sess', {
     status: 200,
     json: {
@@ -420,6 +428,7 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
   const errors = runtimeErrors(page)
   registerPrintShell(api)
   registerMemberLogin(api)
+  await routeFileContent(page, 'doc-p05-report')
   const doc = {
     id: 'doc-p05-report', filename: '简历对照-交接验收.pdf', mimeType: 'application/pdf', sizeBytes: 245_760,
     purpose: 'print_doc', sensitiveLevel: 'normal', assetCategory: 'derived', retentionPolicy: 'months_3',

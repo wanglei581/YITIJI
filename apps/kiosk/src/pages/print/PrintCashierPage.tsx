@@ -50,6 +50,10 @@ function shownIssue(error: unknown, fallback: string): string {
       : kept
     return `${base}。${printProblemLine()}`
   }
+  // 固定句末尾的「请联系现场工作人员」是找人口径：只拿掉这一截，留下说明原因的前半句，求助改走服务电话。
+  // 这样「这台机器的安全校验没通过」这类安全失败不会被泛化成「创建任务失败」，也不会被说成网络问题。
+  const cause = raw.replace(/[，,]?(?:并|或)?(?:请)?联系(?:现场)?工作人员[^。]*$/, '').replace(/[。．\s]+$/g, '')
+  if (cause && cause !== raw && !containsStaffHandoff(cause)) return `${cause}。${printProblemLine()}`
   return preferUnattended(raw, fallback.includes('打印有问题') ? fallback : `${fallback}。${printProblemLine()}`)
 }
 import {

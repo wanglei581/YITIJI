@@ -201,7 +201,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
     scroller.scrollTop = scroller.scrollHeight
     return {
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
-      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      actionsBottom: [...document.querySelectorAll('.ph-grid, .qxt-tools')].reduce((max, node) => Math.max(max, node.getBoundingClientRect().bottom), 0),
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
       navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
@@ -261,8 +261,9 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
 
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback').getByText('打印机离线 · 出纸类暂停', { exact: true })).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback')).toContainText('打印机当前无法连接')
+  // 2026-10-28 稿 print：状态由顶栏胶囊和卡片角标各说一次（取自真实打印机状态），提醒条只留标准句。
+  await expect(page.locator('.qxt-status')).toContainText('打印机离线 · 出纸类暂停')
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('打印机离线')
   await expect(page.getByTestId('print-hub-fallback')).toContainText('这台机器暂时打不了')
   await expect(page.getByTestId('print-hub-fallback')).not.toContainText('找现场工作人员')
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
@@ -270,12 +271,12 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
   await expect(page.getByTestId('print-hub-cap-sign')).toBeEnabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
-  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这台机器现在出不了纸')
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这次出不了纸')
   const bottom = await page.locator('.qxt-body').evaluate((scroller) => {
     scroller.scrollTop = scroller.scrollHeight
     return {
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
-      actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
+      actionsBottom: [...document.querySelectorAll('.ph-grid, .qxt-tools')].reduce((max, node) => Math.max(max, node.getBoundingClientRect().bottom), 0),
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
       navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
