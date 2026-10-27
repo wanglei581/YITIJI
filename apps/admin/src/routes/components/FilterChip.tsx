@@ -3,17 +3,21 @@ export function FilterChip({
   active,
   label,
   count,
+  pressed,
   onClick,
 }: {
   active: boolean
   label: string
   count?: number
+  /** 只有需要对外暴露开关状态时才传。 */
+  pressed?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      {...(pressed === undefined ? {} : { 'aria-pressed': pressed })}
       className={
         'inline-flex h-[30px] items-center gap-1.5 rounded-full border px-[13px] text-xs font-bold transition-colors ' +
         (active

@@ -26,6 +26,8 @@ import { RecentPrintTasks } from './RecentPrintTasks'
 import { RecentActivity } from './RecentActivity'
 import { DashboardDeviceStatus } from './DashboardDeviceStatus'
 import { buildAlertRows } from './dashboardRows'
+import { useIncidentQueue, useReportQueue, useUnconfirmedPrintCount } from '../../components/first-order/useServiceQueues'
+import { incidentTodayRows, reportTodayRows, unconfirmedTodayRows, type TodayRow as ServiceTodayRow } from './todayServiceRows'
 
 /**
  * 工作台分区降级模型（OPS-05）：
@@ -69,12 +71,7 @@ function initialBlock<V>(loading = true): BlockEntry<V> {
   return { value: null, error: null, loading }
 }
 
-interface TodayRow {
-  key: string
-  title: string
-  detail: string
-  href?: string
-  action: string
+interface TodayRow extends ServiceTodayRow {
   retry?: BlockKey[]
   loading?: boolean
 }
@@ -104,6 +101,9 @@ const LOADERS: Record<BlockKey, () => Promise<unknown>> = {
 
 export default function DashboardPage() {
   const hosting = useRecruitmentHosting()
+  const incidents = useIncidentQueue()
+  const reports = useReportQueue()
+  const unconfirmedPrints = useUnconfirmedPrintCount()
   const hostingOpen = hosting.status === 'ready' && hosting.enabled
   const [blocks, setBlocks] = useState<Partial<Record<BlockKey, BlockEntry>>>({})
   const [initialLoading, setInitialLoading] = useState(true)
@@ -160,7 +160,8 @@ export default function DashboardPage() {
   const printTaskPage = hasValue('printTasks') ? (entry('printTasks').value as AdminPrintTaskPage) : null
   const alerts = hasValue('alerts') ? (entry('alerts').value as AdminAlertsResult) : null
 
-  const loadedAny = ALL_BLOCKS.some((key) => hasValue(key))
+  const queueUseful = [incidents.state, reports.state, unconfirmedPrints.state].some((state) => state.status === 'ready' || state.status === 'preview')
+  const loadedAny = ALL_BLOCKS.some((key) => hasValue(key)) || queueUseful
   const readyPrinters = printers?.filter((printer) => printer.status === 'online').length ?? 0
   const stockKpi = recruitmentStockKpi({
     hostingOpen,
@@ -261,6 +262,7 @@ export default function DashboardPage() {
       })
     }
   }
+  todayRows.push(...incidentTodayRows(incidents.state, incidents.retry))
   if (!hold(['terminals'], '离线终端')) {
     const offline = terminals?.filter((terminal) => !terminal.online).length ?? 0
     if (offline > 0) {
@@ -299,6 +301,7 @@ export default function DashboardPage() {
       })
     }
   }
+  todayRows.push(...unconfirmedTodayRows(unconfirmedPrints.state, unconfirmedPrints.retry))
   if (!hold(['privacy'], '数据权利')) {
     const seen = privacy?.items.length ?? 0
     if (privacy?.nextCursor) {
@@ -331,6 +334,7 @@ export default function DashboardPage() {
       })
     }
   }
+  todayRows.push(...reportTodayRows(reports.state, incidents.state, reports.retry))
   if (!hold(['jobSources', 'fairSources'], '招聘存量') && stockTodo && !stockKpi.failed) {
     todayRows.push({
       key: stockTodo.key,
@@ -367,20 +371,37 @@ export default function DashboardPage() {
           <SectionCard title="今天要处理">
             <div className="flex flex-col">
               {todayRows.map((row) => {
-                const primary = row.action !== '' && actionSeen === 0
-                if (row.action !== '') actionSeen += 1
-                const className = primary ? PRIMARY_ACTION : SECONDARY_ACTION
+                const actionClass = (active: boolean) => {
+                  if (!active) return SECONDARY_ACTION
+                  const primary = actionSeen === 0
+                  actionSeen += 1
+                  return primary ? PRIMARY_ACTION : SECONDARY_ACTION
+                }
+                const headerClass = actionClass(row.action !== '' && Boolean(row.href || row.retry || row.onRetry))
                 return (
-                  <div key={row.key} className="flex items-center gap-3 border-t border-neutral-900/[0.06] py-3 first:border-t-0">
+                  <div key={row.key} className="flex items-start gap-3 border-t border-neutral-900/[0.06] py-3 first:border-t-0">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-neutral-900">{row.title}</p>
                       {row.detail && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{row.detail}</p>}
+                      {row.note && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{row.note}</p>}
+                      {row.lines?.map((line) => {
+                        const lineClass = actionClass(line.action !== '')
+                        return (
+                          <div key={line.key} className="mt-2 flex items-center gap-3">
+                            <p className="min-w-0 flex-1 text-xs leading-relaxed text-neutral-700">{line.text}</p>
+                            {line.action !== '' && <a href={line.href} className={lineClass}>{line.action}</a>}
+                          </div>
+                        )
+                      })}
                     </div>
-                    {row.href && (
-                      <a href={row.href} className={className}>{row.action}</a>
+                    {row.href && row.action !== '' && (
+                      <a href={row.href} className={headerClass}>{row.action}</a>
                     )}
                     {row.retry && (
-                      <button type="button" onClick={retry(row.retry)} className={className}>{row.action}</button>
+                      <button type="button" onClick={retry(row.retry)} className={headerClass}>{row.action}</button>
+                    )}
+                    {row.onRetry && (
+                      <button type="button" onClick={row.onRetry} className={headerClass}>{row.action}</button>
                     )}
                   </div>
                 )
