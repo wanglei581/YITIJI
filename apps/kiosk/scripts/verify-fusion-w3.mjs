@@ -287,18 +287,16 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
   check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
 }
 
-// 触屏版把方向设置收成「诊断方向」一步，摘要仍排在可改的设置前面。
-// 旧双栏 / 0.9 比例是被稿替换的结构；440px 方向区下限与标题不逐字折行不放宽。
+// 触屏版把方向设置收成「诊断方向」一步。来源三列、卡片下限、可改设置在只读维度前面（稿：范围 → 两条路 → 六维只读）、路径标题不折行，按稿保留，不放宽。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
-const resumeTriageCss = stripCssComments(read('src/pages/resume/resume-triage-qx.css'))
+const resumeTouchCss = stripCssComments(read('src/pages/resume/touch/resume-touch.css'))
 const directionPane = resumeSource.slice(resumeSource.indexOf("step === 'direction'"))
-check(resumeSource.includes('className="qx-rt-split"') && /(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source uses the design-21 vertical summary stage')
+check(/(?:^|;)\s*min-height:\s*148px\s*;?/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-src")), 'resume source cards keep a 148px minimum')
 check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
-check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-side')), 'resume source direction rail keeps a 440px minimum at 1080')
-check(/flex-direction:\s*column/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-split')), 'resume source keeps file and summary in one vertical column')
-check(directionPane.includes('<ResumeSourceSummary') && directionPane.indexOf('<ResumeSourceSummary') < directionPane.indexOf('qx-rt-settings'), 'read-only summary precedes editable direction settings')
+check(/grid-template-columns:\s*1fr 1fr 1fr/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-srcs")), 'resume source cards stay in three columns')
+check(directionPane.includes('qxt-see') && directionPane.indexOf('qx-rt-settings') < directionPane.indexOf('qxt-see'), 'editable direction settings precede the read-only summary')
 check(resumeSource.includes('<section className="qx-rt-settings"'), 'direction settings remain accessible on the direction step')
-check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTriageCss, '.qx-resume-triage .qx-rt-direction h2')), 'resume direction title cannot wrap character by character')
+check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-direction'] .qxt-path b")), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
 // 迁入后改为正向断言——登记进 QX_MIGRATED_ROUTES、舞台由 KioskRoot 缩放、旧 LightFlow 壳全部退出。

@@ -631,7 +631,7 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
   assert(parseOutage > 0 && parseUnknown > 0 && parseOutage < parseUnknown,
     'parse: 能力级停用必须在「结果未知」判定之前处理 —— 否则 503 AI_PAUSED 会让页面叫人原样再试')
   must('parse', /navigateFail\(aiErrorMessageOf\(err, [^)]*\), undefined, true\)/, '能力级停用转失败屏时必须标 aiDown')
-  const reportAiDownCta = slice(files.report, 'const failCta = state.aiDown ? (', ') : (')
+  const reportAiDownCta = slice(files.report, 'state.aiDown\n          ? (printable', ": { label: '重新解析'")
   assert(reportAiDownCta.length > 0, 'report: 失败屏必须有 aiDown 分支')
   assert(!/handleRetry|重新解析/.test(reportAiDownCta), 'report: AI 停用的失败屏不得再给「重新解析」')
   // AI 顾问：能力级停用锁住输入、转不经过 AI 的入口，不走「重试这一轮」。

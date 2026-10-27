@@ -90,7 +90,7 @@ async function startDiagnosis(page: Page, journey: string, collectors: ReturnTyp
     act: async () => {
       const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })
       if (!(await start.isVisible().catch(() => false))) {
-        await page.getByRole('button', { name: '诊断方向', exact: true }).click()
+        await page.getByRole('button', { name: '下一步：诊断方向', exact: true }).click()
       }
       await start.click()
       await page.waitForURL((url) => url.pathname === '/resume/parse' || url.pathname === '/resume/report', { timeout: 20_000 })
@@ -548,7 +548,7 @@ test('会员态 · 真短信 log 登录后 J1–J4 闭环（非桩） @interacti
     {
       // 稿 23（2.0）：有可对照的条目时先落在建议总览（点「编辑并导出」进编辑区），没有条目时直接是编辑区。
       // 先等两者之一真的出现，再决定点不点，不靠一次不等待的 count()。
-      const toEditor = page.getByRole('button', { name: '编辑并导出', exact: true })
+      const toEditor = page.getByRole('button', { name: '编辑简历', exact: true })
       const exportBtn = page.getByRole('button', { name: /确认优化版，导出 PDF|导出 PDF/ })
       await expect(toEditor.or(exportBtn).first()).toBeVisible({ timeout: 15_000 })
       if (await toEditor.isVisible()) await toEditor.click()

@@ -1,7 +1,6 @@
 import { ChevronLeftIcon } from 'lucide-react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import type { ResumeCompareDecision } from './resumeCompareModel'
-import { ResumeCompareCustomEditor } from './ResumeCompareCustomEditor'
 import { detectUnconfirmedTextAdditions } from '../resume-deliver/facts'
 import { wordDiff } from './wordDiff'
 
@@ -15,7 +14,6 @@ export function ResumeCompareCard(props: {
   isDemoResult: boolean
   onExit: () => void
   onConfirm: (addition: string, checked: boolean) => void
-  onSaveCustom: (text: string) => void
   onPrevious?: () => void
 }) {
   const confirmed = new Set(props.confirmed)
@@ -42,6 +40,7 @@ export function ResumeCompareCard(props: {
           <button type="button" className="qxc-previous" onClick={props.onExit}>返回优化页</button>
         </div>
       </div>
+      <div className="qxc-legend" aria-label="对照图例"><span><del>删掉</del> 删除</span><span><ins>加上</ins> 新增</span><span data-replacement="true">换写法</span><span>普通文字 保留</span></div>
 
       <article className="qx-card qxc-card" data-live="true" data-decision={props.decision ?? 'undecided'}>
         <div className="qxc-columns qxc-diff" aria-label="逐字差异">
@@ -57,7 +56,6 @@ export function ResumeCompareCard(props: {
           </section>
         </div>
 
-        <div className="qxc-legend" aria-label="对照图例"><span><del>删掉</del> 删除</span><span><ins>加上</ins> 新增</span><span data-replacement="true">换写法</span><span>普通文字 保留</span></div>
         <div className="qxc-metrics"><span>字数 {props.item.before.length} → {shown.length}</span><span>删除 {diff.filter((part) => part.type === 'del').reduce((n, part) => n + part.text.length, 0)} 字 · 新增 {diff.filter((part) => part.type === 'ins').reduce((n, part) => n + part.text.length, 0)} 字</span></div>
 
         <section className="qxc-facts" data-has-additions={additions.length > 0 ? 'true' : 'false'}>
@@ -78,13 +76,6 @@ export function ResumeCompareCard(props: {
             </>
           )}
         </section>
-
-        <ResumeCompareCustomEditor
-          decision={props.decision}
-          value={props.customText}
-          seed={props.item.before}
-          onSave={props.onSaveCustom}
-        />
       </article>
     </>
   )

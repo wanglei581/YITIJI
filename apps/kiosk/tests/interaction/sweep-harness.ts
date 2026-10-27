@@ -507,7 +507,7 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
     act: async () => {
       const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })
       if (!(await start.isVisible().catch(() => false))) {
-        await page.getByRole('button', { name: '诊断方向', exact: true }).click()
+        await page.getByRole('button', { name: '下一步：诊断方向', exact: true }).click()
       }
       await page.getByRole('button', { name: /^定向诊断/ }).click()
     },

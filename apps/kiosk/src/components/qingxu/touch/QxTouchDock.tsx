@@ -6,7 +6,7 @@ import { useQxTouchBack } from './useQxTouchBack'
 
 export type QxTouchButtonKind = 'pri' | 'sec' | 'ghost' | 'danger' | 'mint'
 export type QxTouchAsk =
-  | { label: string; draft: string; voice?: boolean }
+  | { label: string; draft: string; voice?: boolean; beforeAsk?: () => boolean }
   | { label: string; disabled: true }
   | false
 export type QxTouchPrimary = {
@@ -17,6 +17,8 @@ export type QxTouchPrimary = {
   disabled?: boolean
   /** 可选。不传时不写 data-testid，原有按钮不受影响。 */
   testId?: string
+  /** 可选。追加到主按钮上，默认不追加，其它页的主按钮类名不变。 */
+  className?: string
 }
 
 /**
@@ -54,6 +56,7 @@ export function QxTouchDock({
         className="qxt-askq"
         data-qxt-ask="on"
         onClick={() => {
+          if (ask.beforeAsk && ask.beforeAsk() === false) return
           rememberAssistantDraft(ask.draft)
           navigate('/assistant')
         }}
@@ -81,7 +84,7 @@ export function QxTouchDock({
       {primary ? (
         <button
           type="button"
-          className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}`}
+          className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}${primary.className ? ` ${primary.className}` : ''}`}
           onClick={primary.onClick}
           disabled={primary.disabled}
           data-testid={primary.testId}

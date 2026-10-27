@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { ResumeOptimizeModule } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
 import { resumeUserReason } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { useAuth } from '../../auth/useAuth'
@@ -12,6 +10,7 @@ import { getResumeOptimize } from '../../services/api'
 import { readAiResumeSession } from './aiResumeSession'
 import { ResumeCompareBatchBar } from './components/resume-compare/ResumeCompareBatchBar'
 import { ResumeCompareCard } from './components/resume-compare/ResumeCompareCard'
+import { ResumeCompareCustomEditor } from './components/resume-compare/ResumeCompareCustomEditor'
 import { ResumeCompareDraft } from './components/resume-compare/ResumeCompareDraft'
 import { ResumeCompareState } from './components/resume-compare/ResumeCompareState'
 import {
@@ -65,6 +64,7 @@ export function ResumeOptimizeComparePage() {
   const [confirmedByModule, setConfirmedByModule] = useState<Record<string, string[]>>({})
   const [customByModule, setCustomByModule] = useState<Record<string, string>>({})
   const [batchNote, setBatchNote] = useState<string | null>(null)
+  const [writeOpen, setWriteOpen] = useState(false)
 
   useEffect(() => {
     if (!taskId) {
@@ -83,6 +83,7 @@ export function ResumeOptimizeComparePage() {
     setConfirmedByModule({})
     setCustomByModule({})
     setBatchNote(null)
+    setWriteOpen(false)
     getResumeOptimize(taskId, { token: getToken(), accessToken }, existingOnly)
       .then((response) => {
         if (cancelled) return
@@ -119,6 +120,7 @@ export function ResumeOptimizeComparePage() {
   useEffect(() => {
     if (items.length > 0 && currentIndex >= items.length) setCurrentIndex(0)
   }, [items.length, currentIndex])
+  useEffect(() => { setWriteOpen(false) }, [currentIndex])
   const current = items[currentIndex]
   const keyAt = (index: number) => moduleKeyOf(items[index], index)
   const isDemoResult = providerName === 'mock'
@@ -138,6 +140,7 @@ export function ResumeOptimizeComparePage() {
       const confirmed = new Set(confirmedByModule[key] ?? [])
       if (current.additions.some((addition) => !confirmed.has(addition))) return
     }
+    setWriteOpen(false)
     setDecisions((previous) => ({ ...previous, [key]: decision }))
   }
 
@@ -156,30 +159,26 @@ export function ResumeOptimizeComparePage() {
       ? { tone: 'unknown' as const, label: '读取中' }
       : outage || failure || !current
         ? { tone: 'warn' as const, label: '未取得候选' }
-        : { tone: 'ok' as const, label: '待本人选择' }
-  const ctabar = current ? (
-    <>
-      <button type="button" className="qx-btn" data-variant="teal" aria-pressed={decisions[keyAt(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed} aria-disabled={currentUnconfirmed || undefined}>用改写</button>
-      <button type="button" className="qx-btn" data-variant="ghost" aria-pressed={decisions[keyAt(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
-      <button type="button" className="qx-btn" data-variant="primary" disabled={!decisions[keyAt(currentIndex)]} onClick={next}>下一条</button>
-    </>
-  ) : (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={backToOptimize}>返回优化页</button>
-  )
+        : { tone: 'unknown' as const, label: '待本人选择' }
+  const decided = Boolean(current && decisions[keyAt(currentIndex)])
+  const lastItem = Boolean(current && currentIndex >= items.length - 1)
+  const dockPrimary = current
+    ? { label: lastItem ? '去编辑' : '下一条', onClick: next, disabled: !decided, className: 'qx-btn', noArrow: true }
+    : { label: '返回优化页', onClick: backToOptimize, className: 'qx-btn', noArrow: true }
+  const pageTitle = current ? `第 ${currentIndex + 1} / ${items.length} 条 · ${current.title}` : '逐条选择改法'
 
   return (
     <ResumeTouchPage
-      eyebrow="AI 生成，仅供参考"
-      title="逐条选择改法"
-      subtitle={isDemoResult ? '演示内容不是你的简历原文。' : '左边原文，右边改写；选择是阅读决策，回优化页时再选择是否应用。'}
+      eyebrow="逐条选择"
+      title={pageTitle}
+      subtitle="选择还没写进简历，在『编辑』里生效"
       status={pageStatus}
       railNow={3}
-      terminalLabel="就业服务大厅"
-      back={{ label: '返回简历优化工作台', onBack: backToOptimize }}
-      navbar={<ResumeOptimizeNavbar />}
-      ctabar={<>{ctabar}<QxStepActions onPrev={backToOptimize}><QxAiHelp label="问小青：这句还能怎么改 →" draft="我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。" /></QxStepActions></>}
+      back={{ label: '返回', onBack: backToOptimize }}
+      ask={{ label: '问小青：这句还能怎么改', draft: '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。' }}
+      primary={dockPrimary}
     >
-      <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize-compare" data-route="/resume/optimize/compare" className="qx-scroll qx-resume-compare" data-takeaway="逐条选择改法，再编辑导出新简历">
+      <section data-qx-page="compare" data-kiosk-domain="resume" data-kiosk-screen="resume-optimize-compare" data-route="/resume/optimize/compare" className="qx-scroll qx-resume-compare" data-takeaway="逐条选择改法，再编辑导出新简历">
         {isDemoResult && <p className="qxc-notice" data-tone="warn">{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>}
         <p className="qxc-notice" role="note">{UNSAVED_NOTICE}</p>
         {!taskId ? (
@@ -223,11 +222,6 @@ export function ResumeOptimizeComparePage() {
               customText={customByModule[keyAt(currentIndex)] ?? ''}
               isDemoResult={isDemoResult}
               onExit={backToOptimize}
-              onSaveCustom={(text) => {
-                const key = keyAt(currentIndex)
-                setCustomByModule((previous) => ({ ...previous, [key]: text }))
-                setDecisions((previous) => ({ ...previous, [key]: 'custom' }))
-              }}
               onConfirm={(addition, checked) => setConfirmedByModule((previous) => {
                 const key = keyAt(currentIndex)
                 const nextConfirmed = new Set(previous[key] ?? [])
@@ -244,6 +238,24 @@ export function ResumeOptimizeComparePage() {
                 return { ...previous, [key]: [...nextConfirmed] }
               })}
               onPrevious={currentIndex > 0 ? () => setCurrentIndex((index) => index - 1) : undefined}
+            />
+            <div className="qxt-seg" role="group" aria-label="这一条用哪一版">
+              <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed}>用改写</button>
+              <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
+              <button type="button" aria-pressed={writeOpen || decisions[keyAt(currentIndex)] === 'custom'} onClick={() => setWriteOpen(true)}>自己写</button>
+            </div>
+            <ResumeCompareCustomEditor
+              decision={decisions[keyAt(currentIndex)]}
+              value={customByModule[keyAt(currentIndex)] ?? ''}
+              seed={current.before}
+              open={writeOpen}
+              hideTrigger
+              onOpenChange={setWriteOpen}
+              onSave={(text) => {
+                const key = keyAt(currentIndex)
+                setCustomByModule((previous) => ({ ...previous, [key]: text }))
+                setDecisions((previous) => ({ ...previous, [key]: 'custom' }))
+              }}
             />
             <ResumeCompareDraft
               items={items}

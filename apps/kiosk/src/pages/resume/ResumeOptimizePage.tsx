@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/shared'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
+import { useSupportContact } from '../../hooks/useSupportContact'
+import { unattendedResumeCopy } from './touch/unattendedResumeCopy'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
@@ -28,7 +29,6 @@ import { optimizeExportErrorMessage, optimizeStateDescription, optimizeStateTitl
 import { ResumeDraftBanner } from './components/resume-deliver/ResumeDraftBanner'
 import { ResumeFactConfirmDialog } from './components/resume-deliver/ResumeFactConfirmDialog'
 import { ResumeOptimizeLeaveDialog } from './components/resume-deliver/ResumeOptimizeLeaveDialog'
-import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
 import { ResumeStatePanel } from './components/resume-deliver/ResumeStatePanel'
 import { useResumeExportPricing } from './components/resume-deliver/useResumeExportPricing'
 import { useResumeDraftAutosave } from './components/resume-deliver/useResumeDraftAutosave'
@@ -62,6 +62,7 @@ const OPTIMIZE_AI_DRAFT = '我想把简历中的一句经历换个改法。请�
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
+  const contact = useSupportContact()
   const startPrint = useStartPrintHandoff()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -287,55 +288,50 @@ export function ResumeOptimizePage() {
     navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken } })
   }
 
-  const navbar = <ResumeOptimizeNavbar />
-  // 稿 23：总览与编辑区是同一页的两屏，用按钮切换（稿里没有页签）。没有可对照的条目时直接进编辑区。
+  // 稿：总览与编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
   const showOverview = workView === 'overview' && modules.length > 0
-
-  const ctabar = (
-    <>
-      <QxStepActions onPrev={() => requestLeave(goToReport)} prevLabel="返回报告">
-        <span className="qx-r1-ai-exit" onClickCapture={(event) => {
-          if (!isDirty) return
-          event.stopPropagation()
-          requestLeave(() => { rememberAssistantDraft(OPTIMIZE_AI_DRAFT); navigate('/assistant') })
-        }}><QxAiHelp label="问小青：这句还能怎么改 →" draft={OPTIMIZE_AI_DRAFT} /></span>
-      </QxStepActions>
-      {editorOpen && showOverview && (
-        <div className="qx-opt-cta">
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('editor')}>编辑并导出</button>
-          <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={() => openCompare()}>
-            逐条看（从第 1 条）
-          </button>
-        </div>
-      )}
-      {assembled && editorOpen && !showOverview && (
-        <div className="qx-opt-cta">
-          {modules.length > 0 && (
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('overview')}>返回建议总览</button>
-          )}
-          {/* 导出的就是编辑区里的这一份：用户在编辑区亲手改过的段落以他改的为准，
-              不因为和某条「保留原文」的选择对不上就拦住导出。 */}
-          <button type="button" className="qx-btn" data-variant="primary" aria-disabled={exportBlocked || titleBlocked || undefined} onClick={requestResumeExport}>
-            {exporting ? '正在生成文件…' : `确认优化版，导出 ${exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'}`}
-          </button>
-        </div>
-      )}
-    </>
-  )
+  const qxPage = workView === 'editor' && exported ? 'resume-export' : workView === 'editor' ? 'resume-edit' : 'optimize'
+  const exportName = exportFormat === 'pdf' ? 'PDF' : exportFormat === 'docx' ? 'Word' : exportFormat === 'md' ? 'Markdown' : 'TXT'
+  const leaveDirty = draft.unsaved || (isDirty && !exported && !token)
+  const ask = {
+    label: '问小青：这句还能怎么改',
+    draft: OPTIMIZE_AI_DRAFT,
+    beforeAsk: () => {
+      if (!leaveDirty) return true
+      requestLeave(() => { rememberAssistantDraft(OPTIMIZE_AI_DRAFT); navigate('/assistant') })
+      return false
+    },
+  }
+  const navTestIds = { home: 'resume-optimize-nav-home', advisor: 'resume-optimize-nav-advisor', profile: 'resume-optimize-nav-profile' }
+  const dockPrimary = editorOpen && showOverview
+    ? { label: '逐条看（从第 1 条）', onClick: () => openCompare(), testId: 'resume-optimize-primary', className: 'qx-btn', noArrow: true as const }
+    : assembled && editorOpen && !showOverview
+      ? {
+          label: exporting ? '正在生成文件…' : `确认优化版，导出 ${exportName}`,
+          onClick: requestResumeExport,
+          disabled: exportBlocked || titleBlocked,
+          className: 'qx-btn',
+          noArrow: true as const,
+        }
+      : undefined
 
   if (consent.needsPrompt && !syntheticReady) {
     return (
-      <ResumeTouchPage title="优化建议" subtitle="基于已有内容优化表达" railNow={3} ctabar={ctabar} navbar={navbar}>
-        <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="qx-resume-optimize" data-optimize-state="loading" />
+      <ResumeTouchPage title="优化建议" subtitle="基于已有内容优化表达" railNow={3} ask={ask} navTestIds={navTestIds}>
+        <section data-qx-page="optimize" data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="qx-resume-optimize" data-optimize-state="loading" />
         <ResumeAiConsentDialog busy={consent.busy} error={consent.error} guest={!token} onCancel={() => navigate(-1)} onConfirm={() => { void consent.confirm() }} />
       </ResumeTouchPage>
     )
   }
 
-  const statusCapsule = workView === 'editor' && view === 'ready'
+  const statusCapsule = workView === 'editor' && exported
+    ? { label: '已生成文件' }
+    : workView === 'editor' && view === 'ready'
     ? { tone: 'unknown' as const, label: '未保存' }
     : optimizeStatusCapsule(view)
-  const pageTitle = workView === 'editor' && view === 'ready'
+  const pageTitle = workView === 'editor' && exported
+    ? '要带走哪一种文件？'
+    : workView === 'editor' && view === 'ready'
     ? '版式和模板，要怎么排？'
     : showOverview && view === 'ready'
       ? `这份简历有 ${modules.length} 处可以改`
@@ -345,7 +341,7 @@ export function ResumeOptimizePage() {
     <ResumeStatePanel
       tone={view === 'loading' ? 'info' : view === 'empty' || view === 'no-context' ? 'empty' : 'error'}
       title={optimizeStateTitle(view)}
-      description={optimizeStateDescription(view, failMsg)}
+      description={unattendedResumeCopy(optimizeStateDescription(view, failMsg), contact)}
       synthetic={resolved.synthetic}
       actions={
         <>
@@ -357,8 +353,9 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <ResumeTouchPage eyebrow={view === 'ready' ? 'AI 生成，仅供参考' : undefined} title={pageTitle} subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} railNow={3} ctabar={ctabar} navbar={navbar}>
+    <ResumeTouchPage eyebrow={workView === 'editor' && exported ? '导出与打印' : view === 'ready' ? 'AI 建议稿 · AI 生成，仅供参考，请自行核对' : undefined} title={pageTitle} subtitle="建议只改表达，事实由你确认，随时可以保留原文。不新增学校、公司、证书、时间、薪资、获奖。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} railNow={3} ask={ask} primary={dockPrimary} navTestIds={navTestIds}>
       <section
+        data-qx-page={qxPage}
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"
         className={`qx-resume-optimize ${confirmLeave ? 'overflow-hidden' : ''}`}
@@ -409,6 +406,9 @@ export function ResumeOptimizePage() {
             onReport={() => requestLeave(goToReport)}
           />
         )}
+        {editorOpen && !showOverview && modules.length > 0 && (
+          <button type="button" className="qxt-link" onClick={() => setWorkView('overview')}>返回建议总览</button>
+        )}
         {editorOpen && resume && assembled && !showOverview && modules.length === 0 && (
           <p className="qx-opt-nomods" role="note">这份结果没有需要逐条对照的建议，下面直接是优化版全文，核对后导出。</p>
         )}
@@ -426,7 +426,7 @@ export function ResumeOptimizePage() {
             adjusting={adjusting}
             lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
             adjustWarnings={adjustWarnings}
-            adjustError={adjustError}
+            adjustError={adjustError ? unattendedResumeCopy(adjustError, contact) : adjustError}
             templates={resumeTemplates}
             templatesError={templatesError}
             selectedTemplateId={selectedTemplateId}
@@ -434,7 +434,7 @@ export function ResumeOptimizePage() {
             printNavigating={printNavigating}
             exported={exported}
             exportKind={exportKind}
-            exportError={exportError}
+            exportError={exportError ? unattendedResumeCopy(exportError, contact) : exportError}
             exportVersion={exportVersion}
             pricing={pricing.pricing}
             pricingLoading={pricing.loading}

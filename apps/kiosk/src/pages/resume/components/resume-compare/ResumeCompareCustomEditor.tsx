@@ -6,28 +6,41 @@ export function ResumeCompareCustomEditor(props: {
   value: string
   seed: string
   onSave: (text: string) => void
+  /** 由本屏分段按钮接管「自己写」时传入。不传则仍由组件内按钮打开。 */
+  open?: boolean
+  hideTrigger?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [editing, setEditing] = useState(false)
+  const controlled = props.open !== undefined
+  const [localEditing, setLocalEditing] = useState(false)
+  const editing = controlled ? Boolean(props.open) : localEditing
   const [draft, setDraft] = useState(props.value || props.seed)
+  const setEditing = (next: boolean) => {
+    if (!controlled) setLocalEditing(next)
+    props.onOpenChange?.(next)
+  }
 
   useEffect(() => {
     setDraft(props.value || props.seed)
-    setEditing(false)
-  }, [props.value, props.seed])
+    if (!controlled) setLocalEditing(false)
+  }, [props.value, props.seed, controlled])
 
   if (!editing) {
+    if (props.hideTrigger && !(props.decision === 'custom' && props.value)) return null
     return (
       <section className="qxc-custom">
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="ghost"
-          aria-pressed={props.decision === 'custom'}
-          onClick={() => setEditing(true)}
-        >
-          自己写
-          <small>用你的话改</small>
-        </button>
+        {props.hideTrigger ? null : (
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="ghost"
+            aria-pressed={props.decision === 'custom'}
+            onClick={() => setEditing(true)}
+          >
+            自己写
+            <small>用你的话改</small>
+          </button>
+        )}
         {props.decision === 'custom' && props.value ? (
           <>
             <p>本页自己写的版本只进阅读草稿与统计，刷新即丢，不会被应用到编辑区。</p>

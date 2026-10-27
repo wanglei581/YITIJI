@@ -6,7 +6,10 @@ import {
   conclusionCount,
   defaultSeg,
   derivedPriorities,
+  DIM_ABOUT,
+  dimLabel,
   quantHits,
+  tierOf,
   type ReportSeg,
 } from '../../resume-report-model'
 import { IssuesZone, StructureZone } from './ResumeReportIssues'
@@ -62,6 +65,58 @@ export function ResumeReportBody({
           ))}
         </div>
       </section>
+
+      {(report.sections.length > 0 || issues.length > 0) ? (
+        <>
+          <section className="qxt-rep" aria-label="诊断结果">
+            {report.sections.length > 0 ? (
+              <section className="qxt-dims" aria-label="六个维度">
+                <div className="qxt-h">六个维度<small>这不是录取分 · 不求和</small></div>
+                {report.sections.map((section) => {
+                  const tier = tierOf(section.score, section.maxScore)
+                  const ratio = section.maxScore > 0 ? section.score / section.maxScore : 0
+                  return (
+                    <div key={section.key} className="qxt-dim" data-tone={tier.tone}>
+                      <span><b>{dimLabel(section.key)}</b><small>{section.key in DIM_ABOUT ? DIM_ABOUT[section.key as keyof typeof DIM_ABOUT] : ''}</small></span>
+                      <em>{section.score} · {tier.word}</em>
+                      <i style={{ ['--p' as string]: String(ratio) }} />
+                    </div>
+                  )
+                })}
+              </section>
+            ) : null}
+            {issues.length > 0 ? (
+              <section className="qxt-prios" aria-label="先改这几处">
+                <div className="qxt-h">先改这几处<small>最多 3 条</small></div>
+                {issues.slice(0, 3).map((issue, index) => (
+                  <article key={issue.id} className="qxt-issue">
+                    <b>{index + 1} {issue.title}</b>
+                    <small>{dimLabel(issue.dim)}</small>
+                    {issue.evidence[0]?.quote ? <p><u>依据</u>「{issue.evidence[0].quote}」</p> : null}
+                    <p><u>影响</u>{issue.impact}</p>
+                    <p><u>可以怎么改</u>{issue.fixIt}</p>
+                  </article>
+                ))}
+              </section>
+            ) : null}
+          </section>
+          {issues.length > 0 ? (
+            <details className="qxt-all" open>
+              <summary>全部问题（{issues.length}）</summary>
+              <p>{issues.slice(0, 3).map((issue, index) => `${index + 1} ${issue.title}`).join(' · ')}{issues.length > 3 ? ' · 上面三张' : ''}</p>
+              {issues.slice(3).map((issue, index) => (
+                <article key={issue.id} className="qxt-issue">
+                  <b>{index + 4} {issue.title}</b>
+                  <small>{dimLabel(issue.dim)}</small>
+                  {issue.evidence[0]?.quote ? <p><u>依据</u>「{issue.evidence[0].quote}」</p> : null}
+                  <p><u>影响</u>{issue.impact}</p>
+                  <p><u>可以怎么改</u>{issue.fixIt}</p>
+                </article>
+              ))}
+            </details>
+          ) : null}
+        </>
+      ) : null}
 
       <div className="rrp-segs" role="tablist" aria-label="报告主内容分区" data-testid="resume-report-segs">
         {([

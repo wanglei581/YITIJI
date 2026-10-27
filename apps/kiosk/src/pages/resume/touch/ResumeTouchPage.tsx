@@ -37,6 +37,7 @@ export function ResumeTouchPage({
   testId,
   stateId,
   navCurrent,
+  navTestIds,
   bandKind = 'compact',
   bodyClassName,
   children,
@@ -60,6 +61,8 @@ export function ResumeTouchPage({
   testId?: string
   stateId?: string
   navCurrent?: 'home' | 'advisor' | 'profile'
+  /** 可选。不传时底导航不写 data-testid。 */
+  navTestIds?: { home?: string; advisor?: string; profile?: string }
   bandKind?: 'std' | 'compact'
   bodyClassName?: string
   children: ReactNode
@@ -101,6 +104,7 @@ export function ResumeTouchPage({
       nav={(
         <QxTouchNav
           current={navCurrent}
+          testIds={navTestIds}
           onHome={() => navigate('/')}
           onAdvisor={() => navigate('/assistant')}
           onProfile={() => navigate('/profile')}

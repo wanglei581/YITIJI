@@ -106,23 +106,16 @@ export function OptimizeOverview(props: {
             const factLine = row.additions.length > 0
               ? `改写里有原文没有的：${row.additions.join('、')}`
               : '文字比对未发现新增事实'
+            const snippet = row.module.before.replace(/\s+/g, ' ').trim()
             return (
               <li key={row.key} className="qx-opt-mod" data-decision={row.switchable ? row.decision : 'manual'} data-pending={row.additions.length}>
-                <button
-                  type="button"
-                  className="qx-opt-mod-open"
-                  onClick={() => props.onCompare(row.index)}
-                  aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
-                >
-                  <i className="no" aria-hidden="true">{row.index + 1}</i>
-                  <span className="tx">
-                    <b>{title}</b>
-                    <span className={row.additions.length > 0 ? 'warn' : undefined}>
-                      原文 {charCount(row.module.before)} 字 → 建议 {charCount(row.module.after)} 字 · {factLine}
-                    </span>
+                <div className="qx-opt-rowtx">
+                  <b>{title}</b>
+                  <small>原文：{snippet || '这一条没有留下原句。'}{row.block ? ' 这一条只能在编辑区里改。' : ''}{row.additions.length > 0 ? ` 待确认：${row.additions.join('、')}` : ''}</small>
+                  <span className={row.additions.length > 0 ? 'warn' : undefined}>
+                    原文 {charCount(row.module.before)} 字 → 建议 {charCount(row.module.after)} 字 · {factLine}
                   </span>
-                  <ChevronRightIcon className="go" aria-hidden="true" />
-                </button>
+                </div>
                 {row.switchable ? <div className="qx-opt-toggle" role="group" aria-label={`第 ${row.index + 1} 条用哪一版`}>
                   <button
                     type="button"
@@ -140,7 +133,15 @@ export function OptimizeOverview(props: {
                   >
                     保留原文
                   </button>
-                </div> : null}
+                </div> : <span className="qx-opt-hand">只能手改</span>}
+                <button
+                  type="button"
+                  className="qx-opt-mod-open"
+                  onClick={() => props.onCompare(row.index)}
+                  aria-label={`第 ${row.index + 1} 条 ${title}，${row.switchable ? `当前${DECISION_LABEL[row.decision]}` : '这一条只能在编辑区里改'}，去逐条对照`}
+                >
+                  打开
+                </button>
                 {row.block
                   ? <p className="qx-opt-decision-row-status" data-testid="resume-optimize-row-manual" role="status">{MANUAL_NOTE[row.block]}</p>
                   : props.decisionIssues[row.key] && <p className="qx-opt-decision-row-status" role="status">{props.decisionIssues[row.key]}</p>}
@@ -156,8 +157,8 @@ export function OptimizeOverview(props: {
           <small>唯一可导出的工作区</small>
         </div>
         <div className="qx-opt-save">
-          <button type="button" className="qx-opt-sbtn" data-testid="resume-optimize-open-editor" onClick={props.onEditor}>
-            <span>编辑优化版简历</span>
+          <button type="button" className="qx-opt-sbtn" data-testid="resume-optimize-open-editor" aria-label="编辑简历" onClick={props.onEditor}>
+            <span>编辑简历</span>
             <small>排版 · 模板 · 导出</small>
           </button>
           <div className="qx-opt-need">
@@ -168,7 +169,7 @@ export function OptimizeOverview(props: {
             <span>· PDF 可以进打印确认；Word、TXT、Markdown 先保存到手机</span>
           </div>
         </div>
-        <div className="qx-opt-exits">
+        <div className="qx-opt-exits qxt-exits">
           <button type="button" className="qx-opt-row" onClick={props.onManual}>
             <i aria-hidden="true"><PencilLineIcon /></i>
             <span className="tx"><b>自己动手改</b><span>自己填写并原样导出草稿，不经过模型</span></span>
@@ -176,7 +177,7 @@ export function OptimizeOverview(props: {
           </button>
           <button type="button" className="qx-opt-row" onClick={props.onReport}>
             <i aria-hidden="true"><FileTextIcon /></i>
-            <span className="tx"><b>回看诊断报告</b><span>确认哪几条最该改</span></span>
+            <span className="tx"><b>回诊断报告</b><span>确认哪几条最该改</span></span>
             <ChevronRightIcon className="go" aria-hidden="true" />
           </button>
         </div>

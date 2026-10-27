@@ -1,35 +1,71 @@
-/* 简历触屏页局部样式。只使用 --qxt-* / --qx-*，挂在 .qxt-screen 下。 */
+/* 简历三条主路的页面样式。只挂在本包 data-qx-page 下，不改 .qxt-* 默认。 */
 
-.qxt-screen .qxt-resume-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+[data-qx-page='resume'] .qxt-resume-pair,
+[data-qx-page='resume-direction'] .qxt-paths,
+[data-qx-page='resume-direction-more'] .qxt-block,
+[data-qx-page='reading'] .qxt-read,
+[data-qx-page='diagnosis'] .qxt-rep,
+[data-qx-page='optimize'] .qxt-stats,
+[data-qx-page='compare'] .qxt-stats,
+[data-qx-page='resume-edit'] .qxt-edit,
+[data-qx-page='resume-export'] .qxt-fmts {
+  min-width: 0;
 }
 
-.qxt-screen .qxt-resume-grid {
+[data-qx-page='resume'] .qxt-resume-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-qx-page='resume'] .qxt-slab {
+  min-height: 260px;
+}
+
+[data-qx-page='resume'][data-readiness='unavailable'] .qxt-tile {
+  min-height: 156px;
+}
+
+[data-qx-page='resume'] .qxt-resume-grid,
+[data-qx-page='resume'] .qxt-hub-hold {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-.qxt-screen .qxt-resume-sec {
+[data-qx-page='resume'] .qxt-resume-sec,
+[data-qx-page='resume-src'] .qxt-resume-sec,
+[data-qx-page='usb'] .qxt-resume-sec,
+[data-qx-page='reading'] .qxt-h,
+[data-qx-page='diagnosis'] .qxt-h,
+[data-qx-page='optimize'] .qxt-h {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 12px;
   margin: 8px 0 12px;
   color: var(--qxt-ink);
   font-size: 26px;
+  font-weight: 700;
 }
 
-.qxt-screen .qxt-resume-sec small {
+[data-qx-page='resume'] .qxt-resume-sec small,
+[data-qx-page='resume-src'] .qxt-fine,
+[data-qx-page='resume-direction'] .qxt-fine,
+[data-qx-page='resume-direction-more'] .qxt-fine,
+[data-qx-page='reading'] .qxt-fine,
+[data-qx-page='diagnosis'] .qxt-fine,
+[data-qx-page='optimize'] .qxt-fine,
+[data-qx-page='compare'] .qxt-fine {
   color: var(--qxt-ink-2);
   font-size: 20px;
+  line-height: 1.45;
 }
 
-.qxt-screen .qxt-resume-more {
+[data-qx-page='resume'] .qxt-resume-more {
   min-height: 64px;
   min-width: 64px;
+  margin-left: auto;
   padding: 0 8px;
   border: 0;
   background: transparent;
@@ -37,84 +73,1104 @@
   font-size: 22px;
 }
 
-.qxt-screen .qxt-resume-fine {
-  margin: 18px 0 8px;
-  color: var(--qxt-ink-2);
-  font-size: 20px;
-  line-height: 1.45;
+[data-qx-page='resume'] .qxt-vis {
+  background: transparent;
+  min-height: 176px;
 }
 
-.qxt-screen .qxt-resume-art {
-  width: 100%;
-  height: 148px;
-  border-radius: 18px;
+[data-qx-page='resume'] .qxt-take span {
+  white-space: nowrap;
+}
+
+[data-qx-page='resume'] .qxt-resume-art {
+  width: 148px;
+  height: 176px;
+  margin: 12px auto;
+  border-radius: 16px;
   background:
-    linear-gradient(180deg, transparent 0 18px, var(--qxt-line, var(--qx-line)) 18px 20px, transparent 20px),
-    linear-gradient(90deg, var(--qx-emerald) 0 8px, transparent 8px),
-    var(--qx-paper);
+    repeating-linear-gradient(180deg, transparent 0 22px, var(--qxt-line) 22px 24px),
+    linear-gradient(90deg, var(--qx-emerald) 0 10px, var(--qxt-card) 10px);
 }
 
-.qxt-screen .qxt-resume-srcs {
+[data-qx-page='resume'] .qxt-resume-pair .qxt-slab:nth-child(2) .qxt-resume-art {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 22px, var(--qxt-line) 22px 24px),
+    var(--qxt-card);
+}
+
+[data-qx-page='resume-src'] .qxt-srcs {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
 
-.qxt-screen .qxt-resume-src {
+[data-qx-page='resume-src'] .qxt-src {
   min-height: 148px;
-  padding: 16px;
-  border-radius: 22px;
-  border: 2px solid var(--qxt-line);
+  padding: 14px;
+  border-radius: 26px;
+  border: 1.5px solid var(--qxt-line);
   background: var(--qxt-card);
   text-align: left;
   color: var(--qxt-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.qxt-screen .qxt-resume-src[aria-pressed="true"] {
-  border-color: var(--qx-emerald);
+[data-qx-page='resume-src'] .qxt-src[aria-pressed='true'] {
+  background: var(--qxt-deep, var(--qx-ink));
+  color: var(--qxt-cream, var(--qx-paper));
+  border-color: var(--qxt-deep, var(--qx-ink));
 }
 
-.qxt-screen .qxt-resume-src b {
+[data-qx-page='resume-src'] .qxt-src b {
   display: block;
-  font-size: 26px;
+  font-size: 28px;
+  white-space: nowrap;
 }
 
-.qxt-screen .qxt-resume-src small {
+[data-qx-page='resume-src'] .qxt-src small {
   display: block;
-  margin-top: 6px;
-  color: var(--qxt-ink-2);
   font-size: 20px;
   line-height: 1.35;
+  color: var(--qxt-ink-2);
 }
 
-.qxt-screen .qxt-dock .qx-btn,
-.qxt-screen .qxt-resume-src,
-.qxt-screen .qxt-resume-more {
+[data-qx-page='resume-src'] .qxt-src[aria-pressed='true'] small {
+  color: var(--qxt-mint, var(--qx-emerald));
+}
+
+[data-qx-page='resume-src'] .qxt-ico {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='resume-src'] .qxt-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 26px;
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+}
+
+[data-qx-page='resume-src'] .qxt-panel > b,
+[data-qx-page='resume-src'] .resume-source-phone-session,
+[data-qx-page='resume-src'] .resume-usb-panel,
+[data-qx-page='resume-src'] .resume-usb-panel button,
+[data-qx-page='resume-src'] .resume-source-phone-session button,
+[data-qx-page='resume-src'] .resume-source-phone-session p,
+[data-qx-page='resume-src'] .resume-usb-panel p {
+  font-size: 22px;
+}
+
+[data-qx-page='resume-src'] .resume-source-phone-session button,
+[data-qx-page='resume-src'] .resume-usb-panel button,
+[data-qx-page='resume-src'] .qxt-ops button,
+[data-qx-page='resume-src'] .qxt-links button,
+[data-qx-page='resume-src'] .qxt-link {
   min-height: 64px;
   min-width: 64px;
 }
 
-.qxt-screen .qx-rt-xq {
-  display: none;
+[data-qx-page='resume-src'] .qxt-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-.qxt-screen .qxt-dock .qx-ctabar {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
+[data-qx-page='resume-src'] .qxt-links button,
+[data-qx-page='resume-src'] .qxt-link {
+  width: 100%;
+  padding: 8px 16px;
   border: 0;
-  background: transparent;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  color: var(--qxt-teal-ink);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: left;
+}
+
+[data-qx-page='resume-direction'] .qxt-modes,
+[data-qx-page='resume-direction'] .qxt-paths,
+[data-qx-page='resume-direction-more'] .qxt-chips,
+[data-qx-page='optimize'] .qxt-batch,
+[data-qx-page='compare'] .qxt-batch {
+  display: grid;
   gap: 12px;
 }
 
-.qxt-screen .qxt-hub-hold {
+[data-qx-page='resume-direction'] .qxt-modes,
+[data-qx-page='resume-direction'] .qxt-paths {
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 12px;
+}
+
+[data-qx-page='resume-direction'] .qxt-modes button,
+[data-qx-page='resume-direction'] .qxt-path,
+[data-qx-page='resume-direction'] .qx-rt-dimchip,
+[data-qx-page='resume-direction-more'] .qx-rt-chip {
+  min-height: 84px;
+  min-width: 64px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 22px;
+  text-align: left;
+}
+
+[data-qx-page='resume-direction'] .qxt-path b {
+  display: block;
+  font-size: 26px;
+  white-space: nowrap;
+}
+
+[data-qx-page='resume-direction'] .qxt-modes b {
+  display: block;
+  font-size: 26px;
+  white-space: nowrap;
+}
+
+[data-qx-page='resume-direction'] .qxt-path small,
+[data-qx-page='resume-direction'] .qxt-modes small {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='resume-direction'] .qxt-path[aria-pressed='true'],
+[data-qx-page='resume-direction'] .qxt-modes button[aria-pressed='true'],
+[data-qx-page='resume-direction'] .qx-rt-dimchip[aria-pressed='true'],
+[data-qx-page='resume-direction-more'] .qx-rt-chip[aria-pressed='true'] {
+  background: var(--qxt-deep, var(--qx-ink));
+  color: var(--qxt-cream, var(--qx-paper));
+  border-color: var(--qxt-deep, var(--qx-ink));
+}
+
+[data-qx-page='resume-direction'] .qxt-see,
+[data-qx-page='resume-direction-more'] .qxt-see {
+  margin: 8px 0 12px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  text-align: left;
+}
+
+[data-qx-page='resume-direction'] .qxt-see b,
+[data-qx-page='resume-direction-more'] .qxt-see b {
+  display: block;
+  font-size: 22px;
+}
+
+[data-qx-page='resume-direction'] .qxt-see li,
+[data-qx-page='resume-direction-more'] .qxt-see li,
+[data-qx-page='resume-direction'] .qxt-see p,
+[data-qx-page='resume-direction-more'] .qxt-hint {
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='resume-direction'] .qx-rt-dimchips,
+[data-qx-page='resume-direction-more'] .qx-rt-grp .ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page='resume-direction'] .qxt-morelink,
+[data-qx-page='resume-direction-more'] .qxt-skip {
+  min-height: 88px;
+  width: 100%;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  color: var(--qxt-teal-ink);
+  font-size: 24px;
+  font-weight: 700;
+  text-align: left;
+  padding: 0 20px;
+}
+
+[data-qx-page='reading'] .qxt-read {
   display: grid;
-  gap: 14px;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 12px;
+}
+
+[data-qx-page='reading'] .qxt-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='reading'] .qxt-step,
+[data-qx-page='reading'] .qx-rt-steps li {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+  font-size: 22px;
+}
+
+.qxt-screen:has([data-qx-page='diagnosis']) .qxt-dock .qxt-btn-pri,
+.qxt-screen:has([data-qx-page='optimize']) .qxt-dock .qxt-btn-pri,
+.qxt-screen:has([data-qx-page='resume-edit']) .qxt-dock .qxt-btn-pri,
+.qxt-screen:has([data-qx-page='resume-export']) .qxt-dock .qxt-btn-pri,
+.qxt-screen:has([data-qx-page='compare']) .qxt-dock .qxt-btn-pri {
+  flex: 1 1 50%;
+  min-width: 46%;
+  min-height: 88px;
+}
+
+[data-qx-page='reading'] .qxt-rcol,
+[data-qx-page='reading'] .qxt-reader {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-qx-page='reading'] .qxt-dimro,
+[data-qx-page='reading'] .qxt-parse-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 22px;
+}
+
+[data-qx-page='reading'] .qxt-parse-acts button,
+[data-qx-page='reading'] .qxt-backstep,
+[data-qx-page='compare'] .qxt-seg button,
+[data-qx-page='optimize'] .qxt-link,
+[data-qx-page='resume-edit'] .qxt-link {
+  min-height: 64px;
+  min-width: 64px;
+  font-size: 22px;
+}
+
+[data-qx-page='compare'] .qxt-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+[data-qx-page='compare'] .qxt-seg button {
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+  font-weight: 700;
+}
+
+[data-qx-page='optimize'] .qx-opt-mod {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1.5px solid var(--qxt-line);
+}
+
+[data-qx-page='optimize'] .qx-opt-rowtx {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 22px;
+}
+
+[data-qx-page='optimize'] .qx-opt-rowtx small,
+[data-qx-page='optimize'] .qx-opt-hand,
+[data-qx-page='optimize'] .qx-opt-mod-open,
+[data-qx-page='optimize'] .qx-opt-toggle button {
+  font-size: 20px;
+}
+
+[data-qx-page='optimize'] .qx-opt-mod-open,
+[data-qx-page='optimize'] .qx-opt-toggle button,
+[data-qx-page='optimize'] .qx-opt-hand {
+  min-height: 64px;
+  min-width: 64px;
+}
+
+[data-qx-page='optimize'] .qx-opt-decision-row-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 20px;
+}
+
+[data-qx-page='optimize'] .qx-opt-stat,
+[data-qx-page='compare'] .qx-r1-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+[data-qx-page='compare'] .qx-r1-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+[data-qx-page='optimize'] .qx-opt-stat span,
+[data-qx-page='compare'] .qx-r1-stats span {
+  min-height: 120px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-line);
+  font-size: 20px;
+}
+
+[data-qx-page='optimize'] .qxt-exits,
+[data-qx-page='resume-edit'] .qxt-exits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+[data-qx-page='optimize'] .qxt-exits button,
+[data-qx-page='resume-edit'] .qxt-exits button {
+  min-height: 88px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-line);
+  background: var(--qxt-card);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='compare'] .qxc-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+[data-qx-page='compare'] .qxc-copy,
+[data-qx-page='compare'] .qxc-column-label,
+[data-qx-page='compare'] .qxc-legend,
+[data-qx-page='compare'] .qxc-metrics,
+[data-qx-page='compare'] .qxc-facts {
+  font-size: 22px;
+}
+
+[data-qx-page='resume-edit'] .qxt-edit,
+[data-qx-page='resume-export'] .qxt-edit {
+  display: grid;
+  grid-template-columns: 440px minmax(0, 1fr);
+  gap: 12px;
+}
+
+[data-qx-page='resume'] .qxt-resume-src,
+[data-qx-page='resume'] .qxt-resume-more,
+[data-qx-page='resume-src'] .qxt-src,
+[data-qx-page='resume-direction'] .qxt-path,
+[data-qx-page='resume-direction-more'] .qx-rt-chip {
+  min-height: 88px;
+  min-width: 148px;
+}
+
+[data-qx-page='resume-direction'] .qxt-sr,
+[data-qx-page='resume-direction-more'] .qxt-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+[data-qx-page='resume-src'] .qx-rt-xq,
+[data-qx-page='reading'] .qx-rt-xq,
+[data-qx-page='resume-direction'] .qx-rt-xq {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .qxt-screen .qxt-resume-src,
-  .qxt-screen .qxt-resume-more {
+  [data-qx-page='resume-src'] .qxt-src,
+  [data-qx-page='resume-direction'] .qxt-path {
     transition: none;
   }
+}
+
+/* 窄屏且舞台不缩放时，顶栏按真实宽度排。品牌不折行，状态胶囊在分隔处折行。
+ * 只挂本包页面，不改 .qxt-* 默认；1080 不进这条媒体查询。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-band {
+    padding-left: 12px;
+    padding-right: 12px;
+    min-height: 0;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-hdr {
+    height: auto;
+    min-height: 64px;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-back {
+    width: 64px;
+    height: 64px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-mark {
+    display: none;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-brand {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-brand b {
+    white-space: nowrap;
+    font-size: 20px;
+    letter-spacing: 0;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-clock {
+    display: none;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-hdr-right {
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-status {
+    height: auto;
+    min-height: 40px;
+    max-width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    font-size: 20px;
+    line-height: 1.25;
+    padding: 4px 8px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-src {
+    min-width: 0;
+    padding: 10px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-src b {
+    font-size: 20px;
+    white-space: normal;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-dock {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has(:is(
+    [data-qx-page='resume'],
+    [data-qx-page='resume-src'],
+    [data-qx-page='resume-direction'],
+    [data-qx-page='resume-direction-more'],
+    [data-qx-page='reading'],
+    [data-qx-page='diagnosis'],
+    [data-qx-page='optimize'],
+    [data-qx-page='compare'],
+    [data-qx-page='resume-edit'],
+    [data-qx-page='resume-export']
+  )) .qxt-dock .qxt-btn {
+    min-width: 0;
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 88px;
+    padding: 8px 12px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* 390 上来源页顶栏按内容撑高后，隐私说明必须还能整段落在底栏之上。 */
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-ask {
+    padding-top: 6px;
+    padding-bottom: 8px;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-ask h1 {
+    font-size: 32px;
+    line-height: 1.2;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-ask p {
+    margin-top: 6px;
+    font-size: 20px;
+    line-height: 1.35;
+  }
+
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-qx-page='resume-src']) .qxt-rail {
+    padding-bottom: 6px;
+  }
+}
+
+/* 长页在正文区里滚。不改 .qxt-body 的默认，只挂本包页面。 */
+.qxt-screen:has(:is(
+  [data-qx-page='resume'],
+  [data-qx-page='resume-src'],
+  [data-qx-page='resume-direction'],
+  [data-qx-page='resume-direction-more'],
+  [data-qx-page='reading'],
+  [data-qx-page='diagnosis'],
+  [data-qx-page='optimize'],
+  [data-qx-page='compare'],
+  [data-qx-page='resume-edit'],
+  [data-qx-page='resume-export']
+)) .qxt-body {
+  overflow: hidden;
+}
+
+.qxt-screen :is(
+  [data-qx-page='resume-src'],
+  [data-qx-page='resume-direction'],
+  [data-qx-page='resume-direction-more'],
+  [data-qx-page='reading'],
+  [data-qx-page='diagnosis'],
+  [data-qx-page='optimize'],
+  [data-qx-page='compare'],
+  [data-qx-page='resume-edit'],
+  [data-qx-page='resume-export']
+) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+[data-qx-page='resume-src'] .text-sm,
+[data-qx-page='resume-src'] .text-xs,
+[data-qx-page='reading'] .text-sm,
+[data-qx-page='reading'] .text-xs,
+[data-qx-page='diagnosis'] .text-sm,
+[data-qx-page='diagnosis'] .text-xs,
+[data-qx-page='optimize'] .text-sm,
+[data-qx-page='optimize'] .text-xs,
+[data-qx-page='compare'] .text-sm,
+[data-qx-page='compare'] .text-xs,
+[data-qx-page='resume-edit'] .text-sm,
+[data-qx-page='resume-edit'] .text-xs,
+[data-qx-page='resume-export'] .text-sm,
+[data-qx-page='resume-export'] .text-xs,
+[data-qx-page='resume-edit'] .qx-rd-aigc,
+[data-qx-page='resume-edit'] .qx-rd-aigc span,
+[data-qx-page='resume-export'] .qx-rd-aigc,
+[data-qx-page='resume-export'] .qx-rd-aigc span,
+[data-qx-page='resume-edit'] .qx-rd-side .qx-card > p,
+[data-qx-page='resume-export'] .qx-rd-side .qx-card > p {
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='resume-src'] button,
+[data-qx-page='reading'] button,
+[data-qx-page='compare'] button,
+[data-qx-page='resume-edit'] button,
+[data-qx-page='resume-export'] button {
+  min-height: 64px;
+  min-width: 64px;
+}
+
+[data-qx-page='resume-src'] .resume-source-phone-session > div.rounded-lg {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+[data-qx-page='resume-src'] .resume-source-phone-session .flex.items-start.gap-4 {
+  display: none;
+}
+
+[data-qx-page='resume-src'] .qxt-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-qx-page='resume-src'] .qxt-steps li {
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  font-size: 22px;
+}
+
+[data-qx-page='resume-src'] .qxt-steps .n {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+[data-qx-page='resume-src'] .qxt-drop {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  border-radius: 22px;
+  border: 1.5px dashed var(--qxt-line);
+  color: var(--qxt-ink-2);
+  font-size: 22px;
+}
+
+[data-qx-page='usb'] .qxt-panel {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+[data-qx-page='usb'] .resume-usb-panel--pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+}
+
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__head {
+  grid-column: 1;
+}
+
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__actions {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  align-self: center;
+}
+
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__icon,
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__hint {
+  display: none;
+}
+
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__list,
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__note,
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-panel__remind,
+[data-qx-page='usb'] .resume-usb-panel--pick .resume-usb-import {
+  grid-column: 1 / -1;
+}
+
+.qxt-screen [data-qx-page='usb'] .resume-usb-panel__list {
+  max-height: none;
+  overflow: visible;
+}
+
+.qxt-screen [data-qx-page='usb'] .resume-usb-panel__row {
+  min-height: 132px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  font-size: 24px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 16px;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__name {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__size {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 20px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='usb'] .resume-usb-panel__row:not([aria-pressed='true'])::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border-right: 3px solid var(--qxt-ink-2);
+  border-bottom: 3px solid var(--qxt-ink-2);
+  transform: rotate(-45deg);
+  justify-self: end;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__remind {
+  display: flex;
+  align-items: center;
+  min-height: 72px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 22px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__row[aria-pressed='true'] {
+  border-color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='usb'] .resume-usb-panel__fmt {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 16px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__name,
+[data-qx-page='usb'] .resume-usb-panel__size,
+[data-qx-page='usb'] .resume-usb-panel__picked,
+[data-qx-page='usb'] .resume-usb-panel__remind,
+[data-qx-page='usb'] .resume-usb-panel h2 {
+  font-size: 22px;
+}
+
+[data-qx-page='usb'] .resume-usb-import {
+  min-height: 88px;
+  width: 100%;
+  border: 0;
+  border-radius: 22px;
+  background: var(--qx-emerald);
+  color: var(--qx-deep);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+[data-qx-page='usb'] .resume-usb-panel__actions button {
+  min-height: 64px;
+  min-width: 64px;
+  font-size: 22px;
+}
+
+[data-qx-page='resume-src'] .min-h-\[180px\] {
+  min-height: 360px;
+}
+
+[data-qx-page='resume-src'] .min-h-\[180px\] svg {
+  width: 360px;
+  height: 360px;
+}
+
+[data-qx-page='resume-src'] .md\:grid-cols-\[180px_1fr\] {
+  grid-template-columns: 1fr;
+}
+
+[data-qx-page='resume-src'] .resume-usb-panel__row {
+  min-height: 64px;
+  font-size: 22px;
+}
+
+[data-qx-page='resume-src'] .resume-usb-import {
+  min-height: 88px;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 22px;
+  font-size: 24px;
+  font-weight: 700;
+  background: var(--qxt-mint, var(--qx-emerald));
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='resume-src'] .resume-usb-panel__hint,
+[data-qx-page='resume-src'] .resume-usb-panel__remind,
+[data-qx-page='resume-src'] .resume-usb-panel__note {
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='diagnosis'] .qxt-rep {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+[data-qx-page='diagnosis'] .rrp-head {
+  display: none;
+}
+
+[data-qx-page='diagnosis'] .qxt-dim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+  font-size: 20px;
+}
+
+[data-qx-page='diagnosis'] .qxt-dim small,
+[data-qx-page='diagnosis'] .qxt-issue,
+[data-qx-page='diagnosis'] .qxt-issue p,
+[data-qx-page='diagnosis'] .qxt-all {
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+[data-qx-page='diagnosis'] .qxt-dim i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--qxt-line);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-qx-page='diagnosis'] .qxt-dim i::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--p, 0) * 100%);
+  background: var(--qx-emerald);
+}
+
+[data-qx-page='diagnosis'] .qxt-dim[data-tone='low'] i::before {
+  background: var(--qxt-clay);
+}
+
+[data-qx-page='diagnosis'] .qxt-dim[data-tone='low'] em {
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='diagnosis'] .qxt-issue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+}
+
+/* 诊断失败这一屏内容少，出口行和自查项加高后空白留在卡片里。
+   无报告、读不出、未开通、不合规这几屏内容已经顶到底栏，不能再加高。 */
+.qxt-screen [data-qx-page='diagnosis'][data-state='diagnose-failed'] .rrp-row {
+  min-height: 120px;
+}
+
+.qxt-screen [data-qx-page='diagnosis'][data-state='diagnose-failed'] .rrp-checks .list > div {
+  min-height: 100px;
+}
+
+.qxt-screen [data-qx-page='resume-direction-more'] .qx-rt-chip {
+  min-height: 88px;
+  min-width: 168px;
+}
+
+[data-qx-page='diagnosis'] .qxt-issue u {
+  font-weight: 700;
+  text-decoration: none;
+  margin-right: 6px;
+}
+
+[data-qx-page='diagnosis'] .qxt-all summary {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='resume-edit'] .qx-rd-work,
+[data-qx-page='resume-export'] .qx-rd-work {
+  grid-template-columns: minmax(0, 1fr) 440px;
+}
+
+/* 诊断失败（行被加高）和未开通（五行出口）两屏，顶栏留白收到刚好让自查清单落在底栏之上。 */
+.qxt-screen:has([data-qx-page='diagnosis']:is([data-state='diagnose-failed'], [data-state='unavailable'])) .qxt-band {
+  min-height: 0;
+}
+
+.qxt-screen:has([data-qx-page='diagnosis']:is([data-state='diagnose-failed'], [data-state='unavailable'])) .qxt-ask {
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+
+.qxt-screen:has([data-qx-page='diagnosis']:is([data-state='diagnose-failed'], [data-state='unavailable'])) .qxt-rail {
+  padding-bottom: 8px;
+}
+
+/* 触屏顶栏已经写出标题和四步。失败态不再重复画旧任务头，自查清单才能落在底栏之上。 */
+[data-qx-page='diagnosis']:is(
+  [data-state='no-context'],
+  [data-state='read-error'],
+  [data-state='unavailable'],
+  [data-state='illegal'],
+  [data-state='diagnose-failed']
+) .rrp-head {
+  display: none;
 }

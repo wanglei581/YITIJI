@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   EDUCATION_LEVEL_OPTIONS,
   EMPLOYMENT_INDUSTRY_SECTORS,
@@ -8,7 +8,7 @@ import {
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
-import { CheckIcon, ListFilterIcon, TargetIcon } from 'lucide-react'
+import { CheckIcon, ListFilterIcon } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../../components/KioskFilterPickerModal'
 
 interface DiagnosisDirectionFormProps {
@@ -31,6 +31,8 @@ interface DiagnosisDirectionFormProps {
   /** all 保持原来的一整页；focus 是方向步；more 是可以不填的那四项。 */
   pane?: 'all' | 'focus' | 'more'
   onOpenMore?: () => void
+  /** 稿把「先诊断 / 直接给改法」放在范围切换和可改项之间。不传则保持原顺序。 */
+  afterModes?: ReactNode
 }
 
 export function DiagnosisDirectionForm({
@@ -52,6 +54,7 @@ export function DiagnosisDirectionForm({
   onTargetDegreeChange,
   pane = 'all',
   onOpenMore,
+  afterModes,
 }: DiagnosisDirectionFormProps) {
   const [showIndustryPicker, setShowIndustryPicker] = useState(false)
 
@@ -77,17 +80,11 @@ export function DiagnosisDirectionForm({
         onClear={() => onTargetIndustryChange('')}
         onClose={() => setShowIndustryPicker(false)}
       />
-      <section className="qx-rt-target" aria-labelledby={showFocus ? 'qx-rt-target-h' : undefined}>
+      <section className="qx-rt-target qxt-modes-wrap" aria-labelledby={showFocus ? 'qx-rt-target-h' : undefined}>
         {showFocus ? (
           <>
-            <header className="qx-rt-blk-h">
-              <span className="qx-rt-blk-ic" aria-hidden="true"><TargetIcon size={26} /></span>
-              <span>
-                <h2 id="qx-rt-target-h">诊断方向设置</h2>
-                <small>只影响建议关注顺序，报告仍固定输出 6 个维度</small>
-              </span>
-            </header>
-            <div className="qx-rt-seg" role="group" aria-label="诊断范围">
+            <h2 id="qx-rt-target-h" className="qxt-sr">诊断方向设置</h2>
+            <div className="qxt-modes" role="group" aria-label="诊断范围">
               <button type="button" aria-pressed={!genericDiagnosis} onClick={() => onGenericDiagnosisChange(false)}>
                 <b>定向诊断</b>
                 <small>按你选的重点排建议顺序</small>
@@ -97,54 +94,56 @@ export function DiagnosisDirectionForm({
                 <small>不设方向，下面各项都不参与</small>
               </button>
             </div>
-            <div className="qx-rt-grp" role="group" aria-labelledby="qx-rt-dims-lb">
-              <span className="lb" id="qx-rt-dims-lb">重点关注维度 <small>默认 3 项，可增减</small></span>
-              <div className="qx-rt-dimchips">
-                {RESUME_SCORING_DIMENSIONS.map((item) => {
-                  const checked = !genericDiagnosis && selectedDimensions.includes(item.key)
-                  return (
-                    <button
-                      type="button"
-                      key={item.key}
-                      className="qx-rt-dimchip"
-                      aria-pressed={checked}
-                      disabled={genericDiagnosis}
-                      onClick={() => onToggleDimension(item.key)}
-                    >
-                      <span className="mk" aria-hidden="true">{checked ? <CheckIcon size={18} strokeWidth={3} /> : null}</span>
-                      <span className="tx">{item.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-            <label className="qx-rt-field">
-              <span className="lb">目标岗位</span>
-              <input
-                value={targetJob}
-                disabled={genericDiagnosis}
-                onChange={(e) => onTargetJobChange(e.target.value.slice(0, 80))}
-                placeholder="例如：前端工程师、财务助理"
-              />
-            </label>
-            <div className="qx-rt-field">
-              <span className="lb">行业方向</span>
-              <button
-                type="button"
-                disabled={genericDiagnosis}
-                aria-haspopup="dialog"
-                aria-label="选择行业方向"
-                onClick={() => setShowIndustryPicker(true)}
-              >
-                <span className="val">{targetIndustry || '暂不指定'}</span>
-                <span className="go">全部 20 个门类 <ListFilterIcon size={18} aria-hidden="true" /></span>
-              </button>
-            </div>
+            {afterModes}
+            {!genericDiagnosis ? (
+              <>
+                <div className="qx-rt-grp" role="group" aria-labelledby="qx-rt-dims-lb">
+                  <span className="lb" id="qx-rt-dims-lb">重点关注维度 <small>默认 3 项，可增减</small></span>
+                  <div className="qx-rt-dimchips">
+                    {RESUME_SCORING_DIMENSIONS.map((item) => {
+                      const checked = selectedDimensions.includes(item.key)
+                      return (
+                        <button
+                          type="button"
+                          key={item.key}
+                          className="qx-rt-dimchip"
+                          aria-pressed={checked}
+                          onClick={() => onToggleDimension(item.key)}
+                        >
+                          <span className="mk" aria-hidden="true">{checked ? <CheckIcon size={18} strokeWidth={3} /> : null}</span>
+                          <span className="tx">{item.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <label className="qx-rt-field">
+                  <span className="lb">目标岗位</span>
+                  <input
+                    value={targetJob}
+                    onChange={(e) => onTargetJobChange(e.target.value.slice(0, 80))}
+                    placeholder="例如：前端工程师、财务助理"
+                  />
+                </label>
+                <div className="qx-rt-field">
+                  <span className="lb">行业方向</span>
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label="选择行业方向"
+                    onClick={() => setShowIndustryPicker(true)}
+                  >
+                    <span className="val">{targetIndustry || '暂不指定'}</span>
+                    <span className="go">全部 20 个门类 <ListFilterIcon size={18} aria-hidden="true" /></span>
+                  </button>
+                </div>
+              </>
+            ) : null}
           </>
         ) : null}
 
-        {pane === 'focus' && onOpenMore ? (
-          <button type="button" className="qx-rt-drawer" onClick={onOpenMore}>
+        {pane === 'focus' && onOpenMore && !genericDiagnosis ? (
+          <button type="button" className="qxt-morelink" onClick={onOpenMore}>
             <b>更多条件（可不填）</b>
             <small>经历、场景、专业、学历</small>
           </button>
@@ -154,7 +153,7 @@ export function DiagnosisDirectionForm({
           <>
             <ChipGroup
               id="qx-rt-exp"
-              label="经验级别"
+              label="经历"
               disabled={genericDiagnosis}
               options={[{ value: '', label: '暂不指定' }, ...RESUME_TARGET_EXPERIENCE_OPTIONS.map((item) => ({ value: item, label: item }))]}
               value={targetExperience ?? ''}
@@ -162,7 +161,7 @@ export function DiagnosisDirectionForm({
             />
             <ChipGroup
               id="qx-rt-scene"
-              label="求职场景"
+              label="场景"
               disabled={genericDiagnosis}
               options={[{ value: '', label: '暂不指定' }, ...RESUME_TARGET_SCENE_OPTIONS.map((item) => ({ value: item, label: item }))]}
               value={targetScene ?? ''}

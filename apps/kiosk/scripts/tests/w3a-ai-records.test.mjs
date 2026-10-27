@@ -201,6 +201,7 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
     },
     // W-125：面板先过后台能力闸门；这份单测只管文件列表与导入契约，闸门按已放行处理。
     '../../../hooks/useUsbImportGate': { useUsbImportGate: () => ({ state: 'allowed', note: null, retry: () => {} }) },
+    '../touch/unattendedResumeCopy': { unattendedResumeCopy: (text) => String(text ?? '') },
   }, { window: { setTimeout: () => 1, clearTimeout: () => {} } })
   const props = { onUploaded: (file) => imported.push(file), onBusyChange: (value) => busy.push(value) }
   const nodes = (node) => Array.isArray(node) ? node.flatMap(nodes) : node && typeof node === 'object' ? [node, ...nodes(node.props?.children)] : []
@@ -216,6 +217,10 @@ test('USB files render as named buttons and retain size, MIME, purpose and busy 
   assert.equal(nodes(h.value).some((node) => node.type === 'details'), false)
   assert.equal(text(h.value).includes('too-large.pdf'), false)
   rows()[1].props.onClick(); await h.flush()
+  assert.deepEqual(requests, [])
+  const importBtn = nodes(h.value).find((node) => node.type === 'button' && text(node).includes('导入这份文件'))
+  assert.ok(importBtn, 'selecting a file reveals 导入这份文件')
+  importBtn.props.onClick(); await h.flush()
   assert.deepEqual(requests, [['image', 'resume_upload', 'test-member-token']])
   assert.ok(rows().every((node) => node.props.disabled)); assert.equal(busy.at(-1), true)
   upload.resolve({ filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', fileId: 'file-image', fileUrl: '/fixture.jpg' }); await h.flush()

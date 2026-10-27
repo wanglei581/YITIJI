@@ -86,7 +86,8 @@ export function ResumeTouchHub({
   pill: { label: string }
 }) {
   const navigate = useNavigate()
-  const help = helpNeededLine(useSupportContact())
+  const contact = useSupportContact()
+  const help = contact.servicePhone ? helpNeededLine(contact) : ''
   const [moreOpen, setMoreOpen] = useState(false)
   const readiness = readinessOf(availability)
   const caps = new Map(spec.capabilities.map((item) => [item.route, item]))
@@ -148,10 +149,16 @@ export function ResumeTouchHub({
   let body: ReactNode
   if (availability.apiDown) {
     body = (
-      <div className="qxt-hub-hold">
-        {spec.capabilities.map((item, index) => tile(item, 'card', index))}
-        {spec.quickLinks.map((item, index) => tile(item as HubCapability, 'quick', index))}
-        <p className="qxt-resume-fine">{help}</p>
+      <div>
+        <div className="qxt-resume-sec"><b>八项简历能力</b><small>要联网的先停</small></div>
+        <div className="qxt-resume-grid">
+          {spec.capabilities.map((item, index) => tile(item, 'card', index))}
+        </div>
+        <div className="qxt-resume-sec"><b>常用入口</b><small>同样要联网</small></div>
+        <div className="qxt-resume-grid">
+          {spec.quickLinks.map((item, index) => tile(item as HubCapability, 'quick', index))}
+        </div>
+        {help ? <p className="qxt-resume-fine">{help}</p> : null}
       </div>
     )
   } else {
@@ -240,7 +247,7 @@ export function ResumeTouchHub({
       ) : null}
     >
       <div
-        data-qx-page="service-hub"
+        data-qx-page="resume"
         data-hub="resume"
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe={deviceProbe}

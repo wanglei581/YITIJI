@@ -34,9 +34,9 @@ async function parseViewSnapshot(page: Page) {
     const text = document.body.innerText
     return {
       state: root?.getAttribute('data-state') ?? null,
-      current: root?.querySelector('.qx-rt-rail li[aria-current="step"]')?.textContent?.replace(/^\d/, '').trim() ?? null,
-      bad: root?.querySelector('.qx-rt-rail li[data-mark="bad"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
-      wait: root?.querySelector('.qx-rt-rail li[data-mark="wait"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
+      current: document.querySelector('.qxt-rail [aria-current="step"]')?.textContent?.replace(/^\d/, '').trim() ?? null,
+      bad: document.querySelector('.qxt-rail [data-mark="bad"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
+      wait: document.querySelector('.qxt-rail [data-mark="wait"]')?.textContent?.replace(/^\d/, '').replace(/（.*）$/, '').trim() ?? null,
       pill: document.querySelector('.qx-pill')?.textContent?.trim() ?? null,
       saysReceived: text.includes('文件收到了'),
       saysError: text.includes('解析出错'),
@@ -96,6 +96,7 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   })
   await page.goto('/resume/source')
   await assertKioskShellFillsViewport(page)
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await expectResumeDirectionUnselected(page)
   await page.getByRole('button', { name: /^定向诊断/ }).click()
   await page.getByRole('button', { name: '选择行业方向' }).click()
@@ -108,14 +109,13 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   await diagnosisIndustryDialog.getByRole('button', { name: '完成' }).click()
   // 经验 / 学历在「更多条件」一步，不再收进专业与学历抽屉。
   await page.getByRole('button', { name: '更多条件（可不填）' }).click()
-  const experience = page.getByRole('group', { name: '经验级别' })
+  const experience = page.getByRole('group', { name: '经历' })
   await experience.getByRole('button', { name: '1年以内', exact: true }).click()
   await expect(experience.getByRole('button', { name: '1年以内', exact: true })).toHaveAttribute('aria-pressed', 'true')
   const degree = page.getByRole('group', { name: '学历（选填）' })
   await degree.getByRole('button', { name: '本科', exact: true }).click()
   await expect(degree.getByRole('button', { name: '本科', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: '好了，回去开始诊断', exact: true }).click()
-  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
@@ -177,9 +177,10 @@ test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ p
   api.respond('POST', '/api/v1/resume/parse', { status: 200, json: diagnosis })
 
   await page.goto('/resume/source')
-  await chooseTargetedResumeDirection(page)
-  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await page.getByRole('button', { name: /在 U 盘里/ }).click()
   await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await page.getByRole('button', { name: '导入这份文件' }).click()
+  await chooseTargetedResumeDirection(page)
   await page.locator('.qx-rt-preview > summary').click()
   await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
   expect(uploadBody).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
@@ -243,11 +244,11 @@ test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', 
   terminalBaseline(api)
 
   await page.goto('/resume/source')
-  await chooseTargetedResumeDirection(page)
-  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await page.getByRole('button', { name: /在 U 盘里/ }).click()
   await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
   await page.getByRole('button', { name: /my_pdf_resume\.jpg/ }).click()
+  await page.getByRole('button', { name: '导入这份文件' }).click()
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="image"]')
   await expect(preview).toBeVisible()
@@ -319,9 +320,11 @@ test('resume usb card stays closed when usb import is not verified @w3-kiosk', a
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('not_verified'))
 
   await page.goto('/resume/source')
-  const card = page.getByRole('button', { name: /U盘上传/ })
-  await expect(card).toBeDisabled()
-  await expect(card).toContainText('本机暂未开通')
+  const card = page.getByRole('button', { name: /在 U 盘里/ })
+  await expect(card).toBeEnabled()
+  await card.click()
+  await expect(page.getByText('U盘上传现在不能用', { exact: true })).toBeVisible()
+  await expect(page.getByText('本机暂未开通', { exact: true })).toBeVisible()
   await expect(page.getByText('等待插入U盘')).toHaveCount(0)
   // 轮询是放行后立刻发出的。先看到拒绝文案，再等一小段，才能证明没有迟到的读盘请求。
   await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 400) }))
@@ -335,7 +338,7 @@ test('resume usb card opens when usb import is available @w3-kiosk', async ({ pa
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', resumeUsbCapability('available'))
 
   await page.goto('/resume/source')
-  const card = page.getByRole('button', { name: /U盘上传/ })
+  const card = page.getByRole('button', { name: /在 U 盘里/ })
   await expect(card).toBeEnabled()
   await card.click()
   await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
@@ -507,7 +510,7 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   const resubmit = page.getByRole('button', { name: '重新提交解析（新的一次）' })
   for (const [label, calls] of [['network drop', 1], ['gateway 504 without an API envelope', 2], ['503 with an API envelope', 3]] as const) {
     await expect(page.getByText('没等到解析结果', { exact: true }), label).toBeVisible()
-    expect(await parseViewSnapshot(page), label).toMatchObject({ state: 'unknown', current: null, pill: '解析结果未知', saysReceived: false, saysError: false })
+    expect(await parseViewSnapshot(page), label).toMatchObject({ state: 'unknown', current: 'AI 解析', bad: null, wait: null, pill: '解析结果未知', saysReceived: false, saysError: false })
     await expect(page.locator('.resume-parse-unknown'), label).toContainText('暂时无法确认')
     await expect(page.getByTestId('resume-parse-unknown-next'), label).toContainText('当前未登录')
     await expect(page.getByTestId('resume-parse-unknown-next'), label).not.toContainText('我的简历')
@@ -617,7 +620,7 @@ test('resume source Qingxu frame keeps intent, the 10MB limit and separates an u
   const source = page.locator('[data-kiosk-screen="resume-source"]')
   await expect(source).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '你的简历在哪里？' })).toBeVisible()
-  await expect(page.locator('[data-kiosk-screen="resume-source"] .qx-rt-rail li[aria-current="step"]')).toHaveText(/上传与方向/)
+  await expect(page.locator('.qxt-rail [aria-current="step"]')).toHaveText(/上传与方向/)
   const primary = page.getByRole('button', { name: '请先上传简历文件' })
   await expect(primary).toBeDisabled()
   const input = page.getByLabel('选择本机简历文件')
@@ -708,8 +711,8 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
   await startResumeDiagnosis(page)
   await page.waitForURL('/resume/parse')
   await expect(page.locator('[data-kiosk-screen="resume-parse"]')).toBeVisible()
-  await expect(page.getByRole('status').filter({ hasText: '正在等待真实解析结果' })).toBeVisible()
-  await expect(page.locator('[data-kiosk-screen="resume-parse"] .qx-rt-rail li[aria-current="step"]')).toHaveText(/AI 解析/)
+  await expect(page.getByRole('status').filter({ hasText: '在进行' })).toBeVisible()
+  await expect(page.locator('.qxt-rail [aria-current="step"]')).toHaveText(/AI 解析/)
   await expect(page.getByText('返回仅停止本机等待，不会撤回已提交的服务请求', { exact: false })).toBeVisible()
   await expect.poll(() => parseCalls).toBe(1)
   await page.getByRole('button', { name: '返回上一步' }).click()
@@ -776,7 +779,7 @@ test('resume parse server failure is labelled failed, never as the running step 
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await startResumeDiagnosis(page)
   await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
-  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: null, bad: 'AI 解析', pill: '解析失败 · 可重试', saysReceived: false })
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: 'AI 解析', bad: null, pill: '解析失败 · 可重试', saysReceived: false })
   // 明确失败才进报告页失败屏；非 AI 出路是青序 rrp-row，重新解析在青序操作条里。
   await page.waitForURL('/resume/report')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
@@ -916,7 +919,7 @@ test('resume parse AI paused lands on the failure report with non-AI exits and n
   // 不用 AI 的出路在，「重新解析」不在。
   await expect(page.getByTestId('resume-report-fail-exits')).toBeVisible()
   await expect(page.getByRole('button', { name: '重新解析' })).toHaveCount(0)
-  await expect(page.getByTestId('resume-report-primary')).toHaveText('返回简历来源')
+  await expect(page.getByTestId('resume-report-primary')).toHaveText('打印我上传的原件')
   expect(tickets, '只提交一次，且 AI 请求带终端会话票').toEqual([expect.stringMatching(/.+/)])
 })
 
@@ -1154,7 +1157,7 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   await startResumeDiagnosis(page)
   await page.waitForURL('/resume/parse')
   await expect(page.getByRole('dialog')).toBeVisible()
-  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: null, wait: 'AI 解析', pill: '等待授权', saysReceived: false })
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: 'AI 解析', wait: null, pill: '等待授权', saysReceived: false })
   expect(parseCalls).toBe(0)
   await page.getByRole('button', { name: '暂不使用' }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
@@ -1349,13 +1352,13 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   expect(new Set(takeawayRow.map((item) => item.top)).size).toBe(1)
   for (const item of takeawayRow) expect(item.height).toBeGreaterThanOrEqual(64)
 
-  const barBefore = await page.locator('.qx-ctabar').boundingBox()
+  const barBefore = await page.locator('.qxt-dock').boundingBox()
   await page.getByTestId('resume-report-block-selfintro').scrollIntoViewIfNeeded()
-  const barAfter = await page.locator('.qx-ctabar').boundingBox()
+  const barAfter = await page.locator('.qxt-dock').boundingBox()
   expect(Math.abs((barBefore?.y ?? 0) - (barAfter?.y ?? 1))).toBeLessThan(2)
 
   const ratio = await page.evaluate(() => {
-    const bar = document.querySelector('.qx-ctabar')
+    const bar = document.querySelector('.qxt-dock')
     const primary = document.querySelector('[data-testid="resume-report-primary"]')
     if (!bar || !primary) return 0
     return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
@@ -1381,7 +1384,7 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
   const failRatio = await page.evaluate(() => {
-    const bar = document.querySelector('.qx-ctabar')
+    const bar = document.querySelector('.qxt-dock')
     const primary = document.querySelector('[data-testid="resume-report-primary"]')
     if (!bar || !primary) return 0
     return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
@@ -1435,7 +1438,7 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
     const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
     expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
     const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
-    const barTop = await page.locator('.qx-ctabar').evaluate((el) => el.getBoundingClientRect().top)
+    const barTop = await page.locator('.qxt-dock').evaluate((el) => el.getBoundingClientRect().top)
     expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
   }
 })
@@ -2613,11 +2616,11 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
     file: null, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z',
   } } })
   await page.goto('/resume/source')
-  await page.getByRole('button', { name: /手机扫码/ }).click()
+  await page.getByRole('button', { name: /在手机里/ }).click()
   await expect.poll(() => creates).toBe(1)
   try {
     await page.getByRole('button', { name: /本机文件/ }).click()
-    await page.getByRole('button', { name: /手机扫码/ }).click()
+    await page.getByRole('button', { name: /在手机里/ }).click()
   } finally {
     release()
   }

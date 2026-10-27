@@ -276,12 +276,13 @@ assertNotIncludes(source, '补充方向（可选）', 'source page no longer use
 assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
 assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
 // 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
-const triageCss = read('src/pages/resume/resume-triage-qx.css')
+// 触屏第 5 版把来源区从左右拉伸列改成三列来源卡，仍要求 min-width: 0，不许被挤没。
+const resumeTouchCss = read('src/pages/resume/touch/resume-touch.css')
 assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')
 // 最终稿要求内容向下顺排，上传条不能为了平衡方向区拉成空白框。
 assertIncludes(read('src/pages/resume/resume-r1-qx2.css'), ".qx-rt-dropzone { flex: none; min-height: 76px", 'source upload strip follows content without stretching an empty card')
-assertIncludes(source, 'className="qx-rt-main"', 'upload column stays a stretch column')
-assertIncludes(triageCss, '.qx-resume-triage .qx-rt-main { display: flex; flex-direction: column; min-width: 0;', 'upload column stays a stretch column (css)')
+assertIncludes(source, 'className="qxt-srcs"', 'upload column stays a stretch column')
+assertIncludes(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-srcs {\n  display: grid;\n  grid-template-columns: 1fr 1fr 1fr;\n  gap: 12px;\n  min-width: 0;", 'upload column stays a stretch column (css)')
 
 assertIncludes(report, "navigate('/resume/optimize'", 'report page navigates to optimize page')
 assertIncludes(report, 'targetContext: state.targetContext', 'report page forwards targetContext into optimize navigate state')
@@ -519,15 +520,15 @@ assertIncludes(report, "inspectionSignalsEncrypted([state.failureCode ?? '', rea
 assertIncludes(parse, "undefined, false, aiErrorCodeOf(err))", 'W-108 错误码从解析页传到报告页')
 
 // 执行真实失败 CTA 的分支，避免仅凭新文案存在就通过。
-const renderFailCta = new Function('encryptedPdf', 'checkingPassword', 'state', 'React', 'stepActions', 'navigate', 'handleRetry', 'intent', executable(`${sourceNode(report, 'failCta')}\n${sourceNode(report, 'fileFailureCta')}\nreturn fileFailureCta;`))
+const renderFailCta = new Function('encryptedPdf', 'checkingPassword', 'state', 'React', 'stepActions', 'navigate', 'handleRetry', 'intent', executable(`${sourceNode(report, 'failurePrimary')}\nreturn failurePrimary;`))
 const React = { createElement: (type, props, ...children) => ({ type, props, children }), Fragment: 'fragment' }
 function labels(node) { return typeof node === 'string' ? node : node?.children?.map(labels).join('') ?? '' }
 let destination
 const encryptedCta = renderFailCta(true, false, {}, React, null, (...args) => { destination = args }, () => { throw new Error('encrypted retry') }, 'optimize')
-assert.equal(labels(encryptedCta), '重新选择文件', 'W-108 加密文件只给重新选择文件')
-encryptedCta.props.onClick()
+assert.equal(encryptedCta.label, '重新选择文件', 'W-108 加密文件只给重新选择文件')
+encryptedCta.onClick()
 assert.deepEqual(destination, ['/resume/source?intent=optimize', { replace: true }], 'W-108 换文件保留优化意图')
-assert.match(labels(renderFailCta(false, false, {}, React, null, () => {}, () => {}, 'diagnose')), /重新解析/, 'W-108 非加密失败保留重新解析')
+assert.match(renderFailCta(false, false, {}, React, null, () => {}, () => {}, 'diagnose').label, /重新解析/, 'W-108 非加密失败保留重新解析')
 assertIncludes(report, '!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits', 'W-108 加密或尚未核查时不显示打印原件等出路')
 assertIncludes(report, 'encryptedPdf ? <p>{ENCRYPTED_PDF_BLOCK_COPY}。</p>', 'W-108 加密失败显示打印链的密码原句')
 const printKindSource = read('src/pages/print/components/printPreviewKind.ts')
@@ -549,15 +550,15 @@ assert.equal(errorOutcome(new ApiHttpError(500, 'UNSUPPORTED_FILE_TYPE')), 'unkn
 
 // 密码文案常量的 declaration 节点不含 export，用同一源码求值。
 const passwordCopy = new Function(executable(`${sourceNode(printKindSource, 'ENCRYPTED_PDF_BLOCK_COPY')}\nreturn ENCRYPTED_PDF_BLOCK_COPY;`))()
-const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'ResumeTouchPage', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
-const failedTree = (encrypted, checking = false) => renderFailure(encrypted, checking, React, 'frame', () => {}, {}, null, null, 'head', passwordCopy, (reason) => reason, 'original-exits', { file: { name: 'resume.pdf' }, fileId: 'original' })
+const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'ResumeTouchPage', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', 'supportPhone', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
+const failedTree = (encrypted, checking = false) => renderFailure(encrypted, checking, React, 'frame', () => {}, {}, null, null, 'head', passwordCopy, (reason) => reason, 'original-exits', { file: { name: 'resume.pdf' }, fileId: 'original' }, '')
 function hasOriginalExits(node) { return node?.type === 'original-exits' || Boolean(node?.children?.some(hasOriginalExits)) }
 assert.match(labels(failedTree(true)), /这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传。/, 'W-108 实际失败正文显示准确密码原因')
 assert.equal(hasOriginalExits(failedTree(true)), false, 'W-108 实际加密失败屏不渲染打印原件')
 assert.equal(hasOriginalExits(failedTree(false, true)), false, 'W-108 确认密码前不渲染打印原件')
 assert.equal(hasOriginalExits(failedTree(false)), true, 'W-108 普通失败仍渲染原来出路')
 assert.match(labels(failedTree(false)), /PDF 解析失败，请确认文件未损坏后重试/, 'W-108 普通失败保留原来原因')
-assertIncludes(report, 'ctabar={fileFailureCta}', 'W-108 页面实际渲染选择文件 CTA')
+assertIncludes(report, 'primary={failurePrimary}', 'W-108 页面实际渲染选择文件 CTA')
 console.log('PASS W-107 未预选与通用提交 / W-108 加密识别与真实出路')
 
 const factsTest = join(dirname(fileURLToPath(import.meta.url)), 'tests/export-generated-resume-facts.test.mjs')
@@ -596,8 +597,9 @@ for (const scenario of ['owned', 'other', 'failed', 'canceled', 'guest']) {
   await Promise.resolve(); await Promise.resolve()
   assert.deepEqual(confirmed, scenario === 'owned' ? [true] : [], `保存提示归属检查：${scenario}`)
 }
-assertIncludes(source, '这次想让我做什么', '取件页有实际意图选择')
-assertIncludes(source, 'compact={!uploadedFile}', '未上传也有常驻方向摘要')
+assertIncludes(source, '先诊断，再逐条改', '取件页有实际意图选择')
+assert.ok(source.includes('className="qxt-see"'), '未上传也有常驻方向摘要')
+assert.ok(source.indexOf('qx-rt-settings') < source.indexOf('className="qxt-see"'), '方向设置在只读维度摘要前面')
 assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportBody.tsx'), '<ResumeReportStates viewState="report-empty" />', '空报告复用真实出口与人工自查，不填造结论')
 const formatChooser = read('src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx')
 assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待态四步流程常驻')

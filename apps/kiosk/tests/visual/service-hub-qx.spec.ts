@@ -87,9 +87,9 @@ interface HubSnapshot {
  * 逐条等待会在中途翻成 'unavailable'，把一个真实缺陷测成随机失败。
  */
 async function readHub(page: Page): Promise<HubSnapshot> {
-  await page.waitForSelector('[data-qx-page="service-hub"]')
+  await page.waitForSelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')
   return page.evaluate(() => {
-    const hub = document.querySelector('[data-qx-page="service-hub"]')!
+    const hub = document.querySelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')!
     const entry = (el: Element, titleSel: string, reasonSel: string): {
       title: string
       clickable: boolean
