@@ -19,6 +19,7 @@ export function QxTouchScreen({
   bodyClassName,
   testId,
   stateId,
+  gallery = true,
 }: {
   band: ReactNode
   children: ReactNode
@@ -29,6 +30,8 @@ export function QxTouchScreen({
   bodyClassName?: string
   testId?: string
   stateId?: string
+  /** 开发样板标记。默认仍写上；业务页可关掉。 */
+  gallery?: boolean
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -43,7 +46,7 @@ export function QxTouchScreen({
     <div
       className={`qxt-screen ${motionClass}`.trim()}
       data-qxt-screen=""
-      data-qxt-gallery=""
+      {...(gallery ? { 'data-qxt-gallery': '' } : {})}
       data-qxt-state={stateId}
       data-testid={testId}
     >

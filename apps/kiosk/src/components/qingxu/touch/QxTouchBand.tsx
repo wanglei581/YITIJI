@@ -1,4 +1,4 @@
-import { Fragment, useId } from 'react'
+import { Fragment, useId, type ReactNode } from 'react'
 import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
 import { useQxTouchBack } from './useQxTouchBack'
@@ -6,7 +6,7 @@ import { useQxTouchBack } from './useQxTouchBack'
 export type QxTouchBandKind = 'std' | 'compact'
 export type QxTouchSeal = 'idle' | 'listen' | 'think'
 export type QxTouchStatus =
-  | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' }
+  | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' | 'bad' }
   | false
 
 export type QxTouchRail = { labels: readonly string[]; now: number }
@@ -53,7 +53,7 @@ export function QxTouchBand({
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
-  title: string
+  title: ReactNode
   sub?: string
   place?: string
   seal?: QxTouchSeal | null

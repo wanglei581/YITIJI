@@ -16,6 +16,10 @@ export type QxTouchTaskProps = {
   onClick?: () => void
   index?: number
   label?: string
+  extra?: ReactNode
+  testId?: string
+  disabledReason?: string
+  className?: string
 }
 
 export function QxTouchTask({
@@ -32,6 +36,10 @@ export function QxTouchTask({
   onClick,
   index = 0,
   label,
+  extra,
+  testId,
+  disabledReason,
+  className: classNameProp,
 }: QxTouchTaskProps) {
   const interactive = Boolean(onClick) && (!held || pressable)
   const className = [
@@ -40,6 +48,7 @@ export function QxTouchTask({
     held ? 'qxt-hold' : '',
     pressable ? 'qxt-press' : '',
     dark ? 'qxt-task-dark' : '',
+    classNameProp ?? '',
   ].filter(Boolean).join(' ')
   const style = { '--i': index } as CSSProperties
   const body = (
@@ -57,17 +66,26 @@ export function QxTouchTask({
           <span>{take}</span>
         </div>
       ) : null}
+      {extra}
     </>
   )
   if (!interactive) {
     return (
-      <div className={className} style={style} role="group" aria-disabled="true" aria-label={label ?? title}>
+      <div
+        className={className}
+        style={style}
+        role="group"
+        aria-disabled="true"
+        aria-label={label ?? title}
+        data-testid={testId}
+        data-disabled-reason={disabledReason}
+      >
         {body}
       </div>
     )
   }
   return (
-    <button type="button" className={className} style={style} onClick={onClick} aria-label={label}>
+    <button type="button" className={className} style={style} onClick={onClick} aria-label={label} data-testid={testId}>
       {body}
     </button>
   )
