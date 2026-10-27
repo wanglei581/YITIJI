@@ -11,7 +11,7 @@ import { QxTouchSeg } from '../../components/qingxu/touch/QxTouchSeg'
 import { QxTouchSlab } from '../../components/qingxu/touch/QxTouchSlab'
 import { QxTouchTask } from '../../components/qingxu/touch/QxTouchTask'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
-import { buildStateFrame, type GalleryStateId } from './touchGalleryFrames'
+import { buildStateFrame, galleryAsk, type GalleryStateId } from './touchGalleryFrames'
 
 const STATES: { id: GalleryStateId; label: string }[] = [
   { id: 'loading', label: '加载' },
@@ -95,7 +95,7 @@ export function QxTouchGalleryPage() {
       dock={(
         <QxTouchDock
           onBack={() => navigate('/')}
-          ask="问小青：这一步怎么办？"
+          ask={galleryAsk('问小青：这一步怎么办？', '这一步我不知道怎么继续。请只说明可以怎么做。不要替我提交或下单。')}
           primary={{ label: '主按钮', onClick: () => setNote('样板：主按钮已按下') }}
         />
       )}
@@ -105,7 +105,7 @@ export function QxTouchGalleryPage() {
           kind="dialog"
           title="确认这一步？"
           onClose={() => setOverlay(null)}
-          dismissOnScrim
+          dismissOnScrim={true}
           actions={(
             <>
               <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => setOverlay(null)}>留下</button>
@@ -116,8 +116,15 @@ export function QxTouchGalleryPage() {
           <p>这一层是对话框。点遮罩可以关掉。</p>
         </QxTouchOverlay>
       ) : overlay === 'sheet' ? (
-        <QxTouchOverlay kind="sheet" title="底单" onClose={() => setOverlay(null)} dismissOnScrim>
-          <p className="qxt-note">这一层是底单。点遮罩可以关掉。</p>
+        <QxTouchOverlay
+          kind="sheet"
+          title="底单"
+          onClose={() => setOverlay(null)}
+          actions={(
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => setOverlay(null)}>关闭</button>
+          )}
+        >
+          <p className="qxt-note">这一层是底单。点遮罩和 Esc 都不会关掉。</p>
         </QxTouchOverlay>
       ) : null}
     >
@@ -126,6 +133,7 @@ export function QxTouchGalleryPage() {
       <QxTouchSlab row title="示例厚卡" desc="横排厚卡，右边是空的插画槽。" onClick={() => setNote('样板：厚卡已按下')} />
       <QxTouchChip>示例标签</QxTouchChip>
       <QxTouchSeg
+        label="示例分段"
         value={seg}
         onChange={setSeg}
         options={[

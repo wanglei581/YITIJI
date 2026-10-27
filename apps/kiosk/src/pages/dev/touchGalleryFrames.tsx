@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
-import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchDock, type QxTouchAsk } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon, type QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 import {
   QxTouchStateAiDown,
@@ -16,6 +16,11 @@ import type { QxTouchTileProps } from '../../components/qingxu/touch/QxTouchTile
 export type GalleryStateId = 'loading' | 'empty' | 'error' | 'unavailable' | 'device-off' | 'unconfirmed' | 'ai-down'
 
 const PHONE = '183-6916-1921'
+
+/** 按钮字用稿里的句子；草稿可以多一句约束。麦克风跟首页同一开关。 */
+export function galleryAsk(label: string, draft: string): QxTouchAsk {
+  return { label, draft, voice: import.meta.env.VITE_USE_TRTC_CALL === 'true' }
+}
 
 type Actions = {
   onGo: (label: string) => void
@@ -88,7 +93,7 @@ export function buildStateFrame(id: GalleryStateId, actions: Actions): {
           ]}
         />
       ),
-      dock: <QxTouchDock onBack={actions.onBack} ask="问小青：怎么选打印方式？" />,
+      dock: <QxTouchDock onBack={actions.onBack} ask={galleryAsk('问小青：怎么选打印方式？', '我正在确认这台机器能做什么。请说明怎么选打印方式。不要替我下单，也不要假设彩色或双面已经开通。')} />,
     }
   }
   if (id === 'empty') {
@@ -117,7 +122,7 @@ export function buildStateFrame(id: GalleryStateId, actions: Actions): {
           fine="这一页本身不保存文件"
         />
       ),
-      dock: <QxTouchDock onBack={actions.onBack} ask="问小青：文件要从哪传？" primary={{ label: '去选文件', onClick: () => go('去选文件') }} />,
+      dock: <QxTouchDock onBack={actions.onBack} ask={galleryAsk('问小青：文件要从哪传？', '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。')} primary={{ label: '去选文件', onClick: () => go('去选文件') }} />,
     }
   }
   if (id === 'error') {
@@ -152,7 +157,7 @@ export function buildStateFrame(id: GalleryStateId, actions: Actions): {
           remind={`需要帮助？拨打服务电话 ${PHONE}`}
         />
       ),
-      dock: <QxTouchDock onBack={actions.onBack} ask="问小青：这份太大了怎么办？" primary={{ label: '重新传一次', onClick: () => go('重新传一次') }} />,
+      dock: <QxTouchDock onBack={actions.onBack} ask={galleryAsk('问小青：这份太大了怎么办？', '这个文件超过单个大小上限，没有传上来。请说明可以怎么处理。不要说系统已经收下了它。')} primary={{ label: '重新传一次', onClick: () => go('重新传一次') }} />,
     }
   }
   if (id === 'unavailable') {
@@ -234,7 +239,7 @@ export function buildStateFrame(id: GalleryStateId, actions: Actions): {
           remind={`这台机器暂时打不了，我们已经收到提醒，会尽快处理。你可以稍后再来；需要帮助请拨打服务电话 ${PHONE}。`}
         />
       ),
-      dock: <QxTouchDock onBack={actions.onBack} ask="问小青：缺纸了文件还要传吗？" />,
+      dock: <QxTouchDock onBack={actions.onBack} ask={galleryAsk('问小青：缺纸了文件还要传吗？', '这台机器缺纸，现在出不了纸。请说明文件还要不要先传上来。不要承诺马上能打出来。')} />,
     }
   }
   if (id === 'unconfirmed') {
@@ -282,7 +287,7 @@ export function buildStateFrame(id: GalleryStateId, actions: Actions): {
               返回首页
             </button>
           )}
-          ask="问小青：取纸或异常怎么办"
+          ask={galleryAsk('问小青：取纸或异常怎么办', '这次打印结果未确认。请说明取纸或遇到异常时怎么做。不要猜成功或失败，也不要让我重复打印。')}
           primary={{ label: '使用帮助', onClick: () => go('使用帮助') }}
         />
       ),

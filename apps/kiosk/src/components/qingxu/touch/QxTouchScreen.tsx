@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
-import '../../../styles/qingxu/index.css'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import '../../../styles/qingxu/tokens-touch.css'
+import '../../../styles/qingxu/touch.css'
 
 export type QxTouchMotion = 'enter' | 'back' | 'leave' | 'none'
 
 /**
  * 触屏版一屏：上意图带、中选择区、下按区、底导航。覆盖层盖在这一屏上。
- * 样式随本组件引入，业务页不引用就不带上这套规则。
+ * 触屏样式只随本组件引入，不进全站主 CSS。
  */
 export function QxTouchScreen({
   band,
@@ -28,6 +29,14 @@ export function QxTouchScreen({
   testId?: string
   stateId?: string
 }) {
+  const underRef = useRef<HTMLDivElement>(null)
+  const covered = Boolean(overlay)
+  useLayoutEffect(() => {
+    const node = underRef.current
+    if (!node) return
+    if (covered) node.setAttribute('inert', '')
+    else node.removeAttribute('inert')
+  }, [covered])
   const motionClass = motion === 'none' ? '' : motion === 'back' ? 'qxt-enter qxt-back' : motion === 'leave' ? 'qxt-leave' : 'qxt-enter'
   return (
     <div
@@ -37,10 +46,12 @@ export function QxTouchScreen({
       data-qxt-state={stateId}
       data-testid={testId}
     >
-      {band}
-      <main className={['qxt-body', bodyClassName].filter(Boolean).join(' ')}>{children}</main>
-      {dock}
-      {nav}
+      <div ref={underRef} className="qxt-under" aria-hidden={covered ? true : undefined}>
+        {band}
+        <div className={['qxt-body', bodyClassName].filter(Boolean).join(' ')}>{children}</div>
+        {dock}
+        {nav}
+      </div>
       {overlay}
     </div>
   )

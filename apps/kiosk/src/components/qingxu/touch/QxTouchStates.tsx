@@ -6,6 +6,11 @@ import { QxTouchSlab, type QxTouchSlabProps } from './QxTouchSlab'
 import { QxTouchTask, type QxTouchTaskProps } from './QxTouchTask'
 import { QxTouchTile, type QxTouchTileProps } from './QxTouchTile'
 
+function Remind({ text, icon }: { text?: string; icon: 'call' | 'alert' }) {
+  if (!text?.trim()) return null
+  return <QxTouchCallout kind="remind" icon={icon}>{text}</QxTouchCallout>
+}
+
 function Section({ title, hint }: { title: string; hint?: string }) {
   return <div className="qxt-sec">{title}{hint ? <small>{hint}</small> : null}</div>
 }
@@ -92,7 +97,7 @@ export function QxTouchStateError({
   reasonTitle: string
   reason: string
   slabs: readonly QxTouchSlabProps[]
-  remind: string
+  remind?: string
 }) {
   return (
     <>
@@ -109,7 +114,7 @@ export function QxTouchStateError({
         <p className="qxt-reason">{reason}</p>
       </div>
       {slabs.map((slab, index) => <QxTouchSlab key={slab.title} row index={index + 2} {...slab} />)}
-      <QxTouchCallout kind="remind" icon="call">{remind}</QxTouchCallout>
+      <Remind text={remind} icon="call" />
     </>
   )
 }
@@ -129,7 +134,7 @@ export function QxTouchStateUnavailable({
   secondaryTitle: string
   secondaryHint?: string
   secondary: readonly QxTouchTileProps[]
-  remind: string
+  remind?: string
 }) {
   return (
     <>
@@ -141,7 +146,7 @@ export function QxTouchStateUnavailable({
       <div className="qxt-grid2">
         {secondary.map((tile, index) => <QxTouchTile key={tile.title} index={primary.length + index} {...tile} />)}
       </div>
-      <QxTouchCallout kind="remind" icon="call">{remind}</QxTouchCallout>
+      <Remind text={remind} icon="call" />
     </>
   )
 }
@@ -155,7 +160,7 @@ export function QxTouchStateDeviceOff({
   tasks: readonly QxTouchTaskProps[]
   laterTitle: string
   later: readonly QxTouchTileProps[]
-  remind: string
+  remind?: string
 }) {
   return (
     <>
@@ -166,7 +171,7 @@ export function QxTouchStateDeviceOff({
       <div className="qxt-grid2">
         {later.map((tile, index) => <QxTouchTile key={tile.title} index={tasks.length + index} {...tile} />)}
       </div>
-      <QxTouchCallout kind="remind" icon="alert">{remind}</QxTouchCallout>
+      <Remind text={remind} icon="alert" />
     </>
   )
 }

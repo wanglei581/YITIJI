@@ -37,15 +37,25 @@ export function QxTouchTile({
       {off ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
     </>
   )
-  if (off || !onClick) {
+  if (!off && !onClick) {
     return (
-      <div className={className} style={style} role="group" aria-disabled="true" aria-label={label ?? `${title}，${desc}`}>
+      <div className={className} style={style}>
         {body}
       </div>
     )
   }
   return (
-    <button type="button" className={className} style={style} onClick={onClick}>
+    <button
+      type="button"
+      className={className}
+      style={style}
+      aria-disabled={off ? true : undefined}
+      aria-label={label}
+      onClick={() => {
+        if (off) return
+        onClick?.()
+      }}
+    >
       {body}
     </button>
   )

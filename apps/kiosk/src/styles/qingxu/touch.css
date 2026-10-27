@@ -38,7 +38,7 @@
 @keyframes qxt-scr-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes qxt-scr-back { from { opacity: 0; } to { opacity: 1; } }
 @keyframes qxt-scr-out { from { opacity: 1; } to { opacity: 0; } }
-.qxt-screen .qxt-rise { animation: qxt-rise 300ms var(--qxt-ease) both; animation-delay: calc(60ms + var(--i, 0) * 45ms); }
+.qxt-screen .qxt-rise { animation: qxt-rise 300ms var(--qxt-ease) backwards; animation-delay: calc(60ms + var(--i, 0) * 45ms); }
 @keyframes qxt-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
 .qxt-screen .qxt-band {
@@ -54,7 +54,6 @@
   min-height: 500px;
 }
 .qxt-screen .qxt-band-compact { min-height: 410px; }
-.qxt-screen .qxt-band-hero { min-height: 600px; padding-bottom: 140px; }
 .qxt-screen .qxt-flow { position: absolute; inset: 0; pointer-events: none; }
 .qxt-screen .qxt-flow svg { position: absolute; left: -10%; width: 120%; height: 100%; }
 .qxt-screen .qxt-halo {
@@ -78,6 +77,8 @@
 .qxt-screen .qxt-back {
   width: 68px;
   height: 68px;
+  min-width: 64px;
+  min-height: 64px;
   border-radius: 50%;
   background: var(--qxt-back-bg);
   display: grid;
@@ -127,7 +128,6 @@
 .qxt-screen .qxt-ask p { font-size: var(--qxt-fs-body); line-height: 1.5; color: var(--qxt-mint); margin: 12px 0 0; text-wrap: pretty; }
 .qxt-screen .qxt-band-compact .qxt-ask { padding: 18px 0 30px; }
 .qxt-screen .qxt-band-compact .qxt-ask h1 { font-size: var(--qxt-fs-ask-c); }
-.qxt-screen .qxt-band-hero .qxt-ask h1 { font-size: var(--qxt-fs-hero); line-height: 1.22; }
 .qxt-screen .qxt-rail { display: flex; gap: 14px; padding: 0 0 34px; margin-top: -8px; }
 .qxt-screen .qxt-rail-st { flex: 1; display: flex; flex-direction: column; gap: 10px; font-size: var(--qxt-fs-rail); color: var(--qxt-rail-dim); min-width: 0; }
 .qxt-screen .qxt-rail-bar { height: 8px; border-radius: 4px; background: var(--qxt-bar); overflow: hidden; position: relative; }
@@ -203,6 +203,14 @@
 }
 .qxt-screen .qxt-path > i { font-style: normal; color: var(--qxt-path-arrow); font-size: var(--qxt-fs-aux); }
 
+.qxt-screen > .qxt-under {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .qxt-screen .qxt-body {
   flex: 1;
   min-height: 0;
@@ -351,7 +359,7 @@
 .qxt-screen .qxt-ic-slate { background: var(--qxt-slate-wash); color: var(--qxt-slate-ink); }
 .qxt-screen .qxt-ic-clay { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
 .qxt-screen .qxt-task h3 { font: 700 var(--qxt-fs-task)/1.2 var(--qx-serif); margin: 6px 0 0; }
-.qxt-screen .qxt-task p { margin: 0; font-size: 23px; line-height: 1.5; color: var(--qxt-ink-2); }
+.qxt-screen .qxt-task p { margin: 0; max-width: 270px; font-size: 23px; line-height: 1.5; color: var(--qxt-ink-2); }
 .qxt-screen .qxt-mini { position: absolute; right: 22px; bottom: 20px; }
 .qxt-screen .qxt-task .qxt-take { margin-top: auto; font-size: var(--qxt-fs-rail); }
 .qxt-screen .qxt-task-dark { background: linear-gradient(155deg, var(--qxt-task-dark), var(--qxt-slab-dark-b) 72%); border-color: transparent; color: var(--qxt-cream); }
@@ -424,7 +432,7 @@
   justify-content: center;
   transition: background-color var(--qxt-t-press), color var(--qxt-t-press);
 }
-.qxt-screen .qxt-seg button[aria-pressed="true"] { background: var(--qx-deep); color: var(--qxt-cream); }
+.qxt-screen .qxt-seg button[aria-checked="true"] { background: var(--qx-deep); color: var(--qxt-cream); }
 .qxt-screen .qxt-seg button:disabled { color: var(--qxt-ink-3); opacity: 0.55; text-decoration: line-through; }
 
 .qxt-screen .qxt-dock {
@@ -457,7 +465,7 @@
 .qxt-screen .qxt-btn-ghost { background: transparent; color: var(--qxt-ink-2); padding: 0 22px; }
 .qxt-screen .qxt-btn-danger { background: var(--qx-cinnabar); color: var(--qx-on-solid); }
 .qxt-screen .qxt-btn-mint { background: var(--qx-emerald); color: var(--qx-deep); }
-.qxt-screen .qxt-btn:disabled { opacity: 0.42; pointer-events: none; }
+.qxt-screen .qxt-btn:disabled { opacity: 0.42; }
 .qxt-screen .qxt-askq {
   flex: 1;
   min-width: 0;
@@ -486,6 +494,7 @@
   place-items: center;
   flex: none;
 }
+.qxt-screen .qxt-askq:not(:has(.qxt-mic)) { padding-left: 26px; }
 .qxt-screen .qxt-askq > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qxt-screen .qxt-askoff,
 .qxt-screen .qxt-askoff:disabled {
@@ -493,7 +502,6 @@
   color: var(--qxt-ink-2);
   opacity: 1;
   cursor: default;
-  pointer-events: none;
 }
 .qxt-screen .qxt-askoff .qxt-mic { background: var(--qxt-ink-3); }
 .qxt-screen .qxt-askoff:active { transform: none; }

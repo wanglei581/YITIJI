@@ -8,7 +8,6 @@
  * V6 那次"只迁移了一半所以效果不好"就是这么来的。
  */
 @import './tokens.css';
-@import './tokens-touch.css';
 @import './shell.css';
 @import './primitives.css';
-@import './touch.css';
+/* 触屏版 tokens-touch.css / touch.css 不进全站主 CSS，由 QxTouchScreen 按需引入。 */

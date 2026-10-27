@@ -1,39 +1,15 @@
-import { Fragment, useEffect, useId, useState } from 'react'
+import { Fragment, useId } from 'react'
+import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
+import { useQxTouchBack } from './useQxTouchBack'
 
-export type QxTouchBandKind = 'std' | 'compact' | 'hero'
+export type QxTouchBandKind = 'std' | 'compact'
 export type QxTouchSeal = 'idle' | 'listen' | 'think'
 export type QxTouchStatus =
   | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' }
   | false
 
 export type QxTouchRail = { labels: readonly string[]; now: number }
-
-function shanghaiNow(now: Date) {
-  const time = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Shanghai',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(now)
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-  }).formatToParts(now)
-  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ''
-  return { time, date: `${pick('month')}月${pick('day')}日 ${pick('weekday')}` }
-}
-
-function useShanghaiClock() {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-  return shanghaiNow(now)
-}
 
 function FlowLines({ id, live }: { id: string; live: boolean }) {
   return (
@@ -57,6 +33,8 @@ function FlowLines({ id, live }: { id: string; live: boolean }) {
 /**
  * 意图带。进度条 rail 与路径胶囊 path 只渲染一种；两者都传时只留 rail。
  * 印章只有 listen / think 才动。不传 status 时写「状态未知」，不假装就绪。
+ * 只传 text 不传 tone 时是灰点；只有显式 tone: 'ok' 才亮绿。
+ * 返回为真却没传 onBack 时，有站内历史就回退，否则回首页。
  */
 export function QxTouchBand({
   kind = 'std',
@@ -88,9 +66,9 @@ export function QxTouchBand({
   live?: boolean
 }) {
   const rawId = useId().replace(/:/g, '')
-  const clock = useShanghaiClock()
+  const goBack = useQxTouchBack(onBack)
   const placeLabel = place?.trim() ? place.trim() : ''
-  const tone = status === false ? null : (status?.tone ?? (status ? 'ok' : 'unknown'))
+  const tone = status === false ? null : (status?.tone ?? 'unknown')
   const statusText = status === false ? '' : (status?.text ?? '状态未知')
   const showRail = Boolean(rail)
   const showPath = !showRail && Boolean(path && path.length > 0)
@@ -102,7 +80,7 @@ export function QxTouchBand({
       <div className="qxt-halo" />
       <div className="qxt-hdr">
         {back ? (
-          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={onBack}>
+          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={goBack}>
             <QxTouchIcon name="chevL" size={34} strokeWidth={2.4} />
           </button>
         ) : null}
@@ -120,10 +98,7 @@ export function QxTouchBand({
               {statusText}
             </span>
           )}
-          <div className="qxt-clock">
-            <b>{clock.time}</b>
-            <small>{clock.date}</small>
-          </div>
+          <QxTouchClock />
         </div>
       </div>
       <div className="qxt-ask">
@@ -135,11 +110,17 @@ export function QxTouchBand({
         {seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}
       </div>
       {showRail && rail ? (
-        <div className="qxt-rail">
+        <div className="qxt-rail" role="list" aria-label="办理步骤">
           {rail.labels.map((label, index) => {
-            const state = index < rail.now ? 'qxt-rail-done' : index === rail.now ? 'qxt-rail-now' : ''
+            const current = index === rail.now
+            const state = index < rail.now ? 'qxt-rail-done' : current ? 'qxt-rail-now' : ''
             return (
-              <div className={`qxt-rail-st ${state}`.trim()} key={label}>
+              <div
+                className={`qxt-rail-st ${state}`.trim()}
+                key={`${label}-${index}`}
+                role="listitem"
+                aria-current={current ? 'step' : undefined}
+              >
                 <div className="qxt-rail-bar" />
                 <span>{index < rail.now ? `✓ ${label}` : label}</span>
               </div>

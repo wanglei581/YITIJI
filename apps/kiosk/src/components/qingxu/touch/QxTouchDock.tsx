@@ -2,9 +2,13 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { rememberAssistantDraft } from '../../../services/assistantDraft'
 import { QxTouchIcon } from './QxTouchIcon'
+import { useQxTouchBack } from './useQxTouchBack'
 
 export type QxTouchButtonKind = 'pri' | 'sec' | 'ghost' | 'danger' | 'mint'
-export type QxTouchAsk = string | { label: string; disabled: true } | false
+export type QxTouchAsk =
+  | { label: string; draft: string; voice?: boolean }
+  | { label: string; disabled: true }
+  | false
 export type QxTouchPrimary = {
   label: string
   onClick: () => void
@@ -15,7 +19,8 @@ export type QxTouchPrimary = {
 
 /**
  * 底栏三槽：返回、问小青、主按钮。问小青不可用时留在原位。
- * 可用时只把这一句草稿带到顾问页，不自动发送。
+ * 按钮写 label，带到顾问页的是 draft，不自动发送。麦克风只在 voice 时画。
+ * 返回为真却没传 onBack 时，有站内历史就回退，否则回首页。
  */
 export function QxTouchDock({
   onBack,
@@ -35,29 +40,33 @@ export function QxTouchDock({
   primary?: QxTouchPrimary
 }) {
   const navigate = useNavigate()
+  const goBack = useQxTouchBack(onBack)
   const askNode = ask && typeof ask === 'object' ? (
-    <button type="button" className="qxt-askq qxt-askoff" aria-disabled="true" disabled data-qxt-ask="off">
-      <span className="qxt-mic"><QxTouchIcon name="mic" size={30} strokeWidth={2.2} /></span>
-      <span>{ask.label}</span>
-    </button>
-  ) : typeof ask === 'string' ? (
-    <button
-      type="button"
-      className="qxt-askq"
-      data-qxt-ask="on"
-      onClick={() => {
-        rememberAssistantDraft(ask)
-        navigate('/assistant')
-      }}
-    >
-      <span className="qxt-mic"><QxTouchIcon name="mic" size={30} strokeWidth={2.2} /></span>
-      <span>{ask}</span>
-    </button>
+    'disabled' in ask ? (
+      <button type="button" className="qxt-askq qxt-askoff" aria-disabled="true" disabled data-qxt-ask="off">
+        <span>{ask.label}</span>
+      </button>
+    ) : (
+      <button
+        type="button"
+        className="qxt-askq"
+        data-qxt-ask="on"
+        onClick={() => {
+          rememberAssistantDraft(ask.draft)
+          navigate('/assistant')
+        }}
+      >
+        {ask.voice ? (
+          <span className="qxt-mic"><QxTouchIcon name="mic" size={30} strokeWidth={2.2} /></span>
+        ) : null}
+        <span>{ask.label}</span>
+      </button>
+    )
   ) : null
   const middle = askNode ?? mid ?? null
   const wide = !middle && Boolean(primary)
   const leftNode = left ?? (back ? (
-    <button type="button" className="qxt-btn qxt-btn-sec" onClick={onBack}>
+    <button type="button" className="qxt-btn qxt-btn-sec" onClick={goBack}>
       <QxTouchIcon name="chevL" size={30} strokeWidth={2.4} />
       {backLabel}
     </button>
