@@ -13514,7 +13514,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 662,
+      "reachableFileCount": 669,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15480,6 +15480,7 @@
             "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-narrow-qx.css",
             "apps/kiosk/src/pages/renshi/renshi-policy-fusion.css",
+            "apps/kiosk/src/pages/renshi/renshi-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
@@ -16421,6 +16422,8 @@
           ],
           "path": "/smart-campus",
           "styles": [
+            "apps/kiosk/src/auth/capability-gate-touch.css",
+            "apps/kiosk/src/pages/smart-campus/smart-campus-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
@@ -16450,6 +16453,7 @@
           ],
           "path": "/smart-campus/service/:key",
           "styles": [
+            "apps/kiosk/src/auth/capability-gate-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
@@ -16481,6 +16485,7 @@
           ],
           "path": "/smart-campus/welcome",
           "styles": [
+            "apps/kiosk/src/auth/capability-gate-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
@@ -16512,7 +16517,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 757
+      "sourceFileCount": 765
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19653,6 +19658,9 @@
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
+    "apps/kiosk/src/auth/capability-gate-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
     "apps/kiosk/src/auth/kioskClearScope.ts": [
       "apps/kiosk/scripts/verify-kiosk-end-use.mjs",
       "apps/kiosk/scripts/verify-scan-session-truth.mjs"
@@ -20034,6 +20042,12 @@
     ],
     "apps/kiosk/src/pages/contract-review/ContractReviewSessionNotice.tsx": [
       "apps/kiosk/scripts/verify-contract-review-session.mjs"
+    ],
+    "apps/kiosk/src/pages/contract-review/contract-review-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
+    "apps/kiosk/src/pages/contract-review/contract-review.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts": [
       "apps/kiosk/scripts/verify-contract-review-report-print.mjs"
@@ -21122,6 +21136,9 @@
     "apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
+    "apps/kiosk/src/pages/renshi/renshi-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/shared.ts": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
@@ -21605,6 +21622,9 @@
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/pages/service-hubs/policy-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
     "apps/kiosk/src/pages/service-hubs/serviceHubModel.ts": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -21653,6 +21673,9 @@
     ],
     "apps/kiosk/src/pages/smart-campus/SmartCampusWelcomePage.tsx": [
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs"
+    ],
+    "apps/kiosk/src/pages/smart-campus/smart-campus-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/styles/campus-policy-fusion.css": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
@@ -29741,6 +29764,7 @@
           "apps/kiosk/src/pages"
         ],
         "files": [
+          "apps/kiosk/src/auth/capability-gate-touch.css",
           "apps/kiosk/src/components/qingxu/QxAppNavbar.tsx",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx",
@@ -29750,6 +29774,8 @@
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts",
           "apps/kiosk/src/pages/auth/mobile-qr-service-desk.css",
+          "apps/kiosk/src/pages/contract-review/contract-review-touch.css",
+          "apps/kiosk/src/pages/contract-review/contract-review.css",
           "apps/kiosk/src/pages/help/HelpCenterPage.tsx",
           "apps/kiosk/src/pages/home/components/ContinuePanel.tsx",
           "apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx",
@@ -29791,8 +29817,11 @@
           "apps/kiosk/src/pages/profile/profile-lightflow-state.css",
           "apps/kiosk/src/pages/profile/profileEntries.ts",
           "apps/kiosk/src/pages/profile/profileTypes.ts",
+          "apps/kiosk/src/pages/renshi/renshi-touch.css",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
+          "apps/kiosk/src/pages/service-hubs/policy-touch.css",
+          "apps/kiosk/src/pages/smart-campus/smart-campus-touch.css",
           "apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx",
           "apps/kiosk/src/pages/toolbox/toolbox-zone.css",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
@@ -43822,21 +43851,6 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx",
-        "kind": "component",
-        "mentions": [
-          ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
-          "apps/kiosk/scripts/verify-fusion-w3.mjs",
-          "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
-          "docs/progress/current-progress.md",
-          "docs/reviews/phase0-final-go-no-go-2026-07-29.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/assistant/assistant-advisor.css",
         "kind": "style",
         "mentions": [
@@ -44176,6 +44190,15 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/pages/home/prototypeIcons.tsx",
+        "kind": "component",
+        "mentions": [],
+        "risk": "low",
+        "scope": "kiosk",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -45076,6 +45099,34 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
+      },
+      {
+        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
+        "file": "apps/kiosk/src/styles/prototype-v1.css",
+        "kind": "style",
+        "mentions": [
+          ".ccg/spec/guides/index.md",
+          ".ccg/tasks/archive/2026-07/align-profile-home-to-fusion-prototypes/requirements.md",
+          ".ccg/tasks/archive/2026-07/align-profile-home-to-fusion-prototypes/review.md",
+          ".ccg/tasks/archive/2026-07/deploy-home-filing-info/requirements.md",
+          ".ccg/tasks/archive/2026-07/home-fusion-youth-stash-reconcile-20260731/requirements.md",
+          ".ccg/tasks/archive/2026-07/home-fusion-youth-stash-reconcile-20260731/review.md",
+          "apps/kiosk/scripts/verify-fusion-home.mjs",
+          "apps/kiosk/scripts/verify-fusion-w3.mjs",
+          "apps/kiosk/scripts/verify-kiosk-visual-unity.mjs",
+          "apps/kiosk/src/styles/kiosk-uplift.css",
+          "apps/kiosk/src/styles/warm-professional-override.css",
+          "docs/design/kiosk-v6-migration-matrix.md",
+          "docs/progress/current-progress.md",
+          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
+          "docs/superpowers/plans/2026-07-23-kiosk-8177-5299-fusion-master.md",
+          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w1.md",
+          "docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md",
+          "docs/superpowers/specs/2026-07-23-kiosk-8177-5299-fusion-design.md"
+        ],
+        "risk": "high",
+        "scope": "kiosk",
+        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-home.mjs、apps/kiosk/scripts/verify-fusion-w3.mjs、apps/kiosk/scripts/verify-kiosk-visual-unity.mjs"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",

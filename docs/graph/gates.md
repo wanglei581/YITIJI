@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1875 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1881 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -423,7 +423,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 541 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 547 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -447,6 +447,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/auth/KioskHandoverGate.tsx` | `verify-kiosk-end-use.mjs` |
 | `apps/kiosk/src/auth/KioskPrivacyGuard.tsx` | `verify-fusion-shell.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-end-use.mjs`<br/>`verify-kiosk-session-reporting.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-print-done-truth.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-scan-session-truth.mjs`<br/>`verify-w3a-ai-records.mjs` |
 | `apps/kiosk/src/auth/KioskSessionControlContext.tsx` | `verify-kiosk-end-use.mjs`<br/>`verify-member-session-closure.mjs` |
+| `apps/kiosk/src/auth/capability-gate-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/auth/kioskClearScope.ts` | `verify-kiosk-end-use.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/auth/kioskEndUse.ts` | `verify-kiosk-end-use.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-print-done-truth.mjs` |
 | `apps/kiosk/src/auth/kioskIdleTiming.ts` | `verify-kiosk-end-use.mjs` |
@@ -532,6 +533,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx` | `verify-contract-review-report-print.mjs`<br/>`verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs` |
 | `apps/kiosk/src/pages/contract-review/ContractReviewSessionNotice.tsx` | `verify-contract-review-session.mjs` |
+| `apps/kiosk/src/pages/contract-review/contract-review-touch.css` | `verify-fusion-w5.mjs` |
+| `apps/kiosk/src/pages/contract-review/contract-review.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts` | `verify-contract-review-report-print.mjs` |
 | `apps/kiosk/src/pages/contract-review/contractReviewSession.ts` | `verify-contract-review-session.mjs`<br/>`verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | `verify-kiosk-runtime-error-boundary.mjs` |
@@ -751,6 +754,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/renshi/components.tsx` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/eligibilityOutcome.ts` | `verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/renshi-eligibility-qx.css` | `verify-policy-eligibility-ui.mjs` |
+| `apps/kiosk/src/pages/renshi/renshi-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/renshi/shared.ts` | `verify-policy-eligibility-ui.mjs`<br/>`verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/usePolicyFocus.ts` | `verify-renshi-policy-ui.mjs` |
 | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-career.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-w3a-ai-records.mjs` |
@@ -869,6 +873,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/screensaver/screensaver-service-desk.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/screensaver/standbyModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/service-hubs/QxServiceHubPage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-kiosk-visible-actions-truth.mjs`<br/>`verify-service-entry-readiness.mjs` |
+| `apps/kiosk/src/pages/service-hubs/policy-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/service-hubs/serviceHubModel.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts` | `extract-service-hub-specs.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css` | `verify-service-entry-readiness.mjs` |
@@ -883,6 +888,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusServicePage.tsx` | `verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusWelcomePage.tsx` | `verify-smart-campus-ui.mjs` |
+| `apps/kiosk/src/pages/smart-campus/smart-campus-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/styles/campus-policy-fusion.css` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/styles/jobs-companies-fusion.css` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/styles/jobs-fairs-foundation.css` | `verify-fusion-w4.mjs` |
