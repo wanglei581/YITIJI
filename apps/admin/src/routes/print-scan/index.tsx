@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { ConsoleTable, Drawer, EmptyState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
+import { isPreviewFailure } from '../../components/first-order/serviceQueueModel'
 import { printErrorText } from '../../lib/printErrorText'
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
@@ -172,10 +173,6 @@ export default function PrintScanOpsPage() {
 
 // ─── 任务中心 ─────────────────────────────────────────────────────────────────
 
-function isUnconfirmedPreview(error: unknown): boolean {
-  return error instanceof Error && (error.message.includes('需要连接真实后端') || error.message.includes('当前预览模式'))
-}
-
 function TaskCenter() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [taskType, setTaskType] = useState<PrintScanTaskType>('print')
@@ -214,7 +211,7 @@ function TaskCenter() {
       return 'success'
     } catch (e) {
       if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
-      if (unconfirmed && isUnconfirmedPreview(e)) {
+      if (unconfirmed && isPreviewFailure(e)) {
         setData(null)
         setUnconfirmedPreview(true)
         return 'failed'
