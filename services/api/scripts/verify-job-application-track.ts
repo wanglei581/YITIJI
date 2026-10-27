@@ -136,9 +136,10 @@ function makeFakePrisma(): PrismaService {
         Object.assign(row, args.data, { updatedAt: new Date() })
         return row
       },
-      async deleteMany(args: { where: Record<string, unknown> }) {
+      async deleteMany(args?: { where?: Record<string, unknown> }) {
+        const where = args?.where ?? {}
         const before = rows.length
-        rows = rows.filter((r) => !matches(r, args.where))
+        rows = rows.filter((r) => !matches(r, where))
         return { count: before - rows.length }
       },
       async groupBy(args: { where: Record<string, unknown> }) {
@@ -636,7 +637,8 @@ async function checkSelfNoteTabSwitchLeavesJobApplications(): Promise<void> {
   const before = rows.length
   const calls = { job: 0 }
   const settings = new Map<string, string | null>()
-  const audits: unknown[] = []
+  const audits: Array<{ action: string; targetType: string; targetId: string; payload: unknown }> = []
+  const jobDelegate = makeFakePrisma().jobApplication as unknown as Record<string, unknown>
   const db = {
     platformSetting: {
       async findMany(args: { where: { key: { in: string[] } } }) {
@@ -654,11 +656,13 @@ async function checkSelfNoteTabSwitchLeavesJobApplications(): Promise<void> {
         return { key: args.where.key, value }
       },
     },
-    jobApplication: new Proxy({}, {
-      get() {
-        return async () => {
+    jobApplication: new Proxy(jobDelegate, {
+      get(target, prop, receiver) {
+        const value: unknown = Reflect.get(target, prop, receiver)
+        if (typeof value !== 'function') return value
+        return (...args: unknown[]) => {
           calls.job += 1
-          return 0
+          return (value as (...inner: unknown[]) => unknown).apply(target, args)
         }
       },
     }),
@@ -667,8 +671,13 @@ async function checkSelfNoteTabSwitchLeavesJobApplications(): Promise<void> {
     },
   }
   const audit = {
-    async writeRequired(_tx: unknown, args: { payload?: unknown }) {
-      audits.push(args.payload ?? null)
+    async writeRequired(_tx: unknown, args: { action: string; targetType: string; targetId: string; payload?: unknown }) {
+      audits.push({
+        action: args.action,
+        targetType: args.targetType,
+        targetId: args.targetId,
+        payload: args.payload ?? null,
+      })
       return 'audit-self-note-tab'
     },
   }
@@ -681,7 +690,15 @@ async function checkSelfNoteTabSwitchLeavesJobApplications(): Promise<void> {
     assert('写 support.selfNoteTab 前后 JobApplication 行数不变', rows.length === before, `${before} -> ${rows.length}`)
     assert('哨兵行仍在', rows.includes(sentinel))
     assert('写 support.selfNoteTab 未调用 jobApplication', calls.job === 0, String(calls.job))
-    assert('该次审计 payload 只有布尔', JSON.stringify(audits) === JSON.stringify([{ selfNoteTab: true }]))
+    assert(
+      '该次审计是页签单列动作，payload 只有布尔前后值',
+      JSON.stringify(audits) === JSON.stringify([{
+        action: 'self_note_tab.update',
+        targetType: 'system',
+        targetId: 'self-note-tab',
+        payload: { before: { selfNoteTab: false }, after: { selfNoteTab: true } },
+      }]),
+    )
     assert('库存只有字符串 true 才算写入开', settings.get('support.selfNoteTab') === 'true')
   } finally {
     const at = rows.lastIndexOf(sentinel)

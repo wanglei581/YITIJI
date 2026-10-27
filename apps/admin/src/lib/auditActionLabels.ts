@@ -329,6 +329,7 @@ const ACTION_LABELS: Record<string, string> = {
   'legal_doc.create': '新建法务文档版本',
   'legal_doc.activate': '启用法务文档版本',
   'support_contact.update': '修改服务联系方式',
+  'self_note_tab.update': '修改一体机求职进度页签开关',
   'policy.publish': '政策发布',
   'policy.review': '政策审核',
   'screensaver_config.update': '待机宣传屏配置更新',

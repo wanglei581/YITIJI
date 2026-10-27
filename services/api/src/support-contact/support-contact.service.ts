@@ -20,6 +20,8 @@ const KEY_MINIAPP = 'support.miniappPublished'
 /** 只有库存字符串 true 算开。缺省、空串和其他值都是关。 */
 const KEY_SELF_NOTE_TAB = 'support.selfNoteTab'
 const AUDIT_ACTION = 'support_contact.update'
+/** 页签开关单独审计，不和电话三项共用 support_contact.update。 */
+const SELF_NOTE_TAB_AUDIT_ACTION = 'self_note_tab.update'
 const TERMINAL_REF_MAX = 128
 
 /** 公开接口不登录，缓存条数要有上限，否则换着终端号刷会让进程内存一直涨。 */
@@ -141,7 +143,8 @@ export class SupportContactService {
    * 只更新请求里出现的字段。空对象不写库、不写审计。
    * 审计与配置在同一事务里：审计失败则配置回滚。
    * 电话、服务时间、小程序是否发布不清除按终端缓存的公开响应。
-   * 页签开关保存成功后只清 selfNoteTab 那一条缓存，公开读取立刻看到新值。
+   * 页签开关保存成功后只清 selfNoteTab 那一条缓存。公开读取通常立刻看到，最迟一个周期。
+   * 并发读回填可能把旧值写回，影响以 TTL 为界。
    */
   async updateAdmin(
     patch: SupportContactPatch,
@@ -180,10 +183,13 @@ export class SupportContactService {
         await this.audit.writeRequired(tx, {
           actorId: actor.userId,
           actorRole: actor.role,
-          action: AUDIT_ACTION,
+          action: SELF_NOTE_TAB_AUDIT_ACTION,
           targetType: 'system',
-          targetId: 'support-contact',
-          payload: { selfNoteTab: next.selfNoteTab },
+          targetId: 'self-note-tab',
+          payload: {
+            before: { selfNoteTab: before.selfNoteTab },
+            after: { selfNoteTab: next.selfNoteTab },
+          },
         })
       }
       return next
@@ -202,14 +208,23 @@ export class SupportContactService {
     }
   }
 
-  /** 缺键、空串、以及除字符串 true 以外的任何值都是关。 */
+  /**
+   * 缺键、空串、以及除字符串 true 以外的任何值都是关。
+   * 读库失败也是关，并按同一 TTL 记住，故障期间不再每个请求都等库。
+   * 失败不得往外抛，也不得读成开。
+   */
   private async readSelfNoteTabCached(now: number): Promise<boolean> {
     if (selfNoteTabCache && selfNoteTabCache.expiresAt > now) return selfNoteTabCache.value
-    const row = await this.prisma.platformSetting.findUnique({
-      where: { key: KEY_SELF_NOTE_TAB },
-      select: { value: true },
-    })
-    const value = row?.value === 'true'
+    let value = false
+    try {
+      const row = await this.prisma.platformSetting.findUnique({
+        where: { key: KEY_SELF_NOTE_TAB },
+        select: { value: true },
+      })
+      value = row?.value === 'true'
+    } catch {
+      value = false
+    }
     rememberSelfNoteTab(now, value)
     return value
   }

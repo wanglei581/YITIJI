@@ -2,7 +2,7 @@
 
 ## 2026-10-27：一体机求职进度页签加管理员开关（默认关，未部署）
 
-- 平台设置新增 `support.selfNoteTab`（沿用已有 `PlatformSetting`，无迁移）。只有字符串 `true` 算开；缺省、空串和其他值都是关。公开接口 `GET /api/v1/public/support-contact` 增加布尔字段 `selfNoteTab`。只有管理员能在「法务与数据权利」页修改，机构端不能看、不能改。审计 payload 只有这个布尔，不含记事内容。保存后只清这一项的服务端缓存；电话、服务时间、附近终端和小程序发布状态的公开缓存仍不主动清，最迟 5 分钟生效。
+- 平台设置新增 `support.selfNoteTab`（沿用已有 `PlatformSetting`，无迁移）。只有字符串 `true` 算开；缺省、空串和其他值都是关。公开接口 `GET /api/v1/public/support-contact` 增加布尔字段 `selfNoteTab`。只有管理员能在「法务与数据权利」页修改，机构端不能看、不能改。页签审计单列动作 `self_note_tab.update`（对象类型 `system`，对象 `self-note-tab`），payload 是 `{ before: { selfNoteTab }, after: { selfNoteTab } }`，只有这个布尔，不含记事内容；电话三项仍走 `support_contact.update`。读页签键失败时按关处理，并按同一缓存周期记住，不把整份公开响应拖垮，电话照常返回。保存后只清这一项的服务端缓存，公开读取通常立刻看到新值，最迟一个周期；电话、服务时间、附近终端和小程序发布状态的公开缓存仍不主动清，最迟 5 分钟生效。
 - 默认关闭。一体机页面由触屏版第 6 包读取公开响应里的 `selfNoteTab`，本包不改一体机。
 - 未部署，生产和真机未验。
 

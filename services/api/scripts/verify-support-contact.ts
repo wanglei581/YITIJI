@@ -87,6 +87,11 @@ function assertStatic(): void {
   assert.ok(tabCard.includes('已保存。开关已更新。'))
   assert.ok(tabCard.includes('保存失败：'))
   assert.ok(tabCard.includes('已禁止保存'))
+  assert.match(
+    tabCard,
+    /onChange=\{\(event\) => \{\s*setNotice\(null\)\s*setError\(null\)\s*setEnabled\(event\.target\.checked\)\s*\}\}/,
+    '复选框 onChange 必须清掉已保存提示和错误',
+  )
   assert.ok(legalPage.includes('<SelfNoteTabCard />'))
   for (const file of [service, online, controller, card, tabCard, legalPage, schema, progress]) {
     assert.equal(file.includes(MOBILE), false)
@@ -198,6 +203,10 @@ async function main(): Promise<void> {
       return prisma.auditLog.count({ where: { action: 'support_contact.update' } })
     }
 
+    async function tabAuditCount(): Promise<number> {
+      return prisma.auditLog.count({ where: { action: 'self_note_tab.update' } })
+    }
+
     const unconfigured = await publicOf(SELF_CODE)
     assert.equal(unconfigured.servicePhone, null)
     assert.notEqual(unconfigured.servicePhone, '')
@@ -223,12 +232,18 @@ async function main(): Promise<void> {
     assert.equal(saved.json.data?.miniappPublished, true)
     assert.equal(await auditCount(), auditsBefore + 1)
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'support_contact.update' }, orderBy: { createdAt: 'desc' } })
-    const payload = JSON.parse(audit.payloadJson) as { before: { servicePhone: string | null }; after: { servicePhone: string | null } }
+    const payload = JSON.parse(audit.payloadJson) as {
+      before: Record<string, unknown>
+      after: Record<string, unknown>
+    }
     assert.equal(audit.actorId, 'user-zhou')
     assert.equal(audit.targetType, 'system')
     assert.equal(audit.targetId, 'support-contact')
     assert.equal(payload.before.servicePhone, null)
     assert.equal(payload.after.servicePhone, MOBILE)
+    const contactKeys = ['miniappPublished', 'serviceHours', 'servicePhone']
+    assert.deepEqual(Object.keys(payload.before).sort(), contactKeys)
+    assert.deepEqual(Object.keys(payload.after).sort(), contactKeys)
     assert.equal(JSON.stringify(payload).includes(SIBLING_CODE), false)
     console.log('PASS 配了返回配置值，管理员修改写入审计')
 
@@ -391,8 +406,11 @@ async function main(): Promise<void> {
         update: { value, updatedBy: 'fixture' },
       })
     }
-    function assertTabPayload(payload: unknown, expected: boolean): void {
-      assert.deepEqual(payload, { selfNoteTab: expected })
+    function assertTabPayload(payload: unknown, before: boolean, after: boolean): void {
+      assert.deepEqual(payload, {
+        before: { selfNoteTab: before },
+        after: { selfNoteTab: after },
+      })
       const text = JSON.stringify(payload)
       for (const word of ['已投递', '面试', '记事', 'JobApplication', 'jobApplication', 'resumeFileId', 'companyName']) {
         assert.equal(text.includes(word), false, word)
@@ -421,46 +439,138 @@ async function main(): Promise<void> {
     assert.equal(primed.selfNoteTab, false)
     assert.equal(primed.servicePhone, LANDLINE)
     await prisma.platformSetting.update({ where: { key: 'support.servicePhone' }, data: { value: MOBILE } })
-    const auditsAtTab = await auditCount()
+    const contactAuditsAtTab = await auditCount()
+    const tabAuditsAtOn = await tabAuditCount()
     const turnedOn = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: true }, adminToken())
     assert.equal(turnedOn.status, 200)
     assert.equal(turnedOn.json.data?.selfNoteTab, true)
-    assert.equal(await auditCount(), auditsAtTab + 1)
+    assert.equal(await auditCount(), contactAuditsAtTab, '页签保存不得写入电话审计')
+    assert.equal(await tabAuditCount(), tabAuditsAtOn + 1)
     const tabAudit = await prisma.auditLog.findFirstOrThrow({
-      where: { action: 'support_contact.update' },
+      where: { action: 'self_note_tab.update' },
       orderBy: { createdAt: 'desc' },
     })
-    assertTabPayload(JSON.parse(tabAudit.payloadJson), true)
+    assert.equal(tabAudit.targetType, 'system')
+    assert.equal(tabAudit.targetId, 'self-note-tab')
+    assertTabPayload(JSON.parse(tabAudit.payloadJson), false, true)
     const immediate = await publicOf(SELF_CODE)
     assert.equal(immediate.selfNoteTab, true)
     assert.equal(immediate.servicePhone, LANDLINE, '保存页签开关不得清掉电话缓存')
-    const beforePartnerTab = await auditCount()
+    const beforePartnerContact = await auditCount()
+    const beforePartnerTab = await tabAuditCount()
     const partnerTab = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: false }, partnerToken())
     assert.equal(partnerTab.status, 403)
     assert.equal(partnerTab.json.error?.code, 'AUTH_ROLE_FORBIDDEN')
     const partnerRead = await call('GET', '/api/v1/admin/support-contact', undefined, partnerToken())
     assert.equal(partnerRead.status, 403)
-    assert.equal(await auditCount(), beforePartnerTab)
+    assert.equal(await auditCount(), beforePartnerContact)
+    assert.equal(await tabAuditCount(), beforePartnerTab)
     const adminStillOn = await call('GET', '/api/v1/admin/support-contact', undefined, adminToken())
     assert.equal(adminStillOn.json.data?.selfNoteTab, true)
+    const contactAuditsAtOff = await auditCount()
+    const tabAuditsAtOff = await tabAuditCount()
     const turnedOff = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: false }, adminToken())
     assert.equal(turnedOff.status, 200)
     assert.equal(turnedOff.json.data?.selfNoteTab, false)
+    assert.equal(await auditCount(), contactAuditsAtOff, '关掉页签也不得写入电话审计')
+    assert.equal(await tabAuditCount(), tabAuditsAtOff + 1)
     const offAudit = await prisma.auditLog.findFirstOrThrow({
-      where: { action: 'support_contact.update' },
+      where: { action: 'self_note_tab.update' },
       orderBy: { createdAt: 'desc' },
     })
-    assertTabPayload(JSON.parse(offAudit.payloadJson), false)
+    assert.equal(offAudit.targetType, 'system')
+    assert.equal(offAudit.targetId, 'self-note-tab')
+    assertTabPayload(JSON.parse(offAudit.payloadJson), true, false)
     const immediateOff = await publicOf(SELF_CODE)
     assert.equal(immediateOff.selfNoteTab, false)
     assert.equal(immediateOff.servicePhone, LANDLINE, '关掉页签开关也不得清掉电话缓存')
-    console.log('PASS 页签开关仅管理员可写，审计只有布尔，保存后公开读取立即反映，电话缓存不变')
+    console.log('PASS 页签开关仅管理员可写，审计单列动作且只有布尔前后值，保存后公开读取立即反映，电话缓存不变')
   } finally {
     setSupportContactClock(null)
     await app.close()
     rmSync(dir, { recursive: true, force: true })
   }
+  await assertTabReadFailureKeepsPhone()
   console.log('verify:support-contact PASS')
+}
+
+/**
+ * 终端缓存是热的、页签缓存刚被保存清掉、读页签键抛错时，公开响应仍要带出电话。
+ * 两份缓存都是模块级的，所以本段用专用终端号，并放在 HTTP 用例之后、时钟回到真实时间以后。
+ */
+async function assertTabReadFailureKeepsPhone(): Promise<void> {
+  const terminalId = 'tab-db-down-isolated'
+  const phone = '02912345678'
+  const settings = new Map<string, string | null>([['support.servicePhone', phone]])
+  let failTabRead = false
+  let tabReads = 0
+  const db: Record<string, unknown> = {
+    platformSetting: {
+      async findMany(args: { where: { key: { in: string[] } } }) {
+        return args.where.key.in
+          .filter((key) => settings.has(key))
+          .map((key) => ({ key, value: settings.get(key) ?? null }))
+      },
+      async findUnique(args: { where: { key: string } }) {
+        tabReads += 1
+        if (failTabRead) throw new Error('模拟：数据库暂时不可用')
+        return settings.has(args.where.key) ? { value: settings.get(args.where.key) ?? null } : null
+      },
+      async upsert(args: {
+        where: { key: string }
+        create: { value: string | null }
+        update: { value: string | null }
+      }) {
+        const value = settings.has(args.where.key) ? args.update.value : args.create.value
+        settings.set(args.where.key, value)
+        return { key: args.where.key, value }
+      },
+    },
+    terminal: {
+      async findUnique() {
+        return null
+      },
+      async findMany() {
+        return []
+      },
+    },
+  }
+  db.$transaction = async (fn: (tx: unknown) => Promise<unknown>) => fn(db)
+  const audit = { async writeRequired() { return 'audit-tab-read-fail' } }
+  const service = new SupportContactService(db as never, audit as never)
+  const t0 = Date.parse('2027-01-01T00:00:00.000Z')
+  let now = t0
+  setSupportContactClock(() => now)
+  try {
+    const warm = await service.getPublic(terminalId)
+    assert.equal(warm.servicePhone, phone)
+    assert.equal(warm.selfNoteTab, false)
+    await service.updateAdmin({ selfNoteTab: true }, { userId: 'user-tab-fail', role: 'admin' })
+    assert.equal(settings.get('support.selfNoteTab'), 'true')
+    failTabRead = true
+    const readsAtFailure = tabReads
+    let during: PublicSupportContact
+    try {
+      during = await service.getPublic(terminalId)
+    } catch (error) {
+      throw new Error(`读页签键失败时 getPublic 不应抛错：${(error as Error).message}`)
+    }
+    assert.equal(during.servicePhone, warm.servicePhone)
+    assert.equal(during.selfNoteTab, false)
+    assert.equal(tabReads, readsAtFailure + 1, '故障时第一次应查库')
+    const again = await service.getPublic(terminalId)
+    assert.equal(again.servicePhone, warm.servicePhone)
+    assert.equal(again.selfNoteTab, false)
+    assert.equal(tabReads, readsAtFailure + 1, '同一周期内不再查库')
+    failTabRead = false
+    now = t0 + SUPPORT_CONTACT_CACHE_TTL_MS
+    const recovered = await service.getPublic(terminalId)
+    assert.equal(recovered.selfNoteTab, true)
+    assert.equal(recovered.servicePhone, warm.servicePhone)
+    console.log('PASS 读页签键失败按关缓存，不拖垮电话，过一个 TTL 且库恢复后读到开')
+  } finally {
+    setSupportContactClock(null)
+  }
 }
 
 async function createTerminal(

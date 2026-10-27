@@ -70,7 +70,11 @@ export function SelfNoteTabCard() {
               type="checkbox"
               checked={enabled}
               disabled={loadFailed || saving}
-              onChange={(event) => setEnabled(event.target.checked)}
+              onChange={(event) => {
+                setNotice(null)
+                setError(null)
+                setEnabled(event.target.checked)
+              }}
               aria-labelledby="self-note-tab-title"
               className="h-4 w-4 disabled:cursor-not-allowed"
             />
