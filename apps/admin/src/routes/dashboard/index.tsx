@@ -291,7 +291,9 @@ export default function DashboardPage() {
       todayRows.push({
         key: 'printers',
         title: parts.join('，'),
-        detail: '不足不写成停机，这里不画百分比',
+        detail: faults > 0 && low > 0
+          ? '故障要现场处理；纸张或墨粉不足的仍可打印，请尽快补充'
+          : faults > 0 ? '故障要现场处理' : '仍可打印，请尽快补纸或更换墨粉',
         href: '/devices',
         action: '去查看',
       })
@@ -419,7 +421,7 @@ export default function DashboardPage() {
                   <p>调用 {formatCount(aiUsage.totalCalls)} 次</p>
                   <p>近 24 小时 · 成功率 {aiUsage.successRate}%</p>
                   <p>成功 {formatCount(aiUsage.successCount)} / 失败 {formatCount(aiUsage.failCount)}</p>
-                  {aiUsage.unmeasuredCalls > 0 && <p>费用未采集，不写成 0 元</p>}
+                  {aiUsage.unmeasuredCalls > 0 && <p>部分调用费用暂未采集</p>}
                 </div>
               )}
             </SectionCard>

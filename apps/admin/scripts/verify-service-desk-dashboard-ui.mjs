@@ -105,7 +105,8 @@ check(
 
 check(
   dashboard.includes('这类这次没读到') &&
-    dashboard.includes('不画百分比') &&
+    // 纸张、墨粉只写「不足」，不画百分比（直接查渲染里没有把读数接上 %）
+    !/(tonerLevel|paperTrayLevel|paperLevel|avgLevel)[^\n]{0,60}%/.test(stripComments(dashboard)) &&
     !dashboard.includes('if (nums.length === 0) return null') &&
     !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)),
   'a failed block says it was not read; paper and toner are not drawn as percents; no amount or revenue KPI',

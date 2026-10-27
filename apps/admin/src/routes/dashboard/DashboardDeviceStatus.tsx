@@ -19,7 +19,7 @@ function supplyLine(printers: AdminPrinterRecord[]): string {
   if (faults > 0) parts.push(`故障 ${formatCount(faults)} 台`)
   if (low > 0) parts.push(`纸张或墨粉不足 ${formatCount(low)} 台`)
   const status = parts.length > 0 ? `${parts.join('，')}。` : '当前没有故障，也没有纸张或墨粉不足。'
-  return `${status}纸张和墨粉不在这里画百分比，不足不写成停机。`
+  return low > 0 ? `${status}不足的仍可打印。` : status
 }
 
 export function DashboardDeviceStatus({
