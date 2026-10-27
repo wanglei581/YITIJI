@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-28：触屏版第 5 版 · 第 3 包「打印整条流程」（分支 `claude/kiosk-touch-p3`，未合并、未部署、真机未验）
+
+- 范围：一体机打印整条流程的正文按触屏版第 5 版重做——打印扫描服务台、选文件三页（来源选择、手机传文件、U 盘）、材料检查、预览与参数、核对价格、收银台、出纸进度、打印完成、结果未确认、到机码输码、核对订单；路由 `/print-scan`、`/print/upload`、`/print/desk`（`/print/material-check`、`/print/preview`、`/print/params` 仍重定向）、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`。不碰后端、数据库、硬件链路、小程序。
+- 产品负责人 10/26 三件：完成页「我拿走了，结束使用」一按就结束（60 秒空闲到点结束、点屏重新计时保留）；打印步骤统一为四步（选文件、材料检查、预览与参数、核对价格，含服务台步骤轴）；收银台、到机码、结果未确认、缺纸与失败各态与金额规则以运行页为准，稿只改版式与字。
+- 删除与改名记录（均有证据：无路由、无 import、无门禁引用，已跑相关门禁）：删除 `PickupWinCard`（到机码成功卡，由 `PickupOkBody` 取代）；样式文件 `print-fulfill-touch.css`（970 行）拆成 `print-progress-touch.css`、`print-done-touch.css`、`print-pickup-touch.css`，规则内容不变；`printArt.ts` 因与 `PrintArt.tsx` 在不区分大小写的文件系统里重名，改为 `printArtSvg.ts`。
+- 门禁与单测改到稿的真值（不放宽，每条都做了反向检查）：`verify:fusion-w2`、`verify:scan-input-safety`（扫码枪入口改认「用扫码枪扫」，说明原句只在 `PickupHidGuide` 写一份）、`verify:device-status-honest`（W-117 改认新结构）、`verify:pii-redaction-contract`、`verify:print-done-truth`（倒计时措辞）、`print-walk-copy` 单测（补 PrintIcon、PrintArt 映射，页数核定与免费摘要的断言按稿分状态，W-117 提示条按新结构）。
+- 稿与运行页的差异处理：选文件来源页没有主按钮；扫码枪说明在说明卡里原地展开，不另起一屏；到机码页键盘下面只留一行折叠「两种码的区别 · 码找不到了」；核对价格页用这一份文件自己的第一页做小样（读不出来退成文件图标）；打印各页补底部导航（稿里首页、选文件、手机传文件亮「首页」，其余不亮）。
+- 同时修了随这批改版暴露的两处运行页问题：收银页失败固定句末尾「请联系现场工作人员」改为只拿掉这一截并保留原因前半句（安全校验失败不再被泛化成创建任务失败）；免费单核对价格页不再出现优惠券卡、收银页免费单摘要不再说「付款」。
+- 仍未做到与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3.md`。
+
 ## 2026-10-24：先收口机构账号真实开通（执行中）
 
 - 最终测试增量复核已收口：Grok `1825f2d2-de18-4616-891d-7f0cb2b2cfed` 与 Hermes `20261024_160958_a4270e` 均实际成功，确认原守卫 finding 已修复、两种内容损坏负例控制位/失败检查/零成功标记正确。Hermes 的正则未转义、后续HEAD404可假通过两项建议已用当前源码与实际断言排除；固定producer的严格文本守卫、历史事故在现有记录/Git留存，均不需再扩展代码。生产器和499行验证器冻结，以包含本次复核记录的最终提交自身完整CI为准；后续过程快照保留历史，不冒充当前生产或真机通过。

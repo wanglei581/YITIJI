@@ -419,6 +419,8 @@ const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/Cas
   '../cashierStatus': cashier, '../printConfirmModel': confirmModelUrl,
   '../cashierQxModel': cashierModelUrl,
   '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
+  // 2026-10-28 稿 cashier：状态说明不够高时画一块装饰小样，本测试只看文案，换成空件。
+  '../art/PrintFillArt': toDataUrl('export const PrintFillArt = () => null'),
 })
 const { CashierQxView } = await import(cashierViewUrl)
 test('B 补：零元收银台与放行失败只说免费试运营，不说收款、付款或权益机制', () => {

@@ -680,7 +680,7 @@ export function PrintDonePage() {
           {!isUnconfirmed && failureReason === printProblemLine() ? null : <p className="pff-out-sub">{printProblemLine()}</p>}
           {takeawayNotices}
           {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
-          <PrintFillArt name="mfp" />
+          <PrintFillArt name="stack" />
         </div>
         {feedbackDialog}
       </PrintTouchFrame>
