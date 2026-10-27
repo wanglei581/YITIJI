@@ -11,12 +11,11 @@ const files = {
   fixture: read('src/pages/resume/resume-report-fixture.ts'),
   css: read('src/pages/resume/resume-report-qx.css'),
   body: read('src/pages/resume/components/resume-report/ResumeReportBody.tsx'),
-  issues: read('src/pages/resume/components/resume-report/ResumeReportIssues.tsx'),
-  scores: read('src/pages/resume/components/resume-report/ResumeReportScores.tsx'),
   states: read('src/pages/resume/components/resume-report/ResumeReportStates.tsx'),
+  exits: read('src/pages/resume/components/resume-report/ResumeReportExits.tsx'),
+  touchCss: read('src/pages/resume/touch/report.css'),
   actions: read('src/pages/resume/components/resume-report/ResumeReportActions.tsx'),
   takeaway: read('src/pages/resume/components/resume-report/ResumeReportTakeaway.tsx'),
-  chrome: read('src/pages/resume/components/resume-report/ResumeReportChrome.tsx'),
   root: read('src/layouts/KioskRoot.tsx'),
 }
 const all = Object.values(files).join('\n')
@@ -40,13 +39,13 @@ for (const state of ['loading', 'report', 'report-empty', 'report-minimal', 'dia
   assert(statesLiteral.includes(`'${state}'`), `state ${state} has a real corresponding branch`)
 }
 
-assert(has(files.issues, 'issue.evidence'), 'issues render original-quote evidence')
-assert(has(files.issues, 'issue.impact'), 'issues render impact')
-assert(has(files.issues, 'issue.fixIt'), 'issues render fix-it')
-assert(has(files.issues, 'sevOf'), 'severity is derived from dimension scores')
+assert(has(files.body, 'issue.evidence'), 'issues render original-quote evidence')
+assert(has(files.body, 'issue.impact'), 'issues render impact')
+assert(has(files.body, 'issue.fixIt'), 'issues render fix-it')
+assert(has(files.body, 'tierOf(section.score, section.maxScore)'), 'dimension tone is derived from the dimension scores')
 assert(has(files.body, 'report.contentBlocks'), 'contentBlocks seven-block structure is rendered')
 assert(has(files.body, '先改这几处'), 'first-screen priorities heading exists')
-assert(has(files.scores, '每维一句人话'), 'each dimension has a human sentence')
+assert(has(files.body, 'DIM_ABOUT[section.key'), 'each dimension has a human sentence')
 assert(has(files.body, '这不是录取分'), 'page states this is not an admission score')
 assert(has(files.page, 'truncatedInput'), 'truncation banner is wired')
 assert(has(files.page, 'image_ocr'), 'OCR banner is gated on real OCR source')
@@ -88,9 +87,9 @@ assert(has(files.page, 'getResumeRecord(taskId, { token: getToken(), accessToken
 const deliverConstants = read('src/pages/resume/components/resume-deliver/constants.ts')
 assert(/export const TASK_ID_RE = \/\^\[A-Za-z0-9_-\]\{1,64\}\$/.test(files.model), 'report task id accepts the 64-char resume intent id')
 assert(/export const TASK_ID_RE = \/\^\[A-Za-z0-9_-\]\{1,64\}\$/.test(deliverConstants), 'optimize and generate task id accept the 64-char resume intent id')
-assert(!has(files.issues, '这七块'), 'structure title does not hardcode seven blocks')
+assert(!has(files.body, '这七块'), 'structure title does not hardcode seven blocks')
 assert(!has(files.model, '简历被读成七块'), 'report subtitle does not hardcode seven blocks')
-assert(has(files.issues, 'displayResumeExcerpt'), 'report display redacts masked placeholders')
+assert(has(files.body, 'displayResumeExcerpt(quote)') && has(files.body, 'displayResumeExcerpt(line)'), 'report display redacts masked placeholders (evidence quote and every block line)')
 assert(has(files.page, 'reportBlocksSubtitle'), 'report subtitle uses the real block count')
 assert(has(files.model, '（已隐去）'), 'masked placeholder display copy exists')
 const placeholderLiteral = /const MASKED_PLACEHOLDER_RE = (\/[\s\S]*?\/g)/.exec(files.model)?.[1]
@@ -106,27 +105,29 @@ const sixtyFour = 'a'.repeat(64)
 assert(taskIdRe.test(sixtyFour) && !/^[A-Za-z0-9_-]{1,24}$/.test(sixtyFour), 'a 64-char task id is accepted and the old 24-char cap rejected it')
 assert(!taskIdRe.test('a'.repeat(65)) && !taskIdRe.test('bad id') && !taskIdRe.test(''), 'task id still rejects overlong, spaced, and empty values')
 assert(has(files.model, 'evidenceCountOfBlock'), 'block tags count evidence lines separately from issues')
-assert(has(files.issues, '条证据'), 'structure blocks show how many evidence lines they hit')
+assert(has(files.body, '条证据') && has(files.body, 'evidenceCountOfBlock(issues, block.key)'), 'structure blocks show how many evidence lines they hit')
 assert(has(files.takeaway, '带走这份报告'), 'takeaway section is titled 带走这份报告')
 assert(has(files.takeaway, 'data-testid="resume-report-takeaway-title"'), 'takeaway title has a stable test id')
 assert(has(files.css, '#resume-report-why'), 'bottom actions fill the row after the why line')
 assert(has(files.css, "flex: 1.35 1 0"), 'primary action stays wider than the ghost action')
-assert(has(files.body, '目标岗位匹配参考（仅供参考）'), 'job-fit entry stays on the report')
-assert(has(files.body, '做一次自我探索'), 'self-assessment entry stays on the report')
-assert(has(files.body, 'rrp-explanation'), 'priority fold stays in the report body')
-assert(has(files.body, "navigate('/resume/self-assessment/intro')"), 'self-assessment stays on the intro route')
+// 2026-10-28 触屏版（稿 diagnosis）：两个入口改成页尾两颗并排按钮「简历对照 / 自我探索」，写在报告页里；
+// 「先改这几处」不再折叠，常驻在报告正文里（稿的左右两栏）。
+assert(has(files.page, "navigate('/resume/job-fit'") && has(files.page, '>简历对照<'), 'job-fit entry stays on the report')
+assert(has(files.page, '>自我探索<'), 'self-assessment entry stays on the report')
+assert(has(files.body, 'data-testid="resume-report-priorities"'), 'priorities stay in the report body')
+assert(has(files.page, "navigate('/resume/self-assessment/intro')"), 'self-assessment stays on the intro route')
 const r1 = read('src/pages/resume/resume-r1-qx2.css')
 assert(has(r1, '.rrp-zone .rrp-scroll { max-height: none; overflow: visible; }'), 'report zones grow with content instead of an inner scroller')
 assert(!has(r1, 'max-height: 440px'), 'report zone no longer caps the list at 440px')
 assert(!/min-height:\s*210px/.test(r1), 'no-context, read-error, unavailable and illegal state cards size to their content')
-assert(has(files.issues, 'new IntersectionObserver'), 'structure scroll hint uses IntersectionObserver')
-assert(!has(files.issues, 'setInterval'), 'structure scroll hint does not poll on a timer')
-assert(has(files.issues, '· 下滑还有'), 'structure title says how many blocks are still below')
-assert(has(files.issues, '最下面可以带走报告'), 'scroll hint mentions the takeaway while it is still below')
-assert(has(files.issues, 'data-testid="resume-report-scroll-hint"'), 'scroll hint has a stable test id')
-assert(has(files.states, 'className="rrp-ic"') && has(files.states, 'className="rrp-go"'), 'non-report exit rows have an icon and a round arrow')
-assert(has(files.css, '.rrp-row .rrp-go'), 'the round arrow is a 40px circle on the exit row')
-assert(/min-height:\s*(\d+)px/.test(files.css) && Number(/\.rrp-row\s*\{[^}]*min-height:\s*(\d+)px/.exec(files.css)?.[1] ?? 0) >= 64, 'exit rows stay at least 64px tall')
+// 2026-10-28 触屏版：内容结构折进 <details>，整页随外层滚动，没有内部滚动区，所以不再有「下滑还有 N 块」的滚动提示；
+// 判据换成：结构块是折叠的、页面正文整体可滚、带走区在滚动正文里。
+assert(has(files.body, '<details className="qxt-all" data-testid="resume-report-structure">'), 'structure blocks are folded in a details, not an inner scroller')
+assert(!has(files.body, 'IntersectionObserver') && !has(files.body, 'setInterval'), 'the report body keeps no scroll observer or polling timer')
+assert(has(files.page, 'bodyClassName="qxt-body-scroll"'), 'the report body scrolls as a whole under the fixed band and dock')
+assert(has(files.page, '<ResumeReportTakeaway'), 'the takeaway panel stays inside the scrolling report body')
+assert(has(files.states, '<ExitRow') && has(files.exits, 'className="qxt-vis"') && has(files.exits, '{take && !disabled ? <div className="qxt-take"><QxTouchIcon name="arrowR"'), 'non-report exit rows have an icon and an arrow to the destination (not on greyed rows)')
+assert(Number(/\.qxt-exit-col \.qxt-slab\s*\{[^}]*min-height:\s*(\d+)px/.exec(files.touchCss)?.[1] ?? 0) >= 64, 'exit rows stay at least 64px tall')
 
 if (failures.length) {
   console.error('verify-resume-report-qx failed:')

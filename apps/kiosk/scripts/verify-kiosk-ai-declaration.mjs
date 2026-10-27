@@ -238,7 +238,8 @@ const NOTE_FILES = [
   'src/pages/job-fairs/FairVisitPlanPage.tsx',
   'src/pages/jobs/components/JobsQxChrome.tsx',
   'src/pages/jobs/components/JobDetailSections.tsx',
-  'src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx',
+  // 2026-10-28 触屏版：优化页的「AI 精简 / AI 调整排版」按钮与它下面的使用声明说明在编辑视图里（原 OptimizeReadyBody 已由它取代并删除）。
+  'src/pages/resume/touch/OptimizeEditView.tsx',
 ]
 
 const RETHROW_FILES = [

@@ -112,7 +112,12 @@ const frozen = {
   // 2026-09-29 重新冻结（W-81）：简历来源页传入 busyWhen="received"，等人扫、还没收到文件时不报忙；
   // 手机已传上或正在确认才报忙。其它调用方不传该参数，仍按会话还在（含等人扫）报忙。卸载仍补报不忙。
   // 旧哈希 1a825bc768c4dde9329542396c19766e2a1742b1103d353fccb7af6ca140b02f。
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb',
+  // 2026-10-28 重新冻结（触屏版简历三条主路）：新增三个可选属性 onCancelled / onReceivedChange / confirmRef，
+  // 供简历来源页在自己的版面里画「已取消」说明、文件卡和底栏「确认使用这份文件」；
+  // 不传时行为与此前逐字节同一（取消、确认、报忙、刷新先撤销旧会话、已上传时刷新不可点都不变）。
+  // 冻结契约不放宽，仍逐字节校验；手机上传的既有行为由 verify:resume-phone-upload-ui 的 AST 断言继续钉住。
+  // 旧哈希 9a3c4e09d4acc5c7912de7bf56ccb4ef9da6b0d8cb24fd6f39f44ee1203242bb。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '97a46d6d5dc1ef8aaafdc1ff99de267d673bb992bac1de6a7ebfa64be8453c82',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -288,15 +293,18 @@ for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerP
 }
 
 // 触屏版把方向设置收成「诊断方向」一步。来源三列、卡片下限、可改设置在只读维度前面（稿：范围 → 两条路 → 六维只读）、路径标题不折行，按稿保留，不放宽。
+// 样式在 touch/source.css（来源卡）与 touch/direction.css（诊断方向），版面在 touch/ResumeSourceWhere.tsx 与 DiagnosisDirectionForm.tsx。
 const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
-const resumeTouchCss = stripCssComments(read('src/pages/resume/touch/resume-touch.css'))
-const directionPane = resumeSource.slice(resumeSource.indexOf("step === 'direction'"))
-check(/(?:^|;)\s*min-height:\s*148px\s*;?/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-src")), 'resume source cards keep a 148px minimum')
+const resumeSourceCss = stripCssComments(read('src/pages/resume/touch/source.css'))
+const resumeDirectionCss = stripCssComments(read('src/pages/resume/touch/direction.css'))
+const directionForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
+const directionPane = directionForm.slice(directionForm.indexOf('qxt-form-focus'))
+check(/(?:^|;)\s*min-height:\s*148px\s*;?/.test(cssRuleBody(resumeSourceCss, "[data-qx-page='resume-src'] .qxt-src")), 'resume source cards keep a 148px minimum')
 check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
-check(/grid-template-columns:\s*1fr 1fr 1fr/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-srcs")), 'resume source cards stay in three columns')
-check(directionPane.includes('qxt-see') && directionPane.indexOf('qx-rt-settings') < directionPane.indexOf('qxt-see'), 'editable direction settings precede the read-only summary')
-check(resumeSource.includes('<section className="qx-rt-settings"'), 'direction settings remain accessible on the direction step')
-check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeTouchCss, "[data-qx-page='resume-direction'] .qxt-path b")), 'resume direction title cannot wrap character by character')
+check(/grid-template-columns:\s*1fr 1fr 1fr/.test(cssRuleBody(resumeSourceCss, "[data-qx-page='resume-src'] .qxt-srcs")), 'resume source cards stay in three columns')
+check(directionPane.indexOf('className="qxt-modes"') >= 0 && directionPane.indexOf('className="qxt-modes"') < directionPane.indexOf('qxt-see'), 'editable direction settings precede the read-only summary')
+check(directionForm.includes('aria-label="诊断方向设置"'), 'direction settings remain accessible on the direction step')
+check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeDirectionCss, "[data-qx-page='resume-direction'] .qxt-intent b")), 'resume direction title cannot wrap character by character')
 for (const route of ['/resume/source', '/resume/parse']) includes('src/layouts/KioskRoot.tsx', `'${route}'`, `${route} is registered as Qingxu-migrated`)
 // 稿 25-material-workshop 迁入青序流光（2026-09-23）：此前这里钉的是「materials 不在本批」，
 // 迁入后改为正向断言——登记进 QX_MIGRATED_ROUTES、舞台由 KioskRoot 缩放、旧 LightFlow 壳全部退出。

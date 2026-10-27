@@ -33,15 +33,24 @@ function assertCountAtLeast(src, marker, min, label) {
   console.log(`PASS ${label}`)
 }
 
-const source = read('src/pages/resume/ResumeSourcePage.tsx')
+// 2026-10-28 触屏版（稿 resume-src）：来源页的「在哪里」一步拆到 touch/ResumeSourceWhere.tsx（来源卡、更换文件、上传提示都在那里）。
+// 来源页的判据对「页面 + 它的版面组件」整体成立（assertNotIncludes 因此只会更严）。
+const source = `${read('src/pages/resume/ResumeSourcePage.tsx')}\n${read('src/pages/resume/touch/ResumeSourceWhere.tsx')}`
 const diagnosisForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
-const parse = read('src/pages/resume/ResumeParsePage.tsx')
+// 2026-10-28 触屏版（稿 reading）：解析页的版面拆到 touch/ResumeReadingView.tsx，等待说明与隐私声明文字在那里。
+// 解析页的判据对「页面 + 它的版面组件」整体成立（assertNotIncludes 因此只会更严）。
+const parseView = read('src/pages/resume/touch/ResumeReadingView.tsx')
+const parse = `${read('src/pages/resume/ResumeParsePage.tsx')}\n${parseView}`
 const report = read('src/pages/resume/ResumeReportPage.tsx')
-const reportScores = readOptional('src/pages/resume/components/resume-report/ResumeReportScores.tsx')
-const reportAll = `${report}\n${reportScores}`
+// 2026-10-28 触屏版：六维分数条在报告正文组件里（原 ResumeReportScores 已随新稿并入）。
+const reportBody = read('src/pages/resume/components/resume-report/ResumeReportBody.tsx')
+const reportAll = `${report}\n${reportBody}`
+// 2026-10-28 触屏版：优化页的工作区拆成总览 / 编辑 / 导出三屏（稿 optimize / resume-edit / resume-export），
+// 原 ResumeDeliverPanel、OptimizeReadyBody、OptimizeWorkArea 已由下面三个视图取代并删除。
 const deliver = [
-  'src/pages/resume/components/resume-deliver/ResumeDeliverPanel.tsx',
-  'src/pages/resume/components/resume-deliver/OptimizeReadyBody.tsx',
+  'src/pages/resume/touch/OptimizeEditView.tsx',
+  'src/pages/resume/touch/OptimizeExportView.tsx',
+  'src/pages/resume/components/resume-deliver/OptimizeOverview.tsx',
   'src/pages/resume/components/resume-deliver/ResumeFactConfirmDialog.tsx',
   'src/pages/resume/components/resume-deliver/ResumePricingBar.tsx',
   'src/pages/resume/components/resume-deliver/ResumeExportResult.tsx',
@@ -101,8 +110,10 @@ assertNotIncludes(parse, 'function delay(', 'parse page removes timer-driven sta
 assertNotIncludes(parse, "setCurrent('ocr')", 'parse page does not claim a live OCR stage without server evidence')
 assertNotIncludes(parse, "setCurrent('extracting')", 'parse page does not claim a live extraction stage without server evidence')
 assertNotIncludes(parse, '评分维度准备进度（逐项点亮）', 'parse page does not present dimensions as live progress')
-assertIncludes(parse, '处理内容说明 · 非实时阶段', 'parse page visibly labels the stage list as non-realtime')
-assertIncludes(parse, '不代表实时进度', 'parse page explains that capability steps are not server telemetry')
+// 稿 reading 的写法：列头只写一次「处理内容」，「在进行」下面写「以下是这次要处理的内容，不代表实时进度」。
+assertIncludes(parseView, '<div className="qxt-h">处理内容</div>', 'parse page visibly titles the stage list as the content to process, not as live stages')
+assertIncludes(parseView, 'aria-label="本次处理内容说明"', 'parse page labels the stage list as a description of what will be processed')
+assertIncludes(parseView, '以下是这次要处理的内容，不代表实时进度', 'parse page explains that capability steps are not server telemetry')
 assertIncludes(parse, 'useBusyLock(Boolean(fileId) && !failed)', 'parse page prevents standby only while waiting for a real result')
 assertIncludes(parse, 'startedRef', 'parse page prevents duplicate submit in repeated effect setup')
 assertNotIncludes(parse, 'simulateFailure', 'parse page removes the unused Strict Mode fragile auto-failure branch')
@@ -134,7 +145,12 @@ assertIncludes(optimize, 'confirmLeave', 'optimize page protects edited resume c
 assertIncludes(optimizeCompare, 'wordDiff(props.item.before, shown)', 'optimize diff uses in-house inline word diff for the displayed revision')
 assertIncludes(optimizeCompare, "props.decision === 'custom' && props.customText ? props.customText : props.item.after", 'diff uses the selected custom text or the original AI revision')
 assertIncludes(optimize, "confirmLeave ? 'overflow-hidden'", 'optimize page locks background scroll behind leave dialog')
-assertIncludes(optimizeCompare, 'className="qxc-copy qxc-diff-text"', 'both full-text columns retain the wrapping class')
+// 2026-10-28 触屏版（稿 compare）：两栏原文 / 改写写成 .qxt-col，换行规则在 touch/compare.css。
+const compareCss = read('src/pages/resume/touch/compare.css')
+assertIncludes(optimizeCompare, 'className="qxt-col"', 'the original full-text column keeps its column class')
+assertIncludes(optimizeCompare, 'className="qxt-col qxt-diff"', 'the revised full-text column keeps its column class')
+assert.match(compareCss, /\.qxt-col p\s*\{[^}]*word-break:\s*break-word/, 'both full-text columns retain the wrapping rule')
+console.log('PASS both full-text columns retain the wrapping rule')
 assertIncludes(optimizeCompare, "renderSide('before')", 'comparison preserves the full original column')
 assertIncludes(optimizeCompare, "renderSide('after')", 'comparison preserves the full revised column')
 // 拆页后母页不得再同屏渲染 diff，否则等于没拆。
@@ -231,9 +247,13 @@ assertIncludes(layoutControls, 'min-w-[48px]', 'layout control choices meet the 
 // 一体机没有滚动条，用户看到的就是一个被切坏的条。复验还发现两处更糟的：
 // `?intent=optimize` 与「上传失败横幅在屏」时 CTA 完全 0px 可见。
 // 修法：诊断维度清单收进可折叠区（默认收起）+ 削掉纵向留白。
-assertIncludes(source, '<details', 'source page collapses the diagnosis dimension list so the primary CTA stays on the first screen')
-// 折叠掉的只能是清单本身；「不编造结论」这句合规声明必须常驻可见。
-assertIncludes(source, '系统不会编造', 'source page keeps the no-fabrication statement outside the collapsed area')
+// 2026-10-28 触屏版：来源页拆成「在哪里 / 诊断方向」两步，主按钮在固定底栏里，不随页面滚动；
+// 维度清单是只读的一排小标签（qxt-see），首屏不会再被长清单顶出去。判据换成这两条。
+assertIncludes(source, 'primary={primary}', 'source page keeps the primary CTA in the fixed dock so it stays on the first screen')
+assert.ok(`${source}\n${read('src/pages/resume/components/DiagnosisDirectionForm.tsx')}`.includes('className="qxt-see"'), 'the diagnosis dimension list is a compact read-only chip summary')
+console.log('PASS the diagnosis dimension list is a compact read-only chip summary')
+// 「不编造结论」这句合规声明必须常驻可见（来源页的「在哪里」一步里）。
+assertIncludes(read('src/pages/resume/touch/ResumeSourceWhere.tsx'), '系统不会编造', 'source page keeps the no-fabrication statement visible')
 
 // ── R5b 上传成功与预览失败不得同屏互相打脸 ────────────────────────────────
 // 事故原样：文件卡写「已就绪」，正下方预览卡写「预览链接不可用或已过期，请重新上传文件」。
@@ -276,13 +296,16 @@ assertNotIncludes(source, '补充方向（可选）', 'source page no longer use
 assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
 assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
 // 2026-09-23 迁入青序流光（稿 21）：两条拉伸断言从 Tailwind 类串改锚到本页 Qx 样式，判据不变。
-// 触屏第 5 版把来源区从左右拉伸列改成三列来源卡，仍要求 min-width: 0，不许被挤没。
-const resumeTouchCss = read('src/pages/resume/touch/resume-touch.css')
+// 触屏第 5 版把来源区从左右拉伸列改成三列来源卡，仍要求 min-width: 0，不许被挤没；样式在 touch/source.css。
+const sourceCss = read('src/pages/resume/touch/source.css')
 assertIncludes(source, 'className="qx-rt-dropzone"', 'upload dropzone stretches to balance the direction column')
-// 最终稿要求内容向下顺排，上传条不能为了平衡方向区拉成空白框。
-assertIncludes(read('src/pages/resume/resume-r1-qx2.css'), ".qx-rt-dropzone { flex: none; min-height: 76px", 'source upload strip follows content without stretching an empty card')
+// 最终稿要求内容向下顺排，上传条不能为了平衡方向区拉成空白框：有内容高度、不占剩余空间。
+assert.match(sourceCss, /\[data-qx-page='resume-src'\] \.qx-rt-dropzone\s*\{[^}]*min-height:\s*\d+px/, 'source upload strip keeps a content-sized min height')
+assert.doesNotMatch(sourceCss, /\.qx-rt-dropzone\s*\{[^}]*flex:\s*1/, 'source upload strip follows content without stretching an empty card')
+console.log('PASS source upload strip follows content without stretching an empty card')
 assertIncludes(source, 'className="qxt-srcs"', 'upload column stays a stretch column')
-assertIncludes(resumeTouchCss, "[data-qx-page='resume-src'] .qxt-srcs {\n  display: grid;\n  grid-template-columns: 1fr 1fr 1fr;\n  gap: 12px;\n  min-width: 0;", 'upload column stays a stretch column (css)')
+assert.match(sourceCss, /\[data-qx-page='resume-src'\] \.qxt-srcs\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*1fr 1fr 1fr;\s*gap:\s*12px;\s*min-width:\s*0;/, 'upload column stays a stretch column (css)')
+console.log('PASS upload column stays a stretch column (css)')
 
 assertIncludes(report, "navigate('/resume/optimize'", 'report page navigates to optimize page')
 assertIncludes(report, 'targetContext: state.targetContext', 'report page forwards targetContext into optimize navigate state')
@@ -484,7 +507,9 @@ const chosen = [false, '制造业', '理货员', '5年以上', '社招', '', '']
 assert.deepEqual(buildTarget(() => [chosen[targetIndex++]]).target, {
   industry: '制造业', targetJob: '理货员', experience: '5年以上', scene: '社招', major: undefined, degree: undefined, skipped: false,
 }, 'W-107 本人选择原样参与诊断')
-assertIncludes(source, '没选方向，按通用标准看', 'W-107 页面如实说明未选方向')
+// 稿 resume-direction 的写法：不选方向时标题问「按通用标准看，可以吗？」，副标题写「不设方向」；原「没选方向，按通用标准看」一句并入这两句。
+assertIncludes(source, '按通用标准看，可以吗？', 'W-107 页面如实说明未选方向（按通用标准看）')
+assertIncludes(source, '不设方向。想指定重点，再改成定向诊断。', 'W-107 页面如实说明未选方向（不设方向）')
 assertIncludes(source, 'selectedDimensions: buildTargetContext().skipped ? [] : selectedDimensions', 'W-107 通用诊断不带默认重点')
 
 const pdfSource = read('src/components/PdfCanvasPreview.tsx')
@@ -530,7 +555,9 @@ encryptedCta.onClick()
 assert.deepEqual(destination, ['/resume/source?intent=optimize', { replace: true }], 'W-108 换文件保留优化意图')
 assert.match(renderFailCta(false, false, {}, React, null, () => {}, () => {}, 'diagnose').label, /重新解析/, 'W-108 非加密失败保留重新解析')
 assertIncludes(report, '!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits', 'W-108 加密或尚未核查时不显示打印原件等出路')
-assertIncludes(report, 'encryptedPdf ? <p>{ENCRYPTED_PDF_BLOCK_COPY}。</p>', 'W-108 加密失败显示打印链的密码原句')
+// 触屏版失败说明里这句是一个模板字面量（稿 st-ai-down 的 howto 框），不再单独包 <p>；判据是「加密失败分支输出密码原句」。
+assert.match(report, /encryptedPdf\s*\?\s*`\$\{ENCRYPTED_PDF_BLOCK_COPY\}。`/, 'W-108 加密失败显示打印链的密码原句')
+console.log('PASS W-108 加密失败显示打印链的密码原句')
 const printKindSource = read('src/pages/print/components/printPreviewKind.ts')
 const printKindModule = { exports: {} }
 new Function('exports', executable([
@@ -550,7 +577,7 @@ assert.equal(errorOutcome(new ApiHttpError(500, 'UNSUPPORTED_FILE_TYPE')), 'unkn
 
 // 密码文案常量的 declaration 节点不含 export，用同一源码求值。
 const passwordCopy = new Function(executable(`${sourceNode(printKindSource, 'ENCRYPTED_PDF_BLOCK_COPY')}\nreturn ENCRYPTED_PDF_BLOCK_COPY;`))()
-const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'ResumeTouchPage', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', 'supportPhone', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
+const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'ResumeTouchPage', 'navigate', 'REPORT_STATUS', 'QxTouchIcon', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', 'supportPhone', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
 const failedTree = (encrypted, checking = false) => renderFailure(encrypted, checking, React, 'frame', () => {}, {}, null, null, 'head', passwordCopy, (reason) => reason, 'original-exits', { file: { name: 'resume.pdf' }, fileId: 'original' }, '')
 function hasOriginalExits(node) { return node?.type === 'original-exits' || Boolean(node?.children?.some(hasOriginalExits)) }
 assert.match(labels(failedTree(true)), /这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传。/, 'W-108 实际失败正文显示准确密码原因')
@@ -598,8 +625,9 @@ for (const scenario of ['owned', 'other', 'failed', 'canceled', 'guest']) {
   assert.deepEqual(confirmed, scenario === 'owned' ? [true] : [], `保存提示归属检查：${scenario}`)
 }
 assertIncludes(source, '先诊断，再逐条改', '取件页有实际意图选择')
-assert.ok(source.includes('className="qxt-see"'), '未上传也有常驻方向摘要')
-assert.ok(source.indexOf('qx-rt-settings') < source.indexOf('className="qxt-see"'), '方向设置在只读维度摘要前面')
+// 2026-10-28 触屏版：方向设置与只读摘要在 DiagnosisDirectionForm 的「诊断方向」一步里；摘要不依赖有没有文件。
+assert.ok(diagnosisForm.includes('className="qxt-see" aria-label="通用诊断看什么"'), '未上传也有常驻方向摘要')
+assert.ok(diagnosisForm.indexOf('className="qxt-modes"') >= 0 && diagnosisForm.indexOf('className="qxt-modes"') < diagnosisForm.indexOf('className="qxt-see" aria-label="通用诊断看什么"'), '方向设置在只读维度摘要前面')
 assertIncludes(read('src/pages/resume/components/resume-report/ResumeReportBody.tsx'), '<ResumeReportStates viewState="report-empty" />', '空报告复用真实出口与人工自查，不填造结论')
 const formatChooser = read('src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx')
 assertIncludes(formatChooser, 'aria-label="文件生成流程"', '导出等待态四步流程常驻')

@@ -1,0 +1,232 @@
+/* 逐条选择（稿 compare）。样式移植自稿 d4-top / d4-legend / d4-stats5 / d4-batch / d4-cols / d4-fact / d4-seg / d4-custom。 */
+
+[data-qx-page='compare'] {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  text-align: left;
+}
+
+/* 上一条 + 图例 */
+[data-qx-page='compare'] .qxt-cmptop { display: flex; align-items: center; gap: 12px; }
+
+[data-qx-page='compare'] .qxt-prev {
+  flex: none;
+  min-height: 64px;
+  min-width: 140px;
+  padding: 0 18px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='compare'] .qxt-legend { flex: 1; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; min-height: 64px; font-size: 20px; }
+
+[data-qx-page='compare'] :is(.qxt-legend, .qxt-diff) del { background: var(--qxt-cin-wash); color: var(--qx-cinnabar); text-decoration: line-through; padding: 0 6px; border-radius: 8px; }
+[data-qx-page='compare'] :is(.qxt-legend, .qxt-diff) ins { background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); text-decoration: none; padding: 0 6px; border-radius: 8px; }
+[data-qx-page='compare'] [data-replacement='true'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); padding: 0 6px; border-radius: 8px; }
+
+/* 五格统计 */
+[data-qx-page='compare'] .qxt-stats5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+
+[data-qx-page='compare'] .qxt-stats5 span {
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='compare'] .qxt-stats5 u { font-size: 20px; text-decoration: none; color: var(--qxt-ink-3); }
+[data-qx-page='compare'] .qxt-stats5 b { font-size: 40px; font-variant-numeric: tabular-nums; }
+
+/* 三条批量 */
+[data-qx-page='compare'] .qxt-batch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+[data-qx-page='compare'] .qxt-batch button {
+  min-height: 96px;
+  padding: 8px 10px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+}
+
+[data-qx-page='compare'] .qxt-batch b { display: block; font-size: 22px; }
+[data-qx-page='compare'] .qxt-batch small { display: block; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-3); font-weight: 500; }
+/* 清空是会丢掉已做选择的动作：标题用朱红，和另外两颗区分开（运行页原有的危险色提示）。 */
+[data-qx-page='compare'] .qxt-batch button[data-tone='danger'] b { color: var(--qx-cinnabar); }
+
+/* 提示一行：未保存声明，或批量处理刚做了什么 */
+[data-qx-page='compare'] .qxt-draft {
+  margin: 0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* 原文 / 改写 */
+[data-qx-page='compare'] .qxt-cols { flex: 1 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+[data-qx-page='compare'] .qxt-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='compare'] .qxt-col b { font-size: 24px; }
+[data-qx-page='compare'] .qxt-col p { margin: 0; font-size: 28px; line-height: 1.45; word-break: break-word; }
+[data-qx-page='compare'] .qxt-col small { font-size: 20px; color: var(--qxt-ink-3); }
+[data-qx-page='compare'] .qxt-metrics { margin: 0; font-size: 22px; color: var(--qxt-ink-3); text-align: right; }
+
+/* 新增事实：要逐项勾「是我的真实信息」 */
+[data-qx-page='compare'] .qxt-facts { display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='compare'] .qxt-facts > p { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-3); }
+
+[data-qx-page='compare'] .qxt-fact {
+  position: relative;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-radius: 20px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 24px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-qx-page='compare'] .qxt-fact mark { background: transparent; color: inherit; }
+
+[data-qx-page='compare'] .qxt-fact input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  border: 2px solid var(--qxt-ink);
+  border-radius: 12px;
+  background: var(--qxt-card);
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='compare'] .qxt-fact input:checked { background: var(--qx-deep); border-color: var(--qx-deep); }
+
+[data-qx-page='compare'] .qxt-fact input:checked::after {
+  content: '';
+  width: 14px;
+  height: 8px;
+  border-left: 3px solid var(--qxt-cream);
+  border-bottom: 3px solid var(--qxt-cream);
+  transform: rotate(-45deg) translate(1px, -2px);
+}
+
+/* 这一条用哪一版 */
+[data-qx-page='compare'] .qxt-dec { display: flex; gap: 8px; }
+
+[data-qx-page='compare'] .qxt-dec button {
+  flex: 1;
+  min-height: 88px;
+  min-width: 64px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+[data-qx-page='compare'] .qxt-dec button[aria-pressed='true'] { background: var(--qx-deep); color: var(--qxt-cream); border-color: var(--qx-deep); }
+[data-qx-page='compare'] .qxt-dec button:disabled { opacity: 0.42; }
+
+/* 自己写这一条 */
+[data-qx-page='compare'] .qxt-custom { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--qxt-well); }
+[data-qx-page='compare'] .qxt-custom label { display: flex; flex-direction: column; gap: 10px; }
+[data-qx-page='compare'] .qxt-cl { font-size: 24px; }
+
+[data-qx-page='compare'] .qxt-custom textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 2px dashed var(--qxt-edge);
+  background: var(--qxt-card);
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--qxt-ink);
+  resize: none;
+}
+
+[data-qx-page='compare'] .qxt-cn { margin: 0; font-size: 20px; line-height: 1.45; color: var(--qxt-ink-3); }
+[data-qx-page='compare'] .qxt-cv { margin: 0; font-size: 24px; line-height: 1.4; }
+[data-qx-page='compare'] .qxt-ca { display: flex; gap: 12px; }
+
+[data-qx-page='compare'] .qxt-use {
+  min-height: 72px;
+  min-width: 160px;
+  padding: 0 22px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='compare'] .qxt-use-pri { background: var(--qx-emerald); color: var(--qx-deep); border-color: transparent; }
+
+/* 选择草稿 */
+[data-qx-page='compare'] .qxt-draftlist { border-radius: 20px; background: var(--qxt-well); padding: 0 14px 8px; }
+[data-qx-page='compare'] .qxt-draftlist > summary { min-height: 64px; display: flex; align-items: center; font-size: 22px; font-weight: 700; cursor: pointer; }
+[data-qx-page='compare'] .qxt-draftlist p,
+[data-qx-page='compare'] .qxt-draftlist li { font-size: 20px; line-height: 1.45; color: var(--qxt-ink-2); }
+[data-qx-page='compare'] .qxt-draftlist ol { margin: 0; padding-left: 28px; display: grid; gap: 6px; }
+[data-qx-page='compare'] .qxt-draftlist li b { display: block; color: var(--qxt-ink); }
+
+/* 没有可对照的内容 */
+[data-qx-page='compare'] .qxt-state { display: flex; align-items: center; gap: 18px; padding: 24px 28px; border-radius: 26px; background: var(--qxt-well); }
+[data-qx-page='compare'] .qxt-state b { display: block; font-size: 26px; }
+[data-qx-page='compare'] .qxt-state p { margin: 6px 0 14px; font-size: 22px; line-height: 1.45; color: var(--qxt-ink-2); }
+
+[data-qx-page='compare'] .qxt-state-spin {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid var(--qxt-teal-wash);
+  border-top-color: var(--qx-teal);
+  animation: qxt-compare-spin 1s linear infinite;
+}
+
+@keyframes qxt-compare-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-page='compare'] .qxt-state-spin { animation: none; }
+}
+
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='compare'] .qxt-cols { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='compare'] .qxt-stats5 { grid-template-columns: repeat(3, 1fr); }
+  [data-kiosk-stage-fit='off'] [data-qx-page='compare'] .qxt-batch { grid-template-columns: 1fr; }
+}

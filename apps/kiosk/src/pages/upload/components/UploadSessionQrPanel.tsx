@@ -34,6 +34,12 @@ interface UploadSessionQrPanelProps {
   confirmLabel?: string
   onUploaded: (file: PhoneUploadedFile) => void
   onBusyChange?: (busy: boolean) => void
+  /** 可选。用户点「取消」、本次二维码已作废之后通知页面；页面可以换成自己的「已取消」说明。默认不传，行为不变。 */
+  onCancelled?: () => void
+  /** 可选。手机端传上来、等一体机确认的那份文件（没有就是 null）。页面想自己画文件卡时用。默认不传，行为不变。 */
+  onReceivedChange?: (file: { filename: string; sizeBytes: number; mimeType: string } | null) => void
+  /** 可选。页面想把「确认」放到自己的底栏时用：面板把当前的确认函数写进来，没有可确认的文件时写 null。默认不传，行为不变。 */
+  confirmRef?: { current: (() => void) | null }
   /**
    * session：二维码还在（含等人扫）即报忙。
    * received：没收到文件不算忙；手机已传上或正在确认才报忙。
@@ -117,6 +123,9 @@ export function UploadSessionQrPanel({
   confirmLabel = '确认使用这份简历',
   onUploaded,
   onBusyChange,
+  onCancelled,
+  onReceivedChange,
+  confirmRef,
   busyWhen = 'session',
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
@@ -143,6 +152,11 @@ export function UploadSessionQrPanel({
       onBusyChange?.(false)
     }
   }, [onBusyChange])
+
+  const receivedFile = status?.status === 'uploaded' ? status.file : null
+  useEffect(() => {
+    onReceivedChange?.(receivedFile ? { filename: receivedFile.filename, sizeBytes: receivedFile.sizeBytes, mimeType: receivedFile.mimeType } : null)
+  }, [onReceivedChange, receivedFile])
 
   useEffect(() => {
     qrRef.current = qr
@@ -302,12 +316,14 @@ export function UploadSessionQrPanel({
       setQr(null)
       setStatus(null)
       setError(null)
+      onCancelled?.()
     }
   }
 
   const uploadedFile = status?.status === 'uploaded' ? status.file : null
   const uploaded = Boolean(uploadedFile)
   const expired = status?.status === 'expired'
+  if (confirmRef) confirmRef.current = uploaded && !confirming ? () => { void handleConfirm() } : null
 
   return (
     <Card className="p-5">

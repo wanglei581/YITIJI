@@ -1,0 +1,201 @@
+/* 读简历（稿 reading）。样式移植自稿 d4-read / d4-steps / d4-dimro / livebox / why。 */
+
+[data-qx-page='reading'] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  gap: 12px;
+  text-align: left;
+}
+
+[data-qx-page='reading'] .qxt-readgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 28px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 左：简历小样，居中，不画扫描线 */
+[data-qx-page='reading'] .qxt-reader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-width: 0;
+  width: 100%;
+}
+
+[data-qx-page='reading'] .qxt-reader svg { width: auto; height: auto; max-width: 100%; max-height: 640px; }
+[data-qx-page='reading'] .qxt-reader-cap { margin: 0; text-align: center; }
+[data-qx-page='reading'] .qxt-reader-cap b { display: block; font-size: 24px; line-height: 1.35; word-break: break-all; }
+[data-qx-page='reading'] .qxt-reader-cap small { display: block; font-size: 20px; color: var(--qxt-ink-3); }
+
+/* 右：一张卡 */
+[data-qx-page='reading'] .qxt-rcol {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='reading'] .qxt-live {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 96px;
+  padding: 14px 20px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='reading'] .qxt-live[data-tone='failed'] { background: var(--qxt-cin-wash); }
+[data-qx-page='reading'] .qxt-live[data-tone='unknown'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+[data-qx-page='reading'] .qxt-live b { display: block; font-size: 26px; line-height: 1.3; }
+[data-qx-page='reading'] .qxt-live small { display: block; font-size: 20px; line-height: 1.35; color: var(--qxt-ink-3); }
+
+[data-qx-page='reading'] .qxt-spin {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid var(--qxt-teal-wash);
+  border-top-color: var(--qx-teal);
+  animation: qxt-reading-spin 1s linear infinite;
+}
+
+@keyframes qxt-reading-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-qx-page='reading'] .qxt-spin { animation: none; }
+}
+
+[data-qx-page='reading'] .qxt-h { font-size: 22px; font-weight: 700; }
+
+/* 四条处理内容说明 */
+[data-qx-page='reading'] .qxt-steps4 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+[data-qx-page='reading'] .qxt-step4 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 20px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='reading'] .qxt-step4 i {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--qxt-well);
+  font-style: normal;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='reading'] .qxt-step4 span { min-width: 0; }
+[data-qx-page='reading'] .qxt-step4 b { display: block; font-size: 22px; }
+[data-qx-page='reading'] .qxt-step4 small { display: block; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-3); }
+
+/* 将评估的六个维度（只读） */
+[data-qx-page='reading'] .qxt-dimro { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='reading'] .qxt-dimro > b { font-size: 22px; }
+[data-qx-page='reading'] .qxt-rochips { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+[data-qx-page='reading'] .qxt-rochips span {
+  flex: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* 声明 */
+[data-qx-page='reading'] .qxt-why {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 72px;
+  margin: 0;
+  padding: 12px 20px;
+  border-radius: 26px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+[data-qx-page='reading'] .qxt-why svg { flex: none; }
+
+/* 运行页原有的说明：游客声明、识别不清怎么办、结果未知的几段 */
+[data-qx-page='reading'] .qxt-rcol .qx-rt-note,
+[data-qx-page='reading'] .qxt-rcol .qxt-read-note {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--qxt-well);
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='reading'] .qxt-rcol .qx-rt-note[data-tone='warn'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+[data-qx-page='reading'] .qxt-rcol .qx-rt-note b { margin-right: 8px; }
+
+[data-qx-page='reading'] .qxt-rcol .qx-rt-kv { margin: 0; display: grid; gap: 6px; }
+[data-qx-page='reading'] .qxt-rcol .qx-rt-kv div { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--qxt-well); }
+[data-qx-page='reading'] .qxt-rcol .qx-rt-kv dt { font-size: 20px; font-weight: 700; }
+[data-qx-page='reading'] .qxt-rcol .qx-rt-kv dd { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-2); }
+
+[data-qx-page='reading'] .qxt-parse-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+[data-qx-page='reading'] .qxt-parse-acts button {
+  min-height: 72px;
+  padding: 0 14px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='reading'] .qxt-parse-acts button:last-child { background: var(--qx-deep); color: var(--qxt-cream); }
+[data-qx-page='reading'] .qxt-parse-acts button:disabled { opacity: 0.42; }
+
+/* 没有文件 / 授权中的单句说明 */
+[data-qx-page='reading'] .qxt-single {
+  margin: 0;
+  padding: 24px 28px;
+  border-radius: 26px;
+  background: var(--qxt-well);
+  font-size: 26px;
+  line-height: 1.5;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='reading'] .qxt-dev { align-self: flex-start; min-height: 64px; padding: 0 16px; border-radius: 16px; background: var(--qxt-well); font-size: 20px; }
+
+/* 手机宽度：左右并排改上下 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] [data-qx-page='reading'] .qxt-readgrid { grid-template-columns: 1fr; }
+  [data-kiosk-stage-fit='off'] [data-qx-page='reading'] .qxt-reader svg { max-height: 280px; }
+}

@@ -40,8 +40,8 @@ export async function startResumeOptimize(page: Page): Promise<void> {
 /** 通用诊断可以直接继续，但目标行业、经验、场景不得替本人填入。查完停在方向步。 */
 export async function expectResumeDirectionUnselected(page: Page): Promise<void> {
   await openResumeDirection(page)
-  const settings = page.locator('.qx-rt-settings')
-  await expect(page.getByText('没选方向，按通用标准看', { exact: true })).toBeVisible()
+  const settings = page.locator('[data-qx-page="resume-direction"]')
+  await expect(page.getByText('按通用标准看，可以吗？', { exact: true })).toBeVisible()
   await expect(settings.getByRole('button', { name: /^通用诊断/ })).toHaveAttribute('aria-pressed', 'true')
   await expect(settings.getByRole('button', { name: /^定向诊断/ })).toHaveAttribute('aria-pressed', 'false')
   await settings.getByRole('button', { name: /^定向诊断/ }).click()
@@ -58,7 +58,7 @@ export async function expectResumeDirectionUnselected(page: Page): Promise<void>
   await page.getByRole('button', { name: '好了，回去开始诊断', exact: true }).click()
   await expect(page.locator('[data-kiosk-screen="resume-source"][data-resume-step="direction"]')).toBeVisible()
   await page.getByRole('button', { name: /^通用诊断/ }).click()
-  await expect(page.getByText('没选方向，按通用标准看', { exact: true })).toBeVisible()
+  await expect(page.getByText('按通用标准看，可以吗？', { exact: true })).toBeVisible()
 }
 
 /** 选完通用诊断后回到「简历在哪里」，U 盘和预览仍能看见文件区。没有文件时主按钮是「请先上传简历文件」，这一步还不存在，不能代传。刚从别的页换过来时按钮还没画上，先等到它出现再判断。 */
@@ -78,7 +78,7 @@ export async function chooseGenericResumeDirection(page: Page): Promise<void> {
   if (await next.isVisible().catch(() => false) && await next.isDisabled().catch(() => false)) return
   await expectResumeDirectionUnselected(page)
   await page.getByRole('button', { name: /^通用诊断/ }).click()
-  await page.locator('.qxt-dock').getByRole('button', { name: '上一步' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
 }
 
 export async function chooseTargetedResumeDirection(page: Page): Promise<void> {
@@ -96,7 +96,7 @@ export async function chooseTargetedResumeDirection(page: Page): Promise<void> {
   await experience.getByRole('button', { name: '1年以内', exact: true }).click()
   await expect(experience.getByRole('button', { name: '1年以内', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: '好了，回去开始诊断', exact: true }).click()
-  await page.locator('.qxt-dock').getByRole('button', { name: '上一步' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
 }
 
 export async function expectInterviewDirectionUnselected(page: Page): Promise<void> {

@@ -23,8 +23,7 @@ import {
   type ResumeCompareDecision,
   type ResumeCompareDecisions,
 } from './components/resume-compare/resumeCompareModel'
-import './resume-optimize-compare.css'
-import './resume-r1-qx2.css'
+import './touch/compare.css'
 
 const OPTIMIZE_ROUTE = '/resume/optimize'
 const UNSAVED_NOTICE =
@@ -177,10 +176,10 @@ export function ResumeOptimizeComparePage() {
       back={{ label: '返回', onBack: backToOptimize }}
       ask={{ label: '问小青：这句还能怎么改', draft: '我想把简历中的一句经历换个改法。请先让我提供原句，只整理真实内容，不添加数字或成果。' }}
       primary={dockPrimary}
+      bodyClassName="qxt-body-scroll"
     >
-      <section data-qx-page="compare" data-kiosk-domain="resume" data-kiosk-screen="resume-optimize-compare" data-route="/resume/optimize/compare" className="qx-scroll qx-resume-compare" data-takeaway="逐条选择改法，再编辑导出新简历">
-        {isDemoResult && <p className="qxc-notice" data-tone="warn">{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>}
-        <p className="qxc-notice" role="note">{UNSAVED_NOTICE}</p>
+      <section data-qx-page="compare" data-kiosk-domain="resume" data-kiosk-screen="resume-optimize-compare" data-route="/resume/optimize/compare" className="qxt-compare-page" data-takeaway="逐条选择改法，再编辑导出新简历">
+        {isDemoResult && <p className="qxt-fine" data-tone="warn">{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>}
         {!taskId ? (
           <ResumeCompareState title="还没有可对照的简历" description="请先完成简历上传与解析，再查看逐条改写。" actionLabel="去上传简历" onAction={() => navigate('/resume/source?intent=optimize')} />
         ) : loading ? (
@@ -191,28 +190,6 @@ export function ResumeOptimizeComparePage() {
           <ResumeCompareState title="本次没有可对照的改写" description={failure ?? '服务没有返回可选择的逐条候选。'} actionLabel="重新读取" onAction={retry} />
         ) : (
           <>
-            <div className="qx-r1-stats" aria-label="改写选择统计">
-              <span>全部<b>{stats.total}</b></span><span>已采纳<b>{stats.adopt}</b></span><span>保留原文<b>{stats.keep}</b></span><span>自己写<b>{stats.custom}</b></span><span>待定<b>{stats.todo}</b></span>
-            </div>
-            <ResumeCompareBatchBar
-              note={batchNote}
-              onAdoptEligible={() => {
-                const result = adoptEligible(items, confirmedByModule, decisions)
-                setDecisions(result.next)
-                setBatchNote(`已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`)
-              }}
-              onKeepUndecided={() => {
-                const result = keepUndecided(items, decisions)
-                setDecisions(result.next)
-                setBatchNote(`已把 ${result.count} 条还没决定的记为「保留原文」。选择可以反复改，随时逐条回去重选。`)
-              }}
-              onClear={() => {
-                setDecisions({})
-                setConfirmedByModule({})
-                setCustomByModule({})
-                setBatchNote('已清空全部选择，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')
-              }}
-            />
             <ResumeCompareCard
               item={current}
               index={currentIndex}
@@ -238,8 +215,38 @@ export function ResumeOptimizeComparePage() {
                 return { ...previous, [key]: [...nextConfirmed] }
               })}
               onPrevious={currentIndex > 0 ? () => setCurrentIndex((index) => index - 1) : undefined}
+              intro={(
+                <>
+              <div className="qxt-stats5" aria-label="改写选择统计">
+                <span><u>全部</u><b>{stats.total}</b></span>
+                <span><u>已采纳</u><b>{stats.adopt}</b></span>
+                <span><u>保留原文</u><b>{stats.keep}</b></span>
+                <span><u>自己写</u><b>{stats.custom}</b></span>
+                <span><u>待定</u><b>{stats.todo}</b></span>
+              </div>
+              <ResumeCompareBatchBar
+                onAdoptEligible={() => {
+                  const result = adoptEligible(items, confirmedByModule, decisions)
+                  setDecisions(result.next)
+                  setBatchNote(`已采纳 ${result.adopted} 条；跳过 ${result.skipped} 条 —— 那几条的改写里有原文没有的事实，要逐项确认后才能采纳。批量动作不会绕过这道拦截。`)
+                }}
+                onKeepUndecided={() => {
+                  const result = keepUndecided(items, decisions)
+                  setDecisions(result.next)
+                  setBatchNote(`已把 ${result.count} 条还没决定的记为「保留原文」。选择可以反复改，随时逐条回去重选。`)
+                }}
+                onClear={() => {
+                  setDecisions({})
+                  setConfirmedByModule({})
+                  setCustomByModule({})
+                  setBatchNote('已清空全部选择，连事实确认标记一起清掉 —— 回到刚读到建议时的样子。')
+                }}
+              />
+              <p className="qxt-draft" role="status" data-testid="resume-compare-note">{batchNote ?? UNSAVED_NOTICE}</p>
+                </>
+              )}
             />
-            <div className="qxt-seg" role="group" aria-label="这一条用哪一版">
+            <div className="qxt-dec" role="group" aria-label="这一条用哪一版">
               <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'optimized'} onClick={() => choose('optimized')} disabled={currentUnconfirmed}>用改写</button>
               <button type="button" aria-pressed={decisions[keyAt(currentIndex)] === 'original'} onClick={() => choose('original')}>保留原文</button>
               <button type="button" aria-pressed={writeOpen || decisions[keyAt(currentIndex)] === 'custom'} onClick={() => setWriteOpen(true)}>自己写</button>

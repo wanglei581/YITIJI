@@ -9,7 +9,9 @@ export type QxTouchStatus =
   | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' }
   | false
 
-export type QxTouchRail = { labels: readonly string[]; now: number }
+/** 步骤条上某一步的特殊记号：bad 是这一步失败，wait 是这一步结果还没确认。有记号的步不算「当前」。 */
+export type QxTouchRailMark = 'bad' | 'wait'
+export type QxTouchRail = { labels: readonly string[]; now: number; marks?: Readonly<Record<number, QxTouchRailMark>> }
 
 function FlowLines({ id, live }: { id: string; live: boolean }) {
   return (
@@ -119,14 +121,16 @@ export function QxTouchBand({
       {showRail && rail ? (
         <div className="qxt-rail" role="list" aria-label="办理步骤">
           {rail.labels.map((label, index) => {
-            const current = index === rail.now
-            const state = index < rail.now ? 'qxt-rail-done' : current ? 'qxt-rail-now' : ''
+            const mark = rail.marks?.[index]
+            const current = index === rail.now && !mark
+            const state = mark ? `qxt-rail-${mark}` : index < rail.now ? 'qxt-rail-done' : current ? 'qxt-rail-now' : ''
             return (
               <div
                 className={`qxt-rail-st ${state}`.trim()}
                 key={`${label}-${index}`}
                 role="listitem"
                 aria-current={current ? 'step' : undefined}
+                data-mark={mark}
               >
                 <div className="qxt-rail-bar" />
                 <span>{index < rail.now ? `✓ ${label}` : label}</span>

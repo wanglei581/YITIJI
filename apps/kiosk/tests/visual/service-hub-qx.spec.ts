@@ -88,6 +88,19 @@ interface HubSnapshot {
  */
 async function readHub(page: Page): Promise<HubSnapshot> {
   await page.waitForSelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')
+  // 触屏版简历服务台只直接画四块，其余入口收在「其余 N 项」弹层里：先把弹层打开，再把整页（含弹层）的入口一次读全。
+  const more = page.getByRole('button', { name: /^其余 \d+ 项/ })
+  const sheetOpened = await more.count() > 0
+  if (sheetOpened) {
+    await more.click()
+    await page.waitForSelector('[data-qx-page="resume-more"]')
+  }
+  const snapshot = await readHubDom(page)
+  if (sheetOpened) await page.getByRole('button', { name: '收起', exact: true }).click()
+  return snapshot
+}
+
+async function readHubDom(page: Page): Promise<HubSnapshot> {
   return page.evaluate(() => {
     const hub = document.querySelector('[data-qx-page="service-hub"], [data-qx-page="resume"]')!
     const entry = (el: Element, titleSel: string, reasonSel: string): {
@@ -106,22 +119,26 @@ async function readHub(page: Page): Promise<HubSnapshot> {
       }
     }
     const notice = document.querySelector('.qx-hub-notice-copy')
+    const noticeTitle = document.querySelector('[data-hub-notice-title]')
+    const noticeDetail = document.querySelector('[data-hub-notice-detail]')
     const grid = [...hub.querySelectorAll('.qx-hub-grid > *')]
     const quickItems = [...hub.querySelectorAll('.qx-hub-quick-item')]
+    // 弹层在页面外层，入口标记要从整个文档里取（简历服务台的「其余」入口在弹层里）。
+    const marked = (attr: string) => [...document.querySelectorAll(`[${attr}]`)]
     const pill = document.querySelector('.qxt-band .qx-pill') ?? document.querySelector('.qx-pill')
     return {
       probe: hub.getAttribute('data-hub-device-probe'),
       readiness: document.querySelector('.qx-hub-notice')?.getAttribute('data-readiness') ?? hub.getAttribute('data-readiness'),
       pill: pill?.textContent?.trim() ?? '',
-      noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
-      noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
-      cards: (grid.length ? grid : [...hub.querySelectorAll('[data-hub-card]')]).map((el) => entry(el, 'h3', '.qx-hub-why')),
+      noticeTitle: noticeTitle?.textContent?.trim() ?? notice?.querySelector('b')?.textContent?.trim() ?? '',
+      noticeDetail: noticeDetail?.textContent?.trim() ?? notice?.querySelector('b + span')?.textContent?.trim() ?? '',
+      cards: (grid.length ? grid : marked('data-hub-card')).map((el) => entry(el, 'h3', '.qx-hub-why')),
       goals: [...hub.querySelectorAll('.qx-hub-goal')].map((el) => ({
         title: el.textContent?.trim() ?? '',
         clickable: el.tagName === 'BUTTON' && !el.hasAttribute('aria-disabled'),
         reason: el.getAttribute('aria-label')?.split('：')[1] ?? null,
       })),
-      quick: (quickItems.length ? quickItems : [...hub.querySelectorAll('[data-hub-quick]')]).map((el) => entry(el, 'b', 'span span')),
+      quick: (quickItems.length ? quickItems : marked('data-hub-quick')).map((el) => entry(el, 'b', 'span span')),
     }
   })
 }

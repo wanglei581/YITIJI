@@ -1,16 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  CheckIcon,
-  SparklesIcon,
-  XCircleIcon,
-} from 'lucide-react'
-import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import type { QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { resumeProcessCopy } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
+import { ResumeReadingView } from './touch/ResumeReadingView'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
@@ -571,20 +567,28 @@ export function ResumeParsePage() {
   const bandSub = view === 'waiting'
     ? '解析是一次出结果的处理，中间没有阶段可以播报。'
     : copy.doing
+  // 步骤条：失败标在第 2 步上，结果未知 / 等授权也不算「正在进行」，只有真在等结果才是当前步。
+  const railMarks: Readonly<Record<number, 'bad' | 'wait'>> | undefined =
+    view === 'failed' ? { 1: 'bad' }
+    : view === 'unknown' || view === 'consent-needed' || view === 'consent-checking' ? { 1: 'wait' }
+    : undefined
 
-  const renderFrame = (body: ReactNode, primary?: QxTouchPrimary) => (
+  const renderFrame = (body: ReactNode, primary?: QxTouchPrimary, overlay?: ReactNode) => (
     <ResumeTouchPage
-      eyebrow={state?.intent === 'optimize' ? 'AI 简历优化' : 'AI 简历诊断'}
+      eyebrow="AI 解析"
       title={bandTitle}
       subtitle={bandSub}
       status={copy.status}
       railNow={view === 'missing-file' ? 0 : 1}
-      seal={view === 'waiting' ? 'think' : 'idle'}
+      railMarks={railMarks}
+      seal={view === 'waiting' ? 'think' : null}
       back={{ label: '返回简历来源', onBack: leaveToSource }}
+      dockBackLabel="返回上一步"
       ask={{ label: '问小青：解析没完成怎么办', draft: '我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。' }}
       primary={primary}
+      overlay={overlay}
     >
-      <section data-qx-page="reading" data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qx-resume-triage" data-takeaway="简历诊断报告">
+      <section data-qx-page="reading" data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qxt-parse-page" data-takeaway="简历诊断报告">
         {body}
       </section>
     </ResumeTouchPage>
@@ -593,12 +597,8 @@ export function ResumeParsePage() {
   // 没有文件就不问授权：授权是为了把文件交给 AI，手里没文件时弹授权只会把人绕进去。
   if (!fileId) {
     return renderFrame(
-      <div className="qx-rt-wait">
-        <section className="qx-rt-fail" data-tone="warn">
-          <p role="status">请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析。</p>
-        </section>
-      </div>,
-      { label: '回到来源选择', onClick: () => navigate('/resume/source'), className: 'qx-btn', noArrow: true },
+      <p className="qxt-single" role="status">请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析。</p>,
+      { label: '回到来源选择', onClick: () => navigate('/resume/source'), noArrow: true },
     )
   }
 
@@ -606,7 +606,7 @@ export function ResumeParsePage() {
     return (
       <>
         {renderFrame(
-          <p className="qx-rt-note" role="status">
+          <p className="qxt-single" role="status">
             {consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权'}
           </p>,
         )}
@@ -623,160 +623,100 @@ export function ResumeParsePage() {
     )
   }
 
-  const page = renderFrame(
-    <>
-      <div className="qxt-read">
-        <div className="qxt-reader">
-          <p className="qxt-fine">{fileName || '这份简历'}</p>
-          {fileSize ? <p className="qxt-fine">{fileSize} · {sourceLabel}</p> : null}
-          {!failed ? <p className="qxt-fine">处理内容说明 · 非实时阶段</p> : null}
-        </div>
-        <div className="qxt-rcol">
-          <section className="qx-card qx-rt-wait-card" data-live={failed ? undefined : 'true'}>
-            <span className="qx-rt-ring" data-tone={outcome === 'failed' ? 'bad' : outcome === 'unknown' ? 'warn' : undefined} aria-hidden="true">
-              {failed ? <XCircleIcon size={44} /> : <SparklesIcon size={44} />}
-            </span>
-            <h2 className="qx-rt-wait-t" role="status" aria-live="polite">
-              {outcome === 'failed'
-                ? '这次没能读出内容'
-                : outcome === 'unknown'
-                  ? (terminal?.mode === 'charged'
-                    ? terminal.copy.title
-                    : terminal?.mode === 'file_changed'
-                      ? '这份文件已停止使用'
-                      : terminal?.mode === 'blocked'
-                        ? '不能继续这次解析'
-                        : (pendingTask ? '解析还没出最终结果' : '没等到解析结果'))
-                  : '在进行'}
-            </h2>
-            <p className="qxt-fine">以下是这次要处理的内容，不代表实时进度</p>
-          </section>
-          {outcome === 'unknown' && (
-            <ResumeParseUnknownNote
-              terminal={terminal}
-              pendingTask={Boolean(pendingTask)}
-              recheck={recheck}
-              blockNote={blockNote}
-              storageBlocked={storageBlocked}
-              confirmFresh={confirmFresh}
-              loggedIn={Boolean(getToken())}
-              onFresh={openFreshConfirm}
-            />
-          )}
+  const unknownTitle = terminal?.mode === 'charged'
+    ? terminal.copy.title
+    : terminal?.mode === 'file_changed'
+      ? '这份文件已停止使用'
+      : terminal?.mode === 'blocked'
+        ? '不能继续这次解析'
+        : (pendingTask ? '解析还没出最终结果' : '没等到解析结果')
+  const liveTitle = outcome === 'failed' ? '这次没能读出内容' : outcome === 'unknown' ? unknownTitle : '在进行'
+
+  return renderFrame(
+    <ResumeReadingView
+      outcome={outcome}
+      title={liveTitle}
+      fileName={fileName || '这份简历'}
+      fileCaption={fileSize ? `${fileSize} · ${sourceLabel}` : sourceLabel}
+      steps={STEPS}
+      dimensions={DIMENSIONS}
+      unknownNote={(
+        <ResumeParseUnknownNote
+          terminal={terminal}
+          pendingTask={Boolean(pendingTask)}
+          recheck={recheck}
+          blockNote={blockNote}
+          storageBlocked={storageBlocked}
+          confirmFresh={confirmFresh}
+          loggedIn={Boolean(getToken())}
+          onFresh={openFreshConfirm}
+        />
+      )}
+      notes={(
+        <>
           {consent.guestNotice && (
             <p className="qx-rt-note" role="note" data-testid="resume-ai-guest-notice">
               未登录使用简历 AI：本次结果只在这次办理中可见，离场即清，不进入任何账号；AI 建议仅供参考，不替你投递。
             </p>
           )}
-          <div className="qxt-h">处理内容</div>
-          <ol className="qxt-steps qx-rt-steps" aria-label="本次处理内容说明">
-            {STEPS.map((step, idx) => (
-              <li key={step.key} className="qxt-step">
-                <i aria-hidden="true">{idx + 1}</i>
-                <span><strong>{step.label}</strong><em>{step.hint}</em></span>
-              </li>
-            ))}
-          </ol>
-          {!failed && (
-            <section className="qxt-dimro">
-              <b>报告将评估的维度</b>
-              <div className="qx-rt-dim-grid">
-                {DIMENSIONS.map((item) => <span key={item} className="qx-rt-dim">{item}</span>)}
-              </div>
-            </section>
-          )}
-          <p className="why">
-            <CheckIcon size={18} aria-hidden="true" />
-            返回仅停止本机等待，不会撤回已提交的服务请求。简历原文不会发送给企业，也不进入平台候选人简历库。
-          </p>
-          <p className="why">发给 AI 之前会先遮住手机号、身份证号、邮箱、住址等个人信息。</p>
           {!terminal && (
             <p className="qx-rt-note" data-tone="warn">
               识别不清或解析失败时会说明下一步怎么做。诊断结果由 AI 生成，仅供参考。
             </p>
           )}
-          {outcome === 'unknown' ? (
-            <div className="qxt-parse-acts">
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={leaveToSource}>返回简历来源</button>
-              {terminal?.mode === 'blocked' ? (
-                <button type="button" className="qx-btn" data-variant="primary" disabled>暂不能开始新的一次</button>
-              ) : terminal?.mode === 'file_changed' ? (
-                <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-reupload" onClick={leaveToSource}>重新上传简历</button>
-              ) : terminal?.mode === 'charged' ? (
-                <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-new-attempt" onClick={openFreshConfirm}>重新解析（新的一次）</button>
-              ) : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
-                <button type="button" className="qx-btn" data-variant="primary" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
-                  {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
-                </button>
-              ) : (
-                <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-parse-replay" onClick={replaySame}>原样再试一次</button>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="qx-btn qxt-backstep"
-              data-variant="ghost"
-              onClick={() => {
-                if (scanHandoff) { leaveToSource(); return }
-                cancelRef.current = true
-                navigate(-1)
-              }}
-            >
-              <XCircleIcon size={20} aria-hidden="true" />
-              返回上一步
-            </button>
-          )}
           {import.meta.env.DEV && Boolean(fileId) && !failed && (
-            <button type="button" onClick={handleDevFail} className="qx-rt-dev resume-parse-dev">
+            <button type="button" onClick={handleDevFail} className="qxt-dev resume-parse-dev">
               [DEV] 模拟失败
             </button>
           )}
-        </div>
-      </div>
-    </>,
-  )
-
-  return (
-    <>
-      {page}
-      {confirmFresh > 0 && (
-        <div
-          className="resume-r1-dialog fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="resume-parse-fresh-title"
-        >
-          <Card className="w-[32rem] max-w-full p-6 shadow-xl">
-            <h2 id="resume-parse-fresh-title" className="text-lg font-semibold text-neutral-900">
-              {confirmFresh === 1 ? '重新提交是新的一次' : '再次确认'}
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-600" data-testid="resume-parse-fresh-copy">
-              {confirmFresh === 1
-                ? (terminal?.mode === 'charged'
-                  ? resumeProcessCopy(terminal.copy.confirm)
-                  : '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。')
-                : terminal?.mode === 'charged'
-                  ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
-                  : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。'}
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <Button size="lg" variant="secondary" className="min-h-14" onClick={() => setConfirmFresh(0)}>
-                先不提交
-              </Button>
-              {confirmFresh === 1 ? (
-                <Button size="lg" className="min-h-14" onClick={() => setConfirmFresh(2)}>
-                  继续确认
-                </Button>
-              ) : (
-                <Button size="lg" className="min-h-14" onClick={() => { void beginFresh() }}>
-                  开始新的一次
-                </Button>
-              )}
-            </div>
-          </Card>
-        </div>
+        </>
       )}
-    </>
+      actions={outcome === 'unknown' ? (
+        <div className="qxt-parse-acts">
+          <button type="button" onClick={leaveToSource}>返回简历来源</button>
+          {terminal?.mode === 'blocked' ? (
+            <button type="button" disabled>暂不能开始新的一次</button>
+          ) : terminal?.mode === 'file_changed' ? (
+            <button type="button" data-testid="resume-parse-reupload" onClick={leaveToSource}>重新上传简历</button>
+          ) : terminal?.mode === 'charged' ? (
+            <button type="button" data-testid="resume-parse-new-attempt" onClick={openFreshConfirm}>重新解析（新的一次）</button>
+          ) : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
+            <button type="button" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
+              {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
+            </button>
+          ) : (
+            <button type="button" data-testid="resume-parse-replay" onClick={replaySame}>原样再试一次</button>
+          )}
+        </div>
+      ) : null}
+    />,
+    undefined,
+    confirmFresh > 0 ? (
+      <QxTouchOverlay
+        kind="dialog"
+        title={confirmFresh === 1 ? '重新提交是新的一次' : '再次确认'}
+        onClose={() => setConfirmFresh(0)}
+        actions={(
+          <>
+            <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => setConfirmFresh(0)}>先不提交</button>
+            {confirmFresh === 1 ? (
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => setConfirmFresh(2)}>继续确认</button>
+            ) : (
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => { void beginFresh() }}>开始新的一次</button>
+            )}
+          </>
+        )}
+      >
+        <p data-testid="resume-parse-fresh-copy">
+          {confirmFresh === 1
+            ? (terminal?.mode === 'charged'
+              ? resumeProcessCopy(terminal.copy.confirm)
+              : '刚才那次解析可能已经完成。重新提交会再调用一次 AI，生成新的一次解析，不会取消或覆盖刚才那次；如果刚才那次其实已经完成，就等于重复解析了一次。')
+            : terminal?.mode === 'charged'
+              ? '将清除本机这一次已结束的解析标识，并开始新的一次 AI 解析。'
+              : '将清除本机这一次未完成的解析标识，并开始新的一次 AI 解析。'}
+        </p>
+      </QxTouchOverlay>
+    ) : undefined,
   )
 }

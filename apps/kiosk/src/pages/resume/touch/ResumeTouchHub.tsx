@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
+import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchOverlay } from '../../../components/qingxu/touch/QxTouchOverlay'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
+import { QxTouchStateUnavailable } from '../../../components/qingxu/touch/QxTouchStates'
 import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
-import type { QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import type { QxTouchStatus } from '../../../components/qingxu/touch/QxTouchBand'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
@@ -14,7 +17,9 @@ import {
   type HubIconKey,
   type ServiceHubSpec,
 } from '../../service-hubs/serviceHubModel'
+import { ResumePaperArt } from './ResumeTouchArt'
 import { ResumeTouchPage } from './ResumeTouchPage'
+import './hub.css'
 
 const ICONS: Record<HubIconKey, QxTouchIconName> = {
   file: 'file',
@@ -45,14 +50,13 @@ const PRINT = '/print/upload?source=resume'
 const MINE = '/me/resumes'
 const RECORDS = '/me/ai-records'
 
+/** 草稿只放问法，不替用户选，也不替用户生成或投递。 */
 const ASK_DRAFT = '我手头有没有简历还没定。请先问我现在最想完成什么，再告诉我该进哪一条。不要替我生成简历，也不要替我投递。'
 
-function bandStatus(state: HubAvailability, label: string): QxTouchStatus {
-  if (state.apiDown) return { text: '在线服务不可用', tone: 'warn' }
-  if (state.apiChecking) return { text: '正在确认在线服务', tone: 'unknown' }
-  if (state.deviceOff) return { text: '本机设备不可用', tone: 'warn' }
-  if (state.deviceChecking) return { text: '正在确认本机设备', tone: 'unknown' }
-  return { text: label }
+type HubPill = { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+
+function bandStatus(pill: HubPill): QxTouchStatus {
+  return { text: pill.label, tone: pill.tone === 'ok' ? 'ok' : pill.tone === 'unknown' ? 'unknown' : 'warn' }
 }
 
 function readinessOf(state: HubAvailability): 'unavailable' | 'degraded' | 'checking' | 'ready' {
@@ -62,9 +66,17 @@ function readinessOf(state: HubAvailability): 'unavailable' | 'degraded' | 'chec
   return 'ready'
 }
 
+/** 单项能力的图标：稿里「简历素材库」用版式图标，「自我探索」用罗盘，其余按规格键。 */
+function iconFor(item: HubCapability): QxTouchIconName {
+  if (item.route === TEMPLATES) return 'layout'
+  if (item.route === SELF) return 'compass'
+  return ICONS[item.icon]
+}
+
 /**
- * 简历服务台触屏版。岗位、招聘会、面试、政策仍走 QxServiceHubPage 原来的返回。
- * 主卡「有，帮我改一改」不是第二张诊断卡：走查用的诊断卡在「其余」里。
+ * 简历服务台触屏版（稿 resume / resume-more / st-unavailable）。
+ * 岗位、招聘会、面试、政策四个服务台仍走 QxServiceHubPage 原来的旧返回，不经过这里。
+ * 「有，帮我改一改」与「其余」里的 AI简历诊断是同一条路由，走查钩子只挂在后者上，不重复计数。
  */
 export function ResumeTouchHub({
   spec,
@@ -83,7 +95,7 @@ export function ResumeTouchHub({
   retryApi: () => void
   contract: HubCapability | null
   notice: { title: string; detail: string }
-  pill: { label: string }
+  pill: HubPill
 }) {
   const navigate = useNavigate()
   const contact = useSupportContact()
@@ -95,33 +107,20 @@ export function ResumeTouchHub({
   const cap = (route: string) => caps.get(route)
   const reasonFor = (item: { kind: HubCapability['kind']; route: string }) =>
     unavailableReason(item.kind, item.route, availability)
-
   const open = (route: string, reason: string | null) => {
-    if (reason) return
-    navigate(route)
+    if (!reason) navigate(route)
   }
-
-  const sheetSpecs: HubCapability[] = [
-    cap(DIAGNOSE),
-    cap(OPTIMIZE),
-    cap(TEMPLATES),
-    cap(PRINT),
-    quick.get(MINE) as HubCapability | undefined,
-    quick.get(RECORDS) as HubCapability | undefined,
-    contract ?? undefined,
-  ].filter((item): item is HubCapability => Boolean(item))
-
-  const sheetCount = 6 + (contract ? 1 : 0)
+  const tone = (item: HubCapability) => (item.route === MINE ? 'slate' as const : 'teal' as const)
 
   const tile = (item: HubCapability, kind: 'card' | 'quick', index: number) => {
     const reason = reasonFor(item)
     return (
       <QxTouchTile
         key={`${kind}-${item.route}`}
-        icon={item.route === SELF ? 'compass' : ICONS[item.icon]}
+        icon={iconFor(item)}
         title={item.title}
         desc={reason ?? item.description}
-        tone={item.kind === 'ai' ? 'teal' : 'slate'}
+        tone={tone(item)}
         off={Boolean(reason)}
         index={index}
         onClick={() => open(item.route, reason)}
@@ -130,99 +129,152 @@ export function ResumeTouchHub({
     )
   }
 
-  const sheet = (
-    <div className="qxt-hub-hold">
-      {sheetSpecs.map((item, index) => tile(
-        item,
-        item.route === MINE || item.route === RECORDS ? 'quick' : 'card',
-        index,
-      ))}
-    </div>
+  /** 其余项：规格里没摆在首屏的几项，加上默认关的合同审查。 */
+  const sheetItems = ([
+    { item: cap(DIAGNOSE), kind: 'card' },
+    { item: cap(OPTIMIZE), kind: 'card' },
+    { item: cap(TEMPLATES), kind: 'card' },
+    { item: cap(PRINT), kind: 'card' },
+    { item: quick.get(MINE) as HubCapability | undefined, kind: 'quick' },
+    { item: quick.get(RECORDS) as HubCapability | undefined, kind: 'quick' },
+    { item: contract ?? undefined, kind: 'card' },
+  ] as Array<{ item: HubCapability | undefined; kind: 'card' | 'quick' }>)
+    .filter((entry): entry is { item: HubCapability; kind: 'card' | 'quick' } => Boolean(entry.item))
+
+  const sheetRow = ({ item, kind }: { item: HubCapability; kind: 'card' | 'quick' }) => {
+    const reason = reasonFor(item)
+    const badge = (item as { badge?: string }).badge ?? ''
+    const ai = badge.startsWith('AI')
+    return (
+      <button
+        key={`${kind}-${item.route}`}
+        type="button"
+        className={`qxt-tile qxt-hub-row${reason ? ' qxt-off qxt-hold' : ''}`}
+        aria-disabled={reason ? true : undefined}
+        data-hub-card={kind === 'card' ? '' : undefined}
+        data-hub-quick={kind === 'quick' ? '' : undefined}
+        data-hub-title={item.title}
+        data-hub-reason={reason || undefined}
+        onClick={() => {
+          if (reason) return
+          setMoreOpen(false)
+          navigate(item.route)
+        }}
+      >
+        <span className="qxt-ic"><QxTouchIcon name={iconFor(item)} size={32} strokeWidth={2} /></span>
+        <span className="qxt-tx">
+          <b>
+            {item.title}
+            {kind === 'card' && badge ? <QxTouchChip tone={ai ? 'teal' : 'slate'} ai={ai}>{badge}</QxTouchChip> : null}
+          </b>
+          <small>{reason ?? item.description}</small>
+        </span>
+        {reason ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>}
+      </button>
+    )
+  }
+
+  const unavailableBody = (
+    <QxTouchStateUnavailable
+      primaryTitle={spec.sectionTitle}
+      primaryHint="要联网的先停"
+      primary={spec.capabilities.map((item) => {
+        const reason = reasonFor(item)
+        return { icon: iconFor(item), title: item.title, desc: reason ?? item.description, tone: tone(item), off: Boolean(reason), hub: { kind: 'card' as const, title: item.title, reason } }
+      })}
+      secondaryTitle="常用入口"
+      secondaryHint="同样要联网"
+      secondary={spec.quickLinks.map((item) => {
+        const reason = reasonFor(item)
+        return { icon: iconFor(item as HubCapability), title: item.title, desc: reason ?? item.description, tone: tone(item as HubCapability), off: Boolean(reason), hub: { kind: 'quick' as const, title: item.title, reason } }
+      })}
+      remind={help}
+    />
   )
 
-  const showNotice = readiness !== 'ready' && !availability.apiDown
   const diagnose = cap(DIAGNOSE)
   const generate = cap(GENERATE)
   const diagnoseReason = diagnose ? reasonFor(diagnose) : null
   const generateReason = generate ? reasonFor(generate) : null
+  const materials = cap(MATERIALS)
+  const career = cap(CAREER)
+  const fit = cap(FIT)
+  const self = quick.get(SELF) as HubCapability | undefined
+  const showNotice = readiness !== 'ready' && !availability.apiDown
 
-  let body: ReactNode
-  if (availability.apiDown) {
-    body = (
-      <div>
-        <div className="qxt-resume-sec"><b>八项简历能力</b><small>要联网的先停</small></div>
-        <div className="qxt-resume-grid">
-          {spec.capabilities.map((item, index) => tile(item, 'card', index))}
+  const normalBody = (
+    <>
+      {showNotice ? (
+        <div
+          className={readiness === 'degraded' ? 'qxt-remind' : 'qxt-howto'}
+          data-hub-notice=""
+          data-readiness={readiness}
+          role="status"
+          aria-live="polite"
+        >
+          <QxTouchIcon name={readiness === 'degraded' ? 'alert' : 'clock'} size={34} strokeWidth={2} />
+          <span>
+            <b data-hub-notice-title="">{notice.title}</b>
+            <span data-hub-notice-detail="">{notice.detail}</span>
+          </span>
         </div>
-        <div className="qxt-resume-sec"><b>常用入口</b><small>同样要联网</small></div>
-        <div className="qxt-resume-grid">
-          {spec.quickLinks.map((item, index) => tile(item as HubCapability, 'quick', index))}
-        </div>
-        {help ? <p className="qxt-resume-fine">{help}</p> : null}
-      </div>
-    )
-  } else {
-    const materials = cap(MATERIALS)
-    const career = cap(CAREER)
-    const fit = cap(FIT)
-    const self = quick.get(SELF)
-    body = (
-      <>
-        <div className="qxt-resume-pair">
-          {diagnose ? (
-            <QxTouchSlab
-              title="有，帮我改一改"
-              desc="上传后做诊断或优化，改不改你定"
-              chip="AI 诊断改写"
-              take="问题清单和改法"
-              visual={<div className="qxt-resume-art" />}
-              off={Boolean(diagnoseReason)}
-              lock={diagnoseReason ?? undefined}
-              onClick={() => open(DIAGNOSE, diagnoseReason)}
-              index={0}
-            />
-          ) : null}
-          {generate ? (
-            <QxTouchSlab
-              title="没有，帮我写一份"
-              desc="从零生成一份可核对的草稿"
-              chip="AI 起草"
-              take="一份新简历"
-              visual={<div className="qxt-resume-art" />}
-              off={Boolean(generateReason)}
-              lock={generateReason ?? undefined}
-              onClick={() => open(GENERATE, generateReason)}
-              hub={{ kind: 'card', title: '从零生成简历', reason: generateReason }}
-              index={1}
-            />
-          ) : null}
-        </div>
-        <div className="qxt-resume-sec">
-          <b>也可以直接用</b>
-          <small>不用先诊断</small>
-          <button type="button" className="qxt-resume-more" onClick={() => setMoreOpen(true)}>
-            其余 {sheetCount} 项
+      ) : null}
+      {diagnose ? (
+        <QxTouchSlab
+          title="有，帮我改一改"
+          desc="上传后做诊断或优化，改不改你定"
+          chip="AI 诊断改写"
+          chipAi
+          take="问题清单和改法"
+          visual={<ResumePaperArt width={150} state="annot" />}
+          off={Boolean(diagnoseReason)}
+          lock={diagnoseReason ?? undefined}
+          onClick={() => open(DIAGNOSE, diagnoseReason)}
+          index={0}
+        />
+      ) : null}
+      {generate ? (
+        <QxTouchSlab
+          title="没有，帮我写一份"
+          desc="从零生成一份可核对的草稿"
+          chip="AI 起草"
+          chipAi
+          take="一份新简历"
+          visual={<ResumePaperArt width={150} state="blank" />}
+          off={Boolean(generateReason)}
+          lock={generateReason ?? undefined}
+          onClick={() => open(GENERATE, generateReason)}
+          hub={{ kind: 'card', title: generate.title, reason: generateReason }}
+          index={1}
+        />
+      ) : null}
+      <div className="qxt-hub-group">
+        <div className="qxt-sec qxt-rise" style={{ ['--i' as string]: 3 }}>
+          也可以直接用<small>不用先诊断</small>
+          <button type="button" className="qxt-hub-more" onClick={() => setMoreOpen(true)}>
+            其余 {sheetItems.length} 项
+            <QxTouchIcon name="chevR" size={24} strokeWidth={2.4} />
           </button>
         </div>
-        <div className="qxt-resume-grid">
-          {materials ? tile(materials, 'card', 2) : null}
-          {career ? tile(career, 'card', 3) : null}
-          {self ? tile(self as HubCapability, 'quick', 4) : null}
-          {fit ? tile(fit, 'card', 5) : null}
+        <div className="qxt-grid2">
+          {materials ? tile(materials, 'card', 4) : null}
+          {career ? tile(career, 'card', 5) : null}
+          {self ? tile(self, 'quick', 6) : null}
+          {fit ? tile(fit, 'card', 7) : null}
         </div>
-        {moreOpen ? null : <div hidden>{sheet}</div>}
-      </>
-    )
-  }
+      </div>
+      <QxTouchCallout kind="fine">{spec.truthTitle}{spec.truth}{spec.note}</QxTouchCallout>
+    </>
+  )
 
   return (
     <ResumeTouchPage
-      eyebrow={availability.apiDown ? '改简历' : 'AI简历服务'}
+      eyebrow={availability.apiDown ? '改简历' : spec.eyebrow}
       title={availability.apiDown ? '在线服务暂时连不上' : '你手上有简历吗？'}
       subtitle={availability.apiDown
         ? '网络断开时，这台机器暂时办不了需要联网的事，请稍后再来。'
         : '有就帮你诊断改写，没有就一步步写一份。'}
-      status={bandStatus(availability, pill.label)}
+      status={bandStatus(pill)}
       showRail={false}
       seal={availability.apiDown ? null : 'idle'}
       bandKind="std"
@@ -233,38 +285,30 @@ export function ResumeTouchHub({
         ? { label: '小青也要联网，恢复后再问', disabled: true }
         : { label: '问小青：我该选哪一个？', draft: ASK_DRAFT }}
       primary={availability.apiDown
-        ? { label: '重新检测', onClick: retryApi, kind: 'sec', noArrow: true }
+        ? { label: '重新检测', onClick: retryApi, noArrow: true }
         : undefined}
       overlay={moreOpen ? (
         <QxTouchOverlay
           kind="sheet"
           title="其余简历服务"
           onClose={() => setMoreOpen(false)}
-          actions={<button type="button" className="qxt-btn qxt-btn-sec" onClick={() => setMoreOpen(false)}>收起</button>}
+          actions={<button type="button" className="qxt-btn qxt-btn-sec qxt-hub-close" onClick={() => setMoreOpen(false)}>收起</button>}
         >
-          {sheet}
+          <div className="qxt-hub-sheet" data-qx-page="resume-more">
+            {sheetItems.map(sheetRow)}
+          </div>
         </QxTouchOverlay>
       ) : null}
     >
       <div
         data-qx-page="resume"
+        data-kiosk-domain="resume"
         data-hub="resume"
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe={deviceProbe}
         data-readiness={readiness}
       >
-        {showNotice ? (
-          <div className="qx-hub-notice" data-readiness={readiness} role="status" aria-live="polite">
-            <span className="qx-hub-notice-copy">
-              <b>{notice.title}</b>
-              <span>{notice.detail}</span>
-            </span>
-          </div>
-        ) : null}
-        {body}
-        <p className="qxt-resume-fine">
-          {spec.truthTitle}{spec.truth}{spec.note}
-        </p>
+        {availability.apiDown ? unavailableBody : normalBody}
       </div>
     </ResumeTouchPage>
   )

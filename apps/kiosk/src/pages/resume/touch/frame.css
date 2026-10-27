@@ -1,0 +1,48 @@
+/* 简历各页共用的触屏壳（ResumeTouchPage）。
+   顶栏状态胶囊带 qx-pill 类名（门禁与走查按它找）。qx-pill 自带一个圆点和最小高度，
+   触屏胶囊已有自己的圆点和 46px 高，这里去掉重复的，让胶囊和稿一致。 */
+.qxt-screen .qxt-status.qx-pill { min-height: 0; }
+.qxt-screen .qxt-status.qx-pill::before { content: none; }
+
+/* 弹层里还不能点的主按钮（例如事实没勾全就不能确认导出）：仍可点到、点了不动作，样子要看得出来。 */
+.qxt-screen .qxt-dialog-btns .qxt-btn[aria-disabled='true'] { opacity: 0.45; }
+
+/* 手机宽度（390）：稿只画 1080，共用壳在窄屏上没有适配（顶栏品牌逐字折行、胶囊被裁、意图带 480px 高把内容区挤到 119px）。
+   这里只对简历各页（含 data-kiosk-domain='resume' 的屏）做一套收紧：顶栏两行（品牌一行，状态胶囊和时钟一行），
+   意图带和步骤条缩小，底栏和底导航变矮，让内容区至少有三百多像素。胶囊允许折成两行，按词组断（不拆「 · 」两边的短语）。 */
+@media (max-width: 640px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) {
+    --qxt-fs-ask: 28px;
+    --qxt-fs-ask-c: 28px;
+    --qxt-fs-body: 18px;
+    --qxt-fs-sub: 16px;
+    --qxt-fs-rail: 14px;
+    --qxt-nav-h: 56px;
+    --qxt-btn-h: 56px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-band { padding: 12px 16px 0; min-height: 0; }
+  /* 光晕框原来宽 500px 贴右边，窄屏上左边会越出视口（越界门禁按框量） */
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-halo { width: 100%; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-hdr { flex-wrap: wrap; height: auto; row-gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-brand b { white-space: nowrap; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-hdr-right { flex: 1 0 100%; margin-left: 0; min-width: 0; justify-content: space-between; gap: 10px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-status.qx-pill {
+    height: auto;
+    min-height: 40px;
+    max-width: 68%;
+    padding: 4px 12px;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: keep-all;
+    text-align: left;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-ask { padding: 8px 0 10px; gap: 12px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-ask p { margin-top: 6px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-seal { display: none; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-rail { padding-bottom: 12px; margin-top: 0; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-body { padding-left: 16px; padding-right: 16px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-dock { padding: 8px 12px; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-btn { padding: 0 16px; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-btn-pri { min-width: 0; }
+  [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-askq { flex: 1 1 0; min-width: 0; }
+}

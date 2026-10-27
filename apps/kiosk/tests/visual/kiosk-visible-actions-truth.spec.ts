@@ -158,7 +158,8 @@ test('逐条对照要求新增事实确认并回传裁决 @kiosk', async ({ page
   await expect(page.getByText('第 2 / 2 条')).toBeVisible()
   await expect(page.getByText('对齐需求，持续跟进问题至闭环。')).toBeVisible()
   await page.getByRole('button', { name: '保留原文', exact: true }).click()
-  await page.getByRole('button', { name: '下一条' }).click()
+  // 稿 compare：最后一条没有下一条，底栏主按钮是「去编辑」，带着裁决回优化页。
+  await page.getByRole('button', { name: '去编辑', exact: true }).click()
   await expect(page).toHaveURL(/\/resume\/optimize$/)
   const returnedState = await page.evaluate(() => window.history.state?.usr)
   expect(returnedState).toEqual({

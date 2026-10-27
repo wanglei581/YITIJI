@@ -134,6 +134,10 @@
 .qxt-screen .qxt-rail-done .qxt-rail-bar { background: var(--qxt-done-bar); }
 .qxt-screen .qxt-rail-done { color: var(--qxt-mint); }
 .qxt-screen .qxt-rail-now { color: var(--qx-on-solid); font-weight: 700; }
+.qxt-screen .qxt-rail-wait { color: var(--qxt-mint); font-weight: 700; }
+.qxt-screen .qxt-rail-wait .qxt-rail-bar { background: var(--qxt-unknown-dot); }
+.qxt-screen .qxt-rail-bad { color: var(--qxt-warn-dot); font-weight: 700; }
+.qxt-screen .qxt-rail-bad .qxt-rail-bar { background: var(--qxt-warn-dot); }
 .qxt-screen .qxt-rail-now .qxt-rail-bar::after {
   content: "";
   position: absolute;

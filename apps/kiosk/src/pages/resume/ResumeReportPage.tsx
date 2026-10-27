@@ -11,6 +11,8 @@ import { ENCRYPTED_PDF_BLOCK_COPY, inspectionSignalsEncrypted, previewKindForFil
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { resumeUserReason } from './resumeUserCopy'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import './touch/report.css'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
 import {
@@ -23,13 +25,11 @@ import {
   shouldSkipReportFetch,
   showsReportBody,
   targetSummary,
-  type ReportSeg,
 } from './resume-report-model'
 import { fixtureReport } from './resume-report-fixture'
-import { ResumeReportHead } from './components/resume-report/ResumeReportChrome'
 import { ResumeReportStates } from './components/resume-report/ResumeReportStates'
 import { EmptyReportBody, ResumeReportBody } from './components/resume-report/ResumeReportBody'
-import { ResumeReportCta, useReportDockPrimary } from './components/resume-report/ResumeReportActions'
+import { useReportDockPrimary } from './components/resume-report/ResumeReportActions'
 import { ResumeReportTakeaway } from './components/resume-report/ResumeReportTakeaway'
 import './resume-report-qx.css'
 import './resume-r1-qx2.css'
@@ -252,6 +252,8 @@ export function ResumeReportPage() {
     onOptimize: openOptimize,
     issueCount: displayIssues.length,
   })
+  const [exportedNow, setExportedNow] = useState(false)
+
   const failView = (failReason: string) => {
     const printable = Boolean(state.file?.fileUrl && state.fileId)
     const strippedReason = resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。').replace(/(?:请|或)?(?:联系|找)(?:现场)?工作人员/g, '').replace(/[，,、]\s*(?=[。.!！]|$)/g, '').trim()
@@ -267,30 +269,40 @@ export function ResumeReportPage() {
             ? { label: '打印我上传的原件', onClick: () => printUploadedOriginal(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
             : { label: '返回简历来源', onClick: () => navigate('/resume/source'), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true })
           : { label: '重新解析', onClick: () => handleRetry(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
+    const fileLabel = state.file?.name ? `「${state.file.name}」的解析没有完成。` : '这次没有生成诊断报告。'
     return (
       <ResumeTouchPage
         eyebrow="简历诊断报告"
         title={state.aiDown ? '这次没诊断出来' : '简历诊断报告'}
         subtitle={state.aiDown ? '再解析一次也不会变好。下面这些不需要 AI，现在就能做。' : '解析中断，你上传的文件没有丢。'}
         back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
+        dockBackLabel="返回"
         status={REPORT_STATUS['diagnose-failed']}
         railNow={1}
+        railMarks={{ 1: 'bad' }}
+        navCurrent="home"
         ask={state.aiDown
           ? { label: '小青暂时不可用，先自己核一遍', disabled: true }
           : { label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
         primary={failurePrimary}
+        bodyClassName="qxt-body-scroll"
       >
-        <section data-qx-page="diagnosis" data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
-          <ResumeReportHead viewState="diagnose-failed" />
-          <section className="rrp-state">
-            <h2>{state.aiDown ? '这次没诊断出来' : '解析中断，中断的只是「读懂它」这一步'}</h2>
-            {encryptedPdf ? <p>{ENCRYPTED_PDF_BLOCK_COPY}。</p> : <p>失败原因：{shownReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。</p>}
-            {checkingPassword ? <p className="why" role="status">正在确认这份 PDF 能否打开，请稍候。</p> : null}
-            {!state.aiDown && !encryptedPdf && !checkingPassword ? <p className="why" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p> : null}
-            {state.aiDown ? <p className="why" id="resume-report-why">AI 现在停用，再解析一次也不会变好；下面几条不需要 AI，现在就能做。</p> : null}
-          </section>
+        <section data-qx-page="st-ai-down" data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed">
+          <div className="qxt-howto" role="status">
+            <QxTouchIcon name="alert" size={34} strokeWidth={2} />
+            <span>
+              <b>{state.aiDown ? '这次没诊断出来' : '解析中断，中断的只是「读懂它」这一步'}</b>
+              {encryptedPdf
+                ? `${ENCRYPTED_PDF_BLOCK_COPY}。`
+                : state.aiDown
+                  ? `${fileLabel}这次没有生成诊断结论，下面不需要 AI 的事现在就能做。${shownReason}`
+                  : `失败原因：${shownReason}。这一屏一条 AI 结论都不给 —— 没跑出来就是没有，不拿通用建议顶替。`}
+            </span>
+          </div>
+          {checkingPassword ? <p className="qxt-fine" role="status">正在确认这份 PDF 能否打开，请稍候。</p> : null}
+          {!state.aiDown && !encryptedPdf && !checkingPassword ? <p className="qxt-fine" id="resume-report-why">上一次已明确没解析成功；重新解析会作为新的一次提交。这一屏一条 AI 结论都不给。</p> : null}
+          {state.aiDown ? <p className="qxt-fine" id="resume-report-why">AI 现在停用，再解析一次也不会变好；下面几条不需要 AI，现在就能做。</p> : null}
           {!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />}
-          <button type="button" className="qxt-link" onClick={() => navigate('/')}>返回首页</button>
         </section>
       </ResumeTouchPage>
     )
@@ -310,18 +322,22 @@ export function ResumeReportPage() {
     : !taskId && (viewState === 'report' || viewState === 'report-minimal') ? '这份报告没有对应的简历编号：优化那一步取不到原文，所以入口先关着。'
     : '本页只给这一次的诊断；想看改完之后的版本对照，去下一步的简历优化。'
 
-  const reportTitle = viewState === 'report' && displayIssues.length > 0 ? `问题 ${displayIssues.length} 处` : '简历诊断报告'
+  const hasBody = showsReportBody(viewState)
+  const reportTitle = hasBody && displayIssues.length > 0 ? `问题 ${displayIssues.length} 处` : '简历诊断报告'
+  const statusState = hasBody && exportedNow ? REPORT_STATUS['export-ready'] : REPORT_STATUS[viewState]
   return (
     <ResumeTouchPage
-      eyebrow={viewState === 'report' ? 'AI 生成，仅供参考，请对照原文核对' : undefined}
+      eyebrow={viewState === 'report' ? AI_LABEL_COPY.RESUME_DIAGNOSIS : undefined}
       title={reportTitle}
       back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
-      subtitle={reportSubtitle}
-      status={REPORT_STATUS[viewState]}
-      railNow={2}
-      terminalLabel="就业服务大厅"
+      dockBackLabel="返回"
+      subtitle={hasBody ? undefined : reportSubtitle}
+      status={statusState}
+      railNow={REPORT_HEAD[viewState].rail}
+      seal={hasBody ? 'idle' : null}
       ask={{ label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
       primary={dockPrimary}
+      bodyClassName="qxt-body-scroll"
     >
       <section
         data-qx-page="diagnosis"
@@ -331,56 +347,39 @@ export function ResumeReportPage() {
         data-state={viewState}
         data-testid={`resume-report-state-${viewState}`}
         data-fallback={parsed.fallback ? '1' : undefined}
-        data-seg={displayReport ? (parsed.seg ?? 'structure') : 'none'}
-        className="qx-scroll rrp-page"
         data-flat={parsed.flat ? '1' : undefined}
       >
-        <ResumeReportHead viewState={viewState} subtitle={viewState === 'report' ? reportSubtitle : undefined} />
-        <ResumeReportCta
-          hidePrimary
-          viewState={viewState}
-          canOptimize={canOptimize}
-          intent={intent}
-          why={why}
-          onRetry={retryLoad}
-          onOptimize={openOptimize}
-        />
         {isFixture ? (
           <div className="rrp-idbar" data-testid="resume-report-fixture">
             <span className="rrp-fx">合成演示</span>
             <span className="rrp-fxtx">合成数据，不是任何人的真实简历，也不是真实 AI 结果。</span>
           </div>
         ) : null}
-        {showsReportBody(viewState) ? (
+        {hasBody ? (
           <>
             <ReportNoticePanel isDemoReport={isDemoReport} extractionNotice={extractionNotice} truncated={displayReport?.truncatedInput} />
             {summary ? <p className="rrp-dir" data-testid="resume-report-target">目标方向 {summary}</p> : null}
-            {displayReport ? (
-              <ResumeReportBody
-                report={displayReport}
-                issues={displayIssues}
-                fixture={isFixture}
-                seg={parsed.seg}
-                dim={parsed.dim}
-                blk={parsed.blk}
-                onSeg={(seg: ReportSeg) => setSearch({ seg, dim: null, blk: null })}
-                onDim={(dim) => setSearch({ seg: 'scores', dim, blk: null })}
-                onJobFit={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
-              />
-            ) : null}
+            {displayReport ? <ResumeReportBody report={displayReport} issues={displayIssues} /> : null}
             <ResumeReportTakeaway
               key={viewState}
               show
               taskId={taskId}
               accessToken={accessToken}
               capture={isExportCaptureState(viewState) ? viewState : null}
+              onExportedChange={setExportedNow}
             />
+            <div className="qxt-links">
+              <button type="button" data-route="/resume/job-fit" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}>简历对照</button>
+              <button type="button" onClick={() => navigate('/resume/self-assessment/intro')}>自我探索</button>
+            </div>
+            <p className="qxt-fine" id="resume-report-why">{why}</p>
           </>
         ) : viewState === 'report-empty' ? (
           <EmptyReportBody />
         ) : (
           <ResumeReportStates viewState={viewState === 'loading' || viewState === 'no-context' || viewState === 'read-error' || viewState === 'unavailable' || viewState === 'illegal' ? viewState : 'no-context'} />
         )}
+        {hasBody ? null : <p className="qxt-fine" id="resume-report-why">{why}</p>}
       </section>
     </ResumeTouchPage>
   )

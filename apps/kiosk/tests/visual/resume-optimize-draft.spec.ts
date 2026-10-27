@@ -100,7 +100,10 @@ async function expectWholeTargetHit(locator: Locator): Promise<void> {
     const scaler = document.querySelector('.kiosk-stage')
     const transform = scaler ? getComputedStyle(scaler).transform : 'none'
     const scale = transform === 'none' ? 1 : Number(transform.match(/^matrix\(([^,]+)/)?.[1] ?? 1)
-    const inset = 3
+    // 触屏版的出路行是大圆角（稿的圆角 28px 上下），矩形外框的四角本来就点不到：
+    // 四个取点沿圆角往里收，落在圆角以内；仍然是「整块目标没被别的东西盖住」的判据。
+    const radius = parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0
+    const inset = Math.max(3, radius * 0.3 + 3)
     const points = [
       [rect.left + inset, rect.top + inset],
       [rect.right - inset, rect.top + inset],
@@ -350,7 +353,8 @@ test('AI provider outage shows an honest unavailable state without removing the 
   await expect(page.locator('.qx-pill')).toHaveText('AI 暂时用不了')
   await expect(page.locator('.qx-pill')).not.toContainText('等待优化建议')
   await expect(page.getByText('简历优化当前不可用', { exact: true })).toBeVisible()
-  await expect(page.getByText('AI 能力尚未启用', { exact: true })).toBeVisible()
+  // 无人值守：说明后面可能带一句服务电话（号码读得到才加），所以只钉原因这句，不钉整段。
+  await expect(page.getByText('AI 能力尚未启用', { exact: false })).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-fallback')).toBeVisible()
   await expect(page.getByTestId('resume-optimize-empty-paths').getByRole('button')).toHaveCount(3)
   await expect(page.getByTestId('resume-optimize-empty-steps').locator('li')).toHaveCount(8)
@@ -422,12 +426,14 @@ async function confirmExportFacts(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '确认导出' }).click()
 }
 
+/** 触屏版（稿 resume-edit → resume-export）：编辑页「去导出」→ 核对事实 → 进导出页选格式 → 「导出」才真正发请求。 */
 async function exportBody(page: Page): Promise<{ experience?: Array<{ company?: string }> }> {
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
+  await confirmExportFacts(page)
   const pending = page.waitForRequest((request) => (
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/resume/generate/export'
   ))
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).click()
-  await confirmExportFacts(page)
+  await page.getByRole('button', { name: '导出', exact: true }).click()
   return (await pending).postDataJSON() as { experience?: Array<{ company?: string }> }
 }
 
@@ -473,6 +479,8 @@ test('删掉多出来的经历需确认，取消不变，确认后预览和导�
   expect(JSON.stringify(body.experience ?? [])).not.toContain(LONG_COMPANY)
 
   await page.getByRole('button', { name: '关闭文件预览' }).click()
+  // 导出页与编辑页是两屏；回到编辑页再继续删。
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
   await page.getByRole('button', { name: '删掉这一条，第 1 条经历' }).click()
   await page.getByRole('dialog', { name: '确定删掉这一条吗？' }).getByRole('button', { name: '确定', exact: true }).click()
   await expect(page.getByRole('textbox', { name: /条经历的公司/ })).toHaveCount(0)
@@ -485,28 +493,25 @@ test('公司名空着不拦导出、超过 100 字才就地提示并拦住 @kios
   ])
   const company = page.getByRole('textbox', { name: '第 1 条经历的公司' })
   const role = page.getByRole('textbox', { name: '第 1 条经历的职务' })
-  const sideExport = page.getByRole('button', { name: '导出 PDF', exact: true })
-  const bottomExport = page.getByRole('button', { name: '确认优化版，导出 PDF' })
+  // 触屏版只有一个导出入口：编辑页底栏的「去导出」（核对事实在它后面），不再有侧栏和底栏两颗导出键。
+  const toExport = page.getByRole('button', { name: '去导出', exact: true })
   // 10/6：原件没写公司 / 职务时如实留空，和服务端 DTO 一致，空着不提示也不拦（走查 W-119 回归：没写职务的简历导不出）。
   await company.fill('')
   await role.fill('')
   await expect(page.getByText(/不能空/)).toHaveCount(0)
-  await expect(sideExport).not.toHaveAttribute('aria-disabled', 'true')
-  await expect(bottomExport).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(toExport).not.toHaveAttribute('aria-disabled', 'true')
   await company.fill('司'.repeat(101))
   await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
-  await expect(sideExport).toHaveAttribute('aria-disabled', 'true')
-  await expect(bottomExport).toHaveAttribute('aria-disabled', 'true')
+  await expect(toExport).toHaveAttribute('aria-disabled', 'true')
   // aria-disabled 会被当成不可点；force 用来确认即使用户点下去，也不会打开发出导出。
-  await sideExport.click({ force: true })
-  await bottomExport.click({ force: true })
+  await toExport.click({ force: true })
   await expect(page.getByRole('heading', { name: '导出前核对事实' })).toHaveCount(0)
   await expect(page.locator('[data-entry-field="experience-0-company"]')).toBeFocused()
 
   await company.fill('司'.repeat(101))
   await expect(page.getByText('公司名最多 100 字', { exact: true })).toBeVisible()
   await expect(page.getByText('公司名不能空')).toHaveCount(0)
-  await sideExport.click({ force: true })
+  await toExport.click({ force: true })
   await page.waitForTimeout(400)
   expect(api.requestCount('POST', '/api/v1/resume/generate/export')).toBe(0)
 })

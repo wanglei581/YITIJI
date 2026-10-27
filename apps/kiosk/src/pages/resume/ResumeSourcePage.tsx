@@ -1,18 +1,11 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
-import { FileContentPreview } from '../../components/FileContentPreview'
 import { ResumeTouchPage } from './touch/ResumeTouchPage'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
-import {
-  CloudUploadIcon,
-  FileTextIcon,
-  SmartphoneIcon,
-  UsbIcon,
-} from 'lucide-react'
+import { ResumeSourceWhere, type StagedFile } from './touch/ResumeSourceWhere'
 import {
   RESUME_SCORING_DIMENSIONS,
   type ResumeScoringDimensionKey,
@@ -20,26 +13,17 @@ import {
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { DIM_ABOUT } from './resume-report-model'
 import { ApiHttpError } from '../../services/api/httpAdapter'
-import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
-import {
-  useDocumentConversionCapabilities,
-  WORD_CONVERSION_DISCLOSURE,
-} from '../../services/api/documentConversion'
+import { useDocumentConversionCapabilities } from '../../services/api/documentConversion'
 import { clearAiResumeSession } from './aiResumeSession'
-import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
+import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import { useUsbImportGate } from '../../hooks/useUsbImportGate'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { unattendedResumeCopy } from './touch/unattendedResumeCopy'
-import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
-import { ResumeScanReady } from './components/ResumeScanReady'
+import type { ResumeUsbImportedFile, ResumeUsbPick } from './components/ResumeUsbImportPanel'
 import { readScanHandoff, type ScanHandoff } from './resumeScanHandoff'
-import './resume-triage-qx.css'
-import './resume-triage-panels-qx.css'
-import './resume-r1-qx2.css'
+import './touch/direction.css'
 
 const DIAGNOSIS_DIMENSIONS = [
   ...RESUME_SCORING_DIMENSIONS.map((item) => item.label),
@@ -51,40 +35,7 @@ type UploadChannel = 'usb' | 'cloud' | 'phone'
 /** 已拿到的文件来自哪条通道；'scan' 只来自扫描工作台的交接（经解析页返回），不是本页可选的通道。 */
 type FileChannel = UploadChannel | 'scan'
 
-interface UploadOption {
-  type: UploadChannel
-  label: string
-  description: string
-  helper: string
-  icon: React.ComponentType<{ className?: string }>
-}
-
 const RESUME_USB_UNCONFIGURED_NOTE = '这台机器暂未开通 U 盘导入。请改用手机扫码上传。'
-
-const UPLOAD_OPTIONS: UploadOption[] = [
-  {
-    type: 'usb',
-    label: 'U盘上传',
-    description: '从已插入一体机的 U 盘中选择简历文件',
-    helper: '只读取你主动选择的文件，上传完成后即可拔出 U 盘。',
-    icon: UsbIcon,
-  },
-  {
-    type: 'cloud',
-    // 稿 21：它打开的是本机文件选择，不是云盘账号登录，所以用户可见名不叫「云端上传」。
-    label: '本机文件 / 云盘下载目录',
-    description: '选择云盘同步目录或本机下载目录中的简历文件',
-    helper: '适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。',
-    icon: CloudUploadIcon,
-  },
-  {
-    type: 'phone',
-    label: '手机扫码上传',
-    description: '用手机扫码选择简历文件，再回到一体机确认',
-    helper: '手机传完，在这里确认要使用的文件。',
-    icon: SmartphoneIcon,
-  },
-]
 
 const DEFAULT_SELECTED_DIMENSIONS: ResumeScoringDimensionKey[] = ['keyword', 'quantification', 'experience']
 // ── intent 分流(diagnose / optimize):同一上传链路,不同语义引导 ──────────────
@@ -92,27 +43,18 @@ type ResumeIntent = 'diagnose' | 'optimize'
 
 const INTENT_COPY: Record<ResumeIntent, {
   title: string
-  subtitle: string
-  infoTitle: string
-  infoBody: string
   privacyNote: string
   buttonReady: string
   buttonEmpty: string
 }> = {
   diagnose: {
     title: 'AI 简历诊断',
-    subtitle: '上传简历文件，生成基于真实内容的结构化诊断报告',
-    infoTitle: '只分析你上传的简历文件',
-    infoBody: '上传简历后，系统从完整度、表达清晰度、岗位表达、风险项、排版结构、修改优先级等方面生成诊断报告。AI 不可用时，你仍可手动整理或打印材料。',
     privacyNote: '简历原文仅用于本次解析和诊断，不作为平台简历库沉淀。',
     buttonReady: '开始 AI 诊断',
     buttonEmpty: '请先上传简历文件',
   },
   optimize: {
     title: 'AI 简历优化',
-    subtitle: '上传简历文件，先完成必要诊断，再基于原文生成可编辑的优化版简历',
-    infoTitle: '只基于你的简历原文优化表达',
-    infoBody: '上传简历后，系统会先完成必要诊断，再基于原文重组优化，生成可编辑的结构化优化版简历。优化版只基于原文事实重组，不补充虚构学校、公司、项目、证书、电话、邮箱等信息；原文没有的内容保持为空，由你自行补充。',
     privacyNote: '简历原文仅用于本次解析、诊断与优化，不作为平台简历库沉淀。',
     buttonReady: '上传并生成优化建议',
     buttonEmpty: '请先上传简历文件',
@@ -220,8 +162,13 @@ export function ResumeSourcePage() {
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(() => scanFileFrom(readScanHandoff(location.state)))
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
+  const [phoneCancelled, setPhoneCancelled] = useState(false)
+  // 手机端已传上来、等本机确认的那份（只有文件名与大小）；确认动作由面板写进 phoneConfirmRef。
+  const [phoneReceived, setPhoneReceived] = useState<{ filename: string; sizeBytes: number; mimeType: string } | null>(null)
+  const phoneConfirmRef = useRef<(() => void) | null>(null)
   const [usbBusy, setUsbBusy] = useState(false)
   const [usbListed, setUsbListed] = useState(0)
+  const [usbPick, setUsbPick] = useState<ResumeUsbPick>({ selected: false, importing: false, run: () => {} })
   const [error, setError] = useState<string | null>(null)
   // 上一次上传没拿到可信答复（稿 21 upload-unknown）；只有用户主动换文件 / 换来源才清掉。
   const [uploadUnknown, setUploadUnknown] = useState(false)
@@ -260,16 +207,22 @@ export function ResumeSourcePage() {
     }
   }
 
-  const handleSelect = (option: UploadOption) => {
-    if (isTerminalKiosk() && option.type === 'cloud') return
-    if (option.type === 'usb' && usbGate.state !== 'allowed') return
+  /** 换来源：放下已拿到的文件，清掉上一次上传的报错 / 未知结果。 */
+  const switchChannel = (next: UploadChannel) => {
     setError(null)
-    if (option.type !== selected) {
+    setPhoneCancelled(false)
+    if (next !== selected) {
       setUploadedFile(null)
       setUploadUnknown(false)
     }
-    setSelected(option.type)
-    if (option.type !== 'cloud') return
+    setSelected(next)
+  }
+
+  const pickPhone = () => { if (!sourceBusy) switchChannel('phone') }
+  const pickUsb = () => { if (!sourceBusy) switchChannel('usb') }
+  const pickCloud = () => {
+    if (isTerminalKiosk()) return
+    switchChannel('cloud')
     fileInputRef.current?.click()
   }
 
@@ -394,31 +347,21 @@ export function ResumeSourcePage() {
             ? 'staged'
             : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
   // 胶囊不报「正常」。文件到了只说收到，等你确认；方向步才说通用或定向。
-  const statusText = sourceBusy
-    ? (uploading ? '上传中' : '接收中')
+  const status = sourceBusy
+    ? { text: uploading ? '上传中' : '接收中', tone: 'reading' as const }
     : step === 'direction'
-      ? (genericDiagnosis ? '通用诊断' : '定向诊断')
+      ? { text: genericDiagnosis ? '通用诊断' : '定向诊断', tone: 'ok' as const }
       : step === 'more'
-        ? '都可以不填'
+        ? { text: '都可以不填', tone: 'ok' as const }
         : scanReady
-          ? '扫描件已交接 · 待确认'
+          ? { text: '扫描件已交接 · 待确认', tone: 'ok' as const }
           : uploadedFile
-            ? '系统已收到，等你确认'
+            ? { text: '系统已收到，等你确认', tone: 'ok' as const }
             : uploadUnknown
-              ? '上传结果未知 · 不重发'
+              ? { text: '上传结果未知 · 不重发', tone: 'warn' as const }
               : error
-                ? '上传未完成'
-                : '等待简历文件'
-  const stepTitle = step === 'more'
-    ? '这些要不要一起告诉我？'
-    : step === 'direction'
-      ? (genericDiagnosis ? '按通用标准看，可以吗？' : '想按什么方向看？')
-      : '你的简历在哪里？'
-  const stepSub = step === 'more'
-    ? '不填也能诊断。填了只影响建议关注顺序。'
-    : step === 'direction'
-      ? (genericDiagnosis ? '不设方向。想指定重点，再改成定向诊断。' : '可以多选重点，也可以改回通用。')
-      : '选一种方式把简历交到这台机器，确认后再开始。'
+                ? { text: '上传未完成', tone: 'warn' as const }
+                : { text: '等待简历文件', tone: 'unknown' as const }
   const channelLabel = (channel: FileChannel) =>
     channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
 
@@ -432,6 +375,7 @@ export function ResumeSourcePage() {
   const changeFile = () => {
     setUploadedFile(null)
     setError(null)
+    setPhoneCancelled(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
     handleUploadBoxClick()
   }
@@ -442,272 +386,161 @@ export function ResumeSourcePage() {
     setTargetDegree('')
     setStep('direction')
   }
+  const setIntent = (value: ResumeIntent) => setSearchParams((params) => { params.set('intent', value); return params }, { replace: true })
   const intentPaths = (
-    <div className="qxt-paths" role="group" aria-label="先诊断还是直接给改法">
-      <button type="button" className="qxt-path" aria-pressed={intent === 'diagnose'} disabled={sourceBusy} onClick={() => setSearchParams((params) => { params.set('intent', 'diagnose'); return params }, { replace: true })}>
+    <div className="qxt-intents" role="group" aria-label="先诊断还是直接给改法">
+      <button type="button" className="qxt-intent" aria-pressed={intent === 'diagnose'} disabled={sourceBusy} onClick={() => setIntent('diagnose')}>
         <b>先诊断，再逐条改</b>
         <small>推荐 · 先看问题，再决定改不改</small>
       </button>
-      <button type="button" className="qxt-path" aria-pressed={intent === 'optimize'} disabled={sourceBusy} onClick={() => setSearchParams((params) => { params.set('intent', 'optimize'); return params }, { replace: true })}>
+      <button type="button" className="qxt-intent" aria-pressed={intent === 'optimize'} disabled={sourceBusy} onClick={() => setIntent('optimize')}>
         <b>直接给改法</b>
         <small>上传后生成优化建议</small>
       </button>
     </div>
   )
-  const directionFields = (
-    <DiagnosisDirectionForm
-      pane={step === 'more' ? 'more' : 'focus'}
-      afterModes={step === 'direction' ? intentPaths : undefined}
-      onOpenMore={() => setStep('more')}
-      genericDiagnosis={genericDiagnosis}
-      selectedDimensions={selectedDimensions}
-      targetIndustry={targetIndustry}
-      targetJob={targetJob}
-      targetExperience={targetExperience}
-      targetScene={targetScene}
-      targetMajor={targetMajor}
-      targetDegree={targetDegree}
-      onGenericDiagnosisChange={setGenericDiagnosis}
-      onToggleDimension={toggleDimension}
-      onTargetIndustryChange={setTargetIndustry}
-      onTargetJobChange={setTargetJob}
-      onTargetExperienceChange={setTargetExperience}
-      onTargetSceneChange={setTargetScene}
-      onTargetMajorChange={setTargetMajor}
-      onTargetDegreeChange={setTargetDegree}
-    />
-  )
+  const onUsbPick = useCallback((pick: ResumeUsbPick) => setUsbPick(pick), [])
+  const staged: StagedFile | null = uploadedFile
+    ? { name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format, fileId: uploadedFile.fileId, fileUrl: uploadedFile.fileUrl, mimeType: uploadedFile.mimeType, channelLabel: channelLabel(uploadedFile.channel) }
+    : null
+  const unknownNext = getToken()
+    ? '可先到「我的 → 我的文档」核对；暂时没看到时可稍后刷新。若决定再传，请重新选择文件，可能出现重复文件。'
+    : '当前未登录，暂时无法核对账号记录。需要继续时，可重新选择文件或换一种来源。'
+
+  const pageKey = step === 'more' ? 'resume-direction-more' : step === 'direction' ? 'resume-direction' : usbScreen ? 'usb' : 'resume-src'
+  const askDraft = '请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。'
+  const band = step === 'more'
+    ? { eyebrow: '更多条件（可不填）', title: '这些要不要一起告诉我？', subtitle: '不填也能诊断。填了只影响建议关注顺序。' }
+    : step === 'direction'
+      ? genericDiagnosis
+        ? { eyebrow: '诊断方向（可以不选）', title: '按通用标准看，可以吗？', subtitle: '不设方向。想指定重点，再改成定向诊断。' }
+        : { eyebrow: '诊断方向（可以不选）', title: '想按什么方向看？', subtitle: '可以多选重点，也可以改回通用。' }
+      : usbScreen
+        ? { eyebrow: copy.title, title: '挑一份就行', subtitle: '只读根目录，不进子文件夹。' }
+        : { eyebrow: copy.title, title: '你的简历在哪里？', subtitle: undefined }
+  const backLabel = step === 'where' ? '上一步' : '返回'
+  const onBack = usbScreen
+    ? () => { setUsbListed(0); setSelected('phone') }
+    : step === 'more' ? () => setStep('direction') : step === 'direction' ? () => setStep('where') : () => navigate('/resume-service')
+  const ask = step === 'more'
+    ? { label: '问小青：可以不填吗', draft: '诊断方向里的经历、场景、专业和学历都可以不填吗？请只说明它们怎么影响建议顺序，不要替我填写。' }
+    : step === 'direction'
+      ? { label: '问小青：帮我选重点', draft: askDraft }
+      : usbScreen
+        ? { label: '问小青：选诊断重点', draft: askDraft }
+        : { label: '问小青：帮我选诊断重点 →', draft: askDraft }
+  const phoneConfirm = step === 'where' && selected === 'phone' && !uploadedFile && phoneBusy ? phoneConfirmRef.current : null
+  const phoneWaitingConfirm = step === 'where' && selected === 'phone' && !uploadedFile && phoneBusy
+  const primary = phoneWaitingConfirm
+    ? { label: phoneConfirm ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirm?.(), disabled: !phoneConfirm, className: 'resume-primary-action' }
+    : usbScreen
+    ? (usbPick.selected ? { label: usbPick.importing ? '正在导入' : '导入这份文件', onClick: usbPick.run, disabled: usbPick.importing } : undefined)
+    : step === 'more'
+      ? { label: '好了，回去开始诊断', onClick: () => setStep('direction'), noArrow: true }
+      : step === 'direction'
+        ? { label: uploadedFile ? copy.buttonReady : copy.buttonEmpty, onClick: handleStartDiagnosis, disabled: !uploadedFile || sourceBusy }
+        : { label: uploadedFile ? '下一步：诊断方向' : '请先上传简历文件', onClick: () => setStep('direction'), disabled: !uploadedFile || sourceBusy, className: 'resume-primary-action' }
 
   return (
     <ResumeTouchPage
-      eyebrow={step === 'more' ? '更多条件（可不填）' : step === 'direction' ? '诊断方向（可以不选）' : copy.title}
-      title={usbScreen ? '挑一份就行' : stepTitle}
-      subtitle={usbScreen ? '只读根目录，不进子文件夹。' : stepSub}
-      status={{ label: statusText }}
+      eyebrow={band.eyebrow}
+      title={band.title}
+      subtitle={band.subtitle}
+      status={status}
       railNow={0}
-      seal="idle"
-      navCurrent="home"
-      backLabel="上一步"
-      onBack={usbScreen
-        ? () => { setUsbListed(0); setSelected('phone') }
-        : step === 'more' ? () => setStep('direction') : step === 'direction' ? () => setStep('where') : () => navigate('/resume-service')}
-      ask={usbScreen
-        ? { label: '问小青：选诊断重点', draft: '请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。' }
-        : step === 'more'
-        ? { label: '问小青：可以不填吗', draft: '诊断方向里的经历、场景、专业和学历都可以不填吗？请只说明它们怎么影响建议顺序，不要替我填写。' }
-        : step === 'direction'
-          ? { label: '问小青：帮我选重点', draft: '请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。' }
-          : { label: '问小青：帮我选诊断重点 →', draft: '请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。' }}
-      primary={usbScreen
-        ? undefined
-        : step === 'more'
-        ? { label: '好了，回去开始诊断', onClick: () => setStep('direction'), noArrow: true }
-        : step === 'direction'
-          ? { label: uploadedFile ? copy.buttonReady : copy.buttonEmpty, onClick: handleStartDiagnosis, disabled: !uploadedFile || sourceBusy }
-          : { label: uploadedFile ? '下一步：诊断方向' : '请先上传简历文件', onClick: () => setStep('direction'), disabled: !uploadedFile || sourceBusy, noArrow: true, className: 'resume-primary-action' }}
+      seal={step === 'where' && !usbScreen ? 'idle' : null}
+      navCurrent={step === 'where' && !usbScreen ? 'home' : undefined}
+      backLabel={backLabel}
+      onBack={onBack}
+      ask={ask}
+      primary={primary}
+      bodyClassName={step === 'where' ? 'qxt-body-scroll' : 'qxt-body-tight'}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-resume-step={step} data-qx-page={step === 'more' ? 'resume-direction-more' : step === 'direction' ? 'resume-direction' : usbScreen ? 'usb' : 'resume-src'} className="qx-resume-triage" data-takeaway="简历诊断报告">
-      {!kiosk && (
-        <input
-          ref={fileInputRef}
-          type="file"
-          aria-label="选择本机简历文件"
-          accept={accept}
-          className="hidden"
-          onChange={handleFileChosen}
-        />
-      )}
-
-      {step === 'where' ? <div className="qx-scroll qx-rt-scroll">
-        {usbScreen ? null : <div className="qxt-srcs" role="group" aria-label="选择简历来源">
-          <button type="button" className="qxt-src" aria-pressed={selected === 'phone'} disabled={sourceBusy} onClick={() => handleSelect(UPLOAD_OPTIONS.find((item) => item.type === 'phone')!)}>
-            <span className="qxt-ico"><QxTouchIcon name="phone" size={40} /></span>
-            <b>在手机里</b>
-            <small>用手机扫码选择简历文件，再回到一体机确认</small>
-          </button>
-          <button
-            type="button"
-            className="qxt-src"
-            aria-pressed={selected === 'usb'}
-            disabled={sourceBusy}
-            onClick={() => {
-              if (sourceBusy) return
-              setError(null)
-              if (selected !== 'usb') {
-                setUploadedFile(null)
-                setUploadUnknown(false)
-              }
-              setSelected('usb')
-            }}
-          >
-            <span className="qxt-ico"><QxTouchIcon name="usb" size={40} /></span>
-            <b>在 U 盘里</b>
-            <small>从已插入的 U 盘里选一份。只读取你点的那份</small>
-          </button>
-          <button type="button" className="qxt-src" aria-pressed={false} onClick={() => navigate('/scan')}>
-            <span className="qxt-ico"><QxTouchIcon name="scan" size={40} /></span>
-            <b>是纸质的</b>
-            <small>在打印机面板上扫描，存成 PDF</small>
-          </button>
-          {!kiosk ? (
-            <button type="button" className="qxt-src" aria-pressed={selected === 'cloud'} disabled={sourceBusy} onClick={() => handleSelect(UPLOAD_OPTIONS.find((item) => item.type === 'cloud')!)}>
-              <span className="qxt-ico"><QxTouchIcon name="file" size={40} /></span>
-              <b>本机文件</b>
-              <small>选择云盘同步目录或本机下载目录中的简历文件</small>
-            </button>
-          ) : null}
-        </div>}
-
-        <div className="qxt-panel">
-          {scanReady && uploadedFile ? (
-            <ResumeScanReady
-              name={uploadedFile.name}
-              size={uploadedFile.size}
-              format={uploadedFile.format}
-              onDrop={dropScanHandoff}
-              onRescan={() => navigate('/scan')}
-            />
-          ) : uploadedFile ? (
-            <>
-              <div className="qx-rt-filecard"><FileTextIcon size={32} aria-hidden="true" /><span className="fx"><b>{uploadedFile.name}</b><small>{uploadedFile.size} · {uploadedFile.format.toUpperCase()} · {channelLabel(uploadedFile.channel)}</small></span><span className="fb">待你确认</span></div>
-              {!scanReady ? (
-                <button type="button" className="qx-btn resume-change-file" data-variant="ghost" disabled={sourceBusy} onClick={changeFile}>更换文件</button>
-              ) : null}
-              <details className="qx-rt-preview">
-                <summary>预览原件</summary>
-                <FileContentPreview compact fileUrl={uploadedFile.fileUrl} fileName={uploadedFile.name} mimeType={uploadedFile.mimeType} format={uploadedFile.format} fileId={uploadedFile.fileId} token={getToken()} />
-              </details>
-            </>
-          ) : selected === 'phone' ? (
-            <div className="resume-source-phone-session">
-              <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} busyWhen="received" />
-              <ol className="qxt-steps" aria-label="怎么把文件传过来">
-                <li><span className="n">1</span><b>扫码</b></li>
-                <li><span className="n">2</span><b>在手机上选文件、点上传</b></li>
-                <li><span className="n">3</span><b>回到这台机器点确认</b></li>
-              </ol>
-              <div className="qxt-drop" role="status">传过来的文件会出现在这里</div>
-            </div>
-          ) : selected === 'usb' ? (
-            <div className="qx-rt-usb">
-              <ResumeUsbImportPanel unattended gate={usbGate} onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} onListed={setUsbListed} />
-            </div>
-          ) : (
-            <button type="button" disabled={sourceBusy} onClick={handleUploadBoxClick} className="qx-rt-dropzone">
-              <strong>点击上传文件</strong>
-              <span>{wordConversionAvailable ? '支持 PDF、DOC、DOCX 和图片格式，单个文件最大 10MB' : '支持 PDF / 图片格式，单个文件最大 10MB'}</span>
-            </button>
-          )}
-          {error ? <p className="qx-rt-note resume-source-error" data-tone="error" role="alert">{unattendedResumeCopy(error, supportContact)}</p> : null}
-          {uploadUnknown ? (
-            <>
-              <p className="qx-rt-note resume-source-unknown" data-tone="warn" role="status">
-                <b>结果未知</b>暂时无法确认这一份有没有传上去。本页不会自动再传，也不会用之前那份文件继续。
-              </p>
-              <dl className="qx-rt-kv">
-                <div><dt>发生了什么</dt><dd>上传过程中网络或服务出了问题，这台机器没能确认上传是否完成。</dd></div>
-                <div><dt>还不确定的</dt><dd>这份文件可能已经传上去了，也可能没有。</dd></div>
-                <div><dt>再传一次</dt><dd>可以重新选择文件再传；如果刚才那次其实已经传上去，会多出一份重复文件。</dd></div>
-                <div>
-                  <dt>建议这样做</dt>
-                  <dd data-testid="resume-source-unknown-next">
-                    {getToken()
-                      ? '可先到「我的 → 我的文档」核对；暂时没看到时可稍后刷新。若决定再传，请重新选择文件，可能出现重复文件。'
-                      : '当前未登录，暂时无法核对账号记录。需要继续时，可重新选择文件或换一种来源。'}
-                  </dd>
-                </div>
-              </dl>
-            </>
-          ) : null}
-          {uploading ? <p className="qx-rt-note resume-source-status" role="status">上传中，请稍候…</p> : null}
-        </div>
-
-        {!scanReady ? (
-          <p id="resume-word-conversion-reason" className="qxt-fine" aria-disabled={!wordConversionAvailable || undefined}>
-            {wordConversionAvailable ? `Word ${WORD_CONVERSION_DISCLOSURE}。` : usbScreen ? 'Word 转换暂未开放，请另存为 PDF 再上传。读不出来可以换一个 USB 口，或者改用手机传。' : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
-          </p>
-        ) : null}
-        {!getToken() ? (
-          <button type="button" className="qxt-link" onClick={() => navigate('/login', { state: { from: `${location.pathname}${location.search}` } })}>
-            当前未登录 · 这次按临时上传处理 · 去登录
-          </button>
-        ) : (
-          <button type="button" className="qxt-link" onClick={() => navigate('/me/resumes')}>保存过的简历在『我的简历』里看</button>
+      <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-resume-step={step} data-qx-page={pageKey} data-directed={!genericDiagnosis ? 'true' : undefined} className="qxt-source-page" data-takeaway="简历诊断报告">
+        {!kiosk && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            aria-label="选择本机简历文件"
+            accept={accept}
+            className="hidden"
+            onChange={handleFileChosen}
+          />
         )}
-        <div className="qxt-links">
-          <button type="button" onClick={() => navigate('/resume/generate')}>没有电子简历？让 AI 帮你写一份</button>
-          <button type="button" onClick={() => navigate('/print-scan')}>只想打印原件</button>
-        </div>
-        <section className="qx-card qx-rt-dims">
-          <details>
-            <summary>
-              <span>{intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}</span>
-              <small>{DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开</small>
-            </summary>
-            <div className="qx-rt-dim-grid">
-              {DIAGNOSIS_DIMENSIONS.map((item, idx) => (
-                <span key={item} className="qx-rt-dim" data-extra={idx >= DIAGNOSIS_DIMENSIONS.length - 2 ? 'true' : undefined}>{item}</span>
-              ))}
-            </div>
-          </details>
-        </section>
-        <p className="qxt-fine">报告按六个维度分别给出建议。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
-        <footer className="qx-rt-truth">
-          <p><b>格式</b>只收 {supportedFormats.join(' / ')}，单份不超过 10MB；U 盘通道只列 PDF / JPG / PNG。</p>
-          <p className="resume-source-privacy"><b>用途 · 隐私</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}</p>
-          <p><b>留存</b>{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
-        </footer>
-      </div> : null}
 
-      {step === 'direction' ? (
-        <div className="qx-scroll qx-rt-scroll">
-          {genericDiagnosis ? <p className="qxt-fine">没选方向，按通用标准看</p> : null}
-          <section className="qx-rt-settings" data-resume-step="direction">
-            {directionFields}
-            <section className="qxt-see" aria-label={genericDiagnosis ? '通用诊断看什么' : '报告仍会写出的维度'}>
-              <b>{genericDiagnosis ? '通用诊断看什么' : '报告仍固定写出这 6 维'}</b>
-              <p>{genericDiagnosis ? '不设方向。报告仍按这 6 个维度输出，只读，这里不能勾。' : '勾选只影响建议关注顺序。下面只读，不能在这里改勾选。'}</p>
-              <ul>
-                {RESUME_SCORING_DIMENSIONS.map((item) => (
-                  <li key={item.key}><b>{item.label}</b><span>{DIM_ABOUT[item.key]}</span></li>
-                ))}
-              </ul>
-            </section>
-            {genericDiagnosis ? <p className="qxt-fine">只影响建议关注顺序，报告仍固定输出 6 个维度。</p> : null}
-          </section>
-          {uploadedFile ? (
-            <div className="qx-rt-filecard"><FileTextIcon size={32} aria-hidden="true" /><span className="fx"><b>{uploadedFile.name}</b><small>{uploadedFile.size} · {uploadedFile.format.toUpperCase()} · {channelLabel(uploadedFile.channel)}</small></span><span className="fb">待你确认</span></div>
-          ) : null}
-          {uploadedFile && !scanReady ? (
-            <button type="button" className="qx-btn resume-change-file" data-variant="ghost" disabled={sourceBusy} onClick={changeFile}>更换文件</button>
-          ) : null}
-          {uploadedFile ? (
-            <details className="qx-rt-preview">
-              <summary>预览原件</summary>
-              <FileContentPreview compact fileUrl={uploadedFile.fileUrl} fileName={uploadedFile.name} mimeType={uploadedFile.mimeType} format={uploadedFile.format} fileId={uploadedFile.fileId} token={getToken()} />
-            </details>
-          ) : null}
-        </div>
-      ) : null}
-      {step === 'more' ? (
-        <div className="qx-scroll qx-rt-scroll">
-          <section data-resume-step="more">
-            {directionFields}
-            <section className="qxt-see" aria-label="这四项怎么用">
-              <b>这四项怎么用</b>
-              <ul>
-                <li><b>经历</b><span>就是经验级别。不选，这一项不参与。</span></li>
-                <li><b>场景</b><span>就是求职场景。「招聘会现场」只是诊断参考，不会打开招聘会。</span></li>
-                <li><b>专业</b><span>不是固定名单，最多 60 字。只作本人简历表达的诊断重点参考。</span></li>
-                <li><b>学历</b><span>选填。同样只影响建议关注顺序，不影响是否可以诊断。</span></li>
-              </ul>
-            </section>
-            <button type="button" className="qxt-skip" onClick={clearMore}>都不填</button>
-          </section>
-        </div>
-      ) : null}
-      <AiDeclarationNote />
-    </section>
+        {step === 'where' ? (
+          <ResumeSourceWhere
+            kiosk={kiosk}
+            selected={selected}
+            sourceBusy={sourceBusy}
+            usbScreen={usbScreen}
+            file={staged}
+            scanReady={scanReady}
+            loggedIn={Boolean(getToken())}
+            uploading={uploading}
+            error={error ? unattendedResumeCopy(error, supportContact) : null}
+            uploadUnknown={uploadUnknown}
+            unknownNext={unknownNext}
+            phoneCancelled={phoneCancelled}
+            phoneReceived={phoneReceived}
+            phoneConfirmRef={phoneConfirmRef}
+            onPhoneReceived={setPhoneReceived}
+            wordConversionAvailable={wordConversionAvailable}
+            supportedFormats={supportedFormats}
+            dimensions={DIAGNOSIS_DIMENSIONS}
+            intentIsOptimize={intent === 'optimize'}
+            intentPrivacy={copy.privacyNote}
+            usbGate={usbGate}
+            token={getToken()}
+            onPickPhone={pickPhone}
+            onPickUsb={pickUsb}
+            onPickCloud={pickCloud}
+            onPaper={() => navigate('/scan')}
+            onPhoneUploaded={handlePhoneUploaded}
+            onPhoneBusy={setPhoneBusy}
+            onPhoneCancelled={() => setPhoneCancelled(true)}
+            onNewScan={() => setPhoneCancelled(false)}
+            onUsbUploaded={handleUsbUploaded}
+            onUsbBusy={setUsbBusy}
+            onUsbListed={setUsbListed}
+            onUsbPick={onUsbPick}
+            onDropScan={dropScanHandoff}
+            onRescan={() => navigate('/scan')}
+            onChangeFile={changeFile}
+            onUploadBox={handleUploadBoxClick}
+            onLogin={() => navigate('/login', { state: { from: `${location.pathname}${location.search}` } })}
+            onMine={() => navigate('/me/resumes')}
+            onGenerate={() => navigate('/resume/generate')}
+            onPrintOnly={() => navigate('/print-scan')}
+          />
+        ) : (
+          <>
+            <DiagnosisDirectionForm
+              pane={step === 'more' ? 'more' : 'focus'}
+              afterModes={step === 'direction' ? intentPaths : undefined}
+              onOpenMore={() => setStep('more')}
+              onSkipMore={clearMore}
+              genericDiagnosis={genericDiagnosis}
+              selectedDimensions={selectedDimensions}
+              targetIndustry={targetIndustry}
+              targetJob={targetJob}
+              targetExperience={targetExperience}
+              targetScene={targetScene}
+              targetMajor={targetMajor}
+              targetDegree={targetDegree}
+              onGenericDiagnosisChange={setGenericDiagnosis}
+              onToggleDimension={toggleDimension}
+              onTargetIndustryChange={setTargetIndustry}
+              onTargetJobChange={setTargetJob}
+              onTargetExperienceChange={setTargetExperience}
+              onTargetSceneChange={setTargetScene}
+              onTargetMajorChange={setTargetMajor}
+              onTargetDegreeChange={setTargetDegree}
+            />
+            {step === 'direction' ? <AiDeclarationNote /> : null}
+          </>
+        )}
+      </section>
     </ResumeTouchPage>
   )
 }

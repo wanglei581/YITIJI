@@ -15,6 +15,8 @@ export type QxTouchPrimary = {
   kind?: QxTouchButtonKind
   noArrow?: boolean
   disabled?: boolean
+  /** 可选。真实的 aria-disabled：按钮仍可点，点了由页面说明为什么不能继续（原生 disabled 点不到，没法带用户去看原因）。 */
+  ariaDisabled?: boolean
   /** 可选。不传时不写 data-testid，原有按钮不受影响。 */
   testId?: string
   /** 可选。追加到主按钮上，默认不追加，其它页的主按钮类名不变。 */
@@ -87,6 +89,7 @@ export function QxTouchDock({
           className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}${primary.className ? ` ${primary.className}` : ''}`}
           onClick={primary.onClick}
           disabled={primary.disabled}
+          aria-disabled={primary.ariaDisabled || undefined}
           data-testid={primary.testId}
         >
           {primary.label}

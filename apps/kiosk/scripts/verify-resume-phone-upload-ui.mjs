@@ -193,7 +193,9 @@ function assertRefreshButtonLockedWhileUploaded(src, label) {
   console.log(`PASS ${label}（disabled 由 ${source} 参与判定）`)
 }
 
-const source = read('src/pages/resume/ResumeSourcePage.tsx')
+// 2026-10-28 触屏版：来源页「在哪里」一步的版面（来源卡、手机 / U 盘面板、原件预览）在 touch/ResumeSourceWhere.tsx。
+// 判据对「页面 + 它的版面组件」整体成立（assertNotIncludes 因此只会更严）。
+const source = `${read('src/pages/resume/ResumeSourcePage.tsx')}\n${read('src/pages/resume/touch/ResumeSourceWhere.tsx')}`
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
 const phoneModel = read('src/pages/upload/phoneUploadModel.ts')

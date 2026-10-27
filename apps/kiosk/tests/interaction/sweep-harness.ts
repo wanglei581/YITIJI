@@ -502,7 +502,7 @@ export async function clickProfileEntry(page: Page, label: string, path: string)
 
 export async function fillDiagnosisDirection(page: Page, journey: string, collectors: ReturnType<typeof attachCollectors>): Promise<void> {
   await recordStep({
-    page, journey, step: 'open-direction-settings', control: '改诊断方向', selectorHint: '.qx-rt-settings > summary',
+    page, journey, step: 'open-direction-settings', control: '改诊断方向', selectorHint: 'button:定向诊断',
     kind: 'click', collectors,
     act: async () => {
       const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })

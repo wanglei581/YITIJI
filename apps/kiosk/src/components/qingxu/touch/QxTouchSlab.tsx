@@ -7,6 +7,8 @@ export type QxTouchSlabProps = {
   desc: string
   chip?: string
   chipTone?: QxTouchChipTone
+  /** 可选。芯片前加一个 AI 小圆点（稿的「AI 诊断改写」这类标）。默认不加。 */
+  chipAi?: boolean
   visual?: ReactNode
   take?: string
   takeStyle?: 'object' | 'plain'
@@ -26,6 +28,7 @@ export function QxTouchSlab({
   desc,
   chip,
   chipTone = 'teal',
+  chipAi = false,
   visual,
   take,
   takeStyle = 'object',
@@ -56,7 +59,7 @@ export function QxTouchSlab({
   const style = { '--i': index } as CSSProperties
   const text = (
     <div className="qxt-slab-txt">
-      {chip ? <QxTouchChip tone={chipTone}>{chip}</QxTouchChip> : null}
+      {chip ? <QxTouchChip tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
       <h3>{title}</h3>
       <p>{desc}</p>
       {lock ? <span className="qxt-lock">{lock}</span> : null}

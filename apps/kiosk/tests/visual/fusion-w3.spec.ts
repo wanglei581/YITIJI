@@ -116,13 +116,16 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   await degree.getByRole('button', { name: '本科', exact: true }).click()
   await expect(degree.getByRole('button', { name: '本科', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: '好了，回去开始诊断', exact: true }).click()
+  // 原件预览在「简历在哪里」一步的文件卡里（稿 resume-src）；从诊断方向返回过去看一眼，再回来开始诊断。
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
   await page.locator('.qx-rt-preview > summary').click()
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
   await expect(preview.locator('[data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/resume.pdf')
   await expect.poll(() => previewLoaded).toBe(true)
   await startResumeDiagnosis(page)
-  await expect(page.getByText('处理内容说明 · 非实时阶段', { exact: true })).toBeVisible()
+  // 稿 reading：列头只写一次「处理内容」，「在进行」下面写「不代表实时进度」。
+  await expect(page.getByText('处理内容', { exact: true })).toBeVisible()
   await expect(page.getByText('不代表实时进度', { exact: false })).toBeVisible()
   await expect(page.getByText(/进行中…|已完成|逐项点亮/)).toHaveCount(0)
   await assertNoHorizontalOverflow(page)
@@ -383,17 +386,19 @@ test('optimized resume previews inline without opening a new tab @w3-kiosk', asy
 
   await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
   await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
-  // 稿 23（2.0）：总览与编辑区用按钮切换，没有页签；这份结果没有可对照的条目，直接进编辑区。
+  // 触屏版：总览、编辑、导出是同一页的三屏；这份结果没有可对照的条目，直接进编辑区。
+  // 编辑区「去导出」→ 核对事实 → 导出页（PDF 默认）→「导出」才出文件。
   await expect(page.getByTestId('resume-optimize-overview')).toHaveCount(0)
-  await page.getByRole('button', { name: '导出 PDF', exact: true }).first().click()
+  await page.getByRole('button', { name: '去导出', exact: true }).click()
   await page.getByRole('checkbox', { name: /测试大学/ }).click()
   await page.getByRole('button', { name: '确认导出' }).click()
-  await expect(page.getByRole('button', { name: '查看或手机保存PDF' })).toBeVisible()
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  await expect(page.getByRole('button', { name: '扫码带走' })).toBeVisible()
   const pageCount = page.context().pages().length
   // 包 F：导出成功后页面会自动打开真实 PDF 预览（预览 = 导出 = 打印同一份）；未自动打开时再点按钮。
   const dialog = page.getByRole('dialog', { name: '优化版简历.pdf' })
   if (!(await dialog.isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+    await page.getByRole('button', { name: '扫码带走' }).click()
   }
   await expect(dialog).toBeVisible()
   await expect(dialog.locator('[data-file-preview-kind="pdf"] [data-pdf-preview-host]')).toHaveAttribute('data-preview-src', '/w3-fixtures/optimized-resume.pdf')
@@ -510,7 +515,7 @@ test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   const resubmit = page.getByRole('button', { name: '重新提交解析（新的一次）' })
   for (const [label, calls] of [['network drop', 1], ['gateway 504 without an API envelope', 2], ['503 with an API envelope', 3]] as const) {
     await expect(page.getByText('没等到解析结果', { exact: true }), label).toBeVisible()
-    expect(await parseViewSnapshot(page), label).toMatchObject({ state: 'unknown', current: 'AI 解析', bad: null, wait: null, pill: '解析结果未知', saysReceived: false, saysError: false })
+    expect(await parseViewSnapshot(page), label).toMatchObject({ state: 'unknown', current: null, pill: '解析结果未知', saysReceived: false, saysError: false })
     await expect(page.locator('.resume-parse-unknown'), label).toContainText('暂时无法确认')
     await expect(page.getByTestId('resume-parse-unknown-next'), label).toContainText('当前未登录')
     await expect(page.getByTestId('resume-parse-unknown-next'), label).not.toContainText('我的简历')
@@ -641,7 +646,8 @@ test('resume source Qingxu frame keeps intent, the 10MB limit and separates an u
   await expect(source).toHaveAttribute('data-state', 'staged')
   await openResumeDirection(page)
   await expect(page.getByRole('button', { name: '上传并生成优化建议' })).toBeEnabled()
-  await page.locator('.qxt-dock').getByRole('button', { name: '上一步' }).click()
+  // 诊断方向这一步的底栏返回键写「返回」（稿 resume-direction），回到「简历在哪里」。
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回', exact: true }).click()
 
   const unknownReplies: Array<[string, (route: Route) => Promise<void>]> = [
     ['network drop', (route) => route.abort('internetdisconnected')],
@@ -779,11 +785,11 @@ test('resume parse server failure is labelled failed, never as the running step 
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
   await startResumeDiagnosis(page)
   await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
-  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: 'AI 解析', bad: null, pill: '解析失败 · 可重试', saysReceived: false })
-  // 明确失败才进报告页失败屏；非 AI 出路是青序 rrp-row，重新解析在青序操作条里。
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'failed', current: null, bad: 'AI 解析', pill: '解析失败 · 可重试', saysReceived: false })
+  // 明确失败才进报告页失败屏；非 AI 出路是触屏版出路行（.qxt-slab），重新解析在底栏主按钮里。
   await page.waitForURL('/resume/report')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
-  const exits = page.getByTestId('resume-report-fail-exits').locator('.rrp-row')
+  const exits = page.getByTestId('resume-report-fail-exits').locator('.qxt-slab')
   await expect(exits).toHaveCount(4)
   for (let index = 0; index < 4; index += 1) await assertTapTargetPointerHit(exits.nth(index))
   await expect(page.getByTestId('resume-report-fallback')).toBeVisible()
@@ -1157,7 +1163,7 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   await startResumeDiagnosis(page)
   await page.waitForURL('/resume/parse')
   await expect(page.getByRole('dialog')).toBeVisible()
-  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: 'AI 解析', wait: null, pill: '等待授权', saysReceived: false })
+  expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: null, wait: 'AI 解析', pill: '等待授权', saysReceived: false })
   expect(parseCalls).toBe(0)
   await page.getByRole('button', { name: '暂不使用' }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
@@ -1295,7 +1301,7 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
   })
   for (const [route, ready] of [
     ['/resume/source', '[data-kiosk-screen="resume-source"]'],
-    [`/resume/report?taskId=${taskId}`, '[data-testid="resume-report-counts"]'],
+    [`/resume/report?taskId=${taskId}`, '[data-testid="resume-report-dims"]'],
     // 稿 23（2.0）：总览与编辑区用按钮切换，没有页签；有可对照的条目时先落在总览。
     [`/resume/optimize?taskId=${taskId}`, '[data-testid="resume-optimize-overview"]'],
     [`/resume/optimize/compare?taskId=${taskId}`, '[aria-label="改写选择统计"]'],
@@ -1314,7 +1320,7 @@ test('R1 2.0 keeps resume controls below the read-only header and preserves the 
   }
 })
 
-test('resume report expands seven blocks, drops the inner scroller, and fills the action row @w3-kiosk', async ({ page, api }) => {
+test('resume report folds the seven blocks, keeps one page scroller, and keeps the takeaway row @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
   await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
@@ -1322,6 +1328,10 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   // 2.0 规则 4：出处标记不上屏。空的 .rrp-prov 没有文字，底色和边框仍会画出浅色小方块。
   await expect(page.locator('.rrp-prov')).toHaveCount(0)
 
+  // 触屏版（稿 diagnosis）：简历内容结构折在一个 <details> 里，点开才看到各块；整页只有外层一个滚动区，没有内部滚动区。
+  const structure = page.getByTestId('resume-report-structure')
+  await expect(structure).not.toHaveAttribute('open', '')
+  await structure.locator('summary').click()
   const blockKeys = ['basic', 'objective', 'education', 'experience', 'project', 'skill', 'selfintro']
   for (const key of blockKeys) {
     const block = page.getByTestId(`resume-report-block-${key}`)
@@ -1331,16 +1341,18 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   await expect(page.getByTestId('resume-report-block-basic')).toContainText('命中 1 条问题 · 1 条证据')
   await expect(page.getByTestId('resume-report-block-experience')).toContainText('命中 1 条问题 · 2 条证据')
   await expect(page.getByTestId('resume-report-block-selfintro')).toContainText('本块没有命中问题')
+  // 被问题引用的那几行原文要标出来（data-ev），没被引用的不标。
+  expect(await page.getByTestId('resume-report-block-basic').locator('p[data-ev="1"]').count()).toBeGreaterThan(0)
+  await expect(page.getByTestId('resume-report-block-selfintro').locator('p[data-ev="1"]')).toHaveCount(0)
 
-  const listOverflow = await page.getByTestId('resume-report-list').evaluate((el) => getComputedStyle(el).overflowY)
-  expect(listOverflow).not.toBe('auto')
-  expect(listOverflow).not.toBe('scroll')
-  const tagFlush = await page.getByTestId('resume-report-block-basic').locator('.bhd').evaluate((el) => {
-    const tag = el.querySelector('.rrp-tag')
-    if (!tag) return 999
-    return el.getBoundingClientRect().right - tag.getBoundingClientRect().right
-  })
-  expect(tagFlush).toBeLessThanOrEqual(8)
+  const structureOverflow = await structure.evaluate((el) => getComputedStyle(el).overflowY)
+  expect(structureOverflow).not.toBe('auto')
+  expect(structureOverflow).not.toBe('scroll')
+  const innerScrollers = await page.locator('[data-kiosk-screen="resume-report"] *').evaluateAll((els) => els.filter((el) => {
+    const overflow = getComputedStyle(el).overflowY
+    return (overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight + 1
+  }).length)
+  expect(innerScrollers).toBe(0)
 
   await expect(page.getByTestId('resume-report-takeaway-title')).toHaveText('带走这份报告')
   const takeawayButtons = page.locator('[data-testid="resume-report-export-actions"] .rrp-export > button')
@@ -1352,80 +1364,60 @@ test('resume report expands seven blocks, drops the inner scroller, and fills th
   expect(new Set(takeawayRow.map((item) => item.top)).size).toBe(1)
   for (const item of takeawayRow) expect(item.height).toBeGreaterThanOrEqual(64)
 
+  // 底栏固定：页面内容滚动时底栏不动；主按钮在底栏里，文字不被裁。
   const barBefore = await page.locator('.qxt-dock').boundingBox()
   await page.getByTestId('resume-report-block-selfintro').scrollIntoViewIfNeeded()
   const barAfter = await page.locator('.qxt-dock').boundingBox()
   expect(Math.abs((barBefore?.y ?? 0) - (barAfter?.y ?? 1))).toBeLessThan(2)
+  const primary = await page.getByTestId('resume-report-primary').evaluate((el) => ({ height: el.getBoundingClientRect().height, clipped: el.scrollWidth > el.clientWidth + 1 }))
+  expect(primary.height).toBeGreaterThanOrEqual(64)
+  expect(primary.clipped).toBe(false)
 
-  const ratio = await page.evaluate(() => {
-    const bar = document.querySelector('.qxt-dock')
-    const primary = document.querySelector('[data-testid="resume-report-primary"]')
-    if (!bar || !primary) return 0
-    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
-  })
-  expect(ratio).toBeGreaterThanOrEqual(0.45)
-  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toHaveCount(0)
-
-  for (const seg of ['issues', 'scores', 'conclusions'] as const) {
-    await page.getByTestId(`resume-report-seg-${seg}`).click()
-    const overflows = await page.locator('.rrp-page .rrp-scroll').evaluateAll((els) => els.map((el) => getComputedStyle(el).overflowY))
-    expect(overflows.every((value) => value !== 'auto' && value !== 'scroll')).toBe(true)
-    if (seg === 'scores') {
-      await page.getByTestId('resume-report-dim-basic').click()
-      const scoreOverflow = await page.getByTestId('resume-report-dim-issues').evaluate((el) => getComputedStyle(el).overflowY)
-      expect(scoreOverflow).not.toBe('auto')
-      expect(scoreOverflow).not.toBe('scroll')
-    }
-  }
-  await page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' }).scrollIntoViewIfNeeded()
-  await expect(page.getByRole('button', { name: '目标岗位匹配参考（仅供参考）' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '做一次自我探索' })).toBeVisible()
+  // 简历对照、自我探索两个入口在报告正文的页尾，各自可点。
+  await page.getByRole('button', { name: '简历对照' }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: '简历对照' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '自我探索' })).toBeVisible()
 
   await page.goto('/resume/report?capture=1&state=diagnose-failed&taskId=paircapture01')
   await expect(page.getByTestId('resume-report-state-diagnose-failed')).toBeVisible()
-  const failRatio = await page.evaluate(() => {
-    const bar = document.querySelector('.qxt-dock')
-    const primary = document.querySelector('[data-testid="resume-report-primary"]')
-    if (!bar || !primary) return 0
-    return primary.getBoundingClientRect().width / bar.getBoundingClientRect().width
-  })
-  expect(failRatio).toBeGreaterThanOrEqual(0.45)
+  const failPrimary = await page.getByTestId('resume-report-primary').evaluate((el) => ({ height: el.getBoundingClientRect().height, clipped: el.scrollWidth > el.clientWidth + 1 }))
+  expect(failPrimary.height).toBeGreaterThanOrEqual(64)
+  expect(failPrimary.clipped).toBe(false)
 })
 
-test('resume report scroll hint clears after the page is scrolled to the bottom @w3-kiosk', async ({ page, api }) => {
+test('resume report page scroll keeps the takeaway reachable and the dock in place @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   api.respond('GET', '/api/v1/resume/export/pricing', { status: 200, json: { mode: 'free', unitCents: 0, unit: 'item', benefit: null } })
   await page.goto('/resume/report?capture=1&state=report&taskId=paircapture01')
   await expect(page.getByTestId('resume-report-state-report')).toBeVisible()
-  const hint = page.getByTestId('resume-report-scroll-hint')
-  await expect(hint).toBeVisible()
-  await expect(hint).toContainText(/下滑还有 [1-9]\d* 块/)
-  await expect(hint).toContainText('最下面可以带走报告')
-
-  const scroller = page.locator('[data-kiosk-screen="resume-report"]')
+  // 触屏版整页滚动取代了原来内部结构区的「下滑还有 N 块」提示：先改这几处在顶部，带走这份报告在滚动正文里，都能到达。
+  const scroller = page.locator('.qxt-body')
+  const dockTop = await page.locator('.qxt-dock').evaluate((el) => el.getBoundingClientRect().top)
   await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight })
-  await expect(hint).toHaveCount(0)
+  await expect(page.getByTestId('resume-report-takeaway-title')).toBeInViewport()
+  expect(await page.getByTestId('resume-report-export-actions').evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(dockTop + 1)
 
   await scroller.evaluate((el) => { el.scrollTop = 0 })
-  await expect(hint).toBeVisible()
-  await expect(hint).toContainText('最下面可以带走报告')
+  await expect(page.getByTestId('resume-report-priorities')).toBeInViewport()
+  expect(Math.abs(await page.locator('.qxt-dock').evaluate((el) => el.getBoundingClientRect().top) - dockTop)).toBeLessThan(2)
 })
 
-test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @w3-kiosk', async ({ page, api }) => {
+test('resume report exit rows keep an icon, an arrow to the destination, and a 64px hit area @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   for (const state of ['unavailable', 'diagnose-failed', 'read-error', 'no-context'] as const) {
     await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
     await expect(page.getByTestId(`resume-report-state-${state}`)).toBeVisible()
-    const rows = page.locator('.rrp-exits .rrp-row')
+    const rows = page.locator('.qxt-exit-col .qxt-slab')
     const count = await rows.count()
     expect(count).toBeGreaterThan(0)
     for (let i = 0; i < count; i += 1) {
       const row = rows.nth(i)
+      await row.scrollIntoViewIfNeeded()
       const box = await row.boundingBox()
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
-      await expect(row.locator('.rrp-ic')).toHaveCount(1)
+      await expect(row.locator('.qxt-vis')).toHaveCount(1)
       const disabled = await row.getAttribute('aria-disabled')
-      await expect(row.locator('.rrp-go')).toHaveCount(disabled === 'true' ? 0 : 1)
+      await expect(row.locator('.qxt-take')).toHaveCount(disabled === 'true' ? 0 : 1)
     }
     if (state === 'diagnose-failed') {
       await expect(page.getByRole('button', { name: /打印我上传的原件/ })).toContainText('本次不可用')
@@ -1433,10 +1425,11 @@ test('resume report exit rows keep an icon, a round arrow, and a 64px hit area @
     }
   }
 
+  // 自查清单在滚动正文的最下面，滚到底后不能被底栏盖住。
   for (const state of ['no-context', 'read-error', 'unavailable', 'illegal', 'diagnose-failed'] as const) {
     await page.goto(`/resume/report?capture=1&state=${state}&taskId=paircapture01`)
-    const minHeight = await page.locator('.rrp-state').first().evaluate((el) => getComputedStyle(el).minHeight)
-    expect(minHeight === '0px' || minHeight === 'auto').toBe(true)
+    await expect(page.locator('.qxt-howto').first()).toBeVisible()
+    await page.locator('.qxt-body').evaluate((el) => { el.scrollTop = el.scrollHeight })
     const checksBottom = await page.getByTestId('resume-report-fallback').evaluate((el) => el.getBoundingClientRect().bottom)
     const barTop = await page.locator('.qxt-dock').evaluate((el) => el.getBoundingClientRect().top)
     expect(checksBottom).toBeLessThanOrEqual(barTop + 1)
