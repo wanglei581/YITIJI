@@ -85,7 +85,7 @@ const exits = [
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleSwitch = [\s\S]{0,200}endKioskUse\('switch_account'\)/, '换号登录（W-64：先完整清场再进登录）'],
   ['src/pages/profile/me/MySettingsPage.tsx', /const handleRebindDone = [\s\S]{0,120}endKioskUse\('switch_account', \{ loginHint:/, '换绑成功重新登录'],
   ['src/pages/print/PrintDonePage.tsx', /const endOnTimeout = useCallback\(\(\) => \{\s*endKioskUse\('print_done_timeout'\)/, '打印完成页 60 秒到点（W-43）'],
-  ['src/pages/print/PrintDonePage.tsx', /if \(endArmed\) \{\s*endKioskUse\('end_use'\)/, '打印完成页「我拿走了，结束使用」'],
+  ['src/pages/print/PrintDonePage.tsx', /onClick=\{\(\) => \{\s*endKioskUse\('end_use'\)/, '打印完成页「我拿走了，结束使用」按一下就结束'],
   ['src/pages/home/HomePage.tsx', /onEndPrevious=\{\(\) => endKioskUse\('handover'\)\}/, '首页「结束上一位的使用」'],
   ['src/auth/KioskHandoverGate.tsx', /onCancel=\{\(\) => endKioskUse\('handover'\)\}/, '「还是你吗？」答「不是我」'],
   ['src/pages/placeholders/SessionTimeoutPage.tsx', /onClick=\{hardClear\}/, '超时提醒页结束按钮（hardClearFromWarning → endKioskUse）'],

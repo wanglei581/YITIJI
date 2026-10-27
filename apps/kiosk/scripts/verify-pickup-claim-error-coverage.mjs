@@ -124,8 +124,10 @@ export const PICKUP_CODE_LENGTH = 8
 export const PICKUP_CODE_MAX_INPUT_LENGTH = 10`)
 const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub })
 const cashierUrl = transpile('apps/kiosk/src/pages/print/cashierStatus.ts')
+const unattendedUrl = transpile('apps/kiosk/src/copy/unattendedCopy.ts')
 const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
   '@ai-job-print/shared': sharedStub,
+  '../../copy/unattendedCopy': unattendedUrl,
   '../../services/api/httpAdapter': httpAdapterStub,
   './cashierStatus': cashierUrl,
   '../../services/api/userErrorMessage': userErrorUrl,
@@ -153,8 +155,10 @@ for (const code of ['PRINT_TERMINAL_QUEUE_HALTED', 'PRINTER_UNAVAILABLE']) {
   assert.match(table[code], /到机码没有作废/)
   assert.doesNotMatch(table[code], /换一台/)
 }
-const original = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
-assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', original, 400)), original)
+const clean = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码'
+assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', clean, 400)), clean)
+const staffOriginal = '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员'
+assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', staffOriginal, 400)), table.PRINT_TERMINAL_QUEUE_HALTED)
 for (const bad of ['queue_cleanup_failed', 'HTTP 400 错误', '请求失败（400）', '故障'.repeat(40), '']) {
   assert.equal(model.pickupClaimMessage(new ApiHttpError('PRINT_TERMINAL_QUEUE_HALTED', bad, 400)), table.PRINT_TERMINAL_QUEUE_HALTED)
 }

@@ -27,9 +27,11 @@ function transpile(absolutePath, replacements = {}) {
 
 const pageRange = transpile(join(kioskRoot, 'src/pages/print/pageRange.ts'))
 const cashier = transpile(join(kioskRoot, 'src/pages/print/cashierStatus.ts'))
+const unattendedUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
 const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressModel.ts'), {
   './cashierStatus': cashier,
   './pageRange': pageRange,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
 
@@ -162,9 +164,10 @@ test('0 元失败页不提已付金额，收费单保留原句', () => {
   assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
   assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
   assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
-  assert.equal(progress.failureStaffDoing('paid'), '订单和支付记录都在，请凭订单找现场工作人员处理。')
-  assert.equal(progress.failureStaffDoing('free'), '你的订单还在，请凭订单找现场工作人员处理。')
-  assert.equal(progress.failureStaffDoing('unknown'), '你的订单还在，请凭订单找现场工作人员处理。')
+  const problem = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
+  assert.equal(progress.failureStaffDoing('paid'), `订单和支付记录都在。${problem}`)
+  assert.equal(progress.failureStaffDoing('free'), `你的订单还在。${problem}`)
+  assert.equal(progress.failureStaffDoing('unknown'), `你的订单还在。${problem}`)
   assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额/)
   assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'free', amountCents: 0 }), /已付金额|支付/)
   assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'unknown', amountCents: null }), /已付金额|支付/)
@@ -177,7 +180,7 @@ test('0 元订单不算收费单', () => {
   assert.equal(payment.isFreeMemberOrder({ payStatus: null, amountCents: 0 }), false)
 })
 
-const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口或找现场工作人员'
+const QUIET_COPY = '这台机器暂时没有回报打印进度，请看出纸口。打印有问题？查看《隐私政策》里的联系方式，或问小青'
 const ENCRYPTED_COPY = '这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传'
 
 test('W-91 出纸中长时间没有新状态就换掉正在出纸', () => {
@@ -202,7 +205,7 @@ test('W-88 已知失败不再说排队', () => {
   assert.doesNotMatch(view.wayOut, /打印机缺纸/)
   assert.doesNotMatch(`${view.headerTitle}${view.badge}${view.ask}${view.doing}${view.wayOut}`, /排队|等待终端领取|正在出纸/)
   const blank = progress.progressFailurePresentation('   ')
-  assert.match(blank.ask, /请联系现场工作人员/)
+  assert.match(blank.ask, /打印有问题/)
   assert.doesNotMatch(blank.badge, /排队/)
   assert.match(progressPage, /progressFailurePresentation/)
   assert.match(progressPage, /failed && !isSim \? failureView\.badge/)
@@ -215,7 +218,7 @@ test('W-88 已知失败不再说排队', () => {
   assert.match(progressSections, /<p className="why">\{hint\}<\/p>/)
   assert.match(progressSections, />\s*重新打印\s*</)
   assert.match(progressSections, /查看订单/)
-  assert.match(progressSections, /联系工作人员/)
+  assert.match(progressSections, /使用帮助/)
   assert.doesNotMatch(progressSections, /重新打印[\s\S]{0,40}<small>/)
 })
 
@@ -291,6 +294,7 @@ const confirmModelUrl = transpile(join(kioskRoot, 'src/pages/print/printConfirmM
 const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../printConfirmModel': confirmModelUrl,
   './PrintConfirmParts': partsUrl,
 })
@@ -329,11 +333,16 @@ test('W-117：收费闸门拒单原因只上屏一次，单卡占满现有栅格
 
 const hubIconUrl = toDataUrl('export const ArrowRightIcon = () => null; export const CopyIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null;')
 const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubContent.ts'))
+const touchChipUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchChip({children}) { return jsx('span', {children}) }`)
+const touchIconUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('span', {}) }`)
 const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': hubIconUrl,
   '../../print/components/PrintAiHelp': aiUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
+  '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
+  '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
   '../printHubContent': hubContentUrl,
 })
 const { QxPrintHubView } = await import(hubViewUrl)
@@ -349,11 +358,11 @@ test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文
     }))
     const text = html.replace(/<[^>]*>/g, '')
     // 未办理、未核价的入口无需钱的字眼，也不得凭入口状态承诺免费；付费核对仍在确认页。
-    assert.doesNotMatch(text, /价格|报价|费用|付款|收款|抵扣|权益|免费/)
+    assert.doesNotMatch(text, /报价|费用|付款|收款|抵扣|权益|免费/)
     assert.match(text, /可用服务，以办理时显示为准/)
     assert.match(text, /隐私与电子签说明/)
     assert.match(text, /按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理/)
-    if (hubState === 'default') assert.match(text, /文件检查 → 设置参数 → 确认打印/)
+    if (hubState === 'default') assert.match(text, /选文件 → 材料检查 → 预览与参数 → 核对价格/)
   }
 })
 
@@ -385,9 +394,11 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
 const cashierIcons = toDataUrl('export const AlertTriangleIcon = () => null; export const CheckCircle2Icon = () => null; export const Clock3Icon = () => null; export const FileXIcon = () => null; export const InfoIcon = () => null; export const LockIcon = () => null; export const QrCodeIcon = () => null; export const ScanLineIcon = () => null; export const Undo2Icon = () => null;')
 const cashierModelUrl = transpile(join(kioskRoot, 'src/pages/print/cashierQxModel.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './cashierStatus': cashier,
+  '../../copy/unattendedCopy': unattendedUrl,
 })
 const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/CashierQxView.tsx'), {
   'react/jsx-runtime': jsxUrl, 'lucide-react': cashierIcons, './PrintAiHelp': aiUrl,
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../cashierStatus': cashier, '../printConfirmModel': confirmModelUrl,
   '../cashierQxModel': cashierModelUrl,
   '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
@@ -409,6 +420,7 @@ const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/Pr
   'react': import.meta.resolve('react'), 'react/jsx-runtime': jsxUrl,
   'lucide-react': toDataUrl('export const FileTextIcon = () => null; export const PrinterIcon = () => null'),
   '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
+  '../../../copy/unattendedCopy': unattendedUrl,
   '../cashierStatus': cashier, '../printProgressModel': progressUrl,
   './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
   './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
@@ -430,7 +442,7 @@ test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保
 const { PrintJamGuide } = await import(doneSectionsUrl)
 test('卡纸三步不提收款', () => {
   const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
-  assert.match(text, /找工作人员之前先做这三件/)
+  assert.match(text, /处理之前先做这三件/)
   assert.match(text, /别硬拉纸/)
   assert.match(text, /订单号 ORD-20261003-JAM/)
   assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)

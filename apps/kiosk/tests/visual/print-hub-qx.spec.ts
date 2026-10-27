@@ -74,23 +74,18 @@ test('print hub default state reads capabilities and never claims 设备正常 @
       const box = (el: Element | null) => el!.getBoundingClientRect()
       const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
       return {
-        pageheadH: box(document.querySelector('.qx-pagehead')).height,
-        heroTop: box(document.querySelector('.ph-xq')).top,
-        heroBottom: box(document.querySelector('.ph-xq')).bottom,
+        bandH: box(document.querySelector('.qxt-band')).height,
         gridTop: box(document.querySelector('.ph-grid')).top,
-        gridBottom: box(document.querySelector('.ph-grid')).bottom,
-        srcBottom: box(document.querySelector('.ph-src')).bottom,
         noticesBottom: box(document.querySelector('.ph-notices')).bottom,
-        truthTop: box(document.querySelector('.ph-truth')).top,
         notesBottom: Math.max(...notes),
         truthBottom: box(document.querySelector('.ph-truth')).bottom,
-        navTop: box(document.querySelector('.qx-navbar')).top,
+        navTop: box(document.querySelector('.qxt-nav')).top,
       }
     })
     console.log(`print-hub-geometry ${JSON.stringify(geo)}`)
     await page.screenshot({ path: 'test-results/print-hub-qx-1080x1920.png' })
-    expect(geo.pageheadH).toBeLessThanOrEqual(1)
-    expect(geo.heroTop).toBeLessThan(140)
+    expect(geo.bandH).toBeGreaterThanOrEqual(400)
+    expect(geo.gridTop).toBeGreaterThanOrEqual(400)
     expect(geo.notesBottom).toBeLessThanOrEqual(geo.navTop)
     expect(geo.truthBottom).toBeLessThanOrEqual(geo.navTop)
     expect(geo.noticesBottom).toBeLessThanOrEqual(geo.navTop)
@@ -112,7 +107,7 @@ test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2',
   await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
   // 手机宽度下横幅标题曾被「青」头像挤成逐字竖排：要求占到过半宽度、每行不少于四个字。
-  const hero = await page.locator('.ph-xq-ask').evaluate((el) => {
+  const hero = await page.locator('.qxt-ask h1').evaluate((el) => {
     const range = document.createRange()
     range.selectNodeContents(el)
     const lines = new Set(Array.from(range.getClientRects()).map((rect) => Math.round(rect.top))).size
@@ -122,7 +117,7 @@ test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2',
   expect(hero.chars / hero.lines, '横幅标题不得逐字竖排').toBeGreaterThanOrEqual(4)
 
   // 滚到底：底注与快捷入口必须落在底栏之上，不被遮住。
-  const geo = await page.locator('.qx-scroll').evaluate((scroller) => {
+  const geo = await page.locator('.ph-page').evaluate((scroller) => {
     scroller.scrollTop = scroller.scrollHeight
     const notes = [...document.querySelectorAll('.ph-note')].map((el) => el.getBoundingClientRect().bottom)
     return {
@@ -130,7 +125,7 @@ test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2',
       scrolls: scroller.scrollHeight > scroller.clientHeight,
       notesBottom: Math.max(...notes),
       truthBottom: document.querySelector('.ph-truth')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(geo.scrolls && geo.atEnd, '390 下内容应在 .qx-scroll 内滚动且已滚到底').toBe(true)
@@ -174,7 +169,8 @@ test('print hub capability-error fail-closes tasks and keeps arrival-code @w2', 
   await expect(page.getByTestId('print-hub-fallback').getByText('服务状态无法确认', { exact: true })).toBeVisible()
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.locator('.ph-actions').getByRole('button', { name: '重新检测', exact: true })).toBeVisible()
-  await expect(page.locator('.ph-actions').getByRole('button', { name: '联系工作人员', exact: true })).toBeVisible()
+  await expect(page.locator('.ph-actions').getByRole('button', { name: '使用帮助', exact: true })).toBeVisible()
+  await expect(page.getByText('需要帮助？')).toBeVisible()
   await expect(page.getByTestId('print-hub-primary')).toBeEnabled()
   await expectNoForgedReady(page)
   expect(errors).toEqual([])
@@ -207,7 +203,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)
@@ -266,7 +262,9 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
   await expect(page.getByTestId('print-hub-fallback').getByText('打印机离线 · 出纸类暂停', { exact: true })).toBeVisible()
-  await expect(page.getByTestId('print-hub-fallback')).toContainText('打印机当前无法连接，请找现场工作人员')
+  await expect(page.getByTestId('print-hub-fallback')).toContainText('打印机当前无法连接')
+  await expect(page.getByTestId('print-hub-fallback')).toContainText('这台机器暂时打不了')
+  await expect(page.getByTestId('print-hub-fallback')).not.toContainText('找现场工作人员')
   await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
   await expect(page.getByTestId('print-hub-cap-convert')).toBeEnabled()
@@ -279,7 +277,7 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)

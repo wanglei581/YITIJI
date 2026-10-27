@@ -15,6 +15,7 @@ import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
 } from '@ai-job-print/shared'
+import { helpNeededLine, machineUnusableLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { formatCents } from './cashierStatus'
 import { SHARED_USER_MESSAGE_CODES, errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
@@ -62,10 +63,10 @@ export const PICKUP_CLOSED_CODES: ReadonlySet<string> = new Set([
  * 不在这里接住就会落到「请重试」——而锁定期内重试只会再被拒。
  * 服务端不回剩余时长，所以不写分钟数。
  */
-export const PICKUP_LOCKED_MESSAGE = '本机输码暂时停用，过一段时间会自动解除；着急请找现场工作人员'
+export const PICKUP_LOCKED_MESSAGE = `本机输码暂时停用，过一段时间会自动解除。${helpNeededLine()}`
 
-const TERMINAL_NOT_READY_MESSAGE = '这台机器暂时不能取件，请找现场工作人员'
-const ORDER_BUSY_MESSAGE = '这笔订单正在处理，请等几秒再输一次；仍不行请找现场工作人员'
+const TERMINAL_NOT_READY_MESSAGE = `这台机器暂时不能取件。${machineUnusableLine()}`
+const ORDER_BUSY_MESSAGE = `这笔订单正在处理，请等几秒再输一次。${helpNeededLine()}`
 
 /** 到机码输入页的续打说明。续打只认出纸失败的那台机器，每单最多 2 次（后端 SELF_SERVICE_REPRINT_LIMIT）。 */
 export const PICKUP_SAME_CODE_RESUME_NOTE =
@@ -80,8 +81,8 @@ export const PICKUP_SAME_CODE_RESUME_NOTE =
  * release / 文件就绪 / 隐私检查 / 能力开关）；门禁从服务端源码抽码，逐个断言这里有。
  */
 export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
-  PRINT_TERMINAL_QUEUE_HALTED: '这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
-  PRINTER_UNAVAILABLE: '这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码，或找现场工作人员',
+  PRINT_TERMINAL_QUEUE_HALTED: `这台终端暂停接打印单，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
+  PRINTER_UNAVAILABLE: `这台终端的打印机暂不可用，你的到机码没有作废，请稍后再来这台终端输码。${helpNeededLine()}`,
   PICKUP_CODE_INVALID: '到机码无效或已过期，请核对后重新输入',
   PICKUP_CODE_EXPIRED: '到机码无效或已过期，请核对后重新输入',
   // 2026-10-06 方案②：同机且任务失败会走续打；别的机器回 PICKUP_CODE_INVALID。
@@ -97,13 +98,13 @@ export const PICKUP_CLAIM_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_FILE_EXPIRED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   PRINT_FILE_NOT_FOUND: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
   FILE_CONTENT_CHANGED: '这笔订单的文件已经失效，不能打印。请在手机上重新上传文件、重新下单',
-  PRINT_PII_SCAN_REQUIRED: '这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次，或找现场工作人员',
+  PRINT_PII_SCAN_REQUIRED: `这份文件的隐私检查还没完成，暂时不能打印。请过一会儿再输一次。${helpNeededLine()}`,
   PII_SCAN_STALE: '这份文件在隐私检查后又改过，暂时不能打印。请在手机上重新检查后再来取件',
   PRINT_PII_MANUAL_CONFIRM_REQUIRED: '这份文件的隐私检查没有完整覆盖，需要你本人先在手机上确认文件里没有不想打印的个人信息，确认后再来取件',
   PICKUP_CLAIM_RATE_LIMITED: '输码太频繁了，请等一分钟再输',
   PICKUP_CLAIM_LOCKED: PICKUP_LOCKED_MESSAGE,
-  CAPABILITY_NOT_CONFIGURED: '这台机器暂时不能打印这笔订单，请找现场工作人员',
-  CAPABILITY_UNAVAILABLE: '这台机器暂时不能打印这笔订单，请找现场工作人员',
+  CAPABILITY_NOT_CONFIGURED: `这台机器暂时不能打印这笔订单。${machineUnusableLine()}`,
+  CAPABILITY_UNAVAILABLE: `这台机器暂时不能打印这笔订单。${machineUnusableLine()}`,
   PRINT_TERMINAL_NOT_READY: TERMINAL_NOT_READY_MESSAGE,
   PRINT_TERMINAL_DEGRADED: TERMINAL_NOT_READY_MESSAGE,
   PRINT_TERMINAL_NOT_FOUND: TERMINAL_NOT_READY_MESSAGE,
@@ -130,7 +131,7 @@ export function classifyClaimFailure(error: unknown): PickupFailure {
 }
 
 /** 未登记的码走共享码表；共享码表也没有时用这句（它是「还能再试」的那类失败才会落到的）。 */
-export const PICKUP_CLAIM_FALLBACK_MESSAGE = '到机码校验没有完成，请重试或联系现场工作人员'
+export const PICKUP_CLAIM_FALLBACK_MESSAGE = `到机码校验没有完成，请重试。${printProblemLine()}`
 
 /**
  * 认领失败时屏上那一句话。取件页没有会员登录：未登记的 401/403 不能落成共享码表的
@@ -140,14 +141,16 @@ export function pickupClaimMessage(error: unknown): string {
   const code = errorCodeOf(error)
   if (code === 'PRINT_TERMINAL_QUEUE_HALTED' && error instanceof ApiHttpError) {
     const message = error.message
-    if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) return message
+    if (message.trim() && message.length <= 60 && /[\u4e00-\u9fa5]/.test(message) && !/^(HTTP\s|请求失败（)/.test(message.trim())) {
+      return preferUnattended(message, PICKUP_CLAIM_MESSAGES.PRINT_TERMINAL_QUEUE_HALTED)
+    }
   }
   if (code && Object.prototype.hasOwnProperty.call(PICKUP_CLAIM_MESSAGES, code)) {
     return PICKUP_CLAIM_MESSAGES[code] as string
   }
   if (code && SHARED_USER_MESSAGE_CODES.includes(code)) return userMessageOf(error, PICKUP_CLAIM_FALLBACK_MESSAGE)
   if (error instanceof ApiHttpError && (error.status === 401 || error.status === 403)) {
-    return '这台机器的安全校验没通过，请找现场工作人员'
+    return `这台机器的安全校验没通过。${printProblemLine()}`
   }
   return userMessageOf(error, PICKUP_CLAIM_FALLBACK_MESSAGE)
 }
@@ -222,8 +225,8 @@ export function claimSuccessCopy(released: boolean, printTaskStatus?: string | n
   if (printTaskStatus === 'failed' || printTaskStatus === 'cancelled' || printTaskStatus === 'abandoned') {
     return {
       title: '这一单没有打成',
-      line: '这一单没有打成。请联系现场工作人员，不要在出纸口空等。',
-      steps: ['订单已核对', '打印没有完成', '找工作人员处理'],
+      line: `这一单没有打成。不要在出纸口空等。${printProblemLine()}`,
+      steps: ['订单已核对', '打印没有完成', '查看这一单'],
       cta: '查看这一单',
     }
   }

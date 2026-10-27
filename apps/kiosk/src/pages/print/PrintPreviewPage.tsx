@@ -17,7 +17,7 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintTouchFrame } from './PrintTouchFrame'
 
 import {
   getPrintParamSuggestions,
@@ -25,6 +25,7 @@ import {
   type PrintParamSuggestionView,
 } from '../../services/api/materials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { machineCannotPrintLine, printProblemLine } from '../../copy/unattendedCopy'
 import { printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff, type PrintHandoffContext } from './printHandoff'
 import { usePreviewPrintParams } from './usePreviewPrintParams'
@@ -212,15 +213,15 @@ export function PrintPreviewPage({
     if (printerNotice) {
       next.push({ id: 'queue-gate', level: 'error', text: printerNotice })
     } else if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
-      next.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
+      next.push({ id: 'unknown', level: 'error', text: `打印机状态未知，请稍候。${printProblemLine()}` })
     } else if (printerKind === 'offline' || !printer.isOnline) {
-      next.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
+      next.push({ id: 'offline', level: 'error', text: `打印机离线。${machineCannotPrintLine()}` })
     } else if (printer.errorCode === 'paperJam') {
-      next.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
+      next.push({ id: 'jam', level: 'error', text: `打印机卡纸。${machineCannotPrintLine()}` })
     } else if (printer.errorCode === 'hardwareError' || printerKind === 'error') {
-      next.push({ id: 'hardware', level: 'error', text: '打印机异常，请联系工作人员检查后再打印' })
+      next.push({ id: 'hardware', level: 'error', text: `打印机异常。${machineCannotPrintLine()}` })
     } else if (printer.errorCode === 'paperEmpty' || !printer.hasPaper) {
-      next.push({ id: 'paper', level: 'error', text: '打印机缺纸，请联系工作人员补纸' })
+      next.push({ id: 'paper', level: 'error', text: `打印机缺纸。${machineCannotPrintLine()}` })
     }
     if (printerKind === 'low_paper') next.push({ id: 'low-paper', level: 'warn', text: '纸量偏低，建议补纸后再大批量打印' })
     return next
@@ -295,7 +296,8 @@ export function PrintPreviewPage({
 
   if (!hasFile) {
     return (
-      <QxPageFrame
+      <PrintTouchFrame
+      railNow={2}
         navbar={<PrintDeskNavbar />}
         back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="预览与打印参数"
@@ -320,14 +322,15 @@ export function PrintPreviewPage({
             <section className="qx-card"><div className="qx-sec-h"><span className="t">先准备一份文件</span></div><ul><li>不显示示例文件或示例页数。</li><li>不默认打印机在线。</li><li>不把参数写成已保存。</li></ul></section>
           </div>
         </div>
-      </QxPageFrame>
+      </PrintTouchFrame>
     )
   }
 
   if (!materialCheckComplete) {
     const canRunCheck = Boolean(file.fileId)
     return (
-      <QxPageFrame
+      <PrintTouchFrame
+      railNow={2}
         navbar={<PrintDeskNavbar />}
         title="预览与打印参数"
         subtitle="隐私预检不可绕过"
@@ -364,7 +367,7 @@ export function PrintPreviewPage({
             <section className="qx-card"><div className="qx-sec-h"><span className="t">继续前必须完成</span></div><ol><li>读取真实文件体检结果。</li><li>完成隐私片段检查与逐项裁决。</li><li>等待遮挡处理返回真实结论。</li></ol></section>
           </div>
         </div>
-      </QxPageFrame>
+      </PrintTouchFrame>
     )
   }
 
@@ -390,7 +393,8 @@ export function PrintPreviewPage({
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={3}.
   // The route now renders QxPageFrame and qx-ctabar while preserving the same business state.
   return (
-    <QxPageFrame
+    <PrintTouchFrame
+      railNow={2}
         navbar={<PrintDeskNavbar />}
       title="预览与打印参数"
       subtitle="第 3 步 / 共 4 步 · 逐页核对文件，再确认份数、颜色、单双面和页范围"
@@ -423,7 +427,7 @@ export function PrintPreviewPage({
     >
       <PrintDeskGuide step={3}
         title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
-        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? '现在不能放行到报价，请等状态返回或联系工作人员。' : '核对内容与参数，下一步看价格，最后带走打印件。'} />
+        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? `现在不能放行到报价，请等状态返回。${printProblemLine()}` : '核对内容与参数，下一步看价格，最后带走打印件。'} />
       <div className="qpd-device-strip" role="status">
         <div data-ready={printerReady ? 'true' : undefined}><span>打印机</span><strong>{printerLoading ? '正在检查' : printerLabel}</strong><small>{printerLoading ? '请稍候' : printerName}</small></div>
         <div><span>纸张</span><strong>A4</strong></div>
@@ -515,6 +519,6 @@ export function PrintPreviewPage({
         <p>下一步核对价格，再决定是否打印。</p>
         <small>未确认前不会收费；文件保留时间以隐私政策和“我的文档”设置为准。</small>
       </section>
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

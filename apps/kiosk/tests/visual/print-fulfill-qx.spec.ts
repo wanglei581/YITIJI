@@ -106,7 +106,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
 
   await expect(page.locator('[data-testid="print-fulfill-state-out-of-paper"]')).toBeVisible()
   await expect(page.getByText('打印机缺纸', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId('print-fulfill-fallback')).toContainText('打印有问题？')
   await expect(page.getByText('agent stack must stay hidden')).toHaveCount(0)
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
 
@@ -117,7 +118,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   // 正是"页面没给出重试出口"的那一态：此时更不能让用户以为补个纸就能等到结果。
   const outOfPaper = page.locator('[data-testid="print-fulfill-state-out-of-paper"]')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
-  await expect(outOfPaper).toContainText('联系现场工作人员')
+  await expect(outOfPaper).toContainText('打印有问题？')
+  await expect(outOfPaper).not.toContainText('联系现场工作人员')
   await expect(outOfPaper).toContainText('订单和已付金额都保留着')
   // 「只有出现按钮时才能自己重打」——重试必须被说成有条件的，不是无条件可用。
   await expect(outOfPaper).toContainText('只有本页出现「重新提交打印」按钮时')
@@ -155,8 +157,9 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
     await expect(outOfPaper, `缺纸页不得出现「${banned}」`).not.toContainText(banned)
   }
   await expect(page.getByRole('button', { name: '查看费用说明' })).toBeVisible()
-  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('联系工作人员处理')
-  await expect(outOfPaper.getByRole('status')).toContainText('暂时无法签发带走链接，请联系工作人员')
+  await expect(page.getByTestId('print-fulfill-primary')).toHaveText('使用帮助')
+  await expect(outOfPaper.getByRole('status')).toContainText('打印有问题？')
+  await expect(outOfPaper.getByRole('status')).not.toContainText('联系工作人员')
 
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-out-of-paper.png'), fullPage: true })
@@ -276,7 +279,7 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
 
   await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toBeVisible()
   await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toContainText('你的订单和已付金额都保留着')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
   if (page.viewportSize()?.width === 1080) {
@@ -341,7 +344,7 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
   await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
   await expect(jam).not.toContainText('已付金额')
   await expect(jam).not.toContainText('已支付')
-  await expect(page.getByRole('region', { name: '找工作人员之前先做这三件' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })
 

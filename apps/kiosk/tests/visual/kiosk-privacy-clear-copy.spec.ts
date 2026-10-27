@@ -129,8 +129,6 @@ test('W-43 print done "我拿走了，结束使用" really ends the use and logs
   const end = page.getByTestId('print-fulfill-primary')
   await expect(end).toHaveText('我拿走了，结束使用')
   await end.click()
-  await expect(end).toHaveText('再按一次，确认结束使用')
-  await end.click()
 
   // 真的结束：回首页、已退出登录，首页不再说有人登录着。
   await expect(page).toHaveURL(/\/$/)

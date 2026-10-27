@@ -20,7 +20,7 @@ import { CircleHelpIcon, FilePlus2Icon, ListOrderedIcon, QrCodeIcon, RefreshCwIc
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintTouchFrame } from './PrintTouchFrame'
 import { API_MODE } from '../../services/api/client'
 import {
   createCodePayAttempt,
@@ -32,6 +32,7 @@ import {
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
 import {
   deriveCashierView,
   isPaymentAttemptSelectionLocked,
@@ -72,7 +73,7 @@ const PAYMENT_METHOD_LABELS = {
   code: { name: '扫付款码', action: '出示你的付款码', desc: '本机扫码器读你手机上的码' },
 } as const
 
-const REFUND_ASSISTANCE_COPY = '如需退款请联系现场工作人员协助处理，本机不提供自助退款'
+const REFUND_ASSISTANCE_COPY = `${refundApplyLine()}本机不提供自助退款`
 
 /** 路由 state 来自上一页，但可能被旧链接 / 浏览历史带成任何形状：只认有文件名的对象。 */
 function isPrintFileState(value: unknown): value is PrintFileState {
@@ -148,7 +149,7 @@ export function PrintCashierPage() {
       if (staleSignal?.aborted) return
       navigatedRef.current = false
       setReleaseFailed(true)
-      setIssueError(userMessageOf(error, '订单已付款，但创建打印任务失败，请重试或联系现场工作人员'))
+      setIssueError(userMessageOf(error, `订单已付款，但创建打印任务失败，请重试。${printProblemLine()}`))
     }
   }, [navigate, state, orderId, paymentSessionToken])
 
@@ -174,7 +175,7 @@ export function PrintCashierPage() {
       } catch (err) {
         if (cancelRef.current) return
         // 出码失败不阻断轮询（订单可能已 paid/closed，轮询会反映真实状态）；仅提示。
-        setIssueError(userMessageOf(err, '出码失败，请稍后重试或联系现场工作人员'))
+        setIssueError(userMessageOf(err, `出码失败，请稍后重试。${printProblemLine()}`))
       } finally {
         if (!cancelRef.current) setIssuing(false)
       }
@@ -196,7 +197,7 @@ export function PrintCashierPage() {
         const first = list.length === 1 ? list[0] ?? null : null
         setSelectedChannel(first)
         if (list.length === 0) {
-          setIssueError('线上支付未开通，请联系现场工作人员')
+          setIssueError(`线上支付未开通。${printProblemLine()}`)
         }
       } catch (err) {
         if (cancelRef.current) return
@@ -480,13 +481,13 @@ export function PrintCashierPage() {
     }
     if (qxState === 'channel-empty') return { label: '改天再打', icon: <XCircleIcon aria-hidden="true" />, run: () => navigate(uploadPath) }
     if (qxState === 'expired') return { label: '改参数需重新下单', icon: <FilePlus2Icon aria-hidden="true" />, run: () => navigate(uploadPath) }
-    if (qxState === 'attempt-channel-unknown' || qxState === 'session-expired') return { label: '联系工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
+    if (qxState === 'attempt-channel-unknown' || qxState === 'session-expired') return { label: '使用帮助', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
     if (qxState === 'attempt-failed' && (channels?.length ?? 0) > 1) return { label: '换个支付通道', icon: <ListOrderedIcon aria-hidden="true" />, run: resetChannelSelection }
     if (qxState === 'pending-scan') return { label: '改用屏上收款码', icon: <QrCodeIcon aria-hidden="true" />, run: () => selectPaymentMethod('qr') }
     if (qxState === 'channel-selected' && (channels?.length ?? 0) > 1) return { label: '重新选通道', icon: <RefreshCwIcon aria-hidden="true" />, run: resetChannelSelection }
     if (['pending', 'channel-selected', 'channel-loading'].includes(qxState)) return paramsBack
-    if (qxState === 'closed') return { label: '拿订单号找工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
-    return { label: '联系工作人员', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
+    if (qxState === 'closed') return { label: '使用帮助', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
+    return { label: '使用帮助', icon: <CircleHelpIcon aria-hidden="true" />, run: () => navigate('/help') }
   })()
 
   /** 订单已建、钱还没付成的那些状态。用户在这里最容易被困住：
@@ -514,7 +515,7 @@ export function PrintCashierPage() {
       return { label: qxState === 'release-failed' ? '重试创建打印任务' : qxState === 'paid' ? '去看打印进度' : '开始打印', run: () => void proceedToPrint(), disabled: false }
     }
     if (qxState === 'channel-failed') return { label: '重新读取支付通道', run: reloadChannels, disabled: false }
-    if (qxState === 'channel-empty' || qxState === 'refunding' || qxState === 'partial-refunded') return { label: '联系工作人员', run: () => navigate('/help'), disabled: false }
+    if (qxState === 'channel-empty' || qxState === 'refunding' || qxState === 'partial-refunded') return { label: '使用帮助', run: () => navigate('/help'), disabled: false }
     if (qxState === 'pending-qr' || qxState === 'awaiting-code-confirmation' || qxState === 'pending-verification' || qxState === 'display-expired-reconciling') {
       const idle = qxState === 'pending-verification' ? '再次刷新结果' : '刷新付款结果'
       return { label: reconciling ? '正在刷新付款结果' : idle, run: () => void refreshStatus(), disabled: reconciling }
@@ -540,7 +541,7 @@ export function PrintCashierPage() {
 
   return (
     <div data-w2-page="print-cashier" className="cashier-qx-route">
-    <QxPageFrame
+    <PrintTouchFrame
       /* 稿 32-cashier 原文：data-route="/me/print-orders" aria-label="返回我的打印订单"。
        *  和 CTA 上的「退出支付」是两件事：返回=去看这张待付订单（订单还在），
        *  退出支付=放弃这次支付回首页。两个都要，缺一都会让人在收银台里困住。 */
@@ -626,7 +627,7 @@ export function PrintCashierPage() {
         onReissue={handleReissue}
         onSimulateSandbox={(result) => void devSimulate(result)}
       />
-    </QxPageFrame>
+    </PrintTouchFrame>
     </div>
   )
 }

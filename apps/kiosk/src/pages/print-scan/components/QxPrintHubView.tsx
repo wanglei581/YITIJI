@@ -10,9 +10,11 @@
 
 import { type CSSProperties, type ReactNode } from 'react'
 import { PrintAiHelp } from '../../print/components/PrintAiHelp'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
+import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
+import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import {
-  ArrowRightIcon,
   CopyIcon,
   InfoIcon,
   LockIcon,
@@ -318,7 +320,7 @@ function HubBanner({
         >
           <p className="ph-state-p">
             {orderPaused ? orderPaused.notice : (
-              <>{printerUnavailable?.notice ?? '打印机暂不可用，请找现场工作人员'}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
+              <>{printerUnavailable?.notice ?? '打印机暂不可用 · 出纸类暂停'}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
             )}
           </p>
         </PrintHubState>
@@ -331,9 +333,68 @@ function HubBanner({
 function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string) {
   return (
     <div className="ph-axes" data-testid="print-hub-axes" data-probe={probe} data-mfp={mfp}>
-      <span>文件检查 → 设置参数 → 确认打印</span>
+      <span>选文件 → 材料检查 → 预览与参数 → 核对价格</span>
       <span>按 A4 出纸 · {colorDuplexLabel}</span>
     </div>
+  )
+}
+
+const HUB_CAP_ICON: Record<string, QxTouchIconName> = {
+  'doc-print': 'printer',
+  scan: 'scan',
+  'photo-print': 'image',
+  'phone-upload': 'phone',
+  'usb-import': 'usb',
+  convert: 'layers',
+  sign: 'pen',
+  'id-photo': 'idcard',
+}
+
+function HubCapButton({
+  capability,
+  index,
+  variant,
+  onCapability,
+}: {
+  capability: QxPrintCapabilityView
+  index: number
+  variant: 'task' | 'tile'
+  onCapability: (key: string) => void
+}) {
+  const closed = !capability.actionable
+  const badge = capability.unavailableBadge ?? '暂不可用'
+  const reason = capability.note ? `${badge}：${capability.note}` : badge
+  const icon = HUB_CAP_ICON[capability.key] ?? 'file'
+  const desc = closed && capability.note ? capability.note : capability.description
+  return (
+    <button
+      type="button"
+      className={variant === 'task'
+        ? `qxt-task qxt-rise${closed ? ' qxt-hold' : ''}`
+        : `qxt-tile qxt-rise qxt-tile-stack${closed ? ' qxt-off qxt-hold' : ''}`}
+      style={stagger(index)}
+      data-testid={`print-hub-cap-${capability.key}`}
+      aria-disabled={closed || undefined}
+      aria-label={closed ? `${capability.title}（${reason}）` : capability.title}
+      onClick={closed ? undefined : () => onCapability(capability.key)}
+    >
+      {variant === 'task' ? (
+        <>
+          <div className="qxt-top">
+            <span className="qxt-ic"><QxTouchIcon name={icon} size={40} /></span>
+            {closed ? <QxTouchChip tone="slate">{badge}</QxTouchChip> : null}
+          </div>
+          <h3>{capability.title}</h3>
+          <p>{desc}</p>
+          {!closed && capability.stateNote ? <div className="qxt-take"><span>{capability.stateNote}</span></div> : null}
+        </>
+      ) : (
+        <>
+          <span className="qxt-ic"><QxTouchIcon name={icon} size={34} /></span>
+          <span className="qxt-tx"><b>{capability.title}</b><small>{desc}</small></span>
+        </>
+      )}
+    </button>
   )
 }
 
@@ -357,14 +418,20 @@ export function QxPrintHubView({
   onQuickLink,
   onBack,
 }: QxPrintHubViewProps) {
-  const ArrivalIcon = arrivalCode.icon
   const showBanner = hubState !== 'default'
   const usableServices = capabilities.filter((item) => item.actionable && ['phone-upload', 'usb-import', 'convert', 'sign'].includes(item.key)).map((item) => item.title).join('、')
   const checking = probe === 'loading'
+  const mainCaps = capabilities.filter((item) => item.key === 'doc-print' || item.key === 'scan')
+  const toolOrder = ['photo-print', 'convert', 'sign', 'id-photo', 'phone-upload', 'usb-import']
+  const toolCaps = capabilities
+    .filter((item) => item.key !== 'doc-print' && item.key !== 'scan')
+    .slice()
+    .sort((a, b) => (toolOrder.indexOf(a.key) < 0 ? 99 : toolOrder.indexOf(a.key)) - (toolOrder.indexOf(b.key) < 0 ? 99 : toolOrder.indexOf(b.key)))
+  const holdTransfer = mfp === 'unavailable' && toolCaps.some((item) => (item.key === 'phone-upload' || item.key === 'usb-import') && item.actionable)
 
   return (
     <div
-      className="qx-scroll ph-page"
+      className="qx-scroll ph-page qxt-print-hub"
       data-w2-page="print-scan-home"
       data-qx-page="print-hub"
       data-takeaway="打印件或 PDF"
@@ -383,115 +450,80 @@ export function QxPrintHubView({
         </section>
       ) : null}
 
-      <section className="ph-sec ph-sec--grow" aria-labelledby="ph-sec-tasks">
-        <div className="ph-sec-h">
-          <span className="ph-no">01</span>
-          <span className="t" id="ph-sec-tasks">要办什么</span>
-          <span className="hint">{capabilityGroupHint}</span>
-        </div>
-        {showBanner ? null : axisChips(probe, mfp, colorDuplexLabel)}
-        <div className="ph-grid" aria-busy={checking || undefined}>
-          {capabilities.map((capability, index) => {
-            const Icon = capability.icon
-            const closed = !capability.actionable
-            const badge = capability.unavailableBadge ?? '暂不可用'
-            const reason = capability.note ? `${badge}：${capability.note}` : badge
-            return (
-              <button
-                key={capability.key}
-                type="button"
-                className={`ph-cap${capability.wide ? ' ph-cap--wide' : ''}`}
-                style={stagger(index)}
-                data-testid={`print-hub-cap-${capability.key}`}
-                aria-disabled={closed || undefined}
-                aria-label={closed ? `${capability.title}（${reason}）` : capability.title}
-                onClick={closed ? undefined : () => onCapability(capability.key)}
-              >
-                <span className="ph-cap-ic" data-tone={capability.iconTone} aria-hidden="true">
-                  <Icon size={32} />
-                </span>
-                <span className="ph-cap-body">
-                  <span className="ph-cap-name">{capability.title}</span>
-                  {/* 停用且有具体原因时，原因顶替说明行：此刻「为什么点不了」比「这是干什么的」更要紧。 */}
-                  {closed && capability.note ? (
-                    <span className="ph-cap-desc ph-cap-note">{capability.note}</span>
-                  ) : (
-                    <span className="ph-cap-desc">{capability.description}</span>
-                  )}
-                </span>
-                <span className="ph-cap-foot">
-                  {closed ? (
-                    <span className="ph-badge-off" data-busy={checking || undefined}>{badge}</span>
-                  ) : (
-                    capability.stateNote
-                  )}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="ph-sec" aria-labelledby="ph-sec-records">
-        <div className="ph-sec-h">
-          <span className="ph-no">02</span>
-          <span className="t" id="ph-sec-records">已下过单 · 我的文件</span>
-          <span className="hint">{recordsGroupHint}</span>
-          {quickLinks.filter((link) => link.compact).map((link) => {
-            const Icon = link.icon
-            return (
-              <button
-                key={link.key}
-                type="button"
-                className="ph-sec-act"
-                data-testid={`print-hub-quick-${link.key}`}
-                aria-label={`${link.title}：${link.description}`}
-                onClick={() => onQuickLink(link.key)}
-              >
-                <Icon size={22} aria-hidden="true" />
-                {link.title}
-              </button>
-            )
-          })}
-        </div>
+      <div className="qxt-sec" id="ph-sec-tasks">
+        要办什么
+        <small>{capabilityGroupHint}</small>
+      </div>
+      {showBanner ? null : axisChips(probe, mfp, colorDuplexLabel)}
+      {holdTransfer ? <p className="qxt-fine qxt-fine-tight">先传、稍后打印。手机和 U 盘仍可把文件存上来。</p> : null}
+      <div className="qxt-grid2 ph-grid" aria-busy={checking || undefined}>
+        {mainCaps.map((capability, index) => (
+          <HubCapButton key={capability.key} capability={capability} index={index} variant="task" onCapability={onCapability} />
+        ))}
+        <button type="button" className="qxt-task qxt-rise" style={stagger(2)} onClick={() => onQuickLink(COPY_GUIDE_KEY)}>
+          <div className="qxt-top">
+            <span className="qxt-ic"><QxTouchIcon name="copy" size={40} /></span>
+          </div>
+          <h3>复印</h3>
+          <p>在打印机面板上操作，取走纸质复印件。</p>
+          <div className="qxt-take"><span>看步骤</span></div>
+        </button>
         <button
           type="button"
-          className="ph-src"
-          style={stagger(9)}
+          className="qxt-task qxt-rise ph-src"
+          style={stagger(3)}
           data-testid="print-hub-primary"
           data-arrival="true"
           onClick={onArrivalCode}
         >
-          <span className="ph-src-ic" data-tone="clay" aria-hidden="true">
-            <ArrivalIcon size={42} />
-          </span>
-          <span className="ph-src-main">
-            <span className="ph-src-name">
-              {arrivalCode.title}
-              <span className="ph-tag">不是取件码</span>
-            </span>
-            <span className="ph-src-desc">{emphasize(arrivalCode.description, arrivalCode.emphasis)}</span>
-            {arrivalCode.stateNote ? (
-              <span className="ph-src-reason">{arrivalCode.stateNote}</span>
-            ) : null}
-          </span>
-          <span className="ph-src-go" aria-hidden="true">
-            <ArrowRightIcon size={28} />
-          </span>
+          <div className="qxt-top">
+            <span className="qxt-ic"><QxTouchIcon name="ticket" size={40} /></span>
+            <QxTouchChip tone="clay">不是取件码</QxTouchChip>
+          </div>
+          <h3>{arrivalCode.title}</h3>
+          <p>{emphasize(arrivalCode.description, arrivalCode.emphasis)}</p>
+          {arrivalCode.stateNote ? <p>{arrivalCode.stateNote}</p> : null}
         </button>
-        <PrintHubRecordNotes links={quickLinks.filter((link) => !link.compact)} onOpen={onQuickLink} />
-      </section>
+      </div>
+
+      {toolCaps.length > 0 ? (
+        <div className="qxt-tools" aria-label="其他办理">
+          {toolCaps.map((capability, index) => (
+            <HubCapButton key={capability.key} capability={capability} index={index + 4} variant="tile" onCapability={onCapability} />
+          ))}
+        </div>
+      ) : null}
+
+      <div className="qxt-sec" id="ph-sec-records">
+        已下过单 · 我的文件
+        <small>{recordsGroupHint}</small>
+      </div>
+      <div className="qxt-tools">
+        {quickLinks.filter((link) => link.compact).map((link) => (
+          <button
+            key={link.key}
+            type="button"
+            className="qxt-tile qxt-rise"
+            data-testid={`print-hub-quick-${link.key}`}
+            aria-label={`${link.title}：${link.description}`}
+            onClick={() => onQuickLink(link.key)}
+          >
+            <span className="qxt-tx"><b>{link.title}</b><small>{link.description}</small></span>
+          </button>
+        ))}
+      </div>
+      <PrintHubRecordNotes links={quickLinks.filter((link) => !link.compact)} onOpen={onQuickLink} />
 
       <div className="ph-actions">
         <button type="button" onClick={onBack}>上一步</button>
         {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
-        {showBanner ? <button type="button" onClick={onHelp}>联系工作人员</button> : null}
+        {showBanner ? <button type="button" onClick={onHelp}>使用帮助</button> : null}
         <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
       </div>
+      {showBanner ? <p className="qxt-fine">{helpNeededLine()}</p> : null}
       <footer className="ph-foot">
         <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务，以办理时显示为准。</div></div>
         {notices.length > 0 ? (
-          // 全文逐字保留，只是默认收起：开关常驻底注右侧，点开在底注上方展开（原生 details，键盘 / 读屏可达）。
           <details className="ph-notices" data-disclaimer="true">
             <summary>
               <span>隐私与电子签说明</span>

@@ -36,7 +36,7 @@ import {
   PICKUP_CODE_PATTERN,
   isLegacyPickupCode,
 } from '@ai-job-print/shared'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintTouchFrame } from './PrintTouchFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
@@ -275,7 +275,7 @@ export function PrintPickupClaimPage() {
 
   // 青序壳：标题全程不变、底部导航按稿常驻；返回键按稿 aria-label="返回打印扫描"，终态「认领成功」不放——它的出口是自己的主行动。
   const frame = (body: ReactNode) => (
-    <QxPageFrame
+    <PrintTouchFrame
       back={screen === 'success' ? undefined : { label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
       title="输入你的到机码"
       subtitle={screen === 'hid' ? <>不用手输：<strong>把手机上的码，对准机身扫码区</strong>。</> : <PickupSubtitle screen={screen} />}
@@ -299,7 +299,7 @@ export function PrintPickupClaimPage() {
       }
     >
       {body}
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 
   // ── 成功：先看有没有放行，再看打印状态（已完成不能再说还在排队） ──

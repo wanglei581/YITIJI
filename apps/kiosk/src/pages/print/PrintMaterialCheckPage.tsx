@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { PrintTouchFrame } from './PrintTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
@@ -567,7 +567,8 @@ export function PrintMaterialCheckPage({
 
   if (!file) {
     return (
-      <QxPageFrame
+      <PrintTouchFrame
+      railNow={1}
         navbar={<PrintDeskNavbar />}
         back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
         title="材料检查"
@@ -632,7 +633,7 @@ export function PrintMaterialCheckPage({
             </section>
           </div>
         </div>
-      </QxPageFrame>
+      </PrintTouchFrame>
     )
   }
 
@@ -657,7 +658,8 @@ export function PrintMaterialCheckPage({
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={2}.
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
-    <QxPageFrame
+    <PrintTouchFrame
+      railNow={1}
       navbar={<PrintDeskNavbar />}
       back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
       title="材料检查"
@@ -746,6 +748,6 @@ export function PrintMaterialCheckPage({
           onDecision={setDecision}
         />
       </div>
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

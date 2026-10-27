@@ -274,7 +274,7 @@ assert.doesNotMatch(printScanFeature, /KioskPageFrame/, 'feature info page has l
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 const printScanHomeView = read('src/pages/print-scan/components/QxPrintHubView.tsx')
 const printHubQxCss = read('src/pages/print-scan/styles/print-hub-qx.css')
-assert.match(printScanHome, /QxPageFrame/, 'print-scan hub uses Qingxu page frame')
+assert.match(printScanHome, /PrintTouchFrame/, 'print-scan hub uses the touch screen frame')
 assert.match(
   printScanHome,
   /QxPrintHubView/,
@@ -527,7 +527,7 @@ assert.match(
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
 assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
-assert.match(printUploadView, /QxPageFrame/, 'print upload uses Qingxu page frame')
+assert.match(printUploadView, /PrintTouchFrame/, 'print upload uses the touch screen frame')
 assert.match(
   read('src/layouts/KioskRoot.tsx'),
   /['"]\/print\/upload['"]/,
@@ -647,7 +647,7 @@ assert.match(
   /data-w2-page=["']print-confirm["']/,
   'src/pages/print/PrintConfirmPage.tsx exposes print-confirm',
 )
-assert.match(printConfirmQx, /QxPageFrame/, 'PrintConfirmPage uses the Qingxu page frame')
+assert.match(printConfirmQx, /PrintTouchFrame/, 'PrintConfirmPage uses the touch screen frame')
 assert.match(printConfirmQx, /qx-btn/, 'PrintConfirmPage uses Qingxu action buttons')
 assert.doesNotMatch(printConfirmQx, /KioskPageFrame/, 'print-confirm has left the V6 frame')
 assert.doesNotMatch(printConfirmQx, /PrintPageFrame/, 'print-confirm has left the V6 print frame')
@@ -788,8 +788,8 @@ const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /已在本机出纸/, 'print done says the paper is already out on this machine')
 assert.doesNotMatch(printDone, /getPayStatus|取件码/, 'print done does not fetch or show a pickup code')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
-assert.match(printProgress, /QxPageFrame/, 'print progress uses Qingxu page frame')
-assert.match(printDone, /QxPageFrame/, 'print done uses Qingxu page frame')
+assert.match(printProgress, /PrintTouchFrame/, 'print progress uses the touch screen frame')
+assert.match(printDone, /PrintTouchFrame/, 'print done uses the touch screen frame')
 assert.doesNotMatch(printProgress, /KioskPageFrame/, 'print progress has left the V6 frame')
 assert.doesNotMatch(printDone, /KioskPageFrame/, 'print done has left the V6 frame')
 assert.doesNotMatch(printProgress, /PrintPageFrame/, 'print progress has left the V6 print frame')

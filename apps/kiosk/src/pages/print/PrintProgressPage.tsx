@@ -29,7 +29,8 @@ import {
   FileTextIcon,
   ShieldIcon,
 } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { printProblemLine } from '../../copy/unattendedCopy'
+import { PrintTouchFrame } from './PrintTouchFrame'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -287,8 +288,8 @@ export function PrintProgressPage() {
           navigateFail(
             result.failureReasonForUser
               ?? (result.status === 'cancelled'
-                ? '任务已取消，请联系现场工作人员确认订单'
-                : '任务已结束，请联系现场工作人员确认订单'),
+                ? `任务已取消。${printProblemLine()}`
+                : `任务已结束。${printProblemLine()}`),
           )
           return
         }
@@ -304,7 +305,7 @@ export function PrintProgressPage() {
         setStatusReadError(true)
         if (pollFailsRef.current >= POLL_FAIL_LIMIT) {
           stopped = true
-          navigateFail(`${STATUS_READ_ERROR_TEXT}，请联系工作人员`)
+          navigateFail(`${STATUS_READ_ERROR_TEXT}。${printProblemLine()}`)
         }
       }
     }
@@ -371,7 +372,7 @@ export function PrintProgressPage() {
 
   if (!hasContext || (!isHttpMode && !canSimulate)) {
     return (
-      <QxPageFrame
+      <PrintTouchFrame
         /* 稿 15-print-fulfill 原文：aria-label="返回首页"。
        *  返回 ≠ 取消：打印任务在服务端，离开这一屏不会终止它，
        *  用户可以从「我的打印订单」再回来看进度。 */
@@ -396,13 +397,13 @@ export function PrintProgressPage() {
             </div>
           </div>
         </div>
-      </QxPageFrame>
+      </PrintTouchFrame>
     )
   }
 
   if (isHttpMode && !taskId) {
     return (
-      <QxPageFrame
+      <PrintTouchFrame
         back={{ label: '返回确认页', onBack: () => navigate('/print/confirm', { state }) }}
         title="打印任务尚未创建"
         subtitle="请返回确认页重试"
@@ -424,7 +425,7 @@ export function PrintProgressPage() {
             </div>
           </div>
         </div>
-      </QxPageFrame>
+      </PrintTouchFrame>
     )
   }
 
@@ -528,7 +529,7 @@ export function PrintProgressPage() {
   const jobRow = <PrintJobRow fileName={fileName} subline={jobSubline(file, params)} idLine={idLine} state={jobState} />
 
   return (
-    <QxPageFrame
+    <PrintTouchFrame
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
       status={frameStatus}
@@ -550,7 +551,7 @@ export function PrintProgressPage() {
               重新查询状态
             </button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>
-              联系工作人员
+              使用帮助
             </button>
           </>
         ) : showFailure ? (
@@ -745,29 +746,29 @@ export function PrintProgressPage() {
         <section className="pff-sec" aria-label="常见情况处理">
           <div className="pff-sec-h">
             <span className="t">遇到这些情况怎么办</span>
-            <span className="hint">找现场工作人员最快</span>
+            <span className="hint">先看下面这几条</span>
           </div>
           <div className="pfp-card pfp-faq-card">
             <ul className="pfp-faq">
               <li><AlertTriangleIcon aria-hidden="true" /><p><b>打印机缺纸 / 卡纸</b>：别硬拉纸；打印机报告卡纸或缺纸后，本页会转到结果页说明原因。</p></li>
-              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口或找现场工作人员。查了很久仍没有最终结果时，本页也会另外提示。</p></li>
+              <li><ClockIcon aria-hidden="true" /><p><b>长时间没有新进度</b>：如果停在出纸又没有新消息，请看出纸口。查了很久仍没有最终结果时，本页也会另外提示。{printProblemLine()}</p></li>
               <li><FileTextIcon aria-hidden="true" /><p><b>文件校验未通过</b>：上传可能中断或文件已变化，需返回重新上传。</p></li>
               <li>
                 <CreditCardIcon aria-hidden="true" />
                 <p>
                   {isFreeOrder
-                    ? <><b>打印失败</b>：订单记录保留，请找现场工作人员核对。</>
+                    ? <><b>打印失败</b>：订单记录保留。{printProblemLine()}</>
                     : payment === 'paid'
-                      ? <><b>已支付但打印失败</b>：订单与支付记录都在，退款以工作人员核查为准。</>
-                      : <><b>打印失败</b>：订单记录已保存，费用以工作人员核查结果为准。</>
+                      ? <><b>已支付但打印失败</b>：订单与支付记录都在。是否退款以订单记录为准，本机不承诺自动退款。{printProblemLine()}</>
+                      : <><b>打印失败</b>：订单记录已保存。{printProblemLine()}</>
                   }
                 </p>
               </li>
             </ul>
             <div className="pff-help" data-testid="print-fulfill-fallback">
-              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>，找现场工作人员处理。</span>
+              <span className="txt">卡纸、缺纸、没出全？<b>别硬拉纸</b>。{printProblemLine()}</span>
               <button type="button" className="pff-help-btn" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                联系工作人员
+                使用帮助
               </button>
             </div>
             <PrintAiHelp
@@ -806,6 +807,6 @@ export function PrintProgressPage() {
         </button>
       )}
     </div>
-    </QxPageFrame>
+    </PrintTouchFrame>
   )
 }

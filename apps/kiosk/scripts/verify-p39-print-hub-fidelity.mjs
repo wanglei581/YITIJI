@@ -72,7 +72,7 @@ must(
   /data-w2-page=["']print-scan-home["']/.test(viewSrc),
   '保留路由归属标记 data-w2-page="print-scan-home"'
 )
-must(/QxPageFrame/.test(homeSrc), 'Hub 使用 QxPageFrame')
+must(/PrintTouchFrame/.test(homeSrc), 'Hub 使用触屏页壳 PrintTouchFrame')
 must(/isQxMigratedPath\(pathname\)/.test(rootSrc), '带参路由走具名谓词，不只 Set.has')
 must(/\/print-scan\/feature\//.test(rootSrc), '前缀列表收录 /print-scan/feature/')
 must(

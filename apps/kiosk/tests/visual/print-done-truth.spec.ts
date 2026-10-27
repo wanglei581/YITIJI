@@ -301,7 +301,8 @@ for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
     await retryButton.click()
 
     const alert = page.locator('.qx-ctabar').getByRole('alert')
-    await expect(alert).toHaveText('这台机器的打印程序需要升级后才能重新提交，请找现场工作人员')
+    await expect(alert).toHaveText(/这台机器的打印程序需要升级后才能重新提交。打印有问题？/)
+    await expect(alert).not.toContainText('找现场工作人员')
     // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。
     await expect(alert).toBeInViewport({ ratio: 1 })
     const box = await alert.boundingBox()

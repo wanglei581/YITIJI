@@ -88,10 +88,10 @@ const checks = [
     // 完成页自己不许 logout / 清数据：半清正是这次要堵的洞。
     assert.doesNotMatch(doneRuntime, /\blogout\s*\(|clearPrintMaterialSession\s*\(|clearKioskSensitiveSession\s*\(/)
     assert.doesNotMatch(doneRuntime, /setWiped|登录还在|账号还登录着|账号不会因此退出/)
-    // 主按钮：两步确认后同样走 endKioskUse。
-    assert.match(doneRuntime, /'我拿走了，结束使用'/)
-    assert.match(doneRuntime, /endArmed \? '再按一次，确认结束使用'/)
-    assert.match(doneRuntime, /if \(endArmed\) \{\s*endKioskUse\('end_use'\)/)
+    // 主按钮：按一下就结束，不再二次确认。到点仍走 print_done_timeout。
+    assert.match(doneRuntime, /我拿走了，结束使用/)
+    assert.doesNotMatch(doneRuntime, /endArmed|再按一次，确认结束使用/)
+    assert.match(doneRuntime, /onClick=\{\(\) => \{\s*endKioskUse\('end_use'\)/)
     // 倒计时文案如实：登录着就说会退出登录。
     assert.match(doneRuntime, /到点会结束本次使用并退出登录/)
     assert.match(doneRuntime, /秒后结束使用/)
@@ -157,14 +157,15 @@ const checks = [
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
     assert.match(doneSource, /文件带走/)
-    assert.match(doneSource, /联系工作人员补打/)
+    assert.match(doneSource, /printProblemLine\(/)
+    assert.doesNotMatch(doneRuntime, /联系工作人员|找现场工作人员|找工作人员/)
     assert.match(doneSource, /重新提交打印/)
     assert.match(doneSource, /issuePrintJobTakeawayUrl/)
     assert.match(doneSource, /retryPrintJob/)
     assert.doesNotMatch(doneRuntime, /const\s+handleRetry/)
   }],
   ['W-114 重提版本门槛给求职者下一步，提示在固定按钮栏', () => {
-    assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\? '这台机器的打印程序需要升级后才能重新提交，请找现场工作人员'/)
+    assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\? `这台机器的打印程序需要升级后才能重新提交。\$\{printProblemLine\(\)\}`/)
     const retryActions = doneRuntime.slice(doneRuntime.indexOf('const retryButton ='), doneRuntime.indexOf('const takeawayNotices ='))
     const takeawayNotices = doneRuntime.slice(doneRuntime.indexOf('const takeawayNotices ='), doneRuntime.indexOf("if (visual === 'out-of-paper')"))
     assert.match(retryActions, /retryError &&[\s\S]*role="alert"[\s\S]*flex: '1 1 100%'[\s\S]*order: -1[\s\S]*\{retryError\}/)

@@ -19,7 +19,7 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.qxt-screen button {
+.qxt-screen.qxt-btn-reset button {
   font: inherit;
   color: inherit;
   background: none;
