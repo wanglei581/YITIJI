@@ -1,5 +1,7 @@
 import type { PendingTask } from '../../services/api/pendingTasks'
-import { PublicArt } from '../public-touch/PublicArt'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { ArtBox, Card, Hit, Note } from '../public-touch/PublicBlocks'
+import { IllusMachine } from '../public-touch/PublicIllus'
 import {
   formatResumeAmount,
   formatResumeUpdatedAt,
@@ -11,12 +13,26 @@ import {
   type ResumeScreen,
 } from './sessionResumeModel'
 
-function exitArt(id: string): 'stack' | 'phone' | 'list' {
-  if (id === 'print') return 'stack'
-  if (id === 'code') return 'phone'
-  return 'list'
+type Exit = { id: string; title: string; sub: string; route: string }
+
+function Exits({ items, onExit }: { items: readonly Exit[]; onExit: (route: string) => void }) {
+  return (
+    <div className="qxp-col sr-exits">
+      {items.map((item) => (
+        <Hit
+          key={item.id}
+          title={item.title}
+          sub={item.sub}
+          chevron
+          testId={`session-resume-exit-${item.id}`}
+          onClick={() => onExit(item.route)}
+        />
+      ))}
+    </div>
+  )
 }
 
+/** 已登录后的正文：读取中 / 空 / 读不到 / 列表。读取中不画骨架，只说明在做什么。 */
 export function SessionResumeView({
   screen,
   tasks,
@@ -30,150 +46,106 @@ export function SessionResumeView({
 }) {
   if (screen === 'loading') {
     return (
-      <div className="sr-page qx-grow qx-scroll" data-screen="session-resume" data-state="loading" data-testid="session-resume-state-loading">
-        <div className="sr-head">
-          <div>
-            <p className="sr-head-p">先确认登录还在不在，再取你名下没办完的打印任务。取不到就说取不到，不会先画一份任务出来。</p>
-          </div>
-        </div>
-        <ul className="sr-list">
-          {Array.from({ length: 7 }, (_, i) => (
-            <li key={i} className="sr-row" aria-hidden="true" data-testid={`session-resume-skeleton-${i}`}>
-              <span className="sr-row-ic" />
-              <span className="sr-row-tx" style={{ flex: 1 }}>
-                <span className="sr-skel t" />
-                <span className="sr-skel s" />
-              </span>
-              <span className="sr-skel a" />
-            </li>
-          ))}
-        </ul>
-        <Truth />
+      <div className="qxp-grow sr-page" data-screen="session-resume" data-state="loading" data-testid="session-resume-state-loading">
+        <QxTouchCallout kind="howto" icon="alert">先确认登录还在不在，再取你名下没办完的打印任务。取不到就说取不到，不会先画一份任务出来。</QxTouchCallout>
+        <Card className="sr-sink">
+          <ArtBox><IllusMachine /></ArtBox>
+        </Card>
       </div>
     )
   }
 
   if (screen === 'empty') {
     return (
-      <div className="sr-page qx-grow qx-scroll" data-screen="session-resume" data-state="empty" data-testid="session-resume-state-empty">
-        <div className="sr-banner" data-testid="session-resume-empty">
-          <div>
-            <b>名下没有未完成的打印任务</b>
-            <p>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。</p>
-          </div>
+      <div className="qxp-grow sr-page" data-screen="session-resume" data-state="empty" data-testid="session-resume-state-empty">
+        <div data-testid="session-resume-empty">
+          <QxTouchCallout kind="howto" icon="alert">没有没办完的打印。已经完成的不在这里。</QxTouchCallout>
         </div>
-        <div className="sr-list sr-exits">
-          {RESUME_EMPTY_EXITS.map((item) => (
-            <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
-              <span>
-                <span className="sr-fn">{item.title}</span>
-                <span className="sr-sub">{item.sub}</span>
-              </span>
-              <span className="qxp-art"><PublicArt kind={exitArt(item.id)} /></span>
-            </button>
-          ))}
-        </div>
-        <Truth />
+        <Exits items={RESUME_EMPTY_EXITS} onExit={onExit} />
+        <Card className="sr-sink" testId="session-resume-truth">
+          <Note>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。</Note>
+          <ArtBox><IllusMachine /></ArtBox>
+        </Card>
       </div>
     )
   }
 
   if (screen === 'unavailable') {
     return (
-      <div className="sr-page qx-grow qx-scroll" data-screen="session-resume" data-state="unavailable" data-testid="session-resume-state-unavailable">
-        <div className="sr-banner" data-tone="bad" data-testid="session-resume-unavailable">
-          <div>
-            <b>没读到未完成任务</b>
-            <p>读不出列表不等于任务没了；已经建好的单继续排队或出纸。先别重新下单。</p>
-          </div>
+      <div className="qxp-grow sr-page" data-screen="session-resume" data-state="unavailable" data-testid="session-resume-state-unavailable">
+        <div data-testid="session-resume-unavailable">
+          <QxTouchCallout kind="howto" icon="alert">读不出列表不等于任务没了；已经建好的单继续排队或出纸。先别重新下单。</QxTouchCallout>
         </div>
-        <div className="sr-list sr-exits">
-          {RESUME_UNAVAILABLE_EXITS.map((item) => (
-            <button key={item.id} type="button" className="sr-link" data-testid={`session-resume-exit-${item.id}`} onClick={() => onExit(item.route)}>
-              <span>
-                <span className="sr-fn">{item.title}</span>
-                <span className="sr-sub">{item.sub}</span>
-              </span>
-              <span className="qxp-art"><PublicArt kind={exitArt(item.id)} /></span>
-            </button>
-          ))}
-        </div>
-        <Truth />
+        <Exits items={RESUME_UNAVAILABLE_EXITS} onExit={onExit} />
+        <Card className="sr-sink" testId="session-resume-truth">
+          <Note>读不到不等于没有。可以点下面的「重新读取」再试一次，或先用到机码继续。</Note>
+          <ArtBox><IllusMachine /></ArtBox>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="sr-page qx-grow qx-scroll" data-screen="session-resume" data-state="list" data-testid="session-resume-state-list">
-      <div className="sr-head">
-        <span className="sr-count" data-testid="session-resume-count">共 {tasks.length} 条</span>
-      </div>
-      <ul className="sr-list">
+    <div className="qxp-grow sr-page" data-screen="session-resume" data-state="list" data-testid="session-resume-state-list">
+      <p className="qxp-k" data-testid="session-resume-count">共 {tasks.length} 条</p>
+      <ul className="qxp-col sr-list">
         {tasks.map((task) => {
           const verdict = resumeVerdict(task)
           const look = resumeRowCopy(task)
           const amount = formatResumeAmount(task.resume.amountCents)
           const orderNo = task.resume.orderNo
           const taskName = task.fileName ?? '未命名打印任务'
+          const go = verdict.ok && resumeContinueRoute(verdict.dest) === '/print/cashier' ? '去收银台付款' : '去打印进度'
           return (
             <li
               key={task.id}
-              className="sr-row"
+              className="qxp-card sr-row"
               data-testid={`session-resume-task-${task.id}`}
               data-status={task.status}
               data-pay={task.payStatus ?? 'none'}
               data-kind={verdict.ok ? verdict.dest : 'blocked'}
               data-blocked={verdict.ok ? '0' : '1'}
             >
-              <span className="sr-row-ic" data-tone={look.tone} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="sr-fn">{taskName}</span>
-                <span className="sr-sub">{look.sub}</span>
-                <span className="sr-meta">
-                  <span className="sr-chip">{look.label}</span>
-                  {orderNo ? <span className="sr-chip">单号 {orderNo}</span> : <span className="sr-chip">无关联订单</span>}
-                  {amount ? <span className="sr-chip">{amount}</span> : null}
-                  <span className="sr-chip">更新于 {formatResumeUpdatedAt(task.updatedAt)}</span>
-                </span>
+              <b className="sr-name">{taskName}</b>
+              <span className="sr-meta">
+                {look.label} · {orderNo ? `单号 ${orderNo}` : '无关联订单'}{amount ? ` · ${amount}` : ''} · 更新于 {formatResumeUpdatedAt(task.updatedAt)}
               </span>
-              <span className="sr-acts">
-                {verdict.ok ? (
+              <span className="sr-sub">{look.sub}</span>
+              {verdict.ok ? (
+                <button
+                  type="button"
+                  className="qxp-hit sr-go"
+                  data-testid={`session-resume-continue-${task.id}`}
+                  /* 可见文案只说去哪，不说是哪一份——待办有好几条时，这些按钮读起来
+                     一模一样，屏读用户听不出点的是哪个材料。把文件名并进无障碍名。 */
+                  aria-label={`${taskName} · ${go}`}
+                  onClick={() => onContinue(task)}
+                >
+                  <span className="qxp-tx"><b>{go}</b></span>
+                </button>
+              ) : (
+                <>
                   <button
                     type="button"
-                    className="qx-btn"
-                    data-variant="primary"
+                    className="qxp-hit qxp-hit-off sr-go"
+                    aria-disabled="true"
+                    disabled
+                    aria-label={`${taskName} · 继续（暂不可用）`}
                     data-testid={`session-resume-continue-${task.id}`}
-                    /* 可见文案只说去哪,不说是哪一份——待办有好几条时,这些按钮读起来
-                       一模一样,屏读用户听不出点的是哪个材料。把文件名并进无障碍名。 */
-                    aria-label={`${taskName} · ${resumeContinueRoute(verdict.dest) === '/print/cashier' ? '去收银台付款' : '去打印进度'}`}
-                    onClick={() => onContinue(task)}
                   >
-                    {resumeContinueRoute(verdict.dest) === '/print/cashier' ? '去收银台付款' : '去打印进度'}
+                    <span className="qxp-tx"><b>继续（暂不可用）</b></span>
                   </button>
-                ) : (
-                  <>
-                    <button type="button" className="qx-btn" aria-disabled="true" disabled aria-label={`${taskName} · 继续（暂不可用）`} data-testid={`session-resume-continue-${task.id}`}>
-                      继续（暂不可用）
-                    </button>
-                    <span className="sr-why" data-testid={`session-resume-why-${task.id}`}>{verdict.why}</span>
-                  </>
-                )}
-              </span>
+                  <span className="sr-why" data-testid={`session-resume-why-${task.id}`}>{verdict.why}</span>
+                </>
+              )}
             </li>
           )
         })}
       </ul>
-      <Truth />
-    </div>
-  )
-}
-
-function Truth() {
-  return (
-    <div className="sr-truth" data-disclaimer="true" data-testid="session-resume-truth">
-      <span><b>去向</b>只回这一单原来那一步：待付款去收银台，其余去打印进度。</span>
-      <span><b>归属</b>只列你名下没办完的打印任务；未登录会先去登录页。</span>
-      <span><b>边界</b>不重新建单，也不删除系统里的订单或文件。</span>
+      <Card className="sr-sink" testId="session-resume-truth">
+        <Note>继续回到这一单原来那一步。已经完成的不在这里。</Note>
+        <ArtBox><IllusMachine /></ArtBox>
+      </Card>
     </div>
   )
 }

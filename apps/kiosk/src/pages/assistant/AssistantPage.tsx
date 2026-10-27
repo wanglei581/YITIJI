@@ -3,8 +3,14 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { KeyboardIcon } from 'lucide-react'
 import { AI_LABEL_COPY } from '@ai-job-print/shared'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
+import { Hit } from '../public-touch/PublicBlocks'
+import { IllusChecklist, IllusResume } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
+import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
@@ -21,7 +27,6 @@ import type { AiAvailability, AiTaskFallback } from '../../ai'
 import { AdvisorCockpit } from './AdvisorCockpit'
 import {
   AdvisorManualEntries,
-  AdvisorSectionLabel,
   AdvisorThinking,
   ChatBubble,
   type Message,
@@ -123,14 +128,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [hostingOpen, selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput] = useState('')
-  const [manualOpen, setManualOpen] = useState(false)
+  const [sheet, setSheet] = useState<'tools' | 'manual' | 'acts' | null>(null)
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
   const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>('unknown')
   const [turnFailed, setTurnFailed] = useState(false)
-  const [providerLabel, setProviderLabel] = useState<string | undefined>(undefined)
 
   useBusyLock(loading)
   useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip, .kassist .assistant-manual-entry, .kassist .assistant-hold-talk-btn, .kassist .assistant-summary-save, .kassist .assistant-turn-action')
@@ -278,7 +282,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = response.sessionId
-      setProviderLabel(response.providerLabel)
       if (!isAiGeneratedReply(response)) {
         setAiAvailability('unavailable')
         // 输入条随即锁上，虚拟键盘也一并收起 —— 留着一个按不出结果的发送键更糟。
@@ -366,7 +369,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     ? lastMessage.kind
     : null
   const lastUserText = [...messages].reverse().find((message) => message.role === 'user')?.text
-  const hasUserTurn = lastUserText !== undefined
   const cockpitState = deriveCockpitState({
     voice: callActive ? voiceState ?? 'voice-gate' : null,
     loading,
@@ -429,9 +431,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     setCallActive(true)
   }
 
-  const chooseQuickQuestion = (question: string) => {
-    if (loading || aiLocked) return
-    setInput(question)
+  const askAgain = () => {
+    setKeyboardOpen(true)
     focusComposer()
   }
 
@@ -458,21 +459,99 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const recheckAdvisor = () => {
     setAiAvailability('unknown')
     setTurnFailed(false)
-    setProviderLabel(undefined)
     resetConversation()
     focusComposer()
   }
 
-  const contextLabel = toolboxScene?.title ?? selectedTask?.label
-  // 主体分区按实际渲染依次编号（稿 05 的 01 / 02 / 03）。
-  let sectionNo = 0
-  const nextNo = () => { sectionNo += 1; return sectionNo }
-  const showPicker = (!hasUserTurn || cockpitState === 'composer') && !aiLocked
-  // 语音转文字的系统消息 id 以 voice- 开头。没有用户发言时对话区本来不展开，
-  // 没接通的说明会写进状态却看不见。有这类消息就把对话区展开。
-  const showConversation = hasUserTurn || Boolean(toolboxScene || selectedTask) || advisorTask.isFailed
-    || messages.some((message) => message.id.startsWith('voice-'))
+  // 主体按「这一轮到哪了」选一种版式：没问过 / 在等 / 有回答 / 这一轮不是 AI 生成 / 本轮失败 / AI 暂不可用。
+  const body: 'picker' | 'submitting' | 'reply' | 'notai' | 'error' | 'locked' = loading
+    ? 'submitting'
+    : lastTurn === 'not-ai'
+      ? 'notai'
+      : aiLocked
+        ? 'locked'
+        : lastTurn === 'error'
+          ? 'error'
+          : lastTurn === 'ai'
+            ? 'reply'
+            : 'picker'
+  // 在等、没问过、有回答这三种有输入坞；其余三种换成底栏按钮，不再给一个按不出结果的发送键。
+  const showComposer = body === 'picker' || body === 'submitting' || body === 'reply'
+  const showConversation = body !== 'picker' || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
+  const toolsLine = aiLocked
+    ? 'AI 专项暂停 · 恢复后可重新选择'
+    : aiAvailability === 'available' ? '8 项 · 本轮已确认可用' : '8 项 · 首轮提问后确认可用性'
+  const phoneLine = useVisibleHelpLine()
+  const askQuestion = (question: string) => {
+    if (loading || aiLocked) return
+    void sendMessage(question)
+  }
+  const openActs = () => setSheet('acts')
+  const complaint = () => navigate(AI_CONTENT_COMPLAINT_ROUTE)
+
+  const sheetClose = () => setSheet(null)
+  const sheetActions = <button type="button" className="qxt-btn qxt-btn-sec" onClick={sheetClose}>收起</button>
+  const overlay = sheet === 'tools' ? (
+    <QxTouchOverlay kind="sheet" title="本机 AI 专项" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
+      <AiToolSection degraded={aiLocked} degradedReason={degradedReason} availability={aiAvailability} activeSkill={toolboxSkill} />
+    </QxTouchOverlay>
+  ) : sheet === 'manual' ? (
+    <QxTouchOverlay kind="sheet" title="不经过 AI，直接去办" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
+      <AdvisorManualEntries variant="sheet" />
+    </QxTouchOverlay>
+  ) : sheet === 'acts' ? (
+    <QxTouchOverlay kind="sheet" title="这一主题还能去哪" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
+      {goActions && goActions.length > 0 ? (
+        <div className="action-chips" aria-label="这一主题的办事入口">
+          {goActions.map((action) => (
+            <Hit key={action.route} title={advisorUserReason(action.label, '去办理')} sub="去办理" onClick={() => navigate(action.route)} />
+          ))}
+        </div>
+      ) : (
+        <p className="qxp-note">本终端未开放岗位与招聘会信息。这一主题没有「去办理」入口，问题仍可以问。</p>
+      )}
+    </QxTouchOverlay>
+  ) : undefined
+
+  const lockedDock = (
+    <QxTouchDock
+      mid={<button type="button" className="qxt-btn qxt-btn-sec qxt-fill" onClick={complaint}>投诉 AI 内容</button>}
+      primary={{ label: '重新检查', onClick: recheckAdvisor, noArrow: true }}
+    />
+  )
+  const backOnlyDock = <QxTouchDock />
+  const dock = body === 'locked' ? lockedDock : showComposer ? undefined : backOnlyDock
+
+  const turnRow = (
+    <div className="assistant-task-actions" data-cols="3" role="group" aria-label="这一轮之后可以做什么">
+      {body === 'reply' ? (
+        <>
+          <AssistantSessionSummaryBar
+            sessionId={sessionIdRef.current}
+            canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
+            loggedIn={isLoggedIn}
+            token={getToken()}
+          />
+          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={askAgain}>
+            <strong>再问一句</strong>
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="button" className="assistant-direct-question assistant-turn-action" data-primary="true" onClick={retryLastTurn}>
+            <strong>重试这一轮</strong>
+          </button>
+          <button type="button" className="assistant-direct-question assistant-turn-action" onClick={resetConversation}>
+            <strong>换个问题</strong>
+          </button>
+        </>
+      )}
+      <button type="button" className="assistant-complaint" onClick={complaint}>
+        <strong>投诉 AI 内容</strong>
+      </button>
+    </div>
+  )
 
   return (
     <PublicTouchFrame
@@ -483,6 +562,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       status={cockpitCopy.pill}
       navCurrent="advisor"
       back={{ label: '返回首页', onBack: () => navigate('/') }}
+      dock={dock}
+      overlay={overlay}
     >
     <section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">
       <div
@@ -491,51 +572,29 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
         data-kiosk-screen="assistant"
         className="assistant-workbench"
         data-cockpit-state={cockpitState}
+        data-view={body}
         data-kb-open={keyboardHeight > 0 || undefined}
         style={keyboardHeight > 0 ? ({ '--kassist-kb-h': `${keyboardHeight}px` } as CSSProperties) : undefined}
       >
-        <AdvisorCockpit state={cockpitState} contextLabel={contextLabel} readingSignals={{
-          loading, lastTurn, providerLabel, aiLocked, voiceAvailable, cockpitState,
-        }}>
-          <AiToolSection
-            degraded={aiLocked}
-            degradedReason={degradedReason}
-            availability={aiAvailability}
-            activeSkill={toolboxSkill}
-          />
-        </AdvisorCockpit>
-
         <div
           className="assistant-cockpit-body"
           data-screen="ai-cockpit"
           data-state={cockpitState}
           data-testid={`ai-cockpit-state-${cockpitState}`}
         >
-          {showPicker && (
-            <AssistantTaskPicker no={nextNo()} composing={cockpitState === 'composer'} input={input}
-              selectedTask={selectedTask} contextLabel={contextLabel} questions={quickQuestions}
-              loading={loading} aiLocked={aiLocked} onSelect={setSelectedTaskId}
-              onClear={clearTask} onQuestion={chooseQuickQuestion}
-              onRecent={() => navigate('/interview')}
-              onOpenManual={() => setManualOpen(true)}
-              onComplaint={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)} />
+          {body === 'picker' && (
+            <AssistantTaskPicker
+              selectedTask={selectedTask} scene={toolboxScene} welcome={welcomeMessage.text} questions={quickQuestions}
+              loading={loading} aiLocked={aiLocked} toolsLine={toolsLine}
+              onSelect={setSelectedTaskId} onClear={clearTask} onQuestion={askQuestion}
+              onOpenTools={() => setSheet('tools')} onOpenManual={() => setSheet('manual')}
+              onOpenActs={openActs} onComplaint={complaint}
+            />
           )}
 
           {showConversation && (
-            <section className="assistant-conversation" aria-labelledby="assistant-conversation-title">
-              <AdvisorSectionLabel
-                no={nextNo()}
-                id="assistant-conversation-title"
-                title={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[0] : '开场说明'}
-                hint={hasUserTurn || cockpitState === 'ai-unavailable' ? cockpitCopy.section[1] : '补充具体情况，再发送问题'}
-              />
-              {(toolboxScene || selectedTask) && (
-                <div className="assistant-context-row">
-                  <span className="assistant-context-tag">{toolboxScene ? `专项 · ${toolboxScene.title}` : `主题 · ${selectedTask?.label}`}</span>
-                  <button type="button" className="assistant-context-chip" onClick={clearTask}>重新选择主题</button>
-                </div>
-              )}
-
+            <section className="assistant-conversation" aria-labelledby="assistant-conversation-title" data-turn={body}>
+              <h2 id="assistant-conversation-title" className="kassist-sr-only" tabIndex={-1}>{cockpitCopy.section[0]}</h2>
               <div
                 className="assistant-transcript"
                 role="log"
@@ -543,114 +602,141 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 aria-busy={loading}
                 aria-relevant="additions text"
               >
-                {messages.filter((message) => !hasUserTurn || message.kind !== 'system' || message.id.startsWith('voice-')).map((message) => <ChatBubble key={message.id} msg={message} />)}
+                {messages
+                  .filter((message) => message.kind !== 'system' || message.id.startsWith('voice-'))
+                  .map((message) => <ChatBubble key={message.id} msg={message} keptQuestion={lastUserText} />)}
               </div>
 
-              {(cockpitState === 'reply-error' || cockpitState === 'reply-not-ai' || cockpitState === 'ai-unavailable') && (
-                <div className="assistant-turn-actions" role="group" aria-label="这一轮之后可以做什么">
-                  {cockpitState === 'reply-error' && lastUserText && (
-                    <button type="button" className="assistant-turn-action" data-primary="true" onClick={retryLastTurn}>
-                      <KIcon name="swap" />重试这一轮
-                    </button>
-                  )}
-                  {cockpitState !== 'reply-error' && (
-                    <button type="button" className="assistant-turn-action" data-primary="true" onClick={recheckAdvisor}>
-                      <KIcon name="swap" />重新检查 AI 顾问
-                    </button>
-                  )}
-                  {voiceAvailable && cockpitState !== 'reply-not-ai' && (
-                    <button type="button" className="assistant-turn-action" onClick={openVoiceDialog}>
-                      <KIcon name="mic" />{cockpitState === 'reply-error' ? '改用语音' : '看看语音入口'}
-                    </button>
-                  )}
-                  {hasUserTurn && (
-                    <button type="button" className="assistant-turn-action" onClick={resetConversation}>
-                      {cockpitState === 'reply-not-ai' ? '回到提问' : '换个问题'}
-                    </button>
-                  )}
+              {body === 'submitting' && (
+                <div className="qxp-pair assistant-wait-pair">
+                  <div className="qxp-card assistant-wait-card">
+                    {/* 请求真的在飞（loading）才画等待说明；任务区的四态照旧挂在下面，只读不画。 */}
+                    <AdvisorThinking />
+                    <AiTaskRegion
+                      task={advisorTask}
+                      label="AI 顾问回答"
+                      className="assistant-ai-status"
+                      idle={null}
+                      fallback={advisorFallback}
+                    />
+                    <div className="qxp-artbox" aria-hidden="true"><IllusResume w={200} annot /></div>
+                  </div>
+                  <div className="qxp-card assistant-wait-card">
+                    <p className="qxp-k">不由 AI 决定</p>
+                    <p className="qxp-note">身份、付款、打印、政策资格和录用结果都不由这一轮回答决定。</p>
+                    <div className="qxp-artbox" aria-hidden="true"><IllusChecklist w={200} /></div>
+                  </div>
                 </div>
               )}
-              <AiTaskRegion
-                task={advisorTask}
-                label="AI 顾问回答"
-                className="assistant-ai-status"
-                running={<AdvisorThinking />}
-                idle={(
-                  <p className="assistant-ai-idle">
-                    {aiAvailability === 'unknown'
-                      ? '写下你的具体情况，小青会帮你梳理下一步。'
-                      : '可以继续问，也可以直接点下面的服务入口自己办。'}
-                  </p>
-                )}
-                fallback={advisorFallback}
-              />
-              <div ref={bottomRef} />
 
-              {advisorTask.isFailed && <AdvisorManualEntries />}
-
-              {hasUserTurn && (
-                <AssistantSessionSummaryBar
-                  sessionId={sessionIdRef.current}
-                  canSave={messages.some((message) => message.kind === 'ai') && !loading && !aiLocked}
-                  loggedIn={isLoggedIn}
-                  token={getToken()}
+              {body !== 'submitting' && (
+                <AiTaskRegion
+                  task={advisorTask}
+                  label="AI 顾问回答"
+                  className="assistant-ai-status"
+                  idle={null}
+                  fallback={advisorFallback}
                 />
               )}
-            </section>
-          )}
+              <div ref={bottomRef} />
 
-          {goActions && goActions.length > 0 && (hasUserTurn || selectedTask) && !advisorTask.isFailed && (
-            <section className="assistant-go-section" aria-labelledby="assistant-go-title">
-              <AdvisorSectionLabel no={nextNo()} id="assistant-go-title" title="可以直接去的地方" hint="能办的下一步" />
-              <div className="action-chips" aria-label="回答后的操作">
-                {goActions.map((action) => (
-                  <button key={action.route} type="button" className="action-chip" onClick={() => navigate(action.route)}>
-                    {advisorUserReason(action.label, '去办理')}
-                    <small aria-hidden="true">去办理</small>
-                    <KIcon name="arrow" />
-                  </button>
-                ))}
-              </div>
+              {body === 'reply' && (
+                <>
+                  <div className="qxp-card assistant-bounds">
+                    <p className="qxp-k">这一轮不替你决定</p>
+                    <ul>
+                      <li>身份</li><li>付款</li><li>打印是否出纸</li><li>政策资格</li><li>录用结果</li>
+                    </ul>
+                  </div>
+                  {goActions && goActions.length > 0 && (
+                    <div className="action-chips" aria-label="回答后的操作">
+                      {goActions.map((action) => (
+                        <button key={action.route} type="button" className="assistant-go-hit" onClick={() => navigate(action.route)}>
+                          <span className="assistant-go-ic" aria-hidden="true"><QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} /></span>
+                          <span className="assistant-go-tx">
+                            <b>{advisorUserReason(action.label, '去办理')}</b>
+                            <small>这一步的入口，办不办由你定</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
 
-            </section>
-          )}
+              {(body === 'notai' || body === 'error' || body === 'locked') && (
+                <>
+                  {body === 'locked' ? (
+                    <button type="button" className="assistant-tools-open qxp-hit" onClick={() => setSheet('tools')}>
+                      <span className="qxp-ic" aria-hidden="true"><QxTouchIcon name="sparkle" size={32} /></span>
+                      <span className="qxp-tx"><b>本机 AI 专项</b><small>{toolsLine}</small></span>
+                      <span className="qxp-go" aria-hidden="true"><QxTouchIcon name="chevR" size={26} strokeWidth={2.2} /></span>
+                    </button>
+                  ) : null}
+                  <p className="assistant-exits-title">这些都不需要 AI · 现在就能做</p>
+                  <AdvisorManualEntries />
+                  {body === 'notai' ? (
+                    <Hit title="重新提问" onClick={resetConversation} />
+                  ) : body === 'error' ? turnRow : null}
+                  {body === 'locked' && phoneLine ? <QxTouchCallout kind="remind">{phoneLine}</QxTouchCallout> : null}
+                </>
+              )}
 
-          {!advisorTask.isFailed && cockpitState !== 'composer' && (
-            <section className="assistant-manual-section" aria-labelledby="assistant-manual-title">
-              <AdvisorSectionLabel no={nextNo()} id="assistant-manual-title" title="不经过 AI 也能办" hint="AI 出问题时这四项照常" />
-              <AdvisorManualEntries variant="rail" />
+              {body === 'reply' && turnRow}
             </section>
           )}
         </div>
 
+        {showComposer && (
         <section className="assistant-composer" aria-labelledby="assistant-composer-label">
-          <label id="assistant-composer-label" htmlFor="assistant-question">向 AI 顾问描述你的问题</label>
-          <textarea
-            id="assistant-question"
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
-            onKeyDown={handleKeyDown}
-            onFocus={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
-            onClick={() => !loading && !declaring && !aiLocked && setKeyboardOpen(true)}
-            inputMode="none"
-            aria-label="输入咨询问题"
-            placeholder={aiLocked
-              ? 'AI 顾问暂不可用，请先选择办事入口'
-              : toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '还没写问题。点「打字」用屏上键盘，或点上面的一句。')}
-            rows={3}
-            maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
-            readOnly={aiLocked}
-            aria-disabled={aiLocked || undefined}
-            disabled={!aiLocked && (loading || declaring)}
-          />
-
+          <label id="assistant-composer-label" htmlFor="assistant-question" className="kassist-sr-only">向 AI 顾问描述你的问题</label>
           <div className="assistant-dock-row">
+            <button
+              type="button"
+              className="assistant-tool-button assistant-type"
+              disabled={loading || declaring}
+              onClick={() => {
+                setKeyboardOpen(true)
+                focusComposer()
+              }}
+            >
+              <KeyboardIcon aria-hidden />
+              打字
+            </button>
+            <textarea
+              id="assistant-question"
+              ref={inputRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
+              onKeyDown={handleKeyDown}
+              onFocus={() => !loading && !declaring && setKeyboardOpen(true)}
+              onClick={() => !loading && !declaring && setKeyboardOpen(true)}
+              inputMode="none"
+              aria-label="输入咨询问题"
+              placeholder={toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '还没写问题。点「打字」用屏上键盘，或点上面的一句。')}
+              rows={1}
+              maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
+              disabled={loading || declaring}
+            />
+            {draftLength > 0 && (
+              <button type="button" className="assistant-dock-clear" disabled={loading || declaring} onClick={() => { setInput(''); focusComposer() }}>
+                清空
+              </button>
+            )}
+            <button
+              type="button"
+              className="assistant-send"
+              onClick={handleSend}
+              disabled={!input.trim() || loading || declaring}
+            >
+              {loading ? '等待返回' : '发送'}
+              <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />
+            </button>
+          </div>
+          <div className="assistant-voice-row">
             <AssistantHoldToTalk
-              unavailable={aiLocked || loading || declaring}
-              unavailableReason={aiLocked
-                ? '按住说话暂时停用，可选择上方的办事入口。'
-                : loading ? '正在等这一轮返回，请稍候再录音。' : undefined}
+              unavailable={loading || declaring}
+              unavailableReason={loading ? '正在等这一轮返回，请稍候再录音。' : undefined}
               sendDirect={sendVoiceDirect}
               onSendDirectChange={setSendVoiceDirect}
               onTranscript={(text, direct) => {
@@ -662,26 +748,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 focusComposer()
               }}
             />
-            <span className="assistant-dock-spacer" />
-            {draftLength > 0 && !aiLocked && (
-              <button type="button" className="assistant-dock-clear" disabled={loading || declaring} onClick={() => { setInput(''); focusComposer() }}>
-                清空草稿
-              </button>
-            )}
-            <button
-              type="button"
-              className="assistant-tool-button"
-              disabled={!aiLocked && (loading || declaring)}
-              aria-disabled={aiLocked || undefined}
-              onClick={() => {
-                if (aiLocked) return
-                setKeyboardOpen(true)
-                focusComposer()
-              }}
-            >
-              <KeyboardIcon aria-hidden />
-              打字
-            </button>
             {voiceAvailable && (
               <button
                 ref={voiceTriggerRef}
@@ -697,41 +763,21 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 语音咨询
               </button>
             )}
-            <button
-              type="button"
-              className="assistant-send"
-              onClick={aiLocked ? undefined : handleSend}
-              disabled={!aiLocked && (!input.trim() || loading || declaring)}
-              aria-disabled={aiLocked || undefined}
-            >
-              <KIcon name="send" />
-              {loading ? '等待返回' : '发送'}
-            </button>
           </div>
-          <AiDeclarationNote />
-
-          {aiLocked ? (
-            <div className="assistant-composer-lock" role="status">
-              <p><b>暂不能发送</b>恢复后可点「重新检查 AI 顾问」再试。</p>
-            </div>
-          ) : (
+          <div className="assistant-fine">
+            <AiDeclarationNote />
             <p className="assistant-dock-note">
-              <b>{loading ? '等待中' : draftLength > 0 ? '草稿' : '提示'}</b>
-              <span>
-                {loading
-                  ? '这一轮还在等待，办事入口照常可用。'
-                  : `${draftLength} / ${ASSISTANT_USER_MESSAGE_MAX_LENGTH} 字 · 草稿只留在本页，离开即清${draftLength > 0 ? '' : ' · 不想打字就点上面的问题'}`}
-              </span>
+              {loading
+                ? '这一轮还在等待，办事入口照常可用。'
+                : `${draftLength} / ${ASSISTANT_USER_MESSAGE_MAX_LENGTH} 字 · 草稿只留在本页，离开即清`}
             </p>
-          )}
+          </div>
         </section>
+        )}
 
         <footer className="assistant-truth" data-disclaimer="true">
+          <AdvisorCockpit state={cockpitState} />
           <p>{toolboxScene?.disclaimer ?? `${AI_LABEL_COPY.BASE}，身份、付款、打印、政策资格和录用结果都不由 AI 决定。`}</p>
-          {/* AI 内容投诉入口（C3，走查 W-01）：稿 05/52 没画，只放一个低调文字入口。 */}
-          <button type="button" className="assistant-complaint-link" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>
-            对回答有异议？投诉 AI 内容
-          </button>
         </footer>
       </div>
 
@@ -746,12 +792,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <LazyCallPanel onClose={closeVoiceDialog} onSwitchToText={switchVoiceToText} onStateChange={setVoiceState} />
         </Suspense>
       )}
-
-      {manualOpen ? (
-        <QxTouchOverlay kind="sheet" title="不经过 AI，直接去办" onClose={() => setManualOpen(false)} dismissOnScrim>
-          <AdvisorManualEntries />
-        </QxTouchOverlay>
-      ) : null}
 
       <KioskKeyboard
         open={keyboardOpen}

@@ -1,9 +1,9 @@
 // ============================================================
 // 机器状态 — /error-offline（整屏路由，在 KioskRoot 之外）。
 //
-// 2026-09-25 迁入青序稿 09-system-state：状态 Hero → 这台机器的八项状态 → 屏幕不会替你猜的三件事。
-// 稿里四个真实态照做：unknown（进页默认，没检测过就不写结论）/ checking / partial / offline。
-// 稿里的 ready-example 是「写死示例值」的排版稿，运行时不渲染 —— 本页不伪造任何读数。
+// 触屏稿 offline：意图带写本页状态 → 八项状态清单（名称、依赖说明、本次判定）→ 机器插画 → 求助句；底栏返回首页、帮助与求助、重新检测。
+// 四个真实态照做：unknown（进页默认，没检测过就不写结论）/ checking / partial / offline。
+// 稿里没有「正常」「在线」这类保证词，本页也不伪造任何读数；没探到的写「暂时读不到」，不写成好或坏。
 //
 // 能真检测的只有两条（其余六轴照实写未检测 / 未验收 / 随请求确认，不默认写成正常）：
 //   1) 联网 = GET {API_BASE_URL}/health（5s 超时）+ navigator.onLine —— 与其它接口同一个基址，
@@ -21,8 +21,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { PublicArt } from '../public-touch/PublicArt'
-import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
+import { IllusMachine } from '../public-touch/PublicIllus'
+import { ArtBox, Card } from '../public-touch/PublicBlocks'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
+import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { mapTerminalPrinterStatus, normalizePrinterStatusRaw } from '../../hooks/useTerminalDeviceStatus'
 import { API_BASE_URL, getTerminalId } from '../../services/api'
 import './system-state-qx.css'
@@ -60,17 +64,17 @@ function Glyph({ name, size = 28 }: { name: GlyphName; size?: number }) {
   )
 }
 
-/** 八个状态轴：名字与依赖说明照稿；判定只有「这次」的读数，没有「正常」「在线」这类保证词。 */
-const CAPS: { key: string; glyph: GlyphName; tone: string; name: string; dep: string }[] = [
-  { key: 'network', glyph: 'upload', tone: 'slate', name: '联网', dep: '这台机器现在能不能连上服务器' },
-  { key: 'agent', glyph: 'desk', tone: 'teal', name: '这台机器的本机程序', dep: '没有单独的检测口，只能从机器上报的信号间接看' },
-  { key: 'printer', glyph: 'printer', tone: 'teal', name: '打印机', dep: '读机器上报的状态；「没读到」和「离线」不合并' },
-  { key: 'scan', glyph: 'scan', tone: 'slate', name: '扫描件的存放', dep: '扫出来的文件先存在这台机器上再送走；没有单独的检测口' },
-  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取', dep: '插盘后由这台机器读取；这条能力暂未开通' },
-  { key: 'pay', glyph: 'gauge', tone: 'clay', name: '付款', dep: '没有单独的检测口，到收银台真付一次才知道' },
-  { key: 'ai', glyph: 'spark', tone: 'plum', name: 'AI 服务', dep: '没有单独的检测口，用到哪个 AI 功能时当场确认' },
-  // 稿 09 规则 5（托管 a）：这一项叫「机构官方渠道」，不在我们云上做招聘入口。key 不改，判定仍是「随请求确认」。
-  { key: 'jobs', glyph: 'briefcase', tone: 'slate', name: '机构官方渠道', dep: '渠道页打得开打不开，打开时再确认；能连上不等于现在有内容' },
+/** 八个状态轴：名字照稿；依赖说明与本次判定随状态变（见 rowsFor），判定只有「这次」的读数，没有「正常」「在线」这类保证词。 */
+const CAPS: { key: string; glyph: GlyphName; tone: string; name: string }[] = [
+  { key: 'network', glyph: 'upload', tone: 'slate', name: '联网' },
+  { key: 'agent', glyph: 'desk', tone: 'teal', name: '本机程序' },
+  { key: 'printer', glyph: 'printer', tone: 'teal', name: '打印机' },
+  { key: 'scan', glyph: 'scan', tone: 'slate', name: '扫描件的存放' },
+  { key: 'usb', glyph: 'usb', tone: 'wheat', name: 'U 盘读取' },
+  { key: 'pay', glyph: 'gauge', tone: 'clay', name: '付款' },
+  { key: 'ai', glyph: 'spark', tone: 'plum', name: 'AI 服务' },
+  // 托管 a：这一项叫「机构官方渠道」，不在我们云上做招聘入口。key 不改，判定仍是「随请求确认」。
+  { key: 'jobs', glyph: 'briefcase', tone: 'slate', name: '机构官方渠道' },
 ]
 
 type Verdict = [label: string, tone: Tone]
@@ -82,7 +86,9 @@ interface PrinterReading {
   verdict: Verdict
 }
 
-const UNREAD: PrinterReading = { heartbeatOnline: false, ready: false, verdict: ['没读到', 'warn'] }
+/** 读不到就写「暂时读不到」：不当成好，也不当成坏。 */
+const UNREAD_LABEL = '暂时读不到'
+const UNREAD: PrinterReading = { heartbeatOnline: false, ready: false, verdict: [UNREAD_LABEL, 'warn'] }
 
 interface CheckResult {
   at: Date
@@ -138,27 +144,73 @@ async function readPrinterStatus(signal: AbortSignal): Promise<PrinterReading> {
       : raw === 'paper_empty' ? ['缺纸', 'bad']
         : raw === 'error' ? ['异常', 'bad']
           : (raw === 'queue_cleanup_failed' || raw === 'queue_pause_failed') ? ['暂停接单', 'bad']
-            : ['没读到', 'warn']
+            : [UNREAD_LABEL, 'warn']
     return { heartbeatOnline, ready: false, verdict }
   } catch {
     return UNREAD
   }
 }
 
-function verdictsFor(view: View, result: CheckResult | null): Verdict[] {
+type Row = { dep: string; verdict: Verdict }
+
+/** 八行：依赖说明随状态变，本次判定只来自这一次检测。读不到的写「暂时读不到」。 */
+function rowsFor(view: View, result: CheckResult | null): Row[] {
   const q = (label: string): Verdict => [label, 'q']
+  const unread: Verdict = [UNREAD_LABEL, 'warn']
+  const asked = '办理到那一步再确认'
+  const usb: Row = { dep: '这项本来就没开', verdict: q('暂未开通') }
   if (view === 'checking') {
-    return [q('检测中'), q('检测中'), q('检测中'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    return [
+      { dep: '正在向服务器探', verdict: q('检测中') },
+      { dep: '正在检测', verdict: q('检测中') },
+      { dep: '正在检测', verdict: q('检测中') },
+      { dep: '还没有检测', verdict: q('未检测') },
+      usb,
+      { dep: asked, verdict: q('随请求确认') },
+      { dep: asked, verdict: q('随请求确认') },
+      { dep: asked, verdict: q('随请求确认') },
+    ]
   }
   if (view === 'offline') {
-    const unread: Verdict = ['没读到', 'warn']
-    return [['这次连不上', 'bad'], unread, unread, q('未检测'), q('暂未开通'), unread, unread, unread]
+    const none = { dep: '这次没有读到', verdict: unread }
+    return [
+      { dep: '和服务器之间不通', verdict: ['这次连不上', 'bad'] },
+      none,
+      none,
+      { dep: '还没有检测', verdict: q('未检测') },
+      usb,
+      none,
+      none,
+      none,
+    ]
   }
   if (view === 'partial' && result?.printer) {
-    const agent: Verdict = result.printer.heartbeatOnline ? ['这次连得上', 'ok'] : ['没读到', 'warn']
-    return [['这次连得上', 'ok'], agent, result.printer.verdict, q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+    const printer = result.printer
+    return [
+      { dep: '只说明这条路通了', verdict: ['这次连得上', 'ok'] },
+      printer.heartbeatOnline
+        ? { dep: '只说明程序有回应', verdict: ['这次连得上', 'ok'] }
+        : { dep: '这次没有读到', verdict: unread },
+      printer.verdict[0] === UNREAD_LABEL
+        ? { dep: '这次没有读到', verdict: printer.verdict }
+        : { dep: '读机器上报的状态', verdict: printer.verdict },
+      { dep: '还没有检测', verdict: q('未检测') },
+      usb,
+      { dep: asked, verdict: q('随请求确认') },
+      { dep: asked, verdict: q('随请求确认') },
+      { dep: asked, verdict: q('随请求确认') },
+    ]
   }
-  return [q('未检测'), q('未检测'), q('未检测'), q('未检测'), q('暂未开通'), q('随请求确认'), q('随请求确认'), q('随请求确认')]
+  return [
+    { dep: '还没有向服务器探过', verdict: q('未检测') },
+    { dep: '还没有检测结果', verdict: q('未检测') },
+    { dep: '还没有检测结果', verdict: q('未检测') },
+    { dep: '办理时才知道落在哪', verdict: q('未检测') },
+    usb,
+    { dep: asked, verdict: q('随请求确认') },
+    { dep: asked, verdict: q('随请求确认') },
+    { dep: asked, verdict: q('随请求确认') },
+  ]
 }
 
 const clock = (date: Date) => `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -252,51 +304,30 @@ export default function ErrorOfflinePage() {
     return () => window.clearTimeout(timer)
   }, [autoDelayMs, retry, view])
 
-  const verdicts = verdictsFor(view, result)
-  const printerRead = result?.printer && result.printer.verdict[0] !== '没读到' ? result.printer.verdict[0] : null
+  const rows = rowsFor(view, result)
   const lastCheck = result ? `最近一次检测：${clock(result.at)}` : ''
-  const hero: Record<View, { glyph: GlyphName; label: string; title: ReactNode; copy: ReactNode; note: ReactNode }> = {
-    unknown: {
-      glyph: 'question', label: '本机状态未检测',
-      title: <>这台机器<em>还没检测</em></>,
-      copy: <>本页<b>不会默认写成正常</b>：没检测过就是没检测过，检测不到就是取不到 —— 不拿一排绿点让你以为一切都好，结果白跑一趟。</>,
-      note: <>进入本页后<b>还没检测过</b>，点下面的重新检测</>,
-    },
-    checking: {
-      glyph: 'radar', label: '正在检测本机状态',
-      title: <>正在<em>检测</em></>,
-      copy: <>先检测<b>联网、这台机器的本机程序和打印机</b>这三项；扫描件存放、U 盘、付款、AI、机构官方渠道没有单独的检测口，照实写成未检测或随请求确认。</>,
-      note: <>检测<b>不会打断</b>你已经创建的打印任务</>,
-    },
-    partial: {
-      glyph: 'half', label: '部分状态取不到',
-      title: <>连得上，但<em>有几项取不到</em></>,
-      copy: printerRead
-        ? <>这次检测里，这台机器<b>连得上服务器</b>；打印机报的是<b>「{printerRead}」</b>，以打印机面板上的提示为准。</>
-        : <>这次检测里，这台机器<b>连得上服务器</b>；打印机那边的状态<b>没读到</b>。没读到不等于坏了，也不等于好着 —— 所以这里写「没读到」。</>,
-      note: <>能不能出纸，<b>要到打印那一步才知道</b>；先别在这里下结论</>,
-    },
-    offline: {
-      glyph: 'wifioff', label: '本机连不上服务器',
-      title: <>和服务器<em>连不上</em></>,
-      copy: safeFrom
-        ? <>传文件、算价、AI 和机构官方渠道都要走服务器，所以这几项这次取不到。<b>机器会自己再试</b>，一连上就把你送回刚才那一页。</>
-        : <>传文件、算价、AI 和机构官方渠道都要走服务器，所以这几项这次取不到。<b>机器会自己再试</b>，连上服务器、打印机也读得到时就带你回首页。</>,
-      note: <>已经交出去的打印任务<b>不会因此取消</b>，到机码照常有效</>,
-    },
-  }
-  const current = hero[view]
   const nextAuto = `约 ${autoDelayMs / 1000} 秒后自动再${view === 'offline' ? '试' : '检测'}`
-  const hint = view === 'unknown' ? '检测之后才有判定'
-    : view === 'checking' ? '等这次结果'
-      : view === 'offline' ? `${lastCheck} · 已重试 ${attempts} 次`
-        : lastCheck || '等下一次检测'
+  const title = view === 'unknown'
+    ? '这台机器还没检测'
+    : view === 'checking'
+      ? '正在检测'
+      : view === 'partial'
+        ? '连得上，但有几项取不到'
+        : '和服务器连不上'
+  const sub = view === 'unknown'
+    ? '还没向服务器和打印机问过。'
+    : view === 'checking'
+      ? '先问联网、本机程序和打印机；其余没有单独的检测口。'
+      : view === 'partial'
+        ? '取不到的标成暂时读不到。'
+        : '这次连不上。其余没问到的项标成暂时读不到。'
   const pill = {
     unknown: { tone: 'unknown', label: '还没检测' },
     checking: { tone: 'unknown', label: '正在检测' },
     partial: { tone: 'warn', label: '部分取不到' },
     offline: { tone: 'bad', label: '连不上服务器' },
   } as const
+  const remind = view === 'offline' ? faultLine : helpLine
 
   return (
     <div
@@ -309,97 +340,47 @@ export default function ErrorOfflinePage() {
       <KioskStageFit>
         <PublicTouchFrame
           page="offline"
-          title={view === 'unknown'
-            ? '这台机器还没检测'
-            : view === 'checking'
-              ? '正在检测'
-              : view === 'partial'
-                ? '连得上，但有几项取不到'
-                : '和服务器连不上'}
-          eyebrow="本机"
-          sub={current.label}
+          title={title}
+          eyebrow="机器状态"
+          sub={sub}
           status={pill[view]}
           back={{ label: '返回首页', onBack: () => navigate('/') }}
           nav={false}
           dock={(
-            <>
-              <div className="k9s-cta qxt-dock">
-                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/')}>返回首页</button>
-                <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/help', { replace: true })}>帮助与求助</button>
-                <button type="button" className="qxt-btn qxt-btn-pri" data-testid="system-state-primary" disabled={checking}
-                        onClick={() => void retry()}>
-                  <Glyph name="radar" size={26} />{checking ? '正在检测' : '重新检测'}
-                </button>
-              </div>
-              <div className="k9s-truth" data-disclaimer="true" data-testid="system-state-truth">
-                <p><b>怎么判断</b>八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，<b>不会默认写成正常</b>。</p>
-                <p><b>读数不留旧值</b>这一页只显示本次检测的结果，不会把上一次的结果接着摆在这里当成现在的情况。</p>
-              </div>
-            </>
+            <QxTouchDock
+              onBack={() => navigate('/')}
+              backLabel="返回首页"
+              mid={<button type="button" className="qxt-btn qxt-btn-sec qxt-fill" onClick={() => navigate('/help', { replace: true })}>帮助与求助</button>}
+              primary={{
+                label: checking ? '正在检测' : '重新检测',
+                kind: 'pri',
+                noArrow: true,
+                disabled: checking,
+                onClick: () => void retry(),
+              }}
+            />
           )}
         >
-          <div className="k9s-scroll" data-testid={`system-state-state-${view}`}>
-            <section className="k9s-sec">
-              <div className="k9s-hero" data-testid={view === 'offline' ? 'system-state-fallback' : undefined}>
-                <div className={`k9s-glyph${view === 'checking' ? ' is-breathing' : ''}`} role="img" aria-label={current.label}>
-                  <Glyph name={current.glyph} size={104} />
-                </div>
-                <div className="k9s-hero-main">
-                  <div className="k9s-eyebrow" aria-hidden="true">机器状态</div>
-                  <h2 className="k9s-title">{current.title}</h2>
-                  <p className="k9s-copy">{current.copy}</p>
-                  <p className="k9s-note" role="status"><Glyph name="info" size={22} />{current.note}</p>
-                </div>
-              </div>
-            </section>
-            <section className="k9s-sec">
-              <div className="k9s-label">
-                <span className="no" aria-hidden="true">01</span>
-                <h2 className="t">这台机器的八项状态</h2>
-                <span className="qxp-sr">
-                  {view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}
-                  <span className="hint">{hint}</span>
-                </span>
-              </div>
-              <ul className="k9s-caps" data-testid="system-state-list">
-                {CAPS.map((cap, index) => (
-                  <li key={cap.key} className="k9s-cap">
-                    <span className="k9s-ic" data-tone={cap.tone}><Glyph name={cap.glyph} size={28} /></span>
-                    <span className="k9s-cap-main">
-                      <span className="k9s-cap-name">{cap.name}</span>
-                      <span className="k9s-cap-dep">{cap.dep}</span>
-                    </span>
-                    <span className="k9s-verdict" data-tone={verdicts[index][1]}>{verdicts[index][0]}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="qxp-card k9s-machine" aria-hidden="true">
-                <span className="qxp-art"><PublicArt kind="machine" /></span>
-              </div>
-            </section>
-            <section className="k9s-sec">
-              <div className="k9s-label">
-                <span className="no" aria-hidden="true">02</span>
-                <h2 className="t">这三件事，屏幕不会替你猜</h2>
-                <span className="hint">说不了就不说</span>
-              </div>
-              <div className="k9s-grid3">
-                <div className="k9s-card">
-                  <h3><span className="k9s-ic" data-tone="slate"><Glyph name="scan" size={26} /></span>有些部件报不了状态</h3>
-                  <p>扫码器当键盘用，<b>插着不等于能用</b>，真读到码才知道；摄像头软件还没接通。所以不给它们发状态徽章。</p>
-                </div>
-                <div className="k9s-card">
-                  <h3><span className="k9s-ic" data-tone="wheat"><Glyph name="gauge" size={26} /></span>耗材数值拿不到</h3>
-                  <p>这台机器不上报墨粉和纸量，这里<b>永远不出现墨粉百分比</b>。缺纸缺粉以打印机面板上的提示为准。</p>
-                </div>
-                <div className="k9s-card">
-                  <h3><span className="k9s-ic" data-tone="cinnabar"><Glyph name="clockoff" size={26} /></span>不预告什么时候好</h3>
-                  <p>屏幕上<b>不写「预计几点恢复」</b>。什么时候好由现场和系统决定，写个时间只会让你白等。</p>
-                </div>
-              </div>
-            </section>
-            {view === 'offline' && faultLine ? <p className="qxp-remind">{faultLine}</p> : null}
-            {view !== 'offline' && helpLine ? <p className="qxp-remind">{helpLine}</p> : null}
+          <div className="of-page" data-testid={`system-state-state-${view}`}>
+            {/* 自动再测的间隔与已重试次数只留给读屏和门禁核对，屏上不写秒数，页面也不自己跳走。 */}
+            <p className="qxp-sr" data-testid="system-state-auto">
+              {view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}
+              <span className="hint">{view === 'checking' ? '等这次结果' : lastCheck || '等下一次检测'}</span>
+            </p>
+            <ul className="of-list" data-testid="system-state-list" aria-label="这台机器的八项状态">
+              {CAPS.map((cap, index) => (
+                <li key={cap.key} className="qxp-hit of-row" data-cap={cap.key}>
+                  <span className="qxp-ic" data-tone={cap.tone} aria-hidden="true"><Glyph name={cap.glyph} size={30} /></span>
+                  <span className="qxp-tx"><b>{cap.name}</b><small>{rows[index].dep}</small></span>
+                  <span className="of-verdict" data-tone={rows[index].verdict[1]}>{rows[index].verdict[0]}</span>
+                </li>
+              ))}
+            </ul>
+            <Card className="of-machine" testId={view === 'offline' ? 'system-state-fallback' : undefined}>
+              {lastCheck ? <p className="qxp-note of-last">{lastCheck}</p> : null}
+              <ArtBox><IllusMachine /></ArtBox>
+            </Card>
+            {remind ? <QxTouchCallout kind="remind">{remind}</QxTouchCallout> : null}
           </div>
         </PublicTouchFrame>
       </KioskStageFit>

@@ -15,8 +15,10 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
-import { PublicArt } from '../public-touch/PublicArt'
-import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
+import { ArtBox } from '../public-touch/PublicBlocks'
+import { IllusPhone, IllusReport, IllusResume, IllusStack } from '../public-touch/PublicIllus'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
+import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { accountDisplayMessage } from './accountUserMessage'
 import { MemberAgreement } from './components/MemberAgreement'
 import { LoginGatePhoneFields } from './components/LoginGatePhoneFields'
@@ -310,22 +312,22 @@ export function LoginPage() {
                 <div className="qxp-card lg-fact">
                   <p className="qxp-k">简历</p>
                   <p className="qxp-note">改好的简历，登录之后才记到账号。没登录时，这次改的先留在这台机器上。</p>
-                  <span className="qxp-art"><PublicArt kind="resume" /></span>
+                  <ArtBox><IllusResume w={160} /></ArtBox>
                 </div>
                 <div className="qxp-card lg-fact">
                   <p className="qxp-k">打印订单</p>
                   <p className="qxp-note">登录后才能对上你名下的订单。到机码不登录也能取手机上已经下过的单。</p>
-                  <span className="qxp-art"><PublicArt kind="stack" /></span>
+                  <ArtBox><IllusStack w={160} n={3} /></ArtBox>
                 </div>
                 <div className="qxp-card lg-fact">
                   <p className="qxp-k">AI 记录</p>
                   <p className="qxp-note">诊断和面试反馈记在这次登录里。要保存回答要点，没登录会先到这一页。</p>
-                  <span className="qxp-art"><PublicArt kind="list" /></span>
+                  <ArtBox><IllusReport w={160} /></ArtBox>
                 </div>
                 <div className="qxp-card lg-fact">
                   <p className="qxp-k">只管这一次</p>
                   <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>
-                  <span className="qxp-art"><PublicArt kind="phone" /></span>
+                  <ArtBox><IllusPhone w={120} /></ArtBox>
                 </div>
               </section>
             ) : null}
@@ -357,7 +359,9 @@ export function LoginPage() {
           </div>
           {helpLine ? <p className="qxp-note" role="note">{helpLine}</p> : null}
           <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>
-          <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
+          <div className="lg-ask">
+            <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
+          </div>
         </PublicTouchFrame>
       </KioskStageFit>
     </div>

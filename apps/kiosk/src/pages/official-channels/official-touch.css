@@ -1,156 +1,53 @@
-/* 渠道卡改成稿上的左码右文。空态和失败态是两张带插画的去处卡。 */
+/* 本机构官方渠道触屏版：码卡左码右文，没有码时是两张带插画的去处卡。块的通用样式在 public-touch.css。 */
 
-.qxt-screen[data-qx-page='official'] .oc-card,
-.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] .oc-card {
-  grid-template-columns: 240px minmax(0, 1fr);
-  grid-template-areas: 'qr main' 'qr check' 'qr cap';
-  align-items: center;
-  min-height: 220px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-}
+.qxt-screen[data-qx-page='official'] .oc-page { --oc-qr: 400px; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] { --oc-qr: 560px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='comfortable'] { --oc-qr: 400px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='compact'] { --oc-qr: 280px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='crowded'] { --oc-qr: 220px; overflow: auto; }
 
-.qxt-screen[data-qx-page='official'] .oc-card-check {
-  position: static;
-  inset: auto;
-  z-index: 1;
-  grid-area: check;
-  justify-self: start;
-  width: auto;
-  min-height: 64px;
-  margin: 8px 0 0;
-  padding: 8px 16px;
-  border: 1.5px solid var(--qxt-edge);
-  border-radius: 16px;
-  background: var(--qxt-well);
-  color: var(--qxt-ink);
-  font-size: var(--qxt-fs-body);
-  text-align: left;
-}
+/* 撤下说明 */
+.qxt-screen[data-qx-page='official'] .oc-withdrawn { margin: 0; padding: 14px 22px; border-radius: var(--qxt-r-btn); background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); font-size: var(--qxt-fs-sub); font-weight: 600; }
 
-.qxt-screen[data-qx-page='official'] .oc-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-pair-card {
+/* 码卡列表：卡平分余高 */
+.qxt-screen[data-qx-page='official'] .oc-sec { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.qxt-screen[data-qx-page='official'] .oc-list { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.qxt-screen[data-qx-page='official'] .oc-card {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 200px;
-  max-height: 280px;
-  padding: 18px;
-  overflow: hidden;
+  align-items: center;
+  gap: 24px;
+  padding: 16px;
   border-radius: 24px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
-  text-align: left;
-  font-size: var(--qxt-fs-body);
-  color: var(--qxt-ink);
+}
+.qxt-screen[data-qx-page='official'] .oc-qr { flex: none; margin: 0; }
+/* 二维码外面的白框（SourceUrlQr 自带的 12px 白边）就是扫码需要的静区，不去掉；码本身按档位缩放，整框约等于 --oc-qr。 */
+.qxt-screen[data-qx-page='official'] .oc-qr-code svg { display: block; width: calc(var(--oc-qr) - 26px); height: calc(var(--oc-qr) - 26px); }
+.qxt-screen[data-qx-page='official'] .oc-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.qxt-screen[data-qx-page='official'] .oc-card-name { margin: 0; font: 700 28px/1.3 var(--qx-sans); color: var(--qxt-ink); overflow-wrap: anywhere; }
+.qxt-screen[data-qx-page='official'] .oc-caption { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='official'] .oc-card-addr { font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); overflow-wrap: anywhere; }
+.qxt-screen[data-qx-page='official'] .oc-card-addr b { color: var(--qxt-ink); font-weight: 700; }
+.qxt-screen[data-qx-page='official'] .oc-card-check { margin-top: 4px; }
+
+/* 三步说明 */
+.qxt-screen[data-qx-page='official'] .oc-steps { flex: none; }
+.qxt-screen[data-qx-page='official'] .oc-steps ol { margin: 0; padding-left: 28px; list-style: decimal; display: flex; flex-direction: column; gap: 6px; }
+.qxt-screen[data-qx-page='official'] .oc-steps li { font-size: var(--qxt-fs-sub); line-height: 1.5; color: var(--qxt-ink-2); }
+
+/* 手机宽度：码卡上下排，码缩小 */
+@media (max-width: 600px) {
+  .qxt-screen[data-qx-page='official'] .oc-page { --oc-qr: 240px; overflow: auto; }
+  .qxt-screen[data-qx-page='official'] .oc-page[data-density] { --oc-qr: 240px; }
+  .qxt-screen[data-qx-page='official'] .oc-card { flex-direction: column; flex: none; align-items: stretch; gap: 12px; }
+  .qxt-screen[data-qx-page='official'] .oc-qr { align-self: center; }
+  .qxt-screen[data-qx-page='official'] .oc-sec { flex: none; }
+  .qxt-screen[data-qx-page='official'] .qxp-pair { grid-template-columns: 1fr; }
 }
 
-.qxt-screen[data-qx-page='official'] .oc-pair-k {
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-pair-d {
-  color: var(--qxt-ink-2);
-  font-size: var(--qxt-fs-aux);
-}
-
-.qxt-screen[data-qx-page='official'] .oc-pair-card .qxp-art {
-  margin-top: auto;
-  color: var(--qxt-teal-ink);
-}
-
-.qxt-screen[data-qx-page='official'] .oc-card-ic {
-  display: none;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-card-name {
-  font-size: 32px;
-  color: var(--qxt-ink);
-}
-
-.qxt-screen[data-qx-page='official'] .oc-card-addr,
-.qxt-screen[data-qx-page='official'] .oc-caption,
-.qxt-screen[data-qx-page='official'] .oc-steps li {
-  font-size: var(--qxt-fs-body);
-  color: var(--qxt-ink-2);
-}
-
-/* 目录页用伪元素和 margin-top:auto 把余量摊开，空态会留下超过一掌的纯色带。触屏页改成内容靠上。 */
-.qxt-screen[data-qx-page='official'] .qxt-body,
-.qxt-screen[data-qx-page='official'] .qxp-fill,
-.qxt-screen[data-qx-page='official'] .oc-page {
-  flex: 0 0 auto;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-page::after {
-  display: none;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-push {
-  margin-top: 0;
-}
-
-.qxt-screen[data-qx-page='official'] .qxt-nav {
-  margin-top: auto;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-page {
-  --oc-qr: 200px;
-}
-
-.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] {
-  --oc-qr: 220px;
-}
-
-.qxt-screen[data-qx-page='official'] .qx-row {
-  min-height: 128px;
-  max-height: 160px;
-}
-
-@media (max-width: 760px) {
-  .qxt-screen[data-qx-page='official'] .qxt-band {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .qxt-screen[data-qx-page='official'] .qxt-hdr {
-    height: auto;
-    min-height: 76px;
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-
-  .qxt-screen[data-qx-page='official'] .qxt-hdr-right {
-    flex: 1 1 100%;
-    margin-left: 0;
-    justify-content: flex-end;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .qxt-screen[data-qx-page='official'] .qxt-clock b {
-    font-size: 24px;
-  }
-
-  .qxt-screen[data-qx-page='official'] .oc-pair {
-    grid-template-columns: 1fr;
-  }
-
-  .qxt-screen[data-qx-page='official'] .oc-pair-card {
-    min-height: 160px;
-    max-height: 220px;
-  }
-}
-
-.qxt-screen[data-qx-page='official'] .oc-cta .qxt-btn {
-  min-height: var(--qxt-btn-h);
-  height: var(--qxt-btn-h);
-  font-size: var(--qxt-fs-btn);
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='official'] * { transition: none; }
 }

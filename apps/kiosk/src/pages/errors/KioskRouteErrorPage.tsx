@@ -1,10 +1,16 @@
 import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { PublicArt } from '../public-touch/PublicArt'
+import { PairCard } from '../public-touch/PublicBlocks'
+import { IllusChecklist, IllusStack } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import './route-error-touch.css'
 
+/**
+ * 路由出错页与未知地址页。只有两个出口：重新打开（真重载）和回首页。
+ * 不链到帮助页，不给设备状态或问小青；不判断打印是否在出。号码读不到就不显示求助句。
+ */
 export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }) {
   const routeError = useRouteError()
   const navigate = useNavigate()
@@ -13,6 +19,8 @@ export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }
   const phoneLine = contact.servicePhone
     ? `需要帮助？拨打服务电话 ${contact.servicePhone}${contact.serviceHours ? `（${contact.serviceHours}）` : ''}`
     : null
+  const reopen = () => window.location.reload()
+  const goHome = () => navigate('/', { replace: true })
 
   return (
     <KioskStageFit>
@@ -34,34 +42,20 @@ export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }
           nav={false}
           dock={(
             <footer className="qxt-dock">
-              <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => window.location.reload()}>
-                重新打开
-              </button>
-              <button type="button" className="qxt-btn qxt-btn-pri qxt-wide" onClick={() => navigate('/', { replace: true })}>
-                回首页
-              </button>
+              <button type="button" className="qxt-btn qxt-btn-sec qxt-fill" onClick={reopen}>重新打开</button>
+              <button type="button" className="qxt-btn qxt-btn-pri qxt-fill" onClick={goHome}>回首页</button>
             </footer>
           )}
         >
           <div className="qxp-grow">
-            <p className="qxp-note">
-              {isNotFound
-                ? '这个入口现在没有对应的页面。'
-                : '这次没有完成。重新打开会再加载一次；已经交出去的打印任务不会因此取消。'}
-            </p>
-            <div className="qxp-pair">
-              <button type="button" className="qxp-card" onClick={() => window.location.reload()}>
-                <p className="qxp-k">重新打开</p>
-                <p className="qxp-note">再载入这一页</p>
-                <span className="qxp-art"><PublicArt kind="list" /></span>
-              </button>
-              <button type="button" className="qxp-card" onClick={() => navigate('/', { replace: true })}>
-                <p className="qxp-k">回首页</p>
-                <p className="qxp-note">改简历、练面试、打印扫描、查政策</p>
-                <span className="qxp-art"><PublicArt kind="stack" /></span>
-              </button>
+            <QxTouchCallout kind="howto" icon="alert">
+              {isNotFound ? '这个入口现在没有对应的页面。' : '这次没有完成。'}
+            </QxTouchCallout>
+            <div className="qxp-pair qxp-pair-grow">
+              <PairCard title="重新打开" desc="再载入这一页" art={<IllusChecklist w={200} />} onClick={reopen} />
+              <PairCard title="回首页" desc="改简历、练面试、打印扫描、查政策" art={<IllusStack w={200} n={3} />} onClick={goHome} />
             </div>
-            {phoneLine ? <p className="qxp-remind">{phoneLine}</p> : null}
+            {phoneLine ? <QxTouchCallout kind="remind">{phoneLine}</QxTouchCallout> : null}
           </div>
         </PublicTouchFrame>
       </div>

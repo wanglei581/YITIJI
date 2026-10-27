@@ -198,6 +198,8 @@ export function ScreensaverPage() {
           current={allFailed ? undefined : shown}
           mediaUrl={allFailed || !shown ? null : media?.url ?? null}
           loopVideo={items.length <= 1}
+          slideIndex={allFailed ? 0 : Math.max(0, items.filter((item) => !failedIds.has(item.id)).findIndex((item) => item.id === shown?.id))}
+          slideCount={allFailed ? 0 : items.filter((item) => !failedIds.has(item.id)).length}
           onAdvance={() => advanceRef.current()}
           onMediaError={() => { if (shown) markFailedRef.current(shown.id) }}
           onWake={exit}

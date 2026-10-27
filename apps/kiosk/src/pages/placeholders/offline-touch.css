@@ -1,70 +1,37 @@
-/* 机器状态。只挂在本页。 */
+/* 机器状态触屏版：八行状态清单 + 机器插画 + 求助句。块的通用样式在 public-touch.css；只挂在本页。 */
+.qxt-screen[data-qx-page='offline'] .of-page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='offline'] .of-page > * { flex-shrink: 0; }
 
-.qxt-screen[data-qx-page='offline'] .k9s-caps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* 八行：名称、依赖说明、本次判定 */
+.qxt-screen[data-qx-page='offline'] .of-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='offline'] .of-row { min-height: 78px; padding: 8px 14px; cursor: default; }
+.qxt-screen[data-qx-page='offline'] .of-row b { font-size: 24px; line-height: 1.3; }
+.qxt-screen[data-qx-page='offline'] .of-row small { margin-top: 0; font-size: var(--qxt-fs-aux); line-height: 1.35; }
+.qxt-screen[data-qx-page='offline'] .of-row .qxp-ic[data-tone='slate'] { background: var(--qxt-slate-wash); color: var(--qxt-slate-ink); }
+.qxt-screen[data-qx-page='offline'] .of-row .qxp-ic[data-tone='clay'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+.qxt-screen[data-qx-page='offline'] .of-row .qxp-ic[data-tone='wheat'] { background: var(--qxt-well); color: var(--qxt-clay-ink); }
+.qxt-screen[data-qx-page='offline'] .of-row .qxp-ic[data-tone='plum'] { background: var(--qxt-cin-wash); color: var(--qx-cinnabar); }
+.qxt-screen[data-qx-page='offline'] .of-verdict { flex: none; max-width: 240px; font-size: var(--qxt-fs-sub); font-weight: 700; text-align: right; color: var(--qxt-ink-3); }
+.qxt-screen[data-qx-page='offline'] .of-verdict[data-tone='ok'] { color: var(--qxt-teal-ink); }
+.qxt-screen[data-qx-page='offline'] .of-verdict[data-tone='warn'] { color: var(--qxt-clay-ink); }
+.qxt-screen[data-qx-page='offline'] .of-verdict[data-tone='bad'] { color: var(--qx-cinnabar); }
+
+/* 机器插画吸收余高 */
+.qxt-screen[data-qx-page='offline'] .of-machine { flex: 1 1 0; min-height: 160px; overflow: hidden; }
+.qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg { height: 92%; width: auto; max-width: 100%; }
+.qxt-screen[data-qx-page='offline'] .of-last { margin: 0; text-align: center; }
+
+/* 底栏：帮助与求助占中间，三颗等宽 */
+.qxt-screen[data-qx-page='offline'] .qxt-dock .qxt-fill { flex: 1; min-width: 0; }
+.qxt-screen[data-qx-page='offline'] .qxt-dock .qxt-btn { padding: 0 22px; }
+.qxt-screen[data-qx-page='offline'] .qxt-dock .qxt-btn-pri { min-width: 0; }
+
+@media (max-width: 600px) {
+  .qxt-screen[data-qx-page='offline'] .of-page { overflow: auto; }
+  .qxt-screen[data-qx-page='offline'] .of-machine { flex: none; min-height: 200px; }
+  .qxt-screen[data-qx-page='offline'] .of-verdict { max-width: 120px; }
 }
 
-.qxt-screen[data-qx-page='offline'] .k9s-cap {
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 72px;
-  padding: 10px 14px;
-  border-radius: 22px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-cap-name {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-cap-dep,
-.qxt-screen[data-qx-page='offline'] .k9s-verdict,
-.qxt-screen[data-qx-page='offline'] .k9s-copy,
-.qxt-screen[data-qx-page='offline'] .k9s-note,
-.qxt-screen[data-qx-page='offline'] .k9s-card p,
-.qxt-screen[data-qx-page='offline'] .k9s-truth {
-  font-size: 20px;
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-label .qxp-sr {
-  margin-left: auto;
-  text-align: right;
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-label .qxp-sr .hint {
-  visibility: visible;
-  margin-left: 0;
-  font-size: 20px;
-  line-height: 1.4;
-  color: var(--qx-ink-3);
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-machine {
-  min-height: 160px;
-  margin-top: 12px;
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-grid3 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.qxt-screen[data-qx-page='offline'] .k9s-card {
-  min-height: 120px;
-}
-
-.qxt-screen[data-qx-page='offline'] .qxt-btn {
-  min-height: var(--qxt-btn-h);
-  height: var(--qxt-btn-h);
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='offline'] * { transition: none; }
 }

@@ -1,259 +1,29 @@
-.qxt-screen[data-qx-page='help'] .k1-help-filters,
-.qxt-screen[data-qx-page='help'] .k1-help-center[data-help-view='default'] .k1-help-filters,
-.qxt-screen[data-qx-page='help'] .k1-help-center[data-help-view='no-result'] .k1-help-filters {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* 帮助中心触屏版：分类行、说明底块、问答卡。块的通用样式在 public-touch.css。 */
 
-.qxt-screen[data-qx-page='help'] .qxt-band-compact {
-  min-height: 0;
-}
+/* 分类行：六行放进正文，每行 112 高 */
+.qxt-screen[data-qx-page='help'] .hp-cats > .qxp-hit { min-height: 112px; }
 
-.qxt-screen[data-qx-page='help'] .qxt-band-compact .qxt-ask {
-  padding: 8px 0 16px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-scroll > .k1-help-sec-head,
-.qxt-screen[data-qx-page='help'] .k1-help-scroll > .k1-help-filing {
-  margin-top: 8px;
-}
-
-.qxt-screen[data-qx-page='help'] .qxp-fill,
-.qxt-screen[data-qx-page='help'] .k1-help-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-filters > button {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  width: 100%;
-  min-height: 72px;
-  padding: 6px 14px;
-  border-radius: 22px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-  text-align: left;
-  font-size: var(--qxt-fs-body);
-  color: var(--qxt-ink);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-cat-icon {
-  width: 48px;
-  height: 48px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-cat-top {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-filters small {
-  flex: 1 1 100%;
-  padding-left: 70px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-steps {
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-steps li {
-  padding: 8px 14px;
-  border-radius: 18px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-steps p {
-  margin-top: 2px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-truth {
-  flex: none;
-  width: auto;
-  padding: 4px 40px 8px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-more {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-  min-height: 72px;
-  margin-top: 8px;
-  padding: 12px 16px;
-  border-radius: 22px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-  text-align: left;
-  font-size: var(--qxt-fs-body);
-  color: var(--qxt-ink);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-more small,
-.qxt-screen[data-qx-page='help'] .k1-help-phone,
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-filing {
-  color: var(--qxt-ink-2);
-  font-size: var(--qxt-fs-aux);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well {
-  margin-top: 12px;
-  padding: 8px 16px 16px;
-  border-radius: 24px;
-  background: var(--qxt-well);
-  border: 1.5px solid var(--qxt-edge);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well-k {
-  margin: 8px 0 4px;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--qxt-ink);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-truth {
-  display: block;
-  flex: none;
-  width: auto;
-  margin: 8px 0 0;
-  padding: 0;
-  color: var(--qxt-ink-2);
-  font-size: var(--qxt-fs-aux);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps li {
-  display: block;
-  padding: 4px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-step-no {
-  display: inline;
-  width: auto;
-  height: auto;
-  margin-right: 4px;
-  border-radius: 0;
-  background: transparent;
-  color: var(--qxt-ink);
-  font-size: var(--qxt-fs-body);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps strong,
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps p {
-  display: inline;
+/* 说明底块：三步自助、服务电话、备案 */
+.qxt-screen[data-qx-page='help'] .hp-well { display: flex; flex-direction: column; gap: 6px; }
+.qxt-screen[data-qx-page='help'] .hp-ol {
   margin: 0;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-well .k1-help-steps strong::after {
-  content: '。';
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-actions .is-primary svg {
-  width: 28px;
-  height: 28px;
-  margin-right: 8px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock {
+  padding-left: 28px;
+  list-style: decimal;
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
+.qxt-screen[data-qx-page='help'] .hp-ol li { font-size: var(--qxt-fs-sub); line-height: 1.45; color: var(--qxt-ink-2); }
+.qxt-screen[data-qx-page='help'] .hp-ol b { color: var(--qxt-ink); }
+.qxt-screen[data-qx-page='help'] .hp-filing a { color: inherit; text-decoration: none; }
 
-.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock > button:not(.is-primary) {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 148px;
-  height: var(--qxt-btn-h);
-  min-height: var(--qxt-btn-h);
-}
+/* 问答卡：问字青色、问题加粗、答案接在下面 */
+.qxt-screen[data-qx-page='help'] .hp-qa { gap: 4px; }
 
-.qxt-screen[data-qx-page='help'] .k1-help-actions.qxt-dock > button.is-primary {
-  flex: 1 1 auto;
-  width: auto;
-  border-radius: 999px;
-}
+/* 吸收余高的插画卡 */
+.qxt-screen[data-qx-page='help'] .hp-sink { flex: 1; min-height: 0; overflow: hidden; }
+.qxt-screen[data-qx-page='help'] .hp-reopen { flex: none; width: 100%; }
 
-.qxt-screen[data-qx-page='help'] .k1-help-filters strong {
-  font-size: 28px;
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-filters small,
-.qxt-screen[data-qx-page='help'] .k1-help-count,
-.qxt-screen[data-qx-page='help'] .k1-help-answer,
-.qxt-screen[data-qx-page='help'] .k1-help-steps,
-.qxt-screen[data-qx-page='help'] .k1-help-filing {
-  font-size: var(--qxt-fs-aux);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-actions button,
-.qxt-screen[data-qx-page='help'] .k1-help-link,
-.qxt-screen[data-qx-page='help'] .k1-help-toggle {
-  min-height: var(--qxt-btn-h);
-  font-size: var(--qxt-fs-btn);
-}
-
-.qxt-screen[data-qx-page='help'] .k1-help-actions button.is-primary {
-  min-height: var(--qxt-btn-h);
-  height: var(--qxt-btn-h);
-}
-
-@media (max-width: 760px) {
-  /* 窄屏不改共享顶栏的 410px 默认。只让本页整列滚动，分类钮的中心才能落到可点区域。 */
-  .qxt-screen[data-qx-page='help'] .qxt-under {
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-
-  .qxt-screen[data-qx-page='help'] .qxt-band-compact {
-    min-height: 0;
-    padding-bottom: 12px;
-  }
-
-  .qxt-screen[data-qx-page='help'] .qxt-band-compact .qxt-ask {
-    padding: 8px 0 12px;
-  }
-
-  .qxt-screen[data-qx-page='help'] .qxt-body,
-  .qxt-screen[data-qx-page='help'] .qxp-fill,
-  .qxt-screen[data-qx-page='help'] .k1-help-scroll {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-
-  .qxt-screen[data-qx-page='help'] .qxt-body {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .qxt-screen[data-qx-page='help'] .k1-help-filters > button {
-    min-height: 72px;
-    padding: 10px 14px;
-  }
-
-  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    padding: 12px 16px;
-  }
-
-  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock > button,
-  .qxt-screen[data-qx-page='help'] .k1-help-center .k1-help-actions.qxt-dock > button.is-primary {
-    width: 100%;
-    flex: 1 1 auto;
-    min-height: var(--qxt-btn-h);
-    height: auto;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen[data-qx-page='help'] * { transition: none; }
 }

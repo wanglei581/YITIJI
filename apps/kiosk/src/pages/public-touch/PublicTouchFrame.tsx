@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
-import { useSupportContact } from '../../hooks/useSupportContact'
-import { helpNeededLine, machineCannotPrintLine } from '../../copy/unattendedCopy'
+import { usePublicNav } from './publicTouchHooks'
 import './public-touch.css'
 
 export type PublicStatus =
@@ -24,22 +22,6 @@ function toStatus(status: PublicStatus | undefined): QxTouchStatus | undefined {
   return { text: status.label, tone }
 }
 
-export function usePublicNav() {
-  const navigate = useNavigate()
-  return {
-    onHome: () => navigate('/'),
-    onAdvisor: () => navigate('/assistant'),
-    onProfile: () => navigate('/profile'),
-  }
-}
-
-/** 有号码才返回求助句。读不到号码时不显示，也不改写成隐私政策提示。 */
-export function useVisibleHelpLine(fault = false): string | null {
-  const contact = useSupportContact()
-  if (!contact.servicePhone) return null
-  return fault ? machineCannotPrintLine(contact) : helpNeededLine(contact)
-}
-
 export function PublicTouchFrame({
   title,
   sub,
@@ -56,6 +38,7 @@ export function PublicTouchFrame({
   className,
   bodyClassName = 'qxt-body-tight',
   band = true,
+  overlay,
   children,
 }: {
   title: string
@@ -74,6 +57,8 @@ export function PublicTouchFrame({
   className?: string
   bodyClassName?: string
   band?: boolean
+  /** 盖在整屏上的弹层。交给 QxTouchScreen 处理底下的 inert，不要把弹层写进正文里。 */
+  overlay?: ReactNode
   children: ReactNode
 }) {
   const navHandlers = usePublicNav()
@@ -104,6 +89,7 @@ export function PublicTouchFrame({
       ) : null}
       dock={dock}
       nav={nav ? <QxTouchNav current={navCurrent} {...navHandlers} /> : undefined}
+      overlay={overlay}
     >
       <main className="qxp-fill" data-kiosk-screen={screen}>{children}</main>
     </QxTouchScreen>

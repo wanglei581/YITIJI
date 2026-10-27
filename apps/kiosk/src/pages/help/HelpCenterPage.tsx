@@ -1,17 +1,18 @@
-import { useTerminalKiosk } from '../../services/api/screensaver'
 // 帮助中心 /help。条目是页内常量，没有帮助内容接口，也没有工单通道。
-// 版式按青序流光 2.0 稿 06：分类首页 / 分类问答 / 分类不在清单 / 内容没显示出来。
+// 版式照触屏稿 help：分类首页 / 分类问答 / 分类不在清单 / 内容没显示出来；隐私、设备与备案收在一张底部弹层里。
 
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  BriefcaseBusinessIcon, ChevronRightIcon, FolderOpenIcon, InfoIcon, LandmarkIcon, LockIcon,
-  MicIcon, PhoneIcon, PrinterIcon, QrCodeIcon, SparklesIcon, UserIcon, type LucideIcon,
-} from 'lucide-react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { HelpCircleIcon } from 'lucide-react'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
-import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
-import { PublicTouchFrame, useVisibleHelpLine } from '../public-touch/PublicTouchFrame'
+import { useTerminalKiosk } from '../../services/api/screensaver'
+import { ArtBox, Card, Hit, K, Note, Well } from '../public-touch/PublicBlocks'
+import { IllusChecklist } from '../public-touch/PublicIllus'
+import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
+import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import './help-service-desk.css'
 import './help-touch.css'
 
@@ -24,7 +25,6 @@ interface QA {
 }
 
 type HelpView = 'default' | 'topic' | 'no-result' | 'unavailable'
-type Tone = 'teal' | 'plum' | 'slate' | 'wheat'
 
 const SELF_HELP_STEPS = [
   { title: '照屏幕上的提示走', body: '出错时先看当前页的提示和按钮，按提示重试或返回。设备故障不要自己拆，也不要拉扯纸张。' },
@@ -32,15 +32,15 @@ const SELF_HELP_STEPS = [
   { title: '换一种来源', body: '一种上传方式不成，就回打印扫描换本机已经开通的其他来源。哪些能用，以那一页显示的为准。' },
 ] as const
 
-const CATEGORIES: { key: string; label: string; summary: string; icon: LucideIcon; tone: Tone }[] = [
-  { key: 'account', label: '登录与账号', summary: '要不要登录、为什么变回游客、怎么换账号', icon: UserIcon, tone: 'teal' },
-  { key: 'resume', label: 'AI简历服务', summary: '能做什么、会不会保证面试或录用', icon: SparklesIcon, tone: 'plum' },
-  { key: 'print', label: '打印与扫描', summary: '怎么打印、扫描件保存在哪', icon: PrinterIcon, tone: 'slate' },
-  { key: 'policy', label: '政策服务', summary: '能不能代申请补贴', icon: LandmarkIcon, tone: 'wheat' },
-  { key: 'channels', label: '机构官方渠道', summary: '本机构的官方渠道在哪看、内容谁负责', icon: QrCodeIcon, tone: 'slate' },
-  { key: 'jobs', label: '岗位与招聘会', summary: '能不能在这里办理岗位申请', icon: BriefcaseBusinessIcon, tone: 'slate' },
-  { key: 'records', label: '我的记录', summary: '文档和订单在哪里看', icon: FolderOpenIcon, tone: 'wheat' },
-  { key: 'privacy', label: '隐私与留存', summary: '会不会推送给企业、文件存多久', icon: LockIcon, tone: 'teal' },
+const CATEGORIES: { key: string; label: string; summary: string }[] = [
+  { key: 'account', label: '登录与账号', summary: '要不要登录、为什么变回游客、怎么换账号' },
+  { key: 'resume', label: 'AI简历服务', summary: '能做什么、会不会保证面试或录用' },
+  { key: 'print', label: '打印与扫描', summary: '怎么打印、扫描件保存在哪' },
+  { key: 'policy', label: '政策服务', summary: '能不能代申请补贴' },
+  { key: 'channels', label: '机构官方渠道', summary: '本机构的官方渠道在哪看、内容谁负责' },
+  { key: 'jobs', label: '岗位与招聘会', summary: '能不能在这里办理岗位申请' },
+  { key: 'records', label: '我的记录', summary: '文档和订单在哪里看' },
+  { key: 'privacy', label: '隐私与留存', summary: '会不会推送给企业、文件存多久' },
 ]
 
 function buildFaq(hostingOpen: boolean): QA[] {
@@ -157,73 +157,37 @@ function resolveView(params: URLSearchParams, keys: readonly string[]): HelpView
   return keys.includes(topic) ? 'topic' : 'no-result'
 }
 
-// 答案里不再各挂一颗入口按钮：照稿 06，本类的入口收进下面「02 直接去办」一排（同一批按钮，只挪位置）。
+// 一条问答：问题和答案都直接摊开，不是折叠按钮。answerId 是稳定的读屏编号，不含问题文字。
 function QaRow({ item, answerId }: { item: QA; answerId: string }) {
   return (
-    <div className="k1-help-row is-open">
-      <button type="button" aria-expanded={true} aria-controls={answerId} className="k1-help-toggle">
-        <span className="k1-help-question-mark" aria-hidden="true">问</span>
-        <span className="k1-help-question"><strong>{item.q}</strong></span>
-      </button>
-      <div id={answerId} className="k1-help-answer">
-        <p>{item.a}</p>
-      </div>
+    <div className="qxp-card hp-qa" role="group" aria-labelledby={`${answerId}-q`}>
+      <p className="qxp-k" aria-hidden="true">问</p>
+      <p className="qxp-note" id={`${answerId}-q`}><b>{item.q}</b></p>
+      <p className="qxp-note" id={answerId}>{item.a}</p>
     </div>
   )
 }
 
-function SectionHead({ no, title, hint }: { no: string; title: string; hint?: string }) {
+/** 备案行：一体机上是文字，浏览器里才是外链。 */
+function FilingLine({ kiosk }: { kiosk: boolean }) {
   return (
-    <div className="k1-help-sec-head">
-      <h2><span>{no}</span>{title}</h2>
-      {hint ? <small>{hint}</small> : null}
-    </div>
-  )
-}
-
-function SelfHelp({ no, plain = false }: { no: string; plain?: boolean }) {
-  return (
-    <>
-      {plain ? (
-        <p className="k1-help-well-k">卡住了，先自己试这三步</p>
-      ) : (
-        <SectionHead no={no} title="卡住了，先自己试这三步" hint="多数情况到第二步就通了" />
+    <p className="qxp-note hp-filing" aria-label="网站备案信息">
+      {kiosk ? <span>鲁ICP备2026023517号-2</span> : (
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">鲁ICP备2026023517号-2</a>
       )}
-      <ol className="k1-help-steps">
-        {SELF_HELP_STEPS.map((step, index) => (
-          <li key={step.title}>
-            <span className="k1-help-step-no" aria-hidden="true">{index + 1}</span>
-            <strong>{step.title}</strong>
-            <p>{step.body}</p>
-          </li>
-        ))}
-      </ol>
-    </>
-  )
-}
-
-function HumanDesk({ no, phoneLine }: { no: string; phoneLine: string | null }) {
-  return (
-    <>
-      <SectionHead no={no} title="自己解决不了时" hint="本页不会替你上报" />
-      <div className="k1-help-people">
-        <div className="k1-help-contact">
-          <span className="k1-help-cat-icon" aria-hidden="true"><PhoneIcon /></span>
-          <div>
-            <h3>{phoneLine ? '服务电话' : '这一页不转达'}</h3>
-            {phoneLine ? <p>{phoneLine}</p> : null}
-            <p>退费、开票和机器故障以现场公示为准，屏幕上不写死地点。</p>
-            <p className="k1-help-note">本页不会自动拨出，也不会自动上报。点任何按钮都不等于已经有人受理。</p>
-          </div>
-        </div>
-      </div>
-    </>
+      {' · '}
+      {kiosk ? <span>鲁公网安备37021402007308号</span> : (
+        <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">鲁公网安备37021402007308号</a>
+      )}
+      {' · 职易达AI'}
+    </p>
   )
 }
 
 export function HelpCenterPage() {
   const kiosk = useTerminalKiosk()
   const navigate = useNavigate()
+  const location = useLocation()
   const [params, setParams] = useSearchParams()
   const hostingOpen = useRecruitmentHosting().enabled
   const phoneLine = useVisibleHelpLine()
@@ -237,16 +201,17 @@ export function HelpCenterPage() {
   const view = cards.length === 0 ? 'unavailable' : resolveView(params, cards.map((card) => card.key))
   const topicKey = params.get('topic') ?? ''
   const topic = cards.find((card) => card.key === topicKey)
-  const visibleFaq = faq.filter((item) => item.categoryKey === topicKey)
-  // 本类问答自带的入口，按出现顺序去重：照稿收进「02 直接去办」一排。
-  const topicLinks = visibleFaq
+  const section = { key: topicKey, items: faq.filter((item) => item.categoryKey === topicKey) }
+  // 本类问答自带的入口，按出现顺序去重，收进「直接去办」一排。
+  const topicLinks = section.items
     .flatMap((item) => (item.link ? [item.link] : []))
     .filter((link, index, all) => all.findIndex((other) => other.route === link.route) === index)
   const home = () => navigate('/')
   const clearTopic = () => setParams({})
   const handleNavigate = (route: string) => {
     if (route === '/login') {
-      navigate('/login', { state: { from: '/help' } })
+      // 登录成功回到进登录前的这一页（带着当前分类）。
+      navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
       return
     }
     navigate(route)
@@ -259,9 +224,8 @@ export function HelpCenterPage() {
       : view === 'unavailable'
         ? '帮助内容没显示出来'
         : '你想解决什么？'
-  const eyebrow = '帮助'
   const subtitle = view === 'topic' && topic
-    ? `${topic.summary}。下面 ${visibleFaq.length} 条是这一类里常被问到的。`
+    ? `${topic.summary}。下面 ${section.items.length} 条是这一类里常被问到的。`
     : view === 'no-result'
       ? '请回到帮助首页，再选一个分类。'
       : view === 'unavailable'
@@ -275,214 +239,137 @@ export function HelpCenterPage() {
         ? { tone: 'unknown' as const, label: `当前分类 · ${topic.label}` }
         : { tone: 'ok' as const, label: '常见问题' }
 
+  const ask = view === 'unavailable'
+    ? { label: '问小青：帮助页打不开', draft: '帮助页打不开，我该怎么继续？', voice: true }
+    : view === 'no-result'
+      ? { label: '问小青：分类里没有我的问题', draft: '这一页的分类里没有我的问题，我该怎么继续？', voice: true }
+      : { label: '问小青：这里没看懂', draft: '帮助页里我没看懂，请帮我说明。', voice: true }
+  const dock = view === 'topic' ? (
+    <QxTouchDock
+      onBack={clearTopic}
+      backLabel="返回分类"
+      ask={ask}
+      primary={{ label: '返回首页', kind: 'sec', noArrow: true, onClick: home }}
+    />
+  ) : (
+    <QxTouchDock onBack={home} backLabel={view === 'default' ? '返回' : '返回首页'} ask={ask} />
+  )
+
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-help-center" data-help-view={view}>
       <PublicTouchFrame
         page="help"
         title={title}
-        eyebrow={eyebrow}
+        eyebrow="帮助"
         sub={subtitle}
         status={status}
         back={view === 'topic' || view === 'no-result'
           ? { label: '返回帮助分类', onBack: clearTopic }
           : { label: '返回首页', onBack: home }}
-        dock={(
-          <>
-            <div className="k1-help-actions qxt-dock">
-              {view === 'unavailable' ? (
-                <>
-                  <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => window.location.assign('/help')}>重新打开帮助</button>
-                </>
-              ) : view === 'no-result' ? (
-                <>
-                  <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={clearTopic}>回到帮助首页</button>
-                  <QxAiHelp label="问小青：分类里没有我的问题" draft="这一页的分类里没有我的问题，我该怎么继续？" />
-                </>
-              ) : view === 'topic' ? (
-                <>
-                  <button type="button" onClick={clearTopic}>返回分类</button>
-                  <button type="button" onClick={home}>返回首页</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}><MicIcon aria-hidden="true" />问小青：这里没看懂</button>
-                </>
-              ) : (
-                <>
-                  <button type="button" onClick={home}>返回</button>
-                  <button type="button" className="is-primary" data-testid="help-primary" onClick={() => navigate('/assistant')}><MicIcon aria-hidden="true" />问小青：这里没看懂</button>
-                </>
-              )}
-            </div>
-          </>
-        )}
+        navCurrent="home"
+        dock={dock}
+        overlay={moreOpen ? (
+          <QxTouchOverlay
+            kind="sheet"
+            title="隐私、设备与备案"
+            onClose={() => setMoreOpen(false)}
+            dismissOnScrim
+            actions={<button type="button" className="qxt-btn qxt-btn-sec" onClick={() => setMoreOpen(false)}>收起</button>}
+          >
+            {privacy ? (
+              <Hit
+                title={privacy.label}
+                sub={privacy.summary}
+                testId={`help-topic-${privacy.key}`}
+                onClick={() => { setMoreOpen(false); setParams({ topic: privacy.key }) }}
+              />
+            ) : null}
+            <Hit title="看设备状态" sub="联网和各项读没读到" onClick={() => navigate('/error-offline')} />
+            <FilingLine kiosk={kiosk} />
+          </QxTouchOverlay>
+        ) : undefined}
       >
-        <section data-kiosk-screen="help" data-state={view} data-testid={`help-state-${view}`} className="k1-help-scroll qx-scroll">
+        <section data-kiosk-screen="help" data-state={view} data-testid={`help-state-${view}`} className="qxp-grow">
           {view === 'default' ? (
             <>
-              <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
-                {listed.map(({ key, label, summary, icon: Icon, tone, count }) => (
-                  <button
+              <div className="qxp-col hp-cats" role="group" aria-label="按分类筛选常见问题">
+                {listed.map(({ key, label, summary, count }) => (
+                  <Hit
                     key={key}
-                    type="button"
-                    data-testid={`help-topic-${key}`}
-                    data-tone={tone}
-                    aria-pressed={false}
+                    icon={<HelpCircleIcon size={28} />}
+                    title={label}
+                    sub={`${summary} · ${count} 问`}
+                    testId={`help-topic-${key}`}
                     onClick={() => setParams({ topic: key })}
-                  >
-                    <span className="k1-help-cat-top">
-                      <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
-                      <strong>{label}</strong>
-                    </span>
-                    <small>{summary} · {count} 问</small>
-                  </button>
+                  />
                 ))}
               </div>
-              <button type="button" className="k1-help-more" onClick={() => setMoreOpen(true)}>
-                <strong>隐私、设备与备案</strong>
-                <small>隐私与留存、看设备状态、备案号</small>
-              </button>
-            </>
-          ) : null}
-          {view === 'no-result' ? (
-            <>
-              <SectionHead
-                no="01"
-                title="可选的分类"
-                hint={`共 ${cards.length} 个`}
-              />
-              <div className="k1-help-filters" role="group" aria-label="按分类筛选常见问题">
-                {cards.map(({ key, label, summary, icon: Icon, tone, count }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    data-testid={`help-topic-${key}`}
-                    data-tone={tone}
-                    aria-pressed={false}
-                    onClick={() => setParams({ topic: key })}
-                  >
-                    <span className="k1-help-cat-top">
-                      <span className="k1-help-cat-icon" aria-hidden="true"><Icon /></span>
-                      <strong>{label}</strong>
-                    </span>
-                    <small>{summary} · {count} 问</small>
-                  </button>
-                ))}
-              </div>
+              <Hit title="隐私、设备与备案" sub="隐私与留存、看设备状态、备案号" onClick={() => setMoreOpen(true)} />
+              <Well className="hp-well">
+                <K>卡住了，先自己试这三步</K>
+                <ol className="hp-ol">
+                  {SELF_HELP_STEPS.map((step) => (
+                    <li key={step.title}><b>{step.title}。</b>{step.body}</li>
+                  ))}
+                </ol>
+                {phoneLine ? <Note>{phoneLine}</Note> : null}
+                <FilingLine kiosk={kiosk} />
+              </Well>
             </>
           ) : null}
 
           {view === 'topic' ? (
             <>
-              <SectionHead no="01" title="这一类的常见问题" hint="答案已展开，不用再点" />
-              <div className="k1-help-faq-list" aria-label="常见问题">
-                {[{ key: topicKey, items: visibleFaq }].map(section => (
-                  section.items.map((item, itemIndex) => (
-                    <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} />
-                  ))
+              <div className="qxp-col" aria-label="常见问题">
+                {section.items.map((item, itemIndex) => (
+                  <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} />
                 ))}
               </div>
               {topicLinks.length > 0 ? (
                 <>
-                  <SectionHead no="02" title="直接去办" hint="看完就能动手" />
-                  <div className="k1-help-links">
+                  <K>直接去办</K>
+                  <div className="qxp-row">
                     {topicLinks.map((link) => (
-                      <button key={link.route} type="button" onClick={() => handleNavigate(link.route)} className="k1-help-link">
-                        {link.label}<ChevronRightIcon aria-hidden="true" />
-                      </button>
+                      <Hit key={link.route} title={link.label} sub="打开" onClick={() => handleNavigate(link.route)} />
                     ))}
                   </div>
                 </>
               ) : null}
-              <div className="k1-help-miss">
-                <h3><InfoIcon aria-hidden="true" />这里没答上你的问题</h3>
-                <p>换一个分类再看看，或者用下面的按钮把问题告诉小青。退费、开票和机器故障本页不会替你转达。</p>
-              </div>
+              <Card className="hp-sink">
+                <Note>这里没答上，可以换一个分类，或问小青。</Note>
+                <ArtBox><IllusChecklist w={160} /></ArtBox>
+              </Card>
+            </>
+          ) : null}
+
+          {view === 'no-result' ? (
+            <>
+              <QxTouchCallout kind="howto" icon="alert">没有这个分类。回到帮助首页再选，正在办的事不受影响。</QxTouchCallout>
+              <Card className="hp-sink" testId="help-fallback">
+                <Note>可以从帮助首页按要办的事继续找。</Note>
+                <ArtBox><IllusChecklist w={200} /></ArtBox>
+              </Card>
+              <Hit title="回到帮助首页" onClick={clearTopic} />
+              {phoneLine ? <QxTouchCallout kind="remind">{phoneLine}</QxTouchCallout> : null}
             </>
           ) : null}
 
           {view === 'unavailable' ? (
             <>
-              <SectionHead no="01" title="按顺序试这三条" hint="前两条自己就能做" />
-              <ol className="k1-help-steps" data-testid="help-fallback">
-                <li><span className="k1-help-step-no" aria-hidden="true">1</span><strong>重新打开帮助</strong><p>点下面的重新打开帮助，这一页会再加载一次。</p></li>
-                <li><span className="k1-help-step-no" aria-hidden="true">2</span><strong>回首页再进来</strong><p>回首页重新进入要办的服务。正在办的打印不会因此取消。</p></li>
-                <li><span className="k1-help-step-no" aria-hidden="true">3</span><strong>回首页继续办</strong><p>连着两次都打不开，回首页接着办。这一页不会替你报修。{phoneLine ? phoneLine : ''}</p></li>
-              </ol>
-              <SectionHead no="02" title="这不影响你办事" hint="帮助页只是补充" />
-              <div className="k1-help-people">
-                <div className="k1-help-contact">
-                  <span className="k1-help-cat-icon" aria-hidden="true"><FolderOpenIcon /></span>
-                  <div>
-                    <h3>正在办的事照常</h3>
-                    <p>打印任务和取件码都还在。帮助页打不开不会取消它们，回首页接着办即可。</p>
-                  </div>
-                </div>
-                <div className="k1-help-contact">
-                  <span className="k1-help-cat-icon" aria-hidden="true"><InfoIcon /></span>
-                  <div>
-                    <h3>业务页上的提示更直接</h3>
-                    <p>真出错时，正在办的那一页会写清卡在哪一步。帮助页只是补充说明。</p>
-                  </div>
-                </div>
+              <QxTouchCallout kind="howto" icon="alert">可以再打开一次。正在办的打印不会因此取消。</QxTouchCallout>
+              <div className="qxp-col" data-testid="help-fallback">
+                <Hit title="重新打开帮助" sub="再加载一次这一页" />
+                <Hit title="回首页再进来" sub="正在办的打印和取件码都还在" />
+                {phoneLine ? <Hit title="拨服务电话" sub={phoneLine} /> : null}
               </div>
+              <Card className="hp-sink">
+                <Note>帮助页打不开，不会取消正在办的打印。</Note>
+                <ArtBox><IllusChecklist w={200} /></ArtBox>
+              </Card>
+              <button type="button" className="qxt-btn qxt-btn-pri qxt-wide hp-reopen" onClick={() => window.location.assign('/help')}>重新打开帮助</button>
             </>
           ) : null}
-
-          {view === 'topic' ? <SelfHelp no={topicLinks.length > 0 ? '03' : '02'} /> : null}
-          {view === 'no-result' ? <HumanDesk no="02" phoneLine={phoneLine} /> : null}
-          {view === 'unavailable' ? <HumanDesk no="03" phoneLine={phoneLine} /> : null}
-          {view === 'no-result' ? (
-            <div className="k1-help-miss" data-testid="help-fallback">
-              <h3><InfoIcon aria-hidden="true" />怎么会到这一页</h3>
-              <p>分类是从上一页点进来的。旧链接，或者分类后来改过名字，都会落到这里。点上面任意一个分类就能继续，你正在办的事不受影响。</p>
-            </div>
-          ) : null}
-
-          {view === 'default' ? (
-            <div className="k1-help-well">
-              <SelfHelp no="01" plain />
-              {phoneLine ? <p className="k1-help-phone">{phoneLine}</p> : null}
-              <p className="k1-help-filing" aria-label="网站备案信息">
-                <span>鲁ICP备2026023517号-2</span>
-                {' · '}
-                <span>鲁公网安备37021402007308号</span>
-                {' · 职易达AI'}
-              </p>
-              <p className="k1-help-truth" data-testid="help-truth">只写本机已经上线的做法。本页不会自动上报，也不会替你转达。</p>
-            </div>
-          ) : (
-            <p className="k1-help-filing" aria-label="网站备案信息">
-              {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
-                鲁ICP备2026023517号-2
-              </a>)}
-              {' · '}
-              {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">
-                鲁公网安备37021402007308号
-              </a>)}
-              {' · 职易达AI'}
-            </p>
-          )}
         </section>
-        {moreOpen ? (
-          <QxTouchOverlay kind="sheet" title="隐私、设备与备案" onClose={() => setMoreOpen(false)} dismissOnScrim>
-            {privacy ? (
-              <button
-                type="button"
-                className="k1-help-more"
-                data-testid={`help-topic-${privacy.key}`}
-                onClick={() => { setMoreOpen(false); setParams({ topic: privacy.key }) }}
-              >
-                <strong>{privacy.label}</strong>
-                <small>{privacy.summary}</small>
-              </button>
-            ) : null}
-            <button type="button" className="k1-help-more" onClick={() => navigate('/error-offline')}>
-              <strong>看设备状态</strong>
-              <small>联网和各项读没读到</small>
-            </button>
-            <p className="k1-help-filing">鲁ICP备2026023517号-2 · 鲁公网安备37021402007308号 · 职易达AI</p>
-          </QxTouchOverlay>
-        ) : null}
       </PublicTouchFrame>
     </div>
   )

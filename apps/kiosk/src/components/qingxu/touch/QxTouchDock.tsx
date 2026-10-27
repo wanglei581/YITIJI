@@ -6,8 +6,8 @@ import { useQxTouchBack } from './useQxTouchBack'
 
 export type QxTouchButtonKind = 'pri' | 'sec' | 'ghost' | 'danger' | 'mint'
 export type QxTouchAsk =
-  | { label: string; draft: string; voice?: boolean }
-  | { label: string; disabled: true }
+  | { label: string; draft: string; voice?: boolean; testId?: string }
+  | { label: string; disabled: true; testId?: string }
   | false
 export type QxTouchPrimary = {
   label: string
@@ -15,6 +15,8 @@ export type QxTouchPrimary = {
   kind?: QxTouchButtonKind
   noArrow?: boolean
   disabled?: boolean
+  /** 供用例定位主按钮。不传则不挂 data-testid，默认行为不变。 */
+  testId?: string
 }
 
 /**
@@ -30,6 +32,7 @@ export function QxTouchDock({
   ask,
   mid,
   primary,
+  className,
 }: {
   onBack?: () => void
   back?: boolean
@@ -38,12 +41,14 @@ export function QxTouchDock({
   ask?: QxTouchAsk
   mid?: ReactNode
   primary?: QxTouchPrimary
+  /** 附加在底栏上的类，供页面样式与用例定位。不传则不变。 */
+  className?: string
 }) {
   const navigate = useNavigate()
   const goBack = useQxTouchBack(onBack)
   const askNode = ask && typeof ask === 'object' ? (
     'disabled' in ask ? (
-      <button type="button" className="qxt-askq qxt-askoff" aria-disabled="true" disabled data-qxt-ask="off">
+      <button type="button" className="qxt-askq qxt-askoff" aria-disabled="true" disabled data-qxt-ask="off" data-testid={ask.testId}>
         <span>{ask.label}</span>
       </button>
     ) : (
@@ -51,6 +56,7 @@ export function QxTouchDock({
         type="button"
         className="qxt-askq"
         data-qxt-ask="on"
+        data-testid={ask.testId}
         onClick={() => {
           rememberAssistantDraft(ask.draft)
           navigate('/assistant')
@@ -73,7 +79,7 @@ export function QxTouchDock({
   ) : null)
 
   return (
-    <footer className="qxt-dock">
+    <footer className={['qxt-dock', className].filter(Boolean).join(' ')}>
       {leftNode}
       {middle}
       {primary ? (
@@ -82,6 +88,7 @@ export function QxTouchDock({
           className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}`}
           onClick={primary.onClick}
           disabled={primary.disabled}
+          data-testid={primary.testId}
         >
           {primary.label}
           {primary.noArrow ? null : <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />}

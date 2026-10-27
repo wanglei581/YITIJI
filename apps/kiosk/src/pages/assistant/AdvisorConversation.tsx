@@ -10,12 +10,17 @@
 // 连 state 都不进（见 advisorProvider.ts）。这里渲染的是那一轮的**诚实说明**。
 // ============================================================
 
+import type { ReactNode } from 'react'
 import type { AssistantAction } from '@ai-job-print/shared'
 import { useNavigate } from 'react-router-dom'
+import { FileTextIcon, HelpCircleIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
 import { EvidenceBadge } from '../../ai'
 import { KIcon } from '../../components/kiosk-icon'
+import { QxTouchSlab } from '../../components/qingxu/touch/QxTouchSlab'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
-import { advisorManualDetails, advisorManualEntries } from './advisorScenes'
+import { Hit } from '../public-touch/PublicBlocks'
+import { IllusChecklist, IllusResume, IllusStack } from '../public-touch/PublicIllus'
+import { advisorManualEntries } from './advisorScenes'
 import { advisorDisplayText } from './advisorUserCopy'
 
 /**
@@ -81,7 +86,8 @@ export function AdvisorThinking() {
   )
 }
 
-export function ChatBubble({ msg }: { msg: Message }) {
+/** keptQuestion：本轮没回答或失败时，把保留下来的问题回显在说明条里（只用于 error / not-ai）。 */
+export function ChatBubble({ msg, keptQuestion }: { msg: Message; keptQuestion?: string }) {
   const isAssistant = msg.role === 'assistant'
 
   return (
@@ -96,6 +102,7 @@ export function ChatBubble({ msg }: { msg: Message }) {
         <div className="assistant-message-bubble assistant-message-bubble--error" role="alert">
           <strong>请求失败，没有回答</strong>
           <p>{advisorDisplayText(msg.text)}</p>
+          {keptQuestion ? <p className="assistant-message-kept">保留的问题：{advisorDisplayText(keptQuestion)}</p> : null}
         </div>
       ) : msg.kind === 'not-ai' ? (
         /*
@@ -105,7 +112,7 @@ export function ChatBubble({ msg }: { msg: Message }) {
          */
         <div className="assistant-message-bubble assistant-message-bubble--not-ai" role="status">
           <strong>这一轮没有 AI 回答</strong>
-          <p>这次没有取得模型写出的回答，已为你保留问题。</p>
+          <p>这次没有取得模型写出的回答，已为你保留问题{keptQuestion ? `：${advisorDisplayText(keptQuestion)}` : '。'}</p>
           <dl className="assistant-provenance">
             <div><dt>回答来源</dt><dd>未确认是 AI 回答</dd></div>
           </dl>
@@ -138,39 +145,61 @@ export function ChatBubble({ msg }: { msg: Message }) {
  * 而本页的手动替代天然是四条并列的路，少列任何一条都会让用户以为
  * 「AI 挂了这台机器就没别的能办了」。所以四条全给，且都是真实注册路由。
  *
- * 稿 05 两种密度：`rail` 是平时的一排四格；`full` 是 AI 答不了时占主视野的 2×2，
- * 每格多列出目的页首屏确有的去处（ADVISOR_MANUAL_DETAILS），不编造能力。
+ * 触屏稿三种形态：`rail` 是语音通话面板里的紧凑一排；`full` 是 AI 答不了、这一轮没回答、本轮失败时占主视野的四张大行（带插画与去往箭头）；
+ * `sheet` 是底部弹层里的四行入口。每格都是目的页首屏确有的去处，不编造能力。
  */
-export function AdvisorManualEntries({ variant = 'full' }: { variant?: 'rail' | 'full' }) {
+const MANUAL_ART = [
+  <IllusStack key="stack" w={130} n={3} />,
+  <IllusChecklist key="help" w={120} />,
+  <IllusChecklist key="policy" w={120} />,
+  <IllusResume key="resume" w={120} />,
+] as const
+
+const MANUAL_ICON: Record<string, ReactNode> = {
+  '/print-scan': <PrinterIcon size={30} />,
+  '/help': <HelpCircleIcon size={30} />,
+  '/policy-service': <LandmarkIcon size={30} />,
+  '/resume-service': <FileTextIcon size={30} />,
+  '/job-fairs': <LandmarkIcon size={30} />,
+}
+
+export function AdvisorManualEntries({ variant = 'full' }: { variant?: 'full' | 'sheet' | 'rail' }) {
   const navigate = useNavigate()
   // 招聘内容托管（3.13）关闭时不摆招聘会入口，那一格换成帮助中心（见 advisorManualEntries）。
   const hostingOpen = useRecruitmentHosting().enabled
+  const entries = advisorManualEntries(hostingOpen)
 
   return (
     <nav className="assistant-manual-entries" data-variant={variant} aria-label="不依赖 AI 的功能入口">
-      {advisorManualEntries(hostingOpen).map((entry) => {
-        const details = variant === 'full' ? advisorManualDetails(entry.route) : []
-        return (
-          <button
-            key={entry.route}
-            type="button"
-            className="assistant-manual-entry"
-            onClick={() => navigate(entry.route)}
-          >
-            <span className="assistant-manual-top">
-              <span className="assistant-manual-icon" aria-hidden="true"><KIcon name={entry.icon} /></span>
-              <strong>{entry.label}</strong>
-              <KIcon name="arrow" />
-            </span>
-            <small>{entry.hint}</small>
-            {details.length > 0 && (
-              <span className="assistant-manual-details">
-                {details.map((detail) => <span key={detail}>{detail}</span>)}
-              </span>
-            )}
-          </button>
-        )
-      })}
+      {entries.map((entry, index) => (variant === 'rail' ? (
+        // 语音通话面板里的紧凑一排：沿用原来的小按钮。
+        <button key={entry.route} type="button" className="assistant-manual-entry" onClick={() => navigate(entry.route)}>
+          <span className="assistant-manual-top">
+            <span className="assistant-manual-icon" aria-hidden="true"><KIcon name={entry.icon} /></span>
+            <strong>{entry.label}</strong>
+            <KIcon name="arrow" />
+          </span>
+          <small>{entry.hint}</small>
+        </button>
+      ) : variant === 'sheet' ? (
+        <Hit
+          key={entry.route}
+          icon={MANUAL_ICON[entry.route] ?? <FileTextIcon size={30} />}
+          title={entry.label}
+          sub={entry.hint}
+          onClick={() => navigate(entry.route)}
+        />
+      ) : (
+        <QxTouchSlab
+          key={entry.route}
+          row
+          index={index}
+          title={entry.label}
+          desc={entry.hint}
+          visual={MANUAL_ART[index] ?? MANUAL_ART[0]}
+          onClick={() => navigate(entry.route)}
+        />
+      )))}
     </nav>
   )
 }

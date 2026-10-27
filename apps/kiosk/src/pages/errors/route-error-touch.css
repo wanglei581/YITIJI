@@ -1,8 +1,4 @@
-.qxt-screen[data-qx-page='route-error'] .qxp-card {
-  min-height: 280px;
-  font-size: var(--qxt-fs-body);
-}
-
-.qxt-screen[data-qx-page='route-error'] .qxp-note {
-  font-size: var(--qxt-fs-body);
-}
+/* 路由出错页：说明条、两张去处卡、求助句。块的通用样式在 public-touch.css。底栏两颗按钮等宽。 */
+.qxt-screen[data-qx-page='route-error'] .qxp-grow { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.qxt-screen[data-qx-page='route-error'] .qxp-pair { grid-template-rows: minmax(0, 1fr); }
+.qxt-screen[data-qx-page='route-error'] .qxt-dock .qxt-fill { flex: 1; min-width: 0; }
