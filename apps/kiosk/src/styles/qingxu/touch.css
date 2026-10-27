@@ -55,20 +55,20 @@
 }
 .qxt-screen .qxt-band-compact { min-height: 410px; }
 .qxt-screen .qxt-flow { position: absolute; inset: 0; pointer-events: none; }
-.qxt-screen .qxt-flow svg { position: absolute; left: -10%; width: 120%; height: 100%; }
+.qxt-screen .qxt-flow svg { position: absolute; left: 0; width: 100%; height: 100%; }
 .qxt-screen .qxt-halo {
-  position: absolute;
-  width: 760px;
+  position: absolute; /* 框贴右边不越出视口（越界门禁按框量），渐变圆心右移 120px 画出原来的光晕；呼吸缩放以右缘为原点 */
+  width: 500px;
   height: 760px;
-  right: -260px;
+  right: 0;
   top: -360px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--qxt-halo), transparent);
+  transform-origin: 100% 50%;
+  background: radial-gradient(circle 380px at calc(100% - 120px) 50%, var(--qxt-halo), transparent);
   pointer-events: none;
 }
 .qxt-screen .qxt-band-live .qxt-flow svg { animation: qxt-drift 18s ease-in-out infinite alternate; }
 .qxt-screen .qxt-band-live .qxt-halo { animation: qxt-breathe 9s ease-in-out infinite alternate; }
-@keyframes qxt-drift { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
+@keyframes qxt-drift { from { transform: translateY(-3%); } to { transform: translateY(3%); } } /* 纵向漂移，横向不越出视口 */
 @keyframes qxt-breathe { from { opacity: 0.65; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
 .qxt-screen .qxt-band > * { position: relative; }
 .qxt-screen .qxt-band > .qxt-flow,
