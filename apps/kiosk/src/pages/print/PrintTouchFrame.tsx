@@ -13,6 +13,11 @@ import './styles/print-touch.css'
 
 export const PRINT_TOUCH_RAIL = ['选文件', '材料检查', '预览与参数', '核对价格'] as const
 
+/** 底栏「问小青」。按钮字用稿里的句子；带到顾问页的草稿不自动发送。麦克风跟首页同一开关（语音构建才画）。 */
+export function printAsk(label: string, draft: string): QxTouchAsk {
+  return { label, draft, voice: import.meta.env.VITE_USE_TRTC_CALL === 'true' }
+}
+
 type FrameStatus = { tone: 'ok' | 'warn' | 'bad' | 'unknown' | 'reading'; label: string }
 
 function toTouchStatus(status?: FrameStatus): QxTouchStatus | undefined {

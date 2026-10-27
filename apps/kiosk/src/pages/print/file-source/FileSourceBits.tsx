@@ -16,6 +16,7 @@ import {
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
+import { PrintArt } from '../art/PrintArt'
 import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
 import type { FileSourceScreen, PhoneSessionView, UploadTab } from './fileSourceModel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
@@ -404,7 +405,7 @@ export function PhoneQrSlot({
   if (qrUrl) {
     return (
       <div className="fs-qr-live" data-testid="file-source-qr">
-        <QRCodeSVG value={qrUrl} size={396} level="M" marginSize={1} />
+        <QRCodeSVG value={qrUrl} size={360} level="M" marginSize={1} />
         <span>
           {expiresLabel && !expiresLabel.includes('NaN')
             ? `二维码有效期 ${expiresLabel}。单份不超过 10MB。`
@@ -439,6 +440,7 @@ function SourceCard({
   title,
   desc,
   icon,
+  art,
   disabled = false,
   onClick,
 }: {
@@ -446,6 +448,8 @@ function SourceCard({
   title: string
   desc: string
   icon: QxTouchIconName
+  /** 稿里的实物小样：手机 / U 盘 / 扫描件。没有就退回图标（本机选文件）。 */
+  art?: 'phone' | 'usb' | 'scan-paper'
   disabled?: boolean
   onClick: () => void
 }) {
@@ -455,7 +459,7 @@ function SourceCard({
       desc={desc}
       row
       off={disabled}
-      visual={<QxTouchIcon name={icon} size={64} />}
+      visual={art ? <PrintArt name={art} size={art === 'phone' ? 78 : 120} /> : <QxTouchIcon name={icon} size={64} />}
       onClick={disabled ? undefined : onClick}
     />
   )
@@ -512,6 +516,7 @@ export function SourceEntry({
           title={CHANNEL_COPY.qr.name}
           desc={CHANNEL_COPY.qr.desc}
           icon="phone"
+          art="phone"
           onClick={() => onSelectChannel('qr')}
         />
         <SourceCard
@@ -519,6 +524,7 @@ export function SourceEntry({
           title={CHANNEL_COPY.usb.name}
           desc={usbDesc}
           icon="usb"
+          art="usb"
           disabled={usbMode !== 'ok'}
           onClick={() => onSelectChannel('usb')}
         />
@@ -528,6 +534,7 @@ export function SourceEntry({
             title="是纸质的 · 放到打印机上扫描"
             desc="扫描纸质原件，扫成 PDF 后可以存、可以打。"
             icon="scan"
+            art="scan-paper"
             onClick={onScan}
           />
         ) : null}
@@ -543,23 +550,27 @@ export function SourceEntry({
       </div>
       <button
         type="button"
-        className="fs-doc-row"
+        className="qxt-rowlink fs-doc-row"
         data-testid="file-source-member-source"
         aria-label="我的文档 / 最近打印"
         onClick={onDocuments}
       >
-        <QxTouchIcon name="folder" size={36} />
+        <QxTouchIcon name="folder" size={32} strokeWidth={2} />
         <span>
           <b>我的文档</b>
           {miniappLine ? <small>{miniappLine}</small> : null}
         </span>
+        <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
       </button>
-      <div className="fs-formats">
-        <div><b>PDF</b><span>.pdf</span></div>
-        <div><b>图片</b><span>.jpg .png</span></div>
-        <div><b>Word</b><span>{wordText}</span></div>
+      <div className="fs-fmt">
+        <div className="fs-fmt-t">能打印的文件</div>
+        <div className="fs-fmt-row">
+          <div><b>PDF</b><span>.pdf</span></div>
+          <div><b>图片</b><span>.jpg .png</span></div>
+          <div className="no"><b>Word</b><span>{wordText}</span></div>
+        </div>
+        <small>手机上传不超过 10MB · U 盘不超过 15MB</small>
       </div>
-      <p className="fs-size-line">手机上传不超过 10MB · U 盘不超过 15MB</p>
       <p className="fs-cloud">第三方网盘尚未接入。公共终端不做网盘授权登录。</p>
     </>
   )
@@ -595,6 +606,17 @@ export function PhoneBoard({
   const received = ['phone-uploaded', 'phone-confirming', 'phone-confirm-failed', 'phone-cancel-requesting', 'phone-cancel-failed'].includes(screen)
   const showQr = !received
   const waiting = screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-generating' || screen === 'phone-uploading'
+  const liveText = received
+    ? (screen === 'phone-uploaded'
+      ? '系统已收到，等你确认'
+      : screen === 'phone-confirming'
+        ? '确认结果回来前，这份还没有进入本次办理。'
+        : screen === 'phone-confirm-failed'
+          ? '确认失败，当前文件仍然是空的。'
+          : screen === 'phone-cancel-requesting'
+            ? '取消结果回来前，这份仍然挂着，不说已经作废。'
+            : '取消没有确认成功，这份仍留着等你决定。')
+    : '等你在手机上传文件 · 传好后会显示在下面，再点确认'
   return (
     <>
       {showQr ? (
@@ -606,10 +628,10 @@ export function PhoneBoard({
           inactive={screen === 'phone-expired' || screen === 'phone-cancelled'}
         />
       ) : null}
-      {waiting ? (
+      {waiting || received ? (
         <div className="qxt-steps fs-phone-steps">
           {PHONE_STEPS.map((step, index) => (
-            <div className="qxt-step" key={step.title}>
+            <div className="qxt-step" key={step.title} data-state={received ? (index < 2 ? 'done' : 'now') : undefined}>
               <span className="qxt-step-n">{index + 1}</span>
               <b>{step.title}</b>
               <small>{step.detail}</small>
@@ -617,7 +639,12 @@ export function PhoneBoard({
           ))}
         </div>
       ) : null}
-      {waiting ? <p className="fs-wait">等你在手机上传文件 · 传好后会显示在下面，再点确认</p> : null}
+      {waiting || received ? (
+        <div className="fs-live" role="status">
+          {received ? <QxTouchIcon name="check" size={36} strokeWidth={2.4} /> : <span className="fs-spin" aria-hidden="true" />}
+          <b>{liveText}</b>
+        </div>
+      ) : null}
       {screen === 'phone-status-unknown' ? (
         <QxTouchCallout kind="remind" icon="alert">暂时查不到结果，不代表二维码已经过期。可以再查一次，或重新出一张码。</QxTouchCallout>
       ) : null}
@@ -630,29 +657,24 @@ export function PhoneBoard({
           <p className="qxt-reason">还没有收到文件，可以重新生成二维码或换一种上传方式。</p>
         </div>
       ) : null}
-      {phone.pendingName ? (
-        <FileRow
-          name={phone.pendingName}
-          meta={`${phone.pendingSize ?? ''} · 手机扫码上传`}
-          tag=""
-          tagTone="doing"
-          testId="file-source-phone-file"
-        />
-      ) : null}
-      {received ? (
-        <p className="fs-wait">
-          {screen === 'phone-uploaded'
-            ? '系统已收到，等你确认'
-            : screen === 'phone-confirming'
-              ? '确认结果回来前，这份还没有进入本次办理。'
-              : screen === 'phone-confirm-failed'
-                ? '确认失败，当前文件仍然是空的。'
-                : screen === 'phone-cancel-requesting'
-                  ? '取消结果回来前，这份仍然挂着，不说已经作废。'
-                  : '取消没有确认成功，这份仍留着等你决定。'}
-        </p>
-      ) : waiting && !phone.pendingName ? (
-        <p className="fs-placeholder">传好的文件会出现在这里</p>
+      {waiting || received ? (
+        <div className={`fs-drop${phone.pendingName ? ' fs-drop-got' : ''}`}>
+          {phone.pendingName ? (
+            <FileRow
+              name={phone.pendingName}
+              meta={`${phone.pendingSize ?? ''} · 手机扫码上传`}
+              tag=""
+              tagTone="doing"
+              mark="PDF"
+              testId="file-source-phone-file"
+            />
+          ) : (
+            <>
+              <QxTouchIcon name="file" size={40} strokeWidth={1.8} />
+              <span className="fs-placeholder">传好的文件会出现在这里</span>
+            </>
+          )}
+        </div>
       ) : null}
       {screen === 'phone-uploaded' ? (
         <QxTouchCallout kind="fine">请核对文件名和大小。在这台机器上确认后，才能继续材料检查。确认前它还不是当前文件。</QxTouchCallout>
@@ -681,6 +703,7 @@ export function UsbPickBoard({
   selected,
   driveLabel,
   formatBytes,
+  wordText,
   onSelect,
   onRescan,
 }: {
@@ -689,6 +712,8 @@ export function UsbPickBoard({
   selected: { safeId: string; filename: string; sizeBytes: number } | null
   driveLabel: string | null
   formatBytes: (bytes: number) => string
+  /** 稿 usb 页脚第一句：Word 能不能转。 */
+  wordText: string
   onSelect: (safeId: string) => void
   onRescan: () => void
 }) {
@@ -736,16 +761,16 @@ export function UsbPickBoard({
         />
       ) : null}
       {screen === 'usb-importing' ? (
-        <>
-          <p className="fs-wait">正在导入选中的文件，请暂时不要拔出 U 盘。</p>
-          <p className="fs-wait">系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。</p>
-        </>
+        <QxTouchCallout kind="remind" icon="usb">正在导入选中的文件，请暂时不要拔出 U 盘。系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。</QxTouchCallout>
       ) : null}
       {screen === 'usb-selected' ? (
-        <QxTouchCallout kind="fine">只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。</QxTouchCallout>
+        <QxTouchCallout kind="remind" icon="usb">只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。</QxTouchCallout>
       ) : null}
       {screen === 'usb-list' ? (
-        <QxTouchCallout kind="fine">一次只选一份。还没选定之前，导入按钮按住不放。只列根目录，不进子文件夹。</QxTouchCallout>
+        <>
+          <QxTouchCallout kind="remind" icon="usb">只读取你主动选择的文件。导入完成后可以直接拔出 U 盘。</QxTouchCallout>
+          <QxTouchCallout kind="fine">{wordText} 读不出来可以换一个 USB 口，或者改用手机传。</QxTouchCallout>
+        </>
       ) : null}
       {screen === 'usb-import-failed' || screen === 'usb-safeid-expired' ? (
         <QxTouchCallout kind="remind" icon="alert">当前文件仍然是空的。重新读一次 U 盘后，在新列表里再选一份。</QxTouchCallout>

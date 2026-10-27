@@ -4,7 +4,7 @@ import { useSupportContact } from '../../../hooks/useSupportContact'
 import { SparklesIcon } from 'lucide-react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
-import { PrintTouchFrame } from '../PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
 import { PrintFilePreviewModal } from '../components/PrintPreviewPanel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
 import type { UsbFileListItem } from '../../../services/files/usbImportApi'
@@ -20,7 +20,6 @@ import {
   FileRow,
   FileSourceNote,
   UsbImportHoldNotice,
-  FileSourceReason,
   FileSourceStatus,
   FileSourceSteps,
   FileSourceTruth,
@@ -35,6 +34,7 @@ import '../styles/file-source-qx.css'
 import './file-source-touch.css'
 
 const ASK_LABEL = '问小青：这份文件怎么检查 →'
+const ASK_LABEL_SHORT = '问小青：怎么检查'
 const ASK_DRAFT = '这份文件要怎么检查？检查会看哪些内容？'
 
 export interface FileSourceViewProps {
@@ -108,7 +108,7 @@ function primaryLabel(screen: FileSourceScreen, isResume: boolean): string {
   if (screen === 'local-upload-failed') return '重试上传'
   if (screen === 'phone-gen-failed' || screen === 'phone-expired' || screen === 'phone-cancelled') return '重新出一张码'
   if (screen === 'phone-status-unknown') return '再查一次状态'
-  if (screen === 'phone-uploaded') return '确认使用这份文件'
+  if (screen === 'phone-uploaded' || screen === 'phone-generating' || screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-uploading') return '确认使用这份文件'
   if (screen === 'phone-confirm-failed') return '重试确认'
   if (screen === 'phone-cancel-failed') return '重试取消'
   if (screen === 'usb-unavailable') return '改用手机扫码上传'
@@ -150,26 +150,6 @@ function primaryEnabled(screen: FileSourceScreen): boolean {
   )
 }
 
-function disabledReason(screen: FileSourceScreen): string | null {
-  if (primaryEnabled(screen) && FILE_SOURCE_HAS_FILE.has(screen)) return null
-  if (FILE_SOURCE_HAS_FILE.has(screen)) return null
-  if (screen === 'local-uploading') return '上传结果还没确认，材料检查按住不放'
-  if (screen === 'phone-generating' || screen === 'phone-ready' || screen === 'phone-waiting') return '还没有文件上来，材料检查按住不放'
-  if (screen === 'phone-uploading') return '文件还在路上，材料检查按住不放'
-  if (screen === 'phone-confirming') return '确认结果还没回来，材料检查按住不放'
-  if (screen === 'phone-cancel-requesting') return '取消结果还没回来，材料检查按住不放'
-  if (screen === 'usb-detecting') return '还在读盘，材料检查按住不放'
-  if (screen === 'usb-list') return '还没选定文件，材料检查按住不放'
-  if (screen === 'usb-importing') return '导入结果还没确认，材料检查按住不放'
-  if (screen === 'source-chooser' || screen === 'missing-file') return '这一步还没有文件，先用上面任一通道把文件搬进来'
-  if (screen === 'local-guide' || screen === 'local-picking') return '还没选文件，材料检查按住不放'
-  if (screen.startsWith('local-')) return '当前文件仍然是空的，材料检查按住不放'
-  if (screen.startsWith('phone-')) return '这一步还没有当前文件，材料检查按住不放'
-  if (screen.startsWith('usb-')) return '还没导入文件，材料检查按住不放'
-  if (primaryEnabled(screen)) return null
-  return '这一步还没有文件，材料检查按住不放'
-}
-
 function touchPage(screen: FileSourceScreen): 'print-src' | 'print-upload' | 'print-usb' {
   if (screen.startsWith('phone')) return 'print-upload'
   if (screen.startsWith('usb')) return 'print-usb'
@@ -202,9 +182,6 @@ function touchTitle(screen: FileSourceScreen): string {
 function touchSubtitle(screen: FileSourceScreen, pageSubtitle: string, paused: string | undefined): string | undefined {
   if (paused) return pageSubtitle
   if (screen === 'usb-list' || screen === 'usb-selected' || screen === 'usb-importing') return '只读根目录，不进子文件夹。'
-  if (screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-generating' || screen === 'phone-uploading') {
-    return '等你在手机上传文件 · 传好后会显示在下面，再点确认'
-  }
   if (screen === 'usb-wait' || screen === 'usb-detecting') return '还没读到 U 盘里的文件。'
   return undefined
 }
@@ -310,6 +287,9 @@ export function FileSourceView(props: FileSourceViewProps) {
     secondary = null
   } else if (screen === 'usb-selected') {
     secondary = ghost('回列表重选', onUsbRescan, 'file-source-back-list')
+  } else if (screen === 'source-chooser' || screen === 'missing-file') {
+    // 稿 print-src：底栏返回就是出口，页内不再摆一颗「退出」
+    secondary = null
   } else if (screen === 'local-uploading' || screen === 'usb-importing') {
     secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
   } else {
@@ -320,9 +300,6 @@ export function FileSourceView(props: FileSourceViewProps) {
   if (usbHoldActive) secondary = ghost('退出 · 回打印扫描', onExit, 'file-source-exit')
 
   const enabled = usbHoldActive ? usbHoldActive.state !== 'loading' : primaryEnabled(screen)
-  const reason = usbHoldActive
-    ? (usbHoldActive.state === 'loading' ? '确认完成前先不读 U 盘' : null)
-    : disabledReason(screen)
   const primaryText = usbHoldActive
     ? (usbHoldActive.state === 'loading' ? '确认后再选文件' : '改用手机扫码上传')
     : primaryLabel(screen, isResumePrint)
@@ -370,7 +347,6 @@ export function FileSourceView(props: FileSourceViewProps) {
             onScan={onScan}
             onDocuments={onDocuments}
           />
-          <QxTouchCallout kind="fine">还没有文件。没有文件就进不了材料检查，所以下一步先按住不放。</QxTouchCallout>
         </>
       )
       break
@@ -519,7 +495,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           expiresLabel={expiresLabel}
           channelKeys={channelKeys}
           usbMode={usbMode}
-          helpText={screen === 'phone-generating' || screen === 'phone-gen-failed' ? '' : helpNeededLine(support)}
+          helpText={['phone-status-unknown', 'phone-expired', 'phone-confirm-failed', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
           actions={screen === 'phone-gen-failed' ? boardActions : undefined}
           onSelectChannel={onSelectChannel}
         />
@@ -595,6 +571,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           selected={usbSelected}
           driveLabel={usbDriveLabel}
           formatBytes={formatBytes}
+          wordText={conversionReason ?? wordHint}
           onSelect={onUsbSelect}
           onRescan={onUsbRescan}
         />
@@ -604,6 +581,8 @@ export function FileSourceView(props: FileSourceViewProps) {
       body = null
   }
 
+  // 稿：来源选择页没有主按钮（没有文件就没有下一步）；U 盘列表选中之前也没有，选中后才出「导入这份文件」。
+  const noPrimary = !usbHoldActive && (screen === 'source-chooser' || screen === 'missing-file' || screen === 'usb-list')
   const eyebrow = pageTitle === '简历打印' || pageTitle === '照片打印' ? pageTitle : '文档打印'
   return (
     <PrintTouchFrame
@@ -613,13 +592,14 @@ export function FileSourceView(props: FileSourceViewProps) {
       eyebrow={eyebrow}
       title={touchTitle(screen)}
       subtitle={touchSubtitle(screen, pageSubtitle, orderPausedNotice)}
-      railNow={0}
+      seal={screen.startsWith('phone') || screen.startsWith('usb') ? null : 'idle'}
+      railNow={screen.startsWith('phone') ? undefined : 0}
       terminalLabel={terminalLabel}
-      status={status}
-      back={{ label: '返回打印扫描', onBack }}
+      status={screen === 'phone-uploaded' ? { tone: 'ok', label: '系统已收到，等你确认' } : status}
+      back={{ label: '上一步', onBack }}
       navbar={previewOpen ? undefined : <QxAppNavbar onHome={props.onHome} onAdvisor={props.onAdvisor} onProfile={props.onProfile} />}
-      ask={previewOpen ? undefined : { label: ASK_LABEL, draft: ASK_DRAFT }}
-      primary={previewOpen ? undefined : {
+      ask={previewOpen ? undefined : printAsk(screen.startsWith('phone') || screen.startsWith('usb') ? ASK_LABEL_SHORT : ASK_LABEL, ASK_DRAFT)}
+      primary={previewOpen || noPrimary ? undefined : {
         label: primaryText,
         onClick: onPrimary,
         disabled: !enabled,
@@ -654,7 +634,6 @@ export function FileSourceView(props: FileSourceViewProps) {
           </button>
         ) : null}
         {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
-        {reason && !previewOpen ? <FileSourceReason>{reason}</FileSourceReason> : null}
         <FileSourceTruth />
         <div className="print-upload-footer" data-testid="file-source-ctabar">
           {previewOpen || ghostInBoard ? null : secondary}

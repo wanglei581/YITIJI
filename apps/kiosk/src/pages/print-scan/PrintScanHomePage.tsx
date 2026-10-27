@@ -46,7 +46,7 @@ import {
 import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
 import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { PrintTouchFrame } from '../print/PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from '../print/PrintTouchFrame'
 import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   COPY_GUIDE_KEY,
@@ -54,10 +54,8 @@ import {
   HUB_ASK,
   HUB_PILL,
   arrivalCodeStateNote,
-  capabilityGroupHint,
   colorDuplexChip,
   deriveHubUiState,
-  recordsGroupHint,
   type MfpStatus,
   type PrintHubCap,
   type ProbeStatus,
@@ -474,21 +472,20 @@ export function PrintScanHomePage() {
     )
   const hubState = deriveHubUiState({ probe, mfp, locked })
   const pill = HUB_PILL[hubState]
+  // 稿：状态由顶栏胶囊和卡片角标说一次，提醒条只留标准句。
   const printerUnavailable = {
     label: device.printerLabel,
-    notice: device.printer.errorCode === 'paperEmpty'
-      ? `打印机缺纸。${machineCannotPrintLine(contact)}`
-      : device.kind === 'offline'
-        ? `打印机当前无法连接。${machineCannotPrintLine(contact)}`
-        : `打印机异常。${machineCannotPrintLine(contact)}`,
+    notice: machineCannotPrintLine(contact),
   }
 
-  const askLabel = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty'
+  // 稿 st-device-off：确定缺纸时是另一版面（眉题「打印 · 扫描 · 复印」、无步骤轴、无印章）；离线、异常、暂停接单仍是 print?printer=down 的版面。
+  const paperOff = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty' && !device.printerNotice
+  const askLabel = paperOff
     ? '问小青：缺纸了文件还要传吗？'
     : '问小青：怎么选打印方式 →'
   const hubSubtitle = hubState === 'capability-loading'
     ? '确认前，打印、扫描这几项先不进入；到机码、复印照常可用。'
-    : hubState === 'device-off' && device.printer.errorCode === 'paperEmpty'
+    : paperOff
       ? '缺纸了。打印和扫描先停，订单还在。'
       : undefined
 
@@ -498,18 +495,15 @@ export function PrintScanHomePage() {
       legacyBody={false}
       nav
       kind="std"
-      seal={hubState === 'device-off' ? null : 'idle'}
-      back={{ label: '上一步', onBack: () => navigate('/') }}
+      seal={paperOff ? null : 'idle'}
+      back={{ label: paperOff ? '返回' : '上一步', onBack: () => navigate('/') }}
       title={HUB_ASK[hubState].text}
       subtitle={hubSubtitle}
-      eyebrow="打印扫描服务"
-      railNow={-1}
-      bodyClassName={hubState === 'device-off' ? 'qxt-body-hub' : 'qxt-body-print'}
+      eyebrow={paperOff ? '打印 · 扫描 · 复印' : '打印扫描服务'}
+      railNow={paperOff ? undefined : -1}
+      bodyClassName={paperOff ? 'qxt-body-hub' : 'qxt-body-print'}
       status={device.printerNotice ? { tone: 'warn', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
-      ask={{
-        label: askLabel,
-        draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。',
-      }}
+      ask={printAsk(askLabel, '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。')}
     >
       <QxPrintHubView
         hubState={hubState}
@@ -534,6 +528,7 @@ export function PrintScanHomePage() {
           wide: capability.wide,
           available: capability.available,
           actionable: Boolean(capability.to),
+          deviceOff: mfp === 'unavailable' && capability.needsMfp && !capability.available,
           stateNote: capability.stateNote,
           unavailableBadge: capability.unavailableBadge,
           note: capability.note,
@@ -545,8 +540,6 @@ export function PrintScanHomePage() {
             : arrivalCodeStateNote(probe, mfp),
         }}
         quickLinks={QUICK_LINKS}
-        capabilityGroupHint={mfp === 'unavailable' && confirmed ? device.printerLabel : capabilityGroupHint(probe, mfp, locked)}
-        recordsGroupHint={recordsGroupHint()}
         notices={[
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE,
           COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE,
@@ -556,7 +549,6 @@ export function PrintScanHomePage() {
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
-        onBack={() => navigate('/')}
       />
       <KioskFeedbackDialog
         open={feedbackOpen}
