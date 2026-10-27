@@ -128,7 +128,10 @@ try {
   new Function('setIndustry', 'DEFAULT_EMPLOYMENT_INDUSTRY', executable(`return (${clearIndustry})();`))((value) => { clearedIndustry = value }, '信息传输、软件和信息技术服务业')
   assert.equal(clearedIndustry, '', '清空行业不能回填 IT')
   assert.ok(setup.includes("{industry || '尚未选择'}"), '未选行业如实显示')
-  assert.ok(setup.includes('请本人填写目标岗位、选择行业和经验后再开始'), '必须选的方向在开始前说明')
+  // 触屏版第 1 步按稿 iv-1：必选项直接写在各自字段的标签上，不再有一句总括。三个标签缺一不可，「尚未选择」的提示也要在。
+  for (const label of ['目标岗位（必填，最多 50 字）', '行业（必填，从就业行业清单选择）', '你的经验（必选）', '尚未选择，请按自己的实际情况选择。']) {
+    assert.ok(setup.includes(label), `必须选的方向在开始前说明：${label}`)
+  }
   const start = new Function('context', executable(`const {
     position, industry, experience, interviewerType, difficulty, duration, resumeFile,
     setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,

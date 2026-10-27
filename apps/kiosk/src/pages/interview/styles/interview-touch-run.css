@@ -1,0 +1,260 @@
+/* 练面试作答页（稿 iv-run）。只挂在 [data-qx-page="interview"] 下。
+   旧作答页的 .interview-session__* 类名还在（测试和读屏认），这里用更高一级的选择器清掉它们的旧盒子样式。 */
+
+/* 题目卡：状态、出题人与题序、题目原文，下面的插画吃余高 */
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-q {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 12px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 24px;
+  background: var(--qxt-card);
+  box-shadow: none;
+}
+
+[data-qx-page="interview"] .qxt-iv-qstat {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  background: var(--qxt-slate-wash);
+  color: var(--qxt-slate-ink);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-qstat .interview-session__wave i {
+  background: currentColor;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-q small {
+  display: block;
+  margin: 0;
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-q .interview-session__question-text {
+  margin: 0;
+  color: var(--qxt-ink);
+  font-family: var(--qx-sans);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-q .interview-session__previous-question {
+  display: block;
+  margin: 0;
+}
+
+[data-qx-page="interview"] .qxt-iv-qart {
+  position: relative;
+  flex: 1 1 120px;
+  min-height: 120px;
+  max-height: 520px;
+}
+
+[data-qx-page="interview"] .qxt-iv-qart-mark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 作答区：旧的卡片盒清掉，子项自己带样式 */
+[data-qx-page="interview"] [data-qx-interview] .interview-session__answer-dock {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-answer {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 24px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .qxt-iv-answer b {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-answer span {
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-answer textarea {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 120px;
+  max-height: none;
+  height: auto;
+  padding: 10px 14px;
+  border: 1.5px solid var(--qxt-line);
+  border-radius: 16px;
+  background: var(--qx-paper);
+  color: var(--qxt-ink);
+  font: 500 24px/1.45 var(--qx-sans);
+  resize: none;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-answer textarea:focus-visible {
+  outline: 3px solid var(--qx-teal);
+  outline-offset: 2px;
+}
+
+/* 动作行：按钮不拉伸，不打印回答是整行点选 */
+[data-qx-page="interview"] [data-qx-interview] .interview-session__answer-dock .qxt-iv-acts > button {
+  flex: 1 1 0;
+  width: auto;
+  font-size: var(--qxt-fs-sub);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-toggle {
+  position: relative;
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 12px;
+  width: auto;
+  min-height: var(--qxt-tap);
+  margin: 0;
+  padding: 8px 14px 8px 12px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-toggle input {
+  position: absolute;
+  inset: -2px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+[data-qx-page="interview"] .qxt-iv-toggle > span {
+  position: relative;
+  z-index: 1;
+}
+
+[data-qx-page="interview"] .qxt-iv-toggle::before {
+  content: "";
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--qxt-edge);
+  border-radius: 8px;
+  background: var(--qx-paper);
+}
+
+[data-qx-page="interview"] .qxt-iv-toggle:has(input:checked) {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .qxt-iv-toggle:has(input:checked)::before {
+  border-color: var(--qx-emerald);
+  background: var(--qx-emerald);
+}
+
+[data-qx-page="interview"] .qxt-iv-toggle:has(input:focus-visible) {
+  outline: 3px solid var(--qx-emerald);
+  outline-offset: 3px;
+}
+
+/* 错误与麦克风原因：整张说明卡转朱砂色，重新检测是一颗 64 高的按钮 */
+[data-qx-page="interview"] .qxt-iv-note.is-bad {
+  border-color: var(--qx-cinnabar);
+  background: var(--qxt-cin-wash);
+}
+
+[data-qx-page="interview"] .qxt-iv-note.is-bad b,
+[data-qx-page="interview"] .qxt-iv-note.is-bad span {
+  color: var(--qx-cinnabar);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .interview-session__error {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--qx-cinnabar);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .interview-session__mic-recheck {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: auto;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 18px;
+  border: 1.5px solid currentColor;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--qx-cinnabar);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+/* 最近对话：近两轮，整张卡跟着内容走，不再自带第二个滚动条 */
+[data-qx-page="interview"] [data-qx-interview] .interview-session__history.qxt-iv-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: none;
+  padding: 12px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 20px;
+  background: var(--qxt-card);
+  overflow: visible;
+}
+
+[data-qx-page="interview"] .interview-session__history span.is-skipped {
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page="interview"] .interview-session__history span b {
+  display: inline;
+  font-size: inherit;
+}

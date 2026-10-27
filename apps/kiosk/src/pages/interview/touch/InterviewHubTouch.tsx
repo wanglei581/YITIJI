@@ -13,7 +13,9 @@ import {
   type HubAvailability,
 } from '../../service-hubs/serviceHubModel'
 import { InterviewArt } from '../InterviewArt'
+import { InterviewScrollCue } from '../interviewQxParts'
 import '../styles/interview-touch.css'
+import '../styles/interview-touch-hub.css'
 
 const ASK_DRAFT = '我想练面试。请先问我现在最想完成哪一项，不要替我开始练习。'
 
@@ -72,16 +74,36 @@ export function InterviewHubTouch({
   const goBack = more ? () => setMore(false) : () => navigate('/')
   const mainReason = unavailableReason('ai', '/interview/setup', availability)
 
+  // 点下去的按钮随视图切换被卸载，焦点会掉回 body。切换后把焦点放到意图带的标题上。
   useLayoutEffect(() => {
     const changed = seenMore.current !== null && seenMore.current !== more
     seenMore.current = more
     if (!changed) return
-    const heading = hubRef.current?.querySelector('h2, h3')
-    if (heading instanceof HTMLElement) {
+    const heading = hubRef.current?.closest('.qxt-screen')?.querySelector<HTMLElement>('.qxt-band h1')
+    if (heading) {
       heading.tabIndex = -1
       heading.focus({ preventScroll: true })
     }
   }, [more])
+
+  const tiles = (list: Entry[], withTestId: boolean) => list.map((entry, index) => {
+    const reason = unavailableReason(entry.kind, entry.route, availability)
+    return (
+      <QxTouchTile
+        key={entry.title}
+        icon={entry.icon}
+        title={entry.title}
+        desc={entry.desc}
+        tone="teal"
+        titleAs="h3"
+        index={index}
+        off={Boolean(reason)}
+        reason={reason ?? undefined}
+        testId={withTestId && entry.title === '面试技巧' ? 'hub-interview-grid-面试技巧' : undefined}
+        onClick={() => navigate(entry.route)}
+      />
+    )
+  })
 
   return (
     <QxTouchScreen
@@ -129,64 +151,35 @@ export function InterviewHubTouch({
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe="off"
       >
-        <div className="qx-hub-grid">
-          {more ? MORE.map((entry, index) => {
-            const reason = unavailableReason(entry.kind, entry.route, availability)
-            return (
-              <QxTouchTile
-                key={entry.title}
-                icon={entry.icon}
-                title={entry.title}
-                desc={entry.desc}
-                tone={entry.kind === 'ai' ? 'teal' : 'slate'}
-                titleAs="h3"
-                index={index}
-                off={Boolean(reason)}
-                reason={reason ?? undefined}
-                onClick={() => navigate(entry.route)}
-              />
-            )
-          }) : (
+        <div className={more ? 'qx-hub-grid is-more' : mainReason ? 'qx-hub-grid is-off' : 'qx-hub-grid'}>
+          {more ? tiles(MORE, false) : (
             <>
               {mainReason ? (
-                <div className="qxt-iv-main is-off" role="group" aria-disabled="true" aria-label="马上练一场">
-                  <span className="qxt-iv-chip">AI · 练习</span>
-                  <h3>马上练一场</h3>
-                  <p>选择岗位类型与难度后进入训练</p>
-                  <span className="qx-hub-why">{mainReason}</span>
+                <div className="qxt-iv-dead" role="group" aria-disabled="true" aria-label="马上练一场">
+                  <span className="qxt-iv-lead">
+                    <span className="qxt-iv-chip">AI · 练习</span>
+                    <h3>马上练一场</h3>
+                    <p>选择岗位类型与难度后进入训练</p>
+                    <span className="qx-hub-why">{mainReason}</span>
+                  </span>
                   <PracticeSteps />
                 </div>
               ) : (
                 <button type="button" className="qxt-iv-main" onClick={() => navigate('/interview/setup')}>
-                  <span className="qxt-iv-chip">AI · 练习</span>
-                  <b>马上练一场</b>
-                  <small>选择岗位类型与难度后进入训练</small>
+                  <span className="qxt-iv-lead">
+                    <span className="qxt-iv-chip">AI · 练习</span>
+                    <b>马上练一场</b>
+                    <small>选择岗位类型与难度后进入训练</small>
+                  </span>
                   <PracticeSteps />
                 </button>
               )}
               {mainReason ? (
-                <button type="button" className="qxt-iv-fallback" onClick={() => navigate('/interview/tips')}>
+                <button type="button" className="qxt-iv-out" onClick={() => navigate('/interview/tips')}>
                   可以先看面试技巧
                 </button>
               ) : null}
-              {TILES.map((entry, index) => {
-                const reason = unavailableReason(entry.kind, entry.route, availability)
-                return (
-                  <QxTouchTile
-                    key={entry.title}
-                    icon={entry.icon}
-                    title={entry.title}
-                    desc={entry.desc}
-                    tone={entry.kind === 'ai' ? 'teal' : 'slate'}
-                    titleAs="h3"
-                    index={index}
-                    off={Boolean(reason)}
-                    reason={reason ?? undefined}
-                    testId={entry.title === '面试技巧' ? 'hub-interview-grid-面试技巧' : undefined}
-                    onClick={() => navigate(entry.route)}
-                  />
-                )
-              })}
+              {tiles(TILES, true)}
             </>
           )}
         </div>
@@ -227,6 +220,7 @@ export function InterviewHubTouch({
           </>
         )}
       </div>
+      <InterviewScrollCue />
     </QxTouchScreen>
   )
 }

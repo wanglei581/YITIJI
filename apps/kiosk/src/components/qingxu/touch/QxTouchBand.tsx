@@ -1,4 +1,4 @@
-import { Fragment, useId, type ReactNode } from 'react'
+import { Fragment, useId } from 'react'
 import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
 import { useQxTouchBack } from './useQxTouchBack'
@@ -54,7 +54,7 @@ export function QxTouchBand({
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
-  title: ReactNode
+  title: string
   sub?: string
   place?: string
   seal?: QxTouchSeal | null

@@ -6,7 +6,7 @@ import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHori
 import {
   ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
-  interviewReport, interviewStarted, uploadedResume,
+  interviewReport, interviewReportRich, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
@@ -1835,7 +1835,7 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await page.reload()
   await expect(page).toHaveURL(/\/interview\?stage=session/)
   await page.getByRole('textbox').fill('我基于真实经历完成了一个可访问性项目。')
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   await page.waitForURL(/\/interview\?stage=report/)
   // 3.5c：横幅以 AI 可见标识开头（审计表一「模拟面试报告（一体机）」），不发给企业的边界不变。
@@ -1888,7 +1888,7 @@ test('interview answer outage drops the unsent turn and restores the draft @w3-k
   })
   await beginTextInterview(page)
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
   const alert = page.locator('.interview-session__error')
   await expect(alert).toContainText('你刚才的回答还在输入框里')
   await expect(alert).toContainText('AI 现在停用')
@@ -1926,7 +1926,7 @@ test('ending an interview during an AI outage keeps the saved answers and offers
   })
   await beginTextInterview(page)
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
-  await page.locator('.interview-session__answer-dock').getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
   await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   const alert = page.locator('.interview-session__error')
@@ -1952,6 +1952,103 @@ test('ending an interview during an AI outage does not claim answers were saved 
   await expect(page.locator('.interview-session__error')).toContainText('AI 暂时用不了，报告现在生成不了')
   await expect(page.getByText('你的回答已保存')).toHaveCount(0)
   await expect(page.getByTestId('interview-finish-recovery').getByRole('button', { name: '看面试要点', exact: true })).toBeVisible()
+})
+
+/** 触屏练面试页里真正在滚的容器：整页只能有这一个。 */
+const INTERVIEW_SCROLLERS = '.interview-flow__scroll, .interview-session__content, .qxt-ivhub'
+
+/** 页内可见的滚动容器（内容超出一屏的才算）。 */
+async function interviewScrollContainers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = []
+    for (const el of document.querySelectorAll('.qxt-screen *')) {
+      const cs = getComputedStyle(el)
+      if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) out.push(el.className.toString())
+    }
+    return out
+  })
+}
+
+/** 每张说明卡、维度行、宽按钮都装得下自己的字：scrollHeight 不大于 clientHeight（被压扁的卡会大于）。 */
+async function expectInterviewCardsWhole(page: Page): Promise<void> {
+  const squeezed = await page.evaluate(() => [...document.querySelectorAll('.qxt-iv-note, .qxt-iv-ab, .qxt-iv-wide, .qxt-iv-banner, .qxt-iv-cells > div')]
+    .filter((el) => el.scrollHeight > el.clientHeight + 1)
+    .map((el) => `${el.className} ${el.scrollHeight}>${el.clientHeight} ${(el.textContent ?? '').slice(0, 16)}`))
+  expect(squeezed, '说明卡里的字被压出盒子').toEqual([])
+}
+
+/** 这一行字在滚动容器的可见范围里，而且中点没有被别的元素盖住（不在底栏、提示条后面）。 */
+async function expectVisibleInInterviewScroller(page: Page, text: string): Promise<void> {
+  const target = page.getByText(text, { exact: false }).last()
+  await target.scrollIntoViewIfNeeded()
+  const probe = await target.evaluate((el, selector) => {
+    const scroller = el.closest(selector) as HTMLElement | null
+    const box = el.getBoundingClientRect()
+    const area = scroller?.getBoundingClientRect()
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+    return {
+      inside: Boolean(area && box.top >= area.top - 1 && box.bottom <= area.bottom + 1),
+      covered: !(hit && (el === hit || el.contains(hit) || hit.contains(el))),
+    }
+  }, INTERVIEW_SCROLLERS)
+  expect(probe, `「${text}」应在可见范围内且没被盖住`).toEqual({ inside: true, covered: false })
+}
+
+test('interview report with many items keeps every card whole and reachable, 更多 opens at its first question @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, { status: 200, json: interviewReportRich })
+  api.respond('GET', `/api/v1/mock-interviews/${INTERVIEW_ID}/report`, { status: 200, json: interviewReportRich })
+  await beginTextInterview(page)
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
+  await page.waitForURL(/\/interview\?stage=report/)
+
+  // 主视图：条目多，超出一屏。只有一个滚动容器，提示出现，每张卡都完整。
+  await expect(page.getByRole('heading', { name: '风险点与改进建议' })).toBeVisible()
+  await expectInterviewCardsWhole(page)
+  expect(await interviewScrollContainers(page)).toHaveLength(1)
+  await expect(page.locator('.iv-scrollcue')).toBeVisible()
+  // 滑到底：最后一句看得见，提示收起；风险点卡里三条都在。
+  await page.locator('.interview-flow__scroll').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+  await expect(page.locator('.iv-scrollcue')).toBeHidden()
+  await expectVisibleInInterviewScroller(page, '失败时仍停在报告页并写明原因')
+  await expectVisibleInInterviewScroller(page, '回答时间偏长，超过一分钟')
+
+  // 从底部点进「更多」：第一屏就是「高频问题预测」和第一道题，不停在中间。
+  await page.getByRole('button', { name: '预测题、STAR、清单、摘录' }).click()
+  await expect(page.getByRole('heading', { name: '高频问题预测' })).toBeFocused()
+  expect(await page.locator('.interview-flow__scroll').evaluate((el) => el.scrollTop)).toBe(0)
+  await expectVisibleInInterviewScroller(page, '1. 你的具体贡献是什么？')
+  // 四张卡的每一条都完整：第五道题、清单第八条、跳过的摘录与第三条摘录、STAR 的 R 与提醒。
+  await expectInterviewCardsWhole(page)
+  for (const text of ['3. 为什么想做这个岗位？', '5. 遇到来访人员不配合怎么办？', '想好薪资期待的区间', '回答：（跳过）', '3. 你为什么想做这个岗位？', 'R 结果：', '数字和成果不用编造。']) {
+    await expectVisibleInInterviewScroller(page, text)
+  }
+
+  // 返回仍回主视图，不是离开报告。
+  await page.getByRole('button', { name: '返回', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '风险点与改进建议' })).toBeVisible()
+  await expect(page).toHaveURL(/\/interview\?stage=report/)
+})
+
+test('interview pages that overflow show the swipe cue, and it goes away at the end @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
+  await beginTextInterview(page)
+  // 答完一题：最近对话多出两条，作答页比一屏高。整页只有 .interview-session__content 一个滚动容器。
+  await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
+  await page.getByRole('button', { name: '提交回答', exact: true }).click()
+  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  expect(await interviewScrollContainers(page)).toEqual(['interview-session__content'])
+  const cue = page.locator('.iv-scrollcue')
+  await expect(cue).toBeVisible()
+  await page.locator('.interview-session__content').evaluate((el) => el.scrollTo(0, el.scrollHeight))
+  await expect(cue).toBeHidden()
+  // 回到顶又出现：提示盯的是真正在滚的那一层，不是外面一层。
+  await page.locator('.interview-session__content').evaluate((el) => el.scrollTo(0, 0))
+  await expect(cue).toBeVisible()
 })
 
 test('interview setup failure stays inside the first screen @w3-kiosk', async ({ page, api }) => {

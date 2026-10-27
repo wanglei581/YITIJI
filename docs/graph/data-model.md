@@ -2,16 +2,16 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`112` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`117` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 112 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 117 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
 flowchart TD
   EndUser["EndUser<br/><small>34 字段</small>"]
-  Organization["Organization<br/><small>28 字段</small>"]
-  Terminal["Terminal<br/><small>29 字段</small>"]
+  Organization["Organization<br/><small>29 字段</small>"]
+  Terminal["Terminal<br/><small>30 字段</small>"]
   FileObject["FileObject<br/><small>50 字段</small>"]
   Job["Job<br/><small>47 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
@@ -20,13 +20,13 @@ flowchart TD
   PrintTask["PrintTask<br/><small>22 字段</small>"]
   AgentReleaseTarget["AgentReleaseTarget<br/><small>10 字段</small>"]
   Order["Order<br/><small>42 字段</small>"]
+  ServiceProject["ServiceProject<br/><small>15 字段</small>"]
   ActiveReleaseObservationAssignment["ActiveReleaseObservationAssignment<br/><small>7 字段</small>"]
   AgentReleasePlan["AgentReleasePlan<br/><small>18 字段</small>"]
   BenefitClaim["BenefitClaim<br/><small>8 字段</small>"]
   DocumentProcessTask["DocumentProcessTask<br/><small>19 字段</small>"]
   FairCompany["FairCompany<br/><small>22 字段</small>"]
   FairVenueGuide["FairVenueGuide<br/><small>8 字段</small>"]
-  OfflineAgencyBranch["OfflineAgencyBranch<br/><small>31 字段</small>"]
   EndUser --- BenefitClaim
   EndUser --- DocumentProcessTask
   EndUser --- FileObject
@@ -34,6 +34,7 @@ flowchart TD
   Organization --- Job
   Organization --- JobFair
   Organization --- JobSource
+  Organization --- ServiceProject
   Organization --- Terminal
   Organization --- User
   Terminal --- ActiveReleaseObservationAssignment
@@ -43,7 +44,6 @@ flowchart TD
   FileObject --- PrintTask
   FileObject --- User
   Job --- JobSource
-  Job --- OfflineAgencyBranch
   JobFair --- FairCompany
   JobFair --- FairVenueGuide
   JobFair --- JobSource
@@ -113,7 +113,7 @@ flowchart TD
 | **JobSource** | 30 | FieldMappingRule、ImportBatch、Job、JobFair、Organization、SyncLog | 7 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/data-source-credential-policy.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **KioskActivity** | 12 | — | **无代码读写** |
 | **KioskJobBoardConfig** | 6 | — | 1 个文件<br/>`terminals/kiosk-job-board.service.ts` |
-| **KioskSession** | 14 | — | 6 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`kiosk-session/kiosk-session-retention.task.ts`<br/>… |
+| **KioskSession** | 14 | — | 7 个文件<br/>`ai/resume/resume-draft-source.service.ts`<br/>`console-screen/console-screen.visits.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
 | **LegalDocVersion** | 10 | — | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`legal/legal.service.ts`<br/>`member-auth/member-auth.service.ts` |
 | **MemberLegalConsent** | 10 | EndUser | 3 个文件<br/>`ai/resume/resume-unlabeled-export.ts`<br/>`member-auth/member-auth.service.ts`<br/>`member-privacy/member-closure-retention.ts` |
 | **MemberNotification** | 12 | EndUser | 2 个文件<br/>`member-notifications/member-notifications.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
@@ -128,7 +128,7 @@ flowchart TD
 | **Order** | 42 | OrderItem、PaymentAttempt、PrintTask、Refund | 31 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>… |
 | **OrderItem** | 15 | Order | 7 个文件<br/>`console-screen/console-screen.printed-pages.ts`<br/>`member-print-orders/package-order-fulfillment.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **OrderSubmissionLedger** | 11 | — | 2 个文件<br/>`member-print-orders/order-submission-ledger.ts`<br/>`member-privacy/member-closure-retention.ts` |
-| **Organization** | 28 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、Terminal、User | 20 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
+| **Organization** | 29 | CompanyProfile、Job、JobDataQualitySnapshot、JobFair、JobSource、OfflineAgencyProfile、OnlinePlatformDirectory、PolicyPost、QualificationRecord、ServiceProject、Terminal、User | 22 个文件<br/>`ai/usage/ai-usage-summary.ts`<br/>`auth/auth.service.ts`<br/>`auth/partner-account-action.service.ts`<br/>… |
 | **PartnerOrgNotice** | 8 | — | 2 个文件<br/>`policies/policies.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
 | **PaymentAttempt** | 13 | Order | 5 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`payment/online-payment.service.ts`<br/>… |
 | **PiiFinding** | 11 | DocumentProcessTask | 2 个文件<br/>`materials/materials.service.ts`<br/>`member-privacy/member-closure.service.ts` |
@@ -138,7 +138,7 @@ flowchart TD
 | **PolicyPost** | 26 | Organization、PolicyEligibilityRule | 12 个文件<br/>`activity/activity.service.ts`<br/>`assistant/daily-brief.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 4 个文件<br/>`benefit-redemption/resume-export-gate.service.ts`<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>… |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 37 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
+| **PrintTask** | 22 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 38 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **PrintTaskStatusLog** | 7 | PrintTask | 14 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RecruitmentCircuitBreak** | 7 | — | 2 个文件<br/>`official-channels/official-channels.service.ts`<br/>`recruitment-hosting/recruitment-emergency.service.ts` |
@@ -148,14 +148,19 @@ flowchart TD
 | **ReviewDecision** | 18 | User | **无代码读写** |
 | **ScanTask** | 22 | EndUser、Terminal | 11 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`console-screen/console-screen.fleet.ts`<br/>`console-screen/console-screen.queries.ts`<br/>… |
 | **ScreensaverContent** | 9 | — | **无代码读写** |
+| **ServiceDeployment** | 12 | ServiceIncident、ServiceProject、Terminal | 4 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>… |
+| **ServiceIncident** | 19 | ServiceDeployment、ServiceIncidentEvent、ServiceProject | 2 个文件<br/>`first-order/first-order-incidents.service.ts`<br/>`first-order/first-order-report-builder.ts` |
+| **ServiceIncidentEvent** | 7 | ServiceIncident | 1 个文件<br/>`first-order/first-order-incidents.service.ts` |
+| **ServiceProject** | 15 | Organization、ServiceDeployment、ServiceIncident、ServiceReport | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
+| **ServiceReport** | 9 | ServiceProject | 3 个文件<br/>`first-order/first-order-access.service.ts`<br/>`first-order/first-order-projects.service.ts`<br/>`first-order/first-order-reports.service.ts` |
 | **StorageDeletion** | 6 | — | 2 个文件<br/>`files/closure-file-deletion.ts`<br/>`member-privacy/member-closure-redis.service.ts` |
 | **SyncLog** | 15 | JobSource | 6 个文件<br/>`console-screen/console-screen.queries.ts`<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 3 个文件<br/>`assistant/daily-brief.service.ts`<br/>`community/community.service.ts`<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 29 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 38 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
+| **Terminal** | 30 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、ServiceDeployment、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 42 个文件<br/>`activity/activity.controller.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 2 个文件<br/>`console-screen/console-screen.twin.ts`<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 16 | Terminal | 7 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`orgs/partner-stats.service.ts`<br/>… |
+| **TerminalHeartbeat** | 16 | Terminal | 8 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`console-screen/console-screen.twin.ts`<br/>`first-order/first-order-report-builder.ts`<br/>… |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
@@ -165,7 +170,7 @@ flowchart TD
 | **ToolboxApp** | 12 | ToolboxAppVersion | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAppVersion** | 14 | ToolboxApp | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxLaunchEvent** | 10 | — | 1 个文件<br/>`terminals/terminal-toolbox.service.ts` |
-| **User** | 28 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 23 个文件<br/>`admin-internal-accounts/admin-internal-accounts.service.ts`<br/>`admin-internal-accounts/admin-step-up.ts`<br/>`admin-internal-accounts/backup-admin-create.service.ts`<br/>… |
+| **User** | 28 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 25 个文件<br/>`admin-internal-accounts/admin-internal-accounts.service.ts`<br/>`admin-internal-accounts/admin-step-up.ts`<br/>`admin-internal-accounts/backup-admin-create.service.ts`<br/>… |
 | **UserAiConsent** | 8 | EndUser | 5 个文件<br/>`ai-access/ai-access.service.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserDataRequest** | 22 | EndUser | 10 个文件<br/>`admin-users/admin-user-closure-read.ts`<br/>`member-privacy/member-closure-requests.ts`<br/>`member-privacy/member-closure-retention.ts`<br/>… |
 | **UserNotification** | 10 | — | 1 个文件<br/>`member-privacy/member-closure.service.ts` |

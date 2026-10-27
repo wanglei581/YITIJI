@@ -106,7 +106,8 @@ async function readHub(page: Page): Promise<HubSnapshot> {
       pill: document.querySelector('.qx-pill')?.textContent?.trim() ?? '',
       noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
       noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
-      cards: [...hub.querySelectorAll('.qx-hub-grid > *')].map((el) => entry(el, 'h3', '.qx-hub-why')),
+      // 练面试服务台换了触屏磁贴，停用原因句挂在 .qxt-tile-why；其余服务台仍是 .qx-hub-why。
+      cards: [...hub.querySelectorAll('.qx-hub-grid > *')].map((el) => entry(el, 'h3', '.qx-hub-why, .qxt-tile-why')),
       goals: [...hub.querySelectorAll('.qx-hub-goal')].map((el) => ({
         title: el.textContent?.trim() ?? '',
         clickable: el.tagName === 'BUTTON' && !el.hasAttribute('aria-disabled'),
@@ -317,6 +318,61 @@ test('在线服务 503：面试技巧可读，但不能从技巧页绕进模拟�
   expect(new URL(page.url()).searchParams.get('stage')).toBe('tips')
   // 「重新检测」仍在：不能让用户在这一页只剩退出去一条路。
   await expect(page.getByTestId('interview-tips-recheck')).toBeVisible()
+})
+
+/**
+ * 练面试服务台一屏的几何：整个服务台装得下（不滚动），每一行字的中点都落在自己所在的那张卡上，没被别的东西压住。
+ * 用一次 evaluate 读完：'checking' 档只有 4 秒寿命。
+ */
+async function readInterviewHubFit(page: Page): Promise<{ over: number; covered: string[] }> {
+  await page.waitForSelector('[data-qx-page="service-hub"]')
+  return page.evaluate(() => {
+    const hub = document.querySelector('.qxt-ivhub') as HTMLElement
+    const covered: string[] = []
+    for (const card of hub.querySelectorAll('.qx-hub-grid > *, .qxt-iv-more, .qx-hub-notice, .qxt-iv-wide')) {
+      const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT)
+      while (walker.nextNode()) {
+        const node = walker.currentNode as Text
+        if (!node.textContent?.trim()) continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        for (const rect of range.getClientRects()) {
+          if (rect.width < 2 || rect.height < 2) continue
+          const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+          if (!hit || !card.contains(hit)) covered.push(`${node.textContent.trim().slice(0, 14)} @${Math.round(rect.top)}`)
+        }
+      }
+    }
+    return { over: hub.scrollHeight - hub.clientHeight, covered }
+  })
+}
+
+test('练面试服务台：正常、在线服务不可用、检查中三态都一屏放下，字不被压住 @kiosk', async ({ page, api }) => {
+  for (const mode of ['ready', 'down', 'checking'] as const) {
+    registerShell(api, { api: mode, printer: { isOnline: true, printerStatus: 'ready' } })
+    await page.goto('/interview-service')
+    const fit = await readInterviewHubFit(page)
+    expect(fit.over, `${mode}：服务台比一屏高 ${fit.over}px，会出现滚动`).toBeLessThanOrEqual(1)
+    expect(fit.covered, `${mode}：这些字被别的元素压住`).toEqual([])
+    // 磁贴标题 28px（稿 .tile b），「其余四项」里的也一样。放不下就从别处匀高度，不缩字。
+    const sizes = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
+    expect(sizes.length, `${mode}：四张入口磁贴`).toBe(4)
+    expect([...new Set(sizes)], `${mode}：磁贴标题字号`).toEqual(['28px'])
+  }
+})
+
+test('练面试服务台：切到「其余 4 项」再回来，焦点落在意图带标题上，磁贴标题仍是 28px @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  await page.goto('/interview-service')
+  await page.waitForSelector('[data-qx-page="service-hub"]')
+  await page.getByRole('button', { name: /其余 4 项/ }).click()
+  await expect(page.locator('.qxt-band h1')).toBeFocused()
+  await expect(page.locator('.qxt-band h1')).toHaveText('其余四项入口')
+  const more = await page.locator('.qxt-ivhub .qxt-tile h3').evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).fontSize))
+  expect(more).toEqual(['28px', '28px', '28px', '28px'])
+  await page.getByRole('button', { name: /返回练面试/ }).click()
+  await expect(page.locator('.qxt-band h1')).toBeFocused()
+  await expect(page.locator('.qxt-band h1')).toHaveText('把表达练熟，不替你下结论')
 })
 
 test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setup @kiosk', async ({ page, api }) => {

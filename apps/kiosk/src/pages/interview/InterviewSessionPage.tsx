@@ -30,13 +30,12 @@ import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
+import './styles/interview-touch-run.css'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { isAiOutage } from '../../ai/aiOutage'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import type { InterviewFinishRecovery } from './session/interviewAnswerRecovery'
 import { finishInterview, submitInterviewAnswer } from './session/interviewTurnActions'
-
-const advisorPortrait = '/assets/ai-advisor.png'
 
 const INTERVIEWER_LABEL: Record<string, string> = {
   hr: 'HR 面试',
@@ -163,7 +162,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const interviewerMsgs = messages.filter((m) => m.role === 'interviewer')
   const lastInterviewerMsg = interviewerMsgs.slice(-1)[0]?.content ?? ''
   const lastInterviewerTurnIdx = (interviewerMsgs.length - 1) * 2
-  const lastInterviewerMessageIndex = messages.map((m) => m.role).lastIndexOf('interviewer')
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const stopPlayback = () => {
@@ -366,26 +364,20 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           mode={mode}
           phase={phase}
           voiceKind={voice.kind}
-          voiceAvailable={voiceAvailable}
           busy={busyTurn || voiceLocked}
           onFinish={() => void finish()}
           onSubmit={() => void submit({ text: draft, skip: false })}
-          onUseText={() => { resetVoiceState(); setMode('text'); setMicError(false) }}
+          onStart={() => void startRecording()}
           onStop={() => void stopRecording()}
           onConfirm={() => {
             if (voice.kind !== 'review') return
             void submit({ text: voice.edited, skip: false, voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec } })
-          }}
-          onUseVoice={() => {
-            if (!voiceAvailable) return
-            setMode('voice'); setMicError(false); setError(null)
           }}
         />
       )}
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-session" data-qx-interview="" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
-        advisorPortrait={advisorPortrait}
         interviewerLabel={interviewerLabel}
         position={state.position}
         remainingSec={remainingSec}
@@ -400,9 +392,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         micStatusTone={micStatusTone}
         speaking={speaking}
         lastInterviewerMsg={lastInterviewerMsg}
-        voiceHint={shownVoiceHint}
+        voiceHint={shownVoiceHint === shownMicBlocked ? null : shownVoiceHint}
         messages={messages}
-        lastInterviewerMessageIndex={lastInterviewerMessageIndex}
         phase={phase}
         listRef={listRef}
       >
@@ -422,16 +413,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         onRecheckMic={recheckMic}
         onDraftChange={setDraft}
         onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}
-        onReviewSubmit={() => {
-          if (voice.kind !== 'review') return
-          void submit({
-            text: voice.edited,
-            skip: false,
-            voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec },
-          })
-        }}
         onRetryVoice={() => void startRecording()}
-        onStopRecording={() => void stopRecording()}
         onUseText={() => {
           // 麦克风失败、转写确认和语音空闲态共用幂等清场，再回到文字输入。
           resetVoiceState()
@@ -450,7 +432,6 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
           setMode('voice'); setMicError(false); setError(null)
         }}
         onSkip={() => void submit({ text: '', skip: true })}
-        onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
         finishRecovery={finishRecovery}
         onContinueAnswering={() => {

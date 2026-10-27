@@ -1,5 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { INTERVIEW_SCROLLER_SELECTOR } from './interviewScroll'
 
+/** 练面试各页共用的小件。样式在 styles/interview-touch.css（挂在 [data-qx-page="interview"] 下）。 */
+
+/** 三格状态：小字说是什么，粗字说现在怎样。 */
 export function InterviewStatus({
   label,
   items,
@@ -8,7 +12,7 @@ export function InterviewStatus({
   items: Array<{ k: string; v: string; tone?: 'ok' | 'off' }>
 }) {
   return (
-    <section className="iv-status" aria-label={label}>
+    <section className="qxt-iv-cells" aria-label={label}>
       {items.map((item) => (
         <div key={item.k}>
           <small>{item.k}</small>
@@ -19,108 +23,66 @@ export function InterviewStatus({
   )
 }
 
-export function InterviewNotice({
-  tone = 'info',
+/** 说明卡：粗体首句加几行说明。 */
+export function InterviewNote({
+  lead,
   children,
 }: {
-  tone?: 'info' | 'danger'
+  lead?: ReactNode
   children: ReactNode
 }) {
   return (
-    <section className={tone === 'danger' ? 'iv-notice is-danger' : 'iv-notice'}>
-      <i aria-hidden="true">{tone === 'danger' ? '!' : 'i'}</i>
-      <div>{children}</div>
-    </section>
-  )
-}
-
-export function InterviewRail() {
-  return (
-    <div className="interview-rail" aria-label="练习边界">
-      <span>只供本人练习参考</span>
-      <span>不发送给任何企业</span>
-      <span>不预测录用结果</span>
+    <div className="qxt-iv-note">
+      {lead ? <b>{lead}</b> : null}
+      {children}
     </div>
   )
 }
 
-export function InterviewSteps({ rows }: { rows: Array<[string, string, string]> }) {
-  return (
-    <div className="iv-steps">
-      {rows.map(([k, title, desc]) => (
-        <div key={k} className="iv-step">
-          <small>{k}</small>
-          <b>{title}</b>
-          <p>{desc}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/** 稿 29 的深绿头卡：青圆章、眉题、大标题、一句说明。标题用普通行内排，句号跟在强调词后面。 */
-export function InterviewHero({
-  ask,
-  doing,
-  live = false,
-}: {
-  ask: ReactNode
-  doing?: ReactNode
-  live?: boolean
-}) {
-  return (
-    <section className="iv-hero" data-iv-head="xq" aria-label="AI 模拟面试">
-      <div className="iv-hero-row">
-        <div className={live ? 'iv-hero-face is-live' : 'iv-hero-face'} aria-hidden="true">青</div>
-        <div className="iv-hero-main">
-          <div className="iv-hero-eyebrow">AI 模拟面试</div>
-          <p className="iv-hero-ask">{ask}</p>
-          {doing ? <p className="iv-hero-doing">{doing}</p> : null}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/** 稿里的「下面还有内容」。内容不满一屏或已经滑到底时不占位。 */
+/**
+ * 「下面还有内容」。盯住页内唯一的滚动容器：内容超出一屏、又没滑到底时才出现，滑到底或放得下就收起。
+ * 提示占位，不盖住下面的字；读屏不读它（内容本身可以用手指或读屏顺序读到）。
+ * 滚动容器可能随状态换成另一个元素，所以每次都重新找，监听挂在正文外层上。
+ */
 export function InterviewScrollCue() {
+  const cueRef = useRef<HTMLDivElement>(null)
   const [show, setShow] = useState(false)
   useEffect(() => {
-    const scroller = document.querySelector<HTMLElement>('.qxt-body-iv > .interview-flow')
-      ?? document.querySelector<HTMLElement>('.iv-shell .interview-flow__scroll, .iv-shell .interview-session__content')
-    if (!scroller) return
-    const update = () => {
-      const overflow = scroller.scrollHeight - scroller.clientHeight > 32
-      const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 32
+    const body = cueRef.current?.parentElement
+    if (!body) return
+    let watched: HTMLElement | null = null
+    const resize = new ResizeObserver(() => update())
+    function update() {
+      const scroller = body!.querySelector<HTMLElement>(INTERVIEW_SCROLLER_SELECTOR)
+      if (scroller !== watched) {
+        if (watched) resize.unobserve(watched)
+        if (scroller) resize.observe(scroller)
+        watched = scroller
+      }
+      if (!scroller) {
+        setShow(false)
+        return
+      }
+      // 差几个像素就算有余：最后一行被底栏压住一截却没提示，比多一条提示更糟。
+      const overflow = scroller.scrollHeight - scroller.clientHeight > 8
+      const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 8
       setShow(overflow && !atEnd)
     }
     update()
-    scroller.addEventListener('scroll', update, { passive: true })
-    const observed = new ResizeObserver(update)
-    observed.observe(scroller)
+    body.addEventListener('scroll', update, { capture: true, passive: true })
+    resize.observe(body)
     const changed = new MutationObserver(update)
-    changed.observe(scroller, { childList: true, subtree: true, characterData: true })
+    changed.observe(body, { childList: true, subtree: true, characterData: true })
     return () => {
-      scroller.removeEventListener('scroll', update)
-      observed.disconnect()
+      body.removeEventListener('scroll', update, true)
+      resize.disconnect()
       changed.disconnect()
     }
   }, [])
   return (
-    <div className="iv-scrollcue" hidden={!show} aria-hidden="true">
+    <div ref={cueRef} className="iv-scrollcue" hidden={!show} aria-hidden="true">
       <em>↓</em>
       下面还有内容，手指往上滑
-    </div>
-  )
-}
-
-/** 卡片头：标题 + 右侧一句提示。`as="h2"` 时标题是真正的标题（读屏与测试都按标题找）。 */
-export function InterviewCardHead({ title, hint, as = 'b', id }: { title: string; hint?: string; as?: 'b' | 'h2'; id?: string }) {
-  const Title = as
-  return (
-    <div className="iv-head">
-      <Title id={id}>{title}</Title>
-      {hint ? <span>{hint}</span> : null}
     </div>
   )
 }

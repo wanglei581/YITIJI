@@ -17,15 +17,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { InterviewShell } from './InterviewShell'
-import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewSteps } from './interviewQxParts'
 import { INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
-import './styles/interview-tips-qx2.css'
+import './styles/interview-touch-lists.css'
 
 // 稿 29 tips 态：一张可勾选的准备清单、一张 STAR 三步、一张高频问题（折叠）加自我介绍时长。
 // 全部是编译进包的公开内容，不联网也能读；不根据任何人的简历生成。
@@ -157,6 +157,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
     if (onGoStage) onGoStage('setup')
     else navigate('/interview/setup')
   }
+  const faq = openFaq === null ? null : FAQS[openFaq]
 
   return (
     <InterviewShell
@@ -187,17 +188,18 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
               onClick={goSetup}
             >
               设置一场练习
+              <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />
             </button>
           ) : (
             <button type="button" className="qxt-btn qxt-btn-pri" data-testid="interview-primary" onClick={goSetup}>
               设置一场练习
+              <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />
             </button>
           )}
         />
       }
     >
-    <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
-
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className={gate ? 'interview-flow interview-tips is-gated' : 'interview-flow interview-tips'} data-visual-theme="service-desk" data-ux-density="touch">
       <div className="interview-flow__scroll">
         {gate ? (
           <div className="qxt-iv-note">
@@ -208,71 +210,75 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
         {apiStatus === 'unavailable' ? (
           <button
             type="button"
-            className="qx-btn"
+            className="qxt-iv-wide qxt-iv-recheck"
             data-testid="interview-tips-recheck"
             onClick={retryApi}
           >
-            重新检测
+            <b>重新检测</b>
           </button>
         ) : null}
-        <section className="iv-card" aria-labelledby="iv-tips-checklist">
-          <div className="iv-head">
-            <h2 id="iv-tips-checklist">面试前准备清单</h2>
-            <span aria-live="polite">{checked.size} / {CHECKLIST.length} 已完成</span>
-          </div>
-          <div className="iv-checklist">
-            {CHECKLIST.map((item, i) => {
-              const done = checked.has(i)
-              return (
-                <button key={item} type="button" className="iv-check" aria-pressed={done} onClick={() => toggleCheck(i)}>
-                  <i aria-hidden="true">{done ? '✓' : ''}</i>
-                  {item}
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        <section className="iv-card" aria-labelledby="iv-tips-star">
-          <InterviewCardHead as="h2" id="iv-tips-star" title="回答一题的基本结构" hint="STAR 练习法" />
-          <InterviewSteps rows={STAR_STEPS} />
-        </section>
-
-        <section className="iv-card" aria-labelledby="iv-tips-faq">
-          <InterviewCardHead as="h2" id="iv-tips-faq" title="高频问题应对" hint="点开看回答思路" />
-          {FAQS.map((f, i) => {
-            const open = openFaq === i
-            const answerId = `iv-tips-faq-${i}`
-            return (
-              <div key={f.q} className="iv-faq-row">
-                <button type="button" aria-expanded={open} aria-controls={answerId} onClick={() => setOpenFaq(open ? null : i)}>
-                  {f.q}
-                  <span aria-hidden="true">{open ? '－' : '＋'}</span>
-                </button>
-                <div id={answerId} hidden={!open}>
-                  <p><b>回答结构：</b>{f.structure}</p>
-                  <p><b>考察什么：</b>{f.examine}</p>
-                  <p><b>别这样答：</b>{f.mistake}</p>
-                  <p><b>建议：</b>{f.tip}</p>
-                </div>
+        <div className="qxt-iv-sec">
+          <h2 id="iv-tips-checklist">面试前准备清单</h2>
+          <span aria-live="polite"> · {checked.size} / {CHECKLIST.length} 已完成</span>
+        </div>
+        <div className="qxt-iv-ckgrid" role="group" aria-labelledby="iv-tips-checklist">
+          {CHECKLIST.map((item, i) => (
+            <button key={item} type="button" className="qxt-iv-ck" aria-pressed={checked.has(i)} onClick={() => toggleCheck(i)}>
+              {item}
+            </button>
+          ))}
+        </div>
+        <div className="qxt-iv-sec">
+          <h2 id="iv-tips-faq">高频问题应对</h2>
+          <span> · 点开看回答思路</span>
+        </div>
+        <div className="qxt-iv-ckgrid is-faq" role="group" aria-labelledby="iv-tips-faq">
+          {FAQS.map((f, i) => (
+            <button key={f.q} type="button" className="qxt-iv-ck" aria-pressed={openFaq === i} aria-controls="iv-tips-faq-detail" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+              {i + 1}. {f.q}
+            </button>
+          ))}
+        </div>
+        <section className="qxt-iv-read">
+          <div className="qxt-iv-split">
+            <div className="qxt-iv-col">
+              <div className="qxt-iv-colhead">
+                <h2>回答一题的基本结构</h2>
+                <span>STAR 练习法</span>
               </div>
-            )
-          })}
-          <h3 className="iv-subhead">自我介绍结构建议</h3>
-          <div className="iv-mini-list">
-            {INTRO_LENGTHS.map(([length, points]) => (
-              <div key={length}>
-                <small>{length}</small>
-                <p>{points}</p>
+              {STAR_STEPS.map(([k, title, desc]) => (
+                <div key={k} className="qxt-iv-line"><b>{k} {title}</b><span>{desc}</span></div>
+              ))}
+            </div>
+            <div className="qxt-iv-col">
+              <div className="qxt-iv-colhead">
+                <h2>自我介绍结构建议</h2>
               </div>
-            ))}
+              {INTRO_LENGTHS.map(([length, points]) => (
+                <div key={length} className="qxt-iv-line"><b>{length}</b><span>{points}</span></div>
+              ))}
+            </div>
           </div>
+          <div id="iv-tips-faq-detail" className="qxt-iv-detail" aria-live="polite">
+            {faq ? (
+              <>
+                <p><b>回答结构</b> {faq.structure}</p>
+                <p><b>考察什么</b> {faq.examine}</p>
+                <p><b>别这样答</b> {faq.mistake}</p>
+                <p><b>建议</b> {faq.tip}</p>
+              </>
+            ) : (
+              <>
+                <p>点一道题，看回答结构、考察什么、别这样答、建议。</p>
+                <p><b>回答结构</b> 先有骨架，再填真实经历。</p>
+                <p><b>考察什么</b> 面试官想确认的能力。</p>
+                <p><b>别这样答</b> 常见的空话。</p>
+                <p><b>建议</b> 提前准备一个能讲清细节的例子。</p>
+              </>
+            )}
+          </div>
+          <p className="qxt-iv-foot">这份技巧是公开的准备方法，不是根据你的材料生成的建议。想让 AI 按你的材料陪练，先设置一场练习。</p>
         </section>
-
-        <InterviewNotice>
-          这份技巧是公开的准备方法，不是根据你的材料生成的建议。想让 AI 按你的材料陪练，先设置一场练习。
-        </InterviewNotice>
-        <InterviewRail />
       </div>
     </div>
     </InterviewShell>

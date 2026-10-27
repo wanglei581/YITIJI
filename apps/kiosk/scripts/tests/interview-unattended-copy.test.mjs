@@ -25,6 +25,8 @@ function transpile(absolutePath, replacements = {}) {
 }
 
 const copyUrl = transpile(join(kioskRoot, 'src/copy/unattendedCopy.ts'))
+// 禁用说法的判定用无人值守词表本体转译出来的 containsStaffHandoff，不在测试里另抄一份词。
+const { containsStaffHandoff } = await import(copyUrl)
 const mic = await import(transpile(join(kioskRoot, 'src/pages/interview/interviewMicCopy.ts'), {
   '../../copy/unattendedCopy': copyUrl,
 }))
@@ -45,22 +47,20 @@ const sentences = [
   '本机设备未就绪，请联系现场工作人员后再试',
 ]
 
-const forbidden = [
-  ['联系现场', '工作人员'].join(''),
-  ['联系', '工作人员'].join(''),
-  ['找现场', '工作人员'].join(''),
-  ['找', '工作人员'].join(''),
-]
+const occurrences = (text, part) => text.split(part).length - 1
 
 for (const sentence of sentences) {
   for (const [label, contact, phoneLine] of contacts) {
     test(`${label}：${sentence.slice(0, 18)}`, () => {
       const result = mic.interviewUserLine(sentence, contact)
       assert.equal(typeof result, 'string')
-      for (const phrase of forbidden) assert.equal(result.includes(phrase), false)
+      assert.equal(containsStaffHandoff(result), false, `仍含现场求助说法：${result}`)
       assert.equal(result.includes('。。'), false)
-      if (phoneLine) assert.equal(result.includes(phoneLine), true)
-      else {
+      if (phoneLine) {
+        // 电话句只出现一次：不能因为替换两次、或原文自带一句而连说两遍。
+        assert.equal(occurrences(result, phoneLine), 1, `电话句应恰好出现一次：${result}`)
+        assert.equal(occurrences(result, '拨打服务电话'), 1)
+      } else {
         assert.equal(result.includes('拨打服务电话'), false)
         assert.equal(result.includes('隐私政策'), false)
       }

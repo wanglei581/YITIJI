@@ -1,6 +1,7 @@
-/* 练面试触屏页。只挂在 [data-qx-page="interview"] 下。颜色走 var(--qx-*) / var(--qxt-*)。 */
+/* 练面试触屏页：正文框架与各页共用的小件。规则都挂在 [data-qx-page="interview"] 下。
+   颜色只走 var(--qx-*) / var(--qxt-*)。各页自己的版式在 interview-touch-<页>.css。 */
 
-[data-qx-page="interview"] .qxt-body-iv {
+[data-qx-page="interview"] .qxt-body.qxt-body-iv {
   justify-content: flex-start;
   align-items: stretch;
   gap: 0;
@@ -9,689 +10,63 @@
   overflow: hidden;
 }
 
-/* 共享意图带的波浪和光晕默认画出视口。只在本页收回，不改 touch.css。 */
-[data-qx-page="interview"] .qxt-band .qxt-flow svg {
-  left: 32px !important;
-  width: calc(100% - 90px) !important;
-  height: 100% !important;
-  animation: none !important;
-  transform: none !important;
-}
-
-[data-qx-page="interview"] .qxt-band > .qxt-halo {
-  right: 0 !important;
-  width: 420px !important;
-  height: 420px !important;
-  animation: none !important;
-  transform: none !important;
-}
-
-[data-qx-page="interview"] .qxt-body-iv > .interview-flow,
-[data-qx-page="interview"] .qxt-body-iv > .qxt-ivhub {
-  flex: 1;
+[data-qx-page="interview"] .qxt-body-iv > .interview-flow {
+  flex: 1 1 auto;
   min-height: 0;
-  background: var(--qx-paper);
-  overflow: auto;
-}
-
-[data-qx-page="interview"] .qxt-body-iv.qxt-body-hub,
-[data-qx-page="interview"] .qxt-body-iv.qxt-body-hub > .qxt-ivhub {
-  overflow: hidden;
-}
-
-/* 服务台主视图把共享意图带收矮一档，三步和边界声明才进得了 1920。只改本页。 */
-[data-qx-page="interview"]:has(.qxt-ivhub:not(.is-more)) .qxt-band {
-  min-height: 280px;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more) {
-  gap: 8px;
-  padding: 8px 40px;
-}
-
-[data-qx-page="interview"] .interview-state-page {
-  display: flex;
-  flex-direction: column;
-}
-
-/* 旧壳把过期页第一个子元素当成 72px 图标。触屏里第一个子元素是正文滚动区，必须铺满。 */
-[data-qx-page="interview"] .interview-session-invalid {
-  align-items: stretch;
-  justify-content: flex-start;
+  width: 100%;
+  height: auto;
   gap: 0;
-  padding: 16px 40px 8px;
-  text-align: left;
-}
-
-[data-qx-page="interview"] .interview-session-invalid > .interview-flow__scroll {
-  width: auto;
-  height: auto;
-  min-width: 0;
-  align-items: stretch;
-  justify-content: flex-start;
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-}
-
-[data-qx-page="interview"] .interview-state-page > .interview-flow__scroll {
-  flex: 1;
-  min-height: 100%;
-}
-
-[data-qx-page="interview"] .interview-flow,
-[data-qx-page="interview"] .interview-flow__scroll {
-  width: 100%;
-  align-self: stretch;
-  align-items: stretch;
-}
-
-[data-qx-page="interview"] .interview-flow__scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow: visible;
-  flex: none;
-  height: auto;
-  min-height: 0;
-}
-
-[data-qx-page="interview"] .interview-state-page > .interview-flow__scroll {
-  flex: 1 1 auto;
-  min-height: 100%;
-  justify-content: space-between;
-}
-
-[data-qx-page="interview"] .interview-report > .interview-flow__scroll {
-  gap: 36px;
-  justify-content: flex-start;
-}
-
-[data-qx-page="interview"] .interview-report__section,
-[data-qx-page="interview"] .interview-report__hero {
-  min-height: 0;
-}
-
-[data-qx-page="interview"] .qxt-iv-sub,
-[data-qx-page="interview"] .interview-report p,
-[data-qx-page="interview"] .interview-report li,
-[data-qx-page="interview"] .interview-report small,
-[data-qx-page="interview"] .interview-report .text-xs,
-[data-qx-page="interview"] .interview-report .text-sm,
-[data-qx-page="interview"] .interview-option,
-[data-qx-page="interview"] .iv-mini-btn,
-[data-qx-page="interview"] .iv-hint,
-[data-qx-page="interview"] .iv-copy,
-[data-qx-page="interview"] .qxt-iv-note,
-[data-qx-page="interview"] .qxt-iv-note span,
-[data-qx-page="interview"] .qx-hub-why,
-[data-qx-page="interview"] .iv-alert {
-  font-size: var(--qxt-fs-aux);
-  line-height: 1.45;
-}
-
-[data-qx-page="interview"] .qxt-dock {
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-[data-qx-page="interview"] .qxt-dock > .qxt-btn,
-[data-qx-page="interview"] .qxt-dock > .qx-btn {
-  height: var(--qxt-btn-h);
-  min-height: var(--qxt-btn-h);
-  min-width: var(--qxt-tap);
-  white-space: nowrap;
-  font-size: var(--qxt-fs-btn);
-}
-
-[data-qx-page="interview"] .qxt-iv-alert {
-  flex-basis: 100%;
-  margin: 0;
-  color: var(--qx-cinnabar);
-}
-
-[data-qx-page="interview"] .qxt-btn[aria-disabled="true"],
-[data-qx-page="interview"] .qx-btn[aria-disabled="true"] {
-  opacity: 0.48;
-}
-
-[data-qx-page="interview"] .interview-option,
-[data-qx-page="interview"] .iv-mini-btn,
-[data-qx-page="interview"] .iv-tabs button,
-[data-qx-page="interview"] .iv-check,
-[data-qx-page="interview"] .iv-faq-row > button,
-[data-qx-page="interview"] .iv-history-row button {
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-  font-size: var(--qxt-fs-aux);
-}
-
-/* 技巧页和设置页后加载的规则把可点压到 58 / 48。这里提高一级，压过它们。
-   练习记录的「查看 / 删除」在 interview-qx2.css 里是 54px，选择器更晚，必须多一级才压得过。 */
-[data-qx-page="interview"] [data-qx-interview] .iv-faq-row > button,
-[data-qx-page="interview"] [data-qx-interview] .iv-tbar .qx-btn,
-[data-qx-page="interview"] [data-qx-interview] .interview-session__mic-recheck,
-[data-qx-page="interview"] [data-qx-interview] .iv-history-actions button {
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-}
-
-[data-qx-page="interview"] [data-qx-interview] .iv-field input {
-  min-height: var(--qxt-tap);
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="interview"] [data-qx-interview] .interview-session__text-grid textarea,
-[data-qx-page="interview"] [data-qx-interview] .interview-session__review-grid textarea {
-  flex: none;
-  box-sizing: border-box;
-  height: 76px;
-  min-height: 64px;
-  max-height: 76px;
-  padding: 8px 14px;
-  line-height: 1.35;
-}
-
-[data-qx-page="interview"] .kiosk-ai-chip {
-  height: auto;
-  min-height: 32px;
-  padding: 4px 12px;
-  font-size: 20px;
-}
-
-[data-qx-page="interview"] .kiosk-ai-fallback__action {
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-  font-size: 20px;
-}
-
-[data-qx-page="interview"] .interview-session__omit-print {
-  min-height: var(--qxt-tap);
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="interview"] .interview-session__omit-print input {
-  width: var(--qxt-tap);
-  height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-  min-height: var(--qxt-tap);
-}
-
-[data-qx-page="interview"] .qxt-ivhub {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
-  padding: 12px 40px 16px;
+  overflow: hidden;
   background: var(--qx-paper);
 }
 
-[data-qx-page="interview"] .qxt-ivhub > .qx-hub-grid {
-  flex: none;
-  height: auto;
+/* 全页只有一个滚动容器：设置、报告、技巧、记录是 .interview-flow__scroll，作答是 .interview-session__content。
+   选择器比 interview-qx2.css / interview-workbench-qx.css 里同名规则多一级，不靠谁后加载。
+   左右 40px，和稿的 .fi-page 一样。子项不收缩，装不下就滚，不压扁卡片。 */
+[data-qx-page="interview"] [data-qx-interview] .interview-flow__scroll,
+[data-qx-page="interview"] [data-qx-interview] .interview-session__content,
+[data-qx-page="interview"] .qxt-ivhub {
+  flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: none;
-  grid-auto-rows: auto;
-  align-content: start;
-  gap: 12px;
-  align-items: start;
-}
-
-[data-qx-page="interview"] .qxt-ivhub.is-more > .qx-hub-grid {
-  flex: none;
-  grid-template-rows: auto;
-}
-
-/* 网格吃掉剩余高度。正常态由主卡的步骤条分掉，不在步骤之间留整宽深色空带。
-   停用态主卡保持内容高，多出来的高度进半宽磁贴，纸色缝打断整行。 */
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more) > .qx-hub-grid {
-  flex: 1 1 auto;
-  align-items: stretch;
-  align-content: stretch;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):not(:has(.qxt-iv-fallback)) > .qx-hub-grid {
-  grid-template-rows: minmax(0, 1fr);
-  grid-auto-rows: auto;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):has(.qxt-iv-fallback) > .qx-hub-grid {
-  grid-template-rows: auto auto minmax(156px, 1fr) minmax(156px, 1fr);
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):not(:has(.qxt-iv-fallback)) .qxt-iv-main {
-  align-self: stretch;
   height: auto;
-  min-height: 100%;
-  justify-content: flex-start;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):not(:has(.qxt-iv-fallback)) .qxt-iv-steps {
-  flex: 1 1 auto;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):not(:has(.qxt-iv-fallback)) .qxt-iv-steps i {
-  flex: 1 1 auto;
-}
-
-[data-qx-page="interview"] .qxt-ivhub:not(.is-more):has(.qxt-iv-fallback) .qxt-tile {
-  height: 100%;
-  align-self: stretch;
-}
-
-[data-qx-page="interview"] .qxt-iv-main {
-  grid-column: 1 / -1;
-  align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  height: auto;
-  min-height: min-content;
-  overflow: visible;
-  padding: 16px 18px;
-  border: 0;
-  border-radius: 28px;
-  text-align: left;
-  color: var(--qxt-cream);
-  background: var(--qx-deep);
+  gap: 10px;
+  padding: 14px 40px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 
-[data-qx-page="interview"] .qxt-iv-main.is-off {
-  color: var(--qxt-ink);
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
+[data-qx-page="interview"] [data-qx-interview] .interview-flow__scroll::-webkit-scrollbar,
+[data-qx-page="interview"] [data-qx-interview] .interview-session__content::-webkit-scrollbar,
+[data-qx-page="interview"] .qxt-ivhub::-webkit-scrollbar {
+  display: none;
 }
 
-[data-qx-page="interview"] .qxt-iv-main h3,
-[data-qx-page="interview"] .qxt-iv-main > b {
-  margin: 0;
-  color: var(--qxt-cream);
-  font-family: var(--qx-serif);
-  font-size: var(--qxt-fs-task);
-  font-weight: 700;
-  line-height: 1.25;
+[data-qx-page="interview"] [data-qx-interview] .interview-flow__scroll > *,
+[data-qx-page="interview"] [data-qx-interview] .interview-session__content > *,
+[data-qx-page="interview"] .qxt-ivhub > * {
+  flex-shrink: 0;
 }
 
-[data-qx-page="interview"] .qxt-iv-main > small {
-  margin: 0;
-  color: var(--qxt-mint);
-  font-size: var(--qxt-fs-body);
-  font-style: normal;
-  line-height: 1.35;
-}
-
-[data-qx-page="interview"] .qxt-iv-steps b {
-  margin: 0;
-  color: var(--qxt-cream);
-  font-size: var(--qxt-fs-sub);
-}
-
-[data-qx-page="interview"] .qxt-iv-main.is-off h3,
-[data-qx-page="interview"] .qxt-iv-main.is-off b,
-[data-qx-page="interview"] .qxt-iv-main.is-off .qxt-iv-steps b {
-  color: var(--qxt-ink);
-}
-
-[data-qx-page="interview"] .qxt-iv-main p,
-[data-qx-page="interview"] .qxt-iv-steps span {
-  margin: 0;
-  color: var(--qxt-mint);
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="interview"] .qxt-iv-main .qx-hub-why {
-  color: var(--qxt-cream);
-}
-
-[data-qx-page="interview"] .qxt-iv-main.is-off p,
-[data-qx-page="interview"] .qxt-iv-main.is-off .qxt-iv-steps span,
-[data-qx-page="interview"] .qxt-iv-main.is-off .qx-hub-why {
-  color: var(--qxt-ink-2);
-}
-
-[data-qx-page="interview"] .qxt-iv-chip {
-  align-self: flex-start;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--qxt-cream) 16%, transparent);
-  font-size: var(--qxt-fs-aux);
-  font-weight: 700;
-}
-
-[data-qx-page="interview"] .qxt-iv-steps {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 0;
-  width: 100%;
-}
-
-[data-qx-page="interview"] .qxt-iv-steps i {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 2px;
-  min-height: 64px;
-  padding: 8px 12px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--qxt-cream) 8%, transparent);
-  font-style: normal;
-}
-
-[data-qx-page="interview"] .qxt-iv-main.is-off .qxt-iv-steps i {
-  background: var(--qxt-well);
-}
-
-[data-qx-page="interview"] .qxt-iv-steps em {
-  display: block;
-  width: auto;
-  color: var(--qxt-mint);
-  font-size: var(--qxt-fs-sub);
-  font-style: normal;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-[data-qx-page="interview"] .qxt-iv-main.is-off .qxt-iv-steps em {
-  background: transparent;
-  color: var(--qxt-ink-2);
-}
-
-[data-qx-page="interview"] .qxt-iv-steps i > span {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-[data-qx-page="interview"] .qxt-iv-fallback {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  align-self: start;
-  height: auto;
-  min-height: var(--qxt-tap);
-  padding: 0 22px;
-  border-radius: 22px;
-  border: 1.5px solid var(--qx-deep);
-  background: var(--qxt-card);
-  color: var(--qx-deep);
-  font-size: var(--qxt-fs-body);
-  font-weight: 700;
-  text-align: left;
-}
-
-[data-qx-page="interview"] .qxt-ivhub .qxt-tile {
-  min-height: 156px;
-  height: auto;
-}
-
-[data-qx-page="interview"] .qxt-ivhub .qxt-tile h3 {
-  margin: 0;
-  font-size: var(--qxt-fs-sub);
-  font-weight: 700;
-}
-
-[data-qx-page="interview"] .qxt-iv-more,
-[data-qx-page="interview"] .qxt-iv-wide {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  min-height: var(--qxt-tap);
-  padding: 14px 22px;
-  border-radius: 22px;
-  border: 1.5px solid var(--qxt-edge);
-  background: var(--qxt-card);
-  color: var(--qxt-ink);
-  text-align: left;
-}
-
-[data-qx-page="interview"] .qxt-iv-wide {
-  flex-direction: column;
-  align-items: flex-start;
-  min-height: 88px;
-}
-
-[data-qx-page="interview"] .qxt-iv-more b,
-[data-qx-page="interview"] .qxt-iv-wide b {
-  font-size: var(--qxt-fs-body);
-}
-
-[data-qx-page="interview"] .qxt-iv-more small,
-[data-qx-page="interview"] .qxt-iv-wide small {
-  font-size: var(--qxt-fs-aux);
-  font-weight: 500;
-  color: var(--qxt-ink-2);
-}
-
-[data-qx-page="interview"] .qxt-iv-note {
-  margin: 0;
-  padding: 12px 16px;
-  border-radius: 20px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-  color: var(--qxt-ink-2);
-}
-
-[data-qx-page="interview"] .interview-flow .qx-btn,
-[data-qx-page="interview"] .qxt-iv-q {
-  min-height: var(--qxt-tap);
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="interview"] .interview-flow h2,
-[data-qx-page="interview"] .interview-flow h3 {
-  font-size: var(--qxt-fs-body);
-}
-
-[data-qx-page="interview"] .interview-flow p,
-[data-qx-page="interview"] .interview-flow li {
-  font-size: var(--qxt-fs-body);
-}
-
-[data-qx-page="interview"] .interview-flow small,
-[data-qx-page="interview"] .interview-flow .text-xs,
-[data-qx-page="interview"] .interview-flow .text-sm {
-  font-size: var(--qxt-fs-aux);
-}
-
-[data-qx-page="interview"] .qxt-iv-note b {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--qxt-ink);
-  font-size: var(--qxt-fs-body);
-}
-
-[data-qx-page="interview"] .qxt-iv-note span {
-  font-size: var(--qxt-fs-sub);
-}
-
-[data-qx-page="interview"] .qx-hub-notice {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-[data-qx-page="interview"] .qx-hub-retry {
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-  padding: 0 18px;
-  border-radius: 18px;
-  background: var(--qx-deep);
-  color: var(--qxt-cream);
-  font-size: var(--qxt-fs-aux);
-  font-weight: 700;
-}
-
-[data-qx-page="interview"] .qxt-iv-art {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  align-self: stretch;
-  gap: 8px;
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 280px;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  padding: 16px 20px;
-  border-radius: 28px;
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-  box-sizing: border-box;
-  text-align: center;
-}
-
-[data-qx-page="interview"] .qxt-iv-art-mark {
-  flex: 1 1 auto;
-  width: 78%;
-  max-width: 78%;
-  height: 100%;
-  min-height: 220px;
-  min-width: 0;
-  align-self: center;
-}
-
-[data-qx-page="interview"] .qxt-iv-art.is-more {
-  gap: 8px;
-}
-
-[data-qx-page="interview"] .qxt-iv-art.is-more .qxt-iv-art-mark {
-  width: 78%;
-  max-width: 78%;
-  min-height: 220px;
-}
-
-[data-qx-page="interview"] .qxt-iv-art-copy {
-  position: relative;
-  flex: none;
-  width: 100%;
-  max-width: 860px;
-  min-width: 0;
-  margin: 0;
-  color: var(--qxt-ink);
-}
-
-[data-qx-page="interview"] .qxt-iv-art-copy h2 {
-  margin: 0 0 10px;
-  font-family: var(--qx-serif);
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1.3;
-  text-align: center;
-}
-
-[data-qx-page="interview"] .qxt-iv-art-copy p {
-  margin: 0;
-  max-width: 860px;
-  color: var(--qxt-ink-2);
-  font-size: 24px;
-  line-height: 1.45;
-  text-align: center;
-}
-
-[data-qx-page="interview"] .interview-setup[data-setup-step="2"] > .interview-flow__scroll {
-  min-height: 100%;
-}
-
-[data-qx-page="interview"] .interview-setup[data-setup-step="2"] .interview-setup__stack,
-[data-qx-page="interview"] .interview-setup[data-setup-step="2"] .interview-setup__interviewer {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-[data-qx-page="interview"] .qxt-iv-personas {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
-}
-
-[data-qx-page="interview"] .qxt-iv-persona {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  min-height: 88px;
-  margin-bottom: 0;
-  padding: 10px 16px;
-  border-radius: 22px;
-  border: 1.5px solid var(--qxt-edge);
-  background: var(--qxt-card);
-  text-align: left;
-  color: var(--qxt-ink);
-}
-
-[data-qx-page="interview"] .qxt-iv-persona[aria-pressed="true"] {
-  border-color: var(--qxt-teal-ink);
-}
-
-[data-qx-page="interview"] .qxt-iv-persona b {
-  display: block;
-  font-size: var(--qxt-fs-body);
-}
-
-[data-qx-page="interview"] .qxt-iv-persona small {
-  display: block;
-  font-size: var(--qxt-fs-aux);
-  color: var(--qxt-ink-2);
-}
-
-[data-qx-page="interview"] .qxt-iv-av {
-  display: grid;
-  width: 64px;
-  height: 64px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--qx-deep);
-  color: var(--qxt-cream);
-  font-size: var(--qxt-fs-body);
-  font-weight: 700;
-}
-
-[data-qx-page="interview"] .qxt-iv-acts {
-  display: flex;
-  gap: 12px;
-}
-
-[data-qx-page="interview"] .qxt-iv-acts .qx-btn,
-[data-qx-page="interview"] .qxt-iv-acts button {
-  flex: 1;
-  min-height: var(--qxt-tap);
-  min-width: var(--qxt-tap);
-  font-size: var(--qxt-fs-aux);
-}
-
+/* 下面还有内容的提示：占位，不盖住字。滑到底或一屏放得下就收起。 */
 [data-qx-page="interview"] .iv-scrollcue {
   flex: none;
+  height: auto;
+  margin: 0;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: var(--qxt-tap);
-  padding: 8px 24px 12px;
-  background: var(--qx-paper);
+  padding: 8px 24px;
+  background: var(--qxt-paper-2);
   color: var(--qxt-ink-2);
   font-size: var(--qxt-fs-aux);
-  font-style: normal;
+  font-weight: 600;
 }
 
 [data-qx-page="interview"] .iv-scrollcue[hidden] {
@@ -700,4 +75,282 @@
 
 [data-qx-page="interview"] .iv-scrollcue em {
   font-style: normal;
+  color: var(--qxt-teal-ink);
+}
+
+/* ── 各页共用的小件（稿 fix-interview.js 的 fi-*） ── */
+
+[data-qx-page="interview"] .qxt-iv-sec {
+  margin: 0;
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-err {
+  margin: 0;
+  color: var(--qx-cinnabar);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-iv-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-cells > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page="interview"] .qxt-iv-cells small {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-cells b {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-cells b.ok {
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page="interview"] .qxt-iv-cells b.off {
+  color: var(--qx-cinnabar);
+}
+
+[data-qx-page="interview"] .qxt-iv-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 20px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page="interview"] .qxt-iv-note b {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-note span,
+[data-qx-page="interview"] .qxt-iv-note p {
+  margin: 0;
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-iv-banner {
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-iv-wide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 22px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+[data-qx-page="interview"] .qxt-iv-wide b {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-wide small {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+[data-qx-page="interview"] .qxt-iv-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page="interview"] .qxt-iv-acts > button {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 8px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+[data-qx-page="interview"] .qxt-iv-acts > button[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .qxt-iv-acts > button.is-go {
+  border-color: var(--qx-teal);
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page="interview"] .qxt-iv-acts > button.is-danger {
+  border-color: var(--qx-cinnabar);
+  color: var(--qx-cinnabar);
+}
+
+[data-qx-page="interview"] [aria-disabled="true"]:not(.qxt-iv-main):not(.qxt-iv-dead):not(.qxt-tile):not(.qxt-askoff) {
+  opacity: 0.48;
+}
+
+/* 状态页的插画说明：插画、标题、说明居中。余高给它，插画跟着放大，不留空盒。 */
+[data-qx-page="interview"] .qxt-iv-art {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 300px;
+  min-width: 0;
+  margin: 0;
+  padding: 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 28px;
+  background: var(--qxt-card);
+  text-align: center;
+}
+
+[data-qx-page="interview"] .qxt-iv-art-mark {
+  flex: 1 1 0;
+  width: auto;
+  min-height: 150px;
+  max-width: 100%;
+  max-height: 960px;
+}
+
+[data-qx-page="interview"] .qxt-iv-art-copy {
+  flex: none;
+  width: 100%;
+  max-width: 860px;
+}
+
+[data-qx-page="interview"] .qxt-iv-art-copy h2 {
+  margin: 0 0 8px;
+  color: var(--qxt-ink);
+  font-family: var(--qx-serif);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+[data-qx-page="interview"] .qxt-iv-art-copy p {
+  margin: 0;
+  color: var(--qxt-ink-2);
+  font-size: 24px;
+  line-height: 1.45;
+}
+
+/* 「使用 AI 即表示你已年满 14 周岁」那一行 */
+[data-qx-page="interview"] .qx-ai-declaration-note {
+  margin: 0;
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+/* 余高吸收件：基准高度 0，有多少余高占多少。够放插画和字才显示，不够整块隐藏（容器查询按它自己的高度判）。 */
+[data-qx-page="interview"] [data-qx-interview] .interview-flow__scroll > .qxt-iv-artslot {
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
+}
+
+[data-qx-page="interview"] .qxt-iv-artslot > .qxt-iv-art {
+  display: none;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+@container (min-height: 340px) {
+  [data-qx-page="interview"] .qxt-iv-artslot > .qxt-iv-art {
+    display: flex;
+  }
+}
+
+/* 作答、设置里的告警 */
+[data-qx-page="interview"] .qxt-dock .qxt-iv-alert {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--qx-cinnabar);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-qx-page="interview"] .qxt-dock {
+  flex-wrap: wrap;
+}
+
+[data-qx-page="interview"] .qxt-dock > .qxt-btn {
+  white-space: nowrap;
+}
+
+/* 共享 AI 标识与降级区的字号补到 20px 以上 */
+[data-qx-page="interview"] .kiosk-ai-chip {
+  height: auto;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback,
+[data-qx-page="interview"] .kiosk-ai-fallback p {
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.45;
+}
+
+[data-qx-page="interview"] .kiosk-ai-fallback__action {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  font-size: var(--qxt-fs-aux);
 }

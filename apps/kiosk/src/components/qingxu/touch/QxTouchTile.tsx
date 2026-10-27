@@ -45,7 +45,7 @@ export function QxTouchTile({
       <span className="qxt-tx">
         <TitleTag>{title}</TitleTag>
         <small>{desc}</small>
-        {reason ? <span className="qx-hub-why qxt-tile-why">{reason}</span> : null}
+        {reason ? <span className="qxt-tile-why">{reason}</span> : null}
       </span>
       {off ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
     </>

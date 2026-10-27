@@ -24,7 +24,7 @@ export function InterviewShell({
   pathLabel,
   children,
 }: {
-  title: ReactNode
+  title: string
   subtitle?: ReactNode
   eyebrow?: string
   status?: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }

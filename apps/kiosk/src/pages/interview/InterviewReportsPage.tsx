@@ -14,13 +14,14 @@ import { deleteMyInterview, getMyInterviews } from '../../services/api/interview
 import { useAuth } from '../../auth/useAuth'
 import { InterviewArt } from './InterviewArt'
 import { InterviewShell } from './InterviewShell'
-import { InterviewRail, InterviewStatus } from './interviewQxParts'
+import { InterviewNote, InterviewStatus } from './interviewQxParts'
 import { interviewUserLine } from './interviewMicCopy'
 import { INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
+import './styles/interview-touch-lists.css'
 
 function formatTime(iso: string) {
   const d = new Date(iso)
@@ -107,24 +108,25 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
         <QxTouchDock
           onBack={() => navigate('/interview-service')}
           ask={{ label: '问小青：练习记录在哪里', draft: '我想查看自己的模拟面试练习报告。请说明未登录和登录后有什么差别，不要列出别人的记录。' }}
-          primary={{ label: primaryLabel, onClick: goSetup, noArrow: true, testId: 'interview-primary' }}
+          primary={{ label: primaryLabel, onClick: goSetup, testId: 'interview-primary' }}
         />
       }
     >
-    <div data-kiosk-domain="interview" data-kiosk-screen="interview-reports" data-qx-interview="" className="interview-flow interview-reports interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
-
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-reports" data-qx-interview="" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
       <div className="interview-flow__scroll">
         {!isLoggedIn ? (
           <>
-            <div className="qxt-iv-note">
-              <b>登录后可保存练习报告</b>
+            <InterviewNote lead="登录后可保存练习报告">
               <span>登录后，完成的练习报告会留在这里，方便你自己回看。</span>
-            </div>
-            <div className="qxt-iv-note">
-              <span>未登录：大约保留 2 小时</span>
-              <span>登录之后：本人记录保留 7 天</span>
-              <span>现在：可以先登录</span>
-            </div>
+            </InterviewNote>
+            <InterviewStatus
+              label="练习记录保留时间"
+              items={[
+                { k: '未登录', v: '大约保留 2 小时' },
+                { k: '登录之后', v: '本人记录保留 7 天' },
+                { k: '现在', v: '可以先登录' },
+              ]}
+            />
             <button type="button" className="qxt-iv-wide" onClick={() => navigate('/login', { state: { from: '/interview?stage=reports' } })}>
               <b>手机号登录</b>
               <small>登录后回到练习记录</small>
@@ -170,36 +172,38 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
           </>
         ) : (
           <>
-            <section className="iv-card">
-              <h2>练习报告</h2>
-              <p className="iv-copy">只有已经生成报告的记录可以查看。没有报告的记录不能当成可打印。</p>
-              <div className="iv-history">
-                {items.map((it) => (
-                  <div key={it.sessionId} className="iv-history-row">
-                    <div>
-                      <small>{formatTime(it.createdAt)}</small>
-                      <b>{it.position} · {it.interviewerLabel}</b>
-                      <p>{it.industry} · {it.durationMin} 分钟练习</p>
-                    </div>
-                    <div className="iv-history-actions">
-                      {it.hasReport ? (
-                        <button type="button" className="is-go" onClick={() => openReport(it.sessionId)}>查看</button>
-                      ) : (
-                        <button type="button" aria-disabled="true">报告未生成</button>
-                      )}
-                      <button
-                        type="button"
-                        className={confirmId === it.sessionId ? 'is-remove is-confirm' : 'is-remove'}
-                        aria-label={confirmId === it.sessionId ? '再次点击确认删除这条练习记录' : '删除这条练习记录'}
-                        onClick={() => void handleDelete(it.sessionId)}
-                      >
-                        {confirmId === it.sessionId ? '再次确认删除' : '删除'}
-                      </button>
-                    </div>
+            <h2 className="qxt-iv-sec">练习报告</h2>
+            <div className="qxt-iv-recs">
+              {items.map((it) => (
+                <article key={it.sessionId} className="qxt-iv-rec">
+                  <div className="qxt-iv-rec-head">
+                    <small>{formatTime(it.createdAt)}</small>
+                    <b>{it.position} · {it.interviewerLabel}</b>
                   </div>
-                ))}
-              </div>
-            </section>
+                  <div className="qxt-iv-cells">
+                    <div className="is-span"><small>行业</small><b>{it.industry}</b></div>
+                    <div><small>时长</small><b>{it.durationMin} 分钟练习</b></div>
+                    <div><small>报告</small><b>{it.hasReport ? '可以查看' : '报告未生成'}</b></div>
+                  </div>
+                  <div className="qxt-iv-acts">
+                    {it.hasReport ? (
+                      <button type="button" className="is-go" onClick={() => openReport(it.sessionId)}>查看</button>
+                    ) : (
+                      <button type="button" aria-disabled="true">报告未生成</button>
+                    )}
+                    <button
+                      type="button"
+                      className={confirmId === it.sessionId ? 'is-danger' : undefined}
+                      aria-label={confirmId === it.sessionId ? '再次点击确认删除这条练习记录' : '删除这条练习记录'}
+                      onClick={() => void handleDelete(it.sessionId)}
+                    >
+                      {confirmId === it.sessionId ? '再次确认删除' : '删除'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            {shownHint ? <p className="qxt-iv-err" role="status">{shownHint}</p> : null}
             <button type="button" className="qxt-iv-wide" onClick={() => navigate('/me/ai-records')}>
               <b>AI服务记录</b>
               <small>查看本人AI调用记录</small>
@@ -208,15 +212,12 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
               <b>先看面试技巧</b>
               <small>公开的准备方法</small>
             </button>
-            <div className="qxt-iv-note is-fill">
+            <InterviewNote>
               <span>已登录 · 本人记录。只有已经生成报告的记录可以查看。没有报告的记录不能当成可打印。</span>
               <span>删除需要再次确认。确认后才会删掉这条本人记录；失败时记录仍留在列表里。登录之后，本人记录保留 7 天。</span>
-            </div>
-            <InterviewArt title="这些记录只属于当前账号">只有已经生成报告的记录可以查看。删除需要再次确认，确认后才会删掉这条本人记录。</InterviewArt>
+            </InterviewNote>
           </>
         )}
-        {shownHint ? <p className="iv-alert" role="status">{shownHint}</p> : null}
-        <InterviewRail />
       </div>
     </div>
     </InterviewShell>
