@@ -20,12 +20,12 @@
 .jfq-sec.qx-grow { min-height: auto; }
 .jfq-sec-head { display: flex; align-items: baseline; gap: 14px; }
 .jfq-sec-no {
-  flex: none; font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+  flex: none; font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
   color: var(--qx-teal-d);
 }
 .jfq-sec-head h2 { margin: 0; font-size: 25px; font-weight: 700; }
-.jfq-sec-hint { margin-left: auto; font-size: 17px; color: var(--qx-ink-3); }
-.jfq-sec-copy { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-sec-hint { margin-left: auto; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
+.jfq-sec-copy { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
 
 /* ── 输入槽位：位置画出来，值留空并显式标注 ────────────────────── */
 .jfq-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -34,7 +34,7 @@
   padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
   background: var(--qx-surface);
 }
-.jfq-slot small { font-size: 17px; color: var(--qx-ink-3); }
+.jfq-slot small { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 .jfq-slot b { font-size: 21px; font-weight: 700; }
 .jfq-slot[data-fixed='true'] { border-color: var(--qx-teal-line); background: var(--qx-teal-soft); }
 .jfq-slot[data-fixed='true'] b { color: var(--qx-teal-d); }
@@ -56,11 +56,11 @@
 .jfq-check[data-tone='off'] .jfq-check-ic { background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); border-color: var(--qx-cinnabar-line); }
 .jfq-check-tx { flex: 1; min-width: 0; }
 .jfq-check-tx b { display: block; font-size: 21px; font-weight: 700; }
-.jfq-check-tx p { margin: 4px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-check-tx p { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 .jfq-chip {
   flex: none; align-self: flex-start;
   padding: 5px 12px; border-radius: var(--qx-r-s);
-  font-size: 17px; font-weight: 700;
+  font-size: var(--qxt-fs-aux); font-weight: 700;
   background: var(--qx-muted-bg); color: var(--qx-muted-ink);
 }
 .jfq-check[data-tone='ok'] .jfq-chip { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
@@ -81,7 +81,7 @@
   background: var(--qx-paper); border: 1px solid var(--qx-line); color: var(--qx-ink-2);
 }
 .jfq-kit b { display: block; font-size: 20px; font-weight: 700; }
-.jfq-kit small { display: block; margin-top: 2px; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-kit small { display: block; margin-top: 2px; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 
 /* ── 等待：整体脉冲，没有进度条 / 百分比 / 预计时间 ────────────── */
 .jfq-wait {
@@ -95,8 +95,8 @@
   background: var(--qx-surface); color: var(--qx-teal-d);
 }
 .jfq-wait b { font-size: 24px; font-weight: 700; }
-.jfq-wait p { margin: 6px 0 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
-.jfq-pulse { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 17px; color: var(--qx-teal-d); }
+.jfq-wait p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-pulse { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: var(--qxt-fs-aux); color: var(--qx-teal-d); }
 .jfq-pulse i {
   width: 8px; height: 8px; border-radius: 50%; background: var(--qx-teal);
   display: inline-block; animation: jfq-pulse 1.2s ease-in-out infinite;
@@ -113,8 +113,8 @@
   background: transparent;
 }
 .jfq-ghost b { font-size: 20px; font-weight: 700; }
-.jfq-ghost p { margin: 6px 0 10px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-3); }
-.jfq-ghost span { font-size: 16px; color: var(--qx-ink-3); }
+.jfq-ghost p { margin: 6px 0 10px; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-3); }
+.jfq-ghost span { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 
 /* ── 当前判定条 ─────────────────────────────────────────────── */
 .jfq-verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -123,7 +123,7 @@
   padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
   background: var(--qx-surface);
 }
-.jfq-verdict small { display: block; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-verdict small { display: block; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 .jfq-verdict b { display: block; margin-top: 4px; font-size: 22px; font-weight: 700; }
 .jfq-verdict > div[data-tone='bad'] { border-color: var(--qx-cinnabar-line); background: var(--qx-cinnabar-soft); }
 .jfq-verdict > div[data-tone='bad'] b { color: var(--qx-cinnabar-d); }
@@ -137,10 +137,10 @@
 .jfq-why > div { padding: 14px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
 .jfq-why-h {
   display: inline-block; margin-right: 10px; padding: 3px 10px; border-radius: var(--qx-r-s);
-  font-size: 16px; background: var(--qx-slate-soft); color: var(--qx-slate-d);
+  font-size: var(--qxt-fs-aux); background: var(--qx-slate-soft); color: var(--qx-slate-d);
 }
 .jfq-why b { font-size: 21px; font-weight: 700; }
-.jfq-why p { margin: 6px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-why p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 
 .jfq-steps { display: flex; flex-direction: column; gap: 10px; }
 .jfq-step { display: flex; gap: 16px; align-items: flex-start; padding: 14px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
@@ -148,36 +148,36 @@
   flex: none; width: 44px; height: 44px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--qx-deep); color: var(--qx-paper);
-  font-family: var(--qx-mono); font-size: 19px; font-weight: 700;
+  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
 }
 .jfq-step b { font-size: 21px; font-weight: 700; }
-.jfq-step p { margin: 4px 0 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-step p { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 
 .jfq-nots { display: flex; flex-direction: column; gap: 8px; }
 .jfq-not {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
-  background: var(--qx-paper); font-size: 19px; color: var(--qx-ink-2);
+  background: var(--qx-paper); font-size: var(--qxt-fs-aux); color: var(--qx-ink-2);
 }
 .jfq-not svg { flex: none; color: var(--qx-cinnabar-d); }
 
 .jfq-list { display: flex; flex-direction: column; gap: 8px; }
-.jfq-list-row { display: flex; gap: 14px; align-items: flex-start; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-list-row { display: flex; gap: 14px; align-items: flex-start; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 .jfq-list-row i {
   flex: none; width: 30px; height: 30px; border-radius: 50%; font-style: normal;
   display: flex; align-items: center; justify-content: center;
   background: var(--qx-teal-soft); color: var(--qx-teal-d);
-  font-family: var(--qx-mono); font-size: 16px; font-weight: 700;
+  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
 }
 
 /* ── 当前停在哪一步 ─────────────────────────────────────────── */
 .jfq-trace { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .jfq-trace > div { padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
 .jfq-trace > div[data-now='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
-.jfq-trace small { display: block; font-size: 16px; color: var(--qx-ink-3); }
+.jfq-trace small { display: block; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 .jfq-trace b { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; }
-.jfq-trace p { margin: 6px 0 0; font-size: 17px; line-height: 1.4; color: var(--qx-ink-2); }
-.jfq-now-tag { display: inline-block; margin-top: 8px; font-size: 16px; font-weight: 700; color: var(--qx-teal-d); }
+.jfq-trace p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qx-ink-2); }
+.jfq-now-tag { display: inline-block; margin-top: 8px; font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qx-teal-d); }
 
 /* ── 紧凑披露条 ─────────────────────────────────────────────── */
 .jfq-guard {
@@ -186,7 +186,7 @@
   background: var(--qx-teal-soft);
 }
 .jfq-guard svg { flex: none; color: var(--qx-teal-d); }
-.jfq-guard p { margin: 0; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-guard p { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 .jfq-guard b { margin-right: 8px; color: var(--qx-teal-d); }
 
 /* ── 恢复路径卡 ─────────────────────────────────────────────── */
@@ -199,8 +199,8 @@
 }
 .jfq-routes button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .jfq-routes b { font-size: 21px; font-weight: 700; }
-.jfq-routes p { margin: 0; flex: 1; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
-.jfq-route-go { font-size: 18px; font-weight: 700; color: var(--qx-teal-d); }
+.jfq-routes p { margin: 0; flex: 1; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-route-go { font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qx-teal-d); }
 
 /* ── 目标岗位二选一 ─────────────────────────────────────────── */
 .jfq-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -213,12 +213,12 @@
 .jfq-choice[aria-pressed='true'] { border-color: var(--qx-teal); box-shadow: inset 3px 0 0 var(--qx-teal); background: var(--qx-teal-soft); }
 .jfq-choice:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .jfq-choice h3 { margin: 0; font-size: 22px; font-weight: 700; }
-.jfq-choice p { margin: 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
-.jfq-choice span { font-size: 16px; color: var(--qx-ink-3); }
+.jfq-choice p { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-choice span { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 
 /* ── 搜索与表单 ─────────────────────────────────────────────── */
 .jfq-field { display: flex; flex-direction: column; gap: 8px; }
-.jfq-field > small { font-size: 17px; color: var(--qx-ink-3); }
+.jfq-field > small { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 .jfq-input, .jfq-textarea {
   width: 100%; min-height: var(--qx-btn-h);
   padding: 0 18px; border: 1px solid var(--qx-line-2); border-radius: var(--qx-r);
@@ -239,20 +239,20 @@
 .jfq-job:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 .jfq-job-tx { flex: 1; min-width: 0; }
 .jfq-job-tx b { display: block; font-size: 21px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jfq-job-tx small { display: block; margin-top: 3px; font-size: 17px; color: var(--qx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jfq-job-tx small { display: block; margin-top: 3px; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jfq-job svg { flex: none; color: var(--qx-teal-d); }
 
 /* ── 结果：摘要 / 匹配依据 ──────────────────────────────────── */
 .jfq-summary { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
-.jfq-summary-eyebrow { margin: 0; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-summary-eyebrow { margin: 0; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 .jfq-summary-title { margin: 0; font-family: var(--qx-serif); font-size: 28px; font-weight: 700; }
-.jfq-summary-body { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
-.jfq-summary-disclaimer { margin: 0; font-size: 17px; color: var(--qx-ink-3); }
+.jfq-summary-body { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-summary-disclaimer { margin: 0; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 
 .jfq-ev-stack { display: flex; flex-direction: column; gap: 10px; }
 .jfq-ev-item { padding: 14px 18px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r); background: var(--qx-teal-soft); }
 .jfq-ev-item p { margin: 0; font-size: 20px; font-weight: 700; }
-.jfq-ev-item span { display: block; margin-top: 6px; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-ev-item span { display: block; margin-top: 6px; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 /* 稿 46 的 evi 两栏：左「简历里已经写到的要求」，右「简历里还没体现的要求」。3.14 起不分档，两栏就是结果本身；
    它是结果屏的余量吸收块（Sec grow），两栏随之等高拉伸。 */
 .jfq-evi { flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -269,8 +269,8 @@
 .jfq-evi-col[data-tone='warn'] .jfq-evi-ic { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
 .jfq-ev-item[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
 .jfq-kw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.jfq-kw-label { font-size: 17px; color: var(--qx-ink-3); }
-.jfq-kw { padding: 5px 12px; border-radius: var(--qx-r-s); font-size: 17px; }
+.jfq-kw-label { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
+.jfq-kw { padding: 5px 12px; border-radius: var(--qx-r-s); font-size: var(--qxt-fs-aux); }
 .jfq-kw[data-tone='ok'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
 .jfq-kw[data-tone='warn'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
 
@@ -287,16 +287,16 @@
   flex: none; width: 40px; height: 40px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--qx-deep); color: var(--qx-paper);
-  font-family: var(--qx-mono); font-size: 18px; font-weight: 700;
+  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
 }
 .jfq-next-t { flex: 1; min-width: 0; }
 .jfq-next-t b { display: block; font-size: 21px; font-weight: 700; }
-.jfq-next-t p { margin: 4px 0 0; font-size: 17px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-next-t p { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 .jfq-next-go { flex: none; font-size: 22px; color: var(--qx-ink-3); }
 
 /* ── 页内提示 / 错误 ────────────────────────────────────────── */
-.jfq-notice { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: 19px; line-height: 1.45; background: var(--qx-slate-soft); color: var(--qx-slate-d); }
-.jfq-alert { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: 19px; line-height: 1.45; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); border: 1px solid var(--qx-cinnabar-line); }
+.jfq-notice { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: var(--qxt-fs-aux); line-height: 1.45; background: var(--qx-slate-soft); color: var(--qx-slate-d); }
+.jfq-alert { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: var(--qxt-fs-aux); line-height: 1.45; background: var(--qx-cinnabar-soft); color: var(--qx-cinnabar-d); border: 1px solid var(--qx-cinnabar-line); }
 
 /* ── 底部操作条注脚 ─────────────────────────────────────────────
  * 操作条本身由 QxPageFrame 渲染成 `.qx-ctabar`（共享层），本页样式又必须
@@ -307,7 +307,7 @@
  * 独占一行；但 DOM 上根本没有 `.jfq-ctabar` 这个类，两条规则一条都没命中，
  * 于是 100% 的基准宽度把三个按钮挤成 111px，「打印报告」四个字竖排成四行。
  */
-.jfq-cta-note { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: 18px; line-height: 1.45; color: var(--qx-ink-2); }
+.jfq-cta-note { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; gap: 10px; align-items: flex-start; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 .jfq-cta-note svg { flex: none; color: var(--qx-wheat-d); }
 /* 按钮不参与压缩，也不允许在字间折行（27 寸竖屏上竖排文字等于不可读）。 */
 .jfq-cta-note ~ .qx-btn { flex: none; white-space: nowrap; }
@@ -325,12 +325,12 @@
   display: flex; flex-direction: column; gap: 14px;
 }
 .jfq-modal-card h2 { margin: 0; font-family: var(--qx-serif); font-size: 30px; font-weight: 700; }
-.jfq-modal-card p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-modal-card p { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
 .jfq-modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 6px; }
 
 /* ── 授权卡（匿名撤回 / 会员开启） ───────────────────────────── */
 .jfq-consent-card { display: flex; flex-direction: column; gap: 14px; }
-.jfq-consent-card p { margin: 0; font-size: 19px; line-height: 1.5; color: var(--qx-ink-2); }
+.jfq-consent-card p { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
 
 /* ── 1080 竖屏与窄屏 ───────────────────────────────────────── */
 @media (max-width: 1080px) {

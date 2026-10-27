@@ -2215,7 +2215,7 @@ test('job fit keeps touch targets usable on a narrow screen @w3-kiosk', async ({
   // 手机上必须关掉 1080 舞台缩放，否则整张稿被缩到 0.36，按钮量出来只有 35px。
   await expect(page.locator('.jfq-root')).toHaveAttribute('data-jfq-layout', 'phone')
   await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
-  for (const target of [page.locator('.qx-topbar-back'), page.getByRole('button', { name: '继续并确认授权' })]) {
+  for (const target of [page.locator('.qxt-back'), page.getByRole('button', { name: '继续并确认授权' })]) {
     const box = await target.boundingBox()
     expect(box, '可点区域必须可见').not.toBeNull()
     expect(box!.width).toBeGreaterThanOrEqual(48)
@@ -2317,7 +2317,7 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     // 换视口后舞台缩放开关要等一次 resize 渲染，几何量用轮询等它落定，不用固定等待。
     await expect.poll(async () => {
       const scroll = await page.locator('.qx-scroll').boundingBox()
-      const ctabar = await page.locator('.qx-ctabar').boundingBox()
+      const ctabar = await page.locator('.qxt-dock').boundingBox()
       if (!scroll || !ctabar) return 'missing'
       if (scroll.y + scroll.height > ctabar.y + 0.5) return `scroll overlaps ctabar ${scroll.y + scroll.height} > ${ctabar.y}`
       if (ctabar.y + ctabar.height > size.height + 0.5) return `ctabar leaves viewport ${ctabar.y + ctabar.height}`
@@ -2326,7 +2326,7 @@ async function captureDecisionViewports(page: Parameters<typeof assertNoHorizont
     await assertNoHorizontalOverflow(page)
     // 横屏电脑改为舞台缩放后，屏上像素要除回 scale；舞台关闭（手机）时 scale 取 1，门槛仍是 48。
     const scale = await readEnabledStageScale(page)
-    for (const target of [page.locator('.qx-topbar-back'), page.locator('.qx-ctabar .qx-btn').last()]) {
+    for (const target of [page.locator('.qxt-back'), page.locator('.qxt-dock .qx-btn').last()]) {
       const box = await target.boundingBox()
       expect(box, '可点区域必须可见').not.toBeNull()
       expect(box!.height / scale, `${name} ${size.width}x${size.height} 触控高度`).toBeGreaterThanOrEqual(48)
@@ -2365,7 +2365,7 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await captureDecisionViewports(page, 'actions-ready')
 
   api.respond('POST', '/api/v1/resume/job-fit/t-act/print', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '生成失败' } } })
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-failed')
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByText('已打印')).toHaveCount(0)
@@ -2387,11 +2387,11 @@ test('job fit actions: a print result arriving after leaving does not hijack nav
   await page.goto('/resume/job-fit/actions?taskId=t-act')
   const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
   await expect(screen).toHaveAttribute('data-state', 'ready')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成打印版' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成打印版' }).click()
   await expect(screen).toHaveAttribute('data-state', 'print-pending')
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await captureDecisionViewports(page, 'actions-print-pending')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回比对结果' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回比对结果' }).click()
   await expect(page).toHaveURL(/\/resume\/job-fit$/)
   releasePrint!()
   await expect.poll(() => api.requestCount('POST', '/api/v1/resume/job-fit/t-act/print')).toBe(1)
@@ -2478,7 +2478,7 @@ test('resume templates: empty, error with real retry, and selection that saves n
   await captureDecisionViewports(page, 'templates-error')
 
   api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [RESUME_TEMPLATE] } })
-  await page.locator('.qx-ctabar').getByRole('button', { name: '重新读取模板' }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '重新读取模板' }).click()
   await expect(screen).toHaveAttribute('data-state', 'list')
   const card = page.getByTestId('resume-templates-template-tpl-clean')
   await expect(card).toHaveAttribute('aria-pressed', 'false')

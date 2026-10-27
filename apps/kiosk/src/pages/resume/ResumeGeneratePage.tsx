@@ -9,7 +9,6 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
@@ -58,6 +57,17 @@ const STEPS = [
 ] as const
 
 const inputCls = 'qx-rd-field'
+
+function StepPreview({ kicker, title, lines, note }: { kicker: string; title: string; lines: string[]; note?: string }) {
+  return (
+    <aside className="rtp-hero" aria-label={kicker}>
+      <p className="rtp-hero-k">{kicker}</p>
+      <b>{title}</b>
+      {lines.map((line, index) => <span key={`${index}-${line}`}>{line}</span>)}
+      {note ? <small>{note}</small> : null}
+    </aside>
+  )
+}
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -414,7 +424,7 @@ export function ResumeGeneratePage() {
 
   return (
     <ResumeTouchFrame
-      eyebrow="从零生成简历"
+      eyebrow="改简历"
       rail={reviewing ? undefined : { labels: STEPS.map((item) => item.title), now: step }}
       title="从零生成简历"
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
@@ -433,7 +443,6 @@ export function ResumeGeneratePage() {
                   : `第 ${step + 1} 步 / 共 ${STEPS.length} 步 · ${STEPS[step].title}`,
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={ctabar}
     >
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
@@ -442,19 +451,6 @@ export function ResumeGeneratePage() {
         ask={reviewing ? <>提交前<em>你先核一遍</em></> : STEPS[step].ask}
         doing={reviewing ? '先核对资料，再让小青整理成新简历。信息不完整的经历可点开补充。' : STEPS[step].doing}
       />
-      {!reviewing && (
-        <ol className="qx-rg-prog" aria-label={`填写进度：第 ${step + 1} 步，共 ${STEPS.length} 步`}>
-          {STEPS.map((item, index) => {
-            const mark = index < step ? 'done' : index === step ? 'now' : undefined
-            return (
-              <li key={item.title} data-on={mark} aria-current={mark === 'now' ? 'step' : undefined}>
-                <u aria-hidden="true" />
-                {index + 1} {item.title}
-              </li>
-            )
-          })}
-        </ol>
-      )}
       {reviewing ? (
         <ResumeGenerateReview
           basic={basic}
@@ -486,12 +482,15 @@ export function ResumeGeneratePage() {
               两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
               删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
             */}
-            <aside className="rtp-hero" aria-label="简历顶部会这样显示">
-              <p className="rtp-hero-k">简历顶部会这样显示</p>
-              <b>{basic.name.trim() || '姓名还没填'}</b>
-              <span>{basic.phone.trim() ? maskPhone(basic.phone) : '电话未填'}</span>
-              <span>{basic.email.trim() ? maskEmail(basic.email) : '邮箱未填'}</span>
-            </aside>
+            <StepPreview
+              kicker="简历顶部会这样显示"
+              title={basic.name.trim() || '必填'}
+              lines={[
+                [basic.city.trim() || '城市未填', basic.phone.trim() ? maskPhone(basic.phone) : '电话未填'].join(' · '),
+                basic.email.trim() ? maskEmail(basic.email) : '邮箱未填',
+              ]}
+              note="公共屏上打码显示，导出的简历里是完整的"
+            />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="姓名" required>
                 <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
@@ -520,6 +519,15 @@ export function ResumeGeneratePage() {
           )}
 
           {step === 1 && (
+            <>
+            <StepPreview
+              kicker="简历顶部会这样显示"
+              title={intention.position.trim() || '必填'}
+              lines={[
+                [intention.city.trim() || '意向城市未填', intention.salary.trim() || '期望薪资未填'].join(' · '),
+                `工作类型：${intention.jobType.trim() || '不填写'}`,
+              ]}
+            />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="目标岗位" required>
                 <input className={inputCls} placeholder="如 前端开发工程师" value={intention.position} onChange={(e) => setIntention((v) => ({ ...v, position: e.target.value }))} />
@@ -539,9 +547,29 @@ export function ResumeGeneratePage() {
                 <input className={inputCls} placeholder="如 8k-12k(可不填)" value={intention.salary} onChange={(e) => setIntention((v) => ({ ...v, salary: e.target.value }))} />
               </Field>
             </div>
+            <p className="qx-rd-selfcheck">目标岗位写你想投的方向。城市、薪资和工作类型空着也可以，预览卡会标成未填或不填写。</p>
+            <div className="qx-rd-notes">
+              <div className="qx-card">
+                <b>这一步只有目标岗位必填</b>
+                <p>意向城市、工作类型和期望薪资都可以空着。空着就按「不填写」留在预览卡上，不会替你编一个数字。</p>
+              </div>
+              <div className="qx-card">
+                <b>预览卡只复述你刚填的</b>
+                <p>上面那张卡跟着这一步的输入变。还没填的格子保持「未填」或「不填写」，不放示例岗位。</p>
+              </div>
+            </div>
+            </>
           )}
 
           {step === 2 && (
+            <>
+            <StepPreview
+              kicker="这一步已经填上的"
+              title={education.find((item) => item.school.trim())?.school.trim() || '教育经历还没填'}
+              lines={education.some((item) => item.school.trim() || (item.major ?? '').trim())
+                ? education.map((item) => [item.school.trim(), (item.major ?? '').trim(), (item.degree ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['可以先跳过，生成后会提示补充']}
+            />
             <EntryList
               items={education}
               maxItems={6}
@@ -582,9 +610,18 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            </>
           )}
 
           {step === 3 && (
+            <>
+            <StepPreview
+              kicker="这一步已经填上的"
+              title={experience.find((item) => item.company.trim())?.company.trim() || '工作经历还没填'}
+              lines={experience.some((item) => item.company.trim() || item.role.trim())
+                ? experience.map((item) => [item.company.trim(), item.role.trim(), (item.period ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['可以先跳过，生成后会提示补充']}
+            />
             <EntryList
               items={experience}
               maxItems={8}
@@ -621,9 +658,18 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            </>
           )}
 
           {step === 4 && (
+            <>
+            <StepPreview
+              kicker="这一步已经填上的"
+              title={projects.find((item) => item.name.trim())?.name.trim() || '项目经历还没填'}
+              lines={projects.some((item) => item.name.trim() || (item.role ?? '').trim())
+                ? projects.map((item) => [item.name.trim(), (item.role ?? '').trim()].filter(Boolean).join(' · ') || '这一段还空着')
+                : ['项目经历可以不填，没有就直接下一步']}
+            />
             <EntryList
               items={projects}
               maxItems={6}
@@ -655,9 +701,40 @@ export function ResumeGeneratePage() {
                 </div>
               )}
             />
+            <div className="qx-rd-notes">
+              <div className="qx-card">
+                <b>没有项目就直接下一步</b>
+                <p>课程作业、毕业设计和自己做过的小工具都算。没有的话这一步留空，生成时不会编一段项目经历。</p>
+              </div>
+              <div className="qx-card">
+                <b>项目名和角色由你写</b>
+                <p>上面那张卡只复述你已经填上的项目名和角色。还没填就写「项目经历还没填」，不放示例项目。</p>
+              </div>
+            </div>
+            <div className="qx-rd-notes">
+              <div className="qx-card">
+                <b>内容写你真正做过的</b>
+                <p>点「添加一个项目经历」之后，项目名称必填。项目内容用你自己的话写，整理时只帮你顺句子，不替你加成果。</p>
+              </div>
+              <div className="qx-card">
+                <b>写到的事实请你自己核对</b>
+                <p>项目里如果提到学校、公司或时间，这些事实一个字都不会改。写错了回到这一步改，再进入下一步。</p>
+              </div>
+            </div>
+            </>
           )}
 
           {step === 5 && (
+            <>
+            <StepPreview
+              kicker="这一步已经填上的"
+              title={skillsText.trim() ? '技能已填写' : '技能还没填'}
+              lines={[
+                skillsText.trim() || '技能还没填',
+                certsText.trim() || '证书还没填',
+                selfIntro.trim() || '自我评价还没填',
+              ]}
+            />
             <div className="space-y-4">
               <Field label="技能(用逗号或换行分隔)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 JavaScript, Excel, 英语六级" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
@@ -678,6 +755,7 @@ export function ResumeGeneratePage() {
                 </div>
               </Field>
             </div>
+            </>
           )}
             </div>
         </div>

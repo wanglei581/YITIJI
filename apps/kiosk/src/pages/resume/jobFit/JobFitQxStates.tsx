@@ -11,6 +11,7 @@
 // 「岗位信息」这个出口（exits.jobs 为空），对应位置换成本机照常能走的扫描。
 
 import type { ReactNode } from 'react'
+import { ResumeTouchActs } from '../touch/ResumeTouchActs'
 import {
   BotIcon,
   ClockIcon,
@@ -102,7 +103,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
               { label: '结果归属', value: '仅本人可见', fixed: true },
             ]} />
           </Sec>
-          <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析" grow>
+          <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析">
             <Checks items={[
               { tone: 'off', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '还没有可读取的简历任务。上传 PDF 或扫描纸质简历，解析成功后才会出现可选任务。', chip: '缺失' },
               { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: exits.jobs ? '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。' : '填一份岗位要求，至少要有岗位名称。当前尚未填写。', chip: '待选择' },
@@ -117,6 +118,14 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
               ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
             ]} />
           </Sec>
+          <ResumeTouchActs
+            note="没有本人简历任务时，本页不显示任何岗位、企业或匹配结论。下面这些是现在就能打开的入口。"
+            items={[
+              { title: '去上传或扫描简历', desc: '解析成功后才会出现可选任务。', take: '去准备', icon: 'scan', onClick: exits.triage },
+              { title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程。', take: '去打印', icon: 'printer', onClick: exits.printHub },
+              { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'file', onClick: exits.resumeHub },
+            ]}
+          />
         </>
       ),
       cta: (

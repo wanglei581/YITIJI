@@ -1,25 +1,9 @@
 import type { ReactNode } from 'react'
-import { BookOpenIcon, FileTextIcon, HelpCircleIcon, HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
+import { BookOpenIcon, FileTextIcon, HelpCircleIcon } from 'lucide-react'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 
 type Go = (to: string) => void
-
-export function GeneratePreviewNavbar({ onNavigate }: { onNavigate: Go }) {
-  return (
-    <>
-      <button type="button" className="qx-nav-item" onClick={() => onNavigate('/')} data-route="/" data-testid="resume-generate-preview-nav-home">
-        <HomeIcon size={32} aria-hidden />首页
-      </button>
-      <button type="button" className="qx-nav-item" onClick={() => onNavigate('/assistant')} data-route="/assistant" data-testid="resume-generate-preview-nav-advisor">
-        <SparklesIcon size={32} aria-hidden />AI 顾问
-      </button>
-      <button type="button" className="qx-nav-item" onClick={() => onNavigate('/profile')} data-route="/profile" data-testid="resume-generate-preview-nav-profile">
-        <UserIcon size={32} aria-hidden />我的
-      </button>
-    </>
-  )
-}
 
 function ExitRow(props: { icon: ReactNode; title: string; desc: string; to: string; testid: string; onNavigate: Go }) {
   return (
@@ -66,7 +50,7 @@ export function GeneratePreviewEmptyExits(props: { view: GeneratePreviewViewStat
   }
   if (props.view === 'preview-loading' || props.view === 'illegal') {
     rows.push(
-      <ExitRow key="help" icon={I.help} title={helpNeededLine()} desc="也可以先回首页，再从简历服务重新进入" to="/help" testid="resume-generate-preview-exit-help" onNavigate={go} />,
+      <ExitRow key="help" icon={I.help} title="帮助中心" desc={`${helpNeededLine()}。也可以先回首页，再从简历服务重新进入`} to="/help" testid="resume-generate-preview-exit-help" onNavigate={go} />,
     )
   }
   if (rows.length === 0) return null

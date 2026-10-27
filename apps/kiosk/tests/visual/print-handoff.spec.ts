@@ -301,9 +301,9 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   await loginOnCurrentPage(page, '/resume/materials')
   await page.locator('#material-field-applicantName').fill('王同学')
   await page.locator('#material-field-targetRole').fill('用户运营专员')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '生成可打印版', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '生成可打印版', exact: true }).click()
   await expect(page.getByTestId('material-workshop-file')).toHaveAttribute('data-print-ready', '1')
-  await page.locator('.qx-ctabar').getByRole('button', { name: '打印材料', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '打印材料', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
 
   const confirm = page.locator('[data-w2-page="print-confirm"]')

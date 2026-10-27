@@ -1,7 +1,6 @@
 // 第 7 包简历页的触屏壳。业务文案留在各页，这里只换青序流光触屏版的带、底栏和导航。
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { QxPageFrameProps } from '../../../components/qingxu/QxPageFrame'
 import { QxTouchBand, type QxTouchRail, type QxTouchStatus } from '../../../components/qingxu/touch/QxTouchBand'
 import { QxTouchNav } from '../../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../../components/qingxu/touch/QxTouchScreen'
@@ -13,16 +12,25 @@ function toneOf(tone: 'ok' | 'warn' | 'bad' | 'unknown' | undefined): 'ok' | 'wa
   return 'unknown'
 }
 
-export function ResumeTouchFrame(props: QxPageFrameProps & {
+export type ResumeTouchFrameProps = {
+  title: string
+  subtitle?: string
+  /** 拿不到真实状态就传 unknown；不传时壳上仍写「状态未知」。 */
+  status?: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  terminalLabel?: string
+  children: ReactNode
+  ctabar?: ReactNode
+  back?: { label: string; onBack: () => void }
   eyebrow?: string
   rail?: QxTouchRail
   stateId?: string
   overlay?: ReactNode
-}) {
+  /** 传给底导航的 testid 前缀。不传则导航按钮没有 testid。 */
+  navTestIdPrefix?: string
+}
+
+export function ResumeTouchFrame(props: ResumeTouchFrameProps) {
   const navigate = useNavigate()
-  const title = typeof props.title === 'string' ? props.title : '简历'
-  const sub = typeof props.subtitle === 'string' ? props.subtitle : undefined
-  const place = typeof props.terminalLabel === 'string' ? props.terminalLabel : undefined
   const status: QxTouchStatus = {
     text: props.status?.label ?? '状态未知',
     tone: toneOf(props.status?.tone),
@@ -35,14 +43,15 @@ export function ResumeTouchFrame(props: QxPageFrameProps & {
         <QxTouchBand
           kind="compact"
           eyebrow={props.eyebrow ?? '改简历'}
-          title={title}
-          sub={sub}
-          place={place}
+          title={props.title}
+          sub={props.subtitle}
+          place={props.terminalLabel}
           seal={null}
           status={status}
           rail={props.rail}
           onBack={props.back?.onBack}
           back={Boolean(props.back)}
+          backLabel={props.back?.label}
         />
       )}
       dock={props.ctabar ? <footer className="qxt-dock rtp-cta">{props.ctabar}</footer> : undefined}
@@ -51,6 +60,7 @@ export function ResumeTouchFrame(props: QxPageFrameProps & {
           onHome={() => navigate('/')}
           onAdvisor={() => navigate('/assistant')}
           onProfile={() => navigate('/profile')}
+          testIdPrefix={props.navTestIdPrefix}
         />
       )}
       overlay={props.overlay}

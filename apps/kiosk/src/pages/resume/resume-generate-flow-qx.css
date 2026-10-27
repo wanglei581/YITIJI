@@ -60,7 +60,7 @@
 }
 .qx-resume-generate .qx-rg-helper button {
   flex: none;
-  min-height: 56px;
+  min-height: var(--qxt-tap);
   padding: 0 18px;
   border: 1px solid var(--qx-line-2);
   border-radius: 17px;

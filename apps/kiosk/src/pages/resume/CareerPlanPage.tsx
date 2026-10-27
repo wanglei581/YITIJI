@@ -45,7 +45,7 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useAuth } from '../../auth/useAuth'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
@@ -382,7 +382,7 @@ export function CareerPlanPage() {
               { tone: 'ok', label: '材料与打印', value: '不受影响' },
             ]} />
           </Sec>
-          <Sec title="规划会用到、也只会用到这些" hint="输入范围写在前面" grow>
+          <Sec title="规划会用到、也只会用到这些" hint="输入范围写在前面">
             <ListRows items={[
               '当前本人简历任务里的经历、技能与教育信息',
               '本人此前的岗位匹配参考或模拟面试摘要（有记录时才会用到）',
@@ -395,6 +395,14 @@ export function CareerPlanPage() {
               { title: '先和 AI 顾问聊目标', desc: '还没想清楚方向时，可以先把想法说出来。', action: '去 AI 顾问', onClick: () => navigate('/assistant') },
             ]} />
           </Sec>
+          <ResumeTouchActs
+            note="没有可读取的简历任务时，不生成任何个人规划内容。"
+            items={[
+              { title: '去上传简历', desc: '有了可读取的简历任务，才能开始做规划。', take: '去上传', icon: 'file', onClick: goUpload },
+              { title: '去 AI 顾问', desc: '还没想清楚方向时，可以先把想法说出来。', take: '去聊聊', icon: 'sparkle', onClick: () => navigate('/assistant') },
+              { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'home', onClick: goResumeHub },
+            ]}
+          />
         </>
       ),
       cta: (
@@ -779,19 +787,12 @@ export function CareerPlanPage() {
   return (
     <JobFitStage>
       <ResumeTouchFrame
-        eyebrow="求职方案"
+        eyebrow="改简历 · 求职方案"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
-        navbar={(
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        )}
       >
         <main
           className="qx-scroll"

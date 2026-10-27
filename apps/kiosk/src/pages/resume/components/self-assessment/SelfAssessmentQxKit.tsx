@@ -56,7 +56,7 @@ export function SaFrame({
   screen: SaScreen
   /** 会同时落到 `data-state` 与 `data-testid`，是浏览器用例唯一的状态锚点。 */
   state: string
-  title: ReactNode
+  title: string
   /** 拿不到真实状态就传 unknown；这一格不许默认「正常」。 */
   status: SaStatus
   eyebrow: string

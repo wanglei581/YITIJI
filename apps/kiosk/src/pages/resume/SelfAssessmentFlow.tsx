@@ -96,16 +96,17 @@ import {
   SaMapGrid,
   SaMeta,
   SaNotice,
-  SaPicks,
   SaReviewGrid,
   type SaStatus,
 } from './components/self-assessment/SelfAssessmentQxKit'
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import type { QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
-const SA_EYEBROW = '自我探索'
+const SA_EYEBROW = '改简历 · 自我探索'
 const SA_TITLE = '自我探索 · 倾向参考'
 /** 四条路由共用的固定壳 props：标题、域标识与底部边界声明逐页相同。 */
 const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
@@ -182,6 +183,17 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
     { key: 'records', icon: '我', title: '去 AI 服务记录', desc: '在「我的」里查看已经产生的服务与文档记录。', route: '/me/ai-records', onClick: () => go('/me/ai-records') },
     { key: 'login', icon: '登', title: '先登录账号', desc: '登录后账号侧记录才会归到本人名下；能否查看以实际记录为准。', route: '/login', onClick: () => go('/login', { state: { from } }) },
   ]
+}
+
+function saActItems(go: NavigateFunction, from: string, resumable: boolean) {
+  const icon: Record<string, QxTouchIconName> = { start: 'pen', hub: 'file', records: 'clipboard', login: 'user' }
+  return saExits(go, from, resumable).map((item) => ({
+    title: item.title,
+    desc: item.desc,
+    take: '打开',
+    icon: icon[item.key] ?? 'file',
+    onClick: item.onClick,
+  }))
 }
 
 // ============================================================
@@ -461,9 +473,10 @@ export function SelfAssessmentQuizPage() {
           <SaChips items={blocked.chips} />
           <p className="sa-sub">{blocked.body}</p>
         </SaCard>
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)} />
-        </SaCard>
+        <ResumeTouchActs
+          note="现在可以做什么。都是现在就能打开的入口。"
+          items={saActItems(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)}
+        />
       </SaFrame>
     )
   }
@@ -864,9 +877,10 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
             </SaCard>
           }
         />
-        <SaCard head="现在可以做什么" hint="都是现在就能打开的入口">
-          <SaPicks items={saExits(navigate, '/resume/self-assessment/result', false)} />
-        </SaCard>
+        <ResumeTouchActs
+          note="现在可以做什么。都是现在就能打开的入口。"
+          items={saActItems(navigate, '/resume/self-assessment/result', false)}
+        />
       </SaFrame>
     )
   }
@@ -1173,9 +1187,10 @@ export function SelfAssessmentHistoryPage() {
         </p>
       </SaCard>
 
-      <SaCard head="现在可以做什么" hint="都是现在就能打开的入口" grow>
-        <SaPicks items={saExits(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)} />
-      </SaCard>
+      <ResumeTouchActs
+        note="现在可以做什么。都是现在就能打开的入口。"
+        items={saActItems(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)}
+      />
 
       <SaNotice>
         本次作答只存在于这台机器的这次使用里，<b>不是账号记录</b>，退出或闲置 60 秒会被清掉，不会留给下一位使用者。

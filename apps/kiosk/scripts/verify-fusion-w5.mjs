@@ -404,7 +404,7 @@ const A_BATCH_EYEBROWS = [
   ['src/pages/legal/LegalDocPage.tsx', ["eyebrow: '你和这台机器'", "eyebrow: '你的信息'"]],
   ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
   ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
-  ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
+  ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '改简历 · 自我探索'"]],
   ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
   ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
   ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的文档和订单"']],

@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
@@ -578,13 +578,12 @@ export function JobMaterialLibraryPage() {
   return (
     <div className="qx-resume-materials">
       <ResumeTouchFrame
-        eyebrow="求职材料"
+        eyebrow="改简历 · 求职材料"
         title="求职材料"
         subtitle={subtitle}
         status={{ tone, label: pillLabel }}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={cta}
-        navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       >
         <section className="qx-scroll qx-rm-scroll" data-kiosk-domain="resume" data-kiosk-screen="resume-materials"
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">

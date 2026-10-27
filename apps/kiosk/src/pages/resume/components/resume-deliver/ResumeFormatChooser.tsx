@@ -250,7 +250,7 @@ export function ResumeFormatChooser(props: {
           <h2>接下来可以做的</h2>
           <div className="qx-rows">
             <button type="button" className="qx-row" disabled={props.exporting} onClick={props.onClearExport}><span className="qx-row-tx"><b className="qx-row-t">{props.screen === 'export-failed' ? '换个格式再试一次' : '再导一份别的格式'}</b><span className="qx-row-d">内容仍在；PDF 用于打印，Word、TXT、Markdown 可带走编辑</span></span><span className="qx-row-go">›</span></button>
-            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">{helpNeededLine()}</b><span className="qx-row-d">不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
+            <button type="button" className="qx-row" onClick={props.onHelp}><span className="qx-row-tx"><b className="qx-row-t">帮助中心</b><span className="qx-row-d">{helpNeededLine()}。不需要重新填写经历</span></span><span className="qx-row-go">›</span></button>
           </div>
           <div className="qx-rg-export-facts">
             <div><b>简历内容</b><span>导出只做排版与文件保存，不再润色</span></div>

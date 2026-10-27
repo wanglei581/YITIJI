@@ -36,7 +36,7 @@ import {
 import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
@@ -312,7 +312,7 @@ export function JobFitActionsPage() {
                 { label: '匹配结果', value: '尚未生成' },
               ]} />
             </Sec>
-            <Sec no="02" title="拿到清单的四步" hint="顺序固定，不能跳过" copy="每一步都在既有流程里完成，本页不会替你跳过其中任何一步。" grow>
+            <Sec no="02" title="拿到清单的四步" hint="顺序固定，不能跳过" copy="每一步都在既有流程里完成，本页不会替你跳过其中任何一步。">
               <Steps items={[
                 { title: '准备本人简历任务', desc: '上传 PDF 或扫描纸质简历，等待解析成功。' },
                 { title: '选择目标岗位', desc: hostingOpen ? '从已发布岗位中选择，或只填一个目标岗位名称。' : '填一份岗位要求，至少要有岗位名称。' },
@@ -328,6 +328,14 @@ export function JobFitActionsPage() {
                   : { title: '先准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', action: '去准备简历', onClick: goTriage },
               ]} />
             </Sec>
+            <ResumeTouchActs
+              note="请先完成一次岗位匹配参考。没有真实结果时，不生成也不打印任何清单。"
+              items={[
+                { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', take: '去对照', icon: 'target', onClick: () => navigate(JOB_FIT_ROUTE) },
+                { title: '去准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', take: '去准备', icon: 'scan', onClick: goTriage },
+                { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'file', onClick: goResumeHub },
+              ]}
+            />
           </>
         ),
         cta: (
@@ -694,7 +702,7 @@ export function JobFitActionsPage() {
   return (
     <JobFitStage>
       <ResumeTouchFrame
-        eyebrow="简历对照"
+        eyebrow="简历对照 · 行动清单"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
@@ -702,13 +710,6 @@ export function JobFitActionsPage() {
           ? { label: '返回比对结果', onBack: backToCompare }
           : { label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
-        navbar={(
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        )}
       >
         <main
           className="qx-scroll"

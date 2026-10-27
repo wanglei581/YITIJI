@@ -15,7 +15,7 @@ import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIc
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
@@ -361,19 +361,12 @@ export function ResumeTemplateLibraryPage() {
   return (
     <div className="jfq-root">
       <ResumeTouchFrame
-        eyebrow="简历模板"
+        eyebrow="改简历 · 模板"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
-        navbar={(
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        )}
       >
         <section
           className="qx-scroll"

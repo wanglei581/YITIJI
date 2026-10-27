@@ -45,15 +45,11 @@
   min-width: 0;
 }
 
+/* 只补触控下限。行、筹码、选项卡不套同一张卡片，各自的样子在下面按类补回。 */
 .qxt-screen .rtp button {
   min-height: var(--qxt-tap);
   min-width: var(--qxt-tap);
   font-size: var(--qxt-fs-body);
-  background: var(--qxt-card);
-  border: 1.5px solid var(--qxt-edge);
-  border-radius: 18px;
-  padding: 12px 16px;
-  color: var(--qxt-ink);
 }
 
 .qxt-screen .rtp-cta .qx-btn,
@@ -93,13 +89,38 @@
   background: var(--qxt-well);
 }
 
+.qxt-screen .rtp-cta .qx-btn[data-variant='danger'],
+.qxt-screen .rtp .qx-btn[data-variant='danger'] {
+  background: var(--qx-cinnabar);
+  border-color: var(--qx-cinnabar);
+  color: var(--qx-on-solid);
+}
+
+.qxt-screen .rtp-cta .qx-step-prev,
+.qxt-screen .rtp-cta .qx-ai-help,
+.qxt-screen .rtp .qx-step-prev,
+.qxt-screen .rtp .qx-ai-help {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .rtp-cta .qx-ai-help,
+.qxt-screen .rtp .qx-ai-help {
+  color: var(--qx-teal-d);
+}
+
 .qxt-screen .rtp-cta .qx-btn:disabled,
 .qxt-screen .rtp .qx-btn:disabled,
 .qxt-screen .rtp button:disabled {
   opacity: 0.48;
 }
 
-.qxt-screen .rtp input,
+.qxt-screen .rtp input:not([type='checkbox']):not([type='radio']),
 .qxt-screen .rtp textarea,
 .qxt-screen .rtp select {
   min-height: var(--qxt-tap);
@@ -110,6 +131,185 @@
   border-radius: 16px;
   padding: 12px 16px;
   width: 100%;
+}
+
+.qxt-screen .rtp label:has(input[type='checkbox']),
+.qxt-screen .rtp label:has(input[type='radio']) {
+  min-height: var(--qxt-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qxt-screen .rtp input[type='checkbox'],
+.qxt-screen .rtp input[type='radio'],
+.qxt-screen .qx-rd-fact input {
+  width: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  height: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0;
+  flex: none;
+  border-radius: 12px;
+}
+
+.qxt-screen .qx-rd-fact span {
+  font-size: var(--qxt-fs-aux);
+}
+
+/* 共享 AI 徽章原语仍是 13px。本包触屏壳里提到辅助字号，不改那条原规则。 */
+.qxt-screen .kiosk-ev,
+.qxt-screen .kiosk-aigc-mark,
+.qxt-screen .kiosk-ai-chip,
+.qxt-screen .kiosk-ev-legend,
+.qxt-screen .kiosk-ai-disclaimer,
+.qxt-screen .kiosk-ai-conclusion {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+}
+
+.qxt-screen .kiosk-ev,
+.qxt-screen .kiosk-ai-chip {
+  height: auto;
+  min-height: 32px;
+}
+
+.qxt-screen .rtp .jfq-choice,
+.qxt-screen .rtp .jfq-job,
+.qxt-screen .rtp .jfq-routes button {
+  display: flex;
+  text-align: left;
+  color: inherit;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+  border-radius: var(--qx-r);
+}
+
+.qxt-screen .rtp .jfq-choice {
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+}
+
+.qxt-screen .rtp .jfq-choice[aria-pressed='true'],
+.qxt-screen .rtp .jfq-job[aria-pressed='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+}
+
+.qxt-screen .rtp .jfq-job {
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 84px;
+  padding: 14px 18px;
+}
+
+.qxt-screen .rtp .jfq-routes button {
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+}
+
+.qxt-screen .rtp .qx-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: var(--qxt-tap);
+  padding: 16px 20px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--qxt-edge);
+  border-radius: 0;
+  color: inherit;
+}
+
+.qxt-screen .rtp .qx-rg-chip {
+  min-height: var(--qxt-tap);
+  padding: 0 16px;
+  border: 1px solid var(--qxt-edge);
+  border-radius: 999px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-weight: 700;
+}
+
+.qxt-screen .rtp .qx-rg-chip[aria-pressed='true'] {
+  background: var(--qx-deep);
+  border-color: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .rtp .sa-pick {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  min-height: 112px;
+  padding: 17px 20px;
+  border: 1.5px solid var(--qx-line);
+  border-radius: 22px;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  text-align: left;
+}
+
+.qxt-screen .rtp .sa-pick[data-lead='true'] {
+  border-color: var(--qx-teal);
+  background: var(--qx-teal-soft);
+}
+
+.qxt-screen .qx-scroll:has(.rtp-acts),
+.qxt-screen .rtp-fill > main:has(.rtp-acts),
+.qxt-screen .rtp-fill > section:has(.rtp-acts) {
+  display: flex;
+  flex-direction: column;
+}
+
+.qxt-screen .sa-qx:has(.rtp-acts) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.qxt-screen .sa-qx:has(.rtp-acts) > .qx-scroll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 空状态说明卡只包住那一句，余量交给下面的行动卡，不把空卡拉高。 */
+.qxt-screen .qx-resume-generate .qx-rd-state.qx-grow {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.qxt-screen .rtp-acts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.qxt-screen .rtp-howto {
+  margin: 0;
+  font-size: var(--qxt-fs-body);
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .rtp-acts .qxt-slab-row {
+  flex: 1 1 0;
+  min-height: 200px;
+  align-items: stretch;
+}
+
+.qxt-screen .rtp-acts .qxt-vis {
+  height: 100%;
+  min-height: 160px;
 }
 
 .qxt-screen .rtp-hero {
@@ -128,6 +328,7 @@
 }
 
 .qxt-screen .rtp-hero span,
+.qxt-screen .rtp-hero small,
 .qxt-screen .rtp-help {
   font-size: var(--qxt-fs-aux);
   color: var(--qxt-ink-2);
@@ -139,6 +340,121 @@
   font-size: var(--qxt-fs-aux);
   font-weight: 700;
   color: var(--qxt-teal-ink);
+}
+
+/* 装饰波纹和光晕收进本包屏幕内。共享 .qxt-flow / .qxt-halo 的默认不动。 */
+.qxt-screen:has(.rtp) .qxt-flow svg {
+  left: 5%;
+  width: 90%;
+}
+.qxt-screen:has(.rtp) .qxt-halo {
+  right: 0;
+  width: 42%;
+}
+
+@media (max-width: 390px) {
+  /* 顶栏保持 76px，底栏按钮各占一整行。并排挤按钮会把主按钮拉成细高条，底边掉出 844。
+     手机断点字号不计入 20px 下限。时钟让位，状态胶囊留够一整词的宽度。 */
+  .qxt-screen:has(.rtp) .qxt-band {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .qxt-screen:has(.rtp) .qxt-hdr {
+    gap: 8px;
+    min-width: 0;
+  }
+  .qxt-screen:has(.rtp) .qxt-brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .qxt-screen:has(.rtp) .qxt-mark {
+    display: none;
+  }
+  .qxt-screen:has(.rtp) .qxt-brand > div {
+    min-width: 0;
+  }
+  .qxt-screen:has(.rtp) .qxt-brand b {
+    font-size: 18px;
+  }
+  .qxt-screen:has(.rtp) .qxt-brand b,
+  .qxt-screen:has(.rtp) .qxt-brand small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .qxt-screen:has(.rtp) .qxt-hdr-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 8px;
+    justify-content: flex-end;
+  }
+  .qxt-screen:has(.rtp) .qxt-clock {
+    display: none;
+  }
+  .qxt-screen:has(.rtp) .qxt-status {
+    flex: 1 1 auto;
+    /* 一短语一行：最短的后半句是 6–7 个字，窄于此会把最后一个字拆出去。 */
+    min-width: 8.5em;
+    max-width: 100%;
+    height: auto;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    line-height: 1.3;
+    font-size: 13px;
+    padding: 4px 8px;
+  }
+  .qxt-screen:has(.rtp) .qxt-band-compact {
+    min-height: 0;
+    padding-top: 8px;
+  }
+  .qxt-screen:has(.rtp) .qxt-band-compact .qxt-ask {
+    padding: 8px 0 12px;
+  }
+  .qxt-screen:has(.rtp) .qxt-band-compact .qxt-ask p {
+    margin-top: 6px;
+    font-size: 16px;
+  }
+  .qxt-screen:has(.rtp) .qxt-body.rtp {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* 底内边距会让滚动区的盒子探进底栏（实测 8px）。间距留给底栏自己的 padding。 */
+    padding: 8px 12px 0;
+    overflow: hidden;
+  }
+  .qxt-screen:has(.rtp) .rtp-fill,
+  .qxt-screen:has(.rtp) .rtp-fill > .qx-scroll {
+    flex: 1 1 0%;
+    height: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+  .qxt-screen:has(.rtp) .qxt-dock {
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .qxt-screen:has(.rtp) footer.qxt-dock.rtp-cta > :not(button):not(.qx-ai-declaration-slot),
+  .qxt-screen:has(.rtp) .qxt-dock > *,
+  .qxt-screen:has(.rtp) .qxt-dock .qx-btn,
+  .qxt-screen:has(.rtp) .qxt-dock .qx-ai-declaration-slot {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .qxt-screen:has(.rtp) .qxt-dock .qx-btn {
+    min-height: var(--qxt-btn-h);
+    height: auto;
+    white-space: normal;
+  }
+  .qxt-screen:has(.rtp) .qxt-dock .qx-step-prev,
+  .qxt-screen:has(.rtp) .qxt-dock .qx-ai-help {
+    min-height: var(--qxt-tap);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

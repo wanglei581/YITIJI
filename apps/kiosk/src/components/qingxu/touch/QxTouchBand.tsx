@@ -49,6 +49,7 @@ export function QxTouchBand({
   pathLabel,
   onBack,
   back = true,
+  backLabel = '返回上一步',
   live = false,
 }: {
   kind?: QxTouchBandKind
@@ -63,6 +64,8 @@ export function QxTouchBand({
   pathLabel?: string
   onBack?: () => void
   back?: boolean
+  /** 返回键读屏名。不传仍是「返回上一步」。 */
+  backLabel?: string
   live?: boolean
 }) {
   const rawId = useId().replace(/:/g, '')
@@ -80,7 +83,7 @@ export function QxTouchBand({
       <div className="qxt-halo" />
       <div className="qxt-hdr">
         {back ? (
-          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={goBack}>
+          <button type="button" className="qxt-back" aria-label={backLabel} onClick={goBack}>
             <QxTouchIcon name="chevL" size={34} strokeWidth={2.4} />
           </button>
         ) : null}
