@@ -14,6 +14,7 @@ export type QxTouchRail = { labels: readonly string[]; now: number }
 function FlowLines({ id, live }: { id: string; live: boolean }) {
   return (
     <div className="qxt-flow" aria-hidden="true" data-live={live ? 'on' : 'off'}>
+      {/* 横坐标收在 0–1200 里：线条两端本就淡出，伸出画框只会让越界门禁变红 */}
       <svg viewBox="0 0 1200 600" preserveAspectRatio="none">
         <defs>
           <linearGradient id={id} x1="0" x2="1">
@@ -22,9 +23,9 @@ function FlowLines({ id, live }: { id: string; live: boolean }) {
             <stop offset="1" stopColor="var(--qx-emerald)" stopOpacity="0" />
           </linearGradient>
         </defs>
-        <path d="M-20 468 C 260 300, 520 588, 820 372 S 1150 180, 1240 264" fill="none" stroke={`url(#${id})`} strokeWidth="2.2" />
-        <path d="M-20 540 C 300 396, 560 636, 860 444 S 1160 276, 1240 348" fill="none" stroke={`url(#${id})`} strokeWidth="1.2" opacity="0.7" />
-        <path d="M-20 216 C 340 72, 640 300, 900 156 S 1180 12, 1240 84" fill="none" stroke={`url(#${id})`} strokeWidth="1" opacity="0.45" />
+        <path d="M0 468 C 267 300, 514 588, 800 372 S 1114 180, 1200 264" fill="none" stroke={`url(#${id})`} strokeWidth="2.2" />
+        <path d="M0 540 C 305 396, 552 636, 838 444 S 1124 276, 1200 348" fill="none" stroke={`url(#${id})`} strokeWidth="1.2" opacity="0.7" />
+        <path d="M0 216 C 343 72, 629 300, 876 156 S 1143 12, 1200 84" fill="none" stroke={`url(#${id})`} strokeWidth="1" opacity="0.45" />
       </svg>
     </div>
   )
