@@ -124,21 +124,27 @@ check(offenders.length === 0, `页面不自己 logout / 清本机数据（另起
 check(!/clearPrintMaterialSession\s*\(/.test(code('src/pages/print/PrintDonePage.tsx')), '打印完成页不再自己只清打印材料（半清）')
 
 // ── B. 首页登录态 ───────────────────────────────────────────
-const homeView = code('src/pages/home/components/QxHomeView.tsx')
+const homeView = code('src/pages/home/components/HomeTouchView.tsx')
 const identity = code('src/pages/home/components/HomeIdentityActions.tsx')
 const homePage = code('src/pages/home/HomePage.tsx')
 check(
   !/displayName|phoneMasked|nickname|maskPhone|\buser\b/.test(homeView + identity) && !/displayName=/.test(homePage),
   '首页不读、不传登录人的名字或手机号（打码的也不显示）',
 )
-check(/const hello = greeting\b/.test(homeView), '首页问候不带名字')
+check(
+  /const greeting = greetingWord\(/.test(homeView) &&
+    /eyebrow=\{greeting\}/.test(homeView) &&
+    /title="我是小青"/.test(homeView) &&
+    !/title=\{`\$\{greeting\}/.test(homeView),
+  '眉题等于 greetingWord，标题只有「我是小青」',
+)
 check(
   /<span>有人登录着<\/span>/.test(identity) && /data-testid="home-end-previous"[\s\S]{0,80}结束上一位的使用/.test(identity),
   '登录态只写「有人登录着」，并给「结束上一位的使用」',
 )
 check(!/进入我的/.test(homeView + identity), '首页不放「进入我的」直达入口（进个人区走底部「我的」）')
 check(
-  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/pages/home/styles/home-qx.css')),
+  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/styles/qingxu/touch.css')),
   '登录态那一行按稿 01 ?state=member 收起副标题、不折行',
 )
 const draft = readFileSync(join(repoRoot, 'docs/design/kiosk-redesign-2026-08-v2/01-home.html'), 'utf8')

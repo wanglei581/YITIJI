@@ -218,7 +218,8 @@ test('home restores real fair and device panels with balanced 1080x1920 geometry
   // 不能用上面的 freezeClock()：它停在真实的现在，到点之后照样会筛掉秋季场。
   await page.clock.install({ time: new Date('2026-10-18T02:00:00.000Z') })
   await page.goto('/')
-  const tiles = page.locator('.qx-home-tiles')
+  const taskGrid = page.locator('.qxt-home-tasks')
+  const tileGrid = page.locator('.qxt-home-tiles')
   const fairPanel = page.locator('[data-home-job-fair-panel]')
   const devicePanel = page.locator('[data-home-device-panel]')
   const bottomNav = page.getByRole('navigation', { name: '主导航' })
@@ -226,25 +227,25 @@ test('home restores real fair and device panels with balanced 1080x1920 geometry
   await expect(fairPanel.getByText('2026 秋季高校毕业生招聘会')).toBeVisible()
   await expect(fairPanel.getByText('2026 冬季专场招聘会')).toHaveCount(0)
   await expect(devicePanel).toHaveAttribute('data-panel-state', 'ready')
-  // V6 首页底部有一块设备遥测栏，纸 / 碳粉 / 扫描仪各标「未单独上报」。
-  // 稿 01-home 没有这块栏，青序流光把打印机状态收进打印磁贴的徽标。
-  // 那条诚实性保证（不编造耗材遥测）改成更直接的表达：这些字段一个都不许出现。
+  // 打印卡在四张大卡里，校园招聘在第三行。两块都不编造纸盒 / 碳粉 / 扫描仪。
   await expect(devicePanel.getByText(/纸盒|碳粉|扫描仪/)).toHaveCount(0)
-  const [tilesBox, fairBox, deviceBox, navBox] = await Promise.all([
-    tiles.boundingBox(),
+  const [taskBox, tileBox, fairBox, deviceBox, navBox] = await Promise.all([
+    taskGrid.boundingBox(),
+    tileGrid.boundingBox(),
     fairPanel.boundingBox(),
     devicePanel.boundingBox(),
     bottomNav.boundingBox(),
   ])
-  expect(tilesBox).not.toBeNull()
+  expect(taskBox).not.toBeNull()
+  expect(tileBox).not.toBeNull()
   expect(fairBox).not.toBeNull()
   expect(deviceBox).not.toBeNull()
   expect(navBox).not.toBeNull()
-  // 两块磁贴都在网格内，且不被底栏压住。
-  expect(fairBox!.x).toBeGreaterThanOrEqual(tilesBox!.x - 1)
-  expect(deviceBox!.x).toBeGreaterThanOrEqual(tilesBox!.x - 1)
-  expect(fairBox!.x + fairBox!.width).toBeLessThanOrEqual(tilesBox!.x + tilesBox!.width + 1)
-  expect(deviceBox!.x + deviceBox!.width).toBeLessThanOrEqual(tilesBox!.x + tilesBox!.width + 1)
+  // 校园招聘落在第三行网格内，打印卡落在大卡网格内，两块都不被底栏压住。
+  expect(fairBox!.x).toBeGreaterThanOrEqual(tileBox!.x - 1)
+  expect(deviceBox!.x).toBeGreaterThanOrEqual(taskBox!.x - 1)
+  expect(fairBox!.x + fairBox!.width).toBeLessThanOrEqual(tileBox!.x + tileBox!.width + 1)
+  expect(deviceBox!.x + deviceBox!.width).toBeLessThanOrEqual(taskBox!.x + taskBox!.width + 1)
   expect(fairBox!.y + fairBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
   expect(deviceBox!.y + deviceBox!.height).toBeLessThanOrEqual(navBox!.y + 1)
   await expectTouchTargets(page)
@@ -771,7 +772,8 @@ test('direct visit to /session-timeout without a pending warning fails closed to
   await expect(page.getByRole('button', { name: /我还在，继续使用/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '结束并清除这台机器上的这次使用记录', exact: true })).toHaveCount(0)
   await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])

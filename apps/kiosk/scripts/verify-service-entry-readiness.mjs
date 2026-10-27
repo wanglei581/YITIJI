@@ -405,7 +405,12 @@ for (const marker of ['AbortController', "cache: 'no-store'", 'CAPABILITY_TIMEOU
 }
 
 const home = read('src/pages/home/HomePage.tsx')
-check(home.includes('useTerminalDeviceStatus'), '首页本机卡使用真实打印机状态')
+check(
+  home.includes('useOutletContext<TerminalDeviceStatusView>()') &&
+    !/useTerminalDeviceStatus\s*\(/.test(home) &&
+    read('src/layouts/KioskRoot.tsx').includes('useTerminalDeviceStatus(true)'),
+  '首页从 Outlet 拿终端设备状态，轮询只在 KioskRoot',
+)
 for (const forbidden of ['文档打印就绪', '材料扫描就绪', '自动双面可用']) {
   check(!home.includes(forbidden), `首页不再硬编码「${forbidden}」`)
 }

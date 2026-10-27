@@ -3,10 +3,10 @@ import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
 import { useQxTouchBack } from './useQxTouchBack'
 
-export type QxTouchBandKind = 'std' | 'compact'
+export type QxTouchBandKind = 'std' | 'compact' | 'hero'
 export type QxTouchSeal = 'idle' | 'listen' | 'think'
 export type QxTouchStatus =
-  | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' }
+  | { text: string; tone?: 'ok' | 'warn' | 'unknown' | 'reading' | 'bad' }
   | false
 
 export type QxTouchRail = { labels: readonly string[]; now: number }
@@ -50,6 +50,7 @@ export function QxTouchBand({
   onBack,
   back = true,
   live = false,
+  dense = false,
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -64,6 +65,8 @@ export function QxTouchBand({
   onBack?: () => void
   back?: boolean
   live?: boolean
+  /** hero 挤版：第三行块数 ≥ 4 时压低意图带。 */
+  dense?: boolean
 }) {
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
@@ -73,9 +76,11 @@ export function QxTouchBand({
   const showRail = Boolean(rail)
   const showPath = !showRail && Boolean(path && path.length > 0)
   const sealClass = seal === 'listen' ? 'qxt-seal qxt-seal-listen' : seal === 'think' ? 'qxt-seal qxt-seal-think' : 'qxt-seal'
+  const hero = kind === 'hero'
+  const sealNode = seal === null ? null : <div className={hero ? `${sealClass} qxt-seal-xl` : sealClass} aria-hidden="true">青</div>
 
   return (
-    <header className={`qxt-band qxt-band-${kind}${live ? ' qxt-band-live' : ''}`}>
+    <header className={`qxt-band qxt-band-${kind}${live ? ' qxt-band-live' : ''}${dense ? ' qxt-band-dense' : ''}`}>
       <FlowLines id={`qxt-flow-${rawId}`} live={live} />
       <div className="qxt-halo" />
       <div className="qxt-hdr">
@@ -101,13 +106,14 @@ export function QxTouchBand({
           <QxTouchClock />
         </div>
       </div>
-      <div className="qxt-ask">
+      <div className={hero ? 'qxt-greet' : 'qxt-ask'}>
+        {hero ? sealNode : null}
         <div className="qxt-ask-t">
           {eyebrow ? <div className="qxt-eyebrow">{eyebrow}</div> : null}
           <h1>{title}</h1>
           {sub ? <p>{sub}</p> : null}
         </div>
-        {seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}
+        {hero ? null : sealNode}
       </div>
       {showRail && rail ? (
         <div className="qxt-rail" role="list" aria-label="办理步骤">

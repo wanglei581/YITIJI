@@ -365,7 +365,8 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -436,7 +437,8 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -653,7 +655,8 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
   // 少任何一条都有洞：登录态但 displayName 为空时只有第 1 条能抓；
   // 姓名残留在问候语以外时只有第 2 条能抓。
   await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /^(夜深了|上午好|中午好|下午好|晚上好)，我是小青$/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '我是小青', exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-eyebrow')).toHaveText(/^(夜深了|上午好|中午好|下午好|晚上好)$/)
 })
 
 // 2026-09-13 口径反转：清场以前**不撤**服务端扫描任务，理由是「任务在服务端，离开这一屏

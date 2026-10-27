@@ -110,7 +110,7 @@ expectMatches(hubView, /capabilities\.filter\(\(item\) => item\.actionable/, 'W-
 expectMatches(hubView, /usableServices=.*usableServices/, 'W-117 可用服务进入设备异常提示条')
 const uploadSrc = read('src/pages/print/PrintUploadPage.tsx')
 const homeDomainSrc = read('src/pages/home/homeDomainStatus.ts')
-const homeViewSrc = read('src/pages/home/components/QxHomeView.tsx')
+const homeViewSrc = read('src/pages/home/components/HomeTouchView.tsx')
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   const marker = `case '${status}':`
   const idx = hookSrc.indexOf(marker)

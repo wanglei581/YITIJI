@@ -10,9 +10,14 @@ export type QxTouchTileProps = {
   tone?: QxTouchTileTone
   off?: boolean
   layout?: 'row' | 'stack'
+  chevron?: boolean
+  /** 诚实状态短句（读取中 / 读取失败）。不传就不画。 */
+  badge?: string
   onClick?: () => void
   index?: number
   label?: string
+  actionId?: string
+  dataAttrs?: Record<string, string | undefined>
 }
 
 export function QxTouchTile({
@@ -22,9 +27,13 @@ export function QxTouchTile({
   tone = 'teal',
   off = false,
   layout = 'row',
+  chevron = true,
+  badge,
   onClick,
   index = 0,
   label,
+  actionId,
+  dataAttrs,
 }: QxTouchTileProps) {
   const className = `qxt-tile qxt-rise${off ? ' qxt-off qxt-hold' : ''}${layout === 'stack' ? ' qxt-tile-stack' : ''}`
   const style = { '--i': index } as CSSProperties
@@ -33,13 +42,22 @@ export function QxTouchTile({
       <span className={`qxt-ic${tone === 'teal' ? '' : ` qxt-ic-${tone}`}`}>
         <QxTouchIcon name={icon} size={34} strokeWidth={2} />
       </span>
-      <span className="qxt-tx"><b>{title}</b><small>{desc}</small></span>
-      {off ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
+      <span className="qxt-tx">
+        <b>{title}</b>
+        {badge ? <em className="qxt-tile-mark">{badge}</em> : null}
+        <small>{desc}</small>
+      </span>
+      {off || !chevron ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
     </>
   )
+  const markers: Record<string, string> = {}
+  if (actionId) markers['data-action'] = actionId
+  for (const [key, value] of Object.entries(dataAttrs ?? {})) {
+    if (value !== undefined) markers[`data-${key}`] = value
+  }
   if (!off && !onClick) {
     return (
-      <div className={className} style={style}>
+      <div className={className} style={style} {...markers}>
         {body}
       </div>
     )
@@ -51,6 +69,7 @@ export function QxTouchTile({
       style={style}
       aria-disabled={off ? true : undefined}
       aria-label={label}
+      {...markers}
       onClick={() => {
         if (off) return
         onClick?.()

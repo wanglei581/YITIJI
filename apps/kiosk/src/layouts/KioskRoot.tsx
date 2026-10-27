@@ -224,8 +224,8 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/** 触屏版路由。首页仍留在 QX_MIGRATED_ROUTES，避免旧壳漏出。 */
+const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery', '/'])
 
 function isTouchRoute(pathname: string): boolean {
   return QX_TOUCH_ROUTES.has(pathname)

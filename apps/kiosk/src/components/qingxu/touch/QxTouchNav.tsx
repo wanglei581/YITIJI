@@ -21,7 +21,7 @@ export function QxTouchNav({
         <QxTouchIcon name="sparkle" size={36} strokeWidth={2} />
         <span>AI 顾问</span>
       </button>
-      <button type="button" className={current === 'profile' ? 'qxt-on' : undefined} onClick={onProfile} aria-current={current === 'profile' ? 'page' : undefined}>
+      <button type="button" className={current === 'profile' ? 'qxt-on' : undefined} data-route="/profile" onClick={onProfile} aria-current={current === 'profile' ? 'page' : undefined}>
         <QxTouchIcon name="user" size={36} strokeWidth={2} />
         <span>我的</span>
       </button>

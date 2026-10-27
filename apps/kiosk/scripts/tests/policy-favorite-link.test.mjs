@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel) => readFileSync(join(root, rel), 'utf8')
 
 const favorites = read('src/pages/profile/me/MyFavoritesPage.tsx')
-const home = read('src/pages/home/components/QxHomeView.tsx')
+const home = read('src/pages/home/components/HomeTouchView.tsx')
 const page = read('src/pages/renshi/RenshiPage.tsx')
 const focus = read('src/pages/renshi/usePolicyFocus.ts')
 const deadEnd = read('src/pages/renshi/policyFocus.tsx')
@@ -68,7 +68,7 @@ test('官方渠道打开时重新读，点卡片前再核对，不另加定时�
 })
 
 test('首页查政策不再写带走材料清单', () => {
-  assert.match(home, /actionId="policy-hub"[^>]*foot="查看政策说明"/)
+  assert.match(home, /actionId="policy-hub"[\s\S]{0,400}take="查看政策说明"/)
   assert.equal(home.includes('带走：材料清单'), false)
   assert.equal(home.includes('title="查政策"'), true)
 })

@@ -256,14 +256,12 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    // 无障碍名是「招聘会」+「场次、企业与现场导览」，中间可能有空格。
-    // V6 首页是 `[data-domain-id="fairs"] button.v6-home-domain__main`；青序流光首页
-    // 换成带 `data-action="fairs-hub"` 的磁贴（QxHomeView.tsx:226）。钉钩子不钉 class。
-    const fairsEntry = page.locator('[data-action="fairs-hub"]')
-    await expect(fairsEntry).toBeVisible({ timeout: 15000 })
+    // 触屏首页不再放 fairs-hub。校园招聘去 /campus，这场旅程仍走招聘会服务台，直接打开它。
+    await expect(page.locator('[data-action="fairs-hub"]')).toHaveCount(0)
+    await expect(page.getByTestId('qx-home')).toBeVisible()
     await step(page, s, 'home')
 
-    await fairsEntry.click()
+    await page.goto('/fairs-service')
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
     // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
     // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；

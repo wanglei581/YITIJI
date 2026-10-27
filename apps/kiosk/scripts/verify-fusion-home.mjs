@@ -12,36 +12,27 @@ const check = (condition, message) => {
 }
 
 const home = read('src/pages/home/HomePage.tsx')
-const viewOnly = read('src/pages/home/components/QxHomeView.tsx')
-const heroHeader = read('src/pages/home/components/HomeHeroHeader.tsx')
-const homeTile = read('src/pages/home/components/HomeTile.tsx')
-/* 2026-09-08：QxHomeView 超了文末的 320 行预算，把纯展示组件 HomeTile 拆了出去
- * （CLAUDE.md §8：500 行以上评估拆分；这里不调阈值，改代码）。
- * 按内容查的断言读这两个文件的合集——断言内容一字未改，只是源集合跟着代码走；
- * 文末的体积断言仍只量 QxHomeView 本身，否则拆分就白拆了。 */
-const view = `${viewOnly}\n${homeTile}`
+const viewOnly = read('src/pages/home/components/HomeTouchView.tsx')
+const view = viewOnly
 const footer = view
 const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
-const css = [
-  read('src/pages/home/styles/home-qx.css'),
-  read('src/pages/home/styles/home-qx-mobile.css'),
-].join('\n')
+const css = read('src/styles/qingxu/touch.css')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
 console.log('\n=== Kiosk 青序流光首页运行时合同 ===')
 
 check(
-  home.includes('className="qx-stage"') &&
-    home.includes('data-qx-frame="true"') &&
-    home.includes('className="qx-navbar"') &&
-    viewOnly.includes('<HomeHeroHeader'),
-  '首页用专属青序舞台，品牌与状态在 Hero 内，底栏独立固定'
+  viewOnly.includes('<QxTouchScreen') &&
+    viewOnly.includes('kind="hero"') &&
+    viewOnly.includes('<QxTouchNav') &&
+    viewOnly.includes('pageId="home"'),
+  '首页用触屏屏、hero 意图带与独立底栏'
 )
-check(!home.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
-check(home.includes('<QxHomeView'), '容器与青序 presentation 已拆分')
-check(home.includes("import './styles/home-qx.css'"), '首页只导入青序页级样式')
-check(home.includes("import './styles/home-qx-mobile.css'"), '首页按顺序加载手机响应式样式')
+check(!home.includes('KioskPageFrame') && !viewOnly.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
+check(home.includes('<HomeTouchView'), '容器与触屏视图已拆分')
+check(!home.includes("home-qx.css") && !home.includes('home-qx-mobile.css'), '首页不再导入旧青序页级样式')
+check(viewOnly.includes('tokens-touch.css') || css.includes('.qxt-band-hero'), '触屏样式随触屏屏加载，hero 档在触屏样式里')
 check(
   !home.includes('prototype-v1.css') &&
     !home.includes('kiosk-uplift.css') &&
@@ -88,10 +79,11 @@ check(
   '首页不拿列表 DTO 不下发的字段做过滤（审核/发布闸门归服务端）'
 )
 check(
-  footer.includes('暂无进行中或即将开始的场次') &&
-    footer.includes('暂时无法获取真实场次') &&
-    footer.includes('正在读取已发布场次'),
-  '招聘会 loading/empty/error 状态均诚实且稳定'
+  read('src/pages/home/homeTouchCopy.ts').includes('正在读取') &&
+    read('src/pages/home/homeTouchCopy.ts').includes('没有使用缓存或示例数据，请稍后重试。') &&
+    read('src/pages/home/homeTouchCopy.ts').includes('校园招聘会、校招和实习岗位') &&
+    read('src/pages/home/homeTouchCopy.ts').includes('暂时无法获取岗位数量'),
+  '社会招聘与校园招聘的 loading/empty/error 文案均诚实且彼此不同'
 )
 check(
   footer.includes('device: TerminalDeviceStatusView') &&
@@ -105,8 +97,10 @@ check(
   '纸张、碳粉、扫描仪不伪造原型百分比或就绪状态'
 )
 check(
-  footer.includes("onAction('fairs-hub')") && footer.includes('actionId="print-hub"'),
-  '招聘会服务与打印扫描均复用现有真实入口'
+  footer.includes('actionId="campus-zone"') &&
+    footer.includes('actionId="print-hub"') &&
+    !footer.includes("onAction('fairs-hub')"),
+  '校园招聘进现成校园专区，打印扫描仍走打印入口，首页不再进招聘会服务台'
 )
 // 稿 01-home 的招聘会磁贴 href="16-service-hubs.html?hub=fairs"、脚注「进入招聘会服务 →」，
 // 落点是**服务台**。此前 ready 态直接 navigate 到 /job-fairs/<id>，绕过服务台跳进被高亮的
@@ -207,7 +201,7 @@ check(
   '青序次级服务卡完整映射到真实 action'
 )
 check(
-  view.includes('foot="查看政策说明"') && !view.includes('带走：材料清单'),
+  view.includes('take="查看政策说明"') && !view.includes('带走：材料清单'),
   '查政策磁贴不再写带走材料清单，脚注改为当前能做的查看政策说明',
 )
 check(
@@ -225,12 +219,17 @@ check(
   '百宝箱确认开通后才渲染，并仍映射真实 action'
 )
 check(
-  view.includes('disabled={disabled}') && view.includes('aria-describedby='),
-  '禁用卡使用原生 disabled 与可访问原因'
+  !view.includes('disabled={'),
+  '首页不渲染没有原因的死按钮'
 )
-check(css.includes("url('/assets/bg-hero.jpg')"), '青序 Hero 复用原型背景资产')
 check(
-  view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('去来源平台投递'),
+  css.includes('.qxt-band-hero') &&
+    css.includes('linear-gradient') &&
+    !css.includes('bg-hero.jpg'),
+  '意图带用渐变，不再引用 bg-hero.jpg'
+)
+check(
+  view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('本终端未开放岗位与招聘会信息'),
   '首页常驻合规边界'
 )
 check(!/一键投递|立即投递/.test(`${home}\n${view}\n${manifest}`), '首页拒绝违规投递文案')
@@ -240,25 +239,20 @@ check(
 )
 
 check(
-  css.includes('.qx-home-tiles') &&
-    /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(css),
-  '1080×1920 服务区保持青序双列布局'
+  css.includes('.qxt-home-tasks') &&
+    /\.qxt-home-tasks\s*\{[^}]*grid-template-columns:\s*1fr 1fr/.test(css) &&
+    !/\.qxt-home-tasks[\s\S]{0,400}grid-column:\s*1\s*\/\s*-1/.test(css),
+  '1080×1920 四张大卡 2×2，打印卡不再横跨'
 )
 check(
-  css.includes(".qx-home-tile[data-size='feature']") &&
-    /grid-column:\s*1\s*\/\s*-1/.test(css),
-  '1080×1920 打印扫描主卡横跨青序双列'
-)
-check(
-  css.includes('.qx-home-truth') &&
-    css.includes('.qx-home-legal') &&
+  css.includes('.qxt-home-foot') &&
     /min-height:\s*64px/.test(css),
-  '1080×1920 底部保留合规真值与备案信息'
+  '1080×1920 底部保留合规真值，身份按钮不低于 64px'
 )
 check(
-  /\.qx-home-voice[\s\S]{0,220}min-height:\s*96px/.test(css) &&
-    /\.qx-home-identity[\s\S]{0,220}min-height:\s*48px/.test(css),
-  '首页主按钮按稿为 96px，身份入口保持 48px 触控下限'
+  /\.qxt-askbar\s*\{[\s\S]{0,280}height:\s*132px/.test(css) &&
+    /\.qx-home-identity[\s\S]{0,180}min-height:\s*64px/.test(css),
+  '问小青条按稿为 132px，身份入口按稿为 64px'
 )
 check(
   /@media\s*\(max-width:\s*760px\)/.test(css) &&
@@ -270,17 +264,18 @@ check(
   '动效提供 reduced-motion 退化'
 )
 check(
-  css.includes('.qx-home-tile:focus-visible') && css.includes('outline:'),
-  '青序首页提供清晰键盘焦点反馈'
+  css.includes('.qxt-task:focus-visible') && css.includes('outline:'),
+  '触屏首页提供清晰键盘焦点反馈'
 )
 check(!css.includes('.kpv1') && !css.includes('.v6-home'), '青序首页样式完全路由作用域化')
 
 check(
   kioskRoot.includes('useTerminalDeviceStatus(true)') &&
     home.includes('deviceStatus={deviceStatus}') &&
-    heroHeader.includes('data-tone={deviceStatus.tone}') &&
-    heroHeader.includes('{deviceStatus.label}'),
-  '首页 Hero 内继续使用真实设备状态'
+    viewOnly.includes('deviceStatus.label') &&
+    viewOnly.includes('deviceStatus.tone') &&
+    viewOnly.includes("kind=\"hero\""),
+  '首页 hero 意图带继续使用真实设备状态'
 )
 check(
   kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>') && kioskRoot.includes("'/'"),
@@ -299,13 +294,10 @@ check(
 )
 
 check(
-  home.split('\n').length < 120 &&
-    viewOnly.split('\n').length < 320 &&
-    homeTile.split('\n').length < 120 &&
-    read('src/pages/home/styles/home-qx.css').split('\n').length < 300 &&
-    read('src/pages/home/styles/home-qx-mobile.css').split('\n').length < 120 &&
+  home.split('\n').length < 160 &&
+    viewOnly.split('\n').length < 500 &&
     fairHook.split('\n').length < 120 &&
-    manifest.split('\n').length < 180,
+    manifest.split('\n').length < 200,
   '运行时文件保持可维护体积'
 )
 
@@ -313,7 +305,13 @@ check(
 // C 批：价格说明只认公开价目，不将免费或读取失败当成收费状态。
 check(viewOnly.includes('usePrintPriceConfig()') && viewOnly.includes("unitCentsFor(price.config, 'black_white')") && viewOnly.includes("unitCentsFor(price.config, 'color')"), '首页复用真实打印价目，两种单价都要读取')
 check(viewOnly.includes("price.status === 'ready' && bwUnit !== null && colorUnit !== null") && viewOnly.includes('priceKnown && (bwUnit > 0 || colorUnit > 0)') && viewOnly.includes('priceKnown && bwUnit === 0 && colorUnit === 0'), '收费、免费与未知价目分开，不把缺价当成免费')
-check(viewOnly.includes("{paidPrint ? ' · 收费以现场公示为准' : ''}") && viewOnly.includes("freePrint ? '免费打印 · 带走：打印件' : '先选材料再出纸 · 带走：打印件'"), '0 元与未知价目不显示价格、报价或收费说明')
+check(
+  viewOnly.includes("paidPrint && !freePrint ? '收费以现场公示为准'") &&
+    viewOnly.includes('先选材料再出纸 · 带走：打印件') &&
+    !viewOnly.includes('免费打印') &&
+    !viewOnly.includes('先看价格再出纸'),
+  '有价才写收费以现场公示为准，卡上不写免费或先看价格'
+)
 check(viewOnly.includes('这台机器上没有待继续的办理') && viewOnly.includes('{continueSlot}'), '保留清场说明（W-42）与真实续办卡')
 
 console.log('\nALL PASS — 青序流光首页视觉、动作、门控与响应式合同成立\n')

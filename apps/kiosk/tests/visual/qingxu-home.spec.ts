@@ -121,15 +121,15 @@ async function expectTouchFloor(locator: Locator, minimumCssHeight: number): Pro
 async function expectReadableFeature(page: Page): Promise<void> {
   const tile = page.locator('[data-action="print-hub"]')
   const [title, desc, foot] = await Promise.all([
-    tile.locator('strong').boundingBox(),
-    tile.locator('.qx-home-tile-desc').boundingBox(),
-    tile.locator('.qx-home-tile-foot').boundingBox(),
+    tile.locator('h3').boundingBox(),
+    tile.locator('p').boundingBox(),
+    tile.locator('.qxt-take').boundingBox(),
   ])
   expect(title && desc && foot).toBeTruthy()
   expect(desc!.height).toBeGreaterThanOrEqual(18)
   expect(desc!.y).toBeGreaterThanOrEqual(title!.y + title!.height - 1)
   expect(desc!.y + desc!.height).toBeLessThanOrEqual(foot!.y + 1)
-  const clipped = await tile.locator('.qx-home-tile-desc').evaluate((el) =>
+  const clipped = await tile.locator('p').evaluate((el) =>
     el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
   )
   expect(clipped, '主卡说明不得在纵向或横向被裁切').toBe(false)
@@ -153,10 +153,12 @@ async function homeAnimations(page: Page): Promise<Array<{ name: string; iterati
       if (!('animationName' in animation)) return []
       const effect = animation.effect as KeyframeEffect
       const target = effect.target as HTMLElement
+      const own = target.getAttribute('class') ?? target.getAttribute('data-action') ?? ''
+      const parent = target.parentElement?.getAttribute('class') ?? ''
       return [{
         name: (animation as CSSAnimation).animationName,
         iterations: effect.getComputedTiming().iterations ?? 0,
-        target: `${target.getAttribute('data-action') ?? target.className}${effect.pseudoElement ?? ''}`,
+        target: `${target.getAttribute('data-action') ?? own} ${parent}${effect.pseudoElement ?? ''}`.trim(),
       }]
     }),
   )
@@ -172,12 +174,13 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
 
   const home = page.getByTestId('qx-home')
   await expect(home).toBeVisible()
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen][data-qx-page="home"]')).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-topbar')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-nav')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-shell')).not.toHaveClass(/kiosk-home-mobile/)
-  await expect(page.getByText('状态未知', { exact: true }).first()).toBeVisible()
-  await expect(home.getByText('2026 青岛秋季高校毕业生招聘会', { exact: true })).toBeVisible()
+  await expect(page.locator('.qxt-status')).toHaveText('状态未知')
+  await expect(home.locator('[data-action="campus-zone"]')).toContainText('2026 青岛秋季高校毕业生招聘会')
   expect(fairRequestUrl.searchParams.get('terminalId')).toBe('KSK-001')
   await expect(home.getByText('这台机器上没有待继续的办理')).toBeVisible()
   // 打印机状态未知时，主卡照实说「状态未知」和受影响范围，不写成「进入后核验」的常态眉题。
@@ -257,18 +260,19 @@ test('home ready state defers capability claims to entry without hiding the real
   const home = page.getByTestId('qx-home')
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'ready')
-  // 真实设备态仍在顶栏胶囊；主卡不重复报「打印机在线」。稿 01 写「先看价格，付了再打」，
-  // 本用例沿用真实价目接口的非零夹具，所以保留原价格眉题；0 元与缺价见下方独立用例。
-  await expect(printTile.getByText(/付了再打/)).toHaveCount(0)
-  await expect(page.locator('.qx-topbar .qx-pill')).toHaveText('打印机在线')
-  await expect(printTile.getByText('先看价格再出纸 · 带走：打印件', { exact: true })).toBeVisible()
+  // 真实设备态在顶栏胶囊。就绪时主卡固定写「先选材料再出纸」，不把「打印机在线」再写一遍，
+  // 也不把价目写进卡面。收费句只在价目已知且大于 0 时出现在页脚。
+  await expect(page.locator('.qxt-status')).toHaveText('打印机在线')
+  await expect(printTile.getByText('先选材料再出纸 · 带走：打印件', { exact: true })).toBeVisible()
   await expect(printTile.getByText('打印机在线')).toHaveCount(0)
+  await expect(printTile.getByText(/付了再打|免费打印|先看价格再出纸/)).toHaveCount(0)
   await expectReadableFeature(page)
   // 智慧校园开通只凭终端配置，首页不宣称「已授权」；开通后可点。
-  const campus = home.getByRole('button', { name: '智慧校园', exact: true })
+  const campus = home.locator('[data-action="smart-campus"]')
   await expect(campus).toBeEnabled()
-  await expect(campus.getByText('受控开放', { exact: true })).toBeVisible()
+  await expect(campus).toContainText('按本机开通范围进入校园服务')
   await expect(home.getByText('已授权', { exact: true })).toHaveCount(0)
+  await expect(home.getByText('受控开放', { exact: true })).toHaveCount(0)
   await expect(home).toHaveAttribute('data-toolbox', 'off')
   await expect(home.getByRole('button', { name: /百宝箱/ })).toHaveCount(0)
   await expect(home.getByRole('button', { name: /查看全部服务|更多服务/ })).toHaveCount(0)
@@ -299,7 +303,8 @@ test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   await expect(page.getByTestId('qx-home')).toBeVisible()
-  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(1)
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
+  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-topbar')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-nav')).toHaveCount(0)
   await expect(page.locator('.ui-kiosk-shell')).not.toHaveClass(/kiosk-home-mobile|v6-runtime-shell/)
@@ -307,10 +312,10 @@ test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page
   await expectReadableFeature(page)
   await expect(page.getByTestId('home-identity')).toBeVisible()
   await expectTouchFloor(page.getByTestId('qx-home').locator('button:visible, a:visible'), 48)
-  const status = await page.locator('.qx-home-hero-top .qx-pill').boundingBox()
-  // 稿 01 把改简历放到第一张。96px 露出阈值不变，锚点从打印卡改到现在的首张。
+  const status = await page.locator('.qxt-status').boundingBox()
+  // 稿把改简历放到第一张。96px 露出阈值不变。
   const firstTile = await page.getByTestId('qx-home').locator('[data-action="resume-hub"]').boundingBox()
-  const nav = await page.locator('.qx-navbar').boundingBox()
+  const nav = await page.locator('.qxt-nav').boundingBox()
   expect(status, '设备状态需完整落在手机屏幕内').not.toBeNull()
   expect(firstTile, '首张服务卡需实际渲染').not.toBeNull()
   expect(nav, '底部导航需实际渲染').not.toBeNull()
@@ -321,8 +326,8 @@ test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page
   expect(runtimeErrors).toEqual([])
 })
 
-// 入场动效必须真跑在运行时首页上，而且只播一次：W1 默认 reduced-motion，这里显式放开。
-// 判据是「放完之后 .qx-home 里一条 CSS 动画都不剩」——任何循环的假忙碌都会让它转红。
+// 入场动效必须真跑在运行时首页上。四张卡的 qxt-rise 只播一次。
+// 光带 qxt-drift / qxt-breathe 只留在 hero 上循环。打印机和 AI 徽标不许自己转。
 test('home plays a one-shot entrance and light sweep, then settles with honest status colors @w1-kiosk', async ({ page, api }) => {
   const runtimeErrors = collectRuntimeErrors(page)
   registerHomeApi(api)
@@ -333,28 +338,46 @@ test('home plays a one-shot entrance and light sweep, then settles with honest s
   const home = page.getByTestId('qx-home')
   await expect(home).toBeVisible()
   const intro = await homeAnimations(page)
-  // 证据图：其余入场直接放完，流光定格在扫到一半，截图后放行（不改变后续判据）。
-  await home.evaluate((root) => root.getAnimations({ subtree: true }).forEach((a) => ((a as CSSAnimation).animationName === 'qx-home-sheen' ? (a.pause(), (a.currentTime = 1350)) : a.finish())))
+  const taskRises = intro.filter((animation) => animation.name === 'qxt-rise' && /resume-hub|interview-hub|print-hub|policy-hub/.test(animation.target))
+  expect(taskRises, JSON.stringify(intro)).toHaveLength(4)
+  expect(taskRises.every((animation) => animation.iterations === 1), JSON.stringify(taskRises)).toBe(true)
+  const loops = intro.filter((animation) => animation.iterations === Infinity)
+  expect(loops.map((animation) => animation.name).sort()).toEqual(['qxt-breathe', 'qxt-drift'])
+  expect(loops.every((animation) => /qxt-flow|qxt-halo|qxt-band/.test(animation.target)), JSON.stringify(loops)).toBe(true)
+  expect(loops.some((animation) => /resume-hub|interview-hub|print-hub|policy-hub|qxt-chip|qxt-status/.test(animation.target))).toBe(false)
+  // 证据图：入场放完，光带停在中途。无限动画不能 finish()。
+  await home.evaluate((root) => {
+    for (const anim of root.getAnimations({ subtree: true })) {
+      const name = (anim as CSSAnimation).animationName
+      if (name === 'qxt-drift') {
+        anim.pause()
+        anim.currentTime = 9000
+      } else if (name === 'qxt-rise' || name === 'qxt-scr-in') {
+        anim.finish()
+      }
+    }
+  })
   await page.screenshot({ path: test.info().outputPath('home-intro-sheen-1080x1920.png') })
-  await home.evaluate((root) => root.getAnimations({ subtree: true }).forEach((a) => a.play()))
-  expect(intro.every((animation) => animation.iterations === 1), JSON.stringify(intro)).toBe(true)
-  expect([...new Set(intro.map((animation) => animation.name))].sort()).toEqual(['qx-home-rise', 'qx-home-settle', 'qx-home-sheen'])
-  expect(intro.filter((animation) => animation.name === 'qx-home-sheen').map((animation) => animation.target)).toEqual(['qx-home-voice::after'])
-  // 小青头像、AI 图标、状态徽标本身都不单独做动效：不演「在听」「成功」。
-  expect(intro.map((animation) => animation.target).filter((target) => /avatar|voice-icon|badge|status/.test(target))).toEqual([])
+  await home.evaluate((root) => {
+    for (const anim of root.getAnimations({ subtree: true })) {
+      if ((anim as CSSAnimation).animationName === 'qxt-drift') anim.play()
+    }
+  })
 
   await expect(home).toHaveAttribute('data-qx-intro', 'done')
-  await expect.poll(() => homeAnimations(page)).toEqual([])
+  await expect.poll(async () => (await homeAnimations(page)).filter((animation) => animation.name === 'qxt-rise')).toEqual([])
+  const settled = await homeAnimations(page)
+  expect(settled.filter((animation) => animation.iterations === Infinity).map((animation) => animation.name).sort()).toEqual(['qxt-breathe', 'qxt-drift'])
   await page.screenshot({ path: test.info().outputPath('home-intro-settled-1080x1920.png') })
 
   // 打印机状态未知时，主卡眉题不能是「一切正常」的翠绿。
   const printTile = home.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'unknown')
-  expect(await printTile.locator('.qx-home-tile-badge').evaluate((el) => getComputedStyle(el).color)).not.toBe('rgb(46, 230, 168)')
+  expect(await printTile.locator('.qxt-chip').evaluate((el) => getComputedStyle(el).color)).not.toBe('rgb(46, 230, 168)')
 
-  // 键盘焦点：磁贴有描边并上浮；深色 hero 上的描边改用纸色，才看得见。
-  // 稿 01：头图里没有可点控件；Tab 顺序跟着视觉顺序（改简历 → 练面试）。描边与上浮阈值不变。
-  await expect(home.locator('.qx-home-hero button, .qx-home-hero a')).toHaveCount(0)
+  // 键盘焦点：任务卡描边并上浮。hero 意图带里没有可点控件。
+  // Tab 从改简历到练面试。Shift+Tab 回到问小青（身份行在卡片后面）。
+  await expect(home.locator('.qxt-band-hero button, .qxt-band-hero a')).toHaveCount(0)
   const resumeTile = home.locator('[data-action="resume-hub"]')
   await resumeTile.focus()
   await page.keyboard.press('Tab')
@@ -364,18 +387,19 @@ test('home plays a one-shot entrance and light sweep, then settles with honest s
   await expect.poll(() => interviewTile.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m42)).toBeLessThan(-2)
   await resumeTile.focus()
   await page.keyboard.press('Shift+Tab')
-  await expect(page.getByTestId('home-device-status')).toBeFocused()
-  expect(await page.getByTestId('home-device-status').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(31, 158, 134)')
+  await expect(page.getByTestId('home-primary')).toBeFocused()
+  expect(await page.getByTestId('home-primary').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(31, 158, 134)')
+  await page.getByTestId('home-device-status').focus()
+  expect(await page.getByTestId('home-device-status').evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid')
 
   // 岗位读取失败 → 重试会让磁贴重挂载；入场已放完，重挂载的磁贴不许再闪一遍。
-  // 先给旧节点打标，等它被卸载——证明确实重挂载过，再断言；否则会在 React 重渲染前就判「没动画」（空转）。
   const jobsRetry = home.locator('[data-action="jobs-retry"]')
   await jobsRetry.evaluate((el) => el.setAttribute('data-before-retry', ''))
   await jobsRetry.click()
   await expect(home.locator('[data-before-retry]')).toHaveCount(0)
   await expect(jobsRetry).toBeVisible()
   expect(api.requestCount('GET', '/api/v1/jobs')).toBe(2)
-  expect(await homeAnimations(page)).toEqual([])
+  expect((await homeAnimations(page)).filter((animation) => animation.name === 'qxt-rise')).toEqual([])
   expect(runtimeErrors).toEqual([])
 })
 
@@ -407,17 +431,18 @@ test('home entrance stays inside the narrow layout and settles fully @w1-mobile'
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('home-intro-midway-390x844.png') })
   await expect(home).toHaveAttribute('data-qx-intro', 'done')
-  await expect.poll(() => homeAnimations(page)).toEqual([])
+  await expect.poll(async () => (await homeAnimations(page)).filter((animation) => animation.name === 'qxt-rise')).toEqual([])
+  expect((await homeAnimations(page)).filter((animation) => animation.iterations === Infinity).map((animation) => animation.name).sort()).toEqual(['qxt-breathe', 'qxt-drift'])
   await assertNoHorizontalOverflow(page)
   await expectTouchFloor(home.locator('button:visible, a:visible'), 48)
   await page.screenshot({ path: test.info().outputPath('home-intro-settled-390x844.png'), fullPage: true })
 })
 
-for (const [label, bw, color, expected] of [
-  ['两行零价', 0, 0, '免费打印 · 带走：打印件'],
-  ['仅黑白免费', 0, 50, '先看价格再出纸 · 带走：打印件'],
-  ['两行非零价', 20, 50, '先看价格再出纸 · 带走：打印件'],
-  ['彩色缺价', 0, null, '先选材料再出纸 · 带走：打印件'],
+for (const [label, bw, color, paid] of [
+  ['两行零价', 0, 0, false],
+  ['仅黑白免费', 0, 50, true],
+  ['两行非零价', 20, 50, true],
+  ['彩色缺价', 0, null, false],
 ] as const) {
   test(`home print copy follows the published price: ${label} @w1-kiosk`, async ({ page, api }) => {
     registerHomeApi(api)
@@ -432,11 +457,13 @@ for (const [label, bw, color, expected] of [
     })
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     const home = page.getByTestId('qx-home')
-    await expect(home.locator('[data-action="print-hub"]').getByText(expected, { exact: true })).toBeVisible()
-    if ((bw === 0 && color === 0) || color === null) {
-      await expect(home.getByText(/价格|报价|收费|付了再打/)).toHaveCount(0)
+    const printTile = home.locator('[data-action="print-hub"]')
+    await expect(printTile.getByText('先选材料再出纸 · 带走：打印件', { exact: true })).toBeVisible()
+    await expect(printTile.getByText(/免费打印|先看价格再出纸|收费以现场公示为准/)).toHaveCount(0)
+    if (paid) {
+      await expect(home.locator('.qxt-home-foot')).toContainText('收费以现场公示为准')
     } else {
-      await expect(home.locator('.qx-home-hero-law')).toContainText('收费以现场公示为准')
+      await expect(home.getByText(/免费|价格|报价|收费|付了再打/)).toHaveCount(0)
     }
   })
 }

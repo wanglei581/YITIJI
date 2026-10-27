@@ -143,10 +143,12 @@ async function expectTouchTargets(page: Page, where: string): Promise<void> {
   }
 }
 
-/** 首页服务区的几何：每一行都铺满两列宽度，行与行之间只有网格间距。 */
-async function homeTileGeometry(page: Page) {
-  return page.locator('.qx-home-tiles').evaluate((grid) => {
+/** 一块首页网格的几何：每一行都铺满网格宽度，行距等于该网格的 row-gap。 */
+async function gridGeometry(page: Page, selector: string) {
+  return page.locator(selector).evaluate((grid) => {
     const box = grid.getBoundingClientRect()
+    const style = getComputedStyle(grid)
+    const rowGap = Math.round(Number.parseFloat(style.rowGap) || Number.parseFloat(style.gap) || 0)
     const tiles = [...grid.children].map((el) => {
       const rect = el.getBoundingClientRect()
       return { action: el.getAttribute('data-action'), top: Math.round(rect.top), bottom: Math.round(rect.bottom), left: Math.round(rect.left), right: Math.round(rect.right), height: Math.round(rect.height) }
@@ -154,6 +156,7 @@ async function homeTileGeometry(page: Page) {
     const rows = new Map<number, typeof tiles>()
     for (const tile of tiles) rows.set(tile.top, [...(rows.get(tile.top) ?? []), tile])
     return {
+      rowGap,
       grid: { top: Math.round(box.top), bottom: Math.round(box.bottom), left: Math.round(box.left), right: Math.round(box.right) },
       rows: [...rows.values()].map((row) => ({
         actions: row.map((tile) => tile.action),
@@ -167,8 +170,22 @@ async function homeTileGeometry(page: Page) {
   })
 }
 
-const CLOSED_ROWS = [['resume-hub', 'interview-hub'], ['print-hub'], ['policy-hub']]
-const CHANNEL_ROWS = [['resume-hub', 'interview-hub'], ['print-hub'], ['policy-hub', 'official-channels']]
+function expectGridFilled(geometry: Awaited<ReturnType<typeof gridGeometry>>): void {
+  for (const row of geometry.rows) {
+    expect(row.left, `${row.actions.join('+')} 贴住左边`).toBeLessThanOrEqual(geometry.grid.left + 1)
+    expect(row.right, `${row.actions.join('+')} 贴住右边`).toBeGreaterThanOrEqual(geometry.grid.right - 1)
+    expect(row.minHeight, `${row.actions.join('+')} 触控高度`).toBeGreaterThanOrEqual(104)
+  }
+  for (let index = 1; index < geometry.rows.length; index += 1) {
+    const gap = geometry.rows[index]!.top - geometry.rows[index - 1]!.bottom
+    expect(Math.abs(gap - geometry.rowGap), '行间只有网格间距').toBeLessThanOrEqual(2)
+  }
+  expect(geometry.grid.bottom - geometry.rows.at(-1)!.bottom, '网格底部不留空白').toBeLessThanOrEqual(2)
+}
+
+const TASK_ROWS = [['resume-hub', 'interview-hub'], ['print-hub', 'policy-hub']]
+const CLOSED_TILES = [['pickup-claim', 'help']]
+const CHANNEL_TILES = [['pickup-claim', 'official-channels', 'help']]
 
 const screenOf = (page: Page) => page.locator('[data-kiosk-screen="official-channels"]')
 const cardsOf = (page: Page, section: 'org' | 'legacy') => page.getByTestId(`official-channels-${section}`).getByTestId('official-channel-card')
@@ -447,28 +464,21 @@ test('home: an org terminal with channels gets one 岗位与招聘会 tile in th
   const tile = home.locator('[data-action="official-channels"]')
   await expect(tile).toBeVisible()
   await expect(home).toHaveAttribute('data-official-channels', 'shown')
-  await expect(tile.locator('strong')).toHaveText('机构官方渠道')
-  await expect(tile.locator('.qx-home-tile-desc')).toHaveText('本机有 2 个渠道，扫码到机构官网')
-  await expect(tile.locator('.qx-home-tile-badge')).toHaveText('机构提供')
-  await expect(tile.locator('.qx-home-tile-foot')).toContainText('扫码前往')
-  for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry']) {
+  await expect(tile.locator('b')).toHaveText('本机构官方渠道')
+  await expect(tile.locator('small')).toHaveText('本机有 2 个渠道，扫码到机构官网')
+  for (const action of ['jobs-hub', 'fairs-hub', 'jobs-retry', 'fairs-retry', 'campus-zone']) {
     await expect(home.locator(`[data-action="${action}"]`), `托管关闭时首页不摆 ${action}`).toHaveCount(0)
   }
-  await expect(home.locator('.qx-home-truth')).toContainText('岗位与招聘会请看本机构官方渠道，本终端不代收简历。')
-  await expect(home.locator('.qx-home-truth'), '有渠道时不再说「未开放岗位与招聘会」').not.toContainText('未开放')
+  await expect(home.locator('.qxt-home-foot')).toContainText('岗位与招聘会请看本机构官方渠道，本终端不代收简历。')
+  await expect(home.locator('.qxt-home-foot'), '有渠道时不再说「未开放岗位与招聘会」').not.toContainText('未开放')
 
-  // 这一张补在岗位 / 招聘会那一行：五行与托管打开时逐行同构，每行铺满、行间只有网格间距、底部不留空。
-  const geometry = await homeTileGeometry(page)
-  expect(geometry.rows.map((row) => row.actions)).toEqual(CHANNEL_ROWS)
-  for (const row of geometry.rows) {
-    expect(row.left, `${row.actions.join('+')} 贴住左边`).toBeLessThanOrEqual(geometry.grid.left + 1)
-    expect(row.right, `${row.actions.join('+')} 贴住右边`).toBeGreaterThanOrEqual(geometry.grid.right - 1)
-    expect(row.minHeight, `${row.actions.join('+')} 触控高度`).toBeGreaterThanOrEqual(104)
-  }
-  for (let index = 1; index < geometry.rows.length; index += 1) {
-    expect(geometry.rows[index]!.top - geometry.rows[index - 1]!.bottom, '行间只有网格间距').toBeLessThanOrEqual(16)
-  }
-  expect(geometry.grid.bottom - geometry.rows.at(-1)!.bottom, '服务区底部不留空白').toBeLessThanOrEqual(16)
+  // 四张大卡仍是 2×2。渠道补进第三行，和到机取件、帮助并排。
+  const tasks = await gridGeometry(page, '.qxt-home-tasks')
+  expect(tasks.rows.map((row) => row.actions)).toEqual(TASK_ROWS)
+  expectGridFilled(tasks)
+  const tiles = await gridGeometry(page, '.qxt-home-tiles')
+  expect(tiles.rows.map((row) => row.actions)).toEqual(CHANNEL_TILES)
+  expectGridFilled(tiles)
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('home-official-channels-tile-1080x1920.png') })
 
@@ -493,7 +503,7 @@ test('home: no tile while the channels request is held, and it appears exactly o
   await expect(home).toHaveAttribute('data-toolbox', 'off')
   await page.waitForTimeout(600)
   await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
-  expect((await homeTileGeometry(page)).rows.map((row) => row.actions)).toEqual(CLOSED_ROWS)
+  expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions)).toEqual(CLOSED_TILES)
 
   await markReleased(page)
   gate.resolve()
@@ -517,8 +527,8 @@ test('home: no tile when the channels request fails or the org has none @w1-kios
     await page.waitForTimeout(400)
     await expect(home.locator('[data-action="official-channels"]'), `${label}：不摆磁贴`).toHaveCount(0)
     await expect(home).not.toHaveAttribute('data-official-channels', 'shown')
-    expect((await homeTileGeometry(page)).rows.map((row) => row.actions), `${label}：仍是托管关闭、没有渠道时的三行`).toEqual(CLOSED_ROWS)
-    await expect(home.locator('.qx-home-truth')).toContainText('本终端未开放岗位与招聘会信息，也不代收简历。')
+    expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions), `${label}：仍是托管关闭、没有渠道时的第三行`).toEqual(CLOSED_TILES)
+    await expect(home.locator('.qxt-home-foot')).toContainText('本终端未开放岗位与招聘会信息，也不代收简历。')
     respondChannels(api, [])
   }
 })
@@ -531,16 +541,17 @@ test('home: hosting on keeps the job and fair tiles, even when the org has chann
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const home = page.getByTestId('qx-home')
   await expect(home).toHaveAttribute('data-recruitment', 'open')
-  await expect(home.locator('[data-action="jobs-hub"]')).toContainText('12 个在招')
+  await expect(home.locator('[data-action="jobs-hub"]')).toContainText('全职、兼职岗位和社会招聘会')
+  await expect(home.locator('[data-action="jobs-hub"]')).not.toContainText('个在招')
+  await expect(home.locator('[data-action="campus-zone"]')).toBeVisible()
+  await expect(home.locator('[data-action="fairs-hub"]')).toHaveCount(0)
   // 不钉「托管打开时要不要去读渠道」——读或不读都对，钉的只是磁贴不出现。渠道答复是立即给的，
-  // 等到岗位计数已经到了再留一段，读了的实现也早该渲染完。
+  // 等到岗位说明已经到了再留一段，读了的实现也早该渲染完。
   await page.waitForTimeout(400)
   await expect(home.locator('[data-action="official-channels"]')).toHaveCount(0)
-  expect((await homeTileGeometry(page)).rows.map((row) => row.actions)).toEqual([
-    ['resume-hub', 'interview-hub'],
-    ['print-hub'],
-    ['jobs-hub', 'fairs-hub'],
-    ['policy-hub'],
+  expect((await gridGeometry(page, '.qxt-home-tiles')).rows.map((row) => row.actions)).toEqual([
+    ['pickup-claim', 'jobs-hub'],
+    ['campus-zone', 'help'],
   ])
 })
 
@@ -620,7 +631,7 @@ test('phone 390x844: the home tile sits in the single column without overflow @w
   const home = page.getByTestId('qx-home')
   const tile = home.locator('[data-action="official-channels"]')
   await expect(tile).toBeVisible()
-  const [tileBox, gridBox] = await Promise.all([tile.boundingBox(), home.locator('.qx-home-tiles').boundingBox()])
+  const [tileBox, gridBox] = await Promise.all([tile.boundingBox(), home.locator('.qxt-home-tiles').boundingBox()])
   expect(Math.round(tileBox!.width), '单列里铺满整行').toBe(Math.round(gridBox!.width))
   expect(tileBox!.height).toBeGreaterThanOrEqual(104)
   await expectTouchTargets(page, '手机首页')
