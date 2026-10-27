@@ -245,8 +245,9 @@
 /* 第 3 步：三行核对，每行一个 64×64 的「改」 */
 [data-qx-page="interview"] .qxt-iv-sum {
   display: flex;
-  flex: none;
+  flex: 1 1 auto;
   flex-direction: column;
+  max-height: 396px;
   border: 1.5px solid var(--qxt-edge);
   border-radius: 30px;
   background: var(--qxt-card);
@@ -255,7 +256,7 @@
 
 [data-qx-page="interview"] .qxt-iv-sum-r {
   display: grid;
-  flex: none;
+  flex: 1 1 auto;
   grid-template-columns: 108px minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
