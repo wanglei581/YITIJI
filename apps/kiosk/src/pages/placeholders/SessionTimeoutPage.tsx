@@ -87,7 +87,6 @@ export default function SessionTimeoutPage() {
           status={{ label: pill.label, tone: pill.tone === 'bad' ? 'warn' : pill.tone }}
           back={false}
           nav={false}
-          screen="session-timeout"
           dock={(
             <footer className="qxt-dock">
               <button

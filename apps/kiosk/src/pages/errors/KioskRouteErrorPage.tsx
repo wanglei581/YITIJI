@@ -29,7 +29,6 @@ export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }
           status={{ tone: 'warn', label: isNotFound ? '没有这一页' : '这一页没打开' }}
           back={false}
           nav={false}
-          screen="route-error"
           dock={(
             <footer className="qxt-dock">
               <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/', { replace: true })}>

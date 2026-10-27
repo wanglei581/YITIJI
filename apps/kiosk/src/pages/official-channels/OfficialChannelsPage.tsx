@@ -308,7 +308,6 @@ export function OfficialChannelsPage() {
       eyebrow="本机构官方渠道"
       sub={subtitle}
       status={status}
-      screen="official-channels"
       dock={<ChannelBar view={view} onHome={home} onRetry={channels.retry} />}
     >
       <div className="dw-page qx-grow oc-page" data-kiosk-screen="official-channels" data-state={view} data-density={density}>

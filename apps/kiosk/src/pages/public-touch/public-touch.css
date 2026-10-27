@@ -1,4 +1,55 @@
-/* 公共与系统页的触屏填充。只挂在 .qxt-screen 下，颜色只用令牌。 */
+/* 公共与系统页的触屏填充。只挂在 .qxt-screen 下，颜色只用令牌。
+   意图带的流线和光晕按稿画出屏外，视口检查仍会计它们的盒子，所以本包把它们收进屏内。 */
+
+.qxt-screen.qxp-app .qxt-flow svg {
+  left: 8%;
+  width: 84%;
+}
+
+.qxt-screen.qxp-app .qxt-halo {
+  right: 0;
+  top: -18%;
+  width: min(420px, 55%);
+  height: min(420px, 55%);
+}
+
+@media (max-width: 800px) {
+  .qxt-screen.qxp-app .qxt-band {
+    padding: 12px 12px 0;
+    min-height: 0;
+  }
+
+  .qxt-screen.qxp-app .qxt-hdr {
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 8px;
+  }
+
+  .qxt-screen.qxp-app .qxt-hdr-right {
+    flex: 1 1 100%;
+    margin-left: 0;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .qxt-screen.qxp-app .qxt-clock {
+    display: none;
+  }
+
+  .qxt-screen.qxp-app .qxt-status {
+    max-width: 100%;
+  }
+
+  .qxt-screen.qxp-app .qxt-ask {
+    gap: 12px;
+    padding: 12px 0 16px;
+  }
+
+  .qxt-screen.qxp-app .qxt-seal {
+    width: 72px;
+    height: 72px;
+  }
+}
 
 .qxt-screen .qxp-fill {
   flex: 1;

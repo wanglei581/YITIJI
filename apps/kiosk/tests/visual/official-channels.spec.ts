@@ -285,7 +285,7 @@ test('empty: says the terminal has no channel configured, not why, and offers wh
   // 只说事实，不说原因（没绑机构、机构没录、被下架……一律不猜）。
   await expect(empty.locator('.qx-state-d')).toHaveText('可以先办下面这些事。')
   // 页上没有码，页头就不能说「扫下面的码」。
-  await expect(page.getByText('本终端暂未配置官方渠道')).toBeVisible()
+  await expect(page.getByTestId('official-channels-empty')).toContainText('本终端暂未配置官方渠道')
   await expect(page.locator('[data-kiosk-screen="official-channels"]')).not.toContainText('招聘')
   await expect(page.locator('.qxt-status')).toHaveText('暂未配置官方渠道')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)

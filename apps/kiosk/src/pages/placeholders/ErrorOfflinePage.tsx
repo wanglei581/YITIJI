@@ -312,7 +312,6 @@ export default function ErrorOfflinePage() {
           status={pill[view]}
           back={{ label: '返回首页', onBack: () => navigate('/') }}
           nav={false}
-          screen="error-offline"
           dock={(
             <>
               <div className="k9s-cta qxt-dock">

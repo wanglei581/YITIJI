@@ -472,7 +472,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       status={cockpitCopy.pill}
       navCurrent="advisor"
       back={{ label: '返回首页', onBack: () => navigate('/') }}
-      screen="assistant"
     >
     <section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">
       <div

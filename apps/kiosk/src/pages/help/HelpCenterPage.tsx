@@ -272,7 +272,6 @@ export function HelpCenterPage() {
         eyebrow={eyebrow}
         sub={subtitle}
         status={status}
-        screen="help"
         back={view === 'topic' || view === 'no-result'
           ? { label: '返回帮助分类', onBack: clearTopic }
           : { label: '返回首页', onBack: home }}

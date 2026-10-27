@@ -78,7 +78,7 @@ export function PublicTouchFrame({
   return (
     <QxTouchScreen
       gallery={false}
-      className={className}
+      className={['qxp-app', className].filter(Boolean).join(' ')}
       testId={testId}
       stateId={stateId}
       motion="none"

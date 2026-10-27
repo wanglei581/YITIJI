@@ -475,7 +475,6 @@ export function LegalDocPage() {
           status={status}
           back={{ label: backLabel, onBack: goBack }}
           nav={false}
-          screen="legal-doc"
           dock={(
             <>
               <div className="legal-doc-cta qxt-dock">

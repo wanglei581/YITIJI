@@ -183,7 +183,6 @@ export function LoginPage() {
           status={pill}
           back={{ label: '返回首页', onBack: goHome }}
           nav={false}
-          screen="login"
           dock={(
             <footer className="qxt-dock">
               <button type="button" className="qxt-btn qxt-btn-sec" data-testid="login-gate-back" onClick={goHome}>返回首页</button>
