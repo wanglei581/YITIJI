@@ -42,7 +42,7 @@ import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import { terminalProtectedFetch } from '../../services/terminalAuth'
 import './styles/pickup-claim-qx.css'
-import './styles/print-fulfill-touch.css'
+import './styles/print-pickup-touch.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupHintCard, PickupKeypadCard, PickupLegacyNote, PickupOutsStrip, PickupScanKinds } from './components/PickupHidGuide'

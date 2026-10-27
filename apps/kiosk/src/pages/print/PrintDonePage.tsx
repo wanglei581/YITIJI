@@ -40,7 +40,7 @@ import {
 import { doneTakeaway, failureStaffDoing, jamOrderKeptLine, jobSubline, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint } from './printProgressModel'
 import { formatCents } from './cashierStatus'
 import './styles/print-fulfill-qx.css'
-import './styles/print-fulfill-touch.css'
+import './styles/print-done-touch.css'
 
 interface PrintFile {
   name:     string

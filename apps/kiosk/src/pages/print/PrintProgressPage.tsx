@@ -45,7 +45,7 @@ import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
 import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
 import './styles/print-fulfill-qx.css'
-import './styles/print-fulfill-touch.css'
+import './styles/print-progress-touch.css'
 import {
   FAIL_REASONS,
   STEPS,
