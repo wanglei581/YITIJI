@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { FirstOrderIncident, FirstOrderOverview, FirstOrderReportSummary } from '@ai-job-print/shared'
 import { Button, Card, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { FIRST_ORDER_HTTP, firstOrderApi } from '../../services/api/firstOrder'
@@ -6,15 +7,29 @@ import { ProjectDetails } from './ProjectDetails'
 import { IncidentPanel } from './IncidentPanel'
 import { ReportPanel } from './ReportPanel'
 
-const tabs = [{ key: 'details', label: '项目资料' }, { key: 'incidents', label: '报障与恢复' }, { key: 'reports', label: '月报资料' }] as const
+const tabs = [{ key: 'details', label: '项目资料', section: 'project' }, { key: 'incidents', label: '报障与恢复', section: 'incidents' }, { key: 'reports', label: '月报资料', section: 'reports' }] as const
 type Tab = (typeof tabs)[number]['key']
 
+function tabFromSection(section: string | null): Tab {
+  if (section === 'incidents' || section === 'reports') return section
+  return 'details'
+}
+
 export function FirstOrderPanel() {
+  const [params, setParams] = useSearchParams()
+  const tab = tabFromSection(params.get('section'))
   const [data, setData] = useState<FirstOrderOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [tab, setTab] = useState<Tab>('details')
+  function selectTab(next: Tab) {
+    const section = tabs.find((item) => item.key === next)?.section ?? 'project'
+    setParams((current) => {
+      const copy = new URLSearchParams(current)
+      copy.set('section', section)
+      return copy
+    }, { replace: true })
+  }
   const request = useRef<AbortController | null>(null)
   const sequence = useRef(0)
   const reload = useCallback(async () => {
@@ -55,7 +70,7 @@ export function FirstOrderPanel() {
       {error && <p role="alert" className="text-sm text-error-fg">{error} 现有内容尚未刷新，请核对后再操作。</p>}
       {data.projects.length === 0 ? <p className="text-sm text-neutral-500">本机构尚未登记服务项目，请联系平台核对采购与安装资料。终端现有运营数据在「终端运营」里查看。</p> : <label className="block text-sm">服务项目<select aria-label="服务项目" disabled={loading} className="mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3 sm:max-w-xl" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">选择服务项目</option>{data.projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
       {project && <>
-        <div role="tablist" aria-label="项目服务分组" className="flex flex-wrap gap-2">{tabs.map((item) => <Button key={item.key} size="sm" role="tab" aria-selected={tab === item.key} variant={tab === item.key ? 'primary' : 'outline'} onClick={() => setTab(item.key)}>{item.label}</Button>)}</div>
+        <div role="tablist" aria-label="项目服务分组" className="flex flex-wrap gap-2">{tabs.map((item) => <Button key={item.key} size="sm" role="tab" aria-selected={tab === item.key} variant={tab === item.key ? 'primary' : 'outline'} onClick={() => selectTab(item.key)}>{item.label}</Button>)}</div>
         {tab === 'details' && <ProjectDetails project={project} terminals={data.terminals} />}
         {tab === 'incidents' && <IncidentPanel key={project.id} deployments={project.deployments} incidents={data.incidents.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={incidentSaved} />}
         {tab === 'reports' && <ReportPanel key={project.id} projectId={project.id} reports={data.reports.filter((item) => item.projectId === project.id)} onChanged={reload} onSaved={reportSaved} />}

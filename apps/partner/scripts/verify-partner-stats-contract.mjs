@@ -197,7 +197,7 @@ mustNotContain(
   'B8b. /stats 页不承诺效果或曝光漏斗',
 )
 
-// B9. PTR-13：工作台「待审核」与统计页同一服务端口径 snapshot.pendingReview
+// B9. 工作台待审核政策与统计页同一口径：snapshot.pendingReviewPolicies（pending+reviewing）
 mustContain(
   DASHBOARD,
   ['getPartnerStats', 'stats.snapshot', 'pendingReview'],
@@ -205,18 +205,18 @@ mustContain(
 )
 mustNotContain(
   DASHBOARD,
-  ['data.pendingTotal', 'pendingTotal }'],
-  'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal',
+  ['data.pendingTotal', 'pendingTotal }', 'data.policies.pending', '待确认交付'],
+  'B9b. 工作台待审核标题不再使用 dashboard.pendingTotal，也不出现待确认交付',
 )
 mustContain(
   DASHBOARD,
-  ['snapshot.pendingReviewJobs', 'snapshot.pendingReviewFairs', 'snapshot.pendingReviewPolicies', 'firstPendingPath(snapshot)'],
-  'B9c. 去查看跳转与计数同用 snapshot 的 pending+reviewing 分类型字段',
+  ['snapshot.pendingReviewPolicies', 'getPolicies', '/policy'],
+  'B9c. 待审核政策计数用 snapshot.pendingReviewPolicies，标题来自政策列表，入口去政策页',
 )
 mustNotContain(
   DASHBOARD,
-  ['data.jobs.pending > 0', 'data.fairs.pending > 0', 'data.policies.pending > 0'],
-  'B9d. firstPendingPath 不再按 dashboard 的 pending-only 计数跳转',
+  ['data.jobs.pending > 0', 'data.fairs.pending > 0', 'data.policies.pending > 0', 'firstPendingPath'],
+  'B9d. 不再按 dashboard 的 pending-only 计数跳转',
 )
 
 // ── C. 与 honest-placeholders 门禁的交接 ───────────────────────────────────

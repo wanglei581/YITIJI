@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { formatDateTime } from '@ai-job-print/shared'
 import { Card, Drawer, ErrorState, LoadingState, StatusBadge, ConsoleTable, type ConsoleColumn } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { FilterIcon, SearchIcon, XIcon } from 'lucide-react'
-import { FilterChip } from '../components/FilterChip'
+import { FilterIcon, XIcon } from 'lucide-react'
 import type { AdminFairSourceRecord, AdminSourcePage, ReviewStatus, PublishStatus, JobFairStatus } from '../../services/api'
 import { getFairSources } from '../../services/api'
 import { requireAdminSourcePage } from '../../services/api/sourcePaging'
@@ -13,6 +12,8 @@ import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentH
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { RECRUITMENT_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
+import { SourceNarrowCards, SourceStatusFilters } from '../components/SourceNarrowCards'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ export default function FairSourcesPage() {
     return (
       <Page title="招聘会信息源" subtitle="第三方来源招聘会查看 · 紧急下架">
         <LoadingState text="加载招聘会信息源…" className="py-24" />
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -129,6 +131,7 @@ export default function FairSourcesPage() {
             重新加载
           </button>
         </div>
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -188,31 +191,30 @@ export default function FairSourcesPage() {
         </div>
       )}
 
-      {/* 筛选标签 */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {REVIEW_FILTERS.map((f) => (
-            <FilterChip
-              key={f}
-              active={reviewFilter === f}
-              label={f}
-              onClick={() => { setReviewFilter(f); setPage(1) }}
-            />
-          ))}
-        </div>
-        <div className="relative">
-          <SearchIcon className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索招聘会名称…"
-            className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
-          />
-        </div>
-      </div>
+      <SourceStatusFilters
+        options={REVIEW_FILTERS}
+        value={reviewFilter}
+        onChange={(next) => { setReviewFilter(next as typeof reviewFilter); setPage(1) }}
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="搜索招聘会名称…"
+      />
 
-      <Card className="overflow-hidden p-0">
+      <SourceNarrowCards
+        items={sources}
+        emptyTitle={search ? '未找到匹配的招聘会' : '该分类暂无招聘会数据'}
+        titleOf={(row) => row.name}
+        statusOf={(row) => (
+          <>
+            <StatusBadge dot status={REVIEW_MAP[row.reviewStatus].badge} label={REVIEW_MAP[row.reviewStatus].label} />
+            <StatusBadge dot status={PUBLISH_MAP[row.publishStatus].badge} label={PUBLISH_MAP[row.publishStatus].label} />
+          </>
+        )}
+        onView={setViewing}
+        onTakedown={(row) => setTakedown({ targetType: 'job_fair', targetId: row.id, title: row.name, orgName: row.sourceName })}
+      />
+
+      <Card className="hidden overflow-hidden p-0 md:block">
         <ConsoleTable items={sources} columns={columns}
           empty={{ title: search ? '未找到匹配的招聘会' : '该分类暂无招聘会数据', description: search ? '请尝试其他关键词' : undefined }}
           page={page} pageSize={pageSize} total={total} onPageChange={setPage}
@@ -222,6 +224,8 @@ export default function FairSourcesPage() {
       <p className="mt-3 text-xs text-neutral-400">
         仅展示第三方平台同步的招聘会信息，不参与招聘闭环。紧急下架只能下架、不能恢复，须写明事由，并会通知所属机构。
       </p>
+
+      <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 
