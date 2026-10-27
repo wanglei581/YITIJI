@@ -10,8 +10,7 @@ import {
 } from '@ai-job-print/shared'
 import { Loader2Icon, MapPinIcon, SearchIcon, SlidersHorizontalIcon } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { DirAiAssist, DirNote, DirSec, DirState } from '../../components/qingxu/directory/DirectoryBits'
 import '../../components/qingxu/directory/directory-qx.css'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
@@ -196,20 +195,19 @@ export function CompaniesPage() {
   )
 
   return (
-    <QxPageFrame
-      // 稿 43 原文：data-route="/jobs-service" aria-label="返回岗位服务"。
-      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
+    <RecruitTouchFrame
+      // 稿 43 原文：data-route="/jobs-service" aria-label="返回社会招聘"。
+      back={{ label: '返回社会招聘', onBack: () => navigate('/jobs-service') }}
       title="找企业"
       subtitle={state === 'loading' ? '企业列表与在招岗位数一起返回，取到之前不显示数字。' : '先定行业和地区，再看企业与在招岗位。'}
       status={pill}
       terminalLabel={getTerminalCode() || '设备未绑定'}
       ctabar={
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={load}>按条件筛选</button>
         </>
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <KioskFilterPickerModal
         open={showTaxonomyPicker}
@@ -310,6 +308,6 @@ export function CompaniesPage() {
           ? <DirNote>{BOUNDARY}</DirNote>
           : <DirAiAssist screen="company-directory" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

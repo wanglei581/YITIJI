@@ -13,8 +13,7 @@ import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import {
   DirAiAssist,
   DirExitList,
@@ -116,7 +115,7 @@ export function CompanyDetailPage() {
 
   const firstJob = jobs[0]
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       // 稿 43 的目录页返回「岗位服务」；本页是详情段，返回落到目录本身。
       back={{ label: '返回找企业', onBack: () => navigate('/companies') }}
       title={company?.name ?? '企业详情'}
@@ -126,7 +125,7 @@ export function CompanyDetailPage() {
       ctabar={
         state === 'error' ? (
           <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={notFound ? () => navigate('/companies') : load}>
               {notFound ? '回企业目录重选' : '重新加载'}
             </button>
@@ -151,7 +150,6 @@ export function CompanyDetailPage() {
           </>
         )
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`company-directory-state-${uiState}`}>
         {qr?.kind === 'source' && company?.sourceUrl ? (
@@ -320,6 +318,6 @@ export function CompanyDetailPage() {
           </>
         )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

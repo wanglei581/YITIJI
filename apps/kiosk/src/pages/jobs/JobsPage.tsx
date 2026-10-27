@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getJobs } from '../../services/api'
 import {
@@ -22,6 +21,7 @@ import { JobResultsSection } from './components/JobResultsSection'
 import { JobsQxAiEntry, JobsQxSourceNotice, JobsQxState } from './components/JobsQxChrome'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import './styles/jobs-list-qx.css'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
@@ -46,6 +46,7 @@ export function JobsPage() {
   const [facetLoading, setFacetLoading] = useState(true)
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [boardOff, setBoardOff] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
 
   const [keyword, setKeyword] = useState('')
@@ -92,16 +93,25 @@ export function JobsPage() {
     let cancelled = false
     setFacetLoading(true)
     setError(null)
+    setBoardOff(null)
     getJobs({ pageSize: 100 })
       .then((res) => {
         if (cancelled) return
         setFacetJobs(res.data)
         setFacetTotal(res.pagination.total)
+        setBoardOff(null)
         setFacetLoading(false)
       })
       .catch((err) => {
         if (cancelled) return
-        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        if (err instanceof ApiHttpError && err.code === 'KIOSK_JOB_BOARD_DISABLED') {
+          setFacetJobs([])
+          setListJobs([])
+          setBoardOff(err.message || '本终端岗位板块已关闭')
+          setError(null)
+        } else {
+          setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        }
         setFacetLoading(false)
       })
     return () => {
@@ -143,7 +153,13 @@ export function JobsPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        if (err instanceof ApiHttpError && err.code === 'KIOSK_JOB_BOARD_DISABLED') {
+          setListJobs([])
+          setBoardOff(err.message || '本终端岗位板块已关闭')
+          setError(null)
+        } else {
+          setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+        }
         setListLoading(false)
       })
     return () => {
@@ -271,20 +287,22 @@ export function JobsPage() {
     setAiError(null)
   }
 
-  const screenState = facetLoading ? 'loading' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
+  const screenState = facetLoading ? 'loading' : boardOff ? 'board-off' : error ? 'error' : displayedJobs.length === 0 ? 'empty' : hasAnyFilter ? 'filtered' : 'default'
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       /* 稿 26-browse-list 原文：data-route="/jobs-service" aria-label="返回岗位服务"。 */
-      back={{ label: '返回岗位服务', onBack: () => navigate('/jobs-service') }}
+      back={{ label: '返回', onBack: () => navigate('/jobs-service') }}
+      ask={{ label: '问小青：这些岗位怎么看？', draft: '这些岗位怎么看？' }}
       title="岗位信息"
       subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
       status={facetLoading
         ? { tone: 'unknown', label: '正在读取岗位名单' }
-        : error
-          ? { tone: 'bad', label: '岗位名单这次没读到' }
-          : { tone: 'ok', label: '岗位与来源信息已读到' }}
+        : boardOff
+          ? { tone: 'warn', label: '岗位板块已关闭' }
+          : error
+            ? { tone: 'bad', label: '岗位名单这次没读到' }
+            : { tone: 'ok', label: '岗位与来源信息已读到' }}
       terminalLabel="就业服务大厅"
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
       ctabar={
         <>
           <p className="why">本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。</p>
@@ -344,7 +362,16 @@ export function JobsPage() {
       />
       <div className="qx-scroll qx-jobs-page" data-screen="jobs" data-state={screenState} data-testid={`jobs-state-${screenState}`}>
         <JobsQxAiEntry onStart={() => void startAiRecommend()} />
-      {facetLoading || error ? (
+      {boardOff ? (
+        <section className="qx-state qx-grow" data-tone="info" role="status">
+          <span>
+            <span className="qx-state-t">岗位板块已关闭</span>
+            <span className="qx-state-d">{boardOff}。这一页不展示岗位名单。企业目录和招聘会不受这一项影响。</span>
+          </span>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/companies')}>找企业</button>
+          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>查看招聘会</button>
+        </section>
+      ) : facetLoading || error ? (
         <JobsQxState error={error} onRetry={() => setRetryKey((key) => key + 1)} />
       ) : (
         <>
@@ -486,7 +513,7 @@ export function JobsPage() {
         </>
       )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }
 
@@ -495,7 +522,7 @@ function formatJobAiError(err: unknown): string {
   if (declined) return declined
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
-    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine()}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message

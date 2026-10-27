@@ -115,7 +115,7 @@ export function FairStatsPage() {
         </DirState>
         <DirStrip>
           <DirStripItem icon={UsersIcon} title="看参展名单" desc="名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-          <DirStripItem icon={InfoIcon} tone="slate" title="找工作人员" desc="需要官方数据可以到服务台咨询" onClick={() => navigate('/help')} />
+          <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="需要官方数据时，查看帮助中心里的服务电话" onClick={() => navigate('/help')} />
         </DirStrip>
       </QxFairWorkbench>
     )

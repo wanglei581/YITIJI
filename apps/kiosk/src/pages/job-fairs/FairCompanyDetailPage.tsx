@@ -10,8 +10,7 @@ import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import {
   DirAiAssist,
   DirExitList,
@@ -136,7 +135,7 @@ export function FairCompanyDetailPage() {
             : { tone: 'ok' as const, label: '展位与岗位以主办方名单为准' }
 
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       // 稿 44 原文：data-route="/job-fairs/:id/companies" aria-label="返回参展企业列表"。
       back={{ label: '返回参展企业列表', onBack: () => navigate(`/job-fairs/${id}/companies`) }}
       title="招聘会参展企业"
@@ -188,7 +187,6 @@ export function FairCompanyDetailPage() {
           </>
         )
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`fair-company-state-${uiState}`}>
         {loading ? (
@@ -211,7 +209,7 @@ export function FairCompanyDetailPage() {
               <DirStripItem icon={BuildingIcon} tone="wheat" title="参展企业列表" desc="回本场名单重新选一家" onClick={() => navigate(listPath)} />
               <DirStripItem icon={MapPinIcon} title="展位图" desc="主办方给了真实图才展示" onClick={() => navigate(`/job-fairs/${fairId}/map`)} />
               <DirStripItem icon={PrinterIcon} title="先打好纸质简历" desc="展位现场收纸质简历很常见" onClick={() => navigate('/print/upload')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="现场工作人员" desc="手上有主办方纸质名单" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="手上有主办方纸质名单时，以现场公示为准" onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>
@@ -302,11 +300,11 @@ export function FairCompanyDetailPage() {
             )}
             <DirNote warn>
               {PRINT_NOTE}
-              <button type="button" className="dw-chip" onClick={() => navigate('/help')}>联系工作人员</button>
+              <button type="button" className="dw-chip" onClick={() => navigate('/help')}>去帮助中心</button>
             </DirNote>
           </>
         ) : null}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

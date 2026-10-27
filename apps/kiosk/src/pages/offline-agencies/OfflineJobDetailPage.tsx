@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import {
   DirAiAssist,
   DirKv,
@@ -79,7 +78,7 @@ export default function OfflineJobDetailPage() {
   const applyReason = trust ? sourceTrustReason(trust, SOURCE_APPLY_UNAVAILABLE_REASON) : SOURCE_APPLY_UNAVAILABLE_REASON
 
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       // 岗位挂在机构下：能拿到 agencyId 就回那家机构，拿不到回目录（不做 history back）。
       back={{ label: '返回机构详情', onBack: () => navigate(job ? `/offline-agencies/${job.agencyId}` : '/offline-agencies') }}
       title="线下机构岗位"
@@ -115,7 +114,6 @@ export default function OfflineJobDetailPage() {
           </>
         )
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
@@ -185,7 +183,7 @@ export default function OfflineJobDetailPage() {
                         ['机构名称', job.agencyName],
                         ['机构类型', job.agencyType],
                         ['营业时间', job.agencyHours || '以机构公示为准'],
-                        ['联系电话', job.agencyPhone || '请向门店工作人员咨询'],
+                        ['联系电话', job.agencyPhone || '请到帮助中心查看服务电话'],
                         ['服务项目', '以机构公示为准'],
                         ['机构地址', job.agencyAddress],
                         ['来源编号', job.externalId || SOURCE_ELEMENT_MISSING_TEXT],
@@ -222,6 +220,6 @@ export default function OfflineJobDetailPage() {
           </>
         )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

@@ -9,8 +9,10 @@
 // ============================================================
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ErrorState, LoadingState } from '@ai-job-print/ui'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
+import { RtFrame } from '../recruitment-touch/RtFrame'
 import type {
   ExternalJobFairDTO,
   FairCompanyDTO,
@@ -33,7 +35,6 @@ import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
-import { KioskPageFrame } from '../jobs/components/W4Presentation'
 import { evaluateJobSourceTrust } from '../jobs/utils/sourceTrust'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
@@ -146,10 +147,13 @@ type QrState =
 
 export function CampusPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fairId = searchParams.get('fair')
 
-  const [fair,    setFair]    = useState<ExternalJobFairDTO | null>(null)
+  const [fairs, setFairs] = useState<ExternalJobFairDTO[]>([])
   const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [tab,     setTab]     = useState<TabKey>('overview')
   const [qr,      setQr]      = useState<QrState>(null)
 
@@ -157,6 +161,8 @@ export function CampusPage() {
   const [zones,     setZones]     = useState<FairZoneDTO[]>([])
   const [stats,     setStats]     = useState<FairLiveStatsDTO | null>(null)
   const { getToken } = useAuth()
+
+  const fair = fairId ? fairs.find((item) => item.id === fairId) ?? null : null
 
   // 浏览记录(P1):校园专区主体招聘会真实加载后上报;fire-and-forget,服务端 30 分钟去重。
   useEffect(() => {
@@ -175,22 +181,19 @@ export function CampusPage() {
   useEffect(() => {
     let cancelled = false
     const terminalId = getTerminalId()
+    setLoading(true)
+    setLoadError(false)
     getJobFairs(terminalId ? { terminalId } : undefined)
       .then((res) => {
         if (cancelled) return
         const campus = res.data.filter(isCampusFair)
-        const pick = (() => {
-          if (!campus.length) return null
-          if (terminalId) return campus[0]
-          return [...campus].sort((a, b) => campusScore(b) - campusScore(a))[0]
-        })()
-        if (pick) setFair(pick)
-        else setError(true)
+        const ordered = terminalId ? campus : [...campus].sort((a, b) => campusScore(b) - campusScore(a))
+        setFairs(ordered)
       })
-      .catch(() => { if (!cancelled) setError(true) })
+      .catch(() => { if (!cancelled) { setLoadError(true); setFairs([]) } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [reloadKey])
 
   // 企业 / 展区 / 大屏数据（并行）
   useEffect(() => {
@@ -209,14 +212,68 @@ export function CampusPage() {
     return () => { cancelled = true }
   }, [fair])
 
-  if (loading) return <LoadingState className="h-full" />
-  if (error || !fair) {
+  if (loading) {
     return (
-      <ErrorState
-        message="暂无校园招聘会数据，请稍后再试"
-        onRetry={() => navigate('/')}
-        className="h-full"
-      />
+      <RtFrame eyebrow="私有化版 · 校园招聘" title="挑一场校园招聘会" sub="正在读取已发布的校园场次" status={{ text: '正在读取校园招聘会' }} backLabel="返回" onBack={() => navigate('/fairs-service')}>
+        <QxTouchCallout kind="howto">正在读取校园招聘会。未返回前不显示场次名称、时间地点和来源，也不拿示例场次把这一页填上。</QxTouchCallout>
+      </RtFrame>
+    )
+  }
+  if (loadError) {
+    return (
+      <RtFrame
+        eyebrow="私有化版 · 校园招聘"
+        title="挑一场校园招聘会"
+        sub="这次没有读到场次"
+        status={{ text: '校园招聘会这次没取到', tone: 'warn' }}
+        backLabel="返回"
+        onBack={() => navigate('/fairs-service')}
+        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？' }}
+        primary={{ label: '重新加载', onClick: () => setReloadKey((key) => key + 1), noArrow: true }}
+      >
+        <QxTouchCallout kind="remind">请求失败了。本机不显示上一次的缓存场次，避免按已经结束的时间地点白跑。</QxTouchCallout>
+        <QxTouchTile icon="map" title="查看招聘会" desc="社会场次和校园场次都在列表里" onClick={() => navigate('/job-fairs')} />
+      </RtFrame>
+    )
+  }
+  if (!fairId || !fair) {
+    return (
+      <RtFrame
+        eyebrow="私有化版 · 校园招聘"
+        title="挑一场校园招聘会"
+        sub="从已发布的校园场次里选一场，再看企业、展位和资料"
+        status={fairs.length ? { text: '按来源原文展示' } : { text: '还没有校园招聘会' }}
+        backLabel="返回"
+        onBack={() => navigate('/fairs-service')}
+        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？' }}
+        primary={fairs.length
+          ? { label: '全部校园招聘会', onClick: () => navigate('/job-fairs?audience=campus') }
+          : { label: '查看招聘会', onClick: () => navigate('/job-fairs') }}
+      >
+        {fairId && !fair ? (
+          <QxTouchCallout kind="remind">这场不在当前校园招聘会名单里。本机不用别的场次顶上。</QxTouchCallout>
+        ) : fairs.length === 0 ? (
+          <>
+            <QxTouchCallout kind="howto">还没有校园招聘会。来源机构还没有已发布的校园场次，本机不会拿往期活动充数。</QxTouchCallout>
+            <button type="button" className="rt-textbtn" onClick={() => setReloadKey((key) => key + 1)}>重新加载</button>
+          </>
+        ) : (
+          <div className="rt-doors">
+            {fairs.map((item) => (
+              <button key={item.id} type="button" className="rt-fair" onClick={() => navigate(`/campus?fair=${encodeURIComponent(item.id)}`)}>
+                <b>{item.name}</b>
+                <small>{item.venue} · {item.sourceName}</small>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="rt-doors">
+          <QxTouchTile icon="clipboard" title="校招岗位" desc="看分类为校招的来源岗位" onClick={() => navigate('/jobs?category=campus')} />
+          <QxTouchTile icon="clock" title="实习岗位" desc="看分类为实习的来源岗位" tone="slate" onClick={() => navigate('/jobs?category=intern')} />
+          <QxTouchTile icon="layers" title="校园招聘数据" desc="只显示经核验的聚合统计" onClick={() => navigate('/campus/freshman-insights')} />
+          <QxTouchTile icon="map" title="全部校园招聘会" desc="场次名单里只留校园相关" tone="slate" onClick={() => navigate('/job-fairs?audience=campus')} />
+        </div>
+      </RtFrame>
     )
   }
 
@@ -238,13 +295,14 @@ export function CampusPage() {
   }
 
   return (
-    <KioskPageFrame
-      tone="clay"
-      title="校园招聘专区"
-      subtitle={`${fair.name} · 招聘会与来源平台信息`}
-      backLabel="返回首页"
-      onBack={() => navigate('/')}
-      tight
+    <RtFrame
+      eyebrow="私有化版 · 校园招聘"
+      title={fair.name}
+      sub="招聘会与来源平台信息"
+      status={{ text: sc.label }}
+      backLabel="返回校园招聘"
+      onBack={() => navigate('/campus')}
+      ask={{ label: '问小青：这场怎么看？', draft: '这场校园招聘会怎么看？' }}
     >
     <div className="campus-proto">
       {qr?.kind === 'book' && (
@@ -278,10 +336,10 @@ export function CampusPage() {
           </span>
         </div>
         <div className="mt-5 flex items-start gap-3">
-          <h1 className="flex-1">
+          <h2 className="flex-1">
             {fair.name}
             <span className="campus-status">{sc.label}</span>
-          </h1>
+          </h2>
         </div>
         {fair.tagline && <p className="tagline">{fair.tagline}</p>}
         <div className="campus-hero-meta">
@@ -342,6 +400,6 @@ export function CampusPage() {
         )}
       </div>
     </div>
-    </KioskPageFrame>
+    </RtFrame>
   )
 }

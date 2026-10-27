@@ -186,14 +186,14 @@ export function JobFairCheckinPage() {
   const ctabar = uiState === 'error'
     ? (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找现场工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
         <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((v) => v + 1)}>重新加载</button>
       </>
     )
     : uiState === 'empty'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>询问现场工作人员</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>查看招聘会</button>
         </>
       )
@@ -246,7 +246,7 @@ export function JobFairCheckinPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={CalendarIcon} tone="wheat" title="查看招聘会" desc="先看时间地点和参展名单" onClick={() => navigate('/job-fairs')} />
-            <DirStripItem icon={InfoIcon} tone="slate" title="询问现场工作人员" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
+            <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
           </DirStrip>
         </>
       ) : (

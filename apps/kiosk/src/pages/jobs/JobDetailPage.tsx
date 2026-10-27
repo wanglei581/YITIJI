@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { ExternalJobDTO, JobExplainResponse, MemberResumeItem } from '@ai-job-print/shared'
 import { ArrowLeftIcon, ExternalLinkIcon, FileQuestionIcon, QrCodeIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { getJobById } from '../../services/api'
 import {
   explainJobWithAi,
@@ -32,6 +31,7 @@ import {
   QrOverlay,
 } from './components/JobDetailSections'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { helpNeededLine } from '../../copy/unattendedCopy'
 import './styles/job-detail-qx.css'
 
 export function JobDetailPage() {
@@ -57,7 +57,6 @@ export function JobDetailPage() {
   const [matchResult, setMatchResult] = useState<JobAiMatchResponse | null>(null)
   const mountedRef = useRef(false)
   const aiInFlightRef = useRef(false)
-  const appNavbar = <QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />
 
   useEffect(() => {
     mountedRef.current = true
@@ -92,12 +91,11 @@ export function JobDetailPage() {
 
   if (loading) {
     return (
-      <QxPageFrame
+      <RecruitTouchFrame
         title="岗位详情"
         subtitle="内容返回前不展示任何岗位内容。"
         status={{ tone: 'unknown', label: '正在取岗位原文与来源四要素' }}
         terminalLabel="就业服务大厅"
-        navbar={appNavbar}
         ctabar={<button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs')}><ArrowLeftIcon aria-hidden="true" />返回岗位列表</button>}
       >
         <div className="qx-scroll qx-job-detail-page" data-screen="job-detail" data-state="loading" data-testid="job-detail-state-loading">
@@ -106,18 +104,17 @@ export function JobDetailPage() {
             <span><span className="qx-state-t">正在读取岗位标题、原文与来源信息</span><span className="qx-state-d">真实内容返回前不显示示例内容，也不预估剩余时间。</span></span>
           </section>
         </div>
-      </QxPageFrame>
+      </RecruitTouchFrame>
     )
   }
 
   if (error || !job) {
     return (
-      <QxPageFrame
+      <RecruitTouchFrame
         title="岗位详情"
         subtitle="找不到就是找不到，不用相似岗位顶替。"
         status={{ tone: 'bad', label: '这条岗位没有找到' }}
         terminalLabel="就业服务大厅"
-        navbar={appNavbar}
         ctabar={<button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs')}>回岗位列表重新找</button>}
       >
         <div className="qx-scroll qx-job-detail-page" data-screen="job-detail" data-state="not-found" data-testid="job-detail-state-not-found">
@@ -126,7 +123,7 @@ export function JobDetailPage() {
             <span><span className="qx-state-t">没有找到这条岗位</span><span className="qx-state-d">岗位可能已被来源平台撤回，或链接本身不正确。本机不会用相似岗位替你补上。</span></span>
           </section>
         </div>
-      </QxPageFrame>
+      </RecruitTouchFrame>
     )
   }
 
@@ -274,14 +271,13 @@ export function JobDetailPage() {
   }
 
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       title="岗位详情"
       subtitle={`${currentJob.sourceName} · 信息以来源平台为准`}
       status={sourceCanApply
         ? { tone: 'ok', label: '来源四要素已返回' }
         : { tone: 'bad', label: '来源要素不完整，外部入口已停用' }}
       terminalLabel="就业服务大厅"
-      navbar={appNavbar}
       ctabar={
         <>
           <p className="why">
@@ -389,7 +385,7 @@ export function JobDetailPage() {
         />
       )}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }
 
@@ -398,7 +394,7 @@ function formatJobAiError(err: unknown): string {
   if (declined) return declined
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
-    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine()}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message

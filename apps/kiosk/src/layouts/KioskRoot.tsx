@@ -224,11 +224,43 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/**
+ * 触屏版路由。第一包样板仍在精确集合里。
+ * 第 11 包只登记托管打开时才会挂载的招聘页；不从 QX_MIGRATED_ROUTES 拿掉，
+ * 也不把 '/job-fairs/' 写进 QX_MIGRATED_PREFIXES。
+ */
+const QX_TOUCH_ROUTES = new Set<string>([
+  '/dev/touch-gallery',
+  '/jobs-service',
+  '/fairs-service',
+  '/offline-agencies',
+  '/companies',
+  '/jobs',
+  '/job-fairs',
+  '/job-fairs/checkin',
+  '/campus',
+  '/campus/welcome',
+  '/campus/freshman-insights',
+])
+
+const QX_TOUCH_PREFIXES = ['/offline-agencies/', '/companies/'] as const
+
+const QX_TOUCH_EXACT_PATTERNS: readonly RegExp[] = [
+  /^\/jobs\/[^/]+$/,
+  /^\/jobs\/[^/]+\/offline$/,
+  /^\/job-fairs\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/companies$/,
+  /^\/job-fairs\/[^/]+\/companies\/[^/]+$/,
+  /^\/job-fairs\/[^/]+\/map$/,
+  /^\/job-fairs\/[^/]+\/materials$/,
+  /^\/job-fairs\/[^/]+\/visit-plan$/,
+  /^\/job-fairs\/[^/]+\/stats$/,
+]
 
 function isTouchRoute(pathname: string): boolean {
-  return QX_TOUCH_ROUTES.has(pathname)
+  if (QX_TOUCH_ROUTES.has(pathname)) return true
+  if (QX_TOUCH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
+  return QX_TOUCH_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {

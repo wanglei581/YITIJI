@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, BriefcaseIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import {
   DirAiAssist,
   DirExitList,
@@ -87,7 +86,7 @@ export default function OfflineAgencyDetailPage() {
   }
 
   return (
-    <QxPageFrame
+    <RecruitTouchFrame
       // 稿 42 的目录页返回「岗位服务」；本页是它的详情段，返回落到目录本身。
       back={{ label: '返回机构列表', onBack: () => navigate('/offline-agencies') }}
       title={agency?.name ?? '机构详情'}
@@ -103,12 +102,12 @@ export default function OfflineAgencyDetailPage() {
       ctabar={
         failed ? (
           <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={reload}>重新加载</button>
           </>
         ) : notFound ? (
           <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回岗位服务</button>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/offline-agencies')}>回机构目录重选</button>
           </>
         ) : jobsEmpty ? (
@@ -130,7 +129,6 @@ export default function OfflineAgencyDetailPage() {
           </>
         )
       }
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
@@ -143,7 +141,7 @@ export default function OfflineAgencyDetailPage() {
             <DirExitList>
               <DirStripItem icon={BuildingIcon} title="重新加载机构详情" desc="再次请求当前机构" onClick={reload} />
               <DirStripItem icon={BuildingIcon} tone="slate" title="返回机构目录" desc="保留目录主任务" onClick={() => navigate('/offline-agencies')} />
-              <DirStripItem icon={BuildingIcon} tone="wheat" title="联系工作人员" desc="现场核对纸质名单" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="纸质名单以机构现场公示为准" onClick={() => navigate('/help')} />
             </DirExitList>
           </>
         ) : notFound ? (
@@ -154,7 +152,7 @@ export default function OfflineAgencyDetailPage() {
             <DirExitList>
               <DirStripItem icon={BuildingIcon} title="回机构目录" desc="重新检索已发布机构" onClick={() => navigate('/offline-agencies')} />
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="第三方来源岗位，带来源与同步时间" onClick={() => navigate('/jobs')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="联系工作人员" desc="现场按纸质名单帮你确认门店" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="门店信息以机构公示的纸质名单为准" onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>
@@ -172,7 +170,7 @@ export default function OfflineAgencyDetailPage() {
                   ['机构类型', agency.type],
                   ['服务项目', (Array.isArray(agency.services) ? agency.services : []).join('、') || '以门店公示为准'],
                   ['营业时间', agency.hours || '服务时间以机构公示为准'],
-                  ['联系电话', agency.phone || '请向门店工作人员咨询'],
+                  ['联系电话', agency.phone || '请到帮助中心查看服务电话'],
                   ['机构地址', agency.address],
                   ['来源编号', agency.orgCode || '来源平台未提供'],
                   ['收录状态', '机构信息已审核'],
@@ -229,6 +227,6 @@ export default function OfflineAgencyDetailPage() {
           </>
         ) : null}
       </div>
-    </QxPageFrame>
+    </RecruitTouchFrame>
   )
 }

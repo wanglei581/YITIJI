@@ -185,7 +185,7 @@ export function FairMapPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="看参展名单" desc="到场前挑好想去的几家，省时间" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-            <DirStripItem icon={InfoIcon} tone="slate" title="到了现场问工作人员" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
+            <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
           </DirStrip>
         </>
       ) : (

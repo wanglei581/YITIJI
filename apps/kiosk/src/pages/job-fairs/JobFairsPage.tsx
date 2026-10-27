@@ -8,7 +8,7 @@
 //   ② 关键字 / 状态走服务端查询，地区 / 日期 / 收藏只在已取回集合内筛——页面必须说清楚。
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
   Building2Icon,
@@ -29,6 +29,8 @@ import { matchesRegion, type RegionSelection } from '../../lib/regions'
 import { fairDateKey } from './fairFormat'
 import { evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceTrust'
 import { FAIR_BOOKING_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
+import { QxTouchSeg } from '../../components/qingxu/touch/QxTouchSeg'
+import { isCampusFair, isSocialFair } from '../recruitment-touch/audience'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FairBookingQr, FairListCard, FairSkeletonList } from './components/FairWorkbenchBits'
 import { DirState, DirStrip, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
@@ -38,6 +40,9 @@ const STATUS_FILTER_MAP: Record<string, string> = { 即将开始: 'upcoming', �
 
 export function JobFairsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const audienceParam = searchParams.get('audience')
+  const audience = audienceParam === 'social' || audienceParam === 'campus' ? audienceParam : 'all'
   const [query, setQuery] = useState('')
   const [region, setRegion] = useState<RegionSelection>({})
   const [statusFilter, setStatusFilter] = useState('全部')
@@ -104,13 +109,15 @@ export function JobFairsPage() {
   const visible = useMemo(() => {
     const statusVal = statusFilter === '全部' ? null : STATUS_FILTER_MAP[statusFilter]
     return fairs.filter((f) => {
+      if (audience === 'campus' && !isCampusFair(f)) return false
+      if (audience === 'social' && !isSocialFair(f)) return false
       if (favoritesOnly && !favoriteSet.has(f.id)) return false
       if (statusVal && f.status !== statusVal) return false
       if (!matchesRegion(f, region)) return false
       if (selectedDate && fairDateKey(f.startTime) !== selectedDate) return false
       return true
     })
-  }, [fairs, statusFilter, region, selectedDate, favoritesOnly, favoriteSet])
+  }, [fairs, statusFilter, region, selectedDate, favoritesOnly, favoriteSet, audience])
 
   const upcomingCount = useMemo(() => visible.filter((f) => f.status === 'upcoming').length, [visible])
   const ongoingCount = useMemo(() => visible.filter((f) => f.status === 'ongoing').length, [visible])
@@ -128,7 +135,7 @@ export function JobFairsPage() {
     : uiState === 'error'
       ? (
         <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
         </>
       )
@@ -141,7 +148,12 @@ export function JobFairsPage() {
       )
 
   return (
-    <QxFairWorkbench screen="list" state={uiState} ctabar={ctabar}>
+    <QxFairWorkbench
+      screen="list"
+      state={uiState}
+      ctabar={ctabar}
+      title={audience === 'social' ? '社会招聘会' : audience === 'campus' ? '校园招聘会' : undefined}
+    >
       {qrFair ? <FairBookingQr fair={qrFair} onClose={() => setQrFair(null)} /> : null}
 
       {uiState === 'loading' ? (
@@ -172,6 +184,22 @@ export function JobFairsPage() {
               aria-label="搜索招聘会"
             />
           </div>
+
+          <QxTouchSeg
+            label="场次范围"
+            value={audience}
+            onChange={(id) => {
+              const next = new URLSearchParams(searchParams)
+              if (id === 'all') next.delete('audience')
+              else next.set('audience', id)
+              setSearchParams(next, { replace: true })
+            }}
+            options={[
+              { id: 'all', label: '全部' },
+              { id: 'social', label: '社会招聘会' },
+              { id: 'campus', label: '校园招聘会' },
+            ]}
+          />
 
           <div className="dw-fgrp">
             <span className="fl">场次状态</span>
@@ -207,7 +235,7 @@ export function JobFairsPage() {
             </div>
           </div>
           <p className="dw-filter-note">
-            关键字和状态会按全部场次来查；地区、日期和收藏只在这次已经加载出来的场次里筛选，不代表全部结果。
+            关键字和状态会按全部场次来查；地区、日期、收藏和这场次范围只在这次已经加载出来的场次里筛选，不代表全部结果。
           </p>
 
           {uiState === 'favorites-empty' ? (

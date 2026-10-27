@@ -307,15 +307,15 @@ export const kioskRouter = createBrowserRouter([
           {
             path: 'jobs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="jobs" /> }
+              const { SocialHubPage } = await import('../pages/recruitment-touch/SocialHubPage')
+              return { Component: SocialHubPage }
             },
           },
           {
             path: 'fairs-service',
             lazy: async () => {
-              const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-              return { Component: () => <QxServiceHubPage hub="fairs" /> }
+              const { CampusServicePage } = await import('../pages/recruitment-touch/CampusServicePage')
+              return { Component: CampusServicePage }
             },
           },
         ],

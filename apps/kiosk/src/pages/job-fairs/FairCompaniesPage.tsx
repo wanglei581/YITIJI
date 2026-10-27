@@ -76,7 +76,7 @@ export function FairCompaniesPage() {
   const ctabar = uiState === 'error'
     ? (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
         <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
       </>
     )
