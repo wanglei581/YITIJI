@@ -51,6 +51,16 @@ export async function expectInterviewDirectionUnselected(page: Page): Promise<vo
   await expect(experience.getByRole('button', { pressed: true })).toHaveCount(0)
 }
 
+/** 触屏版设置分三步。岗位、行业、经验在第 1 步；面试官在第 2 步；「创建并开始练习」在第 3 步。 */
+export async function advanceInterviewSetupToStart(page: Page): Promise<void> {
+  const next = page.getByRole('button', { name: '下一步', exact: true })
+  await next.click()
+  await expect(page.getByRole('button', { name: 'HR 面试', exact: true })).toBeVisible()
+  await expect(page.getByText('HR 初筛')).toHaveCount(0)
+  await next.click()
+  await expect(page.getByRole('button', { name: '创建并开始练习' })).toBeVisible()
+}
+
 export async function chooseInterviewExperience(page: Page): Promise<void> {
   const experience = page.locator('.iv-choice').filter({ hasText: '经验（必选）' })
   await expect(experience.locator('.iv-hint')).toHaveText('尚未选择，请按自己的实际情况选择。')

@@ -269,8 +269,8 @@ test('在线服务 503：面试技巧可读，但不能从技巧页绕进模拟�
   const hub = await readHub(page)
 
   // 这两条一起才构成「绕过」的前提：正门被拦、侧门开着。
-  expect(byTitle(hub.cards, '开始模拟面试')).toEqual({
-    title: '开始模拟面试',
+  expect(byTitle(hub.cards, '马上练一场')).toEqual({
+    title: '马上练一场',
     clickable: false,
     reason: 'AI能力当前不可用',
   })

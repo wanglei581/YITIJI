@@ -11,7 +11,7 @@ import {
 import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 import { changeStoredResumeFileId, clearResumeParseIntents, readResumeParseIntents } from './fixtures/resume-parse-intent-state'
 import { mockAssistantVoice } from './fixtures/assistant-voice'
-import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience } from './fixtures/direction-selection'
+import { chooseGenericResumeDirection, chooseTargetedResumeDirection, expectResumeDirectionUnselected, expectInterviewDirectionUnselected, chooseInterviewExperience, advanceInterviewSetupToStart } from './fixtures/direction-selection'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -1816,7 +1816,6 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/end', { status: 200, json: interviewReport })
   api.respond('GET', '/api/v1/mock-interviews/interview-w3-public-fixture/report', { status: 200, json: interviewReport })
   await page.goto('/interview/setup')
-  await expect(page.getByRole('button', { name: 'HR 面试', exact: true })).toBeVisible()
   await expect(page.getByText('HR 初筛')).toHaveCount(0)
   await assertKioskShellFillsViewport(page)
   await expectInterviewDirectionUnselected(page)
@@ -1830,6 +1829,7 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
   await page.reload()
@@ -1870,6 +1870,7 @@ async function beginTextInterview(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   await page.waitForURL(/\/interview\?stage=session/)
 }
@@ -1961,6 +1962,7 @@ test('interview setup failure stays inside the first screen @w3-kiosk', async ({
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
+  await advanceInterviewSetupToStart(page)
   await page.getByRole('button', { name: '创建并开始练习' }).click()
   const alert = page.locator('.qx-ctabar [role="alert"]')
   await expect(alert).toBeVisible()

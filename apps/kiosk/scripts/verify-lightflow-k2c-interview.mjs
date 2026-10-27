@@ -256,8 +256,8 @@ check(
   fullscreenShell.includes('h-screen') || fullscreenShell.includes('100vh') || fullscreenShell.includes('100dvh'),
   'KioskFullscreenShell 未锁定完整视口高度',
 )
-check(interviewShell.includes('QxPageFrame'), 'InterviewShell 未接入青序流光页壳')
-check(interviewShell.includes('QxAppNavbar'), 'InterviewShell 未接入共享底栏')
+check(interviewShell.includes('QxTouchScreen'), 'InterviewShell 未接入青序流光触屏页壳')
+check(interviewShell.includes('QxTouchNav'), 'InterviewShell 未接入共享触屏底栏')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('readInterviewWorkbenchSession'), '工作台未从 sessionStorage 复水')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('replace: true'), '阶段切换必须 replace 历史')
 check(read('src/pages/interview/InterviewWorkbenchPage.tsx').includes('parseInterviewStage'), '工作台必须解析 ?stage=')

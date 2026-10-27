@@ -230,8 +230,8 @@ for (const [path, screen] of screens) {
   includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
-includes('src/pages/interview/InterviewShell.tsx', 'QxPageFrame', 'interview shell uses Qingxu page frame')
-includes('src/pages/interview/InterviewShell.tsx', 'QxAppNavbar', 'interview shell uses shared Qingxu navbar')
+includes('src/pages/interview/InterviewShell.tsx', 'QxTouchScreen', 'interview shell uses Qingxu touch screen')
+includes('src/pages/interview/InterviewShell.tsx', 'QxTouchNav', 'interview shell uses shared Qingxu touch nav')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'readInterviewWorkbenchSession', 'interview workbench rehydrates from sessionStorage')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'replace: true', 'interview stage changes replace history')
 includes('src/pages/interview/InterviewWorkbenchPage.tsx', 'parseInterviewStage', 'interview workbench parses ?stage=')
