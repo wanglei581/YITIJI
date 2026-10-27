@@ -130,7 +130,7 @@ expectIncludes(
 )
 
 expectNotIncludes(profile, 'ReferenceServiceNav', 'ProfilePage removes the homepage-only reference navigation')
-expectIncludes(profile, 'QxPageFrame', 'ProfilePage uses the Qingxu page frame')
+expectIncludes(profile, 'MeTouchShell', 'ProfilePage uses the touch screen shell')
 expectNotIncludes(profile, 'KioskPageFrame', 'ProfilePage has left the V6 frame')
 expectIncludes(profile, "import './styles/profile-qx.css'", 'ProfilePage imports its Qingxu stylesheet')
 expectIncludes(profile, 'ProfileAssetGrid', 'ProfilePage renders the 30-my-profile asset grid')

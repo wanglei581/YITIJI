@@ -49,7 +49,7 @@ const ci = readFileSync(join(repoRoot, '.github/workflows/ci.yml'), 'utf8')
 const homeVerify = read('scripts/verify-profile-inkpaper-home.mjs')
 
 expectIncludes(page, "import './styles/feedback-qx.css'", 'MyFeedbackPage 引入青序局部 CSS')
-expectIncludes(page, 'QxPageFrame', 'MyFeedbackPage 使用青序页框')
+expectIncludes(page, 'MeTouchShell', 'MyFeedbackPage 使用触屏页壳')
 expectAbsent(page, /KioskPageFrame/, 'MyFeedbackPage has left the V6 frame')
 expectIncludes(page, 'loginFrom="/me/feedback"', '意见反馈保留登录回跳来源')
 
@@ -174,6 +174,11 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/assistant/AssistantPage.tsx',
     'apps/kiosk/src/pages/assistant/assistant-qingxu.css',
+    // 2026-10-27 触屏版第 6 包把反馈、浏览记录、账号设置、消息通知同一批换壳。
+    // 仍留在下面的禁止名单里；这里只加例外。各自的行为断言仍由专属守卫负责。
+    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   ].includes(file) &&
   ([
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
