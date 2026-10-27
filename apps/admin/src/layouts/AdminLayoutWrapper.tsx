@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { BellIcon, LogOutIcon, UserCogIcon } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 import { adminOpsService } from '../services/api/adminOps'
-import { ConsoleTabStrip } from './ConsoleTabStrip'
+import { ConsoleChromeProvider } from './consoleChrome'
 import { KEY_TO_PATH, NAV_ITEMS, PATH_TO_KEY, tabGroupForPath } from './adminNav'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
@@ -78,7 +78,7 @@ export function AdminLayoutWrapper() {
       userName={user?.name ?? '当前用户'}
       userRole={user ? ROLE_LABEL[user.role] : ''}
       headerActions={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* 未处理告警数(实时派生的 open 视图);点击进入告警中心。已确认但仍在发生的不会从告警页消失。 */}
           <a
             href="/alerts"
@@ -87,7 +87,7 @@ export function AdminLayoutWrapper() {
               navigate('/alerts')
             }}
             aria-label={`告警${alertCount > 0 ? `(${alertCount}条)` : ''}`}
-            className="relative flex h-9 w-9 items-center justify-center rounded-[9px] text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700"
+            className="relative flex h-11 w-11 items-center justify-center rounded-[9px] text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700"
           >
             <BellIcon className="h-4 w-4" aria-hidden="true" />
             {alertCount > 0 && (
@@ -104,7 +104,7 @@ export function AdminLayoutWrapper() {
               navigate('/account-settings')
             }}
             aria-label="账号设置"
-            className="flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+            className="flex min-h-11 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
           >
             <UserCogIcon className="h-4 w-4" aria-hidden="true" />
             账号设置
@@ -112,7 +112,7 @@ export function AdminLayoutWrapper() {
           <button
             type="button"
             onClick={logout}
-            className="flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+            className="flex min-h-11 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
             aria-label="退出登录"
           >
             <LogOutIcon className="h-4 w-4" aria-hidden="true" />
@@ -121,8 +121,9 @@ export function AdminLayoutWrapper() {
         </div>
       }
     >
-      {tabGroup ? <ConsoleTabStrip group={tabGroup} /> : null}
-      <Outlet />
+      <ConsoleChromeProvider group={tabGroup}>
+        <Outlet />
+      </ConsoleChromeProvider>
     </AdminLayout>
   )
 }

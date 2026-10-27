@@ -4,7 +4,16 @@ import type { ConsoleTabGroup } from './adminNav'
 /** 同组页面的地址标签。样式对齐设备管理页的下划线标签，窄屏横向滑动，不换行。 */
 export function ConsoleTabStrip({ group }: { group: ConsoleTabGroup }) {
   return (
-    <nav aria-label={group.label} className="mb-4 w-full min-w-0 max-w-full overflow-x-auto">
+    <nav aria-label={group.label} className="relative mb-4 w-full min-w-0 max-w-full">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-[var(--color-canvas)] to-transparent md:hidden"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-[var(--color-canvas)] to-transparent md:hidden"
+      />
+      <div className="w-full min-w-0 max-w-full overflow-x-auto">
       <div className="flex w-max min-w-full flex-nowrap gap-1 border-b-[1.6px] border-neutral-900/[0.06]">
         {group.tabs.map((tab) => (
           <NavLink
@@ -31,6 +40,7 @@ export function ConsoleTabStrip({ group }: { group: ConsoleTabGroup }) {
             )}
           </NavLink>
         ))}
+      </div>
       </div>
     </nav>
   )

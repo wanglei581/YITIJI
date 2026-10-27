@@ -5,7 +5,7 @@ import type { ConsoleTab } from './partnerNav'
 export function ConsoleTabStrip({ label, tabs }: { label: string; tabs: readonly ConsoleTab[] }) {
   if (tabs.length === 0) return null
   return (
-    <nav aria-label={label} className="mb-4 max-w-full min-w-0 overflow-x-auto border-b-[1.6px] border-neutral-900/[0.06]">
+    <nav aria-label={label} className="mb-4 mt-4 max-w-full min-w-0 overflow-x-auto border-b-[1.6px] border-neutral-900/[0.06]">
       <div className="flex w-max min-w-full flex-nowrap gap-1">
         {tabs.map((tab) => (
           <NavLink

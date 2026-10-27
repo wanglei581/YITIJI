@@ -6,14 +6,19 @@ import { getAuditActionLabel, getAuditActorLabel, getAuditTargetLabel } from '..
 import { getUser } from '../../services/auth'
 import { BlockError, BlockLoading, SectionLink } from './DashboardWidgets'
 
+const EARLIER_ACTIONS = new Set([
+  'job.review',
+  'job.publish',
+  'job.import',
+  'fair.review',
+  'fair.publish',
+  'fair.import',
+])
+
 export function RecentActivity({ logs, loading, error, onRetry }: { logs: AuditLogRecord[]; loading: boolean; error: boolean; onRetry: () => void }) {
-  return (
-    <SectionCard title="最近操作" action={<SectionLink href="/audit">日志审计</SectionLink>}>
-      {loading ? <BlockLoading /> : error ? <BlockError message="审计日志加载失败" onRetry={onRetry} /> : logs.length === 0 ? (
-        <p className="py-8 text-center text-sm text-neutral-400">暂无审计记录</p>
-      ) : (
-        <div>
-          {logs.map((log, index) => {
+  const front = logs.filter((log) => !EARLIER_ACTIONS.has(log.action))
+  const earlier = logs.filter((log) => EARLIER_ACTIONS.has(log.action))
+  const renderLog = (log: AuditLogRecord, index: number) => {
             const target = getAuditTargetLabel(log.targetType)
             const actor = getAuditActorLabel({
               actorRole: log.actorRole,
@@ -50,7 +55,20 @@ export function RecentActivity({ logs, loading, error, onRetry }: { logs: AuditL
                 </span>
               </div>
             )
-          })}
+  }
+  return (
+    <SectionCard title="最近操作" action={<SectionLink href="/audit">日志审计</SectionLink>}>
+      {loading ? <BlockLoading /> : error ? <BlockError message="这类这次没读到" onRetry={onRetry} /> : logs.length === 0 ? (
+        <p className="py-8 text-center text-sm text-neutral-400">暂无审计记录</p>
+      ) : (
+        <div>
+          {front.map((log, index) => renderLog(log, index))}
+          {earlier.length > 0 && (
+            <div>
+              <p className="border-t border-neutral-900/[0.06] pt-2 text-xs font-semibold text-neutral-500">更早</p>
+              {earlier.map((log, index) => renderLog(log, index))}
+            </div>
+          )}
         </div>
       )}
     </SectionCard>

@@ -60,7 +60,7 @@ function SwitchPill({ state, disabled = false, onClick, title }: { state: Switch
       disabled={disabled}
       onClick={onClick}
       title={title}
-      className="inline-flex h-8 min-w-10 items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center disabled:cursor-not-allowed disabled:opacity-60"
       aria-label={title ?? (state === 'on' ? '关闭开关' : '开启开关')}
     >
       {content}

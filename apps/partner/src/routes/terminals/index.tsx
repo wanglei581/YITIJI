@@ -250,7 +250,30 @@ export default function TerminalsPage() {
               ))}
               <span className="ml-auto text-xs text-neutral-500">点一行查看这台终端的明细</span>
             </div>
-            <ConsoleTable items={rows} columns={columns} empty={{ title: '没有符合条件的终端', description: '换个筛选或关键词试试' }} page={1} pageSize={rows.length || 1} total={rows.length} onPageChange={() => undefined} />
+            {rows.length === 0 ? (
+              <p className="px-4 py-8 text-sm text-neutral-500 md:hidden">没有符合条件的终端</p>
+            ) : (
+              <ul className="divide-y divide-neutral-900/[0.06] md:hidden">
+                {rows.map((row) => {
+                  const run = RUN_STATE_VIEW[runState(row)]
+                  const unrecovered = row.faults.reportedInWindow ? (row.faults.unrecovered ? '未恢复' : '无') : '无法统计'
+                  const offline = row.faults.reportedInWindow ? `${row.faults.offlineCount} 次` : '无法统计'
+                  return (
+                    <li key={row.terminalCode}>
+                      <button type="button" onClick={() => setSelectedCode(row.terminalCode)} className="flex w-full min-h-11 flex-col items-start gap-1 px-4 py-3 text-left">
+                        <span className="font-semibold text-neutral-900">{terminalName(row)}</span>
+                        <span className="text-sm text-neutral-600">{run.label}</span>
+                        <span className="text-sm text-neutral-600">未恢复：{unrecovered}</span>
+                        <span className="text-sm text-neutral-600">离线次数：{offline}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <div className="hidden md:block">
+              <ConsoleTable items={rows} columns={columns} empty={{ title: '没有符合条件的终端', description: '换个筛选或关键词试试' }} page={1} pageSize={rows.length || 1} total={rows.length} onPageChange={() => undefined} />
+            </div>
           </Card>
 
           <p className="text-xs leading-relaxed text-neutral-500">
