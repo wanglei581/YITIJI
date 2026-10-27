@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { validateSync } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
 import { Reflector } from '@nestjs/core'
-import type { ExecutionContext } from '@nestjs/common'
+import { BadRequestException, ValidationPipe, type ExecutionContext } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { OfficialChannelsService } from '../src/official-channels/official-channels.service'
@@ -45,6 +45,20 @@ async function rollsBack(fn: () => Promise<unknown>, label: string) {
 }
 function invalidDto<T extends object>(ctor: new () => T, value: object, label: string) {
   ok(validateSync(plainToInstance(ctor, value)).length > 0, label)
+}
+const audiencePipe = new ValidationPipe({
+  whitelist: true,
+  forbidNonWhitelisted: true,
+  transform: true,
+  exceptionFactory: () => new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: '请求参数校验失败' } }),
+})
+async function audienceStatus(metatype: new () => object, value: object): Promise<number> {
+  try {
+    await audiencePipe.transform(value, { type: 'body', metatype })
+    return 200
+  } catch (error) {
+    return error instanceof BadRequestException ? error.getStatus() : 0
+  }
 }
 
 async function main() {
@@ -126,6 +140,8 @@ async function main() {
     invalidDto(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', displayOrder: 1000 }, 'sort maximum 999')
     invalidDto(UpdateOfficialChannelDto, { displayOrder: 1.5 }, 'sort must be integer')
     invalidDto(UpdateOfficialChannelDto, { enabled: 'true' }, 'enabled must be boolean')
+    ok(await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: 'campus' }) === 400
+      && await audienceStatus(UpdateOfficialChannelDto, { audience: 'campus' }) === 400, 'unknown audience rejected with 400')
 
     const controller = new OfficialChannelsController(service)
     const roles = new RolesGuard(new Reflector())
@@ -195,8 +211,11 @@ async function main() {
     const adminInitial = await controller.listForAdmin(ids.a)
     ok(adminInitial.success && Object.keys(adminInitial.data).join(',') === 'items'
       && adminInitial.data.items.length === 1 && adminInitial.data.items[0]?.id === a.id
-      && Object.keys(adminInitial.data.items[0]!).sort().join(',') === 'displayOrder,emergencyReasonCode,emergencyReasonText,emergencyTakedown,enabled,id,name,url', 'admin list exposes exact read-only channel shape')
+      && Object.keys(adminInitial.data.items[0]!).sort().join(',') === 'audience,displayOrder,emergencyReasonCode,emergencyReasonText,emergencyTakedown,enabled,id,name,url', 'admin list exposes exact read-only channel shape')
     ok(a.name === '官网' && a.url === 'https://example.com.cn/path', 'channel saves trimmed name and canonical URL')
+    ok(a.audience === 'general' && adminInitial.data.items[0]?.audience === 'general', 'create defaults audience to general')
+    const createAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'official_channel.create', targetId: a.id } })
+    ok(JSON.parse(createAudit.payloadJson).audience === 'general', 'create audit payload includes audience')
     const stored = await prisma.onlinePlatformDirectory.findUniqueOrThrow({ where: { id: a.id } })
     ok(stored.category === 'official_channel' && stored.operatorLegalName === '机构 A' && stored.officialDomainsJson !== '' && stored.reviewStatus === 'pending' && stored.publishStatus === 'draft', 'reused directory required fields explicitly populated')
     const legacyId = `oc_legacy_${suffix}`
@@ -219,6 +238,15 @@ async function main() {
       && JSON.stringify((await controller.listOwn(partnerB)).data.verifiedDomains) === JSON.stringify(['other.org']), 'cleared partner domains are empty without changing another organization')
     const reordered = await service.updateForPartner(partnerA, a.id, { displayOrder: 4, name: '新官网' })
     ok(reordered.displayOrder === 4, 'name/sort update does not revalidate old URL')
+    const graduated = await service.updateForPartner(partnerA, a.id, { audience: 'graduate' })
+    ok(graduated.audience === 'graduate' && graduated.name === '新官网' && graduated.displayOrder === 4, 'audience update keeps name and sort')
+    const audienceAudit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'official_channel.update', targetId: a.id },
+      orderBy: { createdAt: 'desc' },
+    })
+    ok(JSON.parse(audienceAudit.payloadJson).audience === 'graduate', 'update audit payload includes audience')
+    const untouched = await service.updateForPartner(partnerA, a.id, { name: '新官网' })
+    ok(untouched.audience === 'graduate', 'update without audience leaves it unchanged')
     await service.updateForPartner(partnerA, a.id, { url: ' HTTPS://EXAMPLE.COM.CN.:443/path ' })
     ok((await service.listForPartner(partnerA)).items[0]?.url === a.url, 'equivalent canonical URL does not revalidate old URL')
     await service.updateForPartner(partnerA, a.id, { enabled: false })
@@ -244,6 +272,11 @@ async function main() {
     process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
     const publicA = await service.listForTerminal(terminalA)
     ok(publicA.items.length === 1 && publicA.items[0]?.organizationName === '机构 A' && !('id' in publicA.items[0]!), 'terminal A gets only display fields for A')
+    ok(publicA.legacyPlatforms.length === 0, 'hosting off still returns no legacy platforms')
+    ok(publicA.items.find((item) => item.url === a.url)?.audience === 'graduate', 'public item returns stored audience')
+    await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { audience: 'not-a-value' } })
+    ok((await service.listForTerminal(terminalA)).items.find((item) => item.url === a.url)?.audience === 'general', 'public response collapses unknown audience to general')
+    await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { audience: 'graduate' } })
     ok(!publicA.items.some((item) => item.url === b.url), 'terminal A cannot read B channel')
     ok((await service.listForTerminal(terminalB)).items[0]?.url === b.url, 'terminal B gets B channel')
     ok((await service.listForTerminal(terminalEmpty)).items.length === 0, 'unbound terminal has no channel')
@@ -253,9 +286,11 @@ async function main() {
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'archived organization has no public channels')
     await prisma.organization.update({ where: { id: ids.a }, data: { archivedAt: null } })
     ok(publicA.legacyPlatforms.length === 0, 'hosting off returns no legacy platforms')
+    await prisma.onlinePlatformDirectory.update({ where: { id: legacyId }, data: { audience: 'social' } })
     process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'true'
     const hostingOn = await service.listForTerminal(terminalA)
     ok(hostingOn.legacyPlatforms.length === 1 && hostingOn.legacyPlatforms[0]?.name === '原平台目录', 'hosting on exposes only ready legacy directory')
+    ok(hostingOn.legacyPlatforms[0]?.audience === 'general', 'legacy directory audience stays general in the public response')
     process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
     const guard = new TerminalIdentityGuard({ validate: async (id?: string, token?: string) => {
       if (id !== terminalA || token !== 'valid') throw new Error('terminal identity rejected')
@@ -314,6 +349,7 @@ async function main() {
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'emergency-held channel absent publicly')
     ok(!(await service.listForTerminal(terminalB)).items.some((item) => item.url === sameB.url), 'cross-organization duplicate absent publicly')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'active' } })
+    ok(!(await service.listForTerminal(terminalA)).items.some((item) => item.url === a.url), 'emergency takedown row stays off the public screen')
     ok((await service.listForTerminal(terminalA)).items.length === 0, 'hold alone excludes a stale active row')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { status: 'inactive' } })
     await prisma.onlinePlatformDirectory.update({ where: { id: sameB.id }, data: { status: 'active' } })

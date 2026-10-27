@@ -11,7 +11,12 @@ import {
   parseDomainPolicy,
   validateLandingUrl,
 } from '../recruitment-content/recruitment-content-readiness'
-import { OFFICIAL_CHANNEL_CATEGORY, OFFICIAL_CHANNEL_CODES as CODE } from './official-channel.constants'
+import {
+  OFFICIAL_CHANNEL_CATEGORY,
+  OFFICIAL_CHANNEL_CODES as CODE,
+  officialChannelAudienceOrGeneral,
+  type OfficialChannelAudience,
+} from './official-channel.constants'
 import {
   httpsHostnameOf,
   isCommercialRecruitmentHost,
@@ -26,6 +31,7 @@ export interface OfficialChannelPublicItem {
   url: string
   displayOrder: number
   organizationName: string
+  audience: OfficialChannelAudience
 }
 
 export interface OfficialChannelPartnerItem extends OfficialChannelPublicItem {
@@ -101,6 +107,7 @@ export class OfficialChannelsService {
       name: row.name,
       url: row.url,
       displayOrder: row.displayOrder,
+      audience: row.audience,
       enabled: row.enabled,
       emergencyTakedown: row.emergencyTakedown,
       emergencyReasonCode: row.emergencyReasonCode,
@@ -126,6 +133,7 @@ export class OfficialChannelsService {
     const name = this.cleanName(dto.name)
     const url = this.cleanUrl(dto.url, parseVerifiedDomains(org.verifiedOfficialDomainsJson))
     const enabled = dto.enabled ?? true
+    const audience = dto.audience ?? 'general'
     const row = await this.prisma.$transaction(async (tx) => {
       const circuit = await tx.recruitmentCircuitBreak.findUnique({
         where: { scope_targetId: { scope: 'org', targetId: org.id } },
@@ -141,6 +149,7 @@ export class OfficialChannelsService {
         operatorLegalName: org.name,
         officialDomainsJson: org.verifiedOfficialDomainsJson || '[]',
         displayOrder: dto.displayOrder ?? 0,
+        audience,
         status: enabled ? 'active' : 'inactive',
         reviewStatus: 'pending',
         publishStatus: 'draft',
@@ -149,7 +158,7 @@ export class OfficialChannelsService {
       } })
       await this.audit.writeRequired(tx, {
         actorId: user.userId, actorRole: user.role, action: 'official_channel.create',
-        targetType: 'official_channel', targetId: created.id, payload: { orgId: org.id, enabled },
+        targetType: 'official_channel', targetId: created.id, payload: { orgId: org.id, enabled, audience },
       })
       return created
     })
@@ -162,7 +171,7 @@ export class OfficialChannelsService {
     dto: UpdateOfficialChannelDto,
   ): Promise<OfficialChannelPartnerItem> {
     const org = await this.requirePartnerOrg(user)
-    if (dto.name === undefined && dto.url === undefined && dto.displayOrder === undefined && dto.enabled === undefined) {
+    if (dto.name === undefined && dto.url === undefined && dto.displayOrder === undefined && dto.enabled === undefined && dto.audience === undefined) {
       fail('bad', CODE.emptyUpdate, '没有可更新的字段')
     }
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -189,6 +198,7 @@ export class OfficialChannelsService {
           name,
           landingUrl: url,
           displayOrder: dto.displayOrder ?? row.displayOrder,
+          ...(dto.audience === undefined ? {} : { audience: dto.audience }),
           ...(dto.enabled === undefined ? {} : { status: dto.enabled ? 'active' : 'inactive' }),
           ...(linkChanged ? {
             officialDomainsJson: latestOrg.verifiedOfficialDomainsJson || '[]',
@@ -202,7 +212,7 @@ export class OfficialChannelsService {
       if (holdAfterWrite) fail('forbidden', CODE.emergencyHeld, '该渠道已紧急下架，只能归档')
       await this.audit.writeRequired(tx, {
         actorId: user.userId, actorRole: user.role, action: 'official_channel.update',
-        targetType: 'official_channel', targetId: row.id, payload: { orgId: org.id, enabled: next.status === 'active', linkChanged },
+        targetType: 'official_channel', targetId: row.id, payload: { orgId: org.id, enabled: next.status === 'active', linkChanged, audience: next.audience },
       })
       return next
     })
@@ -267,7 +277,7 @@ export class OfficialChannelsService {
         archivedAt: null,
       },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-      select: { id: true, name: true, landingUrl: true, displayOrder: true },
+      select: { id: true, name: true, landingUrl: true, displayOrder: true, audience: true },
     })
     const holds = await this.prisma.recruitmentEmergencyHold.findMany({
       where: { targetType: 'official_channel' },
@@ -287,6 +297,7 @@ export class OfficialChannelsService {
         url: row.landingUrl,
         displayOrder: row.displayOrder,
         organizationName,
+        audience: officialChannelAudienceOrGeneral(row.audience),
       }))
   }
 
@@ -309,6 +320,7 @@ export class OfficialChannelsService {
       url: row.landingUrl,
       displayOrder: row.displayOrder,
       organizationName: row.operatorLegalName,
+      audience: 'general' as const,
     }))
   }
 
@@ -389,7 +401,7 @@ export class OfficialChannelsService {
   }
 
   private toPartnerItem(
-    row: { id: string; name: string; landingUrl: string; displayOrder: number; status: string },
+    row: { id: string; name: string; landingUrl: string; displayOrder: number; status: string; audience: string },
     organizationName: string,
     hold?: { reasonCode: string; reasonText: string },
   ): OfficialChannelPartnerItem {
@@ -398,6 +410,7 @@ export class OfficialChannelsService {
       name: row.name,
       url: row.landingUrl,
       displayOrder: row.displayOrder,
+      audience: row.audience as OfficialChannelAudience,
       enabled: row.status === 'active',
       emergencyTakedown: !!hold,
       emergencyReasonCode: hold?.reasonCode ?? null,
