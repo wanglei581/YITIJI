@@ -19,7 +19,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { CircleHelpIcon, FilePlus2Icon, ListOrderedIcon, QrCodeIcon, RefreshCwIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { PrintTouchFrame } from './PrintTouchFrame'
 import { API_MODE } from '../../services/api/client'
 import {
@@ -31,8 +30,28 @@ import {
   releasePickupOrder,
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
-import { userMessageOf } from '../../services/api/userErrorMessage'
-import { printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { containsStaffHandoff, preferUnattended, printProblemLine, refundApplyLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
+
+function shownIssue(error: unknown, fallback: string): string {
+  const raw = userMessageOf(error, fallback)
+  // 这一码的固定句里有「请勿重复支付」。整句换成「请稍后重试」会在可能已扣款时教人再付一次。
+  // 只拿掉工作人员交接，核实路径留「支付账单」，求助改走服务电话。
+  if (errorCodeOf(error) === 'PAY_CHANNEL_ACCEPTANCE_UNCONFIRMED') {
+    const kept = raw
+      .replace(/[，,]并联系现场工作人员核实该笔订单/g, '')
+      .replace(/请联系现场工作人员/g, '')
+      .replace(/联系现场工作人员/g, '')
+      .replace(/联系工作人员/g, '')
+      .replace(/[。．\s]+$/g, '')
+    const base = containsStaffHandoff(kept)
+      ? '支付结果尚未确认，可能已扣款。请勿重复支付，可在手机支付账单中核对'
+      : kept
+    return `${base}。${printProblemLine()}`
+  }
+  return preferUnattended(raw, fallback.includes('打印有问题') ? fallback : `${fallback}。${printProblemLine()}`)
+}
 import {
   deriveCashierView,
   isPaymentAttemptSelectionLocked,
@@ -42,8 +61,9 @@ import {
 import type { CashierSnapshot, PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
 import { cashierQxPill, deriveCashierQxState, type ChannelLoadState } from './cashierQxModel'
-import { CashierQxDock, CashierQxView } from './components/CashierQxView'
+import { CashierQxView } from './components/CashierQxView'
 import './styles/cashier-qx.css'
+import './styles/print-confirm-touch.css'
 
 interface CashierLocationState {
   orderId?: string
@@ -69,11 +89,9 @@ const AUTO_RECONCILE_INTERVAL_MS = 3500
  *  三者都真实渲染在方式卡上。放在页面而不是呈现层，
  *  因为文案属于业务口径（付款码是一次性凭证、屏上收款码即时出码）。 */
 const PAYMENT_METHOD_LABELS = {
-  qr: { name: '屏上收款码', action: '手机扫屏幕上的码', desc: '你用手机扫这台机器的屏幕' },
-  code: { name: '扫付款码', action: '出示你的付款码', desc: '本机扫码器读你手机上的码' },
+  qr: { name: '屏上收款码', action: '我用手机扫码付', desc: '手机扫屏幕上的码。你用手机扫这台机器的屏幕' },
+  code: { name: '扫付款码', action: '出示付款码给机器扫', desc: '出示你的付款码。本机扫码器读取，屏幕不回显这串码' },
 } as const
-
-const REFUND_ASSISTANCE_COPY = `${refundApplyLine()}本机不提供自助退款`
 
 /** 路由 state 来自上一页，但可能被旧链接 / 浏览历史带成任何形状：只认有文件名的对象。 */
 function isPrintFileState(value: unknown): value is PrintFileState {
@@ -83,6 +101,8 @@ function isPrintFileState(value: unknown): value is PrintFileState {
 export function PrintCashierPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const support = useSupportContact()
+  const refundAssistanceCopy = `${refundApplyLine(support)}本机不提供自助退款`
   const state = useMemo(() => (location.state ?? {}) as CashierLocationState, [location.state])
 
   const orderId = typeof state.orderId === 'string' ? state.orderId : null
@@ -149,7 +169,7 @@ export function PrintCashierPage() {
       if (staleSignal?.aborted) return
       navigatedRef.current = false
       setReleaseFailed(true)
-      setIssueError(userMessageOf(error, `订单已付款，但创建打印任务失败，请重试。${printProblemLine()}`))
+      setIssueError(shownIssue(error, `订单已付款，但创建打印任务失败，请重试。${printProblemLine()}`))
     }
   }, [navigate, state, orderId, paymentSessionToken])
 
@@ -175,7 +195,7 @@ export function PrintCashierPage() {
       } catch (err) {
         if (cancelRef.current) return
         // 出码失败不阻断轮询（订单可能已 paid/closed，轮询会反映真实状态）；仅提示。
-        setIssueError(userMessageOf(err, `出码失败，请稍后重试。${printProblemLine()}`))
+        setIssueError(shownIssue(err, `出码失败，请稍后重试。${printProblemLine()}`))
       } finally {
         if (!cancelRef.current) setIssuing(false)
       }
@@ -203,7 +223,7 @@ export function PrintCashierPage() {
         if (cancelRef.current) return
         setChannels([])
         setChannelLoadState('error')
-        setIssueError(userMessageOf(err, '获取支付通道失败，请检查网络后重试'))
+        setIssueError(shownIssue(err, '获取支付通道失败，请检查网络后重试'))
       }
     })()
     return () => {
@@ -293,7 +313,7 @@ export function PrintCashierPage() {
           if (confirmed.payStatus === 'paid') void proceedToPrint()
         } catch (error) {
           if (!cancelRef.current) {
-            setIssueError(userMessageOf(error, '付款码已提交，暂未取得付款结果，请勿重复扫码'))
+            setIssueError(shownIssue(error, '付款码已提交，暂未取得付款结果，请勿重复扫码'))
           }
         }
         return
@@ -311,7 +331,7 @@ export function PrintCashierPage() {
       if (result.status === 'failed') setIssueError(result.failReason ?? '支付未完成，请重新扫码')
     } catch (error) {
       authCodeBufferRef.current = ''
-      setIssueError(userMessageOf(error, '付款码支付未完成，请重新扫码'))
+      setIssueError(shownIssue(error, '付款码支付未完成，请重新扫码'))
     } finally {
       codeSubmitLockRef.current = false
       if (!cancelRef.current) setCodeSubmitting(false)
@@ -411,7 +431,7 @@ export function PrintCashierPage() {
       else setIssueError(null)
     } catch (err) {
       if (cancelRef.current) return
-      setIssueError(userMessageOf(err, '暂未查到支付结果，请稍候或继续等待自动确认'))
+      setIssueError(shownIssue(err, '暂未查到支付结果，请稍候或继续等待自动确认'))
     } finally {
       if (!cancelRef.current) setReconciling(false)
     }
@@ -427,7 +447,7 @@ export function PrintCashierPage() {
       setIssueError(null)
       if (s.payStatus === 'paid' && !releaseFailed) void proceedToPrint()
     } catch (err) {
-      if (!cancelRef.current) setIssueError(userMessageOf(err, '暂未取得最新支付结果，请稍后重试'))
+      if (!cancelRef.current) setIssueError(shownIssue(err, '暂未取得最新支付结果，请稍后重试'))
     } finally {
       if (!cancelRef.current) setReconciling(false)
     }
@@ -445,7 +465,7 @@ export function PrintCashierPage() {
           if (s.payStatus === 'paid') proceedToPrint()
         }
       } catch (err) {
-        setIssueError(userMessageOf(err, '模拟支付失败，请稍后重试'))
+        setIssueError(shownIssue(err, '模拟支付失败，请稍后重试'))
       }
     },
     [snapshot, orderId, paymentSessionToken, proceedToPrint],
@@ -529,66 +549,35 @@ export function PrintCashierPage() {
     return { label: '选择上方支付通道', run: () => undefined, disabled: true, reason: '尚未选择支付通道' }
   })()
   const primaryReason = 'reason' in primaryAction ? primaryAction.reason ?? null : null
-  const primaryIcon = primaryAction.disabled
-    ? null
-    : ['channel-failed', 'expired', 'attempt-failed', 'release-failed', 'pending-qr', 'awaiting-code-confirmation', 'pending-verification', 'display-expired-reconciling'].includes(qxState)
-      ? <RefreshCwIcon aria-hidden="true" />
-      : <FilePlus2Icon aria-hidden="true" />
   // 异常处理那句只点名这一次真的可能扣款的通道；通道未知时不点名任何一家。
   const billingChannel = qxState === 'attempt-channel-unknown'
     ? null
     : snapshot?.attempt?.channel || selectedChannel || ((channels?.length ?? 0) === 1 ? channels?.[0] ?? null : null)
 
+  const freeOrder = amountCents !== null && amountCents <= 0
   return (
     <div data-w2-page="print-cashier" className="cashier-qx-route">
     <PrintTouchFrame
-      /* 稿 32-cashier 原文：data-route="/me/print-orders" aria-label="返回我的打印订单"。
-       *  和 CTA 上的「退出支付」是两件事：返回=去看这张待付订单（订单还在），
-       *  退出支付=放弃这次支付回首页。两个都要，缺一都会让人在收银台里困住。 */
-      back={{ label: '返回我的打印订单', onBack: () => navigate('/me/print-orders') }}
-      title="订单支付"
-      subtitle="选择已开通的支付通道；确认到账后才会开始打印"
-      terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}
+      page="print-cashier"
+      legacyBody={false}
+      kind="compact"
+      seal={null}
+      eyebrow={freeOrder ? '确认打印' : '打印文件 · 订单支付'}
+      title={freeOrder ? '免费试运营' : '请完成这笔支付'}
+      subtitle={freeOrder ? undefined : '选择已开通的支付通道；确认到账后才会开始打印'}
+      /* 出过码之后返回位是「改参数需重新下单」，没出过码才回确认页。 */
+      back={{ label: paramsBack.label, onBack: paramsBack.run }}
+      ask={freeOrder
+        ? { label: '问小青：核对这单', draft: '请帮我核对这一单的订单和打印状态。' }
+        : { label: '问小青：这笔账看不懂', draft: '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。' }}
+      primary={{
+        label: primaryAction.label,
+        disabled: primaryAction.disabled,
+        onClick: primaryAction.run,
+        noArrow: true,
+      }}
       status={status}
-      ctabar={
-        <CashierQxDock reason={primaryReason} billingChannel={billingChannel}>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={secondaryAction.run}>
-            {secondaryAction.icon}{secondaryAction.label}
-          </button>
-          {qxState === 'attempt-failed' ? (
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(uploadPath)}>
-              <FilePlus2Icon aria-hidden="true" />改参数需重新下单
-            </button>
-          ) : isOpenUnpaidOrder ? (
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              data-cashier-exit=""
-              onClick={() => navigate('/', { replace: true })}
-            >
-              <XCircleIcon aria-hidden="true" />退出支付
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            disabled={primaryAction.disabled}
-            onClick={primaryAction.run}
-          >
-            {primaryIcon}
-            {primaryAction.label}
-          </button>
-        </CashierQxDock>
-      }
-      navbar={
-        <QxAppNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-        />
-      }
+      terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}
     >
       <CashierQxView
         step={5}
@@ -616,7 +605,7 @@ export function PrintCashierPage() {
         canReissue={canReissue}
         canProceed={canProceed}
         issueError={issueError}
-        refundAssistanceCopy={REFUND_ASSISTANCE_COPY}
+        refundAssistanceCopy={refundAssistanceCopy}
         isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
         selectionLocked={hasActivePaymentAttempt}
         onSelectChannel={switchChannel}
@@ -626,7 +615,35 @@ export function PrintCashierPage() {
         onReconcile={() => void handleReconcile()}
         onReissue={handleReissue}
         onSimulateSandbox={(result) => void devSimulate(result)}
+        billingChannel={freeOrder ? null : billingChannel}
       />
+      <div className="pct-acts">
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>
+          返回我的打印订单
+        </button>
+        {secondaryAction.label !== paramsBack.label ? (
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={secondaryAction.run}>
+            {secondaryAction.icon}{secondaryAction.label}
+          </button>
+        ) : null}
+        {qxState === 'attempt-failed' && paramsBack.label !== '改参数需重新下单' ? (
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(uploadPath)}>
+            <FilePlus2Icon aria-hidden="true" />改参数需重新下单
+          </button>
+        ) : null}
+        {isOpenUnpaidOrder ? (
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="ghost"
+            data-cashier-exit=""
+            onClick={() => navigate('/', { replace: true })}
+          >
+            <XCircleIcon aria-hidden="true" />退出支付
+          </button>
+        ) : null}
+      </div>
+      {primaryReason ? <p className="pct-note">{primaryReason}</p> : null}
     </PrintTouchFrame>
     </div>
   )

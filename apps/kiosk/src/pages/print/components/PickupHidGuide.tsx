@@ -10,7 +10,7 @@ import {
   ShieldCheckIcon,
   WifiOffIcon,
 } from 'lucide-react'
-import { helpNeededLine, printProblemLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, peekSupportContact, printProblemLine } from '../../../copy/unattendedCopy'
 import {
   PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
@@ -46,7 +46,9 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
     case 'success':
       return <>校验通过，<b>打印订单已认领</b>。</>
     default:
-      return <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+      return peekSupportContact().miniappPublished
+        ? <>打开手机小程序<b>「我的 → 打印订单」</b>，找到 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
+        : <>输入 {PICKUP_CODE_LENGTH} 位到机码。核对订单后，领取打印件。</>
   }
 }
 
@@ -79,7 +81,7 @@ export function PickupHidGuide({
         <div className="pcp-hid-main">
           <p className="pcp-hid-t">请出示手机上的码</p>
           <p className="pcp-hid-s" id="pcp-hid-hint">
-            打开小程序里的到机码页面，把手机屏幕对准<strong>机身侧面的扫码区</strong>。
+            {peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}把手机屏幕对准<strong>机身侧面的扫码区</strong>。
             扫码模组靠接近感应触发，不会一直亮着。
             <strong>把手机屏幕亮度调高</strong>，再把屏幕凑近扫码区。
             扫到的内容以 USB 键盘方式输入，和手输走同一套校验规则。
@@ -225,7 +227,7 @@ export function PickupKeypadCard({
           ? '正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
           : legacyMode
             ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。</>
-            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。</>}
+            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「历史 {PICKUP_CODE_MAX_INPUT_LENGTH} 位码」。</>}
       </p>
       {legacyMode ? (
         <PickupAlphaKeys value={code} onChange={onChange} disabled={loading} />
@@ -237,7 +239,7 @@ export function PickupKeypadCard({
           disabled={loading}
           label="到机码数字键盘"
           leadKey={{
-            text: '输入历史码',
+            text: `历史 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位码`,
             ariaLabel: `输入 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位历史码`,
             onPress: () => onLegacyMode(true),
           }}
@@ -267,10 +269,12 @@ export function PickupOutsStrip({ onHid, onHelp }: { onHid: () => void; onHelp: 
     <div className="qx-card pcp-help">
       <p className="pch-title">码找不到了？</p>
       <ul className="pch-steps pch-outs">
-        <li>
-          <b>回手机小程序看</b>
-          <span>「我的 → 打印订单」</span>
-        </li>
+        {peekSupportContact().miniappPublished ? (
+          <li>
+            <b>回手机小程序看</b>
+            <span>「我的 → 打印订单」</span>
+          </li>
+        ) : null}
         <li>
           <button type="button" className="pch-out-btn" onClick={onHid}>
             <b>用机身扫码区</b>
@@ -415,7 +419,6 @@ export function PickupWinCard({
         <div className="pcp-win-head">
           <span className="pcp-win-ico"><CheckIcon size={40} strokeWidth={3} aria-hidden="true" /></span>
           <div className="pcp-win-tx">
-            <p className="pcp-win-t">{copy.title}</p>
             <p className="pcp-win-s">{copy.line}</p>
           </div>
         </div>

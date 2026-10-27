@@ -638,7 +638,7 @@ async function openSource(page: Page, api: ApiRouter, state: string, runtimePath
   }
   if (state === 'usb-selected' || state === 'usb-importing' || state === 'usb-safeid-expired' || state === 'usb-import-failed' || state === 'usb-ready') {
     await page.getByTestId('file-source-usb-file-safe-1').click()
-    if (state !== 'usb-selected') await page.getByRole('button', { name: '导入这一份' }).click()
+    if (state !== 'usb-selected') await page.getByRole('button', { name: '导入这份文件' }).click()
   }
   if (state.startsWith('local-') && state !== 'local-guide') {
     const input = page.locator('input[type="file"]')

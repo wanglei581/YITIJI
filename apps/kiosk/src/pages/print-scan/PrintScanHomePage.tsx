@@ -51,6 +51,7 @@ import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   COPY_GUIDE_KEY,
   COPY_GUIDE_ROUTE,
+  HUB_ASK,
   HUB_PILL,
   arrivalCodeStateNote,
   capabilityGroupHint,
@@ -62,11 +63,11 @@ import {
   type ProbeStatus,
 } from './printHubContent'
 import {
-  PrintHubNavbar,
   QxPrintHubView,
   type QxPrintQuickLinkView,
 } from './components/QxPrintHubView'
 import './styles/print-hub-qx.css'
+import './styles/print-hub-touch.css'
 
 interface CapabilityDefinition {
   key: string
@@ -137,7 +138,7 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     // 运行时由 describeDocPrintFoot 按本机彩色 / 双面登记改写；这里是未登记时的口径。
     stateNote: '带走：打印件',
     mfpOffBadge: '这台机器现在出不了纸',
-    mfpOffNote: '文件可以先传上来存着，换一台再打。',
+    mfpOffNote: '这次出不了纸。文件可以先从下面传上来。',
   },
   {
     key: 'phone-upload',
@@ -482,21 +483,33 @@ export function PrintScanHomePage() {
         : `打印机异常。${machineCannotPrintLine(contact)}`,
   }
 
+  const askLabel = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty'
+    ? '问小青：缺纸了文件还要传吗？'
+    : '问小青：怎么选打印方式 →'
+  const hubSubtitle = hubState === 'capability-loading'
+    ? '确认前，打印、扫描这几项先不进入；到机码、复印照常可用。'
+    : hubState === 'device-off' && device.printer.errorCode === 'paperEmpty'
+      ? '缺纸了。打印和扫描先停，订单还在。'
+      : undefined
+
   return (
     <PrintTouchFrame
-      back={{ label: '返回首页', onBack: () => navigate('/') }}
-      title="打印扫描服务"
+      page="print-hub"
+      legacyBody={false}
+      nav
+      kind="std"
+      seal={hubState === 'device-off' ? null : 'idle'}
+      back={{ label: '上一步', onBack: () => navigate('/') }}
+      title={HUB_ASK[hubState].text}
+      subtitle={hubSubtitle}
       eyebrow="打印扫描服务"
       railNow={-1}
-      bodyClassName="qxt-body-hub"
-      status={device.printerNotice ? { tone: 'bad', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
-      navbar={
-        <PrintHubNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-        />
-      }
+      bodyClassName={hubState === 'device-off' ? 'qxt-body-hub' : 'qxt-body-print'}
+      status={device.printerNotice ? { tone: 'warn', label: device.printerLabel } : hubState === 'device-off' ? { tone: 'warn', label: `${device.printerLabel} · 出纸类暂停` } : pill}
+      ask={{
+        label: askLabel,
+        draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。',
+      }}
     >
       <QxPrintHubView
         hubState={hubState}

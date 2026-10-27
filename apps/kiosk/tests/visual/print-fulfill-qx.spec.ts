@@ -42,7 +42,7 @@ const flowState = {
 async function expectTouchAndBounds(page: Page): Promise<void> {
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
-  const buttons = page.locator('.qx-ctabar .qx-btn:not([disabled]):not([aria-disabled="true"]), .qx-nav-item')
+  const buttons = page.locator('.qx-ctabar .qx-btn:not([disabled]):not([aria-disabled="true"]), .qx-nav-item, .qxt-nav button, .qxt-dock .qxt-btn:not([disabled]):not([aria-disabled="true"]), .qxt-dock .qxt-askq:not([disabled]):not([aria-disabled="true"])')
   const count = await buttons.count()
   expect(count, '交付页必须有可点出口').toBeGreaterThan(0)
   for (let i = 0; i < count; i += 1) {
@@ -380,7 +380,7 @@ test('completed done says the paper is already out and never renders a pickup co
   await expect(page.getByText('请取走纸张', { exact: true })).toHaveCount(0)
   await expect(page.getByText('请取走文件', { exact: true })).toHaveCount(0)
   await expect(page.getByText('少了页、印花了、对内容有疑问？')).toBeInViewport()
-  await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办 →' })).toBeInViewport()
+  await expect(page.getByRole('button', { name: '问小青：怎么取纸' })).toBeInViewport()
   await expect(page.getByText('已在本机出纸', { exact: true })).toBeVisible()
   await expect(page.getByText('W2-PICKUP-7391', { exact: true })).toHaveCount(0)
   await expect(page.getByText('取件码', { exact: true })).toHaveCount(0)

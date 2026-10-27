@@ -44,7 +44,6 @@ const COPY = [
   '不是取件码',
   '8 位数字到机码',
   '要办什么',
-  '已下过单 · 我的文件',
   'U 盘导入打印',
   '服务状态无法确认',
   '正在检查本机能力',
@@ -62,7 +61,20 @@ for (const line of COPY) {
   }
   must(productionSrc.includes(line), `文案已迁移：「${line}」`)
 }
+const TOUCH_COPY = [
+  '你的文件，现在在哪？',
+  '打印文件',
+  '扫描纸质材料',
+  '其他工具',
+  '先传、稍后打印',
+  '凭码办理，不登录也能核销',
+  '问小青：怎么选打印方式',
+]
+for (const line of TOUCH_COPY) {
+  must(productionSrc.includes(line), `触屏版第 5 版文案在生产页：「${line}」`)
+}
 // W-117：冻结稿把缺纸 / 异常统称离线；按实际状态修正文案，不回写设计稿。
+must(proto.includes('已下过单 · 我的文件'), '冻结稿的记录区标题仍可定位')
 must(proto.includes('打印扫描一体机离线 —— 要出纸的停了，其余照常'), '冻结稿的设备停用态仍可定位')
 must(contentSrc.includes('打印机暂不可用 · 出纸类暂停'), '生产停用态不把缺纸或异常宣称为离线')
 

@@ -15,6 +15,8 @@ import {
 import { FilePreviewPanel } from './PrintPreviewPanel'
 import { ENCRYPTED_PDF_UNLOCK_STEPS } from './printPreviewKind'
 import type { PrintFileState } from '../printMaterialSession'
+import { useSupportContact } from '../../../hooks/useSupportContact'
+import { preferUnattended, printProblemLine } from '../../../copy/unattendedCopy'
 
 export type MaterialCheckStage =
   | 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan'
@@ -100,6 +102,10 @@ function Summary({
 }
 
 export function MaterialCheckPresentation(props: MaterialCheckPresentationProps) {
+  const support = useSupportContact()
+  const errorText = props.error
+    ? preferUnattended(props.error, `材料检查没做成。${printProblemLine(support)}`)
+    : null
   const reviewReady = props.stage === 'review' || props.stage === 'submitting' || props.stage === 'done'
   const keptCount = props.findings.filter((finding) => finding.selected === 'keep').length
   const redactedCount = props.findings.filter((finding) => finding.selected === 'redact').length
@@ -115,7 +121,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
 
   return (
     <div className="qpd-check-grid" data-w2-page="print-material-check" data-qx-state={props.stage} data-encrypted={props.encryptedPdf ? 'true' : undefined}>
-      <aside className="qpd-check-left">
+      {props.stage === 'error' ? null : <aside className="qpd-check-left">
         <FilePreviewPanel file={props.file} token={props.token} onEncrypted={props.onEncryptedPdf} />
         {props.encryptedPdf ? null : (
           <>
@@ -130,7 +136,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
             </div>
           </>
         )}
-      </aside>
+      </aside>}
 
       <section className="qpd-check-right" aria-live="polite">
         {props.isWorking || props.stage === 'idle' ? (
@@ -155,9 +161,9 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
           <div className="qpd-review">
             <div className="qx-state qpd-error" data-tone="error" role="alert">
               <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-              <div><h2 className="qx-state-t">材料检查未完成</h2><p className="qx-state-d">{props.error ?? '检查结果未知，请重新检查。隐私预检不可跳过。'}</p></div>
+              <div><h2 className="qx-state-t">材料检查未完成</h2><p className="qx-state-d">{errorText ?? '检查结果未知，请重新检查。隐私预检不可跳过。'}</p></div>
             </div>
-            <section className="qpd-options-note"><h3>现在的事实</h3><ul><li>文件还在本次办理里。</li><li>检查结果未知，屏幕上不出现任何检查结论。</li><li>没检查完不能继续。</li></ul></section>
+            <section className="qpd-options-note"><h3>现在的事实</h3><ul><li>当前文件：{props.file.name || '还没有文件名'}。文件还在本次办理里。</li><li>检查结果未知，屏幕上不出现任何检查结论。</li><li>没检查完不能继续。</li></ul></section>
             <section className="qpd-options-note"><h3>两条路</h3><p><b>重试：</b>还是这一份再查一次，不重复收费。</p><button className="qx-btn" data-variant="primary" type="button" onClick={props.onRetry}>重试检查</button><p><b>返回选文件：</b>重新选择要打印的材料。</p><button className="qx-btn" data-variant="ghost" type="button" onClick={props.onBack}>返回选文件</button></section>
           </div>
         ) : null}
@@ -169,7 +175,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
                 <div>
                   <div className="qx-state-t">遮挡处理未完成</div>
-                  <p className="qx-state-d">{props.error}</p>
+                  <p className="qx-state-d">{errorText}</p>
                 </div>
               </div>
             ) : null}
@@ -209,7 +215,6 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               </div>
             ) : props.findings.length > 0 ? (
               <>
-                <div className="qpd-findings-heading"><span>01</span><h2>有 {props.findings.length} 处要你决定</h2></div>
                 <div className="qpd-batch">
                   <div>
                     <button className="qx-btn" type="button" onClick={props.onApplySuggested}>按风险建议处理</button>
@@ -243,7 +248,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                     </article>
                   ))}
                 </div>
-                <div className="qpd-decision-counts"><span>已决定 {decidedCount} / {props.findings.length}</span><span>保留 {keptCount} 处</span><span>遮挡 {redactedCount} 处</span></div>
+                <div className="qpd-decision-counts">已决定 {decidedCount} / {props.findings.length} · 保留 {keptCount} 处 · 遮挡 {redactedCount} 处</div>
                 <p className="qpd-decision-status">{remaining > 0 ? `还有 ${remaining} 处等你决定` : '每一处都已决定，可以继续核对遮挡结果。'}</p>
               </>
             ) : null}

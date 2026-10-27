@@ -1,0 +1,104 @@
+/* 打印服务台触屏正文。只挂在本页，不改共享 .qxt-*。 */
+
+[data-qx-page='print-hub'] .qxt-task,
+[data-qx-page='print-hub'] .qxt-tile {
+  text-align: left;
+}
+
+[data-qx-page='print-hub'] .qxt-task .qxt-mini {
+  position: static;
+  margin-top: 8px;
+  align-self: flex-end;
+}
+
+[data-qx-page='print-hub'] .ph-codeart {
+  display: flex;
+  gap: 6px;
+}
+
+[data-qx-page='print-hub'] .ph-codeart i {
+  display: block;
+  width: 22px;
+  height: 32px;
+  border: 2px solid var(--qx-line);
+  border-radius: 6px;
+}
+
+[data-qx-page='print-hub'] .ph-pass {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+[data-qx-page='print-hub'] .ph-pass > b {
+  font-size: var(--qxt-fs-body);
+}
+
+[data-qx-page='print-hub'] .ph-pass .qxt-tile {
+  flex: 1 1 240px;
+  min-height: var(--qxt-tap);
+}
+
+[data-qx-page='print-hub'] .ph-fallback {
+  flex: none;
+}
+
+[data-qx-page='print-hub'] .ph-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-qx-page='print-hub'] .ph-notices {
+  width: 100%;
+  max-width: none;
+}
+
+[data-qx-page='print-hub'] .ph-notices > summary {
+  min-height: var(--qxt-tap);
+  font-size: var(--qxt-fs-body);
+}
+
+[data-qx-page='print-hub'] .ph-legal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .qxt-screen[data-qx-page='print-hub'] .qxt-band {
+    min-height: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .qxt-seal {
+    display: none;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .qxt-ask {
+    gap: 12px;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .qxt-ask {
+    padding: 8px 0 10px;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .qxt-ask h1 {
+    font-size: 32px;
+    text-wrap: wrap;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .qxt-rail {
+    display: none;
+  }
+
+  .qxt-screen[data-qx-page='print-hub'] .ph-notices > summary,
+  .qxt-screen[data-qx-page='print-hub'] .ph-legal-row .qxt-tile {
+    min-height: 64px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}

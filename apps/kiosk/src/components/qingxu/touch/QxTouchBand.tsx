@@ -50,6 +50,9 @@ export function QxTouchBand({
   onBack,
   back = true,
   live = false,
+  statusClassName,
+  titleRole,
+  titleTag = 'h1',
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -64,6 +67,12 @@ export function QxTouchBand({
   onBack?: () => void
   back?: boolean
   live?: boolean
+  /** 额外挂到状态胶囊上。不传时类名与以前一样。 */
+  statusClassName?: string
+  /** 问句标题的角色。不传时仍是标题。 */
+  titleRole?: 'status'
+  /** 问句标题的标签。不传时仍是 h1。 */
+  titleTag?: 'h1' | 'h2'
 }) {
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
@@ -93,7 +102,7 @@ export function QxTouchBand({
         </div>
         <div className="qxt-hdr-right">
           {status === false ? null : (
-            <span className={`qxt-status qxt-status-${tone}`}>
+            <span className={['qxt-status', `qxt-status-${tone}`, statusClassName].filter(Boolean).join(' ')}>
               <i className="qxt-dot" />
               {statusText}
             </span>
@@ -104,7 +113,7 @@ export function QxTouchBand({
       <div className="qxt-ask">
         <div className="qxt-ask-t">
           {eyebrow ? <div className="qxt-eyebrow">{eyebrow}</div> : null}
-          <h1>{title}</h1>
+          {titleTag === 'h2' ? <h2 role={titleRole}>{title}</h2> : <h1 role={titleRole}>{title}</h1>}
           {sub ? <p>{sub}</p> : null}
         </div>
         {seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}

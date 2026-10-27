@@ -10,6 +10,10 @@ export type QxTouchTaskProps = {
   chipTone?: QxTouchChipTone
   visual?: ReactNode
   take?: string
+  /** 不传时仍是箭头，和改前一样。 */
+  takeIcon?: QxTouchIconName
+  /** 不传时不加重前缀。 */
+  takePrefix?: string
   held?: boolean
   pressable?: boolean
   dark?: boolean
@@ -26,6 +30,8 @@ export function QxTouchTask({
   chipTone = 'teal',
   visual,
   take,
+  takeIcon = 'arrowR',
+  takePrefix = '',
   held = false,
   pressable = false,
   dark = false,
@@ -53,8 +59,8 @@ export function QxTouchTask({
       {visual ? <div className="qxt-mini">{visual}</div> : null}
       {take ? (
         <div className="qxt-take">
-          <QxTouchIcon name="arrowR" size={24} strokeWidth={2.6} />
-          <span>{take}</span>
+          <QxTouchIcon name={takeIcon} size={24} strokeWidth={2.6} />
+          <span>{takePrefix}{take}</span>
         </div>
       ) : null}
     </>

@@ -1,0 +1,369 @@
+/* 出纸进度、打印完成、结果未确认、到机码。只挂这四页，不改 .qxt-* 默认。 */
+
+[data-qx-page='print-progress'] .pfp-job-name,
+[data-qx-page='print-progress'] .pfp-job-sub,
+[data-qx-page='print-progress'] .pfp-job-id,
+[data-qx-page='print-progress'] .pfp-step b,
+[data-qx-page='print-progress'] .pfp-step-d,
+[data-qx-page='print-progress'] .pff-xq-ask,
+[data-qx-page='print-progress'] .pff-xq-doing,
+[data-qx-page='print-progress'] .pff-out-sub,
+[data-qx-page='print-done'] .pff-done-title,
+[data-qx-page='print-done'] .pff-out-sub,
+[data-qx-page='print-done'] .pff-step-txt,
+[data-qx-page='print-done'] .pff-wipe-s,
+[data-qx-page='print-done'] .pff-help .txt,
+[data-qx-page='print-done'] .pft-idle,
+[data-qx-page='print-unconfirmed'] .pft-unc,
+[data-qx-page='print-unconfirmed'] .pft-unc-steps,
+[data-qx-page='print-unconfirmed'] .pft-unc-sum,
+[data-qx-page='print-unconfirmed'] .pft-unc-fine,
+[data-qx-page='print-pickup'] .pcp-keypad-note,
+[data-qx-page='print-pickup'] .pcp-easy,
+[data-qx-page='print-pickup'] .pcp-hid-s,
+[data-qx-page='print-pickup-ok'] .pcp-win-t,
+[data-qx-page='print-pickup-ok'] .pcp-win-s,
+[data-qx-page='print-pickup-ok'] .pcp-win-fn {
+  font-size: var(--qxt-fs-body, 24px);
+}
+
+[data-qx-page='print-done'] .pft-done {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-qx-page='print-done'] .pft-take {
+  display: flex;
+  align-items: center;
+  min-height: 160px;
+  padding: 24px;
+  border-radius: 28px;
+  background: var(--qx-paper);
+  border: 1px solid var(--qx-line);
+}
+
+[data-qx-page='print-done'] .pft-take b {
+  display: block;
+  font-size: 32px;
+}
+
+[data-qx-page='print-done'] .pft-take span,
+[data-qx-page='print-done'] .pft-tray,
+[data-qx-page='print-done'] .pft-again-note {
+  font-size: var(--qxt-fs-body, 24px);
+}
+
+[data-qx-page='print-done'] .pft-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+[data-qx-page='print-done'] .pft-tiles .qxt-tile {
+  min-height: 120px;
+  text-align: left;
+}
+
+[data-qx-page='print-done'] .pft-again {
+  min-height: 80px;
+  align-self: flex-start;
+}
+
+[data-qx-page='print-done'] .pft-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  min-height: 96px;
+  flex: none;
+  gap: 6px;
+}
+
+[data-qx-page='print-done'] .pft-count b {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 6px solid var(--qx-line);
+  font-size: 32px;
+  line-height: 1;
+}
+
+[data-qx-page='print-done'] .pft-count span {
+  font-size: 20px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+[data-qx-page='print-progress'] .pfp-lead {
+  margin: 0 0 16px;
+  font-size: var(--qxt-fs-body, 24px);
+  line-height: 1.45;
+}
+
+[data-qx-page='print-progress'] .pfp-lead-doing {
+  display: block;
+  margin-top: 8px;
+}
+
+[data-qx-page='print-progress'] .pfp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-qx-page='print-progress'] .pfp-step {
+  min-height: 88px;
+  padding: 16px 20px;
+}
+
+[data-qx-page='print-progress'] .pfp-step-st,
+[data-qx-page='print-progress'] .pfp-lead {
+  font-size: 20px;
+}
+
+[data-qx-page='print-done'] .pft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+[data-qx-page='print-done'] .pft-actions .qx-btn,
+[data-qx-page='print-done'] .qxt-dock .qxt-btn,
+[data-qx-page='print-done'] .pff-help-btn,
+[data-qx-page='print-progress'] .qx-btn,
+[data-qx-page='print-progress'] .pff-help-btn,
+[data-qx-page='print-unconfirmed'] .qx-btn,
+[data-qx-page='print-unconfirmed'] .qxt-dock .qxt-btn,
+[data-qx-page='print-pickup'] .qxt-dock .pcp-submit {
+  min-width: 64px;
+  min-height: 88px;
+  height: 88px;
+  padding: 0 28px;
+  font-size: 28px;
+}
+
+[data-qx-page='print-pickup'] .pcp-submit,
+[data-qx-page='print-pickup'] .pcp-act,
+[data-qx-page='print-pickup'] .pcp-kb-back,
+[data-qx-page='print-pickup-ok'] .pcp-act {
+  min-width: 64px;
+  min-height: 64px;
+}
+
+[data-qx-page='print-unconfirmed'] .qxt-body > .pft-unc {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-steps {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: pft-unc;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-steps li {
+  flex: 1 1 0;
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  min-height: 96px;
+  margin: 0;
+  padding: 18px 22px;
+  border-radius: 28px;
+  background: var(--qx-surface);
+  counter-increment: pft-unc;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-steps li::before {
+  content: counter(pft-unc);
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  min-height: 72px;
+  border-radius: 22px;
+  background: var(--qx-ink);
+  color: var(--qx-paper);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 8px 22px;
+  border-radius: 24px;
+  background: var(--qx-surface);
+  border: 1px solid var(--qx-line);
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 0;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum div + div {
+  border-top: 1px solid var(--qx-line);
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum dt {
+  margin: 0;
+  color: var(--qx-ink-3);
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-exits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-exits .qx-btn,
+[data-qx-page='print-unconfirmed'] .pft-unc-row {
+  width: 100%;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0;
+}
+
+[data-qx-page='print-pickup-ok'] .qx-scroll.pickup-claim-success {
+  flex: 1 1 auto;
+  min-height: 100%;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 16px;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-win {
+  flex: 1 1 auto;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-win-steps {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-win-steps li {
+  align-items: stretch;
+  min-height: 88px;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-win-no {
+  align-self: stretch;
+  width: 48px;
+  height: auto;
+  min-height: 48px;
+  border-radius: 16px;
+  font-size: 20px;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-win-fs,
+[data-qx-page='print-pickup-ok'] .pcp-ab-col b,
+[data-qx-page='print-pickup-ok'] .pcp-ab-col span {
+  font-size: 20px;
+}
+
+[data-qx-page='print-done'] .pft-idle {
+  margin: 0;
+  max-width: 280px;
+}
+
+[data-qx-page='print-progress'] .qxt-body:has(.pfp-miss),
+[data-qx-page='print-done'] .qxt-body:has(.pfp-miss) {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-qx-page='print-progress'] .pfp-miss,
+[data-qx-page='print-done'] .pfp-miss {
+  flex: 1 1 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-qx-page='print-progress'] .pfp-miss-lead,
+[data-qx-page='print-done'] .pfp-miss-lead,
+[data-qx-page='print-progress'] .pfp-miss-note,
+[data-qx-page='print-done'] .pfp-miss-note,
+[data-qx-page='print-progress'] .pfp-miss-kicker,
+[data-qx-page='print-done'] .pfp-miss-kicker {
+  margin: 0;
+  font-size: 20px;
+}
+
+[data-qx-page='print-progress'] .pfp-miss-step,
+[data-qx-page='print-done'] .pfp-miss-step,
+[data-qx-page='print-progress'] .pfp-miss-go,
+[data-qx-page='print-done'] .pfp-miss-go {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
+  padding: 12px 20px;
+  border-radius: 20px;
+  background: var(--qx-surface);
+  color: inherit;
+  text-align: left;
+}
+
+[data-qx-page='print-progress'] .pfp-miss-step b,
+[data-qx-page='print-done'] .pfp-miss-step b {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--qx-ink);
+  color: var(--qx-paper);
+  font-size: 24px;
+}
+
+[data-qx-page='print-progress'] .pfp-miss-go,
+[data-qx-page='print-done'] .pfp-miss-go {
+  border: 0;
+  font-size: 20px;
+}
+
+[data-qx-page='print-progress'] .pfp-miss-go b,
+[data-qx-page='print-done'] .pfp-miss-go b {
+  font-size: 24px;
+}

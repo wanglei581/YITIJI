@@ -61,6 +61,8 @@ interface CashierQxViewProps {
   onReconcile: () => void
   onReissue: () => void
   onSimulateSandbox: (result: 'success' | 'failed') => void
+  /** 这一次可能扣款的通道。免费单不传，正文也不画付款说明。 */
+  billingChannel?: string | null
 }
 export function CashierQxView(props: CashierQxViewProps) {
   const { state } = props
@@ -86,7 +88,7 @@ export function CashierQxView(props: CashierQxViewProps) {
     ?? (props.snapshot?.attempt ? (props.snapshot.attempt.qrCodeContent === null ? 'code' : 'qr') : null)
 
   return (
-    <div className="cashier-qx-page" data-qx-state={state}>
+    <div className="cashier-qx-page pct-page" data-qx-state={state}>
       <div className="qx-scroll cashier-qx-scroll">
         <section className="cashier-qx-xq" aria-label="小青提示">
           <div className="cashier-qx-xq-row">
@@ -112,7 +114,11 @@ export function CashierQxView(props: CashierQxViewProps) {
           note={pickerNote(state, free, props.channels.length)}
         />
 
-        <section className="cashier-qx-state" data-kind={copy.kind}>
+        {!free && props.reconciling ? (
+          <p className="pct-note" role="status">正在向支付渠道核实这一次的结果。这一次还没有确认到账。</p>
+        ) : null}
+
+        <section className="cashier-qx-state pct-card" data-kind={copy.kind}>
           <h2 className="cashier-qx-state-h">
             {copy.icon}
             <span className="qx-state-t">{copy.title}</span>
@@ -141,6 +147,8 @@ export function CashierQxView(props: CashierQxViewProps) {
 
         <Closure state={state} ctx={ctx} />
 
+        {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}
+
         {props.issueError ? (
           <div className="cashier-qx-error" role="alert"><AlertTriangleIcon aria-hidden="true" />{props.issueError}</div>
         ) : null}
@@ -167,6 +175,14 @@ function Pickers(props: CashierQxViewProps & {
     <section className="cashier-qx-modes" aria-label="支付方式选择">
       <div className="cashier-qx-picker" data-kind="channels">
         <span className="cashier-qx-picker-label">{free ? '办理方式' : '支付通道'}</span>
+        {showChannels && props.channels.length === 1 && (props.amountCents ?? 0) > 0 ? (
+          <p className="pct-chline">
+            这台机器只启用了一个支付通道，已自动采用。
+            {props.channels[0] === 'sandbox'
+              ? '测试支付通道 · 非真实收款'
+              : `${channelLabelOf(props.channels[0])} · 支付结果以实际到账为准`}
+          </p>
+        ) : null}
         {showChannels ? props.channels.map((channel) => (
           <button
             key={channel}
@@ -284,10 +300,14 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
   } else {
     rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
+  if ((props.amountCents ?? 0) > 0) {
+    const yuan = formatCents(props.amountCents ?? 0).replace(/^¥/, '')
+    rows.push(['应付', `${yuan} 元`])
+  }
   if (props.amountCents !== 0 && props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
   rows.push(...props.rows)
   return (
-    <section className="cashier-qx-group" aria-label="订单信息">
+    <section className="cashier-qx-group pct-sum" aria-label="订单信息">
       <h3>订单信息</h3>
       <dl className="cashier-qx-kv">
         {rows.map(([key, value]) => (
@@ -455,12 +475,28 @@ export function CashierQxDock({
   reason,
   children,
   billingChannel,
+  truthOnly = false,
 }: {
   reason: string | null
-  children: ReactNode
+  children?: ReactNode
   /** 这一次真的可能扣款的通道；未确认时为 null，不点名任何一家。 */
   billingChannel: string | null
+  /** 只放事实说明。免费单不要挂这张条，上面有付款、收款。 */
+  truthOnly?: boolean
 }) {
+  const truth = (
+    <div className="cashier-qx-truth pct-note" data-disclaimer="true">
+      <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
+      <p><b>金额确认</b>只有这笔账的金额明确后，才会出收款码。</p>
+      <p>
+        <b>异常处理</b>
+        {billingChannel === 'sandbox'
+          ? `本次走的是测试支付通道，不产生真实账单。结果长时间未更新时，${printProblemLine()}`
+          : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单。${printProblemLine()}`}
+      </p>
+    </div>
+  )
+  if (truthOnly) return truth
   return (
     <>
       <div className="cashier-qx-cta-reason">
@@ -471,16 +507,7 @@ export function CashierQxDock({
         />
       </div>
       <div className="cashier-qx-cta-row">{children}</div>
-      <div className="cashier-qx-truth" data-disclaimer="true">
-        <p><b>付款安全</b>请勿重复付款；页面会在系统确认结果后更新。付款码不会在屏幕上完整显示或保存。</p>
-        <p><b>金额确认</b>只有这笔账的金额明确后，才会出收款码。</p>
-        <p>
-          <b>异常处理</b>
-          {billingChannel === 'sandbox'
-            ? `本次走的是测试支付通道，不产生真实账单。结果长时间未更新时，${printProblemLine()}`
-            : `结果长时间未更新时，请先查看你的${channelLabelOf(billingChannel) || '支付'}账单。${printProblemLine()}`}
-        </p>
-      </div>
+      {truth}
     </>
   )
 }

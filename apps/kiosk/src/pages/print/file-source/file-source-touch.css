@@ -1,0 +1,248 @@
+/* 选文件正文。只挂在触屏页标记下，不改 .qxt-* 默认。 */
+
+[data-qx-page='print-src'] .fs-touch-page,
+[data-qx-page='print-upload'] .fs-touch-page,
+[data-qx-page='print-usb'] .fs-touch-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+[data-qx-page='print-src'] .w2-print-upload-source-grid,
+[data-qx-page='print-src'] .fs-chs,
+[data-qx-page='print-upload'] .w2-print-upload-source-grid,
+[data-qx-page='print-upload'] .fs-chs,
+[data-qx-page='print-usb'] .w2-print-upload-source-grid,
+[data-qx-page='print-usb'] .fs-chs {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-qx-page='print-src'] div.fs-ch,
+[data-qx-page='print-upload'] div.fs-ch,
+[data-qx-page='print-usb'] div.fs-ch {
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+[data-qx-page='print-src'] .w2-print-upload-source-grid > button,
+[data-qx-page='print-upload'] .w2-print-upload-source-grid > button,
+[data-qx-page='print-usb'] .w2-print-upload-source-grid > button {
+  min-height: 64px !important;
+  min-width: 64px;
+  font-size: 22px !important;
+}
+
+[data-qx-page='print-src'] .fs-touch-btn,
+[data-qx-page='print-upload'] .fs-touch-btn,
+[data-qx-page='print-usb'] .fs-touch-btn,
+[data-qx-page='print-src'] .fs-doc-row,
+[data-qx-page='print-upload'] .fs-doc-row,
+[data-qx-page='print-usb'] .fs-doc-row,
+[data-qx-page='print-src'] button.fs-mini,
+[data-qx-page='print-upload'] button.fs-mini,
+[data-qx-page='print-usb'] button.fs-mini,
+[data-qx-page='print-src'] .fs-sbtn,
+[data-qx-page='print-upload'] .fs-sbtn,
+[data-qx-page='print-usb'] .fs-sbtn,
+[data-qx-page='print-src'] .print-upload-footer .qx-btn,
+[data-qx-page='print-upload'] .print-upload-footer .qx-btn,
+[data-qx-page='print-usb'] .print-upload-footer .qx-btn,
+[data-qx-page='print-src'] .fs-board-actions .qx-btn,
+[data-qx-page='print-upload'] .fs-board-actions .qx-btn,
+[data-qx-page='print-usb'] .fs-board-actions .qx-btn {
+  min-height: 64px;
+  min-width: 64px;
+  font-size: 22px;
+}
+
+[data-qx-page='print-src'] .fs-touch-btn,
+[data-qx-page='print-upload'] .fs-touch-btn,
+[data-qx-page='print-usb'] .fs-touch-btn,
+[data-qx-page='print-src'] .fs-doc-row,
+[data-qx-page='print-upload'] .fs-doc-row,
+[data-qx-page='print-usb'] .fs-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px 20px;
+  border: 1.5px solid var(--qx-line);
+  border-radius: 24px;
+  background: var(--qx-surface);
+  color: var(--qx-ink);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+[data-qx-page='print-src'] .fs-doc-row small,
+[data-qx-page='print-src'] .fs-resume-entry small,
+[data-qx-page='print-upload'] .fs-resume-entry small,
+[data-qx-page='print-usb'] .fs-resume-entry small {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+[data-qx-page='print-src'] .fs-touch-hit,
+[data-qx-page='print-upload'] .fs-touch-hit,
+[data-qx-page='print-usb'] .fs-touch-hit {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  min-width: 64px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: not-allowed;
+}
+
+[data-qx-page='print-src'] .fs-formats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+[data-qx-page='print-src'] .fs-formats > div {
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--qx-line);
+}
+
+[data-qx-page='print-src'] .fs-formats b,
+[data-qx-page='print-src'] .fs-formats span,
+[data-qx-page='print-src'] .fs-size-line,
+[data-qx-page='print-src'] .fs-cloud,
+[data-qx-page='print-src'] .fs-truth,
+[data-qx-page='print-upload'] .fs-truth,
+[data-qx-page='print-usb'] .fs-truth,
+[data-qx-page='print-upload'] .fs-wait,
+[data-qx-page='print-usb'] .fs-wait,
+[data-qx-page='print-upload'] .fs-placeholder,
+[data-qx-page='print-usb'] .fs-placeholder,
+[data-qx-page='print-upload'] .fs-qr-live span,
+[data-qx-page='print-upload'] .fs-qr-blank span,
+[data-qx-page='print-upload'] .fs-qr-blank strong {
+  font-size: 20px;
+  line-height: 1.45;
+}
+
+[data-qx-page='print-src'] .fs-formats b {
+  display: block;
+  font-size: 24px;
+}
+
+[data-qx-page='print-src'] .fs-formats span {
+  display: block;
+  margin-top: 6px;
+}
+
+[data-qx-page='print-src'] .fs-size-line,
+[data-qx-page='print-src'] .fs-cloud,
+[data-qx-page='print-upload'] .fs-wait,
+[data-qx-page='print-usb'] .fs-wait,
+[data-qx-page='print-upload'] .fs-placeholder,
+[data-qx-page='print-usb'] .fs-placeholder,
+[data-qx-page='print-src'] .fs-truth p,
+[data-qx-page='print-upload'] .fs-truth p,
+[data-qx-page='print-usb'] .fs-truth p {
+  margin: 0;
+}
+
+[data-qx-page='print-upload'] .fs-phone-steps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-qx-page='print-upload'] .fs-phone-steps .qxt-step {
+  min-height: 64px;
+}
+
+[data-qx-page='print-upload'] .fs-phone-steps .qxt-step small {
+  font-size: 20px;
+}
+
+[data-qx-page='print-upload'] .fs-qr-live,
+[data-qx-page='print-upload'] .fs-qr-blank {
+  width: min(100%, 560px);
+  margin-inline: auto;
+}
+
+[data-qx-page='print-usb'] .fs-usb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+[data-qx-page='print-usb'] .fs-usb-head b {
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-usb'] .qxt-body > .fs-touch-page {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+[data-qx-page='print-usb'] .fs-usb-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-qx-page='print-usb'] .fs-usb-list .fs-frow {
+  flex: 1 1 0;
+  align-items: stretch;
+  min-height: 140px;
+}
+
+[data-qx-page='print-usb'] .fs-usb-list .fs-frow::after {
+  content: '›';
+  align-self: center;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--qx-ink-3);
+}
+
+[data-qx-page='print-usb'] .fs-usb-list .fs-f-ic {
+  align-self: stretch;
+  width: 96px;
+  height: auto;
+  min-height: 96px;
+  border-radius: 22px;
+  font-size: 22px;
+}
+
+[data-qx-page='print-usb'] .fs-usb-list .fs-f-ic[data-mark='PDF'],
+[data-qx-page='print-usb'] .fs-usb-list .fs-f-ic[data-mark='PNG'] {
+  background: var(--qx-cinnabar-soft);
+  color: var(--qx-cinnabar-d);
+}
+
+[data-qx-page='print-usb'] .fs-usb-list .fs-f-ic[data-mark='JPG'],
+[data-qx-page='print-usb'] .fs-usb-list .fs-f-ic[data-mark='JPEG'] {
+  background: var(--qx-teal-soft);
+  color: var(--qx-teal-d);
+}
+
+[data-qx-page='print-src'] .print-upload-footer,
+[data-qx-page='print-upload'] .print-upload-footer,
+[data-qx-page='print-usb'] .print-upload-footer,
+[data-qx-page='print-src'] .fs-board-actions,
+[data-qx-page='print-upload'] .fs-board-actions,
+[data-qx-page='print-usb'] .fs-board-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

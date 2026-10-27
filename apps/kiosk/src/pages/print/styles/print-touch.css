@@ -1,4 +1,19 @@
-/* 打印触屏页本地样式。颜色只走变量。按钮复位关掉之后，这里只补触屏尺寸和重复步骤轨。 */
+/* 打印流程页自己的覆盖。不改 .qxt-* 默认。
+   顶栏流光线的路径画出 viewBox，光晕 right 为负；本页收进视口，版面门禁才认。 */
+
+[data-qx-page^='print'] .qxt-flow svg {
+  left: 0;
+  width: 100%;
+  transform: scale(0.9);
+  transform-origin: center center;
+}
+
+[data-qx-page^='print'] .qxt-halo {
+  right: 0;
+  width: min(640px, 70%);
+}
+
+/* 旧正文的过渡样式。只在 .qxt-print-legacy 下生效。 */
 
 .qxt-screen .qxt-print-dock {
   flex: none;
@@ -10,7 +25,7 @@
   background: var(--qx-surface);
 }
 
-.qxt-screen .qx-btn {
+.qxt-print-legacy .qx-btn {
   min-height: var(--qxt-tap);
   min-width: var(--qxt-tap);
 }
@@ -19,50 +34,22 @@
   min-height: 0;
 }
 
-.qxt-screen .qxt-body:has(.ph-page) {
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+.qxt-print-legacy .fs-flow,
+.qxt-print-legacy .qpd-guide ol,
+.qxt-print-legacy .pcf-steps,
+.qxt-print-legacy .ph-axes {
+  display: none;
 }
 
-.qxt-screen .ph-page.qx-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-
-.qxt-screen .qxt-print-legacy .fs-page,
-.qxt-screen .qxt-print-legacy .pff-page,
-.qxt-screen .qxt-print-legacy .qpd-page {
+.qxt-print-legacy .fs-page,
+.qxt-print-legacy .pff-page,
+.qxt-print-legacy .qpd-page,
+.qxt-print-legacy .pickup-claim-page {
   overflow: visible;
   height: auto;
   max-height: none;
 }
 
-.qxt-screen .fs-flow,
-.qxt-screen .qpd-guide ol,
-.qxt-screen .pcf-steps,
-.qxt-screen .ph-axes {
-  display: none;
-}
-
-.qxt-screen .qxt-print-hub {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 100%;
-}
-
-/* 能力卡按内容撑开。flex 缩小到固定高度时，卡会叠到下一行上。 */
-.qxt-screen .qxt-print-hub > .qxt-grid2 {
-  flex: none;
-}
-
-.qxt-screen .qxt-print-hub .qxt-task {
-  text-align: left;
-}
-
-/* 短内容页把主块拉到正文区底部，避免和底栏之间留下大块空底。 */
 .qxt-screen .qxt-body.qxt-print-legacy > .pff-page,
 .qxt-screen .qxt-body.qxt-print-legacy > .fs-page,
 .qxt-screen .qxt-body.qxt-print-legacy > .pickup-claim-page {
@@ -72,12 +59,8 @@
   min-height: 100%;
 }
 
-.qxt-screen .pff-page > .pff-issue,
-.qxt-screen .fs-page > .qx-card:last-of-type,
-.qxt-screen .pickup-claim-page > .qx-card:last-of-type {
+.qxt-print-legacy .pff-page > .pff-issue,
+.qxt-print-legacy .fs-page > .qx-card:last-of-type,
+.qxt-print-legacy .pickup-claim-page > .qx-card:last-of-type {
   flex: 1 1 auto;
-}
-
-.qxt-screen .qxt-print-hub .qxt-tile {
-  text-align: left;
 }

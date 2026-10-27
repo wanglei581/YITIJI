@@ -1,0 +1,232 @@
+/* 核对价格 + 收银台正文。只挂在这两页，不改 .qxt-* 默认，不改底色藏字。 */
+
+[data-qx-page='print-confirm'] .pct-page,
+[data-qx-page='print-cashier'] .pct-page {
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qx-ink);
+}
+
+[data-qx-page='print-confirm'] .pct-page p,
+[data-qx-page='print-confirm'] .pct-page li,
+[data-qx-page='print-confirm'] .pct-page button,
+[data-qx-page='print-confirm'] .pct-page span,
+[data-qx-page='print-cashier'] .pct-page p,
+[data-qx-page='print-cashier'] .pct-page li,
+[data-qx-page='print-cashier'] .pct-page button,
+[data-qx-page='print-cashier'] .pct-page dd,
+[data-qx-page='print-cashier'] .pct-page dt {
+  font-size: 22px;
+}
+
+[data-qx-page='print-confirm'] .pct-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.86fr) minmax(0, 1.14fr);
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+[data-qx-page='print-confirm'] .pct-thumb,
+[data-qx-page='print-confirm'] .pct-sum,
+[data-qx-page='print-confirm'] .pct-fee,
+[data-qx-page='print-cashier'] .pct-card,
+[data-qx-page='print-cashier'] .pct-sum {
+  background: var(--qxt-card);
+  border: 1px solid var(--qx-line);
+  border-radius: 28px;
+  padding: 28px;
+  color: var(--qx-ink);
+}
+
+[data-qx-page='print-confirm'] .pct-thumb {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+[data-qx-page='print-confirm'] .pct-preview {
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+}
+
+[data-qx-page='print-confirm'] .pct-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 240px;
+  font-size: 22px;
+}
+
+[data-qx-page='print-confirm'] .pct-mark b {
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-confirm'] .pct-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--qx-line);
+}
+
+[data-qx-page='print-confirm'] .pct-row span {
+  color: var(--qx-ink-3);
+}
+
+[data-qx-page='print-confirm'] .pct-fee {
+  margin-top: 28px;
+}
+
+[data-qx-page='print-confirm'] .pct-fee > b {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 24px;
+}
+
+[data-qx-page='print-confirm'] .pct-num {
+  display: block;
+  margin: 8px 0;
+  font-size: 72px;
+  line-height: 1.05;
+  font-weight: 760;
+  color: var(--qx-ink);
+}
+
+[data-qx-page='print-confirm'] .pct-fee-line {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 760;
+  color: var(--qx-ink);
+}
+
+[data-qx-page='print-confirm'] .pcf-notes,
+[data-qx-page='print-confirm'] .pcf-notes li,
+[data-qx-page='print-confirm'] .pcf-notes p,
+[data-qx-page='print-confirm'] .pcf-rev,
+[data-qx-page='print-confirm'] .pcf-rev b,
+[data-qx-page='print-confirm'] .pcf-rev span {
+  font-size: 20px;
+  line-height: 1.45;
+}
+
+[data-qx-page='print-confirm'] .pcf-rev {
+  padding: 16px 18px;
+}
+
+[data-qx-page='print-confirm'] .pct-note,
+[data-qx-page='print-cashier'] .pct-note,
+[data-qx-page='print-cashier'] .pct-chline {
+  margin: 12px 0 0;
+  color: var(--qx-ink-2);
+  font-size: 22px;
+}
+
+[data-qx-page='print-confirm'] .pct-alert {
+  margin: 0 0 20px;
+  padding: 20px 24px;
+  border-radius: 20px;
+  background: var(--qx-teal-soft);
+  color: var(--qx-ink);
+  font-size: 22px;
+}
+
+[data-qx-page='print-confirm'] .pct-acts,
+[data-qx-page='print-cashier'] .pct-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+[data-qx-page='print-confirm'] .pct-acts .qx-btn,
+[data-qx-page='print-confirm'] .pcf-act .qx-btn,
+[data-qx-page='print-cashier'] .pct-acts .qx-btn,
+[data-qx-page='print-cashier'] .cashier-qx-mode,
+[data-qx-page='print-cashier'] .cashier-qx-channel {
+  min-width: 64px;
+  min-height: 64px;
+  padding: 16px 22px;
+  font-size: 22px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-modes {
+  display: grid;
+  gap: 16px;
+  margin: 12px 0 24px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv {
+  display: grid;
+  gap: 12px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--qx-line);
+}
+
+@media (max-width: 900px) {
+  [data-qx-page='print-confirm'] .pct-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 手机宽度关掉 1080 舞台后，收银正文不能被底栏挤成 0 高，整页也不能横向溢出。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-band,
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-band-compact {
+  min-height: 0;
+  padding: 12px 16px 0;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-hdr {
+  height: auto;
+  min-height: 64px;
+  flex-wrap: wrap;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-hdr-right {
+  margin-left: 0;
+  flex-wrap: wrap;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-body {
+  padding: 16px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .cashier-qx-page {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-dock {
+  flex-wrap: wrap;
+  padding: 12px;
+  gap: 8px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-btn,
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-btn-pri {
+  min-width: 0;
+  padding: 0 16px;
+  flex: 1 1 auto;
+  white-space: normal;
+  height: auto;
+  min-height: 64px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='print-cashier'] .qxt-askq {
+  flex: 1 1 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 64px;
+}

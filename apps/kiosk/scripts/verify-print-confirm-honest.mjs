@@ -1103,10 +1103,10 @@ if (!/quote\.status === 'ready' && quote\.amountCents === 0[\s\S]{0,40}'确认�
 } else {
   pass('0 元单主按钮是确认并打印')
 }
-if (!confirmCopy.includes("'确认并去付款'")) {
-  fail('有金额的单仍要能「确认并去付款」')
+if (!confirmCopy.includes("'去付款'")) {
+  fail('有金额的单仍要能「去付款」')
 } else {
-  pass('付费单主按钮仍是确认并去付款')
+  pass('付费单主按钮仍是去付款')
 }
 if (!/PRINT_MAX_SIDES_PER_ORDER/.test(confirmCopy) || !/每单最多打印 \$\{PRINT_MAX_SIDES_PER_ORDER\} 面（页数 × 份数），当前/.test(confirmCopy)) {
   fail('确认页必须用共享上限，在报价前提示「每单最多打印 N 面（页数 × 份数），当前 N 面」')

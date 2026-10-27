@@ -9,8 +9,7 @@
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
 import { type CSSProperties, type ReactNode } from 'react'
-import { PrintAiHelp } from '../../print/components/PrintAiHelp'
-import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../../copy/unattendedCopy'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
@@ -245,25 +244,6 @@ function emphasize(text: string, marks: readonly string[] = []): ReactNode {
   )
 }
 
-function hubDoing(state: HubPageState): ReactNode {
-  switch (state) {
-    case 'capability-loading':
-      return '正在确认可用服务，请稍候。已有订单仍可使用到机码。'
-    case 'capability-error':
-      return '暂时无法确认可用服务，请重试。已有订单仍可使用到机码。'
-    case 'locked':
-      return '理由直接来自能力配置，不是我猜的。'
-    case 'device-off':
-      return '要打印机的停了，不用打印机的照常。'
-    default:
-      return (
-        <>
-          选好材料，一步步做成<b>打印件或 PDF</b>。
-        </>
-      )
-  }
-}
-
 function HubBanner({
   hubState,
   orderPaused,
@@ -310,7 +290,9 @@ function HubBanner({
           <p className="ph-state-p">请查看卡片上的停用原因，其他服务可以继续办理。</p>
         </PrintHubState>
       )
-    case 'device-off':
+    case 'device-off': {
+      const raw = orderPaused?.notice ?? printerUnavailable?.notice ?? ''
+      const shown = preferUnattended(raw, machineCannotPrintLine())
       return (
         <PrintHubState
           kind="warn"
@@ -319,24 +301,15 @@ function HubBanner({
           testId="print-hub-fallback"
         >
           <p className="ph-state-p">
-            {orderPaused ? orderPaused.notice : (
-              <>{printerUnavailable?.notice ?? '打印机暂不可用 · 出纸类暂停'}。{usableServices ? `${usableServices}仍可使用。` : '请查看卡片上的可用状态。'}</>
-            )}
+            {shown}
+            {usableServices ? `${usableServices}仍可使用。` : ''}
           </p>
         </PrintHubState>
       )
+    }
     default:
       return null
   }
-}
-
-function axisChips(probe: ProbeStatus, mfp: MfpStatus, colorDuplexLabel: string) {
-  return (
-    <div className="ph-axes" data-testid="print-hub-axes" data-probe={probe} data-mfp={mfp}>
-      <span>选文件 → 材料检查 → 预览与参数 → 核对价格</span>
-      <span>按 A4 出纸 · {colorDuplexLabel}</span>
-    </div>
-  )
 }
 
 const HUB_CAP_ICON: Record<string, QxTouchIconName> = {
@@ -348,6 +321,44 @@ const HUB_CAP_ICON: Record<string, QxTouchIconName> = {
   convert: 'layers',
   sign: 'pen',
   'id-photo': 'idcard',
+}
+
+const HUB_DISPLAY_TITLE: Record<string, string> = {
+  'doc-print': '打印文件',
+  scan: '扫描纸质材料',
+  'photo-print': '照片打印',
+  'phone-upload': '手机扫码上传',
+  'usb-import': 'U 盘导入',
+  convert: '照片合成 PDF',
+  sign: '签名',
+  'id-photo': '证件照',
+}
+
+const HUB_OPEN_DESC: Record<string, string> = {
+  'doc-print': '手机、U 盘或我的文档',
+  scan: '扫成 PDF，可以存、可以打',
+  'photo-print': '按照片出纸',
+  convert: '几张照片拼成一个文件',
+  'id-photo': '本机尚未开放 · 看说明',
+  'phone-upload': '先传上来，稍后打印',
+  'usb-import': '先导入，稍后打印',
+}
+
+const HUB_TAKE: Record<string, string> = {
+  'doc-print': '打印件',
+  scan: '扫描件',
+}
+
+function displayTitle(capability: QxPrintCapabilityView): string {
+  return HUB_DISPLAY_TITLE[capability.key] ?? capability.title
+}
+
+function displayDesc(capability: QxPrintCapabilityView): string {
+  if (!capability.actionable) {
+    if (capability.unavailableBadge === '检查中') return '正在确认'
+    return capability.note || capability.unavailableBadge || capability.description
+  }
+  return HUB_OPEN_DESC[capability.key] ?? capability.description
 }
 
 function HubCapButton({
@@ -362,10 +373,12 @@ function HubCapButton({
   onCapability: (key: string) => void
 }) {
   const closed = !capability.actionable
-  const badge = capability.unavailableBadge ?? '暂不可用'
+  const badge = capability.unavailableBadge === '检查中' ? '正在确认' : (capability.unavailableBadge ?? '暂不可用')
   const reason = capability.note ? `${badge}：${capability.note}` : badge
   const icon = HUB_CAP_ICON[capability.key] ?? 'file'
-  const desc = closed && capability.note ? capability.note : capability.description
+  const title = displayTitle(capability)
+  const desc = displayDesc(capability)
+  const take = HUB_TAKE[capability.key]
   return (
     <button
       type="button"
@@ -375,7 +388,7 @@ function HubCapButton({
       style={stagger(index)}
       data-testid={`print-hub-cap-${capability.key}`}
       aria-disabled={closed || undefined}
-      aria-label={closed ? `${capability.title}（${reason}）` : capability.title}
+      aria-label={closed ? `${title}（${reason}）` : title}
       onClick={closed ? undefined : () => onCapability(capability.key)}
     >
       {variant === 'task' ? (
@@ -384,14 +397,20 @@ function HubCapButton({
             <span className="qxt-ic"><QxTouchIcon name={icon} size={40} /></span>
             {closed ? <QxTouchChip tone="slate">{badge}</QxTouchChip> : null}
           </div>
-          <h3>{capability.title}</h3>
+          <h3>{title}</h3>
           <p>{desc}</p>
-          {!closed && capability.stateNote ? <div className="qxt-take"><span>{capability.stateNote}</span></div> : null}
+          {!closed && take ? (
+            <div className="qxt-take">
+              <QxTouchIcon name="check" size={24} strokeWidth={2.6} />
+              <span>带走：{take}</span>
+            </div>
+          ) : null}
         </>
       ) : (
         <>
           <span className="qxt-ic"><QxTouchIcon name={icon} size={34} /></span>
-          <span className="qxt-tx"><b>{capability.title}</b><small>{desc}</small></span>
+          <span className="qxt-tx"><b>{title}</b><small>{desc}</small></span>
+          {closed ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>}
         </>
       )}
     </button>
@@ -418,59 +437,66 @@ export function QxPrintHubView({
   onQuickLink,
   onBack,
 }: QxPrintHubViewProps) {
-  const showBanner = hubState !== 'default'
+  const showBanner = hubState === 'capability-error' || hubState === 'locked' || hubState === 'device-off'
   const usableServices = capabilities.filter((item) => item.actionable && ['phone-upload', 'usb-import', 'convert', 'sign'].includes(item.key)).map((item) => item.title).join('、')
   const checking = probe === 'loading'
-  const mainCaps = capabilities.filter((item) => item.key === 'doc-print' || item.key === 'scan')
-  const toolOrder = ['photo-print', 'convert', 'sign', 'id-photo', 'phone-upload', 'usb-import']
-  const toolCaps = capabilities
-    .filter((item) => item.key !== 'doc-print' && item.key !== 'scan')
-    .slice()
-    .sort((a, b) => (toolOrder.indexOf(a.key) < 0 ? 99 : toolOrder.indexOf(a.key)) - (toolOrder.indexOf(b.key) < 0 ? 99 : toolOrder.indexOf(b.key)))
-  const holdTransfer = mfp === 'unavailable' && toolCaps.some((item) => (item.key === 'phone-upload' || item.key === 'usb-import') && item.actionable)
+  const byKey = (key: string) => capabilities.find((item) => item.key === key)
+  const doc = byKey('doc-print')
+  const scan = byKey('scan')
+  const photo = byKey('photo-print')
+  const convert = byKey('convert')
+  const sign = byKey('sign')
+  const idPhoto = byKey('id-photo')
+  const phone = byKey('phone-upload')
+  const usb = byKey('usb-import')
+  const toolCaps = [photo, convert, idPhoto, sign].filter((item): item is QxPrintCapabilityView => Boolean(item))
+  const transferCaps = [phone, usb].filter((item): item is QxPrintCapabilityView => Boolean(item))
+  const showLater = transferCaps.some((item) => item.actionable) && (!doc?.actionable || mfp === 'unavailable' || hubState === 'device-off')
+  const paperOff = Boolean(printerUnavailable?.label.includes('缺纸'))
+  const copyDesc = orderPaused
+    ? '暂停接单时，复印以打印机屏幕为准'
+    : hubState === 'device-off'
+      ? (paperOff ? '缺纸时复印也出不了纸，补纸后再用' : '打印机离线时复印可能也用不了，以打印机屏幕为准')
+      : '在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单'
+  const arrivalDesc = arrivalCode.stateNote
+    ?? '凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）'
+  const recordLinks = quickLinks.filter((link) => !link.compact && link.key !== 'feedback')
+  const feedback = quickLinks.find((link) => link.key === 'feedback')
 
   return (
     <div
-      className="qx-scroll ph-page qxt-print-hub"
+      className="qxt-print-hub"
       data-w2-page="print-scan-home"
       data-qx-page="print-hub"
       data-takeaway="打印件或 PDF"
       data-state={hubState}
       data-testid={`print-hub-state-${hubState}`}
+      data-probe={probe}
+      data-mfp={mfp}
     >
-      <PrintHubHero
-        state={hubState}
-        doing={orderPaused ? orderPaused.label : hubDoing(hubState)}
-        askText={orderPaused ? { text: orderPaused.notice, em: '暂时不可用' } : undefined}
-      />
-
-      {showBanner ? (
-        <section className="ph-fallback" key={hubState}>
-          <HubBanner hubState={hubState} orderPaused={orderPaused} printerUnavailable={printerUnavailable} usableServices={usableServices} />
-        </section>
-      ) : null}
-
-      <div className="qxt-sec" id="ph-sec-tasks">
-        要办什么
-        <small>{capabilityGroupHint}</small>
-      </div>
-      {showBanner ? null : axisChips(probe, mfp, colorDuplexLabel)}
-      {holdTransfer ? <p className="qxt-fine qxt-fine-tight">先传、稍后打印。手机和 U 盘仍可把文件存上来。</p> : null}
       <div className="qxt-grid2 ph-grid" aria-busy={checking || undefined}>
-        {mainCaps.map((capability, index) => (
-          <HubCapButton key={capability.key} capability={capability} index={index} variant="task" onCapability={onCapability} />
-        ))}
-        <button type="button" className="qxt-task qxt-rise" style={stagger(2)} onClick={() => onQuickLink(COPY_GUIDE_KEY)}>
+        {doc ? <HubCapButton capability={doc} index={0} variant="task" onCapability={onCapability} /> : null}
+        {scan ? <HubCapButton capability={scan} index={1} variant="task" onCapability={onCapability} /> : null}
+        <button
+          type="button"
+          className={`qxt-task qxt-rise${hubState === 'device-off' ? ' qxt-hold qxt-press' : ''}`}
+          style={stagger(2)}
+          data-testid="print-hub-copy-note"
+          onClick={() => onQuickLink(COPY_GUIDE_KEY)}
+        >
           <div className="qxt-top">
             <span className="qxt-ic"><QxTouchIcon name="copy" size={40} /></span>
           </div>
           <h3>复印</h3>
-          <p>在打印机面板上操作，取走纸质复印件。</p>
-          <div className="qxt-take"><span>看步骤</span></div>
+          <p>{copyDesc}</p>
+          <div className="qxt-take">
+            <QxTouchIcon name="check" size={24} strokeWidth={2.6} />
+            <span>带走：复印件</span>
+          </div>
         </button>
         <button
           type="button"
-          className="qxt-task qxt-rise ph-src"
+          className="qxt-task qxt-rise"
           style={stagger(3)}
           data-testid="print-hub-primary"
           data-arrival="true"
@@ -478,60 +504,93 @@ export function QxPrintHubView({
         >
           <div className="qxt-top">
             <span className="qxt-ic"><QxTouchIcon name="ticket" size={40} /></span>
-            <QxTouchChip tone="clay">不是取件码</QxTouchChip>
+            <QxTouchChip tone="slate">不是取件码</QxTouchChip>
           </div>
           <h3>{arrivalCode.title}</h3>
-          <p>{emphasize(arrivalCode.description, arrivalCode.emphasis)}</p>
-          {arrivalCode.stateNote ? <p>{arrivalCode.stateNote}</p> : null}
+          <p>{emphasize(arrivalDesc, arrivalCode.emphasis)}</p>
+          <div className="qxt-take">
+            <QxTouchIcon name="check" size={24} strokeWidth={2.6} />
+            <span>带走：订单里的打印件</span>
+          </div>
+          <div className="qxt-mini" aria-hidden="true"><span className="ph-codeart">{'········'.split('').map((mark, index) => <i key={mark + index} />)}</span></div>
         </button>
       </div>
 
-      {toolCaps.length > 0 ? (
-        <div className="qxt-tools" aria-label="其他办理">
-          {toolCaps.map((capability, index) => (
-            <HubCapButton key={capability.key} capability={capability} index={index + 4} variant="tile" onCapability={onCapability} />
+      {hubState === 'device-off' ? null : (
+        <p className="qxt-fine qxt-fine-tight">按 A4 出纸 · {colorDuplexLabel}</p>
+      )}
+
+      {toolCaps.length > 0 || recordLinks.length > 0 ? (
+        <>
+          <div className="qxt-sec">其他工具<small>{recordsGroupHint || capabilityGroupHint}</small></div>
+          <div className="qxt-tools" aria-label="其他工具">
+            {toolCaps.map((capability, index) => (
+              <HubCapButton key={capability.key} capability={capability} index={index + 4} variant="tile" onCapability={onCapability} />
+            ))}
+            {recordLinks.map((link, index) => (
+              <button
+                key={link.key}
+                type="button"
+                className="qxt-tile qxt-rise qxt-tile-stack ph-note"
+                style={stagger(index + 8)}
+                data-testid={`print-hub-quick-${link.key}`}
+                onClick={() => onQuickLink(link.key)}
+              >
+                <span className="qxt-ic"><QxTouchIcon name={link.key === 'print-orders' ? 'receipt' : 'folder'} size={34} /></span>
+                <span className="qxt-tx"><b>{link.title}</b><small>登录后查看</small></span>
+                <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {showLater ? (
+        <div className="ph-pass">
+          <b>先传、稍后打印</b>
+          {transferCaps.map((capability) => (
+            <HubCapButton key={capability.key} capability={capability} index={10} variant="tile" onCapability={onCapability} />
           ))}
         </div>
       ) : null}
 
-      <div className="qxt-sec" id="ph-sec-records">
-        已下过单 · 我的文件
-        <small>{recordsGroupHint}</small>
-      </div>
-      <div className="qxt-tools">
-        {quickLinks.filter((link) => link.compact).map((link) => (
-          <button
-            key={link.key}
-            type="button"
-            className="qxt-tile qxt-rise"
-            data-testid={`print-hub-quick-${link.key}`}
-            aria-label={`${link.title}：${link.description}`}
-            onClick={() => onQuickLink(link.key)}
-          >
-            <span className="qxt-tx"><b>{link.title}</b><small>{link.description}</small></span>
-          </button>
-        ))}
-      </div>
-      <PrintHubRecordNotes links={quickLinks.filter((link) => !link.compact)} onOpen={onQuickLink} />
+      {showBanner ? (
+        <section className="ph-fallback" key={hubState}>
+          <HubBanner hubState={hubState} orderPaused={orderPaused} printerUnavailable={printerUnavailable} usableServices={usableServices} />
+          <div className="ph-actions">
+            {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
+            <button type="button" onClick={onHelp}>使用帮助</button>
+            <button type="button" onClick={onBack}>上一步</button>
+          </div>
+          <p className="qxt-fine">{helpNeededLine()}</p>
+        </section>
+      ) : null}
 
-      <div className="ph-actions">
-        <button type="button" onClick={onBack}>上一步</button>
-        {hubState === 'capability-error' ? <button type="button" onClick={onRetry}>重新检测</button> : null}
-        {showBanner ? <button type="button" onClick={onHelp}>使用帮助</button> : null}
-        <PrintAiHelp label="问小青：怎么选打印方式 →" draft="我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。" />
-      </div>
-      {showBanner ? <p className="qxt-fine">{helpNeededLine()}</p> : null}
       <footer className="ph-foot">
         <div className="ph-truth" data-disclaimer="true" data-testid="print-hub-truth"><div>可用服务，以办理时显示为准。</div></div>
-        {notices.length > 0 ? (
-          <details className="ph-notices" data-disclaimer="true">
-            <summary>
-              <span>隐私与电子签说明</span>
-              <span className="ph-notices-go">点开看全文</span>
-            </summary>
-            <p>{HUB_TRUTH.map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>
-          </details>
-        ) : null}
+        <div className="ph-legal-row">
+          {notices.length > 0 ? (
+            <details className="ph-notices" data-disclaimer="true">
+              <summary>
+                <span>隐私与电子签说明</span>
+                <span className="ph-notices-go">点开看全文</span>
+              </summary>
+              <p>{HUB_TRUTH.map((row) => `${row.k}：${row.v}`).join(' ')} {notices.join(' ')}</p>
+            </details>
+          ) : (
+            <p className="qxt-fine">{HUB_TRUTH.map((row) => row.v).join('')}</p>
+          )}
+          {feedback ? (
+            <button
+              type="button"
+              className="qxt-tile qxt-rise"
+              data-testid="print-hub-quick-feedback"
+              onClick={() => onQuickLink(feedback.key)}
+            >
+              <span className="qxt-tx"><b>{feedback.title}</b><small>不用登录也能写</small></span>
+            </button>
+          ) : null}
+        </div>
       </footer>
     </div>
   )

@@ -358,12 +358,16 @@ test('BFIX：Hub 不额外读取价目，入口与展开说明均使用中性文
     }))
     const text = html.replace(/<[^>]*>/g, '')
     // 未办理、未核价的入口无需钱的字眼，也不得凭入口状态承诺免费；付费核对仍在确认页。
-    assert.doesNotMatch(text, /报价|费用|付款|收款|抵扣|权益|免费/)
+    assert.doesNotMatch(text, /报价|价格|费用|付款|收款|抵扣|权益|免费/)
     assert.match(text, /可用服务，以办理时显示为准/)
     assert.match(text, /隐私与电子签说明/)
     assert.match(text, /按 A4 出纸；结束办理清除本机临时信息，文件按留存期限管理/)
-    if (hubState === 'default') assert.match(text, /选文件 → 材料检查 → 预览与参数 → 核对价格/)
   }
+  const frame = readFileSync(join(kioskRoot, 'src/pages/print/PrintTouchFrame.tsx'), 'utf8')
+  assert.match(frame, /选文件/)
+  assert.match(frame, /材料检查/)
+  assert.match(frame, /预览与参数/)
+  assert.match(frame, /核对价格/)
 })
 
 test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通时出现', () => {
@@ -383,7 +387,9 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
       }))
       const banner = /<section class="ph-fallback"[^>]*>(.*?)<\/section>/s.exec(html)?.[1]
       assert.ok(banner)
-      assert.match(banner, new RegExp(notice))
+      assert.match(banner, new RegExp(label))
+      assert.match(banner, /这台机器暂时打不了/)
+      assert.doesNotMatch(banner, /工作人员/)
       if (label !== '打印机离线') assert.doesNotMatch(banner, /离线|无法连接/)
       if (actionable) assert.match(banner, /签名仍可使用/)
       else assert.doesNotMatch(banner, /签名仍可使用/)

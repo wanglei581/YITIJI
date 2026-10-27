@@ -67,7 +67,8 @@ test('forged success cannot override pending or failed backend status @kiosk', a
   })
   await openDoneWithState(page, { ...taskState, success: true, reason: '伪造成功' })
   await expect(page.getByText('打印失败', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('private agent stack must remain hidden')).toHaveCount(0)
 })
 
@@ -99,7 +100,7 @@ test('an unconfirmed print is never presented as a confirmed failure @kiosk', as
   await expect(page.getByText('打印结果未确认', { exact: true }).first()).toBeVisible()
   const body = await page.locator('body').innerText()
   expect(body).toContain('出纸口')
-  expect(body).toContain('联系现场工作人员')
+  expect(body).toContain('系统已明确登记，等待人工核查')
   // 不承诺退款、也不替现场断言纸没出来。
   expect(body).not.toContain('已为你退款')
 })

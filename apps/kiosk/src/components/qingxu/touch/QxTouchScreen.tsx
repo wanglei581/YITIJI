@@ -20,6 +20,9 @@ export function QxTouchScreen({
   testId,
   stateId,
   buttonReset = true,
+  page,
+  gallery = true,
+  frame = false,
 }: {
   band: ReactNode
   children: ReactNode
@@ -32,6 +35,12 @@ export function QxTouchScreen({
   stateId?: string
   /** 默认重置屏内按钮，避免裸按钮带出系统样式。已有自己按钮样式的页可关掉。 */
   buttonReset?: boolean
+  /** 页面样式挂点。不传则不写 data-qx-page。 */
+  page?: string
+  /** 样板页才带 data-qxt-gallery。默认保留，避免已有样板页丢标记。 */
+  gallery?: boolean
+  /** 为真时带上旧壳的 data-qx-frame。默认不写，别的页不受影响。 */
+  frame?: boolean
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -46,7 +55,9 @@ export function QxTouchScreen({
     <div
       className={['qxt-screen', buttonReset ? 'qxt-btn-reset' : '', motionClass].filter(Boolean).join(' ')}
       data-qxt-screen=""
-      data-qxt-gallery=""
+      data-qxt-gallery={gallery ? '' : undefined}
+      data-qx-frame={frame ? 'true' : undefined}
+      data-qx-page={page}
       data-qxt-state={stateId}
       data-testid={testId}
     >

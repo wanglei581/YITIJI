@@ -160,7 +160,7 @@ export function PrintUploadPage() {
         ? '照片打印'
         : '文档打印'
   const pageSubtitle = device.printerNotice
-    ? device.printerNotice
+    ? preferUnattended(device.printerNotice, machineCannotPrintLine())
     : !isDocumentPrint
       ? '从我的简历或上传一份简历进入打印'
       : isTransferMode
@@ -234,7 +234,7 @@ export function PrintUploadPage() {
           setUsbAgentOffline(false)
           setUsbReadFailed(true)
         }
-        setUsbError(userMessageOf(err, `暂时无法读取 U 盘，请重试。${printProblemLine()}`))
+        setUsbError(preferUnattended(userMessageOf(err, `暂时无法读取 U 盘，请重试。${printProblemLine()}`), `暂时无法读取 U 盘。${printProblemLine()}`))
       }
     }
 
@@ -322,7 +322,7 @@ export function PrintUploadPage() {
     } catch (err) {
       const kind = classifyUploadError(err)
       if (kind !== 'failed') setLocalRejectKind(kind)
-      setUploadError(userMessageOf(err, '上传失败，请重试'))
+      setUploadError(preferUnattended(userMessageOf(err, '上传失败，请重试'), `上传没做成。${printProblemLine()}`))
     } finally {
       setUploading(false)
     }
@@ -372,7 +372,7 @@ export function PrintUploadPage() {
       } else {
         setUsbImportFailed(true)
       }
-      setUsbError(userMessageOf(err, 'U 盘文件导入失败，请重试'))
+      setUsbError(preferUnattended(userMessageOf(err, 'U 盘文件导入失败，请重试'), `U 盘文件没导入。${printProblemLine()}`))
     } finally {
       setUsbUploading(false)
     }

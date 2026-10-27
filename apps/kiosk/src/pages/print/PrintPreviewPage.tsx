@@ -17,6 +17,8 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { QxTouchStateEmpty } from '../../components/qingxu/touch/QxTouchStates'
 import { PrintTouchFrame } from './PrintTouchFrame'
 
 import {
@@ -25,7 +27,7 @@ import {
   type PrintParamSuggestionView,
 } from '../../services/api/materials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { machineCannotPrintLine, printProblemLine } from '../../copy/unattendedCopy'
+import { machineCannotPrintLine, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { printUploadPathForSource, type PrintFileState } from './printMaterialSession'
 import { patchPrintHandoff, type PrintHandoffContext } from './printHandoff'
 import { usePreviewPrintParams } from './usePreviewPrintParams'
@@ -35,8 +37,50 @@ import { materialRedactionBadge } from './piiRedaction'
 import { isPrintDeskPreviewAuthorized, privacyPreviewGate } from './printDeskModel'
 import { FilePreviewPanel } from './components/PrintPreviewPanel'
 import { previewKindForFile } from './components/printPreviewKind'
-import { PrintDeskGuide, PrintDeskFooter, PrintDeskNavbar } from './components/PrintDeskChrome'
 import './styles/print-desk-qx.css'
+import './styles/print-desk-touch.css'
+
+const PREVIEW_ASK = {
+  label: '问小青：帮我选打印参数 →',
+  draft: '帮我选打印参数：黑白还是彩色、单面还是双面？',
+} as const
+
+const EMPTY_ASK = {
+  label: '问小青：文件要从哪传？',
+  draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。',
+} as const
+
+const PREVIEW_SUB = '第 3 步 / 共 4 步 · 核对内容与参数，下一步看价格'
+const EMPTY_STEPS = ['选文件', '材料检查', '预览与参数', '核对价格'] as const
+
+function EmptyPrintDesk({
+  marker,
+  problem,
+  onPickFile,
+  onDocuments,
+}: {
+  marker: 'print-material-check' | 'print-preview'
+  problem: string | null
+  onPickFile: () => void
+  onDocuments: () => void
+}) {
+  return (
+    <div className="pdt-empty" data-w2-page={marker} data-qx-state="missing-context">
+      <p className="pdt-current-file"><strong>当前文件：无</strong></p>
+      {problem ? <p data-print-handoff-problem="true">{problem}</p> : null}
+      <QxTouchStateEmpty
+        howto="文件还没选，或者上一位的文件已经清除。到这一步没有订单，也没有扣费。"
+        stepsTitle="办理顺序"
+        steps={[...EMPTY_STEPS]}
+        slabs={[
+          { title: '去选文件', desc: '手机、U 盘，把真实文件带进这次办理', onClick: onPickFile, visual: <QxTouchIcon name="phone" size={64} /> },
+          { title: '我的文档（登录后）', desc: '登录后才能看到你保存的文件', onClick: onDocuments, visual: <QxTouchIcon name="file" size={64} /> },
+        ]}
+        fine="这一页本身不保存文件"
+      />
+    </div>
+  )
+}
 
 type PrintFile = PrintFileState
 
@@ -134,7 +178,11 @@ export function PrintPreviewPage({
   onBackToCheck?: () => void
 } = {}) {
   const navigate = useNavigate()
-  const { getToken } = useAuth()
+  const { getToken, isLoggedIn } = useAuth()
+  const openDocuments = () => {
+    if (isLoggedIn) navigate('/me/documents')
+    else navigate('/login', { state: { from: '/me/documents' } })
+  }
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
   const file = handoff?.file ?? emptyFile
@@ -192,7 +240,7 @@ export function PrintPreviewPage({
         message: result.unavailableReason?.text ?? '参数建议暂不可用，请手动设置。',
       })
     }).catch((error) => {
-      if (!cancelled) setSuggestion({ status: 'error', data: null, message: userMessageOf(error, '参数建议读取失败，请手动设置。') })
+      if (!cancelled) setSuggestion({ status: 'error', data: null, message: preferUnattended(userMessageOf(error, '参数建议读取失败，请手动设置。'), `参数建议没读到。请手动设置。${printProblemLine()}`) })
     })
     return () => { cancelled = true }
   }, [getToken, materialCheck?.inspectionTaskId, materialCheckComplete, handoff?.inspectionTask?.accessToken])
@@ -297,31 +345,25 @@ export function PrintPreviewPage({
   if (!hasFile) {
     return (
       <PrintTouchFrame
-      railNow={2}
-        navbar={<PrintDeskNavbar />}
-        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
-        title="预览与打印参数"
-        subtitle="第 3 步 / 共 4 步 · 必须先有真实文件和材料检查结果"
+        page="print-check"
+        legacyBody={false}
+        kind="compact"
+        seal={null}
+        eyebrow="材料检查与预览"
+        title="这一页没有待处理的文件"
+        titleTag="h2"
+        subtitle="先选好要打印的材料，再检查、再设参数。"
         status={{ tone: 'warn', label: '没有待处理的文件' }}
-        ctabar={(
-          <PrintDeskFooter onBack={() => navigate(uploadPath)}>
-            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate('/print-scan')}>返回打印扫描</button>
-            <p className="why">没有文件时不展示预览、参数或设备成功状态。</p>
-            <button className="qx-btn" data-variant="primary" type="button" onClick={() => navigate(uploadPath)}>去选文件</button>
-          </PrintDeskFooter>
-        )}
+        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
+        ask={EMPTY_ASK}
+        primary={{ label: '去选文件', onClick: () => navigate(uploadPath) }}
       >
-        <PrintDeskGuide step={1} title={<>这一页<em>没有文件</em>。</>} detail="先选文件，检查后再设置打印参数。" />
-        <div className="qpd-context-empty" data-w2-page="print-preview" data-qx-state="missing-context">
-          <div className="qx-state" data-tone="empty">
-            <span className="qx-state-ic"><AlertTriangleIcon aria-hidden="true" /></span>
-            <div><h2 className="qx-state-t">这一页没有待处理的文件</h2><p className="qx-state-d" data-print-handoff-problem={problem ? 'true' : undefined}>{problem ?? '请从选文件步骤开始，完成材料检查后再设置打印参数。'}</p></div>
-          </div>
-          <div className="qpd-empty-work qx-grow">
-            <section className="qpd-empty-sheet"><FileTextIcon /><strong>当前文件：无</strong><span>没有预览、页数或打印参数</span></section>
-            <section className="qx-card"><div className="qx-sec-h"><span className="t">先准备一份文件</span></div><ul><li>不显示示例文件或示例页数。</li><li>不默认打印机在线。</li><li>不把参数写成已保存。</li></ul></section>
-          </div>
-        </div>
+        <EmptyPrintDesk
+          marker="print-preview"
+          problem={problem}
+          onPickFile={() => navigate(uploadPath)}
+          onDocuments={openDocuments}
+        />
       </PrintTouchFrame>
     )
   }
@@ -330,33 +372,28 @@ export function PrintPreviewPage({
     const canRunCheck = Boolean(file.fileId)
     return (
       <PrintTouchFrame
-      railNow={2}
-        navbar={<PrintDeskNavbar />}
-        title="预览与打印参数"
-        subtitle="隐私预检不可绕过"
+        page="print-preview"
+        legacyBody={false}
+        kind="compact"
+        seal={null}
+        railNow={2}
+        eyebrow="预览与参数"
+        title="先完成材料检查"
+        subtitle="请先完成文件和隐私检查，再设置打印参数。"
         status={{ tone: 'bad', label: '材料检查尚未完成' }}
-        ctabar={(
-          <PrintDeskFooter onBack={() => navigate(uploadPath)}>
-            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => navigate(uploadPath)}>返回选文件</button>
-            <p className="why">请先完成文件和隐私检查，再设置打印参数。</p>
-            <button
-              className="qx-btn"
-              data-variant="primary"
-              type="button"
-              onClick={() => {
-                if (canRunCheck && onBackToCheck) {
-                  onBackToCheck()
-                  return
-                }
-                navigate(canRunCheck ? '/print/desk?step=check' : uploadPath)
-              }}
-            >
-              {canRunCheck ? '完成材料检查' : '重新选择文件'}
-            </button>
-          </PrintDeskFooter>
-        )}
+        back={{ label: '返回选文件', onBack: () => navigate(uploadPath) }}
+        ask={PREVIEW_ASK}
+        primary={{
+          label: canRunCheck ? '完成材料检查' : '重新选择文件',
+          onClick: () => {
+            if (canRunCheck && onBackToCheck) {
+              onBackToCheck()
+              return
+            }
+            navigate(canRunCheck ? '/print/desk?step=check' : uploadPath)
+          },
+        }}
       >
-        <PrintDeskGuide step={2} title={<>先完成<em>材料检查</em>。</>} detail="逐项检查并确认隐私处理，再核对打印参数。" />
         <div className="qpd-guard" data-w2-page="print-preview" data-qx-state="check-required">
           <div className="qx-state" data-tone="error">
             <span className="qx-state-ic"><AlertTriangleIcon /></span>
@@ -390,44 +427,66 @@ export function PrintPreviewPage({
               ? { tone: 'bad' as const, label: '打印机异常' }
               : { tone: 'warn' as const, label: '打印机状态未知' }
 
+  const previewTitle = unsupported
+    ? '这份文件印不了'
+    : printerLoading
+      ? '正在读设备状态'
+      : printerKind === 'offline'
+        ? '打印机离线'
+        : printerKind === 'error'
+          ? '打印机异常'
+          : !printerReady
+            ? '打印机状态读不到'
+            : capability.loading
+              ? '本机能力还在确认'
+              : capabilityUnknown
+                ? '本机能力读不到'
+                : !capability.color.allowed || !capability.duplex.allowed
+                  ? '部分打印能力暂未开通'
+                  : '纸上会长这样'
+  const backToCheck = () => onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')
+  const blockingLine = printerLoading
+    ? null
+    : handoffError
+      ? handoffError
+      : unsupported
+        ? '当前文件类型不能直接预览打印，请返回重新选择文件。'
+        : hasBlockingWarning
+          ? (warnings.find((warning) => warning.level === 'error')?.text ?? '打印机当前不可用，不能进入报价确认。')
+          : null
+
   // Legacy gate markers: PrintPageFrame, KioskActionBar, step={3}.
   // The route now renders QxPageFrame and qx-ctabar while preserving the same business state.
   return (
     <PrintTouchFrame
+      page="print-preview"
+      legacyBody={false}
+      kind="compact"
+      seal={null}
       railNow={2}
-        navbar={<PrintDeskNavbar />}
-      title="预览与打印参数"
-      subtitle="第 3 步 / 共 4 步 · 逐页核对文件，再确认份数、颜色、单双面和页范围"
+      eyebrow="预览与参数"
+      title={previewTitle}
+      subtitle={PREVIEW_SUB}
       status={status}
-      ctabar={(
-        <PrintDeskFooter onBack={() => exempt ? backToPrevious() : onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>
-          {exempt ? (
-            <button className="qx-btn" data-variant="ghost" type="button" onClick={backToPrevious}>回到上一步</button>
-          ) : (
-            <button className="qx-btn" data-variant="ghost" type="button" onClick={() => onBackToCheck ? onBackToCheck() : navigate('/print/desk?step=check')}>返回材料检查</button>
-          )}
-          <p className="why">
-            {handoffError ? handoffError : unsupported
-              ? '当前文件类型不能直接预览打印，请返回重新选择文件。'
-              : privacyGate.kind === 'confirm' && !privacyConfirmed
-                ? '请先逐页核对预览并确认隐私处理结果。'
-              : printerLoading
-                ? '设备状态返回前不放行。'
-                : printerNotice
-                  ? printerNotice
-                  : hasBlockingWarning
-                    ? '打印机当前不可用，不能进入报价确认。'
-                    : '下一步核对价格，确认前不会收费。'}
-          </p>
-          <button className="qx-btn" data-variant="primary" type="button" disabled={printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed)} onClick={handleNext}>
-            {privacyGate.kind === 'confirm' && !privacyConfirmed ? '请先确认隐私处理结果' : printerLoading ? '设备检测中…' : printerNotice ? printerLabel : hasBlockingWarning ? '打印机不可用' : '下一步：核对价格'}
-          </button>
-        </PrintDeskFooter>
-      )}
+      back={{
+        label: exempt ? '回到上一步' : '返回材料检查',
+        onBack: exempt ? backToPrevious : backToCheck,
+      }}
+      ask={PREVIEW_ASK}
+      primary={{
+        label: privacyGate.kind === 'confirm' && !privacyConfirmed
+          ? '请先确认隐私处理结果'
+          : printerLoading
+            ? '设备检测中…'
+            : printerNotice
+              ? printerLabel
+              : hasBlockingWarning
+                ? '打印机不可用'
+                : '下一步：核对价格',
+        disabled: printerLoading || hasBlockingWarning || unsupported || (privacyGate.kind === 'confirm' && !privacyConfirmed),
+        onClick: handleNext,
+      }}
     >
-      <PrintDeskGuide step={3}
-        title={unsupported ? <>这份文件<em>印不了</em>。</> : printerLoading ? <>正在读<em>设备状态</em>。</> : printerKind === 'offline' ? <>打印机<em>离线</em>。</> : printerKind === 'error' ? <>打印机报了<em>异常</em>。</> : !printerReady ? <>打印机状态<em>读不到</em>。</> : capability.loading ? <>本机能力<em>还在确认</em>。</> : capabilityUnknown ? <>本机能力<em>读不到</em>。</> : !capability.color.allowed || !capability.duplex.allowed ? <>部分打印能力<em>暂未开通</em>。</> : <>纸上<em>会长这样</em>。</>}
-        detail={unsupported ? '请重新选择 PDF / JPG / PNG；Word 请先另存为 PDF。' : printerLoading ? '读到设备状态之前不放行，免得你白跑一趟。' : !printerReady ? `现在不能放行到报价，请等状态返回。${printProblemLine()}` : '核对内容与参数，下一步看价格，最后带走打印件。'} />
       <div className="qpd-device-strip" role="status">
         <div data-ready={printerReady ? 'true' : undefined}><span>打印机</span><strong>{printerLoading ? '正在检查' : printerLabel}</strong><small>{printerLoading ? '请稍候' : printerName}</small></div>
         <div><span>纸张</span><strong>A4</strong></div>
@@ -476,16 +535,14 @@ export function PrintPreviewPage({
         </section>
 
         <section className="qpd-preview-right">
-          {warnings.length > 0 ? <div className="qpd-warnings">{warnings.map((warning) => <div className="qpd-warning" data-level={warning.level} key={warning.id}><AlertTriangleIcon /><span>{warning.text}</span></div>)}</div> : null}
-
           <div className="qpd-param-stack">
             <section className="qpd-param-card">
               <div className="qpd-param-row"><span className="qpd-card-label">份数</span><div className="qpd-stepper">
-                <button type="button" aria-label="减少十份" disabled={copies <= 1} onClick={() => setCopies(Math.max(1, copies - 10))}>−10</button>
-                <button type="button" aria-label="减少打印份数" disabled={copies <= 1} onClick={() => setCopies(Math.max(1, copies - 1))}>−1</button>
+                <button type="button" aria-label="减少十份" aria-disabled={copies <= 1 || undefined} onClick={() => { if (copies > 1) setCopies(Math.max(1, copies - 10)) }}>−10</button>
+                <button type="button" aria-label="减少打印份数" aria-disabled={copies <= 1 || undefined} onClick={() => { if (copies > 1) setCopies(Math.max(1, copies - 1)) }}>−1</button>
                 <output aria-live="polite">{copies} 份</output>
-                <button type="button" aria-label="增加打印份数" disabled={copies >= 99} onClick={() => setCopies(Math.min(99, copies + 1))}>+1</button>
-                <button type="button" aria-label="增加十份" disabled={copies >= 99} onClick={() => setCopies(Math.min(99, copies + 10))}>+10</button>
+                <button type="button" aria-label="增加打印份数" aria-disabled={copies >= 99 || undefined} onClick={() => { if (copies < 99) setCopies(Math.min(99, copies + 1)) }}>+1</button>
+                <button type="button" aria-label="增加十份" aria-disabled={copies >= 99 || undefined} onClick={() => { if (copies < 99) setCopies(Math.min(99, copies + 10)) }}>+10</button>
               </div></div>
               <p className="qpd-param-note">{copies === 1 ? '已经是最少的 1 份，减不下去了。' : copies === 99 ? '已经是最多的 99 份，不能再增加。' : ''}可选 1–99 份。</p>
             </section>
@@ -493,10 +550,10 @@ export function PrintPreviewPage({
               <div className="qpd-param-row"><span className="qpd-card-label">颜色与单双面</span><ToggleGroup options={COLOR_MODE_OPTIONS} value={colorMode} onChange={(value) => setColorMode(value as ColorMode)} disabled={!capability.color.allowed} disabledReason={colorReason} describedById="print-color-capability-note" /></div>
               <ToggleGroup options={DUPLEX_OPTIONS} value={duplex} onChange={(value) => setDuplex(value as DuplexMode)} disabled={!capability.duplex.allowed} disabledReason={duplexReason} describedById="print-duplex-capability-note" />
               <p id="print-color-capability-note" className="qpd-param-note">{capability.color.allowed ? '彩色价格在下一步核对' : colorReason}{capabilityNote ? `；${capabilityNote}` : ''}</p>
-              <p id="print-duplex-capability-note" className="qpd-param-note">{capability.duplex.allowed ? '双面按内容页计费，用纸更省' : duplexReason}</p>
+              <p id="print-duplex-capability-note" className="qpd-param-note">{capability.duplex.allowed ? (duplex === 'simplex' ? '当前是单面。' : `翻页边：${duplex === 'duplex_long_edge' ? '长边' : '短边'}`) : duplexReason}</p>
             </section>
             <section className="qpd-param-card">
-              <span className="qpd-card-label">页面方向与缩放</span>
+              <span className="qpd-card-label">更多设置</span>
               <div className="qpd-orientation-scale">
                 <ToggleGroup options={[{ label: '自动', value: 'auto' }, { label: '纵向', value: 'portrait' }, { label: '横向', value: 'landscape' }]} value={orientation} onChange={(value) => setOrientation(value as PrintOrientation)} />
                 <ToggleGroup options={[{ label: '适合页面', value: 'fit' }, { label: '实际大小', value: 'actual' }]} value={scale} onChange={(value) => setScale(value as PrintScale)} />
@@ -504,8 +561,8 @@ export function PrintPreviewPage({
               <p className="qpd-param-note">方向和缩放会用于打印；请结合原文件预览核对内容。</p>
             </section>
             <section className="qpd-param-card qpd-range-card">
-              <div className="qpd-param-row"><span className="qpd-card-label">版面与页范围</span><span className="qpd-readonly">A4 固定</span><span className="qpd-readonly">{pagesPerSheet} 版/页</span></div>
-              <p className="qpd-param-note">A4 纸，每张印 {pagesPerSheet} 页内容。</p>
+              <div className="qpd-param-row"><span className="qpd-card-label">版面与页范围</span><span className="qpd-readonly">A4（这台机器只打 A4）</span><span className="qpd-readonly">{pagesPerSheet} 版 / 页</span></div>
+              <p className="qpd-param-note">A4（这台机器只打 A4）。每张 {pagesPerSheet} 版 / 页。</p>
               <ToggleGroup options={[{ label: file.pages === null ? '全部页面' : `全部 ${file.pages} 页`, value: 'all' }, { label: '自定义页码', value: 'custom' }]} value={pageRange} onChange={(value) => { setPageRange(value as 'all' | 'custom'); setRangeError(null) }} />
               {pageRange === 'custom' ? <><input className="qpd-range-input" aria-label="自定义页面范围" aria-invalid={Boolean(rangeError)} aria-describedby="print-range-explanation" value={customRange} onChange={(event) => { setCustomRange(event.target.value); setRangeError(null) }} placeholder="例：1-3, 5, 7-9" />{rangeError ? <p className="qpd-range-error" role="alert">{rangeError}</p> : null}</> : null}
               <p className="qpd-range-detail">这份文件{file.pages === null ? '页数待识别' : `共 ${file.pages} 页`}，{pageRange === 'all' ? '现在全部打印。' : selectedPages === null ? '请填写有效页码。' : `本次选中 ${selectedPages} 页。`}</p>
@@ -515,10 +572,12 @@ export function PrintPreviewPage({
         </section>
       </div>
       <section className="qpd-parameter-summary" aria-label="参数摘要">
-        <strong>参数摘要</strong><span>当前参数：A4 · {colorModeLabel(colorMode)} · {duplexLabel(duplex)} · {directionLabel} · {scaleLabel} · {pagesPerSheet} 版/页 · {rangeLabel} · {copies} 份</span>
+        <strong>参数摘要</strong><span>当前参数：A4 · {colorModeLabel(colorMode)} · {duplexLabel(duplex)} · {directionLabel} · {scaleLabel} · {pagesPerSheet} 版 / 页 · {rangeLabel} · {copies} 份</span>
         <p>下一步核对价格，再决定是否打印。</p>
         <small>未确认前不会收费；文件保留时间以隐私政策和“我的文档”设置为准。</small>
       </section>
+      {warnings.length > 0 ? <div className="qpd-warnings">{warnings.map((warning) => <div className="qpd-warning" data-level={warning.level} key={warning.id}><AlertTriangleIcon /><span>{warning.text}</span></div>)}</div> : null}
+      {blockingLine && !warnings.some((warning) => warning.level === 'error' && warning.text === blockingLine) ? <p className="pdt-block-line">{blockingLine}</p> : null}
     </PrintTouchFrame>
   )
 }

@@ -262,7 +262,7 @@ test('H2 back to preview keeps this file instead of rehydrating a stale one @w2'
   await writePrintHandoff(page, { contextId: 'stale-ctx-000000000002' })
   await printOptimizedFromPanel(page)
 
-  await page.getByRole('button', { name: '返回预览与参数' }).click()
+  await page.getByRole('button', { name: '返回修改' }).click()
   await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview')
   // 优化稿是派生产物，免检查：直接进参数页，画的是这一份。
   await expect(page.locator('[data-w2-page="print-preview"]')).toHaveAttribute('data-qx-state', 'preview')
@@ -314,7 +314,7 @@ test('H3 F02 a two-page job material on a simplex-only terminal is quoted single
   await expect(confirm.getByText('已按单面报价')).toBeVisible()
   await expect.poll(() => lastQuoteBody(page).then((body) => body?.params?.['duplex'] ?? null)).toBe('simplex')
   await expect(page.getByTestId('print-confirm-amount')).toHaveText(/2\.00/)
-  await expect(page.getByRole('button', { name: /确认并去付款/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /^去付款$/ })).toBeEnabled()
   expect(errors).toEqual([])
 })
 
@@ -338,7 +338,7 @@ test('H4 F20 color and duplex picked on a verified terminal survive the round tr
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('[data-sum-row="色彩模式"] .v')).toHaveText('彩色')
 
-  await page.getByRole('button', { name: '返回预览与参数' }).click()
+  await page.getByRole('button', { name: '返回修改' }).click()
   await page.waitForURL((url) => url.pathname === '/print/desk' && url.searchParams.get('step') === 'preview')
   await expect(preview).toHaveAttribute('data-qx-state', 'preview')
   await expect(preview.getByRole('button', { name: '彩色', exact: true })).toHaveAttribute('data-selected', 'true')

@@ -386,7 +386,7 @@ test('pickup 问小青 hands one draft to the assistant: prefilled once, never s
   // 读过一次就没有了：回到到机码页，再从底栏进顾问页，输入框是空的。
   await page.goBack()
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
-  await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+  await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
   await expect(page).toHaveURL(/\/assistant$/)
   await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
   expect(errors).toEqual([])
@@ -395,7 +395,7 @@ test('pickup 问小青 hands one draft to the assistant: prefilled once, never s
 for (const help of [
   { path: '/print-scan', label: '问小青：怎么选打印方式 →', draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。' },
   { path: '/print/upload?source=document', label: '问小青：这份文件怎么检查 →', draft: '这份文件要怎么检查？检查会看哪些内容？' },
-  { path: '/print/desk?step=check', label: '问小青：保留和遮挡有什么区别 →', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
+  { path: '/print/desk?step=check', label: '问小青：文件要从哪传？', draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。' },
   { path: '/print/desk?step=preview', label: '问小青：帮我选打印参数 →', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
 ]) {
   test(`M1 AI help hands off the current question once: ${help.path} @w2`, async ({ page, api }) => {
@@ -415,7 +415,7 @@ for (const help of [
     await expect(page.getByLabel('输入咨询问题')).toHaveValue(help.draft)
     expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
     await page.goto('/print/upload?source=document')
-    await page.locator('.qx-nav-item', { hasText: 'AI 顾问' }).first().click()
+    await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
     await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
     expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
     expect(errors).toEqual([])
@@ -1040,7 +1040,7 @@ test('material checks require a PII decision, create the redacted task, and carr
   await binary.install()
 
   await openWithHandoff(page, '/print/desk?step=check', { materialCheck: null, printParams: null })
-  await expect(page.getByRole('heading', { name: '有 1 处要你决定', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '有 1 处要你拿主意', exact: true })).toBeVisible()
   await expect(page.locator('.qpd-finding-snippet')).toHaveText('第 1 页 · 138****8000')
   await expect(page.locator('.qpd-decision-counts')).toContainText('已决定 0 / 1')
   await expect(page.getByRole('button', { name: '下一步：预览与参数' })).toBeDisabled()
@@ -1441,7 +1441,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
 
   await page.goto('/print/confirm')
   await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
+  await page.getByRole('button', { name: /^(去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(W2_ORDER.paymentSessionToken)).toHaveCount(0)
@@ -1867,7 +1867,8 @@ test('failed print status displays only the safe user reason and no pickup code 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('agent stack and local path must stay hidden')).toHaveCount(0)
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
@@ -1908,7 +1909,8 @@ test('takeaway-url stays a payment-token recovery path with no terminal session 
   await page.goto('/print/progress')
   await setReactRouterState(page, '/print/progress', cashierState)
   await page.waitForURL('**/print/done')
-  await expect(page.getByText('打印机暂时离线，请联系现场工作人员', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印有问题？拨打服务电话 18369161921（工作日 9:00–18:00），或问小青', { exact: true })).toBeVisible()
+  await expect(page.getByText('请联系现场工作人员')).toHaveCount(0)
 
   const takeawayHeaders = (await takeawayRequest).headers()
   expect(takeawayHeaders['x-payment-session-token']).toBe(W2_ORDER.paymentSessionToken)
@@ -2084,7 +2086,7 @@ test('benefit card reports 价目拉不到 when the quote fails and shows no amo
   await expect(page.getByText('¥2.00')).toHaveCount(0)
   await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新报价' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^(去付款|确认并打印)$/ })).toHaveCount(0)
   await expectHealthy(page, errors, 'print-confirm')
 })
 
@@ -2317,7 +2319,7 @@ test('print confirm create-job payload matches the quoted file and params @w2', 
   await seedMaterialSession(page)
   await page.goto('/print/confirm')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
-  await page.getByRole('button', { name: /^(确认并去付款|确认并打印)$/ }).click()
+  await page.getByRole('button', { name: /^(去付款|确认并打印)$/ }).click()
   await page.waitForURL('**/print/cashier')
   expect(jobBody?.fileUrl).toBe(W2_FILE.fileUrl)
   expect(jobBody?.fileName).toBe(W2_FILE.name)
@@ -2755,7 +2757,7 @@ test('usb deep link stays closed while usb import is in maintenance @w2', async 
   await page.goto('/print/upload?source=document&tab=usb&mode=transfer')
   await expect(page.getByText('维护中，暂时不可用', { exact: true })).toBeVisible()
   await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toHaveCount(0)
   // 轮询是放行后立刻发出的，不是等 2 秒。先看到拒绝文案再等一小段，才能证明没有迟到的请求。
   await page.waitForTimeout(400)
   expect(hits.count).toBe(0)
@@ -2774,7 +2776,7 @@ test('usb deep link lists files when usb import is available @w2', async ({ page
   await expect(page.getByRole('button', { name: /求职材料\.pdf/ })).toBeVisible()
   expect(hits.count).toBeGreaterThan(0)
   await page.getByRole('button', { name: /求职材料\.pdf/ }).click()
-  await expect(page.getByRole('button', { name: '导入这一份' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toBeVisible()
   await expectHealthy(page, errors, 'print-upload')
 })
 
@@ -2792,7 +2794,7 @@ test('usb column explains when capability status cannot be read @w2', async ({ p
   await expect(page.getByText('暂时读不到本机的服务开通情况，请稍后再试或使用其他方式', { exact: true })).toBeVisible()
   await expect(page.getByText('boom-internal')).toHaveCount(0)
   await expect(page.locator('[data-testid^="file-source-usb-file"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '导入这一份' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '导入这份文件' })).toHaveCount(0)
   const retry = page.getByTestId('usb-import-retry')
   await expect(retry).toBeVisible()
   const box = await retry.boundingBox()
