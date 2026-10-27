@@ -1,0 +1,91 @@
+/* 公共与系统页的触屏填充。只挂在 .qxt-screen 下，颜色只用令牌。 */
+
+.qxt-screen .qxp-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  background: var(--qxt-card);
+  border-radius: var(--qxt-r-card);
+  padding: 16px;
+}
+
+.qxt-screen .qxp-fill > * {
+  min-width: 0;
+}
+
+.qxt-screen .qxp-remind {
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.45;
+}
+
+.qxt-screen .qxp-note {
+  margin: 0;
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.5;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .qxp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.qxt-screen .qxp-actions .qxt-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.qxt-screen .qxp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.qxt-screen.qxp-standby {
+  background: var(--qxt-band-b);
+  color: var(--qx-paper);
+}
+
+.qxt-screen.qxp-standby .qxt-body {
+  padding: 0;
+  gap: 0;
+}
+
+.qxt-screen.qxp-standby .qxp-fill {
+  padding: 0;
+  gap: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.qxt-screen.qxp-standby .sb-stage {
+  height: 100%;
+  min-height: 100%;
+}
+
+.qxt-screen .qxp-fill .qx-scroll,
+.qxt-screen .qxp-fill .k1-help-scroll,
+.qxt-screen .qxp-fill .k9s-scroll,
+.qxt-screen .qxp-fill .legal-doc-scroll,
+.qxt-screen .qxp-fill .sr-page,
+.qxt-screen .qxp-fill .sg-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

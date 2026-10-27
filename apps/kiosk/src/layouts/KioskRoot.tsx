@@ -224,8 +224,22 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/**
+ * 触屏版路由。样板页不并进 QX_MIGRATED_ROUTES。
+ * 本包业务路由已经在 QX_MIGRATED_ROUTES 里的，继续留在那里，避免旧壳漏出来。
+ * 精确匹配，不含 /legal/:doc 这类带参路径。
+ */
+const QX_TOUCH_ROUTES = new Set<string>([
+  '/dev/touch-gallery',
+  '/assistant',
+  '/help',
+  '/official-channels',
+  '/login',
+  '/screensaver',
+  '/session-timeout',
+  '/session-resume',
+  '/error-offline',
+])
 
 function isTouchRoute(pathname: string): boolean {
   return QX_TOUCH_ROUTES.has(pathname)
