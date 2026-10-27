@@ -152,21 +152,43 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await nav(page, '我的').click()
   const dialog = page.getByTestId('handover-confirm')
   await expect(dialog).toBeVisible()
-  await expect(dialog.getByRole('heading', { name: '还是你吗？' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还是你吗？', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('heading')).toHaveCount(0)
+  await expect(page.locator('.qxt-back')).toHaveCount(0)
+  await expect(page.locator('.qxt-nav')).toHaveCount(0)
+  await expect(page.locator('[data-qxt-ask]')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '是我，继续' })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '不是我' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeVisible()
   await expectNoTraceOf(page, WANG)
   // 先确认、后读取：确认层出现时资产页一条请求都不发。
   await page.waitForTimeout(400)
   expect(calls.slice(beforeAsk)).toEqual([])
   await shot(page, '03-still-you-after-31s.png')
 
-  await dialog.getByRole('button', { name: '不是我' }).click()
+  await dialog.getByRole('button', { name: '不是我，结束上一位的使用' }).click()
   await expectLoggedOutHome(page)
   await expectNoTraceOf(page, WANG)
   await shot(page, '04-not-me-home-clean.png')
 
   await expectNextPersonSeesNothing(page, calls, WANG, '05-after-not-me')
+})
+
+test('W-75 handover Escape is 不是我 and clears back home @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  // 登录已经落在首页。首页当前项「首页」是链接不是按钮，不要用底栏按钮选择器再点一次。
+  await expect(page).toHaveURL(/\/$/)
+  await page.clock.runFor(31_000)
+  await nav(page, '我的').click()
+  const dialog = page.getByTestId('handover-confirm')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expectLoggedOutHome(page)
+  await expectNoTraceOf(page, WANG)
+  await expectNextPersonSeesNothing(page, calls, WANG, '08-after-escape')
 })
 
 test('W-75 within 30s no question; 是我，继续 goes straight in @end-use', async ({ page, api }) => {

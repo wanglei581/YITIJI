@@ -15,6 +15,8 @@ import { useAuth } from '../../../auth/useAuth'
 import { accountErrorMessage, accountPhoneDisplay } from '../../auth/accountUserMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import { SettingsConfirm } from './components/SettingsConfirm'
 import { PhoneRebindPanel } from './components/PhoneRebindPanel'
@@ -81,6 +83,7 @@ function SettingsRow({
 export function MySettingsPage() {
   const navigate = useNavigate()
   const { user, isLoggedIn, getToken } = useAuth()
+  const help = helpNeededLine(useSupportContact())
   const { endKioskUse } = useKioskSessionControl()
   const [confirm, setConfirm] = useState<'logout' | 'switch' | 'revokeJobAi' | null>(null)
   const [showRebind, setShowRebind] = useState(false)
@@ -136,7 +139,7 @@ export function MySettingsPage() {
   const handleLogout = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('end_use') } catch {
-      setClearing(false); setClearError('本机登录尚未清除，请重试。需要帮助时，请查看《隐私政策》里的联系方式。')
+      setClearing(false); setClearError(`本机登录尚未清除，请重试。${help}`)
     }
   }
 
@@ -144,7 +147,7 @@ export function MySettingsPage() {
   const handleSwitch = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('switch_account') } catch {
-      setClearing(false); setClearError('还不能切换账号，请重试。需要帮助时，请查看《隐私政策》里的联系方式。')
+      setClearing(false); setClearError(`还不能切换账号，请重试。${help}`)
     }
   }
 
@@ -186,7 +189,7 @@ export function MySettingsPage() {
 
   return (
     <div className="settings-page fusion-w5" data-kiosk-screen="member-settings" data-qx-view="settings" data-state={screenState} data-testid={`member-settings-state-${screenState}`} data-takeaway="本人账号设置与授权状态">
-    <MeTouchShell title="账号设置" sub="换号、管理授权或结束使用，都在这里。"
+    <MeTouchShell eyebrow="我的 · 账号设置" title="账号设置" sub="换号、管理授权或结束使用，都在这里。"
       status={{ tone: jobAi === 'error' ? 'warn' : 'unknown', label: isLoggedIn ? '公共设备，请保护个人信息' : '当前是游客' }}
       backLabel="返回我的"
       onBack={() => navigate('/profile')}

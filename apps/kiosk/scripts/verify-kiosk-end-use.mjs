@@ -164,8 +164,8 @@ check(
 )
 check(/ask: needsHandoverConfirm\(\)/.test(gate) && /decision\.key !== location\.key/.test(gate), '每换一次地址（含后退、深链）重新判一次')
 check(
-  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我"/.test(gate) && /<SettingsConfirm/.test(gate),
-  '确认层复用 2.0 确认弹层：「还是你吗？」「是我，继续」「不是我」',
+  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我，结束上一位的使用"/.test(gate) && /<SettingsConfirm/.test(gate) && /back=\{false\}/.test(gate) && /nav=\{false\}/.test(gate) && !/ask=\{\{/.test(gate),
+  '确认层复用卡片确认：「还是你吗？」「是我，继续」「不是我，结束上一位的使用」，且没有返回、底导航和问小青',
 )
 check(/markKioskPresenceConfirmed\(\)/.test(code('src/auth/AuthContext.tsx')), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
 

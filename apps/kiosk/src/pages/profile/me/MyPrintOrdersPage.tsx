@@ -277,7 +277,7 @@ export function MyPrintOrdersPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载打印订单" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已建立的订单不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="打印订单这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已建立的订单不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
       <>
@@ -286,7 +286,7 @@ export function MyPrintOrdersPage() {
           <span className="qx-me-banner-ico" aria-hidden="true"><PrinterIcon size={34} /></span>
           <span className="qx-me-banner-main">
             <h2 className="qx-me-banner-t">还没有打印订单</h2>
-            <span className="qx-me-banner-p">完成一次打印后，这里会显示你的打印记录。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
+            <span className="qx-me-banner-p">还没有打印订单。没登录时在这台机器上打的单不会进这个账号。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
@@ -424,7 +424,7 @@ export function MyPrintOrdersPage() {
       view="orders"
       screen="member-list"
       screenState={`orders-${uiState}`}
-      eyebrow="我的文档和订单"
+      eyebrow="我的 · 打印订单"
       ask={<>打印到哪一步，<em>一眼看清</em>。</>}
       doing={DOING[uiState]}
       truth={allLoadedFree

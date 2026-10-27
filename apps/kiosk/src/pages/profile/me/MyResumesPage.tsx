@@ -102,7 +102,7 @@ export function MyResumesPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的简历" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="简历记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的简历不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="简历记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的简历不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
       <>
@@ -118,7 +118,7 @@ export function MyResumesPage() {
           <QxMeStartRow icon={UploadIcon} title="上传一份现有简历" desc="上传后可以做诊断、优化，并生成可打印的版本" label="去上传" route="/resume/source" testid="member-records-start-upload" onClick={() => navigate('/resume/source')} />
           <QxMeStartRow icon={ScanLineIcon} tone="slate" title="扫描纸质简历" desc="把纸质简历扫成 PDF，再走同一条诊断流程" label="去扫描" route="/scan/start" testid="member-records-start-scan" onClick={() => navigate('/scan/start')} />
           <QxMeStartRow icon={SparklesIcon} tone="plum" title="让 AI 生成一份新简历" desc="按引导逐段生成，可直接打印" label="去生成" route="/resume/generate" testid="member-records-start-generate" onClick={() => navigate('/resume/generate')} />
-          <div className="qx-me-legal">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历会显示在这里。<b>空就是空</b>，本页不会造几条记录让页面好看。</div>
+          <div className="qx-me-legal">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历会显示在这里。</div>
         </section>
         <QxMeGuide items={[['怎么产生', '登录后上传或生成', '游客上传不会自动绑定到账号'], ['这里显示什么', '记录名称与保存期限', '不展示简历原文或诊断正文'], ['留存', '原始简历短留存', '到期后无法恢复']]} />
       </>
@@ -192,7 +192,7 @@ export function MyResumesPage() {
       view="resumes"
       screen="member-list"
       screenState={`resumes-${uiState}`}
-      eyebrow="我的简历"
+      eyebrow="我的 · 简历"
       ask={<>你的简历，<em>都在这里</em>。</>}
       doing={<>只显示<b>本人简历服务记录</b>，不展示简历原文或诊断正文。</>}
       truth="只展示本人简历记录；原始简历短留存，到期后无法恢复，不向企业提供或投递。"
@@ -219,8 +219,8 @@ function QxMeBannerEmpty() {
     <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
       <span className="qx-me-banner-ico" aria-hidden="true"><FileTextIcon size={34} /></span>
       <span className="qx-me-banner-main">
-        <h2 className="qx-me-banner-t">还没有登录后保存的简历</h2>
-        <span className="qx-me-banner-p">公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历才会出现在这里。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
+        <h2 className="qx-me-banner-t">这个账号还没有简历记录</h2>
+        <span className="qx-me-banner-p">这个账号还没有简历记录。公共一体机上的游客上传不会自动绑定到账号。</span>
       </span>
       <span className="qx-me-banner-mini"><i>共 0</i></span>
     </section>

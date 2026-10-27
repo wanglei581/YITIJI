@@ -108,11 +108,11 @@ export function MyActivityPage() {
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看本人记录" desc="游客模式不把浏览记录留到下一次使用，也不保存你自己填写的求职进度；这台机器不留存这些明细。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看本人记录" desc={showJobProgressTab ? '游客模式不把浏览记录留到下一次使用，也不保存你自己填写的求职进度；这台机器不留存这些明细。' : '游客模式不把浏览记录留到下一次使用。只记录浏览和打开，不记录你在别的平台办了什么。'} struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载本人记录" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (tab === 'applications') {
     body = applications.length === 0 ? (
       <>
@@ -180,7 +180,7 @@ export function MyActivityPage() {
           )}
           <div className="qx-me-legal">
             {browseTab
-              ? <>{hostingOpen ? '浏览岗位 / 招聘会 / 政策 / 企业之后' : '浏览政策之后'}，这里会出现你的浏览记录。{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : '当前没有这一类记录。'}本页不会造记录让页面好看。</>
+              ? <>这里还没有记录。只记你在这台机器上浏览和打开的来源。{pagination.nextCursor ? '已加载的记录中没有这一类，可继续加载较早记录。' : ''}</>
               : <>打开来源平台或官方入口之后，这里会出现记录。<b>是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。</b></>}
           </div>
         </section>
@@ -250,12 +250,17 @@ export function MyActivityPage() {
       view="activity"
       screen="member-list"
       screenState={`activity-${uiState}`}
-      eyebrow="我的足迹"
-      ask={<>看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。</>}
-      doing={<>浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。</>}
-      truth={tab === 'applications'
+      eyebrow="我的 · 浏览记录"
+      sub={showJobProgressTab ? undefined : '只记录浏览和打开，不记录你在别的平台办了什么'}
+      ask={showJobProgressTab
+        ? <>看过什么、去过哪个来源、自己记了哪些进度，<em>都能回看</em>。</>
+        : <>只记录浏览和打开，<em>不记录你在别的平台办了什么</em>。</>}
+      doing={showJobProgressTab
+        ? <>浏览与跳转只记录<b>动作本身</b>；求职进度<b>由你自己填写</b>。</>
+        : <>只记录浏览和打开，不记录你在别的平台办了什么。</>}
+      truth={showJobProgressTab
         ? '本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。'
-        : '本终端不参与投递，也不掌握来源平台的处理结果；求职进度仅你可见，不会提供给企业或来源机构。'}
+        : '只记录浏览和打开，不记录你在别的平台办了什么。'}
       ctabar={recordsCtabar(uiState === 'login' || uiState === 'loading' || uiState === 'error' ? uiState : 'ready', navigate, () => setReloadKey((k) => k + 1), loginFrom, primaryLabel, primaryGo)}
     >
       {body}

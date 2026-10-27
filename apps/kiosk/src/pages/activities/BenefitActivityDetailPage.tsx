@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { MeTouchShell } from '../profile/touch/MeTouchShell'
+import { MeErrorPack, MeLoadingPack } from '../profile/touch/MeStatePacks'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
 import {
   CheckCircleIcon,
@@ -139,19 +139,25 @@ export function BenefitActivityDetailPage() {
     <div className="fusion-w5 fusion-w5--profile k8-act-detail h-full">
     <MeTouchShell
       nav={false}
-      title="权益活动详情"
-      sub="领取后会进入本人「我的权益」"
+      eyebrow={item ? `权益活动 · ${SOURCE_LABEL[item.sourceType]} · ${TYPE_META[item.benefitType].label}` : '权益活动'}
+      title={state === 'loading' ? '正在读取' : state === 'error' || !item ? '这次没读到' : item.title}
+      sub={state === 'loading' ? '请稍等' : state === 'error' || !item ? '可以再试一次' : `${stockText(item)} · 领取后仍留在这一页`}
       backLabel="返回活动"
       onBack={() => navigate('/activities')}
-      status={{ tone: 'unknown', label: '以活动说明为准' }}
+      status={{ tone: state === 'error' ? 'warn' : 'unknown', label: state === 'loading' ? '正在读取' : item ? stockText(item) : '这次没读到' }}
       ask={{ label: '问小青：领了之后在哪里看？', draft: '领了之后在哪里看？' }}
+      primaryNode={state === 'ready' && item ? (
+        <button type="button" className="qx-btn" data-variant="secondary" onClick={() => navigate('/me/benefits')}>
+          我的权益
+        </button>
+      ) : undefined}
     >
 
       <section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="k8-act-scroll">
         {state === 'loading' ? (
-          <LoadingState className="py-20" />
+          <MeLoadingPack rows={6} />
         ) : state === 'error' || !item ? (
-          <ErrorState className="py-20" onRetry={load} />
+          <MeErrorPack onRetry={load} />
         ) : (
           <>
             {/* Hero card */}
@@ -167,7 +173,7 @@ export function BenefitActivityDetailPage() {
                     {stockText(item)}
                   </span>
                 </div>
-                <h2 className="k8-act-title">{item.title}</h2>
+                <p className="k8-act-title">{item.title}</p>
                 {item.description && <p className="k8-act-desc">{item.description}</p>}
               </div>
             </section>
@@ -254,20 +260,12 @@ export function BenefitActivityDetailPage() {
                   ? <><CheckCircleIcon />{!claiming && '查看我的权益'}</>
                   : <><SunIcon />{primaryLabel()}</>}
               </button>
-              <button
-                type="button"
-                className="k8-act-btn ghost"
-                onClick={() => navigate('/me/benefits')}
-                aria-label="我的权益"
-              >
-                我的权益
-              </button>
             </div>
 
             {/* 底部说明 */}
             <p className="k8-act-notice" role="note">
               <InfoIcon aria-hidden="true" />
-              未登录时显示「登录后领取」；已领取后显示「查看我的权益」；已领完或已结束时不可领取。
+              <span>领取不代表报名或投递，只在这台机器使用。抵扣功能尚未开放。</span>
             </p>
           </>
         )}

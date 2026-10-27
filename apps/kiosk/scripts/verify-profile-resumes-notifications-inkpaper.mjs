@@ -66,7 +66,8 @@ expectIncludes(resumes, 'taskId: item.taskId, resumeName: resumeLabel(item)', '�
 expectIncludes(resumes, "taskPath('/resume/generate/preview', taskId)", '我的简历保留 AI 生成预览跳转')
 expectIncludes(resumes, "item.status === 'completed'", '我的简历保留完成态才可操作')
 expectIncludes(resumes, 'recordUnavailableReason(item)', '我的简历保留未完成/失败禁用原因')
-expectIncludes(resumes, '还没有登录后保存的简历', '我的简历保留空态标题')
+// 证据锚点随稿换字，判据不变：空态仍说明这个账号还没有简历，不造记录。
+expectIncludes(resumes, '这个账号还没有简历记录', '我的简历保留空态标题')
 expectIncludes(resumes, '公共一体机上的游客上传不会自动绑定到账号', '我的简历保留游客上传不自动绑定说明')
 expectIncludes(resumes, "navigate('/resume/source')", '我的简历保留上传入口跳转')
 expectIncludes(resumes, '不向企业提供或投递', '我的简历保留合规边界说明')

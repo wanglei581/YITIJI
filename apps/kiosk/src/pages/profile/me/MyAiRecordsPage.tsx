@@ -30,6 +30,7 @@ import { useAuth } from '../../../auth/useAuth'
 import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { formatTime } from '../assets/format'
 import { QxMeGuide, QxMePage, QxMeSummary, recordsCtabar } from './qx/QxMeChrome'
+import { MeAiChip } from '../touch/MeStatePacks'
 import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStartRow, QxMeStructRow } from './qx/QxMeStateBits'
 import { JobAiSessionRecords } from './JobAiSessionRecords'
 import { MockInterviewRecords } from './MockInterviewRecords'
@@ -270,7 +271,7 @@ export function MyAiRecordsPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载 AI 服务记录" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="AI 服务记录这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (empty) {
     body = (
       <>
@@ -278,7 +279,7 @@ export function MyAiRecordsPage() {
           <span className="qx-me-banner-ico" aria-hidden="true"><SparklesIcon size={34} /></span>
           <span className="qx-me-banner-main">
             <h2 className="qx-me-banner-t">还没有 AI 服务记录</h2>
-            <span className="qx-me-banner-p">{hostingOpen ? '完成小青作业、简历诊断、优化、模拟面试、岗位 AI 参考、职业规划或参会准备后，这里会显示记录。' : '完成小青作业、简历诊断、优化、模拟面试、简历对照或职业规划后，这里会显示记录。'}<b>空就是空</b>。</span>
+            <span className="qx-me-banner-p">还没有 AI 服务记录。做过诊断、优化、生成、规划或模拟面试之后，会出现在这里。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
@@ -348,6 +349,7 @@ export function MyAiRecordsPage() {
                     <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
                   </span>
                   <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.kind === 'fair_visit_plan' && item.ref?.name ? item.ref.name : kind.hint}</span>
+                  <MeAiChip />
                   <span className="qx-me-row-sub">{metaLine(item)}</span>
                   {openReason ? <span className="qx-me-reason">{openReason}</span> : null}
                   {confirming && item.kind === 'parse' ? <span className="qx-me-reason">删除这条诊断记录时，会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。</span> : null}
@@ -407,7 +409,7 @@ export function MyAiRecordsPage() {
       view="ai-records"
       screen="member-list"
       screenState={`ai-records-${uiState}`}
-      eyebrow="AI 服务记录"
+      eyebrow="我的 · AI 服务记录"
       ask={<>AI 帮你做过什么，<em>一条不落</em>。</>}
       doing={<>只展示<b>服务记录</b>，不展示简历原文、诊断正文或模型原始输出。</>}
       truth="删除后不可恢复；删除简历诊断记录会同时删除这份简历的优化稿、简历对照、职业规划及相关 AI 分析记录。"

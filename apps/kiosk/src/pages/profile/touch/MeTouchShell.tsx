@@ -17,7 +17,9 @@ export type { MeBandStatus }
  */
 export function MeTouchShell({
   title,
+  eyebrow,
   sub,
+  titleId,
   status,
   showPrinter = false,
   back = true,
@@ -32,7 +34,9 @@ export function MeTouchShell({
   bodyClassName = 'qxt-body-scroll qxt-me-pad',
 }: {
   title: string
+  eyebrow?: string
   sub?: string
+  titleId?: string
   status?: MeBandStatus | null
   showPrinter?: boolean
   back?: boolean
@@ -50,42 +54,48 @@ export function MeTouchShell({
   const device = useTerminalDeviceStatus()
   const bandStatus = showPrinter ? printerTouchStatus(device) : toTouchStatus(status)
   const place = getTerminalCode() || undefined
+  // 返回、问小青、主按钮都没有时不挂底栏。交接屏靠这个只留两张答案卡。
+  const showDock = back || Boolean(ask) || primaryNode != null
   return (
-    <QxTouchScreen
-      testId={testId}
-      stateId={stateId}
-      bodyClassName={bodyClassName}
-      band={(
-        <QxTouchBand
-          kind="compact"
-          title={title}
-          sub={sub}
-          status={bandStatus}
-          back={back}
-          onBack={onBack}
-          seal="idle"
-          place={place}
-        />
-      )}
-      dock={(
-        <QxTouchDock
-          back={back}
-          backLabel={backLabel}
-          onBack={onBack}
-          ask={ask}
-          primaryNode={primaryNode}
-        />
-      )}
-      nav={nav ? (
-        <QxTouchNav
-          current="profile"
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-        />
-      ) : undefined}
-    >
-      {children}
-    </QxTouchScreen>
+    <div data-qx-page="me" className="qxt-me-root">
+      <QxTouchScreen
+        testId={testId}
+        stateId={stateId}
+        bodyClassName={bodyClassName}
+        band={(
+          <QxTouchBand
+            kind="compact"
+            eyebrow={eyebrow}
+            title={title}
+            titleId={titleId}
+            sub={sub}
+            status={bandStatus}
+            back={back}
+            onBack={onBack}
+            seal="idle"
+            place={place}
+          />
+        )}
+        dock={showDock ? (
+          <QxTouchDock
+            back={back}
+            backLabel={backLabel}
+            onBack={onBack}
+            ask={ask}
+            primaryNode={primaryNode}
+          />
+        ) : undefined}
+        nav={nav ? (
+          <QxTouchNav
+            current="profile"
+            onHome={() => navigate('/')}
+            onAdvisor={() => navigate('/assistant')}
+            onProfile={() => navigate('/profile')}
+          />
+        ) : undefined}
+      >
+        {children}
+      </QxTouchScreen>
+    </div>
   )
 }

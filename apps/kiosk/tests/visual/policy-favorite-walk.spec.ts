@@ -274,7 +274,7 @@ test('政策找不到时说明打不开，并能去看其他政策或回到收�
   await expect(page.getByText('这条政策现在打不开', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /返回我的收藏/ }).click()
   await page.waitForURL((url) => url.pathname === '/me/favorites')
-  await expect(page.getByText('登录后查看我的收藏')).toBeVisible()
+  await expect(page.getByText('登录后看你的收藏', { exact: true })).toBeVisible()
 })
 
 test('这次没读到可以再试一次，成功后打开那一条 @kiosk', async ({ page }) => {

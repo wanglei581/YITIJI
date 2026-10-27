@@ -46,7 +46,7 @@ const RECORD_VIEWS: QxMeTab[] = [
   { key: 'favorites', label: '收藏', hint: '岗位·招聘会·政策', to: '/me/favorites' },
   // 稿 39：页签副标题写「名称和状态」，不写「元数据」（v2 规则 4，2026-09-30 A 批）。
   { key: 'ai-records', label: 'AI记录', hint: '名称和状态', to: '/me/ai-records' },
-  { key: 'activity', label: '足迹', hint: '浏览·跳转·进度', to: '/me/activity' },
+  { key: 'activity', label: '足迹', hint: '浏览·跳转', to: '/me/activity' },
 ]
 
 /* 稿 38：文档与打印订单是同一块「本人资产」的两个分域，互相切换，不混进上面四个记录分类。 */
@@ -61,8 +61,7 @@ export function QxMePage({
   screen,
   screenState,
   eyebrow,
-  ask,
-  doing,
+  sub,
   truth,
   toast,
   ctabar,
@@ -77,6 +76,8 @@ export function QxMePage({
   screen: 'member-list' | 'activity-detail' | 'member-settings'
   screenState: string
   eyebrow: string
+  /** 意图带副题。不传时按页面给一句稿上的副题。 */
+  sub?: string
   ask: ReactNode
   doing: ReactNode
   truth: string
@@ -91,7 +92,8 @@ export function QxMePage({
   children: ReactNode
 }) {
   const navigate = useNavigate()
-  const contact = useSupportContact()
+  // 未登录登录门不读服务电话：这条请求也是 /api/v1/，账号资产页未登录必须是 0 条。
+  const contact = useSupportContact(!/(?:^|-)login$/.test(screenState))
   // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
   const hostingOpen = useRecruitmentHosting().enabled
   const isAssetView = view === 'documents' || view === 'orders'
@@ -106,6 +108,47 @@ export function QxMePage({
   const pageClass = isAssetView ? 'qx-me-page qx-me-assets' : isSettingsView ? 'qx-me-page qx-me-settings' : 'qx-me-page'
   const showPrinter = view !== 'settings' && view !== 'activity-detail'
   const goBack = onBack ?? (() => navigate(view === 'activity-detail' ? '/me/activity' : '/profile'))
+  const phase = /(?:^|-)login$/.test(screenState)
+    ? 'login'
+    : /(?:^|-)loading$/.test(screenState)
+      ? 'loading'
+      : /(?:^|-)error$/.test(screenState)
+        ? 'error'
+        : 'ready'
+  const loginWhat: Partial<Record<QxMeView, string>> = {
+    notifications: '消息',
+    resumes: '简历',
+    favorites: '收藏',
+    'ai-records': 'AI 服务记录',
+    activity: '浏览与跳转记录',
+    'activity-detail': '这条记录',
+    documents: '文档',
+    orders: '打印订单',
+  }
+  const readySub: Partial<Record<QxMeView, string>> = {
+    notifications: '只有你本人能看到',
+    resumes: '不显示简历原文',
+    favorites: '只收藏政策',
+    'ai-records': '列表不显示原文、提示词和输出全文',
+    activity: '只记录浏览和打开，不记录你在别的平台办了什么',
+    'activity-detail': '只记你在这台机器上看过的',
+    documents: '文件名、大小、上传时间和保存期限',
+    orders: '进度和到机码',
+  }
+  const bandTitle = phase === 'login' && loginWhat[view]
+    ? `登录后看你的${loginWhat[view]}`
+    : phase === 'error'
+      ? '这次没读到'
+      : phase === 'loading'
+        ? '正在读取'
+        : title
+  const bandSub = phase === 'login'
+    ? '只有你本人能看到'
+    : phase === 'error'
+      ? '可以再试一次'
+      : phase === 'loading'
+        ? '请稍等'
+        : (sub ?? readySub[view])
   const miniLine = view === 'orders'
     ? whenMiniapp(contact, '打印订单在手机小程序里也能看到。')
     : view === 'documents'
@@ -114,8 +157,9 @@ export function QxMePage({
 
   return (
     <MeTouchShell
-      title={title}
-      sub={eyebrow}
+      eyebrow={eyebrow}
+      title={bandTitle}
+      sub={bandSub}
       showPrinter={showPrinter}
       status={showPrinter ? undefined : { tone: 'unknown', label: '以你账号里的实际记录为准' }}
       backLabel={backLabel ?? (view === 'activity-detail' ? '返回记录' : '返回我的')}
@@ -131,17 +175,6 @@ export function QxMePage({
         data-testid={`${testScope}-state-${screenState}`}
         aria-live={live ? 'polite' : undefined}
       >
-        <section className="qx-me-xq">
-          <div className="qx-me-xq-row">
-            <div className="qx-me-xq-face" aria-hidden="true">青</div>
-            <div>
-              <div className="qx-me-xq-eyebrow">{eyebrow}</div>
-              <p className="qx-me-xq-ask">{ask}</p>
-              <p className="qx-me-xq-doing">{doing}</p>
-            </div>
-          </div>
-        </section>
-
         {tabs.length > 0 ? (
           <nav
             className="qx-me-viewtabs"
@@ -176,10 +209,13 @@ export function QxMePage({
 
         {children}
 
-        {view === 'ai-records' ? <p className="qxt-fine">AI 生成，仅供参考</p> : null}
-        {miniLine ? <p className="qxt-me-sync">{miniLine}</p> : null}
-        <p className="qxt-fine">{helpNeededLine(contact)}</p>
-        <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
+        {phase === 'login' ? null : (
+          <>
+            {miniLine ? <p className="qxt-me-sync">{miniLine}</p> : null}
+            <p className="qxt-fine">{helpNeededLine(contact)}</p>
+            <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
+          </>
+        )}
       </div>
     </MeTouchShell>
   )
@@ -267,7 +303,7 @@ export function recordsCtabar(
 ): ReactNode {
   if (uiState === 'error' || uiState.endsWith('error')) {
     return (
-      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>重新读取</button>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>重新加载</button>
     )
   }
   if (uiState === 'login' || uiState.endsWith('login')) {
@@ -293,6 +329,6 @@ export const QX_ME_GUIDE = {
   error: [
     ['数据', '已保存内容不受影响', '这次加载失败不会删除任何记录'],
     ['先试这个', '检查网络后重试', '重试不会重复创建记录'],
-    ['仍不行', '看本页的服务电话', '读不到号码时不显示电话'],
+    ['仍不行', '先去办别的', '回到首页继续打印、扫描或查政策'],
   ],
 } as const satisfies Record<string, [string, string, string][]>

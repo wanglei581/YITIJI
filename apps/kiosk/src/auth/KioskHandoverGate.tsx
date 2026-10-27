@@ -37,28 +37,32 @@ export function KioskHandoverGate() {
   return (
     <div className="h-full" data-kiosk-screen="handover-confirm" data-testid="handover-confirm-page">
       <MeTouchShell
+        eyebrow="继续使用前"
         title="还是你吗？"
-        sub="先确认是不是本人，再打开个人资料。"
+        titleId="handover-title"
+        sub="离开屏幕超过 30 秒后再进来，会先问这一句"
         status={{ tone: 'warn', label: '待确认是不是你' }}
-        backLabel="返回首页"
-        ask={{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' }}
+        back={false}
+        nav={false}
       >
-        <p>
-          这台机器上有人登录着，已经有一会儿没人点屏幕了。本人请点「是我，继续」；不是的话点「不是我」，会结束上一位的使用并回到首页。确认之前不显示上一位的文件、订单或手机号。
-        </p>
-      <SettingsConfirm
-        layout="cards"
-        testId="handover-confirm"
-        title="还是你吗？"
-        description="这台机器上有人登录着，已经有一会儿没人点屏幕了。不是本人请点「不是我」，会结束上一位的使用并回到首页。"
-        confirmLabel="是我，继续"
-        cancelLabel="不是我"
-        onConfirm={() => {
-          markKioskPresenceConfirmed()
-          setDecision({ key: location.key, ask: false })
-        }}
-        onCancel={() => endKioskUse('handover')}
-      />
+        <p id="handover-desc">确认之前不会显示上一位的文件和订单。</p>
+        <SettingsConfirm
+          layout="cards"
+          testId="handover-confirm"
+          labelledBy="handover-title"
+          describedBy="handover-desc"
+          title="还是你吗？"
+          description="确认之前不会显示上一位的文件和订单。"
+          confirmLabel="是我，继续"
+          confirmDetail="接着看简历、文档和订单。"
+          cancelLabel="不是我，结束上一位的使用"
+          cancelDetail="退出登录，并清掉这台机器上这一次的临时信息。"
+          onConfirm={() => {
+            markKioskPresenceConfirmed()
+            setDecision({ key: location.key, ask: false })
+          }}
+          onCancel={() => endKioskUse('handover')}
+        />
       </MeTouchShell>
     </div>
   )

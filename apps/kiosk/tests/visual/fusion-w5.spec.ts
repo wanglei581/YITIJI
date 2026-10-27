@@ -90,7 +90,7 @@ async function completeVisibleLogin(page: Page, returnTo: string): Promise<void>
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
   await page.getByRole('button', { name: '收起键盘', exact: true }).click()
   await page.getByRole('button', { name: '确认登录', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === returnTo)
+  await page.waitForURL((url) => `${url.pathname}${url.search}` === returnTo || url.pathname === returnTo)
 }
 
 function registerMemberLogin(api: ApiRouter): void {
@@ -326,9 +326,9 @@ test('profile permission state uses the canonical fusion shell @w5-kiosk', async
   })
   await page.goto('/profile')
   await expect(page.locator('[data-kiosk-screen="profile"]')).toBeVisible()
-  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(2)
+  await expect(page.getByRole('button', { name: '去登录', exact: true })).toHaveCount(1)
   await expect(page.getByRole('region', { name: '我的资产' })).toHaveCount(0)
-  await expect(page.getByRole('region', { name: '登录与不登录的分界' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '不登录也能办' })).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
 
@@ -342,13 +342,13 @@ test('resumes expose authenticated API error and recovered empty states through 
   })
 
   await loginThroughVisibleUi(page, '/me/resumes')
-  await expect(page.getByRole('heading', { name: '简历记录这次没有加载出来' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这次没读到', exact: true })).toBeVisible()
   api.respond('GET', '/api/v1/me/resumes', {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByText('还没有登录后保存的简历', { exact: true })).toBeVisible()
+  await expect(page.getByText('这个账号还没有简历记录', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '简历记录概览' })).toContainText('0')
   await expectFusionAcceptance(page, errors)
 })
@@ -358,14 +358,14 @@ test('notification alias and member path render the same canonical capability @w
   registerKioskShell(api)
 
   await page.goto('/me/notifications')
-  await expect(page.getByRole('heading', { name: '消息通知' })).toBeVisible()
-  await expect(page.getByText('登录后查看本人消息', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录后看你的消息', exact: true })).toBeVisible()
+  await expect(page.getByText('用手机号和验证码，或在手机上扫码确认。登录后会回到这一页。', { exact: true })).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="member-list"]')).toBeVisible()
   await expectFusionAcceptance(page, errors)
 
   await page.goto('/notifications')
-  await expect(page.getByRole('heading', { name: '消息通知' })).toBeVisible()
-  await expect(page.getByText('登录后查看本人消息', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录后看你的消息', exact: true })).toBeVisible()
+  await expect(page.getByText('用手机号和验证码，或在手机上扫码确认。登录后会回到这一页。', { exact: true })).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="member-list"]')).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
@@ -397,7 +397,7 @@ test('activity detail remains permission-safe without a member token @w5-kiosk',
   registerKioskShell(api)
   await page.goto('/me/activity/browse-fixture-001')
   await expect(page.locator('[data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expect(page.getByText('登录后查看本人记录', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录后看你的这条记录', exact: true })).toBeVisible()
   await expect(page.getByText(/投递或预约结果以来源平台为准/)).toHaveCount(0)
   await expectFusionAcceptance(page, errors)
 })
@@ -549,7 +549,8 @@ test('benefit activity detail keeps the shared shell, real content and return pa
 
   await page.goto('/activities/w5-benefit-detail')
   await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
-  await expectSharedPageShell(page, '权益活动详情')
+  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
+  await expect(page.locator('.qxt-back')).toHaveCount(1)
   await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
   await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
   const backButton = page.getByRole('button', { name: /返回活动/ }).first()
@@ -1128,27 +1129,25 @@ test('activity jump records stay action facts and never show fulfillment statuse
   await expectFusionAcceptance(page, errors)
 })
 
-test('applications empty tab names the writer and does not invent ATS status @w5-kiosk', async ({ page, api }) => {
+test('applications tab stays hidden and a direct tab link falls back to browse @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
   registerAuthenticatedShell(api)
   api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
   api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
   api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  let jobApplicationRequests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/me/job-applications') jobApplicationRequests += 1
+  })
 
-  await loginThroughVisibleUi(page, '/me/activity')
-  await page.getByRole('button', { name: /求职进度/ }).click()
-  const panel = page.getByTestId('member-records-application-list')
-  await expect(panel).toBeVisible()
-  await expect(
-    page.getByText('由你自己填写；本终端不参与投递，也不掌握来源平台的结果', { exact: true }),
-  ).toBeVisible()
-  await expect(page.getByText('手填入口待建设')).toBeVisible()
-  await expect(page.getByText('本页不会替你造进度')).toBeVisible()
-  await expect(panel.getByText('已投递')).toHaveCount(0)
-  // 「查看岗位」在这一屏出现两处（空态引导行 + 底栏行动条），
-  // 本条要证的是「空态里给了一条真实去向」，所以限定在面板内查。
-  await expect(panel.getByRole('button', { name: '查看岗位' })).toBeVisible()
+  await loginThroughVisibleUi(page, '/me/activity?tab=applications')
+  await expect(page.getByRole('button', { name: /求职进度/ })).toHaveCount(0)
+  await expect(page.getByTestId('member-records-activity-tab-browse')).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByText('已投递')).toHaveCount(0)
+  await expect(page.getByText('待面试')).toHaveCount(0)
+  await expect(page.getByText('已录用')).toHaveCount(0)
+  expect(jobApplicationRequests, '默认不打开求职进度，也不去取那张表').toBe(0)
   await assertCtaWhitelist(page)
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
@@ -1286,7 +1285,9 @@ function memberPage(items: unknown[], nextCursor: string | null = null, total = 
 
 /** 旧壳（KioskLayout 深藏青顶栏 + 底栏）不得叠在青序页上；QX 登记漏掉时这里第一个红。 */
 async function expectQxAssetsShell(page: Page, state: string, tab: 'documents' | 'orders'): Promise<void> {
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
+  await expect(page.locator('.qxt-back')).toHaveCount(1)
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回我的', exact: true })).toBeVisible()
   await expect(page.getByTestId(`member-assets-state-${state}`)).toBeVisible()
   await expect(page.locator('.ui-kiosk-topbar'), '青序页不得再挂旧顶栏').toHaveCount(0)
   await expect(page.locator('.ui-kiosk-nav'), '青序页不得再挂旧底栏').toHaveCount(0)
@@ -1314,14 +1315,14 @@ test('documents: signed-out gate on the Qingxu shell sends zero member API reque
   registerKioskShell(api)
   await page.goto('/me/documents')
   await expectQxAssetsShell(page, 'documents-login', 'documents')
-  await expect(page.getByRole('heading', { name: '登录后查看我的文档' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录后看你的文档', exact: true })).toBeVisible()
   await assetShot(page, 'documents-login')
-  await expect(page.getByTestId('member-records-primary')).toHaveText('手机号登录')
+  await expect(page.getByTestId('member-records-primary')).toHaveText('去登录')
   expect(api.requestCount('GET', '/api/v1/me/documents')).toBe(0)
   await page.getByTestId('member-assets-tab-orders').click()
   await expect(page).toHaveURL(/\/me\/print-orders$/)
   await expectQxAssetsShell(page, 'orders-login', 'orders')
-  await expect(page.getByRole('heading', { name: '登录后查看打印订单' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录后看你的打印订单', exact: true })).toBeVisible()
   await assetShot(page, 'orders-login')
   expect(api.requestCount('GET', '/api/v1/me/print-orders')).toBe(0)
   await expectFusionAcceptance(page, errors)
@@ -1465,7 +1466,7 @@ test('documents and orders: error then empty come from the server, never a cache
 
   await loginThroughVisibleUi(page, '/me/documents')
   await expectQxAssetsShell(page, 'documents-error', 'documents')
-  await expect(page.getByRole('heading', { name: '文档这次没有加载出来' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这次没读到', exact: true })).toBeVisible()
   await assetShot(page, 'documents-error')
   api.respond('GET', '/api/v1/me/documents', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
@@ -1475,7 +1476,7 @@ test('documents and orders: error then empty come from the server, never a cache
 
   await page.getByTestId('member-assets-tab-orders').click()
   await expectQxAssetsShell(page, 'orders-error', 'orders')
-  await expect(page.getByRole('heading', { name: '打印订单这次没有加载出来' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这次没读到', exact: true })).toBeVisible()
   api.respond('GET', '/api/v1/me/print-orders', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
   await expect(page.getByRole('heading', { name: '还没有打印订单' })).toBeVisible()
@@ -1677,10 +1678,10 @@ function serverDown(code: string): { status: number; json: unknown } {
 
 /** 旧壳（深藏青顶栏 + 底栏 + 墨青纸感页框）不得叠在青序页上；QX 登记漏掉时这里第一个红。 */
 async function expectQxSettingsShell(page: Page, state: string): Promise<void> {
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
-  await expect(page.locator('.qx-topbar button')).toHaveCount(1)
-  await expect(page.locator('.qx-topbar button')).toHaveAccessibleName('返回我的')
-  await expect(page.locator('.qx-step-prev')).toHaveText('上一步')
+  await expect(page.locator('[data-qxt-screen]')).toBeVisible()
+  await expect(page.locator('.qxt-back')).toHaveCount(1)
+  await expect(page.locator('.qxt-back')).toHaveAccessibleName('返回上一步')
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回我的', exact: true })).toBeVisible()
   await expect(page.getByTestId(`member-settings-state-${state}`)).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="member-settings"]')).toBeVisible()
   await expect(page.locator('.ui-kiosk-topbar'), '青序页不得再挂旧顶栏').toHaveCount(0)
@@ -1724,7 +1725,7 @@ test('settings: guest state reads no account data, then returns to /me/settings 
   expect(api.requestCount('GET', CONSENT_STATUS)).toBe(0)
   await expectFusionAcceptance(page, errors)
 
-  await expect(page.getByTestId('member-settings-primary')).toHaveText('手机号登录')
+  await expect(page.getByTestId('member-settings-primary')).toHaveText('去登录')
   await page.getByTestId('member-settings-primary').click()
   await expect(page).toHaveURL(/\/login$/)
   await completeVisibleLogin(page, '/me/settings')

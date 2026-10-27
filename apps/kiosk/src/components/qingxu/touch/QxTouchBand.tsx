@@ -50,6 +50,7 @@ export function QxTouchBand({
   onBack,
   back = true,
   live = false,
+  titleId,
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -64,6 +65,8 @@ export function QxTouchBand({
   onBack?: () => void
   back?: boolean
   live?: boolean
+  /** 不传时标题没有 id，和以前一样。交接屏用它把对话框说明连到这句标题上。 */
+  titleId?: string
 }) {
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
@@ -104,7 +107,7 @@ export function QxTouchBand({
       <div className="qxt-ask">
         <div className="qxt-ask-t">
           {eyebrow ? <div className="qxt-eyebrow">{eyebrow}</div> : null}
-          <h1>{title}</h1>
+          <h1 id={titleId}>{title}</h1>
           {sub ? <p>{sub}</p> : null}
         </div>
         {seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}

@@ -317,11 +317,11 @@ export function MyDocumentsPage() {
 
   let body: ReactNode
   if (!isLoggedIn) {
-    body = <QxMeLoginBlock title="登录后查看我的文档" desc="公共一体机不会在未登录时展示文件名、保存期限或访问链接；游客上传不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
+    body = <QxMeLoginBlock title="登录后查看我的文档" printPick={pickPrint} desc="公共一体机不会在未登录时展示文件名、保存期限或访问链接；游客上传不会自动归入你的账号。" struct={struct} onJobs={() => navigate('/jobs')} onPrint={() => navigate('/print-scan')} />
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的文档" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="文档这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的文件不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="文档这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已保存的文件不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0 && !pagination.nextCursor) {
     body = (
       <>
@@ -329,8 +329,8 @@ export function MyDocumentsPage() {
         <section className="qx-me-banner" data-testid="qx-me-fallback" data-kind="empty">
           <span className="qx-me-banner-ico" aria-hidden="true"><FilesIcon size={34} /></span>
           <span className="qx-me-banner-main">
-            <h2 className="qx-me-banner-t">还没有文档</h2>
-            <span className="qx-me-banner-p">保存简历 / 打印材料等文档后，这里会显示你的文档记录。<b>空就是空</b>，本页不会造几条记录让页面好看。</span>
+            <h2 className="qx-me-banner-t">这里还没有文档</h2>
+            <span className="qx-me-banner-p">登录后上传的文档才会出现在这里。游客上传的文件不会自动归入你的账号。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
@@ -346,6 +346,7 @@ export function MyDocumentsPage() {
     body = (
       <>
         {summary}
+        {pickPrint ? <p className="qxt-me-lead">能打印的排在前面。选一份，接着做材料检查。</p> : null}
         <section className="qx-me-list qx-me-grow" data-testid="member-assets-list" aria-label="我的文档">
           {(pickPrint ? listed : items).map((doc) => {
             const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
@@ -461,17 +462,18 @@ export function MyDocumentsPage() {
     )
   }
 
-  const ctabar = recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/documents', uiState === 'empty' ? '添加文件' : '添加新文件', () => navigate('/print/upload'))
+  const ctabar = pickPrint ? null : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/documents', uiState === 'empty' ? '添加文件' : '添加新文件', () => navigate('/print/upload'))
 
   return (
     <QxMePage
       title={pickPrint ? '选一份来打印' : '我的文档'}
       view="documents"
       onBack={pickPrint ? () => navigate('/print/upload') : undefined}
-      backLabel={pickPrint ? '返回选文件' : undefined}
+      backLabel={pickPrint ? '返回' : undefined}
+      sub={pickPrint ? '点一份文档的「打印」，接着做材料检查' : undefined}
       screen="member-list"
       screenState={`documents-${uiState}`}
-      eyebrow="我的文档和订单"
+      eyebrow="我的 · 文档"
       ask={<>你的文件，<em>随时接着办</em>。</>}
       doing={DOING[uiState]}
       truth={

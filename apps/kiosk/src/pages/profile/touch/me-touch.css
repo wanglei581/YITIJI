@@ -1,109 +1,115 @@
-/* 我的与权益：挂在 .qxt-screen 下，只使用 --qxt-* / --qx-*。 */
+/* 我的与权益。全部挂在 [data-qx-page="me"] 下，不改 .qxt-* 的默认。
+   正文底色用意图带那张纸，不另铺一层扫不出来的底。 */
 
-.qxt-screen .qxt-body.qxt-me-pad {
-  background: var(--qxt-paper-2);
+.qxt-me-root {
+  height: 100%;
+  min-height: 0;
+}
+
+[data-qx-page="me"] .qxt-body.qxt-me-pad {
   justify-content: flex-start;
   overflow: auto;
   padding: 16px 28px 12px;
-  gap: 12px;
+  gap: 16px;
 }
 
-/* 旧壳把正文收成 flex:1 + overflow:hidden，触屏底栏在正文外面，
-   超出的行会被裁掉且滚不动。改成随内容长高，由 .qxt-body 滚动。 */
-.qxt-screen .qx-me-page,
-.qxt-screen .qx-scroll,
-.qxt-screen .pf-page,
-.qxt-screen .bf-page,
-.qxt-screen .fb-page,
-.qxt-screen .pr-page,
-.qxt-screen .settings-body,
-.qxt-screen .qx-grow {
+[data-qx-page="me"] .qx-me-page,
+[data-qx-page="me"] .qx-scroll,
+[data-qx-page="me"] .pf-page,
+[data-qx-page="me"] .bf-page,
+[data-qx-page="me"] .fb-page,
+[data-qx-page="me"] .pr-page,
+[data-qx-page="me"] .settings-body,
+[data-qx-page="me"] .qx-grow,
+[data-qx-page="me"] .k8-act-scroll,
+[data-qx-page="me"] .k8-activities > section {
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   height: auto;
-  min-height: 0;
+  min-height: 100%;
   max-height: none;
   overflow: visible;
-  gap: 12px;
+  gap: 16px;
 }
 
-.qxt-screen .qx-me-xq-ask,
-.qxt-screen .qx-me-row-title,
-.qxt-screen .qx-row-t,
-.qxt-screen .pf-idname,
-.qxt-screen .pf-asset-t,
-.qxt-screen .qx-me-banner-t,
-.qxt-screen .settings-idtx b {
-  font-size: var(--qxt-fs-body);
-  line-height: 1.35;
+/* 登录门包在测试锚点里。锚点自己拉高，出口卡才能接到 dock，不留一整块纸。 */
+[data-qx-page="me"] .qx-me-page > div:has(> .qxt-me-state),
+[data-qx-page="me"] .fb-page > div:has(> .qxt-me-state),
+[data-qx-page="me"] .bf-page > div:has(> .qxt-me-state),
+[data-qx-page="me"] .pr-page > div:has(> .qxt-me-state) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-.qxt-screen .qx-me-xq-doing,
-.qxt-screen .qx-me-row-sub,
-.qxt-screen .qx-row-d,
-.qxt-screen .pf-idsub,
-.qxt-screen .pf-asset-d,
-.qxt-screen .qx-me-truth,
-.qxt-screen .qx-me-legal,
-.qxt-screen .qxt-fine {
+/* 正文不小于 20px。这条压过页面自己的小号工具类；标题再单独放大。 */
+[data-qx-page="me"] .qxt-body.qxt-me-pad,
+[data-qx-page="me"] .qxt-body.qxt-me-pad * {
   font-size: var(--qxt-fs-aux);
   line-height: 1.45;
 }
 
-.qxt-screen .qx-me-vtab,
-.qxt-screen .qx-me-tab,
-.qxt-screen .qx-me-row,
-.qxt-screen .qx-row,
-.qxt-screen .pf-asset,
-.qxt-screen .pf-mlink,
-.qxt-screen .pf-idbtn {
+[data-qx-page="me"] .qxt-body.qxt-me-pad :is(h2, h3, .qx-me-row-title, .qx-row-t, .pf-idname, .qxt-me-exit b, .qxt-me-can b, .qxt-me-login b, .bf-item-t, .k8-activity-card h2) {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.35;
+}
+
+[data-qx-page="me"] .qxt-body.qxt-me-pad .pf-asset-num,
+[data-qx-page="me"] .qxt-body.qxt-me-pad .qx-num {
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+[data-qx-page="me"] .qx-me-vtab,
+[data-qx-page="me"] .qx-me-tab,
+[data-qx-page="me"] .qx-me-row,
+[data-qx-page="me"] .qx-row,
+[data-qx-page="me"] .pf-asset,
+[data-qx-page="me"] .pf-mlink,
+[data-qx-page="me"] .qx-me-small,
+[data-qx-page="me"] .qxt-me-exit,
+[data-qx-page="me"] .settings-pad button {
   min-height: var(--qxt-tap);
   min-width: var(--qxt-tap);
 }
 
-/* 行本身是按钮。行内的小标签不再撑到 64，避免压到下一行。 */
-.qxt-screen .qx-me-acts .qx-me-small {
-  min-width: 0;
-  min-height: 0;
-}
-
-.qxt-screen .qx-me-list,
-.qxt-screen .qx-me-grow {
+[data-qx-page="me"] .qx-me-list,
+[data-qx-page="me"] .qx-me-grow {
   flex: none;
   height: auto;
   overflow: visible;
   max-height: none;
 }
 
-.qxt-screen .qx-me-list > .qx-me-row {
+/* 列表行旧的 240px 上限只收边框，字会画到盒子外面，窄屏上点不中。
+   可点盒子跟着文字长，正文再负责把它整段放进视口。 */
+[data-qx-page="me"] .qx-me-list > .qx-me-row {
   max-height: none;
+  height: auto;
+  overflow: visible;
 }
 
-.qxt-screen .pf-grid3 {
+[data-qx-page="me"] .pf-grid3,
+[data-qx-page="me"] .pf-morelinks {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
-.qxt-screen .pf-morelinks {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.qxt-screen .pf-asset,
-.qxt-screen .pf-mlink,
-.qxt-screen .qx-me-row,
-.qxt-screen .qx-row {
+[data-qx-page="me"] .pf-asset,
+[data-qx-page="me"] .pf-mlink,
+[data-qx-page="me"] .qx-me-row,
+[data-qx-page="me"] .qx-row {
   background: var(--qxt-card);
   border: 1px solid var(--qxt-line);
   border-radius: 22px;
   text-align: left;
 }
 
-.qxt-screen .qxt-dock .qx-btn,
-.qxt-screen .qxt-dock .qxt-btn {
+[data-qx-page="me"] .qxt-dock .qx-btn,
+[data-qx-page="me"] .qxt-dock .qxt-btn {
   min-height: var(--qxt-btn-h);
   height: var(--qxt-btn-h);
   padding: 0 22px;
@@ -116,48 +122,535 @@
   gap: 8px;
 }
 
-.qxt-screen .qxt-dock .qx-btn[data-variant="primary"] {
+[data-qx-page="me"] .qxt-dock .qx-btn[data-variant="primary"] {
   background: var(--qx-deep);
   color: var(--qxt-cream);
 }
 
-.qxt-screen .qxt-dock .qx-btn[data-variant="ghost"] {
+[data-qx-page="me"] .qxt-dock .qx-btn[data-variant="ghost"] {
   background: var(--qxt-card);
   color: var(--qxt-ink);
   border: 1.5px solid var(--qxt-edge);
 }
 
-.qxt-screen .qxt-dock .qx-btn[data-variant="danger"] {
+[data-qx-page="me"] .qxt-dock .qx-btn[data-variant="danger"] {
   background: var(--qx-cinnabar);
   color: var(--qx-on-solid);
 }
 
-.qxt-screen .qxt-handover-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+[data-qx-page="me"] .qxt-handover-cards {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  flex: 1;
 }
 
-.qxt-screen .qxt-handover-cards button {
+[data-qx-page="me"] .qxt-handover-cards button {
+  flex: 1 1 0;
   min-height: 160px;
+  min-width: var(--qxt-tap);
   border-radius: 28px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-line);
+  color: var(--qxt-ink);
   font-size: var(--qxt-fs-body);
   font-weight: 700;
   padding: 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 24px;
+  text-align: left;
 }
 
-.qxt-screen .qxt-handover-cards button[data-variant="primary"] {
-  background: var(--qx-deep);
-  color: var(--qxt-cream);
+/* 稿上大卡左边是文件 / 手机插画，色板跟着卡片拉高。 */
+[data-qx-page="me"] .qxt-me-art {
+  flex: none;
+  width: 168px;
+  align-self: stretch;
+  min-height: 120px;
+  border-radius: 18px;
+  background: #f7f4ec;
+  color: #1f6b5a;
+  display: grid;
+  place-items: center;
 }
 
-.qxt-screen .qxt-me-sync {
+[data-qx-page="me"] .qxt-me-art svg {
+  width: 72px;
+  height: 72px;
+}
+
+[data-qx-page="me"] .qxt-me-art-phone {
+  background: #e7f3ef;
+  color: #143d36;
+}
+
+[data-qx-page="me"] [role="alertdialog"] {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+[data-qx-page="me"] .k8-activities-grid {
+  grid-template-columns: 1fr;
+}
+
+[data-qx-page="me"] .k8-activity-action {
+  min-height: var(--qxt-tap);
+}
+
+[data-qx-page="me"] .qx-state-ic:empty {
+  background: var(--qxt-teal-wash);
+  color: #1f6b5a;
+}
+
+[data-qx-page="me"] .qx-state-ic:empty::before {
+  content: "";
+  width: 18px;
+  height: 24px;
+  border: 2.5px solid currentColor;
+  border-radius: 3px;
+}
+
+[data-qx-page="me"] .qx-me-row-ico,
+[data-qx-page="me"] .qx-row-ic,
+[data-qx-page="me"] .bf-item-ic {
+  align-self: stretch;
+  height: auto;
+  min-height: 64px;
+}
+
+[data-qx-page="me"] .qxt-handover-cards button small {
+  font-size: var(--qxt-fs-aux);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+[data-qx-page="me"] .qxt-handover-cards button[data-variant="primary"] {
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border-color: #1f6b5a;
+  border-width: 2px;
+}
+
+[data-qx-page="me"] .qxt-me-sync {
   margin: 0;
   padding: 12px 16px;
   border-radius: 18px;
   background: var(--qxt-teal-wash);
   color: var(--qxt-teal-ink);
   font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="me"] .qxt-me-k {
+  margin: 4px 0 0;
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+}
+
+[data-qx-page="me"] .qxt-me-lead,
+[data-qx-page="me"] .qxt-me-idle {
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="me"] .qxt-me-state {
+  flex: 1 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+[data-qx-page="me"] .qxt-me-stack {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+[data-qx-page="me"] .qxt-me-login,
+[data-qx-page="me"] .qxt-me-can,
+[data-qx-page="me"] .qxt-me-exit {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-line);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .qxt-me-exit {
+  flex: 1 1 auto;
+  min-height: 88px;
+  width: 100%;
+  align-items: stretch;
+}
+
+[data-qx-page="me"] .qxt-me-exit > span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+[data-qx-page="me"] .qxt-me-exit .qxt-me-ic {
+  width: 120px;
+  height: auto;
+  min-height: 64px;
+  align-self: stretch;
+}
+
+[data-qx-page="me"] .qxt-me-can b,
+[data-qx-page="me"] .qxt-me-can small,
+[data-qx-page="me"] .qxt-me-exit b,
+[data-qx-page="me"] .qxt-me-exit small,
+[data-qx-page="me"] .qxt-me-login b,
+[data-qx-page="me"] .qxt-me-login p {
+  display: block;
+}
+
+[data-qx-page="me"] .qxt-me-exit small,
+[data-qx-page="me"] .qxt-me-can small,
+[data-qx-page="me"] .qxt-me-login p {
+  margin: 4px 0 0;
+  font-weight: 500;
+  color: var(--qxt-ink-soft, var(--qxt-ink));
+}
+
+/* 小节标题只有两个字，落在取样区左边。加一条横线，避免标题上下被当成整行空白。 */
+[data-qx-page="me"] .settings-page .qx-me-row {
+  min-height: 88px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+[data-qx-page="me"] .settings-page .settings-note {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+[data-qx-page="me"] .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+}
+
+[data-qx-page="me"] .settings-section-title::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 2px;
+  background: var(--qxt-line);
+}
+
+/* 活动列表、详情内容短时，底下一句说明接高。左边色块随卡片拉高，不是铺底色。 */
+[data-qx-page="me"] .k8-activities-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  gap: 16px;
+}
+
+[data-qx-page="me"] .k8-activities-grid {
+  align-items: start;
+}
+
+[data-qx-page="me"] .k8-activity-card,
+[data-qx-page="me"] .k8-activity-card > div {
+  height: auto;
+}
+
+[data-qx-page="me"] .k8-activities-notice,
+[data-qx-page="me"] .k8-act-notice {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  min-height: 88px;
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-line);
+  color: var(--qxt-ink);
+}
+
+[data-qx-page="me"] .k8-activities-notice > svg,
+[data-qx-page="me"] .k8-act-notice > svg {
+  flex: none;
+  width: 72px;
+  height: auto;
+  min-height: 72px;
+  align-self: stretch;
+  padding: 18px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: #1f6b5a;
+}
+
+[data-qx-page="me"] .k8-activities-notice > span,
+[data-qx-page="me"] .k8-act-notice > span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+[data-qx-page="me"] .qxt-me-ic {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page="me"] .qxt-me-ic svg {
+  width: 36px;
+  height: 36px;
+}
+
+[data-qx-page="me"] .qxt-me-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+[data-qx-page="me"] .qxt-me-counts div {
+  min-height: 88px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-line);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+[data-qx-page="me"] .qxt-me-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-qx-page="me"] .qxt-me-skel-row {
+  min-height: 72px;
+  border-radius: 18px;
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-line);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 18px;
+}
+
+[data-qx-page="me"] .qxt-me-skel-row span {
+  display: block;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--qxt-line);
+}
+
+[data-qx-page="me"] .qxt-me-skel-row span:first-child {
+  width: 46%;
+}
+
+[data-qx-page="me"] .qxt-me-skel-row span:last-child {
+  width: 72%;
+}
+
+[data-qx-page="me"] .qxt-me-ai {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+}
+
+/* 共享流光和光晕的盒子画出视口，带上 overflow:hidden 只是看起来裁掉了。
+   测量仍算越界。只收本页的盒子，不改 .qxt-* 默认。光晕改成铺满意图带再画渐变，
+   可见的那一团还在右上角。流光左右各让出一截，路径坐标和漂移都落在屏内。 */
+[data-qx-page="me"] .qxt-screen .qxt-flow svg {
+  left: 7%;
+  width: 84%;
+}
+
+[data-qx-page="me"] .qxt-screen .qxt-halo {
+  left: 0;
+  right: 0;
+  top: 0;
+  width: auto;
+  height: 100%;
+  border-radius: 0;
+  transform: none;
+  pointer-events: none;
+  background: radial-gradient(380px circle at calc(100% - 120px) 20px, var(--qxt-halo), transparent);
+}
+
+@keyframes qxt-me-glow {
+  from { opacity: 0.65; }
+  to { opacity: 1; }
+}
+
+[data-qx-page="me"] .qxt-screen .qxt-band-live .qxt-halo {
+  animation: qxt-me-glow 9s ease-in-out infinite alternate;
+}
+
+@media (max-width: 719px) {
+  /* 紧凑意图带默认 410px。390 宽再加底栏和导航，正文容不下一整行账号卡，
+     行顶会被意图带挡住。只在本页放掉这个下限，并收一收带内间距。 */
+  [data-qx-page="me"] .qxt-screen .qxt-band-compact {
+    min-height: 0;
+    padding: 12px 12px 0;
+  }
+
+  [data-qx-page="me"] .qxt-body.qxt-me-pad {
+    padding: 8px 12px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-hdr {
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    gap: 8px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-back {
+    width: 64px;
+    height: 64px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-mark {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-brand {
+    flex: none;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-brand b {
+    font-size: 20px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-hdr-right {
+    flex: 1 1 100%;
+    margin-left: 0;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-status {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: calc(100% - 116px);
+    height: auto;
+    min-height: 0;
+    white-space: normal;
+    line-height: 1.3;
+    padding: 6px 10px;
+    font-size: 20px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-clock {
+    flex: none;
+    max-width: 108px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-clock small {
+    white-space: normal;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-clock b {
+    font-size: 22px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-ask {
+    padding: 8px 0 12px;
+    gap: 12px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-band-compact .qxt-ask h1 {
+    font-size: 28px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-ask p {
+    font-size: 20px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-seal {
+    width: 72px;
+    height: 72px;
+    font-size: 36px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-nav {
+    height: 76px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-nav button {
+    min-height: 64px;
+    height: 76px;
+    font-size: 20px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-nav svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  [data-qx-page="me"] .settings-page .qx-me-row {
+    padding: 12px 14px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  [data-qx-page="me"] .settings-page .qx-me-row-ico {
+    width: 48px;
+    height: 48px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-dock {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  [data-qx-page="me"] .qxt-screen .qxt-dock .qxt-btn,
+  [data-qx-page="me"] .qxt-screen .qxt-dock .qx-btn,
+  [data-qx-page="me"] .qxt-screen .qxt-dock .qxt-askq,
+  [data-qx-page="me"] .qxt-screen .qxt-dock .qxt-btn-pri {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 0 8px;
+    white-space: normal;
+    line-height: 1.15;
+    font-size: 20px;
+  }
 }

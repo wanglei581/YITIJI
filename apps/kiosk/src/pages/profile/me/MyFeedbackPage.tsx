@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../auth/useAuth'
 import { API_MODE } from '../../../services/api/client'
+import { MeErrorPack, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import {
   addMyFeedbackReply,
@@ -204,8 +205,9 @@ export function MyFeedbackPage() {
       data-login-from={loginFrom}
     >
       <MeTouchShell
-        title="意见反馈"
-        sub="登录后提交的是本人工单，可以查看进度、追加描述和关闭。"
+        eyebrow="我的 · 意见反馈"
+        title={uiState === 'login' ? '登录后看你的反馈' : uiState === 'loading' || uiState === 'detail-loading' ? '正在读取' : uiState === 'error' || uiState === 'service-unavailable' ? '这次没读到' : '遇到什么问题了？'}
+        sub={form.category === 'ai_content' && !relatedPrintTaskId ? 'AI 内容投诉 5 个工作日内答复' : '其他反馈不承诺回复时限'}
         status={status}
         backLabel="返回我的"
         onBack={() => navigate('/profile')}
@@ -219,18 +221,31 @@ export function MyFeedbackPage() {
         )}
       >
         <div className="qx-scroll qx-grow fb-page">
-          <section className="fb-xq">
-            <div className="fb-xq-eyebrow">意见反馈</div>
-            <h2 className="fb-xq-ask">设备和服务哪里不顺，<em>直接告诉我们</em>。</h2>
-            <p className="fb-xq-doing">登录后提交的是<b>本人工单</b>，可以查看进度、追加描述和关闭。</p>
-          </section>
-
           {hint ? (
             <div role="status" className="fb-toast" data-tone={hint.includes('失败') ? 'bad' : undefined}>
               {hint}
             </div>
           ) : null}
 
+          {uiState === 'login' ? (
+            <div data-testid="member-feedback-fallback">
+              <MeLoginGate page="feedback" />
+            </div>
+          ) : null}
+          {uiState === 'service-unavailable' ? (
+            <div data-testid="member-feedback-fallback">
+              <p className="qxt-me-lead">反馈服务这次不可用。已填写的内容还在。这不是简历功能停用。</p>
+              <MeErrorPack onRetry={refresh} />
+            </div>
+          ) : null}
+          {uiState === 'loading' ? <MeLoadingPack rows={6} /> : null}
+          {uiState === 'error' ? (
+            <div data-testid="member-feedback-fallback">
+              <MeErrorPack onRetry={refresh} />
+            </div>
+          ) : null}
+
+          {uiState !== 'login' && uiState !== 'loading' && uiState !== 'error' && uiState !== 'service-unavailable' ? (
           <section className="fb-summary" aria-label="意见反馈概览">
             <div className="fb-summary-main">
               <b>服务反馈</b>
@@ -242,39 +257,6 @@ export function MyFeedbackPage() {
               <p className="fb-legal" style={{ marginTop: 8 }}>{totalLabel}</p>
             </div>
           </section>
-
-          {uiState === 'login' || uiState === 'service-unavailable' ? (
-            <div className="qx-state" data-tone="info" data-testid="member-feedback-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">{uiState === 'login' ? '请先登录' : '当前无法提交反馈'}</div>
-                <p className="qx-state-d">
-                  {uiState === 'login'
-                    ? '登录后可查看和提交本人反馈。本页是登录后的反馈，与不用登录的一体机问题反馈不是同一条流程。'
-                    : '连接真实服务并登录后，可查看和提交本人反馈'}
-                </p>
-              </span>
-            </div>
-          ) : null}
-
-          {uiState === 'loading' ? (
-            <div className="qx-state" data-tone="info">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">正在加载本人记录</div>
-                <p className="qx-state-d">请稍候，不会展示其他账号的数据</p>
-              </span>
-            </div>
-          ) : null}
-
-          {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error" data-testid="member-feedback-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">暂时无法加载</div>
-                <p className="qx-state-d">请检查网络后重试。这次加载失败不会删除任何工单。</p>
-              </span>
-            </div>
           ) : null}
 
           {canUseRemote && loadState === 'ready' ? (

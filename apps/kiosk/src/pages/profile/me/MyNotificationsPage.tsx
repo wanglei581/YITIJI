@@ -26,7 +26,8 @@ import {
   type MemberNotificationItem,
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
-import { QxMeBanner, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
+import { MeAiChip, MeErrorPack, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
+import { QxMeGuide, QxMePage, QxMeSummary } from './qx/QxMeChrome'
 import './styles/notifications-qx.css'
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone: 'slate' | 'clay' | 'plum' | 'wheat' | undefined; hint: string }> = {
@@ -142,39 +143,21 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
     if (!isLoggedIn) {
       body = (
         <>
-          <QxMeBanner
-            tone="lock"
-            title="登录后查看本人消息"
-            desc={<>公共一体机不会在未登录时展示任何消息标题或内容。<b>下面是登录后会出现的消息类型。</b></>}
-            minis={['未读 —', '共 —']}
-          />
-          <section className="qx-me-list qx-me-grow" data-testid="notifications-list" aria-label="登录后会出现的消息类型">
-            {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="lock" />)}
-            <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束这次使用，只清除这台机器上的登录状态和临时使用记录</b>；系统里的订单、文件与消息按各自保存期限管理。</div>
-          </section>
-          <QxMeGuide items={[['隐私', '只对本人可见', '退出或超时后，本机不保留任何消息明细'], ['登录方式', '手机号 + 验证码', '也可以在登录页用手机扫码登录'], ['边界', '不推送广告', '消息只来自本机服务与系统公告']]} />
+          <div data-testid="notifications-list">
+            <MeLoginGate page="notifications" />
+          </div>
         </>
       )
     } else if (state === 'loading') {
       body = (
         <>
-          <QxMeBanner tone="calm" title="正在加载本人消息" desc={<>正在读取当前账号的消息。<b>返回前一律显示「—」</b>，不会闪回上一位用户的消息。</>} minis={['未读 —', '正在安全读取']} />
-          <section className="qx-me-list qx-me-grow" aria-label="正在加载的消息占位">
-            {[0, 1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
-            <div className="qx-me-legal">这次读取失败不会改动任何已读状态，也不会删除消息。</div>
-          </section>
-          <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
+          <MeLoadingPack rows={6} />
         </>
       )
     } else if (state === 'error') {
       body = (
         <>
-          <QxMeBanner tone="warn" title="消息这次没有加载出来" desc={<>当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以一律显示「—」；已读状态和已有消息不会因为这次失败而改变。</>} minis={['未读 —', '本次未取到']} />
-          <section className="qx-me-list qx-me-grow" aria-label="本次未取到的消息类型">
-            {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="error" />)}
-            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，请查看《隐私政策》里的联系方式。</div>
-          </section>
-          <QxMeGuide items={[...QX_ME_GUIDE.error]} />
+          <MeErrorPack onRetry={refresh} />
         </>
       )
     } else {
@@ -218,7 +201,6 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
             <div className="qx-me-legal">
               {unreadOnly ? '当前没有未读消息。未读筛选下没有消息；' : '当前没有消息通知。'}
               {canUseRemote ? '设备和服务状态有更新时，消息会按上面这几类出现在这里。' : '当前没有可读取的消息。连接真实服务并登录后，这里会显示本人消息。'}
-              <b>空就是空</b>，本页不会造消息让页面好看。
             </div>
           </section>
         ) : (
@@ -251,7 +233,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
       view="notifications"
       screen="member-list"
       screenState={uiState}
-      eyebrow="消息通知"
+      eyebrow="我的 · 消息"
       ask={<>本人设备与服务消息，<em>都在这里</em>。</>}
       doing={busy
         ? <>正在把操作发给系统。<b>结果返回前列表保持原样</b>，本页不会提前显示成功。</>
@@ -282,7 +264,7 @@ function notificationCtabar({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新读取</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新加载</button>
       </>
     )
   }
@@ -309,36 +291,6 @@ function notificationCtabar({
     )
   })()
   return primary
-}
-
-function CategoryStructRow({ cat, mode }: { cat: string; mode: 'lock' | 'error' }) {
-  const meta = CATEGORY_META[cat]
-  const Icon = meta.icon
-  return (
-    <div className="qx-me-row" data-dead="true" data-notification-category={cat} data-slot-mode={mode} data-testid={`notifications-cat-${cat}`}>
-      <span className="qx-me-row-ico" data-tone="off" aria-hidden="true"><Icon size={28} /></span>
-      <span className="qx-me-row-main">
-        <span className="qx-me-row-title">{meta.label}消息</span>
-        <span className="qx-me-row-sub" style={{ display: 'flex', gap: 9, flexWrap: 'wrap', marginTop: 9 }}>
-          <span className="qx-me-slot">{mode === 'lock' ? '标题登录后显示' : '—'}</span>
-          <span className="qx-me-slot">时间</span>
-        </span>
-      </span>
-      <span className="qx-me-acts">
-        <span className="qx-me-small" aria-disabled="true">{mode === 'lock' ? '登录后显示' : '本次未取到'}</span>
-      </span>
-    </div>
-  )
-}
-
-function SkeletonRow() {
-  return (
-    <div className="qx-me-row" aria-hidden="true">
-      <span className="qx-me-row-ico" data-tone="off" />
-      <span className="qx-me-row-main"><span className="qx-me-skel" /><span className="qx-me-skel qx-me-skel-s" /></span>
-      <span className="qx-me-acts"><span className="qx-me-skel" style={{ width: 110, height: 50, borderRadius: 16 }} /></span>
-    </div>
-  )
 }
 
 function NotificationRow({
@@ -374,6 +326,7 @@ function NotificationRow({
           <span className="qx-me-chip">{meta.label}</span>
           {item.kind === 'broadcast' ? <span className="qx-me-chip">全站公告</span> : null}
         </span>
+        {item.category === 'ai' ? <MeAiChip /> : null}
         <span className="qx-me-notice-body">{item.content}</span>
         <span className="qx-me-row-sub">{formatTime(item.createdAt)}</span>
         <span className="qx-me-row-foot">

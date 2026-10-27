@@ -17,6 +17,7 @@ import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
 import { createMyDataRequest, listMyDataRequests } from '../../../services/api/memberPrivacy'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
+import { MeErrorPack, MeExitCard, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import './styles/privacy-qx.css'
 
@@ -107,8 +108,9 @@ export function MyPrivacyRequestsPage() {
       data-testid={`member-privacy-state-${uiState}`}
     >
       <MeTouchShell
-        title="隐私与数据请求"
-        sub="当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。"
+        eyebrow="我的 · 隐私与数据请求"
+        title="你的信息由你决定"
+        sub="撤回可以在这里办；导出和注销不在这台机器上提交"
         status={status}
         backLabel="返回我的"
         onBack={() => navigate('/profile')}
@@ -134,35 +136,21 @@ export function MyPrivacyRequestsPage() {
           <p className="pr-legal">{MEMBER_DATA_REQUEST_SCOPE}</p>
 
           {uiState === 'login' ? (
-            <div className="qx-state" data-tone="info" data-testid="member-privacy-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">请先登录</div>
-                <p className="qx-state-d">登录后可提交撤回 AI 使用授权，或查看本人相关请求记录。</p>
-              </span>
+            <div data-testid="member-privacy-fallback">
+              <MeLoginGate page="privacy" />
+              <MeExitCard title="返回账号设置" desc="换号和授权在账号设置里" onClick={() => navigate('/me/settings')} />
             </div>
           ) : null}
 
-          {uiState === 'loading' ? (
-            <div className="qx-state" data-tone="info">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">正在加载请求记录</div>
-                <p className="qx-state-d">返回前一律显示「—」，不会闪回上一位用户的记录。</p>
-              </span>
-            </div>
-          ) : null}
+          {uiState === 'loading' ? <MeLoadingPack rows={6} /> : null}
 
           {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">请求记录这次没有加载出来</div>
-                <p className="qx-state-d">{message ?? '请稍后重试'}。本次加载失败不会撤回或恢复任何授权。</p>
-              </span>
-            </div>
+            <MeErrorPack onRetry={() => void load()} />
           ) : null}
 
+          {isLoggedIn && uiState !== 'loading' && uiState !== 'error' ? (
+            <MeExitCard title="返回账号设置" desc="换号和授权在账号设置里" onClick={() => navigate('/me/settings')} />
+          ) : null}
           {isLoggedIn && uiState !== 'loading' ? (
             <section data-testid="member-privacy-capabilities" aria-label="可提交与暂未开放的请求">
               <div className="pr-cap" data-capability="revoke_consent">
@@ -214,7 +202,7 @@ export function MyPrivacyRequestsPage() {
                   <span className="qx-state-ic" />
                   <span>
                     <div className="qx-state-t">暂无请求记录</div>
-                    <p className="qx-state-d">提交撤回授权后，记录会出现在这里。空就是空，本页不会造记录让页面好看。</p>
+                    <p className="qx-state-d">还没有申请记录。提交撤回授权后，进度会出现在这里。</p>
                   </span>
                 </div>
               ) : (
@@ -286,7 +274,6 @@ function PrivacyCta({
   uiState,
   busy,
   onLogin,
-  onSettings,
   onRetry,
   onRevoke,
 }: {
@@ -299,32 +286,27 @@ function PrivacyCta({
 }) {
   if (uiState === 'login') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>返回账号设置</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onLogin}>
-          去登录
-        </button>
-      </>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onLogin}>
+        去登录
+      </button>
     )
   }
   if (uiState === 'error') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
-          重新读取
-        </button>
-      </>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
+        重新加载
+      </button>
     )
   }
+  if (uiState === 'loading') return null
   return (
     <>
-      <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>返回设置</button>
       <button
         type="button"
         className="qx-btn"
         data-variant="primary"
         data-testid="member-privacy-primary"
-        disabled={busy || uiState === 'revoke-confirm' || uiState === 'submitting' || uiState === 'loading'}
+        disabled={busy || uiState === 'revoke-confirm' || uiState === 'submitting'}
         onClick={onRevoke}
       >
         撤回 AI 使用授权

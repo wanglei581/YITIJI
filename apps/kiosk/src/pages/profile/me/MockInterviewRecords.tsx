@@ -1,6 +1,7 @@
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, Trash2Icon } from 'lucide-react'
 import { KIcon } from '../../../components/kiosk-icon'
+import { MeAiChip } from '../touch/MeStatePacks'
 import { formatTime } from '../assets/format'
 
 function metaLine(item: MemberInterviewItem): string {
@@ -38,6 +39,7 @@ export function MockInterviewRecords({
                 <span className="qx-me-st" data-tone={item.hasReport ? undefined : 'run'}>{item.hasReport ? '已完成' : '无报告'}</span>
               </span>
               <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.position}</span>
+              <MeAiChip />
               <span className="qx-me-row-sub">{metaLine(item)}</span>
             </span>
             <span className="qx-me-acts">

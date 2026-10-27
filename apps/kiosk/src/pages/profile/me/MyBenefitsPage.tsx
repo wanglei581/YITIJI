@@ -10,6 +10,7 @@ import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'luc
 import { getMyBenefits } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
+import { MeEmptyPack, MeErrorPack, MeExitCard, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import './styles/benefits-qx.css'
 
@@ -85,6 +86,7 @@ export function MyBenefitsPage() {
       data-testid={`benefits-state-${uiState}`}
     >
       <MeTouchShell
+        eyebrow="我的 · 权益"
         title="我的权益"
         sub="名称、有效期与可用状态都由系统返回；是否收费以活动说明与现场核价为准。"
         backLabel="返回我的"
@@ -95,45 +97,22 @@ export function MyBenefitsPage() {
       >
         <div className="qx-scroll qx-grow bf-page">
           <BenefitsTabs current="benefits" />
-          {uiState === 'signed-out' ? (
-            <div className="qx-state" data-tone="info" data-testid="benefits-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">权益台账需要先登录</div>
-                <p className="qx-state-d">
-                  权益绑定在<b>你本人的账号</b>上。没登录时，这台机器不会显示任何人的权益，也不会替你领取。
-                </p>
-              </span>
-            </div>
-          ) : null}
-          {uiState === 'loading' ? (
-            <>
-              <div className="qx-sec-h"><span className="t">正在取你的权益台账</span><span className="hint">未返回前不显示条数</span></div>
-              <div className="bf-skel-row"><div className="bf-skel-line" style={{ width: '44%' }} /></div>
-              <div className="bf-skel-row"><div className="bf-skel-line" style={{ width: '50%' }} /></div>
-              <p className="bf-legal">只显示整体等待，不画百分比，也不显示上一次的权益。</p>
-            </>
-          ) : null}
+          {uiState === 'signed-out' ? <MeLoginGate page="my-benefits" /> : null}
+          {uiState === 'loading' ? <MeLoadingPack rows={6} /> : null}
           {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error" data-testid="benefits-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">权益台账这次没取到</div>
-                <p className="qx-state-d">
-                  请求失败了。本机<b>不显示上一次缓存的权益</b>——万一它已经过期或被核销，你会白跑一趟。
-                </p>
-              </span>
+            <div data-testid="benefits-fallback">
+              <h2>权益台账这次没取到</h2>
+              <p>请求失败了。本机不显示上一次缓存的权益。万一它已经过期或被核销，你会白跑一趟。</p>
+              <MeErrorPack onRetry={() => setReloadKey((key) => key + 1)} />
             </div>
           ) : null}
           {uiState === 'empty' ? (
-            <div className="qx-state" data-tone="info" data-testid="benefits-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">还没有权益</div>
-                <p className="qx-state-d">
-                  没有就是没有。本机<b>不会造几张券让这一页看起来热闹</b>。可以去看看正在进行的活动，符合条件的可以领取。
-                </p>
-              </span>
+            <div data-testid="benefits-fallback">
+              <MeEmptyPack sentence="还没有权益。没有权益也照常能打印、做简历、查政策。">
+                <MeExitCard art="print" title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} />
+                <MeExitCard title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} />
+                <MeExitCard title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/policy-service')} />
+              </MeEmptyPack>
             </div>
           ) : null}
           {uiState === 'list' ? (
@@ -169,9 +148,10 @@ export function MyBenefitsPage() {
                 })}
               </ul>
               <LedgerRules />
+              <p className="bf-legal">列表只读。能不能用，以使用时系统的最新状态为准。</p>
             </>
           ) : null}
-          {uiState !== 'list' && uiState !== 'loading' ? <ServiceAlts /> : null}
+          {uiState === 'list' ? <ServiceAlts /> : null}
           <p className="bf-legal">
             <b>权益只对应本机服务与打印，不等于政府补贴已经发放。</b>
             政策资格提示只提供信息指引，具体办理与结果以官方平台为准。本机不代办、不收取额外费用。
@@ -252,46 +232,29 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
   const navigate = useNavigate()
   if (uiState === 'signed-out') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/activities')}>先看看有哪些活动</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
-          去登录
-        </button>
-      </>
-    )
-  }
-  if (uiState === 'loading') {
-    return (
-      <button type="button" className="qx-btn" data-variant="ghost" data-testid="benefits-primary" onClick={() => navigate('/profile')}>
-        返回我的
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/login', { state: { from: '/me/benefits' } })}>
+        去登录
       </button>
     )
   }
+  if (uiState === 'loading') return null
   if (uiState === 'error') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
-          重新读取
-        </button>
-      </>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
+        重新加载
+      </button>
     )
   }
   if (uiState === 'empty') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>直接去打印</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
-          看可参加的活动
-        </button>
-      </>
-    )
-  }
-  return (
-    <>
-      <p className="why">列表只读；能否使用以使用时系统的最新状态为准。</p>
       <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
         看可参加的活动
       </button>
-    </>
+    )
+  }
+  return (
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={() => navigate('/activities')}>
+      看可参加的活动
+    </button>
   )
 }

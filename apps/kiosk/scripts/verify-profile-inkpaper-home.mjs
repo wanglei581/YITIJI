@@ -343,7 +343,8 @@ expectIncludes(favoritesPage, 'return `/renshi?policy=${encodeURIComponent(item.
 expectAbsent(favoritesPage, /return '\/renshi\?tab=policy'/, '我的收藏不再只跳到政策列表')
 expectAbsent(favoritesPage, /对应政策页待建设/, '我的收藏不再写政策页待建设')
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
-expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
+// 证据锚点随稿换字，判据不变：空态仍说明收藏不含投递结果。
+expectIncludes(favoritesPage, '还没有收藏。收藏只是方便下次再找，不含投递结果。', '我的收藏保留空态说明')
 
 expectIncludes(benefitsPage, 'getMyBenefits(token, { pageSize: 50, cursor })', '我的权益保留真实 API 拉取')
 expectIncludes(benefitsPage, '还没有权益', '我的权益保留空态标题')
@@ -449,6 +450,7 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   // 2026-10-27 触屏版第 6 包：我的与权益共用页壳。只加白名单行，不改上面的行为断言。
   'apps/kiosk/src/pages/profile/touch/MeTouchShell.tsx',
+  'apps/kiosk/src/pages/profile/touch/MeStatePacks.tsx',
   'apps/kiosk/src/pages/profile/touch/me-touch.css',
   'apps/kiosk/src/pages/profile/touch/meTouchStatus.ts',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',

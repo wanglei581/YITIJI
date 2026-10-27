@@ -407,15 +407,17 @@ const A_BATCH_EYEBROWS = [
   ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
   ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
   ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
-  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
-  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的文档和订单"']],
-  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的简历"']],
-  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的收藏"']],
-  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="AI 服务记录"']],
-  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的足迹"']],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="我的 · 消息"']],
+  ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的 · 文档"']],
+  ['src/pages/profile/me/MyPrintOrdersPage.tsx', ['eyebrow="我的 · 打印订单"']],
+  ['src/pages/profile/me/MyResumesPage.tsx', ['eyebrow="我的 · 简历"']],
+  ['src/pages/profile/me/MyFavoritesPage.tsx', ['eyebrow="我的 · 收藏"']],
+  ['src/pages/profile/me/MyAiRecordsPage.tsx', ['eyebrow="我的 · AI 服务记录"']],
+  ['src/pages/profile/me/MyActivityPage.tsx', ['eyebrow="我的 · 浏览记录"']],
   ['src/pages/placeholders/MeActivityDetailPage.tsx', ['eyebrow="记录详情"']],
-  ['src/pages/profile/me/MyFeedbackPage.tsx', ['>意见反馈<']],
+  // 证据锚点随稿换字，判据不变：眉题仍是中文、照稿，屏上不出现英文眉题。
+  ['src/pages/profile/me/MyFeedbackPage.tsx', ['eyebrow="我的 · 意见反馈"']],
 ]
 for (const [path, expected] of A_BATCH_EYEBROWS) {
   const source = read(path)

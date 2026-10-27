@@ -179,6 +179,9 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
     'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+    // 2026-10-27 审查：眉题改到稿上的「我的 · …」。行为断言仍由各自的专属守卫负责。
+    'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
+    'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   ].includes(file) &&
   ([
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',

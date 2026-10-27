@@ -2,8 +2,7 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { BriefcaseIcon, LandmarkIcon, PrinterIcon } from 'lucide-react'
-import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../../hooks/useRecruitmentHosting'
-import { QxMeBanner, QxMeGuide, QX_ME_GUIDE } from './QxMeChrome'
+import { MeErrorPack, MeLoadingPack, MeLoginGate, gatePageFromTitle } from '../../touch/MeStatePacks'
 
 export function QxMeSkeletonList({ count = 4, foot }: { count?: number; foot: string }) {
   return (
@@ -134,61 +133,25 @@ export function QxMeGuestRows({ onJobs, onPrint, hostingOpen }: { onJobs: () => 
   )
 }
 
-/** 未登录指引第三条。托管读到「关闭」才说未开放；还没读到时只说本机不代收简历，不提岗位与招聘会。 */
-function guestBoundary(status: RecruitmentHostingState['status']): [string, string, string] {
-  return status === 'ready'
-    ? ['边界', '本机不代收简历', '本终端未开放岗位与招聘会信息']
-    : ['边界', '本机不代收简历', '也不把你的资料转交给任何企业']
-}
-
 export function QxMeLoginBlock({
   title,
-  desc,
-  struct,
-  onJobs,
-  onPrint,
+  printPick = false,
 }: {
   title: string
-  desc: string
-  struct: ReactNode
-  onJobs: () => void
-  onPrint: () => void
+  desc?: string
+  struct?: ReactNode
+  onJobs?: () => void
+  onPrint?: () => void
+  printPick?: boolean
 }) {
-  const hosting = useRecruitmentHosting()
-  const hostingOpen = hosting.enabled
-  return (
-    <>
-      <QxMeBanner tone="lock" title={title} desc={<>{desc}<b>下面是登录后会出现的内容结构，以及现在就能办的事。</b></>} minis={['共 —', '登录后回填']} />
-      <section className="qx-me-list qx-me-grow" aria-label="登录后会出现的内容结构，以及不用登录也能办的事">
-        <div className="qx-me-legal">登录后会出现的内容结构 · 现在不显示任何明细</div>
-        {struct}
-        <QxMeGuestRows onJobs={onJobs} onPrint={onPrint} hostingOpen={hostingOpen} />
-        <div className="qx-me-legal">登录只用来确认「是你本人」。<b>结束这次使用，只清除这台机器上的登录状态和临时使用记录</b>；系统里的记录按各自保存期限管理。</div>
-      </section>
-      <QxMeGuide items={hostingOpen ? [...QX_ME_GUIDE.login] : [...QX_ME_GUIDE.login.slice(0, 2), guestBoundary(hosting.status)]} />
-    </>
-  )
+  return <MeLoginGate page={gatePageFromTitle(title)} printPick={printPick} />
 }
 
-export function QxMeLoadingBlock({ title }: { title: string }) {
-  return (
-    <>
-      <QxMeBanner tone="calm" title={title} desc={<>正在读取当前登录账号的记录。<b>返回前先显示「—」</b>。上一位若没点结束使用，读出来的仍是那个账号。</>} minis={['共 —', '正在安全读取']} />
-      <QxMeSkeletonList foot="这次读取失败不会删除任何记录，也不会改动任何已保存的内容。" />
-      <QxMeGuide items={[...QX_ME_GUIDE.loading]} />
-    </>
-  )
+export function QxMeLoadingBlock(props: { title?: string }) {
+  void props.title
+  return <MeLoadingPack />
 }
 
-export function QxMeErrorBlock({ title, desc, struct }: { title: string; desc: string; struct: React.ReactNode }) {
-  return (
-    <>
-      <QxMeBanner tone="warn" title={title} desc={<>{desc}<b>本页不会拿上一次的内容冒充当前账号</b>，所以每一项都显示「—」。</>} minis={['共 —', '本次未取到']} />
-      <section className="qx-me-list qx-me-grow" aria-label="本次未取到的内容结构">
-        {struct}
-        <div className="qx-me-legal">重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，请查看《隐私政策》里的联系方式。</div>
-      </section>
-      <QxMeGuide items={[...QX_ME_GUIDE.error]} />
-    </>
-  )
+export function QxMeErrorBlock({ onRetry }: { title?: string; desc?: string; struct?: ReactNode; onRetry?: () => void }) {
+  return <MeErrorPack onRetry={onRetry} />
 }

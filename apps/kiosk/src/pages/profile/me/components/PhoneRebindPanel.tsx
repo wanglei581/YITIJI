@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { QxAiHelp, QxStepActions } from '../../../../components/qingxu/QxAiHelp'
+import { QxAiHelp } from '../../../../components/qingxu/QxAiHelp'
+import { helpNeededLine } from '../../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
 import { MeTouchShell } from '../../touch/MeTouchShell'
 import { useBusyLock } from '../../../../contexts/KioskBusyContext'
 import { useIdleTimer } from '../../../../hooks/useIdleTimer'
@@ -35,6 +37,8 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
   const [expiresAt, setExpiresAt] = useState(0)
   const [now, setNow] = useState(Date.now)
   const [leaveConfirm, setLeaveConfirm] = useState(false)
+  const contact = useSupportContact()
+  const help = helpNeededLine(contact)
   const inputRef = useRef<HTMLInputElement>(null)
   const generation = useRef(0)
   const inFlight = useRef(false)
@@ -65,7 +69,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
     try { await fn(current) } catch (error) {
       if (!current()) return
       setErrorCode(error instanceof MemberApiError ? error.code : null)
-      setErr(accountErrorMessage(error, '这一步没有完成，请重试。需要帮助时，请查看《隐私政策》里的联系方式。'))
+      setErr(accountErrorMessage(error, `这一步没有完成，请重试。${help}`))
       if (step === 'verify_old') setOldOtp('')
       if (step === 'verify_new') setNewOtp('')
       if (error instanceof MemberApiError && error.code === 'SMS_SEND_FAILED') {
@@ -133,8 +137,8 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
       <MeTouchShell title="换绑手机号" sub="先验证旧手机号，再验证新手机号；完成后重新登录。"
         backLabel="返回账号设置"
         onBack={cancel}
+        nav={false}
         status={{ tone: err ? 'warn' : 'unknown', label: step === 'done' ? '正在结束本次使用' : `第 ${stepIndex + 1} 步 / 共 4 步` }}
-        ask={{ label: '问小青：换绑手机号要做什么？', draft: '换绑手机号需要哪些步骤？换绑后如何重新登录？' }}
         primaryNode={<><button type="button" className="qx-btn" data-variant="ghost" disabled={busy || step === 'done'} onClick={cancel}>取消换绑</button>
           {step === 'done' ? <button type="button" className="qx-btn" data-variant="primary" disabled={!err} onClick={onDone}>{err ? '重新前往登录' : '正在清除本机登录'}</button>
             : recovery === 'relogin' ? <button type="button" className="qx-btn" data-variant="primary" disabled={busy} onClick={() => handle(async () => onRecheck())}>重新登录核对</button>
@@ -164,7 +168,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
           const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.qx-ai-help')
           if (!button || allowAi.current) return
           event.preventDefault(); event.stopPropagation(); pendingAi.current = button; setLeaveConfirm(true)
-        }}><QxStepActions onPrev={cancel} prevLabel="返回账号设置"><QxAiHelp label="问小青：换绑手机号要做什么？" draft="换绑手机号需要哪些步骤？换绑后如何重新登录？" /></QxStepActions></fieldset>
+        }}><QxAiHelp label="问小青：换绑手机号要做什么？" draft="换绑手机号需要哪些步骤？换绑后如何重新登录？" /></fieldset>
       </MeTouchShell>
       {leaveConfirm ? <SettingsConfirm title="取消这次换绑？" description="已填写的内容会清除，再次换绑需要从旧手机号验证开始。" confirmLabel="取消换绑" onCancel={() => { pendingAi.current = null; setLeaveConfirm(false) }} onConfirm={() => {
         if (pendingAi.current) { allowAi.current = true; pendingAi.current.click() } else onCancel()

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { BellIcon, ClockIcon, FileTextIcon, GiftIcon, HelpCircleIcon, LockIcon, MessageSquareIcon, PrinterIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
+import { BellIcon, ClockIcon, HelpCircleIcon, MessageSquareIcon, SettingsIcon, ShieldIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { whenMiniapp } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
+import { MeErrorPack, MeProfileGuest, MeProfileLoading } from './touch/MeStatePacks'
 import { MeTouchShell } from './touch/MeTouchShell'
 import { accountPhoneDisplay } from '../auth/accountUserMessage'
 import { maskPhone, maskEmail } from '../../utils/maskPii'
@@ -162,35 +163,26 @@ function ProfileContent() {
         primaryNode={dock}
       >
         <div className="qx-scroll qx-grow pf-page">
-          <ProfileHeader
-            isLoggedIn={isLoggedIn}
-            displayName={headerDisplayName}
-            phoneMasked={headerPhoneMasked}
-            reserveBannerSpace={isLoggedIn && Boolean(pendingTask)}
-            onLogin={goLogin}
-            onOpenSettings={() => navigate('/me/settings')}
-          />
+          {isLoggedIn ? (
+            <ProfileHeader
+              isLoggedIn={isLoggedIn}
+              displayName={headerDisplayName}
+              phoneMasked={headerPhoneMasked}
+              reserveBannerSpace={isLoggedIn && Boolean(pendingTask)}
+              onLogin={goLogin}
+              onOpenSettings={() => navigate('/me/settings')}
+            />
+          ) : null}
           {isLoggedIn && miniappLine ? <p className="qxt-me-sync">{miniappLine}</p> : null}
 
-          {uiState === 'signed-out' ? <SignedOutBody /> : null}
+          {uiState === 'signed-out' ? <MeProfileGuest contact={support} /> : null}
 
-          {uiState === 'loading' ? (
-            <div className="qx-card" aria-busy="true">
-              <div className="pf-skel" style={{ width: '40%' }} />
-              <div className="pf-skel" style={{ width: '66%', marginTop: 14 }} />
-              <p className="pf-reading-note">正在取你的资产数量与待办。数量返回前显示「—」，不显示上一次的数字。</p>
-            </div>
-          ) : null}
+          {uiState === 'loading' ? <MeProfileLoading /> : null}
 
           {uiState === 'error' ? (
-            <div className="qx-state" data-tone="error" data-testid="profile-fallback">
-              <span className="qx-state-ic" />
-              <span>
-                <div className="qx-state-t">账号数据这次没取到</div>
-                <p className="qx-state-d">
-                  数量与待办这次没有取到。可以重新加载，或点进各项查看。
-                </p>
-              </span>
+            <div data-testid="profile-fallback">
+              <h2>账号数据这次没取到</h2>
+              <MeErrorPack reloadLabel="重新读取" onRetry={() => setReloadKey((key) => key + 1)} />
             </div>
           ) : null}
 
@@ -202,17 +194,6 @@ function ProfileContent() {
             <ProfileAssetGrid counts={assetOverview.counts} loading={assetOverview.loading} />
           ) : null}
 
-          {uiState === 'loading' || uiState === 'error' ? (
-            <section aria-label="账号数据读取说明">
-              <div className="qx-sec-h"><span className="t">{uiState === 'loading' ? '正在读取什么' : '这次没读到什么'}</span><span className="hint">以本人账号的实际记录为准</span></div>
-              <div className="pf-meta2">
-                <div><small>资产数量</small><b>简历、文档、订单、收藏、权益与 AI 服务记录</b></div>
-                <div><small>未办完的事</small><b>{uiState === 'loading' ? '正在查询你的待办' : '待办这次没取到，不表示没有待办'}</b></div>
-                <div><small>上一次的数字</small><b>不会拿来冒充当前账号</b></div>
-                <div><small>各项入口</small><b>仍然可以点进查看；读不到时可以重新加载</b></div>
-              </div>
-            </section>
-          ) : null}
           {uiState === 'empty' ? (
             <div className="qx-state" data-tone="info" data-testid="profile-fallback">
               <span className="qx-state-ic" />
@@ -286,7 +267,7 @@ function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boo
   const rows = [
     { icon: ClockIcon, title: '浏览与跳转记录', desc: '只记录你看过和打开过的来源，不记录投递结果。', to: '/me/activity', testid: 'profile-activity' },
     { icon: BellIcon, title: '消息通知', desc: '系统下发的会员通知，已读与标记都会记录。', to: '/me/notifications', testid: 'profile-notifications' },
-    { icon: HelpCircleIcon, title: '帮助中心', desc: '常见问题。需要帮助时看本页服务电话。', to: '/help', testid: 'profile-help' },
+    { icon: HelpCircleIcon, title: '帮助中心', desc: '常见问题与服务电话', to: '/help', testid: 'profile-help' },
     { icon: MessageSquareIcon, title: '意见反馈', desc: '提交后能看到处理状态。', to: '/me/feedback', testid: 'profile-feedback' },
     { icon: ShieldIcon, title: '隐私请求', desc: '当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。', to: '/me/privacy-requests', testid: 'profile-privacy' },
   ]
@@ -338,67 +319,6 @@ function AccountRows({ onEnd, primaryEnd }: { onEnd: () => void; primaryEnd: boo
         )}
       </div>
     </section>
-  )
-}
-
-function SignedOutBody() {
-  const navigate = useNavigate()
-  const rows = [
-    { icon: FileTextIcon, title: '你自己的简历与文档', desc: '解析过的简历、生成的材料与扫描件。', from: '/me/resumes' },
-    { icon: PrinterIcon, title: '打印订单与办理进度', desc: '订单状态以系统记录为准，可继续办理。', from: '/me/print-orders' },
-    { icon: GiftIcon, title: '权益台账与活动记录', desc: '是否有可用权益由系统判定。', from: '/me/benefits' },
-  ]
-  const bounds = [
-    ['不需要账号', '打印、扫描、复印与文件转换'],
-    ['不需要账号', '机构官方渠道与政策查询'],
-    ['需要登录', '跨设备保存的简历、文档与打印订单'],
-    ['需要登录', '会员权益、隐私请求与消息通知'],
-    ['现在显示的数量', '没有 —— 未登录时本机不预渲染任何人的数据'],
-    ['登录之后', '数量与待办按你本人的账号显示'],
-  ]
-  return (
-    <>
-      <div className="pf-note">
-        <div className="pf-note-t"><LockIcon size={24} aria-hidden />不登录也能用的服务</div>
-        <p>
-          打印、扫描、政策查询都<b>不需要账号</b>。需要本人身份、跨设备保存或会员权益的功能，会在进入时再要求登录。
-        </p>
-      </div>
-      <section>
-        <div className="qx-sec-h">
-          <span className="t">登录之后会出现</span>
-          <span className="hint">现在不预渲染任何人的数据</span>
-        </div>
-        <div className="qx-rows">
-          {rows.map((row) => (
-            <button
-              type="button"
-              key={row.from}
-              className="qx-row"
-              onClick={() => navigate('/login', { state: { from: row.from } })}
-            >
-              <span className="qx-row-ic" aria-hidden="true"><row.icon size={24} /></span>
-              <span className="qx-row-tx">
-                <span className="qx-row-t">{row.title}</span>
-                <span className="qx-row-d">{row.desc}</span>
-              </span>
-              <span className="qx-row-go" aria-hidden="true">›</span>
-            </button>
-          ))}
-        </div>
-      </section>
-      <section aria-label="登录与不登录的分界">
-        <div className="qx-sec-h">
-          <span className="t">登录与不登录的分界</span>
-          <span className="hint">按功能划线，不按页面划线</span>
-        </div>
-        <div className="pf-meta2">
-          {bounds.map(([label, value]) => (
-            <div key={value}><small>{label}</small><b>{value}</b></div>
-          ))}
-        </div>
-      </section>
-    </>
   )
 }
 

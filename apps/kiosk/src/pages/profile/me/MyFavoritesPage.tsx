@@ -110,7 +110,7 @@ export function MyFavoritesPage() {
   } else if (state === 'loading') {
     body = <QxMeLoadingBlock title="正在加载我的收藏" />
   } else if (state === 'error') {
-    body = <QxMeErrorBlock title="收藏这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。" struct={struct} />
+    body = <QxMeErrorBlock title="收藏这次没有加载出来" desc="当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。" struct={struct} onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (items.length === 0) {
     body = (
       <>
@@ -118,7 +118,7 @@ export function MyFavoritesPage() {
           <span className="qx-me-banner-ico" aria-hidden="true"><HeartIcon size={34} /></span>
           <span className="qx-me-banner-main">
             <h2 className="qx-me-banner-t">还没有收藏</h2>
-            <span className="qx-me-banner-p">{hostingOpen ? '在岗位 / 招聘会 / 政策详情页点收藏之后，才会出现在这里。' : '在政策详情页点收藏之后，才会出现在这里。'}<b>空就是空</b>。</span>
+            <span className="qx-me-banner-p">还没有收藏。收藏只是方便下次再找，不含投递结果。</span>
           </span>
           <span className="qx-me-banner-mini"><i>共 0</i></span>
         </section>
@@ -133,7 +133,7 @@ export function MyFavoritesPage() {
             <QxMeStartRow icon={FileTextIcon} tone="slate" title="看看就业政策" desc="政策、社保与登记指引，资格以官方核验为准" label="查看政策" route="/policy-service" testid="member-records-start-policy" onClick={() => navigate('/policy-service')} />
           )}
           <QxMeStartRow icon={SparklesIcon} tone="plum" title="先把简历准备好" desc={hostingOpen ? '诊断或生成之后再去收藏岗位会更有针对性' : '诊断或生成一份简历，当场打印带走'} label="去简历服务" route="/resume-service" testid="member-records-start-resume" onClick={() => navigate('/resume-service')} />
-          <div className="qx-me-legal">{hostingOpen ? '在岗位 / 招聘会 / 政策详情页点收藏，这里会显示你的收藏。' : '在政策详情页点收藏，这里会显示你的收藏。'}<b>空就是空</b>。</div>
+          <div className="qx-me-legal">点一条打开政策。取消收藏在政策页里。</div>
         </section>
         <QxMeGuide items={hostingOpen
           ? [['怎么产生', '在详情页点收藏', '岗位 / 招聘会 / 政策都可以收藏'], ['这里显示什么', '只有收藏行为', '不含投递或预约结果'], ['去哪儿办', '来源平台', '投递与预约都在来源平台完成']]
@@ -200,7 +200,7 @@ export function MyFavoritesPage() {
       view="favorites"
       screen="member-list"
       screenState={`favorites-${uiState}`}
-      eyebrow="我的收藏"
+      eyebrow="我的 · 收藏"
       ask={hostingOpen ? <>收藏的岗位与招聘会，<em>随时找回</em>。</> : <>收藏的政策，<em>随时找回</em>。</>}
       doing={<>只记录<b>本人收藏行为</b>，不含投递或预约结果。</>}
       truth={hostingOpen ? '投递与预约都在来源平台完成；本机不代收简历，也不记录结果。' : '收藏只记录本人收藏行为；本机不代收简历，也不记录办理结果。'}

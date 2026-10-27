@@ -1,6 +1,7 @@
 import type { JobAiSessionListItem } from '@ai-job-print/shared'
 import { Trash2Icon } from 'lucide-react'
 import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
+import { MeAiChip } from '../touch/MeStatePacks'
 import { formatTime } from '../assets/format'
 
 const OPERATION_META: Record<JobAiSessionListItem['session']['operation'], { label: string; hint: string; icon: KioskIconName; tone?: 'slate' | 'wheat' }> = {
@@ -53,6 +54,7 @@ export function JobAiSessionRecords({
                 <span className="qx-me-st" data-tone={status.tone}>{status.label}</span>
               </span>
               <span className="qx-me-row-title" style={{ marginTop: 8 }}>{item.job ? `${item.job.title} · ${item.job.company}` : meta.hint}</span>
+              <MeAiChip />
               <span className="qx-me-row-sub">{metaLine(item)}</span>
             </span>
             <span className="qx-me-acts">
