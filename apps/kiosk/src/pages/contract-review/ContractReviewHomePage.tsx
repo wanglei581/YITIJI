@@ -169,6 +169,7 @@ export function ContractReviewHomePage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="签约风险提示"
           title="AI 签约风险提示"
           sub={COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}

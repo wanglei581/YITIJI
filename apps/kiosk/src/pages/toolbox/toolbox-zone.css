@@ -28,7 +28,7 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* 说明卡：左边 210 宽的图标列，右边两句话（稿的 fy-up） */
@@ -37,7 +37,7 @@
   grid-template-columns: 210px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  min-height: 276px;
+  min-height: 296px;
   padding: 14px 16px;
   background: var(--qxt-card, var(--qx-paper));
   border: 1.5px solid var(--qxt-edge, var(--qxt-line));
@@ -48,7 +48,7 @@
   display: grid;
   align-self: stretch;
   place-items: center;
-  min-height: 248px;
+  min-height: 268px;
   border-radius: 20px;
   color: var(--qxt-teal-ink);
   background: var(--qxt-well);
@@ -72,16 +72,19 @@
   gap: 16px;
 }
 
-/* 条目：整行卡，三行——标题、说明、启动方式与去向 */
+/* 条目：整行卡，两行——标题和启动方式一行，说明和去向一行 */
 [data-qx-page="toolbox"] .tb-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'title tag'
+    'desc go';
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 8px;
   width: 100%;
-  min-height: 148px;
-  padding: 20px 26px 18px;
+  min-height: 168px;
+  padding: 22px 26px;
   text-align: left;
   color: var(--qxt-ink);
   background: var(--qxt-card, var(--qx-paper));
@@ -99,29 +102,33 @@
   cursor: not-allowed;
 }
 
-[data-qx-page="toolbox"] .tb-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+[data-qx-page="toolbox"] .tb-copy,
+[data-qx-page="toolbox"] .tb-meta {
+  display: contents;
 }
 
 [data-qx-page="toolbox"] .tb-copy b {
+  grid-area: title;
   font-size: 28px;
   line-height: 1.3;
   font-weight: 700;
 }
 
 [data-qx-page="toolbox"] .tb-copy span {
+  grid-area: desc;
   font-size: 22px;
   line-height: 1.45;
   color: var(--qxt-ink-2);
 }
 
-[data-qx-page="toolbox"] .tb-meta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+[data-qx-page="toolbox"] .tb-tag {
+  grid-area: tag;
+  justify-self: end;
+}
+
+[data-qx-page="toolbox"] .tb-go {
+  grid-area: go;
+  justify-self: end;
 }
 
 [data-qx-page="toolbox"] .tb-tag,
@@ -169,7 +176,7 @@
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 14px 20px 18px;
   border-radius: 24px;
   background: var(--qxt-clay-wash, var(--qxt-well));
   color: var(--qxt-ink-2);

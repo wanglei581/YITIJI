@@ -47,6 +47,7 @@ export function SmartCampusGuard({ module, children }: Props) {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="智慧校园"
           title="智慧校园"
           sub="这项还没在这台机器上开通。下面这些去处不受影响。"

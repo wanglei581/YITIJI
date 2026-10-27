@@ -118,9 +118,13 @@
   justify-content: flex-start;
 }
 
-[data-qx-page="campus-welcome"] .kproto-content,
-[data-qx-page="campus-service"] .kproto-content {
+/* 共享的 .kproto-content 是 flex:1 + overflow:hidden（把内容限在正文高度里）。
+   本页内容按自身高度排、由 qxt-body-scroll 整页滚动，所以这里放开，否则超出的部分会被裁掉。 */
+[data-qx-page="smart-campus"] .qxt-screen .kproto.kproto-content,
+[data-qx-page="campus-welcome"] .qxt-screen .kproto.kproto-content,
+[data-qx-page="campus-service"] .qxt-screen .kproto.kproto-content {
   flex: none;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -162,6 +166,7 @@
 /* 迎新页末尾的「办事窗口」卡、服务页底部两颗入口：按内容高度排，不撑满、不加色条。 */
 [data-qx-page="campus-welcome"] .sc-window-list {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin: 14px 0 0;
   padding: 0;

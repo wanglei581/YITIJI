@@ -73,6 +73,7 @@ export function SmartCampusWelcomePage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="智慧校园"
           title="迎新指引"
           sub="通用报到流程参考与入学准备"

@@ -345,6 +345,7 @@ export function RenshiPage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="政策服务"
           title={TAB_TITLE[activeTab]}
           sub={bandSub}

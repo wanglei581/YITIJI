@@ -88,6 +88,7 @@ export function PolicyTouchHub() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow={spec.eyebrow}
           title={spec.title}
           sub={spec.subtitle}

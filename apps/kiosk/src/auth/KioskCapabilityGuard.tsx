@@ -60,6 +60,7 @@ function CapabilityUnavailable({ loading, label }: { loading: boolean; label: st
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="本机能力"
           title={title}
           sub={loading ? '读完之前不显示服务，也不能进入。' : '这项还没在这台机器上开通。下面这些去处不受影响。'}

@@ -177,6 +177,7 @@ export function SmartCampusHomePage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="智慧校园"
           title="选一项校园服务"
           sub="按本机开通的范围开放"

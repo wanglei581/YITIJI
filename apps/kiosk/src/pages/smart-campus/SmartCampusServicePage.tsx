@@ -144,6 +144,7 @@ export function SmartCampusServicePage() {
         bodyClassName="qxt-body-scroll"
         band={(
           <QxTouchBand
+            seal={null}
             eyebrow="智慧校园"
             title="未找到该服务"
             sub="请返回智慧校园选择可用服务"
@@ -213,6 +214,7 @@ export function SmartCampusServicePage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="智慧校园"
           title={info.title}
           sub={`${info.subtitle} · 智慧校园自助服务指引`}

@@ -80,6 +80,7 @@ export function ToolboxZonePage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="百宝箱"
           title={items.length > 0 ? '选一个已上架的服务' : '还没有上架的服务'}
           sub={items.length > 0 ? '经审核后才出现在这里。' : '上架之后会出现在这里。'}

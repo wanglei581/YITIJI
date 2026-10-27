@@ -214,6 +214,7 @@ export function ContractReviewResultPage() {
         bodyClassName="qxt-body-scroll"
         band={(
           <QxTouchBand
+            seal={null}
             eyebrow="签约风险提示"
             title="未找到审查结果"
             sub={deleteError ?? '请重新上传合同进行审查'}
@@ -274,6 +275,7 @@ export function ContractReviewResultPage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="签约风险提示"
           title="审查结果"
           sub="AI 签约风险提示 · 仅供参考"

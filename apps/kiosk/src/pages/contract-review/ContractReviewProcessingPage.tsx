@@ -206,6 +206,7 @@ export function ContractReviewProcessingPage() {
         bodyClassName="qxt-body-scroll"
         band={(
           <QxTouchBand
+            seal={null}
             eyebrow="签约风险提示"
             title="审查未完成"
             sub={deleteError ?? error}
@@ -250,6 +251,7 @@ export function ContractReviewProcessingPage() {
       bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
+          seal={null}
           eyebrow="签约风险提示"
           title="AI 签约风险提示"
           sub="正在分析，请稍候…"
