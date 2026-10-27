@@ -1,8 +1,17 @@
 /* 收银台触屏正文（稿 cashier）：支付通道说明 + 扫码方式分段 + 订单摘要卡 + 收款码框 + 退出支付。
    只挂在 data-qx-page='print-cashier'，不改 .qxt-* 默认。 */
 
+/* 收银台里老部件的小字统一抬到 20px（正文不低于 20px）。
+   放在文件最前：后面各规则同权重、写在后面，照样压过这一条。 */
+[data-qx-page='print-cashier'] .qxt-body :where(p, li, span, small, em, b, dt, dd, summary) {
+  font-size: max(20px, 1em);
+}
+
+
 [data-qx-page='print-cashier'] .cashier-qx-page {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   min-height: auto;
   min-width: 0;
   font-size: 22px;
@@ -11,6 +20,7 @@
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-scroll {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -23,6 +33,15 @@
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-page :where(small) {
+  font-size: 20px;
+}
+
+/* 老样式里还有几处 17px 的说明小字，触屏版一律不低于 20px */
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-countdown,
+[data-qx-page='print-cashier'] .cashier-qx-instrument .cashier-fail-card .ui-kiosk-state-description,
+[data-qx-page='print-cashier'] .cashier-qx-hid-note,
+[data-qx-page='print-cashier'] .cashier-qx-flow span,
+[data-qx-page='print-cashier'] .cashier-qx-truth p {
   font-size: 20px;
 }
 

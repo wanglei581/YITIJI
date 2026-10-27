@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { PrintAiHelp } from './PrintAiHelp'
+import { PrintFillArt } from '../art/PrintFillArt'
 import { printProblemLine } from '../../../copy/unattendedCopy'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
@@ -139,6 +140,8 @@ export function CashierQxView(props: CashierQxViewProps) {
         {props.issueError ? (
           <div className="cashier-qx-error" role="alert"><AlertTriangleIcon aria-hidden="true" />{props.issueError}</div>
         ) : null}
+        {/* 状态说明不够高时，用一块实物小样吃掉剩下的高度（付款那几态画手机，其余画纸）。 */}
+        <PrintFillArt name={state === 'pending-qr' || state === 'pending-scan' || state === 'pending' || state === 'channel-selected' ? 'phone' : 'stack'} />
       </div>
     </div>
   )

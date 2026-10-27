@@ -343,7 +343,7 @@
 }
 
 [data-qx-page='print-usb'] .fs-usb-list {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -363,7 +363,7 @@
 }
 
 [data-qx-page='print-usb'] .fs-usb-list .fs-frow {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 150px;
 }
 

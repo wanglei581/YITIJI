@@ -6,6 +6,7 @@ import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
 import { ENCRYPTED_PDF_UNLOCK_STEPS } from './printPreviewKind'
 import { FileThumbCard } from './FileThumbCard'
 import { PrintIcon } from '../art/PrintIcon'
+import { PrintFillArt } from '../art/PrintFillArt'
 import type { PrintFileState } from '../printMaterialSession'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import { preferUnattended, printProblemLine } from '../../../copy/unattendedCopy'
@@ -300,6 +301,8 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
           </p>
         </>
       ) : null}
+      {/* 检查中、没做成、没有可处理项时内容不够高：用一块纸张小样吃掉剩下的高度。 */}
+      <PrintFillArt name="stack" />
     </div>
   )
 }

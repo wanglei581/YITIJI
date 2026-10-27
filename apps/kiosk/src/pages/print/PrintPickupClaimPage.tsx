@@ -47,6 +47,7 @@ import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
 import { PickupCodeBoxes, PickupFailurePanel, PickupHintCard, PickupKeypadCard, PickupLegacyNote, PickupOutsStrip, PickupScanKinds } from './components/PickupHidGuide'
 import { PickupOkBody } from './components/PickupOkBody'
+import { PrintFillArt } from './art/PrintFillArt'
 import { helpNeededLine, peekSupportContact } from '../../copy/unattendedCopy'
 import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
@@ -584,6 +585,8 @@ export function PrintPickupClaimPage() {
       {legacyNote}
       {fine}
       {fold}
+      {/* 失败屏内容不够高：画一部手机把剩下的高度吃掉（纯装饰，不当扫码结果）。 */}
+      {failurePanel ? <PrintFillArt name="phone" /> : null}
     </div>,
     submitNode,
   )

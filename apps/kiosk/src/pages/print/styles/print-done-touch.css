@@ -210,7 +210,7 @@
 }
 
 [data-qx-page='print-unconfirmed'] .pft-unc-sum .qxt-sum-r {
-  min-height: 76px;
+  min-height: 110px;
   padding: 12px 22px;
 }
 
@@ -221,7 +221,7 @@
 
 [data-qx-page='print-unconfirmed'] .pft-unc-exits .qx-btn {
   width: 100%;
-  height: 80px;
+  height: 96px;
   border-radius: 26px;
   border: 1.5px solid var(--qxt-edge);
   background: var(--qxt-card);

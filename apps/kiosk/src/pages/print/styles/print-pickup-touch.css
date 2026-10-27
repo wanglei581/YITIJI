@@ -230,7 +230,7 @@
 }
 
 [data-qx-page='print-pickup'] .pcp-keypad-card .pcp-alpha-key {
-  min-height: 100px;
+  min-height: 116px;
   border-radius: 22px;
   border: 1.5px solid var(--qxt-edge);
   background: var(--qxt-card);
@@ -391,7 +391,7 @@
   display: grid;
   align-content: center;
   gap: 6px;
-  min-height: 150px;
+  min-height: 170px;
   padding: 20px 28px;
   border-top: 1px solid var(--qxt-line);
 }
@@ -458,7 +458,7 @@
   flex-direction: column;
   justify-content: center;
   gap: 8px;
-  min-height: 220px;
+  min-height: 260px;
   padding: 22px 22px 24px;
   border-radius: 26px;
   background: var(--qxt-card);

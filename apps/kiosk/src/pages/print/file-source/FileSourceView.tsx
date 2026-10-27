@@ -5,6 +5,7 @@ import { SparklesIcon } from 'lucide-react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
+import { PrintFillArt } from '../art/PrintFillArt'
 import { PrintFilePreviewModal } from '../components/PrintPreviewPanel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
 import type { UsbFileListItem } from '../../../services/files/usbImportApi'
@@ -362,8 +363,8 @@ export function FileSourceView(props: FileSourceViewProps) {
                 : '这条会弹出系统文件窗口。一体机上不推荐先用它——系统窗口会盖住流程，公共屏幕也不该暴露本机目录。手机和 U 盘都不方便时再用这条，单份 ≤ 15MB。'}
             </div>
           </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card fs-file-work" style={{ flex: 1 }}>
+          <section className="fs-sec">
+            <div className="qx-card fs-file-work">
               <FileSourceSteps
                 title="点下面这一下会发生什么"
                 items={['浏览器弹出系统文件窗口，你挑一份文件。', '选中即上传，并检查格式和大小。', '收到后，文件名出现在「当前文件」里。']}
@@ -433,8 +434,8 @@ export function FileSourceView(props: FileSourceViewProps) {
                 : '还没有收到这一份文件。可以重试刚才选择的文件。'}
             </div>
           </FileSourceStatus>
-          <section className="fs-sec qx-grow">
-            <div className="qx-card fs-file-work" style={{ flex: 1 }}>
+          <section className="fs-sec">
+            <div className="qx-card fs-file-work">
               {blockedName ? (
                 <FileRow
                   name={blockedName}
@@ -543,8 +544,8 @@ export function FileSourceView(props: FileSourceViewProps) {
               <ChannelGrid keys={channelKeys} active={null} usbMode={usbMode} onSelect={onSelectChannel} />
             </section>
           ) : (
-            <section className="fs-sec qx-grow">
-              <div className="qx-card fs-file-work" style={{ flex: 1 }}>
+            <section className="fs-sec">
+              <div className="qx-card fs-file-work">
                 <FileSourceSteps
                   title="插上之后会发生什么"
                   items={['检测已插入的 U 盘。', '列出根目录里可打印的 PDF / JPG / PNG。', '选择一份文件，再点「导入这份文件」。']}
@@ -637,6 +638,7 @@ export function FileSourceView(props: FileSourceViewProps) {
         ) : null}
         {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
         <FileSourceTruth />
+        {screen === 'source-chooser' ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
         <div className="print-upload-footer" data-testid="file-source-ctabar">
           {previewOpen || ghostInBoard ? null : secondary}
         </div>

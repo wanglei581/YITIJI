@@ -57,3 +57,34 @@
 .pa .a-grad-b { stop-color: var(--pa-grad-b); }
 .pa .a-ring-track { stroke: var(--pa-ring-track); }
 .pa .a-ring-arc { stroke: var(--pa-teal); transition: stroke-dashoffset 1s linear; }
+
+/* 状态屏的填充小样（PrintFillArt）：吃掉剩下的高度，小样按高度缩放；内容够长时高度为 0。 */
+.pfa {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  container-type: size;
+}
+
+/* 剩下的高度放不下一幅完整的小样时就不画，免得只露半截。 */
+@container (max-height: 100px) {
+  .pfa .pa {
+    display: none;
+  }
+}
+
+.pfa .pa,
+.pfa .pa svg {
+  display: block;
+  height: 100cqh;
+  max-height: 100cqh;
+  width: auto;
+  max-width: 100cqw;
+}
+
+/* 小样自带的四周留白往外放一点，贴满填充区；多出来的只是空白边，由 overflow 裁掉。 */
+.pfa .pa svg {
+  transform: scale(1.16);
+}

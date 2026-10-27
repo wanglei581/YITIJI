@@ -24,6 +24,7 @@ import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { helpNeededLine, peekSupportContact, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
+import { PrintFillArt } from './art/PrintFillArt'
 import { PrintArt } from './art/PrintArt'
 import { PrintIcon } from './art/PrintIcon'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
@@ -362,6 +363,7 @@ export function PrintDonePage() {
             label="问小青：取纸或异常怎么办 →"
             draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
           />
+          <PrintFillArt name="stack" />
         </div>
         {feedbackDialog}
       </PrintTouchFrame>
@@ -417,6 +419,7 @@ export function PrintDonePage() {
               note="这一页不会把没核验到的结果说成已经出纸。"
             />
           )}
+          <PrintFillArt name="stack" />
         </div>
         {feedbackDialog}
       </PrintTouchFrame>
@@ -677,6 +680,7 @@ export function PrintDonePage() {
           {!isUnconfirmed && failureReason === printProblemLine() ? null : <p className="pff-out-sub">{printProblemLine()}</p>}
           {takeawayNotices}
           {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
+          <PrintFillArt name="mfp" />
         </div>
         {feedbackDialog}
       </PrintTouchFrame>
@@ -725,7 +729,7 @@ export function PrintDonePage() {
     >
       <div data-w2-page="print-done" data-print-flow-step={6} data-pff-head="xq" data-testid="print-fulfill-state-completed" className="pft-done">
         <div className="pft-take" role="status">
-          <PrintArt name="stack" size={200} count={2} />
+          <PrintArt name="stack" size={340} count={2} />
           <div className="pft-take-tx">
             <b>从出纸口取走</b>
             <span>

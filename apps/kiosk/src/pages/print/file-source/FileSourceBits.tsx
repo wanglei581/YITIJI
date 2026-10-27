@@ -223,7 +223,7 @@ export function NowFileCard({
   previewLabel?: string
 }) {
   return (
-    <div className="qx-card qx-grow fs-file-work" data-testid="file-source-file-card" data-live="true">
+    <div className="qx-card fs-file-work" data-testid="file-source-file-card" data-live="true">
       <div className="fs-now">
         <span className="fs-now-ic"><FileTextIcon size={38} aria-hidden="true" /></span>
         <span className="fs-now-m">

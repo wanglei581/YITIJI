@@ -30,6 +30,7 @@ import {
 import { preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
+import { PrintFillArt } from './art/PrintFillArt'
 import { PrintArt } from './art/PrintArt'
 import { PrintMissResume } from './components/PrintMissResume'
 import { PrintAiHelp } from './components/PrintAiHelp'
@@ -409,6 +410,7 @@ export function PrintProgressPage() {
             onDocuments={() => navigate('/me/documents')}
             note="这一页本身不保存文件，也不会编造进度或打印结果。"
           />
+          <PrintFillArt name="stack" />
         </div>
       </PrintTouchFrame>
     )
@@ -444,6 +446,7 @@ export function PrintProgressPage() {
             onDocuments={() => navigate('/me/documents')}
             note="没有真实任务编号，这一页不会假装已经出纸。"
           />
+          <PrintFillArt name="stack" />
         </div>
       </PrintTouchFrame>
     )
