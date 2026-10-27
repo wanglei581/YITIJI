@@ -11,6 +11,8 @@ import { AuditService } from '../src/audit/audit.service'
 import { OfficialChannelsService } from '../src/official-channels/official-channels.service'
 import { OfficialChannelsController } from '../src/official-channels/official-channels.controller'
 import { CreateOfficialChannelDto, ReplaceVerifiedDomainsDto, UpdateOfficialChannelDto } from '../src/official-channels/dto/official-channel.dto'
+import { OFFICIAL_CHANNEL_AUDIENCES } from '../src/official-channels/official-channel.constants'
+import { OFFICIAL_CHANNEL_AUDIENCES as SHARED_OFFICIAL_CHANNEL_AUDIENCES, OFFICIAL_CHANNEL_AUDIENCE_LABELS } from '../../../packages/shared/src/types/officialChannel'
 import { RecruitmentEmergencyService } from '../src/recruitment-hosting/recruitment-emergency.service'
 import { RecruitmentContentReadService } from '../src/recruitment-content/recruitment-content-read.service'
 import { EmergencyTakedownDto } from '../src/recruitment-hosting/recruitment-emergency.controller'
@@ -52,12 +54,12 @@ const audiencePipe = new ValidationPipe({
   transform: true,
   exceptionFactory: () => new BadRequestException({ error: { code: 'VALIDATION_FAILED', message: '请求参数校验失败' } }),
 })
-async function audienceStatus(metatype: new () => object, value: object): Promise<number> {
+async function audienceStatus(metatype: new () => object, value: object): Promise<{ status: number; body: { audience?: unknown } | null }> {
   try {
-    await audiencePipe.transform(value, { type: 'body', metatype })
-    return 200
+    const body = await audiencePipe.transform(value, { type: 'body', metatype }) as { audience?: unknown }
+    return { status: 200, body }
   } catch (error) {
-    return error instanceof BadRequestException ? error.getStatus() : 0
+    return { status: error instanceof BadRequestException ? error.getStatus() : 0, body: null }
   }
 }
 
@@ -140,8 +142,26 @@ async function main() {
     invalidDto(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', displayOrder: 1000 }, 'sort maximum 999')
     invalidDto(UpdateOfficialChannelDto, { displayOrder: 1.5 }, 'sort must be integer')
     invalidDto(UpdateOfficialChannelDto, { enabled: 'true' }, 'enabled must be boolean')
-    ok(await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: 'campus' }) === 400
-      && await audienceStatus(UpdateOfficialChannelDto, { audience: 'campus' }) === 400, 'unknown audience rejected with 400')
+    const apiAudiences = [...OFFICIAL_CHANNEL_AUDIENCES]
+    const sharedAudiences = [...SHARED_OFFICIAL_CHANNEL_AUDIENCES]
+    ok(apiAudiences.length === sharedAudiences.length && apiAudiences.every((value, index) => value === sharedAudiences[index]), 'API and shared OFFICIAL_CHANNEL_AUDIENCES are equal item by item')
+    ok([...Object.keys(OFFICIAL_CHANNEL_AUDIENCE_LABELS)].sort().join(',') === [...sharedAudiences].sort().join(','), 'OFFICIAL_CHANNEL_AUDIENCE_LABELS keys equal the audience values')
+    ok(OFFICIAL_CHANNEL_AUDIENCE_LABELS.graduate === '面向高校毕业生'
+      && OFFICIAL_CHANNEL_AUDIENCE_LABELS.social === '面向社会求职者'
+      && OFFICIAL_CHANNEL_AUDIENCE_LABELS.general === '通用'
+      && Object.values(OFFICIAL_CHANNEL_AUDIENCE_LABELS).every((label) => !label.includes('招聘')), 'audience titles are 面向高校毕业生 / 面向社会求职者 / 通用 and do not contain 招聘')
+    const campusCreate = await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: 'campus' })
+    const campusUpdate = await audienceStatus(UpdateOfficialChannelDto, { audience: 'campus' })
+    ok(campusCreate.status === 400 && campusUpdate.status === 400, 'unknown audience rejected with 400')
+    const nullCreate = await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: null })
+    const nullUpdate = await audienceStatus(UpdateOfficialChannelDto, { audience: null })
+    ok(nullCreate.status === 400 && nullUpdate.status === 400, 'null audience rejected with 400')
+    const graduateCreate = await audienceStatus(CreateOfficialChannelDto, { name: 'x', url: 'https://example.com.cn', audience: 'graduate' })
+    ok(graduateCreate.status === 200 && graduateCreate.body?.audience === 'graduate', 'create graduate passes and keeps audience')
+    for (const audience of ['graduate', 'social', 'general'] as const) {
+      const updated = await audienceStatus(UpdateOfficialChannelDto, { audience })
+      ok(updated.status === 200 && updated.body?.audience === audience, `update ${audience} passes and keeps audience`)
+    }
 
     const controller = new OfficialChannelsController(service)
     const roles = new RolesGuard(new Reflector())
@@ -276,6 +296,9 @@ async function main() {
     ok(publicA.items.find((item) => item.url === a.url)?.audience === 'graduate', 'public item returns stored audience')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { audience: 'not-a-value' } })
     ok((await service.listForTerminal(terminalA)).items.find((item) => item.url === a.url)?.audience === 'general', 'public response collapses unknown audience to general')
+    const collapsedPartner = (await service.listForPartner(partnerA)).items.find((item) => item.id === a.id)
+    const collapsedAdmin = (await controller.listForAdmin(ids.a)).data.items.find((item) => item.id === a.id)
+    ok(collapsedPartner?.audience === 'general' && collapsedAdmin?.audience === 'general', 'partner and admin responses collapse unknown audience to general')
     await prisma.onlinePlatformDirectory.update({ where: { id: a.id }, data: { audience: 'graduate' } })
     ok(!publicA.items.some((item) => item.url === b.url), 'terminal A cannot read B channel')
     ok((await service.listForTerminal(terminalB)).items[0]?.url === b.url, 'terminal B gets B channel')

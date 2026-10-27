@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator'
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateIf } from 'class-validator'
 import { Transform } from 'class-transformer'
 import { OFFICIAL_CHANNEL_AUDIENCES, type OfficialChannelAudience } from '../official-channel.constants'
 
@@ -37,8 +37,8 @@ export class CreateOfficialChannelDto {
   @IsBoolean()
   enabled?: boolean
 
-  @IsOptional()
   @IsIn(OFFICIAL_CHANNEL_AUDIENCES)
+  @ValidateIf((_object, value) => value !== undefined)
   audience?: OfficialChannelAudience
 }
 
@@ -67,7 +67,7 @@ export class UpdateOfficialChannelDto {
   @IsBoolean()
   enabled?: boolean
 
-  @IsOptional()
   @IsIn(OFFICIAL_CHANNEL_AUDIENCES)
+  @ValidateIf((_object, value) => value !== undefined)
   audience?: OfficialChannelAudience
 }

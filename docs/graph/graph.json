@@ -23050,6 +23050,9 @@
       "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "packages/shared/src/types/officialChannel.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
     "packages/shared/src/types/partner.ts": [
       "apps/admin/scripts/verify-admin-parked-recruitment-ui.mjs",
       "apps/admin/scripts/verify-console-privacy-copy.mjs",
@@ -26606,6 +26609,9 @@
       "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/official-channels/dto/official-channel.dto.ts": [
+      "services/api/scripts/verify-official-channels.ts"
+    ],
+    "services/api/src/official-channels/official-channel.constants.ts": [
       "services/api/scripts/verify-official-channels.ts"
     ],
     "services/api/src/official-channels/official-channels.controller.ts": [
@@ -39756,12 +39762,14 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "packages/shared/src/types/officialChannel.ts",
           "services/api/scripts/support/isolated-verification-database.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/decorators/current-user.decorator.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/official-channels/dto/official-channel.dto.ts",
+          "services/api/src/official-channels/official-channel.constants.ts",
           "services/api/src/official-channels/official-channels.controller.ts",
           "services/api/src/official-channels/official-channels.service.ts",
           "services/api/src/official-channels/registrable-domain.ts",

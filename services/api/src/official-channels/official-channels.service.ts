@@ -410,7 +410,7 @@ export class OfficialChannelsService {
       name: row.name,
       url: row.landingUrl,
       displayOrder: row.displayOrder,
-      audience: row.audience as OfficialChannelAudience,
+      audience: officialChannelAudienceOrGeneral(row.audience),
       enabled: row.status === 'active',
       emergencyTakedown: !!hold,
       emergencyReasonCode: hold?.reasonCode ?? null,

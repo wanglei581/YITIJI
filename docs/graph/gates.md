@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1877 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1879 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1798,7 +1798,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>packages/shared/src/</code> — 37 个文件</summary>
+<summary><code>packages/shared/src/</code> — 38 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1830,6 +1830,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `packages/shared/src/types/memberPrintOrders.ts` | `verify-member-print-orders-ui.mjs`<br/>`verify-member-order-timeline.ts` |
 | `packages/shared/src/types/memberPrivacy.ts` | `verify-user-closure-ui.mjs`<br/>`verify-data-request-ui.mjs`<br/>`verify-ai-usage-retention.ts`<br/>`verify-member-data-request-contract.ts` |
 | `packages/shared/src/types/mockInterview.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs` |
+| `packages/shared/src/types/officialChannel.ts` | `verify-official-channels.ts` |
 | `packages/shared/src/types/partner.ts` | `verify-admin-parked-recruitment-ui.mjs`<br/>`verify-console-privacy-copy.mjs`<br/>`verify-org-type-enum-sync.ts`<br/>`verify-partner-smart-campus.ts` |
 | `packages/shared/src/types/payment.ts` | `verify-price-single-source.mjs`<br/>`verify-admin-order-filters.ts` |
 | `packages/shared/src/types/print.ts` | `verify-print-parameter-capability.mjs`<br/>`verify-print-truth-hardening.ts`<br/>`verify-miniapp-cloud-print-m2.ts`<br/>`verify-print-parameter-capability.ts` |
@@ -2267,7 +2268,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 600 个文件</summary>
+<summary><code>services/api/src/</code> — 601 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2698,6 +2699,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/mock-interview/mock-interview.service.ts` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-cost-ui-coverage.ts`<br/>`verify-ai-user-text-retention.ts`<br/>`verify-beijing-display-time.ts`<br/>`verify-llm-input-pii-mask.ts`<br/>`verify-member-data-retention.ts`<br/>`verify-mock-interview.ts` |
 | `services/api/src/notifications/notifications.controller.ts` | `verify-backend-p0-contracts.mjs` |
 | `services/api/src/official-channels/dto/official-channel.dto.ts` | `verify-official-channels.ts` |
+| `services/api/src/official-channels/official-channel.constants.ts` | `verify-official-channels.ts` |
 | `services/api/src/official-channels/official-channels.controller.ts` | `verify-official-channels.ts` |
 | `services/api/src/official-channels/official-channels.service.ts` | `verify-compliance-copy.mjs`<br/>`verify-official-channels.ts` |
 | `services/api/src/official-channels/registrable-domain.ts` | `verify-official-channels.ts` |
