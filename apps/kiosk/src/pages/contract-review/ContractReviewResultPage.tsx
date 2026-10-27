@@ -15,9 +15,10 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   InfoIcon,
-  PrinterIcon,
   Loader2Icon,
 } from 'lucide-react'
+import { P10BigCard, P10HelpRemind } from '../../auth/CapabilityStayCards'
+import '../../auth/capability-gate-touch.css'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
@@ -55,6 +56,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   imbalance: '权利义务失衡',
   offer_conditions: '录用条件',
 }
+
+/** 没有结果时，重新开始要经过的三步（与上传页的说明一致）。 */
+const RESTART_STEPS = [
+  { title: '手机扫码上传合同', detail: '单个文件不超过 10MB' },
+  { title: '阅读说明并勾选同意', detail: '勾选之后才能开始分析' },
+  { title: '开始风险分析', detail: '结果只提示需要核对的条款' },
+] as const
 
 const KEEP_RETENTION_COPY =
   '保存后仅本人可在「我的文档」查看，保存期限 90 天，可随时删除。报告不会进入打印流程，也不会发给企业或合作机构。合同原件仍按短期策略删除。'
@@ -220,25 +228,34 @@ export function ContractReviewResultPage() {
               label: '问小青：没有结果怎么办？',
               draft: '没有审查结果时怎么办？请只说明可以重新上传或去打印，不要下结论。',
             }}
-            primary={{
-              label: '重新上传',
-              disabled: deleting,
-              onClick: () => void deleteAndNavigate('/contract-review'),
-            }}
           />
         )}
       >
           <div className="cr-missing">
-            <p className="cr-done-screen__sub">
-              {deleteError ?? '直接打开这一页、或中途离开后，可能已经没有结果。'}
-            </p>
-            <button type="button" className="cr-fill-card" onClick={() => navigate('/print-scan')}>
-              <span className="cr-fill-mark" aria-hidden="true"><PrinterIcon /></span>
-              <span className="cr-fill-copy">
-                <b>去打印扫描</b>
-                <span>没有结果时，仍可以把合同打印出来自己看。</span>
-              </span>
-            </button>
+            <P10BigCard
+              icon="file"
+              title="重新上传"
+              desc="回到上传页，重新选择文件。"
+              onClick={() => void deleteAndNavigate('/contract-review')}
+            />
+            <P10BigCard
+              icon="printer"
+              title="去打印扫描"
+              desc="没有结果时，仍可以把合同打印出来自己看。"
+              onClick={() => navigate('/print-scan')}
+            />
+            <div className="qxt-sec">重新开始只要三步</div>
+            <div className="qxt-steps qxt-steps-big">
+              {RESTART_STEPS.map((step, index) => (
+                <div className="qxt-step" key={step.title}>
+                  <span className="qxt-step-n">{index + 1}</span>
+                  <b>{step.title}</b>
+                  <small>{step.detail}</small>
+                </div>
+              ))}
+            </div>
+            <P10HelpRemind />
+            <p className="qxt-fine">直接打开这一页、或中途离开后，可能已经没有结果。</p>
           </div>
       </QxTouchScreen>
       </ContractTouchFrame>

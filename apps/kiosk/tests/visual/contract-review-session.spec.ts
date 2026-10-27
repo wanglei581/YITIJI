@@ -73,6 +73,40 @@ test('风险提示报告可保存到我的文档且不进入打印链路 @contra
   await expect(page.getByText(/需要先登录本人会员账号|保存后仅本人/)).toBeVisible()
 })
 
+test('结果页每一条风险项都能看到：条目数等于三类计数之和，滚轮滚到底后最后一条在视口内 @contract', async ({ page }) => {
+  test.setTimeout(45_000)
+  await startReview(page)
+  await expect(page.getByText('确认文件提取结果')).toBeVisible({ timeout: 12_000 })
+  await page.getByRole('button', { name: '确认，开始分析' }).click()
+  await expect(page).toHaveURL(/\/contract-review\/result$/, { timeout: 18_000 })
+
+  const counts = await page.locator('.cr-summary-stat__num').allTextContents()
+  const expected = counts.map((text) => Number(text.trim())).reduce((sum, n) => sum + n, 0)
+  expect(counts, '优先核查 / 关注 / 信息不足三个计数').toHaveLength(3)
+  expect(expected, '计数之和必须大于 0，否则这条断言没有量到东西').toBeGreaterThan(0)
+  const headers = page.locator('.cr-finding-card__header')
+  await expect(headers, '条目数必须等于三类计数之和').toHaveCount(expected)
+
+  // 溢出的那个容器（条目的祖先里第一个内容比盒子高的）必须能滚：计算样式 overflow-y 是 auto 或 scroll。
+  const overflowY = await headers.last().evaluate((el) => {
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      if (node.scrollHeight > node.clientHeight + 1) return getComputedStyle(node).overflowY
+    }
+    return 'none'
+  })
+  expect(['auto', 'scroll'], '溢出的容器必须能滚动，不能裁切').toContain(overflowY)
+
+  // 像用户那样用滚轮滚（程序设 scrollTop 或 scrollIntoView 对 overflow:hidden 也有效，测不出裁切）
+  const body = page.locator('.qxt-body')
+  const box = await body.boundingBox()
+  expect(box, '正文必须有尺寸').not.toBeNull()
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+  for (let i = 0; i < 10; i += 1) {
+    await page.mouse.wheel(0, 600)
+  }
+  await expect(headers.last(), '滚到底后最后一条必须在视口里').toBeInViewport()
+})
+
 test('三条合同路由铺满视口，底栏贴在视口内 @contract', async ({ page }) => {
   await page.goto('/contract-review')
   await expectScreenFillsViewport(page)
