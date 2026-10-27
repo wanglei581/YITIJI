@@ -8,6 +8,7 @@ import { useTerminalDeviceStatus } from '../../../hooks/useTerminalDeviceStatus'
 import { getTerminalCode } from '../../../services/api/terminalConfig'
 import { printerTouchStatus, toTouchStatus, type MeBandStatus } from './meTouchStatus'
 import './me-touch.css'
+import './me-states.css'
 import './me-pages.css'
 
 export type { MeBandStatus }

@@ -233,7 +233,7 @@ export function MyPrintOrdersPage() {
   }, [items, filterKey])
 
   const uiState = !isLoggedIn ? 'login' : state === 'loading' ? 'loading' : state === 'error' ? 'error' : items.length === 0 ? 'empty' : 'ready'
-  const miniOn = whenMiniapp(useSupportContact(), 'on') !== ''
+  const miniOn = whenMiniapp(useSupportContact(isLoggedIn), 'on') !== ''
   const allLoadedFree = items.length > 0 && items.every(isFreeMemberOrder)
 
   let body: ReactNode
@@ -286,7 +286,7 @@ export function MyPrintOrdersPage() {
             </div>
           </div>
         ) : (
-          <MeRows few={filtered.length < 5 && expandedId === null} testId="member-assets-list" label="我的打印订单">
+          <MeRows few={filtered.length < 7 && expandedId === null} testId="member-assets-list" label="我的打印订单">
             {filtered.map((item) => {
               const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
               const expanded = expandedId === item.id
@@ -343,7 +343,7 @@ export function MyPrintOrdersPage() {
           </QxTouchCallout>
         ) : null}
 
-        {filtered.length > 0 && filtered.length < 5 && expandedId === null ? (
+        {filtered.length > 0 && filtered.length < 7 && expandedId === null ? (
           <div className="me-stack">
             <MeExitCard art="usb" artWidth={110} title="去打印" desc="打一份新的，会新建一张打印任务" onClick={() => navigate('/print-scan')} />
             <MeExitCard art="stack" artWidth={110} title="去我的文档" desc="从已保存的文件里再选一份" onClick={() => navigate('/me/documents')} />

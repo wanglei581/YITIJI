@@ -58,14 +58,14 @@ export function SettingsConfirm({ title, description, confirmLabel, cancelLabel 
         {error ? <p role="alert" className="settings-error">{error}</p> : null}
         <div className="me-answers">
           <button type="button" data-variant="primary" disabled={busy} onClick={onConfirm}>
-            <span className="me-answer-art"><MeArt name="resume" width={220} /></span>
+            <span className="me-answer-art"><MeArt name="resume" width={380} /></span>
             <span>
               <b>{busy ? '处理中…' : confirmLabel}</b>
               {confirmDetail ? <small>{confirmDetail}</small> : null}
             </span>
           </button>
           <button type="button" ref={cancelRef} autoFocus disabled={busy} onClick={onCancel}>
-            <span className="me-answer-art"><MeArt name="phone" width={140} /></span>
+            <span className="me-answer-art"><MeArt name="phone" width={230} /></span>
             <span>
               <b>{cancelLabel}</b>
               {cancelDetail ? <small>{cancelDetail}</small> : null}

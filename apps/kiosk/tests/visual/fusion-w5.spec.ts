@@ -349,7 +349,8 @@ test('resumes expose authenticated API error and recovered empty states through 
   })
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
   await expect(page.getByText('这个账号还没有简历记录', { exact: true })).toBeVisible()
-  await expect(page.getByRole('region', { name: '简历记录概览' })).toContainText('0')
+  await expect(page.getByTestId('qx-me-fallback')).toBeVisible()
+  await expect(page.getByText('公共一体机上的游客上传不会自动绑定到账号', { exact: false })).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
 
@@ -384,7 +385,7 @@ test('feedback exposes the authenticated form and honest submit error through vi
   })
 
   await loginThroughVisibleUi(page, '/me/feedback')
-  await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '提交反馈' })).toBeVisible()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
   await page.getByRole('button', { name: '提交反馈', exact: true }).click()
@@ -1071,10 +1072,11 @@ test('notifications mark-all-read toast is server-driven and stays inside the co
   })
 
   await loginThroughVisibleUi(page, '/me/notifications')
-  const row = page.getByText('打印订单状态更新', { exact: true })
+  const row = page.getByRole('button', { name: /打印订单状态更新/ })
   await expect(row).toBeVisible()
-  await assertTapTargetPointerHit(page.getByRole('button', { name: '全部标记为已读' }))
-  await page.getByRole('button', { name: '全部标记为已读' }).click()
+  // 稿 pageNotes：全部标为已读在底栏。
+  await assertTapTargetPointerHit(page.getByRole('button', { name: '全部标为已读' }))
+  await page.getByRole('button', { name: '全部标为已读' }).click()
   const toast = page.getByRole('status').filter({ hasText: '已标记全部已读' })
   await expect(toast).toBeVisible()
   await assertBannedCopy(await toast.innerText())
@@ -1153,6 +1155,134 @@ test('applications tab stays hidden and a direct tab link falls back to browse @
   await expectFusionAcceptance(page, errors)
 })
 
+/** 后台开了「求职进度页签」的联系方式应答：只多一个布尔，其余照默认。 */
+function supportContactWithSelfNoteTab(selfNoteTab: unknown) {
+  return {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        servicePhone: '18369161921',
+        serviceHours: '工作日 9:00–18:00',
+        otherOnlineTerminalNearby: false,
+        miniappPublished: false,
+        selfNoteTab,
+      },
+    },
+  }
+}
+
+test('applications tab shows when the switch is on, lists only self-reported entries and a direct tab link opens it @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', supportContactWithSelfNoteTab(true))
+  api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/job-applications', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        items: [{
+          id: 'app-1',
+          channel: 'external_self_reported',
+          jobId: null,
+          companyName: '示例科技有限公司',
+          positionTitle: '前端开发工程师',
+          sourceName: null,
+          status: 'applied',
+          statusSource: 'self_reported',
+          note: null,
+          selfReportedAt: '2026-09-03T08:00:00.000Z',
+          createdAt: '2026-09-03T08:05:00.000Z',
+          updatedAt: '2026-09-03T08:05:00.000Z',
+        }],
+        nextCursor: null,
+        total: 1,
+      },
+    },
+  })
+
+  // 直接带 ?tab=applications 进来：开关开着，落在第三个页签上，条目带不可隐藏的「本人自填」。
+  await loginThroughVisibleUi(page, '/me/activity?tab=applications')
+  const progressTab = page.getByTestId('member-records-activity-tab-applications')
+  await expect(progressTab).toBeVisible()
+  await expect(progressTab).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByTestId('member-records-activity-tab-browse')).not.toHaveAttribute('aria-current', 'true')
+  const entry = page.getByTestId('member-records-application-app-1')
+  await expect(entry).toContainText('前端开发工程师')
+  await expect(entry).toContainText('本人自填')
+  await expect(entry).toContainText('已投递')
+  await expect(entry).toHaveAttribute('data-status-source', 'self_reported')
+  // 边界不变：说明里写明本人填写、仅本人可见、不提供给企业或来源机构；页面上没有任何投递、收简历的动作。
+  await expect(page.getByText('由你本人填写，仅你可见')).toBeVisible()
+  await expect(page.getByText('不会把这些记录提供给企业或来源机构', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: /一键投递|立即投递|平台投递/ })).toHaveCount(0)
+  await assertCtaWhitelist(page)
+  await assertNoElementCrossesViewport(page)
+  await expectFusionAcceptance(page, errors)
+
+  // 点回浏览，页签一直在；再点求职进度回来，地址栏跟着变。
+  await page.getByTestId('member-records-activity-tab-browse').click()
+  await expect(page.getByTestId('member-records-activity-tab-browse')).toHaveAttribute('aria-current', 'true')
+  await expect(progressTab).toBeVisible()
+  await progressTab.click()
+  await expect(progressTab).toHaveAttribute('aria-current', 'true')
+  await expect(page).toHaveURL(/\/me\/activity\?tab=applications$/)
+  expect(api.requestCount('GET', '/api/v1/me/job-applications'), '页签开着、打开它才取这张表').toBeGreaterThanOrEqual(1)
+})
+
+test('applications tab with the switch on and no entries says it is self-filled and that manual entry is not built yet @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', supportContactWithSelfNoteTab(true))
+  api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+
+  await loginThroughVisibleUi(page, '/me/activity?tab=applications')
+  await expect(page.getByTestId('member-records-activity-tab-applications')).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByText('求职进度是本人自己填的', { exact: false })).toBeVisible()
+  // 手填入口还没建：按钮是置灰的，不能点，也不假装能填。
+  await expect(page.getByTestId('member-records-start-manual')).toBeDisabled()
+  await expect(page.getByText('本页不会替你造进度', { exact: false })).toBeVisible()
+  await assertNoElementCrossesViewport(page)
+})
+
+// 开关值不是布尔 true（缺字段、字符串 "true"、数字 1、null、false）一律当关：不画页签，直达链接落回浏览，也不去取那张表。
+for (const raw of [undefined, false, null, 'true', 1]) {
+  test(`applications tab stays off when the switch value is ${JSON.stringify(raw) ?? 'missing'} @w5-kiosk`, async ({ page, api }) => {
+    registerMemberLogin(api)
+    registerAuthenticatedShell(api)
+    api.respond('GET', '/api/v1/public/support-contact', supportContactWithSelfNoteTab(raw))
+    api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+    api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+    api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+
+    await loginThroughVisibleUi(page, '/me/activity?tab=applications')
+    await expect(page.getByTestId('member-records-activity-tab-browse')).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByTestId('member-records-activity-tab-applications')).toHaveCount(0)
+    await expect(page.getByTestId('member-records-start-manual')).toHaveCount(0)
+    await expect(page.getByText('手填入口待建设')).toHaveCount(0)
+    expect(api.requestCount('GET', '/api/v1/me/job-applications')).toBe(0)
+  })
+}
+
+test('applications tab stays off when the support contact cannot be read @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/public/support-contact', { status: 500, json: { success: false, error: { code: 'INTERNAL', message: 'boom' } } })
+  api.respond('GET', '/api/v1/me/browse-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/external-jump-logs', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/job-applications', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+
+  await loginThroughVisibleUi(page, '/me/activity?tab=applications')
+  await expect(page.getByTestId('member-records-activity-tab-browse')).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByTestId('member-records-activity-tab-applications')).toHaveCount(0)
+  expect(api.requestCount('GET', '/api/v1/me/job-applications')).toBe(0)
+})
+
 test('AI record delete waits for the server and keeps the row on failure @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerMemberLogin(api)
@@ -1187,13 +1317,17 @@ test('AI record delete waits for the server and keeps the row on failure @w5-kio
   })
 
   await loginThroughVisibleUi(page, '/me/ai-records')
-  await expect(page.getByText('基于诊断生成的优化建议')).toBeVisible()
+  // 稿 pageAi：行上写记录种类，点开才有「打开 / 删除」。
+  const recordRow = page.getByRole('button', { name: /简历优化/ })
+  await expect(recordRow).toBeVisible()
+  await recordRow.click()
+  await expect(page.getByText('AI 生成，仅供参考')).toBeVisible()
   await page.getByRole('button', { name: '删除 AI 服务记录' }).click()
   await expect(page.getByText('本页不会提前显示成功')).toBeVisible()
   await page.getByRole('button', { name: '确认删除这条记录，删除后不可恢复' }).click()
   const toast = page.getByRole('status').filter({ hasText: '删除失败，记录可能已到期或被清理' })
   await expect(toast).toBeVisible()
-  await expect(page.getByText('基于诊断生成的优化建议')).toBeVisible()
+  await expect(page.getByRole('button', { name: /简历优化/ })).toBeVisible()
   await expect(page.getByText('记录已删除')).toHaveCount(0)
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
@@ -1295,15 +1429,25 @@ async function expectQxAssetsShell(page: Page, state: string, tab: 'documents' |
   await expect(page.getByTestId(`member-assets-tab-${tab}`)).toHaveAttribute('aria-current', 'true')
 }
 
-/** 长文件名必须整段折行，不得压到右侧操作区上（同一行时右缘 ≤ 操作区左缘，换行后在它上方）。 */
+/** 稿：先点一行，操作才出现在行里。一次只开一行；已经开着就不再点。 */
+async function openRow(row: ReturnType<Page['locator']>): Promise<void> {
+  const toggle = row.locator('.me-open')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+}
+
+/** 长文件名必须整段折行，落在行卡里，不得伸出卡片；行开着时，换行后的文件名要在操作行上方。 */
 async function expectNameClearOfActions(row: ReturnType<Page['locator']>): Promise<void> {
   const name = await row.locator('.qx-me-asset-name').boundingBox()
-  const acts = await row.locator('.qx-me-acts').boundingBox()
+  const card = await row.boundingBox()
   expect(name).not.toBeNull()
-  expect(acts).not.toBeNull()
-  const sameLine = name!.y < acts!.y + acts!.height && acts!.y < name!.y + name!.height
-  if (sameLine) expect(name!.x + name!.width, '文件名不得压到操作区上').toBeLessThanOrEqual(acts!.x + 1)
-  else expect(name!.y + name!.height, '换行后文件名在操作区上方').toBeLessThanOrEqual(acts!.y + 1)
+  expect(card).not.toBeNull()
+  expect(name!.x, '文件名不得伸出行卡左缘').toBeGreaterThanOrEqual(card!.x - 1)
+  expect(name!.x + name!.width, '文件名不得伸出行卡右缘').toBeLessThanOrEqual(card!.x + card!.width + 1)
+  if ((await row.locator('.me-acts').count()) > 0) {
+    const acts = await row.locator('.me-acts').first().boundingBox()
+    expect(name!.y + name!.height, '换行后文件名在操作区上方').toBeLessThanOrEqual(acts!.y + 1)
+  }
 }
 
 async function assetShot(page: Page, name: string): Promise<void> {
@@ -1364,14 +1508,20 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   // 置灰原因常显在行内（触屏没有 hover，title 读不到）。
   await expect(page.getByText('该文件格式暂不支持打印', { exact: true })).toBeVisible()
-  await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期' })).toBeDisabled()
+  // 稿：点开一行才有操作。过期的「已到期」、不能打的 zip「打印」都是置灰的。
+  await openRow(rows.filter({ hasText: '已过期的求职信.pdf' }))
+  await expect(rows.filter({ hasText: '已过期的求职信.pdf' }).getByRole('button', { name: '已到期', exact: true })).toBeDisabled()
+  await openRow(rows.filter({ hasText: '作品集源文件.zip' }))
   await expect(rows.filter({ hasText: '作品集源文件.zip' }).getByRole('button', { name: '打印' })).toBeDisabled()
+  await openRow(rows.filter({ hasText: LONG_DOC_NAME }))
+  await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   await assetShot(page, 'documents-ready')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
 
   // 查看：凭本人 token 现换短期链接，在当前页内预览。
   const previewRequest = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/v1/files/doc-photo/preview-url')
+  await openRow(rows.filter({ hasText: '一寸证件照.png' }))
   await rows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' }).click()
   expect((await (await previewRequest).allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
   const dialog = page.getByRole('dialog', { name: '一寸证件照.png' })
@@ -1383,16 +1533,18 @@ test('documents: real preview, retention, delete and print calls run on the Qing
 
   // 保存期限：6 个月要先同意，结果以服务端返回回填。
   const longRow = rows.filter({ hasText: LONG_DOC_NAME })
+  await openRow(longRow)
   await longRow.getByRole('button', { name: '修改保存期限' }).click()
   await longRow.getByRole('button', { name: '保存 6 个月' }).click()
   await assetShot(page, 'documents-retention-confirm')
   await page.getByRole('button', { name: '同意并保存' }).click()
   await expect(page.getByTestId('member-assets-toast')).toHaveText('保存期限已更新')
   expect(api.requestCount('PATCH', '/api/v1/files/doc-long/retention')).toBe(1)
-  await expect(longRow.locator('.qx-me-chip')).toContainText('保存 6 个月')
+  await expect(longRow).toContainText('保存 6 个月')
 
   // 删除：两步确认，服务端成功后才从列表移除。
   const zipRow = rows.filter({ hasText: '作品集源文件.zip' })
+  await openRow(zipRow)
   await zipRow.getByRole('button', { name: '删除文档 作品集源文件.zip' }).click()
   await zipRow.getByRole('button', { name: '再次点击确认删除文档 作品集源文件.zip' }).click()
   await expect(page.getByText('作品集源文件.zip', { exact: true })).toHaveCount(0)
@@ -1404,6 +1556,7 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
   )
+  await openRow(longRow)
   await longRow.getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL(/\/print\/desk\?step=check$/)
   await expect(page.locator('[data-w2-page="print-material-check"]')).toBeVisible()
@@ -1418,6 +1571,34 @@ test('documents: real preview, retention, delete and print calls run on the Qing
   expect(api.requestCount('GET', '/api/v1/files/doc-long/preview-url')).toBe(1)
   expect(api.requestCount('POST', '/api/v1/orders/quote'), '原件检查完之前不报价').toBe(0)
   expect(errors).toEqual([])
+})
+
+test('documents: the short-keep chip says about 24 hours only for a normal print document under the system short policy @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  // 同样是「短期保存」，只有 用途=打印文档 且 敏感等级=普通 的那一份才有 24 小时的依据（FILE_DEFAULT_TTL_HOURS.normal）；
+  // 简历上传、较敏感、高敏的短期文件保存多久各有各的期限，不能套这个数。别的保存期限的文案不动。
+  api.respond('GET', '/api/v1/me/documents', memberPage([
+    memberDocument({ id: 'doc-short-normal', filename: '会议材料.pdf', retentionPolicy: 'system_short', allowedRetentionPolicies: [] }),
+    memberDocument({ id: 'doc-short-resume', filename: '上传的简历.pdf', purpose: 'resume_upload', retentionPolicy: 'system_short', allowedRetentionPolicies: [] }),
+    memberDocument({ id: 'doc-short-sensitive', filename: '成绩单扫描.pdf', sensitiveLevel: 'sensitive', retentionPolicy: 'system_short', allowedRetentionPolicies: [] }),
+    memberDocument({ id: 'doc-short-high', filename: '证件复印件.pdf', sensitiveLevel: 'highly_sensitive', retentionPolicy: 'system_short', allowedRetentionPolicies: [] }),
+    memberDocument({ id: 'doc-kept-months', filename: '长期用的简历.pdf', retentionPolicy: 'months_3' }),
+  ]))
+
+  await loginThroughVisibleUi(page, '/me/documents')
+  await expectQxAssetsShell(page, 'documents-ready', 'documents')
+  const rows = page.getByTestId('member-assets-document')
+  await expect(rows).toHaveCount(5)
+  await expect(rows.filter({ hasText: '会议材料.pdf' })).toContainText('短期保存，约 24 小时')
+  for (const name of ['上传的简历.pdf', '成绩单扫描.pdf', '证件复印件.pdf']) {
+    const text = await rows.filter({ hasText: name }).innerText()
+    expect(text, `${name} 只写「短期保存」，不套 24 小时`).toContain('短期保存')
+    expect(text, `${name} 不套 24 小时`).not.toMatch(/24\s*小时/)
+  }
+  await expect(rows.filter({ hasText: '长期用的简历.pdf' })).toContainText('保存 3 个月')
+  await expect(rows.filter({ hasText: '长期用的简历.pdf' })).not.toContainText('约 24 小时')
+  await assertNoElementCrossesViewport(page)
 })
 
 test('documents: derived AI output skips the material check and goes straight to price confirm @w5-kiosk', async ({ page, api }) => {
@@ -1449,7 +1630,9 @@ test('documents: derived AI output skips the material check and goes straight to
   const quoteRequest = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/orders/quote',
   )
-  await page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' }).getByRole('button', { name: '打印', exact: true }).click()
+  const reportRow = page.getByTestId('member-assets-document').filter({ hasText: '简历对照.pdf' })
+  await openRow(reportRow)
+  await reportRow.getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL('**/print/confirm')
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
   expect((await quoteRequest).postDataJSON()).toMatchObject({ fileUrl: '/api/v1/files/doc-ai-report/content?sig=print' })
@@ -1470,8 +1653,8 @@ test('documents and orders: error then empty come from the server, never a cache
   await assetShot(page, 'documents-error')
   api.respond('GET', '/api/v1/me/documents', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '还没有文档' })).toBeVisible()
-  await expect(page.getByRole('region', { name: '文档资产概览' })).toContainText('0')
+  await expect(page.getByText('登录后上传的文档才会出现在这里。游客上传的文件不会自动归入你的账号。', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^去打印，/ })).toBeVisible()
   await expectFusionAcceptance(page, errors)
 
   await page.getByTestId('member-assets-tab-orders').click()
@@ -1479,9 +1662,9 @@ test('documents and orders: error then empty come from the server, never a cache
   await expect(page.getByRole('heading', { name: '这次没读到', exact: true })).toBeVisible()
   api.respond('GET', '/api/v1/me/print-orders', memberPage([]))
   await page.getByRole('button', { name: '重新加载', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '还没有打印订单' })).toBeVisible()
+  await expect(page.getByText('还没有打印订单。没登录时在这台机器上打的单不会进这个账号。', { exact: true })).toBeVisible()
   await assetShot(page, 'orders-empty')
-  await expect(page.getByRole('region', { name: '打印记录概览' })).toContainText('0')
+  await expect(page.getByTestId('member-assets-state-orders-empty')).toBeVisible()
   await expectFusionAcceptance(page, errors)
 })
 
@@ -1506,9 +1689,9 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expectNameClearOfActions(rows.filter({ hasText: LONG_DOC_NAME }))
   await expect(rows.filter({ hasText: '历史打印.pdf' })).toContainText('暂无支付信息')
   await expect(rows.filter({ hasText: '成绩单.pdf' })).toContainText('待退款')
-  // 取件码提示只跟着服务端 pickupCode 走：四单里只有一单带码。
-  await expect(page.locator('.qx-me-chip', { hasText: '取件码' })).toHaveCount(1)
-  await expect(page.getByText('进行中任务每 5 秒自动更新')).toBeVisible()
+  // 到机码提示只跟着服务端 pickupCode 走（稿：行上写「· 到机码」）：四单里只有一单带码。
+  await expect(rows.filter({ hasText: '到机码' })).toHaveCount(1)
+  await expect(page.getByText('进行中的订单会自动刷新')).toBeVisible()
   await assetShot(page, 'orders-ready')
   await assertNoElementCrossesViewport(page)
   await expectFusionAcceptance(page, errors)
@@ -1535,6 +1718,7 @@ test('orders: payment truth, pickup code, filters, detail, load-more and feedbac
   await expect(page.getByRole('button', { name: /加载更多/ })).toHaveCount(0)
 
   const feedbackLoaded = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/me/feedback')
+  await openRow(rows.filter({ hasText: '成绩单.pdf' }))
   await rows.filter({ hasText: '成绩单.pdf' }).getByRole('button', { name: '反馈打印订单 成绩单.pdf' }).click()
   await expect(page).toHaveURL(/\/me\/feedback\?category=print&relatedPrintTaskId=order-failed$/)
   await feedbackLoaded
@@ -1623,6 +1807,7 @@ test('documents and orders stay operable at 390x844 without overlap @w5-mobile',
     await docRows.nth(index).scrollIntoViewIfNeeded()
     await expectNameClearOfActions(docRows.nth(index))
   }
+  await openRow(docRows.filter({ hasText: '一寸证件照.png' }))
   const view = docRows.filter({ hasText: '一寸证件照.png' }).getByRole('button', { name: '查看' })
   await view.scrollIntoViewIfNeeded()
   await assertTapTargetPointerHit(view)
@@ -1747,7 +1932,7 @@ test('settings: consent read failure shows 本次未取到, a failed revoke keep
 
   await loginThroughVisibleUi(page, '/me/settings')
   await expectQxSettingsShell(page, 'error')
-  const consent = page.getByRole('region', { name: '隐私与 AI 授权管理' })
+  const consent = page.getByTestId('member-settings-consent')
   const status = page.getByTestId('member-settings-consent-status')
   const revoke = page.getByRole('button', { name: '撤回授权', exact: true })
   await expect(status).toHaveText('本次未取到')
@@ -1813,6 +1998,13 @@ test('settings: phone rebind hides both codes, closes after 45s idle and clears 
   const dialog = page.locator('.settings-rebind')
   await expect(dialog).toContainText('第 1 步')
   await expect(dialog).toContainText('138****8000')
+  // P0：换绑是一整套四步验证，中途离开前必须先问。屏上只留这几个出口，且都经「取消这次换绑？」确认：
+  // 没有底导航；底栏只有三颗（返回账号设置、取消换绑、主按钮），不放问小青（受保护的那颗在表单里）。
+  await expect(page.locator('.qxt-nav')).toHaveCount(0)
+  await expect(page.locator('[data-qxt-ask]')).toHaveCount(0)
+  await expect(page.locator('.qxt-dock').getByRole('button')).toHaveCount(3)
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回账号设置' })).toHaveCount(1)
+  await expect(dialog.getByRole('button', { name: '返回账号设置' }), '页内不再重复放一颗返回').toHaveCount(1)
   await page.clock.fastForward(46_000)
   await expect(dialog).toHaveCount(0)
   expect(api.requestCount('POST', STEP_UP_SMS)).toBe(0)
@@ -1843,6 +2035,55 @@ test('settings: phone rebind hides both codes, closes after 45s idle and clears 
   await page.waitForURL((url) => url.pathname === '/login')
   await expect(page.getByText('换绑成功，请用新手机号登录')).toBeVisible()
   await expectTokenNotPersisted(page)
+})
+
+test('settings: every way out of the rebind form asks first, and is disabled while submitting @w5-kiosk', async ({ page, api }) => {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', CONSENT_STATUS, consentRows(false))
+  api.respond('POST', STEP_UP_SMS, { status: 200, json: { success: true, data: { challengeId: 'w5-leave', phoneMasked: '138****8000', expiresInSeconds: 300, cooldownSeconds: 60 } } })
+  api.respond('POST', STEP_UP_VERIFY, { status: 200, json: { success: true, data: { stepUpToken: 'w5-leave-token', action: 'phone_rebind', expiresInSeconds: 300 } } })
+  api.respondWith('POST', PHONE_REBIND, async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    return { status: 200, json: { success: true, data: { newPhoneMasked: '139****9000', sessionsRevoked: 1 } } }
+  })
+  api.respond('POST', LOGOUT, { status: 200, json: { success: true, data: { loggedOut: true } } })
+
+  await loginThroughVisibleUi(page, '/me/settings')
+  await page.getByTestId('member-settings-rebind').click()
+  const panel = page.locator('.settings-rebind')
+  await expect(panel).toBeVisible()
+  const confirm = page.getByRole('dialog', { name: '取消这次换绑？' })
+
+  // 四个出口：意图带返回、底栏返回、取消换绑、表单里的问小青。每一个都先弹「取消这次换绑？」，点「取消」留在原处。
+  const exits = [
+    page.locator('.qxt-back'),
+    page.locator('.qxt-dock').getByRole('button', { name: '返回账号设置' }),
+    page.locator('.qxt-dock').getByRole('button', { name: '取消换绑' }),
+    page.locator('.qx-ai-help'),
+  ]
+  for (const exit of exits) {
+    await exit.click()
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole('button', { name: '取消', exact: true }).click()
+    await expect(confirm).toHaveCount(0)
+    await expect(panel).toBeVisible()
+    await expect(page).toHaveURL((url) => url.pathname === '/me/settings')
+  }
+
+  // 走完四步到提交：提交中和完成后，三个出口都点不了。
+  await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
+  await panel.getByLabel('当前手机号验证码，已隐藏显示').fill('654321')
+  await panel.getByRole('button', { name: '下一步', exact: true }).click()
+  await panel.getByLabel('新手机号', { exact: true }).fill('13900139000')
+  await panel.getByRole('button', { name: '发送验证码', exact: true }).click()
+  await panel.getByLabel('新手机号验证码，已隐藏显示').fill('112233')
+  await panel.getByRole('button', { name: '确认换绑', exact: true }).click()
+  await expect(page.locator('.qxt-back')).toBeDisabled()
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回账号设置' })).toBeDisabled()
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '取消换绑' })).toBeDisabled()
+  await expect(confirm).toHaveCount(0)
+  await page.waitForURL((url) => url.pathname === '/login')
 })
 
 // 服务端对新号验证码错 / 过期 / 锁定回 401，但登录仍有效：只让换绑从旧号验证重来，不清场
@@ -1927,7 +2168,7 @@ test('settings: switch-account cancel keeps the session, logout confirms first a
 
   // 取消不清任何东西。
   await page.getByRole('button', { name: /换一个账号登录/ }).click()
-  const switchDialog = page.getByRole('dialog', { name: '切换账号' })
+  const switchDialog = page.getByRole('dialog', { name: '换一个账号登录' })
   await expect(switchDialog).toBeVisible()
   await switchDialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(switchDialog).toHaveCount(0)
@@ -1935,10 +2176,10 @@ test('settings: switch-account cancel keeps the session, logout confirms first a
   expect(api.requestCount('POST', LOGOUT)).toBe(0)
 
   await page.getByTestId('member-settings-primary').click()
-  const logoutDialog = page.getByRole('dialog', { name: '退出登录' })
+  const logoutDialog = page.getByRole('dialog', { name: '结束使用' })
   await expect(logoutDialog).toBeVisible()
   await settingsShot(page, 'logout-confirm')
-  await logoutDialog.getByRole('button', { name: '退出登录', exact: true }).click()
+  await logoutDialog.getByRole('button', { name: '确认结束使用', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/')
   await expect(page.getByTestId('qx-home')).toBeVisible()
   expect(api.requestCount('POST', LOGOUT)).toBe(1)
@@ -1957,9 +2198,9 @@ test('settings: switch account confirms, clears the session and lands on the log
   await loginThroughVisibleUi(page, '/me/settings')
   await expectQxSettingsShell(page, 'member')
   await page.getByRole('button', { name: /换一个账号登录/ }).click()
-  const switchDialog = page.getByRole('dialog', { name: '切换账号' })
+  const switchDialog = page.getByRole('dialog', { name: '换一个账号登录' })
   await expect(switchDialog).toContainText('不会带入下一个账号')
-  await switchDialog.getByRole('button', { name: '退出并切换', exact: true }).click()
+  await switchDialog.getByRole('button', { name: '结束并去登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/login')
   await expect(page.getByRole('button', { name: '获取验证码', exact: true })).toBeVisible()
   expect(api.requestCount('POST', LOGOUT)).toBe(1)
@@ -1987,7 +2228,7 @@ test('settings stays operable at 390x844 without overlap @w5-mobile', async ({ p
   await expectFusionAcceptance(page, errors)
 
   await page.getByTestId('member-settings-primary').click()
-  const dialog = page.getByRole('dialog', { name: '退出登录' })
+  const dialog = page.getByRole('dialog', { name: '结束使用' })
   await expect(dialog).toBeVisible()
   await settingsShot(page, 'mobile-logout-confirm')
   const box = await dialog.boundingBox()

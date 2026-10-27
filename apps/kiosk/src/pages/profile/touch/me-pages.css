@@ -1,13 +1,16 @@
 /* 我的与权益各页专用的样式。同样全部挂在 [data-qx-page="me"] 下；通用版式件在 me-touch.css。 */
 
 /* ── 我的（/profile） ── */
+.pf-root [data-qx-page="me"] .pf-idcard,
 [data-qx-page="me"] .pf-idcard {
+  min-height: 0;
+  margin-bottom: 0;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
-  padding: 14px 18px;
+  gap: 2px;
+  padding: 10px 18px;
   border-radius: 22px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
@@ -15,7 +18,7 @@
 }
 
 [data-qx-page="me"] .pf-idname {
-  font: 700 36px/1.25 var(--qx-serif);
+  font: 700 34px/1.2 var(--qx-serif);
   letter-spacing: 0;
 }
 
@@ -44,8 +47,14 @@
   gap: 8px;
 }
 
-[data-qx-page="me"] .me-rows.me-links > .me-line {
+[data-qx-page="me"] .me-rows.me-few.me-links {
+  flex: 1 0 auto;
+}
+
+[data-qx-page="me"] .me-rows.me-links > .me-line,
+[data-qx-page="me"] .me-rows.me-links > .me-line:not([data-open]) {
   min-height: 0;
+  max-height: none;
 }
 
 /* ── 提示条（已读、删除、提交结果） ── */
@@ -331,4 +340,24 @@
   background: var(--qx-deep);
   color: var(--qxt-cream);
   border-color: transparent;
+}
+
+/* ── AI 内容投诉入口：说明在左、按钮在右，一行放下，不把列表往下挤 ── */
+[data-qx-page="me"] .me-static.me-complaint {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 8px;
+}
+
+[data-qx-page="me"] .me-static.me-complaint .me-p {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+[data-qx-page="me"] .me-static.me-complaint .me-acts {
+  flex: none;
 }

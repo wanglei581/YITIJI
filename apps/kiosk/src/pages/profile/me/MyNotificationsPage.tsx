@@ -136,7 +136,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   let body: ReactNode
   if (!isLoggedIn) {
     body = (
-      <div data-testid="notifications-list">
+      <div data-testid="notifications-list" className="me-state">
         <MeLoginGate page="notifications" />
       </div>
     )
@@ -168,7 +168,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   } else {
     body = (
       <>
-        <MeRows few={items.length < 5} testId="notifications-list" label="消息通知">
+        <MeRows few={items.length < 7} testId="notifications-list" label="消息通知">
           {items.map((item) => {
             const key = `${item.kind}-${item.id}`
             return (
@@ -189,7 +189,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
             )
           })}
         </MeRows>
-        {items.length < 5 && openKey === null ? (
+        {items.length < 7 && openKey === null ? (
           <div className="me-stack">
             <MeExitCard art="checklist" artWidth={110} title="去提反馈" desc="打印或设备上的问题可以写下来" onClick={() => navigate('/me/feedback')} />
             <MeExitCard art="usb" artWidth={110} title="去打印" desc="不看消息也能打印、扫描" onClick={() => navigate('/print-scan')} />

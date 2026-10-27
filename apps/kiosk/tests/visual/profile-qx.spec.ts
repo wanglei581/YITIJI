@@ -172,11 +172,14 @@ test('profile payment todo is driven by pending-tasks payload @w5-kiosk', async 
 
   const continueBtn = page.getByTestId('profile-resume')
   await expect(continueBtn).toHaveText('继续付款')
+  // 稿 pageMe：账号卡 → 六个计数 → 待办卡。待办卡在计数下面，贴着计数，中间不留空档。
   const idBox = await page.locator('.pf-idcard').boundingBox()
+  const gridBox = await page.getByRole('region', { name: '我的资产' }).boundingBox()
   const btnBox = await continueBtn.boundingBox()
-  expect(btnBox && idBox && btnBox.y >= idBox.y + idBox.height - 1, '待办操作在身份卡下方').toBe(true)
-  expect(btnBox && idBox && btnBox.y <= idBox.y + idBox.height + 120, '待办操作贴着身份卡，中间不留空档').toBe(true)
-  expect(await page.locator('.pf-page').evaluate((el) => el.scrollHeight - el.clientHeight), '默认待办态首屏放得下').toBeLessThanOrEqual(1)
+  expect(gridBox && idBox && gridBox.y >= idBox.y + idBox.height - 1, '六个计数在账号卡下方').toBe(true)
+  expect(btnBox && gridBox && btnBox.y >= gridBox.y + gridBox.height - 1, '待办操作在六个计数下方').toBe(true)
+  expect(btnBox && gridBox && btnBox.y <= gridBox.y + gridBox.height + 260, '待办操作贴着六个计数，中间不留空档').toBe(true)
+  expect(await page.locator('.qxt-body').evaluate((el) => el.scrollHeight - el.clientHeight), '默认待办态首屏放得下').toBeLessThanOrEqual(1)
   await assertTapTargetPointerHit(continueBtn)
   await page.screenshot({ path: test.info().outputPath('profile-payment.png'), fullPage: true })
   expect(errors).toEqual([])
@@ -196,8 +199,12 @@ test('profile overview error keeps slots as dash and does not reuse previous tot
 
   await loginThroughVisibleUi(page, '/profile')
   await expect(page.getByTestId('profile-state-error')).toBeVisible()
-  await expect(page.getByTestId('profile-fallback').getByText('账号数据这次没取到')).toBeVisible()
-  await expect(page.getByTestId('profile-asset-resumes')).toContainText('—')
+  // 稿 err('me')：标题在意图带里，正文是一句话加两张出口卡。
+  await expect(page.getByRole('heading', { name: '账号数据这次没取到' })).toBeVisible()
+  await expect(page.getByTestId('profile-fallback').getByText('数量和待办这次没有取到。记录还在，可以重新读取。')).toBeVisible()
+  // 稿 err('me')：读不到时不画计数格（稿上只有一句话和两张出口卡），也就不会拿上一次的数字顶替。
+  await expect(page.getByTestId('profile-asset-resumes')).toHaveCount(0)
+  await expect(page.getByTestId('profile-fallback').getByText(/\d+\s*条/)).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新读取', exact: true })).toBeVisible()
   await expectComplianceCopy(page)
   await page.screenshot({ path: test.info().outputPath('profile-error.png'), fullPage: true })
@@ -215,8 +222,9 @@ test('benefits empty and error states stay honest and read GET /me/benefits @w5-
 
   await loginThroughVisibleUi(page, '/me/benefits')
   await expect(page.getByTestId('benefits-state-empty')).toBeVisible()
-  await expect(page.getByText('还没有权益')).toBeVisible()
-  await expect(page.getByRole('button', { name: '看可参加的活动', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '还没有权益' })).toBeVisible()
+  await expect(page.getByTestId('benefits-fallback').getByText('还没有权益。没有权益也照常能打印、做简历、查政策。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '看看活动', exact: true })).toBeVisible()
   await expect(page.getByText('立即支付')).toHaveCount(0)
   await expect(page.getByText('核销成功')).toHaveCount(0)
   await expectComplianceCopy(page)
@@ -224,7 +232,7 @@ test('benefits empty and error states stay honest and read GET /me/benefits @w5-
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
-  await page.getByRole('button', { name: '看可参加的活动', exact: true }).click()
+  await page.getByRole('button', { name: '看看活动', exact: true }).click()
   await expect(page).toHaveURL(/\/activities/)
   expect(errors).toEqual([])
 })
@@ -262,7 +270,7 @@ test('feedback submit posts the visible form payload and shows server failure @w
   })
 
   await loginThroughVisibleUi(page, '/me/feedback')
-  await expect(page.getByRole('heading', { name: '提交反馈' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '提交反馈' })).toBeVisible()
   await page.getByLabel('标题（选填）').fill('页面使用反馈')
   await page.getByLabel('反馈内容').fill('这是用于验证真实反馈提交失败状态的合成说明。')
 

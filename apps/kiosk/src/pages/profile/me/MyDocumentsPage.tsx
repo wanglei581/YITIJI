@@ -142,7 +142,7 @@ export function MyDocumentsPage() {
   const [retentionConfirm, setRetentionConfirm] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
   const [convertingId, setConvertingId] = useState<string | null>(null)
   const [openDocId, setOpenDocId] = useState<string | null>(null)
-  const miniappLine = whenMiniapp(useSupportContact(), '在手机小程序登录后传的文件也会出现在这里。')
+  const miniappLine = whenMiniapp(useSupportContact(isLoggedIn), '在手机小程序登录后传的文件也会出现在这里。')
 
   const token = getToken()
   const fetchPage = useCallback((cursor?: string) => getMyDocuments(token, { pageSize: 50, cursor }), [token])
@@ -336,7 +336,7 @@ export function MyDocumentsPage() {
     body = (
       <>
         {pickPrint ? <p className="me-p">能打印的排在前面。选一份，接着做材料检查。</p> : null}
-        <MeRows few={items.length < 5 && openDocId === null} testId="member-assets-list" label="我的文档">
+        <MeRows few={items.length < 7 && openDocId === null} testId="member-assets-list" label="我的文档">
           {(pickPrint ? listed : items).map((doc) => {
             const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
             const confirming = confirmId === doc.id
@@ -438,7 +438,7 @@ export function MyDocumentsPage() {
             )
           })}
         </MeRows>
-        {items.length < 5 && openDocId === null ? (
+        {items.length < 7 && openDocId === null ? (
           <div className="me-stack">
             <MeExitCard art={pickPrint ? 'resume' : 'usb'} artWidth={110} title={pickPrint ? '返回选文件' : '去打印'} desc={pickPrint ? '回到刚才的打印' : 'U 盘、手机或扫描都可以'} onClick={() => navigate('/print/upload')} />
             <MeExitCard art="report" artWidth={100} title="看看打印订单" desc="已经打过的，进度在订单里" onClick={() => navigate('/me/print-orders')} />

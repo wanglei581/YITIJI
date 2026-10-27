@@ -121,7 +121,7 @@ export function MyFavoritesPage() {
         {visible.length === 0 ? (
           <MeP>当前分类下没有收藏。</MeP>
         ) : (
-          <MeRows few={visible.length < 5} testId="member-records-list" label="我的收藏">
+          <MeRows few={visible.length < 7} testId="member-records-list" label="我的收藏">
             {visible.map((item) => (
               <button key={item.id} type="button" className="me-line" data-favorite-type={item.targetType} data-testid={`member-records-fav-${item.id}`} onClick={() => navigate(detailRoute(item))}>
                 <b>{item.title ?? '未命名收藏'}</b>
@@ -130,7 +130,7 @@ export function MyFavoritesPage() {
             ))}
           </MeRows>
         )}
-        {visible.length > 0 && visible.length < 5 ? (
+        {visible.length > 0 && visible.length < 7 ? (
           <div className="me-stack">
             <MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '看看第三方来源的岗位' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} />
             <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />

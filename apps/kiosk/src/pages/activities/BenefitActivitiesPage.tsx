@@ -156,6 +156,13 @@ export function BenefitActivitiesPage() {
           </MeRows>
         )}
 
+        {state === 'ready' && items.length > 0 && items.length < 4 ? (
+          <div className="me-stack">
+            <MeExitCard art="usb" artWidth={110} title="去打印" desc="没有活动也能打印、扫描" onClick={() => navigate('/print-scan')} />
+            <MeExitCard art="checklist" artWidth={100} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+          </div>
+        ) : null}
+
         <p className="me-fine k8-activities-notice">
           领取不代表报名、签到或投递。权益活动只用于本终端服务与打印辅助；政策资格提示只给官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。没登录也可以先看。
         </p>

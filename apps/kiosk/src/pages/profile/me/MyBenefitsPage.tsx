@@ -138,11 +138,19 @@ export function MyBenefitsPage() {
                   )
                 })}
               </MeRows>
-              <div className="me-block">
-                <ServiceAlt title="打印与扫描" desc="没有权益也能办" to="/print-scan" />
-                <ServiceAlt title="AI 简历服务" desc="没有权益也能办" to="/resume-service" />
-                <ServiceAlt title="就业政策与补贴指引" desc="说明不等于补贴已发放" to="/renshi" />
-              </div>
+              {items.length < 5 ? (
+                <div className="me-stack">
+                  <MeExitCard art="usb" artWidth={110} title="打印与扫描" desc="没有权益也能办" onClick={() => navigate('/print-scan')} />
+                  <MeExitCard art="resume" artWidth={110} title="AI 简历服务" desc="没有权益也能办" onClick={() => navigate('/resume-service')} />
+                  <MeExitCard art="checklist" artWidth={100} title="就业政策与补贴指引" desc="说明不等于补贴已发放" onClick={() => navigate('/renshi')} />
+                </div>
+              ) : (
+                <div className="me-block">
+                  <ServiceAlt title="打印与扫描" desc="没有权益也能办" to="/print-scan" />
+                  <ServiceAlt title="AI 简历服务" desc="没有权益也能办" to="/resume-service" />
+                  <ServiceAlt title="就业政策与补贴指引" desc="说明不等于补贴已发放" to="/renshi" />
+                </div>
+              )}
             </>
           ) : null}
           {uiState === 'list' || uiState === 'empty' ? (

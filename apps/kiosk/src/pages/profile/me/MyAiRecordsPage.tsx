@@ -274,7 +274,7 @@ export function MyAiRecordsPage() {
   } else {
     body = (
       <>
-        <MeRows few={totalCount < 5 && openKey === null} testId="member-records-list" label="AI 服务记录">
+        <MeRows few={totalCount < 7 && openKey === null} testId="member-records-list" label="AI 服务记录">
           <QaRecords items={qaPage.items} token={token ?? null} onDeleted={() => setReloadKey((key) => key + 1)} openKey={openKey} onToggle={toggleRow} />
           <MockInterviewRecords
             items={interviews}
@@ -357,7 +357,7 @@ export function MyAiRecordsPage() {
             )
           })}
         </MeRows>
-        {totalCount < 5 && openKey === null ? (
+        {totalCount < 7 && openKey === null ? (
           <div className="me-stack">
             <MeExitCard art="resume" artWidth={110} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
             <MeExitCard art="checklist" artWidth={100} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
@@ -393,7 +393,7 @@ export function MyAiRecordsPage() {
       {isLoggedIn && state === 'ready' ? <MemberLoadMore {...recordsPage} label="加载更多简历与规划记录" /> : null}
       {/* AI 内容投诉入口（C3，走查 W-01）：稿 39 没画，放在列表下面，写清是哪个功能、什么时间、哪段内容。 */}
       {isLoggedIn ? (
-        <div className="me-static" data-testid="member-records-ai-complaint">
+        <div className="me-static me-complaint" data-testid="member-records-ai-complaint">
           <MeP>对 AI 生成的内容有异议？可以投诉，写清是哪个功能、什么时间、哪段内容。</MeP>
           <MeActs>
             <MeBtn v="sec" data-route={AI_CONTENT_COMPLAINT_ROUTE} onClick={() => navigate(AI_CONTENT_COMPLAINT_ROUTE)}>投诉 AI 内容</MeBtn>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { MeErrorPack, MeLoadingPack, MeLoginGate, gatePageFromTitle } from '../../touch/MeStatePacks'
+import { MeErrorPack, MeLoadingPack, MeLoginGate } from '../../touch/MeStatePacks'
+import { gatePageFromTitle } from '../../touch/meGatePage'
 
 /**
  * 记录页的登录门、读取中、读不到三种状态，都落到触屏版的状态屏（稿 gate / loading / err）。

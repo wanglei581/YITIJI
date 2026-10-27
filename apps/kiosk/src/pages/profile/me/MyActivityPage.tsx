@@ -39,7 +39,7 @@ export function MyActivityPage() {
   const { isLoggedIn, getToken } = useAuth()
   const hostingOpen = useRecruitmentHosting().enabled
   // 求职进度页签由后台开关控制，默认不显示：读不到开关、没配开关都当关。
-  const showJobProgressTab = useSupportContact().selfNoteTab
+  const showJobProgressTab = useSupportContact(isLoggedIn).selfNoteTab
   const [reloadKey, setReloadKey] = useState(0)
   const requestedTab = getTab(searchParams)
   const tab = showJobProgressTab || requestedTab !== 'applications' ? requestedTab : 'browse'
@@ -152,7 +152,7 @@ export function MyActivityPage() {
     body = (
       <>
         {tabs}
-        <MeRows few={(tab === 'browse' ? browse : jumps).length < 5} testId="member-records-list" label="浏览与跳转记录">
+        <MeRows few={(tab === 'browse' ? browse : jumps).length < 7} testId="member-records-list" label="浏览与跳转记录">
           {tab === 'browse'
             ? browse.map((it) => (
               <button
@@ -181,7 +181,7 @@ export function MyActivityPage() {
               </button>
             ))}
         </MeRows>
-        {(tab === 'browse' ? browse : jumps).length < 5 ? (
+        {(tab === 'browse' ? browse : jumps).length < 7 ? (
           <div className="me-stack">
             <MeExitCard art="checklist" artWidth={110} title={hostingOpen ? '查看岗位' : '查看政策'} desc={hostingOpen ? '在岗位详情里点「去来源平台投递」或「扫码投递」' : '看本机构发布的就业政策'} onClick={() => navigate(hostingOpen ? '/jobs' : '/policy-service')} />
             <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />

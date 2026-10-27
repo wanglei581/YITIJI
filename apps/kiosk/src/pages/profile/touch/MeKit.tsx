@@ -3,7 +3,7 @@ import { MeArt, type MeArtName } from './MeIllus'
 
 /**
  * 我的与权益各屏共用的版式件，对应触屏稿 fix-me.js 的 fe-* 类：分段、行卡、静态卡、操作行、大卡。
- * 只放版式，不放数据和动作；各页把自己的处理函数传进来。样式在 me-touch.css，全部挂在 [data-qx-page="me"] 下。
+ * 只放版式，不放数据和动作；各页把自己的处理函数传进来。样式在 me-touch.css（状态屏在 me-states.css），全部挂在 [data-qx-page="me"] 下。
  */
 
 export type MeSegItem = { id: string; label: string; testId?: string; aria?: string }

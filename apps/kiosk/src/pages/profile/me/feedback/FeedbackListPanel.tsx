@@ -30,7 +30,7 @@ export function FeedbackListPanel({
   return (
     <section aria-label="我的反馈" className="me-hist">
       <MeP>我的反馈 · {totalLabel}。查看处理状态、服务回复和补充描述。</MeP>
-      <MeRows few={items.length < 5}>
+      <MeRows few>
         {items.map((item) => (
           <FeedbackRow
             key={item.id}

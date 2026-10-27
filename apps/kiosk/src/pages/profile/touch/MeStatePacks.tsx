@@ -26,18 +26,7 @@ import { publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kios
 import { helpNeededLine, type PublicSupportContact } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import { MeArt, type MeArtName } from './MeIllus'
-
-export type MeGatePage =
-  | 'notifications'
-  | 'my-resumes'
-  | 'my-orders'
-  | 'my-docs'
-  | 'my-ai'
-  | 'my-activity'
-  | 'my-fav'
-  | 'my-benefits'
-  | 'feedback'
-  | 'privacy'
+import type { MeGatePage } from './meGatePage'
 
 const WHAT: Record<MeGatePage, string> = {
   notifications: '消息',
@@ -262,17 +251,4 @@ export function MeEmptyPack({ sentence, children, note }: { sentence: string; ch
 
 export function MeAiChip() {
   return <span className="me-ai">AI 生成，仅供参考</span>
-}
-
-export function gatePageFromTitle(title: string): MeGatePage {
-  if (title.includes('文档')) return 'my-docs'
-  if (title.includes('简历')) return 'my-resumes'
-  if (title.includes('订单')) return 'my-orders'
-  if (title.includes('AI')) return 'my-ai'
-  if (title.includes('收藏')) return 'my-fav'
-  if (title.includes('消息')) return 'notifications'
-  if (title.includes('权益')) return 'my-benefits'
-  if (title.includes('反馈')) return 'feedback'
-  if (title.includes('隐私')) return 'privacy'
-  return 'my-activity'
 }

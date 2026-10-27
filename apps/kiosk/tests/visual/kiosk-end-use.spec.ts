@@ -157,8 +157,21 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await expect(page.locator('.qxt-back')).toHaveCount(0)
   await expect(page.locator('.qxt-nav')).toHaveCount(0)
   await expect(page.locator('[data-qxt-ask]')).toHaveCount(0)
+  await expect(page.locator('.qxt-dock')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '是我，继续' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeVisible()
+  // 只有这两个出口：屏上除了两张答案卡，没有任何别的按钮可点（P0：不回答就离开会绕过「还是你吗？」）。
+  await expect(page.locator('[data-qxt-screen] button')).toHaveCount(2)
+  // 对话框语义：标题与说明读屏能念出来，且是模态的。
+  await expect(page.getByRole('alertdialog', { name: '还是你吗？' })).toHaveCount(1)
+  await expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await expect(dialog).toHaveAccessibleDescription('确认之前不会显示上一位的文件和订单。')
+  // 两张答案卡的可点区域不小于 64×64（现在靠 .me-answers 里 160px 起的卡高撑着，改版后不能丢）。
+  for (const name of ['是我，继续', '不是我，结束上一位的使用']) {
+    const box = await dialog.getByRole('button', { name }).boundingBox()
+    expect(box!.width, `${name} 宽度`).toBeGreaterThanOrEqual(64)
+    expect(box!.height, `${name} 高度`).toBeGreaterThanOrEqual(64)
+  }
   await expectNoTraceOf(page, WANG)
   // 先确认、后读取：确认层出现时资产页一条请求都不发。
   await page.waitForTimeout(400)
@@ -267,7 +280,7 @@ test('W-64 switch account: 王晓雨 → 陈立行, 陈立行 never sees 王晓�
   await nav(page, '我的').click()
   await page.getByTestId('profile-account').first().click()
   await page.getByTestId('member-settings-switch').click()
-  await page.getByRole('button', { name: '退出并切换' }).click()
+  await page.getByRole('button', { name: '结束并去登录' }).click()
 
   // 先完整清场再进登录页：登录页上没有上一位，也没落回留着上一位的首页。
   await expect(page).toHaveURL(/\/login/)

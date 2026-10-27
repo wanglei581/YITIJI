@@ -104,7 +104,7 @@ export function MyResumesPage() {
   } else {
     body = (
       <>
-      <MeRows few={items.length < 5 && openId === null} testId="member-records-list" label="我的简历">
+      <MeRows few={items.length < 7 && openId === null} testId="member-records-list" label="我的简历">
         {items.map((item) => {
           const status = STATUS_META[item.status] ?? { label: '未知状态', tone: 'run' as const }
           const actionable = isActionable(item)
@@ -163,7 +163,7 @@ export function MyResumesPage() {
           )
         })}
         </MeRows>
-        {items.length < 5 && openId === null ? (
+        {items.length < 7 && openId === null ? (
           <div className="me-stack">
             <MeExitCard art="scan" artWidth={110} title="扫描纸质简历" desc="把纸质简历扫进来" onClick={() => navigate('/scan/start')} />
             <MeExitCard art="checklist" artWidth={100} title="从零生成" desc="没有旧简历也可以做" onClick={() => navigate('/resume/generate')} />

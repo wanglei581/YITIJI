@@ -137,6 +137,7 @@ export function PhoneRebindPanel({ phoneMasked, token, onDone, onRecheck, onCanc
       <MeTouchShell title="换绑手机号" sub="先验证旧手机号，再验证新手机号；完成后重新登录。"
         backLabel="返回账号设置"
         onBack={cancel}
+        backDisabled={busy || step === 'done'}
         nav={false}
         status={{ tone: err ? 'warn' : 'unknown', label: step === 'done' ? '正在结束本次使用' : `第 ${stepIndex + 1} 步 / 共 4 步` }}
         primaryNode={<><button type="button" className="qx-btn" data-variant="ghost" disabled={busy || step === 'done'} onClick={cancel}>取消换绑</button>

@@ -10,7 +10,7 @@ import { useAuth } from '../../../auth/useAuth'
 import { API_MODE } from '../../../services/api/client'
 import { KIcon } from '../../../components/kiosk-icon'
 import { MeFine } from '../touch/MeKit'
-import { MeErrorPack, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
+import { MeErrorPack, MeExitCard, MeLoadingPack, MeLoginGate } from '../touch/MeStatePacks'
 import { MeTouchShell } from '../touch/MeTouchShell'
 import {
   addMyFeedbackReply,
@@ -277,6 +277,12 @@ export function MyFeedbackPage() {
                 replyBusy={busy === 'reply'}
                 closeBusy={busy === 'close'}
               />
+              {items.length < 3 && !selected ? (
+                <div className="me-stack">
+                  <MeExitCard art="usb" artWidth={110} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
+                  <MeExitCard art="checklist" artWidth={100} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+                </div>
+              ) : null}
               <MeFine>
                 本页是登录后的本人反馈，与不用登录的一体机问题反馈不是同一条流程；AI 内容投诉 {AI_COMPLAINT_REPLY_DAYS} 个工作日内答复，其他反馈不承诺受理结论或回复时限。
               </MeFine>

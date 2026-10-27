@@ -214,6 +214,11 @@ export function MySettingsPage() {
         )}
 
         <div className="me-split">
+          {!isLoggedIn && (
+            <MeHero art="checklist" artWidth={150} title="登录后查看" testId="member-settings-consent-locked" className="me-consent">
+              <MeP>登录后可以查看 AI 使用授权。</MeP>
+            </MeHero>
+          )}
           {isLoggedIn && (
             <MeHero
               art="checklist"
