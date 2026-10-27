@@ -347,8 +347,8 @@ export const kioskRouter = createBrowserRouter([
       {
         path: 'policy-service',
         lazy: async () => {
-          const { QxServiceHubPage } = await import('../pages/service-hubs/QxServiceHubPage')
-          return { Component: () => <QxServiceHubPage hub="policy" /> }
+          const { PolicyTouchHub } = await import('../pages/service-hubs/PolicyTouchHub')
+          return { Component: () => <PolicyTouchHub /> }
         },
       },
       {

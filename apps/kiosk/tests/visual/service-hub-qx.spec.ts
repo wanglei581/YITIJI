@@ -86,6 +86,32 @@ interface HubSnapshot {
  * 用单次 evaluate 而不是多条 await expect：'checking' 档只有 4 秒寿命，
  * 逐条等待会在中途翻成 'unavailable'，把一个真实缺陷测成随机失败。
  */
+/** 政策服务台改触屏后的读法。标题、原因、放行判据与旧卡一致，选择器换成触屏入口。 */
+async function readPolicyHub(page: Page): Promise<HubSnapshot> {
+  await page.waitForSelector('[data-qx-page="service-hub"]')
+  return page.evaluate(() => {
+    const hub = document.querySelector('[data-qx-page="service-hub"]')!
+    const entry = (el: Element) => {
+      const button = el.querySelector('button')
+      const clickable = Boolean(button) && !button!.hasAttribute('aria-disabled') && !button!.hasAttribute('disabled')
+      const title = el.querySelector('b')?.textContent?.trim() ?? ''
+      const reason = el.querySelector('[data-hub-reason]')?.textContent?.trim() ?? null
+      return { title, clickable, reason: clickable ? null : reason }
+    }
+    const notice = hub.querySelector('[data-hub-notice]')
+    return {
+      probe: hub.getAttribute('data-hub-device-probe'),
+      readiness: hub.querySelector('[data-readiness]')?.getAttribute('data-readiness') ?? null,
+      pill: document.querySelector('.qxt-status')?.textContent?.trim() ?? '',
+      noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
+      noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
+      cards: [...hub.querySelectorAll('[data-hub-entry]')].map(entry),
+      goals: [...hub.querySelectorAll('[data-hub-goal]')].map(entry),
+      quick: [...hub.querySelectorAll('[data-hub-quick]')].map(entry),
+    }
+  })
+}
+
 async function readHub(page: Page): Promise<HubSnapshot> {
   await page.waitForSelector('[data-qx-page="service-hub"]')
   return page.evaluate(() => {
@@ -215,7 +241,7 @@ test('在线服务「正在确认」同样不放行，白名单不受影响 @kio
   registerShell(api, { api: 'checking', printer: { isOnline: true, printerStatus: 'ready' } })
 
   await page.goto('/policy-service')
-  const hub = await readHub(page)
+  const hub = await readPolicyHub(page)
 
   expect(hub.readiness).toBe('checking')
   expect(hub.pill).toBe('正在确认在线服务')

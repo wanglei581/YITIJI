@@ -224,11 +224,27 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/**
+ * 触屏版路由。已在 QX_MIGRATED_ROUTES 里的不要删：删了旧壳顶栏会漏出来。
+ * 合同审查三条在 KioskRoot 之外，登记在这里只为以后套进本壳时不再露出旧顶栏。
+ * `/smart-campus/service/:key` 只放窄前缀，不写 `/smart-campus`（welcome 已在精确集合）。
+ */
+const QX_TOUCH_ROUTES = new Set<string>([
+  '/dev/touch-gallery',
+  '/policy-service',
+  '/renshi',
+  '/toolbox',
+  '/smart-campus',
+  '/smart-campus/welcome',
+  '/contract-review',
+  '/contract-review/processing',
+  '/contract-review/result',
+])
+const QX_TOUCH_PREFIXES = ['/smart-campus/service/'] as const
 
 function isTouchRoute(pathname: string): boolean {
-  return QX_TOUCH_ROUTES.has(pathname)
+  if (QX_TOUCH_ROUTES.has(pathname)) return true
+  return QX_TOUCH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
