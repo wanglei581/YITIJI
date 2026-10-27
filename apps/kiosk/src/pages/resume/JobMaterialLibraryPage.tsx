@@ -20,7 +20,7 @@ import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
@@ -577,8 +577,9 @@ export function JobMaterialLibraryPage() {
 
   return (
     <div className="qx-resume-materials">
-      <QxPageFrame
-        title="求职材料库"
+      <ResumeTouchFrame
+        eyebrow="求职材料"
+        title="求职材料"
         subtitle={subtitle}
         status={{ tone, label: pillLabel }}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
@@ -592,7 +593,7 @@ export function JobMaterialLibraryPage() {
             模板按你填的内容排版，不调用 AI；不代投递。系统不收取求职者简历给企业。生成后请先核对文件内容和页数。
           </p>
         </section>
-      </QxPageFrame>
+      </ResumeTouchFrame>
       {generated && currentPreview?.url ? (
         <FilePreviewDialog fileUrl={currentPreview.url} fileName={generated.filename} mimeType={generated.mimeType} onClose={() => setPreview(null)} />
       ) : null}

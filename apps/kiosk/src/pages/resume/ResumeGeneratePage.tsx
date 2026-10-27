@@ -9,8 +9,10 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { maskEmail, maskPhone } from '../../utils/maskPii'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import type {
   GeneratedResume,
   ResumeGenEducation,
@@ -411,7 +413,9 @@ export function ResumeGeneratePage() {
   )
 
   return (
-    <QxPageFrame
+    <ResumeTouchFrame
+      eyebrow="从零生成简历"
+      rail={reviewing ? undefined : { labels: STEPS.map((item) => item.title), now: step }}
       title="从零生成简历"
       subtitle="分步问完，一次整理。只整理你说的，不替你编。"
       status={{
@@ -482,6 +486,12 @@ export function ResumeGeneratePage() {
               两张「为什么要填」卡和一条底部自查行；正是它们把 1080×1920 竖屏填满。
               删掉稿里没有的右侧「填写进度」面板之后，这些必须补上，否则下半屏是空的。
             */}
+            <aside className="rtp-hero" aria-label="简历顶部会这样显示">
+              <p className="rtp-hero-k">简历顶部会这样显示</p>
+              <b>{basic.name.trim() || '姓名还没填'}</b>
+              <span>{basic.phone.trim() ? maskPhone(basic.phone) : '电话未填'}</span>
+              <span>{basic.email.trim() ? maskEmail(basic.email) : '邮箱未填'}</span>
+            </aside>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Field label="姓名" required>
                 <input className={inputCls} value={basic.name} onChange={(e) => setBasic((b) => ({ ...b, name: e.target.value }))} />
@@ -674,14 +684,13 @@ export function ResumeGeneratePage() {
       </div>
       )}
       {(reviewing || step === 0) && (
-        <div className="qx-rg-helper">
-          <span>
-            {reviewing
-              ? '可以慢慢核对，准备好后再点生成。'
-              : '姓名、手机号这两项建议自己核对一遍，简历印出来就是这个。'}
-          </span>
-          <button type="button" onClick={() => navigate('/help')}>找工作人员</button>
-        </div>
+        <p className="rtp-help">
+          {reviewing
+            ? '可以慢慢核对，准备好后再点生成。'
+            : '姓名、手机号这两项建议自己核对一遍。输入框是全文，上面那张预览卡里的电话和邮箱是打码的。'}
+          {' '}
+          {helpNeededLine()}
+        </p>
       )}
       {!reviewing && step === 0 && !basic.name.trim() && (
         <p className="qx-rg-reason" id="resume-generate-name-reason">
@@ -719,6 +728,6 @@ export function ResumeGeneratePage() {
         }}
       />
     )}
-    </QxPageFrame>
+    </ResumeTouchFrame>
   )
 }

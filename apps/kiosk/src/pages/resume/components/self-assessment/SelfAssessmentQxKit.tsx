@@ -12,10 +12,8 @@
 // 不要在调用方用内联 style 压小。
 
 import { type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
 import { KioskStageFit } from '../../../../components/kiosk-shell/KioskStageFit'
+import { ResumeTouchFrame } from '../../touch/ResumeTouchFrame'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../../self-assessment-qx.css'
 
@@ -76,24 +74,18 @@ export function SaFrame({
   ctabar: ReactNode
   children: ReactNode
 }) {
-  const navigate = useNavigate()
   const terminalLabel = getTerminalCode() || '设备未绑定'
 
   return (
     <KioskStageFit>
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow={eyebrow}
         title={title}
         status={status}
         terminalLabel={terminalLabel}
         back={back}
         ctabar={ctabar}
-        navbar={
-          <QxAppNavbar
-            onHome={() => navigate('/')}
-            onAdvisor={() => navigate('/assistant')}
-            onProfile={() => navigate('/profile')}
-          />
-        }
+        stateId={state}
       >
         <main
           className="sa-qx"
@@ -121,7 +113,7 @@ export function SaFrame({
             {rail.map((item) => <span key={item}>{item}</span>)}
           </p>
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </KioskStageFit>
   )
 }

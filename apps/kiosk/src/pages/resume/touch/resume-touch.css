@@ -1,0 +1,149 @@
+/* 第 7 包页面局部。颜色只走 var(--qxt-*) / var(--qx-*)。
+   .qxt-screen button 会清掉旧 .qx-btn，这里用更高优先级把按钮和输入补回来。 */
+
+.qxt-screen .qxt-body.rtp {
+  background: var(--qxt-card);
+}
+
+.jfq-root > .qxt-screen {
+  height: 100%;
+}
+
+.qxt-screen .rtp-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.qxt-screen .rtp-fill > section,
+.qxt-screen .rtp-fill > main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.qxt-screen .rtp-cta {
+  flex-wrap: wrap;
+}
+
+.qxt-screen .rtp-cta > :not(button):not(.qx-ai-declaration-slot) {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+.qxt-screen .rtp-cta .qx-ai-declaration-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.qxt-screen .rtp button {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+  font-size: var(--qxt-fs-body);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  padding: 12px 16px;
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .rtp-cta .qx-btn,
+.qxt-screen .rtp .qx-btn {
+  min-height: var(--qxt-btn-h);
+  min-width: var(--qxt-tap);
+  padding: 0 22px;
+  border-radius: var(--qxt-r-btn);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: var(--qxt-fs-btn);
+  font-weight: 700;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .rtp-cta .qx-btn[data-variant='primary'],
+.qxt-screen .rtp .qx-btn[data-variant='primary'] {
+  background: var(--qx-deep);
+  border-color: var(--qx-deep);
+  color: var(--qxt-cream);
+  flex: 1;
+}
+
+.qxt-screen .rtp-cta .qx-btn[data-variant='teal'],
+.qxt-screen .rtp .qx-btn[data-variant='teal'] {
+  background: var(--qxt-teal-wash);
+  border-color: var(--qxt-teal-ink);
+  color: var(--qxt-teal-ink);
+}
+
+.qxt-screen .rtp-cta .qx-btn[data-variant='ghost'],
+.qxt-screen .rtp .qx-btn[data-variant='ghost'] {
+  background: var(--qxt-well);
+}
+
+.qxt-screen .rtp-cta .qx-btn:disabled,
+.qxt-screen .rtp .qx-btn:disabled,
+.qxt-screen .rtp button:disabled {
+  opacity: 0.48;
+}
+
+.qxt-screen .rtp input,
+.qxt-screen .rtp textarea,
+.qxt-screen .rtp select {
+  min-height: var(--qxt-tap);
+  font-size: var(--qxt-fs-body);
+  color: var(--qxt-ink);
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 16px;
+  padding: 12px 16px;
+  width: 100%;
+}
+
+.qxt-screen .rtp-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: var(--qxt-r-card);
+  background: var(--qxt-teal-wash);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .rtp-hero b {
+  font: 700 var(--qxt-fs-slab)/1.2 var(--qx-serif);
+  color: var(--qxt-ink);
+}
+
+.qxt-screen .rtp-hero span,
+.qxt-screen .rtp-help {
+  font-size: var(--qxt-fs-aux);
+  color: var(--qxt-ink-2);
+  line-height: 1.45;
+}
+
+.qxt-screen .rtp-hero-k {
+  margin: 0;
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qxt-screen .rtp button,
+  .qxt-screen .rtp-cta .qx-btn {
+    transition: none;
+  }
+}

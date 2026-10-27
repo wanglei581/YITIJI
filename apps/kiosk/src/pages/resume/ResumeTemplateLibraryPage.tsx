@@ -1,4 +1,4 @@
-// 简历素材库 · 版式参考（/resume/templates）。
+// 简历模板 · 版式参考（/resume/templates）。
 //
 // 视觉真值（2026-09-23 迁入青序流光）：
 //   docs/design/kiosk-redesign-2026-08/46-resume-decision-workspace.html?screen=templates
@@ -16,7 +16,7 @@ import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
@@ -145,7 +145,7 @@ export function ResumeTemplateLibraryPage() {
   function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
     if (screen === 'loading') return {
       title: '正在读取版式，还没有列表',
-      subtitle: '简历素材库的模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
+      subtitle: '模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
       pill: { tone: 'unknown', label: '正在读取简历模板列表' },
       body: (
         <>
@@ -268,7 +268,7 @@ export function ResumeTemplateLibraryPage() {
       title: selected ? '版式选好了，再核对内容' : '先挑一个版式，内容仍由你决定',
       subtitle: selected
         ? '选中只是这次的版式参考。正式简历在后续流程结合你的真实内容生成，这里不冒充已生成。'
-        : '简历素材库：模板来自已发布的列表。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
+        : '模板来自已发布的列表。选中后可以看版式结构，不会自动应用，也不会直接生成简历。',
       pill: selected
         ? { tone: 'ok', label: '已选中一个版式 · 未保存' }
         : { tone: 'ok', label: '以实际发布的模板为准' },
@@ -360,7 +360,8 @@ export function ResumeTemplateLibraryPage() {
 
   return (
     <div className="jfq-root">
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="简历模板"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
@@ -380,11 +381,11 @@ export function ResumeTemplateLibraryPage() {
           data-kiosk-screen="resume-templates"
           data-state={screen}
           data-testid={`resume-templates-state-${screen}`}
-          aria-label="简历素材库"
+          aria-label="简历模板"
         >
           {view.body}
         </section>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </div>
   )
 }

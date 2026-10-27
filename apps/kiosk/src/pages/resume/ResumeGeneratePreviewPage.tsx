@@ -8,7 +8,8 @@ import type {
   ResumeGenerateResponse,
   ResumeTemplate,
 } from '@ai-job-print/shared'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -319,7 +320,8 @@ export function ResumeGeneratePreviewPage() {
       : { eyebrow: '预览', ask: emptyNext.ask, doing: emptyNext.doing }
 
   return (
-    <QxPageFrame
+    <ResumeTouchFrame
+      eyebrow="简历预览"
       title="简历预览"
       subtitle="核对内容后带走"
       status={{
@@ -391,7 +393,7 @@ export function ResumeGeneratePreviewPage() {
             </div>
             <div className="qx-rg-help">
               <p>{token ? '这一页先在屏幕上核对。导出之后可以扫码带走，登录状态下按保存期限留在账号里。' : '这一页只在屏幕上。没登录时导出的文件不会进账号，事后登录也不补绑。要留底就先登录，再生成、再导出。'}</p>
-              <button type="button" className="qx-rg-hbtn" data-route="/help" onClick={() => go('/help')}>找工作人员</button>
+              <p className="rtp-help">{helpNeededLine()}</p>
             </div>
             <p className="qx-rg-reason">学校、专业、公司和职务改完就留在这一份上。学历、时间段、项目名和证书要改，得回填写页。</p>
           </div>
@@ -433,6 +435,6 @@ export function ResumeGeneratePreviewPage() {
           <FilePreviewDialog fileUrl={exported.signedUrl} fileName={exported.filename} format={exportFormat} phoneDownloadUrl={exported.signedUrl} expiresAt={exported.expiresAt} primaryAction={exported.printFileUrl && exportFormat === 'pdf' ? { label: '去打印这一份', onClick: handlePrint, disabled: printNavigating || titleBlocked } : undefined} onClose={() => setPreviewOpen(false)} />
         )}
       </section>
-    </QxPageFrame>
+    </ResumeTouchFrame>
   )
 }

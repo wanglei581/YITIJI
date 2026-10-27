@@ -37,7 +37,7 @@ import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { JobFitStage } from './JobFitPage'
@@ -693,7 +693,8 @@ export function JobFitActionsPage() {
 
   return (
     <JobFitStage>
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="简历对照"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
@@ -719,7 +720,7 @@ export function JobFitActionsPage() {
         >
           {view.body}
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </JobFitStage>
   )
 }

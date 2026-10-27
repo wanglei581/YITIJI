@@ -224,8 +224,15 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/** 触屏版。这些路由仍留在 QX_MIGRATED_ROUTES 里，避免旧壳顶栏漏出来。
+ *  KioskRoot 之外的简历页（job-fit / career-plan / 自我探索）自己挂舞台，不进这个集合。 */
+const QX_TOUCH_ROUTES = new Set<string>([
+  '/dev/touch-gallery',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/templates',
+  '/resume/materials',
+])
 
 function isTouchRoute(pathname: string): boolean {
   return QX_TOUCH_ROUTES.has(pathname)

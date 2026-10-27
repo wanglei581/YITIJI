@@ -46,7 +46,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
@@ -778,7 +778,8 @@ export function CareerPlanPage() {
 
   return (
     <JobFitStage>
-      <QxPageFrame
+      <ResumeTouchFrame
+        eyebrow="求职方案"
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
@@ -801,7 +802,7 @@ export function CareerPlanPage() {
         >
           {view.body}
         </main>
-      </QxPageFrame>
+      </ResumeTouchFrame>
     </JobFitStage>
   )
 }
