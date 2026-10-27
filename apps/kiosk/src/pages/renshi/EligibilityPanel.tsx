@@ -17,6 +17,8 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { helpNeededLine } from '../../copy/unattendedCopy'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useIdleTimer } from '../../hooks/useIdleTimer'
@@ -84,6 +86,7 @@ export function EligibilityPanel({
   ctaHost: HTMLElement | null
   onTab: (tab: TabKey) => void
 }) {
+  const supportContact = useSupportContact()
   const [phase, setPhase] = useState<Phase>({ s: 'loading' })
   /** 作答只放 React state：不写 localStorage / sessionStorage / URL query。 */
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -217,7 +220,7 @@ export function EligibilityPanel({
         onTab={onTab}
         kind="backend-required"
         title="本机现在做不了条件核对"
-        body="本机暂时连不上政策服务。要问什么、怎么判定，都要由政策服务提供，本机不会自己编一套问项或结论。请联系现场工作人员后再试。"
+        body={`本机暂时连不上政策服务。要问什么、怎么判定，都要由政策服务提供，本机不会自己编一套问项或结论。${helpNeededLine(supportContact)}。`}
       />
     )
   }

@@ -6,8 +6,9 @@ import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { AUDIENCE_CHIPS, fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type TabKey } from './shared'
 import { BUILTIN_GUIDES } from './builtinData'
 import { OfficialEntryQrOverlay, RqDeadEnd, SourceLine, TabBar, type DeadEndExit, type SourceQrTarget } from './components'
@@ -314,13 +315,33 @@ export function RenshiPage() {
     </RqDeadEnd>
   )
 
+  const bandStatus = focusOnList && focusFrame ? focusFrame.status : frame.status
+  const bandSub = focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle
   return (
-    <QxPageFrame
-      back={{ label: '返回政策服务', onBack: goHub }}
-      title={TAB_TITLE[activeTab]}
-      subtitle={focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle}
-      status={focusOnList && focusFrame ? focusFrame.status : frame.status}
-      ctabar={(
+    <QxTouchScreen
+      testId="renshi-touch"
+      stateId={activeTab}
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          eyebrow="政策服务"
+          title={TAB_TITLE[activeTab]}
+          sub={bandSub}
+          onBack={goHub}
+          status={{
+            text: bandStatus.label,
+            tone: bandStatus.tone === 'ok' ? 'ok' : bandStatus.tone === 'warn' || bandStatus.tone === 'bad' ? 'warn' : 'unknown',
+          }}
+        />
+      )}
+      nav={(
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      )}
+      dock={(
         <div className="rq-cta-stack">
           <div className="rq-cta-row" data-testid="renshi-ctabar">
             {activeTab === 'eligibility' ? (
@@ -380,7 +401,6 @@ export function RenshiPage() {
           </p>
         </div>
       )}
-      navbar={<QxAppNavbar onHome={() => navigate('/')} onAdvisor={() => navigate('/assistant')} onProfile={() => navigate('/profile')} />}
     >
       <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
         {qrEntry && <OfficialEntryQrOverlay target={qrEntry} onClose={() => setQrEntry(null)} />}
@@ -449,6 +469,6 @@ export function RenshiPage() {
           )}
         </div>
       </div>
-    </QxPageFrame>
+    </QxTouchScreen>
   )
 }

@@ -83,7 +83,7 @@ export function EligibilityResults({
         <p className="k8-elig-headline-text">{headline}</p>
         <p className="k8-elig-headline-meta">
           {/* 证据分级：确定性比对，不标 E3，也不出现「AI 判断」字样 */}
-          <span className="k8-elig-e2">E2 · 按政策原文逐条比对</span>
+          <span className="k8-elig-e2">按政策原文逐条比对</span>
           <span className="k8-elig-chip">共发布 <b>{result.items.length}</b> 条 · 其中 <b>{comparable.length}</b> 条录入了可比对条件</span>
           <span className="k8-elig-chip">你填了 <b>{result.answeredCount} / {questions.questions.length}</b> 项</span>
         </p>
