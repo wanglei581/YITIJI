@@ -205,6 +205,18 @@
   min-height: 32px;
 }
 
+/* AI 不可用时的出路块（AiTaskRegion）：原规则 17–18px、按钮 56 高。只在本包触屏壳里提到下限。 */
+.qxt-screen .kiosk-ai-fallback__reason,
+.qxt-screen .kiosk-ai-fallback__path,
+.qxt-screen .kiosk-ai-fallback__action {
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen .kiosk-ai-fallback__action {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+}
+
 .qxt-screen .rtp .jfq-choice,
 .qxt-screen .rtp .jfq-job,
 .qxt-screen .rtp .jfq-routes button {
