@@ -55,13 +55,13 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
 
 async function main() {
   if (process.env.NODE_ENV === 'production') throw new Error('Refusing migration verification in production')
-  const directory = mkdtempSync(join(tmpdir(), 'first-order-migrations-'))
+  const directory = mkdtempSync(join(tmpdir(), 'verify-first-order-migrations-'))
   // A short, task-owned Unix socket path; never reuse a system PostgreSQL server.
-  const pgDirectory = mkdtempSync('/tmp/fo-pg-')
+  const pgDirectory = mkdtempSync('/tmp/verify-fo-migrations-pg-')
   const pgData = join(pgDirectory, 'data')
   let startAttempted = false
   try {
-    const database = join(directory, 'fixture.db')
+    const database = join(directory, 'verify-first-order-migrations.db')
     closeSync(openSync(database, 'a', 0o600))
     await verify('sqlite', directory, `file:${database}`)
     const port = await freePort()

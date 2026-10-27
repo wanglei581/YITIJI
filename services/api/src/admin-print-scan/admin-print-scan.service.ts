@@ -89,6 +89,8 @@ export interface ListAdminPrintScanTasksParams {
   terminalId?: string
   page: number
   pageSize: number
+  /** true 时只统计出纸未确认：errorCode 为未确认且尚未核查。 */
+  unconfirmed?: boolean
 }
 
 interface SafePrintParams {
@@ -150,6 +152,11 @@ export class AdminPrintScanService {
 
   async listTasks(params: ListAdminPrintScanTasksParams): Promise<AdminPrintScanTaskPage> {
     const type = this.asTaskType(params.type)
+    if (params.unconfirmed && type !== 'print') {
+      throw new BadRequestException({
+        error: { code: 'PRINT_SCAN_UNCONFIRMED_PRINT_ONLY', message: '出纸未确认只适用于打印任务' },
+      })
+    }
     const implemented = (IMPLEMENTED_PRINT_SCAN_TASK_TYPES as readonly string[]).includes(type)
     const pagination = { page: params.page, pageSize: params.pageSize, total: 0, totalPages: 0 }
 
@@ -193,6 +200,10 @@ export class AdminPrintScanService {
     const where: Record<string, unknown> = {}
     if (params.status) where['status'] = params.status
     if (params.terminalId) where['terminalId'] = params.terminalId
+    if (params.unconfirmed) {
+      where['errorCode'] = PRINT_JOB_UNCONFIRMED_ERROR_CODE
+      where['OR'] = [{ printOutcome: null }, { printOutcome: '' }]
+    }
 
     const [rows, total] = await Promise.all([
       this.prisma.printTask.findMany({

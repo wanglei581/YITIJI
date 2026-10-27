@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common'
-import type { FirstOrderIncident, FirstOrderIncidentInput, FirstOrderIncidentUpdate, FirstOrderIncidentStatus, FirstOrderIssue } from '../../../../packages/shared/src/types/firstOrder.contract'
+import type { FirstOrderIncident, FirstOrderIncidentDirectory, FirstOrderIncidentInput, FirstOrderIncidentUpdate, FirstOrderIncidentStatus, FirstOrderIssue } from '../../../../packages/shared/src/types/firstOrder.contract'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { PrismaService } from '../prisma/prisma.service'
@@ -39,6 +39,40 @@ export class FirstOrderIncidentsService {
     const rows = await this.prisma.serviceIncident.findMany({ where: { orgId }, include: eventsInclude, orderBy: { createdAt: 'desc' }, take: 201 })
     if (rows.length > 200) throw new BadRequestException({ error: { code: 'FIRST_ORDER_LIMIT', message: '工单数量超出首单视图范围，请联系平台分批核对' } })
     return { items: rows.map(incidentView), truncated: false }
+  }
+
+  /** Cross-org read. Omits notes, events and any contact fields. Does not write audit. */
+  async listDirectory(user: AuthedUser, status: FirstOrderIncidentStatus | undefined, limit: number): Promise<FirstOrderIncidentDirectory> {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException({ error: { code: 'FIRST_ORDER_SCOPE_REQUIRED', message: '当前账号没有该机构的访问权限' } })
+    }
+    const statuses: FirstOrderIncidentStatus[] = status ? [status] : ['open', 'processing', 'resolved']
+    const total = await this.prisma.serviceIncident.count({ where: { status: { in: statuses } } })
+    const items: FirstOrderIncidentDirectory['items'] = []
+    let remaining = limit
+    for (const current of statuses) {
+      if (remaining <= 0) break
+      const rows = await this.prisma.serviceIncident.findMany({
+        where: { status: current },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: remaining,
+        select: {
+          id: true, orgId: true, projectId: true, terminalCode: true, issueCode: true,
+          status: true, assignee: true, createdAt: true, updatedAt: true,
+          project: { select: { name: true, org: { select: { name: true } } } },
+        },
+      })
+      for (const row of rows) {
+        items.push({
+          id: row.id, orgId: row.orgId, orgName: row.project.org.name, projectId: row.projectId,
+          projectName: row.project.name, terminalCode: row.terminalCode, issueCode: row.issueCode as FirstOrderIssue,
+          status: row.status as FirstOrderIncidentStatus, assignee: row.assignee,
+          createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+        })
+      }
+      remaining -= rows.length
+    }
+    return { items, total, truncated: total > items.length }
   }
 
   async create(user: AuthedUser, input: FirstOrderIncidentInput): Promise<FirstOrderIncident> {
