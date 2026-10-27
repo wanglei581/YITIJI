@@ -30,6 +30,7 @@ export function QxTouchDock({
   ask,
   mid,
   primary,
+  primaryNode,
 }: {
   onBack?: () => void
   back?: boolean
@@ -38,6 +39,8 @@ export function QxTouchDock({
   ask?: QxTouchAsk
   mid?: ReactNode
   primary?: QxTouchPrimary
+  /** 页面自己画的主操作。不传时底栏与以前一样。和 primary 同时传时只留 primary。 */
+  primaryNode?: ReactNode
 }) {
   const navigate = useNavigate()
   const goBack = useQxTouchBack(onBack)
@@ -86,7 +89,7 @@ export function QxTouchDock({
           {primary.label}
           {primary.noArrow ? null : <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />}
         </button>
-      ) : null}
+      ) : primaryNode}
     </footer>
   )
 }
