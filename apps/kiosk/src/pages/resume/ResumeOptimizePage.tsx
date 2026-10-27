@@ -4,7 +4,7 @@ import { type GeneratedResume, type ResumeExportFormat } from '@ai-job-print/sha
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { OptimizeOverview } from './components/resume-deliver/OptimizeOverview'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { getMyDocuments } from '../../services/api/memberAssets'
 import { useAuth } from '../../auth/useAuth'
@@ -304,7 +304,7 @@ export function ResumeOptimizePage() {
         <div className="qx-opt-cta">
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setWorkView('editor')}>编辑并导出</button>
           <button type="button" className="qx-btn" data-variant="primary" data-testid="resume-optimize-primary" onClick={() => openCompare()}>
-            逐条处理这 {modules.length} 条<em aria-hidden="true">→</em>
+            逐条看（从第 1 条）
           </button>
         </div>
       )}
@@ -325,14 +325,21 @@ export function ResumeOptimizePage() {
 
   if (consent.needsPrompt && !syntheticReady) {
     return (
-      <QxPageFrame title="优化建议" subtitle="基于已有内容优化表达" ctabar={ctabar} navbar={navbar}>
+      <ResumeTouchPage title="优化建议" subtitle="基于已有内容优化表达" railNow={3} ctabar={ctabar} navbar={navbar}>
         <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="qx-resume-optimize" data-optimize-state="loading" />
         <ResumeAiConsentDialog busy={consent.busy} error={consent.error} guest={!token} onCancel={() => navigate(-1)} onConfirm={() => { void consent.confirm() }} />
-      </QxPageFrame>
+      </ResumeTouchPage>
     )
   }
 
-  const statusCapsule = optimizeStatusCapsule(view)
+  const statusCapsule = workView === 'editor' && view === 'ready'
+    ? { tone: 'unknown' as const, label: '未保存' }
+    : optimizeStatusCapsule(view)
+  const pageTitle = workView === 'editor' && view === 'ready'
+    ? '版式和模板，要怎么排？'
+    : showOverview && view === 'ready'
+      ? `这份简历有 ${modules.length} 处可以改`
+      : '简历优化建议'
   const retryable = failKind !== 'outage' && (view === 'optimize-failed' || view === 'unavailable' || failKind === 'retry' || failKind === 'consent')
   const stateBody = view === 'ready' ? null : (
     <ResumeStatePanel
@@ -350,7 +357,7 @@ export function ResumeOptimizePage() {
   )
 
   return (
-    <QxPageFrame title="简历优化建议" subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} ctabar={ctabar} navbar={navbar}>
+    <ResumeTouchPage eyebrow={view === 'ready' ? 'AI 生成，仅供参考' : undefined} title={pageTitle} subtitle="建议只改表达，事实由你确认，随时可以保留原文。" back={{ label: '返回诊断报告', onBack: () => requestLeave(goToReport) }} status={statusCapsule} railNow={3} ctabar={ctabar} navbar={navbar}>
       <section
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"
@@ -484,6 +491,6 @@ export function ResumeOptimizePage() {
           />
         )}
       </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 }

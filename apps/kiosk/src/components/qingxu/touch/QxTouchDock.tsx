@@ -15,6 +15,8 @@ export type QxTouchPrimary = {
   kind?: QxTouchButtonKind
   noArrow?: boolean
   disabled?: boolean
+  /** 可选。不传时不写 data-testid，原有按钮不受影响。 */
+  testId?: string
 }
 
 /**
@@ -82,6 +84,7 @@ export function QxTouchDock({
           className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}`}
           onClick={primary.onClick}
           disabled={primary.disabled}
+          data-testid={primary.testId}
         >
           {primary.label}
           {primary.noArrow ? null : <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />}

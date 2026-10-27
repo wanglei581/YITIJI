@@ -10,7 +10,7 @@ import { checkPdfOpeningPassword } from '../../components/PdfCanvasPreview'
 import { ENCRYPTED_PDF_BLOCK_COPY, inspectionSignalsEncrypted, previewKindForFile } from '../print/components/printPreviewKind'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { resumeUserReason } from './resumeUserCopy'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
 import {
@@ -253,7 +253,7 @@ export function ResumeReportPage() {
     <p className="why" role="status">正在确认这份 PDF 能否打开，请稍候。</p>
   ) : failCta
   const failView = (failReason: string) => (
-    <QxPageFrame title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }} status={REPORT_STATUS['diagnose-failed']} terminalLabel="就业服务大厅" navbar={nav} ctabar={fileFailureCta}>
+    <ResumeTouchPage eyebrow={state.aiDown ? 'AI 生成，仅供参考' : undefined} title="简历诊断报告" subtitle="解析中断，你上传的文件没有丢。" back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }} status={REPORT_STATUS['diagnose-failed']} railNow={1} terminalLabel="就业服务大厅" navbar={nav} ctabar={fileFailureCta}>
       <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-takeaway="诊断报告与修改清单" data-ai-down-exits="resume-diagnosis" data-state="diagnose-failed" data-testid="resume-report-state-diagnose-failed" className="qx-scroll rrp-page">
         <ResumeReportHead viewState="diagnose-failed" />
         <section className="rrp-state">
@@ -262,7 +262,7 @@ export function ResumeReportPage() {
         </section>
         {!encryptedPdf && !checkingPassword && <ResumeDiagnosisFailExits file={state.file} fileId={typeof state.fileId === 'string' ? state.fileId : undefined} />}
       </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 
   if (!success) return failView(reason ?? '简历解析未能完成，请重试')
@@ -280,12 +280,15 @@ export function ResumeReportPage() {
     : !taskId && (viewState === 'report' || viewState === 'report-minimal') ? '这份报告没有对应的简历编号：优化那一步取不到原文，所以入口先关着。'
     : '本页只给这一次的诊断；想看改完之后的版本对照，去下一步的简历优化。'
 
+  const reportTitle = viewState === 'report' && displayIssues.length > 0 ? `问题 ${displayIssues.length} 处` : '简历诊断报告'
   return (
-    <QxPageFrame
-      title="简历诊断报告"
+    <ResumeTouchPage
+      eyebrow={viewState === 'report' ? 'AI 生成，仅供参考，请对照原文核对' : undefined}
+      title={reportTitle}
       back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
       subtitle={reportSubtitle}
       status={REPORT_STATUS[viewState]}
+      railNow={2}
       terminalLabel="就业服务大厅"
       navbar={nav}
       ctabar={<>
@@ -355,6 +358,6 @@ export function ResumeReportPage() {
           <ResumeReportStates viewState={viewState === 'loading' || viewState === 'no-context' || viewState === 'read-error' || viewState === 'unavailable' || viewState === 'illegal' ? viewState : 'no-context'} />
         )}
       </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 }

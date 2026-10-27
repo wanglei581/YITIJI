@@ -504,7 +504,13 @@ export async function fillDiagnosisDirection(page: Page, journey: string, collec
   await recordStep({
     page, journey, step: 'open-direction-settings', control: '改诊断方向', selectorHint: '.qx-rt-settings > summary',
     kind: 'click', collectors,
-    act: async () => { await page.locator('.qx-rt-settings > summary').click() },
+    act: async () => {
+      const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })
+      if (!(await start.isVisible().catch(() => false))) {
+        await page.getByRole('button', { name: '诊断方向', exact: true }).click()
+      }
+      await page.getByRole('button', { name: /^定向诊断/ }).click()
+    },
   })
   await recordStep({
     page, journey, step: 'fill-target-job', control: '目标岗位', selectorHint: 'input[placeholder*=前端工程师]',
@@ -573,7 +579,7 @@ export async function uploadResumePdf(page: Page, journey: string, collectors: R
     kind: 'fill', collectors,
     act: async () => {
       await fileInput.setInputFiles(FIXTURE_PDF)
-      await page.getByText(/已就绪|valid-2p|开始 AI 诊断/).first().waitFor({ timeout: 20_000 })
+      await page.getByText(/已就绪|valid-2p|开始 AI 诊断|下一步：诊断方向|系统已收到/).first().waitFor({ timeout: 20_000 })
     },
   })
 }

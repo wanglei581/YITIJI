@@ -26,7 +26,7 @@ const assert = (ok, msg) => { if (!ok) failures.push(msg); else console.log(`PAS
 const has = (src, marker) => src.includes(marker)
 
 assert(has(files.root, "'/resume/report'"), 'KioskRoot QX_MIGRATED_ROUTES registers /resume/report')
-assert(has(files.page, 'QxPageFrame'), 'report page uses QxPageFrame')
+assert(has(files.page, 'ResumeTouchPage'), 'report page uses ResumeTouchPage')
 assert(has(files.page, "import './resume-report-qx.css'"), 'report page imports Qingxu CSS')
 assert(has(files.page, 'data-kiosk-screen="resume-report"'), 'report keeps stable screen landmark')
 assert(has(files.css, 'var(--qx-ink)'), 'page CSS uses Qingxu tokens')

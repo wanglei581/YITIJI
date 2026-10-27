@@ -49,7 +49,9 @@ export function QxTouchBand({
   pathLabel,
   onBack,
   back = true,
+  backLabel = '返回上一步',
   live = false,
+  statusClassName,
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -63,7 +65,11 @@ export function QxTouchBand({
   pathLabel?: string
   onBack?: () => void
   back?: boolean
+  /** 返回键的无障碍名。默认「返回上一步」，不传则与改前一致。 */
+  backLabel?: string
   live?: boolean
+  /** 追加到状态胶囊上的类名。默认不加，不改变原有样式。 */
+  statusClassName?: string
 }) {
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
@@ -80,7 +86,7 @@ export function QxTouchBand({
       <div className="qxt-halo" />
       <div className="qxt-hdr">
         {back ? (
-          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={goBack}>
+          <button type="button" className="qxt-back" aria-label={backLabel} onClick={goBack}>
             <QxTouchIcon name="chevL" size={34} strokeWidth={2.4} />
           </button>
         ) : null}
@@ -93,7 +99,7 @@ export function QxTouchBand({
         </div>
         <div className="qxt-hdr-right">
           {status === false ? null : (
-            <span className={`qxt-status qxt-status-${tone}`}>
+            <span className={`qxt-status qxt-status-${tone}${statusClassName ? ` ${statusClassName}` : ''}`}>
               <i className="qxt-dot" />
               {statusText}
             </span>

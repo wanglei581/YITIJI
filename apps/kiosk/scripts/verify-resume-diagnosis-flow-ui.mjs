@@ -425,7 +425,7 @@ assertIncludes(wavRecorder, 'MIC_PERMISSION_TIMEOUT', 'wav recorder times out st
 assertIncludes(wavRecorder, 'timedOut', 'wav recorder tracks late microphone permission resolution')
 assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.stop())', 'wav recorder releases late microphone streams after timeout')
 
-assertIncludes(optimize, 'QxPageFrame', 'optimize page uses the Qingxu frame')
+assertIncludes(optimize, 'ResumeTouchPage', 'optimize page uses the touch page frame')
 assertIncludes(generatePreview, 'QxPageFrame', 'generate preview uses the Qingxu frame')
 assertIncludes(generatePreview, 'navbar={<GeneratePreviewNavbar', 'generate preview uses the QxPageFrame navbar slot instead of a page-local bar')
 assertIncludes(generatePreview, '返回服务大厅', 'session-lost CTA matches prototype 返回服务大厅 → /')
@@ -549,7 +549,7 @@ assert.equal(errorOutcome(new ApiHttpError(500, 'UNSUPPORTED_FILE_TYPE')), 'unkn
 
 // 密码文案常量的 declaration 节点不含 export，用同一源码求值。
 const passwordCopy = new Function(executable(`${sourceNode(printKindSource, 'ENCRYPTED_PDF_BLOCK_COPY')}\nreturn ENCRYPTED_PDF_BLOCK_COPY;`))()
-const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'QxPageFrame', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
+const renderFailure = new Function('encryptedPdf', 'checkingPassword', 'React', 'ResumeTouchPage', 'navigate', 'REPORT_STATUS', 'nav', 'fileFailureCta', 'ResumeReportHead', 'ENCRYPTED_PDF_BLOCK_COPY', 'resumeUserReason', 'ResumeDiagnosisFailExits', 'state', executable(`${sourceNode(report, 'failView')}\nreturn failView('PDF 解析失败，请确认文件未损坏后重试');`))
 const failedTree = (encrypted, checking = false) => renderFailure(encrypted, checking, React, 'frame', () => {}, {}, null, null, 'head', passwordCopy, (reason) => reason, 'original-exits', { file: { name: 'resume.pdf' }, fileId: 'original' })
 function hasOriginalExits(node) { return node?.type === 'original-exits' || Boolean(node?.children?.some(hasOriginalExits)) }
 assert.match(labels(failedTree(true)), /这份 PDF 设置了打开密码，本机没法读取。请在手机或电脑上去掉密码后重新上传。/, 'W-108 实际失败正文显示准确密码原因')

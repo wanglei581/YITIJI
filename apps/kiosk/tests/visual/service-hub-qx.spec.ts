@@ -96,23 +96,32 @@ async function readHub(page: Page): Promise<HubSnapshot> {
       reason: string | null
     } => {
       const clickable = el.tagName === 'BUTTON' && !el.hasAttribute('aria-disabled')
-      const title = (el.querySelector(titleSel) ?? el).textContent?.trim() ?? ''
-      return { title, clickable, reason: clickable ? null : el.querySelector(reasonSel)?.textContent?.trim() ?? null }
+      const marked = el.getAttribute('data-hub-title')
+      const title = marked || (el.querySelector(titleSel) ?? el).textContent?.trim() || ''
+      const reasonAttr = el.getAttribute('data-hub-reason')
+      return {
+        title,
+        clickable,
+        reason: clickable ? null : (reasonAttr || el.querySelector(reasonSel)?.textContent?.trim() || null),
+      }
     }
     const notice = document.querySelector('.qx-hub-notice-copy')
+    const grid = [...hub.querySelectorAll('.qx-hub-grid > *')]
+    const quickItems = [...hub.querySelectorAll('.qx-hub-quick-item')]
+    const pill = document.querySelector('.qxt-band .qx-pill') ?? document.querySelector('.qx-pill')
     return {
       probe: hub.getAttribute('data-hub-device-probe'),
-      readiness: document.querySelector('.qx-hub-notice')?.getAttribute('data-readiness') ?? null,
-      pill: document.querySelector('.qx-pill')?.textContent?.trim() ?? '',
+      readiness: document.querySelector('.qx-hub-notice')?.getAttribute('data-readiness') ?? hub.getAttribute('data-readiness'),
+      pill: pill?.textContent?.trim() ?? '',
       noticeTitle: notice?.querySelector('b')?.textContent?.trim() ?? '',
       noticeDetail: notice?.querySelector('b + span')?.textContent?.trim() ?? '',
-      cards: [...hub.querySelectorAll('.qx-hub-grid > *')].map((el) => entry(el, 'h3', '.qx-hub-why')),
+      cards: (grid.length ? grid : [...hub.querySelectorAll('[data-hub-card]')]).map((el) => entry(el, 'h3', '.qx-hub-why')),
       goals: [...hub.querySelectorAll('.qx-hub-goal')].map((el) => ({
         title: el.textContent?.trim() ?? '',
         clickable: el.tagName === 'BUTTON' && !el.hasAttribute('aria-disabled'),
         reason: el.getAttribute('aria-label')?.split('：')[1] ?? null,
       })),
-      quick: [...hub.querySelectorAll('.qx-hub-quick-item')].map((el) => entry(el, 'b', 'span span')),
+      quick: (quickItems.length ? quickItems : [...hub.querySelectorAll('[data-hub-quick]')]).map((el) => entry(el, 'b', 'span span')),
     }
   })
 }

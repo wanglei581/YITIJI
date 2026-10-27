@@ -17,6 +17,8 @@ export type QxTouchSlabProps = {
   lock?: string
   onClick?: () => void
   index?: number
+  /** 服务台走查钩子。不传则不写 data-hub-*，原有宽卡不变。 */
+  hub?: { kind: 'card' | 'quick' | 'goal'; title: string; reason?: string | null }
 }
 
 export function QxTouchSlab({
@@ -34,7 +36,15 @@ export function QxTouchSlab({
   lock,
   onClick,
   index = 0,
+  hub,
 }: QxTouchSlabProps) {
+  const hubAttrs = hub ? {
+    'data-hub-card': hub.kind === 'card' ? '' : undefined,
+    'data-hub-quick': hub.kind === 'quick' ? '' : undefined,
+    'data-hub-goal': hub.kind === 'goal' ? '' : undefined,
+    'data-hub-title': hub.title,
+    'data-hub-reason': hub.reason || undefined,
+  } : undefined
   const className = [
     'qxt-slab',
     'qxt-rise',
@@ -72,7 +82,7 @@ export function QxTouchSlab({
   const art = <div className="qxt-vis">{visual}</div>
   const body = row ? <>{art}{text}</> : <>{text}{art}</>
   if (off || !onClick) {
-    return <div className={className} style={style} role="group" aria-disabled={off ? 'true' : undefined}>{body}</div>
+    return <div className={className} style={style} role="group" aria-disabled={off ? 'true' : undefined} {...hubAttrs}>{body}</div>
   }
-  return <button type="button" className={className} style={style} onClick={onClick}>{body}</button>
+  return <button type="button" className={className} style={style} onClick={onClick} {...hubAttrs}>{body}</button>
 }

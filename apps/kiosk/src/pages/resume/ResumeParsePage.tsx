@@ -10,7 +10,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { resumeProcessCopy } from './resumeUserCopy'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
@@ -562,12 +562,24 @@ export function ResumeParsePage() {
         ? 'consent-needed'
         : outcome ?? 'waiting'
   const copy = frameCopy(view, terminal)
+  const bandTitle =
+    view === 'waiting' ? '文件收到了，正在等最终解析结果。'
+    : view === 'failed' ? '解析出错'
+    : view === 'missing-file' ? '未找到简历文件'
+    : view === 'unknown' ? '解析结果暂时无法确认'
+    : view === 'consent-needed' || view === 'consent-checking' ? '用简历 AI 前需要你先授权'
+    : 'AI 解析'
+  const bandSub = view === 'waiting'
+    ? '解析是一次出结果的处理，中间没有阶段可以播报。'
+    : copy.doing
 
   const renderFrame = (body: ReactNode, ctabar?: ReactNode) => (
-    <QxPageFrame
-      title="AI 解析"
-      subtitle="读懂简历，带走诊断报告"
+    <ResumeTouchPage
+      eyebrow={state?.intent === 'optimize' ? 'AI 简历优化' : 'AI 简历诊断'}
+      title={bandTitle}
+      subtitle={bandSub}
       status={copy.status}
+      railNow={view === 'missing-file' ? 0 : 1}
       terminalLabel="AI 简历服务"
       back={{ label: '返回简历来源', onBack: leaveToSource }}
       ctabar={<><QxStepActions><QxAiHelp label="问小青：解析没完成怎么办 →" draft="我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。" /></QxStepActions>{ctabar}</>}
@@ -583,7 +595,7 @@ export function ResumeParsePage() {
         />
         {body}
       </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 
   // 没有文件就不问授权：授权是为了把文件交给 AI，手里没文件时弹授权只会把人绕进去。

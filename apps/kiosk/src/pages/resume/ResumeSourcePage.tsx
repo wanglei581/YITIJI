@@ -5,7 +5,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { FileContentPreview } from '../../components/FileContentPreview'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -24,7 +24,6 @@ import {
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { ResumeSourceSummary } from './components/ResumeSourceSummary'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { KIOSK_DEVICE_ORIGINAL_NOTICE } from '../../utils/kioskLocalPrivacy'
@@ -250,6 +249,7 @@ export function ResumeSourcePage() {
   const [targetMajor, setTargetMajor] = useState('')
   const [targetDegree, setTargetDegree] = useState('')
   const sourceBusy = uploading || phoneBusy || usbBusy
+  const [step, setStep] = useState<'where' | 'direction' | 'more'>('where')
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(sourceBusy)
 
@@ -408,18 +408,32 @@ export function ResumeSourcePage() {
             : selected === 'usb' ? 'usb' : selected === 'phone' ? 'phone' : 'source'
   const hero = SOURCE_HERO[heroKey]
 
-  // 顶栏状态胶囊只报本机真实可知的状态：忙碌 / 文件已就绪 / 还没有文件。拿不到的一律不报「正常」。
-  const frameStatus = sourceBusy
-    ? { tone: 'warn' as const, label: uploading ? '上传中' : '接收中' }
-    : scanReady
-      ? { tone: 'ok' as const, label: '扫描件已交接 · 待确认' }
-      : uploadedFile
-        ? { tone: 'ok' as const, label: '文件已就绪' }
-        : uploadUnknown
-          ? { tone: 'warn' as const, label: '上传结果未知 · 不重发' }
-          : error
-            ? { tone: 'warn' as const, label: '上传未完成' }
-            : { tone: 'unknown' as const, label: '等待简历文件' }
+  // 胶囊不报「正常」。文件到了只说收到，等你确认；方向步才说通用或定向。
+  const statusText = sourceBusy
+    ? (uploading ? '上传中' : '接收中')
+    : step === 'direction'
+      ? (genericDiagnosis ? '通用诊断' : '定向诊断')
+      : step === 'more'
+        ? '都可以不填'
+        : scanReady
+          ? '扫描件已交接 · 待确认'
+          : uploadedFile
+            ? '系统已收到，等你确认'
+            : uploadUnknown
+              ? '上传结果未知 · 不重发'
+              : error
+                ? '上传未完成'
+                : '等待简历文件'
+  const stepTitle = step === 'more'
+    ? '这些都可以不填'
+    : step === 'direction'
+      ? (genericDiagnosis ? '按通用标准看，可以吗？' : '想按什么方向看？')
+      : '你的简历在哪里？'
+  const stepSub = step === 'more'
+    ? '不填也按通用标准看。填了只影响建议顺序。'
+    : step === 'direction'
+      ? '只影响建议关注顺序，报告仍固定输出 6 个维度。'
+      : '选一种方式把简历交到这台机器，确认后再开始。'
   const channelLabel = (channel: FileChannel) =>
     channel === 'usb' ? 'U盘上传' : channel === 'phone' ? '手机扫码上传' : channel === 'scan' ? '扫描工作台交接' : '本机文件'
 
@@ -430,50 +444,63 @@ export function ResumeSourcePage() {
     navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
   }
 
+  const changeFile = () => {
+    setUploadedFile(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    handleUploadBoxClick()
+  }
+  const clearMore = () => {
+    setTargetExperience(undefined)
+    setTargetScene(undefined)
+    setTargetMajor('')
+    setTargetDegree('')
+    setStep('direction')
+  }
+  const directionFields = (
+    <DiagnosisDirectionForm
+      pane={step === 'more' ? 'more' : 'focus'}
+      onOpenMore={() => setStep('more')}
+      genericDiagnosis={genericDiagnosis}
+      selectedDimensions={selectedDimensions}
+      targetIndustry={targetIndustry}
+      targetJob={targetJob}
+      targetExperience={targetExperience}
+      targetScene={targetScene}
+      targetMajor={targetMajor}
+      targetDegree={targetDegree}
+      onGenericDiagnosisChange={setGenericDiagnosis}
+      onToggleDimension={toggleDimension}
+      onTargetIndustryChange={setTargetIndustry}
+      onTargetJobChange={setTargetJob}
+      onTargetExperienceChange={setTargetExperience}
+      onTargetSceneChange={setTargetScene}
+      onTargetMajorChange={setTargetMajor}
+      onTargetDegreeChange={setTargetDegree}
+    />
+  )
+
   return (
-    <QxPageFrame
-      title={copy.title}
-      subtitle={copy.subtitle}
-      status={frameStatus}
-      terminalLabel="AI 简历服务"
-      back={{ label: '返回 AI 简历服务', onBack: () => navigate('/resume-service') }}
-      ctabar={(
-        <>
-          <QxStepActions onPrev={() => navigate('/resume-service')}>
-            <QxAiHelp label="问小青：帮我选诊断重点 →" draft="请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。" />
-          </QxStepActions>
-          {uploadedFile && !scanReady ? (
-            <button
-              type="button"
-              className="qx-btn resume-change-file"
-              data-variant="ghost"
-              disabled={sourceBusy}
-              onClick={() => {
-                setUploadedFile(null)
-                setError(null)
-                if (fileInputRef.current) fileInputRef.current.value = ''
-                handleUploadBoxClick()
-              }}
-            >
-              更换文件
-            </button>
-          ) : null}
-          <span className="qx-ai-declaration-slot">
-            <button
-              type="button"
-              className="qx-btn resume-primary-action"
-              data-variant="primary"
-              disabled={!uploadedFile || sourceBusy}
-              onClick={handleStartDiagnosis}
-            >
-              {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
-            </button>
-            <AiDeclarationNote />
-          </span>
-        </>
-      )}
+    <ResumeTouchPage
+      eyebrow={copy.title}
+      title={stepTitle}
+      subtitle={stepSub}
+      status={{ label: statusText }}
+      railNow={0}
+      seal="idle"
+      navCurrent="home"
+      backLabel="上一步"
+      onBack={step === 'more' ? () => setStep('direction') : step === 'direction' ? () => setStep('where') : () => navigate('/resume-service')}
+      ask={step === 'more'
+        ? { label: '问小青：可以不填吗', draft: '诊断方向里的经历、场景、专业和学历都可以不填吗？请只说明它们怎么影响建议顺序，不要替我填写。' }
+        : { label: '问小青：帮我选诊断重点 →', draft: '请先问我的求职方向，帮我选择这次简历诊断应重点看的部分。' }}
+      primary={step === 'more'
+        ? { label: '好了，回去开始诊断', onClick: () => setStep('direction'), noArrow: true }
+        : step === 'direction'
+          ? { label: uploadedFile ? copy.buttonReady : copy.buttonEmpty, onClick: handleStartDiagnosis, disabled: !uploadedFile || sourceBusy }
+          : { label: uploadedFile ? '下一步：诊断方向' : '请先上传简历文件', onClick: () => setStep('direction'), disabled: !uploadedFile || sourceBusy, noArrow: true }}
     >
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} className="qx-resume-triage" data-takeaway="简历诊断报告">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" data-intent={intent} data-state={heroKey} data-resume-step={step} className="qx-resume-triage" data-takeaway="简历诊断报告">
       {/* 稿 21 小青任务头：随真实状态换话，四步轨当前在第 1 步。页面 h1 仍是 QxPageFrame 页头。 */}
       <ResumeTriageHero
         eyebrow={copy.title}
@@ -495,7 +522,8 @@ export function ResumeSourcePage() {
         />
       )}
 
-      <div className="qx-scroll qx-rt-scroll">
+      {step === 'where' ? <div className="qx-scroll qx-rt-scroll">
+        <button type="button" className="qxt-resume-more" onClick={() => setStep('direction')}>诊断方向</button>
         <section aria-labelledby="resume-intent-title">
           <h2 className="qx-rt-sec-h" id="resume-intent-title">这次想让我做什么 <small>选错了随时能改</small></h2>
           <div className="qx-rt-seg" role="group" aria-label="这次要做的事">
@@ -542,6 +570,10 @@ export function ResumeSourcePage() {
                   </button>
                 )
               })}
+              <button type="button" className="qx-rt-src" onClick={() => navigate('/scan')}>
+                <span className="n">是纸质的</span>
+                <span className="d">在打印机面板上扫描，存成 PDF</span>
+              </button>
             </div>
             {usbGate.state === 'unknown' && selected !== 'usb' ? (
               <button type="button" className="qx-btn" data-variant="ghost" data-testid="resume-usb-retry" onClick={usbGate.retry}>
@@ -618,6 +650,11 @@ export function ResumeSourcePage() {
                 {wordConversionAvailable ? `Word ${WORD_CONVERSION_DISCLOSURE}。` : 'Word 转换暂未开放，请另存为 PDF 再上传。'}
               </p>
             )}
+            {uploadedFile && !scanReady ? (
+              <button type="button" className="qx-btn resume-change-file" data-variant="ghost" disabled={sourceBusy} onClick={changeFile}>
+                更换文件
+              </button>
+            ) : null}
             {uploadedFile && (
               <details className="qx-rt-preview">
                 <summary>预览原件</summary>
@@ -634,34 +671,6 @@ export function ResumeSourcePage() {
             )}
           </div>
 
-          <aside className="qx-rt-side">
-            <h2 className="qx-rt-sec-h">这次的诊断方向与目标背景 <small>没有选择时按通用标准看</small></h2>
-            {buildTargetContext().skipped && <p className="qx-rt-hint">没选方向，按通用标准看</p>}
-            <ResumeSourceSummary compact={!uploadedFile} generic={buildTargetContext().skipped === true} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />
-            <details className="qx-rt-settings">
-              <summary>改诊断方向 <span>选重点、目标与背景</span></summary>
-            <div className="qx-rt-direction">
-              <DiagnosisDirectionForm
-                genericDiagnosis={genericDiagnosis}
-                selectedDimensions={selectedDimensions}
-                targetIndustry={targetIndustry}
-                targetJob={targetJob}
-                targetExperience={targetExperience}
-                targetScene={targetScene}
-                targetMajor={targetMajor}
-                targetDegree={targetDegree}
-                onGenericDiagnosisChange={setGenericDiagnosis}
-                onToggleDimension={toggleDimension}
-                onTargetIndustryChange={setTargetIndustry}
-                onTargetJobChange={setTargetJob}
-                onTargetExperienceChange={setTargetExperience}
-                onTargetSceneChange={setTargetScene}
-                onTargetMajorChange={setTargetMajor}
-                onTargetDegreeChange={setTargetDegree}
-              />
-            </div>
-            </details>
-          </aside>
         </div>
 
         <details className="qx-card qx-rt-intro">
@@ -679,7 +688,7 @@ export function ResumeSourcePage() {
         <button type="button" onClick={() => navigate('/resume/generate')} className="qx-rt-alt">
           <SparklesIcon size={30} aria-hidden="true" />
           <span>
-            <strong>没有电子简历？AI 帮你生成一份</strong>
+            <strong>没有电子简历？让 AI 帮你写一份</strong>
             <small>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</small>
           </span>
           <span className="go">去生成</span>
@@ -722,8 +731,38 @@ export function ResumeSourcePage() {
         <p className="resume-source-privacy"><b>用途 · 隐私</b>{copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}</p>
         <p><b>留存</b>{KIOSK_DEVICE_ORIGINAL_NOTICE}</p>
       </footer>
-      </div>
+      </div> : null}
+      {step === 'direction' ? (
+        <div className="qx-scroll qx-rt-scroll">
+          {buildTargetContext().skipped ? <p className="qx-rt-hint">没选方向，按通用标准看</p> : null}
+          <ResumeSourceSummary compact={!uploadedFile} generic={buildTargetContext().skipped === true} dimensions={selectedDimensions} target={buildTargetContext()} intent={intent} />
+          {uploadedFile ? (
+            <div className="qx-rt-filecard"><FileTextIcon size={32} aria-hidden="true" /><span className="fx"><b>{uploadedFile.name}</b><small>{uploadedFile.size} · {uploadedFile.format.toUpperCase()} · {channelLabel(uploadedFile.channel)}</small></span><span className="fb">待你确认</span></div>
+          ) : null}
+          {uploadedFile && !scanReady ? (
+            <button type="button" className="qx-btn resume-change-file" data-variant="ghost" disabled={sourceBusy} onClick={changeFile}>更换文件</button>
+          ) : null}
+          {uploadedFile ? (
+            <details className="qx-rt-preview">
+              <summary>预览原件</summary>
+              <FileContentPreview compact fileUrl={uploadedFile.fileUrl} fileName={uploadedFile.name} mimeType={uploadedFile.mimeType} format={uploadedFile.format} fileId={uploadedFile.fileId} token={getToken()} />
+            </details>
+          ) : null}
+          <section className="qx-rt-settings" data-resume-step="direction">
+            {directionFields}
+          </section>
+        </div>
+      ) : null}
+      {step === 'more' ? (
+        <div className="qx-scroll qx-rt-scroll">
+          <section data-resume-step="more">
+            {directionFields}
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={clearMore}>都不填</button>
+          </section>
+        </div>
+      ) : null}
+      <AiDeclarationNote />
     </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 }

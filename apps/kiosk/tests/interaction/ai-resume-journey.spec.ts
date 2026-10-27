@@ -75,7 +75,7 @@ async function enterDiagnoseSource(page: Page, journey: string, collectors: Retu
     page, journey, step: 'hub-diagnose', control: 'AI简历诊断', selectorHint: 'button:AI简历诊断',
     kind: 'click', collectors,
     act: async () => {
-      await page.getByRole('button', { name: /AI简历诊断/ }).click()
+      await page.getByRole('button', { name: '有，帮我改一改' }).click()
       await page.waitForURL((url) => url.pathname === '/resume/source', { timeout: 15_000 })
     },
   })
@@ -88,7 +88,11 @@ async function startDiagnosis(page: Page, journey: string, collectors: ReturnTyp
     page, journey, step: 'start-diagnosis', control: '开始 AI 诊断', selectorHint: 'button:开始 AI 诊断',
     kind: 'click', collectors,
     act: async () => {
-      await page.getByRole('button', { name: /开始 AI 诊断/ }).click()
+      const start = page.getByRole('button', { name: '开始 AI 诊断', exact: true })
+      if (!(await start.isVisible().catch(() => false))) {
+        await page.getByRole('button', { name: '诊断方向', exact: true }).click()
+      }
+      await start.click()
       await page.waitForURL((url) => url.pathname === '/resume/parse' || url.pathname === '/resume/report', { timeout: 20_000 })
     },
   })

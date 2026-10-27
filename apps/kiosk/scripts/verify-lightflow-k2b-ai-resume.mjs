@@ -109,13 +109,13 @@ for (const [page, sourceCode, rootClass, cssPath] of [
 }
 
 for (const [page, sourceCode, route] of [['source', source, '/resume/source'], ['parse', parse, '/resume/parse']]) {
-  expectIncludes(sourceCode, 'QxPageFrame', `${page} uses Qingxu page frame (21-resume-triage migration)`)
+  expectIncludes(sourceCode, 'ResumeTouchPage', `${page} uses the touch page frame (21-resume-triage migration)`)
   expectIncludes(kioskShell, `'${route}'`, `${page} is registered in QX_MIGRATED_ROUTES`)
   expectNotIncludes(sourceCode, 'KioskPageFrame', `${page} no longer mounts the old LightFlow page frame`)
   expectNotIncludes(sourceCode, 'resume-lightflow', `${page} no longer mixes the LightFlow namespace into the Qingxu frame`)
 }
 expectIncludes(report, "import './resume-report-qx.css'", 'report imports Qingxu page CSS')
-expectIncludes(report, 'QxPageFrame', 'report uses Qingxu page frame (22-resume-report migration)')
+expectIncludes(report, 'ResumeTouchPage', 'report uses the touch page frame (22-resume-report migration)')
 expectIncludes(kioskShell, "'/resume/report'", 'report is registered in QX_MIGRATED_ROUTES')
 expectIncludes(templates, 'QxPageFrame', 'templates uses Qingxu page frame (46-resume-decision-workspace migration)')
 expectIncludes(kioskShell, "'/resume/templates'", 'templates is registered in QX_MIGRATED_ROUTES')

@@ -13,6 +13,8 @@ export type QxTouchTileProps = {
   onClick?: () => void
   index?: number
   label?: string
+  /** 服务台走查钩子。不传则不写 data-hub-*，原有磁贴不变。 */
+  hub?: { kind: 'card' | 'quick' | 'goal'; title: string; reason?: string | null }
 }
 
 export function QxTouchTile({
@@ -25,7 +27,15 @@ export function QxTouchTile({
   onClick,
   index = 0,
   label,
+  hub,
 }: QxTouchTileProps) {
+  const hubAttrs = hub ? {
+    'data-hub-card': hub.kind === 'card' ? '' : undefined,
+    'data-hub-quick': hub.kind === 'quick' ? '' : undefined,
+    'data-hub-goal': hub.kind === 'goal' ? '' : undefined,
+    'data-hub-title': hub.title,
+    'data-hub-reason': hub.reason || undefined,
+  } : undefined
   const className = `qxt-tile qxt-rise${off ? ' qxt-off qxt-hold' : ''}${layout === 'stack' ? ' qxt-tile-stack' : ''}`
   const style = { '--i': index } as CSSProperties
   const body = (
@@ -39,7 +49,7 @@ export function QxTouchTile({
   )
   if (!off && !onClick) {
     return (
-      <div className={className} style={style}>
+      <div className={className} style={style} {...hubAttrs}>
         {body}
       </div>
     )
@@ -51,6 +61,7 @@ export function QxTouchTile({
       style={style}
       aria-disabled={off ? true : undefined}
       aria-label={label}
+      {...hubAttrs}
       onClick={() => {
         if (off) return
         onClick?.()

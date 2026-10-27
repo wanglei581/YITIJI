@@ -5,7 +5,7 @@ import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { ResumeOptimizeNavbar } from './components/resume-deliver/ResumeOptimizeNavbar'
 import { resumeUserReason } from './resumeUserCopy'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { ResumeTouchPage } from './touch/ResumeTouchPage'
 import { useAuth } from '../../auth/useAuth'
 import { aiErrorMessageOf, isAiOutage } from '../../ai'
 import { getResumeOptimize } from '../../services/api'
@@ -168,10 +168,12 @@ export function ResumeOptimizeComparePage() {
   )
 
   return (
-    <QxPageFrame
+    <ResumeTouchPage
+      eyebrow="AI 生成，仅供参考"
       title="逐条选择改法"
       subtitle={isDemoResult ? '演示内容不是你的简历原文。' : '左边原文，右边改写；选择是阅读决策，回优化页时再选择是否应用。'}
       status={pageStatus}
+      railNow={3}
       terminalLabel="就业服务大厅"
       back={{ label: '返回简历优化工作台', onBack: backToOptimize }}
       navbar={<ResumeOptimizeNavbar />}
@@ -252,6 +254,6 @@ export function ResumeOptimizeComparePage() {
           </>
         )}
       </section>
-    </QxPageFrame>
+    </ResumeTouchPage>
   )
 }
