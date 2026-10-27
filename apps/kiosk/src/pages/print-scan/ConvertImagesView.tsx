@@ -83,17 +83,19 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
   const addReason = uploading ? '这一张还在上传' : atLimit ? '已达 20 张上限' : generating ? '正在合成' : '请稍候'
 
   return (
-    <div className="i2p-page" data-w2-page="print-scan-convert" data-state={phase}>
-      <section className="i2p-xq">
-        <div className="i2p-xq-row">
-          <div className="i2p-xq-face" aria-hidden>青</div>
-          <div>
-            <div className="i2p-xq-eyebrow">图片转 PDF</div>
-            <div className="i2p-xq-ask">{advisor.ask}</div>
-            <div className="i2p-xq-doing">{advisor.doing}</div>
+    <div className="i2p-page" data-w2-page="print-scan-convert" data-qx-page="img2pdf" data-state={phase}>
+      {phase === 'empty' ? null : (
+        <section className="i2p-xq">
+          <div className="i2p-xq-row">
+            <div className="i2p-xq-face" aria-hidden>青</div>
+            <div>
+              <div className="i2p-xq-eyebrow">图片转 PDF</div>
+              <div className="i2p-xq-ask">{advisor.ask}</div>
+              <div className="i2p-xq-doing">{advisor.doing}</div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <div className="i2p-scroll qx-grow">
         {phase === 'usb' ? <UsbGap /> : null}

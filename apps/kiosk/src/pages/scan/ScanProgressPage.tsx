@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircleIcon, XCircleIcon } from 'lucide-react'
+import { XCircleIcon } from 'lucide-react'
 import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
@@ -18,15 +18,11 @@ import {
 } from './scanDeliveryAck'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
+import { FsSheetArt } from '../print-scan/FsSheetArt'
+import { scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import {
-  ScanChain,
   ScanCta,
-  ScanKvCard,
-  ScanNoteCard,
-  ScanPlan,
-  ScanSec,
-  ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
@@ -269,7 +265,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         scheduleNext()
       } catch (err) {
         if (!stopped) {
-          setError(userMessageOf(err, '查询扫描状态失败，请稍后重试'))
+          setError(scanShownText(userMessageOf(err, '查询扫描状态失败，请稍后重试'), '查询扫描状态失败，请稍后重试。'))
           setPolls((count) => count + 1)
           pollFailsRef.current += 1
           if (pollFailsRef.current >= MAX_SCAN_POLL_FAILS || Date.now() - startedAtRef.current > MAX_SCAN_POLL_MS) {
@@ -347,18 +343,6 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const deliveryAcked = ackState === 'acked'
   const ackRetryable = ackState === 'retryable'
   const matched = deliveryAcked && !error && lastLiveStatus === 'matched'
-  /* 稿 18：只有系统确认收到文件时才显示完成，不替用户猜中间状态。 */
-  const chainHint = cancelling
-    ? '取消也可能来不及，以系统为准'
-    : !deliveryAcked
-      ? '授权确认前，请先不要按开始'
-      : pollInFlight
-        ? '查询回来之前，这一屏不改判'
-        : error
-          ? '这次没问到，继续等待下一次查询'
-          : matched
-            ? '系统已收到文件，可以回来确认'
-            : '系统还没收到文件，继续等待'
   const workbenchState = cancelling
     ? 'cancelling'
     : !deliveryAcked
@@ -443,89 +427,54 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanStatusPanel
-        tone={error || ackRetryable ? 'warn' : 'info'}
-        icon={error || ackRetryable ? AlertCircleIcon : undefined}
-        title={
-          cancelling
-            ? '正在发送取消请求'
-            : !deliveryAcked
-              ? ackRetryable ? '还没确认这台机器能收这份文件' : '正在确认能收到扫描件'
-              : pollInFlight
-                ? '正在查询系统'
-                : error
-                  ? '查状态失败，任务仍按进行中处理'
-                  : '正在等文件回传'
-        }
-        breathe={!error && !ackRetryable}
-        chips={deliveryAcked
-          ? [
-              { label: error ? '正在自动重试' : '正在自动检查', tone: error ? 'warn' : 'ok' },
-              { label: `已查询 ${polls} 次` },
-              matched ? { label: '系统：已匹配，仍在处理', tone: 'ok' as const } : { label: '没有页级进度' },
-            ]
-          : [
-              { label: '这次扫描已经建好', tone: 'ok' as const },
-              { label: '还没确认能收到扫描件', tone: 'warn' as const },
-            ]}
-      >
-        {!deliveryAcked && !cancelling ? (
-          <p data-testid="scan-ack-pending-notice">
+      {!deliveryAcked && !cancelling ? (
+        <div className="fs-grow">
+          <div className="fs-facts">
+            <div className="fs-fact wide">
+              <b>还不能等文件</b>
+              <span>确认之前，这一页还不能接收扫描件。</span>
+            </div>
+            <div className="fs-fact"><b>类型</b><span>{SCAN_TYPE_LABELS[scanType]}</span></div>
+            <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+            <div className="fs-fact wide"><b>保存策略</b><span>按设备回传的原格式保存，系统不做转换</span></div>
+            <div className="fs-fact wide"><b>查询</b><span>授权确认之后才每 3 秒查一次，最长 10 分钟。</span></div>
+          </div>
+          <p className="fs-warn" data-testid="scan-ack-pending-notice">
             这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
             没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
             它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
-            {ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒。'}
+            {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : '确认通常就是一两秒。'}
           </p>
-        ) : cancelling ? (
-          <>
-            <p>本机正在请系统取消这次扫描。<b>系统没回之前，页面不说已取消</b> —— 取消成不成功由系统定。</p>
-            <p>如果这一刻文件刚好交完，取消就会来不及，那时以系统结果为准。</p>
-          </>
-        ) : pollInFlight ? (
-          <>
-            <p>本机正在问系统：这次扫描现在是什么状态。<b>结果没回来之前，这一页不改任何判断</b>。</p>
-            <p>查询只是读一次：查多少次都不会重扫，系统不做转换。</p>
-          </>
-        ) : error ? (
-          <>
-            <p>这一次查询没拿到系统返回的结果：<b>{error}</b>。</p>
-            <p><b>查不到不等于扫描失败</b> —— 这一页不改判任务状态，还当它在进行中，下次继续查。</p>
-          </>
-        ) : (
-          <>
-            <p>面板扫完之后，文件会回到这台机器。<b>这中间没有可显示的张数</b>，所以这里只告诉你系统最近一次说了什么、已经查过几次。</p>
-            <p><b>本机正在自动检查</b>：每隔几秒替你问一次系统。想马上知道，点右下角「立即检查」就行。</p>
-          </>
-        )}
-      </ScanStatusPanel>
-      <ScanSec no="01" title="流程走到哪一段" hint={chainHint}>
-        <ScanChain active={matched ? 3 : -1} />
-      </ScanSec>
-      <ScanSec no="02" title="这次扫描与下一步" hint="这一屏现在能做什么">
-        <div className="sw-grid2">
-          <ScanKvCard
-            title="任务信息"
-            rows={[
-              ['扫描类型', SCAN_TYPE_LABELS[scanType]],
-              ['开始等待', `已等待 ${elapsed}`],
-              ['输出格式', SCAN_OUTPUT_FORMAT_PENDING],
-              ['保存策略', '按设备回传的原格式保存，系统不做转换'],
-            ]}
-          />
-          <ScanNoteCard title="这一屏现在会做什么" foot="自动检查只是查一下状态：不会重扫，也不会改变系统里的任何东西。">
-            {/* 指路跟着主按钮走：没拿到投递授权时右下角是「再确认一次」，写「立即检查」就是指向一颗不存在的按钮。 */}
-            <ScanPlan items={deliveryAcked ? [
-              '本机每隔几秒自动查一次，你什么都不用做。',
-              '想马上知道就点「立即检查」，它只是插一次队，不改变结果。',
-              '不想扫了就点「取消扫描」，取消成不成由系统定。',
-            ] : [
-              '本机正在向系统确认：这台机器可以收这一场的文件。',
-              ackRetryable ? '上一次确认没成，点右下角「再确认一次」重来。' : '确认通常就是一两秒，不用你做任何事。',
-              '不想扫了就点「取消扫描」，取消成不成由系统定。',
-            ]} />
-          </ScanNoteCard>
         </div>
-      </ScanSec>
+      ) : (
+        <>
+          <div className="fs-hero">
+            <span className="fs-p">已等待 · 已查询 <b>{polls}</b> 次</span>
+            <b className="fs-time">{elapsed}</b>
+            <span className="fs-p">每 3 秒查一次，最长等 10 分钟。</span>
+          </div>
+          <p className="fs-h">任务信息</p>
+          <div className="fs-kvs">
+            <div className="fs-kv"><span>扫描类型</span><b>{SCAN_TYPE_LABELS[scanType]}</b></div>
+            <div className="fs-kv"><span>输出格式</span><b>{SCAN_OUTPUT_FORMAT_PENDING}</b></div>
+            <div className="fs-kv"><span>保存策略</span><b>按设备回传的原格式保存，系统不做转换</b></div>
+            <div className="fs-kv"><span>你在面板上</span><b>请在打印机上完成扫描。这一页不显示扫到第几张。</b></div>
+          </div>
+          {cancelling ? (
+            <p className="fs-warn">正在发送取消请求。系统没回之前，不说已经取消。如果这一刻文件刚好交完，以系统结果为准。</p>
+          ) : null}
+          {pollInFlight && !cancelling ? (
+            <p className="fs-p">本机正在问系统：这次扫描现在是什么状态。结果没回来之前，这一页不改任何判断。</p>
+          ) : null}
+          {error && !cancelling ? (
+            <p className="fs-warn">这一次没查到状态，不改判。留在这一页，可以再检查一次。{error}</p>
+          ) : null}
+          {matched && !error && !cancelling ? (
+            <p className="fs-p">系统说已经匹配，仍在处理。这里不写页级进度，也不写百分比。</p>
+          ) : null}
+          <FsSheetArt caption="示意图。扫完之后，文件回到这一页。" />
+        </>
+      )}
     </ScanWorkbenchShell>
   )
 }

@@ -284,10 +284,10 @@ export function ConvertImagesPage() {
     <TouchToolScreen
       eyebrow="打印工具"
       title="图片转 PDF"
-      sub="几张图拼成一份 PDF。顺序你自己排，一张一页。"
+      sub={phase === 'empty' ? '还没有图片。加上之后才能合成' : '几张图拼成一份 PDF。顺序你自己排，一张一页。'}
       status={toolBandStatus(status)}
       onBack={() => navigate('/print-scan')}
-      askLabel="问小青：几张图怎么合成一份"
+      askLabel={phase === 'empty' ? '问小青：照片怎么合成 PDF' : '问小青：几张图怎么合成一份'}
       dock={
         <ConvertImagesCta
           phase={phase}

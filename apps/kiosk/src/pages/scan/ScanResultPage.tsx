@@ -9,19 +9,17 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import {
-  ScanChain,
   ScanCta,
-  ScanNoteCard,
-  ScanPlan,
-  ScanSec,
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
+import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import { revokeLiveScanSession } from './scanSessionRevoke'
@@ -102,6 +100,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
   const scanType = state.scanType ?? 'document'
   const success = state.success === true
   const reason = state.reason
+  const shownReason = reason ? scanShownText(reason, '扫描任务未能完成。请返回重试。') : null
   const file = state.file
   const outcome = deriveOutcome(state)
   // 刚结束那一场的凭证还留在本机登记里（finishWithResult 刻意不抹 live）。
@@ -361,7 +360,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
               <p>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。</p>
             </>
           ) : (
-            <p>{reason ?? '扫描任务未能完成，请重试。'}</p>
+            <p>{shownReason ?? '扫描任务未能完成，请重试。'}</p>
           )}
           <PhoneHelpLine />
           {safeRescanLost ? (
@@ -373,47 +372,25 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             </p>
           ) : null}
         </ScanStatusPanel>
-        <ScanSec no="01" title={isNoFile ? '现在能做什么' : '现在怎么办'} hint={isNoFile ? '这是终态，不用再等' : '右下角重扫，左下角回打印扫描'}>
-          <div className="sw-grid2">
-            <ScanNoteCard title="现在能做什么" foot="重扫是另建一次扫描，不是接着这一次。">
-              <ScanPlan items={[
-                /* 按钮文案是两条分支（见 ctabar），这句指路也必须跟着分支走。
-                 * 写死「点右下角重试扫描」时，没有凭据的那一屏上根本没有叫这个名字的按钮
-                 * —— 同一屏两个名字，用户会以为自己少看见了一个控件。 */
-                rescanAuthorized
-                  ? '点右下角「重试扫描（同一份材料）」：那是另一次任务。'
-                  : '点右下角「重新开始一次扫描」：那是另一次任务，也不是免查重的重扫。',
-                '重扫之前把纸取回来抚平、订书钉取掉。',
-                /* 服务端对「取过件但没建档成功」的同一份字节有两小时去重（它挡的是把上一位的
-                 * 扫描件误挂到下一位头上）。所以这句必须按手里有没有那份凭据分开说。
-                 *
-                 * 措辞上有一条不能越过：**本机不知道服务端到底铸没铸过那枚授权**。服务端只在
-                 * 任务已经取到文件（matched + 内容 hash 已落 lastAttemptHash）之后落到
-                 * failed / cancelled / expired 时才铸；而本机在一个还停在 waiting 的任务上
-                 * 放弃轮询，也会走到这一屏 —— 那种情况根本没有授权，凭据照样在手里。
-                 * 所以这里只能说「会带着凭据去申请」，不能说「服务端已经放行」。
-                 * 真正有资格说「已放行」的是设置页：那一行只在创建成功之后才出现，
-                 * 而带着重扫两半的创建能成功，等于服务端已经把授权消费掉了。 */
-                rescanAuthorized
-                  ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。'
-                  : '本机没有可用的安全重扫凭据：同一张纸原样再扫，系统可能按重复件拒收（两小时内），换一次扫描。',
-                isNoFile ? '这个编号问不出文件，反复点也是同一句结果。' : '同一份材料连续失败两次，就停在这一页，不要反复扫。',
-              ]} />
-            </ScanNoteCard>
-            <ScanNoteCard title="本机不会替系统补话">
-              <ScanPlan items={[
-                '不猜纸张或机器故障原因，本机收不到这些事件。',
-                '不自动重扫，避免同一份材料出两份。',
-                '不说「稍后会好」，也不按等待时长改判结果。',
-              ]} />
-            </ScanNoteCard>
+        <div className="fs-facts">
+          <div className="fs-fact wide">
+            <b>失败原因原文</b>
+            <span>{isNoFile ? '系统确认这次扫描已经完成，可是同一份结果里没有带可用的文件信息。' : `页面上的说明：${shownReason ?? '扫描任务未能完成。'}`}</span>
           </div>
-        </ScanSec>
-        {isNoFile ? null : (
-          <ScanSec no="02" title={isExpired ? '流程停在哪' : '流程没走完'} hint="没有可用文件挂到这次扫描">
-            <ScanChain active={-1} />
-          </ScanSec>
-        )}
+          <div className="fs-fact wide">
+            <b>同一张纸</b>
+            <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。这句只出现在失败说明里。</span>
+          </div>
+          <div className="fs-fact">
+            <b>重试扫描（同一份材料）</b>
+            <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
+          </div>
+          <div className="fs-fact">
+            <b>重新开始一次扫描</b>
+            <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
+          </div>
+        </div>
+        <FsSheetArt caption="示意图。这次没有拿到可用的扫描文件。" />
       </ScanWorkbenchShell>
     )
   }
@@ -540,6 +517,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           </span>
         </button>
       </div>
+      <FsSheetArt caption="示意图。核对上面的文件之后，再选打印、识别或去我的文档。" />
       {previewOpen && file ? (
         <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
       ) : null}

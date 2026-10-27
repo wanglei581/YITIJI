@@ -1,0 +1,466 @@
+/* 扫描工作台正文。只挂在本页，不改 .qxt-* 默认。颜色只用 --qxt-* / --qx-*。 */
+
+[data-qx-page='scan-workbench'] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .fs-grow {
+  flex: 0 0 auto;
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-types {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-type {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-type:active {
+  transform: scale(0.98);
+}
+
+[data-qx-page='scan-workbench'] .fs-type b {
+  font-size: 28px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .fs-type .fs-sub {
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+[data-qx-page='scan-workbench'] .fs-chip.is-warn {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .fs-sub {
+  color: var(--qxt-mint);
+}
+
+[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .fs-chip {
+  background: var(--qxt-chip-ghost);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='scan-workbench'] .fs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-row:active {
+  transform: scale(0.98);
+}
+
+[data-qx-page='scan-workbench'] .fs-row b {
+  display: block;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+[data-qx-page='scan-workbench'] .fs-row small {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
+}
+
+[data-qx-page='scan-workbench'] .fs-row[disabled] {
+  opacity: 0.45;
+}
+
+[data-qx-page='scan-workbench'] .fs-facts {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-content: stretch;
+}
+
+[data-qx-page='scan-workbench'] .fs-fact {
+  background: var(--qxt-well);
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 84px;
+}
+
+[data-qx-page='scan-workbench'] .fs-fact.wide {
+  grid-column: 1 / -1;
+}
+
+[data-qx-page='scan-workbench'] .fs-fact b {
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-fact span,
+[data-qx-page='scan-workbench'] .fs-p {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-kvs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-kv {
+  background: var(--qxt-well);
+  border-radius: 18px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 84px;
+}
+
+[data-qx-page='scan-workbench'] .fs-kv span {
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='scan-workbench'] .fs-kv b {
+  font-size: 24px;
+  line-height: 1.35;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-step {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 4px 12px;
+  align-content: center;
+  background: var(--qxt-well);
+  border-radius: 20px;
+  padding: 12px 14px;
+  min-height: 76px;
+}
+
+[data-qx-page='scan-workbench'] .fs-step .n {
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .fs-step b {
+  font-size: 24px;
+  line-height: 1.3;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-step .d {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero {
+  flex: 1 1 auto;
+  min-height: 180px;
+  display: grid;
+  grid-template-columns: minmax(180px, 42%) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  background: var(--qxt-well);
+  border-radius: 22px;
+  padding: 16px 20px;
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet {
+  width: min(180px, 70%);
+  aspect-ratio: 1 / 1.3;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  box-shadow: var(--qxt-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 14px;
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet i {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--qxt-line);
+}
+
+[data-qx-page='scan-workbench'] .fs-sheet i:nth-child(2) {
+  width: 72%;
+  background: var(--qxt-mint);
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero p {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.45;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-warn,
+[data-qx-page='scan-workbench'] .fs-help {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1.45;
+}
+
+[data-qx-page='scan-workbench'] .fs-warn {
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-help {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-hero {
+  background: var(--qxt-well);
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  min-height: 220px;
+}
+
+[data-qx-page='scan-workbench'] .fs-hero .fs-time {
+  font-size: 48px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-h {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .fs-created {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .sw-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .sw-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 26px;
+  padding: 14px 16px;
+  min-height: 0;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvstage,
+[data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  min-height: 96px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+/* 手机不缩放时，预览头不许被挤扁后把「整屏查看」的盒子摊到下一张卡片上。 */
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-result,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-preview,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvhead,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  flex: none;
+  overflow: visible;
+  height: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage,
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  height: 140px;
+  min-height: 96px;
+  overflow: hidden;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvh-1 {
+  align-content: flex-start;
+  height: auto;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-pvh-open {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-truth {
+  flex: none;
+}
+
+[data-kiosk-stage-fit='on'] .qxt-screen.scan-touch .qxt-rail-st {
+  white-space: nowrap;
+}
+
+[data-qx-page='scan-workbench'] .fs-art {
+  flex: 1 1 auto;
+  min-height: 640px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-art svg {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 560px;
+  display: block;
+}
+
+[data-qx-page='scan-workbench'] .fs-art figcaption {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .sw-actrow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .sw-exit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: left;
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='scan-workbench'] .sw-exit-title {
+  display: block;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+[data-qx-page='scan-workbench'] .sw-exit small {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='scan-workbench'] .sw-exit.is-off {
+  opacity: 0.55;
+}

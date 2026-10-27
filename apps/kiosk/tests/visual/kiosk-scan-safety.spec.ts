@@ -1758,7 +1758,8 @@ for (const exit of COMPLETED_EXITS) {
     await page.goto('/scan')
     await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
-    await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+    // 稿的四段进度在每一屏都写着「扫描完成」。这里要钉的是结果页标题不在，不是进度名。
+    await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
     const residue = await page.evaluate((token) => ({
       session: JSON.stringify(Object.fromEntries(
         Array.from({ length: window.sessionStorage.length }, (_, i) => window.sessionStorage.key(i))
@@ -1941,7 +1942,8 @@ test('a later member cannot reopen the previous guest scan @scan-safety', async 
   // ② 落在选类型那一屏，看不到上一位的结果与文件。
   await expect(page.getByText('下一步会真实建立这次扫描', { exact: false }).first()).toBeVisible()
   await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false })).toHaveCount(0)
-  await expect(page.getByText('扫描完成', { exact: true })).toHaveCount(0)
+  // 稿的四段进度在选类型屏也写着「扫描完成」。钉结果页标题，进度名可以留着。
+  await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toHaveCount(0)
   // ③ 任何存储里都不许再有那枚控制凭证。
   const residue = await page.evaluate((token) => ({
     session: JSON.stringify(Object.fromEntries(
@@ -2206,7 +2208,8 @@ for (const attempt of INTERRUPTED_CREATES) {
 
     // ⑧ 而且这一次真的能把同一张纸扫回来（桩只对配对创建回 completed）。
     await page.getByRole('button', { name: '我已操作，开始等待' }).click()
-    await expect(page.getByText('扫描完成', { exact: true })).toBeVisible({ timeout: 15_000 })
+    // 眉题、标题、进度名都是「扫描完成」。钉标题，避免同一句命中三处。
+    await expect(page.getByRole('heading', { name: '扫描完成', exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(SAME_SHEET_FILE.filename, { exact: false }).first()).toBeVisible()
 
     expect(errors).toEqual([])

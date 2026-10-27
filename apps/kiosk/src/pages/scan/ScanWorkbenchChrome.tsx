@@ -20,6 +20,7 @@ import {
 import '../print-scan/styles/tool-touch.css'
 import './styles/scan-workbench-qx.css'
 import './styles/scan-workbench-compact-qx.css'
+import './styles/scan-fs.css'
 
 const SCAN_RAIL = ['选类型', '扫描指引', '等回传', '扫描完成'] as const
 
@@ -118,7 +119,7 @@ export function ScanWorkbenchShell({
   }
   return (
     <QxTouchScreen
-      className="qx-stage"
+      className="qx-stage scan-touch"
       legacyFrame
       testId={`scan-workbench-state-${state}`}
       stateId={state}
@@ -177,8 +178,6 @@ export function ScanWorkbenchShell({
           </div>
         ) : null}
         {children}
-        {/* 底部三列口径只在选类型出现，不每一屏复读。 */}
-        {state === 'setup' ? <ScanTruth /> : null}
       </div>
     </QxTouchScreen>
   )
@@ -268,15 +267,14 @@ export function ScanTypeCards({
   onPick: (type: ScanType) => void
 }) {
   return (
-    <div className="sw-types" role="radiogroup" aria-label="扫描类型">
+    <div className="fs-types" role="radiogroup" aria-label="扫描类型">
       {SCAN_TYPE_OPTIONS.map((option) => {
         const on = selected === option.type
-        const Icon = option.icon
         return (
           <button
             key={option.type}
             type="button"
-            className="sw-ty"
+            className="fs-type"
             role="radio"
             aria-checked={on}
             aria-pressed={on}
@@ -284,14 +282,12 @@ export function ScanTypeCards({
             data-testid={`scan-workbench-type-${option.type}`}
             onClick={() => onPick(option.type)}
           >
-            <span className="sw-ty-ic"><Icon size={30} aria-hidden /></span>
-            <span className="sw-ty-n">{option.label}</span>
-            <span className="sw-ty-d">{option.description}</span>
-            <span className="sw-ty-chips">
+            <b>{option.label}</b>
+            <span className="fs-sub">{option.description}</span>
+            <span className="fs-chips">
               {option.chips.map((chip) => (
-                <span key={chip.label} className={`sw-mini${chip.tone ? ` is-${chip.tone}` : ''}`}>{chip.label}</span>
+                <span key={chip.label} className={`fs-chip${chip.tone === 'warn' ? ' is-warn' : ''}`}>{chip.label}</span>
               ))}
-              {on ? <span className="sw-mini is-pick">已选中</span> : null}
             </span>
           </button>
         )
@@ -330,25 +326,17 @@ export function ScanPlan({ items }: { items: readonly string[] }) {
 
 export function ScanPanelMock({ instructions, scanLabel }: { instructions: string[]; scanLabel: string }) {
   return (
-    <div className="sw-panel">
-      <div className="sw-mfp">
-        <div className="sw-mfp-face">
-          <div className="sw-mfp-screen">在面板上选<br />扫描到 网络文件夹</div>
-          <div className="sw-mfp-row"><span /><span className="is-hi" /><span /></div>
-          <div className="sw-mfp-row"><span /><span /><span /></div>
+    <div className="fs-steps" data-testid="scan-workbench-instructions">
+      {instructions.map((instruction, index) => (
+        <div key={`${instruction}-${index}`} className="fs-step">
+          <span className="n">{index + 1}</span>
+          <b>面板步骤 {index + 1}</b>
+          <span className="d">{instruction}</span>
         </div>
-        <p className="sw-mfp-cap">这是<b>奔图机器自己的操作面板</b>示意图，不是本机屏幕。扫描的每一步都在那上面按。</p>
-      </div>
-      <div className="sw-psteps" data-testid="scan-workbench-instructions">
-        {instructions.map((instruction, index) => (
-          <div key={`${instruction}-${index}`} className="sw-pstep">
-            <span className="sw-pstep-n">{index + 1}</span>
-            <span className="sw-pstep-t">{instruction}</span>
-          </div>
-        ))}
-        <p className="sw-psrc">
-          以上 {instructions.length} 条按「{scanLabel}」下发，本机一字未改。扫完请回到这台屏幕，进入等待之后本机会自动查，别在面板前干等。
-        </p>
+      ))}
+      <div className="fs-scanhero">
+        <div className="fs-sheet" aria-hidden="true"><i /><i /><i /><i /></div>
+        <p>按上面{instructions.length}步，在打印机面板上操作。步骤按「{scanLabel}」原文转达，本机不改写。扫完可以取回原件。</p>
       </div>
     </div>
   )

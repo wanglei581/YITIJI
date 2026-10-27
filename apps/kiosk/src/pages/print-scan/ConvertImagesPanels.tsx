@@ -14,6 +14,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { FsSheetArt } from './FsSheetArt'
 import {
   MAX_IMAGES,
   MAX_OUTPUT_BYTES,
@@ -326,61 +327,44 @@ export function EmptyBody({
 }) {
   return (
     <>
-      <div className="i2p-sec-label"><span className="no">01</span><span className="t">先加第一张图</span><span className="hint">一次一张，可连续添加</span></div>
-      <AddRow disabled={false} reason="" kiosk={kiosk} onPickLocal={onPickLocal} onShowQr={onShowQr} onOpenUsb={onOpenUsb} />
-      <div className="i2p-srcnote" data-testid="img2pdf-sources">
-        <div>用<b>这台机器上的文件</b>，一次加一张。{kiosk ? '一体机不打开系统文件框，请改用手机扫码。' : ''}</div>
-        <div>图在手机里就走这条，<b>传完回到这一页</b>接着排。</div>
-        <div>U 盘里的图片<em>还不能直接进这个列表</em>，点开看还能怎么办。</div>
+      <p className="fs-lead">还没有图片。用手机扫码传上来之后，才能合成。</p>
+      <div className="fs-pair">
+        <button type="button" className="fs-act" data-testid="img2pdf-add-phone" onClick={onShowQr}>
+          <span className="vis" aria-hidden="true"><SmartphoneIcon size={48} /></span>
+          <span className="tx">
+            <h3>手机扫码传图片</h3>
+            <p>在手机上选 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
+        {kiosk ? null : (
+          <button type="button" className="fs-act" data-testid="img2pdf-add-local" onClick={onPickLocal}>
+            <span className="vis" aria-hidden="true"><PlusIcon size={48} /></span>
+            <span className="tx">
+              <h3>本机上传一张</h3>
+              <p>在这台电脑上选 JPG 或 PNG，一次一张。一体机不打开系统文件框。</p>
+            </span>
+            <span className="go" aria-hidden="true">›</span>
+          </button>
+        )}
+        <button type="button" className="fs-act off" disabled data-testid="img2pdf-src-usb" aria-disabled="true">
+          <span className="vis" aria-hidden="true"><UsbIcon size={48} /></span>
+          <span className="tx">
+            <span className="fs-chip">暂未开通</span>
+            <h3>U 盘导入</h3>
+            <p>从 U 盘加图片，本机暂未开通。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
       </div>
-      <div className="i2p-sec-label"><span className="no">02</span><span className="t">加进来之后</span><span className="hint">还没有图片，列表现在是空的</span></div>
-      <div className="i2p-epane qx-grow" data-testid="img2pdf-empty-pane">
-        <div className="ep-l">
-          <div className="i2p-ep-h"><span>列表会长成这样</span><span className="r">顺序 = 页序</span></div>
-          <div className="i2p-ghostwrap" data-testid="img2pdf-empty-slots" role="img" aria-label="示意图：加进来之后，列表里每一张都有序号，选中之后可以上移下移">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={`i2p-grow-r${i === 1 ? ' on' : ''}`}>
-                <span className="i2p-gi">{i + 1}</span>
-                <span className="i2p-gt" aria-hidden />
-                <span className="i2p-gm"><b>加进来的第 {i + 1} 张</b>会成为 PDF 第 {i + 1} 页</span>
-                <span className="i2p-ga" aria-hidden><span><ArrowUpIcon size={20} /></span><span><ArrowDownIcon size={20} /></span></span>
-              </div>
-            ))}
-            <div className="i2p-grow-r">
-              <span className="i2p-gi"><PlusIcon size={22} /></span>
-              <span className="i2p-gt" aria-hidden />
-              <span className="i2p-gm"><b>继续添加</b>加满为止，一次最多 {MAX_IMAGES} 张</span>
-            </div>
-          </div>
-          <div className="i2p-ghostbar" aria-hidden>
-            <span><ArrowUpIcon size={20} />上移</span>
-            <span><ArrowDownIcon size={20} />下移</span>
-            <span className="off"><RotateCwIcon size={20} />旋转不可用</span>
-            <span><TrashIcon size={20} />移除</span>
-          </div>
-        </div>
-        <div className="ep-r">
-          <div className="i2p-ep-h"><span>接下来做三件事</span></div>
-          <div className="i2p-epsteps">
-            <div className="i2p-epstep"><span className="i2p-sn">1</span><span className="i2p-sb"><b>选中一张，排顺序</b>选中之后上移 / 下移立刻改写序号；移除之后剩下的序号也会重排，不留空位。</span></div>
-            <div className="i2p-epstep"><span className="i2p-sn">2</span><span className="i2p-sb"><b>一张图占一页</b>按 A4 居中放大，不裁切也不拼版。<em>旋转 90° 当前不可用</em>，按钮一直保持禁用。</span></div>
-            <div className="i2p-epstep"><span className="i2p-sn">3</span><span className="i2p-sb"><b>合成一份 PDF</b>一次性提交，系统不回传中间进度，结果回来才算完成。</span></div>
-          </div>
-          <div className="i2p-ep-cap">左边是<b>空位示意</b>，不是已有文件。这一页<b>不替你排序</b>，也不按文件名或时间自动排。</div>
-        </div>
-      </div>
-      <div className="i2p-limitbar" data-testid="img2pdf-rules">
-        <div className="i2p-lb-h"><span>这里的规矩</span><span className="r">超出的当场退回，不进列表</span></div>
-        <div className="i2p-lb-c">
-          <span className="i2p-chip">只收 JPG / PNG</span>
-          <span className="i2p-chip">单张 ≤ 10 MB</span>
-          <span className="i2p-chip">单张 ≤ 2500 万像素</span>
-          <span className="i2p-chip">一次最多 20 张</span>
-          <span className="i2p-chip">合计 ≤ 40 MB</span>
-          <span className="i2p-chip">生成的 PDF ≤ 15 MB</span>
-        </div>
-        <div className="i2p-lb-n">上传<b>没拿到系统确认</b>的那一张不会进列表，已经排好的顺序也不会被打乱。</div>
-      </div>
+      <button type="button" className="fs-row" data-testid="img2pdf-add-usb" onClick={onOpenUsb}>
+        看看 U 盘图片现在能怎么办
+      </button>
+      <p className="fine">最多 20 张，单张不超过 10MB，只收 JPG、PNG。</p>
+      <p className="fine">
+        合计不超过 40MB，成品不超过 15MB。单张不超过 2500 万像素，合计不超过 2 亿像素。一次最多 {MAX_IMAGES} 张。旋转 90° 当前不可用。
+      </p>
+      <FsSheetArt caption="示意图。照片传上来之后，在这一页合成 PDF。" />
     </>
   )
 }

@@ -6,6 +6,7 @@ import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import './styles/tool-touch.css'
+import './styles/tool-fs.css'
 
 /**
  * 扫描复印与打印工具共用的触屏壳。

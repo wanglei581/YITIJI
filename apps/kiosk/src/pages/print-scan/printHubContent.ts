@@ -389,4 +389,4 @@ export const COPY_GUIDE_CASES: readonly CopyGuideCase[] = [
 ]
 
 /** 与现场告示口径一致（pilot-onsite-notices：不得打印、复印、扫描伪造的证件、印章、票据）。 */
-export const COPY_GUIDE_LEGAL = '不得复印伪造的证件、印章、票据。'
+export const COPY_GUIDE_LEGAL = '不得复印伪造的证件、印章、票据。只能复印本人的真实证件和票据。'

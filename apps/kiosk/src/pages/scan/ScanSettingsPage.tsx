@@ -8,6 +8,7 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { createScanSession } from '../../services/api/scanTasks'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
 import { acknowledgeScanDelivery, type ScanAckCredentials } from './scanDeliveryAck'
+import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
 import {
   formatCountdown,
@@ -22,6 +23,7 @@ import { scanCleanupInProgress, trackScanSessionCreation } from './scanCleanupGa
 import { useScanSettingsFlags } from './scanSettingsFlags'
 import { createScanSessionTeardown } from './scanSettingsTeardown'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
+import { SCAN_TERMINAL_FAIL_COPY, scanShownText } from './scanShownText'
 import {
   classifyCreateFailure,
   isRescanRefusedByServer,
@@ -29,10 +31,8 @@ import {
   type SessionFailure,
 } from './scanRescanRecovery'
 import {
-  ScanChain,
   ScanCta,
   ScanPanelMock,
-  ScanSec,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
@@ -297,9 +297,9 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         terminalFailClosedRef.current = true
         setFailure({
           title: '这台机器的安全校验没通过',
-          description: userMessageOf(
-            { code: 'TERMINAL_SESSION_INVALID' },
-            '这台机器的安全校验没通过，请联系现场工作人员',
+          description: scanShownText(
+            userMessageOf({ code: 'TERMINAL_SESSION_INVALID' }, SCAN_TERMINAL_FAIL_COPY),
+            SCAN_TERMINAL_FAIL_COPY,
           ),
         })
         setPhase('error')
@@ -762,7 +762,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle={<><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</>}
+      subtitle="扫描任务已创建，请只按系统给出的这一次操作说明来做。"
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
       ctabar={
         <ScanCta>
@@ -775,22 +775,17 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         </ScanCta>
       }
     >
-      <ScanSec no="01" title="照着做：全在机器面板上" hint="以下是系统给的原文，本机不改写" grow>
-        <ScanPanelMock
-          instructions={instructions.map((instruction) => instruction)}
-          scanLabel={SCAN_TYPE_LABELS[scanType]}
-        />
-      </ScanSec>
-      <ScanSec no="02" title="现在能做什么" hint="按系统结果继续">
-        <ScanChain active={0} />
-      </ScanSec>
-      {/* 「这次会话」整张卡是纯展示，已搬去 ScanSettingsStatusView。restoredFromStorage 必须喂
-          **挂载那一刻**那个 ref：每帧重算会把一个刚在本页建成的会话说成「本页重载过」。 */}
+      <p className="fs-created"><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</p>
       <ScanSettingsSessionFacts
         scanType={scanType} countdown={countdown}
         rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
         restoredFromStorage={restoredFromStorageRef.current}
       />
+      <ScanPanelMock
+        instructions={instructions.map((instruction) => instruction)}
+        scanLabel={SCAN_TYPE_LABELS[scanType]}
+      />
+      <FsSheetArt caption="示意图。按上面的步骤，在打印机面板上操作。" />
     </ScanWorkbenchShell>
   )
 }

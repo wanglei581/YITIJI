@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
+import { FsSheetArt } from '../FsSheetArt'
 import { PhoneHelpLine } from '../phoneHelp'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
@@ -42,6 +43,53 @@ const ALTS = [
     Icon: InfoIcon,
   },
 ]
+
+/** 默认关闭：三步都停用，出口只有打印扫描和查政策。卡片文案不含「上传」，避免被当成上传入口。 */
+export function SignClosedBody({ copy }: { copy: StatusCopy }) {
+  const navigate = useNavigate()
+  const hold = (title: string, detail: string) => (
+    <div className="fs-hold" role="group" aria-disabled="true" aria-label={`${title}，本机暂未开通`}>
+      <b>{title}</b>
+      <span>{detail}</span>
+      <span className="fs-chip">本机暂未开通</span>
+    </div>
+  )
+  return (
+    <>
+      <div className="fs-warn" data-testid="sign-stamp-fallback">
+        <b>{copy.title}</b>
+        <span>{copy.body}</span>
+      </div>
+      <p className="fs-h">签名的三步</p>
+      <div className="fs-lock">
+        {hold('选 PDF', '选一份要签名的 PDF')}
+        {hold('传签名图', '上传本人手写签名')}
+        {hold('放置', '把签名放到某一页')}
+      </div>
+      <p className="fs-h">这些还能办</p>
+      <div className="fs-pair">
+        <button type="button" className="fs-act" onClick={() => navigate('/print-scan')}>
+          <span className="vis" aria-hidden="true"><FileTextIcon size={48} /></span>
+          <span className="tx">
+            <h3>打印扫描</h3>
+            <p>打印文件、扫描纸质材料、看复印步骤，都不靠签名。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
+        <button type="button" className="fs-act" onClick={() => navigate('/policy-service')}>
+          <span className="vis" aria-hidden="true"><InfoIcon size={48} /></span>
+          <span className="tx">
+            <h3>查政策</h3>
+            <p>看本机构发布的政策和要带的材料。</p>
+          </span>
+          <span className="go" aria-hidden="true">›</span>
+        </button>
+      </div>
+      <PhoneHelpLine />
+      <FsSheetArt caption="示意图。签名的三步现在都还不能用。" />
+    </>
+  )
+}
 
 export function SignStampGateView({
   copy,
@@ -126,7 +174,7 @@ export function gateWhy(state: string): string[] {
     return ['签名图不留到下一次使用，过期即不可复用。', '这一步不会替你自动重传，也不会替你自动合成。']
   }
   if (state === 'terminal-missing') {
-    return ['不假设「读不到就是可用」。', '请联系现场工作人员登记这台机器。']
+    return ['不假设「读不到就是可用」。', '这台机器还没登记，签名不能开始。请安全返回打印扫描。']
   }
   if (state.startsWith('capability-')) {
     return ['读取中不等于可用，也不等于不可用。', '读不到就不放行，不把失败当成已关闭。']

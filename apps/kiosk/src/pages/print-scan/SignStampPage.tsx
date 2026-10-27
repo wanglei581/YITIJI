@@ -8,7 +8,7 @@ import { toolBandStatus } from './toolBand'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
-import { SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
+import { SignClosedBody, SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
 import { SignStampPickView, pickAsk } from './sign-stamp/SignStampPickView'
 import { SignStampWorkbench } from './sign-stamp/SignStampWorkbench'
 import { AUTHORIZATION_LABEL, useSignStampFlow } from './sign-stamp/useSignStampFlow'
@@ -22,6 +22,8 @@ export function SignStampPage() {
   const terminalLabel = getTerminalCode() || getTerminalId() || '终端未登记'
 
 
+  const closed = flow.viewState === 'capability-disabled'
+
   const onPrimary = () => {
     if (flow.cta.action === 'login') flow.goLogin()
     else if (flow.cta.action === 'help') flow.goHelp()
@@ -34,12 +36,12 @@ export function SignStampPage() {
 
   return (
     <TouchToolScreen
-      eyebrow="打印工具"
-      title="签名"
-      sub="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
+      eyebrow={closed ? '签名' : '打印工具'}
+      title={closed ? '签名：本机暂未开通' : '签名'}
+      sub={closed ? '选 PDF、传签名图和放置，现在都还不能用' : '把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。'}
       status={toolBandStatus(flow.pill)}
       onBack={() => flow.navigate('/print-scan')}
-      askLabel="问小青：这个签名有法律效力吗"
+      askLabel={closed ? '问小青：签名没开怎么办' : '问小青：这个签名有法律效力吗'}
       place={terminalLabel}
       dock={
         <div className="ss-cta-wrap">
@@ -81,6 +83,7 @@ export function SignStampPage() {
       <div
         className="ss-page qx-grow w2-print-scan-preview"
         data-w2-page="print-scan-sign"
+        data-qx-page="sign"
         data-state={flow.viewState}
         data-shape={flow.shape}
         data-testid={`sign-stamp-state-${flow.viewState}`}
@@ -126,7 +129,7 @@ export function SignStampPage() {
         </div>
 
         {flow.shape === 'block' ? (
-          <SignStampGateView copy={flow.status} why={gateWhy(flow.viewState)} />
+          closed ? <SignClosedBody copy={flow.status} /> : <SignStampGateView copy={flow.status} why={gateWhy(flow.viewState)} />
         ) : flow.shape === 'pick' && flow.pickPhase ? (
           <SignStampPickView
             phase={flow.pickPhase}

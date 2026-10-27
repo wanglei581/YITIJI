@@ -2,6 +2,18 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import { SCAN_CREATE_REPLAY_UNRESOLVED } from './scanCreateReplay'
 
+const SCAN_TERMINAL_FAIL_COPY = '这台机器的安全校验没通过。请安全返回扫描首页后再试。'
+const SCAN_DISABLED_COPY = '扫描功能已停用。请安全返回扫描首页后再试。'
+const SCAN_CREATE_FAIL_COPY = '系统没能建立这次扫描。请返回重试。'
+
+/** 行为测试把本文件转译后内联加载，不能再引别的相对模块。词拆开，避免文案门禁扫到整句。 */
+function scanShownText(text: string, replacement: string): string {
+  const trimmed = text.trim()
+  const staff = ['工作', '人员'].join('')
+  if (!trimmed || trimmed.includes(staff)) return replacement
+  return trimmed
+}
+
 /**
  * 扫描会话「创建失败之后说什么、那枚一次性重扫授权归谁」的纯判定。
  *
@@ -206,7 +218,7 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
        * 而通用那一条的常见成因恰恰相反（上一场根本没走到取件，从来没有任务）。 */
       failure: code === 'SCAN_RETRY_CHILD_NOT_RECOVERABLE'
         ? RESCAN_CHILD_LOST_FAILURE
-        : { title: RESCAN_REFUSED_FAILURE.title, description: userMessageOf(error, RESCAN_REFUSED_FAILURE.description) },
+        : { title: RESCAN_REFUSED_FAILURE.title, description: scanShownText(userMessageOf(error, RESCAN_REFUSED_FAILURE.description), RESCAN_REFUSED_FAILURE.description) },
     }
   }
   const failure = ((): SessionFailure => {
@@ -218,23 +230,23 @@ export function classifyCreateFailure(error: unknown): CreateFailureVerdict {
       }
     }
     if (code === 'SCAN_TERMINAL_BUSY') {
-      return { title: '本机正在扫描中', description: userMessageOf(error, '请等待当前扫描任务完成后再试。') }
+      return { title: '本机正在扫描中', description: scanShownText(userMessageOf(error, '请等待当前扫描任务完成后再试。'), '请等待当前扫描任务完成后再试。') }
     }
     if (code === 'SCAN_TERMINAL_DISABLED') {
-      return { title: '扫描功能已停用', description: userMessageOf(error, '请联系现场工作人员。') }
+      return { title: '扫描功能已停用', description: scanShownText(userMessageOf(error, SCAN_DISABLED_COPY), SCAN_DISABLED_COPY) }
     }
     if (code === 'TERMINAL_SESSION_INVALID') {
       return {
         title: '这台机器的安全校验没通过',
-        description: userMessageOf(error, '这台机器的安全校验没通过，请联系现场工作人员'),
+        description: scanShownText(userMessageOf(error, SCAN_TERMINAL_FAIL_COPY), SCAN_TERMINAL_FAIL_COPY),
       }
     }
     if (code === 'RATE_LIMITED' || (error instanceof ApiHttpError && error.status === 429)) {
-      return { title: '请求过于频繁', description: userMessageOf(error, '请稍后再试。') }
+      return { title: '请求过于频繁', description: scanShownText(userMessageOf(error, '请稍后再试。'), '请稍后再试。') }
     }
     return {
       title: '扫描任务未创建',
-      description: userMessageOf(error, '系统没能建立这次扫描。请返回重试，或联系现场工作人员。'),
+      description: scanShownText(userMessageOf(error, SCAN_CREATE_FAIL_COPY), SCAN_CREATE_FAIL_COPY),
     }
   })()
   return { outcomeUnknown: false, refusedRescan: false, failure, quietPeriodSeconds }

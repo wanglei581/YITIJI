@@ -9,20 +9,14 @@
 // 复印只有「怎么在打印机面板上复印」的说明，不经过本机下单，不宣称复印结果。
 // ============================================================
 
-import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { FsSheetArt } from './FsSheetArt'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
-  ArrowRightIcon,
-  CopyIcon,
-  FileTextIcon,
   FilesIcon,
   ImageIcon,
-  IdCardIcon,
-  InfoIcon,
   PackageCheckIcon,
   PrinterIcon,
-  RepeatIcon,
   ScanLineIcon,
   UserSquareIcon,
 } from 'lucide-react'
@@ -33,11 +27,9 @@ import {
   COPY_GUIDE_ROUTE,
   COPY_GUIDE_STEPS,
   HUB_PILL,
-  type CopyGuideCase,
   type HubFeatureState,
 } from './printHubContent'
 import {
-  PrintHubHero,
   PrintHubRecordNotes,
   PrintHubState,
   PrintHubTruth,
@@ -53,12 +45,6 @@ const PHOTO_FALLBACK = '/print/upload?source=document&tab=file&category=photo'
 const SCAN_FALLBACK = '/scan'
 /** 复印说明页的主按钮：有电子版要打，走「文档打印」同一个入口。 */
 const DOC_PRINT_ENTRY = '/print/upload?source=document&tab=file'
-
-const COPY_CASE_ICON: Record<CopyGuideCase['key'], typeof CopyIcon> = {
-  'id-card': IdCardIcon,
-  receipt: FileTextIcon,
-  duplex: RepeatIcon,
-}
 
 const RECORD_LINKS: readonly (QxPrintQuickLinkView & { to: string })[] = [
   { key: 'documents', icon: FilesIcon, title: '我的文档', description: '已上传 / 生成的文件', to: '/me/documents' },
@@ -83,10 +69,10 @@ export function PrintScanFeatureInfoPage() {
       <TouchToolScreen
         eyebrow="打印扫描"
         title="这个能力名我不认识"
-        sub="地址里带了一个本机不认识的能力名称"
+        sub="地址里的能力名对不上现有说明"
         status={pill}
         onBack={() => navigate('/print-scan')}
-        askLabel="问小青：这个入口是什么"
+        askLabel="问小青：这个功能是什么"
         dock={
           <button
             type="button"
@@ -100,69 +86,43 @@ export function PrintScanFeatureInfoPage() {
         }
       >
         <div
-          className="qx-scroll ph-page"
+          className="qx-scroll ph-page fs-page"
           data-w2-page="print-scan-feature"
           data-qx-page="print-hub"
           data-state="feature-not-found"
           data-testid="print-hub-state-feature-not-found"
         >
-          <PrintHubHero
-            state="feature-not-found"
-            askText={{ text: '回打印扫描首页重新选一次。', em: '重新选一次' }}
-            doing="大概率是旧链接。回打印扫描首页重新选一次。"
+          <div className="fs-fact" data-testid="print-hub-fallback">
+            <b>没有这项能力说明</b>
+            <span>这个名字不在复印、证件照这些说明里。本页不编一套步骤。多半是旧二维码或旧链接。</span>
+          </div>
+          <div className="fs-fact">
+            <b>复印</b>
+            <span>复印的说明在「怎么在打印机上复印」。</span>
+          </div>
+          <div className="fs-fact">
+            <b>证件照</b>
+            <span>证件照这一页写的是尚未开放，和两条替代路径。</span>
+          </div>
+          <div className="fs-fact">
+            <b>下一步</b>
+            <span>回到打印扫描，从那里选已经有的功能。</span>
+          </div>
+          <button type="button" className="fs-row" onClick={() => navigate('/print-scan/feature/id-photo')}>
+            看证件照说明
+          </button>
+          <PrintHubRecordNotes
+            links={RECORD_LINKS}
+            onOpen={(linkKey) => {
+              if (linkKey === COPY_GUIDE_KEY) {
+                navigate(COPY_GUIDE_ROUTE)
+                return
+              }
+              const link = RECORD_LINKS.find((item) => item.key === linkKey)
+              if (link) navigate(link.to)
+            }}
           />
-          <section className="ph-fallback">
-            <PrintHubState kind="warn" icon={<InfoIcon size={28} />} heading="没有这项能力说明" testId="print-hub-fallback">
-              <p className="ph-state-p">
-                地址里带了一个本机<b>不认识的能力名称</b>。当前只有「证件照」「复印」两项有说明页。
-              </p>
-              <p className="ph-state-p">多半是旧二维码或旧链接。回打印扫描首页重新选一次即可。</p>
-            </PrintHubState>
-          </section>
-          <section className="ph-sec">
-            <div className="ph-sec-h">
-              <span className="ph-no">01</span>
-              <span className="t">可以直接去的地方</span>
-            </div>
-            <PrintHubRecordNotes
-              links={RECORD_LINKS}
-              onOpen={(linkKey) => {
-                if (linkKey === COPY_GUIDE_KEY) {
-                  navigate(COPY_GUIDE_ROUTE)
-                  return
-                }
-                const link = RECORD_LINKS.find((item) => item.key === linkKey)
-                if (link) navigate(link.to)
-              }}
-            />
-          </section>
-          <section className="ph-sec ph-sec--fill">
-            <div className="ph-sec-h">
-              <span className="ph-no">02</span>
-              <span className="t">本机现在有哪些能力说明</span>
-              <span className="hint">证件照、复印两项</span>
-            </div>
-            <div className="ph-pgrp">
-              <h4>
-                <UserSquareIcon size={28} aria-hidden="true" />
-                证件照说明
-              </h4>
-              <p className="ph-state-p">
-                证件照有未开放说明和替代路径，复印有打印机面板的操作步骤。其他陌生名称不会进入办理流程，请回打印扫描首页重新选择。
-              </p>
-              <div className="ph-axes">
-                <button type="button" className="ph-chip" onClick={() => navigate('/print-scan/feature/id-photo')}>
-                  看证件照说明
-                </button>
-                <button type="button" className="ph-chip" onClick={() => navigate(COPY_GUIDE_ROUTE)}>
-                  看复印步骤
-                </button>
-                <button type="button" className="ph-chip" onClick={() => navigate('/print-scan')}>
-                  回打印扫描首页
-                </button>
-              </div>
-            </div>
-          </section>
+          <FsSheetArt caption="示意图。这个名字没有对应的办理步骤，回到打印扫描再选。" />
           <footer className="ph-foot">
             <PrintHubTruth />
             <PhoneHelpLine />
@@ -180,7 +140,7 @@ export function PrintScanFeatureInfoPage() {
         sub="复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里"
         status={pill}
         onBack={() => navigate('/print-scan')}
-        askLabel="问小青：复印和打印有什么不同"
+        askLabel="问小青：复印要注意什么"
         dock={
           <>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
@@ -199,70 +159,41 @@ export function PrintScanFeatureInfoPage() {
         }
       >
         <div
-          className="qx-scroll ph-page"
+          className="qx-scroll ph-page fs-page"
           data-w2-page="print-scan-feature"
           data-qx-page="print-hub"
           data-state="feature-copy"
           data-testid="print-hub-state-feature-copy"
         >
-          <PrintHubHero
-            state="feature-copy"
-            doing={
-              <>
-                复印<b>不用在这台屏幕上下单</b>，也不会出现在「我的打印订单」里。照下面五步做就行。
-              </>
-            }
-          />
-          <section className="ph-sec" aria-labelledby="ph-copy-steps">
-            <div className="ph-sec-h">
-              <span className="ph-no">01</span>
-              <span className="t" id="ph-copy-steps">照着做：五步复印</span>
-              <span className="hint">按钮名以打印机屏幕为准</span>
+          <p className="fs-lead">复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里。照下面五步做就行。</p>
+          <p className="fs-h" id="ph-copy-steps">照着做：五步复印</p>
+          <ol className="fs-ol" data-testid="print-hub-copy-steps">
+            {COPY_GUIDE_STEPS.map((step, index) => (
+              <li key={step.title} className="fs-step">
+                <span className="n" aria-hidden="true">{index + 1}</span>
+                <b>{step.title}</b>
+                <span className="d"><PrintHubEmphasis text={step.body} marks={step.emphasis} /></span>
+              </li>
+            ))}
+          </ol>
+          <p className="fs-h" id="ph-copy-cases">这几种原件这样复印</p>
+          {COPY_GUIDE_CASES.map((item) => (
+            <div
+              key={item.key}
+              className="fs-fact"
+              data-static="true"
+              data-testid={`print-hub-copy-case-${item.key}`}
+              data-pending={item.pending || undefined}
+            >
+              <b>{item.title}</b>
+              <span><PrintHubEmphasis text={item.body} marks={['「身份证复印」', '「票据复印」']} /></span>
             </div>
-            <ol className="ph-steps" data-testid="print-hub-copy-steps">
-              {COPY_GUIDE_STEPS.map((step, index) => (
-                <li key={step.title} className="ph-step" style={{ '--ph-i': index } as CSSProperties}>
-                  <span className="ph-step-no" aria-hidden="true">{index + 1}</span>
-                  <span className="ph-step-main">
-                    <b>{step.title}</b>
-                    <span className="d"><PrintHubEmphasis text={step.body} marks={step.emphasis} /></span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-          <section className="ph-sec" aria-labelledby="ph-copy-cases">
-            <div className="ph-sec-h">
-              <span className="ph-no">02</span>
-              <span className="t" id="ph-copy-cases">这几种原件这样复印</span>
-            </div>
-            <div className="ph-notes ph-notes--flush">
-              {COPY_GUIDE_CASES.map((item, index) => {
-                const Icon = COPY_CASE_ICON[item.key]
-                return (
-                  <div
-                    key={item.key}
-                    className="ph-note"
-                    style={{ '--ph-i': index + 6 } as CSSProperties}
-                    data-static="true"
-                    data-testid={`print-hub-copy-case-${item.key}`}
-                    data-pending={item.pending || undefined}
-                  >
-                    <span className="ph-note-head">
-                      <span className="ph-note-ic" data-tone="wheat" aria-hidden="true"><Icon size={24} /></span>
-                      <b>{item.title}</b>
-                    </span>
-                    <span className="d"><PrintHubEmphasis text={item.body} marks={['「身份证复印」', '「票据复印」']} /></span>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
+          ))}
           <section className="ph-fallback">
             <PrintHubState
               kind="warn"
               icon={<PackageCheckIcon size={28} />}
-              heading="别忘了取走玻璃上或进纸口里的原件（身份证等）"
+              heading="复印件和原件一起带走"
               testId="print-hub-copy-take-original"
             >
               <p className="ph-state-p">
@@ -288,10 +219,10 @@ export function PrintScanFeatureInfoPage() {
     <TouchToolScreen
       eyebrow="证件照"
       title="证件照：本机尚未开放"
-      sub="这项只有说明，没有可用流程"
+      sub="现在不能裁切、换底色或排版，也不会生成证件照成品"
       status={pill}
       onBack={() => navigate('/print-scan')}
-      askLabel="问小青：没有证件照功能怎么办"
+      askLabel="问小青：证件照怎么办"
       dock={
         <>
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
@@ -310,89 +241,41 @@ export function PrintScanFeatureInfoPage() {
       }
     >
       <div
-        className="qx-scroll ph-page"
+        className="qx-scroll ph-page fs-page"
         data-w2-page="print-scan-feature"
         data-qx-page="print-hub"
         data-state="feature-id-photo"
         data-testid="print-hub-state-feature-id-photo"
       >
-        <PrintHubHero
-          state="feature-id-photo"
-          doing="我不会假装能给你排版出图；下面是真的能走的两条路。"
-        />
-        <section className="ph-fallback">
-          <PrintHubState
-            kind="warn"
-            icon={<UserSquareIcon size={28} />}
-            heading="本机暂未开放证件照"
-            testId="print-hub-idphoto-unavailable"
-          >
-            <p className="ph-state-p">
-              本机不做尺寸裁切、底色处理、版面排布，也不生成证件照成品。
-            </p>
-            <p className="ph-state-p" data-disclaimer="true">
-              开放前不提供换底色、自动排版和成品生成，免得你按着不存在的流程走一遍。
-            </p>
-          </PrintHubState>
-        </section>
-        <section className="ph-sec">
-          <div className="ph-sec-h">
-            <span className="ph-no">01</span>
-            <span className="t">现在可以怎么办</span>
+        <div className="fs-idhead" data-testid="print-hub-idphoto-unavailable">
+          <div className="vis" aria-hidden="true"><UserSquareIcon size={72} /></div>
+          <div>
+            <h2>本机暂未开放证件照</h2>
+            <p>已经有电子版可以按照片打印；只有纸质的，先在打印机上扫描。裁切、换底色和排版都不在这台机器上做。</p>
           </div>
-          <div className="ph-src-list">
-            <button
-              type="button"
-              className="ph-src"
-              style={{ '--ph-i': 1 } as CSSProperties}
-              data-testid="print-hub-idphoto-fallback"
-              onClick={() => navigate(PHOTO_FALLBACK)}
-            >
-              <span className="ph-src-ic" data-tone="teal" aria-hidden="true">
-                <ImageIcon size={40} />
-              </span>
-              <span className="ph-src-main">
-                <span className="ph-src-name">
-                  已经有证件照文件
-                  <span className="ph-tag">现在可用</span>
-                </span>
-                <span className="ph-src-desc">
-                  相册里已有的证件照，传进来<b>按普通照片打印</b>。尺寸和底色以你手上的原图为准。
-                </span>
-              </span>
-              <span className="ph-src-go" aria-hidden="true"><ArrowRightIcon size={28} /></span>
-            </button>
-            <button
-              type="button"
-              className="ph-src"
-              style={{ '--ph-i': 2 } as CSSProperties}
-              data-testid="print-hub-idphoto-scan"
-              onClick={() => navigate(SCAN_FALLBACK)}
-            >
-              <span className="ph-src-ic" data-tone="slate" aria-hidden="true">
-                <ScanLineIcon size={40} />
-              </span>
-              <span className="ph-src-main">
-                <span className="ph-src-name">纸质照片想留电子版</span>
-                <span className="ph-src-desc">
-                  在奔图面板上扫描，回本机取走电子版。<b>扫描不做裁切和底色处理。</b>
-                </span>
-              </span>
-              <span className="ph-src-go" aria-hidden="true"><ArrowRightIcon size={28} /></span>
-            </button>
-          </div>
-        </section>
-        <section className="ph-sec ph-sec--fill">
-          <div className="ph-pgrp">
-            <h4>开放后会做什么<span>规划，不是承诺</span></h4>
-            <ul className="ph-plan">
-              <li><span className="sq" />选常见规格与底色（一寸 / 二寸 / 小一寸）。</li>
-              <li><span className="sq" />按纸张规格自动排版，确认张数后进入打印流程。</li>
-              <li><span className="sq" />证件照属敏感文件，按短期留存策略清理。</li>
-            </ul>
-            <p className="ph-pgrp-note" data-disclaimer="true">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE}</p>
-          </div>
-        </section>
+        </div>
+        <div className="fs-pair">
+          <button type="button" className="fs-act" data-testid="print-hub-idphoto-fallback" onClick={() => navigate(PHOTO_FALLBACK)}>
+            <span className="vis" aria-hidden="true"><ImageIcon size={48} /></span>
+            <span className="tx"><h3>已经有证件照文件</h3><p>传到这台机器，按普通照片打印。尺寸和底色以你手上的原图为准。</p></span>
+            <span className="go" aria-hidden="true">›</span>
+          </button>
+          <button type="button" className="fs-act" data-testid="print-hub-idphoto-scan" onClick={() => navigate(SCAN_FALLBACK)}>
+            <span className="vis" aria-hidden="true"><ScanLineIcon size={48} /></span>
+            <span className="tx"><h3>只有纸质照片</h3><p>在打印机面板上扫描，回到这台机器取电子版。扫描不做裁切和换底色。</p></span>
+            <span className="go" aria-hidden="true">›</span>
+          </button>
+        </div>
+        <div className="fs-plan">
+          <div className="hd"><b>以后会做</b><span className="fs-chip">规划，不是承诺</span></div>
+          <ol>
+            <li>选常见规格与底色（一寸 / 二寸 / 小一寸）。</li>
+            <li>按纸张规格自动排版，确认张数后进入打印流程。</li>
+            <li>证件照属敏感文件，按短期留存策略清理。</li>
+          </ol>
+          <p className="fs-p" data-disclaimer="true">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE}</p>
+        </div>
+        <FsSheetArt caption="示意图。这台机器现在不做证件照成品，可以按照片打印或先扫描。" />
         <footer className="ph-foot">
           <PrintHubTruth />
           <PhoneHelpLine />
