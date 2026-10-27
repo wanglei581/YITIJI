@@ -428,6 +428,19 @@
   overflow-wrap: anywhere;
 }
 
+/* 页脚求助句后面的「帮助中心」按钮：像链接，点击区仍不小于 64。 */
+.qxt-screen .rtp-help-link {
+  margin-left: 12px;
+  padding: 0 16px;
+  background: none;
+  border: 0;
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-aux);
+  font-weight: 700;
+  text-decoration: underline;
+  vertical-align: middle;
+}
+
 .qxt-screen .rtp-hero-k {
   margin: 0;
   font-size: var(--qxt-fs-aux);

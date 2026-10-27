@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ResumeExportFormat, ResumeExportPricing, ResumeGenerateExportResponse, ResumeLayoutSettings, ResumeTemplate } from '@ai-job-print/shared'
 import { helpNeededLine } from '../../../../copy/unattendedCopy'
 import { ResumeLayoutControls } from '../ResumeLayoutControls'
+import { ResumeHelpLine } from '../../touch/ResumeHelpLine'
 import { COMPRESS_ONE_PAGE, type GeneratePreviewViewState } from './constants'
 import { ResumeExportResult } from './ResumeExportResult'
 import { ResumePricingBar } from './ResumePricingBar'
@@ -262,7 +263,10 @@ export function ResumeFormatChooser(props: {
       )}
       <div className="qx-rg-help">
         <p>不确定要哪种？要打印或投简历就选 PDF；要回去自己改就选 DOCX。</p>
-        <p className="rtp-help">{helpNeededLine()}</p>
+        {/* 选格式 / 出文件中没有「接下来可以做的」那一块，帮助中心的去向就放在页脚；有那一块时它已经有一行「帮助中心」。 */}
+        {props.screen !== 'export-chooser' && props.screen !== 'export-exporting'
+          ? <p className="rtp-help">{helpNeededLine()}</p>
+          : <ResumeHelpLine onHelp={props.onHelp} />}
       </div>
     </div>
   )

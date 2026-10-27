@@ -9,8 +9,8 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { helpNeededLine } from '../../copy/unattendedCopy'
 import { maskEmail, maskPhone } from '../../utils/maskPii'
+import { ResumeHelpLine } from './touch/ResumeHelpLine'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import type {
@@ -710,13 +710,10 @@ export function ResumeGeneratePage() {
       </div>
       )}
       {(reviewing || step === 0) && (
-        <p className="rtp-help">
-          {reviewing
-            ? '可以慢慢核对，准备好后再点生成。'
-            : '姓名、手机号这两项建议自己核对一遍。'}
-          {' '}
-          {helpNeededLine()}
-        </p>
+        <ResumeHelpLine
+          lead={reviewing ? '可以慢慢核对，准备好后再点生成。' : '姓名、手机号这两项建议自己核对一遍。'}
+          onHelp={() => navigate('/help')}
+        />
       )}
       {!reviewing && step === 0 && !basic.name.trim() && (
         <p className="qx-rg-reason" id="resume-generate-name-reason">
