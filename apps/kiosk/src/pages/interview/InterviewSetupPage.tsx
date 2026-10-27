@@ -394,7 +394,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         <QxTouchDock
           onBack={step > 1 ? () => { setError(null); setStep((current) => (current === 3 ? 2 : 1)) } : () => navigate('/interview-service')}
           backLabel={step > 1 ? '上一步' : '返回'}
-          ask={{ label: '问小青：这场练习怎么设', draft: SETUP_AI_DRAFT }}
+          ask={{ label: step === 2 ? '问小青：选哪位面试官' : '问小青：这场练习怎么设', draft: SETUP_AI_DRAFT }}
           alert={shownError ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
           primary={{
             label: step < 3

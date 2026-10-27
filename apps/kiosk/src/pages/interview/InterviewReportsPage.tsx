@@ -160,6 +160,8 @@ export function InterviewReportsPage({ onGoStage }: { onGoStage?: (stage: Interv
           </>
         ) : items.length === 0 ? (
           <>
+            {/* 删掉最后一条后列表变空：删除的结果仍要说，不能随着列表换成空态一起消失。 */}
+            {shownHint ? <p className="qxt-iv-err" role="status">{shownHint}</p> : null}
             <button type="button" className="qxt-iv-wide" onClick={() => navigate('/me/ai-records')}>
               <b>AI服务记录</b>
               <small>查看本人AI调用记录</small>
