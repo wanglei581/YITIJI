@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useId, type CSSProperties, type ReactNode } from 'react'
 import { QxTouchChip, type QxTouchChipTone } from './QxTouchChip'
 import { QxTouchIcon, type QxTouchIconName } from './QxTouchIcon'
 
@@ -43,6 +43,11 @@ export function QxTouchTask({
   actionId,
   dataAttrs,
 }: QxTouchTaskProps) {
+  const titleId = useId()
+  const descId = useId()
+  const chipId = useId()
+  const noteId = useId()
+  const describedBy = [descId, chip ? chipId : '', note ? noteId : ''].filter(Boolean).join(' ')
   const interactive = Boolean(onClick) && (!held || pressable)
   const className = [
     'qxt-task',
@@ -56,11 +61,11 @@ export function QxTouchTask({
     <>
       <div className="qxt-top">
         <span className="qxt-ic"><QxTouchIcon name={icon} size={held && !pressable ? 36 : 40} strokeWidth={2} /></span>
-        {chip ? <QxTouchChip tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
+        {chip ? <QxTouchChip id={chipId} tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
       </div>
-      <h3>{title}</h3>
-      <p>{desc}</p>
-      {note ? <small className="qxt-task-note">{note}</small> : null}
+      <h3 id={titleId}>{title}</h3>
+      <p id={descId}>{desc}</p>
+      {note ? <small id={noteId} className="qxt-task-note">{note}</small> : null}
       {visual ? <div className="qxt-mini">{visual}</div> : null}
       {take ? (
         <div className="qxt-take">
@@ -73,13 +78,31 @@ export function QxTouchTask({
   const markers = dataMarkers(actionId, dataAttrs)
   if (!interactive) {
     return (
-      <div className={className} style={style} role="group" aria-disabled="true" aria-label={label ?? title} {...markers}>
+      <div
+        className={className}
+        style={style}
+        role="group"
+        aria-disabled="true"
+        aria-labelledby={label ? undefined : titleId}
+        aria-describedby={label ? undefined : describedBy}
+        aria-label={label}
+        {...markers}
+      >
         {body}
       </div>
     )
   }
   return (
-    <button type="button" className={className} style={style} onClick={onClick} aria-label={label} {...markers}>
+    <button
+      type="button"
+      className={className}
+      style={style}
+      onClick={onClick}
+      aria-labelledby={label ? undefined : titleId}
+      aria-describedby={label ? undefined : describedBy}
+      aria-label={label}
+      {...markers}
+    >
       {body}
     </button>
   )

@@ -193,7 +193,7 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    const jobsEntry = page.getByRole('button', { name: /岗位信息/ }).first()
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
     await expect(jobsEntry).toBeVisible({ timeout: 15000 })
     await step(page, s, 'home')
 
@@ -256,12 +256,18 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
     const s: Step = { n: 0 }
 
     await page.goto('/')
-    // 触屏首页不再放 fairs-hub。校园招聘去 /campus，这场旅程仍走招聘会服务台，直接打开它。
+    const jobsEntry = page.locator('[data-action="jobs-hub"]')
+    await expect(jobsEntry, '托管打开时从首页社会招聘进入').toBeVisible({ timeout: 15000 })
     await expect(page.locator('[data-action="fairs-hub"]')).toHaveCount(0)
     await expect(page.getByTestId('qx-home')).toBeVisible()
     await step(page, s, 'home')
 
-    await page.goto('/fairs-service')
+    await jobsEntry.click()
+    await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
+    const fairEntry = page.locator('button.qx-hub-quick-item').filter({ hasText: '招聘会' })
+    await expect(fairEntry, '社会招聘服务台要有招聘会入口').toBeEnabled({ timeout: 15000 })
+    await step(page, s, 'jobs-to-fairs')
+    await fairEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
     // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
     // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；

@@ -13,7 +13,8 @@ const check = (condition, message) => {
 
 const home = read('src/pages/home/HomePage.tsx')
 const viewOnly = read('src/pages/home/components/HomeTouchView.tsx')
-const view = viewOnly
+const taskCard = read('src/components/qingxu/touch/QxTouchTask.tsx')
+const view = `${viewOnly}\n${taskCard}`
 const footer = view
 const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
@@ -219,6 +220,10 @@ check(
   '百宝箱确认开通后才渲染，并仍映射真实 action'
 )
 check(
+  view.includes('aria-describedby='),
+  '任务卡说明、角标与备注进入 aria-describedby，不被整卡名字盖住'
+)
+check(
   !view.includes('disabled={'),
   '首页不渲染没有原因的死按钮'
 )
@@ -294,10 +299,10 @@ check(
 )
 
 check(
-  home.split('\n').length < 160 &&
-    viewOnly.split('\n').length < 500 &&
+  home.split('\n').length < 120 &&
+    viewOnly.split('\n').length < 320 &&
     fairHook.split('\n').length < 120 &&
-    manifest.split('\n').length < 200,
+    manifest.split('\n').length < 180,
   '运行时文件保持可维护体积'
 )
 

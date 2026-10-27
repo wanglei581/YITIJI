@@ -13,6 +13,8 @@ export type QxTouchTileProps = {
   chevron?: boolean
   /** 诚实状态短句（读取中 / 读取失败）。不传就不画。 */
   badge?: string
+  /** 失败后的可见重试提示，不进 badge。 */
+  cue?: string
   onClick?: () => void
   index?: number
   label?: string
@@ -29,6 +31,7 @@ export function QxTouchTile({
   layout = 'row',
   chevron = true,
   badge,
+  cue,
   onClick,
   index = 0,
   label,
@@ -46,6 +49,7 @@ export function QxTouchTile({
         <b>{title}</b>
         {badge ? <em className="qxt-tile-mark">{badge}</em> : null}
         <small>{desc}</small>
+        {cue ? <span className="qxt-tile-cue">{cue}</span> : null}
       </span>
       {off || !chevron ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
     </>

@@ -20,7 +20,10 @@ import type { HomeV6ActionId } from '../homeV6Domains'
 import type { HomeJobFairHighlightState } from '../hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from '../hooks/useHomeJobHighlight'
 import { campusCopy, capabilityMark, greetingWord, jobCopy } from '../homeTouchCopy'
+import '../styles/home-touch.css'
 import { HomeIdentityActions } from './HomeIdentityActions'
+
+const RETRY_CUE = '点这里重新读取'
 
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 const HOME_ASK_DRAFT = '我想办一件事，请告诉我从哪一项开始。'
@@ -83,18 +86,29 @@ export function HomeTouchView({
   useEffect(() => {
     const node = rootRef.current
     if (!node) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (reduced.matches) {
+      setIntroDone(true)
+      return
+    }
     const pendingRises = () => node.getAnimations({ subtree: true }).filter((anim) => (
       anim instanceof CSSAnimation && anim.animationName === 'qxt-rise' && anim.playState !== 'finished'
     ))
+    const finish = () => setIntroDone(true)
     const onEnd = (event: AnimationEvent) => {
       if (event.animationName !== 'qxt-rise') return
-      if (pendingRises().length === 0) setIntroDone(true)
+      if (pendingRises().length === 0) finish()
+    }
+    const onReduce = () => {
+      if (reduced.matches) finish()
     }
     node.addEventListener('animationend', onEnd)
-    // 减弱动效时 rise 不会开始。超时只作收尾，不在首帧空列表上提前盖章。
-    const timer = window.setTimeout(() => setIntroDone(true), 1600)
+    reduced.addEventListener('change', onReduce)
+    // 动效开着时，超时只作收尾，不在首帧空列表上提前盖章。
+    const timer = window.setTimeout(finish, 1600)
     return () => {
       node.removeEventListener('animationend', onEnd)
+      reduced.removeEventListener('change', onReduce)
       window.clearTimeout(timer)
     }
   }, [])
@@ -156,7 +170,11 @@ export function HomeTouchView({
             status={{ text: deviceStatus.label, tone: deviceStatus.tone }}
           />
           <QxTouchAskBar
+            testId="home-primary"
             voice={ASSISTANT_VOICE_ENTRY}
+            prompt={ASSISTANT_VOICE_ENTRY ? '问小青：说一句你想办的事' : '问小青：打一句你想办的事'}
+            hint={ASSISTANT_VOICE_ENTRY ? '可打字；语音以本机检测为准' : undefined}
+            mark="AI 数字人"
             onClick={() => {
               rememberAssistantDraft(HOME_ASK_DRAFT)
               onAction('assistant')
@@ -175,8 +193,8 @@ export function HomeTouchView({
     >
       <div className="qxt-home-go" data-testid="home-context-region">{continueSlot}</div>
       <div className="qxt-home-tasks">
-        <QxTouchTask actionId="resume-hub" icon="file" title="改简历" label="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
-        <QxTouchTask actionId="interview-hub" icon="mic" title="练面试" label="练面试" desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
+        <QxTouchTask actionId="resume-hub" icon="file" title="改简历" desc="上传或扫描，诊断、优化或生成新简历，改不改你定" chip="AI 诊断改写" chipAi take="带走：新简历" takeIcon="check" visual={<QxTouchArtResume />} index={1} onClick={() => onAction('resume-hub')} />
+        <QxTouchTask actionId="interview-hub" icon="mic" title="练面试" desc="回答常见问题，当场看反馈，不做录用判断" chip="AI 模拟面试" chipAi take="带走：面试反馈" takeIcon="check" visual={<QxTouchArtReport />} index={2} onClick={() => onAction('interview-hub')} />
         <QxTouchTask
           actionId="print-hub"
           icon="printer"
@@ -187,27 +205,26 @@ export function HomeTouchView({
           note={printNote}
           take="开始选择材料"
           takeIcon="check"
-          label="打印 · 扫描"
           dark
           visual={<QxTouchArtStack />}
           index={3}
           dataAttrs={{ 'home-device-panel': '', 'panel-state': device.loading ? 'loading' : device.kind }}
           onClick={() => onAction('print-hub')}
         />
-        <QxTouchTask actionId="policy-hub" icon="landmark" title="查政策" label="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />
+        <QxTouchTask actionId="policy-hub" icon="landmark" title="查政策" desc="补贴、社保怎么办，要带哪些材料，以官方发布为准" chip="官方发布" chipTone="slate" take="查看政策说明" takeIcon="check" visual={<QxTouchArtChecklist />} index={4} onClick={() => onAction('policy-hub')} />
       </div>
       <div className="qxt-home-tiles" data-count={tileCount}>
         <QxTouchTile chevron={false} layout="stack" icon="ticket" title="到机取件" desc="手机上下了单，来这里取" actionId="pickup-claim" index={nextTile()} onClick={() => onAction('pickup-claim')} />
         {recruitmentOpen ? (
           jobs.status === 'error' ? (
-            <QxTouchTile key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} label={`社会招聘 ${job.badge}`} actionId="jobs-retry" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': 'error', 'jobs-badge': job.badge }} index={nextTile()} onClick={jobs.retry} />
+            <QxTouchTile key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} cue={RETRY_CUE} label={`社会招聘，${RETRY_CUE}`} actionId="jobs-retry" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': 'error', 'jobs-badge': job.badge }} index={nextTile()} onClick={jobs.retry} />
           ) : (
             <QxTouchTile key={`jobs-${jobs.status}`} chevron={false} layout="stack" icon="clipboard" tone="slate" title="社会招聘" desc={job.description} badge={job.badge} actionId="jobs-hub" dataAttrs={{ 'home-jobs-panel': '', 'panel-state': jobs.status, 'jobs-badge': job.badge }} index={nextTile()} onClick={() => onAction('jobs-hub')} />
           )
         ) : null}
         {recruitmentOpen ? (
           jobFair.status === 'error' ? (
-            <QxTouchTile key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} label="招聘会 重新加载" actionId="fairs-retry" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': 'error' }} index={nextTile()} onClick={jobFair.retry} />
+            <QxTouchTile key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="refresh" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} cue={RETRY_CUE} label={`校园招聘，${RETRY_CUE}`} actionId="fairs-retry" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': 'error' }} index={nextTile()} onClick={jobFair.retry} />
           ) : (
             <QxTouchTile key={`fair-${jobFair.status}`} chevron={false} layout="stack" icon="book" tone="slate" title="校园招聘" desc={fair.description} badge={fair.badge} actionId="campus-zone" dataAttrs={{ 'home-job-fair-panel': '', 'panel-state': jobFair.status }} index={nextTile()} onClick={() => onAction('campus-zone')} />
           )
@@ -224,14 +241,14 @@ export function HomeTouchView({
         ) : null}
       </div>
       <div className="qxt-home-id" data-member={isLoggedIn ? 'true' : undefined}>
-        {isLoggedIn ? null : <p className="qxt-home-id-note">这台机器上没有待继续的办理 · {standbyNote}</p>}
+        <p className="qxt-home-id-note">{isLoggedIn ? standbyNote : <>这台机器上没有待继续的办理 · {standbyNote}</>}</p>
         <HomeIdentityActions isLoggedIn={isLoggedIn} onLogin={() => onAction('login')} onEndPrevious={onEndPrevious} />
-        <button type="button" className="qxt-home-mini" data-testid="home-device-status" onClick={onOpenDevice}>设备状态</button>
+        <button type="button" className="qxt-home-mini" data-testid="home-device-status" aria-label={`设备状态：${deviceStatus.label}`} onClick={onOpenDevice}>设备状态</button>
       </div>
       <footer className="qxt-home-foot">
         <p>
-          {boundary}
-          {' · AI 生成的内容都会标明，仅供参考'}
+          <span data-testid="home-recruitment-boundary">{boundary}</span>
+          {' · 本机不替你投递 · AI 生成的内容都会标明，仅供参考'}
           {priceNotice ? ` · ${priceNotice}` : ''}
           {` · 离开 ${publicIdleLogoutLabel()} 无操作自动退出登录`}
           {' · 打开本人文档、诊断报告或优化结果后 '}

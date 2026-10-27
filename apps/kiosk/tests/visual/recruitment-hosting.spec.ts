@@ -184,6 +184,13 @@ test('hosting off: home shows no recruitment entry and the grid reflows without 
   const tiles = await gridGeometry(page, '.qxt-home-tiles')
   expect(tiles.rows.map((row) => row.actions)).toEqual([['pickup-claim', 'help']])
   expectGridFilled(tiles)
+  const tileToIdentity = await page.evaluate(() => {
+    const tiles = document.querySelector('.qxt-home-tiles')?.getBoundingClientRect()
+    const identity = document.querySelector('.qxt-home-id')?.getBoundingClientRect()
+    if (!tiles || !identity) return Number.POSITIVE_INFINITY
+    return identity.top - tiles.bottom
+  })
+  expect(tileToIdentity, '磁贴区铺到身份行，中间不留大块空白').toBeLessThanOrEqual(24)
 
   await assertNoHorizontalOverflow(page)
   await page.screenshot({ path: test.info().outputPath('home-hosting-off-1080x1920.png') })
@@ -399,7 +406,7 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   const footer = page.locator('.qxt-home-foot')
   // 读到配置之前必须说出「不代收简历」，并带上 AI 说明；不许提前说「未开放」。
-  await expect(footer.locator('p').first()).toContainText('本终端不代收简历。')
+  await expect(footer.getByTestId('home-recruitment-boundary')).toHaveText('本终端不代收简历。')
   await expect(footer.locator('p').first()).toContainText('AI 生成的内容都会标明，仅供参考')
   await page.waitForTimeout(600)
   await expect(footer).not.toContainText('未开放')

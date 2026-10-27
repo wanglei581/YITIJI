@@ -36,8 +36,8 @@ export function HomePage() {
   const officialChannelCount = recruitment.status === 'ready' && !recruitment.enabled && channels.status === 'ready' ? channels.items.length : 0
 
   const handleAction = (actionId: HomeV6ActionId) => {
-    if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
-    if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled)) return
+    if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled && Boolean(campus.configVersion))) return
+    if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled && Boolean(toolbox.configVersion))) return
     if ((actionId === 'jobs-hub' || actionId === 'fairs-hub' || actionId === 'campus-zone') && !recruitment.enabled) return
     if (actionId === 'official-channels' && officialChannelCount === 0) return
 

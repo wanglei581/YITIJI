@@ -25,7 +25,7 @@ export function capabilityMark(
  * error 与 empty 的说明必须不同。
  */
 export function jobCopy(state: HomeJobHighlightState): { description: string; badge: string } {
-  if (state.status === 'ready') return { description: '全职、兼职岗位和社会招聘会', badge: '已读取' }
+  if (state.status === 'ready') return { description: '全职、兼职岗位和社会招聘会', badge: '' }
   if (state.status === 'loading') return { description: '正在读取', badge: '读取中' }
   if (state.status === 'error') return { description: '暂时无法获取岗位数量', badge: '读取失败' }
   return { description: '全职、兼职岗位和社会招聘会', badge: '暂无岗位' }
@@ -53,7 +53,7 @@ const CAMPUS_BASE = '校园招聘会、校招和实习岗位'
 export function campusCopy(state: HomeJobFairHighlightState): { description: string; badge: string } {
   if (state.status === 'loading') return { description: '正在读取', badge: '读取中' }
   if (state.status === 'error') return { description: '没有使用缓存或示例数据，请稍后重试。', badge: '读取失败' }
-  if (state.status === 'empty') return { description: CAMPUS_BASE, badge: '暂无场次' }
-  const name = isCampusFair(state.fair) ? state.fair.name : ''
+  if (state.status === 'empty' || !isCampusFair(state.fair)) return { description: CAMPUS_BASE, badge: '暂无场次' }
+  const name = state.fair.name
   return { description: name ? `${CAMPUS_BASE} · ${name}` : CAMPUS_BASE, badge: state.fair.status === 'ongoing' ? '正在进行' : '即将开始' }
 }

@@ -2,32 +2,40 @@ import type { CSSProperties } from 'react'
 import { QxTouchChip } from './QxTouchChip'
 import { QxTouchIcon } from './QxTouchIcon'
 
-/** 问小青长条。语音开关决定「说一句 / 打一句」，没开语音不画麦克风。 */
+/** 问小青长条。文案和 testid 由调用方传入；语音开关只决定图标。 */
 export function QxTouchAskBar({
   voice,
   onClick,
   index = 0,
+  testId,
+  prompt,
+  hint,
+  mark,
 }: {
   voice: boolean
   onClick: () => void
   index?: number
+  testId: string
+  prompt: string
+  hint?: string
+  mark: string
 }) {
   return (
     <button
       type="button"
       className="qxt-askbar qxt-rise"
       style={{ '--i': index } as CSSProperties}
-      data-testid="home-primary"
+      data-testid={testId}
       onClick={onClick}
     >
       <span className="qxt-orb" aria-hidden="true">
         <QxTouchIcon name={voice ? 'mic' : 'message'} size={46} strokeWidth={2.2} />
       </span>
       <span className="qxt-askbar-tx">
-        <b>{voice ? '问小青：说一句你想办的事' : '问小青：打一句你想办的事'}</b>
-        {voice ? <small>可打字；语音以本机检测为准</small> : null}
+        <b>{prompt}</b>
+        {hint ? <small>{hint}</small> : null}
       </span>
-      <QxTouchChip ai>AI 数字人</QxTouchChip>
+      <QxTouchChip ai>{mark}</QxTouchChip>
     </button>
   )
 }

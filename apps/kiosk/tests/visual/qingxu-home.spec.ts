@@ -188,6 +188,17 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   await expect(printTile).toHaveAttribute('data-panel-state', 'unknown')
   await expect(printTile.getByText('状态未知', { exact: true })).toBeVisible()
   await expect(printTile.getByText(/出纸与扫描暂停/)).toBeVisible()
+  const printOverlap = await printTile.evaluate((tile) => {
+    const note = tile.querySelector('.qxt-task-note')?.getBoundingClientRect()
+    const art = tile.querySelector('.qxt-mini')?.getBoundingClientRect()
+    const host = tile.getBoundingClientRect()
+    if (!note || !art) return null
+    const intersects = note.left < art.right && note.right > art.left && note.top < art.bottom && note.bottom > art.top
+    return { intersects, gapRight: host.right - note.right }
+  })
+  expect(printOverlap, '打印卡说明和纸堆插画都要在').not.toBeNull()
+  expect(printOverlap!.intersects, '打印卡说明不得与纸堆插画相交').toBe(false)
+  expect(printOverlap!.gapRight, '打印卡说明右侧留白不少于 190px').toBeGreaterThanOrEqual(190)
   await expectReadableFeature(page)
   // 2026-09-28 稿 01：没开通的百宝箱 / 智慧校园不占首页。配置读到「关闭」后磁贴次数为 0，
   // 不是一颗点不动的按钮。data-* 钉的是「已经读完并且判定为关」，不是「还没渲染」。
@@ -285,7 +296,7 @@ test('home exposes an honest job-fair error and a real retry @w1-kiosk', async (
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-  const retry = page.getByTestId('qx-home').getByRole('button', { name: /招聘会.*重新加载/ })
+  const retry = page.getByTestId('qx-home').getByRole('button', { name: /校园招聘/ })
   await expect(retry).toBeVisible()
   await expect(retry.getByText('读取失败', { exact: true })).toBeVisible()
   await expect(retry.getByText('没有使用缓存或示例数据，请稍后重试。', { exact: true })).toBeVisible()
@@ -294,6 +305,49 @@ test('home exposes an honest job-fair error and a real retry @w1-kiosk', async (
   await retry.click()
   expect(new URL((await retryRequest).url()).searchParams.get('terminalId')).toBe('KSK-001')
   await expect.poll(() => api.requestCount('GET', '/api/v1/job-fairs')).toBe(2)
+  await expect(retry).toContainText('点这里重新读取')
+  await expect(retry).toHaveAttribute('aria-label', /校园招聘，点这里重新读取/)
+})
+
+test('home campus tile stays quiet when the only fair is social recruitment @w1-kiosk', async ({ page, api }) => {
+  const startTime = new Date(Date.now() - 60 * 60 * 1000)
+  const endTime = new Date(Date.now() + 6 * 60 * 60 * 1000)
+  registerHomeApi(api, [{
+    id: 'qx-home-social-fair',
+    name: '2026 青岛秋季社会专场',
+    organizer: '青岛市公共就业服务中心',
+    description: '面向社会求职者的线下专场',
+    theme: 'social',
+    startTime: startTime.toISOString(),
+    endTime: endTime.toISOString(),
+    venue: '青岛国际会展中心',
+    status: 'ongoing',
+    sourceOrgId: 'source-qx',
+    externalId: 'external-qx-social',
+    sourceName: '青岛公共就业服务网',
+    sourceUrl: 'https://jobs.example.gov.cn/fairs/qx-social',
+    syncTime: '2026-09-07T00:00:00.000Z',
+    hasManagedData: false,
+    managedCompanyCount: 0,
+    managedMaterialCount: 0,
+    dataSourceNote: '招聘会信息由官方来源提供。',
+  }])
+  api.respond('GET', '/api/v1/jobs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 1, total: 3, totalPages: 3 } },
+  })
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  const campus = home.locator('[data-action="campus-zone"]')
+  await expect(campus).toBeVisible()
+  await expect(campus).toContainText('暂无场次')
+  await expect(campus).not.toContainText('正在进行')
+  await expect(campus).not.toContainText('即将开始')
+  await expect(campus).not.toContainText('2026 青岛秋季社会专场')
+  const jobsTile = home.locator('[data-action="jobs-hub"]')
+  await expect(jobsTile).toBeVisible()
+  await expect(jobsTile).not.toContainText('已读取')
 })
 
 test('home keeps one shell and a usable narrow layout @w1-mobile', async ({ page, api }) => {
