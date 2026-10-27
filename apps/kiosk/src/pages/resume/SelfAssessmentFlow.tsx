@@ -474,7 +474,7 @@ export function SelfAssessmentQuizPage() {
           <p className="sa-sub">{blocked.body}</p>
         </SaCard>
         <ResumeTouchActs
-          note="现在可以做什么。都是现在就能打开的入口。"
+          heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
           items={saActItems(navigate, '/resume/self-assessment/questions', consentOk && !alreadySubmitted)}
         />
       </SaFrame>
@@ -878,7 +878,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           }
         />
         <ResumeTouchActs
-          note="现在可以做什么。都是现在就能打开的入口。"
+          heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
           items={saActItems(navigate, '/resume/self-assessment/result', false)}
         />
       </SaFrame>
@@ -1188,7 +1188,7 @@ export function SelfAssessmentHistoryPage() {
       </SaCard>
 
       <ResumeTouchActs
-        note="现在可以做什么。都是现在就能打开的入口。"
+        heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}
         items={saActItems(navigate, '/resume/self-assessment/history', hasRecordedConsent(session) && !session.result)}
       />
 

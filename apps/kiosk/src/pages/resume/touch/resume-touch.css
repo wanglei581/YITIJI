@@ -27,9 +27,11 @@
 
 .qxt-screen .rtp-cta {
   flex-wrap: wrap;
+  row-gap: 10px;
 }
 
-.qxt-screen .rtp-cta > :not(button):not(.qx-ai-declaration-slot) {
+/* 说明句独占一行；按钮、AI 声明槽、带拦截原因的按钮槽各占一格。 */
+.qxt-screen .rtp-cta > :not(button):not(.qx-ai-declaration-slot):not(.sa-guarded) {
   flex: 1 0 100%;
   margin: 0;
   font-size: var(--qxt-fs-aux);
@@ -37,10 +39,16 @@
   color: var(--qxt-ink-2);
 }
 
-.qxt-screen .rtp-cta .qx-ai-declaration-slot {
-  flex: 1;
+.qxt-screen .rtp-cta > .qx-btn {
+  flex: 0 0 auto;
+}
+
+.qxt-screen .rtp-cta .qx-ai-declaration-slot,
+.qxt-screen .rtp-cta .sa-guarded {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   min-width: 0;
 }
@@ -94,6 +102,12 @@
   background: var(--qx-cinnabar);
   border-color: var(--qx-cinnabar);
   color: var(--qx-on-solid);
+}
+
+.qxt-screen .rtp-cta .qx-ai-declaration-slot > .qx-btn,
+.qxt-screen .rtp-cta .sa-guarded > .qx-btn {
+  flex: none;
+  width: 100%;
 }
 
 .qxt-screen .rtp-cta .qx-step-prev,
@@ -155,6 +169,23 @@
 
 .qxt-screen .qx-rd-fact span {
   font-size: var(--qxt-fs-aux);
+}
+
+/* 事实核对弹窗：勾选行都是 64 高，七八条就超过弹窗的 80%，底下两个按钮被切在滚动区里。
+   弹窗放到屏内最大高度，列表自己滚，标题和两个按钮始终在屏上。 */
+.qxt-screen .qx-rd-dialog {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.qxt-screen .qx-rd-dialog > * {
+  flex: none;
+}
+
+.qxt-screen .qx-rd-dialog > .qx-rd-fact-list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* 共享 AI 徽章原语仍是 13px。本包触屏壳里提到辅助字号，不改那条原规则。 */
@@ -294,13 +325,6 @@
   min-height: 0;
 }
 
-.qxt-screen .rtp-howto {
-  margin: 0;
-  font-size: var(--qxt-fs-body);
-  line-height: 1.45;
-  color: var(--qxt-ink-2);
-}
-
 .qxt-screen .rtp-acts .qxt-slab-row {
   flex: 1 1 0;
   min-height: 200px;
@@ -308,31 +332,88 @@
 }
 
 .qxt-screen .rtp-acts .qxt-vis {
+  position: relative;
   height: 100%;
   min-height: 160px;
 }
 
+.qxt-screen .rtp-acts .qxt-vis .rtp-paper {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  height: 90%;
+  width: auto;
+  max-width: 84%;
+}
+
+/* 生成每一步下面的预览卡：上面是一张纸的小样，下面只复述这一步已填的内容；余量都给小样。 */
 .qxt-screen .rtp-hero {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 18px 20px;
   border-radius: var(--qxt-r-card);
-  background: var(--qxt-teal-wash);
+  background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
+  overflow: hidden;
 }
 
-.qxt-screen .rtp-hero b {
-  font: 700 var(--qxt-fs-slab)/1.2 var(--qx-serif);
+/* 小样只吃余量：卡片里字段多、没有余量时它收成 0，不露出半张纸；余量够了才画。 */
+.qxt-screen .rtp-hero-art {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  background: var(--qxt-well);
+  overflow: hidden;
+  container-type: size;
+}
+
+@container (max-height: 120px) {
+  .rtp-hero-art .rtp-paper {
+    display: none;
+  }
+}
+
+.qxt-screen .rtp-hero-art .rtp-paper {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  height: 92%;
+  width: auto;
+  max-width: 86%;
+}
+
+.qxt-screen .rtp-hero-tx {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 22px 16px;
+}
+
+.qxt-screen .rtp-hero-tx b {
+  font: 700 40px/1.25 var(--qx-serif);
   color: var(--qxt-ink);
+  overflow-wrap: anywhere;
 }
 
-.qxt-screen .rtp-hero span,
-.qxt-screen .rtp-hero small,
+.qxt-screen .rtp-hero-tx b.rtp-hero-need {
+  color: var(--qxt-clay-ink);
+}
+
+.qxt-screen .rtp-hero-tx span,
+.qxt-screen .rtp-hero-tx small,
 .qxt-screen .rtp-help {
   font-size: var(--qxt-fs-aux);
   color: var(--qxt-ink-2);
-  line-height: 1.45;
+  line-height: 1.4;
+}
+
+.qxt-screen .rtp-hero-tx span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .qxt-screen .rtp-hero-k {
@@ -341,6 +422,21 @@
   font-weight: 700;
   color: var(--qxt-teal-ink);
 }
+
+/* 纸张小样（ResumeTouchArt）只出形状，颜色在这里按令牌上。纯装饰。 */
+.qxt-screen .rtp-paper {
+  display: block;
+}
+.qxt-screen .rtp-paper-sheet { fill: var(--qxt-card); stroke: var(--qxt-edge); stroke-width: 1; }
+.qxt-screen .rtp-paper-ink { fill: var(--qxt-ink); }
+.qxt-screen .rtp-paper-sub { fill: var(--qxt-unknown-dot); }
+.qxt-screen .rtp-paper-accent { fill: var(--qx-teal); }
+.qxt-screen .rtp-paper-clay { fill: var(--qxt-clay); }
+.qxt-screen .rtp-paper-slate { fill: var(--qxt-slate-ink); }
+.qxt-screen .rtp-paper-line { fill: var(--qxt-line); }
+.qxt-screen .rtp-paper-track { fill: var(--qxt-well); }
+.qxt-screen .rtp-paper-box { fill: none; stroke: var(--qxt-slate-ink); stroke-width: 2; }
+.qxt-screen .rtp-paper-tick { fill: none; stroke: var(--qxt-slate-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
 /* 装饰波纹和光晕收进本包屏幕内。共享 .qxt-flow / .qxt-halo 的默认不动。 */
 .qxt-screen:has(.rtp) .qxt-flow svg {

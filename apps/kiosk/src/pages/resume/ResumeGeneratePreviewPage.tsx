@@ -29,7 +29,6 @@ import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits } from './GeneratePreviewChrome'
-import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
@@ -359,16 +358,6 @@ export function ResumeGeneratePreviewPage() {
               <p id="resume-generate-preview-retry-why" className="qx-rd-why">没有可回读的记录。请重新填一份，或从「我的简历」打开还在保存期限内的版本。</p>
             )}
             <GeneratePreviewEmptyExits view={view} onNavigate={go} />
-            <ResumeTouchActs
-              note={emptyCopy.description}
-              items={view === 'preview-loading'
-                ? [{ title: '返回我的简历', desc: '记录列表在那边。读回来之前，这一页不显示简历内容。', take: '打开', icon: 'book', onClick: () => go('/me/resumes') }]
-                : [
-                    { title: '回去填写', desc: '从零填写之后，再到这里逐段核对。', take: '去填写', icon: 'pen', onClick: () => go('/resume/generate') },
-                    { title: '打开我的简历', desc: '登录之后，保存期限内的版本可以直接打开。', take: '打开', icon: 'book', onClick: () => go('/me/resumes') },
-                    { title: '返回简历服务', desc: '上传、诊断、优化都在那一页。', take: '返回', icon: 'file', onClick: () => go('/resume/source') },
-                  ]}
-            />
           </>
         )}
         {showWorkspace && resume && result && !onExportScreen && (

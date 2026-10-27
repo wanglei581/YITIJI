@@ -16,8 +16,9 @@ import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 
+import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
-import { Checks, CtaNote, Ghosts, KitRows, ListRows, Nots, RouteCards, Sec, Verdict, Waiting } from './jobFit/jobFitQxKit'
+import { Checks, CtaNote, Ghosts, KitRows, Sec, Waiting } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 import './resume-templates-qx.css'
@@ -184,27 +185,15 @@ export function ResumeTemplateLibraryPage() {
       pill: { tone: 'bad', label: '简历模板列表读取失败' },
       body: (
         <>
-          <Sec title="这次的结果" hint="只写已确认的事实">
-            <Verdict items={[
-              { tone: 'bad', label: '模板列表', value: '未读取到' },
-              { tone: 'ok', label: '简历优化', value: '不依赖模板' },
-            ]} />
-            <p className="jfq-alert" role="alert">{error}</p>
-          </Sec>
-          <Sec title="这次没有发生的事" hint="失败不影响你已有的内容" grow>
-            <Nots items={[
-              '没有显示任何模板名称或版式',
-              '没有用内置默认模板冒充已发布列表',
-              '没有把任何版式套用到你的简历上',
-              '没有修改或保存你的简历内容',
-            ]} />
-          </Sec>
-          <Sec title="接下来" hint="版式不是前提，内容才是">
-            <RouteCards items={[
-              { title: '重新读取模板', desc: '网络或服务恢复之后可以再试一次。', action: '重新读取', onClick: reload },
-              { title: '不用模板，直接优化', desc: '先按目标岗位调整内容重点，版式随后再说。', action: '去简历优化', onClick: handleUseResumeTemplate },
-            ]} />
-          </Sec>
+          <p className="jfq-alert" role="alert">{error}</p>
+          <ResumeTouchActs
+            items={[
+              { title: '重新读取模板', desc: '网络或服务恢复之后可以再试一次。', take: '重新读取', art: 'checklist', onClick: reload },
+              { title: '不用模板，直接优化', desc: '先按目标岗位调整内容重点，版式随后再说。', take: '去简历优化', art: 'resume', onClick: handleUseResumeTemplate },
+              { title: '打印现有简历', desc: '手上已有可用文件就直接打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+            ]}
+            fine="这次没有显示任何模板，也没有用内置默认模板冒充已发布列表；你已有的简历内容没有被改动或保存。"
+          />
         </>
       ),
       cta: (
@@ -222,25 +211,14 @@ export function ResumeTemplateLibraryPage() {
       subtitle: '这次没有已发布的模板。这不影响你继续准备简历 —— 内容比版式更重要。',
       pill: { tone: 'warn', label: '当前没有可用的简历模板' },
       body: (
-        <>
-          <Sec title="当前状态" hint="读取成功，只是内容为空">
-            <Verdict items={[
-              { tone: 'warn', label: '已发布模板', value: '数量为 0' },
-              { tone: 'ok', label: '本次读取', value: '已成功完成' },
-              { tone: 'ok', label: '简历优化', value: '可以直接进行' },
-            ]} />
-          </Sec>
-          <Sec title="没有模板时，这样准备一样有效" hint="一页 A4 就够" grow>
-            <ListRows items={[
-              '用一页 A4 说清楚：目标岗位、核心能力、可验证的成果',
-              '把与目标岗位最相关的经历放在最前面，其余往后压',
-              '每段经历写清楚：做了什么、怎么做的、结果是什么',
-              '只写你本人能解释清楚的事实，不写无法印证的内容',
-              '打印前先看一遍分页，避免关键内容被切到第二页',
-            ]} />
-          </Sec>
-          <Sec title="不用等版式也能推进" hint="都是既有入口">{fallbackKit}</Sec>
-        </>
+        <ResumeTouchActs
+          note="读取成功，只是已发布的模板数量为 0。没有模板时，一页 A4 说清目标岗位、核心能力和可验证的成果就够。"
+          items={[
+            { title: '直接去简历优化', desc: '按目标岗位重排已有内容，不依赖模板。', take: '去简历优化', art: 'resume', onClick: handleUseResumeTemplate },
+            { title: '生成一份新简历', desc: '还没有简历时从结构化填写开始。', take: '去生成', art: 'checklist', onClick: () => navigate('/resume/generate') },
+            { title: '打印现有简历', desc: '手上已有可用文件就直接打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+          ]}
+        />
       ),
       cta: (
         <>

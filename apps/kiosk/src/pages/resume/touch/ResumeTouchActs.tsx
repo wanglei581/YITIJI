@@ -1,23 +1,37 @@
-// 空状态的「一句说明 + 大行动卡」。出口由各页传入，这里不写去向。
+// 空状态的「一句说明 + 大行动卡」。去向由各页传入，这里不写路由。
+// 一屏只有这一句说明（可省略，由页面自己的状态卡出这句）和两三张大卡；不再叠第二套出口。
+import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
+import { ResumeTouchArt, type ResumeTouchArtKind } from './ResumeTouchArt'
+
+export type ResumeTouchActItem = {
+  title: string
+  desc: string
+  take: string
+  onClick: () => void
+  /** 左侧小样。不传时用 icon。 */
+  art?: ResumeTouchArtKind
+  icon?: QxTouchIconName
+}
 
 export function ResumeTouchActs({
   note,
+  heading,
   items,
+  fine,
 }: {
-  note: string
-  items: ReadonlyArray<{
-    title: string
-    desc: string
-    take: string
-    icon: QxTouchIconName
-    onClick: () => void
-  }>
+  note?: string
+  /** 大卡上面的小标题（可带一句提示）。 */
+  heading?: { title: string; hint?: string }
+  items: ReadonlyArray<ResumeTouchActItem>
+  /** 一屏最多一句边界声明，放在大卡下面。 */
+  fine?: string
 }) {
   return (
     <div className="rtp-acts">
-      <p className="rtp-howto">{note}</p>
+      {note ? <QxTouchCallout kind="howto">{note}</QxTouchCallout> : null}
+      {heading ? <div className="qxt-sec">{heading.title}{heading.hint ? <small>{heading.hint}</small> : null}</div> : null}
       {items.map((item, index) => (
         <QxTouchSlab
           key={item.title}
@@ -28,9 +42,10 @@ export function ResumeTouchActs({
           take={item.take}
           takeStyle="plain"
           onClick={item.onClick}
-          visual={<QxTouchIcon name={item.icon} size={64} strokeWidth={1.8} />}
+          visual={item.art ? <ResumeTouchArt kind={item.art} /> : <QxTouchIcon name={item.icon ?? 'file'} size={64} strokeWidth={1.8} />}
         />
       ))}
+      {fine ? <QxTouchCallout kind="fine">{fine}</QxTouchCallout> : null}
     </div>
   )
 }

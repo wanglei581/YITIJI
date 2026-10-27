@@ -17,13 +17,10 @@ import {
   ClockIcon,
   FileTextIcon,
   HelpCircleIcon,
-  ListIcon,
   LockIcon,
   PenLineIcon,
   PrinterIcon,
   RefreshCwIcon,
-  ScanLineIcon,
-  ShieldCheckIcon,
   TargetIcon,
   XIcon,
 } from 'lucide-react'
@@ -36,7 +33,6 @@ import {
   Nots,
   RouteCards,
   Sec,
-  Slots,
   Steps,
   Trace,
   Verdict,
@@ -94,39 +90,16 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       subtitle: '岗位匹配需要一份仍可读取的本人简历任务。现在没有，所以不显示任何岗位、企业或匹配结论。',
       pill: { tone: 'warn', label: '缺少可读取的本人简历任务' },
       body: (
-        <>
-          <Sec no="01" title="这次匹配要用到的输入" hint="四项都要有真实来源">
-            <Slots items={[
-              { label: '本人简历任务', value: '尚未选择' },
-              { label: '目标岗位', value: '尚未选择' },
-              { label: '本人授权', value: '未确认' },
-              { label: '结果归属', value: '仅本人可见', fixed: true },
-            ]} />
-          </Sec>
-          <Sec no="02" title="现在缺哪一项" hint="补齐前不会启动分析">
-            <Checks items={[
-              { tone: 'off', icon: <FileTextIcon size={24} />, title: '本人简历任务', desc: '还没有可读取的简历任务。上传 PDF 或扫描纸质简历，解析成功后才会出现可选任务。', chip: '缺失' },
-              { tone: 'wait', icon: <TargetIcon size={24} />, title: '目标岗位', desc: exits.jobs ? '可以从已发布岗位里选，也可以只填一个目标岗位名称。当前尚未选择。' : '填一份岗位要求，至少要有岗位名称。当前尚未填写。', chip: '待选择' },
-              { tone: 'wait', icon: <ShieldCheckIcon size={24} />, title: '本人授权', desc: '匿名任务和会员账号按各自规则确认。任务补齐后再走这一步。', chip: '待确认' },
-              { tone: 'ok', icon: <LockIcon size={24} />, title: '结果去向', desc: '匹配参考只供本人准备，不提供给企业，也不形成任何投递记录。', chip: '已固定' },
-            ]} />
-          </Sec>
-          <Sec no="03" title="不做 AI 分析，也能先推进这些" hint="都是既有流程">
-            <KitRows items={[
-              { icon: <PrinterIcon size={22} />, title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程', onClick: exits.printHub },
-              { icon: <ScanLineIcon size={22} />, title: '扫描纸质简历', desc: '先扫成 PDF 存下来，再决定要不要分析', onClick: exits.scan },
-              ...(exits.jobs ? [{ icon: <ListIcon size={22} />, title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对', onClick: exits.jobs }] : []),
-            ]} />
-          </Sec>
-          <ResumeTouchActs
-            note="没有本人简历任务时，本页不显示任何岗位、企业或匹配结论。下面这些是现在就能打开的入口。"
-            items={[
-              { title: '去上传或扫描简历', desc: '解析成功后才会出现可选任务。', take: '去准备', icon: 'scan', onClick: exits.triage },
-              { title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程。', take: '去打印', icon: 'printer', onClick: exits.printHub },
-              { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'file', onClick: exits.resumeHub },
-            ]}
-          />
-        </>
+        <ResumeTouchActs
+          note="没有本人简历任务时，本页不显示任何岗位、企业或匹配结论。"
+          items={[
+            { title: '去上传或扫描简历', desc: '上传 PDF 或扫描纸质简历，解析成功后才会出现可选任务。', take: '去准备', art: 'resume', onClick: exits.triage },
+            { title: '打印现有简历', desc: '已有电子稿或纸质件，直接走打印流程。', take: '去打印', art: 'report', onClick: exits.printHub },
+            { title: '扫描纸质简历', desc: '先扫成 PDF 存下来，再决定要不要分析。', take: '去扫描', icon: 'scan', onClick: exits.scan },
+            ...(exits.jobs ? [{ title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对。', take: '去岗位信息', art: 'checklist' as const, onClick: exits.jobs }] : []),
+          ]}
+          fine="匹配参考只供本人准备，不提供给企业，也不形成任何投递记录。"
+        />
       ),
       cta: (
         <Cta note="没有本人简历任务时，本页不显示任何岗位、企业或匹配结论。">
@@ -262,7 +235,8 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
   if (state === 'ai-down') {
     return {
       title: 'AI 匹配当前不可用',
-      subtitle: failMessage ?? '这项分析暂时调不通。系统不显示对照要点或建议，也不会用旧结果冒充这次的结论。',
+      // 能力级故障一律用固定人话：共享错误码表里的原句可能写着「联系现场工作人员」，现场无人值守，屏上不出现。
+      subtitle: '这项分析暂时调不通。系统不显示对照要点或建议，也不会用旧结果冒充这次的结论。',
       pill: { tone: 'bad', label: 'AI 匹配服务当前不可用' },
       body: (
         <>

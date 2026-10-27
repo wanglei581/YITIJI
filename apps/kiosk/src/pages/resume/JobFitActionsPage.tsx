@@ -52,7 +52,6 @@ import {
   RouteCards,
   Sec,
   Slots,
-  Steps,
   Trace,
   Verdict,
   Waiting,
@@ -304,39 +303,16 @@ export function JobFitActionsPage() {
         subtitle: '请先完成一次岗位匹配参考，再看差距行动清单。行动清单必须来自真实的匹配结果，没有结果就不生成空模板。',
         pill: { tone: 'warn', label: '缺少可用的岗位匹配结果' },
         body: (
-          <>
-            <Sec no="01" title="清单依赖的三项输入" hint="缺一项就不生成">
-              <Slots items={[
-                { label: '本人简历任务', value: '尚未确认' },
-                { label: '目标岗位', value: '尚未选择' },
-                { label: '匹配结果', value: '尚未生成' },
-              ]} />
-            </Sec>
-            <Sec no="02" title="拿到清单的四步" hint="顺序固定，不能跳过" copy="每一步都在既有流程里完成，本页不会替你跳过其中任何一步。">
-              <Steps items={[
-                { title: '准备本人简历任务', desc: '上传 PDF 或扫描纸质简历，等待解析成功。' },
-                { title: '选择目标岗位', desc: hostingOpen ? '从已发布岗位中选择，或只填一个目标岗位名称。' : '填一份岗位要求，至少要有岗位名称。' },
-                { title: '确认本人授权', desc: '确认之后，简历才会用于这次岗位匹配分析。' },
-                { title: '等待匹配结果返回', desc: '结果返回后，差距与建议才会变成可执行的行动项。' },
-              ]} />
-            </Sec>
-            <Sec no="03" title="现在就能开始的两条路" hint="按你手上有什么来选">
-              <RouteCards items={[
-                { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', action: '去岗位匹配', onClick: () => navigate(JOB_FIT_ROUTE) },
-                hostingOpen
-                  ? { title: '先看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对要求。', action: '去岗位信息', onClick: goJobs }
-                  : { title: '先准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', action: '去准备简历', onClick: goTriage },
-              ]} />
-            </Sec>
-            <ResumeTouchActs
-              note="请先完成一次岗位匹配参考。没有真实结果时，不生成也不打印任何清单。"
-              items={[
-                { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', take: '去对照', icon: 'target', onClick: () => navigate(JOB_FIT_ROUTE) },
-                { title: '去准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', take: '去准备', icon: 'scan', onClick: goTriage },
-                { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'file', onClick: goResumeHub },
-              ]}
-            />
-          </>
+          <ResumeTouchActs
+            note="请先完成一次岗位匹配参考。没有真实结果时，不生成也不打印任何清单。"
+            items={[
+              { title: '去做岗位匹配', desc: '选择目标岗位并确认授权，走完才会有行动清单。', take: '去岗位匹配', art: 'report', onClick: () => navigate(JOB_FIT_ROUTE) },
+              hostingOpen
+                ? { title: '先看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己比对要求。', take: '去岗位信息', art: 'checklist' as const, onClick: goJobs }
+                : { title: '先准备简历材料', desc: '上传或扫描一份简历，解析成功后才能对照。', take: '去准备简历', art: 'resume' as const, onClick: goTriage },
+            ]}
+            fine="行动清单必须来自真实的匹配结果，没有结果就不生成空模板。"
+          />
         ),
         cta: (
           <>

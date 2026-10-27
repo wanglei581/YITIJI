@@ -374,36 +374,15 @@ export function CareerPlanPage() {
       subtitle: '求职方案会基于已完成的简历诊断整理已有材料、目标与方向、尚需准备和执行计划；没有可读取的本人简历任务时，不生成任何个人规划内容。',
       pill: { tone: 'warn', label: '缺少可读取的本人简历任务' },
       body: (
-        <>
-          <Sec title="当前状态" hint="只写已确认的事实">
-            <Verdict items={[
-              { tone: 'bad', label: '本人简历任务', value: '尚未可用' },
-              { tone: 'warn', label: '求职方案', value: '尚未生成' },
-              { tone: 'ok', label: '材料与打印', value: '不受影响' },
-            ]} />
-          </Sec>
-          <Sec title="规划会用到、也只会用到这些" hint="输入范围写在前面">
-            <ListRows items={[
-              '当前本人简历任务里的经历、技能与教育信息',
-              '本人此前的岗位匹配参考或模拟面试摘要（有记录时才会用到）',
-              '不使用他人材料，不引入企业侧数据，不做录用或收入承诺',
-            ]} />
-          </Sec>
-          <Sec title="现在能做的两件事" hint="按你手上有什么来选">
-            <RouteCards items={[
-              { title: '上传或扫描简历', desc: '有了可读取的简历任务，才能开始做规划。', action: '去简历上传', onClick: goUpload },
-              { title: '先和 AI 顾问聊目标', desc: '还没想清楚方向时，可以先把想法说出来。', action: '去 AI 顾问', onClick: () => navigate('/assistant') },
-            ]} />
-          </Sec>
-          <ResumeTouchActs
-            note="没有可读取的简历任务时，不生成任何个人规划内容。"
-            items={[
-              { title: '去上传简历', desc: '有了可读取的简历任务，才能开始做规划。', take: '去上传', icon: 'file', onClick: goUpload },
-              { title: '去 AI 顾问', desc: '还没想清楚方向时，可以先把想法说出来。', take: '去聊聊', icon: 'sparkle', onClick: () => navigate('/assistant') },
-              { title: '返回简历服务', desc: '上传、诊断、优化都从简历服务进入。', take: '返回', icon: 'home', onClick: goResumeHub },
-            ]}
-          />
-        </>
+        <ResumeTouchActs
+          note="没有可读取的本人简历任务时，不生成任何个人规划内容。"
+          items={[
+            { title: '上传或扫描简历', desc: '有了可读取的简历任务，才能开始做规划。', take: '去简历上传', art: 'resume', onClick: goUpload },
+            { title: '打印现有简历', desc: '已有电子稿或纸质件，规划之外也能先打印。', take: '去打印', art: 'report', onClick: () => navigate('/print-scan') },
+            { title: '先和 AI 顾问聊目标', desc: '还没想清楚方向时，可以先把想法说出来。', take: '去 AI 顾问', icon: 'sparkle', onClick: () => navigate('/assistant') },
+          ]}
+          fine="规划只用本人简历里的经历、技能与教育信息，和本人此前的岗位匹配参考或模拟面试摘要；不使用他人材料，不引入企业数据，不做录用或收入承诺。"
+        />
       ),
       cta: (
         <>
@@ -757,19 +736,20 @@ export function CareerPlanPage() {
         : { tone: 'unknown', label: '服务状态未确认' },
       body: (
         <>
-          <Sec title="生成前说明" hint="把简历经历变成可执行的下一步" grow>
+          <Sec title="生成前说明" hint="把简历经历变成可执行的下一步">
             {generationRegion}
             <Guardline
               head="只供本人参考"
               body="本机不预测前景、不预测薪资、不说「三年后你能到什么岗」—— 那些本机没有依据。本建议仅供本人职业发展参考，不构成任何就业、薪资或录用承诺。"
             />
           </Sec>
-          <Sec title="生成之后能做的" hint="都是既有流程">
-            <KitRows items={[
-              { icon: <PencilLineIcon size={22} />, title: '按方向改简历', desc: '去简历优化调整内容重点', onClick: goOptimize },
-              { icon: <TargetIcon size={22} />, title: '对照一个岗位', desc: '去岗位匹配看具体差距', onClick: goJobFit },
-            ]} />
-          </Sec>
+          <ResumeTouchActs
+            heading={{ title: '生成之后能做的', hint: '都是既有流程' }}
+            items={[
+              { title: '按方向改简历', desc: '去简历优化调整内容重点。', take: '去简历优化', art: 'resume', onClick: goOptimize },
+              { title: '对照一个岗位', desc: '去岗位匹配看具体差距。', take: '去岗位匹配', art: 'report', onClick: goJobFit },
+            ]}
+          />
         </>
       ),
       cta: (
