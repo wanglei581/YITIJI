@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
-import { FsSheetArt } from '../FsSheetArt'
 import { PhoneHelpLine } from '../phoneHelp'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
@@ -86,7 +85,6 @@ export function SignClosedBody({ copy }: { copy: StatusCopy }) {
         </button>
       </div>
       <PhoneHelpLine />
-      <FsSheetArt caption="示意图。签名的三步现在都还不能用。" />
     </>
   )
 }

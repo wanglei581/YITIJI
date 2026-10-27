@@ -246,8 +246,10 @@ export function ScanSettingsStatusView({
             <b>{chainHead[0]}</b>
             <span>{description}</span>
           </div>
-          <div className="fs-fact"><b>类型</b><span>{scanType ? SCAN_TYPE_LABELS[scanType] : '还没选定'}</span></div>
-          <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+          <div className="fs-pairgrid">
+            <div className="fs-fact"><b>类型</b><span>{scanType ? SCAN_TYPE_LABELS[scanType] : '还没选定'}</span></div>
+            <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+          </div>
           <div className="fs-fact wide"><b>保存</b><span>按设备回传的原格式保存，系统不做转换</span></div>
           <div className="fs-fact wide"><b>{chainHead[1]}</b><span>确认完成之前，不显示面板步骤，也不开始等待。</span></div>
         </div>

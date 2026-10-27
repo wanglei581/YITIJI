@@ -18,13 +18,13 @@ import {
 } from './scanDeliveryAck'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import {
   ScanCta,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
+import { ScanPaperArt } from './ScanPaperArt'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
@@ -434,8 +434,10 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               <b>还不能等文件</b>
               <span>确认之前，这一页还不能接收扫描件。</span>
             </div>
-            <div className="fs-fact"><b>类型</b><span>{SCAN_TYPE_LABELS[scanType]}</span></div>
-            <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+            <div className="fs-pairgrid">
+              <div className="fs-fact"><b>类型</b><span>{SCAN_TYPE_LABELS[scanType]}</span></div>
+              <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+            </div>
             <div className="fs-fact wide"><b>保存策略</b><span>按设备回传的原格式保存，系统不做转换</span></div>
             <div className="fs-fact wide"><b>查询</b><span>授权确认之后才每 3 秒查一次，最长 10 分钟。</span></div>
           </div>
@@ -443,15 +445,18 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
             没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
             它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
-            {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : '确认通常就是一两秒。'}
+            {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : ''}
           </p>
         </div>
       ) : (
         <>
           <div className="fs-hero">
-            <span className="fs-p">已等待 · 已查询 <b>{polls}</b> 次</span>
-            <b className="fs-time">{elapsed}</b>
-            <span className="fs-p">每 3 秒查一次，最长等 10 分钟。</span>
+            <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
+            <div className="fs-hero-tx">
+              <span className="fs-p">已等待 · 已查询 <b>{polls}</b> 次</span>
+              <b className="fs-time">{elapsed}</b>
+              <span className="fs-p">每 3 秒查一次，最长等 10 分钟。</span>
+            </div>
           </div>
           <p className="fs-h">任务信息</p>
           <div className="fs-kvs">
@@ -472,7 +477,6 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           {matched && !error && !cancelling ? (
             <p className="fs-p">系统说已经匹配，仍在处理。这里不写页级进度，也不写百分比。</p>
           ) : null}
-          <FsSheetArt caption="示意图。扫完之后，文件回到这一页。" />
         </>
       )}
     </ScanWorkbenchShell>

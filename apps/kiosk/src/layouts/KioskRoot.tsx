@@ -241,7 +241,9 @@ const QX_TOUCH_ROUTES = new Set<string>([
 ])
 
 function isTouchRoute(pathname: string): boolean {
-  return QX_TOUCH_ROUTES.has(pathname)
+  if (QX_TOUCH_ROUTES.has(pathname)) return true
+  // 复印、证件照和不认识的能力名是同一页的 :key。精确名单盖不住未知名字。
+  return pathname.startsWith('/print-scan/feature/')
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {

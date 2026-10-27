@@ -1,5 +1,11 @@
 /* 扫描工作台正文。只挂在本页，不改 .qxt-* 默认。颜色只用 --qxt-* / --qx-*。 */
 
+.qxt-screen [data-qx-page='scan-workbench'].sw-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 10px;
+}
+
 [data-qx-page='scan-workbench'] {
   display: flex;
   flex-direction: column;
@@ -8,8 +14,8 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-grow {
-  flex: 0 0 auto;
-  min-height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -129,10 +135,18 @@
 [data-qx-page='scan-workbench'] .fs-facts {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .fs-pairgrid {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
   gap: 8px;
-  align-content: stretch;
 }
 
 [data-qx-page='scan-workbench'] .fs-fact {
@@ -147,7 +161,10 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-fact.wide {
-  grid-column: 1 / -1;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 [data-qx-page='scan-workbench'] .fs-fact b {
@@ -193,6 +210,8 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-steps {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -207,6 +226,7 @@
   border-radius: 20px;
   padding: 12px 14px;
   min-height: 76px;
+  flex: none;
 }
 
 [data-qx-page='scan-workbench'] .fs-step .n {
@@ -247,16 +267,18 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-sheet {
-  width: min(180px, 70%);
-  aspect-ratio: 1 / 1.3;
-  margin: 0 auto;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  min-height: 140px;
+  margin: 0;
   border-radius: 8px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
   box-shadow: var(--qxt-shadow);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-evenly;
   gap: 10px;
   padding: 18px 14px;
 }
@@ -271,6 +293,26 @@
 [data-qx-page='scan-workbench'] .fs-sheet i:nth-child(2) {
   width: 72%;
   background: var(--qxt-mint);
+}
+
+[data-qx-page='scan-workbench'] .fs-scanhero .vis,
+[data-qx-page='scan-workbench'] .fs-hero .vis,
+[data-qx-page='scan-workbench'] .sw-pvstage .vis {
+  min-height: 0;
+  height: 100%;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page='scan-workbench'] .fs-paper {
+  width: 78%;
+  height: 78%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 [data-qx-page='scan-workbench'] .fs-scanhero p {
@@ -300,15 +342,23 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-hero {
+  flex: 1 1 auto;
+  min-height: 220px;
   background: var(--qxt-well);
   border-radius: 22px;
+  display: grid;
+  grid-template-columns: minmax(180px, 42%) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+[data-qx-page='scan-workbench'] .fs-hero-tx {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 16px;
-  min-height: 220px;
 }
 
 [data-qx-page='scan-workbench'] .fs-hero .fs-time {
@@ -334,6 +384,7 @@
 }
 
 [data-qx-page='scan-workbench'] .sw-result {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -341,6 +392,7 @@
 }
 
 [data-qx-page='scan-workbench'] .sw-preview {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -351,11 +403,32 @@
   min-height: 0;
 }
 
-[data-qx-page='scan-workbench'] .sw-pvstage,
-[data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
-  min-height: 96px;
+[data-qx-page='scan-workbench'] .sw-pvstage {
+  flex: 1 1 auto;
+  min-height: 180px;
   border-radius: 22px;
   background: var(--qxt-well);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(140px, 28%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  align-items: stretch;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvdoc {
+  min-width: 0;
+  min-height: 140px;
+  border-radius: 16px;
+  background: var(--qxt-card);
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .sw-pvstage [data-file-preview-kind] {
+  min-height: 140px;
+  height: 100%;
+  border-radius: 16px;
+  background: var(--qxt-card);
   overflow: hidden;
 }
 
@@ -404,33 +477,20 @@
   white-space: nowrap;
 }
 
-[data-qx-page='scan-workbench'] .fs-art {
-  flex: 1 1 auto;
-  min-height: 640px;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-[data-qx-page='scan-workbench'] .fs-art svg {
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 560px;
-  display: block;
-}
-
-[data-qx-page='scan-workbench'] .fs-art figcaption {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.4;
-  color: var(--qxt-ink-2);
-}
-
 [data-qx-page='scan-workbench'] .sw-actrow {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+[data-qx-page='scan-workbench'] .sw-actrow .sw-exit {
+  /* 旧表把出口按钮 height:100%，百分比高度会把其中一颗压到 56px。 */
+  height: auto;
+  min-height: 76px;
+}
+
+[data-kiosk-stage-fit='off'] [data-qx-page='scan-workbench'] .sw-actrow .sw-exit {
+  min-height: 64px;
 }
 
 [data-qx-page='scan-workbench'] .sw-exit {

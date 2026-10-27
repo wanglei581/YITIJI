@@ -88,6 +88,7 @@ export function SignStampPage() {
         data-shape={flow.shape}
         data-testid={`sign-stamp-state-${flow.viewState}`}
       >
+        {closed ? null : (
         <div className="ss-ctxbar" id="ctxbar">
           <span className="ss-tag" data-tone={flow.displayLive.loggedIn ? 'ok' : 'warn'} data-testid="sign-stamp-auth">
             {flow.displayLive.sessionExpired ? '登录已过期' : flow.displayLive.loggedIn ? '已登录会员' : '未登录'}
@@ -127,6 +128,7 @@ export function SignStampPage() {
             </span>
           ) : null}
         </div>
+        )}
 
         {flow.shape === 'block' ? (
           closed ? <SignClosedBody copy={flow.status} /> : <SignStampGateView copy={flow.status} why={gateWhy(flow.viewState)} />

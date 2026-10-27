@@ -18,6 +18,7 @@ import {
   type ScanWorkbenchState,
 } from './scanWorkbench'
 import '../print-scan/styles/tool-touch.css'
+import { ScanPaperArt } from './ScanPaperArt'
 import './styles/scan-workbench-qx.css'
 import './styles/scan-workbench-compact-qx.css'
 import './styles/scan-fs.css'
@@ -335,7 +336,7 @@ export function ScanPanelMock({ instructions, scanLabel }: { instructions: strin
         </div>
       ))}
       <div className="fs-scanhero">
-        <div className="fs-sheet" aria-hidden="true"><i /><i /><i /><i /></div>
+        <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
         <p>按上面{instructions.length}步，在打印机面板上操作。步骤按「{scanLabel}」原文转达，本机不改写。扫完可以取回原件。</p>
       </div>
     </div>

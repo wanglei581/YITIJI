@@ -10,7 +10,6 @@
 // ============================================================
 
 import { useNavigate, useParams } from 'react-router-dom'
-import { FsSheetArt } from './FsSheetArt'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   FilesIcon,
@@ -92,21 +91,25 @@ export function PrintScanFeatureInfoPage() {
           data-state="feature-not-found"
           data-testid="print-hub-state-feature-not-found"
         >
-          <div className="fs-fact" data-testid="print-hub-fallback">
-            <b>没有这项能力说明</b>
-            <span>这个名字不在复印、证件照这些说明里。本页不编一套步骤。多半是旧二维码或旧链接。</span>
-          </div>
-          <div className="fs-fact">
-            <b>复印</b>
-            <span>复印的说明在「怎么在打印机上复印」。</span>
-          </div>
-          <div className="fs-fact">
-            <b>证件照</b>
-            <span>证件照这一页写的是尚未开放，和两条替代路径。</span>
-          </div>
-          <div className="fs-fact">
-            <b>下一步</b>
-            <span>回到打印扫描，从那里选已经有的功能。</span>
+          <div className="fs-facts">
+            <div className="fs-fact wide" data-testid="print-hub-fallback">
+              <b>没有这项能力说明</b>
+              <span>这个名字不在复印、证件照这些说明里。本页不编一套步骤。多半是旧二维码或旧链接。</span>
+            </div>
+            <div className="fs-pairgrid">
+              <div className="fs-fact">
+                <b>复印</b>
+                <span>复印的说明在「怎么在打印机上复印」。</span>
+              </div>
+              <div className="fs-fact">
+                <b>证件照</b>
+                <span>证件照这一页写的是尚未开放，和两条替代路径。</span>
+              </div>
+              <div className="fs-fact">
+                <b>下一步</b>
+                <span>回到打印扫描，从那里选已经有的功能。</span>
+              </div>
+            </div>
           </div>
           <button type="button" className="fs-row" onClick={() => navigate('/print-scan/feature/id-photo')}>
             看证件照说明
@@ -122,7 +125,6 @@ export function PrintScanFeatureInfoPage() {
               if (link) navigate(link.to)
             }}
           />
-          <FsSheetArt caption="示意图。这个名字没有对应的办理步骤，回到打印扫描再选。" />
           <footer className="ph-foot">
             <PrintHubTruth />
             <PhoneHelpLine />
@@ -275,7 +277,6 @@ export function PrintScanFeatureInfoPage() {
           </ol>
           <p className="fs-p" data-disclaimer="true">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE}</p>
         </div>
-        <FsSheetArt caption="示意图。这台机器现在不做证件照成品，可以按照片打印或先扫描。" />
         <footer className="ph-foot">
           <PrintHubTruth />
           <PhoneHelpLine />

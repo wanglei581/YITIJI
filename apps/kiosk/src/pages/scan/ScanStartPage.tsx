@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
 import { UploadIcon } from 'lucide-react'
-import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
@@ -173,15 +172,16 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           <p className="fs-warn">这条能力暂未开通，不能把这条说明当成已经可以用。</p>
           <div className="fs-grow">
             <div className="fs-facts">
-              <div className="fs-fact"><b>把 U 盘插上</b><span>插到打印机支持的 USB 接口。</span></div>
-              <div className="fs-fact"><b>在奔图面板上选</b><span>打开「扫描」，选择「扫描到 U 盘」。</span></div>
-              <div className="fs-fact"><b>按面板提示</b><span>选文件格式和保存位置，再开始扫描。</span></div>
-              <div className="fs-fact"><b>拔出之前</b><span>先按面板提示安全结束，再拔出 U 盘。</span></div>
+              <div className="fs-pairgrid">
+                <div className="fs-fact"><b>把 U 盘插上</b><span>插到打印机支持的 USB 接口。</span></div>
+                <div className="fs-fact"><b>在奔图面板上选</b><span>打开「扫描」，选择「扫描到 U 盘」。</span></div>
+                <div className="fs-fact"><b>按面板提示</b><span>选文件格式和保存位置，再开始扫描。</span></div>
+                <div className="fs-fact"><b>拔出之前</b><span>先按面板提示安全结束，再拔出 U 盘。</span></div>
+              </div>
               <div className="fs-fact wide"><b>和平台扫描不同</b><span>文件只进你的 U 盘。不创建平台任务，没有任务编号，不显示进度，不进「我的文档」。扫描服务不接收这次文件。</span></div>
               <div className="fs-fact wide"><b>面板没有这一项</b><span>不要反复点。菜单名称和接口位置以打印机屏幕为准。</span></div>
             </div>
             <PhoneHelpLine />
-            <FsSheetArt caption="示意图。文件只进你的 U 盘，不进这台屏幕上的任务。" />
           </div>
         </>
       ) : blocked ? (
@@ -198,13 +198,14 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                       : (blockedNote ?? '扫描还没对这台机器开放，或正在维护。恢复之后可以再试。')}
                 </span>
               </div>
-              <div className="fs-fact"><b>测试中，暂未对用户开放</b><span>还在测试，或正在维护，现在都不能扫描。</span></div>
-              <div className="fs-fact"><b>维护中，暂时不可用</b><span>这台机器暂时不支持扫描。恢复之后可以再试。</span></div>
-              <div className="fs-fact"><b>现在不能开始</b><span>确认完成之前，不能建立扫描，也不能在面板上开始。</span></div>
+              <div className="fs-pairgrid">
+                <div className="fs-fact"><b>测试中，暂未对用户开放</b><span>还在测试，或正在维护，现在都不能扫描。</span></div>
+                <div className="fs-fact"><b>维护中，暂时不可用</b><span>这台机器暂时不支持扫描。恢复之后可以再试。</span></div>
+                <div className="fs-fact"><b>现在不能开始</b><span>确认完成之前，不能建立扫描，也不能在面板上开始。</span></div>
+              </div>
               <div className="fs-fact wide"><b>你现在还能做什么</b><span>上传现成文件仍可打印。也可以看扫描到 U 盘的说明，那条仍写暂未开通。</span></div>
             </div>
             <PhoneHelpLine />
-            <FsSheetArt caption="示意图。现在不能在面板上开始这次扫描。" />
           </div>
           <button
             type="button"
@@ -253,17 +254,20 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               <small>不创建平台任务，文件只在你的 U 盘</small>
             </span>
           </button>
+          <div className="fs-grow">
           <div className="fs-facts">
             <div className="fs-fact wide">
               <b>屏幕上没有「开始扫描」</b>
               <span>只能在奔图面板启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。扫描服务在这一步只建立任务。</span>
             </div>
+            <div className="fs-pairgrid">
             <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
             <div className="fs-fact"><b>面板上按扫描</b><span>按屏幕上给出的这次说明操作。</span></div>
             <div className="fs-fact"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
             <div className="fs-fact">
               <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
               <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
+            </div>
             </div>
           </div>
           <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">
@@ -273,6 +277,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 {item.body}
               </div>
             ))}
+          </div>
           </div>
         </>
       )}

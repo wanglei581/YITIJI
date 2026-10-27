@@ -8,7 +8,6 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { createScanSession } from '../../services/api/scanTasks'
 import { replayCreateUntilOutcomeKnown } from './scanCreateReplay'
 import { acknowledgeScanDelivery, type ScanAckCredentials } from './scanDeliveryAck'
-import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { ScanSettingsSessionFacts, ScanSettingsStatusView } from './ScanSettingsStatusView'
 import {
   formatCountdown,
@@ -785,7 +784,6 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
         instructions={instructions.map((instruction) => instruction)}
         scanLabel={SCAN_TYPE_LABELS[scanType]}
       />
-      <FsSheetArt caption="示意图。按上面的步骤，在打印机面板上操作。" />
     </ScanWorkbenchShell>
   )
 }

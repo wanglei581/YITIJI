@@ -9,7 +9,6 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { FsSheetArt } from '../print-scan/FsSheetArt'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
@@ -19,6 +18,7 @@ import {
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
+import { ScanPaperArt } from './ScanPaperArt'
 import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -381,16 +381,17 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             <b>同一张纸</b>
             <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。这句只出现在失败说明里。</span>
           </div>
-          <div className="fs-fact">
-            <b>重试扫描（同一份材料）</b>
-            <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
-          </div>
-          <div className="fs-fact">
-            <b>重新开始一次扫描</b>
-            <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
+          <div className="fs-pairgrid">
+            <div className="fs-fact">
+              <b>重试扫描（同一份材料）</b>
+              <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
+            </div>
+            <div className="fs-fact">
+              <b>重新开始一次扫描</b>
+              <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
+            </div>
           </div>
         </div>
-        <FsSheetArt caption="示意图。这次没有拿到可用的扫描文件。" />
       </ScanWorkbenchShell>
     )
   }
@@ -453,6 +454,8 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             ) : null}
           </div>
           <div className="sw-pvstage">
+            <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
+            <div className="sw-pvdoc">
             {file ? (
               <FileContentPreview
                 fileUrl={file.fileUrl}
@@ -465,6 +468,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
                 <p>本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。</p>
               </ScanStatusPanel>
             )}
+            </div>
           </div>
           <p className="sw-preview-cap">
             预览用的是结果里那条临时内容链接，不是另外再申请一条要登录的链接。打不开只证明这一次没打开，不改判扫描已完成，也不能据此判断文件是否仍可用。
@@ -517,7 +521,6 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           </span>
         </button>
       </div>
-      <FsSheetArt caption="示意图。核对上面的文件之后，再选打印、识别或去我的文档。" />
       {previewOpen && file ? (
         <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
       ) : null}

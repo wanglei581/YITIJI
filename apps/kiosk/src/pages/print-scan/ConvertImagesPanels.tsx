@@ -14,7 +14,6 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { FsSheetArt } from './FsSheetArt'
 import {
   MAX_IMAGES,
   MAX_OUTPUT_BYTES,
@@ -364,7 +363,6 @@ export function EmptyBody({
       <p className="fine">
         合计不超过 40MB，成品不超过 15MB。单张不超过 2500 万像素，合计不超过 2 亿像素。一次最多 {MAX_IMAGES} 张。旋转 90° 当前不可用。
       </p>
-      <FsSheetArt caption="示意图。照片传上来之后，在这一页合成 PDF。" />
     </>
   )
 }
