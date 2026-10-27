@@ -8,7 +8,7 @@ import { PrintArt, type PrintArtName } from './PrintArt'
 export function PrintFillArt({ name, className }: { name: PrintArtName; className?: string }) {
   return (
     <div className={['pfa', className].filter(Boolean).join(' ')} aria-hidden="true" data-fill-art={name}>
-      <PrintArt name={name} size={520} crop={0.07} />
+      <PrintArt name={name} size={520} crop={{ x: 0.07, top: 0.015, bottom: 0.09 }} />
     </div>
   )
 }
