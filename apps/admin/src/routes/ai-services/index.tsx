@@ -47,6 +47,62 @@ interface MetricProps {
   title?: string
 }
 
+function AiDayOverview({
+  usage,
+  failed,
+  onRetry,
+}: {
+  usage: AdminAiUsage | null
+  failed?: boolean
+  onRetry?: () => void
+}) {
+  const noCalls = usage !== null && usage.totalCalls === 0
+  return (
+    <section aria-label="近 24 小时 AI 服务概览" className="mb-6">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+        <h2 className="text-[13px] font-bold text-neutral-700">近 24 小时概览</h2>
+      </div>
+      {usage === null && !failed && <p className="text-sm text-neutral-500">正在读取近 24 小时</p>}
+      {usage === null && failed && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-error-fg">这类这次没读到</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
+        </div>
+      )}
+      {usage && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricCard label="近 24 小时调用" value={formatCount(usage.totalCalls)} note="近 24 小时累计" icon={BotIcon} />
+          <MetricCard
+            label="成功率"
+            value={logOverviewRate(usage.totalCalls, usage.successRate)}
+            note={noCalls ? '近 24 小时暂无调用' : '按已完成的调用计算'}
+            icon={CheckCircleIcon}
+          />
+          <MetricCard
+            label="成功 / 失败"
+            value={noCalls ? '—' : `${formatCount(usage.successCount)} / ${formatCount(usage.failCount)}`}
+            note={noCalls ? '近 24 小时暂无调用' : '成功与失败分开计'}
+            icon={XCircleIcon}
+          />
+          <MetricCard
+            label="平均耗时"
+            value={logOverviewLatency(usage.totalCalls, usage.avgLatencyMs)}
+            note={noCalls ? '近 24 小时暂无调用' : '仅计入成功请求'}
+            icon={ClockIcon}
+          />
+        </div>
+      )}
+    </section>
+  )
+}
+
 function MetricCard({ label, value, note, title, icon: Icon, iconClass = 'text-primary-600 bg-primary-50' }: MetricProps) {
   return (
     <Card className="flex items-start gap-3.5 p-4">
@@ -143,7 +199,8 @@ export default function AiServicesPage() {
 
   if (loading) {
     return (
-      <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
+      <Page title="AI服务管理" subtitle="AI 开关、用量与额度、调用记录">
+        <AiDayOverview usage={null} />
         <AiAccessSwitchesPanel />
         <AiUsagePanel />
         <LoadingState text="加载 AI 服务数据…" />
@@ -153,7 +210,8 @@ export default function AiServicesPage() {
 
   if (error || !usage) {
     return (
-      <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
+      <Page title="AI服务管理" subtitle="AI 开关、用量与额度、调用记录">
+        <AiDayOverview usage={null} failed onRetry={() => setOverviewTick((tick) => tick + 1)} />
         <AiAccessSwitchesPanel />
         <AiUsagePanel />
         <ErrorState title="数据加载失败" message={error ?? '未知错误'} />
@@ -170,8 +228,6 @@ export default function AiServicesPage() {
     )
   }
 
-  const successRate    = usage.successRate
-  const noCallsIn24h   = usage.totalCalls === 0
   const estimatedCost  = formatCny(usage.estimatedCostCny)
   // 这张卡来自旧调用日志的 token 估算，和上面额度面板按计量账算出的「已计费金额」不是同一本账。
   const logCostDistinction = '这是旧调用日志按 token 估算的金额，和上面额度面板的「已计费金额」不是一回事'
@@ -212,7 +268,8 @@ export default function AiServicesPage() {
     : 0
 
   return (
-    <Page title="AI 服务管理" subtitle="AI 开关、用量与额度、调用记录">
+    <Page title="AI服务管理" subtitle="AI 开关、用量与额度、调用记录">
+      <AiDayOverview usage={usage} />
       <AiAccessSwitchesPanel />
       <AiUsagePanel />
 
@@ -251,33 +308,8 @@ export default function AiServicesPage() {
         )}
       </section>
 
-      {/* ── 近 24 小时概览指标（服务端按滚动 24 小时统计，不是北京时间自然日） ── */}
-      <section aria-label="近 24 小时 AI 服务概览">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-          <h2 className="text-[13px] font-bold text-neutral-700">近 24 小时概览</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MetricCard
-            label="AI 调用总次数"
-            value={formatCount(usage.totalCalls)}
-            note="近 24 小时累计"
-            icon={BotIcon}
-          />
-          <MetricCard
-            label="成功率"
-            value={logOverviewRate(usage.totalCalls, successRate)}
-            note={noCallsIn24h ? '近 24 小时暂无调用' : `${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
-            icon={CheckCircleIcon}
-            iconClass={noCallsIn24h ? 'text-neutral-500 bg-neutral-100' : successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
-          />
-          <MetricCard
-            label="平均响应时间"
-            value={logOverviewLatency(usage.totalCalls, usage.avgLatencyMs)}
-            note={noCallsIn24h ? '近 24 小时暂无调用' : '仅计入成功请求'}
-            icon={ClockIcon}
-            iconClass={noCallsIn24h ? 'text-neutral-500 bg-neutral-100' : 'text-info-fg bg-info-bg'}
-          />
+      <section aria-label="按日志估算的成本" className="mt-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <MetricCard
             label="按日志估算的成本"
             value={estimatedCost}

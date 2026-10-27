@@ -5,7 +5,7 @@ test.describe('AI 服务 / 配置（mock 口径）', () => {
   test('AI 服务管理渲染统计与日志区', async ({ page }) => {
     const guards = await openAuthed(page, '/ai-services')
     await settleAdminPage(page, guards)
-    await expect(page.getByRole('heading', { name: 'AI 服务管理' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'AI服务管理' })).toBeVisible()
     await expect(page.getByText('AI 开关、用量与额度、调用记录', { exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: '最近 AI 调用日志' }).locator('thead th').filter({ hasText: /^厂商与模型$/ })).toBeVisible()
     await expect(page.getByRole('region', { name: '最近 AI 调用日志' }).locator('thead th').filter({ hasText: /^Task ID$/ })).toHaveCount(0)

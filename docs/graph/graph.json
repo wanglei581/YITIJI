@@ -12742,7 +12742,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 245,
+      "reachableFileCount": 248,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12764,8 +12764,11 @@
             "GET /files/lifecycle-summary",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/feedback/:param/status",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "POST /admin/feedback/:param/contact-phone",
+            "POST /admin/feedback/:param/replies",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired",
@@ -13510,7 +13513,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 271
+      "sourceFileCount": 274
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -16494,12 +16497,56 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 90,
+      "reachableFileCount": 92,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
         {
           "component": "DashboardPage",
+          "endpoints": [
+            "DELETE /partner/policies/:param",
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/policies/:param/eligibility-rules",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "GET /policies/eligibility-questions",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "PATCH /partner/policies/:param",
+            "PATCH /partner/policies/:param/publish",
+            "PATCH /partner/policies/:param/release",
+            "PATCH /partner/policies/:param/review",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "POST /partner/policies",
+            "POST /partner/policies/:param/eligibility-preview",
+            "PUT /partner/policies/:param/eligibility-rules",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
+          "file": "apps/partner/src/routes/dashboard/index.tsx",
+          "layout": [
+            "PartnerLayoutWrapper"
+          ],
+          "path": "/",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "AccountPage",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -16521,20 +16568,8 @@
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
-            "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/dashboard/index.tsx",
-          "layout": [
-            "PartnerLayoutWrapper"
-          ],
-          "path": "/",
-          "styles": [],
-          "wrappers": []
-        },
-        {
-          "component": "AccountPage",
-          "endpoints": [],
           "file": "apps/partner/src/routes/account/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16742,7 +16777,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16753,7 +16810,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16901,7 +16980,28 @@
         {
           "component": "TerminalsPage",
           "endpoints": [
-            "PUT /partner/profile"
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
           ],
           "file": "apps/partner/src/routes/terminals/index.tsx",
           "layout": [
@@ -16912,7 +17012,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 91
+      "sourceFileCount": 93
     }
   },
   "dataModel": {
@@ -18943,6 +19043,7 @@
     "apps/admin/src/routes/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
+      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
@@ -28052,6 +28153,7 @@
         "files": [
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
+          "apps/admin/src/routes/index.tsx",
           "apps/admin/src/services/api/adminHttpAdapter.ts",
           "apps/admin/src/services/api/adminMockAdapter.ts",
           "apps/admin/src/services/api/devices.ts",

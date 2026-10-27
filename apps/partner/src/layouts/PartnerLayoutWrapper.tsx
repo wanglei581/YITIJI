@@ -6,7 +6,7 @@ import { LogOutIcon } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 import { PartnerCapabilitiesProvider } from '../services/CapabilitiesProvider'
 import { usePartnerCapabilities } from '../services/capabilities'
-import { ConsoleTabStrip } from './ConsoleTabStrip'
+import { ConsoleChromeProvider } from './consoleChrome'
 import {
   KEY_TO_PATH,
   NAV_ITEMS,
@@ -81,7 +81,7 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
   const activeKey = PATH_TO_KEY[location.pathname] ?? (location.pathname.startsWith('/screen/') ? 'screen' : 'dashboard')
   const navItems = projectNavItems(capabilities)
   const tabs = consoleTabsFor(activeKey, capabilities)
-  const tabLabel = NAV_ITEMS.find((item) => item.key === activeKey)?.label
+  const groupLabel = tabs ? (NAV_ITEMS.find((item) => item.key === activeKey)?.label ?? null) : null
 
   const orgName = user?.name ?? '合作机构后台'
 
@@ -104,7 +104,7 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
           <button
             type="button"
             onClick={logout}
-            className="flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+            className="inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
             aria-label="退出登录"
           >
             <LogOutIcon className="h-4 w-4" aria-hidden="true" />
@@ -117,8 +117,9 @@ function PartnerConsoleShell({ user }: { user: AuthedUser | null }) {
           两条路都要求机构先通过核验。未核验时机构会看到「审核通过了但终端上没有」而
           得不到原因 —— 这条横幅补的就是原因与该找谁。挂布局层，避免逐页塞会漂移。 */}
       <ContentTrustBanner />
-      {tabs && tabLabel && <ConsoleTabStrip label={tabLabel} tabs={tabs} />}
-      <Outlet />
+      <ConsoleChromeProvider value={{ groupLabel, tabs }}>
+        <Outlet />
+      </ConsoleChromeProvider>
     </PartnerLayout>
   )
 }

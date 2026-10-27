@@ -347,7 +347,7 @@ function ReconciliationSection() {
 export default function BillingPage() {
   const [tab, setTab] = useState<'price' | 'reconciliation'>('price')
   return (
-    <Page title="计费与对账" subtitle="打印价目与简历导出管理（唯一合法改价路径，改价即时生效并记审计）。简历导出价目用于一体机 / 小程序简历优化页的导出按钮；停用后导出不可用，并非免费。">
+    <Page title="计费与对账" subtitle="打印价目与简历导出管理（唯一合法改价路径，改价即时生效并记审计）。对应前端：一体机『简历优化建议』与小程序『AI 简历优化』页的导出按钮；停用后导出不可用，并非免费。">
       <div className="mb-4 flex gap-2">
         {(
           [

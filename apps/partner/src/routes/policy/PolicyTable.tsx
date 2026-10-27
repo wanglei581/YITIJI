@@ -177,7 +177,7 @@ export function PolicyTable({
                         disabled={busyId === r.id || recruitmentBlocked}
                         title={recruitmentBlocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined}
                         onClick={() => void handleApprove(r)}
-                        className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-success-fg hover:bg-success-bg disabled:opacity-50"
                       >
                         审核通过
                       </button>
@@ -197,7 +197,7 @@ export function PolicyTable({
                       <button
                         disabled={busyId === r.id}
                         onClick={() => setConfirmUnpublish(r)}
-                        className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
+                        className="inline-flex min-h-11 items-center rounded px-3 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
                       >
                         下架
                       </button>
@@ -207,7 +207,7 @@ export function PolicyTable({
                       aria-label="删除"
                       disabled={busyId === r.id}
                       onClick={() => setConfirmDelete(r)}
-                      className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
                     >
                       <Trash2Icon className="h-3.5 w-3.5" />
                     </button>
