@@ -199,6 +199,10 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   expect(printOverlap, '打印卡说明和纸堆插画都要在').not.toBeNull()
   expect(printOverlap!.intersects, '打印卡说明不得与纸堆插画相交').toBe(false)
   expect(printOverlap!.gapRight, '打印卡说明右侧留白不少于 190px').toBeGreaterThanOrEqual(190)
+  // 读屏：整卡名字只是标题，角标与备注进描述，不被整卡 aria-label 盖住。
+  await expect(printTile).toHaveAccessibleName('打印 · 扫描')
+  await expect(printTile).toHaveAccessibleDescription(/状态未知/)
+  await expect(printTile).toHaveAccessibleDescription(/出纸与扫描暂停/)
   await expectReadableFeature(page)
   // 2026-09-28 稿 01：没开通的百宝箱 / 智慧校园不占首页。配置读到「关闭」后磁贴次数为 0，
   // 不是一颗点不动的按钮。data-* 钉的是「已经读完并且判定为关」，不是「还没渲染」。
