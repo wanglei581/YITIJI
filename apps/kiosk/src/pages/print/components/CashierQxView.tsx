@@ -81,8 +81,22 @@ export function CashierQxView(props: CashierQxViewProps) {
   }
   const copy = copyFor(state, ctx)
   const instrument = INSTRUMENT_STATES.has(state)
-  // 解释卡放在较矮的那一栏（稿 32 的做法）：付款码读取卡比右栏矮，所以 pending-scan 放左栏。
-  const noteInPaycol = !instrument || state === 'pending-scan'
+  // 稿：出码、读付款码时收款码先上屏，状态说明跟在码框后面；其余状态说明在前。
+  const stateCardFirst = !(state === 'pending-qr' || state === 'pending-scan')
+  const stateCard = (
+    <section className="cashier-qx-state pct-card" data-kind={copy.kind}>
+      <h2 className="cashier-qx-state-h">
+        {copy.icon}
+        <span className="qx-state-t">{copy.title}</span>
+      </h2>
+      {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
+      {copy.chips.length > 0 ? (
+        <div className="cashier-qx-chips">
+          {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
+        </div>
+      ) : null}
+    </section>
+  )
   const pickersEnabled = PICKERS_ENABLED.has(state) && !props.selectionLocked
   const activeMethod = props.displayedPaymentMethod
     ?? (props.snapshot?.attempt ? (props.snapshot.attempt.qrCodeContent === null ? 'code' : 'qr') : null)
@@ -90,22 +104,6 @@ export function CashierQxView(props: CashierQxViewProps) {
   return (
     <div className="cashier-qx-page pct-page" data-qx-state={state}>
       <div className="qx-scroll cashier-qx-scroll">
-        <section className="cashier-qx-xq" aria-label="小青提示">
-          <div className="cashier-qx-xq-row">
-            <div className="cashier-qx-xq-face" aria-hidden="true">青</div>
-            <div className="cashier-qx-xq-main">
-              <div className="cashier-qx-xq-eyebrow">{free ? '确认打印' : '付款'}</div>
-              <p className="cashier-qx-xq-ask">{copy.ask[0]}</p>
-              <p className="cashier-qx-xq-doing">{copy.ask[1]}</p>
-            </div>
-          </div>
-          <ol className="cashier-qx-xq-steps">
-            <li><b>1</b>看清本页结果<small>{free ? '查看订单记录与打印状态。' : '先确认是等待、成功、失败、关闭还是退款。'}</small></li>
-            <li><b>2</b>{free ? '核对订单' : '不重复付款'}<small>{free ? '任务未建立时，只恢复同一打印任务。' : '结果异常或长时间未更新时，先查看支付账单。'}</small></li>
-            <li><b>3</b>按底部按钮继续<small>当前可用的处理动作已经放在屏幕下方。</small></li>
-          </ol>
-        </section>
-
         <Pickers
           {...props}
           enabled={pickersEnabled}
@@ -118,36 +116,25 @@ export function CashierQxView(props: CashierQxViewProps) {
           <p className="pct-note" role="status">正在向支付渠道核实这一次的结果。这一次还没有确认到账。</p>
         ) : null}
 
-        <section className="cashier-qx-state pct-card" data-kind={copy.kind}>
-          <h2 className="cashier-qx-state-h">
-            {copy.icon}
-            <span className="qx-state-t">{copy.title}</span>
-          </h2>
-          {copy.paras.map((para, index) => <p key={index} className="cashier-qx-p">{para}</p>)}
-          {copy.chips.length > 0 ? (
-            <div className="cashier-qx-chips">
-              {copy.chips.map(([tone, text]) => <span key={text} className="cashier-qx-chip" data-tone={tone}>{text}</span>)}
-            </div>
-          ) : null}
-        </section>
-
         {state === 'no-order' ? null : (
           <section className="cashier-qx-paywrap">
-            <div className="cashier-qx-paycol">
-              {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
-              {noteInPaycol ? <SideNote state={state} ctx={ctx} /> : null}
-            </div>
-            <div className="cashier-qx-side">
-              {instrument ? <AmountCard {...props} free={free} /> : null}
-              <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
-              {noteInPaycol ? null : <SideNote state={state} ctx={ctx} />}
-            </div>
+            <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
+            {stateCardFirst ? stateCard : null}
+            {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
+            {stateCardFirst ? null : stateCard}
+            {instrument ? <AmountCard {...props} free={free} /> : null}
+            <SideNote state={state} ctx={ctx} />
           </section>
         )}
 
-        <Closure state={state} ctx={ctx} />
-
-        {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}
+        {state === 'no-order' ? <Closure state={state} ctx={ctx} /> : (
+          <details className="cashier-qx-more">
+            <summary>付款说明 · 接下来怎么办</summary>
+            <Closure state={state} ctx={ctx} />
+            <p className="cashier-qx-p">{props.amountCents === 0 ? printProblemLine() : props.refundAssistanceCopy + '。'}</p>
+            {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}
+          </details>
+        )}
 
         {props.issueError ? (
           <div className="cashier-qx-error" role="alert"><AlertTriangleIcon aria-hidden="true" />{props.issueError}</div>
@@ -171,6 +158,8 @@ function Pickers(props: CashierQxViewProps & {
   const channelDisabled = !props.enabled || busy
   const methodDisabled = !props.enabled || busy || !props.selectedChannel
   const showChannels = !props.note
+  // 稿：只启用一个通道且已采用时，只写「这台机器只启用了一个支付通道，已自动采用」，不再摆一颗通道按钮。
+  const singleAdopted = props.channels.length === 1 && (props.amountCents ?? 0) > 0 && showChannels
   return (
     <section className="cashier-qx-modes" aria-label="支付方式选择">
       <div className="cashier-qx-picker" data-kind="channels">
@@ -183,7 +172,7 @@ function Pickers(props: CashierQxViewProps & {
               : `${channelLabelOf(props.channels[0])} · 支付结果以实际到账为准`}
           </p>
         ) : null}
-        {showChannels ? props.channels.map((channel) => (
+        {showChannels ? props.channels.filter((channel) => !(singleAdopted && props.activeChannel === channel)).map((channel) => (
           <button
             key={channel}
             type="button"
@@ -210,6 +199,7 @@ function Pickers(props: CashierQxViewProps & {
               data-active={props.activeMethod === method ? 'true' : undefined}
               aria-pressed={props.activeMethod === method}
               disabled={methodDisabled}
+              aria-label={`${labels.action} ${labels.name} · ${labels.desc}`}
               onClick={() => props.onSelectMethod(method)}
             >
               <span className="cashier-qx-mode-ic">{method === 'qr' ? <QrCodeIcon aria-hidden="true" /> : <ScanLineIcon aria-hidden="true" />}</span>
@@ -317,7 +307,6 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
           </div>
         ))}
       </dl>
-      <p className="cashier-qx-p">{props.amountCents === 0 ? printProblemLine() : props.refundAssistanceCopy + '。'}</p>
     </section>
   )
 }

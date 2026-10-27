@@ -1,68 +1,462 @@
-/* 收银台触屏正文。只挂在 data-qx-page='print-cashier'，不改 .qxt-* 默认。 */
+/* 收银台触屏正文（稿 cashier）：支付通道说明 + 扫码方式分段 + 订单摘要卡 + 收款码框 + 退出支付。
+   只挂在 data-qx-page='print-cashier'，不改 .qxt-* 默认。 */
 
-[data-qx-page='print-cashier'] .pct-page {
+[data-qx-page='print-cashier'] .cashier-qx-page {
+  flex: 0 0 auto;
+  min-height: auto;
+  min-width: 0;
   font-size: 22px;
   line-height: 1.45;
-  color: var(--qx-ink);
+  color: var(--qxt-ink);
 }
 
-[data-qx-page='print-cashier'] .pct-page p,
-[data-qx-page='print-cashier'] .pct-page li,
-[data-qx-page='print-cashier'] .pct-page button,
-[data-qx-page='print-cashier'] .pct-page dd,
-[data-qx-page='print-cashier'] .pct-page dt {
+[data-qx-page='print-cashier'] .cashier-qx-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: visible;
+  padding: 0;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-page :where(p, li, dt, dd, b, span, button) {
   font-size: 22px;
 }
 
-[data-qx-page='print-cashier'] .pct-card,
-[data-qx-page='print-cashier'] .pct-sum {
-  background: var(--qxt-card);
-  border: 1px solid var(--qx-line);
-  border-radius: 28px;
-  padding: 28px;
-  color: var(--qx-ink);
+[data-qx-page='print-cashier'] .cashier-qx-page :where(small) {
+  font-size: 20px;
 }
 
-[data-qx-page='print-cashier'] .pct-note,
-[data-qx-page='print-cashier'] .pct-chline {
-  margin: 12px 0 0;
-  color: var(--qx-ink-2);
-  font-size: 22px;
+/* 通道说明与扫码方式：稿 .d3-chline + .seg */
+[data-qx-page='print-cashier'] .cashier-qx-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
 }
 
-[data-qx-page='print-cashier'] .pct-acts {
+[data-qx-page='print-cashier'] .cashier-qx-picker {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 28px;
+  align-items: center;
+  gap: 10px;
 }
 
-[data-qx-page='print-cashier'] .pct-acts .qx-btn,
-[data-qx-page='print-cashier'] .cashier-qx-mode,
-[data-qx-page='print-cashier'] .cashier-qx-channel {
-  min-width: 64px;
-  min-height: 64px;
-  padding: 16px 22px;
+[data-qx-page='print-cashier'] .cashier-qx-picker-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-picker[data-kind='methods'],
+[data-qx-page='print-cashier'] .cashier-qx-picker[data-kind='channels']:has(.cashier-qx-channel) {
+  padding: 8px;
+  border-radius: 30px;
+  background: var(--qxt-well);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-picker .pct-chline {
+  flex: 0 0 100%;
+  margin: 0 0 4px;
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+  text-align: left;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-channel,
+[data-qx-page='print-cashier'] .cashier-qx-mode {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--qxt-ink-2);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-channel[data-active='true'],
+[data-qx-page='print-cashier'] .cashier-qx-mode[data-active='true'] {
+  background: var(--qxt-band-b);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-channel:disabled,
+[data-qx-page='print-cashier'] .cashier-qx-mode:disabled {
+  opacity: 0.55;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-mode-ic,
+[data-qx-page='print-cashier'] .cashier-qx-mode-tx small {
+  display: none;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-mode-tx b {
+  font-size: 24px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-picker-note {
+  flex: 1 1 100%;
+  padding: 8px 14px;
   font-size: 22px;
+  color: var(--qxt-ink-2);
 }
 
-[data-qx-page='print-cashier'] .cashier-qx-modes {
-  display: grid;
-  gap: 16px;
-  margin: 12px 0 24px;
-}
-
-[data-qx-page='print-cashier'] .cashier-qx-kv {
-  display: grid;
+/* 摘要、状态说明、收款码框、金额：一列排下来 */
+[data-qx-page='print-cashier'] .cashier-qx-paywrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
 }
 
+[data-qx-page='print-cashier'] .pct-sum {
+  padding: 0;
+  border-radius: 30px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  overflow: hidden;
+}
+
+[data-qx-page='print-cashier'] .pct-sum > h3 {
+  display: none;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 [data-qx-page='print-cashier'] .cashier-qx-kv > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 8px 22px;
+  border-top: 1px solid var(--qxt-line);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv > div:first-child {
+  border-top: 0;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv dt {
+  font-size: 22px;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-kv dd {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+[data-qx-page='print-cashier'] .pct-sum > .cashier-qx-p {
+  margin: 0;
+  padding: 12px 22px 16px;
+  font-size: 20px;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-state {
+  padding: 14px 20px;
+  border-radius: 24px;
+  background: var(--qxt-well);
+  border: 0;
+  text-align: left;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-state-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-state .cashier-qx-p {
+  margin: 6px 0 0;
+  font-size: 22px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-chip {
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: var(--qxt-card);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* 稿 .d3-qrframe：收款码框 */
+[data-qx-page='print-cashier'] .cashier-qx-instrument {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 280px;
+  padding: 14px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  text-align: center;
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-area,
+[data-qx-page='print-cashier'] .cashier-qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-frame {
+  position: relative;
+  padding: 12px;
+  border-radius: 24px;
+  background: var(--qxt-card);
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-frame svg {
+  display: block;
+  width: 400px;
+  height: 400px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-title {
+  font: 700 34px/1.3 var(--qx-serif);
+  color: var(--qxt-band-b);
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-sub {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+[data-qx-page='print-cashier'] .cashier-qr-badge,
+[data-qx-page='print-cashier'] .cashier-countdown,
+[data-qx-page='print-cashier'] .cashier-tone-banner p {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-verify-btn {
+  min-height: 72px;
+  padding: 0 22px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-cashier'] .cashier-code-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+[data-qx-page='print-cashier'] .cashier-code-label-title {
+  margin: 0;
+  font: 700 30px/1.35 var(--qx-serif);
+}
+
+[data-qx-page='print-cashier'] .cashier-code-label-hint,
+[data-qx-page='print-cashier'] .cashier-code-progress-text {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-code-input {
+  width: 100%;
+  min-height: 72px;
+  border-radius: 20px;
+  border: 1.5px solid var(--qxt-edge);
+  padding: 0 18px;
+  font-size: 24px;
+}
+
+[data-qx-page='print-cashier'] .cashier-code-submit,
+[data-qx-page='print-cashier'] .cashier-code-clear {
+  min-height: 72px;
+  min-width: 240px;
+  padding: 0 24px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-cashier'] .cashier-fail-card,
+[data-qx-page='print-cashier'] .cashier-idle-panel {
+  width: 100%;
+  font-size: 22px;
+}
+
+[data-qx-page='print-cashier'] .cashier-fail-card :where(p, span, div, b, h2, h3) {
+  font-size: 22px;
+}
+
+[data-qx-page='print-cashier'] .cashier-fail-fact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font-size: 22px;
+}
+
+/* 金额 */
+[data-qx-page='print-cashier'] .cashier-qx-amount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 18px;
+  padding: 14px 22px;
+  border-radius: 24px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  text-align: left;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-amount-lb {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-amount-num {
+  font: 700 44px/1.1 var(--qx-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-amount-src {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 20px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-ledger {
+  flex: 1 1 100%;
+  font-size: 20px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-ledger > div {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--qx-line);
+}
+
+/* 侧注与折叠说明 */
+[data-qx-page='print-cashier'] .cashier-qx-group {
+  padding: 12px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-group h3 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-group .cashier-qx-p {
+  margin: 0;
+  font-size: 22px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-more {
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-more > summary {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-more h2 {
+  margin: 8px 0 4px;
+  font-size: 24px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-flow {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 22px;
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-truth,
+[data-qx-page='print-cashier'] .pct-note {
+  margin: 8px 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-cashier'] .cashier-qx-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: 22px;
+  background: var(--qxt-cin-wash);
+  font-size: 22px;
+  text-align: left;
+}
+
+/* 退出支付 / 返回订单等次出口：稿 .btn.sec，靠左，高 72 */
+[data-qx-page='print-cashier'] .pct-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+[data-qx-page='print-cashier'] .pct-acts .qx-btn {
+  min-width: 240px;
+  min-height: 72px;
+  padding: 0 24px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 24px;
+  font-weight: 700;
 }
 
 /* 手机宽度关掉 1080 舞台后，收银正文不能被底栏挤成 0 高，整页也不能横向溢出。 */
