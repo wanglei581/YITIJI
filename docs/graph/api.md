@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`601` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`603` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -396,6 +396,7 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.directory | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | POST | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.create | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | POST | `/api/v1/admin/first-order/incidents` | AdminFirstOrderIncidentsController.create | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
 | PATCH | `/api/v1/admin/first-order/incidents/:id` | AdminFirstOrderIncidentsController.update | admin | FirstOrderIncidentsService | AuditLog<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceIncidentEvent<br/>ServiceProject<br/>ServiceReport<br/>Terminal |
@@ -415,6 +416,7 @@
 | GET | `/api/v1/admin/first-order/projects/:id/report-preview` | AdminFirstOrderController.preview | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/projects/:id/reports` | AdminFirstOrderController.createReport | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/projects/:id/reports` | AdminFirstOrderController.createReport | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
+| GET | `/api/v1/admin/first-order/reports` | AdminFirstOrderController.reportDirectory | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | GET | `/api/v1/admin/first-order/reports/:id` | AdminFirstOrderController.report | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | GET | `/api/v1/admin/first-order/reports/:id` | AdminFirstOrderController.report | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |
 | POST | `/api/v1/admin/first-order/reports/:id/acknowledge` | AdminFirstOrderController.acknowledge | admin | FirstOrderReportsService | AuditLog<br/>KioskSession<br/>PrintTask<br/>ServiceDeployment<br/>ServiceIncident<br/>ServiceProject<br/>ServiceReport<br/>Terminal<br/>TerminalHeartbeat |

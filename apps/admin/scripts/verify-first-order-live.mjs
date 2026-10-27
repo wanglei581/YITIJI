@@ -616,6 +616,29 @@ try {
   await shot(admin, 'admin-report-narrow', a, true)
   await shot(partner, 'partner-report-narrow', p, true)
   mark('Desktop and 390px views keep first-order panel and controls within viewport')
+  await admin.setViewportSize({ width: 1440, height: 1000 })
+  const directory = await api('admin', '/admin/first-order/incidents')
+  assert.ok(directory.total > 0, 'fixture leaves at least one unclosed incident')
+  const incidentCounts = { open: 0, processing: 0, resolved: 0 }
+  if (directory.truncated) {
+    for (const status of ['open', 'processing', 'resolved']) {
+      incidentCounts[status] = (await api('admin', `/admin/first-order/incidents?status=${status}&limit=1`)).total
+    }
+  } else {
+    for (const item of directory.items) {
+      if (item.status === 'open' || item.status === 'processing' || item.status === 'resolved') incidentCounts[item.status] += 1
+    }
+  }
+  const countText = (value) => String(Math.trunc(Math.abs(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  await admin.goto(`${adminOrigin}/`)
+  const today = admin.locator('section').filter({ has: admin.getByRole('heading', { name: '今天要处理', exact: true }) })
+  await expect(today).toContainText(`未结报障 ${countText(directory.total)}（待受理 ${countText(incidentCounts.open)} · 处理中 ${countText(incidentCounts.processing)} · 技术恢复待机构核对 ${countText(incidentCounts.resolved)}）`)
+  mark('Dashboard unclosed incident count matches the cross-org directory')
+  await admin.goto(`${adminOrigin}/partners?org=${encodeURIComponent(fixture.orgs.own)}&section=incidents`)
+  const deepPanel = adminPanel(admin)
+  await expect(deepPanel.getByRole('tab', { name: '报障处理', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(deepPanel.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
+  mark('Address opens the org drawer on incident handling')
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
   const expectedConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedProjectConflictPath && item.status === 409)
   assert.equal(expectedConflicts.length, fullApp ? 2 : 0, 'Exactly two intentional stale-form conflicts are expected')
