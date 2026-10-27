@@ -24,7 +24,7 @@
   flex-direction: column;
   overflow: hidden;
 }
-.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-workbench[data-kb-open] { padding-bottom: var(--kassist-kb-h); }
+.qxt-screen[data-qx-page='assistant'] .kassist.kassist-qingxu .assistant-workbench[data-kb-open] { padding-bottom: max(0px, calc(var(--kassist-kb-h) - var(--qxt-nav-h))); }
 
 /* 正文：左右 40，纵向排；吸收块拿余高 */
 .qxt-screen[data-qx-page='assistant'] .kassist .assistant-cockpit-body {
@@ -45,7 +45,7 @@
   gap: 12px;
 }
 .qxt-screen[data-qx-page='assistant'] .kassist .assistant-conversation {
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -207,7 +207,15 @@
 .qxt-screen[data-qx-page='assistant'] .assistant-thinking-slot { margin: 0; font-size: var(--qxt-fs-sub); line-height: 1.5; color: var(--qxt-ink-2); }
 .qxt-screen[data-qx-page='assistant'] .assistant-thinking-bar { font-weight: 700; color: var(--qxt-ink); }
 
-/* 回答之后：不替你决定、去办理 */
+/* 回答之后：一张大卡吸收余高（回答、不替你决定、去办理、插画），下面三个按钮 */
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card { flex: 1 1 0; min-height: 0; gap: 10px; overflow: hidden; padding: 14px 16px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card > * { flex-shrink: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card > .qxp-artbox { flex: 1 1 0; min-height: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-transcript { gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message-bubble { padding: 0; border: 0; background: transparent; border-radius: 0; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message-bubble p { font-size: 34px; line-height: 1.45; font-family: var(--qx-serif); font-weight: 700; }
+.qxt-screen[data-qx-page='assistant'] .assistant-reply-card .assistant-message--user .assistant-message-bubble p { font-size: var(--qxt-fs-body); font-family: var(--qx-sans); font-weight: 500; }
+.qxt-screen[data-qx-page='assistant'] .assistant-bounds { display: flex; flex-direction: column; gap: 6px; }
 .qxt-screen[data-qx-page='assistant'] .assistant-bounds ul { margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 22px; list-style: none; }
 .qxt-screen[data-qx-page='assistant'] .assistant-bounds li { font-size: var(--qxt-fs-sub); color: var(--qxt-ink-2); }
 .qxt-screen[data-qx-page='assistant'] .assistant-bounds li::before { content: '· '; color: var(--qxt-teal-ink); font-weight: 700; }
@@ -229,7 +237,7 @@
 
 /* 没回答、失败、AI 暂不可用：四张手动入口 */
 .qxt-screen[data-qx-page='assistant'] .assistant-exits-title { margin: 4px 0 0; font: 700 26px/1.3 var(--qx-sans); color: var(--qxt-ink); }
-.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] { flex: 1 0 auto; display: flex; flex-direction: column; gap: 10px; }
 .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab {
   flex: 1 1 0;
   min-height: 150px;

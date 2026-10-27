@@ -150,7 +150,7 @@ export function IllusPhone({ w = 150 }: { w?: number }) {
 /** 一体机正面示意：上盖、操作面板、出纸口、出纸托盘。 */
 export function IllusMachine() {
   return (
-    <svg className="qxp-illus" width={620} height={600} viewBox="0 0 620 600" aria-hidden="true" focusable="false">
+    <svg className="qxp-illus" width={520} height={510} viewBox="50 30 520 510" aria-hidden="true" focusable="false">
       <rect className="pi-lid" x={70} y={40} width={480} height={70} rx={18} />
       <rect className="pi-body" x={60} y={100} width={500} height={380} rx={30} />
       <rect className="pi-ink" x={420} y={128} width={112} height={64} rx={12} />

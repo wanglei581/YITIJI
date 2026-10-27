@@ -17,8 +17,8 @@
 .qxt-screen[data-qx-page='offline'] .of-verdict[data-tone='bad'] { color: var(--qx-cinnabar); }
 
 /* 机器插画吸收余高 */
-.qxt-screen[data-qx-page='offline'] .of-machine { flex: 1 1 0; min-height: 160px; overflow: hidden; }
-.qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg { height: 92%; width: auto; max-width: 100%; }
+.qxt-screen[data-qx-page='offline'] .of-machine { flex: 1 1 0; min-height: 160px; overflow: hidden; padding: 8px 16px; gap: 4px; }
+.qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg { height: 100%; width: auto; max-width: 100%; }
 .qxt-screen[data-qx-page='offline'] .of-last { margin: 0; text-align: center; }
 
 /* 底栏：帮助与求助占中间，三颗等宽 */

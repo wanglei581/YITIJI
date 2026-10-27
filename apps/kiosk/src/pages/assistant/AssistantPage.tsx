@@ -8,7 +8,7 @@ import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { Hit } from '../public-touch/PublicBlocks'
-import { IllusChecklist, IllusResume } from '../public-touch/PublicIllus'
+import { IllusChecklist, IllusReport, IllusResume } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -477,6 +477,10 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             : 'picker'
   // 在等、没问过、有回答这三种有输入坞；其余三种换成底栏按钮，不再给一个按不出结果的发送键。
   const showComposer = body === 'picker' || body === 'submitting' || body === 'reply'
+  // 没有输入坞的三种版式里，屏幕键盘没有对象可输入，盖在底栏按钮上反而挡路，一并收起。
+  useEffect(() => {
+    if (!showComposer) setKeyboardOpen(false)
+  }, [showComposer])
   const showConversation = body !== 'picker' || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
   const toolsLine = aiLocked
@@ -553,6 +557,20 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     </div>
   )
 
+  const transcript = (
+    <div
+      className="assistant-transcript"
+      role="log"
+      aria-live="polite"
+      aria-busy={loading}
+      aria-relevant="additions text"
+    >
+      {messages
+        .filter((message) => message.kind !== 'system' || message.id.startsWith('voice-'))
+        .map((message) => <ChatBubble key={message.id} msg={message} keptQuestion={lastUserText} />)}
+    </div>
+  )
+
   return (
     <PublicTouchFrame
       page="assistant"
@@ -595,17 +613,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           {showConversation && (
             <section className="assistant-conversation" aria-labelledby="assistant-conversation-title" data-turn={body}>
               <h2 id="assistant-conversation-title" className="kassist-sr-only" tabIndex={-1}>{cockpitCopy.section[0]}</h2>
-              <div
-                className="assistant-transcript"
-                role="log"
-                aria-live="polite"
-                aria-busy={loading}
-                aria-relevant="additions text"
-              >
-                {messages
-                  .filter((message) => message.kind !== 'system' || message.id.startsWith('voice-'))
-                  .map((message) => <ChatBubble key={message.id} msg={message} keptQuestion={lastUserText} />)}
-              </div>
+              {body === 'reply' ? null : transcript}
 
               {body === 'submitting' && (
                 <div className="qxp-pair assistant-wait-pair">
@@ -641,8 +649,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               <div ref={bottomRef} />
 
               {body === 'reply' && (
-                <>
-                  <div className="qxp-card assistant-bounds">
+                <div className="qxp-card assistant-reply-card">
+                  {transcript}
+                  <div className="assistant-bounds">
                     <p className="qxp-k">这一轮不替你决定</p>
                     <ul>
                       <li>身份</li><li>付款</li><li>打印是否出纸</li><li>政策资格</li><li>录用结果</li>
@@ -661,7 +670,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                       ))}
                     </div>
                   )}
-                </>
+                  <div className="qxp-artbox" aria-hidden="true"><IllusReport w={200} /></div>
+                </div>
               )}
 
               {(body === 'notai' || body === 'error' || body === 'locked') && (

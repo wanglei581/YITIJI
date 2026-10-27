@@ -20,7 +20,7 @@ import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { useOfficialChannels } from '../../hooks/useOfficialChannels'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import type { OfficialChannelItem } from '../../services/api/officialChannels'
-import { K, PairCard, Well } from '../public-touch/PublicBlocks'
+import { ArtBox, Card, K, PairCard, Well } from '../public-touch/PublicBlocks'
 import { IllusChecklist, IllusReport } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
@@ -214,9 +214,14 @@ export function OfficialChannelsPage() {
       <div className="oc-page qxp-grow" data-kiosk-screen="official-channels" data-state={view} data-density={density}>
         {note ? <p className="oc-withdrawn" data-testid="official-channel-withdrawn" role="status">{note}</p> : null}
         {view === 'loading' ? (
-          <div data-testid="official-channels-loading">
-            <QxTouchCallout kind="howto" icon="qr">正在读取本终端的官方渠道。读取完成前这里不下结论。</QxTouchCallout>
-          </div>
+          <>
+            <div data-testid="official-channels-loading">
+              <QxTouchCallout kind="howto" icon="qr">正在读取本终端的官方渠道。读取完成前这里不下结论。</QxTouchCallout>
+            </div>
+            <Card className="oc-sink">
+              <ArtBox><IllusChecklist w={200} /></ArtBox>
+            </Card>
+          </>
         ) : null}
         {view === 'error' ? (
           <>

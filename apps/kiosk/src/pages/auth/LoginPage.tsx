@@ -307,31 +307,6 @@ export function LoginPage() {
               />
             )}
 
-            {state === 'phone-idle' ? (
-              <section className="lg-facts" aria-label="登录之后记在哪">
-                <div className="qxp-card lg-fact">
-                  <p className="qxp-k">简历</p>
-                  <p className="qxp-note">改好的简历，登录之后才记到账号。没登录时，这次改的先留在这台机器上。</p>
-                  <ArtBox><IllusResume w={160} /></ArtBox>
-                </div>
-                <div className="qxp-card lg-fact">
-                  <p className="qxp-k">打印订单</p>
-                  <p className="qxp-note">登录后才能对上你名下的订单。到机码不登录也能取手机上已经下过的单。</p>
-                  <ArtBox><IllusStack w={160} n={3} /></ArtBox>
-                </div>
-                <div className="qxp-card lg-fact">
-                  <p className="qxp-k">AI 记录</p>
-                  <p className="qxp-note">诊断和面试反馈记在这次登录里。要保存回答要点，没登录会先到这一页。</p>
-                  <ArtBox><IllusReport w={160} /></ArtBox>
-                </div>
-                <div className="qxp-card lg-fact">
-                  <p className="qxp-k">只管这一次</p>
-                  <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>
-                  <ArtBox><IllusPhone w={120} /></ArtBox>
-                </div>
-              </section>
-            ) : null}
-
             <section className="lg-anon">
               <div className="qx-sec-h"><span className="t">不登录也能办</span></div>
               <div className="lg-entries">
@@ -356,6 +331,38 @@ export function LoginPage() {
                 })}
               </div>
             </section>
+
+            {state === 'phone-idle' ? (
+              <section className="lg-facts" aria-label="登录之后记在哪">
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">简历</p>
+                  <p className="qxp-note">改好的简历，登录之后才记到账号。没登录时，这次改的先留在这台机器上。</p>
+                  <ArtBox><IllusResume w={160} /></ArtBox>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">打印订单</p>
+                  <p className="qxp-note">登录后才能对上你名下的订单。到机码不登录也能取手机上已经下过的单。</p>
+                  <ArtBox><IllusStack w={160} n={3} /></ArtBox>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">AI 记录</p>
+                  <p className="qxp-note">诊断和面试反馈记在这次登录里。要保存回答要点，没登录会先到这一页。</p>
+                  <ArtBox><IllusReport w={160} /></ArtBox>
+                </div>
+                <div className="qxp-card lg-fact">
+                  <p className="qxp-k">只管这一次</p>
+                  <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>
+                  <ArtBox><IllusPhone w={120} /></ArtBox>
+                </div>
+              </section>
+            ) : null}
+            {mode === 'phone' && state !== 'phone-idle' ? (
+              <div className="qxp-card lg-fact lg-absorb">
+                <p className="qxp-k">只管这一次</p>
+                <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>
+                <ArtBox><IllusPhone w={120} /></ArtBox>
+              </div>
+            ) : null}
           </div>
           {helpLine ? <p className="qxp-note" role="note">{helpLine}</p> : null}
           <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>

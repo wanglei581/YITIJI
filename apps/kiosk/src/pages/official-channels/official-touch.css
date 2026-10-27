@@ -1,8 +1,12 @@
 /* 本机构官方渠道触屏版：码卡左码右文，没有码时是两张带插画的去处卡。块的通用样式在 public-touch.css。 */
 
 .qxt-screen[data-qx-page='official'] .oc-page { --oc-qr: 400px; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
-.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] { --oc-qr: 560px; }
-.qxt-screen[data-qx-page='official'] .oc-page[data-density='comfortable'] { --oc-qr: 400px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] { --oc-qr: 780px; }
+/* 只有一张码时：码在上、字在下，码尽量大 */
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] .oc-card { flex-direction: column; justify-content: center; gap: 12px; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] .oc-card-main { flex: none; width: 100%; align-items: center; text-align: center; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='roomy'] .oc-card-check { width: 100%; }
+.qxt-screen[data-qx-page='official'] .oc-page[data-density='comfortable'] { --oc-qr: 470px; }
 .qxt-screen[data-qx-page='official'] .oc-page[data-density='compact'] { --oc-qr: 280px; }
 .qxt-screen[data-qx-page='official'] .oc-page[data-density='crowded'] { --oc-qr: 220px; overflow: auto; }
 
@@ -32,6 +36,8 @@
 .qxt-screen[data-qx-page='official'] .oc-card-addr { font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); overflow-wrap: anywhere; }
 .qxt-screen[data-qx-page='official'] .oc-card-addr b { color: var(--qxt-ink); font-weight: 700; }
 .qxt-screen[data-qx-page='official'] .oc-card-check { margin-top: 4px; }
+
+.qxt-screen[data-qx-page='official'] .oc-sink { flex: 1 1 0; min-height: 200px; overflow: hidden; }
 
 /* 三步说明 */
 .qxt-screen[data-qx-page='official'] .oc-steps { flex: none; }
