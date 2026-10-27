@@ -67,7 +67,7 @@ assertNotContains(
 assertContains('src/routes/index.tsx', 'JobMaterialLibraryPage', 'Kiosk routes job material library as a standalone page')
 assertContains('src/routes/index.tsx', /path:\s*'resume\/templates'[\s\S]*?<ResumeTemplateLibraryPage \/>/, 'Kiosk keeps /resume/templates mapped to resume template library')
 assertContains('src/routes/index.tsx', "path: 'resume/materials'", 'Kiosk exposes standalone /resume/materials route')
-assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', '简历素材库', 'Resume template page is positioned as resume material library')
+assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', '简历模板', 'Resume template page is titled 简历模板')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', "navigate('/resume/materials'", 'Legacy ?tab=materials URL redirects to job material library')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', "searchParams.get('tab') === 'materials'", 'Legacy redirect is gated by tab=materials')
 assertContains('src/pages/resume/ResumeTemplateLibraryPage.tsx', 'legacyMaterialsTab', 'Resume template page names the legacy materials redirect condition')
