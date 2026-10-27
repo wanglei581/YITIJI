@@ -1443,12 +1443,12 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
   terminalBaseline(api)
   await page.goto('/assistant')
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
-  // 稿 05：页面名与当前导航项都是「AI 顾问」，全页只有一个 h1，工作台区域有可访问名称。
+  // 触屏稿：意图带标题是座舱文案，底栏当前项仍是「AI 顾问」，全页只有一个 h1。
   await expect(page.locator('h1')).toHaveCount(1)
-  await expect(page.getByRole('heading', { level: 1, name: 'AI 顾问' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '你想解决什么？' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'AI 顾问咨询工作台' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: 'AI 顾问' })).toHaveAttribute('aria-current', 'page')
-  const navTop = await page.locator('.qx-navbar').evaluate((el) => el.getBoundingClientRect().top)
+  const navTop = await page.locator('.qxt-nav').evaluate((el) => el.getBoundingClientRect().top)
   const input = await page.getByLabel('输入咨询问题').evaluate((el) => el.getBoundingClientRect().toJSON())
   const send = await page.locator('.assistant-send').evaluate((el) => el.getBoundingClientRect().toJSON())
   const cols = await page.locator('.assistant-ai-tools-grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)

@@ -88,15 +88,15 @@ expectIncludes(
   '<section className="kassist kassist-qingxu" aria-label="AI 顾问咨询工作台">',
   '助手工作台区域保留可访问名称',
 )
-expect(!/<h1[\s>]/.test(assistantPage), '助手页不再自带第二个 h1（页面名由 QxPageFrame 顶部标题承担）')
+expect(!/<h1[\s>]/.test(assistantPage), '助手页不再自带第二个 h1（页面名由触屏意图带承担）')
 expect(!assistantModule.includes('kassist-sr-only">AI顾问'), '隐藏的重复 AI顾问 标题已移除')
 {
-  const frameStart = assistantPage.indexOf('<QxPageFrame')
+  const frameStart = assistantPage.indexOf('<PublicTouchFrame')
   const frameEnd = frameStart < 0 ? -1 : assistantPage.indexOf('\n    >\n', frameStart)
   const frameProps = frameEnd < 0 ? '' : assistantPage.slice(frameStart, frameEnd)
-  expect(frameProps.includes('title="AI 顾问"'), '稿 05 页面名：QxPageFrame 可见标题为 AI 顾问')
-  expect(/aria-current="page">[\s\S]*?AI 顾问<\/button>/.test(frameProps), '稿 05 底栏：当前导航项可见文案为 AI 顾问')
-  expect(frameProps !== '' && !frameProps.includes('问小青'), '稿 05 已下线「问小青」称呼：页壳标题与底栏不再出现')
+  expect(frameProps.includes('title={cockpitCopy.title.join'), '触屏意图带标题取自座舱文案')
+  expect(frameProps.includes('navCurrent="advisor"'), '底栏当前项交给触屏导航的 AI 顾问')
+  expect(frameProps.includes('eyebrow="问小青"'), '触屏稿眉题是问小青，不是 JSX 正文')
 }
 expect(!/>[^<>{}]*问小青[^<>{}]*</.test(assistantPage), '助手页 JSX 可见文案不再出现「问小青」')
 expect(!assistantPage.includes('ReferenceServiceNav'), '助手页移除首页服务分类导航')

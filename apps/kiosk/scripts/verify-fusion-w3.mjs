@@ -222,11 +222,13 @@ const qxScreens = new Set([
 ])
 for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
-  const frame = qxScreens.has(path)
-    ? 'QxPageFrame'
-    : isInterview
-      ? 'InterviewShell'
-      : 'KioskPageFrame'
+  const frame = path.endsWith('/AssistantPage.tsx')
+    ? 'PublicTouchFrame'
+    : qxScreens.has(path)
+      ? 'QxPageFrame'
+      : isInterview
+        ? 'InterviewShell'
+        : 'KioskPageFrame'
   includes(path, frame, `${screen} consumes the frozen W1 frame`)
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }

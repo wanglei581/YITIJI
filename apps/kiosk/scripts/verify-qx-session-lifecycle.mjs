@@ -65,9 +65,9 @@ check('standby empty playlist still exits home and does not invent media', () =>
 })
 
 check('login gate has a leave-without-login exit and no 已登录 overlay', () => {
-  assert.match(files.loginPage, /QxPageFrame/)
-  // 规则 1：顶栏返回键保留，底部也要有回退。03 / 30 三张稿顶栏都有返回键。
-  assert.match(files.loginPage, /<QxStepActions onPrev=\{goHome\} prevLabel="返回首页"/)
+  assert.match(files.loginPage, /PublicTouchFrame/)
+  // 规则 1：顶栏返回键保留，底部也要有回退。触屏稿顶栏与底栏都回首页。
+  assert.match(files.loginPage, /data-testid="login-gate-back"[\s\S]{0,40}onClick=\{goHome\}>返回首页/)
   assert.match(files.loginPage, /back=\{\{\s*label:\s*'返回首页',\s*onBack:\s*goHome\s*\}\}/)
   assert.match(files.profilePage, /back=\{\{\s*label:\s*'返回首页'/)
   assert.match(files.profilePage, /<QxStepActions onPrev=/)

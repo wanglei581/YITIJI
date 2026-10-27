@@ -22,11 +22,12 @@ const root = read('src/layouts/KioskRoot.tsx')
 assert.match(errorPage, /useRouteError/)
 assert.match(errorPage, /isRouteErrorResponse/)
 assert.match(errorPage, /页面不存在/)
-assert.match(errorPage, /页面暂时无法显示/)
-assert.match(errorPage, /重试页面/)
+assert.match(errorPage, /这一页打不开/)
+assert.match(errorPage, /重新打开/)
 assert.match(errorPage, /返回首页/)
 assert.match(errorPage, /window\.location\.reload\(\)/)
 assert.match(errorPage, /navigate\('\/',\s*\{\s*replace:\s*true\s*\}\)/)
+assert.doesNotMatch(errorPage, /找工作人员|联系工作人员/)
 assert.doesNotMatch(errorPage, /\{\s*(?:error|routeError)\s*\}/, 'raw route errors must never render into public UI')
 assert.doesNotMatch(errorPage, /\.stack\b/, 'stack traces must never render into public UI')
 
@@ -82,16 +83,22 @@ for (const route of routerArray.elements) {
   }
 
   const dataUrl = (code) => `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`
-  const chromeUrl = dataUrl('export const getKioskPresentationAttributes = () => ({});'
+  const jsxRuntime = import.meta.resolve('react/jsx-runtime')
+  const chromeUrl = dataUrl(
+    `import { jsx as h, jsxs as hs } from '${jsxRuntime}';`
+    + 'export const getKioskPresentationAttributes = () => ({});'
     + 'export const KioskTopbar = () => null; export const KioskStageFit = ({ children }) => children;'
-    + 'export const HomeIcon = () => null; export const RefreshCwIcon = () => null; export const TriangleAlertIcon = () => null;')
+    + 'export const HomeIcon = () => null; export const RefreshCwIcon = () => null; export const TriangleAlertIcon = () => null;'
+    + 'export const useSupportContact = () => ({ servicePhone: null, serviceHours: null });'
+    + 'export const PublicTouchFrame = ({ title, children, dock }) => hs("div", { children: [h("h1", { children: title }), children, dock] });',
+  )
   const compile = (code) => ts.transpileModule(code, {
     fileName: 'probe.tsx',
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText.replace(/from ["']react\/jsx-runtime["']/g, `from '${import.meta.resolve('react/jsx-runtime')}'`)
   const pageUrl = dataUrl(compile(errorPage)
     .replaceAll("from 'react-router-dom'", `from '${import.meta.resolve('react-router-dom')}'`)
-    .replace(/from '(?:@ai-job-print\/ui|lucide-react|\.\.\/\.\.\/components\/kiosk-shell\/KioskStageFit)'/g, `from '${chromeUrl}'`))
+    .replace(/from '(?:@ai-job-print\/ui|lucide-react|\.\.\/\.\.\/components\/kiosk-shell\/KioskStageFit|\.\.\/\.\.\/hooks\/useSupportContact|\.\.\/public-touch\/PublicTouchFrame)'/g, `from '${chromeUrl}'`))
   const { KioskRouteErrorPage } = await import(pageUrl)
   const { fallback } = await import(dataUrl(compile(
     `import { KioskRouteErrorPage } from '${pageUrl}'; export const fallback = ${fallbackElement}`,
@@ -113,7 +120,7 @@ for (const route of routerArray.elements) {
   }
   assert.match(await renderRoute('/registered'), /已注册页面/)
   for (const error of [new Error('render failed'), new Response('unavailable', { status: 500 })]) {
-    assert.match(await renderRoute('/registered', () => { throw error }), /页面暂时无法显示/,
+    assert.match(await renderRoute('/registered', () => { throw error }), /这一页打不开/,
       'registered route failures must not be disguised as missing pages')
   }
   assert.match(await renderRoute('/registered', () => { throw new Response('missing', { status: 404 }) }), /页面不存在/)

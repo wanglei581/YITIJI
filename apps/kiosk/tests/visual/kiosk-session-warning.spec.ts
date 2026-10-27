@@ -440,10 +440,12 @@ test('orphan /session-timeout shows the clearing overlay on first frame and neve
       const heading = document.querySelector('#session-timeout-title')
       const buttons = Array.from(document.querySelectorAll('button'))
       const exitButton = buttons.find((button) =>
-        /结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /结束并清除这台机器上的这次使用记录|现在结束使用/.test(button.textContent ?? '')
+        || /结束并清除这台机器上的这次使用记录/.test(button.getAttribute('aria-label') ?? '')
       )
       const continueButton = buttons.find((button) =>
-        /我还在，继续使用|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        /我还在|结束并清除这台机器上的这次使用记录/.test(button.textContent ?? '')
+        || /我还在，继续使用/.test(button.getAttribute('aria-label') ?? '')
       )
       const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
         /当前登录：|当前会话：/.test(el.textContent ?? '')

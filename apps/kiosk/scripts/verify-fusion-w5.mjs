@@ -227,11 +227,11 @@ for (const marker of ['config.enabled', 'items.length > 0', '<QrLaunchModal', '<
 }
 assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
 /* 2026-09-25 稿 08-legal 迁入青序流光，同强度替换三条：
- * ① 页壳 KioskPageFrame/KioskPageHeader → QxPageFrame（并断言已退出 V6 壳）；
+ * ① 页壳 KioskPageFrame/KioskPageHeader → 触屏 PublicTouchFrame（并断言已退出 V6 壳）；
  * ② 旧页用 `apiContent ? ( … )` / `!apiContent && ( … )` 两支表达「服务端正文 / 本机留存文本」，
  *    新页拆成显式视图：ready 只渲染服务端正文分出的章节，fallback 渲染本机留存文本且必须挂「不作为正式版本」标注；
  * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到青序壳的 .qx-body（稿自带 44px 页边）。 */
-assert.match(legalDoc, /<QxPageFrame\b/, 'LegalDocPage uses the Qingxu page frame')
+assert.match(legalDoc, /<PublicTouchFrame\b/, 'LegalDocPage uses the Qingxu touch page frame')
 assert.doesNotMatch(legalDoc, /KioskPageFrame|KioskPageHeader/, 'LegalDocPage has left the V6 frame')
 assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
 assert.match(
