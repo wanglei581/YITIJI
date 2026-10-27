@@ -332,8 +332,94 @@
   background: var(--qxt-card);
 }
 
-[data-qx-page="interview"] .qxt-iv-panel :is(p, span, small, li, button, label, h3, h4) {
+/* 简历来源面板是共享件（手机扫码、U 盘导入），自带 Tailwind 的小字号和 48px 按钮，
+   触屏页的按钮重置又把它们的底色抹掉了。这里只从外面补：字号不低于 20px，按钮不小于 64×64、有边有底。
+   不改它们的文件（上传面板的文件是冻结的）。 */
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel :is(h1, h2, h3, h4, p, li, span, small, label, a) {
   font-size: max(1em, var(--qxt-fs-aux));
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] [data-qx-interview] .qxt-iv-panel button:disabled {
+  opacity: 0.48;
+}
+
+/* 行业选择弹窗也是共享件（KioskFilterPickerModal，职位页、企业页、简历诊断同在用）：
+   进到触屏页里，页面的按钮重置把 20 个选项的边和底抹光了，选中态也看不出来，
+   「当前：」字号 18px、选项和底部按钮 58px 高、关闭键 56px。只从外面补，不改共享件的文件。
+   弹窗和页面内容是兄弟节点，所以这里挂在页面根上，不挂 [data-qx-interview]。 */
+[data-qx-page="interview"] .ui-kiosk-modal-dialog .ui-kiosk-modal-close {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section span {
+  font-size: var(--qxt-fs-aux);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--qxt-tap);
+  padding: 8px 14px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-content section button[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 28px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+[data-qx-page="interview"] .ui-kiosk-modal-actions button[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
 }
 
 /* 创建失败后的降级区：共享 AiTaskRegion 的字号和按钮在触屏里重排 */

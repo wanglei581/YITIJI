@@ -1,5 +1,6 @@
 /* 练面试服务台（稿 interview / interview-more）。只挂在 [data-qx-page="interview"] 下。
-   一屏放下正常、在线服务不可用、检查中三态，不滚动、互不遮挡：每个子项只按内容高，余高归主卡。 */
+   一屏放下正常、在线服务不可用、检查中三态，不滚动、互不遮挡：正常态主卡那一行吃余高，
+   停用与检查中态每一行只按内容高，余高匀进行距。 */
 
 [data-qx-page="interview"] .qxt-body.qxt-body-hub {
   padding: 0;

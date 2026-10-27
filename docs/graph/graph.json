@@ -13514,7 +13514,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 667,
+      "reachableFileCount": 673,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13876,6 +13876,10 @@
             "apps/kiosk/src/pages/interview/styles/interview-session.css",
             "apps/kiosk/src/pages/interview/styles/interview-shell-ext.css",
             "apps/kiosk/src/pages/interview/styles/interview-shell.css",
+            "apps/kiosk/src/pages/interview/styles/interview-touch-lists.css",
+            "apps/kiosk/src/pages/interview/styles/interview-touch-report.css",
+            "apps/kiosk/src/pages/interview/styles/interview-touch-run.css",
+            "apps/kiosk/src/pages/interview/styles/interview-touch-setup.css",
             "apps/kiosk/src/pages/interview/styles/interview-touch.css",
             "apps/kiosk/src/pages/interview/styles/interview-workbench-qx.css",
             "apps/kiosk/src/styles/ai-primitives.css",
@@ -16489,7 +16493,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 761
+      "sourceFileCount": 767
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
