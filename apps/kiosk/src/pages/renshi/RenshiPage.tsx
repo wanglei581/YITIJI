@@ -9,6 +9,7 @@ import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { AUDIENCE_CHIPS, fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type TabKey } from './shared'
 import { BUILTIN_GUIDES } from './builtinData'
 import { OfficialEntryQrOverlay, RqDeadEnd, SourceLine, TabBar, type DeadEndExit, type SourceQrTarget } from './components'
@@ -22,6 +23,7 @@ import { NoticePanel } from './NoticePanel'
 import './renshi-policy-fusion.css'
 import './renshi-eligibility-qx.css'
 import './renshi-narrow-qx.css'
+import './renshi-touch.css'
 
 const TAB_TITLE: Record<TabKey, string> = {
   policy: '就业政策',
@@ -281,6 +283,24 @@ export function RenshiPage() {
 
   const goHub = () => navigate('/policy-service')
   const readFailed = policyState === 'error' && (activeTab === 'policy' || activeTab === 'notice')
+  const bodyHint = activeTab === 'eligibility'
+    ? null
+    : readFailed
+      ? '重试会先回到读取中，本机不把「点了重试」直接显示成读取成功。'
+      : activeTab === 'policy'
+        ? (policyState === 'loading'
+          ? '政策还没读回来，打印你自己带来的材料不受影响。'
+          : '政策与指引只做说明；需要纸质件请上传你自己的材料。')
+        : activeTab === 'social'
+          ? '社保材料请自行准备，本机只负责打印。'
+          : activeTab === 'register'
+            ? '把清单里需要复印的材料上传，本机可直接出纸。'
+            : policyState === 'loading'
+              ? '公告还没读回来，打印你自己带来的材料不受影响。'
+              : notices.length === 0
+                ? '公告为空不影响打印你自己带来的材料。'
+                : '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。'
+  const askDraft = '问小青别的问题，不判断能不能办'
 
   // 稿 48 的死路屏：政策与公告同一次读取，读取中 / 读取失败时两个分区给同一屏；三条出口都不等这次读取。
   const offReadExits = (hint: string): DeadEndExit[] => [
@@ -317,7 +337,9 @@ export function RenshiPage() {
 
   const bandStatus = focusOnList && focusFrame ? focusFrame.status : frame.status
   const bandSub = focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle
+  const renshiPageAttr = { 'data-qx-page': 'renshi' } as const
   return (
+    <div {...renshiPageAttr} className="rq-touch-fill">
     <QxTouchScreen
       testId="renshi-touch"
       stateId={activeTab}
@@ -342,64 +364,46 @@ export function RenshiPage() {
         />
       )}
       dock={(
-        <div className="rq-cta-stack">
+        <footer className="qxt-dock rq-touch-dock">
+          <button type="button" className="qxt-btn qxt-btn-sec" onClick={goHub}>返回政策服务</button>
+          <button
+            type="button"
+            className="qxt-askq"
+            onClick={() => {
+              rememberAssistantDraft(askDraft)
+              navigate('/assistant')
+            }}
+          >
+            <span>{AI_LABEL}</span>
+          </button>
           <div className="rq-cta-row" data-testid="renshi-ctabar">
             {activeTab === 'eligibility' ? (
               <div ref={setEligHost} className="rq-cta-host" />
             ) : readFailed ? (
-              <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => loadPolicies('block')}>重新读取</button>
-                <span className="why">重试会先回到读取中，本机不把「点了重试」直接显示成读取成功。</span>
-              </>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => loadPolicies('block')}>重新读取</button>
             ) : activeTab === 'policy' ? (
-              <>
-                <button type="button" className="qx-btn" data-variant="primary" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
-                  <PrinterIcon aria-hidden="true" />
-                  上传自备材料打印
-                </button>
-                <span className="why">
-                  {policyState === 'loading'
-                    ? '政策还没读回来，打印你自己带来的材料不受影响。'
-                    : '政策与指引只做说明；需要纸质件请上传你自己的材料。'}
-                </span>
-              </>
+              <button type="button" className="qxt-btn qxt-btn-pri" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
+                <PrinterIcon aria-hidden="true" />
+                上传自备材料打印
+              </button>
             ) : activeTab === 'social' ? (
-              <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
-                  <PrinterIcon aria-hidden="true" />
-                  上传自备材料打印
-                </button>
-                <span className="why">社保材料请自行准备，本机只负责打印。</span>
-              </>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => navigate('/print/upload')}>
+                <PrinterIcon aria-hidden="true" />
+                上传自备材料打印
+              </button>
             ) : activeTab === 'register' ? (
-              <>
-                <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
-                  <PrinterIcon aria-hidden="true" />
-                  上传自备材料打印
-                </button>
-                <span className="why">把清单里需要复印的材料上传，本机可直接出纸。</span>
-              </>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => navigate('/print/upload')}>
+                <PrinterIcon aria-hidden="true" />
+                上传自备材料打印
+              </button>
             ) : (
-              <>
-                <button type="button" className="qx-btn" data-variant="primary" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
-                  <PrinterIcon aria-hidden="true" />
-                  上传自备材料打印
-                </button>
-                <span className="why">
-                  {policyState === 'loading'
-                    ? '公告还没读回来，打印你自己带来的材料不受影响。'
-                    : notices.length === 0
-                      ? '公告为空不影响打印你自己带来的材料。'
-                      : '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。'}
-                </span>
-              </>
+              <button type="button" className="qxt-btn qxt-btn-pri" data-upload-target={uploadTarget ?? ''} onClick={() => uploadOwn(uploadTarget)}>
+                <PrinterIcon aria-hidden="true" />
+                上传自备材料打印
+              </button>
             )}
           </div>
-          <p className="rq-truth" data-testid="renshi-truth">
-            <b>仅信息指引 · 不代办</b>
-            本机只做政策说明、材料清单、来源入口与打印辅助；不代申请、不收费、不承诺补贴到账，也不保存身份证、银行卡或社保材料。
-          </p>
-        </div>
+        </footer>
       )}
     >
       <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
@@ -415,6 +419,11 @@ export function RenshiPage() {
           <TabBar active={activeTab} onChange={setActiveTab} />
         </div>
         <div className="qx-scroll rq-scroll">
+          {bodyHint ? <p className="rq-touch-hint why">{bodyHint}</p> : null}
+          <p className="rq-truth rq-touch-hint" data-testid="renshi-truth">
+            <b>仅信息指引 · 不代办</b>
+            本机只做政策说明、材料清单、来源入口与打印辅助；不代申请、不收费、不承诺补贴到账，也不保存身份证、银行卡或社保材料。
+          </p>
           {guard.message && focus.phase === 'idle' && (activeTab === 'policy' || activeTab === 'notice') ? (
             <p className="rq-note rq-note-warn" role="status" data-testid="renshi-policy-action" data-action-phase={guard.phase}>
               {guard.message}
@@ -470,5 +479,6 @@ export function RenshiPage() {
         </div>
       </div>
     </QxTouchScreen>
+    </div>
   )
 }

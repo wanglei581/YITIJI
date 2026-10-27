@@ -1,48 +1,58 @@
-.qxt-screen .p10-hub {
+/* 政策服务台页内样式。只挂在 .p10-hub 下，不改共享 .qxt-sec。 */
+
+.qxt-screen .qxt-body:has(> .p10-hub) {
+  justify-content: flex-start;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-flow svg {
+  left: 4%;
+  width: 92%;
+}
+
+.qxt-screen:has(.p10-hub) .qxt-halo {
+  right: 24px;
+  width: 640px;
+}
+
+.p10-hub {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 22px;
+  min-height: 0;
 }
 
-.qxt-screen .p10-truth,
-.qxt-screen .p10-note,
-.qxt-screen .p10-notice,
-.qxt-screen .p10-why,
-.qxt-screen .p10-sec h2,
-.qxt-screen .qxt-sec h2 {
-  font-size: 22px;
-  line-height: 1.45;
-}
-
-.qxt-screen .p10-truth {
-  margin: 0;
-  font-weight: 700;
-}
-
-.qxt-screen .p10-notice {
+.p10-hub .p10-notice {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
   align-items: center;
   padding: 18px 20px;
   border-radius: 18px;
-  background: var(--qx-paper);
+  background: var(--qxt-clay-wash, var(--qxt-well));
+  color: var(--qxt-ink);
 }
 
-.qxt-screen .p10-notice b {
+.p10-hub .p10-notice b,
+.p10-hub .p10-note,
+.p10-hub .p10-why,
+.p10-hub .p10-sec h2 {
   font-size: 22px;
+  line-height: 1.45;
 }
 
-.qxt-screen .p10-notice span,
-.qxt-screen .p10-why {
+.p10-hub .p10-notice span,
+.p10-hub .p10-why {
   font-size: 20px;
+  line-height: 1.45;
 }
 
-.qxt-screen .p10-why {
+.p10-hub .p10-why {
   display: block;
   margin: 6px 8px 0;
 }
 
+.p10-hub .p10-retry,
 .qxt-screen .p10-retry {
   min-width: 64px;
   min-height: 64px;
@@ -54,19 +64,39 @@
   font-size: 20px;
 }
 
-.qxt-screen .p10-list {
+.p10-hub .p10-sec {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
-.qxt-screen .p10-note {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
+.p10-hub .p10-grid {
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+.p10-hub .p10-grid > .qxt-tile {
+  height: 100%;
+  min-height: 132px;
+}
+
+.p10-hub .p10-sec h2 {
   margin: 0;
+  font-weight: 700;
 }
 
-.qxt-screen .qxt-sec h2 {
-  margin: 0 0 12px;
+.p10-hub .p10-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 16px;
+}
+
+.p10-hub .p10-note {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
 }

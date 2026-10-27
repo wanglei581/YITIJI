@@ -18,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { CapabilityStayCards } from '../../auth/CapabilityStayCards'
 import '../../auth/capability-gate-touch.css'
 import type { KioskSmartCampusConfig } from '@ai-job-print/shared'
 import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
@@ -46,7 +47,7 @@ export function SmartCampusGuard({ module, children }: Props) {
       band={(
         <QxTouchBand
           eyebrow="智慧校园"
-          title="本机暂未开启这项智慧校园服务"
+          title="智慧校园"
           back={false}
           status={{ text: '未开启', tone: 'unknown' }}
         />
@@ -58,8 +59,11 @@ export function SmartCampusGuard({ module, children }: Props) {
         />
       )}
     >
-      <div className="p10-gate" data-kiosk-screen="capability-gate">
-        <p role="status">本机暂未开启这项智慧校园服务</p>
+      <div className="p10-gate-wrap">
+        <div className="p10-gate" data-kiosk-screen="capability-gate">
+          <p role="status">本机暂未开启这项智慧校园服务</p>
+        </div>
+        <CapabilityStayCards />
       </div>
     </QxTouchScreen>
   )

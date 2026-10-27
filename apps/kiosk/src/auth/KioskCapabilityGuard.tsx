@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../components/qingxu/touch/QxTouchDock'
 import { QxTouchScreen } from '../components/qingxu/touch/QxTouchScreen'
+import { CapabilityStayCards } from './CapabilityStayCards'
 import './capability-gate-touch.css'
 import {
   OFF_SMART_CAMPUS_CAPABILITY,
@@ -46,6 +47,7 @@ function capabilityReady(state: {
 function CapabilityUnavailable({ loading, label }: { loading: boolean; label: string }) {
   const navigate = useNavigate()
   const text = loading ? `${label}配置检查中` : `本机暂未开启${label}`
+  const title = label.startsWith('智慧校园') ? '智慧校园' : '百宝箱'
   return (
     <QxTouchScreen
       testId="capability-gate-touch"
@@ -53,7 +55,7 @@ function CapabilityUnavailable({ loading, label }: { loading: boolean; label: st
       band={(
         <QxTouchBand
           eyebrow="本机能力"
-          title={text}
+          title={title}
           back={false}
           status={{ text: loading ? '正在确认' : '未开启', tone: 'unknown' }}
         />
@@ -65,13 +67,16 @@ function CapabilityUnavailable({ loading, label }: { loading: boolean; label: st
         />
       )}
     >
-      <div
-        className="p10-gate"
-        data-kiosk-screen="capability-gate"
-        data-kiosk-capability-gate={label.startsWith('智慧校园') ? 'smart-campus' : 'toolbox'}
-        data-capability-state={loading ? 'loading' : 'unavailable'}
-      >
-        <p role="status" aria-live="polite">{text}</p>
+      <div className="p10-gate-wrap">
+        <div
+          className="p10-gate"
+          data-kiosk-screen="capability-gate"
+          data-kiosk-capability-gate={label.startsWith('智慧校园') ? 'smart-campus' : 'toolbox'}
+          data-capability-state={loading ? 'loading' : 'unavailable'}
+        >
+          <p role="status" aria-live="polite">{text}</p>
+        </div>
+        {loading ? null : <CapabilityStayCards />}
       </div>
     </QxTouchScreen>
   )

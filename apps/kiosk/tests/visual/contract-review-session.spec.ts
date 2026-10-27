@@ -1,4 +1,19 @@
 import { expect, test, type Page } from '@playwright/test'
+import { assertDialogWithinViewport } from './assert-layout'
+
+async function expectScreenFillsViewport(page: Page): Promise<void> {
+  const box = await page.locator('.qxt-screen').boundingBox()
+  const viewport = page.viewportSize()
+  expect(box, '触屏页必须有尺寸').not.toBeNull()
+  expect(viewport, '视口必须固定').not.toBeNull()
+  if (!box || !viewport) return
+  expect(Math.round(box.height)).toBe(viewport.height)
+  const dock = page.locator('.qxt-dock')
+  const dockBox = await dock.boundingBox()
+  expect(dockBox, '底栏必须可见').not.toBeNull()
+  if (!dockBox) return
+  expect(dockBox.y + dockBox.height).toBeLessThanOrEqual(viewport.height + 1)
+}
 
 async function startReview(page: Page): Promise<void> {
   await page.goto('/contract-review')
@@ -56,4 +71,30 @@ test('风险提示报告可保存到我的文档且不进入打印链路 @contra
   await expect(page.getByRole('button', { name: '保存到我的文档' })).toBeVisible()
   await expect(page.getByRole('button', { name: '打印风险提示报告' })).toHaveCount(0)
   await expect(page.getByText(/需要先登录本人会员账号|保存后仅本人/)).toBeVisible()
+})
+
+test('三条合同路由铺满视口，底栏贴在视口内 @contract', async ({ page }) => {
+  await page.goto('/contract-review')
+  await expectScreenFillsViewport(page)
+  const selected = page.locator('.cr-type-btn--active').first()
+  const idle = page.locator('.cr-type-btn:not(.cr-type-btn--active)').first()
+  const selectedBg = await selected.evaluate((el) => getComputedStyle(el).backgroundColor)
+  const idleBg = await idle.evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(selectedBg).not.toBe(idleBg)
+
+  await startReview(page)
+  await expectScreenFillsViewport(page)
+  await expect(page.getByText('确认文件提取结果')).toBeVisible({ timeout: 12_000 })
+  await assertDialogWithinViewport(page)
+  const dialog = page.getByRole('dialog')
+  for (const name of ['取消审查', '确认，开始分析']) {
+    const button = dialog.getByRole('button', { name })
+    const box = await button.boundingBox()
+    expect(box, `${name} 必须可见`).not.toBeNull()
+    expect(box!.height).toBeGreaterThanOrEqual(64)
+  }
+
+  await page.getByRole('button', { name: '确认，开始分析' }).click()
+  await expect(page).toHaveURL(/\/contract-review\/result$/, { timeout: 18_000 })
+  await expectScreenFillsViewport(page)
 })

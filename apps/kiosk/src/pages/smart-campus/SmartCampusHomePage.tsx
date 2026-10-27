@@ -33,8 +33,8 @@ import { itemBadge, launchKioskAppItem } from '../home/components/kioskAppLaunch
 import { ExternalLaunchModal, QrLaunchModal } from '../home/components/ToolboxLaunchModals'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import './smart-campus-touch.css'
 import { FusionNotice } from '../jobs/components/W4Presentation'
 
 interface SmartCampusCard {
@@ -171,6 +171,7 @@ export function SmartCampusHomePage() {
         : `可查看指引 ${cards.length} 项`
 
   return (
+    <div data-qx-page="smart-campus" className="sc-touch-fill w4-page-frame">
     <QxTouchScreen
       testId="smart-campus-touch"
       bodyClassName="qxt-body-scroll"
@@ -179,7 +180,7 @@ export function SmartCampusHomePage() {
           eyebrow="智慧校园"
           title="智慧校园"
           sub="校园场景服务专区 · 按本机配置开放"
-          onBack={() => navigate('/')}
+          back={false}
           status={statusBadge ? { text: statusBadge, tone: 'unknown' } : false}
         />
       )}
@@ -190,13 +191,12 @@ export function SmartCampusHomePage() {
           ask={{ label: '问小青', draft: '这台机器上的校园指引能看什么？请只做说明。' }}
         />
       )}
-      nav={(
-        <QxTouchNav
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-        />
-      )}
+      overlay={qrItem || externalItem ? (
+        <>
+          <QrLaunchModal item={qrItem} placement="smart_campus" onClose={() => setQrItem(null)} />
+          <ExternalLaunchModal item={externalItem} placement="smart_campus" onClose={() => setExternalItem(null)} />
+        </>
+      ) : undefined}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
@@ -271,9 +271,7 @@ export function SmartCampusHomePage() {
           <FusionNotice>实际办理请前往现场服务窗口或学校官方自助平台；校园大数据模块暂未开放，开放前不展示任何统计数据。</FusionNotice>
         </div>
 
-      {/* 扩展应用启动弹窗：placement=smart_campus，二维码/外链离场确认与匿名上报复用 toolbox 同款。 */}
-      <QrLaunchModal item={qrItem} placement="smart_campus" onClose={() => setQrItem(null)} />
-      <ExternalLaunchModal item={externalItem} placement="smart_campus" onClose={() => setExternalItem(null)} />
     </QxTouchScreen>
+    </div>
   )
 }

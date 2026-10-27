@@ -245,19 +245,58 @@ test('在线服务「正在确认」同样不放行，白名单不受影响 @kio
 
   expect(hub.readiness).toBe('checking')
   expect(hub.pill).toBe('正在确认在线服务')
-  // 「还不知道」不构成放行理由：checking 与 unavailable 一样 fail-closed。
-  expect(byTitle(hub.cards, '就业政策')).toEqual({
-    title: '就业政策',
+  expect(hub.probe).toBe('off')
+  expect(byTitle(hub.cards, '查政策与公告')).toEqual({
+    title: '查政策与公告',
     clickable: false,
     reason: '正在确认在线服务',
   })
-  expect(byTitle(hub.cards, '打开AI顾问').reason).toBe('正在确认AI能力状态')
-  // 白名单的两条静态指引不依赖后端，checking 期间照样可进。
-  expect(hub.cards.filter((card) => card.clickable).map((card) => card.title).sort()).toEqual(
-    ['社保指南', '档案与登记'].sort(),
-  )
-  // 政策服务台没有设备能力：即使在线服务还没确认，也不该顺带播报本机设备。
+  expect(byTitle(hub.goals, '找就业政策')).toEqual({
+    title: '找就业政策',
+    clickable: false,
+    reason: '正在确认在线服务',
+  })
+  expect(byTitle(hub.goals, '核对申领条件')).toEqual({
+    title: '核对申领条件',
+    clickable: false,
+    reason: '正在确认在线服务',
+  })
+  for (const title of ['浏览记录', 'AI 服务记录', '政策收藏']) {
+    expect(byTitle(hub.quick, title)).toEqual({
+      title,
+      clickable: false,
+      reason: '正在确认在线服务',
+    })
+  }
+  const clickable = [...hub.cards, ...hub.goals, ...hub.quick]
+    .filter((entry) => entry.clickable)
+    .map((entry) => entry.title)
+    .sort()
+  expect(clickable).toEqual(['全部服务', '查社保材料', '看登记档案'].sort())
+  await expect(page.getByRole('button', { name: '打开AI顾问' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '问小青' })).toBeVisible()
+})
+
+test('在线服务不可用时只放行社保、登记、全部服务和重新检测 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'down', printer: { isOnline: true, printerStatus: 'ready' } })
+
+  await page.goto('/policy-service')
+  const hub = await readPolicyHub(page)
+
+  expect(hub.readiness).toBe('unavailable')
   expect(hub.probe).toBe('off')
+  expect(byTitle(hub.cards, '查政策与公告').reason).toBe('在线服务当前不可用')
+  expect(byTitle(hub.goals, '找就业政策').reason).toBe('在线服务当前不可用')
+  expect(byTitle(hub.goals, '核对申领条件').reason).toBe('在线服务当前不可用')
+  for (const title of ['浏览记录', 'AI 服务记录', '政策收藏']) {
+    expect(byTitle(hub.quick, title).reason).toBe('在线服务当前不可用')
+  }
+  const clickable = [...hub.cards, ...hub.goals, ...hub.quick]
+    .filter((entry) => entry.clickable)
+    .map((entry) => entry.title)
+    .sort()
+  expect(clickable).toEqual(['全部服务', '查社保材料', '看登记档案'].sort())
+  await expect(page.getByRole('button', { name: '重新检测' })).toBeEnabled()
 })
 
 test('本机设备「正在确认」时提示条不说就绪态的话 @kiosk', async ({ page, api }) => {
@@ -361,4 +400,57 @@ test('阳性对照：在线服务就绪时，同一个按钮真的会进入 setu
   await dialog.getByRole('button', { name: '制造业', exact: true }).click()
   await dialog.getByRole('button', { name: '完成' }).click()
   await chooseInterviewExperience(page)
+})
+
+test('条件核对未选中的选项有边框且高度不少于 64 @kiosk', async ({ page, api }) => {
+  registerShell(api, { api: 'ready', printer: { isOnline: true, printerStatus: 'ready' } })
+  api.respond('GET', '/api/v1/policies', {
+    status: 200,
+    json: { data: [], pagination: { total: 0 } },
+  })
+  api.respond('GET', '/api/v1/policies/eligibility-questions', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      privacyNotice: '作答只留在本页，不写进网址。',
+      disclaimer: '本结果不是资格认定。',
+      questions: [{
+        key: 'household_social',
+        label: '户籍',
+        sensitive: true,
+        options: [
+          { value: 'local_household', label: '本地户籍' },
+          { value: 'other', label: '非本地户籍' },
+        ],
+      }],
+    },
+  })
+  api.respond('POST', '/api/v1/policies/eligibility-check', {
+    status: 200,
+    json: {
+      questionSetVersion: 'policy-eligibility-questions-v1',
+      checkedAt: '2026-10-27T00:00:00.000Z',
+      answeredCount: 0,
+      ignoredQuestionKeys: [],
+      disclaimer: '本结果不是资格认定。',
+      method: 'deterministic_comparison',
+      items: [{
+        policyId: 'p1',
+        title: '示例政策',
+        conditionsRecorded: true,
+        overall: 'some_conditions_unknown',
+        overallLabel: '有无法判定的条件',
+        conditions: [],
+        source: { sourceName: '来源机构', syncTime: '2026-10-27T00:00:00.000Z', externalId: null },
+      }],
+    },
+  })
+
+  await page.goto('/renshi?tab=eligibility')
+  const opt = page.locator('.k8-elig-opt[aria-pressed="false"]').first()
+  await expect(opt).toBeVisible()
+  const box = await opt.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(64)
+  const border = await opt.evaluate((el) => Number.parseFloat(getComputedStyle(el).borderTopWidth))
+  expect(border).toBeGreaterThan(0)
 })

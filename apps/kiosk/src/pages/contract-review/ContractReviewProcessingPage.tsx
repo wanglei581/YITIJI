@@ -8,10 +8,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Button,
-  KioskModal,
-} from '@ai-job-print/ui'
 import { COMPLIANCE_COPY, type ContractReviewTaskView, type ContractType } from '@ai-job-print/shared'
 import {
   BrainCircuitIcon,
@@ -29,8 +25,9 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { ContractTouchFrame } from './ContractTouchFrame'
 import {
   confirmContractReview,
   deleteContractReview,
@@ -200,16 +197,9 @@ export function ContractReviewProcessingPage() {
     ? `已处理 ${task.progress.completedPages} / ${task.totalPages} 页`
     : '等待返回页数'
 
-  const touchNav = (
-    <QxTouchNav
-      onHome={() => navigate('/')}
-      onAdvisor={() => navigate('/assistant')}
-      onProfile={() => navigate('/profile')}
-    />
-  )
-
   if (error) {
     return (
+      <ContractTouchFrame>
       <QxTouchScreen
         testId="contract-touch"
         stateId="failed"
@@ -217,26 +207,28 @@ export function ContractReviewProcessingPage() {
         band={(
           <QxTouchBand
             eyebrow="签约风险提示"
-            title="AI 签约风险提示"
-            sub="分析中"
-            onBack={() => void handleCancel()}
+            title="审查未完成"
+            sub={deleteError ?? error}
+            back={false}
             rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 1 }}
             status={{ text: '审查未完成', tone: 'warn' }}
           />
         )}
         dock={(
           <QxTouchDock
-            onBack={() => void handleCancel()}
-            backLabel="删除并返回"
+            back={false}
+            ask={{
+              label: '问小青：失败了还能打印吗？',
+              draft: '失败了还能打印吗？请只说明能不能去打印扫描，不要下结论。',
+            }}
             primary={{
-              label: '删除任务并返回简历服务',
+              label: cancelling ? '正在删除' : '删除任务并返回简历服务',
               disabled: cancelling,
               kind: 'danger',
               onClick: () => void handleCancel(),
             }}
           />
         )}
-        nav={touchNav}
       >
           <div className="cr-done-screen">
             <div className="cr-done-screen__icon" style={{ background: 'var(--error-soft)', color: 'var(--error)' }}>
@@ -244,16 +236,14 @@ export function ContractReviewProcessingPage() {
             </div>
             <p className="cr-done-screen__title">审查未完成</p>
             <p className="cr-done-screen__sub">{deleteError ?? error}</p>
-            <Button size="lg" disabled={cancelling} onClick={handleCancel}>
-              {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-              删除任务并返回简历服务
-            </Button>
           </div>
       </QxTouchScreen>
+      </ContractTouchFrame>
     )
   }
 
   return (
+    <ContractTouchFrame>
     <QxTouchScreen
       testId="contract-touch"
       stateId="wait"
@@ -271,34 +261,33 @@ export function ContractReviewProcessingPage() {
       dock={(
         <QxTouchDock
           back={false}
+          ask={{
+            label: '问小青：这一步在等什么？',
+            draft: '这一步在等什么？请只说明流程，不要下结论。',
+          }}
           primary={{
             label: cancelling ? '正在取消…' : '取消审查',
             disabled: cancelling,
-            kind: 'ghost',
             onClick: () => void handleCancel(),
           }}
         />
       )}
-      nav={touchNav}
       overlay={showConfirmModal && task ? (
-        <KioskModal
+        <QxTouchOverlay
+          kind="dialog"
           title="确认文件提取结果"
-          open={showConfirmModal}
           onClose={() => setShowConfirmModal(false)}
-          actions={
-            <div className="qx-ai-declaration-slot" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', gap: 16, width: '100%' }}>
-                <Button variant="ghost" onClick={handleCancel} style={{ flex: 1 }}>
-                  取消审查
-                </Button>
-                <Button onClick={handleConfirm} disabled={confirming} style={{ flex: 2 }}>
-                  {confirming ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-                  确认，开始分析
-                </Button>
-              </div>
-              <AiDeclarationNote />
-            </div>
-          }
+          actions={(
+            <>
+              <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => void handleCancel()}>
+                取消审查
+              </button>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => void handleConfirm()} disabled={confirming}>
+                {confirming ? <Loader2Icon size={18} className="animate-spin" aria-hidden="true" /> : null}
+                确认，开始分析
+              </button>
+            </>
+          )}
         >
           <div className="cr-confirm-modal">
             <div className="cr-confirm-modal__info">
@@ -343,8 +332,11 @@ export function ContractReviewProcessingPage() {
             <p style={{ fontSize: 20, color: 'var(--muted)', lineHeight: 1.55 }}>
               {COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_PROCESSING}。重大争议请咨询律师或官方窗口。
             </p>
+            <div className="qx-ai-declaration-slot">
+              <AiDeclarationNote />
+            </div>
           </div>
-        </KioskModal>
+        </QxTouchOverlay>
       ) : undefined}
     >
         {/* 步骤指示器 */}
@@ -416,22 +408,13 @@ export function ContractReviewProcessingPage() {
             })}
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={cancelling}
-            onClick={handleCancel}
-            style={{ marginTop: 8, color: 'var(--muted)' }}
-          >
-            {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
-            取消审查
-          </Button>
           {deleteError && (
-            <p role="alert" style={{ marginTop: -24, color: 'var(--error)', fontSize: 18 }}>
+            <p role="alert" style={{ marginTop: 8, color: 'var(--error)', fontSize: 20 }}>
               {deleteError}
             </p>
           )}
         </div>
     </QxTouchScreen>
+    </ContractTouchFrame>
   )
 }

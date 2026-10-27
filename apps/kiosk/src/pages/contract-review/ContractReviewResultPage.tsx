@@ -7,10 +7,6 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Button,
-  KioskModal,
-} from '@ai-job-print/ui'
 import { AI_LABEL_COPY, type ContractReviewFinding } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -18,19 +14,17 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronUpIcon,
-  HelpCircleIcon,
-  HomeIcon,
   InfoIcon,
+  PrinterIcon,
   Loader2Icon,
-  SaveIcon,
-  Trash2Icon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { ContractTouchFrame } from './ContractTouchFrame'
 import { deleteContractReview, keepContractReviewReport } from '../../services/api/contractReview'
 import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
 import {
@@ -80,8 +74,7 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
     <div className="cr-finding-card">
       <button
         type="button"
-        className="cr-finding-card__header"
-        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}
+        className={`cr-finding-card__header${expanded ? ' cr-finding-card__header--open' : ''}`}
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
@@ -204,17 +197,9 @@ export function ContractReviewResultPage() {
     }
   }
 
-  // 若直接进入此页但没有结果（刷新/深链），回首页
-  const touchNav = (
-    <QxTouchNav
-      onHome={() => navigate('/')}
-      onAdvisor={() => navigate('/assistant')}
-      onProfile={() => navigate('/profile')}
-    />
-  )
-
   if (!result) {
     return (
+      <ContractTouchFrame>
       <QxTouchScreen
         testId="contract-touch"
         stateId="missing"
@@ -222,16 +207,19 @@ export function ContractReviewResultPage() {
         band={(
           <QxTouchBand
             eyebrow="签约风险提示"
-            title="AI 签约风险提示"
-            sub="结果"
-            onBack={() => void deleteAndNavigate('/contract-review')}
-            status={{ text: '未找到审查结果', tone: 'unknown' }}
+            title="未找到审查结果"
+            sub={deleteError ?? '请重新上传合同进行审查'}
+            back={false}
+            status={{ text: '没有结果', tone: 'warn' }}
           />
         )}
         dock={(
           <QxTouchDock
-            onBack={() => void deleteAndNavigate('/contract-review')}
-            backLabel="返回"
+            back={false}
+            ask={{
+              label: '问小青：没有结果怎么办？',
+              draft: '没有审查结果时怎么办？请只说明可以重新上传或去打印，不要下结论。',
+            }}
             primary={{
               label: '重新上传',
               disabled: deleting,
@@ -239,21 +227,21 @@ export function ContractReviewResultPage() {
             }}
           />
         )}
-        nav={touchNav}
       >
-          <div className="cr-done-screen">
-            <div className="cr-done-screen__icon">
-              <HelpCircleIcon size={52} />
-            </div>
-            <p className="cr-done-screen__title">未找到审查结果</p>
+          <div className="cr-missing">
             <p className="cr-done-screen__sub">
-              {deleteError ?? '请重新上传合同进行审查'}
+              {deleteError ?? '直接打开这一页、或中途离开后，可能已经没有结果。'}
             </p>
-            <Button size="lg" disabled={deleting} onClick={() => void deleteAndNavigate('/contract-review')}>
-              重新上传
-            </Button>
+            <button type="button" className="cr-fill-card" onClick={() => navigate('/print-scan')}>
+              <span className="cr-fill-mark" aria-hidden="true"><PrinterIcon /></span>
+              <span className="cr-fill-copy">
+                <b>去打印扫描</b>
+                <span>没有结果时，仍可以把合同打印出来自己看。</span>
+              </span>
+            </button>
           </div>
       </QxTouchScreen>
+      </ContractTouchFrame>
     )
   }
 
@@ -262,6 +250,7 @@ export function ContractReviewResultPage() {
   const infoFindings = result.findings.filter((f) => f.priority === 'insufficient_info')
 
   return (
+    <ContractTouchFrame>
     <QxTouchScreen
       testId="contract-touch"
       stateId="result"
@@ -271,42 +260,43 @@ export function ContractReviewResultPage() {
           eyebrow="签约风险提示"
           title="审查结果"
           sub="AI 签约风险提示 · 仅供参考"
-          onBack={() => void deleteAndNavigate('/contract-review')}
+          back={false}
           rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 2 }}
           status={{ text: 'AI 生成，仅供参考', tone: 'unknown' }}
         />
       )}
-      nav={touchNav}
       dock={(
         <QxTouchDock
-          onBack={() => void deleteAndNavigate('/contract-review')}
-          backLabel="重新审查"
+          back={false}
+          ask={{
+            label: '问小青：哪一条要先核对？',
+            draft: '哪一条要先核对？请只说明怎么核对，不要下结论。',
+          }}
           primary={{
-            label: keepDone ? '已保存到我的文档' : '保存到我的文档',
-            disabled: !canKeep || deleting || keeping || keepDone,
-            onClick: () => {
-              if (!canKeep) return
-              setShowKeepConfirm(true)
-            },
+            label: deleting ? '正在删除' : '重新审查',
+            disabled: deleting,
+            onClick: () => void deleteAndNavigate('/contract-review'),
           }}
         />
       )}
       overlay={showKeepConfirm ? (
-        <KioskModal
+        <QxTouchOverlay
+          kind="dialog"
           title="保存到我的文档"
-          open={showKeepConfirm}
-          onClose={() => !keeping && setShowKeepConfirm(false)}
-          actions={
-            <div style={{ display: 'flex', gap: 16 }}>
-              <Button variant="ghost" disabled={keeping} onClick={() => setShowKeepConfirm(false)} style={{ flex: 1 }}>
+          onClose={() => {
+            if (!keeping) setShowKeepConfirm(false)
+          }}
+          actions={(
+            <>
+              <button type="button" className="qxt-btn qxt-btn-sec" disabled={keeping} onClick={() => setShowKeepConfirm(false)}>
                 暂不保存
-              </Button>
-              <Button disabled={keeping} onClick={() => void continueKeep()} style={{ flex: 2 }}>
-                {keeping ? <Loader2Icon size={18} className="animate-spin mr-1" /> : <SaveIcon size={18} className="mr-1" />}
+              </button>
+              <button type="button" className="qxt-btn qxt-btn-pri" disabled={keeping} onClick={() => void continueKeep()}>
+                {keeping ? <Loader2Icon size={18} className="animate-spin" aria-hidden="true" /> : null}
                 确认保存 90 天
-              </Button>
-            </div>
-          }
+              </button>
+            </>
+          )}
         >
           <div className="cr-confirm-modal">
             <div className="cr-confirm-modal__info">{KEEP_RETENTION_COPY}</div>
@@ -316,7 +306,7 @@ export function ContractReviewResultPage() {
               <div className="cr-confirm-modal__row"><span>打印</span><span>不可打印</span></div>
             </div>
           </div>
-        </KioskModal>
+        </QxTouchOverlay>
       ) : undefined}
     >
       <div className="cr-touch-result">
@@ -330,12 +320,6 @@ export function ContractReviewResultPage() {
           <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
             <AlertCircleIcon />
             <span>{keepError}</span>
-          </div>
-        )}
-        {!canKeep && keepDisabledReason && (
-          <div className="cr-disclaimer-banner" role="status">
-            <InfoIcon />
-            <span>{keepDisabledReason}</span>
           </div>
         )}
         {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
@@ -481,46 +465,35 @@ export function ContractReviewResultPage() {
             </>
           )}
         </div>
-        <div className="cr-touch-actions">
-          <Button
-            variant="outline"
-            size="lg"
-            style={{ flex: 1, minHeight: 64 }}
-            disabled={deleting}
-            onClick={() => void deleteAndNavigate('/contract-review')}
-          >
-            <HomeIcon size={20} className="mr-2" />
-            重新审查
-          </Button>
-          <Button
-            size="lg"
-            style={{ flex: 2, minHeight: 64 }}
-            disabled={!canKeep || deleting || keeping || keepDone}
-            aria-disabled={!canKeep || undefined}
-            title={keepDisabledReason ?? (keepDone ? '已保存到我的文档' : '保存到我的文档')}
-            onClick={() => {
-              if (!canKeep) return
-              setShowKeepConfirm(true)
-            }}
-          >
-            {keeping
-              ? <Loader2Icon size={20} className="mr-2 animate-spin" />
-              : <SaveIcon size={20} className="mr-2" />}
-            {keepDone ? '已保存到我的文档' : '保存到我的文档'}
-          </Button>
-          <Button
-            size="lg"
-            style={{ flex: 2, minHeight: 64 }}
-            disabled={deleting}
-            onClick={() => void deleteAndNavigate('/resume-service')}
-          >
-            {deleting
-              ? <Loader2Icon size={20} className="mr-2 animate-spin" />
-              : <Trash2Icon size={20} className="mr-2" />}
-            结束并删除
-          </Button>
-        </div>
+        {!canKeep && keepDisabledReason && (
+          <div className="cr-disclaimer-banner" role="status">
+            <InfoIcon />
+            <span>{keepDisabledReason}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-pri cr-body-btn"
+          disabled={!canKeep || deleting || keeping || keepDone}
+          onClick={() => {
+            if (!canKeep) return
+            setShowKeepConfirm(true)
+          }}
+        >
+          {keeping ? <Loader2Icon size={20} className="animate-spin" aria-hidden="true" /> : null}
+          {keepDone ? '已保存到我的文档' : '保存到我的文档'}
+        </button>
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-sec cr-body-btn"
+          disabled={deleting}
+          onClick={() => void deleteAndNavigate('/resume-service')}
+        >
+          {deleting ? <Loader2Icon size={20} className="animate-spin" aria-hidden="true" /> : null}
+          结束并删除
+        </button>
       </div>
     </QxTouchScreen>
+    </ContractTouchFrame>
   )
 }

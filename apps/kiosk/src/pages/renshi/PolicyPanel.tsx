@@ -169,7 +169,7 @@ export function PolicyPanel({
             )}
             {kind === 'library' ? (
               <div className="rq-ai-off">
-                <b>本条政策暂未接入小青</b>
+                <b>小青还不能解释这条政策</b>
                 <span>小青还不能解释政策原文。看原文、来源二维码和条件核对都不经过它。</span>
                 <QxAiHelp label={aiLabel} draft={aiDraft} testId="renshi-ask-ai" />
               </div>
@@ -235,11 +235,9 @@ export function PolicyPanel({
       <section className="rq-sec" data-policy-section="library">
         <header className="rq-grp">
           <b>政策库</b>
-          <span>
-            {visibleLibrary.length === 0
-              ? (libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配')
-              : '读到的条目按下面的结构展示'}
-          </span>
+          {visibleLibrary.length === 0 ? (
+            <span>{libraryEmpty ? '本次没有读到条目' : '当前筛选无匹配'}</span>
+          ) : null}
         </header>
         {visibleLibrary.length === 0 ? (
           <div className="rq-state" data-kind={libraryEmpty ? 'empty' : 'filter'}>

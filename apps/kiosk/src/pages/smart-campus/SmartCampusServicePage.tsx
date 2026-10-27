@@ -14,7 +14,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import '../../auth/capability-gate-touch.css'
 import {
   CheckCircle2Icon,
-  ChevronRightIcon,
   ClipboardListIcon,
   CreditCardIcon,
   KeyRoundIcon,
@@ -28,8 +27,9 @@ import {
 } from 'lucide-react'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { CapabilityStayCards } from '../../auth/CapabilityStayCards'
+import './smart-campus-touch.css'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 
@@ -121,6 +121,7 @@ export function SmartCampusServicePage() {
   // 未知 key 直达容错：不白屏，引导回智慧校园。
   if (!isServiceKey(key)) {
     return (
+      <div data-qx-page="campus-service" className="sc-touch-fill w4-page-frame">
       <QxTouchScreen
         testId="campus-svc-missing"
         stateId="missing"
@@ -129,7 +130,7 @@ export function SmartCampusServicePage() {
             eyebrow="智慧校园"
             title="未找到该服务"
             sub="请返回智慧校园选择可用服务"
-            onBack={() => navigate('/smart-campus')}
+            back={false}
             status={{ text: '未找到', tone: 'unknown' }}
           />
         )}
@@ -137,21 +138,30 @@ export function SmartCampusServicePage() {
           <QxTouchDock
             onBack={() => navigate('/smart-campus')}
             backLabel="返回智慧校园"
-            primary={{ label: '返回智慧校园', noArrow: true, onClick: () => navigate('/smart-campus') }}
+            ask={{ label: '问小青：这一项要带什么？', draft: '没有这项服务时还能办什么？请只做说明。' }}
           />
         )}
       >
-        <div className="p10-gate" data-kiosk-screen="campus-service-missing">
-          <p>请返回智慧校园选择可用服务</p>
+        <div className="p10-gate-wrap">
+          <div className="p10-gate" data-kiosk-screen="campus-service-missing">
+            <p>请返回智慧校园选择可用服务</p>
+          </div>
+          <CapabilityStayCards />
         </div>
       </QxTouchScreen>
+      </div>
     )
   }
 
   const info = SERVICES[key]
   const Icon = info.icon
 
+  const help = (key === 'campus-card' || key === 'all-in-one' || key === 'campus-network') && supportContact.servicePhone
+    ? `${helpNeededLine(supportContact)}。`
+    : ''
+
   return (
+    <div data-qx-page="campus-service" className="sc-touch-fill w4-page-frame">
     <QxTouchScreen
       testId="campus-svc-touch"
       stateId={key}
@@ -161,7 +171,7 @@ export function SmartCampusServicePage() {
           eyebrow="智慧校园"
           title={info.title}
           sub={`${info.subtitle} · 智慧校园自助服务指引`}
-          onBack={() => navigate('/smart-campus')}
+          back={false}
           status={{ text: '办理指引 · 未接线上办理', tone: 'unknown' }}
         />
       )}
@@ -169,14 +179,8 @@ export function SmartCampusServicePage() {
         <QxTouchDock
           onBack={() => navigate('/smart-campus')}
           backLabel="返回智慧校园"
+          ask={{ label: '问小青：这一项要带什么？', draft: '这一项要带什么？请只做说明，不要代替学校办理。' }}
           primary={{ label: '查看迎新报到指引', onClick: () => navigate('/smart-campus/welcome') }}
-        />
-      )}
-      nav={(
-        <QxTouchNav
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
         />
       )}
     >
@@ -240,7 +244,7 @@ export function SmartCampusServicePage() {
 
           <div className="kproto-notice warn">
             <ShieldCheckIcon aria-hidden="true" />
-            <p>{info.note}{helpNeededLine(supportContact)}</p>
+            <p>{info.note}{help}</p>
           </div>
 
           {/* 本机可办（仅校园卡页展示：证件照打印即将上线 + 入学材料打印可用） */}
@@ -255,9 +259,9 @@ export function SmartCampusServicePage() {
                 <span className="kproto-icon shrink-0"><ScanFaceIcon aria-hidden="true" /></span>
                 <span className="flex-1 text-left">
                   <b className="block text-[23px] font-semibold">证件照排版打印</b>
-                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">功能即将上线；当前可用手机照片在打印扫描页打印</span>
+                  <span className="sc-sub">功能即将上线；当前可用手机照片在打印扫描页打印</span>
                 </span>
-                <span className="shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-[14px] text-[var(--kp-muted)]">即将上线</span>
+                <span className="sc-soon">即将上线</span>
               </button>
               <button
                 type="button"
@@ -268,20 +272,14 @@ export function SmartCampusServicePage() {
                 <span className="kproto-icon shrink-0" style={{ background: 'var(--kp-teal)', color: '#fffdf8' }}><PrinterIcon aria-hidden="true" /></span>
                 <span className="flex-1 text-left">
                   <b className="block text-[23px] font-semibold">入学材料 / 表格打印</b>
-                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">报到表、申请表等自助打印</span>
+                  <span className="sc-sub">报到表、申请表等自助打印</span>
                 </span>
               </button>
             </div>
           )}
 
-          <div className="kproto-actionbar">
-            <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
-            <div className="kproto-spacer" />
-            <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/welcome')}>
-              查看迎新报到指引<ChevronRightIcon aria-hidden="true" />
-            </button>
-          </div>
         </div>
     </QxTouchScreen>
+    </div>
   )
 }

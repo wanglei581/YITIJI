@@ -13,8 +13,8 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
-import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { ContractTouchFrame } from './ContractTouchFrame'
 import { COMPLIANCE_COPY, type ContractType } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -76,6 +76,7 @@ export function ContractReviewHomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiDown, setAiDown] = useState(false)
   const [drag, setDrag] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -143,10 +144,12 @@ export function ContractReviewHomePage() {
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
       if (declined) {
+        setAiDown(false)
         setError(declined)
         return
       }
       // AI 停用（暂停 / 当日额度已到 / 未配置）不是文件的问题，换文件重试也不会变好。
+      setAiDown(isAiOutage(err))
       setError(isAiOutage(err)
         ? 'AI 现在停用，签约风险提示暂时做不了。合同原件可以到打印扫描里直接打印。'
         : '创建审查任务失败，请检查文件格式后重试')
@@ -156,9 +159,10 @@ export function ContractReviewHomePage() {
   }
 
   const selectedName = file?.name ?? phoneSource?.name ?? null
-  const canSubmit = Boolean(selectedName) && consentChecked && !loadingConsent && !submitting
+  const canSubmit = Boolean(selectedName) && consentChecked && !loadingConsent && !submitting && !aiDown
 
   return (
+    <ContractTouchFrame>
     <QxTouchScreen
       testId="contract-touch"
       stateId="upload"
@@ -170,26 +174,19 @@ export function ContractReviewHomePage() {
           sub={COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}
           onBack={() => navigate('/resume-service')}
           rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 0 }}
-          status={{ text: 'AI 生成，仅供参考', tone: 'unknown' }}
+          status={{ text: aiDown ? 'AI 现在停用' : '等待上传', tone: aiDown ? 'warn' : 'unknown' }}
         />
       )}
       dock={(
         <QxTouchDock
           onBack={() => navigate('/resume-service')}
           backLabel="返回简历服务"
-          ask={{ label: '问小青', draft: '签约风险提示能做什么、不能做什么？请只做说明，不要下结论。' }}
+          ask={{ label: '问小青：上传前要看什么？', draft: '上传前要看什么？请只说明流程，不要下结论。' }}
           primary={{
             label: submitting ? '上传中…' : '开始风险分析',
             disabled: !canSubmit,
             onClick: handleSubmit,
           }}
-        />
-      )}
-      nav={(
-        <QxTouchNav
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
         />
       )}
     >
@@ -317,8 +314,7 @@ export function ContractReviewHomePage() {
           {selectedName && (
             <button
               type="button"
-              className="mt-3 flex items-center gap-2 text-sm"
-              style={{ fontSize: 18, color: 'var(--muted)', marginTop: 12 }}
+              className="cr-file-remove"
               onClick={(e) => { e.stopPropagation(); setFile(null); setPhoneSource(null) }}
             >
               <XIcon size={18} />
@@ -368,7 +364,7 @@ export function ContractReviewHomePage() {
                   <b>发送模型前脱敏，结束时优先删除</b>，不向招聘企业或合作机构回传。
                 </p>
                 {consentScope && (
-                  <p style={{ fontSize: 17, color: 'var(--muted)' }}>
+                  <p style={{ fontSize: 20, color: 'var(--muted)' }}>
                     {/* 服务端返回的是稳定编码（source_file 等），不是展示文案；
                         直接 join 会把机器码念给用户听。 */}
                     数据类别：{describeDataCategories(consentScope.disclosures.dataCategories).join('、')}。
@@ -410,7 +406,13 @@ export function ContractReviewHomePage() {
             {error}
           </div>
         )}
+        {aiDown && (
+          <button type="button" className="qxt-btn qxt-btn-sec cr-body-btn" onClick={() => navigate('/print-scan')}>
+            去打印扫描
+          </button>
+        )}
         <AiDeclarationNote />
     </QxTouchScreen>
+    </ContractTouchFrame>
   )
 }
