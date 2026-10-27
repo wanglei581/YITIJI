@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 601,
+    "endpointCount": 603,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1825,6 +1825,30 @@
       },
       {
         "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.directory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
         "handler": "AdminFirstOrderIncidentsController.create",
         "method": "POST",
         "models": [
@@ -2138,6 +2162,32 @@
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/first-order/projects/:id/reports",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.reportDirectory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports",
         "roles": [
           "admin"
         ],
@@ -12742,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 248,
+      "reachableFileCount": 252,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13513,7 +13563,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 274
+      "sourceFileCount": 278
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -24183,6 +24233,9 @@
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
+    "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts": [
+      "services/api/scripts/verify-admin-print-scan.ts"
+    ],
     "services/api/src/admin-users/admin-users.controller.ts": [
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-member-closure.ts"
@@ -25805,6 +25858,9 @@
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/first-order/first-order-report-metrics.ts": [
+      "services/api/scripts/verify-first-order-http.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -35160,6 +35216,7 @@
         "files": [
           "packages/shared/src/types/printScanCapability.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/files/signing.ts",
@@ -37585,6 +37642,7 @@
           "services/api/scripts/support/first-order-fixture.ts",
           "services/api/scripts/support/first-order-review-boundaries.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/first-order/first-order-report-metrics.ts",
           "services/api/src/terminals/terminal-org-assignment.ts"
         ],
         "missing": []

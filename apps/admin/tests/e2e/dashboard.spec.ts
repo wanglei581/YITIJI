@@ -26,6 +26,16 @@ test.describe('工作台（mock 口径）', () => {
     }
   })
 
+  test('演示模式不显示机构报障、月报和出纸未确认', async ({ page }) => {
+    const guards = await openAuthed(page, '/')
+    await settleAdminPage(page, guards)
+    const today = page.locator('section').filter({ has: page.getByRole('heading', { name: '今天要处理', exact: true }) })
+    await expect(today.getByText('演示模式不显示机构报障与月报')).toBeVisible()
+    await expect(today.getByText('演示模式不显示出纸未确认')).toBeVisible()
+    await expect(today.getByText('这类这次没读到')).toHaveCount(0)
+    await expect(today.getByRole('button', { name: '重试' })).toHaveCount(0)
+  })
+
   test('在线终端卡片可进入设备管理', async ({ page }) => {
     const guards = await openAuthed(page, '/')
     await settleAdminPage(page, guards)
