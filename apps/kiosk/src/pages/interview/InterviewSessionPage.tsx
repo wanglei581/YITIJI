@@ -25,7 +25,7 @@ import { useInterviewLivePersist } from './session/useInterviewLivePersist'
 import { InterviewShell } from './InterviewShell'
 import { interviewMicLine } from './interviewMicCopy'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
-import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { INTERVIEW_AI_DOWN_HINT, INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { readInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
@@ -353,12 +353,11 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const shownMicBlocked = interviewMicLine(micBlockedReason, contact)
 
   const copy = INTERVIEW_STAGE_COPY.session
-  const titleParts = emphasizedTitle(copy)
 
   return (
     <InterviewShell
       eyebrow="练面试 · 作答"
-      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
+      title={copy.title}
       subtitle={copy.subtitle}
       status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
       live={voice.kind === 'recording'}

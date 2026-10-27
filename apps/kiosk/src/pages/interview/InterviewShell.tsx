@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { QxTouchBand, type QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { InterviewScrollCue } from './interviewQxParts'
 import './styles/interview-touch.css'
 
 /**
  * 练面试触屏壳。返回默认去面试服务台，避免五页各自漏传。
- * 底栏仍用 qx-ctabar，打印失败和设置校验的告警选择器继续找得到。
+ * 底栏由各页传入三槽。仍会超出一屏的页在正文滚动容器下保留滑动提示。
  */
 export function InterviewShell({
   title,
@@ -41,6 +42,7 @@ export function InterviewShell({
   const pill = status ?? { tone: 'ok' as const, label: 'AI 模拟面试' }
   return (
     <QxTouchScreen
+      page="interview"
       gallery={false}
       motion="none"
       bodyClassName="qxt-body-iv"
@@ -60,7 +62,7 @@ export function InterviewShell({
           place=" "
         />
       }
-      dock={ctabar ? <div className="qx-ctabar qxt-iv-dock">{ctabar}</div> : undefined}
+      dock={ctabar}
       nav={
         navbar ? (
           <QxTouchNav
@@ -73,6 +75,7 @@ export function InterviewShell({
     >
       {typeof subtitle === 'string' ? null : subtitle ? <p className="qxt-iv-sub">{subtitle}</p> : null}
       {children}
+      <InterviewScrollCue />
     </QxTouchScreen>
   )
 }

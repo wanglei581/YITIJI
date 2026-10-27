@@ -16,11 +16,11 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { useApiReadiness } from '../../hooks/useApiReadiness'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewSteps } from './interviewQxParts'
-import { INTERVIEW_STAGE_COPY, emphasizedTitle, type InterviewStage } from './interviewWorkbenchModel'
+import { INTERVIEW_STAGE_COPY, type InterviewStage } from './interviewWorkbenchModel'
 import { patchInterviewWorkbenchSession } from './interviewWorkbenchSession'
 import './interview-service-desk.css'
 import './styles/interview-workbench-qx.css'
@@ -149,7 +149,6 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
   }
 
   const copy = INTERVIEW_STAGE_COPY.tips
-  const titleParts = emphasizedTitle(copy)
   const goSetup = () => {
     // 闸门在这里再挡一次，不只在渲染层。aria-disabled 的按钮仍然能被程序化点击，
     // 「看起来点不动」和「点了不会发生」必须是同一件事。
@@ -162,7 +161,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
   return (
     <InterviewShell
       eyebrow="练面试 · 面试技巧"
-      title={<>{titleParts.before}<em>{titleParts.em}</em>{titleParts.after}</>}
+      title={copy.title}
       subtitle={copy.subtitle}
       // 顶栏胶囊跟着一起说。默认档是「AI 模拟面试」，
       // 而此刻这台机器恰恰练不了 —— 不出声等于让胶囊替在线服务作保。
@@ -174,50 +173,48 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
             : undefined
       }
       ctabar={
-        <div className="interview-qx-cta">
-          <QxStepActions>
-            <QxAiHelp label="问小青：面试前先准备什么" draft="我想准备一场面试。请根据公开的准备方法告诉我先做哪几步，不要假装已经看过我的简历。" />
-          </QxStepActions>
-          {gate ? (
-            <>
-              <p className="why" id="interview-tips-start-why">{gate.reason}</p>
-              {apiStatus === 'unavailable' ? (
-                <button
-                  type="button"
-                  className="qx-btn"
-                  data-variant="ghost"
-                  data-testid="interview-tips-recheck"
-                  onClick={retryApi}
-                >
-                  重新检测
-                </button>
-              ) : null}
-              {/* 不可用时不是「灰掉的按钮」：它必须说得出为什么，并且真的不导航。
-                  data-disabled-reason 与服务台同名，走查按同一个钩子取证。 */}
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="primary"
-                aria-disabled="true"
-                aria-describedby="interview-tips-start-why"
-                data-disabled-reason={gate.code}
-                data-testid="interview-primary"
-                onClick={goSetup}
-              >
-                设置一场练习
-              </button>
-            </>
+        <QxTouchDock
+          onBack={() => navigate('/interview-service')}
+          ask={{ label: '问小青：面试前先准备什么', draft: '我想准备一场面试。请根据公开的准备方法告诉我先做哪几步，不要假装已经看过我的简历。' }}
+          primarySlot={gate ? (
+            <button
+              type="button"
+              className="qxt-btn qxt-btn-pri"
+              aria-disabled="true"
+              aria-describedby="interview-tips-start-why"
+              data-disabled-reason={gate.code}
+              data-testid="interview-primary"
+              onClick={goSetup}
+            >
+              设置一场练习
+            </button>
           ) : (
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="interview-primary" onClick={goSetup}>
-              设置一场练习<em aria-hidden="true">→</em>
+            <button type="button" className="qxt-btn qxt-btn-pri" data-testid="interview-primary" onClick={goSetup}>
+              设置一场练习
             </button>
           )}
-        </div>
+        />
       }
     >
     <div data-kiosk-domain="interview" data-kiosk-screen="interview-tips" data-qx-interview="" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
 
       <div className="interview-flow__scroll">
+        {gate ? (
+          <div className="qxt-iv-note">
+            <b>{apiStatus === 'unavailable' ? '在线服务不可用' : '正在确认在线服务'}</b>
+            <span id="interview-tips-start-why">{gate.reason}</span>
+          </div>
+        ) : null}
+        {apiStatus === 'unavailable' ? (
+          <button
+            type="button"
+            className="qx-btn"
+            data-testid="interview-tips-recheck"
+            onClick={retryApi}
+          >
+            重新检测
+          </button>
+        ) : null}
         <section className="iv-card" aria-labelledby="iv-tips-checklist">
           <div className="iv-head">
             <h2 id="iv-tips-checklist">面试前准备清单</h2>

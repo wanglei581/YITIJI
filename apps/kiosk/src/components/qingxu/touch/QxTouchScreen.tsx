@@ -20,6 +20,7 @@ export function QxTouchScreen({
   testId,
   stateId,
   gallery = true,
+  page,
 }: {
   band: ReactNode
   children: ReactNode
@@ -32,6 +33,8 @@ export function QxTouchScreen({
   stateId?: string
   /** 开发样板标记。默认仍写上；业务页可关掉。 */
   gallery?: boolean
+  /** 页面样式钩子。不传则不写 data-qx-page。 */
+  page?: string
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -49,6 +52,7 @@ export function QxTouchScreen({
       {...(gallery ? { 'data-qxt-gallery': '' } : {})}
       data-qxt-state={stateId}
       data-testid={testId}
+      {...(page ? { 'data-qx-page': page } : {})}
     >
       <div ref={underRef} className="qxt-under" aria-hidden={covered ? true : undefined}>
         {band}

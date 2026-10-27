@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchNav } from '../../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../../components/qingxu/touch/QxTouchScreen'
-import { QxTouchTask } from '../../../components/qingxu/touch/QxTouchTask'
+import { QxTouchTile } from '../../../components/qingxu/touch/QxTouchTile'
 import type { QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import {
   unavailableReason,
   type CapabilityKind,
   type HubAvailability,
 } from '../../service-hubs/serviceHubModel'
+import { InterviewArt } from '../InterviewArt'
 import '../styles/interview-touch.css'
 
 const ASK_DRAFT = '我想练面试。请先问我现在最想完成哪一项，不要替我开始练习。'
@@ -18,26 +20,23 @@ const ASK_DRAFT = '我想练面试。请先问我现在最想完成哪一项，�
 type Entry = {
   title: string
   desc: string
-  chip: string
   icon: QxTouchIconName
   route: string
   kind: CapabilityKind
-  span?: boolean
 }
 
-const HOME: Entry[] = [
-  { title: '马上练一场', desc: '选择岗位类型与难度后进入训练', chip: 'AI · 练习', icon: 'mic', route: '/interview/setup', kind: 'ai', span: true },
-  { title: '面试技巧', desc: '查看通用问答与沟通要点', chip: '静态内容', icon: 'book', route: '/interview/tips', kind: 'info' },
-  { title: '训练报告', desc: '查看模拟面试报告', chip: '本人记录', icon: 'receipt', route: '/interview/reports', kind: 'info' },
-  { title: '职业自我探索', desc: '了解优势、偏好与可尝试方向', chip: 'AI · 仅供参考', icon: 'compass', route: '/resume/self-assessment/intro', kind: 'ai' },
-  { title: '职业规划建议', desc: '根据经历与目标形成行动建议', chip: 'AI · 仅供参考', icon: 'map', route: '/resume/career-plan', kind: 'ai' },
+const TILES: Entry[] = [
+  { title: '面试技巧', desc: '查看通用问答与沟通要点', icon: 'book', route: '/interview/tips', kind: 'info' },
+  { title: '训练报告', desc: '查看模拟面试报告', icon: 'receipt', route: '/interview/reports', kind: 'info' },
+  { title: '职业自我探索', desc: '了解优势、偏好与可尝试方向', icon: 'compass', route: '/resume/self-assessment/intro', kind: 'ai' },
+  { title: '职业规划建议', desc: '根据经历与目标形成行动建议', icon: 'map', route: '/resume/career-plan', kind: 'ai' },
 ]
 
 const MORE: Entry[] = [
-  { title: '评估历史', desc: '回看本人历次自我探索结果', chip: '本人记录', icon: 'compass', route: '/resume/self-assessment/history', kind: 'info' },
-  { title: '行业薪资参考', desc: '向通用AI顾问询问市场信息', chip: 'AI · 需核实', icon: 'sparkle', route: '/assistant', kind: 'ai' },
-  { title: 'AI服务记录', desc: '查看本人AI调用记录', chip: '本人记录', icon: 'sparkle', route: '/me/ai-records', kind: 'account' },
-  { title: '简历服务', desc: '先完善求职材料', chip: '信息', icon: 'file', route: '/resume-service', kind: 'info' },
+  { title: '评估历史', desc: '回看本人历次自我探索结果', icon: 'compass', route: '/resume/self-assessment/history', kind: 'info' },
+  { title: '行业薪资参考', desc: '向通用AI顾问询问市场信息', icon: 'sparkle', route: '/assistant', kind: 'ai' },
+  { title: 'AI服务记录', desc: '查看本人AI调用记录', icon: 'sparkle', route: '/me/ai-records', kind: 'account' },
+  { title: '简历服务', desc: '先完善求职材料', icon: 'file', route: '/resume-service', kind: 'info' },
 ]
 
 const PRACTICE_STEPS = [
@@ -68,11 +67,25 @@ export function InterviewHubTouch({
 }) {
   const navigate = useNavigate()
   const [more, setMore] = useState(false)
-  const entries = more ? MORE : HOME
+  const hubRef = useRef<HTMLDivElement>(null)
+  const seenMore = useRef<boolean | null>(null)
   const goBack = more ? () => setMore(false) : () => navigate('/')
+  const mainReason = unavailableReason('ai', '/interview/setup', availability)
+
+  useLayoutEffect(() => {
+    const changed = seenMore.current !== null && seenMore.current !== more
+    seenMore.current = more
+    if (!changed) return
+    const heading = hubRef.current?.querySelector('h2, h3')
+    if (heading instanceof HTMLElement) {
+      heading.tabIndex = -1
+      heading.focus({ preventScroll: true })
+    }
+  }, [more])
 
   return (
     <QxTouchScreen
+      page="interview"
       gallery={false}
       motion="none"
       bodyClassName="qxt-body-iv qxt-body-hub"
@@ -95,7 +108,7 @@ export function InterviewHubTouch({
       dock={
         <QxTouchDock
           onBack={goBack}
-          backLabel={more ? '返回练面试' : '返回'}
+          backLabel="返回"
           ask={{ label: '问小青：先练哪一项？', draft: ASK_DRAFT }}
         />
       }
@@ -109,76 +122,124 @@ export function InterviewHubTouch({
       }
     >
       <div
-        className="qxt-ivhub"
+        ref={hubRef}
+        className={more ? 'qxt-ivhub is-more' : 'qxt-ivhub'}
         data-qx-page="service-hub"
         data-hub="interview"
         data-hub-api-blocked={apiBlocked ? 'true' : 'false'}
         data-hub-device-probe="off"
       >
-        <div className="qx-hub-grid qxt-grid2">
-          {entries.map((entry, index) => {
+        <div className="qx-hub-grid">
+          {more ? MORE.map((entry, index) => {
             const reason = unavailableReason(entry.kind, entry.route, availability)
-            const featured = Boolean(entry.span)
             return (
-              <QxTouchTask
-                key={entry.route + entry.title}
+              <QxTouchTile
+                key={entry.title}
                 icon={entry.icon}
                 title={entry.title}
                 desc={entry.desc}
-                chip={entry.chip}
-                chipTone={entry.kind === 'ai' ? 'teal' : 'slate'}
+                tone={entry.kind === 'ai' ? 'teal' : 'slate'}
+                titleAs="h3"
                 index={index}
-                dark={featured}
-                className={featured ? 'qxt-span2' : undefined}
-                testId={!more && entry.title === '面试技巧' ? 'hub-interview-grid-面试技巧' : undefined}
-                disabledReason={reason ? `capability:${entry.kind}` : undefined}
-                onClick={reason ? undefined : () => navigate(entry.route)}
-                take={reason || featured ? undefined : '进入'}
-                extra={featured || reason ? (
-                  <>
-                    {reason ? <span className="qx-hub-why">{reason}</span> : null}
-                    {featured ? (
-                      <ol className="qxt-iv-steps">
-                        {PRACTICE_STEPS.map(([title, detail]) => (
-                          <li key={title}><b>{title}</b><span>{detail}</span></li>
-                        ))}
-                      </ol>
-                    ) : null}
-                    {featured && reason ? (
-                      <button type="button" className="qxt-iv-fallback" onClick={() => navigate('/interview/tips')}>
-                        可以先看面试技巧
-                      </button>
-                    ) : null}
-                  </>
-                ) : undefined}
+                off={Boolean(reason)}
+                reason={reason ?? undefined}
+                onClick={() => navigate(entry.route)}
               />
             )
-          })}
+          }) : (
+            <>
+              {mainReason ? (
+                <div className="qxt-iv-main is-off" role="group" aria-disabled="true" aria-label="马上练一场">
+                  <span className="qxt-iv-chip">AI · 练习</span>
+                  <h3>马上练一场</h3>
+                  <p>选择岗位类型与难度后进入训练</p>
+                  <span className="qx-hub-why">{mainReason}</span>
+                  <PracticeSteps />
+                </div>
+              ) : (
+                <button type="button" className="qxt-iv-main" onClick={() => navigate('/interview/setup')}>
+                  <span className="qxt-iv-chip">AI · 练习</span>
+                  <b>马上练一场</b>
+                  <small>选择岗位类型与难度后进入训练</small>
+                  <PracticeSteps />
+                </button>
+              )}
+              {mainReason ? (
+                <button type="button" className="qxt-iv-fallback" onClick={() => navigate('/interview/tips')}>
+                  可以先看面试技巧
+                </button>
+              ) : null}
+              {TILES.map((entry, index) => {
+                const reason = unavailableReason(entry.kind, entry.route, availability)
+                return (
+                  <QxTouchTile
+                    key={entry.title}
+                    icon={entry.icon}
+                    title={entry.title}
+                    desc={entry.desc}
+                    tone={entry.kind === 'ai' ? 'teal' : 'slate'}
+                    titleAs="h3"
+                    index={index}
+                    off={Boolean(reason)}
+                    reason={reason ?? undefined}
+                    testId={entry.title === '面试技巧' ? 'hub-interview-grid-面试技巧' : undefined}
+                    onClick={() => navigate(entry.route)}
+                  />
+                )
+              })}
+            </>
+          )}
         </div>
-        {more ? null : (
-          <button type="button" className="qxt-iv-more" onClick={() => setMore(true)}>
-            其余 4 项
-          </button>
+        {more ? (
+          <>
+            <button type="button" className="qxt-iv-wide" onClick={() => setMore(false)}>
+              <b>返回练面试</b>
+              <small>回到服务台，不靠历史记录</small>
+            </button>
+            <InterviewArt variant="more" title="按练习目标进入">
+              评估历史回看本人历次自我探索。行业薪资参考向通用 AI 顾问询问市场信息，徽标是「AI · 需核实」。AI服务记录看本人调用。简历服务先完善求职材料，不联网也能进。
+            </InterviewArt>
+          </>
+        ) : (
+          <>
+            <button type="button" className="qxt-iv-more" onClick={() => setMore(true)}>
+              <b>其余 4 项</b>
+              <QxTouchIcon name="chevR" size={28} strokeWidth={2.4} />
+            </button>
+            <div
+              className="qx-hub-notice qxt-iv-note"
+              data-readiness={readinessOf(availability)}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="qx-hub-notice-copy">
+                <b>{notice.title}</b>
+                <span>{notice.detail}</span>
+              </span>
+              <span><b>AI训练不是企业面试。</b>不进行录用判断，不向企业推荐候选人。不排名，不预测录用。报告仅供本人练习参考，不对外共享。</span>
+            </div>
+            {availability.apiDown ? (
+              <button type="button" className="qxt-iv-wide" onClick={onRetry}>
+                <b>重新检测</b>
+                <small>检测完之前，需要联网的入口仍不开放</small>
+              </button>
+            ) : null}
+          </>
         )}
-        <div
-          className="qx-hub-notice"
-          data-readiness={readinessOf(availability)}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="qx-hub-notice-copy">
-            <b>{notice.title}</b>
-            <span>{notice.detail}</span>
-          </span>
-          {availability.apiDown ? (
-            <button type="button" className="qx-hub-retry" onClick={onRetry}>重新检测</button>
-          ) : null}
-        </div>
-        <p className="qxt-iv-note">
-          <b>AI训练不是企业面试。</b>
-          不进行录用判断，不向企业推荐候选人。不排名，不预测录用。报告仅供本人练习参考，不对外共享。
-        </p>
       </div>
     </QxTouchScreen>
+  )
+}
+
+function PracticeSteps() {
+  return (
+    <span className="qxt-iv-steps">
+      {PRACTICE_STEPS.map(([title, detail]) => (
+        <i key={title}>
+          <b>{title}</b>
+          <em>{detail}</em>
+        </i>
+      ))}
+    </span>
   )
 }

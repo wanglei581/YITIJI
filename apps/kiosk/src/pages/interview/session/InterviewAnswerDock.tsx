@@ -127,7 +127,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           <div className="iv-tbar">
             <button type="button" className="qx-btn" disabled={busyTurn || voice.kind === 'recording' || voiceLocked} onClick={onUseText}>改用文字输入</button>
             <button type="button" className="qx-btn" disabled={busyTurn || voice.kind !== 'idle'} onClick={onSkip}>跳过此题</button>
-            <button type="button" className="qx-btn" disabled={busyTurn || voiceLocked} onClick={onFinish}>结束本场</button>
+            <button type="button" className="qx-btn" disabled={busyTurn || voiceLocked} onClick={onFinish}>结束本场练习</button>
           </div>
         </>
       ) : (
@@ -148,7 +148,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
               改用语音回答
             </button>
             <button type="button" className="qx-btn" disabled={busyTurn} onClick={onSkip}>跳过此题</button>
-            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onFinish}>结束本场</button>
+            <button type="button" className="qx-btn" disabled={busyTurn} onClick={onFinish}>结束本场练习</button>
             <span className="cnt">{draft.length} / 2000</span>
           </div>
           {!voiceAvailable && micBlockedReason && (

@@ -86,8 +86,8 @@ export function InterviewHero({
 export function InterviewScrollCue() {
   const [show, setShow] = useState(false)
   useEffect(() => {
-    const shell = document.querySelector('.iv-shell')
-    const scroller = shell?.querySelector<HTMLElement>('.interview-flow__scroll, .interview-session__content')
+    const scroller = document.querySelector<HTMLElement>('.qxt-body-iv > .interview-flow')
+      ?? document.querySelector<HTMLElement>('.iv-shell .interview-flow__scroll, .iv-shell .interview-session__content')
     if (!scroller) return
     const update = () => {
       const overflow = scroller.scrollHeight - scroller.clientHeight > 32

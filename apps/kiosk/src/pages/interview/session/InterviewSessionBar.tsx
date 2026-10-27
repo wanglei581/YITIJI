@@ -1,4 +1,5 @@
-import { QxAiHelp } from '../../../components/qingxu/QxAiHelp'
+import { useNavigate } from 'react-router-dom'
+import { QxTouchDock } from '../../../components/qingxu/touch/QxTouchDock'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 
 /**
@@ -30,6 +31,7 @@ export function InterviewSessionBar({
   onStop: () => void
   onConfirm: () => void
 }) {
+  const navigate = useNavigate()
   const finishing = phase === 'finishing'
   let label = '改用语音回答'
   let run: 'finish' | 'submit' | 'voice' | 'text' | 'stop' | 'confirm' = 'voice'
@@ -60,19 +62,14 @@ export function InterviewSessionBar({
     else onConfirm()
   }
   return (
-    <div className="interview-qx-cta">
-      <QxAiHelp
-        label="问小青：这一题怎么答"
-        draft="我正在做模拟面试。请先问我这一题的原文，再帮我按真实经历组织回答，不要替我编造经历。"
-      />
-      <div className="iv-cta-row">
-        <button type="button" className="qx-btn" data-variant="ghost" disabled={finishing || busy} onClick={onFinish}>
-          结束本场练习
-        </button>
-        <button type="button" className="qx-btn" data-variant="primary" disabled={disabled || finishing} onClick={go}>
-          {label}<em>→</em>
-        </button>
-      </div>
-    </div>
+    <QxTouchDock
+      onBack={() => navigate('/interview-service')}
+      backLabel="返回"
+      ask={{
+        label: '问小青：这一题怎么答',
+        draft: '我正在做模拟面试。请先问我这一题的原文，再帮我按真实经历组织回答，不要替我编造经历。',
+      }}
+      primary={{ label, onClick: go, disabled: disabled || finishing, noArrow: true }}
+    />
   )
 }

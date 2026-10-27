@@ -276,6 +276,14 @@ test('在线服务 503：面试技巧可读，但不能从技巧页绕进模拟�
   })
   expect(byTitle(hub.cards, '面试技巧').clickable).toBe(true)
 
+  // 主卡停用时，出路在卡片外面，读屏不能把它读成不可用。
+  const fallback = page.getByRole('button', { name: '可以先看面试技巧' })
+  await expect(fallback).toBeVisible()
+  expect(await fallback.evaluate((el) => Boolean(el.closest('[aria-disabled="true"]')))).toBe(false)
+  await fallback.click()
+  await page.waitForURL((url) => url.searchParams.get('stage') === 'tips')
+  await page.goto('/interview-service')
+
   // 走用户真正会走的那条路：点服务台上的「面试技巧」。
   await page.getByTestId('hub-interview-grid-面试技巧').click()
   await page.waitForURL((url) => url.searchParams.get('stage') === 'tips')

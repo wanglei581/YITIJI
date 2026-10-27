@@ -5,13 +5,13 @@
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate } from 'react-router-dom'
-import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
-import { Button } from '@ai-job-print/ui'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import {
   EMPLOYMENT_INDUSTRY_SECTORS,
   type CreateInterviewInput,
@@ -20,15 +20,8 @@ import {
   type InterviewExperience,
   type InterviewerType,
 } from '@ai-job-print/shared'
-import {
-  FileTextIcon,
-  Loader2Icon,
-  MonitorSmartphoneIcon,
-  NotebookPenIcon,
-  QrCodeIcon,
-  UsbIcon,
-  XIcon,
-} from 'lucide-react'
+import { InterviewSetupPersonas, InterviewSetupResume } from './InterviewSetupExtras'
+import { interviewUserLine } from './interviewMicCopy'
 import {
   AiTaskRegion,
   useAiTask,
@@ -43,8 +36,6 @@ import { createInterview, printInterviewPracticeSheet, startInterview } from '..
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
-import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewShell } from './InterviewShell'
 import { InterviewCardHead, InterviewNotice, InterviewRail, InterviewStatus, InterviewSteps } from './interviewQxParts'
 import type { InterviewStage } from './interviewWorkbenchModel'
@@ -114,7 +105,9 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const startPrint = useStartPrintHandoff()
   const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const stepTitleRef = useRef<HTMLHeadingElement>(null)
   const kiosk = useTerminalKiosk()
+  const contact = useSupportContact()
   const setupDraft = readInterviewWorkbenchSession()?.setup
 
   const [interviewerType, setInterviewerType] = useState<InterviewerType>(setupDraft?.interviewerType ?? 'hr')
@@ -322,6 +315,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    * 套 manual 等于宣称有一条等价手动路径，那是伪造能力（CLAUDE.md §9）。
    * 它作为 `stillAvailable` 如实写明，并挂成真正可点的动作。
    */
+  const say = (text: string | null) => interviewUserLine(text, contact) ?? text
   const availability: AiAvailability = aiOutage ? 'unavailable' : probed ? 'available' : 'unknown'
   const aiTask = useAiTask({
     availability,
@@ -345,7 +339,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     ? {
         // 能力级不可用：底部「开始模拟面试」这次按了也没用，置灰它并写清原因。
         mode: 'blocked',
-        reason: aiOutage,
+        reason: say(aiOutage) ?? aiOutage,
         blockedActionLabel: '创建并开始练习（AI 面试官）',
         stillAvailable: STILL_AVAILABLE,
         ...sheetAction,
@@ -354,12 +348,18 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         // 这一次失败但服务是通的（限流 / 参数等）：**不是**能力不可用。
         // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
         mode: 'result-unavailable',
-        reason: (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
+        reason: say((startFailed ? error : null) ?? '本次没能进入 AI 面试间。') ?? '本次没能进入 AI 面试间。',
         retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
+  const shownError = interviewUserLine(error, contact)
+  useLayoutEffect(() => {
+    if (step !== 3) return
+    stepTitleRef.current?.focus({ preventScroll: true })
+    document.querySelector<HTMLElement>('.qxt-body-iv > .interview-flow')?.scrollTo(0, 0)
+  }, [step])
   const interviewer = INTERVIEWERS.find((it) => it.key === interviewerType)
   const difficultyItem = DIFFICULTIES.find((item) => item.key === difficulty)
   const durationItem = DURATIONS.find((item) => item.key === duration)
@@ -395,34 +395,29 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       rail={{ labels: ['岗位与经验', '面试官与时长', '核对开始'], now: step - 1 }}
       status={{ tone: aiOutage ? 'bad' : 'ok', label: aiOutage ? 'AI 暂时不能出题' : 'AI 模拟面试' }}
       ctabar={
-        <div className="interview-qx-cta">
-          <QxAiHelp label="问小青：这场练习怎么设" draft={SETUP_AI_DRAFT} />
-          {error && <p className="iv-alert" role="alert" data-testid="interview-setup-error">{error}</p>}
-          <div className="iv-cta-row">
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={goTips}>
-              先看面试技巧
-            </button>
-            {step < 3 ? (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={goNext}>
-                下一步
-              </button>
-            ) : (
-              <span className="qx-ai-declaration-slot">
-                <button
-                  type="button"
-                  className="qx-btn"
-                  data-variant="primary"
-                  data-testid="interview-primary"
-                  disabled={creating || uploading || printingSheet}
-                  onClick={() => void handleStart()}
-                >
-                  {creating ? '正在为你准备面试官…' : <>创建并开始练习<em>→</em></>}
-                </button>
-                <AiDeclarationNote />
-              </span>
-            )}
-          </div>
-        </div>
+        <QxTouchDock
+          onBack={step > 1 ? () => { setError(null); setStep((current) => (current === 3 ? 2 : 1)) } : () => navigate('/interview-service')}
+          backLabel={step > 1 ? '上一步' : '返回'}
+          ask={{ label: '问小青：这场练习怎么设', draft: SETUP_AI_DRAFT }}
+          alert={shownError ? <p className="iv-alert qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
+          primary={{
+            label: step < 3
+              ? '下一步'
+              : creating
+                ? '正在为你准备面试官…'
+                : aiOutage && pendingSession
+                  ? '打印通用题目与答案单'
+                  : '创建并开始练习',
+            testId: step === 3 ? 'interview-primary' : undefined,
+            disabled: step === 3 && (creating || uploading || printingSheet),
+            noArrow: true,
+            onClick: () => {
+              if (step < 3) goNext()
+              else if (aiOutage && pendingSession) void handlePracticeSheet()
+              else void handleStart()
+            },
+          }}
+        />
       }
     >
     <KioskFilterPickerModal
@@ -441,7 +436,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       onClear={() => setIndustry('')}
       onClose={() => setShowIndustryPicker(false)}
     />
-    <div data-kiosk-domain="interview" data-kiosk-screen="interview-setup" data-qx-interview="" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
+    <div data-kiosk-domain="interview" data-kiosk-screen="interview-setup" data-qx-interview="" data-setup-step={step} className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
       <div className="interview-flow__scroll">
         <InterviewStatus
           label="本场练习条件"
@@ -500,38 +495,31 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         {step === 2 && (
           <section className="iv-card interview-setup__stack">
             <div className="iv-choice interview-setup__interviewer">
-              <p>面试官类型</p>
-              <div className="iv-chips">
-                {INTERVIEWERS.map((it) => (
-                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)}>{it.label}</OptionButton>
-                ))}
-              </div>
-              <p className="iv-hint">{interviewer?.desc}</p>
-            </div>
-            <div className="iv-choice">
-              <p>难度</p>
-              <div className="iv-chips">
-                {DIFFICULTIES.map((item) => (
-                  <OptionButton key={item.key} active={difficulty === item.key} onClick={() => setDifficulty(item.key)}>{item.label}</OptionButton>
-                ))}
-              </div>
-              <p className="iv-hint">{difficultyItem?.desc}</p>
-            </div>
-            <div className="iv-choice">
-              <p>时长</p>
-              <div className="iv-chips">
-                {DURATIONS.map((item) => (
-                  <OptionButton key={item.key} active={duration === item.key} onClick={() => setDuration(item.key)}>{item.label}</OptionButton>
-                ))}
-              </div>
-              <p className="iv-hint">{durationItem?.desc}。练习时长到了，只提示你点结束，不自动出报告。</p>
+              <InterviewSetupPersonas
+                interviewers={INTERVIEWERS}
+                interviewerType={interviewerType}
+                onInterviewer={setInterviewerType}
+                difficulties={DIFFICULTIES}
+                difficulty={difficulty}
+                onDifficulty={setDifficulty}
+                durations={DURATIONS}
+                duration={duration}
+                onDuration={setDuration}
+              />
             </div>
           </section>
         )}
 
+        {step < 3 && (
+          <button type="button" className="qxt-iv-wide" onClick={goTips}>
+            <b>先看面试技巧</b>
+            <small>公开的准备方法，不依赖这场配置</small>
+          </button>
+        )}
+
         {step === 3 && (
           <section className="iv-card interview-setup__stack">
-            <InterviewCardHead title="核对这场练习" hint="改完再创建。创建前不会出题。" />
+            <h2 ref={stepTitleRef} tabIndex={-1}>核对这场练习</h2>
             <div className="iv-fields">
               <div className="iv-field">
                 <small>岗位 · 行业 · 经验</small>
@@ -547,71 +535,37 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           </section>
         )}
 
+        {step === 3 && aiTask.isFailed && (
+          <AiTaskRegion
+            className="interview-setup-fallback"
+            task={aiTask}
+            label="AI 面试官出题与点评"
+            fallback={fallback}
+          />
+        )}
+
+        {step === 3 && (
+          <button type="button" className="qxt-iv-wide" onClick={goTips}>
+            <b>先看面试技巧</b>
+            <small>公开的准备方法，不依赖 AI</small>
+          </button>
+        )}
+
         {step === 3 && (<>
         <section className="iv-card">
           <InterviewCardHead title="简历（可选）" hint={resumeFile ? '已选用 1 份' : '不上传也能开始'} />
-          {resumeFile ? (
-            <div className="iv-panel">
-              <div className="iv-head"><b>{resumeFile.name}</b><span>这场练习会用这份简历出题</span></div>
-              <p className="iv-copy">移除后按通用问题练习，不会因此少一道题。</p>
-              <button
-                type="button"
-                onClick={() => setResumeFile(null)}
-                aria-label="移除简历"
-                className="flex h-12 w-12 items-center justify-center rounded-xl"
-              >
-                <XIcon className="h-4 w-4" aria-hidden="true" />
-                移除，不用简历
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="iv-tabs" role="group" aria-label="简历来源">
-                {([
-                  { key: 'phone' as const, label: '手机扫码上传', hint: '把简历传到这台机器', icon: QrCodeIcon },
-                  { key: 'usb' as const, label: 'U 盘导入', hint: '只读取你插入的这只盘', icon: UsbIcon },
-                  { key: 'desktop' as const, label: '本机文件', hint: '从这台设备里选一份', icon: MonitorSmartphoneIcon },
-                ]).filter((channel) => channel.key !== 'desktop' || !isTerminalKiosk()).map((channel) => (
-                  <button
-                    key={channel.key}
-                    type="button"
-                    aria-pressed={resumeChannel === channel.key}
-                    onClick={() => setResumeChannel(resumeChannel === channel.key ? null : channel.key)}
-                  >
-                    <channel.icon className="h-4 w-4" aria-hidden="true" />
-                    <b>{channel.label}</b>
-                    <small>{channel.hint}</small>
-                  </button>
-                ))}
-              </div>
-              <div className="iv-panel">
-                {resumeChannel === 'phone' ? (
-                  <UploadSessionQrPanel
-                    purpose="resume_upload"
-                    title="手机扫码上传简历"
-                    description="手机只负责上传；这台机器确认后才会带进本次练习。不上传也可以开始。"
-                    confirmLabel="确认使用这份简历"
-                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                    onBusyChange={setQrBusy}
-                  />
-                ) : resumeChannel === 'usb' ? (
-                  <ResumeUsbImportPanel
-                    onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
-                    onBusyChange={setUsbBusy}
-                  />
-                ) : resumeChannel === 'desktop' && !kiosk ? (
-                  <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}>
-                    {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
-                    选择本设备上的文件
-                  </Button>
-                ) : uploading ? (
-                  <p className="iv-copy">正在上传。完成前不把这份文件算进本场练习。</p>
-                ) : (
-                  <p className="iv-copy">选一条来源，本机才会去取文件。没有简历时按通用问题练习，不会因此少一道题。</p>
-                )}
-              </div>
-            </>
-          )}
+          <InterviewSetupResume
+            resumeFile={resumeFile}
+            onClearResume={() => setResumeFile(null)}
+            resumeChannel={resumeChannel}
+            onResumeChannel={setResumeChannel}
+            kiosk={kiosk}
+            uploading={uploading}
+            onPickFile={() => { if (!isTerminalKiosk()) fileInputRef.current?.click() }}
+            onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+            onQrBusy={setQrBusy}
+            onUsbBusy={setUsbBusy}
+          />
           {!kiosk && (
             <input
               ref={fileInputRef}
@@ -636,23 +590,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
           <b>模拟面试不是企业面试。</b>不代表任何招聘结果承诺，不会发出面试邀请，也不用于候选人筛选或录用判断。
         </InterviewNotice>
 
-        <AiTaskRegion
-          className="interview-setup-fallback"
-          task={aiTask}
-          label="AI 面试官出题与点评"
-          fallback={fallback}
-        />
-
-        {aiTask.isFailed && (
-          <Button
-            variant="secondary"
-            className="min-h-[56px] w-full text-base"
-            onClick={() => onGoStage ? onGoStage('tips') : navigate('/interview/tips')}
-          >
-            <NotebookPenIcon className="mr-2 h-5 w-5" aria-hidden="true" />
-            查看面试准备要点（本机固定内容，不依赖 AI）
-          </Button>
-        )}
+        <p className="iv-copy">使用 AI 即表示你已年满 14 周岁</p>
+        <AiDeclarationNote />
         </>)}
         <InterviewRail />
       </div>

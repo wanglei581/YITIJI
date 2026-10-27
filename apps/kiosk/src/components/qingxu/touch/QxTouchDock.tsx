@@ -15,6 +15,7 @@ export type QxTouchPrimary = {
   kind?: QxTouchButtonKind
   noArrow?: boolean
   disabled?: boolean
+  testId?: string
 }
 
 /**
@@ -30,6 +31,8 @@ export function QxTouchDock({
   ask,
   mid,
   primary,
+  primarySlot,
+  alert,
 }: {
   onBack?: () => void
   back?: boolean
@@ -38,6 +41,10 @@ export function QxTouchDock({
   ask?: QxTouchAsk
   mid?: ReactNode
   primary?: QxTouchPrimary
+  /** 自定义主按钮。传入后不再渲染内置主按钮。默认不传。 */
+  primarySlot?: ReactNode
+  /** 底栏上方的告警。默认不传。 */
+  alert?: ReactNode
 }) {
   const navigate = useNavigate()
   const goBack = useQxTouchBack(onBack)
@@ -64,7 +71,7 @@ export function QxTouchDock({
     )
   ) : null
   const middle = askNode ?? mid ?? null
-  const wide = !middle && Boolean(primary)
+  const wide = !middle && Boolean(primary || primarySlot)
   const leftNode = left ?? (back ? (
     <button type="button" className="qxt-btn qxt-btn-sec" onClick={goBack}>
       <QxTouchIcon name="chevL" size={30} strokeWidth={2.4} />
@@ -74,19 +81,21 @@ export function QxTouchDock({
 
   return (
     <footer className="qxt-dock">
+      {alert}
       {leftNode}
       {middle}
-      {primary ? (
+      {primarySlot ?? (primary ? (
         <button
           type="button"
           className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}`}
           onClick={primary.onClick}
           disabled={primary.disabled}
+          data-testid={primary.testId}
         >
           {primary.label}
           {primary.noArrow ? null : <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />}
         </button>
-      ) : null}
+      ) : null)}
     </footer>
   )
 }

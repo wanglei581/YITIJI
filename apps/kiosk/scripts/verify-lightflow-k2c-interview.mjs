@@ -167,12 +167,15 @@ try {
   check(false, `模拟面试不预选与本人选择校验：${error.message}`)
 }
 check(setup.indexOf('createInterview(') < setup.indexOf('startInterview('), '创建与启动面试顺序被改变')
+// 简历来源面板随设置页 700 行预算拆到 InterviewSetupExtras，仍由设置页挂上。
+// 移除钮从 48px 图标（className="flex h-12 w-12"）改成整行「移除，不用简历」。
+const setupExtrasPath = 'src/pages/interview/InterviewSetupExtras.tsx'
+const setupExtras = read(setupExtrasPath)
+const setupSurface = `${setup}\n${setupExtras}`
+check(setup.includes('<InterviewSetupResume'), `${pages[0]} — 设置页未挂上拆出的简历来源`)
 for (const token of [
   'kioskUploadFile',
   'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
-  'UploadSessionQrPanel',
-  'ResumeUsbImportPanel',
-  "purpose=\"resume_upload\"",
   'durationMin: duration',
   'interviewerType,',
   'position: pos',
@@ -183,9 +186,17 @@ for (const token of [
   // InterviewSessionPage 只读 state.firstQuestion，`firstQType` 全仓无 reader。
   // 「传了没人消费」正是 verify:kiosk-frontend-debt ② 要清的形态，
   // 由那条门禁反向钉死「不得再传」，本合同不再要求它存在。
-  'className="flex h-12 w-12',
 ]) {
   check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
+}
+for (const token of [
+  'UploadSessionQrPanel',
+  'ResumeUsbImportPanel',
+  'purpose="resume_upload"',
+  '<button type="button" className="qxt-iv-wide" onClick={onClearResume}>',
+  '<b>移除，不用简历</b>',
+]) {
+  check(setupSurface.includes(token), `${setupExtrasPath} — Setup 真实链路合同缺失：${token}`)
 }
 
 for (const token of [
