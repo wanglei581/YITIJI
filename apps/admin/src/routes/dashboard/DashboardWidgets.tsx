@@ -56,7 +56,7 @@ export function KpiCard({ label, value, unit, sub, icon: Icon, warn, failed, onR
       </div>
       {failed ? (
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[13px] text-error-fg">数据源加载失败</span>
+          <span className="text-[13px] text-error-fg">这类这次没读到</span>
           <button
             type="button"
             onClick={onRetry}
@@ -102,7 +102,7 @@ export function BlockError({ message, onRetry }: { message: string; onRetry: () 
       <button
         type="button"
         onClick={onRetry}
-        className="rounded-lg border border-neutral-200 bg-surface px-4 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50"
+        className="inline-flex min-h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-bold text-neutral-700 hover:bg-neutral-50"
       >
         重试
       </button>

@@ -63,11 +63,11 @@ const TAB_GROUPS = [
   {
     menu: '招聘紧急下架',
     tabs: [
-      { path: '/job-sources', label: '岗位' },
-      { path: '/fair-sources', label: '招聘会' },
-      { path: '/fairs', label: '招聘会详情' },
-      { path: '/companies', label: '企业' },
-      { path: '/sync-sources', label: '接入通道' },
+      { path: '/job-sources', label: '岗位信息源' },
+      { path: '/fair-sources', label: '招聘会信息源' },
+      { path: '/fairs', label: '招聘会管理' },
+      { path: '/companies', label: '企业展示管理' },
+      { path: '/sync-sources', label: '数据接入通道' },
     ],
   },
   {
