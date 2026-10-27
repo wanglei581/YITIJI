@@ -10,13 +10,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
 import { useNavigate } from 'react-router-dom'
-import {
-  Button,
-  Card,
-  KioskActionBar,
-  KioskPageFrame,
-  KioskPageHeader,
-} from '@ai-job-print/ui'
+import { Card } from '@ai-job-print/ui'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { COMPLIANCE_COPY, type ContractType } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -25,7 +23,6 @@ import {
   Loader2Icon,
   MonitorSmartphoneIcon,
   QrCodeIcon,
-  ShieldAlertIcon,
   UploadIcon,
   XIcon,
 } from 'lucide-react'
@@ -34,7 +31,7 @@ import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useAuth } from '../../auth/useAuth'
 import { isAiOutage } from '../../ai/aiOutage'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+
 import {
   createContractReview,
   createContractReviewFromSource,
@@ -162,44 +159,40 @@ export function ContractReviewHomePage() {
   const canSubmit = Boolean(selectedName) && consentChecked && !loadingConsent && !submitting
 
   return (
-    <KioskFullscreenShell>
-      <main className="flex min-h-0 flex-1 flex-col">
-        <KioskPageFrame
-          className="fusion-w3 fusion-w3--resume"
-          header={
-            <KioskPageHeader
-              title="AI 签约风险提示"
-              description={COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}
-              onBack={() => navigate('/resume-service')}
-              backLabel="返回简历服务"
-            />
-          }
-          footer={
-            <KioskActionBar>
-              <div className="qx-ai-declaration-slot" style={{ width: '100%' }}>
-              <Button
-                size="lg"
-                className="w-full"
-                disabled={!canSubmit}
-                onClick={handleSubmit}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2Icon className="animate-spin mr-2" size={22} />
-                    上传中…
-                  </>
-                ) : (
-                  <>
-                    <ShieldAlertIcon size={22} className="mr-2" />
-                    开始风险分析
-                  </>
-                )}
-              </Button>
-              <AiDeclarationNote />
-              </div>
-            </KioskActionBar>
-          }
-        >
+    <QxTouchScreen
+      testId="contract-touch"
+      stateId="upload"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          eyebrow="签约风险提示"
+          title="AI 签约风险提示"
+          sub={COMPLIANCE_COPY.KIOSK_CONTRACT_REVIEW_SCOPE}
+          onBack={() => navigate('/resume-service')}
+          rail={{ labels: ['上传合同', 'AI 分析', '查看结果'], now: 0 }}
+          status={{ text: 'AI 生成，仅供参考', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/resume-service')}
+          backLabel="返回简历服务"
+          ask={{ label: '问小青', draft: '签约风险提示能做什么、不能做什么？请只做说明，不要下结论。' }}
+          primary={{
+            label: submitting ? '上传中…' : '开始风险分析',
+            disabled: !canSubmit,
+            onClick: handleSubmit,
+          }}
+        />
+      )}
+      nav={(
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      )}
+    >
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--active">
@@ -417,8 +410,7 @@ export function ContractReviewHomePage() {
             {error}
           </div>
         )}
-        </KioskPageFrame>
-      </main>
-    </KioskFullscreenShell>
+        <AiDeclarationNote />
+    </QxTouchScreen>
   )
 }

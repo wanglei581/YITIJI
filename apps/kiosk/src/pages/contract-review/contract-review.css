@@ -438,6 +438,33 @@
 .cr-results-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 .cr-results-list::-webkit-scrollbar-track { background: transparent; }
 
+.qxt-screen .cr-touch-result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px 8px 24px;
+}
+
+.qxt-screen .cr-touch-actions {
+  display: flex;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.qxt-screen .cr-steps { display: none; }
+
+.qxt-screen .cr-progress-shell {
+  flex: none;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 8px 0 12px;
+}
+
+.qxt-screen .cr-progress-ring {
+  width: auto;
+  height: auto;
+}
+
 .cr-finding-card {
   background: var(--surface);
   border: 1px solid var(--line);
