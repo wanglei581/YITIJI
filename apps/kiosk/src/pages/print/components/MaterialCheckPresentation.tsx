@@ -273,7 +273,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               ) : null}
             </div>
           ) : null}
-          {!props.encryptedPdf ? (
+          {props.encryptedPdf ? null : (
             <QxTouchCallout kind="fine">
               {props.privacyModeWarning
                 ? '这次没有完整检查文件，请自行核对原件并确认检查说明。'
@@ -283,7 +283,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                     ? '每一处都要由你选择保留或遮挡，选完才能继续。报价由下一步的系统给出，在那之前不产生任何费用。'
                     : '确认版面、份数和页范围，再看这台机器的能力与状态。报价由下一步的系统给出，在那之前不产生任何费用。'}
             </QxTouchCallout>
-          ) : null}
+          )}
           {props.encryptedPdf ? (
             <ol className="qxt-steps qxt-steps-big pdk-unlock" aria-label="怎么去掉打开密码">
               {ENCRYPTED_PDF_UNLOCK_STEPS.map((step, index) => (

@@ -33,6 +33,8 @@ const files = {
   guard: stripComments(read('src/components/hid-guard/KioskHidScanGuard.tsx')),
   runtimeRoot: stripComments(read('src/layouts/KioskRuntimeRoot.tsx')),
   pickup: stripComments(read('src/pages/print/PrintPickupClaimPage.tsx')),
+  // 2026-10-28 触屏版第 5 版：扫码枪说明在说明卡里原地展开，原句只在这个展示件里写一份。
+  pickupGuide: stripComments(read('src/pages/print/components/PickupHidGuide.tsx')),
 }
 
 const failures = []
@@ -131,8 +133,9 @@ must('cashier', 'codeSubmitLockRef', '收银页的同步提交锁必须保留（
 must('panel', /autoFocus/, '收银页付款码输入框必须保持自动聚焦，否则扫码枪无处落字')
 must('pickup', /autoFocus/, '取件页输入框必须保持自动聚焦，否则 HID 扫码无处落字')
 must('pickup', /const SETTLE_MS = 250/, '8 位静默窗口必须保持 250ms（存量码前 8 位数字陷阱）')
-must('pickup', '机身侧面的扫码区', 'hid 指引必须写出机身扫码区位置')
-must('pickup', /亮度调高/, 'hid 指引必须写出真机实测的亮度条件')
+must('pickupGuide', '机身侧面的扫码区', 'hid 指引必须写出机身扫码区位置')
+must('pickupGuide', /亮度调高/, 'hid 指引必须写出真机实测的亮度条件')
+must('pickup', /<PickupHidGuide\b/, '取件页必须渲染这张 hid 指引卡')
 must('pickup', 'data-claim-guide', '必须有独立 hid 指引态')
 mustNot('pickup', /扫码器就绪|扫码器在线|扫码器正常/, '不得伪造扫码器状态')
 

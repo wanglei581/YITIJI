@@ -129,7 +129,7 @@ export function CashierQxView(props: CashierQxViewProps) {
 
         {state === 'no-order' ? <Closure state={state} ctx={ctx} /> : (
           <details className="cashier-qx-more">
-            <summary>付款说明 · 接下来怎么办</summary>
+            <summary>{free ? '说明' : '付款说明'} · 接下来怎么办</summary>
             <Closure state={state} ctx={ctx} />
             <p className="cashier-qx-p">{props.amountCents === 0 ? printProblemLine() : props.refundAssistanceCopy + '。'}</p>
             {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}

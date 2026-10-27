@@ -150,9 +150,6 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
 // ── 组件 ──────────────────────────────────────────────────────
 const PICKUP_RAIL = ['输到机码', '核对订单', '取件'] as const
 
-// 稿 pickup「用扫码枪扫」展开的原句：不用手输，把手机上的码对准机身侧面的扫码区；亮度调高是 2026-09-07 真机条件。
-const HID_LINE = '不用手输：把手机上的码，对准机身侧面的扫码区。手机亮度调高，再凑近扫码区。'
-
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -477,7 +474,6 @@ export function PrintPickupClaimPage() {
     />
   ) : screen === 'hid' ? (
     <PickupHidGuide
-      line={HID_LINE}
       echo={
         <span className="pcp-scan-echo" id="hid-echo-code" aria-hidden="true">
           <span className="pcp-scan-dot" data-live={loading || code.length > 0 || undefined} />

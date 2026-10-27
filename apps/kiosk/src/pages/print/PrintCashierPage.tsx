@@ -101,8 +101,9 @@ function isPrintFileState(value: unknown): value is PrintFileState {
 export function PrintCashierPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const support = useSupportContact()
-  const refundAssistanceCopy = `${refundApplyLine(support)}本机不提供自助退款`
+  // 读后台的服务电话并在读到后重绘；标准句自己取同一份缓存（读不到号码时不写死号码）。
+  useSupportContact()
+  const refundAssistanceCopy = `${refundApplyLine()}本机不提供自助退款`
   const state = useMemo(() => (location.state ?? {}) as CashierLocationState, [location.state])
 
   const orderId = typeof state.orderId === 'string' ? state.orderId : null

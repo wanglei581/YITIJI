@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   VERIFIED_PRINT_PARAMETER_PROFILE,
@@ -143,6 +143,11 @@ function ToggleGroup({
       ))}
     </div>
   )
+}
+
+/** 稿 .facts 的一格：「总打印面 2 面」。值只取自真实页数与份数的估算，缺页数时写「待识别」，不写死。 */
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return <b>{label} {value}</b>
 }
 
 function suggestionValueLabel(item: PrintParamSuggestionItem): string {
@@ -525,8 +530,8 @@ export function PrintPreviewPage({
           ) : null}
         </section>
         <div className="pdk-facts-row" aria-label="用纸提示">
-          <b>总打印面 {totalFaces === null ? '待识别，以实际打印为准' : `${totalFaces} 面`}</b>
-          <b>预计用纸 {sheetsUsed === null ? '待识别，以实际打印为准' : `${sheetsUsed} 张`}</b>
+          <InfoRow label="总打印面" value={totalFaces === null ? '待识别，以实际打印为准' : `${totalFaces} 面`} />
+          <InfoRow label="预计用纸" value={sheetsUsed === null ? '待识别，以实际打印为准' : `${sheetsUsed} 张`} />
         </div>
         {paperSaved > 0 ? <p className="pdk-opt">双面比单面预计少用 {paperSaved} 张纸</p> : null}
         <div className="pdk-params qpd-param-stack">
@@ -579,7 +584,7 @@ export function PrintPreviewPage({
             </>
           ) : null}
           <section className="pdk-summary qpd-parameter-summary" aria-label="参数摘要">
-            <span>当前参数：A4 · {colorModeLabel(colorMode)} · {duplexLabel(duplex)} · {directionLabel} · {scaleLabel} · {pagesPerSheet} 版 / 页 · {rangeLabel} · {copies} 份。下一步核对价格，再决定是否打印；未确认前不会收费，文件保留时间以隐私政策和“我的文档”设置为准。</span>
+            <span>当前参数：A4 · {colorModeLabel(colorMode)} · {duplexLabel(duplex)} · {directionLabel} · {scaleLabel} · {pagesPerSheet} 版 / 页 · {rangeLabel} · {copies} 份。下一步核对价格，再决定是否打印。未确认前不会收费，文件保留时间以隐私政策和“我的文档”设置为准。</span>
           </section>
         </div>
         {warnings.length > 0 ? (

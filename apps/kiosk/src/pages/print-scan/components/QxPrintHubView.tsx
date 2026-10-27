@@ -449,7 +449,10 @@ export function QxPrintHubView({
   const copyDesc = orderPaused
     ? '暂停接单时，复印以打印机屏幕为准'
     : hubState === 'device-off'
-      ? (paperOff ? '缺纸时复印也出不了纸，补纸后再用' : '打印机离线时复印可能也用不了，以打印机屏幕为准')
+      ? (paperOff
+        ? '缺纸时复印也出不了纸，补纸后再用'
+        // 离线才说离线：异常不冒充离线（W-117）。
+        : `${deviceLabel?.includes('离线') ? '打印机离线' : '打印机异常'}时复印可能也用不了，以打印机屏幕为准`)
       : '在打印机屏幕上点「复印」「身份证复印」或「票据复印」；不经过这台一体机下单，也不进打印订单'
   const arrivalDesc = arrivalCode.stateNote
     ?? '凭码办理，不登录也能核销 · 8 位数字（历史 10 位码也支持）'

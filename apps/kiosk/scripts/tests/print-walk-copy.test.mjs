@@ -291,9 +291,12 @@ const partsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConf
 })
 const queryUrl = toDataUrl('export const isRegisteredScreen = () => true')
 const confirmModelUrl = transpile(join(kioskRoot, 'src/pages/print/printConfirmModel.ts'), { './printConfirmQuery': queryUrl })
+// 2026-10-28 触屏版第 5 版：核对价格页的线条图标改用页面本地的 PrintIcon（纯 SVG 常量，无外部依赖）。
+const printIconUrl = transpile(join(kioskRoot, 'src/pages/print/art/PrintIcon.tsx'), { 'react/jsx-runtime': jsxUrl })
 const viewUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintConfirmView.tsx'), {
   'react/jsx-runtime': jsxUrl,
   'lucide-react': iconUrl,
+  '../art/PrintIcon': printIconUrl,
   '../../../copy/unattendedCopy': unattendedUrl,
   '../printConfirmModel': confirmModelUrl,
   './PrintConfirmParts': partsUrl,
@@ -310,14 +313,16 @@ const confirmProps = {
 }
 const visibleMarkup = (props) => renderToStaticMarkup(createElement(PrintConfirmView, props)).replace(/<[^>]*>/g, '')
 test('B 补：零元加载、失败、确认与参数收口的真实 JSX 不说收费或权益机制', () => {
-  for (const [screen, quote, adjustments] of [
-    ['quoting', { status: 'loading' }, []],
-    ['quote-failed', { status: 'unavailable', reason: '页数以实际结果为准，确认前不显示金额' }, []],
-    ['zero-amount', { status: 'ready', amountCents: 0, billablePages: 2 }, []],
-    ['capability-invalid-params', { status: 'ready', amountCents: 0, billablePages: 2 }, [{ field: 'colorMode' }]],
+  // 2026-10-28 稿 confirm：页数核对成功后「页数」成了摘要里的一行，「页数核定」只在加载与失败两态作为状态块标题。
+  for (const [screen, quote, adjustments, pagesLabel] of [
+    ['quoting', { status: 'loading' }, [], /页数核定/],
+    ['quote-failed', { status: 'unavailable', reason: '页数以实际结果为准，确认前不显示金额' }, [], /页数核定/],
+    ['zero-amount', { status: 'ready', amountCents: 0, billablePages: 2 }, [], /页数/],
+    ['capability-invalid-params', { status: 'ready', amountCents: 0, billablePages: 2 }, [{ field: 'colorMode' }], /页数/],
   ]) {
-    const text = visibleMarkup({ ...confirmProps, screen, quote, adjustments })
-    assert.match(text, /页数核定/)
+    // 稿 confirm 的摘要里有一行「费用 免费试运营，本单 0 元」：这一句是稿给定的免费说法，其余地方仍不许出现「费用」。
+    const text = visibleMarkup({ ...confirmProps, screen, quote, adjustments }).replace('费用免费试运营，本单 0 元', '')
+    assert.match(text, pagesLabel)
     assert.doesNotMatch(text, /报价|价格|费用|付款|扣费|收款|抵扣|权益/)
   }
 })
@@ -343,6 +348,8 @@ const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/Qx
   '../../../components/qingxu/QxAppNavbar': toDataUrl('export const QxAppNavbar = () => null'),
   '../../../components/qingxu/touch/QxTouchChip': touchChipUrl,
   '../../../components/qingxu/touch/QxTouchIcon': touchIconUrl,
+  // 2026-10-28 稿 print：入口卡里的实物小样是纯装饰 SVG，本测试只看文案，换成空件。
+  '../../print/art/PrintArt': toDataUrl('export const PrintArt = () => null'),
   '../printHubContent': hubContentUrl,
 })
 const { QxPrintHubView } = await import(hubViewUrl)
@@ -387,12 +394,16 @@ test('W-117：缺纸、异常、离线分别说明，签名提示只在真开通
       }))
       const banner = /<section class="ph-fallback"[^>]*>(.*?)<\/section>/s.exec(html)?.[1]
       assert.ok(banner)
-      assert.match(banner, new RegExp(label))
+      // 2026-10-28 稿 print：提醒条只留标准句；离线、异常、缺纸由卡片角标上取自真实设备状态的状态词各说各的，
+      // 缺纸另成一版（ph-paper）。签名磁贴真开通才可点，没开通就是自带「暂不可用」的灰磁贴。
       assert.match(banner, /这台机器暂时打不了/)
       assert.doesNotMatch(banner, /工作人员/)
-      if (label !== '打印机离线') assert.doesNotMatch(banner, /离线|无法连接/)
-      if (actionable) assert.match(banner, /签名仍可使用/)
-      else assert.doesNotMatch(banner, /签名仍可使用/)
+      assert.equal(/ph-paper/.test(html), label === '打印机缺纸')
+      if (label !== '打印机离线') assert.doesNotMatch(html, /离线|无法连接/)
+      const signTile = /<button[^>]*data-testid="print-hub-cap-sign"[^>]*>/.exec(html)?.[0] ?? ''
+      assert.ok(signTile)
+      if (actionable) assert.doesNotMatch(signTile, /aria-disabled="true"/)
+      else assert.match(signTile, /aria-disabled="true"/)
     }
   }
 })

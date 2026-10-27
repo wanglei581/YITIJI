@@ -101,21 +101,23 @@ export function PickupHintCard({
   )
 }
 
+// 稿 pickup「用扫码枪扫」展开的原句：不用手输，把手机上的码对准机身侧面的扫码区；
+// 亮度调高是 2026-09-07 真机条件。这句话只在这里写一份。
+const HID_LINE = '不用手输：把手机上的码，对准机身侧面的扫码区。手机亮度调高，再凑近扫码区。'
+
 /**
  * 到机码页的扫码枪说明（稿 pickup 点「用扫码枪扫」后在说明卡里展开的那一句，不另加一块高度）。
  *
  * 这里教的是「去哪儿扫、怎么扫」，不是扫码器状态。
  * 2026-09-07 Windows 真机实测（PR #913）：模组靠接近感应触发、不常亮；
  * 能读手机屏幕上的码，但需要把亮度调高。亮度这一句稿里没有，照实写。
- * 说明原句由页面传入（原句在 PrintPickupClaimPage），本件只管摆位置、回显与错误条。
+ * 说明原句在本文件顶部的 HID_LINE；页面只传回显、错误条与两枚按钮。
  */
 export function PickupHidGuide({
-  line,
   echo,
   errorMsg,
   actions,
 }: {
-  line: string
   echo: ReactNode
   errorMsg: string
   actions: ReactNode
@@ -125,7 +127,7 @@ export function PickupHidGuide({
       art="scan"
       title="用扫码枪扫"
       descId="pcp-hid-hint"
-      desc={<>{peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}{line}</>}
+      desc={<>{peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}{HID_LINE}</>}
     >
       {echo}
       {errorMsg ? (

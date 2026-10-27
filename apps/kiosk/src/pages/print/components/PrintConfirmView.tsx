@@ -290,7 +290,7 @@ export function PrintConfirmView(props: Props) {
 
           <Review file={file} summaryRows={summaryRows} redactionText={redactionText} materialDemo={materialDemo} />
           {selfAssessment}
-          {ready && (quotedLike || screen === 'capability-invalid-params') ? (
+          {!freePricing && ready && (quotedLike || screen === 'capability-invalid-params') ? (
             <CouponUnavailable free={quote.amountCents === 0} />
           ) : null}
           {!freePricing && benefitView ? <BenefitCard view={{ ...benefitView, detail: preferUnattended(benefitView.detail, `价目与权益都来自机构配置。取不到就不显示金额、不试算抵扣，也不会拿上一次的价格当现价。请稍后重试。${helpNeededLine()}`) }} onLogin={onLogin} /> : null}

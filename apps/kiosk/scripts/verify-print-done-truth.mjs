@@ -94,7 +94,8 @@ const checks = [
     assert.match(doneRuntime, /onClick=\{\(\) => \{\s*endKioskUse\('end_use'\)/)
     // 倒计时文案如实：登录着就说会退出登录。
     assert.match(doneRuntime, /到点会结束本次使用并退出登录/)
-    assert.match(doneRuntime, /秒后结束使用/)
+    // 2026-10-28 稿 done：「不再点屏幕，60 秒后结束本次使用；点一下屏幕重新计时」，措辞比旧稿多「本次」二字，意思与强度不变。
+    assert.match(doneRuntime, /秒后结束本次使用/)
     assert.doesNotMatch(
       doneRuntime,
       /隐私已清除|下一个人看不到|这次办理已清空|结束并清空|空闲超时自动清空|秒空闲后自动清空|已清除/,
