@@ -19,7 +19,7 @@ export interface PublicSupportContact {
   serviceHours: string | null
   otherOnlineTerminalNearby: boolean
   miniappPublished: boolean
-  /** 一体机「求职进度」页签开关（后台可配）。只有 true 才开，缺省和读取失败都是关。 */
+  /** 一体机「我的足迹」第三个页签（本人自填记事本）的开关，后台可配。只有 true 才开，缺省和读取失败都是关。 */
   selfNoteTab: boolean
 }
 

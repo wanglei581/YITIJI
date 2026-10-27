@@ -28,8 +28,10 @@ test('收藏的政策打开对应那一条，不再停在待建设', () => {
   assert.match(favorites, /return `\/renshi\?policy=\$\{encodeURIComponent\(item\.targetId\)\}`/)
   assert.doesNotMatch(favorites, /return '\/renshi\?tab=policy'/)
   assert.equal(favorites.includes('对应政策页待建设'), false)
-  assert.equal(favorites.includes('再打开这则政策说明'), true)
-  assert.equal(favorites.includes('再打开这则说明，办理仍以官方入口为准。'), true)
+  // 证据锚点随稿换字，判据不变：我的收藏改按触屏稿后，说明写在列表下面的小字里——
+  // 点一条是打开那一条政策，办理仍以官方入口为准，不是平台代办。
+  assert.equal(favorites.includes('点一条打开政策'), true)
+  assert.equal(favorites.includes('办理仍以官方入口为准'), true)
 })
 
 test('点名的政策会去读那一条，找不到或失败时有出路', () => {

@@ -150,7 +150,7 @@ export function MyFavoritesPage() {
       sub={hostingOpen ? '岗位、招聘会、政策的收藏' : '只收藏政策'}
       fine={hostingOpen
         ? '点一条打开详情。投递与预约都在来源平台完成，本机不代收简历，也不记录结果。取消收藏在详情页里。离开 3 分钟没操作会自动退出。'
-        : '点一条打开政策。取消收藏在政策页里。本机不代收简历，也不记录办理结果。离开 3 分钟没操作会自动退出。'}
+        : '点一条打开政策。取消收藏在政策页里。办理仍以官方入口为准，本机不代收简历，也不记录办理结果。离开 3 分钟没操作会自动退出。'}
       ctabar={hostingOpen
         ? recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看岗位', () => navigate('/jobs'))
         : recordsCtabar(uiState, navigate, () => setReloadKey((k) => k + 1), '/me/favorites', '查看政策', () => navigate('/policy-service'))}
