@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import '../../../styles/qingxu/tokens.css' /* 触屏件也用 --qx-* 底色与字族；不靠别的页面先加载 */
 import '../../../styles/qingxu/tokens-touch.css'
 import '../../../styles/qingxu/touch.css'
 
