@@ -48,6 +48,8 @@ const FAIL_CLOSED_LANDINGS = {
   '/contract-review': '/',
   '/contract-review/processing': '/',
   '/contract-review/result': '/',
+  // 开发样板（非业务屏）：生产构建不挂载，直接访问回到首页。
+  '/dev/touch-gallery': '/',
 } as const satisfies Partial<Record<ProductionRoutePattern, `/${string}`>>
 
 export const parameterizedPatterns: ProductionRoutePattern[] = productionRoutePatterns.filter((pattern) =>

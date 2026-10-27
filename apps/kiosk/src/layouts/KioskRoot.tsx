@@ -224,6 +224,13 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
+/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
+const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+
+function isTouchRoute(pathname: string): boolean {
+  return QX_TOUCH_ROUTES.has(pathname)
+}
+
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
   // 域名已经在顶栏主标题上时，副标题回落到品牌名，避免「职易达 / 职易达 · 机号」自我重复。
   const base = entry.domainTitle === null ? 'AI 求职操作系统' : '职易达'
@@ -287,6 +294,7 @@ function KioskShell() {
   // 由页面自带顶栏 + 返回箭头承载导航。
   // 青序流光已迁移路由退出旧壳：判定见模块级 isQxMigratedPath（精确集合 + 带参前缀）。
   const isQxRoute = isQxMigratedPath(pathname)
+  const touchRoute = isTouchRoute(pathname)
 
   const isCampusZone = pathname === '/campus'
   const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
@@ -307,8 +315,8 @@ function KioskShell() {
       density="touch"
       presentation="fusion-youth"
       viewport={isCompactViewport ? 'mobile' : 'kiosk'}
-      hideHeader={isCampusZone || isQxRoute}
-      hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar}
+      hideHeader={isCampusZone || isQxRoute || touchRoute}
+      hideBottomNav={isCampusZone || isQxRoute || usesPageActionbar || touchRoute}
       brandMark={isV6Route ? '职' : undefined}
       brandTitle={v6DomainTitle ?? (isV6Route ? '职易达' : `就业服务大厅 · ${terminalCode}`)}
       brandSubtitle={

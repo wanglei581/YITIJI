@@ -201,7 +201,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("看来源、查条件、备材料")', featureText: 'AI顾问不替主管部门作资格判断。' },
-] as const // 110 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels)
+  // 开发样板（非业务屏）。W6 浏览器跑的是生产构建，样板页不挂载，地址回到首页。
+  { pattern: '/dev/touch-gallery', url: '/dev/touch-gallery', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
+] as const // 110 routes (109 + 2026-10-27 开发样板 /dev/touch-gallery)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 

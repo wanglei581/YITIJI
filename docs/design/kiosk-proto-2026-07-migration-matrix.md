@@ -120,6 +120,7 @@
 | `/contract-review` | ContractReviewHomePage | src/pages/contract-review/ContractReviewHomePage.tsx | 合同审查入口；生产路由无独立迁移矩阵屏 |
 | `/contract-review/processing` | ContractReviewProcessingPage | src/pages/contract-review/ContractReviewProcessingPage.tsx | 合同审查处理中状态；生产路由无独立迁移矩阵屏 |
 | `/contract-review/result` | ContractReviewResultPage | src/pages/contract-review/ContractReviewResultPage.tsx | 合同审查结果状态；生产路由无独立迁移矩阵屏 |
+| `/dev/touch-gallery` | QxTouchGalleryPage | src/pages/dev/QxTouchGalleryPage.tsx | 开发样板（非业务屏）。只在开发环境挂载；生产构建访问此地址回到首页 |
 
 > 备注:`src/pages/placeholders/` 下另有 `OfflineAgenciesPage.tsx` / `OfflineJobDetailPage.tsx` / `PrintScanConvertPage.tsx` / `PrintScanFeaturePage.tsx` / `PrintScanSignPage.tsx` 等占位文件,**未被 routes/index.tsx 引用**(实际路由指向正式实现版),属历史遗留,不参与迁移。`src/pages/jobs-fairs-prototype.tsx` 亦未被路由引用。
 

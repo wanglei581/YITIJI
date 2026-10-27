@@ -351,6 +351,16 @@ export const kioskRouter = createBrowserRouter([
           return { Component: () => <QxServiceHubPage hub="policy" /> }
         },
       },
+      {
+        path: 'dev/touch-gallery',
+        ...(import.meta.env.DEV
+          ? {
+              lazy: async () => ({
+                Component: (await import('../pages/dev/QxTouchGalleryPage')).QxTouchGalleryPage,
+              }),
+            }
+          : { element: <Navigate to="/" replace /> }),
+      },
         ],
       },
       // * 是正常匹配的兜底路由，useRouteError 没有 404 错误对象；显式标记未知地址。

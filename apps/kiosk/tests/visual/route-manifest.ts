@@ -44,7 +44,9 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 109 routes (106 + 2026-09-08 三次工作台合并各新增一条：/print/desk、/interview、/scan；2026-09-27 + /official-channels；2026-09-30 停放 smart-campus/freshman-insights)
+  // 触屏版第一包：开发样板（非业务屏）。生产构建不挂载，直接访问回到首页。
+  '/dev/touch-gallery',
+] as const // 110 routes (109 + 2026-10-27 开发样板 /dev/touch-gallery)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

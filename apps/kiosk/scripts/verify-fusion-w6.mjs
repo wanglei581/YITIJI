@@ -231,6 +231,8 @@ const WAVE_ROUTES = new Map([
     '/contract-review',
     '/contract-review/processing',
     '/contract-review/result', '/policy-service',
+    // 开发样板（非业务屏）：触屏公共件，不占业务波次。
+    '/dev/touch-gallery',
   ]],
 ])
 
