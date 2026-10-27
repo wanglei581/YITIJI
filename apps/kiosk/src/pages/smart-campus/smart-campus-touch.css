@@ -42,9 +42,28 @@
   padding: 18px 20px;
 }
 
+/* 盖过共享 .qxt-screen .sc-mod-grid（flex:1 + grid-auto-rows:1fr），否则第二组扩展卡被压成一条。 */
+[data-qx-page="smart-campus"] .qxt-screen .sc-mod-grid {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  grid-auto-rows: auto;
+}
+
 [data-qx-page="smart-campus"] .sc-mod {
-  min-height: 160px;
+  width: 100%;
+  min-height: 104px;
+  flex: none;
   background: var(--kp-surface, var(--qx-paper));
+}
+
+[data-qx-page="smart-campus"] .sc-mod-icon {
+  display: none;
+}
+
+[data-qx-page="smart-campus"] .sc-mod-title {
+  margin-top: 0;
 }
 
 [data-qx-page="campus-welcome"] .kproto-tile.primary,
@@ -65,7 +84,11 @@
 [data-qx-page="campus-welcome"] .sc-soon,
 [data-qx-page="campus-service"] .sc-sub,
 [data-qx-page="campus-service"] .sc-soon,
-[data-qx-page="campus-service"] .kproto-notice p {
+[data-qx-page="campus-service"] .kproto-notice p,
+[data-qx-page="campus-welcome"] .kproto-card-head .sub,
+[data-qx-page="campus-service"] .kproto-card-head .sub,
+[data-qx-page="campus-welcome"] .kproto-content .text-lg,
+[data-qx-page="smart-campus"] .kproto-content .text-lg {
   font-size: 20px;
   line-height: 1.45;
 }

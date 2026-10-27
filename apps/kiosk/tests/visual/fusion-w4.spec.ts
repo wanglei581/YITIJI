@@ -478,7 +478,7 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   await page.goto('/campus')
   await expect(page.getByText(/校园招聘专区/).first()).toBeVisible()
   await page.goto('/smart-campus')
-  await expect(page.getByRole('heading', { name: '智慧校园', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '选一项校园服务', exact: true })).toBeVisible()
   await verifyPage(page, errors)
 })
 

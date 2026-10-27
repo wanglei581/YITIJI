@@ -10,7 +10,7 @@
 // 合规：仅信息展示与指引，不采集任何个人信息；无任何招聘闭环语义。
 // ============================================================
 
-import { Button, Card } from '@ai-job-print/ui'
+import { Card } from '@ai-job-print/ui'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -56,12 +56,12 @@ const ENTRIES: EntryDef[] = [
     key: 'welcome',
     icon: PartyPopperIcon,
     title: '迎新指引',
-    description: '报到流程、办事窗口、入学与求职准备',
+    description: '报到流程、办事窗口、入学准备',
     to: '/smart-campus/welcome',
   },
   // 校园大数据本期严格冻结：不在此列出入口，后端开关亦强制 false，直达 URL 仅见“未开放”。
-  { key: 'luggage', icon: PackageIcon, title: '行李帮运', description: '合作物流服务入口与服务点说明', to: '/smart-campus/service/luggage' },
-  { key: 'panorama', icon: ScanFaceIcon, title: 'VR校园', description: '360° 云游校园与重点场馆介绍', to: '/smart-campus/service/panorama' },
+  { key: 'luggage', icon: PackageIcon, title: '行李帮运', description: '服务点、路线和现场说明', to: '/smart-campus/service/luggage' },
+  { key: 'panorama', icon: ScanFaceIcon, title: 'VR校园', description: '全景导览和场馆介绍', to: '/smart-campus/service/panorama' },
 ]
 
 // 校园自助服务卡：与模块卡同一套卡片体系，校园开启即随迎新一并展示（基础校园服务，
@@ -71,21 +71,21 @@ const SERVICE_ENTRIES: SmartCampusCard[] = [
     key: 'campus-card',
     icon: CreditCardIcon,
     title: '校园卡办理',
-    description: '新生办卡、补卡、挂失后快速办理',
+    description: '新生办卡、补卡、挂失',
     to: '/smart-campus/service/campus-card',
   },
   {
     key: 'all-in-one',
     icon: KeyRoundIcon,
     title: '一卡通开通',
-    description: '开通食堂、门禁、图书馆等校园通行权限',
+    description: '食堂、门禁、图书馆',
     to: '/smart-campus/service/all-in-one',
   },
   {
     key: 'campus-network',
     icon: WifiIcon,
     title: '校园网开通',
-    description: '激活校园 Wi-Fi、宿舍网络与上网账号',
+    description: '校园无线网和宿舍网络',
     to: '/smart-campus/service/campus-network',
   },
 ]
@@ -178,8 +178,8 @@ export function SmartCampusHomePage() {
       band={(
         <QxTouchBand
           eyebrow="智慧校园"
-          title="智慧校园"
-          sub="校园场景服务专区 · 按本机配置开放"
+          title="选一项校园服务"
+          sub="按本机开通的范围开放"
           back={false}
           status={statusBadge ? { text: statusBadge, tone: 'unknown' } : false}
         />
@@ -188,7 +188,7 @@ export function SmartCampusHomePage() {
         <QxTouchDock
           onBack={() => navigate('/')}
           backLabel="返回首页"
-          ask={{ label: '问小青', draft: '这台机器上的校园指引能看什么？请只做说明。' }}
+          ask={{ label: '问小青：报到流程去哪看？', draft: '报到流程去哪看？请只做说明，不要代替学校安排。' }}
         />
       )}
       overlay={qrItem || externalItem ? (
@@ -202,7 +202,7 @@ export function SmartCampusHomePage() {
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>
-          校园服务信息专区。仅信息展示与指引，不在本终端采集任何个人信息；具体办理请以学校官方通知为准。
+          只做说明和指引，不在这台机器上采集个人信息。具体办理以学校通知为准。
             </p>
           </div>
 
@@ -210,7 +210,7 @@ export function SmartCampusHomePage() {
             <Card className="kproto-card flex flex-col items-center justify-center gap-4 p-10 text-center">
               <PartyPopperIcon className="h-12 w-12 text-neutral-400" aria-hidden="true" />
               <p className="text-lg text-neutral-500">本机暂未开启智慧校园服务</p>
-              <Button size="lg" onClick={() => navigate('/')}>返回首页</Button>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={() => navigate('/')}>返回首页</button>
             </Card>
           ) : (
             <div className="sc-mod-grid">

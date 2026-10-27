@@ -100,7 +100,7 @@ export function PolicyTouchHub() {
           onBack={() => navigate('/')}
           backLabel="返回首页"
           ask={{
-            label: '问小青',
+            label: '问小青：这一步怎么看来源？',
             draft: '我想了解政策和办事材料。请只做说明，不要判断我能不能领。',
           }}
         />
