@@ -1,5 +1,15 @@
 # 当前开发进度
 
+## 2026-10-28：触屏版第 6 包「我的与权益」改程序（分支 claude/kiosk-touch-p6，未推送）
+
+- 范围：/profile、消息、简历、打印订单、文档、AI 服务记录、足迹、收藏、权益、权益活动与详情、反馈、账号设置、隐私请求，加「还是你吗？」交接屏和换绑页，按「青序流光 · 触屏版」第 5 版改正文（不是只换外框）。共用页壳与版式件在 `apps/kiosk/src/pages/profile/touch/`（MeTouchShell、MeKit、MeStatePacks、MeIllus、meGatePage、me-*.css），样式全部挂在 `[data-qx-page="me"]` 下，不改 `.qxt-*` 共享类默认。
+- 两处隐私出口收紧：「还是你吗？」只留「是我，继续 / 不是我，结束上一位的使用」两个出口，没有返回、底导航、问小青和底栏（稿上这一屏的底导航与问小青这次不照搬，原因是点底导航会绕开确认，再进「我的」就直接看到上一位的资料）；Esc 等于「不是我」，焦点落在「不是我」，对话框语义用 alertdialog。换绑页没有底导航与底栏问小青，底栏三颗（返回账号设置、取消换绑、主按钮）和表单里的问小青都先问「取消这次换绑？」，提交中和完成后返回键置灰。
+- 求职进度与保存期限：`/api/v1/public/support-contact` 新增的 `selfNoteTab` 只有 `=== true` 才开；开着时「我的足迹」多第三个页签，关着（缺字段、非布尔、读不到）页签不出现，`?tab=applications` 落回浏览记录，也不发 `/me/job-applications`。我的文档里「打印文档 + 普通 + 系统短期」那一类的芯片写「短期保存，约 24 小时」（取 `FILE_DEFAULT_TTL_HOURS.normal`），其余不变。
+- 删除记录（CLAUDE.md §8）：本包没有删除任何文件；`QxMeChrome.tsx`、`QxMeStateBits.tsx` 里不再被引用的导出已删：QxMeBanner、QxMeSummary、QxMeGuide、QX_ME_GUIDE、QxMeCta、QxMeSkeletonList、QxMeStructRow、QxMeStartRow、QxMePendingRow、QxMeGuestRows。证据：全仓无 import（typecheck 通过）、kiosk 全部 verify 与用例无依赖、无文档声明，Git 提交保留。
+- 共享件只加可选 props：`QxTouchBand`（titleId、backDisabled）、`QxTouchDock`（primaryNode、backDisabled），`useSupportContact(enabled = true)`；默认行为不变。
+- 门禁与用例只把真值换成稿的样子，每条都做过反向检查（先提交、故意改坏、确认变红、改回，不用 git stash）：kiosk-end-use、lightflow-profile-entry、job-material-library-ui、member-print-orders-ui、profile-ai-records / documents / feedback / print-orders / resumes-notifications 各 inkpaper、w3a-ai-records、profile-inkpaper-home 范围白名单（补 me-states.css、meGatePage.ts 两行）、policy-favorite-link、unattended-copy.test；浏览器用例 fusion-w5、profile-qx、kiosk-end-use、policy-favorite-walk 同步。未登录、已登录各状态逐屏与稿并排对照过。
+- 没做到或需要别的包配合：入口 `PrintUploadPage.tsx` 还没带 `?pick=print`（打印包）；`packages/shared/src/types/memberPrivacy.ts` 里隐私页底部那句共享法务文案含「如由工作人员办理导出」，是共享常量、不在本包，未动；`kiosk-session-warning`、`kiosk-privacy-timeout` 的个别用例写死了官方端口，本机按私有端口跑时用端口替换的临时副本验证通过。
+
 ## 2026-10-24：先收口机构账号真实开通（执行中）
 
 - 最终测试增量复核已收口：Grok `1825f2d2-de18-4616-891d-7f0cb2b2cfed` 与 Hermes `20261024_160958_a4270e` 均实际成功，确认原守卫 finding 已修复、两种内容损坏负例控制位/失败检查/零成功标记正确。Hermes 的正则未转义、后续HEAD404可假通过两项建议已用当前源码与实际断言排除；固定producer的严格文本守卫、历史事故在现有记录/Git留存，均不需再扩展代码。生产器和499行验证器冻结，以包含本次复核记录的最终提交自身完整CI为准；后续过程快照保留历史，不冒充当前生产或真机通过。
