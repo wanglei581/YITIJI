@@ -2055,6 +2055,48 @@ test('interview pages that overflow show the swipe cue, and it goes away at the 
   await expect(cue).toBeVisible()
 })
 
+test('interview setup industry picker keeps readable text, 64px taps and a visible chosen state @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  await page.goto('/interview/setup')
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const dialog = page.getByRole('dialog', { name: '选择面试行业' })
+  const picked = dialog.getByRole('button', { name: '制造业', exact: true })
+  const idle = dialog.getByRole('button', { name: '采矿业', exact: true })
+  await picked.click()
+  // 选中态要看得出来：选中的是深底，没选的是卡片底，没选的也有边。
+  await expect(picked).toHaveAttribute('aria-pressed', 'true')
+  const look = (button: typeof picked) => button.evaluate((el) => {
+    const style = getComputedStyle(el)
+    return { background: style.backgroundColor, border: style.borderTopWidth }
+  })
+  const chosenLook = await look(picked)
+  const idleLook = await look(idle)
+  expect(chosenLook.background, '选中的行业要有和其他选项不同的底色').not.toBe(idleLook.background)
+  expect(idleLook.border, '没选的行业也要看得出是个按钮').not.toBe('0px')
+  // 字不小于 20px，可点的不小于 64×64（只量看得见的文字和按钮）。
+  const found = await dialog.evaluate((root) => {
+    const smallText: string[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const label = (node.textContent ?? '').trim()
+      const host = node.parentElement
+      if (!label || !host) continue
+      const box = host.getBoundingClientRect()
+      if (box.width < 2 || box.height < 2) continue
+      const size = parseFloat(getComputedStyle(host).fontSize)
+      if (size < 20) smallText.push(`${size}px ${label.slice(0, 16)}`)
+    }
+    const smallTaps = [...root.querySelectorAll('button')]
+      .map((button) => ({ label: (button.textContent ?? '').trim().slice(0, 12), box: button.getBoundingClientRect() }))
+      .filter(({ box }) => box.width < 63.5 || box.height < 63.5)
+      .map(({ label, box }) => `${label || '关闭'} ${Math.round(box.width)}×${Math.round(box.height)}`)
+    return { smallText, smallTaps }
+  })
+  expect(found.smallText, '行业弹窗里的字不小于 20px').toEqual([])
+  expect(found.smallTaps, '行业弹窗里的按钮不小于 64×64').toEqual([])
+})
+
 test('interview setup failure stays inside the first screen @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   api.respond('POST', '/api/v1/mock-interviews', {
