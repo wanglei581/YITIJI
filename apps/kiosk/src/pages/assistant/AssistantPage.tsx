@@ -6,7 +6,6 @@ import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { Hit } from '../public-touch/PublicBlocks'
 import { IllusChecklist, IllusReport, IllusResume } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
@@ -31,7 +30,7 @@ import {
   ChatBubble,
   type Message,
 } from './AdvisorConversation'
-import { AiToolSection } from './AdvisorTools'
+import { AssistantSheets, type AssistantSheetKind } from './AssistantSheets'
 import { buildNonAiNotice, isAiGeneratedReply } from './advisorProvider'
 import {
   COCKPIT_COPY,
@@ -47,7 +46,7 @@ import {
 import { isRecruitmentRoute, useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useAssistantDraftHandoff } from '../../services/assistantDraft'
 import { AssistantTaskPicker } from './AssistantTaskPicker'
-import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import { advisorDisplayText, advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
 import { AI_CONTENT_COMPLAINT_ROUTE } from '../profile/me/feedback/aiComplaint'
 import './assistant-qingxu.css'
 import './assistant-touch.css'
@@ -128,7 +127,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [hostingOpen, selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput] = useState('')
-  const [sheet, setSheet] = useState<'tools' | 'manual' | 'acts' | null>(null)
+  const [sheet, setSheet] = useState<AssistantSheetKind | null>(null)
   useAssistantDraftHandoff(setInput, ASSISTANT_USER_MESSAGE_MAX_LENGTH)
   const [loading, setLoading] = useState(false)
   const [declaring, setDeclaring] = useState(false)
@@ -478,9 +477,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   // 在等、没问过、有回答这三种有输入坞；其余三种换成底栏按钮，不再给一个按不出结果的发送键。
   const showComposer = body === 'picker' || body === 'submitting' || body === 'reply'
   // 没有输入坞的三种版式里，屏幕键盘没有对象可输入，盖在底栏按钮上反而挡路，一并收起。
-  useEffect(() => {
-    if (!showComposer) setKeyboardOpen(false)
-  }, [showComposer])
+  useEffect(() => { if (!showComposer) setKeyboardOpen(false) }, [showComposer])
   const showConversation = body !== 'picker' || messages.some((message) => message.id.startsWith('voice-'))
   const draftLength = input.trim().length
   const toolsLine = aiLocked
@@ -494,38 +491,21 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const openActs = () => setSheet('acts')
   const complaint = () => navigate(AI_CONTENT_COMPLAINT_ROUTE)
 
-  const sheetClose = () => setSheet(null)
-  const sheetActions = <button type="button" className="qxt-btn qxt-btn-sec" onClick={sheetClose}>收起</button>
-  const overlay = sheet === 'tools' ? (
-    <QxTouchOverlay kind="sheet" title="本机 AI 专项" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
-      <AiToolSection degraded={aiLocked} degradedReason={degradedReason} availability={aiAvailability} activeSkill={toolboxSkill} />
-    </QxTouchOverlay>
-  ) : sheet === 'manual' ? (
-    <QxTouchOverlay kind="sheet" title="不经过 AI，直接去办" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
-      <AdvisorManualEntries variant="sheet" />
-    </QxTouchOverlay>
-  ) : sheet === 'acts' ? (
-    <QxTouchOverlay kind="sheet" title="这一主题还能去哪" onClose={sheetClose} dismissOnScrim actions={sheetActions}>
-      {goActions && goActions.length > 0 ? (
-        <div className="action-chips" aria-label="这一主题的办事入口">
-          {goActions.map((action) => (
-            <Hit key={action.route} title={advisorUserReason(action.label, '去办理')} sub="去办理" onClick={() => navigate(action.route)} />
-          ))}
-        </div>
-      ) : (
-        <p className="qxp-note">本终端未开放岗位与招聘会信息。这一主题没有「去办理」入口，问题仍可以问。</p>
-      )}
-    </QxTouchOverlay>
+  const overlay = sheet ? (
+    <AssistantSheets
+      sheet={sheet}
+      onClose={() => setSheet(null)}
+      tools={{ degraded: aiLocked, degradedReason, availability: aiAvailability, activeSkill: toolboxSkill }}
+      goActions={goActions}
+    />
   ) : undefined
 
-  const lockedDock = (
+  const dock = body === 'locked' ? (
     <QxTouchDock
       mid={<button type="button" className="qxt-btn qxt-btn-sec qxt-fill" onClick={complaint}>投诉 AI 内容</button>}
       primary={{ label: '重新检查', onClick: recheckAdvisor, noArrow: true }}
     />
-  )
-  const backOnlyDock = <QxTouchDock />
-  const dock = body === 'locked' ? lockedDock : showComposer ? undefined : backOnlyDock
+  ) : showComposer ? undefined : <QxTouchDock />
 
   const turnRow = (
     <div className="assistant-task-actions" data-cols="3" role="group" aria-label="这一轮之后可以做什么">
@@ -705,33 +685,33 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               type="button"
               className="assistant-tool-button assistant-type"
               disabled={loading || declaring}
-              onClick={() => {
-                setKeyboardOpen(true)
-                focusComposer()
-              }}
+              onClick={() => { setKeyboardOpen(true); focusComposer() }}
             >
               <KeyboardIcon aria-hidden />
               打字
             </button>
-            <textarea
-              id="assistant-question"
-              ref={inputRef}
-              value={input}
-              onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
-              onKeyDown={handleKeyDown}
-              onFocus={() => !loading && !declaring && setKeyboardOpen(true)}
-              onClick={() => !loading && !declaring && setKeyboardOpen(true)}
-              inputMode="none"
-              aria-label="输入咨询问题"
-              placeholder={toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '还没写问题。点「打字」用屏上键盘，或点上面的一句。')}
-              rows={1}
-              maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
-              disabled={loading || declaring}
-            />
+            <div className="assistant-field">
+              {/* 屏上显示的草稿遮住电话、邮箱；文本框本身只收键、留原文，发出去的仍是原文。 */}
+              {draftLength > 0 ? <p className="assistant-draft-text" data-testid="cockpit-draft" aria-hidden="true">{advisorDisplayText(input.trim())}</p> : null}
+              <textarea
+                id="assistant-question"
+                ref={inputRef}
+                value={input}
+                onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
+                onKeyDown={handleKeyDown}
+                onFocus={() => !loading && !declaring && setKeyboardOpen(true)}
+                onClick={() => !loading && !declaring && setKeyboardOpen(true)}
+                inputMode="none"
+                aria-label="输入咨询问题"
+                placeholder={toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '还没写问题。点「打字」用屏上键盘，或点上面的一句。')}
+                rows={1}
+                maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
+                disabled={loading || declaring}
+                data-masked={draftLength > 0 || undefined}
+              />
+            </div>
             {draftLength > 0 && (
-              <button type="button" className="assistant-dock-clear" disabled={loading || declaring} onClick={() => { setInput(''); focusComposer() }}>
-                清空
-              </button>
+              <button type="button" className="assistant-dock-clear" disabled={loading || declaring} onClick={() => { setInput(''); focusComposer() }}>清空</button>
             )}
             <button
               type="button"

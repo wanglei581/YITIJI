@@ -91,7 +91,8 @@ export function PublicTouchFrame({
       nav={nav ? <QxTouchNav current={navCurrent} {...navHandlers} /> : undefined}
       overlay={overlay}
     >
-      <main className="qxp-fill" data-kiosk-screen={screen}>{children}</main>
+      {/* main 地标交给 KioskLayout，页面不再自画一个（否则 /assistant、/help 会有两个，独立路由会多出一个） */}
+      <div className="qxp-fill" data-kiosk-screen={screen}>{children}</div>
     </QxTouchScreen>
   )
 }

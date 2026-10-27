@@ -172,13 +172,9 @@ function QaRow({ item, answerId }: { item: QA; answerId: string }) {
 function FilingLine({ kiosk }: { kiosk: boolean }) {
   return (
     <p className="qxp-note hp-filing" aria-label="网站备案信息">
-      {kiosk ? <span>鲁ICP备2026023517号-2</span> : (
-        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">鲁ICP备2026023517号-2</a>
-      )}
+      {kiosk ? <span>鲁ICP备2026023517号-2</span> : (<a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">鲁ICP备2026023517号-2</a>)}
       {' · '}
-      {kiosk ? <span>鲁公网安备37021402007308号</span> : (
-        <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">鲁公网安备37021402007308号</a>
-      )}
+      {kiosk ? <span>鲁公网安备37021402007308号</span> : (<a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer">鲁公网安备37021402007308号</a>)}
       {' · 职易达AI'}
     </p>
   )

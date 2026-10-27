@@ -6,8 +6,8 @@ import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
 const kioskScenarios = [
-  // 2026-09-25 迁入稿 09-system-state：进页默认是「还没检测」，页面标题换成稿的八项状态区块标题。
-  { path: '/error-offline', landmark: '这台机器的八项状态', registerHealthProbe: true },
+  // 2026-09-25 迁入稿 09-system-state：进页默认是「还没检测」；触屏稿的页眉小字「机器状态」在每一态都在，用它当地标。
+  { path: '/error-offline', landmark: '机器状态', registerHealthProbe: true },
 ] as const
 
 const mobileScenarios = [
@@ -164,15 +164,14 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
     await expect(page.locator('.ui-kiosk-topbar')).toHaveCount(0)
     const categories = page.getByRole('group', { name: '按分类筛选常见问题' })
     await expect(categories.getByRole('button', { name: /登录与账号.*3 问/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /一定要登录才能使用吗/ })).toHaveCount(0)
+    // 备案行在稿的分类首页底部；分类问答页不画它，所以在进分类之前核。
+    await assertHelpCenterFilingInfo(page)
+    await expect(page.getByText('一定要登录才能使用吗？', { exact: true })).toHaveCount(0)
     await categories.getByRole('button', { name: /登录与账号.*3 问/ }).click()
-    const question = page.getByRole('button', { name: /一定要登录才能使用吗/ })
-    await expect(question).toBeVisible()
-    await question.click()
-    await expect(question).toHaveAttribute('aria-expanded', 'true')
+    // 触屏稿 help：分类下每条问答是「问 + 答」一起摆出来的卡片，不是点开才看到答案的折叠项。
+    await expect(page.getByText('一定要登录才能使用吗？', { exact: true })).toBeVisible()
     await expect(page.getByText('不需要。大部分服务可以游客身份直接使用。', { exact: false })).toBeVisible()
     await expect(page.getByRole('button', { name: '去登录' })).toBeVisible()
-    await assertHelpCenterFilingInfo(page)
     await assertNoHorizontalOverflow(page)
     expect(runtimeErrors).toEqual([])
   })

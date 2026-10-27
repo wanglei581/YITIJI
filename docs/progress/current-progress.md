@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-10-28：一体机触屏版第 5 包「公共与系统页」按稿改程序（分支 `claude/kiosk-touch-p5`，未合并、未部署、真机未验）
+
+- 范围：问小青（含键盘、回答、失败、AI 暂停各态）、帮助中心、官方渠道（默认不分组）、登录（手机号 / 扫码）、协议页、机器状态、路由出错页、待机屏、闲置提醒与清场、继续打印任务；手机侧 `/upload/phone`、`/member/qr-login` 只保留最小改动，未按稿重排。页面骨架统一走 `PublicTouchFrame`，块与插画在 `apps/kiosk/src/pages/public-touch/`（`PublicBlocks`、`PublicIllus`、`public-touch.css`）；共享触屏件只加了可选属性（`QxTouchBand.backLabel`、`QxTouchDock` 的 `className` 与 `testId`、`QxTouchScreen` 的 `className`、`page` 等），默认行为不变。
+- 稿里有、运行页没有真实数据的两处没有照画：问小青首屏的「最近办理」示例行换成真实的「本机 AI 专项」入口；待机屏的示例轮播不画，显示后台配的真实素材。屏上不写重测次数和秒数，次数只留给读屏。登录页保留分段切换与现有验证码流程，没有按稿改成整页入口行。
+- 删除：`pages/official-channels/official-channels-qx.css`（main 上原有；官方渠道页不再导入它，全仓库无其他引用）。另有 `pages/public-touch/PublicArt.tsx`、`pages/legal/legal-touch.css` 是本分支过程中新建又删掉的（被 `PublicIllus.tsx` 与 `legal-service-desk.css` 取代，相对 main 净无变化）。
+- 同步改了门禁与用例的真值（照稿，不放宽）：`verify-advisor-provider-gate`、`verify-fusion-w5`、`verify-kiosk-runtime-error-boundary`，以及 `fusion-smoke`、`fusion-w3`、`fusion-w5`、`official-channels` 等浏览器用例里对旧版式（折叠问答、输入框锁定、分区标题）的断言。
+- 本机验证只证明页面在 1080×1920 与 390×844 的浏览器里按稿出现与可操作，不等于一体机现场验过。
+
 ## 2026-10-24：先收口机构账号真实开通（执行中）
 
 - 最终测试增量复核已收口：Grok `1825f2d2-de18-4616-891d-7f0cb2b2cfed` 与 Hermes `20261024_160958_a4270e` 均实际成功，确认原守卫 finding 已修复、两种内容损坏负例控制位/失败检查/零成功标记正确。Hermes 的正则未转义、后续HEAD404可假通过两项建议已用当前源码与实际断言排除；固定producer的严格文本守卫、历史事故在现有记录/Git留存，均不需再扩展代码。生产器和499行验证器冻结，以包含本次复核记录的最终提交自身完整CI为准；后续过程快照保留历史，不冒充当前生产或真机通过。

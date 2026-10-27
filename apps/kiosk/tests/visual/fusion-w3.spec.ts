@@ -1451,21 +1451,25 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
   const navTop = await page.locator('.qxt-nav').evaluate((el) => el.getBoundingClientRect().top)
   const input = await page.getByLabel('输入咨询问题').evaluate((el) => el.getBoundingClientRect().toJSON())
   const send = await page.locator('.assistant-send').evaluate((el) => el.getBoundingClientRect().toJSON())
-  const cols = await page.locator('.assistant-ai-tools-grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)
-  console.log(`assistant-geometry navTop=${navTop} inputTop=${input.top} sendBottom=${send.bottom} toolCols=${cols}`)
-  await page.screenshot({ path: 'test-results/assistant-qx-r4-1080x1920.png' })
   expect(send.bottom).toBeLessThan(navTop - 24)
   expect(input.bottom).toBeLessThan(navTop - 24)
+  // 触屏稿：「本机 AI 专项」收在底部弹层里，开一下再量它的列数，量完收起。
+  await page.getByRole('button', { name: /本机 AI 专项/ }).click()
+  const cols = await page.locator('.assistant-ai-tools-grid').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)
+  expect(cols).toBeGreaterThanOrEqual(1)
+  console.log(`assistant-geometry navTop=${navTop} inputTop=${input.top} sendBottom=${send.bottom} toolCols=${cols}`)
+  await page.screenshot({ path: 'test-results/assistant-qx-r4-1080x1920.png' })
+  await page.getByRole('button', { name: '收起', exact: true }).click()
 
   await page.setViewportSize({ width: 390, height: 844 })
   // 等窄屏重排真正落地（导航贴回 844 视口底部），并回到首屏顶部再量 —— 否则量到的是 1080 版式的残影。
-  // 触屏稿默认正文是「最近办理」示例行加四张主题卡，不再用座舱标题和披露条当首屏几何。
+  // 触屏稿默认正文是一行入口加四张主题卡；稿里的「最近办理」是示例行，运行页没有真实的最近办理数据，不画，换成「本机 AI 专项」入口。
   await page.waitForFunction(() => Math.abs(document.querySelector('.qxt-nav')!.getBoundingClientRect().bottom - window.innerHeight) <= 1)
   await page.locator('.kassist').evaluate((el) => { el.scrollTop = 0 })
   const narrow = await page.evaluate(() => {
     const box = (sel: string) => document.querySelector(sel)!.getBoundingClientRect()
     return {
-      recent: box('.assistant-recent'),
+      recent: box('.assistant-tools-open'),
       firstTask: box('.assistant-task'),
       navTop: box('.qxt-nav').top,
       overflowX: document.documentElement.scrollWidth - window.innerWidth,
@@ -1478,9 +1482,8 @@ test('assistant first screen keeps composer and send above the Qingxu navbar @w3
   expect(narrow.recent.width).toBeLessThanOrEqual(390)
   expect(narrow.recent.height).toBeGreaterThanOrEqual(64)
   expect(narrow.recent.height).toBeLessThan(140)
-  await expect(page.locator('.assistant-recent .assistant-recent-chip')).toHaveText('示例')
-  await expect(page.locator('.assistant-recent strong')).toHaveText('最近办理')
-  await expect(page.locator('.assistant-recent small')).toHaveText('模拟面试 · HR 面试 5 分钟')
+  await expect(page.locator('.assistant-tools-open b')).toHaveText('本机 AI 专项')
+  await expect(page.locator('.assistant-tools-open small')).toHaveText('8 项 · 首轮提问后确认可用性')
   await expect(page.locator('.assistant-task strong')).toHaveText(['简历与求职材料', '面试与沟通', '岗位与选择', '入职与职场'])
   expect(narrow.firstTask.top).toBeGreaterThanOrEqual(0)
   expect(narrow.firstTask.top).toBeLessThan(narrow.navTop)
@@ -1531,8 +1534,9 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   await expect(page.locator('.assistant-ai-status .kiosk-ai-fallback')).toHaveAttribute('data-ai-fallback-mode', 'manual')
   await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
   await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
-  // 一次网络失败不是「模型没接上」，输入条不该被锁死。
-  await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
+  // 一次网络失败不是「模型没接上」，不该锁死：稿 reply-error 给「重试这一轮」，且没有「重新检查」那条锁定路径。
+  await expect(page.getByRole('button', { name: /重试这一轮/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^重新检查/ })).toHaveCount(0)
 
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
@@ -1555,9 +1559,11 @@ test('assistant: AI budget exhausted locks the composer and offers non-AI entrie
   await page.goto('/assistant')
   await page.getByLabel('输入咨询问题').fill('我该先做简历还是先看岗位？')
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
-  await expect(page.getByRole('button', { name: /重新检查 AI 顾问/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^重新检查/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /重试这一轮/ })).toHaveCount(0)
-  await expect(page.locator('.assistant-send')).toHaveAttribute('aria-disabled', 'true')
+  // 稿 ai-down：这一态不画输入坞，不留一个按不出结果的发送键，也没有可输入的框。
+  await expect(page.locator('.assistant-send')).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toHaveCount(0)
   await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
   await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
   expect(tickets, 'AI 请求带终端会话票').toEqual([expect.stringMatching(/.+/)])
@@ -1591,36 +1597,41 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
   await expect(page.locator('.assistant-ai-status .kiosk-ai-fallback')).toHaveAttribute('data-ai-fallback-mode', 'manual')
   await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
 
-  // 置灰一律 aria-disabled，绝不用原生 disabled（触屏无 hover，原生 disabled 掉出 tab 序）。
+  // 稿：这一轮不是 AI 生成时不画输入坞，没有发送键可按；也没有可输入的框。
   const send = page.locator('.assistant-send')
-  await expect(send).toHaveAttribute('aria-disabled', 'true')
-  expect(await send.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false)
-  const toolCard = page.locator('.assistant-ai-tool-card').first()
-  await expect(toolCard).toHaveAttribute('aria-disabled', 'true')
-  expect(await toolCard.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false)
-  // 置灰原因常驻可见，不是 tooltip。
-  await expect(page.locator('.assistant-ai-tools-reason')).toBeVisible()
+  await expect(send).toHaveCount(0)
+  await expect(page.getByLabel('输入咨询问题')).toHaveCount(0)
 
   // 锁上之后不再发请求，也不会再冒出第二条假回答。
   let extraChatCalls = 0
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/v1/assistant/chat') extraChatCalls += 1
   })
+  await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
+
+  // 「重新提问」仍受不可用事实约束，不能靠切换画面解除锁定：落在 AI 暂不可用，输入坞依旧没有。
+  await page.getByRole('button', { name: /^重新提问/ }).click()
+  await expect(page.getByTestId('ai-cockpit-state-ai-unavailable')).toBeVisible()
+  await expect(send).toHaveCount(0)
+
+  // 置灰一律 aria-disabled，绝不用原生 disabled（触屏无 hover，原生 disabled 掉出 tab 序）。专项工具收在「本机 AI 专项」弹层里。
+  await page.getByRole('button', { name: /本机 AI 专项/ }).click()
+  const toolCard = page.locator('.assistant-ai-tool-card').first()
+  await expect(toolCard).toHaveAttribute('aria-disabled', 'true')
+  expect(await toolCard.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false)
+  // 置灰原因常驻可见，不是 tooltip。
+  await expect(page.locator('.assistant-ai-tools-reason')).toBeVisible()
   // force:true 绕过 Playwright 的可操作性检查 —— 它把 aria-disabled 当作不可点，
   // 但真实浏览器里 aria-disabled 的按钮**照样会派发 click**（没有原生 disabled）。
   // 用户在触屏上真的按得下去，所以这里必须模拟真按，才能验证按下去确实没有副作用。
-  await send.click({ force: true })
-  await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
+  await toolCard.click({ force: true })
   expect(extraChatCalls).toBe(0)
+  await page.getByRole('button', { name: '收起', exact: true }).click()
 
-  // 返回提问仍受不可用事实约束，不能靠切换画面解除锁定。
-  await page.getByRole('button', { name: '回到提问', exact: true }).click()
-  await expect(page.getByTestId('ai-cockpit-state-ai-unavailable')).toBeVisible()
-  await expect(send).toHaveAttribute('aria-disabled', 'true')
-
-  // 但不是死局：可以显式重新检查。
-  await page.getByRole('button', { name: '重新检查 AI 顾问' }).click()
-  await expect(send).not.toHaveAttribute('aria-disabled', 'true')
+  // 但不是死局：可以显式重新检查，输入坞随之回来。
+  await page.getByRole('button', { name: /^重新检查/ }).click()
+  await expect(page.getByLabel('输入咨询问题')).toBeVisible()
+  await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
 
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
@@ -1683,7 +1694,9 @@ for (const [message, expected] of [
     await expect(manual.getByRole('button')).toHaveCount(4)
     await expect(manual.getByRole('button', { name: /^帮助中心/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /查看岗位信息|查看招聘会|找企业/ })).toHaveCount(0)
-    await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
+    // 失败不是锁定：给「重试这一轮」，没有「重新检查」那条锁定路径。
+    await expect(page.getByRole('button', { name: /重试这一轮/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^重新检查/ })).toHaveCount(0)
   })
 }
 
@@ -1756,7 +1769,10 @@ test('assistant submitting waits for a response and preserves manual entries @w3
     await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
     await expect(page.getByRole('progressbar')).toHaveCount(0)
     await expect(page.locator('.assistant-send')).toBeDisabled()
-    await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' }).getByRole('button')).toHaveCount(4)
+    // 稿：等待态不另画四个入口，页面明说「办事入口照常可用」，离开靠顶栏返回与底部主导航，都不被等待锁住。
+    await expect(page.getByText('这一轮还在等待，办事入口照常可用。')).toBeVisible()
+    await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '首页' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: '返回首页' })).toBeEnabled()
   } finally {
     release()
   }

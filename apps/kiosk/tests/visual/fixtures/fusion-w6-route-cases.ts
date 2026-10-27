@@ -89,8 +89,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/reports', url: '/interview/reports', expectedPath: '/interview', marker: screen('interview-reports'), featureText: '练习报告' },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '轻触屏幕，开始办事', landmark: 'presentation', seed: seedScreensaver },
   { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '[data-qx-page="home"]', featureText: '问小青：说一句你想办的事' },
-  // 2026-09-25 迁入稿 09-system-state：锚点换成稿里常驻的八项状态区块标题（旧页标题「网络连接中断」已随稿替换）。
-  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '这台机器的八项状态' },
+  // 2026-09-25 迁入稿 09-system-state；2026-10-28 触屏稿里每一态都在的是页眉小字「机器状态」，锚点换成它。
+  { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '机器状态' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
   { pattern: '/profile', url: '/profile', marker: screen('profile'), featureText: '我的' },
   { pattern: '/me/resumes', url: '/me/resumes', marker: member, featureText: '我的简历' },
@@ -142,10 +142,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: w2('pickup-claim'), featureText: '输入你的到机码' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("小青的作业面")', featureText: '小青的作业面' },
-  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续打印任务")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
+  { pattern: '/session-resume', url: '/session-resume', marker: '[data-testid="session-resume-state-list"]', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
   // 3.14：线上平台目录并入本机构官方渠道，旧地址只做重定向。marker 仍是 h1 精确匹配、featureText 钉二维码下那句
   // 来源说明的固定部分（夹具是 b 版本：本机构一个渠道 + 其他来源平台两个），强度不降。
-  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("本机构官方渠道")', featureText: '提供，信息以其官网为准' },
+  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', expectedPath: compatibilityRedirects['/jobs/online-platforms'], marker: 'h1:text-is("扫码，在手机上看")', featureText: '提供，信息以其官网为准' },
   { pattern: '/official-channels', url: '/official-channels', marker: screen('official-channels'), featureText: '本渠道由示例大学就业指导中心提供，信息以其官网为准' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },

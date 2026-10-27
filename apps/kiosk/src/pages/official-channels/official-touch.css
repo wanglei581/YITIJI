@@ -52,6 +52,9 @@
   .qxt-screen[data-qx-page='official'] .oc-qr { align-self: center; }
   .qxt-screen[data-qx-page='official'] .oc-sec { flex: none; }
   .qxt-screen[data-qx-page='official'] .qxp-pair { grid-template-columns: 1fr; }
+  .qxt-screen[data-qx-page='official'] .qxp-pair-grow { flex: none; grid-template-rows: none; }
+  .qxt-screen[data-qx-page='official'] .qxp-pair-card { min-height: 200px; }
+  .qxt-screen[data-qx-page='official'] .qxp-pair-card .qxp-artbox { max-height: 170px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -81,7 +81,8 @@ for (const timer of ['setTimeout', 'setInterval']) {
 // ── ④ 降级：AI 是加速器不是前置条件 ───────────────────────────────────────
 must('page', /mode: 'manual'/, 'P25 的降级必须是 manual —— 用户的目标不依赖模型')
 must('page', /manualPath:/, 'manual 降级必须给出具体的手动路径')
-must('page', /advisorTask\.isFailed && <AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
+// 触屏稿：本轮失败 / 不是 AI 回复 / AI 暂停三种版式，正文都落在「这些都不需要 AI · 现在就能做」的四个手动入口上。
+must('page', /\(body === 'notai' \|\| body === 'error' \|\| body === 'locked'\) && \([\s\S]{0,1400}?<AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。
@@ -94,16 +95,20 @@ for (const route of manualRoutes) {
 // ── ⑤ 置灰一律 aria-disabled ─────────────────────────────────────────────
 // 原生 disabled 会把控件踢出 Tab 序、读屏直接跳过，用户永远读不到「为什么灰」；
 // 触屏也没有 hover 可以补这层解释。
-must('page', /aria-disabled=\{aiLocked \|\| undefined\}/, 'AI 锁定态必须用 aria-disabled 表达')
+// 触屏稿里 AI 暂停 / 非 AI 回复 / 本轮失败三态不画输入坞（底栏只放返回、投诉 AI 内容、重新检查），
+// 所以不再有「一个被锁住的输入框」可以 aria-disabled / readOnly。要守住的是同一条底线：
+// 这三态里不得有一个按不出结果的发送键，锁定时快捷问题也发不出请求，且置灰一律不用原生 disabled。
+must('page', /const showComposer = body === 'picker' \|\| body === 'submitting' \|\| body === 'reply'/, '锁定 / 非 AI 回复 / 失败三态不得画输入坞（不留按不出结果的发送键）')
 mustNot('page', /(?<!aria-)disabled=\{aiLocked/, 'AI 锁定态不得使用原生 disabled')
-must('page', /readOnly=\{aiLocked\}/, '输入框锁定用 readOnly，保持可聚焦可读')
+must('page', /if \(loading \|\| aiLocked\) return/, '锁定时快捷问题点了也不得发出请求')
 must('tools', /aria-disabled=\{degraded \|\| undefined\}/, '专项工具置灰必须用 aria-disabled')
 mustNot('tools', /(?<!aria-)disabled=\{degraded/, '专项工具置灰不得使用原生 disabled')
 must('tools', /aria-describedby=\{degraded \? reasonId : undefined\}/, '置灰按钮必须指向常驻可见的原因')
-must('page', /assistant-composer-lock/, '锁定原因必须常驻可见在输入区旁')
+must('scenes', /lede: '四个入口不经过 AI，照常能办。'/, '锁定原因常驻在页头说明里，不靠输入框旁的小字')
 
 // 锁死不能是终局：配置修好后用户得有办法再试。
 must('page', /重新检查 AI 顾问/, '锁定态必须留一条显式的重新检查路径')
+must('page', /label: '重新检查', onClick: recheckAdvisor/, '锁定态底栏的主按钮必须是重新检查（稿 xq ai-down）')
 
 // ── ⑥ 合规文案白名单（CLAUDE.md §2）────────────────────────────────────────
 for (const key of ['page', 'conversation', 'tools', 'scenes']) {

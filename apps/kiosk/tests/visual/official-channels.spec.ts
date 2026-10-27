@@ -192,27 +192,30 @@ async function expectChannelCards(page: Page, section: 'org' | 'legacy', expecte
  */
 async function expectDraftPairs(page: Page, where: string, labels: readonly string[], { minHeight, maxHeight }: { minHeight: number; maxHeight: number }): Promise<void> {
   const scale = await stageScale(page)
-  const cards = await page.getByTestId('official-channels-alternatives').locator('.oc-pair-card').evaluateAll((elements) => elements.map((card) => {
+  const cards = await page.getByTestId('official-channels-alternatives').locator('.qxp-pair-card').evaluateAll((elements) => elements.map((card) => {
     const box = card.getBoundingClientRect()
-    const title = card.querySelector('.oc-pair-k')!.getBoundingClientRect()
+    const k = card.querySelector('.qxp-k')!
+    const range = document.createRange()
+    range.selectNodeContents(k)
+    const text = range.getBoundingClientRect()
     return {
-      label: card.querySelector('.oc-pair-k')?.textContent ?? '',
+      label: k.textContent ?? '',
       height: box.height,
-      left: box.left,
-      titleLeft: title.left,
-      art: card.querySelector('.qxp-art') ? 1 : 0,
+      centerOff: Math.abs(text.left + text.width / 2 - (box.left + box.width / 2)),
+      art: card.querySelector('.qxp-artbox svg') ? 1 : 0,
     }
   }))
   expect(cards.map((card) => card.label), `${where}：去处`).toEqual([...labels])
   for (const card of cards) {
-    expect(card.height / scale, `${where}「${card.label}」不被拉成空卡（≤${maxHeight}px）`).toBeLessThanOrEqual(maxHeight)
+    expect(card.height / scale, `${where}「${card.label}」不被拉成没有内容的空卡（≤${maxHeight}px）`).toBeLessThanOrEqual(maxHeight)
     expect(card.height / scale, `${where}「${card.label}」保持可点高度（≥${minHeight}px）`).toBeGreaterThanOrEqual(minHeight)
-    expect((card.titleLeft - card.left) / scale, `${where}「${card.label}」标题靠左`).toBeLessThanOrEqual(40)
+    expect(card.centerOff / scale, `${where}「${card.label}」标题居中（稿 45 的空态、失败态是居中小标题加整幅插画）`).toBeLessThanOrEqual(24)
     expect(card.art, `${where}「${card.label}」有插画`).toBe(1)
   }
 }
-const STAGE_PAIRS = { minHeight: 180, maxHeight: 320 }
-const PHONE_PAIRS = { minHeight: 140, maxHeight: 240 }
+// 稿 45：空态、失败态的两张去处卡是撑满正文的大卡，卡里的插画占大头，所以上界放到一屏之内，空卡由「有插画」那条防。
+const STAGE_PAIRS = { minHeight: 180, maxHeight: 1100 }
+const PHONE_PAIRS = { minHeight: 140, maxHeight: 360 }
 
 // ── 渠道页：机构终端 ─────────────────────────────────────────────────────────
 
@@ -228,7 +231,8 @@ test('org terminal: each channel is a card with its own QR and the exact source 
   await expect(page.getByText('扫下面的码，在自己的手机上打开本机构核验过的官方页面。')).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="official-channels"]')).not.toContainText('招聘')
   await expect(page.locator('.qxt-status')).toHaveText('2 个官方渠道')
-  await expect(page.getByTestId('official-channels-org').locator('.dw-sec-h .t'), '分区标题写是哪一家机构').toHaveText(ORG)
+  // 默认不分组：机构名写在每张卡的来源说明里（expectChannelCards 逐字核），整个分区里能找到机构名。
+  await expect(page.getByTestId('official-channels-org'), '分区里写明是哪一家机构').toContainText(ORG)
   await expectChannelCards(page, 'org', ORG_SORTED)
   await expect(page.getByTestId('official-channels-legacy'), '托管关闭：没有「其他来源平台」').toHaveCount(0)
   await expect(page.locator('.qxt-screen a[href]'), '一体机不打开外部网页：整页没有可点的链接').toHaveCount(0)
@@ -253,9 +257,9 @@ test('the channels response may come in the success/data envelope too @w1-kiosk'
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   await expectChannelCards(page, 'org', [ORG_CHANNELS[0]!])
-  // 只有一张本机构渠道时照稿 45：码卡就是主角，不压机构名分区头（机构名在卡底来源说明里），问小青编 01。
-  await expect(page.getByTestId('official-channels-org').locator('.dw-sec-h')).toHaveCount(0)
-  await expect(page.getByTestId('official-channels-assist').locator('.dw-sec-h .no')).toHaveText('01')
+  // 只有一张本机构渠道时照稿 45：码卡就是主角，不压分区标题（机构名在卡底来源说明里）。
+  await expect(page.getByTestId('official-channels-org').locator('.qxp-k')).toHaveCount(0)
+  await expect(page.getByTestId('official-channels-org').locator('.oc-card-name')).toHaveCount(1)
 })
 
 test('a channel whose link is not http(s) gets no QR and no card @w1-kiosk', async ({ page, api }) => {
@@ -277,15 +281,15 @@ test('empty: says the terminal has no channel configured, not why, and offers wh
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'empty')
   const empty = page.getByTestId('official-channels-empty')
-  await expect(empty.locator('.qx-state-t')).toHaveText('本终端暂未配置官方渠道')
+  await expect(page.getByRole('heading', { level: 1, name: '本终端暂未配置官方渠道' })).toBeVisible()
   // 只说事实，不说原因（没绑机构、机构没录、被下架……一律不猜）。
-  await expect(empty.locator('.qx-state-d')).toHaveText('可以先办下面这些事。')
+  await expect(empty).toContainText('本终端还没有可扫的码。')
   // 页上没有码，页头就不能说「扫下面的码」。
   await expect(page.getByText('没有可扫的码。可以问小青，或先看帮助。', { exact: true })).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="official-channels"]')).not.toContainText('招聘')
   await expect(page.locator('.qxt-status')).toHaveText('暂未配置官方渠道')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
-  const alternatives = page.getByTestId('official-channels-alternatives').locator('.oc-pair-k')
+  const alternatives = page.getByTestId('official-channels-alternatives').locator('.qxp-k')
   await expect(alternatives).toHaveText(['问小青', '帮助'])
   await expectDraftPairs(page, '空态', ['问小青', '帮助'], STAGE_PAIRS)
   await expectNoForbiddenCopy(page, '空态')
@@ -328,7 +332,8 @@ test('error then retry: honest failure with a working retry, no raw error text @
 
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'error')
-  await expect(page.getByTestId('official-channels-error').locator('.qx-state-t')).toHaveText('官方渠道这次没有读取成功')
+  await expect(page.getByRole('heading', { level: 1, name: '官方渠道这次没有读取成功' })).toBeVisible()
+  await expect(page.getByTestId('official-channels-error')).toContainText('这次没有读到官方渠道。请重新读取。')
   await expect(page.locator('.qxt-status')).toHaveText('渠道读取失败')
   await expect(page.getByTestId('official-channel-card')).toHaveCount(0)
   await expect(page.getByTestId('official-channels-empty'), '失败不冒充「没有渠道」').toHaveCount(0)
@@ -381,7 +386,7 @@ test('version b: legacy platforms get a second section with the same cards @w1-k
   await page.goto('/official-channels', { waitUntil: 'domcontentloaded' })
   await expect(screenOf(page)).toHaveAttribute('data-state', 'items')
   const legacy = page.getByTestId('official-channels-legacy')
-  await expect(legacy.locator('.dw-sec-h .t')).toHaveText('其他来源平台')
+  await expect(legacy.locator('.qxp-k')).toContainText('其他来源平台')
   await expectChannelCards(page, 'org', [ORG_CHANNELS[1]!])
   await expectChannelCards(page, 'legacy', LEGACY)
   await expect(page.locator('.qxt-screen a[href]')).toHaveCount(0)

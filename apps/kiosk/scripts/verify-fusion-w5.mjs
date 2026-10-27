@@ -230,7 +230,7 @@ assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to 
  * ① 页壳 KioskPageFrame/KioskPageHeader → 触屏 PublicTouchFrame（并断言已退出 V6 壳）；
  * ② 旧页用 `apiContent ? ( … )` / `!apiContent && ( … )` 两支表达「服务端正文 / 本机留存文本」，
  *    新页拆成显式视图：ready 只渲染服务端正文分出的章节，fallback 渲染本机留存文本且必须挂「不作为正式版本」标注；
- * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到青序壳的 .qx-body（稿自带 44px 页边）。 */
+ * ③ 内容区留白中和器从旧壳的 .ui-kiosk-page-content 换到触屏壳的 .qxt-body（稿自带 40px 页边，由 .legal-doc-scroll 自己给）。 */
 assert.match(legalDoc, /<PublicTouchFrame\b/, 'LegalDocPage uses the Qingxu touch page frame')
 assert.doesNotMatch(legalDoc, /KioskPageFrame|KioskPageHeader/, 'LegalDocPage has left the V6 frame')
 assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
@@ -254,7 +254,7 @@ assertSinglePaddingNeutralizer(
   'activities-detail-inkpaper.css',
   /\.k8-act-detail\b/,
 )
-assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qx-body')
+assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qxt-body')
 assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
 assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
 assert.match(

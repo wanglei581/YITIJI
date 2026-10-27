@@ -17,6 +17,15 @@ function Flow() {
   )
 }
 
+/** 手形图标：圆环里的「轻触」提示，只是装饰。 */
+function TouchHand() {
+  return (
+    <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.5a5.5 5.5 0 0 1-4.6-2.5L3.6 14a1.5 1.5 0 0 1 2.5-1.7L8 15" />
+    </svg>
+  )
+}
+
 export function StandbyView({
   phase,
   terminalName,
@@ -111,11 +120,7 @@ export function StandbyView({
 
       <section className="sb-cta-zone" aria-hidden="true">
         <div className="screensaver-wake-prompt sb-cta">
-          <span className="sb-ring">
-            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.5a5.5 5.5 0 0 1-4.6-2.5L3.6 14a1.5 1.5 0 0 1 2.5-1.7L8 15" />
-            </svg>
-          </span>
+          <span className="sb-ring"><TouchHand /></span>
           <span className="sb-cta-txt">
             <strong>轻触屏幕，开始办事</strong>
             <span>AI 帮你改简历、练面试；还能打印、扫描材料</span>

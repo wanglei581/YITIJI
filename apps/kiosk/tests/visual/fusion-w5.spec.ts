@@ -604,10 +604,11 @@ test('legal document never passes local or missing text off as the official vers
   api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
 
   await page.goto('/legal/terms')
-  await expect(page.getByRole('heading', { name: '正文没取到', exact: true })).toBeVisible()
+  // 触屏稿 legal error：标题写明是哪一份没取回来，底栏主按钮是「重新读取」。
+  await expect(page.getByRole('heading', { level: 1, name: '这次没能把《用户服务协议》的正文取回来' })).toBeVisible()
   await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toHaveCount(0)
   await expect(page.getByTestId('legal-doc-fallback-warning')).toHaveCount(0)
-  await expect(page.getByTestId('legal-primary')).toHaveText('重新取正文')
+  await expect(page.getByTestId('legal-primary')).toHaveText('重新读取')
 
   await page.getByRole('button', { name: '看本机留存文本（非正式版本）', exact: true }).click()
   await expect(page.getByTestId('legal-doc-fallback-warning')).toContainText('不作为正式版本')
@@ -639,7 +640,8 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   // 触屏稿默认分类不含隐私；隐私与留存在「隐私、设备与备案」弹层里，仍要点进去再打开隐私政策。
   await page.getByRole('button', { name: /^隐私、设备与备案/ }).click()
   await page.getByRole('dialog', { name: '隐私、设备与备案' }).getByRole('button', { name: /隐私与留存/ }).click()
-  await page.getByRole('button', { name: /文件会保存多久/ }).click()
+  // 触屏稿 help：分类下的问答是「问 + 答」一起摆出的卡片，不用再点开。
+  await expect(page.getByText('文件会保存多久？', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '隐私政策', exact: true }).click()
   await expect(page).toHaveURL(/\/legal\/privacy$/)
   await expect(page.getByRole('heading', { name: '一、我们收集的信息', exact: true })).toBeVisible()
@@ -648,7 +650,7 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   await back.click()
   // 帮助页照稿 06 把所选分类写进地址（?topic=）；「打开时的那一页」就是隐私分类，不是帮助首页。
   await expect(page).toHaveURL(/\/help\?topic=privacy$/)
-  await expect(page.getByRole('button', { name: /文件会保存多久/ })).toBeVisible()
+  await expect(page.getByText('文件会保存多久？', { exact: true })).toBeVisible()
   expect(errors).toEqual([])
 })
 
@@ -712,7 +714,8 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   // 2026-09-25 迁入稿 08-legal：页头由青序顶栏（返回槽）+ 页内文档头承担，字号控件落在「按章节读」一行。
   // 断言意图不变：窄屏下标题可读、返回键与字号控件互不遮挡、页头不吃掉整屏。
   const topbar = root.locator('.qxt-hdr')
-  const title = root.locator('.legal-doc-title')
+  // 触屏稿：文档名在意图带的 h1 里，页内不再另画一块文档头。
+  const title = root.locator('.qxt-ask h1')
   const back = root.locator('.qxt-back')
   const tools = root.locator('.legal-doc-tools')
   await expectQingxuLegalShell(page, '隐私政策')
@@ -835,7 +838,8 @@ test('offline page retains the 8177 state after an aborted health request @w5-ki
   await page.goto('/error-offline')
   await page.getByRole('button', { name: '重新检测', exact: true }).click()
   await expect(page).toHaveURL(/\/error-offline$/)
-  await expect(page.getByText(/已重试 1 次/)).toBeVisible()
+  // 触屏稿 09：屏上只说各项读到没读到，不写重测次数和秒数；次数只留给读屏（.qxp-sr），状态没丢。
+  await expect(page.getByTestId('system-state-auto')).toContainText('已重试 1 次')
   await expectFusionAcceptance(page, errors)
 })
 

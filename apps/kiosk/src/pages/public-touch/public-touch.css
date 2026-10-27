@@ -121,6 +121,31 @@
 .qxt-screen .qxp-illus .pi-tray { fill: var(--pi-g3); stroke: var(--pi-g4); stroke-width: 2; }
 .qxt-screen .qxp-illus .pi-base { fill: var(--pi-g4); }
 
+/* 手机 / 窄窗口：稿按 1080 宽画。窄屏下意图带收低、顶栏允许换行，正文按内容往下排，超出由各页自己的滚动区接住 */
+@media (max-width: 600px) {
+  .qxt-screen.qxp-app .qxt-band,
+  .qxt-screen.qxp-app .qxt-band-compact { min-height: 0; padding: 14px 16px 0; }
+  .qxt-screen.qxp-app .qxt-hdr { height: auto; flex-wrap: wrap; gap: 8px 10px; }
+  .qxt-screen.qxp-app .qxt-brand b { white-space: nowrap; font-size: 22px; }
+  .qxt-screen.qxp-app .qxt-hdr-right { gap: 10px; }
+  .qxt-screen.qxp-app .qxt-clock small { white-space: nowrap; }
+  .qxt-screen.qxp-app .qxt-status { height: auto; min-height: 36px; padding: 4px 12px; white-space: normal; }
+  .qxt-screen.qxp-app .qxt-band-compact .qxt-ask { padding: 8px 0 16px; }
+  .qxt-screen.qxp-app .qxt-ask h1 { font-size: 28px; }
+  .qxt-screen.qxp-app .qxt-ask p { margin-top: 6px; font-size: 18px; }
+  .qxt-screen.qxp-app .qxt-body { padding-left: 16px; padding-right: 16px; }
+  /* 意图带里的光晕和流线只是装饰，窄屏上会画出视口，收掉 */
+  .qxt-screen.qxp-app .qxt-flow,
+  .qxt-screen.qxp-app .qxt-halo { display: none; }
+  /* 底栏：问小青占满一行，其余按钮两两并排，每颗都不窄过 48 */
+  .qxt-screen.qxp-app .qxt-dock { flex-wrap: wrap; gap: 8px; padding-left: 16px; padding-right: 16px; }
+  .qxt-screen.qxp-app .qxt-dock > * { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-askq { order: -1; flex-basis: 100%; }
+  .qxt-screen.qxp-app .qxt-dock .qxt-btn { min-width: 0; padding-left: 12px; padding-right: 12px; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-btn-pri { flex: 2 1 0; font-size: 24px; }
+  .qxt-screen.qxp-app .qxt-dock > .qxt-btn-sec { flex: 1 1 0; }
+}
+
 /* 待机屏整屏深色，不画意图带和底栏 */
 .qxt-screen.qxp-standby { background: var(--qxt-band-b); color: var(--qx-paper); }
 .qxt-screen.qxp-standby .qxt-body { padding: 0; gap: 0; }
