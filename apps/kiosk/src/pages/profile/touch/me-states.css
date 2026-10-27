@@ -398,6 +398,14 @@
     align-items: flex-start;
   }
 
+  /* 窄屏卡片上下排，插画回到自己的大小，不再跟卡片高度走。 */
+  [data-qx-page="me"] .me-hero > .me-art {
+    height: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: none;
+  }
+
   [data-qx-page="me"] .me-exit-art,
   [data-qx-page="me"] .me-exit.me-tall .me-exit-art,
   [data-qx-page="me"] .me-answers > button .me-answer-art {
