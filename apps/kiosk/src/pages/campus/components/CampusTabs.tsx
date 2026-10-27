@@ -141,7 +141,7 @@ export function OverviewTab({
               className="kproto-btn sm primary ml-auto"
               style={{ '--kp-accent': 'var(--kp-wheat)', '--kp-accent-deep': 'var(--kp-wheat-deep)', '--kp-accent-soft': 'var(--kp-wheat-soft)' } as React.CSSProperties}
             >
-              <QrCodeIcon aria-hidden="true" />扫码预约 · 去来源平台办理
+              <QrCodeIcon aria-hidden="true" />扫码预约
             </button>
           )}
         </div>

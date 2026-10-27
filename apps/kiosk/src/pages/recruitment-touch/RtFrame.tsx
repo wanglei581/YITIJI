@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchAsk, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import './recruit-touch.css'
 
 /**
- * 本包页面壳：意图带 + 可滚动正文 + 底栏。不画底导航（稿上 nav 为空）。
+ * 本包页面壳：意图带、正文、一条底栏、三项底导航。
  * 顶栏状态不报打印机；没给 tone 时是灰点，不假装就绪。
  */
 export function RtFrame({
@@ -17,8 +19,9 @@ export function RtFrame({
   backLabel = '返回',
   onBack,
   ask,
+  secondary,
   primary,
-  dockExtra,
+  boundary,
   overlay,
   testId,
   stateId,
@@ -33,16 +36,19 @@ export function RtFrame({
   backLabel?: string
   onBack?: () => void
   ask?: QxTouchAsk
+  secondary?: ReactNode
   primary?: QxTouchPrimary
-  dockExtra?: ReactNode
+  boundary?: ReactNode
   overlay?: ReactNode
   testId?: string
   stateId?: string
   bodyClassName?: string
   children: ReactNode
 }) {
+  const navigate = useNavigate()
   return (
     <QxTouchScreen
+      pageId="recruit"
       testId={testId}
       stateId={stateId}
       bodyClassName={bodyClassName}
@@ -61,9 +67,23 @@ export function RtFrame({
       }
       dock={
         <div className="rt-fair-dock">
-          {dockExtra}
-          <QxTouchDock back={back} backLabel={backLabel} onBack={onBack} ask={ask} primary={primary} />
+          {boundary ? <div className="rt-boundary">{boundary}</div> : null}
+          <QxTouchDock
+            back={back}
+            backLabel={backLabel}
+            onBack={onBack}
+            ask={ask}
+            secondary={secondary}
+            primary={primary}
+          />
         </div>
+      }
+      nav={
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
       }
     >
       {children}

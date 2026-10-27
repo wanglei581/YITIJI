@@ -199,7 +199,7 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await jobsEntry.click()
     await page.waitForURL((u) => u.pathname === '/jobs-service', { timeout: 10000 })
-    const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
+    const fullTime = page.getByRole('button', { name: /找全职/ }).first()
     await expect(fullTime).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'jobs-hub')
 
@@ -265,10 +265,13 @@ test.describe('上线前清单 4.4：岗位 / 招聘会 / 政策', () => {
 
     await fairsEntry.click()
     await page.waitForURL((u) => u.pathname === '/fairs-service', { timeout: 10000 })
-    // /fairs-service 迁入青序流光（稿 16）后，能力卡由「社会招聘会」改称「招聘会列表」，
-    // 落点仍是 /job-fairs。本旅程夹具把 /health 打成 200，所以这张 info 卡可点；
+    // 校园招聘台「更多去处」的「全部招聘会」落到 /job-fairs，不带 audience。
+    // 可用门不写 aria-label，读屏名是「标题 + 说明」，所以按门标题定位，不把说明从名字里裁掉。
+    // 本旅程夹具把 /health 打成 200，所以这扇门可点；
     // API checking/unavailable 时它仍 fail-closed，不得理解成「永远 enabled」。
-    const social = page.getByRole('button', { name: /招聘会列表/ }).first()
+    const socialDoor = page.locator('[data-door-title="全部招聘会"]')
+    await expect(socialDoor).toHaveCount(1)
+    const social = socialDoor.getByRole('button')
     await expect(social).toBeEnabled({ timeout: 15000 })
     await step(page, s, 'fairs-hub')
 

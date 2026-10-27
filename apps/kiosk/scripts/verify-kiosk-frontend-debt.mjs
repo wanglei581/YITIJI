@@ -125,6 +125,67 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
     'JobDetailPage.tsx: 不得向 /print/upload 传 jobId / jobTitle（打印链路没有消费点）',
   )
 
+  // 两条招聘服务台已改挂 SocialHubPage / CampusServicePage。旧服务台断言保留；
+  // 同一组不变量再钉到现在渲染的页面，避免门禁只看着不再上屏的文件。
+  const socialHub = read('src/pages/recruitment-touch/SocialHubPage.tsx')
+  const campusHub = read('src/pages/recruitment-touch/CampusServicePage.tsx')
+  const doors = read('src/pages/recruitment-touch/RecruitDoors.tsx')
+  const availabilityHook = read('src/pages/recruitment-touch/useRecruitmentAvailability.ts')
+  const tile = read('src/components/qingxu/touch/QxTouchTile.tsx')
+  const hubModel = read('src/pages/service-hubs/serviceHubModel.ts')
+  assert(
+    /apiDown: apiStatus === 'unavailable'/.test(availabilityHook) &&
+      /apiChecking: apiStatus === 'checking'/.test(availabilityHook),
+    'useRecruitmentAvailability.ts: checking 与 unavailable 都要记成不可用（fail-closed）',
+  )
+  assert(
+    /off=\{Boolean\(reason\)\}/.test(doors) &&
+      /aria-disabled=\{off \? true : undefined\}/.test(tile) &&
+      /label=\{reason \? `\$\{door\.title\}，\$\{reason\}。\$\{door\.desc\}` : undefined\}/.test(doors),
+    'RecruitDoors.tsx: 被拦的门不可点，并读出「标题，原因。说明」',
+  )
+  assert(
+    socialHub.includes("label: '重新检测'") && campusHub.includes("label: '重新检测'"),
+    '招聘服务台必须保留「重新检测」入口',
+  )
+  assert(
+    socialHub.includes("navigate('/fairs-service')") && campusHub.includes("navigate('/jobs-service')"),
+    '社会招聘与校园招聘必须互为跨域入口',
+  )
+  for (const [name, src] of [
+    ['SocialHubPage.tsx', socialHub],
+    ['CampusServicePage.tsx', campusHub],
+  ]) {
+    assert(src.includes("route: '/me/activity'") && src.includes("route: '/me/activity?tab=jump'"), `${name}: 必须保留通往「我的」台账的入口`)
+    assert(!/navigate\([^)]*,\s*\{\s*state:/.test(src), `${name}: 跳转不得携带 location.state`)
+    assert(!src.includes("kind: 'device'"), `${name}: 不得把入口标成设备类`)
+  }
+  assert(!/navigate\([^)]*,\s*\{\s*state:/.test(doors), 'RecruitDoors.tsx: 跳转不得携带 location.state')
+  assert(
+    /title: '打印扫描'[\s\S]{0,160}kind: 'info'/.test(campusHub) && /useRecruitmentAvailability\(false\)/.test(campusHub),
+    'CampusServicePage.tsx: 打印扫描必须是信息入口，且不探测打印机',
+  )
+  for (const sentence of [
+    '投递在来源平台完成。',
+    '本机记录你的浏览与外部跳转；投递进度由你自己填写，本机不掌握来源平台的处理结果。',
+    '本机不代收简历',
+    '不做企业筛选、面试邀约或Offer管理。',
+  ]) {
+    assert(socialHub.includes(sentence), `SocialHubPage.tsx: 必须逐字保留「${sentence}」`)
+  }
+  for (const sentence of [
+    '预约和投递由来源平台负责。',
+    '本机不代收简历，也不承诺外部活动结果。',
+    '不显示虚构签到结果',
+    '场次、参会企业和地图均以真实数据为准。',
+  ]) {
+    assert(campusHub.includes(sentence), `CampusServicePage.tsx: 必须逐字保留「${sentence}」`)
+  }
+  assert(
+    hubModel.includes('在线服务当前不可用') && hubModel.includes('AI能力当前不可用'),
+    'serviceHubModel.ts: 招聘门的不可用原因仍要区分在线服务与 AI',
+  )
+
   // 面试会话页只读 state.firstQuestion；firstQType 全仓无 reader，
   // 连路由 state 类型里的声明也一并清掉，避免「类型有就等于有人用」的错觉。
   assert(

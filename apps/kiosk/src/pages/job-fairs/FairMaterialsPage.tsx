@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { RtFill } from '../recruitment-touch/RtFill'
 import type { FairMaterialDTO, ExternalJobFairDTO, FairMaterialType } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import {
@@ -133,41 +134,12 @@ export function FairMaterialsPage() {
       <QxFairWorkbench screen="materials" state="list" fairId={fairId}>
         <div className="dw-sec-h"><span className="t">正在取活动物料</span><span className="hint">未返回前不显示份数</span></div>
         <FairSkeletonList rows={3} />
+        <RtFill preset="fair" />
       </QxFairWorkbench>
     )
   }
 
   const uiState = printError ? 'print-failed' : loadError ? 'error' : materials.length === 0 ? 'empty' : 'list'
-
-  const ctabar = uiState === 'print-failed'
-    ? (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
-        <button type="button" className="qx-btn" data-variant="primary" onClick={() => setPrintError(null)}>回到物料列表</button>
-      </>
-    )
-    : uiState === 'error'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>打印你自己的材料</button>
-          {/* 重试只重发这两条请求，不走 window.location.reload —— 一体机整页重载会把
-              路由与已填状态一起清掉，用户还得从服务台一路点回来。 */}
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
-        </>
-      )
-      : uiState === 'empty'
-        ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>打印你自己的材料</button>
-          </>
-        )
-        : (
-          <>
-            <p className="why">打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与系统报价为准。</p>
-            <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-          </>
-        )
 
   return (
     <QxFairWorkbench
@@ -175,7 +147,21 @@ export function FairMaterialsPage() {
       state={uiState}
       fairId={fairId}
       subtitle={fair ? `${fair.name} · ${FAIR_HEAD.materials[1]}` : undefined}
-      ctabar={ctabar}
+      boundary={uiState === 'list' ? '打印份数、单双面与黑白彩色在打印页选择，价格以现场公示与系统报价为准。' : undefined}
+      secondary={uiState === 'print-failed'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/help')}>去帮助中心</button>
+        : uiState === 'error'
+          ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/print-scan')}>打印你自己的材料</button>
+          : uiState === 'empty' || uiState === 'list'
+            ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
+            : undefined}
+      primary={uiState === 'print-failed'
+        ? { label: '回到物料列表', onClick: () => setPrintError(null), noArrow: true }
+        : uiState === 'error'
+          ? { label: '重新加载', onClick: () => setRetryKey((k) => k + 1), noArrow: true }
+          : uiState === 'empty'
+            ? { label: '打印你自己的材料', onClick: () => navigate('/print-scan') }
+            : undefined}
     >
       {uiState === 'print-failed' ? (
         <>
@@ -198,7 +184,7 @@ export function FairMaterialsPage() {
             清单错了你会按着不存在的手册去找。
           </DirState>
           <DirStrip>
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="纸质版以主办方现场公示为准" onClick={() => navigate('/help')} />
+            <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             <DirStripItem icon={PrinterIcon} title="打印你自己的材料" desc="简历、证件材料照常可以打印" onClick={() => navigate('/print-scan')} />
           </DirStrip>
         </>
@@ -209,7 +195,6 @@ export function FairMaterialsPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={SparklesIcon} title="把简历改好再去" desc="诊断、优化和材料工坊都在简历服务里" onClick={() => navigate('/resume-service')} />
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="返回招聘会" desc="时间地点和参展名单仍可查看" onClick={() => navigate(`/job-fairs/${fairId}`)} />
           </DirStrip>
         </>
       ) : (
@@ -309,6 +294,7 @@ export function FairMaterialsPage() {
           </DirNote>
         </>
       )}
+      <RtFill preset="fair" />
     </QxFairWorkbench>
   )
 }

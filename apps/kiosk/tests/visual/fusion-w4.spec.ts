@@ -104,7 +104,7 @@ async function runCapabilityRefresh(page: Page): Promise<void> {
 test('/jobs 保留线上与线下双轨 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/jobs')
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText('前端工程师').first()).toBeVisible()
   await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
   await expect(page.getByText('ext-job-001').first()).toBeVisible()
@@ -159,7 +159,7 @@ test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
     }
   })
   await loginForJobs(page, '/jobs/job-001')
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText(/信息以来源平台为准/).first()).toBeVisible()
   await expect(page.getByText('青岛公共就业服务网').first()).toBeVisible()
   await expect(page.getByText('ext-job-001').first()).toBeVisible()
@@ -315,8 +315,8 @@ test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api 
   await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
   await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
   await expect(page.getByText(/正常收录|已核验|暂停收录/)).toHaveCount(0)
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await expect(page.getByText('全部区域')).toHaveCount(0)
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('qx-b3-offline-agencies.png'), fullPage: true })
   await expect(page.getByText('一键投递')).toHaveCount(0)
   await expect(page.getByText('立即投递')).toHaveCount(0)
@@ -358,7 +358,7 @@ test('companies 列表与详情保持来源导览 @w4', async ({ page, api }) =>
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/companies')
   await expect(page.getByText('青岛示例制造有限公司').first()).toBeVisible()
-  await expect(page.locator('[data-qx-frame="true"]')).toBeVisible()
+  await expect(page.locator('[data-qxt-screen]')).toHaveCount(1)
   await page.getByRole('button', { name: '选择类型 (12)' }).click()
   const companyFilterDialog = page.getByRole('dialog', { name: '企业类型与行业' })
   await expect(companyFilterDialog).toBeVisible()
@@ -395,6 +395,7 @@ test('/jobs/online-platforms 重定向到本机构官方渠道，只给二维码
   await expect(page.locator('[data-testid="official-channel-qr-code"] svg')).toHaveCount(3)
   await expect(legacy.getByText('jobs.example.com', { exact: true })).toBeVisible()
   await expect(legacy.getByText('本渠道由示例招聘平台运营公司提供，信息以其官网为准', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-qx-frame="true"]')).toHaveCount(1)
   await expect(page.locator('[data-qx-frame="true"] a[href]'), '一体机不打开外部网页：整页没有可点的链接').toHaveCount(0)
   for (const word of ['一键投递', '立即投递', '一键全网分发', '授权代投', '同步投递', '扫码投递', '去来源平台投递']) {
     await expect(page.getByText(word)).toHaveCount(0)
@@ -476,7 +477,7 @@ test('/job-fairs/checkin 只展示来源签到 @w4', async ({ page, api }) => {
 test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
-  await expect(page.getByText(/校园招聘专区/).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: '挑一场校园招聘会' })).toBeVisible()
   await page.goto('/smart-campus')
   await expect(page.getByRole('heading', { name: '智慧校园', exact: true })).toBeVisible()
   await verifyPage(page, errors)
@@ -494,6 +495,7 @@ test('/smart-campus/freshman-insights 已停放，路由不存在 @w4', async ({
 test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus')
+  await page.getByRole('button', { name: /2026 青岛高校毕业生招聘会/ }).click()
   await page.getByRole('button', { name: 'AI求职' }).click()
   await page.getByRole('button', { name: '开始模拟' }).click()
   // /interview/setup 现在是带状态的重定向（→ /interview?stage=setup）。
@@ -516,9 +518,10 @@ test('/campus AI求职「开始模拟」进入面试设置 @w4', async ({ page, 
 test('campus 两个直达容错页诚实返回 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus/welcome')
-  await expect(page.getByText('当前没有独立迎新招聘内容')).toBeVisible()
+  await expect(page.locator('.rt-state').getByText('当前没有独立迎新招聘内容')).toHaveCount(1)
   await page.goto('/campus/freshman-insights')
-  await expect(page.getByText('暂无经核验的校园招聘统计')).toBeVisible()
+  await expect(page.locator('.rt-state').getByText('暂无经核验的校园招聘统计')).toHaveCount(1)
+  await expect(page.locator('.rt-state').getByText('不会展示示例数据')).toHaveCount(1)
   await verifyPage(page, errors)
 })
 

@@ -263,105 +263,43 @@ export function FairVisitPlanPage() {
     ? <DirStrip>{exitItems}</DirStrip>
     : <DirExitList>{exitItems}</DirExitList>
 
-  const ctabar = uiState === 'missing-context'
-    ? (
-      <>
-        <p className="why">没有简历也照样能逛：参展名单、展位索引和物料打印都不需要 AI。</p>
-        <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
-        <button type="button" className="qx-btn narrow" data-variant="primary" onClick={() => navigate('/resume/source?intent=diagnose')}>选择本人简历</button>
-      </>
-    )
+  const planBoundary = uiState === 'missing-context'
+    ? '没有简历也照样能逛：参展名单、展位索引和物料打印都不需要 AI。'
+    : uiState === 'idle' || uiState === 'generating'
+      ? '生成不保证成功；失败会明确说明原因，不会给你一份空清单。'
+      : uiState === 'load-failed'
+        ? '读取上次结果失败不影响重新生成，但会多花一次 AI 额度。'
+        : uiState === 'ai-unavailable'
+          ? 'AI 不可用不影响你逛名单、查展位和打印资料。'
+          : undefined
+  const planSecondary = uiState === 'missing-context'
+    ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
     : uiState === 'idle'
-      ? (
-        <>
-          {/* 这一态的全部意义就是让生成键够得着。此前它被折进 missing-context，
-              底栏主键是「选择本人简历」—— 简历明明已经确认过了。 */}
-          <p className="why">生成不保证成功；失败会明确说明原因，不会给你一份空清单。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
-          <span className="qx-ai-declaration-slot">
-            <button
-              type="button"
-              className="qx-btn narrow"
-              data-variant="primary"
-              data-testid="fair-visit-plan-generate"
-              disabled={generating}
-              onClick={() => void handleGenerate()}
-            >
-              <SparklesIcon size={20} aria-hidden />
-              {copy.generate}
-            </button>
-            <AiDeclarationNote />
-          </span>
-        </>
-      )
-    : uiState === 'load-failed'
-      ? (
-        <>
-          <p className="why">读取上次结果失败不影响重新生成，但会多花一次 AI 额度。</p>
-          <button
-            type="button"
-            className="qx-btn narrow"
-            data-variant="ghost"
-            data-testid="fair-visit-plan-reload"
-            onClick={() => setLoadRetryKey((k) => k + 1)}
-          >
-            重新加载
-          </button>
-          <span className="qx-ai-declaration-slot">
-            <button
-              type="button"
-              className="qx-btn narrow"
-              data-variant="primary"
-              data-testid="fair-visit-plan-generate"
-              disabled={generating}
-              onClick={() => void handleGenerate()}
-            >
-              <SparklesIcon size={20} aria-hidden />
-              {copy.generate}
-            </button>
-            <AiDeclarationNote />
-          </span>
-        </>
-      )
-    : uiState === 'generating'
-      ? (
-        <>
-          <p className="why">生成不保证成功；失败会明确说明原因，不会给你一份空清单。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回招聘会</button>
-        </>
-      )
+      ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>打印活动资料</button>
+      : uiState === 'load-failed'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" data-testid="fair-visit-plan-reload" onClick={() => setLoadRetryKey((k) => k + 1)}>重新加载</button>
+        : uiState === 'ai-unavailable'
+          ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
+          : uiState === 'failed'
+            ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/resume/source?intent=diagnose')}>换一份简历再试</button>
+            : uiState === 'generating'
+              ? undefined
+              : (
+                <button type="button" className="qxt-btn qxt-btn-sec" disabled={generating} onClick={() => void handleGenerate()}>
+                  {generating ? '正在生成' : '重新生成'}
+                </button>
+              )
+  const planPrimary = uiState === 'missing-context'
+    ? { label: '选择本人简历', onClick: () => navigate('/resume/source?intent=diagnose') }
+    : uiState === 'idle' || uiState === 'load-failed'
+      ? undefined
       : uiState === 'ai-unavailable'
-      ? (
-        <>
-          {/* AI 是加速器不是前置条件：能力不可用时这条出口必须仍然能走到出纸。 */}
-          <p className="why">AI 不可用不影响你逛名单、查展位和打印资料。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>
-            <PrinterIcon size={20} aria-hidden />
-            打印活动资料
-          </button>
-        </>
-      )
-      : uiState === 'failed'
-        ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/resume/source?intent=diagnose')}>换一份简历再试</button>
-            <button type="button" className="qx-btn" data-variant="primary" disabled={generating} onClick={() => void handleGenerate()}>
-              {generating ? '正在生成' : '重新生成'}
-            </button>
-          </>
-        )
-        : (
-          <>
-            <button type="button" className="qx-btn narrow" data-variant="ghost" disabled={generating} onClick={() => void handleGenerate()}>
-              {generating ? '正在生成' : '重新生成'}
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" disabled={printing} onClick={() => void handlePrint()}>
-              <PrinterIcon size={20} aria-hidden />
-              {printing ? copy.printing : copy.print}
-            </button>
-          </>
-        )
+        ? { label: '打印活动资料', onClick: () => navigate(`/job-fairs/${fairId}/materials`) }
+        : uiState === 'failed'
+          ? { label: generating ? '正在生成' : '重新生成', onClick: () => void handleGenerate(), disabled: generating, noArrow: true }
+          : uiState === 'generating'
+            ? undefined
+            : { label: printing ? copy.printing : copy.print, onClick: () => void handlePrint(), disabled: printing }
 
   return (
     <QxFairWorkbench
@@ -372,7 +310,24 @@ export function FairVisitPlanPage() {
       subtitle={plan
         ? `${plan.basedOn?.fairName ?? plan.fair?.title ?? '招聘会'} · ${plan.basedOn?.companyCount ?? 0} 家企业 / ${plan.basedOn?.positionCount ?? 0} 个岗位`
         : copy.subtitleHint}
-      ctabar={ctabar}
+      boundary={planBoundary ? <><span>{planBoundary}</span>{uiState === 'idle' || uiState === 'load-failed' ? <AiDeclarationNote /> : null}</> : undefined}
+      secondary={uiState === 'idle' || uiState === 'load-failed'
+        ? (
+          <>
+            {planSecondary}
+            <button
+              type="button"
+              className="qxt-btn qxt-btn-pri"
+              data-testid="fair-visit-plan-generate"
+              disabled={generating}
+              onClick={() => void handleGenerate()}
+            >
+              {copy.generate}
+            </button>
+          </>
+        )
+        : planSecondary}
+      primary={planPrimary}
     >
       {uiState === 'missing-context' ? (
         <>

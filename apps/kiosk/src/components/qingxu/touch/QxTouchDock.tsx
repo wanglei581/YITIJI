@@ -15,6 +15,8 @@ export type QxTouchPrimary = {
   kind?: QxTouchButtonKind
   noArrow?: boolean
   disabled?: boolean
+  /** 为真时用 aria-disabled，不写原生 disabled。不传时仍走 disabled。 */
+  ariaDisabled?: boolean
 }
 
 /**
@@ -29,6 +31,7 @@ export function QxTouchDock({
   left,
   ask,
   mid,
+  secondary,
   primary,
 }: {
   onBack?: () => void
@@ -37,6 +40,8 @@ export function QxTouchDock({
   left?: ReactNode
   ask?: QxTouchAsk
   mid?: ReactNode
+  /** 问小青和主按钮之间的次操作。不传时底栏子节点与原来一致。 */
+  secondary?: ReactNode
   primary?: QxTouchPrimary
 }) {
   const navigate = useNavigate()
@@ -64,7 +69,7 @@ export function QxTouchDock({
     )
   ) : null
   const middle = askNode ?? mid ?? null
-  const wide = !middle && Boolean(primary)
+  const wide = !middle && !secondary && Boolean(primary)
   const leftNode = left ?? (back ? (
     <button type="button" className="qxt-btn qxt-btn-sec" onClick={goBack}>
       <QxTouchIcon name="chevL" size={30} strokeWidth={2.4} />
@@ -76,12 +81,17 @@ export function QxTouchDock({
     <footer className="qxt-dock">
       {leftNode}
       {middle}
+      {secondary}
       {primary ? (
         <button
           type="button"
           className={`qxt-btn qxt-btn-${primary.kind ?? 'pri'}${wide ? ' qxt-wide' : ''}`}
-          onClick={primary.onClick}
-          disabled={primary.disabled}
+          onClick={() => {
+            if (primary.ariaDisabled) return
+            primary.onClick()
+          }}
+          disabled={primary.ariaDisabled ? undefined : primary.disabled}
+          aria-disabled={primary.ariaDisabled ? true : undefined}
         >
           {primary.label}
           {primary.noArrow ? null : <QxTouchIcon name="arrowR" size={30} strokeWidth={2.4} />}

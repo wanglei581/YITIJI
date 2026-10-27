@@ -87,8 +87,9 @@ export default function OfflineAgencyDetailPage() {
 
   return (
     <RecruitTouchFrame
-      // 稿 42 的目录页返回「岗位服务」；本页是它的详情段，返回落到目录本身。
-      back={{ label: '返回机构列表', onBack: () => navigate('/offline-agencies') }}
+      eyebrow="机构详情"
+      back={{ label: '返回机构目录', onBack: () => navigate('/offline-agencies') }}
+      ask={{ label: '问小青：这家机构怎么去？', draft: '这家机构怎么去？', voice: true }}
       title={agency?.name ?? '机构详情'}
       subtitle={
         loading ? '正在读取机构资料和岗位清单。'
@@ -99,36 +100,13 @@ export default function OfflineAgencyDetailPage() {
       }
       status={pill}
       terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        failed ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={reload}>重新加载</button>
-          </>
-        ) : notFound ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/offline-agencies')}>回机构目录重选</button>
-          </>
-        ) : jobsEmpty ? (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>返回机构目录</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs')}>去看岗位信息</button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>返回机构目录</button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              onClick={() => { if (jobs[0]) navigate(`/jobs/${jobs[0].id}/offline`) }}
-            >
-              查看该机构岗位
-            </button>
-          </>
-        )
-      }
+      primary={failed
+        ? { label: '重新加载', onClick: reload, noArrow: true }
+        : jobsEmpty
+          ? { label: '去看岗位信息', onClick: () => navigate('/jobs') }
+          : !notFound && jobs[0]
+            ? { label: '查看岗位', onClick: () => navigate(`/jobs/${jobs[0].id}/offline`) }
+            : undefined}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
@@ -140,8 +118,7 @@ export default function OfflineAgencyDetailPage() {
             </DirState>
             <DirExitList>
               <DirStripItem icon={BuildingIcon} title="重新加载机构详情" desc="再次请求当前机构" onClick={reload} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="返回机构目录" desc="保留目录主任务" onClick={() => navigate('/offline-agencies')} />
-              <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="纸质名单以机构现场公示为准" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             </DirExitList>
           </>
         ) : notFound ? (
@@ -150,9 +127,8 @@ export default function OfflineAgencyDetailPage() {
               这家机构可能未发布、已下架，或这条链接已经过期。本机不会用同名或附近的机构顶替。
             </DirState>
             <DirExitList>
-              <DirStripItem icon={BuildingIcon} title="回机构目录" desc="重新检索已发布机构" onClick={() => navigate('/offline-agencies')} />
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="第三方来源岗位，带来源与同步时间" onClick={() => navigate('/jobs')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="门店信息以机构公示的纸质名单为准" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>
@@ -170,7 +146,7 @@ export default function OfflineAgencyDetailPage() {
                   ['机构类型', agency.type],
                   ['服务项目', (Array.isArray(agency.services) ? agency.services : []).join('、') || '以门店公示为准'],
                   ['营业时间', agency.hours || '服务时间以机构公示为准'],
-                  ['联系电话', agency.phone || '请到帮助中心查看服务电话'],
+                  ['联系电话', agency.phone || '来源未提供电话'],
                   ['机构地址', agency.address],
                   ['来源编号', agency.orgCode || '来源平台未提供'],
                   ['收录状态', '机构信息已审核'],

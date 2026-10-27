@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { formatDateTime, parseInstant, type ExternalJobDTO, type JobAiRecommendationDTO, type MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getJobs } from '../../services/api'
 import {
@@ -291,9 +292,10 @@ export function JobsPage() {
   return (
     <RecruitTouchFrame
       /* 稿 26-browse-list 原文：data-route="/jobs-service" aria-label="返回岗位服务"。 */
+      eyebrow="岗位信息"
       back={{ label: '返回', onBack: () => navigate('/jobs-service') }}
-      ask={{ label: '问小青：这些岗位怎么看？', draft: '这些岗位怎么看？' }}
-      title="岗位信息"
+      ask={{ label: '问小青：这些岗位怎么看？', draft: '这些岗位怎么看？', voice: true }}
+      title="想看哪些岗位？"
       subtitle="只展示已审核发布且在有效期内的第三方与官方岗位；来源要素不完整时仅保留只读详情。"
       status={facetLoading
         ? { tone: 'unknown', label: '正在读取岗位名单' }
@@ -303,18 +305,8 @@ export function JobsPage() {
             ? { tone: 'bad', label: '岗位名单这次没读到' }
             : { tone: 'ok', label: '岗位与来源信息已读到' }}
       terminalLabel="就业服务大厅"
-      ctabar={
-        <>
-          <p className="why">本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。</p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/offline-agencies')}>
-            <StoreIcon aria-hidden="true" />线下招聘机构
-          </button>
-          {/* 3.14：原线上平台目录并入本机构官方渠道（b 版本在同一页另列「其他来源平台」）。 */}
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/official-channels')}>
-            官方与合作平台目录
-          </button>
-        </>
-      }
+      boundary="本机不代收简历、不代替投递。岗位由来源平台发布，投递在来源平台完成。"
+      primary={{ label: '线下招聘机构', onClick: () => navigate('/offline-agencies') }}
     >
       <JobAiConsentModal
         open={showConsent}
@@ -387,6 +379,7 @@ export function JobsPage() {
                 key={item.label}
                 type="button"
                 className={`jf-f-chip${category === item.value ? ' on' : ''}`}
+                aria-pressed={category === item.value}
                 onClick={() => setCategory(item.value)}
               >
                 {item.label}
@@ -404,7 +397,7 @@ export function JobsPage() {
 
           <div className="jf-filter-bar">
             <span className="jf-filter-label">来源</span>
-            <button type="button" className={`jf-f-chip${sourceOrgId ? '' : ' on'}`} onClick={() => setSourceOrgId('')}>
+            <button type="button" className={`jf-f-chip${sourceOrgId ? '' : ' on'}`} aria-pressed={!sourceOrgId} onClick={() => setSourceOrgId('')}>
               全部
             </button>
             {sourceCards.slice(0, 3).map((source) => (
@@ -412,6 +405,7 @@ export function JobsPage() {
                 key={source.orgId}
                 type="button"
                 className={`jf-f-chip${sourceOrgId === source.orgId ? ' on' : ''}`}
+                aria-pressed={sourceOrgId === source.orgId}
                 onClick={() => setSourceOrgId(sourceOrgId === source.orgId ? '' : source.orgId)}
               >
                 {source.name}
@@ -454,14 +448,14 @@ export function JobsPage() {
                   </button>
                 </>
               )}
-              <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} onClick={() => setFavoritesOnly((value) => !value)}>
+              <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly((value) => !value)}>
                 仅看收藏 {favoriteSet.size}
               </button>
               排序
-              <button type="button" className={`jf-f-chip sm${sortMode === 'latest' ? ' on' : ''}`} onClick={() => setSortMode('latest')}>
+              <button type="button" className={`jf-f-chip sm${sortMode === 'latest' ? ' on' : ''}`} aria-pressed={sortMode === 'latest'} onClick={() => setSortMode('latest')}>
                 最新同步
               </button>
-              <button type="button" className={`jf-f-chip sm${sortMode === 'salary_first' ? ' on' : ''}`} onClick={() => setSortMode('salary_first')}>
+              <button type="button" className={`jf-f-chip sm${sortMode === 'salary_first' ? ' on' : ''}`} aria-pressed={sortMode === 'salary_first'} onClick={() => setSortMode('salary_first')}>
                 薪资标注优先
               </button>
             </span>
@@ -507,11 +501,16 @@ export function JobsPage() {
               <span className="jf-tile-icon"><Building2Icon aria-hidden="true" /></span>
               <span><b>找企业</b><span>来源企业与岗位导览</span></span>
             </button>
+            <button type="button" className="jf-tile" onClick={() => navigate('/official-channels')}>
+              <span className="jf-tile-icon"><StoreIcon aria-hidden="true" /></span>
+              <span><b>官方与合作平台目录</b><span>手机扫码打开，本机不打开外链</span></span>
+            </button>
           </div>
 
           <JobsQxSourceNotice activeSourceName={hasAnyFilter ? activeSourceName : undefined} />
         </>
       )}
+      <RtFill preset="jobs" />
       </div>
     </RecruitTouchFrame>
   )

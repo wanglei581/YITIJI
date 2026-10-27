@@ -31,6 +31,7 @@ import { evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceT
 import { FAIR_BOOKING_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { QxTouchSeg } from '../../components/qingxu/touch/QxTouchSeg'
 import { isCampusFair, isSocialFair } from '../recruitment-touch/audience'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { FairBookingQr, FairListCard, FairSkeletonList } from './components/FairWorkbenchBits'
 import { DirState, DirStrip, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
@@ -130,28 +131,23 @@ export function JobFairsPage() {
         ? (favoritesOnly ? 'favorites-empty' : 'empty')
         : 'ready'
 
-  const ctabar = uiState === 'loading'
-    ? <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/fairs-service')}>返回招聘会服务</button>
-    : uiState === 'error'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
-        </>
-      )
-      : (
-        <>
-          <p className="why">扫码后在来源平台预约或签到；本机不保存结果。</p>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate('/job-fairs/checkin')}>查看入场入口</button>
-          <button type="button" className="qx-btn narrow" data-variant="primary" onClick={() => navigate('/campus')}>看校园招聘</button>
-        </>
-      )
+  const listActions = uiState !== 'loading' && uiState !== 'error'
 
   return (
     <QxFairWorkbench
       screen="list"
       state={uiState}
-      ctabar={ctabar}
+      boundary={listActions ? '扫码后在来源平台预约或签到；本机不保存结果。' : undefined}
+      secondary={uiState === 'error'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/help')}>去帮助中心</button>
+        : listActions
+          ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate('/job-fairs/checkin')}>查看入场入口</button>
+          : undefined}
+      primary={uiState === 'error'
+        ? { label: '重新加载', onClick: () => setRetryKey((k) => k + 1), noArrow: true }
+        : listActions
+          ? { label: '看校园招聘', onClick: () => navigate('/campus') }
+          : undefined}
       title={audience === 'social' ? '社会招聘会' : audience === 'campus' ? '校园招聘会' : undefined}
     >
       {qrFair ? <FairBookingQr fair={qrFair} onClose={() => setQrFair(null)} /> : null}
@@ -235,7 +231,7 @@ export function JobFairsPage() {
             </div>
           </div>
           <p className="dw-filter-note">
-            关键字和状态会按全部场次来查；地区、日期、收藏和这场次范围只在这次已经加载出来的场次里筛选，不代表全部结果。
+            关键字和状态会按全部场次来查；地区、日期、收藏和场次范围只在这次已经加载出来的场次里筛选，不代表全部结果。
           </p>
 
           {uiState === 'favorites-empty' ? (
@@ -283,6 +279,7 @@ export function JobFairsPage() {
           )}
         </>
       )}
+      <RtFill preset="fairs" />
     </QxFairWorkbench>
   )
 }

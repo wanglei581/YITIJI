@@ -14,17 +14,19 @@ export type RecruitDoor = {
   span?: boolean
 }
 
-/** 入口没确认可用就不给点。原因写在说明上，不把「还在检查」画成可以进入。 */
+/** 入口没确认可用就不给点。可用时不盖读屏名；不可用时读「标题，原因。说明」。 */
 export function RecruitDoors({
   doors,
   availability,
+  layout = 'fill',
 }: {
   doors: readonly RecruitDoor[]
   availability: HubAvailability
+  layout?: 'fill' | 'more'
 }) {
   const navigate = useNavigate()
   return (
-    <div className="rt-doors">
+    <div className={layout === 'more' ? 'rt-more' : 'rt-doors'}>
       {doors.map((door, index) => {
         const reason = doorReason(door.kind, door.route, availability)
         const tile = (
@@ -36,13 +38,18 @@ export function RecruitDoors({
             off={Boolean(reason)}
             index={index}
             onClick={reason ? undefined : () => navigate(door.route)}
-            label={reason ? `${door.title}：${reason}` : door.title}
+            label={reason ? `${door.title}，${reason}。${door.desc}` : undefined}
           />
         )
-        return door.span ? (
-          <div className="rt-span" key={door.route}>{tile}</div>
-        ) : (
-          <div key={door.route}>{tile}</div>
+        return (
+          <div
+            className={door.span ? 'rt-span' : undefined}
+            key={door.route}
+            data-door-title={door.title}
+            data-disabled-reason={reason ? `capability:${door.kind}` : undefined}
+          >
+            {tile}
+          </div>
         )
       })}
     </div>

@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { RtFill } from '../recruitment-touch/RtFill'
 import type {
   FairBoothDTO,
   FairVenueFacilityType,
@@ -127,32 +128,30 @@ export function FairMapPage() {
   const materialsCta = (
     <button
       type="button"
-      className="qx-btn"
-      data-variant="primary"
+      className="qxt-btn qxt-btn-pri"
       onClick={() => navigate(`/job-fairs/${fairId}/materials`)}
     >
-      <PrinterIcon size={20} aria-hidden />
       查看可打印导览资料
     </button>
   )
 
-  const ctabar = uiState === 'error'
+  const dockActions = uiState === 'error'
     ? (
       <>
-        <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => setRetryKey((value) => value + 1)}>重新加载</button>
+        <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => setRetryKey((value) => value + 1)}>重新加载</button>
         {materialsCta}
       </>
     )
     : uiState === 'empty'
       ? (
         <>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
+          <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>看参展名单</button>
           {materialsCta}
         </>
       )
       : (
         <>
-          <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>参展名单</button>
+          <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>参展名单</button>
           {materialsCta}
         </>
       )
@@ -163,7 +162,7 @@ export function FairMapPage() {
       state={uiState}
       fairId={fairId}
       subtitle={fair ? `${fair.name} · ${fair.venue} · ${FAIR_HEAD.map[1]}` : undefined}
-      ctabar={ctabar}
+      secondary={dockActions}
     >
       {loading ? (
         <FairSkeletonList rows={2} />
@@ -175,7 +174,6 @@ export function FairMapPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={FileTextIcon} title="活动物料" desc="手册与名单是另一页，可能还能打开" onClick={() => navigate(`/job-fairs/${fairId}/materials`)} />
-            <DirStripItem icon={BuildingIcon} tone="wheat" title="返回招聘会" desc="时间地点仍可查看" onClick={() => navigate(`/job-fairs/${fairId}`)} />
           </DirStrip>
         </>
       ) : !hasMapData ? (
@@ -185,7 +183,7 @@ export function FairMapPage() {
           </DirState>
           <DirStrip>
             <DirStripItem icon={UsersIcon} title="看参展名单" desc="到场前挑好想去的几家，省时间" onClick={() => navigate(`/job-fairs/${fairId}/companies`)} />
-            <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="入口一般有纸质导览和指示牌" onClick={() => navigate('/help')} />
+            <DirStripItem icon={InfoIcon} tone="slate" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
           </DirStrip>
         </>
       ) : (
@@ -403,6 +401,7 @@ export function FairMapPage() {
           <DirNote>场馆导览信息由主办方提供，仅供现场参考；岗位办理请前往来源平台。</DirNote>
         </>
       )}
+      <RtFill preset="fair" />
     </QxFairWorkbench>
   )
 }

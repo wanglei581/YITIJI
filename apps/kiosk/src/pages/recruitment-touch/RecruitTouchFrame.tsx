@@ -7,16 +7,17 @@ type LegacyTone = 'ok' | 'warn' | 'bad' | 'unknown'
 /**
  * 本包页面从青序页壳换到触屏壳时的承接件。
  * 状态语气沿用原页：只有 ok 亮绿，bad/warn 变提醒，unknown 保持灰点。
- * 底导航按触屏稿留空；原 navbar 参数不再渲染。
+ * 底栏只留一条：返回、问小青、本页主次操作。底导航三项始终在。
  */
 export function RecruitTouchFrame({
   title,
   subtitle,
   status,
   children,
-  ctabar,
+  boundary,
   back,
   ask,
+  secondary,
   primary,
   eyebrow,
   testId,
@@ -26,11 +27,12 @@ export function RecruitTouchFrame({
   subtitle?: ReactNode
   status?: { tone: LegacyTone; label: string }
   children: ReactNode
-  ctabar?: ReactNode
+  boundary?: ReactNode
   navbar?: ReactNode
   terminalLabel?: ReactNode
   back?: { label: string; onBack: () => void }
   ask?: QxTouchAsk
+  secondary?: ReactNode
   primary?: QxTouchPrimary
   eyebrow?: string
   testId?: string
@@ -46,7 +48,7 @@ export function RecruitTouchFrame({
 
   return (
     <RtFrame
-      eyebrow={eyebrow ?? '私有化版 · 来源信息'}
+      eyebrow={eyebrow}
       title={title}
       sub={subtitle}
       status={touchStatus}
@@ -54,8 +56,9 @@ export function RecruitTouchFrame({
       backLabel={back?.label ?? '返回'}
       onBack={back?.onBack}
       ask={ask}
+      secondary={secondary}
       primary={primary}
-      dockExtra={ctabar ? <div className="rt-ctabar">{ctabar}</div> : undefined}
+      boundary={boundary}
       testId={testId}
       stateId={stateId}
     >

@@ -192,66 +192,12 @@ export function JobFairDetailPage() {
    * 四个键挤在一条里（每个都被压到最小宽度）。入口留在 subnav，底栏只留
    * 「离开本机去办」的那两件事：扫码签到、扫码预约。
    */
-  const ctabar = uiState === 'loading'
-    ? <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>返回场次列表</button>
-    : uiState === 'error'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => setRetryKey((k) => k + 1)}>重新加载</button>
-        </>
-      )
-    : uiState === 'unpublished'
-      ? (
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>去帮助中心反馈</button>
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>回场次列表</button>
-        </>
-      )
-      : isEnded
-        ? (
-          <>
-            <button type="button" className="qx-btn narrow" data-variant="ghost" onClick={() => navigate(`/job-fairs/${fair!.id}/companies`)}>
-              看当时的参展名单
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/job-fairs')}>
-              看还在进行的场次
-            </button>
-          </>
-        )
-        : (
-          <>
-            {/* 要素不全时把缺了哪几项写在常显位置：触屏读不到 title，
-                只给一个点不动的按钮等于让用户反复点。 */}
-            <p className="why">
-              {bookTrust.ok
-                ? '预约在来源平台完成；本机不代预约，也拿不到预约结果。'
-                : blockedReason}
-            </p>
-            {fair?.checkinUrl ? (
-              <button
-                type="button"
-                className="qx-btn narrow"
-                data-variant="ghost"
-                aria-disabled={checkinTrust.ok ? undefined : true}
-                onClick={openCheckinQr}
-              >
-                <QrCodeIcon size={20} aria-hidden />
-                扫码签到
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="qx-btn narrow"
-              data-variant="primary"
-              aria-disabled={bookTrust.ok ? undefined : true}
-              onClick={openBookingQr}
-            >
-              <QrCodeIcon size={20} aria-hidden />
-              扫码预约
-            </button>
-          </>
-        )
+  const readyActions = uiState !== 'loading' && uiState !== 'error' && uiState !== 'unpublished' && !isEnded
+  const boundary = readyActions
+    ? (bookTrust.ok
+      ? '预约在来源平台完成；本机不代预约，也拿不到预约结果。'
+      : <p className="why">{blockedReason}</p>)
+    : undefined
 
   return (
     <QxFairWorkbench
@@ -260,7 +206,30 @@ export function JobFairDetailPage() {
       fairId={id ?? ''}
       title={fair && uiState !== 'error' ? fair.name : undefined}
       subtitle={fair && uiState !== 'error' ? `来源 · ${fair.sourceName} · 信息以来源平台为准` : undefined}
-      ctabar={ctabar}
+      boundary={boundary}
+      secondary={uiState === 'error' || uiState === 'unpublished'
+        ? <button type="button" className="qxt-btn qxt-btn-ghost" onClick={() => navigate('/help')}>{uiState === 'unpublished' ? '去帮助中心反馈' : '去帮助中心'}</button>
+        : isEnded
+          ? <button type="button" className="qxt-btn qxt-btn-sec" onClick={() => navigate(`/job-fairs/${fair!.id}/companies`)}>看当时的参展名单</button>
+          : readyActions && fair?.checkinUrl
+            ? (
+              <button
+                type="button"
+                className="qxt-btn qxt-btn-sec"
+                aria-disabled={checkinTrust.ok ? undefined : true}
+                onClick={() => { if (checkinTrust.ok) openCheckinQr() }}
+              >
+                扫码签到
+              </button>
+            )
+            : undefined}
+      primary={uiState === 'error'
+        ? { label: '重新加载', onClick: () => setRetryKey((k) => k + 1), noArrow: true }
+        : isEnded
+          ? { label: '看还在进行的场次', onClick: () => navigate('/job-fairs') }
+          : readyActions
+            ? { label: '扫码预约', onClick: openBookingQr, ariaDisabled: !bookTrust.ok }
+            : undefined}
     >
       {qr?.kind === 'book' && fair ? (
         <FairQrOverlay

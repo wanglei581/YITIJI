@@ -123,23 +123,55 @@ const byTitle = (entries: HubEntry[], title: string): HubEntry => {
   return found
 }
 
+interface RecruitDoorSnapshot {
+  probe: string | null
+  pill: string
+  doors: HubEntry[]
+}
+
+/** 社会招聘台：门在 [data-door-title] 上，不可点时原因写在「标题，原因。说明」里。 */
+async function readRecruitHub(page: Page): Promise<RecruitDoorSnapshot> {
+  await page.waitForSelector('[data-qx-page="recruit"]')
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-qx-page="recruit"]')!
+    const doors = [...root.querySelectorAll('[data-door-title]')].map((el) => {
+      const title = el.getAttribute('data-door-title') ?? ''
+      const button = el.querySelector('button')
+      const clickable = Boolean(button) && !button!.hasAttribute('aria-disabled')
+      let reason: string | null = null
+      if (!clickable) {
+        const label = button?.getAttribute('aria-label') ?? ''
+        const marker = `${title}，`
+        const rest = label.startsWith(marker) ? label.slice(marker.length) : ''
+        reason = rest.split('。')[0] || null
+      }
+      return { title, clickable, reason }
+    })
+    return {
+      probe: root.querySelector('[data-hub-device-probe]')?.getAttribute('data-hub-device-probe') ?? null,
+      pill: root.querySelector('.qxt-status')?.textContent?.trim() ?? '',
+      doors,
+    }
+  })
+}
+
 test('没有设备能力的服务台不探测、也不播报本机设备 @kiosk', async ({ page, api }) => {
   // 打印机明确离线。有设备能力的服务台该说这件事，没有的不该。
   registerShell(api, { api: 'ready', printer: { isOnline: false, printerStatus: 'offline' } })
 
   await page.goto('/jobs-service')
-  const jobs = await readHub(page)
+  const jobs = await readRecruitHub(page)
   // 壳层顶栏自己会轮询一次设备状态（KioskShell 对全路由无条件调用），
   // 这里记下它作为基线——本断言要证的是服务台**没有再加一次**。
   const shellOnly = api.requestCount('GET', PRINTER_STATUS)
 
   expect(jobs.probe).toBe('off')
-  expect(jobs.readiness).toBe('ready')
-  expect(jobs.pill).toBe('能力与设备状态以办理时确认为准')
+  expect(jobs.pill).toBe('社会招聘 · 来源信息入口')
+  expect(jobs.doors.length).toBeGreaterThan(0)
   // 打印机离线是真的，但它和这一页无关：这页一张 kind:'device' 的卡都没有。
   await expect(page.getByText('本机设备', { exact: false })).toHaveCount(0)
   await expect(page.getByText('打印机', { exact: false })).toHaveCount(0)
-  expect(jobs.cards.every((card) => card.clickable)).toBe(true)
+  expect(jobs.doors.every((door) => door.clickable)).toBe(true)
 
   // 同样的离线打印机，简历服务台必须说，并且恰好多探一次（壳层 + 本页）。
   await page.goto('/resume-service')
@@ -184,30 +216,24 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   registerShell(api, { api: 'down', printer: { isOnline: true, printerStatus: 'ready' } })
 
   await page.goto('/jobs-service')
-  const hub = await readHub(page)
+  const hub = await readRecruitHub(page)
 
-  // 3.14：「线上招聘平台」撤出离线白名单。它落到本机构官方渠道（旧地址重定向），渠道要向服务端读——
-  // 原来能离线看是因为四个平台写死在前端，那份常量已经不用了。后端断开时和其余八张一样 fail-closed。
-  expect(byTitle(hub.cards, '线上招聘平台')).toEqual({
-    title: '线上招聘平台',
+  // 要后端的门一律不可点，并说出原因。找全职是信息门，岗位匹配参考和问 AI 顾问走 AI 话术。
+  expect(hub.doors.length).toBeGreaterThan(0)
+  expect(hub.doors.filter((door) => door.clickable).map((door) => door.title)).toEqual([])
+  expect(byTitle(hub.doors, '找全职')).toEqual({
+    title: '找全职',
     clickable: false,
     reason: '在线服务当前不可用',
   })
-  // 其余八张都要后端；写着「进入 →」点进去只有错误页，所以必须 fail-closed 并说明原因。
-  expect(byTitle(hub.cards, '全职岗位')).toEqual({
-    title: '全职岗位',
-    clickable: false,
-    reason: '在线服务当前不可用',
-  })
-  // 3.14：「岗位匹配参考」这张卡在运行时改名「简历对照」（QxServiceHubPage 的 RUNTIME_CARD_COPY，稿 16 不动）。
-  expect(byTitle(hub.cards, '简历对照').reason).toBe('AI能力当前不可用')
-  expect(hub.cards.filter((card) => card.clickable).map((card) => card.title)).toEqual([])
-  expect(hub.readiness).toBe('unavailable')
+  expect(byTitle(hub.doors, '岗位匹配参考').reason).toBe('AI能力当前不可用')
+  expect(byTitle(hub.doors, '问 AI 顾问').reason).toBe('AI能力当前不可用')
 
-  // 白名单照样放行：这一页上登记在白名单里的只剩常用入口「招聘会」（换一个服务台，/fairs-service）。
-  // 它真的能走通，不是只长得像可点。
-  expect(hub.quick.filter((link) => link.clickable).map((link) => link.title)).toEqual(['招聘会'])
-  await page.locator('.qx-hub-quick-item', { hasText: '招聘会' }).click()
+  // 跨到校园招聘的那条不在能力门里，后端断开时仍可点，而且真的走到 /fairs-service。
+  const campus = page.locator('.rt-hint button', { hasText: '校园招聘' })
+  await expect(campus).toHaveCount(1)
+  await expect(campus).toBeEnabled()
+  await campus.click()
   await page.waitForURL((url) => url.pathname === '/fairs-service')
 })
 

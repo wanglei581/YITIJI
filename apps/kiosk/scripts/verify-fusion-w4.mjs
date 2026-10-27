@@ -225,6 +225,16 @@ check('directory pages have left the V6 frame for the touch shell', () => {
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/jobs\//)
   assert.doesNotMatch(kioskRoot, /QX_MIGRATED_PREFIXES = \[[^\]]*['"]\/job-fairs\//)
 })
+check('company directory does not rank companies by the user resume', () => {
+  assert.doesNotMatch(companiesPage, /screen="company-directory"/)
+  assert.doesNotMatch(companyDetail, /screen="company-directory"/)
+  assert.doesNotMatch(companiesPage, /按本人简历排出/)
+  assert.doesNotMatch(companyDetail, /按本人简历排出/)
+  assert.match(companiesPage, /问小青：怎么挑企业？/)
+  assert.match(companyDetail, /问小青：这家企业怎么看？/)
+  assert.match(companiesPage, /RecruitTouchFrame/)
+  assert.match(companyDetail, /RecruitTouchFrame/)
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。

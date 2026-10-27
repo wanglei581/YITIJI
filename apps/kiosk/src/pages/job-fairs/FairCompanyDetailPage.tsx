@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
-import { BuildingIcon, ExternalLinkIcon, MapPinIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
+import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import { getFairCompanyById, prepareFairCompanyPrint } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { recordExternalJump } from '../../services/api/activity'
@@ -136,8 +136,9 @@ export function FairCompanyDetailPage() {
 
   return (
     <RecruitTouchFrame
-      // 稿 44 原文：data-route="/job-fairs/:id/companies" aria-label="返回参展企业列表"。
-      back={{ label: '返回参展企业列表', onBack: () => navigate(`/job-fairs/${id}/companies`) }}
+      eyebrow="参展企业"
+      back={{ label: '返回名单', onBack: () => navigate(`/job-fairs/${id}/companies`) }}
+      ask={{ label: '问小青：这家企业', draft: '这家企业怎么看？', voice: true }}
       title="招聘会参展企业"
       subtitle={
         uiState === 'loading' ? '正在读取展位与岗位，取到之前不显示数字。'
@@ -149,44 +150,25 @@ export function FairCompanyDetailPage() {
       }
       status={pill}
       terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        uiState === 'loading' || notFound ? (
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(listPath)}>返回参展企业列表</button>
-        ) : uiState === 'qr' ? (
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => setShowQr(false)}>关闭二维码</button>
-        ) : uiState === 'source-incomplete' ? (
-          <>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              aria-disabled={!sourceOk || undefined}
-              aria-describedby="fair-company-bar-blocked"
-              onClick={() => { if (!sourceOk) return }}
-            >
-              <QrCodeIcon aria-hidden size={22} />扫码投递
-            </button>
-            <span id="fair-company-bar-blocked" className="why">{SOURCE_APPLY_UNAVAILABLE_REASON}</span>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              aria-disabled={!sourceOk || undefined}
-              aria-describedby="fair-company-bar-blocked"
-              onClick={() => { if (!sourceOk) return }}
-            >
-              <ExternalLinkIcon aria-hidden size={22} />去来源平台投递
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(listPath)}>返回列表</button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={openApplyQr}>
-              <ExternalLinkIcon aria-hidden size={22} />去来源平台投递
-            </button>
-          </>
-        )
-      }
+      boundary={uiState === 'source-incomplete' ? <span id="fair-company-bar-blocked">{SOURCE_APPLY_UNAVAILABLE_REASON}</span> : undefined}
+      secondary={uiState === 'source-incomplete' ? (
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-sec"
+          aria-disabled={!sourceOk || undefined}
+          aria-describedby="fair-company-bar-blocked"
+          onClick={() => { if (!sourceOk) return }}
+        >
+          扫码投递
+        </button>
+      ) : undefined}
+      primary={uiState === 'qr'
+        ? { label: '关闭二维码', onClick: () => setShowQr(false), noArrow: true }
+        : uiState === 'loading' || notFound
+          ? undefined
+          : uiState === 'source-incomplete'
+            ? { label: '去来源平台投递', onClick: () => { if (sourceOk) openApplyQr() }, ariaDisabled: !sourceOk }
+            : { label: '去来源平台投递', onClick: openApplyQr }}
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`fair-company-state-${uiState}`}>
         {loading ? (
@@ -209,7 +191,7 @@ export function FairCompanyDetailPage() {
               <DirStripItem icon={BuildingIcon} tone="wheat" title="参展企业列表" desc="回本场名单重新选一家" onClick={() => navigate(listPath)} />
               <DirStripItem icon={MapPinIcon} title="展位图" desc="主办方给了真实图才展示" onClick={() => navigate(`/job-fairs/${fairId}/map`)} />
               <DirStripItem icon={PrinterIcon} title="先打好纸质简历" desc="展位现场收纸质简历很常见" onClick={() => navigate('/print/upload')} />
-              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="手上有主办方纸质名单时，以现场公示为准" onClick={() => navigate('/help')} />
+              <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             </DirExitList>
             <DirNote>{BOUNDARY}</DirNote>
           </>

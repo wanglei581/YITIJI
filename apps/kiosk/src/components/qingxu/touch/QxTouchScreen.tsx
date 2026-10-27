@@ -19,6 +19,7 @@ export function QxTouchScreen({
   bodyClassName,
   testId,
   stateId,
+  pageId,
 }: {
   band: ReactNode
   children: ReactNode
@@ -29,6 +30,8 @@ export function QxTouchScreen({
   bodyClassName?: string
   testId?: string
   stateId?: string
+  /** 本屏页面样式的归属。不传时不写 data-qx-page，全站默认不变。 */
+  pageId?: string
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -44,6 +47,7 @@ export function QxTouchScreen({
       className={`qxt-screen ${motionClass}`.trim()}
       data-qxt-screen=""
       data-qxt-gallery=""
+      data-qx-page={pageId}
       data-qxt-state={stateId}
       data-testid={testId}
     >

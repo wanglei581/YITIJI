@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { ExternalJobDTO, JobExplainResponse, MemberResumeItem } from '@ai-job-print/shared'
-import { ArrowLeftIcon, ExternalLinkIcon, FileQuestionIcon, QrCodeIcon } from 'lucide-react'
+import { FileQuestionIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
 import { getJobById } from '../../services/api'
 import {
   explainJobWithAi,
@@ -92,17 +93,19 @@ export function JobDetailPage() {
   if (loading) {
     return (
       <RecruitTouchFrame
+        eyebrow="岗位详情"
         title="岗位详情"
         subtitle="内容返回前不展示任何岗位内容。"
         status={{ tone: 'unknown', label: '正在取岗位原文与来源四要素' }}
-        terminalLabel="就业服务大厅"
-        ctabar={<button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs')}><ArrowLeftIcon aria-hidden="true" />返回岗位列表</button>}
+        back={{ label: '返回岗位列表', onBack: () => navigate('/jobs') }}
+        ask={{ label: '问小青：这个岗位怎么看？', draft: '这个岗位怎么看？', voice: true }}
       >
         <div className="qx-scroll qx-job-detail-page" data-screen="job-detail" data-state="loading" data-testid="job-detail-state-loading">
           <section className="qx-state qx-grow" data-tone="info" aria-live="polite">
             <span className="qx-state-ic"><FileQuestionIcon aria-hidden="true" /></span>
             <span><span className="qx-state-t">正在读取岗位标题、原文与来源信息</span><span className="qx-state-d">真实内容返回前不显示示例内容，也不预估剩余时间。</span></span>
           </section>
+          <RtFill preset="jobs" />
         </div>
       </RecruitTouchFrame>
     )
@@ -111,17 +114,19 @@ export function JobDetailPage() {
   if (error || !job) {
     return (
       <RecruitTouchFrame
+        eyebrow="岗位详情"
         title="岗位详情"
         subtitle="找不到就是找不到，不用相似岗位顶替。"
         status={{ tone: 'bad', label: '这条岗位没有找到' }}
-        terminalLabel="就业服务大厅"
-        ctabar={<button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/jobs')}>回岗位列表重新找</button>}
+        back={{ label: '返回岗位列表', onBack: () => navigate('/jobs') }}
+        ask={{ label: '问小青：这个岗位怎么看？', draft: '这个岗位怎么看？', voice: true }}
       >
         <div className="qx-scroll qx-job-detail-page" data-screen="job-detail" data-state="not-found" data-testid="job-detail-state-not-found">
           <section className="qx-state qx-grow" data-tone="error" role="alert">
             <span className="qx-state-ic"><FileQuestionIcon aria-hidden="true" /></span>
             <span><span className="qx-state-t">没有找到这条岗位</span><span className="qx-state-d">岗位可能已被来源平台撤回，或链接本身不正确。本机不会用相似岗位替你补上。</span></span>
           </section>
+          <RtFill preset="jobs" />
         </div>
       </RecruitTouchFrame>
     )
@@ -272,53 +277,36 @@ export function JobDetailPage() {
 
   return (
     <RecruitTouchFrame
+      eyebrow="岗位详情"
       title="岗位详情"
       subtitle={`${currentJob.sourceName} · 信息以来源平台为准`}
       status={sourceCanApply
         ? { tone: 'ok', label: '来源四要素已返回' }
         : { tone: 'bad', label: '来源要素不完整，外部入口已停用' }}
-      terminalLabel="就业服务大厅"
-      ctabar={
+      back={{ label: '返回岗位列表', onBack: () => navigate('/jobs') }}
+      ask={{ label: '问小青：这个岗位怎么看？', draft: '这个岗位怎么看？', voice: true }}
+      boundary={
         <>
-          <p className="why">
-            投递在来源平台完成，本终端不接收简历、不参与招聘流程
-            {sourceCanApply ? null : (
-              <b id="job-detail-apply-blocked" className="jf-blocked-reason">
-                {sourceBlockedReason}
-              </b>
-            )}
-          </p>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs')}>
-            <ArrowLeftIcon aria-hidden="true" />返回岗位列表
-          </button>
-          {/* 能力门禁置灰：aria-disabled 而不是原生 disabled —— 原生 disabled 会把按钮
-              踢出 Tab 序列、读屏直接跳过，旁边那句原因就永远不会被念出来。
-              放行由 openSourceQr / openSourcePlatform 自身的 `if (!sourceCanApply) return`
-              兜底，置灰不是靠属性拦的，点了也不会真的跳出去。 */}
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="teal"
-            aria-disabled={!sourceCanApply || undefined}
-            aria-describedby={sourceCanApply ? undefined : 'job-detail-apply-blocked'}
-            onClick={openSourceQr}
-          >
-            <QrCodeIcon aria-hidden="true" />
-            扫码投递
-          </button>
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            aria-disabled={!sourceCanApply || undefined}
-            aria-describedby={sourceCanApply ? undefined : 'job-detail-apply-blocked'}
-            onClick={openSourcePlatform}
-          >
-            <ExternalLinkIcon aria-hidden="true" />
-            去来源平台投递
-          </button>
+          投递在来源平台完成，本终端不接收简历、不参与招聘流程
+          {sourceCanApply ? null : (
+            <b id="job-detail-apply-blocked" className="jf-blocked-reason">
+              {sourceBlockedReason}
+            </b>
+          )}
         </>
       }
+      secondary={
+        <button
+          type="button"
+          className="qxt-btn qxt-btn-sec"
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'job-detail-apply-blocked'}
+          onClick={openSourceQr}
+        >
+          扫码投递
+        </button>
+      }
+      primary={{ label: '去来源平台投递', onClick: openSourcePlatform, ariaDisabled: !sourceCanApply }}
     >
       <div
         className="qx-scroll qx-job-detail-page"

@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BuildingIcon, ClockIcon, FileTextIcon, MapPinIcon, SearchIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
 import {
   DirAiAssist,
   DirNote,
@@ -168,8 +169,17 @@ export function OfflineAgenciesPage() {
 
   return (
     <RecruitTouchFrame
+      eyebrow="线下招聘机构"
       back={{ label: '返回社会招聘', onBack: () => navigate('/jobs-service') }}
-      title="线下招聘机构"
+      ask={{ label: '问小青：到店要带什么？', draft: '到店要带什么？', voice: true }}
+      title="想去哪家门店问？"
+      primary={{
+        label: '查询机构目录',
+        onClick: () => {
+          const form = document.getElementById('offline-agency-search')
+          if (form instanceof HTMLFormElement) form.requestSubmit()
+        },
+      }}
       subtitle={
         uiState === 'list-loading' ? '正在读取名单，取到之前不显示机构名称或数量。'
           : uiState === 'list-empty' ? '这些条件没有匹配的门店，换个条件再试。'
@@ -178,12 +188,6 @@ export function OfflineAgenciesPage() {
       }
       status={pill}
       terminalLabel={getTerminalCode() || '设备未绑定'}
-      ctabar={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/jobs-service')}>返回社会招聘</button>
-          <button type="submit" form="offline-agency-search" className="qx-btn" data-variant="primary">查询机构目录</button>
-        </>
-      }
     >
       <div className="dw-page qx-grow" data-screen="offline-agency" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         <DirSec no="01" title="先缩小范围" hint="四项都会真正用来筛选，可单选也可组合">
@@ -294,6 +298,7 @@ export function OfflineAgenciesPage() {
             <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
           )}
         </DirSec>
+        {uiState === 'list-empty' || uiState === 'list-error' ? <RtFill preset="directory" /> : null}
       </div>
     </RecruitTouchFrame>
   )

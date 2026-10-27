@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { RecruitDoors, type RecruitDoor } from './RecruitDoors'
 import { RtFrame } from './RtFrame'
 import { useRecruitmentAvailability } from './useRecruitmentAvailability'
@@ -12,7 +11,7 @@ const DOORS: readonly RecruitDoor[] = [
   { icon: 'map', title: '全部校园招聘会', desc: '场次名单里只留校园相关', route: '/job-fairs?audience=campus', kind: 'info', tone: 'slate' },
   { icon: 'qr', title: '到场指引', desc: '核对来源预约，本机不做签到', route: '/job-fairs/checkin', kind: 'info' },
   { icon: 'file', title: '简历服务', desc: '诊断、优化或准备纸质材料', route: '/resume-service', kind: 'info', tone: 'slate' },
-  { icon: 'printer', title: '打印扫描', desc: '先看文件和办理入口，出纸步骤进去再确认', route: '/print-scan', kind: 'device' },
+  { icon: 'printer', title: '打印扫描', desc: '先看文件和办理入口，出纸步骤进去再确认', route: '/print-scan', kind: 'info' },
   { icon: 'sparkle', title: '问 AI', desc: '问问参会准备。AI 不可用时仍可自己看场次', route: '/assistant', kind: 'ai', tone: 'clay' },
 ]
 
@@ -24,39 +23,42 @@ const MORE: readonly RecruitDoor[] = [
 
 export function CampusServicePage() {
   const navigate = useNavigate()
-  const { availability, apiStatus, retryApi } = useRecruitmentAvailability(true)
+  const { availability, apiStatus, retryApi } = useRecruitmentAvailability(false)
   const status = apiStatus === 'checking'
     ? { text: '正在确认在线服务' }
     : apiStatus === 'unavailable'
       ? { text: '在线服务当前不可用', tone: 'warn' as const }
-      : availability.deviceChecking
-        ? { text: '正在确认本机设备' }
-        : availability.deviceOff
-          ? { text: '本机设备当前不可用', tone: 'warn' as const }
-          : { text: '校园招聘 · 来源信息入口' }
+      : { text: '校园招聘 · 来源信息入口' }
 
   return (
     <RtFrame
-      eyebrow="私有化版 · 校园招聘"
+      eyebrow="校园招聘"
       title="先看哪一场？"
       sub="实习和校招从这里进。"
       status={status}
       backLabel="返回"
       onBack={() => navigate('/')}
-      ask={{ label: '问小青：校园招聘怎么看？', draft: '校园招聘怎么看？' }}
-      primary={apiStatus === 'unavailable' ? { label: '重新确认在线服务', onClick: retryApi, noArrow: true } : undefined}
+      ask={{ label: '问小青：校园招聘怎么看？', draft: '校园招聘怎么看？', voice: true }}
+      primary={apiStatus === 'ready' ? undefined : { label: '重新检测', onClick: retryApi, noArrow: true }}
       testId="campus-service"
       stateId={apiStatus}
     >
-      <RecruitDoors doors={DOORS} availability={availability} />
-      <p className="rt-hint">
-        全职和兼职在
-        <button type="button" onClick={() => navigate('/jobs-service')}>社会招聘</button>
-        。
-      </p>
-      <QxTouchCallout kind="fine">不代收简历，也不代预约。预约和到场登记由来源平台与主办方负责。</QxTouchCallout>
-      <p className="rt-note">更多去处</p>
-      <RecruitDoors doors={MORE} availability={availability} />
+      <div className="rt-hub" data-hub-device-probe="off">
+        <RecruitDoors doors={DOORS} availability={availability} />
+        <p className="rt-hint">
+          全职和兼职在
+          <button type="button" onClick={() => navigate('/jobs-service')}>社会招聘</button>
+          。
+        </p>
+        <div className="rt-declarations">
+          <p>预约和投递由来源平台负责。</p>
+          <p>本机不代收简历，也不承诺外部活动结果。</p>
+          <p>不显示虚构签到结果</p>
+          <p>场次、参会企业和地图均以真实数据为准。</p>
+        </div>
+        <p className="rt-note">更多去处</p>
+        <RecruitDoors doors={MORE} availability={availability} layout="more" />
+      </div>
     </RtFrame>
   )
 }

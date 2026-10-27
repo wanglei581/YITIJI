@@ -367,6 +367,29 @@ test('hosting unknown: a direct URL says it is checking and does not claim anyth
   await expect(page.locator('.qx-pagehead h1')).toHaveText('本终端未开放招聘会信息')
 })
 
+test('hosting unknown: campus child routes keep a way home, then land on the campus notice @w1-kiosk', async ({ page, api }) => {
+  for (const url of ['/campus/welcome', '/campus/freshman-insights']) {
+    registerShell(api, RECRUITMENT_HOSTING_OFF)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    api.respondWith('GET', CONFIG, async () => {
+      await held
+      return { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF) }
+    })
+
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    const honest = page.locator('[data-kiosk-screen="recruitment-hosting"]')
+    await expect(honest, `${url} 确认中走说明页`).toHaveAttribute('data-state', 'checking')
+    await expect(page, `${url} 确认中不先跳走`).toHaveURL((current) => current.pathname === url)
+    await expect(page.getByRole('button', { name: '返回首页' }).last()).toBeVisible()
+    await expect(page.locator('.qx-pagehead h1')).toHaveText('正在确认本机开通的服务')
+    release()
+    await page.waitForURL((current) => current.pathname === '/campus')
+    await expect(page.locator('[data-kiosk-screen="recruitment-hosting"]')).toHaveAttribute('data-state', 'off')
+    await expect(page.locator('.qx-pagehead h1')).toHaveText('本终端未开放校园招聘信息')
+  }
+})
+
 test('hosting unknown: the home footer and the member guide stay neutral until the answer arrives @w1-kiosk', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   let gate = deferred()
