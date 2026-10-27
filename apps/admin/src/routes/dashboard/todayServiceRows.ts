@@ -81,7 +81,7 @@ export function reportTodayRows(
     return [{
       key: 'reports-truncated',
       title: '上月月报这次没有完整读完',
-      detail: '这里不给出不完整的数字',
+      detail: '项目较多，请到合作机构管理逐家查看',
       href: '/partners',
       action: '去查看',
     }]

@@ -81,7 +81,7 @@ function SummaryList({
           {org.count !== null && <span className="shrink-0 text-neutral-500">未结报障 {formatCount(org.count)}</span>}
         </button>
       ))}
-      {reports.truncated && <p className="px-2 py-1 text-xs text-neutral-500">这里不给出不完整的数字</p>}
+      {reports.truncated && <p className="px-2 py-1 text-xs text-neutral-500">项目较多，月报情况请打开各机构查看</p>}
       {reportRows.map((org) => (
         <button key={`report-${org.orgId}`} type="button" className={ROW_CLASS} onClick={() => onOpen(org.orgId, 'reports')}>
           <span className="min-w-0 truncate">{org.orgName}</span>

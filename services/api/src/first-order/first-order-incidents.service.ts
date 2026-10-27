@@ -49,6 +49,8 @@ export class FirstOrderIncidentsService {
     const statuses: FirstOrderIncidentStatus[] = status ? [status] : ['open', 'processing', 'resolved']
     const total = await this.prisma.serviceIncident.count({ where: { status: { in: statuses } } })
     const items: FirstOrderIncidentDirectory['items'] = []
+    // 按状态分次读取时，工单可能恰好在两次读取之间改了状态，按编号去重，避免同一张出现两次。
+    const seen = new Set<string>()
     let remaining = limit
     for (const current of statuses) {
       if (remaining <= 0) break
@@ -63,6 +65,8 @@ export class FirstOrderIncidentsService {
         },
       })
       for (const row of rows) {
+        if (seen.has(row.id)) continue
+        seen.add(row.id)
         items.push({
           id: row.id, orgId: row.orgId, orgName: row.project.org.name, projectId: row.projectId,
           projectName: row.project.name, terminalCode: row.terminalCode, issueCode: row.issueCode as FirstOrderIssue,
@@ -70,7 +74,7 @@ export class FirstOrderIncidentsService {
           createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
         })
       }
-      remaining -= rows.length
+      remaining = limit - items.length
     }
     return { items, total, truncated: total > items.length }
   }
