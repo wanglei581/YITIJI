@@ -37,6 +37,7 @@ export function PrintTouchFrame({
   back,
   eyebrow = '打印扫描服务',
   railNow,
+  railLabels,
   bodyClassName,
   testId,
   stateId,
@@ -47,11 +48,13 @@ export function PrintTouchFrame({
   primaryNode,
   dockLeft,
   nav,
+  navCurrent = 'none',
   legacyBody = true,
   backLabel,
   statusClassName,
   titleRole,
   titleTag,
+  sealNode,
 }: {
   page?: string
   title: ReactNode
@@ -67,6 +70,8 @@ export function PrintTouchFrame({
   eyebrow?: string
   /** 四步轴当前位置。-1 表示还没开始；不传则不画步骤轴。 */
   railNow?: number
+  /** 步骤轴文字。不传时是打印四步（稿 RAIL.print）；到机码页传三步（稿 RAIL.pick）。 */
+  railLabels?: readonly string[]
   bodyClassName?: string
   testId?: string
   stateId?: string
@@ -79,6 +84,8 @@ export function PrintTouchFrame({
   dockLeft?: ReactNode
   /** 为真时画触屏底导航。 */
   nav?: boolean
+  /** 底导航高亮哪一项。稿里首页、选文件、手机传文件三屏亮「首页」，其余打印各屏不亮任何一项。 */
+  navCurrent?: 'home' | 'none'
   /** 旧正文才挂拉伸和重复步骤轨隐藏。新正文传 false。 */
   legacyBody?: boolean
   backLabel?: string
@@ -88,6 +95,8 @@ export function PrintTouchFrame({
   titleRole?: 'status'
   /** 问句标题的标签。不传时仍是 h1。空态门禁要可见的 h2 时才传。 */
   titleTag?: 'h1' | 'h2'
+  /** 自带的印章位内容（稿 done 的对勾）。 */
+  sealNode?: ReactNode
 }) {
   const navigate = useNavigate()
   const bandTitle = typeof title === 'string' ? title : '打印'
@@ -115,9 +124,10 @@ export function PrintTouchFrame({
           statusClassName={statusClassName}
           titleRole={titleRole}
           titleTag={titleTag}
+          sealNode={sealNode}
           back={Boolean(back)}
           onBack={back?.onBack}
-          rail={typeof railNow === 'number' ? { labels: PRINT_TOUCH_RAIL, now: railNow } : undefined}
+          rail={typeof railNow === 'number' ? { labels: railLabels ?? PRINT_TOUCH_RAIL, now: railNow } : undefined}
         />
       }
       dock={useDock ? (
@@ -133,7 +143,7 @@ export function PrintTouchFrame({
       ) : ctabar ? <footer className="qxt-print-dock qx-ctabar">{ctabar}</footer> : undefined}
       nav={showNav ? (
         <QxTouchNav
-          current="home"
+          current={navCurrent === 'home' ? 'home' : undefined}
           onHome={() => navigate('/')}
           onAdvisor={() => navigate('/assistant')}
           onProfile={() => navigate('/profile')}

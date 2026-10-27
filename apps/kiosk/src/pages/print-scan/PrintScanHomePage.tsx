@@ -494,6 +494,7 @@ export function PrintScanHomePage() {
       page="print-hub"
       legacyBody={false}
       nav
+      navCurrent="home"
       kind="std"
       seal={paperOff ? null : 'idle'}
       back={{ label: paperOff ? '返回' : '上一步', onBack: () => navigate('/') }}

@@ -22,8 +22,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
-  CheckIcon,
-  CircleDotIcon,
   ClockIcon,
   CreditCardIcon,
   FileTextIcon,
@@ -31,7 +29,8 @@ import {
 } from 'lucide-react'
 import { preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
-import { PrintTouchFrame } from './PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
+import { PrintArt } from './art/PrintArt'
 import { PrintMissResume } from './components/PrintMissResume'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -566,16 +565,15 @@ export function PrintProgressPage() {
       page="print-progress"
       legacyBody={false}
       kind="compact"
+      seal={null}
+      nav
       eyebrow="打印进度"
       back={printingNow ? undefined : { label: '返回首页', onBack: () => navigate('/') }}
       title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
       subtitle={progressSubtitle}
       status={frameStatus}
       terminalLabel="就业服务大厅"
-      ask={printingNow ? {
-        label: '问小青：取纸或异常怎么办',
-        draft: '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。',
-      } : undefined}
+      ask={printingNow ? printAsk('问小青：取纸或异常怎么办', '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。') : undefined}
       ctabar={printingNow ? undefined : (
         isSim ? (
           <span className="why">
@@ -663,29 +661,20 @@ export function PrintProgressPage() {
                 const isFailedStep = failed && tlIdx === currentIdx
                 return (
                   <div key={item.key} className={`pfp-step ${cls}`} data-failed={isFailedStep} role="listitem">
-                    <span className="pfp-step-top">
-                      <span className="pfp-step-dot">
-                        {isFailedStep
-                          ? <AlertCircleIcon aria-hidden="true" />
-                          : isDone || (isSim && simDone)
-                            ? <CheckIcon aria-hidden="true" />
-                            : isActive
-                              ? <CircleDotIcon aria-hidden="true" />
-                              : <ClockIcon aria-hidden="true" />
-                        }
-                      </span>
-                      <span className="pfp-step-st">
-                        {isFailedStep
-                          ? (isSim ? '演示失败' : '出错')
-                          : isDone || (isSim && simDone)
-                            ? (isSim ? '演示结束' : '完成')
-                            : isActive
-                              ? (showFailure ? '打印未完成' : progressQuiet ? '进度未更新' : useRealApi ? realStatus.activeHint : '演示中…')
-                              : '未开始'}
-                      </span>
+                    <span className="pfp-step-n">
+                      {isFailedStep ? <AlertCircleIcon aria-hidden="true" /> : tlIdx + 1}
                     </span>
                     <b>{item.label}</b>
-                    <span className="pfp-step-d">{item.desc}</span>
+                    <em className="pfp-step-st">
+                      {isFailedStep
+                        ? (isSim ? '演示失败' : '出错')
+                        : isDone || (isSim && simDone)
+                          ? (isSim ? '演示结束' : '完成')
+                          : isActive
+                            ? (showFailure ? '打印未完成' : progressQuiet ? '进度未更新' : useRealApi ? realStatus.activeHint : '演示中…')
+                            : '未开始'}
+                    </em>
+                    <small className="pfp-step-d">{item.desc}</small>
                   </div>
                 )
               })}
@@ -744,10 +733,8 @@ export function PrintProgressPage() {
 
       {!timedOut && !failed && (
         <div className="pff-out pfp-out">
-          <div className="pff-out-stage" aria-hidden="true">
-            <div className="pff-out-slot" />
-            <div className="pff-out-paper" />
-            <div className="pff-out-tray" />
+          <div className="pff-out-stage pfp-printer" aria-hidden="true">
+            <PrintArt name="mfp" />
           </div>
           <div className="pff-out-main">
             <div className="pff-out-status">

@@ -337,6 +337,7 @@ export function PrintPreviewPage({
   if (!hasFile) {
     return (
       <PrintTouchFrame
+        nav
         page="print-check"
         legacyBody={false}
         kind="compact"
@@ -364,6 +365,7 @@ export function PrintPreviewPage({
     const canRunCheck = Boolean(file.fileId)
     return (
       <PrintTouchFrame
+        nav
         page="print-preview"
         legacyBody={false}
         kind="compact"
@@ -460,6 +462,7 @@ export function PrintPreviewPage({
   // The route now renders QxPageFrame and qx-ctabar while preserving the same business state.
   return (
     <PrintTouchFrame
+      nav
       page="print-preview"
       legacyBody={false}
       kind="compact"

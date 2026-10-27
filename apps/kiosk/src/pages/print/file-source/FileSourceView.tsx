@@ -598,6 +598,8 @@ export function FileSourceView(props: FileSourceViewProps) {
       status={screen === 'phone-uploaded' ? { tone: 'ok', label: '系统已收到，等你确认' } : status}
       back={{ label: '上一步', onBack }}
       navbar={previewOpen ? undefined : <QxAppNavbar onHome={props.onHome} onAdvisor={props.onAdvisor} onProfile={props.onProfile} />}
+      // 稿：选文件与手机传文件亮「首页」，U 盘选文件不亮任何一项。
+      navCurrent={screen.startsWith('usb') ? 'none' : 'home'}
       ask={previewOpen ? undefined : printAsk(screen.startsWith('phone') || screen.startsWith('usb') ? ASK_LABEL_SHORT : ASK_LABEL, ASK_DRAFT)}
       primary={previewOpen || noPrimary ? undefined : {
         label: primaryText,

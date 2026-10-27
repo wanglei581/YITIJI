@@ -306,7 +306,7 @@ async function openDesk(page: Page, api: ApiRouter, state: string): Promise<void
       return
     }
     if (state === 'check-clean') await see(page, 'text=没有待处理的隐私片段')
-    else if (state === 'check-flagged') await see(page, 'text=逐条裁决')
+    else if (state === 'check-flagged') await see(page, 'text=逐处选择遮挡或保留')
     else if (state === 'check-failed') await see(page, 'text=材料检查未完成')
     else await see(page, '[data-qx-state="inspection"]')
     return
@@ -338,7 +338,7 @@ async function openDesk(page: Page, api: ApiRouter, state: string): Promise<void
   await page.goto('/print/desk?step=preview', { waitUntil: 'domcontentloaded' })
   if (state === 'file-unsupported') await see(page, '[data-qx-state="file-unsupported"]')
   else if (state === 'capability-loading') await see(page, 'text=正在确认本机打印能力')
-  else if (state === 'device-loading') await see(page, 'text=检测设备中')
+  else if (state === 'device-loading') await see(page, 'text=正在读取打印机状态')
   else if (state === 'device-offline') await see(page, 'text=打印机离线')
   else if (state === 'device-error') await see(page, 'text=打印机异常')
   else if (state === 'device-unknown') await see(page, 'text=状态未知')

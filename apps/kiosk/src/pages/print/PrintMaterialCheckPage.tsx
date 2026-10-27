@@ -630,6 +630,7 @@ export function PrintMaterialCheckPage({
   if (!file) {
     return (
       <PrintTouchFrame
+        nav
         page="print-check"
         legacyBody={false}
         kind="compact"
@@ -708,6 +709,7 @@ export function PrintMaterialCheckPage({
   // The route now renders QxPageFrame and its qx-ctabar; these names only document the replaced contract.
   return (
     <PrintTouchFrame
+      nav
       page="print-check"
       legacyBody={false}
       kind="compact"

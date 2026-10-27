@@ -2,12 +2,9 @@ import type { ReactNode } from 'react'
 import { KioskNumpad } from '../../../components/kiosk-numpad/KioskNumpad'
 import {
   AlertCircleIcon,
-  CheckIcon,
-  FileTextIcon,
   InfoIcon,
   LockIcon,
   QrCodeIcon,
-  ShieldCheckIcon,
   WifiOffIcon,
 } from 'lucide-react'
 import { helpNeededLine, peekSupportContact, printProblemLine } from '../../../copy/unattendedCopy'
@@ -18,7 +15,6 @@ import {
 import {
   LEGACY_KEYS,
   PICKUP_SAME_CODE_RESUME_NOTE,
-  type ClaimSuccessCopy,
   type PickupFailure,
   type PickupScreen,
 } from '../pickupClaimModel'
@@ -53,62 +49,111 @@ export function PickupSubtitle({ screen }: { screen: PickupScreen }) {
 }
 
 /**
- * 到机码页的 hid 扫码指引（原型 11-arrival-code.html `rHid()`）。
- *
- * 这一屏教的是「去哪儿扫、怎么扫」，不是扫码器状态。
- * 2026-09-07 Windows 真机实测（PR #913）：模组靠接近感应触发、不常亮；
- * 能读手机屏幕上的码，但需要把亮度调高。亮度这一句稿里没有，照实写。
+ * 稿 .codehint：左边示意图、右边一句主话加一句说明，输码页的唯一一块说明卡。
+ * 默认画手机里「打印订单」页的示意；扫码枪那一态换成机身扫码区的示意。
+ * 手机示意里不画示例码——示例数字不当真，也不能被当成可核销的码。
  */
-export function PickupHidGuide({
-  echo,
-  errorMsg,
+export function PickupHintCard({
+  art,
+  title,
+  desc,
+  descId,
+  status = false,
+  children,
 }: {
-  echo: ReactNode
-  errorMsg: string
+  art: 'phone' | 'scan'
+  title: ReactNode
+  desc: ReactNode
+  descId: string
+  /** 校验中那一态：读屏当状态播报。 */
+  status?: boolean
+  children?: ReactNode
 }) {
   return (
-    <>
-      <div className="qx-card pcp-hid-card pcp-enter">
-        <div className="pcp-hid-stage" aria-hidden="true">
+    <section className="pcp-hint" aria-label="输码说明" role={status ? 'status' : undefined}>
+      {art === 'phone' ? (
+        <div className="pcp-hint-art pcp-phone" aria-hidden="true">
+          <div className="pcp-phone-top">打印订单</div>
+          <div className="pcp-phone-card">
+            <small>到机码</small>
+            <i />
+          </div>
+          <div className="pcp-phone-line" />
+          <div className="pcp-phone-line pcp-phone-line--s" />
+        </div>
+      ) : (
+        <div className="pcp-hint-art pcp-scanart" aria-hidden="true">
           <span className="pcp-hid-corner pcp-hid-corner--tl" />
           <span className="pcp-hid-corner pcp-hid-corner--tr" />
           <span className="pcp-hid-corner pcp-hid-corner--bl" />
           <span className="pcp-hid-corner pcp-hid-corner--br" />
-          <div className="pcp-hid-phone">
-            <QrCodeIcon size={38} />
+          <div className="pcp-scanart-phone">
+            <QrCodeIcon size={44} />
           </div>
         </div>
-        <div className="pcp-hid-main">
-          <p className="pcp-hid-t">请出示手机上的码</p>
-          <p className="pcp-hid-s" id="pcp-hid-hint">
-            {peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}把手机屏幕对准<strong>机身侧面的扫码区</strong>。
-            扫码模组靠接近感应触发，不会一直亮着。
-            <strong>把手机屏幕亮度调高</strong>，再把屏幕凑近扫码区。
-            扫到的内容以 USB 键盘方式输入，和手输走同一套校验规则。
-          </p>
-          {echo}
-          {errorMsg ? (
-            <div id="pcp-error-msg" className="pcp-error" role="alert">
-              ⚠ {errorMsg}
-            </div>
-          ) : null}
+      )}
+      <div className="pcp-hint-tx">
+        <b className="pcp-hint-t">{title}</b>
+        <span className="pcp-hint-d" id={descId}>{desc}</span>
+        {children}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * 到机码页的扫码枪说明（稿 pickup 点「用扫码枪扫」后在说明卡里展开的那一句，不另加一块高度）。
+ *
+ * 这里教的是「去哪儿扫、怎么扫」，不是扫码器状态。
+ * 2026-09-07 Windows 真机实测（PR #913）：模组靠接近感应触发、不常亮；
+ * 能读手机屏幕上的码，但需要把亮度调高。亮度这一句稿里没有，照实写。
+ * 说明原句由页面传入（原句在 PrintPickupClaimPage），本件只管摆位置、回显与错误条。
+ */
+export function PickupHidGuide({
+  line,
+  echo,
+  errorMsg,
+  actions,
+}: {
+  line: string
+  echo: ReactNode
+  errorMsg: string
+  actions: ReactNode
+}) {
+  return (
+    <PickupHintCard
+      art="scan"
+      title="用扫码枪扫"
+      descId="pcp-hid-hint"
+      desc={<>{peekSupportContact().miniappPublished ? '打开小程序里的到机码页面，' : ''}{line}</>}
+    >
+      {echo}
+      {errorMsg ? (
+        <span id="pcp-error-msg" className="pcp-error" role="alert">
+          ⚠ {errorMsg}
+        </span>
+      ) : null}
+      {actions}
+    </PickupHintCard>
+  )
+}
+
+/** 两种「扫码」不是一回事：本页是机器读你的手机，手机传文件、扫码登录是手机扫屏幕。收在折叠里，扫码枪那一态才出现。 */
+export function PickupScanKinds() {
+  return (
+    <section className="qx-card pcp-hid-ab" aria-label="两种扫码的区别">
+      <h2 className="pcp-hid-ab-t">两种「扫码」不是一回事</h2>
+      <div className="pcp-hid-ab-cols">
+        <div className="pcp-hid-ab-col is-current">
+          <b>本页：机器读你的手机</b>
+          <span>机身扫码区读取你手机上的到机码，扫到自动校验。</span>
+        </div>
+        <div className="pcp-hid-ab-col">
+          <b>另一处：你用手机扫屏幕</b>
+          <span>手机传文件、扫码登录是扫这台机器的屏幕，去「文件来源」页。</span>
         </div>
       </div>
-
-      <section className="qx-card pcp-hid-ab" aria-label="两种扫码的区别">
-        <h2 className="pcp-hid-ab-t">两种「扫码」不是一回事</h2>
-        <div className="pcp-hid-ab-cols">
-          <div className="pcp-hid-ab-col is-current">
-            <b>本页：机器读你的手机</b>
-            <span>机身扫码区读取你手机上的到机码，扫到自动校验。</span>
-          </div>
-          <div className="pcp-hid-ab-col">
-            <b>另一处：你用手机扫屏幕</b>
-            <span>手机传文件、扫码登录是扫这台机器的屏幕，去「文件来源」页。</span>
-          </div>
-        </div>
-      </section>
-    </>
+    </section>
   )
 }
 
@@ -201,8 +246,8 @@ export function PickupCodeBoxes({ cells, cursor, error }: { cells: string[]; cur
 }
 
 /**
- * 键盘卡（稿 .kb）：说明 → 数字键或历史码字母键 → 确认行。确认键由页面传入（submit），
- * 它与提交锁、静默窗口是同一条提交路径，留在页面里。
+ * 键盘卡（稿 .keypad）：数字键（左下清空、右下删一位）或历史码字母键。
+ * 历史码与扫码枪的切换放在键盘下面一行（稿 .d3-pickrow），确认键在底栏，都在页面里。
  * 页内键盘是必需品：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘。
  */
 export function PickupKeypadCard({
@@ -210,25 +255,14 @@ export function PickupKeypadCard({
   loading,
   legacyMode,
   onChange,
-  onLegacyMode,
-  submit,
 }: {
   code: string
   loading: boolean
   legacyMode: boolean
   onChange: (next: string) => void
-  onLegacyMode: (legacy: boolean) => void
-  submit: ReactNode
 }) {
   return (
-    <section className="qx-card pcp-keypad-card" data-inert={loading || undefined} aria-label="到机码键盘">
-      <p className="pcp-keypad-note" id="pcp-hint">
-        {loading
-          ? '正在校验，键盘暂时不可用——校验结果出来后会自动恢复。'
-          : legacyMode
-            ? <>历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键——不用担心认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。</>
-            : <>新码是 <b>{PICKUP_CODE_LENGTH} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「历史 {PICKUP_CODE_MAX_INPUT_LENGTH} 位码」。</>}
-      </p>
+    <section className="pcp-keypad-card" data-inert={loading || undefined} aria-label="到机码键盘">
       {legacyMode ? (
         <PickupAlphaKeys value={code} onChange={onChange} disabled={loading} />
       ) : (
@@ -238,28 +272,19 @@ export function PickupKeypadCard({
           maxLength={PICKUP_CODE_MAX_INPUT_LENGTH}
           disabled={loading}
           label="到机码数字键盘"
-          leadKey={{
-            text: `历史 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位码`,
-            ariaLabel: `输入 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位历史码`,
-            onPress: () => onLegacyMode(true),
-          }}
+          delText="删一位"
         />
       )}
-      <div className="pcp-kb-foot">
-        {legacyMode && (
-          <button
-            type="button"
-            className="qx-btn pcp-kb-back"
-            disabled={loading}
-            onPointerDown={e => e.preventDefault()}
-            onClick={() => onLegacyMode(false)}
-          >
-            ← 回到 {PICKUP_CODE_LENGTH} 位新码键盘
-          </button>
-        )}
-        {submit}
-      </div>
     </section>
+  )
+}
+
+/** 历史码一行说明（稿 .d3-note2）：键盘上没有 0/O/1/I/L，所以不会认错。 */
+export function PickupLegacyNote() {
+  return (
+    <p className="pcp-note2" id="pcp-hint">
+      历史码一共 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位</b>，不含 <b>0、O、1、I、L</b>，键盘上没有这几个键，不会认错。读满 {PICKUP_CODE_MAX_INPUT_LENGTH} 位自动校验。
+    </p>
   )
 }
 
@@ -392,57 +417,6 @@ export function PickupFailurePanel({
           {failure === 'invalid' ? '查看取码说明 / 使用帮助' : '使用帮助'}
         </button>
       </div>
-    </>
-  )
-}
-
-/**
- * 认领成功卡（稿 rSuccess）。标题、步骤与主按钮文案全部来自服务端 released 分支，
- * 订单号 / 文件名 / 金额只转述回执，缺哪项就不显示哪项，不补演示值。
- */
-export function PickupWinCard({
-  copy,
-  orderNo,
-  meta,
-  onReset,
-  primary,
-}: {
-  copy: ClaimSuccessCopy
-  orderNo: string
-  meta: string
-  onReset: () => void
-  primary: ReactNode
-}) {
-  return (
-    <>
-      <section className="qx-card pcp-win pcp-enter" aria-label="认领结果">
-        <div className="pcp-win-head">
-          <span className="pcp-win-ico"><CheckIcon size={40} strokeWidth={3} aria-hidden="true" /></span>
-          <div className="pcp-win-tx">
-            <p className="pcp-win-s">{copy.line}</p>
-          </div>
-        </div>
-        <div className="pcp-win-file">
-          <FileTextIcon size={40} aria-hidden="true" />
-          <div className="pcp-win-fm">
-            <p className="pcp-win-fn">打印订单 <span className="qx-num">{orderNo}</span></p>
-            {meta ? <p className="pcp-win-fs">{meta}</p> : null}
-          </div>
-        </div>
-        <ol className="pcp-win-steps">
-          {copy.steps.map((step, index) => (
-            <li key={step}><span className="pcp-win-no" aria-hidden="true">{index + 1}</span>{step}</li>
-          ))}
-        </ol>
-        <div className="pcp-actions">
-          <button type="button" className="qx-btn pcp-act" data-variant="ghost" onClick={onReset}>再取一件</button>
-          {primary}
-        </div>
-      </section>
-      <p className="pcp-safe">
-        <ShieldCheckIcon size={24} aria-hidden="true" />
-        <span>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</span>
-      </p>
     </>
   )
 }

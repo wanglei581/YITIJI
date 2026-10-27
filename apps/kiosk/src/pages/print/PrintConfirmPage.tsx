@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeftIcon, LoaderIcon, PrinterIcon } from 'lucide-react'
 import { PRINT_MAX_SIDES_PER_ORDER, type MemberBenefitItem, type PrintJobParams } from '@ai-job-print/shared'
-import { PrintTouchFrame } from './PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useAuth } from '../../auth/useAuth'
 import { loginPathForPrintStep } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
@@ -706,7 +706,7 @@ export function PrintConfirmPage() {
         },
       }}
       nav
-      ask={{ label: '问小青：核对这单', draft: '请帮我核对这一单要印的文件、页数和设置。' }}
+      ask={printAsk('问小青：核对这单', '请帮我核对这一单要印的文件、页数和设置。')}
       primary={usesDockPrimary ? {
         label: dockLabel,
         disabled: dockDisabled,

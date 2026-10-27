@@ -26,17 +26,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRightIcon } from 'lucide-react'
 import {
   type PrintJobParams,
   PICKUP_CODE_ACCEPTED_PATTERN,
   PICKUP_CODE_INPUT_ALPHABET,
+  PICKUP_CODE_LENGTH,
   PICKUP_CODE_MAX_INPUT_LENGTH,
   PICKUP_CODE_PATTERN,
   isLegacyPickupCode,
 } from '@ai-job-print/shared'
-import { PrintTouchFrame } from './PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import { terminalProtectedFetch } from '../../services/terminalAuth'
@@ -44,9 +45,10 @@ import './styles/pickup-claim-qx.css'
 import './styles/print-fulfill-touch.css'
 import { PickupHidGuide, PickupThreeCodeCard } from './components/PickupHidGuide'
 // 上一行的导入形状被 verify:fusion-w2 逐字钉住，稿 11 其余展示件另起一行导入。
-import { PickupCodeBoxes, PickupFailurePanel, PickupKeypadCard, PickupOutsStrip, PickupWinCard } from './components/PickupHidGuide'
+import { PickupCodeBoxes, PickupFailurePanel, PickupHintCard, PickupKeypadCard, PickupLegacyNote, PickupOutsStrip, PickupScanKinds } from './components/PickupHidGuide'
+import { PickupOkBody } from './components/PickupOkBody'
 import { helpNeededLine, peekSupportContact } from '../../copy/unattendedCopy'
-import { classifyClaimFailure, claimMetaLine, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
+import { classifyClaimFailure, claimSuccessCopy, claimSuccessDestination, failureScreen, pickupCells, pickupClaimMessage } from './pickupClaimModel'
 import type { PickupFailure, PickupScreen } from './pickupClaimModel'
 
 // ── 到机码工具 ────────────────────────────────────────────────
@@ -146,6 +148,11 @@ async function claimPickup(code: string, staleSignal?: AbortSignal): Promise<Cla
 }
 
 // ── 组件 ──────────────────────────────────────────────────────
+const PICKUP_RAIL = ['输到机码', '核对订单', '取件'] as const
+
+// 稿 pickup「用扫码枪扫」展开的原句：不用手输，把手机上的码对准机身侧面的扫码区；亮度调高是 2026-09-07 真机条件。
+const HID_LINE = '不用手输：把手机上的码，对准机身侧面的扫码区。手机亮度调高，再凑近扫码区。'
+
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -280,23 +287,27 @@ export function PrintPickupClaimPage() {
     : successCopyRaw
 
   // 青序壳：输入态标题按新码 / 历史码切换；认领成功改看订单状态。返回键按稿，终态不放。
-  const frame = (body: ReactNode, primaryNode?: ReactNode) => (
+  const frame = (body: ReactNode, primaryNode?: ReactNode, subtitle?: ReactNode) => (
     <PrintTouchFrame
       page={screen === 'success' ? 'print-pickup-ok' : 'print-pickup'}
       legacyBody={false}
       eyebrow="到机码核销"
       kind="compact"
+      seal={null}
+      railNow={screen === 'success' ? 1 : 0}
+      railLabels={PICKUP_RAIL}
       back={screen === 'success'
         ? { label: '重新输入', onBack: handleReset }
-        : { label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
+        : { label: '返回', onBack: () => navigate('/print-scan') }}
       title={successCopy?.title ?? (screen === 'legacy' ? '输入历史码' : '输入你的到机码')}
+      subtitle={subtitle}
       // 胶囊只标页面用途，不表示任何设备状态，所以 tone 保持 unknown。
       status={{ tone: 'unknown', label: '到机码验证' }}
       terminalLabel="就业服务大厅"
-      ask={{
-        label: screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
-        draft: '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
-      }}
+      ask={printAsk(
+        screen === 'success' ? '问小青：码在哪' : '问小青：到机码怎么找 →',
+        '手机打印订单里的到机码在哪里找？8 位新码和 10 位历史码怎么输入？',
+      )}
       primaryNode={primaryNode}
       navbar={
         <QxAppNavbar
@@ -311,6 +322,7 @@ export function PrintPickupClaimPage() {
   )
 
   // ── 成功：先看有没有放行，再看打印状态（已完成不能再说还在排队） ──
+  // 稿 pickup-ok：说明句放进页头，订单摘要、续打说明、三步在正文，主按钮在底栏。
   if (state === 'success' && result && successCopy) {
     const copy = successCopy
     const destination = claimSuccessDestination(result)
@@ -322,47 +334,46 @@ export function PrintPickupClaimPage() {
         data-testid="arrival-code-state-success"
         aria-live="polite"
       >
-        <PickupWinCard
+        <PickupOkBody
           copy={copy}
           orderNo={result.orderNo}
-          meta={claimMetaLine(result.fileName, result.amountCents)}
-          onReset={handleReset}
-          primary={
-            <button
-              type="button"
-              className="qx-btn pcp-act pcp-act--go pcs-primary"
-              data-testid="arrival-code-primary"
-              onClick={() => navigate(destination, {
-                state: result.released
-                  ? {
-                      pickupSource: true,
-                      file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
-                      params: result.params,
-                      taskId: result.taskId,
-                      orderId: result.orderId,
-                      orderNo: result.orderNo,
-                      amountCents: result.amountCents,
-                      paymentSessionToken: result.paymentSessionToken,
-                    }
-                  : {
-                      orderId: result.orderId,
-                      orderNo: result.orderNo,
-                      amountCents: result.amountCents,
-                      priceLines: result.priceLines ?? [],
-                      paymentSessionToken: result.paymentSessionToken,
-                      pickupSource: true,
-                      params: result.params,
-                      file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
-                    },
-              })}
-            >
-              {copy.cta}
-              <ArrowRightIcon size={24} aria-hidden="true" />
-            </button>
-          }
+          fileName={result.fileName}
+          amountCents={result.amountCents}
+          privacyNote={<>办完离开或闲置超时后，会<b>清除本机登录态和临时信息</b>，下一个人无法查看。订单与文件按系统留存期限管理。</>}
         />
-        <PickupThreeCodeCard />
       </div>,
+      <button
+        type="button"
+        className="qx-btn pcp-act pcp-act--go pcs-primary"
+        data-testid="arrival-code-primary"
+        onClick={() => navigate(destination, {
+          state: result.released
+            ? {
+                pickupSource: true,
+                file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
+                params: result.params,
+                taskId: result.taskId,
+                orderId: result.orderId,
+                orderNo: result.orderNo,
+                amountCents: result.amountCents,
+                paymentSessionToken: result.paymentSessionToken,
+              }
+            : {
+                orderId: result.orderId,
+                orderNo: result.orderNo,
+                amountCents: result.amountCents,
+                priceLines: result.priceLines ?? [],
+                paymentSessionToken: result.paymentSessionToken,
+                pickupSource: true,
+                params: result.params,
+                file: result.fileName ? { name: result.fileName, size: '', pages: result.billablePages ?? null } : undefined,
+              },
+        })}
+      >
+        {copy.cta}
+        <QxTouchIcon name="arrowR" size={32} strokeWidth={2.4} />
+      </button>,
+      copy.line,
     )
   }
 
@@ -392,14 +403,154 @@ export function PrintPickupClaimPage() {
     />
   )
 
-  // ── hid 扫码指引（原型 11 rHid；未扫码即可达，不报扫码硬件状态）──
+  // ── 输码页本体：idle / legacy / verifying / hid / 各失败屏（稿 pickup）──
+  // 公共终端失败屏不回显上一位提交的码；重试只从组件内存读取。
+  const display = state === 'error' ? '' : code
+  const cells = pickupCells(display, legacyMode)
+  const entering = screen === 'idle' || screen === 'legacy'
+  // 扫码枪那一态键盘照常留在屏上（稿只在说明卡里展开那一句）。
+  const showKeypad = entering || screen === 'verifying' || screen === 'hid'
+  const goHelp = () => navigate('/help')
+
+  // 码位格：真实 input 透明覆盖在格子上——HID 扫码器与物理键盘仍然直接打进 input，
+  // 格子只做显示。锁定屏不画格子：锁定期内服务端不再核对任何码。
+  const codeBoxes = screen !== 'locked' ? (
+    <div className="pcp-input-wrap">
+      <PickupCodeBoxes
+        cells={cells}
+        cursor={entering || screen === 'hid' ? code.length : -1}
+        error={screen === 'invalid-or-expired' || (screen === 'hid' && state === 'error' && failure?.kind === 'invalid')}
+      />
+      {pickupCodeInput}
+    </div>
+  ) : null
+
+  // 稿 .d3-pickrow：历史 10 位码与扫码枪两个开关放在键盘下面。按键不夺输入框焦点，扫码器随时能接着打。
+  const modeRow = (
+    <div className="pcp-pickrow">
+      <button
+        type="button"
+        className="qxt-btn pcp-mini"
+        aria-pressed={legacyMode}
+        aria-label={legacyMode ? `回到 ${PICKUP_CODE_LENGTH} 位新码键盘` : `输入 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位历史码`}
+        disabled={loading}
+        onPointerDown={(event) => event.preventDefault()}
+        // 只切显示格数与键盘；受理正则同时接受两种码，不改判据也不清空已输内容。
+        onClick={() => setLegacyMode((value) => !value)}
+      >
+        {legacyMode ? `← 回到 ${PICKUP_CODE_LENGTH} 位新码键盘` : `历史 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位码`}
+      </button>
+      <button
+        type="button"
+        className="qxt-btn pcp-mini"
+        aria-pressed={guide === 'hid'}
+        disabled={loading}
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={() => (guide === 'hid' ? setGuide('keypad') : setGuide('hid'))}
+      >
+        用扫码枪扫
+      </button>
+    </div>
+  )
+
+  // 页内键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
+  // 没有物理键盘的用户在扫码失败时原本无法输入到机码。确认键在底栏。
+  const keypad = showKeypad ? (
+    <PickupKeypadCard code={code} loading={loading} legacyMode={legacyMode} onChange={applyCode} />
+  ) : null
+
+  const echoText =
+    loading
+      ? '正在校验，请稍候…'
+      : code.length === 0
+        ? '等待扫码输入…（扫码器扫到会自动填入并校验）'
+        : `已接收 ${code.length} 位`
+
+  // 说明卡只有一块：校验中换成校验提示，扫码枪那一态在卡里展开扫码原句，历史码态换成一行说明。
+  const hint = screen === 'verifying' ? (
+    <PickupHintCard
+      art="phone"
+      status
+      title="正在校验，请稍候"
+      descId="pcp-hint"
+      desc="校验结果出来前键盘暂停使用，出来后自动继续。"
+    />
+  ) : screen === 'hid' ? (
+    <PickupHidGuide
+      line={HID_LINE}
+      echo={
+        <span className="pcp-scan-echo" id="hid-echo-code" aria-hidden="true">
+          <span className="pcp-scan-dot" data-live={loading || code.length > 0 || undefined} />
+          {echoText}
+        </span>
+      }
+      errorMsg={state === 'error' ? errorMsg : ''}
+      actions={
+        <span className="pcp-hint-acts">
+          <button type="button" className="qxt-btn pcp-mini pcp-hid-cta" onClick={() => setGuide('keypad')}>
+            还是手输吧
+          </button>
+          <button type="button" className="qxt-btn pcp-mini pcp-hid-cta" onClick={goHelp}>
+            扫不出来？求助
+          </button>
+        </span>
+      }
+    />
+  ) : legacyMode && showKeypad ? null : showKeypad ? (
+    <PickupHintCard
+      art="phone"
+      title="对着屏幕上的格子输入"
+      descId="pcp-hint"
+      desc="输满后核对订单；有效性以校验结果为准。"
+    />
+  ) : null
+
+  const submitNode = showKeypad ? (
+    <button
+      type="button"
+      className="qx-btn pcp-submit"
+      data-testid="arrival-code-primary"
+      disabled={!isValid || loading}
+      onClick={() => { void handleClaim() }}
+    >
+      {loading ? '正在校验' : '确认校验'}
+      {loading ? null : <QxTouchIcon name="arrowR" size={32} strokeWidth={2.4} />}
+    </button>
+  ) : undefined
+
+  const fine = (
+    <p className="pcp-fine">
+      这一步不收钱 · 输错可以改，不作废
+      {peekSupportContact().miniappPublished ? '。在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付' : ''}
+    </p>
+  )
+
+  const fold = (
+    <details className="pcp-more">
+      <summary>两种码的区别 · 码找不到了</summary>
+      <PickupThreeCodeCard />
+      {guide === 'hid' ? <PickupScanKinds /> : null}
+      {screen !== 'verifying' && screen !== 'legacy' && (
+        <PickupOutsStrip onHid={() => setGuide('hid')} onHelp={goHelp} />
+      )}
+    </details>
+  )
+
+  const failurePanel = state === 'error' && failure && screen !== 'hid' ? (
+    <PickupFailurePanel
+      failure={failure.kind}
+      message={errorMsg}
+      onReset={handleReset}
+      onRetry={handleRetry}
+      onHelp={goHelp}
+      onHome={() => navigate('/')}
+    />
+  ) : null
+
+  const legacyNote = legacyMode && showKeypad ? <PickupLegacyNote /> : null
+
+  // hid 指引（稿 pickup 点「用扫码枪扫」）：未扫码即可达，不报扫码硬件状态；与手输同在一屏。
   if (guide === 'hid') {
-    const echoText =
-      loading
-        ? '正在校验，请稍候…'
-        : code.length === 0
-          ? '等待扫码输入…（扫码器扫到会自动填入并校验）'
-          : `已接收 ${code.length} 位`
     return frame(
       <div
         className="qx-scroll pickup-claim-page pickup-claim-hid"
@@ -408,49 +559,17 @@ export function PrintPickupClaimPage() {
         data-claim-state={state}
         data-testid="arrival-code-state-hid"
       >
-        <PickupHidGuide
-          echo={
-            <div className="pcp-input-wrap">
-              <p className="pcp-scan-echo" id="hid-echo-code" aria-hidden="true">
-                <span className="pcp-scan-dot" data-live={loading || code.length > 0 || undefined} />
-                {echoText}
-              </p>
-              {pickupCodeInput}
-            </div>
-          }
-          errorMsg={state === 'error' ? errorMsg : ''}
-        />
-        <div className="pcp-actions">
-          <button
-            type="button"
-            className="qx-btn pcp-act pcp-hid-cta"
-            data-variant="ghost"
-            data-testid="arrival-code-primary"
-            onClick={() => setGuide('keypad')}
-          >
-            还是手输吧
-          </button>
-          <button
-            type="button"
-            className="qx-btn pcp-act pcp-hid-cta"
-            data-variant="ghost"
-            onClick={() => navigate('/help')}
-          >
-            扫不出来？求助
-          </button>
-        </div>
-        <PickupThreeCodeCard />
+        {codeBoxes}
+        {hint}
+        {keypad}
+        {modeRow}
+        {legacyNote}
+        {fine}
+        {fold}
       </div>,
+      submitNode,
     )
   }
-
-  // ── 手输：idle / legacy / verifying / 各失败屏 ─────────────────
-  // 公共终端失败屏不回显上一位提交的码；重试只从组件内存读取。
-  const display = state === 'error' ? '' : code
-  const cells = pickupCells(display, legacyMode)
-  const entering = screen === 'idle' || screen === 'legacy'
-  const showKeypad = entering || screen === 'verifying'
-  const goHelp = () => navigate('/help')
 
   return frame(
     <div
@@ -461,85 +580,15 @@ export function PrintPickupClaimPage() {
       data-claim-failure={failure?.kind}
       data-testid={`arrival-code-state-${screen}`}
     >
-      {/* 码位格：真实 input 透明覆盖在格子上——HID 扫码器与物理键盘仍然直接打进 input，
-          格子只做显示。锁定屏不画格子：锁定期内服务端不再核对任何码。 */}
-      {screen !== 'locked' && (
-        <div className="pcp-input-wrap">
-          <PickupCodeBoxes
-            cells={cells}
-            cursor={entering ? code.length : -1}
-            error={screen === 'invalid-or-expired'}
-          />
-          {pickupCodeInput}
-        </div>
-      )}
-
-      {screen === 'idle' && (
-        <>
-          {/* 未扫码就要看得见「怎么扫」：扫码模组靠接近感应、不常亮。压成一条紧凑入口，
-              点进去才是 rHid() 的完整指引屏。 */}
-          <button type="button" className="pcp-hid-entry" onClick={() => setGuide('hid')}>
-            <span className="pcp-hid-entry-t">不用手输：把手机上的码，对准机身侧面的扫码区</span>
-            <span className="pcp-hid-entry-d">手机亮度调高，再凑近机身扫码区</span>
-          </button>
-          <ul className="pcp-easy">
-            <li>这一步不收钱 · 输错可以改，不作废</li>
-            <li>输满后核对订单；有效性以校验结果为准</li>
-            {peekSupportContact().miniappPublished ? (
-              <li>在手机小程序下的单，到这里输到机码取件；没付款的在这台机器上付</li>
-            ) : null}
-          </ul>
-        </>
-      )}
-
-      {screen === 'verifying' && (
-        <p className="pcp-strip pcp-strip--checking" role="status">
-          <span className="pcp-dots" aria-hidden="true"><i /><i /><i /></span>
-          正在校验，请稍候
-        </p>
-      )}
-
-      {state === 'error' && failure && (
-        <PickupFailurePanel
-          failure={failure.kind}
-          message={errorMsg}
-          onReset={handleReset}
-          onRetry={handleRetry}
-          onHelp={goHelp}
-          onHome={() => navigate('/')}
-        />
-      )}
-
-      {/* 页内键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
-          没有物理键盘的用户在扫码失败时原本无法输入到机码。确认键按稿收在键盘最后一行。 */}
-      {showKeypad && (
-        <PickupKeypadCard
-          code={code}
-          loading={loading}
-          legacyMode={legacyMode}
-          onChange={applyCode}
-          // 只切显示格数与键盘；受理正则同时接受两种码，不改判据也不清空已输内容。
-          onLegacyMode={setLegacyMode}
-          submit={null}
-        />
-      )}
-
-      <PickupThreeCodeCard />
-
-      {screen !== 'verifying' && screen !== 'legacy' && (
-        <PickupOutsStrip onHid={() => setGuide('hid')} onHelp={goHelp} />
-      )}
+      {codeBoxes}
+      {failurePanel}
+      {hint}
+      {keypad}
+      {showKeypad ? modeRow : null}
+      {legacyNote}
+      {fine}
+      {fold}
     </div>,
-    showKeypad ? (
-      <button
-        type="button"
-        className="qx-btn pcp-submit"
-        data-testid="arrival-code-primary"
-        disabled={!isValid || loading}
-        onClick={() => { void handleClaim() }}
-      >
-        {loading ? '正在校验' : '确认校验'}
-      </button>
-    ) : undefined,
+    submitNode,
   )
 }

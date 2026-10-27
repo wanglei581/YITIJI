@@ -1,4 +1,4 @@
-import { Fragment, useId } from 'react'
+import { Fragment, useId, type ReactNode } from 'react'
 import { QxTouchClock } from './QxTouchClock'
 import { QxTouchIcon } from './QxTouchIcon'
 import { useQxTouchBack } from './useQxTouchBack'
@@ -54,6 +54,7 @@ export function QxTouchBand({
   statusClassName,
   titleRole,
   titleTag = 'h1',
+  sealNode,
 }: {
   kind?: QxTouchBandKind
   eyebrow?: string
@@ -74,6 +75,8 @@ export function QxTouchBand({
   titleRole?: 'status'
   /** 问句标题的标签。不传时仍是 h1。 */
   titleTag?: 'h1' | 'h2'
+  /** 自带的印章位内容（稿 done 的对勾）。不传时仍按 seal 画「青」章。 */
+  sealNode?: ReactNode
 }) {
   const rawId = useId().replace(/:/g, '')
   const goBack = useQxTouchBack(onBack)
@@ -117,7 +120,7 @@ export function QxTouchBand({
           {titleTag === 'h2' ? <h2 role={titleRole}>{title}</h2> : <h1 role={titleRole}>{title}</h1>}
           {sub ? <p>{sub}</p> : null}
         </div>
-        {seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}
+        {sealNode ? <div className="qxt-seal-node" aria-hidden="true">{sealNode}</div> : seal === null ? null : <div className={sealClass} aria-hidden="true">青</div>}
       </div>
       {showRail && rail ? (
         <div className="qxt-rail" role="list" aria-label="办理步骤">

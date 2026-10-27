@@ -19,7 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { CircleHelpIcon, FilePlus2Icon, ListOrderedIcon, QrCodeIcon, RefreshCwIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { PrintTouchFrame } from './PrintTouchFrame'
+import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { API_MODE } from '../../services/api/client'
 import {
   createCodePayAttempt,
@@ -558,6 +558,7 @@ export function PrintCashierPage() {
   return (
     <div data-w2-page="print-cashier" className="cashier-qx-route">
     <PrintTouchFrame
+      nav
       page="print-cashier"
       legacyBody={false}
       kind="compact"
@@ -568,13 +569,12 @@ export function PrintCashierPage() {
       /* 出过码之后返回位是「改参数需重新下单」，没出过码才回确认页。 */
       back={{ label: paramsBack.label, onBack: paramsBack.run }}
       ask={freeOrder
-        ? { label: '问小青：核对这单', draft: '请帮我核对这一单的订单和打印状态。' }
-        : { label: '问小青：这笔账看不懂', draft: '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。' }}
+        ? printAsk('问小青：核对这单', '请帮我核对这一单的订单和打印状态。')
+        : printAsk('问小青：这笔账看不懂', '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。')}
       primary={{
         label: primaryAction.label,
         disabled: primaryAction.disabled,
         onClick: primaryAction.run,
-        noArrow: true,
       }}
       status={status}
       terminalLabel={state.orderNo ? `订单 ${state.orderNo}` : '就业服务大厅'}

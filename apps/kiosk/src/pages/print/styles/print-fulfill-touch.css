@@ -1,145 +1,415 @@
-/* 出纸进度、打印完成、结果未确认、到机码。只挂这四页，不改 .qxt-* 默认。 */
+/* 出纸进度 / 打印完成 / 结果未确认 / 到机码 / 核对订单（稿 printing、done、unconfirmed、pickup、pickup-ok）。
+   各页自己的 data-qx-page 下生效，不改 .qxt-* 默认。 */
 
-[data-qx-page='print-progress'] .pfp-job-name,
-[data-qx-page='print-progress'] .pfp-job-sub,
-[data-qx-page='print-progress'] .pfp-job-id,
-[data-qx-page='print-progress'] .pfp-step b,
-[data-qx-page='print-progress'] .pfp-step-d,
-[data-qx-page='print-progress'] .pff-xq-ask,
-[data-qx-page='print-progress'] .pff-xq-doing,
-[data-qx-page='print-progress'] .pff-out-sub,
-[data-qx-page='print-done'] .pff-done-title,
-[data-qx-page='print-done'] .pff-out-sub,
-[data-qx-page='print-done'] .pff-step-txt,
-[data-qx-page='print-done'] .pff-wipe-s,
-[data-qx-page='print-done'] .pff-help .txt,
-[data-qx-page='print-done'] .pft-idle,
-[data-qx-page='print-unconfirmed'] .pft-unc,
-[data-qx-page='print-unconfirmed'] .pft-unc-steps,
-[data-qx-page='print-unconfirmed'] .pft-unc-sum,
-[data-qx-page='print-unconfirmed'] .pft-unc-fine,
-[data-qx-page='print-pickup'] .pcp-keypad-note,
-[data-qx-page='print-pickup'] .pcp-easy,
-[data-qx-page='print-pickup'] .pcp-hid-s,
-[data-qx-page='print-pickup-ok'] .pcp-win-t,
-[data-qx-page='print-pickup-ok'] .pcp-win-s,
-[data-qx-page='print-pickup-ok'] .pcp-win-fn {
-  font-size: var(--qxt-fs-body, 24px);
-}
-
-[data-qx-page='print-done'] .pft-done {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-[data-qx-page='print-done'] .pft-take {
-  display: flex;
-  align-items: center;
-  min-height: 160px;
-  padding: 24px;
-  border-radius: 28px;
-  background: var(--qx-paper);
-  border: 1px solid var(--qx-line);
-}
-
-[data-qx-page='print-done'] .pft-take b {
-  display: block;
-  font-size: 32px;
-}
-
-[data-qx-page='print-done'] .pft-take span,
-[data-qx-page='print-done'] .pft-tray,
-[data-qx-page='print-done'] .pft-again-note {
-  font-size: var(--qxt-fs-body, 24px);
-}
-
-[data-qx-page='print-done'] .pft-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-[data-qx-page='print-done'] .pft-tiles .qxt-tile {
-  min-height: 120px;
-  text-align: left;
-}
-
-[data-qx-page='print-done'] .pft-again {
-  min-height: 80px;
-  align-self: flex-start;
-}
-
-[data-qx-page='print-done'] .pft-count {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 148px;
-  min-height: 96px;
-  flex: none;
-  gap: 6px;
-}
-
-[data-qx-page='print-done'] .pft-count b {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 6px solid var(--qx-line);
-  font-size: 32px;
-  line-height: 1;
-}
-
-[data-qx-page='print-done'] .pft-count span {
+[data-qx-page='print-done'] .pff-sec-h .hint {
   font-size: 20px;
-  line-height: 1.2;
-  text-align: center;
 }
 
-[data-qx-page='print-progress'] .pfp-lead {
-  margin: 0 0 16px;
-  font-size: var(--qxt-fs-body, 24px);
+
+/* 页内的「问小青」入口（共享老件）：触屏点击区不小于 64 */
+[data-qx-page='print-progress'] .qx-ai-help,
+[data-qx-page='print-done'] .qx-ai-help,
+[data-qx-page='print-unconfirmed'] .qx-ai-help {
+  min-height: 64px;
+}
+
+
+/* 完成页与到机码页里老部件的小字统一抬到 20px（正文不低于 20px）。
+   放在文件最前：后面各页自己写明字号的规则同权重、写在后面，照样压过这一条。 */
+[data-qx-page='print-done'] .qxt-body :where(p, li, span, small, em, b, div, dt, dd, summary) {
+  font-size: max(20px, 1em);
+}
+
+[data-qx-page='print-pickup'] .qxt-body :where(p, li, span, small, em, b, dt, dd, summary) {
+  font-size: max(20px, 1em);
+}
+
+[data-qx-page='print-pickup-ok'] .qxt-body :where(p, li, span, small, em, b, dt, dd, summary) {
+  font-size: max(20px, 1em);
+}
+
+
+/* ── 出纸进度（稿 printing） ── */
+[data-qx-page='print-progress'] .pfp-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  font-size: 22px;
   line-height: 1.45;
 }
 
-[data-qx-page='print-progress'] .pfp-lead-doing {
-  display: block;
-  margin-top: 8px;
+/* 稿没有页内引导句：意图带标题和副题已经说了，这里只留给读屏 */
+[data-qx-page='print-progress'] .pfp-lead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* 进度区把「标题 → 四步 → 打印机 → 文件卡」排成稿的顺序 */
+[data-qx-page='print-progress'] .pfp-page > .pff-sec[aria-label='打印进度'],
+[data-qx-page='print-progress'] .pfp-page > .pff-sec[aria-label='打印进度'] > .pfp-card {
+  display: contents;
+}
+
+[data-qx-page='print-progress'] .pff-sec-h {
+  order: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+[data-qx-page='print-progress'] .pff-sec-h .t {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-progress'] .pff-sec-h .hint {
+  font-size: 21px;
+  color: var(--qxt-ink-3);
 }
 
 [data-qx-page='print-progress'] .pfp-steps {
-  display: flex;
-  flex-direction: column;
+  order: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
 [data-qx-page='print-progress'] .pfp-step {
-  min-height: 88px;
-  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 230px;
+  padding: 18px 16px;
+  border-radius: 24px;
+  background: var(--qxt-well);
+  text-align: left;
 }
 
-[data-qx-page='print-progress'] .pfp-step-st,
-[data-qx-page='print-progress'] .pfp-lead {
+[data-qx-page='print-progress'] .pfp-step.tl-done {
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='print-progress'] .pfp-step.tl-active {
+  background: var(--qxt-card);
+  border: 2px solid var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-progress'] .pfp-step-n {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--qxt-band-b);
+  color: var(--qxt-cream);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-progress'] .pfp-step.tl-done .pfp-step-n,
+[data-qx-page='print-progress'] .pfp-step.tl-active .pfp-step-n {
+  background: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-progress'] .pfp-step[data-failed='true'] .pfp-step-n {
+  background: var(--qx-cinnabar);
+}
+
+[data-qx-page='print-progress'] .pfp-step b {
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+[data-qx-page='print-progress'] .pfp-step-st {
+  font-style: normal;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='print-progress'] .pfp-step.tl-done .pfp-step-st,
+[data-qx-page='print-progress'] .pfp-step.tl-active .pfp-step-st {
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-progress'] .pfp-step-d {
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='print-progress'] .pfp-page > .pff-out {
+  order: 2;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+[data-qx-page='print-progress'] .pff-out-stage.pfp-printer {
+  display: block;
+  position: static;
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+[data-qx-page='print-progress'] .pfp-printer .pa,
+[data-qx-page='print-progress'] .pfp-printer .pa-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-qx-page='print-progress'] .pff-out-main {
+  text-align: center;
+}
+
+[data-qx-page='print-progress'] .pff-out-status {
+  font-size: 28px;
+}
+
+[data-qx-page='print-progress'] .pfp-out-note,
+[data-qx-page='print-progress'] .pff-out-sub {
+  margin: 4px 0 0;
+  font-size: 22px;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-progress'] .pfp-job {
+  order: 3;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 24px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='print-progress'] .pfp-job-name {
+  font-size: 28px;
+}
+
+[data-qx-page='print-progress'] .pfp-job-sub,
+[data-qx-page='print-progress'] .pfp-job-id {
   font-size: 20px;
 }
 
-[data-qx-page='print-done'] .pft-actions {
+[data-qx-page='print-progress'] .pfp-page > .pft-actions {
+  order: 4;
+}
+
+[data-qx-page='print-progress'] .pfp-page > .pff-sec:not([aria-label='打印进度']) {
+  order: 5;
+}
+
+[data-qx-page='print-progress'] .pfp-page :where(p, li, span, small, em, b) {
+  font-size: max(20px, 1em);
+}
+
+[data-qx-page='print-progress'] .pft-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
 }
 
-[data-qx-page='print-done'] .pft-actions .qx-btn,
-[data-qx-page='print-done'] .qxt-dock .qxt-btn,
-[data-qx-page='print-done'] .pff-help-btn,
+[data-qx-page='print-progress'] .pft-actions .qxt-btn {
+  height: 80px;
+}
+
 [data-qx-page='print-progress'] .qx-btn,
-[data-qx-page='print-progress'] .pff-help-btn,
-[data-qx-page='print-unconfirmed'] .qx-btn,
-[data-qx-page='print-unconfirmed'] .qxt-dock .qxt-btn,
-[data-qx-page='print-pickup'] .qxt-dock .pcp-submit {
+[data-qx-page='print-progress'] .pff-help-btn {
+  min-width: 64px;
+  min-height: 72px;
+  padding: 0 24px;
+  font-size: 24px;
+}
+
+/* ── 打印完成（稿 done） ── */
+[data-qx-page^='print'] .qxt-seal-node {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='print-done'] .pft-check-ring,
+[data-qx-page='print-done'] .pft-check-tick {
+  stroke: var(--qxt-mark-a);
+}
+
+[data-qx-page='print-done'] .pft-done {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  font-size: 22px;
+}
+
+[data-qx-page='print-done'] .pft-take {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  min-height: 300px;
+  padding: 24px;
+  border-radius: 30px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+[data-qx-page='print-done'] .pft-take-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+[data-qx-page='print-done'] .pft-take-tx b {
+  font: 700 44px/1.2 var(--qx-serif);
+}
+
+[data-qx-page='print-done'] .pft-take-tx span {
+  font-size: 26px;
+  line-height: 1.6;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-done'] .pft-tray {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-done'] .pft-tray span {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-done'] .pft-dest,
+[data-qx-page='print-done'] .pft-note {
+  margin: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
+[data-qx-page='print-done'] .pft-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+[data-qx-page='print-done'] .pft-tiles .qxt-tile {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 168px;
+  padding: 22px;
+  text-align: left;
+}
+
+[data-qx-page='print-done'] .pft-tiles .qxt-chev {
+  display: none;
+}
+
+[data-qx-page='print-done'] .pft-again {
+  height: 80px;
+  align-self: stretch;
+  width: 100%;
+}
+
+[data-qx-page='print-done'] .pft-again-note {
+  margin: 0;
+  font-size: 22px;
+  text-align: center;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-done'] .pff-help {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+[data-qx-page='print-done'] .pff-help .txt {
+  display: block;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+  text-align: center;
+}
+
+[data-qx-page='print-done'] .pft-record {
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-done'] .pft-record > summary {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-done'] .pft-count {
+  position: relative;
+  flex: none;
+  width: 96px;
+  height: 96px;
+}
+
+[data-qx-page='print-done'] .pft-count .pa {
+  transform: rotate(-90deg);
+}
+
+[data-qx-page='print-done'] .pft-count b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 32px var(--qx-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-qx-page='print-done'] .qxt-dock .qxt-btn,
+[data-qx-page='print-done'] .pff-help-btn {
   min-width: 64px;
   min-height: 88px;
   height: 88px;
@@ -147,223 +417,572 @@
   font-size: 28px;
 }
 
+/* ── 结果未确认（稿 unconfirmed / st-unconfirmed） ── */
+[data-qx-page='print-unconfirmed'] .qxt-body > .pft-unc {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-steps {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum {
+  margin: 0;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum .qxt-sum-r {
+  min-height: 76px;
+  padding: 12px 22px;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-sum dt,
+[data-qx-page='print-unconfirmed'] .pft-unc-sum dd {
+  margin: 0;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-exits .qx-btn {
+  width: 100%;
+  height: 80px;
+  border-radius: 26px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-unconfirmed'] .pft-unc-fine {
+  margin: 0;
+}
+
+[data-qx-page='print-unconfirmed'] .qxt-dock .qxt-btn {
+  min-width: 64px;
+  min-height: 88px;
+  height: 88px;
+  padding: 0 28px;
+  font-size: 28px;
+}
+
+/* ── 到机码（稿 pickup） ── */
+[data-qx-page='print-pickup'] .pickup-claim-page,
+[data-qx-page='print-pickup-ok'] .pickup-claim-page {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  overflow: visible;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  font-size: 22px;
+}
+
+/* 稿 .codebox：8 格 96×120，历史码 10 格 76×108。真实 input 透明覆盖其上，焦点由当前格的光环表达。 */
+[data-qx-page='print-pickup'] .pcp-codebox {
+  gap: 14px;
+  min-height: 120px;
+}
+
+[data-qx-page='print-pickup'] .pcp-cb {
+  width: 96px;
+  max-width: 96px;
+  height: 120px;
+  border-radius: 20px;
+  border: 2px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-band-b);
+  font: 700 56px var(--qx-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-qx-page='print-pickup'] .pcp-codebox--legacy {
+  gap: 8px;
+}
+
+[data-qx-page='print-pickup'] .pcp-codebox--legacy .pcp-cb {
+  width: 76px;
+  max-width: 76px;
+  height: 108px;
+  font-size: 36px;
+}
+
+[data-qx-page='print-pickup'] .pcp-cb.is-cur {
+  border-color: var(--qxt-teal-ink);
+  background: var(--qxt-card);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--qxt-teal-ink) 16%, transparent);
+}
+
+/* 稿 .codehint：左边示意图（手机里的打印订单页，或机身扫码区），右边一句主话加说明。 */
+[data-qx-page='print-pickup'] .pcp-hint {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding: 22px 30px;
+  border-radius: 28px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-art {
+  flex: none;
+  width: 200px;
+  height: 300px;
+}
+
+[data-qx-page='print-pickup'] .pcp-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 12px;
+  border-radius: 30px;
+  background: var(--qxt-band-b);
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-top {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--qxt-cream);
+  color: var(--qxt-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--qxt-cream);
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-card small {
+  color: var(--qxt-ink-3);
+  font-size: 20px;
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-card i {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--qxt-edge);
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-line {
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--qxt-cream) 25%, transparent);
+}
+
+[data-qx-page='print-pickup'] .pcp-phone-line--s {
+  width: 70%;
+}
+
+[data-qx-page='print-pickup'] .pcp-scanart {
+  --pcp-inset: 4px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+[data-qx-page='print-pickup'] .pcp-scanart-phone {
+  display: grid;
+  place-items: center;
+  width: 122px;
+  height: 212px;
+  border-radius: 24px;
+  background: var(--qxt-band-b);
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-t {
+  font: 700 32px/1.3 var(--qx-serif);
+  color: var(--qxt-ink);
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-d {
+  font-size: 24px;
+  line-height: 1.6;
+  color: var(--qxt-ink-2);
+}
+
+[data-qx-page='print-pickup'] .pcp-scan-echo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  color: var(--qxt-ink-3);
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+[data-qx-page='print-pickup'] .pcp-hint .pcp-error {
+  display: block;
+  font-size: 22px;
+  line-height: 1.4;
+}
+
+/* 稿 .keypad：3 列 108 高，左下清空、右下删一位。 */
+[data-qx-page='print-pickup'] .pcp-keypad-card {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .knp {
+  gap: 16px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 760px;
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .knp-key {
+  min-height: 108px;
+  border-radius: 26px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font: 700 46px var(--qx-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .knp-key.knp-fn {
+  font-size: 26px;
+  background: var(--qxt-well);
+  border-color: var(--qxt-edge);
+  color: var(--qxt-ink);
+}
+
+/* 输入框是透明覆盖层：当前格的光环已经表达焦点，自己不再画环（青序壳里没有 .qx-stage，老规则够不着）。 */
+[data-qx-page='print-pickup'] .pcp-input-wrap > .pcp-input:is(:focus, :focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .knp-key:active:not(:disabled) {
+  background: var(--qxt-teal-wash);
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .pcp-alpha {
+  gap: 12px;
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .pcp-alpha-key {
+  min-height: 100px;
+  border-radius: 22px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font: 700 32px var(--qx-sans);
+}
+
+[data-qx-page='print-pickup'] .pcp-keypad-card .pcp-alpha-key.pcp-alpha-del {
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  font-size: 22px;
+}
+
+/* 稿 .d3-pickrow：历史 10 位码与扫码枪两个开关 */
+[data-qx-page='print-pickup'] .pcp-pickrow {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+[data-qx-page='print-pickup'] .qxt-btn.pcp-mini {
+  min-width: 200px;
+  min-height: 72px;
+  height: 72px;
+  padding: 0 18px;
+  border-radius: 20px;
+  border: 1.5px solid var(--qxt-edge);
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+[data-qx-page='print-pickup'] .qxt-btn.pcp-mini[aria-pressed='true'] {
+  border-color: var(--qxt-teal-ink);
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-pickup'] .pcp-hint-acts .qxt-btn.pcp-mini {
+  min-width: 64px;
+  height: 64px;
+  min-height: 64px;
+  font-size: 22px;
+}
+
+[data-qx-page='print-pickup'] .pcp-note2,
+[data-qx-page='print-pickup'] .pcp-fine {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--qxt-ink-3);
+  text-align: center;
+}
+
+[data-qx-page='print-pickup'] .pcp-more {
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-pickup-ok'] .pcp-more {
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  text-align: left;
+}
+
+[data-qx-page='print-pickup'] .pcp-more > summary {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-pickup'] .qxt-dock .qxt-btn {
+  min-width: 64px;
+  min-height: 88px;
+  height: 88px;
+  padding: 0 28px;
+  font-size: 28px;
+}
+
+/* 底栏主按钮（稿 .btn.pri）：确认键沿用到机码页自己的类名，外观与其余打印页的主按钮一致。 */
+[data-qx-page='print-pickup'] .qxt-dock .pcp-submit {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 300px;
+  height: 88px;
+  min-height: 88px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font: 700 28px/1 var(--qx-sans);
+  white-space: nowrap;
+}
+
+[data-qx-page='print-pickup'] .qxt-dock .pcp-submit:disabled {
+  opacity: 0.42;
+}
+
 [data-qx-page='print-pickup'] .pcp-submit,
 [data-qx-page='print-pickup'] .pcp-act,
-[data-qx-page='print-pickup'] .pcp-kb-back,
 [data-qx-page='print-pickup-ok'] .pcp-act {
   min-width: 64px;
   min-height: 64px;
 }
 
-[data-qx-page='print-unconfirmed'] .qxt-body > .pft-unc {
-  flex: 1 1 auto;
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+[data-qx-page='print-pickup'] :where(.pcp-ab-col span, .pcp-ab-col b, .pcp-ab-note, .pch-title, .pch-outs li, .pcp-block-body, .pcp-block-t, .pcp-strip) {
+  font-size: 22px;
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-steps {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: pft-unc;
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-steps li {
-  flex: 1 1 0;
-  display: flex;
-  align-items: stretch;
+/* ── 核对订单（稿 pickup-ok） ── */
+[data-qx-page='print-pickup-ok'] .pickup-claim-page {
+  justify-content: space-evenly;
   gap: 18px;
-  min-height: 96px;
-  margin: 0;
-  padding: 18px 22px;
-  border-radius: 28px;
-  background: var(--qx-surface);
-  counter-increment: pft-unc;
+  padding: 16px 0;
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-steps li::before {
-  content: counter(pft-unc);
-  flex: none;
-  align-self: stretch;
+/* 稿 .confgrid：左边纸张示意，右边订单摘要三行 */
+[data-qx-page='print-pickup-ok'] .pok-grid {
   display: grid;
-  place-items: center;
-  width: 72px;
-  min-height: 72px;
-  border-radius: 22px;
-  background: var(--qx-ink);
-  color: var(--qx-paper);
-  font-size: 28px;
-  font-weight: 800;
+  grid-template-columns: 340px 1fr;
+  gap: 24px;
+  align-items: stretch;
+  flex: none;
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-copy {
+[data-qx-page='print-pickup-ok'] .pok-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  border-radius: 30px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-sum {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  border-radius: 30px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+  overflow: hidden;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-row {
+  flex: 1;
+  display: grid;
+  align-content: center;
   gap: 6px;
+  min-height: 150px;
+  padding: 20px 28px;
+  border-top: 1px solid var(--qxt-line);
+}
+
+[data-qx-page='print-pickup-ok'] .pok-row:first-child {
+  border-top: 0;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-row span {
+  color: var(--qxt-ink-3);
+  font-size: 22px;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-row b {
+  font-size: 30px;
+  font-weight: 700;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-row b.pok-amt {
+  font-size: 44px;
+  color: var(--qxt-band-b);
+}
+
+/* 稿 .d3-oknote */
+[data-qx-page='print-pickup-ok'] .pok-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 24px 28px;
+  border-radius: 26px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink-2);
+  font-size: 24px;
+  line-height: 1.55;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-note > span {
   min-width: 0;
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-sum {
+[data-qx-page='print-pickup-ok'] .pok-note b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 26px;
+  color: var(--qxt-ink);
+}
+
+/* 稿 .process */
+[data-qx-page='print-pickup-ok'] .pok-steps {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-qx-page='print-pickup-ok'] .pok-step {
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  margin: 0;
-  padding: 8px 22px;
-  border-radius: 24px;
-  background: var(--qx-surface);
-  border: 1px solid var(--qx-line);
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 22px 22px 24px;
+  border-radius: 26px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-sum div {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 16px;
-  align-items: center;
-  min-height: 64px;
-  padding: 10px 0;
+[data-qx-page='print-pickup-ok'] .pok-n {
+  position: absolute;
+  right: 18px;
+  top: 16px;
+  color: var(--qxt-ink-3);
+  font: 700 22px var(--qx-sans);
 }
 
-[data-qx-page='print-unconfirmed'] .pft-unc-sum div + div {
-  border-top: 1px solid var(--qx-line);
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-sum dt {
-  margin: 0;
-  color: var(--qx-ink-3);
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-sum dd {
-  margin: 0;
-  font-weight: 700;
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-exits {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-exits .qx-btn,
-[data-qx-page='print-unconfirmed'] .pft-unc-row {
-  width: 100%;
-}
-
-[data-qx-page='print-unconfirmed'] .pft-unc-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 0;
-}
-
-[data-qx-page='print-pickup-ok'] .qx-scroll.pickup-claim-success {
-  flex: 1 1 auto;
-  min-height: 100%;
-  justify-content: flex-start;
-  align-items: stretch;
-  gap: 16px;
-}
-
-[data-qx-page='print-pickup-ok'] .pcp-win {
-  flex: 1 1 auto;
-}
-
-[data-qx-page='print-pickup-ok'] .pcp-win-steps {
-  flex: 1 1 auto;
-  align-items: stretch;
-}
-
-[data-qx-page='print-pickup-ok'] .pcp-win-steps li {
-  align-items: stretch;
-  min-height: 88px;
-}
-
-[data-qx-page='print-pickup-ok'] .pcp-win-no {
-  align-self: stretch;
-  width: 48px;
-  height: auto;
-  min-height: 48px;
-  border-radius: 16px;
-  font-size: 20px;
-}
-
-[data-qx-page='print-pickup-ok'] .pcp-win-fs,
-[data-qx-page='print-pickup-ok'] .pcp-ab-col b,
-[data-qx-page='print-pickup-ok'] .pcp-ab-col span {
-  font-size: 20px;
-}
-
-[data-qx-page='print-done'] .pft-idle {
-  margin: 0;
-  max-width: 280px;
-}
-
-[data-qx-page='print-progress'] .qxt-body:has(.pfp-miss),
-[data-qx-page='print-done'] .qxt-body:has(.pfp-miss) {
-  display: flex;
-  flex-direction: column;
-}
-
-[data-qx-page='print-progress'] .pfp-miss,
-[data-qx-page='print-done'] .pfp-miss {
-  flex: 1 1 auto;
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-[data-qx-page='print-progress'] .pfp-miss-lead,
-[data-qx-page='print-done'] .pfp-miss-lead,
-[data-qx-page='print-progress'] .pfp-miss-note,
-[data-qx-page='print-done'] .pfp-miss-note,
-[data-qx-page='print-progress'] .pfp-miss-kicker,
-[data-qx-page='print-done'] .pfp-miss-kicker {
-  margin: 0;
-  font-size: 20px;
-}
-
-[data-qx-page='print-progress'] .pfp-miss-step,
-[data-qx-page='print-done'] .pfp-miss-step,
-[data-qx-page='print-progress'] .pfp-miss-go,
-[data-qx-page='print-done'] .pfp-miss-go {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 88px;
-  padding: 12px 20px;
-  border-radius: 20px;
-  background: var(--qx-surface);
-  color: inherit;
-  text-align: left;
-}
-
-[data-qx-page='print-progress'] .pfp-miss-step b,
-[data-qx-page='print-done'] .pfp-miss-step b {
+[data-qx-page='print-pickup-ok'] .pok-i {
   display: grid;
   place-items: center;
   width: 64px;
   height: 64px;
-  border-radius: 18px;
-  background: var(--qx-ink);
-  color: var(--qx-paper);
-  font-size: 24px;
+  border-radius: 19px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
 }
 
-[data-qx-page='print-progress'] .pfp-miss-go,
-[data-qx-page='print-done'] .pfp-miss-go {
-  border: 0;
+[data-qx-page='print-pickup-ok'] .pok-step b {
+  font-size: 26px;
+}
+
+/* 箭头压在两张卡之间的缝上，不占卡片宽度 */
+[data-qx-page='print-pickup-ok'] .pok-arrow {
+  position: absolute;
+  right: -25px;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  transform: translateY(-50%);
+  color: var(--qxt-teal-ink);
+}
+
+[data-qx-page='print-pickup-ok'] .pok-fine {
+  margin: 0;
+  color: var(--qxt-ink-3);
   font-size: 20px;
+  line-height: 1.5;
+  text-align: center;
 }
 
-[data-qx-page='print-progress'] .pfp-miss-go b,
-[data-qx-page='print-done'] .pfp-miss-go b {
-  font-size: 24px;
+[data-qx-page='print-pickup-ok'] .qxt-dock .pcs-primary {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 300px;
+  height: 88px;
+  min-height: 88px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: var(--qxt-r-btn);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font: 700 28px/1 var(--qx-sans);
+  white-space: nowrap;
 }
