@@ -236,13 +236,14 @@ test.describe('真人走查（模拟数据）', () => {
     await page.waitForTimeout(2500)
     await step(page, s, 'home')
 
-    const entry = page.getByRole('button', { name: /岗位信息/ }).first()
+    // 触屏版首页的岗位入口是「社会招聘」磁贴（托管打开时才有），点它进服务目录。
+    const entry = page.getByRole('button', { name: /^社会招聘/ }).first()
     await expect(entry).toBeVisible({ timeout: 10000 })
     await entry.click()
     await page.waitForTimeout(2500)
     await step(page, s, 'jobs-list')
 
-    // 「岗位信息」进的是服务目录页 /jobs-service（含校招在内的分类卡），列表还要再点一层。
+    // 「社会招聘」进的是服务目录页 /jobs-service（含校招在内的分类卡），列表还要再点一层。
     // 这一层是走查发现的：直达 /jobs 会跳过目录，真人不会那样走。
     const fullTime = page.getByRole('button', { name: /全职岗位/ }).first()
     if (await fullTime.count()) {
