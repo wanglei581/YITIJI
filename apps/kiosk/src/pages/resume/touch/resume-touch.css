@@ -555,8 +555,13 @@
     flex-direction: column;
     align-items: stretch;
     flex-wrap: nowrap;
-    padding: 10px 12px;
-    gap: 8px;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  /* 底栏的说明句在手机上缩小：三个按钮加说明加求助行叠起来，滚动区会被压到只剩十几像素。 */
+  .qxt-screen:has(.rtp) footer.qxt-dock.rtp-cta > :not(button):not(.qx-ai-declaration-slot):not(.sa-guarded) {
+    font-size: 14px;
+    line-height: 1.35;
   }
   .qxt-screen:has(.rtp) footer.qxt-dock.rtp-cta > :not(button):not(.qx-ai-declaration-slot),
   .qxt-screen:has(.rtp) .qxt-dock > *,
@@ -567,8 +572,9 @@
     max-width: 100%;
     min-width: 0;
   }
+  /* 手机按钮不再 88 高：叠三颗就是 280px，压掉半个屏。按 64（可点下限）算。 */
   .qxt-screen:has(.rtp) .qxt-dock .qx-btn {
-    min-height: var(--qxt-btn-h);
+    min-height: var(--qxt-tap);
     height: auto;
     white-space: normal;
   }
