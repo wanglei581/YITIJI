@@ -1,0 +1,18 @@
+.qxt-screen .qxt-body:has(.p10-gate) {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+.qxt-screen .p10-gate {
+  flex: 1;
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  text-align: center;
+  font-size: 24px;
+  line-height: 1.5;
+  background: var(--qx-surface);
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 30px;
+}

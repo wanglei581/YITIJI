@@ -216,7 +216,9 @@ for (const marker of [
 ]) {
   assert.match(benefitActivityDetail, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `benefit activity detail keeps real branch ${marker}`)
 }
-assertSharedPageShell(toolbox, 'ToolboxZonePage')
+assert.match(toolbox, /<QxTouchScreen\b/, 'ToolboxZonePage uses the touch screen')
+assert.match(toolbox, /<QxTouchBand\b/, 'ToolboxZonePage uses the touch band')
+assert.doesNotMatch(toolbox, /<KioskPageFrame\b|<KioskPageHeader\b/, 'ToolboxZonePage has left the shared Kiosk page frame')
 assert.match(
   toolbox,
   /<section\b(?=[^>]*\bdata-kiosk-screen="toolbox")(?=[^>]*\bclassName="tb-content")[^>]*>/,
@@ -313,7 +315,6 @@ const concretePages = [
   'src/pages/help/HelpCenterPage.tsx',
   'src/pages/activities/BenefitActivitiesPage.tsx',
   'src/pages/activities/BenefitActivityDetailPage.tsx',
-  'src/pages/toolbox/ToolboxZonePage.tsx',
 ]
 for (const path of concretePages) {
   const source = read(path)

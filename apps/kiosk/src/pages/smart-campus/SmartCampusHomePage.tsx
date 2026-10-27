@@ -31,7 +31,11 @@ import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuar
 import { isLaunchableKioskAppItem } from '../../services/api/kioskCapabilityValidation'
 import { itemBadge, launchKioskAppItem } from '../home/components/kioskAppLaunch'
 import { ExternalLaunchModal, QrLaunchModal } from '../home/components/ToolboxLaunchModals'
-import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { FusionNotice } from '../jobs/components/W4Presentation'
 
 interface SmartCampusCard {
   key: string
@@ -167,13 +171,32 @@ export function SmartCampusHomePage() {
         : `可查看指引 ${cards.length} 项`
 
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title="智慧校园"
-      subtitle="校园场景服务专区 · 按本机配置开放"
-      backLabel="返回首页"
-      onBack={() => navigate('/')}
-      badge={statusBadge ? <FusionBadge>{statusBadge}</FusionBadge> : undefined}
+    <QxTouchScreen
+      testId="smart-campus-touch"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          eyebrow="智慧校园"
+          title="智慧校园"
+          sub="校园场景服务专区 · 按本机配置开放"
+          onBack={() => navigate('/')}
+          status={statusBadge ? { text: statusBadge, tone: 'unknown' } : false}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/')}
+          backLabel="返回首页"
+          ask={{ label: '问小青', draft: '这台机器上的校园指引能看什么？请只做说明。' }}
+        />
+      )}
+      nav={(
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      )}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
@@ -251,6 +274,6 @@ export function SmartCampusHomePage() {
       {/* 扩展应用启动弹窗：placement=smart_campus，二维码/外链离场确认与匿名上报复用 toolbox 同款。 */}
       <QrLaunchModal item={qrItem} placement="smart_campus" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="smart_campus" onClose={() => setExternalItem(null)} />
-    </KioskPageFrame>
+    </QxTouchScreen>
   )
 }

@@ -1,6 +1,9 @@
-import { Button, Card } from '@ai-job-print/ui'
 import { createContext, useContext, type ReactNode } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
+import { QxTouchBand } from '../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../components/qingxu/touch/QxTouchDock'
+import { QxTouchScreen } from '../components/qingxu/touch/QxTouchScreen'
+import './capability-gate-touch.css'
 import {
   OFF_SMART_CAMPUS_CAPABILITY,
   type SmartCampusCapabilityState,
@@ -42,24 +45,35 @@ function capabilityReady(state: {
 
 function CapabilityUnavailable({ loading, label }: { loading: boolean; label: string }) {
   const navigate = useNavigate()
+  const text = loading ? `${label}配置检查中` : `本机暂未开启${label}`
   return (
-    <div
-      className="grid min-h-screen place-items-center p-10"
-      data-kiosk-screen="capability-gate"
-      data-kiosk-capability-gate={label.startsWith('智慧校园') ? 'smart-campus' : 'toolbox'}
-      data-capability-state={loading ? 'loading' : 'unavailable'}
+    <QxTouchScreen
+      testId="capability-gate-touch"
+      stateId={loading ? 'loading' : 'off'}
+      band={(
+        <QxTouchBand
+          eyebrow="本机能力"
+          title={text}
+          back={false}
+          status={{ text: loading ? '正在确认' : '未开启', tone: 'unknown' }}
+        />
+      )}
+      dock={loading ? undefined : (
+        <QxTouchDock
+          back={false}
+          primary={{ label: '返回首页', onClick: () => navigate('/'), noArrow: true }}
+        />
+      )}
     >
-      <Card className="kproto-card flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <p className="text-lg text-neutral-500" role="status" aria-live="polite">
-          {loading ? `${label}配置检查中` : `本机暂未开启${label}`}
-        </p>
-        {!loading ? (
-          <Button size="lg" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-        ) : null}
-      </Card>
-    </div>
+      <div
+        className="p10-gate"
+        data-kiosk-screen="capability-gate"
+        data-kiosk-capability-gate={label.startsWith('智慧校园') ? 'smart-campus' : 'toolbox'}
+        data-capability-state={loading ? 'loading' : 'unavailable'}
+      >
+        <p role="status" aria-live="polite">{text}</p>
+      </div>
+    </QxTouchScreen>
   )
 }
 

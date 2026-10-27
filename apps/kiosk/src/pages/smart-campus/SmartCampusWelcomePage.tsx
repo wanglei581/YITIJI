@@ -25,7 +25,10 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
-import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 
 // 通用报到流程参考——**不针对任何具体学校**，仅描述高校迎新的普遍环节。
 // 各校实际安排以学校官方通知为准，页面已就此明确标注。
@@ -61,13 +64,32 @@ export function SmartCampusWelcomePage() {
   const navigate = useNavigate()
 
   return (
-    <KioskPageFrame
-      tone="wheat"
-      title="迎新指引"
-      subtitle="通用报到流程参考与入学准备"
-      backLabel="返回智慧校园"
-      onBack={() => navigate('/smart-campus')}
-      badge={<FusionBadge>通用参考</FusionBadge>}
+    <QxTouchScreen
+      testId="campus-welcome-touch"
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          eyebrow="智慧校园"
+          title="迎新指引"
+          sub="通用报到流程参考与入学准备"
+          onBack={() => navigate('/smart-campus')}
+          status={{ text: '通用参考', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/smart-campus')}
+          backLabel="返回智慧校园"
+          primary={{ label: '校园卡办理指引', onClick: () => navigate('/smart-campus/service/campus-card') }}
+        />
+      )}
+      nav={(
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      )}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
@@ -156,6 +178,6 @@ export function SmartCampusWelcomePage() {
             <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/service/campus-card')}>校园卡办理指引</button>
           </div>
         </div>
-    </KioskPageFrame>
+    </QxTouchScreen>
   )
 }

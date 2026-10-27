@@ -6,10 +6,13 @@
 // 首页 zone-card 点击 → /toolbox；能力（config 驱动 / 站内·外部H5·二维码启动 /
 // 离场确认 / sendBeacon 事件）由本页保留，零削减。
 import type { KioskToolboxItem } from '@ai-job-print/shared'
-import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { ChevronRightIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
 import { useToolboxCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
 import { isLaunchableKioskAppItem } from '../../services/api/kioskCapabilityValidation'
@@ -86,16 +89,33 @@ export function ToolboxZonePage() {
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
   return (
-    <KioskPageFrame
-      className="fusion-w5 fusion-w5--system kpv1 ktoolbox"
-      header={
-        <KioskPageHeader
+    <QxTouchScreen
+      testId="toolbox-touch"
+      stateId={items.length > 0 ? 'items' : 'empty'}
+      bodyClassName="qxt-body-scroll"
+      band={(
+        <QxTouchBand
+          eyebrow="扩展服务"
           title="百宝箱"
-          description="本机已配置的扩展服务，经审核后上架"
+          sub="本机已配置的扩展服务，经审核后上架"
           onBack={() => navigate('/')}
-          backLabel="返回"
+          status={{ text: items.length > 0 ? `已配置 ${items.length} 项` : '待配置', tone: 'unknown' }}
         />
-      }
+      )}
+      dock={(
+        <QxTouchDock
+          onBack={() => navigate('/')}
+          backLabel="返回首页"
+          ask={{ label: '问小青', draft: '百宝箱里的服务是本机配置的吗？进入第三方前会提示什么？' }}
+        />
+      )}
+      nav={(
+        <QxTouchNav
+          onHome={() => navigate('/')}
+          onAdvisor={() => navigate('/assistant')}
+          onProfile={() => navigate('/profile')}
+        />
+      )}
     >
       <section data-kiosk-screen="toolbox" className="tb-content">
         {items.length > 0 ? (
@@ -119,7 +139,7 @@ export function ToolboxZonePage() {
 
       <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />
-    </KioskPageFrame>
+    </QxTouchScreen>
   )
 }
 

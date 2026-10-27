@@ -14,9 +14,11 @@
 // ============================================================
 
 import type { ReactNode } from 'react'
-import { Button, Card } from '@ai-job-print/ui'
-import { PartyPopperIcon } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import '../../auth/capability-gate-touch.css'
 import type { KioskSmartCampusConfig } from '@ai-job-print/shared'
 import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
 
@@ -38,12 +40,27 @@ export function SmartCampusGuard({ module, children }: Props) {
   const blocked = !enabled || (requiredModule ? !config.modules[requiredModule] : false)
   if (!blocked) return <>{children}</>
   return (
-    <div className="grid min-h-screen place-items-center p-10" data-kiosk-screen="capability-gate">
-      <Card className="kproto-card flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <PartyPopperIcon className="h-12 w-12 text-neutral-400" aria-hidden="true" />
-        <p className="text-lg text-neutral-500">本机暂未开启这项智慧校园服务</p>
-        <Button size="lg" onClick={() => navigate('/smart-campus')}>返回智慧校园</Button>
-      </Card>
-    </div>
+    <QxTouchScreen
+      testId="campus-module-off"
+      stateId="module-off"
+      band={(
+        <QxTouchBand
+          eyebrow="智慧校园"
+          title="本机暂未开启这项智慧校园服务"
+          back={false}
+          status={{ text: '未开启', tone: 'unknown' }}
+        />
+      )}
+      dock={(
+        <QxTouchDock
+          back={false}
+          primary={{ label: '返回智慧校园', onClick: () => navigate('/smart-campus'), noArrow: true }}
+        />
+      )}
+    >
+      <div className="p10-gate" data-kiosk-screen="capability-gate">
+        <p role="status">本机暂未开启这项智慧校园服务</p>
+      </div>
+    </QxTouchScreen>
   )
 }
