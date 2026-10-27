@@ -55,6 +55,8 @@
   width: 100%;
   min-height: 104px;
   flex: none;
+  padding-top: 14px;
+  padding-bottom: 14px;
   background: var(--kp-surface, var(--qx-paper));
 }
 
@@ -72,6 +74,8 @@
   border-color: var(--kp-accent, var(--qx-emerald));
 }
 
+[data-qx-page="smart-campus"] .jf-notice,
+[data-qx-page="smart-campus"] .jf-notice span,
 [data-qx-page="smart-campus"] .kproto-notice,
 [data-qx-page="campus-welcome"] .kproto-notice,
 [data-qx-page="campus-service"] .kproto-notice,
@@ -116,57 +120,65 @@
 
 [data-qx-page="campus-welcome"] .kproto-content,
 [data-qx-page="campus-service"] .kproto-content {
-  flex: 1 1 auto;
+  flex: none;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
-[data-qx-page="campus-welcome"] .kproto-content > section.kproto-card:last-of-type {
-  position: relative;
-  flex: 1 1 auto;
-  overflow: hidden;
+/* 服务页顶部说明卡：左边 210 宽的图标列，右边标题和一句说明（稿 campus-svc 的 fy-up） */
+[data-qx-page="campus-service"] .sc-hero {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: var(--sc-hero-h, 300px);
+  padding: 14px 16px;
   background: var(--qxt-card, #fffdf7);
-  padding-left: 128px;
+  border: 1.5px solid var(--qxt-edge, var(--qxt-line));
+  border-radius: 28px;
 }
 
-[data-qx-page="campus-welcome"] .kproto-content > section.kproto-card:last-of-type::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 104px;
-  background: var(--qx-teal-soft, #e7f6f2);
+[data-qx-page="campus-service"] .sc-hero-v {
+  display: grid;
+  align-self: stretch;
+  place-items: center;
+  border-radius: 20px;
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-well);
 }
 
-[data-qx-page="campus-welcome"] .kproto-content > section.kproto-card:last-of-type > div:last-child {
-  flex: none;
-  background: var(--qxt-card, #fffdf7);
+[data-qx-page="campus-service"] .sc-hero-t h2 {
+  margin: 0;
+  font: 700 36px/1.25 var(--qx-serif);
 }
 
-[data-qx-page="campus-service"] .kproto-content > .kproto-grid-2:last-child {
-  flex: 1 1 auto;
-  align-items: stretch;
+[data-qx-page="campus-service"] .sc-hero-t p {
+  margin: 10px 0 0;
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+
+/* 迎新页末尾的「办事窗口」卡、服务页底部两颗入口：按内容高度排，不撑满、不加色条。 */
+[data-qx-page="campus-welcome"] .sc-window-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-qx-page="campus-welcome"] .sc-window-list li {
+  padding: 14px 18px;
+  font-size: 22px;
+  line-height: 1.4;
+  background: var(--qxt-well);
+  border-radius: 16px;
 }
 
 [data-qx-page="campus-service"] .kproto-content > .kproto-grid-2:last-child > button {
-  position: relative;
-  overflow: hidden;
-  height: 100%;
-  min-height: 140px;
-  padding-left: 116px;
+  min-height: 152px;
   background: var(--qxt-card, #fffdf7);
-}
-
-[data-qx-page="campus-service"] .kproto-content > .kproto-grid-2:last-child > button::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 88px;
-  background: var(--qx-teal-soft, #e7f6f2);
 }
 
 [data-qx-page="smart-campus"] [role="dialog"] {
@@ -175,23 +187,11 @@
 }
 
 [data-qx-page="smart-campus"] [role="dialog"] > div {
-  position: relative;
-  overflow: hidden;
   width: min(880px, calc(100% - 80px));
   max-width: 880px;
   border-radius: 40px;
-  padding: 36px 40px 36px 132px;
+  padding: 40px 44px;
   background: var(--qxt-card, #fffdf7);
-}
-
-[data-qx-page="smart-campus"] [role="dialog"] > div::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 104px;
-  background: var(--qx-teal-soft, #e7f6f2);
 }
 
 [data-qx-page="smart-campus"] [role="dialog"] p,

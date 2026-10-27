@@ -1,6 +1,5 @@
-/* 百宝箱触屏页。规则只挂在本页作用域下。 */
-
-[data-qx-page="toolbox"] .ui-kiosk-page-content { padding: 0; }
+/* 百宝箱触屏页。规则只挂在本页作用域下。
+   卡片按内容高度排，整页由 qxt-body-scroll 滚动；不撑满整屏，也不靠色条或底色遮空白。 */
 
 [data-qx-page="toolbox"] {
   height: 100%;
@@ -27,30 +26,62 @@
 
 [data-qx-page="toolbox"] .tb-content {
   display: flex;
-  flex: 1 1 auto;
+  flex: none;
   flex-direction: column;
-  gap: 20px;
-  min-height: 0;
+  gap: 16px;
+}
+
+/* 说明卡：左边 210 宽的图标列，右边两句话（稿的 fy-up） */
+[data-qx-page="toolbox"] .tb-hero {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 276px;
+  padding: 14px 16px;
+  background: var(--qxt-card, var(--qx-paper));
+  border: 1.5px solid var(--qxt-edge, var(--qxt-line));
+  border-radius: 28px;
+}
+
+[data-qx-page="toolbox"] .tb-hero-v {
+  display: grid;
+  align-self: stretch;
+  place-items: center;
+  min-height: 248px;
+  border-radius: 20px;
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-well);
+}
+
+[data-qx-page="toolbox"] .tb-hero-t b {
+  display: block;
+  font: 700 32px/1.3 var(--qx-serif);
+}
+
+[data-qx-page="toolbox"] .tb-hero-t p {
+  margin: 8px 0 0;
+  font-size: 24px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
 }
 
 [data-qx-page="toolbox"] .tb-tiles {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: 16px;
-  min-height: 0;
 }
 
+/* 条目：整行卡，三行——标题、说明、启动方式与去向 */
 [data-qx-page="toolbox"] .tb-tile {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  flex: 1 1 auto;
-  gap: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  min-height: 120px;
-  padding: 22px 24px 22px 72px;
+  min-height: 148px;
+  padding: 20px 26px 18px;
   text-align: left;
   color: var(--qxt-ink);
   background: var(--qxt-card, var(--qx-paper));
@@ -59,15 +90,8 @@
   cursor: pointer;
 }
 
-[data-qx-page="toolbox"] .tb-tile::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 48px;
-  background: var(--qx-teal-soft, #e7f6f2);
-  border-radius: 28px 0 0 28px;
+[data-qx-page="toolbox"] .tb-tile:active {
+  transform: scale(0.985);
 }
 
 [data-qx-page="toolbox"] .tb-tile:disabled {
@@ -89,9 +113,15 @@
 }
 
 [data-qx-page="toolbox"] .tb-copy span {
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1.45;
   color: var(--qxt-ink-2);
+}
+
+[data-qx-page="toolbox"] .tb-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 [data-qx-page="toolbox"] .tb-tag,
@@ -143,7 +173,7 @@
   border-radius: 24px;
   background: var(--qxt-clay-wash, var(--qxt-well));
   color: var(--qxt-ink-2);
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1.5;
 }
 
@@ -153,29 +183,19 @@
   flex: none;
 }
 
+/* 二维码层与外链离场层（共享的 ModalShell）：盖在页面上，不带色条；
+   字提到 22px，按钮不小于 64×64、有边框或底色。 */
 [data-qx-page="toolbox"] [role="dialog"] {
   font-size: 22px;
   backdrop-filter: none;
 }
 
 [data-qx-page="toolbox"] [role="dialog"] > div {
-  position: relative;
-  overflow: hidden;
   width: min(880px, calc(100% - 80px));
   max-width: 880px;
   border-radius: 40px;
-  padding: 36px 40px 36px 132px;
+  padding: 40px 44px;
   background: var(--qxt-card, #fffdf7);
-}
-
-[data-qx-page="toolbox"] [role="dialog"] > div::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 104px;
-  background: var(--qx-teal-soft, #e7f6f2);
 }
 
 [data-qx-page="toolbox"] [role="dialog"] p,

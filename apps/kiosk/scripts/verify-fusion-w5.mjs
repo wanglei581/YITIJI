@@ -258,7 +258,7 @@ assertSinglePaddingNeutralizer(
 )
 assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/, '.qx-body')
 assert.doesNotMatch(legalDocCss, /\.ui-kiosk-page-content/, 'legal-service-desk.css carries no dead selector for the retired V6 content wrapper')
-assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\[data-qx-page=['"]toolbox['"]\]/)
+assert.doesNotMatch(toolboxCss, /\.ui-kiosk-page-content/, 'toolbox-zone.css carries no dead selector for the shared page content wrapper (the toolbox page left KioskPageFrame and never renders it)')
 assert.match(
   profileCss,
   /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,

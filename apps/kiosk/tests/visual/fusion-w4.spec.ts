@@ -527,7 +527,7 @@ test('smart-campus enabled 与 service 指引可达 @w4', async ({ page, api }) 
   await page.goto('/smart-campus')
   await expect(page.getByText('迎新指引')).toBeVisible()
   await page.goto('/smart-campus/service/campus-card')
-  await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
+  await expect(page.getByText('到窗口办理')).toBeVisible()
   await verifyPage(page, errors)
 })
 
@@ -560,7 +560,7 @@ for (const scenario of [
     await page.goto('/smart-campus/service/campus-card')
     await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
     await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
+    await expect(page.getByText('到窗口办理')).toHaveCount(0)
   })
 }
 
@@ -644,7 +644,7 @@ test('smart-campus 子模块关闭不能从深链绕过 @w4', async ({ page, api
     await expect(page.getByText('本机暂未开启这项智慧校园服务')).toBeVisible()
   }
   await page.goto('/smart-campus/service/campus-card')
-  await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
+  await expect(page.getByText('到窗口办理')).toBeVisible()
 })
 
 // MSC-07（2026-09-07）：5 分钟定时刷新不再先置 loading 卸载子页（用户填到一半会丢状态）；
@@ -660,14 +660,14 @@ test('smart-campus 刷新期间保留旧页面，失败后关闭 @w4', async ({ 
 
   try {
     await page.goto('/smart-campus/service/campus-card')
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
+    await expect(page.getByText('到窗口办理')).toBeVisible()
     await runCapabilityRefresh(page)
     await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(2)
     await expect(page.locator('[data-capability-state="loading"]')).toHaveCount(0)
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
+    await expect(page.getByText('到窗口办理')).toBeVisible()
     releaseRefresh({ abort: 'internetdisconnected' })
     await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
+    await expect(page.getByText('到窗口办理')).toHaveCount(0)
   } finally {
     releaseRefresh?.({ abort: 'internetdisconnected' })
   }
@@ -687,7 +687,7 @@ test('smart-campus 乱序旧 ON 响应不能覆盖新 OFF @w4', async ({ page, a
 
   try {
     await page.goto('/smart-campus/service/campus-card')
-    await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
+    await expect(page.getByText('到窗口办理')).toBeVisible()
     await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(1)
     await runCapabilityRefresh(page)
     await expect.poll(() => api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBe(2)
@@ -700,7 +700,7 @@ test('smart-campus 乱序旧 ON 响应不能覆盖新 OFF @w4', async ({ page, a
     releaseLateOn({ status: 200, json: w4TerminalConfig() })
     await lateResponse
     await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
-    await expect(page.getByText('办理指引 · 未接线上办理')).toHaveCount(0)
+    await expect(page.getByText('到窗口办理')).toHaveCount(0)
   } finally {
     releaseLateOn?.({ status: 200, json: w4TerminalConfig() })
   }

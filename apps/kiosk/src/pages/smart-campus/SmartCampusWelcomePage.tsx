@@ -43,6 +43,9 @@ const FLOW_STEPS = [
 // 这些位置**不来自任何学校**，属编造信息，已于 2026-08-11 删除（CLAUDE.md §9）。
 // 恢复展示的前提：CampusServiceWindow 模型落地 + 学校在 Partner 后台配置 + 审核发布。
 
+/** 常见办事窗口类别（只写类别，不写具体位置；具体名单以学校通知为准）。 */
+const WINDOW_KINDS = ['学院迎新点', '宿舍入住', '校园卡与一卡通', '缴费与体检（以学校名单为准）'] as const
+
 interface PrepEntry {
   icon: LucideIcon
   label: string
@@ -160,6 +163,11 @@ export function SmartCampusWelcomePage() {
                 <span>请以学校迎新指南或官方公众号为准</span>
               </p>
             </div>
+            <ul className="sc-window-list" aria-label="常见办事窗口类别">
+              {WINDOW_KINDS.map((kind) => (
+                <li key={kind}>{kind}</li>
+              ))}
+            </ul>
           </section>
 
           <div className="kproto-notice mt-auto">

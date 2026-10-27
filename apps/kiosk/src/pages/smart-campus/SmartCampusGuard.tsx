@@ -18,7 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
-import { CapabilityStayCards } from '../../auth/CapabilityStayCards'
+import { CapabilityExplain, CapabilityStayCards, P10HelpRemind } from '../../auth/CapabilityStayCards'
 import '../../auth/capability-gate-touch.css'
 import type { KioskSmartCampusConfig } from '@ai-job-print/shared'
 import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
@@ -44,10 +44,12 @@ export function SmartCampusGuard({ module, children }: Props) {
     <QxTouchScreen
       testId="campus-module-off"
       stateId="module-off"
+      bodyClassName="qxt-body-scroll"
       band={(
         <QxTouchBand
           eyebrow="智慧校园"
           title="智慧校园"
+          sub="这项还没在这台机器上开通。下面这些去处不受影响。"
           back={false}
           status={{ text: '未开启', tone: 'unknown' }}
         />
@@ -63,7 +65,9 @@ export function SmartCampusGuard({ module, children }: Props) {
         <div className="p10-gate" data-kiosk-screen="capability-gate">
           <p role="status">本机暂未开启这项智慧校园服务</p>
         </div>
+        <CapabilityExplain opensAt={requiredModule ? '智慧校园里' : '首页'} />
         <CapabilityStayCards />
+        <P10HelpRemind />
       </div>
     </QxTouchScreen>
   )

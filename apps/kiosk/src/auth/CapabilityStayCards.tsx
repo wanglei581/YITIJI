@@ -42,18 +42,25 @@ export function P10HelpRemind() {
   return <QxTouchCallout kind="remind" icon="call">{`${helpNeededLine(contact)}。`}</QxTouchCallout>
 }
 
-/** 逐项「本机暂未开通」小卡（稿的 fy-offgrid）。只列这一项能力本来就有的入口名。 */
-export function CapabilityOffTiles({ items }: { items: readonly { title: string; hint?: string }[] }) {
+/**
+ * 为什么看到这一页：三句话。只讲「是否开通由谁定、没开通时不显示什么、开通后入口在哪」，
+ * 不写这项能力里具体有哪些入口（总关闭时不得露出任何业务内容）。
+ */
+export function CapabilityExplain({ opensAt }: { opensAt: string }) {
   return (
-    <div className="p10-offgrid" data-rows={Math.ceil(items.length / 2)}>
-      {items.map((item) => (
-        <div className="p10-offtile" key={item.title} role="group" aria-disabled="true">
-          <b>{item.title}</b>
-          <small>本机暂未开通</small>
-          {item.hint ? <small>{item.hint}</small> : null}
-        </div>
-      ))}
-    </div>
+    <section className="p10-explain" aria-label="这项还没开通">
+      <span className="p10-explain-v" aria-hidden="true">
+        <QxTouchIcon name="eye" size={96} strokeWidth={1.5} />
+      </span>
+      <div className="p10-explain-t">
+        <b>这项还没开通</b>
+        <ul>
+          <li>是否开通，由运营机构按本机配置决定。</li>
+          <li>没开通时，这里不显示相关内容，也不能进入。</li>
+          <li>开通之后，入口会出现在{opensAt}。</li>
+        </ul>
+      </div>
+    </section>
   )
 }
 

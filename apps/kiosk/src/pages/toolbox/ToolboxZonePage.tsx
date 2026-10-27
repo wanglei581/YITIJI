@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { useToolboxCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
 import { isLaunchableKioskAppItem } from '../../services/api/kioskCapabilityValidation'
@@ -54,8 +55,10 @@ function ToolboxItemTile({
         <b>{item.title}</b>
         {item.description ? <span>{item.description}</span> : null}
       </span>
-      <span className="tb-tag">{launchTag(item)}</span>
-      {!disabled ? <span className="tb-go">{goLabel(item)}</span> : null}
+      <span className="tb-meta">
+        <span className="tb-tag">{launchTag(item)}</span>
+        {!disabled ? <span className="tb-go">{goLabel(item)}</span> : null}
+      </span>
     </button>
   )
 }
@@ -103,11 +106,22 @@ export function ToolboxZonePage() {
     >
       <section data-kiosk-screen="toolbox" className="tb-content">
         {config.enabled && items.length > 0 ? (
-          <div className="tb-tiles">
-            {items.map((item) => (
-              <ToolboxItemTile key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
-            ))}
-          </div>
+          <>
+            <div className="tb-hero">
+              <span className="tb-hero-v" aria-hidden="true">
+                <QxTouchIcon name="layers" size={96} strokeWidth={1.5} />
+              </span>
+              <div className="tb-hero-t">
+                <b>本机已上架的扩展服务</b>
+                <p>站内服务直接进入。扫码的用手机继续。外部入口会先请你确认再离开。</p>
+              </div>
+            </div>
+            <div className="tb-tiles">
+              {items.map((item) => (
+                <ToolboxItemTile key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
+              ))}
+            </div>
+          </>
         ) : (
           <div className="tb-empty">
             <b>待配置</b>
