@@ -213,6 +213,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
           pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
           pnpm --filter @ai-job-print/kiosk verify:qingxu-v2-frozen
+          # 触屏版稿（docs/design/kiosk-touch-2026-10）10/26 补稿定稿后冻结：稿文件 sha256 对 FROZEN.json，改稿须产品负责人同意后 --update。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-touch-frozen
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime

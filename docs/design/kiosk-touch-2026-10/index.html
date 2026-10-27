@@ -78,6 +78,10 @@ button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--glow);outl
 .toggles .row{display:flex;flex-wrap:wrap;gap:6px}
 .tg{height:32px;padding:0 11px;border-radius:999px;border:1px solid var(--desk-line);font-size:12.5px;color:var(--desk-ink-2);background:transparent}
 .tg[aria-pressed="true"]{background:#1d3a32;border-color:#2c6b59;color:#fff}
+.demo-row{padding-top:6px;border-top:1px dashed var(--desk-line)}
+.demo-row::before{content:"演示事件（后台或硬件的回报，屏上不显示）";flex-basis:100%;font-size:12px;color:#7f938b}
+.demo-row .tg{border-style:dashed}
+.status.unknown .dot{background:#9fb1aa;box-shadow:0 0 0 4px rgba(159,177,170,.18)}
 .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;margin-right:4px;vertical-align:1px}
 .tag.cx{background:#2a2440;color:#cfc4ff}.tag.ag{background:#2c3320;color:#d8eaa5}.tag.gk{background:#3a2a22;color:#f1c6a8}.tag.cl{background:#183a33;color:#a9ecd5}
 .goal{border-top:1px solid var(--desk-line);padding:10px 0}
@@ -173,6 +177,7 @@ button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--glow);outl
 .stage{position:absolute;left:0;top:0;width:1080px;height:1920px;background:var(--paper);overflow:hidden;font-family:var(--sans);color:var(--ink);
   border-radius:34px;box-shadow:0 0 0 10px #050a09,0 0 0 11px #2a3632,0 40px 120px rgba(0,0,0,.55);font-size:24px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper)}
+.b-ribbon{flex:none;height:56px;display:flex;align-items:center;justify-content:center;padding:0 24px;background:repeating-linear-gradient(-45deg,#8a3b12 0 18px,#7b3310 18px 36px);color:#fff;font:700 21px/1.2 var(--sans);letter-spacing:.02em;text-align:center;white-space:nowrap}
 .screen.enter{animation:scr-in var(--t-in) var(--ease) both}
 .screen.enter.back{animation-name:scr-in-back}
 .screen.leave{animation:scr-out var(--t-out) ease-in both;pointer-events:none}
@@ -952,10 +957,16 @@ button.gi:active{background:#f8f4e8}
       </div>
       <div class="row">
         <button class="tg" id="tg-login" aria-pressed="false">已登录</button>
-        <button class="tg" id="tg-printer" aria-pressed="false">打印机连不上</button>
+        <button class="tg" id="tg-printer" aria-pressed="false">打印机离线</button>
         <button class="tg" id="tg-ai" aria-pressed="false">小青不可用</button>
         <button class="tg" id="tg-idle">演示：无操作提醒</button>
       </div>
+      <div class="row">
+        <button class="tg" id="tg-fee" aria-pressed="false">收费点位</button>
+        <button class="tg" id="tg-ctrl" aria-pressed="false">机构已开通：签名、合同审查、百宝箱、智慧校园</button>
+        <button class="tg" id="tg-showb" aria-pressed="false">显示私有化版页面（客户持证运营，我方云上不出现）</button>
+      </div>
+      <div class="row demo-row" id="demoRow" hidden></div>
     </div>
   </aside>
 </div>
@@ -965,5 +976,16 @@ button.gi:active{background:#f8f4e8}
 <script src="data.js"></script>
 <script src="screens.js"></script>
 <script src="screens2.js"></script>
+<script src="screens3.js"></script>
+<script src="screens4.js"></script>
+<script src="fix-main.js"></script>
+<script src="fix-public.js"></script>
+<script src="fix-me.js"></script>
+<script src="fix-resume2.js"></script>
+<script src="fix-interview.js"></script>
+<script src="fix-scan.js"></script>
+<script src="fix-policy.js"></script>
+<script src="fix-jobs.js"></script>
+<script src="fix-fairs.js"></script>
 <script src="map.js"></script>
 <script src="app.js"></script>

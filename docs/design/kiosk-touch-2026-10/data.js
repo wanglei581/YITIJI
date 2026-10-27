@@ -1,27 +1,17 @@
 /* 演示数据（全部是示例，不连真实接口）+ 说明栏内容 */
 window.D = {
-  resume: { file: '李佳怡-简历-2026秋招.pdf', pages: 1, size: '186 KB', phoneTail: '6721' },
+  resume: { file: '李佳怡-简历-2026秋招.pdf', pages: 1, size: '186 KB' },
   issues: [
-    { cat: '表达', title: '「负责学院公众号日常运营」只写了做什么', hint: '没写做成了什么，招聘方不好判断' },
-    { cat: '结构', title: '教育经历排在最后', hint: '应届生把教育经历放前面更合适' },
-    { cat: '缺少', title: '技能里没写你用过的工具', hint: '实习经历里提到过剪映和 Excel' },
-    { cat: '表达', title: '迎新晚会只写了「组织」', hint: '可以写清规模和你负责的部分' },
-    { cat: '措辞', title: '自我评价比较空泛', hint: '换成具体的事，或者删掉' }
+    { title: '「负责学院公众号日常运营」只写了做什么', hint: '没写做成了什么，招聘方不好判断' },
+    { title: '教育经历排在最后', hint: '应届生把教育经历放前面更合适' },
+    { title: '技能里没写你用过的工具', hint: '实习经历里提到过剪映和 Excel' },
+    { title: '迎新晚会只写了「组织」', hint: '可以写清规模和你负责的部分' },
+    { title: '自我评价比较空泛', hint: '换成具体的事，或者删掉' }
   ],
   sugg: [
-    { cat: '表达', kind: 'text', old: '负责学院公众号的日常运营。',
-      neu: '负责学院公众号的选题、撰写与排版，累计发布推文 <span class="blank" data-blank>▢</span> 篇。',
-      why: '招聘方更关心你做成了什么。▢ 处请填你的真实数字，没有就删掉这半句。' },
-    { cat: '结构', kind: 'reorder', before: ['个人信息', '实习经历', '校园经历', '技能', '教育经历'], after: ['个人信息', '教育经历', '实习经历', '校园经历', '技能'],
-      why: '应届生的学历是招聘方最先看的。只调整顺序，内容一个字不改。' },
-    { cat: '缺少', kind: 'text', old: '技能：熟练使用 Office。',
-      neu: '技能：熟练使用 Office；会用剪映剪辑短视频，用 Excel 整理活动报名数据。',
-      why: '这两项来自你实习经历里写过的内容，不是新加的。' },
-    { cat: '表达', kind: 'text', old: '组织 2025 年迎新晚会，负责节目统筹。',
-      neu: '牵头组织 2025 年学院迎新晚会，负责节目统筹，参加人数约 <span class="blank" data-blank>▢</span> 人。',
-      why: '先写你负责的部分，再用真实数字说明规模。' },
-    { cat: '措辞', kind: 'choice', old: '自我评价：性格开朗，有责任心，学习能力强。',
-      why: '这类话几乎每份简历都有，招聘方很难记住。可以删掉，或者换成一件能说明你的事。' }
+    { title: '公众号运营', old: '负责学院公众号的日常运营。', neu: '负责学院公众号的选题、撰写与排版，写清做成了什么。' },
+    { title: '技能', old: '技能：熟练使用 Office。', neu: '技能：熟练使用 Office；会用剪映剪辑短视频，用 Excel 整理活动报名数据。' },
+    { title: '迎新晚会', old: '组织 2025 年学院迎新晚会，负责节目统筹。', neu: '牵头组织 2025 年学院迎新晚会，负责节目统筹，写清规模和你负责的部分。' }
   ],
   roles: ['新媒体运营', '行政专员', '销售代表', '会计', '前端开发', '机械工程师'],
   industries: ['互联网', '教育培训', '制造业', '金融', '零售与消费'],
@@ -49,10 +39,9 @@ window.D = {
     better: ['第 2 题缺少数字：发了几篇、关注涨了多少', '第 3 题复盘只说了「找原因」，可以分三步讲', '反问环节可以问这个岗位每天具体做什么']
   },
   usbFiles: [
-    { n: '实习证明-盖章版.pdf', t: 'PDF', p: 1, s: '1.2 MB' },
-    { n: '毕业生就业推荐表（已填写）.docx', t: 'Word', p: 2, s: '86 KB', no: 'Word 文档这台机器现在打不了，请先转成 PDF' },
-    { n: '个人作品集-新媒体运营.pdf', t: 'PDF', p: 12, s: '8.4 MB' },
-    { n: '蓝底证件照.jpg', t: 'JPG', p: 1, s: '420 KB' }
+    { n: '实习证明-盖章版.pdf', t: 'PDF', s: '1.2 MB' },
+    { n: '个人作品集-新媒体运营.pdf', t: 'PDF', s: '8.4 MB' },
+    { n: '蓝底证件照.jpg', t: 'JPG', s: '420 KB' }
   ],
   policyCats: [
     { k: '高校毕业生', d: '求职补贴、见习、基层项目', ic: 'book' },
@@ -112,7 +101,7 @@ window.GAPS = [
 
 /* 流程串：说明栏里显示「这一屏所在的流程」缩略图 */
 window.FLOWS = [
-  { n: '改简历', ids: ['resume', 'resume-src', 'upload', 'reading', 'diagnosis', 'optimize', 'compare', 'confirm', 'printing', 'done'] },
+  { n: '改简历', ids: ['resume', 'resume-src', 'upload', 'resume-direction', 'reading', 'diagnosis', 'optimize', 'compare', 'resume-edit', 'resume-export', 'confirm', 'printing', 'done'] },
   { n: '从零写简历', ids: ['resume', 'scratch', 'scratch-1', 'templates', 'gen-preview', 'confirm'] },
   { n: '求职材料', ids: ['resume', 'materials', 'materials-result', 'confirm'] },
   { n: '简历对照与规划', ids: ['resume', 'jobfit', 'jobfit-result', 'jobfit-actions', 'career', 'confirm'] },
@@ -131,5 +120,6 @@ window.FLOWS = [
   { n: '我的', ids: ['me', 'my-resumes', 'my-docs', 'my-orders', 'my-ai', 'my-activity', 'my-fav', 'notifications', 'feedback', 'settings', 'privacy'] },
   { n: '权益与活动', ids: ['me', 'activities', 'activity-detail', 'my-benefits'] },
   { n: '系统与公共', ids: ['standby', 'home', 'session-resume', 'help', 'official', 'legal', 'offline', 'cleared'] },
-  { n: '受控与扩展', ids: ['contract', 'contract-result', 'toolbox', 'smart-campus', 'campus-svc'] }
+  { n: '受控与扩展', ids: ['contract', 'contract-result', 'toolbox', 'smart-campus', 'campus-svc'] },
+  { n: '状态样式板', ids: ['st-loading', 'st-empty', 'st-error', 'st-unavailable', 'st-device-off', 'st-unconfirmed', 'st-ai-down'] }
 ];
