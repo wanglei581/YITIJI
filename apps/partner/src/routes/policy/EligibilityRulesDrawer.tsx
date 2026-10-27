@@ -61,9 +61,11 @@ interface Props {
   onClose: () => void
   /** 保存成功后回调：该政策已回到待审核，外层需要刷新列表状态 */
   onSaved: () => void
+  /** 招募类在托管未打开时只读，不请求条件数据 */
+  readOnlyReason?: string | null
 }
 
-export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Props) {
+export default function EligibilityRulesDrawer({ policy, onClose, onSaved, readOnlyReason }: Props) {
   const [questionSet, setQuestionSet] = useState<PolicyEligibilityQuestionSet | null>(null)
   const [rules, setRules] = useState<PolicyEligibilityRuleDraft[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -92,8 +94,9 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
   }, [policy.id])
 
   useEffect(() => {
+    if (readOnlyReason) return
     void load()
-  }, [load])
+  }, [load, readOnlyReason])
 
   const questions = questionSet?.questions ?? []
   const drafts = rules ?? []
@@ -176,12 +179,28 @@ export default function EligibilityRulesDrawer({ policy, onClose, onSaved }: Pro
         </div>
       }
     >
-      {loadError ? (
+      {readOnlyReason ? (
         <div className="space-y-3">
-          <p className="rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">加载失败:{loadError}</p>
+          <p role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm leading-relaxed text-neutral-700">{readOnlyReason}</p>
+          <button type="button" disabled className="flex items-center gap-1.5 rounded-lg bg-neutral-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+            试算这条政策
+          </button>
+        </div>
+      ) : loadError ? (
+        <div className="space-y-3">
+          {loadError.includes('演示模式不执行') ? (
+            <p role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">演示模式不执行</p>
+          ) : (
+            <p className="rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">加载失败:{loadError}</p>
+          )}
           <button onClick={() => void load()} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50">
             重试
           </button>
+          {loadError.includes('演示模式不执行') && (
+            <button type="button" disabled className="flex items-center gap-1.5 rounded-lg bg-neutral-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+              试算这条政策
+            </button>
+          )}
         </div>
       ) : rules === null ? (
         <LoadingState text="加载问项与已录条件…" className="py-12" />

@@ -318,9 +318,9 @@ for (const file of [OPS_PAGE, OPS_CARDS, OPS_FORMAT, 'src/routes/terminals/Termi
   )
 }
 mustContain(
-  'src/layouts/PartnerLayoutWrapper.tsx',
+  'src/layouts/partnerNav.ts',
   ["'/terminals':  'terminals'", "label: '终端数据'"],
-  'D8. 侧栏「数据与账号」组有「终端数据」入口',
+  'D8. 侧栏「终端与数据」组有「终端数据」入口',
 )
 
 console.log('\nALL PASS')

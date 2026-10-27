@@ -191,6 +191,7 @@ let SMART_CAMPUS_TERMINALS: PartnerSmartCampusTerminal[] = [
 function genId(): string { return `mock-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }
 
 export const MOCK_RECRUITMENT_HOSTING_KEY = 'mock:recruitment-hosting'
+export const MOCK_SMART_CAMPUS_KEY = 'mock:can-manage-smart-campus'
 
 /** 'unavailable' 时能力接口直接失败，用来演示「暂时无法确认」 */
 function mockCapabilitiesUnavailable(): boolean {
@@ -206,6 +207,14 @@ function mockRecruitmentHostingEnabled(): boolean {
     return window.localStorage.getItem(MOCK_RECRUITMENT_HOSTING_KEY) !== 'off'
   } catch {
     return true
+  }
+}
+
+function mockCanManageSmartCampus(): boolean {
+  try {
+    return window.localStorage.getItem(MOCK_SMART_CAMPUS_KEY) === 'on'
+  } catch {
+    return false
   }
 }
 
@@ -246,7 +255,7 @@ export const partnerMockAdapter = {
       canImportJobs: recruitmentHosting,
       canImportFairs: false,
       canManagePolicies: false,
-      canManageSmartCampus: false,
+      canManageSmartCampus: mockCanManageSmartCampus(),
       canManageCompanies: recruitmentHosting,
       companyManageScope: 'unrestricted',
       recruitmentHosting,

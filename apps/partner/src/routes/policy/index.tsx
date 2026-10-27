@@ -6,7 +6,7 @@ import { FileTextIcon, PlusIcon } from 'lucide-react'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { PolicyReleaseDialog } from './PolicyReleaseDialog'
 import { PolicyTable } from './PolicyTable'
-import { AUDIENCE_LABELS, CATEGORY_LABELS } from './policyLabels'
+import { AUDIENCE_LABELS, CANNOT_CREATE_HINT, CATEGORY_LABELS, RECRUITMENT_POLICY_BLOCKED_REASON } from './policyLabels'
 import { ConfirmActionDialog } from '../../components/ConfirmActionDialog'
 import {
   partnerPoliciesService,
@@ -17,7 +17,7 @@ import {
   type SavePolicyInput,
 } from '../../services/api/policies'
 import type { ReviewStatus } from '../../services/api'
-import { useCapability } from '../../services/capabilities'
+import { useCapability, usePartnerCapabilities } from '../../services/capabilities'
 import { isAbsoluteHttpUrl } from '../../lib/httpUrl'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
@@ -69,22 +69,18 @@ function errMsg(e: unknown): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
- * 政策内容只有公共就业服务机构与高校就业中心可**创建**
- * （policies.service.ts 的 assertPolicyCapableOrgType → 400
- * ORG_TYPE_NOT_ALLOWED_FOR_POLICY，判定读 partner-capabilities.ts 的
- * canManagePolicies）。这是合规约束：政策属官方性质，商业机构不得冒名发布。
- *
- * 更新/下架/删除不校验类型，存量内容必须还能被机构自己下架，
+ * 能新增政策的机构类型以服务端 canManagePolicies 为准：公共就业服务机构、高校就业中心、
+ * 零工之家、就业服务站。更新/下架/删除不校验类型，存量内容必须还能被机构自己下架，
  * 所以此页不隐藏、只禁用「新增」。
  *
- * 3.13 起政策由本机构自己「审核通过」并「发布」（发布前须确认发布责任，服务端审计记下
- * 确认人、时间与内容版本）；平台管理员只保留紧急下架。修改已发布的政策会生成新版本、
- * 自动撤下并回到待审核，页面上要把这一点说清楚。审核 / 发布同样不校验机构类型。
+ * 政策由本机构自己审核通过并发布；平台管理员只保留紧急下架。修改已发布的政策会生成新版本、
+ * 自动撤下并回到待审核。招募类在招聘内容托管未明确打开时不能再提审或发布，下架和删除照常。
  */
-const CANNOT_CREATE_HINT = '政策内容属官方性质，仅公共就业服务机构与高校就业中心可发布。本机构不能新增，只能处理已有内容（查看、审核发布、下架）。'
 
 export default function PolicyPage() {
   const canCreate = useCapability('canManagePolicies')
+  const { capabilities } = usePartnerCapabilities()
+  const recruitmentOpen = capabilities?.recruitmentHosting === true
   const [editing, setEditing] = useState<PartnerPolicyRecord | 'new' | null>(null)
   const [form, setForm] = useState<PolicyFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -156,7 +152,9 @@ export default function PolicyPage() {
   }
 
   const urlOk = !form.externalUrl.trim() || isAbsoluteHttpUrl(form.externalUrl)
-  const canSave = form.title.trim().length > 0 && urlOk
+  const editingRecruitmentLocked = editing !== null && editing !== 'new' && editing.category === 'recruitment' && !recruitmentOpen
+  const canSave = form.title.trim().length > 0 && urlOk && !editingRecruitmentLocked
+  const categoryChoices = Object.entries(CATEGORY_LABELS).filter(([key]) => recruitmentOpen || key !== 'recruitment')
 
   const save = async () => {
     setSaving(true)
@@ -310,6 +308,7 @@ export default function PolicyPage() {
       </div>
 
       <PolicyTable rows={rows} page={page} total={total} onPageChange={setPage} reviewFilter={reviewFilter} canCreate={canCreate} cannotCreateHint={CANNOT_CREATE_HINT}
+        recruitmentWriteBlocked={!recruitmentOpen}
         busyId={busyId} openEdit={openEdit} setRulesFor={setRulesFor} handleApprove={handleApprove} setReleasing={setReleasing} setConfirmUnpublish={setConfirmUnpublish} setConfirmDelete={setConfirmDelete} />
 
       <p className="mt-3 text-xs text-neutral-400">
@@ -320,6 +319,7 @@ export default function PolicyPage() {
       {rulesFor && (
         <EligibilityRulesDrawer
           policy={rulesFor}
+          readOnlyReason={rulesFor.category === 'recruitment' && !recruitmentOpen ? RECRUITMENT_POLICY_BLOCKED_REASON : null}
           onClose={() => setRulesFor(null)}
           onSaved={() => {
             setNoticeIsError(false)
@@ -338,7 +338,7 @@ export default function PolicyPage() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
-            <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+            <button onClick={save} disabled={saving || !canSave} title={editingRecruitmentLocked ? RECRUITMENT_POLICY_BLOCKED_REASON : undefined} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
               {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
             </button>
           </div>
@@ -346,6 +346,9 @@ export default function PolicyPage() {
       >
         <div className="space-y-4">
           {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
+          {editingRecruitmentLocked && (
+            <p role="status" className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-600">{RECRUITMENT_POLICY_BLOCKED_REASON}</p>
+          )}
           {editing !== null && editing !== 'new' && (
             <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
               {editing.publishStatus === 'published'
@@ -370,9 +373,13 @@ export default function PolicyPage() {
             </Field>
           ) : (
             <Field label="公告标签" required>
-              <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as PolicyCategory }))}>
-                {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              {editingRecruitmentLocked ? (
+                <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">招募</p>
+              ) : (
+                <select className={inputCls} value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as PolicyCategory }))}>
+                  {categoryChoices.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              )}
             </Field>
           )}
           <Field label="摘要(一体机列表展示)">

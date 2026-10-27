@@ -481,6 +481,8 @@ try {
   }
 
   await partner.goto(`${partnerOrigin}/terminals`)
+  await partner.getByRole('tab', { name: '项目与服务', exact: true }).click()
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
   let p = partnerPanel(partner)
   await expect(p.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
   await chooseProject(p, created.id, '报障与恢复')

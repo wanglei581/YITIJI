@@ -11,6 +11,7 @@
 
 import { formatDateTime } from '@ai-job-print/shared'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button, Card, ConsoleTable, EmptyState, ErrorState, LoadingState, StatusBadge, type ConsoleColumn } from '@ai-job-print/ui'
 import { DownloadIcon, MonitorIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { FRONTEND_HINT, Page, withFrontendHint } from '../Page'
@@ -83,7 +84,20 @@ function PeriodSelector({ value, onChange }: { value: TerminalOpsPeriod; onChang
   )
 }
 
+const PAGE_TABS = [
+  { key: 'ops', label: '终端运营' },
+  { key: 'delivery', label: '项目与服务' },
+] as const
+
 export default function TerminalsPage() {
+  const [params, setParams] = useSearchParams()
+  const delivery = params.get('tab') === 'delivery'
+  const selectTab = (next: 'ops' | 'delivery') => {
+    const copy = new URLSearchParams(params)
+    if (next === 'delivery') copy.set('tab', 'delivery')
+    else copy.delete('tab')
+    setParams(copy, { replace: true })
+  }
   const [period, setPeriod] = useState<TerminalOpsPeriod>('week')
   const [data, setData] = useState<PartnerTerminalOpsView | null>(null)
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
@@ -152,7 +166,7 @@ export default function TerminalsPage() {
     <Page
       title="终端数据"
       subtitle={withFrontendHint('本机构终端的打印扫描服务、出纸与故障恢复', FRONTEND_HINT.terminals)}
-      actions={(
+      actions={delivery ? undefined : (
         <div className="flex flex-wrap items-center gap-2">
           <PeriodSelector value={period} onChange={setPeriod} />
           <Button size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>
@@ -164,7 +178,30 @@ export default function TerminalsPage() {
         </div>
       )}
     >
-      {state === 'loading' && !data ? (
+      <div role="tablist" aria-label="终端数据分页" className="mb-4 flex gap-1 overflow-x-auto border-b-[1.6px] border-neutral-900/[0.06]">
+        {PAGE_TABS.map((tab) => {
+          const selected = tab.key === 'delivery' ? delivery : !delivery
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => selectTab(tab.key)}
+              className={[
+                'relative flex min-h-[44px] shrink-0 items-center whitespace-nowrap px-4 pb-3 pt-2.5 text-sm font-bold transition-colors',
+                selected ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-700',
+              ].join(' ')}
+            >
+              {tab.label}
+              {selected && (
+                <span aria-hidden="true" className="absolute inset-x-3 -bottom-[1.6px] h-[3px] rounded-sm bg-primary-600" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {delivery ? <FirstOrderPanel /> : state === 'loading' && !data ? (
         <LoadingState className="py-20" />
       ) : state === 'error' ? (
         <ErrorState className="py-20" title="终端数据加载失败" message={errorMessage} onRetry={() => setReloadKey((k) => k + 1)} />
@@ -223,14 +260,14 @@ export default function TerminalsPage() {
         </div>
       )}
 
-      <FirstOrderPanel />
-
-      <TerminalOpsDrawer
-        row={selected}
-        windowLabel={data ? windowText(data) : ''}
-        visitRecordingStarted={data?.visitCount.recordingStarted ?? false}
-        onClose={() => setSelectedCode(null)}
-      />
+      {!delivery && (
+        <TerminalOpsDrawer
+          row={selected}
+          windowLabel={data ? windowText(data) : ''}
+          visitRecordingStarted={data?.visitCount.recordingStarted ?? false}
+          onClose={() => setSelectedCode(null)}
+        />
+      )}
     </Page>
   )
 }
