@@ -165,7 +165,8 @@ function countActionable(overview: OverviewLoad, pendingCount: number | null): n
   let count = pendingCount ?? 0
   if (overview.kind !== 'ready') return count
   const month = shanghaiMonth()
-  count += overview.data.incidents.filter((item) => item.status === 'resolved' || item.status === 'processing').length
+  // 未关闭的报障都要让机构看见：刚提交待受理、平台处理中、技术恢复待核对
+  count += overview.data.incidents.filter((item) => item.status !== 'closed').length
   count += overview.data.reports.filter((item) => item.month < month && !item.acknowledgedAt).length
   return count
 }
@@ -193,7 +194,7 @@ function ProjectBar({ overview }: { overview: OverviewLoad }) {
 }
 
 function OverviewRows({ data, month }: { data: FirstOrderOverview; month: string }) {
-  const incidents = data.incidents.filter((item) => item.status === 'resolved' || item.status === 'processing')
+  const incidents = data.incidents.filter((item) => item.status !== 'closed')
   const reports = data.reports.filter((item) => item.month < month && !item.acknowledgedAt)
   return (
     <ul className="space-y-2">
@@ -204,7 +205,7 @@ function OverviewRows({ data, month }: { data: FirstOrderOverview; month: string
           <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-surface px-4 py-3">
             <p className="text-sm text-neutral-800">
               <span className="font-semibold">{item.terminalCode}</span>
-              {' · '}{issue}{' · '}{waiting ? '技术恢复，待你核对' : '平台处理中'}
+              {' · '}{issue}{' · '}{waiting ? '技术恢复，待你核对' : item.status === 'open' ? '已提交，等平台受理' : '平台处理中'}
             </p>
             <Link to={INCIDENTS} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700">{waiting ? '去核对' : '看进度'}</Link>
           </li>

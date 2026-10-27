@@ -521,6 +521,13 @@ try {
   await chooseProject(p, created.id, '报障与恢复')
   await expect(p.getByTestId(`first-order-incident-${incident.id}`)).toContainText('浏览器隔离验证')
   mark('Partner creates equipment incident through real API; refresh retains it')
+  // 刚报的故障还没受理时，机构工作台也要看得见，不能写成「今天没有要核对的事」
+  await partner.goto(`${partnerOrigin}/`)
+  await expect(partner.getByRole('region', { name: '今天要处理' })).toContainText('已提交，等平台受理')
+  await expect(partner.getByRole('region', { name: '今天要处理' })).not.toContainText('今天没有要核对的事')
+  mark('Partner workbench shows the just-reported incident as waiting for platform acceptance')
+  await partner.goto(`${partnerOrigin}/terminals?tab=delivery&section=incidents`); p = partnerPanel(partner)
+  await chooseProject(p, created.id, '报障与恢复')
 
   await refresh(a); await chooseProject(a, created.id, '报障处理')
   let incidentCard = a.getByTestId(`first-order-incident-${incident.id}`)
