@@ -63,6 +63,8 @@ function assertStatic(): void {
   const online = read(join(API_ROOT, 'src/support-contact/support-contact.online.ts'))
   const controller = read(join(API_ROOT, 'src/support-contact/support-contact.public.controller.ts'))
   const card = read(join(REPO_ROOT, 'apps/admin/src/routes/legal-docs/SupportContactCard.tsx'))
+  const tabCard = read(join(REPO_ROOT, 'apps/admin/src/routes/legal-docs/SelfNoteTabCard.tsx'))
+  const legalPage = read(join(REPO_ROOT, 'apps/admin/src/routes/legal-docs/index.tsx'))
   const schema = read(join(API_ROOT, 'prisma/schema.prisma'))
   const progress = read(join(REPO_ROOT, 'docs/progress/current-progress.md'))
   const block = schema.slice(schema.indexOf('model PlatformSetting {'), schema.indexOf('model PlatformSetting {') + 500)
@@ -76,7 +78,17 @@ function assertStatic(): void {
   assert.equal(block.includes('endUserId'), false)
   assert.ok(progress.includes('第 328 行'))
   assert.ok(SUPPORT_CONTACT_CACHE_TTL_MS <= 5 * 60 * 1000)
-  for (const file of [service, online, controller, card, schema, progress]) {
+  assert.ok(service.includes("const KEY_SELF_NOTE_TAB = 'support.selfNoteTab'"))
+  assert.ok(service.includes("map.get(KEY_SELF_NOTE_TAB) === 'true'"))
+  assert.ok(service.includes("row?.value === 'true'"))
+  assert.ok(service.includes('clearSelfNoteTabCache()'))
+  assert.ok(tabCard.includes('一体机显示『求职进度』页签'))
+  assert.ok(tabCard.includes('默认关闭。打开后，一体机『浏览与跳转记录』会多出这个页签，只读显示用户本人自己填写的记事，不对机构或企业开放。手填入口上线前请保持关闭。改完约 5 分钟内生效。'))
+  assert.ok(tabCard.includes('已保存。开关已更新。'))
+  assert.ok(tabCard.includes('保存失败：'))
+  assert.ok(tabCard.includes('已禁止保存'))
+  assert.ok(legalPage.includes('<SelfNoteTabCard />'))
+  for (const file of [service, online, controller, card, tabCard, legalPage, schema, progress]) {
     assert.equal(file.includes(MOBILE), false)
     assert.equal(file.includes(LANDLINE), false)
   }
@@ -176,7 +188,7 @@ async function main(): Promise<void> {
       assert.equal(res.status, 200, path)
       assert.equal(res.json.success, true)
       const data = res.json.data!
-      assert.deepEqual(Object.keys(data).sort(), ['miniappPublished', 'otherOnlineTerminalNearby', 'serviceHours', 'servicePhone'])
+      assert.deepEqual(Object.keys(data).sort(), ['miniappPublished', 'otherOnlineTerminalNearby', 'selfNoteTab', 'serviceHours', 'servicePhone'])
       const text = JSON.stringify(data)
       for (const hidden of HIDDEN) assert.equal(text.includes(hidden), false, hidden)
       return data
@@ -191,11 +203,13 @@ async function main(): Promise<void> {
     assert.notEqual(unconfigured.servicePhone, '')
     assert.equal(unconfigured.serviceHours, DEFAULT_SERVICE_HOURS)
     assert.equal(unconfigured.miniappPublished, false)
+    assert.equal(unconfigured.selfNoteTab, false)
     assert.equal(unconfigured.otherOnlineTerminalNearby, false)
     const adminBefore = await call('GET', '/api/v1/admin/support-contact', undefined, adminToken())
     assert.equal(adminBefore.status, 200)
     assert.equal(adminBefore.json.data?.serviceHours, null)
-    console.log('PASS 没配时电话为 null、服务时间为默认、小程序未发布、附近为 false')
+    assert.equal(adminBefore.json.data?.selfNoteTab, false)
+    console.log('PASS 没配时电话为 null、服务时间为默认、小程序未发布、页签开关为关、附近为 false')
 
     const auditsBefore = await auditCount()
     const saved = await call('PUT', '/api/v1/admin/support-contact', {
@@ -224,12 +238,14 @@ async function main(): Promise<void> {
     assert.equal(cached.servicePhone, null)
     assert.equal(cached.serviceHours, DEFAULT_SERVICE_HOURS)
     assert.equal(cached.miniappPublished, false)
+    assert.equal(cached.selfNoteTab, false)
     assert.equal(cached.otherOnlineTerminalNearby, false)
     now = origin + SUPPORT_CONTACT_CACHE_TTL_MS
     const expired = await publicOf(SELF_CODE)
     assert.equal(expired.servicePhone, MOBILE)
     assert.equal(expired.serviceHours, '工作日 8:30–17:30')
     assert.equal(expired.miniappPublished, true)
+    assert.equal(expired.selfNoteTab, false)
     assert.equal(expired.otherOnlineTerminalNearby, true)
     console.log('PASS 缓存期内仍是旧值，过期后是新值')
 
@@ -362,6 +378,83 @@ async function main(): Promise<void> {
     await advance(async () => {}, SELF_CODE)
     assert.equal(await auditCount(), publicAudits)
     console.log('PASS 非管理员 403，公开读取不写审计')
+
+    const TAB_KEY = 'support.selfNoteTab'
+    async function setTabRaw(value: string | null): Promise<void> {
+      if (value === null) {
+        await prisma.platformSetting.deleteMany({ where: { key: TAB_KEY } })
+        return
+      }
+      await prisma.platformSetting.upsert({
+        where: { key: TAB_KEY },
+        create: { key: TAB_KEY, value, updatedBy: 'fixture' },
+        update: { value, updatedBy: 'fixture' },
+      })
+    }
+    function assertTabPayload(payload: unknown, expected: boolean): void {
+      assert.deepEqual(payload, { selfNoteTab: expected })
+      const text = JSON.stringify(payload)
+      for (const word of ['已投递', '面试', '记事', 'JobApplication', 'jobApplication', 'resumeFileId', 'companyName']) {
+        assert.equal(text.includes(word), false, word)
+      }
+    }
+
+    now += SUPPORT_CONTACT_CACHE_TTL_MS + 1
+    await setTabRaw(null)
+    const missing = await publicOf(SELF_CODE)
+    assert.equal(missing.selfNoteTab, false)
+    const adminMissing = await call('GET', '/api/v1/admin/support-contact', undefined, adminToken())
+    assert.equal(adminMissing.json.data?.selfNoteTab, false)
+    for (const raw of ['', 'false', '1', 'TRUE', 'yes', ' true ']) {
+      await setTabRaw(raw)
+      now += SUPPORT_CONTACT_CACHE_TTL_MS + 1
+      const pub = await publicOf(SELF_CODE)
+      assert.equal(pub.selfNoteTab, false, `公开读取 ${JSON.stringify(raw)} 应为关`)
+      const adminRaw = await call('GET', '/api/v1/admin/support-contact', undefined, adminToken())
+      assert.equal(adminRaw.json.data?.selfNoteTab, false, `管理员读取 ${JSON.stringify(raw)} 应为关`)
+    }
+    console.log('PASS 页签开关缺键、空串、非 true 都是关')
+
+    now += SUPPORT_CONTACT_CACHE_TTL_MS + 1
+    await setTabRaw(null)
+    const primed = await publicOf(SELF_CODE)
+    assert.equal(primed.selfNoteTab, false)
+    assert.equal(primed.servicePhone, LANDLINE)
+    await prisma.platformSetting.update({ where: { key: 'support.servicePhone' }, data: { value: MOBILE } })
+    const auditsAtTab = await auditCount()
+    const turnedOn = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: true }, adminToken())
+    assert.equal(turnedOn.status, 200)
+    assert.equal(turnedOn.json.data?.selfNoteTab, true)
+    assert.equal(await auditCount(), auditsAtTab + 1)
+    const tabAudit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'support_contact.update' },
+      orderBy: { createdAt: 'desc' },
+    })
+    assertTabPayload(JSON.parse(tabAudit.payloadJson), true)
+    const immediate = await publicOf(SELF_CODE)
+    assert.equal(immediate.selfNoteTab, true)
+    assert.equal(immediate.servicePhone, LANDLINE, '保存页签开关不得清掉电话缓存')
+    const beforePartnerTab = await auditCount()
+    const partnerTab = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: false }, partnerToken())
+    assert.equal(partnerTab.status, 403)
+    assert.equal(partnerTab.json.error?.code, 'AUTH_ROLE_FORBIDDEN')
+    const partnerRead = await call('GET', '/api/v1/admin/support-contact', undefined, partnerToken())
+    assert.equal(partnerRead.status, 403)
+    assert.equal(await auditCount(), beforePartnerTab)
+    const adminStillOn = await call('GET', '/api/v1/admin/support-contact', undefined, adminToken())
+    assert.equal(adminStillOn.json.data?.selfNoteTab, true)
+    const turnedOff = await call('PUT', '/api/v1/admin/support-contact', { selfNoteTab: false }, adminToken())
+    assert.equal(turnedOff.status, 200)
+    assert.equal(turnedOff.json.data?.selfNoteTab, false)
+    const offAudit = await prisma.auditLog.findFirstOrThrow({
+      where: { action: 'support_contact.update' },
+      orderBy: { createdAt: 'desc' },
+    })
+    assertTabPayload(JSON.parse(offAudit.payloadJson), false)
+    const immediateOff = await publicOf(SELF_CODE)
+    assert.equal(immediateOff.selfNoteTab, false)
+    assert.equal(immediateOff.servicePhone, LANDLINE, '关掉页签开关也不得清掉电话缓存')
+    console.log('PASS 页签开关仅管理员可写，审计只有布尔，保存后公开读取立即反映，电话缓存不变')
   } finally {
     setSupportContactClock(null)
     await app.close()

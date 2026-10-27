@@ -339,6 +339,8 @@ interface JobFairData {
 
 实现约束与门禁：本能力落为独立模型 `JobApplication`，其 `channel` 在无证期只接受「用户自报的站外投递」一个取值，`statusSource` 只接受「用户自填」，`resumeFileId` / `consentId` 恒为空且无写入路径 —— 逐条由 `verify:job-application-track` 断言。平台内投递（形态 A）另受 `src/common/recruitment-capability.ts` 的许可证闸门管控，与本节无关且不因本节放宽。设计依据见 [recruitment-closure-license-gated-plan-2026-09.md](../product/recruitment-closure-license-gated-plan-2026-09.md) §3。
 
+页签开关只控制一体机是否显示，不改变读写权限，不对机构或企业开放。
+
 ### 4.5 企业展示（CompanyProfile）边界（2026-06-12 新增，长期红线）
 
 企业展示 = 企业风采 / 来源企业与岗位导览，**不是招聘平台、不是企业发岗平台**：

@@ -7,12 +7,18 @@ import { terminalHeartbeatOnline } from './support-contact.online'
 /** 没配服务时间时，公开接口返回这句。合规要求电话后面跟着服务时间。 */
 export const DEFAULT_SERVICE_HOURS = '工作日 9:00–18:00'
 
-/** 按 terminalId 缓存整份公开响应。后台改配置不主动清，最迟一个周期后生效。 */
+/**
+ * 按 terminalId 缓存电话、服务时间、附近终端和小程序是否发布。
+ * 这几项保存后不主动清，最迟一个周期后生效。
+ * 页签开关另有一条缓存，见 selfNoteTabCache。
+ */
 export const SUPPORT_CONTACT_CACHE_TTL_MS = 5 * 60 * 1000
 
 const KEY_PHONE = 'support.servicePhone'
 const KEY_HOURS = 'support.serviceHours'
 const KEY_MINIAPP = 'support.miniappPublished'
+/** 只有库存字符串 true 算开。缺省、空串和其他值都是关。 */
+const KEY_SELF_NOTE_TAB = 'support.selfNoteTab'
 const AUDIT_ACTION = 'support_contact.update'
 const TERMINAL_REF_MAX = 128
 
@@ -24,6 +30,8 @@ export interface PublicSupportContact {
   serviceHours: string | null
   otherOnlineTerminalNearby: boolean
   miniappPublished: boolean
+  /** 一体机是否显示本人记事页签。只有 true 为开。 */
+  selfNoteTab: boolean
 }
 
 /** 管理员读到的是库存值。服务时间没配是 null，不是公开接口那句默认文案。 */
@@ -31,12 +39,25 @@ export interface AdminSupportContact {
   servicePhone: string | null
   serviceHours: string | null
   miniappPublished: boolean
+  selfNoteTab: boolean
 }
 
 export interface SupportContactPatch {
   servicePhone?: string | null
   serviceHours?: string | null
   miniappPublished?: boolean
+  selfNoteTab?: boolean
+}
+
+/** 电话类审计仍只含这三项，不把页签开关混进去。 */
+function contactAuditView(
+  row: AdminSupportContact,
+): Pick<AdminSupportContact, 'servicePhone' | 'serviceHours' | 'miniappPublished'> {
+  return {
+    servicePhone: row.servicePhone,
+    serviceHours: row.serviceHours,
+    miniappPublished: row.miniappPublished,
+  }
 }
 
 type SettingStore = PrismaService | PrismaTransactionClient
@@ -48,12 +69,30 @@ export function setSupportContactClock(next: (() => number) | null): void {
   nowMs = next ?? (() => Date.now())
 }
 
+interface TerminalPublicCache {
+  servicePhone: string | null
+  serviceHours: string | null
+  otherOnlineTerminalNearby: boolean
+  miniappPublished: boolean
+}
+
 interface CacheEntry {
   expiresAt: number
-  value: PublicSupportContact
+  value: TerminalPublicCache
 }
 
 const cache = new Map<string, CacheEntry>()
+
+/** 页签开关与终端无关，全进程只留这一条。保存该键时只清它。 */
+let selfNoteTabCache: { expiresAt: number; value: boolean } | null = null
+
+function rememberSelfNoteTab(now: number, value: boolean): void {
+  selfNoteTabCache = { expiresAt: now + SUPPORT_CONTACT_CACHE_TTL_MS, value }
+}
+
+function clearSelfNoteTabCache(): void {
+  selfNoteTabCache = null
+}
 
 /** 门禁用：当前缓存条数（核上限）。 */
 export function supportContactCacheSize(): number {
@@ -77,17 +116,21 @@ export class SupportContactService {
     const key = typeof terminalId === 'string' ? terminalId : ''
     const now = nowMs()
     const hit = cache.get(key)
-    if (hit && hit.expiresAt > now) return { ...hit.value }
-    const value = await this.computePublic(key, now)
-    // 超长的号不缓存（本来也判 false）；到上限先清过期项，仍满就整表清掉。
-    if (key.length <= TERMINAL_REF_MAX) {
-      if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) {
-        for (const [k, entry] of cache) if (entry.expiresAt <= now) cache.delete(k)
-        if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) cache.clear()
+    let base: TerminalPublicCache
+    if (hit && hit.expiresAt > now) {
+      base = hit.value
+    } else {
+      base = await this.computePublic(key, now)
+      // 超长的号不缓存（本来也判 false）；到上限先清过期项，仍满就整表清掉。
+      if (key.length <= TERMINAL_REF_MAX) {
+        if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) {
+          for (const [k, entry] of cache) if (entry.expiresAt <= now) cache.delete(k)
+          if (cache.size >= SUPPORT_CONTACT_CACHE_MAX_ENTRIES) cache.clear()
+        }
+        cache.set(key, { expiresAt: now + SUPPORT_CONTACT_CACHE_TTL_MS, value: base })
       }
-      cache.set(key, { expiresAt: now + SUPPORT_CONTACT_CACHE_TTL_MS, value })
     }
-    return { ...value }
+    return { ...base, selfNoteTab: await this.readSelfNoteTabCached(now) }
   }
 
   async getAdmin(): Promise<AdminSupportContact> {
@@ -97,7 +140,8 @@ export class SupportContactService {
   /**
    * 只更新请求里出现的字段。空对象不写库、不写审计。
    * 审计与配置在同一事务里：审计失败则配置回滚。
-   * 不清除公开接口缓存。
+   * 电话、服务时间、小程序是否发布不清除按终端缓存的公开响应。
+   * 页签开关保存成功后只清 selfNoteTab 那一条缓存，公开读取立刻看到新值。
    */
   async updateAdmin(
     patch: SupportContactPatch,
@@ -106,30 +150,49 @@ export class SupportContactService {
     const phone = patch.servicePhone === undefined ? undefined : this.normalizePhone(patch.servicePhone)
     const hours = patch.serviceHours === undefined ? undefined : this.normalizeHours(patch.serviceHours)
     const published = patch.miniappPublished
-    if (phone === undefined && hours === undefined && published === undefined) {
+    const tabTouched = patch.selfNoteTab !== undefined
+    if (phone === undefined && hours === undefined && published === undefined && !tabTouched) {
       return this.getAdmin()
     }
-    return this.prisma.$transaction(async (tx) => {
+    const contactTouched = phone !== undefined || hours !== undefined || published !== undefined
+    const after = await this.prisma.$transaction(async (tx) => {
       const before = await this.readSettings(tx)
       if (phone !== undefined) await this.writeKey(tx, KEY_PHONE, phone, actor.userId)
       if (hours !== undefined) await this.writeKey(tx, KEY_HOURS, hours, actor.userId)
       if (published !== undefined) {
         await this.writeKey(tx, KEY_MINIAPP, published ? 'true' : 'false', actor.userId)
       }
-      const after = await this.readSettings(tx)
-      await this.audit.writeRequired(tx, {
-        actorId: actor.userId,
-        actorRole: actor.role,
-        action: AUDIT_ACTION,
-        targetType: 'system',
-        targetId: 'support-contact',
-        payload: { before, after },
-      })
-      return after
+      if (tabTouched) {
+        await this.writeKey(tx, KEY_SELF_NOTE_TAB, patch.selfNoteTab === true ? 'true' : 'false', actor.userId)
+      }
+      const next = await this.readSettings(tx)
+      if (contactTouched) {
+        await this.audit.writeRequired(tx, {
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: AUDIT_ACTION,
+          targetType: 'system',
+          targetId: 'support-contact',
+          payload: { before: contactAuditView(before), after: contactAuditView(next) },
+        })
+      }
+      if (tabTouched) {
+        await this.audit.writeRequired(tx, {
+          actorId: actor.userId,
+          actorRole: actor.role,
+          action: AUDIT_ACTION,
+          targetType: 'system',
+          targetId: 'support-contact',
+          payload: { selfNoteTab: next.selfNoteTab },
+        })
+      }
+      return next
     })
+    if (tabTouched) clearSelfNoteTabCache()
+    return after
   }
 
-  private async computePublic(terminalId: string, now: number): Promise<PublicSupportContact> {
+  private async computePublic(terminalId: string, now: number): Promise<TerminalPublicCache> {
     const stored = await this.readSettings(this.prisma)
     return {
       servicePhone: stored.servicePhone,
@@ -137,6 +200,18 @@ export class SupportContactService {
       otherOnlineTerminalNearby: await this.otherOnlineNearby(terminalId, now),
       miniappPublished: stored.miniappPublished,
     }
+  }
+
+  /** 缺键、空串、以及除字符串 true 以外的任何值都是关。 */
+  private async readSelfNoteTabCached(now: number): Promise<boolean> {
+    if (selfNoteTabCache && selfNoteTabCache.expiresAt > now) return selfNoteTabCache.value
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { key: KEY_SELF_NOTE_TAB },
+      select: { value: true },
+    })
+    const value = row?.value === 'true'
+    rememberSelfNoteTab(now, value)
+    return value
   }
 
   /**
@@ -183,7 +258,7 @@ export class SupportContactService {
 
   private async readSettings(db: SettingStore): Promise<AdminSupportContact> {
     const rows = await db.platformSetting.findMany({
-      where: { key: { in: [KEY_PHONE, KEY_HOURS, KEY_MINIAPP] } },
+      where: { key: { in: [KEY_PHONE, KEY_HOURS, KEY_MINIAPP, KEY_SELF_NOTE_TAB] } },
       select: { key: true, value: true },
     })
     const map = new Map(rows.map((row) => [row.key, row.value]))
@@ -191,6 +266,7 @@ export class SupportContactService {
       servicePhone: storedText(map.get(KEY_PHONE)),
       serviceHours: storedText(map.get(KEY_HOURS)),
       miniappPublished: map.get(KEY_MINIAPP) === 'true',
+      selfNoteTab: map.get(KEY_SELF_NOTE_TAB) === 'true',
     }
   }
 
