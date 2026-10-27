@@ -57,8 +57,7 @@
 .qxt-screen .qxt-flow { position: absolute; inset: 0; pointer-events: none; }
 .qxt-screen .qxt-flow svg { position: absolute; left: 0; width: 100%; height: 100%; }
 .qxt-screen .qxt-halo {
-  position: absolute;
-  /* 框贴右边不越出视口（越界门禁按框量），渐变圆心右移 120px 画出原来的光晕；呼吸缩放以右缘为原点 */
+  position: absolute; /* 框贴右边不越出视口（越界门禁按框量），渐变圆心右移 120px 画出原来的光晕；呼吸缩放以右缘为原点 */
   width: 500px;
   height: 760px;
   right: 0;
