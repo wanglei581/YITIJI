@@ -7,13 +7,12 @@
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HomeIcon, SparklesIcon, UserIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { TouchToolScreen } from './TouchToolScreen'
+import { toolBandStatus } from './toolBand'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { getTerminalId, isTerminalKiosk, useTerminalKiosk } from '../../services/api/screensaver'
-import { getTerminalCode } from '../../services/api/terminalConfig'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
@@ -281,16 +280,15 @@ export function ConvertImagesPage() {
   }
 
   // 未登录时 PDF 不会进入「我的文档」——完成态按转换响应 hasEndUser 分别渲染，游客不得看到已保存。
-  const terminalLabel = getTerminalCode() ? `就业服务大厅 · ${getTerminalCode()}` : '就业服务大厅'
-
   return (
-    <QxPageFrame
-      back={{ label: '返回打印扫描', onBack: () => navigate('/print-scan') }}
+    <TouchToolScreen
+      eyebrow="打印工具"
       title="图片转 PDF"
-      subtitle="几张图拼成一份 PDF。顺序你自己排，一张一页。"
-      status={status}
-      terminalLabel={terminalLabel}
-      ctabar={
+      sub="几张图拼成一份 PDF。顺序你自己排，一张一页。"
+      status={toolBandStatus(status)}
+      onBack={() => navigate('/print-scan')}
+      askLabel="问小青：几张图怎么合成一份"
+      dock={
         <ConvertImagesCta
           phase={phase}
           imageCount={images.length}
@@ -318,22 +316,6 @@ export function ConvertImagesPage() {
           }}
           onPickLocal={handlePickLocal}
         />
-      }
-      navbar={
-        <>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/')}>
-            <HomeIcon size={34} />
-            <span>首页</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/assistant')}>
-            <SparklesIcon size={34} />
-            <span>AI 顾问</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => navigate('/profile')}>
-            <UserIcon size={34} />
-            <span>我的</span>
-          </button>
-        </>
       }
     >
       <ConvertImagesView
@@ -380,6 +362,6 @@ export function ConvertImagesPage() {
         onHelp={() => navigate('/help')}
         onBack={() => navigate('/print-scan')}
       />
-    </QxPageFrame>
+    </TouchToolScreen>
   )
 }

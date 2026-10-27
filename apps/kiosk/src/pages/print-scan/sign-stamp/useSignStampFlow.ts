@@ -503,8 +503,11 @@ function resolveCta(args: {
   if (state === 'capability-error') {
     return { primary: '重试读取', primaryDisabled: false, reason: null, action: 'retry-cap' }
   }
-  if (state === 'terminal-missing' || state.startsWith('capability-')) {
-    return { primary: '联系工作人员', primaryDisabled: false, reason: null, action: 'help' }
+  if (state === 'terminal-missing' || state === 'capability-disabled' || state === 'capability-maintenance') {
+    return { primary: '返回打印扫描', primaryDisabled: false, reason: null, action: 'back' }
+  }
+  if (state.startsWith('capability-')) {
+    return { primary: '正在确认', primaryDisabled: true, reason: null, action: 'none' }
   }
   if (state === 'context-missing' || state === 'return-source-unknown') {
     return { primary: `${backLabel}（唯一出口）`, primaryDisabled: false, reason: null, action: 'back' }

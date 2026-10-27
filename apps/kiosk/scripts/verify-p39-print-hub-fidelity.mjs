@@ -164,7 +164,7 @@ must(
 )
 must(/--qx-tap-min/.test(cssSrc), '触控下限走 --qx-tap-min')
 must(/min-height:\s*200px/.test(cssSrc), '能力卡高度远高于 48px')
-must(/QxPageFrame/.test(featureSrc), '说明页同样使用 QxPageFrame')
+must(/TouchToolScreen/.test(featureSrc), '说明页使用触屏壳')
 must(/feature-id-photo/.test(featureSrc) && /feature-not-found/.test(featureSrc), '说明页覆盖两个 feature 态')
 
 console.log('\n[E] 能力真实性')

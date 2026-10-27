@@ -3,8 +3,8 @@
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
-import { HomeIcon, SparklesIcon, UserRoundIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
+import { TouchToolScreen } from './TouchToolScreen'
+import { toolBandStatus } from './toolBand'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
@@ -33,13 +33,15 @@ export function SignStampPage() {
   }
 
   return (
-    <QxPageFrame
-      back={{ label: '返回打印扫描', onBack: () => flow.navigate('/print-scan') }}
+    <TouchToolScreen
+      eyebrow="打印工具"
       title="签名"
-      subtitle="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
-      terminalLabel={terminalLabel}
-      status={flow.pill}
-      ctabar={
+      sub="把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。"
+      status={toolBandStatus(flow.pill)}
+      onBack={() => flow.navigate('/print-scan')}
+      askLabel="问小青：这个签名有法律效力吗"
+      place={terminalLabel}
+      dock={
         <div className="ss-cta-wrap">
           {flow.cta.reason ? (
             <p className="ss-cta-reason" id="sign-stamp-disabled-reason" data-testid="sign-stamp-disabled-reason">
@@ -74,22 +76,6 @@ export function SignStampPage() {
             </button>
           </div>
         </div>
-      }
-      navbar={
-        <>
-          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/')}>
-            <HomeIcon size={30} />
-            <span>首页</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/assistant')}>
-            <SparklesIcon size={30} />
-            <span>AI 顾问</span>
-          </button>
-          <button type="button" className="qx-nav-item" onClick={() => flow.navigate('/profile')}>
-            <UserRoundIcon size={30} />
-            <span>我的</span>
-          </button>
-        </>
       }
     >
       <div
@@ -238,6 +224,6 @@ export function SignStampPage() {
           </span>
         </div>
       </div>
-    </QxPageFrame>
+    </TouchToolScreen>
   )
 }

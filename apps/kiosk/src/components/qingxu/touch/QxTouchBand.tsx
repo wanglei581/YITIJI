@@ -49,6 +49,9 @@ export function QxTouchBand({
   pathLabel,
   onBack,
   back = true,
+  backLabel = '返回上一步',
+  backClassName,
+  className,
   live = false,
 }: {
   kind?: QxTouchBandKind
@@ -63,6 +66,11 @@ export function QxTouchBand({
   pathLabel?: string
   onBack?: () => void
   back?: boolean
+  /** 返回键的无障碍名。默认「返回上一步」，不传则和改前一样。 */
+  backLabel?: string
+  backClassName?: string
+  /** 叠在意图带根上。默认不传。 */
+  className?: string
   live?: boolean
 }) {
   const rawId = useId().replace(/:/g, '')
@@ -75,12 +83,12 @@ export function QxTouchBand({
   const sealClass = seal === 'listen' ? 'qxt-seal qxt-seal-listen' : seal === 'think' ? 'qxt-seal qxt-seal-think' : 'qxt-seal'
 
   return (
-    <header className={`qxt-band qxt-band-${kind}${live ? ' qxt-band-live' : ''}`}>
+    <header className={['qxt-band', `qxt-band-${kind}`, live ? 'qxt-band-live' : '', className].filter(Boolean).join(' ')}>
       <FlowLines id={`qxt-flow-${rawId}`} live={live} />
       <div className="qxt-halo" />
       <div className="qxt-hdr">
         {back ? (
-          <button type="button" className="qxt-back" aria-label="返回上一步" onClick={goBack}>
+          <button type="button" className={['qxt-back', backClassName].filter(Boolean).join(' ')} aria-label={backLabel} onClick={goBack}>
             <QxTouchIcon name="chevL" size={34} strokeWidth={2.4} />
           </button>
         ) : null}

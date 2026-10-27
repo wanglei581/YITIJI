@@ -336,11 +336,11 @@ test('unknown feature key fails closed with recovery actions @w2', async ({ page
 
   await page.goto('/print-scan/feature/not-a-real-feature')
   await expect(page.locator('[data-testid="print-hub-state-feature-not-found"]')).toBeVisible()
-  await expect(page.getByRole('heading', { name: '未找到该功能' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
   await expect(page.getByText('没有这项能力说明')).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回打印扫描服务' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '联系工作人员' })).toBeVisible()
-  await page.getByRole('button', { name: '返回打印扫描服务' }).click()
+  await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
+  await expect(page.getByRole('button', { name: '联系工作人员' })).toHaveCount(0)
+  await page.getByTestId('print-hub-primary').click()
   await expect(page).toHaveURL(/\/print-scan$/)
   expect(errors).toEqual([])
 })
@@ -382,7 +382,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   }
   // 身份证放置位置待现场核实：只给指路句，不编造位置。
   await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
-  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕提示或找工作人员。')
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕上的图示。')
   await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
   await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
   // 不伪造结果、不写收费、不写工程词。

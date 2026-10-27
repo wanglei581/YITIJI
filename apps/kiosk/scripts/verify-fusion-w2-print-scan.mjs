@@ -259,7 +259,7 @@ for (const path of presentationFiles) {
 // 两页的 QX 断言在下方各自的段落里（含 doesNotMatch(/KioskPageFrame/) 防回退），
 // 断言强度只增不减，故这张表连同它的循环一并移除。
 const printScanFeature = read('src/pages/print-scan/PrintScanFeatureInfoPage.tsx')
-assert.match(printScanFeature, /QxPageFrame/, 'feature info page uses Qingxu page frame')
+assert.match(printScanFeature, /TouchToolScreen/, 'feature info page uses the touch screen')
 assert.match(
   printScanFeature,
   /data-w2-page=["']print-scan-feature["']/,
@@ -402,7 +402,7 @@ const convertImages =
   read('src/pages/print-scan/ConvertImagesView.tsx') +
   read('src/pages/print-scan/ConvertImagesPanels.tsx') +
   read('src/pages/print-scan/convert-images-model.ts')
-for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'QxPageFrame']) {
+for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel', 'TouchToolScreen']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
 }
 assert.match(
@@ -476,7 +476,7 @@ assert.doesNotMatch(
   /<img[\s\S]{0,200}stamp\.(fileAccessUrl|fileUrl)/,
   'sign-stamp does not echo the signature/stamp image on the public screen',
 )
-assert.match(signStamp, /QxPageFrame/, 'SignStampPage uses the qingxu page frame')
+assert.match(signStamp, /TouchToolScreen/, 'SignStampPage uses the touch screen')
 assert.doesNotMatch(signStamp, /KioskPageFrame/, 'SignStampPage has left the V6 frame')
 assert.match(
   signStamp,
@@ -983,13 +983,13 @@ assert.match(
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxPageFrame/,
-  'scan chrome wraps QxPageFrame so the four scan routes leave the V6 shell',
+  /QxTouchScreen/,
+  'scan chrome wraps QxTouchScreen so the four scan routes leave the V6 shell',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),
-  /QxAppNavbar/,
-  'scan chrome uses the shared Qingxu navbar instead of an inlined copy',
+  /QxTouchNav/,
+  'scan chrome uses the shared touch navbar instead of an inlined copy',
 )
 assert.match(
   read('src/pages/scan/ScanWorkbenchChrome.tsx'),

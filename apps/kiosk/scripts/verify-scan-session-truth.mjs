@@ -1191,7 +1191,7 @@ assert.equal(
   '结果页只许有两处 navigate：leaveScanFlow 里那一处（replace），以及 goToSettings 的'
     + '非工作台兜底。多出来的一处就是一个绕开了撤销/清场/replace 的出口',
 )
-for (const destination of ['/print-scan', '/help', '/']) {
+for (const destination of ['/print-scan', '/']) {
   assert.match(
     scanResult,
     new RegExp(`leaveScanFlow\\('${destination.replaceAll('/', '\\/')}'\\)`),
@@ -1203,6 +1203,11 @@ for (const destination of ['/print-scan', '/help', '/']) {
     `落点 ${destination} 一旦改回裸 navigate，这一屏又会把上一位的凭证和授权留给下一位`,
   )
 }
+assert.doesNotMatch(
+  scanResult,
+  /leaveScanFlow\('\/help'\)|navigate\('\/help'\)|联系工作人员|找工作人员/,
+  '结果页不再把失败交给现场人员。返回打印扫描和返回首页仍走 leaveScanFlow',
+)
 
 /* ── F. 谁有资格说「服务端已放行」 ─────────────────────────────────────────
  *

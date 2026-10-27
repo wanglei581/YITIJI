@@ -91,8 +91,8 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
   registerShell(api)
 
   await page.goto('/print-scan/feature/not-a-real-feature')
-  await expect(page.getByRole('heading', { name: '未找到该功能' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '返回打印扫描服务' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '这个能力名我不认识' })).toBeVisible()
+  await expect(page.getByTestId('print-hub-primary')).toHaveText('返回打印扫描')
   await expectHealthy(page, errors, 'print-scan-feature')
 })
 

@@ -519,9 +519,8 @@ export function ConvertImagesCta(props: {
   const ghostBack = (
     <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
   )
-  const help = (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onHelp}>联系工作人员</button>
-  )
+  const help = null
+  void props.onHelp
 
   if (phase === 'empty') {
     return (

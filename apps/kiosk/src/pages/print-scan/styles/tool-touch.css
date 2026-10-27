@@ -1,0 +1,232 @@
+/* 第 9 包触屏壳里的旧按钮。`.qxt-screen button` 会清掉背景，这里按令牌补回来。 */
+
+.qxt-screen .qxt-scan-scroll,
+.qxt-screen .ph-page,
+.qxt-screen .i2p-page,
+.qxt-screen .ss-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.qxt-screen .qx-btn {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  height: var(--qxt-btn-h);
+  border-radius: var(--qxt-r-btn);
+  padding: 0 28px;
+  font: 700 var(--qxt-fs-body)/1.2 var(--qx-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.qxt-screen .qx-btn[data-variant='primary'] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qx-btn[data-variant='ghost'] {
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .qx-btn:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen .qxt-dock .sw-cta-wrap,
+.qxt-screen .qxt-dock .ss-cta-wrap,
+.qxt-screen .qxt-dock .i2p-cta-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+.qxt-screen .qxt-dock .sw-cta-row,
+.qxt-screen .qxt-dock .ss-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qxt-screen .sw-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+}
+
+/* 短页把最后一块说明卡撑满剩余纸面。卡片底是 --qx-surface，不是奶油纸色。 */
+.qxt-screen .sw-page > .sw-sec.is-grow,
+.qxt-screen .sw-page > .sw-sec:last-child {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.qxt-screen .sw-page > .sw-sec.is-grow > .sw-panel,
+.qxt-screen .sw-page > .sw-sec.is-grow > .sw-grid2,
+.qxt-screen .sw-page > .sw-sec:last-child > .sw-grid2,
+.qxt-screen .sw-page > .sw-sec:last-child > .sw-chain {
+  flex: 1 1 auto;
+}
+
+.qxt-screen .sw-page > .sw-sec.is-grow > .sw-panel {
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-edge);
+  border-radius: 28px;
+  padding: 16px;
+}
+
+.qxt-screen .sw-page > .sw-sec.is-grow > .sw-grid2,
+.qxt-screen .sw-page > .sw-sec:last-child > .sw-grid2 {
+  align-items: stretch;
+  grid-template-rows: minmax(min-content, 1fr);
+}
+
+.qxt-screen .ph-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.qxt-screen .ph-page > .ph-sec.ph-sec--fill {
+  flex: 1 1 auto;
+}
+
+.qxt-screen .ph-page > .ph-sec.ph-sec--fill > .ph-pgrp {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.qxt-screen .ss-page {
+  min-height: 100%;
+}
+
+/* 1080 复印说明要在正文区一屏放下。意图带高度不动，只收这一页的横幅和步骤。 */
+.qxt-screen .ph-page[data-state='feature-copy'] {
+  gap: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq {
+  min-height: 0;
+  padding: 12px 24px;
+  border-radius: 24px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-row { gap: 16px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-ask {
+  font-size: 32px;
+  line-height: 1.25;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-xq-doing { margin-top: 4px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-sec-h { min-height: 0; margin-bottom: 6px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-steps { gap: 6px; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-step {
+  min-height: 0;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-step-no {
+  width: 44px;
+  height: 44px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-notes { gap: 8px; margin-top: 0; }
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-note {
+  min-height: 0;
+  padding: 10px 14px;
+}
+.qxt-screen .ph-page[data-state='feature-copy'] .ph-state { padding: 12px 18px; }
+.qxt-screen .ph-page[data-state='feature-copy'] > .ph-foot { margin-top: auto; }
+
+/* 手机不缩放时，410px 意图带把扫描正文挤到比底注还矮，底注滚不进可视区。
+   只在舞台关闭时收这一壳，1080 舞台不吃。 */
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact {
+  min-height: 0;
+  padding: 10px 12px 0;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-hdr {
+  height: auto;
+  min-height: 48px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-hdr-right {
+  flex: 1 1 100%;
+  margin-left: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-status {
+  height: auto;
+  min-height: 36px;
+  max-width: 100%;
+  white-space: normal;
+  padding: 6px 12px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-clock b { font-size: 20px; }
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask { padding: 8px 0 10px; }
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask h1 { font-size: 28px; }
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask p {
+  margin-top: 4px;
+  font-size: 16px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-rail {
+  gap: 8px;
+  padding-bottom: 10px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-body {
+  padding: 8px 12px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .sw-page {
+  min-height: 0;
+  overflow: auto;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock {
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  gap: 8px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .qxt-askq {
+  flex: 1 1 100%;
+  min-width: 0;
+  height: 56px;
+  min-height: 56px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .sw-cta-wrap {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .qx-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 8px;
+  font-size: 16px;
+  white-space: normal;
+  text-align: center;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav { height: 64px; }
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav button {
+  min-height: 64px;
+  font-size: 13px;
+  gap: 2px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav svg {
+  width: 22px;
+  height: 22px;
+}
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen .sw-pvh-t {
+    flex: 1 1 100%;
+    min-width: 12em;
+  }
+}

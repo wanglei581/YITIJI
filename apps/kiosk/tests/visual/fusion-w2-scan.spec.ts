@@ -551,7 +551,7 @@ test.describe('scan result at 390x844', () => {
 
     const viewport = { x: 0, y: 0, width: 390, height: 844 }
     const scroller = page.locator('[data-qx-page="scan-workbench"]')
-    const hero = page.locator('.sw-xq')
+    const ask = page.locator('[data-qxt-ask="on"]')
     const truth = page.getByTestId('scan-workbench-truth')
 
     // 底注按稿 18 只在选类型那一屏出现：在那一屏上它必须随正文整块滚得到，不被操作条 / 底栏盖住。
@@ -580,18 +580,16 @@ test.describe('scan result at 390x844', () => {
     await assertTapTargetPointerHit(ctabar.getByRole('button', { name: '拿去打印' }))
     for (const item of await navbar.getByRole('button').all()) await assertTapTargetPointerHit(item)
 
-    // 横幅一字不删，只是随正文一起滚，整块露得出来；结果页不再复读底注。
-    await expect(hero).toBeVisible()
+    // 问小青在底栏，始终露出来；结果页不再复读底注。
+    await expect(ask).toBeVisible()
     await expect(truth).toHaveCount(0)
-    await revealByUserScroll(hero, 'start')
-    expectInside(await boxOf(hero, '横幅'), await boxOf(scroller, '扫描工作台滚动区'), '横幅必须能整块滚进可视区')
 
     await revealByUserScroll(aiButton)
     const view = await boxOf(scroller, '扫描工作台滚动区')
     const button = await boxOf(aiButton, '「AI 简历识别」')
     expectInside(button, view, '「AI 简历识别」必须能整块滚进可视区，不靠滚动 overflow:hidden 的舞台')
     expectInside(button, viewport, '「AI 简历识别」必须整块在视口内')
-    for (const [what, layer] of [['横幅', hero], ['操作条', ctabar], ['底栏', navbar]] as const) {
+    for (const [what, layer] of [['问小青', ask], ['操作条', ctabar], ['底栏', navbar]] as const) {
       expect(boxesOverlap(button, await boxOf(layer, what)), `「AI 简历识别」不得与${what}重叠`).toBe(false)
     }
     await assertTapTargetPointerHit(aiButton)

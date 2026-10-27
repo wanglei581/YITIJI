@@ -277,7 +277,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             finishWithResult({
               outcome: 'failed',
               success: false,
-              reason: '长时间无法查询扫描状态，请联系工作人员或重新开始',
+              reason: '长时间无法查询扫描状态，请重新开始',
             }, true)
             return
           }
@@ -372,8 +372,8 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     ? { tone: 'unknown' as const, label: '正在发送取消请求' }
     : !deliveryAcked
       ? ackRetryable
-        ? { tone: 'warn' as const, label: '投递授权未确认' }
-        : { tone: 'unknown' as const, label: '正在确认投递授权' }
+        ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
+        : { tone: 'unknown' as const, label: '正在确认能收到扫描件' }
       : pollInFlight
         ? { tone: 'unknown' as const, label: '正在查询系统' }
         : error
@@ -385,7 +385,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-progress"
       state={workbenchState}
       layout="spread"
-      title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认投递授权'}
+      title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认能收到扫描件'}
       subtitle={deliveryAcked
         ? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'
         : '还没确认这台机器可以收这一场的文件；确认之前请先别在面板上按开始'}
@@ -400,7 +400,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             cancelling
               ? '正在等取消结果 —— 这一刻既不说已取消，也不说已完成'
               : !deliveryAcked
-                ? '没拿到投递授权前别在面板上按开始 —— 这一刻扫出来的文件不会交到这一场'
+                ? '还没确认能收到扫描件之前，别在面板上按开始 —— 这一刻扫出来的文件不会交到这一场'
                 : pollInFlight
                   ? '正在等这次查询的结果 —— 这一刻不改判任务状态'
                   : undefined
@@ -437,7 +437,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               aria-disabled={cancelling || !ackRetryable}
               onClick={() => setAckState('pending')}
             >
-              {ackRetryable ? '再确认一次' : '正在确认投递授权'}
+              {ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}
             </button>
           )}
         </ScanCta>
@@ -450,7 +450,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           cancelling
             ? '正在发送取消请求'
             : !deliveryAcked
-              ? ackRetryable ? '还没确认这台机器能收这份文件' : '正在确认投递授权'
+              ? ackRetryable ? '还没确认这台机器能收这份文件' : '正在确认能收到扫描件'
               : pollInFlight
                 ? '正在查询系统'
                 : error
@@ -466,7 +466,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             ]
           : [
               { label: '这次扫描已经建好', tone: 'ok' as const },
-              { label: '投递授权未确认', tone: 'warn' as const },
+              { label: '还没确认能收到扫描件', tone: 'warn' as const },
             ]}
       >
         {!deliveryAcked && !cancelling ? (

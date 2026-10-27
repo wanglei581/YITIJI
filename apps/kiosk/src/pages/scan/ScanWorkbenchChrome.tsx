@@ -1,22 +1,70 @@
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
+import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
+import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
+import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { useAuth } from '../../auth/useAuth'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
-  SCAN_ASK,
   SCAN_CHAIN,
   SCAN_TRUTH,
   SCAN_TYPE_OPTIONS,
   type ScanType,
   type ScanWorkbenchState,
 } from './scanWorkbench'
+import '../print-scan/styles/tool-touch.css'
 import './styles/scan-workbench-qx.css'
 import './styles/scan-workbench-compact-qx.css'
+
+const SCAN_RAIL = ['选类型', '扫描指引', '等回传', '扫描完成'] as const
+
+const SCAN_RAIL_NOW: Record<ScanWorkbenchShellProps['page'], number> = {
+  'scan-start': 0,
+  'scan-settings': 1,
+  'scan-progress': 2,
+  'scan-result': 3,
+}
+
+const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
+  'scan-start': '材料扫描',
+  'scan-settings': '扫描指引',
+  'scan-progress': '等回传',
+  'scan-result': '扫描完成',
+}
+
+function scanAskLabel(page: ScanWorkbenchShellProps['page'], state: ScanWorkbenchState): string {
+  if (state === 'usb-panel') return '问小青：U 盘扫描怎么走'
+  if (state === 'loading' || state === 'blocked' || state === 'unknown') return '问小青：扫描没开放怎么办'
+  if (state === 'awaiting-ack') return page === 'scan-progress' ? '问小青：授权还没好' : '问小青：为什么还不能扫'
+  if (state === 'failed' || state === 'completed-no-file' || state === 'wait-timeout') return '问小青：扫描失败怎么办'
+  if (page === 'scan-settings') return '问小青：面板上怎么扫'
+  if (page === 'scan-progress') return '问小青：一直等不到怎么办'
+  if (page === 'scan-result') return '问小青：扫描件接下来呢'
+  return '问小青：扫描和复印有什么不同'
+}
+
+function bandTone(tone: 'ok' | 'warn' | 'bad' | 'unknown'): 'ok' | 'warn' | 'unknown' {
+  if (tone === 'ok') return 'ok'
+  if (tone === 'warn' || tone === 'bad') return 'warn'
+  return 'unknown'
+}
+
+type ScanWorkbenchShellProps = {
+  page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
+  state: ScanWorkbenchState
+  title: string
+  subtitle: ReactNode
+  status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  ctabar: ReactNode
+  facts?: readonly string[]
+  layout?: 'stack' | 'spread'
+  children: ReactNode
+}
 
 export function scanTerminalLabel(): string {
   return getTerminalCode() || getTerminalId() || '终端未登记'
@@ -50,7 +98,7 @@ export function ScanWorkbenchShell({
 }) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
-  const ask = SCAN_ASK[state]
+  const askLabel = scanAskLabel(page, state)
   /**
    * 离开整条扫描流程。四个阶段、四个出口（顶栏返回 + 底栏三项主导航）共用这一条。
    *
@@ -69,22 +117,45 @@ export function ScanWorkbenchShell({
     navigate(destination)
   }
   return (
-    <QxPageFrame
-      /* 稿 18-scan-workbench 原文：data-route="/print-scan" aria-label="返回打印扫描"。
-       *  一张工作台四个阶段共用这一个返回键，落点是打印扫描 Hub，不是「上一阶段」——
-       *  稿就是这么画的：阶段之间用 CTA 前进/后退，顶栏返回是「离开这条流程」。
-       *  离开整条流程会撤掉这次扫描会话（服务端任务 + 本机登记）；阶段之间来回走不会。
-       *  progress 阶段另有一个显式「取消扫描」，它等服务端回执再改判（稿里 cancel-* 是独立状态）。 */
-      back={{ label: '返回打印扫描', onBack: () => leaveScanFlow('/print-scan') }}
-      title={title}
-      subtitle={subtitle}
-      status={status}
-      terminalLabel={scanTerminalLabel()}
-      ctabar={ctabar}
-      navbar={
+    <QxTouchScreen
+      className="qx-stage"
+      legacyFrame
+      testId={`scan-workbench-state-${state}`}
+      stateId={state}
+      bodyClassName="qxt-body-tight"
+      band={
+        <QxTouchBand
+          kind="compact"
+          className="qx-topbar"
+          backClassName="qx-topbar-back"
+          backLabel="返回打印扫描"
+          onBack={() => leaveScanFlow('/print-scan')}
+          eyebrow={SCAN_EYEBROW[page]}
+          title={title}
+          sub={typeof subtitle === 'string' ? subtitle : undefined}
+          seal={null}
+          place={scanTerminalLabel()}
+          status={{ text: status.label, tone: bandTone(status.tone) }}
+          rail={{ labels: SCAN_RAIL, now: SCAN_RAIL_NOW[page] }}
+        />
+      }
+      dock={
+        <QxTouchDock
+          className="qx-ctabar"
+          back={false}
+          ask={{ label: askLabel, draft: askLabel }}
+          onAsk={() => {
+            rememberAssistantDraft(askLabel)
+            leaveScanFlow('/assistant')
+          }}
+          mid={ctabar}
+        />
+      }
+      nav={
         /* 底栏三项也是「离开整条扫描流程」，不是页内切换：走同一条 leaveScanFlow，
          *  只有落点不同。任何一个改回裸 navigate，这一屏就又会留下孤儿任务。 */
-        <QxAppNavbar
+        <QxTouchNav
+          className="qx-navbar"
           onHome={() => leaveScanFlow('/')}
           onAdvisor={() => leaveScanFlow('/assistant')}
           onProfile={() => leaveScanFlow('/profile')}
@@ -92,19 +163,24 @@ export function ScanWorkbenchShell({
       }
     >
       <div
-        className="sw-page qx-grow"
+        className="sw-page qxt-scan-scroll"
         data-w2-page={page}
         data-qx-page="scan-workbench"
         data-state={state}
-        data-testid={`scan-workbench-state-${state}`}
+        data-layout={layout}
       >
-        <ScanHero ask={ask.text} em={ask.em} doing={ask.doing} facts={facts} />
-        <div className="qx-scroll sw-scroll" data-layout={layout}>{children}</div>
-        {/* 稿 18：底部三列口径是一次性说明，只在起点（选类型）出现，不每一屏复读 ——
-            后面各屏把这块高度还给当前任务；各屏自己的「不猜 / 不改判」写在各自的卡里。 */}
+        {facts && facts.length > 0 ? (
+          <div className="sw-xq-facts">
+            {facts.map((fact) => (
+              <p key={fact}>{fact}</p>
+            ))}
+          </div>
+        ) : null}
+        {children}
+        {/* 底部三列口径只在选类型出现，不每一屏复读。 */}
         {state === 'setup' ? <ScanTruth /> : null}
       </div>
-    </QxPageFrame>
+    </QxTouchScreen>
   )
 }
 

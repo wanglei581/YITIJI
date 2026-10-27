@@ -17,8 +17,10 @@ export function QxTouchScreen({
   overlay,
   motion = 'enter',
   bodyClassName,
+  className,
   testId,
   stateId,
+  legacyFrame = false,
 }: {
   band: ReactNode
   children: ReactNode
@@ -27,8 +29,15 @@ export function QxTouchScreen({
   overlay?: ReactNode
   motion?: QxTouchMotion
   bodyClassName?: string
+  /** 叠在 `.qxt-screen` 上。默认不传，样板页外观不变。 */
+  className?: string
   testId?: string
   stateId?: string
+  /**
+   * 沿用青序页框的 `data-qx-frame`。默认不加，样板页和别的包不受影响。
+   * 扫描与打印工具需要它，返回出口门禁才继续判这些页。
+   */
+  legacyFrame?: boolean
 }) {
   const underRef = useRef<HTMLDivElement>(null)
   const covered = Boolean(overlay)
@@ -41,10 +50,11 @@ export function QxTouchScreen({
   const motionClass = motion === 'none' ? '' : motion === 'back' ? 'qxt-enter qxt-back' : motion === 'leave' ? 'qxt-leave' : 'qxt-enter'
   return (
     <div
-      className={`qxt-screen ${motionClass}`.trim()}
+      className={['qxt-screen', motionClass, className].filter(Boolean).join(' ')}
       data-qxt-screen=""
       data-qxt-gallery=""
       data-qxt-state={stateId}
+      data-qx-frame={legacyFrame ? 'true' : undefined}
       data-testid={testId}
     >
       <div ref={underRef} className="qxt-under" aria-hidden={covered ? true : undefined}>

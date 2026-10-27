@@ -26,7 +26,6 @@ import {
   ScanLineIcon,
   UserSquareIcon,
 } from 'lucide-react'
-import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import {
   COPY_GUIDE_CASES,
   COPY_GUIDE_KEY,
@@ -39,13 +38,15 @@ import {
 } from './printHubContent'
 import {
   PrintHubHero,
-  PrintHubNavbar,
   PrintHubRecordNotes,
   PrintHubState,
   PrintHubTruth,
   PrintHubEmphasis,
   type QxPrintQuickLinkView,
 } from './components/QxPrintHubView'
+import { PhoneHelpLine } from './phoneHelp'
+import { toolBandStatus } from './toolBand'
+import { TouchToolScreen } from './TouchToolScreen'
 import './styles/print-hub-qx.css'
 
 const PHOTO_FALLBACK = '/print/upload?source=document&tab=file&category=photo'
@@ -75,39 +76,27 @@ export function PrintScanFeatureInfoPage() {
   const { key } = useParams<{ key: string }>()
   const hubState = featureState(key)
   const found = hubState !== 'feature-not-found'
-  const pill = HUB_PILL[hubState]
-  const backToHub = { label: '返回打印扫描', onBack: () => navigate('/print-scan') }
-  const navbar = (
-    <PrintHubNavbar
-      onHome={() => navigate('/')}
-      onAdvisor={() => navigate('/assistant')}
-      onProfile={() => navigate('/profile')}
-    />
-  )
+  const pill = toolBandStatus(HUB_PILL[hubState])
 
   if (!found) {
     return (
-      <QxPageFrame
-        back={backToHub}
-        title="未找到该功能"
+      <TouchToolScreen
+        eyebrow="打印扫描"
+        title="这个能力名我不认识"
+        sub="地址里带了一个本机不认识的能力名称"
         status={pill}
-        terminalLabel="就业服务大厅"
-        navbar={navbar}
-        ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-              联系工作人员
-            </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="print-hub-primary"
-              onClick={() => navigate('/print-scan')}
-            >
-              返回打印扫描服务
-            </button>
-          </>
+        onBack={() => navigate('/print-scan')}
+        askLabel="问小青：这个入口是什么"
+        dock={
+          <button
+            type="button"
+            className="qx-btn"
+            data-variant="primary"
+            data-testid="print-hub-primary"
+            onClick={() => navigate('/print-scan')}
+          >
+            返回打印扫描
+          </button>
         }
       >
         <div
@@ -117,7 +106,11 @@ export function PrintScanFeatureInfoPage() {
           data-state="feature-not-found"
           data-testid="print-hub-state-feature-not-found"
         >
-          <PrintHubHero state="feature-not-found" doing="大概率是旧链接。回打印扫描首页重新选一次。" />
+          <PrintHubHero
+            state="feature-not-found"
+            askText={{ text: '回打印扫描首页重新选一次。', em: '重新选一次' }}
+            doing="大概率是旧链接。回打印扫描首页重新选一次。"
+          />
           <section className="ph-fallback">
             <PrintHubState kind="warn" icon={<InfoIcon size={28} />} heading="没有这项能力说明" testId="print-hub-fallback">
               <p className="ph-state-p">
@@ -172,21 +165,23 @@ export function PrintScanFeatureInfoPage() {
           </section>
           <footer className="ph-foot">
             <PrintHubTruth />
+            <PhoneHelpLine />
           </footer>
         </div>
-      </QxPageFrame>
+      </TouchToolScreen>
     )
   }
 
   if (hubState === 'feature-copy') {
     return (
-      <QxPageFrame
-        back={backToHub}
+      <TouchToolScreen
+        eyebrow="复印"
         title="怎么在打印机上复印"
+        sub="复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里"
         status={pill}
-        terminalLabel="就业服务大厅"
-        navbar={navbar}
-        ctabar={
+        onBack={() => navigate('/print-scan')}
+        askLabel="问小青：复印和打印有什么不同"
+        dock={
           <>
             <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
               返回打印扫描
@@ -271,8 +266,9 @@ export function PrintScanFeatureInfoPage() {
               testId="print-hub-copy-take-original"
             >
               <p className="ph-state-p">
-                复印件和原件一起带走。原件落下了，请找现场工作人员。
+                复印件和原件一起带走。原件还在玻璃上或进纸口里，请务必取回。
               </p>
+              <PhoneHelpLine />
             </PrintHubState>
           </section>
           <footer className="ph-foot">
@@ -284,18 +280,19 @@ export function PrintScanFeatureInfoPage() {
             </div>
           </footer>
         </div>
-      </QxPageFrame>
+      </TouchToolScreen>
     )
   }
 
   return (
-    <QxPageFrame
-      back={backToHub}
-      title="证件照"
+    <TouchToolScreen
+      eyebrow="证件照"
+      title="证件照：本机尚未开放"
+      sub="这项只有说明，没有可用流程"
       status={pill}
-      terminalLabel="就业服务大厅"
-      navbar={navbar}
-      ctabar={
+      onBack={() => navigate('/print-scan')}
+      askLabel="问小青：没有证件照功能怎么办"
+      dock={
         <>
           <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
             返回打印扫描
@@ -327,11 +324,11 @@ export function PrintScanFeatureInfoPage() {
           <PrintHubState
             kind="warn"
             icon={<UserSquareIcon size={28} />}
-            heading="证件照：本机尚未开放"
+            heading="本机暂未开放证件照"
             testId="print-hub-idphoto-unavailable"
           >
             <p className="ph-state-p">
-              这项只有说明，<b>没有可用流程</b>。本机不做尺寸裁切、底色处理、版面排布，也不生成证件照成品。
+              本机不做尺寸裁切、底色处理、版面排布，也不生成证件照成品。
             </p>
             <p className="ph-state-p" data-disclaimer="true">
               开放前不提供换底色、自动排版和成品生成，免得你按着不存在的流程走一遍。
@@ -398,8 +395,9 @@ export function PrintScanFeatureInfoPage() {
         </section>
         <footer className="ph-foot">
           <PrintHubTruth />
+          <PhoneHelpLine />
         </footer>
       </div>
-    </QxPageFrame>
+    </TouchToolScreen>
   )
 }

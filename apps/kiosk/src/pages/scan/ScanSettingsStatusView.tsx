@@ -114,7 +114,7 @@ export function ScanSettingsStatusView({
             ? 'expired'
             : 'create-failed'
   const title = awaitingAck
-    ? failure?.title ?? '正在确认投递授权'
+    ? failure?.title ?? '正在确认能收到扫描件'
     : phase === 'invalid'
       ? '未创建扫描任务'
       : phase === 'loading'
@@ -129,8 +129,8 @@ export function ScanSettingsStatusView({
         : failure?.description ?? '这次没有可用的扫描。'
   const status = awaitingAck
     ? ackRetryable
-      ? { tone: 'warn' as const, label: '投递授权未确认' }
-      : { tone: 'unknown' as const, label: '正在确认投递授权' }
+      ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
+      : { tone: 'unknown' as const, label: '正在确认能收到扫描件' }
     : phase === 'loading'
       ? {
           tone: 'unknown' as const,
@@ -149,7 +149,7 @@ export function ScanSettingsStatusView({
   /* 稿 18 状态屏骨架：当前状态 → 链路位置 → 下一步。这几屏一律还没有一段开始（链路不点亮），
    * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。 */
   const chainHead: readonly [string, string] = awaitingAck
-    ? ['这次扫描已经建好，还差投递授权', '授权确认前，请先不要按开始']
+    ? ['这次扫描已经建好，还没确认能收到扫描件', '确认之前，请先不要按开始']
     : cleanupHolding
       ? ['还在收上一场的尾', '这一场的四段都还没开始']
       : phase === 'loading'
@@ -172,7 +172,7 @@ export function ScanSettingsStatusView({
         <ScanCta
           reason={
             awaitingAck
-              ? '没拿到投递授权前不显示面板操作步骤 —— 这一刻扫出来的文件不会交到这一场'
+              ? '还没确认能收到扫描件之前，不显示面板操作步骤 —— 这一刻扫出来的文件不会交到这一场'
               : phase === 'loading'
                 ? '请求还在路上 —— 这一刻页面不做任何判断，也不给你一个假的编号'
                 : cleanupHolding
@@ -197,7 +197,7 @@ export function ScanSettingsStatusView({
               </button>
             ) : (
               <button type="button" className="qx-btn" data-variant="primary" disabled aria-disabled="true">
-                等系统确认投递授权
+                等系统确认能收到扫描件
               </button>
             )
           ) : quietPeriodBlocked ? (
@@ -254,7 +254,7 @@ export function ScanSettingsStatusView({
           awaitingAck
             ? [
                 { label: '这次扫描已经建好', tone: 'ok' as const },
-                { label: '投递授权未确认', tone: 'warn' as const },
+                { label: '还没确认能收到扫描件', tone: 'warn' as const },
               ]
             : phase === 'loading'
               ? [
@@ -365,7 +365,7 @@ export function ScanSettingsStatusView({
                   ? '点右下角「再试一次安全重扫」：同一份材料的授权还在手上。'
                   : '返回扫描首页，从选择类型重新走一遍。',
                 '连续失败就别在面板上扫了，扫了也没有这次扫描来接收。',
-                '叫工作人员看一眼这台机器到系统的网络。',
+                '一直转，多半是这台机器到系统的网络有问题。',
               ]} />
             </ScanNoteCard>
             <ScanNoteCard title="为什么不给你一个编号" foot="这一屏的空白是有意的，不是还没加载完。">

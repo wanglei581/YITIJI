@@ -97,10 +97,10 @@ export const SCAN_ACK_REFUSED_FAILURE: SessionFailure = {
  */
 export const SCAN_ACK_PENDING_FAILURE: SessionFailure = {
   title: '还没确认这台机器能收这份文件',
-  description: '这次扫描已经建好，但本机还没能向系统确认投递授权。没确认之前，'
+  description: '这次扫描已经建好，但本机还没确认能收到扫描件。没确认之前，'
     + '打印机面板上扫出来的文件不会交到这一场，所以现在按开始只会白扫一张纸，'
     + '也不会被别人收走。这一步可以重来：点「再确认一次」让本机再问一遍系统。'
-    + '一直不成就安全返回扫描首页，或者叫工作人员看一眼这台机器到系统的网络。',
+    + '一直不成就安全返回扫描首页。',
 }
 
 /**
@@ -110,7 +110,7 @@ export const SCAN_ACK_PENDING_FAILURE: SessionFailure = {
  * 打在 27 寸公共屏上。三句缺一不可 —— 会话确实建成了、这一刻扫也没用、
  * 但也不会被别人收走（否则用户会以为自己的纸有风险，转身去找工作人员）。
  */
-export const SCAN_ACK_PENDING_NOTICE = '这次扫描已经建好。本机正在向系统确认投递授权：'
+export const SCAN_ACK_PENDING_NOTICE = '这次扫描已经建好。本机正在确认能收到扫描件：'
   + '确认之前，打印机面板上扫出来的文件不会交到这一场，所以请先别在面板上按开始。'
   + '这一场也不会被别人收走 —— 没确认的任务不会接收任何文件。'
 

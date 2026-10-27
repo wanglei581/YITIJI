@@ -30,6 +30,8 @@ export function QxTouchDock({
   ask,
   mid,
   primary,
+  className,
+  onAsk,
 }: {
   onBack?: () => void
   back?: boolean
@@ -38,6 +40,13 @@ export function QxTouchDock({
   ask?: QxTouchAsk
   mid?: ReactNode
   primary?: QxTouchPrimary
+  /** 叠在底栏上。默认不传。 */
+  className?: string
+  /**
+   * 问小青改走调用方。不传时仍是记住草稿再去顾问页。
+   * 扫描流程要先撤销会话，所以由页面自己离开。
+   */
+  onAsk?: () => void
 }) {
   const navigate = useNavigate()
   const goBack = useQxTouchBack(onBack)
@@ -52,6 +61,10 @@ export function QxTouchDock({
         className="qxt-askq"
         data-qxt-ask="on"
         onClick={() => {
+          if (onAsk) {
+            onAsk()
+            return
+          }
           rememberAssistantDraft(ask.draft)
           navigate('/assistant')
         }}
@@ -63,8 +76,8 @@ export function QxTouchDock({
       </button>
     )
   ) : null
-  const middle = askNode ?? mid ?? null
-  const wide = !middle && Boolean(primary)
+  // 问小青和页面主操作可以同时在。只传其中一个时，仍只画那一个。
+  const wide = !askNode && !mid && Boolean(primary)
   const leftNode = left ?? (back ? (
     <button type="button" className="qxt-btn qxt-btn-sec" onClick={goBack}>
       <QxTouchIcon name="chevL" size={30} strokeWidth={2.4} />
@@ -73,9 +86,10 @@ export function QxTouchDock({
   ) : null)
 
   return (
-    <footer className="qxt-dock">
+    <footer className={['qxt-dock', className].filter(Boolean).join(' ')}>
       {leftNode}
-      {middle}
+      {askNode}
+      {mid}
       {primary ? (
         <button
           type="button"

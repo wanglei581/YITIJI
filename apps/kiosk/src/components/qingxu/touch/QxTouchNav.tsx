@@ -5,14 +5,17 @@ export function QxTouchNav({
   onAdvisor,
   onProfile,
   current,
+  className,
 }: {
   onHome: () => void
   onAdvisor: () => void
   onProfile: () => void
   current?: 'home' | 'advisor' | 'profile'
+  /** 叠在主导航上。默认不传。 */
+  className?: string
 }) {
   return (
-    <nav className="qxt-nav" aria-label="主导航">
+    <nav className={['qxt-nav', className].filter(Boolean).join(' ')} aria-label="主导航">
       <button type="button" className={current === 'home' ? 'qxt-on' : undefined} onClick={onHome} aria-current={current === 'home' ? 'page' : undefined}>
         <QxTouchIcon name="home" size={36} strokeWidth={2} />
         <span>首页</span>

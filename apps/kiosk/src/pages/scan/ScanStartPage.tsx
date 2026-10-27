@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
-import { HeadphonesIcon, RefreshCwIcon, UploadIcon } from 'lucide-react'
+import { RefreshCwIcon, UploadIcon } from 'lucide-react'
+import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
   type ConfiguredCapability,
@@ -106,7 +107,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       layout={blocked ? 'spread' : 'stack'}
       facts={
         usbPanel
-          ? ['不创建平台任务', '文件只在你的 U 盘', '暂未开通']
+          ? ['不创建平台任务', '文件只进你的 U 盘', '暂未开通']
           : blocked
             ? undefined
             : ['面板上的扫描入口已准备好，直接按提示操作，不用你填写地址。']
@@ -114,9 +115,19 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       ctabar={
         usbPanel ? (
           <ScanCta>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-              <HeadphonesIcon aria-hidden="true" />
-              联系工作人员
+            <button
+              type="button"
+              className="qx-btn"
+              data-variant="ghost"
+              onClick={() => {
+                if (onGoStage) {
+                  setSearchParams({ stage: 'start' }, { replace: true })
+                  return
+                }
+                navigate('/scan?stage=start')
+              }}
+            >
+              返回材料扫描
             </button>
             <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>
               完成后回打印扫描
@@ -206,7 +217,8 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 <p>回到打印扫描，选择<b>U 盘导入</b>。本机只读取你再次选中的文件，不会自动扫描整个 U 盘。</p>
               </ScanNoteCard>
               <ScanNoteCard title="面板没有这个选项" foot="本页不假设所有奔图固件都提供相同菜单。">
-                <p>不要在本页反复点击。请联系工作人员确认机型、固件和现场 USB 配置。</p>
+                <p>不要反复点。菜单名称、可选格式和 USB 接口位置以现场奔图面板为准。</p>
+                <PhoneHelpLine />
               </ScanNoteCard>
             </div>
           </ScanSec>
@@ -227,7 +239,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                 ? '正在读取这台机器的扫描配置。'
                 : gate === 'unknown'
                   ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
-                  : (blockedNote ?? '工作人员还没有给这台机器开通扫描，或这项能力正在维护、暂未开通。')}
+                  : (blockedNote ?? '扫描还没对这台机器开放，或正在维护、暂未开通。')}
             </p>
           </ScanStatusPanel>
           <ScanSec no="01" title="下一步" hint="扫描之外的路照常可用">
@@ -239,8 +251,9 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   '改用面板扫描到 U 盘：不经过屏幕上的扫描流程，文件只进你的 U 盘。',
                 ]} />
               </ScanNoteCard>
-              <ScanNoteCard title="确认能力" foot="若长时间未恢复，请到服务台联系现场工作人员检查这台机器是否开通了扫描。">
+              <ScanNoteCard title="确认能力" foot="若长时间未恢复，可以再确认一次。本页不会假装扫描仪已经就绪。">
                 <p>本页不会假装扫描仪已经就绪，也不会在能力未知时创建任务。</p>
+                <PhoneHelpLine />
                 <div className="sw-cta-row sw-note-actions">
                   <button
                     type="button"
@@ -251,10 +264,6 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
                   >
                     <RefreshCwIcon aria-hidden="true" />
                     {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
-                  </button>
-                  <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>
-                    <HeadphonesIcon aria-hidden="true" />
-                    联系工作人员
                   </button>
                 </div>
               </ScanNoteCard>

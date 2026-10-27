@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { FileTextIcon, FolderIcon, ImageIcon, InfoIcon } from 'lucide-react'
+import { PhoneHelpLine } from '../phoneHelp'
 import type { StatusCopy } from './signStampModel'
 import { SignStampStatus } from './SignStampStatus'
 
@@ -54,6 +55,7 @@ export function SignStampGateView({
     <>
       <div className="ss-status">
         <SignStampStatus copy={copy} />
+        <PhoneHelpLine />
       </div>
       <div className="ss-work">
         <div className="ss-gatecol">
