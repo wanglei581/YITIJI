@@ -2037,11 +2037,15 @@ test('interview pages that overflow show the swipe cue, and it goes away at the 
   armInterviewSession(api)
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
   await beginTextInterview(page)
-  // 答完一题：最近对话多出两条，作答页比一屏高。整页只有 .interview-session__content 一个滚动容器。
+  // 麦克风探测落定后，语音原因卡常显；再答完一题，最近对话多出两条。作答页比一屏高一截（不靠刚好卡线）。
+  // 整页只有 .interview-session__content 一个滚动容器。
+  await expect(page.locator('[data-mic-reason]')).toBeVisible()
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
   await page.getByRole('button', { name: '提交回答', exact: true }).click()
   await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
   expect(await interviewScrollContainers(page)).toEqual(['interview-session__content'])
+  const overflow = await page.locator('.interview-session__content').evaluate((el) => el.scrollHeight - el.clientHeight)
+  expect(overflow, '作答页要明显超出一屏，滑动提示才有判据').toBeGreaterThan(60)
   const cue = page.locator('.iv-scrollcue')
   await expect(cue).toBeVisible()
   await page.locator('.interview-session__content').evaluate((el) => el.scrollTo(0, el.scrollHeight))
