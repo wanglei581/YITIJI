@@ -38,6 +38,9 @@ function getTab(searchParams: URLSearchParams): ActivityTab {
   return searchParams.get('tab') === 'jump' ? 'jump' : 'browse'
 }
 
+/** 求职进度页签默认不显示。开关留给后台小包，本包不打开。 */
+const showJobProgressTab = false
+
 export function MyActivityPage() {
   const loginFrom = '/me/activity'
   const navigate = useNavigate()
@@ -45,7 +48,8 @@ export function MyActivityPage() {
   const { isLoggedIn, getToken } = useAuth()
   const hostingOpen = useRecruitmentHosting().enabled
   const [reloadKey, setReloadKey] = useState(0)
-  const tab = getTab(searchParams)
+  const requestedTab = getTab(searchParams)
+  const tab = showJobProgressTab || requestedTab !== 'applications' ? requestedTab : 'browse'
   const setTab = (next: ActivityTab) => {
     if (next === 'applications') setSearchParams({ tab: 'applications' }, { replace: true })
     else setSearchParams(next === 'jump' ? { tab: 'jump' } : {}, { replace: true })
@@ -87,16 +91,18 @@ export function MyActivityPage() {
   )
 
   const tabs = (
-    <div className="qx-me-tabbar" data-n="3" role="group" aria-label="记录筛选">
+    <div className="qx-me-tabbar" data-n={showJobProgressTab ? '3' : '2'} role="group" aria-label="记录筛选">
       <button type="button" className="qx-me-tab" aria-current={tab === 'browse' ? 'true' : undefined} data-testid="member-records-activity-tab-browse" onClick={() => setTab('browse')}>
         浏览记录{tab === 'browse' ? <i>{browse.length}</i> : null}
       </button>
       <button type="button" className="qx-me-tab" aria-current={tab === 'jump' ? 'true' : undefined} data-testid="member-records-activity-tab-jump" onClick={() => setTab('jump')}>
         外部跳转记录{tab === 'jump' ? <i>{jumps.length}</i> : null}
       </button>
-      <button type="button" className="qx-me-tab" aria-current={tab === 'applications' ? 'true' : undefined} data-testid="member-records-activity-tab-applications" onClick={() => setTab('applications')}>
-        求职进度{tab === 'applications' ? <i>{applications.length}</i> : null}
-      </button>
+      {showJobProgressTab ? (
+        <button type="button" className="qx-me-tab" aria-current={tab === 'applications' ? 'true' : undefined} data-testid="member-records-activity-tab-applications" onClick={() => setTab('applications')}>
+          求职进度{tab === 'applications' ? <i>{applications.length}</i> : null}
+        </button>
+      ) : null}
     </div>
   )
 

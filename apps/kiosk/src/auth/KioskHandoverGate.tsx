@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { QxPageFrame } from '../components/qingxu/QxPageFrame'
 import { SettingsConfirm } from '../pages/profile/me/components/SettingsConfirm'
-import { QxMemberNavbar } from '../pages/profile/components/QxMemberNavbar'
+import { MeTouchShell } from '../pages/profile/touch/MeTouchShell'
 import { useKioskSessionControl } from './KioskSessionControlContext'
 import { markKioskPresenceConfirmed, needsHandoverConfirm } from './kioskPresence'
 import { useAuth } from './useAuth'
@@ -37,17 +36,18 @@ export function KioskHandoverGate() {
 
   return (
     <div className="h-full" data-kiosk-screen="handover-confirm" data-testid="handover-confirm-page">
-      <QxPageFrame
-        title="我的"
-        subtitle="先确认是不是本人，再打开个人资料。"
-        status={{ tone: 'warn', label: '公共设备，请保护个人信息' }}
-        navbar={<QxMemberNavbar current="profile" />}
+      <MeTouchShell
+        title="还是你吗？"
+        sub="先确认是不是本人，再打开个人资料。"
+        status={{ tone: 'warn', label: '待确认是不是你' }}
+        backLabel="返回首页"
+        ask={{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' }}
       >
-        <div className="qx-card" role="note" style={{ fontSize: 'var(--qx-fs-body)', lineHeight: 1.45 }}>
-          这台机器上有人登录着，已经有一会儿没人点屏幕了。本人请点「是我，继续」；不是的话点「不是我」，会结束上一位的使用并回到首页。
-        </div>
-      </QxPageFrame>
+        <p>
+          这台机器上有人登录着，已经有一会儿没人点屏幕了。本人请点「是我，继续」；不是的话点「不是我」，会结束上一位的使用并回到首页。确认之前不显示上一位的文件、订单或手机号。
+        </p>
       <SettingsConfirm
+        layout="cards"
         testId="handover-confirm"
         title="还是你吗？"
         description="这台机器上有人登录着，已经有一会儿没人点屏幕了。不是本人请点「不是我」，会结束上一位的使用并回到首页。"
@@ -59,6 +59,7 @@ export function KioskHandoverGate() {
         }}
         onCancel={() => endKioskUse('handover')}
       />
+      </MeTouchShell>
     </div>
   )
 }

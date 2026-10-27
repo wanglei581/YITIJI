@@ -6,12 +6,13 @@ import {
   LockIcon,
   TriangleAlertIcon,
 } from 'lucide-react'
-import { QxPageFrame } from '../../../../components/qingxu/QxPageFrame'
-import { QxAppNavbar } from '../../../../components/qingxu/QxAppNavbar'
+import type { QxTouchAsk } from '../../../../components/qingxu/touch/QxTouchDock'
+import { helpNeededLine, whenMiniapp } from '../../../../copy/unattendedCopy'
 import { useRecruitmentHosting } from '../../../../hooks/useRecruitmentHosting'
-import { useTerminalDeviceStatus } from '../../../../hooks/useTerminalDeviceStatus'
-import { getTerminalCode } from '../../../../services/api/terminalConfig'
+import { useSupportContact } from '../../../../hooks/useSupportContact'
+import { MeTouchShell } from '../../touch/MeTouchShell'
 import '../styles/qx-me-shared.css'
+import '../../touch/me-touch.css'
 
 export type QxMeView =
   | 'notifications'
@@ -26,14 +27,16 @@ export type QxMeView =
 
 export type QxMeStatusTone = 'ok' | 'warn' | 'bad' | 'unknown'
 
-function qxStatusFromDevice(device: ReturnType<typeof useTerminalDeviceStatus>): {
-  tone: QxMeStatusTone
-  label: string
-} {
-  if (device.loading || device.kind === 'unknown') return { tone: 'unknown', label: '状态未知' }
-  if (device.printerReady) return { tone: device.kind === 'low_paper' ? 'warn' : 'ok', label: device.printerLabel }
-  if (device.kind === 'offline') return { tone: 'bad', label: device.printerLabel }
-  return { tone: 'bad', label: device.printerLabel }
+const ME_ASK: Record<QxMeView, QxTouchAsk> = {
+  notifications: { label: '问小青：未读消息在哪里？', draft: '未读消息在哪里？' },
+  resumes: { label: '问小青：哪一份还能打开？', draft: '哪一份简历还能打开？' },
+  favorites: { label: '问小青：收藏的政策在哪里看？', draft: '收藏的政策在哪里看？' },
+  'ai-records': { label: '问小青：打不开的记录怎么办？', draft: '打不开的 AI 记录怎么办？' },
+  activity: { label: '问小青：这些记录会发给企业吗？', draft: '这些浏览和跳转记录会发给企业吗？' },
+  'activity-detail': { label: '问小青：这些记录会发给企业吗？', draft: '这条记录会发给企业吗？' },
+  documents: { label: '问小青：哪一种文件能打？', draft: '哪一种文件能打印？' },
+  orders: { label: '问小青：失败的订单怎么办？', draft: '失败的打印订单怎么办？' },
+  settings: { label: '问小青：怎么注销账号？', draft: '怎么注销账号？' },
 }
 
 type QxMeTab = { key: QxMeView; label: string; hint: string; to: string }
@@ -65,6 +68,8 @@ export function QxMePage({
   ctabar,
   live = true,
   ordersHint,
+  onBack,
+  backLabel,
   children,
 }: {
   title: string
@@ -81,14 +86,14 @@ export function QxMePage({
   live?: boolean
   /** 打印订单页在已加载订单全部为 0 元时，把「进度·支付·取件」换成不提钱的说法。 */
   ordersHint?: string
+  onBack?: () => void
+  backLabel?: string
   children: ReactNode
 }) {
   const navigate = useNavigate()
-  const device = useTerminalDeviceStatus()
-  const status = qxStatusFromDevice(device)
+  const contact = useSupportContact()
   // 招聘内容托管（3.13）关闭时收藏里只有政策：分类提示不再写岗位与招聘会。
   const hostingOpen = useRecruitmentHosting().enabled
-  const terminalLabel = getTerminalCode() || '设备未绑定'
   const isAssetView = view === 'documents' || view === 'orders'
   /* 账号设置（稿 30 ?screen=settings）不是记录分类，也不属本人资产分域：不挂分类 Tab。 */
   const isSettingsView = view === 'settings'
@@ -99,21 +104,24 @@ export function QxMePage({
       ? 'member-settings'
       : isAssetView ? 'member-assets' : 'member-records'
   const pageClass = isAssetView ? 'qx-me-page qx-me-assets' : isSettingsView ? 'qx-me-page qx-me-settings' : 'qx-me-page'
+  const showPrinter = view !== 'settings' && view !== 'activity-detail'
+  const goBack = onBack ?? (() => navigate(view === 'activity-detail' ? '/me/activity' : '/profile'))
+  const miniLine = view === 'orders'
+    ? whenMiniapp(contact, '打印订单在手机小程序里也能看到。')
+    : view === 'documents'
+      ? whenMiniapp(contact, '这些文档在手机小程序里也能看到。')
+      : ''
 
   return (
-    <QxPageFrame
+    <MeTouchShell
       title={title}
-      status={status}
-      terminalLabel={terminalLabel}
-      ctabar={ctabar}
-      navbar={
-        <QxAppNavbar
-          onHome={() => navigate('/')}
-          onAdvisor={() => navigate('/assistant')}
-          onProfile={() => navigate('/profile')}
-          current="profile"
-        />
-      }
+      sub={eyebrow}
+      showPrinter={showPrinter}
+      status={showPrinter ? undefined : { tone: 'unknown', label: '以你账号里的实际记录为准' }}
+      backLabel={backLabel ?? (view === 'activity-detail' ? '返回记录' : '返回我的')}
+      onBack={goBack}
+      ask={ME_ASK[view]}
+      primaryNode={ctabar}
     >
       <div
         className={pageClass}
@@ -168,9 +176,12 @@ export function QxMePage({
 
         {children}
 
+        {view === 'ai-records' ? <p className="qxt-fine">AI 生成，仅供参考</p> : null}
+        {miniLine ? <p className="qxt-me-sync">{miniLine}</p> : null}
+        <p className="qxt-fine">{helpNeededLine(contact)}</p>
         <p className="qx-me-truth"><b>本人可见</b><span>{truth}</span></p>
       </div>
-    </QxPageFrame>
+    </MeTouchShell>
   )
 }
 
@@ -246,27 +257,6 @@ export function QxMeGuide({ items }: { items: [string, string, string][] }) {
   )
 }
 
-export function QxMeCta({
-  secondaryLabel,
-  onSecondary,
-  secondaryRoute,
-  primary,
-}: {
-  secondaryLabel: string
-  onSecondary: () => void
-  secondaryRoute: string
-  primary: ReactNode
-}) {
-  return (
-    <>
-      <button type="button" className="qx-btn" data-variant="ghost" data-route={secondaryRoute} onClick={onSecondary}>
-        {secondaryLabel}
-      </button>
-      {primary}
-    </>
-  )
-}
-
 export function recordsCtabar(
   uiState: string,
   navigate: ReturnType<typeof useNavigate>,
@@ -277,25 +267,16 @@ export function recordsCtabar(
 ): ReactNode {
   if (uiState === 'error' || uiState.endsWith('error')) {
     return (
-      <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>重新加载</button>
-      </>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={retry}>重新读取</button>
     )
   }
-  const primary = uiState === 'login' || uiState.endsWith('login')
-    ? <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</button>
-    : uiState === 'loading' || uiState.endsWith('loading')
-      ? <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">记录还未加载完成</span>
-      : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={onReady}>{readyLabel}</button>
-  return (
-    <QxMeCta
-      secondaryLabel="返回我的"
-      secondaryRoute="/profile"
-      onSecondary={() => navigate('/profile')}
-      primary={primary}
-    />
-  )
+  if (uiState === 'login' || uiState.endsWith('login')) {
+    return <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>去登录</button>
+  }
+  if (uiState === 'loading' || uiState.endsWith('loading')) {
+    return <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">记录还未加载完成</span>
+  }
+  return <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={onReady}>{readyLabel}</button>
 }
 
 export const QX_ME_GUIDE = {
@@ -312,6 +293,6 @@ export const QX_ME_GUIDE = {
   error: [
     ['数据', '已保存内容不受影响', '这次加载失败不会删除任何记录'],
     ['先试这个', '检查网络后重试', '重试不会重复创建记录'],
-    ['仍不行', '联系现场工作人员', '可在帮助页找到联系方式'],
+    ['仍不行', '看本页的服务电话', '读不到号码时不显示电话'],
   ],
 } as const satisfies Record<string, [string, string, string][]>

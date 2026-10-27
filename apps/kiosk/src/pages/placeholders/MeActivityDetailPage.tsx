@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/useAuth'
 import { getMyBrowseLogs, getMyJumpLogs } from '../../services/api/activity'
 import { formatTime } from '../profile/assets/format'
 import { actionLabel, detailRoute, TYPE_LABEL } from '../profile/me/activityPresentation'
-import { QxMeCta, QxMeGuide, QxMePage } from '../profile/me/qx/QxMeChrome'
+import { QxMeGuide, QxMePage } from '../profile/me/qx/QxMeChrome'
 import { QxMeErrorBlock, QxMeLoadingBlock, QxMeLoginBlock, QxMeStructRow } from '../profile/me/qx/QxMeStateBits'
 import '../profile/me/styles/member-records-qx.css'
 
@@ -158,26 +158,15 @@ export default function MeActivityDetailPage() {
   }
 
   const ctabar = uiState === 'error' ? (
-    <>
-      <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
-      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={load}>重新加载</button>
-    </>
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={load}>重新加载</button>
   ) : uiState === 'login' ? (
-    <QxMeCta secondaryLabel="返回我的" secondaryRoute="/profile" onSecondary={() => navigate('/profile')} primary={
-      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: `/me/activity/${id}` } })}>手机号登录</button>
-    } />
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/login', { state: { from: `/me/activity/${id}` } })}>去登录</button>
   ) : uiState === 'loading' ? (
-    <QxMeCta secondaryLabel="返回我的" secondaryRoute="/profile" onSecondary={() => navigate('/profile')} primary={
-      <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">记录还未加载完成</span>
-    } />
+    <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="member-records-primary">记录还未加载完成</span>
   ) : uiState === 'not-found' ? (
-    <QxMeCta secondaryLabel="返回我的" secondaryRoute="/profile" onSecondary={() => navigate('/profile')} primary={
-      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/me/activity')}>返回记录列表</button>
-    } />
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => navigate('/me/activity')}>返回记录列表</button>
   ) : (
-    <QxMeCta secondaryLabel="返回记录列表" secondaryRoute="/me/activity" onSecondary={() => navigate('/me/activity')} primary={
-      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => item && navigate(detailRoute(item.targetType, item.targetId, item.externalId))}>查看原内容</button>
-    } />
+    <button type="button" className="qx-btn" data-variant="primary" data-testid="member-records-primary" onClick={() => item && navigate(detailRoute(item.targetType, item.targetId, item.externalId))}>查看原内容</button>
   )
 
   return (

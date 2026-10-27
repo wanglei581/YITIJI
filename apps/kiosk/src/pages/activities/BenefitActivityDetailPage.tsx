@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
+import { ErrorState, LoadingState } from '@ai-job-print/ui'
+import { MeTouchShell } from '../profile/touch/MeTouchShell'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
 import {
   CheckCircleIcon,
@@ -135,16 +136,15 @@ export function BenefitActivityDetailPage() {
   const primaryDisabled = claiming || Boolean(isLoggedIn && item && !item.claimed && (item.soldOut || item.ended))
 
   return (
-    <KioskPageFrame
-      className="fusion-w5 fusion-w5--profile k8-act-detail"
-      header={
-        <KioskPageHeader
-          title="权益活动详情"
-          description="领取后会进入本人「我的权益」"
-          onBack={() => navigate('/activities')}
-          backLabel="返回活动"
-        />
-      }
+    <div className="fusion-w5 fusion-w5--profile k8-act-detail h-full">
+    <MeTouchShell
+      nav={false}
+      title="权益活动详情"
+      sub="领取后会进入本人「我的权益」"
+      backLabel="返回活动"
+      onBack={() => navigate('/activities')}
+      status={{ tone: 'unknown', label: '以活动说明为准' }}
+      ask={{ label: '问小青：领了之后在哪里看？', draft: '领了之后在哪里看？' }}
     >
 
       <section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="k8-act-scroll">
@@ -272,6 +272,7 @@ export function BenefitActivityDetailPage() {
           </>
         )}
       </section>
-    </KioskPageFrame>
+    </MeTouchShell>
+    </div>
   )
 }

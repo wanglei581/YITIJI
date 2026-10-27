@@ -7,9 +7,8 @@ import { MemberLoadMore } from './MemberLoadMore'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../auth/useAuth'
-import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { API_MODE } from '../../../services/api/client'
-import { getTerminalCode } from '../../../services/api/screensaver'
+import { MeTouchShell } from '../touch/MeTouchShell'
 import {
   addMyFeedbackReply,
   closeMyFeedback,
@@ -20,7 +19,6 @@ import {
   type MemberFeedbackTicketDetail,
   type MemberFeedbackTicketItem,
 } from '../../../services/api/memberFeedback'
-import { QxMemberNavbar } from '../components/QxMemberNavbar'
 import { FeedbackDetailPanel } from './feedback/FeedbackDetailPanel'
 import { FeedbackFormPanel } from './feedback/FeedbackFormPanel'
 import { FeedbackListPanel } from './feedback/FeedbackListPanel'
@@ -205,20 +203,20 @@ export function MyFeedbackPage() {
       data-testid={`member-feedback-state-${uiState}`}
       data-login-from={loginFrom}
     >
-      <QxPageFrame
+      <MeTouchShell
         title="意见反馈"
-        subtitle="登录后提交的是本人工单，可以查看进度、追加描述和关闭。"
+        sub="登录后提交的是本人工单，可以查看进度、追加描述和关闭。"
         status={status}
-        terminalLabel={getTerminalCode() || '就业服务大厅'}
-        ctabar={
+        backLabel="返回我的"
+        onBack={() => navigate('/profile')}
+        ask={{ label: '问小青：投诉 AI 内容怎么写？', draft: '投诉 AI 内容怎么写？' }}
+        primaryNode={(
           <FeedbackCta
             uiState={uiState}
             onLogin={() => navigate('/login', { state: { from: loginReturnTo } })}
             onRetry={refresh}
-            onHome={() => navigate('/profile')}
           />
-        }
-        navbar={<QxMemberNavbar current="profile" />}
+        )}
       >
         <div className="qx-scroll qx-grow fb-page">
           <section className="fb-xq">
@@ -315,7 +313,7 @@ export function MyFeedbackPage() {
           </p>
           {isLoggedIn && loadState === 'ready' && !selected ? <MemberLoadMore {...pagination} /> : null}
         </div>
-      </QxPageFrame>
+      </MeTouchShell>
     </div>
   )
 }
@@ -324,21 +322,16 @@ function FeedbackCta({
   uiState,
   onLogin,
   onRetry,
-  onHome,
 }: {
   uiState: FeedbackUiState
   onLogin: () => void
   onRetry: () => void
-  onHome: () => void
 }) {
   if (uiState === 'login' || uiState === 'service-unavailable') {
     return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回我的</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="member-feedback-primary" onClick={onLogin}>
-          手机号登录
-        </button>
-      </>
+      <button type="button" className="qx-btn" data-variant="primary" data-testid="member-feedback-primary" onClick={onLogin}>
+        去登录
+      </button>
     )
   }
   if (uiState === 'error') {
@@ -346,7 +339,5 @@ function FeedbackCta({
       <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新加载</button>
     )
   }
-  return (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={onHome}>返回我的</button>
-  )
+  return null
 }

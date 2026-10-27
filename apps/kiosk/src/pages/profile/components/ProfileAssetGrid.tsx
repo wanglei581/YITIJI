@@ -66,7 +66,10 @@ export function ProfileAssetGrid({
             onClick={() => navigate(item.route)}
           >
             {item.label}
-            <CountValue value={counts[item.key]} loading={loading} />
+            <span className="pf-asset-n">
+              <CountValue value={counts[item.key]} loading={loading} />
+              <span className="pf-asset-unit">条</span>
+            </span>
           </button>
         ))}
       </div>

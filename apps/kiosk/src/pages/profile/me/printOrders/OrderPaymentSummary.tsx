@@ -67,7 +67,7 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
       {payStatus === null ? (
         <p className="me-payment-empty">
           暂无支付信息
-          <span>（该订单未关联支付记录，如有疑问请联系现场工作人员）</span>
+          <span>（该订单未关联支付记录。需要帮助时，请查看《隐私政策》里的联系方式。）</span>
         </p>
       ) : isFreeMemberOrder(item) ? null : (
         <div className="me-payment-grid">

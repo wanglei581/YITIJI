@@ -15,11 +15,9 @@ import {
 } from '@ai-job-print/shared'
 import { FileDownIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
-import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
 import { createMyDataRequest, listMyDataRequests } from '../../../services/api/memberPrivacy'
-import { getTerminalCode } from '../../../services/api/screensaver'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
-import { QxMemberNavbar } from '../components/QxMemberNavbar'
+import { MeTouchShell } from '../touch/MeTouchShell'
 import './styles/privacy-qx.css'
 
 function fmt(iso: string): string {
@@ -108,23 +106,23 @@ export function MyPrivacyRequestsPage() {
       data-state={uiState}
       data-testid={`member-privacy-state-${uiState}`}
     >
-      <QxPageFrame
+      <MeTouchShell
         title="隐私与数据请求"
-        subtitle="当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。"
+        sub="当前可撤回 AI 使用授权；注销账号、复制个人信息，请按《隐私政策》的联系方式申请。"
         status={status}
-        terminalLabel={getTerminalCode() || '就业服务大厅'}
-        ctabar={
+        backLabel="返回我的"
+        onBack={() => navigate('/profile')}
+        ask={{ label: '问小青：撤回授权会怎样？', draft: '撤回授权会怎样？' }}
+        primaryNode={(
           <PrivacyCta
             uiState={uiState}
             busy={busy}
             onLogin={() => navigate('/login', { state: { from: '/me/privacy-requests' } })}
             onSettings={() => navigate('/me/settings')}
             onRetry={() => void load()}
-            onHelp={() => navigate('/help')}
             onRevoke={() => setConfirmRevoke(true)}
           />
-        }
-        navbar={<QxMemberNavbar current="profile" />}
+        )}
       >
         <div className="qx-scroll qx-grow pr-page">
           {message ? (
@@ -254,7 +252,7 @@ export function MyPrivacyRequestsPage() {
             </div>
           </div>
         </div>
-      </QxPageFrame>
+      </MeTouchShell>
 
       {confirmRevoke ? (
         <div className="pr-overlay" data-testid="member-privacy-dialog" onClick={() => !busy && setConfirmRevoke(false)}>
@@ -290,7 +288,6 @@ function PrivacyCta({
   onLogin,
   onSettings,
   onRetry,
-  onHelp,
   onRevoke,
 }: {
   uiState: PrivacyUiState
@@ -298,7 +295,6 @@ function PrivacyCta({
   onLogin: () => void
   onSettings: () => void
   onRetry: () => void
-  onHelp: () => void
   onRevoke: () => void
 }) {
   if (uiState === 'login') {
@@ -306,7 +302,7 @@ function PrivacyCta({
       <>
         <button type="button" className="qx-btn" data-variant="ghost" onClick={onSettings}>返回账号设置</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onLogin}>
-          手机号登录
+          去登录
         </button>
       </>
     )
@@ -314,9 +310,8 @@ function PrivacyCta({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={onHelp}>联系工作人员</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="member-privacy-primary" onClick={onRetry}>
-          重新加载
+          重新读取
         </button>
       </>
     )

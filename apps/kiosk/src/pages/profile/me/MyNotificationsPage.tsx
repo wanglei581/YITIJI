@@ -26,7 +26,7 @@ import {
   type MemberNotificationItem,
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
-import { QxMeBanner, QxMeCta, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
+import { QxMeBanner, QxMeGuide, QxMePage, QxMeSummary, QX_ME_GUIDE } from './qx/QxMeChrome'
 import './styles/notifications-qx.css'
 
 const CATEGORY_META: Record<string, { label: string; icon: typeof BellIcon; tone: 'slate' | 'clay' | 'plum' | 'wheat' | undefined; hint: string }> = {
@@ -172,7 +172,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
           <QxMeBanner tone="warn" title="消息这次没有加载出来" desc={<>当前列表没有更新。<b>本页不会拿上一次的内容冒充当前账号</b>，所以一律显示「—」；已读状态和已有消息不会因为这次失败而改变。</>} minis={['未读 —', '本次未取到']} />
           <section className="qx-me-list qx-me-grow" aria-label="本次未取到的消息类型">
             {CAT_ORDER.map((cat) => <CategoryStructRow key={cat} cat={cat} mode="error" />)}
-            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，可以让现场工作人员协助查询。</div>
+            <div className="qx-me-legal">重试不会重复标记已读，也不会删除消息。多次重试仍失败时，请查看《隐私政策》里的联系方式。</div>
           </section>
           <QxMeGuide items={[...QX_ME_GUIDE.error]} />
         </>
@@ -282,14 +282,13 @@ function notificationCtabar({
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-route="/help" onClick={() => navigate('/help')}>联系工作人员</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新加载</button>
+        <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={refresh}>重新读取</button>
       </>
     )
   }
   const primary = (() => {
     if (uiState === 'login') {
-      return <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</button>
+      return <button type="button" className="qx-btn" data-variant="primary" data-testid="notifications-primary" onClick={() => navigate('/login', { state: { from: loginFrom } })}>去登录</button>
     }
     if (uiState === 'loading') {
       return <span className="qx-btn" data-variant="primary" aria-disabled="true" data-testid="notifications-primary">消息还未加载完成</span>
@@ -309,14 +308,7 @@ function notificationCtabar({
       </button>
     )
   })()
-  return (
-    <QxMeCta
-      secondaryLabel="返回我的"
-      secondaryRoute="/profile"
-      onSecondary={() => navigate('/profile')}
-      primary={primary}
-    />
-  )
+  return primary
 }
 
 function CategoryStructRow({ cat, mode }: { cat: string; mode: 'lock' | 'error' }) {

@@ -8,7 +8,7 @@ import { MemberLoadMore } from './MemberLoadMore'
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { userMessageOf } from '../../../services/api/userErrorMessage'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
 import { ClockIcon, EyeIcon, FilesIcon, FileTextIcon, PenToolIcon, PrinterIcon, ScanLineIcon, Trash2Icon, UploadIcon } from 'lucide-react'
 import {
@@ -101,8 +101,15 @@ function documentForConvertedPdf(
   }
 }
 
+function isPrintableMime(mimeType: string): boolean {
+  return mimeType === 'application/pdf' || mimeType === 'image/jpeg' || mimeType === 'image/png'
+}
+
 export function MyDocumentsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const pickPrint = searchParams.get('pick') === 'print' || (location.state as { pick?: string } | null)?.pick === 'print'
   const startPrint = useStartPrintHandoff()
   const { isLoggedIn, getToken } = useAuth()
   const [reloadKey, setReloadKey] = useState(0)
@@ -122,6 +129,9 @@ export function MyDocumentsPage() {
   const fetchPage = useCallback((cursor?: string) => getMyDocuments(token, { pageSize: 50, cursor }), [token])
   const pagination = useMemberCursorPage<MemberDocumentItem>({ enabled: isLoggedIn, identityKey: token, reloadKey, fetchPage })
   const { items, state: state, setItems } = pagination
+  const listed = pickPrint
+    ? [...items].sort((a, b) => Number(isPrintableMime(b.mimeType)) - Number(isPrintableMime(a.mimeType)))
+    : items
 
   useEffect(() => {
     if (!hint) return
@@ -337,7 +347,7 @@ export function MyDocumentsPage() {
       <>
         {summary}
         <section className="qx-me-list qx-me-grow" data-testid="member-assets-list" aria-label="我的文档">
-          {items.map((doc) => {
+          {(pickPrint ? listed : items).map((doc) => {
             const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
             const confirming = confirmId === doc.id
             const busy = busyId === doc.id
@@ -455,8 +465,10 @@ export function MyDocumentsPage() {
 
   return (
     <QxMePage
-      title="我的文档"
+      title={pickPrint ? '选一份来打印' : '我的文档'}
       view="documents"
+      onBack={pickPrint ? () => navigate('/print/upload') : undefined}
+      backLabel={pickPrint ? '返回选文件' : undefined}
       screen="member-list"
       screenState={`documents-${uiState}`}
       eyebrow="我的文档和订单"

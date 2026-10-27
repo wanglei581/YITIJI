@@ -224,11 +224,33 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版开发样板。第一包只有这一条，不并进 QX_MIGRATED_ROUTES。 */
-const QX_TOUCH_ROUTES = new Set<string>(['/dev/touch-gallery'])
+/** 触屏版路由。精确集合仍是字符串字面量；带参屏走下面的闭集，不从迁移表里拿掉。 */
+const QX_TOUCH_ROUTES = new Set<string>([
+  '/dev/touch-gallery',
+  '/profile',
+  '/me/notifications',
+  '/notifications',
+  '/me/resumes',
+  '/me/print-orders',
+  '/me/documents',
+  '/me/ai-records',
+  '/me/activity',
+  '/me/favorites',
+  '/me/benefits',
+  '/activities',
+  '/me/feedback',
+  '/me/settings',
+  '/me/privacy-requests',
+])
+
+const QX_TOUCH_PATTERNS: readonly RegExp[] = [
+  /^\/activities\/[^/]+$/,
+  /^\/me\/activity\/[^/]+$/,
+]
 
 function isTouchRoute(pathname: string): boolean {
-  return QX_TOUCH_ROUTES.has(pathname)
+  if (QX_TOUCH_ROUTES.has(pathname)) return true
+  return QX_TOUCH_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {

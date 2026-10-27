@@ -15,9 +15,7 @@ import { useAuth } from '../../../auth/useAuth'
 import { accountErrorMessage, accountPhoneDisplay } from '../../auth/accountUserMessage'
 import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
-import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
-import { QxAiHelp, QxStepActions } from '../../../components/qingxu/QxAiHelp'
-import { QxMemberNavbar } from '../components/QxMemberNavbar'
+import { MeTouchShell } from '../touch/MeTouchShell'
 import { SettingsConfirm } from './components/SettingsConfirm'
 import { PhoneRebindPanel } from './components/PhoneRebindPanel'
 import './styles/settings-qx2.css'
@@ -138,7 +136,7 @@ export function MySettingsPage() {
   const handleLogout = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('end_use') } catch {
-      setClearing(false); setClearError('本机登录尚未清除，请重试或联系工作人员。')
+      setClearing(false); setClearError('本机登录尚未清除，请重试。需要帮助时，请查看《隐私政策》里的联系方式。')
     }
   }
 
@@ -146,7 +144,7 @@ export function MySettingsPage() {
   const handleSwitch = () => {
     setClearing(true); setClearError(null)
     try { endKioskUse('switch_account') } catch {
-      setClearing(false); setClearError('还不能切换账号，请重试或联系工作人员。')
+      setClearing(false); setClearError('还不能切换账号，请重试。需要帮助时，请查看《隐私政策》里的联系方式。')
     }
   }
 
@@ -182,18 +180,18 @@ export function MySettingsPage() {
       onRecheck={() => endKioskUse('switch_account', { loginHint: '请用新手机号登录核对换绑结果；如有困难，请按《隐私政策》里的电话、邮箱联系我们。' })}
       onCancel={() => setShowRebind(false)} />
   )
-  const ctabar = <>
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/profile')}>返回我的</button>
-    {isLoggedIn ? <button type="button" className="qx-btn" data-variant="danger" data-testid="member-settings-primary" onClick={() => setConfirm('logout')}><LogOutIcon size={24} aria-hidden="true" />结束使用并退出登录</button>
-      : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-settings-primary" onClick={() => navigate('/login', { state: { from: '/me/settings' } })}>手机号登录</button>}
-  </>
+  const ctabar = isLoggedIn
+    ? <button type="button" className="qx-btn" data-variant="danger" data-testid="member-settings-primary" onClick={() => setConfirm('logout')}><LogOutIcon size={24} aria-hidden="true" />结束使用并退出登录</button>
+    : <button type="button" className="qx-btn" data-variant="primary" data-testid="member-settings-primary" onClick={() => navigate('/login', { state: { from: '/me/settings' } })}>去登录</button>
 
   return (
     <div className="settings-page fusion-w5" data-kiosk-screen="member-settings" data-qx-view="settings" data-state={screenState} data-testid={`member-settings-state-${screenState}`} data-takeaway="本人账号设置与授权状态">
-    <QxPageFrame title="账号设置" subtitle="换号、管理授权或结束使用，都在这里。"
+    <MeTouchShell title="账号设置" sub="换号、管理授权或结束使用，都在这里。"
       status={{ tone: jobAi === 'error' ? 'warn' : 'unknown', label: isLoggedIn ? '公共设备，请保护个人信息' : '当前是游客' }}
-      back={{ label: '返回我的', onBack: () => navigate('/profile') }}
-      ctabar={ctabar} navbar={<QxMemberNavbar current="profile" />}>
+      backLabel="返回我的"
+      onBack={() => navigate('/profile')}
+      ask={{ label: '问小青：怎么注销账号？', draft: '怎么注销账号？' }}
+      primaryNode={ctabar}>
       <div className="qx-scroll qx-grow settings-body">
         <section className="settings-identity" aria-label={isLoggedIn ? '会员账号概览' : '登录引导'}>
           <span className="settings-avatar" aria-hidden="true"><UserIcon size={36} /></span>
@@ -311,10 +309,7 @@ export function MySettingsPage() {
           onCancel={closeConfirm}
         />
       )}
-      <QxStepActions onPrev={() => navigate('/profile')} prevLabel="上一步">
-        <QxAiHelp label="问小青：换号和退出有什么区别？" draft="换绑手机号、换账号和结束使用有什么区别？怎样保护我的个人信息？" />
-      </QxStepActions>
-    </QxPageFrame>
+    </MeTouchShell>
     </div>
   )
 }

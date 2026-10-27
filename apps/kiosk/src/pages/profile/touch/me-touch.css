@@ -1,0 +1,163 @@
+/* 我的与权益：挂在 .qxt-screen 下，只使用 --qxt-* / --qx-*。 */
+
+.qxt-screen .qxt-body.qxt-me-pad {
+  background: var(--qxt-paper-2);
+  justify-content: flex-start;
+  overflow: auto;
+  padding: 16px 28px 12px;
+  gap: 12px;
+}
+
+/* 旧壳把正文收成 flex:1 + overflow:hidden，触屏底栏在正文外面，
+   超出的行会被裁掉且滚不动。改成随内容长高，由 .qxt-body 滚动。 */
+.qxt-screen .qx-me-page,
+.qxt-screen .qx-scroll,
+.qxt-screen .pf-page,
+.qxt-screen .bf-page,
+.qxt-screen .fb-page,
+.qxt-screen .pr-page,
+.qxt-screen .settings-body,
+.qxt-screen .qx-grow {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  gap: 12px;
+}
+
+.qxt-screen .qx-me-xq-ask,
+.qxt-screen .qx-me-row-title,
+.qxt-screen .qx-row-t,
+.qxt-screen .pf-idname,
+.qxt-screen .pf-asset-t,
+.qxt-screen .qx-me-banner-t,
+.qxt-screen .settings-idtx b {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.35;
+}
+
+.qxt-screen .qx-me-xq-doing,
+.qxt-screen .qx-me-row-sub,
+.qxt-screen .qx-row-d,
+.qxt-screen .pf-idsub,
+.qxt-screen .pf-asset-d,
+.qxt-screen .qx-me-truth,
+.qxt-screen .qx-me-legal,
+.qxt-screen .qxt-fine {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.45;
+}
+
+.qxt-screen .qx-me-vtab,
+.qxt-screen .qx-me-tab,
+.qxt-screen .qx-me-row,
+.qxt-screen .qx-row,
+.qxt-screen .pf-asset,
+.qxt-screen .pf-mlink,
+.qxt-screen .pf-idbtn {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+}
+
+/* 行本身是按钮。行内的小标签不再撑到 64，避免压到下一行。 */
+.qxt-screen .qx-me-acts .qx-me-small {
+  min-width: 0;
+  min-height: 0;
+}
+
+.qxt-screen .qx-me-list,
+.qxt-screen .qx-me-grow {
+  flex: none;
+  height: auto;
+  overflow: visible;
+  max-height: none;
+}
+
+.qxt-screen .qx-me-list > .qx-me-row {
+  max-height: none;
+}
+
+.qxt-screen .pf-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.qxt-screen .pf-morelinks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.qxt-screen .pf-asset,
+.qxt-screen .pf-mlink,
+.qxt-screen .qx-me-row,
+.qxt-screen .qx-row {
+  background: var(--qxt-card);
+  border: 1px solid var(--qxt-line);
+  border-radius: 22px;
+  text-align: left;
+}
+
+.qxt-screen .qxt-dock .qx-btn,
+.qxt-screen .qxt-dock .qxt-btn {
+  min-height: var(--qxt-btn-h);
+  height: var(--qxt-btn-h);
+  padding: 0 22px;
+  border-radius: var(--qxt-r-btn);
+  font-weight: 700;
+  font-size: var(--qxt-fs-btn);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.qxt-screen .qxt-dock .qx-btn[data-variant="primary"] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qxt-dock .qx-btn[data-variant="ghost"] {
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  border: 1.5px solid var(--qxt-edge);
+}
+
+.qxt-screen .qxt-dock .qx-btn[data-variant="danger"] {
+  background: var(--qx-cinnabar);
+  color: var(--qx-on-solid);
+}
+
+.qxt-screen .qxt-handover-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.qxt-screen .qxt-handover-cards button {
+  min-height: 160px;
+  border-radius: 28px;
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-line);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  padding: 24px;
+}
+
+.qxt-screen .qxt-handover-cards button[data-variant="primary"] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen .qxt-me-sync {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: var(--qxt-fs-aux);
+}

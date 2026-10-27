@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { MeTouchShell } from '../profile/touch/MeTouchShell'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
 import {
   ChevronRightIcon,
@@ -91,25 +92,20 @@ export function BenefitActivitiesPage() {
     : ''
 
   return (
-    <KioskPageFrame
-      className="fusion-w5 fusion-w5--profile k8-activities h-full"
-      header={
-        <KioskPageHeader
-          className="k8-activities-header"
-          title={title}
-          description={`${subtitle}${countSuffix}`}
-          onBack={() => navigate('/profile')}
-          backLabel="返回我的"
-          aside={
-            <div className="k8-activities-header-actions flex gap-3">
-              <Button size="sm" variant="secondary" onClick={() => navigate('/me/benefits')}>
-                <TicketIcon className="mr-1 h-5 w-5" aria-hidden="true" />
-                我的权益
-              </Button>
-            </div>
-          }
-        />
-      }
+    <div className="fusion-w5 fusion-w5--profile k8-activities h-full">
+    <MeTouchShell
+      nav={false}
+      title={title}
+      sub={`${subtitle}${countSuffix}`}
+      backLabel="返回我的"
+      onBack={() => navigate('/profile')}
+      status={{ tone: 'unknown', label: '以活动说明为准' }}
+      ask={{ label: '问小青：领取代表报名了吗？', draft: '领取代表报名了吗？' }}
+      primaryNode={(
+        <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/me/benefits')}>
+          我的权益
+        </button>
+      )}
     >
       <section data-kiosk-domain="profile" data-kiosk-screen="activities" className="flex min-h-0 flex-1 flex-col gap-4">
 
@@ -190,6 +186,7 @@ export function BenefitActivitiesPage() {
         活动发布后才会在这里展示；未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。
       </p>
       </section>
-    </KioskPageFrame>
+    </MeTouchShell>
+    </div>
   )
 }

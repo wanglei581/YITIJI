@@ -9,10 +9,8 @@ import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-prin
 import { FlagIcon, GiftIcon, PrinterIcon, SparklesIcon, BookOpenIcon } from 'lucide-react'
 import { getMyBenefits } from '../../../services/api/memberFavorites'
 import { useAuth } from '../../../auth/useAuth'
-import { QxPageFrame } from '../../../components/qingxu/QxPageFrame'
-import { getTerminalCode } from '../../../services/api/screensaver'
 import { formatTime } from '../assets/format'
-import { QxMemberNavbar } from '../components/QxMemberNavbar'
+import { MeTouchShell } from '../touch/MeTouchShell'
 import './styles/benefits-qx.css'
 
 const TYPE_META: Record<BenefitType, { label: string; tone: 'teal' | 'wheat' | 'plum' | 'slate' }> = {
@@ -86,15 +84,14 @@ export function MyBenefitsPage() {
       data-state={uiState}
       data-testid={`benefits-state-${uiState}`}
     >
-      <QxPageFrame
+      <MeTouchShell
         title="我的权益"
-        subtitle="名称、有效期与可用状态都由系统返回；是否收费以活动说明与现场核价为准。"
-        /* 稿 31-benefits 原文：data-route="/profile" aria-label="返回我的"。 */
-        back={{ label: '返回我的', onBack: () => navigate('/profile') }}
+        sub="名称、有效期与可用状态都由系统返回；是否收费以活动说明与现场核价为准。"
+        backLabel="返回我的"
+        onBack={() => navigate('/profile')}
         status={status}
-        terminalLabel={getTerminalCode() || '就业服务大厅'}
-        ctabar={<BenefitsCta uiState={uiState} onRetry={() => setReloadKey((key) => key + 1)} />}
-        navbar={<QxMemberNavbar current="profile" />}
+        ask={{ label: '问小青：权益现在能抵扣吗？', draft: '权益现在能抵扣吗？' }}
+        primaryNode={<BenefitsCta uiState={uiState} onRetry={() => setReloadKey((key) => key + 1)} />}
       >
         <div className="qx-scroll qx-grow bf-page">
           <BenefitsTabs current="benefits" />
@@ -181,7 +178,7 @@ export function MyBenefitsPage() {
           </p>
           {isLoggedIn && loadState === 'ready' ? <MemberLoadMore {...pagination} /> : null}
         </div>
-      </QxPageFrame>
+      </MeTouchShell>
     </div>
   )
 }
@@ -273,9 +270,8 @@ function BenefitsCta({ uiState, onRetry }: { uiState: BenefitsUiState; onRetry: 
   if (uiState === 'error') {
     return (
       <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/help')}>找工作人员</button>
         <button type="button" className="qx-btn" data-variant="primary" data-testid="benefits-primary" onClick={onRetry}>
-          重新加载
+          重新读取
         </button>
       </>
     )
