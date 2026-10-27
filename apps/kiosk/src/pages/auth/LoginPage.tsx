@@ -356,7 +356,7 @@ export function LoginPage() {
                 </div>
               </section>
             ) : null}
-            {mode === 'phone' && state !== 'phone-idle' ? (
+            {state !== 'phone-idle' ? (
               <div className="qxp-card lg-fact lg-absorb">
                 <p className="qxp-k">只管这一次</p>
                 <p className="qxp-note">离开会退出。重发 60 秒，扫码票据 180 秒。</p>

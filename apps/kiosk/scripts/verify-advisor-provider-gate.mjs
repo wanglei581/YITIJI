@@ -98,7 +98,7 @@ for (const route of manualRoutes) {
 // 触屏稿里 AI 暂停 / 非 AI 回复 / 本轮失败三态不画输入坞（底栏只放返回、投诉 AI 内容、重新检查），
 // 所以不再有「一个被锁住的输入框」可以 aria-disabled / readOnly。要守住的是同一条底线：
 // 这三态里不得有一个按不出结果的发送键，锁定时快捷问题也发不出请求，且置灰一律不用原生 disabled。
-must('page', /const showComposer = body === 'picker' \|\| body === 'submitting' \|\| body === 'reply'/, '锁定 / 非 AI 回复 / 失败三态不得画输入坞（不留按不出结果的发送键）')
+must('page', /const showComposer = body === 'picker' \|\| body === 'submitting' \|\| body === 'reply'$/m, '锁定 / 非 AI 回复 / 失败三态不得画输入坞（不留按不出结果的发送键）')
 mustNot('page', /(?<!aria-)disabled=\{aiLocked/, 'AI 锁定态不得使用原生 disabled')
 must('page', /if \(loading \|\| aiLocked\) return/, '锁定时快捷问题点了也不得发出请求')
 must('tools', /aria-disabled=\{degraded \|\| undefined\}/, '专项工具置灰必须用 aria-disabled')

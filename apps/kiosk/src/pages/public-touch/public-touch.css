@@ -132,7 +132,7 @@
   .qxt-screen.qxp-app .qxt-status { height: auto; min-height: 36px; padding: 4px 12px; white-space: normal; }
   .qxt-screen.qxp-app .qxt-band-compact .qxt-ask { padding: 8px 0 16px; }
   .qxt-screen.qxp-app .qxt-ask h1 { font-size: 28px; }
-  .qxt-screen.qxp-app .qxt-ask p { margin-top: 6px; font-size: 18px; }
+  .qxt-screen.qxp-app .qxt-ask p { margin-top: 6px; font-size: 20px; }
   .qxt-screen.qxp-app .qxt-body { padding-left: 16px; padding-right: 16px; }
   /* 意图带里的光晕和流线只是装饰，窄屏上会画出视口，收掉 */
   .qxt-screen.qxp-app .qxt-flow,
