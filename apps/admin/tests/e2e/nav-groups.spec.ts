@@ -4,7 +4,7 @@ import { openAuthed, settleAdminPage } from './helpers/open'
 const MENUS = [
   { label: '工作台', href: '/' },
   { label: '数据大屏', href: '/screen' },
-  { label: '合作机构', href: '/partners' },
+  { label: '合作机构管理', href: '/partners' },
   { label: '设备管理', href: '/devices' },
   { label: '打印扫描运维', href: '/print-scan' },
   { label: '告警与反馈', href: '/alerts' },

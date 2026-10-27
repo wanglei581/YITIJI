@@ -179,7 +179,7 @@ export function tabGroupForPath(pathname: string): ConsoleTabGroup | undefined {
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: '工作台', icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
   { key: 'screen', label: '数据大屏', icon: GaugeIcon, href: KEY_TO_PATH.screen },
-  { key: 'partners', label: '合作机构', icon: Building2Icon, group: '客户与设备', href: KEY_TO_PATH.partners },
+  { key: 'partners', label: '合作机构管理', icon: Building2Icon, group: '客户与设备', href: KEY_TO_PATH.partners },
   { key: 'devices', label: '设备管理', icon: MonitorIcon, group: '客户与设备', href: KEY_TO_PATH.devices },
   { key: 'print-scan', label: '打印扫描运维', icon: PrinterIcon, group: '客户与设备', href: KEY_TO_PATH['print-scan'] },
   { key: 'alerts', label: '告警与反馈', icon: AlertTriangleIcon, group: '客户与设备', href: KEY_TO_PATH.alerts },
