@@ -168,13 +168,6 @@ test('0 元失败页不提已付金额，收费单保留原句', () => {
   assert.equal(progress.jamOrderKeptLine('paid'), '你的订单和已付金额都保留着')
   assert.equal(progress.jamOrderKeptLine('free'), '你的订单还在，处理好后可以继续打印')
   assert.equal(progress.jamOrderKeptLine('unknown'), '你的订单还在，处理好后可以继续打印')
-  const problem = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
-  assert.equal(progress.failureStaffDoing('paid'), `订单和支付记录都在。${problem}`)
-  assert.equal(progress.failureStaffDoing('free'), `你的订单还在。${problem}`)
-  assert.equal(progress.failureStaffDoing('unknown'), `你的订单还在。${problem}`)
-  assert.match(progress.outOfPaperDoing({ fact: 'paid', amountCents: 200 }), /已付金额/)
-  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'free', amountCents: 0 }), /已付金额|支付/)
-  assert.doesNotMatch(progress.outOfPaperDoing({ fact: 'unknown', amountCents: null }), /已付金额|支付/)
 })
 
 test('0 元订单不算收费单', () => {
@@ -427,6 +420,8 @@ const cashierViewUrl = transpile(join(kioskRoot, 'src/pages/print/components/Cas
   '../CashierPaymentPanel': toDataUrl('export const CashierPaymentPanel = () => null'),
   // 2026-10-28 稿 cashier：状态说明不够高时画一块装饰小样，本测试只看文案，换成空件。
   '../art/PrintFillArt': toDataUrl('export const PrintFillArt = () => null'),
+  // 订单摘要里的「内容」行把文件名中段截断（扩展名保留）。
+  '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
 })
 const { CashierQxView } = await import(cashierViewUrl)
 test('B 补：零元收银台与放行失败只说免费试运营，不说收款、付款或权益机制', () => {
@@ -441,36 +436,113 @@ test('B 补：零元收银台与放行失败只说免费试运营，不说收款
   }
 })
 
-const doneSectionsUrl = transpile(join(kioskRoot, 'src/pages/print/components/PrintDoneSections.tsx'), {
-  'react': import.meta.resolve('react'), 'react/jsx-runtime': jsxUrl,
-  'lucide-react': toDataUrl('export const FileTextIcon = () => null; export const PrinterIcon = () => null'),
-  '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
+const doneFailedModelUrl = transpile(join(kioskRoot, 'src/pages/print/components/printDoneFailedModel.ts'), {
   '../../../copy/unattendedCopy': unattendedUrl,
-  '../cashierStatus': cashier, '../printProgressModel': progressUrl,
-  './PrintFileDeletionRecords': toDataUrl('export const PrintFileDeletionRecords = () => null'),
-  './PrintFileRetentionNotice': toDataUrl('export const PrintFileRetentionNotice = () => null'),
-  './PrintProgressSections': toDataUrl('export const PrintJobRow = () => null'),
-  './PrintAiHelp': aiUrl,
+  '../../../lib/fileName': transpile(join(kioskRoot, 'src/lib/fileName.ts')),
+  '../cashierStatus': cashier,
+  '../printProgressModel': progressUrl,
 })
-const { PrintOutOfPaperPanel } = await import(doneSectionsUrl)
+const failedModel = await import(doneFailedModelUrl)
+const copyText = (copy) => [copy.title, copy.subtitle, copy.pill, copy.stepsLabel, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' ')
+const stepsText = (copy) => [copy.stepsLabel, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' ')
+const rowsText = (rows) => rows.map((row) => `${row.label}${row.value}`).join(' ')
+
 test('B 补：零元缺纸页两种重试权限均不说收费，付费分支保留原说明', () => {
   for (const canRetry of [false, true]) {
-    const props = { file: null, params: null, taskId: 'internal-task', orderNo: 'ORD-20261003-PAPER', failureReason: '打印机缺纸', canRetry, takeaway: null }
-    const textOf = (money) => renderToStaticMarkup(createElement(PrintOutOfPaperPanel, { ...props, money })).replace(/<[^>]*>/g, '')
-    const freeText = textOf({ fact: 'free', amountCents: 0 })
+    const base = { variant: 'out-of-paper', orderNo: 'ORD-20261003-PAPER', canRetry }
+    const freeMoney = { fact: 'free', amountCents: 0 }
+    const freeText = `${copyText(failedModel.failureCopy({ ...base, money: freeMoney }))} ${rowsText(failedModel.failureSummaryRows({ orderNo: base.orderNo, file: null, params: null, money: freeMoney, reason: '打印机缺纸' }))}`
     assert.match(freeText, /免费试运营/)
     assert.doesNotMatch(freeText, /报价|价格|费用|付款|收费|收款|扣费|抵扣|权益|internal-task/)
-    assert.match(textOf({ fact: 'paid', amountCents: 200 }), /不会重复收费/)
+    const paidText = copyText(failedModel.failureCopy({ ...base, money: { fact: 'paid', amountCents: 200 } }))
+    assert.match(paidText, /不会重复收费/)
   }
 })
 
-const { PrintJamGuide } = await import(doneSectionsUrl)
+test('缺纸页不承诺补纸后自动续打，重打只在 canRetry 时出现且说清整份', () => {
+  const money = { fact: 'paid', amountCents: 200 }
+  const noRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: false })
+  const withRetry = failedModel.failureCopy({ variant: 'out-of-paper', money, orderNo: 'ORD-20261003-PAPER', canRetry: true })
+  assert.equal(noRetry.steps.length, 3)
+  assert.match(noRetry.steps[0].detail, /本机不知道出了几页/)
+  assert.match(noRetry.steps[2].title, /订单号 ORD-20261003-PAPER/)
+  assert.match(withRetry.steps[2].detail, /整份重打/)
+  for (const copy of [noRetry, withRetry]) {
+    assert.match(copyText(copy), /不会在加纸后自动继续/)
+    assert.doesNotMatch(copyText(copy), /加纸后可以继续|加纸后可继续打印|剩下没打的部分会在加纸后继续|不需要重新下单|已出 1|等待加纸|退款|自动续打后/)
+  }
+})
+
 test('卡纸三步不提收款', () => {
-  const text = renderToStaticMarkup(createElement(PrintJamGuide, { orderNo: 'ORD-20261003-JAM' })).replace(/<[^>]*>/g, '')
-  assert.match(text, /处理之前先做这三件/)
-  assert.match(text, /别硬拉纸/)
-  assert.match(text, /订单号 ORD-20261003-JAM/)
-  assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+  for (const fact of ['free', 'unknown', 'paid']) {
+    const copy = failedModel.failureCopy({ variant: 'paper-jam', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-JAM', canRetry: false })
+    const text = stepsText(copy)
+    assert.equal(copy.stepsLabel, '处理之前先做这三件')
+    assert.match(text, /别硬拉纸/)
+    assert.match(text, /订单号 ORD-20261003-JAM/)
+    assert.doesNotMatch(text, /已付金额|已支付|支付|报价|价格/)
+  }
+})
+
+test('普通失败三步：免费与金额未知不提已付，收费单保留原句；标准求助句只出现在一处完整元素里', () => {
+  const problem = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
+  const copyOf = (fact, canRetry = false) => failedModel.failureCopy({ variant: 'failed', money: { fact, amountCents: fact === 'paid' ? 200 : fact === 'free' ? 0 : null }, orderNo: 'ORD-20261003-FAIL', canRetry })
+  assert.match(copyText(copyOf('paid')), /订单和支付记录都在/)
+  for (const fact of ['free', 'unknown']) {
+    assert.match(copyText(copyOf(fact)), /你的订单还在/)
+    assert.doesNotMatch(stepsText(copyOf(fact)), /已付金额|支付|收费|报价|价格|费用/)
+  }
+  const plain = copyOf('paid')
+  assert.equal(plain.steps.filter((step) => step.detail === problem).length, 1, '没有重提出口时，求助句整句只在第三步出现一次')
+  assert.doesNotMatch(plain.fine, /联系|找.*工作人员/)
+  const retry = copyOf('paid', true)
+  assert.equal(retry.steps.filter((step) => step.detail === problem).length, 0)
+  assert.match(retry.steps[2].detail, /整份重打、不再收费/)
+  assert.match(retry.fine, /打印有问题？/, '第三步换成重提说明后，求助句补在小字行')
+})
+
+test('失败摘要行：订单号、文件、参数、支付事实；原因已被标准句替换就不再占一行', () => {
+  const file = { name: 'w2-sample.pdf', pages: 2 }
+  const params = { paperSize: 'A4', colorMode: 'black_white', duplex: 'simplex', copies: 1, pageRange: 'all' }
+  const rowsOf = (money, reason) => failedModel.failureSummaryRows({ orderNo: 'ORD-20261003-ROW', file, params, money, reason })
+  const paid = rowsOf({ fact: 'paid', amountCents: 200 }, '新任务已确认失败')
+  assert.deepEqual(paid.map((row) => row.label), ['订单号', '文件', '参数', '支付状态', '设备上报'])
+  assert.equal(paid.find((row) => row.key === 'pay').value, '已付 ¥2.00')
+  assert.equal(paid.find((row) => row.key === 'file').value, 'w2-sample.pdf')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').label, '办理方式')
+  assert.equal(rowsOf({ fact: 'free', amountCents: 0 }, '').find((row) => row.key === 'pay').value, '免费试运营')
+  assert.equal(rowsOf({ fact: 'unknown', amountCents: null }, '').find((row) => row.key === 'pay').value, '以订单为准')
+  const helpLine = '打印有问题？查看《隐私政策》里的联系方式，或问小青'
+  assert.equal(rowsOf({ fact: 'paid', amountCents: 200 }, helpLine).some((row) => row.key === 'reason'), false)
+  assert.equal(failedModel.failureSummaryRows({ orderNo: null, file: null, params: null, money: { fact: 'unknown', amountCents: null }, reason: '' })[0].value, '本次打印任务')
+})
+
+test('费用与订单边界：免费写订单记录，收费单不承诺自动处理，任何一支都不写退款', () => {
+  const free = failedModel.feeInfoCopy({ free: true, orderNo: 'ORD-20261003-FEE' })
+  const paid = failedModel.feeInfoCopy({ free: false, orderNo: null })
+  assert.equal(free.title, '订单记录')
+  assert.equal(paid.title, '费用与订单边界')
+  assert.match(free.steps[0].title, /订单号 ORD-20261003-FEE/)
+  assert.match(paid.steps[0].title, /记下这台机器的位置/)
+  assert.match(paid.fine, /本机不承诺自动处理/)
+  for (const copy of [free, paid]) assert.doesNotMatch([copy.title, copy.subtitle, ...copy.steps.flatMap((step) => [step.title, step.detail]), copy.fine].join(' '), /退款|赔付|联系现场|联系工作人员|找现场|找工作人员/)
+  assert.doesNotMatch(free.fine, /费用|付款|收费/)
+})
+
+test('失败态版式：二维码不小于 168、重提被拒的提示 role=alert、不再传旧 ctabar，底栏触屏三槽', () => {
+  // 剥注释再判：头注里会写「不让用户去找现场的人」这类说明，不是上屏文案。
+  const failedView = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintDoneFailed.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  const qrSize = Number(/TAKEAWAY_QR_SIZE = (\d+)/.exec(failedView)?.[1])
+  assert.ok(qrSize >= 168, `文件带走二维码 ${qrSize} 不小于 168`)
+  assert.match(failedView, /<p role="alert" className="pft-fail-alert">\{retry\.error\}<\/p>/)
+  assert.match(failedView, /role="region" aria-label="文件带走"/)
+  assert.doesNotMatch(failedView, /ctabar=/)
+  assert.match(failedView, /back=\{\{ label: '返回首页'/)
+  assert.match(failedView, /ask=\{printAsk\(ASK_LABEL, ASK_DRAFT\)\}/)
+  assert.match(failedView, /primary=\{\{ label: '使用帮助'/)
+  assert.doesNotMatch(failedView, /联系现场|找现场|联系工作人员|找工作人员/)
 })
 
 // W-118：执行真实配置回调；测试随 verify:print-done-truth 已进入 CI，无需另加登记。

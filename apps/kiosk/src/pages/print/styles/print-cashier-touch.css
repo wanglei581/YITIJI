@@ -1,6 +1,17 @@
 /* 收银台触屏正文（稿 cashier）：支付通道说明 + 扫码方式分段 + 订单摘要卡 + 收款码框 + 退出支付。
    只挂在 data-qx-page='print-cashier'，不改 .qxt-* 默认。 */
 
+/* 底栏三个键（返回 / 问小青 / 主按钮）：出过码之后返回键是「改参数需重新下单」，稿的问句「问小青：这笔账看不懂」要整句放下，
+   不改字、不省略。收一收返回键与主按钮的左右内边距，把宽度让给问小青。 */
+[data-qx-page='print-cashier'] .qxt-dock .qxt-btn {
+  padding: 0 18px;
+}
+
+[data-qx-page='print-cashier'] .qxt-dock .qxt-askq {
+  gap: 12px;
+  padding-right: 20px;
+}
+
 /* 收银台里老部件的小字统一抬到 20px（正文不低于 20px）。
    放在文件最前：后面各规则同权重、写在后面，照样压过这一条。 */
 [data-qx-page='print-cashier'] .qxt-body :where(p, li, span, small, em, b, dt, dd, summary) {

@@ -301,7 +301,8 @@ for (const errorCode of ['PRINTER_ERROR', 'PAPER_EMPTY']) {
     await expect(retryButton).toBeInViewport({ ratio: 1 })
     await retryButton.click()
 
-    const alert = page.locator('.qx-ctabar').getByRole('alert')
+    // 重提被拒的提示放在出口按钮的第一行（失败态照稿骨架，没有旧的 ctabar 条）。
+    const alert = page.locator('.pft-fail-exits').getByRole('alert')
     await expect(alert).toHaveText(/这台机器的打印程序需要升级后才能重新提交。打印有问题？/)
     await expect(alert).not.toContainText('找现场工作人员')
     // 不滚动找提示：toBeVisible 不能证明没有落在二维码下面的滚动区。

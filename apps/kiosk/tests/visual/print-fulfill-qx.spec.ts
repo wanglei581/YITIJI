@@ -110,7 +110,8 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
   await expect(page.locator('[data-testid="print-fulfill-state-out-of-paper"]')).toBeVisible()
   await expect(page.getByText('打印机缺纸', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('打印机缺纸，当前无法打印，请联系工作人员补纸后重试', { exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('print-fulfill-fallback')).toContainText('打印有问题？')
+  // 订单边界说明在小字行（print-fulfill-fallback）；标准求助句在第三步，下面对整页断言。
+  await expect(page.getByTestId('print-fulfill-fallback')).toContainText('不会在加纸后自动继续')
   await expect(page.getByText('agent stack must stay hidden')).toHaveCount(0)
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
 
@@ -138,20 +139,18 @@ test('PAPER_EMPTY failure shows out-of-paper copy from Agent errorCode @w2', asy
     await expect(outOfPaper, `缺纸页不得再出现「${banned}」`).not.toContainText(banned)
   }
 
-  // 稿 15 out-of-paper 的结构：小青区即页头 → 任务卡（真实单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
-  await expect(outOfPaper.locator('.pff-xq-ask')).toHaveText('机器里没纸了。')
+  // 照稿 st-unconfirmed 的骨架：意图带（标题 + 状态胶囊）→ 三步 → 订单摘要（真实单文件 + 订单号 + 支付事实）→ 出口 → 小字；底栏触屏三槽。
+  await expect(page.getByRole('heading', { name: '打印机缺纸', exact: true })).toBeVisible()
   const taskCard = outOfPaper.getByTestId('print-fulfill-list')
   await expect(taskCard).toContainText(W2_FILE.name)
-  await expect(taskCard).toContainText('缺纸中断')
   await expect(taskCard).not.toContainText(W2_ORDER.taskId)
   await expect(taskCard).not.toContainText('任务号')
-  await expect(taskCard.getByTestId('print-fulfill-fallback')).toContainText('打印机缺纸')
-  await expect(taskCard).toContainText('费用与订单边界')
+  await expect(outOfPaper.getByTestId('print-fulfill-fallback')).toContainText('以订单记录为准')
   // takeaway-url 404：订单号与金额退回进页时带来的真值，不编退款状态。
-  await expect(taskCard.locator('.pff-inbar-kv')).toContainText(`订单 ${W2_ORDER.orderNo}`)
-  await expect(taskCard.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥2.00')
+  await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText(W2_ORDER.orderNo)
+  await expect(taskCard.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥2.00')
   await expect(page.locator('.qx-pill')).toHaveText('已付 ¥2.00 · 缺纸')
-  const steps = outOfPaper.locator('.pff-step')
+  const steps = outOfPaper.locator('.qxt-step')
   await expect(steps).toHaveCount(3)
   await expect(steps.nth(0)).toContainText('本机不知道出了几页')
   await expect(steps.nth(2)).toContainText(`订单号 ${W2_ORDER.orderNo}`)
@@ -204,12 +203,13 @@ test('PAPER_EMPTY with server canRetry offers whole-file resubmit and server ord
   await expect(outOfPaper).toBeVisible()
   // 带走接口回了订单：订单号与金额以服务端为准，不用进页时带来的值。
   await expect(page.locator('.qx-pill')).toHaveText('已付 ¥3.50 · 缺纸')
-  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('订单 ORD-20260929-SRV777')
-  await expect(outOfPaper.locator('.pff-inbar-kv')).toContainText('支付状态 已付 ¥3.50')
+  const summary = outOfPaper.getByTestId('print-fulfill-list')
+  await expect(summary.locator('.qxt-sum-r').filter({ hasText: '订单号' })).toContainText('ORD-20260929-SRV777')
+  await expect(summary.locator('.qxt-sum-r').filter({ hasText: '支付状态' })).toContainText('已付 ¥3.50')
   await expect(outOfPaper).not.toContainText(W2_ORDER.orderNo)
   // canRetry 为真才出现重打出口，且说清是整份重打、不再收费，不是「续打剩下的」。
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
-  await expect(outOfPaper.locator('.pff-step').nth(2)).toContainText('整份重打')
+  await expect(outOfPaper.locator('.qxt-step').nth(2)).toContainText('整份重打')
   await expect(outOfPaper).toContainText('不会在加纸后自动继续')
   await expect(outOfPaper.getByRole('region', { name: '文件带走' })).toBeVisible()
 
@@ -281,7 +281,8 @@ test('failed done retry posts the real taskId and payment session @w2', async ({
   await setReactRouterState(page, '/print/done', flowState)
 
   await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toBeVisible()
-  await expect(page.locator('[data-testid="print-fulfill-state-paper-jam"]')).toContainText('你的订单和已付金额都保留着')
+  // 副题在意图带里（稿骨架），不在正文容器里。
+  await expect(page.locator('.qxt-band')).toContainText('你的订单和已付金额都保留着')
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   await expect(page.getByRole('button', { name: '重新提交打印' })).toBeVisible()
   await expectTouchAndBounds(page)
@@ -344,9 +345,11 @@ test('free paper jam keeps the order without mentioning payment @w2', async ({ p
 
   const jam = page.locator('[data-testid="print-fulfill-state-paper-jam"]')
   await expect(jam).toBeVisible()
-  await expect(jam).toContainText('你的订单还在，处理好后可以继续打印')
-  await expect(jam).not.toContainText('已付金额')
-  await expect(jam).not.toContainText('已支付')
+  // 意图带的副题和正文都不能提已付金额：整屏断言。
+  const jamScreen = page.locator('[data-qx-page="print-done"]')
+  await expect(jamScreen).toContainText('你的订单还在，处理好后可以继续打印')
+  await expect(jamScreen).not.toContainText('已付金额')
+  await expect(jamScreen).not.toContainText('已支付')
   await expect(page.getByRole('region', { name: '处理之前先做这三件' })).toBeVisible()
   expect(errors).toEqual([])
 })

@@ -13,6 +13,9 @@ const withoutComments = (source) => source
 
 const doneSource = read('src/pages/print/PrintDonePage.tsx')
 const doneRuntime = withoutComments(doneSource)
+// 少见失败态（普通失败、卡纸、缺纸、费用说明）的版式与文案在这两个文件里，页面只算真值、传进去。
+const failedViewRuntime = withoutComments(read('src/pages/print/components/PrintDoneFailed.tsx'))
+const failedModelRuntime = withoutComments(read('src/pages/print/components/printDoneFailedModel.ts'))
 const routeCasesSource = read('tests/visual/fixtures/fusion-w6-route-cases.ts')
 const browserSpecSource = read('tests/visual/print-done-truth.spec.ts')
 
@@ -149,7 +152,10 @@ const checks = [
     assert.doesNotMatch(progressRuntime, /不免费/)
     assert.doesNotMatch(progressRuntime, /任务号/)
     assert.doesNotMatch(progressSections, /任务号/)
-    assert.match(doneSections, /shownOrderNo = publicOrderNo\(orderNo\)/)
+    // 失败态的订单号：先取服务端回执里的，再退回进页带来的；两者都只认 ORD- 号，再交给版式。
+    assert.match(doneRuntime, /const faultOrderNo = publicOrderNo\(takeaway\?\.orderNo\) \?\? displayOrderNo/)
+    assert.match(doneRuntime, /orderNo: faultOrderNo/)
+    assert.doesNotMatch(failedViewRuntime + failedModelRuntime, /任务号|orderId|taskId/)
     assert.match(doneSections, /页数待识别/)
     assert.doesNotMatch(doneSections, /\{file\.pages\} 页/)
     assert.doesNotMatch(doneSections, /任务号/)
@@ -157,21 +163,26 @@ const checks = [
     assert.doesNotMatch(model, /不免费/)
   }],
   ['失败态给出带走二维码、订单号和补打入口', () => {
-    assert.match(doneSource, /文件带走/)
+    assert.match(failedViewRuntime, /文件带走/)
     assert.match(doneSource, /printProblemLine\(/)
-    assert.doesNotMatch(doneRuntime, /联系工作人员|找现场工作人员|找工作人员/)
-    assert.match(doneSource, /重新提交打印/)
+    assert.doesNotMatch(doneRuntime + failedViewRuntime + failedModelRuntime, /联系工作人员|找现场工作人员|找工作人员/)
+    assert.match(failedViewRuntime, /重新提交打印/)
     assert.match(doneSource, /issuePrintJobTakeawayUrl/)
     assert.match(doneSource, /retryPrintJob/)
     assert.doesNotMatch(doneRuntime, /const\s+handleRetry/)
   }],
   ['W-114 重提版本门槛给求职者下一步，提示在固定按钮栏', () => {
     assert.match(doneRuntime, /errorCodeOf\(err\) === 'PRINT_RETRY_AGENT_VERSION'\s*\? `这台机器的打印程序需要升级后才能重新提交。\$\{printProblemLine\(\)\}`/)
-    const retryActions = doneRuntime.slice(doneRuntime.indexOf('const retryButton ='), doneRuntime.indexOf('const takeawayNotices ='))
-    const takeawayNotices = doneRuntime.slice(doneRuntime.indexOf('const takeawayNotices ='), doneRuntime.indexOf("if (visual === 'out-of-paper')"))
-    assert.match(retryActions, /retryError &&[\s\S]*role="alert"[\s\S]*flex: '1 1 100%'[\s\S]*order: -1[\s\S]*\{retryError\}/)
-    assert.doesNotMatch(takeawayNotices, /retryError/)
-    assert.equal((doneRuntime.match(/\{retryButton\}/g) ?? []).length, 2, '普通失败与缺纸失败都使用同一按钮栏提示')
+    // 重提被拒的提示：role=alert，放在出口按钮栏的第一行（排在任何按钮前面），不在「文件带走」卡里。
+    const exits = failedViewRuntime.slice(failedViewRuntime.indexOf('className="qxt-exits'), failedViewRuntime.indexOf('<TakeawayCard'))
+    assert.match(exits, /retry\.error \? \(\s*<p role="alert" className="pft-fail-alert">\{retry\.error\}<\/p>/)
+    assert.ok(exits.indexOf('role="alert"') >= 0 && exits.indexOf('role="alert"') < exits.indexOf('<button'), '提示排在按钮前面')
+    const takeawayCard = failedViewRuntime.slice(failedViewRuntime.indexOf('function TakeawayCard'), failedViewRuntime.indexOf('function OrdersRowLink'))
+    assert.doesNotMatch(takeawayCard, /retry/)
+    // 页面把 retryError 原样传给版式；普通失败、卡纸、缺纸共用同一块按钮栏，所以三态的提示位置一致。
+    assert.match(doneRuntime, /retry=\{\{ available: canRetry, busy: retrying, error: retryError, onRetry:/)
+    assert.equal((doneRuntime.match(/<PrintDoneFailed\b/g) ?? []).length, 1, '三种失败态共用同一块版式')
+    assert.match(failedViewRuntime, /TESTID_BY_VARIANT[\s\S]*'print-fulfill-state-failed'[\s\S]*'print-fulfill-state-paper-jam'[\s\S]*'print-fulfill-state-out-of-paper'/)
     assert.match(browserSpecSource, /old agent retry rejection stays beside the actions in the first viewport/)
     assert.match(browserSpecSource, /toBeInViewport\(\{ ratio: 1 \}\)/)
   }],

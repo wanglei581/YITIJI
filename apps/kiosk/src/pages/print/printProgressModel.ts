@@ -141,24 +141,11 @@ export function outOfPaperPill(money: OutOfPaperMoney): string {
   return '订单保留 · 缺纸'
 }
 
-export function outOfPaperDoing(money: OutOfPaperMoney): string {
-  return money.fact === 'paid'
-    ? `不是你操作的问题，纸匣空了。订单和已付金额都保留着。${printProblemLine()}`
-    : `不是你操作的问题，纸匣空了。订单记录保留着。${printProblemLine()}`
-}
-
 /** 卡纸说明的副标题。只有确实收过钱才提已付金额；0 元和金额未知都不说收款。 */
 export function jamOrderKeptLine(fact: PaymentFact): string {
   return fact === 'paid'
     ? '你的订单和已付金额都保留着'
     : '你的订单还在，处理好后可以继续打印'
-}
-
-/** 一般失败页小青区。收费单保留原句；0 元和金额未知改成不提钱的说法。 */
-export function failureStaffDoing(fact: PaymentFact): string {
-  return fact === 'paid'
-    ? `订单和支付记录都在。${printProblemLine()}`
-    : `你的订单还在。${printProblemLine()}`
 }
 
 /** 小青区首句的前半截：先说钱的事实，再说任务阶段（稿「支付成功，正在出纸。」）。 */

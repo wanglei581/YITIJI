@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { QRCodeSVG } from 'qrcode.react'
-import {
-  AlertCircleIcon,
-  AlertTriangleIcon,
-  PrinterIcon,
-} from 'lucide-react'
+import { AlertCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
 import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
-import { formatRemainingSeconds, useRemainingSeconds } from '../../hooks/useCountdown'
+import { useRemainingSeconds } from '../../hooks/useCountdown'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { errorCodeOf, userMessageOf } from '../../services/api/userErrorMessage'
 import {
@@ -29,17 +24,11 @@ import { PrintArt } from './art/PrintArt'
 import { PrintIcon } from './art/PrintIcon'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PrintMissResume } from './components/PrintMissResume'
-import { PrintAiHelp } from './components/PrintAiHelp'
+import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
+import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, type FailureVariant } from './components/printDoneFailedModel'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
-import {
-  PrintDoneRecordSection,
-  PrintDoneXq,
-  PrintFeeBoundaryBar,
-  PrintJamGuide,
-  PrintOutOfPaperPanel,
-} from './components/PrintDoneSections'
-import { doneTakeaway, failureStaffDoing, jamOrderKeptLine, jobSubline, outOfPaperDoing, outOfPaperMoneyOf, outOfPaperPill, paymentFactOf, publicOrderNo, reprintHint } from './printProgressModel'
-import { formatCents } from './cashierStatus'
+import { PrintDoneRecordSection } from './components/PrintDoneSections'
+import { doneTakeaway, jobSubline, outOfPaperMoneyOf, paymentFactOf, publicOrderNo, reprintHint, type OutOfPaperMoney } from './printProgressModel'
 import './styles/print-fulfill-qx.css'
 import './styles/print-done-touch.css'
 
@@ -310,63 +299,23 @@ export function PrintDonePage() {
     }
   }
 
-  const paidLabel = amountCents === 0
-    ? '免费试运营，本单 0 元'
-    : amountCents != null
-      ? `已付 ${formatCents(amountCents)}`
-      : '订单保留'
-
   if (feeInfoOpen) {
+    const fee = feeInfoCopy({ free: amountCents === 0, orderNo: displayOrderNo })
     return (
-      <PrintTouchFrame
-        page="print-done"
-        legacyBody={false}
-        title={amountCents === 0 ? '订单记录' : '费用与订单边界'}
-        subtitle="本页只展示订单的真实状态，不替你承诺结果"
-        status={{ tone: 'warn', label: displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(false)}>
-              返回上一页
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-              使用帮助
-            </button>
-          </>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} data-testid="print-fulfill-state-fee-info" className="qx-scroll pff-page">
-          <PrintDoneXq ask={amountCents === 0 ? <>订单记录，<em>一项一项核对</em>。</> : <>钱的事，<em>一笔一笔说清楚</em>。</>} doing="本页只展示订单的真实状态，不替你承诺结果。" />
-          <PrintFeeBoundaryBar
-            free={amountCents === 0}
-            sub={amountCents === 0 ? '订单记录保留，不会因为这次异常消失' : '订单和支付记录都在，不会因为这次异常消失'}
-            body={amountCents === 0 ? <>是否补打，以订单记录为准。{printProblemLine()}</> : <>是否处理费用、处理多少、多久到账，以订单记录为准。本机不承诺自动处理，也不会替你把费用改成别的数。{printProblemLine()}</>}
-            facts={
-              <>
-                {displayOrderNo ? <span>订单 <b>{displayOrderNo}</b></span> : null}
-                {amountCents != null ? <span>{amountCents === 0 ? '办理方式' : '支付状态'} <b>{paidLabel}</b></span> : <span>支付状态 <b>以订单为准</b></span>}
-              </>
-            }
-          />
-          <div className="qx-card">
-            <div className="pff-step"><span className="pff-step-no">1</span><span className="pff-step-txt">{displayOrderNo ? <>记下<b>订单号 {displayOrderNo}</b> 和这台机器的位置。</> : <>记下这台机器的位置，方便核对这一单。</>}</span></div>
-            <div className="pff-step"><span className="pff-step-no">2</span><span className="pff-step-txt">说明实际拿到了几页、哪几页没出，<b>已出的纸请一并带上</b>。</span></div>
-            <div className="pff-step"><span className="pff-step-no">3</span><span className="pff-step-txt">核对之后是否处理、处理多少，<b>以订单记录为准</b>。{printProblemLine()}</span></div>
-          </div>
-          <div className="pff-help" data-testid="print-fulfill-fallback">
-            <span className="txt">{amountCents === 0 ? <>是否补打，以订单记录为准。{printProblemLine()}</> : <>本机<b>不会自动处理费用</b>，也不会把支付异常写成打印状态。</>}</span>
-            <button type="button" className="pff-help-btn" onClick={() => navigate('/help')}>使用帮助</button>
-          </div>
-          <PrintAiHelp
-            label="问小青：取纸或异常怎么办 →"
-            draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-          />
-          <PrintFillArt name="stack" />
-        </div>
-        {feedbackDialog}
-      </PrintTouchFrame>
+      <PrintDoneFeeInfo
+        title={fee.title}
+        subtitle={fee.subtitle}
+        pill={displayOrderNo ? `订单 ${displayOrderNo}` : '状态未知'}
+        steps={fee.steps}
+        stepsLabel={fee.stepsLabel}
+        rows={[
+          ...(displayOrderNo ? [{ key: 'order', label: '订单号', value: displayOrderNo }] : []),
+          paymentRow({ fact: paymentFactOf(amountCents), amountCents }),
+        ]}
+        fine={fee.fine}
+        onBack={() => setFeeInfoOpen(false)}
+        onHelp={() => navigate('/help')}
+      />
     )
   }
 
@@ -430,45 +379,6 @@ export function PrintDonePage() {
     const feedbackButton = canReportIssue ? (
       <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
     ) : null
-    const retryButton = takeaway?.canRetry && !isUnconfirmed ? (
-      <>
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="teal"
-          disabled={retrying}
-          onClick={() => { void handleResubmitPrint() }}
-        >
-          {retrying ? '正在重新提交…' : '重新提交打印'}
-        </button>
-        {retryError && (
-          <p role="alert" className="qx-state-d" style={{ flex: '1 1 100%', order: -1, margin: 0 }}>
-            {retryError}
-          </p>
-        )}
-      </>
-    ) : null
-    const takeawayNotices = (
-      <>
-        {takeawayQrUrl && (
-          <div className="print-done-takeaway" role="region" aria-label="文件带走">
-            <p className="print-done-takeaway-title">文件带走</p>
-            <div className="print-done-takeaway-qr">
-              <QRCodeSVG value={takeawayQrUrl} size={168} level="M" marginSize={0} />
-            </div>
-            {takeawayRemaining >= 0 && (
-              <p className="print-done-takeaway-note">
-                剩余 {formatRemainingSeconds(takeawayRemaining)}，请用本人手机扫码保存
-              </p>
-            )}
-          </div>
-        )}
-        {takeaway && takeawayExpired && (
-          <p role="status">带走链接已过期。{printProblemLine()}</p>
-        )}
-        {takeawayError && takeawayError !== printProblemLine() ? <p role="status">{takeawayError}</p> : null}
-      </>
-    )
 
     if (isUnconfirmed) {
       const paramLine = params ? jobSubline(file ? { pages: file.pages } : null, params) : null
@@ -543,147 +453,36 @@ export function PrintDonePage() {
       )
     }
 
-    if (visual === 'out-of-paper') {
-      // 稿 15 out-of-paper：小青区即页头 → 任务卡（单文件 + 缺纸说明 + 费用边界）→ 现场三步 → 底栏两出口。
-      // 稿里「加纸后继续」「已出 1 份」在真实合同里都不成立，改写理由见 PrintOutOfPaperPanel 头注。
-      const money = outOfPaperMoneyOf(takeaway, amountCents)
-      const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
-      return (
-        <PrintTouchFrame
-          page="print-done"
-          legacyBody={false}
-          back={{ label: '返回首页', onBack: () => navigate('/') }}
-          title="打印机缺纸"
-          subtitle="已经登记缺纸，这次打印不会在加纸后自动续打"
-          status={{ tone: 'bad', label: outOfPaperPill(money) }}
-          statusClassName="qx-pill"
-          terminalLabel="就业服务大厅"
-          ctabar={
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
-              {feedbackButton}
-              {retryButton}
-              <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-                使用帮助
-              </button>
-            </>
-          }
-          navbar={navbar}
-        >
-          <div
-            data-w2-page="print-done" data-print-flow-step={6}
-            data-pff-head="xq"
-            data-screen="print-fulfill"
-            data-state="out-of-paper"
-            data-testid="print-fulfill-state-out-of-paper"
-            className="qx-scroll pff-page pfp-page pfd-page"
-          >
-            <PrintDoneXq mainClassName="pfp-xq-main" ask={<>机器里<em>没纸了</em>。</>} doing={outOfPaperDoing(money)} />
-            <PrintOutOfPaperPanel
-              file={file ?? null}
-              params={params ?? null}
-              taskId={taskId}
-              orderNo={faultOrderNo}
-              failureReason={failureReason}
-              money={money}
-              canRetry={Boolean(takeaway?.canRetry)}
-              takeaway={takeawayNotices}
-            />
-            <PrintAiHelp
-              label="问小青：取纸或异常怎么办 →"
-              draft="打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。"
-            />
-          </div>
-          {feedbackDialog}
-        </PrintTouchFrame>
-      )
-    }
-
-    const jam = visual === 'paper-jam'
-    const payment = paymentFactOf(amountCents)
-    const issueTitle = isUnconfirmed ? '打印结果未确认' : jam ? '打印机卡纸' : '打印失败'
-    const ask = isUnconfirmed
-      ? <>这次打印<em>结果未确认</em>。</>
-      : jam
-        ? <>纸<em>卡住了</em>，别硬拉。</>
-        : <>打印<em>失败</em>。</>
-    const doing = isUnconfirmed
-      ? '系统已经正式登记，结论出来之前不猜成功也不猜失败。'
-      : jam
-        ? '硬拉可能撕坏纸、伤到机器，交给我们来处理。'
-        : failureStaffDoing(payment)
-    const issueSub = isUnconfirmed
-      ? '系统已明确登记，等待人工核查'
-      : jam
-        ? jamOrderKeptLine(payment)
-        : '打印任务已经确认失败'
+    // 普通失败、卡纸、缺纸三态共用一块版式（PrintDoneFailed）。收款事实：缺纸页优先用服务端回执，其余按进页时带来的金额。
+    const variant: FailureVariant = visual === 'out-of-paper' ? 'out-of-paper' : visual === 'paper-jam' ? 'paper-jam' : 'failed'
+    const money: OutOfPaperMoney = variant === 'out-of-paper'
+      ? outOfPaperMoneyOf(takeaway, amountCents)
+      : { fact: paymentFactOf(amountCents), amountCents }
+    const faultOrderNo = publicOrderNo(takeaway?.orderNo) ?? displayOrderNo
+    const canRetry = Boolean(takeaway?.canRetry)
     return (
-      <PrintTouchFrame
-        page="print-done"
-        legacyBody={false}
-        title={issueTitle}
-        subtitle={isUnconfirmed ? '这次无法确认是否已经出纸' : '打印任务已经确认失败'}
-        status={{ tone: 'bad', label: `${paidLabel} · ${issueTitle}` }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeeInfoOpen(true)}>{amountCents === 0 ? '查看订单说明' : '查看费用说明'}</button>
-            {feedbackButton}
-            {retryButton}
-            <button type="button" className="qx-btn" data-variant="primary" data-testid="print-fulfill-primary" onClick={() => navigate('/help')}>
-              使用帮助
-            </button>
-          </>
-        }
-        navbar={navbar}
-      >
-        <div
-          data-w2-page="print-done" data-print-flow-step={6}
-          data-pff-head="xq"
-          data-testid={
-            isUnconfirmed
-              ? 'print-fulfill-state-result-unconfirmed'
-              : jam
-                ? 'print-fulfill-state-paper-jam'
-                : 'print-fulfill-state-failed'
-          }
-          className={jam ? 'qx-scroll pff-page pff-jam' : 'qx-scroll pff-page'}
-        >
-          <PrintDoneXq ask={ask} doing={doing} />
-
-          <div
-            className="pff-issue"
-            data-tone={isUnconfirmed ? 'deep' : 'bad'}
-            data-testid="print-fulfill-fallback"
-          >
-            <div className="pff-issue-head">
-              <span className="pff-issue-ic">{isUnconfirmed ? <PrinterIcon aria-hidden="true" /> : <AlertTriangleIcon aria-hidden="true" />}</span>
-              <div>
-                <div className="pff-issue-t">{issueTitle}</div>
-                <small>{issueSub}</small>
-              </div>
-            </div>
-            <p className="pff-issue-body">
-              {isUnconfirmed
-                ? <>设备在断电、失联或硬件异常后，<b>无法确认这次打印的实际结果</b>。不猜成功也不猜失败，已登记等待人工核查。请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留。{printProblemLine()}</>
-                : jam
-                  ? <>请<b>不要自己打开机器或拽纸</b>。已出的纸你先收好。{printProblemLine()}</>
-                  : failureReason}
-            </p>
-            {jam && failureReason ? <p className="pff-issue-body">{failureReason}</p> : null}
-          </div>
-
-          {(publicOrderNo(takeaway?.orderNo) ?? displayOrderNo) ? (
-            <p className="pff-out-sub">订单号 {publicOrderNo(takeaway?.orderNo) ?? displayOrderNo}</p>
-          ) : null}
-          {!isUnconfirmed && failureReason === printProblemLine() ? null : <p className="pff-out-sub">{printProblemLine()}</p>}
-          {takeawayNotices}
-          {jam ? <PrintJamGuide orderNo={publicOrderNo(takeaway?.orderNo) ?? displayOrderNo} /> : null}
-          <PrintFillArt name="stack" />
-        </div>
-        {feedbackDialog}
-      </PrintTouchFrame>
+      <PrintDoneFailed
+        variant={variant}
+        copy={failureCopy({ variant, money, orderNo: faultOrderNo, canRetry })}
+        rows={failureSummaryRows({ orderNo: faultOrderNo, file: file ?? null, params: params ?? null, money, reason: failureReason })}
+        free={amountCents === 0}
+        retry={{ available: canRetry, busy: retrying, error: retryError, onRetry: () => { void handleResubmitPrint() } }}
+        takeaway={{
+          qrUrl: takeawayQrUrl,
+          remaining: takeawayRemaining,
+          expired: Boolean(takeaway && takeawayExpired),
+          error: takeawayError && takeawayError !== printProblemLine() ? takeawayError : null,
+        }}
+        expiredLine={`带走链接已过期。${printProblemLine()}`}
+        canReportIssue={canReportIssue}
+        isLoggedIn={isLoggedIn}
+        onFeeInfo={() => setFeeInfoOpen(true)}
+        onFeedback={() => setFeedbackOpen(true)}
+        onHome={() => navigate('/')}
+        onHelp={() => navigate('/help')}
+        onOrders={() => navigate('/me/print-orders')}
+        dialog={feedbackDialog}
+      />
     )
   }
 

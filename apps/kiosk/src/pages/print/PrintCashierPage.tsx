@@ -605,8 +605,9 @@ export function PrintCashierPage() {
       back={{ label: paramsBack.label, onBack: paramsBack.run }}
       ask={freeOrder
         ? printAsk('问小青：核对这单', '请帮我核对这一单的订单和打印状态。')
-        // 出过码之后返回键是「改参数需重新下单」，问小青标签太长会被截成「问小青：这笔账看…」，所以缩到 8 个字以内。
-        : printAsk('问小青：怎么付', '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。')}
+        // 稿 cashier 的问句原样保留。出过码之后返回键是「改参数需重新下单」，两个标签并排会把这一句挤成省略号，
+        // 所以不改字、不缩短，而是在 print-cashier-touch.css 里收一收底栏按钮的内边距，让三个键的字都放得下。
+        : printAsk('问小青：这笔账看不懂', '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。')}
       primary={{
         label: primaryAction.label,
         disabled: primaryAction.disabled,
