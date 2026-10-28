@@ -4,7 +4,7 @@
 // 对每个页面和主要状态量同一组指标，防止回到「只换外框、正文原样」或者悄悄退回旧壳：
 //   · 顶上有私有化版标识条，文字逐字照稿；
 //   · 底导航三项（首页 / AI 顾问 / 我的）始终在，底栏里恰好一个问小青、问小青以「问小青」开头；
-//   · 底栏所有按钮同在一行、都在屏内，主按钮高 88；
+//   · 底栏所有按钮同在一行、都在屏内，主按钮高 88，问小青不被挤得只剩话筒；
 //   · 屏上没有小于 20px 的字，没有小于 64×64 的可点区；
 //   · 现场无人值守：屏上不出现「联系 / 找（现场）工作人员」。
 //
@@ -107,6 +107,7 @@ async function measure(page: Page) {
       primaryHeight: primary ? Math.round(primary.getBoundingClientRect().height / scale) : null,
       navLabels: [...root.querySelectorAll('.qxt-nav button')].map((b) => (b.textContent || '').trim()),
       askLabels: [...root.querySelectorAll('.qxt-dock .qxt-askq')].map((b) => (b.textContent || '').trim()),
+      askWidth: Math.round(((root.querySelector('.qxt-dock .qxt-askq') as HTMLElement | null)?.getBoundingClientRect().width ?? 0) / scale),
       screenText: root.innerText,
     }
   })
@@ -129,6 +130,8 @@ for (const c of CASES) {
     expect(m.navLabels.map((label) => label.replace(/\s+/g, ' '))).toEqual(['首页', 'AI 顾问', '我的'])
     expect(m.askLabels, '底栏里恰好一个问小青').toHaveLength(1)
     expect(m.askLabels[0].startsWith('问小青')).toBe(true)
+    // 问小青放不下时照稿用省略号收尾，但不能被挤成只剩一个话筒：至少留出能读到「问小青：」和几个字的宽度。
+    expect(m.askWidth, '问小青被底栏其他按钮挤得太窄').toBeGreaterThanOrEqual(300)
     expect(m.dockKids).toBeGreaterThanOrEqual(2)
     expect(m.dockRows, `底栏按钮不在同一行（${m.dockKids} 个）`).toBe(1)
     expect(m.dockInside, '底栏按钮越出了屏幕宽度').toBe(true)
