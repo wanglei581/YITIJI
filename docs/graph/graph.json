@@ -13514,7 +13514,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 669,
+      "reachableFileCount": 671,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15483,6 +15483,7 @@
             "apps/kiosk/src/pages/renshi/renshi-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16426,6 +16427,7 @@
             "apps/kiosk/src/pages/smart-campus/smart-campus-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16456,6 +16458,7 @@
             "apps/kiosk/src/auth/capability-gate-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": [
@@ -16488,6 +16491,7 @@
             "apps/kiosk/src/auth/capability-gate-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": [
@@ -16517,7 +16521,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 765
+      "sourceFileCount": 767
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
