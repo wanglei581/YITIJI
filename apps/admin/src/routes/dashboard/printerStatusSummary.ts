@@ -26,3 +26,12 @@ export function printerIssueParts(counts: ReturnType<typeof summarizePrinters>):
   if (counts.lowSupply) parts.push(`纸张或墨粉偏少 ${counts.lowSupply} 台（仍可打印）`)
   return parts
 }
+
+/** 「今天要处理」里给运营的下一步：只说对应情况该做的事，只有离线时不提补耗材。 */
+export function printerActionHint(counts: ReturnType<typeof summarizePrinters>): string {
+  const hints: string[] = []
+  if (counts.needsService) hints.push('故障或缺纸要现场处理')
+  if (counts.offline) hints.push('离线的请检查终端电源和网络')
+  if (counts.lowSupply) hints.push('偏少的仍可打印，请尽快补充')
+  return hints.join('；')
+}

@@ -66,7 +66,8 @@ export function FirstOrderPanel({
     if (creating || !data) return
     setSelectedId((current) => {
       const valid = (id: string) => data.projects.some((project) => project.id === id)
-      if (projectId !== undefined) return projectId && valid(projectId) ? projectId : data.projects[0]?.id ?? ''
+      // 地址里有有效项目号才覆盖；没有时保留用户当前的选择，刷新数据不把人拉回第一个项目
+      if (projectId && valid(projectId)) return projectId
       return valid(current) ? current : data.projects[0]?.id ?? ''
     })
   }, [creating, data, projectId])

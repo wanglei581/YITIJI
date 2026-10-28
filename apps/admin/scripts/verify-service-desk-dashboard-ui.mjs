@@ -123,7 +123,7 @@ vm.runInNewContext(printerSummaryOutput, {
   module: printerSummaryModule,
   require() { throw new Error('printerStatusSummary 不应有运行时依赖') },
 })
-const { summarizePrinters, printerIssueParts } = printerSummaryModule.exports
+const { summarizePrinters, printerIssueParts, printerActionHint } = printerSummaryModule.exports
 const printerCases = [
   [{ status: 'error', paperStatus: 'normal', tonerLevel: 80 }, 'needsService'],
   [{ status: 'online', paperStatus: 'empty', tonerLevel: 80 }, 'needsService'],
@@ -137,6 +137,9 @@ check(printerCases.every(([printer, expected]) => summarizePrinters([printer])[e
   && printerIssueParts(summarizePrinters(printerCases.map(([printer]) => printer))).length === 3
   && !Object.prototype.hasOwnProperty.call(summarizePrinters([]), 'missingReading'),
 'printer categories distinguish service, offline, low supply and normal; empty readings are not "unreported"')
+const offlineOnlyHint = printerActionHint(summarizePrinters([{ status: 'offline', paperStatus: null, tonerLevel: null }]))
+check(offlineOnlyHint.includes('电源和网络') && !offlineOnlyHint.includes('补充') && !offlineOnlyHint.includes('现场处理'),
+'offline-only printers get a power / network hint, not a field-service or refill hint')
 
 const expectedAlertCtaClass =
   'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'

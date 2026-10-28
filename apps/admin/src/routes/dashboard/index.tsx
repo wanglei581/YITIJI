@@ -25,7 +25,7 @@ import { BlockError } from './DashboardWidgets'
 import { RecentPrintTasks } from './RecentPrintTasks'
 import { RecentActivity } from './RecentActivity'
 import { DashboardDeviceStatus } from './DashboardDeviceStatus'
-import { printerIssueParts, summarizePrinters } from './printerStatusSummary'
+import { printerActionHint, printerIssueParts, summarizePrinters } from './printerStatusSummary'
 import { formatCny } from '../ai-services/aiUsageDisplay'
 import { buildAlertRows } from './dashboardRows'
 import { useIncidentQueue, useReportQueue, useUnconfirmedPrintCount } from '../../components/first-order/useServiceQueues'
@@ -284,7 +284,7 @@ export default function DashboardPage() {
       todayRows.push({
         key: 'printers',
         title: parts.join('，'),
-        detail: '请查看设备状态，安排现场处理或补充耗材',
+        detail: printerActionHint(counts),
         href: '/devices',
         action: '去查看',
       })
