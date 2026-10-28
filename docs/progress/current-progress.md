@@ -17,6 +17,9 @@
 - 删除记录（均有证据：无路由、无 import、无门禁与用例引用、无文档声明，已跑相关门禁与图谱）：`components/PrintDeskChrome.tsx`（材料检查与预览改用触屏意图带后成了孤儿，图谱孤儿清单第一条）；`PrintDoneSections` 里只给旧失败版式用的 `PrintDoneXq` / `PrintFeeBoundaryBar` / `PrintOutOfPaperPanel` / `PrintJamGuide`；`printProgressModel` 里只给旧小青区用的 `outOfPaperDoing` / `failureStaffDoing`；`FileSourceBits` 里的 `FileSourceHero` / `FileSourceReason` / `ExistingSourceLinks` / `RejectBoard` 与 `fileSourceModel` 里只给 `FileSourceHero` 用的 `FILE_SOURCE_ASK` / `fileSourceEyebrow`。Git 历史保留。
 - 门禁与用例（强度不变，改过的逐条做了反向检查）：`verify-print-done-truth` 三处锚点改读新文件，`verify-fusion-w2-print-scan` / `verify-print-confirm-honest` / `verify-file-display-truth` 只加读取范围；`print-fulfill-qx` / `print-done-truth` 的选择器改到新结构；新增用例：来源页与空态「我的文档」带 `pick=print`、完成页订单磁贴副题、收银台第一屏、缺纸版面、五种出错屏共用一块板件、问小青交接补回真检查态；`print-walk-copy` 单测加失败文案模型、出错文案模型与版式要点。
 - 反向检查发现的一处覆盖缺口：隐去服务台缺纸版面里的「先传、稍后打印」，所有既有用例照样绿；已补一条 `print-hub-qx` 用例，缺纸版与离线版各验过。
+- 反向检查发现的另两处覆盖缺口：①把 `local-upload-failed` 出错屏出口卡的标题改名，用例仍绿（只看了底栏主键的字）——已补断言「第一张出口卡必须含主键的字」；②出纸页「暂时查不到打印结果」要连续 10 分钟没拿到终态才出现，此前没有任何浏览器用例（夹具里一直标「本轮不加速时钟」）——已补一条，用页面时钟快进到达，验三步、订单摘要、底栏三槽、不下结论、不找人、点「重新查询状态」回到进行中。出错板件用例同时补到 7 屏（加 `local-unreadable`、`local-upload-failed`；`local-oversize` 要 15MB 文件，由文案单测与截图守着）。
+- 小清理：`displayFileName` 从组件文件 `FileSourceBits.tsx` 挪进纯 TS 的 `fileSourceModel.ts`（A8 拆分时为复用把它导出，给组件文件新增了一条 react-refresh 警告；挪后 lint 回到 28 条警告、0 error，函数体一字不动，`verify:file-display-truth` 读取范围加上 `fileSourceModel.ts`、断言不动）。
+- 总指挥追加的小改：`COPY_ID_CARD_PLACEMENT_PENDING`（服务台复印说明里的身份证占位句）由「身份证怎么放、怎么翻面，请看打印机屏幕提示。」改成稿上的「身份证怎么放、怎么翻面，请看打印机屏幕上的图示。」，与第九包逐字一致；钉着旧句的 `print-hub-qx.spec.ts`「copy card opens the panel copy guide and returns to the hub」同步改，反向检查（源码改回旧句）转红。仍是占位句——手册没写放置位置，只指路、不编造位置、不让用户去找人。
 - 验证与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3-fix.md`。
 
 ## 2026-10-28：触屏版共享层补样式——旧共享弹窗与面板在触屏屏里掉样式（第一包补一块，未推送，待总指挥审）
