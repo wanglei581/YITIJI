@@ -258,8 +258,8 @@ function TerminalWeek({
   const lowPaper = overview.kind === 'ready' ? overview.data.terminals.filter((item) => item.printerStatus === 'low_paper') : []
   return (
     <Card className="space-y-3 p-4">
-      <section aria-label="本周终端运营" className="space-y-2">
-        <h2 className="text-[13px] font-bold text-neutral-700">本周终端运营</h2>
+      <section aria-label="近 7 天终端运营（截至昨天）" className="space-y-2">
+        <h2 className="text-[13px] font-bold text-neutral-700">近 7 天终端运营（截至昨天）</h2>
         {ops.status === 'loading' && <p className="text-sm text-neutral-500">正在读取终端运营</p>}
         {ops.status === 'error' && <BlockMiss onRetry={onRetryOps} />}
         {ops.status === 'ready' && ops.data && <OpsFigures data={ops.data} />}
@@ -279,7 +279,7 @@ function OpsFigures({ data }: { data: PartnerTerminalOpsView }) {
   return (
     <div className="space-y-1 text-sm text-neutral-800">
       <p>现在在线 <span className="font-semibold tabular-nums">{formatCount(totals.onlineTerminals)}</span> / <span className="tabular-nums">{formatCount(totals.terminalCount)}</span></p>
-      <p>本周服务次数 {totals.serviceCount === null ? '样本不足' : formatCount(totals.serviceCount)}</p>
+      <p>近 7 天服务次数 {totals.serviceCount === null ? '样本不足' : formatCount(totals.serviceCount)}</p>
       <p className="text-xs text-neutral-500">在线是此刻，服务次数到昨天</p>
     </div>
   )

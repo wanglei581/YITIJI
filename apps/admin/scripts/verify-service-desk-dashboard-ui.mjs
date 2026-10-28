@@ -3,7 +3,7 @@ import vm from 'node:vm'
 import ts from 'typescript'
 
 const layout = readFileSync(new URL('../src/layouts/AdminLayoutWrapper.tsx', import.meta.url), 'utf8')
-const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
+const dashboard = ['index.tsx', 'DashboardWidgets.tsx', 'RecentPrintTasks.tsx', 'RecentActivity.tsx', 'dashboardRows.ts', 'DashboardDeviceStatus.tsx', 'printerStatusSummary.ts'].map((file) => readFileSync(new URL(`../src/routes/dashboard/${file}`, import.meta.url), 'utf8')).join('\n')
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
 const failures = []
@@ -108,9 +108,35 @@ check(
     // 纸张、墨粉只写「不足」，不画百分比（直接查渲染里没有把读数接上 %）
     !/(tonerLevel|paperTrayLevel|paperLevel|avgLevel)[^\n]{0,60}%/.test(stripComments(dashboard)) &&
     !dashboard.includes('if (nums.length === 0) return null') &&
-    !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)),
-  'a failed block says it was not read; paper and toner are not drawn as percents; no amount or revenue KPI',
+    !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)) &&
+    dashboard.includes('formatCny(aiUsage.estimatedCostCny)'),
+  'a failed block says it was not read; paper and toner are not drawn as percents; AI cost uses the shared four-decimal formatter',
 )
+
+const printerSummaryOutput = ts.transpileModule(
+  readFileSync(new URL('../src/routes/dashboard/printerStatusSummary.ts', import.meta.url), 'utf8'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
+).outputText
+const printerSummaryModule = { exports: {} }
+vm.runInNewContext(printerSummaryOutput, {
+  exports: printerSummaryModule.exports,
+  module: printerSummaryModule,
+  require() { throw new Error('printerStatusSummary 不应有运行时依赖') },
+})
+const { summarizePrinters, printerIssueParts } = printerSummaryModule.exports
+const printerCases = [
+  [{ status: 'error', paperStatus: 'normal', tonerLevel: 80 }, 'needsService'],
+  [{ status: 'online', paperStatus: 'empty', tonerLevel: 80 }, 'needsService'],
+  [{ status: 'offline', paperStatus: 'unknown', tonerLevel: null }, 'offline'],
+  [{ status: 'online', paperStatus: 'low', tonerLevel: null }, 'lowSupply'],
+  // 线上真实形状：正常打印机纸张、墨粉都是空值（驱动没报警），必须判为正常而不是「没上报」
+  [{ status: 'online', paperStatus: null, tonerLevel: null }, 'normal'],
+  [{ status: 'online', paperStatus: 'normal', tonerLevel: 80 }, 'normal'],
+]
+check(printerCases.every(([printer, expected]) => summarizePrinters([printer])[expected] === 1)
+  && printerIssueParts(summarizePrinters(printerCases.map(([printer]) => printer))).length === 3
+  && !Object.prototype.hasOwnProperty.call(summarizePrinters([]), 'missingReading'),
+'printer categories distinguish service, offline, low supply and normal; empty readings are not "unreported"')
 
 const expectedAlertCtaClass =
   'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'

@@ -22,7 +22,7 @@ function uniqueOrgs(items: { orgId: string; orgName: string }[]): { orgId: strin
   return rows
 }
 
-export function PartnerServiceSummary({ onOpen }: { onOpen: (orgId: string, section: PartnerSection) => void }) {
+export function PartnerServiceSummary({ onOpen }: { onOpen: (orgId: string, section: PartnerSection, projectId?: string | null) => void }) {
   const incidents = useIncidentQueue()
   const reports = useReportQueue()
   const [expanded, setExpanded] = useState(false)
@@ -66,7 +66,7 @@ function SummaryList({
 }: {
   incidents: IncidentQueue
   reports: ReportQueue
-  onOpen: (orgId: string, section: PartnerSection) => void
+  onOpen: (orgId: string, section: PartnerSection, projectId?: string | null) => void
 }) {
   const incidentRows = incidents.orgCounts ?? uniqueOrgs(incidents.earliest).map((org) => ({ ...org, count: null as number | null }))
   const reportRows = reports.truncated ? [] : groupByOrg(reports.missing)
@@ -76,14 +76,14 @@ function SummaryList({
         <p className="px-2 py-1 text-xs text-neutral-500">共 {formatCount(incidents.total)} 条，先显示最早的 {formatCount(incidents.shown)} 条</p>
       )}
       {incidentRows.map((org) => (
-        <button key={`incident-${org.orgId}`} type="button" className={ROW_CLASS} onClick={() => onOpen(org.orgId, 'incidents')}>
+        <button key={`incident-${org.orgId}`} type="button" className={ROW_CLASS} onClick={() => onOpen(org.orgId, 'incidents', incidents.earliest.find((item) => item.orgId === org.orgId)?.projectId)}>
           <span className="min-w-0 truncate">{org.orgName}</span>
           {org.count !== null && <span className="shrink-0 text-neutral-500">未结报障 {formatCount(org.count)}</span>}
         </button>
       ))}
       {reports.truncated && <p className="px-2 py-1 text-xs text-neutral-500">项目较多，月报情况请打开各机构查看</p>}
       {reportRows.map((org) => (
-        <button key={`report-${org.orgId}`} type="button" className={ROW_CLASS} onClick={() => onOpen(org.orgId, 'reports')}>
+        <button key={`report-${org.orgId}`} type="button" className={ROW_CLASS} onClick={() => onOpen(org.orgId, 'reports', reports.missing.find((item) => item.orgId === org.orgId)?.projectId)}>
           <span className="min-w-0 truncate">{org.orgName}</span>
           <span className="shrink-0 text-neutral-500">未留存 {formatCount(org.count)}</span>
         </button>

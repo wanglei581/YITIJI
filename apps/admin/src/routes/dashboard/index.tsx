@@ -25,6 +25,8 @@ import { BlockError } from './DashboardWidgets'
 import { RecentPrintTasks } from './RecentPrintTasks'
 import { RecentActivity } from './RecentActivity'
 import { DashboardDeviceStatus } from './DashboardDeviceStatus'
+import { printerIssueParts, summarizePrinters } from './printerStatusSummary'
+import { formatCny } from '../ai-services/aiUsageDisplay'
 import { buildAlertRows } from './dashboardRows'
 import { useIncidentQueue, useReportQueue, useUnconfirmedPrintCount } from '../../components/first-order/useServiceQueues'
 import { incidentTodayRows, reportTodayRows, unconfirmedTodayRows, type TodayRow as ServiceTodayRow } from './todayServiceRows'
@@ -276,26 +278,13 @@ export default function DashboardPage() {
     }
   }
   if (!hold(['printers'], '打印机')) {
-    let faults = 0
-    let low = 0
-    for (const printer of printers ?? []) {
-      if (printer.status === 'error' || printer.paperStatus === 'jam') faults += 1
-      else if (
-        printer.paperStatus === 'low'
-        || printer.paperStatus === 'empty'
-        || (printer.tonerLevel !== null && printer.tonerLevel < 20)
-      ) low += 1
-    }
-    if (faults > 0 || low > 0) {
-      const parts: string[] = []
-      if (faults > 0) parts.push(`故障 ${formatCount(faults)} 台`)
-      if (low > 0) parts.push(`纸张或墨粉不足 ${formatCount(low)} 台`)
+    const counts = summarizePrinters(printers ?? [])
+    const parts = printerIssueParts(counts)
+    if (parts.length > 0) {
       todayRows.push({
         key: 'printers',
         title: parts.join('，'),
-        detail: faults > 0 && low > 0
-          ? '故障要现场处理；纸张或墨粉不足的仍可打印，请尽快补充'
-          : faults > 0 ? '故障要现场处理' : '仍可打印，请尽快补纸或更换墨粉',
+        detail: '请查看设备状态，安排现场处理或补充耗材',
         href: '/devices',
         action: '去查看',
       })
@@ -439,10 +428,14 @@ export default function DashboardPage() {
                 <p className="py-6 text-center text-sm text-neutral-500">近 24 小时暂无调用</p>
               ) : (
                 <div className="flex flex-col gap-2 text-sm text-neutral-800">
-                  <p>调用 {formatCount(aiUsage.totalCalls)} 次</p>
+                  <p>调用 {formatCount(aiUsage.totalCalls)} 次{aiUsage.totalCalls >= 10_000 ? '（只统计最近 1 万次）' : ''}</p>
                   <p>近 24 小时 · 成功率 {aiUsage.successRate}%</p>
                   <p>成功 {formatCount(aiUsage.successCount)} / 失败 {formatCount(aiUsage.failCount)}</p>
-                  {aiUsage.unmeasuredCalls > 0 && <p>部分调用费用暂未采集</p>}
+                  <p>{aiUsage.unmeasuredCalls === aiUsage.totalCalls
+                    ? `这 ${formatCount(aiUsage.totalCalls)} 次调用都没有费用数据`
+                    : aiUsage.unmeasuredCalls > 0
+                      ? `已计量部分约 ${formatCny(aiUsage.estimatedCostCny)}；另有 ${formatCount(aiUsage.unmeasuredCalls)} 次没有费用数据，实际花费会更高`
+                      : `估算费用约 ${formatCny(aiUsage.estimatedCostCny)}`}</p>
                 </div>
               )}
             </SectionCard>
