@@ -2346,6 +2346,92 @@ async function openWithRouteState(page: Parameters<typeof assertNoHorizontalOver
   await page.reload()
 }
 
+// ── 求职方案页底栏生成钮（稿 career）：已知 AI 停用 → 置灰、写明原因、点了不发请求；临时性错误 → 仍可点、字是「重试…」 ──
+const CAREER_AI_DOWN_WHY = 'AI 暂时不可用。生成求职方案先停着，可以先打印求职参考单；不承诺恢复时间。'
+const CAREER_AI_DOWN_WHY_WITH_PLAN = 'AI 暂时不可用。这份方案还在，重新生成先停着。'
+const CAREER_PLAN_PATH = '/api/v1/resume/career-plan/t-cp'
+
+/** 底栏的生成钮：aria-disabled=true、字照稿、原因（底栏小字）可见且读屏连着；点它（含强点）不发任何请求、屏不变。 */
+async function expectCareerGenerateKeyGreyed(page: Page, api: ApiRouter, label: string, why: string): Promise<void> {
+  const dock = page.locator('.qxt-dock')
+  const key = dock.locator('[data-career-plan-generate]')
+  await expect(key).toHaveText(label)
+  await expect(key).toHaveAttribute('data-career-plan-generate', 'blocked')
+  await expect(key).toHaveAttribute('aria-disabled', 'true')
+  await expect(dock.getByText(why, { exact: true })).toBeVisible()
+  await expect(key).toHaveAccessibleDescription(why)
+  await expect(dock.getByRole('button', { name: /^重试生成/ })).toHaveCount(0)
+  const posts = api.requestCount('POST', CAREER_PLAN_PATH)
+  // Playwright 不肯点 aria-disabled 的按钮；强点一下真实指针、再直接触发 DOM click，确保页面的点击处理真的跑过、并自己短路。
+  await key.click({ force: true })
+  await key.evaluate((el) => (el as HTMLElement).click())
+  await page.waitForTimeout(400)
+  expect(api.requestCount('POST', CAREER_PLAN_PATH), '已知停用时点生成钮不得发请求').toBe(posts)
+  await expect(key).toHaveText(label)
+  await expect(key).toHaveAttribute('aria-disabled', 'true')
+}
+
+for (const code of ['AI_PAUSED', 'AI_BUDGET_EXHAUSTED'] as const) {
+  test(`career plan: a known AI stop (${code}) greys the generate key, says why, sends no request and keeps print @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    // 首屏读取就撞上能力级停用码：没有发生任何生成请求，页面直接落到 ai-down。
+    api.respond('GET', CAREER_PLAN_PATH, { status: 503, json: { error: { code, message: 'fixture ai stop' } } })
+    await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+    const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+    await expect(screen).toHaveAttribute('data-state', 'ai-down')
+    await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeEnabled()
+    await expectCareerGenerateKeyGreyed(page, api, '生成求职方案', CAREER_AI_DOWN_WHY)
+    expect(api.requestCount('POST', CAREER_PLAN_PATH)).toBe(0)
+  })
+}
+
+test('career plan: a known AI stop after a plan exists greys 重新生成, keeps the plan and the print key @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', CAREER_PLAN_PATH, { status: 200, json: CAREER_PLAN_READY })
+  api.respond('POST', CAREER_PLAN_PATH, { status: 503, json: { error: { code: 'AI_PAUSED', message: 'fixture ai paused' } } })
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.locator('.qxt-dock').locator('[data-career-plan-generate]')).toHaveAttribute('data-career-plan-generate', 'open')
+  await page.locator('.qxt-dock').getByRole('button', { name: '重新生成' }).click()
+  await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(1)
+  // 方案还在、仍是 ready 屏；重新生成置灰，打印建议单照常可点。
+  await expect(screen).toHaveAttribute('data-state', 'ready')
+  await expect(page.locator('.rdq-direction h3')).toContainText('运营助理')
+  await expectCareerGenerateKeyGreyed(page, api, '重新生成', CAREER_AI_DOWN_WHY_WITH_PLAN)
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '打印建议单' })).toBeEnabled()
+})
+
+for (const temporary of [
+  { name: 'network drop', register: (api: ApiRouter) => api.abort('POST', CAREER_PLAN_PATH, 'internetdisconnected') },
+  { name: 'timeout (504 AI_CAREER_PLAN_TIMEOUT)', register: (api: ApiRouter) => api.respond('POST', CAREER_PLAN_PATH, { status: 504, json: { error: { code: 'AI_CAREER_PLAN_TIMEOUT', message: 'fixture timeout' } } }) },
+] as const) {
+  test(`career plan: a temporary error (${temporary.name}) keeps the generate key live as 重试, and the retry really sends @w3-kiosk`, async ({ page, api }) => {
+    terminalBaseline(api)
+    api.respond('GET', CAREER_PLAN_PATH, { status: 404, json: { error: { code: 'CAREER_PLAN_NOT_FOUND', message: '尚未生成' } } })
+    temporary.register(api)
+    await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+    const screen = page.locator('[data-kiosk-screen="resume-career-plan"]')
+    await expect(screen).toHaveAttribute('data-state', 'guide')
+    const key = page.locator('.qxt-dock').locator('[data-career-plan-generate]')
+    await expect(key).toHaveText('生成求职方案')
+    await key.click()
+    await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(1)
+    // 临时性错误不是「AI 停了」：不落 ai-down，生成钮不置灰，字改成重试。
+    await expect(screen).toHaveAttribute('data-state', 'guide')
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(key).toHaveText('重试生成求职方案')
+    await expect(key).toHaveAttribute('data-career-plan-generate', 'open')
+    await expect(key).not.toHaveAttribute('aria-disabled', 'true')
+    await expect(page.getByText('AI 暂时不可用。', { exact: false })).toHaveCount(0)
+    // 重试真的再发一次请求，这回成功就拿到方案。
+    api.respond('POST', CAREER_PLAN_PATH, { status: 200, json: CAREER_PLAN_READY })
+    await key.click()
+    await expect.poll(() => api.requestCount('POST', CAREER_PLAN_PATH)).toBe(2)
+    await expect(screen).toHaveAttribute('data-state', 'ready')
+  })
+}
+
 test('job fit actions lists only returned items and keeps print honest @w3-kiosk', async ({ page, api }) => {
   terminalBaseline(api)
   await page.goto('/resume/job-fit/actions')
@@ -2419,12 +2505,16 @@ test('career plan guide, ai-down and generated result keep print available @w3-k
   // AI 能力级不可用时页面给固定人话和手动出路，不再透出服务端原文（#1241）。
   await expect(page.getByText('AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）')).toBeVisible()
   await expect(page.getByText('AI 能力未配置')).toHaveCount(0)
-  // 出纸不依赖 AI：ai-down 时打印按钮仍在，生成钮也仍可重试（不被 canStart 藏掉）。
+  // 出纸不依赖 AI：ai-down 时打印按钮仍在；生成钮也仍在（不被 canStart 藏掉），但已知停用 → 置灰、不发请求、原因写在旁边（稿 career 的 AI 停）。
   await expect(page.getByRole('button', { name: '打印求职参考单（未含 AI 规划）' })).toBeVisible()
+  await expectCareerGenerateKeyGreyed(page, api, '生成求职方案', CAREER_AI_DOWN_WHY)
   await captureDecisionViewports(page, 'career-ai-down')
 
+  // 离开再进来才会重新探测：这次服务好了，生成钮可点，点了拿到方案。
   api.respond('POST', '/api/v1/resume/career-plan/t-cp', { status: 200, json: CAREER_PLAN_READY })
-  await page.getByRole('button', { name: '重试生成求职方案' }).click()
+  await openWithRouteState(page, '/resume/career-plan', { taskId: 't-cp' })
+  await expect(screen).toHaveAttribute('data-state', 'guide')
+  await page.getByRole('button', { name: '生成求职方案' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ready')
   await expect(page.getByRole('heading', { name: '目标与方向' })).toBeVisible()
   await expect(page.locator('.rdq-direction h3')).toContainText('运营助理')

@@ -57,6 +57,8 @@ import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import { CareerPlanExistingMaterials } from './components/career-plan/CareerPlanExistingMaterials'
 import { CareerPlanSelfAssessmentExcluded } from './components/career-plan/CareerPlanSelfAssessmentExcluded'
 import { CareerPlanColumns, CareerPlanGenerateRegion, CareerPlanSelfCheck } from './components/career-plan/CareerPlanSection'
+import { CareerPlanGenerateKey } from './components/career-plan/CareerPlanGenerateKey'
+import { CAREER_AI_DOWN_WHY_ID, careerAiDownWhy } from './components/career-plan/careerPlanGenerateCopy'
 import { CtaNote, Guardline, KitRows, Sec, Verdict } from './jobFit/jobFitQxKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './job-fit-qx.css'
@@ -172,6 +174,8 @@ export function CareerPlanPage() {
   const [probed, setProbed] = useState(false)
   /** 模型跑了但没给出可用规划（status:'failed'），与「AI 连不上」不是一回事。 */
   const [taskFailReason, setTaskFailReason] = useState<string | null>(null)
+  /** 上一次生成撞上了临时性错误（网络、超时、限流……）：生成钮保持可点，字改成「重试…」。 */
+  const [genFailed, setGenFailed] = useState(false)
 
   useBusyLock(generating || printing)
 
@@ -273,12 +277,14 @@ export function CareerPlanPage() {
     // 写死、canStart 恒 false，生成钮一旦被它包住就再也回不来（AI 恢复了也只能退出重进）。
     // 用户主动点一次就清掉上次的能力判定，再发一次真实请求，由结果重新决定。
     // 不加轮询、不自动重探：只有用户按下去才会再打一次。
+    // 例外：服务端已明确回了能力级停用码（aiOutage 有值）时生成钮置灰、不会走到这里（见 CareerPlanGenerateKey）；重试不会变好。
     if (!taskId || generating) return
     const run = begin('generate')
     if (!run) return
     setGenerating(true)
     setAiOutage(null)
     setError(null)
+    setGenFailed(false)
     setTaskFailReason(null)
     try {
       const result = await generateCareerPlan(taskId, { token: getToken(), accessToken })
@@ -294,7 +300,7 @@ export function CareerPlanPage() {
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
       else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
-      else setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试'))
+      else { setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试')); setGenFailed(true) }
     } finally {
       setGenerating(false)
       settle(run)
@@ -372,16 +378,10 @@ export function CareerPlanPage() {
       {plan ? '打印建议单' : '打印求职参考单（未含 AI 规划）'}
     </button>
   )
-  // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）。
+  // 生成钮**无条件**渲染，不被 aiTask.canStart 包住（见 handleGenerate 顶部注释）；已知停用时置灰（见 CareerPlanGenerateKey）。
   const generateButton = (
     <span className="qx-ai-declaration-slot">
-      <Action
-        variant="primary"
-        busy={generating}
-        onClick={() => void handleGenerate()}
-        label={generating ? '正在生成…' : aiOutage ? (plan ? '重试生成' : '重试生成求职方案') : plan ? '重新生成' : '生成求职方案'}
-        icon={generating ? null : <ArrowRightIcon size={22} aria-hidden="true" />}
-      />
+      <CareerPlanGenerateKey hasPlan={Boolean(plan)} generating={generating} knownDown={Boolean(aiOutage)} retry={genFailed} onGenerate={() => void handleGenerate()} />
       <AiDeclarationNote />
     </span>
   )
@@ -637,7 +637,7 @@ export function CareerPlanPage() {
       ),
       cta: (
         <>
-          <CtaNote>规划只供本人参考，不构成录用或收入承诺。</CtaNote>
+          {aiOutage ? <CtaNote id={CAREER_AI_DOWN_WHY_ID}>{careerAiDownWhy(true)}</CtaNote> : <CtaNote>规划只供本人参考，不构成录用或收入承诺。</CtaNote>}
           {printButton}
           {generateButton}
         </>
@@ -702,7 +702,7 @@ export function CareerPlanPage() {
       ),
       cta: (
         <>
-          <CtaNote>服务不可用时不显示任何规划内容，也不承诺恢复时间。</CtaNote>
+          <CtaNote id={CAREER_AI_DOWN_WHY_ID}>{careerAiDownWhy(false)}</CtaNote>
           {printButton}
           {generateButton}
         </>

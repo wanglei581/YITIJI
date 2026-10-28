@@ -161,9 +161,9 @@ export function RouteCards({ items }: {
 }
 
 /** 底部操作条注脚：稿里 dock 的第一行，说清这一屏的边界。 */
-export function CtaNote({ children }: { children: ReactNode }) {
+export function CtaNote({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <p className="jfq-cta-note">
+    <p className="jfq-cta-note" id={id}>
       <AlertTriangleIcon size={20} aria-hidden="true" />
       <span>{children}</span>
     </p>
