@@ -267,6 +267,28 @@ check('recruitment pages never print the generic 5xx staff handoff and carry a s
   assert.match(help, /useSupportContact\(\)/)
   assert.match(help, /helpNeededLine\(contact\)/)
 })
+// 第 11 包文案照稿：机构电话缺省、企业查询说法、意图带小标题、预约按钮白名单原句、筛选说明、
+// 「去帮助中心」卡的说明（帮助中心实际给的是常见问题和服务电话）、校招数据页去招聘会的去向。
+check('recruitment copy follows the draft', () => {
+  for (const [name, source] of [['offline agency detail', offlineAgencyDetail], ['offline job detail', offlineJobDetail]]) {
+    assert.ok(source.includes('来源未提供电话'), `${name}: 机构电话缺省写「来源未提供电话」`)
+    assert.ok(!source.includes('请到帮助中心查看服务电话'), `${name}: 不把本机的服务电话说成机构电话`)
+  }
+  assert.ok(companiesPage.includes('行业、地区、招聘类型、来源种类都对应真实查询'), 'companies filter hint stays in user words')
+  assert.ok(!companiesPage.includes('CompanyQuery 的') && !/所有条件均对应真实 CompanyQuery/.test(companiesPage), 'no code type name on the screen')
+  for (const rel of ['src/pages/recruitment-touch/RecruitTouchFrame.tsx', 'src/pages/job-fairs/QxFairWorkbench.tsx']) {
+    assert.ok(!read(rel).includes('私有化版 ·'), `${rel}: 意图带小标题不统一加「私有化版 ·」，逐屏照稿`)
+  }
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(!campusTabs.includes('扫码预约 · 去来源平台办理'), '预约按钮只用白名单原句「扫码预约」')
+  assert.ok(read('src/pages/job-fairs/JobFairsPage.tsx').includes('地区、日期、收藏和场次范围'), 'fair list filter note wording')
+  for (const rel of ['FairMapPage', 'JobFairCheckinPage', 'FairCompanyDetailPage']) {
+    const source = read(`src/pages/job-fairs/${rel}.tsx`)
+    assert.ok(source.includes('title="去帮助中心" desc="常见问题和服务电话"'), `${rel}: 帮助中心卡说帮助中心实际给的东西`)
+    assert.ok(!source.includes('入口一般有纸质导览和指示牌') && !source.includes('手上有主办方纸质名单时，以现场公示为准'), `${rel}: 帮助中心卡不讲现场纸质物`)
+  }
+  assert.match(campusInsights, /navigate\('\/job-fairs\?audience=campus'\)/, '校招数据页的「查看招聘会」去校园场次')
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。
