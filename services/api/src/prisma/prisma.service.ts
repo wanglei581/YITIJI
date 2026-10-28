@@ -560,6 +560,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.platformSetting
   }
 
+  // ── 贴牌 Logo 与软件使用授权（src/branding、src/licenses）──────────────────
+
+  get brandLogo() {
+    return this.client.brandLogo
+  }
+
+  get license() {
+    return this.client.license
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   get serviceProject() { return this.client.serviceProject }
