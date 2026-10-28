@@ -316,6 +316,38 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
   expect(errors).toEqual([])
 })
 
+test('print hub paper-empty layout (draft st-device-off): paper paths paused, 先传、稍后打印 stays open @w2', async ({ page, api }) => {
+  // 稿 st-device-off：打印机确定缺纸时，出纸类（打印文件、扫描）先停，复印说明、到机码、手机和 U 盘上传仍可进，
+  // 手机扫码、U 盘导入收在「先传、稍后打印」两块里。这一版式此前没有任何用例守着：隐去那两块，所有用例照样绿。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api, { isOnline: true, printerStatus: 'paper_empty' })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-device-off"]')).toBeVisible()
+  await expect(page.locator('.qxt-print-hub.ph-paper')).toBeVisible()
+  await expect(page.locator('.qxt-status')).toContainText('打印机缺纸 · 出纸类暂停')
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toBeDisabled()
+  await expect(page.getByTestId('print-hub-cap-doc-print')).toContainText('这次出不了纸')
+  await expect(page.getByTestId('print-hub-cap-scan')).toBeDisabled()
+  await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
+  await expect(page.getByTestId('print-hub-fallback')).toContainText('这台机器暂时打不了')
+  await expect(page.getByTestId('print-hub-fallback')).not.toContainText('找现场工作人员')
+  // 「先传、稍后打印」：标题 + 手机扫码上传、U 盘导入两块（行式磁贴），可点。
+  await expect(page.getByText('先传、稍后打印', { exact: true })).toBeVisible()
+  const phoneRow = page.getByTestId('print-hub-cap-phone-upload')
+  const usbRow = page.getByTestId('print-hub-cap-usb-import')
+  await expect(phoneRow).toBeEnabled()
+  await expect(usbRow).toBeEnabled()
+  await expect(phoneRow).toContainText('手机扫码上传')
+  await expect(usbRow).toContainText('U 盘导入')
+  await expectNoForgedReady(page)
+  expect(errors).toEqual([])
+})
+
 test('print hub printer-status failure stays unknown, never 设备正常 @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
