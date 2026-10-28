@@ -440,6 +440,79 @@ test('校园招聘：带着名单里没有的 ?fair= 进来，提示放在列表
   expect(noticeBox && cardBox && noticeBox.y < cardBox.y, '提示在列表上方').toBe(true)
 })
 
+// ── A2 校园专区「扫码预约」：来源四要素缺一不出码；齐全时用招聘会工作台的共享弹层 ─────────────────
+// 二维码一旦出屏，用户就已经离开本机了，事后没有任何补救手段，所以拦截必须发生在弹码之前。
+async function measureDialog(page: Page) {
+  return page.evaluate(() => {
+    const dlg = document.querySelector('[role="dialog"]') as HTMLElement
+    const stage = document.querySelector('.kiosk-stage') as HTMLElement | null
+    const scale = stage ? stage.getBoundingClientRect().width / 1080 : 1
+    const small: string[] = []
+    const walker = document.createTreeWalker(dlg, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const text = (node.textContent || '').trim()
+      const el = node.parentElement
+      if (!text || !el) continue
+      const px = parseFloat(getComputedStyle(el).fontSize)
+      if (px < 20) small.push(`${text.slice(0, 16)}(${px}px)`)
+    }
+    const tiny = [...dlg.querySelectorAll('button, a[href]')]
+      .map((el) => { const r = el.getBoundingClientRect(); return { w: r.width / scale, h: r.height / scale, t: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 10) } })
+      .filter((x) => x.w < 63.5 || x.h < 63.5)
+      .map((x) => `${x.t}[${Math.round(x.w)}x${Math.round(x.h)}]`)
+    const qr = dlg.querySelector('[data-testid="fair-qr-slot"] svg') as SVGElement | null
+    return { small, tiny, qr: qr ? Math.round(qr.getBoundingClientRect().width / scale) : 0, text: dlg.innerText }
+  })
+}
+
+test('校园招聘·选中一场：来源四要素齐全时点「扫码预约」出共享弹层（dialog、二维码不小于 280、字号与可点区达标） @w4', async ({ page, api }) => {
+  registerW6Api(api)
+  await page.goto('/campus?fair=fair-001')
+  const book = page.getByRole('button', { name: '扫码预约' })
+  await expect(book).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(page.getByTestId('campus-book-blocked'), '要素齐全时不写缺项原因').toHaveCount(0)
+  await book.click()
+  const dialog = page.getByRole('dialog', { name: '扫码前往来源平台预约' })
+  await expect(dialog).toBeVisible()
+  await expect(page.getByTestId('fair-qr-slot')).toBeVisible()
+  const m = await measureDialog(page)
+  expect(m.text, '弹层里外部编号如实写出').toContain('ext-fair-001')
+  expect(m.small, `弹层里不足 20px 的字: ${m.small.join('; ')}`).toEqual([])
+  expect(m.tiny, `弹层里小于 64×64 的可点区: ${m.tiny.join('; ')}`).toEqual([])
+  expect(m.qr, '二维码不小于 280').toBeGreaterThanOrEqual(280)
+  await dialog.getByRole('button', { name: '关闭' }).click()
+  await expect(dialog).toHaveCount(0)
+})
+
+test('校园招聘·选中一场：来源要素缺项时「扫码预约」不出码、原因常显（同页先有阳性对照） @w4', async ({ page, api }) => {
+  registerW6Api(api)
+  // 阳性对照：四要素齐全时点了真出码，夹具确实能走到弹层，下面「没出码」才有意义。
+  await page.goto('/campus?fair=fair-001')
+  await page.getByRole('button', { name: '扫码预约' }).click()
+  await expect(page.getByRole('dialog', { name: '扫码前往来源平台预约' })).toBeVisible()
+  // 缺项：外部编号空串、同步时间为空，来源链接仍合法。
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [makeFair({ externalId: '', syncTime: null })], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } },
+  })
+  await page.goto('/campus?fair=fair-001')
+  const book = page.getByRole('button', { name: '扫码预约' })
+  await expect(book).toHaveAttribute('aria-disabled', 'true')
+  await expect(book).toHaveAttribute('aria-describedby', 'campus-book-blocked')
+  const reason = page.getByTestId('campus-book-blocked')
+  await expect(reason).toBeVisible()
+  await expect(reason).toContainText('来源要素缺「同步时间、外部ID」')
+  expect(await reason.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)), '原因字号不小于 20').toBeGreaterThanOrEqual(20)
+  // dispatchEvent 绕开命中测试：被拦的按钮点击事件照样到达 onClick，守卫要在里面兜住。
+  await book.dispatchEvent('click')
+  await expect(page.getByRole('dialog'), '缺项时点了不得出码').toHaveCount(0)
+  await expect(page.getByTestId('fair-qr-slot')).toHaveCount(0)
+  await book.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog'), '键盘触发同样不得出码').toHaveCount(0)
+})
+
 // ── 门的读屏名（A12）：可用的门不盖住说明，不可用的门读「标题，原因。说明」 ───────────────────
 async function doorLabels(page: Page) {
   return page.evaluate(() => [...document.querySelectorAll('[data-door-title]')].map((door) => {

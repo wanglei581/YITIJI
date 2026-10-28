@@ -322,6 +322,17 @@
   line-height: 1.4;
 }
 .qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
+/* 二维码弹层（FairQrOverlay）里的来源三要素与说明：旧样式 18–19px，本页作用域里抬到 20px。
+   校园页签的弹层走触屏壳的 overlay 槽，在 .dw-page 之外，吃不到上面那条「内芯字号继承」，所以单独写。 */
+.qxt-screen[data-qx-page='recruit'] .qxfw-overlay :is(.dw-kv > div, .qxfw-overlay-note, .qxfw-overlay-sub) {
+  font-size: 20px;
+}
+/* 校园页签里「扫码预约」来源要素缺项时是 aria-disabled：保持可聚焦（读屏能播报按钮下面那句原因），样子置灰。 */
+.qxt-screen[data-qx-page='recruit'] .campus-proto .kproto-btn[aria-disabled='true'] {
+  opacity: .45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 /* 岗位页 AI 入口的登录提示：开始推荐 / AI 岗位解读下面一行「要先登录」，不抢按钮的位置。 */
 .qxt-screen[data-qx-page='recruit'] .qx-ai-login-hint {

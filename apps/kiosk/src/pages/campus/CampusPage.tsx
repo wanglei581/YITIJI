@@ -29,16 +29,19 @@ import {
   MapPinIcon,
   NavigationIcon,
   PrinterIcon,
-  SmartphoneIcon,
-  XIcon,
 } from 'lucide-react'
 import { getFairCompanies, getFairStats, getFairZones, getJobFairs, getTerminalId } from '../../services/api'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
-import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
+import { FAIR_BOOKING_LINK_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
-import { evaluateJobSourceTrust } from '../jobs/utils/sourceTrust'
+import { evaluateJobSourceTrust, sourceTrustReason } from '../jobs/utils/sourceTrust'
+// 预约码与「在手机上导航」码都用招聘会工作台的共享弹层（dialog、320px 二维码、64px 关闭键）；
+// 弹层里的来源三要素排版用 directory-qx.css 的 .dw-kv，所以两份样式都要带上。
+import { FairQrOverlay } from '../job-fairs/components/FairWorkbenchBits'
+import '../../components/qingxu/directory/directory-qx.css'
+import '../job-fairs/styles/fair-workbench-qx.css'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
 
@@ -117,57 +120,6 @@ function fmtDateBadge(start: string, end: string) {
   const sameDay = a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   return sameDay ? head : `${head} — ${pad(b.getMonth() + 1)}.${pad(b.getDate())}`
 }
-// ─── 通用二维码弹层（真实二维码）────────────────────────────────────────────────
-
-function QrModal({
-  title,
-  subtitle,
-  value,
-  note,
-  meta,
-  onClose,
-}: {
-  title: string
-  subtitle?: string
-  value: string | undefined | null
-  note: string
-  meta?: { label: string; value: string }[]
-  onClose: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
-          aria-label="关闭"
-        >
-          <XIcon className="h-5 w-5" />
-        </button>
-        <p className="text-center text-base font-semibold text-neutral-800">{title}</p>
-        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-neutral-500">{subtitle}</p>}
-        <div className="mt-5 flex justify-center">
-          <SourceUrlQr value={value} size={180} />
-        </div>
-        {meta && meta.length > 0 && (
-          <div className="mt-5 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
-            {meta.map((m) => (
-              <div key={m.label} className="flex justify-between">
-                <span className="text-neutral-400">{m.label}</span>
-                <span className="font-medium">{m.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-4 flex items-start gap-2">
-          <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-neutral-500">{note}</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── 主组件 ─────────────────────────────────────────────────────────────────────
 
 type QrState =
@@ -199,11 +151,17 @@ export function CampusPage() {
     if (fair?.id) recordBrowse(getToken(), 'job_fair', fair.id)
   }, [fair?.id, getToken])
 
+  // 来源四要素缺一即不放行：不记录、不出码，缺哪几项写在按钮旁边（同招聘会列表、详情、到场指引）。
+  // 二维码一旦出屏，用户就已经离开本机了，事后没有任何补救手段，所以拦截必须发生在弹码之前。
+  const bookTrust = fair ? evaluateJobSourceTrust(fair) : null
+  const bookBlockedReason = bookTrust && !bookTrust.ok
+    ? sourceTrustReason(bookTrust, FAIR_BOOKING_LINK_UNAVAILABLE_REASON, 'job_fair')
+    : ''
+
   // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
   const openBookingQr = () => {
-    if (fair && evaluateJobSourceTrust(fair).ok) {
-      recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
-    }
+    if (!fair || !evaluateJobSourceTrust(fair).ok) return
+    recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
     setQr({ kind: 'book' })
   }
 
@@ -348,6 +306,29 @@ export function CampusPage() {
     navigate(`/job-fairs/${fair.id}/materials`)
   }
 
+  // 弹层交给触屏壳的 overlay 槽：打开时底下整屏 inert，焦点留在弹层里。预约码再核一次来源四要素（调用方必须先过守卫）。
+  const qrOverlay = qr?.kind === 'book' && bookTrust?.ok ? (
+    <FairQrOverlay
+      title="扫码前往来源平台预约"
+      subtitle={fair.name}
+      value={fair.sourceUrl}
+      meta={[
+        { label: '来源机构', value: fair.sourceName },
+        { label: '外部编号', value: fair.externalId },
+      ]}
+      note="请使用手机扫码前往来源平台办理预约，预约由对方平台管理，本系统不参与活动报名流程、不接收简历。"
+      onClose={() => setQr(null)}
+    />
+  ) : qr?.kind === 'nav' ? (
+    <FairQrOverlay
+      title="扫码在手机上导航"
+      subtitle={fair.venue}
+      value={qr.url}
+      note="请使用手机扫码，在手机地图中打开场馆位置并开始导航。"
+      onClose={() => setQr(null)}
+    />
+  ) : null
+
   return (
     <RtFrame
       eyebrow="校园招聘会"
@@ -357,31 +338,9 @@ export function CampusPage() {
       backLabel="返回校园招聘"
       onBack={() => navigate('/campus')}
       ask={{ label: '问小青：这场怎么看', draft: '这场怎么看', voice: true }}
+      overlay={qrOverlay}
     >
     <div className="campus-proto">
-      {qr?.kind === 'book' && (
-        <QrModal
-          title="扫码前往来源平台预约"
-          subtitle={fair.name}
-          value={fair.sourceUrl}
-          meta={[
-            { label: '来源机构', value: fair.sourceName },
-            { label: '外部编号', value: fair.externalId },
-          ]}
-          note="请使用手机扫码前往来源平台办理预约，预约由对方平台管理，本系统不参与活动报名流程、不接收简历。"
-          onClose={() => setQr(null)}
-        />
-      )}
-      {qr?.kind === 'nav' && (
-        <QrModal
-          title="扫码在手机上导航"
-          subtitle={fair.venue}
-          value={qr.url}
-          note="请使用手机扫码，在手机地图中打开场馆位置并开始导航。"
-          onClose={() => setQr(null)}
-        />
-      )}
-
       {/* 顶栏由 KioskPageFrame pagehead 统一提供，不再自绘 campus-topbar（避免双顶栏/双返回）。 */}
       <div className="campus-hero">
         <div className="flex items-center justify-end">
@@ -438,6 +397,7 @@ export function CampusPage() {
             jobCount={jobCount}
             onGoTab={setTab}
             onBook={openBookingQr}
+            bookBlockedReason={bookBlockedReason}
           />
         )}
         {tab === 'companies' && (

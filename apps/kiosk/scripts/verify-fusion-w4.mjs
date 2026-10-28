@@ -317,6 +317,21 @@ check('recruitment screens keep the draft AI elements and handle AI-down honestl
     assert.ok(source.includes(`onRetry={aiError === ${constant} ? undefined :`), `${rel}: AI 整条不可用时不再给重试`)
   }
 })
+// 第二轮审查 A2：校园专区「扫码预约」缺项照样出码。二维码一旦出屏，用户就已经离开本机了，事后没有补救手段，
+// 所以来源四要素守卫必须在 setQr 之前；原来自带的 QrModal 没有 dialog 语义、二维码只有 180px，换成招聘会工作台的共享弹层。
+check('campus booking QR is guarded by the source four elements and uses the shared overlay', () => {
+  const campusPage = read('src/pages/campus/CampusPage.tsx')
+  assert.doesNotMatch(campusPage, /function QrModal/, '校园页不再自带 QrModal')
+  assert.match(campusPage, /<FairQrOverlay/, '预约码与导航码都用共享弹层')
+  const open = campusPage.match(/const openBookingQr = \(\) => \{([\s\S]*?)\n  \}\n/)
+  assert.ok(open, '找不到 openBookingQr')
+  const guard = open[1].indexOf('if (!fair || !evaluateJobSourceTrust(fair).ok) return')
+  assert.ok(guard >= 0, 'openBookingQr 必须先过来源四要素守卫')
+  assert.ok(open[1].indexOf('setQr(') > guard, '守卫必须在 setQr 之前：缺项时不出码')
+  assert.ok(open[1].indexOf('recordExternalJump(') > guard, '记外部跳转也在守卫之后')
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(campusTabs.includes("aria-disabled={bookBlockedReason ? true : undefined}") && campusTabs.includes("aria-describedby={bookBlockedReason ? 'campus-book-blocked' : undefined}"), '「扫码预约」缺项时 aria-disabled 并指向常显的原因')
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。

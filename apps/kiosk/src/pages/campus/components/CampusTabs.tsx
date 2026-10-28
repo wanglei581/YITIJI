@@ -93,6 +93,7 @@ export function OverviewTab({
   jobCount,
   onGoTab,
   onBook,
+  bookBlockedReason = '',
 }: {
   fair: ExternalJobFairDTO
   companies: FairCompanyDTO[]
@@ -100,6 +101,8 @@ export function OverviewTab({
   jobCount: number
   onGoTab: (t: TabKey) => void
   onBook: () => void
+  /** 来源四要素缺项时的常显原因（空串＝放行）。有值时「扫码预约」aria-disabled，原因写在按钮下面。 */
+  bookBlockedReason?: string
 }) {
   const navigate = useNavigate()
 
@@ -138,6 +141,8 @@ export function OverviewTab({
             <button
               type="button"
               onClick={onBook}
+              aria-disabled={bookBlockedReason ? true : undefined}
+              aria-describedby={bookBlockedReason ? 'campus-book-blocked' : undefined}
               className="kproto-btn sm primary ml-auto"
               style={{ '--kp-accent': 'var(--kp-wheat)', '--kp-accent-deep': 'var(--kp-wheat-deep)', '--kp-accent-soft': 'var(--kp-wheat-soft)' } as React.CSSProperties}
             >
@@ -145,6 +150,9 @@ export function OverviewTab({
             </button>
           )}
         </div>
+        {fair.status !== 'ended' && bookBlockedReason ? (
+          <p id="campus-book-blocked" data-testid="campus-book-blocked" className="mb-4 text-[20px] font-semibold leading-snug text-[var(--kp-wheat-deep)]">{bookBlockedReason}</p>
+        ) : null}
         <div className="flex flex-col gap-3 text-[20px]">
           <div className="flex gap-4"><span className="w-[112px] shrink-0 text-[var(--kp-muted)]">举办时间</span><span className="flex-1 font-semibold">{fmtHeldTime(fair.startTime, fair.endTime)}</span></div>
           <div className="flex gap-4"><span className="w-[112px] shrink-0 text-[var(--kp-muted)]">举办地点</span><span className="flex-1 font-semibold">{fair.address || fair.venue}</span></div>
