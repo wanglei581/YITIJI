@@ -92,6 +92,11 @@ must(
 )
 // 降级卡里的动作（去打印扫描）旧样式给 56，触屏稿要求可点区不小于 64×64；只在问小青页作用域里抬，ai/ 共享件的默认不动。
 must('touchCss', /\[data-qx-page='assistant'\] \.kassist \.assistant-ai-status \.kiosk-ai-fallback__action \{ min-height: 64px; min-width: 64px; \}/, '降级卡动作的可点区不小于 64×64')
+// 补上通知条之后这一屏会比屏幕高：locked 态用共享的紧凑样式 qxt-body-aidown，对话区行距收紧，
+// 四张入口的箭头圆钮挪到卡片右侧（卡高装不下「标题 + 说明 + 底部圆钮」，圆钮会探出卡底被下一张压住）。
+must('page', /bodyClassName=\{body === 'locked' \? 'qxt-body-aidown' : undefined\}/, 'AI 暂停时页壳用 qxt-body-aidown 紧凑通知条，求助句才不被挤出这一屏')
+must('touchCss', /\.assistant-conversation\[data-turn='locked'\] \{ gap: 8px; \}/, 'AI 暂停时对话区行距收紧到 8')
+must('touchCss', /\.assistant-manual-entries\[data-variant='full'\] \.qxt-slab \.qxt-take \{ position: absolute; right: 22px; top: 50%;/, '四张入口的箭头圆钮在卡片右侧垂直居中，不探出卡底')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。
