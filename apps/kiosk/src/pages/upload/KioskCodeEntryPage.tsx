@@ -6,6 +6,7 @@ import { BanIcon, CircleAlertIcon, HourglassIcon, type LucideIcon } from 'lucide
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { buildPhoneUploadUrl, isUploadSceneToken, resolveUploadScene } from '../../services/api/uploadSessions'
 import { isQrLoginTicketId } from '../../services/auth/memberQrLoginApi'
+import { PLATFORM_BRAND_NAME } from '../../copy/miniappLinkCopy'
 
 /* 一体机手机码的网页中转：/k/u/:scene（上传）与 /k/l/:ticketId（登录）。
  * 一体机屏上的手机码编的是 https://<公网域名>/k/u/<场景码>、/k/l/<登录票据>。微信后台两条
@@ -35,9 +36,9 @@ function EntryBody({ sub, children }: { sub: string; children: ReactNode }) {
   return (
     <section className="k1-phone-upload-content">
       <header className="ph-up-relaybar">
-        <span className="ph-up-seal" aria-hidden="true">职</span>
+        <span className="ph-up-seal" aria-hidden="true">{PLATFORM_BRAND_NAME.slice(0, 1)}</span>
         <div className="ph-up-brand">
-          <strong>职易达</strong>
+          <strong>{PLATFORM_BRAND_NAME}</strong>
           <small>{sub}</small>
         </div>
       </header>

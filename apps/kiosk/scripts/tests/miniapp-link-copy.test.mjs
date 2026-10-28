@@ -49,6 +49,14 @@ test('小程序的名字是常量「职易达」', () => {
   assert.equal(copy.MINIAPP_DISPLAY_NAME, '职易达')
 })
 
+test('手机侧页头品牌与小程序同名，不随一体机贴牌换；中转页从常量取、不写字面量', () => {
+  assert.equal(copy.PLATFORM_BRAND_NAME, copy.MINIAPP_DISPLAY_NAME)
+  const entry = readFileSync(join(kioskRoot, 'src/pages/upload/KioskCodeEntryPage.tsx'), 'utf8')
+  const code = entry.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  assert.doesNotMatch(code, /职易达/, '中转页页头品牌要从 PLATFORM_BRAND_NAME 取')
+  assert.match(code, /\{PLATFORM_BRAND_NAME\}/)
+})
+
 test('小程序未发布、null、省略参数（会话缓存为空）、字段缺失或非布尔：两句都是空串', () => {
   for (const [name] of hints) {
     assert.equal(copy[name](unpublished), '', `${name} 未发布`)

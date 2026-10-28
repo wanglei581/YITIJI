@@ -17,6 +17,12 @@ import { whenMiniapp, type PublicSupportContact } from './unattendedCopy'
 /** 小程序的名字。一体机贴牌换名时它不变。 */
 export const MINIAPP_DISPLAY_NAME = '职易达'
 
+/**
+ * 手机这一侧（扫一体机码打开的网页：/k/u/、/k/l/ 中转页，手机上传页，手机确认登录页）的页头品牌。
+ * 手机侧和小程序是同一个品牌，不随一体机贴牌换（触屏版总指挥 10/29 定），三页都从这里取，不写字面量。
+ */
+export const PLATFORM_BRAND_NAME = MINIAPP_DISPLAY_NAME
+
 /** 手机上传二维码旁的说明。小程序未发布或读不到联系方式时为空串。 */
 export function phoneUploadScanHint(contact?: PublicSupportContact | null): string {
   return whenMiniapp(contact, `用手机微信扫码：打开的是${MINIAPP_DISPLAY_NAME}小程序，就在里面选文件；打开的是网页，也能照常上传。`)
