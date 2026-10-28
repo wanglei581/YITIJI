@@ -20432,7 +20432,8 @@
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-jobfairs-terminal-priority.mjs",
-      "services/api/scripts/verify-activity-logs.ts"
+      "services/api/scripts/verify-activity-logs.ts",
+      "services/api/scripts/verify-campus-recruitment-stats.ts"
     ],
     "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
@@ -36459,6 +36460,7 @@
         "files": [
           "apps/kiosk/src/pages/campus/CampusInsightsGroups.tsx",
           "apps/kiosk/src/pages/campus/FreshmanInsightsPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
           "apps/kiosk/src/services/api/campusRecruitmentStats.ts",
           "packages/shared/src/index.ts",
           "packages/shared/src/types/campusRecruitmentStats.ts",
