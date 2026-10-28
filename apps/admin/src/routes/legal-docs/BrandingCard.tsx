@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import type { AdminBranding, UpdateBrandingInput } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
@@ -11,6 +11,7 @@ const filingFields: { key: FilingKey; label: string; url: boolean }[] = [
   { key: 'police', label: '公安联网备案号', url: false }, { key: 'policeUrl', label: '公安联网备案查询链接', url: true },
 ]
 export function BrandingCard() {
+  const uid = useId()
   const [original, setOriginal] = useState<AdminBranding | null>(null)
   const [draft, setDraft] = useState<AdminBranding | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,16 +55,18 @@ export function BrandingCard() {
     {API_MODE === 'mock' && <p className="mt-2 text-xs text-neutral-500">演示模式：更改只保存在当前页面会话中。</p>}
     {loading ? <p className="mt-3">正在加载…</p> : !draft ? <div className="mt-3"><p role="alert" className="text-red-600">{error}</p><button type="button" className="min-h-11 rounded border px-3" onClick={() => void load()}>重试</button></div> :
       <div className="mt-3 grid gap-3">
-        {(['brandName', 'brandMark'] as const).map((key) => <label key={key} className="block text-sm">{key === 'brandName' ? '品牌名' : '字标'}
-          <input className="mt-1 w-full rounded-lg border px-3 py-2" value={draft[key] ?? ''} placeholder={draft.defaults[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
-          <span className="block text-xs text-neutral-500">留空用默认：{draft.defaults[key]}</span>
-        </label>)}
+        {(['brandName', 'brandMark'] as const).map((key) => <div key={key} className="text-sm">
+          <label htmlFor={`${uid}-${key}`} className="block">{key === 'brandName' ? '品牌名' : '字标'}</label>
+          <input id={`${uid}-${key}`} aria-describedby={`${uid}-${key}-hint`} className="mt-1 w-full rounded-lg border px-3 py-2" value={draft[key] ?? ''} placeholder={draft.defaults[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+          <span id={`${uid}-${key}-hint`} className="block text-xs text-neutral-500">留空用默认：{draft.defaults[key]}</span>
+        </div>)}
         <BrandLogoField url={draft.logoUrl} onChange={(id, url) => setDraft({ ...draft, brandLogoAssetId: id, logoUrl: url })} />
         <p className="text-xs text-neutral-500">不用 Logo 时，一体机显示字标。</p>
-        {filingFields.map(({ key, label }) => <label key={key} className="block text-sm">{label}
-          <input className="mt-1 w-full rounded-lg border px-3 py-2" value={draft.filing[key] ?? ''} placeholder={draft.defaults.filing[key]} onChange={(e) => setDraft({ ...draft, filing: { ...draft.filing, [key]: e.target.value } })} />
-          <span className="block break-all text-xs text-neutral-500">留空用默认：{draft.defaults.filing[key]}</span>
-        </label>)}
+        {filingFields.map(({ key, label }) => <div key={key} className="text-sm">
+          <label htmlFor={`${uid}-${key}`} className="block">{label}</label>
+          <input id={`${uid}-${key}`} aria-describedby={`${uid}-${key}-hint`} className="mt-1 w-full rounded-lg border px-3 py-2" value={draft.filing[key] ?? ''} placeholder={draft.defaults.filing[key]} onChange={(e) => setDraft({ ...draft, filing: { ...draft.filing, [key]: e.target.value } })} />
+          <span id={`${uid}-${key}-hint`} className="block break-all text-xs text-neutral-500">留空用默认：{draft.defaults.filing[key]}</span>
+        </div>)}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         {notice && <p role="status" className="text-sm text-neutral-700">{notice}</p>}
         <div><button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary-600 px-4 py-2 text-sm text-white disabled:opacity-60">{saving ? '保存中…' : '保存'}</button></div>

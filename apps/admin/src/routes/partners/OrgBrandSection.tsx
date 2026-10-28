@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { AdminBranding, OrgBrandOverride } from '@ai-job-print/shared'
 import { BrandLogoField } from '../../components/branding/BrandLogoField'
 import { brandingAdmin, brandingError, validateBrand } from '../../services/api/brandingAdmin'
@@ -6,6 +6,7 @@ import { API_MODE } from '../../services/api/client'
 import { orgsAdminService, type AdminOrgDetail } from '../../services/api/orgsAdmin'
 
 export function OrgBrandSection({ detail, onChanged }: { detail: AdminOrgDetail; onChanged: () => void }) {
+  const uid = useId()
   const [platform, setPlatform] = useState<AdminBranding | null>(null)
   const [draft, setDraft] = useState<OrgBrandOverride>(() => API_MODE === 'mock' ? brandingAdmin.getMockOrg(detail.id) : {
     brandName: detail.brandName ?? null, brandMark: detail.brandMark ?? null,
@@ -41,10 +42,11 @@ export function OrgBrandSection({ detail, onChanged }: { detail: AdminOrgDetail;
     <p className="text-xs text-neutral-500">只改本机构名下终端上显示的品牌；不填就用平台品牌。备案号不随机构变化。</p>
     {API_MODE === 'mock' && <p className="text-xs text-neutral-500">演示模式：更改只保存在当前页面会话中。</p>}
     {loading ? <p>正在加载…</p> : !platform ? <div><p role="alert" className="text-red-600">{error}</p><button type="button" className="min-h-11 rounded border px-3" onClick={() => { setLoading(true); setRetry((n) => n + 1) }}>重试</button></div> : <>
-      {(['brandName', 'brandMark'] as const).map((key) => <label key={key} className="block text-sm">{key === 'brandName' ? '品牌名' : '字标'}
-        <input className="mt-1 w-full rounded-lg border px-3 py-2" value={draft[key] ?? ''} placeholder={platform[key] || platform.defaults[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
-        <span className="block text-xs text-neutral-500">留空用平台品牌：{platform[key] || platform.defaults[key]}</span>
-      </label>)}
+      {(['brandName', 'brandMark'] as const).map((key) => <div key={key} className="text-sm">
+        <label htmlFor={`${uid}-${key}`} className="block">{key === 'brandName' ? '品牌名' : '字标'}</label>
+        <input id={`${uid}-${key}`} aria-describedby={`${uid}-${key}-hint`} className="mt-1 w-full rounded-lg border px-3 py-2" value={draft[key] ?? ''} placeholder={platform[key] || platform.defaults[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+        <span id={`${uid}-${key}-hint`} className="block text-xs text-neutral-500">留空用平台品牌：{platform[key] || platform.defaults[key]}</span>
+      </div>)}
       <BrandLogoField url={draft.brandLogoUrl} onChange={(id, url) => setDraft({ ...draft, brandLogoAssetId: id, brandLogoUrl: url })} />
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {notice && <p role="status" className="text-sm text-neutral-700">{notice}</p>}
