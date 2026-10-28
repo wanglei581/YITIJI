@@ -18,7 +18,7 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
-import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { ScanSample, ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { FsRow } from '../print-scan/FsRow'
 import { ScanPaperArt } from './ScanPaperArt'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
@@ -402,7 +402,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     >
       {!deliveryAcked && !cancelling ? (
         <>
-          <div className="fs-grow">
+          <div className="fs-grow is-status">
             <div className="fs-facts">
               <div className="fs-fact wide">
                 <b>还不能等文件</b>
@@ -421,6 +421,7 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
               它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
               {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : ''}
             </p>
+            <ScanSample />
           </div>
           <div className="fs-2">
             <FsRow

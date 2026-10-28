@@ -13,6 +13,7 @@ import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import {
+  ScanSample,
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
@@ -322,58 +323,48 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             : { label: '重新开始一次扫描', onClick: handlePlainRestart },
         }}
       >
-        {/* 标题与第一枚标签只说**所有成因都成立**的那句话：这一屏也接本机自己放弃的两条路
-            （轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
-            真实成因由下面那行 reason 原样转达。 */}
-        <ScanStatusPanel
-          tone={isNoFile ? 'warn' : 'error'}
-          title={isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '扫描未完成'}
-          /* 不写「编号已作废」：本机放弃那两条路上的撤销没有回执，本机不知道服务端作没作废。 */
-          chips={isNoFile
-            ? [{ label: '状态：已完成', tone: 'ok' }, { label: '这次扫描没有文件', tone: 'warn' }, { label: '这次扫描到此结束' }]
-            : [
-                ...(isExpired ? [{ label: '等待已超时', tone: 'warn' as const }] : []),
-                { label: '这次扫描没有文件', tone: isExpired ? undefined : 'warn' as const },
-                { label: '不自动重扫' },
-              ]}
-        >
-          {isNoFile ? (
-            <>
-              <p>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</p>
-              <p>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。</p>
-            </>
-          ) : (
-            <p>{shownReason ?? '扫描任务未能完成，请重试。'}</p>
-          )}
-          <PhoneHelpLine />
+        {/* 失败态：原因只写一处。此前意图带标题、状态条、面板标题三处都是「扫描未完成」，面板里的原因
+            和下面「失败原因原文」说明格又是同一句。现在第一格就是原因（标题 + 原因本身）。
+            这一屏也接本机自己放弃的两条路（轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
+            所以第一格的标题只说所有成因都成立的那句话，真实成因由 reason 原样转达。 */}
+        <div className="fs-grow is-status">
+          <div className="fs-facts">
+            <div className="fs-fact wide">
+              <b>{isNoFile ? '系统说已完成，但这次结果里没有可用文件' : isExpired ? '等待超时，这次没有拿到文件' : '这次没扫成的原因'}</b>
+              {isNoFile ? (
+                <>
+                  <span>系统确认<b>这次扫描已经完成</b>，可是同一份结果里<b>没有带可用的文件信息</b>（结果里允许不带文件，这不是出错）。</span>
+                  <span>这份文件此刻还在不在系统里，<b>本机没有依据判断</b>。页面不替系统说它还在，不说它已被删掉，也不承诺能找回来。这次扫描到此结束。</span>
+                </>
+              ) : (
+                <span>{shownReason ?? '扫描任务未能完成，请重试。'}</span>
+              )}
+            </div>
+            <div className="fs-fact wide">
+              <b>同一张纸</b>
+              <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。</span>
+            </div>
+            <div className="fs-pairgrid">
+              <div className="fs-fact">
+                <b>重试扫描（同一份材料）</b>
+                <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
+              </div>
+              <div className="fs-fact">
+                <b>重新开始一次扫描</b>
+                <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
+              </div>
+            </div>
+          </div>
           {safeRescanLost ? (
-            <p data-testid="scan-safe-rescan-lost">
+            <p className="fs-warn" data-testid="scan-safe-rescan-lost">
               <b>刚才那份安全重扫凭据已经用不了了</b>（超过 15 分钟，或者中间清过场 / 换过人）。
               本页<b>没有</b>替你改成普通重扫 —— 同一张纸如果走普通扫描，系统会按重复件拒收，
               你会在机器前白等到这次扫描过期。要继续，请自己按右下角<b>「重新开始一次扫描」</b>，
               并且换一份材料。
             </p>
           ) : null}
-        </ScanStatusPanel>
-        <div className="fs-facts">
-          <div className="fs-fact wide">
-            <b>失败原因原文</b>
-            <span>{isNoFile ? '系统确认这次扫描已经完成，可是同一份结果里没有带可用的文件信息。' : `页面上的说明：${shownReason ?? '扫描任务未能完成。'}`}</span>
-          </div>
-          <div className="fs-fact wide">
-            <b>同一张纸</b>
-            <span>同一张纸原样再扫，系统可能按重复件拒收（两小时内）。这句只出现在失败说明里。</span>
-          </div>
-          <div className="fs-pairgrid">
-            <div className="fs-fact">
-              <b>重试扫描（同一份材料）</b>
-              <span>{rescanAuthorized ? '这一次会带上上一场的凭据去申请安全重扫放行：系统认了，同一份材料照原样再扫一遍就行；不认会在下一页当场说明，不会悄悄按普通重扫处理。' : '本机没有可用的安全重扫凭据。这里不写成已经放行。'}</span>
-            </div>
-            <div className="fs-fact">
-              <b>重新开始一次扫描</b>
-              <span>这是一次普通新会话，不是免查重的重扫。不自动重扫。</span>
-            </div>
-          </div>
+          <PhoneHelpLine />
+          <ScanSample />
         </div>
         {isNoFile ? null : (
           <FsRow title="返回首页" desc="结束这次等待" onClick={() => leaveScanFlow('/')} />

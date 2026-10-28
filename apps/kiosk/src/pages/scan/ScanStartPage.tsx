@@ -8,6 +8,7 @@ import {
   type ConfiguredCapability,
 } from '../../services/api/printScanCapabilities'
 import {
+  ScanSample,
   ScanTypeCards,
   ScanWorkbenchShell,
   type ScanDock,
@@ -151,7 +152,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       {usbPanel ? (
         <>
           <p className="fs-warn">这条能力暂未开通，不能把这条说明当成已经可以用。</p>
-          <div className="fs-grow">
+          <div className="fs-grow is-status">
             <div className="fs-facts">
               <div className="fs-pairgrid">
                 <div className="fs-fact"><b>把 U 盘插上</b><span>插到打印机支持的 USB 接口。</span></div>
@@ -163,11 +164,12 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               <div className="fs-fact wide"><b>面板没有这一项</b><span>不要反复点。菜单名称和接口位置以打印机屏幕为准。</span></div>
             </div>
             <PhoneHelpLine />
+            <ScanSample art="usb" />
           </div>
         </>
       ) : blocked ? (
         <>
-          <div className="fs-grow">
+          <div className="fs-grow is-status">
             <div className="fs-facts">
               <div className="fs-fact wide">
                 <b>{gate === 'loading' ? '正在读取配置' : gate === 'unknown' ? '状态未知' : '暂未开放'}</b>
@@ -187,6 +189,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               <div className="fs-fact wide"><b>你现在还能做什么</b><span>上传现成文件仍可打印。也可以看扫描到 U 盘的说明，那条仍写暂未开通。</span></div>
             </div>
             <PhoneHelpLine />
+            <ScanSample />
           </div>
           <FsRow
             title={checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}

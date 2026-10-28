@@ -4,6 +4,7 @@ import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import type { SessionFailure } from './scanRescanRecovery'
 import { sessionNatureRow, type SessionPhase } from './scanSettingsModel'
 import {
+  ScanSample,
   ScanWorkbenchShell,
   type ScanDock,
 } from './ScanWorkbenchChrome'
@@ -121,6 +122,18 @@ export function ScanSettingsStatusView({
       : phase === 'loading'
         ? '正在等系统建好这次扫描，成功前不会显示任务信息或操作指引。'
         : failure?.description ?? '这次没有可用的扫描。'
+  /* 意图带副标题只写一句短话；原因写在下面第一格里，同一句话不在一屏上说三遍。 */
+  const subtitle = awaitingAck
+    ? '确认之前，先不显示面板步骤'
+    : phase === 'loading'
+      ? '等系统返回这次扫描，返回前不给出面板步骤'
+      : phase === 'expired'
+        ? '有效期 10 分钟，到点就不能按原任务继续'
+        : cleanupHolding
+          ? '等本机收完上一场的尾，再建这一次'
+          : phase === 'invalid'
+            ? '这次不会发起创建请求'
+            : '这次扫描没建好'
   const status = awaitingAck
     ? ackRetryable
       ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
@@ -198,18 +211,12 @@ export function ScanSettingsStatusView({
       page="scan-settings"
       state={workbenchState}
       title={title}
-      subtitle={description}
+      subtitle={subtitle}
       status={status}
       layout="spread"
       dock={dock}
     >
-      <div className="fs-grow">
-        {awaitingAck ? (
-          <span className="sx-chips">
-            <span className="sx-chip">这次扫描已经建好</span>
-            <span className="sx-chip is-warn">还没确认能收到扫描件</span>
-          </span>
-        ) : null}
+      <div className="fs-grow is-status">
         <div className="fs-facts">
           <div className="fs-fact wide">
             <b>{chainHead[0]}</b>
@@ -225,7 +232,6 @@ export function ScanSettingsStatusView({
         {phase === 'loading' && !awaitingAck ? <p className="fs-p">这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
         {awaitingAck ? (
           <p className="fs-warn" data-testid="scan-ack-pending-notice">
-            这次扫描<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
             没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
             这一场也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
           </p>
@@ -252,6 +258,7 @@ export function ScanSettingsStatusView({
           </p>
         ) : null}
         <PhoneHelpLine />
+        <ScanSample />
       </div>
     </ScanWorkbenchShell>
   )

@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { AiDownNote } from '../print-scan/AiDownNote'
+import { UsbArt } from '../print-scan/ToolArt'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
@@ -383,6 +384,19 @@ export function ScanPanelMock({ instructions }: { instructions: string[] }) {
         <p>按上面{count <= 10 ? CN_NUM[count] : count}步，在打印机面板上操作。扫完可以取回原件。</p>
       </div>
     </>
+  )
+}
+
+/**
+ * 状态屏（没建好、没开放、读取中、U 盘、没扫成……）上多出来的高度只给这一块示意小样，不撑空卡
+ * （稿 RULES 第 3 条：卡片按内容定高，多出来的地方放实物小样）。只作示意，不代表任何真实进度。
+ */
+export function ScanSample({ art = 'scan' }: { art?: 'scan' | 'usb' }) {
+  const Art = art === 'usb' ? UsbArt : ScanPaperArt
+  return (
+    <div className="sx-sample" data-testid="scan-sample" aria-hidden="true">
+      <Art />
+    </div>
   )
 }
 

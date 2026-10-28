@@ -148,6 +148,33 @@
   display: contents;
 }
 
+/* 状态屏：说明格按内容定高，不拉伸（稿的 .fs-facts 是拉满整屏的网格，每格 250–290px 里只有一两行字，
+ * 量出来整屏大片空白）；多出来的高度只给示意小样 .sx-sample，不撑空卡。 */
+[data-qx-page='scan-workbench'] .fs-grow.is-status .fs-facts {
+  flex: none;
+  grid-auto-rows: auto;
+}
+
+[data-qx-page='scan-workbench'] .sx-sample {
+  flex: 1 1 0;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  overflow: hidden;
+}
+
+[data-qx-page='scan-workbench'] .sx-sample .sx-art {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+
 [data-qx-page='scan-workbench'] .fs-fact {
   background: var(--qxt-well);
   border-radius: 18px;
@@ -403,6 +430,8 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  /* 预览井封了顶，多出来的高度摊进各块之间，不在卡片底下留成一整片空白。 */
+  justify-content: space-between;
   gap: 8px;
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
@@ -416,6 +445,8 @@
 [data-qx-page='scan-workbench'] .sw-pvstage {
   flex: 1 1 auto;
   min-height: 180px;
+  /* 封顶：整页适配的预览里，一页纸比井矮时上下会留白，井越高留得越多；多出来的高度留在卡片底部（实在的内容区），不留在预览里。 */
+  max-height: 590px;
   border-radius: 22px;
   background: var(--qxt-well);
   overflow: hidden;
@@ -627,7 +658,7 @@
 }
 
 [data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-open {
-  min-height: 64px;
+  min-height: 76px;
   min-width: 64px;
 }
 

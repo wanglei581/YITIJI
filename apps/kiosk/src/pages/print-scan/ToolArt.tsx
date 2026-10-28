@@ -26,7 +26,7 @@ export function PhoneArt() {
 /** U 盘插进打印机侧面的口。 */
 export function UsbArt() {
   return (
-    <svg className="sx-art" viewBox="0 0 150 150" aria-hidden="true">
+    <svg className="sx-art" viewBox="0 0 150 140" aria-hidden="true">
       <rect x="18" y="86" width="114" height="46" rx="10" fill="var(--sx-art-base)" />
       <rect x="40" y="100" width="70" height="18" rx="4" fill="var(--sx-art-ink)" />
       <rect x="54" y="20" width="42" height="56" rx="8" fill="var(--sx-art-teal)" />

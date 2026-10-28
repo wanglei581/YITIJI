@@ -42,6 +42,11 @@
   flex: 1 1 auto;
 }
 
+/* 停用的 U 盘卡按内容定高（虚线卡、底和井同色，拉高了就是一大片空白）；余量给手机扫码那张卡。 */
+[data-qx-page='img2pdf'][data-state='empty'] .i2p-scroll .fs-act:disabled {
+  flex: 0 0 auto;
+}
+
 [data-qx-page='img2pdf'] .i2p-scroll .fs-fact {
   min-height: 0;
 }
