@@ -466,10 +466,11 @@ export function JobFitActionsPage() {
               { title: '进入打印确认', detail: '份数、单双面与费用在确认页由你决定。' },
             ]}
             summary={[
-              { label: '打印版文件', value: '还没有返回，没有可预览的版本' },
-              { label: '打印机', value: '没有收到任务，也没有开始出纸' },
-              { label: '取件码', value: '没有产生，也没有订单号' },
-              { label: '支付', value: '本页没有发起' },
+              { label: '打印版文件', value: '还没有拿到可预览的打印版文件' },
+              { label: '打印机', value: '没有发送到打印机，也没有开始出纸' },
+              { label: '取件码', value: '没有产生取件码或订单号' },
+              { label: '支付', value: '本页没有发起支付' },
+              { label: '提供对象', value: '没有把清单内容提供给企业或第三方' },
             ]}
             fine="行动清单可读，不等于打印文件已经存在；清单内容没有提供给企业或第三方。"
             take={{ art: 'checklist', kicker: '生成之后，你可以带走', title: '一份准备清单', lines: ['差距与准备建议，一件一件列出', '只供本人准备，可打印'] }}
