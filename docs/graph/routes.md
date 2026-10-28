@@ -105,23 +105,23 @@ flowchart LR
 | `/profile` | ProfilePage | `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 11 | 5 |
 | `/renshi` | RenshiPage | `apps/kiosk/src/pages/renshi/RenshiPage.tsx` | 0 | 7 |
 | `/resume` | Navigate | — _(重定向)_ | 0 | — |
-| `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 39 | 8 |
+| `/resume/career-plan` | CareerPlanPage | `apps/kiosk/src/pages/resume/CareerPlanPage.tsx` | 39 | 10 |
 | `/resume/export` | Navigate | — _(重定向)_ | 0 | — |
 | `/resume/generate` | ResumeGeneratePage | `apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx` | 33 | 9 |
 | `/resume/generate/preview` | ResumeGeneratePreviewPage | `apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx` | 34 | 8 |
-| `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 37 | 7 |
-| `/resume/job-fit/actions` | JobFitActionsPage | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 37 | 8 |
-| `/resume/materials` | JobMaterialLibraryPage | `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 10 | 6 |
+| `/resume/job-fit` | JobFitPage | `apps/kiosk/src/pages/resume/JobFitPage.tsx` | 37 | 9 |
+| `/resume/job-fit/actions` | JobFitActionsPage | `apps/kiosk/src/pages/resume/JobFitActionsPage.tsx` | 37 | 10 |
+| `/resume/materials` | JobMaterialLibraryPage | `apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx` | 10 | 7 |
 | `/resume/optimize` | ResumeOptimizePage | `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx` | 34 | 8 |
 | `/resume/optimize/compare` | ResumeOptimizeComparePage | `apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx` | 33 | 7 |
 | `/resume/parse` | ResumeParsePage | `apps/kiosk/src/pages/resume/ResumeParsePage.tsx` | 33 | 8 |
 | `/resume/report` | ResumeReportPage | `apps/kiosk/src/pages/resume/ResumeReportPage.tsx` | 34 | 7 |
-| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 7 |
-| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 7 |
-| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 7 |
-| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 7 |
+| `/resume/self-assessment/history` | SelfAssessmentHistoryPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 8 |
+| `/resume/self-assessment/intro` | SelfAssessmentIntroPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 8 |
+| `/resume/self-assessment/questions` | SelfAssessmentQuizPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 8 |
+| `/resume/self-assessment/result` | SelfAssessmentResultPage | `apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx` | 13 | 8 |
 | `/resume/source` | ResumeSourcePage | `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx` | 33 | 7 |
-| `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 8 |
+| `/resume/templates` | ResumeTemplateLibraryPage | `apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx` | 10 | 10 |
 | `/resume/upload` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan` | ScanWorkbenchPage | `apps/kiosk/src/pages/scan/ScanWorkbenchPage.tsx` | 10 | 7 |
 | `/scan/progress` | Navigate | — _(重定向)_ | 0 | — |

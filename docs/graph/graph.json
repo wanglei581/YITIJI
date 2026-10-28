@@ -13567,7 +13567,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 669,
+      "reachableFileCount": 680,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15594,6 +15594,8 @@
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-fit.css",
+            "apps/kiosk/src/pages/resume/touch/resume-states.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -15779,6 +15781,8 @@
           "path": "/resume/job-fit",
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-fit.css",
+            "apps/kiosk/src/pages/resume/touch/resume-states.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -15838,6 +15842,8 @@
           "styles": [
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-fit.css",
+            "apps/kiosk/src/pages/resume/touch/resume-states.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -15870,6 +15876,7 @@
           "path": "/resume/materials",
           "styles": [
             "apps/kiosk/src/pages/resume/resume-materials-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-materials-touch.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
@@ -16127,6 +16134,7 @@
           "path": "/resume/self-assessment/history",
           "styles": [
             "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-sa.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16161,6 +16169,7 @@
           "path": "/resume/self-assessment/intro",
           "styles": [
             "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-sa.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16195,6 +16204,7 @@
           "path": "/resume/self-assessment/questions",
           "styles": [
             "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-sa.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16229,6 +16239,7 @@
           "path": "/resume/self-assessment/result",
           "styles": [
             "apps/kiosk/src/pages/resume/self-assessment-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-sa.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
@@ -16318,6 +16329,8 @@
             "apps/kiosk/src/pages/resume/job-fit-qx.css",
             "apps/kiosk/src/pages/resume/resume-decision-qx.css",
             "apps/kiosk/src/pages/resume/resume-templates-qx.css",
+            "apps/kiosk/src/pages/resume/touch/resume-states.css",
+            "apps/kiosk/src/pages/resume/touch/resume-templates.css",
             "apps/kiosk/src/pages/resume/touch/resume-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
@@ -16554,7 +16567,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 765
+      "sourceFileCount": 776
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21645,6 +21658,9 @@
     ],
     "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
+    ],
+    "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx": [
+      "apps/kiosk/scripts/verify-lightflow-k2a-career.mjs"
     ],
     "apps/kiosk/src/pages/resume/touch/ResumeTouchFrame.tsx": [
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
@@ -30870,7 +30886,8 @@
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanExistingMaterials.tsx",
           "apps/kiosk/src/pages/resume/components/career-plan/CareerPlanSection.tsx",
           "apps/kiosk/src/pages/resume/jobFit/jobFitQxKit.tsx",
-          "apps/kiosk/src/pages/resume/resume-decision-qx.css"
+          "apps/kiosk/src/pages/resume/resume-decision-qx.css",
+          "apps/kiosk/src/pages/resume/touch/ResumeStates.tsx"
         ],
         "missing": []
       },
