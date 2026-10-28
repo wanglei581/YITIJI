@@ -1041,6 +1041,8 @@ for (const c of [
   { state: 'usb-import-failed', url: '/print/upload?tab=usb', pill: '没有导进来', ask: '问小青：导不进来怎么办？', primary: '重新读一次 U 盘', file: true, help: false, reason: /当前文件仍然是空的/ },
   { state: 'usb-read-failed', url: '/print/upload?tab=usb', pill: '没有读到', ask: '问小青：读不了 U 盘怎么办？', primary: '重新读一次 U 盘', file: false, help: true, reason: /没能列出文件/ },
   { state: 'local-rejected', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：这种文件能打吗？', primary: '回窗口再挑一份', file: true, help: false, reason: /支持 PDF、JPG、PNG/ },
+  { state: 'local-unreadable', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：这份读不出来', primary: '回窗口再挑一份', file: true, help: false, reason: /文件为空或者大小取不到/ },
+  { state: 'local-upload-failed', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：传不上去怎么办？', primary: '重试上传', file: true, help: true, reason: /还没有收到这一份文件/ },
 ] as const) {
   test(`upload error screens share one board (st-error): ${c.state} @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
