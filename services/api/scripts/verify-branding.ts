@@ -475,7 +475,8 @@ async function main(): Promise<void> {
     const tokenL = await sessionOf(termL)
     const stateAt = async (days: number) => {
       setLicenseClock(() => new Date(T0 + days * DAY))
-      return (await profileOf(termL, tokenL)).json.data.licenseState
+      const r = await profileOf(termL, tokenL)
+      return r.json.data?.licenseState ?? `HTTP ${r.status} ${r.json.error?.code ?? ''}`
     }
     c.equal('ok / grace / inactive 随时间变化（到期当刻进宽限，宽限结束当刻锁机）', [await stateAt(40), await stateAt(50), await stateAt(54.9), await stateAt(55)], ['ok', 'grace', 'grace', 'inactive'])
     c.check('锁机时仍给品牌与点位（一体机要用它显示「暂时不能用」）', (await profileOf(termL, tokenL)).json.data.location === `授权点位${suffix}`)
