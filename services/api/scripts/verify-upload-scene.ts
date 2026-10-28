@@ -8,17 +8,18 @@ import 'reflect-metadata'
  * 微信 scene 上限 32 字符，塞不下会话凭据，所以扫码只能带一个短的不透明码，
  * 由服务端换回上传凭据。
  *
- * 这条门禁跑**真实 RedisService**（打到进程内 RESP 桩），不是自己写的假对象 ——
- * 单次兑换靠的是 Redis 的 GETDEL 原子性，用假对象验等于验自己写的那份实现。
+ * 这条门禁跑**真实 RedisService**（有 REDIS_URL 打真实例，没有就打进程内 RESP 桩），不是
+ * 自己写的假对象 —— 兑换在上传锁内重读会话、按条件写回，用假对象验等于验自己写的那份实现。
  *
  * 钉住四件事：
  * ① 明文永不落库：Redis 里存的是 sha256，不是 scene 本身；
- * ② 兑换一次性：同一张码第二次换不到东西；
- * ③ 兑换会轮换 uploadToken：旧网页二维码当场作废；
- * ④ 失败路径不当预言机：格式错/查无此码/已过期/已用掉，对外是同一个错误码。
+ * ② 会话有效期内可重复兑换（2026-10-29 起，原因见 upload-scene.ts ②）：同一张码每次拿到
+ *    同一把派生令牌，两次兑换之间谁先上传都只成功一次；
+ * ③ 首次兑换换掉 create 下发的令牌：那把随之作废，之后再兑换不再写会话；
+ * ④ 失败路径不当预言机：格式错/查无此码/改错一个字/已收到文件/已过期/已作废，对外是同一个错误码。
  */
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createConnection, createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -48,6 +49,8 @@ async function errorCodeOf(run: () => Promise<unknown>): Promise<string> {
 const WECHAT_SCENE_PATTERN = /^[A-Za-z0-9!#$&'()*+,/:;=?@\-._~%]{1,32}$/
 
 async function main(): Promise<void> {
+  // 派生令牌用文件签名密钥（CI 的作业环境里有）；单跑本脚本时给一把测试值，取不到会直接报错。
+  process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-scene-signing-secret-0123456789'
   // 有真 Redis 就用真的（CI 里一定有）。桩只是「本机没有 Redis」时的退路 ——
   // 桩不实现有序集合和 Lua，下面要就地补语义，而每一处补语义都是一次「验的是我自己
   // 写的那份实现」的风险。所以真 Redis 优先，桩降级，并在输出里如实标注跑的是哪一种。
@@ -158,7 +161,23 @@ async function main(): Promise<void> {
     )
     await client.del('upload_session:atomic', 'upload_session_upload_lock:atomic', 'upload_session_cleanup:atomic')
   }
-  const service = new UploadSessionsService(redis as never, null as never, null as never)
+  // 上传只需要一个落地桩：门禁验的是会话与令牌，不是文件服务。
+  let stubFiles = 0
+  const filesStub = {
+    upload: async (args: { buffer: Buffer; filename: string; mimeType: string }) => ({
+      fileId: `scene_stub_${++stubFiles}`,
+      filename: args.filename,
+      sizeBytes: args.buffer.length,
+      mimeType: args.mimeType,
+      sha256: 'a'.repeat(64),
+      fileExpiresAt: null,
+    }),
+  }
+  const service = new UploadSessionsService(redis as never, null as never, filesStub as never)
+  const fakeFile = { buffer: Buffer.from('x'), originalname: 'a.pdf', mimetype: 'application/pdf', size: 1 }
+  const newSession = () => service.create({ purpose: 'print_doc', mode: 'temporary', channel: 'phone_h5', uploadUrl: '/m/upload' })
+  const upload = (sessionId: string, uploadToken: string) =>
+    errorCodeOf(() => service.uploadFile({ sessionId, uploadToken, file: fakeFile as never }))
 
   const created = await service.create({
     purpose: 'print_doc',
@@ -224,47 +243,102 @@ async function main(): Promise<void> {
       && !JSON.stringify(redeemed).includes(created.controlToken),
   )
   check(
-    '兑换发的是**新**上传令牌',
+    '兑换发的不是 create 下发的那把令牌',
     redeemed.uploadToken.length > 0 && redeemed.uploadToken !== created.uploadToken,
     '复用旧令牌等于服务端存了明文',
   )
-
-  // ── 四、一次性 + 轮换 ─────────────────────────────────────────────────
   check(
-    '同一张码第二次兑换失败',
-    (await errorCodeOf(() => service.resolveScene(created.sceneToken))) === 'UPLOAD_SCENE_UNUSABLE',
-    '不是一次性的话，二维码被拍照传播后人人可用',
+    '兑换令牌按规格派生：base64url(HMAC-SHA256(密钥, upload-scene-token:v1:sessionId:scene))',
+    redeemed.uploadToken === createHmac('sha256', process.env['FILE_SIGNING_SECRET'] ?? '')
+      .update(`upload-scene-token:v1:${created.sessionId}:${created.sceneToken}`)
+      .digest('base64url'),
   )
+
+  // ── 四、可重复兑换：同码同令牌；首次兑换才写会话，create 的原令牌随之作废 ──────────
   {
-    // 先直查落盘的哈希：这条不依赖任何下游服务，坏了就是坏在轮换本身。
-    const raw = (await client.get(`upload_session:${created.sessionId}`)) as string
+    const sessionKey = `upload_session:${created.sessionId}`
+    const before = await client.get(sessionKey)
+    const again = await service.resolveScene(created.sceneToken).catch(() => null)
+    check(
+      '同一张码二次兑换成功且令牌相同',
+      again?.sessionId === created.sessionId && again?.uploadToken === redeemed.uploadToken,
+      '一次性兑换会让码当场变死码：先被网页兑换再被小程序兑换、或同一人重扫都会失败',
+    )
+    check('二次兑换不再写会话（令牌哈希已相等）', (await client.get(sessionKey)) === before)
+    // 再直查落盘的哈希：这条不依赖任何下游服务，坏了就是坏在换令牌本身。
+    const raw = (await client.get(sessionKey)) as string
     const h = (s: string): string => createHash('sha256').update(s).digest('hex')
     check(
-      '落盘的 uploadTokenHash 已换成新令牌的哈希',
+      '落盘的 uploadTokenHash 已换成派生令牌的哈希',
       raw.includes(h(redeemed.uploadToken)) && !raw.includes(h(created.uploadToken)),
-      '没落盘等于没轮换',
+      '没落盘等于没换',
     )
-    const fakeFile = { buffer: Buffer.from('x'), originalname: 'a.pdf', mimetype: 'application/pdf', size: 1 }
-    const oldTokenCode = await errorCodeOf(() =>
-      service.uploadFile({ sessionId: created.sessionId, uploadToken: created.uploadToken, file: fakeFile as never }),
-    )
+    const oldTokenCode = await upload(created.sessionId, created.uploadToken)
     check(
-      '兑换后旧上传令牌立即作废',
+      'create 下发的原令牌在首次兑换后失效',
       oldTokenCode === 'UPLOAD_TOKEN_INVALID',
-      `实际 ${oldTokenCode} —— 旧网页二维码应当当场失效`,
+      `实际 ${oldTokenCode} —— 首次兑换必须把会话令牌换成派生令牌`,
     )
+  }
+  // 两次兑换之间，不论谁先拿令牌上传，都恰好成功一次；后来的人看到「已使用」。
+  let uploadedScene = ''
+  for (const order of ['后兑换的人先传', '先兑换的人先传'] as const) {
+    const session = await newSession()
+    const first = await service.resolveScene(session.sceneToken)
+    const second = await service.resolveScene(session.sceneToken)
+    const [winner, loser] = order === '后兑换的人先传' ? [second, first] : [first, second]
+    const won = await upload(session.sessionId, winner.uploadToken)
+    const lost = await upload(session.sessionId, loser.uploadToken)
+    check(
+      `两次兑换之间${order}：成功一次，另一人再传是 UPLOAD_SESSION_NOT_PENDING`,
+      won === '<no-error>' && lost === 'UPLOAD_SESSION_NOT_PENDING',
+      `实际 ${won} / ${lost}`,
+    )
+    uploadedScene = session.sceneToken
   }
 
   // ── 五、失败路径不当预言机 ────────────────────────────────────────────
   {
-    const codes = await Promise.all([
-      errorCodeOf(() => service.resolveScene('!!!bad!!!')),               // 格式错
-      errorCodeOf(() => service.resolveScene('x'.repeat(40))),            // 超长
-      errorCodeOf(() => service.resolveScene('aaaaaaaaaaaaaaaaaaaaaaaa')), // 格式对但查无此码
-      errorCodeOf(() => service.resolveScene(created.sceneToken)),        // 已被用掉
-    ])
+    const uploadedCode = await errorCodeOf(() => service.resolveScene(uploadedScene))
+    check('上传后（会话 uploaded）再兑换 → UNUSABLE', uploadedCode === 'UPLOAD_SCENE_UNUSABLE', `实际 ${uploadedCode}`)
+
+    const expiring = await newSession()
+    const expiringKey = `upload_session:${expiring.sessionId}`
+    const expiringRaw = JSON.parse((await client.get(expiringKey)) as string) as Record<string, unknown>
+    expiringRaw['expiresAt'] = new Date(Date.now() - 1000).toISOString()
+    // 必须用 SETEX 保住 TTL，理由同下面「六」：否则验的是夹具坏没坏。
+    const expiringTtl = await client.ttl(expiringKey)
+    if (expiringTtl <= 0) throw new Error('夹具异常：会话键没有 TTL，本条断言会验错东西')
+    await client.setex(expiringKey, expiringTtl, JSON.stringify(expiringRaw))
+    const expiredCode = await errorCodeOf(() => service.resolveScene(expiring.sceneToken))
+    check('过期后再兑换 → UNUSABLE', expiredCode === 'UPLOAD_SCENE_UNUSABLE', `实际 ${expiredCode}`)
+
+    const cancelled = await newSession()
+    await service.cancel(cancelled.sessionId, cancelled.controlToken)
+    const cancelledCode = await errorCodeOf(() => service.resolveScene(cancelled.sceneToken))
+    check('作废后再兑换 → UNUSABLE', cancelledCode === 'UPLOAD_SCENE_UNUSABLE', `实际 ${cancelledCode}`)
+
+    const probe = await newSession()
+    const last = probe.sceneToken.slice(-1)
+    const flipped = `${probe.sceneToken.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`
+    const flippedCode = await errorCodeOf(() => service.resolveScene(flipped))
+    const stillWorks = await service.resolveScene(probe.sceneToken).then(() => true, () => false)
     check(
-      '四类失败对外是同一个错误码',
+      '改错一个字的码 → UNUSABLE（原码照常可兑）',
+      flippedCode === 'UPLOAD_SCENE_UNUSABLE' && stillWorks,
+      `实际 ${flippedCode} / 原码${stillWorks ? '可兑' : '不可兑'}`,
+    )
+
+    // 逐个跑：并发打同一会话会被锁挡成同一个码，就验不出各自的原因了。
+    const codes: string[] = []
+    for (const run of [
+      () => service.resolveScene('!!!bad!!!'),                // 格式错
+      () => service.resolveScene('x'.repeat(40)),             // 超长
+      () => service.resolveScene('aaaaaaaaaaaaaaaaaaaaaaaa'), // 格式对但查无此码
+    ]) codes.push(await errorCodeOf(run))
+    codes.push(flippedCode, uploadedCode, expiredCode, cancelledCode)
+    check(
+      '七类失败对外是同一个错误码',
       new Set(codes).size === 1 && codes[0] === 'UPLOAD_SCENE_UNUSABLE',
       codes.join(' / '),
     )
@@ -290,6 +364,27 @@ async function main(): Promise<void> {
       '会话缺 sceneTokenHash 时兑换被拒（fail-closed）',
       code === 'UPLOAD_SCENE_UNUSABLE',
       `实际 ${code} —— 缺字段不能等于「任何 scene 都对」`,
+    )
+  }
+
+  // ── 七、派生密钥取不到时报错，绝不回落成固定值 ───────────────────────────
+  {
+    const session = await newSession()
+    const sessionKey = `upload_session:${session.sessionId}`
+    const before = await client.get(sessionKey)
+    const saved = process.env['FILE_SIGNING_SECRET']
+    const outcomes: string[] = []
+    for (const value of [undefined, 'too-short-signing-secret']) {
+      if (value === undefined) delete process.env['FILE_SIGNING_SECRET']
+      else process.env['FILE_SIGNING_SECRET'] = value
+      outcomes.push(await service.resolveScene(session.sceneToken).then(() => 'issued', (e: Error) => e.message))
+    }
+    process.env['FILE_SIGNING_SECRET'] = saved
+    check(
+      '密钥缺失或过短时兑换直接报错，不发令牌、不改会话',
+      outcomes.every((m) => m === 'FILE_SIGNING_SECRET environment variable must be set (≥ 32 chars)')
+        && (await client.get(sessionKey)) === before,
+      outcomes.join(' / '),
     )
   }
 

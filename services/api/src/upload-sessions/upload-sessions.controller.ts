@@ -9,6 +9,7 @@ import {
   Post,
   Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
@@ -18,9 +19,22 @@ import type { Request } from 'express'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
-import { readClientDeclaration } from '../common/privacy/client-declaration'
-import { CreateUploadSessionDto, PhoneUploadSessionDto, ResolveUploadSceneDto } from './upload-sessions.dto'
+import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import {
+  AGE_14_PLUS_HEADER,
+  AGE_14_PLUS_VERSION_HEADER,
+  readClientDeclaration,
+  VOICE_RECORDING_HEADER,
+  VOICE_RECORDING_VERSION_HEADER,
+} from '../common/privacy/client-declaration'
+import {
+  CreateUploadSessionDto,
+  MemberFileUploadSessionDto,
+  PhoneUploadSessionDto,
+  ResolveUploadSceneDto,
+} from './upload-sessions.dto'
 import {
   UploadSessionsService,
   type UploadSessionCancelResponse,
@@ -98,6 +112,29 @@ export class UploadSessionsController {
     }))
   }
 
+  /**
+   * 小程序已登录会员把「我的文档」里的一份文件递进这台一体机的这一单。
+   * 与 `:sessionId/files` 同级、同一把 uploadToken、同形回执；落成的是匿名副本。
+   */
+  @Post(':sessionId/member-file')
+  @UseGuards(EndUserAuthGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  async uploadMemberFile(
+    @Param('sessionId') sessionId: string,
+    @Body() body: MemberFileUploadSessionDto,
+    @CurrentEndUser() user: AuthedEndUser,
+    @Req() req: Request,
+  ): Promise<ApiResponse<UploadSessionStatusResponse>> {
+    return ApiResponse.ok(await this.sessions.uploadMemberFile({
+      sessionId,
+      uploadToken: body.uploadToken,
+      fileId: body.fileId,
+      endUserId: user.endUserId,
+      // 声明头是给未登录用户的；会员请求只在真带了声明头时才记，照原入口的形状。
+      clientDeclaration: hasClientDeclarationHeader(req) ? readClientDeclaration(req.headers) : undefined,
+    }))
+  }
+
   @Post(':sessionId/confirm')
   async confirm(
     @Param('sessionId') sessionId: string,
@@ -115,6 +152,17 @@ export class UploadSessionsController {
   ): Promise<ApiResponse<UploadSessionCancelResponse>> {
     return ApiResponse.ok(await this.sessions.cancel(sessionId, controlToken))
   }
+}
+
+const CLIENT_DECLARATION_HEADERS = [
+  AGE_14_PLUS_HEADER,
+  AGE_14_PLUS_VERSION_HEADER,
+  VOICE_RECORDING_HEADER,
+  VOICE_RECORDING_VERSION_HEADER,
+]
+
+function hasClientDeclarationHeader(req: Request): boolean {
+  return CLIENT_DECLARATION_HEADERS.some((name) => req.headers[name] !== undefined)
 }
 
 function extractAuth(req: Request): string | undefined {

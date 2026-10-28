@@ -31,7 +31,7 @@ import {
   type UploadSessionFileView,
 } from './upload-session-member-bind'
 import { deleteAnonymousObjectThenTombstone } from './upload-session-object-delete'
-import { isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
+import { deriveSceneUploadToken, isWellFormedSceneToken, mintSceneToken, sceneIndexKey } from './upload-scene'
 import { clientDeclarationJson, type ClientDeclaration } from '../common/privacy/client-declaration'
 import type {
   UploadSessionChannel,
@@ -55,7 +55,7 @@ export interface UploadSessionCreateResponse {
   controlToken: string
   expiresAt: string
   /**
-   * 小程序场景码。一体机把它交给 `/miniapp-code` 换二维码，用户扫码即进小程序。
+   * 小程序场景码。一体机把它交给 `/miniapp/code` 换二维码，用户扫码即进小程序。
    * 与 uploadToken 一样只在创建时返回一次（服务端只留哈希）。
    */
   sceneToken: string
@@ -89,6 +89,14 @@ export interface UploadSessionStatusResponse {
 export interface UploadSessionCancelResponse {
   sessionId: string
   status: 'cancelled'
+}
+
+/** 递进会话成功后写的那条 file.upload 审计；multipart 入口只在带客户端声明时写。 */
+interface PhoneUploadAudit {
+  actorRole: 'kiosk' | 'enduser'
+  source: 'upload_session' | 'upload_session_member_file'
+  endUserId?: string
+  clientDeclaration?: ClientDeclaration
 }
 
 const SESSION_TTL_SECONDS = 10 * 60
@@ -220,31 +228,30 @@ export class UploadSessionsService {
   /**
    * 场景码兑换：小程序扫码进来后，用 scene 换回可用的上传凭据。
    *
-   * 兑换是**一次性**的，靠 Redis 的 GETDEL 原子完成 —— 两个人同时拿同一张码，
-   * 只有一个能拿到 sessionId，另一个看到的是「二维码已失效」。用先 GET 再 DEL
-   * 会有窗口期，两边都成功。
+   * 会话有效期内**可重复兑换**，同一张码每次拿到同一把上传令牌（服务端密钥派生，
+   * 见 upload-scene.ts ②）。原因：同一张码可能先被网页兑换、再被小程序兑换，或同一人
+   * 重扫，一次性兑换会让码当场变死码；线上网页码本来就把 uploadToken 明文放在码里，
+   * 可重复兑换并不降低安全等级。
    *
    * 所有失败路径**返回同一个错误码**。区分「格式不对 / 没这张码 / 已过期 /
-   * 已被用掉」对合法用户没有价值（补救动作都是「回一体机刷新二维码」），
+   * 已收到文件或已作废」对合法用户没有价值（补救动作都是「回一体机刷新二维码」），
    * 对探测者却是一台预言机。
    */
   async resolveScene(scene: string): Promise<UploadSessionSceneResolveResponse> {
     // 格式不对就不查 Redis：省一次往返，也不制造可测量的时间差。
     if (!isWellFormedSceneToken(scene)) throw sceneUnusableException()
 
-    const indexKey = sceneIndexKey(scene)
-    const sessionId = await this.redis.get(indexKey)
+    // 索引不删：它与会话同 TTL、随会话自然到期，可重复兑换靠的就是它一直在。
+    const sessionId = await this.redis.get(sceneIndexKey(scene))
     if (!sessionId) throw sceneUnusableException()
 
-    // 锁内重读后再轮换，避免用 pending 快照盖掉已经 uploaded 的收据。
+    // 锁内重读后再写令牌，避免用 pending 快照盖掉已经 uploaded 的收据。
     const lockKey = uploadLockKey(sessionId)
     const lockToken = randomUUID()
     if (!(await this.redis.setNxEx(lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS))) {
       throw sceneUnusableException()
     }
     try {
-      const consumed = await this.redis.getDel(indexKey)
-      if (consumed !== sessionId) throw sceneUnusableException()
       let record: StoredUploadSession
       try {
         record = this.markExpired(await this.load(sessionId))
@@ -253,22 +260,19 @@ export class UploadSessionsService {
         throw error
       }
       if (record.status !== 'pending') throw sceneUnusableException()
-    // 纵深防御：索引命中还不够，会话记录里的哈希也必须对得上。
-    // 旧构建创建的会话没有 sceneTokenHash —— 缺失即拒绝，不是「随便什么 scene 都行」。
-    if (!record.sceneTokenHash || !safeEquals(record.sceneTokenHash, hashToken(scene))) {
-      throw sceneUnusableException()
-    }
-
-    // 轮换上传令牌：服务端只留哈希，换不回创建时那把明文（见 upload-scene.ts ①②）。
-    // 轮换的副作用正是我们想要的 —— 同一个会话的旧网页二维码当场作废。
-    const uploadToken = randomBytes(32).toString('base64url')
-      const committed = await this.commitSession(
-        { ...record, uploadTokenHash: hashToken(uploadToken) },
-        lockKey,
-        lockToken,
-        'pending',
-      )
-      if (committed !== 'updated') throw sceneUnusableException()
+      // 纵深防御：索引命中还不够，会话记录里的哈希也必须对得上。
+      // 旧构建创建的会话没有 sceneTokenHash —— 缺失即拒绝，不是「随便什么 scene 都行」。
+      if (!record.sceneTokenHash || !safeEquals(record.sceneTokenHash, hashToken(scene))) {
+        throw sceneUnusableException()
+      }
+      // 第一次兑换把会话令牌换成派生令牌，create 发给一体机的那把随之作废（一体机自己
+      // 从不用它上传）；之后再兑换，哈希已经相等，不写。服务端仍只存哈希（upload-scene.ts ①）。
+      const uploadToken = deriveSceneUploadToken(sessionId, scene)
+      const uploadTokenHash = hashToken(uploadToken)
+      if (!safeEquals(record.uploadTokenHash, uploadTokenHash)) {
+        const committed = await this.commitSession({ ...record, uploadTokenHash }, lockKey, lockToken, 'pending')
+        if (committed !== 'updated') throw sceneUnusableException()
+      }
 
       return {
         sessionId: record.sessionId,
@@ -301,7 +305,69 @@ export class UploadSessionsService {
         error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传文件不能超过 10MB' },
       })
     }
+    return this.receiveIntoSession({
+      sessionId: args.sessionId,
+      uploadToken: args.uploadToken,
+      produce: async (purpose) => ({
+        buffer: args.file.buffer,
+        filename: restoreMultipartUtf8Filename(args.file.originalname || defaultUploadFilename(purpose)),
+        mimeType: args.file.mimetype,
+      }),
+      audit: args.clientDeclaration
+        ? { actorRole: 'kiosk', source: 'upload_session', clientDeclaration: args.clientDeclaration }
+        : null,
+    })
+  }
 
+  /**
+   * 小程序已登录会员把自己「我的文档」里的一份文件递进这台一体机的这一单。与 multipart 同一条管线、
+   * 同一把 uploadToken、同形回执，只是字节来自本人文件：别人的 / 不存在的 / 已删除的，
+   * readContentForEndUser 一律同一个 404，原样抛出；落成的永远是匿名副本，会话里不存原文件 id，
+   * 作废 / 过期清理只会删副本、碰不到原件；member 会话登录的是另一个会员时，读文件之前就拒、会话不动。
+   */
+  async uploadMemberFile(args: {
+    sessionId: string
+    uploadToken: string
+    fileId: string
+    endUserId: string
+    clientDeclaration?: ClientDeclaration
+  }): Promise<UploadSessionStatusResponse> {
+    // 空身份会让 readContentForEndUser 走匿名分支、读到别人在一体机上的匿名上传，必须先挡。
+    if (!args.endUserId) throw new UnauthorizedException({ error: { code: 'MEMBER_AUTH_REQUIRED', message: '请先登录' } })
+    const { fileId, endUserId } = args
+    return this.receiveIntoSession({
+      sessionId: args.sessionId,
+      uploadToken: args.uploadToken,
+      admit: (session) => {
+        if (session.mode !== 'member' || session.pendingEndUserId === endUserId) return
+        throw new ForbiddenException({ error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '这台一体机现在登录的是另一个账号，不能把你的文档传进去' } })
+      },
+      produce: async () => {
+        // 先看本人那一行登记的大小，别把几百 MB 的大文件整份读进内存再拒。
+        // 查询带 endUserId：别人的文件这里查不到，照常交给下面统一报 404。
+        const own = await this.prisma.fileObject.findFirst({ where: { id: fileId, endUserId, deletedAt: null }, select: { sizeBytes: true } })
+        if (own && own.sizeBytes > MAX_SESSION_UPLOAD_BYTES) throw memberFileTooLargeException()
+        const source = await this.files.readContentForEndUser(fileId, endUserId)
+        if (source.buffer.length > MAX_SESSION_UPLOAD_BYTES) throw memberFileTooLargeException()
+        return { buffer: source.buffer, filename: source.filename, mimeType: source.mimeType }
+      },
+      audit: { actorRole: 'enduser', source: 'upload_session_member_file', endUserId, clientDeclaration: args.clientDeclaration },
+    })
+  }
+
+  /**
+   * 手机端把一份文件递进会话的唯一管线，multipart 与会员文档共用：加锁 → 读会话、按过期处理 →
+   * 只收 pending（或上一轮中断、没有收据的 uploading）→ 校验 uploadToken → admit（入口自己的放行条件，
+   * 此刻还没写任何东西）→ 改 uploading → produce 取字节、files.upload 落成匿名对象（任一步抛错都退回
+   * pending，可以换一份再试）→ uploaded；过期或丢锁就删掉这份匿名对象 → 清理记录 → 审计（失败不影响上传）。
+   */
+  private async receiveIntoSession(args: {
+    sessionId: string
+    uploadToken: string
+    admit?: (session: StoredUploadSession) => void
+    produce: (purpose: FilePurpose) => Promise<{ buffer: Buffer; filename: string; mimeType: string }>
+    audit: PhoneUploadAudit | null
+  }): Promise<UploadSessionStatusResponse> {
     const lockKey = uploadLockKey(args.sessionId)
     const lockToken = randomUUID()
     if (!(await this.redis.setNxEx(lockKey, lockToken, UPLOAD_LOCK_TTL_SECONDS))) {
@@ -313,53 +379,35 @@ export class UploadSessionsService {
       if (loaded.status === 'expired') throw expiredSessionException()
       // 上一轮在落成收据前中断时，记录会停在 uploading 且没有文件。那次没有收据，允许接着传。
       const resumable = loaded.status === 'uploading' && !loaded.file
-      if (loaded.status !== 'pending' && !resumable) {
-        throw new BadRequestException({
-          error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
-        })
-      }
+      if (loaded.status !== 'pending' && !resumable) throw notPendingException()
       if (!safeEquals(loaded.uploadTokenHash, hashToken(args.uploadToken))) {
         throw new ForbiddenException({
           error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' },
         })
       }
+      args.admit?.(loaded)
       const latest: StoredUploadSession = { ...loaded, status: 'uploading', file: null }
-      const started = await this.commitSession(
-        latest,
-        lockKey,
-        lockToken,
-        loaded.status,
-      )
+      const started = await this.commitSession(latest, lockKey, lockToken, loaded.status)
       if (started !== 'updated') {
         if (started === 'expired') throw expiredSessionException()
-        if (started === 'conflict') {
-          throw new BadRequestException({
-            error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
-          })
-        }
+        if (started === 'conflict') throw notPendingException()
         throw uploadInProgressException()
       }
 
       let file: FileUploadResponse
       try {
+        const bytes = await args.produce(latest.purpose)
         file = await this.files.upload({
-          buffer: args.file.buffer,
-          filename: restoreMultipartUtf8Filename(
-            args.file.originalname || defaultUploadFilename(latest.purpose),
-          ),
-          mimeType: args.file.mimetype,
+          buffer: bytes.buffer,
+          filename: bytes.filename,
+          mimeType: bytes.mimeType,
           purpose: latest.purpose,
           uploaderId: null,
           endUserId: null,
           createdBy: null,
         })
       } catch (error) {
-        await this.commitSession(
-          { ...latest, status: 'pending', file: null },
-          lockKey,
-          lockToken,
-          'uploading',
-        ).catch(() => undefined)
+        await this.commitSession({ ...latest, status: 'pending', file: null }, lockKey, lockToken, 'uploading').catch(() => undefined)
         throw error
       }
 
@@ -392,25 +440,24 @@ export class UploadSessionsService {
           'upload lock lost before commit',
         )
         if (committed === 'expired') throw expiredSessionException()
-        if (committed === 'conflict') {
-          throw new BadRequestException({
-            error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
-          })
-        }
+        if (committed === 'conflict') throw notPendingException()
         throw uploadInProgressException()
       }
       await this.persistCleanupRecord(uploaded)
-      if (args.clientDeclaration) {
+      if (args.audit) {
+        // actorId 只能留空（外键指向运营账号），会员记在 payload.endUserId；不写手机号、文件名、原文件 id。
+        const { actorRole, source, endUserId, clientDeclaration } = args.audit
         await this.prisma.auditLog.create({
           data: {
             actorId: null,
-            actorRole: 'kiosk',
+            actorRole,
             action: 'file.upload',
             targetType: 'file',
             targetId: file.fileId,
             payloadJson: JSON.stringify({
-              source: 'upload_session',
-              clientDeclaration: JSON.parse(clientDeclarationJson(args.clientDeclaration) ?? '{}'),
+              source,
+              ...(endUserId ? { endUserId } : {}),
+              ...(clientDeclaration ? { clientDeclaration: JSON.parse(clientDeclarationJson(clientDeclaration) ?? '{}') } : {}),
             }),
           },
         }).catch(() => undefined)
@@ -702,6 +749,18 @@ function expiredSessionException(memberFileRetained = false): BadRequestExceptio
 function uploadInProgressException(): BadRequestException {
   return new BadRequestException({
     error: { code: 'UPLOAD_SESSION_UPLOAD_IN_PROGRESS', message: '该二维码正在上传中,请稍候' },
+  })
+}
+
+function notPendingException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
+  })
+}
+
+function memberFileTooLargeException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'FILE_TOO_LARGE', message: '文件超过 10MB，这台一体机这一单收不了' },
   })
 }
 
