@@ -31,6 +31,9 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
     await client.$connect()
     await client.organization.create({ data: { id: 'first-order-migration-sentinel', name: 'Migration sentinel', type: 'public_employment_service' } })
     run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', migration)])
+    run(['db', 'execute', '--config', config, '--file', join(api, kind === 'sqlite' ? 'prisma/migrations' : 'prisma/postgres/migrations', '20261028120000_ai_service_fact/migration.sql')])
+    await client.aiServiceFact.create({ data: { serviceType: 'resume_optimize', serviceKey: 'migration-test', orgId: 'org-snapshot', terminalId: 'terminal-snapshot' } })
+    if (await client.aiServiceFact.count() !== 1) throw new Error(`${kind}: fact table unavailable`)
     const sentinel = await client.organization.findUnique({ where: { id: 'first-order-migration-sentinel' } })
     if (!sentinel) throw new Error(`${kind}: baseline data was lost`)
     const counts = await Promise.all([client.serviceProject.count(), client.serviceDeployment.count(), client.serviceIncident.count(), client.serviceIncidentEvent.count(), client.serviceReport.count()])
@@ -68,6 +71,14 @@ async function main() {
     execFileSync('initdb', ['-D', pgData, '-A', 'trust', '-U', 'first_order_verify', '--no-locale'], { timeout: 30_000, stdio: 'pipe' })
     startAttempted = true
     execFileSync('pg_ctl', ['-D', pgData, '-l', join(pgDirectory, 'server.log'), '-o', `-h 127.0.0.1 -k ${pgDirectory} -p ${port} -F`, '-w', '-t', '20', 'start'], { timeout: 25_000, stdio: 'pipe' })
+    execFileSync('createdb', ['-h', '127.0.0.1', '-p', String(port), '-U', 'first_order_verify', 'fresh'], { timeout: 30_000, stdio: 'pipe' })
+    const freshUrl = `postgresql://first_order_verify@127.0.0.1:${port}/fresh`
+    const freshEnv = { ...process.env, NODE_ENV: 'test', POSTGRES_URL: freshUrl, DATABASE_URL: freshUrl, DOTENV_CONFIG_PATH: join(directory, 'no-dotenv') }
+    execFileSync(process.execPath, [prismaCli, 'migrate', 'deploy', '--config', 'prisma.postgres.config.ts'], { cwd: api, env: freshEnv, timeout: 120_000, stdio: 'pipe' })
+    execFileSync(process.execPath, [prismaCli, 'migrate', 'diff', '--config', 'prisma.postgres.config.ts', '--from-config-datasource', '--to-schema', 'prisma/postgres/schema.prisma', '--exit-code'], { cwd: api, env: freshEnv, timeout: 120_000, stdio: 'pipe' })
+    const { client: fresh } = createPrismaClient(freshUrl)
+    try { await fresh.aiServiceFact.create({ data: { serviceType: 'mock_interview', serviceKey: 'fresh', orgId: 'org', terminalId: 'terminal' } }) } finally { await fresh.$disconnect() }
+    console.log('PASS postgres: fresh migrations and schema diff; fact table usable')
     await verify('postgres', directory, `postgresql://first_order_verify@127.0.0.1:${port}/postgres`)
   } finally {
     if (startAttempted && existsSync(join(pgData, 'postmaster.pid'))) execFileSync('pg_ctl', ['-D', pgData, '-m', 'fast', '-w', '-t', '20', 'stop'], { timeout: 25_000, stdio: 'pipe' })
