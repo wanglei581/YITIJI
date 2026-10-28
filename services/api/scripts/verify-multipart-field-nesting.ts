@@ -50,6 +50,8 @@ const EXPECTED_FILE_INTERCEPTORS = [
   { file: 'src/branding/branding.admin.controller.ts', count: 1 },
 ] as const
 
+const EXPECTED_GLOBAL_FILE_INTERCEPTORS = 13
+
 type FileInterceptorCall = {
   file: string
   source: ts.SourceFile
@@ -198,8 +200,9 @@ async function verifyStaticGuards(): Promise<void> {
   }
 
   // 13 = 12 处既有入口 + 贴牌 Logo 上传（src/branding/branding.admin.controller.ts）。
-  if (calls.length !== 13) {
-    failures.push(`全局 FileInterceptor: 预期 13 处，实际 ${calls.length} 处`)
+  // 与上面按文件登记的清单是两本独立的账：新增入口两处都要改。
+  if (calls.length !== EXPECTED_GLOBAL_FILE_INTERCEPTORS) {
+    failures.push(`全局 FileInterceptor: 预期 ${EXPECTED_GLOBAL_FILE_INTERCEPTORS} 处，实际 ${calls.length} 处`)
   }
 
   // 代理上传（整 buffer 进内存）的两处入口必须对齐既有的 PROXY_MAX_BYTES，
