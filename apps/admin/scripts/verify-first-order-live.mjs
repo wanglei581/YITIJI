@@ -634,6 +634,12 @@ try {
   const today = admin.locator('section').filter({ has: admin.getByRole('heading', { name: '今天要处理', exact: true }) })
   await expect(today).toContainText(`未结报障 ${countText(directory.total)}（待受理 ${countText(incidentCounts.open)} · 处理中 ${countText(incidentCounts.processing)} · 技术恢复待机构核对 ${countText(incidentCounts.resolved)}）`)
   mark('Dashboard unclosed incident count matches the cross-org directory')
+  // 「去处理」进机构详情的链接都要带项目号，否则多项目机构会打开错项目
+  const handleHrefs = await today.getByRole('link', { name: '去处理', exact: true }).evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''))
+  const drawerHrefs = handleHrefs.filter((href) => href.startsWith('/partners?'))
+  assert.ok(drawerHrefs.length > 0, 'dashboard lists at least one 去处理 link into an org drawer')
+  assert.ok(drawerHrefs.every((href) => /[?&]projectId=[^&]+/.test(href)), `every 去处理 link carries its project: ${drawerHrefs.join(' ')}`)
+  mark('Dashboard 去处理 links into an org drawer all carry the project id')
   await admin.goto(`${adminOrigin}/partners?org=${encodeURIComponent(fixture.orgs.own)}&section=incidents&projectId=${encodeURIComponent(created.id)}`)
   const deepPanel = adminPanel(admin)
   await expect(deepPanel.getByRole('tab', { name: '报障处理', exact: true })).toHaveAttribute('aria-selected', 'true')
