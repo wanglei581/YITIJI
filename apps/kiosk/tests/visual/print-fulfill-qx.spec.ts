@@ -478,3 +478,54 @@ test('progress without task context never claims there is no order or charge eit
   await expect(missing).not.toContainText(NO_ORDER_CLAIM)
   expect(errors).toEqual([])
 })
+
+// 出纸页「暂时查不到打印结果」（连续 10 分钟没拿到终态才翻到这一屏）：照稿 st-unconfirmed 的骨架——数字三步 + 订单摘要 + 小字，
+// 底栏触屏三槽（返回首页 / 问小青 / 重新查询状态）。这一屏此前没有任何浏览器用例：它要等满 10 分钟，这里用页面时钟快进，
+// 期间每分钟点一下屏，整机闲置清场不会插进来。只是查询超时，既不猜成功也不猜失败，也不让用户去找人。
+test('progress status timeout: three steps, order summary and a re-query key, never guesses a result @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let polls = 0
+  api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, async () => {
+    polls += 1
+    return { status: 200, json: { taskId: W2_ORDER.taskId, status: 'pending' } }
+  })
+  await page.clock.install({ time: new Date('2026-10-28T10:00:00+08:00') })
+  await page.goto('/print/progress')
+  await setReactRouterState(page, '/print/progress', flowState)
+  await expect(page.locator('[data-testid="print-fulfill-state-printing"]')).toBeVisible()
+  for (let minute = 0; minute < 11; minute += 1) {
+    await page.clock.runFor(60 * 1000)
+    await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))
+  }
+  await page.clock.runFor(3000)
+
+  const timedOut = page.locator('[data-testid="print-fulfill-state-client-status-timeout"]')
+  await expect(timedOut).toBeVisible()
+  await expect(page.locator('.qxt-band')).toContainText('暂时查不到打印结果')
+  await expect(page.locator('.qxt-band')).toContainText('这不代表成功或失败')
+  // 骨架：三步、订单摘要、小字。
+  await expect(page.getByRole('region', { name: '这一刻你可以做的三件' }).locator('li')).toHaveCount(3)
+  await expect(timedOut.locator('.qxt-sum dt', { hasText: '订单号' })).toHaveCount(1)
+  await expect(timedOut).toContainText('这只是查询超时')
+  await expect(timedOut).toContainText('我们不会猜它成功或失败')
+  // 不下结论、不找人。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  // 底栏：返回首页 / 问小青（本屏专属问句）/ 重新查询状态；整页没有旧的小号 ctabar。
+  await expect(page.getByRole('button', { name: '返回首页' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '问小青：取纸或异常怎么办', exact: true })).toBeVisible()
+  await expect(page.locator('.qx-ctabar')).toHaveCount(0)
+  const recheck = page.getByTestId('print-fulfill-primary')
+  await expect(recheck).toHaveText('重新查询状态')
+  await expectTouchAndBounds(page)
+
+  // 「重新查询状态」只是让轮询从头再来：回到进行中的那一屏，再次向 GET /print/jobs/:taskId 发请求，不重新下单。
+  const pollsBefore = polls
+  await recheck.click()
+  await expect(page.locator('[data-testid="print-fulfill-state-printing"]')).toBeVisible()
+  await page.clock.runFor(3000)
+  await expect.poll(() => polls).toBeGreaterThan(pollsBefore)
+  expect(errors).toEqual([])
+})
