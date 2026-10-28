@@ -2365,7 +2365,9 @@ async function expectCareerGenerateKeyGreyed(page: Page, api: ApiRouter, label: 
   // Playwright 不肯点 aria-disabled 的按钮；强点一下真实指针、再直接触发 DOM click，确保页面的点击处理真的跑过、并自己短路。
   await key.click({ force: true })
   await key.evaluate((el) => (el as HTMLElement).click())
-  await page.waitForTimeout(400)
+  // 不用定时等待（本文件的门禁禁了它）：先冲两帧让点击引起的重渲染落地，再等网络静默，之后请求数还没涨才算「没发」。
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  await page.waitForLoadState('networkidle')
   expect(api.requestCount('POST', CAREER_PLAN_PATH), '已知停用时点生成钮不得发请求').toBe(posts)
   await expect(key).toHaveText(label)
   await expect(key).toHaveAttribute('aria-disabled', 'true')
