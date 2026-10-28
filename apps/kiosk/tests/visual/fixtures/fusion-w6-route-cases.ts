@@ -96,7 +96,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页。
   { pattern: '/me/resumes', url: '/me/resumes', marker: member, featureText: '登录后看你的简历' },
   { pattern: '/me/print-orders', url: '/me/print-orders', marker: member, featureText: '打印订单' },
-  { pattern: '/me/documents', url: '/me/documents', marker: member, featureText: '我的文档' },
+  // 证据锚点随稿换字，判据不变：未登录意图带标题仍逐页点名这一页（旧登录门标题带「我的文档」，稿上的登录门标题是「登录后看你的文档」）。
+  { pattern: '/me/documents', url: '/me/documents', marker: member, featureText: '登录后看你的文档' },
   { pattern: '/me/favorites', url: '/me/favorites', marker: member, featureText: '登录后看你的收藏' },
   { pattern: '/me/ai-records', url: '/me/ai-records', marker: member, featureText: 'AI 服务记录' },
   { pattern: '/me/benefits', url: '/me/benefits', marker: member, featureText: '我的权益' },
