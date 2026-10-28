@@ -13,7 +13,9 @@
  *      并给「结束上一位的使用」；不放「进入我的」直达入口。
  *   C. 进个人资产页先问「还是你吗？」：距上次触屏超过 30 秒（KIOSK_HANDOVER_CONFIRM_MS），
  *      我的、我的文档、打印订单、AI 服务记录、我的简历……全部路由都包在 KioskHandoverGate 下，
- *      确认层出现时不挂载资产页（先确认、后读取）。
+ *      确认层出现时不挂载资产页（先确认、后读取）。弹出了没回答就一直是「待确认」（粘性标记，
+ *      只在内存里）：确认层一弹出就记下，判断时先看它，本人答「是我」、清场退出登录、新的一位登录成功才解除；
+ *      否则交接页一旦有出口（问小青、浏览器后退），下一位隔几秒再点「我的」就直接进了上一位的资料。
  *
  * 全部读源码文本（先剥注释），不 import、不连网。
  */
@@ -157,17 +159,42 @@ check(
   /return idleBeforeEntryMs\(now\) > KIOSK_HANDOVER_CONFIRM_MS/.test(presence),
   '判据：进来之前空了超过 30 秒（行为由单测真跑）',
 )
+// 弹出了没回答就是「待确认」：判断先看这个标记，空多久、从哪条路进来都先问（行为由单测与浏览器用例真跑）。
+check(
+  /export function needsHandoverConfirm\(now: number = Date\.now\(\)\): boolean \{\s*if \(handoverPending\) return true\s*return idleBeforeEntryMs\(now\) > KIOSK_HANDOVER_CONFIRM_MS/.test(presence),
+  '判据先看「待确认」标记（弹出了没回答就一直要问），再看进来之前空了多久',
+)
+check(
+  /export function markKioskPresenceConfirmed\(at: number = Date\.now\(\)\): void \{\s*handoverPending = false/.test(presence) &&
+    /export function clearHandoverPending\(\): void \{\s*handoverPending = false/.test(presence) &&
+    /export function markHandoverPending\(\): void \{\s*handoverPending = true/.test(presence) &&
+    (presence.match(/handoverPending = /g) ?? []).length === 5,
+  '待确认只在三处读写：确认层弹出时记下、答「是我」/ 新的一位登录成功时解除、清场退出登录时解除（再加初值与测试复位）',
+)
+check(
+  !/localStorage|sessionStorage|indexedDB|\bcookie\b|\bhistory\b|\blocation\b/.test(presence),
+  '待确认标记只在内存里：kioskPresence 不碰 localStorage / sessionStorage / cookie / history / 地址（清场与重载让它当场消失）',
+)
 const gate = code('src/auth/KioskHandoverGate.tsx')
 check(
-  /if \(!isLoggedIn \|\| !current\.ask\) return <Outlet \/>/.test(gate) && (gate.match(/<Outlet/g) ?? []).length === 1,
+  /const showConfirm = isLoggedIn && current\.ask/.test(gate) && /if \(!showConfirm\) return <Outlet \/>/.test(gate) && (gate.match(/<Outlet/g) ?? []).length === 1,
   '确认层出现时不挂载资产页（先确认、后读取）',
+)
+check(
+  /useLayoutEffect\(\(\) => \{\s*if \(showConfirm\) markHandoverPending\(\)\s*\}, \[showConfirm\]\)/.test(gate),
+  '确认层一弹出就记「待确认」（和确认层同一次提交，没有「画出来了、标记还没记」的间隙）',
 )
 check(/ask: needsHandoverConfirm\(\)/.test(gate) && /decision\.key !== location\.key/.test(gate), '每换一次地址（含后退、深链）重新判一次')
 check(
   /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我，结束上一位的使用"/.test(gate) && /<SettingsConfirm/.test(gate) && /back=\{false\}/.test(gate) && /nav=\{false\}/.test(gate) && !/ask=\{\{/.test(gate),
   '确认层复用卡片确认：「还是你吗？」「是我，继续」「不是我，结束上一位的使用」，且没有返回、底导航和问小青',
 )
-check(/markKioskPresenceConfirmed\(\)/.test(code('src/auth/AuthContext.tsx')), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
+const authContext = code('src/auth/AuthContext.tsx')
+check(/markKioskPresenceConfirmed\(\)/.test(authContext), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
+check(
+  /const logout = useCallback\(\(\) => \{[\s\S]*?clearHandoverPending\(\)[\s\S]*?\}, \[\]\)/.test(authContext),
+  '退出登录（结束使用、「不是我」、闲置到点、401 过期都走这里）一并解除待确认，不留给下一位',
+)
 
 const routes = code('src/routes/index.tsx')
 const gateBlock = routes.match(/element: <KioskHandoverGate \/>,\s*children: \[([\s\S]*?)\n\s{8}\],/)

@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { SettingsConfirm } from '../pages/profile/me/components/SettingsConfirm'
 import { MeTouchShell } from '../pages/profile/touch/MeTouchShell'
 import { useKioskSessionControl } from './KioskSessionControlContext'
-import { markKioskPresenceConfirmed, needsHandoverConfirm } from './kioskPresence'
+import { markHandoverPending, markKioskPresenceConfirmed, needsHandoverConfirm } from './kioskPresence'
 import { useAuth } from './useAuth'
 import '../pages/profile/me/styles/settings-qx2.css'
 
@@ -18,6 +18,12 @@ import '../pages/profile/me/styles/settings-qx2.css'
  * **先确认、后读取**：确认层出现时根本不挂载资产页，资产页的读取请求一条都不发，
  * 屏上也不出现任何上一位的文件名、订单号或手机号。深链、浏览器后退进来走的是同一个判断
  * （每换一次地址重新判一次）。没登录时资产页只显示登录引导，不问。
+ *
+ * **弹出了没回答，就一直是待确认**：浏览器后退、问小青这些路能把人带离这一屏，
+ * 再点底部「我的」时进页前只空了几秒，光看空闲时长不会再问。所以确认层一弹出就记下「待确认」
+ * （kioskPresence.markHandoverPending，只在内存里），每次判断都先看它：待确认期间，
+ * 不管从底导航、后退、问小青回来还是站内直达地址进来，都先回到这一屏。
+ * 解除只有三条路：本人答「是我，继续」、答「不是我」走清场（退出登录一并清掉）、新的一位登录成功。
  */
 export function KioskHandoverGate() {
   const location = useLocation()
@@ -32,7 +38,13 @@ export function KioskHandoverGate() {
     setDecision(current)
   }
 
-  if (!isLoggedIn || !current.ask) return <Outlet />
+  const showConfirm = isLoggedIn && current.ask
+  // 确认层与「待确认」在同一次提交里就位：没有「已经画出来、标记还没记」的间隙。
+  useLayoutEffect(() => {
+    if (showConfirm) markHandoverPending()
+  }, [showConfirm])
+
+  if (!showConfirm) return <Outlet />
 
   return (
     <div className="h-full" data-kiosk-screen="handover-confirm" data-testid="handover-confirm-page">
