@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1880 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1888 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -185,7 +185,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 172 个文件</summary>
+<summary><code>apps/admin/src/</code> — 173 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -222,6 +222,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/dashboard/RecentPrintTasks.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/dashboard/dashboardRows.ts` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/dashboard/printerStatusSummary.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
@@ -424,7 +425,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 542 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 549 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -648,14 +649,20 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/components/PickupHidGuide.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-pickup-claim-error-coverage.mjs`<br/>`verify-scan-input-safety.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintConfirmParts.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintConfirmView.tsx` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs`<br/>`verify-print-parameter-capability.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintDoneFailed.tsx` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintDoneSections.tsx` | `verify-print-confirm-honest.mjs`<br/>`verify-print-done-truth.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx` | `verify-file-display-truth.mjs`<br/>`verify-print-parameter-capability.mjs`<br/>`verify-word-conversion-ui.mjs` |
+| `apps/kiosk/src/pages/print/components/PrintProgressMissing.tsx` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/PrintProgressSections.tsx` | `verify-print-done-truth.mjs` |
+| `apps/kiosk/src/pages/print/components/printDoneFailedModel.ts` | `verify-print-done-truth.mjs` |
 | `apps/kiosk/src/pages/print/components/printFileRetention.ts` | `verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/components/printPreviewKind.ts` | `verify-resume-diagnosis-flow-ui.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx` | `verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs` |
+| `apps/kiosk/src/pages/print/file-source/FileSourceError.tsx` | `verify-file-display-truth.mjs` |
+| `apps/kiosk/src/pages/print/file-source/FileSourcePhone.tsx` | `verify-file-display-truth.mjs` |
+| `apps/kiosk/src/pages/print/file-source/FileSourceUsb.tsx` | `verify-file-display-truth.mjs` |
 | `apps/kiosk/src/pages/print/file-source/FileSourceView.tsx` | `verify-device-status-honest.mjs`<br/>`verify-file-display-truth.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/print/file-source/fileSourceModel.ts` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/pickupClaimModel.ts` | `verify-pickup-claim-error-coverage.mjs`<br/>`verify-miniapp-cloud-print-m2.ts` |
@@ -668,6 +675,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/print/printHandoffPolicy.ts` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w2-print-scan.mjs`<br/>`verify-scan-session-truth.mjs` |
 | `apps/kiosk/src/pages/print/printMaterialSession.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-pii-redaction-contract.mjs`<br/>`verify-print-entry-source-split.mjs` |
 | `apps/kiosk/src/pages/print/printProgressModel.ts` | `verify-print-done-truth.mjs` |
+| `apps/kiosk/src/pages/print/printProgressStatus.ts` | `verify-fusion-w2-print-scan.mjs`<br/>`verify-print-confirm-honest.mjs` |
 | `apps/kiosk/src/pages/print/printUsageEstimate.ts` | `verify-file-display-truth.mjs` |
 | `apps/kiosk/src/pages/print/styles/file-source-qx.css` | `verify-fusion-w2-print-scan.mjs` |
 | `apps/kiosk/src/pages/print/styles/pickup-claim-qx.css` | `verify-fusion-w2-print-scan.mjs` |

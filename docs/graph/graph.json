@@ -12792,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 252,
+      "reachableFileCount": 253,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13563,11 +13563,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 278
+      "sourceFileCount": 279
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 682,
+      "reachableFileCount": 697,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15093,6 +15093,7 @@
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
             "apps/kiosk/src/pages/print-scan/styles/print-hub-touch.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/print-touch.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15101,6 +15102,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15147,6 +15149,7 @@
           "path": "/print-scan/feature/:key",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/styles/qingxu/index.css",
             "apps/kiosk/src/styles/qingxu/primitives.css",
@@ -15209,6 +15212,7 @@
           ],
           "path": "/print/cashier",
           "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/cashier-qx.css",
             "apps/kiosk/src/pages/print/styles/print-cashier-touch.css",
@@ -15219,6 +15223,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15260,6 +15265,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15286,6 +15292,7 @@
           ],
           "path": "/print/desk",
           "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/print-desk-qx.css",
             "apps/kiosk/src/pages/print/styles/print-desk-touch.css",
@@ -15296,6 +15303,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15323,8 +15331,10 @@
           "path": "/print/done",
           "styles": [
             "apps/kiosk/src/components/styles/kiosk-feedback-dialog.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/print-done-touch.css",
+            "apps/kiosk/src/pages/print/styles/print-fail-touch.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/pages/print/styles/print-touch.css",
             "apps/kiosk/src/styles/qingxu/index.css",
@@ -15333,6 +15343,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15386,6 +15397,7 @@
           "path": "/print/pickup-claim",
           "styles": [
             "apps/kiosk/src/components/kiosk-numpad/kiosk-numpad.css",
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
             "apps/kiosk/src/pages/print/styles/print-pickup-touch.css",
@@ -15396,6 +15408,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15435,7 +15448,9 @@
           ],
           "path": "/print/progress",
           "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
+            "apps/kiosk/src/pages/print/styles/print-fail-touch.css",
             "apps/kiosk/src/pages/print/styles/print-fulfill-qx.css",
             "apps/kiosk/src/pages/print/styles/print-progress-touch.css",
             "apps/kiosk/src/pages/print/styles/print-touch.css",
@@ -15445,6 +15460,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15510,6 +15526,7 @@
           ],
           "path": "/print/upload",
           "styles": [
+            "apps/kiosk/src/pages/print/art/print-art-tokens.css",
             "apps/kiosk/src/pages/print/art/print-art.css",
             "apps/kiosk/src/pages/print/file-source/file-source-touch.css",
             "apps/kiosk/src/pages/print/styles/file-source-qx.css",
@@ -15521,6 +15538,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16592,7 +16610,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 777
+      "sourceFileCount": 791
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19102,6 +19120,9 @@
     "apps/admin/src/routes/dashboard/index.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
+    "apps/admin/src/routes/dashboard/printerStatusSummary.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -20788,6 +20809,9 @@
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs"
     ],
+    "apps/kiosk/src/pages/print/components/PrintDoneFailed.tsx": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
     "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx": [
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
@@ -20803,7 +20827,13 @@
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
       "apps/kiosk/scripts/verify-word-conversion-ui.mjs"
     ],
+    "apps/kiosk/src/pages/print/components/PrintProgressMissing.tsx": [
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
+    ],
     "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx": [
+      "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/components/printDoneFailedModel.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/components/printFileRetention.ts": [
@@ -20816,6 +20846,15 @@
       "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs"
+    ],
+    "apps/kiosk/src/pages/print/file-source/FileSourceError.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/file-source/FileSourcePhone.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/file-source/FileSourceUsb.tsx": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -20865,6 +20904,10 @@
     ],
     "apps/kiosk/src/pages/print/printProgressModel.ts": [
       "apps/kiosk/scripts/verify-print-done-truth.mjs"
+    ],
+    "apps/kiosk/src/pages/print/printProgressStatus.ts": [
+      "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
+      "apps/kiosk/scripts/verify-print-confirm-honest.mjs"
     ],
     "apps/kiosk/src/pages/print/printUsageEstimate.ts": [
       "apps/kiosk/scripts/verify-file-display-truth.mjs"
@@ -29008,6 +29051,7 @@
           "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
+          "apps/admin/src/routes/dashboard/printerStatusSummary.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/admin/src/routes/printers/index.tsx",
@@ -29610,6 +29654,9 @@
           "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "apps/kiosk/src/pages/print/components/PrintPreviewPanel.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceBits.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceError.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourcePhone.tsx",
+          "apps/kiosk/src/pages/print/file-source/FileSourceUsb.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
           "apps/kiosk/src/pages/print/printUsageEstimate.ts"
         ],
@@ -29780,6 +29827,7 @@
           "apps/kiosk/src/pages/print/printDeskModel.ts",
           "apps/kiosk/src/pages/print/printHandoffPolicy.ts",
           "apps/kiosk/src/pages/print/printMaterialSession.ts",
+          "apps/kiosk/src/pages/print/printProgressStatus.ts",
           "apps/kiosk/src/pages/print/styles/file-source-qx.css",
           "apps/kiosk/src/pages/print/styles/pickup-claim-qx.css",
           "apps/kiosk/src/pages/print/styles/print-pickup-claim.css",
@@ -31342,8 +31390,10 @@
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileDeletionRecords.tsx",
           "apps/kiosk/src/pages/print/components/PrintFileRetentionNotice.tsx",
+          "apps/kiosk/src/pages/print/components/PrintProgressMissing.tsx",
           "apps/kiosk/src/pages/print/components/printFileRetention.ts",
           "apps/kiosk/src/pages/print/printConfirmModel.ts",
+          "apps/kiosk/src/pages/print/printProgressStatus.ts",
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/print/localPrintWakeApi.ts",
           "apps/kiosk/src/services/print/paymentApi.ts",
@@ -31389,8 +31439,10 @@
           "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
+          "apps/kiosk/src/pages/print/components/PrintDoneFailed.tsx",
           "apps/kiosk/src/pages/print/components/PrintDoneSections.tsx",
           "apps/kiosk/src/pages/print/components/PrintProgressSections.tsx",
+          "apps/kiosk/src/pages/print/components/printDoneFailedModel.ts",
           "apps/kiosk/src/pages/print/printHandoff.ts",
           "apps/kiosk/src/pages/print/printProgressModel.ts",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
@@ -44581,15 +44633,6 @@
         "risk": "high",
         "scope": "kiosk",
         "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs、apps/kiosk/scripts/verify-print-parameter-capability.mjs"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/print/components/PrintDeskChrome.tsx",
-        "kind": "component",
-        "mentions": [],
-        "risk": "low",
-        "scope": "kiosk",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
