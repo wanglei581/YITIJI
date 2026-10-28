@@ -417,7 +417,7 @@ function Closure({ state, ctx }: { state: CashierQxState; ctx: CopyContext }) {
       <section className="cashier-qx-closure qx-grow" aria-label="没有订单上下文">
         <div className="cashier-qx-empty">
           <span className="cashier-qx-empty-ic"><FileXIcon aria-hidden="true" /></span>
-          <span>没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
+          <span><b className="qx-state-t">没有待支付的订单</b><br />没有订单上下文。<br /><b>这里不显示金额，也不出码 —— 出一张扫不通的码只会让你白扫。</b></span>
         </div>
       </section>
     )

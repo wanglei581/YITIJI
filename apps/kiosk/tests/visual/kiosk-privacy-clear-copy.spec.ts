@@ -121,7 +121,7 @@ test('W-43 print done "我拿走了，结束使用" really ends the use and logs
   // 2026-10-28 稿 done：原「走完就清」那一节没有了，倒计时说法并进帮助行：「不再点屏幕，60 秒后结束本次使用」。
   await expect(page.getByText(/不再点屏幕，60 秒后结束本次使用/)).toBeVisible()
   await expect(page.getByText(/到点会结束本次使用并退出登录/)).toBeVisible()
-  await expect(page.getByText('秒后结束使用')).toBeVisible()
+  await expect(page.getByText('秒后结束本次使用')).toBeVisible()
   await expect(page.getByText('已清除')).toHaveCount(0)
   await expect(page.getByText('下一个人看不到')).toHaveCount(0)
   await expect(page.getByText('结束并清空')).toHaveCount(0)
