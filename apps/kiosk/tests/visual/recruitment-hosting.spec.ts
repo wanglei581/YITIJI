@@ -391,9 +391,11 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
   expect(claims.every(Boolean), '首页在配置答复之前没有说过未开放').toBe(true)
 
   // 「我的」未登录页的指引：整页重新载入，配置缓存随之清空，再扣住一次。
+  // 触屏版登录门不再有 2.0 的三格说明（.qx-me-guide），其中随托管改口的「边界」那一格收成登录门底部的一行小字，
+  // 锚点是 member-records-guest-boundary；要盯的判据不变：没读到之前不说未开放，读到「关闭」才说。
   gate = deferred()
   await page.goto('/me/favorites', { waitUntil: 'domcontentloaded' })
-  const guide = page.locator('.qx-me-guide')
+  const guide = page.getByTestId('member-records-guest-boundary')
   await expect(guide).toContainText('也不把你的资料转交给任何企业')
   await page.waitForTimeout(600)
   await expect(guide).not.toContainText('未开放')
@@ -410,12 +412,24 @@ test('hosting unknown: the home footer and the member guide stay neutral until t
 const POLICY_FAVORITE = { id: 'fav-policy', targetType: 'policy', targetId: 'policy-001', title: '高校毕业生就业服务指引', createdAt: '2026-09-20T08:00:00.000Z' }
 // 服务端托管关闭时不会再返回岗位收藏；这一条模拟旧数据漏过来，证明页面自己也不摆。
 const STALE_JOB_FAVORITE = { id: 'fav-job', targetType: 'job', targetId: 'job-001', title: '漏过来的岗位收藏', createdAt: '2026-09-19T08:00:00.000Z' }
+/**
+ * 后台开了「求职进度页签」的联系方式应答：只多一个布尔，其余照 ApiRouter 的默认。
+ * 触屏版足迹页的第三个页签默认不显示（读不到开关、没配开关都当关），本用例要走到它的空态，所以把开关打开。
+ */
+const SUPPORT_CONTACT_WITH_PROGRESS_TAB = {
+  status: 200,
+  json: {
+    success: true,
+    data: { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: false, selfNoteTab: true },
+  },
+}
 
 test('hosting off: favorites and footprints show no job or fair section @w1-kiosk', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   const recruitmentHits = trackRecruitmentRequests(page)
   registerShell(api, RECRUITMENT_HOSTING_OFF)
   registerMemberLogin(api)
+  api.respond('GET', '/api/v1/public/support-contact', SUPPORT_CONTACT_WITH_PROGRESS_TAB)
   api.respond('GET', '/api/v1/me/favorites', { status: 200, json: { success: true, data: { items: [POLICY_FAVORITE, STALE_JOB_FAVORITE], nextCursor: null, total: 2 } } })
   api.respond('GET', '/api/v1/me/browse-logs', {
     status: 200,
@@ -441,7 +455,12 @@ test('hosting off: favorites and footprints show no job or fair section @w1-kios
   await expect(page.locator('[data-testid^="member-records-fav-tab-"]'), '只剩政策一类时不摆分类条').toHaveCount(0)
   await expect(page.getByText('岗位收藏', { exact: true })).toHaveCount(0)
   await expect(page.getByText('招聘会收藏', { exact: true })).toHaveCount(0)
-  await expect(page.getByTestId('member-records-view-favorites')).toContainText('政策')
+  // 触屏稿的分类条只写「收藏」，不再带「岗位·招聘会·政策」那行副标题；托管关闭时「收藏里只有政策」改由意图带来说
+  // （标题「你收藏的 N 条政策」、副题「只收藏政策」）。判据不变：说的是政策，条上和标题里都不出现「岗位」。
+  const favoritesTitle = page.getByRole('heading', { level: 1 })
+  await expect(favoritesTitle).toContainText('政策')
+  await expect(favoritesTitle).not.toContainText('岗位')
+  await expect(page.getByText('只收藏政策', { exact: true })).toBeVisible()
   await expect(page.getByTestId('member-records-view-favorites')).not.toContainText('岗位')
   await expect(page.getByTestId('member-records-primary')).toHaveText('查看政策')
   await expectNoRecruitmentCopy(page, '我的收藏')
@@ -513,8 +532,9 @@ test('hosting off: AI records never ask for job AI sessions and do not list fair
   await expect(page.getByText('2026 青岛高校毕业生招聘会')).toHaveCount(0)
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toHaveCount(0)
   await expect(page.getByText('岗位 AI 参考记录')).toHaveCount(0)
-  // W3-a 起计数写成「已加载 N 条」（另有一格「小青作业共 N 条」）；数还是这张列表的行数。
-  await expect(page.getByText('已加载 2 条', { exact: true })).toBeVisible()
+  // 触屏稿的 AI 服务记录不再画「已加载 N 条」的汇总格；那个数本来就是这张列表的行数，现在直接数列表里的行。
+  // 夹具里没有小青作业和模拟面试，列表里每一行都带 data-record-kind，数出来的就是整张列表：简历诊断 + 简历对照两行。
+  await expect(list.locator('[data-record-kind]')).toHaveCount(2)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions'), '托管关闭时不请求岗位 AI 会话').toBe(0)
   await expectNoRecruitmentCopy(page, 'AI 服务记录')
   expect(recruitmentHits).toEqual([])
@@ -541,7 +561,8 @@ test('hosting on: AI records wait for the hosting answer, then list job AI sessi
   await expect(list.locator('[data-record-kind="fair_visit_plan"]')).toContainText('2026 青岛高校毕业生招聘会')
   await expect(list.locator('[data-record-kind="job-ai-session"]')).toContainText('前端工程师')
   await expect(list.locator('[data-record-kind="job_fit"]')).toHaveCount(1)
-  await expect(page.getByText('已加载 4 条', { exact: true })).toBeVisible()
+  // 同上：不再有「已加载 N 条」汇总格，直接数行。简历诊断、简历对照、招聘会准备单、岗位 AI 参考记录各一行。
+  await expect(list.locator('[data-record-kind]')).toHaveCount(4)
   expect(api.requestCount('GET', '/api/v1/me/ai-records')).toBe(1)
   expect(api.requestCount('GET', '/api/v1/me/job-ai-sessions')).toBe(1)
 })
