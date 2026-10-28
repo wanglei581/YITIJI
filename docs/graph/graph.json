@@ -20864,6 +20864,7 @@
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts": [
+      "apps/kiosk/scripts/verify-file-display-truth.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs"
     ],
     "apps/kiosk/src/pages/print/pickupClaimModel.ts": [
@@ -29658,6 +29659,7 @@
           "apps/kiosk/src/pages/print/file-source/FileSourcePhone.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceUsb.tsx",
           "apps/kiosk/src/pages/print/file-source/FileSourceView.tsx",
+          "apps/kiosk/src/pages/print/file-source/fileSourceModel.ts",
           "apps/kiosk/src/pages/print/printUsageEstimate.ts"
         ],
         "missing": []
