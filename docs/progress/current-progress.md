@@ -1,5 +1,13 @@
 # 当前开发进度
 
+## 2026-10-29：第 7 包求职方案页「AI 停」时底栏生成钮置灰写明原因，临时性错误才保留重试（本地完成，推 `claude/kiosk-touch-p7`，未部署）
+
+- 问题：求职方案页 `ai-down` 屏底栏的「重试生成求职方案」保持可点，和正文里置灰的生成入口自相矛盾；稿 career 的 AI 停是「生成求职方案」disabled。
+- 做法：新增 `pages/resume/components/career-plan/CareerPlanGenerateKey.tsx`（底栏生成钮）与 `careerPlanGenerateCopy.ts`（字与原因，纯函数）。服务端明确回了能力级停用码（`ai/aiOutage.ts` 的 `AI_OUTAGE_CODES`：AI_PAUSED、未配置、预算用尽等，「配置恢复之前每一次都会失败」）→ `aria-disabled` 置灰、点了不发请求（`handleGenerate` 不再被调到）、字写「生成求职方案」（有方案时「重新生成」，不写「重试」），原因写在底栏小字并用 `aria-describedby` 连着：「AI 暂时不可用。生成求职方案先停着，可以先打印求职参考单；不承诺恢复时间。」（有方案时稿原句「AI 暂时不可用。这份方案还在，重新生成先停着。」）；不用 AI 的出路「打印求职参考单（未含 AI 规划）」仍在底栏。临时性错误（网络、超时、限流、上游 5xx）不进能力级码表：生成钮照常可点，失败之后字改成「重试生成求职方案」，点了真的再发一次。`CtaNote` 加可选 `id`；`CareerPlanPage.tsx` 仍 795 行。
+- 门禁（均未改，强度不变）：`verify:ai-down-fallbacks` 钉着的「生成钮不被 canStart 藏掉」「用户主动生成先清 aiOutage」仍成立（生成钮照样渲染、`handleGenerate` 没动），`verify:lightflow-k2a-career` 的「本页不得用原生 disabled」「置灰一律 aria-disabled」仍成立。
+- 用例：`fusion-w3.spec.ts` 里原来点「重试生成求职方案」期待恢复的那一条，改成断言置灰且不发请求，再进页面重新探测；新增 5 条（两个停用码、有方案后停用、网络断开与 504 超时后重试）。改过的断言做了反向检查，红行见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-tails.md`。
+- 没做：终端配置里的 `ai.paused` 只靠服务端回 `AI_PAUSED` 来认（页面本来就没读这个字段），不在首屏预先置灰；要预判得改屏幕路由，另立项。本机上 `career plan guide…` 那条原有用例在 1440×900 的触控高度检查处红，基线 `01bc01428` 上同样红，是舞台缩放读数竞态的既有问题。
+
 ## 2026-10-28（夜）：一体机触屏版第 7 包（简历其余页）并入统一后的第一包共享层，并按第二轮审查意见返工、每屏补上稿里的「问小青」（本地完成，已推 `claude/kiosk-touch-p7`，未部署）
 
 - **并入**：统一后的第一包（`claude/kiosk-touch-pkg1-shared`）两次并进本包，代码零冲突，冲突只有进度文档（两边都留）和图谱（整份重出）。第一次（第一包 4de32255c，已含主线 4a27ee7df）：`ResumeTouchFrame` 的 `navTestIdPrefix` 改成 `navTestIds={home, advisor, profile}` 对象传给 `QxTouchNav.testIds`（预览页把三个字面量直接写在源码里）；触屏路由重登记到 `KioskRoot` 的三张表，锚点「第七包 简历其余页」（`/resume/generate`、`/resume/generate/preview`、`/resume/templates`、`/resume/materials`）；共享件取第一包版本，本包没再改。合并前后同一时刻（固定页面时钟与夹具时间）逐像素比对 53 张：1080×1920 共 52 张，51 张一致，1 张（生成第 2 步）只有 2 个像素、色差 ≤2（圆角抗锯齿）；390 宽 1 张按第一包说明不比，实测意图带整体下移 16px（touch-hero 手机适配）。第二次（第一包新头 174087ba2，再往前到 7ecb823cc 只多了主线的进度文档）带进来 `aed1b6512`（触屏底栏手机宽度收进一屏）、`174087ba2`（`touch-legacy-parts.css`：共享弹窗与面板在触屏屏里补回边框 / 选中态 / 触屏尺寸）：与并入前逐像素比对 69 张，57 张一致，12 张有差且逐张查清——5 张是意图带步骤条游标的 1 像素竖线（动画相位），6 张是零星抗锯齿像素（5–189 个，并排看不出差别），1 张是手机 390 宽底栏（问小青药丸里的麦克风圆由 64 缩到 44，药丸高度仍是 64），没有一处是本包造成的视觉变化。
