@@ -154,7 +154,11 @@ function assertNoSqliteDrift(db: string, label: string): void {
 //   PlatformSetting —— 平台级公开键值（服务电话、服务时间、小程序是否已发布）。
 //   没有可复用的平台键值表。没有 endUserId，不是会员数据，不进注销删除或置空清单。
 // 117: first-order service project/deployment/incident/event/report; no old model removed.
-const EXPECTED_MODEL_COUNT = 117
+// 119（贴牌与授权管理，+2）：
+//   BrandLogo —— 贴牌 Logo（PNG / WebP，按文件头判、禁 SVG），与待机宣传屏素材分表；
+//   License   —— 软件使用授权（只按期限与终端台数，不与岗位 / 招聘会 / 浏览 / 投递挂钩）。
+// 两个后台线的 AiServiceFact（+1）若先合并，本数是 120；后合并的一方负责改这里。
+const EXPECTED_MODEL_COUNT = 119
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
