@@ -388,6 +388,15 @@ async function main(): Promise<void> {
     at(1)
     await api('POST', `/admin/licenses/${licQ.id}/suspend`, { reason: '暂停期间不许再装机' })
     c.equal('暂停 → 新增绑定被拒', await bind(q[3]!, orgQ), '409:LICENSE_NOT_AVAILABLE_FOR_BINDING')
+    // 授权不可用时，已绑终端「再绑同一机构」是空操作，不能被误拦；新终端才被拦。
+    const orgRB = await newOrg('rb', 'required')
+    const rb = await Promise.all(['rb1', 'rb2'].map((k) => newTerminal(k, null)))
+    await createLicense(orgRB, { startsAt: iso(0), endsAt: iso(30), terminalQuota: 1 })
+    c.equal('同机构空操作：先绑第 1 台', await bind(rb[0]!, orgRB), 'ok')
+    at(40)
+    c.equal('授权过期后：已绑终端再绑同一机构是空操作，不被拦', await bind(rb[0]!, orgRB), 'ok')
+    c.equal('授权过期后：新终端被拦', await bind(rb[1]!, orgRB), '409:LICENSE_NOT_AVAILABLE_FOR_BINDING')
+    at(1)
     // 提前装机：只有待生效的授权
     const orgR = await newOrg('r', 'required')
     const r = await Promise.all(['r1', 'r2'].map((k) => newTerminal(k, null)))

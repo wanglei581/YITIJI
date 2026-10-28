@@ -290,6 +290,7 @@ async function main(): Promise<void> {
       ['主机不在白名单', 'https://evil.example.com/'],
       ['白名单域名做子域前缀', 'https://beian.miit.gov.cn.evil.example.com/'],
       ['账号口令伪装', 'https://beian.miit.gov.cn@evil.example.com/'],
+      ['域名对、但带账号口令', 'https://user:pass@beian.miit.gov.cn/'],
       ['带端口', 'https://beian.miit.gov.cn:8443/'],
       ['javascript 协议', 'javascript:alert(1)'],
       ['协议相对', '//beian.miit.gov.cn/'],
@@ -346,12 +347,15 @@ async function main(): Promise<void> {
     await rejectCase('宽高比刚好越界（111×100）', buildPng(111, 100), 'BRAND_LOGO_NOT_SQUARE')
     await rejectCase('宽高比刚好越界（100×112）', buildPng(100, 112), 'BRAND_LOGO_NOT_SQUARE')
     await rejectCase('PNG 损坏（翻转一个字节）', (() => { const b = Buffer.from(buildPng(64, 64)); b[40]! ^= 0xff; return b })(), 'BRAND_LOGO_CORRUPT')
+    await rejectCase('PNG 数据区被改一个字节（结构仍合法，只有块校验 CRC 能发现）', (() => { const b = Buffer.from(buildPng(64, 64)); b[45]! ^= 0xff; return b })(), 'BRAND_LOGO_CORRUPT')
     await rejectCase('PNG 被截断', buildPng(64, 64).subarray(0, 60), 'BRAND_LOGO_CORRUPT')
     await rejectCase('PNG 结尾夹带脚本', Buffer.concat([buildPng(64, 64), Buffer.from('<script>alert(1)</script>')]), 'BRAND_LOGO_CORRUPT')
     await rejectCase('动图 APNG', buildPng(64, 64, { afterIhdr: [pngChunk('acTL', Buffer.alloc(8))] }), 'BRAND_LOGO_ANIMATED')
     await rejectCase('动态 WebP', buildWebp([vp8xChunk(64, 64, 0x02), { type: 'ANIM', data: Buffer.alloc(6) }, { type: 'ANMF', data: Buffer.alloc(16) }]), 'BRAND_LOGO_ANIMATED', 'logo.webp', 'image/webp')
     await rejectCase('WebP 画布与图像尺寸不一致', buildWebp([vp8xChunk(100, 100, 0), vp8lChunk(64, 64)]), 'BRAND_LOGO_CORRUPT', 'logo.webp', 'image/webp')
     await rejectCase('WebP 结尾夹带', Buffer.concat([canvasImage(64, 64, 'image/webp'), Buffer.from('xx')]), 'BRAND_LOGO_CORRUPT', 'logo.webp', 'image/webp')
+    const huge = await upload(Buffer.concat([buildPng(64, 64), Buffer.alloc(1024 * 1024 + 2048)]))
+    c.check(`远超上限的文件（>1MB）被挡在读入阶段：HTTP ${huge.status} ${huge.json.error?.code ?? ''}，不落盘不入库`, huge.status >= 400 && huge.status < 500 && (await prisma.brandLogo.count({ where: { createdBy: adminId } })) === createdLogoIds.length, `${huge.status} ${JSON.stringify(huge.json)}`)
     const missing = await call('POST', '/api/v1/admin/branding/logo', { token: adminToken(), form: new FormData() })
     c.equal('缺少 file 字段 → 400 FILE_MISSING', `${missing.status}:${missing.json.error?.code}`, '400:FILE_MISSING')
     c.check('非管理员上传 → 403', (await upload(realPng, 'logo.png', 'image/png', partnerToken())).status === 403)
