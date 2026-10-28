@@ -46,7 +46,8 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
-import { ResumeErrorState, ResumeStepsState, ResumeWaitState, unattendedReason } from './touch/ResumeStates'
+import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/ResumeStates'
+import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
@@ -266,7 +267,7 @@ export function CareerPlanPage() {
       const result = await generateCareerPlan(taskId, { token: getToken(), accessToken })
       if (!isLive(run)) return
       if (result.status === 'failed') {
-        setTaskFailReason(result.failReason ?? '模型这次没有返回可用的规划内容')
+        setTaskFailReason(unattendedReason(result.failReason, '模型这次没有返回可用的规划内容'))
       } else {
         setPlan(result)
         setProbed(true)
@@ -276,7 +277,7 @@ export function CareerPlanPage() {
       const code = errorCodeOf(err)
       if (code === 'AI_TASK_NOT_FOUND') setRejectedTask(true)
       else if (AI_OUTAGE_CODES.has(code)) setAiOutage(CAREER_PLAN_OUTAGE_COPY)
-      else setError(userMessageOf(err, '生成失败，请稍后重试'))
+      else setError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
       settle(run)

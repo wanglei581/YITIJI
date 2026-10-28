@@ -6,18 +6,12 @@
 import type { ReactNode } from 'react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
-import { containsStaffHandoff, helpNeededLine } from '../../../copy/unattendedCopy'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { Waiting } from '../jobFit/jobFitQxKit'
 import { ResumeStepPreview } from './ResumeStepPreview'
 import { ResumeTouchActs, type ResumeTouchActItem } from './ResumeTouchActs'
 import type { ResumeTouchArtKind } from './ResumeTouchArt'
 import './resume-states.css'
-
-/** 动态来的失败原因（接口原话）里一旦带「找 / 联系工作人员」这类话，就换成页面给的固定句：现场没有人。 */
-export function unattendedReason(raw: string | null | undefined, fallback: string): string {
-  const text = raw?.trim()
-  return text && !containsStaffHandoff(text) ? text : fallback
-}
 
 export function ResumeWaitState({ icon, title, desc, tag, fine, take }: {
   icon: ReactNode

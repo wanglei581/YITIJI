@@ -104,6 +104,7 @@ import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { toSaActItems } from './touch/saActItems'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { unattendedReason } from './touch/unattendedReason'
 import { SaDimRow } from './touch/SaResultParts'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
@@ -754,7 +755,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         setTaskAiDown(isAiOutage(err))
         setTaskError(isAiOutage(err)
           ? 'AI 暂时不可用，你可以先看这次的固定记分'
-          : userMessageOf(err, mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'))
+          : unattendedReason(userMessageOf(err, mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'), mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试'))
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
   }, [attempt, consentOk, getToken, linkedTaskId, navigate, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
@@ -877,7 +878,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       })
       setPreviewOpen(true)
     } catch (err) {
-      setError(err instanceof SelfAssessmentApiError ? err.message : '打印文件生成失败')
+      setError(unattendedReason(err instanceof SelfAssessmentApiError ? err.message : null, '打印文件生成失败'))
     } finally {
       setPrinting(false)
     }
@@ -914,7 +915,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       clearSession()
       navigate('/')
     } catch (err) {
-      setError(err instanceof SelfAssessmentApiError ? err.message : '撤回失败')
+      setError(unattendedReason(err instanceof SelfAssessmentApiError ? err.message : null, '撤回失败'))
     } finally {
       setWithdrawing(false)
     }
@@ -937,7 +938,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           ? 'AI 解读当前没有开放，这次只有维度强度与依据题号；重新作答也不会有文字解读。'
           : gap === 'unavailable'
             ? 'AI 解读服务当前不可用，这几段陈述这次没有生成。前面三步（作答、记分、依据题号）都已完成。'
-            : result.failReason ?? '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。',
+            : unattendedReason(result.failReason, '本次解读未能生成合规结果，已整体丢弃，不做任何替换或补写。'),
     ...(gap === 'stopped'
       ? { retryHint: '下面的维度强度与依据题号不依赖 AI，现在就能看、能打印。' }
       : {

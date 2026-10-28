@@ -37,7 +37,8 @@ import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
-import { ResumeErrorState, ResumeStepsState, ResumeWaitState, unattendedReason } from './touch/ResumeStates'
+import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/ResumeStates'
+import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchArt } from './touch/ResumeTouchArt'
 import './touch/resume-fit.css'
@@ -356,7 +357,7 @@ export function JobFitActionsPage() {
     if (screen === 'ai-down') {
       return {
         title: '差距清单这次读不到',
-        subtitle: `${aiOutage ?? 'AI 服务当前不可用'} —— 差距与准备建议由 AI 生成，这次生成不了。`,
+        subtitle: `${unattendedReason(aiOutage, 'AI 服务当前不可用')} —— 差距与准备建议由 AI 生成，这次生成不了。`,
         pill: { tone: 'bad', label: 'AI 差距清单当前不可用' },
         body: (
           <>

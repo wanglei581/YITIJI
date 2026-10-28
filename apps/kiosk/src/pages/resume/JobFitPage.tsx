@@ -35,6 +35,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { readAiResumeSession } from './aiResumeSession'
 import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
@@ -318,7 +319,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { token, accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。') })
       } else {
         setResult(res)
       }
@@ -349,7 +350,7 @@ export function JobFitPage() {
           return
         }
       }
-      setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message: userMessageOf(err, '分析失败，请稍后重试') })
+      setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message: unattendedReason(userMessageOf(err, '分析失败，请稍后重试'), '分析失败，请稍后重试') })
     } finally {
       setAnalyzing(false)
     }
@@ -372,7 +373,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。') })
       } else {
         setResult(res)
       }
@@ -388,7 +389,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      const message = userMessageOf(err, '授权失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, '授权失败，请稍后重试'), '授权失败，请稍后重试')
       if (granted) setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message })
       else setConsentError(message)
     } finally {
@@ -421,7 +422,7 @@ export function JobFitPage() {
       const res = await analyzeJobFit(input, { token, accessToken })
       if (analysisRunRef.current !== run) return
       if (res.status === 'failed') {
-        setAnalysisFail({ kind: 'failed', message: res.failReason ?? '请求中断，没有可确认的结果。' })
+        setAnalysisFail({ kind: 'failed', message: unattendedReason(res.failReason, '请求中断，没有可确认的结果。') })
       } else {
         setResult(res)
       }
@@ -437,7 +438,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      const message = userMessageOf(err, '授权失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, '授权失败，请稍后重试'), '授权失败，请稍后重试')
       // 已授权后失败的是分析本身，属页面级错误；授权本身失败才留在弹窗里。
       if (granted) setAnalysisFail({ kind: isAiOutage(err) ? 'ai-down' : 'failed', message })
       else setConsentError(message)
@@ -476,7 +477,7 @@ export function JobFitPage() {
         setRejectedTask(true)
         return
       }
-      setError(userMessageOf(err, '撤回失败，请稍后重试'))
+      setError(unattendedReason(userMessageOf(err, '撤回失败，请稍后重试'), '撤回失败，请稍后重试'))
     } finally {
       setRevokingConsent(false)
     }
@@ -502,7 +503,7 @@ export function JobFitPage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
+      setError(unattendedReason(userMessageOf(err, '打印版生成失败，请稍后重试'), '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }

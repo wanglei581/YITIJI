@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 import type { QxTouchRail } from '../../../components/qingxu/touch/QxTouchBand'
 import { ResumeTouchActs } from '../touch/ResumeTouchActs'
 import { ResumeErrorState, ResumeWaitState } from '../touch/ResumeStates'
+import { unattendedReason } from '../touch/unattendedReason'
 import {
   BotIcon,
   ClockIcon,
@@ -232,7 +233,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
 
   return {
     title: '这次分析没有完成',
-    subtitle: failMessage ?? '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。',
+    subtitle: unattendedReason(failMessage, '请求中断，没有可确认的结果。系统不展示对照要点或建议，也不保留半截结论。'),
     pill: { tone: 'bad', label: '本次分析未完成' },
     body: (
       <>

@@ -21,6 +21,7 @@ import { ResumeWaitState } from './touch/ResumeStates'
 import { ResumeTouchArt } from './touch/ResumeTouchArt'
 import './touch/resume-templates.css'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { CtaNote, KitRows, Sec } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
@@ -96,7 +97,7 @@ export function ResumeTemplateLibraryPage() {
         setSelectedId((prev) => (prev && items.some((item) => item.id === prev) ? prev : null))
       })
       .catch((err) => {
-        if (!cancelled) setError(userMessageOf(err, '简历素材加载失败，请稍后重试'))
+        if (!cancelled) setError(unattendedReason(userMessageOf(err, '简历素材加载失败，请稍后重试'), '简历素材加载失败，请稍后重试'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

@@ -13,6 +13,7 @@ import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeHelpLine } from './touch/ResumeHelpLine'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import type {
   GeneratedResume,
   ResumeGenEducation,
@@ -219,7 +220,7 @@ export function ResumeGeneratePage() {
       // 拿到结构化响应就算一次真实往返 —— 账户级 / 模型名问题除外，那种每次都会失败。
       setProbed(true)
       if (result.status !== 'completed' || !result.resume) {
-        setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
+        setError(unattendedReason(result.failReason, 'AI 简历生成失败，请稍后重试'))
         return
       }
       // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
@@ -230,7 +231,7 @@ export function ResumeGeneratePage() {
         setError(declined)
         return
       }
-      const message = userMessageOf(err, 'AI 简历生成失败，请稍后重试')
+      const message = unattendedReason(userMessageOf(err, 'AI 简历生成失败，请稍后重试'), 'AI 简历生成失败，请稍后重试')
       setError(message)
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误等只是本次失败，
       // 那些必须保留重试入口，不许拿去把能力说成挂了（aiOutage.ts 口径）。
@@ -294,7 +295,7 @@ export function ResumeGeneratePage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '草稿导出失败，请稍后重试'))
+      setError(unattendedReason(userMessageOf(err, '草稿导出失败，请稍后重试'), '草稿导出失败，请稍后重试'))
     } finally {
       setExportingDraft(false)
     }

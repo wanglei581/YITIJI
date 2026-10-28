@@ -24,6 +24,7 @@ import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchArt, type ResumeTouchArtKind } from './touch/ResumeTouchArt'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import './touch/resume-materials-touch.css'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
@@ -289,7 +290,7 @@ export function JobMaterialLibraryPage() {
       setGenerated(result)
       clearJobMaterialDraft()
     } catch (err) {
-      setSubmitError(userMessageOf(err, '生成失败，请稍后重试'))
+      setSubmitError(unattendedReason(userMessageOf(err, '生成失败，请稍后重试'), '生成失败，请稍后重试'))
     } finally {
       setSubmitting(false)
     }
@@ -326,7 +327,7 @@ export function JobMaterialLibraryPage() {
       if (!res?.url) throw new Error('preview url missing')
       setPreview({ file, url: res.url })
     } catch (err) {
-      setPreview({ file, error: userMessageOf(err, '预览链接没能生成，可能已到期或被清理') })
+      setPreview({ file, error: unattendedReason(userMessageOf(err, '预览链接没能生成，可能已到期或被清理'), '预览链接没能生成，可能已到期或被清理') })
     } finally {
       setPreviewBusy(false)
     }

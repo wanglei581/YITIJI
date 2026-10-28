@@ -12,6 +12,7 @@ import { maskEmail, maskPhone } from '../../utils/maskPii'
 import { ResumeHelpLine } from './touch/ResumeHelpLine'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { unattendedReason } from './touch/unattendedReason'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -199,7 +200,7 @@ export function ResumeGeneratePreviewPage() {
       setExportVersion((n) => n + 1)
       if (file.signedUrl && exportFormat === 'pdf') setPreviewOpen(true)
     } catch (err) {
-      setExportError(userMessageOf(err, '导出失败，请稍后重试'))
+      setExportError(unattendedReason(userMessageOf(err, '导出失败，请稍后重试'), '导出失败，请稍后重试'))
     } finally { setExporting(false); setFactOpen(false) }
   }
 
