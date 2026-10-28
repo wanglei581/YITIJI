@@ -15,7 +15,8 @@ import 'reflect-metadata'
  * ① 明文永不落库：Redis 里存的是 sha256，不是 scene 本身；
  * ② 会话有效期内可重复兑换（2026-10-29 起，原因见 upload-scene.ts ②）：同一张码每次拿到
  *    同一把派生令牌，两次兑换之间谁先上传都只成功一次；已兑换过的码走只读快路径、不等锁，
- *    第一次兑换拿锁有界重试（并发兑换两边都成功），与上传交错时不给已收到文件的会话发令牌；
+ *    第一次兑换拿锁有界重试（并发兑换两边都成功），加锁路径与上传交错时不给已收到文件的会话发令牌；
+ *    快路径读到 pending 后会话才收下文件时照样回令牌（旧快照，允许），但这把令牌换不掉已收下的那份；
  * ③ 首次兑换换掉 create 下发的令牌：那把随之作废，之后再兑换不再写会话；
  * ④ 失败路径不当预言机：格式错/查无此码/改错一个字/已收到文件/已过期/已作废，对外是同一个错误码。
  */
@@ -359,6 +360,78 @@ async function main(): Promise<void> {
       uploadCode === '<no-error>' && raceCode === 'UPLOAD_SCENE_UNUSABLE' && afterCode === 'UPLOAD_SCENE_UNUSABLE',
       `实际 ${uploadCode} / ${raceCode} / ${afterCode}`,
     )
+  }
+  // 只读快路径与上传交错：快路径不加锁读到 pending，回令牌之前会话已被上传改成 uploaded。
+  // 快路径照样回出令牌（读的是旧快照，允许）；但上传要重新拿锁、重读状态，这把令牌换不掉已收下的那份。
+  // 卡点包在服务交给 redeemScene 的 memberBind.loadOptional 上 —— 快路径读会话走的就是它；
+  // 上传读会话走服务自己的 load，不经过这里。
+  {
+    const session = await newSession()
+    const sessionKey = `upload_session:${session.sessionId}`
+    const readSession = async () =>
+      JSON.parse((await client.get(sessionKey)) as string) as { status?: string; file?: { fileId?: string } | null }
+    // 先兑换一次：令牌哈希换成派生令牌，之后再兑换就走快路径。
+    const first = await service.resolveScene(session.sceneToken)
+    type SessionRead = (sessionId: string) => Promise<{ status?: string } | null>
+    const host = (service as unknown as { memberBind: { loadOptional: SessionRead } }).memberBind
+    const originalRead = host.loadOptional
+    let releaseRead!: () => void
+    const readGate = new Promise<void>((resolve) => { releaseRead = resolve })
+    let markHeld!: () => void
+    const held = new Promise<boolean>((resolve) => { markHeld = () => resolve(true) })
+    let armed = true
+    // 只卡下一次读到 pending 的那一次（第二次兑换的快路径），其余调用照常。
+    host.loadOptional = async (sessionId) => {
+      const record = await originalRead(sessionId)
+      if (armed && sessionId === session.sessionId && record?.status === 'pending') {
+        armed = false
+        markHeld()
+        await readGate
+      }
+      return record
+    }
+    try {
+      const raced = { token: '' }
+      const racing = errorCodeOf(async () => {
+        raced.token = (await service.resolveScene(session.sceneToken)).uploadToken
+      })
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const heldInTime = await Promise.race([
+        held,
+        new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 5000) }),
+      ])
+      clearTimeout(timer)
+      if (!heldInTime) throw new Error('夹具异常：第二次兑换没有经 memberBind.loadOptional 读到 pending，本条用例会验错东西')
+      const firstUpload = await upload(session.sessionId, first.uploadToken)
+      const landed = await readSession()
+      check(
+        '快路径读到 pending 后卡住期间：拿第一次兑换的令牌上传成功（快路径不占锁）',
+        firstUpload === '<no-error>' && landed.status === 'uploaded' && Boolean(landed.file?.fileId),
+        `实际 ${firstUpload} / ${landed.status}`,
+      )
+      releaseRead()
+      const racedCode = await racing
+      check(
+        '放开后快路径照样回出同一把令牌（读的是旧快照，允许）',
+        racedCode === '<no-error>' && raced.token === first.uploadToken,
+        `实际 ${racedCode}`,
+      )
+      const secondUpload = await upload(session.sessionId, raced.token)
+      const after = await readSession()
+      check(
+        '拿旧快照回出的令牌再传第二份 → UPLOAD_SESSION_NOT_PENDING，会话里仍是第一份文件',
+        secondUpload === 'UPLOAD_SESSION_NOT_PENDING'
+          && after.status === 'uploaded'
+          && Boolean(landed.file?.fileId)
+          && after.file?.fileId === landed.file?.fileId,
+        `实际 ${secondUpload}，fileId ${landed.file?.fileId ?? '无'} → ${after.file?.fileId ?? '无'}`,
+      )
+      const laterCode = await errorCodeOf(() => service.resolveScene(session.sceneToken))
+      check('快路径交错之后再兑换 → UNUSABLE', laterCode === 'UPLOAD_SCENE_UNUSABLE', `实际 ${laterCode}`)
+    } finally {
+      releaseRead()
+      host.loadOptional = originalRead
+    }
   }
 
   // 两次兑换之间，不论谁先拿令牌上传，都恰好成功一次；后来的人看到「已使用」。
