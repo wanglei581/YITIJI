@@ -481,6 +481,8 @@ test('W-75 sticky: 答「是我，继续」后解除，照常进「我的」并�
   const before = calls.length
   await nav(page, '我的').click()
   await expect(page).toHaveURL(/\/profile$/)
+  // 先等到「我的」真的画出来，再看确认层不在：只看「不在」会在路由刚换、新页还没画时空过。
+  await expect(page.getByTestId('profile-asset-documents'), '本人确认过了，不再问').toBeVisible()
   await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
   await page.getByTestId('profile-asset-documents').click()
   await expect(page.getByText(WANG.doc)).toBeVisible()
@@ -516,6 +518,7 @@ test('W-75 sticky: 答「不是我」清场后，下一位看不到上一位，�
   await pace(page)
   await nav(page, '我的').click()
   await expect(page).toHaveURL(/\/profile$/)
+  await expect(page.getByTestId('profile-asset-documents'), '新的一位刚登录，不该被上一位留下的标记拦住').toBeVisible()
   await expect(page.getByTestId('handover-confirm')).toHaveCount(0)
   await page.getByTestId('profile-asset-documents').click()
   await expect(page.getByText(CHEN.doc)).toBeVisible()
