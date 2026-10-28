@@ -9,8 +9,10 @@
  *   5. Logo：只收 PNG（按文件头判，不信扩展名与 Content-Type）；WebP / SVG / JPEG / GIF / 动图 / 损坏 /
  *      超 512KB / 超 1024 / 非 1:1 一律拒；落盘的是解压校验后重新编码的文件（只剩 IHDR / PLTE / tRNS / IDAT / IEND）；
  *      公开读取只认 Logo 表。文件内容检查的细节（压缩流、夹带、解压炸弹、扫描行布局）在 verify-brand-logo-image.ts。
- *   6. 机构覆盖只影响该机构的终端；逐项独立回退；终端 → 机构 → 平台。
- *   6b. kiosk-profile 对已验签终端带 licenseState（ok / grace / inactive），只给状态不给到期日等商务细节。
+ *   6. 机构覆盖只影响该机构的终端；逐项独立回退；终端 → 机构 → 平台；org.update 审计记品牌三项的改前改后（并发时 before 是真正的改前）。
+ *   6b. kiosk-profile 的授权块：licenseState（ok / grace / inactive）+ acceptsNewSessions / currentSessionMayContinue / noticeLine，
+ *      只给状态不给到期日等商务细节；跨场景：会话有效 + 授权到期 → 会话内照常、profile 不许新业务但允许当前继续、换新会话被拒。
+ *   9.  限流：验签通过按终端号计数，未验签一律按 IP——伪造终端号拆不了桶（真实 429）。
  *   7. 未验签 / 未知终端 / 伪造终端头：只拿平台默认，没有点位、没有机构、没有授权状态；公开响应不含任何非公开字段。
  *   8. Redis 暂不可用时已验签请求回 503（一体机据此保持上次状态），不带验签头的请求不受影响。
  *
@@ -26,7 +28,8 @@ import { join, resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { Module, ValidationPipe } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
+import { APP_GUARD, NestFactory } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { JwtModule, JwtService } from '@nestjs/jwt'
 import { AuditService } from '../src/audit/audit.service'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
@@ -35,7 +38,8 @@ import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
 import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 import { RedisService } from '../src/common/redis/redis.service'
 import { setLicenseClock } from '../src/licenses/license-clock'
-import { resolveTerminalScopedTracker } from '../src/common/throttler/terminal-throttle'
+import { buildThrottlerConfig } from '../src/common/throttler/terminal-throttle'
+import { kioskProfileGetTracker, KioskProfileThrottleBinder } from '../src/branding/kiosk-profile-throttle'
 import { BrandLogoService } from '../src/branding/brand-logo.service'
 import { BrandingAdminController } from '../src/branding/branding.admin.controller'
 import { BrandingPublicController } from '../src/branding/branding.public.controller'
@@ -58,7 +62,7 @@ const c = new Checker()
 
 const SETTING_KEYS = Object.values(local.BRAND_SETTING_KEYS)
 /** 公开响应里绝不能出现的东西：机构名、机构号、终端号、点位名（验签通过的响应里点位名是预期内容，单独核）。 */
-const KIOSK_PROFILE_KEYS = ['brandName', 'brandMark', 'filing', 'licenseState', 'location', 'logoUrl']
+const KIOSK_PROFILE_KEYS = ['acceptsNewSessions', 'brandName', 'brandMark', 'currentSessionMayContinue', 'filing', 'licenseState', 'location', 'logoUrl', 'noticeLine']
 const PUBLIC_BRAND_KEYS = ['brandName', 'brandMark', 'logoUrl']
 
 function read(path: string): string {
@@ -108,10 +112,14 @@ function assertStatic(): void {
   const publicGuards = (Reflect.getMetadata(GUARDS_METADATA, BrandingPublicController) ?? []) as unknown[]
   c.check('公开控制器不挂登录守卫', !publicGuards.includes(JwtAuthGuard))
   const handler = BrandingPublicController.prototype.kioskProfile as unknown as object
-  c.check('kiosk-profile 按台限流 30 次/分钟',
+  c.check('kiosk-profile 限流 30 次/分钟：验签通过按终端、其余按 IP（不再用按请求头终端号分桶的 TerminalScopedThrottle）',
     Reflect.getMetadata('THROTTLER:TTLdefault', handler) === 60_000 &&
     Reflect.getMetadata('THROTTLER:LIMITdefault', handler) === 30 &&
-    Reflect.getMetadata('THROTTLER:TRACKERdefault', handler) === resolveTerminalScopedTracker)
+    Reflect.getMetadata('THROTTLER:TRACKERdefault', handler) === kioskProfileGetTracker)
+  const publicController = read(join(API_ROOT, 'src/branding/branding.public.controller.ts'))
+  c.check('公开控制器不再引用 TerminalScopedThrottle', !/TerminalScopedThrottle/.test(publicController))
+  c.check('BrandingModule 注册限流的验签绑定器', /KioskProfileThrottleBinder/.test(read(join(API_ROOT, 'src/branding/branding.module.ts'))))
+  c.equal('屏上暂停说明在 shared 与 API 副本一致', local.KIOSK_PAUSED_NOTICE_LINE, shared.KIOSK_PAUSED_NOTICE_LINE)
   const appModule = read(join(API_ROOT, 'src/app.module.ts'))
   c.check('AppModule 注册 BrandingModule', /import \{ BrandingModule \}/.test(appModule) && /^\s+BrandingModule,$/m.test(appModule))
   // Logo 与待机宣传屏素材分开：品牌模块不碰 AdAsset
@@ -216,6 +224,7 @@ async function main(): Promise<void> {
     const anonymous = await profileOf()
     c.equal('未验签的 kiosk-profile = 平台默认 + 默认备案 + 没有点位 + 没有授权状态', anonymous.json.data, {
       brandName: '职易达', brandMark: '职', logoUrl: null, filing: local.DEFAULT_BRANDING_FILING, location: null, licenseState: null,
+      acceptsNewSessions: true, currentSessionMayContinue: false, noticeLine: null,
     })
     c.check('kiosk-profile 不许被共享缓存', anonymous.headers.get('cache-control') === 'private, no-store')
     const adminDefault = await call('GET', '/api/v1/admin/branding', { token: adminToken() })
@@ -224,7 +233,8 @@ async function main(): Promise<void> {
       adminDefault.json.data.defaults.brandName === '职易达' && adminDefault.json.data.defaults.filing.icp === '鲁ICP备2026023517号-2')
     const verifiedDefault = await profileOf(termB, tokenB)
     c.check('机构没覆盖时已验签终端也拿到平台默认品牌，点位取 locationLabel/displayName，授权状态 ok',
-      verifiedDefault.json.data.brandName === '职易达' && verifiedDefault.json.data.location === LOC_B && verifiedDefault.json.data.licenseState === 'ok')
+      verifiedDefault.json.data.brandName === '职易达' && verifiedDefault.json.data.location === LOC_B && verifiedDefault.json.data.licenseState === 'ok' &&
+      verifiedDefault.json.data.acceptsNewSessions === true && verifiedDefault.json.data.currentSessionMayContinue === true && verifiedDefault.json.data.noticeLine === null)
 
     // ── 3. 平台修改生效、审计、清空 ──────────────────────────────────────────
     console.log('\n[3] 平台修改')
@@ -254,6 +264,7 @@ async function main(): Promise<void> {
     const afterClear = await profileOf()
     c.equal('清空后公开接口回到默认', afterClear.json.data, {
       brandName: '职易达', brandMark: '职', logoUrl: null, filing: local.DEFAULT_BRANDING_FILING, location: null, licenseState: null,
+      acceptsNewSessions: true, currentSessionMayContinue: false, noticeLine: null,
     })
     c.check('非管理员 PUT → 403', (await put({ brandName: '偷改' }, partnerToken())).status === 403)
     c.check('非管理员 GET → 403', (await call('GET', '/api/v1/admin/branding', { token: partnerToken() })).status === 403)
@@ -392,6 +403,29 @@ async function main(): Promise<void> {
       detailA.brandLogoAssetId === pngId && detailA.brandLogoUrl === `/api/v1/public/brand-logo/${pngId}`)
     const orgAudit = await prisma.auditLog.findFirstOrThrow({ where: { action: 'org.update', targetId: orgA }, orderBy: { createdAt: 'desc' } })
     c.check('机构品牌修改进审计（changedFields 含三项）', ['brandName', 'brandMark', 'brandLogoAssetId'].every((f) => (JSON.parse(orgAudit.payloadJson) as { changedFields: string[] }).changedFields.includes(f)))
+    const orgAuditPayload = JSON.parse(orgAudit.payloadJson) as { brand?: { before: Record<string, unknown>; after: Record<string, unknown> } }
+    c.equal('org.update 审计记品牌三项的改前（都还没配）', orgAuditPayload.brand?.before, { brandName: null, brandMark: null, brandLogoAssetId: null })
+    c.equal('org.update 审计记品牌三项的改后', orgAuditPayload.brand?.after, { brandName: '甲机构品牌', brandMark: '甲', brandLogoAssetId: pngId })
+    await patchOrg(orgA, { brandName: '甲机构品牌二' })
+    const secondAudit = JSON.parse((await prisma.auditLog.findFirstOrThrow({ where: { action: 'org.update', targetId: orgA }, orderBy: { createdAt: 'desc' } })).payloadJson) as { brand?: { before: Record<string, unknown>; after: Record<string, unknown> } }
+    c.equal('只改品牌名：改前是上次的值，没提交的两项前后相同', [secondAudit.brand?.before, secondAudit.brand?.after], [
+      { brandName: '甲机构品牌', brandMark: '甲', brandLogoAssetId: pngId },
+      { brandName: '甲机构品牌二', brandMark: '甲', brandLogoAssetId: pngId },
+    ])
+    await patchOrg(orgA, { brandName: '甲机构品牌' })
+    await patchOrg(orgA, { contact: `联系人${suffix}` })
+    const plainAudit = JSON.parse((await prisma.auditLog.findFirstOrThrow({ where: { action: 'org.update', targetId: orgA }, orderBy: { createdAt: 'desc' } })).payloadJson) as Record<string, unknown>
+    c.check('没碰品牌的机构资料修改：审计里没有 brand 一节', !('brand' in plainAudit) && Array.isArray(plainAudit['changedFields']))
+    const auditsBeforeRace = await prisma.auditLog.count({ where: { action: 'org.update', targetId: orgA } })
+    await Promise.all([patchOrg(orgA, { brandName: '并发一' }), patchOrg(orgA, { brandMark: '并' })])
+    const raceRows = (await prisma.auditLog.findMany({ where: { action: 'org.update', targetId: orgA }, orderBy: { createdAt: 'asc' } })).slice(auditsBeforeRace)
+      .map((row) => (JSON.parse(row.payloadJson) as { brand: { before: Record<string, unknown>; after: Record<string, unknown> } }).brand)
+    const nameWrite = raceRows.find((b) => b.after['brandName'] === '并发一' && b.before['brandName'] !== '并发一')
+    const markWrite = raceRows.find((b) => b.after['brandMark'] === '并' && b.before['brandMark'] !== '并')
+    c.check('并发两个机构资料修改：各一条审计', raceRows.length === 2 && !!nameWrite && !!markWrite)
+    c.check('  后做的那条的「改前」带上了先做的那条的结果（不是各自读到的旧值）', !!nameWrite && !!markWrite &&
+      (nameWrite.before['brandMark'] === '并') !== (markWrite.before['brandName'] === '并发一'))
+    await patchOrg(orgA, { brandName: '甲机构品牌', brandMark: '甲' })
     await patchOrg(orgC, { brandName: '丙机构品牌' })
     const profA = (await profileOf(termA, tokenA)).json.data
     c.check('甲机构终端：机构品牌 + 机构 Logo，点位取 locationLabel', profA.brandName === '甲机构品牌' && profA.brandMark === '甲' &&
@@ -445,6 +479,35 @@ async function main(): Promise<void> {
     }
     c.equal('ok / grace / inactive 随时间变化（到期当刻进宽限，宽限结束当刻锁机）', [await stateAt(40), await stateAt(50), await stateAt(54.9), await stateAt(55)], ['ok', 'grace', 'grace', 'inactive'])
     c.check('锁机时仍给品牌与点位（一体机要用它显示「暂时不能用」）', (await profileOf(termL, tokenL)).json.data.location === `授权点位${suffix}`)
+    const profileAt = async (days: number) => {
+      setLicenseClock(() => new Date(T0 + days * DAY))
+      return (await profileOf(termL, tokenL)).json.data as { licenseState: string | null; acceptsNewSessions: boolean; currentSessionMayContinue: boolean; noticeLine: string | null }
+    }
+    const pOk = await profileAt(40)
+    const pGrace = await profileAt(52)
+    const pOff = await profileAt(56)
+    c.equal('授权块 ok：能开新会话、当前会话可继续、没有说明', [pOk.acceptsNewSessions, pOk.currentSessionMayContinue, pOk.noticeLine], [true, true, null])
+    c.equal('授权块 grace（宽限期照常服务）：同 ok', [pGrace.licenseState, pGrace.acceptsNewSessions, pGrace.currentSessionMayContinue, pGrace.noticeLine], ['grace', true, true, null])
+    c.equal('授权块 inactive：不许开新会话，但当前会话可以继续（不打断在办的人），带屏上说明',
+      [pOff.licenseState, pOff.acceptsNewSessions, pOff.currentSessionMayContinue, pOff.noticeLine], ['inactive', false, true, local.KIOSK_PAUSED_NOTICE_LINE])
+    c.check('屏上说明不含授权 / 到期 / 合同 / 续费 / 欠费等商务字眼，也不含服务电话与下一步（屏上自己接标准句）', !!pOff.noticeLine && !/授权|到期|合同|续费|欠费|电话|拨打/.test(pOff.noticeLine), String(pOff.noticeLine))
+    // 跨场景：会话有效 + 授权到期。已签发会话照常；profile 不许新业务但允许当前继续；换新会话被拒；会话结束后问一次，就没有可继续的会话了。
+    setLicenseClock(() => new Date(T0 + 56 * DAY))
+    const codeOf = async (work: () => Promise<unknown>): Promise<string> => {
+      try {
+        await work()
+        return 'ok'
+      } catch (error) {
+        const response = (error as { getResponse?: () => { error?: { code?: string } } }).getResponse?.()
+        return `${(error as { getStatus?: () => number }).getStatus?.() ?? '?'}:${response?.error?.code ?? (error as Error).message}`
+      }
+    }
+    c.equal('跨场景 ①：授权到期后，已签发的会话在会话内接口照常（validate 不看授权）', await codeOf(() => sessions.validate(termL, tokenL)), 'ok')
+    c.equal('跨场景 ②：同一时刻 profile：不许新业务、允许当前继续', [(await profileOf(termL, tokenL)).json.data.acceptsNewSessions, (await profileOf(termL, tokenL)).json.data.currentSessionMayContinue], [false, true])
+    c.equal('跨场景 ③：换新会话（换票）被拒 403 TERMINAL_LICENSE_INACTIVE', await codeOf(async () => sessions.exchangeBootTicket((await sessions.createBootTicket(termL, 'Bearer fixture')).bootTicket)), '403:TERMINAL_LICENSE_INACTIVE')
+    c.equal('跨场景 ④：续期被拒 403 TERMINAL_LICENSE_INACTIVE', await codeOf(() => sessions.refresh(termL, tokenL)), '403:TERMINAL_LICENSE_INACTIVE')
+    const gone = (await profileOf(termL, 'expired-or-ended-' + 'x'.repeat(27))).json.data
+    c.equal('跨场景 ⑤：会话结束后再问（令牌已无效）：没有可继续的会话，也不知道授权状态', [gone.licenseState, gone.currentSessionMayContinue, gone.acceptsNewSessions, gone.noticeLine], [null, false, true, null])
     c.check('profile 里只有状态，没有到期日 / 台数 / 合同等商务细节', !/endsAt|expire|quota|startsAt|contract|credit|licensee/i.test(JSON.stringify((await profileOf(termL, tokenL)).json.data)))
     c.equal('未验签的请求拿不到授权状态', (await profileOf(termL, 'x'.repeat(40))).json.data.licenseState, null)
     setLicenseClock(null)
@@ -464,6 +527,7 @@ async function main(): Promise<void> {
       const body = JSON.stringify(r.json.data)
       c.check(`${label}：只拿平台默认，没有点位 / 授权状态，且不含任何机构或终端信息`,
         r.status === 200 && r.json.data.location === null && r.json.data.licenseState === null && r.json.data.brandName === '平台通用名' &&
+        r.json.data.acceptsNewSessions === true && r.json.data.currentSessionMayContinue === false && r.json.data.noticeLine === null &&
         hiddenWords.every((word) => !body.includes(word)), body)
     }
     for (const [label, r, keys] of [['kiosk-profile（未验签）', anonymous, KIOSK_PROFILE_KEYS], ['kiosk-profile（已验签）', await profileOf(termA, tokenA), KIOSK_PROFILE_KEYS], ['public/brand', await call('GET', '/api/v1/public/brand'), PUBLIC_BRAND_KEYS]] as const) {
@@ -483,6 +547,46 @@ async function main(): Promise<void> {
     redis.down = false
     resetRedisCooldownForTests()
     c.check('Redis 恢复后已验签请求恢复正常', (await profileOf(termA, tokenA)).status === 200)
+
+    // ── 9. 限流：验签通过才按终端号计数，伪造终端号拆不了桶（真实 429）──────────
+    console.log('\n[9] kiosk-profile 限流')
+    @Module({
+      imports: [ThrottlerModule.forRoot(buildThrottlerConfig())],
+      controllers: [BrandingPublicController],
+      providers: [
+        BrandingService, BrandLogoService, KioskProfileService, KioskProfileThrottleBinder, AuditService, PrismaService, StorageService, TerminalSessionService,
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
+        { provide: RedisService, useValue: redis },
+        { provide: TERMINAL_TOKEN_VALIDATOR, useValue: { async validateTerminalToken() { /* 夹具：不校验终端令牌 */ } } },
+      ],
+    })
+    class ThrottleFixtureModule {}
+    const throttled = await NestFactory.create(ThrottleFixtureModule, { logger: false, abortOnError: false })
+    installGlobals(throttled)
+    await throttled.listen(0, '127.0.0.1')
+    try {
+      const callT = makeCaller(throttled)
+      const profileT = (terminalId: string, token: string) =>
+        callT('GET', '/api/v1/public/kiosk-profile', { headers: { 'x-terminal-id': terminalId, 'x-terminal-session-token': token } })
+      const forgedStatuses: number[] = []
+      for (let i = 0; i < 40; i += 1) forgedStatuses.push((await profileT(`forged_${i}_${suffix}`, 'x'.repeat(43))).status)
+      c.equal('伪造终端号换着发 40 次：前 30 次放行', forgedStatuses.slice(0, 30).filter((status) => status === 200).length, 30)
+      c.equal('  第 31 次起全是 429（换一个终端号不换额度；旧的 TerminalScopedThrottle 会让每个伪造号各有 30 次）', forgedStatuses.slice(30).every((status) => status === 429), true)
+      const first = await profileT(termA, tokenA)
+      c.equal('同一出口 IP 的未验签额度已用完时，验签通过的终端仍有自己的额度', first.status, 200)
+      let verifiedOk = 1
+      let firstRejected = 0
+      for (let i = 2; i <= 35 && firstRejected === 0; i += 1) {
+        const r = await profileT(termA, tokenA)
+        if (r.status === 200) verifiedOk += 1
+        else firstRejected = i
+      }
+      c.equal('验签终端自己的桶也是 30 次 / 分钟（第 31 次 429）', [verifiedOk, firstRejected], [30, 31])
+      c.equal('另一台验签终端有独立的桶', (await profileT(termB, tokenB)).status, 200)
+      c.equal('429 之后伪造号仍被挡（IP 桶没被验签请求冲掉）', (await profileT(`forged_again_${suffix}`, 'y'.repeat(43))).status, 429)
+    } finally {
+      await throttled.close()
+    }
   } finally {
     redis.down = false
     resetRedisCooldownForTests()
