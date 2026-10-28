@@ -68,3 +68,17 @@ export function DocStackArt() {
     </svg>
   )
 }
+
+/** 一页纸，下角盖着虚线框的手写签名（签名各屏的示意小样）。 */
+export function SignArt() {
+  return (
+    <svg className="sx-art" viewBox="0 0 150 150" aria-hidden="true">
+      <rect x="30" y="8" width="90" height="126" rx="10" fill="var(--sx-art-sheet)" stroke="var(--qxt-art-edge)" strokeWidth="1.5" />
+      <rect x="44" y="26" width="62" height="7" rx="3" fill="var(--sx-art-line)" />
+      <rect x="44" y="42" width="48" height="7" rx="3" fill="var(--sx-art-line)" />
+      <rect x="44" y="58" width="56" height="7" rx="3" fill="var(--sx-art-line)" />
+      <rect x="62" y="96" width="52" height="28" rx="6" fill="none" stroke="var(--sx-art-teal)" strokeWidth="2.5" strokeDasharray="6 4" />
+      <path d="M68 116c4-12 8-12 10-4s6 8 10-2 6-6 10 2" fill="none" stroke="var(--sx-art-deep)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}

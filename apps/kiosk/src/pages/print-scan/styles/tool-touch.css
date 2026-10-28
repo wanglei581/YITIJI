@@ -89,10 +89,6 @@
   flex-direction: column;
 }
 
-.qxt-screen .ss-page {
-  min-height: 100%;
-}
-
 /* 1080 复印说明要在正文区一屏放下。意图带高度不动，只收这一页的横幅和步骤。 */
 .qxt-screen .ph-page[data-state='feature-copy'] {
   gap: 8px;

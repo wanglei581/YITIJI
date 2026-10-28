@@ -405,7 +405,8 @@ const A_BATCH_EYEBROWS = [
   /* 触屏版（稿 18）：眉题在意图带里，由页面传给 TouchToolScreen；空态标题仍是「图片转 PDF」（h1 锚点与路由巡检按这个名字找）。 */
   ['src/pages/print-scan/ConvertImagesPage.tsx', ['eyebrow="照片合成 PDF"']],
   ['src/pages/print-scan/convert-images-model.ts', ["title: '图片转 PDF'"]],
-  ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
+  /* 触屏版（稿 20）：眉题在意图带里，由页面传给 TouchToolScreen，每一屏都是「签名」。 */
+  ['src/pages/print-scan/SignStampPage.tsx', ['eyebrow="签名"']],
   ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
   ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
   ['src/pages/profile/me/MyDocumentsPage.tsx', ['eyebrow="我的文档和订单"']],
