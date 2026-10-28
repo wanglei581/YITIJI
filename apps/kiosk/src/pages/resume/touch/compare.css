@@ -1,9 +1,14 @@
 /* 逐条选择（稿 compare）。样式移植自稿 d4-top / d4-legend / d4-stats5 / d4-batch / d4-cols / d4-fact / d4-seg / d4-custom。 */
 
+/*
+ * 页面主体比内容高时，多出来的高度摊进各块之间的间距（space-between），不去撑大任何一块的盒子：
+ * 原文 / 改写两张卡随内容高，卡里不会留一大片空白。内容比主体高时不起作用，由页面主体滚动。
+ */
 [data-qx-page='compare'] {
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 10px;
   min-width: 0;
   text-align: left;
@@ -78,7 +83,7 @@
 }
 
 /* 原文 / 改写 */
-[data-qx-page='compare'] .qxt-cols { flex: 1 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+[data-qx-page='compare'] .qxt-cols { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 [data-qx-page='compare'] .qxt-col {
   display: flex;
@@ -93,7 +98,8 @@
 
 [data-qx-page='compare'] .qxt-col b { font-size: 24px; }
 [data-qx-page='compare'] .qxt-col p { margin: 0; font-size: 28px; line-height: 1.45; word-break: break-word; }
-[data-qx-page='compare'] .qxt-col small { font-size: 20px; color: var(--qxt-ink-3); }
+/* 出处小字钉在卡片底部：两张卡同高，较短的一张空隙落在正文与小字之间，小字下面不留空。 */
+[data-qx-page='compare'] .qxt-col small { margin-top: auto; font-size: 20px; color: var(--qxt-ink-3); }
 [data-qx-page='compare'] .qxt-metrics { margin: 0; font-size: 22px; color: var(--qxt-ink-3); text-align: right; }
 
 /* 新增事实：要逐项勾「是我的真实信息」 */

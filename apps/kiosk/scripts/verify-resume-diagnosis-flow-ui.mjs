@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import ts from 'typescript'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,6 +31,24 @@ function assertCountAtLeast(src, marker, min, label) {
   const count = src.split(marker).length - 1
   if (count < min) throw new Error(`${label}: expected at least ${min} ${marker}, got ${count}`)
   console.log(`PASS ${label}`)
+}
+
+// 2026-10-28 简历三条主路返工：
+// ① 触屏版简历页的样式不写裸色值（第一包约定：颜色一律走 --qxt-* 令牌）；
+// ② 屏上不写开发用语：导出页没有文件时，只说用户读得懂、知道下一步怎么做的话。
+{
+  const touchDir = fileURLToPath(new URL('../src/pages/resume/touch/', import.meta.url))
+  const cssFiles = readdirSync(touchDir).filter((file) => file.endsWith('.css'))
+  assert.ok(cssFiles.length >= 8, `touch 目录下应有触屏版样式文件（找到 ${cssFiles.length} 个），找不到就是路径变了，断言必须同步更新而不是放行`)
+  for (const name of cssFiles) {
+    const css = readFileSync(join(touchDir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    const raw = css.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g)
+    assert.equal(raw, null, `src/pages/resume/touch/${name} 不写裸色值，颜色走 --qxt-* 令牌（命中 ${raw}）`)
+  }
+  console.log(`PASS ${cssFiles.length} touch stylesheets carry no raw colour literal`)
+  const exportView = read('src/pages/resume/touch/OptimizeExportView.tsx')
+  assertNotIncludes(exportView, '接入真实导出服务', 'touch export view does not show developer wording')
+  assertIncludes(exportView, '这次没有生成可预览或打印的文件，请重新导出。', 'touch export view tells the user what to do when no file was produced')
 }
 
 // 2026-10-28 触屏版（稿 resume-src）：来源页的「在哪里」一步拆到 touch/ResumeSourceWhere.tsx（来源卡、更换文件、上传提示都在那里）。

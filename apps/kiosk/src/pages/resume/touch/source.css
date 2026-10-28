@@ -45,7 +45,7 @@
   color: var(--qxt-teal-ink);
 }
 
-[data-qx-page='resume-src'] .qxt-src[aria-pressed='true'] .qxt-ico { background: rgba(255, 255, 255, 0.12); color: var(--qxt-cream); }
+[data-qx-page='resume-src'] .qxt-src[aria-pressed='true'] .qxt-ico { background: var(--qxt-chip-ghost); color: var(--qxt-cream); }
 
 /* 面板 */
 [data-qx-page='resume-src'] .qxt-panel {

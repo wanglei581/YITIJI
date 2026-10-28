@@ -1,14 +1,23 @@
 # 当前开发进度
 
-## 2026-10-28：触屏版简历三条主路改程序（包 p4，分支 `claude/kiosk-touch-p4`，本地完成、未推送、待审）
+## 2026-10-28：触屏版简历三条主路改程序（包 p4，分支 `claude/kiosk-touch-p4`，已推送、按审查意见返工后待复审）
 
 按「青序流光 · 触屏版」第 5 版把一体机简历三条主路改成触屏页：简历服务台（`/resume-service`，只动 `hub="resume"` 一支）、来源 / U 盘 / 手机扫码 / 诊断方向两步（`/resume/source`）、读简历（`/resume/parse`）、诊断报告与失败各态（`/resume/report`）、改动清单 / 逐条选择 / 编辑 / 导出（`/resume/optimize`、`/resume/optimize/compare`）。内容以稿为准，运行页有而稿没画的状态与功能（登录与草稿、事实核对、价目、修改清单、打印交接、结果未知、关停各态）按代码事实补进同一版式；旧路由重定向（`/resume`、`/resume/upload`、`/resume/export`）不变。接在第一次提交（Grok 半成品）之上续做，没有重来。
 
-- **共用件只加可选属性，不传时行为不变**：`QxTouchBand`（`rail.marks`、`backLabel`、`statusClassName`）、`QxTouchDock`（`beforeAsk`、`ariaDisabled`、`testId`、`className`）、`QxTouchNav`（`testIds`）、`QxTouchSlab` / `QxTouchTile`（`chipAi`、`hub`）、`QxTouchIcon`（`clock`、`shield`）、`touch.css` 加 4 行步骤条记号；`ResumeLayoutControls` / `ResumeFactConfirmDialog` 加 `variant="touch"`；`ResumeUsbImportPanel` 加 `unattended` / `onListed` / `onPickChange`（面试设置页不传，仍是点文件行即导入）；`UploadSessionQrPanel` 加 `onCancelled` / `onReceivedChange` / `confirmRef`（冻结哈希在 `fusion-w2-print-scan` / `fusion-w3` / `fusion-w5` 三条门禁里按其「重新冻结」惯例更新并写明旧哈希）。
+- **共用件只加可选属性，不传时行为不变**：`QxTouchBand`（`rail.marks`、`backLabel`、`statusClassName`）、`QxTouchDock`（`beforeAsk`、`ariaDisabled`、`testId`、`className`）、`QxTouchNav`（`testIds`）、`QxTouchSlab` / `QxTouchTile`（`chipAi`、`hub`）、`QxTouchIcon`（`clock`、`shield`）、`touch.css` 加 4 行步骤条记号；`ResumeLayoutControls` / `ResumeFactConfirmDialog` 加 `variant="touch"`；`ResumeUsbImportPanel` 加 `unattended` / `onListed` / `onPickChange`（面试设置页不传，仍是点文件行即导入）；`UploadSessionQrPanel` 加 `onCancelled` / `onReceivedChange` / `onConfirmReady`（冻结哈希在 `fusion-w2-print-scan` / `fusion-w3` / `fusion-w5` 三条门禁里按其「重新冻结」惯例更新并写明旧哈希）。
 - **删除（CLAUDE.md §8 证据：无路由、无 import、无 verify 依赖、不在生产部署或硬件链路；依赖它们的门禁已先改指到新文件）**：`ResumeReportChrome` / `ResumeReportIssues` / `ResumeReportScores`、`ResumeReportCta`（`ResumeReportActions` 里仅留 `useReportDockPrimary`）、`ResumeDeliverPanel` / `OptimizeReadyBody` / `OptimizeWorkArea` / `ResumeModuleDecisions` / `ResumeOptimizeNavbar`（由 `touch/OptimizeEditView`、`OptimizeExportView` 与 `OptimizeOverview` 取代）、`touch/resume-touch.css`（半成品里那份 1176 行，已无任何引用）、`optimize-empty-state-qx.css`、`resume-optimize-overview-qx.css`、`resume-optimize-compare.css`、三份 `playwright.*.p4-local.config.ts`。
 - **门禁改锚点（判据不放宽，每处都做了反向检查：先提交、再破坏、确认变红、还原）**：`verify:ai-down-fallbacks`、`verify:resume-report-qx`、`verify:resume-diagnosis-flow-ui`、`verify:lightflow-k2b-ai-resume`、`verify:word-conversion-ui`、`verify:public-screen-mask`、`verify:resume-phone-upload-ui`、`verify:kiosk-ai-declaration`、`verify:fusion-w3` / `w2` / `w5` 的断言原来钉在旧版面的类名与文件上，现改钉到新稿对应的实现；来源页 / 解析页的判据对「页面 + 它的版面组件」整体成立；滚动提示随内部滚动区取消而取消（报告整页滚动、结构块折叠），改钉「结构块折叠、整页可滚、带走区在滚动正文里」；`w3a-ai-records` 恢复 USB 面板默认「点行即导入」的原判据并新增 `unattended` 先选后导的用例。
 - **复核时发现并修好的回归**：报告证据引文与结构块原文没经 `displayResumeExcerpt`（遮盖记号 `[劳动者_1]` 会原样上屏）；六维分数条缺 `role="progressbar"`；方向表单丢了「暂不指定」的 `data-mute`；步骤条失败 / 结果未知两态被半成品写反（现用 `rail.marks`，测试恢复原判据）；状态胶囊带 `qx-pill` 导致双圆点与超高；共用壳在 390 宽度上品牌逐字折行、胶囊被裁、光晕越界、内容区只剩 119px（只对简历各屏收紧，不动别的包）。
 - **验证（本机，未部署、未真机）**：kiosk `typecheck` 通过、`lint` 0 error；生产构建 `pnpm build:kiosk:production`（CI 同款 env）通过且 `verify:prod-build-config` 全 PASS；CI 清单里的 kiosk 静态门禁 101 条逐条跑过全部通过；浏览器用私有端口分批跑：W3 套件（`fusion-w3` + 自我探索 + W-16）83 项全过，`resume-optimize-draft` 10 项、`service-hub-qx` 7 项、`fusion-w6-routes` 114 项加手机 390 的 5 项、W2 里简历相关 6 项、`print-handoff` 的 H1 / H1b / H2 / H6、`kiosk-visible-actions-truth` 逐条对照用例均过；1080×1920 的 33 张页面截图经空白扫描与间隙扫描均不超 105px。未跑通 / 未覆盖：`qingxu-proto-geometry`（只量 docs 原稿，基线同样超过 240 秒）、W1 里 5 项（固定画面样板与手机视口用例，需官方配置自己的视口和环境，与简历页无关）、`account-assets-journey`（用例写死端口 4177）、`ai-resume-journey` 等需要真后端的交互用例（只改了步骤，未能运行）。
+- **返工（2026-10-28，按审查意见 7 条，在并入统一后的第一包共享层之后做）**：
+  - 读简历页右栏溢出：维度条与声明改为只长不缩，右栏所有块不被压扁，卡片固定在可视高度里、内容长了在卡片内滚动；游客说明、识别不清怎么办、开发键挪到左栏文件名下面；结果未知与终态的恢复动作（原样再试一次、按同一编号再查结果、重新上传简历、重新解析（新的一次）、暂不能开始新的一次）改放底栏主按钮，整颗在屏内、高 88，原 testid 与按钮名不变；两句声明在未知 / 终态里排到处理内容前面。
+  - 手机确认防重复：`UploadSessionQrPanel` 的 `confirmRef`（渲染期写 ref）换成 `onConfirmReady`（effect 里交确认函数，确认中与卸载交 null），`handleConfirm` 加不随渲染变的在途标记，来源页把确认函数放进 state，底栏确认中写「正在确认…」并禁用；三条冻结门禁按惯例重新冻结（旧哈希写在各自注释里）。
+  - 对照页两张文字卡随内容高：`.qxt-cols` 不再拉伸，出处小字钉底，多出的高度摊进各块间距。
+  - 导出页没有文件时的屏上文案改成用户语言「这次没有生成可预览或打印的文件，请重新导出。」。
+  - `touch/source.css` 的裸色值改用 `--qxt-chip-ghost` 令牌（`verify:resume-diagnosis-flow-ui` 新增「触屏版样式不写裸色值」断言）。
+  - 删除孤儿件 `components/ResumeSourceSummary.tsx`（旧来源页的办理摘要条，被新来源页取代）。CLAUDE.md §8 五条证据：无路由、全仓无 import、无 verify / 测试依赖、无现行文档声明、不在生产部署或硬件链路；项目图谱孤儿清单也曾把它列为「全仓零提及」。
+  - `verify-kiosk-ai-declaration` 的 `NOTE_FILES` 判据从「文件里出现 `AiDeclarationNote` 这个标识符」收紧成「有 `<AiDeclarationNote />` 的 JSX 用法」。
+  - 新增浏览器用例与断言见各提交；每条改过的门禁都做了反向检查（先提交、再故意改坏、确认变红、还原）。
 - **取舍与未做**：稿 `upload` 一屏并入 `resume-src` 的手机面板（运行页是同一块面板）；诊断方向一步不再画文件卡与预览（稿没有，预览留在「在哪里」一步）；总览第三颗批量沿用运行页「逐条确认或自己写」（「清空选择」在对照页）；总览与对照页不再有 `qx-opt-*` 的字数行与滚动提示；`source.css` 544 行、`ResumeParsePage` 722 行（比改前的 804 行少），不继续往里堆。
 ## 2026-10-27（晚）：管理员看得到全部机构的未结报障、月报与出纸未确认（含后端只读接口，产品负责人已同意，#1500 新一轮三项全绿后自动合并，未部署）
 

@@ -46,7 +46,7 @@ function ExportedCard(props: {
         </small>
         {props.priceCopy ? <span className="qxt-price">{props.priceCopy}</span> : null}
         {hasFile && props.isPdf ? <small>{PRINT_THIS_COPY}</small> : null}
-        {hasFile ? <small>有效期剩余 {countdown.label}{expired ? ' · 请重新导出' : ''}</small> : <small>没有对应的真实文件可预览或打印；接入真实导出服务后才会生成。</small>}
+        {hasFile ? <small>有效期剩余 {countdown.label}{expired ? ' · 请重新导出' : ''}</small> : <small>这次没有生成可预览或打印的文件，请重新导出。</small>}
       </div>
       {props.isPdf ? (
         <button

@@ -33,7 +33,7 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 89 | 768 | 673 |
+| kiosk | `apps/kiosk` | 89 | 767 | 673 |
 | admin | `apps/admin` | 38 | 278 | 252 |
 | partner | `apps/partner` | 15 | 93 | 92 |
 
@@ -50,7 +50,7 @@ node scripts/project-graph-query.mjs model PrintTask
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 79 |
 | 孤儿候选 · medium（仅文档提及） | 28 |
-| 孤儿候选 · low（全仓零提及） | 95 |
+| 孤儿候选 · low（全仓零提及） | 94 |
 
 ## 分册
 
