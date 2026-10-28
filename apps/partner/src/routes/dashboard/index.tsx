@@ -1,3 +1,4 @@
+import { PartnerAiServices } from './PartnerAiServices'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FIRST_ORDER_ISSUE_LABELS, formatCount, formatDate, type FirstOrderOverview } from '@ai-job-print/shared'
@@ -23,7 +24,6 @@ const MISS = '这类这次没读到'
 const MONTH_PREVIEW = '本月月报可以预览，北京时间下月 1 日起才能留存'
 const NO_PROJECT = '尚未登记服务项目，请联系平台核对'
 const PREVIEW_NOTE = '项目交付与服务需要连接真实后端。当前为预览模式，不提供演示数据或模拟操作。'
-const AI_LINE = '暂不能按本机构终端统计'
 const INCIDENTS = '/terminals?tab=delivery&section=incidents'
 const REPORTS = '/terminals?tab=delivery&section=reports'
 const PROJECT = '/terminals?tab=delivery&section=project'
@@ -267,7 +267,7 @@ function TerminalWeek({
         {lowPaper.map((item) => (
           <p key={item.id} className="text-sm text-neutral-700">{item.displayName?.trim() || item.terminalCode}：纸张或墨粉不足，仍可打印</p>
         ))}
-        <p className="text-sm text-neutral-700">{AI_LINE}</p>
+        <PartnerAiServices />
       </section>
     </Card>
   )

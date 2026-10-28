@@ -452,7 +452,13 @@ export interface ScreenPartnerTopContentValue {
   items: Array<{ type: ScreenContentType; title: string; browse: number }>
 }
 
+export interface ScreenPartnerAiServicesValue {
+  resumeOptimize: number | null
+  mockInterview: number | null
+}
+
 export interface ScreenUsageMetrics {
+  partnerAiServices?: ScreenMetric<ScreenPartnerAiServicesValue>
   channels?: ScreenMetric<ScreenUsageChannelsValue>
   visits?: ScreenMetric<number>
   services?: ScreenMetric<ScreenUsageServiceItem[]>
@@ -471,7 +477,7 @@ export interface ScreenUsageMetrics {
 }
 
 export const ADMIN_USAGE_METRIC_KEYS = ['channels', 'visits', 'services', 'outcomes', 'heat7d', 'pulse2h', 'printSteps', 'resumeSteps', 'ai', 'jobs', 'topSources30d', 'content'] as const
-export const PARTNER_USAGE_METRIC_KEYS = ['partnerContent', 'partnerDaily', 'partnerTop', 'visits'] as const
+export const PARTNER_USAGE_METRIC_KEYS = ['partnerContent', 'partnerDaily', 'partnerTop', 'visits', 'partnerAiServices'] as const
 
 export interface ScreenUsageSnapshot {
   generatedAt: string
