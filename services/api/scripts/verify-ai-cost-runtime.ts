@@ -228,9 +228,11 @@ export async function voiceUsageRuntimeChecks(pass: Check, fail: Check, aiLog: i
   }
   const before = await aiLog.getUsage('test')
   aiLog.record({ taskId: null, operation: 'voiceTranscribe', provider: 'asr:test', latencyMs: 1, status: 'success', voiceUsage: valid })
+  // 失败的识别即使带完整时长也不计入：供应方是否计费不明，宁可少算不多算
+  aiLog.record({ taskId: null, operation: 'voiceTranscribe', provider: 'asr:test', latencyMs: 1, status: 'failed', voiceUsage: valid })
   aiLog.record({ taskId: null, operation: 'voiceSynthesize', provider: 'tts:test', latencyMs: 1, status: 'failed', voiceUsage: { textChars: 8, succeededChars: 3, segments: 2, succeededSegments: 1, complete: false, rule: 'v1' } })
   await aiLog.flush()
   const after = await aiLog.getUsage('test')
-  if (after.voiceUsageTotals.asrSeconds - before.voiceUsageTotals.asrSeconds === 1 && after.voiceUsageTotals.ttsChars - before.voiceUsageTotals.ttsChars === 3 && after.unmeasuredCalls - before.unmeasuredCalls === 2 && after.tokenUsageTotals.totalTokens === before.tokenUsageTotals.totalTokens) pass('语音用量: 落库回读、部分成功聚合、token 与费用未受影响')
+  if (after.voiceUsageTotals.asrSeconds - before.voiceUsageTotals.asrSeconds === 1 && after.voiceUsageTotals.asrCallsWithUsage - before.voiceUsageTotals.asrCallsWithUsage === 1 && after.voiceUsageTotals.ttsChars - before.voiceUsageTotals.ttsChars === 3 && after.unmeasuredCalls - before.unmeasuredCalls === 3 && after.tokenUsageTotals.totalTokens === before.tokenUsageTotals.totalTokens) pass('语音用量: 落库回读、部分成功聚合、token 与费用未受影响')
   else fail('语音用量: 落库聚合或 token / 费用不符合预期')
 }
