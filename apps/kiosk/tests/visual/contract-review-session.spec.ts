@@ -95,6 +95,10 @@ test('结果页每一条风险项都能看到：条目数等于三类计数之�
   expect(expected, '计数之和必须大于 0，否则这条断言没有量到东西').toBeGreaterThan(0)
   const headers = page.locator('.cr-finding-card__header')
   await expect(headers, '条目数必须等于三类计数之和').toHaveCount(expected)
+  await expect(page.locator('.cr-finding-ai-label')).toHaveCount(expected)
+  await expect(page.locator('.cr-finding-card').first().locator('.cr-finding-ai-label')).toBeVisible()
+  await expect(page.locator('.cr-finding-card').first().locator('.cr-finding-excerpt')).toBeVisible()
+  await expect(page.locator('.cr-finding-card').first().locator('.cr-finding-question')).toBeVisible()
 
   // 溢出的那个容器（条目的祖先里第一个内容比盒子高的）必须能滚：计算样式 overflow-y 是 auto 或 scroll。
   const overflowY = await headers.last().evaluate((el) => {

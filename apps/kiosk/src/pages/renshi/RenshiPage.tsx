@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangleIcon, InfoIcon, PrinterIcon, ScaleIcon, ShieldCheckIcon } from 'lucide-react'
-import { getPublishedPolicies, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
+import { getPublishedPolicies, getPublishedPolicy, type PolicyPostView, type PublishedPoliciesResult } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
@@ -33,8 +33,12 @@ const TAB_TITLE: Record<TabKey, string> = {
 }
 
 const AI_LABEL = '问小青别的问题，不判断能不能办'
+// 无人值守时每 30 秒核对一次，兼顾紧急下架时效与服务端请求量。
+const POLICY_REFRESH_MS = 30_000
+// 按条核对的上限：读不回来就当这一轮没确认，不让一次挂住拖死后面每一轮。
+const POLICY_CHECK_TIMEOUT_MS = 8_000
 const AI_DRAFT: Record<TabKey, string> = {
-  policy: '我想看懂政策和办事材料该怎么准备、去哪里办。请只做说明，不要判断我能不能领。',
+  policy: '这一条政策来源在哪里？请说明如何核对发布机构和来源地址，不要解释政策原文，也不要判断能否办理。',
   eligibility: '条件核对的结果怎么看？请帮我理解「无法判定」是什么意思，不要替我下能不能办的结论。',
   social: '社保查询、参保证明和异地就医备案，我该去哪个入口、先准备什么？',
   register: '失业登记、就业登记和档案转移分别要带什么材料？请只告诉我去哪里问，不要代我办理。',
@@ -66,6 +70,8 @@ export function RenshiPage() {
   const [noticeTotal, setNoticeTotal] = useState(0)
   const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
   const withdrawnIds = useRef(new Set<string>())
+  const loadGeneration = useRef(0)
+  const [withdrawnDetail, setWithdrawnDetail] = useState<string | null>(null)
 
   const loadPolicies = useCallback((mode: 'block' | 'quiet' = 'block') => {
     const mergePolicyResults = (chunks: PublishedPoliciesResult[]): PublishedPoliciesResult => {
@@ -77,6 +83,7 @@ export function RenshiPage() {
       }
       return { items: [...byId.values()], total }
     }
+    const generation = ++loadGeneration.current
     if (mode !== 'quiet') setPolicyState('loading')
     const keep = (items: PolicyPostView[]) => items.filter((item) => !withdrawnIds.current.has(item.id))
     const guideReq = audience === 'all'
@@ -87,6 +94,7 @@ export function RenshiPage() {
         ]).then((chunks) => mergePolicyResults(chunks))
     Promise.all([guideReq, getPublishedPolicies({ kind: 'notice' })])
       .then(([guideRes, noticeRes]) => {
+        if (generation !== loadGeneration.current) return
         const nextGuides = keep(guideRes.items)
         const nextNotices = keep(noticeRes.items)
         setGuides(nextGuides)
@@ -96,7 +104,7 @@ export function RenshiPage() {
         setPolicyState('ready')
       })
       .catch(() => {
-        if (mode !== 'quiet') setPolicyState('error')
+        if (generation === loadGeneration.current && mode !== 'quiet') setPolicyState('error')
       })
   }, [audience])
 
@@ -122,7 +130,50 @@ export function RenshiPage() {
     withdrawnIds,
   })
   const [activeId, setActiveId] = useState<string | null>(null)
-  const uploadTarget = focus.phase === 'idle' ? activeId : null
+  // 本人点开（或地址点名）的那一条才算「正在看详情」；默认自动展开的第一条不算。由 PolicyPanel 报上来。
+  const [detailSelected, setDetailSelected] = useState(false)
+  // 定时刷新读最新的展开状态走 ref：展开、收起不该让 30 秒的计时重新开始。
+  const watched = useRef<{ id: string | null; userOpened: boolean }>({ id: null, userOpened: false })
+  useEffect(() => { watched.current = { id: activeId, userOpened: detailSelected } }, [activeId, detailSelected])
+  useEffect(() => {
+    if (policyState !== 'ready') return
+    let cancelled = false
+    let checking = false
+    const refresh = async () => {
+      if (checking) return
+      checking = true
+      try {
+        const { id } = watched.current
+        // 内置指引是本机内容，没有「下架」；只核对政策库、公告里展开着的那一条。
+        if (id && !id.startsWith('builtin-')) {
+          // 按条读取没有自己的超时：弱网下挂住会让 checking 一直为真、后面每一轮都被吞掉，所以自己加上限。
+          let timer: number | undefined
+          const timeout = new Promise<{ status: 'failed' }>((resolve) => {
+            timer = window.setTimeout(() => resolve({ status: 'failed' }), POLICY_CHECK_TIMEOUT_MS)
+          })
+          const result = await Promise.race([getPublishedPolicy(id), timeout]).finally(() => window.clearTimeout(timer))
+          if (!cancelled && result.status === 'missing') {
+            withdrawnIds.current.add(id)
+            setGuides((rows) => rows.filter((row) => row.id !== id))
+            setNotices((rows) => rows.filter((row) => row.id !== id))
+            // 等待期间本人可能已经换到别的条目：只有「现在展开的还是这一条」才关二维码；
+            // 且只有本人点开的这一条才整页换成「已下架」（自动展开的第一条只从列表摘掉），不留旧正文。
+            const now = watched.current
+            if (now.id === id) {
+              setQrEntry(null)
+              if (now.userOpened) setWithdrawnDetail(id)
+            }
+          }
+        }
+        if (!cancelled) loadPolicies('quiet')
+      } finally {
+        checking = false
+      }
+    }
+    const timer = window.setInterval(() => { void refresh() }, POLICY_REFRESH_MS)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [loadPolicies, policyState])
+  const uploadTarget = focus.phase === 'idle' && !withdrawnDetail ? activeId : null
 
   async function uploadOwn(id: string | null) {
     const result = await guard.confirm(id)
@@ -299,7 +350,14 @@ export function RenshiPage() {
               : notices.length === 0
                 ? '公告为空不影响打印你自己带来的材料。'
                 : '公告本身不提供下载；如需打印你自己带来的材料，可在这里上传。'
-  const askDraft = AI_DRAFT[activeTab]
+  // 问小青预填：政策分区里本人点开（或地址点名）的那一条，带上这一条的标题，并写明小青不解释原文、不判断能否办理；
+  // 其余按分区的通用问句。没有真实的政策解读能力，不替它承诺。
+  const activeItem = [...libraryItems, ...BUILTIN_GUIDES].find((item) => item.id === activeId)
+  const onDetail = activeTab === 'policy' && (detailSelected || Boolean(focusId))
+  const askDraft = onDetail && activeItem
+    ? `关于「${activeItem.title}」，如何核对发布机构和来源地址？小青还不能解释政策原文，也不判断能否办理。`
+    : AI_DRAFT[activeTab]
+  const askLabel = activeTab === 'policy' && !onDetail ? '问小青：这一条来源在哪？' : AI_LABEL
 
   // 稿 48 的死路屏：政策与公告同一次读取，读取中 / 读取失败时两个分区给同一屏；三条出口都不等这次读取。
   const offReadExits = (hint: string): DeadEndExit[] => [
@@ -334,8 +392,14 @@ export function RenshiPage() {
     </RqDeadEnd>
   )
 
-  const bandStatus = focusOnList && focusFrame ? focusFrame.status : frame.status
-  const bandSub = focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle
+  // 展开着的那一条被下架：整页换成「已下架」，顶栏也跟着说，不留旧正文；出路是回政策列表。
+  const backToPolicyList = () => { setWithdrawnDetail(null); leaveFocusedPolicy(); setActiveTab('policy') }
+  const bandStatus: Pill = withdrawnDetail
+    ? { tone: 'warn', label: '这条已下架' }
+    : focusOnList && focusFrame ? focusFrame.status : frame.status
+  const bandSub = withdrawnDetail
+    ? '这条政策已不在可查看范围内，下架后的正文和来源入口不再显示。'
+    : focusOnList && focusFrame ? focusFrame.subtitle : frame.subtitle
   const renshiPageAttr = { 'data-qx-page': 'renshi' } as const
   return (
     <div {...renshiPageAttr} className="rq-touch-fill">
@@ -364,7 +428,9 @@ export function RenshiPage() {
         />
       )}
       dock={(
-        <footer className="qxt-dock rq-touch-dock">
+        withdrawnDetail ? <footer className="qxt-dock rq-touch-dock">
+          <button type="button" className="qxt-btn qxt-btn-pri qxt-wide" onClick={backToPolicyList}>返回政策列表</button>
+        </footer> : <footer className="qxt-dock rq-touch-dock">
           <button type="button" className="qxt-btn qxt-btn-sec" onClick={goHub}>返回政策服务</button>
           <button
             type="button"
@@ -374,7 +440,7 @@ export function RenshiPage() {
               navigate('/assistant')
             }}
           >
-            <span>{AI_LABEL}</span>
+            <span>{askLabel}</span>
           </button>
           <div className="rq-cta-row" data-testid="renshi-ctabar">
             {activeTab === 'eligibility' ? (
@@ -406,7 +472,14 @@ export function RenshiPage() {
         </footer>
       )}
     >
-      <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
+      {withdrawnDetail ? (
+        <RqDeadEnd tone="warn" icon={AlertTriangleIcon} title="这条政策已下架" testId="renshi-policy-withdrawn"
+          exitsHint="可以返回政策列表"
+          exits={[{ key: 'others', icon: InfoIcon, title: '返回政策列表', desc: '查看当前可用的政策', onClick: backToPolicyList }]}
+          uploadDesc="打印你自己带来的文件" note="已下架的正文和来源入口不再显示。">
+          这条政策已不在可查看范围内。
+        </RqDeadEnd>
+      ) : <div className="w4-policy-page rq-page" data-renshi-tab={activeTab}>
         {qrEntry && <OfficialEntryQrOverlay target={qrEntry} onClose={() => setQrEntry(null)} />}
         <div className="rq-lead">
           <p className="rq-more">看政策、对条件、备材料。不代办，也不判断你能不能领。</p>
@@ -445,6 +518,7 @@ export function RenshiPage() {
                 }}
                 onOpened={handlePolicyItemOpened}
                 onActiveId={setActiveId}
+                onDetailSelected={setDetailSelected}
                 onUpload={(id) => { void uploadOwn(id) }}
                 onOfficialEntry={handlePolicyItemEntry}
                 aiLabel={AI_LABEL}
@@ -472,7 +546,7 @@ export function RenshiPage() {
           {activeTab === 'social' && <SocialPanel onOfficialEntry={setQrEntry} />}
           {activeTab === 'register' && <RegisterPanel />}
         </div>
-      </div>
+      </div>}
     </QxTouchScreen>
     </div>
   )

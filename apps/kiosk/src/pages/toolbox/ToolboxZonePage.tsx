@@ -93,8 +93,8 @@ export function ToolboxZonePage() {
           onBack={() => navigate('/')}
           backLabel="返回首页"
           ask={{
-            label: '问小青：外链和扫码有什么不同？',
-            draft: '外链和扫码有什么不同？请只说明怎么打开，不要替我办理。',
+            label: items.length ? '问小青：外链和扫码有什么不同？' : '问小青：这里为什么是空的？',
+            draft: items.length ? '外链和扫码有什么不同？请只说明怎么打开，不要替我办理。' : '这里为什么是空的？请说明可能的原因，不要假称已查询配置。',
           }}
         />
       )}

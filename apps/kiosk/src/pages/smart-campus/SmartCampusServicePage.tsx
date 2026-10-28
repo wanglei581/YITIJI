@@ -156,7 +156,7 @@ export function SmartCampusServicePage() {
           <QxTouchDock
             onBack={() => navigate('/smart-campus')}
             backLabel="返回智慧校园"
-            ask={{ label: '问小青：这一项要带什么？', draft: '没有这项服务时还能办什么？请只做说明。' }}
+            ask={{ label: '问小青：有哪些校园服务？', draft: '有哪些校园服务？请只做说明，具体以学校官方通知为准。' }}
           />
         )}
       >
@@ -226,7 +226,7 @@ export function SmartCampusServicePage() {
         <QxTouchDock
           onBack={() => navigate('/smart-campus')}
           backLabel="返回智慧校园"
-          ask={{ label: '问小青：这一项要带什么？', draft: '这一项要带什么？请只做说明，不要代替学校办理。' }}
+          ask={{ label: '问小青：这一项要带什么？', draft: `${info.title}要带什么？请只做说明，以学校官方通知为准，不要代替学校办理。` }}
           primary={{ label: '查看迎新报到指引', onClick: () => navigate('/smart-campus/welcome') }}
         />
       )}

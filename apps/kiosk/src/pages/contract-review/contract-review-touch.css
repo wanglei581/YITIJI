@@ -100,6 +100,11 @@
   border: 0;
   cursor: pointer;
 }
+[data-qx-page='contract-review'] .cr-finding-ai-label {
+  font-size: 20px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 [data-qx-page='contract-review'] .cr-finding-card__header--open {
   background: var(--qxt-teal-wash, var(--teal-soft));
 }

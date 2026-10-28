@@ -93,51 +93,53 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
         </span>
       </button>
 
-      {expanded && (
-        <div className="cr-finding-card__body">
-          {/* 原文摘录 */}
-          {finding.evidence.excerpt && (
-            <div className="cr-finding-excerpt">
-              {finding.evidence.pageNumber != null && (
-                <div className="cr-finding-excerpt__page">
-                  第 {finding.evidence.pageNumber} 页
+      <div className="cr-finding-card__body">
+        {/* 默认可见：原文摘录、核对追问、逐条 AI 标识（稿 contract-result）；说明与依据收进展开。 */}
+        {finding.evidence.excerpt && (
+          <div className="cr-finding-excerpt">
+            {finding.evidence.pageNumber != null && (
+              <div className="cr-finding-excerpt__page">
+                第 {finding.evidence.pageNumber} 页
+              </div>
+            )}
+            「{finding.evidence.excerpt}」
+          </div>
+        )}
+
+        {finding.verificationQuestion && finding.verificationQuestion !== '无' && (
+          <div className="cr-finding-question">{finding.verificationQuestion}</div>
+        )}
+
+        <p className="cr-finding-ai-label">{AI_LABEL_COPY.BASE}</p>
+
+        {expanded && (
+          <>
+            <p className="cr-finding-explanation">{finding.explanation}</p>
+
+            {/* 法律依据 / 不确定性 */}
+            <div className="cr-finding-meta">
+              {finding.basisRef && (
+                <div className="cr-finding-meta-row">
+                  <span className="cr-finding-meta-row__key">法律依据</span>
+                  <span className="cr-finding-meta-row__val">{finding.basisRef}</span>
                 </div>
               )}
-              「{finding.evidence.excerpt}」
-            </div>
-          )}
-
-          {/* 说明 */}
-          <p className="cr-finding-explanation">{finding.explanation}</p>
-
-          {/* 法律依据 / 不确定性 */}
-          <div className="cr-finding-meta">
-            {finding.basisRef && (
               <div className="cr-finding-meta-row">
-                <span className="cr-finding-meta-row__key">法律依据</span>
-                <span className="cr-finding-meta-row__val">{finding.basisRef}</span>
+                <span className="cr-finding-meta-row__key">条款类别</span>
+                <span className="cr-finding-meta-row__val">
+                  {CATEGORY_LABELS[finding.category] ?? finding.category}
+                </span>
               </div>
-            )}
-            <div className="cr-finding-meta-row">
-              <span className="cr-finding-meta-row__key">条款类别</span>
-              <span className="cr-finding-meta-row__val">
-                {CATEGORY_LABELS[finding.category] ?? finding.category}
-              </span>
+              {finding.uncertainty && finding.uncertainty !== '无' && (
+                <div className="cr-finding-meta-row">
+                  <span className="cr-finding-meta-row__key">局限性</span>
+                  <span className="cr-finding-meta-row__val">{finding.uncertainty}</span>
+                </div>
+              )}
             </div>
-            {finding.uncertainty && finding.uncertainty !== '无' && (
-              <div className="cr-finding-meta-row">
-                <span className="cr-finding-meta-row__key">局限性</span>
-                <span className="cr-finding-meta-row__val">{finding.uncertainty}</span>
-              </div>
-            )}
-          </div>
-
-          {/* 建议追问 */}
-          {finding.verificationQuestion && finding.verificationQuestion !== '无' && (
-            <div className="cr-finding-question">{finding.verificationQuestion}</div>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
