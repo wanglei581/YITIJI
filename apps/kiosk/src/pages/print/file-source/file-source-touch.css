@@ -466,3 +466,22 @@
   min-height: 72px;
   font-size: 24px;
 }
+
+/* ── 出错板件（稿 st-error）：文件卡 → 原因卡 → 两张大出口卡 → 求助行。
+   出口卡吃掉剩下的高度，不在底栏上方留空白，也不叠填充小样。 ── */
+:is([data-qx-page='print-src'], [data-qx-page='print-upload'], [data-qx-page='print-usb']) .fs-err {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+:is([data-qx-page='print-src'], [data-qx-page='print-upload'], [data-qx-page='print-usb']) .fs-err > .qxt-slab {
+  flex: 1 1 0;
+  min-height: 190px;
+}
+
+:is([data-qx-page='print-src'], [data-qx-page='print-upload'], [data-qx-page='print-usb']) .fs-err .fs-err-help {
+  min-height: 80px;
+}

@@ -9,6 +9,7 @@ import { assertNoElementCrossesViewport, assertNoHorizontalOverflow, assertTapTa
 import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 import { isAbortedPdfjsBlobImport } from './fixtures/pdf-preview-blob-abort'
 import { seedMaterialSession, seedPrintHandoff, setReactRouterState, writeMaterialSession, writePrintHandoff, W2_FILE, W2_ORDER, W2_PRINT_PARAMS, type PrintHandoffSeed } from './fixtures/fusion-w2-state'
+import { preparePrioritySeed } from './fixtures/qingxu-pair-seeds'
 
 const NOW = '2026-07-24T00:00:00.000Z'
 const LATER = '2099-07-24T00:10:00.000Z'
@@ -1030,6 +1031,48 @@ test('print empty desk: 我的文档 card follows login state and carries pick=p
   await expect.poll(() => api.requestCount('GET', '/api/v1/me/documents')).toBeGreaterThan(0)
   expect(errors).toEqual([])
 })
+
+// 选文件页的上传类出错屏，收成同一版式（稿 st-error）：文件卡（带「未收下」类的标；没有文件名的失败省掉）→ 原因卡 → 两张大出口卡 →
+// 求助行；意图带眉题「打印文件 · 上传」、警示色状态胶囊、无「青」印章、不画四步轴；底栏「问小青」是本屏专属问句，
+// 主键是真实的重试动作。文案保留各自的真实原因。
+for (const c of [
+  { state: 'phone-gen-failed', url: '/print/upload?tab=qr', pill: '没有收下', ask: '问小青：码出不来怎么办？', primary: '重新出一张码', file: false, help: true, reason: /还没有收到文件/ },
+  { state: 'phone-confirm-failed', url: '/print/upload?tab=qr', pill: '确认没成功', ask: '问小青：确认失败怎么办？', primary: '重试确认', file: true, help: false, reason: /当前文件仍然是空的/ },
+  { state: 'usb-import-failed', url: '/print/upload?tab=usb', pill: '没有导进来', ask: '问小青：导不进来怎么办？', primary: '重新读一次 U 盘', file: true, help: false, reason: /当前文件仍然是空的/ },
+  { state: 'usb-read-failed', url: '/print/upload?tab=usb', pill: '没有读到', ask: '问小青：读不了 U 盘怎么办？', primary: '重新读一次 U 盘', file: false, help: true, reason: /没能列出文件/ },
+  { state: 'local-rejected', url: '/print/upload?tab=file', pill: '没有收下', ask: '问小青：这种文件能打吗？', primary: '回窗口再挑一份', file: true, help: false, reason: /支持 PDF、JPG、PNG/ },
+] as const) {
+  test(`upload error screens share one board (st-error): ${c.state} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    await preparePrioritySeed(page, api, { nn: '12', state: c.state, screen: '', runtimeUrl: c.url } as never)
+
+    const board = page.getByTestId('file-source-error-board')
+    await expect(board).toBeVisible()
+    // 意图带：眉题带「上传」、警示色胶囊写这一屏的事实、无「青」印章、不画四步轴。
+    await expect(page.locator('.qxt-band .qxt-eyebrow')).toContainText('· 上传')
+    await expect(page.locator('.qxt-band .qxt-status')).toHaveText(c.pill)
+    await expect(page.locator('.qxt-band .qxt-status')).toHaveClass(/qxt-status-warn/)
+    await expect(page.locator('.qxt-seal')).toHaveCount(0)
+    await expect(page.locator('.qxt-rail')).toHaveCount(0)
+    // 正文：文件卡（有文件名才有）→ 原因卡 → 两张大出口卡 → 求助行。
+    await expect(board.locator('.qxt-file')).toHaveCount(c.file ? 1 : 0)
+    await expect(board.getByTestId('file-source-error-reason')).toContainText(c.reason)
+    await expect(board.locator('.qxt-slab')).toHaveCount(2)
+    await expect(board).toContainText('需要帮助？')
+    await expect(board.getByTestId('file-source-help')).toHaveCount(c.help ? 1 : 0)
+    // 底栏：问小青带本屏专属问句，主键是真实的重试动作，三个键的字都不被省略号截掉。
+    await expect(page.getByRole('button', { name: c.ask, exact: true })).toBeVisible()
+    await expect(page.getByTestId('file-source-primary')).toHaveText(c.primary)
+    const clipped = await page.locator('.qxt-dock').evaluate((dock) =>
+      [...dock.querySelectorAll('button, button *')].filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => (el.textContent ?? '').trim()))
+    expect(clipped, '底栏的字不得被省略号截断').toEqual([])
+    // 现场无人值守：不让用户去找人。
+    await expect(page.locator('[data-w2-page="print-upload"]')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+    await page.screenshot({ path: test.info().outputPath(`upload-error-${c.state}.png`) })
+    expect(errors).toEqual([])
+  })
+}
 
 test('print upload does not skip privacy check without a file @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)

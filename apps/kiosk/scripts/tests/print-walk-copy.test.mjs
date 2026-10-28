@@ -48,6 +48,7 @@ const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/pri
 })
 
 const progress = await import(progressUrl)
+const fileSourceErrorModel = await import(transpile(join(kioskRoot, 'src/pages/print/file-source/fileSourceErrorModel.ts')))
 const missResume = await import(missResumeUrl)
 const payment = await import(paymentUrl)
 const previewKind = await import(previewKindUrl)
@@ -726,4 +727,65 @@ test('打印链：我的文档入口一律走 usePickPrintDocuments（/me/docume
   }
   assert.match(readFileSync(join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'), 'utf8'), /onDocuments=\{pickDocuments\}/)
   assert.match(readFileSync(join(kioskRoot, 'src/pages/print/components/PrintMissResume.tsx'), 'utf8'), /usePickPrintDocuments\(\)/)
+})
+
+// ── 选文件页上传类出错屏（稿 st-error）：八种出错屏共用一块版式，文案只写页面真的知道的事 ──
+test('出错屏文案：八种各有本屏问句与重试、换办法两张出口，只在真有帮助入口的几屏多一行使用帮助', () => {
+  const { FILE_SOURCE_ERROR_SCREENS, fileSourceErrorCopy, isFileSourceErrorScreen } = fileSourceErrorModel
+  assert.deepEqual([...FILE_SOURCE_ERROR_SCREENS].sort(), [
+    'local-oversize', 'local-rejected', 'local-unreadable', 'local-upload-failed',
+    'phone-confirm-failed', 'phone-gen-failed', 'usb-import-failed', 'usb-read-failed',
+  ])
+  const staff = /联系现场|联系工作人员|找现场|找工作人员/
+  const asks = new Set()
+  for (const screen of FILE_SOURCE_ERROR_SCREENS) {
+    assert.equal(isFileSourceErrorScreen(screen), true)
+    const copy = fileSourceErrorCopy(screen)
+    const all = [copy.title, copy.subtitle, copy.pill, copy.chip, copy.reason, copy.retry.title, copy.retry.desc, copy.alt.title, copy.alt.desc, copy.ask.label, copy.ask.draft].join(' ')
+    for (const part of [copy.title, copy.subtitle, copy.pill, copy.reason, copy.retry.title, copy.retry.desc, copy.alt.title, copy.alt.desc, copy.ask.label, copy.ask.draft]) assert.ok(part.trim(), `${screen} 有空字段`)
+    assert.doesNotMatch(all, staff, `${screen} 不让用户去找人`)
+    assert.match(copy.ask.label, /^问小青：.{4,16}$/, `${screen} 的问小青带本屏专属问句，且放得进底栏`)
+    assert.match(copy.ask.draft, /不要假装/, `${screen} 的问句草稿让小青不替页面编结果`)
+    assert.equal(asks.has(copy.ask.label), false, `${screen} 的问句不与别的屏重复`)
+    asks.add(copy.ask.label)
+    // 没传上来的几屏不说已经收到；只有「确认没成功」一屏系统确实收到了手机传来的文件。
+    if (screen !== 'phone-confirm-failed') assert.doesNotMatch(`${copy.subtitle} ${copy.reason}`, /已收到|收到了/)
+  }
+  assert.deepEqual(FILE_SOURCE_ERROR_SCREENS.filter((screen) => fileSourceErrorCopy(screen).helpRow).sort(), ['local-upload-failed', 'phone-gen-failed', 'usb-read-failed'])
+  assert.equal(isFileSourceErrorScreen('phone-ready'), false)
+  assert.equal(isFileSourceErrorScreen('usb-safeid-expired'), false)
+})
+
+test('出错屏文案：当前文件仍是空的、各自的真实原因保留，draft 的 oversize 问句原样', () => {
+  const copyOf = (screen, options) => fileSourceErrorModel.fileSourceErrorCopy(screen, options)
+  assert.equal(copyOf('local-oversize').ask.label, '问小青：这份太大了怎么办？')
+  assert.match(copyOf('local-oversize').reason, /15MB/)
+  assert.match(copyOf('local-rejected').reason, /支持 PDF、JPG、PNG/)
+  assert.match(copyOf('local-unreadable').reason, /大小取不到/)
+  assert.match(copyOf('phone-confirm-failed').reason, /当前文件仍然是空的/)
+  assert.match(copyOf('usb-import-failed').reason, /当前文件仍然是空的/)
+  assert.match(copyOf('usb-read-failed').reason, /本机不显示上一次的列表/)
+  assert.equal(copyOf('phone-confirm-failed').pill, '确认没成功')
+  // 二维码没出来：U 盘通道放行就改用 U 盘，没放行就去我的文档，不指一个点了会被拒的入口。
+  assert.match(copyOf('phone-gen-failed', { usbSwitchAllowed: true }).alt.desc, /U 盘/)
+  assert.match(copyOf('phone-gen-failed', { usbSwitchAllowed: false }).alt.desc, /我的文档/)
+})
+
+test('出错屏版式：文件卡可省、原因卡、两张出口卡、求助行；视图把八种出错屏都交给同一块板件', () => {
+  const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
+  const board = read('src/pages/print/file-source/FileSourceError.tsx')
+  assert.match(board, /file \? \(\s*<div className="qxt-file qxt-rise"/)
+  assert.match(board, /<QxTouchSlab row index=\{2\}/)
+  assert.match(board, /<QxTouchSlab row index=\{3\}/)
+  assert.match(board, /<QxTouchCallout kind="remind" icon="call">\{remind\}<\/QxTouchCallout>/)
+  const view = read('src/pages/print/file-source/FileSourceView.tsx')
+  for (const screen of ['local-rejected', 'local-oversize', 'local-unreadable', 'local-upload-failed', 'phone-gen-failed', 'phone-confirm-failed', 'usb-import-failed', 'usb-read-failed']) {
+    assert.match(view, new RegExp(`case '${screen}':`), `${screen} 走出错板件`)
+  }
+  assert.match(view, /body = errorBoard/)
+  assert.doesNotMatch(view, /RejectBoard|boardActions|ghostInBoard/, '旧的出错板件与按钮条不再保留')
+  // 三个超大文件都不超 800 行（拆分只搬不改行为）。
+  for (const path of ['src/pages/print/file-source/FileSourceBits.tsx', 'src/pages/print/file-source/FileSourceView.tsx', 'src/pages/print/PrintDonePage.tsx', 'src/pages/print/PrintProgressPage.tsx']) {
+    assert.ok(read(path).split('\n').length <= 800, `${path} 不超过 800 行`)
+  }
 })

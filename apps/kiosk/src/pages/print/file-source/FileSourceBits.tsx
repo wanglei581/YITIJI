@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -7,8 +6,6 @@ import {
   FolderIcon,
   HelpCircleIcon,
   InfoIcon,
-  Loader2Icon,
-  ScanLineIcon,
   SmartphoneIcon,
   UsbIcon,
   XCircleIcon,
@@ -18,45 +15,8 @@ import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/to
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
 import { PrintArt } from '../art/PrintArt'
 import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
-import type { FileSourceScreen, PhoneSessionView, UploadTab } from './fileSourceModel'
+import type { FileSourceScreen, UploadTab } from './fileSourceModel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
-import { FILE_SOURCE_ASK, fileSourceEyebrow } from './fileSourceModel'
-
-const USB_HOLD_ASK: Record<UsbImportHold['state'], { lead: string; em: string; tail: string; doing: string }> = {
-  loading: { lead: '先确认', em: '能不能用 U 盘', tail: '。', doing: '还没确认前，不读盘，也不列出文件。' },
-  blocked: { lead: 'U 盘这条', em: '现在不能用', tail: '。', doing: '原因写在下面。可以改用手机上传。' },
-  unknown: { lead: '暂时', em: '确认不了', tail: '。', doing: '读不到开通情况时，不把 U 盘当成能用。' },
-}
-
-export function FileSourceHero({
-  screen,
-  isResume,
-  hold = null,
-}: {
-  screen: FileSourceScreen
-  isResume: boolean
-  hold?: UsbImportHold['state'] | null
-}) {
-  const ask = hold ? USB_HOLD_ASK[hold] : FILE_SOURCE_ASK[screen]
-  const doing =
-    !hold && isResume && screen === 'source-chooser'
-      ? '上传已有简历，检查后带走打印件。'
-      : ask.doing
-  return (
-    <section className="fs-hero" data-testid="file-source-hero">
-      <div className="fs-hero-row">
-        <div className="fs-hero-face" aria-hidden="true">青</div>
-        <div className="fs-hero-main">
-          <div className="fs-hero-eyebrow">{fileSourceEyebrow(screen)}</div>
-          <div className="fs-hero-ask">
-            {ask.lead}<em>{ask.em}</em>{ask.tail}
-          </div>
-          <div className="fs-hero-doing">{doing}</div>
-        </div>
-      </div>
-    </section>
-  )
-}
 
 export function FileSourceStatus({
   kind,
@@ -147,16 +107,7 @@ export function FileSourceSteps({ title, items }: { title?: string; items: strin
   )
 }
 
-export function FileSourceReason({ children }: { children: ReactNode }) {
-  return (
-    <div className="fs-reason" data-testid="file-source-disabled-reason">
-      <InfoIcon size={22} aria-hidden="true" />
-      <span>{children}</span>
-    </div>
-  )
-}
-
-function displayFileName(name: string): string {
+export function displayFileName(name: string): string {
   return truncateFileNameMiddle(name, { maxLength: FILE_NAME_BUDGET_CARD })
 }
 
@@ -345,85 +296,12 @@ export function ChannelGrid({
   )
 }
 
-export function ExistingSourceLinks({
-  showScan,
-  onScan,
-  onDocuments,
-}: {
-  showScan: boolean
-  onScan: () => void
-  onDocuments: () => void
-}) {
-  return (
-    <section className="fs-sec">
-      <div className="fs-sec-h">
-        <span className="no">02</span>
-        <span className="t">文件不在手机或 U 盘？</span>
-        <span className="hint">继续准备材料</span>
-      </div>
-      <div className="fs-split">
-        {showScan ? (
-          <button type="button" className="fs-mini" onClick={onScan} data-testid="file-source-scan-source" aria-label="扫描纸质原件">
-            <h4><ScanLineIcon size={22} aria-hidden="true" /><span>扫描纸质原件</span></h4>
-            <p>先开始扫描办理，再去<b>奔图操作面板</b>扫描。完成后取得 PDF；网页不能远程启动扫描仪。</p>
-          </button>
-        ) : null}
-        <button type="button" className="fs-mini" onClick={onDocuments} data-testid="file-source-member-source" aria-label="我的文档 / 最近打印">
-          <h4><FileTextIcon size={22} aria-hidden="true" /><span>我的文档 / 最近打印</span></h4>
-          <p>登录后查看已保存材料和最近打印文件。进入打印前会重新取得<b>有效访问链接</b>，过期或失败会明确提示。</p>
-        </button>
-      </div>
-    </section>
-  )
-}
-
 export function HelpMini({ onHelp, text }: { onHelp: () => void; text: string }) {
   return (
     <button type="button" className="fs-mini" onClick={onHelp} data-testid="file-source-help-link" aria-label="使用帮助">
       <h4><HelpCircleIcon size={22} aria-hidden="true" /><span>卡住了？看使用帮助</span></h4>
       <p>{text}</p>
     </button>
-  )
-}
-
-export function PhoneQrSlot({
-  qrUrl,
-  loading,
-  failed,
-  expiresLabel,
-  inactive = false,
-}: {
-  qrUrl: string | null
-  loading: boolean
-  failed: boolean
-  expiresLabel: string
-  inactive?: boolean
-}) {
-  if (inactive) {
-    return <div className="fs-qr-blank" data-testid="file-source-qr"><InfoIcon size={38} aria-hidden="true" /><strong>这张上传码已失效</strong><span>旧码不再接收文件，请重新出一张码。</span></div>
-  }
-  if (qrUrl) {
-    return (
-      <div className="fs-qr-live" data-testid="file-source-qr">
-        <QRCodeSVG value={qrUrl} size={360} level="M" marginSize={1} />
-        <span>
-          {expiresLabel && !expiresLabel.includes('NaN')
-            ? `二维码有效期 ${expiresLabel}。单份不超过 10MB。`
-            : '二维码有效期从生成时起算，10 分钟。单份不超过 10MB。'}
-        </span>
-      </div>
-    )
-  }
-  return (
-    <div className="fs-qr-blank" data-testid="file-source-qr">
-      {loading ? <Loader2Icon size={36} aria-hidden="true" /> : null}
-      <strong>{failed ? '码没出来' : '码还没出来'}</strong>
-      <span>
-        {failed
-          ? '请重新生成二维码，或换一种上传方式。'
-          : '正在准备上传二维码，请稍候。'}
-      </span>
-    </div>
   )
 }
 
@@ -572,262 +450,6 @@ export function SourceEntry({
         <small>手机上传不超过 10MB · U 盘不超过 15MB</small>
       </div>
       <p className="fs-cloud">第三方网盘尚未接入。公共终端不做网盘授权登录。</p>
-    </>
-  )
-}
-
-const PHONE_STEPS = [
-  { title: '扫码', detail: '相机或微信' },
-  { title: '在手机上选文件、点上传', detail: 'PDF、JPG、PNG' },
-  { title: '回到这台机器点确认', detail: '确认前不会进入下一步' },
-] as const
-
-export function PhoneBoard({
-  screen,
-  phone,
-  qrUrl,
-  expiresLabel,
-  channelKeys,
-  usbMode,
-  helpText,
-  actions,
-  onSelectChannel,
-}: {
-  screen: FileSourceScreen
-  phone: PhoneSessionView
-  qrUrl: string | null
-  expiresLabel: string
-  channelKeys: UploadTab[]
-  usbMode: 'ok' | 'unavailable' | 'offline'
-  helpText: string
-  actions?: ReactNode
-  onSelectChannel: (key: UploadTab) => void
-}) {
-  const received = ['phone-uploaded', 'phone-confirming', 'phone-confirm-failed', 'phone-cancel-requesting', 'phone-cancel-failed'].includes(screen)
-  const showQr = !received
-  const waiting = screen === 'phone-ready' || screen === 'phone-waiting' || screen === 'phone-generating' || screen === 'phone-uploading'
-  const liveText = received
-    ? (screen === 'phone-uploaded'
-      ? '系统已收到，等你确认'
-      : screen === 'phone-confirming'
-        ? '确认结果回来前，这份还没有进入本次办理。'
-        : screen === 'phone-confirm-failed'
-          ? '确认失败，当前文件仍然是空的。'
-          : screen === 'phone-cancel-requesting'
-            ? '取消结果回来前，这份仍然挂着，不说已经作废。'
-            : '取消没有确认成功，这份仍留着等你决定。')
-    : '等你在手机上传文件 · 传好后会显示在下面，再点确认'
-  return (
-    <>
-      {showQr ? (
-        <PhoneQrSlot
-          qrUrl={qrUrl}
-          loading={phone.loading}
-          failed={screen === 'phone-gen-failed'}
-          expiresLabel={expiresLabel}
-          inactive={screen === 'phone-expired' || screen === 'phone-cancelled'}
-        />
-      ) : null}
-      {waiting || received ? (
-        <div className="qxt-steps fs-phone-steps">
-          {PHONE_STEPS.map((step, index) => (
-            <div className="qxt-step" key={step.title} data-state={received ? (index < 2 ? 'done' : 'now') : undefined}>
-              <span className="qxt-step-n">{index + 1}</span>
-              <b>{step.title}</b>
-              <small>{step.detail}</small>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {waiting || received ? (
-        <div className="fs-live" role="status">
-          {received ? <QxTouchIcon name="check" size={36} strokeWidth={2.4} /> : <span className="fs-spin" aria-hidden="true" />}
-          <b>{liveText}</b>
-        </div>
-      ) : null}
-      {screen === 'phone-status-unknown' ? (
-        <QxTouchCallout kind="remind" icon="alert">暂时查不到结果，不代表二维码已经过期。可以再查一次，或重新出一张码。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-expired' || screen === 'phone-cancelled' ? (
-        <QxTouchCallout kind="howto">重新出码会建立新的上传，旧码不再收文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-gen-failed' ? (
-        <div className="qxt-reason-box">
-          <h4><QxTouchIcon name="alert" size={30} />没传上来</h4>
-          <p className="qxt-reason">还没有收到文件，可以重新生成二维码或换一种上传方式。</p>
-        </div>
-      ) : null}
-      {waiting || received ? (
-        <div className={`fs-drop${phone.pendingName ? ' fs-drop-got' : ''}`}>
-          {phone.pendingName ? (
-            <FileRow
-              name={phone.pendingName}
-              meta={`${phone.pendingSize ?? ''} · 手机扫码上传`}
-              tag=""
-              tagTone="doing"
-              mark="PDF"
-              testId="file-source-phone-file"
-            />
-          ) : (
-            <>
-              <QxTouchIcon name="file" size={40} strokeWidth={1.8} />
-              <span className="fs-placeholder">传好的文件会出现在这里</span>
-            </>
-          )}
-        </div>
-      ) : null}
-      {screen === 'phone-uploaded' ? (
-        <QxTouchCallout kind="fine">请核对文件名和大小。在这台机器上确认后，才能继续材料检查。确认前它还不是当前文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-cancel-failed' ? (
-        <QxTouchCallout kind="remind" icon="alert">取消未成功，旧二维码可能仍有效。可以重试取消，或确认使用这份文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-uploading' ? (
-        <QxTouchCallout kind="fine">请保持手机上传页面打开，传完后回来确认文件。本机看不到你扫没扫，只认系统收到文件。</QxTouchCallout>
-      ) : null}
-      {waiting && screen !== 'phone-uploading' ? (
-        <QxTouchCallout kind="fine">本机看不到你扫没扫，只认系统收到文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'phone-cancelled' || screen === 'phone-generating' || screen === 'phone-gen-failed' ? (
-        <ChannelGrid keys={channelKeys} active={screen === 'phone-cancelled' ? 'qr' : null} usbMode={usbMode} onSelect={onSelectChannel} />
-      ) : null}
-      {actions}
-      {helpText ? <QxTouchCallout kind="remind">{helpText}</QxTouchCallout> : null}
-    </>
-  )
-}
-
-export function UsbPickBoard({
-  screen,
-  files,
-  selected,
-  driveLabel,
-  formatBytes,
-  wordText,
-  onSelect,
-  onRescan,
-}: {
-  screen: FileSourceScreen
-  files: { safeId: string; filename: string; sizeBytes: number }[] | null
-  selected: { safeId: string; filename: string; sizeBytes: number } | null
-  driveLabel: string | null
-  formatBytes: (bytes: number) => string
-  /** 稿 usb 页脚第一句：Word 能不能转。 */
-  wordText: string
-  onSelect: (safeId: string) => void
-  onRescan: () => void
-}) {
-  const known = screen === 'usb-list' && files !== null
-  return (
-    <>
-      {screen === 'usb-list' ? (
-        <div className="fs-usb-head">
-          <b>{known ? `U 盘根目录里能用的文件（${files.length} 个）` : '还没读到 U 盘里的文件。'}</b>
-          <button type="button" className="fs-touch-btn" data-testid="file-source-refresh" onClick={onRescan}>重新检测</button>
-        </div>
-      ) : null}
-      {known
-        ? (
-          <div className="fs-usb-list">
-            {files.map((item) => {
-              const ext = item.filename.split('.').pop()?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()
-              return (
-                <FileRow
-                  key={item.safeId}
-                  name={item.filename}
-                  meta={formatBytes(item.sizeBytes)}
-                  tag=""
-                  tagTone="pickable"
-                  mark={ext || '文件'}
-                  on={selected?.safeId === item.safeId}
-                  onClick={() => onSelect(item.safeId)}
-                  testId={`file-source-usb-file-${item.safeId}`}
-                />
-              )
-            })}
-          </div>
-        )
-        : null}
-      {selected && screen !== 'usb-list' ? (
-        <FileRow
-          name={selected.filename}
-          meta={`${formatBytes(selected.sizeBytes)}${driveLabel ? ` · ${driveLabel}` : ''}`}
-          tag=""
-          tagTone={screen === 'usb-importing' ? 'doing' : 'ok'}
-          on={screen === 'usb-selected'}
-          bad={screen === 'usb-import-failed' || screen === 'usb-safeid-expired'}
-          dim={screen === 'usb-safeid-expired'}
-          testId="file-source-selected-file"
-        />
-      ) : null}
-      {screen === 'usb-importing' ? (
-        <QxTouchCallout kind="remind" icon="usb">正在导入选中的文件，请暂时不要拔出 U 盘。系统确认保存之前，当前文件仍然是空的。这期间别拔 U 盘。</QxTouchCallout>
-      ) : null}
-      {screen === 'usb-selected' ? (
-        <QxTouchCallout kind="remind" icon="usb">只导入这一份，U 盘上其它文件不会被读走。导入完成前它还不是当前文件。</QxTouchCallout>
-      ) : null}
-      {screen === 'usb-list' ? (
-        <>
-          <QxTouchCallout kind="remind" icon="usb">只读取你主动选择的文件。导入完成后可以直接拔出 U 盘。</QxTouchCallout>
-          <QxTouchCallout kind="fine">{wordText} 读不出来可以换一个 USB 口，或者改用手机传。</QxTouchCallout>
-        </>
-      ) : null}
-      {screen === 'usb-import-failed' || screen === 'usb-safeid-expired' ? (
-        <QxTouchCallout kind="remind" icon="alert">当前文件仍然是空的。重新读一次 U 盘后，在新列表里再选一份。</QxTouchCallout>
-      ) : null}
-    </>
-  )
-}
-
-export function RejectBoard({
-  reason,
-  name,
-  meta,
-  extra,
-  onRetry,
-  actions,
-  helpText,
-  fileTestId,
-}: {
-  reason: string
-  name: string | null
-  meta: string | null
-  extra?: string | null
-  onRetry: () => void
-  actions?: ReactNode
-  helpText?: string
-  fileTestId?: string
-}) {
-  return (
-    <>
-      {name ? (
-        <div className="qxt-file qxt-rise" data-testid={fileTestId}>
-          <span className="qxt-file-badge">未上传</span>
-          <div>
-            <b>{name}</b>
-            <small>{meta ?? '大小未取得'}</small>
-          </div>
-        </div>
-      ) : (
-        <QxTouchCallout kind="howto" icon="alert">当前文件仍然是空的。</QxTouchCallout>
-      )}
-      <div className="qxt-reason-box qxt-rise">
-        <h4><QxTouchIcon name="alert" size={30} />没传上来</h4>
-        <p className="qxt-reason">{reason}</p>
-      </div>
-      <QxTouchSlab
-        title="重新传"
-        desc="再送一次。系统确认收到之前，当前文件仍然是空的。"
-        row
-        compact
-        takeStyle="plain"
-        take="重新传"
-        visual={<QxTouchIcon name="file" size={48} />}
-        onClick={onRetry}
-      />
-      {actions}
-      {extra ? <QxTouchCallout kind="fine">{extra}</QxTouchCallout> : null}
-      {helpText ? <QxTouchCallout kind="remind">{helpText}</QxTouchCallout> : null}
     </>
   )
 }

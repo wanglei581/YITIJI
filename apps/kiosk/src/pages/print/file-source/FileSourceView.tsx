@@ -26,11 +26,12 @@ import {
   FileSourceTruth,
   HelpMini,
   NowFileCard,
-  PhoneBoard,
-  RejectBoard,
   SourceEntry,
-  UsbPickBoard,
 } from './FileSourceBits'
+import { FileSourceError } from './FileSourceError'
+import { fileSourceErrorCopy, isFileSourceErrorScreen } from './fileSourceErrorModel'
+import { PhoneBoard } from './FileSourcePhone'
+import { UsbPickBoard } from './FileSourceUsb'
 import '../styles/file-source-qx.css'
 import './file-source-touch.css'
 
@@ -311,13 +312,46 @@ export function FileSourceView(props: FileSourceViewProps) {
     }
     handlePrimary()
   }
-  const ghostInBoard = screen === 'local-rejected' || screen === 'local-oversize' || screen === 'local-unreadable' || screen === 'local-upload-failed' || screen === 'phone-gen-failed'
-  const boardActions = ghostInBoard ? (
-    <div className="fs-board-actions">
-      {secondary}
-      {screen === 'local-upload-failed' || screen === 'phone-gen-failed' ? ghost('使用帮助', onHelp, 'file-source-help') : null}
-    </div>
-  ) : null
+  // 八种出错屏（稿 st-error）共用一块出错板件：两张出口卡 = 重试这一步 + 换一种办法。
+  // 动作都沿用原来的底栏主键与次按钮，没有新增能力；USB 通道没放行时，「换一种方式」改成去我的文档。
+  const errorMode = isFileSourceErrorScreen(screen) && !usbHoldActive
+  const usbOk = usbMode === 'ok' && usbSwitchAllowed
+  const errorCopy = errorMode && isFileSourceErrorScreen(screen) ? fileSourceErrorCopy(screen, { usbSwitchAllowed: usbOk }) : null
+  const toQr = () => onSelectChannel('qr')
+  const errorActions: Record<string, { retry: () => void; alt: () => void; file: { name: string; meta: string | null; testId: string } | null; fine?: string | null }> = {
+    'local-rejected': { retry: onOpenPicker, alt: toQr, file: blockedName ? { name: blockedName, meta: blockedMeta, testId: 'file-source-blocked-file' } : null, fine: wordHint },
+    'local-oversize': { retry: onOpenPicker, alt: toQr, file: blockedName ? { name: blockedName, meta: blockedMeta, testId: 'file-source-blocked-file' } : null, fine: wordHint },
+    'local-unreadable': { retry: onOpenPicker, alt: toQr, file: blockedName ? { name: blockedName, meta: blockedMeta, testId: 'file-source-blocked-file' } : null, fine: wordHint },
+    'local-upload-failed': { retry: onRetryLocal, alt: toQr, file: blockedName ? { name: blockedName, meta: blockedMeta, testId: 'file-source-failed-file' } : null },
+    'phone-gen-failed': { retry: onPhoneRefresh, alt: usbOk ? () => onSelectChannel('usb') : onDocuments, file: null },
+    'phone-confirm-failed': {
+      retry: onPhoneConfirm,
+      alt: onPhoneRefresh,
+      file: phone.pendingName ? { name: phone.pendingName, meta: `${phone.pendingSize ?? ''} · 手机扫码上传`, testId: 'file-source-phone-file' } : null,
+    },
+    'usb-import-failed': {
+      retry: onUsbRescan,
+      alt: toQr,
+      file: usbSelected
+        ? { name: usbSelected.filename, meta: `${formatBytes(usbSelected.sizeBytes)}${usbDriveLabel ? ` · ${usbDriveLabel}` : ''}`, testId: 'file-source-selected-file' }
+        : null,
+    },
+    'usb-read-failed': { retry: onUsbRescan, alt: toQr, file: null },
+  }
+  const errorBoard = errorCopy ? (() => {
+    const actions = errorActions[screen]
+    return (
+      <FileSourceError
+        copy={errorCopy}
+        file={actions.file}
+        onRetry={actions.retry}
+        onAlt={actions.alt}
+        onHelp={onHelp}
+        remind={helpNeededLine(support)}
+        fine={actions.fine}
+      />
+    )
+  })() : null
 
   const switchRow = (
     <section className="fs-sec" data-testid="file-source-switch">
@@ -383,37 +417,12 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'local-rejected':
     case 'local-oversize':
     case 'local-unreadable':
-      body = (
-        <RejectBoard
-          fileTestId="file-source-blocked-file"
-          name={blockedName}
-          meta={blockedMeta}
-          extra={wordHint}
-          actions={boardActions}
-          helpText={helpNeededLine(support)}
-          onRetry={onOpenPicker}
-          reason={
-            screen === 'local-rejected'
-              ? '支持 PDF、JPG、PNG；Word 需本机开通转换。这一份未能上传。'
-              : screen === 'local-oversize'
-                ? '本机与 U 盘通道单份上限 15MB，这一份没有被上传。'
-                : '文件为空或者大小取不到，不会硬着头皮上传一份连大小都读不出的东西。'
-          }
-        />
-      )
-      break
     case 'local-upload-failed':
-      body = (
-        <RejectBoard
-          fileTestId="file-source-failed-file"
-          name={blockedName}
-          meta={blockedMeta}
-          actions={boardActions}
-          helpText={helpNeededLine(support)}
-          onRetry={onRetryLocal}
-          reason="还没有收到这一份文件。可以重试刚才选择的文件。重试仍失败时，换一种方式。"
-        />
-      )
+    case 'phone-gen-failed':
+    case 'phone-confirm-failed':
+    case 'usb-import-failed':
+    case 'usb-read-failed':
+      body = errorBoard
       break
     case 'local-uploading':
       body = (
@@ -476,7 +485,6 @@ export function FileSourceView(props: FileSourceViewProps) {
       ) : null
       break
     case 'phone-generating':
-    case 'phone-gen-failed':
     case 'phone-ready':
     case 'phone-waiting':
     case 'phone-uploading':
@@ -484,7 +492,6 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'phone-expired':
     case 'phone-uploaded':
     case 'phone-confirming':
-    case 'phone-confirm-failed':
     case 'phone-cancel-requesting':
     case 'phone-cancel-failed':
     case 'phone-cancelled':
@@ -496,8 +503,7 @@ export function FileSourceView(props: FileSourceViewProps) {
           expiresLabel={expiresLabel}
           channelKeys={channelKeys}
           usbMode={usbMode}
-          helpText={['phone-status-unknown', 'phone-expired', 'phone-confirm-failed', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
-          actions={screen === 'phone-gen-failed' ? boardActions : undefined}
+          helpText={['phone-status-unknown', 'phone-expired', 'phone-cancel-failed'].includes(screen) ? helpNeededLine(support) : ''}
           onSelectChannel={onSelectChannel}
         />
       )
@@ -507,18 +513,16 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'usb-wait':
     case 'usb-detecting':
     case 'usb-empty':
-    case 'usb-read-failed':
       body = (
         <>
           <FileSourceStatus
-            kind={screen === 'usb-unavailable' ? 'lock' : screen === 'usb-agent-offline' || screen === 'usb-read-failed' ? 'error' : screen === 'usb-empty' ? 'warn' : 'plain'}
+            kind={screen === 'usb-unavailable' ? 'lock' : screen === 'usb-agent-offline' ? 'error' : screen === 'usb-empty' ? 'warn' : 'plain'}
             title={
               screen === 'usb-unavailable' ? '这台机器没接通 U 盘导入'
                 : screen === 'usb-agent-offline' ? '暂时无法读取 U 盘'
                   : screen === 'usb-wait' ? '把 U 盘插进右侧 USB 口'
                     : screen === 'usb-detecting' ? '正在读 U 盘'
-                      : screen === 'usb-empty' ? '这个 U 盘里没有能用的文件'
-                        : '读 U 盘失败'
+                      : '这个 U 盘里没有能用的文件'
             }
             pulsing={screen === 'usb-detecting'}
           >
@@ -531,15 +535,13 @@ export function FileSourceView(props: FileSourceViewProps) {
                     ? '还没有检测到 U 盘。插上之后本地服务会列出根目录里能打印的文件。本机不会自动读整盘，也不进子文件夹。'
                     : screen === 'usb-detecting'
                       ? '本地服务在列根目录。不画进度条——读盘这件事没有可确认的百分比。读完之前不显示任何文件名。'
-                      : screen === 'usb-empty'
-                        ? '根目录里没有找到 PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。'
-                        : '本地服务连上了，但这次没能列出文件。本机不显示上一次的列表。'}
+                      : '根目录里没有找到 PDF / JPG / PNG。常见原因：简历是 DOCX、文件放在子文件夹里、或者单份超过 15MB。'}
             </div>
           </FileSourceStatus>
-          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
+          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' ? (
             <div className="qx-card"><FileSourceSteps title={screen === 'usb-empty' ? '对号入座' : '重试是安全的'} items={screen === 'usb-empty' ? ['Word 另存为 PDF，再放到 U 盘最外层。', '不进入子文件夹，请把文件移到最外层。', '单份超过 15MB 时，降低分辨率再导出。'] : ['重新插入 U 盘，或换一个 USB 口。', '重新读取最外层文件，不改动盘上内容。', '仍没有结果时，换手机上传，或看使用帮助。']} /></div>
           ) : null}
-          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' || screen === 'usb-read-failed' ? (
+          {screen === 'usb-unavailable' || screen === 'usb-agent-offline' || screen === 'usb-empty' ? (
             <section className="fs-sec">
               <ChannelGrid keys={channelKeys} active={null} usbMode={usbMode} onSelect={onSelectChannel} />
             </section>
@@ -564,7 +566,6 @@ export function FileSourceView(props: FileSourceViewProps) {
     case 'usb-selected':
     case 'usb-safeid-expired':
     case 'usb-importing':
-    case 'usb-import-failed':
       body = (
         <UsbPickBoard
           screen={screen}
@@ -585,23 +586,26 @@ export function FileSourceView(props: FileSourceViewProps) {
   // 稿：来源选择页没有主按钮（没有文件就没有下一步）；U 盘列表选中之前也没有，选中后才出「导入这份文件」。
   const noPrimary = !usbHoldActive && (screen === 'source-chooser' || screen === 'missing-file' || screen === 'usb-list')
   const eyebrow = pageTitle === '简历打印' || pageTitle === '照片打印' ? pageTitle : '文档打印'
+  // 出错屏（稿 st-error）：眉题「打印文件 · 上传」，警示色状态胶囊，无「青」印章、不画四步轴。
   return (
     <PrintTouchFrame
       page={touchPage(screen)}
       legacyBody={false}
       kind="std"
-      eyebrow={eyebrow}
-      title={touchTitle(screen)}
-      subtitle={touchSubtitle(screen, pageSubtitle, orderPausedNotice)}
-      seal={screen.startsWith('phone') || screen.startsWith('usb') ? null : 'idle'}
-      railNow={screen.startsWith('phone') ? undefined : 0}
+      eyebrow={errorCopy ? `${pageTitle === '简历打印' || pageTitle === '照片打印' ? pageTitle : '打印文件'} · 上传` : eyebrow}
+      title={errorCopy ? errorCopy.title : touchTitle(screen)}
+      subtitle={errorCopy ? errorCopy.subtitle : touchSubtitle(screen, pageSubtitle, orderPausedNotice)}
+      seal={errorCopy || screen.startsWith('phone') || screen.startsWith('usb') ? null : 'idle'}
+      railNow={errorCopy || screen.startsWith('phone') ? undefined : 0}
       terminalLabel={terminalLabel}
-      status={screen === 'phone-uploaded' ? { tone: 'ok', label: '系统已收到，等你确认' } : status}
+      status={errorCopy ? { tone: 'warn', label: errorCopy.pill } : screen === 'phone-uploaded' ? { tone: 'ok', label: '系统已收到，等你确认' } : status}
       back={{ label: '上一步', onBack }}
       navbar={previewOpen ? undefined : <QxAppNavbar onHome={props.onHome} onAdvisor={props.onAdvisor} onProfile={props.onProfile} />}
       // 稿：选文件与手机传文件亮「首页」，U 盘选文件不亮任何一项。
       navCurrent={screen.startsWith('usb') ? 'none' : 'home'}
-      ask={previewOpen ? undefined : printAsk(screen.startsWith('phone') || screen.startsWith('usb') ? ASK_LABEL_SHORT : ASK_LABEL, ASK_DRAFT)}
+      ask={previewOpen ? undefined : errorCopy
+        ? printAsk(errorCopy.ask.label, errorCopy.ask.draft)
+        : printAsk(screen.startsWith('phone') || screen.startsWith('usb') ? ASK_LABEL_SHORT : ASK_LABEL, ASK_DRAFT)}
       primary={previewOpen || noPrimary ? undefined : {
         label: primaryText,
         onClick: onPrimary,
@@ -638,9 +642,10 @@ export function FileSourceView(props: FileSourceViewProps) {
         ) : null}
         {usbHoldActive ? <UsbImportHoldNotice hold={usbHoldActive} /> : body}
         <FileSourceTruth />
-        {screen === 'source-chooser' ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
+        {/* 出错板件里两张出口卡自己吃掉剩下的高度（稿 st-error），不再叠一幅填充小样。 */}
+        {screen === 'source-chooser' || errorCopy ? null : <PrintFillArt name={screen.startsWith('phone') ? 'phone' : screen.startsWith('usb') ? 'usb' : 'scan-paper'} />}
         <div className="print-upload-footer" data-testid="file-source-ctabar">
-          {previewOpen || ghostInBoard ? null : secondary}
+          {previewOpen || errorCopy ? null : secondary}
         </div>
         {previewOpen && currentFile ? (
           <PrintFilePreviewModal file={currentFile} token={previewToken} onClose={onClosePreview} />
