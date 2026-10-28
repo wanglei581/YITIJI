@@ -14,7 +14,8 @@ import 'reflect-metadata'
  * 钉住四件事：
  * ① 明文永不落库：Redis 里存的是 sha256，不是 scene 本身；
  * ② 会话有效期内可重复兑换（2026-10-29 起，原因见 upload-scene.ts ②）：同一张码每次拿到
- *    同一把派生令牌，两次兑换之间谁先上传都只成功一次；
+ *    同一把派生令牌，两次兑换之间谁先上传都只成功一次；已兑换过的码走只读快路径、不等锁，
+ *    第一次兑换拿锁有界重试（并发兑换两边都成功），与上传交错时不给已收到文件的会话发令牌；
  * ③ 首次兑换换掉 create 下发的令牌：那把随之作废，之后再兑换不再写会话；
  * ④ 失败路径不当预言机：格式错/查无此码/改错一个字/已收到文件/已过期/已作废，对外是同一个错误码。
  */
@@ -161,18 +162,26 @@ async function main(): Promise<void> {
     )
     await client.del('upload_session:atomic', 'upload_session_upload_lock:atomic', 'upload_session_cleanup:atomic')
   }
-  // 上传只需要一个落地桩：门禁验的是会话与令牌，不是文件服务。
+  // 上传只需要一个落地桩：门禁验的是会话与令牌，不是文件服务。uploadGate 让一次上传停在
+  // 「已拿锁、会话 uploading」的位置，用来造兑换与上传交错。
   let stubFiles = 0
+  let uploadGate: Promise<void> | null = null
+  let uploadEntered: (() => void) | null = null
   const filesStub = {
-    upload: async (args: { buffer: Buffer; filename: string; mimeType: string }) => ({
-      fileId: `scene_stub_${++stubFiles}`,
-      filename: args.filename,
-      sizeBytes: args.buffer.length,
-      mimeType: args.mimeType,
-      sha256: 'a'.repeat(64),
-      fileExpiresAt: null,
-    }),
+    upload: async (args: { buffer: Buffer; filename: string; mimeType: string }) => {
+      uploadEntered?.()
+      if (uploadGate) await uploadGate
+      return {
+        fileId: `scene_stub_${++stubFiles}`,
+        filename: args.filename,
+        sizeBytes: args.buffer.length,
+        mimeType: args.mimeType,
+        sha256: 'a'.repeat(64),
+        fileExpiresAt: null,
+      }
+    },
   }
+  const lockOf = (sessionId: string) => `upload_session_upload_lock:${sessionId}`
   const service = new UploadSessionsService(redis as never, null as never, filesStub as never)
   const fakeFile = { buffer: Buffer.from('x'), originalname: 'a.pdf', mimetype: 'application/pdf', size: 1 }
   const newSession = () => service.create({ purpose: 'print_doc', mode: 'temporary', channel: 'phone_h5', uploadUrl: '/m/upload' })
@@ -280,6 +289,78 @@ async function main(): Promise<void> {
       `实际 ${oldTokenCode} —— 首次兑换必须把会话令牌换成派生令牌`,
     )
   }
+  // 已兑换过的码不必写会话：锁被别人占着也立刻拿到令牌，不排队。
+  {
+    await client.setex(lockOf(created.sessionId), 30, 'held-by-another-upload')
+    const startedAt = Date.now()
+    const fast = await service.resolveScene(created.sceneToken).catch(() => null)
+    const elapsed = Date.now() - startedAt
+    await client.del(lockOf(created.sessionId))
+    check(
+      '已兑换过的码：锁被占着也立刻兑换成功（只读快路径，不等锁）',
+      fast?.uploadToken === redeemed.uploadToken && elapsed < 1000,
+      `耗时 ${elapsed}ms`,
+    )
+  }
+  // 同一张新码并发兑换两次（真实 Redis 下即两条连接抢锁）：两边都成功，令牌相同。
+  {
+    const session = await newSession()
+    const [a, b] = await Promise.all([
+      service.resolveScene(session.sceneToken).catch(() => null),
+      service.resolveScene(session.sceneToken).catch(() => null),
+    ])
+    check(
+      '同一张新码并发兑换两次：两边都成功且令牌相同',
+      a !== null && b !== null && a.uploadToken === b.uploadToken,
+      `${a ? '成功' : '失败'} / ${b ? '成功' : '失败'}`,
+    )
+  }
+  // 第一次兑换遇到锁被占：有界重试，锁一放开就成功；锁一直占着则约 2 秒后才判失效。
+  {
+    const released = await newSession()
+    await client.setex(lockOf(released.sessionId), 30, 'held-by-another-upload')
+    const timer = setTimeout(() => { void client.del(lockOf(released.sessionId)) }, 300)
+    const retried = await service.resolveScene(released.sceneToken).catch(() => null)
+    clearTimeout(timer)
+    check('第一次兑换遇到锁被占：有界重试，锁放开后兑换成功', retried?.sessionId === released.sessionId)
+
+    const stuck = await newSession()
+    await client.setex(lockOf(stuck.sessionId), 30, 'held-by-another-upload')
+    const startedAt = Date.now()
+    const stuckCode = await errorCodeOf(() => service.resolveScene(stuck.sceneToken))
+    const elapsed = Date.now() - startedAt
+    await client.del(lockOf(stuck.sessionId))
+    check(
+      '锁一直被占、从未兑换过：重试约 2 秒后才判 UNUSABLE，且有上界',
+      // 下界证明真的重试过（约 2 秒的有界重试不可能更快结束）；上界只证明「有界、不会挂住」，
+      // 放宽到 15 秒，免得 CI 机器慢时偶发红（2026-10-29）。
+      stuckCode === 'UPLOAD_SCENE_UNUSABLE' && elapsed >= 1500 && elapsed < 15000,
+      `实际 ${stuckCode}，耗时 ${elapsed}ms`,
+    )
+  }
+  // 兑换与上传交错：上传拿着锁、会话 uploading 时来了一次兑换 —— 它等锁，等到的是已收到文件的会话。
+  {
+    const session = await newSession()
+    const first = await service.resolveScene(session.sceneToken)
+    let release!: () => void
+    uploadGate = new Promise<void>((resolve) => { release = resolve })
+    const entered = new Promise<void>((resolve) => { uploadEntered = resolve })
+    const uploading = upload(session.sessionId, first.uploadToken)
+    await entered
+    const racing = errorCodeOf(() => service.resolveScene(session.sceneToken))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    release()
+    const [uploadCode, raceCode] = await Promise.all([uploading, racing])
+    uploadGate = null
+    uploadEntered = null
+    const afterCode = await errorCodeOf(() => service.resolveScene(session.sceneToken))
+    check(
+      '兑换与上传交错：上传成功；交错中的兑换与之后的兑换都是 UNUSABLE',
+      uploadCode === '<no-error>' && raceCode === 'UPLOAD_SCENE_UNUSABLE' && afterCode === 'UPLOAD_SCENE_UNUSABLE',
+      `实际 ${uploadCode} / ${raceCode} / ${afterCode}`,
+    )
+  }
+
   // 两次兑换之间，不论谁先拿令牌上传，都恰好成功一次；后来的人看到「已使用」。
   let uploadedScene = ''
   for (const order of ['后兑换的人先传', '先兑换的人先传'] as const) {

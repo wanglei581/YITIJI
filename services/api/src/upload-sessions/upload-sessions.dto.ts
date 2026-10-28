@@ -10,6 +10,13 @@ export type UploadSessionStatus =
   | 'expired'
   | 'cancelled'
 export type UploadSessionChannel = 'phone_h5'
+/**
+ * 这份文件从哪来，只给一体机确认屏提示用（本人认出不是自己传的就点取消）：
+ * miniapp_documents = 小程序「我的文档」递进（member-file），miniapp = 小程序直传
+ * （Referer 是 https://servicewechat.com/ 开头），web = 其余手机直传。
+ * Referer 谁都能伪造，**不作任何安全判断**。旧会话记录没有这个字段。
+ */
+export type UploadSessionFileSource = 'miniapp_documents' | 'miniapp' | 'web'
 
 export class CreateUploadSessionDto {
   @IsIn(['resume_upload', 'print_doc', 'contract_upload'])

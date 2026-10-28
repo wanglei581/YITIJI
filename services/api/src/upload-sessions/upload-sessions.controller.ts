@@ -109,6 +109,7 @@ export class UploadSessionsController {
       uploadToken: body.uploadToken,
       file,
       clientDeclaration: readClientDeclaration(req.headers),
+      source: phoneUploadSource(req),
     }))
   }
 
@@ -160,6 +161,15 @@ const CLIENT_DECLARATION_HEADERS = [
   VOICE_RECORDING_HEADER,
   VOICE_RECORDING_VERSION_HEADER,
 ]
+
+/**
+ * 微信小程序发出的网络请求，Referer 固定是 https://servicewechat.com/{appid}/{版本}/page-frame.html，
+ * 开发者改不了。只用于一体机确认屏提示文件从哪来；浏览器和脚本都能伪造，不作任何安全判断。
+ */
+function phoneUploadSource(req: Request): 'miniapp' | 'web' {
+  const referer = req.headers.referer
+  return typeof referer === 'string' && referer.startsWith('https://servicewechat.com/') ? 'miniapp' : 'web'
+}
 
 function hasClientDeclarationHeader(req: Request): boolean {
   return CLIENT_DECLARATION_HEADERS.some((name) => req.headers[name] !== undefined)

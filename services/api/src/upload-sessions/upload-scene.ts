@@ -28,7 +28,9 @@
  *    落在 miniapp-code 的 SCENE_PATTERN 里；18 字节 → 24 字符，
  *    既有 144 位熵，又留了余量不贴着 32 的上限。
  */
-import { createHash, createHmac, randomBytes } from 'crypto'
+import { BadRequestException } from '@nestjs/common'
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
+import type { MemberBindHost, StoredUploadSession } from './upload-session-member-bind'
 
 /** Redis 索引键前缀。键里放的是 sha256(scene)，不是 scene 本身。 */
 const SCENE_INDEX_PREFIX = 'upload_session_scene:'
@@ -73,4 +75,122 @@ function sceneTokenSecret(): string {
     throw new Error('FILE_SIGNING_SECRET environment variable must be set (≥ 32 chars)')
   }
   return secret
+}
+
+/** 第一次兑换要写会话时拿上传锁的有界重试：总共约 2 秒，每次间隔 100–200ms。 */
+const SCENE_LOCK_RETRY_TOTAL_MS = 2_000
+const SCENE_LOCK_RETRY_BASE_MS = 100
+const SCENE_LOCK_RETRY_JITTER_MS = 100
+
+export interface SceneRedemption {
+  sessionId: string
+  purpose: StoredUploadSession['purpose']
+  mode: StoredUploadSession['mode']
+  expiresAt: string
+  /** 派生令牌（见文件头②）。 */
+  uploadToken: string
+}
+
+/**
+ * 场景码兑换：小程序扫码进来后，用 scene 换回可用的上传凭据（规则见文件头②）。
+ *
+ * 一、只读快路径：不加锁先读会话，pending、场景码哈希对得上、令牌哈希已是派生令牌（之前兑换过）
+ *    就不用写，直接回令牌 —— 重扫、网页和小程序先后兑换都走这里，不跟正在进行的上传抢锁。
+ * 二、要写（第一次兑换）：拿上传锁有界重试；拿到后锁内重读、按条件写回。锁内重读是为了不用
+ *    pending 快照盖掉刚落成的 uploaded 收据。
+ * 三、重试用尽仍拿不到锁：再走一次快路径（可能别人刚兑换完），还不行才判失效。
+ *
+ * 所有失败对外是同一个 UPLOAD_SCENE_UNUSABLE。区分「格式不对 / 没这张码 / 已过期 / 已收到文件
+ * 或已作废 / 一直抢不到锁」对合法用户没有价值（补救动作都是回一体机刷新二维码），对探测者却是
+ * 一台预言机。
+ */
+export async function redeemScene(host: MemberBindHost, scene: string): Promise<SceneRedemption> {
+  // 格式不对就不查 Redis：省一次往返，也不制造可测量的时间差。
+  if (!isWellFormedSceneToken(scene)) throw sceneUnusableException()
+  // 索引不删：它与会话同 TTL、随会话自然到期，可重复兑换靠的就是它一直在。
+  const sessionId = await host.redis.get(sceneIndexKey(scene))
+  if (!sessionId) throw sceneUnusableException()
+  const uploadToken = deriveSceneUploadToken(sessionId, scene)
+  const uploadTokenHash = hashToken(uploadToken)
+  const settled = await alreadyRedeemed(host, sessionId, scene, uploadTokenHash)
+  if (settled) return redemption(settled, uploadToken)
+
+  const lockKey = host.uploadLockKey(sessionId)
+  const lockToken = randomUUID()
+  if (!(await acquireWithRetry(() => host.redis.setNxEx(lockKey, lockToken, host.lockTtlSeconds)))) {
+    const later = await alreadyRedeemed(host, sessionId, scene, uploadTokenHash)
+    if (later) return redemption(later, uploadToken)
+    throw sceneUnusableException()
+  }
+  try {
+    const stored = await host.loadOptional(sessionId)
+    const record = stored ? host.markExpired(stored) : null
+    if (!record || !sceneMatches(record, scene)) throw sceneUnusableException()
+    // 第一次兑换把会话令牌换成派生令牌，create 发给一体机的那把随之作废（一体机自己从不用它
+    // 上传）；哈希已经相等（别人刚兑换过）就不写。服务端仍只存哈希（文件头①）。
+    if (!safeEquals(record.uploadTokenHash, uploadTokenHash)) {
+      const committed = await host.commitSession({ ...record, uploadTokenHash }, lockKey, lockToken, 'pending')
+      if (committed !== 'updated') throw sceneUnusableException()
+    }
+    return redemption(record, uploadToken)
+  } finally {
+    await host.redis.getAndDelIfEquals(lockKey, lockToken).catch(() => undefined)
+  }
+}
+
+/**
+ * 会话还在等文件，且场景码哈希对得上。纵深防御：索引命中还不够，会话记录里的哈希也必须相等；
+ * 旧构建创建的会话没有 sceneTokenHash —— 缺失即不认，不是「随便什么 scene 都行」。
+ */
+function sceneMatches(record: StoredUploadSession, scene: string): boolean {
+  return record.status === 'pending'
+    && Boolean(record.sceneTokenHash)
+    && safeEquals(record.sceneTokenHash ?? '', hashToken(scene))
+}
+
+/** 只读快路径：不加锁，令牌哈希已是派生令牌才算数；否则回 null，交给加锁路径。 */
+async function alreadyRedeemed(
+  host: MemberBindHost,
+  sessionId: string,
+  scene: string,
+  uploadTokenHash: string,
+): Promise<StoredUploadSession | null> {
+  const stored = await host.loadOptional(sessionId)
+  const record = stored ? host.markExpired(stored) : null
+  if (!record || !sceneMatches(record, scene)) return null
+  return safeEquals(record.uploadTokenHash, uploadTokenHash) ? record : null
+}
+
+async function acquireWithRetry(tryAcquire: () => Promise<boolean>): Promise<boolean> {
+  const deadline = Date.now() + SCENE_LOCK_RETRY_TOTAL_MS
+  for (;;) {
+    if (await tryAcquire()) return true
+    const wait = SCENE_LOCK_RETRY_BASE_MS + Math.floor(Math.random() * SCENE_LOCK_RETRY_JITTER_MS)
+    if (Date.now() + wait > deadline) return false
+    await new Promise((resolve) => setTimeout(resolve, wait))
+  }
+}
+
+function redemption(record: StoredUploadSession, uploadToken: string): SceneRedemption {
+  return { sessionId: record.sessionId, purpose: record.purpose, mode: record.mode, expiresAt: record.expiresAt, uploadToken }
+}
+
+/**
+ * 场景码不可用的统一出口。刻意**不区分**原因：格式错、查不到、已过期、已收到文件或已作废，
+ * 对合法用户的补救动作完全一样，对探测者却会变成一台预言机。
+ */
+function sceneUnusableException(): BadRequestException {
+  return new BadRequestException({
+    error: { code: 'UPLOAD_SCENE_UNUSABLE', message: '二维码已失效，请回到一体机重新生成' },
+  })
+}
+
+/** 令牌只存 sha256（文件头①）；上传、控制、场景三种令牌共用。 */
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+export function safeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }

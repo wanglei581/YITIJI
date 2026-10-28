@@ -5,8 +5,9 @@ import 'reflect-metadata'
  * `POST /upload-sessions/:sessionId/member-file`：小程序已登录会员把自己「我的文档」里的
  * 一份文件递进一体机的手机上传会话。
  *
- * 真 Prisma（本作业的隔离库）+ 真 FilesService + 本地对象存储：本人归属与 404 口径、10MB、
- * 类型白名单与魔数、副本与原件的删除边界，全在真实代码里判。会话状态用 support 里的
+ * 真 Prisma（本作业的隔离库）+ 真 FilesService + 本地对象存储：资格与「我的文档」列表一致
+ * （直接对照真 listDocuments）、404 口径、10MB、类型白名单与魔数、副本与原件的删除边界，全在
+ * 真实代码里判；文件来源字段（一体机确认屏提示用）三种各打一遍。会话状态用 support 里的
  * FakeRedis（与 RedisService.compareAndSetSession 同一原子条件）。最后起一个只挂本控制器的
  * 最小 Nest 应用、随机端口打真实路由：会员守卫、DTO 白名单、错误信封、与 multipart 回执同形。
  *
@@ -26,6 +27,7 @@ import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 import { RedisService } from '../src/common/redis/redis.service'
 import type { FilePurpose } from '../src/files/file.types'
 import { FilesService } from '../src/files/files.service'
+import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { UploadSessionsController } from '../src/upload-sessions/upload-sessions.controller'
@@ -296,6 +298,62 @@ async function purposeRejectsType(h: Harness, K: string): Promise<void> {
   pass('e 打印单递 txt → 400 FILE_MIME_NOT_ALLOWED，会话退回 pending，换 PDF 成功')
 }
 
+// ── A. 资格与「我的文档」一致：列不出来的一律同一个 404，读字节和大小预检之前就判，会话不动 ──
+async function onlyListedDocumentsAreAccepted(h: Harness, K: string): Promise<void> {
+  const contract = await document(h, K, '王晓雯-劳动合同-待审.pdf', buildRealPdf(1), 'application/pdf', 'contract_upload')
+  const sessionOnly = await document(h, K, '王晓雯-合同审查-对照稿.pdf', buildRealPdf(1), 'application/pdf', 'print_doc')
+  await h.prisma.fileObject.update({ where: { id: sessionOnly }, data: { retentionLockedReason: 'contract_review_session_only' } })
+  const signature = await document(h, K, '王晓雯-手写签名.png', PNG, 'image/png', 'signature_image')
+  h.filenames.add('王晓雯-岗位匹配报告.pdf')
+  const jobFit = (await h.files.upload({
+    buffer: buildRealPdf(1), filename: '王晓雯-岗位匹配报告.pdf', mimeType: 'application/pdf', purpose: 'print_doc',
+    uploaderId: null, endUserId: K, createdBy: 'job_fit',
+  })).fileId
+  h.fileIds.add(jobFit)
+  const expiredBig = await document(h, K, '王晓雯-作品集-去年版.png', Buffer.concat([PNG, Buffer.alloc(11 * MB)]), 'image/png')
+  await h.prisma.fileObject.update({ where: { id: expiredBig }, data: { expiresAt: new Date(Date.now() - 60_000) } })
+  const dataExport = await document(h, K, '王晓雯-个人数据导出.txt', Buffer.from('{"profile":{}}'), 'text/plain')
+  await h.prisma.fileObject.update({ where: { id: dataExport }, data: { purpose: 'member_data_export', mimeType: 'application/json' } })
+  const listedPdf = await document(h, K, '王晓雯-个人简历-投递版.pdf', buildRealPdf(1))
+  const notListed = { contract, sessionOnly, signature, jobFit, expiredBig }
+
+  const listed = await new MemberAssetsService(h.prisma).listDocuments(K, { cursor: null, pageSize: 50 })
+  const listedIds = new Set(listed.items.map((item) => item.id))
+  assert.ok(listedIds.has(listedPdf), 'positive control: a normal document is listed')
+  for (const [name, id] of Object.entries(notListed)) assert.equal(listedIds.has(id), false, `${name} must not be listed`)
+  pass('A 对照真 listDocuments：合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期都不在「我的文档」，普通简历在')
+
+  const { service, redis } = freshService(h)
+  const session = await kioskSession(service)
+  const reads = countCalls(h.files, 'readContentForEndUser')
+  const uploads = countCalls(h.files, 'upload')
+  try {
+    for (const [name, id] of Object.entries(notListed)) {
+      const before = await redis.get(`upload_session:${session.sessionId}`)
+      const r = await rejectionOf(() => push(service, session, id, K))
+      expectError(r, 404, 'FILE_NOT_FOUND', name)
+      assert.deepEqual(r.body, { error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } }, `${name}: same 404 body`)
+      assert.equal(JSON.stringify(r.body).includes(id), false)
+      assert.equal(await redis.get(`upload_session:${session.sessionId}`), before, `${name}: session must not be written`)
+    }
+    assert.equal(reads.count, 0, 'not-listed files must be refused before reading bytes')
+    pass('A 本人合同原件 / 会话专用 / 签名图 / 系统岗位匹配 / 已过期且登记 >10MB：同一个 404、没读字节、会话一字不动')
+    const exported = await rejectionOf(() => push(service, session, dataExport, K))
+    expectError(exported, 404, 'FILE_NOT_FOUND', 'member_data_export')
+    assert.deepEqual(exported.body, { error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+    assert.equal((await stored(redis, session.sessionId)).status, 'pending')
+    assert.equal(uploads.count, 0, 'no copy may be written for any of them')
+  } finally {
+    reads.restore()
+    uploads.restore()
+  }
+  pass('A 本人数据导出（member_data_export）：读字节时 404、会话退回 pending；以上都没落副本')
+  const receipt = await push(service, session, listedPdf, K)
+  h.fileIds.add(receipt.file!.fileId)
+  assert.equal(receipt.status, 'uploaded')
+  pass('A 同一单接着递「我的文档」里列得出来的简历成功')
+}
+
 // ── 同人校验 + f. member 会话：K 的会话 M 递 → 403 且会话一字不动；K 递 → 确认后进 K 的文件库 ──
 async function memberSessionSamePersonAndArchive(h: Harness, K: string, M: string): Promise<void> {
   const { service, redis } = freshService(h)
@@ -466,18 +524,45 @@ async function httpContract(h: Harness, K: string, M: string): Promise<void> {
     assert.equal(ok.status, 201, ok.text)
     assert.equal(ok.json.success, true)
     h.fileIds.add(ok.json.data.file.fileId)
-    const phone = await kioskSession(service)
-    const form = new FormData()
-    form.append('uploadToken', phone.uploadToken)
-    h.filenames.add('手机相册-简历.pdf')
-    form.append('file', new Blob([new Uint8Array(buildRealPdf(1))], { type: 'application/pdf' }), '手机相册-简历.pdf')
-    const multipart = await fetch(`${base}/${phone.sessionId}/files`, { method: 'POST', body: form })
-    const multipartJson = (await multipart.json()) as { data: any }
-    h.fileIds.add(multipartJson.data.file.fileId)
-    assert.deepEqual(Object.keys(ok.json.data).sort(), Object.keys(multipartJson.data).sort())
-    assert.deepEqual(Object.keys(ok.json.data.file).sort(), Object.keys(multipartJson.data.file).sort())
-    assert.equal(ok.json.data.status, multipartJson.data.status)
+    const phoneUpload = async (filename: string, headers: Record<string, string> = {}) => {
+      const target = await kioskSession(service)
+      const form = new FormData()
+      form.append('uploadToken', target.uploadToken)
+      h.filenames.add(filename)
+      form.append('file', new Blob([new Uint8Array(buildRealPdf(1))], { type: 'application/pdf' }), filename)
+      const res = await fetch(`${base}/${target.sessionId}/files`, { method: 'POST', body: form, headers })
+      const json = (await res.json()) as { data: any }
+      h.fileIds.add(json.data.file.fileId)
+      return { target, json }
+    }
+    const web = await phoneUpload('手机相册-简历.pdf')
+    assert.deepEqual(Object.keys(ok.json.data).sort(), Object.keys(web.json.data).sort())
+    assert.deepEqual(Object.keys(ok.json.data.file).sort(), Object.keys(web.json.data.file).sort())
+    assert.equal(ok.json.data.status, web.json.data.status)
     pass('HTTP 本人文件 → 201 success，回执与 :sessionId/files 完全同形')
+
+    const control = (sessionId: string, controlToken: string, method: 'GET' | 'POST', suffix = '') =>
+      fetch(`${base}/${sessionId}${suffix}`, { method, headers: { 'x-upload-session-control': controlToken } })
+        .then(async (res) => ({ status: res.status, json: (await res.json()) as { data: any } }))
+    assert.equal(ok.json.data.file.source, 'miniapp_documents')
+    const seen = await control(session.sessionId, session.controlToken, 'GET')
+    assert.equal(seen.json.data.file.source, 'miniapp_documents')
+    const confirmed = await control(session.sessionId, session.controlToken, 'POST', '/confirm')
+    assert.equal(confirmed.status, 201)
+    assert.equal(confirmed.json.data.file.source, 'miniapp_documents')
+    const wechat = await phoneUpload('小程序相册-简历.pdf', { Referer: 'https://servicewechat.com/wx0123456789abcdef/3/page-frame.html' })
+    assert.equal(wechat.json.data.file.source, 'miniapp')
+    assert.equal(web.json.data.file.source, 'web')
+    pass('D 文件来源：「我的文档」递进 = miniapp_documents（上传 / 状态 / 确认三处都回）、小程序 Referer = miniapp、其余 = web')
+
+    const legacyKey = `upload_session:${web.target.sessionId}`
+    const legacy = JSON.parse((await redis.get(legacyKey)) ?? '{}') as { file?: Record<string, unknown> }
+    delete legacy.file?.['source']
+    await redis.setExistingWithCurrentTtl(legacyKey, JSON.stringify(legacy))
+    const old = await control(web.target.sessionId, web.target.controlToken, 'GET')
+    assert.equal(old.status, 200)
+    assert.equal(old.json.data.file.source ?? null, null)
+    pass('D 旧会话记录没有 source：状态照常回，来源为空')
 
     const plain = await h.prisma.auditLog.findFirstOrThrow({ where: { action: 'file.upload', targetId: ok.json.data.file.fileId } })
     assert.equal('clientDeclaration' in JSON.parse(plain.payloadJson), false)
@@ -516,6 +601,8 @@ async function main(): Promise<void> {
   process.env['VERIFICATION_DATABASE_TARGET'] ||= 'isolated'
   assertIsolatedVerificationDatabase()
   process.env['FILE_STORAGE_DRIVER'] = 'local'
+  // 按生产配置（招聘托管关闭）跑：系统岗位匹配报告此时不在「我的文档」里，A 的负例才有意义。
+  process.env['RECRUITMENT_CONTENT_HOSTING_ENABLED'] = 'false'
   const storageDir = mkdtempSync(path.join(tmpdir(), 'verify-upload-member-file-'))
   process.env['FILE_STORAGE_DIR'] = storageDir
   const prisma = new PrismaService()
@@ -534,6 +621,7 @@ async function main(): Promise<void> {
       ['c', () => sessionGates(h, K)],
       ['d', () => tooLargeFallsBackToPending(h, K)],
       ['e', () => purposeRejectsType(h, K)],
+      ['A', () => onlyListedDocumentsAreAccepted(h, K)],
       ['同人校验/f', () => memberSessionSamePersonAndArchive(h, K, M)],
       ['g', () => abandonDeletesOnlyTheCopy(h, K)],
       ['HTTP', () => httpContract(h, K, M)],
