@@ -51,7 +51,8 @@ const retiredAdminApiPath = join(repoRoot, 'apps/admin/src/services/api/memberPr
 const adminPage = read(adminPagePath)
 const adminApi = read(adminApiPath)
 const adminRoutes = read(join(repoRoot, 'apps/admin/src/routes/index.tsx'))
-const adminNav = read(join(repoRoot, 'apps/admin/src/layouts/AdminLayoutWrapper.tsx'))
+// 2026-10-27 侧栏菜单与标签组搬到 adminNav.ts（「数据权利工单」是「法务与数据权利」下的标签）
+const adminNav = read(join(repoRoot, 'apps/admin/src/layouts/adminNav.ts'))
 const backendCreate = read(join(repoRoot, 'services/api/src/member-privacy/member-data-request.service.ts'))
 const kioskPkg = read(join(kioskRoot, 'package.json'))
 const adminPkg = read(join(repoRoot, 'apps/admin/package.json'))

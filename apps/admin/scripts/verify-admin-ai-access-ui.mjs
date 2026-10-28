@@ -9,7 +9,7 @@
 //   C. AiAccessSwitchesPanel.tsx 真渲染：读取中 / 非管理员 / 读取失败 / 正常；事由必填；更严格的方向
 //      要勾确认；提交中禁用；成功提示只在服务端返回且值一致之后出现；不做乐观更新；声明与登录两项
 //      旁写明一体机要先更新；表单控件都有 id 与 label。
-//   D. ai-services/index.tsx：加载中、加载失败、正常三个返回分支都把面板放在 <Page> 的第一个子元素。
+//   D. ai-services/index.tsx：加载中、加载失败、正常三个返回分支的第一个子元素都是近 24 小时概览，第二个才是开关面板。
 //
 // Run: pnpm --filter @ai-job-print/admin verify:admin-ai-access-ui
 
@@ -664,7 +664,7 @@ await check('C11 表单控件都有 id，并有 htmlFor 指向它的 label', asy
 })
 
 // ─── D. AI 服务管理页三个分支 ─────────────────────────────────────────────────
-await check('D1 AI 服务管理页：加载中、加载失败、正常三个分支都把面板放在 <Page> 的第一个子元素', () => {
+await check('D1 AI 服务管理页：三个分支都先放近 24 小时概览，开关面板紧跟其后且位置相同', () => {
   const source = read('src/routes/ai-services/index.tsx')
   const sourceFile = ts.createSourceFile('index.tsx', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX)
   const imported = sourceFile.statements.some((statement) =>
@@ -698,13 +698,27 @@ await check('D1 AI 服务管理页：加载中、加载失败、正常三个分�
   assert.ok(branches.some((branch) => /\berror\b/.test(branch)), `缺加载失败分支（找到：${branches.join(' / ')}）`)
   assert.ok(branches.includes('正常'), `缺正常分支（找到：${branches.join(' / ')}）`)
   for (const { branch, jsx } of returns) {
-    const first = jsx.children.find((child) =>
+    const kids = jsx.children.filter((child) =>
       !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces) && !(ts.isJsxExpression(child) && !child.expression))
+    const first = kids[0]
+    const second = kids[1]
     assert.ok(
-      first && ts.isJsxSelfClosingElement(first) && first.tagName.getText(sourceFile) === 'AiAccessSwitchesPanel',
-      `分支「${branch}」返回的 <Page> 第一个子元素不是 <AiAccessSwitchesPanel />：紧急暂停不能因为统计接口在加载或失败就找不到`,
+      first && ts.isJsxSelfClosingElement(first) && first.tagName.getText(sourceFile) === 'AiDayOverview',
+      `分支「${branch}」返回的 <Page> 第一个子元素不是 <AiDayOverview />：近 24 小时概览要在四组开关前面`,
+    )
+    assert.ok(
+      second && ts.isJsxSelfClosingElement(second) && second.tagName.getText(sourceFile) === 'AiAccessSwitchesPanel',
+      `分支「${branch}」返回的 <Page> 第二个子元素不是 <AiAccessSwitchesPanel />：紧急暂停不能因为统计在加载或失败就换位置`,
     )
   }
+})
+
+await check('D1b AI 服务管理概览加载失败有重新加载，且不挪走开关面板', () => {
+  const source = read('src/routes/ai-services/index.tsx')
+  assert.ok(source.includes('重新加载'), '概览失败态缺少重新加载')
+  assert.ok(source.includes('setOverviewTick'), '重新加载没有重跑概览加载')
+  const logs = read('src/routes/ai-services/AiLogsTable.tsx')
+  assert.ok(logs.includes('调用日志加载失败') && logs.includes('重新加载') && logs.includes('onReload'), '调用记录失败态缺少重新加载')
 })
 
 await check('D2 package.json 注册本门禁', () => {

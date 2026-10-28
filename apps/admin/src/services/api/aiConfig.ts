@@ -81,14 +81,14 @@ const DEMO_FEATURES: AiModelFeatureMeta[] = [
   { key: 'resume_optimize', label: '简历优化', status: 'active', description: '简历优化', runtimeNote: '运行时消费', allowCustomSystemPrompt: true },
   { key: 'job_fit', label: '岗位匹配', status: 'active', description: '岗位匹配参考', runtimeNote: '运行时消费', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
   { key: 'career_plan', label: '职业规划', status: 'active', description: '职业规划建议', runtimeNote: '运行时消费', allowCustomSystemPrompt: true },
-  { key: 'fair_visit_plan', label: '招聘会行程', status: 'planned', description: '招聘会行程建议', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
+  { key: 'fair_visit_plan', label: '招聘会行程', status: 'active', description: '招聘会行程建议', runtimeNote: '已在招聘会拜访计划中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
   { key: 'self_assessment', label: '自我评估', status: 'active', description: '职业自我评估', runtimeNote: '运行时消费', allowCustomSystemPrompt: true },
-  { key: 'job_recommend', label: '岗位推荐', status: 'planned', description: '岗位推荐说明', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
-  { key: 'job_explain', label: '岗位解读', status: 'planned', description: '岗位解读', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
-  { key: 'advisor_work', label: '顾问工作台', status: 'planned', description: '顾问工作台', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
-  { key: 'print_param_prefill', label: '打印参数预填', status: 'planned', description: '打印参数建议', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
-  { key: 'digital_human', label: '数字人', status: 'planned', description: '数字人台词', runtimeNote: '后续接入', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
-  { key: 'poster_generation', label: '海报生成', status: 'planned', description: '宣传海报文生图', runtimeNote: '后续接入', allowCustomSystemPrompt: false },
+  { key: 'job_recommend', label: '岗位推荐', status: 'active', description: '岗位推荐说明', runtimeNote: '已在岗位推荐中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
+  { key: 'job_explain', label: '岗位解读', status: 'active', description: '岗位解读', runtimeNote: '已在岗位解读中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
+  { key: 'advisor_work', label: '顾问工作台', status: 'active', description: '顾问工作台', runtimeNote: '已在顾问作业面中使用。', allowCustomSystemPrompt: false, inheritsFrom: 'assistant_chat' },
+  { key: 'print_param_prefill', label: '打印参数预填', status: 'active', description: '打印参数建议', runtimeNote: '已在打印参数预填中使用。本功能按规则推算，不调用大模型。', allowCustomSystemPrompt: false },
+  { key: 'digital_human', label: 'AI数字人引导', status: 'planned', description: '后续接入。用于一体机前台数字人引导与操作说明。', runtimeNote: '后续接入，目前还没有功能在用。', allowCustomSystemPrompt: true },
+  { key: 'poster_generation', label: 'AI海报生成', status: 'planned', description: '后续接入。用于待机宣传屏 AI 海报草稿生成。', runtimeNote: '独立配置还在建设中，目前待机宣传屏的 AI 生成图片处于关闭状态。', allowCustomSystemPrompt: true },
 ]
 
 const DEMO_PRESETS: LlmPreset[] = [

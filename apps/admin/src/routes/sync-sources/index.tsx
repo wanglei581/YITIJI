@@ -7,6 +7,7 @@ import { API_MODE } from '../../services/api/client'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { CircuitBreakDialog, type CircuitBreakTarget } from '../components/recruitment/CircuitBreakDialog'
+import { RECRUITMENT_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
 import { fetchApiSources, type ApiSyncSourceItem } from './syncSourcesApi'
 
 // 3.15：本平台不代为同步、启停或配置机构的数据来源。字段映射、立即同步、停用 / 审批启用、
@@ -55,6 +56,7 @@ export default function SyncSourcesPage() {
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -69,6 +71,7 @@ export default function SyncSourcesPage() {
             重试
           </button>
         </div>
+        <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -155,6 +158,8 @@ export default function SyncSourcesPage() {
       <p className="mt-3 text-xs text-neutral-400">
         「按来源熔断」是应急处置：停用该来源，并把它导入的内容全部下架锁定，不可撤销，写入审计，并会通知所属机构。
       </p>
+
+      <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
 
       <CircuitBreakDialog target={circuitTarget} onClose={() => setCircuitTarget(null)} onDone={load} />
     </Page>

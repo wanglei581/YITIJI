@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { PartnerType } from '@ai-job-print/shared'
 import { Card, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { PlusIcon } from 'lucide-react'
@@ -7,8 +8,10 @@ import { useTableState } from '../components/DataTable'
 import { orgsAdminService, type AdminOrgListItem } from '../../services/api/orgsAdmin'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentHosting'
+import { parsePartnerSection, type PartnerSection } from '../../components/first-order/serviceQueueModel'
 import { CreateOrgDrawer } from './CreateOrgDrawer'
 import { OrgDetailDrawer } from './OrgDetailDrawer'
+import { PartnerServiceSummary } from './PartnerServiceSummary'
 import { PartnerFilters } from './PartnerFilters'
 import { PartnerTable } from './PartnerTable'
 import { STATUS_FILTERS } from './orgPresentation'
@@ -19,10 +22,26 @@ export default function PartnersPage() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('全部')
   const [typeFilter, setTypeFilter] = useState<PartnerType | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
-  const [detailOrgId, setDetailOrgId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
+  const requestedOrgId = searchParams.get('org')
+  const requestedSection = parsePartnerSection(searchParams.get('section'))
+  const updateQuery = useCallback((mutate: (params: URLSearchParams) => void) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      mutate(next)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+  const openOrg = useCallback((orgId: string, section: PartnerSection | null) => {
+    updateQuery((params) => {
+      params.set('org', orgId)
+      if (section) params.set('section', section)
+      else params.delete('section')
+    })
+  }, [updateQuery])
   const hosting = useRecruitmentHosting()
   const showRecruitment = hosting.status === 'ready' && hosting.enabled
 
@@ -65,6 +84,10 @@ export default function PartnersPage() {
   const total = searched.length
   const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
+  // 刷新名单时保留已打开的抽屉。名单还没读到时不打开，也不把「还在读」说成没找到。
+  const orgKnown = !!requestedOrgId && orgs.some((org) => org.id === requestedOrgId)
+  const orgMissing = listState === 'ready' && !!requestedOrgId && !orgKnown
+
   const statusCounts = {
     全部: orgs.length,
     合作中: orgs.filter((o) => o.enabled).length,
@@ -85,6 +108,9 @@ export default function PartnersPage() {
         </button>
       }
     >
+      <PartnerServiceSummary onOpen={(orgId, section) => openOrg(orgId, section)} />
+      {orgMissing && <p role="status" className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-700">没找到这家机构</p>}
+
       {listState === 'loading' && <LoadingState className="py-24" />}
       {listState === 'error' && <ErrorState className="py-24" onRetry={() => void load()} />}
       {actionError && (
@@ -100,7 +126,7 @@ export default function PartnersPage() {
           <Card className="overflow-hidden p-0">
             <PartnerTable items={paginated} total={total} page={page} pageSize={pageSize} search={search}
               onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-              showRecruitment={showRecruitment} onDetail={setDetailOrgId} onToggle={toggleOrg} busyId={busyId} />
+              showRecruitment={showRecruitment} onDetail={(orgId) => openOrg(orgId, null)} onToggle={toggleOrg} busyId={busyId} />
           </Card>
 
           <p className="mt-3 text-xs text-neutral-400">
@@ -117,10 +143,12 @@ export default function PartnersPage() {
 
       <CreateOrgDrawer showRecruitment={showRecruitment} open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => void load()} />
       <OrgDetailDrawer
-        orgId={detailOrgId}
-        open={detailOrgId !== null}
+        orgId={orgKnown ? requestedOrgId : null}
+        open={orgKnown}
+        section={requestedSection}
         showRecruitment={showRecruitment}
-        onClose={() => setDetailOrgId(null)}
+        onSectionChange={(section) => updateQuery((params) => { params.set('section', section) })}
+        onClose={() => updateQuery((params) => { params.delete('org'); params.delete('section') })}
         onChanged={() => void load()}
       />
     </Page>
