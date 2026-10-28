@@ -359,7 +359,7 @@ export const COPY_GUIDE_STEPS: readonly CopyGuideStep[] = [
  * 手册只写了「点身份证复印 → 调好设置 → 点复印」，没写证件放在玻璃哪里、正反面怎么翻、
  * 屏幕会不会提示翻面。【待 Windows 窗口现场核实后填写】在那之前不编造位置，只给一句指路。
  */
-export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕提示。'
+export const COPY_ID_CARD_PLACEMENT_PENDING = '身份证怎么放、怎么翻面，请看打印机屏幕上的图示。'
 
 export interface CopyGuideCase {
   key: 'id-card' | 'receipt' | 'duplex'

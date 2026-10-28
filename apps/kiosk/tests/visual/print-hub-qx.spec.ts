@@ -443,7 +443,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   }
   // 身份证放置位置待现场核实：只给指路句，不编造位置。
   await expect(page.getByTestId('print-hub-copy-case-id-card')).toHaveAttribute('data-pending', 'true')
-  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕提示。')
+  await expect(page.getByTestId('print-hub-copy-case-id-card')).toContainText('身份证怎么放、怎么翻面，请看打印机屏幕上的图示。')
   await expect(page.getByTestId('print-hub-copy-take-original')).toContainText('别忘了取走玻璃上或进纸口里的原件（身份证等）')
   await expect(page.getByTestId('print-hub-copy-legal')).toContainText('不得复印伪造的证件、印章、票据。')
   // 不伪造结果、不写收费、不写工程词。
