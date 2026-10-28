@@ -12,6 +12,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
+import { machineUnusableLine } from '../copy/unattendedCopy'
 import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
 import { getTerminalId, subscribeTerminalIdentity } from '../services/api/screensaver'
 
@@ -165,7 +166,8 @@ export function mapTerminalPrinterStatus(input: {
           errorCode: 'queueGate',
         },
         printerLabel: '暂停接单',
-        printerNotice: '打印机暂时不可用，请联系现场工作人员',
+        // 现场无人值守：用标准句 3（暂停接单），号码与「换一台」都读服务联系方式，读不到时用最保守的一套。
+        printerNotice: machineUnusableLine(),
         deviceStatus: 'error',
       }
     default:

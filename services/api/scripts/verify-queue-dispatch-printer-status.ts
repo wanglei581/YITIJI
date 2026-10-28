@@ -74,6 +74,11 @@ function assertKioskFailClosed(): void {
       /import \{[^}]+\} from '\.\.\/services\/api\/screensaver'\n/,
       'const getTerminalId = () => ""\nconst subscribeTerminalIdentity = () => () => undefined\n',
     )
+    // 暂停接单说明来自无人值守文案模块（一体机 hook 的标准句 3）；这里只验 printerReady，给个桩即可。
+    .replace(
+      /import \{[^}]+\} from '\.\.\/copy\/unattendedCopy'\n/,
+      'const machineUnusableLine = () => "这台机器暂时不能用"\n',
+    )
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))
   const file = join(dir, 'map-terminal-printer-status.ts')

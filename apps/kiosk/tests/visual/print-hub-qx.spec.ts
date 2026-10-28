@@ -425,7 +425,8 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
 })
 
 const PAUSE_LABEL = '暂停接单'
-const PAUSE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+// 无人值守标准句 3（machineUnusableLine）。这组用例不给服务电话接口，页面按最保守的一套：没号码、单点位。
+const PAUSE_NOTICE = '这台机器暂时不能用，请稍后再来，或查看《隐私政策》里的联系方式。'
 
 function registerQueueGate(api: ApiRouter, printerStatus: string): void {
   registerShell(api, { isOnline: true, printerStatus })
@@ -449,7 +450,7 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${dir}/${name}.png` })
 }
 
-// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明给现场工作人员。
+// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明用无人值守标准句（不把人引向现场）。
 // 不经过打印机的入口（格式转换）照旧可点。删掉 map 里的 case 会掉进「状态未知」，这两条变红。
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
   test(`print entry pauses new orders when heartbeat is ${status} @w2`, async ({ page, api }) => {

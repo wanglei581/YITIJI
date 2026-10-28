@@ -100,7 +100,11 @@ expectMatches(hookSrc, /网络正常/, 'hook 含「网络正常」文案（仅 A
 expectMatches(hookSrc, /状态未知/, 'hook 含「状态未知」文案')
 
 // 打印闸门合上：两个心跳值各走自己的 case，不掉进 default（default 是「状态未知」，入口不会停）。
-const QUEUE_GATE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+// 说明用无人值守标准句 3（copy/unattendedCopy.ts 的 machineUnusableLine，覆盖「暂停接单」），不写死，也不把人引向现场。
+const QUEUE_GATE_NOTICE_CALL = 'printerNotice: machineUnusableLine()'
+expectMatches(hookSrc, /import \{ machineUnusableLine \} from '\.\.\/copy\/unattendedCopy'/, 'hook 从无人值守文案模块取暂停接单说明')
+if (/工作人员/.test(hookSrc)) fail('useTerminalDeviceStatus 不许出现「工作人员」：现场无人值守')
+else pass('useTerminalDeviceStatus 不把人引向现场工作人员')
 const hubPageSrc = read('src/pages/print-scan/PrintScanHomePage.tsx')
 expectMatches(hubPageSrc, /device\.printer\.errorCode === 'paperEmpty'/, 'W-117 缺纸单独识别，不归入离线文案')
 expectMatches(hubPageSrc, /打印机缺纸，请找现场工作人员加纸/, 'W-117 缺纸提示加纸出路')
@@ -133,8 +137,8 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   else pass(`${status} deviceStatus=error`)
   if (!block.includes("printerLabel: '暂停接单'")) fail(`${status} 入口短标题必须是「暂停接单」`)
   else pass(`${status} 文案「暂停接单」`)
-  if (!block.includes(`printerNotice: '${QUEUE_GATE_NOTICE}'`)) fail(`${status} 缺少说明「${QUEUE_GATE_NOTICE}」`)
-  else pass(`${status} 文案「${QUEUE_GATE_NOTICE}」`)
+  if (!block.includes(QUEUE_GATE_NOTICE_CALL)) fail(`${status} 说明必须是「${QUEUE_GATE_NOTICE_CALL}」（无人值守标准句 3）`)
+  else pass(`${status} 说明用无人值守标准句 3`)
 }
 expectMatches(
   hubPageSrc,
