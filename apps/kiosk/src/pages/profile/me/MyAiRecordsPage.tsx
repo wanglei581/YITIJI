@@ -19,6 +19,7 @@ import { deleteMyAiRecord, getMyAiRecords, type AiRecordsPage } from '../../../s
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { deleteMyInterview, getMyInterviews } from '../../../services/api/interview'
 import { useAuth } from '../../../auth/useAuth'
+import { useKioskAiPause } from '../../../hooks/useKioskAiPause'
 import { useRecruitmentHosting } from '../../../hooks/useRecruitmentHosting'
 import { formatTime } from '../assets/format'
 import { QxMePage, recordsCtabar } from './qx/QxMeChrome'
@@ -70,6 +71,26 @@ function shouldDisplayJobAiSession(
 
 type Toast = { tone: 'ok' | 'bad'; text: string }
 
+// 稿 my-ai：后台把 AI 暂停时（useKioskAiPause 读到 paused），列表照样显示已有记录、照样能打开，
+// 只多一句说明；空态与列表下的出口把「去做简历诊断」换成不用小青的「去打印」。读不到、没暂停都不改任何说法。
+const AI_DOWN_NOTICE = '小青这次不可用。已经生成的记录还可以打开；新的诊断要等服务恢复。'
+const EMPTY_SENTENCE = '还没有 AI 服务记录。做过诊断、优化、生成、规划或模拟面试之后，会出现在这里。'
+const EMPTY_SENTENCE_AI_DOWN = '还没有 AI 服务记录。小青这次不可用，打印和政策不受影响。'
+
+function RecordExitCards({ aiPaused, artWidths }: { aiPaused: boolean; artWidths: [number, number] }) {
+  const navigate = useNavigate()
+  return (
+    <>
+      {aiPaused ? (
+        <MeExitCard art="usb" artWidth={artWidths[0]} title="去打印" desc="打印不需要小青" testId="member-records-ai-down-print" onClick={() => navigate('/print-scan')} />
+      ) : (
+        <MeExitCard art="resume" artWidth={artWidths[0]} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
+      )}
+      <MeExitCard art="checklist" artWidth={artWidths[1]} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+    </>
+  )
+}
+
 export function MyAiRecordsPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
@@ -78,6 +99,8 @@ export function MyAiRecordsPage() {
   const hosting = useRecruitmentHosting()
   const hostingOpen = hosting.enabled
   const hostingKnown = hosting.status === 'ready'
+  // 后台暂停 AI 时才为真；没读到、没暂停都不改页面（见 useKioskAiPause）。
+  const aiPaused = useKioskAiPause() === 'paused'
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [confirmExpired, setConfirmExpired] = useState(false)
@@ -265,15 +288,19 @@ export function MyAiRecordsPage() {
   } else if (empty) {
     body = (
       <div className="me-state" data-testid="qx-me-fallback">
-        <MeEmptyPack sentence="还没有 AI 服务记录。做过诊断、优化、生成、规划或模拟面试之后，会出现在这里。">
-          <MeExitCard art="resume" artWidth={120} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
-          <MeExitCard art="checklist" artWidth={110} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+        <MeEmptyPack sentence={aiPaused ? EMPTY_SENTENCE_AI_DOWN : EMPTY_SENTENCE}>
+          <RecordExitCards aiPaused={aiPaused} artWidths={[120, 110]} />
         </MeEmptyPack>
       </div>
     )
   } else {
     body = (
       <>
+        {aiPaused ? (
+          <div data-testid="member-records-ai-down">
+            <MeP tone="reason">{AI_DOWN_NOTICE}</MeP>
+          </div>
+        ) : null}
         <MeRows few={totalCount < 7 && openKey === null} testId="member-records-list" label="AI 服务记录">
           <QaRecords items={qaPage.items} token={token ?? null} onDeleted={() => setReloadKey((key) => key + 1)} openKey={openKey} onToggle={toggleRow} />
           <MockInterviewRecords
@@ -359,8 +386,7 @@ export function MyAiRecordsPage() {
         </MeRows>
         {totalCount < 7 && openKey === null ? (
           <div className="me-stack">
-            <MeExitCard art="resume" artWidth={110} title="去做简历诊断" desc="上传一份简历，先做诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
-            <MeExitCard art="checklist" artWidth={100} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+            <RecordExitCards aiPaused={aiPaused} artWidths={[110, 100]} />
           </div>
         ) : null}
         <MemberLoadMore {...qaPage} label="加载更多小青作业" />

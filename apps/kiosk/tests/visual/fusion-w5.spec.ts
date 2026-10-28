@@ -1333,6 +1333,120 @@ test('AI record delete waits for the server and keeps the row on failure @w5-kio
   await expectFusionAcceptance(page, errors)
 })
 
+// ───────────── 稿 my-ai：后台暂停 AI 时的「小青这次不可用」 ─────────────
+// 可信的可用状态只有一个来源：终端配置 ai.paused（服务端对每条 AI 请求回 503 AI_PAUSED 的同一个开关）。
+// 读到 true 才写「不可用」；没读到、没暂停都不改页面。旧的真实记录照常显示、照常能打开。
+
+const AI_DOWN_NOTICE_TEXT = '小青这次不可用。已经生成的记录还可以打开；新的诊断要等服务恢复。'
+
+function aiPauseConfig(paused: boolean | null): unknown {
+  const base = terminalConfig({ enabled: false, items: [] }) as Record<string, unknown>
+  return paused === null ? base : { ...base, ai: { loginGate: 'off', declarationEnforced: false, paused } }
+}
+
+function registerAiRecords(api: ApiRouter, paused: boolean | null | 'config-fails', records: unknown[]): void {
+  registerMemberLogin(api)
+  registerAuthenticatedShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', paused === 'config-fails'
+    ? { status: 500, json: { success: false, error: { code: 'INTERNAL', message: 'boom' } } }
+    : { status: 200, json: aiPauseConfig(paused) })
+  api.respond('GET', '/api/v1/me/ai-records', {
+    status: 200,
+    json: { success: true, data: { items: records, nextCursor: null, total: records.length } },
+  })
+  api.respond('GET', '/api/v1/me/job-ai-sessions', { status: 200, json: { success: true, data: { items: [], nextCursor: null, total: 0 } } })
+  api.respond('GET', '/api/v1/me/mock-interviews', { status: 200, json: { success: true, data: { items: [] } } })
+}
+
+const OPENABLE_AI_RECORD = {
+  id: 'ai-open-1',
+  kind: 'optimize',
+  status: 'completed',
+  taskId: 'task-open-1',
+  provider: 'demo',
+  optimized: true,
+  hasDraft: false,
+  latestVersion: null,
+  createdAt: '2026-09-01T08:00:00.000Z',
+  expiresAt: '2099-01-01T00:00:00.000Z',
+}
+
+test('AI records: backend-paused AI is said plainly, the old record still opens, and printing is offered @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerAiRecords(api, true, [OPENABLE_AI_RECORD])
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  const notice = page.getByTestId('member-records-ai-down')
+  await expect(notice).toHaveText(AI_DOWN_NOTICE_TEXT)
+  // 旧的真实记录不因 AI 不可用而藏起，也不改说法：仍是「简历优化」「已完成」，点开仍有「打开」。
+  const recordRow = page.getByRole('button', { name: /简历优化/ })
+  await expect(recordRow).toBeVisible()
+  await expect(recordRow).toContainText('已完成')
+  await recordRow.click()
+  await expect(page.getByRole('button', { name: '打开', exact: true })).toBeEnabled()
+  await expect(page.getByText('AI 生成，仅供参考')).toBeVisible()
+  // 不用小青的出口：列表下面把「去做简历诊断」换成「去打印」；查政策照旧。底栏问小青按稿留在原位、仍是这一屏的问句。
+  await recordRow.click()
+  const printExit = page.getByTestId('member-records-ai-down-print')
+  await expect(printExit).toContainText('去打印')
+  await expect(printExit).toContainText('打印不需要小青')
+  await expect(page.getByRole('button', { name: '去做简历诊断，上传一份简历，先做诊断' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '查政策，看本机构发布的就业政策' })).toBeVisible()
+  await expect(page.locator('[data-qxt-ask="on"]')).toContainText('问小青：打不开的记录怎么办？')
+  await assertTapTargetPointerHit(printExit)
+  await assertNoElementCrossesViewport(page)
+  await page.screenshot({ path: test.info().outputPath('ai-records-paused-with-record-1080x1920.png') })
+  await printExit.click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  expect(errors).toEqual([])
+})
+
+test('AI records: backend-paused AI with no records yet says so and points to printing and policy @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerAiRecords(api, true, [])
+
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  const fallback = page.getByTestId('qx-me-fallback')
+  await expect(fallback).toContainText('还没有 AI 服务记录。小青这次不可用，打印和政策不受影响。')
+  await expect(page.getByTestId('member-records-ai-down')).toHaveCount(0)
+  const printExit = page.getByTestId('member-records-ai-down-print')
+  await expect(printExit).toContainText('去打印')
+  await expect(printExit).toContainText('打印不需要小青')
+  await expect(fallback.getByRole('button', { name: '查政策，看本机构发布的就业政策' })).toBeVisible()
+  await expect(fallback.getByRole('button', { name: '去做简历诊断，上传一份简历，先做诊断' })).toHaveCount(0)
+  await assertTapTargetPointerHit(printExit)
+  await assertNoElementCrossesViewport(page)
+  await page.screenshot({ path: test.info().outputPath('ai-records-paused-empty-1080x1920.png') })
+  await printExit.click()
+  await expect(page).toHaveURL(/\/print-scan$/)
+  expect(errors).toEqual([])
+})
+
+async function expectAiRecordsUnchanged(page: Page, api: ApiRouter, paused: boolean | null | 'config-fails'): Promise<void> {
+  registerAiRecords(api, paused, [])
+  await loginThroughVisibleUi(page, '/me/ai-records')
+  const fallback = page.getByTestId('qx-me-fallback')
+  await expect(fallback).toContainText('还没有 AI 服务记录。做过诊断、优化、生成、规划或模拟面试之后，会出现在这里。')
+  await expect(fallback).not.toContainText('小青这次不可用')
+  await expect(page.getByTestId('member-records-ai-down-print')).toHaveCount(0)
+  await expect(fallback.getByRole('button', { name: '去做简历诊断，上传一份简历，先做诊断' })).toBeVisible()
+  await expect(page.getByTestId('member-records-ai-down')).toHaveCount(0)
+  // 配置已经读到了（阳性对照）：页面没改，不是因为根本没读。
+  expect(api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBeGreaterThan(0)
+}
+
+test('AI records: AI not paused changes nothing on the page @w5-kiosk', async ({ page, api }) => {
+  await expectAiRecordsUnchanged(page, api, false)
+})
+
+test('AI records: a terminal config without the ai field changes nothing on the page @w5-kiosk', async ({ page, api }) => {
+  await expectAiRecordsUnchanged(page, api, null)
+})
+
+test('AI records: a terminal config that cannot be read changes nothing on the page @w5-kiosk', async ({ page, api }) => {
+  await expectAiRecordsUnchanged(page, api, 'config-fails')
+})
+
 // ───────────── 稿 38-member-assets：我的文档 / 打印订单（青序流光） ─────────────
 // 夹具只是合成的服务端响应，用来驱动页面的真实请求路径；不代表真实后端、COS 或设备。
 
