@@ -1,3 +1,6 @@
+// 授权门禁按我方云上的默认配置（招聘托管关闭）运行；授权逻辑不读这个开关，显式写出是为了满足托管声明门禁。
+process.env.RECRUITMENT_CONTENT_HOSTING_ENABLED = 'false'
+
 /**
  * verify:license（下半）—— 授权管理后端的真行为：真库（SQLite 或 PostgreSQL 都行）、真服务、真 HTTP。
  * 状态推导、契约、路由表扫描在 verify-license-state.ts；本文件管：
