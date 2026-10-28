@@ -1,40 +1,41 @@
 {
   "$readme": [
     "一体机页面目录（src/pages/）里「找 / 联系现场工作人员」类说法的存量命中，按归属的触屏版页面包分组，逐个文件记次数。",
-    "次数 = src/copy/unattendedCopy.ts 的 UNATTENDED_FORBIDDEN_PHRASES 里每条说法在该文件中出现的次数之和（各条分别计，重叠算多次）。",
+    "次数 = src/copy/unattendedCopy.ts 的 UNATTENDED_FORBIDDEN_PHRASES 在该文件里盖住的位置数；同一处被好几条说法同时盖住（长句型是短说法的子集）只算一处。",
     "这份名单只许减不许增：新增命中、名单外的文件出现命中、次数超过名单，都由 verify:kiosk-unattended-copy 判红。",
     "那一包整页重写、把说法换成标准句之后，把对应文件的条目删掉（或把次数调低到实际值）；命中比名单少同样判红，要求名单跟上，还账必须落进本文件。",
     "不要往这里加条目。共享模块（src/pages/ 以外）不能进名单，零容忍。",
-    "包号是触屏版页面包的编号：3 打印、4 简历三条主路、5 公共与系统、6 我的与权益、7 简历其余页、9 扫描复印、10 政策与受控扩展、11 私有化版招聘；第 2 包首页与第 8 包练面试没有存量命中。"
+    "包号是触屏版页面包的编号：3 打印、4 简历三条主路、5 公共与系统、6 我的与权益、7 简历其余页、9 扫描复印、10 政策与受控扩展、11 私有化版招聘；第 2 包首页与第 8 包练面试没有存量命中。",
+    "2026-10-29 词表补了 8 条短说法（现场工作人员、叫 / 请 / 问 / 向工作人员、工作人员现场 / 会、由工作人员），名单随之重算：72 个文件 216 处 → 78 个文件 263 处。"
   ],
   "packages": {
     "触屏版第 3 包 · 打印": {
-      "src/pages/print-scan/PrintScanHomePage.tsx": 4,
+      "src/pages/print-scan/PrintScanHomePage.tsx": 5,
       "src/pages/print-scan/components/QxPrintHubView.tsx": 2,
       "src/pages/print-scan/printHubContent.ts": 4,
       "src/pages/print/PrintCashierPage.tsx": 9,
       "src/pages/print/PrintConfirmPage.tsx": 8,
-      "src/pages/print/PrintDonePage.tsx": 20,
+      "src/pages/print/PrintDonePage.tsx": 24,
       "src/pages/print/PrintPreviewPage.tsx": 6,
       "src/pages/print/PrintProgressPage.tsx": 11,
       "src/pages/print/PrintUploadPage.tsx": 1,
       "src/pages/print/cashierQxModel.tsx": 5,
       "src/pages/print/components/CashierQxView.tsx": 3,
-      "src/pages/print/components/PickupHidGuide.tsx": 6,
+      "src/pages/print/components/PickupHidGuide.tsx": 7,
       "src/pages/print/components/PrintConfirmView.tsx": 1,
-      "src/pages/print/components/PrintDoneSections.tsx": 7,
-      "src/pages/print/components/PrintProgressSections.tsx": 5,
+      "src/pages/print/components/PrintDoneSections.tsx": 13,
+      "src/pages/print/components/PrintProgressSections.tsx": 10,
       "src/pages/print/file-source/FileSourceBits.tsx": 1,
-      "src/pages/print/file-source/FileSourceView.tsx": 3,
+      "src/pages/print/file-source/FileSourceView.tsx": 6,
       "src/pages/print/pickupClaimModel.ts": 12,
       "src/pages/print/printHandoff.ts": 1,
-      "src/pages/print/printProgressModel.ts": 15
+      "src/pages/print/printProgressModel.ts": 16
     },
     "触屏版第 4 包 · 简历三条主路": {
       "src/pages/resume/ResumeSourcePage.tsx": 1,
       "src/pages/resume/components/ResumeUsbImportPanel.tsx": 3,
-      "src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx": 2,
-      "src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": 6,
+      "src/pages/resume/components/resume-deliver/ResumeFormatChooser.tsx": 3,
+      "src/pages/resume/components/resume-deliver/optimizeStateCopy.ts": 4,
       "src/pages/resume/resume-report-model.ts": 1
     },
     "触屏版第 5 包 · 公共与系统": {
@@ -44,22 +45,25 @@
       "src/pages/auth/LoginPage.tsx": 1,
       "src/pages/auth/ScanQrLoginPanel.tsx": 1,
       "src/pages/auth/accountUserMessage.ts": 1,
+      "src/pages/auth/mobileQrLoginCopy.ts": 6,
       "src/pages/help/HelpCenterPage.tsx": 6,
-      "src/pages/legal/LegalDocPage.tsx": 2,
+      "src/pages/legal/LegalDocPage.tsx": 7,
       "src/pages/placeholders/ErrorOfflinePage.tsx": 1,
       "src/pages/session-resume/sessionResumeModel.ts": 1,
-      "src/pages/upload/phoneUploadModel.ts": 2
+      "src/pages/upload/phoneUploadModel.ts": 3
     },
     "触屏版第 6 包 · 我的与权益": {
       "src/pages/placeholders/MeActivityDetailPage.tsx": 1,
       "src/pages/profile/ProfilePage.tsx": 1,
       "src/pages/profile/me/MyBenefitsPage.tsx": 1,
-      "src/pages/profile/me/MyNotificationsPage.tsx": 1,
+      "src/pages/profile/me/MyNotificationsPage.tsx": 2,
       "src/pages/profile/me/MyPrivacyRequestsPage.tsx": 1,
       "src/pages/profile/me/MySettingsPage.tsx": 2,
       "src/pages/profile/me/components/PhoneRebindPanel.tsx": 2,
-      "src/pages/profile/me/printOrders/OrderPaymentSummary.tsx": 1,
-      "src/pages/profile/me/qx/QxMeChrome.tsx": 2
+      "src/pages/profile/me/printOrders/OrderPaymentSummary.tsx": 2,
+      "src/pages/profile/me/printOrders/paymentCopy.ts": 1,
+      "src/pages/profile/me/qx/QxMeChrome.tsx": 2,
+      "src/pages/profile/me/qx/QxMeStateBits.tsx": 1
     },
     "触屏版第 7 包 · 简历其余页": {
       "src/pages/resume/GeneratePreviewChrome.tsx": 1,
@@ -70,14 +74,16 @@
       "src/pages/print-scan/ConvertImagesPanels.tsx": 1,
       "src/pages/print-scan/PrintScanFeatureInfoPage.tsx": 2,
       "src/pages/print-scan/sign-stamp/SignStampGateView.tsx": 1,
-      "src/pages/print-scan/sign-stamp/signStampCopy.ts": 2,
+      "src/pages/print-scan/sign-stamp/signStampCopy.ts": 3,
       "src/pages/print-scan/sign-stamp/useSignStampFlow.ts": 1,
       "src/pages/scan/ScanProgressPage.tsx": 1,
       "src/pages/scan/ScanResultPage.tsx": 5,
       "src/pages/scan/ScanSettingsPage.tsx": 1,
+      "src/pages/scan/ScanSettingsStatusView.tsx": 1,
       "src/pages/scan/ScanStartPage.tsx": 4,
-      "src/pages/scan/scanDeliveryAck.ts": 1,
-      "src/pages/scan/scanRescanRecovery.ts": 5
+      "src/pages/scan/scanDeliveryAck.ts": 2,
+      "src/pages/scan/scanRescanRecovery.ts": 5,
+      "src/pages/scan/scanSettingsModel.ts": 3
     },
     "触屏版第 10 包 · 政策与受控扩展": {
       "src/pages/renshi/EligibilityPanel.tsx": 1,
@@ -85,11 +91,12 @@
     },
     "触屏版第 11 包 · 私有化版招聘": {
       "src/pages/job-fairs/FairCompaniesPage.tsx": 1,
-      "src/pages/job-fairs/FairCompanyDetailPage.tsx": 1,
+      "src/pages/job-fairs/FairCompanyDetailPage.tsx": 2,
+      "src/pages/job-fairs/FairMapPage.tsx": 1,
       "src/pages/job-fairs/FairMaterialsPage.tsx": 3,
       "src/pages/job-fairs/FairStatsPage.tsx": 1,
-      "src/pages/job-fairs/JobFairCheckinPage.tsx": 1,
-      "src/pages/job-fairs/JobFairDetailPage.tsx": 1,
+      "src/pages/job-fairs/JobFairCheckinPage.tsx": 3,
+      "src/pages/job-fairs/JobFairDetailPage.tsx": 2,
       "src/pages/job-fairs/JobFairsPage.tsx": 1,
       "src/pages/jobs/JobDetailPage.tsx": 1,
       "src/pages/jobs/JobsPage.tsx": 1,

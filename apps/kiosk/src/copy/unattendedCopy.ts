@@ -67,6 +67,14 @@ function forbiddenPhrase(parts: readonly string[]): string {
   return parts.join('')
 }
 
+/**
+ * 禁用说法表。一体机现场没有人：句子里不许叫用户去找人，也不许替现场的人许愿（会核实、现场处理、由他们处理）。
+ * 门禁 verify:kiosk-unattended-copy 和运行时的 containsStaffHandoff / preferUnattended 共用这一份。
+ *
+ * 按字面匹配，所以写最短的说法去覆盖同类变体；前面几条长句型是后面短说法的子集，留着当已知变体的记录。
+ * 字面匹配分不出「本机的人」和「展会现场、门店、银行的人」，也分不出隐私说明（「……都看不到」）：
+ * 页面里碰上这几种，进待清名单由各触屏包重写时处理，或在门禁里按整行登记 NOT_HELP_GUIDANCE；共享模块里一概不许。
+ */
 export const UNATTENDED_FORBIDDEN_PHRASES = [
   forbiddenPhrase(['联系现场', '工作人员']),
   forbiddenPhrase(['联系', '工作人员']),
@@ -82,6 +90,15 @@ export const UNATTENDED_FORBIDDEN_PHRASES = [
   forbiddenPhrase(['缺纸时一体机会自动停止', '接单']),
   forbiddenPhrase(['找人', '补纸']),
   forbiddenPhrase(['取件', '凭证码']),
+  // 2026-10-29 补：找 / 叫 / 请 / 问 / 向 这一类求助句型，和「会……」「现场……」「由……处理」这类许愿句型。
+  forbiddenPhrase(['现场', '工作人员']),
+  forbiddenPhrase(['叫', '工作人员']),
+  forbiddenPhrase(['请', '工作人员']),
+  forbiddenPhrase(['问', '工作人员']),
+  forbiddenPhrase(['向', '工作人员']),
+  forbiddenPhrase(['工作人员', '现场']),
+  forbiddenPhrase(['工作人员', '会']),
+  forbiddenPhrase(['由', '工作人员']),
 ] as const
 
 export function containsStaffHandoff(text: string): boolean {

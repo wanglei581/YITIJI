@@ -24,7 +24,8 @@
  *        · 命中次数超过名单上的数字        → 红（新增）；
  *        · 命中次数少于名单（含已清零）    → 也红，要把名单调低 / 删条目，
  *          还账必须落进文件，不给自己留额度（同 scripts/verify-fixture-time-bombs.mjs 的记账方式）。
- *      命中次数 = 词表里每条说法在该文件中出现的次数之和（各条分别计，重叠算多次）。
+ *      命中处数 = 该文件里被词表盖住的位置数：同一处被好几条说法同时盖住（长句型是短说法的子集）只算一处，
+ *      所以词表里多写几条同义说法不会把页面存量的数字翻倍。
  *
  * 做不到的事（如实写明）：静态文本扫不到运行时拼出来的句子，也扫不到把词拆开写的字符串。
  * 码表里的句子由 verify-kiosk-runtime-error-boundary 在运行时逐码真跑一遍补上这一层。
@@ -67,18 +68,36 @@ const failures = []
 const fail = (message) => failures.push(message)
 const toPosix = (p) => p.split(sep).join('/')
 
-/** 一行里每个词出现几次，就记几次。 */
+/**
+ * 词表在文本里盖住的位置，一处记一条。同一行里重叠的说法合并成一处
+ * （「联系现场工作人员」同时被「联系现场工作人员」和「现场工作人员」盖住，只算一处）。
+ * 返回的 phrase 是合并后真实匹配到的那段原文。
+ */
 function findHits(text, phrases) {
   const hits = []
   text.split('\n').forEach((line, index) => {
+    const spans = []
     for (const phrase of phrases) {
       for (let from = 0; ;) {
         const at = line.indexOf(phrase, from)
         if (at < 0) break
-        hits.push({ line: index + 1, phrase, text: line.trim() })
-        from = at + phrase.length
+        spans.push({ start: at, end: at + phrase.length })
+        from = at + 1
       }
     }
+    spans.sort((a, b) => a.start - b.start || b.end - a.end)
+    let current = null
+    const flush = () => {
+      if (current) hits.push({ line: index + 1, phrase: line.slice(current.start, current.end), text: line.trim() })
+    }
+    for (const span of spans) {
+      if (current && span.start < current.end) current.end = Math.max(current.end, span.end)
+      else {
+        flush()
+        current = { ...span }
+      }
+    }
+    flush()
   })
   return hits
 }
@@ -123,6 +142,9 @@ if (phrasesOk) {
   for (const phrase of phrases) {
     const sample = findHits(`甲${phrase}乙`, [phrase])
     if (sample.length !== 1) fail(`扫描器对词表条目「${phrase}」没有恰好命中一次（实际 ${sample.length}），扫描逻辑坏了`)
+    // 整张词表一起上：长句型被短说法同时盖住，仍只能算一处，否则页面存量的数字会随词表同义条目翻倍。
+    const merged = findHits(`甲${phrase}乙`, phrases)
+    if (merged.length !== 1) fail(`整张词表扫「${phrase}」应只算一处（重叠的说法要合并），实际 ${merged.length} 处，合并逻辑坏了`)
   }
   if (findHits('这里什么也没有', phrases).length !== 0) fail('扫描器在不含任何禁用说法的句子上误报')
 }
@@ -165,7 +187,7 @@ const isAllowedLine = (file, text) => allowed.get(file)?.has(text) === true
 // ── 扫 src ──────────────────────────────────────────────────────────────────
 let scannedShared = 0
 let scannedPages = 0
-let pageRoleOnly = { files: 0, lines: 0 } // 页面里单独出现「工作人员」、但词表没命中的（只提示，不计入名单）
+const pageRoleOnly = [] // 页面里单独出现「工作人员」、但词表没命中的文件（只提示，不计入名单）：[{ rel, lines }]
 const unknownExt = new Set()
 const sharedHits = [] // [{ rel, hits }]
 /** @type {Map<string, Array<{ line: number, phrase: string, text: string }>>} */
@@ -187,7 +209,7 @@ if (phrasesOk) {
       if (phraseHits.length > 0) pageHits.set(rel, phraseHits)
       else {
         const roleOnly = findHits(text, [ROLE_WORD]).filter((hit) => !isAllowedLine(rel, hit.text))
-        if (roleOnly.length > 0) pageRoleOnly = { files: pageRoleOnly.files + 1, lines: pageRoleOnly.lines + roleOnly.length }
+        if (roleOnly.length > 0) pageRoleOnly.push({ rel, lines: roleOnly.length })
       }
       continue
     }
@@ -253,10 +275,12 @@ if (failures.length > 0) {
 console.log(`  PASS 词表 ${phrases.length} 条，读自 ${COPY_MODULE}（转译后真读，未另抄）`)
 console.log(`  PASS 共享模块 ${scannedShared} 个文件：零命中（词表 + 「${ROLE_WORD}」）`)
 console.log(`  PASS 页面目录 ${scannedPages} 个文件：命中 ${pageHitTotal} 处，全部在待清名单的 ${pending.size} 个文件里，次数与名单逐个一致，无新增`)
-if (pageRoleOnly.lines > 0) {
+if (pageRoleOnly.length > 0) {
+  const lines = pageRoleOnly.reduce((sum, item) => sum + item.lines, 0)
+  const names = pageRoleOnly.slice(0, 8).map((item) => `${item.rel.replace(PAGES_PREFIX, '')}(${item.lines})`).join('、')
   console.log(
-    `  NOTE 另有 ${pageRoleOnly.files} 个页面文件共 ${pageRoleOnly.lines} 行单独出现「${ROLE_WORD}」、词表没命中，不计入名单`
-    + '（有的是求助句，如「请现场工作人员协助」；有的是隐私说明或别家机构的人员）。要把这类求助句纳入，改 unattendedCopy.ts 的词表，名单随之重算。',
+    `  NOTE 另有 ${pageRoleOnly.length} 个页面文件共 ${lines} 行单独出现「${ROLE_WORD}」、词表没命中，不计入名单：${names}${pageRoleOnly.length > 8 ? ' 等' : ''}。`
+    + '这些是隐私说明或展会、门店、银行的人员，不是叫用户去找本机的人；若有求助句漏网，改 unattendedCopy.ts 的词表，名单随之重算。',
   )
 }
 console.log('\n✓ verify:kiosk-unattended-copy 通过\n')

@@ -120,6 +120,31 @@ test('服务端原话叫人找现场工作人员时换成登记句，干净原�
   assert.equal(copy.containsStaffHandoff('缺纸时一体机会自动停止接单'), true)
 })
 
+test('词表补的短说法：找 / 叫 / 请 / 问 / 向、现场……、会……、由……处理 的变体，服务端原话都换成登记句；隐私说明和普通提示不误伤', () => {
+  for (const handoff of [
+    '多次重试仍失败，请现场工作人员协助',
+    '可以叫现场工作人员来看看',
+    '上传一直不结束，可以叫工作人员来看一眼',
+    '打印作业未确认完成，请工作人员检查出纸状态',
+    '不会操作可以问工作人员',
+    '有问题可以向工作人员反馈',
+    '是否补打，以工作人员现场核查结果为准',
+    '工作人员会取出卡纸并补打',
+    '补打由工作人员凭订单号处理',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(handoff), true, `应命中词表：${handoff}`)
+    assert.equal(copy.preferUnattended(handoff, '标准句'), '标准句', `应换成登记句：${handoff}`)
+  }
+  for (const clean of [
+    '企业、合作机构与工作人员都看不到，也不参与岗位排序',
+    '系统不保存答案原文，只留一串校验码',
+    '本机暂停接单，请稍后再来',
+  ]) {
+    assert.equal(copy.containsStaffHandoff(clean), false, `不该命中词表：${clean}`)
+    assert.equal(copy.preferUnattended(clean, '标准句'), clean, `应原样留下：${clean}`)
+  }
+})
+
 const clientStub = toDataUrl('export const API_BASE_URL = "/api/v1"')
 const screenStub = toDataUrl('export function getTerminalId() { return globalThis.__kioskTerminalId || "" }')
 const contactMod = await import(transpile(join(kioskRoot, 'src/services/api/supportContact.ts'), {
