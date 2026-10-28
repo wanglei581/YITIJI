@@ -309,10 +309,12 @@
 [data-qx-page='sign'] .fs-plan ol {
   margin: 6px 0 0;
   padding-left: 1.4em;
+  list-style: decimal;
 }
 
 [data-qx-page='print-hub'] .fs-plan li,
 [data-qx-page='sign'] .fs-plan li {
+  display: list-item;
   font-size: 22px;
   line-height: 1.4;
   color: var(--qxt-ink-2);
@@ -419,4 +421,28 @@
 [data-qx-page='img2pdf'] .fs-row small,
 [data-qx-page='sign'] .fs-row small {
   font-size: 22px;
+}
+
+/* 证件照说明一屏放下：操作卡的最小高度收到 150，让卡片自己让出余量（稿里它们也是挨着排满）。 */
+[data-qx-page='print-hub'][data-state='feature-id-photo'] .fs-act {
+  min-height: 150px;
+}
+
+/* 页脚：说明在上、求助卡在下，各占一整行（只在本包的屏里；打印扫描首页不受影响）。 */
+.qxt-screen.scan-touch [data-qx-page='print-hub'] .ph-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+/* 复印说明的法律提示：稿里是一张泥色提示卡，不是页脚小字。 */
+.qxt-screen.scan-touch [data-testid='print-hub-copy-legal'] {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  line-height: 1.45;
 }

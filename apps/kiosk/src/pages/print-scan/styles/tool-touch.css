@@ -303,3 +303,16 @@
 [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
   padding: 8px 12px;
 }
+
+/* 求助句照稿画成一张泥色提示卡：「需要帮助？拨打服务电话……」。号码读不到时组件不渲染，这里没有占位。 */
+.qxt-screen.scan-touch [data-testid='service-phone-line'] {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-clay-wash);
+  color: var(--qxt-clay-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: left;
+}
