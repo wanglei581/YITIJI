@@ -483,7 +483,6 @@ export function useSignStampFlow() {
     },
     goBack: () => navigate(back.path),
     goLogin: () => navigate(loginPathForCurrentLocation()),
-    goHelp: () => navigate('/help'),
     goDocs: () => navigate('/me/documents'),
     navigate,
   }
@@ -495,7 +494,7 @@ function resolveCta(args: {
   synthetic: boolean
   authorized: boolean
   backLabel: string
-}): { primary: string; primaryDisabled: boolean; reason: string | null; action: 'compose' | 'retry' | 'material' | 'login' | 'help' | 'back' | 'retry-cap' | 'none' } {
+}): { primary: string; primaryDisabled: boolean; reason: string | null; action: 'compose' | 'retry' | 'material' | 'login' | 'back' | 'retry-cap' | 'none' } {
   const { state, live, synthetic, backLabel } = args
   if (state === 'login-required' || state === 'auth-unknown' || state === 'login-expired') {
     return { primary: state === 'login-expired' ? '重新登录' : '去登录', primaryDisabled: false, reason: null, action: 'login' }

@@ -45,32 +45,6 @@
 }
 
 /* 短页把最后一块说明卡撑满剩余纸面。卡片底是 --qx-surface，不是奶油纸色。 */
-.qxt-screen .sw-page > .sw-sec.is-grow,
-.qxt-screen .sw-page > .sw-sec:last-child {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.qxt-screen .sw-page > .sw-sec.is-grow > .sw-panel,
-.qxt-screen .sw-page > .sw-sec.is-grow > .sw-grid2,
-.qxt-screen .sw-page > .sw-sec:last-child > .sw-grid2,
-.qxt-screen .sw-page > .sw-sec:last-child > .sw-chain {
-  flex: 1 1 auto;
-}
-
-.qxt-screen .sw-page > .sw-sec.is-grow > .sw-panel {
-  background: var(--qxt-card);
-  border: 1px solid var(--qxt-edge);
-  border-radius: 28px;
-  padding: 16px;
-}
-
-.qxt-screen .sw-page > .sw-sec.is-grow > .sw-grid2,
-.qxt-screen .sw-page > .sw-sec:last-child > .sw-grid2 {
-  align-items: stretch;
-  grid-template-rows: minmax(min-content, 1fr);
-}
 
 .qxt-screen .ph-page {
   display: flex;

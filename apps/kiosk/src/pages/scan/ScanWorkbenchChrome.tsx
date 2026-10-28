@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
+import { type LucideIcon } from 'lucide-react'
 import { AiDownNote } from '../print-scan/AiDownNote'
 import { askDraftOf } from '../print-scan/askDraft'
 import { UsbArt } from '../print-scan/ToolArt'
@@ -14,8 +14,6 @@ import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
-  SCAN_CHAIN,
-  SCAN_TRUTH,
   SCAN_TYPE_OPTIONS,
   type ScanType,
   type ScanWorkbenchState,
@@ -89,7 +87,6 @@ type ScanWorkbenchShellProps = {
   subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   dock?: ScanDock
-  facts?: readonly string[]
   layout?: 'stack' | 'spread'
   children: ReactNode
 }
@@ -101,7 +98,6 @@ export function ScanWorkbenchShell({
   subtitle,
   status,
   dock,
-  facts,
   layout = 'stack',
   children,
 }: {
@@ -111,7 +107,6 @@ export function ScanWorkbenchShell({
   subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   dock?: ScanDock
-  facts?: readonly string[]
   /**
    * 稿 18 的两种排法：`stack` 最后一块吃余量（选类型 / 面板指引 / 结果预览）；
    * `spread` 给「状态屏」用 —— 卡片按内容收住，余量摊进版块之间，
@@ -213,92 +208,9 @@ export function ScanWorkbenchShell({
         data-layout={layout}
       >
         <AiDownNote />
-        {facts && facts.length > 0 ? (
-          <div className="sw-xq-facts">
-            {facts.map((fact) => (
-              <p key={fact}>{fact}</p>
-            ))}
-          </div>
-        ) : null}
         {children}
       </div>
     </QxTouchScreen>
-  )
-}
-
-export function ScanHero({
-  ask,
-  em,
-  doing,
-  facts,
-}: {
-  ask: string
-  em: string
-  doing: ReactNode
-  facts?: readonly string[]
-}) {
-  const i = ask.indexOf(em)
-  return (
-    <section className="sw-xq">
-      <div className="sw-xq-row">
-        <div className="sw-xq-face" aria-hidden="true">青</div>
-        <div className="sw-xq-main">
-          <h2 className="sw-xq-ask">
-            {i < 0 ? (
-              ask
-            ) : (
-              <>
-                {ask.slice(0, i)}
-                <em>{em}</em>
-                {ask.slice(i + em.length)}
-              </>
-            )}
-          </h2>
-          <p className="sw-xq-doing">{doing}</p>
-        </div>
-      </div>
-      {facts && facts.length > 0 ? (
-        <div className="sw-xq-facts">
-          {facts.map((fact) => (
-            <span key={fact}>{fact}</span>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  )
-}
-
-export function ScanChain({ active }: { active: number }) {
-  return (
-    <div className="sw-chain" data-testid="scan-workbench-chain">
-      {SCAN_CHAIN.map((step, index) => {
-        const Icon = step.icon
-        return (
-          <div key={step.title} className="sw-chain-wrap">
-            {index > 0 ? <span className="sw-chain-arrow" aria-hidden="true"><ChevronRightIcon size={20} /></span> : null}
-            <div className={`sw-link${active === index ? ' is-on' : ''}`}>
-              <span className="sw-link-ic"><Icon size={24} aria-hidden /></span>
-              <b>{step.title}</b>
-              <span className="sw-link-c">{step.copy}</span>
-              <span className="sw-link-who">{step.who}</span>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-export function ScanTruth() {
-  return (
-    <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">
-      {SCAN_TRUTH.map((item) => (
-        <div key={item.title}>
-          <b>{item.title}</b>
-          {item.body}
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -339,34 +251,6 @@ export function ScanTypeCards({
         )
       })}
     </div>
-  )
-}
-
-export function ScanNoteCard({
-  title,
-  children,
-  foot,
-}: {
-  title: string
-  children: ReactNode
-  foot?: ReactNode
-}) {
-  return (
-    <div className="sw-pgrp">
-      <h4>{title}</h4>
-      <div className="sw-note-body">{children}</div>
-      {foot ? <div className="sw-foot">{foot}</div> : null}
-    </div>
-  )
-}
-
-export function ScanPlan({ items }: { items: readonly string[] }) {
-  return (
-    <ul className="sw-plan">
-      {items.map((item) => (
-        <li key={item}><span className="sw-sq" aria-hidden="true" /><span>{item}</span></li>
-      ))}
-    </ul>
   )
 }
 
@@ -436,51 +320,5 @@ export function ScanStatusPanel({
         </div>
       ) : null}
     </div>
-  )
-}
-
-export function ScanKvCard({
-  title,
-  rows,
-}: {
-  title: string
-  rows: readonly [string, string][]
-}) {
-  return (
-    <div className="sw-pgrp" data-testid="scan-workbench-task-card">
-      <h4>{title}</h4>
-      <div className="sw-kv">
-        {rows.map(([key, value]) => (
-          <div key={key}><span>{key}</span><b>{value}</b></div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-export function ScanSec({
-  no,
-  title,
-  hint,
-  children,
-  grow,
-}: {
-  no?: string
-  title?: string
-  hint?: string
-  children: ReactNode
-  grow?: boolean
-}) {
-  return (
-    <section className={`sw-sec${grow ? ' is-grow' : ''}`}>
-      {title ? (
-        <div className="sw-sec-h">
-          {no ? <span className="sw-no">{no}</span> : null}
-          <span className="t">{title}</span>
-          {hint ? <span className="hint">{hint}</span> : null}
-        </div>
-      ) : null}
-      {children}
-    </section>
   )
 }
