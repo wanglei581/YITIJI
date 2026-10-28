@@ -249,7 +249,7 @@ export function HelpCenterPage() {
     ? { label: '问小青：帮助页打不开', draft: '帮助页打不开，我该怎么继续？', voice: true }
     : view === 'no-result'
       ? { label: '问小青：分类里没有我的问题', draft: '这一页的分类里没有我的问题，我该怎么继续？', voice: true }
-      : { label: '问小青：这里没看懂', draft: '帮助页里我没看懂，请帮我说明。', voice: true }
+      : { label: '问小青：这里没看懂', draft: view === 'topic' && topic ? `帮助页「${topic.label}」这一类里我没看懂，请帮我说明。` : '帮助页里我没看懂，请帮我说明。', voice: true }
   const dock = view === 'topic' ? (
     <QxTouchDock
       onBack={clearTopic}
