@@ -30,7 +30,9 @@ import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
+import { ListPrintScanTasksQueryDto } from '../src/admin-print-scan/dto/list-print-scan-tasks.dto'
 import { Reflector } from '@nestjs/core'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { AdminTerminalsController } from '../src/terminals/admin-terminals.controller'
@@ -86,8 +88,34 @@ async function expectHttpErrorCode(
   fail(`${label} — 期望抛出 HTTP ${status}（${code}），实际未抛错`)
 }
 
+async function assertUnconfirmedQueryValidation(): Promise<void> {
+  const pipe = new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    exceptionFactory: () => new BadRequestException({ error: { code: 'VALIDATION_FAILED' } }),
+  })
+  const meta = { type: 'query' as const, metatype: ListPrintScanTasksQueryDto }
+  const kept = await pipe.transform({ type: 'print', status: 'failed', terminalId: 'term', page: '2', pageSize: '20' }, meta) as ListPrintScanTasksQueryDto
+  if (kept.type !== 'print' || kept.status !== 'failed' || kept.terminalId !== 'term' || kept.page !== '2' || kept.pageSize !== '20' || kept.unconfirmed !== undefined) {
+    fail('不传 unconfirmed 时原有查询参数必须原样保留')
+  }
+  const enabled = await pipe.transform({ type: 'print', unconfirmed: '1' }, meta) as ListPrintScanTasksQueryDto
+  if (enabled.unconfirmed !== '1') fail('unconfirmed=1 必须通过校验')
+  let rejected = false
+  try {
+    await pipe.transform({ type: 'print', unconfirmed: 'true' }, meta)
+  } catch (error) {
+    const body = (error as BadRequestException).getResponse() as { error?: { code?: string } }
+    rejected = (error as BadRequestException).getStatus?.() === 400 && body.error?.code === 'VALIDATION_FAILED'
+  }
+  if (!rejected) fail('unconfirmed 不是 1 时必须拒绝')
+  pass('unconfirmed 查询只接受 1，不传时不改变原有参数')
+}
+
 async function main() {
   console.log('\n=== Task 10 Admin print-scan 任务中心 + 能力开关验证 ===')
+  await assertUnconfirmedQueryValidation()
 
   const serviceSource = readFileSync(join(__dirname, '../src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
   if (!/this\.prisma\.\$transaction[\s\S]*this\.audit\.writeRequired/s.test(serviceSource)) {
@@ -432,6 +460,49 @@ async function main() {
       '打印结果未确认，不能重新提交，请联系工作人员核查',
     )
     pass('print-scan 展示 printOutcome，核查后仍禁止重试且不改 errorCode')
+
+    const openUnconfirmedId = `pt_vps_uc_open_${suffix}`
+    const blankUnconfirmedId = `pt_vps_uc_blank_${suffix}`
+    const checkedUnconfirmedId = `pt_vps_uc_checked_${suffix}`
+    const otherFailedId = `pt_vps_uc_other_${suffix}`
+    createdPrintTaskIds.push(openUnconfirmedId, blankUnconfirmedId, checkedUnconfirmedId, otherFailedId)
+    await prisma.printTask.createMany({ data: [
+      { id: openUnconfirmedId, terminalId, fileUrl: 'internal://unconfirmed-open', fileMd5: 'uc-open', status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', printOutcome: null },
+      { id: blankUnconfirmedId, terminalId, fileUrl: 'internal://unconfirmed-blank', fileMd5: 'uc-blank', status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', printOutcome: '' },
+      { id: checkedUnconfirmedId, terminalId, fileUrl: 'internal://unconfirmed-checked', fileMd5: 'uc-checked', status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', printOutcome: 'not_printed' },
+      { id: otherFailedId, terminalId, fileUrl: 'internal://other-failed', fileMd5: 'uc-other', status: 'failed', errorCode: 'PAPER_OUT', printOutcome: null },
+    ] })
+    const unconfirmedWhere = { terminalId, errorCode: 'PRINT_JOB_UNCONFIRMED', OR: [{ printOutcome: null }, { printOutcome: '' }] }
+    const expectedUnconfirmed = await prisma.printTask.count({ where: unconfirmedWhere })
+    const filtered = await printScan.listTasks({ type: 'print', terminalId, page: 1, pageSize: 500, unconfirmed: true })
+    const filteredIds = new Set(filtered.items.map((item) => item.taskId))
+    if (filtered.pagination.total !== expectedUnconfirmed || filtered.items.length !== expectedUnconfirmed) {
+      fail(`unconfirmed=1 的 total 必须等于未确认条数，期望 ${expectedUnconfirmed}，实际 total=${filtered.pagination.total} items=${filtered.items.length}`)
+    }
+    if (!filteredIds.has(openUnconfirmedId) || !filteredIds.has(blankUnconfirmedId) || filteredIds.has(unconfirmedTaskId) || filteredIds.has(checkedUnconfirmedId) || filteredIds.has(otherFailedId)) {
+      fail('unconfirmed=1 只能包含尚未核查的未确认任务')
+    }
+    if (filtered.items.some((item) => item.type !== 'print' || item.errorCode !== 'PRINT_JOB_UNCONFIRMED' || item.printOutcome !== null)) {
+      fail('unconfirmed=1 的每一行都必须是未核查的未确认打印任务')
+    }
+    const firstPage = await printScan.listTasks({ type: 'print', terminalId, page: 1, pageSize: 1, unconfirmed: true })
+    if (firstPage.items.length !== 1 || firstPage.pagination.total !== expectedUnconfirmed) {
+      fail('分页时 total 仍须是全部未确认条数')
+    }
+    const plain = await printScan.listTasks({ type: 'print', terminalId, page: 1, pageSize: 500 })
+    const plainAgain = await printScan.listTasks({ type: 'print', terminalId, page: 1, pageSize: 500, unconfirmed: false })
+    const allOnTerminal = await prisma.printTask.count({ where: { terminalId } })
+    if (JSON.stringify(plain) !== JSON.stringify(plainAgain) || plain.pagination.total !== allOnTerminal) {
+      fail('不传 unconfirmed 时列表必须与原来一致')
+    }
+    if (plain.pagination.total === filtered.pagination.total || !plain.items.some((item) => item.taskId === otherFailedId) || !plain.items.some((item) => item.taskId === unconfirmedTaskId)) {
+      fail('不传 unconfirmed 时不能套用未确认筛选')
+    }
+    const failedFiltered = await printScan.listTasks({ type: 'print', terminalId, status: 'failed', page: 1, pageSize: 500, unconfirmed: true })
+    const expectedFailed = await prisma.printTask.count({ where: { ...unconfirmedWhere, status: 'failed' } })
+    if (failedFiltered.pagination.total !== expectedFailed) fail('unconfirmed=1 与状态筛选必须同时生效，total 仍准确')
+    await expectHttpError(() => printScan.listTasks({ type: 'scan', page: 1, pageSize: 20, unconfirmed: true }), 400, 'unconfirmed=1 不能套到扫描任务')
+    pass('unconfirmed=1 只返回未确认打印任务且 total 准确；不传时与原来一致')
 
     const partialTaskId = `pt_vps_partial_${suffix}`
     const partialOrderId = `order_vps_partial_${suffix}`

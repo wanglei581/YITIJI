@@ -318,6 +318,38 @@ const mockRows: PartnerPolicyRecord[] = [
     emergencyTakedown: true, emergencyReasonCode: 'false_information',
     emergencyReasonText: '申领入口链接指向非官方网站（演示）', emergencyTakedownAt: now(),
   },
+  {
+    id: 'pp-mock-5', kind: 'notice', title: '校园宣讲志愿者招募（演示）',
+    summary: '演示数据：招募类待审核', category: 'recruitment', publishedDate: '2026-10-01',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-6', kind: 'notice', title: '就业指导讲师招募（演示）',
+    summary: '演示数据：招募类已通过未发布', category: 'recruitment', publishedDate: '2026-10-02',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: null, publishConfirmedAt: null, publishConfirmedContentVersion: null,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-7', kind: 'notice', title: '档案服务点招募（演示）',
+    summary: '演示数据：招募类已发布', category: 'recruitment', publishedDate: '2026-10-03',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+  },
+  {
+    id: 'pp-mock-8', kind: 'policy_guide', title: '见习单位招募说明（演示）',
+    summary: '演示数据：招募类扶持条目', audience: 'graduate', category: 'recruitment', publishedDate: '2026-10-04',
+    sourceOrgId: 'mock-org', sourceName: '测试机构',
+    reviewStatus: 'approved', publishStatus: 'published', rejectReason: null,
+    contentVersion: 1, publishConfirmedBy: 'mock-partner-001', publishConfirmedAt: now(), publishConfirmedContentVersion: 1,
+    syncTime: now(), updatedAt: now(),
+  },
 ]
 
 const mockAdapter: PartnerPoliciesServiceInterface = {
@@ -413,7 +445,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
   //   2. 保存必须真正落库并把政策打回待审核，mock 的「已保存」是假的；
   //   3. 判定必须与用户在一体机上拿到的结论**同一条服务端路径**，
   //      前端自己算一遍就成了第二套口径 —— 那比没有预览更糟。
-  // 所以这里如实抛错，由录入面展示「演示模式不可用」，不给任何结果。
+  // 所以这里如实抛错，由录入面展示「演示模式不执行」，不给任何结果。
   async getEligibilityQuestions() { throw mockUnsupported() },
   async getEligibilityRules() { throw mockUnsupported() },
   async replaceEligibilityRules() { throw mockUnsupported() },
@@ -421,11 +453,7 @@ const mockAdapter: PartnerPoliciesServiceInterface = {
 }
 
 function mockUnsupported(): ApiHttpError {
-  return new ApiHttpError(
-    'ELIGIBILITY_REQUIRES_BACKEND',
-    '演示模式(API_MODE=mock)不提供政策申领条件的录入与试算:问项字典、保存与判定都只在服务端进行。请连接真实后端后再录入。',
-    501,
-  )
+  return new ApiHttpError('DEMO_MODE_READONLY', '演示模式不执行', 501)
 }
 
 export const partnerPoliciesService: PartnerPoliciesServiceInterface = API_MODE === 'http' ? httpAdapter : mockAdapter

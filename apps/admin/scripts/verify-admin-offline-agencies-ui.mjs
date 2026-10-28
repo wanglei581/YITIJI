@@ -68,7 +68,8 @@ const INDEX = join(PAGE_DIR, 'index.tsx')
 const QUAL_SECTION = join(adminRoot, 'src/routes/partners/OrgQualificationSection.tsx')
 const PARTNERS_PAGE = join(adminRoot, 'src/routes/partners/index.tsx')
 const ROUTES = join(adminRoot, 'src/routes/index.tsx')
-const NAV = join(adminRoot, 'src/layouts/AdminLayoutWrapper.tsx')
+const NAV = join(adminRoot, 'src/layouts/adminNav.ts')
+const LAYOUT = join(adminRoot, 'src/layouts/AdminLayoutWrapper.tsx')
 const SERVICE = join(adminRoot, 'src/services/api/offlineAgenciesAdmin.ts')
 const GOV_SERVICE = join(adminRoot, 'src/services/api/offlineAgencyGovernance.ts')
 const SERVER_DTO = join(repoRoot, 'services/api/src/offline-agencies/dto/create-offline-agency.dto.ts')
@@ -566,15 +567,17 @@ checkQualificationSurface(QUAL_SECTION, qualAst, { withoutSourceOrgState: false 
 {
   const routes = readOrFail(ROUTES)
   const nav = readOrFail(NAV)
+  const layout = readOrFail(LAYOUT)
   const partners = readOrFail(PARTNERS_PAGE) + readOrFail(join(adminRoot, 'src/routes/partners/OrgDetailDrawer.tsx'))
   const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const navCode = code(nav + '\n' + layout)
   if (/import\s+\w+\s+from\s+'\.\/offline-agencies'/.test(code(routes))) {
     fail(`${rel(ROUTES)} 仍 import 线下机构页 —— 3.15 停放后不得打包`)
   }
   if (!/\{\s*path:\s*'offline-agencies',\s*element:\s*<Navigate to="\/partners" replace \/>\s*\}/.test(routes)) {
     fail(`${rel(ROUTES)} 的旧地址 /offline-agencies 没有按历史路径做法重定向到 /partners`)
   }
-  if (/key:\s*'offline-agencies'/.test(code(nav)) || code(nav).includes("label: '线下机构'")) {
+  if (/key:\s*'offline-agencies'/.test(navCode) || navCode.includes("label: '线下机构'")) {
     fail(`${rel(NAV)} 侧栏仍有「线下机构」`)
   }
   if (!/'\/offline-agencies':\s*'partners'/.test(nav)) {

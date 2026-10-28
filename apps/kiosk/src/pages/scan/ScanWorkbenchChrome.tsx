@@ -145,12 +145,18 @@ export function ScanWorkbenchShell({
         <QxTouchDock
           className="qx-ctabar"
           back={false}
-          ask={{ label: askLabel, draft: askLabel }}
-          onAsk={() => {
-            rememberAssistantDraft(askLabel)
-            leaveScanFlow('/assistant')
+          ask={{
+            label: askLabel,
+            draft: askLabel,
+            /* 问小青也是「离开整条扫描流程」：先记草稿，再走 leaveScanFlow 撤服务端、清本机登记，
+             * 最后返回 false 让底栏不再自己 navigate。 */
+            beforeAsk: () => {
+              rememberAssistantDraft(askLabel)
+              leaveScanFlow('/assistant')
+              return false
+            },
           }}
-          mid={ctabar}
+          secondary={ctabar}
         />
       }
       nav={

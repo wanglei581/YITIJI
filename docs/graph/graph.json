@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 582,
+    "endpointCount": 603,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1796,6 +1796,536 @@
         ],
         "services": [
           "MemberFeedbackService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.end",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/deployments/:id/end",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.directory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.create",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.update",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.update",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.overview",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/overview",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.overview",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/overview",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.createProject",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/projects",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.updateProject",
+        "method": "PATCH",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.deploy",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id/deployments",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-projects.service.ts"
+        ],
+        "services": [
+          "FirstOrderProjectsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.preview",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id/report-preview",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.preview",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id/report-preview",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.createReport",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id/reports",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.createReport",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/projects/:id/reports",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.reportDirectory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.report",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.report",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports/:id",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.acknowledge",
+        "method": "POST",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports/:id/acknowledge",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.csv",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports/:id/csv",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.csv",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports/:id/csv",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
         ]
       },
       {
@@ -4081,6 +4611,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -4113,6 +4644,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -4179,6 +4711,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -4250,6 +4783,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -4280,6 +4814,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -4312,6 +4847,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -5513,6 +6049,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -5541,6 +6078,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -10606,6 +11144,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -11680,6 +12219,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -11708,6 +12248,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -11759,6 +12300,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -11837,6 +12379,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -11866,6 +12409,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCapability",
@@ -11898,6 +12442,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCapability",
@@ -11974,6 +12519,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -12037,6 +12583,7 @@
           "PrintTask",
           "PrintTaskStatusLog",
           "ScanTask",
+          "ServiceDeployment",
           "Terminal",
           "TerminalBindCode",
           "TerminalCredential",
@@ -12245,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 238,
+      "reachableFileCount": 252,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12267,8 +12814,11 @@
             "GET /files/lifecycle-summary",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/feedback/:param/status",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "POST /admin/feedback/:param/contact-phone",
+            "POST /admin/feedback/:param/replies",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired",
@@ -13013,11 +13563,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 264
+      "sourceFileCount": 278
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 639,
+      "reachableFileCount": 671,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -14572,10 +15122,12 @@
           "path": "/print-scan/convert",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/convert-images-qx.css",
-            "apps/kiosk/src/styles/qingxu/index.css",
-            "apps/kiosk/src/styles/qingxu/primitives.css",
-            "apps/kiosk/src/styles/qingxu/shell.css",
-            "apps/kiosk/src/styles/qingxu/tokens.css"
+            "apps/kiosk/src/pages/print-scan/styles/tool-fs.css",
+            "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
         },
@@ -14591,10 +15143,12 @@
           "path": "/print-scan/feature/:key",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/print-hub-qx.css",
-            "apps/kiosk/src/styles/qingxu/index.css",
-            "apps/kiosk/src/styles/qingxu/primitives.css",
-            "apps/kiosk/src/styles/qingxu/shell.css",
-            "apps/kiosk/src/styles/qingxu/tokens.css"
+            "apps/kiosk/src/pages/print-scan/styles/tool-fs.css",
+            "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
         },
@@ -14623,10 +15177,12 @@
           "path": "/print-scan/sign",
           "styles": [
             "apps/kiosk/src/pages/print-scan/styles/sign-stamp-qx.css",
-            "apps/kiosk/src/styles/qingxu/index.css",
-            "apps/kiosk/src/styles/qingxu/primitives.css",
-            "apps/kiosk/src/styles/qingxu/shell.css",
-            "apps/kiosk/src/styles/qingxu/tokens.css"
+            "apps/kiosk/src/pages/print-scan/styles/tool-fs.css",
+            "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
         },
@@ -15800,13 +16356,15 @@
           ],
           "path": "/scan",
           "styles": [
+            "apps/kiosk/src/pages/print-scan/styles/tool-touch.css",
+            "apps/kiosk/src/pages/scan/styles/scan-fs.css",
             "apps/kiosk/src/pages/scan/styles/scan-result-viewer-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-compact-qx.css",
             "apps/kiosk/src/pages/scan/styles/scan-workbench-qx.css",
-            "apps/kiosk/src/styles/qingxu/index.css",
-            "apps/kiosk/src/styles/qingxu/primitives.css",
-            "apps/kiosk/src/styles/qingxu/shell.css",
-            "apps/kiosk/src/styles/qingxu/tokens.css"
+            "apps/kiosk/src/styles/qingxu/tokens-touch.css",
+            "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
         },
@@ -15993,16 +16551,60 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 736
+      "sourceFileCount": 767
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 83,
+      "reachableFileCount": 92,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
         {
           "component": "DashboardPage",
+          "endpoints": [
+            "DELETE /partner/policies/:param",
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/policies/:param/eligibility-rules",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "GET /policies/eligibility-questions",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "PATCH /partner/policies/:param",
+            "PATCH /partner/policies/:param/publish",
+            "PATCH /partner/policies/:param/release",
+            "PATCH /partner/policies/:param/review",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "POST /partner/policies",
+            "POST /partner/policies/:param/eligibility-preview",
+            "PUT /partner/policies/:param/eligibility-rules",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
+          "file": "apps/partner/src/routes/dashboard/index.tsx",
+          "layout": [
+            "PartnerLayoutWrapper"
+          ],
+          "path": "/",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "AccountPage",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -16024,20 +16626,8 @@
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
-            "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/dashboard/index.tsx",
-          "layout": [
-            "PartnerLayoutWrapper"
-          ],
-          "path": "/",
-          "styles": [],
-          "wrappers": []
-        },
-        {
-          "component": "AccountPage",
-          "endpoints": [],
           "file": "apps/partner/src/routes/account/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16245,7 +16835,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16256,7 +16868,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16404,7 +17038,28 @@
         {
           "component": "TerminalsPage",
           "endpoints": [
-            "PUT /partner/profile"
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
           ],
           "file": "apps/partner/src/routes/terminals/index.tsx",
           "layout": [
@@ -16415,11 +17070,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 84
+      "sourceFileCount": 93
     }
   },
   "dataModel": {
-    "modelCount": 112,
+    "modelCount": 117,
     "models": [
       {
         "fieldCount": 7,
@@ -17261,6 +17916,7 @@
         "usedBy": [
           "services/api/src/ai/resume/resume-draft-source.service.ts",
           "services/api/src/console-screen/console-screen.visits.ts",
+          "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/kiosk-session/kiosk-session-retention.task.ts",
           "services/api/src/kiosk-session/kiosk-session.queries.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts",
@@ -17465,7 +18121,7 @@
         ]
       },
       {
-        "fieldCount": 28,
+        "fieldCount": 29,
         "name": "Organization",
         "relations": [
           "CompanyProfile",
@@ -17477,6 +18133,7 @@
           "OnlinePlatformDirectory",
           "PolicyPost",
           "QualificationRecord",
+          "ServiceProject",
           "Terminal",
           "User"
         ],
@@ -17488,6 +18145,7 @@
           "services/api/src/common/auth/optional-internal-user.ts",
           "services/api/src/common/content-trust.ts",
           "services/api/src/companies/companies.service.ts",
+          "services/api/src/first-order/first-order-projects.service.ts",
           "services/api/src/jobs/jobs-admin.service.ts",
           "services/api/src/jobs/jobs-excel.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
@@ -17500,6 +18158,7 @@
           "services/api/src/recruitment-content/recruitment-content-read.service.ts",
           "services/api/src/recruitment-hosting/recruitment-emergency.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts",
           "services/api/src/terminals/terminals-admin.service.ts"
         ]
       },
@@ -17628,6 +18287,7 @@
           "services/api/src/contract-review/contract-review.cleanup.task.ts",
           "services/api/src/files/contract-report-print-lifecycle.service.ts",
           "services/api/src/files/files.service.ts",
+          "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/jobs/fair-material-print-bridge.service.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-feedback/member-feedback.service.ts",
@@ -17769,6 +18429,71 @@
         "usedBy": []
       },
       {
+        "fieldCount": 12,
+        "name": "ServiceDeployment",
+        "relations": [
+          "ServiceIncident",
+          "ServiceProject",
+          "Terminal"
+        ],
+        "usedBy": [
+          "services/api/src/first-order/first-order-access.service.ts",
+          "services/api/src/first-order/first-order-incidents.service.ts",
+          "services/api/src/first-order/first-order-projects.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts"
+        ]
+      },
+      {
+        "fieldCount": 19,
+        "name": "ServiceIncident",
+        "relations": [
+          "ServiceDeployment",
+          "ServiceIncidentEvent",
+          "ServiceProject"
+        ],
+        "usedBy": [
+          "services/api/src/first-order/first-order-incidents.service.ts",
+          "services/api/src/first-order/first-order-report-builder.ts"
+        ]
+      },
+      {
+        "fieldCount": 7,
+        "name": "ServiceIncidentEvent",
+        "relations": [
+          "ServiceIncident"
+        ],
+        "usedBy": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 15,
+        "name": "ServiceProject",
+        "relations": [
+          "Organization",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceReport"
+        ],
+        "usedBy": [
+          "services/api/src/first-order/first-order-access.service.ts",
+          "services/api/src/first-order/first-order-projects.service.ts",
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 9,
+        "name": "ServiceReport",
+        "relations": [
+          "ServiceProject"
+        ],
+        "usedBy": [
+          "services/api/src/first-order/first-order-access.service.ts",
+          "services/api/src/first-order/first-order-projects.service.ts",
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ]
+      },
+      {
         "fieldCount": 6,
         "name": "StorageDeletion",
         "relations": [],
@@ -17805,7 +18530,7 @@
         ]
       },
       {
-        "fieldCount": 29,
+        "fieldCount": 30,
         "name": "Terminal",
         "relations": [
           "ActiveReleaseObservationAssignment",
@@ -17813,6 +18538,7 @@
           "Organization",
           "PrintTask",
           "ScanTask",
+          "ServiceDeployment",
           "TerminalBindCode",
           "TerminalCapability",
           "TerminalCredential",
@@ -17832,6 +18558,9 @@
           "services/api/src/console-screen/console-screen.visits.ts",
           "services/api/src/content/content.service.ts",
           "services/api/src/device-fleet/device-fleet.service.ts",
+          "services/api/src/first-order/first-order-incidents.service.ts",
+          "services/api/src/first-order/first-order-projects.service.ts",
+          "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/jobs/jobs-kiosk.service.ts",
           "services/api/src/kiosk-session/kiosk-session.service.ts",
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
@@ -17853,6 +18582,7 @@
           "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts",
           "services/api/src/terminals/terminal-session.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
@@ -17902,6 +18632,7 @@
         "usedBy": [
           "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/console-screen/console-screen.twin.ts",
+          "services/api/src/first-order/first-order-report-builder.ts",
           "services/api/src/orgs/partner-stats.service.ts",
           "services/api/src/print-jobs/paid-reprint-eligibility.ts",
           "services/api/src/terminals/printer-availability.ts",
@@ -18022,10 +18753,12 @@
           "services/api/src/auth/initial-phone-bind.service.ts",
           "services/api/src/auth/partner-account-action.service.ts",
           "services/api/src/auth/partner-phone-rebind.service.ts",
+          "services/api/src/auth/password-login-identity.ts",
           "services/api/src/common/auth/optional-internal-user.ts",
           "services/api/src/common/health.controller.ts",
           "services/api/src/orgs/admin-org-account-security.ts",
           "services/api/src/orgs/admin-orgs.service.ts",
+          "services/api/src/orgs/partner-account-identifiers.ts",
           "services/api/src/orgs/partner-contact-phone-registration.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
@@ -18208,13 +18941,17 @@
     ],
     "apps/admin/src/layouts/AdminLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/layouts/adminNav.ts": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
-      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
@@ -18246,6 +18983,7 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
@@ -18363,6 +19101,7 @@
     "apps/admin/src/routes/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
+      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
@@ -18855,6 +19594,7 @@
       "scripts/verify-kiosk-font-subset.mjs"
     ],
     "apps/kiosk/package.json": [
+      "apps/admin/scripts/verify-first-order-live.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -21675,8 +22415,11 @@
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-details.mjs",
-      "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
+    ],
+    "apps/partner/src/layouts/partnerNav.ts": [
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/lib/csv.ts": [
       "apps/admin/scripts/verify-console-batch6-copy.mjs",
@@ -22793,6 +23536,7 @@
       "services/api/scripts/verify-admin-orgs-delete-schema.ts",
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
+      "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
@@ -22819,6 +23563,7 @@
       "services/api/scripts/verify-ai-usage-retention.ts",
       "services/api/scripts/verify-ai-user-text-retention.ts",
       "services/api/scripts/verify-db-load-indexes.ts",
+      "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-job-ai.ts",
       "services/api/scripts/verify-job-application-track.ts",
       "services/api/scripts/verify-job-fit-governance.ts",
@@ -23047,6 +23792,12 @@
     "services/api/scripts/support/ephemeral-redis-server.ts": [
       "services/api/scripts/verify-admin-session-revocation.ts",
       "services/api/scripts/verify-internal-login-real-redis.ts"
+    ],
+    "services/api/scripts/support/first-order-fixture.ts": [
+      "services/api/scripts/verify-first-order-http.ts"
+    ],
+    "services/api/scripts/support/first-order-review-boundaries.ts": [
+      "services/api/scripts/verify-first-order-http.ts"
     ],
     "services/api/scripts/support/inmemory-redis-server.ts": [
       "services/api/scripts/verify-upload-scene.ts"
@@ -23486,6 +24237,9 @@
       "services/api/scripts/verify-print-jobs.ts",
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
+    ],
+    "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts": [
+      "services/api/scripts/verify-admin-print-scan.ts"
     ],
     "services/api/src/admin-users/admin-users.controller.ts": [
       "services/api/scripts/verify-admin-users.ts",
@@ -24241,6 +24995,7 @@
       "services/api/scripts/verify-fair-visit-review.ts",
       "services/api/scripts/verify-feedback-notifications.ts",
       "services/api/scripts/verify-field-mapping-rule.ts",
+      "services/api/scripts/verify-first-order-http.ts",
       "services/api/scripts/verify-internal-accounts-postgres.ts",
       "services/api/scripts/verify-internal-accounts.ts",
       "services/api/scripts/verify-internal-auth-phone.ts",
@@ -25108,6 +25863,9 @@
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/first-order/first-order-report-metrics.ts": [
+      "services/api/scripts/verify-first-order-http.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -26572,6 +27330,7 @@
       "services/api/scripts/verify-print-sign.ts"
     ],
     "services/api/src/prisma/create-client.ts": [
+      "services/api/scripts/verify-first-order-migrations.ts",
       "services/api/scripts/verify-member-closure.ts",
       "services/api/scripts/verify-production-db-guard.ts",
       "services/api/scripts/verify-scan-tasks.ts"
@@ -27077,6 +27836,10 @@
       "services/api/scripts/verify-terminal-identity.ts",
       "services/api/scripts/verify-trtc-terminal-http.ts"
     ],
+    "services/api/src/terminals/terminal-org-assignment.ts": [
+      "services/api/scripts/verify-first-order-http.ts",
+      "services/api/scripts/verify-partner-smart-campus.ts"
+    ],
     "services/api/src/terminals/terminal-session.service.ts": [
       "services/api/scripts/verify-ai-usage-coverage.ts",
       "services/api/scripts/verify-member-closure.ts",
@@ -27309,6 +28072,7 @@
         ],
         "files": [
           "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx",
+          "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/ai-services/index.tsx",
           "apps/admin/src/services/api/aiAccess.ts",
           "apps/admin/src/services/api/userErrorMessage.ts",
@@ -27397,7 +28161,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/services/api/adminBilling.ts",
@@ -27421,7 +28185,7 @@
           "apps/admin/src/routes/partners"
         ],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/components/BulkPublishButton.tsx",
           "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx",
           "apps/admin/src/routes/partners/contentTrustRules.ts",
@@ -27447,6 +28211,7 @@
         "files": [
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
+          "apps/admin/src/routes/index.tsx",
           "apps/admin/src/services/api/adminHttpAdapter.ts",
           "apps/admin/src/services/api/adminMockAdapter.ts",
           "apps/admin/src/services/api/devices.ts",
@@ -27511,7 +28276,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/job-materials/index.tsx",
           "apps/admin/src/services/api/jobMaterials.ts"
@@ -27557,6 +28322,7 @@
         ],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/partners/OrgDetailDrawer.tsx",
           "apps/admin/src/routes/partners/OrgQualificationSection.tsx",
@@ -27702,7 +28468,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
@@ -27979,12 +28745,14 @@
         "dirs": [],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/screen/GovGrid.tsx",
           "apps/admin/src/routes/screen/UsageHostingOff.tsx",
           "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screen/screenTabs.ts",
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/index.tsx",
           "apps/partner/src/routes/screen/PartnerGrid.tsx",
@@ -28072,6 +28840,25 @@
       "package": "@ai-job-print/admin",
       "scriptNames": [
         "@ai-job-print/admin::verify:feedback-sla"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/package.json"
+        ],
+        "missing": []
+      },
+      "file": "apps/admin/scripts/verify-first-order-live.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/admin",
+      "scriptNames": [
+        "@ai-job-print/admin::verify:first-order-full-app",
+        "@ai-job-print/admin::verify:first-order-live"
       ],
       "wired": true
     },
@@ -28669,7 +29456,7 @@
         "files": [
           ".github/workflows/ci.yml",
           "apps/admin/package.json",
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/privacy-requests/index.tsx",
           "apps/admin/src/services/api/adminPrivacyRequests.ts",
@@ -32190,7 +32977,7 @@
         "dirs": [],
         "files": [
           "apps/admin/scripts/verify-honest-placeholders.mjs",
-          "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
@@ -33486,7 +34273,9 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "scripts/release-bundle"
+        ],
         "files": [
           ".github/workflows/ci.yml",
           ".github/workflows/deploy.yml",
@@ -34429,6 +35218,7 @@
         "files": [
           "packages/shared/src/types/printScanCapability.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/files/signing.ts",
@@ -36851,6 +37641,52 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "services/api/scripts/support/first-order-fixture.ts",
+          "services/api/scripts/support/first-order-review-boundaries.ts",
+          "services/api/src/audit/audit.service.ts",
+          "services/api/src/first-order/first-order-report-metrics.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-first-order-http.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:first-order-http",
+        "@ai-job-print/api::verify:first-order-http:postgres"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [
+          "services/api/prisma/migrations",
+          "services/api/prisma/postgres/migrations"
+        ],
+        "files": [
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/prisma/create-client.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-first-order-migrations.ts",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:first-order-migrations"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
           "services/api/scripts/lib/verify-governed-job-fit-runtime.ts",
           "services/api/src/ai/ai.module.ts",
           "services/api/src/ai/job-fit.controller.ts",
@@ -37891,7 +38727,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/legal-docs/legalDocRender.ts",
@@ -39649,6 +40485,7 @@
           "services/api/src/smart-campus/dto/save-smart-campus-config.dto.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
           "services/api/src/smart-campus/smart-campus.types.ts",
+          "services/api/src/terminals/terminal-org-assignment.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
           "services/api/src/terminals/terminals-admin.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts",
@@ -43140,18 +43977,6 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",

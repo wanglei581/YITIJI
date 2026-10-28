@@ -10,6 +10,8 @@ import { useTableState } from '../components/DataTable'
 import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { POLICY_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
+import { SourceNarrowCards, SourceStatusFilters } from '../components/SourceNarrowCards'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -84,7 +86,12 @@ export default function PolicySourcesPage() {
   }, [listQuery, applyPage])
 
   const reload = useCallback(() => {
-    policiesAdminService.getPolicySources(listQuery).then(applyPage).catch(() => setError(true))
+    setError(false)
+    setLoading(true)
+    policiesAdminService.getPolicySources(listQuery)
+      .then(applyPage)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
   }, [listQuery, applyPage])
 
   if (loading) {
@@ -93,6 +100,7 @@ export default function PolicySourcesPage() {
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
+        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -103,7 +111,15 @@ export default function PolicySourcesPage() {
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <ScrollTextIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="inline-flex h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50"
+          >
+            重新加载
+          </button>
         </div>
+        <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
       </Page>
     )
   }
@@ -134,29 +150,32 @@ export default function PolicySourcesPage() {
         政策由发布机构自己审核、发布，并在发布时确认对内容负责；管理员不审核、不发布，本页只保留查看与紧急下架。
         紧急下架是单向操作，提交后不能恢复，并会自动通知发布机构。
       </div>
-      {/* 筛选标签 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex gap-2">
-          {REVIEW_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => { setReviewFilter(f); setPage(1) }}
-              className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-                reviewFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索标题、来源机构..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-        </div>
-      </div>
+      <SourceStatusFilters
+        options={REVIEW_FILTERS}
+        value={reviewFilter}
+        onChange={(next) => { setReviewFilter(next as typeof reviewFilter); setPage(1) }}
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="搜索标题、来源机构..."
+      />
+
+      <SourceNarrowCards
+        items={records}
+        emptyTitle={search ? '未找到匹配的政策内容' : '暂无政策内容'}
+        titleOf={(row) => row.title}
+        viewLabel="查看申领条件"
+        statusOf={(row) => (
+          <>
+            <StatusBadge dot status={(REVIEW_MAP[row.reviewStatus] ?? REVIEW_MAP.pending).badge} label={(REVIEW_MAP[row.reviewStatus] ?? REVIEW_MAP.pending).label} />
+            <StatusBadge dot status={(PUBLISH_MAP[row.publishStatus] ?? PUBLISH_MAP.draft).badge} label={(PUBLISH_MAP[row.publishStatus] ?? PUBLISH_MAP.draft).label} />
+          </>
+        )}
+        onView={setRulesFor}
+        onTakedown={(row) => setTakedown({ targetType: 'policy', targetId: row.id, title: row.title, orgName: row.sourceName })}
+      />
 
       {/* 固定列宽在 1280 下给标题留出两行空间；全文与摘要保留在悬停。 */}
-      <Card className="overflow-hidden p-0">
+      <Card className="hidden overflow-hidden p-0 md:block">
         <ConsoleTable items={records} columns={columns} scrollX={false} className="[&_table]:table-fixed"
           empty={{ title: search ? '未找到匹配的政策内容' : '暂无政策内容', description: search ? '请尝试其他关键词' : '政策内容由合作机构在机构后台「政策公告」中提交' }}
           page={page} pageSize={pageSize} total={total} onPageChange={setPage}
@@ -167,6 +186,8 @@ export default function PolicySourcesPage() {
         政策内容只做说明：仅政策说明、材料清单与官方入口；不承诺补贴到账、不代申请。发布机构审核通过并确认发布责任后在一体机「政策服务」页展示,所有操作记录审计日志。
         「查看申领条件」为只读复核:条件由来源机构在合作机构后台录入,本页不改条件。
       </p>
+
+      <RecentEmergencyAuditCard actions={POLICY_AUDIT_ACTIONS} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={reload} />
 

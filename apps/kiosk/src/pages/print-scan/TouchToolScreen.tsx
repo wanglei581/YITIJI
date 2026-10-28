@@ -4,7 +4,6 @@ import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchAsk } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
-import { rememberAssistantDraft } from '../../services/assistantDraft'
 import './styles/tool-touch.css'
 import './styles/tool-fs.css'
 
@@ -62,11 +61,7 @@ export function TouchToolScreen({
           className="qx-ctabar"
           back={false}
           ask={ask}
-          onAsk={() => {
-            rememberAssistantDraft(askLabel)
-            navigate('/assistant')
-          }}
-          mid={dock}
+          secondary={dock}
         />
       }
       nav={

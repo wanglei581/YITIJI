@@ -100,13 +100,15 @@ function findTree(node, predicate) {
   return predicate(node) ? node : findTree(node.props?.children, predicate)
 }
 const privacyStates = ['', '', undefined, [], [], null, 'ready', null, null, false, null]
+// 注销类工单的「去用户管理处理」是站内 Link；文案门禁只看渲染出的文字，替身只渲染子节点（同 verify-console-plain-copy 的做法）。
+const routerStub = { Link: (p) => p.children }
 const privacyPageModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
-  ...common, react: hooks(privacyStates), '../../services/api/adminPrivacyRequests': {},
+  ...common, react: hooks(privacyStates), 'react-router-dom': routerStub, '../../services/api/adminPrivacyRequests': {},
 }, '', browserGlobals)
 const privacyEmptyTree = privacyPageModule.default()
 const privacyPopulatedModule = runFile('apps/admin/src/routes/privacy-requests/index.tsx', {
   ...common, react: hooks(['', '', undefined, [], [{ id: 'ticket', status: 'pending', requestType: 'export', phoneMasked: '138****5678' }], null, 'ready', null, null, false, null]),
-  '../../services/api/adminPrivacyRequests': {},
+  'react-router-dom': routerStub, '../../services/api/adminPrivacyRequests': {},
 }, '', browserGlobals)
 if (!textOf(privacyPopulatedModule.default()).replace(/\s+/g, '').includes('当前页1条')) fail('隐私请求有数据时保留原游标栏')
 if (textOf(privacyEmptyTree).includes('当前页')) fail('隐私请求空列表不得显示游标栏')
