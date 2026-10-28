@@ -1,12 +1,15 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { QxTouchChip, type QxTouchChipTone } from './QxTouchChip'
 import { QxTouchIcon } from './QxTouchIcon'
+import { qxTouchDataMarkers, type QxTouchHubMarker } from './qxTouchMarkers'
 
 export type QxTouchSlabProps = {
   title: string
   desc: string
   chip?: string
   chipTone?: QxTouchChipTone
+  /** 芯片前加一个 AI 小圆点（如「AI 诊断改写」这类标）。默认不加。 */
+  chipAi?: boolean
   visual?: ReactNode
   take?: string
   takeStyle?: 'object' | 'plain'
@@ -17,6 +20,8 @@ export type QxTouchSlabProps = {
   lock?: string
   onClick?: () => void
   index?: number
+  /** 服务台走查钩子。不传则不写 data-hub-*。 */
+  hub?: QxTouchHubMarker
 }
 
 export function QxTouchSlab({
@@ -24,6 +29,7 @@ export function QxTouchSlab({
   desc,
   chip,
   chipTone = 'teal',
+  chipAi = false,
   visual,
   take,
   takeStyle = 'object',
@@ -34,7 +40,9 @@ export function QxTouchSlab({
   lock,
   onClick,
   index = 0,
+  hub,
 }: QxTouchSlabProps) {
+  const hubAttrs = qxTouchDataMarkers({ hub })
   const className = [
     'qxt-slab',
     'qxt-rise',
@@ -46,7 +54,7 @@ export function QxTouchSlab({
   const style = { '--i': index } as CSSProperties
   const text = (
     <div className="qxt-slab-txt">
-      {chip ? <QxTouchChip tone={chipTone}>{chip}</QxTouchChip> : null}
+      {chip ? <QxTouchChip tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
       <h3>{title}</h3>
       <p>{desc}</p>
       {lock ? <span className="qxt-lock">{lock}</span> : null}
@@ -72,7 +80,7 @@ export function QxTouchSlab({
   const art = <div className="qxt-vis">{visual}</div>
   const body = row ? <>{art}{text}</> : <>{text}{art}</>
   if (off || !onClick) {
-    return <div className={className} style={style} role="group" aria-disabled={off ? 'true' : undefined}>{body}</div>
+    return <div className={className} style={style} role="group" aria-disabled={off ? 'true' : undefined} {...hubAttrs}>{body}</div>
   }
-  return <button type="button" className={className} style={style} onClick={onClick}>{body}</button>
+  return <button type="button" className={className} style={style} onClick={onClick} {...hubAttrs}>{body}</button>
 }

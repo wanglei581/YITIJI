@@ -13514,7 +13514,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 672,
+      "reachableFileCount": 674,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13614,6 +13614,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -13648,6 +13649,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14675,6 +14677,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14723,6 +14726,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14758,6 +14762,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14793,6 +14798,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14829,6 +14835,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14864,6 +14871,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14900,6 +14908,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14935,6 +14944,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14969,6 +14979,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15004,6 +15015,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15046,6 +15058,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15511,6 +15524,7 @@
             "apps/kiosk/src/pages/profile/touch/me-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16550,7 +16564,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 767
+      "sourceFileCount": 769
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",

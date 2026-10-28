@@ -224,9 +224,19 @@ function isQxMigratedPath(pathname: string): boolean {
   return QX_MIGRATED_EXACT_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 
-/** 触屏版路由。精确集合仍是字符串字面量；带参屏走下面的闭集，不从迁移表里拿掉。 */
+/**
+ * 触屏版路由，三张表：精确路径、前缀、带参屏的正则。只登记已按触屏稿改好的屏。
+ * 各页面包只在自己那行注释下面加，不动别包那一段：段与段之间隔着注释行，合并时互不冲突。
+ * 改好的屏不从 QX_MIGRATED_ROUTES 拿掉（避免旧壳漏出）。
+ */
 const QX_TOUCH_ROUTES = new Set<string>([
+  // 第一包 开发样板
   '/dev/touch-gallery',
+  // 第二包 首页
+  // 第三包 打印
+  // 第四包 简历三条主路
+  // 第五包 公共与系统
+  // 第六包 我的与权益
   '/profile',
   '/me/notifications',
   '/notifications',
@@ -241,15 +251,44 @@ const QX_TOUCH_ROUTES = new Set<string>([
   '/me/feedback',
   '/me/settings',
   '/me/privacy-requests',
+  // 第七包 简历其余页
+  // 第八包 练面试
+  // 第九包 扫描复印
+  // 第十包 政策与受控扩展
+  // 第十一包 私有化版招聘
 ])
 
+const QX_TOUCH_PREFIXES: readonly string[] = [
+  // 第二包 首页
+  // 第三包 打印
+  // 第四包 简历三条主路
+  // 第五包 公共与系统
+  // 第六包 我的与权益
+  // 第七包 简历其余页
+  // 第八包 练面试
+  // 第九包 扫描复印
+  // 第十包 政策与受控扩展
+  // 第十一包 私有化版招聘
+]
+
 const QX_TOUCH_PATTERNS: readonly RegExp[] = [
+  // 第二包 首页
+  // 第三包 打印
+  // 第四包 简历三条主路
+  // 第五包 公共与系统
+  // 第六包 我的与权益
   /^\/activities\/[^/]+$/,
   /^\/me\/activity\/[^/]+$/,
+  // 第七包 简历其余页
+  // 第八包 练面试
+  // 第九包 扫描复印
+  // 第十包 政策与受控扩展
+  // 第十一包 私有化版招聘
 ]
 
 function isTouchRoute(pathname: string): boolean {
   if (QX_TOUCH_ROUTES.has(pathname)) return true
+  if (QX_TOUCH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true
   return QX_TOUCH_PATTERNS.some((pattern) => pattern.test(pathname))
 }
 

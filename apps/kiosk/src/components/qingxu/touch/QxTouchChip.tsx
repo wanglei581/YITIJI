@@ -6,10 +6,12 @@ export function QxTouchChip({
   children,
   tone = 'teal',
   ai = false,
+  id,
 }: {
   children: ReactNode
   tone?: QxTouchChipTone
   ai?: boolean
+  id?: string
 }) {
-  return <span className={`qxt-chip qxt-chip-${tone}${ai ? ' qxt-chip-ai' : ''}`}>{children}</span>
+  return <span id={id} className={`qxt-chip qxt-chip-${tone}${ai ? ' qxt-chip-ai' : ''}`}>{children}</span>
 }
