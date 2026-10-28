@@ -4,8 +4,9 @@ import { BuildingIcon, BriefcaseIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'l
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { RtFill } from '../recruitment-touch/RtFill'
 import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { OFFLINE_AGENCY_ASK, askDraftWith } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirExitList,
   DirKv,
   DirNote,
@@ -204,7 +205,7 @@ export default function OfflineAgencyDetailPage() {
                 <div className="dw-reason">{BOUNDARY}</div>
               </div>
               {jobsEmpty ? <DirNote>{BOUNDARY}</DirNote> : (
-                <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+                <RtAskCard {...OFFLINE_AGENCY_ASK} draft={askDraftWith(OFFLINE_AGENCY_ASK.draft, agency.name)} />
               )}
             </DirSec>
           </>

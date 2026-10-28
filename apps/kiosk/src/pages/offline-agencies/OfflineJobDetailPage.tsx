@@ -4,8 +4,9 @@ import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { RtFill } from '../recruitment-touch/RtFill'
 import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { OFFLINE_AGENCY_ASK, askDraftWith } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirKv,
   DirMiss,
   DirNote,
@@ -207,7 +208,7 @@ export default function OfflineJobDetailPage() {
                 </DirStrip>
               </DirSec>
             ) : (
-              <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+              <RtAskCard {...OFFLINE_AGENCY_ASK} draft={askDraftWith(OFFLINE_AGENCY_ASK.draft, job.title, job.agencyName)} />
             )}
             <DirNote>{BOUNDARY}</DirNote>
           </>

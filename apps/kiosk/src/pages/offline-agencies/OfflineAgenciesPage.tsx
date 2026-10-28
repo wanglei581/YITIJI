@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { BuildingIcon, ClockIcon, FileTextIcon, MapPinIcon, SearchIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
 import { RtFill } from '../recruitment-touch/RtFill'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { OFFLINE_AGENCY_ASK } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirNote,
   DirSec,
   DirState,
@@ -295,7 +296,7 @@ export function OfflineAgenciesPage() {
             <DirStripItem icon={FileTextIcon} tone="wheat" title="简历先过一遍" desc="上传或扫描后做一次诊断" onClick={() => navigate('/resume/source')} />
           </DirStrip>
           {exception ? <DirNote>{BOUNDARY}</DirNote> : (
-            <DirAiAssist screen="offline-agency" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+            <RtAskCard {...OFFLINE_AGENCY_ASK} />
           )}
         </DirSec>
         {uiState === 'list-empty' || uiState === 'list-error' ? <RtFill preset="directory" /> : null}

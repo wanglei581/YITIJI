@@ -11,8 +11,9 @@ import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtAskCard } from '../recruitment-touch/RtAskCard'
+import { FAIR_COMPANY_ASK, askDraftWith } from '../recruitment-touch/askCopy'
 import {
-  DirAiAssist,
   DirExitList,
   DirKv,
   DirNote,
@@ -278,7 +279,7 @@ export function FairCompanyDetailPage() {
             />
 
             {positionsEmpty ? <DirNote>{BOUNDARY}</DirNote> : (
-              <DirAiAssist screen="fair-company" onProfile={() => navigate('/profile')} onAssistant={() => navigate('/assistant')} />
+              <RtAskCard {...FAIR_COMPANY_ASK} draft={askDraftWith(FAIR_COMPANY_ASK.draft, company.companyName)} />
             )}
             <DirNote warn>
               {PRINT_NOTE}

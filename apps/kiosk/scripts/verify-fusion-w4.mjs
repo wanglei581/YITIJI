@@ -332,6 +332,25 @@ check('campus booking QR is guarded by the source four elements and uses the sha
   const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
   assert.ok(campusTabs.includes("aria-disabled={bookBlockedReason ? true : undefined}") && campusTabs.includes("aria-describedby={bookBlockedReason ? 'campus-book-blocked' : undefined}"), '「扫码预约」缺项时 aria-disabled 并指向常显的原因')
 })
+// 第二轮审查 A3：线下机构三页与参展企业详情上的 AI 入口原来是 DirAiAssist 桩：一次接口都不调，「整理」键永远写
+// 「没连上 AI」、「用本人简历」键永远写「没读到简历」，都是没有探测就下的结论。换成直达小青的真入口 RtAskCard。
+check('recruitment ask cards are real entries to the advisor, not the always-failing stub', () => {
+  for (const rel of [
+    'src/pages/offline-agencies/OfflineAgenciesPage.tsx',
+    'src/pages/offline-agencies/OfflineAgencyDetailPage.tsx',
+    'src/pages/offline-agencies/OfflineJobDetailPage.tsx',
+    'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+  ]) {
+    const source = read(rel)
+    assert.doesNotMatch(source, /DirAiAssist/, `${rel}: 不再引用 DirAiAssist`)
+    assert.match(source, /<RtAskCard /, `${rel}: 用直达小青的 RtAskCard`)
+  }
+  const card = read('src/pages/recruitment-touch/RtAskCard.tsx')
+  assert.doesNotMatch(card, /setStep|没连上/, 'RtAskCard 不写没有探测的失败结论')
+  assert.match(card, /rememberAssistantDraft\(draft\)/, '点了把话放进顾问页输入框')
+  assert.match(card, /navigate\('\/assistant'\)/, '点了去顾问页')
+  assert.ok(card.includes('AI_LABEL_COPY.BASE'), 'AI 内容标「AI 生成，仅供参考」')
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。

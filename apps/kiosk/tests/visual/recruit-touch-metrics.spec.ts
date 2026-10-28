@@ -580,7 +580,42 @@ test('岗位详情：AI 岗位解读与岗位匹配参考两个入口，登录�
   await expect(zone).toContainText('使用 AI 即表示你已年满 14 周岁')
 })
 
-test('线下岗位详情：来源齐全时有「整理咨询问题」，没连上 AI 时给不靠 AI 的做法 @w4', async ({ page, api }) => {
+// 第二轮审查 A3：线下机构三页与参展企业详情上原来的 DirAiAssist 一次接口都不调，「整理」键永远写「没连上 AI」、
+// 「用本人简历」键永远写「没读到简历」，那是没有探测就下的结论（旧用例还把「必然失败」钉成预期）。
+// 换成直达小青的真入口：点「问小青」把一句话放进顾问页输入框再过去，不自动发送；卡底常显不靠 AI 的做法。
+const FAKE_AI_CLAIMS = /本机没有连上 AI 服务|本机没有读到可用的本人简历|小青这次没接上/
+
+async function checkAskCard(page: Page, opts: { testId: string; title: string; desc: string; fallback: string; draft: string }) {
+  const card = page.getByTestId(opts.testId)
+  await expect(card, '问小青卡在').toHaveCount(1)
+  await expect(card).toContainText(opts.title)
+  await expect(card).toContainText(opts.desc)
+  await expect(card.getByTestId(`${opts.testId}-ai-label`)).toHaveText(AI_BASE_LABEL)
+  await expect(card.getByTestId(`${opts.testId}-fallback`), '不靠 AI 的做法常显').toHaveText(opts.fallback)
+  const m = await measure(page)
+  expect(m.small, `不足 20px 的字: ${m.small.join('; ')}`).toEqual([])
+  expect(m.tiny, `小于 64×64 的可点区: ${m.tiny.join('; ')}`).toEqual([])
+  expect(m.screenText, '没有探测就下的「没连上 AI」「没读到简历」类结论').not.toMatch(FAKE_AI_CLAIMS)
+  const ask = card.getByRole('button', { name: '问小青' })
+  await expect(ask).toBeVisible()
+  // 阳性：点了去顾问页，话放进输入框，过一会儿还在（没有自动发送）。
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  const input = page.getByLabel('输入咨询问题')
+  await expect(input).toHaveValue(opts.draft)
+  await page.waitForTimeout(600)
+  await expect(input, '不自动发送').toHaveValue(opts.draft)
+}
+
+const OFFLINE_ASK = {
+  testId: 'offline-agency-ai',
+  title: '整理到店要问的问题',
+  desc: '按你说的整理咨询问题和材料清单。不核验机构资质，也不生成机构或岗位信息。',
+  fallback: '不靠 AI 也能问清楚：岗位要求、材料清单、收费公示，到店当面确认这三项。',
+}
+const OFFLINE_ASK_DRAFT = '到店要带什么？帮我整理要问的问题和材料清单'
+
+test('线下岗位详情：「整理到店要问的问题」是直达小青的真入口，带上岗位与机构名，不写没探测的结论 @w4', async ({ page, api }) => {
   registerW6Api(api)
   api.respond('GET', '/api/v1/kiosk/offline-jobs/offline-job-001', {
     status: 200,
@@ -595,16 +630,31 @@ test('线下岗位详情：来源齐全时有「整理咨询问题」，没连�
     },
   })
   await page.goto('/jobs/offline-job-001/offline')
-  const assist = page.getByTestId('offline-agency-ai')
-  await expect(assist, '来源齐全时「整理咨询问题」在').toHaveCount(1)
-  await expect(assist).toContainText('整理到店要问的问题')
-  await assist.getByRole('button', { name: '填写求职方向' }).click()
-  await assist.getByRole('textbox').fill('仓储物流')
-  await assist.getByRole('button', { name: '整理咨询问题' }).click()
-  // 没连上 AI：不编一份问题清单，退回手动做法（岗位要求、材料清单、收费公示当面确认），并留去问小青的出口。
-  await expect(assist.getByTestId('offline-agency-ai-unavailable')).toBeVisible()
-  await expect(assist).toContainText('不靠 AI 也能问清楚：岗位要求、材料清单、收费公示')
-  await expect(assist.getByRole('button', { name: '去问小青' })).toBeVisible()
+  await checkAskCard(page, { ...OFFLINE_ASK, draft: `${OFFLINE_ASK_DRAFT}（现场咨询岗位，青岛合规人力服务机构）` })
+})
+
+test('线下机构列表：「整理到店要问的问题」直达小青，列表页没有具体对象就不追加 @w4', async ({ page, api }) => {
+  registerW6Api(api)
+  await page.goto('/offline-agencies')
+  await checkAskCard(page, { ...OFFLINE_ASK, draft: OFFLINE_ASK_DRAFT })
+})
+
+test('线下机构详情：「整理到店要问的问题」直达小青，带上机构名 @w4', async ({ page, api }) => {
+  registerW6Api(api)
+  await page.goto('/offline-agencies/agency-001')
+  await checkAskCard(page, { ...OFFLINE_ASK, draft: `${OFFLINE_ASK_DRAFT}（青岛合规人力服务机构）` })
+})
+
+test('参展企业详情：「到展位先问哪几句」直达小青，带上企业名 @w4', async ({ page, api }) => {
+  fair()(api)
+  await page.goto(F('/companies/fair-company-001'))
+  await checkAskCard(page, {
+    testId: 'fair-company-ai',
+    title: '到展位先问哪几句',
+    desc: '按这家企业的现场岗位清单，整理到展位要问的问题。不代投递、不预约、不签到，也不生成企业信息。',
+    fallback: '不靠 AI 也能问：岗位要求、到岗时间、后续联系方式，到展位当面问这三项。',
+    draft: '这家企业的现场岗位，到展位该问哪几句？（青岛示例制造有限公司）',
+  })
 })
 
 test('校园招聘·选中一场：AI 求职页签带 AI 底句、先列参展企业、四个 AI 入口都在 @w4', async ({ page, api }) => {
