@@ -142,6 +142,7 @@ function uploadErrorMessage(err: unknown): string {
 export function ResumeSourcePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const aiDown = (location.state as { aiDown?: boolean } | null)?.aiDown === true
   const [searchParams, setSearchParams] = useSearchParams()
   const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
   const copy = INTENT_COPY[intent]
@@ -373,7 +374,7 @@ export function ResumeSourcePage() {
   const dropScanHandoff = () => {
     setUploadedFile(null)
     setError(null)
-    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: aiDown ? { aiDown: true } : null })
   }
 
   const changeFile = () => {
@@ -426,16 +427,18 @@ export function ResumeSourcePage() {
   const onBack = usbScreen
     ? () => { setUsbListed(0); setSelected('phone') }
     : step === 'more' ? () => setStep('direction') : step === 'direction' ? () => setStep('where') : () => navigate('/resume-service')
-  const ask = step === 'more'
+  const ask = aiDown ? { label: '小青暂时不可用，先打印原件', disabled: true as const } : step === 'more'
     ? { label: '问小青：可以不填吗', draft: '诊断方向里的经历、场景、专业和学历都可以不填吗？请只说明它们怎么影响建议顺序，不要替我填写。' }
     : step === 'direction'
       ? { label: '问小青：帮我选重点', draft: askDraft }
-      : usbScreen
+      : usbScreen || (step === 'where' && selected === 'phone' && !uploadedFile && !scanReady)
         ? { label: '问小青：选诊断重点', draft: askDraft }
         : { label: '问小青：帮我选诊断重点 →', draft: askDraft }
   const phoneWaitingConfirm = step === 'where' && selected === 'phone' && !uploadedFile && phoneBusy
   const phoneConfirmNow = phoneWaitingConfirm ? phoneConfirm : null
-  const primary = phoneWaitingConfirm
+  // 小青停用（从失败屏带回来的）：诊断和优化这次做不了，「简历在哪里」这一步的主按钮改成不用 AI 的打印原件，
+  // 不再把人领进诊断方向那一步；手机确认、U 盘导入这两个中间动作照常。
+  const primary = aiDown && step === 'where' && !phoneWaitingConfirm && !usbScreen ? { label: '去打印原件', onClick: () => navigate('/print-scan') } : phoneWaitingConfirm
     ? { label: phoneConfirmNow ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirmNow?.(), disabled: !phoneConfirmNow, className: 'resume-primary-action' }
     : usbScreen
     ? (usbPick.selected ? { label: usbPick.importing ? '正在导入' : '导入这份文件', onClick: usbPick.run, disabled: usbPick.importing } : undefined)
@@ -514,6 +517,7 @@ export function ResumeSourcePage() {
             onUploadBox={handleUploadBoxClick}
             onLogin={() => navigate('/login', { state: { from: `${location.pathname}${location.search}` } })}
             onMine={() => navigate('/me/resumes')}
+            aiUnavailable={aiDown}
             onGenerate={() => navigate('/resume/generate')}
             onPrintOnly={() => navigate('/print-scan')}
           />

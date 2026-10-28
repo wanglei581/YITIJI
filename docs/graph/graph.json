@@ -15922,6 +15922,7 @@
             "apps/kiosk/src/pages/resume/touch/edit.css",
             "apps/kiosk/src/pages/resume/touch/frame.css",
             "apps/kiosk/src/pages/resume/touch/optimize.css",
+            "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",

@@ -93,6 +93,7 @@ export function ResumeSourceWhere(props: {
   onUploadBox: () => void
   onLogin: () => void
   onMine: () => void
+  aiUnavailable: boolean
   onGenerate: () => void
   onPrintOnly: () => void
 }) {
@@ -198,6 +199,11 @@ export function ResumeSourceWhere(props: {
 
   return (
     <>
+      {props.aiUnavailable ? (
+        <p className="resume-source-ai-down qxt-src-note" data-tone="warn" role="status" data-testid="resume-source-ai-down">
+          <b>小青这次用不了</b>诊断和优化先做不了；你已有的简历文件可以直接打印原件。
+        </p>
+      ) : null}
       {props.usbScreen ? null : sources}
       <div className="qxt-panel" data-panel={props.usbScreen ? 'usb-list' : props.scanReady ? 'scan' : file ? 'file' : props.selected}>
         {panel}
@@ -232,9 +238,10 @@ export function ResumeSourceWhere(props: {
         </button>
       )}
       <div className="qxt-links">
-        <button type="button" onClick={props.onGenerate}>没有电子简历？让 AI 帮你写一份</button>
+        <button type="button" onClick={props.onGenerate}>{props.aiUnavailable ? '没有电子简历？自己填写一份（不经 AI）' : '没有电子简历？让 AI 帮你写一份'}</button>
         <button type="button" onClick={props.onPrintOnly}>只想打印原件</button>
       </div>
+      {props.aiUnavailable ? <p className="qxt-fine" role="status">小青暂时不可用：填写页只能自己填写，没有 AI 润色。</p> : null}
 
       {props.scanReady ? null : (
         <p id="resume-word-conversion-reason" className="qxt-fine" aria-disabled={!props.wordConversionAvailable || undefined}>

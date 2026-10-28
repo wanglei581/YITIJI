@@ -10,7 +10,7 @@ import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { getResumeRecord, submitResumeParse } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { AI_PUBLIC_QUOTA_EXCEEDED_COPY } from '../../services/api/userErrorMessage'
-import { AI_OUTAGE_CODES, aiErrorCodeOf, aiErrorMessageOf, isAiOutage } from '../../ai'
+import { AI_OUTAGE_CODES, aiErrorCodeOf, aiErrorMessageOf, isAiOutage, useAiTask } from '../../ai'
 import { inspectionSignalsEncrypted } from '../print/components/printPreviewKind'
 import {
   canonicalResumeParsePayload,
@@ -92,6 +92,8 @@ export function ResumeParsePage() {
   const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
   const watchedOwner = user?.id ?? null
 
+  const [aiDown, setAiDown] = useState(false)
+  const [serverStatus, setServerStatus] = useState<'pending' | 'done' | 'failed' | null>(null)
   const [outcome, setOutcome] = useState<'failed' | 'unknown' | null>(null)
   const [terminal, setTerminal] = useState<ShownTerminal | null>(null)
   // 结果未知但拿到了编号（2xx 却不是最终结果）：只放内存与既有最小会话，不进地址栏。
@@ -126,6 +128,7 @@ export function ResumeParsePage() {
    */
   const navigateFail = useCallback(
     (reason: string, task?: ParseTask, aiDown = false, failureCode?: string) => {
+      if (aiDown) setAiDown(true)
       if (task) {
         saveAiResumeSession(task)
         if (!anonymousAccessReady(task.taskId, task.accessToken, ownerRef.current === null)) {
@@ -185,6 +188,8 @@ export function ResumeParsePage() {
       setBlockNote('这次重查返回了另一个编号，没有收下，也没有另起一次解析。')
       return
     }
+    setServerStatus(result.status === 'pending' || result.status === 'processing' ? 'pending' : result.status === 'completed' && result.report ? 'done' : result.status === 'failed' ? 'failed' : null)
+    if (result.status === 'failed' && isAiOutage({ code: result.failCode })) setAiDown(true)
     const anonymous = ownerId === null
     if (result.taskId) {
       const kept = keptTokenRef.current?.taskId === result.taskId ? keptTokenRef.current.accessToken : undefined
@@ -265,6 +270,7 @@ export function ResumeParsePage() {
     inFlightRef.current = true
     const ownerId = ownerRef.current
     const knownTaskId = mode === 'replay' ? (pendingTaskRef.current?.taskId ?? '') : ''
+    setServerStatus(null)
     setOutcome(null)
     setTerminal(null)
     setRecheck('idle')
@@ -317,6 +323,7 @@ export function ResumeParsePage() {
       // 与公共额度 429 同样处理：只清对得上的本机意图，转明确失败屏 —— 那一屏有不用 AI 的出路
       // （打印我上传的原件、自查清单），且不再给「重新解析」。
       if (isAiOutage(err)) {
+        setAiDown(true)
         if (await dropHeldIntent(ownerId, '本机解析标识对不上，没有打开失败页，也没有另起一次解析。')) {
           navigateFail(aiErrorMessageOf(err, 'AI 现在停用，暂时做不了简历诊断'), undefined, true)
         }
@@ -466,11 +473,13 @@ export function ResumeParsePage() {
       }
     } catch (err) {
       if (!samePerson(ownerId)) return
+      setServerStatus(null)
       const held = resumeParseIntentHold({
         intent: intentRef.current,
         ownerId,
         payload: payloadRef.current,
       }) !== 'absent'
+      if (isAiOutage(err)) setAiDown(true)
       if (isTaskNotFound(err) && held) {
         setRecheck('replay')
         setBlockNote('解析已经提交并拿到了编号，但结果还没有写入完成。请原样再试一次，不要开始新的解析。')
@@ -546,7 +555,7 @@ export function ResumeParsePage() {
   const sourceRoute = state?.intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source'
   const leaveToSource = () => {
     cancelRef.current = true
-    navigate(sourceRoute, scanHandoff ? { replace: true, state: { scanHandoff } } : { replace: true })
+    navigate(sourceRoute, { replace: true, state: { ...(scanHandoff ? { scanHandoff } : {}), ...(aiDown ? { aiDown: true } : {}) } })
   }
 
   const view: ParseView = !fileId
@@ -573,6 +582,7 @@ export function ResumeParsePage() {
     : view === 'unknown' || view === 'consent-needed' || view === 'consent-checking' ? { 1: 'wait' }
     : undefined
 
+  const aiTask = useAiTask({ availability: aiDown ? 'unavailable' : serverStatus ? 'available' : 'unknown', pending: serverStatus === 'pending', failed: serverStatus === 'failed' || outcome === 'failed', hasResult: serverStatus === 'done' })
   const renderFrame = (body: ReactNode, primary?: QxTouchPrimary, overlay?: ReactNode) => (
     <ResumeTouchPage
       eyebrow="AI 解析"
@@ -584,12 +594,12 @@ export function ResumeParsePage() {
       seal={view === 'waiting' ? 'think' : null}
       back={{ label: '返回简历来源', onBack: leaveToSource }}
       dockBackLabel="返回上一步"
-      ask={{ label: '问小青：解析没完成怎么办', draft: '我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。' }}
+      ask={aiDown ? { label: '小青暂时不可用，先返回选择其他方式', disabled: true } : { label: '问小青：解析没完成怎么办', draft: '我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。' }}
       primary={primary}
       overlay={overlay}
       bodyClassName={view === 'waiting' ? undefined : 'qxt-body-tight qxt-body-scroll'}
     >
-      <section data-qx-page="reading" data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qxt-parse-page" data-takeaway="简历诊断报告">
+      <section data-qx-page="reading" data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qxt-parse-page" {...aiTask.containerProps} data-takeaway="简历诊断报告">
         {body}
       </section>
     </ResumeTouchPage>
@@ -658,7 +668,9 @@ export function ResumeParsePage() {
    * 判断链沿用原来右栏按钮的那一条；「返回简历来源」由顶栏返回键和底栏「返回上一步」承担。
    * 右栏说明里的「重新提交解析（新的一次）」留在原处，不当主按钮。
    */
-  const recoveryPrimary: QxTouchPrimary | undefined = outcome !== 'unknown' ? undefined
+  // 小青停用只改「明确失败」那 700ms 里的主按钮；结果未知时仍是下面这条恢复链 —— 右栏说明正指着
+  // 「按同一编号再查 / 原样再试一次」，不能因为 AI 停用就把这些恢复按钮换掉。
+  const recoveryPrimary: QxTouchPrimary | undefined = aiDown && outcome === 'failed' ? { label: '返回简历来源', onClick: leaveToSource, noArrow: true } : outcome !== 'unknown' ? undefined
     : terminal?.mode === 'blocked' ? { label: '暂不能开始新的一次', onClick: () => undefined, disabled: true, noArrow: true }
     : terminal?.mode === 'file_changed' ? { label: '重新上传简历', onClick: leaveToSource, testId: 'resume-parse-reupload', noArrow: true }
     : terminal?.mode === 'charged' ? { label: '重新解析（新的一次）', onClick: openFreshConfirm, testId: 'resume-parse-new-attempt', noArrow: true }

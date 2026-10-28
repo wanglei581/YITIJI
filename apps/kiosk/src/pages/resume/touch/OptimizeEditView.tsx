@@ -35,6 +35,7 @@ export function OptimizeEditView(props: {
   onTemplates: () => void
   loading: boolean
   exporting: boolean
+  aiUnavailable: boolean
   adjusting: ResumeLayoutAdjustAction | null
   lastResumeBeforeAiAdjust: GeneratedResume | null
   adjustWarnings: string[]
@@ -55,7 +56,7 @@ export function OptimizeEditView(props: {
   const { layout, loading, exporting, resume: optimizedResume, adjusting } = props
   const selected = props.templates.find((tpl) => tpl.id === props.selectedTemplateId)
   const pending = props.unconfirmed.length
-  const aiAdjustDisabled = loading || exporting || !optimizedResume || Boolean(adjusting)
+  const aiAdjustDisabled = props.aiUnavailable || loading || exporting || !optimizedResume || Boolean(adjusting)
   return (
     <div className="qxt-edit">
       <div className="qxt-paperbox">
@@ -110,6 +111,7 @@ export function OptimizeEditView(props: {
             <button type="button" disabled={aiAdjustDisabled} onClick={() => props.onAiAdjust('condense')}>{adjusting === 'condense' ? '正在精简…' : 'AI 精简'}</button>
             <button type="button" disabled={aiAdjustDisabled} onClick={() => props.onAiAdjust('reformat')}>{adjusting === 'reformat' ? '正在调整…' : 'AI 调整排版'}</button>
           </div>
+          {props.aiUnavailable && <p className="qxt-note" role="status">AI 暂时不可用，不能精简或调整排版；你仍可手动编辑和调整版式。</p>}
           <AiDeclarationNote />
           {props.lastResumeBeforeAiAdjust ? <button type="button" className="qxt-outlink" onClick={props.onUndoAi}>撤销 AI 调整</button> : null}
           {props.adjustWarnings.slice(0, 3).map((warning) => <p key={warning} className="qxt-note">{warning}</p>)}

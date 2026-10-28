@@ -106,7 +106,11 @@ export function ResumeReportPage() {
   const location = useLocation()
   const { getToken } = useAuth()
   const supportPhone = useSupportContact().servicePhone?.trim() ?? ''
-  const state = (location.state ?? {}) as ReportState
+  const routeState = (location.state ?? {}) as ReportState
+  // 读回的失败记录带着「能力级停用」码（暂停 / 当日额度到了 / 未配置）：并进 state.aiDown，失败屏按小青停用那一屏画，
+  // 不画「能力未接通」。失败屏只认 state.aiDown，所以从路由带来的和读回发现的是同一个口子。
+  const [recoveredAiDown, setRecoveredAiDown] = useState(false)
+  const state: ReportState = recoveredAiDown ? { ...routeState, aiDown: true } : routeState
   const intent = state.intent === 'optimize' ? 'optimize' : 'diagnose'
   const { success = true, reason } = state
   const parsed = useMemo(() => parseReportSearch(location.search), [location.search])
@@ -137,6 +141,7 @@ export function ResumeReportPage() {
         if (res.extractionNotice) setExtractionNotice(res.extractionNotice)
         if (res.targetContext) setTargetContext(res.targetContext)
         if (res.status === 'failed' || (!res.report && res.failReason)) {
+          if (isAiOutage({ code: res.failCode })) setRecoveredAiDown(true)
           setRecoveredFail(res.failReason ?? '简历解析未能完成，请重试')
           return
         }
@@ -255,27 +260,28 @@ export function ResumeReportPage() {
   const [exportedNow, setExportedNow] = useState(false)
 
   const failView = (failReason: string) => {
+    const sourceState = state.aiDown ? { aiDown: true } : undefined
     const printable = Boolean(state.file?.fileUrl && state.fileId)
     const strippedReason = resumeUserReason(failReason, '这次未能完成解析，请重试或换一份清晰的简历。').replace(/(?:请|或)?(?:联系|找)(?:现场)?工作人员/g, '').replace(/[，,、]\s*(?=[。.!！]|$)/g, '').trim()
     const shownReason = supportPhone && !strippedReason.includes(supportPhone)
       ? `${strippedReason}${/[。！]$/.test(strippedReason) ? '' : '。'}需要帮助？拨打服务电话 ${supportPhone}`
       : strippedReason
     const failurePrimary = encryptedPdf
-      ? { label: '重新选择文件', onClick: () => navigate(intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source', { replace: true }), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
+      ? { label: '重新选择文件', onClick: () => navigate(intent === 'optimize' ? '/resume/source?intent=optimize' : '/resume/source', { replace: true, ...(state.aiDown ? { state: { aiDown: true } } : {}) }), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
       : checkingPassword
         ? undefined
         : state.aiDown
           ? (printable
             ? { label: '打印我上传的原件', onClick: () => printUploadedOriginal(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
-            : { label: '返回简历来源', onClick: () => navigate('/resume/source'), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true })
+            : { label: '返回简历来源', onClick: () => navigate('/resume/source', { state: sourceState }), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true })
           : { label: '重新解析', onClick: () => handleRetry(), testId: 'resume-report-primary', className: 'qx-btn', noArrow: true }
-    const fileLabel = state.file?.name ? `「${state.file.name}」的解析没有完成。` : '这次没有生成诊断报告。'
+    const fileLabel = state.file?.name ? `「${state.file.name}」的解析没有完成。` : ''
     return (
       <ResumeTouchPage
         eyebrow="简历诊断报告"
         title={state.aiDown ? '这次没诊断出来' : '简历诊断报告'}
         subtitle={state.aiDown ? '再解析一次也不会变好。下面这些不需要 AI，现在就能做。' : '解析中断，你上传的文件没有丢。'}
-        back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
+        back={{ label: '返回简历来源', onBack: () => navigate('/resume/source', { state: sourceState }) }}
         dockBackLabel="返回"
         status={REPORT_STATUS['diagnose-failed']}
         railNow={1}
@@ -327,7 +333,7 @@ export function ResumeReportPage() {
   const statusState = hasBody && exportedNow ? REPORT_STATUS['export-ready'] : REPORT_STATUS[viewState]
   return (
     <ResumeTouchPage
-      eyebrow={viewState === 'report' ? AI_LABEL_COPY.RESUME_DIAGNOSIS : undefined}
+      eyebrow={hasBody && displayReport ? AI_LABEL_COPY.RESUME_DIAGNOSIS : undefined}
       title={reportTitle}
       back={{ label: '返回简历来源', onBack: () => navigate('/resume/source') }}
       dockBackLabel="返回"
@@ -335,7 +341,7 @@ export function ResumeReportPage() {
       status={statusState}
       railNow={REPORT_HEAD[viewState].rail}
       seal={hasBody ? 'idle' : null}
-      ask={{ label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
+      ask={(state.aiDown || outage) ? { label: '小青暂时不可用，先自己核一遍', disabled: true } : { label: '问小青：先改哪几处', draft: '请帮我理解这份简历诊断报告，先让我提供想问的内容，再解释修改顺序，不添加我没有提供的事实。' }}
       primary={dockPrimary}
       bodyClassName="qxt-body-scroll"
     >

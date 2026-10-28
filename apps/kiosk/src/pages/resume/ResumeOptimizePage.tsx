@@ -20,6 +20,7 @@ import {
   exportResumeRecord,
   type ResumeLayoutAdjustAction,
 } from '../../services/api'
+import { isAiOutage, useAiTask } from '../../ai'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { DEFAULT_RESUME_LAYOUT, useResumeLayout } from './hooks/useResumeLayout'
@@ -94,6 +95,8 @@ export function ResumeOptimizePage() {
     adjustError, setAdjustError, factOpen, setFactOpen, savedToDocuments, setSavedToDocuments,
     decisions, setDecisions, draftAccepted, setDraftAccepted,
   } = useOptimizeSession(query.format, Boolean(token))
+  const [adjustOutage, setAdjustOutage] = useState(false)
+  const [clearedChoices, setClearedChoices] = useState<ReadonlySet<string>>(new Set())
   const [decisionIssues, setDecisionIssues] = useState<Record<string, string>>({})
   const [baseResume, setBaseResume] = useState<GeneratedResume | null>(null)
   /** 核对事实的时刻与当时那份稿的指纹；稿一改指纹对不上，就得重新核对。 */
@@ -193,6 +196,7 @@ export function ResumeOptimizePage() {
       setDecisionFailures(result.reason ? [{ key, reason: result.reason }] : [], next)
       return
     }
+    setClearedChoices((previous) => { const nextSet = new Set(previous); nextSet.delete(key); return nextSet })
     setOptimizedResume(result.resume)
     setDecisions((prev) => ({ ...prev, [key]: next }))
     setDecisionIssues((prev) => { const nextIssues = { ...prev }; delete nextIssues[key]; return nextIssues })
@@ -206,6 +210,12 @@ export function ResumeOptimizePage() {
       return [[moduleKeyOf(module, index), next]]
     })
     const applied = applyDecisionChanges(optimizedResume, modules, decisions, changes, baseResume)
+    setClearedChoices((previous) => {
+      const nextSet = new Set(previous)
+      const failedKeys = new Set(applied.failures.map((failure) => failure.key))
+      changes.forEach(([key]) => { if (!failedKeys.has(key)) nextSet.delete(key) })
+      return nextSet
+    })
     setOptimizedResume(applied.resume)
     setDecisions(applied.decisions)
     setDecisionFailures(applied.failures, next)
@@ -288,19 +298,20 @@ export function ResumeOptimizePage() {
   }
 
   const handleAiAdjust = async (action: ResumeLayoutAdjustAction) => {
-    if (!taskId || !resume) return
+    if (!taskId || !resume || adjustOutage || (failKind === 'outage' && failMsg)) return
     const before = resume; setAdjusting(action); setAdjustError(null)
     try {
       const result = await adjustResumeLayoutDraft(taskId, resume, action, layout, access)
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings?.length ? ['调整后的内容仍需你逐项核对，确认事实无误。'] : []); setExported(null); setIsDirty(true)
     } catch (err) {
+      if (isAiOutage(err)) setAdjustOutage(true)
       setAdjustError(aiDeclarationDeclineMessage(err) ?? userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
   }
 
   const goToReport = () => {
     const search = taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''
-    navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken } })
+    navigate(`/resume/report${search}`, { state: { ...state, taskId, accessToken, ...(aiDown ? { aiDown: true } : {}) } })
   }
 
   // 稿：总览、编辑、导出是同一页的三屏，用按钮切换。没有可对照的条目时直接进编辑区。
@@ -317,9 +328,11 @@ export function ResumeOptimizePage() {
       return false
     },
   })
-  const ask = pane === 'export' ? askFor('问小青：导出成哪种', EXPORT_AI_DRAFT)
+  const aiDown = adjustOutage || (failKind === 'outage' && Boolean(failMsg))
+  const aiTask = useAiTask({ availability: aiDown ? 'unavailable' : optimizedResume && !syntheticReady ? 'available' : 'unknown', pending: false, failed: Boolean(failMsg || adjustError), hasResult: Boolean(optimizedResume) })
+  const ask = aiDown ? { label: pane === 'export' ? '小青暂时不可用，先自行选择格式' : '小青暂时不可用，先手动编辑', disabled: true as const } : pane === 'export' ? askFor('问小青：导出成哪种', EXPORT_AI_DRAFT)
     : pane === 'editor' && view === 'ready' ? askFor('问小青：版式怎么排', EDIT_AI_DRAFT)
-    : askFor('问小青：这句还能怎么改', OPTIMIZE_AI_DRAFT)
+    : askFor('问小青：这句还能怎么改 →', OPTIMIZE_AI_DRAFT)
   const navTestIds = { home: 'resume-optimize-nav-home', advisor: 'resume-optimize-nav-advisor', profile: 'resume-optimize-nav-profile' }
   const saveInfo = saveInfoOf(Boolean(token), draft.status, draft.savedAt)
   const exportIsPdf = exportKind === 'change_list' || exportFormat === 'pdf'
@@ -361,7 +374,7 @@ export function ResumeOptimizePage() {
   const retry = () => { setFailMsg(null); setRetryNonce((n) => n + 1) }
   const statePrimary = view === 'ready' || view === 'loading' ? undefined
     : retryable ? { label: '重试', onClick: retry }
-    : { label: '重新上传简历', onClick: reupload }
+    : aiDown ? { label: '手动填写简历', onClick: () => navigate('/resume/generate') } : { label: '重新上传简历', onClick: reupload }
   const dialogs = confirmLeave ? (
     <ResumeOptimizeLeaveDialog guest={!token} onStay={() => setConfirmLeave(null)} onLeave={() => { const action = confirmLeave; setConfirmLeave(null); action() }} />
   ) : factOpen && assembled ? (
@@ -389,6 +402,7 @@ export function ResumeOptimizePage() {
         data-kiosk-domain="resume"
         data-kiosk-screen="resume-optimize"
         className={`qxt-optimize ${confirmLeave ? 'overflow-hidden' : ''}`}
+        {...aiTask.containerProps}
         data-optimize-state={view}
         data-work-view={pane}
         data-takeaway="新简历与修改清单"
@@ -431,6 +445,8 @@ export function ResumeOptimizePage() {
             switchBlocks={Object.fromEntries(modules.map((module, index) => [moduleKeyOf(module, index), moduleSwitchBlock(baseResume, module)]))}
             synthetic={resolved.synthetic}
             disabled={loading || exporting || Boolean(adjusting)}
+            clearedChoices={clearedChoices}
+            onClear={() => setClearedChoices(new Set(modules.map(moduleKeyOf)))}
             decisionIssues={decisionIssues}
             onDecisionChange={handleDecisionChange}
             onBatch={handleBatch}
@@ -457,6 +473,7 @@ export function ResumeOptimizePage() {
             loading={loading}
             exporting={exporting}
             adjusting={adjusting}
+            aiUnavailable={aiDown}
             lastResumeBeforeAiAdjust={lastResumeBeforeAiAdjust}
             adjustWarnings={adjustWarnings}
             adjustError={adjustError ? unattendedResumeCopy(adjustError, contact) : adjustError}
