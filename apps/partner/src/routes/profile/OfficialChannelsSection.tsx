@@ -145,7 +145,7 @@ export function OfficialChannelsSection() {
   }
 
   return (
-    <Card className="mt-6 p-6" role="region" aria-labelledby="official-channels-title">
+    <Card className="mb-6 p-6" role="region" aria-labelledby="official-channels-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50">
