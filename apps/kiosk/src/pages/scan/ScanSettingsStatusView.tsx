@@ -134,10 +134,11 @@ export function ScanSettingsStatusView({
           : phase === 'invalid'
             ? '这次不会发起创建请求'
             : '这次扫描没建好'
+  /* 稿「等授权」态的状态条一直写「还没确认能收到扫描件」（在路上和可重试都是）；「正在确认」由意图带标题说。
+   * 隐私清场的用例（kiosk-privacy-timeout「a delivery ack that lands mid-clear」）也按这一句找屏：
+   * 请求还挂在半路时用户眼前就是它，去重不能把它拿掉。 */
   const status = awaitingAck
-    ? ackRetryable
-      ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
-      : { tone: 'warn' as const, label: '正在确认能收到扫描件' }
+    ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
     : phase === 'loading'
       ? {
           tone: 'ok' as const,
