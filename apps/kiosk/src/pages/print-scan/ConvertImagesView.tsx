@@ -21,7 +21,7 @@ import {
   MoreSettings,
   Sample,
   StepRow,
-  retentionLine,
+  UsbBody,
 } from './ConvertImagesPanels'
 import {
   ClosedBody,
@@ -29,10 +29,16 @@ import {
   EmptyBody,
   UnknownBody,
   UploadingBody,
-  UsbBody,
   WorkingBody,
 } from './ConvertImagesStates'
 import { FsRow } from './FsRow'
+
+/** 留存说明：登录与否决定这份 PDF 会不会进「我的文档」。转换前说的是规矩（会不会进），完成态另按响应里的 hasEndUser 说。 */
+function retentionLine(loggedIn: boolean): string {
+  return loggedIn
+    ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长。'
+    : '未登录时 PDF 不会进入「我的文档」，也不下载到这台公用机器。'
+}
 
 interface ConvertImagesViewProps {
   /** 次出口整行按钮（取消这一张、先登录再转换……）。稿里它们在正文里，不在底栏。 */
@@ -98,7 +104,6 @@ export function ConvertQrLayer({
           confirmLabel="确认加入待合并列表"
           onUploaded={onUploaded}
           onBusyChange={onBusyChange}
-          qrSize={280}
         />
       </QxTouchOverlay>
     </div>

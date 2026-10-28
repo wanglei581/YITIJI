@@ -1,8 +1,8 @@
 import { PlusIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { PhoneArt, UsbArt } from './ToolArt'
 import { PhoneHelpLine } from './phoneHelp'
+import { Fact } from './ConvertImagesPanels'
 import {
   MAX_IMAGES,
   formatBytes,
@@ -10,16 +10,6 @@ import {
   type ConvertError,
   type SelectedImage,
 } from './convert-images-model'
-
-/** 说明格：一个标题加一句话（稿的 .fs-fact）。 */
-export function Fact({ title, children, wide }: { title: ReactNode; children: ReactNode; wide?: boolean }) {
-  return (
-    <div className={`fs-fact${wide ? ' wide' : ''}`}>
-      <b>{title}</b>
-      <span>{children}</span>
-    </div>
-  )
-}
 
 function names(images: SelectedImage[]): string {
   return images.map((img) => img.name).join('、')
@@ -80,29 +70,6 @@ export function EmptyBody({
       <p className="fine">
         合计不超过 40MB，成品不超过 15MB。单张不超过 2500 万像素，合计不超过 2 亿像素。一次最多 {MAX_IMAGES} 张。旋转 90° 当前不可用。
       </p>
-    </>
-  )
-}
-
-/** U 盘图片还没接到转换列表：说清现在能走哪两条（稿 18「U 盘图片还没接到这里」）。 */
-export function UsbBody({ kiosk }: { kiosk: boolean }) {
-  return (
-    <>
-      <div className="fs-facts" data-testid="img2pdf-usb-ways">
-        <Fact wide title="尚未接到转换列表">
-          U 盘图片导入尚未接到转换列表。{kiosk ? '一体机这里不打开本机文件框。' : '这一页现在只接了本机上传和手机扫码上传。'}
-        </Fact>
-        <div className="fs-pairgrid">
-          <Fact title={kiosk ? '改用手机' : '改用本机或手机'}>
-            {kiosk ? '这台机器没有本机文件框。请回到手机扫码，传 JPG 或 PNG。' : '在这台设备上选图，或回到手机扫码，传 JPG 或 PNG。'}
-          </Fact>
-          <Fact title="现在能用的">手机扫码上传一张 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</Fact>
-          <Fact title="要拼成一份 PDF">图片得先落到手机或这台机器上，再在这一页上传。拷进来之后，就和别的图片一样：一张一页，顺序你自己排。</Fact>
-          <Fact title="只想把原图打出来">那是打印流程，不是这一页：走「打印扫描」里的 U 盘导入打印。那条路不会回到这个列表，也排不出页序。</Fact>
-        </div>
-        <Fact wide title="还没加进来">U 盘里的图片不会出现在这个列表里。</Fact>
-      </div>
-      <PhoneHelpLine />
     </>
   )
 }

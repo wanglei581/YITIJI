@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { CheckCircleIcon, Loader2Icon, RefreshCwIcon, SmartphoneIcon, XCircleIcon } from 'lucide-react'
 import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/shared'
@@ -39,8 +39,6 @@ interface UploadSessionQrPanelProps {
    * received：没收到文件不算忙；手机已传上或正在确认才报忙。
    */
   busyWhen?: 'session' | 'received'
-  /** 二维码的边长（像素）。默认 150；触屏层里要远处也扫得到，由页面放大。 */
-  qrSize?: number
 }
 
 interface QrState {
@@ -120,7 +118,6 @@ export function UploadSessionQrPanel({
   onUploaded,
   onBusyChange,
   busyWhen = 'session',
-  qrSize = 150,
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const pollFailuresRef = useRef(0)
@@ -329,16 +326,10 @@ export function UploadSessionQrPanel({
         </div>
       </div>
 
-      <div
-        className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[var(--qr-col,180px)_1fr]"
-        style={qrSize !== 150 ? ({ '--qr-col': `${qrSize + 30}px` } as CSSProperties) : undefined}
-      >
-        <div
-          className="flex min-h-[180px] items-center justify-center rounded-2xl border border-neutral-200 bg-white"
-          style={qrSize !== 150 ? { minHeight: qrSize + 30 } : undefined}
-        >
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr]">
+        <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-neutral-200 bg-white">
           {qr && !loading ? (
-            <QRCodeSVG value={qr.qrUrl} size={qrSize} level="M" marginSize={1} />
+            <QRCodeSVG value={qr.qrUrl} size={150} level="M" marginSize={1} />
           ) : (
             <Loader2Icon className="h-8 w-8 animate-spin text-primary-500" aria-hidden="true" />
           )}

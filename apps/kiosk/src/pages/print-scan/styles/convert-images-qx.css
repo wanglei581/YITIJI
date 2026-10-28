@@ -484,3 +484,18 @@
 .i2p-qr-layer .qxt-dialog > :not(h2) h2 {
   font: 700 28px/1.3 var(--qx-sans);
 }
+
+/* 大二维码：远处也扫得到。扫码面板是冻结的共享件（门禁按哈希钉着它），不改它的源码，
+ * 只在层里把二维码那个 svg 放大到 280px，并把它左边的格子（原 180px）撑到放得下。 */
+.i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] {
+  grid-template-columns: 310px minmax(0, 1fr);
+}
+
+.i2p-qr-layer .qxt-dialog [class*='md:grid-cols-[180px_1fr]'] > :first-child {
+  min-height: 310px;
+}
+
+.i2p-qr-layer .qxt-dialog svg:not([class]) {
+  width: 280px;
+  height: 280px;
+}

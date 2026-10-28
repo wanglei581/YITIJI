@@ -2,6 +2,7 @@ import { EyeIcon, InfoIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { FsRow } from './FsRow'
+import { PhoneHelpLine } from './phoneHelp'
 import { DocStackArt, PhoneArt, UsbArt } from './ToolArt'
 import {
   MAX_IMAGES,
@@ -47,6 +48,39 @@ export function Band({
   )
 }
 
+/** 说明格：一个标题加一句话（稿的 .fs-fact）。 */
+export function Fact({ title, children, wide }: { title: ReactNode; children: ReactNode; wide?: boolean }) {
+  return (
+    <div className={`fs-fact${wide ? ' wide' : ''}`}>
+      <b>{title}</b>
+      <span>{children}</span>
+    </div>
+  )
+}
+
+/** U 盘图片还没接到转换列表：说清现在能走哪两条（稿 18「U 盘图片还没接到这里」）。 */
+export function UsbBody({ kiosk }: { kiosk: boolean }) {
+  return (
+    <>
+      <div className="fs-facts" data-testid="img2pdf-usb-ways">
+        <Fact wide title="尚未接到转换列表">
+          U 盘图片导入尚未接到转换列表。{kiosk ? '一体机这里不打开本机文件框。' : '这一页现在只接了本机上传和手机扫码上传。'}
+        </Fact>
+        <div className="fs-pairgrid">
+          <Fact title={kiosk ? '改用手机' : '改用本机或手机'}>
+            {kiosk ? '这台机器没有本机文件框。请回到手机扫码，传 JPG 或 PNG。' : '在这台设备上选图，或回到手机扫码，传 JPG 或 PNG。'}
+          </Fact>
+          <Fact title="现在能用的">手机扫码上传一张 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</Fact>
+          <Fact title="要拼成一份 PDF">图片得先落到手机或这台机器上，再在这一页上传。拷进来之后，就和别的图片一样：一张一页，顺序你自己排。</Fact>
+          <Fact title="只想把原图打出来">那是打印流程，不是这一页：走「打印扫描」里的 U 盘导入打印。那条路不会回到这个列表，也排不出页序。</Fact>
+        </div>
+        <Fact wide title="还没加进来">U 盘里的图片不会出现在这个列表里。</Fact>
+      </div>
+      <PhoneHelpLine />
+    </>
+  )
+}
+
 /** 一块示意小样：多出来的高度给它，不撑空卡。art 是示意图，只作示意；带 facts 时右边讲这份文件。 */
 export function Sample({
   art,
@@ -67,13 +101,6 @@ export function Sample({
       ) : null}
     </div>
   )
-}
-
-/** 留存说明：登录与否决定这份 PDF 会不会进「我的文档」。转换前说的是规矩（会不会进），完成态另按响应里的 hasEndUser 说。 */
-export function retentionLine(loggedIn: boolean): string {
-  return loggedIn
-    ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长。'
-    : '未登录时 PDF 不会进入「我的文档」，也不下载到这台公用机器。'
 }
 
 export function ImageList({

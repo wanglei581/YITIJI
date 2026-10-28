@@ -402,7 +402,9 @@ assert.doesNotMatch(privacyPageQx, /全部个人数据已删除|账号注销成�
  * 机器状态第 8 项按托管 a 叫「机构官方渠道」。18（SCAN VIA PANEL）归 B 批，不在此列。 */
 const A_BATCH_EYEBROWS = [
   ['src/pages/legal/LegalDocPage.tsx', ["eyebrow: '你和这台机器'", "eyebrow: '你的信息'"]],
-  ['src/pages/print-scan/ConvertImagesView.tsx', ['>图片转 PDF<']],
+  /* 触屏版（稿 18）：眉题在意图带里，由页面传给 TouchToolScreen；空态标题仍是「图片转 PDF」（h1 锚点与路由巡检按这个名字找）。 */
+  ['src/pages/print-scan/ConvertImagesPage.tsx', ['eyebrow="照片合成 PDF"']],
+  ['src/pages/print-scan/convert-images-model.ts', ["title: '图片转 PDF'"]],
   ['src/pages/print-scan/sign-stamp/SignStampPickView.tsx', ['>签名<']],
   ['src/pages/resume/SelfAssessmentFlow.tsx', ["SA_EYEBROW = '自我探索'"]],
   ['src/pages/profile/me/MyNotificationsPage.tsx', ['eyebrow="消息通知"']],
