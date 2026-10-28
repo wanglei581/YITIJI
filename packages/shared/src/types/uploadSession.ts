@@ -39,7 +39,15 @@ export interface UploadSessionFileView {
   fileExpiresAt: string | null
   /** resume_upload / print_doc / signature_image / contract_upload 在 confirm 时携带的短时签名内容 URL。 */
   fileUrl?: string | null
+  /**
+   * 这份文件从哪来：小程序「我的文档」/ 小程序里选的文件 / 手机网页。服务端按入口和微信小程序固定的
+   * Referer 判定，只给一体机确认屏作提示（本人认出不是自己传的就取消），可被伪造，不作安全判断。
+   * 旧会话记录没有这个字段。
+   */
+  source?: UploadSessionFileSource | null
 }
+
+export type UploadSessionFileSource = 'miniapp_documents' | 'miniapp' | 'web'
 
 export interface UploadSessionStatusResponse {
   sessionId: string

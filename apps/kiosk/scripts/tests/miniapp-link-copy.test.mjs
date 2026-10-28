@@ -84,6 +84,44 @@ test('两句都不含无人值守禁用说法，也不写价格、购买、岗�
   }
 })
 
+test('文件来源那一行：三种来源各一句，小程序名来自常量；读不到或不认得就是空串', () => {
+  assert.equal(copy.uploadedFileSourceLine('miniapp_documents'), '来自职易达小程序「我的文档」')
+  assert.equal(copy.uploadedFileSourceLine('miniapp'), '来自职易达小程序')
+  assert.equal(copy.uploadedFileSourceLine('web'), '来自手机网页')
+  for (const unknown of [undefined, null, '', 'kiosk', 'MINIAPP', 1, {}]) {
+    assert.equal(copy.uploadedFileSourceLine(unknown), '', `不认得的来源 ${JSON.stringify(unknown)} 要是空串`)
+  }
+  for (const source of ['miniapp_documents', 'miniapp']) {
+    assert.ok(copy.uploadedFileSourceLine(source).includes(`${copy.MINIAPP_DISPLAY_NAME}小程序`), `${source} 要带小程序名`)
+  }
+})
+
+test('来源那一行是事实陈述，不跟着小程序发布开关走；「不是你传的文件」那句叫人点取消再扫', () => {
+  // 未发布时（只有体验成员能从小程序传）文件真从小程序来，也照实说。
+  assert.equal(copy.uploadedFileSourceLine('miniapp'), '来自职易达小程序')
+  const hint = copy.notYourFileHint()
+  assert.equal(hint, '不是你传的文件？请点「取消」，再重新扫码。')
+  assert.ok(hint.includes('「取消」'))
+})
+
+test('来源与提醒两句同样不含无人值守禁用说法，也不写价格、岗位一类字眼', () => {
+  const lines = [
+    copy.uploadedFileSourceLine('miniapp_documents'),
+    copy.uploadedFileSourceLine('miniapp'),
+    copy.uploadedFileSourceLine('web'),
+    copy.notYourFileHint(),
+  ]
+  for (const sentence of lines) {
+    for (const phrase of unattended.UNATTENDED_FORBIDDEN_PHRASES) {
+      assert.ok(!sentence.includes(phrase), `「${sentence}」含禁用说法「${phrase}」`)
+    }
+    assert.equal(unattended.containsStaffHandoff(sentence), false, sentence)
+    assert.doesNotMatch(sentence, /工作人员|服务台|到店|值守|现场处理/, sentence)
+    assert.doesNotMatch(sentence, /价格|收费|付费|购买|充值|优惠|元\/|￥|¥/, sentence)
+    assert.doesNotMatch(sentence, /岗位|招聘|企业|投递/, sentence)
+  }
+})
+
 test('是否已发布只经 whenMiniapp 判断，本文件不发请求', () => {
   const source = readFileSync(sourcePath, 'utf8')
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')

@@ -26,3 +26,22 @@ export function phoneUploadScanHint(contact?: PublicSupportContact | null): stri
 export function qrLoginScanHint(contact?: PublicSupportContact | null): string {
   return whenMiniapp(contact, `用手机微信扫码：打开的是${MINIAPP_DISPLAY_NAME}小程序，已登录的直接确认；打开的是网页，用短信验证。`)
 }
+
+/**
+ * 手机传来文件后，文件名下面那一行「这份文件从哪来」。
+ * 场景码在这单等文件期间可以重复兑换，旁人拍到屏上的码也可能抢在本人之前传；现场无人值守，
+ * 只能靠本人认出不是自己传的文件并点取消。来源由服务端按入口和微信小程序固定的 Referer 判定
+ * （会话状态里 file.source），只作提示、可被伪造。读不到或不认得时为空串，调用方就不显示这一行。
+ * 这是事实陈述，不是「打开小程序」一类引导，所以不经 whenMiniapp。
+ */
+export function uploadedFileSourceLine(source: unknown): string {
+  if (source === 'miniapp_documents') return `来自${MINIAPP_DISPLAY_NAME}小程序「我的文档」`
+  if (source === 'miniapp') return `来自${MINIAPP_DISPLAY_NAME}小程序`
+  if (source === 'web') return '来自手机网页'
+  return ''
+}
+
+/** 手机传来文件后的提醒，和来源那一行一起放在文件名下面。 */
+export function notYourFileHint(): string {
+  return '不是你传的文件？请点「取消」，再重新扫码。'
+}
