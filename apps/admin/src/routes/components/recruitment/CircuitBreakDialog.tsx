@@ -18,7 +18,7 @@ const SCOPE_COPY: Record<RecruitmentCircuitBreakScope, { title: string; noun: st
   org: {
     title: '按机构熔断',
     noun: '机构',
-    effect: '该机构名下的岗位、招聘会、招聘会资料、企业资料、线下机构与政策会全部下架并锁定，今后也不能再发布或同步。',
+    effect: '该机构名下的岗位、招聘会、招聘会资料、企业资料、线下机构与政策会全部下架并锁定，今后也不能再发布或同步；该机构的官方渠道也会一并下架。',
   },
   source: {
     title: '按来源熔断',

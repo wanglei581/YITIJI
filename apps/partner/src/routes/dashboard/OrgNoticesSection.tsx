@@ -24,7 +24,9 @@ function noticeMeta(notice: PartnerOrgNotice): { target?: string; reason?: strin
  * 平台处置通知（3.13）。平台对本机构内容紧急下架或按机构 / 来源熔断时，服务端逐条写一条通知。
  * 读失败如实说「没读到」，不当成「没有通知」；服务端截断时写出总数。
  */
-export function OrgNoticesSection() {
+export type OrgNoticeOutcome = 'loading' | 'error' | 'empty' | 'items'
+
+export function OrgNoticesSection({ onOutcome }: { onOutcome?: (outcome: OrgNoticeOutcome) => void }) {
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [data, setData] = useState<PartnerOrgNoticeList | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -42,6 +44,14 @@ export function OrgNoticesSection() {
     return () => { alive = false }
   }, [reloadKey])
 
+  useEffect(() => {
+    if (!onOutcome) return
+    if (state === 'loading') onOutcome('loading')
+    else if (state === 'error') onOutcome('error')
+    else if (data && data.items.length === 0) onOutcome('empty')
+    else if (data) onOutcome('items')
+  }, [state, data, onOutcome])
+
   return (
     <section aria-label="平台处置通知">
       <div className="mb-3 flex items-center gap-2">
@@ -55,13 +65,13 @@ export function OrgNoticesSection() {
 
         {state === 'error' && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 text-sm text-warning-fg" role="alert">
-            <span>处置通知这次没有读到，不代表没有通知。</span>
+            <span>这类这次没读到，不代表没有通知。</span>
             <button
               type="button"
               onClick={() => setReloadKey((k) => k + 1)}
-              className="shrink-0 rounded-md border border-warning/40 px-2.5 py-1 text-xs font-semibold hover:bg-warning-bg"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-warning/40 px-3 text-sm font-semibold hover:bg-warning-bg"
             >
-              重新读取
+              重试
             </button>
           </div>
         )}

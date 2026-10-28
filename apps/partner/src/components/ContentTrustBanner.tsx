@@ -32,8 +32,21 @@ import { useRecruitmentHosting } from '../services/capabilities'
  * 取不到机构资料时不显示。宁可少提示，也不能因一次网络抖动就对一个其实已可信的
  * 机构挂一条「内容上不了架」—— 那是另一种伪造状态。
  */
+function useNarrowScreen(): boolean {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = () => setNarrow(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
+
 export function ContentTrustBanner() {
   const [profile, setProfile] = useState<PartnerOrgProfile | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const narrow = useNarrowScreen()
   // 只有服务端明确打开托管时才提岗位与招聘会；关闭或没读到时只提政策。
   const recruitmentHosting = useRecruitmentHosting() === 'on'
 
@@ -49,28 +62,46 @@ export function ContentTrustBanner() {
   const archived = Boolean(profile.archived)
   if (isOrgContentPublishable(profile.contentTrustStatus, archived)) return null
 
+  const full = (
+    <>
+      <div className="font-semibold">本机构的内容目前还不会出现在终端上</div>
+      <div className="mt-1">
+        {archived
+          ? '本机构已归档。已归档机构的内容不会被上架到一体机与小程序。'
+          : recruitmentHosting
+            ? '本机构尚未通过平台的「内容可信」核验。在核验通过之前，岗位 / 招聘会 / 政策即使已经录入、通过审核，也无法上架到一体机与小程序。'
+            : '本机构尚未通过平台的「内容可信」核验。在核验通过之前，政策即使已经录入、通过审核，也无法发布到一体机与小程序。'}
+      </div>
+      <div className="mt-1">
+        {archived
+          ? '如需继续供稿，请联系平台运营取消归档并重新核验。'
+          : recruitmentHosting
+            ? '政策由本机构自行发布；岗位 / 招聘会的上架入口尚未开放（平台不代审、不代发）。发布前都要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'
+            : '政策由本机构自行审核发布，发布前要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'}
+      </div>
+    </>
+  )
+
   return (
     <div
       role="status"
       className="mb-4 flex items-start gap-3 rounded-[10px] border border-amber-300 bg-amber-50 px-4 py-3"
     >
       <AlertTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
-      <div className="text-sm leading-relaxed text-amber-900">
-        <div className="font-semibold">本机构的内容目前还不会出现在终端上</div>
-        <div className="mt-1">
-          {archived
-            ? '本机构已归档。已归档机构的内容不会被上架到一体机与小程序。'
-            : recruitmentHosting
-              ? '本机构尚未通过平台的「内容可信」核验。在核验通过之前，岗位 / 招聘会 / 政策即使已经录入、通过审核，也无法上架到一体机与小程序。'
-              : '本机构尚未通过平台的「内容可信」核验。在核验通过之前，政策即使已经录入、通过审核，也无法发布到一体机与小程序。'}
-        </div>
-        <div className="mt-1">
-          {archived
-            ? '如需继续供稿，请联系平台运营取消归档并重新核验。'
-            : recruitmentHosting
-              ? '政策由本机构自行发布；岗位 / 招聘会的上架入口尚未开放（平台不代审、不代发）。发布前都要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'
-              : '政策由本机构自行审核发布，发布前要先通过核验。请联系平台完成来源授权核验（需提供授权书 / 合同 / 公开声明编号等核验依据），核验通过后本提示会自动消失。'}
-        </div>
+      <div className="min-w-0 flex-1 text-sm leading-relaxed text-amber-900">
+        {narrow && !expanded ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-semibold">内容还未核验，通过前不会上屏</p>
+            <button type="button" aria-expanded={false} onClick={() => setExpanded(true)} className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-amber-400 px-3 font-semibold">展开</button>
+          </div>
+        ) : (
+          <>
+            {full}
+            {narrow && (
+              <button type="button" aria-expanded onClick={() => setExpanded(false)} className="mt-2 inline-flex min-h-11 items-center rounded-md border border-amber-400 px-3 font-semibold">收起</button>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
