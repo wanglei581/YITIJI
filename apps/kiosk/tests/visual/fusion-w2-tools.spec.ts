@@ -197,6 +197,8 @@ test('conversion payload order matches the visible list after reorder @w2', asyn
   await upload.setInputFiles({ name: 'w2-image-2.png', mimeType: 'image/png', buffer: Buffer.from('synthetic-w2-image-2') })
   await expect(page.getByText('w2-image-2.png', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '选中第 1 张：w2-image-1.png' }).click()
+  // 上移 / 下移 / 移除 / 查看 / 旋转收在「更多设置」里（稿 18），先点开再排序。
+  await page.getByRole('button', { name: '更多设置', exact: true }).click()
   await page.getByRole('button', { name: '下移' }).click()
   await expect(page.locator('[data-testid="img2pdf-order"]')).toHaveAttribute(
     'data-sent-payload',
@@ -321,6 +323,156 @@ test('guest login from a finished conversion comes back to convert again, not to
   await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toHaveCount(0)
   await expect(page.getByTestId('img2pdf-primary')).toBeDisabled()
   expect(api.requestCount('POST', '/api/v1/print/convert/images-to-pdf')).toBe(1)
+  await expectHealthy(page, errors, 'print-scan-convert')
+})
+
+
+/*
+ * 版式体检（审查意见 A1 / A2）。一体机竖屏 1080×1920 上，工具页的内容块必须：
+ *   · 左右各留 ≥32px（贴到屏边就是没排好）；
+ *   · 上下相邻、互不压盖（后一块的上沿 ≥ 前一块的下沿 − 1）；
+ *   · 带字的块没有被截（scrollHeight ≤ clientHeight + 1；自己能滚的列表不算）；
+ *   · 屏上所有可点的件 ≥64×64（隐藏的文件输入、读屏专用的除外）。
+ * 此前加 3 张图后「待合并图片」卡只露出前 2 行、上移 / 下移那条和下面两句说明叠成一团，
+ * 签名页内容从 x=0 铺到 x=1080：这些靠空白扫描量不到，要用量出来的几何钉住。
+ */
+async function auditToolLayout(page: Page, rootSelector: string, gutter = 32): Promise<string[]> {
+  return page.evaluate(
+    ({ rootSelector: rootSel, gutter: g }) => {
+      const issues: string[] = []
+      const root = document.querySelector(rootSel) as HTMLElement | null
+      if (!root) return [`找不到版式根 ${rootSel}`]
+      const vw = window.innerWidth
+      const vis = (el: Element) => {
+        const rect = el.getBoundingClientRect()
+        const cs = getComputedStyle(el)
+        return rect.width > 0 && rect.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'
+      }
+      const label = (el: Element) => {
+        const h = el as HTMLElement
+        const id = h.dataset?.testid
+        return `${el.tagName.toLowerCase()}${id ? `[${id}]` : `.${String(h.className).split(' ')[0] ?? ''}`}`
+      }
+      const blocks = Array.from(root.children).filter((c) => {
+        const pos = getComputedStyle(c).position
+        return vis(c) && pos !== 'absolute' && pos !== 'fixed'
+      }) as HTMLElement[]
+      const placed = blocks
+        .map((block) => ({ block, rect: block.getBoundingClientRect() }))
+        .sort((a, b) => a.rect.top - b.rect.top)
+      for (const { block, rect } of placed) {
+        if (rect.left < g - 0.5 || vw - rect.right < g - 0.5) {
+          issues.push(`${label(block)} 左右留白不足（左 ${Math.round(rect.left)}、右 ${Math.round(vw - rect.right)}，要 ≥${g}）`)
+        }
+      }
+      for (let i = 1; i < placed.length; i += 1) {
+        const prev = placed[i - 1]!
+        const next = placed[i]!
+        if (next.rect.top < prev.rect.bottom - 1) {
+          issues.push(`${label(next.block)} 压在 ${label(prev.block)} 上（${Math.round(next.rect.top)} < ${Math.round(prev.rect.bottom)}）`)
+        }
+      }
+      const scrolls = (el: Element) => ['auto', 'scroll'].includes(getComputedStyle(el).overflowY)
+      for (const block of blocks) {
+        for (const el of [block, ...Array.from(block.querySelectorAll<HTMLElement>('*'))]) {
+          if (!vis(el) || scrolls(el) || el instanceof SVGElement || el.closest('[aria-hidden="true"]')) continue
+          if (el.clientHeight === 0 || !(el.textContent ?? '').trim()) continue
+          if (el.scrollHeight > el.clientHeight + 1) {
+            issues.push(`${label(el)} 里的字被截（内容 ${el.scrollHeight}px > 盒子 ${el.clientHeight}px）`)
+          }
+        }
+      }
+      const screen = document.querySelector('[data-qxt-screen]')
+      for (const el of Array.from(screen?.querySelectorAll<HTMLElement>('button, a[href], [role="button"], [role="radio"], [role="checkbox"], input:not([type="hidden"])') ?? [])) {
+        if (!vis(el) || el.closest('[inert]') || el.closest('[aria-hidden="true"]')) continue
+        if (el.matches('.sr-only, .ss-hidden-file, input[type="file"]')) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width < 64 - 0.5 || rect.height < 64 - 0.5) {
+          issues.push(`${label(el)}「${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 14)}」可点区只有 ${Math.round(rect.width)}×${Math.round(rect.height)}，要 ≥64×64`)
+        }
+      }
+      return issues
+    },
+    { rootSelector, gutter },
+  )
+}
+
+function registerNumberedImageUploads(api: ApiRouter): void {
+  api.respondWith('POST', '/api/v1/files/kiosk-upload', (n) => ({
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        fileId: `w2-image-${String(n).padStart(3, '0')}`,
+        filename: `成绩单-扫描-${n}.png`,
+        sizeBytes: 1024,
+        mimeType: 'image/png',
+        sha256: 'c'.repeat(64),
+        signedUrl: '/w2-fixtures/image.png',
+        signedUrlExpiresAt: '2026-07-24T00:10:00.000Z',
+        fileExpiresAt: '2026-07-25T00:00:00.000Z',
+      },
+    },
+  }))
+}
+
+async function addNumberedImages(page: Page, count: number): Promise<void> {
+  for (let i = 1; i <= count; i += 1) {
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `成绩单-扫描-${i}.png`,
+      mimeType: 'image/png',
+      buffer: Buffer.from(`synthetic-w2-image-${i}`),
+    })
+    await expect(page.getByText(`成绩单-扫描-${i}.png`, { exact: true })).toBeVisible()
+  }
+}
+
+const CONVERT_LAYOUT_ROOT = '[data-qx-page="img2pdf"] .i2p-scroll'
+
+for (const count of [1, 3, 20]) {
+  test(`conversion list with ${count} image(s) keeps blocks apart, uncut and tappable @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    await fulfillFixtureImage(page)
+    registerShell(api)
+    registerNumberedImageUploads(api)
+
+    await page.goto('/print-scan/convert')
+    await addNumberedImages(page, count)
+    expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), `${count} 张图的列表版式`).toEqual([])
+    // 选中一张、点开「更多设置」之后也一样：设置条不许压在下面的说明上。
+    await page.getByRole('button', { name: `选中第 ${count} 张：成绩单-扫描-${count}.png` }).click()
+    await page.getByRole('button', { name: '更多设置', exact: true }).click()
+    expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), `${count} 张图、选中并展开更多设置的版式`).toEqual([])
+    await expectHealthy(page, errors, 'print-scan-convert')
+  })
+}
+
+test('conversion finished and failed states keep blocks apart, uncut and tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  await fulfillFixtureImage(page)
+  registerShell(api)
+  registerNumberedImageUploads(api)
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 422,
+    json: { success: false, error: { code: 'CONVERT_FAILED', message: '合成图片尺寸不受支持' } },
+  })
+
+  await page.goto('/print-scan/convert')
+  await addNumberedImages(page, 3)
+  await page.getByRole('button', { name: /合成 3 张为一份 PDF/ }).click()
+  await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
+  expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), '明确失败态的版式').toEqual([])
+
+  api.respond('POST', '/api/v1/print/convert/images-to-pdf', {
+    status: 200,
+    json: {
+      success: true,
+      data: { fileId: 'w2-pdf-layout', printFileUrl: '/w2-fixtures/image.png', fileMd5: 'd'.repeat(32), sizeBytes: 4096, pages: 3, hasEndUser: false },
+    },
+  })
+  await page.getByRole('button', { name: '改完之后重试合成' }).click()
+  await expect(page.getByTestId('img2pdf-band').getByText('PDF 已生成')).toBeVisible()
+  expect(await auditToolLayout(page, CONVERT_LAYOUT_ROOT), '完成态的版式').toEqual([])
   await expectHealthy(page, errors, 'print-scan-convert')
 })
 

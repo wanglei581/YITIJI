@@ -1,30 +1,38 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
-import { EyeIcon } from 'lucide-react'
-import type { ChangeEvent, ReactNode, Ref } from 'react'
+import { useState, type ChangeEvent, type ReactNode, type Ref } from 'react'
 import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
+import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
-  MAX_IMAGES,
   MAX_OUTPUT_BYTES,
-  advisorCopy,
   formatBytes,
   outputFileName,
+  totalBytesOf,
   type ConvertError,
   type ConvertPhase,
   type ConvertPreview,
   type SelectedImage,
 } from './convert-images-model'
 import {
-  AddRow,
+  AddRows,
   Band,
-  EmptyBody,
-  ErrorBand,
+  ErrorNote,
   ImageList,
-  Retention,
-  Rules,
-  SelBar,
-  UsbGap,
+  MoreSettings,
+  Sample,
+  StepRow,
+  retentionLine,
 } from './ConvertImagesPanels'
+import {
+  ClosedBody,
+  ConflictBody,
+  EmptyBody,
+  UnknownBody,
+  UploadingBody,
+  UsbBody,
+  WorkingBody,
+} from './ConvertImagesStates'
+import { FsRow } from './FsRow'
 
 interface ConvertImagesViewProps {
   /** 次出口整行按钮（取消这一张、先登录再转换……）。稿里它们在正文里，不在底栏。 */
@@ -39,11 +47,11 @@ interface ConvertImagesViewProps {
   uploading: boolean
   generating: boolean
   rechecking: boolean
-  showQr: boolean
   error: ConvertError | null
   result: ConvertImagesResponse | null
   recovered: boolean
-  requestKey: string | null
+  /** 冲突屏上「上一次的顺序」：上一次提交的图片名，没记下就是 null。 */
+  previousOrder: string[] | null
   preview: ConvertPreview | null
   previewFailed: boolean
   inputRef: Ref<HTMLInputElement>
@@ -51,10 +59,7 @@ interface ConvertImagesViewProps {
   onPickLocal: () => void
   onLocalFile: (event: ChangeEvent<HTMLInputElement>) => void
   onShowQr: () => void
-  onPhoneUploaded: (file: PhoneUploadedFile) => void
-  onQrBusy: (busy: boolean) => void
   onOpenUsb: () => void
-  onCloseUsb: () => void
   onSelect: (index: number) => void
   onMove: (direction: -1 | 1) => void
   onRemove: () => void
@@ -62,189 +67,208 @@ interface ConvertImagesViewProps {
   onPreviewOutput: (index: number) => void
   onClosePreview: () => void
   onPreviewError: () => void
-  onCancelUpload: () => void
-  onConvert: () => void
-  onRecheck: () => void
-  onNewKey: () => void
-  onRestoreOrder: () => void
-  onPrint: () => void
-  onLogin: () => void
-  onDocuments: () => void
-  onHelp: () => void
-  onBack: () => void
+}
+
+/**
+ * 手机扫码加图片的层（稿 18：二维码是层，不是正文里的内联小卡）。
+ * 层里仍是原来的扫码面板：手机传上来之后，要在这里点「确认加入待合并列表」才进列表，这一步确认不省。
+ * 关掉层只是不看这个码，列表和顺序都不动。
+ */
+export function ConvertQrLayer({
+  onClose,
+  onUploaded,
+  onBusyChange,
+}: {
+  onClose: () => void
+  onUploaded: (file: PhoneUploadedFile) => void
+  onBusyChange: (busy: boolean) => void
+}) {
+  return (
+    <div className="i2p-qr-layer" data-testid="img2pdf-qr-layer">
+      <QxTouchOverlay
+        kind="dialog"
+        title="用手机加一张图片"
+        onClose={onClose}
+        actions={<button type="button" className="qxt-btn qxt-btn-sec" data-testid="img2pdf-qr-close" onClick={onClose}>关闭</button>}
+      >
+        <UploadSessionQrPanel
+          purpose="print_doc"
+          title="手机扫码添加图片"
+          description="手机扫码上传一张图片，确认后自动加入待合并列表；可重复扫码继续添加。"
+          confirmLabel="确认加入待合并列表"
+          onUploaded={onUploaded}
+          onBusyChange={onBusyChange}
+          qrSize={280}
+        />
+      </QxTouchOverlay>
+    </div>
+  )
 }
 
 export function ConvertImagesView(props: ConvertImagesViewProps) {
   const {
     loggedIn, hasEndUser, kiosk, phase, images, selected, uploading, generating, rechecking,
-    showQr, error, result, recovered, requestKey, preview, previewFailed, inputRef, atLimit,
+    error, result, recovered, previousOrder, preview, previewFailed, inputRef, atLimit,
   } = props
-  const advisor = advisorCopy(phase, images.length, error)
   const busy = uploading || generating || rechecking
   const addDisabled = busy || atLimit
   const addReason = uploading ? '这一张还在上传' : atLimit ? '已达 20 张上限' : generating ? '正在合成' : '请稍候'
+  const [moreOpen, setMoreOpen] = useState(false)
+  // 「再点一次确认移除」：记下是对哪一张点的第一下，换选中的那一张就自然解除。
+  const [armedFor, setArmedFor] = useState<number | null>(null)
+  const removeArmed = armedFor !== null && armedFor === selected
+
+  const lock = error?.kind === 'result-unknown' || error?.kind === 'in-progress'
+  const closed = error?.kind === 'capability'
+
+  // 上一张 / 下一张只移动选中，不取消选中，也不越过两头。
+  const stepSelect = (direction: -1 | 1) => {
+    const next = selected === null ? (direction === 1 ? 0 : images.length - 1) : selected + direction
+    if (next < 0 || next >= images.length || next === selected) return
+    props.onSelect(next)
+  }
+
+  const remove = () => {
+    if (selected === null) return
+    if (!removeArmed) {
+      setArmedFor(selected)
+      return
+    }
+    setArmedFor(null)
+    props.onRemove()
+  }
+
+  const body = (() => {
+    if (phase === 'usb') return { main: <UsbBody kiosk={kiosk} />, art: 'usb' as const }
+    if (phase === 'uploading') return { main: <UploadingBody />, art: 'phone' as const }
+    if (phase === 'converting' || phase === 'rechecking') {
+      return { main: <WorkingBody recheck={phase === 'rechecking'} images={images} />, art: 'doc' as const }
+    }
+    if (phase === 'conflict') {
+      return { main: <ConflictBody images={images} previous={previousOrder} />, art: 'doc' as const }
+    }
+    if (phase === 'completed' && result) {
+      return {
+        main: (
+          <>
+            <Band
+              kind="info"
+              title={recovered ? '用同一个标记把结果找回来了' : 'PDF 已生成'}
+              chips={[
+                '系统已返回结果',
+                '一张图一页 · A4',
+                ...(typeof hasEndUser === 'boolean'
+                  ? [hasEndUser ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']
+                  : []),
+              ]}
+            >
+              <p className="i2p-band-p">
+                系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
+                {hasEndUser === false ? (
+                  <>
+                    <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
+                    不登录也能直接打印这份；想存进「我的文档」，要先登录，再回到这一页重新添加图片转换。
+                  </>
+                ) : null}
+                {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
+              </p>
+            </Band>
+            <div className="i2p-outcard" data-testid="img2pdf-outfacts">
+              <div className="i2p-kv">
+                <div><span>文件名</span><b>{outputFileName(result.pages)}</b></div>
+                <div><span>页数</span><b>{result.pages} 页（每张图一页）</b></div>
+                <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 {formatBytes(MAX_OUTPUT_BYTES)}）</b></div>
+                <div><span>打印链接</span><b>临时链接，30 分钟内有效</b></div>
+                {images.length > 0 ? <div><span>文件从哪来</span><b>{images.map((img) => img.name).join('、')}</b></div> : null}
+              </div>
+              <FsRow
+                title="逐页完整查看这份 PDF"
+                desc="看合成后的每一页"
+                testId="img2pdf-preview-open"
+                onClick={() => props.onPreviewOutput(0)}
+              />
+            </div>
+          </>
+        ),
+        art: 'doc' as const,
+      }
+    }
+    if (phase === 'edit' && lock && error) return { main: <UnknownBody images={images} error={error} />, art: 'doc' as const }
+    if (phase === 'edit' && closed && error) return { main: <ClosedBody error={error} />, art: 'doc' as const }
+    if (phase === 'empty') {
+      return {
+        main: (
+          <>
+            {error ? <ErrorNote error={error} images={images} /> : null}
+            <EmptyBody kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
+          </>
+        ),
+        art: null,
+      }
+    }
+    // 编辑：待合并的列表、上一张 / 下一张、添加图片、更多设置。
+    return {
+      main: (
+        <>
+          {error ? <ErrorNote error={error} images={images} /> : null}
+          <ImageList images={images} selected={selected} onSelect={props.onSelect} onPreview={props.onPreviewInput} />
+          <StepRow
+            selected={selected}
+            count={images.length}
+            disabled={busy}
+            onStep={stepSelect}
+          />
+          <AddRows
+            disabled={addDisabled}
+            reason={addReason}
+            kiosk={kiosk}
+            onPickLocal={props.onPickLocal}
+            onShowQr={props.onShowQr}
+            onOpenUsb={props.onOpenUsb}
+          />
+          <FsRow
+            title={moreOpen ? '收起更多设置' : '更多设置'}
+            desc="上移、下移、移除、查看、旋转"
+            testId="img2pdf-more"
+            onClick={() => setMoreOpen((open) => !open)}
+          />
+          {moreOpen ? (
+            <MoreSettings
+              selected={selected}
+              count={images.length}
+              removeArmed={removeArmed}
+              onMove={props.onMove}
+              onRemove={remove}
+              onView={() => { if (selected !== null) props.onPreviewInput(selected) }}
+            />
+          ) : null}
+        </>
+      ),
+      art: 'edit' as const,
+    }
+  })()
+
+  const sample = body.art === 'edit' ? (
+    <Sample
+      art="doc"
+      facts={{
+        title: '合成之后的 PDF',
+        lines: [
+          outputFileName(images.length),
+          `${images.length} 页，一张图一页，按 A4 排版`,
+          `合计 ${formatBytes(totalBytesOf(images))}，成品不超过 ${formatBytes(MAX_OUTPUT_BYTES)}`,
+          retentionLine(loggedIn),
+        ],
+      }}
+    />
+  ) : body.art ? <Sample art={body.art} /> : null
 
   return (
     <div className="i2p-page" data-w2-page="print-scan-convert" data-qx-page="img2pdf" data-state={phase}>
-      {phase === 'empty' ? null : (
-        <section className="i2p-xq">
-          <div className="i2p-xq-row">
-            <div className="i2p-xq-face" aria-hidden>青</div>
-            <div>
-              <div className="i2p-xq-eyebrow">图片转 PDF</div>
-              <div className="i2p-xq-ask">{advisor.ask}</div>
-              <div className="i2p-xq-doing">{advisor.doing}</div>
-            </div>
-          </div>
-        </section>
-      )}
-
       <div className="i2p-scroll qx-grow">
-        {phase === 'usb' ? <UsbGap /> : null}
-
-        {phase === 'empty' ? (
-          <EmptyBody kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
-        ) : null}
-
-        {phase === 'uploading' ? (
-          <Band kind="info" title="正在上传这一张" breathe chips={['一次一张', '没有进度回传', '结果未确认前不合成']}>
-            <div className="i2p-band-p">本机一次上传一张。<b>系统不回传上传进度百分比</b>，所以这里不画进度条，也不写「还需几秒」。传成功之后它才会出现在下面的列表里。</div>
-            <div className="i2p-band-p">这一张没确认成功之前，不会进列表，也不会改变已经排好的顺序。</div>
-          </Band>
-        ) : null}
-
-        {phase === 'converting' ? (
-          <Band kind="info" title="正在合成 PDF" breathe chips={['一次性请求', '无进度回传', '结果回来才算完成']}>
-            <div className="i2p-band-p">请求<b>已经发出去了</b>，按你排好的顺序合成一份 PDF，一张图一页。</div>
-            <div className="i2p-band-p">这是一次性请求，<b>系统不回传中间进度</b>，所以这里没有百分比、没有进度条。结果回来之前，这一屏不会自己变。</div>
-          </Band>
-        ) : null}
-
-        {phase === 'rechecking' ? (
-          <Band kind="info" title="正在用同一个标记再查一次" breathe chips={['同一个标记', '没有另起一次', '不会自动变完成']}>
-            <div className="i2p-band-p">正在拿同一个标记去问系统这一次的结果。<b>没有另起一次</b>，也没有换标记，所以不会多出第二份 PDF。</div>
-          </Band>
-        ) : null}
-
-        {phase === 'completed' && result ? (
-          <Band
-            kind="info"
-            title={recovered ? '用同一个标记把结果找回来了' : 'PDF 已生成'}
-            chips={[
-              '系统已返回结果',
-              '一张图一页 · A4',
-              ...(typeof hasEndUser === 'boolean'
-                ? [hasEndUser ? '已进我的文档 · 约 24 小时' : '未登录 · 不进我的文档']
-                : []),
-            ]}
-          >
-            <div className="i2p-band-p">
-              系统返回了合成结果：<b>{outputFileName(result.pages)}，共 {result.pages} 页</b>，页序与你排的顺序一致。
-              {hasEndUser === false ? (
-                <>
-                  <b>你现在没登录，这份 PDF 不会进「我的文档」，转好之后再登录也存不进去。</b>
-                  不登录也能直接打印这份；想存进「我的文档」，要先登录，再回到这一页重新添加图片转换。
-                </>
-              ) : null}
-              {recovered ? ' 没有生成第二份，只是重新签发了一条新的临时打印链接。' : null}
-            </div>
-          </Band>
-        ) : null}
-
-        {error && phase !== 'completed' && phase !== 'converting' && phase !== 'usb' ? (
-          <ErrorBand error={error} images={images} />
-        ) : null}
-
-        {phase !== 'empty' && phase !== 'usb' && images.length > 0 ? (
-          <>
-            <div className="i2p-sec-label">
-              <span className="no">01</span>
-              <span className="t">{phase === 'completed' ? '这份 PDF 的每一页' : atLimit ? '已经到上限' : '排好顺序'}</span>
-              <span className="hint">{images.length} / {MAX_IMAGES} 张 · 一张一页</span>
-            </div>
-            <ImageList
-              images={images}
-              selected={phase === 'completed' ? null : selected}
-              onSelect={phase === 'completed' ? () => undefined : props.onSelect}
-              onPreview={phase === 'completed' ? props.onPreviewOutput : props.onPreviewInput}
-            />
-            {phase === 'completed' ? (
-              <div className="i2p-selbar">
-                <button type="button" className="i2p-selbtn" data-testid="img2pdf-preview-open" onClick={() => props.onPreviewOutput(0)}>
-                  <EyeIcon size={24} />逐页完整查看这份 PDF
-                </button>
-              </div>
-            ) : (
-              <>
-                <SelBar selected={selected} count={images.length} onMove={props.onMove} onRemove={props.onRemove} />
-                <AddRow disabled={addDisabled} reason={addReason} kiosk={kiosk} onPickLocal={props.onPickLocal} onShowQr={props.onShowQr} onOpenUsb={props.onOpenUsb} />
-              </>
-            )}
-          </>
-        ) : null}
-
-        {phase === 'uploading' && images.length === 0 ? (
-          <div className="qx-card">
-            <div className="i2p-band-p">列表里还没有别的图片。<b>这一张传成功之后会成为第 1 页</b>；没成功就什么都不会加进来。</div>
-          </div>
-        ) : null}
-
-        {showQr ? (
-          <UploadSessionQrPanel
-            purpose="print_doc"
-            title="手机扫码添加图片"
-            description="手机扫码上传一张图片，确认后自动加入待合并列表；可重复扫码继续添加。"
-            confirmLabel="确认加入待合并列表"
-            onUploaded={props.onPhoneUploaded}
-            onBusyChange={props.onQrBusy}
-          />
-        ) : null}
-
-        {phase !== 'empty' && phase !== 'usb' ? (
-          <div className="i2p-grid2">
-            {phase === 'completed' && result ? (
-              <div className="i2p-pgrp" data-testid="img2pdf-outfacts">
-                <h4>这份文件</h4>
-                <div className="i2p-kv">
-                  <div><span>文件名</span><b>{outputFileName(result.pages)}</b></div>
-                  <div><span>文件标识</span><b data-testid="img2pdf-fileid">{result.fileId}</b></div>
-                  <div><span>页数</span><b>{result.pages} 页（每张图一页）</b></div>
-                  <div><span>大小</span><b>{formatBytes(result.sizeBytes)}（上限 {formatBytes(MAX_OUTPUT_BYTES)}）</b></div>
-                  <div><span>校验值</span><b>{result.fileMd5.slice(0, 12)}…（系统返回的前 12 位）</b></div>
-                  <div><span>打印链接</span><b>临时链接，30 分钟内有效</b></div>
-                </div>
-              </div>
-            ) : (
-              <Retention loggedIn={loggedIn} />
-            )}
-            {phase === 'completed' && !recovered ? (
-              <Retention loggedIn={loggedIn} />
-            ) : requestKey ? (
-              <div className="i2p-pgrp" data-testid="img2pdf-req">
-                <h4>这一次的标记</h4>
-                <div className="i2p-kv">
-                  <div><span>标记</span><b data-testid="img2pdf-reqid">{requestKey}</b></div>
-                  <div><span>这批图片</span><b>{images.length} 张，按上面的顺序</b></div>
-                </div>
-                <div className="i2p-band-p">同一批图片、同一个顺序，<b>始终用这一个标识</b>：重试、断线重连、恢复结果都靠它，系统不会因此多生成一份。</div>
-              </div>
-            ) : (
-              <Rules />
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      {props.extraRows}
-      <div className="i2p-truth" data-testid="img2pdf-truth">
-        <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
-        <div><b>进度</b>合成是一次性请求，系统不回传进度，所以不画百分比，也不用计时器假装做完了。</div>
-        <div>
-          <b>留存</b>
-          {loggedIn
-            ? '登录后 PDF 进「我的文档」，默认约 24 小时可延长。'
-            : '未登录时 PDF 不会进入「我的文档」，也不下载到这台公用机器。'}
-        </div>
+        {body.main}
+        {props.extraRows}
+        {sample}
       </div>
 
       {!kiosk && (
@@ -273,7 +297,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                     : '显示的是你加进来的原图。'}
                 </div>
               </div>
-              <button type="button" className="qx-btn" data-variant="primary" onClick={props.onClosePreview}>关闭</button>
+              <button type="button" className="qxt-btn qxt-btn-pri" onClick={props.onClosePreview}>关闭</button>
             </div>
             <div className="i2p-pv-view">
               {previewFailed ? (
@@ -305,20 +329,18 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
                 <>
                   <button
                     type="button"
-                    className="qx-btn"
-                    data-variant="ghost"
+                    className="qxt-btn qxt-btn-sec"
                     disabled={preview.index <= 0}
                     onClick={() => props.onPreviewOutput(preview.index - 1)}
                   >
                     上一页
                   </button>
-                  <span className="qx-grow" style={{ textAlign: 'center', fontWeight: 700 }}>
+                  <span className="qx-grow" style={{ textAlign: 'center', fontWeight: 700, fontSize: 22 }}>
                     第 {preview.index + 1} 页 / 共 {result.pages} 页
                   </span>
                   <button
                     type="button"
-                    className="qx-btn"
-                    data-variant="ghost"
+                    className="qxt-btn qxt-btn-sec"
                     disabled={preview.index >= result.pages - 1}
                     onClick={() => props.onPreviewOutput(preview.index + 1)}
                   >
@@ -335,4 +357,3 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
     </div>
   )
 }
-

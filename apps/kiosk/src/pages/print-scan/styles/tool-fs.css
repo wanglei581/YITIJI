@@ -366,7 +366,8 @@
 }
 
 [data-qx-page='print-hub'] .fs-row,
-[data-qx-page='img2pdf'] .fs-row {
+[data-qx-page='img2pdf'] .fs-row,
+[data-qx-page='sign'] .fs-row {
   display: flex;
   align-items: center;
   width: 100%;
@@ -378,6 +379,45 @@
   text-align: left;
   color: var(--qxt-ink);
   font-size: 24px;
+}
+
+[data-qx-page='print-hub'] .fs-row b,
+[data-qx-page='img2pdf'] .fs-row b,
+[data-qx-page='sign'] .fs-row b {
+  display: block;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+[data-qx-page='print-hub'] .fs-row:disabled,
+[data-qx-page='img2pdf'] .fs-row:disabled,
+[data-qx-page='sign'] .fs-row:disabled {
+  opacity: 0.45;
+}
+
+/* 选中态的整行按钮（稿 .fs-row.on / aria-pressed）：深底浅字，授权勾选、九宫格的当前格都用它。 */
+[data-qx-page='sign'] .fs-row[aria-pressed='true'],
+[data-qx-page='sign'] .fs-row[aria-checked='true'] {
+  background: var(--qx-deep, var(--qxt-deep-2));
+  border-color: var(--qx-deep, var(--qxt-deep-2));
+  color: var(--qxt-cream);
+}
+
+[data-qx-page='sign'] .fs-row[aria-pressed='true'] small,
+[data-qx-page='sign'] .fs-row[aria-checked='true'] small {
+  color: var(--qxt-mint);
+}
+
+/* 蓝绿提示条（稿 .fs-help）：一句帮助、一句提示。 */
+[data-qx-page='img2pdf'] .fs-help,
+[data-qx-page='sign'] .fs-help {
+  margin: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 22px;
+  line-height: 1.45;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
 }
 
 /* 示意图在卡里的大小：操作卡里占 76% 高，证件卡抬头里固定 132px（稿）。 */
@@ -420,7 +460,11 @@
 [data-qx-page='print-hub'] .fs-row small,
 [data-qx-page='img2pdf'] .fs-row small,
 [data-qx-page='sign'] .fs-row small {
+  display: block;
   font-size: 22px;
+  line-height: 1.35;
+  color: var(--qxt-ink-2);
+  font-weight: 500;
 }
 
 /* 证件照说明一屏放下：操作卡的最小高度收到 150，让卡片自己让出余量（稿里它们也是挨着排满）。 */

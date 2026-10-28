@@ -25,6 +25,7 @@ export function TouchToolScreen({
   left,
   primary,
   place,
+  overlay,
   children,
 }: {
   eyebrow?: string
@@ -39,6 +40,8 @@ export function TouchToolScreen({
   /** 右边主按钮。不传就只有返回和问小青。 */
   primary?: QxTouchPrimary
   place?: string
+  /** 盖在这一屏上的层（二维码层等）。传了，底下的整片屏幕就是 inert。 */
+  overlay?: ReactNode
   children: ReactNode
 }) {
   const navigate = useNavigate()
@@ -48,6 +51,7 @@ export function TouchToolScreen({
       className="scan-touch"
       legacyFrame
       bodyClassName="qxt-body-tight"
+      overlay={overlay}
       band={
         <QxTouchBand
           kind="compact"
