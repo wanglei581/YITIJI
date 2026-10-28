@@ -340,7 +340,7 @@ export default function MemberBenefitsPage() {
                   </div>
                 )}
                 <div>
-                  <label htmlFor="member-benefit-until" className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分）</label>
+                  <label htmlFor="member-benefit-until" className="text-xs font-medium text-neutral-500">有效期至（年/月/日 时:分，北京时间）</label>
                   <input id="member-benefit-until" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} lang="zh-CN" title="格式：年/月/日 时:分" type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
                 </div>
               </div>

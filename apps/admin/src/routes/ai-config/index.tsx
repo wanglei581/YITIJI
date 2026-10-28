@@ -67,6 +67,8 @@ export default function AiConfigPage() {
   const inheritedFeature = cfg?.inheritedFrom
     ? features.find((feature) => feature.key === cfg.inheritedFrom)
     : null
+  const planned = currentFeature?.status === 'planned'
+  const printRuleOnly = currentFeature?.key === 'print_param_prefill'
 
   const applyConfig = useCallback((c: AiConfigView) => {
     setCfg(c)
@@ -206,7 +208,7 @@ export default function AiConfigPage() {
         <Card className="p-4">
           <div className="mb-3">
             <p className="text-sm font-medium text-neutral-900">功能配置</p>
-            <p className="mt-1 text-xs text-neutral-500">已接入的功能保存后生效；标为「未接入」的功能可以先保存配置，接入前不影响一体机。</p>
+            <p className="mt-1 text-xs text-neutral-500">已接入的功能保存后生效。标为「规划中，暂不生效」的功能保存后不会被使用，因此不能在这里保存或测试。</p>
           </div>
           <div className="ai-feature-grid grid gap-3">
             {features.map((feature) => {
@@ -247,7 +249,7 @@ export default function AiConfigPage() {
                           ? 'bg-info-bg text-info-fg'
                           : 'bg-warning-bg text-warning-fg'}`}
                         >
-                          {feature.status === 'active' ? '已接入' : '未接入'}
+                          {feature.status === 'active' ? '已接入' : feature.status === 'planned' ? '规划中，暂不生效' : '未接入'}
                         </span>
                       )}
                     </div>
@@ -272,6 +274,7 @@ export default function AiConfigPage() {
               <SparklesIcon className="h-5 w-5 text-primary-600" />
               <div>
                 <p className="text-sm font-medium text-neutral-900">当前功能模型：{featureText(currentFeature?.label ?? selectedFeature)}</p>
+                {planned && <p className="text-xs font-medium text-warning-fg">规划中，暂不生效</p>}
                 <p className="text-xs text-neutral-500">
                   {currentPreset?.label ?? vendor} · {cfg?.model}
                   {cfg?.enabled ? '' : '（未启用，相关功能会明确失败或走既有默认应答）'}
@@ -292,6 +295,9 @@ export default function AiConfigPage() {
 
         {/* 配置表单 */}
         <Card className="p-5 space-y-4">
+          {printRuleOnly && (
+            <p className="text-sm text-neutral-600">本功能按规则预填，不调用大模型，只有启用开关生效</p>
+          )}
           {/* 厂商 */}
           <div>
             <label className={labelCls}>模型厂商</label>
@@ -300,8 +306,9 @@ export default function AiConfigPage() {
                 <button
                   key={p.vendor}
                   type="button"
+                  disabled={printRuleOnly}
                   onClick={() => onVendorChange(p.vendor)}
-                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50
                     ${vendor === p.vendor
                       ? 'border-primary-400 bg-primary-50 text-primary-700'
                       : 'border-neutral-200 bg-surface text-neutral-600 hover:bg-neutral-50'}`}
@@ -324,8 +331,9 @@ export default function AiConfigPage() {
             <input
               list="model-options"
               value={model}
+              disabled={printRuleOnly}
               onChange={(e) => setModel(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400`}
               placeholder="如 deepseek-v4-flash"
             />
             <datalist id="model-options">
@@ -347,8 +355,9 @@ export default function AiConfigPage() {
             <input
               type="password"
               value={apiKey}
+              disabled={printRuleOnly}
               onChange={(e) => setApiKey(e.target.value)}
-              className={inputCls}
+              className={`${inputCls} disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400`}
               placeholder={cfg?.apiKeyConfigured ? '已保存，留空则不修改' : '请输入 API Key'}
               autoComplete="off"
             />
@@ -365,9 +374,10 @@ export default function AiConfigPage() {
             <label className={labelCls}>AI 人设提示词（System Prompt）</label>
             <textarea
               value={systemPrompt}
+              disabled={printRuleOnly}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={5}
-              className={`${inputCls} resize-none leading-relaxed`}
+              className={`${inputCls} resize-none leading-relaxed disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400`}
             />
             <p className="mt-1 text-xs text-neutral-400">
               {currentFeature?.allowCustomSystemPrompt === false
@@ -414,8 +424,9 @@ export default function AiConfigPage() {
               <input
                 type="range" min={0} max={1.5} step={0.1}
                 value={temperature}
+                disabled={printRuleOnly}
                 onChange={(e) => setTemperature(Number(e.target.value))}
-                className="w-full accent-primary-600"
+                className="w-full accent-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
               />
               <div className="flex justify-between text-[11px] text-neutral-400">
                 <span>严谨 0</span><span>发散 1.5</span>
@@ -451,13 +462,14 @@ export default function AiConfigPage() {
         {error && cfg && <p className="text-sm text-error-fg">{error}</p>}
 
         {/* 操作 */}
-        <div className="flex items-center gap-3">
-          <Button onClick={() => void onSave()} disabled={saving}>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void onSave()} disabled={saving || planned}>
             {saving ? '保存中…' : '保存配置'}
           </Button>
-          <Button variant="outline" onClick={() => void onTest()} disabled={testing}>
+          <Button variant="outline" onClick={() => void onTest()} disabled={testing || planned}>
             {testing ? '测试中…' : '保存并测试连通'}
           </Button>
+          {planned && <span className="text-sm text-neutral-600">规划中，暂不生效：保存后没有任何功能会读取这项配置。</span>}
           {savedTip && <span className="text-sm text-success-fg">✓ 已保存</span>}
         </div>
       </div>

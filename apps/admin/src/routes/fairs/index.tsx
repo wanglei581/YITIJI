@@ -7,6 +7,7 @@ import { useRecruitmentHosting } from '../components/recruitment/useRecruitmentH
 import { RecruitmentHostingNotice } from '../components/recruitment/RecruitmentHostingNotice'
 import { EmergencyTakedownDialog } from '../components/recruitment/EmergencyTakedownDialog'
 import type { EmergencyTakedownTarget } from '../components/recruitment/emergencyReason'
+import { RECRUITMENT_AUDIT_ACTIONS, RecentEmergencyAuditCard } from '../components/RecentEmergencyAuditCard'
 import { VenueGuideTab } from './VenueGuideTab'
 import { CompaniesTab } from './components/CompaniesTab'
 import { MaterialsTab } from './components/MaterialsTab'
@@ -211,6 +212,8 @@ export default function FairsPage() {
       <p className="mt-6 text-xs text-neutral-400">
         招聘会数字化模块:仅提供信息展示和现场服务,不接收简历,不参与招聘闭环。本平台不代改、不代发招聘会内容;紧急下架只能下架、不能恢复,须写明事由,记录审计日志,并会通知所属机构。
       </p>
+
+      <RecentEmergencyAuditCard actions={RECRUITMENT_AUDIT_ACTIONS} />
 
       <EmergencyTakedownDialog target={takedown} onClose={() => setTakedown(null)} onDone={refresh} />
     </Page>

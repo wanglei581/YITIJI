@@ -481,9 +481,32 @@ try {
   }
 
   await partner.goto(`${partnerOrigin}/terminals`)
+  await partner.getByRole('tab', { name: '项目与服务', exact: true }).click()
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
   let p = partnerPanel(partner)
   await expect(p.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
   await chooseProject(p, created.id, '报障与恢复')
+  await expect(partner).toHaveURL(/[?&]section=incidents(?:&|$)/)
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
+  await p.getByRole('tab', { name: '月报资料', exact: true }).click()
+  await expect(partner).toHaveURL(/[?&]section=reports(?:&|$)/)
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
+  await p.getByRole('tab', { name: '项目资料', exact: true }).click()
+  await expect(partner).toHaveURL(/[?&]section=project(?:&|$)/)
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
+  await p.getByRole('tab', { name: '报障与恢复', exact: true }).click()
+  await expect(p.getByRole('tab', { name: '报障与恢复', exact: true })).toHaveAttribute('aria-selected', 'true')
+  mark('Partner project service tabs write section and keep the delivery tab')
+  await partner.goto(`${partnerOrigin}/terminals?tab=delivery&section=reports&period=month`)
+  p = partnerPanel(partner)
+  await expect(p.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
+  await p.getByLabel('服务项目', { exact: true }).selectOption(created.id)
+  await expect(p.getByRole('tab', { name: '月报资料', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(partner).toHaveURL(/[?&]section=reports(?:&|$)/)
+  await expect(partner).toHaveURL(/[?&]tab=delivery(?:&|$)/)
+  await expect(partner).toHaveURL(/[?&]period=month(?:&|$)/)
+  mark('Direct section=reports opens the monthly report tab and keeps other parameters')
+  await p.getByRole('tab', { name: '报障与恢复', exact: true }).click()
   await p.getByLabel('报障设备', { exact: true }).selectOption(deployed.id)
   await p.getByLabel('设备问题', { exact: true }).selectOption('paper')
   await p.getByLabel('故障情况', { exact: true }).fill('浏览器隔离验证：设备提示缺纸，请检查纸盒。')
@@ -498,6 +521,13 @@ try {
   await chooseProject(p, created.id, '报障与恢复')
   await expect(p.getByTestId(`first-order-incident-${incident.id}`)).toContainText('浏览器隔离验证')
   mark('Partner creates equipment incident through real API; refresh retains it')
+  // 刚报的故障还没受理时，机构工作台也要看得见，不能写成「今天没有要核对的事」
+  await partner.goto(`${partnerOrigin}/`)
+  await expect(partner.getByRole('region', { name: '今天要处理' })).toContainText('已提交，等平台受理')
+  await expect(partner.getByRole('region', { name: '今天要处理' })).not.toContainText('今天没有要核对的事')
+  mark('Partner workbench shows the just-reported incident as waiting for platform acceptance')
+  await partner.goto(`${partnerOrigin}/terminals?tab=delivery&section=incidents`); p = partnerPanel(partner)
+  await chooseProject(p, created.id, '报障与恢复')
 
   await refresh(a); await chooseProject(a, created.id, '报障处理')
   let incidentCard = a.getByTestId(`first-order-incident-${incident.id}`)
@@ -586,6 +616,29 @@ try {
   await shot(admin, 'admin-report-narrow', a, true)
   await shot(partner, 'partner-report-narrow', p, true)
   mark('Desktop and 390px views keep first-order panel and controls within viewport')
+  await admin.setViewportSize({ width: 1440, height: 1000 })
+  const directory = await api('admin', '/admin/first-order/incidents')
+  assert.ok(directory.total > 0, 'fixture leaves at least one unclosed incident')
+  const incidentCounts = { open: 0, processing: 0, resolved: 0 }
+  if (directory.truncated) {
+    for (const status of ['open', 'processing', 'resolved']) {
+      incidentCounts[status] = (await api('admin', `/admin/first-order/incidents?status=${status}&limit=1`)).total
+    }
+  } else {
+    for (const item of directory.items) {
+      if (item.status === 'open' || item.status === 'processing' || item.status === 'resolved') incidentCounts[item.status] += 1
+    }
+  }
+  const countText = (value) => String(Math.trunc(Math.abs(value))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  await admin.goto(`${adminOrigin}/`)
+  const today = admin.locator('section').filter({ has: admin.getByRole('heading', { name: '今天要处理', exact: true }) })
+  await expect(today).toContainText(`未结报障 ${countText(directory.total)}（待受理 ${countText(incidentCounts.open)} · 处理中 ${countText(incidentCounts.processing)} · 技术恢复待机构核对 ${countText(incidentCounts.resolved)}）`)
+  mark('Dashboard unclosed incident count matches the cross-org directory')
+  await admin.goto(`${adminOrigin}/partners?org=${encodeURIComponent(fixture.orgs.own)}&section=incidents`)
+  const deepPanel = adminPanel(admin)
+  await expect(deepPanel.getByRole('tab', { name: '报障处理', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(deepPanel.getByRole('button', { name: '刷新项目服务', exact: true })).toBeEnabled()
+  mark('Address opens the org drawer on incident handling')
   assert.equal(results.pageErrors.length, 0, 'Browser runtime errors occurred')
   const expectedConflicts = results.externalRequests.filter((item) => item.role === 'admin' && item.path === expectedProjectConflictPath && item.status === 409)
   assert.equal(expectedConflicts.length, fullApp ? 2 : 0, 'Exactly two intentional stale-form conflicts are expected')
