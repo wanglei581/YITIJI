@@ -558,7 +558,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       title={cockpitCopy.title.join('')}
       sub={cockpitCopy.lede}
       status={cockpitCopy.pill}
-      navCurrent="advisor"
+      navCurrent="advisor" bodyClassName={body === 'locked' ? 'qxt-body-aidown' : undefined}
       back={{ label: '返回首页', onBack: () => navigate('/') }}
       dock={dock}
       overlay={overlay}

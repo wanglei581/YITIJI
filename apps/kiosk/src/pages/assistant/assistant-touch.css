@@ -51,6 +51,9 @@
   flex-direction: column;
   gap: 12px;
 }
+/* AI 暂不可用：同屏有失败说明、通知条、专项行、四张入口和求助句，行距收紧一点，求助句不被挤出这一屏。
+   通知条本身用共享的 qxt-body-aidown 紧凑样式（页面传 bodyClassName，见 AssistantPage）。 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-conversation[data-turn='locked'] { gap: 8px; }
 
 /* 本机 AI 专项这一行 */
 .qxt-screen[data-qx-page='assistant'] .assistant-tools-open { min-height: 94px; }
@@ -253,6 +256,11 @@
 .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-vis > svg { height: 88%; width: auto; max-width: 100%; }
 .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab h3 { font-size: 34px; }
 .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab-txt { justify-content: flex-start; }
+/* 卡高只有 150 左右，装不下「标题 + 说明 + 底部箭头圆钮」三层（内容约 177），圆钮会探出卡底被下一张压住：
+   箭头圆钮改到卡片右侧垂直居中，文字只留给左边。 */
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab { position: relative; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab-txt { padding-right: 96px; }
+.qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='full'] .qxt-slab .qxt-take { position: absolute; right: 22px; top: 50%; margin: 0; padding: 0; transform: translateY(-50%); }
 .qxt-screen[data-qx-page='assistant'] .assistant-manual-entries[data-variant='sheet'] { display: flex; flex-direction: column; gap: 12px; }
 
 /* 输入坞：照稿 composer，米色底、一行三件；下面一行是语音，再下是声明 */
