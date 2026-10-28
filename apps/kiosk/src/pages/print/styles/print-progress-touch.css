@@ -219,3 +219,8 @@
   padding: 0 24px;
   font-size: 24px;
 }
+
+/* 没有任务上下文时的出路（稿 st-empty）：两张大卡再高一点，不在底栏上方留整块空白 */
+[data-qx-page='print-progress'] .pff-page > .qxt-slab {
+  min-height: 290px;
+}

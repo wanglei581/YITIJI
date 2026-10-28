@@ -424,6 +424,8 @@ test('pickup completed receipt shows real summary and directs reorders to phone 
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, { status: 200, json: { taskId: TASK_ID, status: 'completed' } })
   await openDoneWithState(page, { taskId: TASK_ID, pickupSource: true, file: { name: '取件文件.pdf', size: '', pages: 3 }, params: { copies: 2, colorMode: 'color', duplex: 'duplex_long_edge' } })
+  // 2026-10-28 稿 done：完成页只留取走、入口和结束使用，打印记录收在「本次打印记录」折叠里，点开才是真实摘要。
+  await page.locator('summary', { hasText: '本次打印记录' }).click()
   await expect(page.getByText('本次任务摘要', { exact: true })).toBeVisible()
   await expect(page.getByText('3 页 × 2 份', { exact: true })).toBeVisible()
   await expect(page.getByText('双面（长边）', { exact: true })).toBeVisible()

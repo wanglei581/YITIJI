@@ -457,3 +457,12 @@
   font-weight: 500;
   line-height: 1.45;
 }
+
+/* 当前文件卡上的「更换 / 删除」：触屏点击区不小于 64×64 */
+[data-qx-page='print-upload'] .fs-sbtn,
+[data-qx-page='print-usb'] .fs-sbtn,
+[data-qx-page='print-src'] .fs-sbtn {
+  min-width: 120px;
+  min-height: 72px;
+  font-size: 24px;
+}
