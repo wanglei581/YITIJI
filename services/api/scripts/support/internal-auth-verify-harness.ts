@@ -1,7 +1,7 @@
 import { execFileSync } from 'child_process'
-import { existsSync, mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { partnerPhoneRegisteredNoticeText, type SmsSender } from '../../src/member-auth/sms/sms-sender'
 import { PrismaService } from '../../src/prisma/prisma.service'
 
@@ -294,6 +294,60 @@ export type IsolatedVerificationDatabase = {
   cleanup: () => void
 }
 
+/**
+ * 这个隔离库是手写的最小库（Organization / User / AuditLog 三张表），不是按完整迁移链建的。
+ * 后来的迁移给这三张表加的列，Prisma 客户端的 create / createMany 会把它们一起写进语句和返回列表，库里没有就报
+ * 「The column `xxx` does not exist」。所以这里直接**应用真实的迁移文件**，不在上面的建表语句里再抄一份列定义：
+ *   20261028230000_organization_branding  Organization.brandName / brandMark / brandLogoAssetId + BrandLogo 表
+ *   20261028230100_license                Organization.licenseMode + License 表
+ * 以后再给这三张表加列，要么在下面追加迁移名，要么改上面的建表语句；漏了的话 assertHarnessTablesMatchSchema 会直接点名缺哪几列。
+ */
+const HARNESS_EXTRA_MIGRATIONS = ['20261028230000_organization_branding', '20261028230100_license'] as const
+const API_ROOT = resolve(__dirname, '../..')
+const HARNESS_TABLES = ['Organization', 'User', 'AuditLog'] as const
+const PRISMA_SCALARS = new Set(['String', 'Int', 'BigInt', 'Float', 'Decimal', 'Boolean', 'DateTime', 'Json', 'Bytes'])
+
+/** schema.prisma 里某个 model 的标量列名（关系字段不算）。 */
+function schemaColumns(model: string): string[] {
+  const schema = readFileSync(join(API_ROOT, 'prisma/schema.prisma'), 'utf8')
+  const start = schema.indexOf(`model ${model} {`)
+  if (start < 0) throw new VerificationFailure(`schema.prisma 里找不到 model ${model}`)
+  const body = schema.slice(start, schema.indexOf('\n}', start))
+  const columns: string[] = []
+  for (const raw of body.split('\n').slice(1)) {
+    const line = raw.trim()
+    if (!line || line.startsWith('//') || line.startsWith('@@')) continue
+    const [name, type] = line.split(/\s+/)
+    if (!name || !type) continue
+    if (PRISMA_SCALARS.has(type.replace(/[?[\]]/g, ''))) columns.push(name)
+  }
+  return columns
+}
+
+function databaseColumns(databasePath: string, table: string): string[] {
+  const out = execFileSync('sqlite3', [databasePath, `SELECT name FROM pragma_table_info('${table}')`], { stdio: 'pipe' }).toString('utf8')
+  return out.split('\n').map((line) => line.trim()).filter(Boolean)
+}
+
+/** 隔离库的三张表必须和 schema.prisma 的列逐个对上：对不上就在这里点名，不要等到 Prisma 报 P2022 才发现。 */
+export function assertHarnessTablesMatchSchema(databasePath: string): void {
+  const problems: string[] = []
+  for (const table of HARNESS_TABLES) {
+    const expected = schemaColumns(table)
+    const actual = databaseColumns(databasePath, table)
+    const missing = expected.filter((name) => !actual.includes(name))
+    const extra = actual.filter((name) => !expected.includes(name))
+    if (missing.length > 0) problems.push(`${table} 缺列 ${missing.join('、')}`)
+    if (extra.length > 0) problems.push(`${table} 多出列 ${extra.join('、')}`)
+  }
+  if (problems.length > 0) {
+    throw new VerificationFailure(
+      `隔离库与 schema.prisma 对不上：${problems.join('；')}。` +
+        '这是手写的最小库，schema 给这三张表加列后，要在 internal-auth-verify-harness.ts 里补上建表语句，或把对应迁移加进 HARNESS_EXTRA_MIGRATIONS。',
+    )
+  }
+}
+
 export function prepareIsolatedDatabase(
   tempDirectoryPrefix = 'verify-admin-phone-transfer-',
 ): IsolatedVerificationDatabase {
@@ -380,6 +434,13 @@ export function prepareIsolatedDatabase(
         CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
         `,
       ], { stdio: 'pipe' })
+      for (const name of HARNESS_EXTRA_MIGRATIONS) {
+        execFileSync('sqlite3', [databasePath], {
+          input: readFileSync(join(API_ROOT, 'prisma/migrations', name, 'migration.sql'), 'utf8'),
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      }
+      assertHarnessTablesMatchSchema(databasePath)
     },
     cleanup: () => {
       if (previousDatabaseUrl === undefined) delete process.env['DATABASE_URL']
