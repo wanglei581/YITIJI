@@ -47,6 +47,7 @@ import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/ResumeStates'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
 import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
@@ -99,6 +100,22 @@ function errorCodeOf(error: unknown): string {
 }
 
 const CAREER_PLAN_OUTAGE_COPY = 'AI 暂时不可用，你可以先打印求职参考单（未含 AI 规划）'
+
+/** 每个状态底栏的「问小青」（稿 career 各状态）。 */
+const CAREER_ASKS: Record<CareerScreen, ResumeAsk> = {
+  'session-ended': ASKS.careerEnded,
+  'missing-task': ASKS.careerMissing,
+  'rejected-task': ASKS.careerMissing,
+  loading: ASKS.careerWait,
+  guide: ASKS.careerGuide,
+  generating: ASKS.careerGen,
+  'ai-down': ASKS.careerDown,
+  failed: ASKS.careerFailed,
+  ready: ASKS.careerReady,
+  'print-pending': ASKS.careerPrintWait,
+  'print-failed': ASKS.careerPrintFailed,
+  'print-degraded': ASKS.careerDegraded,
+}
 
 /** 置灰一律 aria-disabled + onClick 自己短路；原生 disabled 会让读屏跳过、触屏读不到原因。 */
 function Action({ label, variant, onClick, busy, icon }: {
@@ -761,6 +778,7 @@ export function CareerPlanPage() {
         rail={view.rail}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
+        ask={{ ...CAREER_ASKS[screen], testId: 'career-plan-ai-ask' }}
       >
         <main
           className="qx-scroll"

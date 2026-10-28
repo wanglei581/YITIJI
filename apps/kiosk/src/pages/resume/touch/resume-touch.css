@@ -43,6 +43,12 @@
   flex: 0 0 auto;
 }
 
+/* 底栏的「问小青」（稿每屏都有）：单独占最下面一整行，高 88、字 23，不缩小。 */
+.qxt-screen .rtp-cta > .qxt-askq {
+  flex: 1 0 100%;
+  order: 99;
+}
+
 .qxt-screen .rtp-cta .qx-ai-declaration-slot,
 .qxt-screen .rtp-cta .sa-guarded {
   flex: 1 1 0;

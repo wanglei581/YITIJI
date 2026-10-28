@@ -70,6 +70,11 @@
   font: 700 var(--qxt-fs-hub) / 1.2 var(--qx-serif);
 }
 
+/* 整屏状态里的兜底出口（打印 / 诊断 / 文档 / 顾问）：每行 112 高，足够放两行字，不撑成大块空白。 */
+.qx-resume-materials .qxt-screen .qx-rm-alt .qx-row {
+  min-height: 112px;
+}
+
 /* 详情铺满整行：整页一起滚，不再在右栏里单独滚。 */
 .qx-resume-materials .qxt-screen .qx-rm-detail {
   overflow: visible;

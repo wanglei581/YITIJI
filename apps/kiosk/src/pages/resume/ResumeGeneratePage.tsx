@@ -42,7 +42,8 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { useResumeAiConsent } from './resumeAiConsent'
 import { ResumeAiConsentDialog } from './components/ResumeAiConsentDialog'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
+import { ASKS } from './touch/resumeAsks'
 import { ResumeGenerateReview } from './components/ResumeGenerateReview'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
@@ -409,9 +410,11 @@ export function ResumeGeneratePage() {
           去核对
         </button>
       )}
-      <ResumeGenerateAiRow />
     </>
   )
+  // 底栏「问小青」：每一步一句自己的问题（稿 scratch / scratch-1，第 3–6 步按同一写法补）；整理中、AI 停了、失败各有各的。
+  const stepAsks = [ASKS.genBasic, ASKS.genIntention, ASKS.genEducation, ASKS.genExperience, ASKS.genProjects, ASKS.genSkills]
+  const askSpec = generating || exportingDraft ? ASKS.genBusy : aiOutage ? ASKS.genDown : error ? ASKS.genFailed : reviewing ? ASKS.genReview : stepAsks[step]
 
   return (
     <ResumeTouchFrame
@@ -435,6 +438,7 @@ export function ResumeGeneratePage() {
       }}
       back={{ label: '返回简历服务', onBack: () => navigate('/resume/source') }}
       ctabar={ctabar}
+      ask={{ ...askSpec, testId: 'resume-generate-ai-help' }}
     >
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="qx-resume-generate qx-scroll">
       <ResumeGenerateAdvisor

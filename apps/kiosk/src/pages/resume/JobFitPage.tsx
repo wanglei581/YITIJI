@@ -35,6 +35,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { isKioskCompactViewport, useKioskStageFit, usesKioskFluidViewport } from '../../hooks/useKioskStageFit'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
 import { unattendedReason } from './touch/unattendedReason'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { readAiResumeSession } from './aiResumeSession'
@@ -95,6 +96,16 @@ export function JobFitStage({ children }: { children: ReactNode }) {
 interface PageState {
   taskId?: string
   accessToken?: string
+}
+
+/** 六个静态屏各自的底栏「问小青」（稿 jobfit 各状态）。 */
+const STATIC_ASKS: Record<JobFitStaticState, ResumeAsk> = {
+  'missing-task': ASKS.fitMissing,
+  'rejected-task': ASKS.fitMissing,
+  loading: ASKS.fitWait,
+  analyzing: ASKS.fitWait,
+  'ai-down': ASKS.fitDown,
+  failed: ASKS.fitFailed,
 }
 
 /**
@@ -272,6 +283,7 @@ export function JobFitPage() {
           rail={view.rail}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
           ctabar={view.cta}
+          ask={{ ...STATIC_ASKS[screenState], testId: 'job-fit-ai-ask' }}
         >
           <main
             className="qx-scroll"
@@ -536,6 +548,7 @@ export function JobFitPage() {
           subtitle="按你给的岗位要求，逐条列出简历里已经写到的和还没体现的；不分档、不打分，也不判断能否录用。"
           status={{ tone: 'ok', label: '对照结果已返回' }}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
+          ask={{ ...(printing ? ASKS.fitPrint : ASKS.fitResult), testId: 'job-fit-ai-ask' }}
           ctabar={
             <>
               <CtaNote>对照只说明简历里写到了什么，不代表企业的真实评价。</CtaNote>
@@ -639,6 +652,7 @@ export function JobFitPage() {
         subtitle="对照结果只给本人看，不分档、不打分。请核对简历和岗位要求后再开始。"
         status={{ tone: 'unknown', label: '对照前请选好简历并确认授权' }}
         back={{ label: '返回简历服务', onBack: exits.resumeHub }}
+        ask={{ ...ASKS.fitForm, testId: 'job-fit-ai-ask' }}
         ctabar={
           <>
             <CtaNote>对照结果不代表录用判断，也不会提供给企业；本平台不提供投递功能。</CtaNote>

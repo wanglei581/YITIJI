@@ -18,9 +18,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { FilePreviewDialog } from '../../components/FilePreviewDialog'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 
 import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
+import { ASKS } from './touch/resumeAsks'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { ResumeTouchArt, type ResumeTouchArtKind } from './touch/ResumeTouchArt'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
@@ -467,8 +467,7 @@ export function JobMaterialLibraryPage() {
         {fallbackRows}
       </>
     )
-    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}
-      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions></>
+    cta = <><p className="why">{status.why}</p>{screen === 'loading' ? btn('ghost', '返回简历服务', goResumeHub) : null}</>
   } else if ((screen === 'submitting' || screen === 'failed') && selected) {
     const waiting = screen === 'submitting'
     const statusRows = waiting
@@ -492,7 +491,6 @@ export function JobMaterialLibraryPage() {
     cta = <>
       <p className="why">{waiting ? '正在等待结果，内容已提交；此时不再重复生成。' : '回表单核对内容后，再由你点击生成。'}</p>
       {waiting ? <button type="button" className="qx-btn" data-variant="primary" disabled>正在生成 PDF…</button> : btn('primary', '改一改再试一次', () => setSubmitError(null))}
-      <QxStepActions onPrev={goResumeHub}><QxAiHelp label="让小青帮我整理材料亮点 →" draft="请先问我的材料用途和真实经历，帮我整理可以填写的亮点。" testId="material-workshop-ai-help" /></QxStepActions>
     </>
   } else {
     body = (
@@ -569,13 +567,6 @@ export function JobMaterialLibraryPage() {
           {demoMode ? '演示模式不保存真实文件，我的文档与打印都停用。' : generated.printFileUrl ? '' : '本次没有打印凭证，只有打印被禁用，我的文档不受影响。'}
         </p>
         {btn('ghost', '重新生成一份', () => void handleGenerate())}
-        <QxStepActions onPrev={goResumeHub}>
-          <QxAiHelp
-            label="让小青帮我整理材料亮点 →"
-            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
-            testId="material-workshop-ai-help"
-          />
-        </QxStepActions>
         {/* 两个都是能力门禁：aria-disabled + 文件卡里那句常显原因（触屏没有 hover，title 永远显示不出来）。 */}
         <button type="button" className="qx-btn" data-variant="ghost" aria-disabled={demoMode || undefined}
           aria-describedby={demoMode ? 'material-docs-blocked' : undefined} onClick={() => { if (!demoMode) navigate('/me/documents') }}>
@@ -593,16 +584,19 @@ export function JobMaterialLibraryPage() {
         <button type="button" className="qx-btn" data-variant="primary" disabled={submitting || !selected} onClick={() => void handleGenerate()}>
           {submitting ? '生成中…' : isLoggedIn ? '生成可打印版' : '登录后生成'}
         </button>
-        <QxStepActions onPrev={goResumeHub}>
-          <QxAiHelp
-            label="让小青帮我整理材料亮点 →"
-            draft="我正在准备求职材料，请先问材料用途和真实经历，帮我整理可填写的亮点。"
-            testId="material-workshop-ai-help"
-          />
-        </QxStepActions>
       </>
     )
   }
+
+  // 底栏「问小青」：每个状态一句自己的问题（稿 materials / materials-result 各状态）。
+  const askSpec = screen === 'loading' ? ASKS.materialsLoad
+    : screen === 'error' || screen === 'empty' ? ASKS.materialsNone
+      : screen === 'submitting' ? ASKS.materialsBusy
+        : screen === 'failed' ? ASKS.materialsFailed
+          : screen === 'generated' || screen === 'generated-no-print' || screen === 'demo-result' ? ASKS.materialsResult
+            : signedOutSelect ? ASKS.materialsOut
+              : Object.values(form).some((value) => value.trim()) ? ASKS.materialsForm
+                : ASKS.materialsPick
 
   return (
     <div className="qx-resume-materials">
@@ -613,6 +607,7 @@ export function JobMaterialLibraryPage() {
         status={{ tone, label: pillLabel }}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={cta}
+        ask={{ ...askSpec, testId: 'material-workshop-ai-help' }}
       >
         <section className="qx-scroll qx-rm-scroll" data-kiosk-domain="resume" data-kiosk-screen="resume-materials"
           data-state={screen} data-testid={`material-workshop-state-${screen}`} aria-label="求职材料库">

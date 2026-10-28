@@ -14,6 +14,7 @@
 import { type ReactNode } from 'react'
 import { KioskStageFit } from '../../../../components/kiosk-shell/KioskStageFit'
 import { ResumeTouchFrame } from '../../touch/ResumeTouchFrame'
+import type { ResumeAsk } from '../../touch/resumeAsks'
 import { getTerminalCode } from '../../../../services/api/terminalConfig'
 import '../../self-assessment-qx.css'
 
@@ -50,6 +51,7 @@ export function SaFrame({
   gate,
   back,
   ctabar,
+  aiAsk,
   children,
 }: {
   screen: SaScreen
@@ -70,6 +72,8 @@ export function SaFrame({
   gate?: ReactNode
   back: { label: string; onBack: () => void }
   ctabar: ReactNode
+  /** 底栏的「问小青」（稿每屏的 ask）。作答与提交前复核两屏稿里没有，不传。 */
+  aiAsk?: ResumeAsk | false
   children: ReactNode
 }) {
   const terminalLabel = getTerminalCode() || '设备未绑定'
@@ -84,6 +88,7 @@ export function SaFrame({
         terminalLabel={terminalLabel}
         back={back}
         ctabar={ctabar}
+        ask={aiAsk}
         stateId={state}
       >
         <main

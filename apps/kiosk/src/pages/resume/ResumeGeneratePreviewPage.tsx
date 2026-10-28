@@ -32,7 +32,8 @@ import { SYNTHETIC_GENERATE } from './components/resume-deliver/fixtures'
 import { parseGeneratePreviewQuery, resolveGeneratePreviewView } from './components/resume-deliver/generatePreviewQuery'
 import type { GeneratePreviewViewState } from './components/resume-deliver/constants'
 import { GeneratePreviewCta, GeneratePreviewEmptyExits } from './GeneratePreviewChrome'
-import { ResumeGenerateAdvisor, ResumeGenerateAiRow } from './components/ResumeGenerateQxChrome'
+import { ResumeGenerateAdvisor } from './components/ResumeGenerateQxChrome'
+import { ASKS, type ResumeAsk } from './touch/resumeAsks'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import './resume-generate-qx.css'
 import './resume-generate-preview-qx.css'
@@ -322,6 +323,20 @@ export function ResumeGeneratePreviewPage() {
       ? { eyebrow: '预览', ask: '生成好了，你核一遍', doing: '事实和你填的逐字一致。被润色过的段落会标明供参考。' }
       : { eyebrow: '预览', ask: emptyNext.ask, doing: emptyNext.doing }
 
+  // 底栏「问小青」：每个状态一句自己的问题（稿 gen-preview 各状态）；稿里 ask 为 false 的「认不出」状态不画。
+  const previewAsk: ResumeAsk | null = onExportScreen
+    ? (exportScreen === 'export-exporting' ? ASKS.exportBusy
+      : exportScreen === 'export-failed' ? ASKS.exportFailed
+        : exportScreen === 'export-ready' ? ASKS.exportReady
+          : exportScreen === 'export-url-expired' ? ASKS.exportExpired
+            : exportScreen === 'export-print-unavailable' ? ASKS.exportNoPrint
+              : ASKS.exportChooser)
+    : view === 'illegal' ? null
+      : view === 'preview-failed' ? ASKS.previewFailed
+        : view === 'preview-no-result' ? ASKS.previewNone
+          : view === 'session-lost' ? ASKS.previewLost
+            : ASKS.previewReady
+
   return (
     <ResumeTouchFrame
       eyebrow="从零生成 · 核对"
@@ -340,7 +355,8 @@ export function ResumeGeneratePreviewPage() {
         advisor: 'resume-generate-preview-nav-advisor',
         profile: 'resume-generate-preview-nav-profile',
       }}
-      ctabar={<>{ctabar}<ResumeGenerateAiRow /></>}
+      ctabar={ctabar}
+      ask={previewAsk ? { ...previewAsk, testId: 'resume-generate-ai-help' } : false}
     >
       <section
         data-kiosk-domain="resume"

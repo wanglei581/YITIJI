@@ -14,13 +14,13 @@ import type { ResumeTemplate, ResumeTemplateSectionKey } from '@ai-job-print/sha
 import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
-import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeWaitState } from './touch/ResumeStates'
 import { ResumeTouchArt } from './touch/ResumeTouchArt'
 import './touch/resume-templates.css'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { ASKS } from './touch/resumeAsks'
 import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { CtaNote, KitRows, Sec } from './jobFit/jobFitQxKit'
@@ -120,16 +120,6 @@ export function ResumeTemplateLibraryPage() {
   }
   const reload = () => setReloadKey((key) => key + 1)
   const goResumeHub = () => navigate('/resume-service')
-  const aiRow = (
-    <QxStepActions onPrev={goResumeHub}>
-      <QxAiHelp
-        label="让小青帮我选版式 →"
-        draft="我想挑一份简历版式，请根据经历长短告诉我更适合单栏还是双栏。"
-        testId="resume-templates-ai-help"
-      />
-    </QxStepActions>
-  )
-
   const screen: TemplatesScreen = loading
     ? 'loading'
     : error
@@ -169,7 +159,6 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>读取期间不显示任何模板，也不保存任何选择。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="不等模板，直接去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
-          {aiRow}
         </>
       ),
     }
@@ -196,7 +185,6 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>模板只影响排版，不影响你已有的简历内容。</CtaNote>
           <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
           <QxAction label="重新读取模板" variant="primary" onClick={reload} />
-          {aiRow}
         </>
       ),
     }
@@ -220,7 +208,6 @@ export function ResumeTemplateLibraryPage() {
           <CtaNote>模板列表为空不代表服务异常；发布后会出现在这一页。</CtaNote>
           <QxAction label="重新读取模板" variant="ghost" onClick={reload} />
           <QxAction label="去简历优化" variant="primary" onClick={handleUseResumeTemplate} />
-          {aiRow}
         </>
       ),
     }
@@ -320,7 +307,6 @@ export function ResumeTemplateLibraryPage() {
       cta: (
         <>
           <CtaNote>{selected ? '此页不会保存模板选择，也不会直接生成简历。' : '模板来自已发布的列表；此页不会保存模板选择，也不会直接生成简历。'}</CtaNote>
-          {aiRow}
           {selected
             ? <QxAction label="换一个版式" variant="ghost" onClick={() => setSelectedId(null)} />
             : <QxAction label="重新读取模板" variant="ghost" onClick={reload} />}
@@ -342,6 +328,7 @@ export function ResumeTemplateLibraryPage() {
         rail={view.rail}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
+        ask={{ ...ASKS.templates, testId: 'resume-templates-ai-help' }}
       >
         <section
           className="qx-scroll"

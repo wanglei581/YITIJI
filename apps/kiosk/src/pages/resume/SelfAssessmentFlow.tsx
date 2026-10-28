@@ -103,6 +103,7 @@ import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { toSaActItems } from './touch/saActItems'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
+import { ASKS } from './touch/resumeAsks'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { unattendedReason } from './touch/unattendedReason'
 import { SaDimRow } from './touch/SaResultParts'
@@ -237,6 +238,7 @@ export function SelfAssessmentIntroPage() {
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-intro"
+      aiAsk={{ ...ASKS.saIntro, testId: 'self-assessment-ai-ask' }}
       state={!bundle ? (consentBundle.state.status === 'error' ? 'intro-consent-error' : 'intro-consent-loading') : ok ? 'intro-ready' : 'intro-consent-pending'}
       status={status}
       ask={<>把职业倾向，<em>说得更明白</em>。</>}
@@ -270,7 +272,12 @@ export function SelfAssessmentIntroPage() {
           `${bank.dimensions.map((d) => d.label).join('、')}。题目问的是你更愿意怎么工作，不是考你会不会。`,
           '不评分、不排名，结果只给你自己看，随时可以返回修改。',
         ]}
-        note="记分不经过 AI，解读才经过 AI：AI 不可用时强度与依据题号照样出，文字解读会如实缺，不拿别的东西顶上。"
+        note={(
+          <>
+            <AiCapabilityChip tone="ai" />
+            {' '}记分不经过 AI，解读才经过 AI：AI 不可用时强度与依据题号照样出，文字解读会如实缺，不拿别的东西顶上。
+          </>
+        )}
       />
 
       {bundle ? (
@@ -434,6 +441,7 @@ export function SelfAssessmentQuizPage() {
       <SaFrame
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-quiz"
+        aiAsk={{ ...ASKS.saBlocked, testId: 'self-assessment-ai-ask' }}
         state={blocked.state}
           status={{ tone: 'warn', label: blocked.pill }}
           ask={blocked.ask}
@@ -796,6 +804,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
       <SaFrame
         {...SA_FRAME_BASE}
         screen="resume-self-assessment-result"
+        aiAsk={{ ...(inflight ? ASKS.saBusy : ASKS.saResultEmpty), testId: 'self-assessment-ai-ask' }}
         state={state}
           status={status}
           ask={inflight ? <>请稍候，<em>这一步还在等结果</em>。</> : failure ? <>这次<em>没能拿到结果</em>。</> : <>还没有<em>可查看的结果</em>。</>}
@@ -957,6 +966,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-result"
+      aiAsk={{ ...ASKS.saResult, testId: 'self-assessment-ai-ask' }}
       state={aiFailed ? 'result-ai-down' : 'result-ready'}
       status={aiFailed ? { tone: 'warn', label: 'AI 解读缺失' } : { tone: 'ok', label: '本次结果已生成' }}
       ask={<>本次作答<em>已完成并提交</em>。</>}
@@ -1091,6 +1101,7 @@ export function SelfAssessmentHistoryPage() {
     <SaFrame
       {...SA_FRAME_BASE}
       screen="resume-self-assessment-history"
+      aiAsk={{ ...ASKS.saHistory, testId: 'self-assessment-ai-ask' }}
       state={current ? 'history-current' : 'history-empty'}
       status={current ? { tone: 'ok', label: '本机有 1 条记录' } : { tone: 'unknown', label: '本机无记录' }}
       ask={current ? <>这台机器上<em>有本次记录</em>。</> : <>这台机器上<em>还没有记录</em>。</>}

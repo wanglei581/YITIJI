@@ -38,6 +38,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/ResumeStates'
+import { ASKS } from './touch/resumeAsks'
 import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchArt } from './touch/ResumeTouchArt'
@@ -613,6 +614,13 @@ export function JobFitActionsPage() {
   }
 
   const view = buildView()
+  // 底栏「问小青」（稿 jobfit-actions）：生成打印版期间稿里 ask 为 false，不画；其余每个状态一句自己的问题。
+  const askSpec = screen === 'session-ended' ? ASKS.actionsEnded
+    : screen === 'missing-task' ? ASKS.actionsMissing
+      : screen === 'loading' || screen === 'unknown' ? ASKS.actionsWait
+        : screen === 'print-pending' ? null
+          : screen === 'print-failed' ? ASKS.actionsPrintFailed
+            : ASKS.actionsReady
 
   return (
     <JobFitStage>
@@ -626,6 +634,7 @@ export function JobFitActionsPage() {
           ? { label: '返回比对结果', onBack: backToCompare }
           : { label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
+        ask={askSpec ? { ...askSpec, testId: 'job-fit-actions-ai-ask' } : false}
       >
         <main
           className="qx-scroll"
