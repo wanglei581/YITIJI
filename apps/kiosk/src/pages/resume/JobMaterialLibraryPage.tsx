@@ -590,13 +590,14 @@ export function JobMaterialLibraryPage() {
 
   // 底栏「问小青」：每个状态一句自己的问题（稿 materials / materials-result 各状态）。
   const askSpec = screen === 'loading' ? ASKS.materialsLoad
-    : screen === 'error' || screen === 'empty' ? ASKS.materialsNone
-      : screen === 'submitting' ? ASKS.materialsBusy
-        : screen === 'failed' ? ASKS.materialsFailed
-          : screen === 'generated' || screen === 'generated-no-print' || screen === 'demo-result' ? ASKS.materialsResult
-            : signedOutSelect ? ASKS.materialsOut
-              : Object.values(form).some((value) => value.trim()) ? ASKS.materialsForm
-                : ASKS.materialsPick
+    : screen === 'error' ? ASKS.materialsError
+      : screen === 'empty' ? ASKS.materialsNone
+        : screen === 'submitting' ? ASKS.materialsBusy
+          : screen === 'failed' ? ASKS.materialsFailed
+            : screen === 'generated' || screen === 'generated-no-print' || screen === 'demo-result' ? ASKS.materialsResult
+              : signedOutSelect ? ASKS.materialsOut
+                : Object.values(form).some((value) => value.trim()) ? ASKS.materialsForm
+                  : ASKS.materialsPick
 
   return (
     <div className="qx-resume-materials">
