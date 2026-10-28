@@ -113,6 +113,12 @@
   opacity: 0.55;
 }
 
+/* 出码之后通道与方式锁定：选中的那一段是本单用的，仍按稿画成深底，不跟着变灰；没选中的才压暗。 */
+[data-qx-page='print-cashier'] .cashier-qx-channel:disabled[data-active='true'],
+[data-qx-page='print-cashier'] .cashier-qx-mode:disabled[data-active='true'] {
+  opacity: 1;
+}
+
 [data-qx-page='print-cashier'] .cashier-qx-mode-ic,
 [data-qx-page='print-cashier'] .cashier-qx-mode-tx small {
   display: none;
@@ -137,7 +143,8 @@
   gap: 12px;
 }
 
-[data-qx-page='print-cashier'] .pct-sum {
+/* 摘要卡：行自己带 22px 内边距，卡本身不再留边（.cashier-qx-group 的 12px 20px 写在后面，同权重会盖掉，所以加一层类名） */
+[data-qx-page='print-cashier'] .cashier-qx-group.pct-sum {
   padding: 0;
   border-radius: 30px;
   background: var(--qxt-card);
@@ -153,11 +160,12 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  margin: 0;
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-kv > div {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   align-items: center;
   gap: 16px;
   min-height: 64px;
@@ -284,7 +292,7 @@
 }
 
 [data-qx-page='print-cashier'] .cashier-verify-btn {
-  min-height: 72px;
+  min-height: 64px;
   padding: 0 22px;
   border-radius: 22px;
   border: 1.5px solid var(--qxt-edge);
@@ -431,6 +439,12 @@
 [data-qx-page='print-cashier'] .cashier-qx-more h2 {
   margin: 8px 0 4px;
   font-size: 24px;
+}
+
+/* 页底「更多订单信息」：首屏让位给收款码卡的订单事实折叠在这里，行距沿用摘要卡。 */
+[data-qx-page='print-cashier'] .cashier-qx-moreinfo .cashier-qx-kv {
+  margin: 0;
+  padding-bottom: 8px;
 }
 
 [data-qx-page='print-cashier'] .cashier-qx-flow {

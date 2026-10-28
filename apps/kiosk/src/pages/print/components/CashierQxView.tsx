@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { PrintAiHelp } from './PrintAiHelp'
 import { PrintFillArt } from '../art/PrintFillArt'
 import { printProblemLine } from '../../../copy/unattendedCopy'
+import { truncateFileNameMiddle } from '../../../lib/fileName'
 import { AlertTriangleIcon, FileXIcon, QrCodeIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import type { CashierView } from '../cashierStatus'
@@ -64,6 +65,8 @@ interface CashierQxViewProps {
   onSimulateSandbox: (result: 'success' | 'failed') => void
   /** 这一次可能扣款的通道。免费单不传，正文也不画付款说明。 */
   billingChannel?: string | null
+  /** 次出口一排（退出支付等）。紧跟在付款区后面画，让「退出支付」落在收款码卡下面、底栏之上（稿 cashier）。 */
+  acts?: ReactNode
 }
 export function CashierQxView(props: CashierQxViewProps) {
   const { state } = props
@@ -81,6 +84,7 @@ export function CashierQxView(props: CashierQxViewProps) {
     free,
   }
   const copy = copyFor(state, ctx)
+  const orderRows = splitOrderRows(props, label, copy.rows)
   const instrument = INSTRUMENT_STATES.has(state)
   // 稿：出码、读付款码时收款码先上屏，状态说明跟在码框后面；其余状态说明在前。
   const stateCardFirst = !(state === 'pending-qr' || state === 'pending-scan')
@@ -119,22 +123,28 @@ export function CashierQxView(props: CashierQxViewProps) {
 
         {state === 'no-order' ? null : (
           <section className="cashier-qx-paywrap">
-            <OrderInfo {...props} channelLabel={label} rows={copy.rows} />
+            <OrderInfo rows={orderRows.core} />
             {stateCardFirst ? stateCard : null}
             {instrument ? <Instrument {...props} ctx={ctx} /> : <AmountCard {...props} free={free} />}
-            {stateCardFirst ? null : stateCard}
+            {/* 出码、读付款码时（稿 cashier）：收款码卡后面紧跟次出口，「退出支付」落在码下面、底栏之上；状态说明、金额、侧注再往下排。 */}
+            {stateCardFirst ? null : <>{props.acts}{stateCard}</>}
             {instrument ? <AmountCard {...props} free={free} /> : null}
             <SideNote state={state} ctx={ctx} />
           </section>
         )}
 
+        {stateCardFirst ? props.acts : null}
+
         {state === 'no-order' ? <Closure state={state} ctx={ctx} /> : (
+          <>
+          <OrderMoreInfo rows={orderRows.more} />
           <details className="cashier-qx-more">
             <summary>{free ? '说明' : '付款说明'} · 接下来怎么办</summary>
             <Closure state={state} ctx={ctx} />
             <p className="cashier-qx-p">{props.amountCents === 0 ? printProblemLine() : props.refundAssistanceCopy + '。'}</p>
             {free ? null : <CashierQxDock truthOnly reason={null} billingChannel={props.billingChannel ?? null} />}
           </details>
+          </>
         )}
 
         {props.issueError ? (
@@ -273,15 +283,29 @@ function priceLineLabel(line: PrintPriceLine): string {
   return line.description ?? line.serviceKey
 }
 
-function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row[] }) {
-  const rows: Row[] = [['订单号', props.orderNo ?? props.orderId ?? '状态未知']]
+/**
+ * 订单摘要（稿 cashier）首屏只有三行：订单号、内容「文件名 · 张数 · 份数 · 颜色」、应付。
+ * 其余事实一个不删，收进页底「更多订单信息」折叠：纸张与单双面、支付通道、支付状态和各态自己的补充行。
+ * 支付通道、支付状态在顶栏胶囊（等待支付 · 未确认）和收款码标题（请使用微信支付扫码支付）里已经各说过一次，
+ * 不再单独占首屏的行；收款码卡要整块落在底栏之上，靠的就是这几行让位。
+ */
+function splitOrderRows(
+  props: CashierQxViewProps,
+  channelLabel: string,
+  stateRows: Row[],
+): { core: Row[]; more: Row[] } {
+  const core: Row[] = [['订单号', props.orderNo ?? props.orderId ?? '状态未知']]
+  const more: Row[] = []
   if (props.file?.name) {
-    const parts = [props.file.name]
+    // 一行放得下：文件名中段截断（扩展名保留），份数只有多于一份才写进这一行，完整份数在「更多订单信息」里。
+    const parts = [truncateFileNameMiddle(props.file.name, { maxLength: 20 })]
     if (props.file.pages !== null && props.file.pages !== undefined) parts.push(`${props.file.pages} 页`)
-    if (props.params?.copies) parts.push(`${props.params.copies} 份`)
-    rows.push(['内容', parts.join(' · ')])
+    if (props.params?.copies && props.params.copies > 1) parts.push(`${props.params.copies} 份`)
+    const color = props.params ? COLOR_MODE_LABEL[props.params.colorMode] ?? null : null
+    if (color) parts.push(color)
+    core.push(['内容', parts.join(' · ')])
   } else {
-    rows.push(['内容', '尚未取得文件信息，请到订单详情核对'])
+    core.push(['内容', '尚未取得文件信息，请到订单详情核对'])
   }
   if (props.params) {
     const params = [
@@ -289,16 +313,21 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
       COLOR_MODE_LABEL[props.params.colorMode] ?? null,
       DUPLEX_LABEL[props.params.duplex] ?? null,
     ].filter(Boolean)
-    if (params.length > 0) rows.push(['参数', params.join(' · ')])
+    if (params.length > 0) more.push(['参数', params.join(' · ')])
+    if (props.params.copies) more.push(['份数', `${props.params.copies} 份`])
   } else {
-    rows.push(['参数', '尚未取得参数信息，请到订单详情核对'])
+    more.push(['参数', '尚未取得参数信息，请到订单详情核对'])
   }
   if ((props.amountCents ?? 0) > 0) {
     const yuan = formatCents(props.amountCents ?? 0).replace(/^¥/, '')
-    rows.push(['应付', `${yuan} 元`])
+    core.push(['应付', `${yuan} 元`])
   }
-  if (props.amountCents !== 0 && props.channelLabel && !props.rows.some(([key]) => key === '支付通道')) rows.push(['支付通道', props.channelLabel])
-  rows.push(...props.rows)
+  if (props.amountCents !== 0 && channelLabel && !stateRows.some(([key]) => key === '支付通道')) more.push(['支付通道', channelLabel])
+  more.push(...stateRows)
+  return { core, more }
+}
+
+function OrderInfo({ rows }: { rows: Row[] }) {
   return (
     <section className="cashier-qx-group pct-sum" aria-label="订单信息">
       <h3>订单信息</h3>
@@ -311,6 +340,24 @@ function OrderInfo(props: CashierQxViewProps & { channelLabel: string; rows: Row
         ))}
       </dl>
     </section>
+  )
+}
+
+/** 首屏没有的订单事实，折叠在页底，不删。 */
+function OrderMoreInfo({ rows }: { rows: Row[] }) {
+  if (rows.length === 0) return null
+  return (
+    <details className="cashier-qx-more cashier-qx-moreinfo">
+      <summary>更多订单信息</summary>
+      <dl className="cashier-qx-kv">
+        {rows.map(([key, value]) => (
+          <div key={key}>
+            <dt>{key}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   )
 }
 

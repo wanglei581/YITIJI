@@ -560,6 +560,36 @@ export function PrintCashierPage() {
     : snapshot?.attempt?.channel || selectedChannel || ((channels?.length ?? 0) === 1 ? channels?.[0] ?? null : null)
 
   const freeOrder = amountCents !== null && amountCents <= 0
+  // 次出口一排：交给收银台正文画在付款区后面，「退出支付」才落在收款码卡下面、底栏之上（稿 cashier）。
+  const acts = (
+    <div className="pct-acts">
+      <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>
+        返回我的打印订单
+      </button>
+      {/* 「我的打印订单」和上面那颗「返回我的打印订单」去同一个地方，不再重复画一颗。 */}
+      {secondaryAction.label !== paramsBack.label && secondaryAction.label !== '我的打印订单' ? (
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={secondaryAction.run}>
+          {secondaryAction.icon}{secondaryAction.label}
+        </button>
+      ) : null}
+      {qxState === 'attempt-failed' && paramsBack.label !== '改参数需重新下单' ? (
+        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(uploadPath)}>
+          <FilePlus2Icon aria-hidden="true" />改参数需重新下单
+        </button>
+      ) : null}
+      {isOpenUnpaidOrder ? (
+        <button
+          type="button"
+          className="qx-btn"
+          data-variant="ghost"
+          data-cashier-exit=""
+          onClick={() => navigate('/', { replace: true })}
+        >
+          <XCircleIcon aria-hidden="true" />退出支付
+        </button>
+      ) : null}
+    </div>
+  )
   return (
     <div data-w2-page="print-cashier" className="cashier-qx-route">
     <PrintTouchFrame
@@ -575,7 +605,8 @@ export function PrintCashierPage() {
       back={{ label: paramsBack.label, onBack: paramsBack.run }}
       ask={freeOrder
         ? printAsk('问小青：核对这单', '请帮我核对这一单的订单和打印状态。')
-        : printAsk('问小青：这笔账看不懂', '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。')}
+        // 出过码之后返回键是「改参数需重新下单」，问小青标签太长会被截成「问小青：这笔账看…」，所以缩到 8 个字以内。
+        : printAsk('问小青：怎么付', '我在付款这一步。请用白话告诉我：现在是在等付款、已经付好，还是需要再看支付账单。不要替我判断有没有扣款。')}
       primary={{
         label: primaryAction.label,
         disabled: primaryAction.disabled,
@@ -621,33 +652,8 @@ export function PrintCashierPage() {
         onReissue={handleReissue}
         onSimulateSandbox={(result) => void devSimulate(result)}
         billingChannel={freeOrder ? null : billingChannel}
+        acts={acts}
       />
-      <div className="pct-acts">
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>
-          返回我的打印订单
-        </button>
-        {secondaryAction.label !== paramsBack.label ? (
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={secondaryAction.run}>
-            {secondaryAction.icon}{secondaryAction.label}
-          </button>
-        ) : null}
-        {qxState === 'attempt-failed' && paramsBack.label !== '改参数需重新下单' ? (
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate(uploadPath)}>
-            <FilePlus2Icon aria-hidden="true" />改参数需重新下单
-          </button>
-        ) : null}
-        {isOpenUnpaidOrder ? (
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="ghost"
-            data-cashier-exit=""
-            onClick={() => navigate('/', { replace: true })}
-          >
-            <XCircleIcon aria-hidden="true" />退出支付
-          </button>
-        ) : null}
-      </div>
       {primaryReason ? <p className="pct-note">{primaryReason}</p> : null}
     </PrintTouchFrame>
     </div>
