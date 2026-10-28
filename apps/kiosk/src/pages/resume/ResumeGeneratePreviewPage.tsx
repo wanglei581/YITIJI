@@ -373,7 +373,7 @@ export function ResumeGeneratePreviewPage() {
             <ResumeStepPreview
               className="rtp-hero-min"
               kicker="核对这一份"
-              title={resume.basic.name.trim() || '姓名未填'}
+              title={resume.basic.name.trim() ? `${resume.basic.name.trim()}的简历` : '姓名未填'}
               lines={[
                 [resume.intention.position, resume.intention.city].filter(Boolean).join(' · ') || '求职意向未填',
                 [resume.basic.phone ? maskPhone(resume.basic.phone) : '', resume.basic.email ? maskEmail(resume.basic.email) : ''].filter(Boolean).join(' · ') || '联系方式未填',
