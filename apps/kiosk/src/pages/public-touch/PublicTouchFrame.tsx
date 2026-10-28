@@ -69,9 +69,8 @@ export function PublicTouchFrame({
   const pageId = page ?? screen
   return (
     <QxTouchScreen
-      gallery={false}
       page={pageId}
-      frameMarker
+      legacyFrame
       className={['qxp-app', className].filter(Boolean).join(' ')}
       testId={testId}
       stateId={stateId}

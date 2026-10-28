@@ -42,7 +42,7 @@ export const ORG_CONTENT_TRUST_UNSET_LABEL = '未标记'
 
 /**
  * 「内容可信」控件在 Admin 后台里的**真实**位置，三段都必须是页面上真渲染得出来的文案：
- *   [0] 左侧导航项           → apps/admin/src/layouts/AdminLayoutWrapper.tsx 的 NAV_ITEMS
+ *   [0] 左侧导航项           → apps/admin/src/layouts/adminNav.ts 的 NAV_ITEMS
  *   [1] 机构行「详情/账号」打开的抽屉标题 → apps/admin/src/routes/partners/index.tsx
  *   [2] 抽屉内该控件的小节标题 → apps/admin/src/routes/partners/OrgContentTrustPanel.tsx
  * 任何指路文案都引用本常量，不许手写。门禁逐段核对它确实被渲染。
