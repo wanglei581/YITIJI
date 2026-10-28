@@ -1061,6 +1061,8 @@ for (const c of [
     await expect(board.locator('.qxt-file')).toHaveCount(c.file ? 1 : 0)
     await expect(board.getByTestId('file-source-error-reason')).toContainText(c.reason)
     await expect(board.locator('.qxt-slab')).toHaveCount(2)
+    // 底栏主键就是第一张出口卡的那个动作，两处写同一句，不能一处改了另一处还是旧的。
+    await expect(board.locator('.qxt-slab').first()).toContainText(c.primary)
     await expect(board).toContainText('需要帮助？')
     await expect(board.getByTestId('file-source-help')).toHaveCount(c.help ? 1 : 0)
     // 底栏：问小青带本屏专属问句，主键是真实的重试动作，三个键的字都不被省略号截掉。
