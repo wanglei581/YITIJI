@@ -81,6 +81,12 @@ export class ApiRouter {
     this.respond('GET', SELF_ASSESSMENT_QUESTIONS_PATH, { status: 200, json: selfAssessmentQuestionsResponse() })
     // W-125：打印上传页与简历来源页挂载时读终端能力。默认空列表 = 没接管，U 盘保持可用。
     this.respond('GET', '/api/v1/terminals/KSK-001/capabilities', { status: 200, json: { capabilities: [] } })
+    // 扫描、复印、照片合成、签名各屏正文最上面读「小青现在能不能用」（GET /advisor/availability）。
+    // 默认按可用应答，所以既有用例里不会出现「小青暂时接不上」那一句；要看它的用例自行 respond available:false。
+    this.respond('GET', '/api/v1/advisor/availability', {
+      status: 200,
+      json: { available: true, providerLabel: null, reason: null, degradedCapabilities: [], disclaimer: '' },
+    })
     // 无人值守服务联系方式。默认给出公示号码与服务时间，两个布尔都是假：
     // 单点位不出现「换一台机器」，小程序未发布不出现「手机上能看到 / 用手机继续」。
     // 要看换机、小程序已发布或 404 的用例自行 respond 覆盖。

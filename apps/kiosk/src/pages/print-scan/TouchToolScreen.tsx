@@ -5,6 +5,7 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import type { ReactNode } from 'react'
+import { AiDownNote } from './AiDownNote'
 import './styles/tool-touch.css'
 import './styles/tool-fs.css'
 
@@ -86,6 +87,7 @@ export function TouchToolScreen({
         />
       }
     >
+      <AiDownNote />
       {children}
     </QxTouchScreen>
   )

@@ -254,3 +254,16 @@
   line-height: 1.45;
   text-align: left;
 }
+
+/* AI 状态：小青确实接不上时写在正文最上面（稿的 aiNote）。 */
+.qxt-screen.scan-touch .sx-ai-note {
+  flex: none;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.45;
+}

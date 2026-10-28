@@ -327,6 +327,58 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
   await expectHealthy(page, errors)
 })
 
+// ── AI 是驱动层：小青接不上时这一步也要做得完 ───────────────────────────────────
+//
+// 稿 18 / 20 每一屏正文最上面都有一条 AI 状态：小青确实接不上时写一句实话，并说明这一步不靠它也能做完；
+// 底栏「问小青」不动，扫描、复印、照片合成这些手动路径照旧。判「接不上」只认服务端那个真探测
+// （GET /advisor/availability 回 200 + available:false）；探不到、超时都不下结论，更不写「接不上」。
+const AI_DOWN_BODY = {
+  status: 200,
+  json: { available: false, providerLabel: null, reason: 'AI 顾问暂不可用：管理员尚未配置或已停用该功能位', degradedCapabilities: [], disclaimer: '' },
+}
+
+test('when 小青 is down every scan and tool screen says so and the manual path stays @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  api.respond('GET', '/api/v1/advisor/availability', AI_DOWN_BODY)
+
+  await page.goto('/scan/start')
+  await expect(page.getByTestId('ai-down-note')).toHaveText('小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。')
+  // 手动路径照旧：问小青还在（点过去由顾问页自己降级）、「下一步」照样能按。
+  await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  await expect(page.getByRole('button', { name: /下一步 · 建立这次扫描/ })).toBeEnabled()
+
+  for (const [path, primary] of [
+    ['/print-scan/feature/copy', '去打印文件'],
+    ['/print-scan/feature/id-photo', '先用照片打印'],
+  ] as const) {
+    await page.goto(path)
+    await expect(page.getByTestId('ai-down-note'), `${path} 要写小青接不上`).toBeVisible()
+    await expect(page.locator('[data-qxt-ask="on"]'), `${path} 底栏问小青还在`).toBeVisible()
+    await expect(page.getByRole('button', { name: primary, exact: true }), `${path} 主按钮照常能按`).toBeEnabled()
+  }
+  await page.goto('/print-scan/convert')
+  await expect(page.getByTestId('ai-down-note')).toBeVisible()
+  await expect(page.locator('[data-qxt-ask="on"]')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('小青 reachable or unprobed never gets the 接不上 note @w2', async ({ page, api }) => {
+  registerShell(api)
+  registerScanCapability(api, 'available')
+  // 可用：不写。
+  await page.goto('/scan/start')
+  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('ai-down-note')).toHaveCount(0)
+  // 探不到（断网）：不下结论，不写「接不上」，也不写「正常」。
+  api.abort('GET', '/api/v1/advisor/availability', 'internetdisconnected')
+  await page.reload()
+  await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
+  await page.waitForTimeout(600)
+  await expect(page.getByTestId('ai-down-note')).toHaveCount(0)
+})
+
 test('direct scan settings access does not create a session @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

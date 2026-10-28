@@ -1328,4 +1328,52 @@ for (const path of [
   checkVisibleIdentity(ast)
 }
 
+/* ── AI 是驱动层：稿上每屏的 AI 元素一个不许少（产品负责人 8/16、10/28） ────────────────
+ *
+ * 触屏版稿 18（扫描四阶段）、稿 20（复印、照片合成、证件照、签名）每一屏底栏都有「问小青」，
+ * 问句是**本屏专属**的（label 与带去顾问页的 draft 是同一句），逐态不同；每屏正文最上面还有一条 AI 状态
+ * （小青接不上时写实话，说明这一步不靠它也能做完）。这些是 AI 与打印扫描功能结合的接口，
+ * 改版时最容易被当成「文案」顺手删掉或合并成一句通用话，所以逐句钉在源码里。
+ * 缺哪一句，门禁就指名哪一句。 */
+const ASK_LABELS = [
+  ['src/pages/scan/ScanWorkbenchChrome.tsx', [
+    '问小青：扫描和复印有什么不同', '问小青：U 盘扫描怎么走', '问小青：扫描没开放怎么办', '问小青：任务还没建好',
+    '问小青：扫描任务没建好', '问小青：扫描过期了怎么办', '问小青：为什么还不能扫', '问小青：面板上怎么扫',
+    '问小青：授权还没好', '问小青：一直等不到怎么办', '问小青：扫描件接下来呢', '问小青：扫描失败怎么办',
+  ]],
+  ['src/pages/print-scan/ConvertImagesPage.tsx', [
+    '问小青：不能转 PDF 怎么办', '问小青：U 盘图片怎么加', '问小青：上传停住了', '问小青：合成要多久',
+    '问小青：合成的 PDF 怎么打印', '问小青：结果还没回来', '问小青：顺序冲突了', '问小青：照片怎么合成 PDF',
+  ]],
+  ['src/pages/print-scan/PrintScanFeatureInfoPage.tsx', [
+    '问小青：复印要注意什么', '问小青：这个功能是什么', '问小青：证件照怎么办',
+  ]],
+  ['src/pages/print-scan/SignStampPage.tsx', [
+    '问小青：签名没开怎么办', '问小青：签名用哪份 PDF', '问小青：签名图是什么', '问小青：签名放在哪一页',
+    '问小青：合成完怎么打印', '问小青：签名结果没回来',
+  ]],
+]
+for (const [path, labels] of ASK_LABELS) {
+  const code = read(path)
+  for (const label of labels) {
+    assert.ok(code.includes(label), `${path} 缺稿上的底栏问句「${label}」：AI 元素一个不许少，也不许并成一句通用话`)
+  }
+}
+// 问小青按钮本身：带麦克风（voice），label 与 draft 同一句；扫描壳里还要先撤销会话再走（见 scan-session-truth）。
+for (const path of ['src/pages/scan/ScanWorkbenchChrome.tsx', 'src/pages/print-scan/TouchToolScreen.tsx']) {
+  const code = read(path)
+  assert.match(code, /draft: askLabel,[\s\S]{0,120}?voice: true|draft: askLabel, voice: true/, `${path} 的问小青必须 draft 与 label 同一句且带麦克风`)
+  assert.match(code, /<AiDownNote \/>/, `${path} 正文最上面必须有 AI 状态（小青接不上时写实话）`)
+}
+const aiDownProbe = read('src/pages/print-scan/useXiaoqingAvailability.ts')
+const aiDownNote = aiDownProbe + read('src/pages/print-scan/AiDownNote.tsx')
+assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那个真探测，不靠猜')
+assert.match(aiDownNote, /row\.available === false\) return 'unavailable'/, '只有服务端明说 available:false 才写「接不上」')
+assert.match(aiDownNote, /小青暂时接不上。这一步不用它也能做完，照下面的按钮继续。/, 'AI 状态那一句要说清这一步不靠小青也能做完')
+// 扫描完成后的 AI 简历识别入口与结果页不降级：入口还在、只对简历扫描放行、去的是简历解析页。
+const scanResultPage = read('src/pages/scan/ScanResultPage.tsx')
+assert.match(scanResultPage, /AI 简历识别/, '扫描结果页的「AI 简历识别」入口不许删')
+assert.match(scanResultPage, /const aiEnabled = scanType === 'resume' && Boolean\(file\)/, 'AI 简历识别只对简历扫描且有文件时放行')
+assert.match(scanResultPage, /leaveScanFlow\('\/resume\/parse'/, 'AI 简历识别去的是简历解析页，由那一屏自己按 AI 能力降级')
+
 console.log('ALL PASS fusion W2 print/scan contract')

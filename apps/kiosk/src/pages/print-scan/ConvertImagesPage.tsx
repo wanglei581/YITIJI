@@ -32,12 +32,25 @@ import {
   derivePhase,
   type ConvertError,
   type ConvertIdempotency,
+  type ConvertPhase,
   type ConvertPreview,
   type SelectedImage,
 } from './convert-images-model'
 import './styles/convert-images-qx.css'
 
 const LIMIT_MESSAGE = `最多支持 ${MAX_IMAGES} 张图片，已达上限`
+
+/** 底栏「问小青」的本屏问句，逐态照稿 18（label 与带去顾问页的 draft 是同一句）。 */
+function convertAskLabel(phase: ConvertPhase, error: ConvertError | null): string {
+  if (error?.kind === 'capability') return '问小青：不能转 PDF 怎么办'
+  if (error?.kind === 'result-unknown' || error?.kind === 'in-progress') return '问小青：结果还没回来'
+  if (phase === 'usb') return '问小青：U 盘图片怎么加'
+  if (phase === 'uploading') return '问小青：上传停住了'
+  if (phase === 'converting' || phase === 'rechecking') return '问小青：合成要多久'
+  if (phase === 'completed') return '问小青：合成的 PDF 怎么打印'
+  if (phase === 'conflict') return '问小青：顺序冲突了'
+  return '问小青：照片怎么合成 PDF'
+}
 
 export function ConvertImagesPage() {
   const navigate = useNavigate()
@@ -314,7 +327,7 @@ export function ConvertImagesPage() {
       sub={phase === 'empty' ? '还没有图片。加上之后才能合成' : '几张图拼成一份 PDF。顺序你自己排，一张一页。'}
       status={toolBandStatus(status)}
       onBack={() => navigate('/print-scan')}
-      askLabel={phase === 'empty' ? '问小青：照片怎么合成 PDF' : '问小青：几张图怎么合成一份'}
+      askLabel={convertAskLabel(phase, error)}
       primary={dockSpec.primary}
     >
       <ConvertImagesView

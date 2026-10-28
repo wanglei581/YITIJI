@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
+import { AiDownNote } from '../print-scan/AiDownNote'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
@@ -39,9 +40,13 @@ const SCAN_EYEBROW: Record<ScanWorkbenchShellProps['page'], string> = {
   'scan-result': '扫描完成',
 }
 
+/** 底栏「问小青」的本屏问句，逐态照稿 18（label 与带去顾问页的 draft 是同一句）。 */
 function scanAskLabel(page: ScanWorkbenchShellProps['page'], state: ScanWorkbenchState): string {
   if (state === 'usb-panel') return '问小青：U 盘扫描怎么走'
   if (state === 'loading' || state === 'blocked' || state === 'unknown') return '问小青：扫描没开放怎么办'
+  if (state === 'create-loading') return '问小青：任务还没建好'
+  if (state === 'create-failed' || state === 'invalid' || state === 'cleanup-holding') return '问小青：扫描任务没建好'
+  if (state === 'expired') return '问小青：扫描过期了怎么办'
   if (state === 'awaiting-ack') return page === 'scan-progress' ? '问小青：授权还没好' : '问小青：为什么还不能扫'
   if (state === 'failed' || state === 'completed-no-file' || state === 'wait-timeout') return '问小青：扫描失败怎么办'
   if (page === 'scan-settings') return '问小青：面板上怎么扫'
@@ -203,6 +208,7 @@ export function ScanWorkbenchShell({
         data-state={state}
         data-layout={layout}
       >
+        <AiDownNote />
         {facts && facts.length > 0 ? (
           <div className="sw-xq-facts">
             {facts.map((fact) => (

@@ -11,11 +11,38 @@ import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { SignClosedBody, SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
 import { SignStampPickView, pickAsk } from './sign-stamp/SignStampPickView'
 import { SignStampWorkbench } from './sign-stamp/SignStampWorkbench'
+import type { SignStampStateId } from './sign-stamp/constants'
 import { AUTHORIZATION_LABEL, useSignStampFlow } from './sign-stamp/useSignStampFlow'
 import './styles/sign-stamp-qx.css'
 
 const SIGN_ENDPOINTS = { signInspect, signCompose, AUTHORIZATION_LABEL } as const
 void SIGN_ENDPOINTS
+
+/**
+ * 底栏「问小青」的本屏问句，逐态照稿 20（label 与带去顾问页的 draft 是同一句）。
+ * 稿里没有画的登录、能力读取这几道闸，保留原来那句「这个签名有法律效力吗」。
+ */
+function signAskLabel(state: SignStampStateId, pickPhase: 'doc' | 'stamp' | null): string {
+  if (state === 'capability-disabled') return '问小青：签名没开怎么办'
+  if (pickPhase === 'doc') return '问小青：签名用哪份 PDF'
+  if (pickPhase === 'stamp') return '问小青：签名图是什么'
+  if (state === 'result-unknown' || state === 'retrying-same-request' || state === 'conversion-in-progress') {
+    return '问小青：签名结果没回来'
+  }
+  if (
+    state === 'composing' || state === 'completed' || state === 'recovered-completed' || state === 'add-another-ready'
+    || state.startsWith('output-')
+  ) {
+    return '问小青：合成完怎么打印'
+  }
+  if (
+    state.startsWith('placement-') || state.startsWith('preview-') || state === 'authorization-required'
+    || state === 'ready-to-compose'
+  ) {
+    return '问小青：签名放在哪一页'
+  }
+  return '问小青：这个签名有法律效力吗'
+}
 
 export function SignStampPage() {
   const flow = useSignStampFlow()
@@ -39,7 +66,7 @@ export function SignStampPage() {
       sub={closed ? '选 PDF、传签名图和放置，现在都还不能用' : '把本人手写签名图片叠到 PDF 上，生成一份新文件。只接受本人手写签名，不接受单位公章或圆形章；这不是可靠电子签名。'}
       status={toolBandStatus(flow.pill)}
       onBack={() => flow.navigate('/print-scan')}
-      askLabel={closed ? '问小青：签名没开怎么办' : '问小青：这个签名有法律效力吗'}
+      askLabel={signAskLabel(flow.viewState, flow.pickPhase)}
       left={{ label: flow.back.label, onClick: flow.goBack, testId: 'sign-stamp-exit' }}
       primary={{
         label: flow.cta.primary,
