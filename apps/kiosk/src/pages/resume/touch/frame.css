@@ -33,7 +33,11 @@
     padding: 4px 12px;
     line-height: 1.25;
     white-space: normal;
-    word-break: keep-all;
+    /* 第一包把窄屏胶囊字号收到 14px 后，一行只装得下 14 个字，15 个字的整句（服务台「能力与设备状态以办理时确认为准」）
+       在 keep-all 下只能靠 overflow-wrap 硬断，把最后一个字单独甩到第二行。改成常规断行，再让两行等长（balance）。
+       带「 · 」的标签最长 12 个字，一行放得下，不会被断开。 */
+    word-break: normal;
+    text-wrap: balance;
     text-align: left;
   }
   [data-kiosk-stage-fit='off'] .qxt-screen:has([data-kiosk-domain='resume']) .qxt-ask { padding: 8px 0 10px; gap: 12px; }
