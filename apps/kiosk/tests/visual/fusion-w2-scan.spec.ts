@@ -1037,7 +1037,7 @@ test('sensitive session clear returns the workbench to start without the previou
 
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
-  await expect(page.getByText('任务信息', { exact: true })).toBeVisible()
+  await expect(page.getByText('你在面板上', { exact: true })).toBeVisible()
   await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
   await expect(page.getByText(SCAN_TASK_ID, { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('ai-job-print:current-scan-workbench') ?? '{}').live?.scanTaskId)).toBe(SCAN_TASK_ID)
@@ -1168,10 +1168,8 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   const stage = await boxOf(page.locator('.kiosk-stage'), '舞台')
   expect(Math.abs(scrim.x - stage.x) + Math.abs(scrim.y - stage.y), '预览层从舞台左上角铺起').toBeLessThanOrEqual(1)
   expect(Math.abs(scrim.width - stage.width) + Math.abs(scrim.height - stage.height), '预览层与舞台同大').toBeLessThanOrEqual(1)
-  /* 触屏壳把顶栏、底栏、导航整片放进同一个 inert 的底层（.qxt-under），不是每层各挂一个。
-   * 所以这里判「落在 inert 子树里」，不是判元素自己带 inert：只要有一层漏出来，它的最近 inert 祖先就是空。 */
   for (const layer of ['.qxt-band', '.qxt-dock', '.qxt-nav', '[data-testid="scan-workbench-exits"]']) {
-    expect(await page.locator(layer).evaluate((el) => el.closest('[inert]') !== null), `${layer} 在预览打开时不可达`).toBe(true)
+    await expect(page.locator(layer), `${layer} 在预览打开时不可达`).toHaveAttribute('inert', '')
   }
   await expect(dialog.getByTestId('rs-pv-close')).toBeFocused()
   await expect(dialog.getByTestId('rs-pv-meta')).toContainText('2 页')

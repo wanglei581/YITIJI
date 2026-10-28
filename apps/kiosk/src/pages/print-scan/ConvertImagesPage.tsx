@@ -318,6 +318,7 @@ export function ConvertImagesPage() {
       primary={dockSpec.primary}
     >
       <ConvertImagesView
+        extraRows={dockSpec.rows}
         loggedIn={loggedIn}
         hasEndUser={hasEndUser}
         kiosk={kiosk}
@@ -361,7 +362,6 @@ export function ConvertImagesPage() {
         onHelp={() => navigate('/help')}
         onBack={() => navigate('/print-scan')}
       />
-      {dockSpec.rows}
     </TouchToolScreen>
   )
 }

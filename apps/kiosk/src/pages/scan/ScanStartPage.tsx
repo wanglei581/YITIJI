@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
+import { FsRow } from '../print-scan/FsRow'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
@@ -187,20 +188,15 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
             </div>
             <PhoneHelpLine />
           </div>
-          <button
-            type="button"
-            className="fs-row"
+          <FsRow
+            title={checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
+            desc="再读一次这台机器的扫描配置"
             disabled={checking || gate === 'loading'}
             onClick={() => void refreshGate()}
-          >
-            <span>
-              <b>{checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}</b>
-              <small>再读一次这台机器的扫描配置</small>
-            </span>
-          </button>
-          <button
-            type="button"
-            className="fs-row"
+          />
+          <FsRow
+            title="改用面板扫描到 U 盘"
+            desc="文件只进你的 U 盘，平台不接收"
             onClick={() => {
               if (onGoStage) {
                 setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
@@ -208,19 +204,14 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               }
               navigate('/scan?stage=start&mode=usb-panel')
             }}
-          >
-            <span>
-              <b>改用面板扫描到 U 盘</b>
-              <small>文件只进你的 U 盘，平台不接收</small>
-            </span>
-          </button>
+          />
         </>
       ) : (
         <>
           <ScanTypeCards selected={selected} onPick={setSelected} />
-          <button
-            type="button"
-            className="fs-row"
+          <FsRow
+            title="改用面板扫描到 U 盘"
+            desc="不创建平台任务，文件只在你的 U 盘"
             onClick={() => {
               if (onGoStage) {
                 setSearchParams({ stage: 'start', mode: 'usb-panel' }, { replace: true })
@@ -228,12 +219,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
               }
               navigate('/scan?stage=start&mode=usb-panel')
             }}
-          >
-            <span>
-              <b>改用面板扫描到 U 盘</b>
-              <small>不创建平台任务，文件只在你的 U 盘</small>
-            </span>
-          </button>
+          />
           <div className="fs-grow">
           <div className="fs-facts">
             <div className="fs-fact wide">

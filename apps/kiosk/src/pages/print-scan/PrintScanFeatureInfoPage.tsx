@@ -36,6 +36,7 @@ import {
 } from './components/QxPrintHubView'
 import { PhoneHelpLine } from './phoneHelp'
 import { toolBandStatus } from './toolBand'
+import { FsRow } from './FsRow'
 import { DocStackArt, IdCardArt } from './ToolArt'
 import { TouchToolScreen } from './TouchToolScreen'
 import './styles/print-hub-qx.css'
@@ -101,9 +102,7 @@ export function PrintScanFeatureInfoPage() {
               </div>
             </div>
           </div>
-          <button type="button" className="fs-row" onClick={() => navigate('/print-scan/feature/id-photo')}>
-            看证件照说明
-          </button>
+          <FsRow title="看证件照说明" desc="证件照这一页写的是尚未开放，和两条替代路径" onClick={() => navigate('/print-scan/feature/id-photo')} />
           <PrintHubRecordNotes
             links={RECORD_LINKS}
             onOpen={(linkKey) => {

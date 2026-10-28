@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from 'react'
 import type { QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { FsRow } from './FsRow'
 import { PhoneArt, UsbArt } from './ToolArt'
 import {
   MAX_IMAGES,
@@ -477,13 +478,7 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
 
 
 /** 一个正文里的整行按钮（稿里次出口都是这个样子，不挤进底栏）。 */
-function ActionRow({ title, desc, onClick, disabled }: { title: string; desc?: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button type="button" className="fs-row" disabled={disabled} onClick={onClick}>
-      <span><b>{title}</b>{desc ? <small>{desc}</small> : null}</span>
-    </button>
-  )
-}
+const ActionRow = FsRow
 
 export type ConvertDockSpec = {
   /** 底栏右边的主按钮。没有就不画。 */

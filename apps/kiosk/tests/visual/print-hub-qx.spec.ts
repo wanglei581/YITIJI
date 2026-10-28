@@ -84,7 +84,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
         truthTop: box(document.querySelector('.ph-truth')).top,
         notesBottom: Math.max(...notes),
         truthBottom: box(document.querySelector('.ph-truth')).bottom,
-        navTop: box(document.querySelector('.qxt-nav')).top,
+        navTop: box(document.querySelector('.qx-navbar')).top,
       }
     })
     console.log(`print-hub-geometry ${JSON.stringify(geo)}`)
@@ -130,7 +130,7 @@ test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2',
       scrolls: scroller.scrollHeight > scroller.clientHeight,
       notesBottom: Math.max(...notes),
       truthBottom: document.querySelector('.ph-truth')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
     }
   })
   expect(geo.scrolls && geo.atEnd, '390 下内容应在 .qx-scroll 内滚动且已滚到底').toBe(true)
@@ -207,7 +207,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)
@@ -279,7 +279,7 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)
@@ -370,8 +370,10 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   const guide = page.getByTestId('print-hub-state-feature-copy')
   await expect(guide).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '怎么在打印机上复印' })).toHaveCount(1)
-  await expect(guide.getByText('不用在这台屏幕上下单', { exact: false })).toBeVisible()
-  await expect(guide.getByText('也不会出现在「我的打印订单」里', { exact: false })).toBeVisible()
+  // 稿 18：这句话在意图带的副标题里，不再在正文里重复一遍。
+  const band = page.locator('.qxt-band')
+  await expect(band.getByText('不用在这台屏幕上下单', { exact: false })).toBeVisible()
+  await expect(band.getByText('也不会出现在「我的打印订单」里', { exact: false })).toBeVisible()
   await expect(page.getByTestId('print-hub-copy-steps').locator('li')).toHaveCount(5)
   // 按钮名按面板屏幕实际字样：主屏的「复印」「身份证复印」「票据复印」。手册里前后不一的叫法不得出现。
   for (const panelWord of ['「复印」', '「身份证复印」', '「票据复印」']) {

@@ -19,6 +19,7 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 import { scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
 import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
+import { FsRow } from '../print-scan/FsRow'
 import { ScanPaperArt } from './ScanPaperArt'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -379,12 +380,12 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
 
   /* 取消扫描：确认没回话的时候也照样可按（取消回执就是服务端报的终态），所以两种屏都放它。 */
   const cancelRow = (
-    <button type="button" className="fs-row" disabled={cancelling} onClick={handleCancelPress}>
-      <span>
-        <b>{cancelling ? '正在发送取消请求' : cancelArmed ? '再点一次确认取消' : '取消扫描'}</b>
-        <small>{cancelArmed && !cancelling ? '再按一次才会发出取消' : '取消这次还没完成的扫描'}</small>
-      </span>
-    </button>
+    <FsRow
+      title={cancelling ? '正在发送取消请求' : cancelArmed ? '再点一次确认取消' : '取消扫描'}
+      desc={cancelArmed && !cancelling ? '再按一次才会发出取消' : '取消这次还没完成的扫描'}
+      disabled={cancelling}
+      onClick={handleCancelPress}
+    />
   )
 
   return (
@@ -422,18 +423,13 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
             </p>
           </div>
           <div className="fs-2">
-            <button
-              type="button"
-              className="fs-row"
+            <FsRow
+              title={ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}
+              desc="系统没回之前，不说已经确认"
               disabled={cancelling || !ackRetryable}
-              aria-disabled={cancelling || !ackRetryable}
+              ariaDisabled={cancelling || !ackRetryable}
               onClick={() => setAckState('pending')}
-            >
-              <span>
-                <b>{ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}</b>
-                <small>系统没回之前，不说已经确认</small>
-              </span>
-            </button>
+            />
             {cancelRow}
           </div>
         </>
@@ -467,17 +463,12 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
           </div>
           <div className="fs-2">
             {cancelRow}
-            <button
-              type="button"
-              className="fs-row"
+            <FsRow
+              title="立即检查"
+              desc="只增加一次查询，不自己判成功"
               disabled={cancelling || pollInFlight}
               onClick={() => pollNowRef.current()}
-            >
-              <span>
-                <b>立即检查</b>
-                <small>只增加一次查询，不自己判成功</small>
-              </span>
-            </button>
+            />
           </div>
         </>
       )}

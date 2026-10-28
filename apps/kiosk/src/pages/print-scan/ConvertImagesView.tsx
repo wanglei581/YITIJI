@@ -1,6 +1,6 @@
 import type { ConvertImagesResponse } from '@ai-job-print/shared'
 import { EyeIcon } from 'lucide-react'
-import type { ChangeEvent, Ref } from 'react'
+import type { ChangeEvent, ReactNode, Ref } from 'react'
 import { PdfCanvasPreview } from '../../components/PdfCanvasPreview'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
@@ -27,6 +27,8 @@ import {
 } from './ConvertImagesPanels'
 
 interface ConvertImagesViewProps {
+  /** 次出口整行按钮（取消这一张、先登录再转换……）。稿里它们在正文里，不在底栏。 */
+  extraRows?: ReactNode
   loggedIn: boolean
   /** 转换响应的真信号；缺省（尚未转换 / 旧响应）时完成态两句都不说。 */
   hasEndUser: boolean | undefined
@@ -233,6 +235,7 @@ export function ConvertImagesView(props: ConvertImagesViewProps) {
         ) : null}
       </div>
 
+      {props.extraRows}
       <div className="i2p-truth" data-testid="img2pdf-truth">
         <div><b>顺序</b>列表顺序就是提交顺序，也是 PDF 的页序：一张图一页，按 A4 排版，不裁切、不拼版。</div>
         <div><b>进度</b>合成是一次性请求，系统不回传进度，所以不画百分比，也不用计时器假装做完了。</div>

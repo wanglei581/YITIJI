@@ -274,3 +274,32 @@
   max-width: 100%;
   max-height: 100%;
 }
+
+/* 手机宽度（不缩放的舞台）：底栏折成两行——问小青独占第一行，返回与主按钮并排在第二行。
+ * 本包四屏与工具三屏共用，所以挂 .scan-touch，不挂 :has(.sw-page)。 */
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock {
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  gap: 8px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-askq {
+  order: -1;
+  flex: 1 1 100%;
+  min-width: 0;
+  height: 56px;
+  min-height: 56px;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 8px;
+  gap: 6px;
+  font-size: 16px;
+  white-space: normal;
+  text-align: center;
+}
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
+  padding: 8px 12px;
+}

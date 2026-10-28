@@ -16,6 +16,7 @@ import {
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
+import { FsRow } from '../print-scan/FsRow'
 import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -375,14 +376,10 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           </div>
         </div>
         {isNoFile ? null : (
-          <button type="button" className="fs-row" onClick={() => leaveScanFlow('/')}>
-            <span><b>返回首页</b><small>结束这次等待</small></span>
-          </button>
+          <FsRow title="返回首页" desc="结束这次等待" onClick={() => leaveScanFlow('/')} />
         )}
         {rescanAuthorized ? (
-          <button type="button" className="fs-row" onClick={handlePlainRestart}>
-            <span><b>重新开始一次扫描</b><small>回选类型，不带安全重扫凭据</small></span>
-          </button>
+          <FsRow title="重新开始一次扫描" desc="回选类型，不带安全重扫凭据" onClick={handlePlainRestart} />
         ) : null}
       </ScanWorkbenchShell>
     )

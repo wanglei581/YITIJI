@@ -391,3 +391,10 @@
 [data-qx-page='sign'] .fs-idhead .vis .sx-art {
   height: 132px;
 }
+
+/* 两个整行按钮并排（冲突屏的「换一个新标识」与「恢复上一次的顺序」）。 */
+[data-qx-page='img2pdf'] .fs-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}

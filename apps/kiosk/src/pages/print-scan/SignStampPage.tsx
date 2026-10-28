@@ -3,6 +3,7 @@
 // signInspect / signCompose，本文件只换外壳并补状态覆盖。
 
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { FsRow } from './FsRow'
 import { TouchToolScreen } from './TouchToolScreen'
 import { toolBandStatus } from './toolBand'
 import { signCompose, signInspect } from '../../services/api/printSign'
@@ -195,9 +196,7 @@ export function SignStampPage() {
           </p>
         ) : null}
         {flow.viewState === 'completed' || flow.viewState === 'recovered-completed' || flow.viewState.startsWith('output-preview') || flow.viewState === 'output-expired' || flow.viewState === 'output-preview-failed' ? (
-          <button type="button" className="fs-row" data-testid="sign-stamp-add-another" onClick={flow.addAnother}>
-            <span><b>再加一处本人手写签名</b><small>在同一份 PDF 上继续放一处</small></span>
-          </button>
+          <FsRow title="再加一处本人手写签名" desc="在同一份 PDF 上继续放一处" testId="sign-stamp-add-another" onClick={flow.addAnother} />
         ) : null}
 
         <div className="ss-truth" data-testid="sign-stamp-truth">
