@@ -13,7 +13,7 @@ test.describe('工作台（mock 口径）', () => {
 
     await expect(page.getByRole('region', { name: '今天要处理' })).toBeVisible()
     await expect(page.getByText('待确认交付')).toHaveCount(0)
-    await expect(page.getByText('暂不能按本机构终端统计')).toBeVisible()
+    await expect(page.getByText('演示模式不显示 AI 服务情况')).toBeVisible()
     await expect(page.getByRole('heading', { name: '近 7 天终端运营（截至昨天）' })).toBeVisible()
     await expect(page.getByText(/近 7 天服务次数/)).toBeVisible()
     await expect(page.getByText('样本不足')).toBeVisible()
