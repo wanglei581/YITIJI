@@ -1,9 +1,19 @@
 # 当前开发进度
 
+## 2026-10-29：触屏版第 6 包隐私加固——「还是你吗？」弹出了没回答就一直待确认，交接页补上稿上的问小青（分支 claude/kiosk-touch-p6，PR #1505）
+
+- 取证（10/28）：交接确认只按「进页之前空了多久」判，弹出了没回答不记。临时给交接页加问小青后，下一位点问小青进顾问页、再点底导航「我的」，直接进了上一位的「我的」（屏上有打码手机号，发出 7 条带上一位令牌的 /me 请求）。10/29 复查发现**不用加任何出口，浏览器后退这条今天就漏**：弹出后后退到首页，隔几秒点底导航「我的」，旧判据只看到「进页前空了几秒」，不再问。
+- 做法：`kioskPresence` 加会话内「待确认」标记（只在内存，不写 localStorage / sessionStorage / cookie / URL；整页重载本来就丢登录，标记随之没有）。`KioskHandoverGate` 在确认层出现的同一次提交里记下它，`needsHandoverConfirm()` 先看它再看空闲时长：待确认期间不管从底导航、后退、顾问页回来还是站内直达 /profile、/me/*，都先回到确认层，资产页不挂载，一条 /me 请求都不发。解除只有三条：答「是我，继续」、新的一位登录成功（同走 `markKioskPresenceConfirmed`）、清场退出登录（`AuthContext.logout` 里 `clearHandoverPending`）。
+- 证明成立之后才照稿加问小青：交接页底栏一颗「问小青：这一页是什么意思？」（draft「这一页是什么意思？」，只填进顾问页输入框、不替人发送），仍没有返回和底导航。
+- 用例与门禁（只把真值换成稿的样子，强度不降）：kiosk-end-use 原来断言「没有问小青、没有底栏、屏上只有两个按钮」，改成「底栏只有问小青、屏上三个按钮、无返回无底导航」；新增 7 条浏览器用例（后退、顾问页、站内直达五个 /me 地址、从交接页点问小青再回来、答「是我」解除、答「不是我」清场后下一位不被拦、标记不进存储且重载后零 /me 请求）和 3 条单测，`verify-kiosk-end-use` 加 5 项断言。每条都做了反向检查（先提交、故意改坏、确认红在目标那一行、改回，不用 git stash），共十处（去掉标记判断、弹出不记标记、答「是我」不解除、logout 不解除、登录误标待确认、标记写进 sessionStorage、去掉问小青、改 draft、改 label），红行原文在 `~/.cache/claude-lanes/touch-impl-1025/grok/out-p6-sticky.md`。
+- 验证：privacy-clear 配置 18 条（原 11 + 新 7）全过，单测 9、`verify:kiosk-end-use` 与图谱列出的另外 6 个关联门禁全过，kiosk tsc 0 错，eslint 改动文件 0 错。
+- 顺带发现、没改：① 非触屏首页的 `ContinuePanel` 对已登录者拿上一位的令牌读 `/me/print-orders`、`/me/resumes`，有进行中打印或未优化简历时首页就写出文件名（在「我的」闸之外，属首页一包）；② 顾问页发问和「保存会话摘要」用当前登录人的令牌，下一位提问会记到上一位名下（首页问小青同样如此，不是本次引入）。
+- 还没做（本节随后补）：AI 服务记录暂停态两屏最长空白 126 / 127px 收到 ≤105；privacy-timeout、session-warning、w5 整套重跑。
+
 ## 2026-10-28：触屏版第 6 包「我的与权益」改程序（分支 claude/kiosk-touch-p6，未推送）
 
 - 范围：/profile、消息、简历、打印订单、文档、AI 服务记录、足迹、收藏、权益、权益活动与详情、反馈、账号设置、隐私请求，加「还是你吗？」交接屏和换绑页，按「青序流光 · 触屏版」第 5 版改正文（不是只换外框）。共用页壳与版式件在 `apps/kiosk/src/pages/profile/touch/`（MeTouchShell、MeKit、MeStatePacks、MeIllus、meGatePage、me-*.css），样式全部挂在 `[data-qx-page="me"]` 下，不改 `.qxt-*` 共享类默认。
-- 两处隐私出口收紧：「还是你吗？」只留「是我，继续 / 不是我，结束上一位的使用」两个出口，没有返回、底导航、问小青和底栏（稿上这一屏的底导航与问小青这次不照搬，原因是点底导航会绕开确认，再进「我的」就直接看到上一位的资料）；Esc 等于「不是我」，焦点落在「不是我」，对话框语义用 alertdialog。换绑页没有底导航与底栏问小青，底栏三颗（返回账号设置、取消换绑、主按钮）和表单里的问小青都先问「取消这次换绑？」，提交中和完成后返回键置灰。
+- 两处隐私出口收紧：「还是你吗？」只有「是我，继续 / 不是我，结束上一位的使用」两张答案卡，没有返回和底导航（10/29 起底栏照稿补上一颗「问小青：这一页是什么意思？」，绕开确认的洞由「待确认」粘性标记堵住，见下面 10/29 一节；稿上这一屏的底导航仍没加）；Esc 等于「不是我」，焦点落在「不是我」，对话框语义用 alertdialog。换绑页没有底导航与底栏问小青，底栏三颗（返回账号设置、取消换绑、主按钮）和表单里的问小青都先问「取消这次换绑？」，提交中和完成后返回键置灰。
 - 求职进度与保存期限：`/api/v1/public/support-contact` 新增的 `selfNoteTab` 只有 `=== true` 才开；开着时「我的足迹」多第三个页签，关着（缺字段、非布尔、读不到）页签不出现，`?tab=applications` 落回浏览记录，也不发 `/me/job-applications`。我的文档里「打印文档 + 普通 + 系统短期」那一类的芯片写「短期保存，约 24 小时」（取 `FILE_DEFAULT_TTL_HOURS.normal`），其余不变。
 - 删除记录（CLAUDE.md §8）：本包没有删除任何文件；`QxMeChrome.tsx`、`QxMeStateBits.tsx` 里不再被引用的导出已删：QxMeBanner、QxMeSummary、QxMeGuide、QX_ME_GUIDE、QxMeCta、QxMeSkeletonList、QxMeStructRow、QxMeStartRow、QxMePendingRow、QxMeGuestRows。证据：全仓无 import（typecheck 通过）、kiosk 全部 verify 与用例无依赖、无文档声明，Git 提交保留。
 - 共享件只加可选 props：`QxTouchBand`（titleId、backDisabled）、`QxTouchDock`（primaryNode、backDisabled），`useSupportContact(enabled = true)`；默认行为不变。
