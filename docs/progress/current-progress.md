@@ -17,7 +17,10 @@
   - `touch/source.css` 的裸色值改用 `--qxt-chip-ghost` 令牌（`verify:resume-diagnosis-flow-ui` 新增「触屏版样式不写裸色值」断言）。
   - 删除孤儿件 `components/ResumeSourceSummary.tsx`（旧来源页的办理摘要条，被新来源页取代）。CLAUDE.md §8 五条证据：无路由、全仓无 import、无 verify / 测试依赖、无现行文档声明、不在生产部署或硬件链路；项目图谱孤儿清单也曾把它列为「全仓零提及」。
   - `verify-kiosk-ai-declaration` 的 `NOTE_FILES` 判据从「文件里出现 `AiDeclarationNote` 这个标识符」收紧成「有 `<AiDeclarationNote />` 的 JSX 用法」。
+  - 复核重截时顺带补的两处：读简历页「没有文件」「等授权」两态原先只有一句话、下面空 1100 多像素，改成与等待态同一版式（`ResumeReadingView` 加 `paused` 态，不转圈、不说「在进行」）；授权弹层 `ResumeAiConsentDialog` 是旧弹层（正文 14px、按钮 56px），加可选 `variant="touch"`（触屏弹层，正文 28px、按钮高 88）给读简历页与优化页用，生成页等其它调用方不传、不变。
+  - 并入第一包共享层后 390 宽的状态胶囊字号收到 14px，服务台 15 个字的整句会把最后一个字甩到第二行（W3 顶栏用例转红），简历各页的窄屏收紧规则改为常规断行 + 两行等长（`text-wrap: balance`），1080 不受影响。
   - 新增浏览器用例与断言见各提交；每条改过的门禁都做了反向检查（先提交、再故意改坏、确认变红、还原）。
+  - 返工后的验证（本机，私有端口，未部署、未真机）：kiosk `typecheck`、`lint`（0 error）、CI 同款环境的 `pnpm build` 与 `verify:prod-build-config` 全过；CI 清单里 101 条 kiosk 静态门禁、`verify:kiosk-font-subset`、`verify:compliance-copy`、`verify:qingxu-proto-geometry`（52 页 723 个变体）、shell-chrome-contract、kiosk 的 node 契约测试（308 过）、项目图谱 `--check` 全过；浏览器 W3 套件 93 项、W6 114 项、W2 里 `print-handoff` + `fusion-w2-scan` 34 项、默认配置里 `resume-optimize-draft` + `service-hub-qx` + `kiosk-visible-actions-truth` + 冒烟 + 路由扫描 150 项均过；偶发红与端口差异：`route-sweep` 的 `/campus`（单跑 3 次 2 过 1 红，非简历页）、`fusion-w2-scan` 的 `qingxu scan workbench captures 1080x1920 evidence`（扫描台投递授权数偶发 2≠3，改动前后各 6 次实测都是多数次红，非本包引入）、W1 里 3 条写死端口 4178 的 fixture 用例。重截的 54 张页面截图经空白扫描与间隙扫描均不超 105px。
 - **取舍与未做**：稿 `upload` 一屏并入 `resume-src` 的手机面板（运行页是同一块面板）；诊断方向一步不再画文件卡与预览（稿没有，预览留在「在哪里」一步）；总览第三颗批量沿用运行页「逐条确认或自己写」（「清空选择」在对照页）；总览与对照页不再有 `qx-opt-*` 的字数行与滚动提示；`source.css` 544 行、`ResumeParsePage` 722 行（比改前的 804 行少），不继续往里堆。
 ## 2026-10-27（晚）：管理员看得到全部机构的未结报障、月报与出纸未确认（含后端只读接口，产品负责人已同意，#1500 新一轮三项全绿后自动合并，未部署）
 
