@@ -3,6 +3,7 @@ import { KIcon } from '../../components/kiosk-icon'
 import { transcribeAssistantVoice } from '../../services/api'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { advisorErrorMessage, advisorUserReason } from './advisorUserCopy'
+import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
 import { getVoiceCapability } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import {
@@ -21,6 +22,23 @@ type HoldState = 'idle' | 'recording' | 'transcribing'
 function asrReason(configured: boolean | null): string | null {
   if (configured === false) return '语音转文字暂不可用，请使用文字输入。'
   return null
+}
+
+/**
+ * 「按住说话」旁边常显的麦克风原因。通用表 MIC_REASON 在面试页也用，这里不改它，只在本页换两句：
+ * · 权限没开：通用句让人去找现场的人，现场没有人；这里只说语音暂时用不了、文字照常，
+ *   求助交给调用方传进来的服务电话句（后台读不到号码就是 null，什么都不加）。
+ * · 没有麦克风：通用句叫人点一颗「重新检测麦克风」，本页没有这颗按钮（插上麦克风会自动重测）。
+ * 其余状态沿用通用句，仍过一遍 advisorUserReason 的工程词过滤。
+ */
+function micReason(mic: MicCapabilityState, helpLine: string | null): string | null {
+  if (mic === 'available') return null
+  if (mic === 'permission-denied') {
+    const base = '麦克风没有打开，语音暂时用不了，可以直接用文字提问。'
+    return helpLine ? `${base}${helpLine}` : base
+  }
+  if (mic === 'no-device') return '本机没有麦克风，语音暂时用不了，可以直接用文字提问。'
+  return advisorUserReason(MIC_REASON[mic], '麦克风暂不可用，请使用文字输入。')
 }
 
 function errorCodeOf(error: unknown): string {
@@ -45,6 +63,7 @@ export function AssistantHoldToTalk({
   onTranscript,
 }: AssistantHoldToTalkProps) {
   const [mic, setMic] = useState<MicCapabilityState | null>(null)
+  const helpLine = useVisibleHelpLine()
   const [asrConfigured, setAsrConfigured] = useState<boolean | null>(null)
   const [holdState, setHoldState] = useState<HoldState>('idle')
   const [seconds, setSeconds] = useState(0)
@@ -129,7 +148,7 @@ export function AssistantHoldToTalk({
     : asrConfigured === null || mic === null
       ? '正在检查语音输入是否可用…'
       : asrReason(asrConfigured)
-        ?? (mic !== 'available' ? advisorUserReason(MIC_REASON[mic], '麦克风暂不可用，请使用文字输入。') : null)
+        ?? micReason(mic, helpLine)
 
   const blocked = Boolean(blockedReason) || mic === null || asrConfigured !== true
   const pressed = holdState === 'recording'

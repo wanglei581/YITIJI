@@ -1863,6 +1863,19 @@ assert.match(
 for (const leak of [/controlToken/, /scanTaskId/, /identityToken/, /status\.(?:message|detail)/]) {
   assert.doesNotMatch(clearingOverlay, leak, `清场遮罩里不许出现 ${leak} —— 旁边站着的人看的是同一块屏`)
 }
+// F5b. 现场没有人可叫（2026-10-28 触屏版第 5 包）：遮罩里不许再出现「叫 / 找 / 联系工作人员」。
+//      需要帮助只给服务电话——走标准句 helpNeededLine，号码从后台读（useSupportContact），读不到就不写这一行。
+assert.doesNotMatch(clearingOverlay, /工作人员/, '清场遮罩里不许让人去找现场工作人员：现场没有人，求助只给服务电话')
+assert.match(
+  clearingOverlay,
+  /contact\.servicePhone \? helpNeededLine\(contact\) : null/,
+  '清场遮罩的求助句必须走标准句 helpNeededLine，且读不到服务电话号码就不写',
+)
+assert.match(
+  clearingOverlay,
+  /\{helpLine \? <p className="qx-clearing-note" data-testid="session-guard-cleanup-help">\{helpLine\}<\/p> : null\}/,
+  '清场遮罩的求助句只在有号码时才画出来',
+)
 assert.match(
   scanCleanupGate,
   /export type ScanCleanupOutcome = 'none' \| 'unreachable' \| 'server-error' \| 'rejected'/,

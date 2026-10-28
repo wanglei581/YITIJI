@@ -129,7 +129,11 @@ const frozen = {
   // 2026-10-06 重新冻结：live 后若一直没有远端音量也没有字幕，12 秒提示、30 秒结束会话并转文字。
   // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
   // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
-  'src/hooks/useAiAdvisorCallSession.ts': '9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4',
+  // 2026-10-28 重新冻结（触屏版第 5 包）：机器没有终端编号时的错误句，从「请联系现场工作人员」
+  // 换成无人值守标准句 machineUnusableLine()（现场没有人可联系）。只多一行 import、一行调用、一行注释，
+  // 通话逻辑零改动；下面「无人值守」那组断言钉死这个文件里不得再出现「工作人员」。冻结仍是逐字节校验，没有删断言。
+  // 旧哈希 9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4。
+  'src/hooks/useAiAdvisorCallSession.ts': '59c5d239bb209a5906111fd15e05abb3e49bd2a6c5c1402044f6b378a5607f25',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
@@ -376,6 +380,21 @@ for (const file of [
   check(!read(file).includes('工作人员'), `${file} does not ask for on-site staff`)
   check(!read(file).includes('服务台'), `${file} does not mention a service desk`)
 }
+// 2026-10-28 触屏版第 5 包：问小青页的「按住说话」与语音通话的错误句都不得叫人去找现场的人（现场没有人）。
+// 求助只给服务电话（标准句，读不到号码就不写）；机器没有终端编号时用标准句 3。清场遮罩那一条在 verify-scan-session-truth。
+for (const file of [
+  'src/pages/assistant/AssistantHoldToTalk.tsx',
+  'src/pages/assistant/AssistantCallPanel.tsx',
+  'src/hooks/useAiAdvisorCallSession.ts',
+]) {
+  check(!read(file).includes('工作人员'), `${file} does not ask for on-site staff`)
+}
+includes('src/hooks/useAiAdvisorCallSession.ts', 'setErrMsg(machineUnusableLine())', 'call without a terminal id uses the unattended standard line')
+includes('src/pages/assistant/AssistantHoldToTalk.tsx', 'micReason(mic, helpLine)', 'hold-to-talk mic reason goes through the page copy with the visible help line')
+check(
+  /if \(mic === 'permission-denied'\) \{[\s\S]{0,160}?helpLine \? `\$\{base\}\$\{helpLine\}` : base/.test(read('src/pages/assistant/AssistantHoldToTalk.tsx')),
+  'permission-denied reason adds only the service-phone line, and only when the number is readable',
+)
 check(!existsSync(join(ROOT, 'src/pages/resume/ResumeExportPage.tsx')), 'AI-07 ResumeExportPage is deleted')
 includes('src/routes/index.tsx', 'path: \'resume/export\'', 'AI-07 keeps /resume/export as a compatibility route')
 includes('src/routes/index.tsx', '<Navigate to="/resume/optimize" replace />', 'AI-07 /resume/export redirects to real optimize export')
