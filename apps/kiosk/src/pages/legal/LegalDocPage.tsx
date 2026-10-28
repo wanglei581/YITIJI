@@ -298,7 +298,7 @@ export function LegalDocPage() {
       <>
         <DocTabs docs={DOC_LIST} active={meta.key} onSwitch={switchDoc} />
         <Card className="legal-doc-slot">
-          <K>正在读取</K>
+          <K as="h2">正在读取</K>
           <div className="legal-doc-sk" aria-hidden="true">
             <i /><i style={{ width: '72%' }} /><i /><i style={{ width: '48%' }} />
           </div>

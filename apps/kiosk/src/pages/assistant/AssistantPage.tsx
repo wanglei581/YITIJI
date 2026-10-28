@@ -6,7 +6,7 @@ import { AI_LABEL_COPY } from '@ai-job-print/shared'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { Hit } from '../public-touch/PublicBlocks'
+import { Hit, K } from '../public-touch/PublicBlocks'
 import { IllusChecklist, IllusReport, IllusResume } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
 import { useVisibleHelpLine } from '../public-touch/publicTouchHooks'
@@ -610,7 +610,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                     <div className="qxp-artbox" aria-hidden="true"><IllusResume w={200} annot /></div>
                   </div>
                   <div className="qxp-card assistant-wait-card">
-                    <p className="qxp-k">不由 AI 决定</p>
+                    <K as="h3">不由 AI 决定</K>
                     <p className="qxp-note">身份、付款、打印、政策资格和录用结果都不由这一轮回答决定。</p>
                     <div className="qxp-artbox" aria-hidden="true"><IllusChecklist w={200} /></div>
                   </div>
@@ -632,7 +632,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 <div className="qxp-card assistant-reply-card">
                   {transcript}
                   <div className="assistant-bounds">
-                    <p className="qxp-k">这一轮不替你决定</p>
+                    <K as="h3">这一轮不替你决定</K>
                     <ul>
                       <li>身份</li><li>付款</li><li>打印是否出纸</li><li>政策资格</li><li>录用结果</li>
                     </ul>

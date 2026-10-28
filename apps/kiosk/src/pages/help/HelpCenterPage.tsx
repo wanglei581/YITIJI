@@ -162,7 +162,8 @@ function QaRow({ item, answerId }: { item: QA; answerId: string }) {
   return (
     <div className="qxp-card hp-qa" role="group" aria-labelledby={`${answerId}-q`}>
       <p className="qxp-k" aria-hidden="true">问</p>
-      <p className="qxp-note" id={`${answerId}-q`}><b>{item.q}</b></p>
+      {/* 问题是这一张卡的标题：h2，样子仍是 .qxp-note 加粗。 */}
+      <h2 className="qxp-note" id={`${answerId}-q`}><b>{item.q}</b></h2>
       <p className="qxp-note" id={answerId}>{item.a}</p>
     </div>
   )
@@ -302,7 +303,7 @@ export function HelpCenterPage() {
               </div>
               <Hit title="隐私、设备与备案" sub="隐私与留存、看设备状态、备案号" onClick={() => setMoreOpen(true)} />
               <Well className="hp-well">
-                <K>卡住了，先自己试这三步</K>
+                <K as="h2">卡住了，先自己试这三步</K>
                 <ol className="hp-ol">
                   {SELF_HELP_STEPS.map((step) => (
                     <li key={step.title}><b>{step.title}。</b>{step.body}</li>
@@ -323,7 +324,7 @@ export function HelpCenterPage() {
               </div>
               {topicLinks.length > 0 ? (
                 <>
-                  <K>直接去办</K>
+                  <K as="h2">直接去办</K>
                   <div className="qxp-row">
                     {topicLinks.map((link) => (
                       <Hit key={link.route} title={link.label} sub="打开" onClick={() => handleNavigate(link.route)} />

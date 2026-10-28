@@ -83,6 +83,8 @@
 
 /* 间隔句挂在这里给读屏和门禁核对，可见性交给子元素。不用 1px 负边距，避免越出视口。 */
 .qxt-screen .qxp-sr { visibility: hidden; font-size: 0; line-height: 0; margin: 0; padding: 0; }
+/* 只给读屏的页内标题（SrHeading）：稿上没有这行字，但这一组内容该有个标题。不占版面，也不用 1px 负边距。 */
+.qxt-screen .qxp-sr-h { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* 插画：颜色取自令牌。灰色由墨色按比例混进卡色得到，不用裸色值。 */
 .qxt-screen .qxp-illus {

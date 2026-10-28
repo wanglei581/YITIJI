@@ -22,7 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
 import { IllusMachine } from '../public-touch/PublicIllus'
-import { ArtBox, Card } from '../public-touch/PublicBlocks'
+import { ArtBox, Card, SrHeading } from '../public-touch/PublicBlocks'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
@@ -368,7 +368,9 @@ export default function ErrorOfflinePage() {
               {view === 'offline' ? `已重试 ${attempts} 次，${nextAuto}` : nextAuto}
               <span className="hint">{view === 'checking' ? '等这次结果' : lastCheck || '等下一次检测'}</span>
             </p>
-            <ul className="of-list" data-testid="system-state-list" aria-label="这台机器的八项状态">
+            {/* 稿上八行直接排在意图带下面，没有标题字；这一组状态给读屏一个 h2（不占版面）。 */}
+            <SrHeading id="of-list-title">这台机器的八项状态</SrHeading>
+            <ul className="of-list" data-testid="system-state-list" aria-labelledby="of-list-title">
               {CAPS.map((cap, index) => (
                 <li key={cap.key} className="qxp-hit of-row" data-cap={cap.key}>
                   <span className="qxp-ic" data-tone={cap.tone} aria-hidden="true"><Glyph name={cap.glyph} size={30} /></span>

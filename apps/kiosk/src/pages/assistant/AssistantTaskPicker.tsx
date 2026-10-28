@@ -62,8 +62,8 @@ export function AssistantTaskPicker({
       <section className="assistant-task-picker" data-mode="scene" aria-label="专项咨询">
         <QxTouchCallout kind="howto" icon="sparkle">{scene.welcome}</QxTouchCallout>
         <div className="qxp-pair assistant-scene-pair">
-          <Card k="可以说"><Note>{scene.placeholder}</Note><ArtBox><IllusChecklist w={200} /></ArtBox></Card>
-          <Card k="结果怎么用"><Note>{scene.disclaimer}</Note><ArtBox><IllusReport w={200} /></ArtBox></Card>
+          <Card k="可以说" kAs="h2"><Note>{scene.placeholder}</Note><ArtBox><IllusChecklist w={200} /></ArtBox></Card>
+          <Card k="结果怎么用" kAs="h2"><Note>{scene.disclaimer}</Note><ArtBox><IllusReport w={200} /></ArtBox></Card>
         </div>
         <div className="assistant-task-actions" data-cols="3">
           <button type="button" className="assistant-complaint" onClick={onClear}>

@@ -437,4 +437,30 @@ const errorOfflineSrc = read('src/pages/placeholders/ErrorOfflinePage.tsx')
 assert.match(errorOfflineSrc, /key: 'jobs'[^\n]*name: '机构官方渠道'/, 'system state item 8 is 机构官方渠道 (hosting a)')
 assert.doesNotMatch(errorOfflineSrc, /name: '岗位与招聘会信息'|AI、岗位信息没有/, 'system state no longer lists recruitment info')
 
+/* 触屏版第 5 包（2026-10-28）：稿上的小标题、问答标题在读屏里仍是标题层级，不是 <p> / <b>。
+ * 画面由 .qxp-k / .qxp-note 类名保持（1080 宽改前改后逐像素比对一致），所以这里只钉标签。
+ * 对照旧版页内标题数：帮助 7、机器状态 6、登录 2、协议 5、闲置提醒 4，改版曾把它们都压成了 0 或 1。 */
+const publicBlocksSrc = read('src/pages/public-touch/PublicBlocks.tsx')
+assert.match(publicBlocksSrc, /export function K\(\{ children, as: Tag = 'p', id \}/, 'K：小标题标签可选，默认仍是 p，老调用不变')
+assert.match(publicBlocksSrc, /export function SrHeading\(/, 'SrHeading：稿上没有字的那一组内容，给读屏一个标题')
+const helpSrc = read('src/pages/help/HelpCenterPage.tsx')
+assert.match(helpSrc, /<h2 className="qxp-note" id=\{`\$\{answerId\}-q`\}><b>\{item\.q\}<\/b><\/h2>/, '帮助页：每条问答的问题是 h2')
+assert.match(helpSrc, /<K as="h2">卡住了，先自己试这三步<\/K>/, '帮助页：自助三步的小标题是 h2')
+assert.match(helpSrc, /<K as="h2">直接去办<\/K>/, '帮助页：直接去办的小标题是 h2')
+assert.match(
+  errorOfflineSrc,
+  /<SrHeading id="of-list-title">这台机器的八项状态<\/SrHeading>\s*<ul className="of-list"[^>]*aria-labelledby="of-list-title"/,
+  '机器状态页：八项状态清单有 h2 标题，清单用它命名',
+)
+const loginSrc = read('src/pages/auth/LoginPage.tsx')
+assert.ok((loginSrc.match(/<K as="h3">/g) ?? []).length >= 4, '登录页：四张「记在哪」卡的标题是 h3')
+assert.match(loginSrc, /<h2 className="t">不登录也能办<\/h2>/, '登录页：「不登录也能办」是 h2')
+assert.match(loginSrc, /<SrHeading id="lg-facts-title">登录之后记在哪<\/SrHeading>/, '登录页：四张卡这一组有 h2 标题')
+const legalViewsSrc = read('src/pages/legal/LegalDocViews.tsx')
+assert.match(legalViewsSrc, /<h2 className="legal-doc-toc-title">章节目录<\/h2>/, '协议页：章节目录有 h2 标题')
+assert.match(legalViewsSrc, /<h3>\{section\.title\}<\/h3>/, '协议页：章节标题仍是 h3（用例按 .legal-doc-body h3 取）')
+const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
+assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
+assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
+
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

@@ -60,11 +60,14 @@ export function Hit({
   )
 }
 
-/** 一张块：可选青色小标题。 */
-export function Card({ k, children, className, testId }: { k?: ReactNode; children?: ReactNode; className?: string; testId?: string }) {
+/** 小标题用什么标签。默认 p（老调用不变）；真正的页内标题写 h2 / h3，类名和样子都不变，只多给读屏一层标题。 */
+export type KTag = 'p' | 'h2' | 'h3'
+
+/** 一张块：可选青色小标题。kAs 不传时标题仍是 p。 */
+export function Card({ k, kAs, children, className, testId }: { k?: ReactNode; kAs?: KTag; children?: ReactNode; className?: string; testId?: string }) {
   return (
     <div className={['qxp-card', className].filter(Boolean).join(' ')} data-testid={testId}>
-      {k ? <p className="qxp-k">{k}</p> : null}
+      {k ? <K as={kAs}>{k}</K> : null}
       {children}
     </div>
   )
@@ -80,9 +83,14 @@ export function Note({ children, className, id }: { children: ReactNode; classNa
   return <p id={id} className={['qxp-note', className].filter(Boolean).join(' ')}>{children}</p>
 }
 
-/** 青色小标题（稿 fp-k）。 */
-export function K({ children }: { children: ReactNode }) {
-  return <p className="qxp-k">{children}</p>
+/** 青色小标题（稿 fp-k）。as 不传时是 p；是页内标题的写 h2 / h3（preflight 已清掉标题默认样式，样子不变）。 */
+export function K({ children, as: Tag = 'p', id }: { children: ReactNode; as?: KTag; id?: string }) {
+  return <Tag id={id} className="qxp-k">{children}</Tag>
+}
+
+/** 只给读屏的页内标题：稿上没有这行字，但页里这一组内容该有一个标题。不占版面，不用 1px 负边距。 */
+export function SrHeading({ as: Tag = 'h2', id, children }: { as?: 'h2' | 'h3'; id?: string; children: ReactNode }) {
+  return <Tag id={id} className="qxp-sr-h">{children}</Tag>
 }
 
 /** 插画槽：把一张插画放进卡里，吸收卡里剩下的高度。 */

@@ -77,7 +77,8 @@ export function LegalReader({ sections, active, onSelect, fontPercent, bodyRef }
   return (
     <div className="legal-doc-reader">
       <aside className="legal-doc-toc" aria-label="章节目录" data-testid="legal-list">
-        <p className="legal-doc-toc-title" aria-hidden="true">章节目录</p>
+        {/* 稿上目录没有标题字，样式把它收起来；给读屏留一个 h2，章节标题仍是下面的 h3。 */}
+        <h2 className="legal-doc-toc-title">章节目录</h2>
         {sections.map((item, index) => (
           <button key={`${index}-${item.title}`} type="button" aria-current={index === active ? 'true' : undefined}
                   data-testid={`legal-sec-${index}`} onClick={() => onSelect(index)}>

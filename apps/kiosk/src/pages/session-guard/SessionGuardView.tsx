@@ -83,7 +83,7 @@ export function SessionGuardView({
       <div className="qxp-pair qxp-pair-grow cg-clears">
         {clears.map((card) => (
           <Card key={card.title} className="cg-clear">
-            <K>{card.title}</K>
+            <K as="h3">{card.title}</K>
             <ul className="cg-list">
               {card.items.map((item) => <li key={item}>{item}</li>)}
             </ul>
@@ -96,7 +96,7 @@ export function SessionGuardView({
         <div className="qxp-col cg-asks">
           {SESSION_GUARD_ASKS.map((ask) => (
             <div key={ask.title} className="qxp-card cg-ask">
-              <b>{ask.title}</b>
+              <h3>{ask.title}</h3>
               <small>{ask.body}</small>
             </div>
           ))}

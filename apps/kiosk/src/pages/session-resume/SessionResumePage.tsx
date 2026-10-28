@@ -144,16 +144,16 @@ export function SessionResumePage() {
       {guest ? (
         <div className="qxp-grow" data-screen="session-resume" data-state="guest" data-testid="session-resume-state-guest">
           <Card>
-            <K>先登录，再看你的任务</K>
+            <K as="h2">先登录，再看你的任务</K>
             <Note>还没登录。登录之后才能看到你名下没办完的打印。登录成功会回到这一页，不重新建单。</Note>
           </Card>
-          <K>登录后在这一页能</K>
+          <K as="h2">登录后在这一页能</K>
           <div className="qxp-col">
             <Hit title="看没办完的打印" sub="只列还没办完的，已经完成的不在这里" />
             <Hit title="接着付款或取件" sub="回到这一单原来那一步。这一页不判定付成没有" />
             <Hit title="不能继续的会写原因" sub="按钮会停住，并写明原因，不写价钱" />
           </div>
-          <K>不登录也能办</K>
+          <K as="h2">不登录也能办</K>
           <div className="qxp-pair qxp-pair-grow">
             <PairCard title="打印与扫描" desc="上传文件或扫描原件，不用登录也能开始" art={<IllusStack w={200} n={3} />} onClick={() => navigate('/print-scan')} />
             <PairCard title="到机码" desc="手机上已经下过的单，凭码继续" art={<IllusPhone w={150} />} onClick={() => navigate('/print/pickup-claim')} />
