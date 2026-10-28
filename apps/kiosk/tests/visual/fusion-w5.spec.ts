@@ -1442,6 +1442,10 @@ test('documents: derived AI output skips the material check and goes straight to
     status: 200,
     json: { amountCents: 200, billablePages: 2, billingPageSource: 'detected', priceLines: [{ serviceKey: 'print_bw_page', description: '黑白打印', unitCents: 100, quantity: 2, amountCents: 200 }] },
   })
+  // 2026-10-28 稿 confirm：核对价格页的小样会取这一份文件自己的第一页（print-handoff.spec.ts 的 routeFileContent 同款）。
+  // 把内容接到一份可见 PDF，让请求有人应答；「未处理请求即失败」的夹具不放宽。
+  await page.route((url) => url.pathname === '/api/v1/files/doc-ai-report/content', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
 
   await loginThroughVisibleUi(page, '/me/documents')
   await expectQxAssetsShell(page, 'documents-ready', 'documents')
