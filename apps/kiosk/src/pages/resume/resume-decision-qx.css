@@ -13,28 +13,16 @@
  */
 
 /* ── 分组清单（行动清单三组 / 求职方案列内的条目）──────────────── */
-.rdq-groups { display: flex; flex-direction: column; gap: 14px; }
-.rdq-group {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 18px 20px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
-  background: var(--qx-surface); box-shadow: inset 4px 0 0 var(--qx-line-2);
-}
-.rdq-group[data-tone='urgent'] { box-shadow: inset 4px 0 0 var(--qx-cinnabar); }
-.rdq-group[data-tone='week'] { box-shadow: inset 4px 0 0 var(--qx-wheat-d); }
-.rdq-group[data-tone='print'] { box-shadow: inset 4px 0 0 var(--qx-teal); }
-.rdq-group-top { display: flex; align-items: center; gap: 12px; }
-.rdq-group-no {
-  flex: none; width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--qx-deep); color: var(--qx-paper);
-  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
-}
-.rdq-group-top > b { flex: 1; min-width: 0; font-size: 23px; font-weight: 700; }
-.rdq-group-chip {
-  flex: none; padding: 5px 12px; border-radius: var(--qx-r-s);
-  font-size: var(--qxt-fs-aux); font-weight: 700; background: var(--qx-muted-bg); color: var(--qx-muted-ink);
-}
-.rdq-group-desc { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
+
+
+
+
+
+
+
+
+
+
 
 .rdq-items { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .rdq-item { padding: 14px 16px; border-radius: var(--qx-r); background: var(--qx-paper); border: 1px solid var(--qx-line); }
@@ -46,10 +34,10 @@
   font-size: var(--qxt-fs-aux); font-weight: 700; background: var(--qx-teal-soft); color: var(--qx-teal-d);
 }
 
-.rdq-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.rdq-field { padding: 12px 14px; border-radius: var(--qx-r); border: 2px dashed var(--qx-line-2); }
-.rdq-field small { display: block; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
-.rdq-field span { display: block; margin-top: 4px; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qx-ink-2); }
+
+
+
+
 
 .rdq-checklist { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 8px; }
 .rdq-checklist li { font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink); }
@@ -159,9 +147,9 @@
   .rdq-tpl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  .rdq-fields, .rdq-tpl-grid, .rdq-split { grid-template-columns: minmax(0, 1fr); }
-  .rdq-group, .rdq-col { padding: 14px 16px; }
-  .rdq-group-top > b, .rdq-col-head h2 { font-size: 20px; }
+  .rdq-tpl-grid, .rdq-split { grid-template-columns: minmax(0, 1fr); }
+  .rdq-col { padding: 14px 16px; }
+  .rdq-col-head h2 { font-size: 20px; }
   .rdq-item > b, .rdq-direction h3, .rdq-tpl h3 { font-size: 18px; }
   .rdq-item > p, .rdq-direction p, .rdq-checklist li, .rdq-guide-list, .rdq-note { font-size: 16px; }
   .rdq-actions > .qx-btn { flex: 1 1 100%; }

@@ -107,14 +107,11 @@
 @media (prefers-reduced-motion: reduce) { .jfq-pulse i { animation: none; opacity: .7; } }
 
 /* ── 未返回占位：虚线框，不画骨架假内容 ──────────────────────── */
-.jfq-ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.jfq-ghost {
-  padding: 16px 18px; border: 2px dashed var(--qx-line-2); border-radius: var(--qx-r);
-  background: transparent;
-}
-.jfq-ghost b { font-size: 20px; font-weight: 700; }
-.jfq-ghost p { margin: 6px 0 10px; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-3); }
-.jfq-ghost span { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
+
+
+
+
+
 
 /* ── 当前判定条 ─────────────────────────────────────────────── */
 .jfq-verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -142,41 +139,27 @@
 .jfq-why b { font-size: 21px; font-weight: 700; }
 .jfq-why p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 
-.jfq-steps { display: flex; flex-direction: column; gap: 10px; }
-.jfq-step { display: flex; gap: 16px; align-items: flex-start; padding: 14px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
-.jfq-step-no {
-  flex: none; width: 44px; height: 44px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--qx-deep); color: var(--qx-paper);
-  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
-}
-.jfq-step b { font-size: 21px; font-weight: 700; }
-.jfq-step p { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
 
-.jfq-nots { display: flex; flex-direction: column; gap: 8px; }
-.jfq-not {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r);
-  background: var(--qx-paper); font-size: var(--qxt-fs-aux); color: var(--qx-ink-2);
-}
-.jfq-not svg { flex: none; color: var(--qx-cinnabar-d); }
 
-.jfq-list { display: flex; flex-direction: column; gap: 8px; }
-.jfq-list-row { display: flex; gap: 14px; align-items: flex-start; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
-.jfq-list-row i {
-  flex: none; width: 30px; height: 30px; border-radius: 50%; font-style: normal;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--qx-teal-soft); color: var(--qx-teal-d);
-  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
-}
+
+
+
+
+
+
+
+
+
+
+
 
 /* ── 当前停在哪一步 ─────────────────────────────────────────── */
-.jfq-trace { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.jfq-trace > div { padding: 16px 18px; border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-surface); }
-.jfq-trace > div[data-now='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
-.jfq-trace small { display: block; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
-.jfq-trace b { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; }
-.jfq-trace p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qx-ink-2); }
+
+
+
+
+
+
 .jfq-now-tag { display: inline-block; margin-top: 8px; font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qx-teal-d); }
 
 /* ── 紧凑披露条 ─────────────────────────────────────────────── */
@@ -249,50 +232,34 @@
 .jfq-summary-body { margin: 0; font-size: var(--qxt-fs-aux); line-height: 1.5; color: var(--qx-ink-2); }
 .jfq-summary-disclaimer { margin: 0; font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
 
-.jfq-ev-stack { display: flex; flex-direction: column; gap: 10px; }
-.jfq-ev-item { padding: 14px 18px; border: 1px solid var(--qx-teal-line); border-radius: var(--qx-r); background: var(--qx-teal-soft); }
-.jfq-ev-item p { margin: 0; font-size: 20px; font-weight: 700; }
-.jfq-ev-item span { display: block; margin-top: 6px; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
+
+
+
+
 /* 稿 46 的 evi 两栏：左「简历里已经写到的要求」，右「简历里还没体现的要求」。3.14 起不分档，两栏就是结果本身；
    它是结果屏的余量吸收块（Sec grow），两栏随之等高拉伸。 */
-.jfq-evi { flex: 1 1 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.jfq-evi-col {
-  display: flex; min-width: 0; flex-direction: column; gap: 12px; padding: 16px;
-  border: 1px solid var(--qx-line); border-radius: var(--qx-r); background: var(--qx-paper);
-}
-.jfq-evi-h { display: flex; align-items: center; gap: 10px; }
-.jfq-evi-h b { font-size: 21px; font-weight: 700; }
-.jfq-evi-ic {
-  display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: var(--qx-r);
-  color: var(--qx-teal-d); background: var(--qx-teal-soft);
-}
-.jfq-evi-col[data-tone='warn'] .jfq-evi-ic { color: var(--qx-wheat-d); background: var(--qx-wheat-soft); }
-.jfq-ev-item[data-tone='warn'] { border-color: var(--qx-line-2); background: var(--qx-wheat-soft); }
-.jfq-kw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.jfq-kw-label { font-size: var(--qxt-fs-aux); color: var(--qx-ink-3); }
-.jfq-kw { padding: 5px 12px; border-radius: var(--qx-r-s); font-size: var(--qxt-fs-aux); }
-.jfq-kw[data-tone='ok'] { background: var(--qx-teal-soft); color: var(--qx-teal-d); }
-.jfq-kw[data-tone='warn'] { background: var(--qx-wheat-soft); color: var(--qx-wheat-d); }
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* ── 下一步建议 ─────────────────────────────────────────────── */
-.jfq-next { display: flex; flex-direction: column; gap: 10px; }
-.jfq-next button {
-  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
-  min-height: var(--qx-tap-min); padding: 14px 18px;
-  border: 1px solid var(--qx-line); border-radius: var(--qx-r);
-  background: var(--qx-surface); color: inherit; font: inherit; cursor: pointer;
-}
-.jfq-next button:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
-.jfq-next-no {
-  flex: none; width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--qx-deep); color: var(--qx-paper);
-  font-family: var(--qx-mono); font-size: var(--qxt-fs-aux); font-weight: 700;
-}
-.jfq-next-t { flex: 1; min-width: 0; }
-.jfq-next-t b { display: block; font-size: 21px; font-weight: 700; }
-.jfq-next-t p { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.45; color: var(--qx-ink-2); }
-.jfq-next-go { flex: none; font-size: 22px; color: var(--qx-ink-3); }
+
+
+
+
+
+
+
+
 
 /* ── 页内提示 / 错误 ────────────────────────────────────────── */
 .jfq-notice { margin: 0; padding: 14px 18px; border-radius: var(--qx-r); font-size: var(--qxt-fs-aux); line-height: 1.45; background: var(--qx-slate-soft); color: var(--qx-slate-d); }
@@ -334,11 +301,10 @@
 
 /* ── 1080 竖屏与窄屏 ───────────────────────────────────────── */
 @media (max-width: 1080px) {
-  .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jfq-verdict, .jfq-routes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 390px) {
-  .jfq-slots, .jfq-choices, .jfq-ghosts, .jfq-verdict, .jfq-trace, .jfq-routes, .jfq-evi,
-  .jfq-modal-actions { grid-template-columns: minmax(0, 1fr); }
+  .jfq-slots, .jfq-choices, .jfq-verdict, .jfq-routes, .jfq-modal-actions { grid-template-columns: minmax(0, 1fr); }
   .jfq-modal { padding: 16px; }
 }
 

@@ -656,6 +656,12 @@
     height: auto;
     white-space: normal;
   }
+  /* 底栏的「问小青」同样收到 64 高、字 18：手机上屏高只有 844，药丸再占 88 会把滚动区压没。 */
+  .qxt-screen:has(.rtp) .rtp-cta > .qxt-askq {
+    height: var(--qxt-tap);
+    min-height: var(--qxt-tap);
+    font-size: 18px;
+  }
   .qxt-screen:has(.rtp) .qxt-dock .qx-step-prev,
   .qxt-screen:has(.rtp) .qxt-dock .qx-ai-help {
     min-height: var(--qxt-tap);
