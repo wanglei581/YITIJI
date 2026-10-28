@@ -1266,7 +1266,13 @@ jobs:
     # 下次它又开始撞线时：**先量一次再调，别直接加十分钟**。
     # 量法：gh api repos/<owner>/<repo>/actions/runs/<id>/jobs，
     # 用 started_at / completed_at 算时长；只看 conclusion=success 的那些定基线。
-    timeout-minutes: 70
+    #
+    # 2026-10-28 按上面的量法把 70 提到 90。main 上最近 8 次的本 job 时长（分钟）：
+    #   70.0 ← cancelled（撞上限，run 40563203054，路由巡检 67/110 时被停，前面步骤全过）
+    #   66  64  63  63  62  55  50  ← 全部 success；10/10 另有一次 68.5 success、一次撞 70
+    # 成功区间 50–68.5，上限 70，余量最少只剩 2%，两次撞线都挡住了发布。
+    # 90 让最差成功观测（68.5）留 31% 余量；真的挂死仍会被 90 分钟兜住。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 

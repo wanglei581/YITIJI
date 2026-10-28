@@ -12792,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 252,
+      "reachableFileCount": 253,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13563,11 +13563,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 278
+      "sourceFileCount": 279
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 677,
+      "reachableFileCount": 678,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13794,6 +13794,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -13821,6 +13822,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -13858,6 +13860,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14049,6 +14052,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14105,6 +14109,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14161,6 +14166,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14216,6 +14222,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14272,6 +14279,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14328,6 +14336,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14384,6 +14393,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14418,6 +14428,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14474,6 +14485,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14529,6 +14541,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14584,6 +14597,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16552,7 +16566,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 771
+      "sourceFileCount": 772
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19061,6 +19075,9 @@
     ],
     "apps/admin/src/routes/dashboard/index.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
+    ],
+    "apps/admin/src/routes/dashboard/printerStatusSummary.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
     ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
@@ -29005,6 +29022,7 @@
           "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
+          "apps/admin/src/routes/dashboard/printerStatusSummary.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/admin/src/routes/printers/index.tsx",

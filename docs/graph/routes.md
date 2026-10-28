@@ -49,9 +49,9 @@ flowchart LR
 | `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 1 | 1 |
 | `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 1 |
 | `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 38 | 10 |
-| `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 33 | 5 |
-| `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 5 | 6 |
-| `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 15 | 6 |
+| `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 33 | 6 |
+| `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 5 | 7 |
+| `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 15 | 7 |
 | `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 5 |
 | `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 15 | 15 |
 | `/interview/report` | Navigate | — _(重定向)_ | 0 | — |
@@ -59,17 +59,17 @@ flowchart LR
 | `/interview/session` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/setup` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/tips` | Navigate | — _(重定向)_ | 0 | — |
-| `/job-fairs` | JobFairsPage | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | 33 | 7 |
-| `/job-fairs/:id` | JobFairDetailPage | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | 33 | 7 |
-| `/job-fairs/:id/companies` | FairCompaniesPage | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | 33 | 7 |
-| `/job-fairs/:id/companies/:companyId` | FairCompanyDetailPage | `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx` | 33 | 6 |
-| `/job-fairs/:id/map` | FairMapPage | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | 33 | 7 |
-| `/job-fairs/:id/materials` | FairMaterialsPage | `apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx` | 33 | 7 |
-| `/job-fairs/:id/stats` | FairStatsPage | `apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx` | 33 | 7 |
-| `/job-fairs/:id/visit-plan` | FairVisitPlanPage | `apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx` | 11 | 7 |
-| `/job-fairs/checkin` | JobFairCheckinPage | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | 33 | 7 |
-| `/jobs` | JobsPage | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | 33 | 6 |
-| `/jobs/:id` | JobDetailPage | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | 33 | 6 |
+| `/job-fairs` | JobFairsPage | `apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx` | 33 | 8 |
+| `/job-fairs/:id` | JobFairDetailPage | `apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx` | 33 | 8 |
+| `/job-fairs/:id/companies` | FairCompaniesPage | `apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx` | 33 | 8 |
+| `/job-fairs/:id/companies/:companyId` | FairCompanyDetailPage | `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx` | 33 | 7 |
+| `/job-fairs/:id/map` | FairMapPage | `apps/kiosk/src/pages/job-fairs/FairMapPage.tsx` | 33 | 8 |
+| `/job-fairs/:id/materials` | FairMaterialsPage | `apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx` | 33 | 8 |
+| `/job-fairs/:id/stats` | FairStatsPage | `apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx` | 33 | 8 |
+| `/job-fairs/:id/visit-plan` | FairVisitPlanPage | `apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx` | 11 | 8 |
+| `/job-fairs/checkin` | JobFairCheckinPage | `apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx` | 33 | 8 |
+| `/jobs` | JobsPage | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | 33 | 7 |
+| `/jobs/:id` | JobDetailPage | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | 33 | 7 |
 | `/jobs/online-platforms` | Navigate | — _(重定向)_ | 0 | — |
 | `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 5 |
 | `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 10 | 5 |
