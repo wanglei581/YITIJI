@@ -446,3 +446,64 @@
   font-size: 22px;
   line-height: 1.45;
 }
+
+/* 手机宽度（舞台不缩放）：1080 舞台的字号、整行高度、三列网格在 390 宽上放不下，说明格互相叠在一起。
+ * 这一块把复印、证件照、照片合成、签名收成手机尺寸：行高按内容走、整页可滚，正文不小于 15px
+ * （一体机 20px / 64px 的底线只管 1080 舞台）。 */
+@media (max-width: 760px) {
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.ph-page, .i2p-page, .ss-page) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: auto;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.fs-ol, .fs-pair, .fs-lock, .fs-plist, .fs-facts) {
+    flex: none;
+    min-height: auto;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-facts { grid-auto-rows: auto; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: 34px 1fr;
+    gap: 2px 10px;
+    padding: 8px 10px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step .n { width: 34px; height: 34px; font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-step .d { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact { min-height: 0; padding: 8px 10px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact b { font-size: 16px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-fact span { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-h { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-lead { font-size: 18px; line-height: 1.4; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row { min-height: 56px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-row small { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act {
+    flex: none;
+    min-height: 0;
+    grid-template-columns: 84px minmax(0, 1fr) 40px;
+    gap: 10px;
+    padding: 10px;
+  }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act .vis { min-height: 84px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act h3 { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act p { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-act .go { width: 40px; height: 40px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead { grid-template-columns: 96px minmax(0, 1fr); gap: 10px; padding: 10px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead .vis { min-height: 70px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead .vis .sx-art { height: 60px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead h2 { font-size: 20px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-idhead p { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-plan .hd b { font-size: 17px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .fs-plan li { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch :is(.fs-warn, .fs-help, [data-testid='service-phone-line'], [data-testid='print-hub-copy-legal']) { font-size: 15px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .sx-chip { font-size: 14px; min-height: 28px; }
+  /* 底栏左键的字比扫描页长（「返回打印扫描」），限一下宽，别把主按钮挤成一条竖缝。 */
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn-sec { flex: 0 1 auto; max-width: 42%; white-space: normal; line-height: 1.15; font-size: 15px; }
+  /* 主按钮的字比共享件的 18px 再小一档：「下一步 · 建立这次扫描」这类长字在 64px 高的钮里折三行放得下。 */
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn-pri { font-size: 15px; padding: 0 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-truth { flex-direction: column; gap: 8px; }
+  [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-truth div { font-size: 14px; }
+}
