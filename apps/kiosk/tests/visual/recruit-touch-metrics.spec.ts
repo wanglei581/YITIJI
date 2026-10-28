@@ -6,7 +6,9 @@
 //   · 底导航三项（首页 / AI 顾问 / 我的）始终在，底栏里恰好一个问小青、文字逐屏照稿；
 //   · 底栏所有按钮同在一行、都在屏内，主按钮高 88，问小青不被挤得只剩话筒；
 //   · 屏上没有小于 20px 的字，没有小于 64×64 的可点区；
-//   · 现场无人值守：屏上不出现「联系 / 找（现场）工作人员」。
+//   · 现场无人值守：屏上不出现「联系 / 找（现场）工作人员」；
+//   · 版面不压扁、不互压（第二轮审查补）：上面几条只量字号与可点区，量不到「文字互相盖住」和「内容被压扁」，
+//     六个屏的内容叠成一团时探针一路绿灯。layoutProbe 两条指标：文字互压、块内内容被裁。
 //
 // 阳性对照写在断言里：先断言触屏壳恰好 1 个、标识条恰好 1 个，再断言「没有」类指标，
 // 探针没量到东西时不会因为空数组而通过。
@@ -15,13 +17,15 @@ import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { registerW6Api } from './fixtures/fusion-w6-api'
 import { registerFairApi, makeFair, FAIR_ID } from './fixtures/fair-workbench-api'
+import { manyCompanies, manyAgencies, agencyWithJobs, manyJobs, companyJobs, fairCompanies, fairCompanyWithPositions, manyFairs } from './fixtures/recruit-many-rows'
 
 const RIBBON = '私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传'
 const FORBIDDEN_STAFF = /联系现场|联系工作人员|找现场|找工作人员|交给.{0,2}工作人员|去服务台|工作人员核查/
 const boom = { status: 500, json: { success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } } }
 const notFound = { status: 404, json: { success: false, error: { code: 'NOT_FOUND', message: 'not found' } } }
 
-type Case = { name: string; url: string; ask: string; setup?: (api: ApiRouter) => void }
+/** rows：这个状态里重复出现的「行」（选择器与应有个数），多行状态要额外过一遍整页可滚、每行完整的检查。 */
+type Case = { name: string; url: string; ask: string; setup?: (api: ApiRouter) => void; rows?: { selector: string; count: number } }
 const w6 = (extra?: (api: ApiRouter) => void) => (api: ApiRouter) => { registerW6Api(api); extra?.(api) }
 const fair = (options: Parameters<typeof registerFairApi>[1] = {}) => (api: ApiRouter) => { registerW6Api(api); registerFairApi(api, options) }
 const F = (path: string) => `/job-fairs/${FAIR_ID}${path}`
@@ -60,6 +64,16 @@ const CASES: Case[] = [
   { name: '现场统计', url: F('/stats'), ask: '问小青：这些数怎么来', setup: fair({ stats: 'real' }) },
   { name: '到场指引', url: '/job-fairs/checkin', ask: '问小青：怎么签到', setup: fair({ fair: { status: 'ongoing' } }) },
   { name: '到场指引·没有入口', url: '/job-fairs/checkin', ask: '问小青：怎么签到', setup: fair({ list: 'empty' }) },
+  // 多行：列表一长，整页要能滚到底，每一行都完整、看得见名称（见 auditRows）。
+  { name: '企业列表·10 家', url: '/companies', ask: '问小青：怎么挑企业？', rows: { selector: 'article.dw-row', count: 10 }, setup: w6((api) => { const m = manyCompanies(10); api.respond('GET', '/api/v1/companies', m.list); api.respond('GET', '/api/v1/companies/stats', m.stats) }) },
+  { name: '线下机构列表·4 家', url: '/offline-agencies', ask: '问小青：到店要带什么？', rows: { selector: 'article.dw-row', count: 4 }, setup: w6((api) => api.respond('GET', '/api/v1/kiosk/offline-agencies', manyAgencies(4))) },
+  { name: '线下机构详情·6 个岗位', url: '/offline-agencies/agency-001', ask: '问小青：这家机构怎么去？', rows: { selector: '.dw-rlist > .dw-row', count: 6 }, setup: w6((api) => api.respond('GET', '/api/v1/kiosk/offline-agencies/agency-001', agencyWithJobs(6))) },
+  { name: '岗位列表·8 条（一页 6 行）', url: '/jobs', ask: '问小青：这些岗位怎么看？', rows: { selector: '.jf-row', count: 6 }, setup: w6((api) => api.respond('GET', '/api/v1/jobs', manyJobs(8))) },
+  { name: '企业详情·6 个在招岗位', url: '/companies/company-001', ask: '问小青：这家企业怎么看？', rows: { selector: '.dw-rlist > .dw-row', count: 6 }, setup: w6((api) => api.respond('GET', '/api/v1/companies/company-001/jobs', companyJobs(6))) },
+  { name: '校园招聘·3 场', url: '/campus', ask: '问小青：怎么挑一场', rows: { selector: '.rt-fair', count: 3 }, setup: w6((api) => api.respond('GET', '/api/v1/job-fairs', manyFairs(3))) },
+  { name: '招聘会列表·4 场', url: '/job-fairs', ask: '问小青', rows: { selector: '[data-testid^="fair-card-"]', count: 4 }, setup: (api) => { fair()(api); api.respond('GET', '/api/v1/job-fairs', manyFairs(4, 'general')) } },
+  { name: '参展企业·8 家', url: F('/companies'), ask: '问小青：这家企业', rows: { selector: '[data-testid="fair-companies-list"] > .dw-row', count: 8 }, setup: (api) => { fair()(api); api.respond('GET', `/api/v1/job-fairs/${FAIR_ID}/companies`, fairCompanies(8)) } },
+  { name: '参展企业详情·8 个现场岗位', url: F('/companies/fair-company-001'), ask: '问小青：这家企业', rows: { selector: '.jf-job-row', count: 8 }, setup: (api) => { fair()(api); api.respond('GET', `/api/v1/job-fairs/${FAIR_ID}/companies/fair-company-001`, fairCompanyWithPositions(8)) } },
 ]
 
 /** 在页面里量一遍。可点区按舞台缩放换算回 CSS px（舞台等比缩放时屏上量到的 px = CSS px × scale）。 */
@@ -113,6 +127,147 @@ async function measure(page: Page) {
   })
 }
 
+/**
+ * 版面两条指标（第二轮审查补）。字号与可点区之外，「文字互相盖住」「内容被压扁」是另一类问题：触屏壳顶上多了标识条、
+ * 底下多了底栏与导航，正文可用高度少了一截，旧页里「吸收余量」的块（min-height:0）被压到比内容还矮，
+ * 内容要么溢出去盖住别的块，要么被裁掉，而前面几条指标一路绿灯。
+ *   · overlaps（文字互压）：壳内所有可见文字的矩形，先按每个会裁剪的祖先（含自己，overflow 非 visible）裁到可见区，
+ *     再两两比较；互不为祖孙的两个元素，矩形相交面积超过较小者的 25% 记一条。
+ *   · squashed（压扁）：overflow 非 visible 的块里，真实内容（文字、控件、图，不含装饰伪元素与绝对定位件）伸出盒子底边 8px 以上，
+ *     盒子高为 0 而里头有内容的也算。白名单只放整页滚动容器（.qxt-body / .qxt-body-scroll / .qx-scroll / .dw-page）：
+ *     它们本来就该滚，滚到底能看全。判据用「真实内容伸出盒子」而不单看 scrollHeight：.campus-hero 的 ::after 光晕会让它的
+ *     scrollHeight 比盒子高 24px，那是装饰，里头的字并没有被裁。
+ */
+async function layoutProbe(page: Page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-qxt-screen]') as HTMLElement
+    const PAGE_SCROLLERS = '.qxt-body, .qxt-body-scroll, .qx-scroll, .dw-page'
+    const HIDDEN = '[aria-hidden="true"], script, style, .sr-only, .dw-sr-only, [inert]'
+    const label = (el: Element) => `${el.tagName.toLowerCase()}${(el as HTMLElement).className ? '.' + String((el as HTMLElement).className).trim().split(/\s+/).slice(0, 2).join('.') : ''}`
+    const clipsOf = (el: Element) => {
+      const boxes: DOMRect[] = []
+      for (let cur: Element | null = el; cur && cur !== document.documentElement; cur = cur.parentElement) {
+        const cs = getComputedStyle(cur)
+        if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') boxes.push(cur.getBoundingClientRect())
+      }
+      return boxes
+    }
+
+    // ── 文字互压 ──
+    type Item = { text: string; l: number; t: number; r: number; b: number; el: Element }
+    const items: Item[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      const text = (node.textContent || '').trim()
+      const el = node.parentElement
+      if (!text || !el) continue
+      const cs = getComputedStyle(el)
+      if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0' || el.closest(HIDDEN)) continue
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const boxes = clipsOf(el)
+      for (const r of Array.from(range.getClientRects())) {
+        if (r.width < 4 || r.height < 4) continue
+        let l = r.left, t = r.top, rt = r.right, b = r.bottom
+        for (const c of boxes) { l = Math.max(l, c.left); t = Math.max(t, c.top); rt = Math.min(rt, c.right); b = Math.min(b, c.bottom) }
+        if (rt - l < 4 || b - t < 4) continue
+        items.push({ text: text.slice(0, 14), l, t, r: rt, b, el })
+      }
+    }
+    const overlaps: string[] = []
+    for (let i = 0; i < items.length; i += 1) {
+      for (let j = i + 1; j < items.length; j += 1) {
+        const a = items[i], c = items[j]
+        if (a.el === c.el || a.el.contains(c.el) || c.el.contains(a.el)) continue
+        const w = Math.min(a.r, c.r) - Math.max(a.l, c.l)
+        const h = Math.min(a.b, c.b) - Math.max(a.t, c.t)
+        if (w <= 2 || h <= 2) continue
+        const small = Math.min((a.r - a.l) * (a.b - a.t), (c.r - c.l) * (c.b - c.t))
+        if ((w * h) / small > 0.25) overlaps.push(`「${a.text}」压住「${c.text}」`)
+      }
+    }
+
+    // ── 压扁 ──
+    const flowBottom = (host: Element): number => {
+      let bottom = -Infinity
+      const visit = (node: Element) => {
+        for (const child of Array.from(node.childNodes)) {
+          if (child.nodeType === Node.TEXT_NODE) {
+            if (!(child.textContent || '').trim()) continue
+            const range = document.createRange()
+            range.selectNodeContents(child)
+            for (const r of Array.from(range.getClientRects())) if (r.width > 0 && r.height > 0) bottom = Math.max(bottom, r.bottom)
+            continue
+          }
+          if (child.nodeType !== Node.ELEMENT_NODE) continue
+          const el = child as Element
+          const cs = getComputedStyle(el)
+          if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'absolute' || cs.position === 'fixed') continue
+          const r = el.getBoundingClientRect()
+          if (r.width > 0 && r.height > 0) bottom = Math.max(bottom, r.bottom)
+          if (cs.overflowY === 'visible') visit(el) // 里头自己会裁剪的块，裁掉什么归它自己报
+        }
+      }
+      visit(host)
+      return bottom
+    }
+    const squashed: string[] = []
+    let scrollers = 0
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
+      const cs = getComputedStyle(el)
+      if (cs.overflowY === 'visible' || cs.display === 'none') continue
+      if (el.matches(PAGE_SCROLLERS)) { scrollers += 1; continue }
+      if (el.closest(HIDDEN)) continue
+      const box = el.clientHeight
+      const content = el.scrollHeight
+      if (content - box <= 8) continue
+      if (flowBottom(el) - el.getBoundingClientRect().bottom <= 8) continue
+      squashed.push(`${label(el)} 盒子 ${box}px、内容 ${content}px`)
+    }
+    return { rects: items.length, overlaps: overlaps.slice(0, 8), scrollers, squashed: squashed.slice(0, 8) }
+  })
+}
+
+/**
+ * 多行状态：列表一长，整页要能滚到底，任何一行都没被裁，每行的名称看得见。
+ *   · 行数对得上（阳性对照，选择器漏了会红）；
+ *   · 每行不小于 64 高、行自己不裁内容、行与行不重叠、每行第一段文字（名称）落在行框里；
+ *   · 放不下时滚的是整页滚动容器（不是块里的小滚框），滚到底后最后一行完整露出；放得下时最后一行本来就在正文区里。
+ */
+async function auditRows(page: Page, selector: string): Promise<{ count: number; problems: string[] }> {
+  return page.evaluate((sel) => {
+    const PAGE_SCROLLERS = '.qxt-body, .qxt-body-scroll, .qx-scroll, .dw-page'
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((el) => el.getBoundingClientRect().height > 0)
+    const problems: string[] = []
+    const body = document.querySelector('.qxt-body') as HTMLElement
+    rows.forEach((row, index) => {
+      const r = row.getBoundingClientRect()
+      if (r.height < 64) problems.push(`第 ${index + 1} 行只有 ${Math.round(r.height)}px 高`)
+      if (row.scrollHeight - row.clientHeight > 8) problems.push(`第 ${index + 1} 行自己裁掉了内容（盒子 ${row.clientHeight}、内容 ${row.scrollHeight}）`)
+      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT)
+      let first: Text | null = null
+      while (walker.nextNode()) { if ((walker.currentNode.textContent || '').trim()) { first = walker.currentNode as Text; break } }
+      if (!first) { problems.push(`第 ${index + 1} 行没有文字`); return }
+      const range = document.createRange(); range.selectNodeContents(first)
+      const t = range.getBoundingClientRect()
+      if (t.height <= 0 || t.top < r.top - 1 || t.bottom > r.bottom + 1) problems.push(`第 ${index + 1} 行的名称不在行框里（「${(first.textContent || '').trim().slice(0, 12)}」）`)
+      const next = rows[index + 1]
+      if (next && next.getBoundingClientRect().top < r.bottom - 2) problems.push(`第 ${index + 1} 行与下一行重叠`)
+    })
+    const last = rows[rows.length - 1]
+    if (last) {
+      let sc: HTMLElement | null = last.parentElement
+      while (sc && !(sc.scrollHeight - sc.clientHeight > 2 && getComputedStyle(sc).overflowY !== 'visible')) sc = sc.parentElement
+      if (sc && !sc.matches(PAGE_SCROLLERS)) problems.push(`滚的是块里的小滚框（${sc.tagName.toLowerCase()}.${String(sc.className).split(/\s+/)[0]}），不是整页`)
+      if (sc) sc.scrollTop = sc.scrollHeight
+      const lr = last.getBoundingClientRect(); const view = (sc ?? body).getBoundingClientRect()
+      if (lr.bottom > view.bottom + 1 || lr.top < view.top - 1) problems.push('最后一行没能完整露出来')
+    }
+    return { count: rows.length, problems }
+  }, selector)
+}
+
 for (const c of CASES) {
   test(`${c.name}：触屏壳体检（标识条、底导航、问小青、单行底栏、字号与可点区、无人值守） @w4`, async ({ page, api }) => {
     ;(c.setup ?? w6())(api)
@@ -140,6 +295,21 @@ for (const c of CASES) {
     expect(m.small, `不足 20px 的字: ${m.small.join('; ')}`).toEqual([])
     expect(m.tiny, `小于 64×64 的可点区: ${m.tiny.join('; ')}`).toEqual([])
     expect(m.screenText).not.toMatch(FORBIDDEN_STAFF)
+    // 版面：文字不互相压住，块里的内容不被压扁。先断言探针真的量到了文字与整页滚动容器，免得空数组凑出通过。
+    const layout = await layoutProbe(page)
+    expect(layout.rects, '版面探针没量到文字').toBeGreaterThan(10)
+    expect(layout.scrollers, '版面探针没找到整页滚动容器').toBeGreaterThanOrEqual(1)
+    expect(layout.overlaps, `文字互相压住: ${layout.overlaps.join('；')}`).toEqual([])
+    expect(layout.squashed, `内容被压扁或裁掉的块: ${layout.squashed.join('；')}`).toEqual([])
+    if (c.rows) {
+      const audit = await auditRows(page, c.rows.selector)
+      expect(audit.count, `多行状态应有 ${c.rows.count} 行（选择器 ${c.rows.selector}）`).toBe(c.rows.count)
+      expect(audit.problems, `多行版面: ${audit.problems.join('；')}`).toEqual([])
+      // 滚到底之后再量一遍：原先在可见区外的行也不能互相压住。
+      const bottom = await layoutProbe(page)
+      expect(bottom.overlaps, `滚到底后文字互相压住: ${bottom.overlaps.join('；')}`).toEqual([])
+      expect(bottom.squashed, `滚到底后内容被压扁或裁掉的块: ${bottom.squashed.join('；')}`).toEqual([])
+    }
   })
 }
 

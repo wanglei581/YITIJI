@@ -264,6 +264,21 @@
   overflow: visible;
 }
 
+/* 吸收块只涨不缩（第二轮审查补）。触屏壳比旧壳少一截正文高度（顶上标识条，底下 88px 底栏与三项导航），
+   旧目录页里「吸收余量」的块写的是 flex:1 + min-height:0：余量不够时被压到比内容还矮，列表行被裁掉、
+   标题互相盖住。这里在本页作用域里改成：余量有多就吃多（短页仍填满，不留大片空白），不够时按内容自然高度排，
+   放不下就整页滚动（.qxt-body-scroll / .dw-page / .qx-scroll 本来就是滚动容器）。
+   旧样式的全局默认不动：官方渠道等页还在用。页里有 RtFill 的由上面那条 :has(.rt-fill) 规则管（更具体，仍胜出）。 */
+.qxt-screen[data-qx-page='recruit'] :is(.dw-rlist, .dw-sec.grow, .qx-grow, .dw-rbox:not(:has(> .qx-state))):not(.dw-page, .qx-scroll) {
+  flex: 1 0 auto;
+  min-height: auto;
+}
+.qxt-screen[data-qx-page='recruit'] .dw-rlist { overflow: visible; }
+/* 容器里的直接子块一律不缩：.jf-card 这类自带 overflow:hidden 的卡，被压扁时里头的内容会被静默裁掉。RtFill 是例外，它要让出余量。 */
+.qxt-screen[data-qx-page='recruit'] :is(.dw-page, .dw-sec, .dw-rbox, .dw-rlist, .qx-scroll, .campus-proto) > :not(.rt-fill) {
+  flex-shrink: 0;
+}
+
 /* 芯片不折行。超出时在本行里横滑，滑块本身不越出正文。 */
 .qxt-screen[data-qx-page='recruit'] .qx-jobs-page .jf-filter-bar,
 .qxt-screen[data-qx-page='recruit'] .qx-jobs-page .jf-list-meta {
