@@ -1,5 +1,14 @@
 # 当前开发进度
 
+## 2026-10-28：触屏版共享层补样式——旧共享弹窗与面板在触屏屏里掉样式（第一包补一块，未推送，待总指挥审）
+
+- 问题：触屏屏里的按钮重置 `.qxt-screen:where(.qxt-btn-reset) button`（0,1,1）盖掉了旧共享件用 Tailwind 工具类写的边、底、内距、字号。行业 / 筛选选择弹窗的 20 个选项变成一片纯文字、选中态看不出；手机扫码、U 盘面板里的按钮只剩文字；Tailwind 的 14px / 12px 小字、48–58px 的按钮都低于触屏下限（正文 20px、可点区 64×64）。第八包原先在自己的页面样式里从外面补，第四、九、十、十一包也会遇到。
+- 做法：新增 `apps/kiosk/src/styles/qingxu/touch-legacy-parts.css`（325 行），由 `QxTouchScreen` 在 `touch-hero.css` 之后引入。`touch.css` 与三个共享件的 TSX 一个字没动，按哈希冻结的 `UploadSessionQrPanel.tsx` 只从外面认结构。选择器全部限定在 `.qxt-screen` 下，非触屏页不受影响。各件的挂点：选择弹窗认 `.ui-kiosk-modal-dialog` 里含 `section button[aria-pressed]`（两列大选项、选中深底浅字、清空 / 完成键）；扫码面板没有专属类名，认「头部行里 lucide 手机图标」这条结构（卡片、标题说明、状态句、井色按钮、主键深底）；U 盘面板认 `.resume-usb-panel` 且直接含 `__head`（第四包的 unattended 版没有它，不受影响）；KioskModal 另补关闭键 64×64、正文里 Tailwind 小字抬到 20px、操作区里 ui Button 的边底。
+- 量测（Playwright，1080×1920，逐状态数「< 20px 的文字 / < 64×64 的可点区 / 没边没底的按钮」）：第八包设置页 11 个状态，去掉页面补丁、没有共享层时为 2–8 / 1–12 / 1–22（最小字 12px），只靠共享层为 0 / 0 / 0（最小字 20px），页面补丁加共享层也是 0 / 0 / 0；第四包方向步骤的行业弹窗原为 2 / 9 / 23（最小字 18px，选中态看不出），并入后 0 / 0 / 0；第十包合同上传面板去掉页面补丁、没有共享层时 3–4 / 3–4 / 2–3，并入后文字与按钮全部达标（剩的 1 个是页面自己的同意复选框 48×48，不是共享件）。
+- 不变的：开发样板 `/dev/touch-gallery`（1080、390 两个宽度，各 10 个状态的截图和页面结构，共 40 份）与改前逐像素一致，唯一差别是 390 宽一张图里 18 个像素最大差 4/255（动画线条底噪，同代码两次运行之间也有）；非触屏页（2.0 的简历来源里扫码 / U 盘 / 行业弹窗，面试设置行业弹窗）把本文件强行塞进页面后，32 张图里 26 张逐字节一致，其余 6 张各不到 30 个像素的抗锯齿底噪（改前两次运行之间也是这个量级）。第八包页面在生产构建（vite build + preview）下与开发服务器逐像素一致（顶栏时钟、二维码、倒计时除外）。tsc、eslint（0 error）、`verify:kiosk-visual-unity`、`verify:kiosk-font-subset`、fusion-w2~w6、qingxu-v2-frozen、public-screen-mask、resume-phone-upload-ui、kiosk-end-use、kiosk-ai-declaration、kiosk-ai-primitives 通过。
+- 没做 / 注意：弹窗正文里没有 `aria-pressed` 的内容按钮（如岗位页简历选择的列表行）、`KioskFeedbackDialog`、`buttonReset={false}` 的屏（第三包打印）不在本文件范围；第九、十一包的页面未单独截图（挂点与第四、八、十包同一套 DOM）。第八、十包页面里已有的补丁可以逐步删，重叠处取值相同或由本文件接管。
+- 截图与量测原图：`~/.cache/claude-lanes/touch-impl-1025/uni/scratch-pkg1/out/`（`cmp/` 里是改前改后并排图）。
+
 ## 2026-10-28：两个后台上线前修复（PR 待合并，随本次发布上线）
 
 - 产品负责人原话：「当前任务到哪了？剩下的问题，你和codex和agy一起你们共同解决。然后发布上线，然后进行清理」。分工：Codex 只读复核待发布的 0b4b5770b..294627015 并调查两处数据缺口；agy 反方评审方案与最终改动；Codex 实现；Claude 逐条对代码核实、收货调整、跑浏览器用例。
