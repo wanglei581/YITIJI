@@ -21,8 +21,11 @@ import { API_BASE_URL } from './client'
 import { getTerminalId, subscribeTerminalIdentity } from './screensaver'
 
 const TTL_MS = 5 * 60 * 1000
-/** 缓存 5 分钟，赶在过期前续上；留一分钟余量给慢网和超时（单次请求最长 8 秒）。 */
-export const SUPPORT_CONTACT_RENEW_MS = 4 * 60 * 1000
+/**
+ * 缓存 5 分钟，每 3 分钟续一次（慢网和超时有足够余量，单次请求最长 8 秒）。
+ * 后端缓存 90 秒（SUPPORT_CONTACT_CACHE_TTL_MS），后台改了号码最迟约 4 分半到屏，兑现管理员卡片上的「最迟 5 分钟内」。
+ */
+export const SUPPORT_CONTACT_RENEW_MS = 3 * 60 * 1000
 const TIMEOUT_MS = 8000
 
 /** 缓存记着是为哪台终端读的：终端号换了，旧号的结果一律不认。 */
