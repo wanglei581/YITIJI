@@ -610,7 +610,8 @@ test('legal document never passes local or missing text off as the official vers
   await expect(page.getByTestId('legal-doc-fallback-warning')).toHaveCount(0)
   await expect(page.getByTestId('legal-primary')).toHaveText('重新读取')
 
-  await page.getByRole('button', { name: '看本机留存文本（非正式版本）', exact: true }).click()
+  // 触屏稿里这是一行「标题 + 说明」入口，可访问名带说明，按开头匹配。
+  await page.getByRole('button', { name: /^看本机留存文本（非正式版本）/ }).click()
   await expect(page.getByTestId('legal-doc-fallback-warning')).toContainText('不作为正式版本')
   await expect(page.getByText('本终端为「AI求职打印服务终端」', { exact: false })).toBeVisible()
   await expect(page.getByTestId('legal-ai-explain')).toBeDisabled()
@@ -642,7 +643,7 @@ test('legal document returns to the page it was opened from @w5-kiosk', async ({
   await page.getByRole('dialog', { name: '隐私、设备与备案' }).getByRole('button', { name: /隐私与留存/ }).click()
   // 触屏稿 help：分类下的问答是「问 + 答」一起摆出的卡片，不用再点开。
   await expect(page.getByText('文件会保存多久？', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '隐私政策', exact: true }).click()
+  await page.getByRole('button', { name: /^隐私政策/ }).click()
   await expect(page).toHaveURL(/\/legal\/privacy$/)
   await expect(page.getByRole('heading', { name: '一、我们收集的信息', exact: true })).toBeVisible()
   const back = page.getByRole('button', { name: '返回上一页', exact: true }).first()

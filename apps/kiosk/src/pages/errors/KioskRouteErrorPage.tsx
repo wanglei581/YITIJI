@@ -32,6 +32,7 @@ export function KioskRouteErrorPage({ notFound = false }: { notFound?: boolean }
       >
         <PublicTouchFrame
           page="route-error"
+          main
           title={isNotFound ? '页面不存在' : '这一页打不开'}
           sub={isNotFound
             ? '当前入口可能已经调整，请返回首页重新选择服务。'

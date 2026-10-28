@@ -340,6 +340,7 @@ export default function ErrorOfflinePage() {
       <KioskStageFit>
         <PublicTouchFrame
           page="offline"
+          main
           title={title}
           eyebrow="机器状态"
           sub={sub}

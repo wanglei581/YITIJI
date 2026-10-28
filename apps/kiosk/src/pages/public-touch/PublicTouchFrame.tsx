@@ -39,6 +39,7 @@ export function PublicTouchFrame({
   bodyClassName = 'qxt-body-tight',
   band = true,
   overlay,
+  main = false,
   children,
 }: {
   title: string
@@ -59,6 +60,8 @@ export function PublicTouchFrame({
   band?: boolean
   /** 盖在整屏上的弹层。交给 QxTouchScreen 处理底下的 inert，不要把弹层写进正文里。 */
   overlay?: ReactNode
+  /** 独立页面（不在 KioskLayout 里的）自己带 main 地标；在 KioskLayout 里的页面不要画，避免出现两个。 */
+  main?: boolean
   children: ReactNode
 }) {
   const navHandlers = usePublicNav()
@@ -91,8 +94,9 @@ export function PublicTouchFrame({
       nav={nav ? <QxTouchNav current={navCurrent} {...navHandlers} /> : undefined}
       overlay={overlay}
     >
-      {/* main 地标交给 KioskLayout，页面不再自画一个（否则 /assistant、/help 会有两个，独立路由会多出一个） */}
-      <div className="qxp-fill" data-kiosk-screen={screen}>{children}</div>
+      {main
+        ? <main className="qxp-fill" data-kiosk-screen={screen}>{children}</main>
+        : <div className="qxp-fill" data-kiosk-screen={screen}>{children}</div>}
     </QxTouchScreen>
   )
 }
