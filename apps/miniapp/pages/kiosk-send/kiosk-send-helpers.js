@@ -88,11 +88,16 @@ function dateLabel(value) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 「我的文档」→ 可选的行。已过期的不列；超过 10MB 的列出来但不能选。 */
+// 「我的文档」列得出、但服务端不许递进一体机的用途：本人数据导出包、合同审查报告
+// （files.service 的本人读取对这两种一律 404）。列出来只会让人点了才知道传不过去，不列。
+const NOT_SENDABLE_PURPOSES = ['member_data_export', 'contract_review_report']
+
+/** 「我的文档」→ 可选的行。已过期的、递不进一体机的不列；超过 10MB 的列出来但不能选。 */
 function docRowsOf(items, nowMs) {
   const rows = []
   ;(Array.isArray(items) ? items : []).forEach((item) => {
     if (!item || typeof item !== 'object') return
+    if (NOT_SENDABLE_PURPOSES.indexOf(item.purpose) !== -1) return
     const id = item.id == null ? '' : String(item.id).trim()
     if (!id) return
     const expiresMs = item.expiresAt ? new Date(item.expiresAt).getTime() : NaN

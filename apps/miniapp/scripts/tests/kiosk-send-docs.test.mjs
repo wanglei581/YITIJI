@@ -478,3 +478,31 @@ test('我的文档那份：码已不能再传、正在收、结果说不清，�
     assert.equal(env.page.data.phase, phase)
   }
 })
+
+test('我的文档：本人数据导出包、合同审查报告递不进一体机（服务端本人读取一律 404），列表里不出现', async () => {
+  const env = harness(() => Promise.reject(new Error('should not upload')), {
+    loggedIn: true,
+    docs: () => Promise.resolve(listOf([
+      myDoc('file-export', '我的数据导出.zip', 4096, { purpose: 'member_data_export' }),
+      myDoc('file-contract-report', '合同风险提示.pdf', 8192, { purpose: 'contract_review_report' }),
+      myDoc('file-resume', '简历.pdf', 2048, { purpose: 'resume_upload' }),
+    ])),
+  })
+  env.openDirect()
+  await flush()
+  assert.equal(env.page.data.docState, 'list')
+  assert.equal(env.page.data.docs.map((d) => d.id).join(','), 'file-resume')
+  env.page.pickDoc(tap('file-export'))
+  env.page.pickDoc(tap('file-contract-report'))
+  assert.equal(env.wx.calls.modal.length, 0)
+  assert.equal(env.memberCalls.length, 0)
+
+  // 只剩递不进去的：如实说没有能传的
+  const empty = harness(() => Promise.reject(new Error('should not upload')), {
+    loggedIn: true,
+    docs: () => Promise.resolve(listOf([myDoc('file-export', '我的数据导出.zip', 4096, { purpose: 'member_data_export' })])),
+  })
+  empty.openDirect()
+  await flush()
+  assert.equal(empty.page.data.docState, 'empty')
+})
