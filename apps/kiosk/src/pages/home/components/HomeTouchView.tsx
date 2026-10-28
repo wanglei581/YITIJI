@@ -146,10 +146,10 @@ export function HomeTouchView({
     <QxTouchScreen
       rootRef={rootRef}
       testId="qx-home"
-      pageId="home"
+      page="home"
       intro={introDone ? 'done' : undefined}
       bodyClassName={['qxt-home', isLoggedIn ? 'qxt-home-on' : '', dense ? 'qxt-home-squeeze' : ''].filter(Boolean).join(' ')}
-      markers={{
+      dataAttrs={{
         recruitment: recruitmentOpen ? 'open' : 'closed',
         toolbox: capabilityMark(toolbox.status, toolbox.configVersion, toolboxReady),
         campus: capabilityMark(campus.status, campus.configVersion, campusReady),

@@ -19,7 +19,8 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.qxt-screen button {
+/* :where() 不加权重：和原来的 .qxt-screen button 一样轻，卡片、磁贴自己的样式照样盖得过它 */
+.qxt-screen:where(.qxt-btn-reset) button {
   font: inherit;
   color: inherit;
   background: none;
@@ -119,9 +120,9 @@
 .qxt-screen .qxt-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--qx-emerald); box-shadow: 0 0 0 4px var(--qxt-glow-ring); }
 .qxt-screen .qxt-status-warn { background: var(--qxt-warn-bg); }
 .qxt-screen .qxt-status-warn .qxt-dot { background: var(--qxt-warn-dot); box-shadow: 0 0 0 4px var(--qxt-warn-ring); }
+.qxt-screen .qxt-status-unknown .qxt-dot { background: var(--qxt-unknown-dot); box-shadow: 0 0 0 4px var(--qxt-unknown-ring); }
 .qxt-screen .qxt-status-bad { background: var(--qxt-bad-bg); }
 .qxt-screen .qxt-status-bad .qxt-dot { background: var(--qxt-bad-dot); box-shadow: 0 0 0 4px var(--qxt-bad-ring); }
-.qxt-screen .qxt-status-unknown .qxt-dot { background: var(--qxt-unknown-dot); box-shadow: 0 0 0 4px var(--qxt-unknown-ring); }
 .qxt-screen .qxt-status-reading .qxt-dot { background: var(--qxt-mint); box-shadow: 0 0 0 4px var(--qxt-mint-pulse); }
 .qxt-screen .qxt-ask { flex: 1; display: flex; gap: 30px; align-items: center; padding: 30px 0 40px; }
 .qxt-screen .qxt-ask-t { flex: 1; min-width: 0; }
@@ -136,6 +137,10 @@
 .qxt-screen .qxt-rail-done .qxt-rail-bar { background: var(--qxt-done-bar); }
 .qxt-screen .qxt-rail-done { color: var(--qxt-mint); }
 .qxt-screen .qxt-rail-now { color: var(--qx-on-solid); font-weight: 700; }
+.qxt-screen .qxt-rail-wait { color: var(--qxt-mint); font-weight: 700; }
+.qxt-screen .qxt-rail-wait .qxt-rail-bar { background: var(--qxt-unknown-dot); }
+.qxt-screen .qxt-rail-bad { color: var(--qxt-warn-dot); font-weight: 700; }
+.qxt-screen .qxt-rail-bad .qxt-rail-bar { background: var(--qxt-warn-dot); }
 .qxt-screen .qxt-rail-now .qxt-rail-bar::after {
   content: "";
   position: absolute;
@@ -692,109 +697,10 @@
 @keyframes qxt-sheet { from { transform: translateY(60%); opacity: 0.4; } to { transform: none; opacity: 1; } }
 .qxt-screen .qxt-note { margin: 0; font-size: var(--qxt-fs-aux); color: var(--qxt-ink-2); }
 
-.qxt-screen .qxt-band-hero { padding-bottom: 140px; min-height: 600px; }
-.qxt-screen .qxt-band-hero.qxt-band-dense { min-height: 520px; }
-.qxt-screen .qxt-greet { flex: 1; display: flex; align-items: center; gap: 32px; padding: 46px 0 0; }
-.qxt-screen .qxt-band-hero h1 { font: 700 var(--qxt-fs-hero)/1.22 var(--qx-serif); margin: 6px 0 0; color: var(--qxt-ask); }
-.qxt-screen .qxt-band-hero .qxt-eyebrow { font-size: var(--qxt-fs-greet); }
-.qxt-screen .qxt-greet p { font-size: var(--qxt-fs-greet); color: var(--qxt-mint); margin: 12px 0 0; }
-.qxt-screen .qxt-seal-xl {
-  width: 176px;
-  height: 176px;
-  font-size: var(--qxt-fs-seal-xl);
-  box-shadow: 0 0 0 10px var(--qxt-seal-xl-ring), inset 0 -8px 18px var(--qxt-seal-xl-inset);
-}
-.qxt-screen .qxt-askbar {
-  position: relative;
-  z-index: 2;
-  flex: none;
-  margin: -84px 56px 0;
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  height: 132px;
-  padding: 0 24px 0 22px;
-  border-radius: 66px;
-  background: var(--qxt-card);
-  box-shadow: var(--qxt-shadow), 0 0 0 1.5px var(--qxt-edge);
-  text-align: left;
-}
-.qxt-screen .qxt-askbar:active { transform: scale(0.985); }
-.qxt-screen .qxt-orb {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  flex: none;
-  position: relative;
-  color: var(--qx-on-solid);
-  background: radial-gradient(circle at 35% 30%, var(--qxt-orb-a), var(--qxt-seal-b) 55%, var(--qxt-seal-c));
-}
-.qxt-screen .qxt-orb::after {
-  content: "";
-  position: absolute;
-  inset: -9px;
-  border-radius: 50%;
-  border: 2px solid var(--qxt-orb-ring);
-}
-.qxt-screen .qxt-askbar-tx { flex: 1; min-width: 0; }
-.qxt-screen .qxt-askbar b { display: block; font: 700 var(--qxt-fs-hub)/1.3 var(--qx-serif); color: var(--qxt-ink); }
-.qxt-screen .qxt-askbar small { display: block; font-size: var(--qxt-fs-sub); color: var(--qxt-ink-3); font-weight: 400; }
-.qxt-screen .qxt-askbar .qxt-chip { margin-left: auto; }
-.qxt-screen .qxt-paper { filter: drop-shadow(0 6px 10px rgba(11, 36, 30, 0.12)); }
-.qxt-screen .qxt-body.qxt-home { justify-content: flex-start; }
-.qxt-screen .qxt-home-tasks { display: grid; grid-template-columns: 1fr 1fr; }
-.qxt-screen .qxt-home-foot { text-align: center; }
-.qxt-screen .qxt-home-id .qx-home-identity { min-height: 64px; }
-.qxt-screen .qxt-home-id[data-member='true'] .qx-home-identity[data-kind='status'] {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.qxt-screen .qxt-task:focus-visible,
-.qxt-screen .qxt-tile:focus-visible,
-.qxt-screen .qxt-askbar:focus-visible {
-  outline: 3px solid var(--qx-teal);
-  outline-offset: 3px;
-}
-
-@media (max-width: 760px) {
-  .qxt-screen .qxt-band { min-height: 0; padding: 12px 16px 0; }
-  .qxt-screen .qxt-band-hero,
-  .qxt-screen .qxt-band-hero.qxt-band-dense { min-height: 0; padding-bottom: 56px; }
-  .qxt-screen .qxt-hdr { height: auto; min-height: 56px; flex-wrap: wrap; gap: 8px 12px; }
-  .qxt-screen .qxt-mark { width: 44px; height: 44px; font-size: 22px; }
-  .qxt-screen .qxt-brand b { font-size: 18px; }
-  .qxt-screen .qxt-brand small { font-size: 13px; white-space: nowrap; }
-  .qxt-screen .qxt-status { height: 36px; padding: 0 10px; font-size: 14px; }
-  .qxt-screen .qxt-clock b { font-size: 20px; }
-  .qxt-screen .qxt-clock small { font-size: 12px; }
-  .qxt-screen .qxt-greet { gap: 12px; padding: 4px 0 0; }
-  .qxt-screen .qxt-seal-xl { width: 84px; height: 84px; font-size: 40px; }
-  .qxt-screen .qxt-band-hero h1 { font-size: 34px; }
-  .qxt-screen .qxt-band-hero .qxt-eyebrow,
-  .qxt-screen .qxt-greet p { font-size: 15px; }
-  .qxt-screen .qxt-askbar {
-    height: auto;
-    min-height: 88px;
-    margin: -36px 12px 0;
-    padding: 8px 12px;
-    gap: 10px;
-    border-radius: 44px;
-  }
-  .qxt-screen .qxt-orb { width: 64px; height: 64px; }
-  .qxt-screen .qxt-askbar b { font-size: 16px; line-height: 1.25; }
-  .qxt-screen .qxt-askbar small { font-size: 12px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .qxt-screen,
   .qxt-screen * {
     animation: none !important;
     transition: none !important;
   }
-  .qxt-screen .qxt-task:focus-visible,
-  .qxt-screen .qxt-tile:focus-visible,
-  .qxt-screen .qxt-askbar:focus-visible { transform: none; }
 }

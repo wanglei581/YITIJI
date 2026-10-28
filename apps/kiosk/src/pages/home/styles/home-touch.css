@@ -1,4 +1,14 @@
 /* 首页专用。只挂在 [data-qx-page='home'] 下，不改共享类的默认。 */
+/* 下面 9 行原在共享 touch.css 末尾（10/28 共享层统一时挪来），选择器原样保留。 */
+.qxt-screen .qxt-body.qxt-home { justify-content: flex-start; }
+.qxt-screen .qxt-home-tasks { display: grid; grid-template-columns: 1fr 1fr; }
+.qxt-screen .qxt-home-foot { text-align: center; }
+.qxt-screen .qxt-home-id .qx-home-identity { min-height: 64px; }
+.qxt-screen .qxt-home-id[data-member='true'] .qx-home-identity[data-kind='status'] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 [data-qx-page='home'] .qxt-body.qxt-home {
   justify-content: flex-start;

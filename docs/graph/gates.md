@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1874 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1876 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -423,7 +423,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 540 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 542 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -550,6 +550,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | `verify-prod-build-config.mjs`<br/>`verify-runtime-terminal-identity.mjs` |
 | `apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | `verify-job-material-library-ui.mjs`<br/>`verify-jobfair-checkin.mjs`<br/>`verify-jobfair-commercial-closure.mjs`<br/>`verify-jobfair-ui.mjs`<br/>`verify-print-entry-source-split.mjs`<br/>`verify-renshi-policy-ui.mjs` |
+| `apps/kiosk/src/pages/home/styles/home-touch.css` | `verify-fusion-home.mjs`<br/>`verify-kiosk-end-use.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewReportPage.tsx` | `verify-ai-artifact-print-url-contract.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-no-raw-error-render.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewReportsPage.tsx` | `verify-fusion-w3.mjs`<br/>`verify-lightflow-k2c-interview.mjs` |
 | `apps/kiosk/src/pages/interview/InterviewSessionPage.tsx` | `verify-ai-down-fallbacks.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-runtime-error-boundary.mjs`<br/>`verify-lightflow-k2c-interview.mjs`<br/>`verify-mic-capability-truth.mjs` |
@@ -961,7 +962,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/styles/prototype-v1.css` | `verify-kiosk-visual-unity.mjs` |
 | `apps/kiosk/src/styles/qingxu/primitives.css` | `verify-kiosk-ai-declaration.mjs` |
 | `apps/kiosk/src/styles/qingxu/tokens.css` | `verify-kiosk-font-subset.mjs` |
-| `apps/kiosk/src/styles/qingxu/touch.css` | `verify-fusion-home.mjs`<br/>`verify-kiosk-end-use.mjs` |
+| `apps/kiosk/src/styles/qingxu/touch-hero.css` | `verify-fusion-home.mjs` |
+| `apps/kiosk/src/styles/qingxu/touch.css` | `verify-fusion-home.mjs` |
 | `apps/kiosk/src/styles/warm-professional-override.css` | `verify-device-status-honest.mjs`<br/>`verify-kiosk-visual-unity.mjs` |
 | `apps/kiosk/src/utils/maskPii.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-public-screen-mask.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/utils/micCapability.ts` | `verify-mic-capability-truth.mjs` |

@@ -13514,7 +13514,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 660,
+      "reachableFileCount": 662,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13566,6 +13566,7 @@
             "apps/kiosk/src/pages/home/styles/home-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16488,7 +16489,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 762
+      "sourceFileCount": 764
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -20096,6 +20097,10 @@
       "apps/kiosk/scripts/verify-print-entry-source-split.mjs",
       "apps/kiosk/scripts/verify-renshi-policy-ui.mjs"
     ],
+    "apps/kiosk/src/pages/home/styles/home-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs",
+      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+    ],
     "apps/kiosk/src/pages/interview/InterviewReportPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
@@ -21991,9 +21996,11 @@
     "apps/kiosk/src/styles/qingxu/tokens.css": [
       "scripts/verify-kiosk-font-subset.mjs"
     ],
+    "apps/kiosk/src/styles/qingxu/touch-hero.css": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
+    ],
     "apps/kiosk/src/styles/qingxu/touch.css": [
-      "apps/kiosk/scripts/verify-fusion-home.mjs",
-      "apps/kiosk/scripts/verify-kiosk-end-use.mjs"
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
     ],
     "apps/kiosk/src/styles/warm-professional-override.css": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -29459,6 +29466,8 @@
           "apps/kiosk/src/pages/home/homeTouchCopy.ts",
           "apps/kiosk/src/pages/home/homeV6Domains.ts",
           "apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts",
+          "apps/kiosk/src/pages/home/styles/home-touch.css",
+          "apps/kiosk/src/styles/qingxu/touch-hero.css",
           "apps/kiosk/src/styles/qingxu/touch.css"
         ],
         "missing": []
@@ -30319,6 +30328,7 @@
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/home/components/HomeIdentityActions.tsx",
           "apps/kiosk/src/pages/home/components/HomeTouchView.tsx",
+          "apps/kiosk/src/pages/home/styles/home-touch.css",
           "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
           "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "apps/kiosk/src/pages/profile/ProfilePage.tsx",
@@ -30326,7 +30336,6 @@
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/services/terminalAuth.ts",
-          "apps/kiosk/src/styles/qingxu/touch.css",
           "docs/design/kiosk-redesign-2026-08-v2/01-home.html"
         ],
         "missing": []

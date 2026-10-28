@@ -18,7 +18,10 @@ const view = `${viewOnly}\n${taskCard}`
 const footer = view
 const fairHook = read('src/pages/home/hooks/useHomeJobFairHighlight.ts')
 const manifest = read('src/pages/home/homeV6Domains.ts')
-const css = read('src/styles/qingxu/touch.css')
+// 共享触屏样式：touch.css 与 touch-hero.css（10/28 从 touch.css 拆出 hero、问小青条、手机宽）。
+// 首页专用规则（四卡、页脚、身份入口）10/28 从 touch.css 挪进 home-touch.css，单独查。
+const css = ['src/styles/qingxu/touch.css', 'src/styles/qingxu/touch-hero.css'].map(read).join('\n')
+const homeCss = read('src/pages/home/styles/home-touch.css')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
 console.log('\n=== Kiosk 青序流光首页运行时合同 ===')
@@ -27,7 +30,7 @@ check(
   viewOnly.includes('<QxTouchScreen') &&
     viewOnly.includes('kind="hero"') &&
     viewOnly.includes('<QxTouchNav') &&
-    viewOnly.includes('pageId="home"'),
+    viewOnly.includes('page="home"'),
   '首页用触屏屏、hero 意图带与独立底栏'
 )
 check(!home.includes('KioskPageFrame') && !viewOnly.includes('KioskPageFrame'), '首页已退出 V6 KioskPageFrame')
@@ -244,19 +247,19 @@ check(
 )
 
 check(
-  css.includes('.qxt-home-tasks') &&
-    /\.qxt-home-tasks\s*\{[^}]*grid-template-columns:\s*1fr 1fr/.test(css) &&
-    !/\.qxt-home-tasks[\s\S]{0,400}grid-column:\s*1\s*\/\s*-1/.test(css),
+  homeCss.includes('.qxt-home-tasks') &&
+    /\.qxt-home-tasks\s*\{[^}]*grid-template-columns:\s*1fr 1fr/.test(homeCss) &&
+    !/\.qxt-home-tasks[\s\S]{0,400}grid-column:\s*1\s*\/\s*-1/.test(homeCss),
   '1080×1920 四张大卡 2×2，打印卡不再横跨'
 )
 check(
-  css.includes('.qxt-home-foot') &&
-    /min-height:\s*64px/.test(css),
+  homeCss.includes('.qxt-home-foot') &&
+    /min-height:\s*64px/.test(homeCss),
   '1080×1920 底部保留合规真值，身份按钮不低于 64px'
 )
 check(
   /\.qxt-askbar\s*\{[\s\S]{0,280}height:\s*132px/.test(css) &&
-    /\.qx-home-identity[\s\S]{0,180}min-height:\s*64px/.test(css),
+    /\.qx-home-identity[\s\S]{0,180}min-height:\s*64px/.test(homeCss),
   '问小青条按稿为 132px，身份入口按稿为 64px'
 )
 check(
@@ -272,7 +275,7 @@ check(
   css.includes('.qxt-task:focus-visible') && css.includes('outline:'),
   '触屏首页提供清晰键盘焦点反馈'
 )
-check(!css.includes('.kpv1') && !css.includes('.v6-home'), '青序首页样式完全路由作用域化')
+check(!`${css}\n${homeCss}`.includes('.kpv1') && !`${css}\n${homeCss}`.includes('.v6-home'), '青序首页样式完全路由作用域化')
 
 check(
   kioskRoot.includes('useTerminalDeviceStatus(true)') &&

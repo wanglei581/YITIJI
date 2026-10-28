@@ -1,6 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from 'react'
 import { QxTouchChip, type QxTouchChipTone } from './QxTouchChip'
 import { QxTouchIcon, type QxTouchIconName } from './QxTouchIcon'
+import { qxTouchDataMarkers } from './qxTouchMarkers'
 
 export type QxTouchTaskProps = {
   icon: QxTouchIconName
@@ -12,6 +13,8 @@ export type QxTouchTaskProps = {
   visual?: ReactNode
   take?: string
   takeIcon?: QxTouchIconName
+  /** 加在去处文字前面、不加重的前缀。 */
+  takePrefix?: string
   note?: string
   held?: boolean
   pressable?: boolean
@@ -33,6 +36,7 @@ export function QxTouchTask({
   visual,
   take,
   takeIcon = 'arrowR',
+  takePrefix = '',
   note,
   held = false,
   pressable = false,
@@ -70,12 +74,12 @@ export function QxTouchTask({
       {take ? (
         <div className="qxt-take">
           <QxTouchIcon name={takeIcon} size={24} strokeWidth={2.6} />
-          <span>{take}</span>
+          <span>{takePrefix}{take}</span>
         </div>
       ) : null}
     </>
   )
-  const markers = dataMarkers(actionId, dataAttrs)
+  const markers = qxTouchDataMarkers({ actionId, dataAttrs })
   if (!interactive) {
     return (
       <div
@@ -106,13 +110,4 @@ export function QxTouchTask({
       {body}
     </button>
   )
-}
-
-function dataMarkers(actionId?: string, dataAttrs?: Record<string, string | undefined>) {
-  const props: Record<string, string> = {}
-  if (actionId) props['data-action'] = actionId
-  for (const [key, value] of Object.entries(dataAttrs ?? {})) {
-    if (value !== undefined) props[`data-${key}`] = value
-  }
-  return props
 }

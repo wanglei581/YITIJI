@@ -144,7 +144,7 @@ check(
 )
 check(!/进入我的/.test(homeView + identity), '首页不放「进入我的」直达入口（进个人区走底部「我的」）')
 check(
-  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/styles/qingxu/touch.css')),
+  /isLoggedIn \? 'true' : undefined/.test(homeView) && /data-member='true'/.test(read('src/pages/home/styles/home-touch.css')),
   '登录态那一行按稿 01 ?state=member 收起副标题、不折行',
 )
 const draft = readFileSync(join(repoRoot, 'docs/design/kiosk-redesign-2026-08-v2/01-home.html'), 'utf8')
