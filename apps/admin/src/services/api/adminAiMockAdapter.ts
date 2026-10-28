@@ -76,7 +76,12 @@ function delay(): Promise<void> {
 export const adminAiMockAdapter = {
   async getAiUsage(): Promise<AdminAiUsage> {
     await delay()
-    return computeUsage(MOCK_LOG_ENTRIES)
+    const usage = computeUsage(MOCK_LOG_ENTRIES)
+    const scenario = new URLSearchParams(window.location.search).get('mock:aiCost')
+    if (scenario === 'measured') return { ...usage, estimatedCostCny: 0.1234 }
+    if (scenario === 'partial') return { ...usage, estimatedCostCny: 0.1234, unmeasuredCalls: 2 }
+    if (scenario === 'unmeasured') return { ...usage, unmeasuredCalls: usage.totalCalls }
+    return usage
   },
 
   /**

@@ -3,12 +3,13 @@ import {
   PREVIEW_INCIDENTS_AND_REPORTS,
   PREVIEW_UNCONFIRMED,
   QUEUE_MISS,
-  groupByOrg,
   incidentCountText,
   incidentLine,
   partnerSectionHref,
 } from '../../components/first-order/serviceQueueModel'
 import type { IncidentQueue, QueueState, ReportQueue } from '../../components/first-order/useServiceQueues'
+
+const MISSING_REPORT_LINES = 5
 
 export interface TodayLine {
   key: string
@@ -58,7 +59,7 @@ export function incidentTodayRows(
     lines: data.earliest.map((item) => ({
       key: item.id,
       text: incidentLine(item),
-      href: partnerSectionHref(item.orgId, 'incidents'),
+      href: partnerSectionHref(item.orgId, 'incidents', item.projectId),
       action: '去处理',
     })),
     note: data.truncated && data.shown > 0
@@ -94,12 +95,18 @@ export function reportTodayRows(
       title: `${formatCount(missing.length)} 个项目上月还没留存月报`,
       detail: '',
       action: '',
-      lines: groupByOrg(missing).map((org) => ({
-        key: org.orgId,
-        text: `${org.orgName} · ${formatCount(org.count)} 个项目`,
-        href: partnerSectionHref(org.orgId, 'reports'),
-        action: '去处理',
-      })),
+      // 逐个项目直达；月初可能有很多项目，只列前几个，其余到合作机构管理逐家看
+      lines: [
+        ...missing.slice(0, MISSING_REPORT_LINES).map((item) => ({
+          key: item.projectId,
+          text: `${item.orgName} · ${item.projectName}`,
+          href: partnerSectionHref(item.orgId, 'reports', item.projectId),
+          action: '去处理',
+        })),
+        ...(missing.length > MISSING_REPORT_LINES
+          ? [{ key: 'reports-missing-more', text: `还有 ${formatCount(missing.length - MISSING_REPORT_LINES)} 个项目`, href: '/partners', action: '去查看' }]
+          : []),
+      ],
     })
   }
   if (reports.data.awaitingAck > 0) {
