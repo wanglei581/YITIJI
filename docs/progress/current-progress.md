@@ -2,7 +2,7 @@
 
 ## 2026-10-28：触屏版第 5 版 · 第 3 包「打印整条流程」（分支 `claude/kiosk-touch-p3`，未合并、未部署、真机未验）
 
-- 范围：一体机打印整条流程的正文按触屏版第 5 版重做——打印扫描服务台、选文件三页（来源选择、手机传文件、U 盘）、材料检查、预览与参数、核对价格、收银台、出纸进度、打印完成、结果未确认、到机码输码、核对订单；路由 `/print-scan`、`/print/upload`、`/print/desk`（`/print/material-check`、`/print/preview`、`/print/params` 仍重定向）、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`。不碰后端、数据库、硬件链路、小程序。
+- 范围：一体机打印整条流程的正文按触屏版第 5 版重做——打印扫描服务台、材料检查、预览与参数、核对价格、收银台、出纸进度、打印完成、结果未确认、到机码输码、核对订单，以及选文件三页（来源选择、手机传文件、U 盘）；路由 `/print-scan`、`/print/upload`、`/print/desk`（`/print/material-check`、`/print/preview`、`/print/params` 仍重定向）、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`。不碰后端、数据库、硬件链路、小程序。
 - 产品负责人 10/26 三件：完成页「我拿走了，结束使用」一按就结束（60 秒空闲到点结束、点屏重新计时保留）；打印步骤统一为四步（选文件、材料检查、预览与参数、核对价格，含服务台步骤轴）；收银台、到机码、结果未确认、缺纸与失败各态与金额规则以运行页为准，稿只改版式与字。
 - 删除与改名记录（均有证据：无路由、无 import、无门禁引用，已跑相关门禁）：删除 `PickupWinCard`（到机码成功卡，由 `PickupOkBody` 取代）；样式文件 `print-fulfill-touch.css`（970 行）拆成 `print-progress-touch.css`、`print-done-touch.css`、`print-pickup-touch.css`，规则内容不变；`printArt.ts` 因与 `PrintArt.tsx` 在不区分大小写的文件系统里重名，改为 `printArtSvg.ts`。
 - 门禁与单测改到稿的真值（不放宽，每条都做了反向检查）：`verify:fusion-w2`、`verify:scan-input-safety`（扫码枪入口改认「用扫码枪扫」，说明原句只在 `PickupHidGuide` 写一份）、`verify:device-status-honest`（W-117 改认新结构）、`verify:pii-redaction-contract`、`verify:print-done-truth`（倒计时措辞）、`print-walk-copy` 单测（补 PrintIcon、PrintArt 映射，页数核定与免费摘要的断言按稿分状态，W-117 提示条按新结构）。

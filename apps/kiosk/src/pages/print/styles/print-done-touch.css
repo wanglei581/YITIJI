@@ -193,3 +193,21 @@
 [data-qx-page='print-done'] .pff-page > .qxt-slab {
   min-height: 290px;
 }
+
+/* 有任务号的「无法确认」：正文多了「反馈问题」「查看打印订单」一排出口，两张出路卡回到自然高度（250），整屏仍落在底栏之上 */
+[data-qx-page='print-done'] .pff-page.pfp-miss-more > .qxt-slab {
+  min-height: 250px;
+}
+
+/* 正在核验：主按钮暂不能点的原因，贴在底栏上方（按钮用 aria-describedby 连着它） */
+[data-qx-page='print-done'] .pft-wait-why {
+  flex: none;
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 22px;
+  background: var(--qxt-well);
+  font-size: 22px;
+  line-height: 1.5;
+  color: var(--qxt-ink-2);
+  text-align: center;
+}

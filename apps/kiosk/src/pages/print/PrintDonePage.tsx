@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintJobTakeawayUrl } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { useAuth } from '../../auth/useAuth'
@@ -19,11 +18,10 @@ import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { helpNeededLine, peekSupportContact, preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
-import { PrintFillArt } from './art/PrintFillArt'
 import { PrintArt } from './art/PrintArt'
 import { PrintIcon } from './art/PrintIcon'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
-import { PrintMissResume } from './components/PrintMissResume'
+import { PrintDoneUnverified } from './components/PrintDoneUnverified'
 import { PrintDoneFailed, PrintDoneFeeInfo } from './components/PrintDoneFailed'
 import { failureCopy, failureSummaryRows, feeInfoCopy, paymentRow, type FailureVariant } from './components/printDoneFailedModel'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
@@ -322,56 +320,18 @@ export function PrintDonePage() {
   if (resultState === 'loading' || resultState === 'unknown') {
     const isLoading = resultState === 'loading'
     return (
-      <PrintTouchFrame
-        page="print-done"
-        legacyBody={false}
+      <PrintDoneUnverified
+        loading={isLoading}
+        hasTask={taskId !== null}
         title={isLoading ? '正在核验打印结果' : '无法确认打印结果'}
         subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : '当前未取得可信的任务终态，请勿据此判断已经出纸'}
-        status={{ tone: 'unknown', label: '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          isLoading ? (
-            <span className="why">核验完成后将显示真实结果或返回任务进度页</span>
-          ) : (
-            <>
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/')}>返回首页</button>
-              {taskId ? (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/me/print-orders')}>查看打印订单</button>
-              ) : null}
-              {canReportIssue ? (
-                <button type="button" className="qx-btn" data-variant="ghost" onClick={() => setFeedbackOpen(true)}>反馈问题</button>
-              ) : null}
-              <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>使用帮助</button>
-            </>
-          )
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-done" data-print-flow-step={6} data-testid={isLoading ? 'print-fulfill-state-loading' : 'print-fulfill-state-unknown'} className="qx-scroll pff-page pfp-miss">
-          <div className="qx-state" data-tone={isLoading ? 'info' : 'error'}>
-            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-            <div>
-              <div className="qx-state-t">{isLoading ? '正在向打印服务核验' : '暂未取得可信状态'}</div>
-              <div className="qx-state-d">
-                {isLoading
-                  ? '核验完成后将显示真实结果或返回任务进度页'
-                  : taskId
-                    ? '暂时无法核验这一单，请在打印订单中查看。'
-                    : '未找到打印任务上下文，请从打印入口重新开始'}
-              </div>
-            </div>
-          </div>
-          {isLoading ? null : (
-            <PrintMissResume
-              orderMayExist
-              onUpload={() => navigate(uploadPath)}
-              note="这一页不会把没核验到的结果说成已经出纸。"
-            />
-          )}
-          <PrintFillArt name="stack" />
-        </div>
-        {feedbackDialog}
-      </PrintTouchFrame>
+        onHome={() => navigate('/')}
+        onHelp={() => navigate('/help')}
+        onUpload={() => navigate(uploadPath)}
+        onOrders={() => navigate('/me/print-orders')}
+        onFeedback={() => setFeedbackOpen(true)}
+        dialog={feedbackDialog}
+      />
     )
   }
 

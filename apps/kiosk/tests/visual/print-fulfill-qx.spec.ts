@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
+import { RECRUITMENT_HOSTING_OFF, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import {
   assertNoElementCrossesViewport,
   assertNoHorizontalOverflow,
@@ -464,6 +465,152 @@ test('done with a real taskId whose status cannot be verified never claims there
   await expect(unknown).toContainText('打印有问题？')
   await expect(unknown).not.toContainText(NO_ORDER_CLAIM)
   await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  expect(errors).toEqual([])
+})
+
+// ── 完成页「无法确认打印结果」「正在核验打印结果」两态 ──
+// 稿里没有这两态；照同页失败各态与稿 st-unconfirmed 的做法：底栏用触屏三槽（返回首页 / 问小青 / 主按钮），不再是旧的小号 ctabar。
+// 「查看打印订单」「反馈问题」原先挤在旧 ctabar 里，现在放进正文出口，一个不丢。
+// 问小青只把本屏专属的一句话带到顾问页、由本人自己按发送；句子里写明：不要假装查过订单、不要替我判断有没有扣款。
+const UNKNOWN_ASK_LABEL = '问小青：结果没确认怎么办'
+const UNKNOWN_ASK_DRAFT = '这一页没能确认这次打印的结果，订单可能已经建立，我也说不准有没有下过单、扣没扣费。请告诉我接下来怎么核对：先看出纸口，再到「我的 → 打印订单」里看。不要假装已经查过我的订单，不要替我判断有没有扣款，不要猜成功或失败，也不要让我重复打印。'
+const LOADING_ASK_LABEL = '问小青：结果怎么还没出来'
+const LOADING_ASK_DRAFT = '这一页正在向打印服务核验这次打印的结果，还没有显示。请告诉我等的时候可以做什么、一直没有结果该怎么办。不要假装已经查到结果，也不要替我判断有没有出纸或扣款。'
+
+function registerAssistantShell(api: ApiRouter): void {
+  // 顾问页挂载时读终端配置与语音能力；形状同 W3 基线，招聘托管按云上默认关闭。
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w2-done-unverified-assistant'),
+  })
+  api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', {
+    status: 200,
+    json: { data: { asrEnabled: false, ttsEnabled: false } },
+  })
+}
+
+/** 底栏必须是触屏三槽：整页没有旧的小号 ctabar，三个键都在。 */
+async function expectTouchDock(page: Page, ask: string, primary: string): Promise<void> {
+  const dock = page.locator('.qxt-dock')
+  await expect(dock).toBeVisible()
+  await expect(page.locator('.qx-ctabar')).toHaveCount(0)
+  await expect(dock.getByRole('button', { name: '返回首页' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: ask, exact: true })).toBeVisible()
+  await expect(dock.getByTestId('print-fulfill-primary')).toHaveText(primary)
+}
+
+/** 点问小青：到顾问页，输入框里就是这一句、没有自动发送；读过一次就没有了。 */
+async function expectAskHandsOffOnce(page: Page, api: ApiRouter, ask: string, draft: string): Promise<void> {
+  await page.locator('.qxt-dock').getByRole('button', { name: ask, exact: true }).click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  const input = page.getByLabel('输入咨询问题')
+  await expect(input).toHaveValue(draft)
+  expect(api.requestCount('POST', '/api/v1/assistant/chat'), '问小青只填进输入框，不自动发送').toBe(0)
+  await page.goBack()
+  await page.locator('.qxt-nav button', { hasText: 'AI 顾问' }).first().click()
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('')
+}
+
+test('unknown done (status cannot be verified): touch dock with its own 问小青 question, feedback and orders stay in the body @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 503,
+    json: { error: { code: 'PRINT_STATUS_UNAVAILABLE', message: 'fixture status down' } },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '使用帮助')
+  // 旧 ctabar 里的另外两个出口挪进正文，一个不丢。
+  await expect(unknown.getByRole('button', { name: '反馈问题', exact: true })).toBeVisible()
+  await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeVisible()
+  // 不下结论、不找人、不说成已出纸。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(/联系现场|联系工作人员|找现场|找工作人员/)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expectTouchAndBounds(page)
+  // 整屏落在底栏之上：正文最后一块不压到底栏（旧版这一屏要靠把底栏顶出屏幕才放得下出口）。
+  await expect(unknown.getByRole('button', { name: '查看打印订单', exact: true })).toBeInViewport({ ratio: 1 })
+  expect(await page.evaluate(() => {
+    const dockTop = document.querySelector('.qxt-dock')?.getBoundingClientRect().top ?? 0
+    const exits = document.querySelector('[data-testid="print-fulfill-state-unknown"] .qxt-exits')?.getBoundingClientRect().bottom ?? 9999
+    return exits <= dockTop
+  }), '出口一排整个在底栏之上').toBe(true)
+  await page.screenshot({ path: test.info().outputPath('fulfill-unknown-dock.png'), fullPage: true })
+
+  // 问小青：本屏专属的一句话。草稿里要如实说「没能确认、订单可能已经建立」，并拦住假装查过订单、替人判断扣款、猜结果、重复打印。
+  for (const must of ['没能确认这次打印的结果', '订单可能已经建立', '不要假装已经查过我的订单', '不要替我判断有没有扣款', '不要猜成功或失败', '不要让我重复打印']) {
+    expect(UNKNOWN_ASK_DRAFT).toContain(must)
+  }
+  await expectAskHandsOffOnce(page, api, UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT)
+  expect(errors).toEqual([])
+})
+
+test('unknown done without task context: touch dock, help key, and no feedback or orders to attach to @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+
+  await page.goto('/print/done')
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  await expectTouchDock(page, UNKNOWN_ASK_LABEL, '使用帮助')
+  // 没有任务号：没有可关联的任务，也就没有「反馈问题」和「查看打印订单」（旧 ctabar 也是这样）。
+  await expect(page.getByRole('button', { name: '反馈问题', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '查看打印订单', exact: true })).toHaveCount(0)
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expectTouchAndBounds(page)
+  await expectAskHandsOffOnce(page, api, UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT)
+  await page.goto('/print/done')
+  await page.getByTestId('print-fulfill-primary').click()
+  await expect(page).toHaveURL(/\/help$/)
+  expect(errors).toEqual([])
+})
+
+test('loading done: touch dock, the primary key is off while verifying and says why @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerAssistantShell(api)
+  // 状态请求发出去、一直不回：页面就停在「正在核验」。
+  api.respondWith('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, () => new Promise(() => undefined))
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const loading = page.locator('[data-testid="print-fulfill-state-loading"]')
+  await expect(loading).toBeVisible()
+  await expect.poll(() => api.requestCount('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`), '真的在核验：状态请求已发出').toBeGreaterThan(0)
+  await expectTouchDock(page, LOADING_ASK_LABEL, '正在核验…')
+
+  // 主按钮：核验期间不可点，并且旁边写明原因（读屏用 aria-describedby 连着）。
+  const primary = page.getByTestId('print-fulfill-primary')
+  await expect(primary).toBeDisabled()
+  const why = '核验期间主按钮暂不能点：还没拿到这一单的真实状态，不知道下一步该做什么。'
+  await expect(loading.getByText(why, { exact: true })).toBeVisible()
+  await expect(primary).toHaveAccessibleDescription(why)
+  // 强行点也点不动：没有任何去处、页面还在核验。
+  await primary.click({ force: true })
+  await expect(page).toHaveURL(/\/print\/done$/)
+  await expect(loading).toBeVisible()
+  // 核验期间不挡路：返回首页、问小青仍可点。
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '返回首页' })).toBeEnabled()
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: LOADING_ASK_LABEL, exact: true })).toBeEnabled()
+  // 不说成已出纸、不下「没有订单」的结论。
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
+  await expectTouchAndBounds(page)
+  await page.screenshot({ path: test.info().outputPath('fulfill-loading-dock.png'), fullPage: true })
+
+  for (const must of ['不要假装已经查到结果', '不要替我判断有没有出纸或扣款']) {
+    expect(LOADING_ASK_DRAFT).toContain(must)
+  }
+  await expectAskHandsOffOnce(page, api, LOADING_ASK_LABEL, LOADING_ASK_DRAFT)
   expect(errors).toEqual([])
 })
 

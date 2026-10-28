@@ -694,16 +694,62 @@ test('PrintMissResume：orderMayExist 必传；出纸页、完成页三处传 tr
   // 出纸页的两种「没有任务可看」拆在 PrintProgressMissing（一处调用，两种情形共用）；页面本身只挑走哪一支。
   const progress = read('src/pages/print/PrintProgressPage.tsx')
   const progressMissing = read('src/pages/print/components/PrintProgressMissing.tsx')
+  // 完成页「没拿到可信结果」的两态（正在核验、无法确认）拆在 PrintDoneUnverified（一处调用，只有「无法确认」那一支画它）；页面本身只挑走哪一支。
   const done = read('src/pages/print/PrintDonePage.tsx')
+  const doneUnverified = read('src/pages/print/components/PrintDoneUnverified.tsx')
   assert.equal(callsTotal(progress), 0)
   assert.match(progress, /<PrintProgressMissing variant="no-context"/)
   assert.match(progress, /<PrintProgressMissing variant="not-created"/)
   assert.equal(callsTotal(progressMissing), 1)
   assert.equal(callsWithTrue(progressMissing), 1)
-  assert.equal(callsTotal(done), 1)
-  assert.equal(callsWithTrue(done), 1)
+  assert.equal(callsTotal(done), 0)
+  assert.match(done, /<PrintDoneUnverified\b/)
+  assert.equal(callsTotal(doneUnverified), 1)
+  assert.equal(callsWithTrue(doneUnverified), 1)
   assert.match(read('src/pages/print/components/PrintEmptyDesk.tsx'), /<PrintMissResume orderMayExist=\{false\}/)
-  assert.doesNotMatch(progress + progressMissing + done, /没有订单，也没有扣费/)
+  assert.doesNotMatch(progress + progressMissing + done + doneUnverified, /没有订单，也没有扣费/)
+})
+
+// ── 完成页「正在核验 / 无法确认」两态：底栏触屏三槽，问小青带本屏专属的一句话，核验期间主键不可点并写明原因 ──
+const unverifiedCopy = await import(transpile(join(kioskRoot, 'src/pages/print/components/printDoneUnverifiedCopy.ts')))
+
+test('完成页「无法确认」的问小青草稿：如实说没能确认、订单可能已建，不让小青假装查过订单或替人判断扣款', () => {
+  const { UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT } = unverifiedCopy
+  assert.match(UNKNOWN_ASK_LABEL, /^问小青：/)
+  assert.match(UNKNOWN_ASK_DRAFT, /没能确认这次打印的结果/)
+  assert.match(UNKNOWN_ASK_DRAFT, /订单可能已经建立/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要假装已经查过我的订单/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要替我判断有没有扣款/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要猜成功或失败/)
+  assert.match(UNKNOWN_ASK_DRAFT, /不要让我重复打印/)
+  assert.doesNotMatch(UNKNOWN_ASK_DRAFT, NO_ORDER_CLAIM)
+  assert.doesNotMatch(UNKNOWN_ASK_DRAFT, /帮你查|联系现场|找现场|联系工作人员|找工作人员/)
+})
+
+test('完成页「正在核验」的问小青草稿与主键原因：不假装查到结果，不替人判断出纸或扣款，原因写明', () => {
+  const { LOADING_ASK_LABEL, LOADING_ASK_DRAFT, LOADING_PRIMARY_LABEL, LOADING_PRIMARY_WHY } = unverifiedCopy
+  assert.match(LOADING_ASK_LABEL, /^问小青：/)
+  assert.match(LOADING_ASK_DRAFT, /不要假装已经查到结果/)
+  assert.match(LOADING_ASK_DRAFT, /不要替我判断有没有出纸或扣款/)
+  assert.doesNotMatch(LOADING_ASK_DRAFT, NO_ORDER_CLAIM)
+  assert.match(LOADING_PRIMARY_LABEL, /正在核验/)
+  assert.match(LOADING_PRIMARY_WHY, /核验期间主按钮暂不能点：还没拿到这一单的真实状态/)
+  assert.doesNotMatch(`${LOADING_ASK_DRAFT}${LOADING_PRIMARY_WHY}`, /帮你查|联系现场|找现场|联系工作人员|找工作人员/)
+})
+
+test('完成页「正在核验 / 无法确认」版式：底栏触屏三槽、不再传旧 ctabar；核验期间主键 disabled 并连着原因', () => {
+  // 剥注释再判：头注里会写「不说没有订单」这类说明，不是上屏文案。
+  const view = readFileSync(join(kioskRoot, 'src/pages/print/components/PrintDoneUnverified.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  assert.doesNotMatch(view, /ctabar=|navbar=/)
+  assert.match(view, /back=\{\{ label: '返回首页', onBack: onHome \}\}/)
+  assert.match(view, /printAsk\(LOADING_ASK_LABEL, LOADING_ASK_DRAFT\)/)
+  assert.match(view, /printAsk\(UNKNOWN_ASK_LABEL, UNKNOWN_ASK_DRAFT\)/)
+  assert.match(view, /primary=\{loading \? undefined : \{ label: '使用帮助', testId: 'print-fulfill-primary'/)
+  assert.match(view, /<button[^>]*className="qxt-btn qxt-btn-pri"[^>]*\sdisabled\s[^>]*aria-describedby=\{LOADING_WHY_ID\}/)
+  assert.match(view, /id=\{LOADING_WHY_ID\}/)
+  assert.doesNotMatch(view, /联系现场|找现场|联系工作人员|找工作人员/)
 })
 
 // ── 打印链上「去我的文档选一份来打印」只经 usePickPrintDocuments，落点带 ?pick=print ──
