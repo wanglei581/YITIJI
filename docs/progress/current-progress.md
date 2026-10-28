@@ -6,6 +6,7 @@
 - 稿里有、运行页没有真实数据的两处没有照画：问小青首屏的「最近办理」示例行换成真实的「本机 AI 专项」入口；待机屏的示例轮播不画，显示后台配的真实素材。屏上不写重测次数和秒数，次数只留给读屏。登录页保留分段切换与现有验证码流程，没有按稿改成整页入口行。
 - 删除：`pages/official-channels/official-channels-qx.css`（main 上原有；官方渠道页不再导入它，全仓库无其他引用）。另有 `pages/public-touch/PublicArt.tsx`、`pages/legal/legal-touch.css` 是本分支过程中新建又删掉的（被 `PublicIllus.tsx` 与 `legal-service-desk.css` 取代，相对 main 净无变化）。
 - 同步改了门禁与用例的真值（照稿，不放宽）：`verify-advisor-provider-gate`、`verify-fusion-w5`、`verify-kiosk-runtime-error-boundary`，以及 `fusion-smoke`、`fusion-w3`、`fusion-w5`、`official-channels` 等浏览器用例里对旧版式（折叠问答、输入框锁定、分区标题）的断言。
+- 验证（本机，Playwright 私有端口副本，逐套件前台真跑）：fusion-smoke、w1、w2、w3、w4、w5、w6（我方 9 条路由）、privacy、warning、privacy-clear、journeys 相关、truth、route-sweep、mic-capability、w16 均通过；用例写死官方端口的几条（w1 夹具三条、w5 `session-timeout`、privacy 一条、warning 整份、journeys `account-assets`）另用「只换端口」的用例副本真跑通过。`contract-review`、`scan-safety` 两套件本包没碰相关页面，未跑。首页入场动画与 `scan-session-truth` 各有一条在机器负载极高时失败、单独重跑通过，判为负载抖动。
 - 本机验证只证明页面在 1080×1920 与 390×844 的浏览器里按稿出现与可操作，不等于一体机现场验过。
 
 ## 2026-10-24：先收口机构账号真实开通（执行中）
