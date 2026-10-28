@@ -595,32 +595,52 @@ export function ResumeParsePage() {
     </ResumeTouchPage>
   )
 
+  // 还没开始解析（没有文件、等授权）：版式与等待时一致，只是不转圈、不说「在进行」，上面换成对应的一句说明。
+  const fileCaption = fileSize ? `${fileSize} · ${sourceLabel}` : sourceLabel
+  const pausedView = (title: string, note: string, art: 'plain' | 'blank', name: string, caption: string | null) => (
+    <ResumeReadingView
+      outcome="paused"
+      title={title}
+      liveNote={note}
+      art={art}
+      fileName={name}
+      fileCaption={caption}
+      steps={STEPS}
+      dimensions={DIMENSIONS}
+      notes={null}
+      unknownNote={null}
+    />
+  )
+
   // 没有文件就不问授权：授权是为了把文件交给 AI，手里没文件时弹授权只会把人绕进去。
   if (!fileId) {
     return renderFrame(
-      <p className="qxt-single" role="status">请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析。</p>,
+      pausedView('没有简历文件', '请回到来源选择，把简历交进来后，再开始 AI 诊断。本页不会凭空开始解析。', 'blank', '还没有拿到简历文件', null),
       { label: '回到来源选择', onClick: () => navigate('/resume/source'), noArrow: true },
     )
   }
 
   if (consent.checking || consent.needsPrompt) {
-    return (
-      <>
-        {renderFrame(
-          <p className="qxt-single" role="status">
-            {consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权'}
-          </p>,
-        )}
-        {consent.needsPrompt && (
-          <ResumeAiConsentDialog
-            busy={consent.busy}
-            error={consent.error}
-            guest={!getToken()}
-            onCancel={leaveToSource}
-            onConfirm={() => { void consent.confirm() }}
-          />
-        )}
-      </>
+    // 授权弹层放进触屏页的 overlay 槽：盖在这一屏上，底下的页面不可点，正文 20px 以上、按钮高 88。
+    return renderFrame(
+      pausedView(
+        consent.checking ? '确认授权中' : '等你确认授权',
+        consent.checking ? '正在确认授权状态…' : '使用简历 AI 前需要先确认授权',
+        'plain',
+        fileName || '这份简历',
+        fileCaption,
+      ),
+      undefined,
+      consent.needsPrompt ? (
+        <ResumeAiConsentDialog
+          variant="touch"
+          busy={consent.busy}
+          error={consent.error}
+          guest={!getToken()}
+          onCancel={leaveToSource}
+          onConfirm={() => { void consent.confirm() }}
+        />
+      ) : undefined,
     )
   }
 
@@ -651,7 +671,7 @@ export function ResumeParsePage() {
       outcome={outcome}
       title={liveTitle}
       fileName={fileName || '这份简历'}
-      fileCaption={fileSize ? `${fileSize} · ${sourceLabel}` : sourceLabel}
+      fileCaption={fileCaption}
       steps={STEPS}
       dimensions={DIMENSIONS}
       unknownNote={(

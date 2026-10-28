@@ -8,10 +8,13 @@ import './reading.css'
  * 小样与圆圈只表示在进行，不表示百分比；四条说明不打勾、不报阶段。
  * 运行页原有的游客声明、识别不清怎么办放在左栏小样与文件名下面（右栏只留稿里的内容，不会被挤出卡片）；
  * 结果未知 / 失败时把「在进行」换成对应的说明，结果未知的几段说明放在右栏，恢复动作由页面放进底栏主按钮。
+ * paused：还没开始解析（没有文件、等授权）。版式与等待时一致，只是不转圈、不说「在进行」，上面换成对应的一句说明。
  */
 export function ResumeReadingView({
   outcome,
   title,
+  liveNote = '以下是这次要处理的内容，不代表实时进度',
+  art = 'plain',
   fileName,
   fileCaption,
   steps,
@@ -19,9 +22,13 @@ export function ResumeReadingView({
   notes,
   unknownNote,
 }: {
-  outcome: 'failed' | 'unknown' | null
-  /** 「在进行」那一格的标题；等待时写「在进行」，失败 / 未知时写对应说明。 */
+  outcome: 'failed' | 'unknown' | 'paused' | null
+  /** 「在进行」那一格的标题；等待时写「在进行」，失败 / 未知 / 没开始时写对应说明。 */
   title: string
+  /** 标题下面的小字。默认是等待时的「不代表实时进度」；没开始解析时换成对应的一句话。 */
+  liveNote?: string
+  /** 左边小样：plain 是有内容的简历页，blank 是还没有文件时的空白页。 */
+  art?: 'plain' | 'blank'
   fileName: string
   fileCaption: string | null
   steps: ReadonlyArray<{ key: string; label: string; hint: string }>
@@ -57,23 +64,24 @@ export function ResumeReadingView({
       <p className="qxt-why"><QxTouchIcon name="shield" size={28} strokeWidth={2} /><span>发给 AI 之前会先遮住手机号、身份证号、邮箱、住址等个人信息。</span></p>
     </>
   )
+  const ended = outcome === 'failed' || outcome === 'unknown'
   return (
     <div className="qxt-readgrid">
       <div className="qxt-reader">
-        <ResumePaperArt width={520} state="plain" shadow={false} />
+        <ResumePaperArt width={520} state={art} shadow={false} />
         <p className="qxt-reader-cap"><b>{fileName}</b>{fileCaption ? <small>{fileCaption}</small> : null}</p>
         <div className="qxt-reader-notes">{notes}</div>
       </div>
       <div className="qxt-rcol">
         <div className="qxt-live" role="status" aria-live="polite" data-tone={outcome ?? 'running'}>
-          {outcome ? <QxTouchIcon name="alert" size={40} strokeWidth={2} /> : <span className="qxt-spin" aria-hidden="true" />}
+          {outcome === 'paused' ? <QxTouchIcon name="shield" size={40} strokeWidth={2} /> : outcome ? <QxTouchIcon name="alert" size={40} strokeWidth={2} /> : <span className="qxt-spin" aria-hidden="true" />}
           <div>
             <b>{title}</b>
-            <small>以下是这次要处理的内容，不代表实时进度</small>
+            <small>{liveNote}</small>
           </div>
         </div>
         {outcome === 'unknown' ? unknownNote : null}
-        {outcome ? <>{whys}{stepList}</> : <>{stepList}{dimList}{whys}</>}
+        {ended ? <>{whys}{stepList}</> : <>{stepList}{dimList}{whys}</>}
       </div>
     </div>
   )

@@ -338,9 +338,16 @@ export function ResumeOptimizePage() {
 
   if (consent.needsPrompt && !syntheticReady) {
     return (
-      <ResumeTouchPage title="优化建议" subtitle="基于已有内容优化表达" railNow={3} ask={ask} navTestIds={navTestIds} bodyClassName="qxt-body-scroll">
+      <ResumeTouchPage
+        title="优化建议"
+        subtitle="基于已有内容优化表达"
+        railNow={3}
+        ask={ask}
+        navTestIds={navTestIds}
+        bodyClassName="qxt-body-scroll"
+        overlay={<ResumeAiConsentDialog variant="touch" busy={consent.busy} error={consent.error} guest={!token} onCancel={() => navigate(-1)} onConfirm={() => { void consent.confirm() }} />}
+      >
         <section data-qx-page="optimize" data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="qxt-optimize" data-optimize-state="loading" />
-        <ResumeAiConsentDialog busy={consent.busy} error={consent.error} guest={!token} onCancel={() => navigate(-1)} onConfirm={() => { void consent.confirm() }} />
       </ResumeTouchPage>
     )
   }

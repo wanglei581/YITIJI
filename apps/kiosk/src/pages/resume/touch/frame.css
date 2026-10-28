@@ -4,6 +4,9 @@
 .qxt-screen .qxt-status.qx-pill { min-height: 0; }
 .qxt-screen .qxt-status.qx-pill::before { content: none; }
 
+/* 授权弹层的错误一句（ResumeAiConsentDialog variant="touch"）：要看得出来是出错了。 */
+.qxt-screen .qxt-dialog p[data-tone='bad'] { color: var(--qx-cinnabar); font-weight: 700; }
+
 /* 弹层里还不能点的主按钮（例如事实没勾全就不能确认导出）：仍可点到、点了不动作，样子要看得出来。 */
 .qxt-screen .qxt-dialog-btns .qxt-btn[aria-disabled='true'] { opacity: 0.45; }
 

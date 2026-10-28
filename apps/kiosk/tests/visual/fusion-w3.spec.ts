@@ -488,6 +488,9 @@ test('direct resume parse stays fail-closed without fake stages @w3-kiosk', asyn
   await expect(page).toHaveURL(/\/resume\/parse$/)
   // 缺文件不是「解析中」：四步轨停在第 1 步，不说「文件收到了」，胶囊说这一步没有文件。
   expect(await parseViewSnapshot(page)).toMatchObject({ state: 'missing-file', current: '上传与方向', pill: '这一步没有文件', saysReceived: false })
+  // 没有文件也是完整的读简历版式（空白页小样 + 一句说明 + 处理内容 + 两句声明），不是一句话下面空一整屏。
+  await expect(page.locator('[data-kiosk-screen="resume-parse"] .qxt-live[data-tone="paused"]')).toContainText('请回到来源选择，把简历交进来后，再开始 AI 诊断。')
+  await expect(page.getByRole('button', { name: '回到来源选择' })).toBeInViewport({ ratio: 1 })
   await assertNoHorizontalOverflow(page)
   await page.getByRole('button', { name: '回到来源选择' }).click()
   await page.waitForURL('/resume/source')
@@ -1258,6 +1261,21 @@ test('resume parse consent gate pauses the rail and sends nothing until granted 
   await expect(page.getByRole('dialog')).toBeVisible()
   expect(await parseViewSnapshot(page)).toMatchObject({ state: 'consent-needed', current: null, wait: 'AI 解析', pill: '等待授权', saysReceived: false })
   expect(parseCalls).toBe(0)
+  // 授权弹层是触屏弹层，盖在这一屏上：正文 20px 以上、两颗按钮都 ≥64 高；底下的页面被盖住（不可点、不被读屏），
+  // 但仍是完整的读简历版式（等你授权的说明、处理内容、六个维度、两句声明），不是一整屏空白。
+  const consentDialog = page.getByRole('dialog', { name: '确认使用简历 AI' })
+  await expect(consentDialog).toBeVisible()
+  const consentGeometry = await consentDialog.evaluate((dialog) => {
+    const sizes = Array.from(dialog.querySelectorAll('p')).map((node) => parseFloat(getComputedStyle(node).fontSize))
+    const buttons = Array.from(dialog.querySelectorAll('button')).map((button) => button.getBoundingClientRect())
+    const under = document.querySelector('.qxt-under')
+    return { minFont: Math.min(...sizes), buttonHeights: buttons.map((rect) => rect.height), underInert: under?.hasAttribute('inert') ?? false }
+  })
+  expect(consentGeometry.minFont).toBeGreaterThanOrEqual(20)
+  for (const height of consentGeometry.buttonHeights) expect(height).toBeGreaterThanOrEqual(64)
+  expect(consentGeometry.underInert).toBe(true)
+  await expect(page.locator('[data-kiosk-screen="resume-parse"] .qxt-live[data-tone="paused"]')).toContainText('使用简历 AI 前需要先确认授权')
+  await expect(page.locator('[data-kiosk-screen="resume-parse"] .qxt-rochips span')).toHaveCount(6)
   await page.getByRole('button', { name: '暂不使用' }).click()
   await page.waitForURL((url) => url.pathname === '/resume/source')
   expect(parseCalls).toBe(0)

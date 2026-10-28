@@ -67,8 +67,11 @@
   border: 1.5px solid var(--qxt-edge);
 }
 
+[data-qx-page='reading'] .qxt-live[data-tone='paused'] { background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); }
+[data-qx-page='reading'] .qxt-live[data-tone='paused'] small { color: var(--qxt-teal-ink); }
 [data-qx-page='reading'] .qxt-live[data-tone='failed'] { background: var(--qxt-cin-wash); }
 [data-qx-page='reading'] .qxt-live[data-tone='unknown'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
+[data-qx-page='reading'] .qxt-live svg { flex: none; }
 [data-qx-page='reading'] .qxt-live b { display: block; font-size: 26px; line-height: 1.3; }
 [data-qx-page='reading'] .qxt-live small { display: block; font-size: 20px; line-height: 1.35; color: var(--qxt-ink-3); }
 
@@ -183,17 +186,6 @@
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv div { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--qxt-well); }
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv dt { font-size: 20px; font-weight: 700; }
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv dd { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-2); }
-
-/* 没有文件 / 授权中的单句说明 */
-[data-qx-page='reading'] .qxt-single {
-  margin: 0;
-  padding: 24px 28px;
-  border-radius: 26px;
-  background: var(--qxt-well);
-  font-size: 26px;
-  line-height: 1.5;
-  color: var(--qxt-ink-2);
-}
 
 [data-qx-page='reading'] .qxt-dev { align-self: flex-start; min-height: 64px; padding: 0 16px; border-radius: 16px; background: var(--qxt-well); font-size: 20px; }
 
