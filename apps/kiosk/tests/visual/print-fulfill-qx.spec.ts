@@ -591,9 +591,11 @@ test('loading done: touch dock, the primary key is off while verifying and says 
   // 主按钮：核验期间不可点，并且旁边写明原因（读屏用 aria-describedby 连着）。
   const primary = page.getByTestId('print-fulfill-primary')
   await expect(primary).toBeDisabled()
-  const why = '核验期间主按钮暂不能点：还没拿到这一单的真实状态，不知道下一步该做什么。'
+  const why = '正在核对这一单的打印结果，核对完才能继续。'
   await expect(loading.getByText(why, { exact: true })).toBeVisible()
   await expect(primary).toHaveAccessibleDescription(why)
+  // 原因是对办事的人说的话：不带「主按钮」「真实状态」这类写给开发看的字眼。
+  await expect(page.locator('body')).not.toContainText(/主按钮|真实状态|不知道下一步/)
   // 强行点也点不动：没有任何去处、页面还在核验。
   await primary.click({ force: true })
   await expect(page).toHaveURL(/\/print\/done$/)

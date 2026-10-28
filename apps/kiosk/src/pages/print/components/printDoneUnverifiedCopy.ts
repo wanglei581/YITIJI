@@ -21,6 +21,6 @@ export const LOADING_ASK_DRAFT =
   + '请告诉我等的时候可以做什么、一直没有结果该怎么办。'
   + '不要假装已经查到结果，也不要替我判断有没有出纸或扣款。'
 
-/** 核验期间主按钮不可点：按钮上写状态，旁边的小字写原因。 */
+/** 核验期间主按钮不可点：按钮上写状态，旁边的小字写原因。小字是对办事的人说的话，不写「主按钮」「真实状态」这类写给开发看的字眼。 */
 export const LOADING_PRIMARY_LABEL = '正在核验…'
-export const LOADING_PRIMARY_WHY = '核验期间主按钮暂不能点：还没拿到这一单的真实状态，不知道下一步该做什么。'
+export const LOADING_PRIMARY_WHY = '正在核对这一单的打印结果，核对完才能继续。'

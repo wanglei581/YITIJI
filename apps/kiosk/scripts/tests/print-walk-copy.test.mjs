@@ -733,7 +733,9 @@ test('完成页「正在核验」的问小青草稿与主键原因：不假装�
   assert.match(LOADING_ASK_DRAFT, /不要替我判断有没有出纸或扣款/)
   assert.doesNotMatch(LOADING_ASK_DRAFT, NO_ORDER_CLAIM)
   assert.match(LOADING_PRIMARY_LABEL, /正在核验/)
-  assert.match(LOADING_PRIMARY_WHY, /核验期间主按钮暂不能点：还没拿到这一单的真实状态/)
+  // 旁边的小字是对办事的人说的话：说清在核对什么、核对完能做什么；不写「主按钮」「真实状态」这类写给开发看的字眼。
+  assert.equal(LOADING_PRIMARY_WHY, '正在核对这一单的打印结果，核对完才能继续。')
+  assert.doesNotMatch(LOADING_PRIMARY_WHY, /主按钮|真实状态|不知道下一步|不承诺/)
   assert.doesNotMatch(`${LOADING_ASK_DRAFT}${LOADING_PRIMARY_WHY}`, /帮你查|联系现场|找现场|联系工作人员|找工作人员/)
 })
 
