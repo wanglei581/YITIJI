@@ -249,6 +249,11 @@ test('success renders only server instructions and creates and cancels once in S
 })
 
 test('a session that expires while visible is cancelled and can no longer continue @kiosk', async ({ page, api }) => {
+  // 到期不依赖墙钟（审查意见 A6）：进页面前装假时钟，会话有效期写成固定的「现在 + 90 秒」，
+  // 等「扫描任务已创建」可见之后再快进。此前 expiresAt = 桩注册时刻 + 1.5 秒：随后还要整页加载、点「下一步」、等 URL，
+  // 机器一忙，页面收到会话时它已过期，直接渲染过期屏，「扫描任务已创建」永远看不到。
+  const NOW = new Date('2026-10-29T10:00:00+08:00')
+  await page.clock.install({ time: NOW })
   registerShell(api)
   const cancelRequests = countRequests(page, 'DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`)
   const ack = registerScanAck(page, api, { controlToken: CONTROL_TOKEN })
@@ -258,7 +263,7 @@ test('a session that expires while visible is cancelled and can no longer contin
       ...createdSession(),
       data: {
         ...createdSession().data,
-        expiresAt: new Date(Date.now() + 1_500).toISOString(),
+        expiresAt: new Date(NOW.getTime() + 90_000).toISOString(),
       },
     },
   })
@@ -269,6 +274,11 @@ test('a session that expires while visible is cancelled and can no longer contin
 
   await enterSettingsFromVisibleStart(page)
   await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  // 还没到期：此刻面板指引在、没有撤销请求、也没有过期屏。
+  await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toBeVisible()
+  expect(cancelRequests()).toBe(0)
+  await expect(page.getByText('这次扫描已过期', { exact: true })).toHaveCount(0)
+  await page.clock.fastForward(95_000)
   await expect(page.getByText('这次扫描已过期', { exact: true }).first()).toBeVisible({ timeout: 5_000 })
   await expect(page.getByRole('button', { name: '我已操作，开始等待' })).toHaveCount(0)
   await expect.poll(cancelRequests).toBe(1)
