@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1890 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1891 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -425,7 +425,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 551 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 552 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -746,6 +746,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/recruitment-touch/CampusServicePage.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/recruitment-touch/RecruitDoors.tsx` | `verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/recruitment-touch/RecruitTouchFrame.tsx` | `verify-fusion-w4.mjs` |
+| `apps/kiosk/src/pages/recruitment-touch/RtAskCard.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/recruitment-touch/RtFrame.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/recruitment-touch/RtHelpLine.tsx` | `verify-fusion-w4.mjs` |
 | `apps/kiosk/src/pages/recruitment-touch/RtRibbon.tsx` | `verify-fusion-w4.mjs` |

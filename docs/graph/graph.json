@@ -13567,7 +13567,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 678,
+      "reachableFileCount": 680,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13790,6 +13790,8 @@
           ],
           "path": "/campus",
           "styles": [
+            "apps/kiosk/src/components/qingxu/directory/directory-qx.css",
+            "apps/kiosk/src/pages/job-fairs/styles/fair-workbench-qx.css",
             "apps/kiosk/src/pages/recruitment-touch/recruit-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
@@ -16566,7 +16568,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 772
+      "sourceFileCount": 774
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -21263,6 +21265,9 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/recruitment-touch/RecruitTouchFrame.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs"
+    ],
+    "apps/kiosk/src/pages/recruitment-touch/RtAskCard.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/src/pages/recruitment-touch/RtFrame.tsx": [
@@ -29932,6 +29937,7 @@
           "apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx",
           "apps/kiosk/src/pages/placeholders/CampusWelcomePage.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RecruitTouchFrame.tsx",
+          "apps/kiosk/src/pages/recruitment-touch/RtAskCard.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtFrame.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtHelpLine.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtRibbon.tsx",
