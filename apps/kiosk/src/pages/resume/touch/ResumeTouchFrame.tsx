@@ -25,8 +25,8 @@ export type ResumeTouchFrameProps = {
   rail?: QxTouchRail
   stateId?: string
   overlay?: ReactNode
-  /** 传给底导航的 testid 前缀。不传则导航按钮没有 testid。 */
-  navTestIdPrefix?: string
+  /** 传给底导航三个按钮的 testid。不传则导航按钮没有 testid。 */
+  navTestIds?: { home?: string; advisor?: string; profile?: string }
 }
 
 export function ResumeTouchFrame(props: ResumeTouchFrameProps) {
@@ -60,7 +60,7 @@ export function ResumeTouchFrame(props: ResumeTouchFrameProps) {
           onHome={() => navigate('/')}
           onAdvisor={() => navigate('/assistant')}
           onProfile={() => navigate('/profile')}
-          testIdPrefix={props.navTestIdPrefix}
+          testIds={props.navTestIds}
         />
       )}
       overlay={props.overlay}

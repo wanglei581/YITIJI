@@ -427,7 +427,9 @@ assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.sto
 
 assertIncludes(optimize, 'QxPageFrame', 'optimize page uses the Qingxu frame')
 assertIncludes(generatePreview, 'ResumeTouchFrame', 'generate preview uses the touch frame')
-assertIncludes(generatePreview, 'navTestIdPrefix="resume-generate-preview-nav"', 'generate preview keeps the shared navbar destinations instead of a page-local bar')
+assertIncludes(generatePreview, "home: 'resume-generate-preview-nav-home'", 'generate preview keeps the shared navbar home destination instead of a page-local bar')
+assertIncludes(generatePreview, "advisor: 'resume-generate-preview-nav-advisor'", 'generate preview keeps the shared navbar advisor destination instead of a page-local bar')
+assertIncludes(generatePreview, "profile: 'resume-generate-preview-nav-profile'", 'generate preview keeps the shared navbar profile destination instead of a page-local bar')
 assertIncludes(generatePreview, '返回服务大厅', 'session-lost CTA matches prototype 返回服务大厅 → /')
 assertIncludes(generatePreview, '重新填一份', 'session-lost / failed CTA keeps the refill action under the prototype name')
 assertIncludes(generatePreview, '回去改资料', 'ready CTA refill is named 回去改资料')

@@ -16,6 +16,7 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { AdminPrintScanService } from './admin-print-scan.service'
 import { ApplyPrintScanActionDto } from './dto/apply-print-scan-action.dto'
 import { CancelUnpaidPrintTaskDto } from './dto/cancel-unpaid-print-task.dto'
+import { ListPrintScanTasksQueryDto } from './dto/list-print-scan-tasks.dto'
 import type {
   AdminCloseUnpaidPrintTaskResult,
   AdminPrintScanActionResult,
@@ -45,20 +46,18 @@ export class AdminPrintScanController {
   ) {}
 
   @Get('tasks')
-  async listTasks(
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-    @Query('terminalId') terminalId?: string,
-    @Query('page') pageStr?: string,
-    @Query('pageSize') sizeStr?: string,
-  ): Promise<ApiResponse<AdminPrintScanTaskPage>> {
+  async listTasks(@Query() query: ListPrintScanTasksQueryDto): Promise<ApiResponse<AdminPrintScanTaskPage>> {
+    const type = query.type?.trim() || 'print'
+    const status = query.status?.trim() || undefined
+    const terminalId = query.terminalId?.trim() || undefined
     return ApiResponse.ok(
       await this.printScan.listTasks({
-        type: type?.trim() || 'print',
-        status: status?.trim() || undefined,
-        terminalId: terminalId?.trim() || undefined,
-        page: safeInt(pageStr, 1, 1, 10_000),
-        pageSize: safeInt(sizeStr, 20, 1, 100),
+        type,
+        status,
+        terminalId,
+        page: safeInt(query.page, 1, 1, 10_000),
+        pageSize: safeInt(query.pageSize, 20, 1, 100),
+        unconfirmed: query.unconfirmed === '1',
       }),
     )
   }

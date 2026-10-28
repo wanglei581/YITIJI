@@ -8,6 +8,7 @@
 import type { OrgContentTrustStatus } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import { demoPartnerOrgType } from './partnerMockAdapter'
 
 export interface PartnerDashboardData {
   jobs: { total: number; published: number; pending: number }
@@ -73,10 +74,10 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
 }
 
 const MOCK_DASHBOARD: PartnerDashboardData = {
-  jobs: { total: 28, published: 24, pending: 2 },
+  jobs: { total: 9, published: 4, pending: 1 },
   fairs: { total: 5, published: 4, pending: 1 },
-  policies: { total: 6, published: 5, pending: 1 },
-  pendingTotal: 4,
+  policies: { total: 8, published: 4, pending: 2 },
+  pendingTotal: 6,
   sources: { total: 3, enabled: 2 },
   recentSyncs: [
     { id: 'mock-1', source: '市人才网 API（演示）', dataType: 'job', status: 'success', addedCount: 12, updatedCount: 3, errorCount: 0, syncTime: '2026-05-25 08:00' },
@@ -87,7 +88,7 @@ const MOCK_DASHBOARD: PartnerDashboardData = {
 const MOCK_PROFILE: PartnerOrgProfile = {
   id: 'mock-org',
   name: '演示机构（mock 模式）',
-  type: 'school',
+  type: 'licensed_hr_agency',
   contact: '演示联系人',
   contactPhone: '0532-00000000',
   sceneTemplate: 'campus',
@@ -108,14 +109,18 @@ export function getPartnerDashboard(): Promise<PartnerDashboardData> {
   return request<PartnerDashboardData>('/partner/dashboard')
 }
 
+function demoProfile(): PartnerOrgProfile {
+  return { ...MOCK_PROFILE, type: demoPartnerOrgType() }
+}
+
 /** 本机构档案。 */
 export function getOrgProfile(): Promise<PartnerOrgProfile> {
-  if (API_MODE !== 'http') return Promise.resolve(MOCK_PROFILE)
+  if (API_MODE !== 'http') return Promise.resolve(demoProfile())
   return request<PartnerOrgProfile>('/partner/profile')
 }
 
 /** 更新机构联系人 / 联系电话（其余字段由管理员管理）。 */
 export function updateOrgProfile(input: { contact?: string; contactPhone?: string }): Promise<PartnerOrgProfile> {
-  if (API_MODE !== 'http') return Promise.resolve({ ...MOCK_PROFILE, ...input })
+  if (API_MODE !== 'http') return Promise.resolve({ ...demoProfile(), ...input })
   return request<PartnerOrgProfile>('/partner/profile', { method: 'PUT', body: input })
 }

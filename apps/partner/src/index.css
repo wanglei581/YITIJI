@@ -22,3 +22,38 @@
     background-color: var(--color-canvas);
   }
 }
+
+.partner-print-only {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #partner-monthly-report,
+  #partner-monthly-report * {
+    visibility: visible;
+  }
+
+  #partner-monthly-report {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #fff;
+  }
+
+  .partner-print-only {
+    display: block !important;
+  }
+
+  .partner-print-hide,
+  #partner-monthly-report button,
+  aside,
+  header.ui-admin-topbar,
+  nav,
+  [role='tablist'] {
+    display: none !important;
+  }
+}

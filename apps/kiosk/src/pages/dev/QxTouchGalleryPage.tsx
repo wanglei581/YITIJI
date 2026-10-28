@@ -60,6 +60,7 @@ export function QxTouchGalleryPage() {
     return (
       <QxTouchScreen
         key={view}
+        gallery
         stateId={view}
         testId="touch-gallery"
         motion="enter"
@@ -77,6 +78,7 @@ export function QxTouchGalleryPage() {
   return (
     <QxTouchScreen
       key="parts"
+      gallery
       stateId="parts"
       testId="touch-gallery"
       motion="enter"

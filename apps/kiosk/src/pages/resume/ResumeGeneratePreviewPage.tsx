@@ -332,7 +332,11 @@ export function ResumeGeneratePreviewPage() {
         label: onExportScreen ? '返回预览' : '返回填写',
         onBack: () => { if (onExportScreen) backToPreview(); else go('/resume/generate') },
       }}
-      navTestIdPrefix="resume-generate-preview-nav"
+      navTestIds={{
+        home: 'resume-generate-preview-nav-home',
+        advisor: 'resume-generate-preview-nav-advisor',
+        profile: 'resume-generate-preview-nav-profile',
+      }}
       ctabar={<>{ctabar}<ResumeGenerateAiRow /></>}
     >
       <section
