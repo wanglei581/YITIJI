@@ -1,0 +1,325 @@
+/*
+ * 触屏屏里的旧共享件补样式。随 QxTouchScreen 在 touch-hero.css 之后引入，选择器都限定在 .qxt-screen 下，
+ * 非触屏页（2.0 页）一律不受影响。颜色与尺寸只走 var(--qx-*) / var(--qxt-*)，不写裸色值。
+ *
+ * 为什么需要：touch.css 里的按钮重置 .qxt-screen:where(.qxt-btn-reset) button（0,1,1）盖过了这些旧件用
+ * Tailwind 工具类写的边、底、内距、字号、字重，于是行业选项变成一片纯文字、选中态看不出，面板里的按钮只剩文字；
+ * 它们自带的 text-sm / text-xs 又低于触屏 20px 的字号下限，按钮 48–58px 高低于 64px。
+ * 重置保留（别的触屏页靠它），这里按组件补回，每个件只认自己的挂点：
+ *
+ *   选择弹窗   KioskFilterPickerModal  .ui-kiosk-modal-dialog 里含「section 里的 aria-pressed 按钮」。
+ *              弹窗和页面内容是兄弟节点，都在 .qxt-screen 里面。
+ *   手机扫码   UploadSessionQrPanel    文件按哈希冻结、没有专属类名，只能从外面认结构：
+ *              根 div 的孙辈是 lucide 手机图标（头部行 .flex.items-start → 图标格 .flex.shrink-0 → svg.lucide-smartphone）。
+ *   U 盘导入   ResumeUsbImportPanel    根 .resume-usb-panel 且直接子级含 __head。第四包的 unattended 版
+ *              （.resume-usb-panel.qxt-usb，没有 __head）是它自己的触屏版式，不在这里。
+ *   弹窗外壳   KioskModal              关闭键、操作区里的 ui Button、正文里的小字。
+ *
+ * 优先级：Tailwind 工具类在 @layer utilities 里，任何不分层的规则都压得过它；要压过的是按钮重置（0,1,1）和各页
+ * 沿用 2.0 的老规则（如 .interview-flow button[class*='h-12'] 的 min-height:56px，0,2,1）。所以按钮类规则
+ * 都挂在 .qxt-screen.qxt-btn-reset 下（只有开着重置的屏才需要补回；优先级 0,2,2 起），其余挂在 .qxt-screen 下。
+ * 页面自己为触屏写的补丁（[data-qx-page=…] 开头）和本文件冲突时按优先级谁高谁赢；两边同值的地方谁赢都不变样，
+ * 页面补丁可以逐步删掉。
+ * 一处例外：扫码面板的按钮认完整根结构，优先级自然到 0,7,3，会压过页面里泛化的按钮补丁（合同页的
+ * .qxt-body button:not(…)，0,6,1：只补底色、不补字色，会和主键的浅色字撞成看不见的字），这几颗按钮的外观归本文件管。
+ * 触屏下限：正文 ≥ 20px（--qxt-fs-aux），可点区 ≥ 64×64（--qxt-tap），禁用态降透明度（同 .qxt-btn:disabled 的 0.42）。
+ */
+
+/* ── 一、KioskModal 外壳（任何触屏屏里的弹窗）：关闭键不小于 64×64，正文里的 Tailwind 小字抬到 20px ── */
+.qxt-screen .ui-kiosk-modal-dialog .ui-kiosk-modal-close {
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+}
+
+.qxt-screen .ui-kiosk-modal-dialog .ui-kiosk-modal-content :is(.text-xs, .text-sm, .text-base, .text-lg) {
+  font-size: var(--qxt-fs-aux);
+}
+
+/* 操作区里的 ui Button（取消 / 去上传 / 同意并继续…）：次要键有边有底，主键深底浅字，危险键朱红 */
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-actions > button:where(.font-medium.transition-colors) {
+  gap: 8px;
+  min-width: var(--qxt-tap);
+  height: auto;
+  min-height: var(--qxt-tap);
+  padding: 0 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-actions > button:where(.font-medium.transition-colors)[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-actions > button:where(.font-medium.transition-colors)[class~="bg-error"] {
+  border-color: var(--qx-cinnabar);
+  background: var(--qx-cinnabar);
+  color: var(--qx-on-solid);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-actions > button:where(.font-medium.transition-colors):active {
+  transform: scale(0.97);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-actions > button:where(.font-medium.transition-colors):disabled {
+  opacity: 0.42;
+}
+
+/* ── 二、选择弹窗（KioskFilterPickerModal：行业 / 筛选）：两列大选项，选中深底浅字 ── */
+.qxt-screen .ui-kiosk-modal-dialog[role="dialog"]:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) {
+  width: min(880px, 100%);
+}
+
+/* 小标题行里的「当前：…」 */
+.qxt-screen .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section span {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+}
+
+.qxt-screen .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section .grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section button {
+  min-height: var(--qxt-tap);
+  padding: 8px 18px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qx-paper);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+  text-wrap: balance;
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section button:active {
+  transform: scale(0.98);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section button[aria-pressed="true"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-content section button:disabled {
+  opacity: 0.42;
+}
+
+/* 底部「清空筛选 / 完成」：自己写的 Tailwind 按钮，不带 ui Button 的标记 */
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-actions button {
+  gap: 10px;
+  min-width: var(--qxt-tap);
+  min-height: var(--qxt-tap);
+  padding: 0 28px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-actions button[class~="bg-primary-600"] {
+  border-color: var(--qx-deep);
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-actions button:active {
+  transform: scale(0.97);
+}
+
+.qxt-screen.qxt-btn-reset .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-actions button:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen .ui-kiosk-modal-dialog:where(:has(.ui-kiosk-modal-content section button[aria-pressed])) .ui-kiosk-modal-actions button svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ── 三、手机扫码上传面板（UploadSessionQrPanel）──
+   版式照稿 resume-src：卡片 + 标题说明 + 二维码 + 状态句 + 井色按钮；信息区不再另起一块底，二维码格保持白底（扫码要对比度） */
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)).rounded-lg {
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-card);
+  box-shadow: none;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) h2 {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) p {
+  color: var(--qxt-ink-2);
+  font-size: var(--qxt-fs-sub);
+  line-height: 1.5;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) p.font-bold {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+}
+
+/* 会员徽标、成功 / 失败提示条里的 Tailwind 小字 */
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) :is(.text-xs, .text-sm):not(p):not(button) {
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.4;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) :is([class~="bg-error-bg"], [class~="bg-success-bg"]) svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) > .grid > :last-child {
+  padding: 4px 8px;
+  background: transparent;
+}
+
+.qxt-screen div:where(:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone)) > .grid > :last-child > :last-child {
+  gap: 12px;
+}
+
+/* 按钮规则不用 :where 包住根结构：完整结构自然带来高优先级（0,7,3），压得过页面里泛化的补丁
+   （如合同页 .qxt-body button:not(…)，0,6,1，它只补了底色不补字色，会和主键的浅色字撞成看不见的字）。
+   这几颗按钮的外观归共享层管。注意：不写 display，第四包要靠 button:last-child{display:none} 把面板里的确认键收起来。 */
+.qxt-screen.qxt-btn-reset div:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone) button {
+  gap: 8px;
+  min-width: 120px;
+  height: auto;
+  min-height: var(--qxt-tap);
+  padding: 0 18px;
+  border-radius: 20px;
+  background: var(--qxt-well);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.qxt-screen.qxt-btn-reset div:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone) button[class~="bg-primary-600"] {
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+}
+
+.qxt-screen.qxt-btn-reset div:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone) button:active {
+  transform: scale(0.97);
+}
+
+.qxt-screen.qxt-btn-reset div:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone) button:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen.qxt-btn-reset div:has(> .flex.items-start > .flex.shrink-0 > svg.lucide-smartphone) button > svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+
+/* ── 四、U 盘导入面板（ResumeUsbImportPanel，非 unattended 版）── */
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) {
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: var(--qxt-r-btn);
+  background: var(--qxt-card);
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__head h2 {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-body);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) > .ui-kiosk-state-panel {
+  margin-top: 12px;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__hint,
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__empty {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+  line-height: 1.5;
+}
+
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__row {
+  gap: 14px;
+  min-height: 72px;
+  padding: 8px 18px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qx-paper);
+  color: var(--qxt-ink);
+  text-align: left;
+}
+
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__row:active {
+  background: var(--qxt-well);
+}
+
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__row:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__row > svg {
+  width: 28px;
+  height: 28px;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__name {
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__size {
+  color: var(--qxt-ink-3);
+  font-size: var(--qxt-fs-aux);
+}
+
+/* 「重新检测」：单独一颗，放在卡片白底上，要有边才看得出是按钮 */
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__actions button {
+  gap: 8px;
+  min-width: var(--qxt-tap);
+  height: auto;
+  min-height: var(--qxt-tap);
+  padding: 0 20px;
+  border: 1.5px solid var(--qxt-edge);
+  border-radius: 18px;
+  background: var(--qxt-card);
+  color: var(--qxt-ink);
+  font-size: var(--qxt-fs-sub);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__actions button:active {
+  transform: scale(0.97);
+}
+
+.qxt-screen.qxt-btn-reset .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__actions button:disabled {
+  opacity: 0.42;
+}
+
+.qxt-screen .resume-usb-panel:where(:has(> .resume-usb-panel__head)) .resume-usb-panel__actions button > svg {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
