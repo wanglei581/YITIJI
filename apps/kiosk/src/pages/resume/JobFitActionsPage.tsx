@@ -385,7 +385,7 @@ export function JobFitActionsPage() {
         ),
         cta: (
           <>
-            <CtaNote>服务不可用时不显示任何清单内容，也不承诺恢复时间。</CtaNote>
+            <CtaNote>AI 暂时不可用，这次没有行动清单。</CtaNote>
             <QxAction label="返回简历服务" variant="ghost" onClick={goResumeHub} />
             <QxAction label="返回比对结果" variant="primary" onClick={backToCompare} />
           </>

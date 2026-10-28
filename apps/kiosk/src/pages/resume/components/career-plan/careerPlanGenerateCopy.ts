@@ -4,11 +4,11 @@
 /** 底栏小字（CtaNote）的 id；置灰的主键用 aria-describedby 连着它。 */
 export const CAREER_AI_DOWN_WHY_ID = 'career-plan-ai-down-why'
 
-/** AI 停用时写在主键旁边的原因。有方案时是稿 career 的原句；没有方案时在稿「AI 暂时不可用。可以先打印求职参考单。」上加一句主键先停着。 */
+/** AI 停用时写在主键旁边的原因。两句都是稿 career 的原句：有方案时「这份方案还在，重新生成先停着」，没有方案时「可以先打印求职参考单」。 */
 export function careerAiDownWhy(hasPlan: boolean): string {
   return hasPlan
     ? 'AI 暂时不可用。这份方案还在，重新生成先停着。'
-    : 'AI 暂时不可用。生成求职方案先停着，可以先打印求职参考单；不承诺恢复时间。'
+    : 'AI 暂时不可用。可以先打印求职参考单。'
 }
 
 export function careerGenerateLabel(input: { hasPlan: boolean; generating: boolean; retry: boolean }): string {

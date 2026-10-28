@@ -214,7 +214,7 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
           <Sec title="不可用期间，这些仍然成立" hint="不因故障降低标准" grow>
             <Why items={[
               { head: '状态', title: '不做假降级', desc: '不会用模板结论或历史报告冒充这一次的分析结果。' },
-              { head: '恢复', title: '不承诺恢复时间', desc: '没有给出可用时间，本页也不写「稍后自动恢复」。' },
+              { head: '恢复', title: '还不确定什么时候能用', desc: '这项分析暂时用不了。先走上面三条路里的一条。' },
               { head: '数据', title: '材料仍在你这边', desc: '分析不可用不影响你查看、修改和打印自己的材料。' },
               { head: '费用', title: '本页没有发起支付', desc: '这条流程不含支付步骤；是否已计入当日次数，本页无法确认。' },
               { head: '边界', title: '仍不提供给企业', desc: '无论服务是否可用，简历都不会提供给企业或第三方。' },

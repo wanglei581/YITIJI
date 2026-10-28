@@ -199,7 +199,14 @@ expectAbsent(jobFitQxCss, /#[0-9a-f]{3,8}\b/i, '岗位匹配青序流光样式�
 expectIncludes(jobFitStates, '不显示匹配百分比、评分或通过率预测', '等待态不预告分数或通过率')
 expectIncludes(jobFitStates, '不把简历内容提供给企业或第三方', '等待态保留不提供给企业的边界')
 expectIncludes(jobFitStates, '不替你在来源渠道完成任何投递或预约动作', '等待态不伪称代办投递或预约')
-expectIncludes(jobFitStates, '不承诺恢复时间', 'AI 不可用时不伪造恢复时间')
+// AI 不可用时恢复时间没有任何依据：屏上只如实写「还不确定」，不预告恢复（「稍后自动恢复」「很快恢复」…），
+// 也不写给审稿人看的批注（「不承诺恢复时间」「本页也不写…」）—— 屏上的字是对办事的人说的话。
+expectIncludes(jobFitStates, '还不确定什么时候能用', 'AI 不可用时如实说恢复时间还不确定')
+expectAbsent(jobFitStates, /稍后自动恢复|很快(?:就)?恢复|马上恢复|预计[^。]{0,8}恢复/, 'AI 不可用时不预告恢复时间')
+expectAbsent(jobFitStates, /不承诺恢复时间|本页也不写/, 'AI 不可用屏上不写给审稿人看的批注')
+// 差距行动页 AI 停：底栏小字是稿这一态的原句，同样不写批注、不预告恢复。
+expectIncludes(jobFitActionsPage, 'AI 暂时不可用，这次没有行动清单。', '行动页 AI 不可用时底栏如实说这次没有行动清单')
+expectAbsent(jobFitActionsPage, /不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/, '行动页 AI 不可用屏上不写批注、不预告恢复')
 expectAbsent(jobFitRoute, /一键投递|立即投递|平台投递|投递简历/, '岗位匹配整条路由不出现平台内投递文案')
 
 expectIncludes(recordsPage, 'completedJobFitTaskIds', '我的 AI 记录识别已完成岗位匹配结果')

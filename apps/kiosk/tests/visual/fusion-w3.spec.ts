@@ -2254,6 +2254,9 @@ test('job fit outage and failure screens claim only what is provable @w3-kiosk',
   // 本页确实没有任何支付调用；但配额回滚是 best-effort，「未产生任何扣费」没有服务端证明。
   await expect(page.getByText('本页没有发起支付')).toBeVisible()
   await expect(page.getByText('未产生任何扣费')).toHaveCount(0)
+  // 恢复时间没有任何依据：屏上只如实写「还不确定」，不写「稍后自动恢复」这类预告，也不写给审稿人看的「不承诺…」「本页也不写…」。
+  await expect(page.getByText('还不确定什么时候能用')).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|本页也不写|稍后自动恢复/)
 
   api.respond('POST', '/api/v1/resume/job-fit', { status: 500, json: { error: { code: 'SERVER_ERROR', message: '分析失败' } } })
   await page.goto('/resume/job-fit?taskId=t-w3')
@@ -2347,7 +2350,7 @@ async function openWithRouteState(page: Parameters<typeof assertNoHorizontalOver
 }
 
 // ── 求职方案页底栏生成钮（稿 career）：已知 AI 停用 → 置灰、写明原因、点了不发请求；临时性错误 → 仍可点、字是「重试…」 ──
-const CAREER_AI_DOWN_WHY = 'AI 暂时不可用。生成求职方案先停着，可以先打印求职参考单；不承诺恢复时间。'
+const CAREER_AI_DOWN_WHY = 'AI 暂时不可用。可以先打印求职参考单。'
 const CAREER_AI_DOWN_WHY_WITH_PLAN = 'AI 暂时不可用。这份方案还在，重新生成先停着。'
 const CAREER_PLAN_PATH = '/api/v1/resume/career-plan/t-cp'
 
@@ -2360,6 +2363,8 @@ async function expectCareerGenerateKeyGreyed(page: Page, api: ApiRouter, label: 
   await expect(key).toHaveAttribute('aria-disabled', 'true')
   await expect(dock.getByText(why, { exact: true })).toBeVisible()
   await expect(key).toHaveAccessibleDescription(why)
+  // 原因是对本人说的一句话（稿原句）：不带「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
+  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|生成求职方案先停着|稍后自动恢复/)
   await expect(dock.getByRole('button', { name: /^重试生成/ })).toHaveCount(0)
   const posts = api.requestCount('POST', CAREER_PLAN_PATH)
   // Playwright 不肯点 aria-disabled 的按钮；强点一下真实指针、再直接触发 DOM click，确保页面的点击处理真的跑过、并自己短路。
@@ -2461,6 +2466,21 @@ test('job fit actions lists only returned items and keeps print honest @w3-kiosk
   await page.getByRole('button', { name: '返回行动清单' }).click()
   await expect(screen).toHaveAttribute('data-state', 'ready')
   expect(page.url()).not.toContain('/print/confirm')
+})
+
+test('job fit actions: an AI stop says in plain words there is no list, and keeps the non-AI exits @w3-kiosk', async ({ page, api }) => {
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/resume/job-fit/t-act', { status: 503, json: { error: { code: 'AI_NOT_CONFIGURED', message: 'AI 能力未配置' } } })
+  await page.goto('/resume/job-fit/actions?taskId=t-act')
+  const screen = page.locator('[data-kiosk-screen="resume-job-fit-actions"]')
+  await expect(screen).toHaveAttribute('data-state', 'ai-down')
+  // 底栏小字是对本人说的一句实话（稿 jobfit-actions 这一态的原句）：不写「不承诺恢复时间」这类写给审稿人看的批注，也不预告恢复。
+  await expect(page.locator('.qxt-dock').getByText('AI 暂时不可用，这次没有行动清单。', { exact: true })).toBeVisible()
+  await expect(page.locator('body')).not.toContainText(/不承诺恢复时间|稍后自动恢复|服务不可用时不显示任何清单内容/)
+  // 没有清单，也不拿别的内容顶替；AI 停了，不经过 AI 的出路照常可点。
+  await expect(page.getByText('缺少 Excel 数据整理经历')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /自己改简历/ })).toBeEnabled()
+  await expect(page.getByRole('button', { name: /打印现有简历/ })).toBeEnabled()
 })
 
 test('job fit actions: a print result arriving after leaving does not hijack navigation @w3-kiosk', async ({ page, api }) => {
