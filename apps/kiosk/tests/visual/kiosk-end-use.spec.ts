@@ -156,12 +156,15 @@ test('W-75 back home, idle 31s, open 我的 → 还是你吗？→ 不是我 cle
   await expect(dialog.getByRole('heading')).toHaveCount(0)
   await expect(page.locator('.qxt-back')).toHaveCount(0)
   await expect(page.locator('.qxt-nav')).toHaveCount(0)
-  await expect(page.locator('[data-qxt-ask]')).toHaveCount(0)
-  await expect(page.locator('.qxt-dock')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '是我，继续' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '不是我，结束上一位的使用' })).toBeVisible()
-  // 只有这两个出口：屏上除了两张答案卡，没有任何别的按钮可点（P0：不回答就离开会绕过「还是你吗？」）。
-  await expect(page.locator('[data-qxt-screen] button')).toHaveCount(2)
+  // 稿上这一屏的底栏「问小青」（AI 是驱动层）：底栏里只有这一颗，没有返回、没有主按钮。
+  // 点它会离开这一屏，所以「弹出了没回答」是粘性的——离开再回来仍是待确认，见下面 W-75 sticky 的用例。
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveCount(1)
+  await expect(page.locator('[data-qxt-ask="on"]')).toHaveText('问小青：这一页是什么意思？')
+  await expect(page.locator('.qxt-dock button')).toHaveCount(1)
+  // 屏上能点的只有这三个：两张答案卡和问小青，再没有别的按钮（P0：不回答就离开会绕过「还是你吗？」）。
+  await expect(page.locator('[data-qxt-screen] button')).toHaveCount(3)
   // 对话框语义：标题与说明读屏能念出来，且是模态的。
   await expect(page.getByRole('alertdialog', { name: '还是你吗？' })).toHaveCount(1)
   await expect(dialog).toHaveAttribute('aria-modal', 'true')
@@ -410,6 +413,51 @@ test('W-75 sticky: 弹出后站内直达 /profile 与 /me/*，都先问，不发
     await expectStillAsked(page, calls, mark, `直达 ${path}`)
   }
   await shot(page, '16-sticky-deeplinks.png')
+})
+
+test('W-75 sticky: 从交接页点「问小青」去顾问页，再回「我的」仍是待确认，全程不发 /me 请求 @end-use', async ({ page, api }) => {
+  await page.clock.install()
+  const calls = await routeMembers(page, api)
+  await allowLocalBootTicket(page)
+  await loginThroughVisibleUi(page, '/', WANG.phone)
+  const mark = await openHandover(page, calls)
+  const ask = page.locator('[data-qxt-ask="on"]')
+
+  // 点底栏「问小青」离开确认层，去顾问页：顾问页上没有上一位的任何东西，也不读「我的」。
+  await pace(page)
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await expect(page.locator('body')).not.toContainText(WANG.nickname)
+  await expectNoTraceOf(page, WANG)
+  await page.waitForTimeout(500)
+  await shot(page, '18-sticky-ask-assistant.png')
+
+  // 回来的每一条路都先问：底导航「我的」……
+  await pace(page)
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, mark, '问小青后点底导航「我的」')
+
+  // ……浏览器后退（回到的就是确认层）……
+  await pace(page)
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await pace(page)
+  await page.goBack()
+  await expectStillAsked(page, calls, mark, '问小青后浏览器后退')
+
+  // ……从顾问页回首页再点「我的」（首页自己读的「继续办理」不是「进我的」，从点「我的」那一下起算）。
+  await pace(page)
+  await ask.click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  await pace(page)
+  await nav(page, '首页').click()
+  await expect(page).toHaveURL(/\/$/)
+  await pace(page)
+  await page.waitForTimeout(500)
+  const beforeProfile = calls.length
+  await nav(page, '我的').click()
+  await expectStillAsked(page, calls, beforeProfile, '问小青后经首页再点「我的」')
+  await shot(page, '19-sticky-ask-home-then-nav.png')
 })
 
 test('W-75 sticky: 答「是我，继续」后解除，照常进「我的」并读取 @end-use', async ({ page, api }) => {

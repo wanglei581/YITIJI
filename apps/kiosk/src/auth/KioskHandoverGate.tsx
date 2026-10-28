@@ -56,6 +56,7 @@ export function KioskHandoverGate() {
         status={{ tone: 'warn', label: '待确认是不是你' }}
         back={false}
         nav={false}
+        ask={{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' }}
       >
         <p id="handover-desc">确认之前不会显示上一位的文件和订单。</p>
         <SettingsConfirm

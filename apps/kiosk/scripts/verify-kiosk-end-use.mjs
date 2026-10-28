@@ -186,8 +186,14 @@ check(
 )
 check(/ask: needsHandoverConfirm\(\)/.test(gate) && /decision\.key !== location\.key/.test(gate), '每换一次地址（含后退、深链）重新判一次')
 check(
-  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我，结束上一位的使用"/.test(gate) && /<SettingsConfirm/.test(gate) && /back=\{false\}/.test(gate) && /nav=\{false\}/.test(gate) && !/ask=\{\{/.test(gate),
-  '确认层复用卡片确认：「还是你吗？」「是我，继续」「不是我，结束上一位的使用」，且没有返回、底导航和问小青',
+  /title="还是你吗？"/.test(gate) && /confirmLabel="是我，继续"/.test(gate) && /cancelLabel="不是我，结束上一位的使用"/.test(gate) && /<SettingsConfirm/.test(gate) && /back=\{false\}/.test(gate) && /nav=\{false\}/.test(gate),
+  '确认层复用卡片确认：「还是你吗？」「是我，继续」「不是我，结束上一位的使用」，且没有返回和底导航',
+)
+// 稿上这一屏的底栏「问小青」（AI 是驱动层，label 与 draft 照稿）。它是能离开这一屏的出口，
+// 所以必须和上面的「待确认」粘性标记同在：离开再回来仍先问（浏览器用例 W-75 sticky 真跑）。
+check(
+  /ask=\{\{ label: '问小青：这一页是什么意思？', draft: '这一页是什么意思？' \}\}/.test(gate) && /markHandoverPending\(\)/.test(gate),
+  '确认层底栏有稿上的「问小青：这一页是什么意思？」，并和「待确认」粘性标记同在（出口不会绕过确认）',
 )
 const authContext = code('src/auth/AuthContext.tsx')
 check(/markKioskPresenceConfirmed\(\)/.test(authContext), '登录成功算本人刚确认过（扫码登录后直接进「我的」不再多问）')
