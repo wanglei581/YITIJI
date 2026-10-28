@@ -481,7 +481,9 @@ async function main(): Promise<void> {
     c.check('锁机时仍给品牌与点位（一体机要用它显示「暂时不能用」）', (await profileOf(termL, tokenL)).json.data.location === `授权点位${suffix}`)
     const profileAt = async (days: number) => {
       setLicenseClock(() => new Date(T0 + days * DAY))
-      return (await profileOf(termL, tokenL)).json.data as { licenseState: string | null; acceptsNewSessions: boolean; currentSessionMayContinue: boolean; noticeLine: string | null }
+      const r = await profileOf(termL, tokenL)
+      c.equal(`第 ${days} 天带着仍有效的会话问 profile：200（授权到期不能把在办的会话踢掉）`, `${r.status}:${r.json.error?.code ?? 'ok'}`, '200:ok')
+      return (r.json.data ?? {}) as { licenseState: string | null; acceptsNewSessions: boolean; currentSessionMayContinue: boolean; noticeLine: string | null }
     }
     const pOk = await profileAt(40)
     const pGrace = await profileAt(52)

@@ -141,6 +141,17 @@ async function main(): Promise<void> {
     const row6 = await prisma.license.findUniqueOrThrow({ where: { id: lic6.id } })
     c.check('吊销与更正同时来：不会出现「已吊销却被改了台数」', race.filter((r) => r.status === 200).length === 1 && (row6.status === 'revoked' ? row6.terminalQuota === 3 : row6.terminalQuota === 8))
 
+    // 同一条授权同时续期两次、同一时段同时新建两条：机构行锁把它们排成队，后到的看到先到的，恰好一个成功
+    const org13 = await newOrg('w13')
+    const base13 = await createLicense(org13, { from: 0, to: 30 })
+    const renewRace = await Promise.all([h.renewLicense(base13.id, { to: 60 }), h.renewLicense(base13.id, { to: 60 })])
+    c.equal('同一条授权同时续期两次（双击）：恰好一次成功，另一次 409 LICENSE_PERIOD_OVERLAP', renewRace.map((r) => `${r.status}:${r.json.error?.code ?? 'ok'}`).sort(), ['201:ok', '409:LICENSE_PERIOD_OVERLAP'])
+    c.equal('  库里只多了一条后续授权', (await detail(org13)).items.length, 2)
+    const org14 = await newOrg('w14')
+    const createRace = await Promise.all([createLicense(org14, { from: 0, to: 30 }), createLicense(org14, { from: 10, to: 40 })])
+    c.equal('同一机构同时新建两条重叠的授权：恰好一条成功', createRace.map((r) => `${r.status}:${r.error ?? 'ok'}`).sort(), ['201:ok', '409:LICENSE_PERIOD_OVERLAP'])
+    c.equal('  库里没有重叠的两条', (await detail(org14)).items.length, 1)
+
     // ── W3. 审计与改动同生共死 ───────────────────────────────────────────────
     console.log('\n[W3] 事务内审计：审计写失败则整个改动回滚')
     const org7 = await newOrg('w7')
