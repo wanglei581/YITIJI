@@ -9,7 +9,7 @@ import { QxTouchIcon } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
 import { PrintArt } from '../art/PrintArt'
 import type { ErrorArt, FileSourceErrorCopy } from './fileSourceErrorModel'
-import { displayFileName } from './FileSourceBits'
+import { displayFileName } from './fileSourceModel'
 
 function artOf(art: ErrorArt) {
   return art === 'phone'

@@ -14,8 +14,7 @@ import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
 import { PrintArt } from '../art/PrintArt'
-import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
-import type { FileSourceScreen, UploadTab } from './fileSourceModel'
+import { displayFileName, type FileSourceScreen, type UploadTab } from './fileSourceModel'
 import type { UsbImportHold } from '../../../hooks/useUsbImportGate'
 
 export function FileSourceStatus({
@@ -105,10 +104,6 @@ export function FileSourceSteps({ title, items }: { title?: string; items: strin
       </ol>
     </div>
   )
-}
-
-export function displayFileName(name: string): string {
-  return truncateFileNameMiddle(name, { maxLength: FILE_NAME_BUDGET_CARD })
 }
 
 export function FileRow({

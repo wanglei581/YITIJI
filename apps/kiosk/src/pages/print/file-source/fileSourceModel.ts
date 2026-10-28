@@ -4,6 +4,8 @@
 // `var STATES=[...]` 逐字对齐。运行时**不**实现 ?state= 夹具：带文件名的画面
 // 只来自真实上传 / 轮询结果，禁止 capture=1 伪造成功。
 
+import { FILE_NAME_BUDGET_CARD, truncateFileNameMiddle } from '../../../lib/fileName'
+
 export const FILE_SOURCE_SCREENS = [
   'source-chooser',
   'missing-file',
@@ -201,4 +203,9 @@ export function classifyUploadError(err: unknown): LocalRejectKind | 'failed' {
     return 'rejected'
   }
   return 'failed'
+}
+
+/** 文件卡上的文件名：长名字中段省略，完整名放在 title 与读屏里。上传页文件名只走这一处（verify:file-display-truth 钉着）。 */
+export function displayFileName(name: string): string {
+  return truncateFileNameMiddle(name, { maxLength: FILE_NAME_BUDGET_CARD })
 }
