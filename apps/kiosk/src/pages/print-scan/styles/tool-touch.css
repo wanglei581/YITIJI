@@ -131,55 +131,58 @@
 
 /* 手机不缩放时，410px 意图带把扫描正文挤到比底注还矮，底注滚不进可视区。
    只在舞台关闭时收这一壳，1080 舞台不吃。 */
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact {
   min-height: 0;
   padding: 10px 12px 0;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-hdr {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-hdr {
   height: auto;
   min-height: 48px;
   flex-wrap: wrap;
   gap: 6px 10px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-hdr-right {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-hdr-right {
   flex: 1 1 100%;
   margin-left: 0;
   justify-content: flex-start;
   flex-wrap: wrap;
   max-width: 100%;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-status {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-status {
   height: auto;
   min-height: 36px;
   max-width: 100%;
   white-space: normal;
   padding: 6px 12px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-clock b { font-size: 20px; }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask { padding: 8px 0 10px; }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask h1 { font-size: 28px; }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-band-compact .qxt-ask p {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-clock b { font-size: 20px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask { padding: 8px 0 10px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask h1 { font-size: 28px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-band-compact .qxt-ask p {
   margin-top: 4px;
   font-size: 16px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-rail {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-rail {
   gap: 8px;
   padding-bottom: 10px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-body {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
   padding: 8px 12px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .sw-page {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .sw-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .ph-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .i2p-page,
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .ss-page {
   min-height: 0;
   overflow: auto;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav { height: 64px; }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav button {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav { height: 64px; }
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav button {
   min-height: 64px;
   font-size: 13px;
   gap: 2px;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav svg {
+[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-nav svg {
   width: 22px;
   height: 22px;
 }
