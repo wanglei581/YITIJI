@@ -439,7 +439,10 @@ test('H7 after 结束使用 the print desk shows only the empty state @w2', asyn
 
   await page.goto(`/login?from=${encodeURIComponent('/me/documents')}`)
   await loginOnCurrentPage(page, '/me/documents')
-  await page.getByTestId('member-assets-document').filter({ hasText: doc.filename }).getByRole('button', { name: '打印', exact: true }).click()
+  // 触屏版我的文档：先点一行，操作才出现在行里（行是一颗带 aria-expanded 的展开按钮）。判据不变：这份文件的「打印」把它送去打印确认。
+  const docRow = page.getByTestId('member-assets-document').filter({ hasText: doc.filename })
+  await docRow.getByRole('button', { expanded: false }).click()
+  await docRow.getByRole('button', { name: '打印', exact: true }).click()
   await page.waitForURL((url) => url.pathname === '/print/confirm')
   await expect(page.locator('.print-file-name')).toHaveText(doc.filename)
 
