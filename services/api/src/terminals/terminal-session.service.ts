@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto'
 import { tryRedis } from '../common/redis/redis-degradation'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { assertOrgMaySignSessions } from '../licenses/license-gate'
 
 export interface TerminalTokenValidator {
   validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void>
@@ -51,7 +52,7 @@ export class TerminalSessionService {
     const raw = await this.readAndDelete(this.bootKey(ticket))
     if (!raw) throw this.invalid()
     const payload = this.parse(raw)
-    await this.assertCurrent(payload)
+    await this.assertCurrent(payload, { issuing: true })
     return this.issue(payload)
   }
 
@@ -61,7 +62,7 @@ export class TerminalSessionService {
     if (!raw) throw this.invalid()
     const payload = this.parse(raw)
     if (payload.terminalId !== terminalId) throw this.invalid()
-    await this.assertCurrent(payload)
+    await this.assertCurrent(payload, { issuing: true })
     // Keep the prior short session until its own TTL. A request that raced the
     // periodic refresh can still refresh instead of becoming a false 401.
     // Every token remains bounded by 30 minutes and is checked against enabled
@@ -75,7 +76,9 @@ export class TerminalSessionService {
     if (!raw) throw this.invalid()
     const payload = this.parse(raw)
     if (payload.terminalId !== terminalId) throw this.invalid()
-    await this.assertCurrent(payload)
+    // 校验已签发的会话：不看软件使用授权。授权到期只拦「新会话签发」（换票、续期），
+    // 正在办事的会话照常用到自然过期（≤ 30 分钟），不掐断群众手头的事。
+    await this.assertCurrent(payload, { issuing: false })
   }
 
   private async issue(payload: TerminalSessionPayload) {
@@ -87,12 +90,15 @@ export class TerminalSessionService {
     return { sessionToken, expiresInSeconds: SESSION_TTL_SECONDS }
   }
 
-  private async assertCurrent(payload: TerminalSessionPayload): Promise<void> {
+  private async assertCurrent(payload: TerminalSessionPayload, options: { issuing: boolean }): Promise<void> {
     const terminal = await this.prisma.terminal.findUnique({
       where: { id: payload.terminalId },
-      select: { enabled: true, credentialGeneration: true },
+      select: { enabled: true, credentialGeneration: true, orgId: true },
     })
     if (!terminal?.enabled || terminal.credentialGeneration !== payload.generation) throw this.invalid()
+    // 签发新会话（换票、续期）前核对所属机构的软件使用授权：机构需要授权且不可用时拒绝
+    // （403 TERMINAL_LICENSE_INACTIVE）。不管控的机构（所有现有机构的默认）一条查询就放行。
+    if (options.issuing) await assertOrgMaySignSessions(this.prisma, terminal.orgId)
   }
 
   private async read(key: string): Promise<string | null> {

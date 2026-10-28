@@ -3,6 +3,7 @@ import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.se
 import type { AssignTerminalOrgResult } from './terminals-admin.service'
 import { isParkedTerminalOrgType, orgTypeParkedError } from './terminal-org-parking'
 import { terminalOrgBindingWrite } from './terminal-org-binding'
+import { assertCanBindTerminal } from '../licenses/license-gate'
 
 export type TerminalOrgAssignmentAudit = (tx: PrismaTransactionClient, result: AssignTerminalOrgResult & {
   deploymentIds: string[]; effectiveAt: string
@@ -44,6 +45,9 @@ export async function assignTerminalOrganization(prisma: PrismaService, terminal
     if (changed.count !== 1) {
       throw new ConflictException({ error: { code: 'TERMINAL_ORG_CHANGED', message: '终端归属已变更，请刷新后重试' } })
     }
+    // 软件使用授权：把终端绑到「需要授权」的机构时，超过授权台数（或授权不可用）拒绝。
+    // 只管新增绑定——解绑、改绑到别的机构不受限，解绑立即释放名额；已绑终端运行期不按台数裁决。
+    if (orgId !== null && orgId !== oldOrgId) await assertCanBindTerminal(tx, prisma.dbKind, orgId, terminal.id)
     const current = await tx.terminal.findUniqueOrThrow({ where: { id: terminal.id }, select: { orgBoundAt: true } })
     const active = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: null }, select: { id: true, startedAt: true } })
     const latest = await tx.serviceDeployment.findFirst({ where: { terminalId: terminal.id, endedAt: { not: null } }, orderBy: { endedAt: 'desc' }, select: { endedAt: true } })

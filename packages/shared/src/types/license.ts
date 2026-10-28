@@ -187,7 +187,7 @@ export interface LicenseResumeInput {
 /**
  * PUT /admin/orgs/:orgId/license-mode。
  * 把没有可用授权的机构切到 required 会让它名下的终端不能开新会话——此时必须带 confirmLockout: true，
- * 否则服务端回 409 LICENSE_MODE_WOULD_LOCK_TERMINALS（details.terminalCount 给界面做二次确认）。
+ * 否则服务端回 409 LICENSE_MODE_WOULD_LOCK_TERMINALS（文案写明受影响终端数；界面也可先用 terminalsBound 做二次确认）。
  */
 export interface SetLicenseModeInput {
   licenseMode: LicenseMode

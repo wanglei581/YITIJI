@@ -58,6 +58,7 @@ import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
 import { HelpModule } from './help/help.module'
 import { LegalModule } from './legal/legal.module'
 import { SupportContactModule } from './support-contact/support-contact.module'
+import { LicenseModule } from './licenses/license.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
@@ -170,6 +171,8 @@ const redisUrl = process.env['REDIS_URL']
     HelpModule,
     LegalModule,
     SupportContactModule,
+    // 软件使用授权（期限 + 终端台数 + 到期停用）。
+    LicenseModule,
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,
