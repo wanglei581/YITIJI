@@ -480,9 +480,12 @@ export function PrintScanHomePage() {
 
   // 稿 st-device-off：确定缺纸时是另一版面（眉题「打印 · 扫描 · 复印」、无步骤轴、无印章）；离线、异常、暂停接单仍是 print?printer=down 的版面。
   const paperOff = hubState === 'device-off' && device.printer.errorCode === 'paperEmpty' && !device.printerNotice
+  // 稿：st-loading「问小青：怎么选打印方式？」、st-device-off「问小青：缺纸了文件还要传吗？」、默认「问小青：怎么选打印方式 →」。
   const askLabel = paperOff
     ? '问小青：缺纸了文件还要传吗？'
-    : '问小青：怎么选打印方式 →'
+    : hubState === 'capability-loading'
+      ? '问小青：怎么选打印方式？'
+      : '问小青：怎么选打印方式 →'
   const hubSubtitle = hubState === 'capability-loading'
     ? '确认前，打印、扫描这几项先不进入；到机码、复印照常可用。'
     : paperOff

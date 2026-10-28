@@ -9,9 +9,15 @@
 - 稿与运行页的差异处理：选文件来源页没有主按钮；扫码枪说明在说明卡里原地展开，不另起一屏；到机码页键盘下面只留一行折叠「两种码的区别 · 码找不到了」；核对价格页用这一份文件自己的第一页做小样（读不出来退成文件图标）；打印各页补底部导航（稿里首页、选文件、手机传文件亮「首页」，其余不亮）。
 - 同时修了随这批改版暴露的两处运行页问题：收银页失败固定句末尾「请联系现场工作人员」改为只拿掉这一截并保留原因前半句（安全校验失败不再被泛化成创建任务失败）；免费单核对价格页不再出现优惠券卡、收银页免费单摘要不再说「付款」。
 - 仍未做到与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3.md`。
-## 2026-10-28（夜）：第 3 包按审查意见修改（分批推送到 `claude/kiosk-touch-p3`，进行中）
+## 2026-10-28（夜）：第 3 包按审查意见修改（分批推送到 `claude/kiosk-touch-p3`，未合并、未部署、真机未验）
 
-- 删除记录：删除 `apps/kiosk/src/pages/print/components/PrintDeskChrome.tsx`（稿 13 的只读引导与步骤轨）。理由：材料检查页与预览页改用触屏意图带和底栏问小青后弃用，成了孤儿。证据：全仓除生成产物 `docs/graph/orphans.md` 外零引用（无路由、无 import、无门禁、无文档、无 CI），`node scripts/project-graph-query.mjs file` 显示没有任何门禁断言它；Git 历史保留（03af40238c、6dd95d40b6）。
+- 范围：Claude 审查子代理在合并提交 `1fc2a36dd` 上提的 13 条代码审查加 2 条反方审查意见，逐条返工；并入第一包新头 `aed1b6512`（触屏底栏在手机宽下收进一屏），390×844 的「价格变动提示与再确认键」用例转绿。
+- 做了什么：①打印实物小样的色值挪进只含令牌声明的 `art/print-art-tokens.css`（`verify:kiosk-visual-unity` 转绿，色值一个不改）；②w5「派生产物直达核对价格」接上小样要取的文件内容、privacy 的严格模式冲突收窄到意图带；③出纸页、完成页没拿到任务信息时不再说「没有订单、没有扣费」（`PrintMissResume` 必传 `orderMayExist`，订单可能已建已付就只说说不准并给出路，付款之前的空态保留原句）；④打印链上「去我的文档选一份来打印」收成一个 hook，落点带 `?pick=print`，登录回跳也带；⑤收银台第一屏订单摘要收成三行、其余事实折进「更多订单信息」、「退出支付」挪到收款码卡下面，底栏三个键的字不再被截，稿的问句「问小青：这笔账看不懂」原样保留；⑥完成页普通失败、卡纸、缺纸、费用说明与出纸页查询超时、已知失败，照稿 st-unconfirmed 的骨架重做（三步 + 摘要 + 出口 + 小字，底栏触屏三槽，「文件带走」做成触屏卡），真实状态与分支一个不丢；⑦上传类八种出错屏收成同一块出错板件（稿 st-error）；⑧服务台可点卡读屏名只取标题、说明句进描述；⑨取件页「历史 10 位码」键读屏名取可见文字；完成页「查看打印订单」副题只在建单响应确认关联账号时才写「这一单的记录」。
+- 拆分（拆分只搬不改行为，门禁只改读取范围）：`PrintDonePage` 820 → 620 行（失败各态进 `components/PrintDoneFailed.tsx`，文案与摘要行是纯函数 `printDoneFailedModel.ts`），`PrintProgressPage` 848 → 701 行（轮询常量与三态话术进 `printProgressStatus.ts`，缺任务两支进 `PrintProgressMissing.tsx`），`FileSourceBits` 833 → 约 450 行（手机各态进 `FileSourcePhone.tsx`、U 盘各态进 `FileSourceUsb.tsx`、出错板件 `FileSourceError.tsx` 与纯文案 `fileSourceErrorModel.ts`）。
+- 删除记录（均有证据：无路由、无 import、无门禁与用例引用、无文档声明，已跑相关门禁与图谱）：`components/PrintDeskChrome.tsx`（材料检查与预览改用触屏意图带后成了孤儿，图谱孤儿清单第一条）；`PrintDoneSections` 里只给旧失败版式用的 `PrintDoneXq` / `PrintFeeBoundaryBar` / `PrintOutOfPaperPanel` / `PrintJamGuide`；`printProgressModel` 里只给旧小青区用的 `outOfPaperDoing` / `failureStaffDoing`；`FileSourceBits` 里的 `FileSourceHero` / `FileSourceReason` / `ExistingSourceLinks` / `RejectBoard` 与 `fileSourceModel` 里只给 `FileSourceHero` 用的 `FILE_SOURCE_ASK` / `fileSourceEyebrow`。Git 历史保留。
+- 门禁与用例（强度不变，改过的逐条做了反向检查）：`verify-print-done-truth` 三处锚点改读新文件，`verify-fusion-w2-print-scan` / `verify-print-confirm-honest` / `verify-file-display-truth` 只加读取范围；`print-fulfill-qx` / `print-done-truth` 的选择器改到新结构；新增用例：来源页与空态「我的文档」带 `pick=print`、完成页订单磁贴副题、收银台第一屏、缺纸版面、五种出错屏共用一块板件、问小青交接补回真检查态；`print-walk-copy` 单测加失败文案模型、出错文案模型与版式要点。
+- 反向检查发现的一处覆盖缺口：隐去服务台缺纸版面里的「先传、稍后打印」，所有既有用例照样绿；已补一条 `print-hub-qx` 用例，缺纸版与离线版各验过。
+- 验证与已知差异见 `/Users/wanglei/.cache/claude-lanes/touch-impl-1025/grok/out-CL-p3-fix.md`。
 
 ## 2026-10-27（晚）：管理员看得到全部机构的未结报障、月报与出纸未确认（含后端只读接口，产品负责人已同意，#1500 新一轮三项全绿后自动合并，未部署）
 

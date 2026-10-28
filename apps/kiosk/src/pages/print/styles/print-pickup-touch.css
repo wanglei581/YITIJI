@@ -264,7 +264,8 @@
   font-weight: 700;
 }
 
-[data-qx-page='print-pickup'] .qxt-btn.pcp-mini[aria-pressed='true'] {
+[data-qx-page='print-pickup'] .qxt-btn.pcp-mini[aria-pressed='true'],
+[data-qx-page='print-pickup'] .qxt-btn.pcp-mini[data-active='true'] {
   border-color: var(--qxt-teal-ink);
   background: var(--qxt-teal-wash);
   color: var(--qxt-teal-ink);

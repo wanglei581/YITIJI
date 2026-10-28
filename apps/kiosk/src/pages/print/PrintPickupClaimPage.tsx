@@ -427,10 +427,12 @@ export function PrintPickupClaimPage() {
   const modeRow = (
     <div className="pcp-pickrow">
       {/* 读屏名取可见文字（WCAG 2.5.3：语音控制喊「点历史 10 位码」要对得上）；两种状态的可见字本来就不同，
-          所以这个键是一次动作、不是开关，不加 aria-pressed，也不再另写和可见字不一致的 aria-label。 */}
+          所以这个键是一次动作、不是开关，不加 aria-pressed，也不再另写和可见字不一致的 aria-label。
+          选中的深底样式改挂 data-active（不是 ARIA 属性，读屏不播报），外观与原来一致。 */}
       <button
         type="button"
         className="qxt-btn pcp-mini"
+        data-active={legacyMode ? 'true' : undefined}
         disabled={loading}
         onPointerDown={(event) => event.preventDefault()}
         // 只切显示格数与键盘；受理正则同时接受两种码，不改判据也不清空已输内容。

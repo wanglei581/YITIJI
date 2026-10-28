@@ -176,6 +176,8 @@ test('print hub capability-loading fail-closes all eight cards @w2', async ({ pa
   await page.goto('/print-scan')
   await expect(page.locator('[data-testid="print-hub-state-capability-loading"]')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '正在确认这台机器能做什么。' })).toBeVisible()
+  // 稿 st-loading 的问句原样：「问小青：怎么选打印方式？」（默认态才带箭头）。
+  await expect(page.getByRole('button', { name: '问小青：怎么选打印方式？', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /打印文件/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: /到机码核销/ })).toBeEnabled()
   await expectNoForgedReady(page)
