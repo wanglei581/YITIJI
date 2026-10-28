@@ -102,7 +102,7 @@ import {
 import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/self-assessment/SelfAssessmentConsentKit'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
-import type { QxTouchIconName } from '../../components/qingxu/touch/QxTouchIcon'
+import { toSaActItems } from './touch/saActItems'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
@@ -185,16 +185,7 @@ function saExits(go: NavigateFunction, from: string, resumable: boolean) {
   ]
 }
 
-function saActItems(go: NavigateFunction, from: string, resumable: boolean) {
-  const icon: Record<string, QxTouchIconName> = { start: 'pen', hub: 'file', records: 'clipboard', login: 'user' }
-  return saExits(go, from, resumable).map((item) => ({
-    title: item.title,
-    desc: item.desc,
-    take: '打开',
-    icon: icon[item.key] ?? 'file',
-    onClick: item.onClick,
-  }))
-}
+const saActItems = (go: NavigateFunction, from: string, resumable: boolean) => toSaActItems(saExits(go, from, resumable), '打开')
 
 // ============================================================
 // 1) 同意页

@@ -285,24 +285,6 @@
   color: var(--qxt-cream);
 }
 
-.qxt-screen .rtp .sa-pick {
-  display: flex;
-  gap: 15px;
-  align-items: flex-start;
-  min-height: 112px;
-  padding: 17px 20px;
-  border: 1.5px solid var(--qx-line);
-  border-radius: 22px;
-  background: var(--qx-paper);
-  color: var(--qx-ink);
-  text-align: left;
-}
-
-.qxt-screen .rtp .sa-pick[data-lead='true'] {
-  border-color: var(--qx-teal);
-  background: var(--qx-teal-soft);
-}
-
 .qxt-screen .qx-scroll:has(.rtp-acts),
 .qxt-screen .rtp-fill > main:has(.rtp-acts),
 .qxt-screen .rtp-fill > section:has(.rtp-acts) {

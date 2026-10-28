@@ -102,7 +102,6 @@
    用显式 data-grow 而不是 :first-of-type / :last-child ——
    2026-09-20 服务台那次 400px 死白就是 `:first-of-type` 按标签名算、一次都没命中。 */
 .sa-card[data-grow='true'] { flex: 1 0 auto; display: flex; flex-direction: column; }
-.sa-card[data-grow='true'] > .sa-picks { flex: 1 0 auto; grid-auto-rows: minmax(112px, 1fr); }
 .sa-card[data-grow='true'] > .sa-map { flex: 1 0 auto; grid-auto-rows: minmax(100px, 1fr); }
 
 /* ── 事实胶囊（稿 .task） ─────────────────────────────────────── */
@@ -285,27 +284,6 @@
 .sa-meta dt { font-size: var(--qxt-fs-aux); font-weight: 800; color: var(--qx-teal-d); }
 .sa-meta dd { margin: 7px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.44; color: var(--qx-ink-2); overflow-wrap: anywhere; }
 .sa-mono { font-family: var(--qx-mono); font-variant-numeric: tabular-nums; }
-
-/* ── 出口卡（稿 .picks） ─────────────────────────────────────── */
-.sa-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
-.sa-picks[data-cols='3'] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.sa-pick {
-  display: flex; gap: 15px; align-items: flex-start;
-  min-height: 112px; padding: 17px 20px;
-  border: 1.5px solid var(--qx-line); border-radius: 22px;
-  background: var(--qx-paper); color: var(--qx-ink);
-  font-family: var(--qx-sans); text-align: left; cursor: pointer;
-}
-.sa-pick i {
-  flex: none; display: grid; place-items: center;
-  width: 46px; height: 46px; border-radius: 15px;
-  background: var(--qx-teal-soft); color: var(--qx-teal-d);
-  font-style: normal; font-size: 20px; font-weight: 800;
-}
-.sa-pick b { display: block; font-size: 20px; }
-.sa-pick p { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.42; color: var(--qx-ink-2); }
-.sa-pick[data-lead='true'] { border-color: var(--qx-teal); background: var(--qx-teal-soft); }
-.sa-pick:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 3px; }
 
 /* ── 说明条与底部 truth（稿 .notice / .rail） ─────────────────── */
 .sa-notice {

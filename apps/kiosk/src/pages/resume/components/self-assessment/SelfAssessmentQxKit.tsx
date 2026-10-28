@@ -192,37 +192,6 @@ export function SaGate({ tone, children }: { tone: 'ok' | 'warn'; children: Reac
   )
 }
 
-/** 稿的 `.picks`：现在就能打开的出口。没有 onClick 的一律不渲染成按钮。 */
-export function SaPicks({
-  cols = 2,
-  items,
-}: {
-  cols?: 2 | 3
-  items: readonly { key: string; icon: string; title: string; desc: string; lead?: boolean; onClick: () => void; route: string }[]
-}) {
-  return (
-    <div className="sa-picks" data-cols={String(cols)}>
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          className="sa-pick"
-          data-lead={item.lead ? 'true' : undefined}
-          data-route={item.route}
-          data-testid={`self-assessment-pick-${item.key}`}
-          onClick={item.onClick}
-        >
-          <i aria-hidden="true">{item.icon}</i>
-          <span>
-            <b>{item.title}</b>
-            <p>{item.desc}</p>
-          </span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /** 稿的 `.notice`：一条贴边说明，不抢主操作。 */
 export function SaNotice({ children }: { children: ReactNode }) {
   return (

@@ -1,39 +1,6 @@
-/* 稿 24 填写流：分段进度、说明卡、核对屏。挂在 .qx-resume-generate 下。 */
+/* 稿 24 填写流：说明卡、核对屏。挂在 .qx-resume-generate 下。（页内第二条分段进度已删，步骤只在意图带的 rail 上。） */
 
 .qx-resume-generate { font-size: var(--qx-fs-body); }
-
-.qx-resume-generate .qx-rg-prog {
-  flex: none;
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.qx-resume-generate .qx-rg-prog li {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--qx-ink-3);
-  white-space: nowrap;
-}
-.qx-resume-generate .qx-rg-prog u {
-  display: block;
-  height: 9px;
-  border-radius: 5px;
-  background: var(--qx-line);
-  text-decoration: none;
-}
-.qx-resume-generate .qx-rg-prog li[data-on='done'] { color: var(--qx-teal-d); }
-.qx-resume-generate .qx-rg-prog li[data-on='done'] u { background: var(--qx-teal); }
-.qx-resume-generate .qx-rg-prog li[data-on='now'] { color: var(--qx-ink); }
-.qx-resume-generate .qx-rg-prog li[data-on='now'] u { background: var(--qx-deep); }
 
 .qx-resume-generate .qx-rg-helper,
 .qx-resume-generate .qx-rg-reason,
