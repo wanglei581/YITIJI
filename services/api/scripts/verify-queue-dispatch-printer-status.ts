@@ -74,6 +74,12 @@ function assertKioskFailClosed(): void {
       /import \{[^}]+\} from '\.\.\/services\/api\/screensaver'\n/,
       'const getTerminalId = () => ""\nconst subscribeTerminalIdentity = () => () => undefined\n',
     )
+    // 无人值守标准句（copy/unattendedCopy，打印闸门说明）：本门禁只验状态映射，把这句换成同形状的桩，
+    // 不让临时目录里解析不到相对路径。
+    .replace(
+      /import \{[^}]+\} from '\.\.\/copy\/unattendedCopy'\n/,
+      'const machineUnusableLine = () => "queue-gate-notice"\n',
+    )
     .replace(/import\.meta\.env/g, '({} as { VITE_PRINTER_NAME?: string })')
   const dir = mkdtempSync(join(tmpdir(), 'kiosk-printer-map-'))
   const file = join(dir, 'map-terminal-printer-status.ts')
