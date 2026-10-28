@@ -37,6 +37,7 @@ import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewShell } from './InterviewShell'
+import { assistantOffAsk, interviewAiPill, isAiGateDown, useInterviewAiCapabilities } from './useInterviewAiCapabilities'
 import { InterviewNote, InterviewStatus } from './interviewQxParts'
 import { scrollInterviewToTop } from './interviewScroll'
 import type { InterviewStage } from './interviewWorkbenchModel'
@@ -52,6 +53,7 @@ import './styles/interview-workbench-qx.css'
 import './styles/interview-qx2.css'
 import './styles/interview-touch-setup.css'
 
+const INTERVIEWER_AI_DRAFT = '我正在选择面试官。请先问我想练什么，再解释各类面试官的侧重点，由我自己选择。'
 const SETUP_AI_DRAFT = '我想开始一场模拟面试。请先问我的目标岗位，再说明岗位、面试官和时长怎么选。不要替我创建练习。'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string; mark: string }> = [
@@ -108,6 +110,10 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
   const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** 各 AI 能力的配置状态（读不到按没确认处理）；入口、顶栏、底栏小青都按它判。 */
+  const capabilities = useInterviewAiCapabilities()
+  /** 这次创建被服务端 AI 闸门（暂停、额度）拦下：小青这次也用不了。只管本页本次，不落存储。 */
+  const [assistantDown, setAssistantDown] = useState(false)
   /**
    * `POST /mock-interviews` 建会话时**不调模型**（写一行配置就返回），
    * 真正调 LLM 的是紧随其后的 `/start`。所以 start 503 之后这个 sessionId 仍然有效 ——
@@ -184,6 +190,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
     setCreating(true)
     setError(null)
     setAiOutage(null)
+    setAssistantDown(false)
     setStartFailed(false)
     try {
       const input: CreateInterviewInput = {
@@ -244,6 +251,8 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
       setStartFailed(true)
+      // 服务端 AI 闸门（暂停、额度）拦下的，小青这次也用不了：底栏问小青换停用态。
+      setAssistantDown(isAiGateDown(err))
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误只是本次失败，保留重试入口。
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
@@ -300,7 +309,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
    * 它作为 `stillAvailable` 如实写明，并挂成真正可点的动作。
    */
   const say = (text: string | null) => interviewUserLine(text, contact) ?? text
-  const availability: AiAvailability = aiOutage ? 'unavailable' : probed ? 'available' : 'unknown'
+  const availability: AiAvailability = aiOutage ? 'unavailable' : creating || probed ? 'available' : 'unknown'
   const aiTask = useAiTask({
     availability,
     pending: creating,
@@ -329,15 +338,24 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
         ...sheetAction,
       }
     : {
-        // 这一次失败但服务是通的（限流 / 参数等）：**不是**能力不可用。
+        // 这一次失败不代表能力整体不可用。
         // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
         mode: 'result-unavailable',
         reason: say((startFailed ? error : null) ?? '本次没能进入 AI 面试间。') ?? '本次没能进入 AI 面试间。',
-        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
+        retryHint: `本次没有进入面试间。可以再点一次「创建并开始练习」；不想等的话，${STILL_AVAILABLE}`,
         ...sheetAction,
       }
 
   const goTips = () => (onGoStage ? onGoStage('tips') : navigate('/interview/tips'))
+  // 小青：配置没确认可用、或这次创建被服务端 AI 闸门拦下，都换停用态（照稿 st-ai-down）。
+  const assistantState = assistantDown ? 'off' : capabilities.state('assistant_chat')
+  const mockState = capabilities.state('mock_interview')
+  // 配置没确认可用就不放行创建：写明原因，出口是不依赖 AI 的「先看面试技巧」。第 1、2 步也先说，别让人白填到第 3 步。
+  const capabilityNote = mockState !== 'available' && !aiOutage && !creating ? (
+    <InterviewNote lead={mockState === 'checking' ? '正在确认 AI 面试能力' : '暂时不能开始 AI 面试'}>
+      <span>{capabilities.reason('mock_interview')}。{step === 3 ? '下面的「先看面试技巧」' : '「先看面试技巧」'}不依赖 AI，现在就能看。</span>
+    </InterviewNote>
+  ) : null
   const shownError = interviewUserLine(error, contact)
   // 换步后点下去的按钮被卸载，焦点会掉回 body。把焦点放到意图带的标题上，并回到顶。第一次进来不抢焦点。
   const seenStep = useRef<number | null>(null)
@@ -389,12 +407,14 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       subtitle={stepCopy.sub}
       onBack={step > 1 ? () => { setError(null); setStep((current) => (current === 3 ? 2 : 1)) } : undefined}
       rail={{ labels: ['岗位与经验', '面试官与时长', '核对开始'], now: step - 1 }}
-      status={{ tone: aiOutage ? 'bad' : 'ok', label: aiOutage ? 'AI 暂时不能出题' : 'AI 模拟面试' }}
+      status={interviewAiPill(mockState, Boolean(aiOutage))}
       ctabar={
         <QxTouchDock
           onBack={step > 1 ? () => { setError(null); setStep((current) => (current === 3 ? 2 : 1)) } : () => navigate('/interview-service')}
           backLabel={step > 1 ? '上一步' : '返回'}
-          ask={{ label: step === 2 ? '问小青：选哪位面试官' : '问小青：这场练习怎么设', draft: SETUP_AI_DRAFT }}
+          ask={assistantState === 'available'
+            ? { label: step === 2 ? '问小青：选哪位面试官' : '问小青：这场练习怎么设', draft: step === 2 ? INTERVIEWER_AI_DRAFT : SETUP_AI_DRAFT }
+            : assistantOffAsk(assistantState, '可继续手动设置')}
           alert={shownError ? <p className="qxt-iv-alert" role="alert" data-testid="interview-setup-error">{shownError}</p> : undefined}
           primary={{
             label: step < 3
@@ -405,7 +425,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                   ? '打印通用题目与答案单'
                   : '创建并开始练习',
             testId: step === 3 ? 'interview-primary' : undefined,
-            disabled: step === 3 && (creating || uploading || printingSheet),
+            disabled: step === 3 && (creating || uploading || printingSheet || (mockState !== 'available' && !(aiOutage && pendingSession))),
             onClick: () => {
               if (step < 3) goNext()
               else if (aiOutage && pendingSession) void handlePracticeSheet()
@@ -435,6 +455,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
       <div className="interview-flow__scroll">
         {step === 1 && (
           <section className="interview-setup__stack qxt-iv-stack">
+            {capabilityNote}
             <label className="qxt-iv-field">
               <small>目标岗位（必填，最多 50 字）</small>
               <input
@@ -491,6 +512,7 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
 
         {step === 2 && (
           <section className="interview-setup__stack qxt-iv-stack">
+            {capabilityNote}
             <div className="interview-setup__interviewer qxt-iv-group is-grow">
               <InterviewSetupPersonas
                 interviewers={INTERVIEWERS}
@@ -543,11 +565,13 @@ export function InterviewSetupPage({ onGoStage }: { onGoStage?: (stage: Intervie
                 { k: '练习报告', v: '完成后生成' },
               ]}
             />
-            {aiTask.isFailed && (
+            {capabilityNote}
+            {(aiTask.isFailed || aiTask.isRunning) && (
               <AiTaskRegion
                 className="interview-setup-fallback"
                 task={aiTask}
                 label="AI 面试官出题与点评"
+                running={<InterviewNote lead="正在为你准备面试官…"><span>请稍候，完成后进入练习。</span></InterviewNote>}
                 fallback={fallback}
               />
             )}

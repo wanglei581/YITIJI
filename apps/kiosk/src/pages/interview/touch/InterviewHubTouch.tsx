@@ -12,6 +12,7 @@ import {
   type CapabilityKind,
   type HubAvailability,
 } from '../../service-hubs/serviceHubModel'
+import { assistantOffAsk, useInterviewAiCapabilities, type InterviewAiKey } from '../useInterviewAiCapabilities'
 import { InterviewArt } from '../InterviewArt'
 import { InterviewScrollCue } from '../interviewQxParts'
 import '../styles/interview-touch.css'
@@ -25,18 +26,20 @@ type Entry = {
   icon: QxTouchIconName
   route: string
   kind: CapabilityKind
+  /** kind 为 ai 的入口各自依赖哪一项 AI 能力；服务端配置明确可用才放行。 */
+  capability?: InterviewAiKey
 }
 
 const TILES: Entry[] = [
   { title: '面试技巧', desc: '查看通用问答与沟通要点', icon: 'book', route: '/interview/tips', kind: 'info' },
   { title: '训练报告', desc: '查看模拟面试报告', icon: 'receipt', route: '/interview/reports', kind: 'info' },
-  { title: '职业自我探索', desc: '了解优势、偏好与可尝试方向', icon: 'compass', route: '/resume/self-assessment/intro', kind: 'ai' },
-  { title: '职业规划建议', desc: '根据经历与目标形成行动建议', icon: 'map', route: '/resume/career-plan', kind: 'ai' },
+  { title: '职业自我探索', desc: '了解优势、偏好与可尝试方向', icon: 'compass', route: '/resume/self-assessment/intro', kind: 'ai', capability: 'self_assessment' },
+  { title: '职业规划建议', desc: '根据经历与目标形成行动建议', icon: 'map', route: '/resume/career-plan', kind: 'ai', capability: 'career_plan' },
 ]
 
 const MORE: Entry[] = [
   { title: '评估历史', desc: '回看本人历次自我探索结果', icon: 'compass', route: '/resume/self-assessment/history', kind: 'info' },
-  { title: '行业薪资参考', desc: '向通用AI顾问询问市场信息', icon: 'sparkle', route: '/assistant', kind: 'ai' },
+  { title: '行业薪资参考', desc: '向通用AI顾问询问市场信息', icon: 'sparkle', route: '/assistant', kind: 'ai', capability: 'assistant_chat' },
   { title: 'AI服务记录', desc: '查看本人AI调用记录', icon: 'sparkle', route: '/me/ai-records', kind: 'account' },
   { title: '简历服务', desc: '先完善求职材料', icon: 'file', route: '/resume-service', kind: 'info' },
 ]
@@ -68,11 +71,14 @@ export function InterviewHubTouch({
   notice: { title: string; detail: string }
 }) {
   const navigate = useNavigate()
+  const capabilities = useInterviewAiCapabilities()
   const [more, setMore] = useState(false)
   const hubRef = useRef<HTMLDivElement>(null)
   const seenMore = useRef<boolean | null>(null)
   const goBack = more ? () => setMore(false) : () => navigate('/')
-  const mainReason = unavailableReason('ai', '/interview/setup', availability)
+  // 在线服务的原因优先（更具体）；服务可达但这一项 AI 能力没确认可用时，用能力状态的原因。
+  const mainReason = unavailableReason('ai', '/interview/setup', availability) ?? capabilities.reason('mock_interview')
+  const assistantState = capabilities.state('assistant_chat')
 
   // 点下去的按钮随视图切换被卸载，焦点会掉回 body。切换后把焦点放到意图带的标题上。
   useLayoutEffect(() => {
@@ -88,6 +94,7 @@ export function InterviewHubTouch({
 
   const tiles = (list: Entry[], withTestId: boolean) => list.map((entry, index) => {
     const reason = unavailableReason(entry.kind, entry.route, availability)
+      ?? (entry.capability ? capabilities.reason(entry.capability) : null)
     return (
       <QxTouchTile
         key={entry.title}
@@ -131,7 +138,9 @@ export function InterviewHubTouch({
         <QxTouchDock
           onBack={goBack}
           backLabel="返回"
-          ask={{ label: '问小青：先练哪一项？', draft: ASK_DRAFT }}
+          ask={assistantState === 'available'
+            ? { label: '问小青：先练哪一项？', draft: ASK_DRAFT }
+            : assistantOffAsk(assistantState, '先看面试技巧')}
         />
       }
       nav={

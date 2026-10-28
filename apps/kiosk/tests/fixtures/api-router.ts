@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { KIOSK_AI_CAPABILITIES_PATH, kioskAiCapabilitiesResponse } from './ai-capabilities'
 import { RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from './recruitment-hosting'
 import { SELF_ASSESSMENT_QUESTIONS_PATH, selfAssessmentQuestionsResponse } from './self-assessment-questions'
 
@@ -69,6 +70,10 @@ export class ApiRouter {
       status: 200,
       json: terminalConfigWithHosting(RECRUITMENT_HOSTING_ON, 'api-router-default'),
     })
+    // 练面试服务台、设置页、作答页挂载时各读一次各 AI 能力的配置状态（GET /kiosk/ai/capabilities，不调计费 AI）。
+    // 默认按「全部可用」应答，既有用例不因这条新请求中断，入口也不会被误停；
+    // 要测某项能力关闭 / 降级 / 读不到的用例自行 respond 覆盖（见 ai-capabilities.ts）。
+    this.respond('GET', KIOSK_AI_CAPABILITIES_PATH, { status: 200, json: kioskAiCapabilitiesResponse() })
     // 3.14 本机构官方渠道：首页（「岗位与招聘会」磁贴）与 /official-channels 挂载时各读一次（同一缓存）。
     // 默认按「本终端没有渠道」应答：首页不摆磁贴，既有用例的栅格与文案一概不变；
     // 要看磁贴、渠道卡片或 b 版本「其他来源平台」的用例自行 respond 覆盖。

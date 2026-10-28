@@ -134,7 +134,7 @@ try {
   }
   const start = new Function('context', executable(`const {
     position, industry, experience, interviewerType, difficulty, duration, resumeFile,
-    setError, setCreating, setAiOutage, setStartFailed, getToken, createInterview,
+    setError, setCreating, setAiOutage, setAssistantDown, setStartFailed, getToken, createInterview,
     setPendingSession, startInterview, setProbed, patchInterviewWorkbenchSession, onGoStage,
   } = context; return ${sourceNode(setupAst, 'handleStart')};`))
   const noop = () => {}
@@ -143,7 +143,7 @@ try {
     const errors = []
     const context = {
       ...draft, duration: 5, resumeFile: null,
-      setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop,
+      setError: (value) => errors.push(value), setCreating: noop, setAiOutage: noop, setAssistantDown: noop,
       setStartFailed: noop, getToken: noop, setPendingSession: noop, setProbed: noop,
       patchInterviewWorkbenchSession: noop, onGoStage: noop,
       createInterview: async (input) => { requests.push(input); return { sessionId: 'real-handle', questionTarget: 6 } },

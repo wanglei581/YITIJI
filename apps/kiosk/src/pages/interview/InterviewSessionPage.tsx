@@ -1,6 +1,7 @@
 // 模拟面试作答页。文字是硬兜底；麦克风、播报、转写任何一步失败都不阻塞。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { interviewAiPill, isAiGateDown, useInterviewAiCapabilities, type InterviewAiState } from './useInterviewAiCapabilities'
 import { InterviewSessionInvalid } from './session/InterviewSessionInvalid'
 import { resolveInterviewSessionState } from './session/resolveInterviewSessionState'
 import { fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
@@ -52,6 +53,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const location = useLocation()
   const { getToken } = useAuth()
   const contact = useSupportContact()
+  const capabilities = useInterviewAiCapabilities()
   const storedLive = readInterviewWorkbenchSession()?.live
   const state = resolveInterviewSessionState(location.state as InterviewSessionRouteState | null)
 
@@ -63,6 +65,9 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const [questionIndex, setQuestionIndex] = useState(storedLive?.questionIndex ?? 1)
   const [draft, setDraft] = useState('')
   const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
+  const [aiOutage, setAiOutage] = useState(false)
+  // 本场某次 AI 调用被服务端 AI 闸门（暂停、额度）拦下：小青这次也用不了。成功一次就清掉。
+  const [assistantDown, setAssistantDown] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [omitPrintAnswers, setOmitPrintAnswers] = useState(storedLive?.omitPrintAnswers ?? false)
   // 只认本场亲眼成功过的非跳过回答。乐观写进对话的那条不算，刷新也不能把没成功的说成已保存。
@@ -288,6 +293,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
       const { text } = await transcribeAnswer(state.sessionId, wav, access)
       setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
     } catch (err) {
+      // 转写同样过服务端 AI 闸门：暂停 / 额度到了，小青这次也用不了（文字作答照常，提示语不变）。
+      if (isAiGateDown(err)) setAssistantDown(true)
       const declined = aiDeclarationDeclineMessage(err)
       const msg = declined ?? userMessageOf(err, '语音转写失败')
       if (declined) {
@@ -306,7 +313,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     void submitInterviewAnswer({
       args, state, access, messages, draft, voiceKind: voice.kind, questionShownAtRef,
       setMessages, setDraft, setMode, setVoice, setPhase, setError, setMicError,
-      setFinishRecovery, setAnswersRecorded, setQuestionIndex,
+      setFinishRecovery, setAnswersRecorded, setQuestionIndex, setAiOutage, setAssistantDown,
     })
   }
 
@@ -314,7 +321,7 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
     void finishInterview({
       state, access, phase, voiceKind: voice.kind, messages, answersRecorded, omitPrintAnswers,
       onGoStage, navigate, stopPlayback, resetVoiceState,
-      setPhase, setError, setMicError, setFinishRecovery,
+      setPhase, setError, setMicError, setFinishRecovery, setAssistantDown,
     })
   }
 
@@ -351,16 +358,24 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
   const shownMicBlocked = interviewMicLine(micBlockedReason, contact)
 
   const copy = INTERVIEW_STAGE_COPY.session
+  // 会话已经建好、正在作答：能力状态「还没读回来」时不闪顶栏和底栏（它们只是提示，不拦作答）；读不到才写「没确认」。
+  const settled = (s: InterviewAiState): InterviewAiState => (s === 'checking' ? 'available' : s)
 
   return (
     <InterviewShell
       eyebrow="练面试 · 作答"
       title={copy.title}
       subtitle={copy.subtitle}
-      status={{ tone: timeUp ? 'warn' : 'ok', label: timeUp ? '练习时间已到' : 'AI 模拟面试' }}
+      // 顶栏：本场作答 / 出报告已观测到 AI 故障，或配置明确关闭 → 不能出题；读不到 → 没确认；否则才是到点或正常。
+      status={interviewAiPill(
+        settled(capabilities.state('mock_interview')),
+        aiOutage || finishRecovery === 'outage',
+        timeUp ? { tone: 'warn', label: '练习时间已到' } : undefined,
+      )}
       live={voice.kind === 'recording'}
       ctabar={(
         <InterviewSessionBar
+          assistantState={assistantDown ? 'off' : settled(capabilities.state('assistant_chat'))}
           mode={mode}
           phase={phase}
           voiceKind={voice.kind}
@@ -398,6 +413,8 @@ export function InterviewSessionPage({ onGoStage }: { onGoStage?: (stage: Interv
         listRef={listRef}
       >
       <InterviewAnswerDock
+        aiOutage={aiOutage}
+        answersRecorded={answersRecorded}
         micError={micError}
         error={shownError}
         voiceLocked={voiceLocked}

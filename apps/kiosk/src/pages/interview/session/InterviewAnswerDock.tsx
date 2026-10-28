@@ -1,3 +1,4 @@
+import { AiTaskRegion, useAiTask } from '../../../ai'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 import { InterviewNote } from '../interviewQxParts'
 import type { InterviewFinishRecovery } from './interviewAnswerRecovery'
@@ -5,6 +6,8 @@ import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
 
 interface InterviewAnswerDockProps {
+  answersRecorded: boolean
+  aiOutage: boolean
   micError: boolean
   error: string | null
   voiceLocked: boolean
@@ -41,13 +44,15 @@ interface InterviewAnswerDockProps {
  */
 export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
   const {
-    micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
+    answersRecorded, aiOutage, micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
     draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
     onRetryVoice, onUseText, onUseVoice, onSkip,
     onFinish, finishRecovery, onContinueAnswering, onLeaveInterview,
     onOpenTips, onRetryReport, omitPrintAnswers, onOmitPrintAnswersChange,
   } = props
   const turnBusy = phase === 'thinking' || phase === 'finishing'
+  const pending = phase === 'thinking' || phase === 'finishing' || voice.kind === 'transcribing'
+  const task = useAiTask({ availability: 'available', pending, failed: false, hasResult: false })
   const done = phase === 'done_suggest'
 
   return (
@@ -71,14 +76,14 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>
         </div>
       )}
-      {finishRecovery === 'outage' && !micError && (
+      {(finishRecovery === 'outage' || (aiOutage && !finishRecovery)) && !micError && (
         <div className="qxt-iv-acts" data-testid="interview-finish-recovery">
           <button type="button" className="is-go" disabled={busyTurn} onClick={onOpenTips}>看面试要点</button>
-          <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button>
+          {answersRecorded ? <button type="button" disabled={busyTurn} onClick={onRetryReport}>稍后再试生成报告</button> : <button type="button" disabled={busyTurn} onClick={onLeaveInterview}>离开</button>}
         </div>
       )}
 
-      {phase === 'thinking' ? (
+      {pending && <AiTaskRegion task={task} label="本次 AI 任务" fallback={{ mode: 'result-unavailable', reason: '本次任务未完成', retryHint: '可以稍后重试。' }} running={phase === 'thinking' ? (
         <InterviewNote lead="面试官正在分析你的回答…">
           <span>提交后才会进入下一题。这次没发出去时，页面会留下原因，你可以再试一次。</span>
         </InterviewNote>
@@ -86,17 +91,16 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         <InterviewNote lead="正在生成练习报告…">
           <span>生成好之前，不跳到报告页。</span>
         </InterviewNote>
-      ) : done ? null : mode === 'voice' && voice.kind === 'recording' ? (
+      ) : (
+        <InterviewNote lead="正在转写你的回答…"><span>转写完成后请你确认，不会自动提交。</span></InterviewNote>
+      )} />}
+      {!pending && (done ? null : mode === 'voice' && voice.kind === 'recording' ? (
         <InterviewNote lead={`正在录音，已录 ${formatInterviewClock(recordSec)}，最长 ${maxRecordSec} 秒`}>
           <span>点「结束回答并转写」就停。录满 {maxRecordSec} 秒也只停止录音并进入转写，不结束这场练习，也不自动出报告。</span>
         </InterviewNote>
       ) : mode === 'voice' && voice.kind === 'requesting_permission' ? (
         <InterviewNote lead="正在请求麦克风权限…">
           <span>请在浏览器的提示里选择允许，之后才开始录音。</span>
-        </InterviewNote>
-      ) : mode === 'voice' && voice.kind === 'transcribing' ? (
-        <InterviewNote lead="正在转写你的回答…">
-          <span>转写完成后请你确认，不会自动提交。</span>
         </InterviewNote>
       ) : mode === 'voice' && voice.kind === 'review' ? (
         <label className="qxt-iv-answer">
@@ -122,7 +126,7 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           <span>{draft.length} / 2000</span>
           <span>提交后才会进入下一题。这次没发出去时，页面会留下原因，你可以再试一次。</span>
         </label>
-      )}
+      ))}
 
       {!turnBusy && (
         <div className="qxt-iv-acts">

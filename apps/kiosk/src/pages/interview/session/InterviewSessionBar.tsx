@@ -1,13 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { QxTouchDock } from '../../../components/qingxu/touch/QxTouchDock'
+import { assistantOffAsk, type InterviewAiState } from '../useInterviewAiCapabilities'
 import type { InterviewSessionPhase, InterviewVoiceState } from './types'
 
 /**
  * 作答屏底栏（稿 iv-run）：返回、问小青、主按钮。主按钮永远是这一刻要做的那件事：
  * 文字模式提交回答，语音模式开始回答 / 结束回答并转写 / 确认提交，问完了结束并生成报告。
  * 分析、转写、生成报告期间主按钮置灰并写明在做什么，不会再点出第二次。
+ * 小青不是确认可用时位置不动，换成停用态并写明作答仍可继续（照稿 st-ai-down）。
  */
 export function InterviewSessionBar({
+  assistantState,
   mode,
   phase,
   voiceKind,
@@ -18,6 +21,7 @@ export function InterviewSessionBar({
   onStop,
   onConfirm,
 }: {
+  assistantState: InterviewAiState
   mode: 'voice' | 'text'
   phase: InterviewSessionPhase
   voiceKind: InterviewVoiceState['kind']
@@ -69,10 +73,10 @@ export function InterviewSessionBar({
     <QxTouchDock
       onBack={() => navigate('/interview-service')}
       backLabel="返回"
-      ask={{
+      ask={assistantState === 'available' ? {
         label: '问小青：这一题怎么答',
         draft: '我正在做模拟面试。请先问我这一题的原文，再帮我按真实经历组织回答，不要替我编造经历。',
-      }}
+      } : assistantOffAsk(assistantState, '可继续作答')}
       primary={{ label, onClick: go, disabled, testId: 'interview-primary' }}
     />
   )
