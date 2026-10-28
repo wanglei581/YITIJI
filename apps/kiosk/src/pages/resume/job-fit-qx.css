@@ -225,7 +225,7 @@
   background: var(--qx-surface); color: var(--qx-ink);
   font-family: var(--qx-sans); font-size: 21px;
 }
-.jfq-textarea { min-height: 200px; padding: 16px 18px; line-height: 1.5; resize: none; }
+.jfq-textarea { min-height: 120px; padding: 16px 18px; line-height: 1.5; resize: none; }
 .jfq-input:focus-visible, .jfq-textarea:focus-visible { outline: 3px solid var(--qx-teal); outline-offset: 2px; }
 
 .jfq-joblist { display: flex; flex-direction: column; gap: 10px; }

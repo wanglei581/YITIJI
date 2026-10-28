@@ -102,6 +102,7 @@ import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { toSaActItems } from './touch/saActItems'
+import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
 import { SaDimRow } from './touch/SaResultParts'
 
@@ -259,33 +260,17 @@ export function SelfAssessmentIntroPage() {
         </>
       }
     >
-      <SaCard head="这次要做的事" hint={`约 6 分钟 · 不需登录`}>
-        <SaChips
-          items={[
-            { key: 'count', text: <><b>{total}</b> 道选择题</> },
-            { key: 'dims', text: <>覆盖 <b>{dimCount}</b> 个方向</> },
-            { key: 'back', text: '随时可返回修改' },
-            { key: 'norank', text: '不评分、不排名' },
-          ]}
-        />
-        <p className="sa-sub">
-          题目问的是你更愿意怎么工作，不是考你会不会。{total} 道题按
-          {bank.dimensions.map((d) => d.label).join('、')}排列，题干与选项与共享题库逐字一致，本页不改写题意、不另造题目。
-        </p>
-      </SaCard>
-
-      <SaCard head="这一页里，哪部分是 AI" hint="分工写在前面，不等结果出来才说">
-        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AiCapabilityChip tone="ai" />
-          <span>记分不经过 AI，解读才经过 AI。</span>
-        </p>
-        <SaFlow
-          items={[
-            { key: 'e2', step: '记分 · 不经过 AI', title: '维度强度与依据题号', current: true, desc: `${dimCount} 个方向的强度由固定权重算出，依据只有你自己的选择 —— AI 不可用时照样出。` },
-            { key: 'e3', step: '解读 · 由 AI 生成', title: `${dimCount} 段陈述式解读`, desc: '它不打分、不排名，也不说你适合或不适合哪类岗位；AI 不可用时会如实缺，不拿别的东西顶上。' },
-          ]}
-        />
-      </SaCard>
+      <ResumeStepPreview
+        className="rtp-hero-min"
+        art="checklist"
+        kicker={`约 6 分钟 · ${total} 题 · 不需登录`}
+        title={`${total} 道选择题，覆盖 ${dimCount} 个方向`}
+        lines={[
+          `${bank.dimensions.map((d) => d.label).join('、')}。题目问的是你更愿意怎么工作，不是考你会不会。`,
+          '不评分、不排名，结果只给你自己看，随时可以返回修改。',
+        ]}
+        note="记分不经过 AI，解读才经过 AI：AI 不可用时强度与依据题号照样出，文字解读会如实缺，不拿别的东西顶上。"
+      />
 
       {bundle ? (
         <SaCard head="开始前请先确认" hint="勾选后才能作答" testId="self-assessment-consent">
@@ -308,14 +293,14 @@ export function SelfAssessmentIntroPage() {
           />
         </SaCard>
       ) : consentBundle.state.status === 'error' ? (
-        <SaCard head="同意说明没有取到，请重试" hint="没有说明就不能开始作答" tone="down" grow testId="self-assessment-consent">
+        <SaCard head="同意说明没有取到，请重试" hint="没有说明就不能开始作答" tone="down" testId="self-assessment-consent">
           <p className="sa-sub">这次没能取到要你确认的说明。本页不会拿旧的说明顶上，也不会跳过这一步。</p>
           <div className="sa-quickrow">
             <button type="button" className="sa-quick" data-testid="self-assessment-consent-retry" onClick={consentBundle.retry}>↻ 重新读取说明</button>
           </div>
         </SaCard>
       ) : (
-        <SaCard head="开始前请先确认" hint="正在读取说明" grow testId="self-assessment-consent">
+        <SaCard head="开始前请先确认" hint="正在读取说明" testId="self-assessment-consent">
           <p className="sa-sub" role="status">正在读取这次要确认的说明。读到之前不显示任何条款，也不能勾选。</p>
         </SaCard>
       )}
@@ -1118,54 +1103,39 @@ export function SelfAssessmentHistoryPage() {
       }
     >
       {current ? (
-        <SaCard head="这台机器上的本次记录" hint="只对本人可见" tone="lead" testId="self-assessment-list">
-          <SaMeta
-            items={[
-              { key: 'task', label: '记录编号', value: current, mono: true },
-              { key: 'consented', label: '同意时间', value: consentedAt ?? '未记录' },
-              { key: 'dims', label: '维度', value: answered > 0 ? `${answered} 个维度已出结果` : '未拿到结果' },
-              { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间' },
+        <div data-testid="self-assessment-list">
+          <ResumeStepPreview
+            className="rtp-hero-min"
+            art="report"
+            kicker="这台机器上的本次记录 · 只对本人可见"
+            title={answered > 0 ? `${answered} 个维度已出结果` : '未拿到结果'}
+            lines={[
+              `同意时间 ${consentedAt ?? '未记录'} · 保留至 ${expiresAt ?? '未返回到期时间'}`,
+              `记录编号 ${current}`,
             ]}
           />
-          <div className="sa-quickrow">
+          <div className="qxt-exits">
             <button
               type="button"
-              className="sa-quick"
+              className="qxt-btn qxt-btn-sec qxt-btn-exit"
               data-route="/resume/self-assessment/result"
               onClick={() => navigate(`/resume/self-assessment/result?taskId=${encodeURIComponent(current)}`)}
             >
               回看这次结果
             </button>
           </div>
-        </SaCard>
+        </div>
       ) : (
-        <SaCard head="这里还没有可查看的记录" hint="不是没加载出来，是本来就不存" testId="self-assessment-list">
-          <SaChips
-            items={[
-              { key: 'none', text: <>这台机器上的这次使用<b>没有记录</b></>, tone: 'warn' },
-              { key: 'nofake', text: '不生成示例历史' },
-              { key: 'nodraft', text: '未提交的答案不算记录' },
-            ]}
-          />
-          <p className="sa-sub">
-            不登录时不会保存；这次使用结束后，本机记录会自动清理。会员本人的历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
-          </p>
-        </SaCard>
+        <div data-testid="self-assessment-list" className="rtp-sa-empty">
+          <QxTouchCallout kind="howto">
+            这台机器上的这次使用没有记录。不登录时不会保存；未提交的答案不算记录，也不生成示例历史。会员本人的历史可在「我的 → AI 服务记录 → 自我探索」查看与管理。
+          </QxTouchCallout>
+        </div>
       )}
 
-      <SaCard head="这里没有什么" hint="每一条都可核对">
-        <SaMeta
-          items={[
-            { key: 'raw', label: '答案原文', value: '没有保存' },
-            { key: 'expired', label: '过期的解读', value: '到期自动清理' },
-            { key: 'withdrawn', label: '撤回的那次', value: '已物理删除，不可恢复' },
-            { key: 'enterprise', label: '企业 / 合作机构 / 工作人员', value: '都看不到，也不参与岗位排序' },
-          ]}
-        />
-        <p className="sa-sub">
-          本页不做跨次对比 —— 要能比就得留着两次的作答原文，本机选了不留，这是取舍不是漏做。
-        </p>
-      </SaCard>
+      <p className="qxt-fine">
+        答案原文没有保存；过期的解读到期自动清理；撤回的那一次已物理删除、不可恢复；企业、合作机构、工作人员都看不到，也不参与岗位排序。本页不做跨次对比——要能比就得留着两次的作答原文，本机选了不留，这是取舍不是漏做。
+      </p>
 
       <ResumeTouchActs
         heading={{ title: '现在可以做什么', hint: '都是现在就能打开的入口' }}

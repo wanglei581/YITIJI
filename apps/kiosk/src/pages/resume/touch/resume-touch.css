@@ -460,6 +460,11 @@
   color: var(--qxt-teal-ink);
 }
 
+/* 一行里只有一个出口按钮时（自我探索记录页的「回看这次结果」）占满整行，不缩成半条。 */
+.qxt-screen .qxt-exits:has(> :only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 /* 预览核对：整页一起滚动。原来生成页的样式把表单卡压成「剩余高度」并 overflow:hidden，
    整份简历比屏高时卡片内部被切掉半截；这里让卡片按内容高度排，由外层滚动区滚。 */
 .qxt-screen .qx-resume-generate .qx-rg-review {
