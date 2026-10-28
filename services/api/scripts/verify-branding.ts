@@ -384,11 +384,15 @@ async function main(): Promise<void> {
     c.check('清洗后的 WebP 仍能解码为 128×128', (await decodeSize(webpStored)).width === 128)
     // 公开读取只认 Logo 表
     const adId = randomUUID().replace(/-/g, '')
-    await prisma.adAsset.create({ data: { id: adId, type: 'image', title: `品牌门禁素材${suffix}`, storageKey: `screensaver/materials/${adId}.png`, mimeType: 'image/png', sizeBytes: 1, sha256: 'x'.repeat(8) } })
+    const adKey = `screensaver/materials/${adId}.png`
+    // 待机素材是真有文件的：如果公开读取不只认 Logo 表，这里就会读到 200。
+    await storage.putObject(adKey, realPng, 'image/png')
+    await prisma.adAsset.create({ data: { id: adId, type: 'image', title: `品牌门禁素材${suffix}`, storageKey: adKey, mimeType: 'image/png', sizeBytes: realPng.length, sha256: 'x'.repeat(8) } })
     for (const [label, id] of [['待机宣传屏素材的编号', adId], ['形状合法但不存在', 'a'.repeat(32)], ['大写十六进制', pngId.toUpperCase()], ['路径穿越', '..%2F..%2Fetc%2Fpasswd'], ['太短', 'abc']] as const) {
       c.check(`brand-logo 读不到：${label}`, (await call('GET', `/api/v1/public/brand-logo/${id}`)).status === 404)
     }
     await prisma.adAsset.delete({ where: { id: adId } })
+    await storage.deleteObject(adKey)
 
     // ── 6. 机构覆盖与终端解析 ───────────────────────────────────────────────
     console.log('\n[6] 机构覆盖只影响该机构的终端')
