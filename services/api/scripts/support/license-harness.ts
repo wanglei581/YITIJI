@@ -99,12 +99,15 @@ class FixtureMixedController {
   @Post('mixed') @Roles('admin', 'partner') mixed() { return { ok: 'mixed' } }
 }
 
+type Resp = Awaited<ReturnType<ReturnType<typeof makeCaller>>>
+
 export interface Harness {
   c: Checker
   suffix: string
   prisma: PrismaService
   redis: FakeRedis
   sessions: TerminalSessionService
+  audit: AuditService
   call: ReturnType<typeof makeCaller>
   adminId: string
   adminToken: string
@@ -114,6 +117,8 @@ export interface Harness {
   terminalIds: string[]
   /** 把注入时钟拨到 T0 + days 天。 */
   at(days: number): void
+  /** 把注入时钟拨到某个绝对毫秒（测毫秒边界用）。 */
+  atMs(ms: number): void
   nowMs(): number
   newOrg(key: string, mode?: 'none' | 'required'): Promise<string>
   newTerminal(key: string, orgId: string | null, extra?: Record<string, unknown>): Promise<string>
@@ -127,8 +132,19 @@ export interface Harness {
    * 默认 [0, 30)、3 台、宽限 7 天、合同编号随机。
    */
   createLicense(orgId: string, over?: Record<string, unknown> & { from?: number; to?: number }): Promise<{ status: number; id: string; org: any; error?: string; message?: string }> // eslint-disable-line @typescript-eslint/no-explicit-any
-  /** 带上授权当前版本发请求体：从详情里读 version。 */
-  versionOf(orgId: string, licenseId: string): Promise<number>
+  /** 读一条授权的当前 version。 */
+  versionOfLicense(licenseId: string): Promise<number>
+  /**
+   * 更正 / 暂停 / 恢复 / 吊销 / 续期 / 切换授权方式：自动带上当前 version 和一份够格的理由（工单号），
+   * over 里的同名字段优先（造缺字段、错版本、短理由的用例用）；值为 undefined 的字段不发。
+   */
+  updateLicense(id: string, patch?: Record<string, unknown>, over?: Record<string, unknown>): Promise<Resp>
+  suspendLicense(id: string, over?: Record<string, unknown>): Promise<Resp>
+  resumeLicense(id: string, over?: Record<string, unknown>): Promise<Resp>
+  revokeLicense(id: string, over?: Record<string, unknown>): Promise<Resp>
+  /** 续期：to / from 以天数给（to 是排他终点，endsOn = dateOf(to - 1)）；不给 from 就不发 startsOn（默认上一条到期日次日）。 */
+  renewLicense(id: string, over?: Record<string, unknown> & { from?: number; to?: number }): Promise<Resp>
+  setMode(orgId: string, licenseMode: string, over?: Record<string, unknown>): Promise<Resp>
   close(): Promise<void>
 }
 
@@ -164,7 +180,8 @@ export async function createLicenseHarness(): Promise<Harness> {
 
   let nowMs = T0
   setLicenseClock(() => new Date(nowMs))
-  const app = await NestFactory.create(FixtureModule, { logger: false, abortOnError: false })
+  // 排错时 LICENSE_HARNESS_LOG=1 打开 Nest 的 error / warn 日志（默认静音，免得刷屏）。
+  const app = await NestFactory.create(FixtureModule, { logger: process.env['LICENSE_HARNESS_LOG'] ? ['error', 'warn'] : false, abortOnError: false })
   installGlobals(app)
   await app.listen(0, '127.0.0.1')
   const call = makeCaller(app)
@@ -200,10 +217,14 @@ export async function createLicenseHarness(): Promise<Harness> {
   const api: Harness['api'] = (method, path, body, token = adminToken) => call(method, `/api/v1${path}`, { body, token })
   const detail: Harness['detail'] = async (orgId) => (await api('GET', `/admin/orgs/${orgId}/licenses`)).json.data
   let contractSeq = 0
+  const dropUndefined = (body: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined))
+  const versionOfLicense = async (id: string): Promise<number> => (await api('GET', `/admin/licenses/${id}`)).json.data.version as number
 
   return {
-    c, suffix, prisma, redis, sessions, call, adminId, adminToken, webhooks, fakeFetch, orgIds, terminalIds,
+    c, suffix, prisma, redis, sessions, audit: app.get(AuditService), call, adminId, adminToken, webhooks, fakeFetch, orgIds, terminalIds,
     at(days) { nowMs = T0 + days * DAY_MS },
+    atMs(ms) { nowMs = ms },
     nowMs: () => nowMs,
     newOrg, newTerminal, newUser, api, detail,
     async sessionOf(terminalId) {
@@ -228,9 +249,32 @@ export async function createLicenseHarness(): Promise<Harness> {
       })
       return { status: r.status, id: r.json.data?.licenseId as string, org: r.json.data?.org, error: r.json.error?.code as string | undefined, message: r.json.error?.message as string | undefined }
     },
-    async versionOf(orgId, licenseId) {
-      const org = await detail(orgId)
-      return org.items.find((item: { id: string }) => item.id === licenseId).version as number
+    async versionOfLicense(licenseId) {
+      return (await api('GET', `/admin/licenses/${licenseId}`)).json.data.version as number
+    },
+    async updateLicense(id, patch = {}, over = {}) {
+      const body = dropUndefined({ version: await versionOfLicense(id), reason: '门禁用的更正理由', ...patch, ...over })
+      return api('PATCH', `/admin/licenses/${id}`, body)
+    },
+    async suspendLicense(id, over = {}) {
+      return api('POST', `/admin/licenses/${id}/suspend`, dropUndefined({ version: await versionOfLicense(id), reason: '欠费暂停，门禁用理由', approvalTicketNo: 'WO-LIC-1', ...over }))
+    },
+    async resumeLicense(id, over = {}) {
+      return api('POST', `/admin/licenses/${id}/resume`, dropUndefined({ version: await versionOfLicense(id), reason: '已补缴，恢复使用', ...over }))
+    },
+    async revokeLicense(id, over = {}) {
+      return api('POST', `/admin/licenses/${id}/revoke`, dropUndefined({ version: await versionOfLicense(id), reason: '合同解除，门禁用理由', approvalTicketNo: 'WO-LIC-2', ...over }))
+    },
+    async renewLicense(id, over = {}) {
+      const { from, to = 60, ...rest } = over
+      contractSeq += 1
+      return api('POST', `/admin/licenses/${id}/renew`, dropUndefined({
+        licenseeName: '青岛某某人力资源有限公司', creditCode: CREDIT, contractNo: `HT-R-${suffix}-${contractSeq}`,
+        ...(from === undefined ? {} : { startsOn: dateOf(from) }), endsOn: dateOf(to - 1), ...rest,
+      }))
+    },
+    async setMode(orgId, licenseMode, over = {}) {
+      return api('PUT', `/admin/orgs/${orgId}/license-mode`, dropUndefined({ licenseMode, reason: '门禁切换授权方式', ...over }))
     },
     async close() {
       setLicenseClock(null)
