@@ -10,6 +10,14 @@
   text-overflow: ellipsis;
 }
 
+/* 页眉品牌名下的点位小字是本机绑定的机构名，长度由后台定：放不下就收成省略号，不把页眉撑歪、不越出屏幕。 */
+[data-qx-page='home'] .qxt-band .qxt-brand > div:last-child { min-width: 0; }
+[data-qx-page='home'] .qxt-band .qxt-brand small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 [data-qx-page='home'] .qxt-body.qxt-home {
   justify-content: flex-start;
   gap: 16px;

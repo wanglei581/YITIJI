@@ -10,6 +10,7 @@ import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStat
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinuePanel } from './components/ContinuePanel'
 import { HomeTouchView } from './components/HomeTouchView'
+import { placeLabel } from './homeTouchCopy'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
 import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
 import { useHomeJobHighlight } from './hooks/useHomeJobHighlight'
@@ -71,6 +72,7 @@ export function HomePage() {
       jobs={jobs}
       recruitment={recruitment}
       officialChannelCount={officialChannelCount}
+      place={placeLabel(channels)}
       deviceStatus={deviceStatus}
       continueSlot={<ContinuePanel />}
       onAction={handleAction}

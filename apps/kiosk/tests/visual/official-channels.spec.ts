@@ -555,7 +555,80 @@ test('home: hosting on keeps the job and fair tiles, even when the org has chann
   ])
 })
 
+// ── 首页页眉的点位小字 ────────────────────────────────────────────────────
+// 页眉品牌名下的小字不再写死「就业服务大厅」：读到本机绑定的机构名就写机构名，读不到给中性说法，不编地点。
+const BRAND_SMALL = '.qxt-band .qxt-brand small'
+const NEUTRAL_PLACE = '自助服务终端'
+const LONG_ORG = '青岛市市南区人力资源和社会保障局就业服务中心第二分中心（香港中路营业厅）'
+
+test('home: the header names the bound organization, and says nothing until the channels answer @w1-kiosk', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  const gate = deferred()
+  api.respondWith('GET', CHANNELS, async () => {
+    await gate.promise
+    return { status: 200, json: { items: ORG_CHANNELS, legacyPlatforms: [] } }
+  })
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  await expect(home).toHaveAttribute('data-recruitment', 'closed')
+  await page.waitForTimeout(600)
+  // 渠道答复还没到：不先写一句中性说法再改口，小字整行不画（阳性对照在放行之后）。
+  await expect(home.locator(BRAND_SMALL)).toHaveCount(0)
+  await expect(home.locator('.qxt-band .qxt-brand b')).toHaveText('职易达')
+
+  gate.resolve()
+  await expect(home.locator(BRAND_SMALL)).toHaveText(ORG)
+  await expect(home, '页眉不再写死「就业服务大厅」').not.toContainText('就业服务大厅')
+  await assertNoHorizontalOverflow(page)
+  await page.screenshot({ path: test.info().outputPath('home-header-organization-1080x1920.png') })
+  expect(errors).toEqual([])
+})
+
+test('home: the header falls back to the neutral line when no organization is known @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  api.respond('GET', CHANNELS, { status: 500, json: { success: false, error: { code: 'INTERNAL', message: 'boom' } } })
+
+  for (const label of ['读取失败', '终端没绑机构或没有渠道']) {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    const home = page.getByTestId('qx-home')
+    await expect(home.locator(BRAND_SMALL), `${label}：中性说法`).toHaveText(NEUTRAL_PLACE)
+    await expect(home, `${label}：不编地点`).not.toContainText('就业服务大厅')
+    respondChannels(api, [])
+  }
+})
+
+test('home: a very long organization name is cut so the header stays on one line @w1-kiosk', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  respondChannels(api, [{ name: '官方公众号', url: 'https://mp.example.edu.cn/official', displayOrder: 1, organizationName: LONG_ORG }])
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const small = page.getByTestId('qx-home').locator(BRAND_SMALL)
+  const expected = `${Array.from(LONG_ORG).slice(0, 23).join('')}…`
+  await expect(small).toHaveText(expected)
+  expect(Array.from(expected).length).toBe(24)
+  await assertNoHorizontalOverflow(page)
+  await assertNoElementCrossesViewport(page)
+})
+
 // ── 手机宽度 ─────────────────────────────────────────────────────────────
+
+test('phone 390x844: the home header keeps a long organization name inside the screen @w1-mobile', async ({ page, api }) => {
+  registerShell(api, RECRUITMENT_HOSTING_OFF)
+  respondChannels(api, [{ name: '官方公众号', url: 'https://mp.example.edu.cn/official', displayOrder: 1, organizationName: LONG_ORG }])
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const small = page.getByTestId('qx-home').locator(BRAND_SMALL)
+  await expect(small).toHaveText(`${Array.from(LONG_ORG).slice(0, 23).join('')}…`)
+  const viewport = page.viewportSize()!
+  const box = await small.boundingBox()
+  expect(box!.x, '小字不越出左缘').toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width, '小字不越出右缘').toBeLessThanOrEqual(viewport.width)
+  // 页眉上的装饰光晕（.qxt-halo）本来就越出手机宽度，是共享件的既有样子，所以这里只量小字自己和横向滚动。
+  await assertNoHorizontalOverflow(page)
+  await page.screenshot({ path: test.info().outputPath('home-header-long-organization-390x844.png') })
+})
 
 test('taken-down channel drops its QR when the card is checked again @w1-kiosk @w90', async ({ page, api }) => {
   registerShell(api, RECRUITMENT_HOSTING_OFF)

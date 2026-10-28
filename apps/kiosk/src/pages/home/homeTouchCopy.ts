@@ -1,5 +1,28 @@
+import type { OfficialChannelsState } from '../../hooks/useOfficialChannels'
 import type { HomeJobFairHighlightState } from './hooks/useHomeJobFairHighlight'
 import type { HomeJobHighlightState } from './hooks/useHomeJobHighlight'
+
+/** 读不到点位名时的中性说法：只说这是一台自助终端，不写任何地点。 */
+export const NEUTRAL_PLACE_LABEL = '自助服务终端'
+const PLACE_LABEL_MAX_CHARS = 24
+
+/**
+ * 首页页眉品牌名下面的小字。
+ *
+ * 一体机现在没有哪个终端接口直接给「点位名」（后台里的终端名称、点位只在匿名的服务点目录
+ * GET /terminals/public 里有，那是小程序用的）。首页本来就在读的数据里，唯一带地点性名称的是
+ * 「本机构官方渠道」：服务端按终端身份取这台终端在管理员后台绑定的机构，每条渠道带回 organizationName。
+ *   · 还在读取：先不画，免得先写一句中性说法、读到后再改口；
+ *   · 读到了机构名：写机构名，过长截断，免得把页眉撑歪；
+ *   · 没读到（读失败、终端没绑机构、绑了机构但没有已启用的渠道）：中性说法，不编地点。
+ */
+export function placeLabel(channels: OfficialChannelsState): string {
+  if (channels.status === 'loading') return ''
+  const name = channels.status === 'ready' ? (channels.items[0]?.organizationName.trim() ?? '') : ''
+  if (!name) return NEUTRAL_PLACE_LABEL
+  const chars = Array.from(name)
+  return chars.length > PLACE_LABEL_MAX_CHARS ? `${chars.slice(0, PLACE_LABEL_MAX_CHARS - 1).join('')}…` : name
+}
 
 export function greetingWord(date: Date): string {
   const hour = date.getHours()

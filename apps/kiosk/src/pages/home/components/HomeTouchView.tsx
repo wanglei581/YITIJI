@@ -26,7 +26,9 @@ import { HomeIdentityActions } from './HomeIdentityActions'
 const RETRY_CUE = '点这里重新读取'
 
 const ASSISTANT_VOICE_ENTRY = import.meta.env.VITE_USE_TRTC_CALL === 'true'
-const HOME_ASK_DRAFT = '我想办一件事，请告诉我从哪一项开始。'
+// 带去顾问页的预填问句：照首页四张大卡的名字问（改简历 / 练面试 / 打印 · 扫描 / 查政策），
+// 小青才知道要在这四项里帮着挑；只填进输入框，用户自己按发送才会发出。
+const HOME_ASK_DRAFT = '我想改简历、练面试、打印扫描或查政策，请帮我看看先从哪一项开始。'
 
 export interface HomeTouchDeviceStatus {
   tone: 'ok' | 'warn' | 'bad' | 'unknown'
@@ -43,6 +45,8 @@ interface HomeTouchViewProps {
   jobs: HomeJobHighlightState & { retry: () => void }
   recruitment: RecruitmentHostingState
   officialChannelCount: number
+  /** 页眉品牌名下的小字（placeLabel 算好的）：本机绑定的机构名，或中性说法；读取中为空串。 */
+  place: string
   deviceStatus: HomeTouchDeviceStatus
   continueSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
@@ -61,6 +65,7 @@ export function HomeTouchView({
   jobs,
   recruitment,
   officialChannelCount,
+  place,
   deviceStatus,
   continueSlot,
   onAction,
@@ -163,7 +168,7 @@ export function HomeTouchView({
             live
             back={false}
             dense={dense}
-            place="就业服务大厅"
+            place={place}
             eyebrow={greeting}
             title="我是小青"
             sub="今天想办哪件事？下面选一项，或者直接问我"

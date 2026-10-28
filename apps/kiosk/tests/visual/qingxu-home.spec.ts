@@ -256,6 +256,23 @@ test('home uses the Qingxu frame, honest states, and real destinations @w1-kiosk
   expect(runtimeErrors).toEqual([])
 })
 
+test('home ask bar hands the assistant a question worded after the four big cards, filled in but never sent @w1-kiosk', async ({ page, api }) => {
+  registerHomeApi(api)
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  const home = page.getByTestId('qx-home')
+  // 预填的那一句照首页四张大卡的名字问：小青才知道要在这四项里帮着挑，而不是一句谁都能说的「我想办一件事」。
+  for (const entry of ['resume-hub', 'interview-hub', 'print-hub', 'policy-hub']) {
+    await expect(home.locator(`[data-action="${entry}"]`)).toBeVisible()
+  }
+  await home.getByTestId('home-primary').click()
+  await expect(page).toHaveURL(/\/assistant$/)
+  const question = page.locator('#assistant-question')
+  await expect(question).toHaveValue('我想改简历、练面试、打印扫描或查政策，请帮我看看先从哪一项开始。')
+  // 只填进输入框，用户自己按发送才会发出：没有替用户调过 AI。
+  expect(api.requestCount('POST', '/api/v1/assistant/chat')).toBe(0)
+  await expect(question).toBeEditable()
+})
+
 test('home ready state defers capability claims to entry without hiding the real device pill @w1-kiosk', async ({ page, api }) => {
   registerHomeApi(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', { status: 200, json: { printerStatus: 'ready', isOnline: true } })
