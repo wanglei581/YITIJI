@@ -155,9 +155,11 @@ export function ScanSettingsStatusView({
           ? { tone: 'warn' as const, label: '正在收上一场的尾' }
           : { tone: 'bad' as const, label: '这次扫描没建好' }
   /* 稿 18 状态屏骨架：当前状态 → 链路位置 → 下一步。这几屏一律还没有一段开始（链路不点亮），
-   * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。 */
-  const chainHead: readonly [string, string] = awaitingAck
-    ? ['这次扫描已经建好，还没确认能收到扫描件', '确认之前，请先不要按开始']
+   * 标题只说「卡在哪」—— 不写百分比，也不暗示哪一段已经在动。
+   * 等授权这一屏没有「下一步」那一格：正文已经说了「现在是什么状态、为什么扫也没用」，
+   * 下面的警示条说「先别按开始」，再来一格只是把同一句话换个说法说第三遍（审查意见 A4）。 */
+  const chainHead: readonly [string, string | null] = awaitingAck
+    ? ['卡在最后一步', null]
     : cleanupHolding
       ? ['还在收上一场的尾', '这一场的四段都还没开始']
       : phase === 'loading'
@@ -228,13 +230,14 @@ export function ScanSettingsStatusView({
             <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
           </div>
           <div className="fs-fact wide"><b>保存</b><span>按设备回传的原格式保存，系统不做转换</span></div>
-          <div className="fs-fact wide"><b>{chainHead[1]}</b><span>确认完成之前，不显示面板步骤，也不开始等待。</span></div>
+          {chainHead[1] ? (
+            <div className="fs-fact wide"><b>{chainHead[1]}</b><span>确认完成之前，不显示面板步骤，也不开始等待。</span></div>
+          ) : null}
         </div>
         {phase === 'loading' && !awaitingAck ? <p className="fs-p">这一步不碰扫描仪，也不会替你启动任何硬件。</p> : null}
         {awaitingAck ? (
           <p className="fs-warn" data-testid="scan-ack-pending-notice">
-            没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
-            这一场也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
+            <b>先别在面板上按开始</b>。
           </p>
         ) : null}
         {phase === 'loading' && replayingLostCreate ? (
