@@ -428,6 +428,25 @@
   overflow-wrap: anywhere;
 }
 
+/* 求职材料详情栏的信息条（材料类型 / 字段数 / 页数 / 文件名）：触屏壳里详情栏只有约 500px 宽，
+   旧规则 overflow:hidden 加值不折行，右边几格的字被切掉。和手机断点同口径：允许折行，每格至少占四成宽。
+   页面把整个触屏壳包在 .qx-resume-materials 里，所以这里写成「外层 .qx-resume-materials 里的 .qxt-screen」，
+   权重高过 resume-materials-qx.css 的原规则，不改那份原规则。 */
+.qx-resume-materials .qxt-screen .qx-rm-tmeta {
+  flex-wrap: wrap;
+}
+
+.qx-resume-materials .qxt-screen .qx-rm-tmeta div,
+.qx-resume-materials .qxt-screen .qx-rm-tmeta div:first-child {
+  flex: 1 1 40%;
+}
+
+.qx-resume-materials .qxt-screen .qx-rm-tmeta div + div,
+.qx-resume-materials .qxt-screen .qx-rm-tmeta div + div b,
+.qx-resume-materials .qxt-screen .qx-rm-tmeta div + div u {
+  white-space: normal;
+}
+
 /* 页脚求助句后面的「帮助中心」按钮：像链接，点击区仍不小于 64。 */
 .qxt-screen .rtp-help-link {
   margin-left: 12px;

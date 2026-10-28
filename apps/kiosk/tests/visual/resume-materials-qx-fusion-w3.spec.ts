@@ -86,8 +86,26 @@ async function loginBackToMaterials(page: Page): Promise<void> {
 }
 
 /**
+ * 详情栏的信息条（材料类型 / 字段数 / 页数 / 文件名）：条本身和里面每个元素的内容都不许比盒子宽，
+ * 否则右边的字被 overflow:hidden 切掉（触屏壳里详情栏只有约 500px 宽，实测「材料类型」「5 项 · 2 必填」被切）。
+ * 这一页没有信息条（空态、读取失败）时不判。
+ */
+async function assertTemplateMetaNotClipped(page: Page, label: string): Promise<void> {
+  const clipped = await page.evaluate(() => {
+    const bad: string[] = []
+    for (const bar of document.querySelectorAll<HTMLElement>('.qx-rm-tmeta')) {
+      for (const el of [bar, ...bar.querySelectorAll<HTMLElement>('*')]) {
+        if (el.scrollWidth > el.clientWidth + 0.5) bad.push(`${el.tagName.toLowerCase()}「${(el.textContent ?? '').trim().slice(0, 16)}」${el.scrollWidth}>${el.clientWidth}`)
+      }
+    }
+    return bad
+  })
+  expect(clipped, `${label} 材料信息条文字被切`).toEqual([])
+}
+
+/**
  * 1080×1920 一体机舞台与 390×844 手机（关缩放走流式）各量一遍：操作条不压滚动区、不掉出视口，
- * 无横向溢出与越界元素，状态胶囊可读，返回键与主操作真能被 ≥48px 的指针命中，再落一张截图。
+ * 无横向溢出与越界元素，状态胶囊可读，信息条文字不被切，返回键与主操作真能被 ≥48px 的指针命中，再落一张截图。
  */
 async function captureViewports(page: Page, name: string, primary = page.locator('.qxt-dock .qx-btn').last()): Promise<void> {
   for (const size of VIEWPORTS) {
@@ -103,6 +121,7 @@ async function captureViewports(page: Page, name: string, primary = page.locator
     await assertNoHorizontalOverflow(page)
     await assertNoElementCrossesViewport(page)
     await assertQxPillReadable(page, `${name} ${size.width}x${size.height}`, '.qxt-status')
+    await assertTemplateMetaNotClipped(page, `${name} ${size.width}x${size.height}`)
     await primary.scrollIntoViewIfNeeded()
     for (const target of [page.locator('.qxt-back'), primary]) await assertTapTargetPointerHit(target)
     await page.screenshot({ path: test.info().outputPath(`${name}-${size.width}x${size.height}.png`) })
