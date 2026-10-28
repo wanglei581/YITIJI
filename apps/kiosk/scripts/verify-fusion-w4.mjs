@@ -235,6 +235,38 @@ check('company directory does not rank companies by the user resume', () => {
   assert.match(companiesPage, /RecruitTouchFrame/)
   assert.match(companyDetail, /RecruitTouchFrame/)
 })
+// 第 11 包页面只在托管打开（客户私有化部署）时挂载；两个壳（RtFrame 与招聘会八屏的 QxFairWorkbench）
+// 一律在最上面挂私有化版标识条，文字逐字照稿，防止被当成我方云上的页面拿去演示或宣传。
+check('recruitment touch frames wear the private-deployment ribbon word for word', () => {
+  const ribbon = read('src/pages/recruitment-touch/RtRibbon.tsx')
+  assert.ok(
+    ribbon.includes('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传'),
+    'ribbon text must stay verbatim',
+  )
+  assert.match(read('src/pages/recruitment-touch/RtFrame.tsx'), /<RtRibbon\s*\/>/)
+  assert.match(read('src/pages/job-fairs/QxFairWorkbench.tsx'), /<RtRibbon\s*\/>/)
+})
+// 现场无人值守：5xx 的通用说法带「联系现场工作人员」。招聘页的接口错误一律经 recruitErrorText，
+// 命中无人值守禁用说法就换成当前操作的那句；状态屏求助只给服务电话（RtHelpLine 读后台号码）。
+check('recruitment pages never print the generic 5xx staff handoff and carry a service-phone help line', () => {
+  const guarded = [
+    'src/pages/jobs/JobsPage.tsx',
+    'src/pages/jobs/JobDetailPage.tsx',
+    'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+    'src/pages/job-fairs/FairVisitPlanPage.tsx',
+    'src/pages/job-fairs/FairMaterialsPage.tsx',
+  ]
+  for (const rel of guarded) {
+    const source = read(rel)
+    assert.doesNotMatch(source, /\buserMessageOf\b/, `${rel} must route API errors through recruitErrorText`)
+    assert.match(source, /recruitErrorText\(/, `${rel} must call recruitErrorText`)
+  }
+  assert.match(read('src/pages/recruitment-touch/recruitErrorText.ts'), /containsStaffHandoff\(text\) \? fallback : text/)
+  assert.match(read('src/pages/job-fairs/QxFairWorkbench.tsx'), /fairIsCentered\(screen, state\) \? <RtHelpLine \/> : null/)
+  const help = read('src/pages/recruitment-touch/RtHelpLine.tsx')
+  assert.match(help, /useSupportContact\(\)/)
+  assert.match(help, /helpNeededLine\(contact\)/)
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。

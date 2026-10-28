@@ -218,6 +218,9 @@ test('在线服务 503：白名单离线入口仍可进，其余一律不可点 
   await page.goto('/jobs-service')
   const hub = await readRecruitHub(page)
 
+  // 旧台有 data-readiness 属性可断言；触屏台没有，改断言顶栏胶囊和屏的状态标记，两者都要说「不可用」。
+  expect(hub.pill).toBe('在线服务当前不可用')
+  await expect(page.locator('[data-qx-page="recruit"]')).toHaveAttribute('data-qxt-state', 'unavailable')
   // 要后端的门一律不可点，并说出原因。找全职是信息门，岗位匹配参考和问 AI 顾问走 AI 话术。
   expect(hub.doors.length).toBeGreaterThan(0)
   expect(hub.doors.filter((door) => door.clickable).map((door) => door.title)).toEqual([])

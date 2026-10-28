@@ -16,6 +16,7 @@ import { expect, test } from '../fixtures/kiosk-test'
 import { createRecruitmentHostingLoader, type RecruitmentHostingState } from '../../src/hooks/recruitmentHostingModel'
 import { RECRUITMENT_HOSTING_OFF, RECRUITMENT_HOSTING_ON, terminalConfigWithHosting } from '../fixtures/recruitment-hosting'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { registerW6Api } from './fixtures/fusion-w6-api'
 
 const CONFIG = '/api/v1/terminals/KSK-001/config'
 
@@ -327,6 +328,8 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
     await expect(page.locator('[data-kiosk-screen="route-error"]'), `${url} 不是报错页`).toHaveCount(0)
     await expect(page.locator('.qx-pagehead h1'), `${url} 说清楚哪一类没开放`).toHaveText(`本终端未开放${topic}`)
     await expect(page.getByRole('button', { name: '返回首页' }).last()).toBeVisible()
+    // 私有化版标识条只挂在招聘页上；托管关闭时招聘页根本不挂载，说明页上不能有它。
+    await expect(page.getByTestId('recruit-private-ribbon'), `${url} 托管关闭时没有私有化版标识条`).toHaveCount(0)
     await expectNoRecruitmentCopy(page, url)
   }
 
@@ -346,6 +349,21 @@ test('hosting off: every direct recruitment URL lands on the honest state, never
 
   expect(recruitmentHits, '托管关闭时直达地址也不请求招聘类接口').toEqual([])
   expect(errors).toEqual([])
+})
+
+// 与上面「托管关闭没有标识条」配对的阳性对照：托管打开（客户私有化部署）时，招聘页顶上逐字带这条标识条，
+// 首页不带。没有这条对照，「关闭时没有」可能只是因为这条标识条根本没人渲染。
+test('hosting on: the recruitment pages wear the private-deployment ribbon word for word, the home does not @w1-kiosk', async ({ page, api }) => {
+  registerW6Api(api)
+  for (const url of ['/jobs-service', '/fairs-service', '/jobs', '/job-fairs', '/campus/welcome']) {
+    await page.goto(url)
+    const ribbon = page.getByTestId('recruit-private-ribbon')
+    await expect(ribbon, `${url} 顶上有私有化版标识条`).toHaveCount(1)
+    await expect(ribbon).toHaveText('私有化部署版 · 仅供持有人力资源服务许可证的客户自行运营 · 我方云上不出现 · 不得用于对外宣传')
+  }
+  await page.goto('/')
+  await expect(page.getByTestId('qx-home')).toBeVisible()
+  await expect(page.getByTestId('recruit-private-ribbon')).toHaveCount(0)
 })
 
 test('hosting unknown: a direct URL says it is checking and does not claim anything yet @w1-kiosk', async ({ page, api }) => {
