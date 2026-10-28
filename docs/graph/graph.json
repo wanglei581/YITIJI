@@ -20229,6 +20229,7 @@
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/pages/help/HelpCenterPage.tsx": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
@@ -20539,6 +20540,7 @@
       "scripts/verify-datetime-honesty.mjs"
     ],
     "apps/kiosk/src/pages/legal/LegalDocPage.tsx": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-fusion-shell.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-legal-retention-copy.mjs",
@@ -20558,6 +20560,7 @@
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
     "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx": [
@@ -29239,6 +29242,9 @@
           "apps/kiosk/src/pages/assistant/advisorUserCopy.ts",
           "apps/kiosk/src/pages/assistant/assistant-touch.css",
           "apps/kiosk/src/pages/auth/LoginPage.tsx",
+          "apps/kiosk/src/pages/help/HelpCenterPage.tsx",
+          "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/utils/maskPii.ts"
         ],
