@@ -113,6 +113,7 @@ export interface AdminOrgListItem {
 }
 
 export interface AdminOrgDetail extends AdminOrgListItem {
+  brandName?: string | null; brandMark?: string | null; brandLogoAssetId?: string | null; brandLogoUrl?: string | null; licenseMode?: 'none' | 'required'
   accounts: AdminOrgAccount[]
 }
 
@@ -156,6 +157,7 @@ export interface CreateOrgInput {
 }
 
 export interface UpdateOrgInput {
+  brandName?: string | null; brandMark?: string | null; brandLogoAssetId?: string | null
   name?: string
   type?: string
   contact?: string

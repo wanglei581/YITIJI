@@ -1,0 +1,55 @@
+import { expect, test } from '@playwright/test'
+import { openAuthed, settleAdminPage } from './helpers/open'
+
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64')
+
+test('品牌与备案校验、默认值和保存', async ({ page }) => {
+  const guards = await openAuthed(page, '/legal-docs')
+  await settleAdminPage(page, guards)
+  const card = page.locator('section, div').filter({ has: page.getByRole('heading', { name: '品牌与备案' }) }).filter({ has: page.getByLabel('ICP 备案号', { exact: true }) }).last()
+  const save = card.getByRole('button', { name: '保存', exact: true })
+  let writes = 0
+  page.on('request', (request) => { if (request.method() === 'PUT' && /\/admin\/branding$/.test(request.url())) writes++ })
+  await expect(card.getByText('留空用默认：职易达')).toBeVisible()
+  await expect(card.getByText('留空用默认：职', { exact: true })).toBeVisible()
+  await expect(card.getByText('留空用默认：鲁ICP备2026023517号-2')).toBeVisible()
+  await card.getByLabel('品牌名').fill('一二三四五六七八九十一二三')
+  await save.click(); await expect(card.getByRole('alert')).toBeVisible(); await expect(card.getByRole('status')).toHaveCount(0)
+  await card.getByLabel('品牌名').fill(''); await card.getByLabel('字标').fill('两个')
+  await save.click(); await expect(card.getByRole('alert')).toBeVisible(); await expect(card.getByRole('status')).toHaveCount(0)
+  await card.getByLabel('字标').fill('')
+  await card.getByLabel('ICP 备案查询链接').fill('http://beian.miit.gov.cn/')
+  await save.click(); await expect(card.getByRole('alert')).toBeVisible(); await expect(card.getByRole('status')).toHaveCount(0)
+  await card.getByLabel('ICP 备案查询链接').fill('https://example.com/')
+  await save.click(); await expect(card.getByRole('alert')).toBeVisible(); await expect(card.getByRole('status')).toHaveCount(0)
+  expect(writes).toBe(0)
+  await card.getByLabel('ICP 备案查询链接').fill('https://beian.miit.gov.cn/')
+  await card.getByLabel('品牌名').fill('新品牌')
+  await save.click()
+  await expect(card.getByRole('status')).toHaveText('已保存。一体机更新到支持贴牌的版本后，最迟 5 分钟内按这里显示。')
+})
+
+test('Logo 按文件头校验并预览', async ({ page }) => {
+  const guards = await openAuthed(page, '/legal-docs')
+  await settleAdminPage(page, guards)
+  const field = page.getByLabel('选择 Logo')
+  await field.setInputFiles({ name: 'brand.png', mimeType: 'image/png', buffer: png })
+  await expect(page.getByAltText('Logo 预览')).toBeVisible()
+  await field.setInputFiles({ name: 'brand.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') })
+  await expect(page.getByRole('alert')).toContainText('请选择')
+})
+
+test('机构品牌保存后重新打开仍回显', async ({ page }) => {
+  const guards = await openAuthed(page, '/partners?org=org-mock-1')
+  await settleAdminPage(page, guards)
+  const drawer = page.getByRole('dialog')
+  const section = drawer.locator('section').filter({ has: page.getByRole('heading', { name: '机构品牌' }) })
+  await section.getByLabel('品牌名').fill('机构品牌')
+  await section.getByLabel('字标').fill('机')
+  await section.getByRole('button', { name: '保存机构品牌' }).click()
+  await expect(section.getByRole('status')).toHaveText('已保存。一体机更新到支持贴牌的版本后，本机构名下的终端最迟 5 分钟内按这里显示。')
+  await page.keyboard.press('Escape')
+  await page.locator('tbody tr').first().getByRole('button', { name: '详情/账号' }).click()
+  await expect(section.getByLabel('品牌名')).toHaveValue('机构品牌')
+  await expect(section.getByLabel('字标')).toHaveValue('机')
+})
