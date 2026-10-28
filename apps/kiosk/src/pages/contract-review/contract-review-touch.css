@@ -227,6 +227,91 @@
   line-height: 1.5;
 }
 
+/* ── 处理失败（稿 failBody）：原因、合同卡、五格「未完成」；卡按内容高，整页由 qxt-body-scroll 滚 ──
+   正在删除时合同卡原位换成转圈和说明，页高不跳；AI 停用时多一张「去打印扫描」大卡（P10BigCard）。 */
+[data-qx-page='contract-review'] .cr-failed,
+[data-qx-page='contract-review'] .cr-failed__steps {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+[data-qx-page='contract-review'] .cr-failed__steps { gap: 10px; }
+[data-qx-page='contract-review'] .cr-failed__warn {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--qxt-cin-wash);
+  color: var(--qx-cinnabar);
+  font-size: 24px;
+  line-height: 1.45;
+}
+[data-qx-page='contract-review'] .cr-failed__file,
+[data-qx-page='contract-review'] .cr-failed__step {
+  background: var(--qxt-card);
+  border: 1.5px solid var(--qxt-edge);
+}
+[data-qx-page='contract-review'] .cr-failed__file {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 24px;
+}
+[data-qx-page='contract-review'] .cr-failed__file-icon {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-height: 250px;
+  border-radius: 18px;
+  color: var(--qxt-teal-ink);
+  background: var(--qxt-well);
+}
+[data-qx-page='contract-review'] .cr-failed__file strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1.3;
+}
+[data-qx-page='contract-review'] .cr-failed__file p {
+  margin: 8px 0 0;
+  font-size: 22px;
+  line-height: 1.45;
+  color: var(--qxt-ink-2);
+}
+[data-qx-page='contract-review'] .cr-failed__step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 132px;
+  padding: 10px 16px;
+  border-radius: 18px;
+}
+/* AI 停用：合同卡压到 130（稿 failHero），五格回到稿的 122，让后面的「去打印扫描」大卡整张露在底栏之上 */
+[data-qx-page='contract-review'] .cr-failed--ai-down .cr-failed__file-icon { min-height: 130px; }
+[data-qx-page='contract-review'] .cr-failed--ai-down .cr-failed__step { min-height: 122px; }
+[data-qx-page='contract-review'] .cr-failed__number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--qx-deep);
+  color: var(--qxt-cream);
+  font-size: 22px;
+  font-weight: 700;
+}
+[data-qx-page='contract-review'] .cr-failed__step strong {
+  display: block;
+  font-size: 24px;
+}
+[data-qx-page='contract-review'] .cr-failed__step p {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--qxt-ink-3);
+}
+
 /* ── 未找到结果：两张大卡（带图标列），不撑满整屏 ── */
 [data-qx-page='contract-review'] .cr-missing {
   display: flex;

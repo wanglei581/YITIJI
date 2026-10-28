@@ -40,6 +40,15 @@ test('合同凭证不进 history，刷新后无法恢复 @contract', async ({ pa
   await expect(page.getByRole('button', { name: '开始风险分析' })).toBeVisible()
 })
 
+test('审查中取消：删除成功后回简历服务，不被「没有会话就回上传页」抢走去向 @contract', async ({ page }) => {
+  test.setTimeout(45_000)
+  await startReview(page)
+  // 等弹层开了再点它里面的「取消审查」：弹层刚开的瞬间去点底栏那颗，会点到遮罩上把弹层关掉。
+  await expect(page.getByText('确认文件提取结果')).toBeVisible({ timeout: 12_000 })
+  await page.getByRole('dialog').getByRole('button', { name: '取消审查' }).click()
+  await expect(page).toHaveURL(/\/resume-service$/)
+})
+
 test('完成结果只存易失内存，结束后直接访问不能恢复 @contract', async ({ page }) => {
   test.setTimeout(45_000)
   await startReview(page)

@@ -16,15 +16,16 @@ import {
   FileSearchIcon,
   Loader2Icon,
   ShieldCheckIcon,
-  XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { isAiOutage } from '../../ai/aiOutage'
 import { AiDeclarationNote } from '../../ai/AiDeclarationNote'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { P10BigCard } from '../../auth/CapabilityStayCards'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchOverlay } from '../../components/qingxu/touch/QxTouchOverlay'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { ContractTouchFrame } from './ContractTouchFrame'
@@ -39,6 +40,7 @@ import {
   readContractReviewSession,
   updateContractReviewSession,
 } from './contractReviewSession'
+import '../../auth/capability-gate-touch.css'
 import './contract-review.css'
 
 const STAGES = [
@@ -99,8 +101,14 @@ export function ContractReviewProcessingPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // 确认时撞上 AI 停用：失败页多给一个不用 AI 的出路（去打印扫描）。
+  const [aiDown, setAiDown] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
+  // 删除成功、本页自己清掉会话之后正在离开：下面「没有会话就回上传页」的兜底不许抢走去向。
+  const leavingRef = useRef(false)
+  // 这次删完要去哪：只用来让「正在删除」那句话说对去向。
+  const [leavingTo, setLeavingTo] = useState('/resume-service')
 
   useBusyLock(confirming || cancelling)
 
@@ -138,7 +146,7 @@ export function ContractReviewProcessingPage() {
 
   useEffect(() => {
     if (!taskId) {
-      navigate('/contract-review', { replace: true })
+      if (!leavingRef.current) navigate('/contract-review', { replace: true })
       return
     }
     mountedRef.current = true
@@ -167,6 +175,7 @@ export function ContractReviewProcessingPage() {
       pollRef.current = setTimeout(poll, 1500)
     } catch (err) {
       const declined = aiDeclarationDeclineMessage(err)
+      setAiDown(isAiOutage(err))
       setError(declined ?? (isAiOutage(err)
         ? 'AI 现在停用，这份合同暂时审不了。可以删除本次任务，合同原件到打印扫描里直接打印。'
         : '确认失败，请重试'))
@@ -175,17 +184,21 @@ export function ContractReviewProcessingPage() {
     }
   }
 
-  async function handleCancel() {
+  /** 先删本次任务，删成功才离开；`to` 默认回简历服务，AI 停用时失败页也可以直接去打印扫描。 */
+  async function handleCancel(to = '/resume-service') {
+    if (cancelling) return
+    setLeavingTo(to)
     setCancelling(true)
     setDeleteError(null)
     try {
       await deleteContractReview(taskId, { token: getToken(), accessToken })
+      leavingRef.current = true
       clearContractReviewSession()
-      navigate('/resume-service', { replace: true })
+      // 成功就一直停在「正在删除」，等路由换页；不先复位成可点状态，免得换页前一闪又能点删除。
+      navigate(to, { replace: true })
     } catch {
       setShowConfirmModal(false)
       setDeleteError('删除失败，合同仍可能处于短期保留状态，请重试。')
-    } finally {
       if (mountedRef.current) setCancelling(false)
     }
   }
@@ -231,12 +244,44 @@ export function ContractReviewProcessingPage() {
           />
         )}
       >
-          <div className="cr-done-screen">
-            <div className="cr-done-screen__icon" style={{ background: 'var(--error-soft)', color: 'var(--error)' }}>
-              <XCircleIcon size={52} />
+          <div className={aiDown ? 'cr-failed cr-failed--ai-down' : 'cr-failed'}>
+            <div className="cr-failed__warn" role="alert">{deleteError ?? error}</div>
+            <div className="cr-failed__file">
+              <div className="cr-failed__file-icon">
+                {cancelling
+                  ? <Loader2Icon size={96} className="animate-spin" aria-hidden="true" />
+                  : <QxTouchIcon name="file" size={96} strokeWidth={1.5} />}
+              </div>
+              {cancelling ? (
+                <div role="status">
+                  <strong>正在删除本次任务</strong>
+                  <p>{leavingTo === '/print-scan' ? '删完再去打印扫描。' : '删完再回简历服务。'}</p>
+                </div>
+              ) : (
+                <div>
+                  <strong>本次合同</strong>
+                  <p>这次未能取得审查结果。可以删除任务后重新上传，或到打印扫描里自己看合同。</p>
+                </div>
+              )}
             </div>
-            <p className="cr-done-screen__title">审查未完成</p>
-            <p className="cr-done-screen__sub">{deleteError ?? error}</p>
+            <div className="cr-failed__steps">
+              {STAGES.map((stage, index) => (
+                <div className="cr-failed__step" key={stage.key}>
+                  <span className="cr-failed__number">{index + 1}</span>
+                  <div><strong>未完成 · {stage.label}</strong><p>{stage.desc}</p></div>
+                </div>
+              ))}
+            </div>
+            {aiDown && (
+              <P10BigCard
+                icon="printer"
+                title="去打印扫描"
+                desc="AI 现在停用。可以删掉这次任务，合同到打印扫描里直接打印。"
+                cta={cancelling ? '正在删除，请稍候' : '先删除任务，再进入'}
+                onClick={() => void handleCancel('/print-scan')}
+              />
+            )}
+            <p className="qxt-fine">删除之后才离开。这一页不会把失败显示成已有结果。</p>
           </div>
       </QxTouchScreen>
       </ContractTouchFrame>
