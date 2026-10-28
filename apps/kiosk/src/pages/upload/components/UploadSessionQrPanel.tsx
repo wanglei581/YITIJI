@@ -38,8 +38,12 @@ interface UploadSessionQrPanelProps {
   onCancelled?: () => void
   /** 可选。手机端传上来、等一体机确认的那份文件（没有就是 null）。页面想自己画文件卡时用。默认不传，行为不变。 */
   onReceivedChange?: (file: { filename: string; sizeBytes: number; mimeType: string } | null) => void
-  /** 可选。页面想把「确认」放到自己的底栏时用：面板把当前的确认函数写进来，没有可确认的文件时写 null。默认不传，行为不变。 */
-  confirmRef?: { current: (() => void) | null }
+  /**
+   * 可选。页面想把「确认」放到自己的底栏时用：有可确认的文件、且不在确认中时，面板交出一个稳定的确认函数，
+   * 其余时候（没有文件、确认进行中、卸载）交 null。页面把它放进 state，底栏就会随确认进行与否重绘，
+   * 不会拿着确认前的旧函数再点一遍。默认不传，行为不变。
+   */
+  onConfirmReady?: (confirm: (() => void) | null) => void
   /**
    * session：二维码还在（含等人扫）即报忙。
    * received：没收到文件不算忙；手机已传上或正在确认才报忙。
@@ -125,13 +129,17 @@ export function UploadSessionQrPanel({
   onBusyChange,
   onCancelled,
   onReceivedChange,
-  confirmRef,
+  onConfirmReady,
   busyWhen = 'session',
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const pollFailuresRef = useRef(0)
   const qrRef = useRef<QrState | null>(null)
   const statusRef = useRef<UploadSessionStatusResponse | null>(null)
+  // 确认的在途标记：交给页面的确认函数可能是旧一帧的闭包，闭包里的 confirming 不可靠，所以另留一个不随渲染变的标记。
+  const confirmingRef = useRef(false)
+  const handleConfirmRef = useRef<() => Promise<void>>(async () => undefined)
+  const confirmNow = useCallback(() => { void handleConfirmRef.current() }, [])
   const [qr, setQr] = useState<QrState | null>(null)
   const [status, setStatus] = useState<UploadSessionStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -282,7 +290,8 @@ export function UploadSessionQrPanel({
   }, [qr, status?.status, purpose])
 
   const handleConfirm = async () => {
-    if (!status?.file || !qr || confirming) return
+    if (!status?.file || !qr || confirming || confirmingRef.current) return
+    confirmingRef.current = true
     setConfirming(true)
     setError(null)
     try {
@@ -302,6 +311,7 @@ export function UploadSessionQrPanel({
     } catch (err) {
       setError(uploadSessionUserMessage(err, '确认失败，请刷新二维码重试。'))
     } finally {
+      confirmingRef.current = false
       setConfirming(false)
     }
   }
@@ -323,7 +333,19 @@ export function UploadSessionQrPanel({
   const uploadedFile = status?.status === 'uploaded' ? status.file : null
   const uploaded = Boolean(uploadedFile)
   const expired = status?.status === 'expired'
-  if (confirmRef) confirmRef.current = uploaded && !confirming ? () => { void handleConfirm() } : null
+  // 最新的确认函数放进 ref（在 effect 里写，不在渲染期写）；交给页面的 confirmNow 稳定不变，点下去读到的总是最新的那个。
+  useEffect(() => {
+    handleConfirmRef.current = handleConfirm
+  })
+  useEffect(() => {
+    onConfirmReady?.(uploaded && !confirming ? confirmNow : null)
+  }, [confirmNow, confirming, onConfirmReady, uploaded])
+  // 卸载时再交一次 null：确认成功后本面板被卸掉，页面不该还留着一个已经没用的确认函数。
+  useEffect(() => {
+    return () => {
+      onConfirmReady?.(null)
+    }
+  }, [onConfirmReady])
 
   return (
     <Card className="p-5">

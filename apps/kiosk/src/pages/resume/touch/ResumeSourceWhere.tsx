@@ -65,7 +65,8 @@ export function ResumeSourceWhere(props: {
   unknownNext: string
   phoneCancelled: boolean
   phoneReceived: { filename: string; sizeBytes: number; mimeType: string } | null
-  phoneConfirmRef: { current: (() => void) | null }
+  /** 面板交来的确认函数（有文件且不在确认中时有值，其余为 null）；页面放进 state 给底栏用。 */
+  onPhoneConfirmReady: (confirm: (() => void) | null) => void
   onPhoneReceived: (file: { filename: string; sizeBytes: number; mimeType: string } | null) => void
   wordConversionAvailable: boolean
   supportedFormats: string[]
@@ -162,7 +163,7 @@ export function ResumeSourceWhere(props: {
           onBusyChange={props.onPhoneBusy}
           onCancelled={props.onPhoneCancelled}
           onReceivedChange={props.onPhoneReceived}
-          confirmRef={props.phoneConfirmRef}
+          onConfirmReady={props.onPhoneConfirmReady}
           busyWhen="received"
         />
         <ol className="qxt-steps3" aria-label="怎么把文件传过来">

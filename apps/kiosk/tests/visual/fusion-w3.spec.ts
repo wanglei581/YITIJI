@@ -2714,3 +2714,59 @@ test('W-118 resume diagnosis phone entry creates only one upload session @w3-kio
   await expect(page.locator('.resume-source-phone-session svg[width="150"]')).toBeVisible()
   expect(creates).toBe(1)
 })
+
+/*
+ * 手机传来的简历：底栏「确认使用这份文件」。
+ * 面板交给页面的确认函数曾是渲染期写进 ref 的旧闭包：确认一开始父页不重渲染，底栏仍写「确认使用这份文件」、
+ * 没禁用，再点一下就把 /confirm 发第二遍。现在面板在确认开始时交回 null、底栏写「正在确认…」并禁用，
+ * 面板里另有不随渲染变的在途标记，连同一帧内的两次点击也只发一次。
+ */
+test('resume source phone confirm sends one request per tap, shows 正在确认… while it runs and can be retried after a failure @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  const SESSION = 'w3-phone-confirm'
+  const FILE = { fileId: 'w3-phone-file', filename: '手机传来的简历.pdf', sizeBytes: 253952, mimeType: 'application/pdf', sha256: 'b'.repeat(64), fileExpiresAt: null, fileUrl: '/w3-fixtures/resume.pdf' }
+  api.respond('POST', '/api/v1/upload-sessions', { status: 201, json: { success: true, data: { sessionId: SESSION, uploadUrl: '/upload/phone', uploadToken: 'w3-up', controlToken: 'w3-ctl', expiresAt: '2099-01-01T00:00:00.000Z' } } })
+  api.respond('GET', `/api/v1/upload-sessions/${SESSION}`, { status: 200, json: { success: true, data: { sessionId: SESSION, status: 'uploaded', purpose: 'resume_upload', mode: 'temporary', file: FILE, requiresKioskConfirmation: false, expiresAt: '2099-01-01T00:00:00.000Z' } } })
+  await page.route('**/w3-fixtures/resume.pdf', (route) => route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }))
+  let confirms = 0
+  let releaseFirst!: () => void
+  const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve })
+  await page.route(`**/api/v1/upload-sessions/${SESSION}/confirm`, async (route) => {
+    confirms += 1
+    if (confirms === 1) {
+      // 第一次确认慢，而且最后失败：期间连点只能发这一次；失败后按钮要恢复，能再确认。
+      await firstHeld
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, error: { code: 'INTERNAL_ERROR', message: 'x' } }) })
+      return
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { sessionId: SESSION, status: 'confirmed', file: FILE } }) })
+  })
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /在手机里/ }).click()
+  const dock = page.locator('.qxt-dock')
+  const confirm = dock.getByRole('button', { name: '确认使用这份文件' })
+  await expect(confirm).toBeEnabled({ timeout: 10_000 })
+  // 同一帧里连点两次：只许发一次确认。
+  await confirm.evaluate((button: HTMLElement) => { button.click(); button.click() })
+  // 确认进行中：底栏改写「正在确认…」且不可点；再强点一次也没有第二次请求。
+  const confirming = dock.getByRole('button', { name: '正在确认…' })
+  await expect(confirming).toBeDisabled()
+  await expect(dock.getByRole('button', { name: '确认使用这份文件' })).toHaveCount(0)
+  await expect.poll(() => confirms).toBe(1)
+  await confirming.click({ force: true, timeout: 2_000 }).catch(() => undefined)
+  // 不靠固定等待：让两帧渲染与排队中的请求都过一遍，再数请求。
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  expect(confirms, '确认进行中连点只发一次').toBe(1)
+  // 第一次确认失败：按钮恢复可点，再确认一次成功，文件进入「待你确认」的文件卡。
+  releaseFirst()
+  await expect(confirm).toBeEnabled({ timeout: 10_000 })
+  expect(confirms).toBe(1)
+  await confirm.click()
+  await expect(page.locator('.qxt-filecard')).toContainText('手机传来的简历.pdf')
+  expect(confirms, '失败后再确认才发第二次').toBe(2)
+  await expect(dock.getByRole('button', { name: '确认使用这份文件' })).toHaveCount(0)
+  expect(runtimeErrors).toEqual([])
+})
+

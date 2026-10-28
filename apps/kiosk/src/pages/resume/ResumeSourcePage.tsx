@@ -163,9 +163,13 @@ export function ResumeSourcePage() {
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [phoneCancelled, setPhoneCancelled] = useState(false)
-  // 手机端已传上来、等本机确认的那份（只有文件名与大小）；确认动作由面板写进 phoneConfirmRef。
+  // 手机端已传上来、等本机确认的那份（只有文件名与大小）。
   const [phoneReceived, setPhoneReceived] = useState<{ filename: string; sizeBytes: number; mimeType: string } | null>(null)
-  const phoneConfirmRef = useRef<(() => void) | null>(null)
+  // 确认函数由面板在「有文件、且不在确认中」时交进来，放在 state 里：确认一开始面板就交回 null，
+  // 底栏马上写「正在确认…」并禁用，不会再用确认前的旧函数点出第二次确认。
+  // 函数放进 setState 必须包一层，否则会被当成更新函数立即执行。
+  const [phoneConfirm, setPhoneConfirm] = useState<(() => void) | null>(null)
+  const onPhoneConfirmReady = useCallback((confirm: (() => void) | null) => setPhoneConfirm(() => confirm), [])
   const [usbBusy, setUsbBusy] = useState(false)
   const [usbListed, setUsbListed] = useState(0)
   const [usbPick, setUsbPick] = useState<ResumeUsbPick>({ selected: false, importing: false, run: () => {} })
@@ -429,10 +433,10 @@ export function ResumeSourcePage() {
       : usbScreen
         ? { label: '问小青：选诊断重点', draft: askDraft }
         : { label: '问小青：帮我选诊断重点 →', draft: askDraft }
-  const phoneConfirm = step === 'where' && selected === 'phone' && !uploadedFile && phoneBusy ? phoneConfirmRef.current : null
   const phoneWaitingConfirm = step === 'where' && selected === 'phone' && !uploadedFile && phoneBusy
+  const phoneConfirmNow = phoneWaitingConfirm ? phoneConfirm : null
   const primary = phoneWaitingConfirm
-    ? { label: phoneConfirm ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirm?.(), disabled: !phoneConfirm, className: 'resume-primary-action' }
+    ? { label: phoneConfirmNow ? '确认使用这份文件' : '正在确认…', onClick: () => phoneConfirmNow?.(), disabled: !phoneConfirmNow, className: 'resume-primary-action' }
     : usbScreen
     ? (usbPick.selected ? { label: usbPick.importing ? '正在导入' : '导入这份文件', onClick: usbPick.run, disabled: usbPick.importing } : undefined)
     : step === 'more'
@@ -483,7 +487,7 @@ export function ResumeSourcePage() {
             unknownNext={unknownNext}
             phoneCancelled={phoneCancelled}
             phoneReceived={phoneReceived}
-            phoneConfirmRef={phoneConfirmRef}
+            onPhoneConfirmReady={onPhoneConfirmReady}
             onPhoneReceived={setPhoneReceived}
             wordConversionAvailable={wordConversionAvailable}
             supportedFormats={supportedFormats}
