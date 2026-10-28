@@ -1433,6 +1433,7 @@ async function expectAiRecordsUnchanged(page: Page, api: ApiRouter, paused: bool
   await expect(page.getByTestId('member-records-ai-down')).toHaveCount(0)
   // 配置已经读到了（阳性对照）：页面没改，不是因为根本没读。
   expect(api.requestCount('GET', '/api/v1/terminals/KSK-001/config')).toBeGreaterThan(0)
+  await page.screenshot({ path: test.info().outputPath(`ai-records-empty-ai-${String(paused)}-1080x1920.png`) })
 }
 
 test('AI records: AI not paused changes nothing on the page @w5-kiosk', async ({ page, api }) => {
