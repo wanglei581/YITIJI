@@ -10,7 +10,7 @@ import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { Waiting } from '../jobFit/jobFitQxKit'
 import { ResumeStepPreview } from './ResumeStepPreview'
 import { ResumeTouchActs, type ResumeTouchActItem } from './ResumeTouchActs'
-import type { ResumeTouchArtKind } from './ResumeTouchArt'
+import type { ResumeDocArtKind } from './ResumeDocArt'
 import './resume-states.css'
 
 export function ResumeWaitState({ icon, title, desc, tag, fine, take }: {
@@ -20,7 +20,7 @@ export function ResumeWaitState({ icon, title, desc, tag, fine, take }: {
   /** 等待卡下面那一行小字：只表达整体等待，不写百分比、不写预计时间。 */
   tag: string
   fine: string
-  take: { art: ResumeTouchArtKind; kicker: string; title: string; lines: readonly string[] }
+  take: { art: ResumeDocArtKind; kicker: string; title: string; lines: readonly string[] }
 }) {
   return (
     <div className="rtp-state">
@@ -78,7 +78,7 @@ export function ResumeStepsState({ steps, summary, fine, take }: {
   summary: ReadonlyArray<{ label: string; value: string }>
   fine: string
   /** 「带走什么」的纸张小样，只吃三步和摘要下面剩下的高度。 */
-  take: { art: ResumeTouchArtKind; kicker: string; title: string; lines: readonly string[] }
+  take: { art: ResumeDocArtKind; kicker: string; title: string; lines: readonly string[] }
 }) {
   return (
     <div className="rtp-state rtp-state-steps">

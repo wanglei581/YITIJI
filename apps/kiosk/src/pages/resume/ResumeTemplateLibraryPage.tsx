@@ -17,7 +17,7 @@ import { userMessageOf } from '../../services/api/userErrorMessage'
 
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeWaitState } from './touch/ResumeStates'
-import { ResumeTouchArt } from './touch/ResumeTouchArt'
+import { ResumeDocArt } from './touch/ResumeDocArt'
 import './touch/resume-templates.css'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ASKS } from './touch/resumeAsks'
@@ -256,7 +256,7 @@ export function ResumeTemplateLibraryPage() {
                     data-testid={`resume-templates-template-${template.id}`}
                   >
                     <span className="rdq-tpl-art" data-columns={template.resumeLayoutPreset.defaultLayout.columns === 2 ? '2' : '1'} aria-hidden="true">
-                      <ResumeTouchArt kind="resume" columns={template.resumeLayoutPreset.defaultLayout.columns === 2 ? 2 : 1} />
+                      <ResumeDocArt kind="resume" columns={template.resumeLayoutPreset.defaultLayout.columns === 2 ? 2 : 1} />
                     </span>
                     <span className="rdq-tpl-sample">示例</span>
                     <h3>{template.title}</h3>

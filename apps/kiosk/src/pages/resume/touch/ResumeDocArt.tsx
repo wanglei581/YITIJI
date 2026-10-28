@@ -2,7 +2,7 @@
 // 颜色全在 resume-touch.css 里按令牌上色（.rtp-paper-*），这里只出形状。
 import type { ReactNode } from 'react'
 
-export type ResumeTouchArtKind = 'resume' | 'report' | 'checklist'
+export type ResumeDocArtKind = 'resume' | 'report' | 'checklist'
 
 const W = 200
 const H = 283
@@ -124,7 +124,7 @@ function ChecklistSheet(): ReactNode {
 }
 
 /** 纯装饰：读屏跳过。大小由外层 .rtp-art / .rtp-hero-art 的高度决定。columns 只对简历纸有效：2 是双栏。 */
-export function ResumeTouchArt({ kind = 'resume', columns = 1 }: { kind?: ResumeTouchArtKind; columns?: 1 | 2 }) {
+export function ResumeDocArt({ kind = 'resume', columns = 1 }: { kind?: ResumeDocArtKind; columns?: 1 | 2 }) {
   return (
     <svg className="rtp-paper" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
       <rect className="rtp-paper-sheet" x={0} y={0} width={W} height={H} rx={W * 0.05} />

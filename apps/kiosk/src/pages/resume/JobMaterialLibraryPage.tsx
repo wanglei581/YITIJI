@@ -22,7 +22,7 @@ import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { QxTouchSection, QxTouchTile } from './touch/ResumeMaterialsTouch'
 import { ASKS } from './touch/resumeAsks'
 import { ResumeStepPreview } from './touch/ResumeStepPreview'
-import { ResumeTouchArt, type ResumeTouchArtKind } from './touch/ResumeTouchArt'
+import { ResumeDocArt, type ResumeDocArtKind } from './touch/ResumeDocArt'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { unattendedReason } from './touch/unattendedReason'
 import './touch/resume-materials-touch.css'
@@ -113,7 +113,7 @@ function formatTime(iso: string | null): string {
 }
 
 /** 目录卡上的纸张小样：只表示这一类材料的版式形状，不是任何人的内容。 */
-const ART_OF: Record<JobMaterialTemplateType, ResumeTouchArtKind> = {
+const ART_OF: Record<JobMaterialTemplateType, ResumeDocArtKind> = {
   cover_letter: 'resume', thank_you: 'resume', resume_template: 'resume', portfolio_cover: 'report', materials_checklist: 'checklist',
 }
 
@@ -155,7 +155,7 @@ function FileCard({ file, demo, onPreview, previewBusy, previewError }: {
   return (
     <div className="qx-rm-file" data-tone={demo ? 'demo' : canPrint ? 'ok' : 'warn'} data-print-ready={canPrint ? '1' : '0'} data-testid="material-workshop-file">
       <div className="qx-rm-file-h">
-        <span className="qx-rm-file-art" aria-hidden="true"><ResumeTouchArt kind={ART_OF[file.documentType]} /></span>
+        <span className="qx-rm-file-art" aria-hidden="true"><ResumeDocArt kind={ART_OF[file.documentType]} /></span>
         <span className="tx">
           <b>{head}</b>
           <span>{demo ? `已生成 ${file.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。` : `已生成 ${file.filename}，文件已进入我的文档。`}</span>
@@ -518,7 +518,7 @@ export function JobMaterialLibraryPage() {
             ) : visible.map((template) => (
               <button key={template.id} type="button" className="qx-rm-template" aria-pressed={selected?.id === template.id} disabled={submitting}
                 onClick={() => selectTemplate(template)} data-testid={`material-workshop-template-${template.id}`}>
-                <span className="qx-rm-art" aria-hidden="true"><ResumeTouchArt kind={ART_OF[template.type]} /></span>
+                <span className="qx-rm-art" aria-hidden="true"><ResumeDocArt kind={ART_OF[template.type]} /></span>
                 <span className="qx-rm-sample">示例</span>
                 <b>{template.title}</b>
                 <span className="qx-rm-desc">{template.description}</span>

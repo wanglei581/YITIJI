@@ -1,5 +1,5 @@
 import { AigcMark } from '../../../ai'
-import { ResumeTouchArt } from '../touch/ResumeTouchArt'
+import { ResumeDocArt } from '../touch/ResumeDocArt'
 import '../touch/resume-fit.css'
 
 interface DecisionSummaryBarProps {
@@ -24,7 +24,7 @@ export function DecisionSummaryBar({ jobTitle, company, summary, matched, missin
   const heading = matched + missing > 0 ? `写到 ${matched} 条，还有 ${missing} 条没写到` : '这次没有逐条对照的内容'
   return (
     <section className="jfq-summary rtp-fit-hero" aria-label="简历对照摘要">
-      <div className="rtp-fit-art"><ResumeTouchArt kind="report" /></div>
+      <div className="rtp-fit-art"><ResumeDocArt kind="report" /></div>
       <div className="rtp-fit-tx">
         <p className="jfq-summary-eyebrow">
           简历对照 · <AigcMark />

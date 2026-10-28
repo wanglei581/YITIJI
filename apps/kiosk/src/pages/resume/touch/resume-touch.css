@@ -526,7 +526,7 @@
   display: none;
 }
 
-/* 纸张小样（ResumeTouchArt）只出形状，颜色在这里按令牌上。纯装饰。 */
+/* 纸张小样（ResumeDocArt）只出形状，颜色在这里按令牌上。纯装饰。 */
 .qxt-screen .rtp-paper {
   display: block;
 }

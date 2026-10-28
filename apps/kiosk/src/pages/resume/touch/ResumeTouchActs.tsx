@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchIcon, type QxTouchIconName } from '../../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchSlab } from '../../../components/qingxu/touch/QxTouchSlab'
-import { ResumeTouchArt, type ResumeTouchArtKind } from './ResumeTouchArt'
+import { ResumeDocArt, type ResumeDocArtKind } from './ResumeDocArt'
 
 export type ResumeTouchActItem = {
   title: string
@@ -12,7 +12,7 @@ export type ResumeTouchActItem = {
   take: string
   onClick: () => void
   /** 左侧小样。不传时用 icon。 */
-  art?: ResumeTouchArtKind
+  art?: ResumeDocArtKind
   icon?: QxTouchIconName
 }
 
@@ -50,7 +50,7 @@ export function ResumeTouchActs({
           take={item.take}
           takeStyle="plain"
           onClick={item.onClick}
-          visual={item.art ? <ResumeTouchArt kind={item.art} /> : <QxTouchIcon name={item.icon ?? 'file'} size={64} strokeWidth={1.8} />}
+          visual={item.art ? <ResumeDocArt kind={item.art} /> : <QxTouchIcon name={item.icon ?? 'file'} size={64} strokeWidth={1.8} />}
         />
       ))}
       {after}

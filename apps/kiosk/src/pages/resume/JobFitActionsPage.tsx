@@ -41,7 +41,7 @@ import { ResumeErrorState, ResumeStepsState, ResumeWaitState } from './touch/Res
 import { ASKS } from './touch/resumeAsks'
 import { unattendedReason } from './touch/unattendedReason'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
-import { ResumeTouchArt } from './touch/ResumeTouchArt'
+import { ResumeDocArt } from './touch/ResumeDocArt'
 import './touch/resume-fit.css'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
@@ -526,7 +526,7 @@ export function JobFitActionsPage() {
       body: (
         <>
           <section className="jfq-summary rtp-fit-hero" aria-label="行动清单摘要">
-            <div className="rtp-fit-art"><ResumeTouchArt kind="checklist" /></div>
+            <div className="rtp-fit-art"><ResumeDocArt kind="checklist" /></div>
             <div className="rtp-fit-tx">
               <p className="jfq-summary-eyebrow"><AigcMark /></p>
               <h2 className="jfq-summary-title">可以先做这 {gapPoints.length + rewrites.length} 件</h2>
