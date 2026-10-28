@@ -322,6 +322,15 @@
   line-height: 1.4;
 }
 .qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
+/* 「问小青」卡（RtAskCard）的按钮：触屏壳的按钮重置（.qxt-screen button，权重 0,1,1）比 directory-qx.css 的 .dw-ai-run（0,1,0）高，
+   深底被抹成透明，主动作看起来像一段字。在本页作用域里把深底、字色、圆角与内边距写回来。 */
+.qxt-screen[data-qx-page='recruit'] .dw-ai-run {
+  padding: 0 24px;
+  border-radius: 16px;
+  background: var(--qx-deep);
+  color: var(--qx-emerald);
+  font-weight: 700;
+}
 /* 岗位列表底部「AI岗位推荐」磁贴：旧样式的图标是白色（var(--k-surface)）叠在浅底上几乎看不见，
    本页作用域里给图标块上浅青底、深青字；jobs-fairs-foundation.css 的默认不动。 */
 .qxt-screen[data-qx-page='recruit'] .jf-tile.tinted .jf-tile-icon {
