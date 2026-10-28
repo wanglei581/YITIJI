@@ -193,12 +193,14 @@ const contactBody = (servicePhone, serviceHours = HOURS) =>
     data: { servicePhone, serviceHours, otherOnlineTerminalNearby: false, miniappPublished: false },
   }), { status: 200, headers: { 'content-type': 'application/json' } })
 
-/** 装一个假 fetch，记下每次请求带的终端号（没带为 null）。 */
+/** 装一个假 fetch，记下每次请求带的终端号（没带为 null）；请求头里的 x-terminal-id 记在 calls.headerIds。 */
 function installContactFetch(respond) {
   const calls = []
-  globalThis.fetch = async (url) => {
+  Object.defineProperty(calls, 'headerIds', { value: [], enumerable: false }) // 不可枚举：不干扰 deepEqual(calls, [...])
+  globalThis.fetch = async (url, init) => {
     const terminalId = new URL(String(url), 'http://kiosk.test').searchParams.get('terminalId')
     calls.push(terminalId)
+    calls.headerIds.push(new Headers(init?.headers).get('x-terminal-id'))
     return respond(terminalId, calls.length)
   }
   return calls
@@ -265,6 +267,7 @@ test('运行时根：挂载读一次（带终端号），每 4 分钟强制续�
     try {
       await flush()
       assert.deepEqual(calls, ['KSK-001'], '挂载时读一次，带终端号')
+      assert.deepEqual(calls.headerIds, ['KSK-001'], '请求头也带终端号：服务端按「出口 IP + 终端号」分限流桶，同一大厅的机器各用各的额度')
       assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
 
       mock.timers.tick(contactMod.SUPPORT_CONTACT_RENEW_MS - 1)
@@ -362,12 +365,14 @@ test('没有终端身份时也读（机器未登记正是需要电话的时候�
     try {
       await flush()
       assert.deepEqual(calls, [null], '没有终端号时请求不带 terminalId')
+      assert.deepEqual(calls.headerIds, [null], '没有终端号时也不带 x-terminal-id 请求头')
       assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_A)
 
       globalThis.__kioskTerminalId = 'KSK-001'
       globalThis.__fireTerminalIdentity()
       await flush()
       assert.deepEqual(calls, [null, 'KSK-001'])
+      assert.deepEqual(calls.headerIds, [null, 'KSK-001'])
       assert.equal(contactMod.peekSupportContact().servicePhone, PHONE_B)
     } finally {
       stop()

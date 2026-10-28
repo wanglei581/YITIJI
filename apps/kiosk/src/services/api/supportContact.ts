@@ -106,9 +106,13 @@ async function requestSupportContact(terminalId: string): Promise<PublicSupportC
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     const query = terminalId ? `?terminalId=${encodeURIComponent(terminalId)}` : ''
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    // 服务端按「出口 IP + 终端号」给这条公开接口分限流桶（@TerminalScopedThrottle）：带上终端号，
+    // 同一个大厅里的几十台机器各用各的额度；不带就退化成整个大厅共用一个桶，周期性续期会互相挤掉。
+    if (terminalId) headers['x-terminal-id'] = terminalId
     const response = await fetch(`${API_BASE_URL}/public/support-contact${query}`, {
       signal: controller.signal,
-      headers: { Accept: 'application/json' },
+      headers,
     })
     if (!response.ok) return remember(CONSERVATIVE_SUPPORT_CONTACT, terminalId)
     const body: unknown = await response.json()

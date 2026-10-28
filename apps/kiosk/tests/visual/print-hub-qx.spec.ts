@@ -550,7 +550,7 @@ test('pause notice switches to the phone sentence when the number arrives after 
   const printTile = page.locator('[data-action="print-hub"]')
   await expect(printTile).toHaveAttribute('data-panel-state', 'error')
   await expect(printTile.getByText(PAUSE_NOTICE_CONSERVATIVE, { exact: true })).toBeVisible()
-  expect(api.requestCount('GET', CONTACT_PATH), '号码还没回来，但已经问过一次').toBe(1)
+  await expect.poll(() => api.requestCount('GET', CONTACT_PATH), '号码还没回来，但已经问过一次').toBe(1)
   const statusRequestsBefore = api.requestCount('GET', '/api/v1/terminals/KSK-001/printer-status')
   await shot(page, 'G8-contact-late-before')
 
