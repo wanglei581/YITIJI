@@ -44,6 +44,31 @@ async function parseViewSnapshot(page: Page) {
   })
 }
 
+/**
+ * 解析页右栏的块不叠、不被压扁：被压扁的块（带 min-height 的声明、维度条）会让文字叠到下一块上。
+ * 逐对比较相邻块的上下沿；再看每个块自己的内容有没有超出它自己的盒子。
+ * toBeVisible() 对被 overflow 裁掉或叠住的元素也会通过，所以这里直接量几何。
+ */
+async function expectParseColumnBlocksClear(page: Page, label: string) {
+  const problems = await page.evaluate(() => {
+    const card = document.querySelector('[data-kiosk-screen="resume-parse"] .qxt-rcol')
+    if (!card) return ['找不到右栏卡片 .qxt-rcol']
+    const blocks = Array.from(card.children) as HTMLElement[]
+    const out: string[] = []
+    for (let index = 0; index < blocks.length; index += 1) {
+      const block = blocks[index]
+      const name = `${block.tagName.toLowerCase()}.${String(block.className).split(' ')[0] || '-'}#${index}`
+      if (block.scrollHeight > block.clientHeight + 1) out.push(`${name} 内容超出自己的盒子（${block.scrollHeight} > ${block.clientHeight}）`)
+      if (index === 0) continue
+      const before = blocks[index - 1].getBoundingClientRect()
+      const here = block.getBoundingClientRect()
+      if (before.bottom > here.top + 0.5) out.push(`${name} 压在上一块上（上一块下沿 ${Math.round(before.bottom)} > 本块上沿 ${Math.round(here.top)}）`)
+    }
+    return out
+  })
+  expect(problems, label).toEqual([])
+}
+
 /** 青序顶栏几何：文字折成几行、胶囊有没有被裁、返回键多大。只量 CSS 像素（舞台缩放关闭时 = 屏幕像素）。 */
 async function qxTopbarMetrics(page: Page) {
   await expect(page.locator('.qxt-band')).toBeVisible()
@@ -575,6 +600,10 @@ test('resume parse unknown with a task id rechecks the same record instead of re
   expect(await parseViewSnapshot(page)).toMatchObject({ state: 'unknown', pill: '解析结果未知', saysError: false })
   await expect(page.getByRole('button', { name: '重新提交解析（新的一次）' })).toHaveCount(0)
   const recheck = page.getByRole('button', { name: '按同一编号再查结果' })
+  await expect(recheck).toBeInViewport({ ratio: 1 })
+  await assertTapTargetPointerHit(recheck)
+  await expect(page.locator('.qxt-dock').getByRole('button', { name: '按同一编号再查结果' })).toHaveCount(1)
+  await expectParseColumnBlocksClear(page, '结果未知（有编号）右栏')
   await recheck.click()
   await expect(page.getByTestId('resume-parse-recheck-result')).toContainText('仍不是最终结果')
   await expect(page).toHaveURL((url) => url.pathname === '/resume/parse')
@@ -733,6 +762,57 @@ test('resume parse: a result arriving after leaving never hijacks navigation @w3
   expect(parseCalls).toBe(1)
 })
 
+/*
+ * 游客等待态（稿 reading）：右栏只有「在进行 + 四条处理内容 + 六个维度 + 两句声明」，
+ * 游客说明与「识别不清怎么办」放在左栏文件名下面，不挤右栏。
+ * 此前右栏塞满后，第 5 个维度被第一块声明盖住一半、第 6 个看不见，toBeVisible 却照样通过，所以量几何。
+ */
+test('resume parse waiting keeps all six dimensions clear of the declarations and the guest notes in the left column @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await page.route('**/api/v1/resume/parse', async (route) => {
+    await held
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) }).catch(() => undefined)
+  })
+  await page.goto('/resume/source')
+  await chooseGenericResumeDirection(page)
+  await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  await startResumeDiagnosis(page)
+  await page.waitForURL('/resume/parse')
+  const root = page.locator('[data-kiosk-screen="resume-parse"][data-state="waiting"]')
+  await expect(root).toBeVisible()
+  const dimensions = root.locator('.qxt-rochips span')
+  await expect(dimensions).toHaveCount(6)
+  for (let index = 0; index < 6; index += 1) await expect(dimensions.nth(index)).toBeInViewport({ ratio: 1 })
+  const rects = await root.evaluate((el) => {
+    const box = (node: Element) => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom } }
+    return {
+      dims: Array.from(el.querySelectorAll('.qxt-rochips span')).map(box),
+      firstWhy: box(el.querySelector('.qxt-rcol .qxt-why') as Element),
+      card: box(el.querySelector('.qxt-rcol') as Element),
+      cardWhys: Array.from(el.querySelectorAll('.qxt-rcol .qxt-why')).map(box),
+    }
+  })
+  // 最后一个维度条的下沿不大于第一块声明的上沿；声明整块落在右栏卡片里。
+  expect(rects.dims[5].bottom).toBeLessThanOrEqual(rects.firstWhy.top)
+  for (let index = 1; index < rects.dims.length; index += 1) expect(rects.dims[index - 1].bottom).toBeLessThanOrEqual(rects.dims[index].top)
+  for (const why of rects.cardWhys) expect(why.bottom).toBeLessThanOrEqual(rects.card.bottom)
+  await expectParseColumnBlocksClear(page, '等待态右栏')
+  // 游客说明、识别不清怎么办在左栏；右栏里一句也不留（它们不是稿里右栏的内容）。
+  const left = root.locator('.qxt-reader-notes')
+  await expect(left.getByTestId('resume-ai-guest-notice')).toContainText('未登录使用简历 AI')
+  await expect(left).toContainText('识别不清或解析失败时会说明下一步怎么做。诊断结果由 AI 生成，仅供参考。')
+  await expect(root.locator('.qxt-rcol .qx-rt-note')).toHaveCount(0)
+  await assertNoHorizontalOverflow(page)
+  release()
+  await page.waitForURL('/resume/report')
+  expect(runtimeErrors).toEqual([])
+})
+
 test('resume parse first POST carries both intent headers and a lost reply replays the same pair @w3-kiosk', async ({ page, api }) => {
   const calls: Array<{ intent: string; proof: string }> = []
   terminalBaseline(api)
@@ -760,6 +840,11 @@ test('resume parse first POST carries both intent headers and a lost reply repla
   expect(calls[0].intent).not.toBe(calls[0].proof)
   await expect(page.locator('b').filter({ hasText: /^结果未知$/ })).toBeVisible()
   await expect(page.getByTestId('resume-parse-replay')).toHaveText('原样再试一次')
+  // 恢复动作在底栏主按钮里：整颗在屏内、真的点得到。右栏说明再长也不能把它挤到屏外（toBeVisible 对被裁掉的元素也会通过）。
+  await expect(page.getByTestId('resume-parse-replay')).toBeInViewport({ ratio: 1 })
+  await assertTapTargetPointerHit(page.getByTestId('resume-parse-replay'))
+  await expect(page.locator('.qxt-dock').getByTestId('resume-parse-replay')).toHaveCount(1)
+  await expectParseColumnBlocksClear(page, '结果未知（无编号）右栏')
   await page.getByTestId('resume-parse-replay').click()
   await page.waitForURL('/resume/report')
   expect(calls).toHaveLength(2)
@@ -1001,6 +1086,11 @@ test('resume parse terminal keyed 4xx tells the truth and does not start another
   await expect(page.getByTestId('resume-parse-terminal-next')).toContainText('连续确认两次')
   await expect(page.getByText('没有调用模型')).toHaveCount(0)
   await expect(page.getByTestId('resume-parse-replay')).toHaveCount(0)
+  // 终态的恢复动作同样在底栏、整颗在屏内。
+  await expect(page.getByTestId('resume-parse-new-attempt')).toBeInViewport({ ratio: 1 })
+  await assertTapTargetPointerHit(page.getByTestId('resume-parse-new-attempt'))
+  await expect(page.locator('.qxt-dock').getByTestId('resume-parse-new-attempt')).toHaveCount(1)
+  await expectParseColumnBlocksClear(page, '终态（已撤销）右栏')
   expect(await stored()).toHaveLength(1)
   expect(posts).toHaveLength(1)
   const revokedIntent = posts[0].intent
@@ -1077,6 +1167,9 @@ test('resume parse terminal keyed 4xx tells the truth and does not start another
   await expect(page.getByTestId('resume-parse-terminal')).toContainText('文件内容已变化')
   await expect(page.getByTestId('resume-parse-terminal-next')).toContainText('重新上传')
   await expect(page.getByText('文件内容已变化，已停止使用。这次没有调用模型。', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('resume-parse-reupload')).toBeInViewport({ ratio: 1 })
+  await assertTapTargetPointerHit(page.getByTestId('resume-parse-reupload'))
+  await expectParseColumnBlocksClear(page, '终态（文件已变化）右栏')
   await expect(page.getByTestId('resume-parse-replay')).toHaveCount(0)
   await expect(page.getByTestId('resume-parse-new-attempt')).toHaveCount(0)
   expect(await stored()).toEqual([])

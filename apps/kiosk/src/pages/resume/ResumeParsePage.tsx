@@ -587,6 +587,7 @@ export function ResumeParsePage() {
       ask={{ label: '问小青：解析没完成怎么办', draft: '我的简历解析还没有完成，请说明等待、复查和重新提交有什么区别，不要替我重新提交。' }}
       primary={primary}
       overlay={overlay}
+      bodyClassName={view === 'waiting' ? undefined : 'qxt-body-tight qxt-body-scroll'}
     >
       <section data-qx-page="reading" data-kiosk-domain="resume" data-kiosk-screen="resume-parse" data-state={view} className="qxt-parse-page" data-takeaway="简历诊断报告">
         {body}
@@ -632,6 +633,19 @@ export function ResumeParsePage() {
         : (pendingTask ? '解析还没出最终结果' : '没等到解析结果')
   const liveTitle = outcome === 'failed' ? '这次没能读出内容' : outcome === 'unknown' ? unknownTitle : '在进行'
 
+  /*
+   * 结果未知时的恢复动作进底栏主按钮：一直在屏内、够得着，不随右栏说明的长短被挤出视口。
+   * 判断链沿用原来右栏按钮的那一条；「返回简历来源」由顶栏返回键和底栏「返回上一步」承担。
+   * 右栏说明里的「重新提交解析（新的一次）」留在原处，不当主按钮。
+   */
+  const recoveryPrimary: QxTouchPrimary | undefined = outcome !== 'unknown' ? undefined
+    : terminal?.mode === 'blocked' ? { label: '暂不能开始新的一次', onClick: () => undefined, disabled: true, noArrow: true }
+    : terminal?.mode === 'file_changed' ? { label: '重新上传简历', onClick: leaveToSource, testId: 'resume-parse-reupload', noArrow: true }
+    : terminal?.mode === 'charged' ? { label: '重新解析（新的一次）', onClick: openFreshConfirm, testId: 'resume-parse-new-attempt', noArrow: true }
+    : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found'
+      ? { label: recheck === 'checking' ? '正在查询…' : '按同一编号再查结果', onClick: () => { void recheckTask() }, disabled: recheck === 'checking', testId: 'resume-parse-recheck', noArrow: true }
+      : { label: '原样再试一次', onClick: replaySame, testId: 'resume-parse-replay', noArrow: true }
+
   return renderFrame(
     <ResumeReadingView
       outcome={outcome}
@@ -671,26 +685,8 @@ export function ResumeParsePage() {
           )}
         </>
       )}
-      actions={outcome === 'unknown' ? (
-        <div className="qxt-parse-acts">
-          <button type="button" onClick={leaveToSource}>返回简历来源</button>
-          {terminal?.mode === 'blocked' ? (
-            <button type="button" disabled>暂不能开始新的一次</button>
-          ) : terminal?.mode === 'file_changed' ? (
-            <button type="button" data-testid="resume-parse-reupload" onClick={leaveToSource}>重新上传简历</button>
-          ) : terminal?.mode === 'charged' ? (
-            <button type="button" data-testid="resume-parse-new-attempt" onClick={openFreshConfirm}>重新解析（新的一次）</button>
-          ) : pendingTask && !storageBlocked && recheck !== 'replay' && recheck !== 'not-found' ? (
-            <button type="button" disabled={recheck === 'checking'} onClick={() => { void recheckTask() }}>
-              {recheck === 'checking' ? '正在查询…' : '按同一编号再查结果'}
-            </button>
-          ) : (
-            <button type="button" data-testid="resume-parse-replay" onClick={replaySame}>原样再试一次</button>
-          )}
-        </div>
-      ) : null}
     />,
-    undefined,
+    recoveryPrimary,
     confirmFresh > 0 ? (
       <QxTouchOverlay
         kind="dialog"

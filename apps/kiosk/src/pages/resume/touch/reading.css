@@ -35,10 +35,15 @@
 [data-qx-page='reading'] .qxt-reader-cap b { display: block; font-size: 24px; line-height: 1.35; word-break: break-all; }
 [data-qx-page='reading'] .qxt-reader-cap small { display: block; font-size: 20px; color: var(--qxt-ink-3); }
 
-/* 右：一张卡 */
+/*
+ * 右：一张卡。卡片固定在可视高度里，内容比卡片长（结果未知的几段说明）就在卡片里滚，
+ * 不会叠出卡片也不会被永久裁掉；恢复动作在底栏，不用滚就够得着。页面主体另给 .qxt-body-scroll 兜底。
+ */
 [data-qx-page='reading'] .qxt-rcol {
   min-width: 0;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -47,6 +52,9 @@
   background: var(--qxt-card);
   border: 1.5px solid var(--qxt-edge);
 }
+
+/* 右栏里的块一律不被压扁：带 min-height 的块在滚动卡片里会缩到比内容矮，文字就叠到下一块上。 */
+[data-qx-page='reading'] .qxt-rcol > * { flex-shrink: 0; }
 
 [data-qx-page='reading'] .qxt-live {
   display: flex;
@@ -112,13 +120,16 @@
 [data-qx-page='reading'] .qxt-step4 b { display: block; font-size: 22px; }
 [data-qx-page='reading'] .qxt-step4 small { display: block; font-size: 20px; line-height: 1.3; color: var(--qxt-ink-3); }
 
-/* 将评估的六个维度（只读） */
-[data-qx-page='reading'] .qxt-dimro { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+/*
+ * 将评估的六个维度（只读）。只长不缩（flex: 1 0 auto）：剩余高度由六个条目均分（稿里就是这样），
+ * 但绝不被挤到比内容矮——挤压会让条目叠到后面的声明上。
+ */
+[data-qx-page='reading'] .qxt-dimro { flex: 1 0 auto; display: flex; flex-direction: column; gap: 8px; }
 [data-qx-page='reading'] .qxt-dimro > b { font-size: 22px; }
-[data-qx-page='reading'] .qxt-rochips { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='reading'] .qxt-rochips { flex: 1 0 auto; display: flex; flex-direction: column; gap: 8px; }
 
 [data-qx-page='reading'] .qxt-rochips span {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -147,7 +158,12 @@
 
 [data-qx-page='reading'] .qxt-why svg { flex: none; }
 
+/* 左栏文件名下面：游客声明、识别不清怎么办、开发键。没有内容时不占位。 */
+[data-qx-page='reading'] .qxt-reader-notes { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+[data-qx-page='reading'] .qxt-reader-notes:empty { display: none; }
+
 /* 运行页原有的说明：游客声明、识别不清怎么办、结果未知的几段 */
+[data-qx-page='reading'] .qxt-reader-notes .qx-rt-note,
 [data-qx-page='reading'] .qxt-rcol .qx-rt-note,
 [data-qx-page='reading'] .qxt-rcol .qxt-read-note {
   margin: 0;
@@ -159,6 +175,7 @@
   color: var(--qxt-ink-2);
 }
 
+[data-qx-page='reading'] .qxt-reader-notes .qx-rt-note[data-tone='warn'],
 [data-qx-page='reading'] .qxt-rcol .qx-rt-note[data-tone='warn'] { background: var(--qxt-clay-wash); color: var(--qxt-clay-ink); }
 [data-qx-page='reading'] .qxt-rcol .qx-rt-note b { margin-right: 8px; }
 
@@ -166,20 +183,6 @@
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv div { display: grid; grid-template-columns: 132px 1fr; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--qxt-well); }
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv dt { font-size: 20px; font-weight: 700; }
 [data-qx-page='reading'] .qxt-rcol .qx-rt-kv dd { margin: 0; font-size: 20px; line-height: 1.4; color: var(--qxt-ink-2); }
-
-[data-qx-page='reading'] .qxt-parse-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-[data-qx-page='reading'] .qxt-parse-acts button {
-  min-height: 72px;
-  padding: 0 14px;
-  border-radius: 20px;
-  background: var(--qxt-well);
-  font-size: 22px;
-  font-weight: 700;
-}
-
-[data-qx-page='reading'] .qxt-parse-acts button:last-child { background: var(--qx-deep); color: var(--qxt-cream); }
-[data-qx-page='reading'] .qxt-parse-acts button:disabled { opacity: 0.42; }
 
 /* 没有文件 / 授权中的单句说明 */
 [data-qx-page='reading'] .qxt-single {
