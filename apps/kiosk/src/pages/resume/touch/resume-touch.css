@@ -429,6 +429,17 @@
   white-space: normal;
 }
 
+/* 自我探索的问句进了意图带标题：强调词用薄荷色、不斜体；副题里的加粗保持亮色。 */
+.qxt-screen .qxt-band h1 em {
+  font-style: normal;
+  color: var(--qxt-mint);
+}
+
+.qxt-screen .qxt-band .qxt-ask-t p b {
+  color: var(--qx-on-solid);
+  font-weight: 700;
+}
+
 /* 页脚求助句后面的「帮助中心」按钮：像链接，点击区仍不小于 64。 */
 .qxt-screen .rtp-help-link {
   margin-left: 12px;

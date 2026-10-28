@@ -34,7 +34,6 @@ import { useNavigate, useSearchParams, type NavigateFunction } from 'react-route
 import type {
   SelfAssessmentConsentLink,
   SelfAssessmentDimensionKey,
-  SelfAssessmentDimensionResult,
 } from '@ai-job-print/shared'
 import { SELF_ASSESSMENT_DIMENSIONS } from '@ai-job-print/shared'
 import {
@@ -103,13 +102,14 @@ import { SaConsentBox, SaConsentLinkedCheck, SaConsentList } from './components/
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { toSaActItems } from './touch/saActItems'
+import { ResumeStepPreview } from './touch/ResumeStepPreview'
+import { SaDimRow } from './touch/SaResultParts'
 
 /** 稿底部那一行不可关闭的边界声明，四个页面共用。 */
 const SA_RAIL = ['结果仅供自我参考', '不评分不排名', '不替代能力证明'] as const
 const SA_EYEBROW = '改简历 · 自我探索'
-const SA_TITLE = '自我探索 · 倾向参考'
-/** 四条路由共用的固定壳 props：标题、域标识与底部边界声明逐页相同。 */
-const SA_FRAME_BASE = { title: SA_TITLE, eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
+/** 四条路由共用的固定壳 props：域标识与底部边界声明逐页相同；问句与说明进意图带的标题和副题。 */
+const SA_FRAME_BASE = { eyebrow: SA_EYEBROW, rail: SA_RAIL } as const
 /** 返回口：稿的返回键指向「简历服务」服务台，不是浏览器历史（一体机没有后退键）。 */
 const SA_BACK_ROUTE = '/resume-service'
 
@@ -308,14 +308,14 @@ export function SelfAssessmentIntroPage() {
           />
         </SaCard>
       ) : consentBundle.state.status === 'error' ? (
-        <SaCard head="同意说明没有取到，请重试" hint="没有说明就不能开始作答" tone="down" testId="self-assessment-consent">
+        <SaCard head="同意说明没有取到，请重试" hint="没有说明就不能开始作答" tone="down" grow testId="self-assessment-consent">
           <p className="sa-sub">这次没能取到要你确认的说明。本页不会拿旧的说明顶上，也不会跳过这一步。</p>
           <div className="sa-quickrow">
             <button type="button" className="sa-quick" data-testid="self-assessment-consent-retry" onClick={consentBundle.retry}>↻ 重新读取说明</button>
           </div>
         </SaCard>
       ) : (
-        <SaCard head="开始前请先确认" hint="正在读取说明" testId="self-assessment-consent">
+        <SaCard head="开始前请先确认" hint="正在读取说明" grow testId="self-assessment-consent">
           <p className="sa-sub" role="status">正在读取这次要确认的说明。读到之前不显示任何条款，也不能勾选。</p>
         </SaCard>
       )}
@@ -817,7 +817,7 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
           ? <>页面不设倒计时，也不会自己变成「完成」；<b>只有系统真实返回才会换屏。</b></>
           : failure
             ? <>失败原因写在下面。<b>页面不会用别的东西顶上，也不会假装已完成。</b></>
-            : <>完成页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
+            : <>倾向参考的结果页只在本次答满并提交后才有内容。<b>直接打开这个地址不会补一个结果给你看。</b></>}
           back={{ label: '返回简历服务', onBack: () => navigate(SA_BACK_ROUTE) }}
         ctabar={
           <>
@@ -986,30 +986,13 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         </>
       }
     >
-      <SaCard head="本次自我探索已完成" hint="仅供本人参考" tone="lead">
-        <SaChips
-          items={[
-            { key: 'dims', text: <>覆盖 <b>{dimensions.length}</b> 个方向</> },
-            { key: 'norank', text: '不评分、不排名' },
-            { key: 'self', text: '仅本人可见' },
-            aiFailed
-              ? { key: 'ai', text: <>AI 解读<b>本次未生成</b></>, tone: 'warn' as const }
-              : { key: 'ai', text: 'AI 解读已生成' },
-          ]}
-        />
-        <p className="sa-sub">
-          本结果基于本人作答的 {dimensions.length} 维度倾向，不含临床 / 心理 / 人格诊断；
-          不代任何招聘结果、能力证明或心理评估；不向企业、合作机构或第三方推送。
-        </p>
-        <SaMeta
-          items={[
-            { key: 'task', label: '记录编号', value: taskId, mono: true },
-            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
-            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
-            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
-          ]}
-        />
-      </SaCard>
+      <ResumeStepPreview
+        className="rtp-hero-min"
+        art="report"
+        kicker={expiresAt ? `保留至 ${expiresAt}` : '只在这台机器的这次使用里保留'}
+        title={`${dimensions.length} 个方向各看你选了多少`}
+        lines={['不评分、不排名，不说适合或不适合哪类岗位。', aiFailed ? 'AI 解读这次没有生成，强度与依据题号照常有。' : '强度由固定权重算出，解读由 AI 写。']}
+      />
 
       {/* AI 只负责这一块，它挂了不影响下面的维度强度与依据题号。走到这里 result
           一定在手，四态只可能是 done / failed，running / idle 由上一支负责。 */}
@@ -1024,18 +1007,45 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         </SaCard>
       </AiTaskRegion>
 
-      <SaCard head="维度强度与依据" hint="这一块不经过 AI">
-        <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <EvidenceBadge level="E2" />
-          <span>
-            每一项的强度都是<b>固定权重累加</b>算出来的，依据只有你自己的选择
-            <EvidenceBadge level="E1" compact />
-            。这部分不经过 AI{aiFailed ? '，所以这次 AI 没成也照常有' : ''}。
-          </span>
+      <p className="sa-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <EvidenceBadge level="E2" />
+        <span>
+          每一项的强度都是<b>固定权重累加</b>算出来的，依据只有你自己的选择
+          <EvidenceBadge level="E1" compact />
+          。这部分不经过 AI{aiFailed ? '，所以这次 AI 没成也照常有' : ''}。
+        </span>
+      </p>
+      <div className="rtp-sa-rows" aria-label="维度强度与依据">
+        {dimensions.map((d) => (
+          <SaDimRow
+            key={d.key}
+            label={SELF_ASSESSMENT_DIMENSIONS.find((dim) => dim.key === d.key)?.label ?? d.label}
+            strength={d.strength}
+            strengthLabel={`强度 ${d.strength}/5`}
+            evidence={`依据：本组第 ${d.evidenceQuestionIdx.length > 0 ? d.evidenceQuestionIdx.map((i) => i + 1).join('、') : '—'} 题的选择（只记题号，不含选项内容）。`}
+          >
+            {d.note ? <AiConclusion text={d.note} /> : (
+              <p className="sa-muted">
+                {aiFailed ? '本次解读未生成 —— 缺的只是这段文字，强度与依据题号已经算出来了。' : '本维度解读未生成。'}
+              </p>
+            )}
+          </SaDimRow>
+        ))}
+      </div>
+
+      <SaCard head="这一次的记录" hint="仅供本人参考">
+        <SaMeta
+          items={[
+            { key: 'task', label: '记录编号', value: taskId, mono: true },
+            { key: 'consented', label: '同意时间', value: completedAt ?? '这台机器上的这次使用未记录' },
+            { key: 'version', label: '同意版本', value: session.consentVersion ?? '这台机器上的这次使用未记录（本次结果由记录编号读回）' },
+            { key: 'expires', label: '保留至', value: expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）' },
+          ]}
+        />
+        <p className="sa-sub">
+          本结果基于本人作答的 {dimensions.length} 维度倾向，不含临床 / 心理 / 人格诊断；
+          不代任何招聘结果、能力证明或心理评估；不向企业、合作机构或第三方推送。
         </p>
-        <div className="sa-dims">
-          {dimensions.map((d) => <DimensionCard key={d.key} d={d} aiFailed={aiFailed} />)}
-        </div>
       </SaCard>
 
       {error ? (
@@ -1070,27 +1080,6 @@ function SelfAssessmentResultContent({ linkedTaskId }: { linkedTaskId: string | 
         />
       ) : null}
     </SaFrame>
-  )
-}
-
-function DimensionCard({ d, aiFailed }: { d: SelfAssessmentDimensionResult; aiFailed: boolean }) {
-  const label = SELF_ASSESSMENT_DIMENSIONS.find((dim) => dim.key === d.key)?.label ?? d.label
-  return (
-    <section className="sa-dim">
-      <div className="sa-dim-h">
-        <h3>{label}</h3>
-        <span className="sa-strength">强度 {d.strength}/5</span>
-      </div>
-      {d.note ? <AiConclusion text={d.note} /> : (
-        <p className="sa-muted">
-          {aiFailed ? '本次解读未生成 —— 缺的只是这段文字，强度与依据题号已经算出来了。' : '本维度解读未生成。'}
-        </p>
-      )}
-      <footer>
-        依据：本组第 {d.evidenceQuestionIdx.length > 0 ? d.evidenceQuestionIdx.map((i) => i + 1).join('、') : '—'} 题的选择（只记题号，不含选项内容）。
-        本解读仅描述本次作答的倾向，不构成能力评价或职业推荐。
-      </footer>
-    </section>
   )
 }
 

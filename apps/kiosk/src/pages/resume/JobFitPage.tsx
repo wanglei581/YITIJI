@@ -43,7 +43,7 @@ import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
 import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import { buildJobFitStateView, type JobFitExits, type JobFitStaticState } from './jobFit/JobFitQxStates'
-import { CtaNote, Guardline, KitRows, ManualTargetFields, NextSteps, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
+import { CtaNote, KitRows, ManualTargetFields, PreflightChecklist, Sec } from './jobFit/jobFitQxKit'
 import { JOB_FIT_NEXT_STEPS, type JobFitStepTarget } from './jobFit/jobFitResultSpec'
 import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
 import { grantJobAiConsent } from '../../services/api/jobAi'
@@ -566,17 +566,13 @@ export function JobFitPage() {
             data-testid="resume-job-fit-state-result"
           >
             <p className="jfq-sec-copy" data-testid="job-fit-resume-name">正在用：{resumeName}</p>
-            <Sec title="对照概要" hint="仅供本人准备使用">
-              <DecisionSummaryBar
-                jobTitle={result.job?.title ?? '目标岗位'}
-                company={result.job?.company}
-                summary={result.summary}
-              />
-              <Guardline
-                head="只对照，不打分"
-                body="不分档、不给分数或通过率，也不等于录用结论；结果只供本人准备，不提供给企业。"
-              />
-            </Sec>
+            <DecisionSummaryBar
+              jobTitle={result.job?.title ?? '目标岗位'}
+              company={result.job?.company}
+              summary={result.summary}
+              matched={(result.matchPoints ?? []).length}
+              missing={(result.gapPoints ?? []).length}
+            />
 
             <FitSkillMap
               matchPoints={result.matchPoints ?? []}
@@ -586,21 +582,24 @@ export function JobFitPage() {
 
             {/*
               「怎么办」已拆到 `/resume/job-fit/actions`（S2-2，矩阵 §3.5）：
-              本页专心做「差在哪」（已写到 / 还没体现两栏 + 关键词命中），
+              本页专心做「差在哪」（每条一行：已经写到 / 还没体现 + 关键词命中），
               行动页专心做「怎么补」（差距项 + 定向改写 + 打印/改简历/备材料）。
               原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
+              「去简历优化」是底栏主按钮，这里只放另外两个去处。
             */}
             {gapActionCount > 0 && (
-              <Sec title="下一步建议" hint="都是本机既有流程">
+              <>
                 <p className="jfq-sec-copy">
-                  这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，单独放在一屏里。
+                  这次一共列出 {gapActionCount} 条可以着手补的地方；补什么、怎么补，单独放在行动清单一屏里。
                 </p>
-                <NextSteps items={JOB_FIT_NEXT_STEPS.map((step) => ({
-                  title: step.title,
-                  desc: step.desc,
-                  onClick: () => goStep(step.target),
-                }))} />
-              </Sec>
+                <div className="qxt-exits">
+                  {JOB_FIT_NEXT_STEPS.filter((step) => step.target !== 'optimize').map((step) => (
+                    <button key={step.target} type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={() => goStep(step.target)}>
+                      {step.title}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             {showSource && (

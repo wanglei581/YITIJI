@@ -39,6 +39,8 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
 import { ResumeErrorState, ResumeStepsState, ResumeWaitState, unattendedReason } from './touch/ResumeStates'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
+import { ResumeTouchArt } from './touch/ResumeTouchArt'
+import './touch/resume-fit.css'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
@@ -48,9 +50,7 @@ import {
   CtaNote,
   Guardline,
   KitRows,
-  RouteCards,
   Sec,
-  Slots,
   Verdict,
 } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
@@ -522,88 +522,51 @@ export function JobFitActionsPage() {
       pill: { tone: 'ok', label: '行动建议以真实匹配结果为准' },
       body: (
         <>
-          <Sec title="你的准备清单" hint="按这次返回的内容分组" grow>
-            <Slots items={[
-              { label: '目标岗位', value: jobLabel },
-              { label: '清单归属', value: '仅本人准备使用', fixed: true },
-            ]} />
-            <div className="rdq-ai">
-              <AiDisclaimerLine>
-                以下差距与准备建议由 AI 依据你的简历与该岗位公开要求生成，仅供参考，不代表任何招聘结果。
-              </AiDisclaimerLine>
+          <section className="jfq-summary rtp-fit-hero" aria-label="行动清单摘要">
+            <div className="rtp-fit-art"><ResumeTouchArt kind="checklist" /></div>
+            <div className="rtp-fit-tx">
+              <p className="jfq-summary-eyebrow"><AigcMark /></p>
+              <h2 className="jfq-summary-title">可以先做这 {gapPoints.length + rewrites.length} 件</h2>
+              <p className="rtp-fit-job">{jobLabel}</p>
+              <div className="rdq-ai">
+                <AiDisclaimerLine>
+                  以下差距与准备建议由 AI 依据你的简历与该岗位公开要求生成，仅供参考，不代表任何招聘结果。
+                </AiDisclaimerLine>
+              </div>
             </div>
-            <div className="rdq-groups">
-              <section className="rdq-group" data-tone="urgent" aria-label="差距与准备建议">
-                <div className="rdq-group-top">
-                  <span className="rdq-group-no" aria-hidden="true">1</span>
-                  <b>差距与准备建议</b>
-                  <span className="rdq-group-chip">{gapPoints.length > 0 ? `${gapPoints.length} 项` : '本次未提供'}</span>
-                </div>
-                <p className="rdq-group-desc">岗位要求里有、简历里还看不到的部分，以及每一项怎么补。</p>
-                {gapPoints.length > 0 ? (
-                  <ul className="rdq-items">
-                    {gapPoints.map((point, index) => (
-                      <li key={`${point.gap.slice(0, 24)}-${index}`} className="rdq-item">
-                        <b><EvidenceBadge level="E3" />{point.gap}</b>
-                        <p>{point.suggestion}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="rdq-muted">这次返回的结果里没有差距项。</p>
-                )}
-              </section>
-              <section className="rdq-group" data-tone="week" aria-label="简历定向优化建议">
-                <div className="rdq-group-top">
-                  <span className="rdq-group-no" aria-hidden="true">2</span>
-                  <b>简历定向优化建议</b>
-                  <span className="rdq-group-chip">{rewrites.length > 0 ? `${rewrites.length} 条` : '本次未提供'}</span>
-                </div>
-                <p className="rdq-group-desc">照着改的是你自己的简历，本页不会自动改写或保存任何内容。</p>
-                {rewrites.length > 0 ? (
-                  <ul className="rdq-items">
-                    {rewrites.map((item, index) => (
-                      <li key={`${item.slice(0, 24)}-${index}`} className="rdq-item">
-                        <b><EvidenceBadge level="E3" />{item}</b>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="rdq-muted">这次返回的结果里没有改写建议。</p>
-                )}
-              </section>
-              <section className="rdq-group" data-tone="print" aria-label="材料与打印">
-                <div className="rdq-group-top">
-                  <span className="rdq-group-no" aria-hidden="true">3</span>
-                  <b>材料与打印</b>
-                  <span className="rdq-group-chip">由你决定</span>
-                </div>
-                <p className="rdq-group-desc">需要纸质件时，先生成打印版，再在打印确认页决定份数与单双面。</p>
-                <div className="rdq-fields">
-                  <div className="rdq-field"><small>打印版文件</small><span>尚未生成</span></div>
-                  <div className="rdq-field"><small>要不要纸质件</small><span>由你在打印流程里确认</span></div>
-                </div>
-              </section>
-            </div>
-            <div className="rdq-ai">
-              <EvidenceLegend />
-              <AigcMark />
-            </div>
-          </Sec>
+          </section>
 
-          <Sec title="准备路径" hint="确认后再进入既有流程">
-            <RouteCards items={[
-              { title: '按建议改简历', desc: '按你确认的方向修改内容，不自动改写简历。', action: '去简历优化', onClick: goResumeOptimize },
-              { title: '准备求职材料', desc: '按目标岗位补齐成果、证书这类可出示材料。', action: '去材料工坊', onClick: goMaterials },
-              { title: '生成打印版', desc: '文件生成成功后才进入打印确认，生成前不表示已打印。', action: '生成打印版', onClick: () => void handlePrint() },
-            ]} />
-            <Guardline
-              head="清单只供本人准备"
-              body={hostingOpen
-                ? '以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。'
-                : '以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能。'}
-            />
-          </Sec>
+          <div className="rtp-fit">
+            {gapPoints.map((point, index) => (
+              <div key={`${point.gap.slice(0, 24)}-${index}`} className="rtp-fit-row" data-tone="warn">
+                <b><EvidenceBadge level="E3" /><i>准备</i> · {point.gap}</b>
+                <span>{point.suggestion}</span>
+              </div>
+            ))}
+            {rewrites.map((item, index) => (
+              <div key={`${item.slice(0, 24)}-${index}`} className="rtp-fit-row" data-tone="ok">
+                <b><EvidenceBadge level="E3" /><i>简历</i> · {item}</b>
+              </div>
+            ))}
+            {gapPoints.length === 0 ? <p className="rdq-muted">这次返回的结果里没有差距项。</p> : null}
+            {rewrites.length === 0 ? <p className="rdq-muted">这次返回的结果里没有改写建议。</p> : null}
+          </div>
+
+          <div className="qxt-exits">
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={goResumeOptimize}>去简历优化</button>
+            <button type="button" className="qxt-btn qxt-btn-sec qxt-btn-exit" onClick={goMaterials}>去材料工坊</button>
+          </div>
+
+          <div className="rdq-ai">
+            <EvidenceLegend />
+          </div>
+
+          <Guardline
+            head="清单只供本人准备"
+            body={hostingOpen
+              ? '以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。'
+              : '以下内容仅为帮助你修改简历与准备材料的参考，不代表任何招聘结果；本平台不提供投递功能。'}
+          />
 
           {hostingOpen && result?.job?.sourceName && (
             <Sec title="岗位来源" hint="以来源平台公示为准">

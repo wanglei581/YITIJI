@@ -37,52 +37,6 @@
   overflow: hidden;
 }
 
-/* ── 小青横幅（稿 .hero） ─────────────────────────────────────── */
-.sa-xq {
-  flex: none;
-  position: relative;
-  overflow: hidden;
-  padding: 26px 38px;
-  border-radius: 34px;
-  background: linear-gradient(158deg, var(--qx-deep-2), var(--qx-deep) 68%);
-  color: var(--qx-paper);
-}
-.sa-xq::after {
-  content: '';
-  position: absolute;
-  right: -140px;
-  top: -140px;
-  width: 410px;
-  height: 410px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--qx-emerald) 16%, transparent), transparent 65%);
-}
-.sa-xq-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 24px; }
-.sa-xq-face {
-  flex: none;
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid color-mix(in srgb, var(--qx-emerald) 42%, transparent);
-  background: color-mix(in srgb, var(--qx-emerald) 10%, transparent);
-  color: var(--qx-emerald);
-  font-family: var(--qx-serif);
-  font-size: 40px;
-}
-/* 眉题 2026-09-30 换成中文「自我探索」，字号、字距、颜色照稿 34 v2 覆盖块。 */
-.sa-xq-eyebrow {
-  margin-bottom: 7px;
-  font-size: var(--qx-fs-aux-lg);
-  letter-spacing: 2px;
-  color: color-mix(in srgb, var(--qx-paper) 90%, transparent);
-}
-.sa-xq-ask { margin: 0; font-family: var(--qx-serif); font-size: 35px; line-height: 1.28; font-weight: 800; }
-.sa-xq-ask em { font-style: normal; color: var(--qx-emerald); }
-.sa-xq-doing { margin: 9px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.46; color: color-mix(in srgb, var(--qx-paper) 74%, transparent); }
-.sa-xq-doing b { color: var(--qx-paper); font-weight: 700; }
-
 /* ── 卡片内的小标题（稿 .hd / .sub） ───────────────────────────── */
 .sa-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 25px; font-weight: 700; }
 .sa-hd span { font-size: var(--qxt-fs-aux); font-weight: 700; color: var(--qx-ink-3); }

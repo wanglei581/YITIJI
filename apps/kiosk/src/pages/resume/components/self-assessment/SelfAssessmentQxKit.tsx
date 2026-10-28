@@ -42,7 +42,6 @@ export interface SaStatus {
 export function SaFrame({
   screen,
   state,
-  title,
   status,
   eyebrow,
   ask,
@@ -56,7 +55,6 @@ export function SaFrame({
   screen: SaScreen
   /** 会同时落到 `data-state` 与 `data-testid`，是浏览器用例唯一的状态锚点。 */
   state: string
-  title: string
   /** 拿不到真实状态就传 unknown；这一格不许默认「正常」。 */
   status: SaStatus
   eyebrow: string
@@ -80,7 +78,8 @@ export function SaFrame({
     <KioskStageFit>
       <ResumeTouchFrame
         eyebrow={eyebrow}
-        title={title}
+        title={ask}
+        subtitle={doing}
         status={status}
         terminalLabel={terminalLabel}
         back={back}
@@ -94,17 +93,6 @@ export function SaFrame({
           data-state={state}
           data-testid={`self-assessment-state-${state}`}
         >
-          <section className="sa-xq">
-            <div className="sa-xq-row">
-              <div className="sa-xq-face" aria-hidden="true">青</div>
-              <div>
-                <div className="sa-xq-eyebrow">{eyebrow}</div>
-                <p className="sa-xq-ask">{ask}</p>
-                <p className="sa-xq-doing">{doing}</p>
-              </div>
-            </div>
-          </section>
-
           <div className="qx-scroll">{children}</div>
 
           {gate}

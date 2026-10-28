@@ -9,6 +9,7 @@ export function ResumeStepPreview({
   note,
   need = false,
   art = 'resume',
+  className,
 }: {
   kicker: string
   title: string
@@ -18,9 +19,11 @@ export function ResumeStepPreview({
   need?: boolean
   /** 小样的纸型。不传是简历。 */
   art?: ResumeTouchArtKind
+  /** 追加到卡片上的类名（如 rtp-hero-min：纸张区至少 190 高，内容多时整屏滚动而不是把纸收没）。 */
+  className?: string
 }) {
   return (
-    <aside className="rtp-hero" aria-label={kicker}>
+    <aside className={className ? `rtp-hero ${className}` : 'rtp-hero'} aria-label={kicker}>
       <div className="rtp-hero-art"><ResumeTouchArt kind={art} /></div>
       <div className="rtp-hero-tx">
         <p className="rtp-hero-k">{kicker}</p>

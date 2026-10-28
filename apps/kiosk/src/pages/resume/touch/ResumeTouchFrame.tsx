@@ -13,8 +13,9 @@ function toneOf(tone: 'ok' | 'warn' | 'bad' | 'unknown' | undefined): 'ok' | 'wa
 }
 
 export type ResumeTouchFrameProps = {
-  title: string
-  subtitle?: string
+  /** 标题可以带节点（自我探索的问句里有强调）。 */
+  title: ReactNode
+  subtitle?: ReactNode
   /** 拿不到真实状态就传 unknown；不传时壳上仍写「状态未知」。 */
   status?: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
   terminalLabel?: string
