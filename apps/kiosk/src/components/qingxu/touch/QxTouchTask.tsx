@@ -1,6 +1,7 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useId, type CSSProperties, type ReactNode } from 'react'
 import { QxTouchChip, type QxTouchChipTone } from './QxTouchChip'
 import { QxTouchIcon, type QxTouchIconName } from './QxTouchIcon'
+import { qxTouchDataMarkers } from './qxTouchMarkers'
 
 export type QxTouchTaskProps = {
   icon: QxTouchIconName
@@ -8,18 +9,21 @@ export type QxTouchTaskProps = {
   desc: ReactNode
   chip?: string
   chipTone?: QxTouchChipTone
+  chipAi?: boolean
   visual?: ReactNode
   take?: string
-  /** 不传时仍是箭头，和改前一样。 */
   takeIcon?: QxTouchIconName
-  /** 不传时不加重前缀。 */
+  /** 加在去处文字前面、不加重的前缀。 */
   takePrefix?: string
+  note?: string
   held?: boolean
   pressable?: boolean
   dark?: boolean
   onClick?: () => void
   index?: number
   label?: string
+  actionId?: string
+  dataAttrs?: Record<string, string | undefined>
 }
 
 export function QxTouchTask({
@@ -28,17 +32,26 @@ export function QxTouchTask({
   desc,
   chip,
   chipTone = 'teal',
+  chipAi = false,
   visual,
   take,
   takeIcon = 'arrowR',
   takePrefix = '',
+  note,
   held = false,
   pressable = false,
   dark = false,
   onClick,
   index = 0,
   label,
+  actionId,
+  dataAttrs,
 }: QxTouchTaskProps) {
+  const titleId = useId()
+  const descId = useId()
+  const chipId = useId()
+  const noteId = useId()
+  const describedBy = [descId, chip ? chipId : '', note ? noteId : ''].filter(Boolean).join(' ')
   const interactive = Boolean(onClick) && (!held || pressable)
   const className = [
     'qxt-task',
@@ -52,10 +65,11 @@ export function QxTouchTask({
     <>
       <div className="qxt-top">
         <span className="qxt-ic"><QxTouchIcon name={icon} size={held && !pressable ? 36 : 40} strokeWidth={2} /></span>
-        {chip ? <QxTouchChip tone={chipTone}>{chip}</QxTouchChip> : null}
+        {chip ? <QxTouchChip id={chipId} tone={chipTone} ai={chipAi}>{chip}</QxTouchChip> : null}
       </div>
-      <h3>{title}</h3>
-      <p>{desc}</p>
+      <h3 id={titleId}>{title}</h3>
+      <p id={descId}>{desc}</p>
+      {note ? <small id={noteId} className="qxt-task-note">{note}</small> : null}
       {visual ? <div className="qxt-mini">{visual}</div> : null}
       {take ? (
         <div className="qxt-take">
@@ -65,15 +79,34 @@ export function QxTouchTask({
       ) : null}
     </>
   )
+  const markers = qxTouchDataMarkers({ actionId, dataAttrs })
   if (!interactive) {
     return (
-      <div className={className} style={style} role="group" aria-disabled="true" aria-label={label ?? title}>
+      <div
+        className={className}
+        style={style}
+        role="group"
+        aria-disabled="true"
+        aria-labelledby={label ? undefined : titleId}
+        aria-describedby={label ? undefined : describedBy}
+        aria-label={label}
+        {...markers}
+      >
         {body}
       </div>
     )
   }
   return (
-    <button type="button" className={className} style={style} onClick={onClick} aria-label={label}>
+    <button
+      type="button"
+      className={className}
+      style={style}
+      onClick={onClick}
+      aria-labelledby={label ? undefined : titleId}
+      aria-describedby={label ? undefined : describedBy}
+      aria-label={label}
+      {...markers}
+    >
       {body}
     </button>
   )

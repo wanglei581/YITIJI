@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { FirstOrderProjectsService } from './first-order-projects.service'
 import { FirstOrderReportsService } from './first-order-reports.service'
-import { AdminFirstOrderQuery, CreateFirstOrderProjectDto, FirstOrderDeploymentDto, FirstOrderEmptyDto, FirstOrderMonthDto, UpdateFirstOrderProjectDto } from './first-order.dto'
+import { AdminFirstOrderQuery, AdminReportDirectoryQuery, CreateFirstOrderProjectDto, FirstOrderDeploymentDto, FirstOrderEmptyDto, FirstOrderMonthDto, UpdateFirstOrderProjectDto, parseFirstOrderListLimit } from './first-order.dto'
 
 @Controller('admin/first-order')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -47,6 +47,11 @@ export class AdminFirstOrderController {
   @Header('Cache-Control', 'no-store')
   createReport(@CurrentUser() user: AuthedUser, @Param('id') id: string, @Body() body: FirstOrderMonthDto) {
     return this.reports.create(user, id, body.month)
+  }
+  @Get('reports')
+  @Header('Cache-Control', 'no-store')
+  reportDirectory(@CurrentUser() user: AuthedUser, @Query() query: AdminReportDirectoryQuery) {
+    return this.reports.listByMonth(user, query.month, parseFirstOrderListLimit(query.limit))
   }
   @Get('reports/:id')
   @Header('Cache-Control', 'no-store')

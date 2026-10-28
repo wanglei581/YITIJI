@@ -106,8 +106,7 @@ export function PrintTouchFrame({
   return (
     <QxTouchScreen
       buttonReset={false}
-      gallery={false}
-      frame
+      legacyFrame
       page={page}
       motion="none"
       testId={testId}
