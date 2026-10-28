@@ -41,7 +41,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 81 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 80 |
 | **medium** | 只被文档或其它文件提及 | 29 |
 | **low** | 全仓零提及 | 94 |
 
@@ -230,9 +230,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（81）
+## high — 仍被 CI / 门禁 / 包脚本引用（80）
 
-### 页面/组件（37）
+### 页面/组件（36）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -257,7 +257,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/admin/src/services/api/offlineAgenciesAdmin.ts` | 不在 apps/admin/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/admin/scripts/verify-admin-offline-agencies-ui.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
 | `apps/kiosk/src/components/ComingSoonNotice.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 | `apps/kiosk/src/components/KioskDeviceStatusPills.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-device-status-honest.mjs |
-| `apps/kiosk/src/copy/unattendedCopy.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs |
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs、apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/auth/components/MemberPhoneLoginPane.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs、apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/contract-review/contractReviewReportPrintFlow.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-contract-review-report-print.mjs |

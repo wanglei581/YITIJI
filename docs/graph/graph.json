@@ -13569,7 +13569,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 641,
+      "reachableFileCount": 642,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -19607,6 +19607,9 @@
     "apps/kiosk/scripts/extract-service-hub-specs.mjs": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/scripts/fixtures/unattended-pending-pages.json": [
+      "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs"
+    ],
     "apps/kiosk/scripts/lib/fusion-baseline-contract.mjs": [
       "apps/kiosk/scripts/verify-fusion-baseline.mjs"
     ],
@@ -19848,7 +19851,8 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs"
     ],
     "apps/kiosk/src/components/KioskFeedbackDialog.tsx": [
-      "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
+      "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs",
+      "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs"
     ],
     "apps/kiosk/src/components/PdfCanvasPreview.tsx": [
       "apps/kiosk/scripts/verify-print-parameter-capability.mjs",
@@ -19874,6 +19878,11 @@
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
+    "apps/kiosk/src/copy/unattendedCopy.ts": [
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
+      "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs"
+    ],
     "apps/kiosk/src/favorites/localFavorites.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
@@ -19898,6 +19907,7 @@
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
       "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
+      "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs",
       "apps/terminal-agent/scripts/verify-print-monitor-truth.ts",
@@ -21949,6 +21959,7 @@
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/services/api/httpAdapter.ts": [
+      "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
@@ -22085,6 +22096,7 @@
     "apps/kiosk/src/services/api/userErrorMessage.ts": [
       "apps/kiosk/scripts/verify-backend-error-copy-coverage.mjs",
       "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
+      "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
       "apps/kiosk/scripts/verify-pickup-claim-error-coverage.mjs",
       "apps/kiosk/scripts/verify-print-confirm-honest.mjs",
       "scripts/verify-no-raw-error-render.mjs",
@@ -29375,6 +29387,7 @@
         ],
         "files": [
           "apps/kiosk/src/pages/auth/accountUserMessage.ts",
+          "apps/kiosk/src/services/api/httpAdapter.ts",
           "apps/kiosk/src/services/api/userErrorMessage.ts",
           "apps/kiosk/src/services/auth/memberAuthApi.ts",
           "services/api/src/member-auth/member-phone-rebind.service.ts",
@@ -30624,6 +30637,7 @@
         ],
         "files": [
           "apps/kiosk/scripts/lib/shell-chrome-contract.mjs",
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/main.tsx",
           "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx",
@@ -30698,6 +30712,28 @@
       "package": "@ai-job-print/kiosk",
       "scriptNames": [
         "@ai-job-print/kiosk::verify:kiosk-shell-active-nav"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "apps/kiosk/scripts/fixtures/unattended-pending-pages.json",
+          "apps/kiosk/src/components/KioskFeedbackDialog.tsx",
+          "apps/kiosk/src/copy/unattendedCopy.ts",
+          "apps/kiosk/src/hooks/useTerminalDeviceStatus.ts",
+          "apps/kiosk/src/services/api/userErrorMessage.ts"
+        ],
+        "missing": []
+      },
+      "file": "apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/kiosk",
+      "scriptNames": [
+        "@ai-job-print/kiosk::verify:kiosk-unattended-copy"
       ],
       "wired": true
     },
@@ -31188,6 +31224,7 @@
           "apps"
         ],
         "files": [
+          "apps/kiosk/src/copy/unattendedCopy.ts",
           "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
           "apps/kiosk/src/pages/print/cashierStatus.ts",
           "apps/kiosk/src/pages/print/components/PickupHidGuide.tsx",
@@ -43988,18 +44025,6 @@
         "risk": "medium",
         "scope": "kiosk",
         "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/copy/unattendedCopy.ts",
-        "kind": "component",
-        "mentions": [
-          "apps/kiosk/scripts/tests/unattended-copy.test.mjs",
-          "docs/progress/current-progress.md"
-        ],
-        "risk": "high",
-        "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/tests/unattended-copy.test.mjs"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
