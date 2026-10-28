@@ -88,6 +88,19 @@
   .qxt-screen .qxt-orb { width: 64px; height: 64px; }
   .qxt-screen .qxt-askbar b { font-size: 16px; line-height: 1.25; }
   .qxt-screen .qxt-askbar small { font-size: 12px; }
+  /* 底栏三件（返回、问小青、主按钮）在手机宽下挤得下：原来返回约 170px、主按钮最少 300px，合计顶到 650px 把整屏横向推出。
+     压低间距与按钮高度，主按钮和问小青平分剩下的宽度、文字可折两行；问小青的字照样看得见（不带麦克风的页也不会变成空圆钮）。 */
+  .qxt-screen .qxt-dock { gap: 8px; padding: 10px 12px; }
+  .qxt-screen .qxt-dock .qxt-btn { height: 64px; min-height: 64px; padding: 0 12px; gap: 6px; font-size: 18px; }
+  .qxt-screen .qxt-dock .qxt-btn-pri { min-width: 0; flex: 1 1 0; white-space: normal; line-height: 1.15; }
+  .qxt-screen .qxt-dock .qxt-askq { flex: 1 1 0; height: 64px; min-height: 64px; padding: 0 10px; gap: 6px; font-size: 16px; line-height: 1.15; }
+  .qxt-screen .qxt-dock .qxt-askq > span:last-child {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .qxt-screen .qxt-dock .qxt-mic { width: 44px; height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

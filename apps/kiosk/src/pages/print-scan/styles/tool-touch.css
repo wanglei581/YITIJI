@@ -37,22 +37,6 @@
   opacity: 0.42;
 }
 
-.qxt-screen .qxt-dock .sw-cta-wrap,
-.qxt-screen .qxt-dock .ss-cta-wrap,
-.qxt-screen .qxt-dock .i2p-cta-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: none;
-}
-
-.qxt-screen .qxt-dock .sw-cta-row,
-.qxt-screen .qxt-dock .ss-cta-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .qxt-screen .sw-page {
   display: flex;
   flex-direction: column;
@@ -189,31 +173,6 @@
   min-height: 0;
   overflow: auto;
 }
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock {
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  gap: 8px;
-}
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .qxt-askq {
-  flex: 1 1 100%;
-  min-width: 0;
-  height: 56px;
-  min-height: 56px;
-}
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .sw-cta-wrap {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-[data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-dock .qx-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 56px;
-  min-height: 56px;
-  padding: 0 8px;
-  font-size: 16px;
-  white-space: normal;
-  text-align: center;
-}
 [data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav { height: 64px; }
 [data-kiosk-stage-fit='off'] .qxt-screen:has(.sw-page) .qxt-nav button {
   min-height: 64px;
@@ -275,31 +234,7 @@
   max-height: 100%;
 }
 
-/* 手机宽度（不缩放的舞台）：底栏折成两行——问小青独占第一行，返回与主按钮并排在第二行。
- * 本包四屏与工具三屏共用，所以挂 .scan-touch，不挂 :has(.sw-page)。 */
-[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock {
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  gap: 8px;
-}
-[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-askq {
-  order: -1;
-  flex: 1 1 100%;
-  min-width: 0;
-  height: 56px;
-  min-height: 56px;
-}
-[data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-dock .qxt-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 56px;
-  min-height: 56px;
-  padding: 0 8px;
-  gap: 6px;
-  font-size: 16px;
-  white-space: normal;
-  text-align: center;
-}
+/* 手机宽度的底栏由共享件自己收进一行（touch-hero.css），这里不再另写。正文内边距照旧收紧。 */
 [data-kiosk-stage-fit='off'] .qxt-screen.scan-touch .qxt-body {
   padding: 8px 12px;
 }
