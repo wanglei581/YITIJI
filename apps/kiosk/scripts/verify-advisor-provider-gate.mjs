@@ -23,6 +23,9 @@ const files = {
   touchCss: read('src/pages/assistant/assistant-touch.css'),
   picker: read('src/pages/assistant/AssistantTaskPicker.tsx'),
   login: read('src/pages/auth/LoginPage.tsx'),
+  help: read('src/pages/help/HelpCenterPage.tsx'),
+  channels: read('src/pages/official-channels/OfficialChannelsPage.tsx'),
+  legal: read('src/pages/legal/LegalDocPage.tsx'),
   routes: read('src/routes/index.tsx'),
 }
 
@@ -115,6 +118,14 @@ must('page', /sub=\{toolboxScene && body === 'picker' \? `\$\{toolboxScene\.disc
 must('login', /label: '问小青：不登录能办什么', draft: '不登录可以办理哪些服务？登录之后又多出什么？'/, '登录页问小青的 label 与预填问句照稿')
 must('login', /<span className="qxt-mic"><QxTouchIcon name="mic" size=\{30\} strokeWidth=\{2\.2\} \/><\/span>/, '登录页问小青带话筒圆钮')
 must('login', /rememberAssistantDraft\(LOGIN_ASK\.draft\); navigate\('\/assistant'\)/, '登录页问小青：预填后去顾问页，不自动发送')
+// 其余带底栏问小青的屏（稿 fix-public.js）：label 逐字照稿、带话筒、各带本屏专属问句；点了只预填，不自动发送（共享底栏的约定）。
+must('help', /label: '问小青：帮助页打不开', draft: '帮助页打不开，我该怎么继续？', voice: true/, '帮助页（打不开）问小青的 label 与预填问句照稿，带话筒')
+must('help', /label: '问小青：分类里没有我的问题', draft: '这一页的分类里没有我的问题，我该怎么继续？', voice: true/, '帮助页（没有这个分类）问小青的 label 与预填问句照稿，带话筒')
+must('help', /label: '问小青：这里没看懂', draft: view === 'topic' && topic \? `帮助页「\$\{topic\.label\}」这一类里我没看懂，请帮我说明。` : '帮助页里我没看懂，请帮我说明。', voice: true/, '帮助页（首页与分类）问小青的 label 照稿，分类页的预填问句带分类名')
+must('channels', /label: '问小青：这个码怎么用', draft: CHANNEL_ASK_DRAFT, voice: true/, '官方渠道问小青的 label 照稿，带话筒')
+must('channels', /<PairCard title="问小青" desc="渠道还没有码，仍可以问别的事"/, '官方渠道没有码时仍留一张「问小青」卡（稿：渠道还没有码，仍可以问别的事）')
+must('legal', /label: '问小青：看不懂这一章', draft: `《\$\{meta\.title\}》里「\$\{sections\[activeChapter\]\?\.title \?\? ''\}」这一章我没看懂，请只做通俗转述，不要给法律结论。`, voice: true/, '协议页问小青的 label 照稿，预填问句带书名与章名并写明只做通俗转述')
+must('legal', /\{ label: '看不懂这一章', disabled: true, testId: 'legal-ai-explain' \}/, '协议正文没取回来时，问小青只置灰（唯一产出是对这一章的转述，没有正文就没有可转述的）')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。
