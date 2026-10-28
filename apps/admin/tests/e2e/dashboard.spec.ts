@@ -2,6 +2,41 @@ import { expect, test } from '@playwright/test'
 import { openAuthed, settleAdminPage } from './helpers/open'
 
 test.describe('工作台（mock 口径）', () => {
+  for (const [scenario, expected] of [
+    ['empty', '还没有打印机上报状态。'],
+    ['offline', '离线或未上报 1 台'],
+    ['low', '纸张或墨粉偏少 1 台（仍可打印）'],
+    ['normal', '1 台打印机都在线，没有报告故障，也没有报告纸张或墨粉不足。'],
+  ] as const) {
+    test(`设备现在：${scenario} 状态如实显示`, async ({ page }) => {
+      const guards = await openAuthed(page, `/?mock:printerStatus=${scenario}`)
+      await settleAdminPage(page, guards)
+      await expect(page.getByRole('region', { name: '设备现在' })).toContainText(expected)
+      const today = page.locator('section').filter({ has: page.getByRole('heading', { name: '今天要处理', exact: true }) })
+      if (scenario === 'offline' || scenario === 'low') await expect(today).toContainText(expected)
+      // 全部正常时「今天要处理」不能挂着打印机这一行
+      if (scenario === 'normal') {
+        await expect(today).not.toContainText('离线或未上报')
+        await expect(today).not.toContainText('纸张或墨粉偏少')
+        await expect(today).not.toContainText('要现场处理')
+      }
+    })
+  }
+
+  for (const [scenario, expected] of [
+    ['measured', '估算费用约 ¥0.1234'],
+    ['partial', '已计量部分约 ¥0.1234；另有 2 次没有费用数据，实际花费会更高'],
+    ['unmeasured', '这 12 次调用都没有费用数据'],
+  ] as const) {
+    test(`AI 近 24 小时：${scenario} 费用口径`, async ({ page }) => {
+      const guards = await openAuthed(page, `/?mock:aiCost=${scenario}`)
+      await settleAdminPage(page, guards)
+      const card = page.locator('section').filter({ has: page.getByRole('heading', { name: 'AI 近 24 小时' }) })
+      await expect(card).toContainText(expected)
+      if (scenario === 'unmeasured') await expect(card).not.toContainText('¥0')
+    })
+  }
+
   test('刷新与待办入口可点，页面保持诚实', async ({ page }) => {
     const guards = await openAuthed(page, '/')
     await settleAdminPage(page, guards)
