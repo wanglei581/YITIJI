@@ -3,6 +3,7 @@
 --      已有机构全部落在 none，所以上线本迁移不会让任何现有点位受影响。
 --   2. 新表 License：授权给哪家企业、期限、终端台数、宽限天数、状态。
 --      只按「期限 + 台数」授权，没有任何与岗位、招聘会、浏览、投递挂钩的列。
+--      version：乐观版本号，更正 / 暂停 / 恢复 / 吊销按版本做条件更新，并发改同一条授权时后到的回 409。
 --   库里另加 CHECK 兜底（应用层已校验，这里防绕过应用直接写库）。
 
 -- AlterTable
@@ -27,13 +28,15 @@ CREATE TABLE "License" (
     "statusChangedBy" TEXT,
     "createdBy" TEXT NOT NULL,
     "updatedBy" TEXT,
+    "version" INTEGER NOT NULL DEFAULT 1,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "License_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "License_status_check" CHECK ("status" IN ('active', 'suspended', 'revoked')),
     CONSTRAINT "License_terminalQuota_check" CHECK ("terminalQuota" >= 1 AND "terminalQuota" <= 10000),
     CONSTRAINT "License_graceDays_check" CHECK ("graceDays" >= 0 AND "graceDays" <= 30),
-    CONSTRAINT "License_period_check" CHECK ("endsAt" > "startsAt")
+    CONSTRAINT "License_period_check" CHECK ("endsAt" > "startsAt"),
+    CONSTRAINT "License_version_check" CHECK ("version" >= 1)
 );
 
 -- CreateIndex

@@ -3430,6 +3430,9 @@ model License {
   statusChangedBy String?
   createdBy       String
   updatedBy       String?
+  /// 乐观版本号：从 1 起，每次变更（更正 / 暂停 / 恢复 / 吊销）+1。
+  /// 写入必须带上界面读到的版本，更新条件带 where version，对不上回 409 LICENSE_VERSION_CONFLICT。
+  version         Int      @default(1)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

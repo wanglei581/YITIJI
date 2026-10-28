@@ -7,6 +7,7 @@ import { BrandingAdminController } from './branding.admin.controller'
 import { BrandingPublicController } from './branding.public.controller'
 import { BrandingService } from './branding.service'
 import { KioskProfileService } from './kiosk-profile.service'
+import { KioskProfileThrottleBinder } from './kiosk-profile-throttle'
 
 /**
  * 贴牌：平台默认品牌与备案、机构覆盖的解析、Logo 上传与公开读取、一体机 kiosk-profile。
@@ -15,7 +16,7 @@ import { KioskProfileService } from './kiosk-profile.service'
 @Module({
   imports: [PrismaModule, AuthModule, TerminalsModule],
   controllers: [BrandingPublicController, BrandingAdminController],
-  providers: [BrandLogoService, BrandingService, KioskProfileService],
+  providers: [BrandLogoService, BrandingService, KioskProfileService, KioskProfileThrottleBinder],
   exports: [BrandingService, BrandLogoService],
 })
 export class BrandingModule {}

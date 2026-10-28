@@ -1,5 +1,6 @@
 import { toLicenseWindow } from './license-gate'
 import { graceEndsAt, licensePhase, normalizeLicenseMode, resolveOrgLicense } from './license-state'
+import { beijingDateOf, lastDayOf, periodText } from './license-time'
 import type {
   LicenseMode,
   LicenseStatus,
@@ -27,8 +28,14 @@ export interface LicenseRow {
   statusChangedBy: string | null
   createdBy: string
   updatedBy: string | null
+  version: number
   createdAt: Date
   updatedAt: Date
+}
+
+/** 宽限的最后一天（含当天）；没有宽限（graceDays 为 0）时 null。 */
+export function graceEndsOn(row: Pick<LicenseRow, 'endsAt' | 'graceDays'>): string | null {
+  return row.graceDays > 0 ? lastDayOf(graceEndsAt(row)) : null
 }
 
 export function licenseView(row: LicenseRow, now: Date): LicenseView {
@@ -36,13 +43,18 @@ export function licenseView(row: LicenseRow, now: Date): LicenseView {
   return {
     id: row.id,
     orgId: row.orgId,
+    version: row.version,
     licenseeName: row.licenseeName,
     creditCode: row.creditCode,
     contractNo: row.contractNo,
     startsAt: row.startsAt.toISOString(),
     endsAt: row.endsAt.toISOString(),
+    startsOn: beijingDateOf(row.startsAt),
+    endsOn: lastDayOf(row.endsAt),
+    periodText: periodText(row.startsAt, row.endsAt),
     graceDays: row.graceDays,
     graceEndsAt: graceEndsAt(window).toISOString(),
+    graceEndsOn: graceEndsOn(row),
     terminalQuota: row.terminalQuota,
     status: row.status as LicenseStatus,
     phase: licensePhase(window, now),
@@ -68,10 +80,13 @@ export function licenseSnapshot(row: LicenseRow): Record<string, unknown> {
     contractNo: row.contractNo,
     startsAt: row.startsAt.toISOString(),
     endsAt: row.endsAt.toISOString(),
+    startsOn: beijingDateOf(row.startsAt),
+    endsOn: lastDayOf(row.endsAt),
     terminalQuota: row.terminalQuota,
     graceDays: row.graceDays,
     status: row.status,
     note: row.note,
+    version: row.version,
   }
 }
 
@@ -115,6 +130,7 @@ export function buildOverview(
       usable: resolution.usable,
       daysLeft: resolution.daysLeft,
       coveredUntil: resolution.coveredUntil?.toISOString() ?? null,
+      coveredUntilOn: resolution.coveredUntil ? lastDayOf(resolution.coveredUntil) : null,
       current: view(resolution.current?.id),
       upcoming: view(resolution.upcoming?.id),
       terminalQuota,
@@ -139,14 +155,26 @@ export function partnerView(overview: OrgLicenseOverview): PartnerLicenseView {
           licenseeName: current.licenseeName,
           startsAt: current.startsAt,
           endsAt: current.endsAt,
+          startsOn: current.startsOn,
+          endsOn: current.endsOn,
+          periodText: current.periodText,
           graceDays: current.graceDays,
           graceEndsAt: current.graceEndsAt,
+          graceEndsOn: current.graceEndsOn,
           terminalQuota: current.terminalQuota,
           status: current.status,
         }
       : null,
     upcoming: upcoming
-      ? { startsAt: upcoming.startsAt, endsAt: upcoming.endsAt, terminalQuota: upcoming.terminalQuota }
+      ? {
+          startsAt: upcoming.startsAt,
+          endsAt: upcoming.endsAt,
+          startsOn: upcoming.startsOn,
+          endsOn: upcoming.endsOn,
+          periodText: upcoming.periodText,
+          graceEndsOn: upcoming.graceEndsOn,
+          terminalQuota: upcoming.terminalQuota,
+        }
       : null,
     terminalsBound: overview.terminalsBound,
   }

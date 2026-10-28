@@ -1,5 +1,6 @@
-import { BadRequestException } from '@nestjs/common'
-import type { PrismaService } from '../prisma/prisma.service'
+import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { lockOrganization } from '../licenses/license-gate'
+import type { PrismaService, PrismaTransactionClient } from '../prisma/prisma.service'
 import { normalizeBrandMark, normalizeBrandName, normalizeLogoAssetId } from './branding.validation'
 import { BRAND_LOGO_ID_PATTERN, brandLogoUrl, type OrgBrandOverride } from './branding.types'
 
@@ -44,6 +45,45 @@ export async function prepareOrgBrandPatch(
     patch.brandLogoAssetId = assetId
   }
   return patch
+}
+
+export interface OrgBrandSnapshot {
+  brandName: string | null
+  brandMark: string | null
+  brandLogoAssetId: string | null
+}
+
+/**
+ * 事务内：先锁住机构、再读出品牌三项的当前值，作为审计的「改前」。
+ * 不拿事务外读到的旧值——两个管理员同时改同一个机构时，审计里的「改前」才是真正的改前。
+ */
+export async function lockAndReadOrgBrand(
+  tx: PrismaTransactionClient,
+  dbKind: PrismaService['dbKind'],
+  orgId: string,
+): Promise<OrgBrandSnapshot> {
+  await lockOrganization(tx, dbKind, orgId)
+  const row = await tx.organization.findUnique({
+    where: { id: orgId },
+    select: { brandName: true, brandMark: true, brandLogoAssetId: true },
+  })
+  if (!row) throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+  return row
+}
+
+/** 审计载荷：品牌名、字标、Logo 三项的改前改后（没提交的项原值不变，前后相同）。 */
+export function orgBrandAudit(
+  before: OrgBrandSnapshot,
+  patch: OrgBrandPatch,
+): { before: OrgBrandSnapshot; after: OrgBrandSnapshot } {
+  return {
+    before,
+    after: {
+      brandName: patch.brandName !== undefined ? patch.brandName : before.brandName,
+      brandMark: patch.brandMark !== undefined ? patch.brandMark : before.brandMark,
+      brandLogoAssetId: patch.brandLogoAssetId !== undefined ? patch.brandLogoAssetId : before.brandLogoAssetId,
+    },
+  }
 }
 
 /** 给管理员后台回显：库存值 + 现成的公开图片地址。 */

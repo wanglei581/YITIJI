@@ -30,7 +30,7 @@ import { contactPhoneAssignment } from './contact-phone-change'
 import { assertPartnerAccountIdentifiers } from './partner-account-identifiers'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
-import { orgBrandOverrideView, prepareOrgBrandPatch } from '../branding/org-brand-patch'
+import { lockAndReadOrgBrand, orgBrandAudit, orgBrandOverrideView, prepareOrgBrandPatch } from '../branding/org-brand-patch'
 import {
   ADMIN_ORG_ACCOUNT_SELECT,
   mapAdminOrgAccount,
@@ -411,7 +411,10 @@ export class AdminOrgsService {
       })
     }
     const brandPatch = await prepareOrgBrandPatch(this.prisma, dto)
+    const brandTouched = Object.keys(brandPatch).length > 0
     await this.prisma.$transaction(async (tx) => {
+      // 品牌三项的「改前」在事务内锁机构后读，审计才记得准。
+      const brandBefore = brandTouched ? await lockAndReadOrgBrand(tx, this.prisma.dbKind, orgId) : null
       await tx.organization.update({
         where: { id: orgId },
         data: {
@@ -430,7 +433,7 @@ export class AdminOrgsService {
         action: 'org.update',
         targetType: 'organization',
         targetId: orgId,
-        payload: { changedFields },
+        payload: { changedFields, ...(brandBefore ? { brand: orgBrandAudit(brandBefore, brandPatch) } : {}) },
       })
     })
     return this.getOrgDetail(orgId)

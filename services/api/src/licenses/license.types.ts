@@ -25,6 +25,11 @@ export type LicensePhase = (typeof LICENSE_PHASES)[number]
 export const LICENSE_DEFAULT_GRACE_DAYS = 7
 export const LICENSE_MAX_GRACE_DAYS = 30
 export const LICENSE_MAX_TERMINAL_QUOTA = 10000
+export const LICENSE_REASON_MIN_LENGTH = 2
+export const LICENSE_REASON_MAX_LENGTH = 200
+export const LICENSE_TICKET_NO_MAX_LENGTH = 64
+export const LICENSE_TICKET_NO_PATTERN = '^[A-Za-z0-9_/-]+$'
+export const LICENSE_CONTRACT_NO_MAX_LENGTH = 64
 export const LICENSE_WARN_DAYS = [30, 7, 1] as const
 
 export type KioskLicenseState = 'ok' | 'grace' | 'inactive'
@@ -32,13 +37,18 @@ export type KioskLicenseState = 'ok' | 'grace' | 'inactive'
 export interface LicenseView {
   id: string
   orgId: string
+  version: number
   licenseeName: string
   creditCode: string
   contractNo: string
   startsAt: string
   endsAt: string
+  startsOn: string
+  endsOn: string
+  periodText: string
   graceDays: number
   graceEndsAt: string
+  graceEndsOn: string | null
   terminalQuota: number
   status: LicenseStatus
   phase: LicensePhase
@@ -62,6 +72,7 @@ export interface OrgLicenseOverview {
   usable: boolean
   daysLeft: number | null
   coveredUntil: string | null
+  coveredUntilOn: string | null
   current: LicenseView | null
   upcoming: LicenseView | null
   terminalQuota: number | null
@@ -96,12 +107,24 @@ export interface PartnerLicenseView {
     licenseeName: string
     startsAt: string
     endsAt: string
+    startsOn: string
+    endsOn: string
+    periodText: string
     graceDays: number
     graceEndsAt: string
+    graceEndsOn: string | null
     terminalQuota: number
     status: LicenseStatus
   } | null
-  upcoming: { startsAt: string; endsAt: string; terminalQuota: number } | null
+  upcoming: {
+    startsAt: string
+    endsAt: string
+    startsOn: string
+    endsOn: string
+    periodText: string
+    graceEndsOn: string | null
+    terminalQuota: number
+  } | null
   terminalsBound: number
 }
 
@@ -109,44 +132,50 @@ export interface CreateLicenseInput {
   licenseeName: string
   creditCode: string
   contractNo: string
-  startsAt: string
-  endsAt: string
+  startsOn: string
+  endsOn: string
   terminalQuota: number
   graceDays?: number
   note?: string | null
 }
 
 export interface UpdateLicenseInput {
+  version: number
+  reason: string
   licenseeName?: string
   creditCode?: string
   contractNo?: string
-  startsAt?: string
-  endsAt?: string
+  startsOn?: string
+  endsOn?: string
   terminalQuota?: number
   graceDays?: number
   note?: string | null
 }
 
 export interface RenewLicenseInput {
-  startsAt?: string
-  endsAt: string
+  licenseeName: string
+  creditCode: string
   contractNo: string
+  startsOn?: string
+  endsOn: string
   terminalQuota?: number
   graceDays?: number
   note?: string | null
 }
 
 export interface LicenseStatusChangeInput {
+  version: number
   reason: string
-  ticketNo?: string | null
+  approvalTicketNo: string
 }
 
 export interface LicenseResumeInput {
-  reason?: string | null
+  version: number
+  reason: string
 }
 
 export interface SetLicenseModeInput {
   licenseMode: LicenseMode
   confirmLockout?: boolean
-  reason?: string | null
+  reason: string
 }

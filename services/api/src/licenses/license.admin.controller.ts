@@ -20,17 +20,19 @@ function actorOf(user: AuthedUser, req: unknown): LicenseActor {
 
 /**
  * 管理员：软件使用授权（授权给哪家企业、期限、终端台数、到期停用）。全部 Bearer + admin，写操作全部审计。
+ * 期限按合同口径「含到期日」、北京时间：请求收 startsOn / endsOn（YYYY-MM-DD，都含当天）。
  *
  *   GET  /api/v1/admin/licenses/attention        工作台「今天要处理」：30 天内到期 / 宽限中 / 已停用
  *   GET  /api/v1/admin/licenses/:id              一条授权
  *   GET  /api/v1/admin/orgs/:orgId/licenses      机构的授权一节：概览 + 全部历史
- *   POST /api/v1/admin/orgs/:orgId/licenses      新建（可提前录入未来生效的）
- *   PATCH /api/v1/admin/licenses/:id             更正 / 改期 / 改台数（吊销后不可改）
- *   POST /api/v1/admin/licenses/:id/renew        续期：新建首尾相接的后续授权
- *   POST /api/v1/admin/licenses/:id/suspend      暂停（理由必填，可带工单号）
- *   POST /api/v1/admin/licenses/:id/resume       恢复（只对已暂停）
- *   POST /api/v1/admin/licenses/:id/revoke       吊销（理由必填，可带工单号；不可恢复）
- *   PUT  /api/v1/admin/orgs/:orgId/license-mode  授权方式 none / required（切到 required 且会锁住终端时需 confirmLockout）
+ *   POST /api/v1/admin/orgs/:orgId/licenses      新建（可提前录入未来生效的）：licenseeName / creditCode / contractNo 必填
+ *   PATCH /api/v1/admin/licenses/:id             更正 / 改期 / 改台数（吊销后不可改）：version、reason 必填
+ *   POST /api/v1/admin/licenses/:id/renew        续期：新建首尾相接的后续授权；licenseeName / creditCode / contractNo 必填，startsOn 可省
+ *   POST /api/v1/admin/licenses/:id/suspend      暂停：version、reason、approvalTicketNo 必填
+ *   POST /api/v1/admin/licenses/:id/resume       恢复（只对已暂停）：version、reason 必填
+ *   POST /api/v1/admin/licenses/:id/revoke       吊销（不可恢复）：version、reason、approvalTicketNo 必填
+ *   PUT  /api/v1/admin/orgs/:orgId/license-mode  授权方式 none / required：reason 必填；切到 required 且会锁住终端时需 confirmLockout
+ * version 对不上回 409 LICENSE_VERSION_CONFLICT（有人先改过了，刷新后重来）。
  * 写操作统一返回 { licenseId, org }：被改动的那条的编号 + 刷新后的整个机构授权一节。
  */
 @Controller()

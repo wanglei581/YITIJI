@@ -48,10 +48,16 @@ export interface PublicBrand {
 
 export type KioskLicenseState = 'ok' | 'grace' | 'inactive'
 
+/** 屏上「暂停服务」的如实说法（契约见 packages/shared 的同名常量）。 */
+export const KIOSK_PAUSED_NOTICE_LINE = '这台机器暂时不能用。'
+
 export interface PublicKioskProfile extends PublicBrand {
   filing: BrandingFiling
   location: string | null
   licenseState: KioskLicenseState | null
+  acceptsNewSessions: boolean
+  currentSessionMayContinue: boolean
+  noticeLine: string | null
 }
 
 export interface AdminBranding {

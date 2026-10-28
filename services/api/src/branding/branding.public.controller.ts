@@ -1,14 +1,15 @@
 import { Controller, Get, Header, Headers, NotFoundException, Param, Req, Res } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { BrandLogoService } from './brand-logo.service'
 import { BrandingService } from './branding.service'
 import { KioskProfileService } from './kiosk-profile.service'
+import { KioskProfileThrottle } from './kiosk-profile-throttle'
 
 /**
  * 公开读取（不登录）：
  *   GET /api/v1/public/brand               平台默认品牌（不带终端），两个后台的登录页与标题用
- *   GET /api/v1/public/kiosk-profile       一体机：品牌、点位名、备案、授权状态；只认已验签终端（见 KioskProfileService）
+ *   GET /api/v1/public/kiosk-profile       一体机：品牌、点位名、备案、授权块；只认已验签终端（见 KioskProfileService）；
+ *                                          限流 30 次/分钟：验签通过按终端计，其余按 IP 计（见 kiosk-profile-throttle.ts）
  *   GET /api/v1/public/brand-logo/:assetId Logo 图片本体，只认 BrandLogo 表，别的素材读不到
  */
 @Controller('public')
@@ -27,7 +28,7 @@ export class BrandingPublicController {
 
   // 响应因终端而异，且含授权状态，绝不能被共享缓存。
   @Get('kiosk-profile')
-  @TerminalScopedThrottle(30)
+  @KioskProfileThrottle()
   @Header('Cache-Control', 'private, no-store')
   async kioskProfile(
     @Headers('x-terminal-id') terminalId?: string,

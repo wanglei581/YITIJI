@@ -8,14 +8,14 @@
  *   起点含，到期不含：startsAt ≤ 现在 < endsAt 是「在期内」；
  *   endsAt ≤ 现在 < endsAt + graceDays 天 是「宽限期」（照常服务）；
  *   现在 ≥ 宽限结束 是「已过期」。graceDays = 0 即到期当刻就停。
- *   startsAt 在未来的授权是「待生效」，不算当前。
+ *   startsAt 在未来的授权是「待生效」，不算当前；只有 active 的待生效授权才算（暂停的不算）。
  *
  * 机构状态（只对 licenseMode = required 管控；none 恒为 ok、不管控）：
  *   ok         有一条 active 授权覆盖当前时刻
  *   suspended  没有 ok，且有一条被暂停的授权（含宽限期）还罩着当前时刻
  *   grace      没有 ok / suspended，且有一条 active 授权处在宽限期
  *   expired    起点已到的授权都已过了宽限
- *   unlicensed 一条可用授权都没有（没建过、只有吊销的、只有待生效的）
+ *   unlicensed 一条可用授权都没有（没建过、只有吊销的、只有待生效的——被暂停的待生效授权同样不算）
  *   优先级 ok > suspended > grace > expired > unlicensed。
  *   expired / suspended / unlicensed 同等处理：不可用。
  */
@@ -43,7 +43,7 @@ export interface OrgLicenseResolution {
   usable: boolean
   /** 认定的那条：ok / grace / suspended 时是对应那条，expired 时是最近到期的那条，unlicensed 为 null。 */
   current: LicenseWindow | null
-  /** 最近一条待生效（未吊销、startsAt 在未来）的授权。 */
+  /** 最近一条待生效（active、startsAt 在未来）的授权；暂停的、吊销的都不算。 */
   upcoming: LicenseWindow | null
   /** ok：距到期；grace：距宽限结束；其余 null。向上取整的整天数。 */
   daysLeft: number | null
@@ -115,8 +115,9 @@ export function resolveOrgLicense(input: {
   const t = input.now.getTime()
   const live = input.licenses.filter((item) => item.status !== 'revoked')
   const started = live.filter((item) => item.startsAt.getTime() <= t)
+  // 待生效只认 active 的：被暂停的未来授权不算（否则先录入未来授权再暂停，仍能用它的台数提前绑定终端）。
   const pending = live
-    .filter((item) => item.startsAt.getTime() > t)
+    .filter((item) => item.status === 'active' && item.startsAt.getTime() > t)
     .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.createdAt.getTime() - b.createdAt.getTime())
   const upcoming = pending[0] ?? null
 

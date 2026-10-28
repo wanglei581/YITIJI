@@ -1,13 +1,27 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
-import { formatBeijingDate } from '../common/beijing-display-time'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import * as input from './license-input'
 import { licenseNow } from './license-clock'
-import { countBoundTerminals, lockOrganization, toLicenseWindow } from './license-gate'
+import { countBoundTerminals, toLicenseWindow } from './license-gate'
 import { loadLicenseAttention, loadOrgLicenseDetail } from './license-queries'
 import { normalizeLicenseMode, resolveOrgLicense } from './license-state'
+import { beijingDateOf } from './license-time'
 import { licenseSnapshot, licenseView, partnerView, type LicenseRow } from './license-view'
+import {
+  assertNoOverlap,
+  assertVersion,
+  auditBase,
+  licenseNotFound,
+  lockLicense,
+  lockOrg,
+  orgNotFound,
+  orgStateSnapshot,
+  revokedConflict,
+  statusConflict,
+  writeVersioned,
+  type LicenseAuditActor,
+} from './license-write'
 import {
   LICENSE_MODES,
   type CreateLicenseInput,
@@ -24,23 +38,15 @@ import {
   type UpdateLicenseInput,
 } from './license.types'
 
-export interface LicenseActor {
-  userId: string
-  role: string
-  ipAddress?: string | null
-  userAgent?: string | null
-  requestId?: string | null
-}
+export type LicenseActor = LicenseAuditActor
 
-function notFound(): NotFoundException {
-  return new NotFoundException({ error: { code: 'LICENSE_NOT_FOUND', message: '授权不存在' } })
-}
+/** 更正时不写进「改前改后」对比的快照字段。 */
+const NOT_COMPARED = new Set(['id', 'orgId', 'status', 'version'])
 
-function orgNotFound(): NotFoundException {
-  return new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
-}
-
-/** 授权的增改续期暂停恢复吊销，以及授权方式切换。每一步都在同一事务里写审计（谁、何时、改前改后）。 */
+/**
+ * 授权的增改续期暂停恢复吊销，以及授权方式切换。每一步都在同一事务里写审计（谁、何时、为什么、改前改后）。
+ * 写操作的顺序与理由见 license-write.ts 顶部：事务内先锁机构再读授权，补丁与审计用事务内读到的值算，写库带版本。
+ */
 @Injectable()
 export class LicenseService {
   constructor(
@@ -58,11 +64,11 @@ export class LicenseService {
 
   async getLicense(id: string): Promise<LicenseView> {
     const row = await this.prisma.license.findUnique({ where: { id } })
-    if (!row) throw notFound()
+    if (!row) throw licenseNotFound()
     return licenseView(row, licenseNow())
   }
 
-  /** 机构自己看：只读，不含备注、暂停理由、工单号、经办人。 */
+  /** 机构自己看：只读，不含备注、暂停理由、工单号、经办人、版本号。 */
   async getPartnerView(orgId: string): Promise<PartnerLicenseView> {
     return partnerView(await this.getOrgDetail(orgId))
   }
@@ -74,10 +80,12 @@ export class LicenseService {
 
   // ── 写 ──────────────────────────────────────────────────────────────────────
 
+  /** 新建（每条授权是一份合同）。期限收含到期日的北京日期。 */
   async create(orgId: string, body: CreateLicenseInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const startsAt = input.instant(body.startsAt, 'LICENSE_PERIOD_INVALID', '生效时间')
-    const endsAt = input.instant(body.endsAt, 'LICENSE_PERIOD_INVALID', '到期时间')
-    input.period(startsAt, endsAt)
+    const { startsAt, endsAt } = input.period(
+      input.licenseDay(body.startsOn, 'LICENSE_PERIOD_INVALID', '生效日'),
+      input.licenseDay(body.endsOn, 'LICENSE_PERIOD_INVALID', '到期日'),
+    )
     const data = {
       licenseeName: input.licenseeName(body.licenseeName),
       creditCode: input.creditCode(body.creditCode),
@@ -89,164 +97,192 @@ export class LicenseService {
       note: input.note(body.note),
     }
     const licenseId = await this.prisma.$transaction(async (tx) => {
-      await this.lockOrg(tx, orgId)
-      const before = await this.orgState(tx, orgId)
-      await this.assertNoOverlap(tx, orgId, startsAt, endsAt)
+      await lockOrg(tx, this.prisma.dbKind, orgId)
+      const before = await orgStateSnapshot(tx, orgId)
+      await assertNoOverlap(tx, orgId, startsAt, endsAt)
       const created = await tx.license.create({
         data: { orgId, ...data, status: 'active', createdBy: actor.userId },
       })
       await this.audit.writeRequired(tx, {
-        ...this.auditBase(actor),
+        ...auditBase(actor),
         action: 'license.create',
         targetType: 'license',
         targetId: created.id,
-        payload: { orgId, license: licenseSnapshot(created), orgState: { before, after: await this.orgState(tx, orgId) } },
+        payload: { orgId, license: licenseSnapshot(created), orgState: { before, after: await orgStateSnapshot(tx, orgId) } },
       })
       return created.id
     })
     return { licenseId, org: await this.getOrgDetail(orgId) }
   }
 
+  /**
+   * 更正：改信息 / 期限 / 台数。必须带界面读到的 version 与理由。
+   * 补丁、期限校验、审计的前后对比全部基于事务内读到的最新值；一个字都没变就不写库、不审计、不加版本。
+   */
   async update(id: string, body: UpdateLicenseInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const existing = await this.requireLicense(id)
-    if (existing.status === 'revoked') throw this.revokedConflict()
-    const patch: Record<string, unknown> = {}
-    if (body.licenseeName !== undefined) patch['licenseeName'] = input.licenseeName(body.licenseeName)
-    if (body.creditCode !== undefined) patch['creditCode'] = input.creditCode(body.creditCode)
-    if (body.contractNo !== undefined) patch['contractNo'] = input.contractNo(body.contractNo)
-    if (body.terminalQuota !== undefined) patch['terminalQuota'] = input.terminalQuota(body.terminalQuota)
-    if (body.graceDays !== undefined) patch['graceDays'] = input.graceDays(body.graceDays)
-    if (body.note !== undefined) patch['note'] = input.note(body.note)
-    const startsAt =
-      body.startsAt !== undefined ? input.instant(body.startsAt, 'LICENSE_PERIOD_INVALID', '生效时间') : existing.startsAt
-    const endsAt =
-      body.endsAt !== undefined ? input.instant(body.endsAt, 'LICENSE_PERIOD_INVALID', '到期时间') : existing.endsAt
-    if (body.startsAt !== undefined || body.endsAt !== undefined) {
-      input.period(startsAt, endsAt)
-      patch['startsAt'] = startsAt
-      patch['endsAt'] = endsAt
+    const version = input.version(body.version)
+    const reason = input.reason(body.reason)
+    const startsOn = body.startsOn !== undefined ? input.licenseDay(body.startsOn, 'LICENSE_PERIOD_INVALID', '生效日') : undefined
+    const endsOn = body.endsOn !== undefined ? input.licenseDay(body.endsOn, 'LICENSE_PERIOD_INVALID', '到期日') : undefined
+    const wanted = {
+      licenseeName: body.licenseeName !== undefined ? input.licenseeName(body.licenseeName) : undefined,
+      creditCode: body.creditCode !== undefined ? input.creditCode(body.creditCode) : undefined,
+      contractNo: body.contractNo !== undefined ? input.contractNo(body.contractNo) : undefined,
+      terminalQuota: body.terminalQuota !== undefined ? input.terminalQuota(body.terminalQuota) : undefined,
+      graceDays: body.graceDays !== undefined ? input.graceDays(body.graceDays) : undefined,
+      note: body.note !== undefined ? input.note(body.note) : undefined,
     }
-    // 只留真正变了的字段；一个字都没变就不写库、不写审计。
-    const before: Record<string, unknown> = {}
-    const after: Record<string, unknown> = {}
-    const current = licenseSnapshot(existing)
-    for (const [key, value] of Object.entries(patch)) {
-      const next = value instanceof Date ? value.toISOString() : value
-      if (current[key] === next) {
-        delete patch[key]
-        continue
-      }
-      before[key] = current[key]
-      after[key] = next
-    }
-    if (Object.keys(patch).length === 0) return { licenseId: id, org: await this.getOrgDetail(existing.orgId) }
+    const orgId = await this.prisma.$transaction(async (tx) => {
+      const fresh = await lockLicense(tx, this.prisma.dbKind, id)
+      if (fresh.status === 'revoked') throw revokedConflict()
+      assertVersion(fresh, version)
 
-    await this.prisma.$transaction(async (tx) => {
-      await this.lockOrg(tx, existing.orgId)
-      const stateBefore = await this.orgState(tx, existing.orgId)
-      const fresh = await tx.license.findUnique({ where: { id } })
-      if (!fresh) throw notFound()
-      if (fresh.status === 'revoked') throw this.revokedConflict()
-      if ('startsAt' in patch || 'endsAt' in patch) {
-        await this.assertNoOverlap(tx, existing.orgId, startsAt, endsAt, id)
+      const patch: Record<string, unknown> = {}
+      const assign = (key: keyof LicenseRow, value: unknown): void => {
+        if (value === undefined) return
+        const old = fresh[key]
+        const same = value instanceof Date ? old instanceof Date && old.getTime() === value.getTime() : old === value
+        if (!same) patch[key] = value
       }
-      await tx.license.update({ where: { id }, data: { ...patch, updatedBy: actor.userId } })
+      for (const [key, value] of Object.entries(wanted)) assign(key as keyof LicenseRow, value)
+      // 期限：另一端用这次事务内读到的值，不用锁外读到的旧值
+      if (startsOn !== undefined || endsOn !== undefined) {
+        const startsAt = startsOn !== undefined ? input.dayStart(startsOn) : fresh.startsAt
+        const endsAt = endsOn !== undefined ? input.dayEnd(endsOn) : fresh.endsAt
+        input.checkPeriod(startsAt, endsAt)
+        assign('startsAt', startsAt)
+        assign('endsAt', endsAt)
+      }
+      if (Object.keys(patch).length === 0) return fresh.orgId
+
+      const beforeSnapshot = licenseSnapshot(fresh)
+      const afterSnapshot = licenseSnapshot({ ...fresh, ...(patch as Partial<LicenseRow>) })
+      const before: Record<string, unknown> = {}
+      const after: Record<string, unknown> = {}
+      for (const key of Object.keys(beforeSnapshot)) {
+        if (NOT_COMPARED.has(key) || beforeSnapshot[key] === afterSnapshot[key]) continue
+        before[key] = beforeSnapshot[key]
+        after[key] = afterSnapshot[key]
+      }
+      if ('startsAt' in patch || 'endsAt' in patch) {
+        await assertNoOverlap(
+          tx,
+          fresh.orgId,
+          (patch['startsAt'] as Date | undefined) ?? fresh.startsAt,
+          (patch['endsAt'] as Date | undefined) ?? fresh.endsAt,
+          id,
+        )
+      }
+      const stateBefore = await orgStateSnapshot(tx, fresh.orgId)
+      await writeVersioned(tx, fresh, patch, actor.userId)
       await this.audit.writeRequired(tx, {
-        ...this.auditBase(actor),
+        ...auditBase(actor),
         action: 'license.update',
         targetType: 'license',
         targetId: id,
-        payload: { orgId: existing.orgId, before, after, orgState: { before: stateBefore, after: await this.orgState(tx, existing.orgId) } },
+        payload: {
+          orgId: fresh.orgId,
+          reason,
+          version: { before: fresh.version, after: fresh.version + 1 },
+          before,
+          after,
+          orgState: { before: stateBefore, after: await orgStateSnapshot(tx, fresh.orgId) },
+        },
       })
+      return fresh.orgId
     })
-    return { licenseId: id, org: await this.getOrgDetail(existing.orgId) }
+    return { licenseId: id, org: await this.getOrgDetail(orgId) }
   }
 
-  /** 续期 = 新建一条首尾相接的后续授权（默认从原授权到期时刻起算），旧的不动，历史完整。 */
+  /**
+   * 续期 = 新建一条首尾相接的后续授权，旧的不动，历史完整。续期也是一份合同：被授权企业、信用代码、合同编号都必填。
+   * startsOn 可不填，不填 = 上一条授权到期日的次日；填了照样走「非吊销授权期限不得重叠」的校验。
+   */
   async renew(id: string, body: RenewLicenseInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const predecessor = await this.requireLicense(id)
-    if (predecessor.status === 'revoked') throw this.revokedConflict()
-    const startsAt =
-      body.startsAt !== undefined
-        ? input.instant(body.startsAt, 'LICENSE_PERIOD_INVALID', '生效时间')
-        : predecessor.endsAt
-    const endsAt = input.instant(body.endsAt, 'LICENSE_PERIOD_INVALID', '到期时间')
-    input.period(startsAt, endsAt)
-    const data = {
-      licenseeName: predecessor.licenseeName,
-      creditCode: predecessor.creditCode,
+    const wanted = {
+      licenseeName: input.licenseeName(body.licenseeName),
+      creditCode: input.creditCode(body.creditCode),
       contractNo: input.contractNo(body.contractNo),
-      startsAt,
-      endsAt,
-      terminalQuota: body.terminalQuota !== undefined ? input.terminalQuota(body.terminalQuota) : predecessor.terminalQuota,
-      graceDays: body.graceDays !== undefined ? input.graceDays(body.graceDays) : predecessor.graceDays,
       note: input.note(body.note),
     }
-    const licenseId = await this.prisma.$transaction(async (tx) => {
-      await this.lockOrg(tx, predecessor.orgId)
-      const before = await this.orgState(tx, predecessor.orgId)
-      await this.assertNoOverlap(tx, predecessor.orgId, startsAt, endsAt)
+    const startsOn = body.startsOn !== undefined ? input.licenseDay(body.startsOn, 'LICENSE_PERIOD_INVALID', '生效日') : undefined
+    const endsOn = input.licenseDay(body.endsOn, 'LICENSE_PERIOD_INVALID', '到期日')
+    const quota = body.terminalQuota !== undefined ? input.terminalQuota(body.terminalQuota) : undefined
+    const grace = body.graceDays !== undefined ? input.graceDays(body.graceDays) : undefined
+    const result = await this.prisma.$transaction(async (tx) => {
+      const predecessor = await lockLicense(tx, this.prisma.dbKind, id)
+      if (predecessor.status === 'revoked') throw revokedConflict()
+      // 上一条的 endsAt 是「到期日次日的 0 点」，它所在的北京日期正好是「到期日的次日」。
+      const { startsAt, endsAt } = input.period(startsOn ?? beijingDateOf(predecessor.endsAt), endsOn)
+      const before = await orgStateSnapshot(tx, predecessor.orgId)
+      await assertNoOverlap(tx, predecessor.orgId, startsAt, endsAt)
       const created = await tx.license.create({
-        data: { orgId: predecessor.orgId, ...data, status: 'active', createdBy: actor.userId },
+        data: {
+          orgId: predecessor.orgId,
+          ...wanted,
+          startsAt,
+          endsAt,
+          terminalQuota: quota ?? predecessor.terminalQuota,
+          graceDays: grace ?? predecessor.graceDays,
+          status: 'active',
+          createdBy: actor.userId,
+        },
       })
       await this.audit.writeRequired(tx, {
-        ...this.auditBase(actor),
+        ...auditBase(actor),
         action: 'license.renew',
         targetType: 'license',
         targetId: created.id,
         payload: {
           orgId: predecessor.orgId,
-          predecessorId: predecessor.id,
+          predecessor: { id: predecessor.id, contractNo: predecessor.contractNo, version: predecessor.version },
           license: licenseSnapshot(created),
-          orgState: { before, after: await this.orgState(tx, predecessor.orgId) },
+          orgState: { before, after: await orgStateSnapshot(tx, predecessor.orgId) },
         },
       })
-      return created.id
+      return { licenseId: created.id, orgId: predecessor.orgId }
     })
-    return { licenseId, org: await this.getOrgDetail(predecessor.orgId) }
+    return { licenseId: result.licenseId, org: await this.getOrgDetail(result.orgId) }
   }
 
-  /** 暂停：理由必填（8–500 字），可带工单号。active → suspended。 */
+  /** 暂停：version、理由、审批工单号都必填。active → suspended。 */
   async suspend(id: string, body: LicenseStatusChangeInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const reasonText = input.reason(body.reason)
-    const ticket = input.ticketNo(body.ticketNo)
     return this.changeStatus(id, actor, {
       action: 'license.suspend',
+      version: input.version(body.version),
       from: ['active'],
       to: 'suspended',
-      reason: reasonText,
-      ticketNo: ticket,
+      reason: input.reason(body.reason),
+      approvalTicketNo: input.approvalTicketNo(body.approvalTicketNo),
     })
   }
 
-  /** 恢复：只对 suspended，回到 active；说明可不填。 */
+  /** 恢复：只对 suspended，回到 active；version 与理由必填。 */
   async resume(id: string, body: LicenseResumeInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const note = input.optionalReason(body.reason)
     return this.changeStatus(id, actor, {
       action: 'license.resume',
+      version: input.version(body.version),
       from: ['suspended'],
       to: 'active',
-      reason: null,
-      ticketNo: null,
-      note,
+      reason: input.reason(body.reason),
+      approvalTicketNo: null,
     })
   }
 
-  /** 吊销：理由必填，可带工单号。active / suspended → revoked，不可恢复。 */
+  /** 吊销：version、理由、审批工单号都必填。active / suspended → revoked，不可恢复。 */
   async revoke(id: string, body: LicenseStatusChangeInput, actor: LicenseActor): Promise<LicenseMutationResult> {
-    const reasonText = input.reason(body.reason)
-    const ticket = input.ticketNo(body.ticketNo)
     return this.changeStatus(id, actor, {
       action: 'license.revoke',
+      version: input.version(body.version),
       from: ['active', 'suspended'],
       to: 'revoked',
-      reason: reasonText,
-      ticketNo: ticket,
+      reason: input.reason(body.reason),
+      approvalTicketNo: input.approvalTicketNo(body.approvalTicketNo),
     })
   }
 
   /**
-   * 切换授权方式。把没有可用授权的机构切到 required，会让它名下终端不能开新会话——
+   * 切换授权方式（含切回「不管控」），理由必填。把没有可用授权的机构切到 required，会让它名下终端不能开新会话——
    * 此时必须显式带 confirmLockout: true，否则 409 LICENSE_MODE_WOULD_LOCK_TERMINALS（界面据此二次确认）。
    */
   async setMode(orgId: string, body: SetLicenseModeInput, actor: LicenseActor): Promise<OrgLicenseDetail> {
@@ -256,23 +292,20 @@ export class LicenseService {
       })
     }
     const mode = body.licenseMode
-    const note = input.optionalReason(body.reason)
+    const reason = input.reason(body.reason)
     await this.prisma.$transaction(async (tx) => {
-      const org = await tx.organization.findUnique({ where: { id: orgId }, select: { id: true, licenseMode: true } })
+      await lockOrg(tx, this.prisma.dbKind, orgId)
+      // 拿到锁之后才读当前方式，不拿锁外读到的旧值做「没变就直接返回」的判断。
+      const org = await tx.organization.findUnique({ where: { id: orgId }, select: { licenseMode: true } })
       if (!org) throw orgNotFound()
-      await this.lockOrg(tx, orgId)
       const current = normalizeLicenseMode(org.licenseMode)
       if (current === mode) return
-      const before = await this.orgState(tx, orgId)
+      const before = await orgStateSnapshot(tx, orgId)
       let lockout = false
       let terminalCount = 0
       if (mode === 'required') {
         const rows = await tx.license.findMany({ where: { orgId } })
-        const resolution = resolveOrgLicense({
-          mode: 'required',
-          licenses: rows.map(toLicenseWindow),
-          now: licenseNow(),
-        })
+        const resolution = resolveOrgLicense({ mode: 'required', licenses: rows.map(toLicenseWindow), now: licenseNow() })
         if (!resolution.usable) {
           terminalCount = await countBoundTerminals(tx, orgId)
           lockout = terminalCount > 0
@@ -288,18 +321,18 @@ export class LicenseService {
       }
       await tx.organization.update({ where: { id: orgId }, data: { licenseMode: mode } })
       await this.audit.writeRequired(tx, {
-        ...this.auditBase(actor),
+        ...auditBase(actor),
         action: 'license.mode_update',
         targetType: 'organization',
         targetId: orgId,
         payload: {
           before: current,
           after: mode,
-          note,
+          reason,
           confirmLockout: body.confirmLockout === true,
           lockout,
           terminalCount,
-          orgState: { before, after: await this.orgState(tx, orgId) },
+          orgState: { before, after: await orgStateSnapshot(tx, orgId) },
         },
       })
     })
@@ -313,139 +346,51 @@ export class LicenseService {
     actor: LicenseActor,
     change: {
       action: string
+      version: number
       from: string[]
       to: 'active' | 'suspended' | 'revoked'
-      reason: string | null
-      ticketNo: string | null
-      note?: string | null
+      reason: string
+      approvalTicketNo: string | null
     },
   ): Promise<LicenseMutationResult> {
-    const existing = await this.requireLicense(id)
-    await this.prisma.$transaction(async (tx) => {
-      await this.lockOrg(tx, existing.orgId)
-      const stateBefore = await this.orgState(tx, existing.orgId)
-      const now = licenseNow()
-      // 带上期望的旧状态做条件更新：并发的两次暂停 / 吊销只有一次生效。
-      const changed = await tx.license.updateMany({
-        where: { id, status: { in: change.from } },
-        data: {
+    const orgId = await this.prisma.$transaction(async (tx) => {
+      const fresh = await lockLicense(tx, this.prisma.dbKind, id)
+      if (fresh.status === 'revoked') throw revokedConflict()
+      assertVersion(fresh, change.version)
+      if (!change.from.includes(fresh.status)) throw statusConflict(fresh.status)
+      const stateBefore = await orgStateSnapshot(tx, fresh.orgId)
+      // 恢复时清空当前理由与工单号，完整历史在审计日志里。
+      const resuming = change.to === 'active'
+      await writeVersioned(
+        tx,
+        fresh,
+        {
           status: change.to,
-          // 恢复时清空当前理由与工单号，完整历史在审计日志里。
-          statusReason: change.to === 'active' ? null : change.reason,
-          statusTicketNo: change.to === 'active' ? null : change.ticketNo,
-          statusChangedAt: now,
+          statusReason: resuming ? null : change.reason,
+          statusTicketNo: resuming ? null : change.approvalTicketNo,
+          statusChangedAt: licenseNow(),
           statusChangedBy: actor.userId,
-          updatedBy: actor.userId,
         },
-      })
-      if (changed.count !== 1) {
-        const latest = await tx.license.findUnique({ where: { id }, select: { status: true } })
-        if (!latest) throw notFound()
-        if (latest.status === 'revoked') throw this.revokedConflict()
-        throw new ConflictException({
-          error: {
-            code: 'LICENSE_STATUS_CONFLICT',
-            message: `这条授权当前是「${latest.status === 'suspended' ? '已暂停' : '生效中'}」，不能执行该操作，请刷新后重试`,
-          },
-        })
-      }
+        actor.userId,
+      )
       await this.audit.writeRequired(tx, {
-        ...this.auditBase(actor),
+        ...auditBase(actor),
         action: change.action,
         targetType: 'license',
         targetId: id,
         payload: {
-          orgId: existing.orgId,
-          contractNo: existing.contractNo,
-          before: { status: existing.status },
+          orgId: fresh.orgId,
+          contractNo: fresh.contractNo,
+          version: { before: fresh.version, after: fresh.version + 1 },
+          before: { status: fresh.status },
           after: { status: change.to },
           reason: change.reason,
-          ticketNo: change.ticketNo,
-          note: change.note ?? null,
-          orgState: { before: stateBefore, after: await this.orgState(tx, existing.orgId) },
+          approvalTicketNo: change.approvalTicketNo,
+          orgState: { before: stateBefore, after: await orgStateSnapshot(tx, fresh.orgId) },
         },
       })
+      return fresh.orgId
     })
-    return { licenseId: id, org: await this.getOrgDetail(existing.orgId) }
-  }
-
-  private async requireLicense(id: string): Promise<LicenseRow> {
-    const row = await this.prisma.license.findUnique({ where: { id } })
-    if (!row) throw notFound()
-    return row
-  }
-
-  private revokedConflict(): ConflictException {
-    return new ConflictException({
-      error: { code: 'LICENSE_REVOKED', message: '这条授权已吊销，不能再修改、续期或恢复' },
-    })
-  }
-
-  private async lockOrg(tx: PrismaTransactionClient, orgId: string): Promise<void> {
-    const org = await tx.organization.findUnique({ where: { id: orgId }, select: { id: true } })
-    if (!org) throw orgNotFound()
-    await lockOrganization(tx, this.prisma.dbKind, orgId)
-  }
-
-  /** 非吊销的授权期限不许重叠（首尾相接可以）。 */
-  private async assertNoOverlap(
-    tx: PrismaTransactionClient,
-    orgId: string,
-    startsAt: Date,
-    endsAt: Date,
-    exceptId?: string,
-  ): Promise<void> {
-    const clash = await tx.license.findMany({
-      where: {
-        orgId,
-        status: { not: 'revoked' },
-        startsAt: { lt: endsAt },
-        endsAt: { gt: startsAt },
-        ...(exceptId ? { id: { not: exceptId } } : {}),
-      },
-      select: { id: true, contractNo: true, startsAt: true, endsAt: true },
-      take: 3,
-    })
-    if (clash.length === 0) return
-    const list = clash
-      .map((row) => `合同 ${row.contractNo}（${formatBeijingDate(row.startsAt)} 至 ${formatBeijingDate(row.endsAt)}）`)
-      .join('、')
-    throw new ConflictException({
-      error: {
-        code: 'LICENSE_PERIOD_OVERLAP',
-        message: `与已有授权的期限重叠：${list}。续期请用「续期」，让新授权从旧授权到期时刻起算。`,
-      },
-    })
-  }
-
-  /** 审计里记「这次操作前后，机构的授权状态与绑定终端数」，作为停机 / 恢复的操作快照。 */
-  private async orgState(
-    tx: PrismaTransactionClient,
-    orgId: string,
-  ): Promise<{ mode: LicenseMode; state: string; usable: boolean; terminalsBound: number }> {
-    const org = await tx.organization.findUnique({ where: { id: orgId }, select: { licenseMode: true } })
-    const rows = await tx.license.findMany({ where: { orgId } })
-    const resolution = resolveOrgLicense({
-      mode: org?.licenseMode,
-      licenses: rows.map(toLicenseWindow),
-      now: licenseNow(),
-    })
-    return {
-      mode: resolution.mode,
-      state: resolution.state,
-      usable: resolution.usable,
-      terminalsBound: await countBoundTerminals(tx, orgId),
-    }
-  }
-
-  private auditBase(actor: LicenseActor) {
-    return {
-      actorId: actor.userId,
-      actorRole: actor.role,
-      ipAddress: actor.ipAddress ?? null,
-      userAgent: actor.userAgent ?? null,
-      requestId: actor.requestId ?? null,
-    }
+    return { licenseId: id, org: await this.getOrgDetail(orgId) }
   }
 }
-

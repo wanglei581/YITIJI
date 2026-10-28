@@ -34,13 +34,28 @@ export type LicensePhase = (typeof LICENSE_PHASES)[number]
 export const LICENSE_DEFAULT_GRACE_DAYS = 7
 export const LICENSE_MAX_GRACE_DAYS = 30
 export const LICENSE_MAX_TERMINAL_QUOTA = 10000
+/** 更正 / 恢复 / 模式切换 / 暂停 / 吊销的理由：去首尾空白后 2–200 字。 */
+export const LICENSE_REASON_MIN_LENGTH = 2
+export const LICENSE_REASON_MAX_LENGTH = 200
+/** 暂停 / 吊销必填的审批工单号：1–64 位，只许字母、数字、- _ /。 */
+export const LICENSE_TICKET_NO_MAX_LENGTH = 64
+export const LICENSE_TICKET_NO_PATTERN = '^[A-Za-z0-9_/-]+$'
+/** 合同编号：1–64 位。 */
+export const LICENSE_CONTRACT_NO_MAX_LENGTH = 64
 /** 距到期还剩这几天时，往管理员告警通道各推一次；宽限期内每天推一次；结束宽限时再推一次。 */
 export const LICENSE_WARN_DAYS = [30, 7, 1] as const
 
-/** 一条授权。时间都是 ISO 8601（UTC，带 Z）。 */
+/**
+ * 一条授权。期限按合同口径「含到期日」、北京时间：
+ *   录入收 startsOn / endsOn（YYYY-MM-DD，都含当天）；服务端存 startsAt = startsOn 当天北京 0 点（含）、
+ *   endsAt = endsOn 次日北京 0 点（不含）。*At 字段是 ISO 8601（UTC，带 Z），*On 字段与 periodText 是给人看的北京日期，
+ *   界面直接显示 periodText，不自己换算。
+ */
 export interface LicenseView {
   id: string
   orgId: string
+  /** 版本号：从 1 起，每次变更（更正 / 暂停 / 恢复 / 吊销）+1。更正、暂停、恢复、吊销请求必须带上界面读到的版本。 */
+  version: number
   /** 被授权企业全称，可与机构名不同。 */
   licenseeName: string
   /** 统一社会信用代码，18 位（格式与校验位都在服务端校验）。 */
@@ -48,11 +63,19 @@ export interface LicenseView {
   /** 合同编号，必填。 */
   contractNo: string
   startsAt: string
-  /** 到期时刻（不含）。 */
+  /** 到期时刻（不含）= endsOn 次日北京 0 点。 */
   endsAt: string
+  /** 生效第一天（含），北京时间 YYYY-MM-DD。 */
+  startsOn: string
+  /** 到期日（含当天），北京时间 YYYY-MM-DD。 */
+  endsOn: string
+  /** 「2026-11-01 至 2027-10-31（北京时间，含当天）」，界面直接显示。 */
+  periodText: string
   graceDays: number
-  /** endsAt + graceDays 天。 */
+  /** endsAt + graceDays 天（不含）。 */
   graceEndsAt: string
+  /** 宽限的最后一天（含当天），北京时间 YYYY-MM-DD；graceDays 为 0（没有宽限）时为 null。 */
+  graceEndsOn: string | null
   terminalQuota: number
   status: LicenseStatus
   phase: LicensePhase
@@ -82,9 +105,11 @@ export interface OrgLicenseOverview {
   daysLeft: number | null
   /** 连续覆盖到哪一刻（把首尾相接的后续授权一并算上）；仅 state 为 ok 时有值，告警按它算。 */
   coveredUntil: string | null
+  /** 连续覆盖的最后一天（含当天），北京时间 YYYY-MM-DD；与 coveredUntil 同时有值。 */
+  coveredUntilOn: string | null
   /** 认定的那条（ok / grace / suspended / expired 时有）。 */
   current: LicenseView | null
-  /** 最近一条待生效的授权（提前录入的续期）。 */
+  /** 最近一条待生效的授权（提前录入的续期）。只认 active 的：被暂停的待生效授权不算，也不能用来提前绑定终端。 */
   upcoming: LicenseView | null
   /** 认定那条的台数上限；没有则 null。 */
   terminalQuota: number | null
@@ -127,70 +152,102 @@ export interface PartnerLicenseView {
     licenseeName: string
     startsAt: string
     endsAt: string
+    startsOn: string
+    endsOn: string
+    periodText: string
     graceDays: number
     graceEndsAt: string
+    graceEndsOn: string | null
     terminalQuota: number
     status: LicenseStatus
   } | null
-  upcoming: { startsAt: string; endsAt: string; terminalQuota: number } | null
+  upcoming: {
+    startsAt: string
+    endsAt: string
+    startsOn: string
+    endsOn: string
+    periodText: string
+    graceEndsOn: string | null
+    terminalQuota: number
+  } | null
   terminalsBound: number
 }
 
-/** POST /admin/orgs/:orgId/licenses。时间必须是带时区的 ISO 8601（例：2027-10-29T00:00:00+08:00）。 */
+/**
+ * POST /admin/orgs/:orgId/licenses（每条授权是一份合同）。
+ * 期限收含到期日的北京日期：startsOn / endsOn 都是 YYYY-MM-DD，都含当天。不再接受带时区的 startsAt / endsAt。
+ */
 export interface CreateLicenseInput {
   licenseeName: string
+  /** 统一社会信用代码，18 位，按 GB 32100 校验位校验。 */
   creditCode: string
+  /** 合同编号，1–64 位。 */
   contractNo: string
-  startsAt: string
-  endsAt: string
+  startsOn: string
+  endsOn: string
   terminalQuota: number
   /** 默认 7，0–30。 */
   graceDays?: number
   note?: string | null
 }
 
-/** PATCH /admin/licenses/:id（更正信息 / 改期 / 改台数）；吊销后的授权不能改。 */
+/**
+ * PATCH /admin/licenses/:id（更正信息 / 改期 / 改台数）；吊销后的授权不能改。
+ * version 必填：对不上回 409 LICENSE_VERSION_CONFLICT（有人先改过了，刷新后重来）；reason 必填。
+ * 一个字段都没变：不写库、不审计、不加版本，照常返回。
+ */
 export interface UpdateLicenseInput {
+  version: number
+  reason: string
   licenseeName?: string
   creditCode?: string
   contractNo?: string
-  startsAt?: string
-  endsAt?: string
+  startsOn?: string
+  endsOn?: string
   terminalQuota?: number
   graceDays?: number
   note?: string | null
-}
-
-/** POST /admin/licenses/:id/renew：新建一条首尾相接的后续授权（旧到期新接上，不断档）。 */
-export interface RenewLicenseInput {
-  /** 缺省 = 原授权的 endsAt（首尾相接）。 */
-  startsAt?: string
-  endsAt: string
-  contractNo: string
-  /** 缺省沿用原授权。 */
-  terminalQuota?: number
-  graceDays?: number
-  note?: string | null
-}
-
-/** POST /admin/licenses/:id/suspend 与 /revoke：理由必填（8–500 字），可带工单号。 */
-export interface LicenseStatusChangeInput {
-  reason: string
-  ticketNo?: string | null
-}
-
-/** POST /admin/licenses/:id/resume（只对 suspended）。 */
-export interface LicenseResumeInput {
-  reason?: string | null
 }
 
 /**
- * PUT /admin/orgs/:orgId/license-mode。
+ * POST /admin/licenses/:id/renew：新建一条首尾相接的后续授权（旧到期新接上，不断档）。
+ * 续期也是一份合同：licenseeName / creditCode / contractNo 都必填。
+ * startsOn 可不填，不填 = 上一条授权 endsOn 的次日；填了照样走「非吊销授权期限不得重叠」的校验。
+ */
+export interface RenewLicenseInput {
+  licenseeName: string
+  creditCode: string
+  contractNo: string
+  startsOn?: string
+  endsOn: string
+  /** 缺省沿用上一条授权。 */
+  terminalQuota?: number
+  graceDays?: number
+  note?: string | null
+}
+
+/** POST /admin/licenses/:id/suspend 与 /revoke：version、reason、approvalTicketNo 都必填。 */
+export interface LicenseStatusChangeInput {
+  version: number
+  /** 去首尾空白后 2–200 字。 */
+  reason: string
+  /** 审批工单号，1–64 位，只许字母、数字、- _ /。 */
+  approvalTicketNo: string
+}
+
+/** POST /admin/licenses/:id/resume（只对 suspended）：version、reason 必填。 */
+export interface LicenseResumeInput {
+  version: number
+  reason: string
+}
+
+/**
+ * PUT /admin/orgs/:orgId/license-mode（含切回「不管控」）：reason 必填。
  * 把没有可用授权的机构切到 required 会让它名下的终端不能开新会话——此时必须带 confirmLockout: true，
  * 否则服务端回 409 LICENSE_MODE_WOULD_LOCK_TERMINALS（文案写明受影响终端数；界面也可先用 terminalsBound 做二次确认）。
  */
 export interface SetLicenseModeInput {
   licenseMode: LicenseMode
   confirmLockout?: boolean
-  reason?: string | null
+  reason: string
 }

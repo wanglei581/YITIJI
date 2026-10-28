@@ -1,11 +1,11 @@
 import { Injectable, Logger, Optional } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import { deliverOpsAlert, type OpsAlertPayload } from '../admin-ops/admin-alert-push.service'
-import { formatBeijingDate } from '../common/beijing-display-time'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { licenseNow } from './license-clock'
 import { toLicenseWindow } from './license-gate'
+import { beijingDateOf, inclusiveDayText, lastDayOf } from './license-time'
 import { DAY_MS, graceEndsAt, resolveOrgLicense, type LicenseWindow } from './license-state'
 import { LICENSE_WARN_DAYS } from './license.types'
 
@@ -23,7 +23,8 @@ export interface AlertOrgInput {
  *   到期前 30 / 7 / 1 天各推一次（按「连续覆盖到哪一刻」算——已经录了首尾相接的续期就不推）；
  *   宽限期内每天推一次；结束宽限的那一刻起推一次「已停用」。
  * 暂停 / 没有授权是管理员明确的动作或状态，不在这里重复推。
- * 告警正文只写机构名与日期，不含合同编号、信用代码。
+ * 告警正文只写机构名与日期，不含合同编号、信用代码；日期一律写成「2027-10-31（北京时间，含当天）」，
+ * 与后台期限显示（periodText）同一口径：到期日那一整天都还在期内。
  */
 export function planLicenseAlerts(orgs: AlertOrgInput[], now: Date): OpsAlertPayload[] {
   const alerts: OpsAlertPayload[] = []
@@ -41,17 +42,17 @@ export function planLicenseAlerts(orgs: AlertOrgInput[], now: Date): OpsAlertPay
         episodeToken: `${resolution.coveredUntil.toISOString()}:t${stage}`,
         type: 'license_expiry',
         severity: stage === 1 ? 'error' : 'warning',
-        title: `机构「${org.name}」的软件使用授权还有 ${daysLeft} 天到期（${formatBeijingDate(resolution.coveredUntil)}），请尽快续期`,
+        title: `机构「${org.name}」的软件使用授权还有 ${daysLeft} 天到期（有效期至 ${inclusiveDayText(lastDayOf(resolution.coveredUntil))}），请尽快续期`,
         terminalCode: null,
       })
     } else if (resolution.state === 'grace' && resolution.current) {
       const graceEnd = graceEndsAt(resolution.current)
       alerts.push({
         subjectKey,
-        episodeToken: `${resolution.current.endsAt.toISOString()}:grace:${formatBeijingDate(now)}`,
+        episodeToken: `${resolution.current.endsAt.toISOString()}:grace:${beijingDateOf(now)}`,
         type: 'license_expiry',
         severity: 'error',
-        title: `机构「${org.name}」的软件使用授权已到期，宽限期到 ${formatBeijingDate(graceEnd)}，之后其终端将不能开始新会话`,
+        title: `机构「${org.name}」的软件使用授权已过到期日，宽限期到 ${inclusiveDayText(lastDayOf(graceEnd))}，之后其终端将不能开始新会话`,
         terminalCode: null,
       })
     } else if (resolution.state === 'expired' && resolution.current) {

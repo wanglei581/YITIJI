@@ -1,9 +1,15 @@
 import { BadRequestException } from '@nestjs/common'
 import { normalizeCreditCode } from './credit-code'
+import { beijingDayStart } from './license-time'
 import {
+  LICENSE_CONTRACT_NO_MAX_LENGTH,
   LICENSE_DEFAULT_GRACE_DAYS,
   LICENSE_MAX_GRACE_DAYS,
   LICENSE_MAX_TERMINAL_QUOTA,
+  LICENSE_REASON_MAX_LENGTH,
+  LICENSE_REASON_MIN_LENGTH,
+  LICENSE_TICKET_NO_MAX_LENGTH,
+  LICENSE_TICKET_NO_PATTERN,
 } from './license.types'
 
 /** 授权录入的校验。校验不过一律 400，错误码按字段区分，界面可以直接指到那一格。 */
@@ -32,7 +38,7 @@ export function licenseeName(value: unknown): string {
 }
 
 export function contractNo(value: unknown): string {
-  return text(value, 'LICENSE_CONTRACT_NO_INVALID', '合同编号', 1, 64)
+  return text(value, 'LICENSE_CONTRACT_NO_INVALID', '合同编号', 1, LICENSE_CONTRACT_NO_MAX_LENGTH)
 }
 
 export function creditCode(value: unknown): string {
@@ -68,61 +74,79 @@ export function graceDays(value: unknown): number {
   return value
 }
 
-/** 带时区的 ISO 8601（例：2027-10-29T00:00:00+08:00 或 2027-10-28T16:00:00Z）。日期不带时间或不带时区一律拒绝，免得「到期日」差一天。 */
-const ISO_WITH_ZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/
-
-export function instant(value: unknown, code: string, label: string): Date {
-  if (typeof value !== 'string' || !ISO_WITH_ZONE.test(value.trim())) {
-    throw invalid(code, `${label}需为带时区的时间，例如 2027-10-29T00:00:00+08:00`)
-  }
-  const date = new Date(value.trim())
-  const year = date.getUTCFullYear()
-  if (Number.isNaN(date.getTime()) || year < 2000 || year > 2100) {
-    throw invalid(code, `${label}不是有效时间`)
-  }
-  return date
+/**
+ * 期限里的一天：YYYY-MM-DD，北京时间，必须是真实存在的日期（2027-02-30 之类拒绝），年份限 2000–2100。
+ * 只收日期、不收带时区的时刻：合同写「到 10 月 31 日」就填 2027-10-31，服务端换成次日北京 0 点存，不会差一天。
+ */
+export function licenseDay(value: unknown, code: string, label: string): string {
+  const day = typeof value === 'string' ? value.trim() : ''
+  const start = beijingDayStart(day)
+  if (!start) throw invalid(code, `${label}需为 YYYY-MM-DD 格式的真实日期（北京时间），例如 2027-10-31`)
+  const year = Number(day.slice(0, 4))
+  if (year < 2000 || year > 2100) throw invalid(code, `${label}不是有效日期`)
+  return day
 }
 
 const MAX_PERIOD_MS = 10 * 366 * 24 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
-export function period(startsAt: Date, endsAt: Date): void {
+/** 生效日 → 当天北京 0 点（含）。day 必须先经过 licenseDay 校验。 */
+export function dayStart(day: string): Date {
+  return beijingDayStart(day)!
+}
+
+/** 到期日（含当天）→ 次日北京 0 点（不含）。day 必须先经过 licenseDay 校验。 */
+export function dayEnd(day: string): Date {
+  return new Date(beijingDayStart(day)!.getTime() + DAY_MS)
+}
+
+/** 起止时刻的合理性：到期日不得早于生效日（同一天 = 一天），最长 10 年。 */
+export function checkPeriod(startsAt: Date, endsAt: Date): void {
   if (endsAt.getTime() <= startsAt.getTime()) {
-    throw invalid('LICENSE_PERIOD_INVALID', '到期时间必须晚于生效时间')
+    throw invalid('LICENSE_PERIOD_INVALID', '到期日不能早于生效日')
   }
   if (endsAt.getTime() - startsAt.getTime() > MAX_PERIOD_MS) {
     throw invalid('LICENSE_PERIOD_INVALID', '一条授权的期限不能超过 10 年')
   }
 }
 
-/** 暂停 / 吊销的理由：必填，8–500 个字。 */
+/** 含到期日的期限 → 存库的起止时刻。 */
+export function period(startsOn: string, endsOn: string): { startsAt: Date; endsAt: Date } {
+  const startsAt = dayStart(startsOn)
+  const endsAt = dayEnd(endsOn)
+  checkPeriod(startsAt, endsAt)
+  return { startsAt, endsAt }
+}
+
+/** 乐观版本号：界面读到的 version，正整数。 */
+export function version(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw invalid('LICENSE_VERSION_INVALID', '请带上界面读到的授权版本号（正整数）')
+  }
+  return value
+}
+
+/** 更正 / 恢复 / 模式切换 / 暂停 / 吊销的理由：必填，去首尾空白后 2–200 个字。 */
 export function reason(value: unknown): string {
   const trimmed = typeof value === 'string' ? value.trim() : ''
   const length = Array.from(trimmed).length
-  if (length < 8 || length > 500) {
-    throw invalid('LICENSE_REASON_INVALID', '理由需为 8–500 个字，请写清原因（可同时填工单号）')
+  if (length < LICENSE_REASON_MIN_LENGTH || length > LICENSE_REASON_MAX_LENGTH) {
+    throw invalid('LICENSE_REASON_INVALID', `理由必填，需为 ${LICENSE_REASON_MIN_LENGTH}–${LICENSE_REASON_MAX_LENGTH} 个字，请写清原因`)
   }
   if (UNSAFE_TEXT.test(trimmed)) throw invalid('LICENSE_REASON_INVALID', '理由含有不可见或控制字符')
   return trimmed
 }
 
-/** 恢复 / 切换授权方式的说明：可不填，填了不超过 500 个字。 */
-export function optionalReason(value: unknown): string | null {
-  if (value === null || value === undefined) return null
-  if (typeof value !== 'string') throw invalid('LICENSE_REASON_INVALID', '说明需为文字')
-  const trimmed = value.trim()
-  if (trimmed === '') return null
-  if (Array.from(trimmed).length > 500) throw invalid('LICENSE_REASON_INVALID', '说明不超过 500 个字')
-  if (UNSAFE_TEXT.test(trimmed)) throw invalid('LICENSE_REASON_INVALID', '说明含有不可见或控制字符')
-  return trimmed
-}
+const TICKET_PATTERN = new RegExp(LICENSE_TICKET_NO_PATTERN)
 
-export function ticketNo(value: unknown): string | null {
-  if (value === null || value === undefined) return null
-  if (typeof value !== 'string') throw invalid('LICENSE_TICKET_INVALID', '工单号需为文字')
-  const trimmed = value.trim()
-  if (trimmed === '') return null
-  if (Array.from(trimmed).length > 64 || UNSAFE_TEXT.test(trimmed)) {
-    throw invalid('LICENSE_TICKET_INVALID', '工单号不超过 64 个字，且不能含控制字符')
+/** 暂停 / 吊销必填的审批工单号：1–64 位，只许字母、数字、- _ /。 */
+export function approvalTicketNo(value: unknown): string {
+  const trimmed = typeof value === 'string' ? value.trim() : ''
+  if (trimmed === '' || trimmed.length > LICENSE_TICKET_NO_MAX_LENGTH || !TICKET_PATTERN.test(trimmed)) {
+    throw invalid(
+      'LICENSE_TICKET_INVALID',
+      `审批工单号必填，1–${LICENSE_TICKET_NO_MAX_LENGTH} 位，只能含字母、数字、- _ /`,
+    )
   }
   return trimmed
 }
