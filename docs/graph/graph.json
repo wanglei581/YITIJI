@@ -17066,7 +17066,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 117,
+    "modelCount": 118,
     "models": [
       {
         "fieldCount": 7,
@@ -17227,6 +17227,12 @@
           "services/api/src/member-assets/member-assets.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
+      },
+      {
+        "fieldCount": 6,
+        "name": "AiServiceFact",
+        "relations": [],
+        "usedBy": []
       },
       {
         "fieldCount": 13,
@@ -32969,7 +32975,9 @@
     },
     {
       "asserts": {
-        "absent": [],
+        "absent": [
+          "src/routes/dashboard/PartnerAiServices.tsx"
+        ],
         "dirs": [],
         "files": [
           "apps/admin/scripts/verify-honest-placeholders.mjs",
