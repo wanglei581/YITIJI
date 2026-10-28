@@ -17,6 +17,7 @@ export const UNKNOWN_COPY = '这次上传的结果还不确定。请回到一体
 export const BUSY_COPY = '这个二维码正在处理一次上传。请回到一体机屏幕查看，不要重复发送。'
 // 2026-10-29：码失效 / 已用 / 过期改用一体机那一句（apps/kiosk uploadSessionUserMessage，一体机句子为准）
 export const DEAD_COPY = '二维码已失效或已使用，请回到一体机刷新二维码。'
+export const OCCUPIED_COPY = '这一单已经不能再收文件了。如果一体机屏上有不是你传的文件，请在一体机上点「取消」，再重新扫码。'
 export const REJECT_FALLBACK = '系统没有收下这份文件，可以重新选择后再试'
 export const OFFLINE_COPY = '没连上终端，可以重试。'
 export const NOT_KIOSK_COPY = '这不是一体机上的二维码，请扫一体机屏幕上显示的二维码。'

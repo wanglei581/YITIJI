@@ -13,7 +13,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  MINIAPP, SESSION, TOKEN, FILE, UNKNOWN_COPY, BUSY_COPY, DEAD_COPY, REJECT_FALLBACK,
+  MINIAPP, SESSION, TOKEN, FILE, UNKNOWN_COPY, BUSY_COPY, DEAD_COPY, OCCUPIED_COPY, REJECT_FALLBACK,
   DOC_NOT_FOUND_COPY, DOC_TOO_LARGE_COPY, MEMBER_MISMATCH_COPY, LOGIN_EXPIRED_COPY, UPLOAD_LINK,
   DOCS,
   myDoc, listOf, tap, receipt, httpError, harness, assertTokenStaysInMemory, assertUnknown,
@@ -450,7 +450,7 @@ test('递的时候登录失效（401）：这份没传过去，回到「登录�
 
 test('我的文档那份：码已不能再传、正在收、结果说不清，都不给再递', async () => {
   const cases = [
-    ...['UPLOAD_SESSION_EXPIRED', 'UPLOAD_SESSION_NOT_PENDING', 'UPLOAD_SESSION_NOT_FOUND', 'UPLOAD_TOKEN_INVALID'].map((code) => [httpError(code === 'UPLOAD_TOKEN_INVALID' ? 403 : 400, code, code), 'error', DEAD_COPY]),
+    ...['UPLOAD_SESSION_EXPIRED', 'UPLOAD_SESSION_NOT_PENDING', 'UPLOAD_SESSION_NOT_FOUND', 'UPLOAD_TOKEN_INVALID'].map((code) => [httpError(code === 'UPLOAD_TOKEN_INVALID' ? 403 : 400, code, code), 'error', code === 'UPLOAD_SESSION_NOT_PENDING' ? OCCUPIED_COPY : DEAD_COPY]),
     [httpError(400, 'UPLOAD_SESSION_UPLOAD_IN_PROGRESS', '该二维码正在上传中,请稍候'), 'unknown', BUSY_COPY],
     [httpError(-1, 'NETWORK_ERROR', '网络连接失败，请检查网络后重试'), 'unknown', UNKNOWN_COPY],
     [httpError(500, 'INTERNAL', '服务器内部错误'), 'unknown', UNKNOWN_COPY],

@@ -19,7 +19,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  MINIAPP, PAGE, SESSION, TOKEN, FILE, BUSY_COPY, DEAD_COPY, REJECT_FALLBACK, OFFLINE_COPY,
+  MINIAPP, PAGE, SESSION, TOKEN, FILE, BUSY_COPY, DEAD_COPY, OCCUPIED_COPY, REJECT_FALLBACK, OFFLINE_COPY,
   NOT_KIOSK_COPY, SCENE, UPLOAD_LINK, LOGIN_LINK,
   receipt, httpError, harness, assertTokenStaysInMemory, assertUnknown, send, deferred, flush,
 } from './kiosk-send-harness.mjs'
@@ -115,7 +115,8 @@ test('会话已失效是可确认的失败，但不能用同一张码再传', as
     assert.equal(env.page.data.canRetry, false)
     assert.equal(env.page.data.sceneFailed, false)
     assert.equal(env.page.data.sent.length, 0)
-    assert.equal(env.page.data.errorMsg, DEAD_COPY)
+    // 这一单不再收文件（可能旁人先传了）单说一句，叫本人去一体机上认、不是自己的就取消
+    assert.equal(env.page.data.errorMsg, code === 'UPLOAD_SESSION_NOT_PENDING' ? OCCUPIED_COPY : DEAD_COPY)
     assert.equal(env.page.data.errorMsg.includes(code), false)
     env.page.retry()
     env.page.chooseAndSend()
