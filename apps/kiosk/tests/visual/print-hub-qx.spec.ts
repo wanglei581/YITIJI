@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
+import { MACHINE_UNUSABLE_LINE, whole } from '../fixtures/unattended-lines'
 
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -425,7 +426,9 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
 })
 
 const PAUSE_LABEL = '暂停接单'
-const PAUSE_NOTICE = '打印机暂时不可用，请联系现场工作人员'
+// 闸门合上的说明是无人值守标准句 3（useTerminalDeviceStatus.printerNotice），不再叫人联系现场的人。
+const PAUSE_NOTICE = MACHINE_UNUSABLE_LINE // 包含式断言用（按钮、说明区里除了这句还有别的字）
+const PAUSE_NOTICE_ONLY = whole(MACHINE_UNUSABLE_LINE) // 整句断言用（这一句自己占一个文字节点）
 
 function registerQueueGate(api: ApiRouter, printerStatus: string): void {
   registerShell(api, { isOnline: true, printerStatus })
@@ -449,7 +452,7 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${dir}/${name}.png` })
 }
 
-// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明给现场工作人员。
+// 打印闸门合上：要出纸的入口停用，短标题「暂停接单」，说明是标准句 3（整台机器暂时不能用，稍后再来或服务电话）。
 // 不经过打印机的入口（格式转换）照旧可点。删掉 map 里的 case 会掉进「状态未知」，这两条变红。
 for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
   test(`print entry pauses new orders when heartbeat is ${status} @w2`, async ({ page, api }) => {
@@ -460,7 +463,7 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
     const printTile = page.locator('[data-action="print-hub"]')
     await expect(printTile).toHaveAttribute('data-panel-state', 'error')
     await expect(printTile.getByText(PAUSE_LABEL, { exact: true })).toBeVisible()
-    await expect(printTile.getByText(PAUSE_NOTICE, { exact: true })).toBeVisible()
+    await expect(printTile.getByText(PAUSE_NOTICE_ONLY)).toBeVisible()
     await shot(page, `G8-${status}-home`)
 
     await page.goto('/print-scan')
@@ -482,7 +485,7 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed'] as const) {
 
     await page.goto('/print/upload?source=document&tab=file')
     await expect(page.getByText(PAUSE_LABEL, { exact: true }).first()).toBeVisible()
-    await expect(page.getByText(PAUSE_NOTICE, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText(PAUSE_NOTICE_ONLY).first()).toBeVisible()
     await shot(page, `G8-${status}-upload`)
 
     await expectNoForgedReady(page)

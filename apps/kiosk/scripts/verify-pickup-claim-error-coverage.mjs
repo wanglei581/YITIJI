@@ -122,7 +122,11 @@ const httpAdapterStub = toDataUrl(`export class ApiHttpError extends Error {
 const sharedStub = toDataUrl(`export const LEGACY_PICKUP_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 export const PICKUP_CODE_LENGTH = 8
 export const PICKUP_CODE_MAX_INPUT_LENGTH = 10`)
-const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', { './httpAdapter': httpAdapterStub })
+// userErrorMessage 现在从 copy/unattendedCopy 取无人值守标准句（该文件自身无依赖），原样转译后接上，不另抄。
+const userErrorUrl = transpile('apps/kiosk/src/services/api/userErrorMessage.ts', {
+  './httpAdapter': httpAdapterStub,
+  '../../copy/unattendedCopy': transpile('apps/kiosk/src/copy/unattendedCopy.ts'),
+})
 const cashierUrl = transpile('apps/kiosk/src/pages/print/cashierStatus.ts')
 const modelUrl = transpile('apps/kiosk/src/pages/print/pickupClaimModel.ts', {
   '@ai-job-print/shared': sharedStub,

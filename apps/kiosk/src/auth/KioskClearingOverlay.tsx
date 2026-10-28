@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { helpNeededLine, networkDisconnectLine } from '../copy/unattendedCopy'
 import {
   retryScanCleanupNow,
   type ScanCleanupOutcome,
@@ -66,7 +67,7 @@ function CleanupHoldPanel({ status }: { status: ScanCleanupStatus }) {
       >
         立即重试
       </button>
-      <p className="qx-clearing-note">一直不成，请叫现场工作人员看一眼这台机器的网络。</p>
+      <p className="qx-clearing-note">一直不成。{networkDisconnectLine()}。{helpNeededLine()}。</p>
     </div>
   )
 }

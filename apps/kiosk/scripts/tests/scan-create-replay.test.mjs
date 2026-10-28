@@ -63,9 +63,12 @@ async function loadRecoveryModule() {
     transpile('src/pages/scan/scanCreateReplay.ts')
       .replaceAll("'../../services/api/httpAdapter'", `'${HTTP_ADAPTER_STUB}'`),
   )
+  // userErrorMessage 从 copy/unattendedCopy 取无人值守标准句（该文件自身无依赖），原样转译后接上。
+  const unattendedCopy = toDataUrl(transpile('src/copy/unattendedCopy.ts'))
   const userErrors = toDataUrl(
     transpile('src/services/api/userErrorMessage.ts')
-      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`),
+      .replaceAll("'./httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)
+      .replaceAll("'../../copy/unattendedCopy'", `'${unattendedCopy}'`),
   )
   const code = transpile('src/pages/scan/scanRescanRecovery.ts')
     .replaceAll("'../../services/api/httpAdapter'", `'${HTTP_ADAPTER_STUB}'`)

@@ -10,8 +10,9 @@
  * 运行时根在进页时拉取一次，子页面重绘时就能读到。
  * 本文件不发请求，也不 import 接口模块，避免和 supportContact 循环引用。
  *
- * `UNATTENDED_FORBIDDEN_PHRASES` 与 `scripts/verify-kiosk-unattended-copy.mjs` 共用。
- * 门禁用文本解析读这份数组，改词必须两处一起看。
+ * `UNATTENDED_FORBIDDEN_PHRASES` 与 `apps/kiosk/scripts/verify-kiosk-unattended-copy.mjs` 共用。
+ * 门禁把本文件转译后真读这份数组（不另抄一份），改词时共享模块立刻按新词表变红，
+ * 页面目录里的存量按 `scripts/fixtures/unattended-pending-pages.json` 的待清名单只减不增。
  */
 
 export interface PublicSupportContact {

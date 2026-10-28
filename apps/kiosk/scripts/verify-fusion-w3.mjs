@@ -129,7 +129,12 @@ const frozen = {
   // 2026-10-06 重新冻结：live 后若一直没有远端音量也没有字幕，12 秒提示、30 秒结束会话并转文字。
   // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
   // 旧哈希 7f4c697aca220e1c48f3a9df2f450800d0aec72b4c391488fed62caff797d0c6。
-  'src/hooks/useAiAdvisorCallSession.ts': '9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4',
+  // 2026-10-29 重新冻结：现场无人值守（产品负责人 10/4 定），「当前设备身份不可用」那一句不再叫用户去找现场的人，
+  // 换成 copy/unattendedCopy 的标准句 3（整台机器暂时不能用）。只多一行导入、换一句文案，通话流程没动；
+  // 身份、声明、停止与到点降级仍由 assistant-trtc-guard 钉住。冻结仍是逐字节校验，没有删断言。
+  // 这句也在 verify:kiosk-unattended-copy 的共享模块零容忍范围内，改回旧句会同时红两条。
+  // 旧哈希 9843b115f8bec2868e4f5c961ac3a3ab9cd3f5f77b5c2cd623ec3af82a65bfe4。
+  'src/hooks/useAiAdvisorCallSession.ts': 'ec52fe181cf0cea681a526a844d56a3a8ef5223730f12e5f6fe5f3e62f3ecde4',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
