@@ -308,6 +308,9 @@ for (const [name, source, fetchName] of [
   if (source.includes('服务端当前全量返回，本页本地分页') || source.includes('仅显示前')) {
     fail(`ADM-C15: ${name} 已接服务端分页，不得再声明本地截断`)
   }
+  if (!source.includes('重新加载') || !source.includes('setError(false)') || !source.includes('onClick={reload}')) {
+    fail(`ADM-C15: ${name} 列表加载失败必须能重新加载并离开错误态`)
+  }
   if (source.includes('.slice((page - 1) * pageSize') || source.includes('const total = searched.length')) {
     fail(`ADM-C15: ${name} 不得再对全集做本地 slice / 用筛选长度当 total`)
   }

@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 601,
+    "endpointCount": 603,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -1825,6 +1825,30 @@
       },
       {
         "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
+        "handler": "AdminFirstOrderIncidentsController.directory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceIncidentEvent",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal"
+        ],
+        "path": "/api/v1/admin/first-order/incidents",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-incidents.service.ts"
+        ],
+        "services": [
+          "FirstOrderIncidentsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order-incidents.controller.ts",
         "handler": "AdminFirstOrderIncidentsController.create",
         "method": "POST",
         "models": [
@@ -2138,6 +2162,32 @@
           "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/first-order/projects/:id/reports",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/first-order/first-order-reports.service.ts"
+        ],
+        "services": [
+          "FirstOrderReportsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/first-order/first-order.controller.ts",
+        "handler": "AdminFirstOrderController.reportDirectory",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "KioskSession",
+          "PrintTask",
+          "ServiceDeployment",
+          "ServiceIncident",
+          "ServiceProject",
+          "ServiceReport",
+          "Terminal",
+          "TerminalHeartbeat"
+        ],
+        "path": "/api/v1/admin/first-order/reports",
         "roles": [
           "admin"
         ],
@@ -12742,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 243,
+      "reachableFileCount": 252,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -12764,8 +12814,11 @@
             "GET /files/lifecycle-summary",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
+            "PATCH /admin/feedback/:param/status",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "POST /admin/feedback/:param/contact-phone",
+            "POST /admin/feedback/:param/replies",
             "POST /admin/recruitment-emergency/circuit-break",
             "POST /admin/recruitment-emergency/takedown",
             "POST /files/cleanup-expired",
@@ -13510,11 +13563,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 269
+      "sourceFileCount": 278
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 671,
+      "reachableFileCount": 673,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -15871,6 +15924,7 @@
             "apps/kiosk/src/pages/resume/touch/optimize.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15925,6 +15979,7 @@
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -15982,6 +16037,7 @@
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16039,6 +16095,7 @@
             "apps/kiosk/src/styles/ai-primitives.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16225,6 +16282,7 @@
             "apps/kiosk/src/pages/resume/touch/source.css",
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
+            "apps/kiosk/src/styles/qingxu/touch-hero.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16489,16 +16547,60 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 766
+      "sourceFileCount": 768
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 88,
+      "reachableFileCount": 92,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
         {
           "component": "DashboardPage",
+          "endpoints": [
+            "DELETE /partner/policies/:param",
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/policies/:param/eligibility-rules",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "GET /policies/eligibility-questions",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "PATCH /partner/policies/:param",
+            "PATCH /partner/policies/:param/publish",
+            "PATCH /partner/policies/:param/release",
+            "PATCH /partner/policies/:param/review",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "POST /partner/policies",
+            "POST /partner/policies/:param/eligibility-preview",
+            "PUT /partner/policies/:param/eligibility-rules",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
+          "file": "apps/partner/src/routes/dashboard/index.tsx",
+          "layout": [
+            "PartnerLayoutWrapper"
+          ],
+          "path": "/",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "AccountPage",
           "endpoints": [
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
@@ -16520,20 +16622,8 @@
             "POST /partner/excel/:param/confirm",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
-            "PUT /partner/profile",
             "PUT /partner/smart-campus/terminals/:param/config"
           ],
-          "file": "apps/partner/src/routes/dashboard/index.tsx",
-          "layout": [
-            "PartnerLayoutWrapper"
-          ],
-          "path": "/",
-          "styles": [],
-          "wrappers": []
-        },
-        {
-          "component": "AccountPage",
-          "endpoints": [],
           "file": "apps/partner/src/routes/account/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16741,7 +16831,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16752,7 +16864,29 @@
         },
         {
           "component": "ScreenPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/smart-campus/terminals/:param/config"
+          ],
           "file": "apps/partner/src/routes/screen/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -16900,7 +17034,28 @@
         {
           "component": "TerminalsPage",
           "endpoints": [
-            "PUT /partner/profile"
+            "GET /partner/data-sources",
+            "GET /partner/data-sources/capabilities",
+            "GET /partner/excel/mapping-rule",
+            "GET /partner/fairs",
+            "GET /partner/jobs",
+            "GET /partner/jobs/quality-summary",
+            "GET /partner/smart-campus/terminals",
+            "GET /partner/sync-logs",
+            "PATCH /partner/data-sources/:param/archive",
+            "PATCH /partner/data-sources/:param/toggle",
+            "PATCH /partner/data-sources/:param/unarchive",
+            "PATCH /partner/fairs/:param",
+            "PATCH /partner/fairs/:param/publish",
+            "PATCH /partner/jobs/:param",
+            "PATCH /partner/jobs/:param/publish",
+            "POST /partner/data-sources",
+            "POST /partner/data-sources/:param/rotate-credential",
+            "POST /partner/excel/:param/confirm",
+            "POST /partner/fairs/import",
+            "POST /partner/jobs/import",
+            "PUT /partner/profile",
+            "PUT /partner/smart-campus/terminals/:param/config"
           ],
           "file": "apps/partner/src/routes/terminals/index.tsx",
           "layout": [
@@ -16911,7 +17066,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 89
+      "sourceFileCount": 93
     }
   },
   "dataModel": {
@@ -18782,13 +18937,17 @@
     ],
     "apps/admin/src/layouts/AdminLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
+      "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
+    "apps/admin/src/layouts/adminNav.ts": [
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
       "apps/admin/scripts/verify-admin-content-trust-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
       "apps/admin/scripts/verify-console-screen-details.mjs",
-      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs",
       "apps/kiosk/scripts/verify-data-request-ui.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
     ],
@@ -18820,6 +18979,7 @@
       "apps/admin/scripts/verify-admin-ai-access-ui.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiLogsTable.tsx": [
+      "apps/admin/scripts/verify-admin-ai-access-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
     ],
     "apps/admin/src/routes/ai-services/AiOperationCostTable.tsx": [
@@ -18937,6 +19097,7 @@
     "apps/admin/src/routes/index.tsx": [
       "apps/admin/scripts/verify-admin-account-settings-ui.mjs",
       "apps/admin/scripts/verify-admin-billing-ui.mjs",
+      "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-admin-job-materials-ui.mjs",
       "apps/admin/scripts/verify-admin-offline-agencies-ui.mjs",
       "apps/admin/scripts/verify-admin-print-scan-ui.mjs",
@@ -22268,8 +22429,11 @@
     ],
     "apps/partner/src/layouts/PartnerLayoutWrapper.tsx": [
       "apps/admin/scripts/verify-console-screen-details.mjs",
-      "apps/partner/scripts/verify-partner-stats-contract.mjs",
       "apps/partner/scripts/verify-service-desk-jobs-ui.mjs"
+    ],
+    "apps/partner/src/layouts/partnerNav.ts": [
+      "apps/admin/scripts/verify-console-screen-details.mjs",
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/lib/csv.ts": [
       "apps/admin/scripts/verify-console-batch6-copy.mjs",
@@ -24088,6 +24252,9 @@
       "services/api/scripts/verify-print-retry-lock-postgres.ts",
       "services/api/scripts/verify-refund-idempotent.ts"
     ],
+    "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts": [
+      "services/api/scripts/verify-admin-print-scan.ts"
+    ],
     "services/api/src/admin-users/admin-users.controller.ts": [
       "services/api/scripts/verify-admin-users.ts",
       "services/api/scripts/verify-member-closure.ts"
@@ -25710,6 +25877,9 @@
       "services/api/scripts/verify-resume-export-label.ts",
       "services/api/scripts/verify-wechat-refund-notify.ts",
       "services/api/scripts/verify-wechat-refund-regression.ts"
+    ],
+    "services/api/src/first-order/first-order-report-metrics.ts": [
+      "services/api/scripts/verify-first-order-http.ts"
     ],
     "services/api/src/job-ai/governed-job-fit.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -27916,6 +28086,7 @@
         ],
         "files": [
           "apps/admin/src/routes/ai-services/AiAccessSwitchesPanel.tsx",
+          "apps/admin/src/routes/ai-services/AiLogsTable.tsx",
           "apps/admin/src/routes/ai-services/index.tsx",
           "apps/admin/src/services/api/aiAccess.ts",
           "apps/admin/src/services/api/userErrorMessage.ts",
@@ -28004,7 +28175,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/billing/index.tsx",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/services/api/adminBilling.ts",
@@ -28028,7 +28199,7 @@
           "apps/admin/src/routes/partners"
         ],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/components/BulkPublishButton.tsx",
           "apps/admin/src/routes/partners/OrgContentTrustPanel.tsx",
           "apps/admin/src/routes/partners/contentTrustRules.ts",
@@ -28054,6 +28225,7 @@
         "files": [
           "apps/admin/src/routes/devices/TerminalFleetOverview.tsx",
           "apps/admin/src/routes/devices/index.tsx",
+          "apps/admin/src/routes/index.tsx",
           "apps/admin/src/services/api/adminHttpAdapter.ts",
           "apps/admin/src/services/api/adminMockAdapter.ts",
           "apps/admin/src/services/api/devices.ts",
@@ -28118,7 +28290,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/job-materials/index.tsx",
           "apps/admin/src/services/api/jobMaterials.ts"
@@ -28164,6 +28336,7 @@
         ],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/partners/OrgDetailDrawer.tsx",
           "apps/admin/src/routes/partners/OrgQualificationSection.tsx",
@@ -28309,7 +28482,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/print-scan/CapabilityCenter.tsx",
           "apps/admin/src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx",
@@ -28586,12 +28759,14 @@
         "dirs": [],
         "files": [
           "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/screen/GovGrid.tsx",
           "apps/admin/src/routes/screen/UsageHostingOff.tsx",
           "apps/admin/src/routes/screen/UsageView.tsx",
           "apps/admin/src/routes/screen/screenTabs.ts",
           "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/routes/Page.tsx",
           "apps/partner/src/routes/index.tsx",
           "apps/partner/src/routes/screen/PartnerGrid.tsx",
@@ -29296,7 +29471,7 @@
         "files": [
           ".github/workflows/ci.yml",
           "apps/admin/package.json",
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/index.tsx",
           "apps/admin/src/routes/privacy-requests/index.tsx",
           "apps/admin/src/services/api/adminPrivacyRequests.ts",
@@ -32824,7 +32999,7 @@
         "dirs": [],
         "files": [
           "apps/admin/scripts/verify-honest-placeholders.mjs",
-          "apps/partner/src/layouts/PartnerLayoutWrapper.tsx",
+          "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
@@ -35065,6 +35240,7 @@
         "files": [
           "packages/shared/src/types/printScanCapability.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
+          "services/api/src/admin-print-scan/dto/list-print-scan-tasks.dto.ts",
           "services/api/src/audit/audit.service.ts",
           "services/api/src/common/guards/roles.guard.ts",
           "services/api/src/files/signing.ts",
@@ -37490,6 +37666,7 @@
           "services/api/scripts/support/first-order-fixture.ts",
           "services/api/scripts/support/first-order-review-boundaries.ts",
           "services/api/src/audit/audit.service.ts",
+          "services/api/src/first-order/first-order-report-metrics.ts",
           "services/api/src/terminals/terminal-org-assignment.ts"
         ],
         "missing": []
@@ -38572,7 +38749,7 @@
         "absent": [],
         "dirs": [],
         "files": [
-          "apps/admin/src/layouts/AdminLayoutWrapper.tsx",
+          "apps/admin/src/layouts/adminNav.ts",
           "apps/admin/src/routes/legal-docs/LegalDocPreview.tsx",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/legal-docs/legalDocRender.ts",

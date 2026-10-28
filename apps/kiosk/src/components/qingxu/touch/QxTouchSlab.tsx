@@ -1,13 +1,14 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { QxTouchChip, type QxTouchChipTone } from './QxTouchChip'
 import { QxTouchIcon } from './QxTouchIcon'
+import { qxTouchDataMarkers, type QxTouchHubMarker } from './qxTouchMarkers'
 
 export type QxTouchSlabProps = {
   title: string
   desc: string
   chip?: string
   chipTone?: QxTouchChipTone
-  /** 可选。芯片前加一个 AI 小圆点（稿的「AI 诊断改写」这类标）。默认不加。 */
+  /** 芯片前加一个 AI 小圆点（如「AI 诊断改写」这类标）。默认不加。 */
   chipAi?: boolean
   visual?: ReactNode
   take?: string
@@ -19,8 +20,8 @@ export type QxTouchSlabProps = {
   lock?: string
   onClick?: () => void
   index?: number
-  /** 服务台走查钩子。不传则不写 data-hub-*，原有宽卡不变。 */
-  hub?: { kind: 'card' | 'quick' | 'goal'; title: string; reason?: string | null }
+  /** 服务台走查钩子。不传则不写 data-hub-*。 */
+  hub?: QxTouchHubMarker
 }
 
 export function QxTouchSlab({
@@ -41,13 +42,7 @@ export function QxTouchSlab({
   index = 0,
   hub,
 }: QxTouchSlabProps) {
-  const hubAttrs = hub ? {
-    'data-hub-card': hub.kind === 'card' ? '' : undefined,
-    'data-hub-quick': hub.kind === 'quick' ? '' : undefined,
-    'data-hub-goal': hub.kind === 'goal' ? '' : undefined,
-    'data-hub-title': hub.title,
-    'data-hub-reason': hub.reason || undefined,
-  } : undefined
+  const hubAttrs = qxTouchDataMarkers({ hub })
   const className = [
     'qxt-slab',
     'qxt-rise',

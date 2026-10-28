@@ -15,6 +15,7 @@ const paths = {
 
 const read = (path) => existsSync(path) ? readFileSync(path, 'utf8') : ''
 const source = Object.fromEntries(Object.entries(paths).map(([key, path]) => [key, read(path)]))
+const routes = read(join(adminRoot, 'src/routes/index.tsx'))
 const checks = []
 
 function verify(name, assertion) {
@@ -33,12 +34,14 @@ verify('overview component exists', () => {
   assert.equal(existsSync(paths.component), true, 'TerminalFleetOverview.tsx is missing')
 })
 
-verify('devices route exposes the same-page overview tab without changing the default', () => {
+verify('devices route opens the overview tab and keeps the legacy terminals address', () => {
   assert.match(source.route, /key:\s*['"]overview['"]/)
   assert.match(source.route, /label:\s*['"]设备总览['"]/)
   assert.match(source.route, /LayoutDashboardIcon/)
   assert.match(source.route, /<TerminalFleetOverview\s*\/>/)
-  assert.match(source.route, /\?\s*raw\s*:\s*['"]terminals['"]/, 'default tab must remain terminals')
+  assert.match(source.route, /\?\s*raw\s*:\s*['"]overview['"]/, 'missing tab opens 设备总览')
+  assert.match(source.component, /机队总览按设备上报统计，条数可能与终端名册不同/)
+  assert.match(routes, /\/devices\?tab=terminals/, 'legacy /terminals must still land on the terminal tab')
 })
 
 verify('frontend contract is a strict device-fleet whitelist', () => {

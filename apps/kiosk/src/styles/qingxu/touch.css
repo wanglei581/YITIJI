@@ -19,7 +19,8 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.qxt-screen button {
+/* :where() 不加权重：和原来的 .qxt-screen button 一样轻，卡片、磁贴自己的样式照样盖得过它 */
+.qxt-screen:where(.qxt-btn-reset) button {
   font: inherit;
   color: inherit;
   background: none;
@@ -120,6 +121,8 @@
 .qxt-screen .qxt-status-warn { background: var(--qxt-warn-bg); }
 .qxt-screen .qxt-status-warn .qxt-dot { background: var(--qxt-warn-dot); box-shadow: 0 0 0 4px var(--qxt-warn-ring); }
 .qxt-screen .qxt-status-unknown .qxt-dot { background: var(--qxt-unknown-dot); box-shadow: 0 0 0 4px var(--qxt-unknown-ring); }
+.qxt-screen .qxt-status-bad { background: var(--qxt-bad-bg); }
+.qxt-screen .qxt-status-bad .qxt-dot { background: var(--qxt-bad-dot); box-shadow: 0 0 0 4px var(--qxt-bad-ring); }
 .qxt-screen .qxt-status-reading .qxt-dot { background: var(--qxt-mint); box-shadow: 0 0 0 4px var(--qxt-mint-pulse); }
 .qxt-screen .qxt-ask { flex: 1; display: flex; gap: 30px; align-items: center; padding: 30px 0 40px; }
 .qxt-screen .qxt-ask-t { flex: 1; min-width: 0; }

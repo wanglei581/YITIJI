@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { QxTouchIcon, type QxTouchIconName } from './QxTouchIcon'
+import { qxTouchDataMarkers, type QxTouchHubMarker } from './qxTouchMarkers'
 
 export type QxTouchTileTone = 'teal' | 'slate' | 'clay'
 
@@ -10,11 +11,23 @@ export type QxTouchTileProps = {
   tone?: QxTouchTileTone
   off?: boolean
   layout?: 'row' | 'stack'
+  chevron?: boolean
+  /** 诚实状态短句（读取中 / 读取失败）。不传就不画。 */
+  badge?: string
+  /** 失败后的可见重试提示，不进 badge。 */
+  cue?: string
   onClick?: () => void
   index?: number
   label?: string
-  /** 服务台走查钩子。不传则不写 data-hub-*，原有磁贴不变。 */
-  hub?: { kind: 'card' | 'quick' | 'goal'; title: string; reason?: string | null }
+  /** 停用原因，画在说明下面。不传就不画。 */
+  reason?: string
+  /** 标题标签。默认 b。 */
+  titleAs?: 'b' | 'h3'
+  testId?: string
+  actionId?: string
+  dataAttrs?: Record<string, string | undefined>
+  /** 服务台走查钩子。不传则不写 data-hub-*。 */
+  hub?: QxTouchHubMarker
 }
 
 export function QxTouchTile({
@@ -24,32 +37,41 @@ export function QxTouchTile({
   tone = 'teal',
   off = false,
   layout = 'row',
+  chevron = true,
+  badge,
+  cue,
   onClick,
   index = 0,
   label,
+  reason,
+  titleAs = 'b',
+  testId,
+  actionId,
+  dataAttrs,
   hub,
 }: QxTouchTileProps) {
-  const hubAttrs = hub ? {
-    'data-hub-card': hub.kind === 'card' ? '' : undefined,
-    'data-hub-quick': hub.kind === 'quick' ? '' : undefined,
-    'data-hub-goal': hub.kind === 'goal' ? '' : undefined,
-    'data-hub-title': hub.title,
-    'data-hub-reason': hub.reason || undefined,
-  } : undefined
   const className = `qxt-tile qxt-rise${off ? ' qxt-off qxt-hold' : ''}${layout === 'stack' ? ' qxt-tile-stack' : ''}`
   const style = { '--i': index } as CSSProperties
+  const TitleTag = titleAs === 'h3' ? 'h3' : 'b'
   const body = (
     <>
       <span className={`qxt-ic${tone === 'teal' ? '' : ` qxt-ic-${tone}`}`}>
         <QxTouchIcon name={icon} size={34} strokeWidth={2} />
       </span>
-      <span className="qxt-tx"><b>{title}</b><small>{desc}</small></span>
-      {off ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
+      <span className="qxt-tx">
+        <TitleTag>{title}</TitleTag>
+        {badge ? <em className="qxt-tile-mark">{badge}</em> : null}
+        <small>{desc}</small>
+        {reason ? <span className="qxt-tile-why">{reason}</span> : null}
+        {cue ? <span className="qxt-tile-cue">{cue}</span> : null}
+      </span>
+      {off || !chevron ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={30} strokeWidth={2.2} /></span>}
     </>
   )
+  const markers = qxTouchDataMarkers({ actionId, dataAttrs, hub, testId })
   if (!off && !onClick) {
     return (
-      <div className={className} style={style} {...hubAttrs}>
+      <div className={className} style={style} {...markers}>
         {body}
       </div>
     )
@@ -61,7 +83,7 @@ export function QxTouchTile({
       style={style}
       aria-disabled={off ? true : undefined}
       aria-label={label}
-      {...hubAttrs}
+      {...markers}
       onClick={() => {
         if (off) return
         onClick?.()

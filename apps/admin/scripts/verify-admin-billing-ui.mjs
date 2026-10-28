@@ -5,7 +5,7 @@ const root = process.cwd()
 const pagePath = join(root, 'src/routes/billing/index.tsx')
 const servicePath = join(root, 'src/services/api/adminBilling.ts')
 const routesPath = join(root, 'src/routes/index.tsx')
-const navPath = join(root, 'src/layouts/AdminLayoutWrapper.tsx')
+const navPath = join(root, 'src/layouts/adminNav.ts')
 
 let failures = 0
 const pass = (m) => console.log(`  PASS ${m}`)
@@ -138,7 +138,10 @@ if (page.includes('maxLength={200}') && descriptionSaveBlock.includes('nextDescr
 // route + nav 接入
 if (routes.includes("path: 'billing'") && routes.includes('BillingPage')) pass('路由注册 /billing')
 else fail('路由未注册 /billing')
-if (nav.includes("'/billing'") && nav.includes('计费与对账')) pass('侧栏导航接入计费与对账')
+if (
+  nav.includes("path: '/billing'") && nav.includes("label: '计费与对账'")
+  && nav.includes("key: 'orders'") && nav.includes("label: '订单与计费'")
+) pass('计费与对账仍可从「订单与计费」的标签进入')
 else fail('侧栏未接入计费与对账')
 
 if (!page.includes('print_duplex_surcharge') && !page.includes('双面附加')) {

@@ -5,7 +5,7 @@ import {
   SearchIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../lib/cn'
 import {
   getVisualThemeAttributes,
@@ -57,6 +57,79 @@ export interface AdminLayoutProps {
   className?: string
 }
 
+function SidebarNavItem({
+  item,
+  index,
+  named,
+  tall,
+  navItems,
+  activeKey,
+  onNavChange,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem
+  index: number
+  named: boolean
+  tall: boolean
+  navItems: NavItem[]
+  activeKey?: string
+  onNavChange?: (key: string) => void
+  collapsed: boolean
+  onNavigate: () => void
+}) {
+  const active = activeKey === item.key
+  const Icon = item.icon
+  const prevItem = navItems[index - 1]
+  const showGroup = named && item.group && item.group !== prevItem?.group
+  return (
+    <li key={item.key}>
+      {showGroup && (
+        <div className={cn('px-3 pb-0 leading-none', index === 0 ? 'pt-0.5' : 'pt-1')}>
+          <span className="block text-[10px] font-bold leading-none tracking-[0.08em] text-[#8fb5a7]">
+            {item.group}
+          </span>
+        </div>
+      )}
+      <a
+        href={item.href ?? '#'}
+        aria-current={active ? 'page' : undefined}
+        aria-label={named ? undefined : item.label}
+        onClick={(e) => {
+          if (onNavChange) {
+            e.preventDefault()
+            onNavChange(item.key)
+          }
+          onNavigate()
+        }}
+        className={cn(
+          'relative flex w-full items-center gap-2.5 rounded-[9px] px-3 text-[13px] font-semibold leading-4 transition-colors',
+          tall ? 'min-h-11' : 'min-h-9',
+          active
+            ? 'bg-primary-600 text-white'
+            : 'text-[#c6ddd3] hover:bg-white/[0.07] hover:text-white',
+          !named && collapsed && 'justify-center px-2',
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0 opacity-85" aria-hidden="true" />
+        {named && <span className="flex-1 truncate">{item.label}</span>}
+        {named && item.badge != null && (
+          <span
+            className={cn(
+              'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-extrabold leading-none',
+              typeof item.badge === 'number' && item.badge > 0
+                ? 'bg-error text-white'
+                : 'bg-white/10 text-[#c6ddd3]',
+            )}
+          >
+            {item.badge}
+          </span>
+        )}
+      </a>
+    </li>
+  )
+}
+
 export function AdminLayout({
   children,
   navItems = [],
@@ -74,6 +147,23 @@ export function AdminLayout({
   density = 'compact',
   className,
 }: AdminLayoutProps) {
+  const [narrow, setNarrow] = useState(false)
+  const [flyoutOpen, setFlyoutOpen] = useState(false)
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = () => {
+      setNarrow(media.matches)
+      if (!media.matches) setFlyoutOpen(false)
+    }
+    onChange()
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
+  useEffect(() => {
+    setFlyoutOpen(false)
+  }, [activeKey])
+  const flyoutMode = narrow && collapsed && flyoutOpen
+
   return (
     <div
       {...getVisualThemeAttributes(visualTheme, density)}
@@ -90,14 +180,14 @@ export function AdminLayout({
         {/* Brand */}
         <div
           className={cn(
-            'flex h-[70px] shrink-0 items-center gap-3',
+            'flex h-14 shrink-0 items-center gap-2.5',
             collapsed ? 'justify-center px-3' : 'px-5',
           )}
         >
           {appLogo
             ? <div className="shrink-0">{appLogo}</div>
             : (
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-[#fdfbf4] to-[#dff2ea]">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-[#fdfbf4] to-[#dff2ea]">
                 <span className="text-sm font-extrabold leading-none text-primary-700">AI</span>
               </div>
             )
@@ -111,64 +201,22 @@ export function AdminLayout({
         </div>
 
         {/* Nav items */}
-        <nav aria-label="侧边导航" className="flex-1 overflow-y-auto py-2">
-          <ul role="list" className="space-y-0.5 px-2">
-            {navItems.map((item, index) => {
-              const active = activeKey === item.key
-              const Icon = item.icon
-              const prevItem = navItems[index - 1]
-              const showGroup = !collapsed && item.group && item.group !== prevItem?.group
-
-              return (
-                <li key={item.key}>
-                  {/* Group label */}
-                  {showGroup && (
-                    <div className={cn('px-3 pb-1.5', index === 0 ? 'pt-1' : 'pt-4')}>
-                      <span className="text-[11px] font-bold tracking-[0.08em] text-[#8fb5a7]">
-                        {item.group}
-                      </span>
-                    </div>
-                  )}
-
-                  <a
-                    href={item.href ?? '#'}
-                    aria-current={active ? 'page' : undefined}
-                    onClick={(e) => {
-                      if (onNavChange) {
-                        e.preventDefault()
-                        onNavChange(item.key)
-                      }
-                    }}
-                    className={cn(
-                      'relative flex w-full items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13.5px] font-semibold transition-colors',
-                      active
-                        ? 'bg-primary-600 text-white'
-                        : 'text-[#c6ddd3] hover:bg-white/[0.07] hover:text-white',
-                      collapsed && 'justify-center px-2',
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 opacity-85" aria-hidden="true" />
-
-                    {!collapsed && (
-                      <span className="flex-1 truncate">{item.label}</span>
-                    )}
-
-                    {!collapsed && item.badge != null && (
-                      <span
-                        className={cn(
-                          'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-extrabold leading-none',
-                          typeof item.badge === 'number' && item.badge > 0
-                            ? 'bg-error text-white'
-                            : 'bg-white/10 text-[#c6ddd3]',
-                        )}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </a>
-                </li>
-              )
-            })}
+        <nav aria-label="侧边导航" aria-hidden={flyoutMode || undefined} className="flex-1 overflow-y-auto py-1">
+          <ul role="list" className="space-y-0 px-2">
+            {navItems.map((item, index) => (
+              <SidebarNavItem
+                key={item.key}
+                item={item}
+                index={index}
+                named={!collapsed}
+                tall={false}
+                navItems={navItems}
+                activeKey={activeKey}
+                onNavChange={onNavChange}
+                collapsed={collapsed}
+                onNavigate={() => setFlyoutOpen(false)}
+              />
+            ))}
           </ul>
         </nav>
 
@@ -177,10 +225,10 @@ export function AdminLayout({
           <div
             className={cn(
               'flex shrink-0 items-center gap-2.5 border-t border-white/10',
-              collapsed ? 'justify-center px-3 py-3' : 'px-5 py-3.5',
+              collapsed ? 'justify-center px-2 py-2' : 'px-4 py-2',
             )}
           >
-            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-primary-600">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-600">
               <span className="text-sm font-extrabold text-white">
                 {(userName ?? '管')[0]}
               </span>
@@ -200,12 +248,15 @@ export function AdminLayout({
 
         {/* Collapse toggle */}
         {onCollapseChange && (
-          <div className="border-t border-white/10 p-2">
+          <div className="relative z-40 border-t border-white/10 p-1">
             <button
               type="button"
-              aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
-              onClick={() => onCollapseChange(!collapsed)}
-              className="flex w-full items-center justify-center rounded-[9px] p-2 text-[#8fb5a7] hover:bg-white/[0.07] hover:text-white"
+              aria-label={narrow && collapsed ? (flyoutOpen ? '关闭菜单' : '打开菜单') : (collapsed ? '展开侧边栏' : '收起侧边栏')}
+              onClick={() => {
+                if (narrow && collapsed) setFlyoutOpen((open) => !open)
+                else onCollapseChange(!collapsed)
+              }}
+              className="flex h-8 w-full items-center justify-center rounded-[9px] text-[#8fb5a7] hover:bg-white/[0.07] hover:text-white"
             >
               {collapsed
                 ? <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -216,11 +267,43 @@ export function AdminLayout({
         )}
       </aside>
 
+      {flyoutMode && (
+        <>
+          <button
+            type="button"
+            aria-label="关闭菜单"
+            className="fixed bottom-0 left-16 right-0 top-[60px] z-30 bg-black/20"
+            onClick={() => setFlyoutOpen(false)}
+          />
+          <nav
+            aria-label="侧边导航"
+            className="fixed bottom-0 left-16 top-[60px] z-40 w-60 overflow-y-auto bg-neutral-900 px-2 py-2 shadow-xl"
+          >
+            <ul role="list" className="space-y-0">
+              {navItems.map((item, index) => (
+                <SidebarNavItem
+                  key={item.key}
+                  item={item}
+                  index={index}
+                  named
+                  tall
+                  navItems={navItems}
+                  activeKey={activeKey}
+                  onNavChange={onNavChange}
+                  collapsed={collapsed}
+                  onNavigate={() => setFlyoutOpen(false)}
+                />
+              ))}
+            </ul>
+          </nav>
+        </>
+      )}
+
       {/* ── Main area ──────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-7">
+        <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-3 sm:px-7">
           {/* Left placeholder (can be used for breadcrumbs) */}
           <div />
 

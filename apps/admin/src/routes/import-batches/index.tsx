@@ -25,14 +25,14 @@ const DATA_TYPE_LABEL: Record<'job' | 'fair', string> = {
   fair: '招聘会',
 }
 
-const STATUS_FILTERS = ['全部', '待确认', '已确认', '已取消', '失败'] as const
+const STATUS_FILTERS = ['全部状态', '待确认', '已确认', '已取消', '失败'] as const
 const STATUS_FILTER_MAP: Record<string, BatchStatus | null> = {
-  全部: null, 待确认: 'pending', 已确认: 'confirmed', 已取消: 'cancelled', 失败: 'failed',
+  全部状态: null, 待确认: 'pending', 已确认: 'confirmed', 已取消: 'cancelled', 失败: 'failed',
 }
 
-const DATA_TYPE_FILTERS = ['全部', '岗位', '招聘会'] as const
+const DATA_TYPE_FILTERS = ['全部类型', '岗位', '招聘会'] as const
 const DATA_TYPE_FILTER_MAP: Record<string, 'job' | 'fair' | null> = {
-  全部: null, 岗位: 'job', 招聘会: 'fair',
+  全部类型: null, 岗位: 'job', 招聘会: 'fair',
 }
 
 function fmtDate(iso: string | null): string {
@@ -49,8 +49,8 @@ export default function ImportBatchesPage() {
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(false)
   const [search,      setSearch]      = useState('')
-  const [statusFlt,   setStatusFlt]   = useState('全部')
-  const [typeFlt,     setTypeFlt]     = useState('全部')
+  const [statusFlt,   setStatusFlt]   = useState('全部状态')
+  const [typeFlt,     setTypeFlt]     = useState('全部类型')
   const [page,        setPage]        = useState(1)
   const [pageSize,    setPageSize]    = useState(20)
   // 本页本来只读（没有导入 / 确认 / 撤回按钮）。托管关闭时如实说明导入已停止，
@@ -99,7 +99,7 @@ export default function ImportBatchesPage() {
   const paged  = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts: Record<string, number> = {
-    全部:   batches.length,
+    全部状态: batches.length,
     待确认: batches.filter((b) => b.status === 'pending').length,
     已确认: batches.filter((b) => b.status === 'confirmed').length,
     已取消: batches.filter((b) => b.status === 'cancelled').length,

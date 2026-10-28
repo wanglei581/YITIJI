@@ -13,4 +13,19 @@ test.describe('账号权限（mock 口径）', () => {
     await expect(page.getByText(/RBAC|UTF-8|字节/)).toHaveCount(0)
     await assertPageHonest(page, errors)
   })
+
+  test('演示模式保存新密码不发请求，并写明不执行', async ({ page }) => {
+    const calls: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/auth/password')) calls.push(request.url())
+    })
+    await injectPartnerAuth(page)
+    await gotoPartner(page, '/account', '账号')
+    await page.getByLabel('当前密码').fill('OldPassword1!')
+    await page.getByLabel('新密码', { exact: true }).fill('NewPassword2!')
+    await page.getByLabel('确认新密码').fill('NewPassword2!')
+    await page.getByRole('button', { name: '保存新密码' }).click()
+    await expect(page.getByRole('status').filter({ hasText: '演示模式不执行' })).toHaveText('演示模式不执行')
+    expect(calls).toEqual([])
+  })
 })
