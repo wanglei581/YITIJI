@@ -306,7 +306,7 @@ export function JobDetailPage() {
           扫码投递
         </button>
       }
-      primary={{ label: '去来源平台投递', onClick: openSourcePlatform, ariaDisabled: !sourceCanApply }}
+      primary={{ label: '去来源平台投递', onClick: () => { if (sourceCanApply) openSourcePlatform() }, ariaDisabled: !sourceCanApply }}
     >
       <div
         className="qx-scroll qx-job-detail-page"

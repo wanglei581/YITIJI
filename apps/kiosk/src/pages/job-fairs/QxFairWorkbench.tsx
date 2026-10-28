@@ -111,7 +111,7 @@ export function QxFairWorkbench({
 
   return (
     <QxTouchScreen
-      pageId="recruit"
+      page="recruit"
       stateId={`${screen}:${state}`}
       bodyClassName="qxt-body-scroll"
       band={

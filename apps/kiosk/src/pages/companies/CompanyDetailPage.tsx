@@ -127,7 +127,7 @@ export function CompanyDetailPage() {
           : { label: '重新加载', onClick: load, noArrow: true })
         : {
           label: '查看在招岗位',
-          onClick: () => { if (firstJob) navigate(`/jobs/${firstJob.id}`) },
+          onClick: () => { if (!sparse && firstJob) navigate(`/jobs/${firstJob.id}`) },
           ariaDisabled: sparse || !firstJob,
         }}
     >

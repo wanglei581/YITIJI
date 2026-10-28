@@ -47,7 +47,9 @@ const realCalls = [
   'getPrinters()',
   'getJobSources()',
   'getFairSources()',
-  'listFiles({ limit: 100 })',
+  'getFileLifecycleSummary()',
+  "memberFeedbackAdminApi.list({ category: 'ai_content' })",
+  "adminPrivacyRequestsService.list({ status: 'pending', limit: 100 })",
   'getAiUsage()',
   'getAuditLogs({ limit: 6, offset: 0 })',
   'adminOpsService.listPrintTasks({ page: 1, pageSize: 5 })',
@@ -62,10 +64,11 @@ check(
     !dashboard.includes('Promise.all([') &&
     loadersBlock.length > 0 &&
     realCalls.every((call) => count(loadersBlock, call) === 1) &&
+    !loadersBlock.includes('listFiles({ limit: 100 })') &&
     dashboard.includes("alertCount = alerts?.firingCount") &&
     dashboard.includes('BlockError') &&
-    dashboard.includes('数据源加载失败'),
-  'OPS-05: nine independent loaders, allSettled per-block degrade, firingCount for 处理告警(N)',
+    dashboard.includes('这类这次没读到'),
+  'OPS-05: independent loaders, allSettled per-block degrade, firingCount for 处理告警(N)',
 )
 
 check(
@@ -73,7 +76,7 @@ check(
     dashboard.includes('title="工作台数据加载失败"') &&
     dashboard.includes('onRetry={loadAll}') &&
     dashboard.includes('打印任务加载失败') &&
-    dashboard.includes('实时告警加载失败'),
+    dashboard.includes('这类这次没读到'),
   'full-page error only when every block failed; each block has its own error + retry',
 )
 
@@ -101,11 +104,12 @@ check(
 )
 
 check(
-  dashboard.includes('if (nums.length === 0) return null') &&
-    dashboard.includes('{toner !== null && (') &&
-    dashboard.includes('{paper !== null && (') &&
+  dashboard.includes('这类这次没读到') &&
+    // 纸张、墨粉只写「不足」，不画百分比（直接查渲染里没有把读数接上 %）
+    !/(tonerLevel|paperTrayLevel|paperLevel|avgLevel)[^\n]{0,60}%/.test(stripComments(dashboard)) &&
+    !dashboard.includes('if (nums.length === 0) return null') &&
     !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)),
-  'unknown metrics stay unknown and the dashboard adds no amount or revenue KPI',
+  'a failed block says it was not read; paper and toner are not drawn as percents; no amount or revenue KPI',
 )
 
 const expectedAlertCtaClass =
@@ -220,9 +224,10 @@ check(
 
 const paidPendingMeta = block(alertsPage, '  paid_pending_file_unavailable: {', '\n  },')
 // 工作台只扫告警相关代码：审计动作标签里合法地出现 file.get_signed_url。
-const dashboardAlertCode =
-  readFileSync(new URL('../src/routes/dashboard/dashboardRows.ts', import.meta.url), 'utf8') +
-  block(dashboard, '<SectionCard title="实时告警"', '</SectionCard>')
+const dashboardAlertCode = readFileSync(
+  new URL('../src/routes/dashboard/dashboardRows.ts', import.meta.url),
+  'utf8',
+)
 const alertSurfaces = stripComments(alertsPage) + stripComments(dashboardAlertCode) + stripComments(adminOps)
 check(
   dashboardAlertCode.includes('buildAlertRows') &&

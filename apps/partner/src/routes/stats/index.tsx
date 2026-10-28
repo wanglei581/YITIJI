@@ -331,6 +331,13 @@ export default function StatsPage() {
       // 周期只作用于同步概况；托管关闭时那一段不展示，选择器也就不给，免得点了没有任何变化。
       actions={recruitmentHosting ? <PeriodSelector value={period} onChange={setPeriod} /> : undefined}
     >
+      {!recruitmentHosting && (
+        <div className="mb-4">
+          <Link to="/terminals?tab=delivery&section=reports" className="inline-flex min-h-11 items-center rounded-lg border border-neutral-200 bg-surface px-4 text-sm font-semibold text-neutral-800 hover:bg-neutral-50">
+            月报与核对
+          </Link>
+        </div>
+      )}
       {state === 'loading' ? (
         <LoadingState className="py-20" />
       ) : state === 'error' || !data ? (

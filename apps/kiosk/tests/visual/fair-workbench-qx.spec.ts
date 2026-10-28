@@ -635,8 +635,28 @@ test('来源要素缺项：详情「扫码预约」同样 fail-closed @kiosk', a
   // 所以这一条覆盖的是 FAIR_BOOKING_LINK_UNAVAILABLE_REASON 而非 'job_fair' 参数。
   await expectFairWordedBlockReason(page, 'p.why')
   await book.click({ force: true })
+  // 底栏主按钮是 ariaDisabled：只写 aria-disabled、不写原生 disabled，点击照常交给页面的 onClick。
+  // 一体机是 1080×1920 舞台等比缩放，force 点击的坐标不一定落在按钮上，所以再直接派发一次 click，
+  // 保证处理函数确实被调到，「点了不出码」才不是空断言。
+  await book.dispatchEvent('click')
   await expect(page.getByRole('dialog', { name: '扫码前往来源平台预约' })).toHaveCount(0)
+  await expect(page.getByTestId('fair-qr-slot')).toHaveCount(0)
   await shot(page, 'qx-fair-detail-source-blocked')
+})
+
+// 阳性对照：与上一条配对。来源四要素齐全时，详情底栏同一颗「扫码预约」点了要真的出码；
+// 否则上一条里「点了没出码」可能只是按钮根本接不到点击。
+test('来源要素齐全：详情「扫码预约」点了出码，窗口不代预约 @kiosk', async ({ page, api }) => {
+  registerFairApi(api)
+  await page.goto(`/job-fairs/${FAIR_ID}`)
+  await expectQxWorkbench(page, 'detail', 'detail')
+  const book = page.getByRole('button', { name: '扫码预约' })
+  await expect(book).not.toHaveAttribute('aria-disabled', 'true')
+  await book.dispatchEvent('click')
+  const overlay = page.getByRole('dialog', { name: '扫码前往来源平台预约' })
+  await expect(overlay).toBeVisible()
+  await expect(overlay).toContainText('本系统不参与活动报名流程、不接收简历')
+  await expect(page.getByTestId('fair-qr-slot')).toBeVisible()
 })
 
 test('来源要素缺项：到场指引「扫码签到」不出码 @kiosk', async ({ page, api }) => {

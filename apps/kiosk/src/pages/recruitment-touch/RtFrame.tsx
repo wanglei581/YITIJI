@@ -48,7 +48,7 @@ export function RtFrame({
   const navigate = useNavigate()
   return (
     <QxTouchScreen
-      pageId="recruit"
+      page="recruit"
       testId={testId}
       stateId={stateId}
       bodyClassName={bodyClassName}

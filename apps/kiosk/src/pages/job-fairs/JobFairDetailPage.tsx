@@ -228,7 +228,7 @@ export function JobFairDetailPage() {
         : isEnded
           ? { label: '看还在进行的场次', onClick: () => navigate('/job-fairs') }
           : readyActions
-            ? { label: '扫码预约', onClick: openBookingQr, ariaDisabled: !bookTrust.ok }
+            ? { label: '扫码预约', onClick: () => { if (bookTrust.ok) openBookingQr() }, ariaDisabled: !bookTrust.ok }
             : undefined}
     >
       {qr?.kind === 'book' && fair ? (
