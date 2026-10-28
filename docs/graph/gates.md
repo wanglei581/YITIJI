@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1880 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1881 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -1124,7 +1124,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/partner/src/</code> — 50 个文件</summary>
+<summary><code>apps/partner/src/</code> — 51 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -1135,6 +1135,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/partner/src/routes/account/index.tsx` | `verify-console-privacy-copy.mjs`<br/>`verify-honest-placeholders.mjs`<br/>`verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/companies/CompaniesTable.tsx` | `verify-partner-refresh-safe.mjs` |
 | `apps/partner/src/routes/companies/index.tsx` | `verify-partner-refresh-safe.mjs` |
+| `apps/partner/src/routes/dashboard/PartnerAiServices.tsx` | `verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/dashboard/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-partner-stats-contract.mjs` |
 | `apps/partner/src/routes/fairs/index.tsx` | `verify-partner-refresh-safe.mjs`<br/>`verify-jobfair-checkin.ts` |
 | `apps/partner/src/routes/index.tsx` | `verify-console-screen-details.mjs`<br/>`frontend.mjs` |

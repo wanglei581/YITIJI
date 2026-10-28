@@ -222,7 +222,7 @@ mustNotContain(
 mustContain(DASHBOARD, ['<PartnerAiServices />'], 'B10. 工作台独立显示 AI 服务情况')
 mustContain(
   'src/routes/dashboard/PartnerAiServices.tsx',
-  ["fetchPartnerUsage('7d')", '正在读取 AI 服务情况', 'AI 服务情况这次没读到', '演示模式不显示 AI 服务情况', '少于 5 次，暂不显示具体数字', 'min-h-11', 'min-w-11', '只统计本机构终端上成功完成的 AI 简历优化和模拟面试'],
+  ["fetchPartnerUsage('7d')", '正在读取 AI 服务情况', 'AI 服务情况这次没读到', '演示模式不显示 AI 服务情况', '少于 5 ${unit}，暂不显示具体数字', 'min-h-11', 'min-w-11', '只统计本机构终端上成功完成的 AI 简历优化和模拟面试'],
   'B10b. AI 服务读数和失败、演示、小样本状态',
 )
 

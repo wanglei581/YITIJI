@@ -4458,6 +4458,7 @@
         "handler": "UsageRangeQueryDto.getAdminUsage",
         "method": "GET",
         "models": [
+          "AiServiceFact",
           "AiServiceLog",
           "AuditLog",
           "BrowseLog",
@@ -10828,6 +10829,7 @@
         "handler": "UsageRangeQueryDto.getPartnerUsage",
         "method": "GET",
         "models": [
+          "AiServiceFact",
           "AiServiceLog",
           "AuditLog",
           "BrowseLog",
@@ -16547,7 +16549,7 @@
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
-      "reachableFileCount": 92,
+      "reachableFileCount": 93,
       "root": "apps/partner",
       "router": "apps/partner/src/routes/index.tsx",
       "routes": [
@@ -17062,7 +17064,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 93
+      "sourceFileCount": 94
     }
   },
   "dataModel": {
@@ -17232,7 +17234,10 @@
         "fieldCount": 6,
         "name": "AiServiceFact",
         "relations": [],
-        "usedBy": []
+        "usedBy": [
+          "services/api/src/ai/usage/ai-service-fact.ts",
+          "services/api/src/console-screen/console-screen.partner-ai.ts"
+        ]
       },
       {
         "fieldCount": 13,
@@ -22443,6 +22448,9 @@
     ],
     "apps/partner/src/routes/companies/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs"
+    ],
+    "apps/partner/src/routes/dashboard/PartnerAiServices.tsx": [
+      "apps/partner/scripts/verify-partner-stats-contract.mjs"
     ],
     "apps/partner/src/routes/dashboard/index.tsx": [
       "apps/partner/scripts/verify-partner-refresh-safe.mjs",
@@ -32975,15 +32983,14 @@
     },
     {
       "asserts": {
-        "absent": [
-          "src/routes/dashboard/PartnerAiServices.tsx"
-        ],
+        "absent": [],
         "dirs": [],
         "files": [
           "apps/admin/scripts/verify-honest-placeholders.mjs",
           "apps/partner/src/layouts/partnerNav.ts",
           "apps/partner/src/lib/csv.ts",
           "apps/partner/src/routes/account/index.tsx",
+          "apps/partner/src/routes/dashboard/PartnerAiServices.tsx",
           "apps/partner/src/routes/dashboard/index.tsx",
           "apps/partner/src/routes/stats/index.tsx",
           "apps/partner/src/routes/terminals/TerminalOpsCards.tsx",

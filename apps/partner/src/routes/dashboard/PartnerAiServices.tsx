@@ -14,7 +14,7 @@ export function PartnerAiServices() {
   const metric = result?.kind === 'ok' ? result.usage.metrics.partnerAiServices : undefined
   const failed = result && result.kind !== 'mock' && (result.kind !== 'ok' || !metric?.available)
   const line = (label: string, count: number | null, unit: string) =>
-    count === null ? `${label}：少于 5 次，暂不显示具体数字` : `${label}：${formatCount(count)} ${unit}`
+    count === null ? `${label}：少于 5 ${unit}，暂不显示具体数字` : `${label}：${formatCount(count)} ${unit}`
   return (
     <div className="space-y-1 text-sm text-neutral-700">
       {!result && <p>正在读取 AI 服务情况</p>}

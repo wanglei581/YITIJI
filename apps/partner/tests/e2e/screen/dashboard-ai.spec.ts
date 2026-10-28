@@ -18,6 +18,11 @@ test('工作台 AI 服务：加载、小样本、零与正常计数', async ({ p
   await page.reload()
   await expect(page.getByText('AI 简历优化：5 次')).toBeVisible()
   await expect(page.getByText('AI 模拟面试：8 场')).toBeVisible()
+  // 被隐藏时量词跟着服务走：模拟面试写「场」
+  await serve(page, () => bare(snapshot(value(0, null))))
+  await page.reload()
+  await expect(page.getByText('AI 简历优化：0 次')).toBeVisible()
+  await expect(page.getByText('AI 模拟面试：少于 5 场，暂不显示具体数字')).toBeVisible()
 })
 
 test('工作台 AI 服务：切片不可用可重试；请求失败也可重试', async ({ page }) => {
