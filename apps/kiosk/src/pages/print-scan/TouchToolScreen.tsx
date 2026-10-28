@@ -6,6 +6,7 @@ import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import type { ReactNode } from 'react'
 import { AiDownNote } from './AiDownNote'
+import { askDraftOf } from './askDraft'
 import './styles/tool-touch.css'
 import './styles/tool-fs.css'
 
@@ -45,7 +46,7 @@ export function TouchToolScreen({
   children: ReactNode
 }) {
   const navigate = useNavigate()
-  const ask: QxTouchAsk = { label: askLabel, draft: askLabel, voice: true }
+  const ask: QxTouchAsk = { label: askLabel, draft: askDraftOf(askLabel), voice: true }
   return (
     <QxTouchScreen
       className="scan-touch"

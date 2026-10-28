@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { AiDownNote } from '../print-scan/AiDownNote'
+import { askDraftOf } from '../print-scan/askDraft'
 import { UsbArt } from '../print-scan/ToolArt'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
@@ -122,6 +123,8 @@ export function ScanWorkbenchShell({
   const navigate = useNavigate()
   const { getToken } = useAuth()
   const askLabel = scanAskLabel(page, state)
+  /* 带去顾问页的草稿：不带按钮上的「问小青：」前缀，是一句自然问句（B1）。 */
+  const askDraft = askDraftOf(askLabel)
   /**
    * 离开整条扫描流程。四个阶段、四个出口（顶栏返回 + 底栏三项主导航）共用这一条。
    *
@@ -179,12 +182,12 @@ export function ScanWorkbenchShell({
           }
           ask={{
             label: askLabel,
-            draft: askLabel,
+            draft: askDraft,
             voice: true,
             /* 问小青也是「离开整条扫描流程」：先记草稿，再走 leaveScanFlow 撤服务端、清本机登记，
              * 最后返回 false 让底栏不再自己 navigate。 */
             beforeAsk: () => {
-              rememberAssistantDraft(askLabel)
+              rememberAssistantDraft(askDraft)
               leaveScanFlow('/assistant')
               return false
             },
@@ -310,6 +313,9 @@ export function ScanTypeCards({
     <div className="fs-types" role="radiogroup" aria-label="扫描类型">
       {SCAN_TYPE_OPTIONS.map((option) => {
         const on = selected === option.type
+        const base = `scan-type-${option.type}`
+        /* 单选卡的读屏名只取标题；说明与角标进 aria-describedby，读屏能听到「支持 AI 简历识别」「敏感文件 · 自动清理」。
+           不再同时写 aria-pressed（radio 上是非法组合）和盖住整张卡的 aria-label（B2）。 */
         return (
           <button
             key={option.type}
@@ -317,14 +323,14 @@ export function ScanTypeCards({
             className="fs-type"
             role="radio"
             aria-checked={on}
-            aria-pressed={on}
-            aria-label={`选择扫描类型：${option.label}`}
+            aria-labelledby={`${base}-title`}
+            aria-describedby={`${base}-desc ${base}-chips`}
             data-testid={`scan-workbench-type-${option.type}`}
             onClick={() => onPick(option.type)}
           >
-            <b>{option.label}</b>
-            <span className="fs-sub">{option.description}</span>
-            <span className="sx-chips">
+            <b id={`${base}-title`}>{option.label}</b>
+            <span id={`${base}-desc`} className="fs-sub">{option.description}</span>
+            <span id={`${base}-chips`} className="sx-chips">
               {option.chips.map((chip) => (
                 <span key={chip.label} className={`sx-chip${chip.tone === 'warn' ? ' is-warn' : ''}`}>{chip.label}</span>
               ))}

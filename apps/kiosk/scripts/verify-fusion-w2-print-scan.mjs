@@ -1359,12 +1359,41 @@ for (const [path, labels] of ASK_LABELS) {
     assert.ok(code.includes(label), `${path} 缺稿上的底栏问句「${label}」：AI 元素一个不许少，也不许并成一句通用话`)
   }
 }
-// 问小青按钮本身：带麦克风（voice），label 与 draft 同一句；扫描壳里还要先撤销会话再走（见 scan-session-truth）。
+// 问小青按钮本身：带麦克风（voice）；带去顾问页的草稿取自 askDraftOf(label)；扫描壳里还要先撤销会话再走（见 scan-session-truth）。
 for (const path of ['src/pages/scan/ScanWorkbenchChrome.tsx', 'src/pages/print-scan/TouchToolScreen.tsx']) {
   const code = read(path)
-  assert.match(code, /draft: askLabel,[\s\S]{0,120}?voice: true|draft: askLabel, voice: true/, `${path} 的问小青必须 draft 与 label 同一句且带麦克风`)
+  assert.match(code, /draft: askDraft,[\s\S]{0,120}?voice: true|draft: askDraftOf\(askLabel\), voice: true/, `${path} 的问小青必须带麦克风，draft 取自 askDraftOf(label)，不再与 label 同一句`)
   assert.match(code, /<AiDownNote \/>/, `${path} 正文最上面必须有 AI 状态（小青接不上时写实话）`)
 }
+/* 带去顾问页的草稿（审查意见 B1）：每句一个 draft。此前 draft 与 label 同一句，用户点过去，顾问页输入框里是
+ * 「问小青：扫描件接下来呢」——把按钮名带进了对话框。其余各包都是 label「问小青：…」+ 一句不带前缀的自然问句。
+ * 真把 askDraftOf 取出来跑一遍：每个 label 的草稿必须非空、不以「问小青」开头、与 label 不同；现场无人值守，草稿里不许出现「工作人员」「联系」。 */
+const askDraftJs = ts.transpileModule(read('src/pages/print-scan/askDraft.ts'), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const { askDraftOf } = await import(`data:text/javascript;base64,${Buffer.from(askDraftJs).toString('base64')}`)
+for (const [path, labels] of ASK_LABELS) {
+  for (const label of labels) {
+    const draft = askDraftOf(label)
+    assert.ok(typeof draft === 'string' && draft.trim().length > 0, `${path}「${label}」的草稿不能为空`)
+    assert.ok(!/^问小青/.test(draft), `${path}「${label}」的草稿不能以「问小青」开头：那是按钮名，不是问句`)
+    assert.notEqual(draft, label, `${path}「${label}」的草稿不能与按钮上的字同一句`)
+    assert.doesNotMatch(draft, /工作人员|联系/, `${path}「${label}」的草稿里不许出现「工作人员」「联系」（现场无人值守）`)
+  }
+}
+/* 类型卡的读屏语义（审查意见 B2）：单选卡 role="radio" 上不许同时写 aria-pressed（非法组合，读屏会把状态混报成
+ * 「已选中并已按下」），也不许用盖住整张卡的 aria-label（读屏只念「选择扫描类型：简历扫描」，听不到说明和
+ * 「支持 AI 简历识别」「敏感文件 · 自动清理」角标）：标题走 aria-labelledby，说明与角标走 aria-describedby。 */
+const scanChromeSource = read('src/pages/scan/ScanWorkbenchChrome.tsx')
+const typeCardsStart = scanChromeSource.indexOf('export function ScanTypeCards')
+assert.ok(typeCardsStart >= 0, 'ScanTypeCards 还在')
+const typeCardsEnd = scanChromeSource.indexOf('\nexport function ', typeCardsStart + 10)
+const typeCardsBlock = scanChromeSource.slice(typeCardsStart, typeCardsEnd < 0 ? undefined : typeCardsEnd)
+assert.match(typeCardsBlock, /role="radio"/, '类型卡是单选')
+assert.doesNotMatch(typeCardsBlock, /aria-pressed=/, '类型卡 role="radio" 上不许同时写 aria-pressed')
+assert.doesNotMatch(typeCardsBlock, /aria-label=\{/, '类型卡不许用 aria-label 盖住整张卡的读屏内容')
+assert.match(typeCardsBlock, /aria-labelledby=/, '类型卡的读屏名取标题（aria-labelledby）')
+assert.match(typeCardsBlock, /aria-describedby=/, '类型卡的说明与角标走 aria-describedby')
 const aiDownProbe = read('src/pages/print-scan/useXiaoqingAvailability.ts')
 const aiDownNote = aiDownProbe + read('src/pages/print-scan/AiDownNote.tsx')
 assert.match(aiDownNote, /\/advisor\/availability/, 'AI 状态只认服务端那个真探测，不靠猜')

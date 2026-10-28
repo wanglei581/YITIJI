@@ -567,7 +567,7 @@ assert.match(
  * 少了 beforeAsk，底栏默认会「记草稿 + navigate('/assistant')」，服务端任务和本机登记都留在原地。 */
 assert.match(
   scanChrome,
-  /beforeAsk: \(\) => \{\s*\n\s*rememberAssistantDraft\(askLabel\)\s*\n\s*leaveScanFlow\('\/assistant'\)\s*\n\s*return false\s*\n\s*\},/,
+  /beforeAsk: \(\) => \{\s*\n\s*rememberAssistantDraft\(askDraft\)\s*\n\s*leaveScanFlow\('\/assistant'\)\s*\n\s*return false\s*\n\s*\},/,
   '问小青必须走 beforeAsk：记草稿 → leaveScanFlow(\'/assistant\') → return false',
 )
 

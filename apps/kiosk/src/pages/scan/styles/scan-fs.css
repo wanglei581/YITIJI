@@ -82,17 +82,17 @@
   color: var(--qxt-clay-ink);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] {
   background: var(--qx-deep, var(--qxt-deep-2));
   color: var(--qxt-cream);
   border-color: var(--qx-deep, var(--qxt-deep-2));
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .fs-sub {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .fs-sub {
   color: var(--qxt-mint);
 }
 
-[data-qx-page='scan-workbench'] .fs-type[aria-pressed='true'] .sx-chip {
+[data-qx-page='scan-workbench'] .fs-type[aria-checked='true'] .sx-chip {
   background: var(--qxt-chip-ghost);
   color: var(--qxt-cream);
 }
