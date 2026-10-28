@@ -107,6 +107,14 @@ async function main(): Promise<void> {
   const flip = (buffer: Buffer, at: number): Buffer => { const b = Buffer.from(buffer); b[at]! ^= 0xff; return b }
   rejects('PNG 头部被改一个字节（块校验不过）', flip(base, 40), 'BRAND_LOGO_CORRUPT')
   rejects('PNG 数据区被改一个字节（结构合法，只有块校验 CRC 能发现）', flip(base, 45), 'BRAND_LOGO_CORRUPT')
+  // 只有 CRC 字段本身不对、块内容是好的：靠别的检查（解压、块结构）发现不了，只有核块 CRC 能挡
+  const baseChunks = pngChunks(base)
+  const flipCrcOf = (index: number): Buffer =>
+    Buffer.concat([PNG_SIG, ...baseChunks.map((chunk, i) => (i === index ? flip(chunk.raw, chunk.raw.length - 1) : chunk.raw))])
+  rejects('只有 IHDR 的 CRC 字段被改（数据本身没动）', flipCrcOf(0), 'BRAND_LOGO_CORRUPT')
+  rejects('只有 IDAT 的 CRC 字段被改（压缩流是完好的）', flipCrcOf(1), 'BRAND_LOGO_CORRUPT')
+  rejects('只有 IEND 的 CRC 字段被改', flipCrcOf(baseChunks.length - 1), 'BRAND_LOGO_CORRUPT')
+  rejects('辅助块（tEXt）的 CRC 不对：丢掉也不能放行一个校验不过的文件', buildPng(64, 64, { afterIhdr: [flip(pngChunk('tEXt', Buffer.from('a\0b')), 12 + 2)] }), 'BRAND_LOGO_CORRUPT')
   rejects('PNG 被截断', base.subarray(0, 60), 'BRAND_LOGO_CORRUPT')
   rejects('PNG 结尾夹带脚本（IEND 之后还有字节）', Buffer.concat([base, Buffer.from('<script>alert(1)</script>')]), 'BRAND_LOGO_CORRUPT')
   rejects('没有 IEND', pngFromSpec({ width: 64, height: 64, iend: false }), 'BRAND_LOGO_CORRUPT')
