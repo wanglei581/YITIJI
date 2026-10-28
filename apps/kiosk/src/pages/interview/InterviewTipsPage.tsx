@@ -177,7 +177,7 @@ export function InterviewTipsPage({ onGoStage }: { onGoStage?: (stage: Interview
         <QxTouchDock
           onBack={() => navigate('/interview-service')}
           ask={{ label: '问小青：面试前先准备什么', draft: '我想准备一场面试。请根据公开的准备方法告诉我先做哪几步，不要假装已经看过我的简历。' }}
-          primarySlot={gate ? (
+          primaryNode={gate ? (
             <button
               type="button"
               className="qxt-btn qxt-btn-pri"
