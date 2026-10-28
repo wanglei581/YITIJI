@@ -657,6 +657,23 @@ export const adminMockAdapter = {
   async getPrinters(): Promise<AdminPrintersResponse> {
     await delay()
     const terminals = (await this.getTerminals()).terminals
+    const scenario = new URLSearchParams(window.location.search).get('mock:printerStatus')
+    if (scenario === 'empty') return { printers: [] }
+    // 与线上真实形状一致：终端只报总体状态，纸张只有「偏低 / 空」报警，墨粉没有余量（恒为空）
+    const shapes = {
+      offline: { status: 'offline', printerStatus: null, paperStatus: null, fault: '打印机状态未上报' },
+      low: { status: 'online', printerStatus: 'low_paper', paperStatus: 'low', fault: '纸张或墨粉不足，可打印、需补充' },
+      normal: { status: 'online', printerStatus: 'ready', paperStatus: null, fault: null },
+    } as const
+    if (scenario === 'offline' || scenario === 'low' || scenario === 'normal') {
+      const base = terminals[0]
+      if (base) return { printers: [{
+        id: `printer:${base.terminalCode}`, terminalId: base.id, terminalCode: base.terminalCode,
+        name: `${base.terminalCode} 打印机`, model: null, serialNumber: null,
+        ...shapes[scenario], currentTask: null, tonerLevel: null, paperTrayLevel: null,
+        lastHeartbeatAt: base.lastHeartbeatAt, lastSyncAt: base.lastHeartbeatAt,
+      }] }
+    }
     return {
       printers: terminals.map((t): AdminPrinterRecord => {
         const status = toMockPrinterStatus(t.online, t.printerStatus)

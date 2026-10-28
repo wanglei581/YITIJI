@@ -3,6 +3,7 @@ import '../../../styles/qingxu/tokens.css' /* 触屏件也用 --qx-* 底色与�
 import '../../../styles/qingxu/tokens-touch.css'
 import '../../../styles/qingxu/touch.css'
 import '../../../styles/qingxu/touch-hero.css'
+import '../../../styles/qingxu/touch-legacy-parts.css' /* 旧共享件（选择弹窗、扫码面板、U 盘面板）在触屏屏里的补样式 */
 
 export type QxTouchMotion = 'enter' | 'back' | 'leave' | 'none'
 
