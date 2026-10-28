@@ -305,6 +305,16 @@
 }
 .qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
 
+/* 岗位页 AI 入口的登录提示：开始推荐 / AI 岗位解读下面一行「要先登录」，不抢按钮的位置。 */
+.qxt-screen[data-qx-page='recruit'] .qx-ai-login-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--qxt-ink-2);
+}
+
 /* 状态页：状态卡保持内容高，紧跟其后的去处排成两列大块，撑满剩下的高度；块与块之间留 12px 缝，
    样子和 RtFill 的整块磁贴一致。页里已经有 RtFill 时不再拉伸，免得两处抢同一块余量。 */
 .qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) {
@@ -357,7 +367,9 @@
   }
   .qxt-screen[data-qx-page='recruit'] .qxt-band { padding-left: 16px; padding-right: 16px; }
   .qxt-screen[data-qx-page='recruit'] .qxt-body { padding-left: 16px; padding-right: 16px; }
-  .qxt-screen[data-qx-page='recruit'] .qxt-dock { padding-left: 12px; padding-right: 12px; }
+  /* 手机宽度放不下一行：问小青独占第一行，返回与本页操作排第二行。一体机 1080 宽仍是单行。 */
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock { padding-left: 12px; padding-right: 12px; flex-wrap: wrap; }
+  .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { flex: 1 1 100%; order: -1; }
   .qxt-screen[data-qx-page='recruit'] .qxt-btn-pri { min-width: 0; max-width: 100%; }
   .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn,
   .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { max-width: 100%; }

@@ -15,6 +15,7 @@ import {
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { getTerminalId } from '../../services/api/screensaver'
 import { aiDeclarationDeclineMessage } from '../../ai/aiDeclarationErrors'
+import { isAiOutage } from '../../ai/aiOutage'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { evaluateJobSourceTrust, sourceTrustReason } from './utils/sourceTrust'
@@ -347,6 +348,7 @@ export function JobDetailPage() {
         onViewCompany={viewCompany}
         onExplainAi={() => void startExplain()}
         onMatchAi={() => void startMatch()}
+        needLogin={!getToken()}
         // 这里原来传 `state: { source:'job_detail', jobId, jobTitle }`，三个都没人读：
         // `/print/upload` 的 source 取自 **query**（`searchParams.get('source')`）而不是 state，
         // 且取值只认 'resume' | 'document'，'job_detail' 不是合法值；jobId / jobTitle
@@ -361,7 +363,7 @@ export function JobDetailPage() {
           error={aiError}
           explanation={explanation}
           match={matchResult}
-          onRetry={() => {
+          onRetry={aiError === JOB_AI_OUTAGE_TEXT ? undefined : () => {
             if (pendingAiAction === 'match') void startMatch()
             else void startExplain()
           }}
@@ -377,15 +379,20 @@ export function JobDetailPage() {
   )
 }
 
+const JOB_AI_OUTAGE_TEXT = 'AI 暂时无法使用。岗位原文和扫码投递不受影响，你可以自己看职责和要求，或扫码到来源平台。'
+const JOB_AI_RETRY_TEXT = 'AI 这次没有生成出来。岗位原文和扫码投递不受影响，你可以自己看职责和要求，或扫码到来源平台，也可以再试一次。'
+
 function formatJobAiError(err: unknown): string {
   const declined = aiDeclarationDeclineMessage(err)
   if (declined) return declined
+  // 整条 AI 能力不可用（未配置、连不上、后台暂停等，重试不会变好）：照稿说清哪些不受影响，不再引导重试。
+  if (isAiOutage(err)) return JOB_AI_OUTAGE_TEXT
   if (err instanceof ApiHttpError) {
     if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
     if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return `岗位 AI 配额服务暂不可用。${helpNeededLine()}`
     if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
-    return err.message
   }
-  return recruitErrorText(err, 'AI 辅助暂时不可用，请稍后重试。')
+  // 其余是「这一次没成」：保留重试入口，不拿服务端原话上屏。
+  return recruitErrorText(err, JOB_AI_RETRY_TEXT)
 }

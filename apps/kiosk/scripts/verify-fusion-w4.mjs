@@ -289,6 +289,33 @@ check('recruitment copy follows the draft', () => {
   }
   assert.match(campusInsights, /navigate\('\/job-fairs\?audience=campus'\)/, '校招数据页的「查看招聘会」去校园场次')
 })
+// 产品负责人 10/28：「AI 和这些功能结合在一起」。稿上本包每屏的 AI 元素一个不许少：
+// 底栏问小青（逐屏文字由 recruit-touch-metrics.spec.ts 钉）、岗位 AI 入口与登录提示、AI 底句、
+// 校园 AI 求职页签、AI 参会准备 / 回顾、AI 参会准备单；AI 整条不可用时结果区写「AI 暂时无法使用」且不再给重试。
+check('recruitment screens keep the draft AI elements and handle AI-down honestly', () => {
+  const social = read('src/pages/recruitment-touch/SocialHubPage.tsx')
+  assert.ok(social.includes("title: '岗位匹配参考'") && social.includes("title: '问 AI 顾问'"), '社会招聘台两扇 AI 门')
+  const jobsChrome = read('src/pages/jobs/components/JobsQxChrome.tsx')
+  assert.ok(jobsChrome.includes('用我的简历智能推荐') && jobsChrome.includes('开始推荐') && jobsChrome.includes('要先登录'), '岗位列表 AI 推荐入口与登录提示')
+  const jobSections = read('src/pages/jobs/components/JobDetailSections.tsx')
+  assert.ok(jobSections.includes('AI岗位解读') && jobSections.includes('岗位匹配参考'), '岗位详情两个 AI 入口')
+  assert.ok((jobSections.match(/要先登录/g) ?? []).length >= 2, '岗位详情两个 AI 入口登录前写「要先登录」')
+  assert.ok(jobSections.includes('AI_LABEL_COPY.BASE'), '岗位详情 AI 段用标准底句')
+  const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+  assert.ok(campusTabs.includes('AI_LABEL_COPY.BASE') && campusTabs.includes('先看这几家再决定练什么'), '校园 AI 求职页签：AI 底句与先看参展企业')
+  for (const title of ['AI简历诊断', 'AI模拟面试', 'AI简历优化', '岗位信息参考']) {
+    assert.ok(campusTabs.includes(`title="${title}"`), `校园 AI 求职页签入口：${title}`)
+  }
+  const detailSections = read('src/pages/job-fairs/components/FairDetailSections.tsx')
+  assert.ok(detailSections.includes("'AI参会回顾'") && detailSections.includes("'AI 参会准备清单'"), '招聘会详情：AI 参会准备 / 回顾入口')
+  const visitPlan = read('src/pages/job-fairs/FairVisitPlanPage.tsx')
+  assert.ok(visitPlan.includes("title: 'AI参会准备单'") && visitPlan.includes('isAiOutage('), 'AI 参会准备单与能力级不可用判定')
+  for (const [rel, constant] of [['src/pages/jobs/JobsPage.tsx', 'JOBS_AI_OUTAGE_TEXT'], ['src/pages/jobs/JobDetailPage.tsx', 'JOB_AI_OUTAGE_TEXT']]) {
+    const source = read(rel)
+    assert.ok(source.includes('isAiOutage(err)') && source.includes(`'AI 暂时无法使用。`), `${rel}: AI 整条不可用写「AI 暂时无法使用」`)
+    assert.ok(source.includes(`onRetry={aiError === ${constant} ? undefined :`), `${rel}: AI 整条不可用时不再给重试`)
+  }
+})
 // 旧页的正向锚点是按钮文案「扫码打开来源平台」；新页不再有「先点再出码」这一步，出口就是二维码本身，
 // 正向锚点换成：二维码由 SourceUrlQr 按渠道网址生成 + 二维码下的来源说明逐字固定。反向判据一条不少，
 // 另加一条：页面里不得出现任何打开外部网页的写法（一体机只给二维码，不给可点的外链）。

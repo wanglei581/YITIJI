@@ -20409,6 +20409,7 @@
       "services/api/scripts/verify-activity-logs.ts"
     ],
     "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-jobfairs-terminal-priority.mjs",
@@ -20428,6 +20429,7 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
       "apps/kiosk/scripts/verify-jobfair-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs"
@@ -20482,6 +20484,7 @@
       "services/api/scripts/verify-job-headcount.ts"
     ],
     "apps/kiosk/src/pages/jobs/components/JobsQxChrome.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-kiosk-ai-declaration.mjs"
     ],
     "apps/kiosk/src/pages/jobs/components/ResumeSelectModal.tsx": [
@@ -21242,6 +21245,9 @@
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
+    "apps/kiosk/src/pages/recruitment-touch/RecruitTouchFrame.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs"
+    ],
     "apps/kiosk/src/pages/recruitment-touch/RtFrame.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
@@ -21252,6 +21258,7 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
     "apps/kiosk/src/pages/recruitment-touch/SocialHubPage.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
@@ -29889,12 +29896,15 @@
           "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/QxFairWorkbench.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/FairDetailSections.tsx",
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
           "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
           "apps/kiosk/src/pages/jobs/JobsPage.tsx",
           "apps/kiosk/src/pages/jobs/components/JobDetailSections.tsx",
+          "apps/kiosk/src/pages/jobs/components/JobsQxChrome.tsx",
           "apps/kiosk/src/pages/jobs/components/W4Presentation.tsx",
           "apps/kiosk/src/pages/jobs/styles/job-detail-qx.css",
           "apps/kiosk/src/pages/jobs/styles/jobs-list-qx.css",
@@ -29903,9 +29913,11 @@
           "apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx",
           "apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx",
           "apps/kiosk/src/pages/placeholders/CampusWelcomePage.tsx",
+          "apps/kiosk/src/pages/recruitment-touch/RecruitTouchFrame.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtFrame.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtHelpLine.tsx",
           "apps/kiosk/src/pages/recruitment-touch/RtRibbon.tsx",
+          "apps/kiosk/src/pages/recruitment-touch/SocialHubPage.tsx",
           "apps/kiosk/src/pages/recruitment-touch/recruitErrorText.ts",
           "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx",

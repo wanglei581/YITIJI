@@ -3,7 +3,7 @@ import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
 import { helpNeededLine } from '../../../copy/unattendedCopy'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 
-export function JobsQxAiEntry({ onStart }: { onStart: () => void }) {
+export function JobsQxAiEntry({ onStart, needLogin = false }: { onStart: () => void; needLogin?: boolean }) {
   return (
     <section className="qx-card qx-jobs-ai" data-live="true">
       <span className="qx-jobs-ai-icon"><SparklesIcon aria-hidden="true" /></span>
@@ -13,6 +13,7 @@ export function JobsQxAiEntry({ onStart }: { onStart: () => void }) {
       </span>
       <span className="qx-ai-declaration-slot">
         <button type="button" className="qx-btn" data-variant="teal" onClick={onStart}>开始推荐</button>
+        {needLogin ? <span className="qx-ai-login-hint" data-testid="jobs-ai-login-hint">要先登录</span> : null}
         <AiDeclarationNote />
       </span>
     </section>

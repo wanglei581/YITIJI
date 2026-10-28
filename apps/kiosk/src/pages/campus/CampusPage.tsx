@@ -448,7 +448,7 @@ export function CampusPage() {
         {tab === 'map' && (
           <MapTab fair={fair} zones={zones} navUrl={navUrl} onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })} />
         )}
-        {tab === 'ai' && <AiJobTab />}
+        {tab === 'ai' && <AiJobTab companies={companies} />}
         {tab === 'print' && (
           <PrintTab onPrintMaterial={handlePrintMaterial} />
         )}

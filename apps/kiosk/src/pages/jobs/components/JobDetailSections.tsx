@@ -1,6 +1,6 @@
 import { Button } from '@ai-job-print/ui'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
-import type { ExternalJobDTO } from '@ai-job-print/shared'
+import { AI_LABEL_COPY, type ExternalJobDTO } from '@ai-job-print/shared'
 import {
   ArrowRightIcon,
   BanIcon,
@@ -340,6 +340,7 @@ export function JobNextActionsSection({
   onExplainAi,
   onMatchAi,
   onPrint,
+  needLogin = false,
 }: {
   job: ExternalJobDTO
   trust: JobSourceTrust
@@ -348,6 +349,8 @@ export function JobNextActionsSection({
   onExplainAi: () => void
   onMatchAi: () => void
   onPrint: () => void
+  /** 没登录时 AI 两个入口的小字写「要先登录」（稿 b-job）。 */
+  needLogin?: boolean
 }) {
   const sourceCanApply = trust.ok
   const blockedReason = sourceTrustReason(trust, SOURCE_APPLY_UNAVAILABLE_REASON)
@@ -359,7 +362,7 @@ export function JobNextActionsSection({
           <span className="jf-g-icon"><ArrowRightIcon aria-hidden="true" /></span>
           <div>
             <h2>后续动作</h2>
-            <div className="sub">AI 内容仅供参考，需登录后使用</div>
+            <div className="sub">{AI_LABEL_COPY.BASE}，需登录后使用</div>
           </div>
         </div>
         <section className="qx-job-apply-guide" aria-labelledby="job-apply-guide-title">
@@ -371,8 +374,8 @@ export function JobNextActionsSection({
           </ol>
         </section>
         <div className="jf-next-grid">
-          <ActionButton tinted icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
-          <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
+          <ActionButton tinted icon={SparklesIcon} label="AI岗位解读" hint={needLogin ? '要先登录' : '看懂职责与准备点'} onClick={onExplainAi} />
+          <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint={needLogin ? '要先登录' : '用本人简历做准备'} onClick={onMatchAi} />
           <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
           <ActionButton icon={PrinterIcon} label="打印岗位信息" hint="A4 黑白 · 以现场公示价为准" onClick={onPrint} />
         </div>
