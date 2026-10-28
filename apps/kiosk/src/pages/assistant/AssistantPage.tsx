@@ -657,11 +657,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               {(body === 'notai' || body === 'error' || body === 'locked') && (
                 <>
                   {body === 'locked' ? (
-                    <button type="button" className="assistant-tools-open qxp-hit" onClick={() => setSheet('tools')}>
-                      <span className="qxp-ic" aria-hidden="true"><QxTouchIcon name="sparkle" size={32} /></span>
-                      <span className="qxp-tx"><b>本机 AI 专项</b><small>{toolsLine}</small></span>
-                      <span className="qxp-go" aria-hidden="true"><QxTouchIcon name="chevR" size={26} strokeWidth={2.2} /></span>
-                    </button>
+                    <>
+                      {/* 稿 xq ai-down 通知条的原话：先说小青没接上，再说下面这些事不用问也能办。 */}
+                      <QxTouchCallout kind="howto" icon="alert">小青这会儿没有接上。下面这些事不用问也能办。</QxTouchCallout>
+                      <Hit className="assistant-tools-open" icon={<QxTouchIcon name="sparkle" size={32} />} title="本机 AI 专项" sub={toolsLine} chevron onClick={() => setSheet('tools')} />
+                    </>
                   ) : null}
                   <p className="assistant-exits-title">这些都不需要 AI · 现在就能做</p>
                   <AdvisorManualEntries />

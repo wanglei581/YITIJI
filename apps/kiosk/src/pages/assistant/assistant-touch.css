@@ -201,6 +201,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* 任务区里降级卡的动作（「去打印扫描」）：旧样式 assistant-qingxu-content.css 写死 56，这里抬到 64×64 以上。
+   ai/ 共享件和 ai-primitives.css 的默认不动；这一格目前在上面那个读屏区里，抬高只为任何一态露出来时都够大。 */
+.qxt-screen[data-qx-page='assistant'] .kassist .assistant-ai-status .kiosk-ai-fallback__action { min-height: 64px; min-width: 64px; }
 .qxt-screen[data-qx-page='assistant'] .assistant-wait-pair { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
 .qxt-screen[data-qx-page='assistant'] .assistant-wait-card { overflow: hidden; }
 .qxt-screen[data-qx-page='assistant'] .assistant-thinking-bar,

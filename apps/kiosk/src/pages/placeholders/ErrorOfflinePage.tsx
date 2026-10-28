@@ -381,6 +381,10 @@ export default function ErrorOfflinePage() {
             </ul>
             <Card className="of-machine" testId={view === 'offline' ? 'system-state-fallback' : undefined}>
               {lastCheck ? <p className="qxp-note of-last">{lastCheck}</p> : null}
+              {/* 旧版「怎么判断」：稿上没画，放在机器插画上面的小字里。 */}
+              <p className="qxp-note of-truth" data-disclaimer="true" data-testid="system-state-truth">
+                <b>怎么判断</b>：八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，不会默认写成正常。
+              </p>
               <ArtBox><IllusMachine /></ArtBox>
             </Card>
             {remind ? <QxTouchCallout kind="remind">{remind}</QxTouchCallout> : null}

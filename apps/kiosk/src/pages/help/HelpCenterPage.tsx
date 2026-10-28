@@ -169,6 +169,15 @@ function QaRow({ item, answerId }: { item: QA; answerId: string }) {
   )
 }
 
+/** 旧版「这页写的是什么」：稿上没画，放进各页的小字里（分类首页放在「隐私、设备与备案」弹层里）。 */
+function HelpTruth() {
+  return (
+    <p className="qxp-note hp-truth" data-disclaimer="true" data-testid="help-truth">
+      <b>这页写的是什么</b>：只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。
+    </p>
+  )
+}
+
 /** 备案行：一体机上是文字，浏览器里才是外链。 */
 function FilingLine({ kiosk }: { kiosk: boolean }) {
   return (
@@ -282,6 +291,7 @@ export function HelpCenterPage() {
               />
             ) : null}
             <Hit title="看设备状态" sub="联网和各项读没读到" onClick={() => navigate('/error-offline')} />
+            <HelpTruth />
             <FilingLine kiosk={kiosk} />
           </QxTouchOverlay>
         ) : undefined}
@@ -334,6 +344,7 @@ export function HelpCenterPage() {
               ) : null}
               <Card className="hp-sink">
                 <Note>这里没答上，可以换一个分类，或问小青。</Note>
+                <HelpTruth />
                 <ArtBox><IllusChecklist w={160} /></ArtBox>
               </Card>
             </>
@@ -344,6 +355,7 @@ export function HelpCenterPage() {
               <QxTouchCallout kind="howto" icon="alert">没有这个分类。回到帮助首页再选，正在办的事不受影响。</QxTouchCallout>
               <Card className="hp-sink" testId="help-fallback">
                 <Note>可以从帮助首页按要办的事继续找。</Note>
+                <HelpTruth />
                 <ArtBox><IllusChecklist w={200} /></ArtBox>
               </Card>
               <Hit title="回到帮助首页" onClick={clearTopic} />
@@ -361,6 +373,7 @@ export function HelpCenterPage() {
               </div>
               <Card className="hp-sink">
                 <Note>帮助页打不开，不会取消正在办的打印。</Note>
+                <HelpTruth />
                 <ArtBox><IllusChecklist w={200} /></ArtBox>
               </Card>
               <button type="button" className="qxt-btn qxt-btn-pri qxt-wide hp-reopen" onClick={() => window.location.assign('/help')}>重新打开帮助</button>

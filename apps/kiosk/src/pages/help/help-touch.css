@@ -20,6 +20,9 @@
 /* 问答卡：问字青色、问题加粗、答案接在下面 */
 .qxt-screen[data-qx-page='help'] .hp-qa { gap: 4px; }
 
+/* 旧版「这页写的是什么」：小字，放在各页的插画卡里；分类首页放在「隐私、设备与备案」弹层里 */
+.qxt-screen[data-qx-page='help'] .hp-truth { font-size: var(--qxt-fs-aux); line-height: 1.4; }
+
 /* 吸收余高的插画卡 */
 .qxt-screen[data-qx-page='help'] .hp-sink { flex: 1; min-height: 0; overflow: hidden; }
 .qxt-screen[data-qx-page='help'] .hp-reopen { flex: none; width: 100%; }

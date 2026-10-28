@@ -270,6 +270,9 @@ export function LoginPage() {
               </div>
             ) : null}
             {hint ? <p className="lg-hint" role="status">{hint}</p> : null}
+            {/* 旧版的三步条和身份说明，稿上没画，默认态一屏也放不下可见的字：都留给读屏。 */}
+            <ol className="qxp-sr-h" aria-label="登录步骤"><li>01 选择登录方式</li><li>02 核对本人身份</li><li>03 回到刚才的办理</li></ol>
+            <p className="qxp-sr-h">验证码由短信发到你的手机。这台机器不生成、也不代填。这一步不用 AI 核对是不是你。</p>
 
             <div className="lg-tabs">
               <button type="button" className="lg-tab" data-testid="login-gate-tab-phone" aria-label="手机号登录" aria-current={mode === 'phone' ? 'page' : undefined} onClick={() => switchTab('phone')}>

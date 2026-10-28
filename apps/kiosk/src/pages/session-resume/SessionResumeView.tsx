@@ -15,6 +15,9 @@ import {
 
 type Exit = { id: string; title: string; sub: string; route: string }
 
+/** 旧版「边界」那一句，稿上没画，放回结论卡里：这一页只回到原来那一步，不新建、不删除。 */
+const RESUME_BOUNDARY = '这一页不重新建单，也不删除系统里的订单或文件。'
+
 function Exits({ items, onExit }: { items: readonly Exit[]; onExit: (route: string) => void }) {
   return (
     <div className="qxp-col sr-exits">
@@ -63,7 +66,7 @@ export function SessionResumeView({
         </div>
         <Exits items={RESUME_EMPTY_EXITS} onExit={onExit} />
         <Card className="sr-sink" testId="session-resume-truth">
-          <Note>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。</Note>
+          <Note>这条结论来自系统返回的空列表，不是读取失败。历史订单不在这里。{RESUME_BOUNDARY}</Note>
           <ArtBox><IllusMachine /></ArtBox>
         </Card>
       </div>
@@ -78,7 +81,7 @@ export function SessionResumeView({
         </div>
         <Exits items={RESUME_UNAVAILABLE_EXITS} onExit={onExit} />
         <Card className="sr-sink" testId="session-resume-truth">
-          <Note>读不到不等于没有。可以点下面的「重新读取」再试一次，或先用到机码继续。</Note>
+          <Note>读不到不等于没有。可以点下面的「重新读取」再试一次，或先用到机码继续。{RESUME_BOUNDARY}</Note>
           <ArtBox><IllusMachine /></ArtBox>
         </Card>
       </div>
@@ -143,7 +146,7 @@ export function SessionResumeView({
         })}
       </ul>
       <Card className="sr-sink" testId="session-resume-truth">
-        <Note>继续回到这一单原来那一步。已经完成的不在这里。</Note>
+        <Note>继续回到这一单原来那一步。已经完成的不在这里。{RESUME_BOUNDARY}</Note>
         <ArtBox><IllusMachine /></ArtBox>
       </Card>
     </div>

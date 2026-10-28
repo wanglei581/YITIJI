@@ -463,4 +463,33 @@ const guardViewSrc = read('src/pages/session-guard/SessionGuardView.tsx')
 assert.match(guardViewSrc, /<K as="h3">\{card\.title\}<\/K>/, '闲置提醒：两张清单卡的标题是 h3')
 assert.match(guardViewSrc, /<h3>\{ask\.title\}<\/h3>/, '闲置提醒：三个常问的问题是 h3')
 
+/* 触屏版第 5 包（2026-10-28）：改版时被删掉的说明句，稿上没画，按「稿上没画的也保留」放回。
+ * 登录步骤、身份说明只给读屏（默认态一屏放不下可见的字）；帮助与机器状态的说明是小字，运行页没有它们就是少了一条交代。 */
+assert.match(
+  loginSrc,
+  /<ol className="qxp-sr-h" aria-label="登录步骤"><li>01 选择登录方式<\/li><li>02 核对本人身份<\/li><li>03 回到刚才的办理<\/li><\/ol>/,
+  '登录页：三步（选择登录方式、核对本人身份、回到刚才的办理）留给读屏的有序列表',
+)
+assert.match(loginSrc, /这台机器不生成、也不代填。这一步不用 AI 核对是不是你。/, '登录页：验证码来源与「不用 AI 核对」的说明还在')
+assert.match(helpSrc, /data-testid="help-truth"[\s\S]{0,120}?只写本机已经上线的做法；帮助内容随应用一起发布，不是实时服务状态。/, '帮助页：「这页写的是什么」还在')
+assert.ok((helpSrc.match(/<HelpTruth \/>/g) ?? []).length >= 4, '帮助页：弹层与三个分支的插画卡里都放着「这页写的是什么」')
+assert.match(
+  errorOfflineSrc,
+  /data-testid="system-state-truth"[\s\S]{0,200}?八项状态一项不少地列出来；只有能真检测的才给结果，其余照实写未检测或随请求确认，不会默认写成正常。/,
+  '机器状态页：「怎么判断」还在',
+)
+const resumeViewSrc = read('src/pages/session-resume/SessionResumeView.tsx')
+assert.match(resumeViewSrc, /const RESUME_BOUNDARY = '这一页不重新建单，也不删除系统里的订单或文件。'/, '继续打印页：边界那一句还在')
+assert.strictEqual((resumeViewSrc.match(/\{RESUME_BOUNDARY\}/g) ?? []).length, 3, '继续打印页：空、读不到、列表三种结论卡都带着边界那一句')
+
+/* 点击区与插画（同一包）：协议行那颗勾选框原来只有 48，登录页四张「记在哪」卡的插画原来被压成一条缝。 */
+const loginCss = read('src/pages/auth/login-touch.css')
+assert.match(
+  loginCss,
+  /\.k-agree \.k-agree-check,\s*\n[^\n]*\.k-agree \.doclink \{[^}]*min-height: 64px;[^}]*min-width: 64px;/,
+  '登录页：协议勾选框和两个协议链接的可点区不小于 64×64',
+)
+assert.match(loginCss, /\.lg-fact \.qxp-artbox \{ min-height: 96px; \}/, '登录页：四张「记在哪」卡的插画保底 96 高，放不下由页面滚动，不压插画')
+assert.match(loginCss, /\.lg-fact \{ min-height: 224px; overflow: hidden; \}/, '登录页：「记在哪」卡保底 224 高')
+
 console.log('ALL PASS fusion W5 route, boundary, and presentation contract')

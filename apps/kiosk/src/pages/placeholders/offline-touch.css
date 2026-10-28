@@ -20,6 +20,7 @@
 .qxt-screen[data-qx-page='offline'] .of-machine { flex: 1 1 0; min-height: 160px; overflow: hidden; padding: 8px 16px; gap: 4px; }
 .qxt-screen[data-qx-page='offline'] .of-machine .qxp-artbox > svg { height: 100%; width: auto; max-width: 100%; }
 .qxt-screen[data-qx-page='offline'] .of-last { margin: 0; text-align: center; }
+.qxt-screen[data-qx-page='offline'] .of-truth { margin: 6px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.4; text-align: center; }
 
 /* 底栏：帮助与求助占中间，三颗等宽 */
 .qxt-screen[data-qx-page='offline'] .qxt-dock .qxt-fill { flex: 1; min-width: 0; }
