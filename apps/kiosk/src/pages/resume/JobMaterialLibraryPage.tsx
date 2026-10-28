@@ -232,7 +232,7 @@ export function JobMaterialLibraryPage() {
         })
         setError(null)
       })
-      .catch((err) => { if (!cancelled) setError(userMessageOf(err, '求职材料加载失败，请稍后重试')) })
+      .catch((err) => { if (!cancelled) setError(unattendedReason(userMessageOf(err, '求职材料加载失败，请稍后重试'), '求职材料加载失败，请稍后重试')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [reloadKey])

@@ -69,7 +69,8 @@ function registerShell(api: ApiRouter): void {
 
 /** 原文一律不透传：5xx 走统一的「服务暂时不可用」，未登记错误码的 4xx 回落到页面自己的兜底句。 */
 const failure = (status: number, message: string) => ({ status, json: { success: false, error: { code: 'FIXTURE_UNREGISTERED', message } } })
-const SERVICE_DOWN = '服务暂时不可用，请稍后重试或联系现场工作人员'
+// 现场无人值守：目录读不到时屏上不许写「联系现场工作人员」。共享错误码表对 5xx 的句子带着这句话，页面先过 unattendedReason，换成固定句。
+const CATALOG_DOWN = '求职材料加载失败，请稍后重试'
 
 /** 已停在登录页时完成短信登录，并等回到材料库。 */
 async function loginBackToMaterials(page: Page): Promise<void> {
@@ -240,7 +241,8 @@ test('material workshop: empty list and read failure are separate honest states 
   api.respond('GET', TEMPLATES, failure(503, 'fixture template failure'))
   await catalogRetry(screen, '重新读取一次').click()
   await expect(screen).toHaveAttribute('data-state', 'error')
-  await expect(page.getByRole('alert')).toHaveText(SERVICE_DOWN)
+  await expect(page.getByRole('alert')).toHaveText(CATALOG_DOWN)
+  await expect(page.getByText('联系现场工作人员')).toHaveCount(0)
   await expect(page.getByText('fixture template failure')).toHaveCount(0)
   await expect(page.locator('.qx-rm-template')).toHaveCount(0)
   await captureViewports(page, 'materials-error', catalogRetry(screen, '重新读取'))
