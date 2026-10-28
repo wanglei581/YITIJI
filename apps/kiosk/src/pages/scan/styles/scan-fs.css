@@ -228,7 +228,7 @@
   border-radius: 20px;
   padding: 12px 14px;
   min-height: 76px;
-  flex: none;
+  flex: 1 1 auto;
 }
 
 [data-qx-page='scan-workbench'] .fs-step .n {
@@ -257,10 +257,12 @@
 }
 
 [data-qx-page='scan-workbench'] .fs-scanhero {
-  flex: 1 1 auto;
+  /* 示意图区不再吃掉全部余量：封顶 470px，余量给上面的步骤卡（每步一张大卡，读起来也更省力）。 */
+  flex: 0 1 auto;
+  height: 470px;
   min-height: 180px;
   display: grid;
-  grid-template-columns: minmax(180px, 42%) minmax(0, 1fr);
+  grid-template-columns: minmax(180px, 56%) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
@@ -358,13 +360,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* 余量摊在示意图与各行之间，不在上下各留一大片。 */
+  justify-content: space-evenly;
   gap: 6px;
   padding: 12px 16px;
 }
 
 [data-qx-page='scan-workbench'] .sx-hero .fs-doc {
-  height: 52%;
+  height: 64%;
   max-width: 78%;
   display: flex;
   align-items: center;
@@ -539,4 +542,31 @@
 
 [data-qx-page='scan-workbench'] .sw-exit.is-off {
   opacity: 0.55;
+}
+
+/* 一体机尺寸底线：正文 ≥20px，可点 ≥64×64。旧工作台样式里 17–18px 的小字与 56px 的小按钮在这里抬起来。 */
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-truth div,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-truth b,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-preview-cap,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-2,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-2 b,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-2 span,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-1 .sw-chip,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .text-lg {
+  font-size: 20px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvh-open {
+  min-height: 64px;
+  min-width: 64px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .min-h-14,
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-pvdoc .min-w-14 {
+  min-height: 64px;
+  min-width: 64px;
+}
+
+[data-kiosk-stage-fit='on'] [data-qx-page='scan-workbench'] .sw-offtag {
+  font-size: 20px;
 }

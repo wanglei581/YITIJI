@@ -240,7 +240,7 @@ export function ScanSettingsStatusView({
         {liveNotDurable ? (
           <p className="fs-warn" data-testid="scan-live-not-durable-notice">
             这次扫描<b>建出来过</b>，但本机没能把它的凭据记住（写完读回来对不上），
-            所以本页<b>没有</b>向系统确认投递授权，并且已经把那条任务<b>撤掉</b>了。
+            所以本页<b>没有</b>向系统确认能收到扫描件，并且已经把那条任务<b>撤掉</b>了。
             现在<b>先别在面板上按开始</b>：没有这次扫描来接收那份文件，它也不会被别人收走。
           </p>
         ) : null}

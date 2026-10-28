@@ -7,6 +7,7 @@ import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { useAuth } from '../../auth/useAuth'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
@@ -115,6 +116,8 @@ export function ScanWorkbenchShell({
 }) {
   const navigate = useNavigate()
   const { getToken } = useAuth()
+  /* 各屏的「需要帮助？拨打服务电话」读的是会话内缓存；这里触发一次加载，直接落到本屏时也有号码可读，读不到就不显示。 */
+  useSupportContact()
   const askLabel = scanAskLabel(page, state)
   /**
    * 离开整条扫描流程。四个阶段、四个出口（顶栏返回 + 底栏三项主导航）共用这一条。
@@ -363,7 +366,7 @@ export function ScanPanelMock({ instructions }: { instructions: string[] }) {
   const count = instructions.length
   return (
     <>
-      <div className="fs-steps" data-testid="scan-workbench-instructions">
+      <div className="sx-steps" data-testid="scan-workbench-instructions">
         {instructions.map((instruction, index) => (
           <div key={`${instruction}-${index}`} className="fs-step">
             <span className="n">{index + 1}</span>

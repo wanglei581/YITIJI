@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useSupportContact } from '../../hooks/useSupportContact'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
 import { QxTouchDock, type QxTouchAsk, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
@@ -41,6 +42,8 @@ export function TouchToolScreen({
   children: ReactNode
 }) {
   const navigate = useNavigate()
+  /* 触发服务电话加载，页内的 PhoneHelpLine 才读得到号码；读不到就不显示。 */
+  useSupportContact()
   const ask: QxTouchAsk = { label: askLabel, draft: askLabel, voice: true }
   return (
     <QxTouchScreen

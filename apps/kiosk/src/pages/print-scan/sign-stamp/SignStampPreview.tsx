@@ -280,7 +280,7 @@ export function SignStampPreview({
             data-preview-kind="no-file"
             style={{ position: 'relative', left: 20, top: 20, width: pw, height: ph }}
           >
-            <p style={{ margin: 24, fontSize: 18, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
+            <p style={{ margin: 24, fontSize: 20, lineHeight: 1.5 }}>没有可打开的文件内容，这里不画示意纸面。</p>
             {marker}
           </div>
         )}

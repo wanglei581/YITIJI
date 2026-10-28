@@ -398,3 +398,25 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+
+/* 一体机尺寸底线：正文 ≥20px。旧页面样式里 17–18px 的小字在这里抬起来。 */
+[data-kiosk-stage-fit='on'] [data-qx-page='img2pdf'] .i2p-truth div,
+[data-kiosk-stage-fit='on'] [data-qx-page='img2pdf'] .i2p-truth b,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-tag,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-chip,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-gatecol .r,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-gatecol .d,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-gatecol .f,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-truth span,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-gatecol .note,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-gatecol li span,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-why li,
+[data-kiosk-stage-fit='on'] [data-qx-page='sign'] .ss-why span {
+  font-size: 20px;
+}
+
+[data-qx-page='print-hub'] .fs-row small,
+[data-qx-page='img2pdf'] .fs-row small,
+[data-qx-page='sign'] .fs-row small {
+  font-size: 22px;
+}

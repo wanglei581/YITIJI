@@ -512,15 +512,19 @@ const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
 }
 
 /**
- * 四个出口。顶栏返回按 `.qxt-band .qxt-back` 取 —— result 阶段的 CTA 条上另有一个同名
+ * 五个出口（顶栏返回、问小青、底栏三项）。顶栏返回按 `.qxt-band .qxt-back` 取 —— result 阶段的 CTA 条上另有一个同名
  * 「返回打印扫描」按钮（ScanResultPage 的终态出口，不在本次改动范围内），
  * 按可访问名取会一次命中两个。
  */
 const SCAN_EXITS = [
-  { label: '返回打印扫描', destination: '/print-scan', topbar: true },
-  { label: '首页', destination: '/', topbar: false },
-  { label: 'AI 顾问', destination: '/assistant', topbar: false },
-  { label: '我的', destination: '/profile', topbar: false },
+  { label: '返回打印扫描', destination: '/print-scan', topbar: true, ask: false },
+  { label: '首页', destination: '/', topbar: false, ask: false },
+  { label: 'AI 顾问', destination: '/assistant', topbar: false, ask: false },
+  { label: '我的', destination: '/profile', topbar: false, ask: false },
+  /* 底栏中间的「问小青：…」也是离开整条扫描流程的出口（稿 18：问小青离开时先记下要撤销未完成任务）。
+   * 它的名字随阶段与状态变，所以按底栏的问小青键本身取；落点同样是顾问页。
+   * 这一条之前没有用例钉：少了 beforeAsk，底栏默认「记草稿 + 直接 navigate」，服务端任务就留在原地。 */
+  { label: '问小青', destination: '/assistant', topbar: false, ask: true },
 ] as const
 
 /** 离开扫描流程之后会落到的四个目的地，各自挂载时要读的接口。 */
@@ -590,7 +594,9 @@ for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
 
       await (exit.topbar
         ? page.locator('.qxt-band .qxt-back')
-        : page.getByRole('button', { name: exit.label, exact: true })
+        : exit.ask
+          ? page.locator('[data-qxt-ask="on"]')
+          : page.getByRole('button', { name: exit.label, exact: true })
       ).click()
       await page.waitForURL((url) => url.pathname === exit.destination)
 
@@ -988,7 +994,7 @@ test('a definitive ack refusal revokes the session and offers a plain restart, n
   await enterSettingsFromVisibleStart(page)
 
   // ① 屏幕如实说这一场没拿到投递授权，并且**明说别去面板按开始**。
-  await expect(page.getByText('这次扫描没能取得投递授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('这次扫描没能确认能收到扫描件', { exact: true }).first()).toBeVisible()
   await expect(page.getByText(/现在请先别在面板上按开始/).first()).toBeVisible()
   await expectNoPanelGuidance(page)
 
@@ -1123,7 +1129,7 @@ test('the wait page tells the truth when the ack is definitively refused @kiosk'
   await page.goto('/scan?stage=progress')
 
   // ① 如实落一个失败结果，不在这一屏继续假装还在等文件。
-  await expect(page.getByText(/系统没有给这一场投递授权/).first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText(/系统没有确认这一场能收到扫描件/).first()).toBeVisible({ timeout: 10_000 })
   // ② 这一屏绝不许再出现那句把人支到面板上的话。
   await expect(page.getByText(/请在打印机面板完成扫描/)).toHaveCount(0)
   // ③ 服务端那条任务被撤掉（localGiveUp），用的是本机登记里那份控制凭证。
