@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CampusRecruitmentStatsData } from '@ai-job-print/shared'
-import { helpNeededLine } from '../../copy/unattendedCopy'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import { getCampusRecruitmentStats } from '../../services/api'
 import { RtFill } from '../recruitment-touch/RtFill'
 import { RtFrame } from '../recruitment-touch/RtFrame'
@@ -59,7 +59,7 @@ export default function FreshmanInsightsPage() {
         <div className="rt-state">
           <section className="rt-statecard">
             <h2>正在读取经核验的校园招聘统计</h2>
-            <p className="rt-note">{helpNeededLine()}</p>
+            <RtHelpLine />
           </section>
           <RtFill preset="campus" />
         </div>
@@ -70,7 +70,7 @@ export default function FreshmanInsightsPage() {
           <section className="rt-statecard">
             <h2>校园招聘统计暂时无法读取</h2>
             <p>没有编造数字。请稍后重试，或查看具体招聘会。</p>
-            <p className="rt-note">{helpNeededLine()}</p>
+            <RtHelpLine />
             <button type="button" className="rt-textbtn" onClick={retry}>重新加载</button>
           </section>
           <RtFill preset="campus" />
@@ -82,7 +82,7 @@ export default function FreshmanInsightsPage() {
           <section className="rt-statecard">
             <h2>暂无经核验的校园招聘统计</h2>
             <p>当前没有经核验的校园招聘聚合统计，请查看具体招聘会；不会展示示例数据。</p>
-            <p className="rt-note">{helpNeededLine()}</p>
+            <RtHelpLine />
           </section>
           <RtFill preset="campus" />
         </div>

@@ -31,7 +31,7 @@ import {
   JobTrustSection,
   QrOverlay,
 } from './components/JobDetailSections'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import './styles/job-detail-qx.css'
 
@@ -387,5 +387,5 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message
   }
-  return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')
+  return recruitErrorText(err, 'AI 辅助暂时不可用，请稍后重试。')
 }

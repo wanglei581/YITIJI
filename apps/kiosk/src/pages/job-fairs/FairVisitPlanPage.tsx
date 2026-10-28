@@ -41,7 +41,7 @@ import {
 import { getJobFairById } from '../../services/api/jobFairs'
 import { readAiResumeSession } from '../resume/aiResumeSession'
 import { isAiOutage } from '../../ai/aiOutage'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { QxFairWorkbench } from './QxFairWorkbench'
 import { fairIsCentered } from './fairWorkbenchSpecs'
 import { FairSkeletonList } from './components/FairWorkbenchBits'
@@ -160,7 +160,7 @@ export function FairVisitPlanPage() {
         // 原来一律 `.catch(() => undefined)` 吞掉，屏幕上看起来和「没生成过」一模一样。
         const status = err instanceof FairVisitPlanApiError ? err.status : null
         if (status === 404) return
-        setLoadError(userMessageOf(err, '上次的参会准备单没取到，请重新加载'))
+        setLoadError(recruitErrorText(err, '上次的参会准备单没取到，请重新加载'))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -184,7 +184,7 @@ export function FairVisitPlanPage() {
       // 能力级故障与「这次没成」分开报：前者说清 AI 不可用、浏览与打印不受影响，
       // 后者保留重试。把限流报成「功能不可用」本身就是伪造能力的一种。
       setAiUnavailable(isAiOutage(err))
-      setError(userMessageOf(err, '参会准备单生成失败，请稍后重试'))
+      setError(recruitErrorText(err, '参会准备单生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
     }
@@ -211,7 +211,7 @@ export function FairVisitPlanPage() {
         },
       })
     } catch (err) {
-      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
+      setError(recruitErrorText(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }

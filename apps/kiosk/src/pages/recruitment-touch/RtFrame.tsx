@@ -4,10 +4,11 @@ import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/Q
 import { QxTouchDock, type QxTouchAsk, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { RtRibbon } from './RtRibbon'
 import './recruit-touch.css'
 
 /**
- * 本包页面壳：意图带、正文、一条底栏、三项底导航。
+ * 本包页面壳：私有化版标识条、意图带、正文、一条底栏、三项底导航。
  * 顶栏状态不报打印机；没给 tone 时是灰点，不假装就绪。
  */
 export function RtFrame({
@@ -54,16 +55,19 @@ export function RtFrame({
       bodyClassName={bodyClassName}
       overlay={overlay}
       band={
-        <QxTouchBand
-          kind="compact"
-          eyebrow={eyebrow}
-          title={title}
-          sub={sub}
-          seal={null}
-          status={status}
-          back={back}
-          onBack={onBack}
-        />
+        <>
+          <RtRibbon />
+          <QxTouchBand
+            kind="compact"
+            eyebrow={eyebrow}
+            title={title}
+            sub={sub}
+            seal={null}
+            status={status}
+            back={back}
+            onBack={onBack}
+          />
+        </>
       }
       dock={
         <div className="rt-fair-dock">

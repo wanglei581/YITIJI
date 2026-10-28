@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, BriefcaseIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import {
   DirAiAssist,
   DirExitList,
@@ -110,7 +112,10 @@ export default function OfflineAgencyDetailPage() {
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
-          <DirState tone="info" testId="offline-agency-agency-loading" title="正在读取机构详情">取到之前不显示机构名称、岗位数量或收录状态。</DirState>
+          <>
+            <DirState tone="info" testId="offline-agency-agency-loading" title="正在读取机构详情">取到之前不显示机构名称、岗位数量或收录状态。</DirState>
+            <RtFill preset="directory" />
+          </>
         ) : failed ? (
           <>
             <DirState tone="error" testId="offline-agency-agency-error" title="机构详情读取失败">
@@ -120,6 +125,7 @@ export default function OfflineAgencyDetailPage() {
               <DirStripItem icon={BuildingIcon} title="重新加载机构详情" desc="再次请求当前机构" onClick={reload} />
               <DirStripItem icon={BuildingIcon} tone="wheat" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             </DirExitList>
+            <RtHelpLine />
           </>
         ) : notFound ? (
           <>
@@ -130,6 +136,7 @@ export default function OfflineAgencyDetailPage() {
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="第三方来源岗位，带来源与同步时间" onClick={() => navigate('/jobs')} />
               <DirStripItem icon={BuildingIcon} tone="slate" title="去帮助中心" desc="常见问题和服务电话" onClick={() => navigate('/help')} />
             </DirExitList>
+            <RtHelpLine />
             <DirNote>{BOUNDARY}</DirNote>
           </>
         ) : agency ? (

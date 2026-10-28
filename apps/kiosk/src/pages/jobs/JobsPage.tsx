@@ -21,7 +21,7 @@ import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobResultsSection } from './components/JobResultsSection'
 import { JobsQxAiEntry, JobsQxSourceNotice, JobsQxState } from './components/JobsQxChrome'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { helpNeededLine } from '../../copy/unattendedCopy'
 import './styles/jobs-list-qx.css'
 
@@ -111,7 +111,7 @@ export function JobsPage() {
           setBoardOff(err.message || '本终端岗位板块已关闭')
           setError(null)
         } else {
-          setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+          setError(recruitErrorText(err, '岗位信息暂时无法加载，请稍后重试'))
         }
         setFacetLoading(false)
       })
@@ -159,7 +159,7 @@ export function JobsPage() {
           setBoardOff(err.message || '本终端岗位板块已关闭')
           setError(null)
         } else {
-          setError(userMessageOf(err, '岗位信息暂时无法加载，请稍后重试'))
+          setError(recruitErrorText(err, '岗位信息暂时无法加载，请稍后重试'))
         }
         setListLoading(false)
       })
@@ -526,7 +526,7 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连上真实服务后才能使用。'
     return err.message
   }
-  return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')
+  return recruitErrorText(err, 'AI 辅助暂时不可用，请稍后重试。')
 }
 // Component markers for verify:job-info-ui contract
 // JobOverviewPanel — 岗位总览面板 (显示来源统计、岗位数量、最近同步时间)

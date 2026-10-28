@@ -20,6 +20,8 @@ import { QxTouchBand, type QxTouchStatus } from '../../components/qingxu/touch/Q
 import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
+import { RtRibbon } from '../recruitment-touch/RtRibbon'
 import {
   FAIR_HEAD,
   FAIR_TRUTH_LEAD,
@@ -49,12 +51,18 @@ const FAIR_EYEBROW: Record<FairScreen, string> = {
 const FAIR_ASK: Record<FairScreen, string> = {
   list: '问小青',
   checkin: '问小青：怎么签到',
-  detail: '问小青：这场怎么走',
+  detail: '问小青',
   companies: '问小青：这家企业',
   map: '问小青：展位怎么看',
   materials: '问小青：打印哪一份',
   'visit-plan': '问小青：准备单怎么用',
   stats: '问小青：这些数怎么来',
+}
+
+/** 稿里招聘会详情的底栏：读到详情时只写「问小青」，详情在读、没取到、已下架时写「问小青：这场怎么走」。 */
+function askLabelOf(screen: FairScreen, state: string): string {
+  if (screen === 'detail' && state !== 'detail' && state !== 'ended') return '问小青：这场怎么走'
+  return FAIR_ASK[screen]
 }
 
 /** 胶囊只有明确 ok 才亮绿。bad / warn 用提醒色，unknown 保持灰点。 */
@@ -107,7 +115,7 @@ export function QxFairWorkbench({
   const defaultBack = fairBackOf(screen, fairId)
   const resolvedBack = back ?? { label: defaultBack.label, onBack: () => navigate(defaultBack.route) }
   const pill = fairPillOf(screen, state)
-  const askLabel = FAIR_ASK[screen]
+  const askLabel = askLabelOf(screen, state)
 
   return (
     <QxTouchScreen
@@ -115,16 +123,19 @@ export function QxFairWorkbench({
       stateId={`${screen}:${state}`}
       bodyClassName="qxt-body-scroll"
       band={
-        <QxTouchBand
-          kind="compact"
-          eyebrow={FAIR_EYEBROW[screen]}
-          title={title ?? headTitle}
-          sub={subtitle ?? headSubtitle}
-          seal={null}
-          status={pillStatus(pill)}
-          back
-          onBack={resolvedBack.onBack}
-        />
+        <>
+          <RtRibbon />
+          <QxTouchBand
+            kind="compact"
+            eyebrow={FAIR_EYEBROW[screen]}
+            title={title ?? headTitle}
+            sub={subtitle ?? headSubtitle}
+            seal={null}
+            status={pillStatus(pill)}
+            back
+            onBack={resolvedBack.onBack}
+          />
+        </>
       }
       dock={
         <div className="rt-fair-dock">
@@ -166,6 +177,7 @@ export function QxFairWorkbench({
         data-testid={`fair-${screen}-state-${state}`}
       >
         {children}
+        {fairIsCentered(screen, state) ? <RtHelpLine /> : null}
       </div>
     </QxTouchScreen>
   )

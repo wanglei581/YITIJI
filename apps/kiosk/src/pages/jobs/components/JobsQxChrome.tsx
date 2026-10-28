@@ -1,5 +1,7 @@
 import { Building2Icon, SearchIcon, SparklesIcon } from 'lucide-react'
 import { AiDeclarationNote } from '../../../ai/AiDeclarationNote'
+import { helpNeededLine } from '../../../copy/unattendedCopy'
+import { useSupportContact } from '../../../hooks/useSupportContact'
 
 export function JobsQxAiEntry({ onStart }: { onStart: () => void }) {
   return (
@@ -30,6 +32,7 @@ export function JobsQxSourceNotice({ activeSourceName }: { activeSourceName?: st
 }
 
 export function JobsQxState({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  const contact = useSupportContact()
   if (!error) {
     return (
       <section className="qx-state qx-grow" data-tone="info" aria-live="polite">
@@ -41,7 +44,7 @@ export function JobsQxState({ error, onRetry }: { error: string | null; onRetry:
   return (
     <section className="qx-state qx-grow" data-tone="error" role="alert">
       <span className="qx-state-ic"><SearchIcon aria-hidden="true" /></span>
-      <span><span className="qx-state-t">岗位名单这次没取到</span><span className="qx-state-d">{error}。本机不显示缓存结果冒充最新岗位。</span></span>
+      <span><span className="qx-state-t">岗位名单这次没取到</span><span className="qx-state-d">{error}。本机不显示缓存结果冒充最新岗位。{helpNeededLine(contact)}</span></span>
       <button type="button" className="qx-btn" data-variant="primary" onClick={onRetry}>重新加载</button>
     </section>
   )

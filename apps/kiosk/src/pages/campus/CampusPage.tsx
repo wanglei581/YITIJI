@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { QxTouchCallout } from '../../components/qingxu/touch/QxTouchCallout'
 import { QxTouchTile } from '../../components/qingxu/touch/QxTouchTile'
-import { helpNeededLine } from '../../copy/unattendedCopy'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import { fmtFairDateTime, fmtFairSyncDate, fmtFairTime } from '../job-fairs/fairFormat'
 import { RtFill } from '../recruitment-touch/RtFill'
 import { RtFrame } from '../recruitment-touch/RtFrame'
@@ -249,7 +249,7 @@ export function CampusPage() {
           <section className="rt-statecard">
             <h2>正在读取校园招聘会</h2>
             <p>未返回前不显示场次名称、时间地点和来源，也不拿示例场次把这一页填上。</p>
-            <p className="rt-note">{helpNeededLine()}</p>
+            <RtHelpLine />
           </section>
           <RtFill preset="campus" />
         </div>
@@ -265,14 +265,14 @@ export function CampusPage() {
         status={{ text: '校园招聘会这次没取到', tone: 'warn' }}
         backLabel="返回"
         onBack={() => navigate('/fairs-service')}
-        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？' }}
+        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？', voice: true }}
         primary={{ label: '重新加载', onClick: () => setReloadKey((key) => key + 1), noArrow: true }}
       >
         <div className="rt-state">
           <section className="rt-statecard">
             <h2>校园招聘会这次没取到</h2>
             <p>请求失败了。本机不显示上一次的缓存场次，避免按已经结束的时间地点白跑。</p>
-            <p className="rt-note">{helpNeededLine()}</p>
+            <RtHelpLine />
           </section>
           <QxTouchTile icon="map" title="查看招聘会" desc="社会场次和校园场次都在列表里" onClick={() => navigate('/job-fairs')} />
           <RtFill preset="campus" />
@@ -289,7 +289,7 @@ export function CampusPage() {
         status={fairs.length ? { text: '按来源原文展示' } : { text: '还没有校园招聘会' }}
         backLabel="返回"
         onBack={() => navigate('/fairs-service')}
-        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？' }}
+        ask={{ label: '问小青：怎么挑一场', draft: '怎么挑一场校园招聘会？', voice: true }}
         primary={fairs.length
           ? { label: '全部校园招聘会', onClick: () => navigate('/job-fairs?audience=campus') }
           : { label: '查看招聘会', onClick: () => navigate('/job-fairs') }}
@@ -302,7 +302,7 @@ export function CampusPage() {
             <section className="rt-statecard">
               <h2>还没有校园招聘会</h2>
               <p>来源机构还没有已发布的校园场次，本机不会拿往期活动充数。</p>
-              <p className="rt-note">{helpNeededLine()}</p>
+              <RtHelpLine />
               <button type="button" className="rt-textbtn" onClick={() => setReloadKey((key) => key + 1)}>重新加载</button>
             </section>
             <RtFill preset="campus" />
@@ -453,6 +453,7 @@ export function CampusPage() {
           <PrintTab onPrintMaterial={handlePrintMaterial} />
         )}
       </div>
+      <RtFill preset="campus" />
     </div>
     </RtFrame>
   )

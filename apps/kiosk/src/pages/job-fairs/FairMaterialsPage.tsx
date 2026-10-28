@@ -35,7 +35,7 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { getFairMaterials, getJobFairById, prepareFairMaterialPrint } from '../../services/api'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { API_MODE } from '../../services/api/client'
 import { QxFairWorkbench } from './QxFairWorkbench'
@@ -96,7 +96,7 @@ export function FairMaterialsPage() {
       })
       // 取不到就说取不到。不猜是不是过期 —— 过期有过期的话术（「重取即可，内容不变」），
       // 那句话在 500 / 断网时是假的，而用户会照着它反复点重取。
-      .catch((err) => { if (!cancelled) setLoadError(userMessageOf(err, '活动物料列表这次没取到，请重新加载')) })
+      .catch((err) => { if (!cancelled) setLoadError(recruitErrorText(err, '活动物料列表这次没取到，请重新加载')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [fairId, retryKey])
@@ -123,7 +123,7 @@ export function FairMaterialsPage() {
         },
       })
     } catch (error) {
-      setPrintError(userMessageOf(error, '打印文件准备失败，请稍后重试'))
+      setPrintError(recruitErrorText(error, '打印文件准备失败，请稍后重试'))
     } finally {
       setPrintingId(null)
     }

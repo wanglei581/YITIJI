@@ -1,5 +1,26 @@
 /* 第 11 包页面局部版式。每条都挂在本页 data-qx-page 下，不改 .qxt-* 默认。 */
 
+/* 私有化版标识条：照稿 .b-ribbon，斜纹两种深赭色，白字 21px。颜色只取令牌，不写裸色值。 */
+.qxt-screen[data-qx-page='recruit'] .rt-ribbon {
+  flex: none;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 24px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--qxt-clay-ink) 0 18px,
+    color-mix(in srgb, var(--qxt-clay-ink) 82%, black) 18px 36px
+  );
+  color: var(--qxt-cream);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
 .qxt-screen[data-qx-page='recruit'] .rt-hub {
   flex: 1;
   min-height: 0;
@@ -211,7 +232,6 @@
   min-width: 64px;
   font-size: 24px;
 }
-.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn { font-size: var(--qxt-fs-btn); }
 .qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq { font-size: var(--qxt-fs-askq); }
 
 /* 短页：说明保持内容高，剩下的高度交给两列真实入口。格子本身不涂底。 */
@@ -229,13 +249,13 @@
   min-height: 100%;
   align-self: stretch;
 }
-.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page):has(.rt-fill) {
+.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page, .campus-proto):has(.rt-fill) {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page):has(.rt-fill) :is(.qx-grow, .dw-rlist, .dw-rbox, .dw-sec.grow) {
+.qxt-screen[data-qx-page='recruit'] :is(.rt-state, .qxfw, .dw-page, .qx-jobs-page, .qx-job-detail-page, .campus-proto):has(.rt-fill) :is(.qx-grow, .dw-rlist, .dw-rbox, .dw-sec.grow, .campus-tab-body) {
   flex: none;
   min-height: auto;
 }
@@ -258,13 +278,55 @@
   white-space: nowrap;
 }
 
-/* 问小青留在可读宽度，放不下就换行，不再缩成「问…」。 */
-.qxt-screen[data-qx-page='recruit'] .qxt-dock { flex-wrap: wrap; }
-.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-askq {
-  flex: 1 1 440px;
-  min-width: min(440px, 100%);
+/* 底栏一条：返回、问小青、本页次主操作同在一行，照稿 .fj-dock 把按钮收紧（左右 16px、24px 字）。
+   高度仍是 88px、字不小于 20px；问小青放不下时照稿用省略号收尾，不换行。 */
+.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn {
+  padding: 0 16px;
+  min-width: 0;
+  font-size: 24px;
 }
-.qxt-screen[data-qx-page='recruit'] .qxt-dock .qxt-btn { flex: 0 1 auto; }
+
+/* 可点区不小于 64×64：旧内芯里的小按钮、下拉、输入框、标签页一并抬上来。 */
+.qxt-screen[data-qx-page='recruit'] :is(button, select, [role='button'], a[href], input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='file'])) {
+  min-height: var(--qxt-tap);
+  min-width: var(--qxt-tap);
+}
+
+/* 旧校园页签（Tailwind 小字与 campus-policy-fusion.css）里不足 20px 的说明，在本页抬到 20px。
+   旧样式的全局默认不动，只在本页作用域里覆盖。 */
+.qxt-screen[data-qx-page='recruit'] .campus-proto :is(
+  .text-xs, .text-sm, .text-base, .text-lg,
+  .text-\[17px\], .text-\[18px\], .text-\[19px\],
+  .kproto-card-head .sub, .kproto-notice, .kproto-badge, .kproto-chip, .kproto-btn.sm, .kproto-tile span span,
+  .campus-status, .campus-tab, .campus-band4 .campus-band-cell span, .campus-qk4 .kproto-tile span
+) {
+  font-size: 20px;
+  line-height: 1.4;
+}
+.qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
+
+/* 状态页：状态卡保持内容高，紧跟其后的去处排成两列大块，撑满剩下的高度；块与块之间留 12px 缝，
+   样子和 RtFill 的整块磁贴一致。页里已经有 RtFill 时不再拉伸，免得两处抢同一块余量。 */
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(120px, 1fr);
+  gap: 12px;
+}
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) > .dw-stripitem {
+  min-height: 120px;
+  height: 100%;
+  padding: 20px 24px;
+  gap: 20px;
+  border: 1.5px solid var(--qxt-line);
+  border-radius: var(--qxt-r-card);
+  background: var(--qxt-card);
+}
+.qxt-screen[data-qx-page='recruit'] .qx-state ~ :is(.dw-strip, .dw-exitlist):not(:has(~ .rt-fill)) > .dw-stripitem:only-child {
+  grid-column: 1 / -1;
+}
 
 @media (max-width: 760px) {
   .qxt-screen[data-qx-page='recruit'] .qxt-halo {

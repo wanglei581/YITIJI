@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import {
   DirAiAssist,
   DirKv,
@@ -102,11 +104,18 @@ export default function OfflineJobDetailPage() {
     >
       <div className="dw-page qx-grow" data-state={uiState} data-testid={`offline-agency-state-${uiState}`}>
         {loading ? (
-          <DirState tone="info" testId="offline-job-loading" title="正在读取线下岗位">取到之前不显示岗位名称或来源编号。</DirState>
+          <>
+            <DirState tone="info" testId="offline-job-loading" title="正在读取线下岗位">取到之前不显示岗位名称或来源编号。</DirState>
+            <RtFill preset="directory" />
+          </>
         ) : error || !job || !trust ? (
-          <DirState tone="error" testId="offline-job-error" title="岗位信息加载失败">
-            <button type="button" className="dw-chip" onClick={() => setRetryKey((key) => key + 1)}>重试</button>
-          </DirState>
+          <>
+            <DirState tone="error" testId="offline-job-error" title="岗位信息加载失败">
+              <button type="button" className="dw-chip" onClick={() => setRetryKey((key) => key + 1)}>重试</button>
+            </DirState>
+            <RtHelpLine />
+            <RtFill preset="directory" />
+          </>
         ) : (
           <>
             <JobAntiFraudNotice />

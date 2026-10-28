@@ -7,13 +7,15 @@ import {
   type CompanyDetailDTO,
   type CompanyJobItemDTO,
 } from '@ai-job-print/shared'
-import { BriefcaseIcon, MapPinIcon, PlayIcon } from 'lucide-react'
+import { BriefcaseIcon, LayersIcon, MapPinIcon, PlayIcon } from 'lucide-react'
 import { getCompanyById, getCompanyJobs } from '../../services/api/companies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { RecruitTouchFrame } from '../recruitment-touch/RecruitTouchFrame'
+import { RtFill } from '../recruitment-touch/RtFill'
+import { RtHelpLine } from '../recruitment-touch/RtHelpLine'
 import {
   DirExitList,
   DirKv,
@@ -153,7 +155,10 @@ export function CompanyDetailPage() {
         {qr ? (
           <button type="button" className="qx-btn" data-variant="primary" onClick={() => setQr(null)}>关闭二维码</button>
         ) : state === 'loading' ? (
-          <DirState tone="info" testId="company-directory-loading" title="正在读取企业资料">企业名称、在招岗位数取到之前不显示任何数字。</DirState>
+          <>
+            <DirState tone="info" testId="company-directory-loading" title="正在读取企业资料">企业名称、在招岗位数取到之前不显示任何数字。</DirState>
+            <RtFill preset="directory" />
+          </>
         ) : state === 'error' || !company ? (
           <>
             <DirState tone={notFound ? 'empty' : 'error'} testId={notFound ? 'company-directory-company-missing' : 'company-directory-company-error'} title={notFound ? '企业详情不可用' : '企业详情读取失败'}>
@@ -161,7 +166,9 @@ export function CompanyDetailPage() {
             </DirState>
             <DirExitList>
               <DirStripItem icon={BriefcaseIcon} tone="wheat" title="看岗位信息" desc="直接按岗位找，不按企业找" onClick={() => navigate('/jobs')} />
+              <DirStripItem icon={LayersIcon} tone="slate" title="看招聘会" desc="先看场次，再决定要不要去" onClick={() => navigate('/job-fairs')} />
             </DirExitList>
+            <RtHelpLine />
             <DirNote>{BOUNDARY}</DirNote>
           </>
         ) : (
@@ -292,6 +299,7 @@ export function CompanyDetailPage() {
             </DirSec>
             <DirNote>{BOUNDARY}</DirNote>
             {companyTrust && !companyTrust.ok ? <div className="dw-reason">{sourceTrustReason(companyTrust, SOURCE_APPLY_UNAVAILABLE_REASON)}</div> : null}
+            {sparse ? <RtFill preset="directory" /> : null}
           </>
         )}
       </div>

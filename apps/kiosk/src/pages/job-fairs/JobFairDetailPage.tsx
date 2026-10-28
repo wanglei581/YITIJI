@@ -41,6 +41,7 @@ import {
   type FairSubnavAvailability,
 } from './components/FairDetailSections'
 import { DirState, DirStrip, DirStripItem } from '../../components/qingxu/directory/DirectoryBits'
+import { RtFill } from '../recruitment-touch/RtFill'
 
 type QrState =
   | { kind: 'book' }
@@ -271,6 +272,7 @@ export function JobFairDetailPage() {
         <>
           <FairSkeletonList rows={2} />
           <p className="dw-why">正在取这场的详情与来源三要素。内容返回前不展示任何内容。</p>
+          <RtFill preset="fair" />
         </>
       ) : uiState === 'error' || !fair ? (
         <>

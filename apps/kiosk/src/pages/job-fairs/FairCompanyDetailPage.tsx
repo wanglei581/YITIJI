@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { userMessageOf } from '../../services/api/userErrorMessage'
+import { recruitErrorText } from '../recruitment-touch/recruitErrorText'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
@@ -114,7 +114,7 @@ export function FairCompanyDetailPage() {
       // 企业资料是运营资料（派生），免检查：写打印交接上下文后进参数页（入口见 printHandoffPolicy）。
       startPrint({ origin: 'fair_company', file, returnPath: window.location.pathname })
     } catch (err) {
-      setPrintError(userMessageOf(err, '打印文件准备失败，请稍后重试'))
+      setPrintError(recruitErrorText(err, '打印文件准备失败，请稍后重试'))
     } finally {
       setPrinting(null)
     }
