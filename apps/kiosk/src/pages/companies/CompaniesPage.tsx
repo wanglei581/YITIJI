@@ -46,9 +46,9 @@ function ChipRow({
     <div className="dw-fgrp">
       <span className="fl">{label}</span>
       <span className="fc">
-        <button type="button" onClick={() => onChange('')} className={`dw-chip ${active === '' ? 'on' : ''}`}>全部</button>
+        <button type="button" onClick={() => onChange('')} aria-pressed={active === ''} className={`dw-chip ${active === '' ? 'on' : ''}`}>全部</button>
         {options.map((o) => (
-          <button key={o.value} type="button" onClick={() => onChange(active === o.value ? '' : o.value)} className={`dw-chip ${active === o.value ? 'on' : ''}`}>{o.text}</button>
+          <button key={o.value} type="button" onClick={() => onChange(active === o.value ? '' : o.value)} aria-pressed={active === o.value} className={`dw-chip ${active === o.value ? 'on' : ''}`}>{o.text}</button>
         ))}
         {onMore && totalCount && totalCount > options.length ? (
           <button type="button" className="dw-chip" aria-haspopup="dialog" onClick={onMore}>
