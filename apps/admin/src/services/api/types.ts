@@ -501,7 +501,8 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
-  voiceUsageTotals: { asrSeconds: number; asrCallsWithUsage: number; ttsChars: number; ttsCallsWithUsage: number }
+  /** 旧版后端没有这个字段（发布时前端可能先到），读取方按「暂无用量数据」处理 */
+  voiceUsageTotals?: { asrSeconds: number; asrCallsWithUsage: number; ttsChars: number; ttsCallsWithUsage: number }
   /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost。 */
   costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{

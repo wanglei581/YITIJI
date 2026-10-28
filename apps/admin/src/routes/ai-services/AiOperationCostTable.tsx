@@ -34,7 +34,9 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
     })
     .filter((row) => row.calls > 0)
     .sort((a, b) => b.calls - a.calls)
-  const roundedAsrSeconds = Math.round(usage.voiceUsageTotals.asrSeconds * 10) / 10
+  // 新前端可能先于后端到达浏览器：旧接口没有语音合计时按「暂无用量数据」显示，不让整页崩
+  const voiceTotals = usage.voiceUsageTotals ?? { asrSeconds: 0, asrCallsWithUsage: 0, ttsChars: 0, ttsCallsWithUsage: 0 }
+  const roundedAsrSeconds = Math.round(voiceTotals.asrSeconds * 10) / 10
   const totalOperationCalls = operationRows.reduce((sum, row) => sum + row.calls, 0)
   // 只累计**已采集**的成本。未采集的那部分不能当 0 加进来充数。
   const totalTokenBilledCost = operationRows
@@ -88,8 +90,8 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                     <td className="px-4 py-3 text-xs text-neutral-500">
                       {!row.tokenBilled
                         ? <>{NON_TOKEN_BILLED_NOTE[row.op]} · {row.op === 'voiceTranscribe'
-                          ? usage.voiceUsageTotals.asrCallsWithUsage > 0 ? `时长 ${Math.floor(roundedAsrSeconds / 60)} 分 ${(roundedAsrSeconds % 60).toFixed(1)} 秒` : '暂无用量数据'
-                          : usage.voiceUsageTotals.ttsCallsWithUsage > 0 ? `${formatCount(usage.voiceUsageTotals.ttsChars)} 字` : '暂无用量数据'}{(row.op === 'voiceTranscribe' ? usage.voiceUsageTotals.asrCallsWithUsage : usage.voiceUsageTotals.ttsCallsWithUsage) < row.calls && '（部分调用无可用数据）'}</>
+                          ? voiceTotals.asrCallsWithUsage > 0 ? `时长 ${Math.floor(roundedAsrSeconds / 60)} 分 ${(roundedAsrSeconds % 60).toFixed(1)} 秒` : '暂无用量数据'
+                          : voiceTotals.ttsCallsWithUsage > 0 ? `${formatCount(voiceTotals.ttsChars)} 字` : '暂无用量数据'}{((measured) => measured > 0 && measured < row.calls ? '（部分调用无可用数据）' : null)(row.op === 'voiceTranscribe' ? voiceTotals.asrCallsWithUsage : voiceTotals.ttsCallsWithUsage)}</>
                         : row.costState === 'uncollected'
                           ? '按 token 计费，但本窗口未采集到用量'
                           : '按 token 用量'}
