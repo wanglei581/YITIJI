@@ -425,6 +425,7 @@ test('W-75 sticky: 从交接页点「问小青」去顾问页，再回「我的�
 
   // 点底栏「问小青」离开确认层，去顾问页：顾问页上没有上一位的任何东西，也不读「我的」。
   await pace(page)
+  await expect(ask, '确认层底栏有稿上的问小青').toBeVisible()
   await ask.click()
   await expect(page).toHaveURL(/\/assistant$/)
   // 稿上的问句只填进输入框，用户自己按发送才发出（没发出就不会有 /assistant/chat 请求，ApiRouter 也会拦下没登记的请求）。
