@@ -484,7 +484,7 @@ expectIncludes(legalDocPage, '<PublicTouchFrame', 'LegalDocPage 必须使用触�
 expectNotIncludes(legalDocPage, 'KioskPageFrame', 'LegalDocPage 已退出 V6 KioskPageFrame')
 expectPattern(
   legalDocPage,
-  /<PublicTouchFrame\b[\s\S]{0,600}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
+  /<PublicTouchFrame\b[\s\S]{0,400}?back=\{\{\s*label:\s*backLabel,\s*onBack:\s*goBack\s*\}\}/,
   'LegalDocPage 顶栏返回槽必须接到 goBack',
 )
 expectPattern(

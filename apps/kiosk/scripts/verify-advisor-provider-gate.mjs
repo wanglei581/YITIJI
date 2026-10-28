@@ -82,7 +82,7 @@ for (const timer of ['setTimeout', 'setInterval']) {
 must('page', /mode: 'manual'/, 'P25 的降级必须是 manual —— 用户的目标不依赖模型')
 must('page', /manualPath:/, 'manual 降级必须给出具体的手动路径')
 // 触屏稿：本轮失败 / 不是 AI 回复 / AI 暂停三种版式，正文都落在「这些都不需要 AI · 现在就能做」的四个手动入口上。
-must('page', /\(body === 'notai' \|\| body === 'error' \|\| body === 'locked'\) && \([\s\S]{0,1400}?<AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
+must('page', /\(body === 'notai' \|\| body === 'error' \|\| body === 'locked'\) && \([\s\S]{0,800}?<AdvisorManualEntries \/>/, '降级时必须给出可点的真实入口，而不只是一句安慰话')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。
