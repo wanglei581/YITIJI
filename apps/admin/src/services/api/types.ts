@@ -501,6 +501,7 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
+  voiceUsageTotals: { asrSeconds: number; asrCallsWithUsage: number; ttsChars: number; ttsCallsWithUsage: number }
   /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost。 */
   costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{

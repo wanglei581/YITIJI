@@ -230,7 +230,7 @@ export default function AiServicesPage() {
 
   const estimatedCost  = formatCny(usage.estimatedCostCny)
   // 这张卡来自旧调用日志的 token 估算，和上面额度面板按计量账算出的「已计费金额」不是同一本账。
-  const logCostDistinction = '这是旧调用日志按 token 估算的金额，和上面额度面板的「已计费金额」不是一回事'
+  const logCostDistinction = '这是旧调用日志中大模型按 token 估算的金额，语音费用待配置单价后计入，和上面额度面板的「已计费金额」不是一回事'
   const costNote       = usage.unmeasuredCalls > 0
     ? `下限 · 另有 ${usage.unmeasuredCalls} 次调用未采集成本。${logCostDistinction}`
     : usage.estimatedCostCny === 0

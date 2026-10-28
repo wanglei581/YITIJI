@@ -61,6 +61,7 @@ function computeUsage(entries: AdminAiLogEntry[]): AdminAiUsage {
     byOperation,
     errorDistribution: Object.entries(errorCounts).map(([code, count]) => ({ code, count })),
     tokenUsageTotals: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    voiceUsageTotals: { asrSeconds: 0, asrCallsWithUsage: 0, ttsChars: 0, ttsCallsWithUsage: 0 },
     costByOperation,
     alerts: [],
     estimatedCostCny: 0,

@@ -11,6 +11,7 @@ import { formatCny } from './aiUsageDisplay'
 // ============================================================
 
 import { Card } from '@ai-job-print/ui'
+import { formatCount } from '@ai-job-print/shared'
 import type { AdminAiUsage, AiOperation } from '../../services/api'
 import { NON_TOKEN_BILLED_NOTE, NON_TOKEN_BILLED_OPS, OPERATION_LABELS } from './aiOperationLabels'
 
@@ -33,6 +34,7 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
     })
     .filter((row) => row.calls > 0)
     .sort((a, b) => b.calls - a.calls)
+  const roundedAsrSeconds = Math.round(usage.voiceUsageTotals.asrSeconds * 10) / 10
   const totalOperationCalls = operationRows.reduce((sum, row) => sum + row.calls, 0)
   // 只累计**已采集**的成本。未采集的那部分不能当 0 加进来充数。
   const totalTokenBilledCost = operationRows
@@ -70,8 +72,10 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                     <td className="px-4 py-3 text-right font-mono text-neutral-700">{row.calls}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs">
                       {/* 三态：未采集绝不显示 ¥0（那等于谎称免费）；部分采集要标出缺口 */}
-                      {!row.tokenBilled || row.costState === 'uncollected'
-                        ? <span className="text-neutral-400">未估算</span>
+                      {!row.tokenBilled
+                        ? <span className="text-neutral-400">未配置单价</span>
+                        : row.costState === 'uncollected'
+                          ? <span className="text-neutral-400">未估算</span>
                         : (
                           <span className="text-neutral-700">
                             {formatCny(row.cost)}
@@ -83,7 +87,9 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                     </td>
                     <td className="px-4 py-3 text-xs text-neutral-500">
                       {!row.tokenBilled
-                        ? NON_TOKEN_BILLED_NOTE[row.op]
+                        ? <>{NON_TOKEN_BILLED_NOTE[row.op]} · {row.op === 'voiceTranscribe'
+                          ? usage.voiceUsageTotals.asrCallsWithUsage > 0 ? `时长 ${Math.floor(roundedAsrSeconds / 60)} 分 ${(roundedAsrSeconds % 60).toFixed(1)} 秒` : '暂无用量数据'
+                          : usage.voiceUsageTotals.ttsCallsWithUsage > 0 ? `${formatCount(usage.voiceUsageTotals.ttsChars)} 字` : '暂无用量数据'}{(row.op === 'voiceTranscribe' ? usage.voiceUsageTotals.asrCallsWithUsage : usage.voiceUsageTotals.ttsCallsWithUsage) < row.calls && '（部分调用无可用数据）'}</>
                         : row.costState === 'uncollected'
                           ? '按 token 计费，但本窗口未采集到用量'
                           : '按 token 用量'}
@@ -100,8 +106,8 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
                   <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{formatCny(totalTokenBilledCost)}</td>
                   <td className="px-4 py-3 text-neutral-500">
                     {totalUnmeasuredCalls > 0
-                      ? `语音能力未含在内；另有 ${totalUnmeasuredCalls} 笔未采集，合计为下限`
-                      : '语音能力成本未含在内'}
+                      ? `合计只含大模型费用；语音费用待配置单价后计入；另有 ${totalUnmeasuredCalls} 笔未采集，合计为下限`
+                      : '合计只含大模型费用；语音费用待配置单价后计入'}
                   </td>
                 </tr>
               </tfoot>
@@ -110,7 +116,7 @@ export function AiOperationCostTable({ usage }: CostTableProps) {
         </div>
       </Card>
       <p className="mt-2 text-xs text-neutral-400">
-        语音转写 / 语音播报按时长与字符计费，缺少厂家确认单价，此处不估算成本，请以厂商账单为准。
+        语音用量仅统计可确认的音频时长和合成成功文字；计费单位与单价待合同确认，请以厂商账单为准。
       </p>
       {/*
         历史数据说明（交付章程 D-2）：token 用量从来没采集过，少算部分不可恢复。

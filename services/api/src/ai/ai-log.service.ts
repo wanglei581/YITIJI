@@ -1,3 +1,4 @@
+import { parseVoiceUsage, type VoiceUsage } from './voice-usage'
 import { Injectable, Logger } from '@nestjs/common'
 import type { AiProviderName, AiTokenUsage, AiUsageReport } from './interfaces/ai-provider.interface'
 import { PrismaService } from '../prisma/prisma.service'
@@ -70,6 +71,7 @@ export interface AiLogEntry {
   status: 'success' | 'failed'
   /** 缺省 = 未采集到 token（**不是 0**）。 */
   tokenUsage?: AiTokenUsage
+  voiceUsage?: VoiceUsage
   /**
    * 估算成本（元）。三态语义，落库映射到 AiServiceLog.estimatedCostCny：
    * - 数字（含 0）→ 已确定成本（0 = 确实没花钱，如 mock provider / 一次都没打到模型）
@@ -128,6 +130,7 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
+  voiceUsageTotals: { asrSeconds: number; asrCallsWithUsage: number; ttsChars: number; ttsCallsWithUsage: number }
   /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost 的注释。 */
   costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{
@@ -400,7 +403,7 @@ export class AiLogService {
   record(entry: AiLogRecordInput): void {
     const full: AiLogRecordInput & { createdAt: string } = {
       ...entry,
-      estimatedCostCny: entry.estimatedCostCny ?? estimateCostCny(entry.provider, entry.tokenUsage),
+      estimatedCostCny: NON_TOKEN_BILLED_OPERATIONS.includes(entry.operation) ? undefined : entry.estimatedCostCny ?? estimateCostCny(entry.provider, entry.tokenUsage),
       createdAt: new Date().toISOString(),
     }
     this.logs.push(full)
@@ -461,8 +464,8 @@ export class AiLogService {
         status: entry.status,
         latencyMs: entry.latencyMs,
         errorCode: entry.errorCode ?? null,
-        tokenUsageJson: entry.tokenUsage ? JSON.stringify(entry.tokenUsage) : '{}',
-        estimatedCostCny: entry.estimatedCostCny ?? null,
+        tokenUsageJson: JSON.stringify({ ...entry.tokenUsage, ...(entry.voiceUsage ? { voiceUsage: entry.voiceUsage } : {}) }),
+        estimatedCostCny: NON_TOKEN_BILLED_OPERATIONS.includes(entry.operation) ? null : entry.estimatedCostCny ?? null,
         endUserId: entry.endUserId ?? null,
         terminalId: entry.terminalId ?? null,
         clientDeclarationJson: declarationJsonFor(entry),
@@ -485,6 +488,7 @@ export class AiLogService {
     const byOperation = operationRecord(0)
     const costByOperation = emptyOperationCosts()
     const tokenUsageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+    const voiceUsageTotals = { asrSeconds: 0, asrCallsWithUsage: 0, ttsChars: 0, ttsCallsWithUsage: 0 }
     const errorCounts: Record<string, number> = {}
     const callsByTerminal = new Map<string, number>()
     let unmeasuredCalls = 0
@@ -500,6 +504,16 @@ export class AiLogService {
         cost.cny += e.estimatedCostCny
       } else {
         unmeasuredCalls += 1
+      }
+      const voice = e.voiceUsage
+      // 识别只算成功的调用：失败的供应方是否计费不明，宁可少算不多算
+      if (e.operation === 'voiceTranscribe' && e.status === 'success' && voice?.complete && typeof voice.audioSeconds === 'number') {
+        voiceUsageTotals.asrSeconds += voice.audioSeconds
+        voiceUsageTotals.asrCallsWithUsage++
+      }
+      if (e.operation === 'voiceSynthesize' && typeof voice?.succeededChars === 'number' && (voice.complete || (voice.succeededSegments ?? 0) > 0)) {
+        voiceUsageTotals.ttsChars += voice.succeededChars
+        voiceUsageTotals.ttsCallsWithUsage++
       }
       tokenUsageTotals.promptTokens += e.tokenUsage?.promptTokens ?? 0
       tokenUsageTotals.completionTokens += e.tokenUsage?.completionTokens ?? 0
@@ -521,6 +535,7 @@ export class AiLogService {
       byOperation,
       errorDistribution,
       tokenUsageTotals,
+      voiceUsageTotals,
       costByOperation: roundOperationCosts(costByOperation),
       alerts: buildAiUsageAlerts({ total, failCount: failList.length, estimatedCostCny, callsByTerminal, unmeasuredCalls }),
       estimatedCostCny,
@@ -589,6 +604,7 @@ function toLogEntry(row: AiServiceLogRow, providerFallback: string): AiLogEntry 
     latencyMs: row.latencyMs ?? 0,
     status: row.status === 'failed' ? 'failed' : 'success',
     tokenUsage: parseTokenUsage(row.tokenUsageJson),
+    voiceUsage: parseVoiceUsage(row.tokenUsageJson),
     estimatedCostCny: row.estimatedCostCny ?? undefined,
     errorCode: row.errorCode ?? undefined,
     createdAt: row.createdAt.toISOString(),

@@ -16,7 +16,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { verifyAiCostUiCoverage } from './verify-ai-cost-ui-coverage'
-import { costTriStateRuntimeChecks, providerCompatRuntimeChecks } from './verify-ai-cost-runtime'
+import { costTriStateRuntimeChecks, providerCompatRuntimeChecks, voiceUsageRuntimeChecks } from './verify-ai-cost-runtime'
 
 const ROOT = join(__dirname, '..')
 const APPS_ROOT = join(ROOT, '..', '..', 'apps')
@@ -378,8 +378,9 @@ async function runtimeChecks(): Promise<void> {
     else fail(`运行时: ${c.label} estimatedCostCny 应为 null，实际 ${String(row.estimatedCostCny)}`)
 
     // 按 token 计费的字段必须为空对象，不能塞假 token
-    if (row.tokenUsageJson === '{}') pass(`运行时: ${c.label} tokenUsage 为空（ASR/TTS 无 token）`)
-    else fail(`运行时: ${c.label} tokenUsageJson 应为 {}，实际 ${row.tokenUsageJson}`)
+    const parsedUsage = JSON.parse(row.tokenUsageJson ?? '{}') as Record<string, unknown>
+    if (!('promptTokens' in parsedUsage) && !('completionTokens' in parsedUsage) && !('totalTokens' in parsedUsage)) pass(`运行时: ${c.label} 不含虚构 token`)
+    else fail(`运行时: ${c.label} 出现虚构 token`)
 
     if (row.latencyMs !== null && row.latencyMs >= 0) pass(`运行时: ${c.label} latencyMs 已记录`)
     else fail(`运行时: ${c.label} latencyMs 缺失`)
@@ -391,6 +392,8 @@ async function runtimeChecks(): Promise<void> {
   else fail(`运行时: getUsage.byOperation.voiceTranscribe 应 ≥2，实际 ${usage.byOperation.voiceTranscribe}`)
   if (usage.byOperation.voiceSynthesize >= 2) pass('运行时: getUsage.byOperation.voiceSynthesize 已计数')
   else fail(`运行时: getUsage.byOperation.voiceSynthesize 应 ≥2，实际 ${usage.byOperation.voiceSynthesize}`)
+
+  await voiceUsageRuntimeChecks(pass, fail, aiLog)
 
   // 清理本次运行时产生的行，保持脚本幂等
   await prisma.aiServiceLog.deleteMany({
