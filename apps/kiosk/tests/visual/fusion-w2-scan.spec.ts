@@ -1299,6 +1299,66 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   await expectHealthy(page, errors)
 })
 
+/** 一个元素里的文字排成了几行（按字形矩形的纵向中心去重；折行的字会落在不同的纵向位置）。 */
+async function textLineCount(target: Locator): Promise<number> {
+  return target.evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const centers = Array.from(range.getClientRects())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => rect.top + rect.height / 2)
+      .sort((a, b) => a - b)
+    const tolerance = parseFloat(getComputedStyle(el).fontSize) * 0.6
+    return centers.filter((center, index) => index === 0 || center - centers[index - 1] > tolerance).length
+  })
+}
+
+/*
+ * 结果页的页内预览曾落进两列网格的第一列（minmax(140px, 28%)），只有 263px 宽，右边 700×620 的空米色，
+ * 翻页键被挤成「上一 / 页」「下一 / 页」竖排。示意图拿掉以后那条两列网格没跟着改。
+ * 空白扫描量不到它（左边那条白纸让每一行都不「纯色」），所以要用量出来的几何钉住。
+ */
+test('scan result inline preview takes the full well, keeps the pager on one line and the open row tappable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page, TWO_PAGE_PDF_PATH)
+  await installPreviewFixtures(page)
+  registerShell(api)
+  await seedScanResult(page, previewResult({
+    fileUrl: TWO_PAGE_PDF_PATH,
+    name: 'w2-scan-two-page.pdf',
+    pages: 2,
+    mimeType: 'application/pdf',
+    format: 'PDF',
+  }))
+  await page.goto('/scan?stage=result')
+  const inline = page.locator('.sw-pvstage [data-file-preview-kind="pdf"] [data-pdf-preview-host]')
+  await expect(inline).toHaveAttribute('data-pdf-status', 'ready', { timeout: 20_000 })
+
+  const stage = await boxOf(page.locator('.sw-pvstage'), '预览井')
+  const doc = await boxOf(page.locator('.sw-pvdoc'), '预览卡')
+  expect(
+    doc.width,
+    `预览卡只有 ${Math.round(doc.width)}px 宽，要占预览井 ${Math.round(stage.width)}px 的六成以上`,
+  ).toBeGreaterThanOrEqual(stage.width * 0.6)
+
+  // 翻页键：单行，且可点区不小于 64×64。
+  for (const name of ['上一页', '下一页']) {
+    const key = page.locator('.sw-pvdoc').getByRole('button', { name, exact: true })
+    expect(await textLineCount(key), `「${name}」的字不许折成两行`).toBe(1)
+    const box = await boxOf(key, name)
+    expect(box.width, `${name} 宽`).toBeGreaterThanOrEqual(64)
+    expect(box.height, `${name} 高`).toBeGreaterThanOrEqual(64)
+  }
+
+  // 稿的排法：预览在上，文件信息在下，「整屏查看」是文件信息下面的一整行。
+  const brief = await boxOf(page.getByTestId('scan-workbench-file-brief'), '文件信息条')
+  expect(brief.y, '文件信息在预览下面').toBeGreaterThanOrEqual(stage.y + stage.height - 1)
+  const open = await boxOf(page.getByTestId('scan-result-preview-open'), '整屏查看')
+  expect(open.y, '整屏查看在文件信息下面').toBeGreaterThanOrEqual(brief.y + brief.height - 1)
+  expect(open.width, '整屏查看宽').toBeGreaterThanOrEqual(64)
+  expect(open.height, '整屏查看高').toBeGreaterThanOrEqual(64)
+  await expectHealthy(page, errors)
+})
+
 test('scan result preview counts pages from the file when the receipt omits them @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
   const binary = new FusionW2BinaryRoute(page)
