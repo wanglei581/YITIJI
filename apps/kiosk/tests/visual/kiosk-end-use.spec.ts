@@ -427,6 +427,8 @@ test('W-75 sticky: 从交接页点「问小青」去顾问页，再回「我的�
   await pace(page)
   await ask.click()
   await expect(page).toHaveURL(/\/assistant$/)
+  // 稿上的问句只填进输入框，用户自己按发送才发出（没发出就不会有 /assistant/chat 请求，ApiRouter 也会拦下没登记的请求）。
+  await expect(page.getByLabel('输入咨询问题')).toHaveValue('这一页是什么意思？')
   await expect(page.locator('body')).not.toContainText(WANG.nickname)
   await expectNoTraceOf(page, WANG)
   await page.waitForTimeout(500)
