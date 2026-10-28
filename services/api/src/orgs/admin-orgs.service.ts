@@ -30,6 +30,7 @@ import { contactPhoneAssignment } from './contact-phone-change'
 import { assertPartnerAccountIdentifiers } from './partner-account-identifiers'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 import { isParkedOrgType, throwOrgTypeParked } from './parked-org-types'
+import { orgBrandOverrideView, prepareOrgBrandPatch } from '../branding/org-brand-patch'
 import {
   ADMIN_ORG_ACCOUNT_SELECT,
   mapAdminOrgAccount,
@@ -163,6 +164,13 @@ export interface AdminOrgListItem {
   contentTrustStatus: string | null
   /** archivedAt != null。已归档机构即使 contentTrustStatus='active' 也一样不得发布。 */
   archived: boolean
+  /** 贴牌：机构自己的品牌覆盖三项（库存值，null = 用平台默认）与现成的 Logo 公开地址。 */
+  brandName: string | null
+  brandMark: string | null
+  brandLogoAssetId: string | null
+  brandLogoUrl: string | null
+  /** 软件使用授权方式：none 不管控（默认）/ required 须有生效授权。授权本身见 /admin/orgs/:orgId/licenses。 */
+  licenseMode: string
   createdAt: string
   updatedAt: string
   counts: { accounts: number; sources: number; jobs: number; fairs: number }
@@ -183,6 +191,10 @@ interface PrismaOrgRow {
   enabled: boolean
   contentTrustStatus: string | null
   archivedAt: Date | null
+  brandName: string | null
+  brandMark: string | null
+  brandLogoAssetId: string | null
+  licenseMode: string
   createdAt: Date
   updatedAt: Date
 }
@@ -225,6 +237,8 @@ function mapOrg(
     enabled: o.enabled,
     contentTrustStatus: o.contentTrustStatus,
     archived: o.archivedAt != null,
+    ...orgBrandOverrideView(o),
+    licenseMode: o.licenseMode,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
     counts,
@@ -396,10 +410,12 @@ export class AdminOrgsService {
         typeIsNew: typeChanged,
       })
     }
+    const brandPatch = await prepareOrgBrandPatch(this.prisma, dto)
     await this.prisma.$transaction(async (tx) => {
       await tx.organization.update({
         where: { id: orgId },
         data: {
+          ...brandPatch,
           ...(dto.name !== undefined ? { name: dto.name } : {}),
           ...(dto.type !== undefined ? { type: dto.type } : {}),
           ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
