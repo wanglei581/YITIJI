@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1880 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1881 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -185,7 +185,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 172 个文件</summary>
+<summary><code>apps/admin/src/</code> — 173 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -222,6 +222,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/dashboard/RecentPrintTasks.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/dashboard/dashboardRows.ts` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/dashboard/printerStatusSummary.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |

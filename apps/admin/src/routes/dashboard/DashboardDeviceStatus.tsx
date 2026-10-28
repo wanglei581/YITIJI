@@ -2,24 +2,15 @@ import { formatCount } from '@ai-job-print/shared'
 import { SectionCard } from '@ai-job-print/ui'
 import type { AdminPrinterRecord, AdminTerminalRecord } from '../../services/api/devices'
 import { BlockError } from './DashboardWidgets'
+import { printerIssueParts, summarizePrinters } from './printerStatusSummary'
 
 function supplyLine(printers: AdminPrinterRecord[]): string {
-  let faults = 0
-  let low = 0
-  for (const printer of printers) {
-    const jammed = printer.paperStatus === 'jam'
-    if (printer.status === 'error' || jammed) faults += 1
-    else if (
-      printer.paperStatus === 'low'
-      || printer.paperStatus === 'empty'
-      || (printer.tonerLevel !== null && printer.tonerLevel < 20)
-    ) low += 1
-  }
-  const parts: string[] = []
-  if (faults > 0) parts.push(`故障 ${formatCount(faults)} 台`)
-  if (low > 0) parts.push(`纸张或墨粉不足 ${formatCount(low)} 台`)
-  const status = parts.length > 0 ? `${parts.join('，')}。` : '当前没有故障，也没有纸张或墨粉不足。'
-  return low > 0 ? `${status}不足的仍可打印。` : status
+  if (printers.length === 0) return '还没有打印机上报状态。'
+  const counts = summarizePrinters(printers)
+  const parts = printerIssueParts(counts)
+  return parts.length > 0
+    ? `${parts.join('，')}。`
+    : `${formatCount(counts.normal)} 台打印机都在线，没有报告故障，也没有报告纸张或墨粉不足。`
 }
 
 export function DashboardDeviceStatus({

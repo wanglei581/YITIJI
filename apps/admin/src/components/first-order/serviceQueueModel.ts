@@ -13,8 +13,9 @@ export function parsePartnerSection(value: string | null): PartnerSection | null
   return SECTIONS.find((section) => section === value) ?? null
 }
 
-export function partnerSectionHref(orgId: string, section: PartnerSection): string {
-  return `/partners?org=${encodeURIComponent(orgId)}&section=${section}`
+export function partnerSectionHref(orgId: string, section: PartnerSection, projectId?: string | null): string {
+  const base = `/partners?org=${encodeURIComponent(orgId)}&section=${section}`
+  return projectId ? `${base}&projectId=${encodeURIComponent(projectId)}` : base
 }
 
 /** 首单客户端和出纸未确认在演示模式都会抛这句，不能当成读取失败。 */
