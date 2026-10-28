@@ -25051,6 +25051,9 @@
       "services/api/scripts/verify-resume-parse-intent-http.ts",
       "services/api/scripts/verify-resume-voice-generate.ts"
     ],
+    "services/api/src/asr/wav-duration.ts": [
+      "services/api/scripts/verify-ai-cost-runtime.ts"
+    ],
     "services/api/src/assistant/daily-brief.controller.ts": [
       "services/api/scripts/verify-ai-access.ts",
       "services/api/scripts/verify-community-daily-brief.ts"
@@ -35613,6 +35616,7 @@
           "services/api/src/ai/providers/openai.provider.stub.ts",
           "services/api/src/ai/providers/qwen.provider.stub.ts",
           "services/api/src/ai/providers/zhipu.provider.stub.ts",
+          "services/api/src/asr/wav-duration.ts",
           "services/api/src/mock-interview/asr/tts.service.ts",
           "services/api/src/mock-interview/mock-interview.controller.ts"
         ],

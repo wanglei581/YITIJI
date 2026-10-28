@@ -2271,7 +2271,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>services/api/src/</code> — 602 个文件</summary>
+<summary><code>services/api/src/</code> — 603 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -2407,6 +2407,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `services/api/src/ai/usage/ai-usage.module.ts` | `verify-ai-usage-budget.ts`<br/>`verify-ai-usage-coverage.ts` |
 | `services/api/src/app.module.ts` | `verify-profile-commercial-first-batch.mjs`<br/>`verify-ai-access.ts`<br/>`verify-ai-platform-degradation.ts`<br/>`verify-ai-usage-budget.ts`<br/>`verify-contract-review-http.ts`<br/>`verify-file-assets-trial-acceptance.ts`<br/>`verify-job-ai-backend.ts`<br/>`verify-job-ai-privacy.ts`<br/>`verify-job-application-track.ts`<br/>`verify-job-favorites-http.ts`<br/>`verify-job-materials.ts`<br/>`verify-member-assets-c2d.ts`<br/>`verify-member-auth.ts`<br/>`verify-member-qr-login.ts`<br/>`verify-member-restore.ts`<br/>`verify-member-step-up.ts`<br/>`verify-resume-export-draft-source.ts`<br/>`verify-trtc-ownership.ts`<br/>`verify-upload-sessions-http.ts` |
 | `services/api/src/asr/asr.service.ts` | `verify-ai-endpoint-allowlist.ts`<br/>`verify-ai-throttle-dimension.ts`<br/>`verify-ai-usage-coverage.ts`<br/>`verify-resume-parse-intent-http.ts`<br/>`verify-resume-voice-generate.ts` |
+| `services/api/src/asr/wav-duration.ts` | `verify-ai-cost-runtime.ts` |
 | `services/api/src/assistant/daily-brief.controller.ts` | `verify-ai-access.ts`<br/>`verify-community-daily-brief.ts` |
 | `services/api/src/assistant/daily-brief.service.ts` | `verify-beijing-display-time.ts`<br/>`verify-community-daily-brief.ts`<br/>`verify-recruitment-hosting-default-off.ts` |
 | `services/api/src/audit/audit.module.ts` | `verify-contract-review-http.ts`<br/>`verify-internal-accounts.ts` |
