@@ -46,8 +46,8 @@ export function QrOverlay({
         aria-label="扫码投递"
         onClick={(event) => event.stopPropagation()}
       >
-        <button onClick={onClose} aria-label="关闭" className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100">
-          <XIcon className="h-5 w-5" />
+        <button onClick={onClose} aria-label="关闭" className="absolute right-3 top-3 flex h-[64px] w-[64px] items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100">
+          <XIcon className="h-6 w-6" />
         </button>
 
         <p className="text-center text-base font-semibold text-neutral-800">扫码投递</p>

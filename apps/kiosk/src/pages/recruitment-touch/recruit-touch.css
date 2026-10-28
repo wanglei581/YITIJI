@@ -322,6 +322,12 @@
   line-height: 1.4;
 }
 .qxt-screen[data-qx-page='recruit'] .rt-boundary * { font-size: inherit; }
+/* 岗位列表底部「AI岗位推荐」磁贴：旧样式的图标是白色（var(--k-surface)）叠在浅底上几乎看不见，
+   本页作用域里给图标块上浅青底、深青字；jobs-fairs-foundation.css 的默认不动。 */
+.qxt-screen[data-qx-page='recruit'] .jf-tile.tinted .jf-tile-icon {
+  background: var(--qxt-teal-wash);
+  color: var(--qxt-teal-ink);
+}
 /* 二维码弹层（FairQrOverlay）里的来源三要素与说明：旧样式 18–19px，本页作用域里抬到 20px。
    校园页签的弹层走触屏壳的 overlay 槽，在 .dw-page 之外，吃不到上面那条「内芯字号继承」，所以单独写。 */
 .qxt-screen[data-qx-page='recruit'] .qxfw-overlay :is(.dw-kv > div, .qxfw-overlay-note, .qxfw-overlay-sub) {
