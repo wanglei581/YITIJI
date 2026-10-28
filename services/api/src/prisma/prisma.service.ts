@@ -82,6 +82,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // ── Model delegates ────────────────────────────────────────────────────────
 
+  get aiServiceFact() {
+    return this.client.aiServiceFact
+  }
+
   get terminal() {
     return this.client.terminal
   }

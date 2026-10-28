@@ -3530,3 +3530,15 @@ model ServiceReport {
   @@unique([projectId, month])
   @@index([orgId, month])
 }
+
+model AiServiceFact {
+  id          String   @id @default(cuid())
+  serviceType String
+  serviceKey  String
+  orgId       String
+  terminalId  String
+  occurredAt  DateTime @default(now())
+
+  @@unique([serviceType, serviceKey])
+  @@index([orgId, occurredAt])
+}
