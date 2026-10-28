@@ -43,7 +43,7 @@ async function verify(kind: 'sqlite' | 'postgres', directory: string, url: strin
       orgId: sentinel.id, name: 'Migration project', reference: 'migration-1', serviceStartAt: new Date('2026-01-01T00:00:00Z'),
       serviceEndAt: new Date('2027-01-01T00:00:00Z'), serviceScope: 'Migration only', supportContact: 'Test support',
     } })
-    await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id } })
+    await client.terminal.create({ data: { id: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', agentToken: 'migration-only-no-device', deviceFingerprint: 'migration', orgId: sentinel.id }, select: { id: true } })
     const deployment = await client.serviceDeployment.create({ data: {
       projectId: project.id, orgId: sentinel.id, terminalId: 'migration-terminal', activeTerminalId: 'migration-terminal', terminalCode: 'MIGRATION-TERMINAL', locationLabel: 'Test',
     } })
