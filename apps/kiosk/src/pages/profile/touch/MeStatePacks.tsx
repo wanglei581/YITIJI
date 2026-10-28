@@ -24,6 +24,7 @@ import {
 import { QxTouchCallout } from '../../../components/qingxu/touch/QxTouchCallout'
 import { publicIdleLogoutLabel, resultIdleLogoutLabel } from '../../../auth/kioskIdleTiming'
 import { helpNeededLine, type PublicSupportContact } from '../../../copy/unattendedCopy'
+import { useRecruitmentHosting, type RecruitmentHostingState } from '../../../hooks/useRecruitmentHosting'
 import { useSupportContact } from '../../../hooks/useSupportContact'
 import { MeArt, type MeArtName } from './MeIllus'
 import type { MeGatePage } from './meGatePage'
@@ -122,7 +123,28 @@ function LoginCard({ title, text }: { title: string; text: string }) {
   )
 }
 
-export function MeLoginGate({ page, printPick = false }: { page: MeGatePage; printPick?: boolean }) {
+/**
+ * 登录门的边界句。稿上没画这一行，2.0 的说明格里有，招聘托管用例按它盯着：
+ * 托管读到「关闭」才说未开放；还没读到时只说不代收简历、不转交企业，不提岗位与招聘会开没开；打开时说它们只做来源信息入口。
+ */
+function guestBoundaryLine(hosting: RecruitmentHostingState): string {
+  if (hosting.status !== 'ready') return '本机不代收简历，也不把你的资料转交给任何企业。'
+  return hosting.enabled
+    ? '本机不代收简历，岗位与招聘会只做来源信息入口。'
+    : '本机不代收简历，本终端未开放岗位与招聘会信息。'
+}
+
+function GuestBoundary() {
+  const hosting = useRecruitmentHosting()
+  return <p className="me-fine" data-testid="member-records-guest-boundary">{guestBoundaryLine(hosting)}</p>
+}
+
+export function MeLoginGate({ page, printPick = false, boundary = false }: {
+  page: MeGatePage
+  printPick?: boolean
+  /** 画边界句（本机不代收简历，随招聘托管状态改口）。只有 2.0 里带说明格的记录页要，别的页的登录门不读终端配置。 */
+  boundary?: boolean
+}) {
   const navigate = useNavigate()
   const what = WHAT[page]
   const docs = page === 'my-docs'
@@ -142,11 +164,12 @@ export function MeLoginGate({ page, printPick = false }: { page: MeGatePage; pri
           <MeExitCard art="scan" artWidth={120} title="返回选文件" desc="回到刚才的打印" onClick={() => navigate('/print/upload')} />
         ) : null}
         <MeExitCard art="usb" artWidth={120} title="打印扫描" desc="不登录也能打印、扫描" onClick={() => navigate('/print-scan')} />
-        <MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+        <MeExitCard art="checklist" artWidth={108} title="查政策" desc="看本机构发布的就业政策" testId="member-records-guest-policy" onClick={() => navigate('/policy-service')} />
         {page === 'my-benefits' ? (
           <MeExitCard art="stack" artWidth={108} title="先看看有哪些活动" desc="活动列表现在就能看" onClick={() => navigate('/activities')} />
         ) : null}
       </div>
+      {boundary ? <GuestBoundary /> : null}
       <MeIdleHelp docs={docs} />
     </div>
   )

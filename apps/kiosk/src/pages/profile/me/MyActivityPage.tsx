@@ -135,12 +135,12 @@ export function MyActivityPage() {
           <MeEmptyPack sentence={browseTab ? '这里还没有记录。只记你在这台机器上浏览和打开的来源。' : '打开来源平台或官方入口之后，这里会出现记录。是否投递、是否预约得成由来源平台决定，本系统不记录也不参与。'}>
             {hostingOpen ? (
               <>
-                <MeExitCard art="checklist" artWidth={120} title="查看岗位" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" onClick={() => navigate('/jobs')} />
-                <MeExitCard art="stack" artWidth={110} title="查看招聘会" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" onClick={() => navigate('/job-fairs')} />
+                <MeExitCard art="checklist" artWidth={120} title="查看岗位" desc="在岗位详情里点「去来源平台投递」或「扫码投递」" testId="member-records-start-jobs" onClick={() => navigate('/jobs')} />
+                <MeExitCard art="stack" artWidth={110} title="查看招聘会" desc="在招聘会详情里点「去来源平台预约」或「扫码预约」" testId="member-records-start-fairs" onClick={() => navigate('/job-fairs')} />
               </>
             ) : (
               <>
-                <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="看本机构发布的就业政策" onClick={() => navigate('/policy-service')} />
+                <MeExitCard art="checklist" artWidth={120} title="查看政策" desc="看本机构发布的就业政策" testId="member-records-start-policy" onClick={() => navigate('/policy-service')} />
                 <MeExitCard art="usb" artWidth={120} title="去打印" desc="打印和扫描现在就能办" onClick={() => navigate('/print-scan')} />
               </>
             )}
