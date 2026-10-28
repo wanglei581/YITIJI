@@ -6,8 +6,9 @@
  *   2. 默认：没配置时和今天一模一样（职易达 / 职 / 现有备案号与查询链接），两个公开接口都是。
  *   3. 平台修改生效、写审计；省略不改、清空回默认；非管理员 403。
  *   4. 校验：品牌名 1–12 字、字标恰好 1 字、控制字符 / 零宽字符拒绝；备案链接只许 https + 官方备案域名（含 beian.mps.gov.cn）。
- *   5. Logo：只收 PNG / WebP（按文件头判，不信扩展名与 Content-Type）；SVG / JPEG / GIF / 动图 / 损坏 /
- *      超 512KB / 超 1024 / 非 1:1 一律拒；元数据块被剥掉、清洗后仍能解码；公开读取只认 Logo 表。
+ *   5. Logo：只收 PNG（按文件头判，不信扩展名与 Content-Type）；WebP / SVG / JPEG / GIF / 动图 / 损坏 /
+ *      超 512KB / 超 1024 / 非 1:1 一律拒；落盘的是解压校验后重新编码的文件（只剩 IHDR / PLTE / tRNS / IDAT / IEND）；
+ *      公开读取只认 Logo 表。文件内容检查的细节（压缩流、夹带、解压炸弹、扫描行布局）在 verify-brand-logo-image.ts。
  *   6. 机构覆盖只影响该机构的终端；逐项独立回退；终端 → 机构 → 平台。
  *   6b. kiosk-profile 对已验签终端带 licenseState（ok / grace / inactive），只给状态不给到期日等商务细节。
  *   7. 未验签 / 未知终端 / 伪造终端头：只拿平台默认，没有点位、没有机构、没有授权状态；公开响应不含任何非公开字段。
@@ -22,6 +23,7 @@ import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { GUARDS_METADATA } from '@nestjs/common/constants'
 import { Module, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
@@ -46,21 +48,8 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { TERMINAL_TOKEN_VALIDATOR, TerminalSessionService } from '../src/terminals/terminal-session.service'
 import * as shared from '../../../packages/shared/src/types/branding'
-import {
-  buildPng,
-  buildWebp,
-  canvasImage,
-  Checker,
-  decodeSize,
-  FakeRedis,
-  installGlobals,
-  makeCaller,
-  parseWebp,
-  pngChunk,
-  pngChunks,
-  vp8lChunk,
-  vp8xChunk,
-} from './support/branding-license-support'
+import { Checker, FakeRedis, installGlobals, makeCaller } from './support/branding-license-support'
+import { buildPng, canvasImage, decodeSize, plainRows, pngChunk, pngChunks, pngFromSpec } from './support/png-fixtures'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const API_ROOT = resolve(__dirname, '..')
@@ -109,7 +98,7 @@ function assertStatic(): void {
   })
   c.equal('备案查询链接白名单含 beian.mps.gov.cn / beian.miit.gov.cn / www.beian.gov.cn',
     [...local.BRAND_FILING_URL_HOSTS].sort(), ['beian.miit.gov.cn', 'beian.mps.gov.cn', 'www.beian.gov.cn'])
-  c.equal('Logo 只收 PNG 与 WebP', [...local.BRAND_LOGO_MIME_TYPES], ['image/png', 'image/webp'])
+  c.equal('Logo 只收 PNG', [...local.BRAND_LOGO_MIME_TYPES], ['image/png'])
   c.check('PlatformSetting 键沿用设计稿', JSON.stringify(Object.values(local.BRAND_SETTING_KEYS).sort()) ===
     JSON.stringify(['brand.logoAssetId', 'brand.mark', 'brand.name', 'filing.icp', 'filing.icpUrl', 'filing.police', 'filing.policeUrl']))
   // 控制器：守卫、角色、限流、注册
@@ -324,9 +313,9 @@ async function main(): Promise<void> {
     c.check('公开读取的字节能解码为 256×256', (await decodeSize(served.buffer)).width === 256)
     const notModified = await call('GET', okPng.json.data.logoUrl, { headers: { 'if-none-match': served.headers.get('etag') ?? '' } })
     c.check('带 If-None-Match → 304', notModified.status === 304)
-    const okWebp = await upload(canvasImage(300, 300, 'image/webp'), 'logo.webp', 'image/webp')
-    c.check('合法 WebP → 201', okWebp.status === 201 && okWebp.json.data.mimeType === 'image/webp')
-    createdLogoIds.push(okWebp.json.data.assetId)
+    const okPng2 = await upload(canvasImage(300, 300, 'image/png'))
+    c.check('第二张合法 PNG（300×300，后面当平台 Logo 用）→ 201', okPng2.status === 201 && okPng2.json.data.width === 300 && okPng2.json.data.mimeType === 'image/png')
+    createdLogoIds.push(okPng2.json.data.assetId)
     c.check('Logo 上传不动待机宣传屏素材表', (await prisma.adAsset.count()) === adAssetsBefore)
     c.check('上传写审计 branding.logo_upload', (await prisma.auditLog.count({ where: { action: 'branding.logo_upload', targetId: 'branding' } })) >= 2)
 
@@ -351,9 +340,11 @@ async function main(): Promise<void> {
     await rejectCase('PNG 被截断', buildPng(64, 64).subarray(0, 60), 'BRAND_LOGO_CORRUPT')
     await rejectCase('PNG 结尾夹带脚本', Buffer.concat([buildPng(64, 64), Buffer.from('<script>alert(1)</script>')]), 'BRAND_LOGO_CORRUPT')
     await rejectCase('动图 APNG', buildPng(64, 64, { afterIhdr: [pngChunk('acTL', Buffer.alloc(8))] }), 'BRAND_LOGO_ANIMATED')
-    await rejectCase('动态 WebP', buildWebp([vp8xChunk(64, 64, 0x02), { type: 'ANIM', data: Buffer.alloc(6) }, { type: 'ANMF', data: Buffer.alloc(16) }]), 'BRAND_LOGO_ANIMATED', 'logo.webp', 'image/webp')
-    await rejectCase('WebP 画布与图像尺寸不一致', buildWebp([vp8xChunk(100, 100, 0), vp8lChunk(64, 64)]), 'BRAND_LOGO_CORRUPT', 'logo.webp', 'image/webp')
-    await rejectCase('WebP 结尾夹带', Buffer.concat([canvasImage(64, 64, 'image/webp'), Buffer.from('xx')]), 'BRAND_LOGO_CORRUPT', 'logo.webp', 'image/webp')
+    await rejectCase('WebP（老实声明 webp，不再收）', canvasImage(64, 64, 'image/webp'), 'BRAND_LOGO_FORMAT_UNSUPPORTED', 'logo.webp', 'image/webp')
+    await rejectCase('WebP（扩展名与 Content-Type 都冒充 PNG）', canvasImage(64, 64, 'image/webp'), 'BRAND_LOGO_FORMAT_UNSUPPORTED')
+    // 块校验是对的，但图本身不对：旧版只验块结构和 CRC 会放行这两种
+    await rejectCase('IDAT 里不是压缩流（块校验仍是对的）', pngFromSpec({ width: 64, height: 64, idat: [Buffer.from('this is not a zlib stream')] }), 'BRAND_LOGO_CORRUPT')
+    await rejectCase('IDAT 里压缩流结束后夹带脚本（块校验仍是对的）', pngFromSpec({ width: 64, height: 64, idat: [Buffer.concat([deflateSync(plainRows(64, 64, 32)), Buffer.from('<script>alert(1)</script>')])] }), 'BRAND_LOGO_CORRUPT')
     const huge = await upload(Buffer.concat([buildPng(64, 64), Buffer.alloc(1024 * 1024 + 2048)]))
     c.check(`远超上限的文件（>1MB）被挡在读入阶段：HTTP ${huge.status} ${huge.json.error?.code ?? ''}，不落盘不入库`, huge.status >= 400 && huge.status < 500 && (await prisma.brandLogo.count({ where: { createdBy: adminId } })) === createdLogoIds.length, `${huge.status} ${JSON.stringify(huge.json)}`)
     const missing = await call('POST', '/api/v1/admin/branding/logo', { token: adminToken(), form: new FormData() })
@@ -371,21 +362,10 @@ async function main(): Promise<void> {
     createdLogoIds.push(dirtyUp.json.data.assetId)
     const dirtyRow = await prisma.brandLogo.findUniqueOrThrow({ where: { id: dirtyUp.json.data.assetId } })
     const dirtyStored = await storage.getObject(dirtyRow.storageKey)
-    c.check('落盘的是清洗后的：不含 tEXt / eXIf / tIME，也不含秘密字符串',
-      !pngChunks(dirtyStored).some((ch) => ['tEXt', 'eXIf', 'tIME'].includes(ch.type)) && !dirtyStored.includes('SECRET'))
+    c.check('落盘的是重编码后的：只剩 IHDR / IDAT / IEND（文字块、EXIF、时间块都没了），也不含秘密字符串',
+      pngChunks(dirtyStored).map((ch) => ch.type).join() === 'IHDR,IDAT,IEND' && !dirtyStored.includes('SECRET'))
+    c.check('公开读取到的字节就是落盘的重编码文件', (await call('GET', `/api/v1/public/brand-logo/${dirtyUp.json.data.assetId}`)).buffer.equals(dirtyStored))
     c.check('清洗后的 PNG 仍能解码为 128×128', (await decodeSize(dirtyStored)).width === 128)
-    const webpChunks = parseWebp(canvasImage(128, 128, 'image/webp'))
-    const webpDirty = buildWebp([{ type: 'VP8X', data: Buffer.from(webpChunks[0]!.data) }, ...webpChunks.slice(1), { type: 'EXIF', data: Buffer.from('Exif\0\0SECRET-EXIF') }, { type: 'XMP ', data: Buffer.from('<x:xmpmeta>SECRET</x:xmpmeta>') }])
-    webpDirty[20] = webpDirty[20]! | 0x08 | 0x04
-    const webpUp = await upload(webpDirty, 'logo.webp', 'image/webp')
-    c.check('带 EXIF / XMP / ICC 的 WebP 可以上传', webpUp.status === 201)
-    createdLogoIds.push(webpUp.json.data.assetId)
-    const webpRow = await prisma.brandLogo.findUniqueOrThrow({ where: { id: webpUp.json.data.assetId } })
-    const webpStored = await storage.getObject(webpRow.storageKey)
-    const storedChunks = parseWebp(webpStored)
-    c.check('落盘的 WebP 只剩画面块，VP8X 标志位已清零，不含秘密字符串',
-      storedChunks.every((ch) => ['VP8X', 'ALPH', 'VP8 ', 'VP8L'].includes(ch.type)) && (storedChunks[0]!.data[0]! & (0x20 | 0x08 | 0x04)) === 0 && !webpStored.includes('SECRET'))
-    c.check('清洗后的 WebP 仍能解码为 128×128', (await decodeSize(webpStored)).width === 128)
     // 公开读取只认 Logo 表
     const adId = randomUUID().replace(/-/g, '')
     const adKey = `screensaver/materials/${adId}.png`

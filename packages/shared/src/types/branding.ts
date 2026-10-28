@@ -22,8 +22,12 @@ export const BRAND_FILING_URL_MAX_LENGTH = 512
 /** 备案查询链接：只许 https，主机只许这三个官方备案域名（精确匹配，不带账号、不带端口）。 */
 export const BRAND_FILING_URL_HOSTS = ['beian.miit.gov.cn', 'www.beian.gov.cn', 'beian.mps.gov.cn'] as const
 
-/** Logo：只收 PNG / WebP（按文件头判，不信扩展名与 Content-Type），禁 SVG；静态单帧；1:1（±10%）。 */
-export const BRAND_LOGO_MIME_TYPES = ['image/png', 'image/webp'] as const
+/**
+ * Logo：**只收 PNG**（按文件头判，不信扩展名与 Content-Type）。SVG / JPEG / GIF / WebP 一律拒绝。
+ * 静态单帧；宽高都 ≤1024；宽高比 1:1（±10%）；≤512KB。
+ * 服务端会完整解压校验像素数据并**重新编码**后落盘（只留 IHDR / PLTE / tRNS + 一个 IDAT + IEND），所以上传后的文件字节与原文件不同，画面一个像素不变。
+ */
+export const BRAND_LOGO_MIME_TYPES = ['image/png'] as const
 export type BrandLogoMimeType = (typeof BRAND_LOGO_MIME_TYPES)[number]
 export const BRAND_LOGO_MAX_BYTES = 512 * 1024
 export const BRAND_LOGO_MAX_PIXELS = 1024
@@ -104,7 +108,7 @@ export interface UpdateBrandingInput {
   }
 }
 
-/** POST /api/v1/admin/branding/logo（multipart，字段名 file）。上传不会自动启用，拿 assetId 再保存。 */
+/** POST /api/v1/admin/branding/logo（multipart，字段名 file，只收 PNG）。上传不会自动启用，拿 assetId 再保存。 */
 export interface BrandLogoUploadResult {
   assetId: string
   logoUrl: string

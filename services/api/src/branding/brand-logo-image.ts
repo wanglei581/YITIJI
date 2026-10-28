@@ -1,18 +1,23 @@
 /**
- * 贴牌 Logo 的文件检查与清洗（不新增依赖，直接读文件头）。
+ * 贴牌 Logo 的文件检查与重编码（只收 PNG，不新增依赖，用 node:zlib）。
  *
- * 只收 PNG 与 WebP，格式只按**文件头魔数**判断——不信扩展名，也不信 Content-Type。
- * SVG（含改了扩展名的）、JPEG、GIF 一律拒绝：SVG 能带脚本，是存储型 XSS 的入口。
+ * 为什么只收 PNG：仓库里没有图像库，WebP 只能读帧头、没法证明图像数据本身是好的；
+ * PNG 的像素数据就是一条 zlib 压缩流，Node 自带解压，可以完整验证并重新编码。
  *
- * 通过检查的文件还要「清洗」再落盘：
- *   - PNG 只保留画面必需块与颜色块（IHDR PLTE tRNS IDAT IEND gAMA cHRM sRGB），
- *     丢掉文字块、EXIF、时间、内嵌色彩配置等一切元数据；
- *   - WebP 只保留 VP8X / ALPH / VP8 / VP8L，丢掉 EXIF / XMP / ICCP，并把 VP8X 里对应的标志位清零。
- * 清洗只做块级复制，不重新编码，所以画面一个像素都不会变。
- * 另外拒绝：动图（APNG / 动态 WebP）、块长度越界、CRC 不符、文件尾部有多余字节。
+ * 格式只按**文件头魔数**判断——不信扩展名，也不信 Content-Type。
+ * SVG（含改了扩展名的）、JPEG、GIF、WebP 一律拒绝：SVG 能带脚本，是存储型 XSS 的入口。
  *
- * 限值：不超过 512KB；宽高都不超过 1024；宽高比 1:1（允许 ±10%）。
+ * 检查顺序（先便宜的、先挡会吃资源的）：
+ *   1. 总长不超过 512KB；PNG 文件头；逐块核对长度与 CRC，必须以 IEND 结尾、IEND 后不得有多余字节；
+ *   2. 拒动图块（acTL / fcTL / fdAT）；
+ *   3. 读 IHDR 就限宽高（≤1024）与 1:1（±10%）——**在解压之前**，解压炸弹到不了下一步；
+ *   4. 按 IHDR 算出「应有的解压后字节数」，用 inflateSync(maxOutputLength = 该值) 解开全部 IDAT：
+ *      压缩流损坏、解压后超长或不足、压缩流结束后 IDAT 里还有夹带的字节，一律拒；
+ *      每一行的滤波类型字节必须是 0–4；
+ *   5. **重新编码**：只写 IHDR、PLTE、tRNS + 一个重新压缩的 IDAT + IEND，落盘的是重编码后的文件。
+ *      文字块、EXIF、时间、内嵌色彩配置、未知块一概不留；像素数据（滤波后的扫描行）原样保留，画面不变。
  */
+import { deflateSync, inflateSync } from 'node:zlib'
 import {
   BRAND_LOGO_MAX_BYTES,
   BRAND_LOGO_MAX_PIXELS,
@@ -23,10 +28,10 @@ export type BrandLogoInspection =
   | {
       ok: true
       mimeType: BrandLogoMimeType
-      ext: 'png' | 'webp'
+      ext: 'png'
       width: number
       height: number
-      /** 清洗后的文件内容，落盘的就是它。 */
+      /** 重编码后的文件内容，落盘的就是它。 */
       sanitized: Buffer
     }
   | { ok: false; code: BrandLogoErrorCode; message: string }
@@ -47,17 +52,27 @@ function fail(code: BrandLogoErrorCode, message: string): BrandLogoInspection {
 const CORRUPT = fail('BRAND_LOGO_CORRUPT', '图片文件已损坏或不完整，请换一张重新导出')
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-const PNG_KEEP = new Set(['IHDR', 'PLTE', 'tRNS', 'IDAT', 'IEND', 'gAMA', 'cHRM', 'sRGB'])
 /** 动图相关块。出现任何一个都拒绝，Logo 只收静态单帧。 */
 const PNG_ANIMATION = new Set(['acTL', 'fcTL', 'fdAT'])
-/** colorType → 允许的位深。 */
-const PNG_DEPTHS: Record<number, readonly number[]> = {
-  0: [1, 2, 4, 8, 16],
-  2: [8, 16],
-  3: [1, 2, 4, 8],
-  4: [8, 16],
-  6: [8, 16],
+const PNG_CRITICAL = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND'])
+/** colorType → 允许的位深，以及每个像素的通道数。 */
+const PNG_COLOR: Record<number, { depths: readonly number[]; channels: number }> = {
+  0: { depths: [1, 2, 4, 8, 16], channels: 1 },
+  2: { depths: [8, 16], channels: 3 },
+  3: { depths: [1, 2, 4, 8], channels: 1 },
+  4: { depths: [8, 16], channels: 2 },
+  6: { depths: [8, 16], channels: 4 },
 }
+/** Adam7 七趟扫描：[起始列, 起始行, 列间隔, 行间隔]。 */
+const ADAM7: ReadonlyArray<readonly [number, number, number, number]> = [
+  [0, 0, 8, 8],
+  [4, 0, 8, 8],
+  [0, 4, 4, 8],
+  [2, 0, 4, 4],
+  [0, 2, 2, 4],
+  [1, 0, 2, 2],
+  [0, 1, 1, 2],
+]
 
 let crcTable: Uint32Array | null = null
 function crc32(buffer: Buffer): number {
@@ -72,6 +87,15 @@ function crc32(buffer: Buffer): number {
   let crc = 0xffffffff
   for (const byte of buffer) crc = crcTable[(crc ^ byte) & 0xff]! ^ (crc >>> 8)
   return (crc ^ 0xffffffff) >>> 0
+}
+
+function chunk(type: string, data: Buffer): Buffer {
+  const head = Buffer.alloc(8)
+  head.writeUInt32BE(data.length, 0)
+  head.write(type, 4, 'latin1')
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])), 0)
+  return Buffer.concat([head, data, crc])
 }
 
 /** 宽高都在 1..1024 之内、且 0.9 ≤ 宽/高 ≤ 1.1。整数运算，避免浮点边界误差。 */
@@ -90,22 +114,44 @@ function checkDimensions(width: number, height: number): BrandLogoInspection | n
   return null
 }
 
+interface Layout {
+  /** 解压后应有的总字节数（含每行开头的滤波类型字节）。 */
+  expectedBytes: number
+  /** 每一行（含滤波字节）的长度，按文件里出现的顺序；用来逐行核对滤波类型字节。 */
+  rowLengths: number[]
+}
+
+/** 按 IHDR 算出解压后的数据布局：非隔行是 height 行，隔行（Adam7）是七趟里非空的各行。 */
+function layoutOf(width: number, height: number, bitsPerPixel: number, interlace: number): Layout {
+  const rowBytes = (pixels: number) => 1 + Math.ceil((pixels * bitsPerPixel) / 8)
+  const rowLengths: number[] = []
+  if (interlace === 0) {
+    for (let y = 0; y < height; y += 1) rowLengths.push(rowBytes(width))
+  } else {
+    for (const [xStart, yStart, xStep, yStep] of ADAM7) {
+      if (width <= xStart || height <= yStart) continue
+      const passWidth = Math.ceil((width - xStart) / xStep)
+      const passHeight = Math.ceil((height - yStart) / yStep)
+      for (let y = 0; y < passHeight; y += 1) rowLengths.push(rowBytes(passWidth))
+    }
+  }
+  return { expectedBytes: rowLengths.reduce((sum, n) => sum + n, 0), rowLengths }
+}
+
 function inspectPng(buffer: Buffer): BrandLogoInspection {
   let pos = PNG_SIGNATURE.length
-  const kept: Buffer[] = [PNG_SIGNATURE]
-  let width = 0
-  let height = 0
   let index = 0
-  let sawIdat = false
-  let sawPlte = false
-  let colorType = -1
   let ended = false
+  let ihdr: Buffer | null = null
+  let plte: Buffer | null = null
+  let trns: Buffer | null = null
+  const idat: Buffer[] = []
+  let idatClosed = false
   while (pos < buffer.length) {
     if (pos + 12 > buffer.length) return CORRUPT
     const length = buffer.readUInt32BE(pos)
     if (length > 0x7fffffff) return CORRUPT
-    const typeBytes = buffer.subarray(pos + 4, pos + 8)
-    const type = typeBytes.toString('latin1')
+    const type = buffer.toString('latin1', pos + 4, pos + 8)
     if (!/^[A-Za-z]{4}$/.test(type)) return CORRUPT
     const end = pos + 12 + length
     if (end > buffer.length) return CORRUPT
@@ -114,28 +160,28 @@ function inspectPng(buffer: Buffer): BrandLogoInspection {
     if (PNG_ANIMATION.has(type)) {
       return fail('BRAND_LOGO_ANIMATED', 'Logo 只能是静态图片，不能是动图（APNG）')
     }
+    // 类型首字母大写 = 关键块。PNG 只有 IHDR / PLTE / IDAT / IEND 四种关键块，别的关键块规范要求解码器拒绝。
+    if (/^[A-Z]/.test(type) && !PNG_CRITICAL.has(type)) return CORRUPT
     if (index === 0) {
       if (type !== 'IHDR' || length !== 13) return CORRUPT
-      width = body.readUInt32BE(0)
-      height = body.readUInt32BE(4)
-      const depth = body[8]!
-      colorType = body[9]!
-      const compression = body[10]
-      const filter = body[11]
-      const interlace = body[12]
-      if (!PNG_DEPTHS[colorType]?.includes(depth)) return CORRUPT
-      if (compression !== 0 || filter !== 0 || (interlace !== 0 && interlace !== 1)) return CORRUPT
-      const dimension = checkDimensions(width, height)
-      if (dimension) return dimension
+      ihdr = body
     } else if (type === 'IHDR') {
       return CORRUPT
     }
     if (type === 'PLTE') {
-      if (sawIdat || length === 0 || length % 3 !== 0 || length > 768) return CORRUPT
-      sawPlte = true
+      // PLTE 只能出现一次，且必须在 tRNS 与第一个 IDAT 之前。
+      if (plte || trns || idat.length > 0 || length === 0 || length % 3 !== 0 || length > 768) return CORRUPT
+      plte = body
+    } else if (type === 'tRNS') {
+      if (trns || idat.length > 0) return CORRUPT
+      trns = body
+    } else if (type === 'IDAT') {
+      // 多个 IDAT 必须连续；中间夹了别的块再出现 IDAT 按损坏处理。
+      if (idatClosed) return CORRUPT
+      idat.push(body)
+    } else if (idat.length > 0) {
+      idatClosed = true
     }
-    if (type === 'IDAT') sawIdat = true
-    if (PNG_KEEP.has(type)) kept.push(buffer.subarray(pos, end))
     pos = end
     index += 1
     if (type === 'IEND') {
@@ -145,116 +191,75 @@ function inspectPng(buffer: Buffer): BrandLogoInspection {
     }
   }
   // 必须以 IEND 结尾，且 IEND 之后不能再有字节（防图片后面夹带别的内容）。
-  if (!ended || pos !== buffer.length || !sawIdat) return CORRUPT
-  if (colorType === 3 && !sawPlte) return CORRUPT
-  return { ok: true, mimeType: 'image/png', ext: 'png', width, height, sanitized: Buffer.concat(kept) }
-}
+  if (!ended || pos !== buffer.length || !ihdr || idat.length === 0) return CORRUPT
 
-const WEBP_IMAGE_CHUNKS = new Set(['VP8 ', 'VP8L'])
-const WEBP_KEEP = new Set(['VP8X', 'ALPH', 'VP8 ', 'VP8L'])
-/** VP8X 标志位：ICC 0x20、EXIF 0x08、XMP 0x04 要清零；动画 0x02 直接拒绝。 */
-const VP8X_ANIMATION = 0x02
-const VP8X_CLEAR = 0x20 | 0x08 | 0x04
-
-interface WebpChunk {
-  type: string
-  data: Buffer
-}
-
-function webpImageSize(chunk: WebpChunk): { width: number; height: number } | null {
-  const data = chunk.data
-  if (chunk.type === 'VP8 ') {
-    // 3 字节帧标签（最低位 0 = 关键帧）+ 起始码 9d 01 2a + 14 位宽 + 14 位高
-    if (data.length < 10 || (data[0]! & 1) !== 0) return null
-    if (data[3] !== 0x9d || data[4] !== 0x01 || data[5] !== 0x2a) return null
-    return { width: data.readUInt16LE(6) & 0x3fff, height: data.readUInt16LE(8) & 0x3fff }
-  }
-  // VP8L：签名字节 0x2f，之后 14 位（宽-1）、14 位（高-1）、1 位透明、3 位版本（必须为 0）
-  if (data.length < 5 || data[0] !== 0x2f) return null
-  const bits = data.readUInt32LE(1)
-  if (bits >>> 29 !== 0) return null
-  return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 }
-}
-
-function inspectWebp(buffer: Buffer): BrandLogoInspection {
-  if (buffer.length < 20) return CORRUPT
-  // RIFF 总长必须等于文件长度：不许尾部夹带，也不许截断。
-  if (buffer.readUInt32LE(4) + 8 !== buffer.length) return CORRUPT
-  const chunks: WebpChunk[] = []
-  let pos = 12
-  while (pos < buffer.length) {
-    if (pos + 8 > buffer.length) return CORRUPT
-    const type = buffer.toString('latin1', pos, pos + 4)
-    const size = buffer.readUInt32LE(pos + 4)
-    const next = pos + 8 + size + (size & 1)
-    if (pos + 8 + size > buffer.length || next > buffer.length) return CORRUPT
-    chunks.push({ type, data: buffer.subarray(pos + 8, pos + 8 + size) })
-    pos = next
-  }
-  const first = chunks[0]
-  if (!first || !(first.type === 'VP8X' || WEBP_IMAGE_CHUNKS.has(first.type))) return CORRUPT
-  const imageChunk = chunks.find((chunk) => WEBP_IMAGE_CHUNKS.has(chunk.type))
-  if (chunks.some((chunk) => chunk.type === 'ANIM' || chunk.type === 'ANMF')) {
-    return fail('BRAND_LOGO_ANIMATED', 'Logo 只能是静态图片，不能是动图（动态 WebP）')
-  }
-  let extended: WebpChunk | null = null
-  if (first.type === 'VP8X') {
-    extended = first
-    if (first.data.length !== 10) return CORRUPT
-    if (first.data[0]! & VP8X_ANIMATION) {
-      return fail('BRAND_LOGO_ANIMATED', 'Logo 只能是静态图片，不能是动图（动态 WebP）')
-    }
-  }
-  if (!imageChunk) return CORRUPT
-  const size = webpImageSize(imageChunk)
-  if (!size) return CORRUPT
-  let { width, height } = size
-  if (extended) {
-    const canvasWidth = extended.data.readUIntLE(4, 3) + 1
-    const canvasHeight = extended.data.readUIntLE(7, 3) + 1
-    // 单帧 WebP 的画布必须与图像本身同尺寸，不一致按损坏处理（防用画布尺寸绕过检查）。
-    if (canvasWidth !== width || canvasHeight !== height) return CORRUPT
-    width = canvasWidth
-    height = canvasHeight
-  }
+  // ── 解压之前：IHDR 自洽 + 限宽高 + 限比例 ──────────────────────────────────
+  const width = ihdr.readUInt32BE(0)
+  const height = ihdr.readUInt32BE(4)
+  const bitDepth = ihdr[8]!
+  const colorType = ihdr[9]!
+  const compression = ihdr[10]
+  const filter = ihdr[11]
+  const interlace = ihdr[12]!
+  const color = PNG_COLOR[colorType]
+  if (!color || !color.depths.includes(bitDepth)) return CORRUPT
+  if (compression !== 0 || filter !== 0 || (interlace !== 0 && interlace !== 1)) return CORRUPT
   const dimension = checkDimensions(width, height)
   if (dimension) return dimension
-
-  const out: Buffer[] = []
-  for (const chunk of chunks) {
-    if (!WEBP_KEEP.has(chunk.type)) continue
-    let data = chunk.data
-    if (chunk.type === 'VP8X') {
-      data = Buffer.from(data)
-      data[0] = data[0]! & ~VP8X_CLEAR
-    }
-    const header = Buffer.alloc(8)
-    header.write(chunk.type, 0, 'latin1')
-    header.writeUInt32LE(data.length, 4)
-    out.push(header, data)
-    if (data.length & 1) out.push(Buffer.from([0]))
+  if (colorType === 3 && !plte) return CORRUPT
+  if (plte && (colorType === 0 || colorType === 4)) return CORRUPT
+  if (colorType === 3 && plte && plte.length / 3 > 2 ** bitDepth) return CORRUPT
+  // tRNS 的长度随颜色类型而定；灰度 + 透明、真彩 + 透明本身已带 alpha，不允许再有 tRNS。
+  if (trns) {
+    const ok =
+      (colorType === 0 && trns.length === 2) ||
+      (colorType === 2 && trns.length === 6) ||
+      (colorType === 3 && plte !== null && trns.length <= plte.length / 3)
+    if (!ok) return CORRUPT
   }
-  const body = Buffer.concat(out)
-  const riff = Buffer.alloc(12)
-  riff.write('RIFF', 0, 'latin1')
-  riff.writeUInt32LE(body.length + 4, 4)
-  riff.write('WEBP', 8, 'latin1')
-  return { ok: true, mimeType: 'image/webp', ext: 'webp', width, height, sanitized: Buffer.concat([riff, body]) }
+
+  // ── 完整解压：长度必须正好、压缩流后面不许有多余字节 ──────────────────────
+  const layout = layoutOf(width, height, color.channels * bitDepth, interlace)
+  const compressed = Buffer.concat(idat)
+  let raw: Buffer
+  try {
+    // info: true 时 Node 返回 { buffer, engine }；@types/node 没有这个重载，按实际返回形状断言。
+    const result = inflateSync(compressed, { info: true, maxOutputLength: layout.expectedBytes }) as unknown as {
+      buffer: Buffer
+      engine: { bytesWritten: number }
+    }
+    // engine.bytesWritten = 解压引擎实际吃掉的输入字节数；小于总长说明压缩流结束后还有夹带的字节。
+    if (result.engine.bytesWritten !== compressed.length) return CORRUPT
+    raw = result.buffer
+  } catch {
+    // 压缩流损坏、被截断，或解压后超过应有长度（解压炸弹）。
+    return CORRUPT
+  }
+  if (raw.length !== layout.expectedBytes) return CORRUPT
+  let offset = 0
+  for (const rowLength of layout.rowLengths) {
+    if (raw[offset]! > 4) return CORRUPT
+    offset += rowLength
+  }
+
+  // ── 重新编码：只写 IHDR、PLTE、tRNS + 一个 IDAT + IEND ─────────────────────
+  const parts = [PNG_SIGNATURE, chunk('IHDR', ihdr)]
+  if (plte) parts.push(chunk('PLTE', plte))
+  if (trns) parts.push(chunk('tRNS', trns))
+  parts.push(chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0)))
+  const sanitized = Buffer.concat(parts)
+  if (sanitized.length > BRAND_LOGO_MAX_BYTES) {
+    return fail('BRAND_LOGO_TOO_LARGE', `Logo 不能超过 ${Math.round(BRAND_LOGO_MAX_BYTES / 1024)}KB`)
+  }
+  return { ok: true, mimeType: 'image/png', ext: 'png', width, height, sanitized }
 }
 
-/** 检查并清洗一张 Logo。只看内容，不看文件名与 Content-Type。 */
+/** 检查并重编码一张 Logo。只看内容，不看文件名与 Content-Type。 */
 export function inspectBrandLogo(buffer: Buffer): BrandLogoInspection {
   if (buffer.length === 0) return fail('BRAND_LOGO_EMPTY', '上传的文件是空的')
   if (buffer.length > BRAND_LOGO_MAX_BYTES) {
     return fail('BRAND_LOGO_TOO_LARGE', `Logo 不能超过 ${Math.round(BRAND_LOGO_MAX_BYTES / 1024)}KB`)
   }
   if (buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return inspectPng(buffer)
-  if (
-    buffer.length >= 12 &&
-    buffer.toString('latin1', 0, 4) === 'RIFF' &&
-    buffer.toString('latin1', 8, 12) === 'WEBP'
-  ) {
-    return inspectWebp(buffer)
-  }
-  return fail('BRAND_LOGO_FORMAT_UNSUPPORTED', 'Logo 只支持 PNG 或 WebP 图片（不支持 SVG、JPG、GIF）')
+  return fail('BRAND_LOGO_FORMAT_UNSUPPORTED', 'Logo 只支持 PNG 图片（不支持 WebP、SVG、JPG、GIF）')
 }

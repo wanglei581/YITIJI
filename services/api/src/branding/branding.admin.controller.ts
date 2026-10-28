@@ -30,7 +30,7 @@ const LOGO_UPLOAD_HARD_LIMIT = BRAND_LOGO_MAX_BYTES * 2
  * 管理员：平台默认品牌与备案、Logo 上传。
  *   GET  /api/v1/admin/branding        读库存值（null = 没配、用默认）+ 默认值
  *   PUT  /api/v1/admin/branding        省略 = 不改；null 或纯空白 = 清除（回到默认）；写审计
- *   POST /api/v1/admin/branding/logo   multipart，字段名 file；只收 PNG / WebP；返回 assetId，不自动启用
+ *   POST /api/v1/admin/branding/logo   multipart，字段名 file；只收 PNG（解压校验后重编码落盘）；返回 assetId，不自动启用
  * 一体机最迟 5 分钟内读到新值（客户端轮询，服务端不缓存）。
  */
 @Controller('admin/branding')
