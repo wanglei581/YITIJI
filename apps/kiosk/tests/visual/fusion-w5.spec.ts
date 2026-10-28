@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { RECRUITMENT_HOSTING_ON } from '../fixtures/recruitment-hosting'
@@ -1371,6 +1371,26 @@ const OPENABLE_AI_RECORD = {
   expiresAt: '2099-01-01T00:00:00.000Z',
 }
 
+/** 两张出口卡里插画之间的空白带上限（px）：和一体机整页「最长均匀空白不超过 105」的口径一致。 */
+const EXIT_ART_GAP_MAX = 105
+
+/**
+ * 第一张出口卡里插画画出来的底，到第二张出口卡里插画画出来的顶（量真实几何：SVG 内容包围盒折到屏幕坐标）。
+ * U 盘插画在 150×150 的画布里只占上 4% 到下 88%，出口卡被撑高时，它底部自带的空、两卡之间的缝、
+ * 下一张插画顶上的空连成一条均匀空白带；暂停态没把插画放大时这条是 126px。
+ */
+async function exitArtGapBelow(first: Locator, second: Locator): Promise<number> {
+  const drawn = (card: Locator) => card.locator('.me-exit-art svg').evaluate((svg: SVGSVGElement) => {
+    const box = svg.getBoundingClientRect()
+    const content = svg.getBBox()
+    const k = box.height / svg.viewBox.baseVal.height
+    const top = box.top + (content.y - svg.viewBox.baseVal.y) * k
+    return { top, bottom: top + content.height * k }
+  })
+  const [upper, lower] = [await drawn(first), await drawn(second)]
+  return Math.round(lower.top - upper.bottom)
+}
+
 test('AI records: backend-paused AI is said plainly, the old record still opens, and printing is offered @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerAiRecords(api, true, [OPENABLE_AI_RECORD])
@@ -1395,6 +1415,9 @@ test('AI records: backend-paused AI is said plainly, the old record still opens,
   await expect(page.locator('[data-qxt-ask="on"]')).toContainText('问小青：打不开的记录怎么办？')
   await assertTapTargetPointerHit(printExit)
   await assertNoElementCrossesViewport(page)
+  // 出口卡里两张插画之间不留大片空白（暂停态用 U 盘插画，没放大时是 126px）。
+  const gap = await exitArtGapBelow(printExit, page.getByRole('button', { name: '查政策，看本机构发布的就业政策' }))
+  expect(gap, `「去打印」与「查政策」两张插画之间的空白带 ${gap}px，不得超过 ${EXIT_ART_GAP_MAX}px`).toBeLessThanOrEqual(EXIT_ART_GAP_MAX)
   await page.screenshot({ path: test.info().outputPath('ai-records-paused-with-record-1080x1920.png') })
   await printExit.click()
   await expect(page).toHaveURL(/\/print-scan$/)
@@ -1416,6 +1439,9 @@ test('AI records: backend-paused AI with no records yet says so and points to pr
   await expect(fallback.getByRole('button', { name: '去做简历诊断，上传一份简历，先做诊断' })).toHaveCount(0)
   await assertTapTargetPointerHit(printExit)
   await assertNoElementCrossesViewport(page)
+  // 出口卡里两张插画之间不留大片空白（暂停态用 U 盘插画，没放大时是 127px）。
+  const gap = await exitArtGapBelow(printExit, fallback.getByRole('button', { name: '查政策，看本机构发布的就业政策' }))
+  expect(gap, `「去打印」与「查政策」两张插画之间的空白带 ${gap}px，不得超过 ${EXIT_ART_GAP_MAX}px`).toBeLessThanOrEqual(EXIT_ART_GAP_MAX)
   await page.screenshot({ path: test.info().outputPath('ai-records-paused-empty-1080x1920.png') })
   await printExit.click()
   await expect(page).toHaveURL(/\/print-scan$/)

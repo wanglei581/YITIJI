@@ -287,7 +287,7 @@ export function MyAiRecordsPage() {
     body = <QxMeErrorBlock onRetry={() => setReloadKey((k) => k + 1)} />
   } else if (empty) {
     body = (
-      <div className="me-state" data-testid="qx-me-fallback">
+      <div className="me-state" data-testid="qx-me-fallback" data-ai-down={aiPaused ? 'true' : undefined}>
         <MeEmptyPack sentence={aiPaused ? EMPTY_SENTENCE_AI_DOWN : EMPTY_SENTENCE}>
           <RecordExitCards aiPaused={aiPaused} artWidths={[120, 110]} />
         </MeEmptyPack>
@@ -385,7 +385,7 @@ export function MyAiRecordsPage() {
           })}
         </MeRows>
         {totalCount < 7 && openKey === null ? (
-          <div className="me-stack">
+          <div className="me-stack" data-ai-down={aiPaused ? 'true' : undefined}>
             <RecordExitCards aiPaused={aiPaused} artWidths={[110, 100]} />
           </div>
         ) : null}

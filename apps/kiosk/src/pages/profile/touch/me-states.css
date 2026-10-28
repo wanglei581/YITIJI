@@ -115,6 +115,14 @@
   max-height: 380px;
 }
 
+/* 我的 → AI 服务记录，小青暂停时（页面给出口区挂 data-ai-down）：出口里的「去打印」用 U 盘插画，
+   它在 150×150 的画布里只占从上 4% 到下 88%。出口卡被撑到 380px 上下高时，U 盘底部自带的空、
+   两张卡之间的缝、下一张卡插画顶上的空连成一条 126px 的均匀空白带。暂停态把插画放大到卡高的 96%，
+   让两张卡的画都顶满：最长空白 126 / 127 → 87 / 88px（blankscan，阈值 105）。不暂停的屏不动。 */
+[data-qx-page="me"] [data-ai-down="true"] .me-exit-art .me-art {
+  height: 96%;
+}
+
 [data-qx-page="me"] .me-exit.me-tall .me-exit-art {
   min-width: 240px;
 }
