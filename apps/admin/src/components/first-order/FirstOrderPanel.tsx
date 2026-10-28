@@ -22,10 +22,14 @@ export function FirstOrderPanel({
   orgId,
   section = null,
   onSectionChange,
+  projectId,
+  onProjectChange,
 }: {
   orgId: string
   section?: PartnerSection | null
   onSectionChange?: (section: PartnerSection) => void
+  projectId?: string | null
+  onProjectChange?: (id: string) => void
 }) {
   const [data, setData] = useState<FirstOrderOverview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,10 +63,16 @@ export function FirstOrderPanel({
     return cancelRequest
   }, [reload, cancelRequest])
   useEffect(() => {
-    if (!creating && data && !data.projects.some((project) => project.id === selectedId)) setSelectedId(data.projects[0]?.id ?? '')
-  }, [creating, data, selectedId])
+    if (creating || !data) return
+    setSelectedId((current) => {
+      const valid = (id: string) => data.projects.some((project) => project.id === id)
+      // 地址里有有效项目号才覆盖；没有时保留用户当前的选择，刷新数据不把人拉回第一个项目
+      if (projectId && valid(projectId)) return projectId
+      return valid(current) ? current : data.projects[0]?.id ?? ''
+    })
+  }, [creating, data, projectId])
   useEffect(() => {
-    if (section) setTab(tabOf(section))
+    setTab(section ? tabOf(section) : 'ledger')
   }, [section])
   useEffect(() => {
     if (!section) return
@@ -76,7 +86,7 @@ export function FirstOrderPanel({
   function projectSaved(saved: FirstOrderProject, select: boolean) {
     setData((current) => current ? { ...current, projects: [saved, ...current.projects.filter((item) => item.id !== saved.id)] } : current)
     setNotice(`项目「${saved.name}」资料已保存。`)
-    if (select) { setCreating(false); setSelectedId(saved.id) }
+    if (select) { setCreating(false); setSelectedId(saved.id); onProjectChange?.(saved.id) }
   }
   function deploymentChanged(saved: FirstOrderDeployment) {
     setData((current) => current ? { ...current, projects: current.projects.map((item) => item.id === saved.projectId
@@ -102,7 +112,7 @@ export function FirstOrderPanel({
       {error && <p role="alert" className="text-sm text-error-fg">{error} 现有内容尚未刷新，请核对后再操作。</p>}
       {notice && <p role="status" className="break-words text-sm text-success-fg">{notice}</p>}
       <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-0 flex-1 text-sm">服务项目<select aria-label="服务项目" disabled={loading} className="mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3" value={creating ? '' : selectedId} onChange={(event) => { setCreating(false); setSelectedId(event.target.value); setNotice('') }}><option value="">{creating ? '正在新建服务项目' : '选择服务项目'}</option>{data.projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="min-w-0 flex-1 text-sm">服务项目<select aria-label="服务项目" disabled={loading} className="mt-1 min-h-12 w-full rounded-lg border border-neutral-300 bg-white px-3" value={creating ? '' : selectedId} onChange={(event) => { const id = event.target.value; setCreating(false); setSelectedId(id); setNotice(''); onProjectChange?.(id) }}><option value="">{creating ? '正在新建服务项目' : '选择服务项目'}</option>{data.projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <Button size="sm" disabled={loading || creating} onClick={() => { setCreating(true); setTab('ledger'); setNotice(''); onSectionChange?.('project') }}>新建服务项目</Button>
         {creating && data.projects.length > 0 && <Button size="sm" variant="ghost" onClick={() => setCreating(false)}>取消新建</Button>}
       </div>
