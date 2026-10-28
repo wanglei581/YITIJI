@@ -482,7 +482,7 @@ console.log('\n=== 打印错误原因与服务端告警同一口径 ===')
   if (failures.length === 0) console.log(`  PASS 服务端登记的 ${serverCodes.length} 个错误码后台都有中文原因，且不引用一体机源码`)
 }
 verifyBatch6Copy({ runFile, textOf, shared, ui, fail })
-verifyPrivacyCopy({ runFile, textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
+verifyPrivacyCopy({ runFile: (rel, imports, ...rest) => runFile(rel, rel === 'apps/partner/src/routes/profile/index.tsx' ? { ...imports, './LicenseSection': {} } : imports, ...rest), textOf, shared, ui, hooks, common, adminRoot, repoRoot, fail, failures, actions, labels: module.exports })
 verifyBatch5Copy({ runFile, textOf, shared, ui, hooks, adminRoot, repoRoot, fail })
 verifyBatch7Copy({ runFile, repoRoot, fail })
 

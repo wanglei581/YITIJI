@@ -302,8 +302,9 @@ export const partnerHttpAdapter = {
       credentials: 'include',
     }).then(async (res) => {
       if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: { code?: string; message?: string } }
         if (res.status === 401) redirectToLogin()
-        throw new ApiHttpError(`HTTP_${res.status}`, res.statusText, res.status)
+        throw new ApiHttpError(body.error?.code ?? `HTTP_${res.status}`, body.error?.message ?? res.statusText, res.status)
       }
       return res.json() as Promise<{ success: boolean }>
     }),

@@ -62,6 +62,7 @@ export interface TerminalDetailDrawerProps {
   terminal: AdminTerminalRecord | null
   organizations: AdminOrganizationOption[]
   orgLoadError: string | null
+  orgLicenseError: string | null
   notice: Notice | null
   editingOrg: boolean
   editOrgValue: string
@@ -92,6 +93,7 @@ export function TerminalDetailDrawer({
   terminal,
   organizations,
   orgLoadError,
+  orgLicenseError,
   notice,
   editingOrg,
   editOrgValue,
@@ -177,6 +179,7 @@ export function TerminalDetailDrawer({
                 <Button size="sm" onClick={() => onSaveOrg(terminal)} disabled={savingOrg} aria-label="保存归属"><CheckIcon className="h-4 w-4" /></Button>
                 <Button size="sm" variant="outline" onClick={onCancelOrgEdit} disabled={savingOrg} aria-label="取消"><XIcon className="h-4 w-4" /></Button>
               </div>
+              {orgLicenseError && <p role="alert" className="text-xs text-error-fg">{orgLicenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(editOrgValue)}`}>查看该机构的授权</a></p>}
             </>
           ) : (
             <>

@@ -9,7 +9,8 @@ import { authHeader, redirectToLogin } from '../auth'
 export const FIRST_ORDER_HTTP = API_MODE === 'http'
 const PREFIX = '/partner/first-order'
 
-function responseError(status: number, code?: string): Error {
+function responseError(status: number, code?: string, message?: string): Error {
+  if (code === 'ORG_LICENSE_INACTIVE' && message) return new Error(message)
   if (code === 'FIRST_ORDER_PROJECT_DATES_LOCKED') return new Error('项目已有设备登记，历史服务日期不能修改；续期请新建项目。')
   if (code === 'FIRST_ORDER_BINDING_UNVERIFIED') return new Error('设备归属变化尚未完成登记核对，请联系平台核验后再生成报告。')
   if (code === 'FIRST_ORDER_LIMIT' || code === 'FIRST_ORDER_REPORT_LIMIT') return new Error('数据量超出本次计算范围，请联系平台分批核对，不显示截断结果。')
@@ -40,10 +41,10 @@ async function request<T>(path: string, method = 'GET', body?: unknown, signal?:
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     })
     if (!response.ok) {
-      let code: string | undefined
-      try { code = ((await response.json()) as { error?: { code?: string } }).error?.code } catch { /* status fallback */ }
+      let code: string | undefined, message: string | undefined
+      try { const error = ((await response.json()) as { error?: { code?: string; message?: string } }).error; code = error?.code; message = error?.message } catch { /* status fallback */ }
       if (response.status === 401) redirectToLogin()
-      throw responseError(response.status, code)
+      throw responseError(response.status, code, message)
     }
     if (asBlob) return await response.blob() as T
     try { return await response.json() as T } catch { throw new Error('服务返回的内容不完整，请刷新重试。') }

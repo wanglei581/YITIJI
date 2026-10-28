@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { XIcon } from 'lucide-react'
+import { ApiHttpError } from '../../services/api/client'
 import {
   createPlannedTerminal,
   type AdminOrganizationOption,
@@ -19,10 +20,12 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
   const [orgId, setOrgId] = useState('')
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [licenseError, setLicenseError] = useState<string | null>(null)
 
   async function submit() {
     if (!terminalCode.trim()) return
     setErrorMessage(null)
+    setLicenseError(null)
     setSaving(true)
     try {
       const created = await createPlannedTerminal({
@@ -34,8 +37,8 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
       onCreated(created.terminalCode)
     } catch (error) {
       const message = error instanceof Error ? error.message : '预创建设备失败，请稍后重试'
-      setErrorMessage(message)
-      onError(message)
+      if (error instanceof ApiHttpError && ['LICENSE_TERMINAL_QUOTA_EXCEEDED', 'LICENSE_NOT_AVAILABLE_FOR_BINDING'].includes(error.code)) setLicenseError(message)
+      else { setErrorMessage(message); onError(message) }
     } finally {
       setSaving(false)
     }
@@ -69,11 +72,12 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
           </label>
           <label className="grid gap-1.5 text-sm font-medium text-neutral-700">
             所属机构
-            <select value={orgId} onChange={(e) => setOrgId(e.target.value)} className="h-10 rounded-lg border border-neutral-200 bg-surface px-3 text-sm outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-600/15">
+            <select value={orgId} onChange={(e) => { setOrgId(e.target.value); setLicenseError(null) }} className="h-10 rounded-lg border border-neutral-200 bg-surface px-3 text-sm outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-600/15">
               <option value="">暂不绑定</option>
               {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
             </select>
           </label>
+          {licenseError && <p role="alert" className="text-sm text-error-fg">{licenseError} <a className="underline" href={`/partners?org=${encodeURIComponent(orgId)}`}>查看该机构的授权</a></p>}
         </div>
 
         {errorMessage ? (
