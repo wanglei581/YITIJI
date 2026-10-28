@@ -126,9 +126,9 @@ check('clearing overlay tells the truth while it waits for the server, and stays
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-status"/)
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-deadline"/)
   assert.match(files.clearingOverlay, /data-testid="session-guard-cleanup-retry"/)
-  // CLAUDE.md §9：27 寸竖屏触控，主要按钮不小于 56px。这颗「立即重试」是这一屏
-  // 唯一可点的东西 —— 它按不准，用户就只剩「等」这一个选项。
-  assert.match(files.clearingOverlayCss, /\.qx-clearing-retry \{[\s\S]*?min-height: 56px/)
+  // CLAUDE.md §9：27 寸竖屏触控，主要按钮不小于 56px；触屏版第 5 包起可点区不小于 64×64。
+  // 这颗「立即重试」是这一屏唯一可点的东西 —— 它按不准，用户就只剩「等」这一个选项。
+  assert.match(files.clearingOverlayCss, /\.qx-clearing-retry \{[\s\S]*?min-height: 64px/)
 })
 
 check('session resume maps only cashier/progress and fail-closes invalid rows', () => {
