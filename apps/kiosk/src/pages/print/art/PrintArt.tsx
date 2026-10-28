@@ -1,3 +1,4 @@
+import './print-art-tokens.css'
 import './print-art.css'
 import { mfpArt, phoneArt, resumeArt, ringArt, scanPaperArt, stackArt, usbArt } from './printArtSvg'
 

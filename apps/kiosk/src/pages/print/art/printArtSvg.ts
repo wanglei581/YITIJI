@@ -1,4 +1,4 @@
-// 打印流程的实物小样插画。照第 5 版稿 ui.js 的画法，颜色全走 CSS 类（见 print-art.css），源码里不写色值。
+// 打印流程的实物小样插画。照第 5 版稿 ui.js 的画法，颜色全走 CSS 类（见 print-art.css 与 print-art-tokens.css），源码里不写色值。
 // 返回 SVG 字符串，由 PrintArt 组件以 aria-hidden 方式放进页面；内容全是常量，不含用户数据。
 
 function lines(x: number, y: number, w: number, rows: number, gap: number, cls: string, widths: readonly number[]): string {

@@ -1,27 +1,6 @@
-/* 打印流程实物小样的配色（照第 5 版稿 ui.js 的画法）。整份只在这里写色值，TSX 与 SVG 字符串里不出现色值。 */
+/* 打印流程实物小样的样式（照第 5 版稿 ui.js 的画法）。色值全在 print-art-tokens.css 的 --pa-* 令牌里（PrintArt.tsx 先引令牌再引本文件），
+   TSX 与 SVG 字符串里不出现色值，本文件也不写裸色值。 */
 .pa {
-  --pa-white: #fff;
-  --pa-white-2: #f6f4ee;
-  --pa-paper: #f5f2e9;
-  --pa-ink: #13231e;
-  --pa-ink-2: #33423d;
-  --pa-deep: #0b241e;
-  --pa-line: #d9ded9;
-  --pa-line-2: #b9c3bf;
-  --pa-edge: rgba(11, 36, 30, 0.12);
-  --pa-edge-2: #c9d1cd;
-  --pa-teal: #1f9e86;
-  --pa-mint: #2ee6a8;
-  --pa-clay: #b8683c;
-  --pa-metal-1: #c9cfcc;
-  --pa-metal-2: #9aa6a1;
-  --pa-metal-3: #dfe5e2;
-  --pa-metal-4: #aab4af;
-  --pa-metal-5: #c3cbc7;
-  --pa-metal-6: #dfe4e1;
-  --pa-grad-a: #eef0ee;
-  --pa-grad-b: #cfd5d2;
-  --pa-ring-track: rgba(11, 36, 30, 0.1);
   display: inline-flex;
   line-height: 0;
 }
