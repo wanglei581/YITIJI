@@ -10,15 +10,15 @@ const P = 20
 const INNER = W - P * 2
 const G = 10.4
 
-function bars(rows: number, y: number, widths: readonly number[], className: string): ReactNode[] {
+function bars(rows: number, y: number, widths: readonly number[], className: string, x = P, span = INNER): ReactNode[] {
   const gap = G * 0.78
   return Array.from({ length: rows }, (_, i) => (
     <rect
-      key={`${className}-${y}-${i}`}
+      key={`${className}-${x}-${y}-${i}`}
       className={className}
-      x={P}
+      x={x}
       y={y + i * gap}
-      width={INNER * widths[i % widths.length]}
+      width={span * widths[i % widths.length]}
       height={Math.max(3, gap * 0.34)}
       rx={2}
     />
@@ -36,6 +36,32 @@ function ResumeSheet(): ReactNode {
         <g key={top}>
           <rect className="rtp-paper-accent" x={P} y={top} width={INNER * 0.26} height={G * 0.55} rx={2} />
           {bars(k === 2 ? 3 : 4, top + G * 1.1, widths, 'rtp-paper-line')}
+        </g>
+      ))}
+    </>
+  )
+}
+
+/** 双栏：左窄栏放姓名与联系方式一类的短条，右宽栏放各段经历。只表示「这是双栏」，不是任何人的内容。 */
+function ResumeTwoColSheet(): ReactNode {
+  const widths = [1, 0.84, 0.94, 0.72, 0.9] as const
+  const left = P
+  const leftSpan = INNER * 0.3
+  const right = P + INNER * 0.36
+  const rightSpan = INNER * 0.64
+  const sections = [P + G * 1.2, P + G * 6.2, P + G * 11.2, P + G * 16.2] as const
+  return (
+    <>
+      <rect className="rtp-paper-sub" x={left} y={P} width={leftSpan} height={G * 6.4} rx={3} opacity={0.35} />
+      <rect className="rtp-paper-ink" x={left + 4} y={P + 6} width={leftSpan * 0.7} height={G * 0.9} rx={3} />
+      {bars(5, P + G * 2.4, widths, 'rtp-paper-line', left + 4, leftSpan - 8)}
+      <rect className="rtp-paper-accent" x={left} y={P + G * 8.2} width={leftSpan * 0.7} height={G * 0.5} rx={2} />
+      {bars(4, P + G * 9.4, widths, 'rtp-paper-line', left, leftSpan)}
+      <rect className="rtp-paper-ink" x={right} y={P} width={rightSpan * 0.55} height={G * 1.05} rx={3} />
+      {sections.map((top, k) => (
+        <g key={top}>
+          <rect className="rtp-paper-accent" x={right} y={top + G * 0.6} width={rightSpan * 0.32} height={G * 0.5} rx={2} />
+          {bars(k === 3 ? 3 : 4, top + G * 1.7, widths, 'rtp-paper-line', right, rightSpan)}
         </g>
       ))}
     </>
@@ -97,12 +123,12 @@ function ChecklistSheet(): ReactNode {
   )
 }
 
-/** 纯装饰：读屏跳过。大小由外层 .rtp-art / .rtp-hero-art 的高度决定。 */
-export function ResumeTouchArt({ kind = 'resume' }: { kind?: ResumeTouchArtKind }) {
+/** 纯装饰：读屏跳过。大小由外层 .rtp-art / .rtp-hero-art 的高度决定。columns 只对简历纸有效：2 是双栏。 */
+export function ResumeTouchArt({ kind = 'resume', columns = 1 }: { kind?: ResumeTouchArtKind; columns?: 1 | 2 }) {
   return (
     <svg className="rtp-paper" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
       <rect className="rtp-paper-sheet" x={0} y={0} width={W} height={H} rx={W * 0.05} />
-      {kind === 'report' ? <ReportSheet /> : kind === 'checklist' ? <ChecklistSheet /> : <ResumeSheet />}
+      {kind === 'report' ? <ReportSheet /> : kind === 'checklist' ? <ChecklistSheet /> : columns === 2 ? <ResumeTwoColSheet /> : <ResumeSheet />}
     </svg>
   )
 }

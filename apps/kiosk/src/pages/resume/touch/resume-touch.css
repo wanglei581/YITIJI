@@ -460,6 +460,30 @@
   color: var(--qxt-teal-ink);
 }
 
+/* 放不下整张时收成一行（只留眉题和标题），一行也放不下就不画：滚动区下沿不再切出半张卡。 */
+.qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-art,
+.qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-tx span,
+.qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-tx small {
+  display: none;
+}
+
+.qxt-screen .rtp-hero[data-fit='row'] {
+  flex: none;
+}
+
+.qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-tx {
+  padding: 10px 22px;
+}
+
+.qxt-screen .rtp-hero[data-fit='row'] .rtp-hero-tx b {
+  font-size: var(--qxt-fs-body);
+  line-height: 1.3;
+}
+
+.qxt-screen .rtp-hero[data-fit='none'] {
+  display: none;
+}
+
 /* 纸张小样（ResumeTouchArt）只出形状，颜色在这里按令牌上。纯装饰。 */
 .qxt-screen .rtp-paper {
   display: block;
