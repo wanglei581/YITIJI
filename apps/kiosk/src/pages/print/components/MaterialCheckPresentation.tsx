@@ -108,7 +108,15 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
         <PrintIcon name="shield" size={34} />
         <span>{props.precheckLine}</span>
       </div>
-      {props.stage === 'error' ? null : (
+      {props.stage === 'error' ? (
+        // 没做成时不去取文件内容画小样，但这一份文件的名字仍要在屏上，别让人以为文件没了。
+        <div className="pdk-doc pdk-doc-sm" data-testid="print-check-file-line">
+          <div className="qpd-preview-meta pdk-doc-meta" aria-label="当前文件">
+            <strong title={props.file.name}>{props.file.name}</strong>
+            <span>{props.file.pages === null ? '页数待识别' : `共 ${props.file.pages} 页`} · {props.file.size}</span>
+          </div>
+        </div>
+      ) : (
         <FileThumbCard file={props.file} token={props.token} onEncrypted={props.onEncryptedPdf} />
       )}
 
