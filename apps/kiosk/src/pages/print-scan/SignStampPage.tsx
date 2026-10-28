@@ -5,7 +5,6 @@
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { TouchToolScreen } from './TouchToolScreen'
 import { toolBandStatus } from './toolBand'
-import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
 import { SignClosedBody, SignStampGateView, gateWhy } from './sign-stamp/SignStampGateView'
@@ -19,8 +18,6 @@ void SIGN_ENDPOINTS
 
 export function SignStampPage() {
   const flow = useSignStampFlow()
-  const terminalLabel = getTerminalCode() || getTerminalId() || '终端未登记'
-
 
   const closed = flow.viewState === 'capability-disabled'
 
@@ -42,43 +39,13 @@ export function SignStampPage() {
       status={toolBandStatus(flow.pill)}
       onBack={() => flow.navigate('/print-scan')}
       askLabel={closed ? '问小青：签名没开怎么办' : '问小青：这个签名有法律效力吗'}
-      place={terminalLabel}
-      dock={
-        <div className="ss-cta-wrap">
-          {flow.cta.reason ? (
-            <p className="ss-cta-reason" id="sign-stamp-disabled-reason" data-testid="sign-stamp-disabled-reason">
-              {flow.cta.reason}
-            </p>
-          ) : null}
-          <div className="ss-cta-row">
-            <button type="button" className="qx-btn" data-variant="ghost" data-testid="sign-stamp-exit" onClick={flow.goBack}>
-              {flow.back.label}
-            </button>
-            {flow.viewState === 'completed' || flow.viewState === 'recovered-completed' || flow.viewState.startsWith('output-preview') || flow.viewState === 'output-expired' || flow.viewState === 'output-preview-failed' ? (
-              <button
-                type="button"
-                className="qx-btn"
-                data-variant="ghost"
-                data-testid="sign-stamp-add-another"
-                onClick={flow.addAnother}
-              >
-                再加一处本人手写签名
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="sign-stamp-primary"
-              disabled={flow.cta.primaryDisabled}
-              aria-describedby={flow.cta.reason ? 'sign-stamp-disabled-reason' : undefined}
-              onClick={onPrimary}
-            >
-              {flow.cta.primary}
-            </button>
-          </div>
-        </div>
-      }
+      left={{ label: flow.back.label, onClick: flow.goBack, testId: 'sign-stamp-exit' }}
+      primary={{
+        label: flow.cta.primary,
+        onClick: onPrimary,
+        disabled: flow.cta.primaryDisabled,
+        testId: 'sign-stamp-primary',
+      }}
     >
       <div
         className="ss-page qx-grow w2-print-scan-preview"
@@ -220,6 +187,17 @@ export function SignStampPage() {
               />
             )}
           </div>
+        ) : null}
+
+        {flow.cta.reason ? (
+          <p className="fs-help" id="sign-stamp-disabled-reason" data-testid="sign-stamp-disabled-reason">
+            {flow.cta.reason}
+          </p>
+        ) : null}
+        {flow.viewState === 'completed' || flow.viewState === 'recovered-completed' || flow.viewState.startsWith('output-preview') || flow.viewState === 'output-expired' || flow.viewState === 'output-preview-failed' ? (
+          <button type="button" className="fs-row" data-testid="sign-stamp-add-another" onClick={flow.addAnother}>
+            <span><b>再加一处本人手写签名</b><small>在同一份 PDF 上继续放一处</small></span>
+          </button>
         ) : null}
 
         <div className="ss-truth" data-testid="sign-stamp-truth">

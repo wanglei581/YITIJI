@@ -512,7 +512,7 @@ const SCAN_STAGE_LANDMARK: Record<SeedStage, string> = {
 }
 
 /**
- * 四个出口。顶栏返回按 `.qx-topbar-back` 取 —— result 阶段的 CTA 条上另有一个同名
+ * 四个出口。顶栏返回按 `.qxt-band .qxt-back` 取 —— result 阶段的 CTA 条上另有一个同名
  * 「返回打印扫描」按钮（ScanResultPage 的终态出口，不在本次改动范围内），
  * 按可访问名取会一次命中两个。
  */
@@ -589,7 +589,7 @@ for (const stage of ['start', 'settings', 'progress', 'result'] as const) {
       await expect(page.getByText(SCAN_STAGE_LANDMARK[stage], { exact: false }).first()).toBeVisible()
 
       await (exit.topbar
-        ? page.locator('.qx-topbar-back')
+        ? page.locator('.qxt-band .qxt-back')
         : page.getByRole('button', { name: exit.label, exact: true })
       ).click()
       await page.waitForURL((url) => url.pathname === exit.destination)

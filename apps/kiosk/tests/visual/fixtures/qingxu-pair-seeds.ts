@@ -721,7 +721,10 @@ async function openScan(page: Page, api: ApiRouter, state: string): Promise<void
     await page.goto('/scan?stage=start', { waitUntil: 'domcontentloaded' })
     await writeScanWorkbenchSession(page, { stage: 'progress', scanType: 'resume', live })
     await page.goto('/scan?stage=progress', { waitUntil: 'domcontentloaded' })
-    if (state === 'cancelling') await page.getByRole('button', { name: '取消扫描' }).click()
+    if (state === 'cancelling') {
+      await page.getByRole('button', { name: '取消扫描' }).click()
+      await page.getByRole('button', { name: '再点一次确认取消' }).click()
+    }
     await see(page, `[data-state="${state}"]`)
     return
   }

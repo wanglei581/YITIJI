@@ -1222,9 +1222,11 @@ assert.match(
   /terminalId,/,
   'convert request body must include terminalId',
 )
+/* 签名页的终端身份读取在 useSignStampFlow 里（页面本身不再展示终端号，稿 20 的顶栏没有它），
+ * 所以这里读 hook：它仍是 convert 要照抄的参考，发请求前先读本机终端号。 */
 assert.match(
-  signStamp,
-  /getTerminalId\(\)/,
+  read('src/pages/print-scan/sign-stamp/useSignStampFlow.ts'),
+  /const tid = getTerminalId\(\)/,
   'sign-stamp remains the reference deep-link gate that convert must copy',
 )
 

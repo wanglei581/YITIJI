@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
-import { UploadIcon } from 'lucide-react'
 import { PhoneHelpLine } from '../print-scan/phoneHelp'
 import {
   loadConfiguredCapabilities,
   type ConfiguredCapability,
 } from '../../services/api/printScanCapabilities'
 import {
-  ScanCta,
   ScanTypeCards,
   ScanWorkbenchShell,
+  type ScanDock,
 } from './ScanWorkbenchChrome'
 import { SCAN_TRUTH, SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -92,6 +91,42 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       ? '当前无法创建扫描任务，请查看说明或改用其他方式'
       : '请先选择扫描类型；本页尚未创建任务。下一步会真实建立这次扫描'
 
+  const goStart = () => {
+    if (onGoStage) {
+      setSearchParams({ stage: 'start' }, { replace: true })
+      return
+    }
+    navigate('/scan?stage=start')
+  }
+  const dock: ScanDock = usbPanel
+    ? {
+        left: { label: '返回材料扫描', onClick: goStart },
+        primary: { label: '完成后回打印扫描', onClick: () => navigate('/print-scan') },
+      }
+    : blocked
+      ? {
+          left: { label: '返回打印扫描', onClick: () => navigate('/print-scan') },
+          primary: { label: '改用上传文件打印', onClick: () => navigate('/print/upload') },
+        }
+      : {
+          primary: {
+            label: '下一步 · 建立这次扫描',
+            onClick: () => {
+              patchScanWorkbenchSession({
+                stage: 'settings',
+                scanType: selected,
+                live: undefined,
+                result: undefined,
+              })
+              if (onGoStage) {
+                onGoStage('settings')
+                return
+              }
+              navigate('/scan?stage=settings', { state: { scanType: selected } })
+            },
+          },
+        }
+
   return (
     <ScanWorkbenchShell
       page="scan-start"
@@ -110,62 +145,7 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
       subtitle={subtitle}
       status={status}
       layout="stack"
-      ctabar={
-        usbPanel ? (
-          <ScanCta>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              onClick={() => {
-                if (onGoStage) {
-                  setSearchParams({ stage: 'start' }, { replace: true })
-                  return
-                }
-                navigate('/scan?stage=start')
-              }}
-            >
-              返回材料扫描
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print-scan')}>
-              完成后回打印扫描
-            </button>
-          </ScanCta>
-        ) : blocked ? (
-          <ScanCta reason="能力确认前不会创建扫描任务">
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
-              返回打印扫描
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/upload')}>
-              <UploadIcon aria-hidden="true" />
-              改用上传文件打印
-            </button>
-          </ScanCta>
-        ) : (
-          <ScanCta>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              onClick={() => {
-                patchScanWorkbenchSession({
-                  stage: 'settings',
-                  scanType: selected,
-                  live: undefined,
-                  result: undefined,
-                })
-                if (onGoStage) {
-                  onGoStage('settings')
-                  return
-                }
-                navigate('/scan?stage=settings', { state: { scanType: selected } })
-              }}
-            >
-              下一步 · 建立这次扫描
-            </button>
-          </ScanCta>
-        )
-      }
+      dock={dock}
     >
       {usbPanel ? (
         <>
@@ -258,16 +238,16 @@ export function ScanStartPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =>
           <div className="fs-facts">
             <div className="fs-fact wide">
               <b>屏幕上没有「开始扫描」</b>
-              <span>只能在奔图面板启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。扫描服务在这一步只建立任务。</span>
+              <span>只能在奔图面板启动。网页不能远程驱动扫描仪，也没有扫到第几张的进度。</span>
             </div>
             <div className="fs-pairgrid">
-            <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
-            <div className="fs-fact"><b>面板上按扫描</b><span>按屏幕上给出的这次说明操作。</span></div>
-            <div className="fs-fact"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
-            <div className="fs-fact">
+              <div className="fs-fact"><b>放好纸</b><span>把原稿放进扫描区。你在打印机上操作。</span></div>
+              <div className="fs-fact"><b>面板上按扫描</b><span>按屏幕上给出的这次说明操作。</span></div>
+            </div>
+            <div className="fs-fact wide"><b>回到这台机器</b><span>文件回来后在这里确认。未登录扫描件不会进入「我的文档」。</span></div>
+            <div className="fs-fact wide">
               <b>已选「{SCAN_TYPE_LABELS[selected]}」</b>
               <span>点类型只是选中。下一步建立这次扫描，并确认这台机器能收到扫描件。</span>
-            </div>
             </div>
           </div>
           <div className="sw-truth" data-disclaimer="true" data-testid="scan-workbench-truth">

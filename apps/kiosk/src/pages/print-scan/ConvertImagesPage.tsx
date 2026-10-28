@@ -17,7 +17,7 @@ import { convertImagesToPdf } from '../../services/api/printConversion'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { useStartPrintHandoff } from '../print/usePrintHandoff'
 import type { PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import { ConvertImagesCta } from './ConvertImagesPanels'
+import { convertDockSpec } from './ConvertImagesPanels'
 import { ConvertImagesView } from './ConvertImagesView'
 import {
   MAX_IMAGES,
@@ -279,6 +279,33 @@ export function ConvertImagesPage() {
     void runConvert('recheck', false, lastSubmitted)
   }
 
+  const dockSpec = convertDockSpec({
+    phase,
+    imageCount: images.length,
+    error,
+    generating,
+    rechecking,
+    uploading,
+    hasEndUser,
+    kiosk,
+    onConvert: () => void runConvert('convert'),
+    onRecheck: () => void runConvert('recheck'),
+    onNewKey: () => void runConvert('convert', true),
+    onRestoreOrder: handleRestoreOrder,
+    onPrint: handlePrint,
+    onLogin: handleLogin,
+    onDocuments: () => navigate('/me/documents'),
+    onCancelUpload: () => {
+      uploadGen.current += 1
+      setUploading(false)
+    },
+    onCloseUsb: () => {
+      setUsbOpen(false)
+      if (!kiosk) handlePickLocal()
+    },
+    onPickLocal: handlePickLocal,
+  })
+
   // 未登录时 PDF 不会进入「我的文档」——完成态按转换响应 hasEndUser 分别渲染，游客不得看到已保存。
   return (
     <TouchToolScreen
@@ -288,35 +315,7 @@ export function ConvertImagesPage() {
       status={toolBandStatus(status)}
       onBack={() => navigate('/print-scan')}
       askLabel={phase === 'empty' ? '问小青：照片怎么合成 PDF' : '问小青：几张图怎么合成一份'}
-      dock={
-        <ConvertImagesCta
-          phase={phase}
-          imageCount={images.length}
-          error={error}
-          generating={generating}
-          rechecking={rechecking}
-          uploading={uploading}
-          hasEndUser={hasEndUser}
-          onBack={() => navigate('/print-scan')}
-          onConvert={() => void runConvert('convert')}
-          onRecheck={() => void runConvert('recheck')}
-          onNewKey={() => void runConvert('convert', true)}
-          onRestoreOrder={handleRestoreOrder}
-          onPrint={handlePrint}
-          onLogin={handleLogin}
-          onDocuments={() => navigate('/me/documents')}
-          onHelp={() => navigate('/help')}
-          onCancelUpload={() => {
-            uploadGen.current += 1
-            setUploading(false)
-          }}
-          onCloseUsb={() => {
-            setUsbOpen(false)
-            handlePickLocal()
-          }}
-          onPickLocal={handlePickLocal}
-        />
-      }
+      primary={dockSpec.primary}
     >
       <ConvertImagesView
         loggedIn={loggedIn}
@@ -362,6 +361,7 @@ export function ConvertImagesPage() {
         onHelp={() => navigate('/help')}
         onBack={() => navigate('/print-scan')}
       />
+      {dockSpec.rows}
     </TouchToolScreen>
   )
 }

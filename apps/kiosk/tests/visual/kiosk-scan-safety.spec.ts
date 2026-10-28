@@ -962,7 +962,7 @@ test('leaving the scan flow drops the rescan authority @scan-safety', async ({ p
 
   // 顶栏返回和隐私清场、退出、屏保走同一条 leaveScanFlow → clearScanWorkbenchSession，
   // 代次在抹掉登记之前同步推进 —— 授权必须跟着那一步消失，不能被下一位用户继承。
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // 这里**必须**用页内回退，不能 page.goto：整页加载会把模块内存连同授权一起抹掉，
@@ -1000,7 +1000,7 @@ test('the result page own exit drops the rescan authority too @scan-safety', asy
   // 「返回打印扫描」是**另一套按钮**，此前只是裸 navigate —— 同一屏两个出口两种命运：
   // 从顶栏走的人登记被清干净，从这里走的人把 live 登记（含刚结束那一场的 controlToken
   // 明文）和这枚一次性授权一起留在原地，下一位用户接着用这台机器就继承了。
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回打印扫描', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true }).click()
   await page.waitForURL(/\/print-scan$/)
 
   // 必须页内回退：整页加载会把模块内存连授权一起抹掉，那样这条用例无论代码对不对都绿。
@@ -1269,7 +1269,7 @@ test('leaving during the recovery window revokes the recovered child @scan-safet
    * 真正要证明的是：随后领回来的那条 child 不许被写进任何状态，而且必须被撤掉。
    * 这一步刻意用页内跳转，不用 page.goto：整页加载会把还在飞的重放一起干掉，
    * 那样这条用例无论代码对不对都是绿的。 */
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 领回来的 child 必须被撤掉。不撤它就停在 waiting 收下一位的面板扫描 ——
@@ -1505,7 +1505,7 @@ test('leaving while the delivery ack is in flight revokes the session @scan-safe
 
   // 顶栏返回 = leaveScanFlow（撤服务端 + 清本机登记 + 推进代次）。用页内跳转，
   // 不用 page.goto：整页加载会把还在飞的那次确认一起干掉，那样用例怎么写都是绿的。
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 这一场必须被撤掉 —— 否则它就是一条没人看着的会话。
@@ -1570,7 +1570,7 @@ test('an ack that succeeds after the user left forces a second revoke when the f
   // 离开时那一次撤销在路上丢了。页内跳转，不用 page.goto：整页加载会把还在飞的
   // 那次确认一起干掉，那样这条用例无论代码对不对都是绿的。
   server.dropNextDelete()
-  await page.locator('.qx-topbar-back').click()
+  await page.locator('.qxt-band .qxt-back').click()
   await page.waitForURL(/\/print-scan$/)
 
   // ① 本机确实按登记发了那一次，而它确实没生效 —— 前提成立，这条用例才测得到东西。

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { XCircleIcon } from 'lucide-react'
 import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
@@ -12,7 +11,6 @@ import {
 } from './scanSessionRevoke'
 import {
   acknowledgeScanDelivery,
-  SCAN_ACK_PENDING_NOTICE,
   SCAN_ACK_REFUSED_PROGRESS_REASON,
   type ScanAckState,
 } from './scanDeliveryAck'
@@ -20,10 +18,7 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { scanShownText } from './scanShownText'
 import { SCAN_OUTPUT_FORMAT_PENDING, formatLabelFromMime } from './scanOutputFormat'
-import {
-  ScanCta,
-  ScanWorkbenchShell,
-} from './ScanWorkbenchChrome'
+import { ScanWorkbenchShell } from './ScanWorkbenchChrome'
 import { ScanPaperArt } from './ScanPaperArt'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -51,7 +46,7 @@ function formatElapsed(startedAt: number): string {
   const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
   const minutes = Math.floor(seconds / 60)
   const remain = seconds % 60
-  return `${String(minutes).padStart(2, '0')}:${String(remain).padStart(2, '0')}`
+  return `${minutes} 分 ${String(remain).padStart(2, '0')} 秒`
 }
 
 /** 组装扫描结果页需要的 file 展示对象，poll 成功路径与取消时的补查路径共用，避免字段映射写两遍。 */
@@ -82,10 +77,12 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const hasTaskIdentity = Boolean(scanTaskId && controlToken)
   const pollFailsRef = useRef(0)
   const [error, setError] = useState<string | null>(null)
-  const [elapsed, setElapsed] = useState('00:00')
+  const [elapsed, setElapsed] = useState('0 分 00 秒')
   const [busyPhase, setBusyPhase] = useState<ScanBusyPhase>('active')
   const [pollInFlight, setPollInFlight] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  /** 取消要按两下：第一下只是「武装」，第二下才发出取消请求；几秒不按就自己解除。 */
+  const [cancelArmed, setCancelArmed] = useState(false)
   const [polls, setPolls] = useState(0)
   /**
    * 服务端最近一次说的「仍在进行」是哪一种。只用来**转达**：matched 说明文件已经回到服务端、
@@ -299,6 +296,22 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanTaskId, controlToken])
 
+  useEffect(() => {
+    if (!cancelArmed) return undefined
+    const timer = window.setTimeout(() => setCancelArmed(false), 8000)
+    return () => window.clearTimeout(timer)
+  }, [cancelArmed])
+
+  const handleCancelPress = () => {
+    if (cancelling) return
+    if (!cancelArmed) {
+      setCancelArmed(true)
+      return
+    }
+    setCancelArmed(false)
+    void handleCancel()
+  }
+
   const handleCancel = async () => {
     if (!scanTaskId || !controlToken || cancellingRef.current) return
     cancellingRef.current = true
@@ -357,12 +370,22 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
     : !deliveryAcked
       ? ackRetryable
         ? { tone: 'warn' as const, label: '还没确认能收到扫描件' }
-        : { tone: 'unknown' as const, label: '正在确认能收到扫描件' }
+        : { tone: 'warn' as const, label: '正在确认能收到扫描件' }
       : pollInFlight
-        ? { tone: 'unknown' as const, label: '正在查询系统' }
+        ? { tone: 'ok' as const, label: '正在查询系统' }
         : error
           ? { tone: 'warn' as const, label: '查状态失败 · 不改判' }
-          : { tone: 'unknown' as const, label: '等待文件回传' }
+          : { tone: 'ok' as const, label: '等待文件回传' }
+
+  /* 取消扫描：确认没回话的时候也照样可按（取消回执就是服务端报的终态），所以两种屏都放它。 */
+  const cancelRow = (
+    <button type="button" className="fs-row" disabled={cancelling} onClick={handleCancelPress}>
+      <span>
+        <b>{cancelling ? '正在发送取消请求' : cancelArmed ? '再点一次确认取消' : '取消扫描'}</b>
+        <small>{cancelArmed && !cancelling ? '再按一次才会发出取消' : '取消这次还没完成的扫描'}</small>
+      </span>
+    </button>
+  )
 
   return (
     <ScanWorkbenchShell
@@ -372,111 +395,90 @@ export function ScanProgressPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       title={deliveryAcked ? '等待打印机端扫描完成' : '正在确认能收到扫描件'}
       subtitle={deliveryAcked
         ? '请在打印机面板完成扫描；本页每 3 秒自动检测结果'
-        : '还没确认这台机器可以收这一场的文件；确认之前请先别在面板上按开始'}
+        : '确认之前，这一页还不能检查文件'}
       status={status}
-      facts={deliveryAcked
-        ? ['面板扫完就回到这台屏幕：本机每隔几秒自动查一次，有结果会自动切过去。']
-        : [SCAN_ACK_PENDING_NOTICE]}
-      ctabar={
-        <ScanCta
-          reserveReason
-          reason={
-            cancelling
-              ? '正在等取消结果 —— 这一刻既不说已取消，也不说已完成'
-              : !deliveryAcked
-                ? '还没确认能收到扫描件之前，别在面板上按开始 —— 这一刻扫出来的文件不会交到这一场'
-                : pollInFlight
-                  ? '正在等这次查询的结果 —— 这一刻不改判任务状态'
-                  : undefined
-          }
-        >
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="ghost"
-            disabled={cancelling || pollInFlight}
-            onClick={() => void handleCancel()}
-          >
-            <XCircleIcon aria-hidden />
-            取消扫描
-          </button>
-          {/* 没拿到投递授权时主行动不是「立即检查」——查多少次都不会让它变得可投递。
-              这一屏能做的只有再确认一次，所以主行动换成它。 */}
-          {deliveryAcked ? (
+      dock={{ left: { label: '返回打印扫描', leaveTo: '/print-scan' } }}
+    >
+      {!deliveryAcked && !cancelling ? (
+        <>
+          <div className="fs-grow">
+            <div className="fs-facts">
+              <div className="fs-fact wide">
+                <b>还不能等文件</b>
+                <span>确认之前，这一页还不能接收扫描件。</span>
+              </div>
+              <div className="fs-pairgrid">
+                <div className="fs-fact"><b>类型</b><span>{SCAN_TYPE_LABELS[scanType]}</span></div>
+                <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
+              </div>
+              <div className="fs-fact wide"><b>保存策略</b><span>按设备回传的原格式保存，系统不做转换</span></div>
+              <div className="fs-fact wide"><b>查询</b><span>确认能收到扫描件之后才每 3 秒查一次，最长 10 分钟。</span></div>
+            </div>
+            <p className="fs-warn" data-testid="scan-ack-pending-notice">
+              这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
+              没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
+              它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
+              {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : ''}
+            </p>
+          </div>
+          <div className="fs-2">
             <button
               type="button"
-              className="qx-btn"
-              data-variant="primary"
-              disabled={cancelling || pollInFlight}
-              onClick={() => pollNowRef.current()}
-            >
-              立即检查
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
+              className="fs-row"
               disabled={cancelling || !ackRetryable}
               aria-disabled={cancelling || !ackRetryable}
               onClick={() => setAckState('pending')}
             >
-              {ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}
+              <span>
+                <b>{ackRetryable ? '再确认一次' : '正在确认能收到扫描件'}</b>
+                <small>系统没回之前，不说已经确认</small>
+              </span>
             </button>
-          )}
-        </ScanCta>
-      }
-    >
-      {!deliveryAcked && !cancelling ? (
-        <div className="fs-grow">
-          <div className="fs-facts">
-            <div className="fs-fact wide">
-              <b>还不能等文件</b>
-              <span>确认之前，这一页还不能接收扫描件。</span>
-            </div>
-            <div className="fs-pairgrid">
-              <div className="fs-fact"><b>类型</b><span>{SCAN_TYPE_LABELS[scanType]}</span></div>
-              <div className="fs-fact"><b>输出格式</b><span>{SCAN_OUTPUT_FORMAT_PENDING}</span></div>
-            </div>
-            <div className="fs-fact wide"><b>保存策略</b><span>按设备回传的原格式保存，系统不做转换</span></div>
-            <div className="fs-fact wide"><b>查询</b><span>授权确认之后才每 3 秒查一次，最长 10 分钟。</span></div>
+            {cancelRow}
           </div>
-          <p className="fs-warn" data-testid="scan-ack-pending-notice">
-            这一场<b>已经建好</b>，但系统还没确认这台机器可以收它的文件。
-            没确认之前，面板上扫出来的东西<b>不会</b>交到这一场，所以<b>先别在面板上按开始</b>。
-            它也<b>不会</b>被别人收走：没确认的任务不会接收任何文件。
-            {ackRetryable ? '上一次确认没成，点下面「再确认一次」重来。' : ''}
-          </p>
-        </div>
+        </>
       ) : (
         <>
-          <div className="fs-hero">
-            <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
-            <div className="fs-hero-tx">
+          <div className="fs-grow">
+            <div className="sx-hero">
+              <div className="fs-doc" aria-hidden="true"><ScanPaperArt /></div>
               <span className="fs-p">已等待 · 已查询 <b>{polls}</b> 次</span>
               <b className="fs-time">{elapsed}</b>
               <span className="fs-p">每 3 秒查一次，最长等 10 分钟。</span>
             </div>
+            <div className="fs-kvs flat">
+              <div className="fs-kv"><span>扫描类型</span><b>{SCAN_TYPE_LABELS[scanType]}</b></div>
+              <div className="fs-kv"><span>输出格式</span><b>{SCAN_OUTPUT_FORMAT_PENDING}</b></div>
+              <div className="fs-kv"><span>保存策略</span><b>按设备回传的原格式保存，系统不做转换</b></div>
+              <div className="fs-kv"><span>你在面板上</span><b>请在打印机上完成扫描。这一页不显示扫到第几张。</b></div>
+            </div>
+            {cancelling ? (
+              <p className="fs-warn">正在发送取消请求。系统没回之前，不说已经取消。如果这一刻文件刚好交完，以系统结果为准。</p>
+            ) : null}
+            {pollInFlight && !cancelling ? (
+              <p className="fs-p">本机正在问系统：这次扫描现在是什么状态。结果没回来之前，这一页不改任何判断。</p>
+            ) : null}
+            {error && !cancelling ? (
+              <p className="fs-warn">这一次没查到状态，不改判。留在这一页，可以再检查一次。{error}</p>
+            ) : null}
+            {matched && !error && !cancelling ? (
+              <p className="fs-p">系统说已经匹配，仍在处理。这里不写页级进度，也不写百分比。</p>
+            ) : null}
           </div>
-          <p className="fs-h">任务信息</p>
-          <div className="fs-kvs">
-            <div className="fs-kv"><span>扫描类型</span><b>{SCAN_TYPE_LABELS[scanType]}</b></div>
-            <div className="fs-kv"><span>输出格式</span><b>{SCAN_OUTPUT_FORMAT_PENDING}</b></div>
-            <div className="fs-kv"><span>保存策略</span><b>按设备回传的原格式保存，系统不做转换</b></div>
-            <div className="fs-kv"><span>你在面板上</span><b>请在打印机上完成扫描。这一页不显示扫到第几张。</b></div>
+          <div className="fs-2">
+            {cancelRow}
+            <button
+              type="button"
+              className="fs-row"
+              disabled={cancelling || pollInFlight}
+              onClick={() => pollNowRef.current()}
+            >
+              <span>
+                <b>立即检查</b>
+                <small>只增加一次查询，不自己判成功</small>
+              </span>
+            </button>
           </div>
-          {cancelling ? (
-            <p className="fs-warn">正在发送取消请求。系统没回之前，不说已经取消。如果这一刻文件刚好交完，以系统结果为准。</p>
-          ) : null}
-          {pollInFlight && !cancelling ? (
-            <p className="fs-p">本机正在问系统：这次扫描现在是什么状态。结果没回来之前，这一页不改任何判断。</p>
-          ) : null}
-          {error && !cancelling ? (
-            <p className="fs-warn">这一次没查到状态，不改判。留在这一页，可以再检查一次。{error}</p>
-          ) : null}
-          {matched && !error && !cancelling ? (
-            <p className="fs-p">系统说已经匹配，仍在处理。这里不写页级进度，也不写百分比。</p>
-          ) : null}
         </>
       )}
     </ScanWorkbenchShell>

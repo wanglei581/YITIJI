@@ -393,6 +393,7 @@ test('cancel-completed race rechecks status and recovers the real scan file @w2'
   await seedScanLive(page)
   await page.goto('/scan?stage=progress')
   await page.getByRole('button', { name: '取消扫描' }).click()
+  await page.getByRole('button', { name: '再点一次确认取消' }).click()
   await page.waitForURL(/\/scan\?stage=result/)
   await expect(page.getByText('w2-scan.pdf', { exact: true })).toBeVisible()
   // 等待页挂载那一次。走到结果页之后不许再确认。
@@ -455,7 +456,7 @@ test('successful scan result takes this scanned original to the print desk mater
 
   // 按操作条主按钮点（不按文字找）：这一条钉的是落点，文案另有一句软断言。
   // 它先去材料检查，就不能再叫「直接打印」；名字照稿 18 的出口名「拿去打印」。
-  const printAction = page.locator('.sw-cta-row .qx-btn[data-variant="primary"]')
+  const printAction = page.locator('.qxt-dock .qxt-btn-pri')
   await expect.soft(printAction, '打印出口先去材料检查，按钮不能再说「直接」').toHaveText('拿去打印')
   const inspectionCreated = page.waitForRequest((request) =>
     request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/materials/tasks',
@@ -562,14 +563,14 @@ test.describe('scan result at 390x844', () => {
     const truthBox = await boxOf(truth, '底注')
     expectInside(truthBox, await boxOf(scroller, '扫描工作台滚动区'), '底注必须能整块滚进可视区')
     // 操作条在底栏之上：底注下沿不越过操作条上沿（与 expectInside 同一个 0.5px 容差），也就压不到底栏。
-    const ctabarTop = (await boxOf(page.locator('.qx-ctabar'), '操作条')).y
+    const ctabarTop = (await boxOf(page.locator('.qxt-dock'), '操作条')).y
     expect(truthBox.y + truthBox.height, '底注滚到底时不得压到操作条下面').toBeLessThanOrEqual(ctabarTop + 0.5)
 
     await seedScanResult(page, resultState)
     await page.goto('/scan?stage=result')
     await expectPdfCompleted(binary)
     await expect(page.locator('[data-kiosk-stage-fit]')).toHaveAttribute('data-kiosk-stage-fit', 'off')
-    const ctabar = page.locator('.qx-ctabar')
+    const ctabar = page.locator('.qxt-dock')
     const navbar = page.getByRole('navigation', { name: '主导航' })
     const aiButton = page.getByRole('button', { name: /AI 简历识别/ })
     await expect(aiButton).toBeEnabled()
@@ -1167,8 +1168,10 @@ test('scan result full-screen preview drives real PDF page and fit controls with
   const stage = await boxOf(page.locator('.kiosk-stage'), '舞台')
   expect(Math.abs(scrim.x - stage.x) + Math.abs(scrim.y - stage.y), '预览层从舞台左上角铺起').toBeLessThanOrEqual(1)
   expect(Math.abs(scrim.width - stage.width) + Math.abs(scrim.height - stage.height), '预览层与舞台同大').toBeLessThanOrEqual(1)
-  for (const layer of ['.qx-topbar', '.qx-ctabar', '.qx-navbar', '[data-testid="scan-workbench-exits"]']) {
-    await expect(page.locator(layer), `${layer} 在预览打开时不可达`).toHaveAttribute('inert', '')
+  /* 触屏壳把顶栏、底栏、导航整片放进同一个 inert 的底层（.qxt-under），不是每层各挂一个。
+   * 所以这里判「落在 inert 子树里」，不是判元素自己带 inert：只要有一层漏出来，它的最近 inert 祖先就是空。 */
+  for (const layer of ['.qxt-band', '.qxt-dock', '.qxt-nav', '[data-testid="scan-workbench-exits"]']) {
+    expect(await page.locator(layer).evaluate((el) => el.closest('[inert]') !== null), `${layer} 在预览打开时不可达`).toBe(true)
   }
   await expect(dialog.getByTestId('rs-pv-close')).toBeFocused()
   await expect(dialog.getByTestId('rs-pv-meta')).toContainText('2 页')

@@ -230,3 +230,47 @@
     min-width: 12em;
   }
 }
+
+/* 扫描与打印工具这几屏的底栏、正文间距：稿 18 把内容排得更紧（底栏 121px，正文左右 40px）。
+ * 只挂在本包的屏上，不动共享件的默认。 */
+.qxt-screen.scan-touch .qxt-dock {
+  padding: 16px 28px;
+  gap: 12px;
+}
+
+.qxt-screen.scan-touch .qxt-dock .qxt-btn {
+  padding: 0 16px;
+}
+
+.qxt-screen.scan-touch .qxt-dock .qxt-btn-pri {
+  min-width: 0;
+}
+
+.qxt-screen.scan-touch .qxt-body {
+  padding: 12px 40px 10px;
+  gap: 10px;
+}
+
+/* 示意图配色：稿 18 / 稿 20 那组灰、深青、浅蓝，全部取自 --qxt-* 令牌（页面 CSS 不写裸色值）。 */
+.qxt-screen.scan-touch {
+  --sx-art-base: color-mix(in srgb, var(--qxt-art-mist) 70%, var(--qxt-card));
+  --sx-art-top: var(--qxt-unknown-dot);
+  --sx-art-sheet: var(--qxt-card);
+  --sx-art-edge: var(--sx-art-base);
+  --sx-art-line: var(--qxt-art-rule);
+  --sx-art-ink: var(--qxt-ink);
+  --sx-art-deep: var(--qx-deep);
+  --sx-art-speaker: var(--qxt-ink-2);
+  --sx-art-teal: var(--qxt-mark-b);
+  --sx-art-plug: var(--qxt-art-track);
+  --sx-art-id-a: color-mix(in srgb, var(--qxt-art-slate) 50%, var(--qxt-card));
+  --sx-art-id-b: color-mix(in srgb, var(--qxt-art-slate) 25%, var(--qxt-card));
+}
+
+.qxt-screen.scan-touch .sx-art {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}

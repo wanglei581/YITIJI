@@ -2,12 +2,12 @@ import { type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRightIcon, type LucideIcon } from 'lucide-react'
 import { QxTouchBand } from '../../components/qingxu/touch/QxTouchBand'
-import { QxTouchDock } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchDock, type QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
 import { QxTouchNav } from '../../components/qingxu/touch/QxTouchNav'
 import { QxTouchScreen } from '../../components/qingxu/touch/QxTouchScreen'
 import { useAuth } from '../../auth/useAuth'
 import { rememberAssistantDraft } from '../../services/assistantDraft'
-import { getTerminalCode, getTerminalId } from '../../services/api/screensaver'
 import { revokeLiveScanSession } from './scanSessionRevoke'
 import { clearScanWorkbenchSession } from './scanWorkbenchSession'
 import {
@@ -56,20 +56,35 @@ function bandTone(tone: 'ok' | 'warn' | 'bad' | 'unknown'): 'ok' | 'warn' | 'unk
   return 'unknown'
 }
 
+/** 底栏左边的次按钮。不传时是「返回」，走 leaveScanFlow('/print-scan')。 */
+export type ScanDockLeft = {
+  label: string
+  /** 二选一：leaveTo 走 leaveScanFlow（撤服务端任务、清本机登记再走人），onClick 是页内动作。 */
+  leaveTo?: string
+  onClick?: () => void
+  icon?: 'back' | 'refresh'
+  disabled?: boolean
+}
+
+/**
+ * 底栏三槽：左边次按钮、中间问小青、右边主按钮，照稿 18 和共享底栏一个样子。
+ * 主按钮不传就不画（等回传那一屏的「取消扫描」「立即检查」放在正文里，稿就是这么排的）。
+ */
+export type ScanDock = {
+  left?: ScanDockLeft
+  primary?: QxTouchPrimary
+}
+
 type ScanWorkbenchShellProps = {
   page: 'scan-start' | 'scan-settings' | 'scan-progress' | 'scan-result'
   state: ScanWorkbenchState
   title: string
   subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
-  ctabar: ReactNode
+  dock?: ScanDock
   facts?: readonly string[]
   layout?: 'stack' | 'spread'
   children: ReactNode
-}
-
-export function scanTerminalLabel(): string {
-  return getTerminalCode() || getTerminalId() || '终端未登记'
 }
 
 export function ScanWorkbenchShell({
@@ -78,7 +93,7 @@ export function ScanWorkbenchShell({
   title,
   subtitle,
   status,
-  ctabar,
+  dock,
   facts,
   layout = 'stack',
   children,
@@ -88,7 +103,7 @@ export function ScanWorkbenchShell({
   title: string
   subtitle: ReactNode
   status: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
-  ctabar: ReactNode
+  dock?: ScanDock
   facts?: readonly string[]
   /**
    * 稿 18 的两种排法：`stack` 最后一块吃余量（选类型 / 面板指引 / 结果预览）；
@@ -118,9 +133,10 @@ export function ScanWorkbenchShell({
     clearScanWorkbenchSession()
     navigate(destination)
   }
+  const leftSpec: ScanDockLeft = dock?.left ?? { label: '返回', leaveTo: '/print-scan' }
   return (
     <QxTouchScreen
-      className="qx-stage scan-touch"
+      className="scan-touch"
       legacyFrame
       testId={`scan-workbench-state-${state}`}
       stateId={state}
@@ -128,26 +144,37 @@ export function ScanWorkbenchShell({
       band={
         <QxTouchBand
           kind="compact"
-          className="qx-topbar"
-          backClassName="qx-topbar-back"
           backLabel="返回打印扫描"
           onBack={() => leaveScanFlow('/print-scan')}
           eyebrow={SCAN_EYEBROW[page]}
           title={title}
-          sub={typeof subtitle === 'string' ? subtitle : undefined}
+          sub={subtitle}
           seal={null}
-          place={scanTerminalLabel()}
           status={{ text: status.label, tone: bandTone(status.tone) }}
           rail={{ labels: SCAN_RAIL, now: SCAN_RAIL_NOW[page] }}
         />
       }
       dock={
         <QxTouchDock
-          className="qx-ctabar"
           back={false}
+          left={
+            <button
+              type="button"
+              className="qxt-btn qxt-btn-sec"
+              disabled={leftSpec.disabled}
+              onClick={() => {
+                if (leftSpec.leaveTo) leaveScanFlow(leftSpec.leaveTo)
+                else leftSpec.onClick?.()
+              }}
+            >
+              <QxTouchIcon name={leftSpec.icon === 'refresh' ? 'refresh' : 'chevL'} size={30} strokeWidth={2.4} />
+              {leftSpec.label}
+            </button>
+          }
           ask={{
             label: askLabel,
             draft: askLabel,
+            voice: true,
             /* 问小青也是「离开整条扫描流程」：先记草稿，再走 leaveScanFlow 撤服务端、清本机登记，
              * 最后返回 false 让底栏不再自己 navigate。 */
             beforeAsk: () => {
@@ -156,14 +183,13 @@ export function ScanWorkbenchShell({
               return false
             },
           }}
-          secondary={ctabar}
+          primary={dock?.primary}
         />
       }
       nav={
         /* 底栏三项也是「离开整条扫描流程」，不是页内切换：走同一条 leaveScanFlow，
          *  只有落点不同。任何一个改回裸 navigate，这一屏就又会留下孤儿任务。 */
         <QxTouchNav
-          className="qx-navbar"
           onHome={() => leaveScanFlow('/')}
           onAdvisor={() => leaveScanFlow('/assistant')}
           onProfile={() => leaveScanFlow('/profile')}
@@ -291,9 +317,9 @@ export function ScanTypeCards({
           >
             <b>{option.label}</b>
             <span className="fs-sub">{option.description}</span>
-            <span className="fs-chips">
+            <span className="sx-chips">
               {option.chips.map((chip) => (
-                <span key={chip.label} className={`fs-chip${chip.tone === 'warn' ? ' is-warn' : ''}`}>{chip.label}</span>
+                <span key={chip.label} className={`sx-chip${chip.tone === 'warn' ? ' is-warn' : ''}`}>{chip.label}</span>
               ))}
             </span>
           </button>
@@ -331,21 +357,26 @@ export function ScanPlan({ items }: { items: readonly string[] }) {
   )
 }
 
-export function ScanPanelMock({ instructions, scanLabel }: { instructions: string[]; scanLabel: string }) {
+const CN_NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+
+export function ScanPanelMock({ instructions }: { instructions: string[] }) {
+  const count = instructions.length
   return (
-    <div className="fs-steps" data-testid="scan-workbench-instructions">
-      {instructions.map((instruction, index) => (
-        <div key={`${instruction}-${index}`} className="fs-step">
-          <span className="n">{index + 1}</span>
-          <b>面板步骤 {index + 1}</b>
-          <span className="d">{instruction}</span>
-        </div>
-      ))}
+    <>
+      <div className="fs-steps" data-testid="scan-workbench-instructions">
+        {instructions.map((instruction, index) => (
+          <div key={`${instruction}-${index}`} className="fs-step">
+            <span className="n">{index + 1}</span>
+            <b>面板步骤 {index + 1}</b>
+            <span className="d">{instruction}</span>
+          </div>
+        ))}
+      </div>
       <div className="fs-scanhero">
         <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
-        <p>按上面{instructions.length}步，在打印机面板上操作。步骤按「{scanLabel}」原文转达，本机不改写。扫完可以取回原件。</p>
+        <p>按上面{count <= 10 ? CN_NUM[count] : count}步，在打印机面板上操作。扫完可以取回原件。</p>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -397,27 +428,6 @@ export function ScanKvCard({
           <div key={key}><span>{key}</span><b>{value}</b></div>
         ))}
       </div>
-    </div>
-  )
-}
-
-export function ScanCta({
-  reason,
-  reserveReason,
-  children,
-}: {
-  reason?: string
-  /**
-   * 给理由行留住位置。等待页每 3 秒查一次，理由行只在「查询在路上」那一瞬出现；
-   * 不留位的话整条操作条每 3 秒跳一下高度，主按钮在手指底下上下挪。
-   */
-  reserveReason?: boolean
-  children: ReactNode
-}) {
-  return (
-    <div className="sw-cta-wrap" data-reserve-reason={reserveReason ? 'true' : undefined}>
-      {reason ? <p className="sw-cta-reason" data-testid="scan-workbench-disabled-reason">{reason}</p> : null}
-      <div className="sw-cta-row">{children}</div>
     </div>
   )
 }

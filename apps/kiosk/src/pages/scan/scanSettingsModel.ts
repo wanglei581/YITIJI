@@ -86,7 +86,7 @@ export function formatCountdown(expiresAt: string): string {
   const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
   const minutes = Math.floor(seconds / 60)
   const remain = seconds % 60
-  return `${minutes}:${String(remain).padStart(2, '0')}`
+  return `剩余 ${minutes} 分 ${String(remain).padStart(2, '0')} 秒`
 }
 
 export function liveSessionStillValid(live: ScanLiveState | undefined): live is ScanLiveState {

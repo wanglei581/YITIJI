@@ -30,11 +30,10 @@ import {
   type SessionFailure,
 } from './scanRescanRecovery'
 import {
-  ScanCta,
   ScanPanelMock,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
-import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
+import { type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
 import {
   beginPlainScanRestart,
@@ -106,7 +105,7 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
   const [starting, setStarting] = useState(false)
   const [scanTaskId, setScanTaskId] = useState<string | null>(restoredLive?.scanTaskId ?? null)
   const [expiresAt, setExpiresAt] = useState<string | null>(restoredLive?.expiresAt ?? null)
-  const [countdown, setCountdown] = useState('--:--')
+  const [countdown, setCountdown] = useState('剩余 -- 分 -- 秒')
   const [quietPeriodRemaining, setQuietPeriodRemaining] = useState(0)
   const [quietPeriodBlocked, setQuietPeriodBlocked] = useState(false)
   const [controlToken, setControlToken] = useState<string | null>(restoredLive?.controlToken ?? null)
@@ -761,29 +760,24 @@ export function ScanSettingsPage({ onGoStage }: { onGoStage?: (stage: ScanStage)
       page="scan-settings"
       state="panel-instruction"
       title="扫描指引"
-      subtitle="扫描任务已创建，请只按系统给出的这一次操作说明来做。"
+      /* 「扫描任务已创建」单独包一层：门禁与用例按这一整句精确匹配它来判断「会话真的建成了」。 */
+      subtitle={<><span>扫描任务已创建</span>，请只按系统给出的这一次操作说明来做。</>}
       status={{ tone: 'ok', label: '第 2 步 · 去面板操作' }}
-      ctabar={
-        <ScanCta>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={handleSafeReturn}>
-            返回（取消任务）
-          </button>
-          <button type="button" className="qx-btn" data-variant="primary" disabled={starting} onClick={handleConfirm}>
-            {starting ? '正在进入等待…' : '我已操作，开始等待'}
-          </button>
-        </ScanCta>
-      }
+      dock={{
+        left: { label: '返回（取消任务）', onClick: handleSafeReturn },
+        primary: {
+          label: starting ? '正在进入等待…' : '我已操作，开始等待',
+          onClick: handleConfirm,
+          disabled: starting,
+        },
+      }}
     >
-      <p className="fs-created"><b>扫描任务已创建</b>，请只按系统给出的这一次操作说明来做。</p>
       <ScanSettingsSessionFacts
         scanType={scanType} countdown={countdown}
         rescanRequested={rescanRequested} plainRestartChosen={plainRestartChosen}
         restoredFromStorage={restoredFromStorageRef.current}
       />
-      <ScanPanelMock
-        instructions={instructions.map((instruction) => instruction)}
-        scanLabel={SCAN_TYPE_LABELS[scanType]}
-      />
+      <ScanPanelMock instructions={instructions.map((instruction) => instruction)} />
     </ScanWorkbenchShell>
   )
 }

@@ -1,11 +1,11 @@
 /* 复印、证件照、照片合成 PDF、签名的正文。只挂在这三页，不改 .qxt-*。 */
 
-[data-qx-page='print-hub'].fs-page,
+[data-qx-page='print-hub'].sx-page,
 [data-qx-page='img2pdf'].i2p-page,
 [data-qx-page='sign'].ss-page,
-[data-qx-page='print-hub'] .fs-page,
-[data-qx-page='img2pdf'] .fs-page,
-[data-qx-page='sign'] .fs-page {
+[data-qx-page='print-hub'] .sx-page,
+[data-qx-page='img2pdf'] .sx-page,
+[data-qx-page='sign'] .sx-page {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -318,9 +318,9 @@
   color: var(--qxt-ink-2);
 }
 
-[data-qx-page='print-hub'] .fs-chip,
-[data-qx-page='img2pdf'] .fs-chip,
-[data-qx-page='sign'] .fs-chip {
+[data-qx-page='print-hub'] .sx-chip,
+[data-qx-page='img2pdf'] .sx-chip,
+[data-qx-page='sign'] .sx-chip {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
@@ -376,4 +376,18 @@
   text-align: left;
   color: var(--qxt-ink);
   font-size: 24px;
+}
+
+/* 示意图在卡里的大小：操作卡里占 76% 高，证件卡抬头里固定 132px（稿）。 */
+[data-qx-page='print-hub'] .fs-act .vis .sx-art,
+[data-qx-page='img2pdf'] .fs-act .vis .sx-art,
+[data-qx-page='sign'] .fs-act .vis .sx-art {
+  height: 76%;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+[data-qx-page='print-hub'] .fs-idhead .vis .sx-art,
+[data-qx-page='sign'] .fs-idhead .vis .sx-art {
+  height: 132px;
 }

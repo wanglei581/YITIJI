@@ -84,7 +84,7 @@ test('print hub default state reads capabilities and never claims 设备正常 @
         truthTop: box(document.querySelector('.ph-truth')).top,
         notesBottom: Math.max(...notes),
         truthBottom: box(document.querySelector('.ph-truth')).bottom,
-        navTop: box(document.querySelector('.qx-navbar')).top,
+        navTop: box(document.querySelector('.qxt-nav')).top,
       }
     })
     console.log(`print-hub-geometry ${JSON.stringify(geo)}`)
@@ -130,7 +130,7 @@ test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2',
       scrolls: scroller.scrollHeight > scroller.clientHeight,
       notesBottom: Math.max(...notes),
       truthBottom: document.querySelector('.ph-truth')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(geo.scrolls && geo.atEnd, '390 下内容应在 .qx-scroll 内滚动且已滚到底').toBe(true)
@@ -207,7 +207,7 @@ test('print hub locked state uses admin capability notes @w2', async ({ page, ap
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)
@@ -279,7 +279,7 @@ test('print hub device-off pauses paper paths and keeps software paths @w2', asy
       atEnd: scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
       actionsBottom: document.querySelector('.ph-actions')!.getBoundingClientRect().bottom,
       footerBottom: document.querySelector('.ph-foot')!.getBoundingClientRect().bottom,
-      navTop: document.querySelector('.qx-navbar')!.getBoundingClientRect().top,
+      navTop: document.querySelector('.qxt-nav')!.getBoundingClientRect().top,
     }
   })
   expect(bottom.atEnd).toBe(true)
@@ -400,7 +400,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
       const texts = [...scroller.querySelectorAll('b, .d, .ph-state-p, .ph-state-t, .ph-truth div, .ph-xq-doing, .ph-sec-h .t, .hint')]
         .filter((el) => (el.textContent ?? '').trim().length > 0)
         .map((el) => parseFloat(getComputedStyle(el).fontSize))
-      const ctas = [...document.querySelectorAll('.qx-ctabar .qx-btn')].map((el) => el.getBoundingClientRect().height)
+      const ctas = [...document.querySelectorAll('.qxt-dock .qxt-btn')].map((el) => el.getBoundingClientRect().height)
       return {
         overflow: scroller.scrollHeight - scroller.clientHeight,
         trailingBlank: box.bottom - lastBottom,
@@ -417,7 +417,7 @@ test('copy card opens the panel copy guide and returns to the hub @w2', async ({
   await page.screenshot({ path: test.info().outputPath('02-copy-guide.png') })
 
   // 点底部操作条里的「返回打印扫描」（顶栏返回键同名，这里点的是操作条那一个）。
-  await page.locator('.qx-ctabar').getByRole('button', { name: '返回打印扫描', exact: true }).click()
+  await page.locator('.qxt-dock').getByRole('button', { name: '返回打印扫描', exact: true }).click()
   await expect(page).toHaveURL(/\/print-scan$/)
   await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
   await page.screenshot({ path: test.info().outputPath('03-back-to-hub.png') })

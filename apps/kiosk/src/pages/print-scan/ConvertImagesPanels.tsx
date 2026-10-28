@@ -3,9 +3,7 @@ import {
   ArrowUpIcon,
   CheckIcon,
   EyeIcon,
-  ImageIcon,
   InfoIcon,
-  LoaderIcon,
   PlusIcon,
   RotateCwIcon,
   SmartphoneIcon,
@@ -14,6 +12,9 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { QxTouchPrimary } from '../../components/qingxu/touch/QxTouchDock'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { PhoneArt, UsbArt } from './ToolArt'
 import {
   MAX_IMAGES,
   MAX_OUTPUT_BYTES,
@@ -329,12 +330,12 @@ export function EmptyBody({
       <p className="fs-lead">还没有图片。用手机扫码传上来之后，才能合成。</p>
       <div className="fs-pair">
         <button type="button" className="fs-act" data-testid="img2pdf-add-phone" onClick={onShowQr}>
-          <span className="vis" aria-hidden="true"><SmartphoneIcon size={48} /></span>
+          <span className="vis" aria-hidden="true"><PhoneArt /></span>
           <span className="tx">
             <h3>手机扫码传图片</h3>
             <p>在手机上选 JPG 或 PNG。传到这台机器之后，才会出现在列表里。</p>
           </span>
-          <span className="go" aria-hidden="true">›</span>
+          <span className="go" aria-hidden="true"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
         </button>
         {kiosk ? null : (
           <button type="button" className="fs-act" data-testid="img2pdf-add-local" onClick={onPickLocal}>
@@ -343,17 +344,17 @@ export function EmptyBody({
               <h3>本机上传一张</h3>
               <p>在这台电脑上选 JPG 或 PNG，一次一张。一体机不打开系统文件框。</p>
             </span>
-            <span className="go" aria-hidden="true">›</span>
+            <span className="go" aria-hidden="true"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
           </button>
         )}
         <button type="button" className="fs-act off" disabled data-testid="img2pdf-src-usb" aria-disabled="true">
-          <span className="vis" aria-hidden="true"><UsbIcon size={48} /></span>
+          <span className="vis" aria-hidden="true"><UsbArt /></span>
           <span className="tx">
-            <span className="fs-chip">暂未开通</span>
+            <span className="sx-chip">暂未开通</span>
             <h3>U 盘导入</h3>
             <p>从 U 盘加图片，本机暂未开通。</p>
           </span>
-          <span className="go" aria-hidden="true">›</span>
+          <span className="go" aria-hidden="true"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
         </button>
       </div>
       <button type="button" className="fs-row" data-testid="img2pdf-add-usb" onClick={onOpenUsb}>
@@ -475,7 +476,27 @@ export function ErrorBand({ error, images }: { error: ConvertError; images: Sele
 }
 
 
-export function ConvertImagesCta(props: {
+/** 一个正文里的整行按钮（稿里次出口都是这个样子，不挤进底栏）。 */
+function ActionRow({ title, desc, onClick, disabled }: { title: string; desc?: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className="fs-row" disabled={disabled} onClick={onClick}>
+      <span><b>{title}</b>{desc ? <small>{desc}</small> : null}</span>
+    </button>
+  )
+}
+
+export type ConvertDockSpec = {
+  /** 底栏右边的主按钮。没有就不画。 */
+  primary?: QxTouchPrimary
+  /** 次出口：放在正文底部。 */
+  rows?: ReactNode
+}
+
+/**
+ * 底栏三槽照稿：左边固定是「返回打印扫描」，中间问小青，右边主按钮；
+ * 其余次出口都是正文里的整行按钮。按阶段给出主按钮与次出口。
+ */
+export function convertDockSpec(props: {
   phase: ConvertPhase
   imageCount: number
   error: ConvertError | null
@@ -483,7 +504,7 @@ export function ConvertImagesCta(props: {
   rechecking: boolean
   uploading: boolean
   hasEndUser: boolean | undefined
-  onBack: () => void
+  kiosk: boolean
   onConvert: () => void
   onRecheck: () => void
   onNewKey: () => void
@@ -491,139 +512,76 @@ export function ConvertImagesCta(props: {
   onPrint: () => void
   onLogin: () => void
   onDocuments: () => void
-  onHelp: () => void
   onCancelUpload: () => void
   onCloseUsb: () => void
   onPickLocal: () => void
-}) {
-  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser } = props
-  const convertLabel = `合成 ${imageCount} 张为一份 PDF`
-  const ghostBack = (
-    <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
-  )
-  const help = null
-  void props.onHelp
+}): ConvertDockSpec {
+  const { phase, imageCount, error, generating, rechecking, uploading, hasEndUser, kiosk } = props
+  const primary = (p: Omit<QxTouchPrimary, 'testId'>): QxTouchPrimary => ({ ...p, testId: 'img2pdf-primary' })
 
   if (phase === 'empty') {
-    return (
-      <>
-        <div className="i2p-cta-reason" data-testid="img2pdf-disabled-reason">还没有图片，没有可合成的内容</div>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onBack}>返回打印扫描</button>
-        <button type="button" className="qx-btn" data-variant="primary" disabled data-testid="img2pdf-primary" aria-label="至少加一张图再合成（还没有图片，没有可合成的内容）">
-          至少加一张图再合成
-        </button>
-      </>
-    )
+    return { primary: primary({ label: '至少加一张图再合成', onClick: () => undefined, disabled: true, noArrow: true }) }
   }
   if (phase === 'usb') {
-    return (
-      <>
-        {ghostBack}
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onCloseUsb}>
-          改用本机上传
-        </button>
-      </>
-    )
+    /* 一体机没有本机文件框：U 盘没接线时说「回到手机扫码」，不去开文件框（稿注）。 */
+    return {
+      rows: kiosk
+        ? <ActionRow title="回到手机扫码" desc="继续用手机加图片" onClick={props.onCloseUsb} />
+        : <ActionRow title="改用本机上传" desc="在这台设备上选 JPG 或 PNG" onClick={props.onCloseUsb} />,
+    }
   }
   if (phase === 'uploading') {
-    return (
-      <>
-        <div className="i2p-cta-reason">这一张还在上传，结果没确认前不合成</div>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onCancelUpload}>取消这一张</button>
-        {ghostBack}
-        <button type="button" className="qx-btn" data-variant="primary" disabled data-testid="img2pdf-primary">上传完成后可合成</button>
-      </>
-    )
+    return { rows: <ActionRow title="取消这一张" desc="回到加图片" onClick={props.onCancelUpload} /> }
   }
   if (phase === 'converting') {
-    return (
-      <>
-        <div className="i2p-cta-reason">系统还没返回合成结果</div>
-        {ghostBack}
-        <button type="button" className="qx-btn" data-variant="primary" disabled data-testid="img2pdf-primary">
-          <LoaderIcon size={22} />合成完成后可继续
-        </button>
-      </>
-    )
+    return { primary: primary({ label: '合成完成后可继续', onClick: () => undefined, disabled: true, noArrow: true }) }
   }
   if (phase === 'completed') {
-    return (
-      <>
-        {typeof hasEndUser === 'boolean'
-          ? hasEndUser
-            ? <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onDocuments}>查看我的文档</button>
-            : <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onLogin}>先登录再转换</button>
-          : null}
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onPrint}>
-          拿这份 PDF 去打印
-        </button>
-      </>
-    )
+    return {
+      primary: primary({ label: '拿这份 PDF 去打印', onClick: props.onPrint }),
+      rows: typeof hasEndUser === 'boolean'
+        ? hasEndUser
+          ? <ActionRow title="查看我的文档" desc="登录后可以去我的文档" onClick={props.onDocuments} />
+          : <ActionRow title="先登录再转换" desc="这是完成之后的登录入口，合成本身不用先登录" onClick={props.onLogin} />
+        : null,
+    }
   }
   if (phase === 'conflict') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onNewKey}>换一个新标识重新提交</button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onRestoreOrder}>
-          恢复上一次的顺序
-        </button>
-      </>
-    )
+    return {
+      rows: (
+        <div className="fs-2">
+          <ActionRow title="换一个新标识重新提交" desc="按当前顺序继续" onClick={props.onNewKey} />
+          <ActionRow title="恢复上一次的顺序" desc="按冲突前的顺序放回" onClick={props.onRestoreOrder} />
+        </div>
+      ),
+    }
   }
   if (error?.kind === 'in-progress' || error?.kind === 'result-unknown' || phase === 'rechecking') {
-    return (
-      <>
-        {help}
-        <button
-          type="button"
-          className="qx-btn"
-          data-variant="primary"
-          data-testid="img2pdf-primary"
-          disabled={rechecking}
-          onClick={props.onRecheck}
-        >
-          {rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个标记查这一次的结果' : '用同一个标记再查一次'}
-        </button>
-      </>
-    )
+    return {
+      primary: primary({
+        label: rechecking ? '正在查询…' : error?.kind === 'result-unknown' ? '用同一个标记查这一次的结果' : '用同一个标记再查一次',
+        onClick: props.onRecheck,
+        disabled: rechecking,
+      }),
+    }
   }
   if (error?.kind === 'known-failed' || error?.kind === 'source-unavailable' || error?.kind === 'source-expired' || error?.kind === 'total-too-large' || error?.kind === 'dimensions' || error?.kind === 'output-too-large' || error?.kind === 'capability') {
-    return (
-      <>
-        {help}
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" disabled={generating} onClick={props.onConvert}>
-          {generating ? '正在生成…' : '改完之后重试合成'}
-        </button>
-      </>
-    )
+    return {
+      primary: primary({ label: generating ? '正在生成…' : '改完之后重试合成', onClick: props.onConvert, disabled: generating }),
+    }
   }
   if (error?.kind === 'format' || error?.kind === 'too-large' || error?.kind === 'upload-failed') {
-    return (
-      <>
-        <button type="button" className="qx-btn" data-variant="ghost" onClick={props.onConvert} disabled={imageCount === 0}>
-          先用现有 {imageCount} 张合成
-        </button>
-        <button type="button" className="qx-btn" data-variant="primary" data-testid="img2pdf-primary" onClick={props.onPickLocal}>
-          换一张再传
-        </button>
-      </>
-    )
+    return {
+      primary: primary({ label: '换一张再传', onClick: props.onPickLocal }),
+      rows: <ActionRow title={`先用现有 ${imageCount} 张合成`} desc="不再等这一张" onClick={props.onConvert} disabled={imageCount === 0} />,
+    }
   }
-
-  return (
-    <>
-      {ghostBack}
-      <button
-        type="button"
-        className="qx-btn"
-        data-variant="primary"
-        data-testid="img2pdf-primary"
-        disabled={generating || uploading || imageCount === 0}
-        onClick={props.onConvert}
-      >
-        {generating ? <LoaderIcon size={22} /> : <ImageIcon size={22} />}
-        {generating ? '正在生成…' : convertLabel}
-      </button>
-    </>
-  )
+  return {
+    primary: primary({
+      label: generating ? '正在生成…' : `合成 ${imageCount} 张为一份 PDF`,
+      onClick: props.onConvert,
+      disabled: generating || uploading || imageCount === 0,
+      noArrow: generating,
+    }),
+  }
 }

@@ -50,7 +50,7 @@ export function SignClosedBody({ copy }: { copy: StatusCopy }) {
     <div className="fs-hold" role="group" aria-disabled="true" aria-label={`${title}，本机暂未开通`}>
       <b>{title}</b>
       <span>{detail}</span>
-      <span className="fs-chip">本机暂未开通</span>
+      <span className="sx-chip">本机暂未开通</span>
     </div>
   )
   return (

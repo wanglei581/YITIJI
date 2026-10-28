@@ -5,7 +5,6 @@ import {
   FileTextIcon,
   FolderIcon,
   PrinterIcon,
-  RotateCcwIcon,
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
@@ -14,11 +13,9 @@ import { FileContentPreview } from '../../components/FileContentPreview'
 import { formatLabelFromMime } from './scanOutputFormat'
 import { ScanResultPreviewViewer } from './ScanResultPreviewViewer'
 import {
-  ScanCta,
   ScanStatusPanel,
   ScanWorkbenchShell,
 } from './ScanWorkbenchChrome'
-import { ScanPaperArt } from './ScanPaperArt'
 import { scanShownText } from './scanShownText'
 import { SCAN_TYPE_LABELS, type ScanType } from './scanWorkbench'
 import { type ScanStage } from './scanWorkbenchModel'
@@ -314,30 +311,15 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
         title={isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时' : '扫描未完成'}
         subtitle="本次没有生成可用的扫描文件"
         status={{ tone: isNoFile || isExpired ? 'warn' : 'bad', label: isNoFile ? '已完成 · 结果里没有文件' : isExpired ? '等待超时 · 没有文件' : '扫描未完成' }}
-        ctabar={
-          <ScanCta>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/print-scan')}>
-              返回打印扫描
-            </button>
-            {isNoFile ? null : (
-              <button type="button" className="qx-btn" data-variant="ghost" onClick={() => leaveScanFlow('/')}>
-                返回首页
-              </button>
-            )}
-            {/* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
-                拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
-                拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */}
-            {rescanAuthorized ? (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handleRetry}>
-                重试扫描（同一份材料）
-              </button>
-            ) : (
-              <button type="button" className="qx-btn" data-variant="primary" onClick={handlePlainRestart}>
-                重新开始一次扫描
-              </button>
-            )}
-          </ScanCta>
-        }
+        /* 两个按钮，不是一个按钮两种文案：拿到凭据时它是「同一份材料」的安全重扫，
+           拿不到时它是一次普通新会话 —— 后者会让同一张纸撞上服务端两小时的重复件
+           拒收，代价完全不同，所以文案必须分开，并且由用户自己按下那一个。 */
+        dock={{
+          left: { label: '返回打印扫描', leaveTo: '/print-scan' },
+          primary: rescanAuthorized
+            ? { label: '重试扫描（同一份材料）', onClick: handleRetry }
+            : { label: '重新开始一次扫描', onClick: handlePlainRestart },
+        }}
       >
         {/* 标题与第一枚标签只说**所有成因都成立**的那句话：这一屏也接本机自己放弃的两条路
             （轮询到点、连续查不动），那两条服务端并没有说过「失败」或「过期」，
@@ -392,6 +374,16 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             </div>
           </div>
         </div>
+        {isNoFile ? null : (
+          <button type="button" className="fs-row" onClick={() => leaveScanFlow('/')}>
+            <span><b>返回首页</b><small>结束这次等待</small></span>
+          </button>
+        )}
+        {rescanAuthorized ? (
+          <button type="button" className="fs-row" onClick={handlePlainRestart}>
+            <span><b>重新开始一次扫描</b><small>回选类型，不带安全重扫凭据</small></span>
+          </button>
+        ) : null}
       </ScanWorkbenchShell>
     )
   }
@@ -406,21 +398,14 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
       title="扫描完成"
       subtitle="请核对文件信息，选择下一步操作"
       status={{ tone: 'ok', label: '系统已返回完成，并带回文件' }}
-      ctabar={
-        <ScanCta reason="未选择去向的临时文件会按系统的保存规则清理；本页不会伪造“已保存”">
-          {/* 成功页上的「重新扫描」本来就没有安全重扫可言：上一场已经建档，服务端那条
-              两小时去重只管「取过件但没建档成功」的字节。所以它是一次普通新会话，
-              走显式的那一条，不碰重扫授权。 */}
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={handlePlainRestart}>
-            <RotateCcwIcon aria-hidden />
-            重新扫描
-          </button>
-          {/* 名字照稿 18 的出口名：它先去材料检查（原件要先过隐私检查），不能再叫「直接打印」。 */}
-          <button type="button" className="qx-btn" data-variant="primary" disabled={!printEnabled} onClick={handlePrint}>
-            拿去打印
-          </button>
-        </ScanCta>
-      }
+      /* 成功页上的「重新扫描」本来就没有安全重扫可言：上一场已经建档，服务端那条
+         两小时去重只管「取过件但没建档成功」的字节。所以它是一次普通新会话，
+         走显式的那一条，不碰重扫授权。名字照稿 18 的出口名：「拿去打印」先去材料检查
+         （原件要先过隐私检查），不能再叫「直接打印」。 */
+      dock={{
+        left: { label: '重新扫描', onClick: handlePlainRestart, icon: 'refresh' },
+        primary: { label: '拿去打印', onClick: handlePrint, disabled: !printEnabled },
+      }}
     >
       <div className="sw-result qx-grow">
         <div className="sw-preview">
@@ -454,7 +439,6 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
             ) : null}
           </div>
           <div className="sw-pvstage">
-            <div className="vis" aria-hidden="true"><ScanPaperArt /></div>
             <div className="sw-pvdoc">
             {file ? (
               <FileContentPreview
@@ -521,6 +505,7 @@ export function ScanResultPage({ onGoStage }: { onGoStage?: (stage: ScanStage) =
           </span>
         </button>
       </div>
+      <p className="fs-p fs-foot">还没选下一步的临时文件，会按保存规则清理。扫完请取回原件。</p>
       {previewOpen && file ? (
         <ScanResultPreviewViewer file={file} formatLabel={displayFormat} onClose={closePreview} />
       ) : null}

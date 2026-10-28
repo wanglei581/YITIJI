@@ -13,12 +13,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   FilesIcon,
-  ImageIcon,
   PackageCheckIcon,
   PrinterIcon,
-  ScanLineIcon,
-  UserSquareIcon,
 } from 'lucide-react'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { ScanPaperArt } from '../scan/ScanPaperArt'
 import {
   COPY_GUIDE_CASES,
   COPY_GUIDE_KEY,
@@ -37,6 +36,7 @@ import {
 } from './components/QxPrintHubView'
 import { PhoneHelpLine } from './phoneHelp'
 import { toolBandStatus } from './toolBand'
+import { DocStackArt, IdCardArt } from './ToolArt'
 import { TouchToolScreen } from './TouchToolScreen'
 import './styles/print-hub-qx.css'
 
@@ -72,20 +72,10 @@ export function PrintScanFeatureInfoPage() {
         status={pill}
         onBack={() => navigate('/print-scan')}
         askLabel="问小青：这个功能是什么"
-        dock={
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            data-testid="print-hub-primary"
-            onClick={() => navigate('/print-scan')}
-          >
-            返回打印扫描
-          </button>
-        }
+        primary={{ label: '返回打印扫描', onClick: () => navigate('/print-scan'), testId: 'print-hub-primary' }}
       >
         <div
-          className="qx-scroll ph-page fs-page"
+          className="qx-scroll ph-page sx-page"
           data-w2-page="print-scan-feature"
           data-qx-page="print-hub"
           data-state="feature-not-found"
@@ -139,35 +129,19 @@ export function PrintScanFeatureInfoPage() {
       <TouchToolScreen
         eyebrow="复印"
         title="怎么在打印机上复印"
-        sub="复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里"
+        sub="复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里。照下面五步做就行。"
         status={pill}
         onBack={() => navigate('/print-scan')}
         askLabel="问小青：复印要注意什么"
-        dock={
-          <>
-            <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
-              返回打印扫描
-            </button>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="primary"
-              data-testid="print-hub-primary"
-              onClick={() => navigate(DOC_PRINT_ENTRY)}
-            >
-              去打印文件
-            </button>
-          </>
-        }
+        primary={{ label: '去打印文件', onClick: () => navigate(DOC_PRINT_ENTRY), testId: 'print-hub-primary' }}
       >
         <div
-          className="qx-scroll ph-page fs-page"
+          className="qx-scroll ph-page sx-page"
           data-w2-page="print-scan-feature"
           data-qx-page="print-hub"
           data-state="feature-copy"
           data-testid="print-hub-state-feature-copy"
         >
-          <p className="fs-lead">复印不用在这台屏幕上下单，也不会出现在「我的打印订单」里。照下面五步做就行。</p>
           <p className="fs-h" id="ph-copy-steps">照着做：五步复印</p>
           <ol className="fs-ol" data-testid="print-hub-copy-steps">
             {COPY_GUIDE_STEPS.map((step, index) => (
@@ -225,32 +199,17 @@ export function PrintScanFeatureInfoPage() {
       status={pill}
       onBack={() => navigate('/print-scan')}
       askLabel="问小青：证件照怎么办"
-      dock={
-        <>
-          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>
-            返回打印扫描
-          </button>
-          <button
-            type="button"
-            className="qx-btn"
-            data-variant="primary"
-            data-testid="print-hub-primary"
-            onClick={() => navigate(PHOTO_FALLBACK)}
-          >
-            先用照片打印
-          </button>
-        </>
-      }
+      primary={{ label: '先用照片打印', onClick: () => navigate(PHOTO_FALLBACK), testId: 'print-hub-primary' }}
     >
       <div
-        className="qx-scroll ph-page fs-page"
+        className="qx-scroll ph-page sx-page"
         data-w2-page="print-scan-feature"
         data-qx-page="print-hub"
         data-state="feature-id-photo"
         data-testid="print-hub-state-feature-id-photo"
       >
         <div className="fs-idhead" data-testid="print-hub-idphoto-unavailable">
-          <div className="vis" aria-hidden="true"><UserSquareIcon size={72} /></div>
+          <div className="vis" aria-hidden="true"><IdCardArt /></div>
           <div>
             <h2>本机暂未开放证件照</h2>
             <p>已经有电子版可以按照片打印；只有纸质的，先在打印机上扫描。裁切、换底色和排版都不在这台机器上做。</p>
@@ -258,18 +217,18 @@ export function PrintScanFeatureInfoPage() {
         </div>
         <div className="fs-pair">
           <button type="button" className="fs-act" data-testid="print-hub-idphoto-fallback" onClick={() => navigate(PHOTO_FALLBACK)}>
-            <span className="vis" aria-hidden="true"><ImageIcon size={48} /></span>
+            <span className="vis" aria-hidden="true"><DocStackArt /></span>
             <span className="tx"><h3>已经有证件照文件</h3><p>传到这台机器，按普通照片打印。尺寸和底色以你手上的原图为准。</p></span>
-            <span className="go" aria-hidden="true">›</span>
+            <span className="go" aria-hidden="true"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
           </button>
           <button type="button" className="fs-act" data-testid="print-hub-idphoto-scan" onClick={() => navigate(SCAN_FALLBACK)}>
-            <span className="vis" aria-hidden="true"><ScanLineIcon size={48} /></span>
+            <span className="vis" aria-hidden="true"><ScanPaperArt /></span>
             <span className="tx"><h3>只有纸质照片</h3><p>在打印机面板上扫描，回到这台机器取电子版。扫描不做裁切和换底色。</p></span>
-            <span className="go" aria-hidden="true">›</span>
+            <span className="go" aria-hidden="true"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>
           </button>
         </div>
         <div className="fs-plan">
-          <div className="hd"><b>以后会做</b><span className="fs-chip">规划，不是承诺</span></div>
+          <div className="hd"><b>以后会做</b><span className="sx-chip">规划，不是承诺</span></div>
           <ol>
             <li>选常见规格与底色（一寸 / 二寸 / 小一寸）。</li>
             <li>按纸张规格自动排版，确认张数后进入打印流程。</li>
