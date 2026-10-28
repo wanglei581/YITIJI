@@ -14,7 +14,8 @@ import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskStageFit } from '../../components/kiosk-shell/KioskStageFit'
-import { QxAiHelp } from '../../components/qingxu/QxAiHelp'
+import { QxTouchIcon } from '../../components/qingxu/touch/QxTouchIcon'
+import { rememberAssistantDraft } from '../../services/assistantDraft'
 import { ArtBox, K, SrHeading } from '../public-touch/PublicBlocks'
 import { IllusPhone, IllusReport, IllusResume, IllusStack } from '../public-touch/PublicIllus'
 import { PublicTouchFrame } from '../public-touch/PublicTouchFrame'
@@ -51,6 +52,29 @@ const ANON_ICONS: Record<string, LucideIcon> = {
   print: PrinterIcon,
   code: TicketIcon,
   policy: LandmarkIcon,
+}
+
+/**
+ * 稿 login 底栏的「问小青」：label 照稿写「问小青：不登录能办什么」，带本屏专属问句去顾问页，
+ * 只预填、不自动发送。模样用共享底栏同一套 askq 类（话筒圆钮 + 青色长钮）；
+ * 登录页底栏要放返回 / 不登录 / 主按钮最多四颗，放不下第五颗，所以这一条排在底栏上面、通宽。
+ */
+const LOGIN_ASK = { label: '问小青：不登录能办什么', draft: '不登录可以办理哪些服务？登录之后又多出什么？' } as const
+
+function LoginAsk() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      className="qxt-askq"
+      data-qxt-ask="on"
+      data-testid="login-gate-ask"
+      onClick={() => { rememberAssistantDraft(LOGIN_ASK.draft); navigate('/assistant') }}
+    >
+      <span className="qxt-mic"><QxTouchIcon name="mic" size={30} strokeWidth={2.2} /></span>
+      <span>{LOGIN_ASK.label}</span>
+    </button>
+  )
 }
 
 export function LoginPage() {
@@ -370,9 +394,7 @@ export function LoginPage() {
           </div>
           {helpLine ? <p className="qxp-note" role="note">{helpLine}</p> : null}
           <p className="lg-truth" data-disclaimer="true">登录只用于本人服务记录，身份与验证码由登录服务核验。</p>
-          <div className="lg-ask">
-            <QxAiHelp label="问小青：登录后能办什么？" draft="登录后可以办理哪些服务？不登录还能做什么？" />
-          </div>
+          <div className="lg-ask"><LoginAsk /></div>
         </PublicTouchFrame>
       </KioskStageFit>
     </div>

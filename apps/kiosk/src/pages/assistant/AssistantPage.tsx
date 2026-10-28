@@ -28,6 +28,7 @@ import {
   AdvisorManualEntries,
   AdvisorThinking,
   ChatBubble,
+  ReplyBounds,
   type Message,
 } from './AdvisorConversation'
 import { AssistantSheets, type AssistantSheetKind } from './AssistantSheets'
@@ -555,8 +556,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     <PublicTouchFrame
       page="assistant"
       eyebrow="问小青"
-      title={cockpitCopy.title.join('')}
-      sub={cockpitCopy.lede}
+      title={toolboxScene && body === 'picker' ? toolboxScene.title : cockpitCopy.title.join('')}
+      sub={toolboxScene && body === 'picker' ? `${toolboxScene.disclaimer}。` : cockpitCopy.lede}
       status={cockpitCopy.pill}
       navCurrent="advisor" bodyClassName={body === 'locked' ? 'qxt-body-aidown' : undefined}
       back={{ label: '返回首页', onBack: () => navigate('/') }}
@@ -631,12 +632,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               {body === 'reply' && (
                 <div className="qxp-card assistant-reply-card">
                   {transcript}
-                  <div className="assistant-bounds">
-                    <K as="h3">这一轮不替你决定</K>
-                    <ul>
-                      <li>身份</li><li>付款</li><li>打印是否出纸</li><li>政策资格</li><li>录用结果</li>
-                    </ul>
-                  </div>
+                  <ReplyBounds more={quickQuestions.filter((question) => question !== lastUserText)} />
                   {goActions && goActions.length > 0 && (
                     <div className="action-chips" aria-label="回答后的操作">
                       {goActions.map((action) => (

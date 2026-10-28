@@ -85,6 +85,8 @@ export interface ToolboxAssistantScene {
   welcome: string
   placeholder: string
   disclaimer: string
+  /** 稿 xq 场景态里「点了就发给小青」的起手问句。没有这一句的场景不画这个按钮。 */
+  starter?: string
 }
 
 export const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssistantScene> = {
@@ -136,6 +138,7 @@ export const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssi
     welcome: '这里是求职方向探索助手。如果你还不确定自己适合做什么，可以告诉我专业背景、感兴趣的领域或当前困惑，我们一起通过对话梳理可匹配的岗位方向和下一步行动路径。结果仅供个人参考。',
     placeholder: '例如：金融学本科，对互联网感兴趣，不知道适合哪个方向；或：想转行，有3年销售经验…',
     disclaimer: '探索结果仅供个人参考，不构成职业规划建议',
+    starter: '我还不确定适合做什么',
   },
   cover_letter_gen: {
     title: 'AI 求职信生成',

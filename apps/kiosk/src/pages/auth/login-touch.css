@@ -65,7 +65,8 @@
 .qxt-screen[data-qx-page='login'] .qxp-fill > .qxp-note,
 .qxt-screen[data-qx-page='login'] .lg-truth { margin: 4px 0 0; font-size: var(--qxt-fs-aux); line-height: 1.4; color: var(--qxt-ink-2); }
 .qxt-screen[data-qx-page='login'] .lg-ask { flex: none; margin-top: 6px; }
-.qxt-screen[data-qx-page='login'] .lg-ask .qx-ai-help { width: 100%; min-height: 80px; padding: 0 26px; border-radius: 44px; border: 0; background: var(--qxt-teal-wash); color: var(--qxt-teal-ink); font-size: var(--qxt-fs-askq); font-weight: 700; text-align: left; }
+/* 问小青：共享底栏的 askq 样子（话筒圆钮 + 青色长钮），这里通宽排在底栏上面 */
+.qxt-screen[data-qx-page='login'] .lg-ask .qxt-askq { width: 100%; flex: none; }
 
 /* 数字键盘盖住底部时仍用原来的遮罩与键帽，只把字号放到不小于 20 */
 .qxt-screen[data-qx-page='login'] .lg-kb { font-size: 36px; }

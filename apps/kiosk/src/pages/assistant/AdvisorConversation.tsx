@@ -18,7 +18,7 @@ import { EvidenceBadge } from '../../ai'
 import { KIcon } from '../../components/kiosk-icon'
 import { QxTouchSlab } from '../../components/qingxu/touch/QxTouchSlab'
 import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
-import { Hit } from '../public-touch/PublicBlocks'
+import { Hit, K } from '../public-touch/PublicBlocks'
 import { IllusChecklist, IllusResume, IllusStack } from '../public-touch/PublicIllus'
 import { advisorManualEntries } from './advisorScenes'
 import { advisorDisplayText } from './advisorUserCopy'
@@ -135,6 +135,29 @@ export function ChatBubble({ msg, keptQuestion }: { msg: Message; keptQuestion?:
         </div>
       )}
     </article>
+  )
+}
+
+/**
+ * 回答之后的两块交代（稿 xq 回答态）：这一轮不替你决定什么；这一主题还可以问什么。
+ * 后者是给下一问的提示，只列出来，不替你发、不自动提交；已经问过的那一句不重复列。
+ */
+export function ReplyBounds({ more }: { more: readonly string[] }) {
+  return (
+    <>
+      <div className="assistant-bounds">
+        <K as="h3">这一轮不替你决定</K>
+        <ul>
+          <li>身份</li><li>付款</li><li>打印是否出纸</li><li>政策资格</li><li>录用结果</li>
+        </ul>
+      </div>
+      {more.length > 0 ? (
+        <div className="assistant-bounds" data-testid="assistant-more-questions">
+          <K as="h3">这一主题还可以问</K>
+          <ul>{more.map((question) => <li key={question}>{question}</li>)}</ul>
+        </div>
+      ) : null}
+    </>
   )
 }
 

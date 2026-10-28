@@ -21,6 +21,8 @@ const files = {
   conversation: read('src/pages/assistant/AdvisorConversation.tsx'),
   scenes: read('src/pages/assistant/advisorScenes.ts'),
   touchCss: read('src/pages/assistant/assistant-touch.css'),
+  picker: read('src/pages/assistant/AssistantTaskPicker.tsx'),
+  login: read('src/pages/auth/LoginPage.tsx'),
   routes: read('src/routes/index.tsx'),
 }
 
@@ -97,6 +99,22 @@ must('touchCss', /\[data-qx-page='assistant'\] \.kassist \.assistant-ai-status \
 must('page', /bodyClassName=\{body === 'locked' \? 'qxt-body-aidown' : undefined\}/, 'AI 暂停时页壳用 qxt-body-aidown 紧凑通知条，求助句才不被挤出这一屏')
 must('touchCss', /\.assistant-conversation\[data-turn='locked'\] \{ gap: 8px; \}/, 'AI 暂停时对话区行距收紧到 8')
 must('touchCss', /\.assistant-manual-entries\[data-variant='full'\] \.qxt-slab \.qxt-take \{ position: absolute; right: 22px; top: 50%;/, '四张入口的箭头圆钮在卡片右侧垂直居中，不探出卡底')
+
+// ── 稿上本包每屏的 AI 元素一个不许少（产品负责人 10/28：AI 和这些功能结合在一起）──────────
+// 回答态：稿「这一主题还可以问」——给下一问的提示，只列不替用户发；已经问过的那句不重复。
+must('page', /<ReplyBounds more=\{quickQuestions\.filter\(\(question\) => question !== lastUserText\)\} \/>/, '回答态必须列出「这一主题还可以问」（去掉已问过的那一句）')
+must('conversation', /<K as="h3">这一主题还可以问<\/K>/, '回答态：「这一主题还可以问」是小标题')
+must('conversation', /<K as="h3">这一轮不替你决定<\/K>/, '回答态：「这一轮不替你决定」不得丢')
+// 场景态：稿 xq 场景屏的标题就是场景名（AI 求职方向探索），并有一颗「点了就发给小青」的起手问句；没有起手句的场景不画。
+must('scenes', /starter\?: string/, '场景可以带起手问句（starter）')
+must('scenes', /career_explore: \{[\s\S]{0,900}?starter: '我还不确定适合做什么',/, 'AI 求职方向探索的起手问句照稿：我还不确定适合做什么')
+must('picker', /\{scene\.starter \? \(\s*<Hit title=\{scene\.starter\} sub="点了就发给小青" testId="cockpit-scene-starter" disabled=\{loading\} onClick=\{\(\) => onQuestion\(scene\.starter \?\? ''\)\} \/>/, '场景态：起手问句是一颗点了就发给小青的按钮，等回答时停住')
+must('page', /title=\{toolboxScene && body === 'picker' \? toolboxScene\.title : cockpitCopy\.title\.join\(''\)\}/, '场景态：页头标题是场景名（稿：AI 求职方向探索）')
+must('page', /sub=\{toolboxScene && body === 'picker' \? `\$\{toolboxScene\.disclaimer\}。` : cockpitCopy\.lede\}/, '场景态：页头说明是「仅供参考」那一句')
+// 登录页底栏的问小青：label 照稿「问小青：不登录能办什么」，话筒圆钮，带本屏专属问句，只预填不自动发送。
+must('login', /label: '问小青：不登录能办什么', draft: '不登录可以办理哪些服务？登录之后又多出什么？'/, '登录页问小青的 label 与预填问句照稿')
+must('login', /<span className="qxt-mic"><QxTouchIcon name="mic" size=\{30\} strokeWidth=\{2\.2\} \/><\/span>/, '登录页问小青带话筒圆钮')
+must('login', /rememberAssistantDraft\(LOGIN_ASK\.draft\); navigate\('\/assistant'\)/, '登录页问小青：预填后去顾问页，不自动发送')
 must('scenes', /ADVISOR_MANUAL_ENTRIES/, '手动入口必须集中声明，便于逐条核对路由真实性')
 
 // 手动路径必须指向**真实注册**的路由，否则「不用等 AI 也能办」就是空话。

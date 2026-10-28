@@ -65,6 +65,10 @@ export function AssistantTaskPicker({
           <Card k="可以说" kAs="h2"><Note>{scene.placeholder}</Note><ArtBox><IllusChecklist w={200} /></ArtBox></Card>
           <Card k="结果怎么用" kAs="h2"><Note>{scene.disclaimer}</Note><ArtBox><IllusReport w={200} /></ArtBox></Card>
         </div>
+        {/* 稿 xq 场景态的起手问句：点一下发给小青，不替用户多说别的；这一轮在等回答时按钮停住。 */}
+        {scene.starter ? (
+          <Hit title={scene.starter} sub="点了就发给小青" testId="cockpit-scene-starter" disabled={loading} onClick={() => onQuestion(scene.starter ?? '')} />
+        ) : null}
         <div className="assistant-task-actions" data-cols="3">
           <button type="button" className="assistant-complaint" onClick={onClear}>
             <strong>重新选择主题</strong><small>回到四个咨询主题</small>

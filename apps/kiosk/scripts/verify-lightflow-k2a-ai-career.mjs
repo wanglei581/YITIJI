@@ -94,7 +94,11 @@ expect(!assistantModule.includes('kassist-sr-only">AI顾问'), '隐藏的重复 
   const frameStart = assistantPage.indexOf('<PublicTouchFrame')
   const frameEnd = frameStart < 0 ? -1 : assistantPage.indexOf('\n    >\n', frameStart)
   const frameProps = frameEnd < 0 ? '' : assistantPage.slice(frameStart, frameEnd)
-  expect(frameProps.includes('title={cockpitCopy.title.join'), '触屏意图带标题取自座舱文案')
+  // 标题只有两个来源：座舱文案；或者场景态（稿 xq：AI 求职方向探索）取场景名。不许写死别的字。
+  expect(
+    /title=\{(?:toolboxScene && body === 'picker' \? toolboxScene\.title : )?cockpitCopy\.title\.join\(''\)\}/.test(frameProps),
+    '触屏意图带标题取自座舱文案（场景态取场景名）',
+  )
   expect(frameProps.includes('navCurrent="advisor"'), '底栏当前项交给触屏导航的 AI 顾问')
   expect(frameProps.includes('eyebrow="问小青"'), '触屏稿眉题是问小青，不是 JSX 正文')
 }
