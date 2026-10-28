@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
-import { PrintArt } from './art/PrintArt'
-import { QxTouchStateEmpty } from '../../components/qingxu/touch/QxTouchStates'
+import { PrintEmptyDesk } from './components/PrintEmptyDesk'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
@@ -53,8 +52,6 @@ const EMPTY_ASK = {
   draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。',
 } as const
 
-const EMPTY_STEPS = ['选文件', '材料检查', '预览与参数', '核对价格'] as const
-
 const IMAGE_CLARITY_CODES = ['IMAGE_RESOLUTION_OK_FOR_A4', 'IMAGE_RESOLUTION_LOW_FOR_A4']
 const INCOMPLETE_INSPECTION_CODES = [
   'PRINT_MIME_UNSUPPORTED',
@@ -69,35 +66,6 @@ function imageClarityAlreadyChecked(summary: InspectionSummaryView | null): bool
   const codes = summary.messages.map((message) => message.code)
   if (codes.some((code) => INCOMPLETE_INSPECTION_CODES.includes(code))) return false
   return codes.some((code) => IMAGE_CLARITY_CODES.includes(code))
-}
-
-function EmptyPrintDesk({
-  marker,
-  problem,
-  onPickFile,
-  onDocuments,
-}: {
-  marker: 'print-material-check' | 'print-preview'
-  problem: string | null
-  onPickFile: () => void
-  onDocuments: () => void
-}) {
-  return (
-    <div className="pdt-empty" data-w2-page={marker} data-qx-state="missing-context">
-      <p className="pdt-current-file"><strong>当前文件：无</strong></p>
-      {problem ? <p data-print-handoff-problem="true">{problem}</p> : null}
-      <QxTouchStateEmpty
-        howto="文件还没选，或者上一位的文件已经清除。到这一步没有订单，也没有扣费。"
-        stepsTitle="办理顺序"
-        steps={[...EMPTY_STEPS]}
-        slabs={[
-          { title: '去选文件', desc: '手机、U 盘，把真实文件带进这次办理', onClick: onPickFile, visual: <PrintArt name="phone" size={86} /> },
-          { title: '我的文档（登录后）', desc: '登录后才能看到你保存的文件', onClick: onDocuments, visual: <PrintArt name="stack" size={100} count={2} /> },
-        ]}
-        fine="这一页本身不保存文件"
-      />
-    </div>
-  )
 }
 
 /** 检查途中这一份交接已被替换或失效：迟到的结果一律不写，当场停下。 */
@@ -308,11 +276,7 @@ export function PrintMaterialCheckPage({
   onAdvanceToPreview?: () => void
 } = {}) {
   const navigate = useNavigate()
-  const { getToken, isLoggedIn } = useAuth()
-  const openDocuments = () => {
-    if (isLoggedIn) navigate('/me/documents')
-    else navigate('/login', { state: { from: '/me/documents' } })
-  }
+  const { getToken } = useAuth()
   const [session, setSession] = useState<PrintHandoffContext | null>(handoff)
   const contextId = handoff?.contextId ?? null
   const file: PrintFileState | undefined = session?.file
@@ -644,11 +608,10 @@ export function PrintMaterialCheckPage({
         ask={printAsk(EMPTY_ASK.label, EMPTY_ASK.draft)}
         primary={{ label: '去选文件', onClick: () => navigate(uploadPath) }}
       >
-        <EmptyPrintDesk
+        <PrintEmptyDesk
           marker="print-material-check"
           problem={problem}
           onPickFile={() => navigate(uploadPath)}
-          onDocuments={openDocuments}
         />
       </PrintTouchFrame>
     )

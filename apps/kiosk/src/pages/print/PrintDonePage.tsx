@@ -407,15 +407,15 @@ export function PrintDonePage() {
                 {isLoading
                   ? '核验完成后将显示真实结果或返回任务进度页'
                   : taskId
-                    ? `暂时无法核验这一单，请在打印订单中查看。${problem}`
+                    ? '暂时无法核验这一单，请在打印订单中查看。'
                     : '未找到打印任务上下文，请从打印入口重新开始'}
               </div>
             </div>
           </div>
           {isLoading ? null : (
             <PrintMissResume
+              orderMayExist
               onUpload={() => navigate(uploadPath)}
-              onDocuments={() => navigate('/me/documents')}
               note="这一页不会把没核验到的结果说成已经出纸。"
             />
           )}
@@ -744,13 +744,14 @@ export function PrintDonePage() {
         ) : null}
         <p className="pft-tray"><PrintIcon name="arrowD" size={72} strokeWidth={2.4} /><span>出纸口在下面</span></p>
 
+        {/* 「这一单的记录」只在建单响应确认这一单关联了账号时才成立；没关联（false）或不知道（未知）时只说登录后看你的订单，不多承诺一层。 */}
         {hasEndUser === false ? <p className="pft-dest" role="status">本次打印未关联账号</p> : null}
         {hasEndUser === true && miniappPublished ? <p className="pft-dest" role="status">这单在手机『我的 → 打印订单』里能看到</p> : null}
 
         <div className="pft-tiles">
           <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => navigate('/me/print-orders')}>
             <span className="qxt-ic"><QxTouchIcon name="receipt" size={34} /></span>
-            <span className="qxt-tx"><b>查看打印订单</b><small>这一单的记录</small></span>
+            <span className="qxt-tx"><b>查看打印订单</b><small>{hasEndUser === true ? '这一单的记录' : '登录后看你的订单'}</small></span>
           </button>
           <button type="button" className="qxt-tile qxt-tile-stack" onClick={() => navigate('/help')}>
             <span className="qxt-ic"><PrintIcon name="help" size={34} /></span>

@@ -8,7 +8,7 @@
 // 动效只做三件事：入场逐卡浮现、按压回弹、探测中的扫光。全部在 CSS 里，
 // 不驱动任何业务状态；prefers-reduced-motion 下由 shell 与本页样式一并关掉。
 
-import { type CSSProperties, type ReactNode } from 'react'
+import { useId, type CSSProperties, type ReactNode } from 'react'
 import { helpNeededLine, machineCannotPrintLine, preferUnattended } from '../../../copy/unattendedCopy'
 import { QxAppNavbar } from '../../../components/qingxu/QxAppNavbar'
 import { QxTouchChip } from '../../../components/qingxu/touch/QxTouchChip'
@@ -371,6 +371,10 @@ function HubCapButton({
         : (paperOff ? '打印机缺纸，这次出不了纸。文件可以先从下面传上来。' : '这次出不了纸'))
       : displayDesc(capability)
   const take = HUB_TAKE[capability.key]
+  // 可点卡照统一版 QxTouchTask 的做法：读屏名只取标题（aria-labelledby），说明句进描述（aria-describedby），
+  // 读屏用户听得到「手机、U 盘或我的文档」这类说明。停用卡保持原读屏名：标题 + 原因。
+  const titleId = useId()
+  const descId = useId()
   return (
     <button
       type="button"
@@ -380,7 +384,9 @@ function HubCapButton({
       style={stagger(index)}
       data-testid={`print-hub-cap-${capability.key}`}
       aria-disabled={closed || undefined}
-      aria-label={closed ? `${title}（${reason}）` : title}
+      aria-label={closed ? `${title}（${reason}）` : undefined}
+      aria-labelledby={closed ? undefined : titleId}
+      aria-describedby={closed ? undefined : descId}
       onClick={closed ? undefined : () => onCapability(capability.key)}
     >
       {variant === 'task' ? (
@@ -389,8 +395,8 @@ function HubCapButton({
             <span className="qxt-ic"><QxTouchIcon name={icon} size={40} /></span>
             {closed ? <QxTouchChip tone={badge === '正在确认' ? 'slate' : 'clay'}>{badge}</QxTouchChip> : null}
           </div>
-          <h3>{title}</h3>
-          <p>{desc}</p>
+          <h3 id={titleId}>{title}</h3>
+          <p id={descId}>{desc}</p>
           {(!closed || (deviceTask && !paperOff)) && take ? (
             <div className="qxt-take">
               <QxTouchIcon name="check" size={24} strokeWidth={2.6} />
@@ -403,7 +409,7 @@ function HubCapButton({
       ) : (
         <>
           <span className="qxt-ic"><QxTouchIcon name={icon} size={34} /></span>
-          <span className="qxt-tx"><b>{title}</b><small>{desc}</small></span>
+          <span className="qxt-tx"><b id={titleId}>{title}</b><small id={descId}>{desc}</small></span>
           {closed || variant === 'tile' ? null : <span className="qxt-chev"><QxTouchIcon name="chevR" size={28} strokeWidth={2.2} /></span>}
         </>
       )}

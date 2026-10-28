@@ -426,11 +426,11 @@ export function PrintPickupClaimPage() {
   // 稿 .d3-pickrow：历史 10 位码与扫码枪两个开关放在键盘下面。按键不夺输入框焦点，扫码器随时能接着打。
   const modeRow = (
     <div className="pcp-pickrow">
+      {/* 读屏名取可见文字（WCAG 2.5.3：语音控制喊「点历史 10 位码」要对得上）；两种状态的可见字本来就不同，
+          所以这个键是一次动作、不是开关，不加 aria-pressed，也不再另写和可见字不一致的 aria-label。 */}
       <button
         type="button"
         className="qxt-btn pcp-mini"
-        aria-pressed={legacyMode}
-        aria-label={legacyMode ? `回到 ${PICKUP_CODE_LENGTH} 位新码键盘` : `输入 ${PICKUP_CODE_MAX_INPUT_LENGTH} 位历史码`}
         disabled={loading}
         onPointerDown={(event) => event.preventDefault()}
         // 只切显示格数与键盘；受理正则同时接受两种码，不改判据也不清空已输内容。

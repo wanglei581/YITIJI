@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -34,6 +34,9 @@ const progressUrl = transpile(join(kioskRoot, 'src/pages/print/printProgressMode
   '../../copy/unattendedCopy': unattendedUrl,
 })
 const paymentUrl = transpile(join(kioskRoot, 'src/pages/profile/me/printOrders/paymentCopy.ts'))
+const missResumeUrl = transpile(join(kioskRoot, 'src/pages/print/components/printMissResumeCopy.ts'), {
+  '../../../copy/unattendedCopy': unattendedUrl,
+})
 
 const httpStub = toDataUrl('export class ApiHttpError extends Error { constructor(status, code) { super(String(code)); this.status = status; this.code = code } }')
 const phoneUrl = transpile(join(kioskRoot, 'src/pages/upload/phoneUploadModel.ts'), {
@@ -45,6 +48,7 @@ const previewKindUrl = transpile(join(kioskRoot, 'src/pages/print/components/pri
 })
 
 const progress = await import(progressUrl)
+const missResume = await import(missResumeUrl)
 const payment = await import(paymentUrl)
 const previewKind = await import(previewKindUrl)
 const phone = await import(phoneUrl)
@@ -341,6 +345,8 @@ const hubContentUrl = transpile(join(kioskRoot, 'src/pages/print-scan/printHubCo
 const touchChipUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchChip({children}) { return jsx('span', {children}) }`)
 const touchIconUrl = toDataUrl(`import { jsx } from '${jsxUrl}'; export function QxTouchIcon() { return jsx('span', {}) }`)
 const hubViewUrl = transpile(join(kioskRoot, 'src/pages/print-scan/components/QxPrintHubView.tsx'), {
+  // 入口卡的读屏名取标题、说明句进描述，用 useId 配对；静态渲染只看文案，id 给个递增数即可。
+  react: toDataUrl('let n = 0; export function useId() { n += 1; return `hub-id-${n}` }'),
   'react/jsx-runtime': jsxUrl,
   'lucide-react': hubIconUrl,
   '../../print/components/PrintAiHelp': aiUrl,
@@ -574,4 +580,71 @@ test('W-118：重复挂载与重挂共享检查结果，不同文件隔离，失
   const failed = checkFlight.shareMaterialChecks('context:file', async () => { throw new Error('failed') })
   await assert.rejects(failed, /failed/)
   assert.deepEqual(await checkFlight.shareMaterialChecks('context:file', async () => ({ pii: { id: 'retry' } })), { pii: { id: 'retry' } })
+})
+
+// ── 出纸页、完成页「没拿到任务」空态：订单可能已建、已付，不得说「没有订单、没有扣费」 ──
+const NO_ORDER_CLAIM = /没有订单|没有扣费|没有收款/
+const PRE_ORDER_ORIGINAL = '文件还没选，或者上一位的文件已经清除。到这一步没有订单，也没有扣费。'
+
+test('PrintMissResume：订单可能已存在（出纸页、完成页）时渲染文字不下「没有订单、没有扣费、没有收款」的结论', () => {
+  const contact = { servicePhone: '18369161921', serviceHours: '工作日 9:00–18:00', otherOnlineTerminalNearby: false, miniappPublished: true }
+  for (const support of [undefined, null, contact]) {
+    for (const note of ['这一页不会把没核验到的结果说成已经出纸。', '没有真实任务编号，这一页不会假装已经出纸。']) {
+      const rendered = `${missResume.missResumeHowto(true)}${missResume.missResumeFine(true, note, support)}`
+      assert.doesNotMatch(rendered, NO_ORDER_CLAIM)
+      assert.match(rendered, /说不准有没有下过单、扣没扣费/)
+      assert.match(rendered, /我的 → 打印订单/)
+      assert.match(rendered, /打印有问题？/, '求助用 printProblemLine 的标准句')
+      assert.doesNotMatch(rendered, /联系现场|找现场|工作人员/)
+    }
+  }
+})
+
+test('PrintMissResume：付款之前（材料检查、预览的空态）保留原句，小字行不加求助句', () => {
+  assert.equal(missResume.missResumeHowto(false), PRE_ORDER_ORIGINAL)
+  assert.equal(missResume.missResumeFine(false, '这一页本身不保存文件'), '这一页本身不保存文件')
+})
+
+test('PrintMissResume：我的文档卡说明句按登录状态写', () => {
+  assert.equal(missResume.missResumeDocumentsDesc(true), '你保存过的文件在这里，选一份再来')
+  assert.equal(missResume.missResumeDocumentsDesc(false), '登录后才能看到你保存的文件')
+})
+
+test('PrintMissResume：orderMayExist 必传；出纸页、完成页三处传 true，材料检查与预览的空态传 false', () => {
+  const read = (path) => readFileSync(join(kioskRoot, path), 'utf8')
+  assert.match(read('src/pages/print/components/PrintMissResume.tsx'), /orderMayExist: boolean/)
+  assert.doesNotMatch(read('src/pages/print/components/PrintMissResume.tsx'), /orderMayExist\?:/)
+  const callsWithTrue = (src) => [...src.matchAll(/<PrintMissResume\s+orderMayExist\s/g)].length
+  const callsTotal = (src) => [...src.matchAll(/<PrintMissResume\b/g)].length
+  const progress = read('src/pages/print/PrintProgressPage.tsx')
+  const done = read('src/pages/print/PrintDonePage.tsx')
+  assert.equal(callsTotal(progress), 2)
+  assert.equal(callsWithTrue(progress), 2)
+  assert.equal(callsTotal(done), 1)
+  assert.equal(callsWithTrue(done), 1)
+  assert.match(read('src/pages/print/components/PrintEmptyDesk.tsx'), /<PrintMissResume orderMayExist=\{false\}/)
+  assert.doesNotMatch(progress + done, /没有订单，也没有扣费/)
+})
+
+// ── 打印链上「去我的文档选一份来打印」只经 usePickPrintDocuments，落点带 ?pick=print ──
+function printSourceFiles(dir) {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name)
+    if (statSync(full).isDirectory()) return printSourceFiles(full)
+    return /\.(ts|tsx)$/.test(name) ? [full] : []
+  })
+}
+
+test('打印链：我的文档入口一律走 usePickPrintDocuments（/me/documents?pick=print），登录回跳也带上', () => {
+  const hookPath = join(kioskRoot, 'src/pages/print/usePickPrintDocuments.ts')
+  const hook = readFileSync(hookPath, 'utf8')
+  assert.match(hook, /PRINT_PICK_DOCUMENTS_PATH = '\/me\/documents\?pick=print'/)
+  assert.match(hook, /navigate\(PRINT_PICK_DOCUMENTS_PATH\)/)
+  assert.match(hook, /navigate\('\/login', \{ state: \{ from: PRINT_PICK_DOCUMENTS_PATH \} \}\)/)
+  for (const file of printSourceFiles(join(kioskRoot, 'src/pages/print'))) {
+    if (file === hookPath) continue
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /['"`]\/me\/documents['"`]/, `${file} 不得再直接去不带 pick 的 /me/documents`)
+  }
+  assert.match(readFileSync(join(kioskRoot, 'src/pages/print/PrintUploadPage.tsx'), 'utf8'), /onDocuments=\{pickDocuments\}/)
+  assert.match(readFileSync(join(kioskRoot, 'src/pages/print/components/PrintMissResume.tsx'), 'utf8'), /usePickPrintDocuments\(\)/)
 })

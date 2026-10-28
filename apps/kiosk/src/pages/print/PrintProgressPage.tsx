@@ -406,8 +406,8 @@ export function PrintProgressPage() {
             </div>
           </div>
           <PrintMissResume
+            orderMayExist
             onUpload={() => navigate(uploadPath)}
-            onDocuments={() => navigate('/me/documents')}
             note="这一页本身不保存文件，也不会编造进度或打印结果。"
           />
           <PrintFillArt name="stack" />
@@ -442,8 +442,8 @@ export function PrintProgressPage() {
             </div>
           </div>
           <PrintMissResume
+            orderMayExist
             onUpload={() => navigate(uploadPath)}
-            onDocuments={() => navigate('/me/documents')}
             note="没有真实任务编号，这一页不会假装已经出纸。"
           />
           <PrintFillArt name="stack" />

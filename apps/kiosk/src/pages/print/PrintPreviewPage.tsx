@@ -12,11 +12,10 @@ import {
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import { useAuth } from '../../auth/useAuth'
-import { QxTouchStateEmpty } from '../../components/qingxu/touch/QxTouchStates'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
-import { PrintArt } from './art/PrintArt'
 import { PrintIcon } from './art/PrintIcon'
 import { FileThumbCard } from './components/FileThumbCard'
+import { PrintEmptyDesk } from './components/PrintEmptyDesk'
 
 import {
   getPrintParamSuggestions,
@@ -47,37 +46,6 @@ const EMPTY_ASK = {
 } as const
 
 const PREVIEW_SUB = '第 3 步 / 共 4 步 · 核对内容与参数，下一步看价格'
-const EMPTY_STEPS = ['选文件', '材料检查', '预览与参数', '核对价格'] as const
-
-function EmptyPrintDesk({
-  marker,
-  problem,
-  onPickFile,
-  onDocuments,
-}: {
-  marker: 'print-material-check' | 'print-preview'
-  problem: string | null
-  onPickFile: () => void
-  onDocuments: () => void
-}) {
-  return (
-    <div className="pdt-empty" data-w2-page={marker} data-qx-state="missing-context">
-      <p className="pdt-current-file"><strong>当前文件：无</strong></p>
-      {problem ? <p data-print-handoff-problem="true">{problem}</p> : null}
-      <QxTouchStateEmpty
-        howto="文件还没选，或者上一位的文件已经清除。到这一步没有订单，也没有扣费。"
-        stepsTitle="办理顺序"
-        steps={[...EMPTY_STEPS]}
-        slabs={[
-          { title: '去选文件', desc: '手机、U 盘，把真实文件带进这次办理', onClick: onPickFile, visual: <PrintArt name="phone" size={86} /> },
-          { title: '我的文档（登录后）', desc: '登录后才能看到你保存的文件', onClick: onDocuments, visual: <PrintArt name="stack" size={100} count={2} /> },
-        ]}
-        fine="这一页本身不保存文件"
-      />
-    </div>
-  )
-}
-
 type PrintFile = PrintFileState
 
 type SuggestionState =
@@ -175,11 +143,7 @@ export function PrintPreviewPage({
   onBackToCheck?: () => void
 } = {}) {
   const navigate = useNavigate()
-  const { getToken, isLoggedIn } = useAuth()
-  const openDocuments = () => {
-    if (isLoggedIn) navigate('/me/documents')
-    else navigate('/login', { state: { from: '/me/documents' } })
-  }
+  const { getToken } = useAuth()
 
   const emptyFile: PrintFile = { name: '', size: '', pages: null }
   const file = handoff?.file ?? emptyFile
@@ -356,11 +320,10 @@ export function PrintPreviewPage({
         ask={printAsk(EMPTY_ASK.label, EMPTY_ASK.draft)}
         primary={{ label: '去选文件', onClick: () => navigate(uploadPath) }}
       >
-        <EmptyPrintDesk
+        <PrintEmptyDesk
           marker="print-preview"
           problem={problem}
           onPickFile={() => navigate(uploadPath)}
-          onDocuments={openDocuments}
         />
       </PrintTouchFrame>
     )

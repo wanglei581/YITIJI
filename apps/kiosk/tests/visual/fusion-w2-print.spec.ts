@@ -400,18 +400,27 @@ for (const help of [
   { path: '/print-scan', label: '问小青：怎么选打印方式 →', draft: '我想打印一份文件，应该选手机上传、U 盘还是扫描？请帮我选一种方式。' },
   { path: '/print/upload?source=document', label: '问小青：这份文件怎么检查 →', draft: '这份文件要怎么检查？检查会看哪些内容？' },
   { path: '/print/desk?step=check', label: '问小青：文件要从哪传？', draft: '这一页没有待处理的文件。请说明文件可以从哪里传上来。不要假装已经收到文件。' },
+  // 同一条路径种上材料会话后是真的检查态，问小青换成「怎么遮挡」。上一条是没有文件的空态，两条各自覆盖，不能互相顶替。
+  { path: '/print/desk?step=check', seeded: true, name: '/print/desk?step=check (file seeded)', label: '问小青：怎么遮挡', draft: '材料检查发现了个人信息片段，保留和遮挡有什么区别？' },
   { path: '/print/desk?step=preview', label: '问小青：选参数', draft: '帮我选打印参数：黑白还是彩色、单面还是双面？' },
 ]) {
-  test(`M1 AI help hands off the current question once: ${help.path} @w2`, async ({ page, api }) => {
+  test(`M1 AI help hands off the current question once: ${help.name ?? help.path} @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page, W2_FILE.fileUrl)
     registerShell(api)
     api.respond('GET', '/api/v1/terminals/KSK-001/config', { status: 200, json: terminalConfigWithHosting(RECRUITMENT_HOSTING_OFF, 'w4-m1-assistant-draft') })
     api.respond('GET', '/api/v1/mock-interviews/capabilities/voice', { status: 200, json: { data: { asrEnabled: false, ttsEnabled: false } } })
-    if (help.path.endsWith('preview')) {
+    if (help.seeded || help.path.endsWith('preview')) {
       registerPrice(api)
       const binary = new FusionW2BinaryRoute(page)
       await binary.install()
       await seedMaterialSession(page)
+    }
+    if (help.seeded) {
+      // 真检查态一进来就会建材料任务；让它稳定停在「材料检查未完成」。问小青在检查的每个阶段都是同一句。
+      api.respond('POST', '/api/v1/materials/tasks', {
+        status: 503,
+        json: { success: false, error: { code: 'MATERIAL_UNAVAILABLE', message: '材料服务暂不可用' } },
+      })
     }
     await page.goto(help.path)
     await page.getByRole('button', { name: help.label, exact: true }).click()
@@ -968,6 +977,58 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   await page.waitForURL((url) => url.pathname === '/scan')
   await expect(page.getByRole('heading', { name: '材料扫描' })).toBeVisible()
   await expectHealthy(page, errors)
+})
+
+test('print source page 我的文档 row opens my documents in pick-to-print mode, also through login @w2', async ({ page, api }) => {
+  // 我的文档页按 ?pick=print 进「选一份来打印」模式（文件按能打印的排前面）。
+  // 来源页这一行、游客登录后的回跳，都必须带上它；否则用户落在普通查看页，不知道要选哪一份。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+
+  // 游客：去登录，登录成功后的回跳地址带 pick=print。
+  await page.goto('/print/upload?source=document')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await page.getByTestId('file-source-member-source').click()
+  await expect(page).toHaveURL(/\/login(\?|$)/)
+  const guestFrom = await page.evaluate(() => (window.history.state as { usr?: { from?: string } } | null)?.usr?.from)
+  expect(guestFrom).toBe('/me/documents?pick=print')
+
+  // 已登录：直达我的文档的选文件模式。
+  await loginThroughVisibleUi(page, '/print/upload')
+  await expect(page.locator('[data-w2-page="print-upload"]')).toBeVisible()
+  await page.getByTestId('file-source-member-source').click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+  expect(new URL(page.url()).searchParams.get('pick')).toBe('print')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/me/documents')).toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
+
+test('print empty desk: 我的文档 card follows login state and carries pick=print @w2', async ({ page, api }) => {
+  // 材料检查 / 预览没有文件时的空态（稿 st-empty）。第二张卡：游客写「登录后才能看到你保存的文件」并去登录，
+  // 已登录写「你保存过的文件在这里，选一份再来」并直达选文件模式；两条路都带 pick=print。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerMemberLogin(api)
+
+  await page.goto('/print/desk?step=check')
+  const docsCard = page.getByRole('button', { name: /我的文档（登录后）/ })
+  await expect(docsCard).toContainText('登录后才能看到你保存的文件')
+  await docsCard.click()
+  await expect(page).toHaveURL(/\/login(\?|$)/)
+  expect(await page.evaluate(() => (window.history.state as { usr?: { from?: string } } | null)?.usr?.from)).toBe('/me/documents?pick=print')
+
+  await loginThroughVisibleUi(page, '/print/upload')
+  // 登录会清掉上一位的材料上下文；软跳转回空态（不重载，会话是内存态）。
+  await softNavigate(page, '/print/desk?step=check', null)
+  const loggedInCard = page.getByRole('button', { name: /我的文档（登录后）/ })
+  await expect(loggedInCard).toContainText('你保存过的文件在这里，选一份再来')
+  await expect(loggedInCard).not.toContainText('登录后才能看到你保存的文件')
+  await loggedInCard.click()
+  await page.waitForURL((url) => url.pathname === '/me/documents')
+  expect(new URL(page.url()).searchParams.get('pick')).toBe('print')
+  await expect.poll(() => api.requestCount('GET', '/api/v1/me/documents')).toBeGreaterThan(0)
+  expect(errors).toEqual([])
 })
 
 test('print upload does not skip privacy check without a file @w2', async ({ page, api }) => {

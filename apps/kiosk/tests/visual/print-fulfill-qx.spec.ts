@@ -39,6 +39,9 @@ const flowState = {
   ...W2_ORDER,
 }
 
+// 订单可能已建、已付的页面（出纸页、完成页）拿不到任务信息时，不得说「没有订单、没有扣费、没有收款」：这些话只在付款之前才是事实。
+const NO_ORDER_CLAIM = /没有订单|没有扣费|没有收款/
+
 async function expectTouchAndBounds(page: Page): Promise<void> {
   await assertNoHorizontalOverflow(page)
   await assertNoElementCrossesViewport(page)
@@ -390,6 +393,40 @@ test('completed done says the paper is already out and never renders a pickup co
   expect(errors).toEqual([])
 })
 
+// 完成页「查看打印订单」磁贴的副题：「这一单的记录」只在建单响应确认这一单关联了账号（hasEndUser === true）时才成立；
+// 没关联（false）或不知道（缺省）时，这一单进不了「我的打印订单」，只能说「登录后看你的订单」，不多承诺一层。
+for (const [label, hasEndUser, expected, forbidden] of [
+  ['hasEndUser true', true, '这一单的记录', '登录后看你的订单'],
+  ['hasEndUser false', false, '登录后看你的订单', '这一单的记录'],
+  ['hasEndUser unknown', undefined, '登录后看你的订单', '这一单的记录'],
+] as const) {
+  test(`completed done order tile only promises this order's record when it is tied to an account: ${label} @w2`, async ({ page, api }) => {
+    const errors = collectRuntimeErrors(page)
+    registerShell(api)
+    api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+      status: 200,
+      json: { taskId: W2_ORDER.taskId, status: 'completed', completedAt: '2026-07-26T00:00:00.000Z' },
+    })
+    api.respond('GET', `/api/v1/orders/${W2_ORDER.orderId}/pay-status`, {
+      status: 200,
+      json: {
+        orderId: W2_ORDER.orderId, orderNo: W2_ORDER.orderNo, payStatus: 'paid', paymentSource: 'wechat', payChannel: 'wechat',
+        amountCents: W2_ORDER.amountCents, paidAt: '2026-07-26T00:00:00.000Z', pickupCode: null, attempt: null,
+      },
+    })
+
+    await page.goto('/print/done')
+    await setReactRouterState(page, '/print/done', hasEndUser === undefined ? flowState : { ...flowState, hasEndUser })
+
+    await expect(page.locator('[data-testid="print-fulfill-state-completed"]')).toBeVisible()
+    const tile = page.locator('.pft-tiles').getByRole('button', { name: /查看打印订单/ })
+    await expect(tile).toBeVisible()
+    await expect(tile).toContainText(expected)
+    await expect(tile).not.toContainText(forbidden)
+    expect(errors).toEqual([])
+  })
+}
+
 test('direct done visit without task context stays unknown @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
@@ -397,7 +434,44 @@ test('direct done visit without task context stays unknown @w2', async ({ page, 
   await expect(page.getByText('无法确认打印结果', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).toBeVisible()
+  // 没拿到任务信息不等于没有订单：不下「没有订单、没有扣费」的结论，只说说不准，并给出可以自己查的出路。
+  await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).toContainText('说不准有没有下过单、扣没扣费')
+  await expect(page.locator('[data-testid="print-fulfill-state-unknown"]')).not.toContainText(NO_ORDER_CLAIM)
   await expectTouchAndBounds(page)
   await page.screenshot({ path: test.info().outputPath('fulfill-unknown.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
+test('done with a real taskId whose status cannot be verified never claims there is no order or charge @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${W2_ORDER.taskId}`, {
+    status: 503,
+    json: { error: { code: 'PRINT_STATUS_UNAVAILABLE', message: 'fixture status down' } },
+  })
+
+  await page.goto('/print/done')
+  await setReactRouterState(page, '/print/done', flowState)
+
+  const unknown = page.locator('[data-testid="print-fulfill-state-unknown"]')
+  await expect(unknown).toBeVisible()
+  await expect(unknown).toContainText('暂时无法核验这一单')
+  await expect(unknown).toContainText('说不准有没有下过单、扣没扣费')
+  await expect(unknown).toContainText('我的 → 打印订单')
+  await expect(unknown).toContainText('打印有问题？')
+  await expect(unknown).not.toContainText(NO_ORDER_CLAIM)
+  await expect(page.locator('body')).not.toContainText(NO_ORDER_CLAIM)
+  expect(errors).toEqual([])
+})
+
+test('progress without task context never claims there is no order or charge either @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.goto('/print/progress')
+
+  const missing = page.locator('[data-testid="print-fulfill-state-missing-context"]')
+  await expect(missing).toBeVisible()
+  await expect(missing).toContainText('说不准有没有下过单、扣没扣费')
+  await expect(missing).not.toContainText(NO_ORDER_CLAIM)
   expect(errors).toEqual([])
 })

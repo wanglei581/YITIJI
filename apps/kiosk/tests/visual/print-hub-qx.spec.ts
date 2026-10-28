@@ -94,6 +94,32 @@ test('print hub default state reads capabilities and never claims 设备正常 @
   expect(errors).toEqual([])
 })
 
+test('print hub openable cards: name is the title, the description sentence is the accessible description @w2', async ({ page, api }) => {
+  // 照统一版 QxTouchTask：可点卡 aria-labelledby 指标题、aria-describedby 指说明句。
+  // 只给 aria-label 标题时，读屏用户听不到「手机、U 盘或我的文档」这类说明。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: AVAILABLE },
+  })
+
+  await page.goto('/print-scan')
+  await expect(page.locator('[data-testid="print-hub-state-default"]')).toBeVisible()
+  // 大卡（task）：打印文件、扫描纸质材料。
+  const docCard = page.getByRole('button', { name: '打印文件', exact: true })
+  await expect(docCard).toHaveCount(1)
+  await expect(docCard).toHaveAccessibleDescription('手机、U 盘或我的文档')
+  const scanCard = page.getByRole('button', { name: '扫描纸质材料', exact: true })
+  await expect(scanCard).toHaveCount(1)
+  await expect(scanCard).toHaveAccessibleDescription('扫成 PDF，可以存、可以打')
+  // 磁贴（tile）：同一做法。
+  const convertCard = page.getByRole('button', { name: '照片合成 PDF', exact: true })
+  await expect(convertCard).toHaveCount(1)
+  await expect(convertCard).toHaveAccessibleDescription('几张照片拼成一个文件')
+  expect(errors).toEqual([])
+})
+
 test('print hub 390 keeps hero readable and bottom notes above the nav bar @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

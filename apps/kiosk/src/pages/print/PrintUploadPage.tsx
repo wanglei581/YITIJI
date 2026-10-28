@@ -42,6 +42,7 @@ import {
 } from '../../services/api/documentConversion'
 import { useUploadSession, type PhoneUploadedFile } from '../upload/hooks/useUploadSession'
 import { useStartPrintHandoff } from './usePrintHandoff'
+import { usePickPrintDocuments } from './usePickPrintDocuments'
 import {
   clearPrintMaterialSession,
   type PrintFileState,
@@ -124,6 +125,7 @@ export function PrintUploadPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
+  const pickDocuments = usePickPrintDocuments()
   const device = useTerminalDeviceStatus()
   const { capabilities: conversionCapabilities } = useDocumentConversionCapabilities()
   const wordConversionAvailable = conversionCapabilities.wordToPdf
@@ -445,8 +447,6 @@ export function PrintUploadPage() {
     usbReadFailed: Boolean(usbReadFailed && usbError),
   })
 
-  const fromQuery = `${location.pathname}${location.search}`
-
   return (
     <>
     <span
@@ -516,10 +516,7 @@ export function PrintUploadPage() {
       onExit={() => navigate(exitPath)}
       onHelp={() => navigate('/help')}
       onScan={() => navigate('/scan')}
-      onDocuments={() => {
-        if (isLoggedIn) navigate('/me/documents')
-        else navigate('/login', { state: { from: fromQuery } })
-      }}
+      onDocuments={pickDocuments}
       onResumes={() => {
         if (isLoggedIn) navigate('/me/resumes')
         else navigate('/login', { state: { from: '/print/upload?source=resume' } })
