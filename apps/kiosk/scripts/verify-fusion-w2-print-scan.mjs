@@ -756,7 +756,8 @@ assert.match(
 for (const phase of ['failed', 'closed', 'expired', 'refunded']) {
   assert.match(cashierPanel, new RegExp(`["']${phase}["']`), `cashier panel maps ${phase}`)
 }
-const printProgress = read('src/pages/print/PrintProgressPage.tsx')
+// 轮询参数与三态话术在 printProgressStatus.ts（拆分只搬不改行为），门禁连同页面一起取证。
+const printProgress = read('src/pages/print/PrintProgressPage.tsx') + '\n' + read('src/pages/print/printProgressStatus.ts')
 for (const marker of [
   'POLL_INTERVAL_MS = 3000',
   'REAL_POLL_TIMEOUT_MS = 10 \* 60 \* 1000',

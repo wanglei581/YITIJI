@@ -17,6 +17,7 @@ import { formatRemainingSeconds } from '../../../hooks/useCountdown'
 import { PrintTouchFrame, printAsk } from '../PrintTouchFrame'
 import { PrintFillArt } from '../art/PrintFillArt'
 import type { FailureCopy, FailureStep, SummaryRow, FailureVariant } from './printDoneFailedModel'
+import { FailSteps, FailSummary } from './PrintFailParts'
 
 const ASK_LABEL = '问小青：取纸或异常怎么办'
 const ASK_DRAFT = '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。'
@@ -58,36 +59,6 @@ export interface PrintDoneFailedProps {
   onOrders: () => void
   /** 反馈弹层：挂在触屏壳里面（与其余各态一致），由页面持有开关。 */
   dialog?: ReactNode
-}
-
-function Steps({ steps, label }: { steps: FailureStep[]; label: string }) {
-  return (
-    <section aria-label={label}>
-      <ol className="qxt-steps qxt-steps-big pft-unc-steps" style={{ gridTemplateColumns: '1fr' }}>
-        {steps.map((step, index) => (
-          <li key={step.title} className="qxt-step">
-            <span className="qxt-step-n">{index + 1}</span>
-            <b>{step.title}</b>
-            <small>{step.detail}</small>
-          </li>
-        ))}
-      </ol>
-    </section>
-  )
-}
-
-function Summary({ rows, testId, compact = true }: { rows: SummaryRow[]; testId?: string; compact?: boolean }) {
-  return (
-    <dl className={compact ? 'qxt-sum pft-unc-sum pft-fail-sum' : 'qxt-sum pft-unc-sum'} data-testid={testId}>
-      {rows.map((row) => (
-        <div key={row.key} className="qxt-sum-r">
-          <dt>{row.label}</dt>
-          <dd>{row.value}</dd>
-          <span />
-        </div>
-      ))}
-    </dl>
-  )
 }
 
 /** 「文件带走」一张触屏卡：标题 + 二维码（不小于 168）+ 剩余时间 + 说明。过期与签发失败只说一句，不放二维码。 */
@@ -154,8 +125,8 @@ export function PrintDoneFailed(props: PrintDoneFailedProps & { expiredLine: str
         data-testid={TESTID_BY_VARIANT[variant]}
         className="qx-scroll pff-page pft-unc pft-fail"
       >
-        <Steps steps={copy.steps} label={copy.stepsLabel} />
-        <Summary rows={rows} testId="print-fulfill-list" />
+        <FailSteps steps={copy.steps} label={copy.stepsLabel} />
+        <FailSummary rows={rows} testId="print-fulfill-list" />
         <div className="qxt-exits pft-unc-exits pft-fail-exits">
           {retry.error ? (
             <p role="alert" className="pft-fail-alert">{retry.error}</p>
@@ -231,8 +202,8 @@ export function PrintDoneFeeInfo({
         className="qx-scroll pff-page pft-unc"
       >
         {/* 这一屏内容少，沿用未确认页的大尺寸三步与摘要行，不用失败态的紧凑尺寸，免得整屏留白。 */}
-        <Steps steps={steps} label={stepsLabel} />
-        <Summary rows={rows} compact={false} />
+        <FailSteps steps={steps} label={stepsLabel} />
+        <FailSummary rows={rows} compact={false} />
         <p className="pft-unc-fine qxt-fine" data-testid="print-fulfill-fallback">{fine}</p>
         {/* 内容不够高时，用一块实物小样吃掉剩下的高度（够放不下就不画），不在底栏上方留整块空白。 */}
         <PrintFillArt name="stack" />

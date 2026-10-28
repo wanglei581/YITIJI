@@ -30,21 +30,22 @@ import {
 import { preferUnattended, printProblemLine } from '../../copy/unattendedCopy'
 import { useSupportContact } from '../../hooks/useSupportContact'
 import { PrintTouchFrame, printAsk } from './PrintTouchFrame'
-import { PrintFillArt } from './art/PrintFillArt'
 import { PrintArt } from './art/PrintArt'
-import { PrintMissResume } from './components/PrintMissResume'
+import { PrintProgressMissing } from './components/PrintProgressMissing'
 import { PrintAiHelp } from './components/PrintAiHelp'
 import { QxAppNavbar } from '../../components/qingxu/QxAppNavbar'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { truncateFileNameMiddle, FILE_NAME_BUDGET_COMPACT } from '../../lib/fileName'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus, type PrintJobStatusResult } from '../../services/print/printJobsApi'
+import { POLL_FAIL_LIMIT, POLL_INTERVAL_MS, REAL_POLL_TIMEOUT_MS, STATUS_READ_ERROR_TEXT, realStatusPresentation } from './printProgressStatus'
 import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { formatCents } from './cashierStatus'
 import { PrintJobRow, PrintProgressFailureActions, PrintProgressFailureNote, PrintStatusTimeoutPanel, type PrintJobState } from './components/PrintProgressSections'
+import { failureSummaryRows, timeoutCopy } from './components/printDoneFailedModel'
 import './styles/print-fulfill-qx.css'
 import './styles/print-progress-touch.css'
 import {
@@ -67,64 +68,6 @@ import {
   tlItemClass,
   type Step,
 } from './printProgressModel'
-
-const POLL_INTERVAL_MS = 3000
-const POLL_FAIL_LIMIT = 5
-const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000
-const STATUS_READ_ERROR_TEXT = '暂时无法读取状态'
-
-function realStatusPresentation(status: BackendJobStatus | null) {
-  switch (status) {
-    case 'pending':
-      return {
-        headerTitle: '等待终端领取',
-        headerSubtitle: '任务已进入队列，终端尚未领取，请留在机器旁',
-        stageTitle: '等待终端领取',
-        stageSubtitle: '任务正在队列中等待，尚未发送到打印机',
-        queueLabel: '等待终端领取',
-        queueDesc: '任务正在队列中，终端尚未领取',
-        activeHint: '等待终端领取…',
-        askPhase: '等待终端领取',
-        badge: '排队等待中',
-      }
-    case 'claimed':
-      return {
-        headerTitle: '终端已领取任务',
-        headerSubtitle: '终端正在准备打印，请留在机器旁',
-        stageTitle: '终端已领取任务',
-        stageSubtitle: '终端已领取任务，正在准备打印',
-        queueLabel: '终端已领取',
-        queueDesc: '终端已领取任务，正在准备打印',
-        activeHint: '终端准备中…',
-        askPhase: '终端准备打印',
-        badge: '终端准备中',
-      }
-    case 'printing':
-      return {
-        headerTitle: '正在打印',
-        headerSubtitle: '打印机正在出纸，请留在机器旁及时取件',
-        stageTitle: '正在打印',
-        stageSubtitle: '打印机正在出纸，请在出纸口等候',
-        queueLabel: '终端已领取',
-        queueDesc: '终端已领取任务并进入打印阶段',
-        activeHint: '打印机正在出纸…',
-        askPhase: '正在出纸',
-        badge: '打印进行中',
-      }
-    default:
-      return {
-        headerTitle: '正在确认任务状态',
-        headerSubtitle: '任务已提交，正在读取终端状态，请留在机器旁',
-        stageTitle: '正在确认任务状态',
-        stageSubtitle: '尚未收到终端处理状态',
-        queueLabel: '等待状态更新',
-        queueDesc: '正在确认这台机器有没有领到任务',
-        activeHint: '正在读取状态…',
-        askPhase: '正在确认状态',
-        badge: '状态确认中',
-      }
-  }
-}
 
 export function PrintProgressPage() {
   const navigate = useNavigate()
@@ -378,78 +321,11 @@ export function PrintProgressPage() {
         : { tone: 'ok' as const, label: pillLabel }
 
   if (!hasContext || (!isHttpMode && !canSimulate)) {
-    return (
-      <PrintTouchFrame
-        page="print-progress"
-        legacyBody={false}
-        /* 稿 15-print-fulfill 原文：aria-label="返回首页"。
-       *  返回 ≠ 取消：打印任务在服务端，离开这一屏不会终止它，
-       *  用户可以从「我的打印订单」再回来看进度。 */
-        back={{ label: '返回首页', onBack: () => navigate('/') }}
-        title="未找到打印任务"
-        subtitle="请从上传文件重新开始打印流程"
-        status={{ tone: 'unknown', label: '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate(uploadPath)}>
-            重新上传文件
-          </button>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-progress" data-print-flow-step={6} data-testid="print-fulfill-state-missing-context" className="qx-scroll pff-page pfp-miss">
-          <div className="qx-state" data-tone="empty">
-            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-            <div>
-              <div className="qx-state-t">未找到打印任务</div>
-              <div className="qx-state-d">请从上传文件重新开始打印流程。本页不会编造进度或打印结果。</div>
-            </div>
-          </div>
-          <PrintMissResume
-            orderMayExist
-            onUpload={() => navigate(uploadPath)}
-            note="这一页本身不保存文件，也不会编造进度或打印结果。"
-          />
-          <PrintFillArt name="stack" />
-        </div>
-      </PrintTouchFrame>
-    )
+    return <PrintProgressMissing variant="no-context" uploadPath={uploadPath} confirmState={state} />
   }
 
   if (isHttpMode && !taskId) {
-    return (
-      <PrintTouchFrame
-        page="print-progress"
-        legacyBody={false}
-        back={{ label: '返回确认页', onBack: () => navigate('/print/confirm', { state }) }}
-        title="打印任务尚未创建"
-        subtitle="请返回确认页重试"
-        status={{ tone: 'unknown', label: '状态未知' }}
-        terminalLabel="就业服务大厅"
-        ctabar={
-          <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/print/confirm', { state })}>
-            返回确认页
-          </button>
-        }
-        navbar={navbar}
-      >
-        <div data-w2-page="print-progress" data-print-flow-step={6} data-testid="print-fulfill-state-missing-context" className="qx-scroll pff-page pfp-miss">
-          <div className="qx-state" data-tone="error">
-            <span className="qx-state-ic"><AlertCircleIcon aria-hidden="true" /></span>
-            <div>
-              <div className="qx-state-t">打印任务尚未创建</div>
-              <div className="qx-state-d">没有真实 taskId，不能展示打印进度，也不会假装已经出纸。</div>
-            </div>
-          </div>
-          <PrintMissResume
-            orderMayExist
-            onUpload={() => navigate(uploadPath)}
-            note="没有真实任务编号，这一页不会假装已经出纸。"
-          />
-          <PrintFillArt name="stack" />
-        </div>
-      </PrintTouchFrame>
-    )
+    return <PrintProgressMissing variant="not-created" uploadPath={uploadPath} confirmState={state} />
   }
 
   const TL_ITEMS = [
@@ -553,6 +429,7 @@ export function PrintProgressPage() {
   const jobRow = <PrintJobRow fileName={fileName} subline={jobFacts} idLine={idLine} state={jobState} />
 
   const printingNow = !isSim && !timedOut && !showFailure
+  const timeout = timeoutCopy({ money: { fact: payment, amountCents }, orderNo })
   const progressSubtitle = isSim
     ? (simDone ? '未真实打印，未创建打印任务' : '当前为演示模式，不会建单、支付或出纸')
     : timedOut
@@ -569,59 +446,22 @@ export function PrintProgressPage() {
       legacyBody={false}
       kind="compact"
       seal={null}
-      nav
+      navbar={navbar}
       eyebrow="打印进度"
       back={printingNow ? undefined : { label: '返回首页', onBack: () => navigate('/') }}
       title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : timedOut ? '暂时查不到打印结果' : showFailure ? failureView.headerTitle : progressQuiet ? '暂时没有新的打印进度' : realStatus.headerTitle}
       subtitle={progressSubtitle}
       status={frameStatus}
       terminalLabel="就业服务大厅"
-      ask={printingNow ? printAsk('问小青：取纸或异常怎么办', '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。') : undefined}
-      ctabar={printingNow ? undefined : (
-        isSim ? (
-          <span className="why">
-            {simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页'}
-          </span>
-        ) : (timedOut ? (
-          <>
-            <button
-              type="button"
-              className="qx-btn"
-              data-variant="ghost"
-              data-testid="print-fulfill-primary"
-              onClick={recheckStatus}
-            >
-              重新查询状态
-            </button>
-            <button type="button" className="qx-btn" data-variant="primary" onClick={() => navigate('/help')}>
-              使用帮助
-            </button>
-          </>
-        ) : showFailure ? (
-          <PrintProgressFailureActions
-            hint={reprintHint(amountCents)}
-            onHelp={() => navigate('/help')}
-            onOrders={() => navigate('/me/print-orders')}
-            onReprint={() => navigate(uploadPath)}
-          />
-        ) : (
-          <>
-            <button
-              type="button"
-              className="qx-btn pff-again"
-              data-variant="ghost"
-              data-testid="print-fulfill-reprint"
-              onClick={() => navigate(uploadPath)}
-            >
-              再印一份
-              <small>{reprintHint(amountCents)}</small>
-            </button>
-            <button type="button" className="qx-btn pfp-end" data-variant="ghost" disabled aria-disabled="true">
-              {endLabel}
-            </button>
-          </>
-        )))
-      }
+      ask={printAsk('问小青：取纸或异常怎么办', '打印时取纸或遇到异常该怎么办？请告诉我现在可以做的事，不要替我判断有没有打出来。')}
+      /* 触屏底栏三槽（返回首页 / 问小青 / 主按钮），不再传旧的小号 ctabar：
+         查询超时的主键是「重新查询状态」（只是让轮询从头再来，不重下单、不重复扣费）；
+         已知失败的主键是「重新打印」；打印中与演示态没有主键。 */
+      primary={timedOut
+        ? { label: '重新查询状态', testId: 'print-fulfill-primary', onClick: recheckStatus }
+        : showFailure
+          ? { label: '重新打印', testId: 'print-fulfill-reprint', onClick: () => navigate(uploadPath) }
+          : undefined}
     >
     <div
       data-w2-page="print-progress" data-print-flow-step={6}
@@ -630,7 +470,7 @@ export function PrintProgressPage() {
       data-state={view}
       data-progress-quiet={progressQuiet ? 'true' : undefined}
       data-testid={timedOut ? 'print-fulfill-state-client-status-timeout' : failed ? 'print-fulfill-state-failed' : 'print-fulfill-state-printing'}
-      className="qx-scroll pff-page pfp-page"
+      className={timedOut ? 'qx-scroll pff-page pft-unc' : 'qx-scroll pff-page pfp-page'}
     >
       <p className="pfp-lead" role="status"><span className="pfp-lead-title">{askTitle}</span>{askDoing ? <span className="pfp-lead-doing">{askDoing}</span> : null}</p>
 
@@ -639,14 +479,20 @@ export function PrintProgressPage() {
           演示模式·非真实打印
         </div>
       )}
+      {/* 原先挂在旧底栏条里的演示说明，改放进正文（静态文字，不带 aria-live）。 */}
+      {isSim && (
+        <p className="qxt-fine" role="note">
+          {simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页'}
+        </p>
+      )}
 
       {timedOut ? (
         <PrintStatusTimeoutPanel
-          jobRow={jobRow}
-          payment={payment}
-          amountCents={amountCents}
-          orderNo={orderNo}
-          taskId={taskId}
+          steps={timeout.steps}
+          stepsLabel={timeout.stepsLabel}
+          rows={failureSummaryRows({ orderNo, file, params, money: { fact: payment, amountCents }, reason: '' })}
+          fine={timeout.fine}
+          onHelp={() => navigate('/help')}
         />
       ) : (
         <section className="pff-sec" aria-label="打印进度">
@@ -695,6 +541,13 @@ export function PrintProgressPage() {
             )}
             {showFailure ? <PrintProgressFailureNote wayOut={failureView.wayOut} /> : null}
           </div>
+          {showFailure ? (
+            <PrintProgressFailureActions
+              hint={reprintHint(amountCents)}
+              onHelp={() => navigate('/help')}
+              onOrders={() => navigate('/me/print-orders')}
+            />
+          ) : null}
         </section>
       )}
 

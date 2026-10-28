@@ -212,11 +212,13 @@ test('W-88 已知失败不再说排队', () => {
   assert.match(progressSections, /data-testid="print-progress-failure"/)
   assert.match(progressSections, /\{wayOut\}/)
   assert.doesNotMatch(progressSections, /\{ask\}/)
-  assert.match(progressSections, /<p className="why">\{hint\}<\/p>/)
-  assert.match(progressSections, />\s*重新打印\s*</)
+  // 失败出口：说明行独占一行（在按钮外面），使用帮助、查看订单在下；主按钮「重新打印」是触屏底栏的主键，标签里不带价目小字。
+  assert.match(progressSections, /<p className="qxt-fine">\{hint\}<\/p>/)
   assert.match(progressSections, /查看订单/)
   assert.match(progressSections, /使用帮助/)
-  assert.doesNotMatch(progressSections, /重新打印[\s\S]{0,40}<small>/)
+  assert.match(progressPage, /label: '重新打印',\s*testId: 'print-fulfill-reprint'/)
+  assert.doesNotMatch(progressPage, /label: '重新打印'[\s\S]{0,80}<small>/)
+  assert.doesNotMatch(progressPage, /ctabar=/, '出纸页不再传旧的小号 ctabar，底栏用触屏三槽')
 })
 
 test('W-93 加密 PDF 说明原因并重新选择，页数未识别本身不算加密', () => {
@@ -688,14 +690,19 @@ test('PrintMissResume：orderMayExist 必传；出纸页、完成页三处传 tr
   assert.doesNotMatch(read('src/pages/print/components/PrintMissResume.tsx'), /orderMayExist\?:/)
   const callsWithTrue = (src) => [...src.matchAll(/<PrintMissResume\s+orderMayExist\s/g)].length
   const callsTotal = (src) => [...src.matchAll(/<PrintMissResume\b/g)].length
+  // 出纸页的两种「没有任务可看」拆在 PrintProgressMissing（一处调用，两种情形共用）；页面本身只挑走哪一支。
   const progress = read('src/pages/print/PrintProgressPage.tsx')
+  const progressMissing = read('src/pages/print/components/PrintProgressMissing.tsx')
   const done = read('src/pages/print/PrintDonePage.tsx')
-  assert.equal(callsTotal(progress), 2)
-  assert.equal(callsWithTrue(progress), 2)
+  assert.equal(callsTotal(progress), 0)
+  assert.match(progress, /<PrintProgressMissing variant="no-context"/)
+  assert.match(progress, /<PrintProgressMissing variant="not-created"/)
+  assert.equal(callsTotal(progressMissing), 1)
+  assert.equal(callsWithTrue(progressMissing), 1)
   assert.equal(callsTotal(done), 1)
   assert.equal(callsWithTrue(done), 1)
   assert.match(read('src/pages/print/components/PrintEmptyDesk.tsx'), /<PrintMissResume orderMayExist=\{false\}/)
-  assert.doesNotMatch(progress + done, /没有订单，也没有扣费/)
+  assert.doesNotMatch(progress + progressMissing + done, /没有订单，也没有扣费/)
 })
 
 // ── 打印链上「去我的文档选一份来打印」只经 usePickPrintDocuments，落点带 ?pick=print ──

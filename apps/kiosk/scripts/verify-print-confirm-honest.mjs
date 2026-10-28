@@ -98,7 +98,8 @@ if (/已进我的文档/.test(convertSrc)) {
 }
 
 const confirmSrc = read(CONFIRM)
-const progressSrc = read(PROGRESS)
+// 轮询参数与三态话术在 printProgressStatus.ts（拆分只搬不改行为），门禁连同页面一起取证。
+const progressSrc = read(PROGRESS) + '\n' + read('src/pages/print/printProgressStatus.ts')
 const localPrintWakeSrc = read(LOCAL_PRINT_WAKE)
 const cashierSrc = read(CASHIER)
 const doneSrc = read(DONE)
@@ -273,11 +274,18 @@ expectMatches(
   /if\s*\(\s*useRealApi\s*\|\|\s*!canSimulate\s*\)\s*return/,
   'PrintProgressPage SIM effect 在 http 无 taskId 时直接返回',
 )
+// 两种「没有任务可看」的出路拆到 PrintProgressMissing（拆分只搬不改行为）：页面只判断走哪一支，文字与出口在组件里。
 expectMatches(
   progressSrc,
-  /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{[\s\S]*?打印任务尚未创建[\s\S]*?返回确认页[\s\S]*?\}/,
-  'PrintProgressPage http 无 taskId 时显示错误态而非伪造成功',
+  /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{\s*return\s*<PrintProgressMissing\s+variant="not-created"/,
+  'PrintProgressPage http 无 taskId 时显示错误态（PrintProgressMissing not-created）而非伪造成功',
 )
+{
+  const missingSrc = read('src/pages/print/components/PrintProgressMissing.tsx')
+  expectMatches(missingSrc, /打印任务尚未创建/, 'PrintProgressMissing 写明「打印任务尚未创建」')
+  expectMatches(missingSrc, /没有真实 taskId，不能展示打印进度，也不会假装已经出纸/, 'PrintProgressMissing 写明没有真实 taskId、不展示进度')
+  expectMatches(missingSrc, /label:\s*'返回确认页',\s*onClick:\s*\(\)\s*=>\s*navigate\('\/print\/confirm'/, 'PrintProgressMissing 给「返回确认页」出口')
+}
 expectMatches(
   progressSrc,
   /wakeRequestedTaskIdRef\.current\s*!==\s*taskId[\s\S]*?wakeLocalPrintQueue\(\)/,

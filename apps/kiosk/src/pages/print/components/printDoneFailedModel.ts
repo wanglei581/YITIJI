@@ -142,6 +142,35 @@ export function failureCopy(input: {
   }
 }
 
+/**
+ * 出纸页「暂时查不到打印结果」（client-status-timeout）的三步与小字。
+ * 本机连续 10 分钟没拿到终态只是查询超时：系统的任务状态没有被改变，不猜成功也不猜失败。
+ */
+export function timeoutCopy(input: { money: OutOfPaperMoney; orderNo: string | null }): {
+  stepsLabel: string
+  steps: FailureStep[]
+  fine: string
+} {
+  const { money, orderNo } = input
+  const help = printProblemLine()
+  const boundary = money.fact === 'free'
+    ? '这次到底出没出纸、要不要补打，以订单记录为准。订单记录保留。'
+    : money.fact === 'paid'
+      ? '这次到底出没出纸、要不要补打或退费，以订单记录为准。是否退款、退多少、多久到账，本机不承诺自动退款。'
+      : '这次到底出没出纸，以订单记录为准。'
+  return {
+    stepsLabel: '这一刻你可以做的三件',
+    steps: [
+      { title: '看一眼出纸口，已出的纸先取走收好', detail: '它和这次查询结果无关。' },
+      { title: '点下方「重新查询状态」', detail: '这只是再问系统一次，不会重下单、不会重复扣费。' },
+      orderNo
+        ? { title: `还是查不到就记下订单号 ${orderNo}`, detail: `和这台机器的位置。${help}` }
+        : { title: '还是查不到就记下这台机器的位置', detail: help },
+    ],
+    fine: `这只是查询超时：系统的打印任务状态没有被改变，我们不会猜它成功或失败。可以先重新查询。${boundary}`,
+  }
+}
+
 /** 「查看费用说明 / 查看订单说明」那一屏的文案。 */
 export function feeInfoCopy(input: { free: boolean; orderNo: string | null }): {
   title: string
