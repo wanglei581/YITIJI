@@ -28,6 +28,8 @@ export default function PartnersPage() {
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
   const requestedOrgId = searchParams.get('org')
   const requestedSection = parsePartnerSection(searchParams.get('section'))
+  const rawProjectId = searchParams.get('projectId')
+  const requestedProjectId = rawProjectId && rawProjectId.length <= 64 ? rawProjectId : null
   const updateQuery = useCallback((mutate: (params: URLSearchParams) => void) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
@@ -35,11 +37,13 @@ export default function PartnersPage() {
       return next
     }, { replace: true })
   }, [setSearchParams])
-  const openOrg = useCallback((orgId: string, section: PartnerSection | null) => {
+  const openOrg = useCallback((orgId: string, section: PartnerSection | null, projectId?: string | null) => {
     updateQuery((params) => {
       params.set('org', orgId)
       if (section) params.set('section', section)
       else params.delete('section')
+      if (projectId) params.set('projectId', projectId)
+      else params.delete('projectId')
     })
   }, [updateQuery])
   const hosting = useRecruitmentHosting()
@@ -108,7 +112,7 @@ export default function PartnersPage() {
         </button>
       }
     >
-      <PartnerServiceSummary onOpen={(orgId, section) => openOrg(orgId, section)} />
+      <PartnerServiceSummary onOpen={openOrg} />
       {orgMissing && <p role="status" className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-700">没找到这家机构</p>}
 
       {listState === 'loading' && <LoadingState className="py-24" />}
@@ -143,12 +147,15 @@ export default function PartnersPage() {
 
       <CreateOrgDrawer showRecruitment={showRecruitment} open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => void load()} />
       <OrgDetailDrawer
+        key={orgKnown ? requestedOrgId : 'none'}
         orgId={orgKnown ? requestedOrgId : null}
         open={orgKnown}
         section={requestedSection}
+        projectId={requestedProjectId}
         showRecruitment={showRecruitment}
         onSectionChange={(section) => updateQuery((params) => { params.set('section', section) })}
-        onClose={() => updateQuery((params) => { params.delete('org'); params.delete('section') })}
+        onProjectChange={(id) => updateQuery((params) => { if (id) params.set('projectId', id); else params.delete('projectId') })}
+        onClose={() => updateQuery((params) => { params.delete('org'); params.delete('section'); params.delete('projectId') })}
         onChanged={() => void load()}
       />
     </Page>
