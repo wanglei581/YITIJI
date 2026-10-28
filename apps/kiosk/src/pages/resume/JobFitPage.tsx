@@ -268,6 +268,7 @@ export function JobFitPage() {
           title={view.title}
           subtitle={view.subtitle}
           status={view.pill}
+          rail={view.rail}
           back={{ label: '返回简历服务', onBack: exits.resumeHub }}
           ctabar={view.cta}
         >

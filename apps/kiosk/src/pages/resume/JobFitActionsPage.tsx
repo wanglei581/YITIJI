@@ -22,7 +22,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { JobFitResponse } from '@ai-job-print/shared'
-import { BriefcaseIcon, FileTextIcon, ListIcon, PenLineIcon, PrinterIcon, UserIcon } from 'lucide-react'
+import { BriefcaseIcon, ListIcon, PenLineIcon, PrinterIcon } from 'lucide-react'
 import {
   AiDisclaimerLine,
   AigcMark,
@@ -36,6 +36,8 @@ import {
 import { getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
+import { ResumeErrorState, ResumeStepsState, ResumeWaitState, unattendedReason } from './touch/ResumeStates'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
 import { readAiResumeSession } from './aiResumeSession'
@@ -43,18 +45,13 @@ import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { JobFitStage } from './JobFitPage'
 import { useRouteIdentityGuard } from './hooks/useRouteIdentityGuard'
 import {
-  Checks,
   CtaNote,
-  Ghosts,
   Guardline,
   KitRows,
-  Nots,
   RouteCards,
   Sec,
   Slots,
-  Trace,
   Verdict,
-  Waiting,
 } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
@@ -78,6 +75,7 @@ interface ScreenView {
   title: string
   subtitle: string
   pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  rail?: QxTouchRail
   body: ReactNode
   cta: ReactNode
 }
@@ -279,13 +277,18 @@ export function JobFitActionsPage() {
         subtitle: '登录状态或这台机器上的这次使用刚刚变化（退出、过期或清场）。刚才的行动清单和还在路上的请求都不再显示或继续。',
         pill: { tone: 'warn', label: '这次办理已结束 · 内容已隐藏' },
         body: (
-          <Sec title="这次没有发生的事" hint="明确否定，避免误解" grow>
-            <Nots items={[
-              '不再显示刚才的差距清单与改写建议',
-              '不再用刚才的登录凭证读取或生成打印版',
-              '还在路上的返回结果不会再进入打印确认',
-            ]} />
-          </Sec>
+          <ResumeErrorState
+            reasonTitle="这次没有发生的事"
+            rows={[
+              { title: '不再显示刚才的清单', desc: '差距清单与改写建议都已隐藏。' },
+              { title: '不再用刚才的登录凭证', desc: '读取或生成打印版都不会再用它。' },
+              { title: '不会再进入打印确认', desc: '还在路上的返回结果不会再把你带去打印确认页。' },
+            ]}
+            acts={[
+              { title: '去准备简历材料', desc: '需要继续时，重新登录或重新准备一份简历，再回来做岗位对照。', take: '去准备', art: 'resume', onClick: goTriage },
+              { title: '先打印现有简历', desc: '已有电子稿或纸质件时，直接走打印流程。', take: '去打印', art: 'report', onClick: goPrintHub },
+            ]}
+          />
         ),
         cta: (
           <>
@@ -329,31 +332,16 @@ export function JobFitActionsPage() {
         title: '正在读取，清单还没到',
         subtitle: '读取请求已提交。只有系统确认存在真实差距与建议，才会出现行动项。',
         pill: { tone: 'unknown', label: '正在读取行动清单' },
+        rail: { labels: ['读取清单', '看行动项', '改简历或打印'], now: 0 },
         body: (
-          <>
-            <Sec title="正在读取本人的行动清单" hint="无进度条 · 无预计时间">
-              <Waiting
-                icon={<ListIcon size={34} />}
-                title="读取请求已提交，等待返回"
-                desc="清单内容全部来自这次匹配结果。读取失败或没有内容会直接说明，不补造行动项。"
-                tag="整体等待中，没有百分比"
-              />
-            </Sec>
-            <Sec title="这次读取用到的条件" hint="每一项都可核对" grow>
-              <Checks items={[
-                { tone: 'ok', icon: <UserIcon size={24} />, title: '本人凭证', desc: '请求带着你这次登录的身份，系统据此只返回属于你本人的清单。', chip: '已提交' },
-                { tone: 'wait', icon: <FileTextIcon size={24} />, title: '匹配结果', desc: '按这次匹配的任务读取；任务失效或不属于你时会直接说明。', chip: '等待返回' },
-                { tone: 'wait', icon: <ListIcon size={24} />, title: '行动项内容', desc: '差距与准备建议由系统逐条给出。', chip: '等待返回' },
-                { tone: 'wait', icon: <PrinterIcon size={24} />, title: '打印版文件', desc: '清单可读之后才谈打印，本页现在不生成任何文件。', chip: '未开始' },
-              ]} />
-            </Sec>
-            <Sec title="还没有返回的内容" hint="返回前一律留空">
-              <Ghosts items={[
-                { title: '差距与依据', desc: '每条行动项对应的岗位要求与准备建议，返回后才显示。', tag: '等待返回' },
-                { title: '可执行动作', desc: '优化、材料准备还是打印，按真实建议再决定。', tag: '等待返回' },
-              ]} />
-            </Sec>
-          </>
+          <ResumeWaitState
+            icon={<ListIcon size={34} />}
+            title="读取请求已提交，等待返回"
+            desc="清单内容全部来自这次匹配结果。读取失败或没有内容会直接说明，不补造行动项。"
+            tag="整体等待中，没有百分比"
+            fine="读取期间不放开打印，也不提前显示清单内容；请求带着你这次的身份，只返回属于你本人的清单。"
+            take={{ art: 'checklist', kicker: '读到之后，你可以带走', title: '一份准备清单', lines: ['差距与准备建议，一件一件列出', '只供本人准备，可打印'] }}
+          />
         ),
         cta: (
           <>
@@ -404,33 +392,29 @@ export function JobFitActionsPage() {
     }
 
     if (screen === 'failed') {
+      const reasonText = unattendedReason(failReason, '')
       return {
         title: '这次没有可执行的差距清单',
-        subtitle: failReason
-          ? `本次没有可执行的差距清单：${failReason}`
+        subtitle: reasonText
+          ? `本次没有可执行的差距清单：${reasonText}`
           : '本次没有可执行的差距清单。',
         pill: { tone: 'warn', label: '本次没有返回行动项' },
         body: (
-          <>
-            <Sec title="这次的结果" hint="只写事实，不补内容">
-              <Verdict items={[
-                { tone: 'warn', label: '差距清单', value: '这次没有' },
-                { tone: 'ok', label: '匹配参考', value: '回比对页查看' },
-              ]} />
-              <p className="jfq-sec-copy">
-                这不是你的操作问题。可以回比对结果页重新分析一次；若这个岗位的要求写得很笼统，通常就抽不出可执行的差距项。
-              </p>
-            </Sec>
-            <Sec title="接下来" hint="都进入既有流程" grow>
-              <RouteCards items={[
-                { title: '回比对结果', desc: '重新分析一次，或换一个更具体的目标岗位。', action: '返回比对结果', onClick: backToCompare },
-                { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', action: '去简历优化', onClick: goResumeOptimize },
-                hostingOpen
-                  ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', action: '去岗位信息', onClick: goJobs }
-                  : { title: '打印现有简历', desc: '手上已有可用文件时，直接进入既有打印流程。', action: '去打印服务', onClick: goPrintHub },
-              ]} />
-            </Sec>
-          </>
+          <ResumeErrorState
+            reasonTitle="这次的结果"
+            reason="这不是你的操作问题。可以回比对结果页重新分析一次；若这个岗位的要求写得很笼统，通常就抽不出可执行的差距项。"
+            rows={[
+              { title: '差距清单', desc: '这次没有' },
+              { title: '匹配参考', desc: '回比对页查看' },
+            ]}
+            acts={[
+              { title: '回比对结果', desc: '重新分析一次，或换一个更具体的目标岗位。', take: '返回比对结果', art: 'report', onClick: backToCompare },
+              { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', take: '去简历优化', art: 'resume', onClick: goResumeOptimize },
+              hostingOpen
+                ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息，自己逐条比对。', take: '去岗位信息', art: 'checklist' as const, onClick: goJobs }
+                : { title: '打印现有简历', desc: '手上已有可用文件时，直接进入既有打印流程。', take: '去打印服务', art: 'checklist' as const, onClick: goPrintHub },
+            ]}
+          />
         ),
         cta: (
           <>
@@ -448,14 +432,16 @@ export function JobFitActionsPage() {
         subtitle: '还没有确认 AI 服务状态，本页暂不展示差距清单 —— 状态不明时不假装能算。',
         pill: { tone: 'unknown', label: '服务状态未确认' },
         body: (
-          <Sec title="现在能做的" hint="回到比对页会重新读取" grow>
-            <RouteCards items={[
-              { title: '回比对结果', desc: '比对页会重新读取这次的匹配结果。', action: '返回比对结果', onClick: backToCompare },
+          <ResumeTouchActs
+            note="回到比对页会重新读取这次的匹配结果；状态没有确认之前，本页不显示任何清单内容。"
+            items={[
+              { title: '回比对结果', desc: '比对页会重新读取这次的匹配结果。', take: '返回比对结果', art: 'report', onClick: backToCompare },
               hostingOpen
-                ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息。', action: '去岗位信息', onClick: goJobs }
-                : { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', action: '去简历优化', onClick: goResumeOptimize },
-            ]} />
-          </Sec>
+                ? { title: '看来源岗位要求', desc: '直接浏览来源平台的岗位信息。', take: '去岗位信息', art: 'checklist' as const, onClick: goJobs }
+                : { title: '先自己改简历', desc: '按目标岗位调整内容重点，不依赖这份清单。', take: '去简历优化', art: 'resume' as const, onClick: goResumeOptimize },
+            ]}
+            fine="状态不明时不显示任何清单内容，也不假装能算。"
+          />
         ),
         cta: (
           <>
@@ -472,32 +458,21 @@ export function JobFitActionsPage() {
         subtitle: '文件正在等待生成。生成成功才进入既有打印确认流程；本页不代表已打印或已出纸。',
         pill: { tone: 'unknown', label: '等待生成打印版文件' },
         body: (
-          <>
-            <Sec title="已提交生成打印版" hint="生成 ≠ 打印">
-              <Waiting
-                icon={<PrinterIcon size={34} />}
-                title="请求已提交，等待文件生成"
-                desc="行动清单可读，不等于打印文件已经存在。文件真实生成后，才会进入既有的打印确认与取件流程。"
-                tag="等待生成，没有进度和预计时间"
-              />
-            </Sec>
-            <Sec title="打印这件事现在到哪一步" hint="只标位置，不画进度">
-              <Trace items={[
-                { phase: '第一步', title: '清单已可读', desc: '行动项来自这次真实的匹配结果。' },
-                { phase: '第二步', title: '等待生成文件', desc: '生成文件之前不进入打印。', now: true },
-                { phase: '第三步', title: '进入打印确认', desc: '份数、单双面与费用在确认页由你决定。' },
-              ]} />
-            </Sec>
-            <Sec title="现在还没有发生的事" hint="不提前写成已完成" grow>
-              <Nots items={[
-                '没有发送到打印机，也没有开始出纸',
-                '没有产生取件码或订单号',
-                '本页没有发起支付',
-                '还没有拿到可预览的打印版文件',
-                '没有把清单内容提供给企业或第三方',
-              ]} />
-            </Sec>
-          </>
+          <ResumeStepsState
+            steps={[
+              { title: '清单已可读', detail: '行动项来自这次真实的匹配结果。' },
+              { title: '等待生成打印文件', detail: '生成文件之前不进入打印，也没有进度和预计时间。', now: true },
+              { title: '进入打印确认', detail: '份数、单双面与费用在确认页由你决定。' },
+            ]}
+            summary={[
+              { label: '打印版文件', value: '还没有返回，没有可预览的版本' },
+              { label: '打印机', value: '没有收到任务，也没有开始出纸' },
+              { label: '取件码', value: '没有产生，也没有订单号' },
+              { label: '支付', value: '本页没有发起' },
+            ]}
+            fine="行动清单可读，不等于打印文件已经存在；清单内容没有提供给企业或第三方。"
+            take={{ art: 'checklist', kicker: '生成之后，你可以带走', title: '一份准备清单', lines: ['差距与准备建议，一件一件列出', '只供本人准备，可打印'] }}
+          />
         ),
         cta: (
           <>
@@ -515,24 +490,21 @@ export function JobFitActionsPage() {
         subtitle: '文件生成失败。系统不会把失败写成已发送打印。',
         pill: { tone: 'bad', label: '打印版文件生成失败' },
         body: (
-          <>
-            <Sec title="这次的结果" hint="只写已确认的事实">
-              <Verdict items={[
-                { tone: 'bad', label: '打印版文件', value: '未生成' },
-                { tone: 'ok', label: '行动清单', value: '仍可查看' },
-                { tone: 'ok', label: '打印机', value: '未收到任务' },
-              ]} />
-              {error && (
-                <p className="jfq-alert" role="alert">{error}</p>
-              )}
-            </Sec>
-            <Sec title="接下来" hint="两条都进入既有流程" grow>
-              <RouteCards items={[
-                { title: '重新生成打印版', desc: '沿用当前清单再试一次，不重新跑匹配分析。', action: '重新生成', onClick: () => void handlePrint() },
-                { title: '改用现有文件打印', desc: '手上已有可用文件或纸质件时，直接走既有打印流程。', action: '去打印服务', onClick: goPrintHub },
-              ]} />
-            </Sec>
-          </>
+          <ResumeErrorState
+            reasonTitle="这次的结果"
+            reason={error && (
+              <span role="alert">{unattendedReason(error, '打印版这次没有生成成功，请重新生成，或改用现有文件打印。')}</span>
+            )}
+            rows={[
+              { title: '打印版文件', desc: '未生成' },
+              { title: '行动清单', desc: '仍可查看' },
+              { title: '打印机', desc: '未收到任务' },
+            ]}
+            acts={[
+              { title: '重新生成打印版', desc: '沿用当前清单再试一次，不重新跑匹配分析。', take: '重新生成', art: 'checklist', onClick: () => void handlePrint() },
+              { title: '改用现有文件打印', desc: '手上已有可用文件或纸质件时，直接走既有打印流程。', take: '去打印服务', art: 'report', onClick: goPrintHub },
+            ]}
+          />
         ),
         cta: (
           <>
@@ -684,6 +656,7 @@ export function JobFitActionsPage() {
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
+        rail={view.rail}
         back={taskId && !identityEnded
           ? { label: '返回比对结果', onBack: backToCompare }
           : { label: '返回简历服务', onBack: goResumeHub }}

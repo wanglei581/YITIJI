@@ -37,7 +37,13 @@ check(page.includes('<JobFitStage>'), '职业规划页挂宿主 46 的共用舞�
 check((page.match(/<ResumeTouchFrame/g) ?? []).length === 1, '全部状态共用一层触屏壳，不按屏各挂一个壳')
 check(page.includes('data-kiosk-screen="resume-career-plan"'), '职业规划保留稳定 landmark')
 check(page.includes('data-state={screen}'), '职业规划把当前状态铺到 DOM 上供断言')
-check(page.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'), '职业规划读取与生成中必须提供状态播报（Waiting 自带 status + polite）')
+// 读取中走本包的 ResumeWaitState（里面渲染 Waiting），生成中走 CareerPlanGenerateRegion 的 Waiting；
+// 两条路径都要落到带 status + polite 的 Waiting 上。比原来只看页面里有没有 <Waiting 多钉了两处出处。
+const states = readRequired('src/pages/resume/touch/ResumeStates.tsx')
+check(
+  page.includes('<ResumeWaitState') && states.includes('<Waiting') && section.includes('<Waiting') && kit.includes('role="status" aria-live="polite"'),
+  '职业规划读取与生成中必须提供状态播报（读取走 ResumeWaitState → Waiting，生成走 CareerPlanGenerateRegion 的 Waiting；Waiting 自带 status + polite）',
+)
 check(page.includes('role="alert"'), '职业规划错误必须提供告警语义')
 check(page.includes('className="qx-scroll"') && page.includes('ctabar={view.cta}'), '内容区独立滚动，出口按钮留在滚动区之外的操作条上')
 

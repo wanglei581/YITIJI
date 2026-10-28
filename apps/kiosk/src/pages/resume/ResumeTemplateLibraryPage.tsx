@@ -11,14 +11,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { ResumeTemplate, ResumeTemplateSectionKey } from '@ai-job-print/shared'
-import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon, UserIcon } from 'lucide-react'
+import { CheckCircle2Icon, FileTextIcon, LayoutTemplateIcon, LockIcon, PenLineIcon, PrinterIcon, TargetIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { userMessageOf } from '../../services/api/userErrorMessage'
 import { QxAiHelp, QxStepActions } from '../../components/qingxu/QxAiHelp'
 
+import type { QxTouchRail } from '../../components/qingxu/touch/QxTouchBand'
+import { ResumeWaitState } from './touch/ResumeStates'
 import { ResumeTouchActs } from './touch/ResumeTouchActs'
 import { ResumeTouchFrame } from './touch/ResumeTouchFrame'
-import { Checks, CtaNote, Ghosts, KitRows, Sec, Waiting } from './jobFit/jobFitQxKit'
+import { CtaNote, KitRows, Sec } from './jobFit/jobFitQxKit'
 import './job-fit-qx.css'
 import './resume-decision-qx.css'
 import './resume-templates-qx.css'
@@ -143,31 +145,21 @@ export function ResumeTemplateLibraryPage() {
     ]} />
   )
 
-  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; body: ReactNode; cta: ReactNode } {
+  function buildView(): { title: string; subtitle: string; pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }; rail?: QxTouchRail; body: ReactNode; cta: ReactNode } {
     if (screen === 'loading') return {
       title: '正在读取版式，还没有列表',
       subtitle: '模板由已发布的列表决定。读取完成前不显示任何模板名称、数量或已选状态。',
       pill: { tone: 'unknown', label: '正在读取简历模板列表' },
+      rail: { labels: ['读取模板', '选一个版式', '去简历优化'], now: 0 },
       body: (
-        <>
-          <Sec title="正在读取可用的简历模板" hint="无进度条 · 无预计时间">
-            <Waiting icon={<LayoutTemplateIcon size={34} />} title="读取请求已提交，等待列表返回" desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。" tag="整体等待中，没有百分比" />
-          </Sec>
-          <Sec title="这一步会做什么、不会做什么" hint="读取范围写在前面" grow>
-            <Checks items={[
-              { tone: 'ok', icon: <UserIcon size={24} />, title: '只读列表', desc: '这一步只读取模板列表，不读取你的简历内容。', chip: '已确认' },
-              { tone: 'wait', icon: <LayoutTemplateIcon size={24} />, title: '模板数量', desc: '有几个模板由已发布的列表决定，本页不预设。', chip: '等待返回' },
-              { tone: 'ok', icon: <LockIcon size={24} />, title: '不自动应用', desc: '读到列表也不会自动套用到你的简历上。', chip: '已固定' },
-            ]} />
-          </Sec>
-          <Sec title="还没有返回的内容" hint="返回前一律留空">
-            <Ghosts items={[
-              { title: '模板名称', desc: '标题与适用场景随列表一起返回。', tag: '等待返回' },
-              { title: '版式结构', desc: '栏数与分区顺序随模板返回。', tag: '等待返回' },
-              { title: '适用说明', desc: '适合哪类经历由发布方说明。', tag: '等待返回' },
-            ]} />
-          </Sec>
-        </>
+        <ResumeWaitState
+          icon={<LayoutTemplateIcon size={34} />}
+          title="读取请求已提交，等待列表返回"
+          desc="只显示已经发布的模板。读取失败或没有模板时会直接说明，不用内置默认模板顶替。"
+          tag="整体等待中，没有百分比"
+          fine="这一步只读取模板列表，不读取你的简历内容；读到列表也不会自动套用到你的简历上。"
+          take={{ art: 'resume', kicker: '读到之后，你可以挑一个版式', title: '版式只影响排版', lines: ['栏数与分区顺序随模板返回', '不会改写你的经历、技能或成果'] }}
+        />
       ),
       cta: (
         <>
@@ -343,6 +335,7 @@ export function ResumeTemplateLibraryPage() {
         title={view.title}
         subtitle={view.subtitle}
         status={view.pill}
+        rail={view.rail}
         back={{ label: '返回简历服务', onBack: goResumeHub }}
         ctabar={view.cta}
       >

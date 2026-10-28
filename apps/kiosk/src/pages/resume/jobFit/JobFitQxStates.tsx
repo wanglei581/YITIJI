@@ -11,7 +11,9 @@
 // 「岗位信息」这个出口（exits.jobs 为空），对应位置换成本机照常能走的扫描。
 
 import type { ReactNode } from 'react'
+import type { QxTouchRail } from '../../../components/qingxu/touch/QxTouchBand'
 import { ResumeTouchActs } from '../touch/ResumeTouchActs'
+import { ResumeErrorState, ResumeWaitState } from '../touch/ResumeStates'
 import {
   BotIcon,
   ClockIcon,
@@ -27,16 +29,10 @@ import {
 import {
   Checks,
   CtaNote,
-  Ghosts,
   KitRows,
-  ListRows,
-  Nots,
   RouteCards,
   Sec,
-  Steps,
-  Trace,
   Verdict,
-  Waiting,
   Why,
 } from './jobFitQxKit'
 
@@ -62,6 +58,8 @@ export interface JobFitStateView {
   title: string
   subtitle: string
   pill: { tone: 'ok' | 'warn' | 'bad' | 'unknown'; label: string }
+  /** 步骤位置放在意图带上（读取中 / 分析中）。没有就不画。 */
+  rail?: QxTouchRail
   body: ReactNode
   cta: ReactNode
 }
@@ -116,29 +114,19 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       subtitle: '这次没有返回这份简历任务的内容。系统不会用其他人的任务或历史结果替代它。',
       pill: { tone: 'bad', label: '任务不可读取，需重新准备' },
       body: (
-        <>
-          <Sec title="读不出来的三种可能" hint="具体原因以这次读到的说明为准">
-            <Why items={[
-              { head: '可能原因', title: '任务已过期', desc: '临时任务有保存期限，过期后不再返回原文，也不保留分析结果。' },
-              { head: '可能原因', title: '不属于这次使用', desc: '换人使用或重新登录后，上一次的任务不会带到这次使用里。' },
-              { head: '可能原因', title: '已经停止读取', desc: '系统可以主动停止某份任务的读取，此时不展示任何原文片段。' },
-            ]} />
-          </Sec>
-          <Sec title="让它重新可用的三步" hint="每一步都在既有流程里" grow>
-            <Steps items={[
-              { title: '重新上传或扫描一份简历', desc: '进入简历材料入口，选择文件上传、纸质扫描或手机传输。' },
-              { title: '等待解析完成', desc: '解析成功后才会出现可用任务；失败会直接显示失败原因，不会静默通过。' },
-              { title: '回到岗位匹配重新选目标', desc: '任务可用后，再选择目标岗位并确认本人授权。' },
-            ]} />
-          </Sec>
-          <Sec title="这次没有发生的事" hint="明确否定，避免误解">
-            <Nots items={[
-              '没有读取到本人简历原文',
-              '没有生成任何对照结果或建议',
-              '没有把简历内容提供给企业或第三方',
-            ]} />
-          </Sec>
-        </>
+        <ResumeErrorState
+          reasonTitle="读不出来的三种可能"
+          rows={[
+            { title: '任务已过期', desc: '临时任务有保存期限，过期后不再返回原文，也不保留分析结果。' },
+            { title: '不属于这次使用', desc: '换人使用或重新登录后，上一次的任务不会带到这次使用里。' },
+            { title: '已经停止读取', desc: '系统可以主动停止某份任务的读取，此时不展示任何原文片段。' },
+          ]}
+          acts={[
+            { title: '重新上传或扫描一份简历', desc: '进入简历材料入口，选文件上传、纸质扫描或手机传输；解析完成后，再回来选目标岗位并确认本人授权。', take: '去上传', art: 'resume', onClick: exits.triage },
+            { title: '先打印现有简历', desc: '已有电子稿或纸质件时不需要这份任务，直接走打印流程。', take: '去打印', art: 'report', onClick: exits.printHub },
+          ]}
+          fine="这次没有读取到本人简历原文，没有生成任何对照结果，也没有把简历内容提供给企业或第三方。"
+        />
       ),
       cta: (
         <Cta note="不会用其他人的任务或历史结果顶替这份不可读取的任务。">
@@ -154,33 +142,16 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       title: '正在读取，还没有结果',
       subtitle: '读取请求已经提交。读到历史报告才显示内容；没有报告或读取失败会直接转到对应状态。',
       pill: { tone: 'unknown', label: '正在等待返回' },
+      rail: { labels: ['读取历史报告', '选目标岗位', '看对照结果'], now: 0 },
       body: (
-        <>
-          <Sec title="正在读取历史岗位匹配报告" hint="无进度条 · 无预计时间">
-            <Waiting
-              icon={<ClockIcon size={34} />}
-              title="请求已提交，等待返回"
-              desc="读取的是你本人此前的简历对照报告。返回之前，不显示对照要点或建议。"
-              tag="只表达整体等待，没有百分比"
-            />
-          </Sec>
-          <Sec title="已经确认并提交的内容" hint="本次读取用到的真实条件" grow>
-            <ListRows items={[
-              '这次使用的身份已核对，只读取本人的任务与报告',
-              '读取请求已发出，等待确认这份任务是否仍然可用',
-              '如果历史报告存在，其目标岗位会随报告一起返回',
-              '如果不存在历史报告，会转到目标岗位选择，而不是显示一份空结果',
-              '等待期间不放开打印，也不提前展示任何结论',
-            ]} />
-          </Sec>
-          <Sec title="还没有返回的内容" hint="返回前一律留空">
-            <Ghosts items={[
-              { title: '对照要点', desc: '已写到与还没体现的要求，只在结果返回后显示。', tag: '等待返回' },
-              { title: '匹配依据', desc: '岗位要求与简历依据由系统逐条给出。', tag: '等待返回' },
-              { title: '行动建议', desc: '差距与准备建议只出现在真实结果里。', tag: '等待返回' },
-            ]} />
-          </Sec>
-        </>
+        <ResumeWaitState
+          icon={<ClockIcon size={34} />}
+          title="请求已提交，等待返回"
+          desc="读取的是你本人此前的简历对照报告。返回之前，不显示对照要点或建议。"
+          tag="只表达整体等待，没有百分比"
+          fine="等待期间不放开打印，也不提前展示任何结论；没有历史报告时，会转到目标岗位选择。"
+          take={{ art: 'report', kicker: '读到之后，你可以带走', title: '一份简历对照报告', lines: ['已经写到的、还没体现的要求，逐条列出', '只供本人准备，可打印'] }}
+        />
       ),
       cta: (
         <Cta note="读取失败或没有历史报告时会直接说明，不会显示一份空白结果。">
@@ -195,33 +166,16 @@ export function buildJobFitStateView(state: JobFitStaticState, exits: JobFitExit
       title: '已提交分析，等待返回',
       subtitle: '目标岗位与本人授权已确认。返回之前，不显示对照要点、百分比或任何录用相关结论。',
       pill: { tone: 'unknown', label: '分析进行中，等待返回' },
+      rail: { labels: ['选目标岗位', '等待返回', '看对照结果'], now: 1 },
       body: (
-        <>
-          <Sec title="正在等待岗位匹配结果" hint="无阶段名 · 无百分比">
-            <Waiting
-              icon={<BotIcon size={34} />}
-              title="分析请求已提交"
-              desc="本页只表达整体等待。没有阶段进度，也不预告结果会是什么。"
-              tag="等待中，可随时取消并返回"
-            />
-          </Sec>
-          <Sec title="当前停在哪一步" hint="只标位置，不画进度">
-            <Trace items={[
-              { phase: '输入', title: '已确认输入', desc: '目标岗位与本人授权都已确认。' },
-              { phase: '当前', title: '等待返回', desc: '对照要点与建议全部由系统给出。', now: true },
-              { phase: '之后', title: '由本人决定下一步', desc: '看完参考后，是否优化、准备材料或打印由你决定。' },
-            ]} />
-          </Sec>
-          <Sec title="等待期间不会发生的事" hint="合规边界不随状态放宽" grow>
-            <Nots items={[
-              '不显示匹配百分比、评分或通过率预测',
-              '不给出录用、面试或 Offer 相关结论',
-              '不把简历内容提供给企业或第三方',
-              '不在本页生成文件、发起支付或打印',
-              '不替你在来源渠道完成任何投递或预约动作',
-            ]} />
-          </Sec>
-        </>
+        <ResumeWaitState
+          icon={<BotIcon size={34} />}
+          title="分析请求已提交"
+          desc="本页只表达整体等待。没有阶段进度，也不预告结果会是什么；可随时取消并返回。"
+          tag="等待中，没有百分比"
+          fine={`等待期间不显示匹配百分比、评分或通过率预测，不给出录用、面试或 Offer 相关结论，不把简历内容提供给企业或第三方，也不在本页生成文件、发起支付或打印${exits.jobs ? '；不替你在来源渠道完成任何投递或预约动作' : ''}。`}
+          take={{ art: 'report', kicker: '返回之后，你可以带走', title: '一份简历对照报告', lines: ['已经写到的、还没体现的要求，逐条列出', '只供本人准备，可打印'] }}
+        />
       ),
       cta: (
         <Cta note="分析结果只供本人准备使用，不构成企业侧任何判断。">
