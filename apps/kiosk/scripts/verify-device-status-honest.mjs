@@ -140,6 +140,24 @@ for (const status of ['queue_cleanup_failed', 'queue_pause_failed']) {
   if (!block.includes(QUEUE_GATE_NOTICE_CALL)) fail(`${status} 说明必须是「${QUEUE_GATE_NOTICE_CALL}」（无人值守标准句 3）`)
   else pass(`${status} 说明用无人值守标准句 3`)
 }
+// 服务联系方式（号码）比打印机状态晚到、或之后被后台改了：state 里存的是取状态那一刻算好的句子，
+// hook 返回前必须按当前联系方式重算，否则要等下一次轮询（60 秒）才换，看起来就是「后台改了号码，一体机不认」。
+// 读取归运行时根，hook 只订阅：页面停用 hook（enabled=false）时仍不发任何请求。
+expectMatches(hookSrc, /import \{ useSupportContactSnapshot \} from '\.\/useSupportContact'/, 'hook 只读订阅服务联系方式')
+expectMatches(hookSrc, /const notice = machineUnusableLine\(contact\)/, '暂停接单说明按当前联系方式重算')
+expectMatches(
+  hookSrc,
+  /return useMemo\(\(\) => withLiveNotice\(view, contact\), \[view, contact\]\)/,
+  'hook 返回的视图套用当前联系方式（号码晚到，说明不等下一次轮询）',
+)
+expectNotMatches(hookSrc, /loadSupportContact|refreshSupportContact/, 'hook 自己不读服务联系方式（读取归运行时根，停用时不发请求）')
+const runtimeRootSrc = read('src/layouts/KioskRuntimeRoot.tsx')
+expectMatches(runtimeRootSrc, /<SupportContactGuard\s*\/>/, '运行时根渲染服务联系方式守卫（没人读，说明里永远没有号码）')
+expectMatches(
+  runtimeRootSrc,
+  /useEffect\(\(\) => startSupportContactKeeper\(\), \[\]\)/,
+  '守卫挂载时读服务联系方式并续期，卸载时停',
+)
 expectMatches(
   hubPageSrc,
   /orderPaused \? device\.printerNotice/,

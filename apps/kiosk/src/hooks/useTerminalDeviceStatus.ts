@@ -10,11 +10,13 @@
  * - Agent 当前不上报耗材；tonerKnown=false，禁止用假数值触发「墨粉不足」
  * - 「网络正常」只表示本机能连上 API（本次请求成功），不表示打印机侧网络
  */
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { DeviceStatus, PrinterStatus } from '@ai-job-print/shared'
 import { machineUnusableLine } from '../copy/unattendedCopy'
+import type { PublicSupportContact } from '../copy/unattendedCopy'
 import { API_BASE_URL, IS_MOCK_MODE } from '../services/api/client'
 import { getTerminalId, subscribeTerminalIdentity } from '../services/api/screensaver'
+import { useSupportContactSnapshot } from './useSupportContact'
 
 const ZERO_TONER = { black: 0, cyan: 0, magenta: 0, yellow: 0 } as const
 
@@ -204,8 +206,25 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
   }
 }
 
+/**
+ * 暂停接单说明在取状态时就算好存进了 state，而服务联系方式是运行时根另外读的，可能比状态晚到，
+ * 也可能之后被后台改掉。所以这里不用 state 里存的那句：渲染时按当前联系方式重算，
+ * 号码到了说明立刻换成带号码的那句，不等下一次轮询（60 秒）碰运气。
+ * 只动有说明的视图（打印闸门合上）；其余、以及说明没变时，原样返回同一个对象。
+ */
+function withLiveNotice(
+  view: TerminalDeviceStatusView,
+  contact: PublicSupportContact,
+): TerminalDeviceStatusView {
+  if (view.printerNotice === undefined) return view
+  const notice = machineUnusableLine(contact)
+  return notice === view.printerNotice ? view : { ...view, printerNotice: notice }
+}
+
 export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusView {
   const terminalId = useSyncExternalStore(subscribeTerminalIdentity, getTerminalId, () => '')
+  // 只读订阅，不发请求：页面停用本 hook（enabled=false）时仍然不发任何请求，读取归运行时根。
+  const contact = useSupportContactSnapshot()
   const [view, setView] = useState<TerminalDeviceStatusView>(() =>
     terminalId
       ? {
@@ -325,5 +344,5 @@ export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusVie
     }
   }, [enabled, terminalId])
 
-  return view
+  return useMemo(() => withLiveNotice(view, contact), [view, contact])
 }
