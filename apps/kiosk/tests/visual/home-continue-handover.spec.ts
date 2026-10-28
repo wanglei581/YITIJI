@@ -19,7 +19,7 @@
 import type { Locator, Page, Request, Route } from '@playwright/test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { expect, test } from '../fixtures/kiosk-test'
-import { allowLocalBootTicket, loginThroughVisibleUi, registerPrivacyShell, shotTo } from './fixtures/privacy-clear-shell'
+import { allowLocalBootTicket, fillPhoneLogin, loginThroughVisibleUi, registerPrivacyShell, shotTo } from './fixtures/privacy-clear-shell'
 
 /** 设了环境变量才存证据截图；不设就不写任何目录（CI 上不落盘）。 */
 const EVIDENCE_DIR = process.env.HOME_CONTINUE_EVIDENCE_DIR ?? ''
@@ -178,6 +178,15 @@ test('home continue block shows the signed-in owner’s print file while they ke
     await expect(region(page)).toContainText(WANG_FILE)
   }
   expect(homePanelCalls(callsBy(calls, WANG)), '面板挂着的这段时间只读一次，不反复读').toHaveLength(2)
+
+  // 本人去别的页、不到 30 秒回来：没有空档，面板重新挂载、照常读照常显示（不误收）。
+  await page.locator('[data-action="help"]').click()
+  await expect(page).toHaveURL(/\/help$/)
+  await page.clock.runFor(8_000)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(region(page)).toContainText(`${WANG_FILE} · 打印中`)
+  expect(homePanelCalls(callsBy(calls, WANG))).toHaveLength(4)
 })
 
 for (const scene of [
@@ -261,8 +270,11 @@ test('home continue block collapses on the very first touch after the gap even b
   await expect(region(page)).toContainText(WANG_FILE)
   const before = calls.length
 
-  // 系统时间一下跳过 40 秒，定时器一个都没来得及跑（setSystemTime 不触发任何定时器）；下一位这时碰屏。
-  await page.clock.setSystemTime(new Date(Date.now() + 40_000))
+  // 先把页面时钟停住：之后一个定时器都不会跑，每秒一次的检查也就没有机会收起面板。
+  // 再把系统时间一下拨过 40 秒（setSystemTime 不触发定时器）；下一位这时碰屏——只有「碰屏即判」这条路能收起。
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 200)
+  await page.clock.setSystemTime(now + 40_000)
   await touchScreen(page)
   await expectNoTraceOf(page, WANG, WANG_FILE)
   await page.clock.runFor(6_000)
@@ -325,9 +337,12 @@ test('home continue block leaves nothing of the previous person after 不是我 
   await expectNoTraceOf(page, WANG, WANG_FILE)
   await shot(page, '05-home-after-not-me.png')
 
-  // 下一位登录：不被上一位留下的「收起」拦住，看到的是自己的，没有王晓雨的。
+  // 下一位从首页点登录：不被上一位留下的「收起」拦住，看到的是自己的，没有王晓雨的。
   const beforeNext = calls.length
-  await loginThroughVisibleUi(page, '/', CHEN.phone)
+  await page.getByRole('button', { name: '登录后查看本人记录' }).click()
+  await expect(page).toHaveURL(/\/login/)
+  await fillPhoneLogin(page, CHEN.phone)
+  await page.waitForURL((url) => url.pathname === '/')
   await expect(region(page)).toContainText(`${CHEN_FILE} · 排队中`)
   await expect(page.locator('body')).not.toContainText(WANG_FILE)
   expect(callsBy(calls.slice(beforeNext), WANG), '下一位登录之后不该再有王晓雨令牌的请求').toEqual([])

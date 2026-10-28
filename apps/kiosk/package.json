@@ -109,7 +109,7 @@
     "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs",
     "verify:v6-type-floor": "node ../../docs/design/kiosk-ai-os-v3-2026-08/tools/verify-type-floor.mjs",
     "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs",
-    "verify:fusion-home": "node scripts/verify-fusion-home.mjs",
+    "verify:fusion-home": "node scripts/verify-fusion-home.mjs && node --test scripts/tests/home-continue-handover.test.mjs",
     "verify:fusion-w2": "node scripts/verify-fusion-w2-print-scan.mjs",
     "verify:fusion-w3": "node scripts/verify-fusion-w3.mjs",
     "verify:fusion-w4": "node scripts/verify-fusion-w4.mjs",

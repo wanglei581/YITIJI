@@ -8,6 +8,7 @@ import { useRecruitmentHosting } from '../../hooks/useRecruitmentHosting'
 import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
+import { ContinueHandoverGuard } from './components/ContinueHandoverGuard'
 import { ContinuePanel } from './components/ContinuePanel'
 import { HomeTouchView } from './components/HomeTouchView'
 import { placeLabel } from './homeTouchCopy'
@@ -74,7 +75,8 @@ export function HomePage() {
       officialChannelCount={officialChannelCount}
       place={placeLabel(channels)}
       deviceStatus={deviceStatus}
-      continueSlot={<ContinuePanel />}
+      // 「继续办理」会把上一位的打印文件名写在首页上：空档超过 30 秒（和「我的」闸同一个判据）就收起、不再读 /me。
+      continueSlot={<ContinueHandoverGuard><ContinuePanel /></ContinueHandoverGuard>}
       onAction={handleAction}
       onHome={() => navigate('/')}
       onOpenDevice={() => navigate('/error-offline')}
