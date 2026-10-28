@@ -237,7 +237,7 @@
   font-weight: 700;
 }
 
-/* 最近对话：近两轮，整张卡跟着内容走，不再自带第二个滚动条 */
+/* 最近对话：本人最近两次作答或跳过，整张卡跟着内容走，不再自带第二个滚动条 */
 [data-qx-page="interview"] [data-qx-interview] .interview-session__history.qxt-iv-note {
   display: flex;
   flex-direction: column;

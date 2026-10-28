@@ -28,8 +28,7 @@ export function InterviewArtMark({ className = 'qxt-iv-art-mark', align = 'cente
 
 /**
  * 稿 fi-art：插画在上、标题和说明居中。状态页（读取中、不可用、为空、过期）都用它。
- * fill：放在内容页的最下面当余高吸收件。余高够放（约 320px 以上）时撑满余高，不够就整块不出现，
- * 不留半截字，也不给已经装满的页再多添一屏要滑。
+ * 内容页（报告「更多」等）按稿不画插画；内容少时由最后一张卡吸收余高。
  */
 export function InterviewArt({
   title,
@@ -40,9 +39,9 @@ export function InterviewArt({
   title: string
   children: ReactNode
   headingRef?: React.Ref<HTMLHeadingElement>
-  variant?: 'page' | 'more' | 'fill'
+  variant?: 'page' | 'more'
 }) {
-  const art = (
+  return (
     <section className={variant === 'more' ? 'qxt-iv-art is-more' : 'qxt-iv-art'}>
       <InterviewArtMark />
       <div className="qxt-iv-art-copy">
@@ -51,5 +50,4 @@ export function InterviewArt({
       </div>
     </section>
   )
-  return variant === 'fill' ? <div className="qxt-iv-artslot">{art}</div> : art
 }

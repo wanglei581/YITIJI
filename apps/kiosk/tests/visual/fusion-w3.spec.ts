@@ -1896,6 +1896,30 @@ test('interview answer outage drops the unsent turn and restores the draft @w3-k
   await expect(page.getByRole('textbox', { name: '本题回答' })).toHaveValue(INTERVIEW_ANSWER)
 })
 
+test('interview 最近对话 lists only the user own last two answers, with the draft empty line before the first @w3-kiosk', async ({ page, api }) => {
+  armInterviewSession(api)
+  const questions = ['请说明一次解决困难的真实经历。', '你怎么保证开学周高峰时登记不漏项？', '最后，你有什么想问我们的吗？']
+  api.respondWith('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, (n) => ({
+    status: 200,
+    json: { data: { done: false, question: questions[Math.min(n - 1, questions.length - 1)], qType: 'experience', questionIndex: n + 1, questionTarget: 5 } },
+  }))
+  await beginTextInterview(page)
+  const history = page.locator('.interview-session__history')
+  await expect(history).toContainText('这场还没有记下的对话')
+  for (const [n, answer] of ['第一次回答', '第二次回答', '第三次回答'].entries()) {
+    await page.getByRole('textbox', { name: '本题回答' }).fill(answer)
+    await page.getByRole('button', { name: '提交回答', exact: true }).click()
+    await expect(page.locator('.interview-session__question-text')).toContainText(questions[n]!)
+  }
+  // 稿 slice(-2)：只留本人最近两次回答；第一次回答、面试官的题都不在这块里（题在题目卡）。
+  await expect(history).toContainText('第三次回答')
+  await expect(history).toContainText('第二次回答')
+  await expect(history).not.toContainText('第一次回答')
+  await expect(history).not.toContainText(questions[2]!)
+  await expect(history).not.toContainText('这场还没有记下的对话')
+  await expect(history.locator(':scope > span')).toHaveCount(3)
+})
+
 test('ending an interview with no saved answers does not say retry @w3-kiosk', async ({ page, api }) => {
   armInterviewSession(api)
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/end`, {
@@ -1927,7 +1951,9 @@ test('ending an interview during an AI outage keeps the saved answers and offers
   await beginTextInterview(page)
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
   await page.getByRole('button', { name: '提交回答', exact: true }).click()
-  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  // 下一题进题目卡；「最近对话」只列本人记下的回答（稿 slice(-2)），不再重复面试官的题。
+  await expect(page.locator('.interview-session__question-text')).toContainText('请说明一次解决困难的真实经历。')
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
   await page.getByRole('button', { name: '结束本场练习', exact: true }).click()
   const alert = page.locator('.interview-session__error')
   await expect(alert).toContainText('你的回答已保存')
@@ -2037,12 +2063,14 @@ test('interview pages that overflow show the swipe cue, and it goes away at the 
   armInterviewSession(api)
   api.respond('POST', `/api/v1/mock-interviews/${INTERVIEW_ID}/answer`, { status: 200, json: interviewAnswered })
   await beginTextInterview(page)
-  // 麦克风探测落定后，语音原因卡常显；再答完一题，最近对话多出两条。作答页比一屏高一截（不靠刚好卡线）。
+  // 麦克风探测落定后，语音原因卡常显；再答完一题，最近对话多出一条本人回答。作答页比一屏高一截（不靠刚好卡线）。
   // 整页只有 .interview-session__content 一个滚动容器。
   await expect(page.locator('[data-mic-reason]')).toBeVisible()
   await page.getByRole('textbox', { name: '本题回答' }).fill(INTERVIEW_ANSWER)
   await page.getByRole('button', { name: '提交回答', exact: true }).click()
-  await expect(page.locator('.interview-session__history')).toContainText('请说明一次解决困难的真实经历。')
+  // 下一题进题目卡；「最近对话」只列本人记下的回答（稿 slice(-2)），不再重复面试官的题。
+  await expect(page.locator('.interview-session__question-text')).toContainText('请说明一次解决困难的真实经历。')
+  await expect(page.locator('.interview-session__history')).toContainText(INTERVIEW_ANSWER)
   expect(await interviewScrollContainers(page)).toEqual(['interview-session__content'])
   const overflow = await page.locator('.interview-session__content').evaluate((el) => el.scrollHeight - el.clientHeight)
   expect(overflow, '作答页要明显超出一屏，滑动提示才有判据').toBeGreaterThan(60)

@@ -29,8 +29,11 @@ interface InterviewSessionPanelsProps {
   children?: ReactNode
 }
 
-/** 近两轮对话就够：更早的在这场练习的报告里。 */
-const RECENT_MESSAGES = 4
+/**
+ * 只列本人最近两次作答或跳过（稿 fiMsgs.slice(-2)，稿里这块只有「你的回答 / 跳过记录」）。
+ * 面试官的题在上面的题目卡里（当前题 + 上一题），不在这里重复；更早的问答在这场练习的报告里。
+ */
+const RECENT_MESSAGES = 2
 
 /**
  * 作答页正文（稿 iv-run）：题目、三格状态、到点与问完的提示、回答时的组织提示，
@@ -61,7 +64,10 @@ export function InterviewSessionPanels({
     .slice(-2, -1)[0]?.content
 
   const micTone = micStatusTone === 'green' ? 'ok' : micStatusTone === 'red' ? 'off' : undefined
-  const lastInterviewerIndex = messages.map((m) => m.role).lastIndexOf('interviewer')
+  const recent = messages
+    .map((message, index) => ({ message, index }))
+    .filter(({ message }) => message.role === 'candidate')
+    .slice(-RECENT_MESSAGES)
 
   return (
     <div className="interview-session__content">
@@ -96,13 +102,11 @@ export function InterviewSessionPanels({
       {children}
       <div ref={listRef} className="interview-session__history qxt-iv-note" role="log" aria-live="polite" aria-relevant="additions text">
         <b>最近对话</b>
-        {messages.slice(-RECENT_MESSAGES).map((message, index, shown) => (
-          <span
-            key={`${message.role}-${messages.length - shown.length + index}`}
-            className={message.skipped ? 'is-skipped' : undefined}
-            data-current={messages.length - shown.length + index === lastInterviewerIndex && message.role === 'interviewer' && phase === 'answering' ? 'true' : undefined}
-          >
-            <b>{message.role === 'interviewer' ? interviewerLabel : message.skipped ? '跳过记录' : '你的回答'}</b> {message.content}
+        {recent.length === 0 ? (
+          <span>这场还没有记下的对话。提交或跳过之后，这里按本场返回。</span>
+        ) : recent.map(({ message, index }) => (
+          <span key={index} className={message.skipped ? 'is-skipped' : undefined}>
+            <b>{message.skipped ? '跳过记录' : '你的回答'}</b> {message.content}
           </span>
         ))}
         <span>模拟练习仅供本人参考，对话内容不会发送给任何企业。转写不落库、音频不落盘。转完即删。</span>

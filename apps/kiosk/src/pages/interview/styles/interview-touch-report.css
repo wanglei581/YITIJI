@@ -72,3 +72,9 @@
   font-weight: 700;
   line-height: 1.3;
 }
+
+/* 「更多」内容少时：最后一张卡（STAR）吸收余高，和稿的 fi-rest 一样；内容多时按内容高，不多出一屏。
+   不再放稿上没有的插画。 */
+[data-qx-page="interview"] .qxt-iv-note.qxt-iv-rest {
+  flex-grow: 1;
+}

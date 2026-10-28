@@ -274,7 +274,7 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
                   ))}
                 </section>
               )}
-              <section className="qxt-iv-note">
+              <section className="qxt-iv-note qxt-iv-rest">
                 <h2>STAR 回答建议</h2>
                 <span><b>S 情境：</b>{data.report.starAdvice.s}</span>
                 <span><b>T 任务：</b>{data.report.starAdvice.t}</span>
@@ -282,9 +282,6 @@ export function InterviewReportPage({ onGoStage }: { onGoStage?: (stage: Intervi
                 <span><b>R 结果：</b>{data.report.starAdvice.r}</span>
                 <span>{data.report.starAdvice.reminder}</span>
               </section>
-              <InterviewArt variant="fill" title="这些栏目只属于这一场练习">
-                预测题、STAR 建议、准备清单和问答摘录都按这一场练习的报告显示，只用于本人复盘，不预测录用，也不发送给任何企业。
-              </InterviewArt>
             </>
           ) : (
             <>

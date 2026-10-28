@@ -296,27 +296,6 @@
   line-height: 1.4;
 }
 
-/* 余高吸收件：基准高度 0，有多少余高占多少。够放插画和字才显示，不够整块隐藏（容器查询按它自己的高度判）。 */
-[data-qx-page="interview"] [data-qx-interview] .interview-flow__scroll > .qxt-iv-artslot {
-  flex: 1 1 0;
-  min-height: 0;
-  container-type: size;
-}
-
-[data-qx-page="interview"] .qxt-iv-artslot > .qxt-iv-art {
-  display: none;
-  height: 100%;
-  min-height: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-@container (min-height: 340px) {
-  [data-qx-page="interview"] .qxt-iv-artslot > .qxt-iv-art {
-    display: flex;
-  }
-}
-
 /* 作答、设置里的告警 */
 [data-qx-page="interview"] .qxt-dock .qxt-iv-alert {
   flex-basis: 100%;
