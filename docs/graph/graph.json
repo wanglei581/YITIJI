@@ -12792,7 +12792,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 252,
+      "reachableFileCount": 253,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -13563,11 +13563,11 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 278
+      "sourceFileCount": 279
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 680,
+      "reachableFileCount": 681,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -13651,6 +13651,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -13760,6 +13761,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -13912,6 +13914,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14663,6 +14666,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -14694,6 +14698,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16467,6 +16472,7 @@
             "apps/kiosk/src/styles/qingxu/tokens-touch.css",
             "apps/kiosk/src/styles/qingxu/tokens.css",
             "apps/kiosk/src/styles/qingxu/touch-hero.css",
+            "apps/kiosk/src/styles/qingxu/touch-legacy-parts.css",
             "apps/kiosk/src/styles/qingxu/touch.css"
           ],
           "wrappers": []
@@ -16574,7 +16580,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 774
+      "sourceFileCount": 775
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -19084,6 +19090,9 @@
     "apps/admin/src/routes/dashboard/index.tsx": [
       "apps/admin/scripts/verify-admin-ai-usage-ui.mjs"
     ],
+    "apps/admin/src/routes/dashboard/printerStatusSummary.ts": [
+      "apps/admin/scripts/verify-service-desk-dashboard-ui.mjs"
+    ],
     "apps/admin/src/routes/devices/TerminalFleetOverview.tsx": [
       "apps/admin/scripts/verify-admin-device-fleet-overview-ui.mjs",
       "apps/admin/scripts/verify-console-plain-copy.mjs"
@@ -20021,6 +20030,7 @@
       "apps/kiosk/scripts/verify-kiosk-ai-label-copy.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-kiosk-field-safety.mjs",
       "services/api/scripts/verify-assistant-voice.ts"
     ],
@@ -20040,6 +20050,7 @@
       "apps/kiosk/scripts/verify-fusion-w3.mjs"
     ],
     "apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs"
     ],
     "apps/kiosk/src/pages/assistant/advisorProvider.ts": [
@@ -20074,7 +20085,11 @@
       "apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs"
     ],
+    "apps/kiosk/src/pages/assistant/assistant-touch.css": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs"
+    ],
     "apps/kiosk/src/pages/auth/LoginPage.tsx": [
+      "apps/kiosk/scripts/verify-advisor-provider-gate.mjs",
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-job-material-library-ui.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
@@ -20124,6 +20139,9 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-w4-login-profile-l1.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
+    ],
+    "apps/kiosk/src/pages/auth/login-touch.css": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/auth/login.css": [
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs"
@@ -20527,6 +20545,9 @@
       "apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs",
       "apps/kiosk/scripts/verify-self-assessment-consent-source.mjs",
       "services/api/scripts/verify-legal-doc-version.ts"
+    ],
+    "apps/kiosk/src/pages/legal/LegalDocViews.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
     ],
     "apps/kiosk/src/pages/legal/legal-service-desk.css": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
@@ -21250,6 +21271,9 @@
       "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
+    "apps/kiosk/src/pages/public-touch/PublicBlocks.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs"
+    ],
     "apps/kiosk/src/pages/renshi/EligibilityPanel.tsx": [
       "apps/kiosk/scripts/verify-policy-eligibility-ui.mjs"
     ],
@@ -21782,6 +21806,7 @@
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
     ],
     "apps/kiosk/src/pages/session-guard/SessionGuardView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
     "apps/kiosk/src/pages/session-guard/sessionGuardModel.ts": [
@@ -21795,6 +21820,7 @@
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
     "apps/kiosk/src/pages/session-resume/SessionResumeView.tsx": [
+      "apps/kiosk/scripts/verify-fusion-w5.mjs",
       "apps/kiosk/scripts/verify-qx-session-lifecycle.mjs"
     ],
     "apps/kiosk/src/pages/session-resume/sessionResumeModel.ts": [
@@ -28985,6 +29011,7 @@
           "apps/admin/src/routes/alerts/alertDetailText.ts",
           "apps/admin/src/routes/alerts/index.tsx",
           "apps/admin/src/routes/dashboard/dashboardRows.ts",
+          "apps/admin/src/routes/dashboard/printerStatusSummary.ts",
           "apps/admin/src/routes/legal-docs/index.tsx",
           "apps/admin/src/routes/login/LegalDocsModal.tsx",
           "apps/admin/src/routes/printers/index.tsx",
@@ -29206,9 +29233,12 @@
           "apps/kiosk/src/pages/assistant/AdvisorConversation.tsx",
           "apps/kiosk/src/pages/assistant/AdvisorTools.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx",
           "apps/kiosk/src/pages/assistant/advisorProvider.ts",
           "apps/kiosk/src/pages/assistant/advisorScenes.ts",
           "apps/kiosk/src/pages/assistant/advisorUserCopy.ts",
+          "apps/kiosk/src/pages/assistant/assistant-touch.css",
+          "apps/kiosk/src/pages/auth/LoginPage.tsx",
           "apps/kiosk/src/routes/index.tsx",
           "apps/kiosk/src/utils/maskPii.ts"
         ],
@@ -29803,6 +29833,7 @@
           "apps/kiosk/src/pages/ai-plan/advisorArtifactModel.ts",
           "apps/kiosk/src/pages/ai-plan/styles/advisor-artifact-qx.css",
           "apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx",
+          "apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx",
           "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx",
           "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
@@ -29928,12 +29959,14 @@
           "apps/kiosk/src/pages/auth/LoginPage.tsx",
           "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts",
+          "apps/kiosk/src/pages/auth/login-touch.css",
           "apps/kiosk/src/pages/auth/mobile-qr-service-desk.css",
           "apps/kiosk/src/pages/help/HelpCenterPage.tsx",
           "apps/kiosk/src/pages/home/components/ContinuePanel.tsx",
           "apps/kiosk/src/pages/home/components/ToolboxLaunchModals.tsx",
           "apps/kiosk/src/pages/home/components/kioskAppLaunch.ts",
           "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
+          "apps/kiosk/src/pages/legal/LegalDocViews.tsx",
           "apps/kiosk/src/pages/legal/legal-service-desk.css",
           "apps/kiosk/src/pages/placeholders/ErrorOfflinePage.tsx",
           "apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx",
@@ -29970,8 +30003,11 @@
           "apps/kiosk/src/pages/profile/profile-lightflow-state.css",
           "apps/kiosk/src/pages/profile/profileEntries.ts",
           "apps/kiosk/src/pages/profile/profileTypes.ts",
+          "apps/kiosk/src/pages/public-touch/PublicBlocks.tsx",
           "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
           "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
+          "apps/kiosk/src/pages/session-guard/SessionGuardView.tsx",
+          "apps/kiosk/src/pages/session-resume/SessionResumeView.tsx",
           "apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx",
           "apps/kiosk/src/pages/toolbox/toolbox-zone.css",
           "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",

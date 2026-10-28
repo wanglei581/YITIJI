@@ -69,7 +69,7 @@ _（空）_
 
 ## 反向索引：文件 → 断言它的门禁
 
-**改文件前查这里**，就知道会红哪条门禁。共 1879 个文件被至少一条门禁断言。
+**改文件前查这里**，就知道会红哪条门禁。共 1884 个文件被至少一条门禁断言。
 
 命令行版本（推荐，支持前缀匹配）：
 ```bash
@@ -185,7 +185,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/admin/src/</code> — 172 个文件</summary>
+<summary><code>apps/admin/src/</code> — 173 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -222,6 +222,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/admin/src/routes/dashboard/RecentPrintTasks.tsx` | `verify-console-batch5-copy.mjs` |
 | `apps/admin/src/routes/dashboard/dashboardRows.ts` | `verify-service-desk-dashboard-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/admin/src/routes/dashboard/index.tsx` | `verify-admin-ai-usage-ui.mjs` |
+| `apps/admin/src/routes/dashboard/printerStatusSummary.ts` | `verify-service-desk-dashboard-ui.mjs` |
 | `apps/admin/src/routes/devices/TerminalFleetOverview.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/devices/index.tsx` | `verify-admin-device-fleet-overview-ui.mjs`<br/>`verify-console-plain-copy.mjs` |
 | `apps/admin/src/routes/fair-sources/FairSourceReviewActions.tsx` | `verify-source-publish-actions.mjs` |
@@ -424,7 +425,7 @@ node scripts/project-graph-query.mjs file <路径>
 </details>
 
 <details>
-<summary><code>apps/kiosk/src/</code> — 541 个文件</summary>
+<summary><code>apps/kiosk/src/</code> — 545 个文件</summary>
 
 | 文件 | 被这些门禁断言 |
 | --- | --- |
@@ -494,10 +495,10 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/assistant/AdvisorConversation.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/AdvisorTools.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/AssistantCallPanel.tsx` | `verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs` |
-| `apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx` | `verify-kiosk-field-safety.mjs`<br/>`verify-assistant-voice.ts` |
+| `apps/kiosk/src/pages/assistant/AssistantHoldToTalk.tsx` | `verify-fusion-w3.mjs`<br/>`verify-kiosk-field-safety.mjs`<br/>`verify-assistant-voice.ts` |
 | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-ai-down-fallbacks.mjs`<br/>`verify-assistant-trtc-guard.mjs`<br/>`verify-fusion-w3.mjs`<br/>`verify-kiosk-ai-declaration.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs`<br/>`verify-assistant-voice.ts`<br/>`verify-toolbox-ai-skill-intents.ts` |
 | `apps/kiosk/src/pages/assistant/AssistantSessionSummaryBar.tsx` | `verify-fusion-w3.mjs` |
-| `apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx` | `verify-lightflow-k2a-ai-career.mjs` |
+| `apps/kiosk/src/pages/assistant/AssistantTaskPicker.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/advisorProvider.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/advisorScenes.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-kiosk-ai-label-copy.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/advisorUserCopy.ts` | `verify-advisor-provider-gate.mjs`<br/>`verify-public-screen-mask.mjs` |
@@ -506,7 +507,8 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/assistant/assistant-qingxu-content.css` | `verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-qingxu-input.css` | `verify-assistant-trtc-guard.mjs`<br/>`verify-lightflow-k2a-ai-career.mjs` |
 | `apps/kiosk/src/pages/assistant/assistant-qingxu.css` | `verify-lightflow-k2a-ai-career.mjs`<br/>`verify-profile-feedback-inkpaper.mjs` |
-| `apps/kiosk/src/pages/auth/LoginPage.tsx` | `verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-user-center-wave0.mjs` |
+| `apps/kiosk/src/pages/assistant/assistant-touch.css` | `verify-advisor-provider-gate.mjs` |
+| `apps/kiosk/src/pages/auth/LoginPage.tsx` | `verify-advisor-provider-gate.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-job-material-library-ui.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-print-orders-login-smoke.mjs`<br/>`verify-qr-login-ui.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-user-center-wave0.mjs` |
 | `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/pages/auth/ScanQrLoginPanel.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-qr-login-ui.mjs` |
 | `apps/kiosk/src/pages/auth/accountUserMessage.ts` | `verify-backend-error-copy-coverage.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
@@ -515,6 +517,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs` |
 | `apps/kiosk/src/pages/auth/components/MemberPhoneLoginPane.tsx` | `verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs` |
 | `apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-member-login-dialog.mjs`<br/>`verify-member-session-closure.mjs`<br/>`verify-w4-login-profile-l1.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/kiosk/src/pages/auth/login-touch.css` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/auth/login.css` | `verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/auth/loginGateModel.ts` | `verify-member-session-closure.mjs`<br/>`verify-qx-session-lifecycle.mjs`<br/>`verify-w4-login-profile-l1.mjs` |
 | `apps/kiosk/src/pages/auth/mobile-qr-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
@@ -603,6 +606,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/jobs/utils/sourceContentTrust.ts` | `verify-job-info-ui.mjs` |
 | `apps/kiosk/src/pages/jobs/utils/sourceTrust.ts` | `verify-jobfair-ui.mjs`<br/>`verify-datetime-honesty.mjs` |
 | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | `verify-fusion-shell.mjs`<br/>`verify-fusion-w5.mjs`<br/>`verify-legal-retention-copy.mjs`<br/>`verify-lightflow-k1-public-entry.mjs`<br/>`verify-self-assessment-consent-source.mjs`<br/>`verify-legal-doc-version.ts` |
+| `apps/kiosk/src/pages/legal/LegalDocViews.tsx` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/legal/legal-service-desk.css` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-k1-public-entry.mjs` |
 | `apps/kiosk/src/pages/legal/legalDocModel.ts` | `verify-self-assessment-consent-source.mjs`<br/>`verify-legal-doc-version.ts` |
 | `apps/kiosk/src/pages/official-channels/OfficialChannelsPage.tsx` | `verify-fusion-w4.mjs` |
@@ -741,6 +745,7 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/profile/profileEntries.ts` | `verify-fusion-w5.mjs`<br/>`verify-lightflow-profile-entry.mjs`<br/>`verify-profile-commercial-first-batch.mjs`<br/>`verify-profile-inkpaper-home.mjs`<br/>`verify-user-center-wave0.mjs` |
 | `apps/kiosk/src/pages/profile/profileTypes.ts` | `verify-fusion-w5.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
 | `apps/kiosk/src/pages/profile/styles/profile-qx.css` | `verify-lightflow-profile-entry.mjs`<br/>`verify-profile-inkpaper-home.mjs` |
+| `apps/kiosk/src/pages/public-touch/PublicBlocks.tsx` | `verify-fusion-w5.mjs` |
 | `apps/kiosk/src/pages/renshi/EligibilityPanel.tsx` | `verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/EligibilityResults.tsx` | `verify-policy-eligibility-ui.mjs` |
 | `apps/kiosk/src/pages/renshi/NoticePanel.tsx` | `verify-renshi-policy-ui.mjs` |
@@ -873,11 +878,11 @@ node scripts/project-graph-query.mjs file <路径>
 | `apps/kiosk/src/pages/service-hubs/serviceHubModel.ts` | `verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/serviceHubSpecs.ts` | `extract-service-hub-specs.mjs`<br/>`verify-kiosk-frontend-debt.mjs`<br/>`verify-service-entry-readiness.mjs` |
 | `apps/kiosk/src/pages/service-hubs/styles/service-hub-qx.css` | `verify-service-entry-readiness.mjs` |
-| `apps/kiosk/src/pages/session-guard/SessionGuardView.tsx` | `verify-qx-session-lifecycle.mjs` |
+| `apps/kiosk/src/pages/session-guard/SessionGuardView.tsx` | `verify-fusion-w5.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/sessionGuardModel.ts` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-guard/styles/session-guard-qx.css` | `verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-resume/SessionResumePage.tsx` | `verify-member-session-closure.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
-| `apps/kiosk/src/pages/session-resume/SessionResumeView.tsx` | `verify-qx-session-lifecycle.mjs` |
+| `apps/kiosk/src/pages/session-resume/SessionResumeView.tsx` | `verify-fusion-w5.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/session-resume/sessionResumeModel.ts` | `verify-member-session-closure.mjs`<br/>`verify-qx-session-lifecycle.mjs` |
 | `apps/kiosk/src/pages/smart-campus/FreshmanInsightsPage.tsx` | `verify-fusion-w4.mjs`<br/>`verify-fusion-w6.mjs`<br/>`verify-smart-campus-ui.mjs` |
 | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | `verify-smart-campus-ui.mjs` |

@@ -45,14 +45,14 @@ flowchart LR
 | 路由 | 页面组件 | 页面文件 | 端点数 | 样式 |
 | --- | --- | --- | --- | --- |
 | `/` | HomePage | `apps/kiosk/src/pages/home/HomePage.tsx` | 33 | 6 |
-| `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 10 | 6 |
+| `/*` | KioskRouteErrorPage | `apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx` | 10 | 7 |
 | `/activities` | BenefitActivitiesPage | `apps/kiosk/src/pages/activities/BenefitActivitiesPage.tsx` | 1 | 1 |
 | `/activities/:id` | BenefitActivityDetailPage | `apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx` | 11 | 1 |
-| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 38 | 12 |
+| `/assistant` | AssistantPage | `apps/kiosk/src/pages/assistant/AssistantPage.tsx` | 38 | 13 |
 | `/campus` | CampusPage | `apps/kiosk/src/pages/campus/CampusPage.tsx` | 33 | — |
 | `/companies` | CompaniesPage | `apps/kiosk/src/pages/companies/CompaniesPage.tsx` | 15 | 5 |
 | `/companies/:id` | CompanyDetailPage | `apps/kiosk/src/pages/companies/CompanyDetailPage.tsx` | 15 | 5 |
-| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 7 |
+| `/help` | HelpCenterPage | `apps/kiosk/src/pages/help/HelpCenterPage.tsx` | 10 | 8 |
 | `/interview` | InterviewWorkbenchPage | `apps/kiosk/src/pages/interview/InterviewWorkbenchPage.tsx` | 15 | 15 |
 | `/interview/report` | Navigate | — _(重定向)_ | 0 | — |
 | `/interview/reports` | Navigate | — _(重定向)_ | 0 | — |
@@ -71,8 +71,8 @@ flowchart LR
 | `/jobs` | JobsPage | `apps/kiosk/src/pages/jobs/JobsPage.tsx` | 33 | 5 |
 | `/jobs/:id` | JobDetailPage | `apps/kiosk/src/pages/jobs/JobDetailPage.tsx` | 33 | 5 |
 | `/jobs/online-platforms` | Navigate | — _(重定向)_ | 0 | — |
-| `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 6 |
-| `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 10 | 7 |
+| `/legal/:doc` | LegalDocPage | `apps/kiosk/src/pages/legal/LegalDocPage.tsx` | 33 | 7 |
+| `/login` | LoginPage | `apps/kiosk/src/pages/auth/LoginPage.tsx` | 10 | 8 |
 | `/me/activity` | MyActivityPage | `apps/kiosk/src/pages/profile/me/MyActivityPage.tsx` | 10 | 6 |
 | `/me/ai-records` | MyAiRecordsPage | `apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx` | 23 | 6 |
 | `/me/benefits` | MyBenefitsPage | `apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx` | 11 | 5 |
@@ -128,7 +128,7 @@ flowchart LR
 | `/scan/result` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/settings` | Navigate | — _(重定向)_ | 0 | — |
 | `/scan/start` | Navigate | — _(重定向)_ | 0 | — |
-| `/screensaver` | ScreensaverPage | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | 10 | 9 |
+| `/screensaver` | ScreensaverPage | `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | 10 | 10 |
 | `/smart-campus` | SmartCampusHomePage | `apps/kiosk/src/pages/smart-campus/SmartCampusHomePage.tsx` | 10 | — |
 | `/smart-campus/service/:key` | SmartCampusGuard | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | 10 | — |
 | `/smart-campus/welcome` | SmartCampusGuard | `apps/kiosk/src/pages/smart-campus/SmartCampusGuard.tsx` | 10 | — |
